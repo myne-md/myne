@@ -1,12 +1,19 @@
 // `emptyTrash` — permanently delete every note currently in the trash
-// (MYND-133). A TS orchestrator over the existing `note_delete` IPC primitive,
-// mirroring `moveNote.ts::bulkMoveNotes`: N independent best-effort
-// `Promise.allSettled` hard-deletes, never rejecting, surfacing per-note
-// failures for a remaining-count UI.
+// (MYND-133). A TS orchestrator over `deleteNoteRouted`, mirroring
+// `moveNote.ts::bulkMoveNotes`: N independent best-effort `Promise.allSettled`
+// deletes, never rejecting, surfacing per-note failures for a remaining-count UI.
+//
+// **Sync-aware deletion (sync Bug 3 fix).** Each note is removed through
+// `deleteNoteRouted`, NOT the bare `note_delete` unlink: when a sync endpoint is
+// configured the deletion is a `deleted:`-marker tombstone version that
+// PROPAGATES to other devices (and is horizon-GC'd server-side); local-only, it
+// is the hard cryptographic-erase unlink. The old bare-unlink path silently
+// dropped the blob from this device only — the emptied trash never reached the
+// peer, which kept showing the notes despite a "synced" status.
 //
 // There is no backend `note_empty_trash` command: empty is exactly N
-// `note_delete` calls, and a restore racing an empty is benign in the Phase 1
-// single-window app (the Trash panel disables its actions during the op; worst
+// `deleteNoteRouted` calls, and a restore racing an empty is benign in the Phase
+// 1 single-window app (the Trash panel disables its actions during the op; worst
 // case a just-restored note is re-deletable). This is the same one-shot
 // best-effort + remaining-count posture as bulk move (grill 2026-05-29 Q8 /
 // decisions.md 2026-05-26).
@@ -15,7 +22,7 @@
 // click time — `emptyTrash` does not enumerate; it purges exactly what it is
 // handed.
 
-import { noteDelete } from "./deleteNote";
+import { deleteNoteRouted } from "./deleteNote";
 
 /** Outcome of an {@link emptyTrash} call — purged IDs + per-note failures. */
 export interface EmptyTrashResult {
@@ -26,7 +33,8 @@ export interface EmptyTrashResult {
 }
 
 /**
- * Permanently delete each id in `trashedIds` via `note_delete`. Each delete is
+ * Permanently delete each id in `trashedIds` via {@link deleteNoteRouted} — a
+ * propagating tombstone under sync, a hard unlink local-only. Each delete is
  * independent (`Promise.allSettled`) — one failure does not abort the rest.
  * Never rejects; surfaces results via {@link EmptyTrashResult} so the UI can
  * report how many notes remain in the trash.
@@ -35,7 +43,7 @@ export async function emptyTrash(
   trashedIds: string[],
 ): Promise<EmptyTrashResult> {
   const settled = await Promise.allSettled(
-    trashedIds.map((id) => noteDelete(id)),
+    trashedIds.map((id) => deleteNoteRouted(id)),
   );
   const purged: string[] = [];
   const failed: Array<{ noteId: string; error: unknown }> = [];
