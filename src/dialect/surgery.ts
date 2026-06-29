@@ -802,6 +802,32 @@ export function readTrashedFromFmBody(fmBody: string): string | null {
 }
 
 /**
+ * Read the Myne-managed `deleted:` tombstone marker, **value-strict**, from a
+ * frontmatter **body** — the exact value-strict twin of
+ * {@link readTrashedFromFmBody}. Returns the RFC 3339 timestamp string iff a
+ * `deleted:` field carries a valid RFC 3339 value, else `null` (not deleted).
+ *
+ * `deleted:` is the SYNC deletion tombstone (MYND-426, written by
+ * `tombstoneNote`/`patchDeletedField`): the note is logically gone but the blob
+ * persists so the deletion PROPAGATES to other devices and is horizon-GC'd
+ * server-side. Locally a `deleted != null` record must be hidden from every view
+ * (sidebar, trash, conflicts, search, resolver) — it is a tombstone, not a note.
+ * A user's own non-timestamp `deleted:` leaves the note live (same unprefixed-
+ * field collision mitigation as `trashed:`).
+ */
+export function readDeletedFromFmBody(fmBody: string): string | null {
+  const lines = fmBody.split(NEWLINE);
+  for (const line of lines) {
+    const m = DELETED_KEY_RE.exec(line);
+    if (m === null) continue;
+    const value = extractTrashedScalar(m[2] ?? "");
+    if (value !== null && isValidRfc3339(value)) return value;
+    return null;
+  }
+  return null;
+}
+
+/**
  * Read the Myne-managed `archived:` marker, **value-strict**, from a frontmatter
  * **body** — the exact value-strict twin of {@link readTrashedFromFmBody}.
  * Returns the RFC 3339 timestamp string iff an `archived:` field carries a valid

@@ -139,6 +139,7 @@ export function applyOptimisticCreate(
     folder: null,
     updatedAt: null,
     trashed: null,
+    deleted: null,
     archived: null,
     template: false,
     folderIndex: false,
@@ -170,6 +171,7 @@ export function liveCache(
     // trash/archive state (a template is never part of the working set).
     if (
       record.trashed == null &&
+      record.deleted == null &&
       record.archived == null &&
       record.template !== true &&
       record.conflict !== true
@@ -187,7 +189,10 @@ export function conflictRecordsByOriginal(
 ): Map<string, TitleRecord[]> {
   const groups = new Map<string, TitleRecord[]>();
   for (const record of cache.values()) {
-    if (record.conflict !== true) continue;
+    // A `deleted:`-tombstoned copy is gone (e.g. the user hit Discard, which
+    // routes through the propagating tombstone) — it must drop out of the
+    // Conflicts list, not linger with its `conflict:` marker still set.
+    if (record.conflict !== true || record.deleted != null) continue;
     const key = record.conflictOf ?? "(unknown)";
     const list = groups.get(key) ?? [];
     list.push(record);
@@ -200,7 +205,7 @@ export function conflictRecordsByOriginal(
 export function conflictCount(cache: ReadonlyMap<NoteId, TitleRecord>): number {
   let n = 0;
   for (const record of cache.values()) {
-    if (record.conflict === true) n += 1;
+    if (record.conflict === true && record.deleted == null) n += 1;
   }
   return n;
 }
@@ -220,7 +225,12 @@ export function resolverCache(
   for (const [id, record] of cache) {
     // Conflict copies are excluded from the resolver too (MYND-427): a transient
     // keep-both copy must not become a backlink target / graph node until reconciled.
-    if (record.trashed == null && record.template !== true && record.conflict !== true) {
+    if (
+      record.trashed == null &&
+      record.deleted == null &&
+      record.template !== true &&
+      record.conflict !== true
+    ) {
       out.set(id, record);
     }
   }
@@ -235,7 +245,9 @@ export function trashedRecords(
 ): TitleRecord[] {
   const out: TitleRecord[] = [];
   for (const record of cache.values()) {
-    if (record.trashed != null) out.push(record);
+    // A tombstoned (`deleted:`) note leaves the Trash too — emptying the trash
+    // (or discarding a conflict) is a propagating delete, not a move-to-trash.
+    if (record.trashed != null && record.deleted == null) out.push(record);
   }
   out.sort((a, b) => (b.trashed ?? "").localeCompare(a.trashed ?? ""));
   return out;
@@ -248,7 +260,7 @@ export function trashedRecords(
 export function trashedCount(cache: ReadonlyMap<NoteId, TitleRecord>): number {
   let n = 0;
   for (const record of cache.values()) {
-    if (record.trashed != null) n += 1;
+    if (record.trashed != null && record.deleted == null) n += 1;
   }
   return n;
 }
@@ -263,7 +275,7 @@ export function archivedRecords(
 ): TitleRecord[] {
   const out: TitleRecord[] = [];
   for (const record of cache.values()) {
-    if (record.archived != null) out.push(record);
+    if (record.archived != null && record.deleted == null) out.push(record);
   }
   out.sort((a, b) => (b.archived ?? "").localeCompare(a.archived ?? ""));
   return out;
@@ -274,7 +286,7 @@ export function archivedRecords(
 export function archivedCount(cache: ReadonlyMap<NoteId, TitleRecord>): number {
   let n = 0;
   for (const record of cache.values()) {
-    if (record.archived != null) n += 1;
+    if (record.archived != null && record.deleted == null) n += 1;
   }
   return n;
 }
@@ -292,7 +304,8 @@ export function templateRecords(
 ): TitleRecord[] {
   const out: TitleRecord[] = [];
   for (const record of cache.values()) {
-    if (record.template === true && record.trashed == null) out.push(record);
+    if (record.template === true && record.trashed == null && record.deleted == null)
+      out.push(record);
   }
   out.sort((a, b) => {
     const at = a.updatedAt?.getTime() ?? 0;

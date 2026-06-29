@@ -67,8 +67,9 @@ export function resolveTodayNote(
   const wantTitle = foldSegment(dateTitle);
 
   for (const n of notes) {
-    // Exclude trashed + templates (same machinery as the sidebar live set).
-    if (n.trashed != null || n.template === true) continue;
+    // Exclude trashed + deleted (tombstoned) + templates (same machinery as the
+    // sidebar live set).
+    if (n.trashed != null || n.deleted != null || n.template === true) continue;
     if (folderKey(n.folder) !== wantFolder) continue;
     if (n.title == null || foldSegment(n.title) !== wantTitle) continue;
     return { kind: "open", id: n.noteUuid as NoteId, dateTitle };

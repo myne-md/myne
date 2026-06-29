@@ -32,6 +32,7 @@ function copy(
     folder: null,
     updatedAt: null,
     trashed: null,
+    deleted: null,
     archived: null,
     template: false,
     folderIndex: false,
