@@ -1387,7 +1387,7 @@
       "changelogButton": "변경 사항 보기…",
       "changelogHelper": "버전별 변경 사항. MYND-119 작업이 적용되면 표시됩니다.",
       "changelogLabel": "변경 사항",
-      "licenseBody": "프리알파 · CC0 문서 · 1단계 출시 시 AGPL-3.0 애플리케이션 코드.",
+      "licenseBody": "프리알파 · CC-BY-4.0 문서 · 1단계 출시 시 AGPL-3.0 애플리케이션 코드.",
       "licenseLabel": "라이선스",
       "tagline": "프리알파 · 1단계 데스크톱 클라이언트",
       "threatModelHelper": "공개 위협 모델 문서를 브라우저에서 엽니다.",

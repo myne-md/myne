@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0
 //! CLI for the E2E fixture generator. Invoked by the TS harness
 //! (`e2e/support/fixtures.ts::seedVault`) via
 //! `cargo run --release -p e2e-fixture-gen -- …`.

@@ -3,7 +3,7 @@
 > **Status:** normative operator contract for the Phase 2 sync server (MYND-413). This document is the
 > operator-facing projection of `spec/server-protocol.md` §6 and `threat-model.md` TB5/§7. The
 > *mechanical* HOW (compose, env vars, snapshot commands) lives in the `myne-ops` runbooks; this is the
-> WHAT-you-are-obligated-to. License: CC0 (like all of `docs/`), so independent server implementations'
+> WHAT-you-are-obligated-to. License: CC-BY-4.0 (like all of `docs/`), so independent server implementations'
 > operators can rely on the same contract.
 
 ## 1. Self-host = the same trust boundary as hosted

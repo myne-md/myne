@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0
 //! Offensive red-team: recovery-phrase collision & normalization attacks.
 //!
 //! The 24-word BIP-39 recovery phrase is a SECOND root-key path. A collision

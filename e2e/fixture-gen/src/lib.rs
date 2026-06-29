@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0
 //! E2E fixture generator — unlockable `vaults/<id>/vault.meta` layouts
 //! with known credentials (e2e-harness task 5; epic policy SYNC-2/9).
 //!

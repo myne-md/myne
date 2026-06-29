@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: AGPL-3.0-or-later
+# SPDX-License-Identifier: AGPL-3.0
 #
 # Fuzz harness crate for the `protocol` blob decoders.
 #
@@ -19,7 +19,7 @@ name = "protocol-fuzz"
 version = "0.0.0"
 publish = false
 edition = "2021"
-license = "AGPL-3.0-or-later"
+license = "AGPL-3.0"
 
 [package.metadata]
 cargo-fuzz = true

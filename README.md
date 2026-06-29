@@ -97,4 +97,9 @@ Cryptography questions and vulnerability reports: see [`SECURITY.md`](SECURITY.m
 
 ## License
 
-Application code (the desktop client and the [`protocol/`](protocol/) crate) is **AGPL-3.0-or-later**, as declared in the crate manifests. The [`docs/`](docs/) subtree stays under a permissive content license (currently CC0, the license at the repo root) so the specification remains reusable for independent implementations. The licensing transition is recorded in [`docs/decisions.md`](docs/decisions.md).
+This repository is multi-licensed by subtree (see [`LICENSING.md`](LICENSING.md) for the authoritative map):
+
+- **Application code** — the desktop client (`src/`, `src-tauri/`) and the [`protocol/`](protocol/) crate — is **AGPL-3.0**, as declared in the crate manifests and per-file SPDX headers. The repo-root [`LICENSE`](LICENSE) carries the AGPL-3.0 text.
+- **Specifications** — the [`docs/`](docs/) subtree — are **CC-BY-4.0** ([`docs/LICENSE`](docs/LICENSE)), so the protocol stays reusable for independent implementations as long as Myne is credited.
+
+The licensing decision is recorded in [`docs/decisions.md`](docs/decisions.md).

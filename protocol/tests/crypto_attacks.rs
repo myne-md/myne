@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0
 //! Offensive crypto red-team suite against the MY01 per-note encryption.
 //!
 //! Each test MOUNTS AN ATTACK and asserts the secure outcome (rejection).

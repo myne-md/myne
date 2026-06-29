@@ -1516,7 +1516,7 @@
       "changelogButton": "Посмотреть список изменений…",
       "changelogHelper": "Заметки по версиям. Появятся после выхода MYND-119.",
       "changelogLabel": "Список изменений",
-      "licenseBody": "Pre-alpha · документация под CC0 · код приложения под AGPL-3.0 в релизе Фазы 1.",
+      "licenseBody": "Pre-alpha · документация под CC-BY-4.0 · код приложения под AGPL-3.0 в релизе Фазы 1.",
       "licenseLabel": "Лицензия",
       "tagline": "Pre-alpha · настольный клиент Фазы 1",
       "threatModelHelper": "Открыть публичный документ модели угроз в браузере.",

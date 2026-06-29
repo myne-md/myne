@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0
 
 //! `vault.indices` 34-byte-header encrypted structured-metadata codec —
 //! see `docs/spec/protocol.md` § 9.8 (MYND-271; design MYND-31).

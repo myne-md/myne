@@ -50,7 +50,7 @@ JS tests run on **Vitest** (`pnpm test` → `vitest run`; config `vite.config.ts
 
 ```
 myne/
-├── docs/                ← specs, threat model, glossary, decisions log (CC0)
+├── docs/                ← specs, threat model, glossary, decisions log (CC-BY-4.0)
 ├── src/                 ← React UI (Tauri WebView)
 ├── src-tauri/           ← Tauri 2 + Rust desktop core
 │   └── capabilities/    ← Tauri capability ACLs (security-load-bearing)
@@ -146,4 +146,4 @@ Full primitive details, audit anchors, and subkey derivation discipline rule (wh
 
 ## License
 
-Currently CC0 (docs only). When Phase 1 application code lands, the repo moves to **AGPL-3.0** with the `docs/` subtree keeping a permissive content license so the spec stays reusable for independent implementations. Transition recorded in `docs/decisions.md` when it happens.
+Multi-licensed by subtree — see [`LICENSING.md`](LICENSING.md) for the authoritative map. Application code (`src/`, `src-tauri/`, `protocol/`) is **AGPL-3.0** (not "or-later"); the `docs/` subtree is **CC-BY-4.0** so the spec stays reusable for independent implementations as long as Myne is credited. Every `protocol/` source file carries `// SPDX-License-Identifier: AGPL-3.0`. Decision recorded in `docs/decisions.md`.

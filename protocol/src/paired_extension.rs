@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0
 
 //! Canonical `PairedExtension` record + its `vault.prefs`-embedded array codec
 //! — the on-disk projection of the browser-clipper pairing-token registry
