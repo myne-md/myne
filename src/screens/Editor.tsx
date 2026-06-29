@@ -1104,7 +1104,7 @@ function EditorChrome({
     void (async () => {
       try {
         const w = getCurrentWebviewWindow();
-        unlisten = await w.onCloseRequested(async (event) => {
+        const fn = await w.onCloseRequested(async (event) => {
           if (cancelled) return;
           // Stop the default close; we terminate manually after the flush.
           event.preventDefault();
@@ -1122,6 +1122,17 @@ function EditorChrome({
           // the Rust-side search-index persist on exit still runs.
           await w.destroy();
         });
+        // `onCloseRequested` registers asynchronously: the component can
+        // unmount (e.g. lock → Unlock screen) while this await is still in
+        // flight. Without re-checking `cancelled` here the listener attaches
+        // AFTER cleanup ran and is never removed — a leak that follows onto
+        // later screens. Its mere presence makes Tauri `prevent_close()` the
+        // native title-bar X (manager/window.rs `has_js_listener`), so on
+        // Windows — where the X is the only quit affordance — the app can wedge
+        // unclosable. Mirror the vault-lock-imminent effect below +
+        // CreateVault's registration guard.
+        if (cancelled) fn();
+        else unlisten = fn;
       } catch {
         // Not running inside Tauri (e.g., `pnpm dev` browser shim) →
         // close-intercept is a no-op. Tests + vite dev mode hit this

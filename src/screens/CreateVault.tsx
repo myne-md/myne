@@ -198,7 +198,17 @@ export function CreateVault({
     const win = getCurrentWindow();
     win
       .onCloseRequested(async (event) => {
-        if (!isSensitiveStep(stepRef.current)) return;
+        // Tauri `prevent_close()`s the native X the moment a listener exists
+        // (manager/window.rs `has_js_listener`), so the window only closes if
+        // WE call `destroy()` — never rely on the JS wrapper's version-dependent
+        // "auto-destroy when preventDefault wasn't called". Take control up
+        // front, then destroy() on the close-intended paths. `destroy()` force-
+        // closes WITHOUT re-firing onCloseRequested (so no recursion).
+        event.preventDefault();
+        if (!isSensitiveStep(stepRef.current)) {
+          await win.destroy();
+          return;
+        }
         let proceed: boolean;
         try {
           proceed = await dialogConfirm(
@@ -213,11 +223,9 @@ export function CreateVault({
           );
         } catch (e) {
           logErrorKind(e, "close-confirm-failed");
-          event.preventDefault();
-          return;
+          return; // keep the window open if the confirm prompt failed
         }
-        // Calling close() here would recursively re-fire onCloseRequested.
-        if (!proceed) event.preventDefault();
+        if (proceed) await win.destroy();
       })
       .then((fn) => {
         if (cancelled) fn();
