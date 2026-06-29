@@ -29,6 +29,7 @@ import {
   readArchivedFromFmBody,
   readConflictFromFmBody,
   readConflictOfFromFmBody,
+  readDeletedFromFmBody,
   readFolderIndexFromFmBody,
   readTemplateFromFmBody,
   readTitleFromFmBody,
@@ -73,6 +74,16 @@ export type TitleRecord = {
    * `trashed:` value reads as `null` here (value-strict — `readTrashedFromFmBody`).
    */
   trashed: string | null;
+  /**
+   * Value-strict `deleted:` tombstone marker (RFC 3339 UTC string) when the note
+   * has been deleted under sync (MYND-426), else `null`. Unlike `trashed:` (a
+   * recoverable raft surfaced by the Trash panel), a `deleted !== null` record is
+   * a tombstone: it lingers on disk only to PROPAGATE the deletion to other
+   * devices (and for server horizon-GC), so it must be excluded from EVERY local
+   * view — sidebar, trash, conflicts, search, resolver. Value-strict
+   * (`readDeletedFromFmBody`); a user's own non-timestamp `deleted:` reads `null`.
+   */
+  deleted: string | null;
   /**
    * Value-strict `archived:` marker (RFC 3339 UTC string) when the note is in
    * the indefinite-retention Archive, else `null` (not archived). note-archive /
@@ -217,6 +228,9 @@ function recordFromSlice(slice: TitleSlice): TitleRecord {
   // object) so the sidebar path and the dialect `readTrashedField` share one
   // definition — js-yaml would coerce a date-only value to a Date and diverge.
   const trashed = readTrashedFromFmBody(slice.frontmatter_bytes ?? "");
+  // `deleted:` sync tombstone (MYND-426) — value-strict, same RFC 3339 shape as
+  // `trashed:`. A non-null value hides the note from every local view.
+  const deleted = readDeletedFromFmBody(slice.frontmatter_bytes ?? "");
   // `archived:` read value-strict from the raw FM slice — same rationale and
   // RFC 3339 shape as `trashed:` (the value-strict timestamp twin).
   const archived = readArchivedFromFmBody(slice.frontmatter_bytes ?? "");
@@ -244,6 +258,7 @@ function recordFromSlice(slice: TitleSlice): TitleRecord {
     folder: normalizeFolderPath(folderRaw),
     updatedAt: deriveUpdatedAt(parsed),
     trashed,
+    deleted,
     archived,
     template,
     folderIndex,
@@ -294,6 +309,7 @@ export async function loadNoteBatch(ids: string[]): Promise<TitleRecord[]> {
       folder: null,
       updatedAt: null,
       trashed: null,
+      deleted: null,
       archived: null,
       template: false,
       folderIndex: false,

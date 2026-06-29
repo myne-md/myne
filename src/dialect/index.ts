@@ -68,6 +68,7 @@ export {
   readArchivedFromFmBody,
   readConflictFromFmBody,
   readConflictOfFromFmBody,
+  readDeletedFromFmBody,
   readFolderIndexFromFmBody,
   readTemplateFromFmBody,
   readTitleFromFmBody,

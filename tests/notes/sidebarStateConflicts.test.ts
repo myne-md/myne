@@ -26,16 +26,19 @@ import type { TitleRecord } from "../../src/notes/loadNoteBatch";
  * test.
  */
 function cacheWith(
-  entries: Array<[id: string, conflict: boolean, conflictOf: string | null]>,
+  entries: Array<
+    [id: string, conflict: boolean, conflictOf: string | null, deleted?: string | null]
+  >,
 ): Map<string, TitleRecord> {
   const cache = new Map<string, TitleRecord>();
-  for (const [id, conflict, conflictOf] of entries) {
+  for (const [id, conflict, conflictOf, deleted] of entries) {
     cache.set(id, {
       noteUuid: id,
       title: conflict ? `${id} (conflict)` : id,
       folder: null,
       updatedAt: null,
       trashed: null,
+      deleted: deleted ?? null,
       archived: null,
       template: false,
       folderIndex: false,
@@ -71,6 +74,14 @@ describe("conflictCount", () => {
       ["live-2", false, null],
     ]);
     expect(conflictCount(cache)).toBe(0);
+  });
+
+  it("does not count a deleted (discarded) conflict copy", () => {
+    const cache = cacheWith([
+      ["conf-a1", true, "orig-a"],
+      ["conf-a2", true, "orig-a", "2026-06-29T00:00:00Z"], // discarded → tombstoned
+    ]);
+    expect(conflictCount(cache)).toBe(1);
   });
 
   it("is 0 for an empty cache", () => {
@@ -109,6 +120,20 @@ describe("conflictRecordsByOriginal", () => {
   it("returns an empty Map when there are no conflict copies", () => {
     const cache = cacheWith([["live-1", false, null]]);
     expect(conflictRecordsByOriginal(cache).size).toBe(0);
+  });
+
+  // Discard fix: hitting "Discard" routes the conflict copy through the
+  // propagating `deleted:` tombstone. The copy keeps its `conflict:` marker on
+  // disk (until horizon-GC) but must DROP OUT of the Conflicts list immediately
+  // — otherwise discard looks like it does nothing.
+  it("excludes a deleted (discarded) conflict copy from the groups", () => {
+    const cache = cacheWith([
+      ["conf-a1", true, "orig-a"],
+      ["conf-a2", true, "orig-a", "2026-06-29T00:00:00Z"], // discarded → tombstoned
+    ]);
+    const groups = conflictRecordsByOriginal(cache);
+    const ids = (groups.get("orig-a") ?? []).map((r) => r.noteUuid);
+    expect(ids).toEqual(["conf-a1"]); // the discarded copy is gone
   });
 });
 
