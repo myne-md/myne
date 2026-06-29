@@ -59,4 +59,4 @@ Skip a hook run ad hoc with `LEFTHOOK=0 git commit …` or `git commit --no-veri
 
 ## License
 
-This repository is licensed **AGPL-3.0** (see [`LICENSE`](LICENSE)), matching the application code across the Myne project. The specifications in the main repo's `docs/` carry a permissive content license (CC0) so the protocol stays reusable by independent implementations.
+This repository is licensed **AGPL-3.0** (see [`LICENSE`](LICENSE)), matching the application code across the Myne project. The specifications in the main repo's `docs/` carry a permissive content license (CC-BY-4.0) so the protocol stays reusable by independent implementations.
