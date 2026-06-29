@@ -392,17 +392,37 @@ pub fn run() {
                 {
                     let app = app_handle.clone();
                     tauri::async_runtime::block_on(async move {
-                        plugins::notes::search_sync::persist_search_index(&app, state.inner())
+                        // Best-effort graceful-exit persist, bounded by a hard
+                        // timeout. `block_on` runs on the main event-loop thread
+                        // and cannot be preempted, so a wedged persist (e.g. a
+                        // slots RwLock held by an in-flight lock/idle-lock task,
+                        // or slow disk) would otherwise stall the exit forever —
+                        // the window is already gone but `ControlFlow::Exit` is
+                        // never reached, leaving a zombie process. On Windows the
+                        // title-bar X is the only quit affordance, so that reads
+                        // as "the app won't close". On timeout we drop the
+                        // persist and let the app exit (the periodic coalesced
+                        // flush already bounds layout loss to ~5 min).
+                        let persist = async {
+                            plugins::notes::search_sync::persist_search_index(&app, state.inner())
+                                .await;
+                            // MYND-166: flush the staged editor workspace
+                            // descriptor to vault.workspace. Cmd+Q / app-menu
+                            // Quit fire only ExitRequested (not the window's
+                            // onCloseRequested), so this is the layout's persist
+                            // path on app quit.
+                            plugins::workspace::commands::persist_workspace_on_exit(
+                                &app,
+                                state.inner(),
+                            )
                             .await;
-                        // MYND-166: flush the staged editor workspace descriptor
-                        // to vault.workspace. Cmd+Q / app-menu Quit fire only
-                        // ExitRequested (not the window's onCloseRequested), so
-                        // this is the layout's persist path on app quit.
-                        plugins::workspace::commands::persist_workspace_on_exit(
-                            &app,
-                            state.inner(),
-                        )
-                        .await;
+                        };
+                        if tokio::time::timeout(std::time::Duration::from_secs(5), persist)
+                            .await
+                            .is_err()
+                        {
+                            tracing::warn!(event = "exit_persist_timed_out");
+                        }
                     });
                 }
             }
