@@ -25,6 +25,7 @@ import { Segmented } from "../primitives/Segmented";
 import { PasswordInput } from "../PasswordInput";
 import { DestructiveBanner } from "../DestructiveBanner";
 import { normalizeBip39Phrase } from "../../lib/bip39-normalize";
+import { formatAccountNumberInput } from "../../lib/account-number-format";
 import { useEnroll, type EnrollCredentialKind } from "../../hooks/useEnroll";
 import {
   ENROLL_APPROVED_NOTICE,
@@ -223,7 +224,7 @@ export function EnrollDeviceForm() {
           value={accountNumber}
           onChange={(e) => {
             clearOutcome();
-            setAccountNumber(e.target.value);
+            setAccountNumber(formatAccountNumberInput(e.target.value));
           }}
           placeholder={t("sync.enroll.accountNumberPlaceholder")}
           autoComplete="off"

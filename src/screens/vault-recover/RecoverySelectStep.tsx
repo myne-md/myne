@@ -41,6 +41,7 @@ import { Input } from "../../components/primitives/Input";
 import { Spinner } from "../../components/Spinner";
 import { listVaults, orderByLastUnlock } from "../../lib/vault-list";
 import { resolveVaultByAccountNumber } from "../../lib/vault-recover";
+import { formatAccountNumberInput } from "../../lib/account-number-format";
 import { formatRelativeTime, useTick } from "../../notes/components/relativeTime";
 import type { VaultSummary } from "../../types/vault-summary";
 import { StepShell } from "./step-shell";
@@ -301,7 +302,7 @@ export function RecoverySelectStep({
           mono
           value={accountNumber}
           onChange={(e) => {
-            setAccountNumber(e.target.value);
+            setAccountNumber(formatAccountNumberInput(e.target.value));
             if (accountError) setAccountError(null);
           }}
           placeholder={t("vaultRecover.select.accountPlaceholder")}
