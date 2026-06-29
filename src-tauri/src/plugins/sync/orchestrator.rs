@@ -373,9 +373,11 @@ fn sync_cycle_attempt(
 ) -> Result<SyncSummary, SyncCycleError> {
     // --- PULL (head verify + rollback rejection happen inside) ---
     // A `cursor_expired` (410) means the server GC'd past our stored cursor: reset
-    // to a full reconcile from 0 and re-pull ONCE. The baseline self-heal below
-    // re-establishes per-blob versions, so a long-offline device recovers instead
-    // of looping on 410 forever (MYND-426 task 8).
+    // to a full reconcile from 0 and re-pull ONCE. The re-pull sets `reconcile=true`
+    // so the server exempts it from the cursor-expired floor — otherwise a vault
+    // whose reclaim floor sits beyond the first pull page would 410 the page-2
+    // request of the reconcile walk itself and wedge us at 410 forever. The baseline
+    // self-heal below re-establishes per-blob versions (MYND-426 task 8).
     let local = local_manifest(notes_dir);
     let page = match engine::pull_to_stable(
         transport,
@@ -384,12 +386,13 @@ fn sync_cycle_attempt(
         baseline_vv,
         from_cursor,
         &local,
+        false,
     ) {
         Ok(p) => p,
         Err(PullError::CursorExpired) => {
             state.cursor = 0;
             write_sync_state(vault_root, state).map_err(|_| SyncCycleError::Io)?;
-            engine::pull_to_stable(transport, root_key, token, baseline_vv, 0, &local)
+            engine::pull_to_stable(transport, root_key, token, baseline_vv, 0, &local, true)
                 .map_err(SyncCycleError::Pull)?
         }
         Err(e) => return Err(SyncCycleError::Pull(e)),
@@ -1880,9 +1883,11 @@ mod tests {
             410,
             br#"{"error_code":"cursor_expired"}"#.to_vec(),
         );
+        // The recovery re-pull carries `reconcile=1` so the server exempts it from
+        // the cursor-expired floor (the pagination×floor wedge fix).
         fake.on(
             HttpMethod::Get,
-            "/sync/pull?cursor=0",
+            "/sync/pull?cursor=0&reconcile=1",
             200,
             br#"{"metas":[],"next_cursor":0}"#.to_vec(),
         );
@@ -1892,12 +1897,15 @@ mod tests {
         )
         .expect("the cycle recovers from cursor_expired");
         assert_eq!(summary.cursor, 0, "cursor reset to a full reconcile");
-        // The recovery re-pull from 0 actually happened.
+        // The recovery re-pull from 0 actually happened, with the reconcile flag.
         let pulled_from_0 = fake
             .requests()
             .iter()
-            .any(|(m, p, _, _)| *m == HttpMethod::Get && p == "/sync/pull?cursor=0");
-        assert!(pulled_from_0, "re-pulled from cursor 0 after the 410");
+            .any(|(m, p, _, _)| *m == HttpMethod::Get && p == "/sync/pull?cursor=0&reconcile=1");
+        assert!(
+            pulled_from_0,
+            "re-pulled from cursor 0 with reconcile=1 after the 410"
+        );
 
         std::fs::remove_dir_all(&dir).ok();
     }

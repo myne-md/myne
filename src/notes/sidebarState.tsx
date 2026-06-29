@@ -12,7 +12,7 @@
 // exercise the state-transition logic without rendering a tree. The
 // Context layer is a thin wrapper that owns the `useState` slot + the
 // IPC orchestration (calls into `createNote` / `renameNote` /
-// `deleteNote` / `loadNoteBatch` from the same module).
+// `deleteNoteRouted` / `loadNoteBatch` from the same module).
 
 import {
   createContext,
@@ -25,7 +25,7 @@ import {
 } from "react";
 import { createNote } from "./createNote";
 import { prefsRead, normalizeNewNoteLocation } from "../lib/prefs";
-import { deleteNote } from "./deleteNote";
+import { deleteNoteRouted } from "./deleteNote";
 import {
   archiveNote,
   bulkArchiveNotes,
@@ -182,6 +182,11 @@ export function liveCache(
   return live;
 }
 
+/** Group key for a conflict copy whose `conflict_of:` is missing — an orphan
+ *  copy with no locatable original. take-theirs can't act on it (there's no
+ *  original to trash); the Conflicts view suppresses that action for this key. */
+export const UNKNOWN_CONFLICT_ORIGINAL = "(unknown)";
+
 /** Conflict copies grouped by the original UUID they forked from (MYND-427).
  * The Conflicts view renders these — kept out of the live sidebar (above). */
 export function conflictRecordsByOriginal(
@@ -193,7 +198,7 @@ export function conflictRecordsByOriginal(
     // routes through the propagating tombstone) — it must drop out of the
     // Conflicts list, not linger with its `conflict:` marker still set.
     if (record.conflict !== true || record.deleted != null) continue;
-    const key = record.conflictOf ?? "(unknown)";
+    const key = record.conflictOf ?? UNKNOWN_CONFLICT_ORIGINAL;
     const list = groups.get(key) ?? [];
     list.push(record);
     groups.set(key, list);
@@ -966,9 +971,17 @@ export function SidebarStateProvider({ children }: { children: ReactNode }) {
       return result.next;
     });
     try {
-      await deleteNote(id);
-      // MYND-31: drop the hard-deleted note from the index (live; trash
-      // does NOT route here — trashed notes stay indexed, filtered TS-side).
+      // Sync Bug 3 fix (single-purge half): route through `deleteNoteRouted`,
+      // NOT the bare `note_delete` unlink. Under sync this writes a `deleted:`
+      // tombstone version that PROPAGATES to peers (and is server-GC'd); local-
+      // only it is the hard cryptographic-erase unlink — same as before. The bare
+      // unlink dropped the blob from this device only, so a trash purge never
+      // reached the other device (it kept showing the note, despite "synced").
+      // Mirrors `emptyTrash.ts`, which already routes the bulk path.
+      await deleteNoteRouted(id);
+      // MYND-31: drop the purged note from the index (live; trash does NOT route
+      // here — trashed notes stay indexed, filtered TS-side). Belt-and-suspenders
+      // under sync: a tombstoned note is also hidden by the `deleted:` filter.
       void vaultIndicesRemove(id);
     } catch (err) {
       setState((prev) => rollbackOptimisticDelete(prev, id, snapshot));

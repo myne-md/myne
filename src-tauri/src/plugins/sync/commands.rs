@@ -809,6 +809,21 @@ pub async fn sync_enroll<R: Runtime>(
     .await
     .map_err(|_| SyncDeviceError::Internal)??;
 
+    // Bootstrap upload (MYND-424): an approved device that just enrolled with an
+    // existing, populated vault must push it WITHOUT waiting for a note edit.
+    // `sync_enroll` itself does not author a head; the background loop only pushes
+    // once a local change is signalled. Reuse that same coalesced-push trigger
+    // (the SyncLocalChange counter note_create / note_update bump) so the loop's
+    // next tick opens the coalescing window and runs an allow_push cycle. Safe re:
+    // the resolution-blur side-channel — a one-shot bootstrap, not edit timing. A
+    // pending (not-yet-approved) device is skipped: it cannot push and, as a
+    // joining device, has no local vault to upload.
+    if outcome {
+        if let Some(sig) = app.try_state::<super::loop_control::SyncLocalChange>() {
+            sig.bump();
+        }
+    }
+
     Ok(EnrollResult { approved: outcome })
 }
 

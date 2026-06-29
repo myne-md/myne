@@ -9,6 +9,7 @@ import type { CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import i18n from "../../i18n";
 import type { TitleRecord } from "../loadNoteBatch";
+import { UNKNOWN_CONFLICT_ORIGINAL } from "../sidebarState";
 
 const ROOT: CSSProperties = {
   display: "flex",
@@ -66,6 +67,9 @@ export interface ConflictsViewProps {
   onKeepBoth: (copyId: string) => void;
   /** Discard the conflict copy (the user kept the other side). */
   onDiscard: (copyId: string) => void;
+  /** "Use this version" (take theirs): promote this remote copy to the surviving
+   *  note and send the local original (`originalUuid`) to trash (MYND-452). */
+  onTakeTheirs: (copyId: string, originalUuid: string) => void;
 }
 
 function displayTitle(r: TitleRecord): string {
@@ -74,7 +78,7 @@ function displayTitle(r: TitleRecord): string {
     : i18n.t("sync.conflicts.untitled", { hex: r.noteUuid.slice(0, 6) });
 }
 
-export function ConflictsView({ groups, onKeepBoth, onDiscard }: ConflictsViewProps) {
+export function ConflictsView({ groups, onKeepBoth, onDiscard, onTakeTheirs }: ConflictsViewProps) {
   const { t } = useTranslation();
   if (groups.size === 0) {
     return (
@@ -113,6 +117,16 @@ export function ConflictsView({ groups, onKeepBoth, onDiscard }: ConflictsViewPr
                 >
                   {t("sync.conflicts.discard")}
                 </button>
+                {originalUuid !== UNKNOWN_CONFLICT_ORIGINAL && (
+                  <button
+                    type="button"
+                    style={BTN}
+                    onClick={() => onTakeTheirs(c.noteUuid, originalUuid)}
+                    data-testid="conflicts.take-this"
+                  >
+                    {t("sync.conflicts.useThisVersion")}
+                  </button>
+                )}
               </div>
             </div>
           ))}

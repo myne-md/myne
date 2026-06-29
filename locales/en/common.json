@@ -1803,7 +1803,10 @@
       "groupTitle_one": "{{count}} conflicting copy of {{original}}",
       "groupTitle_other": "{{count}} conflicting copies of {{original}}",
       "keepAsSeparate": "Keep as separate",
-      "untitled": "Untitled ({{hex}})"
+      "tookTheirsToast": "Local version moved to Trash.",
+      "tookTheirsUndo": "Undo",
+      "untitled": "Untitled ({{hex}})",
+      "useThisVersion": "Use this version"
     },
     "devices": {
       "approve": "Approve",

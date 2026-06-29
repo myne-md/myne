@@ -169,8 +169,17 @@ pub fn pull_page(
     baseline_vv: &[VvEntry],
     cursor: u64,
     local: &HashMap<[u8; 16], [u8; 24]>,
+    reconcile: bool,
 ) -> Result<PullPage, PullError> {
-    let path = format!("/sync/pull?cursor={cursor}");
+    // `reconcile=1` is a full-manifest walk (§11.2): the server exempts it from the
+    // cursor-expired floor so the walk can drain a vault whose reclaim floor sits
+    // beyond the first page boundary. A plain incremental pull omits it, so a stale
+    // cursor still earns the 410 that flips us into the reconcile walk below.
+    let path = if reconcile {
+        format!("/sync/pull?cursor={cursor}&reconcile=1")
+    } else {
+        format!("/sync/pull?cursor={cursor}")
+    };
     let resp = transport.request(HttpMethod::Get, &path, &[], Some(token))?;
 
     match resp.status {
@@ -257,6 +266,7 @@ pub fn pull_to_stable(
     baseline_vv: &[VvEntry],
     start_cursor: u64,
     local: &HashMap<[u8; 16], [u8; 24]>,
+    reconcile: bool,
 ) -> Result<PullPage, PullError> {
     let mut cursor = start_cursor;
     let mut acc: HashMap<[u8; 16], ChangedBlob> = HashMap::new();
@@ -264,7 +274,15 @@ pub fn pull_to_stable(
     let mut latest_head: Option<VerifiedHead> = None;
 
     loop {
-        let page = pull_page(transport, root_key, token, baseline_vv, cursor, local)?;
+        let page = pull_page(
+            transport,
+            root_key,
+            token,
+            baseline_vv,
+            cursor,
+            local,
+            reconcile,
+        )?;
         for c in page.changed {
             acc.insert(c.id, c);
         }
@@ -589,7 +607,7 @@ mod tests {
             200,
             pull_body("", 0, None),
         );
-        let page = pull_page(&t, &ROOT, "tok", &[], 0, &HashMap::new()).unwrap();
+        let page = pull_page(&t, &ROOT, "tok", &[], 0, &HashMap::new(), false).unwrap();
         assert_eq!(page.next_cursor, 0);
         assert!(page.head.is_none());
         assert!(page.changed.is_empty());
@@ -614,7 +632,7 @@ mod tests {
         );
 
         let local = HashMap::new(); // blob unknown locally → changed
-        let page = pull_page(&t, &ROOT, "tok", &baseline, 1, &local).unwrap();
+        let page = pull_page(&t, &ROOT, "tok", &baseline, 1, &local, false).unwrap();
         let vh = page.head.unwrap();
         assert_eq!(vh.dominance, Dominance::Extension);
         assert_eq!(vh.head_id, head_id);
@@ -636,7 +654,7 @@ mod tests {
         );
         let mut local = HashMap::new();
         local.insert([0x01u8; 16], [0xaau8; 24]); // same content_nonce → not changed
-        let page = pull_page(&t, &ROOT, "tok", &[], 0, &local).unwrap();
+        let page = pull_page(&t, &ROOT, "tok", &[], 0, &local, false).unwrap();
         assert!(page.changed.is_empty());
     }
 
@@ -653,7 +671,7 @@ mod tests {
             pull_body("", 9, Some((&rec, &id))),
         );
         assert_eq!(
-            pull_page(&t, &ROOT, "tok", &baseline, 0, &HashMap::new()).unwrap_err(),
+            pull_page(&t, &ROOT, "tok", &baseline, 0, &HashMap::new(), false).unwrap_err(),
             PullError::RollbackRejected
         );
     }
@@ -672,7 +690,7 @@ mod tests {
             200,
             pull_body("", 1, Some((&bad, &id))),
         );
-        let r = pull_page(&t, &ROOT, "tok", &[], 0, &HashMap::new());
+        let r = pull_page(&t, &ROOT, "tok", &[], 0, &HashMap::new(), false);
         assert!(matches!(
             r,
             Err(PullError::HeadInvalid)
@@ -691,7 +709,7 @@ mod tests {
             b"{\"error_code\":\"cursor_expired\"}".to_vec(),
         );
         assert_eq!(
-            pull_page(&t, &ROOT, "tok", &[], 5, &HashMap::new()).unwrap_err(),
+            pull_page(&t, &ROOT, "tok", &[], 5, &HashMap::new(), false).unwrap_err(),
             PullError::CursorExpired
         );
     }
@@ -706,7 +724,7 @@ mod tests {
             b"{\"error_code\":\"unauthenticated\"}".to_vec(),
         );
         assert_eq!(
-            pull_page(&t, &ROOT, "tok", &[], 0, &HashMap::new()).unwrap_err(),
+            pull_page(&t, &ROOT, "tok", &[], 0, &HashMap::new(), false).unwrap_err(),
             PullError::Unauthenticated
         );
     }
@@ -731,7 +749,49 @@ mod tests {
             200,
             pull_body(m2, 1, None),
         );
-        let page = pull_to_stable(&t, &ROOT, "tok", &baseline, 0, &HashMap::new()).unwrap();
+        let page = pull_to_stable(&t, &ROOT, "tok", &baseline, 0, &HashMap::new(), false).unwrap();
+        assert_eq!(page.next_cursor, 1);
+        assert_eq!(page.changed.len(), 2);
+    }
+
+    // Regression for the pagination×reclaim-floor wedge: a vault larger than one
+    // page whose reclaim floor sits beyond the first page boundary. An incremental
+    // walk 410s on page 2 (cursor below floor); the reconcile walk must pass
+    // `reconcile=1` so the server exempts page 2 and the drain completes.
+    #[test]
+    fn pull_to_stable_reconcile_walks_past_floor() {
+        let baseline: Vec<VvEntry> = Vec::new();
+        let m1 = "{\"uuid_hex\":\"01010101010101010101010101010101\",\"version\":1,\"content_nonce_hex\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"size\":1}";
+        let m2 = "{\"uuid_hex\":\"02020202020202020202020202020202\",\"version\":2,\"content_nonce_hex\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"size\":1}";
+        let t = FakeTransport::new();
+        // Incremental page-2 (no reconcile flag) at a sub-floor cursor → 410.
+        t.on(
+            HttpMethod::Get,
+            "/sync/pull?cursor=1",
+            410,
+            b"{\"error_code\":\"cursor_expired\"}".to_vec(),
+        );
+        // Reconcile walk: page 1 (cursor 0 → next 1) then page 2 (cursor 1 → next 2,
+        // stable) — both carry reconcile=1, so the server serves the sub-floor page.
+        t.on(
+            HttpMethod::Get,
+            "/sync/pull?cursor=0&reconcile=1",
+            200,
+            pull_body(m1, 1, None),
+        );
+        t.on(
+            HttpMethod::Get,
+            "/sync/pull?cursor=1&reconcile=1",
+            200,
+            pull_body(m2, 1, None), // next == cursor → stable, walk stops
+        );
+        // Plain walk wedges on page 2.
+        assert_eq!(
+            pull_to_stable(&t, &ROOT, "tok", &baseline, 1, &HashMap::new(), false).unwrap_err(),
+            PullError::CursorExpired
+        );
+        // Reconcile walk drains both pages.
+        let page = pull_to_stable(&t, &ROOT, "tok", &baseline, 0, &HashMap::new(), true).unwrap();
         assert_eq!(page.next_cursor, 1);
         assert_eq!(page.changed.len(), 2);
     }

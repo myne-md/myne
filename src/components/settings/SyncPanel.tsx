@@ -18,11 +18,17 @@ import { ConflictsView } from "../../notes/components/ConflictsView";
 import {
   useSelectedNote,
   conflictRecordsByOriginal,
+  UNKNOWN_CONFLICT_ORIGINAL,
 } from "../../notes/sidebarState";
 import { noteRead } from "../../notes/readNote";
 import { noteUpdate } from "../../notes/updateNote";
 import { deleteNoteRouted } from "../../notes/deleteNote";
-import { clearConflictMarkers } from "../../notes/conflictCopy";
+import {
+  clearConflictMarkers,
+  applyConflictVersion,
+  undoConflictVersion,
+} from "../../notes/conflictCopy";
+import { Toast } from "../Toast";
 import { noteList } from "../../notes";
 import { useDevices } from "../../hooks/useDevices";
 import {
@@ -130,6 +136,49 @@ export function SyncPanel() {
     [refreshSidebar],
   );
 
+  // Take theirs ("Use this version", MYND-452): promote the remote copy to the
+  // surviving note and tombstone the local original. A result toast offers Undo.
+  // The toast is local to this panel (rendered below) — it floats above the
+  // Settings modal (fixed, z-index 1100), so no Editor↔modal plumbing is needed.
+  const [takeTheirsPending, setTakeTheirsPending] = useState<{
+    copyId: string;
+    originalUuid: string;
+  } | null>(null);
+
+  const handleTakeTheirs = useCallback(
+    (copyId: string, originalUuid: string) => {
+      // Defensive: `conflictRecordsByOriginal` groups an orphan copy (no
+      // `conflict_of:`) under the UNKNOWN_CONFLICT_ORIGINAL sentinel; ConflictsView
+      // already suppresses the take-theirs button there, so this only guards a
+      // direct/programmatic call — there's no real original to trash.
+      if (originalUuid === UNKNOWN_CONFLICT_ORIGINAL) return;
+      void (async () => {
+        try {
+          await applyConflictVersion(copyId, originalUuid);
+          await refreshSidebar();
+          setTakeTheirsPending({ copyId, originalUuid });
+        } catch {
+          // Non-fatal — the copy stays listed until the next refresh.
+        }
+      })();
+    },
+    [refreshSidebar],
+  );
+
+  const handleUndoTakeTheirs = useCallback(() => {
+    const pending = takeTheirsPending;
+    if (pending === null) return;
+    setTakeTheirsPending(null);
+    void (async () => {
+      try {
+        await undoConflictVersion(pending.copyId, pending.originalUuid);
+        await refreshSidebar();
+      } catch {
+        // Non-fatal — the user can reconcile manually from the list.
+      }
+    })();
+  }, [takeTheirsPending, refreshSidebar]);
+
   return (
     <div style={PANEL_ROOT_STYLE} data-testid="settings.sync-panel">
       <div style={BLOCK_STYLE}>
@@ -175,8 +224,23 @@ export function SyncPanel() {
           groups={groups}
           onKeepBoth={handleKeepBoth}
           onDiscard={handleDiscard}
+          onTakeTheirs={handleTakeTheirs}
         />
       </div>
+
+      <Toast
+        message={takeTheirsPending ? t("sync.conflicts.tookTheirsToast") : null}
+        onDone={() => setTakeTheirsPending(null)}
+        durationMs={8000}
+        action={
+          takeTheirsPending
+            ? {
+                label: t("sync.conflicts.tookTheirsUndo"),
+                onAction: handleUndoTakeTheirs,
+              }
+            : undefined
+        }
+      />
     </div>
   );
 }

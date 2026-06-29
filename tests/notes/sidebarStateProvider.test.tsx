@@ -17,6 +17,7 @@ import type { ReactNode } from "react";
 // ── IPC-boundary module mocks ──────────────────────────────────────────────
 const createNote = vi.fn();
 const deleteNote = vi.fn();
+const deleteNoteRouted = vi.fn();
 const trashNote = vi.fn();
 const restoreNote = vi.fn();
 const bulkTrashNotes = vi.fn();
@@ -34,6 +35,7 @@ vi.mock("../../src/notes/createNote", () => ({
 }));
 vi.mock("../../src/notes/deleteNote", () => ({
   deleteNote: (...a: unknown[]) => deleteNote(...a),
+  deleteNoteRouted: (...a: unknown[]) => deleteNoteRouted(...a),
 }));
 vi.mock("../../src/notes/trashNote", () => ({
   trashNote: (...a: unknown[]) => trashNote(...a),
@@ -80,7 +82,13 @@ function rec(id: string, over: Partial<TitleRecord> = {}): TitleRecord {
     folder: null,
     updatedAt: null,
     trashed: null,
+    deleted: null,
+    archived: null,
     template: false,
+    folderIndex: false,
+    conflict: false,
+    conflictOf: null,
+    hasSource: false,
     ...over,
   };
 }
@@ -93,6 +101,7 @@ beforeEach(() => {
   for (const m of [
     createNote,
     deleteNote,
+    deleteNoteRouted,
     trashNote,
     restoreNote,
     bulkTrashNotes,
@@ -182,12 +191,16 @@ describe("useSelectedNote — delete with rollback", () => {
     });
     expect(result.current.cache.has("d-1")).toBe(true);
 
-    deleteNote.mockResolvedValue(undefined);
+    deleteNoteRouted.mockResolvedValue(undefined);
     await act(async () => {
       await result.current.deleteWithRollback("d-1");
     });
     expect(result.current.cache.has("d-1")).toBe(false);
     expect(vaultIndicesRemove).toHaveBeenCalledWith("d-1");
+    // Sync Bug 3 fix (single-purge half): a trash purge routes through the
+    // sync-aware deleter so a `deleted:` tombstone propagates to peers — NOT a
+    // bare local-only `note_delete` unlink that never reaches the other device.
+    expect(deleteNoteRouted).toHaveBeenCalledWith("d-1");
   });
 
   it("rolls the row back and rethrows when the IPC rejects", async () => {
@@ -196,7 +209,7 @@ describe("useSelectedNote — delete with rollback", () => {
     await act(async () => {
       await result.current.refreshAll(["d-2"]);
     });
-    deleteNote.mockRejectedValue(new Error("io"));
+    deleteNoteRouted.mockRejectedValue(new Error("io"));
     await act(async () => {
       await expect(result.current.deleteWithRollback("d-2")).rejects.toThrow("io");
     });
