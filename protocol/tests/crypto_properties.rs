@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0
 //! Property-based crypto laws (proptest).
 //!
 //! Where the attack suite asserts "THIS crafted input is rejected", these

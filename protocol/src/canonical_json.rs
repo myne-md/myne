@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0
 
 //! Shared canonical-JSON emit primitives (`docs/spec/protocol.md` § 9.5.2).
 //!

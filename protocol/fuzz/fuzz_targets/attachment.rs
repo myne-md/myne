@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0
 //! Fuzz target: `decode_attachment_blob` (`MYA1` per-attachment, spec §9.9).
 //!
 //! `data` is the untrusted attachment blob; attachment_id, content_type,

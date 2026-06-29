@@ -1436,7 +1436,7 @@
       "changelogButton": "Wijzigingslog bekijken…",
       "changelogHelper": "Notities per versie. Verschijnt zodra MYND-119 wordt opgeleverd.",
       "changelogLabel": "Wijzigingslog",
-      "licenseBody": "Pre-alpha · CC0-documentatie · AGPL-3.0-toepassingscode bij de release van fase 1.",
+      "licenseBody": "Pre-alpha · CC-BY-4.0-documentatie · AGPL-3.0-toepassingscode bij de release van fase 1.",
       "licenseLabel": "Licentie",
       "tagline": "Pre-alpha · Desktopclient fase 1",
       "threatModelHelper": "Open het openbare dreigingsmodeldocument in je browser.",

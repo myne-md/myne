@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0
 //! Offensive red-team round 2 — type/role confusion, the nonce-reuse
 //! catastrophe proof, and Damm-32 residual error rate.
 //!

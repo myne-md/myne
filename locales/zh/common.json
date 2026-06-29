@@ -1387,7 +1387,7 @@
       "changelogButton": "查看更新日志…",
       "changelogHelper": "各版本的更新说明。将在 MYND-119 完成后显示。",
       "changelogLabel": "更新日志",
-      "licenseBody": "预览版（pre-alpha）· 文档采用 CC0 · 第 1 阶段发布时应用代码采用 AGPL-3.0。",
+      "licenseBody": "预览版（pre-alpha）· 文档采用 CC-BY-4.0 · 第 1 阶段发布时应用代码采用 AGPL-3.0。",
       "licenseLabel": "许可证",
       "tagline": "预览版（pre-alpha）· 第 1 阶段桌面客户端",
       "threatModelHelper": "在浏览器中打开公开的威胁模型文档。",

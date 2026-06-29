@@ -5,7 +5,7 @@
 ## Crate constraints (non-negotiable)
 
 - **`#![no_std]` + `extern crate alloc;`** — Phase 3 wasm-reuse must not require a refactor.
-- **License: AGPL-3.0-or-later** — every new file gets the SPDX header `// SPDX-License-Identifier: AGPL-3.0-or-later`.
+- **License: AGPL-3.0** — every new file gets the SPDX header `// SPDX-License-Identifier: AGPL-3.0`.
 - **No custom primitive implementations.** Pure-Rust RustCrypto only (audited stack); no hand-rolled AES, no hand-rolled SHA, no clever constant-time tricks.
 
 ## Stack (RustCrypto, hash-pinned)

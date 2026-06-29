@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0
 
 //! `vault.prefs` 34-byte-header encrypted-prefs codec — see
 //! `docs/spec/protocol.md` § 9.5.

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0
 //! Offensive red-team: integrity of the OTHER encrypted containers —
 //! attachment blobs (MYA1) and the vault.meta wrapped-root-key (MYV1).
 //!

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0
 
 //! `attachments-text/<attachment-id-hex>` 34-byte-header encrypted
 //! extracted-attachment-text codec (MYND-328; `docs/spec/protocol.md` § 9.15).

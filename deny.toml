@@ -48,12 +48,12 @@ ignore = [
 
 # ─────────────────────────────────────────────────────────────────────
 # Licenses — allow-list per docs/dependency-policy.md
-# AGPL-3.0-or-later workspace; permissive + weak-copyleft + GPL-compat allowed
+# AGPL-3.0 workspace; permissive + weak-copyleft + GPL-compat allowed
 # ─────────────────────────────────────────────────────────────────────
 [licenses]
 version = 2
 allow = [
-    "AGPL-3.0-or-later",
+    "AGPL-3.0",
     "Apache-2.0",
     "Apache-2.0 WITH LLVM-exception",
     "BSD-2-Clause",

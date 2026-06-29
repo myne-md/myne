@@ -1383,7 +1383,7 @@
       "changelogButton": "変更履歴を表示…",
       "changelogHelper": "バージョンごとのリリースノート。MYND-119の実装時に表示されます。",
       "changelogLabel": "変更履歴",
-      "licenseBody": "プレアルファ · ドキュメントはCC0 · フェーズ1リリースでアプリケーションコードはAGPL-3.0。",
+      "licenseBody": "プレアルファ · ドキュメントはCC-BY-4.0 · フェーズ1リリースでアプリケーションコードはAGPL-3.0。",
       "licenseLabel": "ライセンス",
       "tagline": "プレアルファ · フェーズ1デスクトップクライアント",
       "threatModelHelper": "公開されている脅威モデルのドキュメントをブラウザで開きます。",

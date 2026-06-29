@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0
 //! Vault-head manifest — the canonical `uuid → content_nonce` map the vault
 //! head commits as `manifest_hash` (`docs/spec/sync-protocol.md` §4.2, MYND-414).
 //!

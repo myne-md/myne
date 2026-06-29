@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0
 
 //! `vault.workspace` 34-byte-header encrypted editor-workspace codec —
 //! see `docs/spec/protocol.md` § 9.7 (MYND-166).

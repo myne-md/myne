@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0
 //! Offensive KDF red-team: demonstrate and QUANTIFY the missing Argon2id
 //! minimum-strength floor (the one defense-in-depth finding from the crypto
 //! review). Run with output visible:

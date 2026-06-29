@@ -22,7 +22,7 @@ Before opening the PR that adds the dep, the proposer must have answered:
 2. **Is the dep actively maintained?** Last release within 12 months; no `unmaintained` advisory in `cargo audit` / `npm audit`.
 3. **Who maintains it?** Solo-maintainer-with-no-bus-factor is a yellow flag; document the bus-factor risk in the PR if accepted.
 4. **What's the transitive tree like?** Run `cargo tree -p <crate>` or `pnpm why <pkg>`. If the dep brings in 50+ transitives for a leaf use case, that's a red flag — look for a leaner alternative.
-5. **License compatible?** AGPL-3.0-or-later (this repo) requires:
+5. **License compatible?** AGPL-3.0 (this repo) requires:
    - Permissive licenses OK: MIT, Apache-2.0, BSD-2/3-Clause, ISC, MPL-2.0, Unicode-DFS-2016, CC0-1.0
    - Weak copyleft OK: MPL-2.0, LGPL (with caveat for static linking)
    - Strong copyleft consider: GPL-3.0 (compatible with AGPL-3.0)

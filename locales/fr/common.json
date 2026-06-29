@@ -1467,7 +1467,7 @@
       "changelogButton": "Voir le journal des modifications…",
       "changelogHelper": "Notes par version. S'affichera lorsque MYND-119 sera disponible.",
       "changelogLabel": "Journal des modifications",
-      "licenseBody": "Pré-alpha · docs CC0 · code applicatif AGPL-3.0 à la sortie de la phase 1.",
+      "licenseBody": "Pré-alpha · docs CC-BY-4.0 · code applicatif AGPL-3.0 à la sortie de la phase 1.",
       "licenseLabel": "Licence",
       "tagline": "Pré-alpha · client de bureau de la phase 1",
       "threatModelHelper": "Ouvrir le document public du modèle de menace dans votre navigateur.",

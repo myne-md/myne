@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0
 
 //! Canonical `SavedView` schema + recursive filter AST — the single
 //! contract the Saved Views epic binds to (sub-feature #3,

@@ -1467,7 +1467,7 @@
       "changelogButton": "Visualizza changelog…",
       "changelogHelper": "Note per versione. Saranno disponibili quando verrà rilasciato MYND-119.",
       "changelogLabel": "Changelog",
-      "licenseBody": "Pre-alpha · documentazione CC0 · codice dell'app AGPL-3.0 al rilascio della Fase 1.",
+      "licenseBody": "Pre-alpha · documentazione CC-BY-4.0 · codice dell'app AGPL-3.0 al rilascio della Fase 1.",
       "licenseLabel": "Licenza",
       "tagline": "Pre-alpha · client desktop della Fase 1",
       "threatModelHelper": "Apri il documento pubblico del modello di minaccia nel browser.",

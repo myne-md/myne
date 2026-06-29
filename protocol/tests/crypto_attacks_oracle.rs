@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0
 //! Offensive red-team round 2 — statistical / side-channel attacks:
 //!  * timing oracle on decode failure classes (§6.4 non-distinguishing)
 //!  * nonce RNG bias (monobit + byte chi-square), not just uniqueness

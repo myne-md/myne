@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0
 //! Fuzz target: `decode_attachments_catalog` (`MYC1` vault.attachments, spec §9.10).
 //!
 //! Untrusted blob + fixed dummy key/hash. Pre-decrypt 34-byte header parse is

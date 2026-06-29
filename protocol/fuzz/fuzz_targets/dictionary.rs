@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0
 //! Fuzz target: `decode_dictionary_blob` (`MYD1` vault.dictionary, spec §9.13).
 //!
 //! Untrusted blob + fixed dummy key/hash. Pre-decrypt 34-byte header parse is

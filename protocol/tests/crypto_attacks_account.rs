@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0
 //! Offensive red-team: account-number forgery against the Damm-32 check.
 //!
 //! The 20-char Crockford account number ends in a Damm-32 check character.

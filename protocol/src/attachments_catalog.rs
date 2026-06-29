@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0
 //! `vault.attachments` 34-byte-header encrypted attachments-catalog
 //! codec (`MYC1` magic) — see `docs/spec/protocol.md` § 9.10.
 //!

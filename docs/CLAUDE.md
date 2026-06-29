@@ -66,16 +66,16 @@ Specs in `protocol.md` are the human-readable contract; vectors in the `myne-tes
 
 ## License
 
-`docs/` is **CC0** (Creative Commons Zero, public domain). The spec must remain reusable for independent implementations even after the rest of the repo moves to AGPL-3.0. **Don't add code-level license headers to docs.**
+`docs/` is **CC-BY-4.0** (Creative Commons Attribution 4.0). The spec must remain reusable for independent implementations as long as Myne is credited; application code is AGPL-3.0. **Don't add code-level license headers to docs.**
 
 ## Operator-doc placement (normative vs runbook)
 
 Split operator-facing docs by **nature**, which maps to the license boundary (MYND-439, ledger SYNC-27):
 
-- **Normative / spec-projection** (the operator *contract* — what a self-hoster must preserve: no-IP, ZK, the protocol-guarantee-vs-policy-obligation split, retention obligations) → lives in `docs/` (CC0, reusable for independent implementations). Example: `docs/self-host-policy.md`.
+- **Normative / spec-projection** (the operator *contract* — what a self-hoster must preserve: no-IP, ZK, the protocol-guarantee-vs-policy-obligation split, retention obligations) → lives in `docs/` (CC-BY-4.0, reusable for independent implementations). Example: `docs/self-host-policy.md`.
 - **Operational / how-to** (bundle-specific mechanics: compose commands, env-var syntax, snapshot/restore scripts, Caddy config, migration steps) → lives in the **`operations`** companion (AGPL).
 
-Cross-reference is **one-way**: a runbook (AGPL) points to the policy doc (CC0) for the *why/guarantee*; the CC0 doc embeds **no** bundle-specific command (so it stays bundle-agnostic and reusable). Never reference an AGPL runbook from a CC0 doc.
+Cross-reference is **one-way**: a runbook (AGPL) points to the policy doc (CC-BY-4.0) for the *why/guarantee*; the CC-BY-4.0 doc embeds **no** bundle-specific command (so it stays bundle-agnostic and reusable). Never reference an AGPL runbook from a CC-BY-4.0 doc.
 
 ## Gotchas
 

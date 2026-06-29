@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0
 //! SCRAM-SHA-256-PLUS **client** proof (MYND-425; RFC 5802 / 7677 / 9266).
 //!
 //! The deterministic client-side crypto of the device-authentication handshake:

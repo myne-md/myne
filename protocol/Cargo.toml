@@ -2,7 +2,7 @@
 name = "protocol"
 version = "0.1.0"
 edition = "2021"
-license = "AGPL-3.0-or-later"
+license = "AGPL-3.0"
 repository = "https://github.com/myne-md/myne"
 description = "Myne v0.1 cryptographic protocol primitives (no_std + alloc)"
 

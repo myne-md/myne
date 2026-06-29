@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0
 
 //! `vault.quickunlock` 50-byte-header encrypted quick-unlock credential codec
 //! (MYND-329; `docs/spec/protocol.md` § 9.14).

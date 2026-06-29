@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0
 //! Fuzz target: `decode_note` (`MY01` per-note blob, spec §9.2).
 //!
 //! `data` is the untrusted on-disk `.myn` blob — exactly what an attacker
