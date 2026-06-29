@@ -11,6 +11,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { Input } from "../primitives/Input";
 import { PasswordInput } from "../PasswordInput";
 import { DestructiveBanner } from "../DestructiveBanner";
+import { formatAccountNumberInput } from "../../lib/account-number-format";
 
 interface JoinResult {
   vault_id: string;
@@ -161,8 +162,8 @@ export function JoinDeviceModal({ onCancel, onJoined }: JoinDeviceModalProps) {
           <Input
             id={`${baseId}-account`}
             value={account}
-            onChange={(e) => setAccount(e.target.value)}
-            placeholder="MY-XXXX-XXXX-XXXX-XXXX-X"
+            onChange={(e) => setAccount(formatAccountNumberInput(e.target.value))}
+            placeholder="MY-XXXX-XXXX-XXXX-XXXX-XXXX"
             autoComplete="off"
             spellCheck={false}
             autoCapitalize="characters"
