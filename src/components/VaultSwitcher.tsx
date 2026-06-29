@@ -165,29 +165,6 @@ const ROW_LEAD_STYLE: CSSProperties = {
   minWidth: 0,
 };
 
-const DOT_CHIP_STYLE: CSSProperties = {
-  width: 24,
-  height: 24,
-  flexShrink: 0,
-  borderRadius: "var(--radius-2)",
-  background: "var(--paper-2)",
-  border: "1px solid var(--line-1)",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-};
-
-function dotStyle(real: boolean): CSSProperties {
-  return {
-    width: 10,
-    height: 10,
-    borderRadius: "50%",
-    // Real-label vault → the decorative iron blue-grey; a fallback
-    // ("Vault N") vault gets a neutral grey so it reads as demoted (SYNC-3).
-    background: real ? "var(--label-slate)" : "var(--line-2)",
-  };
-}
-
 const ROW_TEXT_STYLE: CSSProperties = {
   display: "flex",
   flexDirection: "column",
@@ -495,9 +472,6 @@ export function VaultSwitcher({
                 style={rowStyle(rowState)}
               >
                 <span style={ROW_LEAD_STYLE}>
-                  <span style={DOT_CHIP_STYLE} aria-hidden="true">
-                    <span style={dotStyle(!isFallback)} />
-                  </span>
                   <span style={ROW_TEXT_STYLE}>
                     <span
                       style={rowNameStyle({
