@@ -55,7 +55,7 @@ const ORIG_B = "ffeeddccbbaa00998877665544332211";
 describe("ConflictsView — empty state", () => {
   it("renders the calm empty state (no view, no group) for zero groups", () => {
     render(
-      <ConflictsView groups={groupsOf([])} onKeepBoth={vi.fn()} onDiscard={vi.fn()} />,
+      <ConflictsView groups={groupsOf([])} onKeepBoth={vi.fn()} onDiscard={vi.fn()} onTakeTheirs={vi.fn()} />,
     );
     expect(screen.getByTestId("conflicts.empty").textContent).toContain(
       "No conflicts",
@@ -73,7 +73,7 @@ describe("ConflictsView — group + copy rendering", () => {
       [ORIG_B, [copy("c2", "Beta", ORIG_B)]],
     ]);
     render(
-      <ConflictsView groups={groups} onKeepBoth={vi.fn()} onDiscard={vi.fn()} />,
+      <ConflictsView groups={groups} onKeepBoth={vi.fn()} onDiscard={vi.fn()} onTakeTheirs={vi.fn()} />,
     );
     expect(screen.getByTestId("conflicts.view")).toBeTruthy();
     expect(screen.queryByTestId("conflicts.empty")).toBeNull();
@@ -91,7 +91,7 @@ describe("ConflictsView — group + copy rendering", () => {
       [ORIG_A, [copy("c1", "Alpha", ORIG_A), copy("c2", "Bravo", ORIG_A)]],
     ]);
     render(
-      <ConflictsView groups={groups} onKeepBoth={vi.fn()} onDiscard={vi.fn()} />,
+      <ConflictsView groups={groups} onKeepBoth={vi.fn()} onDiscard={vi.fn()} onTakeTheirs={vi.fn()} />,
     );
     const rows = screen.getAllByTestId("conflicts.copy");
     expect(rows).toHaveLength(2);
@@ -110,7 +110,7 @@ describe("ConflictsView — group + copy rendering", () => {
       ]],
     ]);
     render(
-      <ConflictsView groups={groups} onKeepBoth={vi.fn()} onDiscard={vi.fn()} />,
+      <ConflictsView groups={groups} onKeepBoth={vi.fn()} onDiscard={vi.fn()} onTakeTheirs={vi.fn()} />,
     );
     const row = screen.getByTestId("conflicts.copy");
     expect(row.textContent).toContain("Untitled");
@@ -124,7 +124,7 @@ describe("ConflictsView — group + copy rendering", () => {
       [ORIG_B, [copy("c2", "Beta", ORIG_B), copy("c3", "Gamma", ORIG_B)]],
     ]);
     render(
-      <ConflictsView groups={groups} onKeepBoth={vi.fn()} onDiscard={vi.fn()} />,
+      <ConflictsView groups={groups} onKeepBoth={vi.fn()} onDiscard={vi.fn()} onTakeTheirs={vi.fn()} />,
     );
     const [groupA, groupB] = screen.getAllByTestId("conflicts.group");
     expect(groupA!.textContent).toContain("1 conflicting copy");
@@ -144,6 +144,7 @@ describe("ConflictsView — reconcile actions", () => {
         groups={groups}
         onKeepBoth={onKeepBoth}
         onDiscard={onDiscard}
+        onTakeTheirs={vi.fn()}
       />,
     );
     fireEvent.click(screen.getByTestId("conflicts.keep-both"));
@@ -161,6 +162,7 @@ describe("ConflictsView — reconcile actions", () => {
         groups={groups}
         onKeepBoth={onKeepBoth}
         onDiscard={onDiscard}
+        onTakeTheirs={vi.fn()}
       />,
     );
     fireEvent.click(screen.getByTestId("conflicts.discard"));
@@ -181,6 +183,7 @@ describe("ConflictsView — reconcile actions", () => {
         groups={groups}
         onKeepBoth={onKeepBoth}
         onDiscard={onDiscard}
+        onTakeTheirs={vi.fn()}
       />,
     );
     const rowByNote = (id: string) =>
@@ -196,5 +199,86 @@ describe("ConflictsView — reconcile actions", () => {
 
     fireEvent.click(within(rowByNote("c1")).getByTestId("conflicts.keep-both"));
     expect(onKeepBoth).toHaveBeenLastCalledWith("c1");
+  });
+});
+
+describe("ConflictsView — take theirs (Use this version)", () => {
+  it("clicking 'Use this version' fires onTakeTheirs with the copy id + original uuid", () => {
+    const onTakeTheirs = vi.fn();
+    const groups = groupsOf([[ORIG_A, [copy("c1", "Alpha", ORIG_A)]]]);
+    render(
+      <ConflictsView
+        groups={groups}
+        onKeepBoth={vi.fn()}
+        onDiscard={vi.fn()}
+        onTakeTheirs={onTakeTheirs}
+      />,
+    );
+    fireEvent.click(screen.getByTestId("conflicts.take-this"));
+    expect(onTakeTheirs).toHaveBeenCalledWith("c1", ORIG_A);
+    expect(onTakeTheirs).toHaveBeenCalledTimes(1);
+  });
+
+  it("renders the three actions in order: Keep-as-separate · Discard · Use this version (rightmost)", () => {
+    const groups = groupsOf([[ORIG_A, [copy("c1", "Alpha", ORIG_A)]]]);
+    render(
+      <ConflictsView
+        groups={groups}
+        onKeepBoth={vi.fn()}
+        onDiscard={vi.fn()}
+        onTakeTheirs={vi.fn()}
+      />,
+    );
+    const row = screen.getByTestId("conflicts.copy");
+    const testIds = within(row)
+      .getAllByRole("button")
+      .map((b) => b.getAttribute("data-testid"));
+    expect(testIds).toEqual([
+      "conflicts.keep-both",
+      "conflicts.discard",
+      "conflicts.take-this",
+    ]);
+  });
+
+  it("suppresses the Use-this-version button for an unknown-original group", () => {
+    // Orphan copy (no `conflict_of:`) groups under the "(unknown)" sentinel —
+    // there is no original to trash, so take-theirs is not offered (Keep-as-
+    // separate / Discard still are).
+    const groups = groupsOf([["(unknown)", [copy("c1", "Orphan", "(unknown)")]]]);
+    render(
+      <ConflictsView
+        groups={groups}
+        onKeepBoth={vi.fn()}
+        onDiscard={vi.fn()}
+        onTakeTheirs={vi.fn()}
+      />,
+    );
+    expect(screen.queryByTestId("conflicts.take-this")).toBeNull();
+    expect(screen.getByTestId("conflicts.keep-both")).toBeTruthy();
+    expect(screen.getByTestId("conflicts.discard")).toBeTruthy();
+  });
+
+  it("routes each row's Use-this-version to that row's own ids (no cross-talk)", () => {
+    const onTakeTheirs = vi.fn();
+    const groups = groupsOf([
+      [ORIG_A, [copy("c1", "Alpha", ORIG_A)]],
+      [ORIG_B, [copy("c2", "Beta", ORIG_B), copy("c3", "Gamma", ORIG_B)]],
+    ]);
+    render(
+      <ConflictsView
+        groups={groups}
+        onKeepBoth={vi.fn()}
+        onDiscard={vi.fn()}
+        onTakeTheirs={onTakeTheirs}
+      />,
+    );
+    const rowByNote = (id: string) =>
+      screen
+        .getAllByTestId("conflicts.copy")
+        .find((r) => r.getAttribute("data-note-id") === id)!;
+    fireEvent.click(within(rowByNote("c3")).getByTestId("conflicts.take-this"));
+    expect(onTakeTheirs).toHaveBeenLastCalledWith("c3", ORIG_B);
+    fireEvent.click(within(rowByNote("c1")).getByTestId("conflicts.take-this"));
+    expect(onTakeTheirs).toHaveBeenLastCalledWith("c1", ORIG_A);
   });
 });

@@ -187,6 +187,73 @@ describeCanary("two-device sync canary (MYND-428)", () => {
     }
   });
 
+  it("take-theirs: the remote version wins, the local original is tombstoned, and the win replicates to A", async () => {
+    const srv = await startSyncServer();
+    try {
+      const { a, b, noteId, teardown } = await setupTwoSyncedDevices(srv);
+      try {
+        const idHex = noteId.replace(/-/g, "");
+        // Concurrent edits to the SAME synced note (deterministic note_update).
+        await ipcOk(a.session, "plugin:notes|note_update", { noteId, plaintext: "A edit taketheirs" });
+        await ipcOk(b.session, "plugin:notes|note_update", { noteId, plaintext: "B edit taketheirs" });
+        // A pushes first; B's push loses the CAS → the engine STAGES A's remote
+        // revision (the same path keep-both uses).
+        await ipcOk(a.session, "plugin:sync|sync_now", {});
+        await ipcOk(b.session, "plugin:sync|sync_now", {});
+        // B materializes A's remote revision as a conflict copy (capture its id).
+        const pending = (await ipcOk(b.session, "plugin:sync|sync_pending_conflicts", {})) as string[];
+        expect(pending).toContain(idHex);
+        const remoteBody = (await ipcOk(b.session, "plugin:sync|sync_take_conflict", { originalIdHex: idHex })) as string;
+        expect(remoteBody).toContain("A edit taketheirs");
+        const copyId = (await ipcOk(b.session, "plugin:notes|note_create", {
+          plaintext: buildConflictCopy(remoteBody, noteId),
+        })) as string;
+        await ipcOk(b.session, "plugin:sync|sync_resolve_conflict", { originalIdHex: idHex });
+
+        // "Use this version" / take-theirs (the `applyConflictVersion` chain):
+        // promote the copy (clear its conflict markers) + tombstone the original.
+        const copyContent = (await ipcOk(b.session, "plugin:notes|note_read", { noteId: copyId })) as string;
+        await ipcOk(b.session, "plugin:notes|note_update", {
+          noteId: copyId,
+          plaintext: clearConflictMarkersRaw(copyContent),
+        });
+        const origContent = (await ipcOk(b.session, "plugin:notes|note_read", { noteId })) as string;
+        const tombstoned = new TextDecoder().decode(
+          patchDeletedField(new TextEncoder().encode(origContent), "2026-06-29T00:00:00Z"),
+        );
+        await ipcOk(b.session, "plugin:notes|note_update", { noteId, plaintext: tombstoned });
+        await ipcOk(b.session, "plugin:sync|sync_mark_tombstone", { noteIdHex: idHex }, 5_000);
+
+        // On B: the surviving copy carries A's remote content with no conflict
+        // markers; the local original carries the `deleted:` tombstone.
+        const survivor = (await ipcOk(b.session, "plugin:notes|note_read", { noteId: copyId })) as string;
+        expect(survivor).toContain("A edit taketheirs");
+        expect(survivor).not.toContain("conflict:");
+        const localOrig = (await ipcOk(b.session, "plugin:notes|note_read", { noteId })) as string;
+        expect(localOrig).toContain("deleted:");
+        // Two blobs on disk: the promoted copy + the tombstoned original.
+        expect(noteBlobCount(b.appDataDir)).toBe(2);
+
+        // Push B's resolution; A pulls until the original shows the tombstone —
+        // the "theirs won everywhere" replication. Generous budget (≈48 s) under
+        // full-suite cumulative load (server + two app instances live).
+        await ipcOk(b.session, "plugin:sync|sync_now", {});
+        let propagated = false;
+        for (let i = 0; i < 24 && !propagated; i++) {
+          await ipcOk(a.session, "plugin:sync|sync_now", {});
+          await new Promise((r) => setTimeout(r, 2_000));
+          const onA = (await ipcOk(a.session, "plugin:notes|note_read", { noteId })) as string;
+          propagated = onA.includes("deleted:");
+        }
+        expect(propagated, "the take-theirs tombstone replicated to A").toBe(true);
+      } finally {
+        await teardown();
+      }
+    } finally {
+      await srv.teardown();
+    }
+  });
+
   it("tombstone: a deletion on A propagates to B", async () => {
     const srv = await startSyncServer();
     try {
@@ -245,6 +312,15 @@ function buildConflictCopy(remoteBody: string, originalUuid: string): string {
   const withConflict = patchFrontmatterField(enc.encode(remoteBody), "conflict", "true");
   const withBoth = patchFrontmatterField(withConflict, "conflict_of", originalUuid);
   return new TextDecoder().decode(withBoth);
+}
+
+/** Clear a conflict copy's `conflict:` / `conflict_of:` markers — the same
+ *  composition as `clearConflictMarkers` in `src/notes/conflictCopy.ts`. */
+function clearConflictMarkersRaw(content: string): string {
+  const enc = new TextEncoder();
+  const noConflict = patchFrontmatterField(enc.encode(content), "conflict", null);
+  const cleared = patchFrontmatterField(noConflict, "conflict_of", null);
+  return new TextDecoder().decode(cleared);
 }
 
 /** Boot A (seeded vault) + B, enroll A, write+push one note, B joins + is
