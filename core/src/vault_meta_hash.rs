@@ -16,7 +16,7 @@ use sha2::{Digest, Sha256};
 /// the `Slot::Unlocked.vault_meta_bytes_hash` CAS anchor needs to be
 /// computed (unlock-time read, post-rewrite verify, change_password
 /// disk CAS check, integration-test fixtures).
-pub(crate) fn vault_meta_sha256(bytes: &[u8]) -> [u8; 32] {
+pub fn vault_meta_sha256(bytes: &[u8]) -> [u8; 32] {
     let mut h = Sha256::new();
     h.update(bytes);
     h.finalize().into()

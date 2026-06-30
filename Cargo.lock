@@ -2613,6 +2613,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "myne-core"
+version = "0.1.0"
+dependencies = [
+ "getrandom 0.2.17",
+ "protocol",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tauri",
+ "thiserror 2.0.18",
+ "tokio",
+ "tracing",
+ "tracing-test",
+ "unicode-normalization",
+ "uuid",
+ "zeroize",
+]
+
+[[package]]
 name = "myne-desktop"
 version = "0.1.0"
 dependencies = [
@@ -2621,6 +2640,7 @@ dependencies = [
  "getrandom 0.2.17",
  "gtk",
  "lopdf",
+ "myne-core",
  "objc2",
  "objc2-app-kit",
  "objc2-foundation",

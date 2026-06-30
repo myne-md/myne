@@ -55,9 +55,10 @@ myne/
 ├── src-tauri/           ← Tauri 2 + Rust desktop core
 │   └── capabilities/    ← Tauri capability ACLs (security-load-bearing)
 ├── protocol/            ← Rust crypto crate
+├── core/                ← myne-core: shared backend plugin cores (vault/notes/prefs), desktop+mobile
 ├── public/              ← static assets bundled into the WebView
 ├── workspace/           ← multi-repo helper scripts + manifest
-├── Cargo.toml           ← workspace root (members: src-tauri, protocol)
+├── Cargo.toml           ← workspace root (members: src-tauri, protocol, core)
 ├── Cargo.lock           ← single shared lockfile (TB9 audit anchor)
 ├── rust-toolchain.toml  ← pinned Rust toolchain
 ├── package.json         ← pnpm + Vite + React 19 + TS toolchain

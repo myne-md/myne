@@ -140,6 +140,7 @@ pub async fn unlock<R: Runtime>(
     vault_id: Option<String>,
     password: String,
     state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
     app: AppHandle<R>,
 ) -> Result<(), VaultUnlockError> {
     // SYNC-6 targeting: `Some(id)` → unlock exactly `vaults/<id>/` (the picker
@@ -176,22 +177,22 @@ pub async fn unlock<R: Runtime>(
     // the EXACT existing teardown calls from the lock path — not a second wipe
     // path.
     if is_vault_switch(active_before, target_id) {
-        crate::plugins::notes::search_sync::zeroize_search_index(&app);
+        hooks.zeroize_search_index();
         // MYND-262/266: drop the prior vault's spell engine + personal/ignore
         // sets before the new vault hydrates — no cross-vault dictionary bleed.
-        crate::spell::sync::zeroize_spell(&app);
+        hooks.zeroize_spell();
         // MYND-166: drop the prior vault's staged editor-workspace descriptor
         // so the switch can't flush vault A's layout into vault B.
-        crate::plugins::workspace::commands::clear_staged_descriptor();
+        hooks.clear_staged_descriptor();
         // MYND-255: destroy the hidden pdf-export render window and wipe its
         // stashed HTML payload — vault A's plaintext projection must not
         // survive the switch into vault B's session.
-        crate::plugins::pdf_export::teardown_on_lock(&app);
-        crate::plugins::vault_indices::zeroize_vault_indices(&app);
-        crate::plugins::attachments::zeroize_attachment_refs(&app);
+        hooks.pdf_export_teardown_on_lock();
+        hooks.zeroize_vault_indices();
+        hooks.zeroize_attachment_refs();
         // MYND-259: abort any in-progress voice recording so the mic + RAM
         // PCM buffer never survive the switch into another vault's session.
-        crate::plugins::attachments::abort_active_recording(&app);
+        hooks.abort_active_recording();
         // MYND-205: the prior vault is now locked (its keys were zeroized by
         // `set_unlocked_locking_others`), so drop its cached label too — a
         // switch must stop surfacing the prior vault's real name (SYNC-3).
@@ -238,8 +239,7 @@ pub async fn unlock<R: Runtime>(
     // here (post-unlock, slot Unlocked → catalog KEK derivable) and is
     // fail-closed on an undecodable catalog (never mass-deletes on
     // corruption). Best-effort: any failure is logged and never blocks unlock.
-    crate::plugins::attachments::commands::reclaim_stray_attachment_blobs(&app, state.inner())
-        .await;
+    hooks.reclaim_stray_attachment_blobs(state.inner()).await;
 
     // ---- MYND-160 pipeline steps 4-6 (post-`set_unlocked` orchestration) ----
     //
@@ -260,7 +260,7 @@ pub async fn unlock<R: Runtime>(
     // logged via `tracing::warn!` inside `prefs::read_or_default`
     // and `screen_capture::apply`. **vault_unlock's `VaultUnlockError`
     // surface is unchanged** — the user's unlock succeeds regardless.
-    apply_persisted_prefs(&app, state.inner()).await;
+    apply_persisted_prefs(&app, state.inner(), hooks.inner()).await;
 
     // ---- MYND-29 Task 7: hydrate the search index ----------------------
     //
@@ -273,11 +273,11 @@ pub async fn unlock<R: Runtime>(
     // `vault_lock` into repopulating a just-cleared index. A cold first
     // unlock (no blob) is a full rebuild — a known latency cost the Task 9
     // benchmark will quantify.
-    crate::plugins::notes::search_sync::hydrate_search_index(&app, state.inner()).await;
+    hooks.hydrate_search_index(state.inner()).await;
 
     // MYND-262/266: load the bundled dictionaries (en-US, SYNC-12) + hydrate the
     // personal/ignore sets from vault.dictionary. Best-effort, like search.
-    crate::spell::sync::hydrate_spell(&app, state.inner()).await;
+    hooks.hydrate_spell(state.inner()).await;
 
     Ok(())
 }
@@ -304,6 +304,7 @@ pub async fn unlock<R: Runtime>(
 pub(crate) async fn apply_persisted_prefs<R: Runtime>(
     app: &AppHandle<R>,
     state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
 ) {
     // SYNC-6: resolve the ACTIVE vault root via the just-unlocked slot's id
     // (`unlock_with_path` set the slot to `Unlocked` before this runs, so
@@ -319,7 +320,7 @@ pub(crate) async fn apply_persisted_prefs<R: Runtime>(
             event = "prefs_post_unlock_skipped",
             reason = "vault_dir_resolution_failed",
         );
-        crate::screen_capture::apply(app, true, "runtime_apply");
+        hooks.apply_screen_capture(true, "runtime_apply");
         return;
     };
 
@@ -344,15 +345,15 @@ pub(crate) async fn apply_persisted_prefs<R: Runtime>(
         }
     };
 
-    crate::screen_capture::apply(app, prefs.screen_capture_protection, "runtime_apply");
+    hooks.apply_screen_capture(prefs.screen_capture_protection, "runtime_apply");
 
     // MYND-121: cache the effective auto-lock timeout for the idle timer.
     // prefs are not held in Slot::Unlocked (disk is canonical), so the timer
     // reads this lock-free atom rather than re-decrypting vault.prefs each
-    // tick. The setter IPC (task 9) updates it on a live change.
-    state.set_auto_lock_timeout_secs(crate::auto_lock::effective_auto_lock_secs(
-        prefs.auto_lock_seconds,
-    ));
+    // tick. The setter IPC (task 9) updates it on a live change. The clamp into
+    // the effective range is desktop-only (auto_lock stays in the desktop
+    // crate) and is threaded through the hook.
+    state.set_auto_lock_timeout_secs(hooks.effective_auto_lock_secs(prefs.auto_lock_seconds));
 
     // MYND-205: decrypt the per-vault label into the RAM cache (SYNC-3/4). The
     // label rode inside the same `vault.prefs` blob just read above; cache it
@@ -372,19 +373,10 @@ pub(crate) async fn apply_persisted_prefs<R: Runtime>(
     // field). A tampered/absent/replayed blob already collapsed to
     // `PrefsView::default()` above (empty registry) → the extension must
     // re-pair, never a partial/injected grant (`decisions.md` 2026-06-20). The
-    // `PairingState` singleton is managed by the `clipper-pairing` plugin; its
-    // absence (clipper plugin not installed) is a no-op. The token VALUES are
-    // never logged — only the live-pairing COUNT.
-    if let Some(pairing) = app.try_state::<crate::plugins::clipper_pairing::state::PairingState>() {
-        let registry =
-            crate::clipper::token::TokenRegistry::from_paired_extensions(&prefs.paired_extensions);
-        let live = registry.live_extension_ids().len();
-        pairing.replace_registry(registry);
-        tracing::debug!(
-            event = "clipper_pairing_registry_loaded",
-            live_pairings = live,
-        );
-    }
+    // clipper machinery is desktop-only; the hook is a no-op when the
+    // `clipper-pairing` plugin is not installed (mobile). The token VALUES are
+    // never logged — only the live-pairing COUNT (inside the desktop hook).
+    hooks.hydrate_clipper_pairing(&prefs.paired_extensions);
 }
 
 /// Closed-enum mapping for `PrefsReadError` variants emitted from the
@@ -459,7 +451,7 @@ pub(crate) async fn recover_pending_rename_in_dir(notes_dir: PathBuf) {
 /// tests do not need an [`AppHandle`].
 ///
 /// All decisions documented on [`unlock`] apply identically.
-pub(crate) async fn unlock_with_path(
+pub async fn unlock_with_path(
     password: String,
     vault_id: Option<crate::vault_id::VaultId>,
     vault_path: &Path,
@@ -823,9 +815,9 @@ fn open_32_byte_secret(
 /// `decrypting`); a Rust-side "lock requested" signal that the
 /// pipelines check before populating the slot is a Phase 2+ fix.
 #[tauri::command]
-pub async fn lock<R: Runtime>(
+pub async fn lock(
     state: State<'_, VaultRuntimeState>,
-    app: AppHandle<R>,
+    hooks: State<'_, crate::hooks::Hooks>,
 ) -> Result<(), VaultUnlockError> {
     // ---- MYND-29 Task 7: graceful-lock flush ----------------------------
     //
@@ -841,7 +833,7 @@ pub async fn lock<R: Runtime>(
     // Task 8's job. Until then the index lingers post-lock, but `note_search`
     // gates on `Slot::Unlocked` (returns empty when locked), so there is no
     // IPC leak — only raw RAM retention that Task 8 zeroizes.
-    crate::plugins::notes::search_sync::persist_search_index(&app, state.inner()).await;
+    hooks.persist_search_index(state.inner()).await;
 
     lock_with_state(state.inner()).await?;
 
@@ -852,25 +844,25 @@ pub async fn lock<R: Runtime>(
     // sensitive as the keys), so it is overwritten + reset here so no terms
     // survive the manual lock. The persist above already flushed it to the
     // `vault.search` blob (persist-then-wipe); the next unlock reloads it.
-    crate::plugins::notes::search_sync::zeroize_search_index(&app);
+    hooks.zeroize_search_index();
     // MYND-262/266: wipe the spell engine + personal/ignore sets on lock (each
     // add already persisted, so nothing to flush — only RAM to zeroize).
-    crate::spell::sync::zeroize_spell(&app);
+    hooks.zeroize_spell();
     // MYND-166: wipe the staged editor-workspace descriptor on the same lock
     // path (AS3 note-ids + layout, as sensitive as the index).
-    crate::plugins::workspace::commands::clear_staged_descriptor();
+    hooks.clear_staged_descriptor();
     // MYND-255: destroy the hidden pdf-export render window (a
     // plaintext-bearing second WebView) and wipe its stashed HTML payload on
     // the same lock path — locking means locked for every plaintext surface,
     // not just "main".
-    crate::plugins::pdf_export::teardown_on_lock(&app);
+    hooks.pdf_export_teardown_on_lock();
 
     // ---- MYND-31: wipe the plaintext-derived VaultIndices ---------------
     //
     // Same lock path as the search-index wipe — the wikilink graph + tag
     // index are plaintext-derived RAM (as sensitive as the keys), wiped here
     // so nothing survives the manual lock. Rebuilt on the next unlock.
-    crate::plugins::vault_indices::zeroize_vault_indices(&app);
+    hooks.zeroize_vault_indices();
 
     // ---- MYND-169: wipe the plaintext-derived attachment reference graph -
     //
@@ -878,10 +870,10 @@ pub async fn lock<R: Runtime>(
     // reference graph's note-ids / attachment-ids are plaintext-derived
     // correlation tags (AS3), wiped here so nothing survives the manual
     // lock. Rebuilt on the next unlock.
-    crate::plugins::attachments::zeroize_attachment_refs(&app);
+    hooks.zeroize_attachment_refs();
     // MYND-259: abort any in-progress voice recording on the manual lock so the
     // mic + RAM PCM buffer never survive it.
-    crate::plugins::attachments::abort_active_recording(&app);
+    hooks.abort_active_recording();
 
     // ---- MYND-160 Task 11: post-zeroize native default-ON ---------------
     //
@@ -901,7 +893,7 @@ pub async fn lock<R: Runtime>(
     // call sits AFTER lock_with_state's `Ok(())` early-return is
     // committed — a `vault_locked` event is already in the tracing
     // stream by this point.
-    crate::screen_capture::apply(&app, true, "lock_reset");
+    hooks.apply_screen_capture(true, "lock_reset");
 
     Ok(())
 }
@@ -1460,82 +1452,6 @@ mod tests {
                 "orphan .tmp swept on roll-back"
             );
         });
-    }
-
-    /// Index-bleed guard (task 2): on a vault switch the four-surface lock
-    /// teardown wipes the GLOBAL plaintext-derived indices — search index,
-    /// VaultIndices, attachment-ref graph — BEFORE the next vault hydrates
-    /// them, so vault A's terms / wikilink records / attachment correlation
-    /// tags cannot bleed into vault B. This pins the wipe MECHANISM: the
-    /// `zeroize_*`/`clear()` calls the switch triggers actually empty
-    /// previously-populated indices. (Driving the full Tauri `unlock` wrapper
-    /// end-to-end needs a `tauri::test::mock_app` harness + the `tauri/test`
-    /// feature, which would bump `Cargo.lock` — TB9 audit-anchor discipline;
-    /// the switch-decision half is covered by `is_vault_switch_*` above and
-    /// the slot-level lock-then-unlock by the `state` module's acceptance
-    /// test.)
-    #[test]
-    fn switch_teardown_wipes_every_global_derived_index() {
-        use crate::plugins::attachments::AttachmentRefsState;
-        use crate::plugins::vault_indices::state::NoteRecord;
-        use crate::plugins::vault_indices::VaultIndicesState;
-        use crate::search::SearchIndexState;
-
-        // Simulate vault A having hydrated all three global indices.
-        let search = SearchIndexState::default();
-        search.upsert("note-a", "Alpha Title", "alpha body text");
-        assert!(
-            !search.query("alpha").is_empty(),
-            "precondition: vault A search index populated"
-        );
-
-        let indices = VaultIndicesState::default();
-        indices.apply(
-            "note-a",
-            NoteRecord {
-                title: Some("Alpha Title".to_string()),
-                folder: None,
-                title_key: None,
-                edges: Vec::new(),
-                tags: Vec::new(),
-                properties: Vec::new(),
-            },
-        );
-        assert_eq!(
-            indices.note_count(),
-            1,
-            "precondition: vault A VaultIndices populated"
-        );
-
-        let refs = AttachmentRefsState::default();
-        refs.apply("note-a", ["att-a".to_string()]);
-        assert_eq!(
-            refs.note_count(),
-            1,
-            "precondition: vault A attachment-ref graph populated"
-        );
-
-        // The switch teardown wipes each global index (the same `clear()` the
-        // `zeroize_*` wrappers call). After it, NONE of vault A's data
-        // survives into the next vault's about-to-hydrate indices.
-        search.clear();
-        indices.clear();
-        refs.clear();
-
-        assert!(
-            search.query("alpha").is_empty(),
-            "search index must be wiped on switch (no vault-A term bleed)"
-        );
-        assert_eq!(
-            indices.note_count(),
-            0,
-            "VaultIndices must be wiped on switch (no vault-A wikilink bleed)"
-        );
-        assert_eq!(
-            refs.note_count(),
-            0,
-            "attachment-ref graph must be wiped on switch (no vault-A correlation-tag bleed)"
-        );
     }
 
     /// Seed a real `vault.meta` via `vault_creation::build_session`

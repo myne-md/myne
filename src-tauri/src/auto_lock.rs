@@ -28,7 +28,11 @@ use tauri::{AppHandle, Emitter, Manager, Runtime};
 /// MYND-122 / Penpot (see the feature PRD Open Questions). Chosen as a sane
 /// middle ground: short enough to bound A6 exposure, long enough not to
 /// interrupt active work. Must remain within `[MIN, CEILING]`.
-pub const DEFAULT_AUTO_LOCK_SECS: u32 = 300;
+///
+/// Single-sourced in `myne-core` (the shared `VaultRuntimeState` seeds itself
+/// with it); re-exported here so the desktop auto-lock policy keeps the same
+/// `crate::auto_lock::DEFAULT_AUTO_LOCK_SECS` path.
+pub use myne_core::DEFAULT_AUTO_LOCK_SECS;
 
 /// Hard upper bound on the effective timeout, enforced in code.
 ///

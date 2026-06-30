@@ -9,9 +9,13 @@
 //!
 //! See: ../../CLAUDE.md "Secret-handling logging discipline".
 
-pub mod account_number_select;
-pub mod commands;
-pub mod error;
+// The vault-recover command core (`recover_with_phrase`, `complete_recovery`,
+// account-number selector) + `error` moved to `myne-core` (shared with the
+// mobile client). The post-recovery prefs-apply + search-index hydrate attach
+// through the `hooks::VaultLifecycleHooks` seam. Re-exported so existing
+// `crate::plugins::vault_recover::{commands,error,account_number_select}::…`
+// paths keep resolving. The `init()` wiring stays desktop-side.
+pub use myne_core::plugins::vault_recover::{account_number_select, commands};
 
 use tauri::plugin::{Builder, TauriPlugin};
 use tauri::Runtime;

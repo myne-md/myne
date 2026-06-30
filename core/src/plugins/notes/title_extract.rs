@@ -134,7 +134,7 @@ pub fn resolve_note_title(plaintext: &[u8]) -> Option<String> {
 /// (`plugins::export`, MYND-211) — the tree filename rule is FM `title:`
 /// ONLY (no H1 fallback; the importer inversion injects `title:` for every
 /// imported note, so the FM field is the round-trip identity).
-pub(crate) fn fm_title(frontmatter: &[u8]) -> Option<String> {
+pub fn fm_title(frontmatter: &[u8]) -> Option<String> {
     fm_scalar(frontmatter, b"title:")
 }
 
@@ -143,7 +143,7 @@ pub(crate) fn fm_title(frontmatter: &[u8]) -> Option<String> {
 /// engine (`plugins::export`, MYND-211) inverts into tree directories. Same
 /// scanner discipline as [`fm_title`]: first top-level line decides, quotes
 /// stripped, block/flow scalars declined, `None` for absent/empty (= root).
-pub(crate) fn fm_folder(frontmatter: &[u8]) -> Option<String> {
+pub fn fm_folder(frontmatter: &[u8]) -> Option<String> {
     fm_scalar(frontmatter, b"folder:")
 }
 
@@ -155,7 +155,7 @@ pub(crate) fn fm_folder(frontmatter: &[u8]) -> Option<String> {
 /// each caller keeps its OWN value-parsing semantics (the
 /// comment-stripping divergence between them is TS-lockstep
 /// deliberate).
-pub(crate) fn fm_raw_value<'a>(frontmatter: &'a [u8], key: &[u8]) -> Option<&'a [u8]> {
+pub fn fm_raw_value<'a>(frontmatter: &'a [u8], key: &[u8]) -> Option<&'a [u8]> {
     frontmatter.split(|b| *b == b'\n').find_map(|line| {
         // Top-level key only — a leading space/indent means a nested mapping,
         // which `strip_prefix` correctly rejects.

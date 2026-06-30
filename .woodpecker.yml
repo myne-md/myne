@@ -98,6 +98,12 @@ steps:
       - curl -fsSL https://nodejs.org/dist/v25.9.0/node-v25.9.0-linux-x64.tar.xz | tar -xJ -C /usr/local --strip-components=1
       - npm install -g pnpm@11.7.0
       - pnpm install --frozen-lockfile
+      # Lint the shared `myne-core` crate here (not in the slim cargo-clippy
+      # step): myne-core depends on `tauri` (default features), so it needs the
+      # webkit/gtk -dev chains this step already installs. No frontend dist
+      # needed — myne-core has no `generate_context!`.
+      - rustup component add clippy
+      - cargo clippy -p myne-core --all-targets -- -D warnings
       - pnpm tauri build --no-bundle
 
   # ─── Backend host tests (src-tauri / myne-desktop) ───────────
@@ -106,7 +112,9 @@ steps:
   # `generate_context!()` embeds `frontendDist` at compile time. 502 tests
   # (paths, atomic_write, auto_lock, search, vault_* plugins, prefs, …).
   # depends_on tauri-compile so the two heavy workspace builds don't run
-  # concurrently on the shared CI host.
+  # concurrently on the shared CI host. Also runs `myne-core`'s own tests
+  # (the shared vault/notes/prefs plugin cores) in the same sysdeps env —
+  # the slim cargo-test step can't, since myne-core pulls Tauri default-features.
   cargo-test-tauri:
     image: rust:1.96.0-slim
     depends_on: [tauri-compile]
@@ -123,7 +131,7 @@ steps:
       - useradd -m ci && chown -R ci:ci .
       # ulimit -n: raise the fd soft limit to the hard cap (EMFILE guard, see
       # tauri-compile) inside the unprivileged shell where the build actually runs.
-      - su ci -c 'export HOME=/home/ci CARGO_HOME=/home/ci/.cargo RUSTUP_HOME=/usr/local/rustup PATH=/usr/local/cargo/bin:/usr/local/bin:$PATH ; ulimit -n $(ulimit -Hn) 2>/dev/null || true ; pnpm install --frozen-lockfile && pnpm build && cargo test -p myne-desktop --no-fail-fast'
+      - su ci -c 'export HOME=/home/ci CARGO_HOME=/home/ci/.cargo RUSTUP_HOME=/usr/local/rustup PATH=/usr/local/cargo/bin:/usr/local/bin:$PATH ; ulimit -n $(ulimit -Hn) 2>/dev/null || true ; pnpm install --frozen-lockfile && pnpm build && cargo test -p myne-desktop -p myne-core --no-fail-fast'
 
   # ─── E2E suite (real binary via tauri-driver) ────────────────
   # MYND-129 (e2e-harness). Drives the production binary built by

@@ -130,6 +130,7 @@ use tauri::{AppHandle, Runtime, State};
 #[tauri::command]
 pub async fn vault_delete<R: Runtime>(
     state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
     app: AppHandle<R>,
     vault_id: Option<String>,
 ) -> Result<(), VaultDeleteError> {
@@ -158,8 +159,7 @@ pub async fn vault_delete<R: Runtime>(
     // MYND-351 Direction 2: a user-initiated delete preempts an in-flight
     // scheduled backup (which holds the shared auth permit) so the `try_acquire`
     // inside `vault_delete_with_dir` is not rejected by the invisible job.
-    crate::plugins::backup::commands::preempt_inflight_backup_for_user_auth(state.inner(), &app)
-        .await;
+    hooks.preempt_inflight_backup(state.inner()).await;
 
     let result = vault_delete_with_dir(vault_dir, vault_id, state.inner()).await;
 
@@ -173,24 +173,24 @@ pub async fn vault_delete<R: Runtime>(
         &result,
         Ok(()) | Err(VaultDeleteError::PartialDelete { .. })
     ) {
-        crate::plugins::notes::search_sync::zeroize_search_index(&app);
+        hooks.zeroize_search_index();
         // MYND-166: wipe the staged editor-workspace descriptor too.
-        crate::plugins::workspace::commands::clear_staged_descriptor();
+        hooks.clear_staged_descriptor();
         // MYND-255: destroy the hidden pdf-export render window (a
         // plaintext-bearing second WebView) and wipe its stashed HTML
         // payload on the same delete-proceeded path — the deleted vault's
         // plaintext must not outlive the vault in a second window.
-        crate::plugins::pdf_export::teardown_on_lock(&app);
+        hooks.pdf_export_teardown_on_lock();
         // MYND-31: wipe the plaintext-derived VaultIndices on the same
         // delete-proceeded path so it does not outlive the deleted vault.
-        crate::plugins::vault_indices::zeroize_vault_indices(&app);
+        hooks.zeroize_vault_indices();
         // MYND-169: wipe the plaintext-derived attachment reference graph
         // on the same delete-proceeded path so it does not outlive the
         // deleted vault.
-        crate::plugins::attachments::zeroize_attachment_refs(&app);
+        hooks.zeroize_attachment_refs();
         // MYND-259: abort any in-progress voice recording so the mic + RAM
         // PCM buffer do not outlive the deleted vault.
-        crate::plugins::attachments::abort_active_recording(&app);
+        hooks.abort_active_recording();
     }
     result
 }

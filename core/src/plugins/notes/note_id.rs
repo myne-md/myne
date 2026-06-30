@@ -146,7 +146,7 @@ impl<'de> Deserialize<'de> for NoteId {
 /// public `InvalidNoteId` variant per the boundary policy in
 /// `decisions.md` 2026-05-07.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum InvalidNoteIdCause {
+pub enum InvalidNoteIdCause {
     WrongLength,
     InvalidChar,
     WrongHyphenPosition,

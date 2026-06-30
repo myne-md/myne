@@ -36,14 +36,14 @@ use std::path::{Path, PathBuf};
 use tauri::{AppHandle, Manager, Runtime};
 
 /// Top-level directory holding every `<VaultId>/` vault root.
-pub(crate) const VAULTS_DIR_NAME: &str = "vaults";
+pub const VAULTS_DIR_NAME: &str = "vaults";
 
 /// Destination-parent predicate shared by the export-suite destination
 /// checks (note / tree / PDF export): the path's parent must be
 /// non-empty and an existing directory. The OS save dialog normally
 /// guarantees this; it fails when the directory vanished between
 /// confirm and write (the backup `export_phase_one` precedent).
-pub(crate) fn parent_dir_ok(path: &Path) -> bool {
+pub fn parent_dir_ok(path: &Path) -> bool {
     path.parent()
         .filter(|p| !p.as_os_str().is_empty() && p.is_dir())
         .is_some()
@@ -53,7 +53,7 @@ pub(crate) fn parent_dir_ok(path: &Path) -> bool {
 /// boot migration (sub-feature task 4) renames this into `vaults/<id>/`;
 /// until then [`current_vault_root`] still accepts it so the app boots
 /// pre-migration.
-pub(crate) const LEGACY_VAULT_DIR_NAME: &str = "vault";
+pub const LEGACY_VAULT_DIR_NAME: &str = "vault";
 
 /// Fixed sentinel [`VaultId`] for the legacy single-vault directory (`vault/`,
 /// pre-`vaults/<id>/` layout). Until the boot migration (sub-feature task 4)
@@ -75,18 +75,18 @@ const LEGACY_VAULT_ID_STR: &str = "00000000-0000-7000-8000-777777777777";
 /// Used as a deterministic fallback key when no real `VaultId` is in play —
 /// e.g. the active-vault read helpers when no vault is unlocked (the keyed
 /// entry is absent → `Slot::Empty`). TRANSITIONAL (sub-feature task 4).
-pub(crate) fn legacy_vault_id() -> VaultId {
+pub fn legacy_vault_id() -> VaultId {
     VaultId::parse(LEGACY_VAULT_ID_STR).expect("LEGACY_VAULT_ID_STR is a valid UUIDv7")
 }
 
 /// Resolve `<app_data_dir>` for the running app, mapping a failure to
 /// the `vault_creation` plugin's [`AppError`] shape.
 ///
-/// `pub(crate)` so `vault_creation::begin` can resolve the base it needs to
+/// `pub` so `vault_creation::begin` can resolve the base it needs to
 /// mint a fresh, collision-free [`VaultId`] (`vault_registry::mint_unique_vault_id`)
 /// into the creation session (SYNC-6 create targeting — every vault, first or
 /// Nth, lands at a freshly-minted `vaults/<id>/`).
-pub(crate) fn app_data_dir<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, AppError> {
+pub fn app_data_dir<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, AppError> {
     app.path().app_data_dir().map_err(|_| AppError::Io {
         kind: crate::plugins::vault_creation::error::IoErrorKind::Other,
     })
@@ -97,11 +97,11 @@ pub(crate) fn app_data_dir<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, Ap
 /// logic + a read-only `vaults/` scan; the only fallible step (the
 /// `app_data_dir` lookup) is the caller's, so this is infallible.
 ///
-/// `pub(crate)` so the various plugin helpers — each with its own error
+/// `pub` so the various plugin helpers — each with its own error
 /// type (`VaultUnlockError`, `std::io::Error`, `Option<PathBuf>`) — can map
 /// their `app_data_dir` lookup as they already do and then layer this
 /// resolution on top without an `AppError` cross-plugin conversion.
-pub(crate) fn current_vault_root_from_base(base: &Path) -> PathBuf {
+pub fn current_vault_root_from_base(base: &Path) -> PathBuf {
     let vaults_dir = base.join(VAULTS_DIR_NAME);
 
     // (1) Single well-formed `vaults/<id>/` child wins.
@@ -221,7 +221,7 @@ pub fn snapshots_dir_for<R: Runtime>(
 /// This is how the UNLOCK / RECOVER set-sites key the slot map while there is
 /// effectively one vault on disk. Task 4 replaces the derivation with an
 /// id threaded explicitly through the IPC layer.
-pub(crate) fn current_vault_id_from_base(base: &Path) -> VaultId {
+pub fn current_vault_id_from_base(base: &Path) -> VaultId {
     vault_id_from_root(&current_vault_root_from_base(base))
 }
 
@@ -232,7 +232,7 @@ pub(crate) fn current_vault_id_from_base(base: &Path) -> VaultId {
 /// already hold the resolved root and want to avoid a second `vaults/` scan.
 ///
 /// TRANSITIONAL (sub-feature task 4): superseded by explicit id threading.
-pub(crate) fn vault_id_from_root(root: &Path) -> VaultId {
+pub fn vault_id_from_root(root: &Path) -> VaultId {
     root.file_name()
         .and_then(|n| n.to_str())
         .and_then(|n| VaultId::parse(n).ok())
@@ -249,10 +249,10 @@ pub(crate) fn vault_id_from_root(root: &Path) -> VaultId {
 /// `VaultId`'s strict parse contract guarantees `id.to_string()` is a safe path
 /// component (no traversal / case-folding), so the join is sound.
 ///
-/// `pub(crate)` so the unlock / recover / create targeting wrappers — each with
+/// `pub` so the unlock / recover / create targeting wrappers — each with
 /// its own error universe — can map their own `app_data_dir` lookup and then
 /// layer this pure join on top.
-pub(crate) fn vault_root_for_id_from_base(base: &Path, id: VaultId) -> PathBuf {
+pub fn vault_root_for_id_from_base(base: &Path, id: VaultId) -> PathBuf {
     base.join(VAULTS_DIR_NAME).join(id.to_string())
 }
 
@@ -260,7 +260,7 @@ pub(crate) fn vault_root_for_id_from_base(base: &Path, id: VaultId) -> PathBuf {
 /// resolution that replaces the transitional disk-heuristic
 /// [`current_vault_root_from_base`] for every command operating on the unlocked
 /// vault. `active_id` is the sole-`Unlocked` slot key the caller reads from
-/// [`crate::plugins::vault_unlock::state::VaultRuntimeState::active_vault_id`]:
+/// `VaultRuntimeState::active_vault_id`:
 ///
 /// - `Some(id)` → `<base>/vaults/<id>/` (the unlocked vault — the only correct
 ///   answer once two or more vaults exist on disk).
@@ -405,7 +405,7 @@ pub fn notes_dir<R: Runtime>(app: &AppHandle<R>) -> std::io::Result<PathBuf> {
 ///
 /// The root itself must already exist ([`require_vault_root`]) — only the
 /// `notes/` child is ever created here.
-pub(crate) fn notes_dir_under(parent: &Path) -> std::io::Result<PathBuf> {
+pub fn notes_dir_under(parent: &Path) -> std::io::Result<PathBuf> {
     require_vault_root(parent)?;
     let dir = parent.join("notes");
     std::fs::create_dir_all(&dir)?;
@@ -433,7 +433,7 @@ pub fn snapshots_dir<R: Runtime>(app: &AppHandle<R>) -> std::io::Result<PathBuf>
 ///
 /// The root itself must already exist ([`require_vault_root`]) — only the
 /// `snapshots/` child is ever created here.
-pub(crate) fn snapshots_dir_under(parent: &Path) -> std::io::Result<PathBuf> {
+pub fn snapshots_dir_under(parent: &Path) -> std::io::Result<PathBuf> {
     require_vault_root(parent)?;
     let dir = parent.join("snapshots");
     std::fs::create_dir_all(&dir)?;

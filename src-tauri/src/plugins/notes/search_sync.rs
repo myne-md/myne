@@ -466,6 +466,13 @@ mod tests {
     };
     use crate::test_support::ScopedTempDir;
 
+    /// No-op `Hooks` for the `note_update_with_dir` index/snapshot side-effect:
+    /// this test drives the hydrate/persist path directly, so the CRUD-side
+    /// hooks are inert.
+    fn noop_hooks() -> myne_core::hooks::Hooks {
+        std::sync::Arc::new(myne_core::hooks::NoopHooks)
+    }
+
     // Fixture key bytes — `note_create_with_dir` encrypts under these, and
     // the persist/hydrate path derives `search_index_key` from the same
     // `root_key` (so the second hydrate decrypts the blob it wrote).
@@ -603,6 +610,7 @@ mod tests {
             note_update_with_dir(
                 notes_dir.clone(),
                 &state,
+                &noop_hooks(),
                 id_a.clone(),
                 "# Alpha\nrust tokio reactor".into(),
             )

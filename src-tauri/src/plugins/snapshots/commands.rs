@@ -14,7 +14,8 @@
 use super::error::{snapshot_error_kind, SnapshotError};
 use crate::io_failure_kind::from_io_error_kind;
 use crate::paths;
-use crate::plugins::notes::commands::{note_snapshot_flush_with_dir, note_update_with_dir};
+use crate::plugins::notes::commands::note_update_with_dir;
+use crate::plugins::notes::desktop_commands::note_snapshot_flush_with_dir;
 use crate::plugins::notes::error::NoteUpdateError;
 use crate::plugins::notes::note_id::NoteId;
 use crate::plugins::notes::title_extract::resolve_note_title;
@@ -203,6 +204,7 @@ pub(crate) async fn snapshot_restore_in(
     notes_dir: PathBuf,
     state: &VaultRuntimeState,
     search: &SearchIndexState,
+    hooks: &myne_core::hooks::Hooks,
     note_id: String,
     snapshot_uuid: String,
 ) -> Result<(), SnapshotError> {
@@ -264,9 +266,15 @@ pub(crate) async fn snapshot_restore_in(
     // (Capture vault_dir before note_update_with_dir moves notes_dir — needed
     // for the MYND-328 attachment-text fold below.)
     let vault_dir = notes_dir.parent().map(std::path::Path::to_path_buf);
-    note_update_with_dir(notes_dir, state, note_id.clone(), (*plaintext).clone())
-        .await
-        .map_err(map_note_update_err)?;
+    note_update_with_dir(
+        notes_dir,
+        state,
+        hooks,
+        note_id.clone(),
+        (*plaintext).clone(),
+    )
+    .await
+    .map_err(map_note_update_err)?;
 
     // Step 4: keep the live in-RAM search index correct. MYND-328: fold the
     // restored note's attachment text in (parity with note_create/update/batch)
@@ -291,6 +299,7 @@ pub async fn snapshot_restore<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
     search: State<'_, SearchIndexState>,
+    hooks: State<'_, myne_core::hooks::Hooks>,
     note_id: String,
     snapshot_uuid: String,
 ) -> Result<(), SnapshotError> {
@@ -299,6 +308,7 @@ pub async fn snapshot_restore<R: Runtime>(
         notes_dir,
         state.inner(),
         search.inner(),
+        hooks.inner(),
         note_id,
         snapshot_uuid,
     )
@@ -412,6 +422,98 @@ mod tests {
     const FIXTURE_ITEMS_BYTE: u8 = 0x09;
     const FIXTURE_ITEMS_ID_BYTE: u8 = 0x01;
 
+    /// A `Hooks` whose snapshot-capture / -purge methods delegate to the REAL
+    /// desktop snapshot store (exactly what `DesktopHooks` does), with every
+    /// other hook a no-op. These tests assert that `note_update_with_dir`
+    /// actually writes / purges snapshots, so the snapshot pair must be live;
+    /// the index/sync side-effects are irrelevant here. Avoids needing an
+    /// `AppHandle` / `tauri::test` harness (TB9 Cargo.lock discipline) — the
+    /// `ClampHooks` precedent in `prefs/mod.rs`.
+    struct SnapshotHooks;
+    impl myne_core::hooks::VaultLifecycleHooks for SnapshotHooks {
+        fn hydrate_search_index<'a>(
+            &'a self,
+            _: &'a VaultRuntimeState,
+        ) -> myne_core::hooks::BoxFuture<'a> {
+            Box::pin(std::future::ready(()))
+        }
+        fn hydrate_spell<'a>(
+            &'a self,
+            _: &'a VaultRuntimeState,
+        ) -> myne_core::hooks::BoxFuture<'a> {
+            Box::pin(std::future::ready(()))
+        }
+        fn reclaim_stray_attachment_blobs<'a>(
+            &'a self,
+            _: &'a VaultRuntimeState,
+        ) -> myne_core::hooks::BoxFuture<'a> {
+            Box::pin(std::future::ready(()))
+        }
+        fn persist_search_index<'a>(
+            &'a self,
+            _: &'a VaultRuntimeState,
+        ) -> myne_core::hooks::BoxFuture<'a> {
+            Box::pin(std::future::ready(()))
+        }
+        fn fold_attachment_text_for_index<'a>(
+            &'a self,
+            _: &'a VaultRuntimeState,
+            note_body: &'a str,
+        ) -> myne_core::hooks::BoxFuture<'a, String> {
+            let body = note_body.to_string();
+            Box::pin(std::future::ready(body))
+        }
+        fn zeroize_search_index(&self) {}
+        fn zeroize_spell(&self) {}
+        fn zeroize_vault_indices(&self) {}
+        fn zeroize_attachment_refs(&self) {}
+        fn abort_active_recording(&self) {}
+        fn pdf_export_teardown_on_lock(&self) {}
+        fn clear_staged_descriptor(&self) {}
+        fn apply_screen_capture(&self, _: bool, _: &'static str) {}
+        fn search_upsert(&self, _: &str, _: &str, _: &str) {}
+        fn search_remove(&self, _: &str) {}
+        fn bump_local_change(&self) {}
+        fn emit_snapshot_write_failed(&self, _: &str) {}
+        fn effective_auto_lock_secs(&self, prefs_value: Option<u32>) -> u32 {
+            prefs_value.unwrap_or(myne_core::DEFAULT_AUTO_LOCK_SECS)
+        }
+        fn hydrate_clipper_pairing(&self, _: &[protocol::PairedExtension]) {}
+        fn preempt_inflight_backup<'a>(
+            &'a self,
+            _: &'a VaultRuntimeState,
+        ) -> myne_core::hooks::BoxFuture<'a> {
+            Box::pin(std::future::ready(()))
+        }
+        fn invalidate_quick_unlock(&self, _: &std::path::Path) {}
+        fn capture_snapshot(
+            &self,
+            vault_root: &std::path::Path,
+            note_uuid: &str,
+            old_blob: &[u8],
+            now_ms: u64,
+            force: bool,
+        ) -> bool {
+            crate::plugins::notes::desktop_commands::capture_snapshot_best_effort(
+                vault_root, note_uuid, old_blob, now_ms, force,
+            )
+        }
+        fn purge_note_snapshots(
+            &self,
+            vault_root: &std::path::Path,
+            note_uuid: &str,
+        ) -> std::io::Result<usize> {
+            crate::snapshot_store::remove_all_note_snapshots(
+                &vault_root.join("snapshots"),
+                note_uuid,
+            )
+        }
+    }
+
+    fn noop_hooks() -> myne_core::hooks::Hooks {
+        std::sync::Arc::new(SnapshotHooks)
+    }
+
     fn rt() -> tokio::runtime::Runtime {
         tokio::runtime::Builder::new_multi_thread()
             .worker_threads(2)
@@ -452,9 +554,15 @@ mod tests {
                 .unwrap()
                 .is_empty());
             // First update → one snapshot (of v1).
-            note_update_with_dir(notes_dir.clone(), &state, id.clone(), "v2".to_string())
-                .await
-                .unwrap();
+            note_update_with_dir(
+                notes_dir.clone(),
+                &state,
+                &noop_hooks(),
+                id.clone(),
+                "v2".to_string(),
+            )
+            .await
+            .unwrap();
 
             let list = snapshot_list_in(sdir, &state, id).await.unwrap();
             assert_eq!(list.len(), 1);
@@ -488,9 +596,15 @@ mod tests {
             let id = note_create_with_dir(notes_dir.clone(), &state, v1.to_string())
                 .await
                 .unwrap();
-            note_update_with_dir(notes_dir.clone(), &state, id.clone(), "# v2".to_string())
-                .await
-                .unwrap();
+            note_update_with_dir(
+                notes_dir.clone(),
+                &state,
+                &noop_hooks(),
+                id.clone(),
+                "# v2".to_string(),
+            )
+            .await
+            .unwrap();
 
             let snap_uuid = snapshot_list_in(sdir.clone(), &state, id.clone())
                 .await
@@ -559,6 +673,7 @@ mod tests {
             note_update_with_dir(
                 notes_dir.clone(),
                 &state,
+                &noop_hooks(),
                 id.clone(),
                 "# v2\nedited".to_string(),
             )
@@ -573,9 +688,16 @@ mod tests {
                 .clone();
 
             // Restore S1 (v1).
-            snapshot_restore_in(notes_dir.clone(), &state, &search, id.clone(), s1)
-                .await
-                .unwrap();
+            snapshot_restore_in(
+                notes_dir.clone(),
+                &state,
+                &search,
+                &noop_hooks(),
+                id.clone(),
+                s1,
+            )
+            .await
+            .unwrap();
 
             // Live note is now v1 again.
             let note_id = NoteId::parse(&id).unwrap();
@@ -611,9 +733,15 @@ mod tests {
             let id = note_create_with_dir(notes_dir.clone(), &state, "v1".to_string())
                 .await
                 .unwrap();
-            note_update_with_dir(notes_dir, &state, id.clone(), "v2".to_string())
-                .await
-                .unwrap();
+            note_update_with_dir(
+                notes_dir,
+                &state,
+                &noop_hooks(),
+                id.clone(),
+                "v2".to_string(),
+            )
+            .await
+            .unwrap();
             // The lone snapshot is recent → retention keeps it.
             assert_eq!(snapshot_prune_in(sdir, &state, id).await.unwrap(), 0);
         });

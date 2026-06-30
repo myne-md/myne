@@ -166,7 +166,7 @@ impl Default for VaultRuntimeState {
             auth_permits: Semaphore::new(AUTH_PERMITS),
             start_instant: Instant::now(),
             last_activity_millis: AtomicU64::new(0),
-            auto_lock_timeout_secs: AtomicU32::new(crate::auto_lock::DEFAULT_AUTO_LOCK_SECS),
+            auto_lock_timeout_secs: AtomicU32::new(crate::DEFAULT_AUTO_LOCK_SECS),
             label_cache: RwLock::new(HashMap::new()),
             full_unlock_this_session: AtomicBool::new(false),
         }
@@ -1201,9 +1201,9 @@ pub struct UnlockedVault {
 /// variant, panic on any other variant. Replaces the
 /// `Option::expect(...)` pattern in tests written before `Slot` existed
 /// (when `take()` returned `Option<UnlockedVault>`).
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 impl Slot {
-    pub(crate) fn unwrap_unlocked(self) -> UnlockedVault {
+    pub fn unwrap_unlocked(self) -> UnlockedVault {
         match self {
             Slot::Unlocked(uv) => uv,
             Slot::Empty => panic!("expected Slot::Unlocked, got Slot::Empty"),
@@ -1218,9 +1218,9 @@ impl Slot {
 /// before, during, and after an idle-lock or a lock-on-switch. Tests assert
 /// against it directly so the invariant is checked, not merely implied by the
 /// `active_vault_id` min-by-id tie-break.
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 impl VaultRuntimeState {
-    pub(crate) async fn unlocked_entry_count(&self) -> usize {
+    pub async fn unlocked_entry_count(&self) -> usize {
         self.slots
             .read()
             .await
@@ -1242,15 +1242,15 @@ impl VaultRuntimeState {
 /// exactly this legacy sentinel — keeping the direct accessor and the
 /// production command on the SAME map entry. Tests that need two distinct
 /// entries pair this with [`test_vault_id_b`].
-#[cfg(test)]
-pub(crate) fn test_vault_id() -> VaultId {
+#[cfg(any(test, feature = "test-support"))]
+pub fn test_vault_id() -> VaultId {
     crate::paths::legacy_vault_id()
 }
 
 /// A second fixed, deterministic test [`VaultId`], distinct from
 /// [`test_vault_id`], for tests that need two independent slot-map entries.
-#[cfg(test)]
-pub(crate) fn test_vault_id_b() -> VaultId {
+#[cfg(any(test, feature = "test-support"))]
+pub fn test_vault_id_b() -> VaultId {
     VaultId::parse("22222222-2222-7222-8222-222222222222").expect("valid test UUIDv7")
 }
 
@@ -1262,8 +1262,8 @@ pub(crate) fn test_vault_id_b() -> VaultId {
 /// (production code never produces all-`0xFF` from SHA-256 with
 /// vanishing probability), letting tests distinguish "fixture-built
 /// slot" from "real-unlock-built slot" when needed.
-#[cfg(test)]
-pub(crate) fn fixture_unlocked_with_keys(
+#[cfg(any(test, feature = "test-support"))]
+pub fn fixture_unlocked_with_keys(
     root_byte: u8,
     items_byte: u8,
     items_id_byte: u8,
@@ -1280,8 +1280,8 @@ pub(crate) fn fixture_unlocked_with_keys(
 /// Build a fixture [`RecoveringMaterial`] with byte-pattern arguments,
 /// for tests that exercise the `Slot::Recovering` variant. Mirror of
 /// `fixture_unlocked_with_keys` for the other variant.
-#[cfg(test)]
-pub(crate) fn fixture_recovering_with_keys(
+#[cfg(any(test, feature = "test-support"))]
+pub fn fixture_recovering_with_keys(
     root_byte: u8,
     items_byte: u8,
     items_id_byte: u8,
