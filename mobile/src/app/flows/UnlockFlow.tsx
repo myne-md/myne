@@ -1,0 +1,476 @@
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { CSSProperties, ReactNode } from "react";
+import {
+  Screen,
+  Eyebrow,
+  Button,
+  Banner,
+  BlockingOverlay,
+  Sheet,
+  Icon,
+  MyneMark,
+} from "../../components";
+import { HAS_TAURI, closeApp } from "../../lib/app-window";
+import { unlockWithPassword } from "../../lib/commands";
+import { deleteVault } from "../../lib/vault-delete";
+import { ioBanner } from "../../lib/io-banner";
+import {
+  UNLOCK_NON_DISTINGUISHING_BANNER,
+  LOST_BOTH_SECRETS_SENTENCE,
+} from "../../lib/load-bearing-copy";
+import type { SuspicionReason } from "../../lib/stage";
+import type { VaultUnlockError } from "../../types/vault-unlock-error";
+import type { UnlockFlowProps } from "./types";
+
+// ── On-design helpers (local, mirroring src/screens/unlock/index.tsx) ─────────
+
+/** Wordmark: mark + "myne" (unlock screens use the 24/18 size). */
+function Wordmark() {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+      <MyneMark size={24} radius={6} />
+      <span style={{ fontSize: 18, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--fg-1)" }}>
+        myne
+      </span>
+    </div>
+  );
+}
+
+/** The vault-name display title (display ink). Label is null pre-unlock, so a
+ *  neutral fallback stands in for the design's "Personal" specimen. */
+function VaultTitle({ size = 22, children }: { size?: number; children: ReactNode }) {
+  return (
+    <div style={{ marginTop: 8, fontSize: size, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--fg-display)" }}>
+      {children}
+    </div>
+  );
+}
+
+/** Tighter-tracked uppercase field label (0.06em) used over inputs. */
+function FieldLabel({ children }: { children: ReactNode }) {
+  return (
+    <div
+      style={{
+        fontSize: 12,
+        fontWeight: 600,
+        letterSpacing: "0.06em",
+        textTransform: "uppercase",
+        color: "var(--fg-3)",
+        marginBottom: 8,
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+/** Text-link button (accent by default; weight 600). */
+function TextButton({
+  children,
+  onClick,
+  color = "var(--accent)",
+  height = 44,
+  fontSize = 15,
+  testId,
+  style,
+}: {
+  children: ReactNode;
+  onClick: () => void;
+  color?: string;
+  height?: number;
+  fontSize?: number;
+  testId?: string;
+  style?: CSSProperties;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      data-testid={testId}
+      style={{
+        height,
+        padding: 0,
+        border: "none",
+        background: "transparent",
+        color,
+        fontFamily: "var(--font-sans)",
+        fontSize,
+        fontWeight: 600,
+        cursor: "pointer",
+        ...style,
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
+/** Functional masked password input, styled to the design's PasswordField
+ *  geometry (h:52, accent focus ring, monospace, eye reveal toggle). */
+function PasswordInput({
+  value,
+  onChange,
+  onSubmit,
+  error,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  onSubmit: () => void;
+  error: boolean;
+}) {
+  const [focused, setFocused] = useState(true);
+  const [revealed, setRevealed] = useState(false);
+  const active = focused || value.length > 0;
+  const borderColor = error ? "var(--danger)" : active ? "var(--accent)" : "var(--line-2)";
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        height: 52,
+        border: `${active || error ? 1.5 : 1}px solid ${borderColor}`,
+        borderRadius: 6,
+        background: "var(--bg-1)",
+        padding: "0 14px",
+        boxShadow: focused ? "0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent)" : "none",
+      }}
+    >
+      <input
+        type={revealed ? "text" : "password"}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") onSubmit();
+        }}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+        autoFocus
+        autoComplete="off"
+        autoCapitalize="off"
+        autoCorrect="off"
+        spellCheck={false}
+        aria-label="Password"
+        data-testid="unlock-password"
+        style={{
+          flex: 1,
+          minWidth: 0,
+          border: "none",
+          outline: "none",
+          background: "transparent",
+          fontFamily: "var(--font-mono)",
+          fontSize: revealed ? 16 : 18,
+          letterSpacing: revealed ? "0" : "0.14em",
+          color: "var(--fg-1)",
+        }}
+      />
+      <button
+        type="button"
+        onClick={() => setRevealed((r) => !r)}
+        aria-label={revealed ? "Hide password" : "Show password"}
+        style={{ border: "none", background: "transparent", padding: 0, marginLeft: 8, cursor: "pointer", display: "flex" }}
+      >
+        <Icon name={revealed ? "eye-off" : "eye"} size={20} color="var(--fg-3)" strokeWidth={1.6} />
+      </button>
+    </div>
+  );
+}
+
+// ── Copy maps ─────────────────────────────────────────────────────────────────
+
+/** Suspicion-banner copy is LITERAL per stage.ts SuspicionReason docs. */
+const SUSPICION_COPY: Record<SuspicionReason, { text: string; kind: "danger" | "info" }> = {
+  "vault-meta-changed-externally": {
+    text: "Vault was modified in another session — please unlock again.",
+    kind: "danger",
+  },
+  "vault-locked-during-change": {
+    text: "Password change cancelled: vault was locked.",
+    kind: "info",
+  },
+};
+
+/** Map an unlock rejection to its banner string. The `InvalidCredentialOrVault`
+ *  leg is the load-bearing non-distinguishing constant (rendered verbatim). */
+function messageForUnlockError(e: unknown): string {
+  const err = e as VaultUnlockError;
+  switch (err?.kind) {
+    case "InvalidCredentialOrVault":
+      return UNLOCK_NON_DISTINGUISHING_BANNER;
+    case "IoError":
+      return ioBanner(err.detail.io_error_kind);
+    case "InvalidVaultMeta":
+      return "Vault file is unreadable. Restore from a backup.";
+    default:
+      return "Couldn't unlock. Please try again.";
+  }
+}
+
+// ── Flow ──────────────────────────────────────────────────────────────────────
+
+/**
+ * UN-05 · Password unlock — wired. Mirrors src/screens/unlock/index.tsx's
+ * PasswordUnlock. Renders the password form for an `Exists` vault, or a
+ * fail-closed surface for `Corrupted` / `IoError`. The typed password is held
+ * in component-local state + a ref and wiped on every exit path / unmount.
+ */
+export function UnlockFlow(props: UnlockFlowProps) {
+  const { initialStatus, vaultId, suspicionReason, fromPicker, onBackToPicker } = props;
+
+  const pwRef = useRef("");
+  const [password, setPassword] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [errorBanner, setErrorBanner] = useState<string | null>(null);
+  const [showSuspicion, setShowSuspicion] = useState(!!suspicionReason);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteFailed, setDeleteFailed] = useState(false);
+
+  const wipePassword = useCallback(() => {
+    pwRef.current = "";
+    setPassword("");
+  }, []);
+
+  const setPw = useCallback((v: string) => {
+    pwRef.current = v;
+    setPassword(v);
+  }, []);
+
+  // Secret discipline: wipe the held password on unmount.
+  useEffect(() => {
+    return () => {
+      pwRef.current = "";
+    };
+  }, []);
+
+  const handleUnlock = useCallback(async () => {
+    if (submitting || pwRef.current.length === 0) return;
+    setShowSuspicion(false); // one-shot: cleared on first unlock attempt
+    setErrorBanner(null);
+    setSubmitting(true);
+    try {
+      if (HAS_TAURI) {
+        await unlockWithPassword(pwRef.current, vaultId);
+      } else {
+        // Browser dev (no Tauri host): advance with a simulated success so the
+        // flow is demoable under `pnpm dev`.
+        await new Promise((r) => setTimeout(r, 350));
+      }
+      wipePassword();
+      props.onUnlocked();
+    } catch (e) {
+      setErrorBanner(messageForUnlockError(e));
+      setSubmitting(false);
+    }
+  }, [submitting, vaultId, wipePassword, props]);
+
+  const handleStartRecovery = useCallback(() => {
+    wipePassword();
+    props.onStartRecovery();
+  }, [wipePassword, props]);
+
+  const handleBackToPicker = useCallback(() => {
+    wipePassword();
+    onBackToPicker?.();
+  }, [wipePassword, onBackToPicker]);
+
+  const handleDelete = useCallback(async () => {
+    if (deleting) return;
+    setDeleting(true);
+    setDeleteFailed(false);
+    try {
+      if (HAS_TAURI) {
+        await deleteVault(vaultId);
+      } else {
+        await new Promise((r) => setTimeout(r, 350));
+      }
+      wipePassword();
+      props.onDeleteVaultSuccess();
+    } catch {
+      // PartialDelete / Io: the slot is already Empty and the editor cannot
+      // resume — surface a banner and offer the terminal Continue exit.
+      setDeleteFailed(true);
+      setDeleting(false);
+    }
+  }, [deleting, vaultId, wipePassword, props]);
+
+  // ── Fail-closed: corrupted vault.meta ──────────────────────────────────────
+  if (initialStatus.kind === "Corrupted") {
+    return (
+      <FailClosed
+        heading="Vault file is unreadable"
+        message="Vault file is unreadable. Restore from a backup."
+        fromPicker={fromPicker}
+        onBackToPicker={onBackToPicker ? handleBackToPicker : undefined}
+      />
+    );
+  }
+
+  // ── Fail-closed: list/read IO error ────────────────────────────────────────
+  if (initialStatus.kind === "IoError") {
+    return (
+      <FailClosed
+        heading="Can't read this vault"
+        message={ioBanner(initialStatus.ioKind)}
+        fromPicker={fromPicker}
+        onBackToPicker={onBackToPicker ? handleBackToPicker : undefined}
+      />
+    );
+  }
+
+  // ── Exists: the password form ──────────────────────────────────────────────
+  const suspicion = suspicionReason ? SUSPICION_COPY[suspicionReason] : null;
+
+  return (
+    <Screen style={{ alignItems: "center", padding: "0 32px" }}>
+      {submitting && (
+        <BlockingOverlay title="Unlocking" subtitle="Decrypting your keys on this device." />
+      )}
+
+      <div style={{ paddingTop: 84 }}>
+        <Wordmark />
+      </div>
+
+      <div style={{ marginTop: 36, textAlign: "center" }}>
+        <Eyebrow>Unlock vault</Eyebrow>
+        <VaultTitle>Your vault</VaultTitle>
+      </div>
+
+      {showSuspicion && suspicion && (
+        <div data-testid="unlock-suspicion" style={{ width: "100%", marginTop: 22 }}>
+          <Banner kind={suspicion.kind}>{suspicion.text}</Banner>
+        </div>
+      )}
+
+      <div style={{ marginTop: showSuspicion && suspicion ? 18 : 30, width: "100%" }}>
+        <FieldLabel>Password</FieldLabel>
+        <PasswordInput value={password} onChange={setPw} onSubmit={handleUnlock} error={!!errorBanner} />
+        {errorBanner && (
+          <div data-testid="unlock-error" style={{ marginTop: 10 }}>
+            <Banner kind="danger">{errorBanner}</Banner>
+          </div>
+        )}
+      </div>
+
+      <Button
+        style={{ marginTop: 16 }}
+        disabled={submitting || password.length === 0}
+        onClick={() => void handleUnlock()}
+        data-testid="unlock-submit"
+      >
+        Unlock
+      </Button>
+
+      <div style={{ flex: 1 }} />
+
+      <div style={{ paddingBottom: 18, display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
+        {fromPicker && onBackToPicker && (
+          <TextButton height={40} onClick={handleBackToPicker} testId="unlock-back-to-picker">
+            Choose a different vault
+          </TextButton>
+        )}
+        <TextButton height={40} onClick={handleStartRecovery} testId="unlock-recovery-link">
+          Use your recovery phrase
+        </TextButton>
+        <TextButton
+          height={40}
+          fontSize={14}
+          color="var(--danger)"
+          onClick={() => {
+            setDeleteFailed(false);
+            setConfirmingDelete(true);
+          }}
+          testId="unlock-delete-link"
+        >
+          Delete vault and start over
+        </TextButton>
+      </div>
+
+      {confirmingDelete && (
+        <Sheet>
+          <div style={{ fontSize: 19, fontWeight: 600, letterSpacing: "-0.01em", color: "var(--fg-display)" }}>
+            Delete this vault?
+          </div>
+          <p style={{ margin: "10px 0 0", fontSize: 14, lineHeight: 1.55, color: "var(--fg-2)" }}>
+            {LOST_BOTH_SECRETS_SENTENCE}
+          </p>
+          {deleteFailed && (
+            <div data-testid="unlock-delete-error" style={{ marginTop: 14 }}>
+              <Banner kind="danger">
+                Some files couldn't be removed. The vault is no longer usable — continue to start over.
+              </Banner>
+            </div>
+          )}
+          <div style={{ marginTop: 18, display: "flex", flexDirection: "column", gap: 10 }}>
+            {deleteFailed ? (
+              <Button
+                variant="danger"
+                onClick={() => {
+                  wipePassword();
+                  props.onDeleteVaultSuccess();
+                }}
+                data-testid="unlock-delete-continue"
+              >
+                Continue
+              </Button>
+            ) : (
+              <Button
+                variant="danger"
+                disabled={deleting}
+                onClick={() => void handleDelete()}
+                data-testid="unlock-delete-confirm"
+              >
+                {deleting ? "Deleting…" : "Delete vault"}
+              </Button>
+            )}
+            {!deleteFailed && (
+              <Button variant="ghost" disabled={deleting} onClick={() => setConfirmingDelete(false)}>
+                Cancel
+              </Button>
+            )}
+          </div>
+        </Sheet>
+      )}
+    </Screen>
+  );
+}
+
+/** Fail-closed surface shared by the corrupted + IO-error initial states. No
+ *  password form: the only legitimate exits are restore-from-backup
+ *  (out-of-band, via Close app) or — when reached from the picker — choosing a
+ *  different vault. */
+function FailClosed({
+  heading,
+  message,
+  fromPicker,
+  onBackToPicker,
+}: {
+  heading: string;
+  message: string;
+  fromPicker?: boolean;
+  onBackToPicker?: () => void;
+}) {
+  return (
+    <Screen style={{ alignItems: "center", padding: "0 32px" }}>
+      <div style={{ paddingTop: 84 }}>
+        <Wordmark />
+      </div>
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", width: "100%" }}>
+        <Eyebrow>Can't open vault</Eyebrow>
+        <VaultTitle size={24}>{heading}</VaultTitle>
+        <div data-testid="unlock-fail-closed" style={{ width: "100%", marginTop: 22 }}>
+          <Banner kind="danger">{message}</Banner>
+        </div>
+        <p style={{ margin: "14px 0 0", fontSize: 14, lineHeight: 1.55, color: "var(--fg-3)", textAlign: "center", maxWidth: 280 }}>
+          Restore from a backup to continue.
+        </p>
+      </div>
+      <div style={{ paddingBottom: 46, width: "100%", display: "flex", flexDirection: "column", gap: 10 }}>
+        {fromPicker && onBackToPicker && (
+          <Button variant="secondary" style={{ height: 48 }} onClick={onBackToPicker}>
+            Choose a different vault
+          </Button>
+        )}
+        <Button onClick={() => void closeApp()}>Close app</Button>
+      </div>
+    </Screen>
+  );
+}

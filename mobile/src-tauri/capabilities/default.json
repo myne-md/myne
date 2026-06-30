@@ -1,0 +1,17 @@
+{
+  "$schema": "../gen/schemas/mobile-schema.json",
+  "identifier": "default",
+  "description": "Default capability for the main mobile window. Narrow by design — widen only with a named, scoped permission per command (security-load-bearing, TB6). Mirrors the desktop vault + notes + prefs plugin grants, trimmed to the mobile surface.",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "opener:default",
+    "vault-creation:default",
+    "vault-unlock:default",
+    "vault-recover:default",
+    "vault-change-password:default",
+    "vault-delete:default",
+    "prefs:default",
+    "notes:default"
+  ]
+}
