@@ -1,4 +1,4 @@
-mod atomic_write;
+pub use myne_core::atomic_write;
 mod auto_lock;
 mod backup_container;
 mod backup_schedule;
@@ -12,21 +12,25 @@ mod backup_schedule;
 // from `main.rs` before the Tauri app builds).
 mod clipper;
 mod export_naming;
-mod io_failure_kind;
-mod note_txn;
-mod paths;
+// Desktop wiring of `myne_core::hooks::VaultLifecycleHooks` — the lifecycle
+// side-effects the shared command cores trigger (search/spell/attachments/
+// pdf/workspace/screen-capture/sync) that do not live in `myne-core`.
+mod hooks;
+pub use myne_core::io_failure_kind;
+pub use myne_core::note_txn;
+pub use myne_core::paths;
 mod plugins;
-mod protocol_error_kind;
+pub use myne_core::protocol_error_kind;
 mod screen_capture;
 mod search;
 mod snapshot_policy;
 mod snapshot_store;
 mod spell;
 #[cfg(test)]
-mod test_support;
-mod text;
-mod vault_id;
-mod vault_meta_hash;
+pub use myne_core::test_support;
+pub use myne_core::text;
+pub use myne_core::vault_id;
+pub use myne_core::vault_meta_hash;
 // SAFETY-CRITICAL eager boot migration `vault/` → `vaults/<id>/` (MYND-202
 // task 4). Runs once at boot, before any routing, from the `setup` hook
 // below — so every downstream probe/resolver sees only the post-migration
@@ -37,8 +41,8 @@ mod vault_migration;
 // (`plugins::vault_unlock::commands::vault_list_from_base`). The remaining
 // not-yet-wired helper (`mint_unique_vault_id`, consumed by sub-feature 3's
 // create path) carries its own per-item `#[cfg_attr(not(test), allow(dead_code))]`.
-mod vault_registry;
-mod vault_sweep;
+pub use myne_core::vault_registry;
+pub use myne_core::vault_sweep;
 
 /// Host-mode entry: if the process was launched by a browser with the
 /// `--native-messaging-host` flag, run the keyless native-messaging stdio
@@ -308,6 +312,15 @@ pub fn run() {
             // MYND-121: start the authoritative, fail-closed idle-lock timer.
             // Runs for the process lifetime; no-op until a vault is Unlocked.
             auto_lock::spawn_idle_lock_timer(app.handle().clone());
+            // Shared command-core lifecycle hooks (myne-core). The desktop
+            // impl captures the AppHandle and delegates to the desktop-only
+            // modules below; must be managed before any command taking
+            // `State<'_, Hooks>` runs. The concrete state singletons the hooks
+            // reach via `try_state` (SearchIndexState/SyncLocalChange/…) are
+            // still managed individually below.
+            let hooks: myne_core::hooks::Hooks =
+                std::sync::Arc::new(hooks::DesktopHooks::new(app.handle().clone()));
+            app.manage(hooks);
             // MYND-29: app-level live in-RAM search-index state, updated
             // incrementally by the notes lifecycle (create/update/delete) and
             // queried by the search command; cleared on lock (Task 8).

@@ -165,7 +165,7 @@ pub async fn begin<R: Runtime>(
 /// `begin` always pass `DEFAULT_V0_1_KDF_PARAMS`. The chosen params
 /// are stored on the returned session so `commit` rebuilds the AADs
 /// and `vault.meta` under the same set.
-pub(crate) fn build_session(
+pub fn build_session(
     vault_id: VaultId,
     password: &str,
     kdf_params: KdfParams,
@@ -378,7 +378,7 @@ pub(crate) async fn commit_with_permit(
 /// therefore holds **per-vault-dir**. SYNC-9 keeps the predicate verbatim;
 /// the per-dir guarantee is a property of the call site (the freshly-minted
 /// dir) plus this purity, not a code change to the guard.
-pub(crate) fn vault_artifacts_present(vault_dir: &Path) -> std::io::Result<bool> {
+pub fn vault_artifacts_present(vault_dir: &Path) -> std::io::Result<bool> {
     if !vault_dir.exists() {
         return Ok(false);
     }
@@ -678,7 +678,7 @@ pub fn cancel(session_token: String, state: State<'_, VaultCreationState>) -> Re
 ///
 /// Borrows the session immutably so a failed `atomic_write` can
 /// return the session to the caller for retry-on-failure.
-pub(crate) fn build_and_serialize_vault_meta(
+pub fn build_and_serialize_vault_meta(
     session: &VaultCreationSession,
 ) -> Result<[u8; protocol::VAULT_META_LEN], AppError> {
     // Wrap root_key under password_wrap_key.

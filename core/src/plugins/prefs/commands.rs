@@ -31,7 +31,7 @@ use tokio::sync::Mutex;
 /// theoretically race. Future per-field setters (`set_theme`,
 /// `set_font_size`, ...) share this same mutex so cross-field
 /// concurrent writes also serialize.
-fn write_mutex() -> &'static Mutex<()> {
+pub fn write_mutex() -> &'static Mutex<()> {
     static M: OnceLock<Mutex<()>> = OnceLock::new();
     M.get_or_init(|| Mutex::new(()))
 }
@@ -58,7 +58,7 @@ fn vault_dir<R: Runtime>(
 /// `pub(crate)` so the future Task 10 (vault_unlock pipeline
 /// integration) can share the same read-or-default discipline at the
 /// unlock-time step 5 call site.
-pub(crate) fn read_or_default(
+pub fn read_or_default(
     prefs_path: &Path,
     prefs_key: &[u8; 32],
     account_number_hash: &[u8; VAULT_META_ACCOUNT_HASH_LEN],
@@ -164,7 +164,7 @@ pub async fn prefs_read<R: Runtime>(
 }
 
 /// Testable core of [`prefs_read`].
-pub(crate) async fn prefs_read_with_dir(
+pub async fn prefs_read_with_dir(
     vault_dir: &Path,
     state: &VaultRuntimeState,
 ) -> Result<PrefsView, PrefsReadError> {
@@ -191,7 +191,7 @@ pub(crate) async fn prefs_read_with_dir(
 /// reminder). Same write discipline as every IPC setter (per-plugin write
 /// mutex + SYNC-6 hold guard). Best-effort at the call site: a failed
 /// prefs write never demotes a verified export.
-pub(crate) async fn record_last_backup_at_with_dir(
+pub async fn record_last_backup_at_with_dir(
     vault_dir: &Path,
     state: &VaultRuntimeState,
     epoch_seconds: u64,
@@ -233,7 +233,7 @@ pub(crate) async fn record_last_backup_at_with_dir(
 /// Logs the record COUNT only — a token value + an extension id are vault-stable
 /// correlation tags (see ../../CLAUDE.md "Secret-handling logging discipline").
 /// The token VALUES never reach the log surface.
-pub(crate) async fn persist_paired_extensions_with_dir(
+pub async fn persist_paired_extensions_with_dir(
     vault_dir: &Path,
     state: &VaultRuntimeState,
     records: Vec<protocol::PairedExtension>,
@@ -276,13 +276,15 @@ pub(crate) async fn persist_paired_extensions_with_dir(
 pub async fn set_screen_capture_protection<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
     enabled: bool,
 ) -> Result<(), PrefsWriteError> {
     let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
     // Disk-side commit FIRST, under the mutex.
     set_screen_capture_protection_with_dir(&dir, state.inner(), enabled).await?;
-    // Native side-effect SECOND, only on disk-side success.
-    crate::screen_capture::apply(&app, enabled, "runtime_apply");
+    // Native side-effect SECOND, only on disk-side success (desktop-only;
+    // mobile no-op through the hook).
+    hooks.apply_screen_capture(enabled, "runtime_apply");
     Ok(())
 }
 
@@ -803,7 +805,7 @@ pub async fn set_deliberate_folders<R: Runtime>(
 }
 
 /// Testable core of [`set_deliberate_folders`].
-pub(crate) async fn set_deliberate_folders_with_dir(
+pub async fn set_deliberate_folders_with_dir(
     vault_dir: &Path,
     state: &VaultRuntimeState,
     folders: Vec<String>,
@@ -1676,10 +1678,11 @@ pub(crate) async fn set_favorites_with_dir(
 pub async fn set_auto_lock_timeout<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
     seconds: u32,
 ) -> Result<(), PrefsWriteError> {
     let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    set_auto_lock_timeout_with_dir(&dir, state.inner(), seconds).await
+    set_auto_lock_timeout_with_dir(&dir, state.inner(), hooks.inner(), seconds).await
 }
 
 /// Testable core of [`set_auto_lock_timeout`]. Persists `auto_lock_seconds`
@@ -1693,9 +1696,10 @@ pub async fn set_auto_lock_timeout<R: Runtime>(
 /// (MYND-121 task 3) is applied only to the in-memory cache + at read time,
 /// so a replayed `vault.prefs` can still only make auto-lock stricter
 /// (`threat-model.md` §7 two-class taxonomy).
-pub(crate) async fn set_auto_lock_timeout_with_dir(
+pub async fn set_auto_lock_timeout_with_dir(
     vault_dir: &Path,
     state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
     seconds: u32,
 ) -> Result<(), PrefsWriteError> {
     let _write_guard = write_mutex().lock().await;
@@ -1722,8 +1726,9 @@ pub(crate) async fn set_auto_lock_timeout_with_dir(
 
     // Effect SECOND (only on disk success): refresh the cached effective
     // timeout the running idle timer reads, clamped through the envelope so
-    // a live change can never exceed the ceiling.
-    state.set_auto_lock_timeout_secs(crate::auto_lock::effective_auto_lock_secs(Some(seconds)));
+    // a live change can never exceed the ceiling. The clamp is desktop-only
+    // (auto_lock stays in the desktop crate) and is threaded via the hook.
+    state.set_auto_lock_timeout_secs(hooks.effective_auto_lock_secs(Some(seconds)));
 
     tracing::info!(
         event = "prefs_written",
@@ -2115,6 +2120,13 @@ mod tests {
             .expect("current-thread runtime build")
     }
 
+    /// A `Hooks` whose `effective_auto_lock_secs` is a no-op (returns the value
+    /// unchanged) — the core has no desktop clamp range. The clamp-WIRING
+    /// assertion lives desktop-side (`auto_lock` owns the clamp + its tests).
+    fn noop_hooks() -> crate::hooks::Hooks {
+        std::sync::Arc::new(crate::hooks::NoopHooks)
+    }
+
     #[test]
     fn record_last_backup_at_round_trips_through_prefs() {
         // MYND-58: the export engine's best-effort recorder writes the
@@ -2416,7 +2428,8 @@ mod tests {
         rt().block_on(async {
             let tmp = ScopedTempDir::new("prefs-autolock-empty").expect("scoped tempdir");
             let state = VaultRuntimeState::default();
-            let result = set_auto_lock_timeout_with_dir(tmp.path(), &state, 300).await;
+            let result =
+                set_auto_lock_timeout_with_dir(tmp.path(), &state, &noop_hooks(), 300).await;
             assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
         });
     }
@@ -2426,7 +2439,7 @@ mod tests {
         rt().block_on(async {
             let (tmp, state) = make_temp_vault_with_unlocked_state(0x33).await;
 
-            set_auto_lock_timeout_with_dir(tmp.path(), &state, 900)
+            set_auto_lock_timeout_with_dir(tmp.path(), &state, &noop_hooks(), 900)
                 .await
                 .expect("write must succeed");
 
@@ -2442,28 +2455,11 @@ mod tests {
         });
     }
 
-    #[test]
-    fn set_auto_lock_timeout_stores_raw_but_caches_clamped() {
-        rt().block_on(async {
-            let (tmp, state) = make_temp_vault_with_unlocked_state(0x33).await;
-
-            // A huge value is stored RAW on disk (replay-resistance lives in
-            // the read-time clamp, not the write)...
-            set_auto_lock_timeout_with_dir(tmp.path(), &state, u32::MAX)
-                .await
-                .expect("write must succeed");
-            let view = prefs_read_with_dir(tmp.path(), &state)
-                .await
-                .expect("read must succeed");
-            assert_eq!(view.auto_lock_seconds, Some(u32::MAX));
-
-            // ...but the cached effective timeout is clamped to the ceiling.
-            assert_eq!(
-                state.auto_lock_timeout_secs(),
-                crate::auto_lock::AUTO_LOCK_CEILING_SECS
-            );
-        });
-    }
+    // The clamp-WIRING test (`set_auto_lock_timeout_stores_raw_but_caches_clamped`)
+    // asserts the cached effective timeout is clamped to the desktop ceiling. The
+    // clamp is desktop-only (`auto_lock`), so that test lives desktop-side
+    // (`src-tauri/src/plugins/prefs/mod.rs` tests) where a real clamping hook is
+    // available; the clamp function itself is unit-tested in `auto_lock.rs`.
 
     #[test]
     fn deliberate_folders_round_trip_via_set_then_read() {
@@ -2822,71 +2818,13 @@ mod tests {
         });
     }
 
-    #[test]
-    fn paired_extensions_persist_and_read_round_trip_valid_and_revoked() {
-        // MYND-443 task 7 acceptance — the FULL persistence path through the
-        // encrypted prefs blob: issue → snapshot → persist to vault.prefs →
-        // re-read → hydrate a fresh registry → token still valid; revoke →
-        // persist → re-read → hydrate → RegistryGate rejects it.
-        use crate::clipper::token::{RegistryGate, TokenRegistry, TokenValidation};
-        const EXT: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-        rt().block_on(async {
-            let (tmp, state) = make_temp_vault_with_unlocked_state(0x4c).await;
-
-            // Issue a token, snapshot to records, persist through the prefs path.
-            let mut reg = TokenRegistry::new();
-            let token = reg.issue(EXT).unwrap();
-            persist_paired_extensions_with_dir(tmp.path(), &state, reg.to_paired_extensions())
-                .await
-                .expect("persist issued");
-
-            // Simulate a restart: re-read prefs from disk, hydrate a fresh
-            // registry — the token survives and still validates.
-            let view = prefs_read_with_dir(tmp.path(), &state).await.expect("read");
-            assert_eq!(view.paired_extensions.len(), 1);
-            let restored = TokenRegistry::from_paired_extensions(&view.paired_extensions);
-            assert_eq!(
-                restored.validate(EXT, token.value()),
-                TokenValidation::Valid
-            );
-
-            // Revoke, persist, re-read, hydrate — the gate now rejects it
-            // (durable revocation across the restart boundary).
-            reg.revoke_extension(EXT);
-            persist_paired_extensions_with_dir(tmp.path(), &state, reg.to_paired_extensions())
-                .await
-                .expect("persist revoked");
-            let view = prefs_read_with_dir(tmp.path(), &state).await.expect("read");
-            let restored = TokenRegistry::from_paired_extensions(&view.paired_extensions);
-            let gate = RegistryGate::new(&restored, EXT, token.value());
-            // The gate's closed outcome is Revoked → not paired (the host maps
-            // everything but Valid to silence).
-            assert_eq!(gate.validation(), TokenValidation::Revoked);
-            assert_ne!(gate.validation(), TokenValidation::Valid);
-
-            // The pre-existing screen_capture default rode along untouched.
-            assert!(view.screen_capture_protection);
-        });
-    }
-
-    #[test]
-    fn paired_extensions_persist_rejects_when_slot_empty() {
-        // The persist setter is Slot::Unlocked-gated like every other prefs
-        // writer — a locked vault cannot mutate the registry on disk.
-        use crate::clipper::token::TokenRegistry;
-        const EXT: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
-        rt().block_on(async {
-            let tmp = ScopedTempDir::new("prefs-paired-locked").expect("scoped tempdir");
-            seed_real_vault_meta(tmp.path(), 0x4d);
-            let state = VaultRuntimeState::default(); // never unlocked
-            let mut reg = TokenRegistry::new();
-            reg.issue(EXT).unwrap();
-            let result =
-                persist_paired_extensions_with_dir(tmp.path(), &state, reg.to_paired_extensions())
-                    .await;
-            assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
-        });
-    }
+    // The browser-clipper paired-extension persistence acceptance tests
+    // (`paired_extensions_persist_and_read_round_trip_valid_and_revoked` +
+    // `paired_extensions_persist_rejects_when_slot_empty`) exercise the core
+    // `persist_paired_extensions_with_dir` path but build/validate the records
+    // through the desktop-only `clipper::token::TokenRegistry`, so they live
+    // desktop-side (`src-tauri/src/plugins/prefs/mod.rs` tests). The protocol
+    // round-trip of the `paired_extensions` field is covered in `protocol`.
 
     #[test]
     fn upsert_over_cap_fails_and_leaves_prior_prefs_intact() {

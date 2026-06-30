@@ -7,7 +7,7 @@
 //! deliberately no filesystem-visible account fingerprint (a DENY-list
 //! concern: the dir name must not leak which account a vault belongs to).
 //!
-//! ## Why a newtype (mirrors [`crate::plugins::notes::note_id::NoteId`])
+//! ## Why a newtype (mirrors `notes::note_id::NoteId`)
 //!
 //! The string form of a `VaultId` becomes a path component (`vaults/<id>/`).
 //! Routing an unvalidated UI- or disk-supplied string straight into a path
@@ -106,7 +106,7 @@ impl VaultId {
     /// degrades to the active-vault path instead of hard-failing routing. The
     /// single shared parser for every `Option<String>`-IPC targeting site
     /// (sub-feature 2 task 4, SYNC-6).
-    pub(crate) fn parse_optional(s: Option<&str>) -> Option<Self> {
+    pub fn parse_optional(s: Option<&str>) -> Option<Self> {
         s.and_then(|s| Self::parse(s).ok())
     }
 }
@@ -125,7 +125,7 @@ impl core::fmt::Display for VaultId {
 /// error if they surface anything at all.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(not(test), allow(dead_code))]
-pub(crate) enum InvalidVaultIdCause {
+pub enum InvalidVaultIdCause {
     WrongLength,
     InvalidChar,
     WrongHyphenPosition,

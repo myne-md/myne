@@ -18,7 +18,7 @@ use std::path::{Path, PathBuf};
 /// pass the unlock/recover/change-password range gate, while staying ~32×
 /// cheaper than production (256 MiB). Production never uses these —
 /// `protocol::DEFAULT_V0_1_KDF_PARAMS` is the only set used at runtime.
-pub(crate) const FAST_TEST_KDF: KdfParams = KdfParams {
+pub const FAST_TEST_KDF: KdfParams = KdfParams {
     m_kib: protocol::MIN_KDF_M_KIB,
     t: 1,
     p: 1,
@@ -28,24 +28,24 @@ pub(crate) const FAST_TEST_KDF: KdfParams = KdfParams {
 /// Scoped temp directory holding a single `vault.meta`. Caller writes
 /// the bytes via [`Self::write_meta`]; the `Drop` impl removes the
 /// directory tree at end of scope.
-pub(crate) struct ScratchVault {
-    pub(crate) dir: PathBuf,
+pub struct ScratchVault {
+    pub dir: PathBuf,
     meta_path: PathBuf,
 }
 
 impl ScratchVault {
-    pub(crate) fn new(label: &str) -> Self {
+    pub fn new(label: &str) -> Self {
         let dir = std::env::temp_dir().join(format!("myne_{label}_{}", uuid::Uuid::new_v4()));
         std::fs::create_dir_all(&dir).expect("create scratch dir");
         let meta_path = dir.join("vault.meta");
         Self { dir, meta_path }
     }
 
-    pub(crate) fn path(&self) -> &Path {
+    pub fn path(&self) -> &Path {
         &self.meta_path
     }
 
-    pub(crate) fn write_meta(&self, bytes: &[u8]) {
+    pub fn write_meta(&self, bytes: &[u8]) {
         std::fs::write(&self.meta_path, bytes).expect("write vault.meta");
     }
 }
@@ -61,12 +61,12 @@ impl Drop for ScratchVault {
 /// under `std::env::temp_dir()` and removes it on drop. Avoids pulling
 /// `tempfile` as a dev-dep just to provide the same shape (TB9
 /// minimal-dep posture).
-pub(crate) struct ScopedTempDir {
+pub struct ScopedTempDir {
     path: PathBuf,
 }
 
 impl ScopedTempDir {
-    pub(crate) fn new(label: &str) -> std::io::Result<Self> {
+    pub fn new(label: &str) -> std::io::Result<Self> {
         // UUID suffix (not a timestamp) so parallel tests sharing a label never
         // collide on one directory — a collision lets one test's `Drop`
         // `remove_dir_all` delete another's `vault.meta` mid-run. Mirrors the
@@ -76,7 +76,7 @@ impl ScopedTempDir {
         Ok(Self { path })
     }
 
-    pub(crate) fn path(&self) -> &Path {
+    pub fn path(&self) -> &Path {
         &self.path
     }
 }
@@ -91,7 +91,7 @@ impl Drop for ScopedTempDir {
 /// with `account_number_hash` = `seed_byte` repeating (filler key material;
 /// parse-passes, never unlock-passes). Shared by the prefs + backup test
 /// suites — the restore validator's stage-5 parse needs a real header.
-pub(crate) fn seed_real_vault_meta(dir: &Path, seed_byte: u8) {
+pub fn seed_real_vault_meta(dir: &Path, seed_byte: u8) {
     let meta = protocol::VaultMeta {
         account_number_hash: [seed_byte; 16],
         kdf_params: protocol::DEFAULT_V0_1_KDF_PARAMS,

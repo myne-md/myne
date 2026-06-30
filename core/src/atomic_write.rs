@@ -298,7 +298,7 @@ fn write_temp(tmp: &Path, bytes: &[u8], fault: Fault) -> std::io::Result<()> {
 /// filesystems); `MoveFileExW(WRITE_THROUGH)` is the canonical Windows
 /// durability primitive.
 #[cfg(unix)]
-pub(crate) fn finalize_atomic(src: &Path, dst: &Path, _replace: bool) -> std::io::Result<()> {
+pub fn finalize_atomic(src: &Path, dst: &Path, _replace: bool) -> std::io::Result<()> {
     std::fs::rename(src, dst)?;
     let parent = dst
         .parent()
@@ -307,7 +307,7 @@ pub(crate) fn finalize_atomic(src: &Path, dst: &Path, _replace: bool) -> std::io
 }
 
 #[cfg(windows)]
-pub(crate) fn finalize_atomic(src: &Path, dst: &Path, replace: bool) -> std::io::Result<()> {
+pub fn finalize_atomic(src: &Path, dst: &Path, replace: bool) -> std::io::Result<()> {
     use std::os::windows::ffi::OsStrExt;
     use windows_sys::Win32::Storage::FileSystem::{
         MoveFileExW, MOVEFILE_REPLACE_EXISTING, MOVEFILE_WRITE_THROUGH,
@@ -342,7 +342,7 @@ pub(crate) fn finalize_atomic(src: &Path, dst: &Path, replace: bool) -> std::io:
     Ok(())
 }
 
-pub(crate) fn tmp_path(path: &Path) -> std::path::PathBuf {
+pub fn tmp_path(path: &Path) -> std::path::PathBuf {
     let mut p = path.to_path_buf();
     let name = p.file_name().map(|n| n.to_os_string()).unwrap_or_default();
     let mut tmp_name = name;

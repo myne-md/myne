@@ -68,15 +68,15 @@ const REGISTRY_FILE_NAME: &str = "registry.json";
 /// into the IPC `VaultSummary { id, status, label, last_unlock }` shape,
 /// dropping the path.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct DiscoveredVault {
+pub struct DiscoveredVault {
     /// The opaque per-vault identifier (the `vaults/<id>/` directory name).
-    pub(crate) id: VaultId,
+    pub id: VaultId,
     /// Absolute path to the vault's root directory. Internal-only.
-    pub(crate) root: PathBuf,
+    pub root: PathBuf,
     /// `true` when the directory carries a readable `vault.meta` (a
     /// fully-formed vault); `false` for a discovered-but-corrupted dir.
     /// Task 3 maps `false` → the `Corrupted` status arm.
-    pub(crate) well_formed: bool,
+    pub well_formed: bool,
 }
 
 /// One cached registry entry: opaque [`VaultId`] + last-unlock-time. **No
@@ -86,9 +86,9 @@ pub(crate) struct DiscoveredVault {
 /// never been unlocked (e.g. a freshly-rebuilt entry). Milliseconds keep the
 /// serialized form a plain integer with no `SystemTime` serde quirks.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct RegistryEntry {
-    pub(crate) id: VaultId,
-    pub(crate) last_unlock_ms: Option<u64>,
+pub struct RegistryEntry {
+    pub id: VaultId,
+    pub last_unlock_ms: Option<u64>,
 }
 
 /// The best-effort registry cache: opaque `VaultId` + last-unlock-time only.
@@ -97,13 +97,13 @@ pub(crate) struct RegistryEntry {
 /// disk-scan is the discovery authority (SYNC-10). If the file is missing or
 /// corrupt it is transparently rebuilt from the disk-scan.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub(crate) struct VaultRegistry {
-    pub(crate) entries: Vec<RegistryEntry>,
+pub struct VaultRegistry {
+    pub entries: Vec<RegistryEntry>,
 }
 
 impl VaultRegistry {
     /// Look up a vault's cached last-unlock time (epoch ms), if present.
-    pub(crate) fn last_unlock_ms(&self, id: &VaultId) -> Option<u64> {
+    pub fn last_unlock_ms(&self, id: &VaultId) -> Option<u64> {
         self.entries
             .iter()
             .find(|e| &e.id == id)
@@ -126,7 +126,7 @@ impl VaultRegistry {
 /// Results are sorted by `VaultId` for deterministic ordering (the registry
 /// holds the user-meaningful last-unlock ordering; discovery itself is
 /// order-stable but not semantically ordered).
-pub(crate) fn discover_vaults(base: &Path) -> Vec<DiscoveredVault> {
+pub fn discover_vaults(base: &Path) -> Vec<DiscoveredVault> {
     let vaults_dir = base.join(VAULTS_DIR_NAME);
     let mut found = Vec::new();
 
@@ -197,7 +197,7 @@ fn is_well_formed(vault_dir: &Path) -> bool {
 /// The retry is bounded only as a defensive guard against a pathological
 /// filesystem (a 122-bit random collision is not reachable in practice); the
 /// loop terminates on the first non-colliding id.
-pub(crate) fn mint_unique_vault_id(base: &Path) -> VaultId {
+pub fn mint_unique_vault_id(base: &Path) -> VaultId {
     let vaults_dir = base.join(VAULTS_DIR_NAME);
     loop {
         let id = VaultId::mint();
@@ -234,7 +234,7 @@ pub(crate) fn mint_unique_vault_id(base: &Path) -> VaultId {
 /// `vault_list_from_base` calls the `_with` form directly (it needs the scan
 /// for `well_formed` too, so it must not scan twice); this single-scan wrapper
 /// is exercised by the registry tests.
-pub(crate) fn load_or_rebuild_registry(base: &Path) -> VaultRegistry {
+pub fn load_or_rebuild_registry(base: &Path) -> VaultRegistry {
     load_or_rebuild_registry_with(base, &discover_vaults(base))
 }
 
@@ -250,7 +250,7 @@ pub(crate) fn load_or_rebuild_registry(base: &Path) -> VaultRegistry {
 /// matching entry survives the reconcile). A failed persist is swallowed — the
 /// cache is non-authoritative (SYNC-10), so a stale ordering never blocks the
 /// unlock that produced it.
-pub(crate) fn record_unlock(base: &Path, vault_id: &VaultId, now_ms: u64) {
+pub fn record_unlock(base: &Path, vault_id: &VaultId, now_ms: u64) {
     let mut registry = load_or_rebuild_registry(base);
     let Some(entry) = registry.entries.iter_mut().find(|e| &e.id == vault_id) else {
         return; // vault not on disk → nothing to stamp
@@ -271,10 +271,7 @@ pub(crate) fn record_unlock(base: &Path, vault_id: &VaultId, now_ms: u64) {
 /// write is skipped, avoiding a redundant rewrite on every call. A missing or
 /// corrupt cache (parse → `None`) always writes the rebuild so the cache
 /// becomes valid on disk.
-pub(crate) fn load_or_rebuild_registry_with(
-    base: &Path,
-    discovered: &[DiscoveredVault],
-) -> VaultRegistry {
+pub fn load_or_rebuild_registry_with(base: &Path, discovered: &[DiscoveredVault]) -> VaultRegistry {
     // Try to read + parse the existing cache. Any failure → rebuild.
     let cached = read_registry_file(base);
 
@@ -395,7 +392,7 @@ fn parse_registry(bytes: &[u8]) -> Option<VaultRegistry> {
 /// `registry.json` and the `.migration-*` / `.restore-staging-*` residue
 /// prefixes) are never touched. Best-effort: failures are swallowed — the
 /// sweep re-runs every boot.
-pub(crate) fn sweep_empty_vault_dirs(base: &Path) {
+pub fn sweep_empty_vault_dirs(base: &Path) {
     let vaults_dir = base.join(VAULTS_DIR_NAME);
     let Ok(entries) = std::fs::read_dir(&vaults_dir) else {
         return;

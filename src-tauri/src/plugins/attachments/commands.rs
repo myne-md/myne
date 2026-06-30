@@ -613,7 +613,7 @@ pub(crate) async fn attachment_unused_list_with_dir(
     // `items_key_id` move into the closure (Zeroizing wipes on exit).
     let notes_dir = vault_dir.join("notes");
     let referenced = tokio::task::spawn_blocking(move || {
-        crate::plugins::notes::commands::collect_referenced_attachment_ids(
+        crate::plugins::notes::desktop_commands::collect_referenced_attachment_ids(
             &notes_dir,
             &items_key,
             &items_key_id,
@@ -766,7 +766,7 @@ pub(crate) async fn attachment_clean_unused_with_dir(
     // there is no vault-wide write lock in v0.1; Phase 2 sync revisit.)
     let notes_dir = vault_dir.join("notes");
     let referenced = tokio::task::spawn_blocking(move || {
-        crate::plugins::notes::commands::collect_referenced_attachment_ids(
+        crate::plugins::notes::desktop_commands::collect_referenced_attachment_ids(
             &notes_dir,
             &items_key,
             &items_key_id,

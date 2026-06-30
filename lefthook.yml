@@ -53,13 +53,23 @@ pre-commit:
         exit $fail
 
     cargo-lock-singleton:
-      # TB9 audit anchor: workspace must keep a single Cargo.lock at the root.
-      # protocol/fuzz is an intentionally severed tooling workspace (its own
-      # empty [workspace] table so the nightly libFuzzer toolchain stays out of
-      # the product build) — its Cargo.lock is gitignored, not a product audit
-      # anchor, so it is excluded here.
+      # TB9 audit anchor: the workspace must keep a single Cargo.lock at the
+      # root. The guard governs GIT-TRACKED locks — the product audit anchor is
+      # the committed lockfile graph. Two classes of legitimate non-root lock
+      # are gitignored and therefore correctly skipped:
+      #   - protocol/fuzz — an intentionally severed tooling workspace (its own
+      #     empty [workspace] table so the nightly libFuzzer toolchain stays out
+      #     of the product build).
+      #   - companion repos nested under this checkout (myne-mobile/, myne-server/,
+      #     …; all gitignored) — each is a separate repo with its own deliberate
+      #     lock (e.g. myne-mobile/src-tauri/Cargo.lock shares `myne-core` via a
+      #     path dep but pins it in its own standalone workspace lock), never the
+      #     main repo's audit anchor.
+      # `git check-ignore` filters those out while still catching a real
+      # per-crate lock SPLIT committed inside the workspace.
       run: |
-        extra=$(find . -name Cargo.lock -not -path './target/*' -not -path './node_modules/*' -not -path './protocol/fuzz/*' -not -path './Cargo.lock' 2>/dev/null)
+        extra=$(find . -name Cargo.lock -not -path './target/*' -not -path './node_modules/*' -not -path './Cargo.lock' 2>/dev/null \
+          | while read -r f; do git check-ignore -q "$f" || echo "$f"; done)
         if [ -n "$extra" ]; then
           echo "extra Cargo.lock files outside workspace root:"
           echo "$extra"

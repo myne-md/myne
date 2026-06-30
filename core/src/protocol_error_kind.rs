@@ -17,7 +17,7 @@
 /// Never log the underlying `ProtocolError` value via `?` or `%` —
 /// those formatters could expand to leak DENY-listed material if a
 /// future variant grows a payload field. Use this helper exclusively.
-pub(crate) fn protocol_error_kind(e: &protocol::ProtocolError) -> &'static str {
+pub fn protocol_error_kind(e: &protocol::ProtocolError) -> &'static str {
     match e {
         protocol::ProtocolError::InvalidPassword => "InvalidPassword",
         protocol::ProtocolError::PasswordTooShort => "PasswordTooShort",

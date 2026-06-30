@@ -51,6 +51,7 @@ pub async fn change_password<R: Runtime>(
     current_password: String,
     new_password: String,
     state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
     app: AppHandle<R>,
 ) -> Result<(), VaultChangePasswordError> {
     let vault_path = vault_meta_path(&app, state.active_vault_id().await)?;
@@ -58,11 +59,16 @@ pub async fn change_password<R: Runtime>(
     // MYND-351 Direction 2: a user-initiated change-password preempts an
     // in-flight scheduled backup (which holds the shared auth permit) so the
     // pipeline's `try_acquire` below is not rejected by the invisible job.
-    crate::plugins::backup::commands::preempt_inflight_backup_for_user_auth(state.inner(), &app)
-        .await;
+    hooks.preempt_inflight_backup(state.inner()).await;
 
-    let result =
-        change_password_with_path(current_password, new_password, &vault_path, state.inner()).await;
+    let result = change_password_with_path(
+        current_password,
+        new_password,
+        &vault_path,
+        state.inner(),
+        hooks.inner(),
+    )
+    .await;
 
     // MYND-29: wipe the plaintext-derived search index on the force-relock
     // outcomes — they drop `Slot::Unlocked` to `Empty` and zeroize the keys
@@ -80,15 +86,15 @@ pub async fn change_password<R: Runtime>(
         Err(VaultChangePasswordError::InvalidVaultMeta)
             | Err(VaultChangePasswordError::VaultMetaChangedExternally)
     ) {
-        crate::plugins::notes::search_sync::zeroize_search_index(&app);
+        hooks.zeroize_search_index();
         // MYND-166: wipe the staged editor-workspace descriptor on this
         // force-relock path too.
-        crate::plugins::workspace::commands::clear_staged_descriptor();
+        hooks.clear_staged_descriptor();
         // MYND-255: destroy the hidden pdf-export render window (a
         // plaintext-bearing second WebView) and wipe its stashed HTML
         // payload on the same force-relock path — locking means locked
         // for every plaintext surface, not just "main".
-        crate::plugins::pdf_export::teardown_on_lock(&app);
+        hooks.pdf_export_teardown_on_lock();
     }
     result
 }
@@ -101,6 +107,7 @@ pub(crate) async fn change_password_with_path(
     new_password: String,
     vault_path: &Path,
     state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
 ) -> Result<(), VaultChangePasswordError> {
     // Wrap immediately so any early-return path drops the wrapper and
     // zeroes the bytes. Both passwords are wrapped on the FIRST non-
@@ -527,7 +534,7 @@ pub(crate) async fn change_password_with_path(
     // for this vault (defense-in-depth — a password change signals "reset my
     // access", User Story 8). Best-effort; absence of a credential is a no-op.
     if let Some(vault_dir) = vault_path.parent() {
-        crate::plugins::quick_unlock::commands::invalidate_credential(vault_dir);
+        hooks.invalidate_quick_unlock(vault_dir);
     }
 
     Ok(())
@@ -541,6 +548,13 @@ mod tests {
     use crate::plugins::vault_unlock::commands::unlock_with_path;
     use crate::plugins::vault_unlock::state::{test_vault_id, SlotKind};
     use crate::test_support::{ScratchVault, FAST_TEST_KDF};
+
+    /// No-op lifecycle hooks for the `_with_path` core tests — the
+    /// quick-unlock-invalidation side-effect (desktop-only) is exercised by the
+    /// desktop `quick_unlock` plugin's own tests, not asserted here.
+    fn noop_hooks() -> crate::hooks::Hooks {
+        std::sync::Arc::new(crate::hooks::NoopHooks)
+    }
 
     /// Same per-test runtime pattern as the sibling plugins. Builds a
     /// current-thread tokio runtime each test (no `#[tokio::test]` —
@@ -619,6 +633,7 @@ mod tests {
                 "new-password-12".to_string(),
                 scratch.path(),
                 &state,
+                &noop_hooks(),
             )
             .await
             .expect("change_password happy path");
@@ -685,6 +700,7 @@ mod tests {
                 "new-password-12".to_string(),
                 scratch.path(),
                 &state,
+                &noop_hooks(),
             )
             .await
             .expect("change_password");
@@ -716,6 +732,7 @@ mod tests {
                 "new-password-12".to_string(),
                 scratch.path(),
                 &state,
+                &noop_hooks(),
             )
             .await
             .expect("change_password");
@@ -770,6 +787,7 @@ mod tests {
                 "new-password-12".to_string(),
                 scratch.path(),
                 &state,
+                &noop_hooks(),
             )
             .await;
 
@@ -812,6 +830,7 @@ mod tests {
                 "new-password-12".to_string(),
                 scratch.path(),
                 &state,
+                &noop_hooks(),
             )
             .await;
             assert!(
@@ -844,6 +863,7 @@ mod tests {
                 "new-password-12".to_string(),
                 scratch.path(),
                 &state,
+                &noop_hooks(),
             )
             .await;
             assert!(
@@ -870,6 +890,7 @@ mod tests {
                 "orig-password-12".to_string(),
                 scratch.path(),
                 &state,
+                &noop_hooks(),
             )
             .await;
             let elapsed = started.elapsed();
@@ -922,6 +943,7 @@ mod tests {
                 weak_new,
                 scratch.path(),
                 &state,
+                &noop_hooks(),
             )
             .await;
             let elapsed = started.elapsed();
@@ -987,6 +1009,7 @@ mod tests {
                 "new-password-12".to_string(),
                 scratch.path(),
                 &state,
+                &noop_hooks(),
             )
             .await;
 
@@ -1029,6 +1052,7 @@ mod tests {
                 "new-password-12".to_string(),
                 scratch.path(),
                 &state,
+                &noop_hooks(),
             )
             .await;
 
@@ -1084,6 +1108,7 @@ mod tests {
                 "new-password-12".to_string(),
                 scratch.path(),
                 &state,
+                &noop_hooks(),
             )
             .await;
 
@@ -1129,6 +1154,7 @@ mod tests {
                 "intermediate-pw".to_string(),
                 scratch.path(),
                 &state,
+                &noop_hooks(),
             )
             .await
             .expect("first change_password (A→B) must succeed");
@@ -1146,6 +1172,7 @@ mod tests {
                 "final-password-12".to_string(),
                 scratch.path(),
                 &state,
+                &noop_hooks(),
             )
             .await
             .expect("second change_password (B→C) must succeed via propagated CAS anchor");
@@ -1309,6 +1336,7 @@ mod tests {
                 "new-password-12".to_string(),
                 scratch.path(),
                 &state,
+                &noop_hooks(),
             )
             .await;
 
@@ -1573,6 +1601,7 @@ mod tests {
                 "short-pw".to_string(),
                 scratch.path(),
                 &state,
+                &noop_hooks(),
             )
             .await;
 

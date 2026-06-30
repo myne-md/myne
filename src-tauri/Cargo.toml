@@ -25,6 +25,7 @@ tauri-plugin-fs = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 protocol = { path = "../protocol" }
+myne-core = { path = "../core" }
 uuid = { version = "1", features = ["v4", "v7"] }
 thiserror = "2"
 getrandom = "0.2"
@@ -257,3 +258,7 @@ objc2-web-kit = { version = "0.3", default-features = false, features = [
 # the precedent".
 [dev-dependencies]
 tracing-test = "0.2"
+# Cross-plugin test fixtures (ScratchVault, ScopedTempDir, FAST_TEST_KDF,
+# seed_real_vault_meta) live in `myne-core`; the `test-support` feature gates
+# them so production builds never compile them. See `core/src/test_support.rs`.
+myne-core = { path = "../core", features = ["test-support"] }

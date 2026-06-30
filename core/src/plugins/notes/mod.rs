@@ -1,0 +1,28 @@
+// SPDX-License-Identifier: AGPL-3.0
+//! `notes` plugin — shared core.
+//!
+//! Owns the platform-agnostic per-note CRUD + listing commands
+//! (`note_create`, `note_read`, `note_update`, `note_write_batch_transactional`,
+//! `note_delete`, `note_list`, `note_titles_batch`) plus the `NoteId`
+//! identifier, the title-extraction helpers, and the error enums. Each command
+//! pattern-matches `Slot::Unlocked(_)` only; `Slot::Recovering` is rejected at
+//! compile time per `recovery-flow.md` §4.1. The plugin holds no own state and
+//! borrows `VaultRuntimeState` cross-plugin.
+//!
+//! The desktop-only index/sync/snapshot side-effects the CRUD commands trigger
+//! (search upsert/remove, sync dirty-bump, pre-overwrite snapshot capture,
+//! snapshot purge-on-delete, the attachment-text fold) attach through the
+//! [`crate::hooks::VaultLifecycleHooks`] seam — no-op on mobile. The
+//! desktop-only commands (note export, full-text search, snapshot flush,
+//! attachment-reference scan) live in the desktop crate
+//! (`src-tauri/src/plugins/notes/desktop_commands.rs`); the `tauri::Builder`
+//! `init()` wiring stays in each client crate.
+//!
+//! See: ../../../CLAUDE.md "Secret-handling logging discipline".
+
+pub mod commands;
+pub mod error;
+pub mod note_id;
+pub mod title_extract;
+
+pub use commands::SNAPSHOT_WRITE_FAILED_EVENT;
