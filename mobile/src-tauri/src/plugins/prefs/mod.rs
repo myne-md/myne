@@ -43,12 +43,21 @@
 //!
 //! See: ../../CLAUDE.md "Secret-handling logging discipline".
 
-pub mod commands;
-pub mod error;
+// The `prefs` command core (`vault.prefs` read + every per-field setter) and
+// its `error` enum live in `myne-core` (shared with the desktop client).
+// Re-exported so existing `crate::plugins::prefs::{commands,error}::…` paths
+// keep resolving; the no-op `NoopHooks` installed in `lib.rs` satisfies the
+// screen-capture / auto-lock-clamp hook seam. The `init()` wiring stays
+// mobile-side.
+pub use myne_core::plugins::prefs::{commands, error};
 
 // Re-exports for cross-plugin consumers (e.g., vault_unlock's
-// `apply_persisted_prefs` post-pipeline hook).
+// `apply_persisted_prefs` post-pipeline hook). Kept for path-compatibility with
+// the desktop re-export surface even though the consuming code now lives in
+// `myne-core`, hence the `unused_imports` allow.
+#[allow(unused_imports)]
 pub use error::PrefsReadError;
+#[allow(unused_imports)]
 pub use protocol::PrefsView;
 
 use tauri::plugin::{Builder, TauriPlugin};
