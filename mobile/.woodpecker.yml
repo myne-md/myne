@@ -1,0 +1,87 @@
+# Woodpecker CI — myne-mobile (Phase-3 mobile client).
+# Mirrors the main `myne` repo's self-hosted Woodpecker pipeline, adapted for the
+# mobile layout:
+#   * The Cargo workspace is at `src-tauri/` (mobile has no root Cargo.toml).
+#   * The audited `protocol` crate is REUSED from the main repo via the nested
+#     path dep `../../protocol`. Locally that resolves because myne-mobile is
+#     cloned inside the main `myne` checkout; in CI (standalone checkout) the
+#     `provision-protocol` snippet clones the main repo and symlinks it into
+#     place — the same companion-repo-clone idiom the desktop `sync-sim` step
+#     uses (token-gated Forgejo clone).
+#   * Native iOS/Android builds need Xcode / the Android SDK+NDK and CANNOT run
+#     on the Linux runner — they belong to a separate mac/Android release matrix
+#     (documented, not gated here), exactly as the desktop signed-bundle release
+#     pipeline is separate from this verification CI.
+
+when:
+  - event: [push, pull_request, manual]
+    branch: [develop, main]
+
+steps:
+  # ── Rust style (no compile) ───────────────────────────────────────────────
+  cargo-fmt:
+    image: rust:1.96.0-slim
+    commands:
+      - rustup component add rustfmt
+      - cd src-tauri && cargo fmt --all -- --check
+
+  # ── Rust lint + unit tests (mirrored vault/notes/prefs plugins) ───────────
+  # Compiling the mobile Tauri lib for the Linux host exercises the platform-
+  # agnostic Rust logic; it needs the Tauri Linux WebView sysdeps + the protocol
+  # crate provisioned adjacently.
+  cargo-checks:
+    image: rust:1.96.0-slim
+    environment:
+      MYNE_REPO_TOKEN:
+        from_secret: myne_repo_token
+    commands:
+      - ulimit -n $(ulimit -Hn) 2>/dev/null || true
+      - apt-get update && apt-get install -y --no-install-recommends
+        git ca-certificates pkg-config libssl-dev
+        libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
+      # provision-protocol: make ../../protocol (relative to src-tauri) resolve.
+      - |
+        PARENT="$(cd .. && pwd)"
+        if [ ! -e "$PARENT/protocol" ]; then
+          if [ -n "$MYNE_REPO_TOKEN" ]; then
+            git clone --depth 1 "https://oauth2:$MYNE_REPO_TOKEN@git.myne.md/Myne/myne.git" "$PARENT/myne-main"
+          else
+            git clone --depth 1 "https://github.com/myne-md/myne.git" "$PARENT/myne-main"
+          fi
+          ln -sfn "$PARENT/myne-main/protocol" "$PARENT/protocol"
+        fi
+      - rustup component add clippy
+      - cd src-tauri && cargo clippy --all-targets -- -D warnings
+      - cargo test --no-fail-fast
+
+  # ── Rust supply-chain audit ───────────────────────────────────────────────
+  cargo-deny:
+    image: rust:1.96.0-slim
+    commands:
+      - apt-get update && apt-get install -y --no-install-recommends git ca-certificates
+      - cargo install --locked cargo-deny
+      - cd src-tauri && cargo deny check
+
+  # ── Frontend build (tsc typecheck + vite bundle) ──────────────────────────
+  pnpm-build:
+    image: node:25
+    commands:
+      - npm install -g pnpm@11.8.0
+      - pnpm install --frozen-lockfile
+      - pnpm build
+
+  # ── Frontend unit tests (TS↔Rust mirrors, dialect, etc.) ──────────────────
+  # Serialized after pnpm-build so the two pnpm-install steps stay linear (the
+  # desktop pipeline does the same to avoid pnpm lockdir ENOENT races).
+  vitest:
+    image: node:25
+    depends_on: [pnpm-build]
+    commands:
+      - npm install -g pnpm@11.8.0
+      - pnpm install --frozen-lockfile
+      - pnpm test
+
+# Native build matrix (NOT run here — needs Xcode / Android SDK+NDK):
+#   iOS:     pnpm tauri ios build      (mac runner, signing identity)
+#   Android: pnpm tauri android build  (JDK 17 + Android SDK/NDK runner)
+# See operations for the reproducible mobile-build recipe (Phase-3 release track).

@@ -1,0 +1,1556 @@
+//! Tauri commands for the `vault-change-password` plugin.
+//!
+//! [`change_password`] is the standalone password-rotation flow: user
+//! knows their current password, sets a new one. The post-recovery
+//! password reset (where the user proves identity via recovery phrase
+//! instead) lives in `vault_recover::complete_recovery` — different
+//! signature, different command.
+//!
+//! Design history: PRD + MYND-22 grilling Q1–Q9 in `agent-tooling/`.
+//!
+//! See: ../../CLAUDE.md "Secret-handling logging discipline".
+
+use super::super::vault_unlock::state::VaultRuntimeState;
+use super::error::VaultChangePasswordError;
+use crate::io_failure_kind::{from_io_error_kind, IoFailureKind};
+use crate::protocol_error_kind::protocol_error_kind;
+use protocol::{AEAD_NONCE_LEN, ARGON2_SALT_LEN};
+use std::path::{Path, PathBuf};
+use std::time::Instant;
+use tauri::{AppHandle, Manager, Runtime, State};
+use zeroize::Zeroizing;
+
+/// Resolve `<active-vault-root>/vault.meta`. Local rather than imported from
+/// sibling plugins because the return type is `VaultChangePasswordError`.
+/// `active_id` is read from the runtime state by [`change_password`]
+/// (`state.active_vault_id().await`) — the only place with `.await` access to
+/// the slot map. SYNC-6: a password change always rotates the unlocked vault's
+/// wrap, so resolving via the active id (not the transitional sole-vault disk
+/// heuristic) keeps the rewrite targeting the correct `vault.meta` once two or
+/// more exist.
+fn vault_meta_path<R: Runtime>(
+    app: &AppHandle<R>,
+    active_id: Option<crate::vault_id::VaultId>,
+) -> Result<PathBuf, VaultChangePasswordError> {
+    let base = app
+        .path()
+        .app_data_dir()
+        .map_err(|_| VaultChangePasswordError::IoError {
+            io_error_kind: IoFailureKind::Other,
+        })?;
+    Ok(crate::paths::active_vault_root_from_base(&base, active_id).join("vault.meta"))
+}
+
+/// Tauri command name `change_password` (NOT `commit`) — chosen to
+/// avoid `#[tauri::command]` macro symbol collision with
+/// `vault_creation::commands::commit`. Both macros generate a hidden
+/// `__cmd__<fn-name>` symbol in the global namespace; identical
+/// short names across plugins collide at link-time.
+#[tauri::command]
+pub async fn change_password<R: Runtime>(
+    current_password: String,
+    new_password: String,
+    state: State<'_, VaultRuntimeState>,
+    app: AppHandle<R>,
+) -> Result<(), VaultChangePasswordError> {
+    let vault_path = vault_meta_path(&app, state.active_vault_id().await)?;
+
+    // Desktop preempted an in-flight scheduled backup here and, on the
+    // force-relock error outcomes, tore down the search index / staged
+    // workspace / pdf-export render window. Those subsystems are desktop-only;
+    // the password-rotation crypto core below is unchanged.
+    let result =
+        change_password_with_path(current_password, new_password, &vault_path, state.inner()).await;
+
+    result
+}
+
+/// Testable core of [`change_password`]. The Tauri-command wrapper
+/// resolves the platform-specific `vault.meta` path and delegates here
+/// so tests do not need an [`AppHandle`].
+pub(crate) async fn change_password_with_path(
+    current_password: String,
+    new_password: String,
+    vault_path: &Path,
+    state: &VaultRuntimeState,
+) -> Result<(), VaultChangePasswordError> {
+    // Wrap immediately so any early-return path drops the wrapper and
+    // zeroes the bytes. Both passwords are wrapped on the FIRST non-
+    // doc statement of the function body per `src-tauri/CLAUDE.md`
+    // "Secret-handling logging discipline" (Zeroizing wrap +
+    // spawn_blocking move idiom). Plain `String` would drop without
+    // zeroize.
+    let current_password = Zeroizing::new(current_password);
+    let new_password = Zeroizing::new(new_password);
+    let started = Instant::now();
+
+    // (0a) Same-password reject (MYND-22 grilling Q7-α).
+    //      Pre-Argon2id, pre-slot-peek, pre-permit-acquire — a same-
+    //      password input must NOT consume a slot read-lock OR an
+    //      auth_permits slot OR pay 2× Argon2id cost. Plain UTF-8
+    //      bytes compare; Phase 1 A7 side-channel out of scope per
+    //      `threat-model.md`. Saves the 2× Argon2id round-trip.
+    //
+    //      Ordered BEFORE the weak-pw gate so a "I copy-pasted my
+    //      current into new" mistake surfaces with the more specific
+    //      "Yeni parola mevcut parolayla aynı." UX message.
+    if current_password.as_bytes() == new_password.as_bytes() {
+        tracing::error!(
+            stage = "same_password_check",
+            error_kind = "SamePasswordRejected",
+            "change_password rejected: new password identical to current"
+        );
+        return Err(VaultChangePasswordError::SamePasswordRejected);
+    }
+
+    // (0b) Weak new-password reject (MYND-22 grilling Q7-β).
+    //      Backend `MIN_PASSWORD_LEN` floor — structural belt+suspenders
+    //      against frontend bypass per `decisions.md` 2026-05-06
+    //      "Auth-pipeline backend MIN_PASSWORD_LEN floor; project-wide
+    //      retroactive". Cross-plugin shared variant name with
+    //      `AppError::WeakNewPassword` and
+    //      `VaultRecoveryError::WeakNewPassword`. Mapped explicitly
+    //      via `if .is_err()` (not `?`-propagation) — there is no
+    //      `From<ProtocolError> for VaultChangePasswordError` impl,
+    //      so explicit mapping is the single-path discipline that
+    //      avoids any future dual-path drift.
+    if protocol::password_policy::validate_min_length(&new_password).is_err() {
+        tracing::error!(
+            stage = "weak_new_password",
+            error_kind = "WeakNewPassword",
+            "change_password rejected: new password below MIN_PASSWORD_LEN"
+        );
+        return Err(VaultChangePasswordError::WeakNewPassword);
+    }
+
+    // (1) Slot peek + snapshot — must be Unlocked. Slot stays
+    //     Unlocked across the spawn_blocking work; the post-Argon2id
+    //     re-peek (step 4) catches a mid-flight `vault_lock`.
+    let (root_key_for_seal, snapshot_meta_hash) =
+        match state.peek_unlocked_root_key_and_hash_clone().await {
+            Some(pair) => pair,
+            None => {
+                tracing::error!(
+                    stage = "slot_check",
+                    error_kind = "VaultNotUnlocked",
+                    "change_password rejected: slot is not Unlocked"
+                );
+                return Err(VaultChangePasswordError::VaultNotUnlocked);
+            }
+        };
+
+    // (2) Acquire shared auth permit (RAII guard). Reject, never queue —
+    //     `decisions.md` 2026-05-02 generalizes the "single in-flight"
+    //     posture across all auth-pipeline plugins.
+    let _permit = match state.auth_permits().try_acquire() {
+        Ok(p) => p,
+        Err(_) => {
+            tracing::error!(
+                stage = "permit_acquire",
+                error_kind = "ChangePasswordInProgress",
+                "change_password rejected: another auth op in flight"
+            );
+            return Err(VaultChangePasswordError::ChangePasswordInProgress);
+        }
+    };
+
+    let vault_path_for_pipeline = vault_path.to_path_buf();
+    let vault_path_for_write = vault_path_for_pipeline.clone();
+
+    // (3) Run the Argon2id-bound derivation pipeline in spawn_blocking.
+    //     Returns the freshly-built `new_bytes` WITHOUT writing them
+    //     to disk — atomic_write is conditional on the post-Argon2id
+    //     slot peek (option p, MYND-22 grilling Q4) in step (4).
+    //     This split mirrors vault_recover's Task 4 restructure: if
+    //     `vault_lock` fires during the Argon2id window, we bail
+    //     WITHOUT touching `vault.meta`.
+    let derive_outcome = tokio::task::spawn_blocking(
+        move || -> Result<[u8; protocol::VAULT_META_LEN], VaultChangePasswordError> {
+            // (a) Read existing vault.meta.
+            let bytes = std::fs::read(&vault_path_for_pipeline).map_err(|e| {
+                let io_kind = from_io_error_kind(e.kind());
+                tracing::error!(
+                    stage = "read_meta",
+                    error_kind = "IoError",
+                    io_failure_kind = ?io_kind,
+                    "vault.meta read failed during change_password"
+                );
+                VaultChangePasswordError::IoError {
+                    io_error_kind: io_kind,
+                }
+            })?;
+
+            // (a.5) Disk-level CAS check. Mismatch ⇒ vault.meta was
+            //       externally mutated between unlock and this
+            //       rewrite (parallel instance, disk tampering); bail
+            //       and let the post-await caller force-relock.
+            //       Placed BEFORE Argon2id so a mutation is detected
+            //       in µs rather than after a ~1-3 s derivation.
+            let disk_hash = crate::vault_meta_hash::vault_meta_sha256(&bytes);
+            if disk_hash != snapshot_meta_hash {
+                tracing::warn!(
+                    stage = "disk_cas_check",
+                    error_kind = "VaultMetaChangedExternally",
+                    "disk vault.meta SHA-256 differs from slot-held snapshot — external mutation detected"
+                );
+                return Err(VaultChangePasswordError::VaultMetaChangedExternally);
+            }
+
+            // (b) Parse.
+            let existing = protocol::parse_vault_meta(&bytes).map_err(|e| {
+                tracing::error!(
+                    stage = "parse_meta",
+                    error_kind = "InvalidVaultMeta",
+                    protocol_error_kind = protocol_error_kind(&e),
+                    "vault.meta parse failed during change_password"
+                );
+                VaultChangePasswordError::InvalidVaultMeta
+            })?;
+
+            // (c) Current-password verify via AEAD-tag-verify success
+            //     (MYND-22 grilling Q2 — `decisions.md` 2026-05-06
+            //     entry "Naming-discipline > scenario-optimization").
+            //     Re-derive `password_wrap_key` under the existing
+            //     salt + KDF params, then `aead_open_ctx` against
+            //     `enc_root_key_password`. The AEAD-tag check is the
+            //     proof; the decrypted bytes are dropped immediately
+            //     (slot.root_key is the truth). `Err(AeadFailure)`
+            //     → `InvalidCredentialOrVault` per the cross-plugin
+            //     shared-name discipline; any other ProtocolError
+            //     surfaces as `InvalidVaultMeta`.
+            protocol::validate_kdf_params(&existing.kdf_params).map_err(|e| {
+                tracing::error!(
+                    stage = "kdf_params_range",
+                    error_kind = "InvalidVaultMeta",
+                    protocol_error_kind = protocol_error_kind(&e),
+                    "kdf params outside accepted range"
+                );
+                VaultChangePasswordError::InvalidVaultMeta
+            })?;
+
+            let current_wrap_key = protocol::derive_password_wrap_key(
+                &current_password,
+                &existing.random_salt_password,
+                &existing.account_number_hash,
+                &existing.kdf_params,
+            )
+            .map_err(|e| {
+                tracing::error!(
+                    stage = "current_password_verify",
+                    error_kind = "InvalidVaultMeta",
+                    protocol_error_kind = protocol_error_kind(&e),
+                    "current-password Argon2id derivation failed"
+                );
+                VaultChangePasswordError::InvalidVaultMeta
+            })?;
+            let aad = protocol::aad_password_wrap(&existing.kdf_params);
+            let opened = protocol::aead_open_ctx(
+                &current_wrap_key,
+                &existing.nonce_password_wrap,
+                &existing.enc_root_key_password,
+                &aad,
+            )
+            .map_err(|e| match e {
+                protocol::ProtocolError::AeadFailure => {
+                    tracing::error!(
+                        stage = "current_password_verify",
+                        error_kind = "InvalidCredentialOrVault",
+                        "current-password AEAD-open failed (wrong pw OR tampered password section)"
+                    );
+                    VaultChangePasswordError::InvalidCredentialOrVault
+                }
+                other => {
+                    tracing::error!(
+                        stage = "current_password_verify",
+                        error_kind = "InvalidVaultMeta",
+                        protocol_error_kind = protocol_error_kind(&other),
+                        "current-password AEAD-open returned non-AEAD ProtocolError"
+                    );
+                    VaultChangePasswordError::InvalidVaultMeta
+                }
+            })?;
+            // The opened bytes are not the truth — slot.root_key is.
+            // Drop the decrypted output explicitly (Zeroize wipes).
+            drop(opened);
+
+            // (c.5) Items_key wrap verify — POST-derivation
+            //       structural-integrity check. After the current-
+            //       password wrap-key has AEAD-verified, also verify
+            //       that the singleton `enc_items_key` blob in
+            //       vault.meta decrypts cleanly under the
+            //       `items_key_wrap_key = derive_subkey(root_key,
+            //       ItemsKeyWrap)`. A failure here means the items_key
+            //       wrap section is corrupt or tampered EVEN THOUGH
+            //       the password section is intact — surfaces as
+            //       `InvalidVaultMeta`, NOT `InvalidCredentialOrVault`
+            //       (which would falsely accuse the password). Single
+            //       user-facing CTA "vault file is unreadable" per
+            //       MYND-22 grilling Q6(b) + `decisions.md` 2026-05-02
+            //       "Phase 1 unlock error discipline" (post-derivation
+            //       items_key wrap failure → InvalidVaultMeta), now
+            //       extended to vault_change_password.
+            //
+            //       The decrypted items_key bytes are dropped
+            //       immediately — slot.items_key is the truth (the
+            //       cloned root_key + slot's items_key are both held
+            //       in memory; this verify only confirms vault.meta's
+            //       wrap is consistent with our memory state).
+            let items_key_wrap_key =
+                protocol::derive_subkey(&root_key_for_seal, protocol::SubkeyRole::ItemsKeyWrap);
+            let aad_items = protocol::aad_vault_items_key_wrap(&existing.items_key_id);
+            let items_opened = protocol::aead_open_ctx(
+                &items_key_wrap_key,
+                &existing.items_key_nonce,
+                &existing.enc_items_key,
+                &aad_items,
+            )
+            .map_err(|e| {
+                tracing::error!(
+                    stage = "items_key_wrap_verify",
+                    error_kind = "InvalidVaultMeta",
+                    protocol_error_kind = protocol_error_kind(&e),
+                    "items_key wrap AEAD-open failed POST current-password verify"
+                );
+                VaultChangePasswordError::InvalidVaultMeta
+            })?;
+            drop(items_opened);
+
+            // (d) Sample fresh CSPRNG salt + nonce for the new
+            //     password-side wrap.
+            let mut fresh_salt = [0u8; ARGON2_SALT_LEN];
+            getrandom::getrandom(&mut fresh_salt).map_err(|_| {
+                tracing::error!(
+                    stage = "csprng_salt_nonce",
+                    error_kind = "IoError",
+                    "OS CSPRNG failed for fresh password salt"
+                );
+                VaultChangePasswordError::IoError {
+                    io_error_kind: IoFailureKind::Other,
+                }
+            })?;
+            let mut fresh_nonce = [0u8; AEAD_NONCE_LEN];
+            getrandom::getrandom(&mut fresh_nonce).map_err(|_| {
+                tracing::error!(
+                    stage = "csprng_salt_nonce",
+                    error_kind = "IoError",
+                    "OS CSPRNG failed for fresh password nonce"
+                );
+                VaultChangePasswordError::IoError {
+                    io_error_kind: IoFailureKind::Other,
+                }
+            })?;
+
+            // (e) Build new vault.meta bytes via the protocol-crate
+            //     primitive. Recovery-side + items_key wrap byte-
+            //     preserved per `recovery-flow.md` §4.4 — the helper
+            //     enforces the invariant internally.
+            let new_bytes = protocol::rewrite_vault_meta_password_side(
+                &existing,
+                &root_key_for_seal,
+                &new_password,
+                &fresh_salt,
+                &fresh_nonce,
+            )
+            .map_err(|e| {
+                tracing::error!(
+                    stage = "vault_meta_rewrite",
+                    error_kind = "InvalidVaultMeta",
+                    protocol_error_kind = protocol_error_kind(&e),
+                    "vault.meta rewrite failed during change_password"
+                );
+                VaultChangePasswordError::InvalidVaultMeta
+            })?;
+
+            // Atomic write + SHA-256 are deferred to spawn_blocking 2
+            // (after the post-Argon2id slot peek). If `vault_lock`
+            // fired during the Argon2id window above, the slot is now
+            // `Empty` and we bail with `VaultLockedDuringChange`
+            // WITHOUT touching `vault.meta` — the (p) checkpoint per
+            // MYND-22 grilling Q4.
+            Ok(new_bytes)
+        },
+    )
+    .await;
+
+    // The Zeroizing<String> wrappers + the cloned root_key were moved
+    // into spawn_blocking 1; on closure exit (success or error) the
+    // bytes wipe via Drop.
+
+    let new_bytes = match derive_outcome {
+        Ok(Ok(b)) => b,
+        Ok(Err(VaultChangePasswordError::InvalidVaultMeta)) => {
+            // Force-relock per MYND-22 grilling Q6(b) +
+            // `decisions.md` 2026-05-06 entry "InvalidVaultMeta posture".
+            // TRANSITIONAL (sub-feature 2): drop the active vault entry.
+            if let Some(id) = state.active_vault_or_recovering_for_probe().await {
+                let _prior = state.take(id).await;
+            }
+            tracing::warn!(
+                stage = "force_relock_on_invalid_vault_meta",
+                error_kind = "InvalidVaultMeta",
+                "vault.meta integrity failure during change_password; slot dropped to Empty"
+            );
+            return Err(VaultChangePasswordError::InvalidVaultMeta);
+        }
+        Ok(Err(VaultChangePasswordError::VaultMetaChangedExternally)) => {
+            // Force-relock per MYND-22 grilling Q3 + `decisions.md`
+            // 2026-05-06 entry "CAS mismatch posture: force-relock".
+            // TRANSITIONAL (sub-feature 2): drop the active vault entry.
+            if let Some(id) = state.active_vault_or_recovering_for_probe().await {
+                let _prior = state.take(id).await;
+            }
+            tracing::warn!(
+                stage = "force_relock_on_cas_mismatch",
+                error_kind = "VaultMetaChangedExternally",
+                "disk CAS mismatch during change_password; slot dropped to Empty"
+            );
+            return Err(VaultChangePasswordError::VaultMetaChangedExternally);
+        }
+        Ok(Err(inner)) => return Err(inner),
+        Err(_) => {
+            tracing::error!(
+                stage = "spawn_blocking_join",
+                error_kind = "JoinFailure",
+                "blocking derivation task join failed during change_password"
+            );
+            return Err(VaultChangePasswordError::JoinFailure);
+        }
+    };
+
+    // (4) Post-Argon2id commit under a single write-lock critical
+    //     section: verify slot is still `Slot::Unlocked` with the
+    //     snapshot hash, run atomic_write + sha256 in spawn_blocking
+    //     (lock held across the .await), then update slot's hash
+    //     anchor — all atomic vs `vault_lock`. This closes the µs
+    //     gap that an earlier "release lock → spawn_blocking →
+    //     re-lock" pattern left open. See `decisions.md` 2026-05-06
+    //     "post-Argon2id slot peek (option p)" + the C1 fix entry.
+    use super::super::vault_unlock::state::CommitRewriteError;
+    match state
+        .commit_unlocked_rewrite(snapshot_meta_hash, move || {
+            crate::atomic_write::atomic_write(&vault_path_for_write, &new_bytes, true).map_err(
+                |e| {
+                    let io_kind = from_io_error_kind(e.kind());
+                    tracing::error!(
+                        stage = "atomic_write",
+                        error_kind = "IoError",
+                        io_failure_kind = ?io_kind,
+                        "atomic write of new vault.meta failed during change_password"
+                    );
+                    VaultChangePasswordError::IoError {
+                        io_error_kind: io_kind,
+                    }
+                },
+            )?;
+            Ok(crate::vault_meta_hash::vault_meta_sha256(&new_bytes))
+        })
+        .await
+    {
+        Ok(()) => {}
+        Err(CommitRewriteError::HashMismatch) => {
+            // Helper already dropped the slot to Empty.
+            tracing::warn!(
+                stage = "post_argon2id_slot_peek",
+                error_kind = "VaultMetaChangedExternally",
+                "slot hash drift detected post-Argon2id (defensive bail)"
+            );
+            return Err(VaultChangePasswordError::VaultMetaChangedExternally);
+        }
+        Err(CommitRewriteError::SlotDropped) => {
+            // Slot was Empty/Recovering at the post-Argon2id check;
+            // closure did NOT run, vault.meta untouched. Slot stays
+            // as it was.
+            tracing::warn!(
+                stage = "post_argon2id_slot_peek",
+                error_kind = "VaultLockedDuringChange",
+                "vault_lock fired mid-Argon2id during change_password; bailed without disk write"
+            );
+            return Err(VaultChangePasswordError::VaultLockedDuringChange);
+        }
+        Err(CommitRewriteError::Rewrite(inner)) => return Err(inner),
+        Err(CommitRewriteError::Join) => {
+            tracing::error!(
+                stage = "spawn_blocking_join",
+                error_kind = "JoinFailure",
+                "blocking write task join failed during change_password"
+            );
+            return Err(VaultChangePasswordError::JoinFailure);
+        }
+    };
+
+    // Success event. Coarse `duration_ms` only — no account
+    // identifier, no path, no key material. Per ALLOW-list in
+    // `src-tauri/CLAUDE.md` "Secret-handling logging discipline".
+    // `duration_ms` rounded down to 10ms granularity per
+    // `decisions.md` 2026-05-06 "Tracing event-name pattern" entry —
+    // future-ready timing-channel resistance (Phase 1 A7 side-channel
+    // out of scope, but the discipline costs ~zero today).
+    // Event name `vault_password_changed` follows the project-wide
+    // `vault_<verb_past>` discipline alongside vault_unlocked,
+    // vault_locked, vault_recovered_with_phrase, vault_recovery_completed.
+    let now = Instant::now();
+    tracing::info!(
+        event = "vault_password_changed",
+        duration_ms = (now.duration_since(started).as_millis() / 10 * 10) as u64,
+        "vault password rotated successfully (root_key unchanged; only its wrap rotated)"
+    );
+
+    // Desktop invalidated any quick-unlock credential for this vault here
+    // (`quick_unlock::commands::invalidate_credential`); the quick-unlock
+    // subsystem is desktop-only.
+
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::plugins::vault_creation::commands::{build_and_serialize_vault_meta, build_session};
+    use crate::plugins::vault_recover::commands::recover_with_phrase_with_path;
+    use crate::plugins::vault_unlock::commands::unlock_with_path;
+    use crate::plugins::vault_unlock::state::{test_vault_id, SlotKind};
+    use crate::test_support::{ScratchVault, FAST_TEST_KDF};
+
+    /// Same per-test runtime pattern as the sibling plugins. Builds a
+    /// current-thread tokio runtime each test (no `#[tokio::test]` —
+    /// the `tokio = ["macros"]` feature is intentionally NOT enabled
+    /// per workspace TB9 audit-anchor discipline; tests build the
+    /// runtime manually via `block_on`).
+    fn rt() -> tokio::runtime::Runtime {
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("current-thread runtime build")
+    }
+
+    fn scratch_vault() -> ScratchVault {
+        ScratchVault::new("change_password_test")
+    }
+
+    /// Build a real vault.meta via `vault_creation::build_session`,
+    /// write it to the scratch path, run `vault_unlock_with_path` to
+    /// populate `Slot::Unlocked`, and return all the artefacts the
+    /// downstream tests need: state, scratch, original password,
+    /// recovery phrase (for the recovery-still-works test), original
+    /// vault.meta bytes (for byte-equal pre/post diffs).
+    async fn seed_unlocked_state(
+        password: &str,
+    ) -> (
+        VaultRuntimeState,
+        ScratchVault,
+        String,
+        String,
+        [u8; protocol::VAULT_META_LEN],
+    ) {
+        let scratch = scratch_vault();
+        let session = build_session(crate::vault_id::VaultId::mint(), password, FAST_TEST_KDF)
+            .expect("build_session");
+        let phrase_string: String = (*session.phrase.join_normalized()).to_string();
+        let meta_bytes = build_and_serialize_vault_meta(&session).expect("serialize vault.meta");
+        scratch.write_meta(&meta_bytes);
+
+        let state = VaultRuntimeState::default();
+        unlock_with_path(password.to_string(), None, scratch.path(), &state)
+            .await
+            .expect("seed: vault_unlock must succeed against the seeded vault");
+        assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Unlocked);
+
+        (
+            state,
+            scratch,
+            password.to_string(),
+            phrase_string,
+            meta_bytes,
+        )
+    }
+
+    use crate::vault_meta_hash::vault_meta_sha256 as sha256;
+
+    /// Q2 + Q1 happy path: unlock with A → change_password(A→B) →
+    /// vault_lock → unlock(A) returns InvalidCredentialOrVault;
+    /// unlock(B) returns Ok.
+    #[test]
+    fn change_password_happy_path() {
+        rt().block_on(async {
+            let (state, scratch, _orig_pw, _phrase, _orig_bytes) =
+                seed_unlocked_state("orig-password-12").await;
+
+            // Sanity: slot is Unlocked with a populated meta hash.
+            let initial_hash = state
+                .peek_unlocked_root_key_and_hash_clone()
+                .await
+                .expect("seed left slot Unlocked")
+                .1;
+            assert_ne!(initial_hash, [0u8; 32]);
+
+            change_password_with_path(
+                "orig-password-12".to_string(),
+                "new-password-12".to_string(),
+                scratch.path(),
+                &state,
+            )
+            .await
+            .expect("change_password happy path");
+
+            // Slot stays Unlocked (root_key NOT rotated; only the wrap
+            // is rotated). Verify by re-peeking.
+            assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Unlocked);
+            let post_hash = state
+                .peek_unlocked_root_key_and_hash_clone()
+                .await
+                .expect("slot still Unlocked")
+                .1;
+            // Slot's hash anchor was updated to match the new disk state.
+            let new_disk_bytes = std::fs::read(scratch.path()).expect("vault.meta exists");
+            assert_eq!(
+                post_hash,
+                sha256(&new_disk_bytes),
+                "slot.vault_meta_bytes_hash must equal SHA-256 of the rewritten vault.meta"
+            );
+            // And it MUST NOT equal the pre-change hash.
+            assert_ne!(
+                post_hash, initial_hash,
+                "slot hash must reflect the post-rewrite disk state"
+            );
+
+            // Lock and re-unlock with old + new passwords.
+            let _ = state.take(test_vault_id()).await; // simulate vault_lock
+            assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Empty);
+
+            // Old password no longer unlocks.
+            let result_old = unlock_with_path(
+                "orig-password-12".to_string(),
+                None,
+                scratch.path(),
+                &state,
+            )
+            .await;
+            assert!(
+                matches!(
+                    result_old,
+                    Err(crate::plugins::vault_unlock::error::VaultUnlockError::InvalidCredentialOrVault)
+                ),
+                "old password must NOT unlock after change; got {result_old:?}"
+            );
+
+            // New password unlocks.
+            unlock_with_path("new-password-12".to_string(), None, scratch.path(), &state)
+                .await
+                .expect("new password must unlock the rewritten vault");
+        });
+    }
+
+    /// Recovery phrase must still recover the vault after change_password
+    /// (Q1 + recovery-flow.md §4.4 — recovery-side byte-preserved
+    /// across the rewrite).
+    #[test]
+    fn change_password_recovery_phrase_still_works() {
+        rt().block_on(async {
+            let (state, scratch, _orig_pw, phrase, _orig_bytes) =
+                seed_unlocked_state("orig-password-12").await;
+
+            change_password_with_path(
+                "orig-password-12".to_string(),
+                "new-password-12".to_string(),
+                scratch.path(),
+                &state,
+            )
+            .await
+            .expect("change_password");
+
+            // Lock and recover via phrase.
+            let _ = state.take(test_vault_id()).await;
+            recover_with_phrase_with_path(phrase, None, scratch.path(), &state)
+                .await
+                .expect("recovery phrase must still work after change_password");
+            assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Recovering);
+        });
+    }
+
+    /// Recovery-side fields and items_key wrap byte-equal pre/post
+    /// the change_password rewrite (recovery-flow §4.4 invariant).
+    /// Spec § 9.3 offsets:
+    ///   49..65    random_salt_recovery (16 bytes)
+    ///   153..177  nonce_recovery_wrap (24 bytes)
+    ///   177..241  enc_root_key_recovery (64 bytes)
+    ///   241..345  items_key_id + items_key_nonce + enc_items_key (104 bytes)
+    #[test]
+    fn change_password_preserves_recovery_side_byte_byte() {
+        rt().block_on(async {
+            let (state, scratch, _orig_pw, _phrase, orig_bytes) =
+                seed_unlocked_state("orig-password-12").await;
+
+            change_password_with_path(
+                "orig-password-12".to_string(),
+                "new-password-12".to_string(),
+                scratch.path(),
+                &state,
+            )
+            .await
+            .expect("change_password");
+
+            let new_bytes = std::fs::read(scratch.path()).expect("vault.meta exists");
+            assert_eq!(
+                new_bytes.len(),
+                protocol::VAULT_META_LEN,
+                "rewritten vault.meta must be the canonical 345 bytes"
+            );
+            assert_eq!(
+                &new_bytes[49..65],
+                &orig_bytes[49..65],
+                "random_salt_recovery @ 49..65 must byte-equal original"
+            );
+            assert_eq!(
+                &new_bytes[153..177],
+                &orig_bytes[153..177],
+                "nonce_recovery_wrap @ 153..177 must byte-equal original"
+            );
+            assert_eq!(
+                &new_bytes[177..241],
+                &orig_bytes[177..241],
+                "enc_root_key_recovery @ 177..241 must byte-equal original"
+            );
+            assert_eq!(
+                &new_bytes[241..345],
+                &orig_bytes[241..345],
+                "items_key_id + items_key_nonce + enc_items_key @ 241..345 must byte-equal original"
+            );
+
+            // Password-side fields MUST differ (fresh CSPRNG).
+            assert_ne!(
+                &new_bytes[33..49],
+                &orig_bytes[33..49],
+                "random_salt_password @ 33..49 must change"
+            );
+        });
+    }
+
+    /// Wrong current password → InvalidCredentialOrVault. Slot stays
+    /// Unlocked (Task 8 has no force-relock yet — Task 11 will add
+    /// force-relock on CAS mismatch); disk untouched.
+    #[test]
+    fn change_password_wrong_current_password() {
+        rt().block_on(async {
+            let (state, scratch, _orig_pw, _phrase, orig_bytes) =
+                seed_unlocked_state("orig-password-12").await;
+
+            let result = change_password_with_path(
+                "WRONG-pw-1234".to_string(),
+                "new-password-12".to_string(),
+                scratch.path(),
+                &state,
+            )
+            .await;
+
+            assert!(
+                matches!(
+                    result,
+                    Err(VaultChangePasswordError::InvalidCredentialOrVault)
+                ),
+                "expected InvalidCredentialOrVault, got {result:?}"
+            );
+
+            // Disk untouched.
+            let after_bytes = std::fs::read(scratch.path()).expect("vault.meta exists");
+            assert_eq!(
+                &after_bytes[..],
+                &orig_bytes[..],
+                "vault.meta must be unchanged on InvalidCredentialOrVault"
+            );
+
+            // Slot still Unlocked (Task 8 scope; Task 11 introduces
+            // force-relock on CAS mismatch — different failure class).
+            assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Unlocked);
+
+            // Permit released.
+            assert_eq!(state.auth_permits().available_permits(), 1);
+        });
+    }
+
+    /// Slot is Empty → VaultNotUnlocked (router-bug guard).
+    #[test]
+    fn change_password_rejects_when_slot_empty() {
+        rt().block_on(async {
+            let scratch = scratch_vault();
+            let state = VaultRuntimeState::default();
+            // No unlock call — slot is Empty.
+            assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Empty);
+
+            let result = change_password_with_path(
+                "orig-password-12".to_string(),
+                "new-password-12".to_string(),
+                scratch.path(),
+                &state,
+            )
+            .await;
+            assert!(
+                matches!(result, Err(VaultChangePasswordError::VaultNotUnlocked)),
+                "expected VaultNotUnlocked, got {result:?}"
+            );
+            // Permit released.
+            assert_eq!(state.auth_permits().available_permits(), 1);
+        });
+    }
+
+    /// Slot is Recovering → VaultNotUnlocked (only Slot::Unlocked
+    /// permits change_password per the PRD).
+    #[test]
+    fn change_password_rejects_when_slot_recovering() {
+        use crate::plugins::vault_unlock::state::fixture_recovering_with_keys;
+        rt().block_on(async {
+            let scratch = scratch_vault();
+            let state = VaultRuntimeState::default();
+            state
+                .set_recovering(
+                    test_vault_id(),
+                    fixture_recovering_with_keys(0xAA, 0xBB, 0xCC),
+                )
+                .await;
+            assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Recovering);
+
+            let result = change_password_with_path(
+                "orig-password-12".to_string(),
+                "new-password-12".to_string(),
+                scratch.path(),
+                &state,
+            )
+            .await;
+            assert!(
+                matches!(result, Err(VaultChangePasswordError::VaultNotUnlocked)),
+                "expected VaultNotUnlocked, got {result:?}"
+            );
+            // Slot still Recovering (rejection is non-mutative).
+            assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Recovering);
+        });
+    }
+
+    /// Q7-α: same-password input rejected pre-Argon2id, pre-permit-
+    /// acquire, pre-slot-peek. Disk untouched; runtime proves
+    /// Argon2id NOT invoked.
+    #[test]
+    fn change_password_same_password_rejected() {
+        rt().block_on(async {
+            let (state, scratch, _orig_pw, _phrase, orig_bytes) =
+                seed_unlocked_state("orig-password-12").await;
+
+            let started = std::time::Instant::now();
+            let result = change_password_with_path(
+                "orig-password-12".to_string(),
+                "orig-password-12".to_string(),
+                scratch.path(),
+                &state,
+            )
+            .await;
+            let elapsed = started.elapsed();
+
+            assert!(
+                matches!(result, Err(VaultChangePasswordError::SamePasswordRejected)),
+                "expected SamePasswordRejected, got {result:?}"
+            );
+
+            // Disk byte-equal to the original — atomic_write never fired.
+            let after_bytes = std::fs::read(scratch.path()).expect("vault.meta exists");
+            assert_eq!(
+                &after_bytes[..],
+                &orig_bytes[..],
+                "vault.meta must be unchanged on SamePasswordRejected"
+            );
+
+            // Slot still Unlocked — gate fires before slot-mutating paths.
+            assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Unlocked);
+
+            // Permit released — gate fires before permit acquire.
+            assert_eq!(state.auth_permits().available_permits(), 1);
+
+            // Sanity: rejection is fast — proves Argon2id was NOT invoked.
+            // Even with FAST_TEST_KDF, Argon2id × 2 + IO would push the
+            // happy path well above this threshold.
+            assert!(
+                elapsed.as_millis() < 200,
+                "same-password reject must be sub-Argon2id fast; got {}ms",
+                elapsed.as_millis()
+            );
+        });
+    }
+
+    /// Q7-β: weak-new-password input rejected pre-Argon2id, pre-permit-
+    /// acquire, pre-slot-peek. Sub-`MIN_PASSWORD_LEN` (12 chars) inputs
+    /// surface as `WeakNewPassword`. Disk untouched; runtime proves
+    /// Argon2id NOT invoked.
+    #[test]
+    fn change_password_weak_new_password_rejected() {
+        rt().block_on(async {
+            let (state, scratch, _orig_pw, _phrase, orig_bytes) =
+                seed_unlocked_state("orig-password-12").await;
+
+            // 11 chars — below MIN_PASSWORD_LEN of 12.
+            let weak_new = "a".repeat(11);
+            let started = std::time::Instant::now();
+            let result = change_password_with_path(
+                "orig-password-12".to_string(),
+                weak_new,
+                scratch.path(),
+                &state,
+            )
+            .await;
+            let elapsed = started.elapsed();
+
+            assert!(
+                matches!(result, Err(VaultChangePasswordError::WeakNewPassword)),
+                "expected WeakNewPassword, got {result:?}"
+            );
+
+            // Disk byte-equal to the original.
+            let after_bytes = std::fs::read(scratch.path()).expect("vault.meta exists");
+            assert_eq!(
+                &after_bytes[..],
+                &orig_bytes[..],
+                "vault.meta must be unchanged on WeakNewPassword"
+            );
+
+            // Slot still Unlocked.
+            assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Unlocked);
+
+            // Permit released.
+            assert_eq!(state.auth_permits().available_permits(), 1);
+
+            // Sanity: rejection is fast.
+            assert!(
+                elapsed.as_millis() < 200,
+                "weak-new-password reject must be sub-Argon2id fast; got {}ms",
+                elapsed.as_millis()
+            );
+        });
+    }
+
+    /// Q1 — External mutation to `vault.meta` (in this case a magic-
+    /// byte flip) is detected by the disk-level CAS check (Task 11)
+    /// BEFORE the crypto pipeline runs. Surfaces as
+    /// `VaultMetaChangedExternally` and force-relocks the slot.
+    ///
+    /// **Note**: Pre-Task-11 this test was named
+    /// `change_password_invalid_vault_meta_pre_derivation` and
+    /// expected `InvalidVaultMeta` (parse failure). With Task 11's
+    /// CAS in place, external mutation is caught at the CAS layer
+    /// FIRST — the parse path is now structurally unreachable for
+    /// this scenario (and similarly for the items_key wrap path
+    /// below). The InvalidVaultMeta variant remains in the code
+    /// (defense in depth, runs inside spawn_blocking after CAS) but
+    /// integration coverage via external mutation is now subsumed
+    /// by VaultMetaChangedExternally — a more specific + more
+    /// useful classification.
+    #[test]
+    fn change_password_external_magic_byte_corruption_caught_by_cas() {
+        rt().block_on(async {
+            let (state, scratch, _orig_pw, _phrase, _orig_bytes) =
+                seed_unlocked_state("orig-password-12").await;
+
+            // Corrupt the magic bytes (offset 0..4 = "MYV1").
+            let mut corrupted_bytes =
+                std::fs::read(scratch.path()).expect("vault.meta exists for corruption");
+            corrupted_bytes[0] = corrupted_bytes[0].wrapping_add(1);
+            std::fs::write(scratch.path(), &corrupted_bytes).expect("write corrupted vault.meta");
+
+            let result = change_password_with_path(
+                "orig-password-12".to_string(),
+                "new-password-12".to_string(),
+                scratch.path(),
+                &state,
+            )
+            .await;
+
+            // CAS catches the byte difference BEFORE parse runs.
+            assert!(
+                matches!(
+                    result,
+                    Err(VaultChangePasswordError::VaultMetaChangedExternally)
+                ),
+                "expected VaultMetaChangedExternally (CAS catches external mutation pre-parse), got {result:?}"
+            );
+
+            // Force-relock: slot dropped to Empty.
+            assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Empty);
+            assert_eq!(state.auth_permits().available_permits(), 1);
+
+            // Disk untouched (atomic_write never fired).
+            let after_bytes = std::fs::read(scratch.path()).expect("vault.meta exists");
+            assert_eq!(after_bytes[0], corrupted_bytes[0]);
+        });
+    }
+
+    /// Q1 — External mutation to the items_key wrap section is
+    /// caught by the disk-level CAS check (Task 11) before the
+    /// items_key wrap verify runs. Same Task-11 semantic as the
+    /// magic-byte test above.
+    #[test]
+    fn change_password_external_items_key_nonce_corruption_caught_by_cas() {
+        rt().block_on(async {
+            let (state, scratch, _orig_pw, _phrase, _orig_bytes) =
+                seed_unlocked_state("orig-password-12").await;
+
+            let mut corrupted_bytes =
+                std::fs::read(scratch.path()).expect("vault.meta exists for corruption");
+            corrupted_bytes[260] = corrupted_bytes[260].wrapping_add(1);
+            std::fs::write(scratch.path(), &corrupted_bytes).expect("write corrupted vault.meta");
+
+            let result = change_password_with_path(
+                "orig-password-12".to_string(),
+                "new-password-12".to_string(),
+                scratch.path(),
+                &state,
+            )
+            .await;
+
+            assert!(
+                matches!(
+                    result,
+                    Err(VaultChangePasswordError::VaultMetaChangedExternally)
+                ),
+                "expected VaultMetaChangedExternally (CAS catches external mutation), got {result:?}"
+            );
+            // Crucially NOT InvalidCredentialOrVault — the password
+            // wasn't even attempted; CAS fired first.
+            assert!(!matches!(
+                result,
+                Err(VaultChangePasswordError::InvalidCredentialOrVault)
+            ));
+
+            assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Empty);
+
+            let after_bytes = std::fs::read(scratch.path()).expect("vault.meta exists");
+            assert_eq!(after_bytes[260], corrupted_bytes[260]);
+        });
+    }
+
+    /// Q1 — Disk-level CAS catches external mutation. This test
+    /// uses a SEPARATE valid vault (different password's salts/
+    /// nonces) overwriting the seeded vault.meta. CAS fires at the
+    /// disk-hash mismatch level — even though the replacement is
+    /// itself a structurally valid vault.meta. Force-relocks.
+    #[test]
+    fn change_password_cas_mismatch_external_mutate() {
+        rt().block_on(async {
+            let (state, scratch, _orig_pw, _phrase, _orig_bytes) =
+                seed_unlocked_state("orig-password-12").await;
+
+            // Build a SECOND, different valid vault.meta and overwrite
+            // the disk. The disk now holds a parseable vault.meta but
+            // its bytes (and SHA-256) differ from the slot's snapshot.
+            // This simulates a parallel app instance committing a
+            // competing rewrite while our session was idle.
+            let other_session = build_session(
+                crate::vault_id::VaultId::mint(),
+                "different-password",
+                FAST_TEST_KDF,
+            )
+            .expect("build_session");
+            let other_bytes =
+                build_and_serialize_vault_meta(&other_session).expect("serialize alt vault.meta");
+            std::fs::write(scratch.path(), other_bytes).expect("overwrite vault.meta");
+
+            let result = change_password_with_path(
+                "orig-password-12".to_string(),
+                "new-password-12".to_string(),
+                scratch.path(),
+                &state,
+            )
+            .await;
+
+            assert!(
+                matches!(
+                    result,
+                    Err(VaultChangePasswordError::VaultMetaChangedExternally)
+                ),
+                "expected VaultMetaChangedExternally, got {result:?}"
+            );
+
+            // Force-relock per Q3.
+            assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Empty);
+
+            // Permit released.
+            assert_eq!(state.auth_permits().available_permits(), 1);
+
+            // Disk byte-equal to the OTHER vault.meta (NOT the new
+            // wrap that change_password would have produced — atomic_
+            // write never fired).
+            let after_bytes = std::fs::read(scratch.path()).expect("vault.meta exists");
+            assert_eq!(
+                after_bytes.len(),
+                protocol::VAULT_META_LEN,
+                "disk holds the externally-mutated vault.meta, not the rewrite"
+            );
+        });
+    }
+
+    /// Q1 — In-session idempotency: A→B→C in the SAME session works
+    /// because Task 8's `update_unlocked_meta_hash` correctly
+    /// propagates the slot hash post-rewrite, so the second
+    /// change_password's CAS check sees a coherent snapshot.
+    #[test]
+    fn change_password_idempotent_in_session() {
+        rt().block_on(async {
+            let (state, scratch, _orig_pw, _phrase, _orig_bytes) =
+                seed_unlocked_state("orig-password-12").await;
+
+            // First change: A → B.
+            change_password_with_path(
+                "orig-password-12".to_string(),
+                "intermediate-pw".to_string(),
+                scratch.path(),
+                &state,
+            )
+            .await
+            .expect("first change_password (A→B) must succeed");
+
+            // Slot must still be Unlocked with a freshly-pinned hash
+            // (no force-relock; Task 8's update_unlocked_meta_hash
+            // ran successfully).
+            assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Unlocked);
+
+            // Second change: B → C, in the SAME session. CAS must
+            // pass because the slot's hash was updated to match the
+            // post-A→B disk state.
+            change_password_with_path(
+                "intermediate-pw".to_string(),
+                "final-password-12".to_string(),
+                scratch.path(),
+                &state,
+            )
+            .await
+            .expect("second change_password (B→C) must succeed via propagated CAS anchor");
+
+            assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Unlocked);
+
+            // Verify the final disk state by locking + unlocking with
+            // the final password.
+            let _ = state.take(test_vault_id()).await;
+            unlock_with_path(
+                "final-password-12".to_string(),
+                None,
+                scratch.path(),
+                &state,
+            )
+            .await
+            .expect("final password must unlock the post-B→C rewritten vault");
+        });
+    }
+
+    /// Q4 (p) C1 fix — atomic post-Argon2id commit under a single
+    /// write lock. Pure-function unit test on
+    /// `commit_unlocked_rewrite`'s match arms; covers the four cases
+    /// (Unlocked + matching hash → run rewrite; Unlocked + mismatched
+    /// hash → HashMismatch + drop slot; Empty → SlotDropped without
+    /// running rewrite; Recovering → SlotDropped without running
+    /// rewrite).
+    ///
+    /// Deterministically pins the C1-fix invariant: the closure is
+    /// invoked iff the slot was Unlocked-with-matching-hash at the
+    /// commit point. The race itself (`vault_lock` firing in the
+    /// post-await µs gap that pre-fix existed) is now structurally
+    /// impossible because the helper holds the write lock through
+    /// the rewrite — `vault_lock`'s own write-lock acquire blocks
+    /// until the helper returns.
+    #[test]
+    fn commit_unlocked_rewrite_runs_closure_only_on_matching_hash() {
+        use crate::plugins::vault_unlock::state::fixture_recovering_with_keys;
+        use crate::plugins::vault_unlock::state::fixture_unlocked_with_keys;
+        use crate::plugins::vault_unlock::state::CommitRewriteError;
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        use std::sync::Arc;
+
+        rt().block_on(async {
+            let snapshot_hash = [0xDE; 32];
+
+            // Case 1: Slot::Empty → SlotDropped, closure NOT invoked.
+            {
+                let state = VaultRuntimeState::default();
+                let calls = Arc::new(AtomicUsize::new(0));
+                let calls_c = calls.clone();
+                let result: Result<(), CommitRewriteError<()>> = state
+                    .commit_unlocked_rewrite(snapshot_hash, move || {
+                        calls_c.fetch_add(1, Ordering::SeqCst);
+                        Ok([0xAA; 32])
+                    })
+                    .await;
+                assert!(matches!(result, Err(CommitRewriteError::SlotDropped)));
+                assert_eq!(calls.load(Ordering::SeqCst), 0, "closure must NOT run");
+            }
+
+            // Case 2: Slot::Recovering → SlotDropped, closure NOT invoked.
+            {
+                let state = VaultRuntimeState::default();
+                state
+                    .set_recovering(
+                        test_vault_id(),
+                        fixture_recovering_with_keys(0xAA, 0xBB, 0xCC),
+                    )
+                    .await;
+                let calls = Arc::new(AtomicUsize::new(0));
+                let calls_c = calls.clone();
+                let result: Result<(), CommitRewriteError<()>> = state
+                    .commit_unlocked_rewrite(snapshot_hash, move || {
+                        calls_c.fetch_add(1, Ordering::SeqCst);
+                        Ok([0xAA; 32])
+                    })
+                    .await;
+                assert!(matches!(result, Err(CommitRewriteError::SlotDropped)));
+                assert_eq!(calls.load(Ordering::SeqCst), 0, "closure must NOT run");
+                // Slot still Recovering — helper does not touch a
+                // non-Unlocked slot on SlotDropped.
+                assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Recovering);
+            }
+
+            // Case 3: Slot::Unlocked + MISMATCHED hash → HashMismatch,
+            //         closure NOT invoked, slot dropped to Empty.
+            {
+                let state = VaultRuntimeState::default();
+                let mut uv = fixture_unlocked_with_keys(0x42, 0x13, 0x99);
+                uv.vault_meta_bytes_hash = [0xAB; 32]; // != snapshot_hash
+                state.set_unlocked(test_vault_id(), uv).await;
+                let calls = Arc::new(AtomicUsize::new(0));
+                let calls_c = calls.clone();
+                let result: Result<(), CommitRewriteError<()>> = state
+                    .commit_unlocked_rewrite(snapshot_hash, move || {
+                        calls_c.fetch_add(1, Ordering::SeqCst);
+                        Ok([0xAA; 32])
+                    })
+                    .await;
+                assert!(matches!(result, Err(CommitRewriteError::HashMismatch)));
+                assert_eq!(calls.load(Ordering::SeqCst), 0, "closure must NOT run");
+                // Slot dropped to Empty (force-relock).
+                assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Empty);
+            }
+
+            // Case 4: Slot::Unlocked + MATCHING hash → closure runs,
+            //         slot's hash anchor updated to closure's return
+            //         value.
+            {
+                let state = VaultRuntimeState::default();
+                let mut uv = fixture_unlocked_with_keys(0x42, 0x13, 0x99);
+                uv.vault_meta_bytes_hash = snapshot_hash;
+                state.set_unlocked(test_vault_id(), uv).await;
+                let calls = Arc::new(AtomicUsize::new(0));
+                let calls_c = calls.clone();
+                let new_hash = [0xCD; 32];
+                let result: Result<(), CommitRewriteError<()>> = state
+                    .commit_unlocked_rewrite(snapshot_hash, move || {
+                        calls_c.fetch_add(1, Ordering::SeqCst);
+                        Ok(new_hash)
+                    })
+                    .await;
+                assert!(result.is_ok());
+                assert_eq!(
+                    calls.load(Ordering::SeqCst),
+                    1,
+                    "closure must run exactly once"
+                );
+                // Slot still Unlocked, hash anchor pinned to closure's return.
+                let post = state
+                    .peek_unlocked_root_key_and_hash_clone()
+                    .await
+                    .expect("slot still Unlocked");
+                assert_eq!(post.1, new_hash);
+            }
+        });
+    }
+
+    /// Q4 — `ChangePasswordInProgress` rejection when the shared
+    /// `auth_permits` semaphore is held. Deterministic: manually
+    /// acquire the permit before calling change_password; the call
+    /// must fast-fail with the in-progress variant. (Different from
+    /// the (p) post-Argon2id race, which is inspection-only per
+    /// grilling Q9.)
+    #[test]
+    fn change_password_returns_in_progress_when_permit_held() {
+        rt().block_on(async {
+            let (state, scratch, _orig_pw, _phrase, _orig_bytes) =
+                seed_unlocked_state("orig-password-12").await;
+
+            // Manually acquire the shared permit so the change_password
+            // call hits the `try_acquire` failure branch.
+            let _held = state
+                .auth_permits()
+                .try_acquire()
+                .expect("permit should be available pre-call");
+
+            let result = change_password_with_path(
+                "orig-password-12".to_string(),
+                "new-password-12".to_string(),
+                scratch.path(),
+                &state,
+            )
+            .await;
+
+            assert!(
+                matches!(
+                    result,
+                    Err(VaultChangePasswordError::ChangePasswordInProgress)
+                ),
+                "expected ChangePasswordInProgress, got {result:?}"
+            );
+
+            // Slot stays Unlocked (rejection is non-mutative — fires
+            // before any state-changing code runs).
+            assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Unlocked);
+
+            // Held permit still held (the test's own _held).
+            assert_eq!(state.auth_permits().available_permits(), 0);
+        });
+    }
+
+    /// Q8 — DENY-list grep: scan the production source of
+    /// `vault_change_password::commands` for any `tracing::*!`
+    /// argument that references DENY-listed secret material
+    /// (password, wrap_key, root_key, items_key, item_key, salt,
+    /// nonce, account_hash, meta_bytes). Per `src-tauri/CLAUDE.md`
+    /// "Secret-handling logging discipline" + `decisions.md`
+    /// 2026-05-02 "manual grep is the live discipline check" — the
+    /// pattern is reviewer-enforced; this test is the automated
+    /// canary that fails the build if the discipline regresses.
+    ///
+    /// Patterns: any `tracing::*` macro call (info!/warn!/error!/
+    /// debug!/trace!) whose argument list contains a DENY-listed
+    /// identifier reference (e.g. `password`, `?password`,
+    /// `%password`, `password = ...`, `%password.len()`). Excludes
+    /// stage-tag string literals (e.g. `stage = "weak_new_password"`)
+    /// since those are bare static strings carrying no secret bytes
+    /// — the discriminator is whether the identifier appears in a
+    /// formatter-position rather than a literal-string-value position.
+    #[test]
+    fn tracing_emits_have_no_deny_listed_secrets() {
+        // Read this very source file and scan for tracing::* macro
+        // calls + verify no DENY-listed identifier appears in a
+        // formatter slot.
+        let source = include_str!("commands.rs");
+
+        // Strip the test module so the grep doesn't false-positive
+        // on fixture passwords. Use the explicit bottom-of-file
+        // sentinel `#[cfg(test)]\nmod tests {` rather than the bare
+        // `#[cfg(test)]` token — the latter would also strip any
+        // future `#[cfg(test)]`-gated production helper module above
+        // the test block, silently shrinking the deny scan's reach.
+        let test_marker = "#[cfg(test)]\nmod tests {";
+        let production = source.split(test_marker).next().expect(
+            "source must contain `#[cfg(test)]\\nmod tests {` sentinel \
+             at the bottom of the file (do NOT add other `#[cfg(test)]` \
+             markers above it without updating this test)",
+        );
+
+        // Catalogue of forbidden patterns. Stage-tag string literals
+        // (e.g. `stage = "weak_new_password"`) are EXCLUDED — they
+        // are bare static strings carrying no secret bytes.
+        // Identifier-references in formatter slots are caught by the
+        // patterns below; both `key = value` (structured field) and
+        // `{value}` (positional formatter inside the message string)
+        // shapes are covered.
+        let deny_patterns: &[&str] = &[
+            // Structured-field formatter bindings.
+            "= current_password",
+            "= new_password",
+            "= password.",
+            "?current_password",
+            "?new_password",
+            "%current_password",
+            "%new_password",
+            "= root_key",
+            "?root_key",
+            "%root_key",
+            "= items_key",
+            "?items_key",
+            "%items_key",
+            "= item_key",
+            "?item_key",
+            "%item_key",
+            "= wrap_key",
+            "?wrap_key",
+            "%wrap_key",
+            "= current_wrap_key",
+            "?current_wrap_key",
+            "= items_key_wrap_key",
+            "?items_key_wrap_key",
+            "= fresh_salt",
+            "?fresh_salt",
+            "= fresh_nonce",
+            "?fresh_nonce",
+            "= account_number_hash",
+            "?account_number_hash",
+            "= bytes",
+            "?bytes",
+            "= new_bytes",
+            "?new_bytes",
+            "= opened",
+            "?opened",
+            "= items_opened",
+            "?items_opened",
+            // Positional formatters inside the message string —
+            // `tracing::info!("len: {}", password.len())` style.
+            // `{name}` named-formatter shape catches both implicit
+            // capture and `:?`/`:%` modifiers.
+            "{password",
+            "{current_password",
+            "{new_password",
+            "{root_key",
+            "{items_key",
+            "{item_key",
+            "{wrap_key",
+            "{current_wrap_key",
+            "{items_key_wrap_key",
+            "{fresh_salt",
+            "{fresh_nonce",
+            "{account_number_hash",
+            "{opened",
+            "{items_opened",
+        ];
+
+        // Walk every line that contains a `tracing::` macro call and
+        // check no deny pattern appears within the macro's argument
+        // span. A multi-line `tracing::*!(...)` block is captured by
+        // checking each line that follows the macro invocation up to
+        // the closing paren.
+        let mut violations: Vec<(usize, String, String)> = Vec::new();
+        let lines: Vec<&str> = production.lines().collect();
+        let mut i = 0;
+        while i < lines.len() {
+            let line = lines[i];
+            let is_tracing_start = line.contains("tracing::info!")
+                || line.contains("tracing::warn!")
+                || line.contains("tracing::error!")
+                || line.contains("tracing::debug!")
+                || line.contains("tracing::trace!");
+            if is_tracing_start {
+                // Capture the macro invocation span: from this line
+                // until we see the closing `);`.
+                let start = i;
+                while i < lines.len() && !lines[i].contains(");") {
+                    i += 1;
+                }
+                let span = lines[start..=i.min(lines.len() - 1)].join("\n");
+                for pat in deny_patterns {
+                    if span.contains(pat) {
+                        violations.push((start + 1, pat.to_string(), span.clone()));
+                    }
+                }
+            }
+            i += 1;
+        }
+
+        assert!(
+            violations.is_empty(),
+            "DENY-list violations in tracing emits ({} found):\n{}",
+            violations.len(),
+            violations
+                .iter()
+                .map(|(ln, pat, span)| format!(
+                    "  line {ln}: pattern `{pat}` in:\n    {}",
+                    span.lines().collect::<Vec<_>>().join("\n    ")
+                ))
+                .collect::<Vec<_>>()
+                .join("\n")
+        );
+    }
+
+    /// Q4 (p) — Pure-function unit test on the post-Argon2id slot
+    /// peek's variant-match logic. Exercises the three cases that
+    /// the production code's `match peek_unlocked_root_key_and_hash_clone()`
+    /// arm covers: `Some` with matching hash → proceed (None error),
+    /// `Some` with mismatched hash → VaultMetaChangedExternally,
+    /// `None` (Empty/Recovering) → VaultLockedDuringChange.
+    ///
+    /// **Note**: The actual race (vault_lock fires DURING Argon2id)
+    /// is inspection-only per MYND-22 grilling Q9 — Argon2id at
+    /// production parameters cannot be deterministically raced
+    /// without `argon2_mock_with_yield_points` (Phase 2 retrofit
+    /// anchor). This test exercises the variant-match arm directly
+    /// by manipulating the slot to each state and observing what
+    /// `peek_unlocked_root_key_and_hash_clone` returns.
+    #[test]
+    fn post_argon2id_slot_peek_variant_match_logic() {
+        rt().block_on(async {
+            let state = VaultRuntimeState::default();
+            let snapshot_hash = [0xDE; 32];
+
+            // Case 1: Slot::Empty → None → VaultLockedDuringChange
+            //         path in production code.
+            assert!(
+                state
+                    .peek_unlocked_root_key_and_hash_clone()
+                    .await
+                    .is_none(),
+                "Empty slot must return None (would route to VaultLockedDuringChange)"
+            );
+
+            // Case 2: Slot::Recovering → None → VaultLockedDuringChange
+            //         path in production code.
+            use crate::plugins::vault_unlock::state::fixture_recovering_with_keys;
+            state
+                .set_recovering(
+                    test_vault_id(),
+                    fixture_recovering_with_keys(0xAA, 0xBB, 0xCC),
+                )
+                .await;
+            assert!(
+                state
+                    .peek_unlocked_root_key_and_hash_clone()
+                    .await
+                    .is_none(),
+                "Recovering slot must return None (would route to VaultLockedDuringChange)"
+            );
+            let _ = state.take(test_vault_id()).await; // reset
+
+            // Case 3: Slot::Unlocked with MATCHING hash → Some(_,
+            //         matching) → proceed path.
+            use crate::plugins::vault_unlock::state::fixture_unlocked_with_keys;
+            let mut uv = fixture_unlocked_with_keys(0x42, 0x13, 0x99);
+            uv.vault_meta_bytes_hash = snapshot_hash;
+            state.set_unlocked(test_vault_id(), uv).await;
+            let peek = state.peek_unlocked_root_key_and_hash_clone().await;
+            assert!(
+                matches!(peek, Some((_, h)) if h == snapshot_hash),
+                "Unlocked + matching hash must return Some with snapshot_hash"
+            );
+            let _ = state.take(test_vault_id()).await; // reset
+
+            // Case 4: Slot::Unlocked with DIFFERENT hash → Some(_,
+            //         different) → VaultMetaChangedExternally path
+            //         (defensive; unreachable under auth_permits).
+            let mut uv2 = fixture_unlocked_with_keys(0x42, 0x13, 0x99);
+            uv2.vault_meta_bytes_hash = [0xAB; 32]; // != snapshot_hash
+            state.set_unlocked(test_vault_id(), uv2).await;
+            let peek2 = state.peek_unlocked_root_key_and_hash_clone().await;
+            assert!(
+                matches!(peek2, Some((_, h)) if h != snapshot_hash),
+                "Unlocked + different hash must return Some with non-snapshot hash"
+            );
+        });
+    }
+
+    /// Same-password reject takes priority over weak-new-password
+    /// reject when BOTH conditions fire (user typed same password as
+    /// current AND it's also below the floor). The same-pw error is
+    /// the more diagnostic message ("you copy-pasted current into
+    /// new") so it surfaces first.
+    #[test]
+    fn change_password_same_password_takes_priority_over_weak() {
+        rt().block_on(async {
+            // Setup: seed with a sub-floor password (bypasses the
+            // creation-side gate via build_session test entry). Then
+            // change_password(weak, weak) — both gates would fire.
+            let (state, scratch, _orig_pw, _phrase, _) = seed_unlocked_state("short-pw").await;
+
+            let result = change_password_with_path(
+                "short-pw".to_string(),
+                "short-pw".to_string(),
+                scratch.path(),
+                &state,
+            )
+            .await;
+
+            // Same-password reject fires FIRST (ordered before the
+            // weak-pw gate in the function body).
+            assert!(
+                matches!(result, Err(VaultChangePasswordError::SamePasswordRejected)),
+                "expected SamePasswordRejected (priority over WeakNewPassword), got {result:?}"
+            );
+        });
+    }
+}

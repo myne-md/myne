@@ -2,12 +2,22 @@
 # Install once per clone:  brew install lefthook && lefthook install
 # Skip ad-hoc:             LEFTHOOK=0 git commit ...   (or  git commit --no-verify)
 #
-# Baseline (text hygiene + secret guard). Extend with language-specific
-# checks (cargo fmt, etc.) once the codebase grows.
+# Mirrors the main `myne` repo's hook discipline, adapted for the mobile layout:
+# the Cargo workspace lives at `src-tauri/` (mobile has no root Cargo.toml), so
+# Rust hooks target `src-tauri/Cargo.toml`. Fast hygiene on pre-commit; the full
+# build/lint/test battery on pre-push.
 
 pre-commit:
   parallel: true
   commands:
+
+    rustfmt:
+      glob: "*.rs"
+      run: cargo fmt --manifest-path src-tauri/Cargo.toml --all -- --check
+
+    tsc:
+      glob: "*.{ts,tsx}"
+      run: pnpm exec tsc --noEmit
 
     whitespace:
       run: git diff --cached --check
@@ -38,3 +48,14 @@ pre-commit:
           fi
         done
         exit $fail
+
+# Full validation battery — serial, runs before push.
+pre-push:
+  piped: true
+  commands:
+    clippy:
+      run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
+    cargo-test:
+      run: cargo test --manifest-path src-tauri/Cargo.toml --no-fail-fast
+    pnpm-build:
+      run: pnpm build

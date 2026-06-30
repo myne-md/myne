@@ -1,0 +1,132 @@
+/* =========================================================================
+   Myne Mobile — extension layer on top of the canonical tokens.css.
+
+   tokens.css is copied verbatim from the desktop client (the shared design
+   canon: colours, type scale, dark/amoled themes). This file adds ONLY what is
+   mobile-specific and overrides the few desktop-only rules that don't fit a
+   scrolling design-gallery / phone canvas:
+
+     1. device-frame + liquid-glass geometry tokens (iOS 26 / Material 3)
+     2. mobile type-size aliases (phone body is 16px, not the desktop 14px)
+     3. reset overrides — the desktop reset locks outer scroll + text-select for
+        a fixed-window native app; the mobile gallery board scrolls freely.
+   ========================================================================= */
+
+:root {
+  /* -- Device frame geometry (from ios-frame.jsx / android-frame.jsx) ----- */
+  --ios-w: 402px;
+  --ios-h: 874px;
+  --ios-radius: 48px;
+  --ios-island-w: 126px;
+  --ios-island-h: 37px;
+  --ios-home-indicator: 139px;
+
+  --android-w: 412px;
+  --android-h: 892px;
+  --android-radius: 40px;
+
+  --ipad-portrait-w: 834px;
+  --ipad-portrait-h: 1112px;
+  --ipad-landscape-w: 1194px;
+  --ipad-landscape-h: 834px;
+  --ipad-radius: 42px;
+
+  /* -- Mobile control geometry (design-accurate, differs from desktop) ---- */
+  --m-btn-h: 52px;            /* primary / secondary button height */
+  --m-btn-h-sm: 48px;        /* ghost button */
+  --m-field-h: 52px;         /* text field height */
+  --m-radius-control: 6px;   /* buttons, fields, banners */
+  --m-radius-card: 26px;     /* iOS grouped-list inset card */
+  --m-radius-sheet: 20px;    /* bottom sheet top corners */
+  --m-row-h: 52px;           /* list row min height */
+  --m-touch: 44px;           /* minimum touch target */
+
+  /* -- Mobile type sizes (phone) ----------------------------------------- */
+  --m-text-hero: 36px;       /* welcome H1 */
+  --m-text-h1: 27px;         /* screen H1 */
+  --m-text-large-title: 34px;/* iOS large nav title */
+  --m-text-body: 16px;       /* mobile body */
+  --m-text-secondary: 15px;
+  --m-text-label: 13px;
+  --m-text-eyebrow: 12px;    /* uppercase tracked section header */
+
+  /* -- Board background (the design canvas behind the device frames) ----- */
+  --board-bg: #e3e1da;
+  --board-bg-dark: #1a1916;
+}
+
+/* iOS liquid-glass surface tint (light/dark). The recipe (blur + saturate +
+   inset shine) is applied per-element in the device components; these tokens
+   carry the per-theme tint + shine values so they flip with the theme. */
+:root {
+  --glass-tint: rgba(255, 255, 255, 0.5);
+  --glass-shine: inset 1.5px 1.5px 1px rgba(255, 255, 255, 0.7),
+    inset -1px -1px 1px rgba(255, 255, 255, 0.4);
+  --glass-border: 0.5px solid rgba(0, 0, 0, 0.06);
+  --glass-shadow: 0 1px 3px rgba(0, 0, 0, 0.07), 0 3px 10px rgba(0, 0, 0, 0.06);
+}
+:root[data-theme="dark"],
+:root[data-theme="amoled"] {
+  --glass-tint: rgba(120, 120, 128, 0.28);
+  --glass-shine: inset 1.5px 1.5px 1px rgba(255, 255, 255, 0.15),
+    inset -1px -1px 1px rgba(255, 255, 255, 0.08);
+  --glass-border: 0.5px solid rgba(255, 255, 255, 0.15);
+  --glass-shadow: 0 2px 6px rgba(0, 0, 0, 0.35), 0 6px 16px rgba(0, 0, 0, 0.2);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]):not([data-theme="dark"]):not([data-theme="amoled"]) {
+    --glass-tint: rgba(120, 120, 128, 0.28);
+    --glass-shine: inset 1.5px 1.5px 1px rgba(255, 255, 255, 0.15),
+      inset -1px -1px 1px rgba(255, 255, 255, 0.08);
+    --glass-border: 0.5px solid rgba(255, 255, 255, 0.15);
+    --glass-shadow: 0 2px 6px rgba(0, 0, 0, 0.35), 0 6px 16px rgba(0, 0, 0, 0.2);
+  }
+}
+
+/* -- Reset overrides ------------------------------------------------------
+   The desktop reset (tokens.css) locks the outer scroll + makes #root
+   non-selectable for a fixed native window. The mobile gallery board is a
+   wide/tall scrolling canvas, so re-enable scroll + selection here. */
+html,
+body,
+#root {
+  height: auto;
+  min-height: 100%;
+  overflow: visible;
+  overscroll-behavior: auto;
+}
+#root {
+  -webkit-user-select: auto;
+  user-select: auto;
+}
+
+/* A phone "screen" — fills its device frame, scrolls its own overflow, and is
+   the positioning context for sheets/overlays anchored to the device. */
+.m-screen {
+  position: relative;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-1);
+  color: var(--fg-1);
+  font-family: var(--font-sans);
+}
+.m-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Hide scrollbars inside device frames (mobile uses native transient bars). */
+.m-screen ::-webkit-scrollbar,
+.m-scroll::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+.m-screen,
+.m-scroll {
+  scrollbar-width: none;
+}

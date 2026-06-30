@@ -1,0 +1,53 @@
+# Standalone workspace — myne-mobile is cloned INSIDE the main `myne` repo
+# directory, so without this empty table cargo would treat src-tauri as a member
+# of the main repo's workspace (which doesn't list it) and fail.
+[workspace]
+
+[package]
+name = "myne-mobile"
+version = "0.1.0"
+description = "Myne — mobile client"
+authors = ["Myne"]
+edition = "2021"
+license = "AGPL-3.0-or-later"
+
+# `_lib` suffix is required to avoid the Windows lib-vs-bin name collision
+# (rust-lang/cargo#8519) — same rule as the desktop crate. Don't rename.
+# Mobile needs staticlib (iOS) + cdylib (Android) in addition to rlib.
+[lib]
+name = "myne_mobile_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+# Reuse the audited Phase-1 crypto crate directly (no port). From this
+# crate's directory the main repo's `protocol/` is two levels up.
+protocol = { path = "../../protocol" }
+tauri = { version = "2", features = [] }
+tauri-plugin-opener = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+uuid = { version = "1", features = ["v4", "v7"] }
+thiserror = "2"
+getrandom = "0.2"
+zeroize = { version = "1.8", features = ["alloc", "derive"] }
+tokio = { version = "1", features = ["rt", "rt-multi-thread", "time", "sync", "macros"] }
+# `tracing` for structured ops-side logging (stage tags + bounded
+# variant-name fields only; see the main repo's src-tauri/CLAUDE.md
+# "Secret-handling logging discipline").
+tracing = "0.1"
+# NFC/NFKD normalization shared with the protocol crate's vault.prefs folder
+# normalization. Pure-Rust, already in the shared lock.
+unicode-normalization = { version = "0.1.25", default-features = false }
+# SHA-256 of `vault.meta` bytes for the slot-held CAS anchor
+# (`Slot::Unlocked.vault_meta_bytes_hash`). Same RustCrypto sister crate the
+# protocol crate uses.
+sha2 = { version = "0.10", default-features = false }
+
+# Dev-dependencies — same policy bar as runtime deps. `tracing-test` captures
+# `tracing` events per-test so the plugins' tracing-level discipline is
+# asserted in unit tests rather than reviewer-inspected.
+[dev-dependencies]
+tracing-test = "0.2"
