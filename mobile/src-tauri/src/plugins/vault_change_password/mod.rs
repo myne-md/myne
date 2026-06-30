@@ -22,8 +22,13 @@
 //!
 //! See: ../../CLAUDE.md "Secret-handling logging discipline".
 
-pub mod commands;
-pub mod error;
+// The vault-change-password command core + `error` live in `myne-core` (shared
+// with the desktop client). Re-exported so existing
+// `crate::plugins::vault_change_password::commands::…` paths keep resolving; the
+// no-op `NoopHooks` installed in `lib.rs` satisfies the backup-preempt /
+// force-relock / quick-unlock-invalidation hook seam. The `init()` wiring stays
+// mobile-side.
+pub use myne_core::plugins::vault_change_password::commands;
 
 use tauri::plugin::{Builder, TauriPlugin};
 use tauri::Runtime;

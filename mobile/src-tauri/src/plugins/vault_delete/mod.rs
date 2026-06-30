@@ -29,8 +29,14 @@
 //!
 //! See: ../../CLAUDE.md "Secret-handling logging discipline".
 
-pub mod commands;
-pub mod error;
+// The vault-delete command core + `error` live in `myne-core` (shared with the
+// desktop client); the recursive unlink uses the shared `myne_core::vault_sweep`
+// pipeline (the mobile-local `sweep_remove` reimplementation that used to live
+// in this plugin's `commands.rs` is gone with it). Re-exported so existing
+// `crate::plugins::vault_delete::commands::…` paths keep resolving; the no-op
+// `NoopHooks` installed in `lib.rs` satisfies the backup-preempt / teardown hook
+// seam. The `init()` wiring stays mobile-side.
+pub use myne_core::plugins::vault_delete::commands;
 
 use tauri::plugin::{Builder, TauriPlugin};
 use tauri::Runtime;

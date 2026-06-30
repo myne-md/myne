@@ -39,16 +39,24 @@ steps:
       - apt-get update && apt-get install -y --no-install-recommends
         git ca-certificates pkg-config libssl-dev
         libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
-      # provision-protocol: make ../../protocol (relative to src-tauri) resolve.
+      # provision-protocol+core: make ../../protocol AND ../../core (relative to
+      # src-tauri) resolve. Mobile depends on `myne-core` directly, and core in
+      # turn depends on `../protocol`; both crates live in the main `myne` repo.
+      # One clone of the main repo backs both symlinks. The `core` symlink points
+      # INTO the cloned tree (myne-main/core) so core's own `../protocol`
+      # path-dep resolves to myne-main/protocol without a second checkout.
       - |
         PARENT="$(cd .. && pwd)"
-        if [ ! -e "$PARENT/protocol" ]; then
-          if [ -n "$MYNE_REPO_TOKEN" ]; then
-            git clone --depth 1 "https://oauth2:$MYNE_REPO_TOKEN@git.myne.md/Myne/myne.git" "$PARENT/myne-main"
-          else
-            git clone --depth 1 "https://github.com/myne-md/myne.git" "$PARENT/myne-main"
+        if [ ! -e "$PARENT/protocol" ] || [ ! -e "$PARENT/core" ]; then
+          if [ ! -e "$PARENT/myne-main" ]; then
+            if [ -n "$MYNE_REPO_TOKEN" ]; then
+              git clone --depth 1 "https://oauth2:$MYNE_REPO_TOKEN@git.myne.md/Myne/myne.git" "$PARENT/myne-main"
+            else
+              git clone --depth 1 "https://github.com/myne-md/myne.git" "$PARENT/myne-main"
+            fi
           fi
           ln -sfn "$PARENT/myne-main/protocol" "$PARENT/protocol"
+          ln -sfn "$PARENT/myne-main/core" "$PARENT/core"
         fi
       - rustup component add clippy
       - cd src-tauri && cargo clippy --all-targets -- -D warnings

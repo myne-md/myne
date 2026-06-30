@@ -25,6 +25,12 @@ tauri-build = { version = "2", features = [] }
 # Reuse the audited Phase-1 crypto crate directly (no port). From this
 # crate's directory the main repo's `protocol/` is two levels up.
 protocol = { path = "../../protocol" }
+# Shared backend logic (vault / notes / prefs plugin cores + crate-root
+# helpers), extracted from the desktop crate into `myne-core` so the mobile
+# client consumes one source of truth instead of a copied backend. The
+# desktop-only side-effects attach through `myne_core::hooks` (mobile installs
+# the no-op `NoopHooks`).
+myne-core = { path = "../../core" }
 tauri = { version = "2", features = [] }
 tauri-plugin-opener = "2"
 serde = { version = "1", features = ["derive"] }
@@ -51,3 +57,7 @@ sha2 = { version = "0.10", default-features = false }
 # asserted in unit tests rather than reviewer-inspected.
 [dev-dependencies]
 tracing-test = "0.2"
+# The `test-support` feature exposes the shared `ScopedTempDir` /
+# `seed_real_vault_meta` / `VaultRuntimeState` fixtures so mobile-side tests can
+# reuse the same harness the core tests use.
+myne-core = { path = "../../core", features = ["test-support"] }

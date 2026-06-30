@@ -13,10 +13,21 @@
 //!
 //! See: ../../CLAUDE.md "Secret-handling logging discipline" in the main repo.
 
-pub mod commands;
-pub mod error;
-pub mod note_id;
-pub(crate) mod title_extract;
+// The platform-agnostic CRUD command core (`commands`), the `NoteId` identifier
+// (`note_id`), the title-extraction helpers (`title_extract`), and the error
+// enums (`error`) live in `myne-core` (shared with the desktop client).
+// Re-exported so existing `crate::plugins::notes::{commands,error,note_id,
+// title_extract}::…` paths keep resolving. Mobile registers ONLY the seven CRUD
+// commands — the desktop-only export / full-text-search / snapshot-flush
+// commands are not carried over. The no-op `NoopHooks` installed in `lib.rs`
+// satisfies the search-upsert / snapshot-capture hook seam.
+//
+// `commands` is the only symbol `init()` registers; `error` / `note_id` /
+// `title_extract` are re-exported for path-compatibility with any consumer that
+// referenced `crate::plugins::notes::{error,note_id,title_extract}` (mirrors the
+// desktop re-export surface), hence the `unused_imports` allow.
+#[allow(unused_imports)]
+pub use myne_core::plugins::notes::{commands, error, note_id, title_extract};
 
 use tauri::plugin::{Builder, TauriPlugin};
 use tauri::Runtime;

@@ -1,37 +1,33 @@
-// Myne mobile — Tauri 2 host. Phase-1 vault + notes + prefs backend, mirrored
-// from the desktop `src-tauri/` and reusing the audited `protocol/` crate
-// directly (no port). The crypto / secret-handling discipline is preserved
-// verbatim from desktop; desktop-only subsystems (clipper, screen-capture,
-// auto-lock, backup, export, importer, snapshots, sync, themes, attachments,
-// workspace, vault-indices, spell, search) are not carried over.
+// Myne mobile — Tauri 2 host. Phase-1 vault + notes + prefs backend that
+// consumes the shared `myne-core` crate (the single source of truth for the
+// vault / notes / prefs plugin cores, extracted from the desktop crate) and the
+// audited `protocol/` crate directly (no port). Desktop-only subsystems
+// (clipper, screen-capture, auto-lock, backup, export, importer, snapshots,
+// sync, themes, attachments, workspace, vault-indices, spell, search) are not
+// carried over — the core command cores trigger those side-effects through the
+// `myne_core::hooks::VaultLifecycleHooks` seam, into which mobile installs the
+// no-op `NoopHooks`.
 //
 // See the main repo's `src-tauri/CLAUDE.md` "Secret-handling logging
 // discipline" and `protocol/CLAUDE.md` for the rules these modules follow.
 
-// The support modules (atomic_write, paths, text, vault_registry, …) and the
-// notes/prefs error enums are copied VERBATIM from the desktop crate, so some
-// helpers exist only for the desktop-only subsystems that were not carried over
-// (export's `atomic_write_unclobbered`, snapshots' `snapshots_dir_for`, search's
-// `split_nfc`/`turkish_lower`, the boot sweep's `sweep_empty_vault_dirs`, …).
-// They are intentionally kept byte-for-byte rather than pruned; allow the
-// resulting dead-code warnings crate-wide instead of editing the copies.
-#![allow(dead_code)]
-
-mod atomic_write;
-mod io_failure_kind;
-mod note_txn;
-mod paths;
-mod plugins;
-mod protocol_error_kind;
+// The crate-root support modules (atomic_write, paths, text, vault_registry, …)
+// moved to `myne-core` (shared with the desktop client). Re-exported so existing
+// `crate::<module>::…` paths keep resolving — the desktop `lib.rs` re-export
+// pattern, mirrored here.
 #[cfg(test)]
-mod test_support;
-mod text;
-mod vault_id;
-mod vault_meta_hash;
-mod vault_registry;
+pub use myne_core::test_support;
+pub use myne_core::{
+    atomic_write, io_failure_kind, note_txn, paths, protocol_error_kind, text, vault_id,
+    vault_meta_hash, vault_registry,
+};
+
+mod plugins;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    use tauri::Manager;
+
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(plugins::vault_creation::init())
@@ -41,6 +37,15 @@ pub fn run() {
         .plugin(plugins::vault_delete::init())
         .plugin(plugins::prefs::init())
         .plugin(plugins::notes::init())
+        .setup(|app| {
+            // Mobile has no desktop-only vault-lifecycle side-effects (search,
+            // spell, snapshots, sync, attachments, …); install the no-op hooks
+            // implementation the shared `myne-core` command cores take as
+            // `State<'_, myne_core::hooks::Hooks>`. Registered before any
+            // command can run — mirrors the desktop `app.manage(hooks)` wiring.
+            app.manage::<myne_core::hooks::Hooks>(std::sync::Arc::new(myne_core::hooks::NoopHooks));
+            Ok(())
+        })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

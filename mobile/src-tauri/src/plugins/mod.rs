@@ -13,7 +13,11 @@
 pub mod notes;
 pub mod prefs;
 pub mod vault_change_password;
-pub mod vault_creation;
+// `vault_creation` core (commands + state + error + `init()`) lives entirely in
+// `myne-core` (shared with the desktop client) — there is no mobile-side
+// side-effect to attach, so the whole module is re-exported. The
+// `plugins::vault_creation::init()` call in `lib.rs` resolves through this.
+pub use myne_core::plugins::vault_creation;
 pub mod vault_delete;
 pub mod vault_recover;
 pub mod vault_unlock;

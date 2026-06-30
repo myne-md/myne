@@ -9,9 +9,18 @@
 //!
 //! See: ../../CLAUDE.md "Secret-handling logging discipline".
 
-pub mod account_number_select;
-pub mod commands;
-pub mod error;
+// The vault-recover command core (`recover_with_phrase`, `complete_recovery`,
+// account-number selector) + `error` live in `myne-core` (shared with the
+// desktop client). Re-exported so existing
+// `crate::plugins::vault_recover::{commands,account_number_select}::…` paths
+// keep resolving; the no-op `NoopHooks` installed in `lib.rs` satisfies the
+// post-recovery hook seam. The `init()` wiring stays mobile-side.
+//
+// `commands` is what `init()` registers; `account_number_select` is re-exported
+// for path-compatibility (mirrors the desktop re-export surface), hence the
+// `unused_imports` allow.
+#[allow(unused_imports)]
+pub use myne_core::plugins::vault_recover::{account_number_select, commands};
 
 use tauri::plugin::{Builder, TauriPlugin};
 use tauri::Runtime;

@@ -10,9 +10,14 @@
 //!
 //! See: ../../CLAUDE.md "Secret-handling logging discipline".
 
-pub mod commands;
-pub mod error;
-pub mod state;
+// `state` (VaultRuntimeState), `error`, and the `commands` core (unlock / lock /
+// status probes) live in `myne-core` (shared with the desktop client). Mobile
+// has no desktop-only side-effects to attach — the no-op `NoopHooks` installed
+// in `lib.rs` satisfies the `State<'_, Hooks>` the core commands take.
+// `state` + `commands` are re-exported so existing
+// `crate::plugins::vault_unlock::{state,commands}::…` paths keep resolving. The
+// `init()` wiring (including registering `VaultRuntimeState`) stays mobile-side.
+pub use myne_core::plugins::vault_unlock::{commands, state};
 
 use tauri::plugin::{Builder, TauriPlugin};
 use tauri::{Manager, Runtime};
