@@ -93,7 +93,13 @@ export async function resolveClipWikilinks(
   // without this guard every clip pays a whole-vault decrypt that can blow the
   // 30 s relay dispatch timeout on a large vault — the note still seals, but the
   // extension sees a spurious "couldn't clip". Skip the load entirely here.
-  if (!body.includes("[[")) {
+  // Strip form-C attachment embeds (`![[att:…]]`) before the probe: ingestClipImages
+  // runs BEFORE this step, so a clip with any imported image already carries `![[`,
+  // whose `[[` would otherwise defeat the guard and force a whole-vault decrypt on
+  // every image-bearing clip. What remains after removing `![[` is a real title
+  // wikilink; only then is the loader worth calling.
+  const withoutEmbeds = body.replace(/!\[\[/g, "");
+  if (!withoutEmbeds.includes("[[")) {
     return body;
   }
 
