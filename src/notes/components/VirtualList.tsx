@@ -104,7 +104,11 @@ export function VirtualList<T>(props: VirtualListProps<T>): ReactNode {
 
   const [scrollTop, setScrollTop] = useState(0);
   const [viewportHeight, setViewportHeight] = useState(0);
-  const [, forceRender] = useState(0);
+  // Capture the render counter's VALUE (not just the setter): the cumulativeOffsets
+  // memo depends on it so a ResizeObserver measurement (which bumps it via
+  // triggerRender) actually re-runs the memo and feeds real heights into the
+  // offset table. Discarding the value left the memo pinned to estimated heights.
+  const [heightVersion, forceRender] = useState(0);
   const triggerRender = useCallback(() => {
     forceRender((n) => (n + 1) % 1_000_000);
   }, []);
@@ -157,7 +161,7 @@ export function VirtualList<T>(props: VirtualListProps<T>): ReactNode {
       offsets[i + 1] = (offsets[i] ?? 0) + h;
     }
     return offsets;
-  }, [items, keyOf, estimatedRowHeight, heightResetToken]);
+  }, [items, keyOf, estimatedRowHeight, heightResetToken, heightVersion]);
 
   const totalHeight = cumulativeOffsets[cumulativeOffsets.length - 1] ?? 0;
 
