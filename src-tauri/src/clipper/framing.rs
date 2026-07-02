@@ -189,14 +189,30 @@ pub fn read_frame<R: Read>(reader: &mut R) -> Result<Vec<u8>, FrameError> {
 /// the tiny `accepted | error | locked` reply composed by
 /// [`super::envelope::encode_reply`] (the task-5 reply path).
 pub fn write_frame<W: Write>(writer: &mut W, body: &[u8]) -> Result<(), FrameError> {
-    if body.len() > MAX_HOST_TO_EXT_REPLY {
+    // The reply/ACK channel is bounded tiny by contract (SYNC-10).
+    write_frame_capped(writer, body, MAX_HOST_TO_EXT_REPLY)
+}
+
+/// Write a length-prefixed frame, refusing a body larger than `cap`.
+///
+/// The reply path passes the tiny [`MAX_HOST_TO_EXT_REPLY`]; the host→app
+/// FORWARD path (`relay::forward_stdio_over_socket`) passes
+/// [`MAX_EXT_TO_HOST_FRAME`] — a frame `read_frame` already accepted (up to 64
+/// MiB). Capping the forward at the reply size silently dropped every clip
+/// larger than 1 MiB (e.g. any image-bearing capture, which JSON-inflates ~3-4×).
+pub fn write_frame_capped<W: Write>(
+    writer: &mut W,
+    body: &[u8],
+    cap: usize,
+) -> Result<(), FrameError> {
+    if body.len() > cap {
         return Err(FrameError::ReplyOversized {
             len: body.len(),
-            cap: MAX_HOST_TO_EXT_REPLY,
+            cap,
         });
     }
-    // `body.len()` is bounded by the cap above (≤ 1 MiB), so the `as u32`
-    // truncation can never lose information.
+    // `cap` is at most MAX_EXT_TO_HOST_FRAME (64 MiB) < u32::MAX and `body.len()`
+    // is bounded by the check above, so the `as u32` truncation is lossless.
     let prefix = (body.len() as u32).to_le_bytes();
     writer
         .write_all(&prefix)
@@ -275,6 +291,34 @@ mod tests {
         let mut v = (body.len() as u32).to_le_bytes().to_vec();
         v.extend_from_slice(body);
         v
+    }
+
+    #[test]
+    fn write_frame_capped_accepts_above_reply_cap_up_to_forward_cap() {
+        // A 2 MiB body (over the 1 MiB reply cap) must succeed at the 64 MiB
+        // forward cap — the clip-forward path a plain write_frame silently broke.
+        let body = vec![0xABu8; 2 * 1024 * 1024];
+        let mut out = Vec::new();
+        write_frame_capped(&mut out, &body, MAX_EXT_TO_HOST_FRAME).expect("under forward cap");
+        let mut cursor = Cursor::new(out);
+        assert_eq!(read_frame(&mut cursor).expect("read back"), body);
+    }
+
+    #[test]
+    fn write_frame_capped_rejects_above_cap() {
+        let mut out = Vec::new();
+        let err = write_frame_capped(&mut out, &[0u8; 8], 4).unwrap_err();
+        assert!(matches!(err, FrameError::ReplyOversized { len: 8, cap: 4 }));
+    }
+
+    #[test]
+    fn write_frame_still_enforces_the_tiny_reply_cap() {
+        let body = vec![0u8; MAX_HOST_TO_EXT_REPLY + 1];
+        let mut out = Vec::new();
+        assert!(matches!(
+            write_frame(&mut out, &body).unwrap_err(),
+            FrameError::ReplyOversized { .. }
+        ));
     }
 
     #[test]

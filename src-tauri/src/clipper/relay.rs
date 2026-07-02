@@ -234,8 +234,13 @@ where
                 return Ok(());
             }
         };
-        // Forward it verbatim to the app over the socket (re-framed).
-        if let Err(e) = framing::write_frame(app_writer, &body) {
+        // Forward it verbatim to the app over the socket (re-framed). Cap at the
+        // ext→host frame size (64 MiB), NOT the tiny reply cap: `read_frame` above
+        // already accepted this body up to 64 MiB, and the plain `write_frame`
+        // (1 MiB reply cap) would silently drop every clip > 1 MiB — i.e. any
+        // image-bearing capture.
+        if let Err(e) = framing::write_frame_capped(app_writer, &body, super::MAX_EXT_TO_HOST_FRAME)
+        {
             tracing::debug!(stage = "clip_relay_host_out", frame_error = e.label());
             return Ok(());
         }
