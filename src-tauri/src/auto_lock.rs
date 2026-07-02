@@ -309,6 +309,12 @@ async fn lock_unlocked_if_idle<R: Runtime>(app: &AppHandle<R>, state: &VaultRunt
                          // / grill Q5): no blob-write latency on the fail-closed idle
                          // path — the index rebuilds on the next unlock.
             crate::plugins::notes::search_sync::zeroize_search_index(app);
+            // Review Ö-24: wipe the personal + ignore spell dictionaries on the
+            // SAME leg. They are plaintext-derived AS3 vocabulary (spell/dictionary.rs
+            // "zeroized on lock") and the manual vault_lock path already wipes them
+            // via hooks.zeroize_spell(); the idle auto-lock leg must match, or a
+            // fail-closed idle lock leaves the user's private words resident.
+            crate::spell::sync::zeroize_spell(app);
             // MYND-166: wipe the staged editor-workspace descriptor too.
             crate::plugins::workspace::commands::clear_staged_descriptor();
             // MYND-255: destroy the hidden pdf-export render window (a
