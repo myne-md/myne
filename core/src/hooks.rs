@@ -49,6 +49,13 @@ pub trait VaultLifecycleHooks: Send + Sync + 'static {
     fn reclaim_stray_attachment_blobs<'a>(&'a self, state: &'a VaultRuntimeState) -> BoxFuture<'a>;
     fn persist_search_index<'a>(&'a self, state: &'a VaultRuntimeState) -> BoxFuture<'a>;
 
+    /// Embed-on-unlock trigger for the local-AI semantic index (semantic-search-
+    /// qa task 3). Desktop, when the `local-inference` feature is on AND the
+    /// vault opted in (`ai_enabled`), walks the resident notes and populates the
+    /// RAM vector store off the unlock hot path; the default build and mobile
+    /// install a no-op. Best-effort — never blocks or fails unlock.
+    fn hydrate_ai_vectors<'a>(&'a self, state: &'a VaultRuntimeState) -> BoxFuture<'a>;
+
     /// Folds cached attachment text into a note body for indexing and RETURNS
     /// the (possibly unchanged) body. `note_body` is plaintext — never log it.
     /// Mobile returns the body verbatim (the note is still saved; only the
@@ -74,6 +81,24 @@ pub trait VaultLifecycleHooks: Send + Sync + 'static {
     /// Replaces the old `search: State<'_, SearchIndexState>` command param.
     fn search_upsert(&self, id: &str, title: &str, body: &str);
     fn search_remove(&self, id: &str);
+    /// Eager per-note AI re-embed on save (MYND-453): (re-)embed this note's
+    /// chunks into the RAM vector store so a this-session create/edit is
+    /// searchable without a re-unlock. Detached + best-effort in the desktop
+    /// impl; the save critical path NEVER blocks on the model-bound embed. A
+    /// no-op unless the `local-inference` feature is built and `ai_enabled` is
+    /// on. The durable `vault.embeddings` blob is refreshed by the next unlock's
+    /// reconcile (§9.17.4), so this hook only touches RAM.
+    fn ai_note_changed(&self, id: &str, body: &str);
+    /// Drop a deleted note's vectors from the RAM vector store (MYND-453).
+    /// Cheap + synchronous — no model call.
+    fn ai_note_deleted(&self, id: &str);
+    /// Reflect an `ai_enabled` / `ai_excluded_folders` change into the live AI
+    /// runtime (SYNC-14): refresh the query-time policy and immediately purge any
+    /// resident vector for a now-excluded note, and zeroize the whole store when
+    /// AI is turned off — so a control the user just changed takes effect against
+    /// ALREADY-embedded notes, not only future embeds. Desktop-only; mobile
+    /// no-op. Called AFTER the `vault.prefs` write succeeds.
+    fn ai_policy_changed(&self, enabled: bool, excluded: &[String]);
     /// Soft `SyncLocalChange.bump()` — no-op if the sync plugin is unmanaged.
     fn bump_local_change(&self);
     /// `app.emit(SNAPSHOT_WRITE_FAILED_EVENT, note_id)`.
@@ -140,6 +165,9 @@ impl VaultLifecycleHooks for NoopHooks {
     fn persist_search_index<'a>(&'a self, _: &'a VaultRuntimeState) -> BoxFuture<'a> {
         Box::pin(std::future::ready(()))
     }
+    fn hydrate_ai_vectors<'a>(&'a self, _: &'a VaultRuntimeState) -> BoxFuture<'a> {
+        Box::pin(std::future::ready(()))
+    }
     fn fold_attachment_text_for_index<'a>(
         &'a self,
         _: &'a VaultRuntimeState,
@@ -160,6 +188,9 @@ impl VaultLifecycleHooks for NoopHooks {
 
     fn search_upsert(&self, _: &str, _: &str, _: &str) {}
     fn search_remove(&self, _: &str) {}
+    fn ai_note_changed(&self, _: &str, _: &str) {}
+    fn ai_note_deleted(&self, _: &str) {}
+    fn ai_policy_changed(&self, _: bool, _: &[String]) {}
     fn bump_local_change(&self) {}
     fn emit_snapshot_write_failed(&self, _: &str) {}
 

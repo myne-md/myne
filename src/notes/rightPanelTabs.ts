@@ -27,6 +27,12 @@ export const RIGHT_PANEL_TABS: readonly RightPanelTab[] = [
   { id: "backlinks", labelKey: "editor.chrome.rightPanel.tabs.backlinks", icon: "link" },
   { id: "unlinked", labelKey: "editor.chrome.rightPanel.tabs.unlinked", icon: "hash" },
   { id: "outline", labelKey: "editor.chrome.rightPanel.tabs.outline", icon: "list" },
+  // AI Chat — the canonical render target the local-ai sibling outputs (summary,
+  // Q&A, tag/link suggestions) mount into (local-ai epic, ai-ux-surface MYND-408,
+  // SYNC-15). Always present in the vocabulary; the "AI off" / "thinking" chrome
+  // and the ai_enabled gating are the AI Chat body's concern (task 5), not the
+  // strip's — a hideable tab like any other.
+  { id: "ai-chat", labelKey: "editor.chrome.rightPanel.tabs.aiChat", icon: "message-square" },
 ];
 
 /**
@@ -35,7 +41,12 @@ export const RIGHT_PANEL_TABS: readonly RightPanelTab[] = [
  * its position here (see `resolveBarOrder`). Must list every id in
  * {@link RIGHT_PANEL_TABS}.
  */
-export const RIGHT_PANEL_DEFAULT_ORDER: readonly string[] = ["backlinks", "unlinked", "outline"];
+export const RIGHT_PANEL_DEFAULT_ORDER: readonly string[] = [
+  "backlinks",
+  "unlinked",
+  "outline",
+  "ai-chat",
+];
 
 /** Label-key lookup for a tab id (used by the strip + the context menus). */
 export function rightPanelTabLabelKey(id: string): string | null {

@@ -57,6 +57,7 @@ import { TemplatesManager } from "../components/TemplatesManager";
 import { Spinner } from "../components/Spinner";
 import { SnapshotsPanel } from "../notes/components/SnapshotsPanel";
 import { SnapshotFailedIndicator } from "../notes/components/SnapshotFailedIndicator";
+import { AiHydrationProbe } from "../notes/components/AiHydrationProbe";
 import { NewNoteFromTemplateModal } from "../components/NewNoteFromTemplateModal";
 import { Toast, type ToastAction } from "../components/Toast";
 import { NoteExportModal } from "../components/export/NoteExportModal";
@@ -109,6 +110,19 @@ import { vaultIndicesPersist } from "../notes/vaultIndices";
 import { requestRevealViews } from "../notes/views/revealViewsSignal";
 import { useResolverNotes } from "../notes/resolverNotes";
 import { UnlinkedMentionsSection } from "../notes/components/UnlinkedMentionsSection";
+import { AiChatTab } from "../notes/components/AiChatTab";
+import { clearAiOutput } from "../notes/ai/aiOutputStore";
+import { clearTagSuggest } from "../notes/ai/tagSuggestStore";
+import { runSummarizeToStore } from "../notes/ai/runSummarizeToStore";
+import { runTagSuggestToStore } from "../notes/ai/runTagSuggestToStore";
+import { runAskToStore } from "../notes/ai/runAskToStore";
+import { appendSummaryBlock, SUMMARIZE_BUDGET_CHARS } from "../notes/ai/summarize";
+import { appendInlineTag } from "../notes/ai/acceptTag";
+import { infer as aiInfer, computeRewrite } from "../lib/writing-assistant";
+import { askQuestion } from "../lib/ai-qa";
+import { isNoteAiExcluded } from "../lib/aiExcludedFolders";
+import { getActiveEditorView } from "../editor/active-view";
+import { tagTree } from "../notes/vaultIndices";
 import { BacklinksTab } from "../notes/components/BacklinksTab";
 import { OutlineTab } from "../notes/components/OutlineTab";
 import {
@@ -1620,6 +1634,7 @@ function EditorChrome({
         onRestored={() => ctx.reloadOpenNote()}
       />
       <SnapshotFailedIndicator />
+      <AiHydrationProbe />
       <NewNoteFromTemplateModal
         open={newFromTemplateOpen}
         onClose={() => setNewFromTemplateOpen(false)}
@@ -2118,6 +2133,30 @@ function CommandPaletteHost({
 }: CommandPaletteHostProps) {
   const { t } = useTranslation();
   const ctx = useSelectedNote();
+  // AI surface (local-ai epic, ai-ux-surface MYND-408, SYNC-9): the `ai_enabled`
+  // gate + the AI Chat reveal, threaded into CommandContext so AI capability
+  // actions (siblings 4/6/7) gate on `stageName === "editor" && aiEnabled` and
+  // open the shared right-panel AI Chat tab.
+  const { prefs: aiPrefs, setRightPanelActiveTab: revealRightPanelTab } = usePrefs();
+  // Drop the ephemeral AI render stores when the editor session tears down
+  // (lock / vault-switch unmounts this host) — the AS1 artifacts (summary text +
+  // tag suggestions) never outlive the open vault (SYNC-8).
+  useEffect(
+    () => () => {
+      clearAiOutput();
+      clearTagSuggest();
+    },
+    [],
+  );
+  // Also drop the AI render stores when the SELECTED NOTE changes (the host
+  // stays mounted across a note switch, so the unmount cleanup above does not
+  // fire). Without this, note A's summary / tag chips linger — and could be
+  // inserted into note B — after switching. Bumping the run epoch (inside the
+  // clears) also drops any of A's in-flight runs so they never resolve onto B.
+  useEffect(() => {
+    clearAiOutput();
+    clearTagSuggest();
+  }, [ctx.selectedId]);
   // "Open today's note" (MYND-191): idempotent open-or-create over the FULL note
   // set (authoritative note_list + loadNoteBatch, not the partial sidebar cache).
   // Found → open; not found → create (from the daily template if set, else a
@@ -2189,6 +2228,93 @@ function CommandPaletteHost({
     () => ({
       stageName: "editor",
       selectedNoteId: ctx.selectedId,
+      aiEnabled: aiPrefs.ai_enabled,
+      onOpenAiChat: () => void revealRightPanelTab("ai-chat"),
+      // Summarize the focused note into the AI Chat tab (note-summarization
+      // tasks 3–4): reveal the render target, grab the focused pane's live view
+      // via the `getActiveEditorView` registry (the palette pattern), then drive
+      // the tested `runSummarizeToStore` pipeline (resolve → truncate → blocking
+      // `infer` → ephemeral render). Returns stub output until Candle.
+      onSummarizeNote: () => {
+        revealRightPanelTab("ai-chat");
+        const view = getActiveEditorView();
+        if (view === null) return;
+        // SYNC-14 fail-closed: never summarize a note in an excluded folder, and
+        // never run when the note's folder is unknown (no selection / not cached)
+        // — an unknown folder must not default to root and slip past the gate.
+        if (ctx.selectedId === null) return;
+        const cached = ctx.cache.get(ctx.selectedId);
+        if (cached === undefined) return;
+        // A cached entry with `folder === null` is a genuine root note ("").
+        if (isNoteAiExcluded(cached.folder ?? "", aiPrefs.ai_excluded_folders)) return;
+        void runSummarizeToStore({
+          state: view.state,
+          budget: SUMMARIZE_BUDGET_CHARS,
+          infer: aiInfer,
+        });
+      },
+      // Suggest tags for the focused note into the AI Chat tab (auto-tag-link
+      // tasks 2-4): reveal the tab, then run the exclusion-gated, infer-once pass
+      // over the note body + the vault's existing tag vocabulary (tagTree), and
+      // render the ranked chips. The note folder (for the excluded-folder gate)
+      // comes from the selection cache; excluded folders from prefs (SYNC-14).
+      onSuggestTags: () => {
+        revealRightPanelTab("ai-chat");
+        const view = getActiveEditorView();
+        if (view === null) return;
+        // SYNC-14 fail-closed (see onSummarizeNote): skip when the folder is
+        // unknown rather than defaulting to root.
+        if (ctx.selectedId === null) return;
+        const cached = ctx.cache.get(ctx.selectedId);
+        if (cached === undefined) return;
+        const noteFolder = cached.folder ?? "";
+        if (isNoteAiExcluded(noteFolder, aiPrefs.ai_excluded_folders)) return;
+        void (async () => {
+          const existingTags = (await tagTree()).map((n) => n.display);
+          await runTagSuggestToStore({
+            noteBody: view.state.doc.toString(),
+            noteFolder,
+            existingTags,
+            excludedFolders: aiPrefs.ai_excluded_folders,
+            infer: aiInfer,
+          });
+        })();
+      },
+      // Rewrite the current selection (writing-assistant `/yeniden-yaz` as a
+      // palette action): resolve the selection span via the tested `computeRewrite`
+      // core, then replace it in place as plain markdown (`ai.rewrite`, one undo
+      // step). A no-op on an empty selection.
+      onRewriteSelection: () => {
+        const view = getActiveEditorView();
+        if (view === null) return;
+        // SYNC-14 fail-closed: never rewrite a note in an excluded folder, and
+        // never when the folder is unknown (see onSummarizeNote).
+        if (ctx.selectedId === null) return;
+        const cached = ctx.cache.get(ctx.selectedId);
+        if (cached === undefined) return;
+        if (isNoteAiExcluded(cached.folder ?? "", aiPrefs.ai_excluded_folders)) return;
+        // Snapshot the note + the immutable pre-inference state, so the
+        // multi-second blocking infer cannot land a stale range onto a document
+        // the user edited (or a different note they switched to) in the meantime.
+        const noteAtStart = ctx.selectedId;
+        const stateAtStart = view.state;
+        void (async () => {
+          const result = await computeRewrite({ state: stateAtStart, infer: aiInfer });
+          if (result === null || result.text.length === 0) return;
+          const original = stateAtStart.doc.sliceString(result.from, result.to);
+          const now = getActiveEditorView();
+          // Staleness guard: same view, same note, and the target range still
+          // holds exactly the text we rewrote — otherwise drop the result rather
+          // than corrupt the document with pre-inference offsets.
+          if (now === null || now !== view || ctx.selectedId !== noteAtStart) return;
+          if (result.to > now.state.doc.length) return;
+          if (now.state.doc.sliceString(result.from, result.to) !== original) return;
+          now.dispatch({
+            changes: { from: result.from, to: result.to, insert: result.text },
+            userEvent: "ai.rewrite",
+          });
+        })();
+      },
       onLock: onLockFlushed,
       onOpenSettings,
       onManageTemplates,
@@ -2227,6 +2353,10 @@ function CommandPaletteHost({
     [
       ctx.selectedId,
       ctx.open,
+      ctx.cache,
+      aiPrefs.ai_enabled,
+      aiPrefs.ai_excluded_folders,
+      revealRightPanelTab,
       onLockFlushed,
       onOpenSettings,
       onManageTemplates,
@@ -2682,6 +2812,51 @@ function RightSidebar() {
           />
         ) : active === "outline" ? (
           <OutlineTab />
+        ) : active === "ai-chat" ? (
+          <AiChatTab
+            onInsert={(text) => {
+              // "Insert into note" (note-summarization task 5, SYNC-17): append a
+              // `## Summary` block to the focused note and let the normal autosave
+              // path (note_save/MY01) persist it — byte-identical to a hand-typed
+              // block, only on this explicit click.
+              const view = getActiveEditorView();
+              if (view === null) return;
+              const newBody = appendSummaryBlock(view.state.doc.toString(), text);
+              view.dispatch({
+                changes: { from: 0, to: view.state.doc.length, insert: newBody },
+                userEvent: "ai.insert",
+              });
+            }}
+            onAcceptTag={(suggestion) => {
+              // Accept a tag chip (auto-tag-link task 5, SYNC-17): append an inline
+              // `#tag` (idempotent, byte-identical) to the focused note, persisted
+              // through the normal autosave path — only on this explicit click.
+              const view = getActiveEditorView();
+              if (view === null) return;
+              const newBody = appendInlineTag(view.state.doc.toString(), suggestion.tag);
+              if (newBody === view.state.doc.toString()) return; // already present
+              view.dispatch({
+                changes: { from: 0, to: view.state.doc.length, insert: newBody },
+                userEvent: "ai.rewrite",
+              });
+            }}
+            onAsk={
+              prefs.ai_enabled
+                ? (q) => {
+                    // Grounded Q&A (semantic-search-qa tasks 6/7, SYNC-17): the
+                    // AI Chat tab's question box drives the tested
+                    // `runAskToStore` pipeline (THINKING → blocking on-device
+                    // `ask` → RESOLVED answer) into the shared output store. The
+                    // answer grounds ONLY on resident, non-excluded chunks
+                    // (excluded notes are never embedded). Explicit user action.
+                    void runAskToStore({
+                      question: q,
+                      ask: (question) => askQuestion(question).then((r) => r.answer),
+                    });
+                  }
+                : undefined
+            }
+          />
         ) : null}
       </div>
 

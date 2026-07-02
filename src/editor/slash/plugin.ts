@@ -22,7 +22,8 @@ import {
 } from "@codemirror/view";
 import { computePosition } from "../positioning";
 import { ensureFloatingStyles } from "../floating-styles";
-import { filterCommands, slashCommands, type SlashCommand } from "./commands";
+import { filterCommands, type SlashCommand } from "./commands";
+import { aiSlashEnabledFacet, slashCommandsForContext } from "./aiSlash";
 
 const SUPPRESS_NODE_NAMES = new Set<string>([
   "FencedCode",
@@ -71,7 +72,11 @@ class SlashMenuView implements PluginValue {
   private readonly commands: readonly SlashCommand[];
 
   constructor(private readonly view: EditorView) {
-    this.commands = slashCommands();
+    // AI slash commands (`/devam`, `/başlık`) appear only when the host provides
+    // `ai_enabled` via `aiSlashEnabledFacet` (default false → base menu; task 6).
+    this.commands = slashCommandsForContext({
+      aiEnabled: view.state.facet(aiSlashEnabledFacet),
+    });
     ensureFloatingStyles();
   }
 
@@ -338,5 +343,9 @@ function slashKeymap(): readonly KeyBinding[] {
 }
 
 export function slashMenuExtension(): Extension {
+  // The `aiSlashEnabledFacet` value is NOT provided here — it lives in the
+  // live-reconfigurable AI compartment (`extensions.ts::aiSurface`) so
+  // `ai_enabled` can toggle the AI slash commands without a remount. Absent a
+  // provided value the facet defaults to `false` (base menu only).
   return [slashPlugin, Prec.highest(keymap.of(slashKeymap()))];
 }

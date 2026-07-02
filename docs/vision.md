@@ -92,7 +92,7 @@ A record of the choices made while drafting this document, captured for the next
 - **Definition of done is the recovery flow drill**: lose the password, recover from the phrase, plaintext never on disk. Recovery is the highest-risk piece of the project; the DoD reflects that.
 
 **Deliberately deferred**
-- AI features. The category was raised and rejected for v1; reconsider only if the answer is a fully local LLM with no provider call.
+- AI features — **reconsidered and admitted under the exact stated condition** (2026-07-01): a **fully local LLM with no provider call**. The local-ai epic (MYND-406–412) ships on-device summarize / semantic search / auto-tag / writing-assistant behind Candle, **opt-in and default-off**, with **models side-loaded from the user's own disk** (never downloaded) and a CI gate proving the feature adds **zero networked dependency** — Myne never sends your notes anywhere. The line held: no cloud AI, no provider call, no telemetry. (See `decisions.md` 2026-07-01 + `threat-model.md` §7 "Local AI"; the model runtime's key-isolation sidecar is a pre-default-on hardening still owed.)
 - Real-time collaboration (CRDT, Yjs) — Phase 4 at the earliest.
 - Plugin API — possibly never; if it lands, sandboxed and capability-scoped from the first design.
 - Mobile — Phase 3.

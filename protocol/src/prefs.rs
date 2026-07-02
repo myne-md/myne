@@ -340,6 +340,32 @@ pub struct PrefsView {
     #[serde(default)]
     pub active_workspace: Option<alloc::string::String>,
 
+    /// AI opt-in toggle (local-ai epic, ai-ux-surface MYND-408, SYNC-12).
+    /// `false` ≡ AI off (the default). **Omitted entirely from the canonical
+    /// JSON when `false`**, so a vault that never enabled AI is byte-identical
+    /// to a pre-feature `vault.prefs` (existing golden vectors unaffected —
+    /// migration-less additive field on `MYP1`, the `archive_disabled`
+    /// precedent class; per-vault + encrypted so the at-rest "uses AI"
+    /// fingerprint never leaks). Canonical key `ai_enabled` — sorts after
+    /// `active_workspace` (`ac` < `ai`), before `archive_disabled`
+    /// (`ai` < `ar`). **Non-load-bearing / AS-low** — no protective-envelope
+    /// clamp; the host treats a tampered/replayed value as a cosmetic toggle.
+    #[serde(default)]
+    pub ai_enabled: bool,
+
+    /// Folders excluded from every AI read/index (local-ai epic, ai-ux-surface
+    /// MYND-408, SYNC-14) — canonical trailing-slash display form. **Same
+    /// canonical encoding as `deliberate_folders`** (NFC-normalized,
+    /// lexicographically sorted, exact-deduped set) and **omitted entirely when
+    /// empty**, so a vault with no exclusions is byte-identical to a pre-feature
+    /// `vault.prefs`. Default empty (whole vault in scope; AI is already
+    /// opt-in). Canonical key `ai_excluded_folders` — sorts after `ai_enabled`
+    /// (`ai_en` < `ai_ex`), before `archive_disabled` (`ai` < `ar`).
+    /// **Non-load-bearing** — a tampered value can at worst widen/narrow this
+    /// device's AI read scope; no protective-envelope clamp.
+    #[serde(default)]
+    pub ai_excluded_folders: Vec<alloc::string::String>,
+
     /// User toggle that disables the note-archive feature (archive-disable,
     /// MYND-…). `None` ≡ unset → the host applies the default-OFF policy
     /// (archiving enabled — the pre-feature behaviour). Omitted entirely from
@@ -812,6 +838,8 @@ impl Default for PrefsView {
             daily_folder: None,
             daily_template: None,
             active_workspace: None,
+            ai_enabled: false,
+            ai_excluded_folders: Vec::new(),
             archive_disabled: None,
             editor_layout: None,
             editor_line_numbers: None,
@@ -977,6 +1005,36 @@ fn canonical_json_encode(prefs: &PrefsView) -> Vec<u8> {
         out.extend_from_slice(b"\"active_workspace\":");
         push_json_string(&mut out, &slot.nfc().collect::<String>());
         out.push(b',');
+    }
+
+    // ai_enabled (canonical key 'ai_enabled' — after active_workspace
+    // ['ai' > 'ac'], before ai_excluded_folders ['ai_en' < 'ai_ex'] and
+    // archive_disabled ['ai' < 'ar']). AI opt-in toggle (local-ai epic,
+    // SYNC-12). Emitted ONLY when true; omitted entirely when false (the
+    // default) so a vault that never enabled AI is byte-identical to a
+    // pre-feature vault.prefs (preserves existing KAT vectors). Per-vault +
+    // encrypted — no at-rest "uses AI" fingerprint.
+    if prefs.ai_enabled {
+        out.extend_from_slice(b"\"ai_enabled\":true,");
+    }
+
+    // ai_excluded_folders (canonical key 'ai_ex…' — after ai_enabled
+    // ['ai_en' < 'ai_ex'], before archive_disabled ['ai' < 'ar']). Folders the
+    // AI never reads/indexes (local-ai epic, SYNC-14). SAME canonical encoding
+    // as deliberate_folders (NFC-normalized, sorted, exact-deduped set),
+    // OMITTED entirely when empty so a vault with no exclusions is
+    // byte-identical to a pre-feature vault.prefs (preserves existing KAT
+    // vectors).
+    let ai_folders = canonical_folder_list(&prefs.ai_excluded_folders);
+    if !ai_folders.is_empty() {
+        out.extend_from_slice(b"\"ai_excluded_folders\":[");
+        for (i, f) in ai_folders.iter().enumerate() {
+            if i > 0 {
+                out.push(b',');
+            }
+            push_json_string(&mut out, f);
+        }
+        out.extend_from_slice(b"],");
     }
 
     // archive_disabled (canonical key 'a', AFTER active_workspace
@@ -1570,6 +1628,50 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
         None => (None, stripped),
     };
 
+    // ---- ai_enabled (optional, after active_workspace — SYNC-12) ----
+    // Canonical key order active_workspace < ai_enabled < ai_excluded_folders <
+    // archive_disabled, so when present this bool is a literal PREFIX of the
+    // post-active_workspace bytes (strip_prefix, not find_subslice — a later
+    // folder name containing an `"ai_enabled":`-looking substring cannot fool
+    // it). Emitted only as `true` by the encoder; `false` is tolerated for
+    // robustness. Absent → false (the default). MUST be followed by `,`.
+    let ai_enabled_marker = b"\"ai_enabled\":";
+    let (ai_enabled, post_ai_enabled) = match post_active.strip_prefix(ai_enabled_marker) {
+        Some(after) => {
+            let (val, after_val) = if let Some(r) = after.strip_prefix(b"true") {
+                (true, r)
+            } else if let Some(r) = after.strip_prefix(b"false") {
+                (false, r)
+            } else {
+                return Err(PrefsBlobError::PlaintextParseFailed);
+            };
+            let rest = after_val
+                .strip_prefix(b",")
+                .ok_or(PrefsBlobError::PlaintextParseFailed)?;
+            (val, rest)
+        }
+        None => (false, post_active),
+    };
+
+    // ---- ai_excluded_folders (optional, after ai_enabled — SYNC-14) ----
+    // Canonical key order ai_enabled < ai_excluded_folders < archive_disabled,
+    // so when present this string array is a literal PREFIX of the
+    // post-ai_enabled bytes. Same canonical set encoding as deliberate_folders;
+    // absent → empty. Value MUST be a well-formed JSON string array + `,`.
+    let ai_excluded_marker = b"\"ai_excluded_folders\":";
+    let (ai_excluded_folders, post_ai_excluded) =
+        match post_ai_enabled.strip_prefix(ai_excluded_marker) {
+            Some(after) => {
+                let (list, consumed) =
+                    parse_json_string_array(after).ok_or(PrefsBlobError::PlaintextParseFailed)?;
+                let rest = after[consumed..]
+                    .strip_prefix(b",")
+                    .ok_or(PrefsBlobError::PlaintextParseFailed)?;
+                (list, rest)
+            }
+            None => (Vec::new(), post_ai_enabled),
+        };
+
     // ---- archive_disabled (optional, after active_workspace) ----
     // Canonical key order is active_workspace < archive_disabled <
     // auto_lock_seconds, so when present this field is a literal PREFIX of the
@@ -1579,7 +1681,7 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
     // MUST be followed by `,` — screen_capture_protection is mandatory and
     // canonically last, so a further field always follows.
     let archive_marker = b"\"archive_disabled\":";
-    let (archive_disabled, post_archive) = match post_active.strip_prefix(archive_marker) {
+    let (archive_disabled, post_archive) = match post_ai_excluded.strip_prefix(archive_marker) {
         Some(after) => {
             let (val, after_val) = if let Some(r) = after.strip_prefix(b"true") {
                 (true, r)
@@ -1593,7 +1695,7 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
                 .ok_or(PrefsBlobError::PlaintextParseFailed)?;
             (Some(val), rest)
         }
-        None => (None, post_active),
+        None => (None, post_ai_excluded),
     };
 
     // ---- auto_lock_seconds (optional, after archive_disabled) ----
@@ -1615,7 +1717,7 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
                 .ok_or(PrefsBlobError::PlaintextParseFailed)?;
             (Some(val), rest)
         }
-        None => (None, post_active),
+        None => (None, post_ai_excluded),
     };
 
     // ---- optional string-array fields (canonical key order) ----
@@ -1816,6 +1918,8 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
         item_order,
         keymap,
         active_workspace,
+        ai_enabled,
+        ai_excluded_folders,
         archive_disabled,
         editor_layout,
         editor_line_numbers,
@@ -2573,6 +2677,8 @@ mod tests {
             daily_folder: None,
             daily_template: None,
             active_workspace: None,
+            ai_enabled: false,
+            ai_excluded_folders: Vec::new(),
             archive_disabled: None,
             editor_layout: None,
             editor_line_numbers: None,
@@ -2622,6 +2728,8 @@ mod tests {
             daily_folder: None,
             daily_template: None,
             active_workspace: None,
+            ai_enabled: false,
+            ai_excluded_folders: Vec::new(),
             archive_disabled: None,
             editor_layout: None,
             editor_line_numbers: None,
@@ -2779,6 +2887,8 @@ mod tests {
             PrefsView {
                 screen_capture_protection: true,
                 bar_items_order: Vec::new(),
+                ai_enabled: false,
+                ai_excluded_folders: Vec::new(),
                 show_note_timestamps: true,
                 folder_icons: Default::default(),
                 hidden_bar_items: Vec::new(),
@@ -2830,6 +2940,8 @@ mod tests {
             PrefsView {
                 screen_capture_protection: false,
                 bar_items_order: Vec::new(),
+                ai_enabled: false,
+                ai_excluded_folders: Vec::new(),
                 show_note_timestamps: true,
                 folder_icons: Default::default(),
                 hidden_bar_items: Vec::new(),
@@ -3274,6 +3386,111 @@ mod tests {
         }
     }
 
+    // ---- ai_enabled / ai_excluded_folders (local-ai, MYND-408, SYNC-12/14) --
+
+    #[test]
+    fn encode_omits_ai_fields_when_default_byte_identical_to_pre_feature() {
+        // A vault that never enabled AI (ai_enabled=false, ai_excluded_folders
+        // empty — the defaults) encodes byte-identically to the bare pre-feature
+        // form: both additive fields are omitted, so existing MYP1 golden vectors
+        // are unaffected (SYNC-12/14 migration-less additive discipline).
+        let encoded = canonical_json_encode(&PrefsView {
+            ai_enabled: false,
+            ai_excluded_folders: Vec::new(),
+            ..PrefsView::default()
+        });
+        assert_eq!(encoded.as_slice(), br#"{"screen_capture_protection":true}"#);
+    }
+
+    #[test]
+    fn encode_emits_ai_fields_in_canonical_position() {
+        // Canonical key order: active_workspace < ai_enabled < ai_excluded_folders
+        // < archive_disabled < auto_lock_seconds (`ac` < `ai_en` < `ai_ex` < `ar`
+        // < `au`). ai_enabled emits only `true`; ai_excluded_folders is a sorted,
+        // deduped, NFC set (mirrors deliberate_folders).
+        let encoded = canonical_json_encode(&PrefsView {
+            active_workspace: Some(alloc::string::String::from("ws-1")),
+            ai_enabled: true,
+            ai_excluded_folders: alloc::vec![
+                alloc::string::String::from("Zeta/"),
+                alloc::string::String::from("Alpha/"),
+                alloc::string::String::from("Alpha/"),
+            ],
+            archive_disabled: Some(true),
+            auto_lock_seconds: Some(300),
+            ..PrefsView::default()
+        });
+        assert_eq!(
+            encoded.as_slice(),
+            br#"{"active_workspace":"ws-1","ai_enabled":true,"ai_excluded_folders":["Alpha/","Zeta/"],"archive_disabled":true,"auto_lock_seconds":300,"screen_capture_protection":true}"#,
+        );
+    }
+
+    #[test]
+    fn ai_enabled_omitted_when_false_emitted_only_when_true() {
+        let off = canonical_json_encode(&PrefsView {
+            ai_enabled: false,
+            ..PrefsView::default()
+        });
+        assert!(!core::str::from_utf8(&off).unwrap().contains("ai_enabled"));
+        let on = canonical_json_encode(&PrefsView {
+            ai_enabled: true,
+            ..PrefsView::default()
+        });
+        assert_eq!(
+            on.as_slice(),
+            br#"{"ai_enabled":true,"screen_capture_protection":true}"#,
+        );
+    }
+
+    #[test]
+    fn ai_excluded_folders_omitted_when_empty_present_when_set() {
+        let empty = canonical_json_encode(&PrefsView {
+            ai_excluded_folders: Vec::new(),
+            ..PrefsView::default()
+        });
+        assert!(!core::str::from_utf8(&empty)
+            .unwrap()
+            .contains("ai_excluded_folders"));
+        let set = canonical_json_encode(&PrefsView {
+            ai_excluded_folders: alloc::vec![alloc::string::String::from("Secret/")],
+            ..PrefsView::default()
+        });
+        assert_eq!(
+            set.as_slice(),
+            br#"{"ai_excluded_folders":["Secret/"],"screen_capture_protection":true}"#,
+        );
+    }
+
+    #[test]
+    fn ai_fields_round_trip_through_decode() {
+        // Already-canonical (sorted) input → decode reproduces the original.
+        let original = PrefsView {
+            ai_enabled: true,
+            ai_excluded_folders: alloc::vec![
+                alloc::string::String::from("Alpha/"),
+                alloc::string::String::from("Beta/"),
+            ],
+            active_workspace: Some(alloc::string::String::from("ws-2")),
+            archive_disabled: Some(false),
+            auto_lock_seconds: Some(900),
+            ..PrefsView::default()
+        };
+        let encoded = canonical_json_encode(&original);
+        let decoded = canonical_json_decode(&encoded).expect("decode");
+        assert_eq!(decoded, original);
+    }
+
+    #[test]
+    fn ai_fields_default_off_empty_when_absent_on_decode() {
+        // A pre-feature blob (no ai keys) decodes to the defaults (off / empty),
+        // spec § 9.5.2 forward-compat fall-back.
+        let decoded =
+            canonical_json_decode(br#"{"screen_capture_protection":true}"#).expect("decode");
+        assert!(!decoded.ai_enabled);
+        assert!(decoded.ai_excluded_folders.is_empty());
+    }
+
     // ---- archive_disabled (archive-disable, MYND-…) --------------------
 
     #[test]
@@ -3656,6 +3873,8 @@ mod tests {
             editor_line_numbers: None,
             theme: Some(ThemeChoice::Dark),
             active_workspace: None,
+            ai_enabled: false,
+            ai_excluded_folders: Vec::new(),
             archive_disabled: None,
             editor_content_width: None,
             editor_default_view_mode: None,
@@ -3938,6 +4157,8 @@ mod tests {
             daily_folder: None,
             daily_template: None,
             active_workspace: None,
+            ai_enabled: false,
+            ai_excluded_folders: Vec::new(),
             archive_disabled: None,
             editor_layout: None,
             editor_line_numbers: None,
@@ -3994,6 +4215,8 @@ mod tests {
             daily_folder: None,
             daily_template: None,
             active_workspace: None,
+            ai_enabled: false,
+            ai_excluded_folders: Vec::new(),
             archive_disabled: None,
             editor_layout: None,
             editor_line_numbers: None,
@@ -4048,6 +4271,8 @@ mod tests {
             daily_folder: None,
             daily_template: None,
             active_workspace: None,
+            ai_enabled: false,
+            ai_excluded_folders: Vec::new(),
             archive_disabled: None,
             editor_layout: None,
             editor_line_numbers: None,
@@ -4101,6 +4326,8 @@ mod tests {
             daily_folder: None,
             daily_template: None,
             active_workspace: None,
+            ai_enabled: false,
+            ai_excluded_folders: Vec::new(),
             archive_disabled: None,
             editor_layout: None,
             editor_line_numbers: None,
@@ -4217,6 +4444,8 @@ mod tests {
             daily_folder: None,
             daily_template: None,
             active_workspace: None,
+            ai_enabled: false,
+            ai_excluded_folders: Vec::new(),
             archive_disabled: None,
             editor_layout: None,
             editor_line_numbers: None,
@@ -4298,6 +4527,8 @@ mod tests {
                 alloc::string::String::from("n2"),
             ],
             active_workspace: None,
+            ai_enabled: false,
+            ai_excluded_folders: Vec::new(),
             archive_disabled: None,
             editor_layout: None,
             editor_line_numbers: None,
@@ -4358,6 +4589,8 @@ mod tests {
                 alloc::string::String::from("zzz"),
             ],
             active_workspace: None,
+            ai_enabled: false,
+            ai_excluded_folders: Vec::new(),
             archive_disabled: None,
             editor_layout: None,
             editor_line_numbers: None,
@@ -4453,6 +4686,8 @@ mod tests {
                 alloc::string::String::from("0190a000-0000-7000-8000-000000000001"),
             ],
             active_workspace: None,
+            ai_enabled: false,
+            ai_excluded_folders: Vec::new(),
             archive_disabled: None,
             editor_layout: None,
             editor_line_numbers: None,
@@ -4524,6 +4759,8 @@ mod tests {
             daily_folder: None,
             daily_template: None,
             active_workspace: None,
+            ai_enabled: false,
+            ai_excluded_folders: Vec::new(),
             archive_disabled: None,
             editor_layout: None,
             editor_line_numbers: None,
@@ -4642,6 +4879,8 @@ mod tests {
             daily_folder: None,
             daily_template: None,
             active_workspace: None,
+            ai_enabled: false,
+            ai_excluded_folders: Vec::new(),
             archive_disabled: None,
             editor_layout: None,
             editor_line_numbers: None,
@@ -4695,6 +4934,8 @@ mod tests {
             daily_folder: None,
             daily_template: None,
             active_workspace: None,
+            ai_enabled: false,
+            ai_excluded_folders: Vec::new(),
             archive_disabled: None,
             editor_layout: None,
             editor_line_numbers: None,
@@ -4750,6 +4991,8 @@ mod tests {
             daily_folder: None,
             daily_template: None,
             active_workspace: None,
+            ai_enabled: false,
+            ai_excluded_folders: Vec::new(),
             archive_disabled: None,
             editor_layout: None,
             editor_line_numbers: None,
@@ -4873,6 +5116,8 @@ mod tests {
             daily_folder: None,
             daily_template: None,
             active_workspace: None,
+            ai_enabled: false,
+            ai_excluded_folders: Vec::new(),
             archive_disabled: None,
             editor_layout: None,
             editor_line_numbers: None,
@@ -4970,6 +5215,8 @@ mod tests {
             favorites: alloc::vec![alloc::string::String::from("f1")],
             item_order: alloc::vec![alloc::string::String::from("n1")],
             active_workspace: None,
+            ai_enabled: false,
+            ai_excluded_folders: Vec::new(),
             archive_disabled: None,
             editor_layout: Some(sample_layout()),
             editor_line_numbers: None,
@@ -5257,6 +5504,8 @@ mod tests {
             daily_folder: None,
             daily_template: None,
             active_workspace: None,
+            ai_enabled: false,
+            ai_excluded_folders: Vec::new(),
             archive_disabled: None,
             editor_layout: None,
             editor_line_numbers: None,
@@ -5314,6 +5563,8 @@ mod tests {
             daily_folder: None,
             daily_template: None,
             active_workspace: None,
+            ai_enabled: false,
+            ai_excluded_folders: Vec::new(),
             archive_disabled: None,
             editor_layout: None,
             editor_line_numbers: None,
@@ -5617,6 +5868,8 @@ mod tests {
             &PrefsView {
                 screen_capture_protection: true,
                 bar_items_order: Vec::new(),
+                ai_enabled: false,
+                ai_excluded_folders: Vec::new(),
                 show_note_timestamps: true,
                 folder_icons: Default::default(),
                 hidden_bar_items: Vec::new(),
@@ -5667,6 +5920,8 @@ mod tests {
             &PrefsView {
                 screen_capture_protection: false,
                 bar_items_order: Vec::new(),
+                ai_enabled: false,
+                ai_excluded_folders: Vec::new(),
                 show_note_timestamps: true,
                 folder_icons: Default::default(),
                 hidden_bar_items: Vec::new(),
@@ -5719,6 +5974,8 @@ mod tests {
         let prefs_populated = PrefsView {
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
+            ai_enabled: false,
+            ai_excluded_folders: Vec::new(),
             show_note_timestamps: true,
             folder_icons: Default::default(),
             hidden_bar_items: Vec::new(),
@@ -6394,6 +6651,99 @@ mod tests {
         dump.push_str("---end amoled theme prefs vectors---\n");
         std::fs::write("/tmp/myne_vault_prefs_amoled_vectors.txt", dump.as_bytes())
             .expect("write amoled prefs vectors dump");
+    }
+
+    /// Generator for the local-ai `ai_enabled` + `ai_excluded_folders` vector
+    /// cases (MYND-408 / SYNC-12/14; appended to the companion repo's
+    /// `vault-prefs` family — per-feature generator, keeps the originals
+    /// byte-stable):
+    ///
+    /// `cargo test -p protocol --lib emit_ai_prefs_vectors -- --ignored`
+    ///
+    /// One `encrypt` + one `decrypt_ok` case for a prefs blob carrying the two
+    /// additive local-AI fields — `ai_enabled: true` and a one-entry
+    /// `ai_excluded_folders: ["Private/"]`. Pins the canonical key positions
+    /// (`ai_enabled` < `ai_excluded_folders` < `screen_capture_protection`, all
+    /// alphabetical) + the folder-set encoding (same `canonical_folder_list`
+    /// codec as `deliberate_folders`), the cross-impl MYP1 contract for the AI
+    /// prefs. Nonce `0xA1` (next free after `0xA0` amoled).
+    #[test]
+    #[ignore]
+    fn emit_ai_prefs_vectors() {
+        extern crate std;
+
+        let root_a: [u8; 32] = [0x42; 32];
+        let account_hash_a: [u8; PREFS_BLOB_ACCOUNT_HASH_LEN] = [0x33; PREFS_BLOB_ACCOUNT_HASH_LEN];
+        let prefs_key_a = derive_subkey(&root_a, SubkeyRole::PrefsKey);
+
+        let nonce_ai: [u8; AEAD_NONCE_LEN] = [0xA1; AEAD_NONCE_LEN];
+        let prefs_ai = PrefsView {
+            ai_enabled: true,
+            ai_excluded_folders: alloc::vec![alloc::string::String::from("Private/")],
+            ..PrefsView::default()
+        };
+        let canonical_ai = canonical_json_encode(&prefs_ai);
+        assert_eq!(
+            canonical_ai.as_slice(),
+            br#"{"ai_enabled":true,"ai_excluded_folders":["Private/"],"screen_capture_protection":true}"#.as_slice(),
+            "canonical plaintext must emit ai_enabled < ai_excluded_folders < screen_capture_protection",
+        );
+        let blob_ai = encode_prefs_blob_raw(&prefs_key_a, &account_hash_a, &prefs_ai, &nonce_ai)
+            .expect("encode ai");
+        let decoded_ai =
+            decode_prefs_blob(&prefs_key_a, &account_hash_a, &blob_ai).expect("decode ai");
+        assert_eq!(decoded_ai, prefs_ai);
+        assert!(decoded_ai.ai_enabled);
+        assert_eq!(
+            decoded_ai.ai_excluded_folders,
+            alloc::vec![alloc::string::String::from("Private/")]
+        );
+
+        let mut dump = alloc::string::String::new();
+        dump.push_str("---begin local-ai prefs vectors---\n\n");
+
+        dump.push_str("# case 1/2: encrypt-ai-enabled-excluded\n");
+        dump.push_str(&alloc::format!("root_key_hex: {}\n", hex_lower(&root_a)));
+        dump.push_str(&alloc::format!(
+            "account_number_hash_hex: {}\n",
+            hex_lower(&account_hash_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "plaintext_canonical_utf8_hex: {}\n",
+            hex_lower(&canonical_ai)
+        ));
+        dump.push_str(&alloc::format!(
+            "plaintext_canonical_utf8: {}\n",
+            core::str::from_utf8(&canonical_ai).unwrap_or("<non-utf8>")
+        ));
+        dump.push_str(&alloc::format!(
+            "prefs_nonce_hex: {}\n",
+            hex_lower(&nonce_ai)
+        ));
+        dump.push_str(&alloc::format!(
+            "expected_prefs_blob_hex: {}\n\n",
+            hex_lower(&blob_ai)
+        ));
+
+        dump.push_str("# case 2/2: decrypt-ai-enabled-excluded (round-trip with case 1)\n");
+        dump.push_str(&alloc::format!("input_blob_hex: {}\n", hex_lower(&blob_ai)));
+        dump.push_str(&alloc::format!("root_key_hex: {}\n", hex_lower(&root_a)));
+        dump.push_str(&alloc::format!(
+            "account_number_hash_hex: {}\n",
+            hex_lower(&account_hash_a)
+        ));
+        dump.push_str("expected_kind: ok\n");
+        dump.push_str(&alloc::format!(
+            "expected_plaintext_canonical_utf8_hex: {}\n",
+            hex_lower(&canonical_ai)
+        ));
+        dump.push_str(
+            "expected_prefs_view: { \"ai_enabled\": true, \"ai_excluded_folders\": [\"Private/\"], \"screen_capture_protection\": true }\n\n",
+        );
+
+        dump.push_str("---end local-ai prefs vectors---\n");
+        std::fs::write("/tmp/myne_vault_prefs_ai_vectors.txt", dump.as_bytes())
+            .expect("write ai prefs vectors dump");
     }
 
     /// Generator for the MYND-273 `saved_views` + `view_order` vector cases

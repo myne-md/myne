@@ -320,6 +320,12 @@ async fn lock_unlocked_if_idle<R: Runtime>(app: &AppHandle<R>, state: &VaultRunt
             // leg — it is as sensitive as the keys + search index, and
             // rebuilds on the next unlock.
             crate::plugins::vault_indices::zeroize_vault_indices(app);
+            // semantic-search-qa task 2: wipe the plaintext-derived AI vector
+            // store on the SAME idle-auto-lock leg — its embeddings + nonce
+            // manifest are as sensitive as vault.indices, rebuilt on the next
+            // unlock. Feature-gated (default build has no AI teardown).
+            #[cfg(feature = "local-inference")]
+            crate::plugins::local_inference::zeroize_ai_vectors(app);
             // MYND-169: wipe the plaintext-derived attachment reference
             // graph on the same leg — the note-ids / attachment-ids it
             // holds are correlation tags (AS3), rebuilt on the next unlock.

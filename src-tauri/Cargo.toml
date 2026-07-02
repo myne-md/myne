@@ -16,6 +16,22 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
+[features]
+# AI is OFF by default. The `local-inference` feature gates the entire
+# on-device LLM/embedding module (`plugins::local_inference`, local-ai epic
+# MYND-406) — the `Engine` trait + stub now, Candle + the sandboxed sidecar in
+# later tasks. With the feature off nothing AI compiles in: zero symbols, no
+# `local-inference` command, no capability exercised, so the default auditable
+# binary and the reproducible-build / single-`Cargo.lock` (TB9) surface are
+# byte-unchanged (SYNC-5). Enable with `--features local-inference`.
+default = []
+local-inference = ["dep:candle-core", "dep:candle-nn", "dep:candle-transformers", "dep:tokenizers"]
+# E2E-only build variant: enables `local-inference` but swaps the Candle engine
+# for the deterministic `StubEngine` at compile time, so the tauri-driver
+# flow-suite gets stable AI output without a model file in the repo. NEVER
+# enabled in the audited production bundle (SYNC-5). See `docs/dev/e2e.md`.
+local-inference-stub = ["local-inference"]
+
 [dependencies]
 tauri = { version = "2", features = [] }
 tauri-plugin-opener = "2"
@@ -73,6 +89,29 @@ whatlang = "0.18"
 # index_format_version 0x01 payload encoding (nothing shipped yet → no version
 # bump). Record in the Task 10 dependency-policy finalization.
 postcard = { version = "1", default-features = false, features = ["alloc"] }
+
+# On-device inference stack (local-ai epic, MYND-406). OPTIONAL + pulled ONLY by
+# the default-off `local-inference` feature, so the default auditable binary
+# carries zero ML symbols (SYNC-5) and the no-egress gate's feature-delta stays
+# network-free. `default-features = false` on candle-transformers + tokenizers is
+# load-bearing: it keeps `hf-hub` / `http` (networked model-download crates) OUT
+# of the tree — models are side-loaded from the user's disk (SYNC-1), never
+# downloaded (SYNC-2). Verified by `scripts/ai-no-network-check.sh` +
+# `no_egress.rs` after this addition.
+#
+# tokenizers `features = ["onig"]` — the Oniguruma (C) regex engine — is a
+# DELIBERATE, audited choice, NOT a default. tokenizers 0.20 offers a pure-Rust
+# regex only via `fancy-regex`, which the crate gates exclusively behind its
+# `unstable_wasm` feature; that feature also force-enables `getrandom/js` (a
+# wasm32 RNG backend), which is wrong for and would break a NATIVE desktop build.
+# So there is no native-safe pure-Rust swap in this version. `onig` adds a C
+# build-time dep (cc + a vendored Oniguruma) but no network/runtime surface, and
+# is confined to the default-off `local-inference` feature. Revisit if a
+# tokenizers release exposes a native-target pure-Rust regex feature.
+candle-core = { version = "0.8", optional = true, default-features = false }
+candle-nn = { version = "0.8", optional = true, default-features = false }
+candle-transformers = { version = "0.8", optional = true, default-features = false }
+tokenizers = { version = "0.20", optional = true, default-features = false, features = ["onig"] }
 
 # Direct-dep widening of the existing workspace-transitive `sha2`
 # (already pulled in via `protocol`'s KDF salt construction). Used
@@ -247,6 +286,23 @@ objc2-web-kit = { version = "0.3", default-features = false, features = [
     # transitively via wry — declared here so our own use is explicit.
     "objc2-app-kit",
 ] }
+
+# On-device AI (local-ai epic) — macOS override: enable candle's `accelerate`
+# feature so matmul uses Apple's Accelerate.framework BLAS instead of the naive
+# `gemm` fallback. Accelerate is a SYSTEM-framework link (`accelerate-src`), NOT
+# a network crate — no-egress (SYNC-2) is preserved (re-verified by
+# `ai-no-network-check.sh`). Without it a MiniLM embed is ~1.3s (naive gemm) vs
+# ~tens of ms (BLAS). These UNION with the base optional candle deps in
+# `[dependencies]`, and are still pulled ONLY by the default-off `local-inference`
+# feature (macOS build only).
+# `metal` adds the Apple GPU backend (Metal.framework — a SYSTEM framework, not a
+# network crate; no-egress preserved) so inference can run on the M-series GPU
+# instead of the CPU; `accelerate` stays as the CPU-BLAS fallback path (used when
+# Metal device creation fails). Device selection is runtime (`select_device()` in
+# engine_candle.rs, macOS→Metal-or-CPU).
+candle-core = { version = "0.8", optional = true, default-features = false, features = ["accelerate", "metal"] }
+candle-nn = { version = "0.8", optional = true, default-features = false, features = ["accelerate", "metal"] }
+candle-transformers = { version = "0.8", optional = true, default-features = false, features = ["accelerate", "metal"] }
 
 # Dev-dependencies — evaluated under the same `docs/dependency-policy.md`
 # bar as runtime dependencies. `tracing-test` (tokio-rs org, MIT) is the

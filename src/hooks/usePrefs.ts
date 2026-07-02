@@ -24,6 +24,8 @@ import i18n from "../i18n";
 import {
   PrefsView,
   prefsRead,
+  setAiEnabled as persistAiEnabled,
+  setAiExcludedFolders as persistAiExcludedFolders,
   setAutoLockTimeout,
   setEditorContentWidth,
   setEditorFontFamily,
@@ -48,6 +50,8 @@ const DEFAULT_PREFS: PrefsView = {
   screen_capture_protection: true,
   show_note_timestamps: true,
   deliberate_folders: [],
+  ai_enabled: false,
+  ai_excluded_folders: [],
   auto_lock_seconds: null,
   active_workspace: null,
   custom_theme: null,
@@ -97,6 +101,10 @@ interface UsePrefsResult {
    * to a toast).
    */
   toggleScreenCapture: (enabled: boolean) => Promise<void>;
+  /** Flip the AI opt-in toggle (optimistic; same converge-on-error pattern). */
+  setAiEnabled: (enabled: boolean) => Promise<void>;
+  /** Replace the AI excluded-folders set (optimistic; same pattern). */
+  setAiExcludedFolders: (folders: string[]) => Promise<void>;
   /**
    * Set the auto-lock-on-idle timeout (seconds). Optimistic: cache updates
    * immediately. On IPC rejection, the cache is re-read from disk
@@ -217,6 +225,47 @@ export function usePrefs(onError?: (message: string) => void): UsePrefsResult {
           // Re-read also failed — keep the optimistic value; the
           // backend tracing has logged the original failure. User can
           // retry by toggling again.
+        }
+        onError?.(i18n.t("settings.prefs.saveError"));
+      }
+    },
+    [onError],
+  );
+
+  // AI opt-in toggle + excluded-folders set (local-ai epic, ai-ux-surface
+  // MYND-408). Optimistic-then-converge, identical discipline to
+  // `toggleScreenCapture`: flip the cache, persist, and on failure re-read disk
+  // truth (never roll back to a captured pre-flip value).
+  const setAiEnabledPref = useCallback(
+    async (enabled: boolean) => {
+      setPrefs((p) => ({ ...p, ai_enabled: enabled }));
+      try {
+        await persistAiEnabled(enabled);
+      } catch {
+        try {
+          const view = await prefsRead();
+          setPrefs(view);
+        } catch {
+          // Re-read also failed — keep the optimistic value; the backend
+          // tracing logged the original failure. User can retry.
+        }
+        onError?.(i18n.t("settings.prefs.saveError"));
+      }
+    },
+    [onError],
+  );
+
+  const setAiExcludedFoldersPref = useCallback(
+    async (folders: string[]) => {
+      setPrefs((p) => ({ ...p, ai_excluded_folders: folders }));
+      try {
+        await persistAiExcludedFolders(folders);
+      } catch {
+        try {
+          const view = await prefsRead();
+          setPrefs(view);
+        } catch {
+          // Keep the optimistic value; the backend tracing logged the failure.
         }
         onError?.(i18n.t("settings.prefs.saveError"));
       }
@@ -444,6 +493,8 @@ export function usePrefs(onError?: (message: string) => void): UsePrefsResult {
   return {
     prefs,
     toggleScreenCapture,
+    setAiEnabled: setAiEnabledPref,
+    setAiExcludedFolders: setAiExcludedFoldersPref,
     setAutoLock,
     setHiddenBarItems,
     setBarItemsOrder,

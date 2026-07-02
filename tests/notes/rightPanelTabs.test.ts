@@ -19,8 +19,14 @@ describe("RIGHT_PANEL_TABS vocabulary", () => {
     );
   });
 
-  it("exposes the expected three tabs in canonical order", () => {
-    expect(RIGHT_PANEL_DEFAULT_ORDER).toEqual(["backlinks", "unlinked", "outline"]);
+  it("exposes the expected four tabs in canonical order", () => {
+    // The AI Chat tab (ai-ux-surface MYND-408) is the fourth, last in order.
+    expect(RIGHT_PANEL_DEFAULT_ORDER).toEqual([
+      "backlinks",
+      "unlinked",
+      "outline",
+      "ai-chat",
+    ]);
   });
 
   it("resolves a label key for a known id and null for an unknown id", () => {
@@ -54,8 +60,9 @@ describe("resolveActiveTab", () => {
   });
 
   it("returns null when every tab is hidden", () => {
-    expect(resolveActiveTab("backlinks", order, ["backlinks", "unlinked", "outline"])).toBeNull();
-    expect(resolveActiveTab(null, order, ["backlinks", "unlinked", "outline"])).toBeNull();
+    const allHidden = ["backlinks", "unlinked", "outline", "ai-chat"];
+    expect(resolveActiveTab("backlinks", order, allHidden)).toBeNull();
+    expect(resolveActiveTab(null, order, allHidden)).toBeNull();
   });
 
   it("works on a reordered (resolved) order", () => {

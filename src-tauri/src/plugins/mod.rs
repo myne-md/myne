@@ -12,6 +12,11 @@ pub mod backup;
 pub mod clipper_pairing;
 pub mod export;
 pub mod importer;
+// local-ai epic (MYND-406): on-device inference plugin, gated behind the
+// default-off `local-inference` cargo feature (SYNC-5). Absent — zero symbols —
+// from the default build.
+#[cfg(feature = "local-inference")]
+pub mod local_inference;
 pub mod notes;
 pub mod pdf_export;
 pub mod prefs;

@@ -200,6 +200,90 @@ const convertWikilinksAction: CommandAction = {
   },
 };
 
+// Shared AI command surface (local-ai epic, ai-ux-surface MYND-408, SYNC-9).
+// The stub sibling that proves the `ai.*` surface + the shared gate: editor
+// stage + `ai_enabled`. When AI is OFF it renders **disabled** (not hidden) so
+// the feature is discoverable and the user learns it is a toggle away
+// (disabled-control discipline). Capability actions (siblings 4/6/7) register
+// through the same gate + the reserved `ai.*` id / `ai.insert`/`ai.rewrite`/
+// `ai.title` userEvent namespace.
+const aiOpenChatAction: CommandAction = {
+  id: "ai.open-chat",
+  get label() {
+    return i18n.t("commands.actions.aiOpenChat.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.ai");
+  },
+  visibility: (ctx) =>
+    ctx.stageName !== "editor" ? "hidden" : ctx.aiEnabled ? "show" : "disabled",
+  run: (ctx) => {
+    ctx.onOpenAiChat();
+  },
+};
+
+// Summarize the open note / selection (note-summarization MYND-409). Per-note
+// AI action: needs a selected note (the exportNote pattern) AND ai_enabled. In
+// the editor with a note but AI off → disabled (discoverable); with no note, or
+// outside the editor → hidden. The excluded-folder block (SYNC-14) + the
+// ephemeral AI Chat render are the handler's concern; this is the gate + entry.
+const aiSummarizeNoteAction: CommandAction = {
+  id: "ai.summarize-note",
+  get label() {
+    return i18n.t("commands.actions.aiSummarizeNote.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.ai");
+  },
+  visibility: (ctx) =>
+    ctx.stageName !== "editor" || ctx.selectedNoteId === null
+      ? "hidden"
+      : ctx.aiEnabled
+        ? "show"
+        : "disabled",
+  run: (ctx) => {
+    ctx.onSummarizeNote();
+  },
+};
+
+const aiSuggestTagsAction: CommandAction = {
+  id: "ai.suggest-tags",
+  get label() {
+    return i18n.t("commands.actions.aiSuggestTags.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.ai");
+  },
+  visibility: (ctx) =>
+    ctx.stageName !== "editor" || ctx.selectedNoteId === null
+      ? "hidden"
+      : ctx.aiEnabled
+        ? "show"
+        : "disabled",
+  run: (ctx) => {
+    ctx.onSuggestTags();
+  },
+};
+
+const aiRewriteSelectionAction: CommandAction = {
+  id: "ai.rewrite-selection",
+  get label() {
+    return i18n.t("commands.actions.aiRewriteSelection.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.ai");
+  },
+  visibility: (ctx) =>
+    ctx.stageName !== "editor" || ctx.selectedNoteId === null
+      ? "hidden"
+      : ctx.aiEnabled
+        ? "show"
+        : "disabled",
+  run: (ctx) => {
+    ctx.onRewriteSelection();
+  },
+};
+
 const foldAllAction: CommandAction = {
   id: "editor.fold-all",
   get label() {
@@ -606,4 +690,8 @@ export const COMMAND_ACTIONS: readonly CommandAction[] = Object.freeze([
   backupVaultAction,
   exportVaultMarkdownAction,
   convertWikilinksAction,
+  aiOpenChatAction,
+  aiSummarizeNoteAction,
+  aiSuggestTagsAction,
+  aiRewriteSelectionAction,
 ]);

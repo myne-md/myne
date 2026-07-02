@@ -636,6 +636,7 @@ fn hkdf_sha256_vectors() {
             "personal-dictionary-key" => SubkeyRole::PersonalDictKey,
             "vault-indices-key" => SubkeyRole::VaultIndicesKey,
             "attachment-text-key" => SubkeyRole::AttachmentTextKey,
+            "ai-embeddings-key" => SubkeyRole::AiEmbeddingsKey,
             other => panic!(
                 "[{id}] unknown input_role '{other}' — schema enforces enum; if a new variant landed in SubkeyRole, update this match arm in lockstep"
             ),
@@ -687,6 +688,7 @@ fn hkdf_sha256_vectors() {
         "personal-dictionary-key",
         "vault-indices-key",
         "attachment-text-key",
+        "ai-embeddings-key",
     ] {
         assert!(
             seen_roles.contains(required),
@@ -1391,9 +1393,9 @@ fn password_policy_vectors() {
 #[test]
 fn ctx_aead_vectors() {
     use protocol::{
-        aad_note_content_encrypt, aad_note_item_key_wrap, aad_password_wrap,
-        aad_personal_dictionary_blob, aad_prefs_blob, aad_quick_unlock_blob, aad_recovery_wrap,
-        aad_search_index_blob, aad_vault_indices_blob, aad_vault_items_key_wrap,
+        aad_ai_embeddings_blob, aad_note_content_encrypt, aad_note_item_key_wrap,
+        aad_password_wrap, aad_personal_dictionary_blob, aad_prefs_blob, aad_quick_unlock_blob,
+        aad_recovery_wrap, aad_search_index_blob, aad_vault_indices_blob, aad_vault_items_key_wrap,
         aad_workspace_blob, aead_open_ctx, aead_seal_ctx, KdfParams, ProtocolError,
     };
 
@@ -1660,6 +1662,14 @@ fn ctx_aead_vectors() {
                         );
                         aad_vault_indices_blob(&account_number_hash)
                     }
+                    "aad_ai_embeddings_blob" => {
+                        let account_number_hash: [u8; 16] = hex_decode_array(
+                            case["input_account_number_hash_hex"].as_str().unwrap_or_else(
+                                || panic!("[{id}] missing input_account_number_hash_hex"),
+                            ),
+                        );
+                        aad_ai_embeddings_blob(&account_number_hash)
+                    }
                     "aad_personal_dictionary_blob" => {
                         let account_number_hash: [u8; 16] = hex_decode_array(
                             case["input_account_number_hash_hex"].as_str().unwrap_or_else(
@@ -1703,7 +1713,7 @@ fn ctx_aead_vectors() {
     // one aad_canonical_bytes pin in the cases array. Drift in either
     // the schema's input_builder_name enum or the cases.json coverage
     // surfaces here.
-    let required: [&str; 11] = [
+    let required: [&str; 12] = [
         "aad_password_wrap",
         "aad_recovery_wrap",
         "aad_vault_items_key_wrap",
@@ -1713,6 +1723,7 @@ fn ctx_aead_vectors() {
         "aad_search_index_blob",
         "aad_workspace_blob",
         "aad_vault_indices_blob",
+        "aad_ai_embeddings_blob",
         "aad_personal_dictionary_blob",
         "aad_quick_unlock_blob",
     ];
@@ -1940,10 +1951,10 @@ fn bip39_recovery_vectors() {
 #[test]
 fn aad_construction_vectors() {
     use protocol::{
-        aad_attachment_text_blob, aad_note_content_encrypt, aad_note_item_key_wrap,
-        aad_password_wrap, aad_personal_dictionary_blob, aad_prefs_blob, aad_quick_unlock_blob,
-        aad_recovery_wrap, aad_search_index_blob, aad_vault_indices_blob, aad_vault_items_key_wrap,
-        aad_workspace_blob,
+        aad_ai_embeddings_blob, aad_attachment_text_blob, aad_note_content_encrypt,
+        aad_note_item_key_wrap, aad_password_wrap, aad_personal_dictionary_blob, aad_prefs_blob,
+        aad_quick_unlock_blob, aad_recovery_wrap, aad_search_index_blob, aad_vault_indices_blob,
+        aad_vault_items_key_wrap, aad_workspace_blob,
     };
 
     let path = companion_vectors_root()
@@ -2039,6 +2050,7 @@ fn aad_construction_vectors() {
             "aad_search_index_blob" => aad_search_index_blob(&account_number_hash()),
             "aad_workspace_blob" => aad_workspace_blob(&account_number_hash()),
             "aad_vault_indices_blob" => aad_vault_indices_blob(&account_number_hash()),
+            "aad_ai_embeddings_blob" => aad_ai_embeddings_blob(&account_number_hash()),
             "aad_personal_dictionary_blob" => {
                 aad_personal_dictionary_blob(&account_number_hash())
             }
@@ -2102,7 +2114,7 @@ fn aad_construction_vectors() {
 
     // Structural guarantee: every pub aad_* builder must have a decomposition
     // case — drift in either the schema enum or the cases.json surfaces here.
-    let required: [&str; 12] = [
+    let required: [&str; 13] = [
         "aad_password_wrap",
         "aad_recovery_wrap",
         "aad_vault_items_key_wrap",
@@ -2111,6 +2123,7 @@ fn aad_construction_vectors() {
         "aad_search_index_blob",
         "aad_workspace_blob",
         "aad_vault_indices_blob",
+        "aad_ai_embeddings_blob",
         "aad_personal_dictionary_blob",
         "aad_quick_unlock_blob",
         "aad_note_content_encrypt",

@@ -28,7 +28,12 @@ import {
 import { closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { Subscript, Superscript, Emoji } from "@lezer/markdown";
-import { EditorState, type Extension } from "@codemirror/state";
+import {
+  Compartment,
+  EditorState,
+  type Extension,
+  type StateEffect,
+} from "@codemirror/state";
 import { Wikilink } from "../dialect/lezer/wikilink";
 import { InlineTag } from "../dialect/lezer/inline-tag";
 import { DefinitionList } from "../dialect/lezer/definition-list";
@@ -50,6 +55,32 @@ import { attachmentCatalogExtension } from "./attachments/catalog";
 import { attachmentPasteDropExtension } from "./attachments/paste-drop";
 import { attachmentInsertPlaceholderExtension } from "./attachments/insert-placeholder";
 import { slashMenuExtension } from "./slash/plugin";
+import { aiSlashEnabledFacet } from "./slash/aiSlash";
+import { ghostTextExtension } from "./ai/ghostText";
+
+// AI surface (slash AI commands + inline ghost-text) lives in a CM6 Compartment
+// so `ai_enabled` — and the excluded-folder gate the host folds into it — can be
+// toggled LIVE without a remount. Turning AI off (or opening a note in an
+// excluded folder) mid-session must actually stop ghost-text from feeding note
+// content to the model; seeding this at mount and never reconfiguring (the prior
+// bug) left ghost-text running after the pref flipped.
+const aiCompartment = new Compartment();
+
+/** The AI surface for a given enabled state: the slash-menu AI facet + (only
+ *  when on) the ghost-text extension. `enabled` is the `ai_enabled` pref AND the
+ *  not-excluded-folder gate ANDed by the host. */
+export function aiSurface(enabled: boolean): Extension {
+  return [
+    aiSlashEnabledFacet.of(enabled),
+    ...(enabled ? ghostTextExtension() : []),
+  ];
+}
+
+/** Reconfigure the live AI surface (host dispatches this on an `ai_enabled` /
+ *  excluded-folder change) — re-mount-free, cursor/scroll/undo preserved. */
+export function reconfigureAi(enabled: boolean): StateEffect<unknown> {
+  return aiCompartment.reconfigure(aiSurface(enabled));
+}
 import { templateTokenMenuExtension } from "./template-tokens/plugin";
 import { selectionToolbarExtension } from "./toolbar/plugin";
 import { completionExtension } from "./completion";
@@ -63,7 +94,11 @@ import { selectionCountObserver } from "./selection-count";
 import { focusModeExtension } from "./focus-mode";
 import { myneTheme } from "./theme";
 
-export function myneExtensions(opts?: { viewMode?: ViewMode; readOnly?: boolean }): readonly Extension[] {
+export function myneExtensions(opts?: {
+  viewMode?: ViewMode;
+  readOnly?: boolean;
+  aiEnabled?: boolean;
+}): readonly Extension[] {
   const viewMode = opts?.viewMode ?? "live";
   const readOnly = opts?.readOnly ?? false;
   return [
@@ -142,6 +177,11 @@ export function myneExtensions(opts?: { viewMode?: ViewMode; readOnly?: boolean 
     // Hover-tooltip R1 (§6.2): resolved path / "(N matches)" / "(no match)".
     wikilinkHoverExtension(),
     slashMenuExtension(),
+    // AI surface (slash AI commands + ghost-text) in a live-reconfigurable
+    // compartment so `ai_enabled` / excluded-folder changes take effect without
+    // a remount (see `reconfigureAi`). Off = zero ghost field / trigger / keymap
+    // and the base slash menu only.
+    aiCompartment.of(aiSurface(opts?.aiEnabled ?? false)),
     // `[[` note picker (MYND-38) — fuzzy note search → canonical §3 emit. Reads
     // the WL-5 note-set facet; reuses the slash-menu surface + fuzzyFilter.
     wikilinkPickerExtension(),

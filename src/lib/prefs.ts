@@ -224,6 +224,20 @@ export interface PrefsView {
    */
   deliberate_folders: string[];
   /**
+   * AI opt-in toggle (local-ai epic, ai-ux-surface MYND-408, SYNC-12). `false`
+   * ≡ AI off (the default). Serialized from Rust `bool`; omitted from the
+   * encrypted blob when `false` (byte-identical to a pre-feature vault). The
+   * whole AI surface is gated on this. Non-load-bearing.
+   */
+  ai_enabled: boolean;
+  /**
+   * Folders excluded from every AI read/index (local-ai epic, ai-ux-surface
+   * MYND-408, SYNC-14) — canonical trailing-slash form. Same encoding as
+   * `deliberate_folders` (NFC-normalized, sorted, deduped set). Absent →
+   * defaulted to `[]`. Non-load-bearing.
+   */
+  ai_excluded_folders: string[];
+  /**
    * Active workspace slot id (MYND-308) — the workspace slot the editor restores
    * on unlock. `null` ≡ unset → the host applies its default (first / last-used)
    * workspace policy. A free string stored verbatim (NFC on the wire); the
@@ -489,6 +503,27 @@ export async function setScreenCaptureProtection(enabled: boolean): Promise<void
  */
 export async function setDeliberateFolders(folders: string[]): Promise<void> {
   await invoke<void>("plugin:prefs|set_deliberate_folders", { folders });
+}
+
+/**
+ * Persist the `ai_enabled` AI opt-in toggle (local-ai epic, ai-ux-surface
+ * MYND-408, SYNC-12). Per-vault + encrypted; a rejected promise means the disk
+ * write failed and the caller's optimistic UI must revert (re-read disk truth,
+ * as the screen-capture toggle does).
+ */
+export async function setAiEnabled(enabled: boolean): Promise<void> {
+  await invoke<void>("plugin:prefs|set_ai_enabled", { enabled });
+}
+
+/**
+ * Persist the full `ai_excluded_folders` set (local-ai epic, ai-ux-surface
+ * MYND-408, SYNC-14) — folders the AI never reads/indexes. Same canonical set
+ * encoding as `deliberate_folders` (the Rust codec NFC-sorts + exact-dedups).
+ * The caller passes the entire desired set; a rejected promise means the disk
+ * write failed and the caller's optimistic UI must revert.
+ */
+export async function setAiExcludedFolders(folders: string[]): Promise<void> {
+  await invoke<void>("plugin:prefs|set_ai_excluded_folders", { folders });
 }
 
 /**

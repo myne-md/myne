@@ -193,6 +193,21 @@ One JS dep for the Phase-1 minimal graph view's force-directed layout. Not crypt
 - **Lazy/cold-path:** invoked only by the user-initiated `voice_record_start` command (the mic stream opens on an explicit gesture), never on the boot/unlock/cold path; the recording is aborted on lock / auto-lock / vault-delete so the mic never outlives the unlocked session.
 - **Hash-pinning:** `0.15` in `Cargo.toml`, single workspace `Cargo.lock` updated; added to `src-tauri/` only (never `protocol/`).
 
+### On-device inference (local-ai, MYND-406) — `src-tauri/Cargo.toml` — ⚠️ HEAVIEST RUST DEPENDENCY
+
+The Candle ML stack + tokenizer for [local inference](../glossary.md) — the single largest Rust-side transitive surface Myne takes (the peer of Mermaid on the npm side).
+
+| Dep | Version | Use | Transitive footprint | License | Provenance |
+|---|---|---|---|---|---|
+| `candle-core` | 0.8 | CPU tensors + quantized GGUF loader (`gguf_file`) | gemm, half, rayon, memmap2, safetensors, … (large) | MIT/Apache-2.0 | `decisions.md` 2026-07-01; local-inference-runtime task 3 |
+| `candle-nn` | 0.8 | `VarBuilder` (safetensors → BERT weights) | shares candle-core's tree | MIT/Apache-2.0 | same |
+| `candle-transformers` | 0.8 | `quantized_qwen2::ModelWeights` (infer) + `bert::BertModel` (embed) + `LogitsProcessor` | candle-nn + rand_distr | MIT/Apache-2.0 | same |
+| `tokenizers` | 0.20 | BPE/WordPiece tokenizer (`Tokenizer::from_file`) | onig (regex C-binding), esaxx-rs, … | Apache-2.0 | same |
+
+- **"The bar" Q4 (transitive tree):** RED FLAG by the ≥50-transitive heuristic — the largest Rust-side TB9 surface. Accepted as a **conscious, human-approved decision** (`decisions.md` 2026-07-01) with three load-bearing mitigations: (1) **optional + feature-gated** — pulled ONLY by the default-off `local-inference` feature, so the audited production bundle compiles zero ML symbols and its `Cargo.lock`-resolved graph is byte-unchanged; (2) **`default-features = false`** on `candle-transformers` + `tokenizers` keeps `hf-hub` / `http` (networked model-download crates) OUT of the tree — models are side-loaded (SYNC-1/2), verified network-free by the `ai-no-network-check.sh` feature-delta gate + `no_egress.rs`; (3) **not in `protocol/`** — the crypto crate's dependency surface is untouched.
+- **Hash-pinning:** exact minor pins in `Cargo.toml`, single workspace `Cargo.lock` updated; the `rustls` in the tree is pre-existing sync-TLS, not a Candle delta. Added to `src-tauri/` only.
+- **The `local-inference-stub` build feature** (E2E-only) enables `local-inference` but swaps the Candle engine for the deterministic stub at compile time — it pulls the same crates but is never the audited bundle.
+
 ## Reference
 
 - `threat-model.md` §6 — compensating controls

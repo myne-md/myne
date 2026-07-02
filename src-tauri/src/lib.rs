@@ -17,6 +17,14 @@ mod export_naming;
 // pdf/workspace/screen-capture/sync) that do not live in `myne-core`.
 mod hooks;
 pub use myne_core::io_failure_kind;
+// App-global no-egress invariant + static CI gate (local-ai epic,
+// ai-egress-guardrail MYND-407). NOT AI-scoped — the whole client must never
+// gain a network egress path. The canonical lists + pure predicates and the
+// gate that applies them to `tauri.conf.json` / `Cargo.toml` / the runtime
+// dep-closure / `capabilities/*.json` are the `cargo test` battery in this
+// module, so the module is test-only (`#[cfg(test)]`).
+#[cfg(test)]
+mod no_egress;
 pub use myne_core::note_txn;
 pub use myne_core::paths;
 mod plugins;
@@ -215,7 +223,7 @@ pub fn run() {
         }
     }));
 
-    builder
+    let builder = builder
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_dialog::init())
@@ -258,7 +266,16 @@ pub fn run() {
         .register_asynchronous_uri_scheme_protocol(
             plugins::attachments::scheme::SCHEME,
             plugins::attachments::scheme::handle,
-        )
+        );
+
+    // local-ai epic (MYND-406): register the on-device inference plugin ONLY
+    // when the default-off `local-inference` cargo feature is enabled, so the
+    // default auditable binary carries zero AI symbols and no `local-inference`
+    // command (SYNC-5). The `Engine` trait + stub live behind the same gate.
+    #[cfg(feature = "local-inference")]
+    let builder = builder.plugin(plugins::local_inference::init());
+
+    builder
         .setup(|app| {
             use tauri::Manager;
             // MYND-202: SAFETY-CRITICAL eager boot migration `vault/` →

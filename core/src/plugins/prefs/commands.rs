@@ -838,6 +838,120 @@ pub async fn set_deliberate_folders_with_dir(
     Ok(())
 }
 
+/// Slot::Unlocked-gated setter for the `ai_enabled` AI opt-in toggle (local-ai
+/// epic, ai-ux-surface MYND-408, SYNC-12). Read-modify-write under the
+/// per-plugin write mutex; **no native side-effect** (same shape as
+/// `set_deliberate_folders`). Per-vault + encrypted in `vault.prefs` (the
+/// at-rest "uses AI" fingerprint never leaks).
+#[tauri::command]
+pub async fn set_ai_enabled<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
+    enabled: bool,
+) -> Result<(), PrefsWriteError> {
+    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    // Disk-side commit FIRST, under the mutex.
+    set_ai_enabled_with_dir(&dir, state.inner(), enabled).await?;
+    // Reflect the new policy into the AI runtime SECOND (desktop-only; mobile
+    // no-op). Read back the authoritative post-write policy so both the opt-in
+    // and the current exclusion set are consistent (SYNC-14).
+    if let Ok(view) = prefs_read_with_dir(&dir, state.inner()).await {
+        hooks.ai_policy_changed(view.ai_enabled, &view.ai_excluded_folders);
+    }
+    Ok(())
+}
+
+/// Testable core of [`set_ai_enabled`].
+pub(crate) async fn set_ai_enabled_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    enabled: bool,
+) -> Result<(), PrefsWriteError> {
+    let _write_guard = write_mutex().lock().await;
+
+    let (_slots_guard, root_key, _vmh) = state
+        .hold_unlocked_root_key_and_hash()
+        .await
+        .ok_or(PrefsWriteError::SlotNotUnlocked)?;
+
+    let account_number_hash = read_account_number_hash_for_write(&vault_dir.join("vault.meta"))?;
+    let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
+    let prefs_path = vault_dir.join("vault.prefs");
+
+    let mut prefs = read_or_default(&prefs_path, &prefs_key, &account_number_hash);
+    prefs.ai_enabled = enabled;
+
+    let blob_bytes = encode_prefs_blob(&prefs_key, &account_number_hash, &prefs)
+        .map_err(|_| PrefsWriteError::PrefsEncodeFailed)?;
+
+    crate::atomic_write::atomic_write(&prefs_path, &blob_bytes, true)
+        .map_err(PrefsWriteError::from)?;
+
+    tracing::info!(event = "prefs_written", field = "ai_enabled", enabled);
+    Ok(())
+}
+
+/// Slot::Unlocked-gated setter for the `ai_excluded_folders` set (local-ai
+/// epic, ai-ux-surface MYND-408, SYNC-14) — folders the AI never reads/indexes.
+/// Same canonical set encoding as `deliberate_folders`; direct mirror of
+/// [`set_deliberate_folders`] (read-modify-write, no native side-effect).
+#[tauri::command]
+pub async fn set_ai_excluded_folders<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
+    folders: Vec<String>,
+) -> Result<(), PrefsWriteError> {
+    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    // Disk-side commit FIRST, under the mutex.
+    set_ai_excluded_folders_with_dir(&dir, state.inner(), folders).await?;
+    // Reflect the new exclusion set into the AI runtime SECOND: purge any
+    // now-excluded note from the resident store + persisted blob (SYNC-14).
+    // Read back the authoritative policy (opt-in may be off).
+    if let Ok(view) = prefs_read_with_dir(&dir, state.inner()).await {
+        hooks.ai_policy_changed(view.ai_enabled, &view.ai_excluded_folders);
+    }
+    Ok(())
+}
+
+/// Testable core of [`set_ai_excluded_folders`].
+pub(crate) async fn set_ai_excluded_folders_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    folders: Vec<String>,
+) -> Result<(), PrefsWriteError> {
+    let _write_guard = write_mutex().lock().await;
+
+    let (_slots_guard, root_key, _vmh) = state
+        .hold_unlocked_root_key_and_hash()
+        .await
+        .ok_or(PrefsWriteError::SlotNotUnlocked)?;
+
+    let account_number_hash = read_account_number_hash_for_write(&vault_dir.join("vault.meta"))?;
+    let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
+    let prefs_path = vault_dir.join("vault.prefs");
+
+    let mut prefs = read_or_default(&prefs_path, &prefs_key, &account_number_hash);
+    let count = folders.len();
+    prefs.ai_excluded_folders = folders;
+
+    let blob_bytes = encode_prefs_blob(&prefs_key, &account_number_hash, &prefs)
+        .map_err(|_| PrefsWriteError::PrefsEncodeFailed)?;
+
+    crate::atomic_write::atomic_write(&prefs_path, &blob_bytes, true)
+        .map_err(PrefsWriteError::from)?;
+
+    // Folder COUNT only — never the paths (AS3 Sensitive; see the
+    // `set_deliberate_folders` note + ../../CLAUDE.md logging discipline).
+    tracing::info!(
+        event = "prefs_written",
+        field = "ai_excluded_folders",
+        count
+    );
+    Ok(())
+}
+
 /// Slot::Unlocked-gated setter for the `item_order` sequence — the unified
 /// manual sidebar order across the single interleaved file-tree (a flat,
 /// heterogeneous list of note UUIDs + folder paths, MYND-183, superseding the
@@ -2245,6 +2359,8 @@ mod tests {
                 &account_hash,
                 &PrefsView {
                     screen_capture_protection: false,
+                    ai_enabled: false,
+                    ai_excluded_folders: Vec::new(),
                     bar_items_order: Vec::new(),
                     show_note_timestamps: true,
                     folder_icons: Default::default(),
@@ -2493,6 +2609,57 @@ mod tests {
                 .await
                 .expect("read after clear");
             assert!(cleared.deliberate_folders.is_empty());
+        });
+    }
+
+    // ---- AI prefs setters (local-ai, ai-ux-surface MYND-408) ----------
+
+    #[test]
+    fn ai_prefs_round_trip_via_set_then_read() {
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x51).await;
+
+            // Defaults: AI off, no exclusions.
+            let base = prefs_read_with_dir(tmp.path(), &state).await.expect("read");
+            assert!(!base.ai_enabled);
+            assert!(base.ai_excluded_folders.is_empty());
+
+            // Enable + set exclusions (unsorted input).
+            set_ai_enabled_with_dir(tmp.path(), &state, true)
+                .await
+                .expect("enable must succeed");
+            set_ai_excluded_folders_with_dir(
+                tmp.path(),
+                &state,
+                alloc_vec(["Private/", "Archive/2025/"]),
+            )
+            .await
+            .expect("set exclusions must succeed");
+
+            let view = prefs_read_with_dir(tmp.path(), &state)
+                .await
+                .expect("read after write");
+            assert!(view.ai_enabled);
+            // Canonical sort applies at encode → read-back is sorted.
+            assert_eq!(
+                view.ai_excluded_folders,
+                alloc_vec(["Archive/2025/", "Private/"]),
+            );
+            // Unrelated fields untouched (defaults on).
+            assert!(view.screen_capture_protection);
+
+            // Disable + clear → back to defaults (byte-identical to pre-field).
+            set_ai_enabled_with_dir(tmp.path(), &state, false)
+                .await
+                .expect("disable must succeed");
+            set_ai_excluded_folders_with_dir(tmp.path(), &state, Vec::new())
+                .await
+                .expect("clear must succeed");
+            let cleared = prefs_read_with_dir(tmp.path(), &state)
+                .await
+                .expect("read after clear");
+            assert!(!cleared.ai_enabled);
+            assert!(cleared.ai_excluded_folders.is_empty());
         });
     }
 

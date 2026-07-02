@@ -30,6 +30,7 @@ import { Icon } from "./primitives/Icon";
 import { useFocusTrap } from "../hooks/useFocusTrap";
 import { AboutPanel } from "./settings/AboutPanel";
 import { AccountPanel } from "./settings/AccountPanel";
+import { AiPanel } from "./settings/AiPanel";
 import { AppearancePanel } from "./settings/AppearancePanel";
 import { EditorPanel } from "./settings/EditorPanel";
 import { FilesPanel } from "./settings/FilesPanel";
@@ -49,6 +50,7 @@ type PanelId =
   | "account"
   | "privacy"
   | "sync"
+  | "ai"
   | "editor"
   | "files"
   | "hotkeys"
@@ -67,6 +69,7 @@ const PANELS: readonly PanelMeta[] = [
   { id: "account", labelKey: "settings.shell.panels.account" },
   { id: "privacy", labelKey: "settings.shell.panels.privacy" },
   { id: "sync", labelKey: "settings.shell.panels.sync" },
+  { id: "ai", labelKey: "settings.shell.panels.ai" },
   { id: "editor", labelKey: "settings.shell.panels.editor" },
   { id: "files", labelKey: "settings.shell.panels.files" },
   { id: "hotkeys", labelKey: "settings.shell.panels.hotkeys" },
@@ -248,6 +251,7 @@ export function SettingsModal({
     account: null,
     privacy: null,
     sync: null,
+    ai: null,
     editor: null,
     files: null,
     hotkeys: null,
@@ -319,6 +323,7 @@ export function SettingsModal({
     ),
     privacy: <PrivacyPanel onShowToast={onShowToast} />,
     sync: <SyncPanel />,
+    ai: <AiPanel onShowToast={onShowToast} />,
     editor: <EditorPanel />,
     files: <FilesPanel />,
     hotkeys: <HotkeysPanel />,
