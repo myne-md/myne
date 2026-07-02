@@ -117,6 +117,20 @@ describe("importVault — walk, classify, serial ingest", () => {
     expect(r.skippedExisting).toBe(0);
   });
 
+  it("idempotent skip when the note's own `folder:` FM diverges from its path (SYNC-5)", async () => {
+    // The file is at Notes/todo.md but declares `folder: Archive`, so it persists
+    // under Archive/ and the live-set keys it there. Keying dedup on the
+    // path-derived folder ("Notes") would miss and re-create it every re-import.
+    const h = harness({
+      Notes: { "todo.md": "---\nfolder: Archive\ntitle: Todo\n---\nbody\n" },
+    });
+    const existing = buildExistingIdentitySet([note("Archive", "Todo")]);
+    const r = await importVault("/v", h.ports, existing, "skip");
+    expect(r.skippedExisting).toBe(1);
+    expect(r.imported).toBe(0);
+    expect(h.created).toHaveLength(0); // no duplicate
+  });
+
   it("preserves an empty source dir via one set_deliberate_folders write (SYNC-4)", async () => {
     const h = harness({
       Projects: { "spec.md": "# spec\n" },
