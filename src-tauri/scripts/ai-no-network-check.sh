@@ -1,22 +1,29 @@
 #!/usr/bin/env bash
 # ai-no-network-check.sh — enforce the local-ai runtime's no-egress invariant
-# at the dependency level (local-ai epic, MYND-406, task 7a; SYNC-2 lens).
+# at the dependency level (local-ai epic, MYND-406/407, task 7a; SYNC-2 lens).
 #
-# The `local-inference` cargo feature must NOT introduce a networked / HTTP-
-# client / socket-opening transitive crate. This is the runtime side of the
-# guarantee: the *enforcing* CI gate (CSP, sidecar OS-sandbox, entitlement
-# scan) is sibling 2 (ai-egress-guardrail); this check is the negative — the
-# AI feature's dependency DELTA over the default build must contain none of a
-# denylist of network crates.
+# As of `decisions.md` 2026-07-02 the on-device AI ships in the DEFAULT build
+# (the `local-inference` feature moved into `default`), so no-egress is now an
+# ABSOLUTE property of the single shipped dependency tree, not a feature delta:
+# the shipped binary must contain NO networked / HTTP-client / model-download /
+# socket-opening / telemetry crate — with one narrow, documented exception, the
+# Phase-2 sync TLS stack (rustls + pki-types + webpki), which is a transport
+# primitive gated by CSP + Tauri capabilities, is NOT an AI dependency, and is
+# NOT an HTTP client. (Measured 2026-07-02: the only denylist-family crates in
+# the shipped tree are those three; the AI delta adds zero networked crate.)
 #
-# Method: compare the normal-dependency closure WITH the feature on vs off and
-# fail if any crate the feature ADDS is on the denylist. The delta (not the
-# whole lock) is checked deliberately — the workspace legitimately carries
-# `rustls` for Phase-2 sync, which is NOT under the AI feature and must not
-# false-positive. Also asserts the single-shared `Cargo.lock` (TB9 anchor) and
-# no wildcard version specs.
+# Two checks run:
+#   1. ABSOLUTE — scan the shipped (default, AI-on) closure; fail on any
+#      denylisted crate that is NOT in the SYNC_TLS_ALLOW allowlist. If sync
+#      ever swaps its TLS crate, this fails on purpose and forces a conscious
+#      TB9 review rather than silently widening the network surface.
+#   2. AI DELTA (belt-and-suspenders) — diff the shipped tree against the
+#      AI-free `--no-default-features` baseline; the crates the AI path adds
+#      must contain none of the denylist. Proves "enabling AI adds no egress".
 #
-# Exit non-zero on any violation. Intended for CI (woodpecker) + local runs.
+# Also asserts the single-shared `Cargo.lock` (TB9 anchor) and no wildcard
+# version specs. `cargo tree` only RESOLVES the graph (no compile), so this is
+# a cheap gate. Exit non-zero on any violation. Intended for CI + local runs.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."          # src-tauri/
@@ -24,6 +31,18 @@ REPO_ROOT="$(cd .. && pwd)"
 
 PKG="myne-desktop"
 FEATURE="local-inference"
+
+# Narrow allowlist: networked crates that are legitimately in the shipped tree
+# and are NOT AI dependencies — the Phase-2 sync TLS transport stack. These are
+# transport primitives (no HTTP client, no model download), reachable only
+# through the CSP `connect-src` allowlist + Tauri sync capabilities. Keep this
+# list minimal: a new entry is a deliberate TB9 decision.
+SYNC_TLS_ALLOW=$(cat <<'EOF'
+rustls
+rustls-pki-types
+rustls-webpki
+EOF
+)
 
 # Socket-opening / HTTP-client / TLS-transport crates. A crate appearing here
 # in the FEATURE DELTA means the AI runtime gained a network capability.
@@ -65,7 +84,7 @@ sentry-core
 EOF
 )
 
-echo "== AI no-network dependency check (feature: $FEATURE) =="
+echo "== AI no-network dependency check (shipped tree; AI is default-on) =="
 
 closure() {
   # crate names only, one per line, sorted-unique. `-e normal` excludes
@@ -77,27 +96,46 @@ closure() {
     | sort -u
 }
 
-off="$(closure)"
-on="$(closure --features "$FEATURE")"
-
-# Crates ADDED by turning the feature on.
-delta="$(comm -13 <(printf '%s\n' "$off") <(printf '%s\n' "$on") || true)"
-
-if [ -z "$delta" ]; then
-  echo "  feature delta: (none — the AI feature adds zero dependencies)"
-else
-  echo "  feature delta adds:"
-  printf '    %s\n' $delta
-fi
+off="$(closure)"                           # AI-free baseline (--no-default-features)
+on="$(closure --features "$FEATURE")"      # shipped tree (default == local-inference on)
 
 violation=0
+
+# ── Check 1: ABSOLUTE — no networked crate in the shipped tree except the
+#    documented sync-TLS allowlist. ───────────────────────────────────────
+echo "== absolute scan of the shipped tree =="
+found_net=""
+while IFS= read -r crate; do
+  [ -z "$crate" ] && continue
+  if printf '%s\n' "$DENYLIST" | grep -qx "$crate"; then
+    if printf '%s\n' "$SYNC_TLS_ALLOW" | grep -qx "$crate"; then
+      echo "  · allowed (sync TLS, not AI): $crate"
+    else
+      echo "  ✗ DENYLISTED networked crate present in the shipped tree: $crate"
+      violation=1
+    fi
+    found_net="$found_net $crate"
+  fi
+done <<< "$on"
+[ -z "$found_net" ] && echo "  (no denylist-family crate present at all)"
+[ "$violation" -eq 0 ] && echo "  ✓ shipped tree carries no networked crate outside the sync-TLS allowlist"
+
+# ── Check 2: AI DELTA — enabling the AI path over the AI-free baseline adds
+#    no networked crate (belt-and-suspenders). ─────────────────────────────
+echo "== AI delta over the --no-default-features baseline =="
+delta="$(comm -13 <(printf '%s\n' "$off") <(printf '%s\n' "$on") || true)"
+if [ -z "$delta" ]; then
+  echo "  (delta empty — unexpected: AI should add tensor/tokenizer crates)"
+fi
+delta_net=0
 for crate in $delta; do
   if printf '%s\n' "$DENYLIST" | grep -qx "$crate"; then
     echo "  ✗ DENYLISTED networked crate added by '$FEATURE': $crate"
     violation=1
+    delta_net=1
   fi
 done
-[ "$violation" -eq 0 ] && echo "  ✓ no networked crate in the AI feature delta"
+[ "$delta_net" -eq 0 ] && echo "  ✓ the AI path adds zero networked crate"
 
 echo "== Cargo.lock single-shared (TB9 anchor) =="
 tracked_locks="$(git -C "$REPO_ROOT" ls-files '*Cargo.lock' | grep -v '/fuzz/' || true)"

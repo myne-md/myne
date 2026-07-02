@@ -4,7 +4,8 @@
 // Covers the open/closed gate, tab routing (click + ArrowUp/ArrowDown cycle),
 // Esc / backdrop / × dismissal, and the in-flight gating contract: when the
 // AccountPanel raises `onInFlightChange(true)`, Esc / backdrop / × all become
-// no-ops. The six panel children are stubbed to trivial markers so the test
+// no-ops. The panel children exercised here (account, privacy, editor,
+// appearance, storage, about, ai) are stubbed to trivial markers so the test
 // targets the shell's routing + dismissal logic, not the panels.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -33,6 +34,9 @@ vi.mock("../../src/components/settings/StoragePanel", () => ({
 }));
 vi.mock("../../src/components/settings/AboutPanel", () => ({
   AboutPanel: () => <div data-testid="panel.about">about</div>,
+}));
+vi.mock("../../src/components/settings/AiPanel", () => ({
+  AiPanel: () => <div data-testid="panel.ai">ai</div>,
 }));
 
 import { SettingsModal } from "../../src/components/SettingsModal";
@@ -88,8 +92,11 @@ describe("SettingsModal — tab routing", () => {
     // ArrowUp from account would wrap; reset to account first by clicking.
     fireEvent.click(screen.getByTestId("settings.tab-account"));
     fireEvent.keyDown(window, { key: "ArrowUp" });
-    // Wraps to the last panel (About).
-    expect(screen.getByTestId("panel.about")).toBeTruthy();
+    // Wraps to the last panel — now AI (the Labs group panel, moved last).
+    expect(screen.getByTestId("panel.ai")).toBeTruthy();
+    expect(
+      screen.getByTestId("settings.tab-ai").getAttribute("aria-selected"),
+    ).toBe("true");
   });
 });
 

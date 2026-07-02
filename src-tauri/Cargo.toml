@@ -17,19 +17,27 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [features]
-# AI is OFF by default. The `local-inference` feature gates the entire
-# on-device LLM/embedding module (`plugins::local_inference`, local-ai epic
-# MYND-406) — the `Engine` trait + stub now, Candle + the sandboxed sidecar in
-# later tasks. With the feature off nothing AI compiles in: zero symbols, no
-# `local-inference` command, no capability exercised, so the default auditable
-# binary and the reproducible-build / single-`Cargo.lock` (TB9) surface are
-# byte-unchanged (SYNC-5). Enable with `--features local-inference`.
-default = []
+# AI ships in the DEFAULT build, but stays OFF at runtime until the user opts in
+# via the Settings → Labs "AI (Beta)" toggle (`ai_enabled` pref, default off).
+# The `local-inference` feature gates the entire on-device LLM/embedding module
+# (`plugins::local_inference`, local-ai epic MYND-406/408) — Candle engine +
+# embed-on-unlock; the sandboxed sidecar is still deferred. Because it is in
+# `default`, `pnpm tauri dev` / `pnpm tauri build` / CI all compile AI with no
+# `--features` flag (decisions.md 2026-07-02 "Ship local AI in the default build
+# behind a runtime beta opt-in", superseding the 2026-07-01 default-off posture).
+#
+# AI-FREE auditable build: `cargo build -p myne-desktop --no-default-features`
+# (or `pnpm tauri build --no-default-features`) still compiles zero ML symbols and
+# resolves the pre-AI `Cargo.lock` graph byte-for-byte — the reproducible-build /
+# TB9 escape hatch is preserved even though it is no longer the default. The
+# no-egress guarantee is an ABSOLUTE property of the single shipped tree, proved
+# by `scripts/ai-no-network-check.sh` (denylist scan), not a feature delta.
+default = ["local-inference"]
 local-inference = ["dep:candle-core", "dep:candle-nn", "dep:candle-transformers", "dep:tokenizers"]
-# E2E-only build variant: enables `local-inference` but swaps the Candle engine
-# for the deterministic `StubEngine` at compile time, so the tauri-driver
-# flow-suite gets stable AI output without a model file in the repo. NEVER
-# enabled in the audited production bundle (SYNC-5). See `docs/dev/e2e.md`.
+# E2E-only build variant: keeps `local-inference` but swaps the Candle engine for
+# the deterministic `StubEngine` at compile time, so the tauri-driver flow-suite
+# gets stable AI output without a model file in the repo. NEVER the shipped
+# bundle (the production build uses the real Candle engine). See `docs/dev/e2e.md`.
 local-inference-stub = ["local-inference"]
 
 [dependencies]
@@ -90,10 +98,12 @@ whatlang = "0.18"
 # bump). Record in the Task 10 dependency-policy finalization.
 postcard = { version = "1", default-features = false, features = ["alloc"] }
 
-# On-device inference stack (local-ai epic, MYND-406). OPTIONAL + pulled ONLY by
-# the default-off `local-inference` feature, so the default auditable binary
-# carries zero ML symbols (SYNC-5) and the no-egress gate's feature-delta stays
-# network-free. `default-features = false` on candle-transformers + tokenizers is
+# On-device inference stack (local-ai epic, MYND-406). OPTIONAL + pulled by the
+# (now default-on) `local-inference` feature; a `--no-default-features` build
+# still carries zero ML symbols (the AI-free auditable variant). The no-egress
+# gate is an absolute denylist scan over the shipped tree (no networked crate
+# present), not a feature delta. `default-features = false` on candle-transformers
+# + tokenizers is
 # load-bearing: it keeps `hf-hub` / `http` (networked model-download crates) OUT
 # of the tree — models are side-loaded from the user's disk (SYNC-1), never
 # downloaded (SYNC-2). Verified by `scripts/ai-no-network-check.sh` +
@@ -106,7 +116,8 @@ postcard = { version = "1", default-features = false, features = ["alloc"] }
 # wasm32 RNG backend), which is wrong for and would break a NATIVE desktop build.
 # So there is no native-safe pure-Rust swap in this version. `onig` adds a C
 # build-time dep (cc + a vendored Oniguruma) but no network/runtime surface, and
-# is confined to the default-off `local-inference` feature. Revisit if a
+# is confined to the `local-inference` feature (absent from `--no-default-features`).
+# Revisit if a
 # tokenizers release exposes a native-target pure-Rust regex feature.
 candle-core = { version = "0.8", optional = true, default-features = false }
 candle-nn = { version = "0.8", optional = true, default-features = false }
@@ -293,8 +304,8 @@ objc2-web-kit = { version = "0.3", default-features = false, features = [
 # a network crate — no-egress (SYNC-2) is preserved (re-verified by
 # `ai-no-network-check.sh`). Without it a MiniLM embed is ~1.3s (naive gemm) vs
 # ~tens of ms (BLAS). These UNION with the base optional candle deps in
-# `[dependencies]`, and are still pulled ONLY by the default-off `local-inference`
-# feature (macOS build only).
+# `[dependencies]`, and are pulled by the (now default-on) `local-inference`
+# feature (macOS build only; absent from a `--no-default-features` build).
 # `metal` adds the Apple GPU backend (Metal.framework — a SYSTEM framework, not a
 # network crate; no-egress preserved) so inference can run on the M-series GPU
 # instead of the CPU; `accelerate` stays as the CPU-BLAS fallback path (used when

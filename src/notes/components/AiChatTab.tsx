@@ -6,8 +6,11 @@
 // the strip wiring + empty-state; task 5 adds the shared **"AI off / ready"
 // chrome** — the header status reflects the `ai_enabled` pref so a user who
 // switches to this tab with AI off sees why it's empty and where to turn it on.
-// The "AI thinking…" busy state is wired when a sibling drives a blocking
-// inference call (SYNC-7); until then the two states are off / ready.
+// Because AI now ships in the default build as a runtime beta opt-in (decisions.md
+// 2026-07-02), the status has THREE resting states: off (`ai_enabled` false),
+// no-model (enabled but no generation model side-loaded — every infer would fail
+// `NotReady`, so we point at Settings → Labs → AI), and ready. The "AI thinking…"
+// busy state is wired when a sibling drives a blocking inference call (SYNC-7).
 //
 // Inference is local — no provider call, ever (the trust affordance in the AI
 // settings panel states the bounded guarantee).
@@ -16,6 +19,7 @@ import { useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 
 import { usePrefs } from "../../hooks/usePrefs";
+import { useAiModelReady } from "../../hooks/useAiModelReady";
 import { useAiOutput } from "../ai/aiOutputStore";
 import { useTagSuggest } from "../ai/tagSuggestStore";
 import type { TagSuggestion } from "../ai/tagRanker";
@@ -69,6 +73,9 @@ export function AiChatTab({ onInsert, onAcceptTag, onAsk }: AiChatTabProps = {})
   const { t } = useTranslation();
   const { prefs } = usePrefs();
   const aiEnabled = prefs.ai_enabled;
+  // Enabled but no model side-loaded → the engine can't produce output yet.
+  const modelReady = useAiModelReady(aiEnabled);
+  const noModel = aiEnabled && modelReady === false;
   const output = useAiOutput();
   const tagSuggest = useTagSuggest();
   const [question, setQuestion] = useState("");
@@ -82,19 +89,22 @@ export function AiChatTab({ onInsert, onAcceptTag, onAsk }: AiChatTabProps = {})
         <span
           data-testid="ai.chrome-status"
           data-ai-enabled={aiEnabled ? "true" : "false"}
+          data-ai-model-ready={aiEnabled ? (noModel ? "false" : "true") : ""}
           style={{
             fontSize: 11,
             fontWeight: 500,
-            color: aiEnabled ? "var(--fg-2)" : "var(--fg-3)",
+            color: aiEnabled && !noModel ? "var(--fg-2)" : "var(--fg-3)",
             border: "1px solid var(--line-1)",
             borderRadius: "var(--radius-1)",
             padding: "1px 6px",
             whiteSpace: "nowrap",
           }}
         >
-          {aiEnabled
-            ? t("editor.chrome.rightPanel.aiChat.statusReady")
-            : t("editor.chrome.rightPanel.aiChat.statusOff")}
+          {!aiEnabled
+            ? t("editor.chrome.rightPanel.aiChat.statusOff")
+            : noModel
+              ? t("editor.chrome.rightPanel.aiChat.statusNoModel")
+              : t("editor.chrome.rightPanel.aiChat.statusReady")}
         </span>
       </div>
       {aiEnabled && onAsk && (
@@ -132,6 +142,7 @@ export function AiChatTab({ onInsert, onAcceptTag, onAsk }: AiChatTabProps = {})
         </form>
       )}
       <p
+        data-testid={noModel ? "ai.status-no-model" : undefined}
         style={{
           fontSize: 13,
           lineHeight: 1.5,
@@ -139,9 +150,11 @@ export function AiChatTab({ onInsert, onAcceptTag, onAsk }: AiChatTabProps = {})
           margin: "8px 0 0",
         }}
       >
-        {aiEnabled
-          ? t("editor.chrome.rightPanel.aiChat.empty")
-          : t("editor.chrome.rightPanel.aiChat.offHint")}
+        {!aiEnabled
+          ? t("editor.chrome.rightPanel.aiChat.offHint")
+          : noModel
+            ? t("editor.chrome.rightPanel.aiChat.noModelHint")
+            : t("editor.chrome.rightPanel.aiChat.empty")}
       </p>
 
       {/* Persistent polite live region: because the summary / Q&A output below

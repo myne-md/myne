@@ -110,7 +110,7 @@ Identifiers and constants whose change is a major-version event. Most are bound 
 | Personal-dictionary blob magic | `MYD1` (file `vault.dictionary`; §9.13) |
 | Quick-unlock credential blob magic | `MYQ1` (file `vault.quickunlock`; §9.14; device-local, wraps a third `root_key` copy) |
 | Extracted-attachment-text blob magic | `MYE1` (files `attachments-text/<attachment-id-hex>`; §9.15; per-attachment search-extraction cache) |
-| AI-embeddings blob magic | `MYR1` (file `vault.embeddings`; §9.17; on-device AI embedding index, `local-inference` feature + `ai_enabled` only; rebuildable cache, never synced/backed up) |
+| AI-embeddings blob magic | `MYR1` (file `vault.embeddings`; §9.17; on-device AI embedding index, written only when the runtime beta opt-in `ai_enabled` is on — AI ships in the default build, `decisions.md` 2026-07-02; a `--no-default-features` build never writes it; rebuildable cache, never synced/backed up) |
 | Subkey role string (personal-dictionary KEK) | `"personal-dictionary-key"` (HKDF context `"myne.v0.1 personal-dictionary-key"`; §9.13.3) |
 | AAD role string (personal-dictionary blob) | `"personal-dictionary-blob"` (length-prefixed; §9.13.3) |
 | Subkey role string (attachment-text KEK) | `"attachment-text-key"` (HKDF context `"myne.v0.1 attachment-text-key"`; §9.15.3) |

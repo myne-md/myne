@@ -17,6 +17,7 @@
 // becomes dismissable again.
 
 import {
+  Fragment,
   useCallback,
   useEffect,
   useRef,
@@ -31,6 +32,7 @@ import { useFocusTrap } from "../hooks/useFocusTrap";
 import { AboutPanel } from "./settings/AboutPanel";
 import { AccountPanel } from "./settings/AccountPanel";
 import { AiPanel } from "./settings/AiPanel";
+import { BetaBadge } from "./settings/BetaBadge";
 import { AppearancePanel } from "./settings/AppearancePanel";
 import { EditorPanel } from "./settings/EditorPanel";
 import { FilesPanel } from "./settings/FilesPanel";
@@ -58,24 +60,38 @@ type PanelId =
   | "storage"
   | "about";
 
+/** Rail sections. `core` is the standard settings set; `labs` groups
+ *  experimental / beta features under a divider header (local-ai epic
+ *  MYND-408). Ordering below places every `core` panel before the single
+ *  `labs` panel so the divider renders once at the boundary. */
+type PanelGroup = "core" | "labs";
+
 interface PanelMeta {
   id: PanelId;
   /** i18n leaf under `settings.shell.panels.*` — resolved at render time so a
    *  language switch re-labels the rail (never frozen at module load). */
   labelKey: string;
+  /** Rail section. Omitted → `core`. */
+  group?: PanelGroup;
+  /** Render a small "Beta" badge next to the rail label. */
+  beta?: boolean;
 }
 
+// `ai` sits LAST, in the `labs` group: it ships in the default build but is a
+// runtime beta opt-in (decisions.md 2026-07-02). Keeping PANELS a single flat
+// array preserves the ArrowUp/ArrowDown cycle + `itemRefs` logic unchanged — the
+// Labs divider is a non-focusable presentation row inserted at the group edge.
 const PANELS: readonly PanelMeta[] = [
   { id: "account", labelKey: "settings.shell.panels.account" },
   { id: "privacy", labelKey: "settings.shell.panels.privacy" },
   { id: "sync", labelKey: "settings.shell.panels.sync" },
-  { id: "ai", labelKey: "settings.shell.panels.ai" },
   { id: "editor", labelKey: "settings.shell.panels.editor" },
   { id: "files", labelKey: "settings.shell.panels.files" },
   { id: "hotkeys", labelKey: "settings.shell.panels.hotkeys" },
   { id: "appearance", labelKey: "settings.shell.panels.appearance" },
   { id: "storage", labelKey: "settings.shell.panels.storage" },
   { id: "about", labelKey: "settings.shell.panels.about" },
+  { id: "ai", labelKey: "settings.shell.panels.ai", group: "labs", beta: true },
 ];
 
 interface SettingsModalProps {
@@ -216,6 +232,18 @@ const RAIL_ITEM_SELECTED_STYLE: CSSProperties = {
   ...RAIL_ITEM_BASE_STYLE,
   background: "var(--paper-3)",
   color: "var(--fg-1)",
+};
+
+// Non-focusable divider heading that opens the Labs section in the rail. Not a
+// tab (no `role="tab"`, absent from `itemRefs`), so ↑/↓ tab cycling skips it.
+const RAIL_GROUP_HEADER_STYLE: CSSProperties = {
+  padding: "var(--space-4) var(--space-5) var(--space-2)",
+  fontFamily: "var(--font-sans)",
+  fontSize: "var(--text-xs)",
+  fontWeight: "var(--weight-semibold)" as CSSProperties["fontWeight"],
+  letterSpacing: "0.06em",
+  textTransform: "uppercase",
+  color: "var(--fg-3)",
 };
 
 const CONTENT_STYLE: CSSProperties = {
@@ -381,29 +409,44 @@ export function SettingsModal({
             aria-orientation="vertical"
             style={RAIL_STYLE}
           >
-            {PANELS.map((panel) => {
+            {PANELS.map((panel, i) => {
               const isSelected = panel.id === selected;
+              // Insert the Labs divider once, at the core→labs boundary.
+              const opensLabs =
+                panel.group === "labs" &&
+                (i === 0 || PANELS[i - 1].group !== "labs");
               return (
-                <button
-                  key={panel.id}
-                  ref={(el) => {
-                    itemRefs.current[panel.id] = el;
-                  }}
-                  type="button"
-                  role="tab"
-                  data-testid={`settings.tab-${panel.id}`}
-                  aria-selected={isSelected}
-                  aria-controls={`settings-panel-${panel.id}`}
-                  tabIndex={isSelected ? 0 : -1}
-                  onClick={() => {
-                    if (panel.id !== selected) setSelected(panel.id);
-                  }}
-                  style={
-                    isSelected ? RAIL_ITEM_SELECTED_STYLE : RAIL_ITEM_BASE_STYLE
-                  }
-                >
-                  {t(panel.labelKey)}
-                </button>
+                <Fragment key={panel.id}>
+                  {opensLabs && (
+                    <div
+                      role="presentation"
+                      data-testid="settings.labs-group"
+                      style={RAIL_GROUP_HEADER_STYLE}
+                    >
+                      {t("settings.shell.groups.labs")}
+                    </div>
+                  )}
+                  <button
+                    ref={(el) => {
+                      itemRefs.current[panel.id] = el;
+                    }}
+                    type="button"
+                    role="tab"
+                    data-testid={`settings.tab-${panel.id}`}
+                    aria-selected={isSelected}
+                    aria-controls={`settings-panel-${panel.id}`}
+                    tabIndex={isSelected ? 0 : -1}
+                    onClick={() => {
+                      if (panel.id !== selected) setSelected(panel.id);
+                    }}
+                    style={
+                      isSelected ? RAIL_ITEM_SELECTED_STYLE : RAIL_ITEM_BASE_STYLE
+                    }
+                  >
+                    {t(panel.labelKey)}
+                    {panel.beta && <BetaBadge testId="settings.rail-ai-beta" />}
+                  </button>
+                </Fragment>
               );
             })}
           </nav>

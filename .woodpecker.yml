@@ -50,6 +50,17 @@ steps:
       - cargo install --locked cargo-deny
       - cargo deny check
 
+  # ─── AI no-egress dependency gate ────────────────────────────
+  # Proves the shipped tree carries no networked / model-download crate now that
+  # on-device AI is default-on (decisions.md 2026-07-02). `cargo tree` only
+  # RESOLVES the graph (no compile), so this is cheap and needs no Tauri sysdeps
+  # — just git for the Cargo.lock-singleton + wildcard checks. SYNC-2.
+  ai-no-network:
+    image: rust:1.96.0-slim
+    commands:
+      - apt-get update && apt-get install -y --no-install-recommends git
+      - bash src-tauri/scripts/ai-no-network-check.sh
+
   # ─── TypeScript typecheck + Vite build ───────────────────────
   # `node:25` does not ship corepack; install pnpm directly via npm.
   pnpm-build:
@@ -104,7 +115,15 @@ steps:
       # needed — myne-core has no `generate_context!`.
       - rustup component add clippy
       - cargo clippy -p myne-core --all-targets -- -D warnings
+      # Default build now compiles the on-device AI (local-inference is in
+      # `default` as of decisions.md 2026-07-02) — no `--features` flag needed.
       - pnpm tauri build --no-bundle
+      # Guard the AI-free auditable variant: `--no-default-features` drops candle
+      # entirely and exercises the `#[cfg(not(feature="local-inference"))]` no-op
+      # hook arms (hooks.rs / auto_lock.rs) + the zero-ML-symbol reproducible path.
+      # Now that AI is default-on this path would otherwise never compile in CI and
+      # could bit-rot. Cheap `check` (no link) — the full build is the one above.
+      - cargo check -p myne-desktop --no-default-features
 
   # ─── Backend host tests (src-tauri / myne-desktop) ───────────
   # The protocol-scoped cargo-test above can't reach src-tauri: it needs the
