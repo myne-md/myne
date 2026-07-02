@@ -14,7 +14,9 @@ use super::config::{
 };
 use serde::Serialize;
 use std::path::PathBuf;
+use std::sync::OnceLock;
 use tauri::{AppHandle, Emitter, Manager, Runtime};
+use tokio::sync::Mutex;
 
 /// The runtime sync status surfaced to the UI (MYND-424 task 10). The live
 /// `syncing` / `error` / `conflicts` states light up once the engine loop is
@@ -254,12 +256,29 @@ async fn try_claim_token(
     .flatten()
 }
 
+/// Process-wide async lock serializing EVERY sync-cycle entry against every
+/// other cycle AND against [`sync_reset_local`]. Phase 1 has exactly one active
+/// unlocked vault, so a single mutex is a correct per-vault serializer (a future
+/// multi-vault design would key it by vault id). Same `OnceLock<Mutex<()>>` shape
+/// as `attachments::catalog_write_mutex`.
+fn sync_cycle_mutex() -> &'static Mutex<()> {
+    static M: OnceLock<Mutex<()>> = OnceLock::new();
+    M.get_or_init(|| Mutex::new(()))
+}
+
 /// Gather the active vault's sync inputs (endpoint, enrollment identity, token,
 /// `root_key`) and run one [`run_sync_cycle`](super::orchestrator::run_sync_cycle)
 /// off-thread. `allow_push=false` is a poll-driven pull-only cycle (coalescing —
 /// see `loop_control`); `true` also pushes pending local changes. Used by both
 /// the `sync_now` command and the background loop, so the gathering lives once.
 pub async fn run_active_cycle<R: Runtime>(app: &AppHandle<R>, allow_push: bool) -> CycleOutcome {
+    // Serialize with any concurrent cycle + sync_reset_local: run_sync_cycle is a
+    // read-modify-write on sync-state.json / staging / tombstones with no other
+    // guard, so two overlapping cycles (a double "Sync now", or a click coinciding
+    // with a poll tick) lost-update each other's cursor/baseline — and a dropped
+    // tombstone revives a deleted note elsewhere. Held across the whole gather +
+    // spawn_blocking so the token claim is serialized too.
+    let _cycle_guard = sync_cycle_mutex().lock().await;
     let Ok(cfg) = config_path(app).and_then(|p| read_config(&p)) else {
         return CycleOutcome::Failed;
     };
@@ -516,6 +535,11 @@ pub async fn sync_reset_local<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
 ) -> Result<(), SyncDeviceError> {
+    // Serialize against an in-flight cycle: without this a reset can clear the
+    // token / device-local sync files while a cycle's spawn_blocking is finishing,
+    // and the cycle then writes them back — reviving the enrollment/baseline the
+    // reset removed.
+    let _cycle_guard = sync_cycle_mutex().lock().await;
     let dir = crate::paths::active_vault_root_io(&app, state.active_vault_id().await)
         .map_err(|_| SyncDeviceError::Internal)?;
     super::token_store::clear_token_fallback(&dir).map_err(|_| SyncDeviceError::Internal)?;
@@ -987,6 +1011,41 @@ pub async fn sync_join_account<R: Runtime>(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn sync_cycle_mutex_serializes_concurrent_holders() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        // Two truly-parallel tasks. If the guard did not serialize (or the callers
+        // used different mutex instances), both would occupy the critical section
+        // at once and MAX_SEEN would reach 2; the shared lock keeps it at 1.
+        static ACTIVE: AtomicUsize = AtomicUsize::new(0);
+        static MAX_SEEN: AtomicUsize = AtomicUsize::new(0);
+        async fn hold() {
+            let _g = sync_cycle_mutex().lock().await;
+            let n = ACTIVE.fetch_add(1, Ordering::SeqCst) + 1;
+            MAX_SEEN.fetch_max(n, Ordering::SeqCst);
+            // Widen the overlap window so a broken lock is caught deterministically.
+            tokio::task::yield_now().await;
+            std::thread::sleep(std::time::Duration::from_millis(20));
+            ACTIVE.fetch_sub(1, Ordering::SeqCst);
+        }
+        let rt = tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(2)
+            .enable_all()
+            .build()
+            .expect("multi-thread runtime");
+        rt.block_on(async {
+            let a = tokio::spawn(hold());
+            let b = tokio::spawn(hold());
+            a.await.unwrap();
+            b.await.unwrap();
+        });
+        assert_eq!(
+            MAX_SEEN.load(Ordering::SeqCst),
+            1,
+            "two sync-cycle-guard holders must never overlap"
+        );
+    }
 
     #[test]
     fn status_from_maps_endpoint_token_identity_to_status() {
