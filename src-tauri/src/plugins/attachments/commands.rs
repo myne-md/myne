@@ -790,6 +790,20 @@ pub(crate) async fn attachment_clean_unused_with_dir(
     let attachments_dir = vault_dir.join("attachments");
     let mut bytes_reclaimed = 0u64;
     for (id, size) in &survivors {
+        // Crypto-erase parity with the single-delete path (§9.15.4): the MYE1
+        // extracted-text cache lives under a persistent root_key-derived key (NOT
+        // the per-attachment key destroyed with the blob), so dropping only the
+        // MYA1 blob would leave a "permanently deleted" attachment's searchable
+        // plaintext recoverable. Best-effort-remove the MYE1 cache too.
+        if let Some(idb) = hex_decode_id(id) {
+            if let Err(e) = super::text_cache::remove_extracted(vault_dir, &idb) {
+                tracing::warn!(
+                    stage = "text_cache_unlink",
+                    io_failure_kind = ?crate::io_failure_kind::from_io_error_kind(e.kind()),
+                    "attachment_clean_unused MYE1 cache unlink failed; left as a stray"
+                );
+            }
+        }
         match std::fs::remove_file(attachments_dir.join(id)) {
             Ok(()) => bytes_reclaimed += *size,
             // Already gone: the catalog entry is dropped regardless (still
@@ -1514,6 +1528,42 @@ mod tests {
             assert!(
                 !crate::plugins::attachments::text_cache::cache_path(tmp.path(), &id).exists(),
                 "no MYE1 cache blob for an unsupported attachment"
+            );
+        });
+    }
+
+    #[test]
+    fn clean_unused_crypto_erases_the_mye1_text_cache() {
+        rt().block_on(async {
+            let (tmp, state) = temp_vault().await;
+            // Import a text attachment: eager extraction writes its MYE1 cache.
+            let imported = attachment_import_with_dir(
+                tmp.path(),
+                &state,
+                ImportSource::Bytes {
+                    bytes: b"searchable attachment body to be crypto-erased".to_vec(),
+                    filename: Some("note.txt".to_string()),
+                },
+            )
+            .await
+            .expect("import succeeds");
+            let id = hex_decode_id(&imported.id).expect("valid id");
+            assert!(
+                crate::plugins::attachments::text_cache::cache_path(tmp.path(), &id).exists(),
+                "MYE1 cache present after import"
+            );
+
+            // No note references it, so clean_unused deletes it. The MYE1 cache
+            // MUST go too — otherwise the "permanently deleted" attachment's
+            // searchable plaintext stays decryptable (§9.15.4 crypto-erase parity).
+            let result =
+                attachment_clean_unused_with_dir(tmp.path(), &state, vec![imported.id.clone()])
+                    .await
+                    .expect("clean_unused succeeds");
+            assert_eq!(result.deleted, 1);
+            assert!(
+                !crate::plugins::attachments::text_cache::cache_path(tmp.path(), &id).exists(),
+                "MYE1 cache removed on clean_unused (crypto-erase parity)"
             );
         });
     }
