@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Argon2id wrap-key derivation — see `docs/spec/protocol.md` § 3.1, § 4.
 //!
 //! Two parallel paths derive 32-byte AEAD keys that wrap `root_key`:

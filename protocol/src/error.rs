@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Single concrete error enum for the protocol crate.
 //!
 //! All variants are unit — there are no `String` payloads, by design.

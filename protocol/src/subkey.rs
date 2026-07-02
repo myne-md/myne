@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Single canonical HKDF helper — see `docs/spec/protocol.md` § 3.2, § 3.4.
 //!
 //! Every subkey derivation in the v0.1 protocol MUST go through
