@@ -827,6 +827,16 @@ function safeHref(url: string): string | null {
   return SAFE_SCHEMES.has(m[0].toLowerCase()) ? url : null;
 }
 
+/** A CommonMark angle-bracketed destination `<url>` keeps its brackets in the
+ *  parsed URL node; strip them so `safeHref` sees the real scheme. Otherwise a
+ *  leading `<` is non-scheme → the URL is treated as relative and emitted as a
+ *  broken `&lt;…&gt;` href. Mirrors the clip serializer's `formatLinkDestination`. */
+function stripAngle(url: string): string {
+  return url.length >= 2 && url.startsWith("<") && url.endsWith(">")
+    ? url.slice(1, -1)
+    : url;
+}
+
 function autolinkHref(url: string): string | null {
   if (SCHEME_RE.test(url)) return safeHref(url);
   if (url.includes("@")) return `mailto:${url}`;
@@ -856,7 +866,7 @@ function renderLink(ctx: Ctx, node: SyntaxNode): string {
       rawTitle !== null && rawTitle.length >= 2
         ? rawTitle.slice(1, -1)
         : rawTitle;
-    return renderAnchor(safeHref(url), textHtml, title);
+    return renderAnchor(safeHref(stripAngle(url)), textHtml, title);
   }
 
   // Reference link: full `[text][label]`, collapsed `[text][]`, or shortcut
@@ -870,7 +880,7 @@ function renderLink(ctx: Ctx, node: SyntaxNode): string {
     folded === "" ? foldLabel(ctx.src.slice(textFrom, textTo)) : folded;
   const target = ctx.refs.get(effective);
   if (target === undefined) return escapeHtml(slice(ctx, node));
-  return renderAnchor(safeHref(target), textHtml, null);
+  return renderAnchor(safeHref(stripAngle(target)), textHtml, null);
 }
 
 function renderImage(ctx: Ctx, node: SyntaxNode): string {
@@ -880,7 +890,7 @@ function renderImage(ctx: Ctx, node: SyntaxNode): string {
   const altFrom = marks[0]?.to ?? node.from;
   const altTo = marks[1]?.from ?? node.to;
   const alt = ctx.src.slice(altFrom, altTo).trim();
-  const url = childText(ctx.src, node, "URL") ?? "";
+  const url = stripAngle(childText(ctx.src, node, "URL") ?? "");
   const label = alt !== "" ? alt : url;
   return `<span class="embed-placeholder">${escapeHtml(label)}</span>`;
 }

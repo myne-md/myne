@@ -29,7 +29,10 @@ pub enum ScheduleConfigError {
     InvalidVaultId,
     /// `interval` was not one of `every-unlock` / `daily` / `weekly`.
     InvalidInterval,
-    /// A `success` result was recorded without the written backup path.
+    /// A `success` result was recorded without a valid written backup path —
+    /// absent, or not a `.myne-backup` under the schedule's configured target
+    /// folder (the pruner only ever deletes ledgered paths, so an out-of-target
+    /// path must be rejected before it can become a delete target).
     MissingBackupPath,
     /// Resolving `app_data_dir` or persisting the store failed.
     Io { io_error_kind: IoFailureKind },
@@ -176,6 +179,21 @@ pub async fn backup_schedule_record_result<R: Runtime>(
     }
     let base = app_base(&app)?;
     let now_ms = now_epoch_ms();
+
+    // TB6 narrow-seam: the WebView-supplied `written_path` becomes a delete target
+    // in the retention pruner (`prune_entry_files` remove_file's ledgered paths),
+    // so require a real `.myne-backup` UNDER this schedule's configured target
+    // folder before recording — otherwise a compromised WebView gets an arbitrary
+    // file-delete primitive reaching outside the vault.
+    if success {
+        let path = written_path
+            .as_deref()
+            .expect("checked above: a success result carries a path");
+        let target = backup_schedule::read_config(&base, &id).target_folder;
+        if !backup_schedule::backup_path_under_target(path, target.as_deref()) {
+            return Err(ScheduleConfigError::MissingBackupPath);
+        }
+    }
 
     let result = tokio::task::spawn_blocking(move || {
         if success {

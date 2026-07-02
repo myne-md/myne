@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Account number scheme — see `docs/spec/account-number.md`.
 //!
 //! 20-character self-generated identifier: 19 Crockford-base32 entropy

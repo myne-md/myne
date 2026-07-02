@@ -8,7 +8,7 @@
 //! plaintext sync would be an A4 downgrade), so production https always routes to
 //! the pinned rustls layer.
 
-use super::http_codec::{build_http_request, parse_http_response};
+use super::http_codec::{build_http_request, parse_http_response, MAX_SYNC_RESPONSE_BYTES};
 use super::transport::{HttpMethod, SyncTransport, TransportError, TransportResponse};
 use std::io::{Read, Write};
 use std::net::TcpStream;
@@ -45,9 +45,16 @@ impl SyncTransport for HttpTransport {
             .map_err(|_| TransportError::Network)?;
         stream.flush().map_err(|_| TransportError::Network)?;
         let mut raw = Vec::new();
-        stream
+        // Bound the socket read: a hostile relay can otherwise stream an unbounded
+        // body and OOM the client. Read one byte past the cap so an over-limit body
+        // is detectable rather than silently truncated.
+        (&mut stream)
+            .take(MAX_SYNC_RESPONSE_BYTES + 1)
             .read_to_end(&mut raw)
             .map_err(|_| TransportError::Network)?;
+        if raw.len() as u64 > MAX_SYNC_RESPONSE_BYTES {
+            return Err(TransportError::Network);
+        }
         parse_http_response(&raw).ok_or(TransportError::Network)
     }
 }

@@ -7,6 +7,13 @@
 
 use super::transport::{HttpMethod, TransportResponse};
 
+/// Hard cap on a sync response body read from the socket. TB5 treats the
+/// self-hosted/hosted relay as untrusted (a compromised server is in scope), so
+/// an unbounded `read_to_end` lets it stream a giant body and OOM-crash the
+/// client. 64 MiB comfortably exceeds any legitimate `/sync/pull` or `/sync/blob`
+/// response while turning a hostile oversized body into a clean `TransportError`.
+pub(crate) const MAX_SYNC_RESPONSE_BYTES: u64 = 64 * 1024 * 1024;
+
 /// Build a minimal HTTP/1.1 request (`Connection: close`).
 pub(crate) fn build_http_request(
     method: HttpMethod,
