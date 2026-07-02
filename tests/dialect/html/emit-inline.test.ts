@@ -62,6 +62,14 @@ describe("hard breaks + escapes + entities", () => {
 });
 
 describe("links", () => {
+  it("strips a CommonMark angle-bracketed destination `[t](<url>)` to a clean href", async () => {
+    const html = await emit("[label](<https://a.example>)\n");
+    // Without stripping the `<>` the URL reads as non-scheme → relative → the
+    // href is emitted as a broken `&lt;https://a.example&gt;`.
+    expect(html).toContain('<a href="https://a.example">label</a>');
+    expect(html).not.toContain("&lt;https");
+  });
+
   it("renders inline links with optional title", async () => {
     const html = await emit('[text](https://example.com "Hi")\n');
     expect(html).toContain(
