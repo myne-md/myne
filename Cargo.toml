@@ -1,3 +1,38 @@
 [workspace]
 members = ["src-tauri", "protocol", "core", "e2e/fixture-gen"]
 resolver = "2"
+
+# Optimize the on-device AI math crates even in DEV builds. Candle + its `gemm`
+# matmul backend are catastrophically slow when compiled unoptimized — a single
+# MiniLM embed runs ~2s in a debug build vs ~tens of ms optimized — which makes
+# `pnpm tauri dev --features local-inference` feel frozen (the embed-on-unlock
+# walk hogs the CPU for minutes and starves interactive inference). These crates
+# only compile when the default-off `local-inference` feature is enabled, so the
+# default dev build is byte-unaffected; the reproducible RELEASE build is
+# unchanged (this is a `profile.dev` override only). Workspace/app crates stay at
+# dev opt-level for fast incremental rebuilds + debuggability.
+[profile.dev.package.candle-core]
+opt-level = 3
+[profile.dev.package.candle-nn]
+opt-level = 3
+[profile.dev.package.candle-transformers]
+opt-level = 3
+[profile.dev.package.gemm]
+opt-level = 3
+[profile.dev.package.half]
+opt-level = 3
+
+# Same override for the `test` profile (it does NOT inherit `profile.dev`'s
+# per-package settings), so the `#[ignore]`d real-model smoke tests in
+# `engine_candle.rs` run with optimized candle instead of a ~50×-slower debug
+# build.
+[profile.test.package.candle-core]
+opt-level = 3
+[profile.test.package.candle-nn]
+opt-level = 3
+[profile.test.package.candle-transformers]
+opt-level = 3
+[profile.test.package.gemm]
+opt-level = 3
+[profile.test.package.half]
+opt-level = 3

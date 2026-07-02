@@ -39,6 +39,8 @@ permissions = [
   "allow-set-editor-content-width",
   "allow-set-editor-font-family",
   "allow-set-active-workspace",
+  "allow-set-ai-enabled",
+  "allow-set-ai-excluded-folders",
   "allow-set-editor-default-view-mode",
   "allow-set-editor-focus-dim-inactive",
   "allow-set-editor-focus-typewriter",
@@ -341,3 +343,19 @@ commands.allow = ["set_right_panel_hidden_tabs"]
 identifier = "allow-set-right-panel-tab-order"
 description = "Allow invoking prefs:set_right_panel_tab_order (Slot::Unlocked-gated setter for the right_panel_tab_order sequence — the right-sidebar tab display order; atomic-writes vault.prefs with no native side-effect, preserving element order verbatim; no codec GC of unknown ids)."
 commands.allow = ["set_right_panel_tab_order"]
+
+# local-ai epic (ai-ux-surface MYND-408): two write setters for the AI prefs
+# (ai_enabled toggle SYNC-12 + ai_excluded_folders set SYNC-14). Both inherit
+# the same main-window-only invariant as the other allow-set-* permissions —
+# v0.2 multi-window MUST NOT grant these to any non-main window. Both
+# atomic-write vault.prefs with no native side-effect; non-load-bearing (no
+# clamp). Per-vault + encrypted (the at-rest "uses AI" fingerprint never leaks).
+[[permission]]
+identifier = "allow-set-ai-enabled"
+description = "Allow invoking prefs:set_ai_enabled (Slot::Unlocked-gated setter for the ai_enabled AI opt-in toggle; atomic-writes vault.prefs with no native side-effect; the default-OFF policy is applied host-side at read time; emitted on disk only when true)."
+commands.allow = ["set_ai_enabled"]
+
+[[permission]]
+identifier = "allow-set-ai-excluded-folders"
+description = "Allow invoking prefs:set_ai_excluded_folders (Slot::Unlocked-gated setter for the ai_excluded_folders set — folders the AI never reads/indexes; same canonical set encoding as deliberate_folders; atomic-writes vault.prefs with no native side-effect)."
+commands.allow = ["set_ai_excluded_folders"]

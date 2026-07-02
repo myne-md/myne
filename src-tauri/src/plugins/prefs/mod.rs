@@ -86,6 +86,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::set_editor_content_width,
             commands::set_editor_font_family,
             commands::set_active_workspace,
+            commands::set_ai_enabled,
+            commands::set_ai_excluded_folders,
             commands::set_editor_default_view_mode,
             commands::set_editor_focus_dim_inactive,
             commands::set_editor_focus_typewriter,
@@ -159,6 +161,9 @@ mod desktop_tests {
         fn persist_search_index<'a>(&'a self, _: &'a VaultRuntimeState) -> BoxFuture<'a> {
             Box::pin(std::future::ready(()))
         }
+        fn hydrate_ai_vectors<'a>(&'a self, _: &'a VaultRuntimeState) -> BoxFuture<'a> {
+            Box::pin(std::future::ready(()))
+        }
         fn fold_attachment_text_for_index<'a>(
             &'a self,
             _: &'a VaultRuntimeState,
@@ -177,6 +182,9 @@ mod desktop_tests {
         fn apply_screen_capture(&self, _: bool, _: &'static str) {}
         fn search_upsert(&self, _: &str, _: &str, _: &str) {}
         fn search_remove(&self, _: &str) {}
+        fn ai_note_changed(&self, _: &str, _: &str) {}
+        fn ai_note_deleted(&self, _: &str) {}
+        fn ai_policy_changed(&self, _: bool, _: &[String]) {}
         fn bump_local_change(&self) {}
         fn emit_snapshot_write_failed(&self, _: &str) {}
         fn effective_auto_lock_secs(&self, prefs_value: Option<u32>) -> u32 {

@@ -20,6 +20,11 @@ function makeContext(over: Partial<CommandContext> = {}): CommandContext {
   return {
     stageName: "editor",
     selectedNoteId: null,
+    aiEnabled: false,
+    onOpenAiChat: vi.fn(),
+    onSummarizeNote: vi.fn(),
+    onSuggestTags: vi.fn(),
+    onRewriteSelection: vi.fn(),
     onLock: vi.fn(async () => {}),
     onOpenSettings: vi.fn(),
     onManageTemplates: vi.fn(),
@@ -57,6 +62,10 @@ function find(id: string): CommandAction {
 describe("Command palette action registry", () => {
   it("exposes exactly the v1 actions (note picking moved to inline search, MYND-40; templates.manage MYND-189; templates.new-note MYND-190; snapshots.open MYND-97; graph.show MYND-198; tags.show MYND-46; sidebar toggles MYND-166)", () => {
     expect([...COMMAND_ACTIONS].map((a) => a.id).sort()).toEqual([
+      "ai.open-chat",
+      "ai.rewrite-selection",
+      "ai.suggest-tags",
+      "ai.summarize-note",
       "app.open-settings",
       "attachments.open",
       "daily.open-today",
@@ -120,6 +129,85 @@ describe("Command palette action registry", () => {
     const onImportBaseView = vi.fn();
     void find("views.import-base").run(makeContext({ onImportBaseView }));
     expect(onImportBaseView).toHaveBeenCalledTimes(1);
+  });
+
+  it("ai.open-chat gates on editor stage + ai_enabled; DISABLED (not hidden) when AI is off (SYNC-9)", () => {
+    const action = find("ai.open-chat");
+    expect(
+      action.visibility(makeContext({ stageName: "editor", aiEnabled: true })),
+    ).toBe("show");
+    // AI off in the editor → disabled, NOT hidden (disabled-control discipline:
+    // the feature stays discoverable, a toggle away).
+    expect(
+      action.visibility(makeContext({ stageName: "editor", aiEnabled: false })),
+    ).toBe("disabled");
+    // Outside the editor stage → hidden regardless of the toggle.
+    expect(
+      action.visibility(makeContext({ stageName: "welcome", aiEnabled: true })),
+    ).toBe("hidden");
+    const onOpenAiChat = vi.fn();
+    void action.run(makeContext({ onOpenAiChat }));
+    expect(onOpenAiChat).toHaveBeenCalledTimes(1);
+  });
+
+  it("ai.summarize-note needs editor + a selected note + ai_enabled; disabled when off, hidden without a note (SYNC-9/14)", () => {
+    const action = find("ai.summarize-note");
+    const note = "n1" as CommandContext["selectedNoteId"];
+    expect(
+      action.visibility(makeContext({ stageName: "editor", selectedNoteId: note, aiEnabled: true })),
+    ).toBe("show");
+    // Note selected but AI off → disabled (discoverable).
+    expect(
+      action.visibility(makeContext({ stageName: "editor", selectedNoteId: note, aiEnabled: false })),
+    ).toBe("disabled");
+    // AI on but no note → hidden (nothing to summarize).
+    expect(
+      action.visibility(makeContext({ stageName: "editor", selectedNoteId: null, aiEnabled: true })),
+    ).toBe("hidden");
+    // Outside the editor → hidden.
+    expect(
+      action.visibility(makeContext({ stageName: "welcome", selectedNoteId: note, aiEnabled: true })),
+    ).toBe("hidden");
+    const onSummarizeNote = vi.fn();
+    void action.run(makeContext({ onSummarizeNote }));
+    expect(onSummarizeNote).toHaveBeenCalledTimes(1);
+  });
+
+  it("ai.suggest-tags needs editor + a selected note + ai_enabled; disabled when off, hidden without a note (SYNC-9/14)", () => {
+    const action = find("ai.suggest-tags");
+    const note = "n1" as CommandContext["selectedNoteId"];
+    expect(
+      action.visibility(makeContext({ stageName: "editor", selectedNoteId: note, aiEnabled: true })),
+    ).toBe("show");
+    expect(
+      action.visibility(makeContext({ stageName: "editor", selectedNoteId: note, aiEnabled: false })),
+    ).toBe("disabled");
+    expect(
+      action.visibility(makeContext({ stageName: "editor", selectedNoteId: null, aiEnabled: true })),
+    ).toBe("hidden");
+    expect(
+      action.visibility(makeContext({ stageName: "welcome", selectedNoteId: note, aiEnabled: true })),
+    ).toBe("hidden");
+    const onSuggestTags = vi.fn();
+    void action.run(makeContext({ onSuggestTags }));
+    expect(onSuggestTags).toHaveBeenCalledTimes(1);
+  });
+
+  it("ai.rewrite-selection needs editor + a selected note + ai_enabled; disabled when off, hidden without a note", () => {
+    const action = find("ai.rewrite-selection");
+    const note = "n1" as CommandContext["selectedNoteId"];
+    expect(
+      action.visibility(makeContext({ stageName: "editor", selectedNoteId: note, aiEnabled: true })),
+    ).toBe("show");
+    expect(
+      action.visibility(makeContext({ stageName: "editor", selectedNoteId: note, aiEnabled: false })),
+    ).toBe("disabled");
+    expect(
+      action.visibility(makeContext({ stageName: "editor", selectedNoteId: null, aiEnabled: true })),
+    ).toBe("hidden");
+    const onRewriteSelection = vi.fn();
+    void action.run(makeContext({ onRewriteSelection }));
+    expect(onRewriteSelection).toHaveBeenCalledTimes(1);
   });
 
   it("views.show is editor-only and dispatches to onShowViews (MYND-274)", () => {

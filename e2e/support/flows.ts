@@ -217,6 +217,7 @@ export async function openSettings(
     | "hotkeys"
     | "appearance"
     | "storage"
+    | "ai"
     | "about",
 ): Promise<void> {
   await (await session.byTestId("editor.settings-cta")).click();
@@ -224,6 +225,26 @@ export async function openSettings(
   if (tab && tab !== "account") {
     await (await session.byTestId(`settings.tab-${tab}`)).click();
   }
+}
+
+/** Enable the local-AI master switch via Settings → AI → toggle, then close
+ *  the modal. The switch is off by default (opt-in, SYNC-12); the `ai.*`
+ *  editor extensions (ghost-text, slash) compose only when it is on, so callers
+ *  that drive those flows enable AI BEFORE opening the target note. Reflects the
+ *  persisted pref via `aria-checked` on the `role="switch"` element. Requires the
+ *  `local-inference`(-stub) build — the AI settings tab is absent otherwise. */
+export async function enableAi(session: Session): Promise<void> {
+  await openSettings(session, "ai");
+  await session.byTestId("settings.ai-panel");
+  await (await session.byTestId("ai.enable-toggle")).click();
+  await session.waitUntil(
+    async () =>
+      (await (await session.byTestId("ai.enable-toggle")).attribute("aria-checked")) === "true"
+        ? true
+        : null,
+    { label: "ai_enabled toggled on", timeoutMs: 10_000 },
+  );
+  await closeSettings(session);
 }
 
 /** Close the Settings modal via its × button and wait for the dialog

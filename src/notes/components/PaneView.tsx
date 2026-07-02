@@ -52,6 +52,7 @@ import { ViewRenderHost } from "../views/viewRenderHost";
 import { resolveCoverAttachmentId } from "../views/cardsView";
 import { setNoteCover } from "../setNoteCover";
 import { upsertSavedView } from "../../lib/prefs";
+import { isNoteAiExcluded } from "../../lib/aiExcludedFolders";
 import { CoverPicker, type CoverChoice } from "../../components/attachments/CoverPicker";
 import { ContextMenu, type ContextMenuItem } from "./ContextMenu";
 import { buildCardMenuItems } from "../views/cardMenu";
@@ -178,6 +179,20 @@ export function PaneView({
   const liveNotes = useResolverNotes();
   const indexNonce = useIndexNonce();
   const notes = useMemo(() => liveNotes.slice(), [liveNotes, indexNonce]);
+  // writing-assistant task 6 / SYNC-14: the AI surface (slash `/devam`,
+  // `/başlık` + inline ghost-text) is enabled only when `ai_enabled` AND the
+  // open note is not in an `ai_excluded_folders` folder. This flows to CMEditor's
+  // `aiEnabled` prop, which reconfigures the live AI compartment — so toggling
+  // the pref, excluding the folder, or switching notes takes effect immediately
+  // (no remount / reopen needed).
+  const aiSlashEnabled = useMemo(() => {
+    if (prefs.ai_enabled !== true) return false;
+    const folder =
+      activeId !== null
+        ? (notes.find((n) => n.noteUuid === activeId)?.folder ?? "")
+        : "";
+    return !isNoteAiExcluded(folder, prefs.ai_excluded_folders);
+  }, [prefs.ai_enabled, prefs.ai_excluded_folders, activeId, notes]);
   // MYND-305: the vault-wide heading set the `[[##` autocomplete searches (built
   // lazily by reading note bodies; rebuilt on the index nonce). Empty until the
   // first async build settles — `[[##` simply finds nothing until then.
@@ -531,6 +546,10 @@ export function PaneView({
             vaultHeadings={vaultHeadings}
             onOpenWikilink={handleOpenWikilink}
             scrollAnchor={activeScrollAnchor}
+            // writing-assistant task 6: surface the AI slash commands only in the
+            // editable editor, gated on ai_enabled + the excluded-folder check
+            // (SYNC-14). The reading-view instance below leaves it default-false.
+            aiEnabled={aiSlashEnabled}
             // editor-line-numbers (MYND-314): default OFF (prose-first); the open
             // editor reconfigures its line-number compartment live when the pref
             // flips (no remount). `prefs` is already a useMemo dep below.

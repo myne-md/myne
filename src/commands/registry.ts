@@ -33,6 +33,41 @@ export type CommandContext = {
   stageName: AppStageName;
   /** Current selection in the editor (or null when not in editor stage). */
   selectedNoteId: NoteId | null;
+  /**
+   * Whether local AI is enabled (`ai_enabled` pref, local-ai epic MYND-408,
+   * SYNC-9). The shared gate every AI capability action reads:
+   * `ctx.stageName === "editor" && ctx.aiEnabled`. Off-by-default; when off,
+   * AI actions render **disabled** (not hidden — disabled-control discipline).
+   */
+  aiEnabled: boolean;
+  /**
+   * Reveal the AI Chat right-panel tab (the shared render target siblings 4/6/7
+   * mount output into). Sets the right-panel active tab to `ai-chat`.
+   */
+  onOpenAiChat: () => void;
+  /**
+   * Summarize the open note / selection (note-summarization MYND-409). Runs the
+   * local `Engine.infer` on a RAM-assembled prompt and renders ephemerally in
+   * the AI Chat tab; blocked for a note in an `ai_excluded_folders` folder
+   * (SYNC-14). Gated by the action on `editor + selectedNote + aiEnabled`.
+   */
+  onSummarizeNote: () => void;
+  /**
+   * Suggest tags for the open note (auto-tag-link MYND-411). Runs the local
+   * `Engine.infer` once on the note body + existing-vocabulary hint, ranks the
+   * candidates, and renders chips in the AI Chat tab; blocked for a note in an
+   * `ai_excluded_folders` folder (SYNC-14). Gated on `editor + selectedNote +
+   * aiEnabled`.
+   */
+  onSuggestTags: () => void;
+  /**
+   * Rewrite the current editor selection in place (writing-assistant MYND-410
+   * `/yeniden-yaz` as a palette action — a slash trigger has no selection). Runs
+   * the local `Engine.infer` on the selection and replaces it as plain markdown
+   * (`ai.rewrite`); a no-op on an empty selection. Gated on `editor +
+   * selectedNote + aiEnabled`.
+   */
+  onRewriteSelection: () => void;
   /** Invoke the lock-vault flow (mirrors BottomBar Lock button). */
   onLock: () => Promise<void>;
   /** Open the Settings modal (mirrors gear button). */

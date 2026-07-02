@@ -134,6 +134,15 @@ const ROLE_STR_SERVER_AUTH: &[u8] = b"server-auth";
 /// distinct subkey. DISTINCT from the AAD role string `"attachment-text-blob"`.
 const ROLE_STR_ATTACHMENT_TEXT_KEY: &[u8] = b"attachment-text-key";
 
+/// Registered role string for the v0.1 AI-embeddings blob KEK
+/// (MYND-453; encrypts the `vault.embeddings` on-device AI embedding index —
+/// `embeddings_blob.rs`, `MYR1`, `protocol.md` § 9.17 + § 3.4). Load-bearing:
+/// drift silently changes the KEK. `root_key`-derived (like prefs/search/
+/// indices), so it is `itemsKey`-independent and survives a v005 epoch
+/// rotation. Only ever derived with the default-off `local-inference` feature +
+/// `ai_enabled` on. DISTINCT from the AAD role string `"ai-embeddings-blob"`.
+const ROLE_STR_AI_EMBEDDINGS_KEY: &[u8] = b"ai-embeddings-key";
+
 /// Identifies which subkey is being derived from `root_key`.
 ///
 /// Spec § 3.4: every public subkey role appears here as a variant.
@@ -205,6 +214,14 @@ pub enum SubkeyRole {
     /// `attachment_id` AAD binding (§ 9.15.3). Distinct from every other
     /// `root_key`-derived blob KEK so the families stay domain-separated.
     AttachmentTextKey,
+    /// KEK for the v0.1 AI-embeddings blob (`vault.embeddings`, `MYR1`,
+    /// MYND-453). Encrypts the on-device AI embedding index (semantic-search /
+    /// Q&A vectors + `{note_id → content_nonce}` manifest + the model-identity
+    /// tuple) under XChaCha20-Poly1305 (CTX commitment outer). `root_key`-derived
+    /// (like prefs/search/indices), so it is `itemsKey`-independent and survives
+    /// a v005 epoch rotation. Distinct from every other blob KEK so the families
+    /// stay domain-separated; only derived with the `local-inference` feature.
+    AiEmbeddingsKey,
 }
 
 impl SubkeyRole {
@@ -224,6 +241,7 @@ impl SubkeyRole {
             SubkeyRole::VaultHeadMac => ROLE_STR_VAULT_HEAD_MAC,
             SubkeyRole::ServerAuth => ROLE_STR_SERVER_AUTH,
             SubkeyRole::AttachmentTextKey => ROLE_STR_ATTACHMENT_TEXT_KEY,
+            SubkeyRole::AiEmbeddingsKey => ROLE_STR_AI_EMBEDDINGS_KEY,
         }
     }
 }
@@ -643,6 +661,7 @@ mod tests {
                 SubkeyRole::VaultHeadMac => "vault-head-mac",
                 SubkeyRole::ServerAuth => "server-auth",
                 SubkeyRole::AttachmentTextKey => "attachment-text-key",
+                SubkeyRole::AiEmbeddingsKey => "ai-embeddings-key",
             }
         }
 
@@ -653,7 +672,7 @@ mod tests {
         let gamma = pseudorandom_root(b"myne-test-vectors-seed-v0.1.gamma");
 
         type Case<'a> = (&'a str, &'a str, &'a [u8; 32], SubkeyRole, bool);
-        let cases: [Case<'_>; 24] = [
+        let cases: [Case<'_>; 26] = [
             (
                 "zero-root-items-key-wrap",
                 "All-zero root_key with the ItemsKeyWrap role. Promotes the in-crate golden at protocol/src/subkey.rs:222 — same input, same expected bytes; drift in either the unit test or this integration assertion indicates HKDF prefix or role-string corruption.",
@@ -822,6 +841,20 @@ mod tests {
                 SubkeyRole::AttachmentTextKey,
                 true,
             ),
+            (
+                "zero-root-ai-embeddings-key",
+                "All-zero root_key with the AiEmbeddingsKey role (MYND-453, §9.17). KEK for the vault.embeddings on-device AI embedding-index blob (MYR1); role string 'ai-embeddings-key' (17 ASCII bytes). Pairs with the other zero-root vectors under the same trivial root — catches a role-confusion bug that would collapse the ai-embeddings lineage onto another role's info string (most importantly vault-indices-key and search-index-key, its structural siblings).",
+                &zero_root,
+                SubkeyRole::AiEmbeddingsKey,
+                false,
+            ),
+            (
+                "prn-alpha-ai-embeddings-key",
+                "Pseudorandom alpha root with the AiEmbeddingsKey role. The informational_info_utf8_hex field carries the canonical 27-byte HKDF info bytes ('myne.v0.1 ai-embeddings-key') so independent implementers can verify the tenth registered role's info assembly without re-parsing the spec. NOTE: the HKDF role string 'ai-embeddings-key' is DISTINCT from the AAD role string 'ai-embeddings-blob' (aad_ai_embeddings_blob, ctx-aead / aad-construction vectors), AND distinct from vault-indices-key / search-index-key — vault.embeddings (dense AI vectors), vault.indices (structured metadata), and vault.search (BM25) are separate blob families, one KEK each.",
+                &alpha,
+                SubkeyRole::AiEmbeddingsKey,
+                true,
+            ),
         ];
 
         let mut dump = alloc::string::String::new();
@@ -829,7 +862,7 @@ mod tests {
         dump.push_str("  \"schema\": \"hkdf-sha256\",\n");
         dump.push_str("  \"protocol_version\": \"v0.1\",\n");
         dump.push_str("  \"spec_section\": \"protocol.md §3.2 + §3.4\",\n");
-        dump.push_str("  \"description\": \"Pins protocol::derive_subkey byte mapping for cross-implementation conformance. Each case fixes a (root_key, role) input pair under HKDF-SHA-256 with salt=zero_32 and info='myne.v0.1 '||role, and the 32-byte subkey the helper must produce. Role registry mirrors the type-safe Rust SubkeyRole enum (spec §3.4); v0.1 registers itemsKey-wrap + prefs-key + search-index-key + attachments-catalog-key + attachments-id-hmac + session-state-key + personal-dictionary-key + vault-indices-key. Vectors generated by `cargo test -p protocol --lib emit_subkey_vectors_for_paste -- --ignored` (in protocol/src/subkey.rs).\",\n");
+        dump.push_str("  \"description\": \"Pins protocol::derive_subkey byte mapping for cross-implementation conformance. Each case fixes a (root_key, role) input pair under HKDF-SHA-256 with salt=zero_32 and info='myne.v0.1 '||role, and the 32-byte subkey the helper must produce. Role registry mirrors the type-safe Rust SubkeyRole enum (spec §3.4); v0.1 registers itemsKey-wrap + prefs-key + search-index-key + attachments-catalog-key + attachments-id-hmac + session-state-key + personal-dictionary-key + vault-indices-key + attachment-text-key + ai-embeddings-key. Vectors generated by `cargo test -p protocol --lib emit_subkey_vectors_for_paste -- --ignored` (in protocol/src/subkey.rs).\",\n");
         dump.push_str("  \"cases\": [\n");
 
         for (i, (slug, desc, root, role, include_info)) in cases.iter().enumerate() {

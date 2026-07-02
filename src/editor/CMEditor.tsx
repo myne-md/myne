@@ -15,7 +15,7 @@ import { useEffect, useRef, type CSSProperties } from "react";
 import { EditorState, type Extension } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { diffDoc } from "./doc-diff";
-import { myneExtensions } from "./extensions";
+import { myneExtensions, reconfigureAi } from "./extensions";
 import { selectedRangesText } from "./selectionText";
 import { reconfigureNoteSet } from "./wikilink/note-set";
 import { reconfigureVaultHeadings } from "./wikilink/vault-headings";
@@ -72,11 +72,15 @@ export type CMEditorProps = {
    *  buffer (§6 C1). */
   viewMode?: ViewMode;
   readOnly?: boolean;
+  /** Surface the AI slash commands (`/devam`, `/başlık`) in the menu — the
+   *  `ai_enabled` pref (MYP1). Default false; read at mount (writing-assistant
+   *  task 6). Never set on the reading-view instance (inert in Reading view). */
+  aiEnabled?: boolean;
   style?: CSSProperties;
 };
 
 export function CMEditor(props: CMEditorProps) {
-  const { value, onChange, onBlur, onSelectionChange, extensions, noteSet, vaultHeadings, onOpenWikilink, scrollAnchor = null, lineNumbers = false, viewMode = "live", readOnly = false, style } = props;
+  const { value, onChange, onBlur, onSelectionChange, extensions, noteSet, vaultHeadings, onOpenWikilink, scrollAnchor = null, lineNumbers = false, viewMode = "live", readOnly = false, aiEnabled = false, style } = props;
   const hostRef = useRef<HTMLDivElement | null>(null);
   const viewRef = useRef<EditorView | null>(null);
   const onChangeRef = useRef(onChange);
@@ -109,7 +113,7 @@ export function CMEditor(props: CMEditorProps) {
       state: EditorState.create({
         doc: value,
         extensions: [
-          ...myneExtensions({ viewMode, readOnly }),
+          ...myneExtensions({ viewMode, readOnly, aiEnabled }),
           ...(extensions ?? []),
           EditorView.updateListener.of((update) => {
             if (update.docChanged) {
@@ -206,6 +210,17 @@ export function CMEditor(props: CMEditorProps) {
     if (view === null) return;
     view.dispatch({ effects: reconfigureViewMode(viewMode, readOnly) });
   }, [viewMode, readOnly]);
+
+  // local-ai (SYNC-14): push the live `ai_enabled` (ANDed with the not-excluded
+  // gate the host passes) into the AI compartment whenever it changes — so
+  // turning AI off, or opening a note in an excluded folder, immediately tears
+  // down ghost-text + the AI slash commands instead of leaving them live-feeding
+  // note content to the model. Seeded at mount, so this runs once then on toggle.
+  useEffect(() => {
+    const view = viewRef.current;
+    if (view === null) return;
+    view.dispatch({ effects: reconfigureAi(aiEnabled) });
+  }, [aiEnabled]);
 
   // MYND-305 deep-link scroll (SYNC-5). Keyed on BOTH the request nonce and
   // `value`: the click sets the request, but the target note's body arrives

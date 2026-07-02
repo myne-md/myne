@@ -106,6 +106,9 @@ pub async fn note_create<R: Runtime>(
             .fold_attachment_text_for_index(state.inner(), &plaintext)
             .await;
         hooks.search_upsert(id, &title, &body);
+        // MYND-453: eager per-note AI re-embed (detached; no-op unless the
+        // local-inference feature + ai_enabled are on).
+        hooks.ai_note_changed(id, &body);
         // MYND-424: mark the sync loop dirty so the new note pushes (soft dep).
         hooks.bump_local_change();
     }
@@ -559,6 +562,8 @@ pub async fn note_update<R: Runtime>(
                 .fold_attachment_text_for_index(state.inner(), &plaintext)
                 .await;
             hooks.search_upsert(&note_id, &title, &body);
+            // MYND-453: eager per-note AI re-embed (detached; feature/ai-gated).
+            hooks.ai_note_changed(&note_id, &body);
             // MYND-424: mark the sync loop dirty so the coalesced push fires
             // (soft dependency — a no-op when the sync plugin isn't registered).
             hooks.bump_local_change();
@@ -919,6 +924,8 @@ pub async fn note_write_batch_transactional<R: Runtime>(
             .fold_attachment_text_for_index(state.inner(), plaintext)
             .await;
         hooks.search_upsert(note_id, &title, &body);
+        // MYND-453: eager per-note AI re-embed (detached; feature/ai-gated).
+        hooks.ai_note_changed(note_id, &body);
     }
     tracing::debug!(
         stage = "success",
@@ -1178,6 +1185,9 @@ pub async fn note_delete<R: Runtime>(
         note_delete_with_dir(notes_dir, state.inner(), hooks.inner(), note_id.clone()).await;
     if result.is_ok() {
         hooks.search_remove(&note_id);
+        // MYND-453: drop the deleted note's vectors from the RAM store
+        // (feature/ai-gated; the durable blob is reconciled on next unlock).
+        hooks.ai_note_deleted(&note_id);
     }
     result
 }

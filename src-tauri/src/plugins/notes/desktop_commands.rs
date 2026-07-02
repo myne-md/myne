@@ -1652,6 +1652,12 @@ mod tests {
         ) -> myne_core::hooks::BoxFuture<'a> {
             Box::pin(std::future::ready(()))
         }
+        fn hydrate_ai_vectors<'a>(
+            &'a self,
+            _: &'a VaultRuntimeState,
+        ) -> myne_core::hooks::BoxFuture<'a> {
+            Box::pin(std::future::ready(()))
+        }
         fn fold_attachment_text_for_index<'a>(
             &'a self,
             _: &'a VaultRuntimeState,
@@ -1670,6 +1676,9 @@ mod tests {
         fn apply_screen_capture(&self, _: bool, _: &'static str) {}
         fn search_upsert(&self, _: &str, _: &str, _: &str) {}
         fn search_remove(&self, _: &str) {}
+        fn ai_note_changed(&self, _: &str, _: &str) {}
+        fn ai_note_deleted(&self, _: &str) {}
+        fn ai_policy_changed(&self, _: bool, _: &[String]) {}
         fn bump_local_change(&self) {}
         fn emit_snapshot_write_failed(&self, _: &str) {}
         fn effective_auto_lock_secs(&self, prefs_value: Option<u32>) -> u32 {

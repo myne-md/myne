@@ -57,6 +57,7 @@ pub mod attachments_catalog;
 pub mod blob;
 pub(crate) mod canonical_json;
 pub mod dictionary_blob;
+pub mod embeddings_blob;
 pub mod error;
 pub mod kdf;
 pub mod manifest;
@@ -81,10 +82,11 @@ pub use account_number::{
     ACCOUNT_NUMBER_HASH_LEN,
 };
 pub use aead::{
-    aad_attachment_text_blob, aad_note_content_encrypt, aad_note_item_key_wrap, aad_password_wrap,
-    aad_personal_dictionary_blob, aad_prefs_blob, aad_quick_unlock_blob, aad_recovery_wrap,
-    aad_search_index_blob, aad_vault_indices_blob, aad_vault_items_key_wrap, aad_workspace_blob,
-    aead_open_ctx, aead_seal_ctx, AEAD_KEY_LEN, AEAD_NONCE_LEN, CTX_COMMITMENT_TAG_LEN,
+    aad_ai_embeddings_blob, aad_attachment_text_blob, aad_note_content_encrypt,
+    aad_note_item_key_wrap, aad_password_wrap, aad_personal_dictionary_blob, aad_prefs_blob,
+    aad_quick_unlock_blob, aad_recovery_wrap, aad_search_index_blob, aad_vault_indices_blob,
+    aad_vault_items_key_wrap, aad_workspace_blob, aead_open_ctx, aead_seal_ctx, AEAD_KEY_LEN,
+    AEAD_NONCE_LEN, CTX_COMMITMENT_TAG_LEN,
 };
 pub use attachment_blob::{
     aad_encrypt_attachment, aad_wrap_attachment_key, compute_attachment_id, decode_attachment_blob,
@@ -113,6 +115,12 @@ pub use dictionary_blob::{
     DictionaryBlobError, DICTIONARY_BLOB_ACCOUNT_HASH_LEN, DICTIONARY_BLOB_FORMAT_V1,
     DICTIONARY_BLOB_HEADER_LEN, DICTIONARY_BLOB_MAGIC, DICTIONARY_BLOB_PROTOCOL_VERSION,
     MAX_DICTIONARY_PLAINTEXT_LEN,
+};
+pub use embeddings_blob::{
+    decode_embeddings_blob, encode_embeddings_blob, encode_embeddings_blob_raw,
+    EmbeddingsBlobError, EMBEDDINGS_BLOB_ACCOUNT_HASH_LEN, EMBEDDINGS_BLOB_FORMAT_V1,
+    EMBEDDINGS_BLOB_HEADER_LEN, EMBEDDINGS_BLOB_MAGIC, EMBEDDINGS_BLOB_PROTOCOL_VERSION,
+    MAX_EMBEDDINGS_PLAINTEXT_LEN,
 };
 pub use error::ProtocolError;
 pub use kdf::{

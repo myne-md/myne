@@ -279,6 +279,15 @@ pub async fn unlock<R: Runtime>(
     // personal/ignore sets from vault.dictionary. Best-effort, like search.
     hooks.hydrate_spell(state.inner()).await;
 
+    // MYND-412 (semantic-search-qa task 3): embed-on-unlock trigger for the
+    // local-AI semantic index. Unlike the search/spell hydrates this is NOT
+    // awaited to completion — the desktop hook gates on the `ai_enabled` opt-in
+    // (default OFF → an immediate no-op) and, when on, spawns the model-bound
+    // embed walk detached so it never blocks unlock. Mobile + the default
+    // (feature-off) desktop build install a no-op. Best-effort: it can never
+    // block or fail the unlock the user just completed.
+    hooks.hydrate_ai_vectors(state.inner()).await;
+
     Ok(())
 }
 
@@ -1581,6 +1590,8 @@ mod tests {
                 &parsed_meta.account_number_hash,
                 &protocol::PrefsView {
                     screen_capture_protection: false,
+                    ai_enabled: false,
+                    ai_excluded_folders: Vec::new(),
                     bar_items_order: Vec::new(),
                     show_note_timestamps: true,
                     folder_icons: Default::default(),
@@ -1714,6 +1725,8 @@ mod tests {
             &account_hash,
             &protocol::PrefsView {
                 screen_capture_protection: false,
+                ai_enabled: false,
+                ai_excluded_folders: Vec::new(),
                 bar_items_order: Vec::new(),
                 show_note_timestamps: true,
                 folder_icons: Default::default(),

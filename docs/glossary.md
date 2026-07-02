@@ -172,6 +172,10 @@ The editor representation of a non-renderable (generic) [attachment](#attachment
 
 The on-device extraction of searchable text from an [attachment](#attachment)'s plaintext — PDF text-layer, Word (`.docx`) OOXML text, and text-like files (`.txt`/`.md`/`.csv`) in v0.1 — so a note becomes findable by the contents of the files embedded in it. Extraction runs entirely in the Rust core (no network, no cloud OCR — `vision.md` zero-knowledge), is cached per attachment in an [`MYE1`](#mye1) blob keyed by [attachment-id](#attachment-id), and is folded into the [search index](#mys1) against each embedding note (the `MYS1` snapshot records the [extractor version](#extractor-version) it was built under — a change forces a rebuild; the codec's `index_format_version` byte is unchanged, the fold rides the engine-opaque inner snapshot). Image OCR + scanned (text-layer-less) PDFs are out of scope for v0.1, deferred to MYND-441, which reuses the same cache by bumping the [extractor version](#extractor-version). (`spec/protocol.md` §9.15; MYND-328)
 
+### **AI-excluded folder** &nbsp; 📦 *Product*
+
+A folder the user has excluded from on-device AI ([local inference](#local-inference)): notes inside it (and its subfolders) are never chunked, embedded, summarized, tag-suggested, or offered ghost-text completions. Backed by the additive `ai_excluded_folders` field in the encrypted `vault.prefs` (`MYP1`), canonical trailing-slash folder paths (SYNC-14). Enforced at **both** embed-time (excluded notes are never added to the RAM vector store) and query-time (defense-in-depth), so an excluded note's plaintext never reaches the model. The whole AI surface is additionally gated on the `ai_enabled` pref (default off). See `threat-model.md` §7 "Local AI".
+
 ### **auto-lock on idle** &nbsp; 📦 *Product*
 
 A security control that locks the vault after a period of device inactivity, bounding the exposure window of an unattended unlocked Myne (`threat-model.md` A6). A backend-authoritative, fail-closed idle timer fires at a configurable timeout; the lock has two legs — (1) unconditional in-memory key zeroize ("no further notes decryptable"), and (2) best-effort teardown of the decrypted open note (a synchronous OS-level window hide plus a WebView reload). **"Idle" means machine-level** device idle (no input to the whole machine, not merely the Myne window), read per-platform (`GetLastInputInfo` / `CGEventSourceSecondsSinceLastEventType` / `XScreenSaverQueryInfo`); on Wayland, where no portable OS-idle API exists, it falls back to window-level idle as a fail-secure (more-eager) degradation. The timeout preference lives in the encrypted `vault.prefs` blob (`auto_lock_seconds`); the protection itself is always on (see **AUTO_LOCK_CEILING**). Moves A6 from ❌ Out-of-scope to 🔒 Mitigated — deliberately not a 🛡️ Strong guarantee, since freed-page RAM, swap, and hibernation are not scrubbed (A7/A10).
@@ -269,6 +273,10 @@ Used in: `threat-model.md` §6
 Rust-ecosystem tools for auditing transitive Cargo dependencies for known vulnerabilities (cargo-audit) and for crowd-sourced trust attestations (cargo-vet). With the Tauri/Rust stack decision, these are part of Myne's supply-chain defense (`threat-model.md` §7).
 
 Used in: `threat-model.md` §7
+
+### **Candle** &nbsp; 🛠️ *Tooling*
+
+The minimalist pure-Rust ML framework (`candle-core` / `candle-nn` / `candle-transformers`, from Hugging Face) Myne uses to run [local inference](#local-inference) on CPU — quantized GGUF generation + BERT embeddings. Added as an **optional dependency behind the default-off `local-inference` feature** with `default-features = false`, so the audited production bundle pulls zero ML symbols and the model-download crate families (`hf-hub` / `http`) never enter the tree (models are side-loaded, SYNC-1/2). The largest single third-party surface Myne takes, deliberately quarantined behind an opt-in build feature and a no-egress CI gate (`decisions.md` 2026-07-01).
 
 ### **ChaCha20-Poly1305** &nbsp; 🔐 *Primitive*
 
@@ -649,6 +657,10 @@ The canonical Myne autosave call-pattern locked in `decisions.md` 2026-05-07 "`n
 
 Used in: `decisions.md` 2026-05-07 (pattern), 2026-05-15 (concrete timings); MYND-81
 
+### **ghost-text** &nbsp; 📦 *Product*
+
+The dimmed inline completion the writing-assistant ([local inference](#local-inference)) shows at the cursor: a `Decoration.widget` overlay (never in the document buffer) rendering the model's short continuation in `--fg-3` italic, accepted with **Tab** (inserts it as plain markdown, one undo step) and dismissed by **Esc** or any edit. Fired on a paused cursor by a debounced CM6 `ViewPlugin` that cancels any in-flight inference on a doc/viewport change so a stale suggestion never lands. Composed into the editor only when `ai_enabled` (and the note is not an [AI-excluded folder](#ai-excluded-folder)). Modeled on the `spell.ts` StateEffect→StateField loader pattern (MYND-410).
+
 ### **graph view** &nbsp; 📦 *Product*
 
 The visualization of `[[wikilink]]` relationships between notes as a force-directed graph. Myne Phase 1 includes a minimal graph view — [d3-force](#d3-force) layout + a hand-rolled canvas renderer — in a separate, lazy-loaded panel (`vision.md` Phase 1 Scope). Nodes are notes only (tags/folders are a filter dimension, not nodes); edges are resolved cross-note references.
@@ -918,6 +930,10 @@ A `[label]: url` line (CommonMark "link reference definition") that supplies the
 
 Used in: `spec/markdown-dialect.md` §3.2; `decisions.md` 2026-05-30
 
+### **local inference** &nbsp; 📦 *Product* (*Myne-divergent*)
+
+On-device AI: the local-ai epic (MYND-406–412) runs a **side-loaded** quantized Qwen2 GGUF (generation) and an all-MiniLM-L6-v2 BERT (embedding) through the [Candle](#candle) ML stack, entirely on the user's machine — no cloud model, no download, no telemetry, ever (a standing anti-feature). *Myne-divergent* because "AI" in most note apps means a server API call; here it is a local, opt-in, default-off capability behind the `local-inference` cargo feature, verified to add **zero networked dependency** (`ai-no-network-check.sh`). Powers summarize, semantic search / Q&A, auto-tag, and the writing-assistant ([ghost-text](#ghost-text) + slash commands). Models are the user's own files (untrusted input); v0.1 runs the runtime in-process, with a sandboxed keyless sidecar deferred as pre-default-on hardening. AI outputs are AS1-class RAM, zeroized on lock; excluded per-folder via [AI-excluded folder](#ai-excluded-folder). See `threat-model.md` §7 "Local AI" + `decisions.md` 2026-07-01.
+
 ### **local graph** &nbsp; 📦 *Product*
 
 The open note's neighborhood (1-2 hop) subgraph in the [graph view](#graph-view) — the note plus the notes it links to and that link to it, expanded one or two hops (MYND-199). It is a MODE of the graph modal (a note-relative entry centered on the open note), NOT a separate sidebar pane — a deliberate choice to keep the persistent UI calm (a persistent animated graph beside the editor would be the loudest element against the no-decorative-motion canon; deferred behind a dogfood trip-wire as a v1.x canon amendment). A single click pivots (re-centers on the clicked node, no navigation); a double-click opens the note. Selecting the "All" filter chip returns to the whole-vault graph.
@@ -1026,6 +1042,10 @@ The 4-byte ASCII magic identifying a v0.1 [`vault.indices`](#vaultindices) blob 
 The 4-byte ASCII magic identifying a v0.1 `vault.prefs` blob. Parallel to `MY01` (per-note) and `MYV1` (vault metadata) in the v0.1 magic-byte family. Registered in `spec/protocol.md` §10.3's major-version registry alongside its v005-reserved sibling `MYP5`. Implementations MUST reject any candidate `vault.prefs` whose first four bytes do not match `MYP1`.
 
 Used in: `spec/protocol.md` §9.5, §10.3
+
+### **MYR1** &nbsp; 📋 *Protocol*
+
+The 4-byte ASCII magic identifying a v0.1 [`vault.embeddings`](#vaultembeddings) blob (`spec/protocol.md` §9.17) — the encrypted-at-rest on-device AI embedding index (semantic-search / Q&A vectors, MYND-453). Parallel to `MYS1` (search) / `MYI1` (indices) in the v0.1 magic-byte family; a **distinct family** (one magic per family). `R` = **R**etrieval/RAG (the natural `E`-for-embeddings letter was already taken by `MYE1`, extracted-attachment-text). Registered in `spec/protocol.md` §10.3 alongside its v005-reserved sibling `MYR5`. Only ever written with the default-off `local-inference` cargo feature + `ai_enabled` on. Implementations MUST reject any candidate `vault.embeddings` whose first four bytes do not match `MYR1` — and [fall to rebuild](#fall-to-rebuild) (re-embed) rather than treating the rejection as data loss.
 
 ### **MYS1** &nbsp; 📋 *Protocol*
 
@@ -1439,7 +1459,7 @@ Used in: `spec/sync-protocol.md` §8
 
 ### **sync taxonomy** &nbsp; 📋 *Protocol*
 
-The Phase 2 four-class partition of a vault's artefacts by sync disposition: **authoritative-data** (notes, snapshots, `vault.prefs`, `vault.dictionary`, attachments + `vault.attachments` — SYNC), **identity** (`vault.meta` — SYNC, bespoke merge), **rebuildable-cache** (`vault.search`, `vault.indices` — re-derived locally via the §9.6.4 reconcile, NEVER synced), **device-local** (`vault.workspace`, `vault.quickunlock`, `vault.head-state` — NEVER synced). Governed by the invariant **sync members ⊆ backup members**: sync membership is the authoritative-vs-derivable cut of the `protocol.md` §9.11.3 backup allowlist, not a separate list. Phase 2.
+The Phase 2 four-class partition of a vault's artefacts by sync disposition: **authoritative-data** (notes, snapshots, `vault.prefs`, `vault.dictionary`, attachments + `vault.attachments` — SYNC), **identity** (`vault.meta` — SYNC, bespoke merge), **rebuildable-cache** (`vault.search`, `vault.indices`, `vault.embeddings` — re-derived locally via the §9.6.4 reconcile, NEVER synced; `vault.embeddings` is additionally model-specific), **device-local** (`vault.workspace`, `vault.quickunlock`, `vault.head-state` — NEVER synced). Governed by the invariant **sync members ⊆ backup members**: sync membership is the authoritative-vs-derivable cut of the `protocol.md` §9.11.3 backup allowlist, not a separate list. Phase 2.
 
 Used in: `spec/sync-protocol.md` §9
 
@@ -1661,6 +1681,10 @@ Used in: `spec/protocol.md` §9.5; `decisions.md` 2026-05-27 "Vault preferences 
 ### **vault.attachments** &nbsp; 📦 *Product*
 
 The vault-level singleton catalog ([`MYC1`](#myc1) blob, `spec/protocol.md` §9.10) holding **authoritative** per-[attachment](#attachment) metadata — `id → {content_type, created_at, filename, size}` — so the attachments library can display an attachment even when no note references it (the filename survives note deletion; the in-note alias is a cosmetic copy). AEAD-encrypted under a `root_key`-derived KEK (`"myne.v0.1 attachments-catalog-key"`); canonical-JSON inner; fall-back-to-empty on absent/tampered; eager-written at vault creation. The note→attachment reference graph ("used in N notes") is **not** stored here — it is derived from note bodies at runtime via the `content_nonce` reconcile (the [search index](#search-index) MYND-29 pattern), kept in RAM and rebuilt on demand. (MYND-164)
+
+### **vault.embeddings** &nbsp; 📦 *Product*
+
+Vault-level singleton encrypted blob ([`MYR1`](#myr1), `spec/protocol.md` §9.17) caching the on-device **AI embedding index** — the dense semantic-search / Q&A vectors (MYND-453, local-ai epic). The structural twin of [vault.search](#vaultsearch): same 34-byte fixed-offset header (magic `MYR1`, protocol_version, an `embeddings_format_version` byte, nonce, ciphertext_len), same **engine-opaque** postcard inner plaintext (a `{note_id → content_nonce}` staleness manifest + the serialized vector store), same decryption-free `content_nonce` reconcile + [fall-to-rebuild](#fall-to-rebuild) posture — but stores embedding vectors, not full-text terms, and additionally carries a trailing **model-identity tuple** `{model_hash, embedding_dim, chunker_version}` that forces a full re-embed when the embedding model, its output dimension, or the chunker changes (vectors are model-specific; the embeddings analogue of `vault.search`'s `extractor_version`, carried inside the payload — **not** the AAD, which stays vault-scoped). AEAD-encrypted under `ai_embeddings_key` (`DeriveSubkey(root_key, "ai-embeddings-key")`); a pure **rebuildable cache** (deleting it loses nothing — the `.myn` files are the source of truth) — [rebuildable-cache](#sync-artefact-classes) Class 3, so **never synced and never backed up** (device-local; `sync-protocol.md` §319). Only ever written with the default-off `local-inference` cargo feature + `ai_enabled` on. At-rest size leaks a coarse embedded-volume signal, accepted as a derived-cache leak (`threat-model.md` §7, with the embedding-inversion note).
 
 ### **vault.indices** &nbsp; 📦 *Product*
 

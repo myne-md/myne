@@ -238,3 +238,32 @@ export const CONNECTED_EXTENSIONS_REVOKE_LABEL = "Revoke";
  *  extension's side, out of scope for this UI). */
 export const CONNECTED_EXTENSIONS_REPAIR_HINT =
   "A revoked extension must pair again to reconnect.";
+
+// Local-AI trust affordance (local-ai epic, ai-ux-surface MYND-408, SYNC-16).
+// The AI settings panel's honesty copy: a headline + a "How does this work?"
+// disclosure. Load-bearing because the wording is a threat-model-bounded
+// privacy claim — it must NOT exceed the guarantee set: A7 (local malware) and
+// A13 are acknowledged, and no absolute "fully private / never leaves anywhere"
+// claim is made (PRODUCT.md:41,80). E2E asserts both by FULL-literal equality;
+// changing either is a decisions.md event, not a copy edit. Rendered verbatim
+// in every locale (never i18n'd, per src/CLAUDE.md).
+
+/** AI panel trust headline — the CSP-backed "runs on your device" claim. */
+export const AI_TRUST_HEADLINE =
+  "This model runs entirely on your device. Myne never sends your notes to any server.";
+
+/** AI panel "How does this work?" disclosure — the honest, bounded detail:
+ *  local, network-free inference, a user-picked model file, and the A7 residual
+ *  (malware already on the device can read app memory) stated plainly.
+ *
+ *  NOTE (2026-07-01): the earlier wording claimed inference runs "in a sandboxed
+ *  process" — an OVERCLAIM. Per `threat-model.md` §7 "Local AI runs in-process,
+ *  not yet sandboxed", the model runtime is IN-PROCESS in v0.1 (the sandboxed
+ *  sidecar is a deferred pre-default-on hardening), and the threat model
+ *  explicitly forbids claiming model-runtime isolation until it lands — the true
+ *  claim is "runs locally, sends nothing". The sandbox phrase was removed; the
+ *  no-network / never-transmitted / A7-residual claims are all still accurate
+ *  (the no-egress gate guarantees no network path structurally). Re-add the
+ *  isolation wording only when the sidecar ships (a `decisions.md` event). */
+export const AI_TRUST_DISCLOSURE =
+  "Inference runs locally with no network access, so your notes are never transmitted. You pick the model file from your own disk. Like the rest of Myne, this does not protect against malware already running on your device — such software can read app memory.";

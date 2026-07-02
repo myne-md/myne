@@ -174,10 +174,23 @@
         "label": "Back up vault…"
       },
       "category": {
+        "ai": "AI",
         "app": "App",
         "editor": "Editor",
         "vault": "Vault",
         "view": "View"
+      },
+      "aiOpenChat": {
+        "label": "Open AI Chat"
+      },
+      "aiSummarizeNote": {
+        "label": "Summarize note"
+      },
+      "aiSuggestTags": {
+        "label": "Suggest tags"
+      },
+      "aiRewriteSelection": {
+        "label": "Rewrite selection"
       },
       "convertWikilinks": {
         "label": "Convert imported wikilinks in this note…"
@@ -589,12 +602,26 @@
       "resizeBacklinksSidebar": "Resize backlinks sidebar",
       "resizeNotesSidebar": "Resize notes sidebar",
       "rightPanel": {
+        "aiChat": {
+          "askPlaceholder": "Ask a question about your notes…",
+          "askSubmit": "Ask",
+          "empty": "AI output — summaries, answers, and suggestions — appears here.",
+          "error": "The AI request could not be completed.",
+          "insert": "Insert into note",
+          "offHint": "Local AI is off. Turn it on in Settings → AI.",
+          "statusOff": "Off",
+          "statusReady": "Ready",
+          "tagsThinking": "Suggesting tags…",
+          "thinking": "AI is thinking…",
+          "truncated": "Summarized the first {{count}} characters."
+        },
         "allHidden": "All tabs are hidden — right-click to restore.",
         "outline": {
           "empty": "No headings",
           "heading": "Outline"
         },
         "tabs": {
+          "aiChat": "AI Chat",
           "backlinks": "Backlinks",
           "outline": "Outline",
           "unlinked": "Unlinked mentions"
@@ -666,6 +693,8 @@
       "rendering": "Rendering diagram…"
     },
     "slash": {
+      "aiContinue": "Continue writing (AI)",
+      "aiTitle": "Suggest title (AI)",
       "attachFile": "Attach file",
       "bulletList": "Bullet list",
       "callout": "Callout",
@@ -1678,6 +1707,27 @@
       "off": "Off",
       "on": "On"
     },
+    "ai": {
+      "disclosureToggle": "How does this work?",
+      "enableHelper": "Runs a model you provide entirely on your device. Experimental, off by default.",
+      "enableLabel": "Enable local AI",
+      "excludedHelper": "Notes in these folders are never read or indexed by AI. One folder path per line.",
+      "excludedLabel": "Excluded folders",
+      "excludedPlaceholder": "Private/\nJournal/",
+      "modelChoose": "Choose file…",
+      "modelEmbeddingLabel": "Search model — semantic search & Q&A",
+      "modelFilter": {
+        "gguf": "GGUF model",
+        "safetensors": "Safetensors model"
+      },
+      "modelGenerationLabel": "Text model — chat, summaries, writing",
+      "modelNone": "No file selected",
+      "modelSaveFailed": "Couldn't save the model path (it must be outside your vault).",
+      "modelsHelper": "Myne never downloads models — that would mean sending data over the network. Open a link to get one in your browser, then pick the downloaded files here. Everything runs on your device.",
+      "modelsLabel": "Models",
+      "recommendedFilesEmbedding": "Needs model.safetensors + config.json + tokenizer.json in one folder.",
+      "recommendedFilesGeneration": "Needs the .gguf file + tokenizer.json in the same folder."
+    },
     "prefs": {
       "saveError": "Couldn't save preference — try again"
     },
@@ -1718,6 +1768,7 @@
       "panels": {
         "about": "About",
         "account": "Account",
+        "ai": "AI",
         "appearance": "Appearance",
         "editor": "Editor",
         "files": "Files",

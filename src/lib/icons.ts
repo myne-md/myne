@@ -111,6 +111,11 @@ export const ICON_PATHS: Record<string, string> = {
   // `src/notes/folderIcons.ts`, which is a user-assignable FOLDER category glyph.)
   bookmark:
     '<path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/>',
+  // AI Chat right-panel tab (local-ai epic, ai-ux-surface MYND-408). Lucide
+  // `message-square` stroke path — a plain speech bubble. Deliberately NOT a
+  // sparkle/wand/"magic" glyph (PRODUCT.md:70 bans hype AI framing).
+  "message-square":
+    '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
 };
 
 export type IconName = keyof typeof ICON_PATHS;
