@@ -317,7 +317,14 @@ impl LocalInferenceVectorState {
     /// of `VaultIndicesState::clear`. Bumps the teardown generation so an
     /// in-flight embed walk's publish becomes a no-op.
     pub fn clear(&self) {
-        self.lock().zeroize();
+        // Hold the store guard across BOTH the zeroize and the generation bump.
+        // The publish path (hydrate.rs) reads generation() and swaps under this
+        // same guard, so bumping the generation outside it left a window where a
+        // publisher could read the pre-teardown generation, pass its staleness
+        // check, and repopulate a just-cleared (locked-vault) store with fresh
+        // plaintext-derived vectors. Bumping under the guard makes teardown win.
+        let mut store = self.lock();
+        store.zeroize();
         self.generation
             .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
     }
