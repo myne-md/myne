@@ -87,6 +87,21 @@ describe("resolveClipWikilinks — outbound wikilink resolution (R2 reuse)", () 
     expect(loader).not.toHaveBeenCalled(); // the whole-vault load was skipped
   });
 
+  it("FAST PATH: an image-only body (`![[att:…]]`, no real `[[`) still skips the loader", async () => {
+    // ingestClipImages runs BEFORE resolution, so any image-bearing clip already
+    // carries form-C embeds `![[att:…]]` whose `[[` would defeat a naive guard and
+    // force a whole-vault decrypt on every image clip. The guard must ignore embeds.
+    const loader = vi.fn(() =>
+      Promise.resolve([note("u-x", "X")] as readonly ResolverNote[]),
+    );
+    const body = "A clipped article.\n\n![[att:0a1b2c|photo.png]]\n\nMore text.";
+
+    const out = await resolveClipWikilinks(body, loader);
+
+    expect(out).toBe(body); // unchanged
+    expect(loader).not.toHaveBeenCalled(); // embeds must NOT trigger the load
+  });
+
   it("leaves a link matching nothing UNCHANGED — no fabricated target (#2)", async () => {
     const notes = [note("u-other", "Something Else")];
     const body = "A dangling [[Nonexistent Note]] link.";

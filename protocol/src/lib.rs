@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Myne v0.1 cryptographic protocol primitives.
 //!
 //! This crate is `#![no_std]` + `alloc`. It provides every cryptographic

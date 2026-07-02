@@ -23,6 +23,10 @@ export const CHECKBOX_UNCHECKED = "☐";
 /** Absolute human-readable date formatter (dep-free `Intl`); a date-only value
  *  is anchored to 00:00:00Z so the displayed day matches the stored full-date. */
 const DATE_FORMAT = new Intl.DateTimeFormat("en-GB", {
+  // Format in UTC to match the `T00:00:00Z` anchor below: a date-only value must
+  // display the same calendar day everywhere, not shift back a day for users west
+  // of UTC (the whole of the Americas). Without this the day is off-by-one there.
+  timeZone: "UTC",
   day: "numeric",
   month: "short",
   year: "numeric",

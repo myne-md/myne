@@ -47,6 +47,7 @@ import {
   assembleClip,
   defaultClipAssemblyDeps,
   type ClipPlaintextComposer,
+  type ClipIngestResult,
 } from "./assembleClip";
 import { buildClipNotice, type ClipNotice } from "./buildClipNotice";
 import { composeBookmarkPlaintext } from "./composeBookmarkPlaintext";
@@ -144,12 +145,22 @@ export function ClipDispatchListener({
       // Assemble + seal. The body is the caller-supplied param; the composer is
       // the caller-supplied seam (defaulted for a clip). On a locked vault this
       // returns `{ kind: "locked" }` and writes nothing.
-      const result = await assembleClip(
-        rawEnvelope,
-        body,
-        defaultClipAssemblyDeps(),
-        composePlaintext,
-      );
+      // Guard the whole assembly. assembleClip try/catches its noteCreate seal
+      // internally, but its earlier awaits (isVaultUnlocked / loadResolverNotes
+      // IPC) can still reject; an unguarded throw here would skip the reply below,
+      // hanging the relay to its 30 s timeout (+ an unhandled rejection). Map any
+      // throw to an error result so a reply is ALWAYS sent.
+      let result: ClipIngestResult;
+      try {
+        result = await assembleClip(
+          rawEnvelope,
+          body,
+          defaultClipAssemblyDeps(),
+          composePlaintext,
+        );
+      } catch {
+        result = { kind: "error", reason: "assembly-threw" };
+      }
 
       // Reply with the TINY outcome string ONLY (no note id, no counts).
       const outcome = mapResultToOutcome(result);

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! XChaCha20-Poly1305 with CTX commitment + AAD construction —
 //! see `docs/spec/protocol.md` § 5.
 //!

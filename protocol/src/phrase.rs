@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! BIP-39 24-word recovery phrase — see `docs/spec/protocol.md` § 7.
 //!
 //! 256 bits of CSPRNG entropy + an 8-bit BIP-39 checksum encode to 24

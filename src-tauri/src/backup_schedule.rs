@@ -279,6 +279,21 @@ fn prune_entry_files(entry: &mut ScheduleEntry) {
     }
 }
 
+/// True iff `path` is a `.myne-backup` file located under `target_folder`
+/// (component-wise, so `/a/b-evil` is NOT under `/a/b`). Validates a
+/// WebView-supplied scheduled-backup path BEFORE it can reach the retention
+/// pruner's `remove_file` — an out-of-target path would be an arbitrary-file
+/// delete primitive (TB6 narrow-seam). An absent/empty target cannot be
+/// validated, so it fails closed.
+pub(crate) fn backup_path_under_target(path: &str, target_folder: Option<&str>) -> bool {
+    let p = std::path::Path::new(path);
+    let ext_ok = p.extension().and_then(|e| e.to_str()) == Some("myne-backup");
+    let under_ok = target_folder
+        .map(|t| !t.is_empty() && p.starts_with(t))
+        .unwrap_or(false);
+    ext_ok && under_ok
+}
+
 /// Record a successful scheduled backup: append `written_path` to the ledger,
 /// stamp the per-device success/attempt clock + `Success` status, prune to
 /// `retention_n`, and persist. The append-then-prune order means a freshly
@@ -450,6 +465,36 @@ mod tests {
     }
 
     // ---- defaults for an unconfigured vault ----------------------------
+
+    #[test]
+    fn backup_path_under_target_accepts_myne_backup_within_target() {
+        assert!(backup_path_under_target(
+            "/Users/me/Backups/myne-2026-07-03.myne-backup",
+            Some("/Users/me/Backups"),
+        ));
+    }
+
+    #[test]
+    fn backup_path_under_target_rejects_outside_target_wrong_ext_or_no_target() {
+        // Outside the configured folder — the arbitrary-delete vector.
+        assert!(!backup_path_under_target(
+            "/Users/me/Documents/taxes.pdf",
+            Some("/Users/me/Backups"),
+        ));
+        // Right folder, wrong extension.
+        assert!(!backup_path_under_target(
+            "/Users/me/Backups/notes.txt",
+            Some("/Users/me/Backups"),
+        ));
+        // Component-wise: a sibling sharing a name prefix must NOT match.
+        assert!(!backup_path_under_target(
+            "/Users/me/Backups-evil/x.myne-backup",
+            Some("/Users/me/Backups"),
+        ));
+        // No target, or empty target → cannot validate → fail closed.
+        assert!(!backup_path_under_target("/x.myne-backup", None));
+        assert!(!backup_path_under_target("/x.myne-backup", Some("")));
+    }
 
     #[test]
     fn read_returns_defaults_when_store_absent() {
