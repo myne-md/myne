@@ -608,7 +608,9 @@
           "empty": "AI output — summaries, answers, and suggestions — appears here.",
           "error": "The AI request could not be completed.",
           "insert": "Insert into note",
-          "offHint": "Local AI is off. Turn it on in Settings → AI.",
+          "noModelHint": "No model selected. Choose one in Settings → Labs → AI to start.",
+          "offHint": "Local AI is off. Turn it on in Settings → Labs → AI.",
+          "statusNoModel": "No model",
           "statusOff": "Off",
           "statusReady": "Ready",
           "tagsThinking": "Suggesting tags…",
@@ -1708,6 +1710,7 @@
       "on": "On"
     },
     "ai": {
+      "betaBadge": "Beta",
       "disclosureToggle": "How does this work?",
       "enableHelper": "Runs a model you provide entirely on your device. Experimental, off by default.",
       "enableLabel": "Enable local AI",
@@ -1726,7 +1729,8 @@
       "modelsHelper": "Myne never downloads models — that would mean sending data over the network. Open a link to get one in your browser, then pick the downloaded files here. Everything runs on your device.",
       "modelsLabel": "Models",
       "recommendedFilesEmbedding": "Needs model.safetensors + config.json + tokenizer.json in one folder.",
-      "recommendedFilesGeneration": "Needs the .gguf file + tokenizer.json in the same folder."
+      "recommendedFilesGeneration": "Needs the .gguf file + tokenizer.json in the same folder.",
+      "title": "AI"
     },
     "prefs": {
       "saveError": "Couldn't save preference — try again"
@@ -1764,6 +1768,9 @@
     },
     "shell": {
       "closeLabel": "Close settings",
+      "groups": {
+        "labs": "Labs"
+      },
       "navLabel": "Settings panels",
       "panels": {
         "about": "About",

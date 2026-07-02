@@ -1,9 +1,13 @@
 // AI UX-surface flow suite (ai-ux-surface MYND-408 task 7). Drives the AI
 // settings panel + the right-sidebar AI Chat tab on the real tauri-driver
-// harness, against the **`local-inference-stub` build variant** (SYNC-5). The
-// audited production bundle never enables the AI feature, so this suite runs
-// ONLY when the AI-feature binary is under test — gated on `MYNE_E2E_AI=1`
-// (see `docs/dev/e2e.md`).
+// harness, against the **`local-inference-stub` build variant** — gated on
+// `MYNE_E2E_AI=1` (see `docs/dev/e2e.md`).
+//
+// AI now ships in the DEFAULT build (decisions.md 2026-07-02), so the AI panel +
+// commands DO exist in the production bundle; the pure-UI surface (Labs group,
+// Beta badge, no-model state) is covered UNGATED in `ai-labs-beta.e2e.ts`. This
+// suite stays gated because it needs the STUB engine for deterministic
+// inference-adjacent behaviour without a real model file in the repo.
 //
 //   aux1 — open Settings → AI panel → assert the trust HEADLINE and (expanded)
 //          DISCLOSURE by FULL-LITERAL equality against the load-bearing-copy
@@ -32,9 +36,11 @@ import {
 import { type Session, testIdSelector } from "./support/webdriver";
 import { AI_TRUST_DISCLOSURE, AI_TRUST_HEADLINE } from "../src/lib/load-bearing-copy";
 
-/** Only run when the binary under test is the AI-feature (`local-inference-stub`)
- *  build — the default production bundle has no AI panel/commands, so these
- *  testids never appear there. The feature-flagged build sets `MYNE_E2E_AI=1`. */
+/** Only run against the `local-inference-stub` build (sets `MYNE_E2E_AI=1`),
+ *  which swaps in the deterministic StubEngine so inference-adjacent behaviour
+ *  is stable without a model file. The AI panel/commands themselves now ship in
+ *  the default bundle too (decisions.md 2026-07-02) — their pure-UI checks live
+ *  ungated in `ai-labs-beta.e2e.ts`; this suite is the stub-only slice. */
 const aiDescribe = process.env.MYNE_E2E_AI === "1" ? describeE2E : describe.skip;
 
 /** The id of the currently-active right-panel tab, or null if none (mirrors
