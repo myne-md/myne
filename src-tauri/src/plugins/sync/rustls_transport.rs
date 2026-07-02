@@ -24,7 +24,7 @@
 //! - Fallback if `-PLUS` channel binding slips: cert-pinning only (the exporter
 //!   call is then simply unused).
 
-use super::http_codec::{build_http_request, parse_http_response};
+use super::http_codec::{build_http_request, parse_http_response, MAX_SYNC_RESPONSE_BYTES};
 use super::transport::{HttpMethod, SyncTransport, TransportError, TransportResponse};
 use rustls::client::danger::{HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier};
 use rustls::crypto::{verify_tls12_signature, verify_tls13_signature, WebPkiSupportedAlgorithms};
@@ -264,10 +264,16 @@ impl SyncTransport for RustlsTransport {
             .map_err(|_| TransportError::Network)?;
         stream.flush().map_err(|_| TransportError::Network)?;
         let mut raw = Vec::new();
-        // `Connection: close` → read to EOF.
-        stream
+        // `Connection: close` → read to EOF, but bound it: an untrusted relay (TB5)
+        // can otherwise stream an unbounded body and OOM the client. Read one byte
+        // past the cap so an over-limit body is detectable rather than truncated.
+        (&mut stream)
+            .take(MAX_SYNC_RESPONSE_BYTES + 1)
             .read_to_end(&mut raw)
             .map_err(|_| TransportError::Network)?;
+        if raw.len() as u64 > MAX_SYNC_RESPONSE_BYTES {
+            return Err(TransportError::Network);
+        }
         parse_http_response(&raw).ok_or(TransportError::Network)
     }
 }
