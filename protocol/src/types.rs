@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Shared value types and on-disk encodings used across the crate.
 //!
 //! This module currently hosts:

@@ -10,6 +10,20 @@ pre-commit:
       glob: "*.rs"
       run: cargo fmt --all -- --check
 
+    spdx-header:
+      # Every protocol/ source file MUST carry the AGPL-3.0 SPDX header on line 1
+      # (root CLAUDE.md "License" + protocol/CLAUDE.md). This is the machine-readable
+      # anchor of the file-level licensing claim; drift here is a normative violation.
+      # Fix: add `// SPDX-License-Identifier: AGPL-3.0` as the first line.
+      run: |
+        fail=0
+        for f in {staged_files}; do
+          case "$f" in protocol/*.rs) ;; *) continue ;; esac
+          [ -f "$f" ] || continue
+          head -1 "$f" | grep -q 'SPDX-License-Identifier: AGPL-3.0' || { echo "missing SPDX header: $f"; fail=1; }
+        done
+        exit $fail
+
     tsc:
       glob: "*.{ts,tsx}"
       run: pnpm exec tsc --noEmit
