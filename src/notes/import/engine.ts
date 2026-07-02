@@ -190,7 +190,15 @@ export async function importVault(
     }
 
     const folder = deriveImportFolder(rel);
-    if (decideImport(seen, folder, mapped.readTimeTitle, policy) === "skip") {
+    // Dedup identity must key on the folder the note is ACTUALLY persisted under.
+    // A file carrying its own `folder:` FM field is stored there (mapping.ts keeps
+    // it byte-for-byte) and the live identity-set keys on that real folder — so
+    // keying dedup on the path-derived folder misses the match and re-creates the
+    // note on every re-import (SYNC-5 idempotency break). Both sides run through
+    // noteIdentityKey → folderKey → normalizeFolderPath (idempotent), so passing
+    // the raw FM value here is enough (no extra normalization needed).
+    const identityFolder = mapped.preexistingFolder?.existing ?? folder;
+    if (decideImport(seen, identityFolder, mapped.readTimeTitle, policy) === "skip") {
       skippedExisting++;
     } else {
       // Media is processed only for notes we actually create, on the
@@ -204,8 +212,8 @@ export async function importVault(
       }
       await ports.createNote(plaintext);
       imported++;
-      noteFolders.push(folder);
-      seen.add(noteIdentityKey(folder, mapped.readTimeTitle));
+      noteFolders.push(folder); // empty-dir collection stays path-derived
+      seen.add(noteIdentityKey(identityFolder, mapped.readTimeTitle));
     }
     options.onProgress?.(i + 1, total);
   }

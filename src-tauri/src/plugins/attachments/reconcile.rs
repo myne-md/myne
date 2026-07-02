@@ -250,20 +250,17 @@ struct AttachmentRefs {
 
 impl AttachmentRefs {
     fn zeroize_in_place(&mut self) {
-        // note-ids + attachment-ids are plaintext-derived correlation
-        // tags (AS3) — overwrite the key/value strings before dropping.
-        let mut notes: Vec<String> = self.by_note.keys().cloned().collect();
-        for (_note, ids) in self.by_note.iter_mut() {
-            let mut id_vec: Vec<String> = ids.iter().cloned().collect();
-            for s in id_vec.iter_mut() {
+        // note-ids + attachment-ids are plaintext-derived correlation tags (AS3)
+        // — overwrite the REAL heap strings before dropping. Take ownership of the
+        // map so we can zeroize the owned keys/values in place; cloning them (the
+        // prior approach) only wiped throwaway copies and left the originals
+        // resident until drop.
+        for (mut note, ids) in std::mem::take(&mut self.by_note) {
+            note.zeroize();
+            for mut s in ids {
                 s.zeroize();
             }
-            ids.clear();
         }
-        for s in notes.iter_mut() {
-            s.zeroize();
-        }
-        self.by_note.clear();
     }
 }
 
