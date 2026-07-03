@@ -274,6 +274,7 @@ pub fn decode_quick_unlock_blob(
 #[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
     use super::*;
+    use crate::test_vector_fmt::{hex_lower, json_escape};
 
     const WRAP_KEY: [u8; AEAD_KEY_LEN] = [0x42; AEAD_KEY_LEN];
     const ACCOUNT_HASH: [u8; QUICK_UNLOCK_ACCOUNT_HASH_LEN] = [0x7c; QUICK_UNLOCK_ACCOUNT_HASH_LEN];
@@ -502,32 +503,6 @@ mod tests {
     #[ignore]
     fn emit_quick_unlock_vectors_for_paste() {
         extern crate std;
-
-        fn hex_lower(bytes: &[u8]) -> alloc::string::String {
-            let mut s = alloc::string::String::with_capacity(bytes.len() * 2);
-            for b in bytes {
-                s.push_str(&alloc::format!("{:02x}", b));
-            }
-            s
-        }
-
-        fn json_escape(input: &str) -> alloc::string::String {
-            let mut out = alloc::string::String::with_capacity(input.len() + 2);
-            for c in input.chars() {
-                match c {
-                    '"' => out.push_str("\\\""),
-                    '\\' => out.push_str("\\\\"),
-                    '\n' => out.push_str("\\n"),
-                    '\r' => out.push_str("\\r"),
-                    '\t' => out.push_str("\\t"),
-                    c if (c as u32) < 0x20 => {
-                        out.push_str(&alloc::format!("\\u{:04x}", c as u32));
-                    }
-                    c => out.push(c),
-                }
-            }
-            out
-        }
 
         // Fixed fixtures — the wrap_key is PRE-DERIVED (the codec is
         // provider-agnostic). Patterns match this test mod's inline fixtures.

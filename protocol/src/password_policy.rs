@@ -75,6 +75,7 @@ pub fn validate_min_length(password: &str) -> Result<(), ProtocolError> {
 #[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
     use super::*;
+    use crate::test_vector_fmt::{hex_lower, json_escape};
 
     #[test]
     fn min_password_len_is_twelve() {
@@ -154,30 +155,6 @@ mod tests {
     fn emit_password_policy_vectors_for_paste() {
         extern crate std;
         use alloc::string::String;
-
-        fn hex_lower(bytes: &[u8]) -> String {
-            let mut s = String::with_capacity(bytes.len() * 2);
-            for b in bytes {
-                s.push_str(&alloc::format!("{:02x}", b));
-            }
-            s
-        }
-
-        fn json_escape(input: &str) -> String {
-            let mut out = String::with_capacity(input.len() + 2);
-            for c in input.chars() {
-                match c {
-                    '"' => out.push_str("\\\""),
-                    '\\' => out.push_str("\\\\"),
-                    '\n' => out.push_str("\\n"),
-                    '\r' => out.push_str("\\r"),
-                    '\t' => out.push_str("\\t"),
-                    c if (c as u32) < 0x20 => out.push_str(&alloc::format!("\\u{:04x}", c as u32)),
-                    c => out.push(c),
-                }
-            }
-            out
-        }
 
         let mut dump = String::new();
         dump.push_str("{\n");
