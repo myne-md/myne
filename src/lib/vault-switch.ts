@@ -25,6 +25,7 @@
 // button relies on). So a switch never silently drops an edit and never
 // needs a "you have unsaved changes" prompt.
 
+import { resetSessionIgnored } from "../editor/decorations/spell";
 import type { Action, VaultId } from "./stage";
 import { lockVault } from "./vault-unlock";
 
@@ -89,6 +90,11 @@ export async function switchVault(
   } finally {
     onSavingChange(false);
   }
+  // Vault change: clear the editor's module-level session-ignore spell set so
+  // "ignore this session" words from the prior vault don't suppress squiggles in
+  // the target vault.
+  resetSessionIgnored();
+
   // Route to the target's unlock screen carrying its VaultId (SYNC-6). The
   // password entry + vault-addressed unlock IPC happen on the Unlock screen.
   dispatch({ type: "editor.switch-vault", vaultId: targetVaultId });

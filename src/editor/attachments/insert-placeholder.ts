@@ -109,6 +109,17 @@ export function clearInsertPlaceholder(view: EditorView, token: number): void {
   view.dispatch({ effects: removePlaceholder.of(token) });
 }
 
+/** The placeholder's CURRENT (change-mapped) document position for `token`, or
+ *  null if it's gone. Callers insert the real embed here rather than at the
+ *  stale absolute position captured when the import began — concurrent edits
+ *  during the async import move the placeholder, but a raw offset does not. */
+export function insertPlaceholderPos(view: EditorView, token: number): number | null {
+  const found = view.state
+    .field(placeholderField, false)
+    ?.find((p) => p.token === token);
+  return found?.pos ?? null;
+}
+
 /** The extension bundle: the placeholder field (decorations included). */
 export function attachmentInsertPlaceholderExtension(): Extension {
   return placeholderField;

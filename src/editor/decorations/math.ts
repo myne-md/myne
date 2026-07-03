@@ -184,11 +184,18 @@ const inlineMathPlugin = ViewPlugin.fromClass(
 // Block `$$…$$` (regex; not a parser node).
 const BLOCK_MATH_RE = /\$\$([\s\S]*?)\$\$/g;
 
-function buildBlockMath(state: EditorState): DecorationSet {
-  const renderer = state.field(mathRendererField, false) ?? null;
-  if (renderer === null) return Decoration.none;
+// Cache the whole-doc `$$…$$` scan keyed by document identity. A pure cursor
+// move keeps the SAME `Text` object (only the selection changes), so the reveal
+// state can be re-evaluated without re-running the O(n) `toString()` + regex on
+// every keystroke — the field still rebuilds on selection change (reveal depends
+// on it), but only the cheap per-block loop runs, not the whole-doc scan.
+let cachedMathDoc: EditorState["doc"] | null = null;
+let cachedMathEntries: Array<{ from: number; to: number; latex: string }> = [];
 
-  const doc = state.doc;
+function blockMathEntries(
+  doc: EditorState["doc"],
+): Array<{ from: number; to: number; latex: string }> {
+  if (doc === cachedMathDoc) return cachedMathEntries;
   const text = doc.toString();
   const entries: Array<{ from: number; to: number; latex: string }> = [];
   BLOCK_MATH_RE.lastIndex = 0;
@@ -196,6 +203,17 @@ function buildBlockMath(state: EditorState): DecorationSet {
   while ((m = BLOCK_MATH_RE.exec(text)) !== null) {
     entries.push({ from: m.index, to: m.index + m[0].length, latex: m[1] });
   }
+  cachedMathDoc = doc;
+  cachedMathEntries = entries;
+  return entries;
+}
+
+function buildBlockMath(state: EditorState): DecorationSet {
+  const renderer = state.field(mathRendererField, false) ?? null;
+  if (renderer === null) return Decoration.none;
+
+  const doc = state.doc;
+  const entries = blockMathEntries(doc);
 
   const builder = new RangeSetBuilder<Decoration>();
   for (const { from, to, latex } of entries) {
@@ -208,7 +226,7 @@ function buildBlockMath(state: EditorState): DecorationSet {
     const widget =
       error === null
         ? new MathWidget(html, key, true, from)
-        : new MathErrorWidget(text.slice(from, to), error, key, from);
+        : new MathErrorWidget(doc.sliceString(from, to), error, key, from);
     builder.add(
       fromLine.from,
       toLine.to,

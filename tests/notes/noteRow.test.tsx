@@ -111,9 +111,11 @@ describe("NoteRow — subtitle / timestamps", () => {
 });
 
 describe("NoteRow — selection + aria", () => {
-  it("reflects selection via aria-selected", () => {
+  it("reflects selection via aria-current", () => {
+    // `aria-selected` is not a permitted attribute on role="button"; the
+    // highlighted/active row conveys selection via `aria-current` instead.
     renderRow({ selected: true });
-    expect(screen.getByTestId("notes.row").getAttribute("aria-selected")).toBe(
+    expect(screen.getByTestId("notes.row").getAttribute("aria-current")).toBe(
       "true",
     );
   });
@@ -125,11 +127,11 @@ describe("NoteRow — selection + aria", () => {
     );
   });
 
-  it("multiSelected → data-multiselected + aria-selected (MYND-367)", () => {
+  it("multiSelected → data-multiselected + aria-current (MYND-367)", () => {
     renderRow({ multiSelected: true });
     const row = screen.getByTestId("notes.row");
     expect(row.getAttribute("data-multiselected")).toBe("true");
-    expect(row.getAttribute("aria-selected")).toBe("true");
+    expect(row.getAttribute("aria-current")).toBe("true");
   });
 
   it("not multiSelected → no data-multiselected attribute", () => {
