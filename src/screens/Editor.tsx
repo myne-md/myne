@@ -616,19 +616,24 @@ function EditorChrome({
   }, []);
 
   const handleImported = useCallback(
-    (result: ImportResult) => {
-      const skipped =
-        result.skippedExisting > 0
-          ? t("editor.chrome.import.skippedSuffix", {
-              count: result.skippedExisting,
-            })
-          : "";
-      showToastMessage(
-        t("editor.chrome.import.imported", {
-          count: result.imported,
-          skipped,
-        }),
-      );
+    (result: ImportResult | null) => {
+      // A null result = the import ended in a hard error (the modal shows its own
+      // error); skip the success toast but STILL refresh the sidebar below so any
+      // notes created before the failure appear immediately.
+      if (result !== null) {
+        const skipped =
+          result.skippedExisting > 0
+            ? t("editor.chrome.import.skippedSuffix", {
+                count: result.skippedExisting,
+              })
+            : "";
+        showToastMessage(
+          t("editor.chrome.import.imported", {
+            count: result.imported,
+            skipped,
+          }),
+        );
+      }
       // Repopulate the sidebar so the imported notes appear immediately.
       void noteList()
         .then((ids) => ctx.refreshAll(ids))

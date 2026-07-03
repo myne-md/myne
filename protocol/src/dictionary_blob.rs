@@ -48,15 +48,14 @@
 //! writes a higher value, and a `0x01`-only client returns
 //! [`DictionaryBlobError::DictFormatUnsupported`] → empty.
 
-use crate::aead::{
-    aad_personal_dictionary_blob, aead_open_ctx, aead_seal_ctx, AEAD_KEY_LEN, AEAD_NONCE_LEN,
-    CTX_COMMITMENT_TAG_LEN,
+use crate::aead::{aad_personal_dictionary_blob, AEAD_KEY_LEN, AEAD_NONCE_LEN};
+use crate::blob_envelope::{
+    decode_blob_envelope, encode_blob_envelope, encode_blob_envelope_raw, EnvelopeError,
 };
 use crate::error::ProtocolError;
 use alloc::vec::Vec;
-use getrandom::getrandom;
 use thiserror::Error;
-use zeroize::{Zeroize, Zeroizing};
+use zeroize::Zeroizing;
 
 /// Magic bytes at offset 0 — ASCII `"MYD1"` (Myne Dictionary v1).
 pub const DICTIONARY_BLOB_MAGIC: [u8; 4] = *b"MYD1";
@@ -126,6 +125,25 @@ impl From<ProtocolError> for DictionaryBlobError {
     }
 }
 
+impl From<EnvelopeError> for DictionaryBlobError {
+    /// Map the shared-envelope error into this codec's public variant so the
+    /// distinguishable-reject surface (and its vectors) stay unchanged. Note the
+    /// `FormatUnsupported` → `DictFormatUnsupported` rename (§9.13 spelling).
+    fn from(e: EnvelopeError) -> Self {
+        match e {
+            EnvelopeError::HeaderTooShort => DictionaryBlobError::HeaderTooShort,
+            EnvelopeError::MagicMismatch => DictionaryBlobError::MagicMismatch,
+            EnvelopeError::ProtocolVersionMismatch => DictionaryBlobError::ProtocolVersionMismatch,
+            EnvelopeError::FormatUnsupported => DictionaryBlobError::DictFormatUnsupported,
+            EnvelopeError::CiphertextLenOverflow => DictionaryBlobError::CiphertextLenOverflow,
+            EnvelopeError::CiphertextTruncated => DictionaryBlobError::CiphertextTruncated,
+            EnvelopeError::CannotDecrypt => DictionaryBlobError::CannotDecrypt,
+            EnvelopeError::PlaintextTooLarge => DictionaryBlobError::PlaintextTooLarge,
+            EnvelopeError::RandomnessUnavailable => DictionaryBlobError::RandomnessUnavailable,
+        }
+    }
+}
+
 /// Encode a `vault.dictionary` blob from an opaque `plaintext` (the desktop
 /// layer's serialized `{personal_words, ignore_words}`), sealing under
 /// `personal_dictionary_key` with `nonce`.
@@ -140,28 +158,17 @@ pub fn encode_dictionary_blob_raw(
     plaintext: &[u8],
     nonce: &[u8; AEAD_NONCE_LEN],
 ) -> Result<Vec<u8>, DictionaryBlobError> {
-    if plaintext.len() > MAX_DICTIONARY_PLAINTEXT_LEN {
-        return Err(DictionaryBlobError::PlaintextTooLarge);
-    }
-
     let aad = aad_personal_dictionary_blob(account_number_hash);
-    let sealed = aead_seal_ctx(personal_dictionary_key, nonce, plaintext, &aad)?;
-
-    let ciphertext_len = sealed.len();
-    debug_assert_eq!(
-        ciphertext_len,
-        plaintext.len() + CTX_COMMITMENT_TAG_LEN,
-        "aead_seal_ctx invariant: output is ciphertext || CTX tag",
-    );
-
-    let mut out = Vec::with_capacity(DICTIONARY_BLOB_HEADER_LEN + ciphertext_len);
-    out.extend_from_slice(&DICTIONARY_BLOB_MAGIC);
-    out.push(DICTIONARY_BLOB_PROTOCOL_VERSION);
-    out.push(DICTIONARY_BLOB_FORMAT_V1);
-    out.extend_from_slice(nonce);
-    out.extend_from_slice(&(ciphertext_len as u32).to_be_bytes());
-    out.extend_from_slice(&sealed);
-    Ok(out)
+    encode_blob_envelope_raw(
+        personal_dictionary_key,
+        &DICTIONARY_BLOB_MAGIC,
+        DICTIONARY_BLOB_FORMAT_V1,
+        &aad,
+        MAX_DICTIONARY_PLAINTEXT_LEN,
+        plaintext,
+        nonce,
+    )
+    .map_err(DictionaryBlobError::from)
 }
 
 /// Encode a `vault.dictionary` blob, pulling the 24-byte nonce from the OS
@@ -172,16 +179,16 @@ pub fn encode_dictionary_blob(
     account_number_hash: &[u8; DICTIONARY_BLOB_ACCOUNT_HASH_LEN],
     plaintext: &[u8],
 ) -> Result<Vec<u8>, DictionaryBlobError> {
-    let mut nonce = [0u8; AEAD_NONCE_LEN];
-    getrandom(&mut nonce).map_err(|_| DictionaryBlobError::RandomnessUnavailable)?;
-    let result = encode_dictionary_blob_raw(
+    let aad = aad_personal_dictionary_blob(account_number_hash);
+    encode_blob_envelope(
         personal_dictionary_key,
-        account_number_hash,
+        &DICTIONARY_BLOB_MAGIC,
+        DICTIONARY_BLOB_FORMAT_V1,
+        &aad,
+        MAX_DICTIONARY_PLAINTEXT_LEN,
         plaintext,
-        &nonce,
-    );
-    nonce.zeroize();
-    result
+    )
+    .map_err(DictionaryBlobError::from)
 }
 
 /// Decode a `vault.dictionary` blob into its opaque inner plaintext (the
@@ -193,44 +200,16 @@ pub fn decode_dictionary_blob(
     account_number_hash: &[u8; DICTIONARY_BLOB_ACCOUNT_HASH_LEN],
     blob: &[u8],
 ) -> Result<Zeroizing<Vec<u8>>, DictionaryBlobError> {
-    // ---- parse the 34-byte header (all checks BEFORE decryption) -------
-    if blob.len() < DICTIONARY_BLOB_HEADER_LEN {
-        return Err(DictionaryBlobError::HeaderTooShort);
-    }
-    if blob[0..4] != DICTIONARY_BLOB_MAGIC {
-        return Err(DictionaryBlobError::MagicMismatch);
-    }
-    if blob[4] != DICTIONARY_BLOB_PROTOCOL_VERSION {
-        return Err(DictionaryBlobError::ProtocolVersionMismatch);
-    }
-    if blob[5] != DICTIONARY_BLOB_FORMAT_V1 {
-        return Err(DictionaryBlobError::DictFormatUnsupported);
-    }
-
-    let mut nonce = [0u8; AEAD_NONCE_LEN];
-    nonce.copy_from_slice(&blob[6..30]);
-
-    let ciphertext_len = u32::from_be_bytes([blob[30], blob[31], blob[32], blob[33]]) as usize;
-
-    // Reject oversize BEFORE indexing so a hostile ciphertext_len cannot
-    // panic on the slice.
-    if ciphertext_len > MAX_DICTIONARY_PLAINTEXT_LEN + CTX_COMMITMENT_TAG_LEN {
-        return Err(DictionaryBlobError::CiphertextLenOverflow);
-    }
-    let ciphertext_end = DICTIONARY_BLOB_HEADER_LEN + ciphertext_len;
-    if blob.len() < ciphertext_end {
-        return Err(DictionaryBlobError::CiphertextTruncated);
-    }
-
-    // ---- AEAD-decrypt --------------------------------------------------
     let aad = aad_personal_dictionary_blob(account_number_hash);
-    let plaintext = aead_open_ctx(
+    decode_blob_envelope(
         personal_dictionary_key,
-        &nonce,
-        &blob[DICTIONARY_BLOB_HEADER_LEN..ciphertext_end],
+        &DICTIONARY_BLOB_MAGIC,
+        DICTIONARY_BLOB_FORMAT_V1,
         &aad,
-    )?;
-    Ok(plaintext)
+        MAX_DICTIONARY_PLAINTEXT_LEN,
+        blob,
+    )
+    .map_err(DictionaryBlobError::from)
 }
 
 #[cfg(test)]

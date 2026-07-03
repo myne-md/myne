@@ -45,7 +45,7 @@ interface ObsidianImportModalProps {
   onClose: () => void;
   /** Fired once the import resolves (completed or cancelled) so the parent can
    *  refresh the sidebar + surface a toast. */
-  onImported?: (result: ImportResult) => void;
+  onImported?: (result: ImportResult | null) => void;
 }
 
 const BACKDROP_STYLE: CSSProperties = {
@@ -197,6 +197,9 @@ export function ObsidianImportModal({ open, onClose, onImported }: ObsidianImpor
       .catch((err) => {
         setErrorMsg(err instanceof Error ? err.message : t("notes.import.modal.importFailed"));
         setPhase("error");
+        // Notes may have been created before the hard failure — refresh the
+        // sidebar (null = "errored, just refresh") so they don't stay hidden.
+        onImported?.(null);
       });
   }, [folder, policy, onImported, t]);
 

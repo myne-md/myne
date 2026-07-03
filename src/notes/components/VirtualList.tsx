@@ -81,7 +81,7 @@ export function VirtualList<T>(props: VirtualListProps<T>): ReactNode {
   const {
     items,
     renderItem,
-    keyOf = (_item: T, index: number) => String(index),
+    keyOf = (item: T, _index: number) => String(item),
     estimatedRowHeight = DEFAULT_ESTIMATED_HEIGHT,
     buffer = DEFAULT_BUFFER,
     heightResetToken,
@@ -234,8 +234,15 @@ export function VirtualList<T>(props: VirtualListProps<T>): ReactNode {
     visibleSlice.push({ item, index: i, key: keyOf(item, i) });
   }
 
-  const setRowRef = useCallback(
-    (key: string) => (node: HTMLDivElement | null) => {
+  // Cache one ref-callback per key so `ref={setRowRef(key)}` keeps a STABLE
+  // identity across renders — otherwise React ran the cleanup (unobserve+delete)
+  // and re-observe on every render for every visible row.
+  const refCbCacheRef = useRef(new Map<string, (node: HTMLDivElement | null) => void>());
+  const setRowRef = useCallback((key: string) => {
+    const cache = refCbCacheRef.current;
+    const existing = cache.get(key);
+    if (existing !== undefined) return existing;
+    const cb = (node: HTMLDivElement | null) => {
       const map = rowNodesRef.current;
       const prev = map.get(key);
       const ro = observerRef.current;
@@ -249,9 +256,10 @@ export function VirtualList<T>(props: VirtualListProps<T>): ReactNode {
         }
         map.set(key, node);
       }
-    },
-    [],
-  );
+    };
+    cache.set(key, cb);
+    return cb;
+  }, []);
 
   const containerStyle: CSSProperties = {
     height: "100%",

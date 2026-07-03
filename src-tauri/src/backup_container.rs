@@ -596,20 +596,27 @@ pub type TolerantVerify = (Vec<MemberRecord>, Vec<String>);
 /// (damaged members included — container offsets are computed over the
 /// full set) plus the damaged members' paths. Never silently complete:
 /// the caller MUST surface `skipped`.
-pub fn read_and_verify_members_tolerant(
+/// Stages 1–3 of container verification (§9.11), shared by the strict and
+/// tolerant readers: open the file, validate the fixed header (magic /
+/// version / reserved / ceilings / the §9.11.6 file-length equation), read
+/// the member table, and parse + STRICTLY validate every record (UTF-8 +
+/// length-bounded path, allowlist family, canonical lexicographic order, the
+/// per-family allocation cap, and the `Σ member_len` / table-consumption
+/// equations). Returns the open `File` positioned at the start of the member
+/// DATA region (header + table already consumed) alongside the table-order
+/// record set. The per-member DATA hash pass (stage 4) is the caller's — it
+/// differs by mode (fail-fast for the strict reader, tolerant-skip for
+/// salvage), so it stays out of this shared prefix.
+fn open_and_parse_member_table(
     path: &Path,
-    hooks: &ContainerHooks,
-) -> Result<TolerantVerify, BackupContainerError> {
-    // Strict structural pass first (stages 1–3 + equations): reuse the
-    // hooked verifier's parsing by re-running it and downgrading ONLY
-    // hash mismatches. Implementation note: the strict verifier fails
-    // fast on the first bad hash, so the tolerant pass re-reads the
-    // table itself and hash-checks member by member.
+) -> Result<(File, Vec<MemberRecord>), BackupContainerError> {
     let mut file = File::open(path)?;
     let file_len = file.metadata()?.len();
     if file_len < BACKUP_CONTAINER_HEADER_LEN {
         return Err(BackupContainerError::HeaderTooShort);
     }
+
+    // Stage 1: fixed header.
     let mut header = [0u8; BACKUP_CONTAINER_HEADER_LEN as usize];
     file.read_exact(&mut header)?;
     if header[0..4] != BACKUP_CONTAINER_MAGIC {
@@ -624,6 +631,8 @@ pub fn read_and_verify_members_tolerant(
     let member_count = u32::from_be_bytes(header[6..10].try_into().expect("4 bytes"));
     let members_total_len = u64::from_be_bytes(header[10..18].try_into().expect("8 bytes"));
     let table_len = u32::from_be_bytes(header[18..22].try_into().expect("4 bytes"));
+
+    // Stage 2: ceilings + the §9.11.6 file-length equation.
     if member_count > MAX_MEMBER_COUNT {
         return Err(BackupContainerError::MemberCountOverflow);
     }
@@ -638,6 +647,8 @@ pub fn read_and_verify_members_tolerant(
     {
         return Err(BackupContainerError::LengthsInconsistent);
     }
+
+    // Stage 3: member table.
     let mut table = vec![0u8; table_len as usize];
     file.read_exact(&mut table)?;
     let mut records: Vec<MemberRecord> = Vec::with_capacity(member_count as usize);
@@ -696,6 +707,41 @@ pub fn read_and_verify_members_tolerant(
         return Err(BackupContainerError::LengthsInconsistent);
     }
 
+    Ok((file, records))
+}
+
+/// Stream `record.len` bytes from `file`'s CURRENT position in `CHUNK`-sized
+/// reads — feeding the §9.11.2 path-seeded hasher and honouring cooperative
+/// cancel per chunk — and return the recomputed digest. Advances `file` past
+/// the member's data region (the callers read members back-to-back in table
+/// order, so this leaves the cursor at the next member).
+fn stream_member_hash(
+    file: &mut File,
+    record: &MemberRecord,
+    buf: &mut [u8],
+    hooks: &ContainerHooks,
+) -> Result<[u8; 32], BackupContainerError> {
+    let mut hasher = path_seeded_hasher(&record.path);
+    let mut remaining = record.len;
+    while remaining > 0 {
+        hooks.check_cancel()?;
+        let want = remaining.min(CHUNK as u64) as usize;
+        file.read_exact(&mut buf[..want])?;
+        hasher.update(&buf[..want]);
+        remaining -= want as u64;
+    }
+    Ok(hasher.finalize().into())
+}
+
+pub fn read_and_verify_members_tolerant(
+    path: &Path,
+    hooks: &ContainerHooks,
+) -> Result<TolerantVerify, BackupContainerError> {
+    // Strict structural pass first (stages 1–3 + equations); the tolerant
+    // posture downgrades ONLY per-member hash mismatches (stage 4 below) to
+    // `skipped`, never a structural fault.
+    let (mut file, records) = open_and_parse_member_table(path)?;
+
     // Tolerant stage 4: per-member hash check; failures join `skipped`
     // (the records themselves stay in the full list for offset math).
     let mut skipped: Vec<String> = Vec::new();
@@ -703,16 +749,7 @@ pub fn read_and_verify_members_tolerant(
     let total = records.len() as u32;
     for (done, record) in records.iter().enumerate() {
         hooks.check_cancel()?;
-        let mut hasher = path_seeded_hasher(&record.path);
-        let mut remaining = record.len;
-        while remaining > 0 {
-            hooks.check_cancel()?;
-            let want = remaining.min(CHUNK as u64) as usize;
-            file.read_exact(&mut buf[..want])?;
-            hasher.update(&buf[..want]);
-            remaining -= want as u64;
-        }
-        let got: [u8; 32] = hasher.finalize().into();
+        let got = stream_member_hash(&mut file, record, &mut buf, hooks)?;
         if got != record.sha256 {
             skipped.push(record.path.clone());
         }
@@ -823,113 +860,16 @@ pub fn read_and_verify_container_hooked(
     path: &Path,
     hooks: &ContainerHooks,
 ) -> Result<Vec<MemberRecord>, BackupContainerError> {
-    let mut file = File::open(path)?;
-    let file_len = file.metadata()?.len();
-    if file_len < BACKUP_CONTAINER_HEADER_LEN {
-        return Err(BackupContainerError::HeaderTooShort);
-    }
-
-    // Stage 1: fixed header.
-    let mut header = [0u8; BACKUP_CONTAINER_HEADER_LEN as usize];
-    file.read_exact(&mut header)?;
-    if header[0..4] != BACKUP_CONTAINER_MAGIC {
-        return Err(BackupContainerError::MagicMismatch);
-    }
-    if header[4] != BACKUP_CONTAINER_PROTOCOL_VERSION {
-        return Err(BackupContainerError::ProtocolVersionMismatch);
-    }
-    if header[5] != BACKUP_CONTAINER_RESERVED {
-        return Err(BackupContainerError::ReservedByteNonZero);
-    }
-    let member_count = u32::from_be_bytes(header[6..10].try_into().expect("4 bytes"));
-    let members_total_len = u64::from_be_bytes(header[10..18].try_into().expect("8 bytes"));
-    let table_len = u32::from_be_bytes(header[18..22].try_into().expect("4 bytes"));
-
-    // Stage 2: ceilings + the §9.11.6 file-length equation.
-    if member_count > MAX_MEMBER_COUNT {
-        return Err(BackupContainerError::MemberCountOverflow);
-    }
-    if table_len > MAX_MEMBER_TABLE_LEN {
-        return Err(BackupContainerError::MemberTableOverflow);
-    }
-    if file_len
-        != BACKUP_CONTAINER_HEADER_LEN
-            .checked_add(table_len as u64)
-            .and_then(|v| v.checked_add(members_total_len))
-            .ok_or(BackupContainerError::LengthsInconsistent)?
-    {
-        return Err(BackupContainerError::LengthsInconsistent);
-    }
-
-    // Stage 3: member table.
-    let mut table = vec![0u8; table_len as usize];
-    file.read_exact(&mut table)?;
-    let mut records: Vec<MemberRecord> = Vec::with_capacity(member_count as usize);
-    let mut cursor = 0usize;
-    let mut sum_member_len: u64 = 0;
-    for _ in 0..member_count {
-        let fixed_end = cursor + 2;
-        if fixed_end > table.len() {
-            return Err(BackupContainerError::LengthsInconsistent);
-        }
-        let path_len =
-            u16::from_be_bytes(table[cursor..fixed_end].try_into().expect("2 bytes")) as usize;
-        if path_len == 0 || path_len > MAX_MEMBER_PATH_LEN {
-            return Err(BackupContainerError::PathInvalid);
-        }
-        let rec_end = fixed_end + path_len + 40;
-        if rec_end > table.len() {
-            return Err(BackupContainerError::LengthsInconsistent);
-        }
-        let path = std::str::from_utf8(&table[fixed_end..fixed_end + path_len])
-            .map_err(|_| BackupContainerError::PathInvalid)?
-            .to_owned();
-        validate_member_path(&path)?;
-        let family = classify_member_path(&path).ok_or(BackupContainerError::PathNotAllowlisted)?;
-        if let Some(prev) = records.last() {
-            match prev.path.as_bytes().cmp(path.as_bytes()) {
-                std::cmp::Ordering::Less => {}
-                std::cmp::Ordering::Equal => return Err(BackupContainerError::DuplicatePath),
-                std::cmp::Ordering::Greater => {
-                    return Err(BackupContainerError::PathOrderViolation)
-                }
-            }
-        }
-        let len = u64::from_be_bytes(
-            table[fixed_end + path_len..fixed_end + path_len + 8]
-                .try_into()
-                .expect("8 bytes"),
-        );
-        if len > family_member_cap(family) {
-            return Err(BackupContainerError::MemberLenOverflow);
-        }
-        let mut sha256 = [0u8; 32];
-        sha256.copy_from_slice(&table[fixed_end + path_len + 8..rec_end]);
-        sum_member_len = sum_member_len
-            .checked_add(len)
-            .ok_or(BackupContainerError::LengthsInconsistent)?;
-        records.push(MemberRecord { path, len, sha256 });
-        cursor = rec_end;
-    }
-    if cursor != table.len() || sum_member_len != members_total_len {
-        return Err(BackupContainerError::LengthsInconsistent);
-    }
+    // Stages 1–3: header + member-table structural verification (shared).
+    let (mut file, records) = open_and_parse_member_table(path)?;
 
     // Stage 4: streamed hash verification (path prefix + data, §9.11.2).
+    // Strict posture — the first mismatch is fatal.
     let mut buf = vec![0u8; CHUNK];
     let total_records = records.len() as u32;
     for (done, record) in records.iter().enumerate() {
         hooks.check_cancel()?;
-        let mut hasher = path_seeded_hasher(&record.path);
-        let mut remaining = record.len;
-        while remaining > 0 {
-            hooks.check_cancel()?;
-            let want = remaining.min(CHUNK as u64) as usize;
-            file.read_exact(&mut buf[..want])?;
-            hasher.update(&buf[..want]);
-            remaining -= want as u64;
-        }
-        let got: [u8; 32] = hasher.finalize().into();
+        let got = stream_member_hash(&mut file, record, &mut buf, hooks)?;
         if got != record.sha256 {
             return Err(BackupContainerError::HashMismatch);
         }

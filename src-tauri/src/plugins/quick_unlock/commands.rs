@@ -103,7 +103,12 @@ fn read_attempt_state(dir: &Path) -> AttemptState {
     match std::fs::read(attempt_path(dir)) {
         Ok(bytes) => parse_attempt_count(&bytes)
             .unwrap_or_else(|| AttemptState::from_count(MAX_QUICK_UNLOCK_ATTEMPTS)),
-        Err(_) => AttemptState::fresh(),
+        // Absent → fresh (no failures yet). Any OTHER read error (present but
+        // unreadable — PermissionDenied / EIO) is fail-safe clamped to the cap,
+        // matching the "present-but-corrupt → wipe" doc above and the sibling
+        // blob read: an unreadable counter must never silently reset to 5 tries.
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => AttemptState::fresh(),
+        Err(_) => AttemptState::from_count(MAX_QUICK_UNLOCK_ATTEMPTS),
     }
 }
 
@@ -291,9 +296,17 @@ pub(crate) async fn quick_unlock_with_dir<P: QuickUnlockProvider + Send + 'stati
                     },
                 )
                 .await;
-            // Success resets the consecutive-failure count.
+            // Success resets the consecutive-failure count. The vault is already
+            // unlocked (slot installed above), so a failure to persist the reset
+            // must NOT surface as an unlock failure — best-effort; a stale counter
+            // only fails safe (fewer future attempts) and recovers on next success.
             attempts.record_success();
-            persist_attempt_state(dir, &attempts)?;
+            if let Err(_e) = persist_attempt_state(dir, &attempts) {
+                tracing::debug!(
+                    stage = "persist_attempt_reset",
+                    "quick-unlock succeeded; attempt-reset not persisted"
+                );
+            }
             Ok(())
         }
         Err(_) => match attempts.record_failure() {
