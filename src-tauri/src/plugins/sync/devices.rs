@@ -60,13 +60,7 @@ impl From<TransportError> for DeviceMgmtError {
     }
 }
 
-fn hex_encode(bytes: &[u8]) -> String {
-    let mut s = String::with_capacity(bytes.len() * 2);
-    for b in bytes {
-        s.push_str(&format!("{b:02x}"));
-    }
-    s
-}
+use super::to_hex as hex_encode;
 
 /// Read the device roster (authed). The list UI renders this; pending discovery
 /// is `entries.iter().filter(|d| !d.approved)`.

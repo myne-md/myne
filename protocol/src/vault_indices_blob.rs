@@ -48,15 +48,14 @@
 //! errors** per failure mode; the caller applies fall-to-rebuild at the
 //! boundary (parity with `search_blob.rs` / `workspace_blob.rs`).
 
-use crate::aead::{
-    aad_vault_indices_blob, aead_open_ctx, aead_seal_ctx, AEAD_KEY_LEN, AEAD_NONCE_LEN,
-    CTX_COMMITMENT_TAG_LEN,
+use crate::aead::{aad_vault_indices_blob, AEAD_KEY_LEN, AEAD_NONCE_LEN};
+use crate::blob_envelope::{
+    decode_blob_envelope, encode_blob_envelope, encode_blob_envelope_raw, EnvelopeError,
 };
 use crate::error::ProtocolError;
 use alloc::vec::Vec;
-use getrandom::getrandom;
 use thiserror::Error;
-use zeroize::{Zeroize, Zeroizing};
+use zeroize::Zeroizing;
 
 /// Magic bytes at offset 0 — ASCII `"MYI1"` (Myne Indices v1).
 pub const VAULT_INDICES_BLOB_MAGIC: [u8; 4] = *b"MYI1";
@@ -133,6 +132,26 @@ impl From<ProtocolError> for VaultIndicesBlobError {
     }
 }
 
+impl From<EnvelopeError> for VaultIndicesBlobError {
+    /// Map the shared-envelope error into this codec's public variant so the
+    /// distinguishable-reject surface (and its vectors) stay unchanged.
+    fn from(e: EnvelopeError) -> Self {
+        match e {
+            EnvelopeError::HeaderTooShort => VaultIndicesBlobError::HeaderTooShort,
+            EnvelopeError::MagicMismatch => VaultIndicesBlobError::MagicMismatch,
+            EnvelopeError::ProtocolVersionMismatch => {
+                VaultIndicesBlobError::ProtocolVersionMismatch
+            }
+            EnvelopeError::FormatUnsupported => VaultIndicesBlobError::FormatUnsupported,
+            EnvelopeError::CiphertextLenOverflow => VaultIndicesBlobError::CiphertextLenOverflow,
+            EnvelopeError::CiphertextTruncated => VaultIndicesBlobError::CiphertextTruncated,
+            EnvelopeError::CannotDecrypt => VaultIndicesBlobError::CannotDecrypt,
+            EnvelopeError::PlaintextTooLarge => VaultIndicesBlobError::PlaintextTooLarge,
+            EnvelopeError::RandomnessUnavailable => VaultIndicesBlobError::RandomnessUnavailable,
+        }
+    }
+}
+
 /// Encode a `vault.indices` blob from an opaque `plaintext` (the desktop
 /// layer's serialized structured-metadata index), sealing under
 /// `vault_indices_key` with `nonce`.
@@ -147,28 +166,17 @@ pub fn encode_vault_indices_blob_raw(
     plaintext: &[u8],
     nonce: &[u8; AEAD_NONCE_LEN],
 ) -> Result<Vec<u8>, VaultIndicesBlobError> {
-    if plaintext.len() > MAX_VAULT_INDICES_PLAINTEXT_LEN {
-        return Err(VaultIndicesBlobError::PlaintextTooLarge);
-    }
-
     let aad = aad_vault_indices_blob(account_number_hash);
-    let sealed = aead_seal_ctx(vault_indices_key, nonce, plaintext, &aad)?;
-
-    let ciphertext_len = sealed.len();
-    debug_assert_eq!(
-        ciphertext_len,
-        plaintext.len() + CTX_COMMITMENT_TAG_LEN,
-        "aead_seal_ctx invariant: output is ciphertext || CTX tag",
-    );
-
-    let mut out = Vec::with_capacity(VAULT_INDICES_BLOB_HEADER_LEN + ciphertext_len);
-    out.extend_from_slice(&VAULT_INDICES_BLOB_MAGIC);
-    out.push(VAULT_INDICES_BLOB_PROTOCOL_VERSION);
-    out.push(VAULT_INDICES_BLOB_FORMAT_V1);
-    out.extend_from_slice(nonce);
-    out.extend_from_slice(&(ciphertext_len as u32).to_be_bytes());
-    out.extend_from_slice(&sealed);
-    Ok(out)
+    encode_blob_envelope_raw(
+        vault_indices_key,
+        &VAULT_INDICES_BLOB_MAGIC,
+        VAULT_INDICES_BLOB_FORMAT_V1,
+        &aad,
+        MAX_VAULT_INDICES_PLAINTEXT_LEN,
+        plaintext,
+        nonce,
+    )
+    .map_err(VaultIndicesBlobError::from)
 }
 
 /// Encode a `vault.indices` blob, pulling the 24-byte nonce from the OS
@@ -179,12 +187,16 @@ pub fn encode_vault_indices_blob(
     account_number_hash: &[u8; VAULT_INDICES_BLOB_ACCOUNT_HASH_LEN],
     plaintext: &[u8],
 ) -> Result<Vec<u8>, VaultIndicesBlobError> {
-    let mut nonce = [0u8; AEAD_NONCE_LEN];
-    getrandom(&mut nonce).map_err(|_| VaultIndicesBlobError::RandomnessUnavailable)?;
-    let result =
-        encode_vault_indices_blob_raw(vault_indices_key, account_number_hash, plaintext, &nonce);
-    nonce.zeroize();
-    result
+    let aad = aad_vault_indices_blob(account_number_hash);
+    encode_blob_envelope(
+        vault_indices_key,
+        &VAULT_INDICES_BLOB_MAGIC,
+        VAULT_INDICES_BLOB_FORMAT_V1,
+        &aad,
+        MAX_VAULT_INDICES_PLAINTEXT_LEN,
+        plaintext,
+    )
+    .map_err(VaultIndicesBlobError::from)
 }
 
 /// Decode a `vault.indices` blob into its opaque inner plaintext (the
@@ -197,42 +209,16 @@ pub fn decode_vault_indices_blob(
     account_number_hash: &[u8; VAULT_INDICES_BLOB_ACCOUNT_HASH_LEN],
     blob: &[u8],
 ) -> Result<Zeroizing<Vec<u8>>, VaultIndicesBlobError> {
-    if blob.len() < VAULT_INDICES_BLOB_HEADER_LEN {
-        return Err(VaultIndicesBlobError::HeaderTooShort);
-    }
-    if blob[0..4] != VAULT_INDICES_BLOB_MAGIC {
-        return Err(VaultIndicesBlobError::MagicMismatch);
-    }
-    if blob[4] != VAULT_INDICES_BLOB_PROTOCOL_VERSION {
-        return Err(VaultIndicesBlobError::ProtocolVersionMismatch);
-    }
-    if blob[5] != VAULT_INDICES_BLOB_FORMAT_V1 {
-        return Err(VaultIndicesBlobError::FormatUnsupported);
-    }
-
-    let mut nonce = [0u8; AEAD_NONCE_LEN];
-    nonce.copy_from_slice(&blob[6..30]);
-
-    let ciphertext_len = u32::from_be_bytes([blob[30], blob[31], blob[32], blob[33]]) as usize;
-
-    // Reject oversize BEFORE indexing so a hostile ciphertext_len cannot
-    // panic on the slice.
-    if ciphertext_len > MAX_VAULT_INDICES_PLAINTEXT_LEN + CTX_COMMITMENT_TAG_LEN {
-        return Err(VaultIndicesBlobError::CiphertextLenOverflow);
-    }
-    let ciphertext_end = VAULT_INDICES_BLOB_HEADER_LEN + ciphertext_len;
-    if blob.len() < ciphertext_end {
-        return Err(VaultIndicesBlobError::CiphertextTruncated);
-    }
-
     let aad = aad_vault_indices_blob(account_number_hash);
-    let plaintext = aead_open_ctx(
+    decode_blob_envelope(
         vault_indices_key,
-        &nonce,
-        &blob[VAULT_INDICES_BLOB_HEADER_LEN..ciphertext_end],
+        &VAULT_INDICES_BLOB_MAGIC,
+        VAULT_INDICES_BLOB_FORMAT_V1,
         &aad,
-    )?;
-    Ok(plaintext)
+        MAX_VAULT_INDICES_PLAINTEXT_LEN,
+        blob,
+    )
+    .map_err(VaultIndicesBlobError::from)
 }
 
 #[cfg(test)]

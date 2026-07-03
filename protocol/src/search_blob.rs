@@ -48,15 +48,14 @@
 //! engine. The index is always reconstructible from the notes, so an
 //! unreadable `vault.search` is never data loss.
 
-use crate::aead::{
-    aad_search_index_blob, aead_open_ctx, aead_seal_ctx, AEAD_KEY_LEN, AEAD_NONCE_LEN,
-    CTX_COMMITMENT_TAG_LEN,
+use crate::aead::{aad_search_index_blob, AEAD_KEY_LEN, AEAD_NONCE_LEN};
+use crate::blob_envelope::{
+    decode_blob_envelope, encode_blob_envelope, encode_blob_envelope_raw, EnvelopeError,
 };
 use crate::error::ProtocolError;
 use alloc::vec::Vec;
-use getrandom::getrandom;
 use thiserror::Error;
-use zeroize::{Zeroize, Zeroizing};
+use zeroize::Zeroizing;
 
 /// Magic bytes at offset 0 — ASCII `"MYS1"` (Myne Search v1).
 pub const SEARCH_BLOB_MAGIC: [u8; 4] = *b"MYS1";
@@ -123,6 +122,25 @@ impl From<ProtocolError> for SearchBlobError {
     }
 }
 
+impl From<EnvelopeError> for SearchBlobError {
+    /// Map the shared-envelope error into this codec's public variant so the
+    /// distinguishable-reject surface (and its vectors) stay unchanged. Note the
+    /// `FormatUnsupported` → `IndexFormatUnsupported` rename (§9.6 spelling).
+    fn from(e: EnvelopeError) -> Self {
+        match e {
+            EnvelopeError::HeaderTooShort => SearchBlobError::HeaderTooShort,
+            EnvelopeError::MagicMismatch => SearchBlobError::MagicMismatch,
+            EnvelopeError::ProtocolVersionMismatch => SearchBlobError::ProtocolVersionMismatch,
+            EnvelopeError::FormatUnsupported => SearchBlobError::IndexFormatUnsupported,
+            EnvelopeError::CiphertextLenOverflow => SearchBlobError::CiphertextLenOverflow,
+            EnvelopeError::CiphertextTruncated => SearchBlobError::CiphertextTruncated,
+            EnvelopeError::CannotDecrypt => SearchBlobError::CannotDecrypt,
+            EnvelopeError::PlaintextTooLarge => SearchBlobError::PlaintextTooLarge,
+            EnvelopeError::RandomnessUnavailable => SearchBlobError::RandomnessUnavailable,
+        }
+    }
+}
+
 /// Encode a `vault.search` blob from an opaque `plaintext` (the desktop
 /// layer's serialized index + manifest), sealing under `search_index_key`
 /// with `nonce`.
@@ -137,28 +155,17 @@ pub fn encode_search_index_blob_raw(
     plaintext: &[u8],
     nonce: &[u8; AEAD_NONCE_LEN],
 ) -> Result<Vec<u8>, SearchBlobError> {
-    if plaintext.len() > MAX_SEARCH_INDEX_PLAINTEXT_LEN {
-        return Err(SearchBlobError::PlaintextTooLarge);
-    }
-
     let aad = aad_search_index_blob(account_number_hash);
-    let sealed = aead_seal_ctx(search_index_key, nonce, plaintext, &aad)?;
-
-    let ciphertext_len = sealed.len();
-    debug_assert_eq!(
-        ciphertext_len,
-        plaintext.len() + CTX_COMMITMENT_TAG_LEN,
-        "aead_seal_ctx invariant: output is ciphertext || CTX tag",
-    );
-
-    let mut out = Vec::with_capacity(SEARCH_BLOB_HEADER_LEN + ciphertext_len);
-    out.extend_from_slice(&SEARCH_BLOB_MAGIC);
-    out.push(SEARCH_BLOB_PROTOCOL_VERSION);
-    out.push(SEARCH_BLOB_INDEX_FORMAT_V1);
-    out.extend_from_slice(nonce);
-    out.extend_from_slice(&(ciphertext_len as u32).to_be_bytes());
-    out.extend_from_slice(&sealed);
-    Ok(out)
+    encode_blob_envelope_raw(
+        search_index_key,
+        &SEARCH_BLOB_MAGIC,
+        SEARCH_BLOB_INDEX_FORMAT_V1,
+        &aad,
+        MAX_SEARCH_INDEX_PLAINTEXT_LEN,
+        plaintext,
+        nonce,
+    )
+    .map_err(SearchBlobError::from)
 }
 
 /// Encode a `vault.search` blob, pulling the 24-byte nonce from the OS
@@ -169,12 +176,16 @@ pub fn encode_search_index_blob(
     account_number_hash: &[u8; SEARCH_BLOB_ACCOUNT_HASH_LEN],
     plaintext: &[u8],
 ) -> Result<Vec<u8>, SearchBlobError> {
-    let mut nonce = [0u8; AEAD_NONCE_LEN];
-    getrandom(&mut nonce).map_err(|_| SearchBlobError::RandomnessUnavailable)?;
-    let result =
-        encode_search_index_blob_raw(search_index_key, account_number_hash, plaintext, &nonce);
-    nonce.zeroize();
-    result
+    let aad = aad_search_index_blob(account_number_hash);
+    encode_blob_envelope(
+        search_index_key,
+        &SEARCH_BLOB_MAGIC,
+        SEARCH_BLOB_INDEX_FORMAT_V1,
+        &aad,
+        MAX_SEARCH_INDEX_PLAINTEXT_LEN,
+        plaintext,
+    )
+    .map_err(SearchBlobError::from)
 }
 
 /// Decode a `vault.search` blob into its opaque inner plaintext (the
@@ -186,44 +197,16 @@ pub fn decode_search_index_blob(
     account_number_hash: &[u8; SEARCH_BLOB_ACCOUNT_HASH_LEN],
     blob: &[u8],
 ) -> Result<Zeroizing<Vec<u8>>, SearchBlobError> {
-    // ---- parse the 34-byte header (all checks BEFORE decryption) -------
-    if blob.len() < SEARCH_BLOB_HEADER_LEN {
-        return Err(SearchBlobError::HeaderTooShort);
-    }
-    if blob[0..4] != SEARCH_BLOB_MAGIC {
-        return Err(SearchBlobError::MagicMismatch);
-    }
-    if blob[4] != SEARCH_BLOB_PROTOCOL_VERSION {
-        return Err(SearchBlobError::ProtocolVersionMismatch);
-    }
-    if blob[5] != SEARCH_BLOB_INDEX_FORMAT_V1 {
-        return Err(SearchBlobError::IndexFormatUnsupported);
-    }
-
-    let mut nonce = [0u8; AEAD_NONCE_LEN];
-    nonce.copy_from_slice(&blob[6..30]);
-
-    let ciphertext_len = u32::from_be_bytes([blob[30], blob[31], blob[32], blob[33]]) as usize;
-
-    // Reject oversize BEFORE indexing so a hostile ciphertext_len cannot
-    // panic on the slice.
-    if ciphertext_len > MAX_SEARCH_INDEX_PLAINTEXT_LEN + CTX_COMMITMENT_TAG_LEN {
-        return Err(SearchBlobError::CiphertextLenOverflow);
-    }
-    let ciphertext_end = SEARCH_BLOB_HEADER_LEN + ciphertext_len;
-    if blob.len() < ciphertext_end {
-        return Err(SearchBlobError::CiphertextTruncated);
-    }
-
-    // ---- AEAD-decrypt --------------------------------------------------
     let aad = aad_search_index_blob(account_number_hash);
-    let plaintext = aead_open_ctx(
+    decode_blob_envelope(
         search_index_key,
-        &nonce,
-        &blob[SEARCH_BLOB_HEADER_LEN..ciphertext_end],
+        &SEARCH_BLOB_MAGIC,
+        SEARCH_BLOB_INDEX_FORMAT_V1,
         &aad,
-    )?;
-    Ok(plaintext)
+        MAX_SEARCH_INDEX_PLAINTEXT_LEN,
+        blob,
+    )
+    .map_err(SearchBlobError::from)
 }
 
 #[cfg(test)]

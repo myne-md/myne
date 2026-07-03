@@ -56,6 +56,7 @@ pub mod attachment_blob;
 pub mod attachment_text_blob;
 pub mod attachments_catalog;
 pub mod blob;
+pub(crate) mod blob_envelope;
 pub(crate) mod canonical_json;
 pub mod dictionary_blob;
 pub mod embeddings_blob;

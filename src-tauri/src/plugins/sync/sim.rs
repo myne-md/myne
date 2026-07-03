@@ -138,13 +138,7 @@ macro_rules! server_or_skip {
     };
 }
 
-fn hex(bytes: &[u8]) -> String {
-    let mut s = String::with_capacity(bytes.len() * 2);
-    for b in bytes {
-        s.push_str(&format!("{b:02x}"));
-    }
-    s
-}
+use super::to_hex as hex;
 
 /// Parse a 32-hex note id back to its 16 raw bytes (the inverse of `hex` over a
 /// note id). `None` on a malformed id.
