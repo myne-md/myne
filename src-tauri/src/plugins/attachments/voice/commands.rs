@@ -35,6 +35,9 @@ pub const VOICE_LEVEL_EVENT: &str = "voice-record:level";
 /// Tauri event carrying a finished continuation-clip's [`ImportedAttachment`]
 /// so the WebView inserts its embed in order while recording continues.
 pub const VOICE_CLIP_EVENT: &str = "voice-record:clip";
+/// Emitted when a continuation clip fails to import (disk-full / transient IO),
+/// so the recording UI can flag the gap instead of the clip vanishing silently.
+pub const VOICE_CLIP_FAILED_EVENT: &str = "voice-record:clip-failed";
 
 /// E2E / test escape hatch: when `MYNE_E2E_AUDIO_FIXTURE` is set, capture uses
 /// the deterministic fixture source so the record flow runs with no real mic on
@@ -171,7 +174,13 @@ async fn consume_clips<R: Runtime>(app: AppHandle<R>, mut rx: UnboundedReceiver<
                 count += 1;
             }
             Err(_) => {
+                // Surface the gap instead of dropping it silently: a continuation
+                // clip that fails to import (disk-full / transient IO) would
+                // otherwise leave an invisible hole in a long recording. Emit a
+                // failure event the recording UI can react to; the count below
+                // still reflects only the clips that actually landed.
                 tracing::warn!(stage = "voice_record", "continuation clip import failed");
+                let _ = app.emit(VOICE_CLIP_FAILED_EVENT, ());
             }
         }
     }
