@@ -722,12 +722,18 @@ impl VaultRuntimeState {
     /// post-Argon2id slot peek symmetric retrofit".
     pub async fn peek_recovering_root_key_clone(&self) -> Option<Zeroizing<[u8; AEAD_KEY_LEN]>> {
         // TRANSITIONAL (sub-feature 2): resolve the single active `Recovering`
-        // entry. Sub-feature 4 threads an explicit `vault_id` here.
+        // entry. Sub-feature 4 threads an explicit `vault_id` here. Deterministic
+        // min-by-id (mirroring `active_vault_id`) rather than HashMap-iteration
+        // order, so if a bug ever left two `Recovering` slots the choice is stable.
         let slots = self.slots.read().await;
-        slots.values().find_map(|slot| match slot {
-            Slot::Recovering { root_key, .. } => Some(Zeroizing::new(**root_key)),
-            _ => None,
-        })
+        slots
+            .iter()
+            .filter_map(|(id, slot)| match slot {
+                Slot::Recovering { root_key, .. } => Some((id, root_key)),
+                _ => None,
+            })
+            .min_by_key(|(id, _)| **id)
+            .map(|(_, root_key)| Zeroizing::new(**root_key))
     }
 
     /// Read-lock peek that returns a CLONE of `(root_key, vault_meta_bytes_hash)`
@@ -747,12 +753,18 @@ impl VaultRuntimeState {
         &self,
     ) -> Option<(Zeroizing<[u8; AEAD_KEY_LEN]>, [u8; 32])> {
         // TRANSITIONAL (sub-feature 2): resolve the single active `Unlocked`
-        // entry. Sub-feature 4 threads an explicit `vault_id` here.
+        // entry. Sub-feature 4 threads an explicit `vault_id` here. Deterministic
+        // min-by-id (mirroring `active_vault_id`) rather than HashMap-iteration
+        // order, so if a bug ever left two `Unlocked` slots the choice is stable.
         let slots = self.slots.read().await;
-        slots.values().find_map(|slot| match slot {
-            Slot::Unlocked(uv) => Some((Zeroizing::new(*uv.root_key), uv.vault_meta_bytes_hash)),
-            _ => None,
-        })
+        slots
+            .iter()
+            .filter_map(|(id, slot)| match slot {
+                Slot::Unlocked(uv) => Some((id, uv)),
+                _ => None,
+            })
+            .min_by_key(|(id, _)| **id)
+            .map(|(_, uv)| (Zeroizing::new(*uv.root_key), uv.vault_meta_bytes_hash))
     }
 
     /// Read-lock peek that returns a CLONE of just the `root_key` from
@@ -768,12 +780,18 @@ impl VaultRuntimeState {
     /// borrowed surface minimal at each call site.
     pub async fn peek_unlocked_root_key_clone(&self) -> Option<Zeroizing<[u8; AEAD_KEY_LEN]>> {
         // TRANSITIONAL (sub-feature 2): resolve the single active `Unlocked`
-        // entry. Sub-feature 4 threads an explicit `vault_id` here.
+        // entry. Sub-feature 4 threads an explicit `vault_id` here. Deterministic
+        // min-by-id (mirroring `active_vault_id`) rather than HashMap-iteration
+        // order, so if a bug ever left two `Unlocked` slots the choice is stable.
         let slots = self.slots.read().await;
-        slots.values().find_map(|slot| match slot {
-            Slot::Unlocked(uv) => Some(Zeroizing::new(*uv.root_key)),
-            _ => None,
-        })
+        slots
+            .iter()
+            .filter_map(|(id, slot)| match slot {
+                Slot::Unlocked(uv) => Some((id, uv)),
+                _ => None,
+            })
+            .min_by_key(|(id, _)| **id)
+            .map(|(_, uv)| Zeroizing::new(*uv.root_key))
     }
 
     /// Read-lock peek that returns CLONES of `(items_key, items_key_id,

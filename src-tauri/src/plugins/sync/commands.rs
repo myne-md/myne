@@ -635,7 +635,7 @@ use super::enroll::{self, EnrollPath};
 use protocol::{
     aad_password_wrap, aad_recovery_wrap, aead_open_ctx, derive_password_wrap_key,
     derive_recovery_wrap_key_from_normalized, derive_subkey, normalize_user_phrase,
-    parse_account_number, parse_vault_meta, SubkeyRole, AEAD_KEY_LEN,
+    parse_account_number, parse_vault_meta, validate_kdf_params, SubkeyRole, AEAD_KEY_LEN,
 };
 use zeroize::Zeroizing;
 
@@ -711,6 +711,13 @@ pub async fn sync_enroll<R: Runtime>(
             _ => return Err(SyncDeviceError::Transport),
         };
         let meta = parse_vault_meta(&meta_bytes).map_err(|_| SyncDeviceError::Internal)?;
+        // The `vault.meta` came from the (untrusted, TB5) sync server, so its
+        // `kdf_params` are attacker-controlled. Validate the Argon2id memory/time
+        // floor+ceiling BEFORE deriving — otherwise a hostile server could pin an
+        // absurd `m_kib` (e.g. multi-TiB) and force a pre-auth OOM/DoS. Every
+        // other derive site (unlock / recover / change-password / quick-unlock)
+        // already gates on this; the sync enroll path was the one gap.
+        validate_kdf_params(&meta.kdf_params).map_err(|_| SyncDeviceError::BadRequest)?;
 
         // 2. Derive root_key from the credential + the meta salts.
         let root_key: Zeroizing<[u8; AEAD_KEY_LEN]> = match path {
