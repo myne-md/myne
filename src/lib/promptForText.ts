@@ -10,7 +10,7 @@
 // commands (MYND-308), kept generic so other text prompts can reuse it.
 
 import i18n from "../i18n";
-import { trapFocus } from "./imperative-focus-trap";
+import { openModal } from "./imperative-modal";
 
 /** Options for {@link promptForText}. */
 export interface PromptForTextOptions {
@@ -45,44 +45,35 @@ export function promptForText(
 
   return new Promise<string | null>((resolve) => {
     let settled = false;
-    let releaseTrap: (() => void) | null = null;
     const finish = (value: string | null) => {
       if (settled) return;
       settled = true;
-      releaseTrap?.();
-      document.removeEventListener("keydown", onKey, true);
-      backdrop.remove();
+      modal.close();
       resolve(value);
     };
     const commit = () => {
       const v = input.value.trim();
       finish(v === "" ? null : v);
     };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.preventDefault();
-        e.stopPropagation();
-        finish(null);
-      } else if (e.key === "Enter") {
+
+    const modal = openModal({
+      backdropStyle: {
+        position: "fixed",
+        inset: "0",
+        background: "rgba(0, 0, 0, 0.32)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: "1300",
+      },
+      onDismiss: () => finish(null),
+      onEnter: (e) => {
         e.preventDefault();
         e.stopPropagation();
         commit();
-      }
-    };
-
-    const backdrop = document.createElement("div");
-    Object.assign(backdrop.style, {
-      position: "fixed",
-      inset: "0",
-      background: "rgba(0, 0, 0, 0.32)",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      zIndex: "1300",
+      },
     });
-    backdrop.addEventListener("mousedown", (e) => {
-      if (e.target === backdrop) finish(null);
-    });
+    const backdrop = modal.backdrop;
 
     const dialog = document.createElement("div");
     dialog.setAttribute("role", "dialog");
@@ -171,11 +162,9 @@ export function promptForText(
     row.append(cancel, confirm);
     dialog.append(label, input, row);
     backdrop.append(dialog);
-    document.body.append(backdrop);
 
-    document.addEventListener("keydown", onKey, true);
     // Trap + restore focus (MYND-93); initial focus is the input, then select.
-    releaseTrap = trapFocus(dialog, { initialFocus: input });
+    modal.installTrap(dialog, input);
     input.select();
   });
 }
