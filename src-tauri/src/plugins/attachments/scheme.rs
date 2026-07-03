@@ -44,11 +44,10 @@
 //! only the served `&'static str` MIME label + a coarse status crosses a
 //! tracing boundary.
 
+use super::commands::hex_decode_id;
 use super::sniff::{sniff_content_type, ALLOWLISTED_CONTENT_TYPES};
 use crate::plugins::vault_unlock::state::VaultRuntimeState;
-use protocol::{
-    decode_attachment_blob, AttachmentsCatalog, ATTACHMENT_ID_LEN, VAULT_META_ACCOUNT_HASH_LEN,
-};
+use protocol::{decode_attachment_blob, AttachmentsCatalog, VAULT_META_ACCOUNT_HASH_LEN};
 use std::path::{Path, PathBuf};
 use tauri::{http, Manager, Runtime, UriSchemeContext, UriSchemeResponder};
 use zeroize::Zeroizing;
@@ -306,31 +305,11 @@ fn extract_id(uri: &http::Uri) -> Option<String> {
     None
 }
 
-// ---- hex + meta + catalog helpers (mirrors commands.rs) -----------------
-
-/// Decode a 64-char lowercase-hex id into its 32-byte value. Strict —
-/// rejects wrong length, non-hex, and uppercase.
-fn hex_decode_id(s: &str) -> Option<[u8; ATTACHMENT_ID_LEN]> {
-    if s.len() != ATTACHMENT_ID_LEN * 2 {
-        return None;
-    }
-    let bytes = s.as_bytes();
-    let mut out = [0u8; ATTACHMENT_ID_LEN];
-    for (i, out_byte) in out.iter_mut().enumerate() {
-        let hi = hex_val(bytes[i * 2])?;
-        let lo = hex_val(bytes[i * 2 + 1])?;
-        *out_byte = (hi << 4) | lo;
-    }
-    Some(out)
-}
-
-fn hex_val(b: u8) -> Option<u8> {
-    match b {
-        b'0'..=b'9' => Some(b - b'0'),
-        b'a'..=b'f' => Some(b - b'a' + 10),
-        _ => None,
-    }
-}
+// ---- meta + catalog helpers (serve-specific: collapse failure to empty) --
+// The strict `hex_decode_id` (the path-traversal guard) is reused verbatim from
+// `super::commands`; only the read helpers below stay local because the serve
+// path intentionally collapses IO/parse failure to empty (§9.10.4) rather than
+// surfacing the distinguishable errors the command path returns.
 
 /// Resolve the ACTIVE vault root. `active_id` is read from the runtime state by
 /// [`serve`] (`state.active_vault_id().await`) after it obtains the managed

@@ -129,6 +129,15 @@ export function ContextMenu({ x, y, items, onClose }: ContextMenuProps) {
     };
   }, [onClose]);
 
+  // A11y (review): a `role="menu"` must be keyboard-operable. Focus the first
+  // item on open so arrow-key navigation (handled on the container below) has a
+  // starting point; Enter/Space activate via the native <button> semantics.
+  useEffect(() => {
+    ref.current
+      ?.querySelector<HTMLButtonElement>('[role^="menuitem"]')
+      ?.focus();
+  }, []);
+
   const handleSelect = useCallback(
     (item: ContextMenuItem) => {
       item.onSelect();
@@ -144,6 +153,24 @@ export function ContextMenu({ x, y, items, onClose }: ContextMenuProps) {
       ref={ref}
       style={{ ...MENU_STYLE, left: position.left, top: position.top }}
       role="menu"
+      onKeyDown={(e) => {
+        const node = ref.current;
+        if (node === null) return;
+        const its = Array.from(
+          node.querySelectorAll<HTMLButtonElement>('[role^="menuitem"]'),
+        );
+        if (its.length === 0) return;
+        const cur = its.findIndex((el) => el === document.activeElement);
+        let next: number;
+        if (e.key === "ArrowDown") next = cur < 0 ? 0 : (cur + 1) % its.length;
+        else if (e.key === "ArrowUp")
+          next = cur < 0 ? its.length - 1 : (cur - 1 + its.length) % its.length;
+        else if (e.key === "Home") next = 0;
+        else if (e.key === "End") next = its.length - 1;
+        else return;
+        e.preventDefault();
+        its[next]?.focus();
+      }}
     >
       {items.map((item) => {
         const isHovering = hoverId === item.id;
