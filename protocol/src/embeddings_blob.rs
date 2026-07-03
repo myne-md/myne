@@ -55,15 +55,14 @@
 //! errors** per failure mode; the caller applies fall-to-rebuild at the
 //! boundary (parity with `search_blob.rs` / `vault_indices_blob.rs`).
 
-use crate::aead::{
-    aad_ai_embeddings_blob, aead_open_ctx, aead_seal_ctx, AEAD_KEY_LEN, AEAD_NONCE_LEN,
-    CTX_COMMITMENT_TAG_LEN,
+use crate::aead::{aad_ai_embeddings_blob, AEAD_KEY_LEN, AEAD_NONCE_LEN};
+use crate::blob_envelope::{
+    decode_blob_envelope, encode_blob_envelope, encode_blob_envelope_raw, EnvelopeError,
 };
 use crate::error::ProtocolError;
 use alloc::vec::Vec;
-use getrandom::getrandom;
 use thiserror::Error;
-use zeroize::{Zeroize, Zeroizing};
+use zeroize::Zeroizing;
 
 /// Magic bytes at offset 0 — ASCII `"MYR1"` (Myne Retrieval/embeddings v1;
 /// the natural `E`-for-embeddings letter was already taken by `MYE1`).
@@ -140,6 +139,24 @@ impl From<ProtocolError> for EmbeddingsBlobError {
     }
 }
 
+impl From<EnvelopeError> for EmbeddingsBlobError {
+    /// Map the shared-envelope error into this codec's public variant so the
+    /// distinguishable-reject surface (and its vectors) stay unchanged.
+    fn from(e: EnvelopeError) -> Self {
+        match e {
+            EnvelopeError::HeaderTooShort => EmbeddingsBlobError::HeaderTooShort,
+            EnvelopeError::MagicMismatch => EmbeddingsBlobError::MagicMismatch,
+            EnvelopeError::ProtocolVersionMismatch => EmbeddingsBlobError::ProtocolVersionMismatch,
+            EnvelopeError::FormatUnsupported => EmbeddingsBlobError::FormatUnsupported,
+            EnvelopeError::CiphertextLenOverflow => EmbeddingsBlobError::CiphertextLenOverflow,
+            EnvelopeError::CiphertextTruncated => EmbeddingsBlobError::CiphertextTruncated,
+            EnvelopeError::CannotDecrypt => EmbeddingsBlobError::CannotDecrypt,
+            EnvelopeError::PlaintextTooLarge => EmbeddingsBlobError::PlaintextTooLarge,
+            EnvelopeError::RandomnessUnavailable => EmbeddingsBlobError::RandomnessUnavailable,
+        }
+    }
+}
+
 /// Encode a `vault.embeddings` blob from an opaque `plaintext` (the desktop
 /// layer's serialized embedding store + manifest + model-identity tuple),
 /// sealing under `ai_embeddings_key` with `nonce`.
@@ -154,28 +171,17 @@ pub fn encode_embeddings_blob_raw(
     plaintext: &[u8],
     nonce: &[u8; AEAD_NONCE_LEN],
 ) -> Result<Vec<u8>, EmbeddingsBlobError> {
-    if plaintext.len() > MAX_EMBEDDINGS_PLAINTEXT_LEN {
-        return Err(EmbeddingsBlobError::PlaintextTooLarge);
-    }
-
     let aad = aad_ai_embeddings_blob(account_number_hash);
-    let sealed = aead_seal_ctx(ai_embeddings_key, nonce, plaintext, &aad)?;
-
-    let ciphertext_len = sealed.len();
-    debug_assert_eq!(
-        ciphertext_len,
-        plaintext.len() + CTX_COMMITMENT_TAG_LEN,
-        "aead_seal_ctx invariant: output is ciphertext || CTX tag",
-    );
-
-    let mut out = Vec::with_capacity(EMBEDDINGS_BLOB_HEADER_LEN + ciphertext_len);
-    out.extend_from_slice(&EMBEDDINGS_BLOB_MAGIC);
-    out.push(EMBEDDINGS_BLOB_PROTOCOL_VERSION);
-    out.push(EMBEDDINGS_BLOB_FORMAT_V1);
-    out.extend_from_slice(nonce);
-    out.extend_from_slice(&(ciphertext_len as u32).to_be_bytes());
-    out.extend_from_slice(&sealed);
-    Ok(out)
+    encode_blob_envelope_raw(
+        ai_embeddings_key,
+        &EMBEDDINGS_BLOB_MAGIC,
+        EMBEDDINGS_BLOB_FORMAT_V1,
+        &aad,
+        MAX_EMBEDDINGS_PLAINTEXT_LEN,
+        plaintext,
+        nonce,
+    )
+    .map_err(EmbeddingsBlobError::from)
 }
 
 /// Encode a `vault.embeddings` blob, pulling the 24-byte nonce from the OS
@@ -186,12 +192,16 @@ pub fn encode_embeddings_blob(
     account_number_hash: &[u8; EMBEDDINGS_BLOB_ACCOUNT_HASH_LEN],
     plaintext: &[u8],
 ) -> Result<Vec<u8>, EmbeddingsBlobError> {
-    let mut nonce = [0u8; AEAD_NONCE_LEN];
-    getrandom(&mut nonce).map_err(|_| EmbeddingsBlobError::RandomnessUnavailable)?;
-    let result =
-        encode_embeddings_blob_raw(ai_embeddings_key, account_number_hash, plaintext, &nonce);
-    nonce.zeroize();
-    result
+    let aad = aad_ai_embeddings_blob(account_number_hash);
+    encode_blob_envelope(
+        ai_embeddings_key,
+        &EMBEDDINGS_BLOB_MAGIC,
+        EMBEDDINGS_BLOB_FORMAT_V1,
+        &aad,
+        MAX_EMBEDDINGS_PLAINTEXT_LEN,
+        plaintext,
+    )
+    .map_err(EmbeddingsBlobError::from)
 }
 
 /// Decode a `vault.embeddings` blob into its opaque inner plaintext (the
@@ -204,42 +214,16 @@ pub fn decode_embeddings_blob(
     account_number_hash: &[u8; EMBEDDINGS_BLOB_ACCOUNT_HASH_LEN],
     blob: &[u8],
 ) -> Result<Zeroizing<Vec<u8>>, EmbeddingsBlobError> {
-    if blob.len() < EMBEDDINGS_BLOB_HEADER_LEN {
-        return Err(EmbeddingsBlobError::HeaderTooShort);
-    }
-    if blob[0..4] != EMBEDDINGS_BLOB_MAGIC {
-        return Err(EmbeddingsBlobError::MagicMismatch);
-    }
-    if blob[4] != EMBEDDINGS_BLOB_PROTOCOL_VERSION {
-        return Err(EmbeddingsBlobError::ProtocolVersionMismatch);
-    }
-    if blob[5] != EMBEDDINGS_BLOB_FORMAT_V1 {
-        return Err(EmbeddingsBlobError::FormatUnsupported);
-    }
-
-    let mut nonce = [0u8; AEAD_NONCE_LEN];
-    nonce.copy_from_slice(&blob[6..30]);
-
-    let ciphertext_len = u32::from_be_bytes([blob[30], blob[31], blob[32], blob[33]]) as usize;
-
-    // Reject oversize BEFORE indexing so a hostile ciphertext_len cannot
-    // panic on the slice.
-    if ciphertext_len > MAX_EMBEDDINGS_PLAINTEXT_LEN + CTX_COMMITMENT_TAG_LEN {
-        return Err(EmbeddingsBlobError::CiphertextLenOverflow);
-    }
-    let ciphertext_end = EMBEDDINGS_BLOB_HEADER_LEN + ciphertext_len;
-    if blob.len() < ciphertext_end {
-        return Err(EmbeddingsBlobError::CiphertextTruncated);
-    }
-
     let aad = aad_ai_embeddings_blob(account_number_hash);
-    let plaintext = aead_open_ctx(
+    decode_blob_envelope(
         ai_embeddings_key,
-        &nonce,
-        &blob[EMBEDDINGS_BLOB_HEADER_LEN..ciphertext_end],
+        &EMBEDDINGS_BLOB_MAGIC,
+        EMBEDDINGS_BLOB_FORMAT_V1,
         &aad,
-    )?;
-    Ok(plaintext)
+        MAX_EMBEDDINGS_PLAINTEXT_LEN,
+        blob,
+    )
+    .map_err(EmbeddingsBlobError::from)
 }
 
 #[cfg(test)]

@@ -129,13 +129,7 @@ impl SyncState {
     }
 }
 
-fn hex(bytes: &[u8]) -> String {
-    let mut s = String::with_capacity(bytes.len() * 2);
-    for b in bytes {
-        s.push_str(&format!("{b:02x}"));
-    }
-    s
-}
+use super::to_hex as hex;
 
 /// Read `<dir>/sync-state.json`. Absent → default (no cursor, empty log).
 pub fn read_sync_state(dir: &Path) -> Result<SyncState, SyncConfigError> {

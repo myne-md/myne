@@ -64,13 +64,7 @@ pub enum SyncCycleError {
     Head,
 }
 
-fn hex(bytes: &[u8]) -> String {
-    let mut s = String::with_capacity(bytes.len() * 2);
-    for b in bytes {
-        s.push_str(&format!("{b:02x}"));
-    }
-    s
-}
+use super::to_hex as hex;
 
 /// The `<vault>/notes/<uuid>.myn` path for a 16-byte blob id.
 fn blob_path(notes_dir: &Path, id: &[u8; 16]) -> std::path::PathBuf {
