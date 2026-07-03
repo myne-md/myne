@@ -110,53 +110,85 @@ function applyStateB(source: string, bodyEnd: number, iso: string): string {
   return source.substring(0, bodyEnd) + insert + source.substring(bodyEnd);
 }
 
-// State C strategy ξ: replace the existing `updated:` value byte-by-byte.
-// Block-scalar collapse to single line is justified because `updated:` is
+// State C strategy ξ: replace an existing managed field's value byte-by-byte.
+// Block-scalar collapse to single line is justified because these fields are
 // Myne-managed per §3.6.1 — it does not violate §6 C1 byte-stability for
 // other keys (those are preserved untouched).
-function applyStateC(
+//
+// Every `applyStateC*` family (updated / title / folder / trashed / archived /
+// deleted / template + the generic keyed `patchFrontmatterField`) shares this
+// exact body; they differ ONLY in the key matcher (`keyRe`) and the plain-scalar
+// formatter (`format`). The quoted branch escapes the RAW value per the existing
+// quote style (double → `\`+`"`, single → `''`) independent of `format`, matching
+// every prior per-field body. (`updated:`'s old body emitted the raw ISO in the
+// quoted branch; escaping an RFC 3339 string is a no-op, so this is byte-identical.)
+function applyStateCImpl(
   source: string,
   bodyStart: number,
   bodyEnd: number,
-  iso: string,
+  keyRe: RegExp,
+  format: (v: string) => string,
+  value: string,
 ): string | null {
   const fmBody = source.substring(bodyStart, bodyEnd);
   const lines = fmBody.split(NEWLINE);
 
   for (let i = 0; i < lines.length; i++) {
-    const m = UPDATED_KEY_RE.exec(lines[i] ?? "");
+    const m = keyRe.exec(lines[i] ?? "");
     if (m === null) continue;
     const prefix = m[1] ?? "";
     const valuePortion = m[2] ?? "";
     const trimmedValue = valuePortion.trim();
 
+    // Block-scalar (|, >) → collapse to canonical single-line form.
     if (/^[|>]/.test(trimmedValue)) {
-      lines[i] = prefix + iso;
+      lines[i] = prefix + format(value);
       let j = i + 1;
       while (j < lines.length && /^[ \t]+\S/.test(lines[j] ?? "")) j++;
       lines.splice(i + 1, j - (i + 1));
       return lines.join(NEWLINE);
     }
 
+    // Existing quoted scalar (single or double) → preserve quote style.
     const quotedM = /^(["'])(.*?)\1([ \t]*(?:#.*)?)$/.exec(valuePortion);
     if (quotedM !== null) {
       const quote = quotedM[1] ?? '"';
       const trailing = quotedM[3] ?? "";
-      lines[i] = prefix + quote + iso + quote + trailing;
+      const escaped =
+        quote === '"'
+          ? value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')
+          : value.replace(/'/g, "''");
+      lines[i] = prefix + quote + escaped + quote + trailing;
       return lines.join(NEWLINE);
     }
 
+    // Existing unquoted + trailing comment → preserve the comment.
     const commentM = /^([^#]*?)([ \t]+#.*)$/.exec(valuePortion);
     if (commentM !== null) {
-      lines[i] = prefix + iso + (commentM[2] ?? "");
+      lines[i] = prefix + format(value) + (commentM[2] ?? "");
       return lines.join(NEWLINE);
     }
 
-    lines[i] = prefix + iso;
+    // Existing plain unquoted scalar.
+    lines[i] = prefix + format(value);
     return lines.join(NEWLINE);
   }
 
   return null;
+}
+
+/** Plain-scalar formatter for `updated:` — RFC 3339 values are always
+ *  plain-scalar safe, so the value passes through verbatim. */
+const rawScalar = (v: string): string => v;
+
+// `updated:` — value is always an RFC 3339 timestamp (plain-scalar safe).
+function applyStateC(
+  source: string,
+  bodyStart: number,
+  bodyEnd: number,
+  iso: string,
+): string | null {
+  return applyStateCImpl(source, bodyStart, bodyEnd, UPDATED_KEY_RE, rawScalar, iso);
 }
 
 /**
@@ -269,57 +301,22 @@ function applyStateBTitle(
   return source.substring(0, bodyEnd) + insert + source.substring(bodyEnd);
 }
 
+// `title:` — user-authored; `formatYamlTitleScalar` also quotes a value YAML
+// would re-type away from a string (a date-/int-/bool-shaped title).
 function applyStateCTitle(
   source: string,
   bodyStart: number,
   bodyEnd: number,
   value: string,
 ): string | null {
-  const fmBody = source.substring(bodyStart, bodyEnd);
-  const lines = fmBody.split(NEWLINE);
-
-  for (let i = 0; i < lines.length; i++) {
-    const m = TITLE_KEY_RE.exec(lines[i] ?? "");
-    if (m === null) continue;
-    const prefix = m[1] ?? "";
-    const valuePortion = m[2] ?? "";
-    const trimmedValue = valuePortion.trim();
-
-    // Block-scalar (|, >) → collapse to canonical single-line form.
-    if (/^[|>]/.test(trimmedValue)) {
-      lines[i] = prefix + formatYamlTitleScalar(value);
-      let j = i + 1;
-      while (j < lines.length && /^[ \t]+\S/.test(lines[j] ?? "")) j++;
-      lines.splice(i + 1, j - (i + 1));
-      return lines.join(NEWLINE);
-    }
-
-    // Existing quoted scalar (single or double) → preserve quote style.
-    const quotedM = /^(["'])(.*?)\1([ \t]*(?:#.*)?)$/.exec(valuePortion);
-    if (quotedM !== null) {
-      const quote = quotedM[1] ?? '"';
-      const trailing = quotedM[3] ?? "";
-      const escaped =
-        quote === '"'
-          ? value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')
-          : value.replace(/'/g, "''");
-      lines[i] = prefix + quote + escaped + quote + trailing;
-      return lines.join(NEWLINE);
-    }
-
-    // Existing unquoted + trailing comment → preserve the comment.
-    const commentM = /^([^#]*?)([ \t]+#.*)$/.exec(valuePortion);
-    if (commentM !== null) {
-      lines[i] = prefix + formatYamlTitleScalar(value) + (commentM[2] ?? "");
-      return lines.join(NEWLINE);
-    }
-
-    // Existing plain unquoted scalar.
-    lines[i] = prefix + formatYamlTitleScalar(value);
-    return lines.join(NEWLINE);
-  }
-
-  return null;
+  return applyStateCImpl(
+    source,
+    bodyStart,
+    bodyEnd,
+    TITLE_KEY_RE,
+    formatYamlTitleScalar,
+    value,
+  );
 }
 
 export function patchTitleField(bytes: Uint8Array, value: string): Uint8Array {
@@ -490,51 +487,14 @@ function applyStateCFolder(
   bodyEnd: number,
   value: string,
 ): string | null {
-  const fmBody = source.substring(bodyStart, bodyEnd);
-  const lines = fmBody.split(NEWLINE);
-
-  for (let i = 0; i < lines.length; i++) {
-    const m = FOLDER_KEY_RE.exec(lines[i] ?? "");
-    if (m === null) continue;
-    const prefix = m[1] ?? "";
-    const valuePortion = m[2] ?? "";
-    const trimmedValue = valuePortion.trim();
-
-    // Block-scalar (|, >) → collapse to canonical single-line form.
-    if (/^[|>]/.test(trimmedValue)) {
-      lines[i] = prefix + formatYamlScalar(value);
-      let j = i + 1;
-      while (j < lines.length && /^[ \t]+\S/.test(lines[j] ?? "")) j++;
-      lines.splice(i + 1, j - (i + 1));
-      return lines.join(NEWLINE);
-    }
-
-    // Existing quoted scalar (single or double) → preserve quote style.
-    const quotedM = /^(["'])(.*?)\1([ \t]*(?:#.*)?)$/.exec(valuePortion);
-    if (quotedM !== null) {
-      const quote = quotedM[1] ?? '"';
-      const trailing = quotedM[3] ?? "";
-      const escaped =
-        quote === '"'
-          ? value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')
-          : value.replace(/'/g, "''");
-      lines[i] = prefix + quote + escaped + quote + trailing;
-      return lines.join(NEWLINE);
-    }
-
-    // Existing unquoted + trailing comment → preserve the comment.
-    const commentM = /^([^#]*?)([ \t]+#.*)$/.exec(valuePortion);
-    if (commentM !== null) {
-      lines[i] = prefix + formatYamlScalar(value) + (commentM[2] ?? "");
-      return lines.join(NEWLINE);
-    }
-
-    // Existing plain unquoted scalar.
-    lines[i] = prefix + formatYamlScalar(value);
-    return lines.join(NEWLINE);
-  }
-
-  return null;
+  return applyStateCImpl(
+    source,
+    bodyStart,
+    bodyEnd,
+    FOLDER_KEY_RE,
+    formatYamlScalar,
+    value,
+  );
 }
 
 // State D — delete the folder field. Removes only the `folder:` line; if that
@@ -623,9 +583,8 @@ export function buildInitialPlaintext(folder: string | null): string {
 // is a passthrough for Myne-written values; the quoting/comment branches in state C
 // only matter for a pre-existing user-authored `trashed:` line.
 //
-// (NOTE: this mirrors the updated/title/folder field-families nearly verbatim — a
-// `/simplify` candidate is to generalize the four into one keyed helper. Kept
-// per-field here to match the surrounding pattern and minimise regression risk.)
+// (Its State C body is the shared `applyStateCImpl` — every managed field-family
+// delegates to that one keyed helper; only the key matcher + formatter differ.)
 
 function applyStateATrashed(source: string, value: string): string {
   return (
@@ -652,47 +611,14 @@ function applyStateCTrashed(
   bodyEnd: number,
   value: string,
 ): string | null {
-  const fmBody = source.substring(bodyStart, bodyEnd);
-  const lines = fmBody.split(NEWLINE);
-
-  for (let i = 0; i < lines.length; i++) {
-    const m = TRASHED_KEY_RE.exec(lines[i] ?? "");
-    if (m === null) continue;
-    const prefix = m[1] ?? "";
-    const valuePortion = m[2] ?? "";
-    const trimmedValue = valuePortion.trim();
-
-    if (/^[|>]/.test(trimmedValue)) {
-      lines[i] = prefix + formatYamlScalar(value);
-      let j = i + 1;
-      while (j < lines.length && /^[ \t]+\S/.test(lines[j] ?? "")) j++;
-      lines.splice(i + 1, j - (i + 1));
-      return lines.join(NEWLINE);
-    }
-
-    const quotedM = /^(["'])(.*?)\1([ \t]*(?:#.*)?)$/.exec(valuePortion);
-    if (quotedM !== null) {
-      const quote = quotedM[1] ?? '"';
-      const trailing = quotedM[3] ?? "";
-      const escaped =
-        quote === '"'
-          ? value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')
-          : value.replace(/'/g, "''");
-      lines[i] = prefix + quote + escaped + quote + trailing;
-      return lines.join(NEWLINE);
-    }
-
-    const commentM = /^([^#]*?)([ \t]+#.*)$/.exec(valuePortion);
-    if (commentM !== null) {
-      lines[i] = prefix + formatYamlScalar(value) + (commentM[2] ?? "");
-      return lines.join(NEWLINE);
-    }
-
-    lines[i] = prefix + formatYamlScalar(value);
-    return lines.join(NEWLINE);
-  }
-
-  return null;
+  return applyStateCImpl(
+    source,
+    bodyStart,
+    bodyEnd,
+    TRASHED_KEY_RE,
+    formatYamlScalar,
+    value,
+  );
 }
 
 // State D — delete the trashed field (restore). Mirrors `deleteFolderField`:
@@ -931,47 +857,14 @@ function applyStateCArchived(
   bodyEnd: number,
   value: string,
 ): string | null {
-  const fmBody = source.substring(bodyStart, bodyEnd);
-  const lines = fmBody.split(NEWLINE);
-
-  for (let i = 0; i < lines.length; i++) {
-    const m = ARCHIVED_KEY_RE.exec(lines[i] ?? "");
-    if (m === null) continue;
-    const prefix = m[1] ?? "";
-    const valuePortion = m[2] ?? "";
-    const trimmedValue = valuePortion.trim();
-
-    if (/^[|>]/.test(trimmedValue)) {
-      lines[i] = prefix + formatYamlScalar(value);
-      let j = i + 1;
-      while (j < lines.length && /^[ \t]+\S/.test(lines[j] ?? "")) j++;
-      lines.splice(i + 1, j - (i + 1));
-      return lines.join(NEWLINE);
-    }
-
-    const quotedM = /^(["'])(.*?)\1([ \t]*(?:#.*)?)$/.exec(valuePortion);
-    if (quotedM !== null) {
-      const quote = quotedM[1] ?? '"';
-      const trailing = quotedM[3] ?? "";
-      const escaped =
-        quote === '"'
-          ? value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')
-          : value.replace(/'/g, "''");
-      lines[i] = prefix + quote + escaped + quote + trailing;
-      return lines.join(NEWLINE);
-    }
-
-    const commentM = /^([^#]*?)([ \t]+#.*)$/.exec(valuePortion);
-    if (commentM !== null) {
-      lines[i] = prefix + formatYamlScalar(value) + (commentM[2] ?? "");
-      return lines.join(NEWLINE);
-    }
-
-    lines[i] = prefix + formatYamlScalar(value);
-    return lines.join(NEWLINE);
-  }
-
-  return null;
+  return applyStateCImpl(
+    source,
+    bodyStart,
+    bodyEnd,
+    ARCHIVED_KEY_RE,
+    formatYamlScalar,
+    value,
+  );
 }
 
 // State D — delete the archived field (unarchive). Mirrors `deleteTrashedField`:
@@ -1072,47 +965,14 @@ function applyStateCDeleted(
   bodyEnd: number,
   value: string,
 ): string | null {
-  const fmBody = source.substring(bodyStart, bodyEnd);
-  const lines = fmBody.split(NEWLINE);
-
-  for (let i = 0; i < lines.length; i++) {
-    const m = DELETED_KEY_RE.exec(lines[i] ?? "");
-    if (m === null) continue;
-    const prefix = m[1] ?? "";
-    const valuePortion = m[2] ?? "";
-    const trimmedValue = valuePortion.trim();
-
-    if (/^[|>]/.test(trimmedValue)) {
-      lines[i] = prefix + formatYamlScalar(value);
-      let j = i + 1;
-      while (j < lines.length && /^[ \t]+\S/.test(lines[j] ?? "")) j++;
-      lines.splice(i + 1, j - (i + 1));
-      return lines.join(NEWLINE);
-    }
-
-    const quotedM = /^(["'])(.*?)\1([ \t]*(?:#.*)?)$/.exec(valuePortion);
-    if (quotedM !== null) {
-      const quote = quotedM[1] ?? '"';
-      const trailing = quotedM[3] ?? "";
-      const escaped =
-        quote === '"'
-          ? value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')
-          : value.replace(/'/g, "''");
-      lines[i] = prefix + quote + escaped + quote + trailing;
-      return lines.join(NEWLINE);
-    }
-
-    const commentM = /^([^#]*?)([ \t]+#.*)$/.exec(valuePortion);
-    if (commentM !== null) {
-      lines[i] = prefix + formatYamlScalar(value) + (commentM[2] ?? "");
-      return lines.join(NEWLINE);
-    }
-
-    lines[i] = prefix + formatYamlScalar(value);
-    return lines.join(NEWLINE);
-  }
-
-  return null;
+  return applyStateCImpl(
+    source,
+    bodyStart,
+    bodyEnd,
+    DELETED_KEY_RE,
+    formatYamlScalar,
+    value,
+  );
 }
 
 function deleteDeletedField(source: string): string {
@@ -1208,47 +1068,14 @@ function applyStateCTemplate(
   bodyEnd: number,
   value: string,
 ): string | null {
-  const fmBody = source.substring(bodyStart, bodyEnd);
-  const lines = fmBody.split(NEWLINE);
-
-  for (let i = 0; i < lines.length; i++) {
-    const m = TEMPLATE_KEY_RE.exec(lines[i] ?? "");
-    if (m === null) continue;
-    const prefix = m[1] ?? "";
-    const valuePortion = m[2] ?? "";
-    const trimmedValue = valuePortion.trim();
-
-    if (/^[|>]/.test(trimmedValue)) {
-      lines[i] = prefix + formatYamlScalar(value);
-      let j = i + 1;
-      while (j < lines.length && /^[ \t]+\S/.test(lines[j] ?? "")) j++;
-      lines.splice(i + 1, j - (i + 1));
-      return lines.join(NEWLINE);
-    }
-
-    const quotedM = /^(["'])(.*?)\1([ \t]*(?:#.*)?)$/.exec(valuePortion);
-    if (quotedM !== null) {
-      const quote = quotedM[1] ?? '"';
-      const trailing = quotedM[3] ?? "";
-      const escaped =
-        quote === '"'
-          ? value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')
-          : value.replace(/'/g, "''");
-      lines[i] = prefix + quote + escaped + quote + trailing;
-      return lines.join(NEWLINE);
-    }
-
-    const commentM = /^([^#]*?)([ \t]+#.*)$/.exec(valuePortion);
-    if (commentM !== null) {
-      lines[i] = prefix + formatYamlScalar(value) + (commentM[2] ?? "");
-      return lines.join(NEWLINE);
-    }
-
-    lines[i] = prefix + formatYamlScalar(value);
-    return lines.join(NEWLINE);
-  }
-
-  return null;
+  return applyStateCImpl(
+    source,
+    bodyStart,
+    bodyEnd,
+    TEMPLATE_KEY_RE,
+    formatYamlScalar,
+    value,
+  );
 }
 
 // State D — delete the template field (convert-back-to-note). Mirrors
@@ -1472,52 +1299,14 @@ function applyStateCField(
   key: string,
   value: string,
 ): string | null {
-  const keyRe = fmKeyRe(key);
-  const fmBody = source.substring(bodyStart, bodyEnd);
-  const lines = fmBody.split(NEWLINE);
-
-  for (let i = 0; i < lines.length; i++) {
-    const m = keyRe.exec(lines[i] ?? "");
-    if (m === null) continue;
-    const prefix = m[1] ?? "";
-    const valuePortion = m[2] ?? "";
-    const trimmedValue = valuePortion.trim();
-
-    // Block-scalar (|, >) → collapse to canonical single-line form.
-    if (/^[|>]/.test(trimmedValue)) {
-      lines[i] = prefix + formatYamlScalar(value);
-      let j = i + 1;
-      while (j < lines.length && /^[ \t]+\S/.test(lines[j] ?? "")) j++;
-      lines.splice(i + 1, j - (i + 1));
-      return lines.join(NEWLINE);
-    }
-
-    // Existing quoted scalar (single or double) → preserve quote style.
-    const quotedM = /^(["'])(.*?)\1([ \t]*(?:#.*)?)$/.exec(valuePortion);
-    if (quotedM !== null) {
-      const quote = quotedM[1] ?? '"';
-      const trailing = quotedM[3] ?? "";
-      const escaped =
-        quote === '"'
-          ? value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')
-          : value.replace(/'/g, "''");
-      lines[i] = prefix + quote + escaped + quote + trailing;
-      return lines.join(NEWLINE);
-    }
-
-    // Existing unquoted + trailing comment → preserve the comment.
-    const commentM = /^([^#]*?)([ \t]+#.*)$/.exec(valuePortion);
-    if (commentM !== null) {
-      lines[i] = prefix + formatYamlScalar(value) + (commentM[2] ?? "");
-      return lines.join(NEWLINE);
-    }
-
-    // Existing plain unquoted scalar.
-    lines[i] = prefix + formatYamlScalar(value);
-    return lines.join(NEWLINE);
-  }
-
-  return null;
+  return applyStateCImpl(
+    source,
+    bodyStart,
+    bodyEnd,
+    fmKeyRe(key),
+    formatYamlScalar,
+    value,
+  );
 }
 
 function deleteField(source: string, key: string): string {

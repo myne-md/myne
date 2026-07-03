@@ -16,7 +16,7 @@
 // replaces the first (and tears down any open PDF reader first).
 
 import i18n from "../../i18n";
-import { trapFocus } from "../../lib/imperative-focus-trap";
+import { openModal } from "../../lib/imperative-modal";
 import { ensureAttachmentInsertStyles, hasDom } from "./styles";
 import { mountPdfScroller } from "./pdf-reader";
 import { exportAttachment } from "./fileCardActions";
@@ -65,30 +65,23 @@ export interface LightboxOptions {
   readonly id?: string;
 }
 
-let activeBackdrop: HTMLDivElement | null = null;
-let activeOnKey: ((e: KeyboardEvent) => void) | null = null;
-let activeReleaseTrap: (() => void) | null = null;
+// The shared-skeleton teardown (release trap + remove keydown + remove backdrop)
+// for the currently-open lightbox. Null when nothing is open.
+let activeClose: (() => void) | null = null;
 // Cleanup for an open PDF reader (task.destroy + observer disconnect). Null for
 // image mode / when nothing is open.
 let activePdfCleanup: (() => void) | null = null;
 
 /** Tear down any open lightbox (Esc / backdrop click / replace / test cleanup). */
 export function dismissAttachmentLightbox(): void {
-  activeReleaseTrap?.();
-  activeReleaseTrap = null;
-  if (activeOnKey !== null && typeof document !== "undefined") {
-    document.removeEventListener("keydown", activeOnKey, true);
-    activeOnKey = null;
-  }
   if (activePdfCleanup !== null) {
-    // Destroy the pdf.js task + disconnect the observer before the surface goes.
+    // Destroy the pdf.js task + disconnect the observer BEFORE the surface goes
+    // (activeClose removes the backdrop).
     activePdfCleanup();
     activePdfCleanup = null;
   }
-  if (activeBackdrop !== null) {
-    activeBackdrop.remove();
-    activeBackdrop = null;
-  }
+  activeClose?.();
+  activeClose = null;
 }
 
 /**
@@ -102,11 +95,17 @@ export function showAttachmentLightbox(opts: LightboxOptions): void {
   dismissAttachmentLightbox();
 
   const kind = opts.kind ?? "image";
-  const backdrop = document.createElement("div");
-  backdrop.className =
-    kind === "pdf"
-      ? "cm-attach-lightbox-backdrop cm-attach-lightbox-backdrop-pdf"
-      : "cm-attach-lightbox-backdrop";
+  // Shared modal skeleton: fixed backdrop + Esc / backdrop-click dismissal + focus
+  // trap + idempotent teardown. The lightbox traps on the backdrop itself (no
+  // inner dialog card) and has no Enter-commit, so `onEnter` is omitted.
+  const host = openModal({
+    backdropClass:
+      kind === "pdf"
+        ? "cm-attach-lightbox-backdrop cm-attach-lightbox-backdrop-pdf"
+        : "cm-attach-lightbox-backdrop",
+    onDismiss: () => dismissAttachmentLightbox(),
+  });
+  const backdrop = host.backdrop;
   backdrop.setAttribute("role", "dialog");
   backdrop.setAttribute("aria-modal", "true");
   backdrop.setAttribute(
@@ -171,8 +170,9 @@ export function showAttachmentLightbox(opts: LightboxOptions): void {
   });
   backdrop.appendChild(closeBtn);
 
-  document.body.appendChild(backdrop);
-  activeBackdrop = backdrop;
+  // `openModal` already appended the backdrop; record its teardown so
+  // `dismissAttachmentLightbox` (external callers, replace-on-open) can close it.
+  activeClose = host.close;
 
   // Surface is now in the live DOM — mount the scrollable reader so its
   // IntersectionObserver has a connected, laid-out root.
@@ -192,20 +192,7 @@ export function showAttachmentLightbox(opts: LightboxOptions): void {
     });
   }
 
-  const onKey = (e: KeyboardEvent): void => {
-    if (e.key === "Escape") {
-      e.preventDefault();
-      dismissAttachmentLightbox();
-    }
-  };
-  activeOnKey = onKey;
-  document.addEventListener("keydown", onKey, true);
-
-  // Trap + restore focus (MYND-93).
-  activeReleaseTrap = trapFocus(backdrop, { initialFocus: closeBtn });
-
-  backdrop.addEventListener("mousedown", (e) => {
-    // Click on the dimmed backdrop (not the image itself) closes the preview.
-    if (e.target === backdrop) dismissAttachmentLightbox();
-  });
+  // Trap + restore focus (MYND-93). Esc + backdrop-click dismissal are already
+  // wired by `openModal` (→ `onDismiss` → `dismissAttachmentLightbox`).
+  host.installTrap(backdrop, closeBtn);
 }

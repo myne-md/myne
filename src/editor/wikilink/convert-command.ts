@@ -20,7 +20,7 @@ import {
 } from "./convert";
 import type { ByteRange } from "../../dialect/types";
 import i18n from "../../i18n";
-import { trapFocus } from "../../lib/imperative-focus-trap";
+import { openModal } from "../../lib/imperative-modal";
 
 interface Rewrite {
   readonly byteRange: ByteRange;
@@ -50,8 +50,21 @@ export function showWikilinkConvertPreview(
       .filter((i) => i >= 0);
     const rewriteableCount = rows.filter((r) => r.kind !== "skipped").length;
 
-    const backdrop = document.createElement("div");
-    backdrop.className = "cm-attach-diff-backdrop";
+    const cleanup = (confirmed: boolean): void => {
+      host.close();
+      resolve({ confirmed, rewrites: confirmed ? buildRewrites() : [] });
+    };
+    const host = openModal({
+      backdropClass: "cm-attach-diff-backdrop",
+      onDismiss: () => cleanup(false), // Esc / backdrop click = cancel
+      onEnter: (e) => {
+        if (!commitBtn.disabled) {
+          e.preventDefault();
+          cleanup(true);
+        }
+      },
+    });
+    const backdrop = host.backdrop;
     const modal = document.createElement("div");
     modal.className = "cm-attach-diff";
     modal.setAttribute("role", "dialog");
@@ -144,7 +157,6 @@ export function showWikilinkConvertPreview(
     actions.append(cancelBtn, commitBtn);
     modal.appendChild(actions);
     backdrop.appendChild(modal);
-    document.body.appendChild(backdrop);
     updateCommit();
 
     const buildRewrites = (): Rewrite[] => {
@@ -163,34 +175,12 @@ export function showWikilinkConvertPreview(
       return out;
     };
 
-    let releaseTrap: (() => void) | null = null;
-    const cleanup = (confirmed: boolean): void => {
-      releaseTrap?.();
-      document.removeEventListener("keydown", onKey, true);
-      backdrop.remove();
-      resolve({ confirmed, rewrites: confirmed ? buildRewrites() : [] });
-    };
-    const onKey = (e: KeyboardEvent): void => {
-      if (e.key === "Escape") {
-        e.preventDefault();
-        cleanup(false);
-      } else if (e.key === "Enter" && !commitBtn.disabled) {
-        e.preventDefault();
-        cleanup(true);
-      }
-    };
-    document.addEventListener("keydown", onKey, true);
-    backdrop.addEventListener("mousedown", (e) => {
-      if (e.target === backdrop) cleanup(false);
-    });
     cancelBtn.addEventListener("click", () => cleanup(false));
     commitBtn.addEventListener("click", () => {
       if (!commitBtn.disabled) cleanup(true);
     });
     // Trap + restore focus (MYND-93).
-    releaseTrap = trapFocus(modal, {
-      initialFocus: rewriteableCount === 0 ? cancelBtn : commitBtn,
-    });
+    host.installTrap(modal, rewriteableCount === 0 ? cancelBtn : commitBtn);
   });
 }
 
