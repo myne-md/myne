@@ -219,8 +219,15 @@ impl AiVectorStore {
                 zeroize_vec(&mut v);
             }
         }
-        self.nonces.remove(note_id);
-        self.folders.remove(note_id);
+        // Overwrite the plaintext-derived nonce bytes + folder string before the
+        // map drop frees them, matching `zeroize()` — a plain `.remove()` left
+        // these AS3 correlation tags resident in the freed capacity.
+        if let Some(mut n) = self.nonces.remove(note_id) {
+            n.iter_mut().for_each(|b| *b = 0);
+        }
+        if let Some(mut f) = self.folders.remove(note_id) {
+            f.zeroize();
+        }
     }
 
     /// **Zeroize the entire store** (every slot-drop site). Overwrites every

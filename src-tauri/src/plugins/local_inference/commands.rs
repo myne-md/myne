@@ -305,7 +305,7 @@ pub(crate) async fn infer_with_engine(
     // early return (join failure, engine error) wipes the bytes.
     let prompt = Zeroizing::new(prompt);
     let joined = tokio::task::spawn_blocking(move || engine.infer(&prompt)).await;
-    unwrap_join(joined, EngineError::InferenceFailed)
+    unwrap_join(joined, EngineError::InferenceFailed, "infer")
 }
 
 /// Testable core of [`embed`].
@@ -315,7 +315,7 @@ pub(crate) async fn embed_with_engine(
 ) -> Result<Vec<f32>, EngineError> {
     let text = Zeroizing::new(text);
     let joined = tokio::task::spawn_blocking(move || engine.embed(&text)).await;
-    unwrap_join(joined, EngineError::EmbeddingFailed)
+    unwrap_join(joined, EngineError::EmbeddingFailed, "embed")
 }
 
 /// Collapse a `spawn_blocking` join into the engine result, logging (DENY-safe)
@@ -324,16 +324,18 @@ pub(crate) async fn embed_with_engine(
 fn unwrap_join<T>(
     joined: Result<Result<T, EngineError>, tokio::task::JoinError>,
     on_join_err: EngineError,
+    stage: &'static str,
 ) -> Result<T, EngineError> {
     match joined {
         Ok(Ok(value)) => Ok(value),
         Ok(Err(e)) => {
-            tracing::warn!(stage = "infer", error_kind = local_inference_error_kind(&e));
+            tracing::warn!(stage, error_kind = local_inference_error_kind(&e));
             Err(e)
         }
         Err(_join) => {
             tracing::warn!(
-                stage = "infer_join",
+                stage,
+                event = "join_failed",
                 error_kind = local_inference_error_kind(&on_join_err)
             );
             Err(on_join_err)
