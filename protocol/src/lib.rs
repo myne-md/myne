@@ -79,6 +79,11 @@ pub mod vault_indices_blob;
 pub mod vault_meta;
 pub mod workspace_blob;
 
+/// Test-only shared formatting helpers (`hex_lower` / `json_escape`) for the
+/// `#[ignore]`-gated vector generators. Compiled only under `#[cfg(test)]`.
+#[cfg(test)]
+pub(crate) mod test_vector_fmt;
+
 pub use account_number::{
     damm32_table, generate_account_number, parse_account_number, AccountNumber,
     ACCOUNT_NUMBER_HASH_LEN,

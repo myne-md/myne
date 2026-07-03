@@ -43,20 +43,22 @@ fn vault_dir<R: Runtime>(
     crate::paths::active_vault_root_io(app, active_id)
 }
 
-/// Read `vault.meta` and return its `account_number_hash` (offset 6).
-fn read_account_number_hash(
+/// Read `vault.meta` and return its `account_number_hash` (offset 6). The read +
+/// parse are identical on the read and write paths; only which error surface a
+/// PARSE failure lands on differs, so the caller passes the parse-error
+/// constructor (`InvalidVaultMeta` on `WorkspaceReadError` / `WorkspaceWriteError`).
+/// An IO failure flows through `E: From<io::Error>` (the `Io { io_error_kind }`
+/// variant on both), so the asymmetric error surface is preserved without a
+/// duplicated body.
+fn read_account_number_hash<E>(
     meta_path: &Path,
-) -> Result<[u8; VAULT_META_ACCOUNT_HASH_LEN], WorkspaceReadError> {
+    on_parse_err: impl FnOnce() -> E,
+) -> Result<[u8; VAULT_META_ACCOUNT_HASH_LEN], E>
+where
+    E: From<std::io::Error>,
+{
     let bytes = std::fs::read(meta_path)?;
-    let meta = parse_vault_meta(&bytes).map_err(|_| WorkspaceReadError::InvalidVaultMeta)?;
-    Ok(meta.account_number_hash)
-}
-
-fn read_account_number_hash_for_write(
-    meta_path: &Path,
-) -> Result<[u8; VAULT_META_ACCOUNT_HASH_LEN], WorkspaceWriteError> {
-    let bytes = std::fs::read(meta_path)?;
-    let meta = parse_vault_meta(&bytes).map_err(|_| WorkspaceWriteError::InvalidVaultMeta)?;
+    let meta = parse_vault_meta(&bytes).map_err(|_| on_parse_err())?;
     Ok(meta.account_number_hash)
 }
 
@@ -141,7 +143,9 @@ pub(crate) async fn workspace_read_with_dir(
         .await
         .ok_or(WorkspaceReadError::SlotNotUnlocked)?;
 
-    let account_number_hash = read_account_number_hash(&vault_dir.join("vault.meta"))?;
+    let account_number_hash = read_account_number_hash(&vault_dir.join("vault.meta"), || {
+        WorkspaceReadError::InvalidVaultMeta
+    })?;
     let session_state_key = derive_subkey(&root_key, SubkeyRole::SessionStateKey);
 
     Ok(read_or_none(
@@ -179,7 +183,9 @@ pub(crate) async fn workspace_write_with_dir(
         .await
         .ok_or(WorkspaceWriteError::SlotNotUnlocked)?;
 
-    let account_number_hash = read_account_number_hash_for_write(&vault_dir.join("vault.meta"))?;
+    let account_number_hash = read_account_number_hash(&vault_dir.join("vault.meta"), || {
+        WorkspaceWriteError::InvalidVaultMeta
+    })?;
     let session_state_key = derive_subkey(&root_key, SubkeyRole::SessionStateKey);
 
     let blob_bytes = encode_workspace_blob(

@@ -737,6 +737,7 @@ pub fn read_or_empty(
 mod tests {
     use super::*;
     use crate::subkey::{derive_subkey, SubkeyRole};
+    use crate::test_vector_fmt::{hex_lower, json_escape};
     use alloc::string::ToString;
 
     fn fixed_root_key() -> [u8; 32] {
@@ -1399,14 +1400,6 @@ mod tests {
     fn emit_attachments_catalog_vectors_for_paste() {
         extern crate std;
 
-        fn hex_lower(bytes: &[u8]) -> String {
-            let mut s = String::with_capacity(bytes.len() * 2);
-            for b in bytes {
-                s.push_str(&alloc::format!("{:02x}", b));
-            }
-            s
-        }
-
         let root_key: [u8; 32] = [0x42; 32];
         let catalog_key = derive_subkey(&root_key, SubkeyRole::AttachmentsCatalogKey);
         let account_hash: [u8; CATALOG_BLOB_ACCOUNT_HASH_LEN] =
@@ -1681,32 +1674,6 @@ mod tests {
     #[ignore]
     fn emit_catalog_parse_fail_vectors() {
         extern crate std;
-
-        fn hex_lower(bytes: &[u8]) -> String {
-            let mut s = String::with_capacity(bytes.len() * 2);
-            for b in bytes {
-                s.push_str(&alloc::format!("{:02x}", b));
-            }
-            s
-        }
-
-        fn json_escape(input: &str) -> String {
-            let mut out = String::with_capacity(input.len() + 2);
-            for c in input.chars() {
-                match c {
-                    '"' => out.push_str("\\\""),
-                    '\\' => out.push_str("\\\\"),
-                    '\n' => out.push_str("\\n"),
-                    '\r' => out.push_str("\\r"),
-                    '\t' => out.push_str("\\t"),
-                    c if (c as u32) < 0x20 => {
-                        out.push_str(&alloc::format!("\\u{:04x}", c as u32));
-                    }
-                    c => out.push(c),
-                }
-            }
-            out
-        }
 
         // Same fixed inputs as emit_attachments_catalog_vectors_for_paste;
         // nonces 0x99 + 0xAA are the next free entries in this family's

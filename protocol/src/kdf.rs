@@ -236,6 +236,7 @@ fn argon2id_derive(
 mod tests {
     use super::*;
     use crate::phrase::recovery_phrase_from_fixed_entropy_for_test;
+    use crate::test_vector_fmt::{hex_lower, json_escape};
 
     /// Fast Argon2id parameters for unit tests. Default v0.1 baseline
     /// (256 MiB / t=3) takes 1–2 seconds per call; running every test
@@ -629,32 +630,6 @@ mod tests {
         use crate::types::DEFAULT_V0_1_KDF_PARAMS;
         use unicode_normalization::UnicodeNormalization;
 
-        fn hex_lower(bytes: &[u8]) -> alloc::string::String {
-            let mut s = alloc::string::String::with_capacity(bytes.len() * 2);
-            for b in bytes {
-                s.push_str(&alloc::format!("{:02x}", b));
-            }
-            s
-        }
-
-        fn json_escape(input: &str) -> alloc::string::String {
-            let mut out = alloc::string::String::with_capacity(input.len() + 2);
-            for c in input.chars() {
-                match c {
-                    '"' => out.push_str("\\\""),
-                    '\\' => out.push_str("\\\\"),
-                    '\n' => out.push_str("\\n"),
-                    '\r' => out.push_str("\\r"),
-                    '\t' => out.push_str("\\t"),
-                    c if (c as u32) < 0x20 => {
-                        out.push_str(&alloc::format!("\\u{:04x}", c as u32));
-                    }
-                    c => out.push(c),
-                }
-            }
-            out
-        }
-
         // Canonical Phase 1 params. DEFAULT_V0_1_KDF_PARAMS exposed via
         // crate::types — same constant the production code uses.
         let canonical_params = DEFAULT_V0_1_KDF_PARAMS;
@@ -895,30 +870,6 @@ mod tests {
         use crate::types::DEFAULT_V0_1_KDF_PARAMS;
         use alloc::string::String;
         use alloc::vec::Vec;
-
-        fn hex_lower(bytes: &[u8]) -> String {
-            let mut s = String::with_capacity(bytes.len() * 2);
-            for b in bytes {
-                s.push_str(&alloc::format!("{:02x}", b));
-            }
-            s
-        }
-
-        fn json_escape(input: &str) -> String {
-            let mut out = String::with_capacity(input.len() + 2);
-            for c in input.chars() {
-                match c {
-                    '"' => out.push_str("\\\""),
-                    '\\' => out.push_str("\\\\"),
-                    '\n' => out.push_str("\\n"),
-                    '\r' => out.push_str("\\r"),
-                    '\t' => out.push_str("\\t"),
-                    c if (c as u32) < 0x20 => out.push_str(&alloc::format!("\\u{:04x}", c as u32)),
-                    c => out.push(c),
-                }
-            }
-            out
-        }
 
         let params = DEFAULT_V0_1_KDF_PARAMS;
         // Distinct from the argon2id category's fixtures so a key collision

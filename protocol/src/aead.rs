@@ -715,6 +715,7 @@ fn ctx_canonical_hash(
 #[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
     use super::*;
+    use crate::test_vector_fmt::{hex_lower, json_escape};
     use crate::types::DEFAULT_V0_1_KDF_PARAMS;
 
     /// Hand-derived golden bytes for `aad_password_wrap(default)`.
@@ -1364,32 +1365,6 @@ mod tests {
     fn emit_ctx_aead_vectors_for_paste() {
         extern crate std;
 
-        fn hex_lower(bytes: &[u8]) -> alloc::string::String {
-            let mut s = alloc::string::String::with_capacity(bytes.len() * 2);
-            for b in bytes {
-                s.push_str(&alloc::format!("{:02x}", b));
-            }
-            s
-        }
-
-        fn json_escape(input: &str) -> alloc::string::String {
-            let mut out = alloc::string::String::with_capacity(input.len() + 2);
-            for c in input.chars() {
-                match c {
-                    '"' => out.push_str("\\\""),
-                    '\\' => out.push_str("\\\\"),
-                    '\n' => out.push_str("\\n"),
-                    '\r' => out.push_str("\\r"),
-                    '\t' => out.push_str("\\t"),
-                    c if (c as u32) < 0x20 => {
-                        out.push_str(&alloc::format!("\\u{:04x}", c as u32));
-                    }
-                    c => out.push(c),
-                }
-            }
-            out
-        }
-
         // FAST_TEST KDF params — match the cross-category fixtures so
         // a reviewer cross-checks aad_password_wrap output against
         // the embedded KDF block in vault-meta vectors.
@@ -1835,30 +1810,6 @@ mod tests {
     fn emit_aad_construction_vectors_for_paste() {
         extern crate std;
         use alloc::string::String;
-
-        fn hex_lower(bytes: &[u8]) -> String {
-            let mut s = String::with_capacity(bytes.len() * 2);
-            for b in bytes {
-                s.push_str(&alloc::format!("{:02x}", b));
-            }
-            s
-        }
-
-        fn json_escape(input: &str) -> String {
-            let mut out = String::with_capacity(input.len() + 2);
-            for c in input.chars() {
-                match c {
-                    '"' => out.push_str("\\\""),
-                    '\\' => out.push_str("\\\\"),
-                    '\n' => out.push_str("\\n"),
-                    '\r' => out.push_str("\\r"),
-                    '\t' => out.push_str("\\t"),
-                    c if (c as u32) < 0x20 => out.push_str(&alloc::format!("\\u{:04x}", c as u32)),
-                    c => out.push(c),
-                }
-            }
-            out
-        }
 
         let params = DEFAULT_V0_1_KDF_PARAMS;
         // Distinct byte patterns per field — easy visual cross-check.
