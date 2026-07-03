@@ -8,7 +8,7 @@ import {
   clear as clipboardClear,
 } from "@tauri-apps/plugin-clipboard-manager";
 import { save as dialogSave } from "@tauri-apps/plugin-dialog";
-import { writeTextFile } from "@tauri-apps/plugin-fs";
+import { invoke } from "@tauri-apps/api/core";
 import { logErrorKind } from "./vault-creation-logging";
 
 const CLIPBOARD_AUTO_CLEAR_MS = 30_000;
@@ -61,7 +61,10 @@ export async function saveSecretAsTextFile(
   }
   if (!path) return;
   try {
-    await writeTextFile(path, contents);
+    // Narrow seam: the Rust core does the only IO. The WebView holds NO
+    // fs-write scope (removed from capabilities/default.json); the command
+    // re-validates the destination and rejects the app-data / vault tree.
+    await invoke("plugin:secret-export|save_secret_text", { path, contents });
   } catch (e) {
     logErrorKind(e, "fs-write-failed");
   }

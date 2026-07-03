@@ -41,9 +41,6 @@
     "dialog:allow-save",
     "dialog:allow-open",
     "dialog:allow-confirm",
-    {
-      "identifier": "fs:allow-write-text-file",
-      "allow": [{ "path": "$HOME/**" }]
-    }
+    "secret-export:default"
   ]
 }

@@ -272,6 +272,20 @@ fn main() {
                 .commands(&["vault_export_markdown", "vault_export_cancel"]),
         )
         .plugin(
+            "secret-export",
+            // Recovery-kit / account-number `.txt` save (vault-creation
+            // PhraseStep/AccountStep). `save_secret_text` is the ONLY path that
+            // writes a user-chosen secret file — the Rust core does the IO; the
+            // WebView only picks the destination via the dialog plugin and the
+            // command re-validates it (rejecting the app-data/vault tree). No
+            // `fs:` write scope is granted (narrow-seam, TB6). Lock-step with
+            // `permissions/secret-export/default.toml`; adding a command here
+            // without a matching `commands.allow` entry is a security regression
+            // (the InlinedPlugin mirror is load-bearing per the `vault-creation`
+            // note above).
+            tauri_build::InlinedPlugin::new().commands(&["save_secret_text"]),
+        )
+        .plugin(
             "importer",
             // MYND-53 (importer engine read-seam, SYNC-1). `import_read_dir`
             // + `import_read_file` are the ONLY external-dir read path — no
