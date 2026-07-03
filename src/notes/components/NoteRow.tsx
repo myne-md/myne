@@ -385,7 +385,9 @@ export function NoteRow(props: NoteRowProps) {
       data-note-id={record.noteUuid}
       data-multiselected={multiSelected ? "true" : undefined}
       role="button"
-      aria-selected={highlighted}
+      // `aria-selected` is not a permitted attribute on role="button"; use
+      // `aria-current` to convey the highlighted/active row in the list instead.
+      aria-current={highlighted ? "true" : undefined}
       tabIndex={-1}
     >
       <div style={rowContentStyle}>

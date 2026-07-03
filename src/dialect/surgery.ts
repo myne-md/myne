@@ -403,8 +403,17 @@ export function readTitleFromFmBody(fmBody: string): string | null {
 //    `# <value>\n\n` so the H1 is followed by a blank line.
 
 function findFirstH1LineIndex(lines: string[]): number {
+  let inFence = false;
   for (let i = 0; i < lines.length; i++) {
-    if ((lines[i] ?? "").startsWith("# ")) return i;
+    const line = lines[i] ?? "";
+    // Track fenced code blocks so a column-0 `# ` INSIDE a fence is not mistaken
+    // for the title — the Lezer reader (visitors/headings) skips it as CodeText,
+    // so the writer must too, or a rename would corrupt code and miss the real H1.
+    if (line.startsWith("```") || line.startsWith("~~~")) {
+      inFence = !inFence;
+      continue;
+    }
+    if (!inFence && line.startsWith("# ")) return i;
   }
   return -1;
 }

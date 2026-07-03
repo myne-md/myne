@@ -31,6 +31,11 @@ interface ImportedAttachment {
 /** Insert one voice-note embed at the cursor and advance past it, so a sequence
  *  of continuation clips chains in order. */
 function insertVoiceEmbed(view: EditorView, imported: ImportedAttachment): void {
+  // The record→stop round-trip can outlive the editor: if the user switched
+  // notes while recording, this `view` was destroyed and dispatching to it is a
+  // silent no-op (the recording would appear to vanish). Bail on a detached view
+  // — the audio is still stored in the vault and re-embeddable via the picker.
+  if (!view.dom.isConnected) return;
   // Seed the editor catalog cache with the just-imported row FIRST, so the
   // embed resolves to its audio player immediately — otherwise it renders a
   // stale "deleted" tombstone until a note-reopen reloads the catalog (the same
