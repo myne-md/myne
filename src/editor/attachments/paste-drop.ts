@@ -28,6 +28,7 @@ import { showAttachmentToast } from "./toast";
 import { addCatalogRows } from "./catalog";
 import {
   clearInsertPlaceholder,
+  insertPlaceholderPos,
   showInsertPlaceholder,
 } from "./insert-placeholder";
 
@@ -110,13 +111,19 @@ export async function importAndInsert(
   // note bytes stay clean, so nothing is ever persisted for the placeholder.
   const token = showInsertPlaceholder(view, insertAt, "importing");
   let outcomes: readonly ImportOutcome[];
+  // Insert at the placeholder's CURRENT position, not the stale `insertAt`:
+  // concurrent edits during the async import move the placeholder (a CM6
+  // change-mapped position), so the raw offset can land the embed in the wrong
+  // place. Capture the mapped position before clearing the placeholder.
+  let insertPos = insertAt;
   try {
     outcomes = await importMany(sources);
   } finally {
+    insertPos = insertPlaceholderPos(view, token) ?? insertAt;
     clearInsertPlaceholder(view, token);
   }
 
-  insertEmbedsForOutcomes(view, outcomes, insertAt);
+  insertEmbedsForOutcomes(view, outcomes, insertPos);
 
   const summary = summarizeBatch(outcomes);
   if (summary !== null) showAttachmentToast(summary);

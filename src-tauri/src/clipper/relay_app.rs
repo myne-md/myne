@@ -658,6 +658,17 @@ impl<R: Runtime> PairingDispatcher for PairingDispatch<R> {
             Ok(result) => result,
             Err(_) => {
                 let _ = registry.take(&request_id);
+                // Also clear the pending SESSION so a late Accept (clicked AFTER this
+                // 30 s timeout) can't mint an undeliverable orphan token that lingers
+                // in the registry showing a phantom "connected" extension while clips
+                // still fail: pairing_accept then returns NoPendingPairing. A sub-ms
+                // race at the exact boundary remains; the common late-click case closes.
+                if let Some(state) = self
+                    .app
+                    .try_state::<crate::plugins::clipper_pairing::state::PairingState>()
+                {
+                    state.reject_pending();
+                }
                 tracing::debug!(stage = "pair_dispatch", outcome = "timeout");
                 return PairDispatchOutcome::Error("pairing_timeout");
             }
