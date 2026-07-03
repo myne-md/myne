@@ -287,6 +287,7 @@ pub(crate) fn derive_with_context(root_key: &[u8; 32], info: &[u8]) -> Zeroizing
 #[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
     use super::*;
+    use crate::test_vector_fmt::{hex_lower, json_escape};
 
     #[test]
     fn hkdf_prefix_is_exactly_myne_v0_1_with_trailing_space() {
@@ -615,32 +616,6 @@ mod tests {
     fn emit_subkey_vectors_for_paste() {
         extern crate std;
         use sha2::Digest;
-
-        fn hex_lower(bytes: &[u8]) -> alloc::string::String {
-            let mut s = alloc::string::String::with_capacity(bytes.len() * 2);
-            for b in bytes {
-                s.push_str(&alloc::format!("{:02x}", b));
-            }
-            s
-        }
-
-        fn json_escape(input: &str) -> alloc::string::String {
-            let mut out = alloc::string::String::with_capacity(input.len() + 2);
-            for c in input.chars() {
-                match c {
-                    '"' => out.push_str("\\\""),
-                    '\\' => out.push_str("\\\\"),
-                    '\n' => out.push_str("\\n"),
-                    '\r' => out.push_str("\\r"),
-                    '\t' => out.push_str("\\t"),
-                    c if (c as u32) < 0x20 => {
-                        out.push_str(&alloc::format!("\\u{:04x}", c as u32));
-                    }
-                    c => out.push(c),
-                }
-            }
-            out
-        }
 
         fn pseudorandom_root(label: &[u8]) -> [u8; 32] {
             let digest = Sha256::digest(label);

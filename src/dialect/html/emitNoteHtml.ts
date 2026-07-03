@@ -822,8 +822,19 @@ const SCHEME_RE = /^[a-z][a-z0-9+.-]*:/i;
 const SAFE_SCHEMES = new Set(["http:", "https:", "mailto:"]);
 
 function safeHref(url: string): string | null {
-  const m = SCHEME_RE.exec(url);
-  if (m === null) return url; // relative / fragment — inert in a document
+  // Browsers ignore leading C0-control / space when resolving an href, so probe
+  // the URL the way the browser will — otherwise `\thttp:` or `  //host` would
+  // slip past both checks below.
+  const probe = url.replace(/^[\u0000-\u0020]+/, "");
+  const m = SCHEME_RE.exec(probe);
+  if (m === null) {
+    // No explicit scheme. A protocol-relative URL (`//host`, plus the `/\` `\/`
+    // `\\` variants browsers fold to it) has NO scheme but is NOT inert — it
+    // navigates to `<page-protocol>//host`, bypassing the scheme allowlist. A
+    // genuinely relative path or `#fragment` stays inert in the document.
+    if (/^[/\\]{2}/.test(probe)) return null;
+    return url;
+  }
   return SAFE_SCHEMES.has(m[0].toLowerCase()) ? url : null;
 }
 

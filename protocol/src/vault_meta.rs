@@ -314,6 +314,7 @@ pub fn derive_items_key(
 mod tests {
     use super::*;
     use crate::aead::aead_open_ctx;
+    use crate::test_vector_fmt::{hex_lower, json_escape};
     use crate::types::DEFAULT_V0_1_KDF_PARAMS;
 
     /// Hand-crafted fixture: every byte in every field set to a unique
@@ -925,24 +926,6 @@ mod tests {
     fn emit_vault_meta_vectors_for_paste() {
         extern crate std;
 
-        fn json_escape(input: &str) -> alloc::string::String {
-            let mut out = alloc::string::String::with_capacity(input.len() + 2);
-            for c in input.chars() {
-                match c {
-                    '"' => out.push_str("\\\""),
-                    '\\' => out.push_str("\\\\"),
-                    '\n' => out.push_str("\\n"),
-                    '\r' => out.push_str("\\r"),
-                    '\t' => out.push_str("\\t"),
-                    c if (c as u32) < 0x20 => {
-                        out.push_str(&alloc::format!("\\u{:04x}", c as u32));
-                    }
-                    c => out.push(c),
-                }
-            }
-            out
-        }
-
         // Distinct byte patterns per field — chosen NOT to collide
         // with the vault_meta_rewrite fixture's 0xAC/0x11.. patterns
         // so the two vector sets visually disambiguate in any cross-
@@ -1116,24 +1099,6 @@ mod tests {
     fn emit_vault_meta_parse_fail_vectors() {
         extern crate std;
 
-        fn json_escape(input: &str) -> alloc::string::String {
-            let mut out = alloc::string::String::with_capacity(input.len() + 2);
-            for c in input.chars() {
-                match c {
-                    '"' => out.push_str("\\\""),
-                    '\\' => out.push_str("\\\\"),
-                    '\n' => out.push_str("\\n"),
-                    '\r' => out.push_str("\\r"),
-                    '\t' => out.push_str("\\t"),
-                    c if (c as u32) < 0x20 => {
-                        out.push_str(&alloc::format!("\\u{:04x}", c as u32));
-                    }
-                    c => out.push(c),
-                }
-            }
-            out
-        }
-
         // Identical fixture to emit_vault_meta_vectors_for_paste — the new
         // tampers derive from the SAME canonical blob the landed
         // `canonical-roundtrip` case pins.
@@ -1229,14 +1194,6 @@ mod tests {
             dump.as_bytes(),
         )
         .expect("write vault-meta parse_fail vectors dump");
-    }
-
-    fn hex_lower(bytes: &[u8]) -> alloc::string::String {
-        let mut s = alloc::string::String::with_capacity(bytes.len() * 2);
-        for b in bytes {
-            s.push_str(&alloc::format!("{:02x}", b));
-        }
-        s
     }
 
     #[test]

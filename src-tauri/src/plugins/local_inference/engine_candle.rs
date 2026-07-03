@@ -335,7 +335,7 @@ fn run_infer(loaded: &mut LoadedGen, prompt: &str) -> Result<String, EngineError
         .tokenizer
         .encode(templated, true)
         .map_err(|e| fmt_stage_fail("infer.encode", e, EngineError::InferenceFailed))?;
-    let mut tokens: Vec<u32> = encoding.get_ids().to_vec();
+    let tokens: Vec<u32> = encoding.get_ids().to_vec();
     if tokens.is_empty() {
         return Ok(String::new());
     }
@@ -367,7 +367,6 @@ fn run_infer(loaded: &mut LoadedGen, prompt: &str) -> Result<String, EngineError
             .sample(&logits)
             .map_err(|_| EngineError::InferenceFailed)?;
         pos += input_tokens.len();
-        tokens.push(next);
         generated.push(next);
         if Some(next) == loaded.eos {
             break;

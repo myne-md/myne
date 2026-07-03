@@ -222,6 +222,7 @@ pub fn decode_workspace_blob(
 mod tests {
     use super::*;
     use crate::subkey::{derive_subkey, SubkeyRole};
+    use crate::test_vector_fmt::{hex_lower, json_escape};
 
     fn fixed_key() -> [u8; AEAD_KEY_LEN] {
         *derive_subkey(&[0x42; 32], SubkeyRole::SessionStateKey)
@@ -390,32 +391,6 @@ mod tests {
     #[ignore]
     fn emit_vault_workspace_vectors_for_paste() {
         extern crate std;
-
-        fn hex_lower(bytes: &[u8]) -> alloc::string::String {
-            let mut s = alloc::string::String::with_capacity(bytes.len() * 2);
-            for b in bytes {
-                s.push_str(&alloc::format!("{:02x}", b));
-            }
-            s
-        }
-
-        fn json_escape(input: &str) -> alloc::string::String {
-            let mut out = alloc::string::String::with_capacity(input.len() + 2);
-            for c in input.chars() {
-                match c {
-                    '"' => out.push_str("\\\""),
-                    '\\' => out.push_str("\\\\"),
-                    '\n' => out.push_str("\\n"),
-                    '\r' => out.push_str("\\r"),
-                    '\t' => out.push_str("\\t"),
-                    c if (c as u32) < 0x20 => {
-                        out.push_str(&alloc::format!("\\u{:04x}", c as u32));
-                    }
-                    c => out.push(c),
-                }
-            }
-            out
-        }
 
         // Distinct byte patterns per field — easy visual cross-check.
         // root_key (NOT the KEK): the runner derives session_state_key from

@@ -2641,6 +2641,7 @@ pub fn decode_prefs_blob(
 mod tests {
     use super::*;
     use crate::subkey::{derive_subkey, SubkeyRole};
+    use crate::test_vector_fmt::{hex_lower, json_escape};
 
     // Fixed root_key + account_number_hash so KAT-style tests are
     // deterministic. Real-world callers source these from `getrandom`
@@ -7550,24 +7551,6 @@ mod tests {
         extern crate std;
         use crate::aead::{aad_prefs_blob, aead_seal_ctx, CTX_COMMITMENT_TAG_LEN};
 
-        fn json_escape(input: &str) -> alloc::string::String {
-            let mut out = alloc::string::String::with_capacity(input.len() + 2);
-            for c in input.chars() {
-                match c {
-                    '"' => out.push_str("\\\""),
-                    '\\' => out.push_str("\\\\"),
-                    '\n' => out.push_str("\\n"),
-                    '\r' => out.push_str("\\r"),
-                    '\t' => out.push_str("\\t"),
-                    c if (c as u32) < 0x20 => {
-                        out.push_str(&alloc::format!("\\u{:04x}", c as u32));
-                    }
-                    c => out.push(c),
-                }
-            }
-            out
-        }
-
         // Same fixed vault-A inputs as the sibling generators; nonces 0xF2 +
         // 0xF3 are the next free entries in the family's nonce registry
         // (0x77, 0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xF1 are taken).
@@ -7735,14 +7718,6 @@ mod tests {
             dump.as_bytes(),
         )
         .expect("write vault-prefs parse_fail vectors dump");
-    }
-
-    fn hex_lower(bytes: &[u8]) -> alloc::string::String {
-        let mut s = alloc::string::String::with_capacity(bytes.len() * 2);
-        for b in bytes {
-            s.push_str(&alloc::format!("{:02x}", b));
-        }
-        s
     }
 
     // ---- daily-notes fields (MYND-191) ---------------------------------

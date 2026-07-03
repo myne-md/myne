@@ -3,7 +3,8 @@
 //! Three things persist **device-local, never synced** (AS6/A13 — sync state
 //! must not leak to the server):
 //!
-//! 1. **cursor** — the opaque server-issued pull cursor (SYNC-6); a `String`.
+//! 1. **cursor** — the server-issued pull cursor (SYNC-6): a monotonic `u64`
+//!    change-seq high-water mark (see the `cursor` field below).
 //! 2. **last-seen head baseline** — the `MYH1` `vault.head-state` blob
 //!    (`protocol.md` §9.15) via `protocol::encode_head_state` /
 //!    `decode_head_state` (re-verifies the head's own MAC under `root_key`).
