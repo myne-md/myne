@@ -58,16 +58,21 @@ async function collectFromClipboard(
   data: DataTransfer,
   now: Date = new Date(),
 ): Promise<PendingFile[]> {
+  // Extract EVERY File synchronously while the DataTransfer is still live: after
+  // the first `await` below the clipboard store enters protected mode and
+  // `getAsFile()` returns null for the 2nd+ items, silently dropping all files
+  // but the first on a multi-file paste. (collectFromDrop is immune because
+  // `data.files` snapshots real File objects that outlive the event.)
+  const files = Array.from(data.items)
+    .filter((item) => item.kind === "file")
+    .map((item) => item.getAsFile())
+    .filter((f): f is File => f !== null);
   const out: PendingFile[] = [];
-  for (const item of Array.from(data.items)) {
-    if (item.kind !== "file") continue;
-    const file = item.getAsFile();
-    if (file === null) continue;
+  for (const file of files) {
     const bytes = await readFileBytes(file);
     // A pasted screenshot has an empty `name`; auto-generate per decision 1.
-    const filename = file.name && file.name.trim() !== ""
-      ? file.name
-      : autoPasteName(file.type, now);
+    const filename =
+      file.name && file.name.trim() !== "" ? file.name : autoPasteName(file.type, now);
     out.push({ bytes, filename, mime: file.type });
   }
   return out;
