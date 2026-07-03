@@ -1,0 +1,25 @@
+# Permissions for the in-app `secret-export` Tauri plugin. Picked up under the
+# `secret-export:` ACL namespace only because `build.rs` declares this as an
+# `InlinedPlugin`. Capability files reference these as `secret-export:default`.
+#
+# `save_secret_text` is the ONLY path that writes a user-chosen secret .txt
+# (recovery phrase / account number): the WebView picks the destination via
+# `dialog:allow-save` and the Rust core does the only IO — NO `fs:` write scope
+# is granted to the WebView (least-privilege, TB6; the backup/importer/export
+# narrow-seam precedent). The command re-validates the destination as untrusted
+# and rejects anything inside the app-data / vault tree. Adding a command here
+# without a matching `build.rs` `InlinedPlugin::commands` entry is a security
+# regression.
+
+"$schema" = "../../gen/schemas/desktop-schema.json"
+
+[default]
+description = "Default permission set for the secret-export plugin."
+permissions = [
+    "allow-save-secret-text",
+]
+
+[[permission]]
+identifier = "allow-save-secret-text"
+description = "Allow invoking secret-export:save_secret_text (write a recovery phrase / account number to a user-chosen .txt destination; the Rust core does the IO and rejects any destination inside the app-data / vault tree)."
+commands.allow = ["save_secret_text"]

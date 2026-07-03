@@ -230,6 +230,7 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .plugin(plugins::backup::init())
         .plugin(plugins::export::init())
+        .plugin(plugins::secret_export::init())
         .plugin(plugins::vault_creation::init())
         .plugin(plugins::vault_unlock::init())
         .plugin(plugins::vault_recover::init())
