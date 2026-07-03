@@ -49,6 +49,18 @@ pub mod taxonomy;
 pub mod token_store;
 pub mod transport;
 
+/// Byte slice → lowercase hex, in a single allocation (no per-byte `format!`).
+/// The canonical hex encoder for the sync module — the per-file `hex` /
+/// `hex_encode` / `hex_lower` helpers alias this so the logic lives in one place.
+pub(crate) fn to_hex(bytes: &[u8]) -> String {
+    let mut s = String::with_capacity(bytes.len() * 2);
+    for b in bytes {
+        s.push(char::from_digit((b >> 4) as u32, 16).expect("high nibble < 16"));
+        s.push(char::from_digit((b & 0x0f) as u32, 16).expect("low nibble < 16"));
+    }
+    s
+}
+
 use tauri::plugin::{Builder, TauriPlugin};
 use tauri::Runtime;
 

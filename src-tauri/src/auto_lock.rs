@@ -303,42 +303,24 @@ async fn lock_unlocked_if_idle<R: Runtime>(app: &AppHandle<R>, state: &VaultRunt
         // never re-expose plaintext).
         run_lock_teardown(&AppTeardown { app }, || {
             drop(prior); // leg 1 — zeroize the keys
-                         // MYND-29 Task 8: wipe the plaintext-derived search index on the
-                         // SAME leg as the key zeroize (it is as sensitive as the keys).
-                         // Auto-lock deliberately SKIPS persist (decisions.md 2026-05-30
-                         // / grill Q5): no blob-write latency on the fail-closed idle
-                         // path — the index rebuilds on the next unlock.
-            crate::plugins::notes::search_sync::zeroize_search_index(app);
-            // Review Ö-24: wipe the personal + ignore spell dictionaries on the
-            // SAME leg. They are plaintext-derived AS3 vocabulary (spell/dictionary.rs
-            // "zeroized on lock") and the manual vault_lock path already wipes them
-            // via hooks.zeroize_spell(); the idle auto-lock leg must match, or a
-            // fail-closed idle lock leaves the user's private words resident.
-            crate::spell::sync::zeroize_spell(app);
-            // MYND-166: wipe the staged editor-workspace descriptor too.
-            crate::plugins::workspace::commands::clear_staged_descriptor();
-            // MYND-255: destroy the hidden pdf-export render window (a
-            // plaintext-bearing second WebView) and wipe its stashed
-            // HTML payload on the SAME leg — locking means locked for
-            // every plaintext surface, not just "main".
-            crate::plugins::pdf_export::teardown_on_lock(app);
-            // MYND-31: wipe the plaintext-derived VaultIndices on the same
-            // leg — it is as sensitive as the keys + search index, and
-            // rebuilds on the next unlock.
-            crate::plugins::vault_indices::zeroize_vault_indices(app);
-            // semantic-search-qa task 2: wipe the plaintext-derived AI vector
-            // store on the SAME idle-auto-lock leg — its embeddings + nonce
-            // manifest are as sensitive as vault.indices, rebuilt on the next
-            // unlock. Feature-gated (default build has no AI teardown).
-            #[cfg(feature = "local-inference")]
-            crate::plugins::local_inference::zeroize_ai_vectors(app);
-            // MYND-169: wipe the plaintext-derived attachment reference
-            // graph on the same leg — the note-ids / attachment-ids it
-            // holds are correlation tags (AS3), rebuilt on the next unlock.
-            crate::plugins::attachments::zeroize_attachment_refs(app);
-            // MYND-259: abort any in-progress voice recording on the same leg
-            // so the mic + RAM PCM buffer never outlive the locked session.
-            crate::plugins::attachments::abort_active_recording(app);
+                         // Route every plaintext-derived teardown surface through the SAME
+                         // managed VaultLifecycleHooks the manual vault_lock path uses (core
+                         // vault_unlock::commands), so the idle-auto-lock and manual-lock
+                         // teardown lists cannot silently DIVERGE: a new surface added to the
+                         // hooks impl is wiped by BOTH paths automatically. This idle leg still
+                         // SKIPS persist (decisions.md 2026-05-30 / grill Q5) — the indices
+                         // rebuild on the next unlock — and `zeroize_vault_indices` also wipes
+                         // the feature-gated AI vector store (see DesktopHooks). Hooks is
+                         // always registered at setup, so this is unconditional in practice.
+            if let Some(hooks) = app.try_state::<myne_core::hooks::Hooks>() {
+                hooks.zeroize_search_index();
+                hooks.zeroize_spell();
+                hooks.clear_staged_descriptor();
+                hooks.pdf_export_teardown_on_lock();
+                hooks.zeroize_vault_indices();
+                hooks.zeroize_attachment_refs();
+                hooks.abort_active_recording();
+            }
         });
     }
 }

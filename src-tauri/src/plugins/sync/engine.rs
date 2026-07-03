@@ -438,13 +438,7 @@ impl From<TransportError> for PushError {
     }
 }
 
-fn hex_encode(bytes: &[u8]) -> String {
-    let mut s = String::with_capacity(bytes.len() * 2);
-    for b in bytes {
-        s.push_str(&format!("{b:02x}"));
-    }
-    s
-}
+use super::to_hex as hex_encode;
 
 /// Push a coalesced batch of blobs (each with its per-blob CAS `base_version`)
 /// plus an optional new head (pointer-CAS on `prev_head_hash`). Idempotent: a

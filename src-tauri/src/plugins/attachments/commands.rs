@@ -259,6 +259,20 @@ pub(crate) async fn attachment_import_with_dir(
         ImportSource::Bytes { bytes, filename } => (Zeroizing::new(bytes), filename),
         ImportSource::Path { path } => {
             let p = PathBuf::from(path);
+            // Reject an over-cap file BEFORE reading it into RAM: `std::fs::read`
+            // on a huge picked / drag-dropped file (e.g. a multi-GB video) would
+            // allocate the whole file and OOM the host before the `len()` cap
+            // check below could fire. The Bytes arm is already materialized by the
+            // WebView, so only the Path arm (host reads the file) needs this.
+            if std::fs::metadata(&p)
+                .map_err(AttachmentImportError::from)?
+                .len()
+                > MAX_ATTACHMENT_IMPORT_LEN as u64
+            {
+                return Err(AttachmentImportError::Oversize {
+                    cap_bytes: MAX_ATTACHMENT_IMPORT_LEN,
+                });
+            }
             let bytes = std::fs::read(&p).map_err(AttachmentImportError::from)?;
             // Derive the display name from the final path component; the
             // raw path itself is DENY-listed and never logged.

@@ -250,9 +250,19 @@ function createFindPanel(view: EditorView): Panel {
     top: true,
     mount: () => bar.focus(),
     update: (u: ViewUpdate) => {
+      const prevQuery = getSearchQuery(u.startState);
       const nextQuery = getSearchQuery(u.state);
-      const queryChanged = !getSearchQuery(u.startState).eq(nextQuery);
-      if (queryChanged && !nextQuery.valid) {
+      // The match set depends ONLY on the search pattern + flags — never on the
+      // replace text. Gate the (whole-doc) scan on a search-relevant change so
+      // typing in the replace field doesn't re-scan the document for an
+      // identical match set.
+      const searchChanged =
+        prevQuery.search !== nextQuery.search ||
+        prevQuery.caseSensitive !== nextQuery.caseSensitive ||
+        prevQuery.literal !== nextQuery.literal ||
+        prevQuery.regexp !== nextQuery.regexp ||
+        prevQuery.wholeWord !== nextQuery.wholeWord;
+      if (searchChanged && !nextQuery.valid) {
         // Query emptied → reset the count now; don't wait on (or run) a scan.
         if (scanTimer !== null) {
           clearTimeout(scanTimer);
@@ -262,7 +272,7 @@ function createFindPanel(view: EditorView): Panel {
         render();
         return;
       }
-      if (queryChanged || u.docChanged) {
+      if (searchChanged || u.docChanged) {
         scheduleScan(); // count refreshes when the scan lands (avoid stale render)
         return;
       }

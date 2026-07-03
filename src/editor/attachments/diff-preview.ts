@@ -10,7 +10,7 @@
 // the caller (`convert.ts`) applies the rewrite only on `confirm`.
 
 import i18n from "../../i18n";
-import { trapFocus } from "../../lib/imperative-focus-trap";
+import { openModal } from "../../lib/imperative-modal";
 import { ensureAttachmentInsertStyles, hasDom } from "./styles";
 
 /** One line in the preview: a proposed rewrite, or a skipped ref. */
@@ -39,8 +39,22 @@ export function showDiffPreview(
   ensureAttachmentInsertStyles();
 
   return new Promise<DiffPreviewResult>((resolve) => {
-    const backdrop = document.createElement("div");
-    backdrop.className = "cm-attach-diff-backdrop";
+    const cleanup = (confirmed: boolean): void => {
+      host.close();
+      resolve({ confirmed });
+    };
+
+    const host = openModal({
+      backdropClass: "cm-attach-diff-backdrop",
+      onDismiss: () => cleanup(false), // Esc / backdrop click = cancel
+      onEnter: (e) => {
+        if (rewriteCount > 0) {
+          e.preventDefault();
+          cleanup(true);
+        }
+      },
+    });
+    const backdrop = host.backdrop;
 
     const modal = document.createElement("div");
     modal.className = "cm-attach-diff";
@@ -102,35 +116,12 @@ export function showDiffPreview(
     modal.appendChild(actions);
 
     backdrop.appendChild(modal);
-    document.body.appendChild(backdrop);
 
-    let releaseTrap: (() => void) | null = null;
-    const cleanup = (confirmed: boolean): void => {
-      releaseTrap?.();
-      document.removeEventListener("keydown", onKey, true);
-      backdrop.remove();
-      resolve({ confirmed });
-    };
-    const onKey = (e: KeyboardEvent): void => {
-      if (e.key === "Escape") {
-        e.preventDefault();
-        cleanup(false);
-      } else if (e.key === "Enter" && rewriteCount > 0) {
-        e.preventDefault();
-        cleanup(true);
-      }
-    };
-    document.addEventListener("keydown", onKey, true);
-    backdrop.addEventListener("mousedown", (e) => {
-      if (e.target === backdrop) cleanup(false); // backdrop click = cancel
-    });
     cancelBtn.addEventListener("click", () => cleanup(false));
     commitBtn.addEventListener("click", () => cleanup(true));
 
     // Focus the safe default (Cancel when nothing to commit, else Convert).
     // Trap + restore focus (MYND-93).
-    releaseTrap = trapFocus(modal, {
-      initialFocus: rewriteCount === 0 ? cancelBtn : commitBtn,
-    });
+    host.installTrap(modal, rewriteCount === 0 ? cancelBtn : commitBtn);
   });
 }

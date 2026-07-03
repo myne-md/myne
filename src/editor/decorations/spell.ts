@@ -118,6 +118,13 @@ export function ignoreWordThisSession(view: EditorView, word: string): void {
   requestSpellRescan(view);
 }
 
+/** Clear the session-ignore set. Called on a vault SWITCH so "ignore this
+ *  session" words from one vault don't suppress squiggles in another — the set
+ *  is module-level and would otherwise outlive the vault that populated it. */
+export function resetSessionIgnored(): void {
+  sessionIgnored.clear();
+}
+
 /** Dispatch a re-scan request (used after add-to-dictionary / ignore). */
 export function requestSpellRescan(view: EditorView): void {
   view.dispatch({ effects: triggerSpellRescan.of(null) });

@@ -74,13 +74,7 @@ pub async fn sync_get_endpoint<R: Runtime>(
     read_config(&path)
 }
 
-fn hex_lower(b: &[u8]) -> String {
-    let mut s = String::with_capacity(b.len() * 2);
-    for x in b {
-        s.push_str(&format!("{x:02x}"));
-    }
-    s
-}
+use super::to_hex as hex_lower;
 
 /// Parse a 64-char lowercase-hex cert pin into raw SHA-256 bytes.
 fn parse_pin_hex(s: &str) -> Option<[u8; 32]> {

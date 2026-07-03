@@ -44,15 +44,14 @@
 //! fall-back-to-defaults at the boundary (parity with `prefs.rs` /
 //! `search_blob.rs`).
 
-use crate::aead::{
-    aad_workspace_blob, aead_open_ctx, aead_seal_ctx, AEAD_KEY_LEN, AEAD_NONCE_LEN,
-    CTX_COMMITMENT_TAG_LEN,
+use crate::aead::{aad_workspace_blob, AEAD_KEY_LEN, AEAD_NONCE_LEN};
+use crate::blob_envelope::{
+    decode_blob_envelope, encode_blob_envelope, encode_blob_envelope_raw, EnvelopeError,
 };
 use crate::error::ProtocolError;
 use alloc::vec::Vec;
-use getrandom::getrandom;
 use thiserror::Error;
-use zeroize::{Zeroize, Zeroizing};
+use zeroize::Zeroizing;
 
 /// Magic bytes at offset 0 — ASCII `"MYW1"` (Myne Workspace v1).
 pub const WORKSPACE_BLOB_MAGIC: [u8; 4] = *b"MYW1";
@@ -131,6 +130,24 @@ impl From<ProtocolError> for WorkspaceBlobError {
     }
 }
 
+impl From<EnvelopeError> for WorkspaceBlobError {
+    /// Map the shared-envelope error into this codec's public variant so the
+    /// distinguishable-reject surface (and its vectors) stay unchanged.
+    fn from(e: EnvelopeError) -> Self {
+        match e {
+            EnvelopeError::HeaderTooShort => WorkspaceBlobError::HeaderTooShort,
+            EnvelopeError::MagicMismatch => WorkspaceBlobError::MagicMismatch,
+            EnvelopeError::ProtocolVersionMismatch => WorkspaceBlobError::ProtocolVersionMismatch,
+            EnvelopeError::FormatUnsupported => WorkspaceBlobError::FormatUnsupported,
+            EnvelopeError::CiphertextLenOverflow => WorkspaceBlobError::CiphertextLenOverflow,
+            EnvelopeError::CiphertextTruncated => WorkspaceBlobError::CiphertextTruncated,
+            EnvelopeError::CannotDecrypt => WorkspaceBlobError::CannotDecrypt,
+            EnvelopeError::PlaintextTooLarge => WorkspaceBlobError::PlaintextTooLarge,
+            EnvelopeError::RandomnessUnavailable => WorkspaceBlobError::RandomnessUnavailable,
+        }
+    }
+}
+
 /// Encode a `vault.workspace` blob from an opaque `plaintext` (the desktop
 /// layer's serialized pane-tree descriptor), sealing under
 /// `session_state_key` with `nonce`.
@@ -145,28 +162,17 @@ pub fn encode_workspace_blob_raw(
     plaintext: &[u8],
     nonce: &[u8; AEAD_NONCE_LEN],
 ) -> Result<Vec<u8>, WorkspaceBlobError> {
-    if plaintext.len() > MAX_WORKSPACE_PLAINTEXT_LEN {
-        return Err(WorkspaceBlobError::PlaintextTooLarge);
-    }
-
     let aad = aad_workspace_blob(account_number_hash);
-    let sealed = aead_seal_ctx(session_state_key, nonce, plaintext, &aad)?;
-
-    let ciphertext_len = sealed.len();
-    debug_assert_eq!(
-        ciphertext_len,
-        plaintext.len() + CTX_COMMITMENT_TAG_LEN,
-        "aead_seal_ctx invariant: output is ciphertext || CTX tag",
-    );
-
-    let mut out = Vec::with_capacity(WORKSPACE_BLOB_HEADER_LEN + ciphertext_len);
-    out.extend_from_slice(&WORKSPACE_BLOB_MAGIC);
-    out.push(WORKSPACE_BLOB_PROTOCOL_VERSION);
-    out.push(WORKSPACE_BLOB_FORMAT_VERSION);
-    out.extend_from_slice(nonce);
-    out.extend_from_slice(&(ciphertext_len as u32).to_be_bytes());
-    out.extend_from_slice(&sealed);
-    Ok(out)
+    encode_blob_envelope_raw(
+        session_state_key,
+        &WORKSPACE_BLOB_MAGIC,
+        WORKSPACE_BLOB_FORMAT_VERSION,
+        &aad,
+        MAX_WORKSPACE_PLAINTEXT_LEN,
+        plaintext,
+        nonce,
+    )
+    .map_err(WorkspaceBlobError::from)
 }
 
 /// Encode a `vault.workspace` blob, pulling the 24-byte nonce from the OS
@@ -177,12 +183,16 @@ pub fn encode_workspace_blob(
     account_number_hash: &[u8; WORKSPACE_BLOB_ACCOUNT_HASH_LEN],
     plaintext: &[u8],
 ) -> Result<Vec<u8>, WorkspaceBlobError> {
-    let mut nonce = [0u8; AEAD_NONCE_LEN];
-    getrandom(&mut nonce).map_err(|_| WorkspaceBlobError::RandomnessUnavailable)?;
-    let result =
-        encode_workspace_blob_raw(session_state_key, account_number_hash, plaintext, &nonce);
-    nonce.zeroize();
-    result
+    let aad = aad_workspace_blob(account_number_hash);
+    encode_blob_envelope(
+        session_state_key,
+        &WORKSPACE_BLOB_MAGIC,
+        WORKSPACE_BLOB_FORMAT_VERSION,
+        &aad,
+        MAX_WORKSPACE_PLAINTEXT_LEN,
+        plaintext,
+    )
+    .map_err(WorkspaceBlobError::from)
 }
 
 /// Decode a `vault.workspace` blob into its opaque inner plaintext (the
@@ -195,42 +205,16 @@ pub fn decode_workspace_blob(
     account_number_hash: &[u8; WORKSPACE_BLOB_ACCOUNT_HASH_LEN],
     blob: &[u8],
 ) -> Result<Zeroizing<Vec<u8>>, WorkspaceBlobError> {
-    if blob.len() < WORKSPACE_BLOB_HEADER_LEN {
-        return Err(WorkspaceBlobError::HeaderTooShort);
-    }
-    if blob[0..4] != WORKSPACE_BLOB_MAGIC {
-        return Err(WorkspaceBlobError::MagicMismatch);
-    }
-    if blob[4] != WORKSPACE_BLOB_PROTOCOL_VERSION {
-        return Err(WorkspaceBlobError::ProtocolVersionMismatch);
-    }
-    if blob[5] != WORKSPACE_BLOB_FORMAT_VERSION {
-        return Err(WorkspaceBlobError::FormatUnsupported);
-    }
-
-    let mut nonce = [0u8; AEAD_NONCE_LEN];
-    nonce.copy_from_slice(&blob[6..30]);
-
-    let ciphertext_len = u32::from_be_bytes([blob[30], blob[31], blob[32], blob[33]]) as usize;
-
-    // Reject oversize BEFORE indexing so a hostile ciphertext_len cannot
-    // panic on the slice.
-    if ciphertext_len > MAX_WORKSPACE_PLAINTEXT_LEN + CTX_COMMITMENT_TAG_LEN {
-        return Err(WorkspaceBlobError::CiphertextLenOverflow);
-    }
-    let ciphertext_end = WORKSPACE_BLOB_HEADER_LEN + ciphertext_len;
-    if blob.len() < ciphertext_end {
-        return Err(WorkspaceBlobError::CiphertextTruncated);
-    }
-
     let aad = aad_workspace_blob(account_number_hash);
-    let plaintext = aead_open_ctx(
+    decode_blob_envelope(
         session_state_key,
-        &nonce,
-        &blob[WORKSPACE_BLOB_HEADER_LEN..ciphertext_end],
+        &WORKSPACE_BLOB_MAGIC,
+        WORKSPACE_BLOB_FORMAT_VERSION,
         &aad,
-    )?;
-    Ok(plaintext)
+        MAX_WORKSPACE_PLAINTEXT_LEN,
+        blob,
+    )
+    .map_err(WorkspaceBlobError::from)
 }
 
 #[cfg(test)]

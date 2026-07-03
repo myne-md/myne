@@ -146,6 +146,46 @@ fn read_account_number_hash_for_write(
     Ok(meta.account_number_hash)
 }
 
+/// Shared read-modify-write core for every `Slot::Unlocked`-gated prefs setter
+/// (SYNC-6, MYND-32). Every `set_*_with_dir` below wrapped the SAME skeleton:
+/// take the per-plugin write mutex → hold the SYNC-6 root-key guard → derive the
+/// prefs key → read-or-default the current `vault.prefs` → apply the field
+/// mutation → re-encode → atomically persist. This centralises that skeleton;
+/// callers supply only `mutate` (the field-specific edit) and keep their own
+/// success `tracing::info!(event = "prefs_written", field = …)` line (the field
+/// name — and whether its value is loggable — is per-setter) plus any native
+/// side-effect. **Ordering contract (MYND-160 grill Q5.2):** this persists to
+/// disk BEFORE returning, so a caller's native side-effect runs on the
+/// `.await?`-success path — disk write FIRST, native side-effect SECOND.
+async fn update_prefs_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    mutate: impl FnOnce(&mut PrefsView),
+) -> Result<(), PrefsWriteError> {
+    let _write_guard = write_mutex().lock().await;
+
+    // SYNC-6 writer-guard (MYND-32): see state::hold_unlocked_root_key_and_hash.
+    let (_slots_guard, root_key, _vmh) = state
+        .hold_unlocked_root_key_and_hash()
+        .await
+        .ok_or(PrefsWriteError::SlotNotUnlocked)?;
+
+    let account_number_hash = read_account_number_hash_for_write(&vault_dir.join("vault.meta"))?;
+    let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
+    let prefs_path = vault_dir.join("vault.prefs");
+
+    let mut prefs = read_or_default(&prefs_path, &prefs_key, &account_number_hash);
+    mutate(&mut prefs);
+
+    let blob_bytes = encode_prefs_blob(&prefs_key, &account_number_hash, &prefs)
+        .map_err(|_| PrefsWriteError::PrefsEncodeFailed)?;
+
+    crate::atomic_write::atomic_write(&prefs_path, &blob_bytes, true)
+        .map_err(PrefsWriteError::from)?;
+
+    Ok(())
+}
+
 /// Slot::Unlocked-gated read of the `vault.prefs` blob.
 ///
 /// Returns `PrefsView::default()` on any prefs-blob failure (absent /
@@ -196,26 +236,10 @@ pub async fn record_last_backup_at_with_dir(
     state: &VaultRuntimeState,
     epoch_seconds: u64,
 ) -> Result<(), PrefsWriteError> {
-    let _write_guard = write_mutex().lock().await;
-
-    // SYNC-6 writer-guard (MYND-32): see state::hold_unlocked_root_key_and_hash.
-    let (_slots_guard, root_key, _vmh) = state
-        .hold_unlocked_root_key_and_hash()
-        .await
-        .ok_or(PrefsWriteError::SlotNotUnlocked)?;
-
-    let account_number_hash = read_account_number_hash_for_write(&vault_dir.join("vault.meta"))?;
-    let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
-    let prefs_path = vault_dir.join("vault.prefs");
-
-    let mut prefs = read_or_default(&prefs_path, &prefs_key, &account_number_hash);
-    prefs.last_backup_at = Some(epoch_seconds);
-
-    let blob_bytes = encode_prefs_blob(&prefs_key, &account_number_hash, &prefs)
-        .map_err(|_| PrefsWriteError::PrefsEncodeFailed)?;
-
-    crate::atomic_write::atomic_write(&prefs_path, &blob_bytes, true)
-        .map_err(PrefsWriteError::from)?;
+    update_prefs_with_dir(vault_dir, state, |prefs| {
+        prefs.last_backup_at = Some(epoch_seconds);
+    })
+    .await?;
 
     tracing::info!(event = "prefs_written", field = "last_backup_at");
     Ok(())
@@ -238,27 +262,11 @@ pub async fn persist_paired_extensions_with_dir(
     state: &VaultRuntimeState,
     records: Vec<protocol::PairedExtension>,
 ) -> Result<(), PrefsWriteError> {
-    let _write_guard = write_mutex().lock().await;
-
-    // SYNC-6 writer-guard (MYND-32): see state::hold_unlocked_root_key_and_hash.
-    let (_slots_guard, root_key, _vmh) = state
-        .hold_unlocked_root_key_and_hash()
-        .await
-        .ok_or(PrefsWriteError::SlotNotUnlocked)?;
-
-    let account_number_hash = read_account_number_hash_for_write(&vault_dir.join("vault.meta"))?;
-    let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
-    let prefs_path = vault_dir.join("vault.prefs");
-
-    let mut prefs = read_or_default(&prefs_path, &prefs_key, &account_number_hash);
     let count = records.len();
-    prefs.paired_extensions = records;
-
-    let blob_bytes = encode_prefs_blob(&prefs_key, &account_number_hash, &prefs)
-        .map_err(|_| PrefsWriteError::PrefsEncodeFailed)?;
-
-    crate::atomic_write::atomic_write(&prefs_path, &blob_bytes, true)
-        .map_err(PrefsWriteError::from)?;
+    update_prefs_with_dir(vault_dir, state, |prefs| {
+        prefs.paired_extensions = records;
+    })
+    .await?;
 
     // COUNT only — never a token value / extension id (AS-low correlation tags).
     tracing::info!(event = "prefs_written", field = "paired_extensions", count);
@@ -299,26 +307,10 @@ pub(crate) async fn set_screen_capture_protection_with_dir(
     state: &VaultRuntimeState,
     enabled: bool,
 ) -> Result<(), PrefsWriteError> {
-    let _write_guard = write_mutex().lock().await;
-
-    // SYNC-6 writer-guard (MYND-32): see state::hold_unlocked_root_key_and_hash.
-    let (_slots_guard, root_key, _vmh) = state
-        .hold_unlocked_root_key_and_hash()
-        .await
-        .ok_or(PrefsWriteError::SlotNotUnlocked)?;
-
-    let account_number_hash = read_account_number_hash_for_write(&vault_dir.join("vault.meta"))?;
-    let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
-    let prefs_path = vault_dir.join("vault.prefs");
-
-    let mut prefs = read_or_default(&prefs_path, &prefs_key, &account_number_hash);
-    prefs.screen_capture_protection = enabled;
-
-    let blob_bytes = encode_prefs_blob(&prefs_key, &account_number_hash, &prefs)
-        .map_err(|_| PrefsWriteError::PrefsEncodeFailed)?;
-
-    crate::atomic_write::atomic_write(&prefs_path, &blob_bytes, true)
-        .map_err(PrefsWriteError::from)?;
+    update_prefs_with_dir(vault_dir, state, |prefs| {
+        prefs.screen_capture_protection = enabled;
+    })
+    .await?;
 
     tracing::info!(
         event = "prefs_written",
@@ -349,26 +341,10 @@ pub(crate) async fn set_spell_enabled_with_dir(
     state: &VaultRuntimeState,
     enabled: bool,
 ) -> Result<(), PrefsWriteError> {
-    let _write_guard = write_mutex().lock().await;
-
-    // SYNC-6 writer-guard (MYND-32): see state::hold_unlocked_root_key_and_hash.
-    let (_slots_guard, root_key, _vmh) = state
-        .hold_unlocked_root_key_and_hash()
-        .await
-        .ok_or(PrefsWriteError::SlotNotUnlocked)?;
-
-    let account_number_hash = read_account_number_hash_for_write(&vault_dir.join("vault.meta"))?;
-    let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
-    let prefs_path = vault_dir.join("vault.prefs");
-
-    let mut prefs = read_or_default(&prefs_path, &prefs_key, &account_number_hash);
-    prefs.spell_enabled = Some(enabled);
-
-    let blob_bytes = encode_prefs_blob(&prefs_key, &account_number_hash, &prefs)
-        .map_err(|_| PrefsWriteError::PrefsEncodeFailed)?;
-
-    crate::atomic_write::atomic_write(&prefs_path, &blob_bytes, true)
-        .map_err(PrefsWriteError::from)?;
+    update_prefs_with_dir(vault_dir, state, |prefs| {
+        prefs.spell_enabled = Some(enabled);
+    })
+    .await?;
 
     tracing::info!(
         event = "prefs_written",
@@ -399,26 +375,10 @@ pub(crate) async fn set_editor_line_numbers_with_dir(
     state: &VaultRuntimeState,
     enabled: bool,
 ) -> Result<(), PrefsWriteError> {
-    let _write_guard = write_mutex().lock().await;
-
-    // SYNC-6 writer-guard (MYND-32): see state::hold_unlocked_root_key_and_hash.
-    let (_slots_guard, root_key, _vmh) = state
-        .hold_unlocked_root_key_and_hash()
-        .await
-        .ok_or(PrefsWriteError::SlotNotUnlocked)?;
-
-    let account_number_hash = read_account_number_hash_for_write(&vault_dir.join("vault.meta"))?;
-    let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
-    let prefs_path = vault_dir.join("vault.prefs");
-
-    let mut prefs = read_or_default(&prefs_path, &prefs_key, &account_number_hash);
-    prefs.editor_line_numbers = Some(enabled);
-
-    let blob_bytes = encode_prefs_blob(&prefs_key, &account_number_hash, &prefs)
-        .map_err(|_| PrefsWriteError::PrefsEncodeFailed)?;
-
-    crate::atomic_write::atomic_write(&prefs_path, &blob_bytes, true)
-        .map_err(PrefsWriteError::from)?;
+    update_prefs_with_dir(vault_dir, state, |prefs| {
+        prefs.editor_line_numbers = Some(enabled);
+    })
+    .await?;
 
     tracing::info!(
         event = "prefs_written",
@@ -452,26 +412,10 @@ pub(crate) async fn set_archive_disabled_with_dir(
     state: &VaultRuntimeState,
     enabled: bool,
 ) -> Result<(), PrefsWriteError> {
-    let _write_guard = write_mutex().lock().await;
-
-    // SYNC-6 writer-guard (MYND-32): see state::hold_unlocked_root_key_and_hash.
-    let (_slots_guard, root_key, _vmh) = state
-        .hold_unlocked_root_key_and_hash()
-        .await
-        .ok_or(PrefsWriteError::SlotNotUnlocked)?;
-
-    let account_number_hash = read_account_number_hash_for_write(&vault_dir.join("vault.meta"))?;
-    let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
-    let prefs_path = vault_dir.join("vault.prefs");
-
-    let mut prefs = read_or_default(&prefs_path, &prefs_key, &account_number_hash);
-    prefs.archive_disabled = Some(enabled);
-
-    let blob_bytes = encode_prefs_blob(&prefs_key, &account_number_hash, &prefs)
-        .map_err(|_| PrefsWriteError::PrefsEncodeFailed)?;
-
-    crate::atomic_write::atomic_write(&prefs_path, &blob_bytes, true)
-        .map_err(PrefsWriteError::from)?;
+    update_prefs_with_dir(vault_dir, state, |prefs| {
+        prefs.archive_disabled = Some(enabled);
+    })
+    .await?;
 
     tracing::info!(
         event = "prefs_written",
@@ -538,26 +482,10 @@ pub(crate) async fn set_editor_focus_dim_inactive_with_dir(
     state: &VaultRuntimeState,
     enabled: bool,
 ) -> Result<(), PrefsWriteError> {
-    let _write_guard = write_mutex().lock().await;
-
-    // SYNC-6 writer-guard (MYND-32): see state::hold_unlocked_root_key_and_hash.
-    let (_slots_guard, root_key, _vmh) = state
-        .hold_unlocked_root_key_and_hash()
-        .await
-        .ok_or(PrefsWriteError::SlotNotUnlocked)?;
-
-    let account_number_hash = read_account_number_hash_for_write(&vault_dir.join("vault.meta"))?;
-    let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
-    let prefs_path = vault_dir.join("vault.prefs");
-
-    let mut prefs = read_or_default(&prefs_path, &prefs_key, &account_number_hash);
-    prefs.editor_focus_dim_inactive = Some(enabled);
-
-    let blob_bytes = encode_prefs_blob(&prefs_key, &account_number_hash, &prefs)
-        .map_err(|_| PrefsWriteError::PrefsEncodeFailed)?;
-
-    crate::atomic_write::atomic_write(&prefs_path, &blob_bytes, true)
-        .map_err(PrefsWriteError::from)?;
+    update_prefs_with_dir(vault_dir, state, |prefs| {
+        prefs.editor_focus_dim_inactive = Some(enabled);
+    })
+    .await?;
 
     tracing::info!(
         event = "prefs_written",
@@ -588,26 +516,10 @@ pub(crate) async fn set_editor_focus_typewriter_with_dir(
     state: &VaultRuntimeState,
     enabled: bool,
 ) -> Result<(), PrefsWriteError> {
-    let _write_guard = write_mutex().lock().await;
-
-    // SYNC-6 writer-guard (MYND-32): see state::hold_unlocked_root_key_and_hash.
-    let (_slots_guard, root_key, _vmh) = state
-        .hold_unlocked_root_key_and_hash()
-        .await
-        .ok_or(PrefsWriteError::SlotNotUnlocked)?;
-
-    let account_number_hash = read_account_number_hash_for_write(&vault_dir.join("vault.meta"))?;
-    let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
-    let prefs_path = vault_dir.join("vault.prefs");
-
-    let mut prefs = read_or_default(&prefs_path, &prefs_key, &account_number_hash);
-    prefs.editor_focus_typewriter = Some(enabled);
-
-    let blob_bytes = encode_prefs_blob(&prefs_key, &account_number_hash, &prefs)
-        .map_err(|_| PrefsWriteError::PrefsEncodeFailed)?;
-
-    crate::atomic_write::atomic_write(&prefs_path, &blob_bytes, true)
-        .map_err(PrefsWriteError::from)?;
+    update_prefs_with_dir(vault_dir, state, |prefs| {
+        prefs.editor_focus_typewriter = Some(enabled);
+    })
+    .await?;
 
     tracing::info!(
         event = "prefs_written",
@@ -639,26 +551,10 @@ pub(crate) async fn set_show_note_timestamps_with_dir(
     state: &VaultRuntimeState,
     enabled: bool,
 ) -> Result<(), PrefsWriteError> {
-    let _write_guard = write_mutex().lock().await;
-
-    // SYNC-6 writer-guard (MYND-32): see state::hold_unlocked_root_key_and_hash.
-    let (_slots_guard, root_key, _vmh) = state
-        .hold_unlocked_root_key_and_hash()
-        .await
-        .ok_or(PrefsWriteError::SlotNotUnlocked)?;
-
-    let account_number_hash = read_account_number_hash_for_write(&vault_dir.join("vault.meta"))?;
-    let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
-    let prefs_path = vault_dir.join("vault.prefs");
-
-    let mut prefs = read_or_default(&prefs_path, &prefs_key, &account_number_hash);
-    prefs.show_note_timestamps = enabled;
-
-    let blob_bytes = encode_prefs_blob(&prefs_key, &account_number_hash, &prefs)
-        .map_err(|_| PrefsWriteError::PrefsEncodeFailed)?;
-
-    crate::atomic_write::atomic_write(&prefs_path, &blob_bytes, true)
-        .map_err(PrefsWriteError::from)?;
+    update_prefs_with_dir(vault_dir, state, |prefs| {
+        prefs.show_note_timestamps = enabled;
+    })
+    .await?;
 
     tracing::info!(
         event = "prefs_written",
@@ -691,27 +587,11 @@ pub(crate) async fn set_spell_languages_with_dir(
     state: &VaultRuntimeState,
     languages: Vec<String>,
 ) -> Result<(), PrefsWriteError> {
-    let _write_guard = write_mutex().lock().await;
-
-    // SYNC-6 writer-guard (MYND-32): see state::hold_unlocked_root_key_and_hash.
-    let (_slots_guard, root_key, _vmh) = state
-        .hold_unlocked_root_key_and_hash()
-        .await
-        .ok_or(PrefsWriteError::SlotNotUnlocked)?;
-
-    let account_number_hash = read_account_number_hash_for_write(&vault_dir.join("vault.meta"))?;
-    let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
-    let prefs_path = vault_dir.join("vault.prefs");
-
-    let mut prefs = read_or_default(&prefs_path, &prefs_key, &account_number_hash);
     let count = languages.len();
-    prefs.spell_languages = languages;
-
-    let blob_bytes = encode_prefs_blob(&prefs_key, &account_number_hash, &prefs)
-        .map_err(|_| PrefsWriteError::PrefsEncodeFailed)?;
-
-    crate::atomic_write::atomic_write(&prefs_path, &blob_bytes, true)
-        .map_err(PrefsWriteError::from)?;
+    update_prefs_with_dir(vault_dir, state, |prefs| {
+        prefs.spell_languages = languages;
+    })
+    .await?;
 
     tracing::info!(event = "prefs_written", field = "spell_languages", count);
     Ok(())
@@ -750,35 +630,17 @@ pub(crate) async fn set_keymap_binding_with_dir(
     command_id: String,
     chords: Option<Vec<String>>,
 ) -> Result<(), PrefsWriteError> {
-    let _write_guard = write_mutex().lock().await;
-
-    // SYNC-6 writer-guard (MYND-32): see state::hold_unlocked_root_key_and_hash.
-    let (_slots_guard, root_key, _vmh) = state
-        .hold_unlocked_root_key_and_hash()
-        .await
-        .ok_or(PrefsWriteError::SlotNotUnlocked)?;
-
-    let account_number_hash = read_account_number_hash_for_write(&vault_dir.join("vault.meta"))?;
-    let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
-    let prefs_path = vault_dir.join("vault.prefs");
-
-    let mut prefs = read_or_default(&prefs_path, &prefs_key, &account_number_hash);
     let removed = chords.is_none();
     let count = chords.as_ref().map(Vec::len).unwrap_or(0);
-    match chords {
+    update_prefs_with_dir(vault_dir, state, |prefs| match chords {
         Some(c) => {
             prefs.keymap.insert(command_id, c);
         }
         None => {
             prefs.keymap.remove(&command_id);
         }
-    }
-
-    let blob_bytes = encode_prefs_blob(&prefs_key, &account_number_hash, &prefs)
-        .map_err(|_| PrefsWriteError::PrefsEncodeFailed)?;
-
-    crate::atomic_write::atomic_write(&prefs_path, &blob_bytes, true)
-        .map_err(PrefsWriteError::from)?;
+    })
+    .await?;
 
     tracing::info!(event = "prefs_written", field = "keymap", removed, count);
     Ok(())
@@ -810,27 +672,11 @@ pub async fn set_deliberate_folders_with_dir(
     state: &VaultRuntimeState,
     folders: Vec<String>,
 ) -> Result<(), PrefsWriteError> {
-    let _write_guard = write_mutex().lock().await;
-
-    // SYNC-6 writer-guard (MYND-32): see state::hold_unlocked_root_key_and_hash.
-    let (_slots_guard, root_key, _vmh) = state
-        .hold_unlocked_root_key_and_hash()
-        .await
-        .ok_or(PrefsWriteError::SlotNotUnlocked)?;
-
-    let account_number_hash = read_account_number_hash_for_write(&vault_dir.join("vault.meta"))?;
-    let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
-    let prefs_path = vault_dir.join("vault.prefs");
-
-    let mut prefs = read_or_default(&prefs_path, &prefs_key, &account_number_hash);
     let count = folders.len();
-    prefs.deliberate_folders = folders;
-
-    let blob_bytes = encode_prefs_blob(&prefs_key, &account_number_hash, &prefs)
-        .map_err(|_| PrefsWriteError::PrefsEncodeFailed)?;
-
-    crate::atomic_write::atomic_write(&prefs_path, &blob_bytes, true)
-        .map_err(PrefsWriteError::from)?;
+    update_prefs_with_dir(vault_dir, state, |prefs| {
+        prefs.deliberate_folders = folders;
+    })
+    .await?;
 
     // Folder COUNT only — never the paths (folder structure is AS3
     // Sensitive; see ../../CLAUDE.md "Secret-handling logging discipline").
@@ -868,25 +714,10 @@ pub(crate) async fn set_ai_enabled_with_dir(
     state: &VaultRuntimeState,
     enabled: bool,
 ) -> Result<(), PrefsWriteError> {
-    let _write_guard = write_mutex().lock().await;
-
-    let (_slots_guard, root_key, _vmh) = state
-        .hold_unlocked_root_key_and_hash()
-        .await
-        .ok_or(PrefsWriteError::SlotNotUnlocked)?;
-
-    let account_number_hash = read_account_number_hash_for_write(&vault_dir.join("vault.meta"))?;
-    let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
-    let prefs_path = vault_dir.join("vault.prefs");
-
-    let mut prefs = read_or_default(&prefs_path, &prefs_key, &account_number_hash);
-    prefs.ai_enabled = enabled;
-
-    let blob_bytes = encode_prefs_blob(&prefs_key, &account_number_hash, &prefs)
-        .map_err(|_| PrefsWriteError::PrefsEncodeFailed)?;
-
-    crate::atomic_write::atomic_write(&prefs_path, &blob_bytes, true)
-        .map_err(PrefsWriteError::from)?;
+    update_prefs_with_dir(vault_dir, state, |prefs| {
+        prefs.ai_enabled = enabled;
+    })
+    .await?;
 
     tracing::info!(event = "prefs_written", field = "ai_enabled", enabled);
     Ok(())
@@ -921,26 +752,11 @@ pub(crate) async fn set_ai_excluded_folders_with_dir(
     state: &VaultRuntimeState,
     folders: Vec<String>,
 ) -> Result<(), PrefsWriteError> {
-    let _write_guard = write_mutex().lock().await;
-
-    let (_slots_guard, root_key, _vmh) = state
-        .hold_unlocked_root_key_and_hash()
-        .await
-        .ok_or(PrefsWriteError::SlotNotUnlocked)?;
-
-    let account_number_hash = read_account_number_hash_for_write(&vault_dir.join("vault.meta"))?;
-    let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
-    let prefs_path = vault_dir.join("vault.prefs");
-
-    let mut prefs = read_or_default(&prefs_path, &prefs_key, &account_number_hash);
     let count = folders.len();
-    prefs.ai_excluded_folders = folders;
-
-    let blob_bytes = encode_prefs_blob(&prefs_key, &account_number_hash, &prefs)
-        .map_err(|_| PrefsWriteError::PrefsEncodeFailed)?;
-
-    crate::atomic_write::atomic_write(&prefs_path, &blob_bytes, true)
-        .map_err(PrefsWriteError::from)?;
+    update_prefs_with_dir(vault_dir, state, |prefs| {
+        prefs.ai_excluded_folders = folders;
+    })
+    .await?;
 
     // Folder COUNT only — never the paths (AS3 Sensitive; see the
     // `set_deliberate_folders` note + ../../CLAUDE.md logging discipline).
@@ -977,27 +793,11 @@ pub(crate) async fn set_item_order_with_dir(
     state: &VaultRuntimeState,
     order: Vec<String>,
 ) -> Result<(), PrefsWriteError> {
-    let _write_guard = write_mutex().lock().await;
-
-    // SYNC-6 writer-guard (MYND-32): see state::hold_unlocked_root_key_and_hash.
-    let (_slots_guard, root_key, _vmh) = state
-        .hold_unlocked_root_key_and_hash()
-        .await
-        .ok_or(PrefsWriteError::SlotNotUnlocked)?;
-
-    let account_number_hash = read_account_number_hash_for_write(&vault_dir.join("vault.meta"))?;
-    let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
-    let prefs_path = vault_dir.join("vault.prefs");
-
-    let mut prefs = read_or_default(&prefs_path, &prefs_key, &account_number_hash);
     let count = order.len();
-    prefs.item_order = order;
-
-    let blob_bytes = encode_prefs_blob(&prefs_key, &account_number_hash, &prefs)
-        .map_err(|_| PrefsWriteError::PrefsEncodeFailed)?;
-
-    crate::atomic_write::atomic_write(&prefs_path, &blob_bytes, true)
-        .map_err(PrefsWriteError::from)?;
+    update_prefs_with_dir(vault_dir, state, |prefs| {
+        prefs.item_order = order;
+    })
+    .await?;
 
     // COUNT only — never the item IDs/paths (note_id is a per-note vault-stable
     // correlation tag, folder paths are AS3 Sensitive; see ../../CLAUDE.md
@@ -1029,27 +829,11 @@ pub(crate) async fn set_hidden_bar_items_with_dir(
     state: &VaultRuntimeState,
     items: Vec<String>,
 ) -> Result<(), PrefsWriteError> {
-    let _write_guard = write_mutex().lock().await;
-
-    // SYNC-6 writer-guard (MYND-32): see state::hold_unlocked_root_key_and_hash.
-    let (_slots_guard, root_key, _vmh) = state
-        .hold_unlocked_root_key_and_hash()
-        .await
-        .ok_or(PrefsWriteError::SlotNotUnlocked)?;
-
-    let account_number_hash = read_account_number_hash_for_write(&vault_dir.join("vault.meta"))?;
-    let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
-    let prefs_path = vault_dir.join("vault.prefs");
-
-    let mut prefs = read_or_default(&prefs_path, &prefs_key, &account_number_hash);
     let count = items.len();
-    prefs.hidden_bar_items = items;
-
-    let blob_bytes = encode_prefs_blob(&prefs_key, &account_number_hash, &prefs)
-        .map_err(|_| PrefsWriteError::PrefsEncodeFailed)?;
-
-    crate::atomic_write::atomic_write(&prefs_path, &blob_bytes, true)
-        .map_err(PrefsWriteError::from)?;
+    update_prefs_with_dir(vault_dir, state, |prefs| {
+        prefs.hidden_bar_items = items;
+    })
+    .await?;
 
     // COUNT only — the ids are a non-secret closed UI vocabulary, but stay
     // consistent with the other prefs setters' count-only discipline.
@@ -1083,33 +867,16 @@ pub(crate) async fn upsert_saved_view_with_dir(
     state: &VaultRuntimeState,
     view: SavedView,
 ) -> Result<(), PrefsWriteError> {
-    let _write_guard = write_mutex().lock().await;
-
-    // SYNC-6 writer-guard (MYND-32): see state::hold_unlocked_root_key_and_hash.
-    let (_slots_guard, root_key, _vmh) = state
-        .hold_unlocked_root_key_and_hash()
-        .await
-        .ok_or(PrefsWriteError::SlotNotUnlocked)?;
-
-    let account_number_hash = read_account_number_hash_for_write(&vault_dir.join("vault.meta"))?;
-    let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
-    let prefs_path = vault_dir.join("vault.prefs");
-
-    let mut prefs = read_or_default(&prefs_path, &prefs_key, &account_number_hash);
-    // Upsert by id: replace in place, else append. No duplicate ids.
-    match prefs.saved_views.iter_mut().find(|v| v.id == view.id) {
-        Some(existing) => *existing = view,
-        None => prefs.saved_views.push(view),
-    }
-    let count = prefs.saved_views.len();
-
-    // The 64 KiB §9.5.4 cap is enforced inside the encode — an over-cap encode
-    // fails HERE, before the atomic write, leaving the prior on-disk prefs intact.
-    let blob_bytes = encode_prefs_blob(&prefs_key, &account_number_hash, &prefs)
-        .map_err(|_| PrefsWriteError::PrefsEncodeFailed)?;
-
-    crate::atomic_write::atomic_write(&prefs_path, &blob_bytes, true)
-        .map_err(PrefsWriteError::from)?;
+    let mut count = 0usize;
+    update_prefs_with_dir(vault_dir, state, |prefs| {
+        // Upsert by id: replace in place, else append. No duplicate ids.
+        match prefs.saved_views.iter_mut().find(|v| v.id == view.id) {
+            Some(existing) => *existing = view,
+            None => prefs.saved_views.push(view),
+        }
+        count = prefs.saved_views.len();
+    })
+    .await?;
 
     // COUNT only — never a view name / filter / property (AS3-Sensitive).
     tracing::info!(event = "prefs_written", field = "saved_views", count);
@@ -1137,29 +904,14 @@ pub(crate) async fn delete_saved_view_with_dir(
     state: &VaultRuntimeState,
     id: String,
 ) -> Result<(), PrefsWriteError> {
-    let _write_guard = write_mutex().lock().await;
-
-    // SYNC-6 writer-guard (MYND-32): see state::hold_unlocked_root_key_and_hash.
-    let (_slots_guard, root_key, _vmh) = state
-        .hold_unlocked_root_key_and_hash()
-        .await
-        .ok_or(PrefsWriteError::SlotNotUnlocked)?;
-
-    let account_number_hash = read_account_number_hash_for_write(&vault_dir.join("vault.meta"))?;
-    let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
-    let prefs_path = vault_dir.join("vault.prefs");
-
-    let mut prefs = read_or_default(&prefs_path, &prefs_key, &account_number_hash);
-    prefs.saved_views.retain(|v| v.id != id);
-    // Prune the id from the display order too (no dangling entry).
-    prefs.view_order.retain(|vid| *vid != id);
-    let count = prefs.saved_views.len();
-
-    let blob_bytes = encode_prefs_blob(&prefs_key, &account_number_hash, &prefs)
-        .map_err(|_| PrefsWriteError::PrefsEncodeFailed)?;
-
-    crate::atomic_write::atomic_write(&prefs_path, &blob_bytes, true)
-        .map_err(PrefsWriteError::from)?;
+    let mut count = 0usize;
+    update_prefs_with_dir(vault_dir, state, |prefs| {
+        prefs.saved_views.retain(|v| v.id != id);
+        // Prune the id from the display order too (no dangling entry).
+        prefs.view_order.retain(|vid| *vid != id);
+        count = prefs.saved_views.len();
+    })
+    .await?;
 
     // COUNT only — never the view id (AS3-Sensitive correlation surface).
     tracing::info!(event = "prefs_written", field = "saved_views", count);
@@ -1189,27 +941,11 @@ pub(crate) async fn set_view_order_with_dir(
     state: &VaultRuntimeState,
     order: Vec<String>,
 ) -> Result<(), PrefsWriteError> {
-    let _write_guard = write_mutex().lock().await;
-
-    // SYNC-6 writer-guard (MYND-32): see state::hold_unlocked_root_key_and_hash.
-    let (_slots_guard, root_key, _vmh) = state
-        .hold_unlocked_root_key_and_hash()
-        .await
-        .ok_or(PrefsWriteError::SlotNotUnlocked)?;
-
-    let account_number_hash = read_account_number_hash_for_write(&vault_dir.join("vault.meta"))?;
-    let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
-    let prefs_path = vault_dir.join("vault.prefs");
-
-    let mut prefs = read_or_default(&prefs_path, &prefs_key, &account_number_hash);
     let count = order.len();
-    prefs.view_order = order;
-
-    let blob_bytes = encode_prefs_blob(&prefs_key, &account_number_hash, &prefs)
-        .map_err(|_| PrefsWriteError::PrefsEncodeFailed)?;
-
-    crate::atomic_write::atomic_write(&prefs_path, &blob_bytes, true)
-        .map_err(PrefsWriteError::from)?;
+    update_prefs_with_dir(vault_dir, state, |prefs| {
+        prefs.view_order = order;
+    })
+    .await?;
 
     // COUNT only — never the view ids (AS3-Sensitive correlation surface).
     tracing::info!(event = "prefs_written", field = "view_order", count);
@@ -1239,27 +975,11 @@ pub(crate) async fn set_bar_items_order_with_dir(
     state: &VaultRuntimeState,
     order: Vec<String>,
 ) -> Result<(), PrefsWriteError> {
-    let _write_guard = write_mutex().lock().await;
-
-    // SYNC-6 writer-guard (MYND-32): see state::hold_unlocked_root_key_and_hash.
-    let (_slots_guard, root_key, _vmh) = state
-        .hold_unlocked_root_key_and_hash()
-        .await
-        .ok_or(PrefsWriteError::SlotNotUnlocked)?;
-
-    let account_number_hash = read_account_number_hash_for_write(&vault_dir.join("vault.meta"))?;
-    let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
-    let prefs_path = vault_dir.join("vault.prefs");
-
-    let mut prefs = read_or_default(&prefs_path, &prefs_key, &account_number_hash);
     let count = order.len();
-    prefs.bar_items_order = order;
-
-    let blob_bytes = encode_prefs_blob(&prefs_key, &account_number_hash, &prefs)
-        .map_err(|_| PrefsWriteError::PrefsEncodeFailed)?;
-
-    crate::atomic_write::atomic_write(&prefs_path, &blob_bytes, true)
-        .map_err(PrefsWriteError::from)?;
+    update_prefs_with_dir(vault_dir, state, |prefs| {
+        prefs.bar_items_order = order;
+    })
+    .await?;
 
     // COUNT only — the bar element ids are fixed UI affordance names, but keep
     // the count-only discipline uniform with the other prefs setters.
@@ -1307,27 +1027,11 @@ pub(crate) async fn set_right_panel_hidden_tabs_with_dir(
     state: &VaultRuntimeState,
     items: Vec<String>,
 ) -> Result<(), PrefsWriteError> {
-    let _write_guard = write_mutex().lock().await;
-
-    // SYNC-6 writer-guard (MYND-32): see state::hold_unlocked_root_key_and_hash.
-    let (_slots_guard, root_key, _vmh) = state
-        .hold_unlocked_root_key_and_hash()
-        .await
-        .ok_or(PrefsWriteError::SlotNotUnlocked)?;
-
-    let account_number_hash = read_account_number_hash_for_write(&vault_dir.join("vault.meta"))?;
-    let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
-    let prefs_path = vault_dir.join("vault.prefs");
-
-    let mut prefs = read_or_default(&prefs_path, &prefs_key, &account_number_hash);
     let count = items.len();
-    prefs.right_panel_hidden_tabs = items;
-
-    let blob_bytes = encode_prefs_blob(&prefs_key, &account_number_hash, &prefs)
-        .map_err(|_| PrefsWriteError::PrefsEncodeFailed)?;
-
-    crate::atomic_write::atomic_write(&prefs_path, &blob_bytes, true)
-        .map_err(PrefsWriteError::from)?;
+    update_prefs_with_dir(vault_dir, state, |prefs| {
+        prefs.right_panel_hidden_tabs = items;
+    })
+    .await?;
 
     // COUNT only — the tab ids are a non-secret closed UI vocabulary, but stay
     // consistent with the other prefs setters' count-only discipline.
@@ -1361,27 +1065,11 @@ pub(crate) async fn set_right_panel_tab_order_with_dir(
     state: &VaultRuntimeState,
     order: Vec<String>,
 ) -> Result<(), PrefsWriteError> {
-    let _write_guard = write_mutex().lock().await;
-
-    // SYNC-6 writer-guard (MYND-32): see state::hold_unlocked_root_key_and_hash.
-    let (_slots_guard, root_key, _vmh) = state
-        .hold_unlocked_root_key_and_hash()
-        .await
-        .ok_or(PrefsWriteError::SlotNotUnlocked)?;
-
-    let account_number_hash = read_account_number_hash_for_write(&vault_dir.join("vault.meta"))?;
-    let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
-    let prefs_path = vault_dir.join("vault.prefs");
-
-    let mut prefs = read_or_default(&prefs_path, &prefs_key, &account_number_hash);
     let count = order.len();
-    prefs.right_panel_tab_order = order;
-
-    let blob_bytes = encode_prefs_blob(&prefs_key, &account_number_hash, &prefs)
-        .map_err(|_| PrefsWriteError::PrefsEncodeFailed)?;
-
-    crate::atomic_write::atomic_write(&prefs_path, &blob_bytes, true)
-        .map_err(PrefsWriteError::from)?;
+    update_prefs_with_dir(vault_dir, state, |prefs| {
+        prefs.right_panel_tab_order = order;
+    })
+    .await?;
 
     // COUNT only — the tab ids are fixed UI affordance names, but keep the
     // count-only discipline uniform with the other prefs setters.
@@ -1413,26 +1101,10 @@ pub(crate) async fn set_daily_date_format_with_dir(
     state: &VaultRuntimeState,
     format: String,
 ) -> Result<(), PrefsWriteError> {
-    let _write_guard = write_mutex().lock().await;
-
-    // SYNC-6 writer-guard (MYND-32): see state::hold_unlocked_root_key_and_hash.
-    let (_slots_guard, root_key, _vmh) = state
-        .hold_unlocked_root_key_and_hash()
-        .await
-        .ok_or(PrefsWriteError::SlotNotUnlocked)?;
-
-    let account_number_hash = read_account_number_hash_for_write(&vault_dir.join("vault.meta"))?;
-    let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
-    let prefs_path = vault_dir.join("vault.prefs");
-
-    let mut prefs = read_or_default(&prefs_path, &prefs_key, &account_number_hash);
-    prefs.daily_date_format = Some(format);
-
-    let blob_bytes = encode_prefs_blob(&prefs_key, &account_number_hash, &prefs)
-        .map_err(|_| PrefsWriteError::PrefsEncodeFailed)?;
-
-    crate::atomic_write::atomic_write(&prefs_path, &blob_bytes, true)
-        .map_err(PrefsWriteError::from)?;
+    update_prefs_with_dir(vault_dir, state, |prefs| {
+        prefs.daily_date_format = Some(format);
+    })
+    .await?;
 
     tracing::info!(event = "prefs_written", field = "daily_date_format");
     Ok(())
@@ -1459,31 +1131,15 @@ pub(crate) async fn set_daily_folder_with_dir(
     state: &VaultRuntimeState,
     folder: String,
 ) -> Result<(), PrefsWriteError> {
-    let _write_guard = write_mutex().lock().await;
-
-    // SYNC-6 writer-guard (MYND-32): see state::hold_unlocked_root_key_and_hash.
-    let (_slots_guard, root_key, _vmh) = state
-        .hold_unlocked_root_key_and_hash()
-        .await
-        .ok_or(PrefsWriteError::SlotNotUnlocked)?;
-
-    let account_number_hash = read_account_number_hash_for_write(&vault_dir.join("vault.meta"))?;
-    let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
-    let prefs_path = vault_dir.join("vault.prefs");
-
-    let mut prefs = read_or_default(&prefs_path, &prefs_key, &account_number_hash);
-    prefs.daily_folder = Some(folder.clone());
-    // Register as a deliberate folder so the daily folder survives empty
-    // (MYND-144). Exact-dedup here; the codec sorts + exact-dedups on encode.
-    if !prefs.deliberate_folders.contains(&folder) {
-        prefs.deliberate_folders.push(folder);
-    }
-
-    let blob_bytes = encode_prefs_blob(&prefs_key, &account_number_hash, &prefs)
-        .map_err(|_| PrefsWriteError::PrefsEncodeFailed)?;
-
-    crate::atomic_write::atomic_write(&prefs_path, &blob_bytes, true)
-        .map_err(PrefsWriteError::from)?;
+    update_prefs_with_dir(vault_dir, state, |prefs| {
+        prefs.daily_folder = Some(folder.clone());
+        // Register as a deliberate folder so the daily folder survives empty
+        // (MYND-144). Exact-dedup here; the codec sorts + exact-dedups on encode.
+        if !prefs.deliberate_folders.contains(&folder) {
+            prefs.deliberate_folders.push(folder);
+        }
+    })
+    .await?;
 
     // Field name only — never the path (folder structure is AS3 Sensitive; see
     // ../../CLAUDE.md "Secret-handling logging discipline").
@@ -1511,27 +1167,11 @@ pub(crate) async fn set_daily_template_with_dir(
     state: &VaultRuntimeState,
     template_id: Option<String>,
 ) -> Result<(), PrefsWriteError> {
-    let _write_guard = write_mutex().lock().await;
-
-    // SYNC-6 writer-guard (MYND-32): see state::hold_unlocked_root_key_and_hash.
-    let (_slots_guard, root_key, _vmh) = state
-        .hold_unlocked_root_key_and_hash()
-        .await
-        .ok_or(PrefsWriteError::SlotNotUnlocked)?;
-
-    let account_number_hash = read_account_number_hash_for_write(&vault_dir.join("vault.meta"))?;
-    let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
-    let prefs_path = vault_dir.join("vault.prefs");
-
-    let mut prefs = read_or_default(&prefs_path, &prefs_key, &account_number_hash);
     let cleared = template_id.is_none();
-    prefs.daily_template = template_id;
-
-    let blob_bytes = encode_prefs_blob(&prefs_key, &account_number_hash, &prefs)
-        .map_err(|_| PrefsWriteError::PrefsEncodeFailed)?;
-
-    crate::atomic_write::atomic_write(&prefs_path, &blob_bytes, true)
-        .map_err(PrefsWriteError::from)?;
+    update_prefs_with_dir(vault_dir, state, |prefs| {
+        prefs.daily_template = template_id;
+    })
+    .await?;
 
     // Field name + set/cleared only — never the UUID (note_id is a vault-stable
     // correlation tag; see ../../CLAUDE.md "Secret-handling logging discipline").
@@ -1566,34 +1206,18 @@ pub(crate) async fn set_new_note_location_with_dir(
     location: Option<String>,
     folder: Option<String>,
 ) -> Result<(), PrefsWriteError> {
-    let _write_guard = write_mutex().lock().await;
-
-    // SYNC-6 writer-guard (MYND-32): see state::hold_unlocked_root_key_and_hash.
-    let (_slots_guard, root_key, _vmh) = state
-        .hold_unlocked_root_key_and_hash()
-        .await
-        .ok_or(PrefsWriteError::SlotNotUnlocked)?;
-
-    let account_number_hash = read_account_number_hash_for_write(&vault_dir.join("vault.meta"))?;
-    let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
-    let prefs_path = vault_dir.join("vault.prefs");
-
-    let mut prefs = read_or_default(&prefs_path, &prefs_key, &account_number_hash);
-    prefs.new_note_location = location;
-    prefs.new_note_location_folder = folder.clone();
-    // When a specific target folder is named, register it as a deliberate folder
-    // so it survives empty (MYND-144) — exactly like set_daily_folder.
-    if let Some(folder) = folder {
-        if !prefs.deliberate_folders.contains(&folder) {
-            prefs.deliberate_folders.push(folder);
+    update_prefs_with_dir(vault_dir, state, |prefs| {
+        prefs.new_note_location = location;
+        prefs.new_note_location_folder = folder.clone();
+        // When a specific target folder is named, register it as a deliberate folder
+        // so it survives empty (MYND-144) — exactly like set_daily_folder.
+        if let Some(folder) = folder {
+            if !prefs.deliberate_folders.contains(&folder) {
+                prefs.deliberate_folders.push(folder);
+            }
         }
-    }
-
-    let blob_bytes = encode_prefs_blob(&prefs_key, &account_number_hash, &prefs)
-        .map_err(|_| PrefsWriteError::PrefsEncodeFailed)?;
-
-    crate::atomic_write::atomic_write(&prefs_path, &blob_bytes, true)
-        .map_err(PrefsWriteError::from)?;
+    })
+    .await?;
 
     // Field name only — never the path (folder structure is AS3 Sensitive; see
     // ../../CLAUDE.md "Secret-handling logging discipline").
@@ -1615,26 +1239,7 @@ async fn set_typography_field_with_dir(
     field_label: &'static str,
     mutate: impl FnOnce(&mut PrefsView),
 ) -> Result<(), PrefsWriteError> {
-    let _write_guard = write_mutex().lock().await;
-
-    // SYNC-6 writer-guard (MYND-32): see state::hold_unlocked_root_key_and_hash.
-    let (_slots_guard, root_key, _vmh) = state
-        .hold_unlocked_root_key_and_hash()
-        .await
-        .ok_or(PrefsWriteError::SlotNotUnlocked)?;
-
-    let account_number_hash = read_account_number_hash_for_write(&vault_dir.join("vault.meta"))?;
-    let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
-    let prefs_path = vault_dir.join("vault.prefs");
-
-    let mut prefs = read_or_default(&prefs_path, &prefs_key, &account_number_hash);
-    mutate(&mut prefs);
-
-    let blob_bytes = encode_prefs_blob(&prefs_key, &account_number_hash, &prefs)
-        .map_err(|_| PrefsWriteError::PrefsEncodeFailed)?;
-
-    crate::atomic_write::atomic_write(&prefs_path, &blob_bytes, true)
-        .map_err(PrefsWriteError::from)?;
+    update_prefs_with_dir(vault_dir, state, mutate).await?;
 
     // Field name only — never the value (a typography preset is not secret, but
     // the field-name-only discipline is uniform across prefs setters).
@@ -1757,27 +1362,11 @@ pub(crate) async fn set_favorites_with_dir(
     state: &VaultRuntimeState,
     order: Vec<String>,
 ) -> Result<(), PrefsWriteError> {
-    let _write_guard = write_mutex().lock().await;
-
-    // SYNC-6 writer-guard (MYND-32): see state::hold_unlocked_root_key_and_hash.
-    let (_slots_guard, root_key, _vmh) = state
-        .hold_unlocked_root_key_and_hash()
-        .await
-        .ok_or(PrefsWriteError::SlotNotUnlocked)?;
-
-    let account_number_hash = read_account_number_hash_for_write(&vault_dir.join("vault.meta"))?;
-    let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
-    let prefs_path = vault_dir.join("vault.prefs");
-
-    let mut prefs = read_or_default(&prefs_path, &prefs_key, &account_number_hash);
     let count = order.len();
-    prefs.favorites = order;
-
-    let blob_bytes = encode_prefs_blob(&prefs_key, &account_number_hash, &prefs)
-        .map_err(|_| PrefsWriteError::PrefsEncodeFailed)?;
-
-    crate::atomic_write::atomic_write(&prefs_path, &blob_bytes, true)
-        .map_err(PrefsWriteError::from)?;
+    update_prefs_with_dir(vault_dir, state, |prefs| {
+        prefs.favorites = order;
+    })
+    .await?;
 
     // COUNT only — never the note IDs (note_id is a per-note vault-stable
     // correlation tag; see ../../CLAUDE.md "Secret-handling logging discipline").
@@ -1816,27 +1405,10 @@ pub async fn set_auto_lock_timeout_with_dir(
     hooks: &crate::hooks::Hooks,
     seconds: u32,
 ) -> Result<(), PrefsWriteError> {
-    let _write_guard = write_mutex().lock().await;
-
-    // SYNC-6 writer-guard (MYND-32): see state::hold_unlocked_root_key_and_hash.
-    let (_slots_guard, root_key, _vmh) = state
-        .hold_unlocked_root_key_and_hash()
-        .await
-        .ok_or(PrefsWriteError::SlotNotUnlocked)?;
-
-    let account_number_hash = read_account_number_hash_for_write(&vault_dir.join("vault.meta"))?;
-    let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
-    let prefs_path = vault_dir.join("vault.prefs");
-
-    let mut prefs = read_or_default(&prefs_path, &prefs_key, &account_number_hash);
-    prefs.auto_lock_seconds = Some(seconds);
-
-    let blob_bytes = encode_prefs_blob(&prefs_key, &account_number_hash, &prefs)
-        .map_err(|_| PrefsWriteError::PrefsEncodeFailed)?;
-
-    // Disk commit FIRST.
-    crate::atomic_write::atomic_write(&prefs_path, &blob_bytes, true)
-        .map_err(PrefsWriteError::from)?;
+    update_prefs_with_dir(vault_dir, state, |prefs| {
+        prefs.auto_lock_seconds = Some(seconds);
+    })
+    .await?;
 
     // Effect SECOND (only on disk success): refresh the cached effective
     // timeout the running idle timer reads, clamped through the envelope so
@@ -1876,27 +1448,11 @@ pub(crate) async fn set_editor_layout_with_dir(
     state: &VaultRuntimeState,
     layout: EditorLayout,
 ) -> Result<(), PrefsWriteError> {
-    let _write_guard = write_mutex().lock().await;
-
-    // SYNC-6 writer-guard (MYND-32): see state::hold_unlocked_root_key_and_hash.
-    let (_slots_guard, root_key, _vmh) = state
-        .hold_unlocked_root_key_and_hash()
-        .await
-        .ok_or(PrefsWriteError::SlotNotUnlocked)?;
-
-    let account_number_hash = read_account_number_hash_for_write(&vault_dir.join("vault.meta"))?;
-    let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
-    let prefs_path = vault_dir.join("vault.prefs");
-
-    let mut prefs = read_or_default(&prefs_path, &prefs_key, &account_number_hash);
     let (left_collapsed, right_collapsed) = (layout.left_collapsed, layout.right_collapsed);
-    prefs.editor_layout = Some(layout);
-
-    let blob_bytes = encode_prefs_blob(&prefs_key, &account_number_hash, &prefs)
-        .map_err(|_| PrefsWriteError::PrefsEncodeFailed)?;
-
-    crate::atomic_write::atomic_write(&prefs_path, &blob_bytes, true)
-        .map_err(PrefsWriteError::from)?;
+    update_prefs_with_dir(vault_dir, state, |prefs| {
+        prefs.editor_layout = Some(layout);
+    })
+    .await?;
 
     // Collapsed flags only — window-layout metadata (AS3-low), never note
     // content; widths are equally benign but omitted to keep the line minimal.
@@ -1951,26 +1507,10 @@ pub(crate) async fn set_theme_with_dir(
     state: &VaultRuntimeState,
     theme: Option<ThemeChoice>,
 ) -> Result<(), PrefsWriteError> {
-    let _write_guard = write_mutex().lock().await;
-
-    // SYNC-6 writer-guard (MYND-32): see state::hold_unlocked_root_key_and_hash.
-    let (_slots_guard, root_key, _vmh) = state
-        .hold_unlocked_root_key_and_hash()
-        .await
-        .ok_or(PrefsWriteError::SlotNotUnlocked)?;
-
-    let account_number_hash = read_account_number_hash_for_write(&vault_dir.join("vault.meta"))?;
-    let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
-    let prefs_path = vault_dir.join("vault.prefs");
-
-    let mut prefs = read_or_default(&prefs_path, &prefs_key, &account_number_hash);
-    prefs.theme = theme;
-
-    let blob_bytes = encode_prefs_blob(&prefs_key, &account_number_hash, &prefs)
-        .map_err(|_| PrefsWriteError::PrefsEncodeFailed)?;
-
-    crate::atomic_write::atomic_write(&prefs_path, &blob_bytes, true)
-        .map_err(PrefsWriteError::from)?;
+    update_prefs_with_dir(vault_dir, state, |prefs| {
+        prefs.theme = theme;
+    })
+    .await?;
 
     // Theme is a non-secret cosmetic preference (AS3-low) — the resolved
     // label is safe to emit.
@@ -2010,27 +1550,11 @@ pub(crate) async fn set_custom_theme_with_dir(
     state: &VaultRuntimeState,
     custom_theme: Option<String>,
 ) -> Result<(), PrefsWriteError> {
-    let _write_guard = write_mutex().lock().await;
-
-    // SYNC-6 writer-guard (MYND-32): see state::hold_unlocked_root_key_and_hash.
-    let (_slots_guard, root_key, _vmh) = state
-        .hold_unlocked_root_key_and_hash()
-        .await
-        .ok_or(PrefsWriteError::SlotNotUnlocked)?;
-
-    let account_number_hash = read_account_number_hash_for_write(&vault_dir.join("vault.meta"))?;
-    let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
-    let prefs_path = vault_dir.join("vault.prefs");
-
-    let mut prefs = read_or_default(&prefs_path, &prefs_key, &account_number_hash);
     let is_set = custom_theme.is_some();
-    prefs.custom_theme = custom_theme;
-
-    let blob_bytes = encode_prefs_blob(&prefs_key, &account_number_hash, &prefs)
-        .map_err(|_| PrefsWriteError::PrefsEncodeFailed)?;
-
-    crate::atomic_write::atomic_write(&prefs_path, &blob_bytes, true)
-        .map_err(PrefsWriteError::from)?;
+    update_prefs_with_dir(vault_dir, state, |prefs| {
+        prefs.custom_theme = custom_theme;
+    })
+    .await?;
 
     // The custom-theme NAME is user-authored cosmetic data; emit only whether a
     // custom theme is now selected or cleared, never the name itself.
@@ -2066,27 +1590,11 @@ pub(crate) async fn set_item_colors_with_dir(
     state: &VaultRuntimeState,
     colors: std::collections::BTreeMap<String, String>,
 ) -> Result<(), PrefsWriteError> {
-    let _write_guard = write_mutex().lock().await;
-
-    // SYNC-6 writer-guard (MYND-32): see state::hold_unlocked_root_key_and_hash.
-    let (_slots_guard, root_key, _vmh) = state
-        .hold_unlocked_root_key_and_hash()
-        .await
-        .ok_or(PrefsWriteError::SlotNotUnlocked)?;
-
-    let account_number_hash = read_account_number_hash_for_write(&vault_dir.join("vault.meta"))?;
-    let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
-    let prefs_path = vault_dir.join("vault.prefs");
-
-    let mut prefs = read_or_default(&prefs_path, &prefs_key, &account_number_hash);
     let count = colors.len();
-    prefs.item_colors = colors;
-
-    let blob_bytes = encode_prefs_blob(&prefs_key, &account_number_hash, &prefs)
-        .map_err(|_| PrefsWriteError::PrefsEncodeFailed)?;
-
-    crate::atomic_write::atomic_write(&prefs_path, &blob_bytes, true)
-        .map_err(PrefsWriteError::from)?;
+    update_prefs_with_dir(vault_dir, state, |prefs| {
+        prefs.item_colors = colors;
+    })
+    .await?;
 
     // Entry COUNT only — never the keys (note IDs / folder paths are AS3
     // correlation tags; see ../../CLAUDE.md "Secret-handling logging discipline").
@@ -2116,27 +1624,11 @@ pub(crate) async fn set_folder_icons_with_dir(
     state: &VaultRuntimeState,
     icons: std::collections::BTreeMap<String, String>,
 ) -> Result<(), PrefsWriteError> {
-    let _write_guard = write_mutex().lock().await;
-
-    // SYNC-6 writer-guard (MYND-32): see state::hold_unlocked_root_key_and_hash.
-    let (_slots_guard, root_key, _vmh) = state
-        .hold_unlocked_root_key_and_hash()
-        .await
-        .ok_or(PrefsWriteError::SlotNotUnlocked)?;
-
-    let account_number_hash = read_account_number_hash_for_write(&vault_dir.join("vault.meta"))?;
-    let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
-    let prefs_path = vault_dir.join("vault.prefs");
-
-    let mut prefs = read_or_default(&prefs_path, &prefs_key, &account_number_hash);
     let count = icons.len();
-    prefs.folder_icons = icons;
-
-    let blob_bytes = encode_prefs_blob(&prefs_key, &account_number_hash, &prefs)
-        .map_err(|_| PrefsWriteError::PrefsEncodeFailed)?;
-
-    crate::atomic_write::atomic_write(&prefs_path, &blob_bytes, true)
-        .map_err(PrefsWriteError::from)?;
+    update_prefs_with_dir(vault_dir, state, |prefs| {
+        prefs.folder_icons = icons;
+    })
+    .await?;
 
     // Entry COUNT only — never the keys (folder paths are AS3 correlation tags).
     tracing::info!(event = "prefs_written", field = "folder_icons", count,);
@@ -2180,28 +1672,11 @@ pub(crate) async fn vault_set_label_with_dir(
     state: &VaultRuntimeState,
     label: Option<String>,
 ) -> Result<(), PrefsWriteError> {
-    let _write_guard = write_mutex().lock().await;
-
-    // SYNC-6 writer-guard (MYND-32): see state::hold_unlocked_root_key_and_hash.
-    let (_slots_guard, root_key, _vmh) = state
-        .hold_unlocked_root_key_and_hash()
-        .await
-        .ok_or(PrefsWriteError::SlotNotUnlocked)?;
-
-    let account_number_hash = read_account_number_hash_for_write(&vault_dir.join("vault.meta"))?;
-    let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
-    let prefs_path = vault_dir.join("vault.prefs");
-
-    let mut prefs = read_or_default(&prefs_path, &prefs_key, &account_number_hash);
     let cleared = label.is_none();
-    prefs.label = label.clone();
-
-    let blob_bytes = encode_prefs_blob(&prefs_key, &account_number_hash, &prefs)
-        .map_err(|_| PrefsWriteError::PrefsEncodeFailed)?;
-
-    // Disk commit FIRST.
-    crate::atomic_write::atomic_write(&prefs_path, &blob_bytes, true)
-        .map_err(PrefsWriteError::from)?;
+    update_prefs_with_dir(vault_dir, state, |prefs| {
+        prefs.label = label.clone();
+    })
+    .await?;
 
     // Effect SECOND (only on disk success): refresh the active vault's entry in
     // the per-session RAM label cache so `vault_list` reflects the rename

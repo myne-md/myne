@@ -76,10 +76,16 @@ pub fn folder_of(body: &str) -> String {
 /// is ignored (a degenerate value that would otherwise exclude the whole vault).
 /// Pure + testable.
 pub fn folder_is_excluded(folder: &str, excluded: &[String]) -> bool {
-    excluded.iter().any(|ex| {
-        !ex.is_empty()
-            && (folder == ex.as_str() || (ex.ends_with('/') && folder.starts_with(ex.as_str())))
-    })
+    // Delegate to the store's canonical matcher so embed-time exclusion is the
+    // SAME case/diacritic-insensitive test the resident store applies (SYNC-14):
+    // matching raw strings here let a note under `Private/` embed while the store
+    // excluded it under a `private/` entry. `folder_matches_excluded` canonicalizes
+    // the folder; canonicalize the excluded entries the same way the store does.
+    let canon: Vec<String> = excluded
+        .iter()
+        .map(|e| super::vector_store::canonical_folder(e))
+        .collect();
+    super::vector_store::folder_matches_excluded(folder, &canon)
 }
 
 /// Read a single `.myn` file's `content_nonce` from its header WITHOUT
