@@ -120,12 +120,22 @@ function createFindPanel(view: EditorView): Panel {
   // 1-based ordinal of the match at/after the current selection (the one the
   // selection sits on after a nav, else the next one Enter would reach; wraps
   // past the last match to the first). The cached list is already in document
-  // order, so the first match at/after the cursor is a plain scan.
+  // order, so this is a binary search (lower bound) for the first match at/after
+  // the cursor — matching the module-header note.
   const currentOrdinal = (): number => {
     if (matches.length === 0) return 0;
     const from = view.state.selection.main.from;
-    const i = matches.findIndex((m) => m.from >= from);
-    return (i === -1 ? 0 : i) + 1;
+    // lower_bound: first index i with matches[i].from >= from.
+    let lo = 0;
+    let hi = matches.length; // exclusive
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if ((matches[mid]?.from ?? 0) >= from) hi = mid;
+      else lo = mid + 1;
+    }
+    // No match at/after the cursor → wrap to the first (ordinal 1), matching the
+    // prior `findIndex === -1 ? 0` behavior.
+    return (lo === matches.length ? 0 : lo) + 1;
   };
 
   const render = (): void => {

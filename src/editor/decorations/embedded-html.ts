@@ -150,7 +150,76 @@ const inlineHtmlPlugin = ViewPlugin.fromClass(
 // its open/closed state lives in a WebView-only Map keyed by source (never the
 // buffer, so C1 holds regardless of toggle state).
 
-const BLOCK_HTML_RE = /<(p|details)\b[^>]*>[\s\S]*?<\/\1>/gi;
+// Locate a `<p>`/`<details>` opening tag (word-boundaried so `<param>` is not a
+// `<p>`). `<(/?)…` also matches the close form so the balanced scanner below can
+// tell opens from closes.
+const BLOCK_TAG_RE = /<(\/?)(p|details)\b/gi;
+
+/** Index just AFTER the `>` that ends the tag starting at `<` index `i`,
+ *  respecting `>` inside single/double-quoted attribute values, or -1 if the tag
+ *  is unterminated. (A plain `[^>]*` regex would stop at a quoted `>`.) */
+function tagEnd(text: string, i: number): number {
+  let quote: string | null = null;
+  for (let j = i + 1; j < text.length; j++) {
+    const c = text[j];
+    if (quote !== null) {
+      if (c === quote) quote = null;
+    } else if (c === '"' || c === "'") {
+      quote = c;
+    } else if (c === ">") {
+      return j + 1;
+    }
+  }
+  return -1;
+}
+
+/** Collect balanced top-level `<p>`/`<details>` blocks. A regex cannot do this
+ *  correctly: `[^>]*` breaks on a `>` inside a quoted attribute, and a non-greedy
+ *  body stops at the FIRST close, truncating nested same-tag blocks
+ *  (`<details><details>…</details></details>`). This scanner respects quoted
+ *  attributes (via {@link tagEnd}) and counts tag depth so both resolve. */
+function collectBlockHtmlRanges(
+  text: string,
+): Array<{ from: number; to: number; html: string }> {
+  const out: Array<{ from: number; to: number; html: string }> = [];
+  BLOCK_TAG_RE.lastIndex = 0;
+  let m: RegExpExecArray | null;
+  while ((m = BLOCK_TAG_RE.exec(text)) !== null) {
+    if (m[1] === "/") continue; // an orphan close — only opens start a block
+    const name = (m[2] ?? "").toLowerCase();
+    const openStart = m.index;
+    const openEnd = tagEnd(text, openStart);
+    if (openEnd === -1) break; // unterminated opening → nothing renderable after
+    // Depth-count same-name opens/closes from openEnd until depth returns to 0.
+    const scan = new RegExp(`<(/?)(${name})\\b`, "gi");
+    scan.lastIndex = openEnd;
+    let depth = 1;
+    let closeEnd = -1;
+    let t: RegExpExecArray | null;
+    while ((t = scan.exec(text)) !== null) {
+      const tEnd = tagEnd(text, t.index);
+      if (tEnd === -1) break; // unterminated inner tag → give up on this block
+      if (t[1] === "/") {
+        depth -= 1;
+        if (depth === 0) {
+          closeEnd = tEnd;
+          break;
+        }
+      } else {
+        depth += 1;
+      }
+      scan.lastIndex = tEnd;
+    }
+    if (closeEnd === -1) {
+      // Unbalanced (no matching close) → don't render; resume after the opening.
+      BLOCK_TAG_RE.lastIndex = openEnd;
+      continue;
+    }
+    out.push({ from: openStart, to: closeEnd, html: text.slice(openStart, closeEnd) });
+    BLOCK_TAG_RE.lastIndex = closeEnd; // skip the whole block — no overlap
+  }
+  return out;
+}
 
 /** Ephemeral `<details>` open state, keyed by source HTML. WebView-only —
  *  never persisted, never written to the note buffer. */
@@ -191,12 +260,7 @@ function buildBlockHtml(state: EditorState): DecorationSet {
 
   const doc = state.doc;
   const text = doc.toString();
-  const entries: Array<{ from: number; to: number; html: string }> = [];
-  BLOCK_HTML_RE.lastIndex = 0;
-  let m: RegExpExecArray | null;
-  while ((m = BLOCK_HTML_RE.exec(text)) !== null) {
-    entries.push({ from: m.index, to: m.index + m[0].length, html: m[0] });
-  }
+  const entries = collectBlockHtmlRanges(text);
 
   const builder = new RangeSetBuilder<Decoration>();
   for (const { from, to, html } of entries) {

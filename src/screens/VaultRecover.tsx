@@ -181,6 +181,17 @@ export function VaultRecover({
     };
   }, []);
 
+  // Live-after-await guard for the async delete handler below (mirrors the
+  // `cancelled` bail in the `gatedRef` probe). Reset true on mount so the
+  // StrictMode dev remount doesn't leave it stuck false.
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
   // MYND-206 multi-vault recovery gate. On a COLD-START mount (the orchestrator
   // entered via `unlock.start-recovery` → `initialSubStep === "phrase-entry"`),
   // probe how many vaults exist on disk. ≥2 → require a selection first
@@ -303,11 +314,13 @@ export function VaultRecover({
         void (async () => {
           try {
             await deleteVault();
+            if (!mountedRef.current) return;
             onDeleteVaultSuccess();
           } catch (raw) {
             const e = raw as VaultDeleteError;
             const base = await appDataDir();
             const vaultDirPath = await join(base, "vault");
+            if (!mountedRef.current) return;
             const mapping = mapDeleteVaultError(e, vaultDirPath);
             if (mapping.kind === "partial-fail") {
               dispatch({
