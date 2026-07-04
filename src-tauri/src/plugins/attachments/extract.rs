@@ -19,80 +19,17 @@
 //! / unsupported input yields a `Failed` / `Unsupported` result, cached so the
 //! search index does not retry it every rebuild (§ 9.15.4).
 
-use serde::{Deserialize, Serialize};
+// The pure extracted-text payload types (`ExtractStatus`, `SourceFormat`,
+// `ExtractedText`, `MAX_EXTRACTED_TEXT_LEN` + their postcard round-trip) moved
+// to `myne_core::plugins::attachments::extract_types` (shared desktop↔mobile) so
+// the `MYE1` cache codec can round-trip them without pulling this module's
+// desktop-only `lopdf`/`zip`/`quick-xml` deps. Re-exported here so existing
+// `crate::plugins::attachments::extract::{ExtractStatus, …}` paths keep
+// resolving. This module keeps ONLY the desktop extraction *producer* below.
+pub use myne_core::plugins::attachments::extract_types::{
+    ExtractStatus, ExtractedText, SourceFormat, MAX_EXTRACTED_TEXT_LEN,
+};
 use unicode_normalization::UnicodeNormalization;
-
-/// Upper bound on emitted extracted text (1 MiB of UTF-8). Bounds the `MYE1`
-/// blob + the search index growth; the codec's own ceiling is 4 MiB
-/// (`MAX_ATTACHMENT_TEXT_PLAINTEXT_LEN`), generous headroom over this plus
-/// postcard overhead. Over-cap extractions set [`ExtractedText::truncated`].
-pub const MAX_EXTRACTED_TEXT_LEN: usize = 1024 * 1024;
-
-/// Outcome of an extraction attempt. All four values are persisted in the
-/// `MYE1` cache so a rebuild does not retry an extraction that already
-/// failed / was unsupported / was empty — until `extractor_version` bumps
-/// (§ 9.15.4).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum ExtractStatus {
-    /// Text was extracted (non-empty after normalization).
-    Ok,
-    /// Supported format, but no extractable text (e.g. a scanned PDF with no
-    /// text layer — extractable only once the OCR layer lands, MYND-441).
-    Empty,
-    /// Format not handled by this extractor generation.
-    Unsupported,
-    /// Extraction errored (corrupt / password-protected / malformed).
-    Failed,
-}
-
-/// The format this extractor dispatched on. `Other` accompanies
-/// [`ExtractStatus::Unsupported`].
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum SourceFormat {
-    Pdf,
-    Docx,
-    Text,
-    Other,
-}
-
-/// The extracted-text payload, serialized (postcard) into the `MYE1` blob
-/// plaintext (`extractor_version 0x01`, § 9.15.2).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ExtractedText {
-    pub status: ExtractStatus,
-    pub source_format: SourceFormat,
-    /// NFC-normalized extracted text; empty unless `status == Ok`.
-    pub text: String,
-    /// Char count of the extracted text BEFORE truncation (§ 9.15.2).
-    pub char_count: u32,
-    /// Set when extraction hit [`MAX_EXTRACTED_TEXT_LEN`].
-    pub truncated: bool,
-}
-
-impl ExtractedText {
-    fn negative(status: ExtractStatus, source_format: SourceFormat) -> Self {
-        ExtractedText {
-            status,
-            source_format,
-            text: String::new(),
-            char_count: 0,
-            truncated: false,
-        }
-    }
-
-    /// Serialize to the opaque `MYE1` inner plaintext (postcard).
-    pub fn to_blob_plaintext(&self) -> Vec<u8> {
-        // postcard serialization of a plain struct is infallible in practice;
-        // fall back to an empty payload rather than propagating.
-        postcard::to_allocvec(self).unwrap_or_default()
-    }
-
-    /// Deserialize from an `MYE1` inner plaintext. Returns `None` on a malformed
-    /// payload (the caller treats it as a cache miss → re-extract).
-    pub fn from_blob_plaintext(bytes: &[u8]) -> Option<ExtractedText> {
-        postcard::from_bytes(bytes).ok()
-    }
-}
 
 /// Extract searchable text from an attachment's decrypted `bytes`, dispatching
 /// on `content_type` first and the `filename` extension as a fallback (an
@@ -414,22 +351,6 @@ mod tests {
         assert_eq!(r.char_count as usize, MAX_EXTRACTED_TEXT_LEN + 1000);
     }
 
-    // --- payload round-trip ---------------------------------------------
-
-    #[test]
-    fn payload_round_trips_through_postcard() {
-        let r = extract("text/plain", "n.txt", b"round trip me");
-        let bytes = r.to_blob_plaintext();
-        let back = ExtractedText::from_blob_plaintext(&bytes).expect("decode");
-        assert_eq!(r, back);
-    }
-
-    #[test]
-    fn malformed_payload_decodes_to_none() {
-        // A truncated/garbage payload is a cache miss, not a panic.
-        assert!(
-            ExtractedText::from_blob_plaintext(&[0xff, 0xff, 0xff]).is_none()
-                || ExtractedText::from_blob_plaintext(&[]).is_none()
-        );
-    }
+    // The postcard payload round-trip tests moved with the types to
+    // `myne_core::plugins::attachments::extract_types`.
 }

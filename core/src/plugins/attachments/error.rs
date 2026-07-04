@@ -423,11 +423,11 @@ impl From<std::io::Error> for AttachmentUnusedListError {
     }
 }
 
-impl From<crate::plugins::notes::desktop_commands::ReferencedScanError>
+impl From<crate::plugins::attachments::ref_scan::ReferencedScanError>
     for AttachmentUnusedListError
 {
-    fn from(e: crate::plugins::notes::desktop_commands::ReferencedScanError) -> Self {
-        use crate::plugins::notes::desktop_commands::ReferencedScanError as Scan;
+    fn from(e: crate::plugins::attachments::ref_scan::ReferencedScanError) -> Self {
+        use crate::plugins::attachments::ref_scan::ReferencedScanError as Scan;
         match e {
             Scan::Io(kind) => AttachmentUnusedListError::Io {
                 io_error_kind: from_io_error_kind(kind),
@@ -507,11 +507,11 @@ impl From<std::io::Error> for AttachmentCleanUnusedError {
     }
 }
 
-impl From<crate::plugins::notes::desktop_commands::ReferencedScanError>
+impl From<crate::plugins::attachments::ref_scan::ReferencedScanError>
     for AttachmentCleanUnusedError
 {
-    fn from(e: crate::plugins::notes::desktop_commands::ReferencedScanError) -> Self {
-        use crate::plugins::notes::desktop_commands::ReferencedScanError as Scan;
+    fn from(e: crate::plugins::attachments::ref_scan::ReferencedScanError) -> Self {
+        use crate::plugins::attachments::ref_scan::ReferencedScanError as Scan;
         match e {
             Scan::Io(kind) => AttachmentCleanUnusedError::Io {
                 io_error_kind: from_io_error_kind(kind),

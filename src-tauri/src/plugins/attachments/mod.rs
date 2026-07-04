@@ -16,42 +16,53 @@
 //! content-type from the decrypted bytes, and serves ONLY an allowlisted
 //! type — never `text/html` (the XSS-defense invariant).
 //!
+//! ## Extraction into `myne-core`
+//!
+//! The platform-agnostic plugin core (commands, error, sniff, reconcile,
+//! reconcile_commands, text_cache, the pure `extract_types`, the pure
+//! `scheme_core::build_response`, and the cleanup ref-scan) moved to
+//! `myne_core::plugins::attachments` (shared with the mobile client). Re-exported
+//! below so existing `crate::plugins::attachments::{commands, error, …}::…`
+//! paths keep resolving. This crate keeps the desktop-only pieces:
+//!
+//! - `extract` — the `lopdf`/`zip`/`quick-xml` text-extraction *producer*
+//!   (mobile has no extraction step); it re-exports the pure payload types from
+//!   core. The eager MYE1 cache on import rides `import_desktop` (the desktop
+//!   `attachment_import` wrapper that injects the real extractor into
+//!   `commands::attachment_import_with_dir_ext`).
+//! - `scheme` — the Tauri `handle`/`serve` glue delegating to
+//!   `scheme_core::build_response`.
+//! - `voice` — the `cpal` native-mic capture (a hard mobile blocker).
+//! - `init()` + the lock-teardown wipes (`zeroize_attachment_refs` /
+//!   `abort_active_recording`) that ride the `hooks::VaultLifecycleHooks` seam.
+//!
+//! The CRUD commands are registered via the `myne_core::plugins::attachments`
+//! module path so `generate_handler!` finds each command's hidden `__cmd__`
+//! items (a bare `pub use` of the `#[tauri::command]` fns would drop them).
+//!
 //! Sibling to `vault_unlock`, `prefs`, `notes`, `vault_indices`. The
 //! plugin name in the ACL namespace is `attachments` (hyphenless single
 //! word); `build.rs` declares it as an `InlinedPlugin` so permissions
 //! resolve under the `attachments:` namespace.
 //!
-//! ## Design history
-//!
-//! - PRD: `myne-agents/features/attachments-crypto-pipeline/prd.md`
-//! - Epic sync-ledger: `myne-agents/epics/attachments/sync-ledger.md`
-//!   (SYNC-4 handler contract, SYNC-6 reference graph, SYNC-8 import +
-//!   dedup, SYNC-10 CSP)
-//! - Spec: `docs/spec/protocol.md` §9.9 (MYA1) / §9.10 (MYC1) / §5.2
-//!   (AADs) / §3.4 (subkeys)
-//!
-//! ## Capability ACL
-//!
-//! `attachments:default` bundles `allow-attachment-import`,
-//! `allow-catalog-list`, `allow-attachment-delete`,
-//! `allow-attachment-rename`, the reconcile trio, and
-//! `allow-attachment-unused-list` (MYND-171). Main-window-only — the
-//! import/delete/cleanup writes and the catalog/scan reads are privileged
-//! operations on vault state.
-//!
 //! See: ../../CLAUDE.md "Secret-handling logging discipline".
 
-pub mod commands;
-pub mod error;
+// Platform-agnostic plugin core, re-exported so `crate::plugins::attachments::…`
+// paths keep resolving (hooks.rs, notes, export, search_sync, clipper,
+// export_naming all reach in through these).
+#[allow(unused_imports)]
+pub use myne_core::plugins::attachments::{
+    commands, error, extract_types, reconcile, reconcile_commands, ref_scan, scheme_core, sniff,
+    text_cache,
+};
+pub use myne_core::plugins::attachments::AttachmentRefsState;
+
+// Desktop-only modules.
 pub mod extract;
-pub mod reconcile;
-pub mod reconcile_commands;
+pub mod import_desktop;
 pub mod scheme;
-pub mod sniff;
-pub mod text_cache;
 pub mod voice;
 
-pub use reconcile::AttachmentRefsState;
 pub use voice::{abort_active_recording, VoiceRecordState};
 
 use tauri::plugin::{Builder, TauriPlugin};
@@ -73,14 +84,17 @@ pub fn zeroize_attachment_refs<R: Runtime>(app: &AppHandle<R>) {
 
 /// Construct the `attachments` plugin.
 ///
-/// Binds the IPC commands declared in [`commands`]. Does NOT register
-/// `VaultRuntimeState` (the unlock plugin owns the runtime-state
-/// singleton; attachments borrows via `tauri::State<...>`) nor the
-/// `attachment://` scheme (registered on the `Builder` in `lib.rs`).
+/// Binds the IPC commands. Does NOT register `VaultRuntimeState` (the
+/// unlock plugin owns the runtime-state singleton; attachments borrows via
+/// `tauri::State<...>`) nor the `attachment://` scheme (registered on the
+/// `Builder` in `lib.rs`). `attachment_import` is the DESKTOP wrapper
+/// (`import_desktop`) that eagerly extracts text into the MYE1 cache; the
+/// other CRUD commands are the shared `myne-core` cores.
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::<R>::new("attachments")
         .invoke_handler(tauri::generate_handler![
-            commands::attachment_import,
+            // Desktop import wrapper: core import + eager MYE1 text extraction.
+            import_desktop::attachment_import,
             commands::catalog_list,
             commands::attachment_delete,
             commands::attachment_rename,
