@@ -124,10 +124,11 @@ interface SettingsModalProps {
   /**
    * Fired by AccountPanel after a successful `vault_delete` IPC OR
    * after the user clicks Continue on the post-fail banner. Threaded
-   * from Editor → App.tsx, where it dispatches
-   * `editor.delete-vault-success` to transition Stage to welcome.
-   * Editor unmounts; this modal unmounts in cascade. No
-   * `onClose()` call needed here — the unmount cascade closes us.
+   * from Editor → App.tsx, where it triggers a `reprobe()`; boot
+   * routing then selects the return surface by remaining vault count
+   * (picker at ≥2, unlock at 1, welcome at 0). Editor unmounts; this
+   * modal unmounts in cascade. No `onClose()` call needed here — the
+   * unmount cascade closes us.
    */
   onDeleteVaultSuccess: () => void;
   /**

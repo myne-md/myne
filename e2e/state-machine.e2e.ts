@@ -15,6 +15,7 @@ import { describeE2E, scenario } from "./support/scenario";
 import {
   dismissImporterOffer,
   enterRecoveryPhrase,
+  openSettings,
   selectPickerRow,
   switchToVault,
   unlockToEditor,
@@ -27,6 +28,7 @@ import {
   vaultMetaPath,
   type SeededVault,
 } from "./support/fixtures";
+import type { Session } from "./support/webdriver";
 import { UNLOCK_NON_DISTINGUISHING_BANNER } from "../src/lib/load-bearing-copy";
 
 // Story 12 (boot-probe single-fire, the SM-9 prod replacement) is NOT
@@ -251,6 +253,108 @@ describeE2E("picker boot routing (MYND-127 task 2, ≥2 vaults)", () => {
           timeoutMs: 15_000,
         });
         expect(await failClosed.attribute("data-reason")).toBe("corrupted-vault");
+      },
+    );
+  });
+});
+
+describeE2E("post-delete routing (Settings → Account delete)", () => {
+  // Deleting a vault must RE-PROBE the disk and route by the REMAINING
+  // vault count, not hardcode Welcome. Pre-fix, `onDeleteVaultSuccess`
+  // dispatched a `*.delete-vault-success` Action that always returned
+  // `welcome`, so a multi-vault user who deleted one vault landed on the
+  // create screen instead of the picker. The fix routes all three delete
+  // surfaces through App.tsx's `reprobe()` — the same boot-routing brain
+  // that back-from-create and restore-exit already use. Every existing
+  // delete scenario is 1 → 0 (where Welcome is coincidentally correct),
+  // so this bug lived uncaught; these two scenarios pin the ≥2-remaining
+  // and exactly-1-remaining arms. Distinct passwords keep targeting
+  // falsifiable (SYNC-6); credentials never reach an assertion (SYNC-13).
+  const PASSWORD_A = "e2e-delete-routing-a-pw";
+  const PASSWORD_B = "e2e-delete-routing-b-pw";
+  const PASSWORD_C = "e2e-delete-routing-c-pw";
+
+  async function deleteOpenVaultFromSettings(session: Session): Promise<void> {
+    // Settings → Account → Danger zone → typed-DELETE gate → Submit.
+    await openSettings(session, "account");
+    await (await session.byTestId("settings.delete-vault-cta")).click();
+    const confirmInput = await session.byTestId("delete-vault.confirm-input", {
+      timeoutMs: 10_000,
+    });
+    await confirmInput.sendKeys("DELETE");
+    const submit = await session.byTestId("delete-vault.submit");
+    await session.waitUntil(() => submit.enabled(), {
+      label: "delete submit enabled on exact DELETE",
+      timeoutMs: 10_000,
+    });
+    await submit.click();
+  }
+
+  it("3 vaults: deleting the open vault from Settings re-routes to the picker with the siblings", async () => {
+    // Vault-count precondition: 3 → 2 (the ≥2-remaining picker arm).
+    let a!: SeededVault;
+    let b!: SeededVault;
+    let c!: SeededVault;
+    await scenario(
+      "sm-delete-to-picker",
+      {
+        seed: (appDataDir) => {
+          a = seedVault(appDataDir, { password: PASSWORD_A });
+          b = seedVault(appDataDir, { password: PASSWORD_B });
+          c = seedVault(appDataDir, { password: PASSWORD_C });
+        },
+      },
+      async (app) => {
+        // Boot → picker (3 rows); open B into the editor.
+        await app.session.byTestId("picker.root", { timeoutMs: 20_000 });
+        expect(await app.session.byTestIdAll("picker.vault-row")).toHaveLength(3);
+        await selectPickerRow(app.session, b.vaultId);
+        await unlockToEditor(app.session, PASSWORD_B);
+        await dismissImporterOffer(app.session);
+
+        await deleteOpenVaultFromSettings(app.session);
+
+        // Post-fix: reprobe routes to the picker (2 vaults remain), NOT
+        // the create/Welcome screen (the regression).
+        await app.session.byTestId("picker.root", { timeoutMs: 20_000 });
+        expect(await app.session.byTestIdAll("picker.vault-row")).toHaveLength(2);
+        expect(await app.session.byTestIdAll("welcome.root")).toHaveLength(0);
+
+        // B's dir is gone; the two siblings survive on disk (SYNC-6 targeting).
+        expect(existsSync(join(app.appDataDir, "vaults", b.vaultId))).toBe(false);
+        expect(existsSync(join(app.appDataDir, "vaults", a.vaultId))).toBe(true);
+        expect(existsSync(join(app.appDataDir, "vaults", c.vaultId))).toBe(true);
+      },
+    );
+  });
+
+  it("2 vaults: deleting the open vault from Settings re-routes to the lone sibling's Unlock", async () => {
+    // Vault-count precondition: 2 → 1 (the exactly-one-remaining Unlock arm).
+    let a!: SeededVault;
+    let b!: SeededVault;
+    await scenario(
+      "sm-delete-to-unlock",
+      {
+        seed: (appDataDir) => {
+          a = seedVault(appDataDir, { password: PASSWORD_A });
+          b = seedVault(appDataDir, { password: PASSWORD_B });
+        },
+      },
+      async (app) => {
+        await app.session.byTestId("picker.root", { timeoutMs: 20_000 });
+        await selectPickerRow(app.session, b.vaultId);
+        await unlockToEditor(app.session, PASSWORD_B);
+        await dismissImporterOffer(app.session);
+
+        await deleteOpenVaultFromSettings(app.session);
+
+        // One vault remains → Unlock addressed at exactly A (no picker,
+        // no Welcome), mirroring the single-vault boot bucket.
+        const form = await app.session.byTestId("unlock.form", { timeoutMs: 20_000 });
+        expect(await form.attribute("data-vault-id")).toBe(a.vaultId);
+        expect(await app.session.byTestIdAll("welcome.root")).toHaveLength(0);
+        expect(existsSync(join(app.appDataDir, "vaults", b.vaultId))).toBe(false);
+        expect(existsSync(join(app.appDataDir, "vaults", a.vaultId))).toBe(true);
       },
     );
   });

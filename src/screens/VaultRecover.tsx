@@ -77,12 +77,12 @@ interface VaultRecoverProps {
    *  lock/relock exits. */
   onCompleteSuccess: (vaultId?: string) => void;
   /**
-   * MYND-108-bis: terminal-destructive transition from the lost-
-   * credentials cul-de-sac. Dispatched when the user submits the
-   * delete-confirm sub-step's typed-DELETE form (vault_delete IPC Ok)
-   * OR clicks Continue after a PartialDelete/Io banner. Routes Stage
-   * `recover → welcome` via `recover.delete-vault-success`. Backend
-   * accepts via `Slot::Empty + vault.meta-exists` no-keys arm
+   * MYND-108-bis: fired from the lost-credentials cul-de-sac when the
+   * user submits the delete-confirm sub-step's typed-DELETE form
+   * (vault_delete IPC Ok) OR clicks Continue after a PartialDelete/Io
+   * banner. App.tsx reprobes; boot routing picks the return surface by
+   * remaining vault count (picker at ≥2, unlock at 1, welcome at 0).
+   * Backend accepts via `Slot::Empty + vault.meta-exists` no-keys arm
    * (`decisions.md` 2026-05-26 entry "MYND-108-bis vault_delete
    * extended to accept Slot::Empty + vault.meta-exists"). The
    * `recovery-flow.md` §4.1 / §4.3 invariants are preserved — the
@@ -307,8 +307,8 @@ export function VaultRecover({
     case "delete-confirm": {
       // MYND-108-bis: typed-DELETE confirmation form. IPC accepts
       // via `Slot::Empty + vault.meta-exists` no-keys arm. On Ok or
-      // PartialDelete-Continue, dispatches `recover.delete-vault-success`
-      // through the parent.
+      // PartialDelete-Continue, notifies the parent, which reprobes to
+      // route by remaining vault count.
       const handleDeleteSubmit = () => {
         dispatch({ type: "delete-in-flight" });
         void (async () => {

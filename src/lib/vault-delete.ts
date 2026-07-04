@@ -169,11 +169,11 @@ export function mapDeleteVaultError(
  *
  * **Post-condition on resolve:** `Slot::Empty` + `<app_data_dir>/vault/`
  * recursively removed (modulo the per-file partial-fail surface).
- * Caller dispatches the appropriate Stage Action variant via the
- * `onDeleteVaultSuccess` callback chain:
- *   - From Settings → Editor → `editor.delete-vault-success` → welcome
- *   - From Unlock screen → `unlock.delete-vault-success` → welcome
- *   - From Recovery phrase-entry → `recover.delete-vault-success` → welcome
+ * Caller fires the `onDeleteVaultSuccess` callback, which App.tsx wires
+ * to `reprobe()` on all three surfaces (Settings → Editor, Unlock
+ * screen, Recovery phrase-entry). Boot routing then selects the return
+ * surface by remaining vault count: picker at ≥2, unlock at 1, welcome
+ * at 0.
  *
  * Slot stays Empty regardless of resolve vs reject — on the
  * Unlocked/Recovering arms the zeroize fires before unlink; on the
