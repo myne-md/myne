@@ -16,6 +16,7 @@ pub mod export;
 pub mod notes;
 pub mod prefs;
 pub mod quick_unlock;
+pub mod secret_export;
 pub mod snapshots;
 pub mod vault_change_password;
 pub mod vault_creation;

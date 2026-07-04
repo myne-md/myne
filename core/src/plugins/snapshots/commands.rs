@@ -195,11 +195,14 @@ pub async fn snapshot_preview<R: Runtime>(
 /// Testable core of [`snapshot_restore`]. Atomic, guaranteed-undoable (SYNC-5):
 /// (1) decode the selected snapshot, (2) force-snapshot the current live note
 /// (the undo point) through the `hooks::VaultLifecycleHooks::capture_snapshot`
-/// seam, (3) overwrite the live note with the snapshot content via
-/// `note_update_with_dir` — whose creation hook is coalesced by step 2's forced
-/// capture, so there is no double snapshot. Keeps the live search + AI indices
-/// correct via the hooks seam. Mobile installs `NoopHooks`, so steps 2 and 4 are
-/// no-ops there (mobile has no snapshot subsystem yet).
+/// seam — **aborting before any overwrite if that undo-point cannot be written**,
+/// so the undoability guarantee never silently degrades into data-loss,
+/// (3) overwrite the live note with the snapshot content via `note_update_with_dir`
+/// — whose creation hook is coalesced by step 2's forced capture, so there is no
+/// double snapshot. Keeps the live search + AI indices correct via the hooks
+/// seam. Desktop's `DesktopHooks` and mobile's `MobileHooks` both capture through
+/// the shared `myne-core` snapshot store; a client whose hooks no-op capture
+/// (`NoopHooks`) simply has no undo point to fail on.
 pub(crate) async fn snapshot_restore_in(
     notes_dir: PathBuf,
     state: &VaultRuntimeState,
@@ -254,20 +257,20 @@ pub(crate) async fn snapshot_restore_in(
     };
 
     // Step 2: force-snapshot the current live note (the undo point, SYNC-5)
-    // through the hooks seam (`capture_snapshot`, force=true) rather than the
-    // desktop-only flush command. Read the live `.myn` verbatim bytes and
-    // capture them so the pre-restore state is always recorded, bypassing the
-    // coalescing window. Best-effort — the warning bool is ignored (restore's
-    // contract is the overwrite, not the undo-point capture); a missing live
-    // blob is a no-op. Mobile's `NoopHooks` makes the capture a no-op. File IO
-    // runs on a blocking thread. Mirrors how `note_update` routes its
-    // pre-overwrite snapshot through `hooks.capture_snapshot`.
+    // through the hooks seam (`capture_snapshot`, force=true), bypassing the
+    // coalescing window. `capture_snapshot` returns `true` ONLY on a real
+    // dir-create/write failure (`false` on success or a coalesced skip — and
+    // force=true precludes the latter). If the live note EXISTS but its undo
+    // point cannot be written, ABORT before overwriting: the guaranteed-undoable
+    // contract (SYNC-5) must never degrade into silent data-loss. A missing live
+    // blob is a fresh note — nothing to undo, proceed. File IO runs on a blocking
+    // thread; mirrors how `note_update` routes its pre-overwrite snapshot.
     if let Some(vault_root) = notes_dir.parent().map(std::path::Path::to_path_buf) {
         let note_uuid_str = note_id_parsed.as_uuid().to_string();
         let live_path = notes_dir.join(format!("{note_uuid_str}.myn"));
         let hooks_owned: crate::hooks::Hooks = hooks.clone();
-        let _ = tokio::task::spawn_blocking(move || {
-            if let Ok(old_blob) = std::fs::read(&live_path) {
+        let undo_failed = tokio::task::spawn_blocking(move || match std::fs::read(&live_path) {
+            Ok(old_blob) => {
                 let now_ms = crate::snapshot_store::now_unix_ms();
                 hooks_owned.capture_snapshot(
                     &vault_root,
@@ -275,10 +278,17 @@ pub(crate) async fn snapshot_restore_in(
                     &old_blob,
                     now_ms,
                     /* force = */ true,
-                );
+                )
             }
+            Err(_) => false, // no live blob → nothing to undo
         })
-        .await;
+        .await
+        .map_err(|_| SnapshotError::JoinFailure)?;
+        if undo_failed {
+            return Err(SnapshotError::Io {
+                io_error_kind: crate::io_failure_kind::IoFailureKind::Other,
+            });
+        }
     }
 
     // Step 3: overwrite the live note with the snapshot content. The creation
@@ -291,8 +301,9 @@ pub(crate) async fn snapshot_restore_in(
     // Step 4: keep the live in-RAM search + AI indices correct through the hooks
     // seam. MYND-328: fold the restored note's attachment text in (parity with
     // note_create/update/batch) so a restore doesn't drop attachment
-    // searchability until the next unlock. Mobile's `NoopHooks` makes these
-    // no-ops.
+    // searchability until the next unlock. Mobile's `MobileHooks` no-ops these
+    // search/AI hooks (its index is fed TS-side), so the fold returns the body
+    // unchanged there.
     let title = resolve_note_title(plaintext.as_bytes()).unwrap_or_default();
     let body = hooks
         .fold_attachment_text_for_index(state, &plaintext)
