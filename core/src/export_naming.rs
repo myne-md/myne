@@ -17,7 +17,7 @@ use crate::plugins::attachments::reconcile::AttEmbedSpan;
 
 /// Suffix-dedup retry cap shared by both export dedup loops — a
 /// pathological collision flood bails closed instead of spinning.
-pub(crate) const DEDUP_RETRY_CAP: u32 = 9_999;
+pub const DEDUP_RETRY_CAP: u32 = 9_999;
 
 /// Make one export name component (catalog display filename, FM
 /// `title:`, or tree folder segment) safe as a filesystem name and as
@@ -33,7 +33,7 @@ pub(crate) const DEDUP_RETRY_CAP: u32 = 9_999;
 /// attachment/title surfaces, `"_"` for tree directory segments — so a
 /// pathological segment like `".."` can never traverse or vanish).
 /// Deterministic — the same input always sanitizes identically.
-pub(crate) fn sanitize_export_component(name: &str, fallback: &str) -> String {
+pub fn sanitize_export_component(name: &str, fallback: &str) -> String {
     let cleaned: String = name
         .trim()
         .chars()
@@ -78,7 +78,7 @@ fn is_windows_reserved_basename(name: &str) -> bool {
 /// `photo.png` + 1 → `photo (1).png`; extensionless / dot-leading names
 /// suffix at the end (`notes` + 2 → `notes (2)`, `.env` + 1 →
 /// `.env (1)`).
-pub(crate) fn suffixed_filename(name: &str, n: u32) -> String {
+pub fn suffixed_filename(name: &str, n: u32) -> String {
     match name.rfind('.') {
         Some(dot) if dot > 0 => format!("{} ({}){}", &name[..dot], n, &name[dot..]),
         _ => format!("{name} ({n})"),
@@ -91,7 +91,7 @@ pub(crate) fn suffixed_filename(name: &str, n: u32) -> String {
 /// inverse). A span whose id somehow has no final name (structurally
 /// impossible — the same scan fed both) keeps its original bytes,
 /// never an empty splice.
-pub(crate) fn rewrite_embeds_to_final_names(
+pub fn rewrite_embeds_to_final_names(
     plaintext: &str,
     spans: &[AttEmbedSpan<'_>],
     final_names: &HashMap<String, String>,
@@ -125,7 +125,7 @@ pub(crate) fn rewrite_embeds_to_final_names(
 /// final name (structurally impossible — the same scan fed both) is left
 /// untouched. Every byte outside the rewritten `attachment://<id>` token
 /// is preserved.
-pub(crate) fn rewrite_html_attachment_srcs(
+pub fn rewrite_html_attachment_srcs(
     html: &str,
     final_names: &HashMap<String, String>,
 ) -> String {

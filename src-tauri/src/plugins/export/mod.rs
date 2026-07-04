@@ -1,6 +1,16 @@
 //! `export` plugin — whole-vault plaintext markdown tree export
 //! (MYND-211, epic export-suite; the importer's mirror).
 //!
+//! ## Extraction into `myne-core`
+//!
+//! The platform-agnostic plugin core (`commands` — including both
+//! `#[tauri::command]`s `vault_export_markdown` + `vault_export_cancel`, the
+//! app-managed `ExportRuntime` cancel flag, the `export://progress` emitter, and
+//! the pure `vault_export_core` — and `error`) moved to
+//! `myne_core::plugins::export` (shared with the mobile client). Re-exported
+//! below so existing `crate::plugins::export::{commands, error}::…` paths keep
+//! resolving. This crate keeps only the `tauri::Builder` `init()` wiring.
+//!
 //! `vault_export_markdown` decrypts the vault's live notes into an
 //! Obsidian-shape folder tree at a user-chosen destination: folder
 //! hierarchy from each note's FM `folder:`, filenames from FM `title:`
@@ -10,16 +20,11 @@
 //! sanctioned export transform), per-file mtimes from FM `updated:`.
 //! The whole tree stages in a sibling directory and publishes via one
 //! same-filesystem rename — a tree exists at the destination only when
-//! complete (SYNC of the backup engine's "success = verified" posture).
+//! complete.
 //!
-//! Lives as its OWN plugin (rather than inside `notes`): the engine is
-//! a vault-lifecycle operation (capacity-1 auth permit + writer
-//! quiescence, the backup plugin's exact concurrency discipline), not a
-//! per-note CRUD verb — the backup plugin is the precedent it mirrors,
-//! and `VaultRuntimeState` is borrowed cross-plugin the same way. The
-//! per-note machinery (decrypt, sanitize, suffix-dedup, embed rewrite,
-//! mtime) is shared with the notes plugin via `pub(crate)` helpers, not
-//! duplicated.
+//! The two commands are registered via the `myne_core::plugins::export` module
+//! path so `generate_handler!` finds each command's hidden `__cmd__` items (a
+//! bare `pub use` of the `#[tauri::command]` fns would drop them).
 //!
 //! TB3 egress: deliberate, user-initiated plaintext leaving the vault —
 //! covered by the SYNC-4 spec package landed with MYND-115 (threat-model
@@ -33,8 +38,10 @@
 //! Logging: see `src-tauri/CLAUDE.md` "Secret-handling logging
 //! discipline" — counts-only events, no paths/titles/ids.
 
-pub mod commands;
-pub mod error;
+// Platform-agnostic plugin core, re-exported so `crate::plugins::export::…`
+// paths keep resolving.
+#[allow(unused_imports)]
+pub use myne_core::plugins::export::{commands, error};
 
 use tauri::plugin::{Builder, TauriPlugin};
 use tauri::Runtime;
