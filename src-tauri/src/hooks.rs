@@ -228,7 +228,7 @@ impl<R: Runtime> VaultLifecycleHooks for DesktopHooks<R> {
         now_ms: u64,
         force: bool,
     ) -> bool {
-        crate::plugins::notes::capture_snapshot_best_effort(
+        myne_core::snapshot_store::capture_snapshot_best_effort(
             vault_root, note_uuid, old_blob, now_ms, force,
         )
     }
