@@ -25,6 +25,7 @@ use super::error::{
     AttachmentCleanUnusedError, AttachmentDeleteError, AttachmentExportError,
     AttachmentImportError, AttachmentRenameError, AttachmentUnusedListError, CatalogListError,
 };
+use super::extract_types::ExtractedText;
 use super::sniff::sniff_content_type;
 use crate::plugins::vault_unlock::state::VaultRuntimeState;
 use protocol::{
@@ -126,7 +127,7 @@ pub struct ImportedAttachment {
 /// on-disk attachment filename + the catalog key + the IPC id string.
 /// `pub(crate)` for cross-module reuse (e.g. `text_cache` for the
 /// `attachments-text/<id-hex>` cache path), mirroring `hex_decode_id`.
-pub(crate) fn hex_encode(bytes: &[u8]) -> String {
+pub fn hex_encode(bytes: &[u8]) -> String {
     let mut s = String::with_capacity(bytes.len() * 2);
     for b in bytes {
         s.push(char::from_digit((b >> 4) as u32, 16).expect("high nibble < 16"));
@@ -142,7 +143,7 @@ pub(crate) fn hex_encode(bytes: &[u8]) -> String {
 /// `pub(crate)`: also consumed by the notes plugin's
 /// `note_export_attachments` (MYND-115 task 4 — cross-plugin reuse, the
 /// `VaultRuntimeState`-borrow precedent).
-pub(crate) fn hex_decode_id(s: &str) -> Option<[u8; ATTACHMENT_ID_LEN]> {
+pub fn hex_decode_id(s: &str) -> Option<[u8; ATTACHMENT_ID_LEN]> {
     if s.len() != ATTACHMENT_ID_LEN * 2 {
         return None;
     }
@@ -171,7 +172,7 @@ fn hex_val(b: u8) -> Option<u8> {
 /// Generic over the caller's error type via the two `From` impls.
 /// `pub(crate)`: also consumed by the notes plugin's
 /// `note_export_attachments` (MYND-115 task 4).
-pub(crate) fn read_account_number_hash(
+pub fn read_account_number_hash(
     vault_meta_path: &Path,
 ) -> std::io::Result<Result<[u8; VAULT_META_ACCOUNT_HASH_LEN], MetaParseFailed>> {
     let bytes = std::fs::read(vault_meta_path)?;
@@ -182,7 +183,7 @@ pub(crate) fn read_account_number_hash(
 
 /// Zero-sized marker for a `vault.meta` parse failure, mapped to each
 /// command's `InvalidVaultMeta` variant at the call site.
-pub(crate) struct MetaParseFailed;
+pub struct MetaParseFailed;
 
 /// Current UNIX time in whole seconds, saturating at 0 if the clock is
 /// before the epoch (cannot happen in practice). Used for the catalog
@@ -237,7 +238,11 @@ pub async fn attachment_import<R: Runtime>(
     attachment_import_with_dir(&dir, state.inner(), source).await
 }
 
-/// Testable core of [`attachment_import`].
+/// Testable core of [`attachment_import`] — the **extraction-free** import
+/// (the mobile + core-command path). Desktop uses
+/// [`attachment_import_with_dir_ext`] with its real text extractor so the eager
+/// `MYE1` cache is populated for search parity; this wrapper injects a no-op
+/// extractor, so no cache blob is written.
 ///
 /// Steps: read the source bytes (first-line `Zeroizing`-wrapped),
 /// enforce the cap, sniff the type (unrecognized ⇒ `octet-stream`,
@@ -245,11 +250,39 @@ pub async fn attachment_import<R: Runtime>(
 /// for `(items_key, items_key_id, root_key)`, read the catalog, dedup on
 /// the computed id, else encode + `atomic_write` the `MYA1` blob and
 /// upsert + `atomic_write` the `MYC1` catalog. Returns the id + metadata.
-pub(crate) async fn attachment_import_with_dir(
+pub async fn attachment_import_with_dir(
     vault_dir: &Path,
     state: &VaultRuntimeState,
     source: ImportSource,
 ) -> Result<ImportedAttachment, AttachmentImportError> {
+    attachment_import_with_dir_ext(vault_dir, state, source, no_op_extract).await
+}
+
+/// No-op text extractor: reports every input as `Unsupported`, so the eager
+/// `MYE1` cache write in [`attachment_import_with_dir_ext`] is skipped. This is
+/// the extractor the core `attachment_import` command + the mobile client use
+/// (no extraction step); desktop injects the real `lopdf`/`zip`/`quick-xml` one.
+fn no_op_extract(_content_type: &str, _filename: &str, _bytes: &[u8]) -> ExtractedText {
+    ExtractedText::negative(
+        super::extract_types::ExtractStatus::Unsupported,
+        super::extract_types::SourceFormat::Other,
+    )
+}
+
+/// Testable core of [`attachment_import`], with the text-extraction *producer*
+/// injected as `extract` so this module (in `myne-core`) never depends on the
+/// desktop-only `lopdf`/`zip`/`quick-xml` extractor. Desktop passes its real
+/// extractor (eager `MYE1` cache — search parity); mobile / the core command
+/// pass [`no_op_extract`] (no extraction step).
+pub async fn attachment_import_with_dir_ext<F>(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    source: ImportSource,
+    extract: F,
+) -> Result<ImportedAttachment, AttachmentImportError>
+where
+    F: Fn(&str, &str, &[u8]) -> ExtractedText + Send + 'static,
+{
     // (1) Materialize the source bytes + the display filename. For the
     //     path arm, the host reads the file. The bytes are wrapped in a
     //     `Zeroizing` on the first non-doc statement of their lifetime so
@@ -401,13 +434,13 @@ pub(crate) async fn attachment_import_with_dir(
         // write must never fail the import; the lazy backfill (search rebuild)
         // retries. Unsupported formats (e.g. images) are NOT cached — their
         // O(1) dispatch is cheap to repeat and a cache blob per image is waste.
-        let extracted = crate::plugins::attachments::extract::extract(
+        let extracted = extract(
             &content_type_owned,
             &filename_for_extract,
             &file_bytes,
         );
-        if extracted.status != crate::plugins::attachments::extract::ExtractStatus::Unsupported
-            && crate::plugins::attachments::text_cache::write_extracted(
+        if extracted.status != super::extract_types::ExtractStatus::Unsupported
+            && super::text_cache::write_extracted(
                 &vault_dir_for_cache,
                 &attachment_text_key,
                 &account_number_hash,
@@ -627,7 +660,7 @@ pub(crate) async fn attachment_unused_list_with_dir(
     // `items_key_id` move into the closure (Zeroizing wipes on exit).
     let notes_dir = vault_dir.join("notes");
     let referenced = tokio::task::spawn_blocking(move || {
-        crate::plugins::notes::desktop_commands::collect_referenced_attachment_ids(
+        crate::plugins::attachments::ref_scan::collect_referenced_attachment_ids(
             &notes_dir,
             &items_key,
             &items_key_id,
@@ -747,7 +780,7 @@ pub async fn attachment_clean_unused<R: Runtime>(
 }
 
 /// Testable core of [`attachment_clean_unused`].
-pub(crate) async fn attachment_clean_unused_with_dir(
+pub async fn attachment_clean_unused_with_dir(
     vault_dir: &Path,
     state: &VaultRuntimeState,
     ids: Vec<String>,
@@ -780,7 +813,7 @@ pub(crate) async fn attachment_clean_unused_with_dir(
     // there is no vault-wide write lock in v0.1; Phase 2 sync revisit.)
     let notes_dir = vault_dir.join("notes");
     let referenced = tokio::task::spawn_blocking(move || {
-        crate::plugins::notes::desktop_commands::collect_referenced_attachment_ids(
+        crate::plugins::attachments::ref_scan::collect_referenced_attachment_ids(
             &notes_dir,
             &items_key,
             &items_key_id,
@@ -948,7 +981,7 @@ pub(crate) fn reclaim_stray_blobs(
 /// the catalog write mutex across the read+scan so it cannot race a
 /// concurrent import/delete catalog RMW (none can occur at unlock time in
 /// Phase 1's single window, but the guard keeps the invariant explicit).
-pub(crate) async fn reclaim_stray_attachment_blobs<R: Runtime>(
+pub async fn reclaim_stray_attachment_blobs<R: Runtime>(
     app: &AppHandle<R>,
     state: &VaultRuntimeState,
 ) {
@@ -1027,7 +1060,7 @@ pub async fn attachment_delete<R: Runtime>(
 }
 
 /// Testable core of [`attachment_delete`].
-pub(crate) async fn attachment_delete_with_dir(
+pub async fn attachment_delete_with_dir(
     vault_dir: &Path,
     state: &VaultRuntimeState,
     id: String,
@@ -1204,7 +1237,7 @@ pub(crate) async fn attachment_rename_with_dir(
 /// `note_export_attachments` (MYND-115 task 4) — there a masked-empty
 /// catalog would mis-report every referenced attachment as missing, so
 /// the hard-IO-error surface is the right one for it too.
-pub(crate) fn read_catalog(
+pub fn read_catalog(
     catalog_path: &Path,
     catalog_key: &[u8; 32],
     account_number_hash: &[u8; CATALOG_BLOB_ACCOUNT_HASH_LEN],
@@ -1224,7 +1257,7 @@ pub(crate) fn read_catalog(
 /// export callers map each variant onto their own error enums (with
 /// their own stage-tagged tracing), keeping the closed-enum logging
 /// discipline at the call sites.
-pub(crate) enum CatalogLoadError {
+pub enum CatalogLoadError {
     /// `vault.meta` exists but does not parse — the catalog AAD
     /// identity cannot be derived.
     InvalidVaultMeta,
@@ -1243,7 +1276,7 @@ pub(crate) enum CatalogLoadError {
 /// (`plugins::export`) — both read-only consumers where a
 /// masked-empty catalog would mis-report referenced attachments as
 /// missing, so the hard-IO-error surface is the right one.
-pub(crate) fn load_catalog_for_export(
+pub fn load_catalog_for_export(
     vault_root: &Path,
     root_key: &[u8; 32],
 ) -> Result<AttachmentsCatalog, CatalogLoadError> {
@@ -1487,143 +1520,13 @@ mod tests {
         (tmp, state)
     }
 
-    // ---- eager text extraction → MYE1 cache (MYND-328, Task 5) ----------
-
-    #[test]
-    fn import_eagerly_caches_extracted_text() {
-        rt().block_on(async {
-            let (tmp, state) = temp_vault().await;
-            let imported = attachment_import_with_dir(
-                tmp.path(),
-                &state,
-                ImportSource::Bytes {
-                    bytes: b"searchable attachment body alpha".to_vec(),
-                    filename: Some("note.txt".to_string()),
-                },
-            )
-            .await
-            .expect("import succeeds");
-
-            let id = hex_decode_id(&imported.id).expect("valid id");
-            let key = derive_subkey(&[SEED_ROOT; 32], SubkeyRole::AttachmentTextKey);
-            let cached = crate::plugins::attachments::text_cache::read_extracted(
-                tmp.path(),
-                &key,
-                &[SEED_ACCOUNT_HASH; 16],
-                &id,
-            )
-            .expect("MYE1 cache written at import");
-            assert_eq!(
-                cached.status,
-                crate::plugins::attachments::extract::ExtractStatus::Ok
-            );
-            assert!(cached.text.contains("searchable attachment body alpha"));
-        });
-    }
-
-    #[test]
-    fn import_unsupported_writes_no_text_cache() {
-        rt().block_on(async {
-            let (tmp, state) = temp_vault().await;
-            // Opaque bytes + an unsupported extension → octet-stream + Unsupported
-            // → no cache blob (images/binaries are not text-cached).
-            let imported = attachment_import_with_dir(
-                tmp.path(),
-                &state,
-                ImportSource::Bytes {
-                    bytes: b"\x00\x01\x02 binary blob".to_vec(),
-                    filename: Some("thing.bin".to_string()),
-                },
-            )
-            .await
-            .expect("import succeeds");
-
-            let id = hex_decode_id(&imported.id).expect("valid id");
-            assert!(
-                !crate::plugins::attachments::text_cache::cache_path(tmp.path(), &id).exists(),
-                "no MYE1 cache blob for an unsupported attachment"
-            );
-        });
-    }
-
-    #[test]
-    fn clean_unused_crypto_erases_the_mye1_text_cache() {
-        rt().block_on(async {
-            let (tmp, state) = temp_vault().await;
-            // Import a text attachment: eager extraction writes its MYE1 cache.
-            let imported = attachment_import_with_dir(
-                tmp.path(),
-                &state,
-                ImportSource::Bytes {
-                    bytes: b"searchable attachment body to be crypto-erased".to_vec(),
-                    filename: Some("note.txt".to_string()),
-                },
-            )
-            .await
-            .expect("import succeeds");
-            let id = hex_decode_id(&imported.id).expect("valid id");
-            assert!(
-                crate::plugins::attachments::text_cache::cache_path(tmp.path(), &id).exists(),
-                "MYE1 cache present after import"
-            );
-
-            // No note references it, so clean_unused deletes it. The MYE1 cache
-            // MUST go too — otherwise the "permanently deleted" attachment's
-            // searchable plaintext stays decryptable (§9.15.4 crypto-erase parity).
-            let result =
-                attachment_clean_unused_with_dir(tmp.path(), &state, vec![imported.id.clone()])
-                    .await
-                    .expect("clean_unused succeeds");
-            assert_eq!(result.deleted, 1);
-            assert!(
-                !crate::plugins::attachments::text_cache::cache_path(tmp.path(), &id).exists(),
-                "MYE1 cache removed on clean_unused (crypto-erase parity)"
-            );
-        });
-    }
-
-    #[test]
-    fn delete_removes_the_extracted_text_cache() {
-        // MYND-328 Task 8: permanent delete erases the MYE1 cache (crypto-erase
-        // parity with the MYA1 source).
-        rt().block_on(async {
-            let (tmp, state) = temp_vault().await;
-            let imported = attachment_import_with_dir(
-                tmp.path(),
-                &state,
-                ImportSource::Bytes {
-                    bytes: b"deletable searchable text body".to_vec(),
-                    filename: Some("d.txt".to_string()),
-                },
-            )
-            .await
-            .expect("import succeeds");
-            let id = hex_decode_id(&imported.id).expect("valid id");
-            let key = derive_subkey(&[SEED_ROOT; 32], SubkeyRole::AttachmentTextKey);
-
-            // Cache present after the eager import...
-            assert!(
-                crate::plugins::attachments::text_cache::read_extracted(
-                    tmp.path(),
-                    &key,
-                    &[SEED_ACCOUNT_HASH; 16],
-                    &id,
-                )
-                .is_some(),
-                "import eager-cached the text"
-            );
-
-            attachment_delete_with_dir(tmp.path(), &state, imported.id.clone())
-                .await
-                .expect("delete succeeds");
-
-            // ...and gone after delete.
-            assert!(
-                !crate::plugins::attachments::text_cache::cache_path(tmp.path(), &id).exists(),
-                "delete removed the MYE1 cache blob"
-            );
-        });
-    }
+    // Eager-text-extraction → MYE1-cache tests (MYND-328) moved to the desktop
+    // crate (`src-tauri/.../attachments/import_desktop.rs`): they exercise the
+    // desktop-only `lopdf`/`zip`/`quick-xml` extractor via
+    // `attachment_import_with_dir_ext`, which lives here but takes the extractor
+    // as an injected closure. The core `attachment_import_with_dir` used by these
+    // slots is extraction-free (no-op extractor), so an in-core assertion of "the
+    // MYE1 cache exists after import" cannot hold without the desktop producer.
 
     // ---- hex round-trip ------------------------------------------------
 

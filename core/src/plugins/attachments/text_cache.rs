@@ -21,7 +21,7 @@
 //! `protocol::derive_subkey(root_key, SubkeyRole::AttachmentTextKey)` and passes
 //! it in, mirroring how `commands.rs` derives the catalog KEK at its call site.
 
-use super::extract::{ExtractStatus, ExtractedText};
+use super::extract_types::{ExtractStatus, ExtractedText};
 use protocol::{
     decode_attachment_blob, decode_attachment_text_blob, encode_attachment_text_blob,
     AttachmentsCatalog, AEAD_KEY_LEN, ATTACHMENT_ID_LEN, ATTACHMENT_TEXT_BLOB_ACCOUNT_HASH_LEN,
@@ -148,8 +148,13 @@ pub fn fold_attachment_text(
 /// post-MYND-328 rebuild (which the snapshot `extractor_version` forces).
 /// Best-effort: an unreadable / undecryptable / unsupported attachment resolves
 /// to no text and is not retried this pass.
+///
+/// `extract` is the injected text-extraction *producer* — the desktop client
+/// passes its `lopdf`/`zip`/`quick-xml` extractor; this pure cache module never
+/// depends on those crates so it compiles on mobile (which simply never calls
+/// this — mobile has no extraction step).
 #[allow(clippy::too_many_arguments)]
-pub fn backfill_note_attachment_text(
+pub fn backfill_note_attachment_text<F>(
     note_body: &str,
     vault_dir: &Path,
     attachment_text_key: &[u8; AEAD_KEY_LEN],
@@ -158,7 +163,10 @@ pub fn backfill_note_attachment_text(
     items_key_id: &[u8; ITEMS_KEY_ID_LEN],
     catalog: &AttachmentsCatalog,
     memo: &mut HashMap<[u8; ATTACHMENT_ID_LEN], Option<String>>,
-) {
+    extract: F,
+) where
+    F: Fn(&str, &str, &[u8]) -> ExtractedText,
+{
     for id_hex in super::reconcile::extract_att_ids(note_body) {
         let Some(id) = super::commands::hex_decode_id(&id_hex) else {
             continue;
@@ -198,7 +206,7 @@ pub fn backfill_note_attachment_text(
                 continue;
             }
         };
-        let extracted = super::extract::extract(&meta.content_type, &meta.filename, &plaintext);
+        let extracted = extract(&meta.content_type, &meta.filename, &plaintext);
         if extracted.status != ExtractStatus::Unsupported {
             let _ = write_extracted(
                 vault_dir,
@@ -227,9 +235,33 @@ pub fn remove_extracted(
 
 #[cfg(test)]
 mod tests {
-    use super::super::extract::{ExtractStatus, SourceFormat};
+    use super::super::extract_types::{ExtractStatus, SourceFormat};
     use super::*;
     use crate::test_support::ScopedTempDir;
+
+    /// A minimal text-only extractor for the backfill test — stands in for the
+    /// desktop `lopdf`/`zip`/`quick-xml` producer, which lives in the desktop
+    /// crate. Text-like content is UTF-8-decoded; everything else is Unsupported.
+    fn test_extract(content_type: &str, filename: &str, bytes: &[u8]) -> ExtractedText {
+        let is_text = content_type.starts_with("text/")
+            || filename.ends_with(".txt")
+            || filename.ends_with(".md");
+        if !is_text {
+            return ExtractedText::negative(ExtractStatus::Unsupported, SourceFormat::Other);
+        }
+        let text = String::from_utf8_lossy(bytes).into_owned();
+        if text.trim().is_empty() {
+            return ExtractedText::negative(ExtractStatus::Empty, SourceFormat::Text);
+        }
+        let char_count = text.chars().count() as u32;
+        ExtractedText {
+            status: ExtractStatus::Ok,
+            source_format: SourceFormat::Text,
+            text,
+            char_count,
+            truncated: false,
+        }
+    }
 
     const KEY: [u8; AEAD_KEY_LEN] = [0x42; AEAD_KEY_LEN];
     const ACCOUNT_HASH: [u8; ATTACHMENT_TEXT_BLOB_ACCOUNT_HASH_LEN] =
@@ -418,6 +450,7 @@ mod tests {
             &items_key_id,
             &catalog,
             &mut memo,
+            test_extract,
         );
 
         // The cache now exists on disk...
@@ -443,6 +476,7 @@ mod tests {
             &[0u8; 16],
             &catalog,
             &mut memo,
+            test_extract,
         );
         assert_eq!(memo.get(&ATT_ID), Some(&None)); // resolved, no text
     }

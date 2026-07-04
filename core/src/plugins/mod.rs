@@ -11,6 +11,7 @@
 //! the desktop crate and attach through the `hooks::VaultLifecycleHooks`
 //! seam rather than living here.
 
+pub mod attachments;
 pub mod notes;
 pub mod prefs;
 pub mod quick_unlock;

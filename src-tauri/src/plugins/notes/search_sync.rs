@@ -267,6 +267,9 @@ pub(crate) async fn hydrate_search_index_with_dir(
                     &items_key_id,
                     &attachment_catalog,
                     &mut attachment_text_memo,
+                    // The MYE1 producer is injected so the shared cache module
+                    // (myne-core) stays free of the desktop-only extractor deps.
+                    crate::plugins::attachments::extract::extract,
                 );
                 let body = crate::plugins::attachments::text_cache::fold_attachment_text(
                     &plaintext,
