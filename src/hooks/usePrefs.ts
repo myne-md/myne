@@ -80,6 +80,7 @@ const DEFAULT_PREFS: PrefsView = {
   item_colors: {},
   keymap: {},
   label: null,
+  icon: null,
   last_backup_at: null,
   new_note_location: null,
   new_note_location_folder: null,

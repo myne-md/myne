@@ -554,6 +554,26 @@ pub struct PrefsView {
     #[serde(default)]
     pub bar_items_order: Vec<String>,
 
+    /// Per-vault decorative icon (vault-icons) — the curated stroke-glyph name
+    /// the in-app vault switcher shows beside this vault's name, replacing the
+    /// default `M` wordmark. `None` ≡ no icon set → the switcher shows the
+    /// neutral `M` fallback. Drawn from the client's curated glyph set (the same
+    /// `FOLDER_ICON_PATHS` family as [`PrefsView::folder_icons`]); an unknown
+    /// name is ignored at render (falls back to the wordmark). A
+    /// **non-load-bearing** cosmetic preference (AS-low) — a tampered/replayed
+    /// `vault.prefs` can at worst surface a different glyph — so no
+    /// protective-envelope clamp. Like [`PrefsView::label`], the icon lives
+    /// **encrypted-only** inside `vault.prefs` (SYNC-3): it decrypts into a
+    /// per-session RAM cache on unlock and the switcher reads that cache (never
+    /// re-derivable from disk without the `prefs_key`). NFC-normalized +
+    /// **omitted entirely when `None`**, so a vault that never set an icon is
+    /// byte-identical to a pre-feature `vault.prefs` (existing golden vectors
+    /// unaffected — this rides the existing `MYP1` format as a migration-less
+    /// additive field, exactly like `label`). Canonical key `icon` — sorts after
+    /// `hidden_bar_items` (`h` < `i`), before `item_colors` (`ico` < `ite`).
+    #[serde(default)]
+    pub icon: Option<String>,
+
     /// Per-item color label (MYND-184) — a map from a sidebar item key to a
     /// color-slot name. Keys are heterogeneous: a note UUID **or** a canonical
     /// trailing-slash folder path, discriminated by the trailing `/` exactly as
@@ -826,6 +846,7 @@ impl Default for PrefsView {
             show_note_timestamps: true,
             folder_icons: Default::default(),
             hidden_bar_items: Vec::new(),
+            icon: None,
             item_colors: Default::default(),
             keymap: Default::default(),
             theme: None,
@@ -1245,6 +1266,17 @@ fn canonical_json_encode(prefs: &PrefsView) -> Vec<u8> {
             push_json_string(&mut out, id);
         }
         out.extend_from_slice(b"],");
+    }
+
+    // icon (canonical key 'icon' — after 'hidden_bar_items' [h < i], before
+    // 'item_colors' ['ico' < 'ite']). The per-vault switcher glyph name
+    // (vault-icons); omitted entirely when None so a vault that never set an icon
+    // is byte-identical to a pre-feature vault.prefs (existing KAT vectors
+    // unaffected). NFC-normalized like label.
+    if let Some(ref icon) = prefs.icon {
+        out.extend_from_slice(b"\"icon\":");
+        push_json_string(&mut out, &icon.nfc().collect::<String>());
+        out.push(b',');
     }
 
     // item_colors (canonical key 'i' — after 'hidden_bar_items', before 'item_order'
@@ -1792,6 +1824,11 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
     // (`h` < `s`, so the cursor-based helper — not the post-SCP `_marker`
     // variant — is correct here).
     let hidden_bar_items = parse_optional_array_field(rest, &mut cursor, b"\"hidden_bar_items\":")?;
+    // icon (key 'icon') sits between hidden_bar_items (h) and item_colors (i)
+    // ['ico' < 'ite'] in canonical order. The per-vault switcher glyph name
+    // (vault-icons), parsed from the same monotonic cursor so a later field's key
+    // marker is never matched inside a prior field's content.
+    let icon = parse_optional_string_field(rest, &mut cursor, b"\"icon\":")?;
     let item_colors = parse_optional_string_map_field(rest, &mut cursor, b"\"item_colors\":")?;
     let item_order = parse_optional_array_field(rest, &mut cursor, b"\"item_order\":")?;
     // keymap (key 'k') — user keybinding overrides (MYND-304), sitting between
@@ -1907,6 +1944,7 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
         folder_icons,
         hidden_bar_items,
         bar_items_order,
+        icon,
         item_colors,
         deliberate_folders,
         auto_lock_seconds,
@@ -2666,6 +2704,7 @@ mod tests {
             show_note_timestamps: true,
             folder_icons: Default::default(),
             hidden_bar_items: Vec::new(),
+            icon: None,
             item_colors: Default::default(),
             keymap: Default::default(),
             theme: None,
@@ -2717,6 +2756,7 @@ mod tests {
             show_note_timestamps: true,
             folder_icons: Default::default(),
             hidden_bar_items: Vec::new(),
+            icon: None,
             item_colors: Default::default(),
             keymap: Default::default(),
             theme: None,
@@ -2888,6 +2928,7 @@ mod tests {
             PrefsView {
                 screen_capture_protection: true,
                 bar_items_order: Vec::new(),
+                icon: None,
                 ai_enabled: false,
                 ai_excluded_folders: Vec::new(),
                 show_note_timestamps: true,
@@ -2941,6 +2982,7 @@ mod tests {
             PrefsView {
                 screen_capture_protection: false,
                 bar_items_order: Vec::new(),
+                icon: None,
                 ai_enabled: false,
                 ai_excluded_folders: Vec::new(),
                 show_note_timestamps: true,
@@ -3088,6 +3130,53 @@ mod tests {
             encoded.as_slice(),
             br#"{"item_order":["n1"],"label":"Work","screen_capture_protection":true}"#,
         );
+    }
+
+    // ---- icon field (vault-icons) ------------------------------------
+
+    #[test]
+    fn encode_omits_icon_when_none_byte_identical_to_pre_icon() {
+        // A vault that never set an icon encodes byte-identically to the
+        // single-field pre-feature form (migration-less additive field, the
+        // `label` precedent class — existing golden vectors unaffected).
+        let encoded = canonical_json_encode(&PrefsView {
+            icon: None,
+            ..PrefsView::default()
+        });
+        assert_eq!(encoded.as_slice(), br#"{"screen_capture_protection":true}"#,);
+    }
+
+    #[test]
+    fn encode_places_icon_between_hidden_bar_items_and_item_colors() {
+        // Canonical key order: hidden_bar_items (h) < icon (ico) < item_colors (ite).
+        let encoded = canonical_json_encode(&PrefsView {
+            hidden_bar_items: alloc::vec![alloc::string::String::from("graph")],
+            icon: Some(alloc::string::String::from("book")),
+            item_colors: map_of(&[("Projects/", "red")]),
+            ..PrefsView::default()
+        });
+        assert_eq!(
+            encoded.as_slice(),
+            br#"{"hidden_bar_items":["graph"],"icon":"book","item_colors":{"Projects/":"red"},"screen_capture_protection":true}"#,
+        );
+    }
+
+    #[test]
+    fn icon_round_trips_through_decode() {
+        let original = PrefsView {
+            icon: Some(alloc::string::String::from("briefcase")),
+            ..PrefsView::default()
+        };
+        let encoded = canonical_json_encode(&original);
+        let decoded = canonical_json_decode(&encoded).expect("decode");
+        assert_eq!(decoded.icon, Some(alloc::string::String::from("briefcase")));
+    }
+
+    #[test]
+    fn decode_absent_icon_is_none() {
+        let decoded =
+            canonical_json_decode(br#"{"screen_capture_protection":true}"#).expect("decode");
+        assert_eq!(decoded.icon, None);
     }
 
     // ---- keymap (MYND-304 / 366) -------------------------------------------
@@ -3836,6 +3925,7 @@ mod tests {
             show_note_timestamps: true,
             folder_icons: Default::default(),
             hidden_bar_items: Vec::new(),
+            icon: None,
             item_colors: Default::default(),
             theme: Some(ThemeChoice::Dark),
             ..PrefsView::default()
@@ -3855,6 +3945,7 @@ mod tests {
             show_note_timestamps: true,
             folder_icons: Default::default(),
             hidden_bar_items: Vec::new(),
+            icon: None,
             item_colors: Default::default(),
             keymap: Default::default(),
             deliberate_folders: alloc::vec![alloc::string::String::from("Archive/")],
@@ -4143,6 +4234,7 @@ mod tests {
             show_note_timestamps: true,
             folder_icons: Default::default(),
             hidden_bar_items: Vec::new(),
+            icon: None,
             item_colors: Default::default(),
             keymap: Default::default(),
             theme: None,
@@ -4200,6 +4292,7 @@ mod tests {
             show_note_timestamps: true,
             folder_icons: Default::default(),
             hidden_bar_items: Vec::new(),
+            icon: None,
             item_colors: Default::default(),
             keymap: Default::default(),
             theme: None,
@@ -4260,6 +4353,7 @@ mod tests {
             show_note_timestamps: true,
             folder_icons: Default::default(),
             hidden_bar_items: Vec::new(),
+            icon: None,
             item_colors: Default::default(),
             keymap: Default::default(),
             theme: None,
@@ -4315,6 +4409,7 @@ mod tests {
             show_note_timestamps: true,
             folder_icons: Default::default(),
             hidden_bar_items: Vec::new(),
+            icon: None,
             item_colors: Default::default(),
             keymap: Default::default(),
             theme: None,
@@ -4430,6 +4525,7 @@ mod tests {
             show_note_timestamps: true,
             folder_icons: Default::default(),
             hidden_bar_items: Vec::new(),
+            icon: None,
             item_colors: Default::default(),
             keymap: Default::default(),
             theme: None,
@@ -4509,6 +4605,7 @@ mod tests {
             show_note_timestamps: true,
             folder_icons: Default::default(),
             hidden_bar_items: Vec::new(),
+            icon: None,
             item_colors: Default::default(),
             keymap: Default::default(),
             theme: None,
@@ -4573,6 +4670,7 @@ mod tests {
             show_note_timestamps: true,
             folder_icons: Default::default(),
             hidden_bar_items: Vec::new(),
+            icon: None,
             item_colors: Default::default(),
             keymap: Default::default(),
             theme: None,
@@ -4669,6 +4767,7 @@ mod tests {
                 alloc::string::String::from("graph"),
                 alloc::string::String::from("word-count"),
             ],
+            icon: None,
             item_colors: Default::default(),
             keymap: Default::default(),
             theme: None,
@@ -4748,6 +4847,7 @@ mod tests {
                 alloc::string::String::from("graph"),
                 alloc::string::String::from("graph"),
             ],
+            icon: None,
             item_colors: map_of(&[("Projects/", "red")]),
             keymap: Default::default(),
             theme: None,
@@ -4868,6 +4968,7 @@ mod tests {
             show_note_timestamps: true,
             folder_icons: Default::default(),
             hidden_bar_items: Vec::new(),
+            icon: None,
             item_colors: Default::default(),
             keymap: Default::default(),
             theme: None,
@@ -4923,6 +5024,7 @@ mod tests {
             show_note_timestamps: true,
             folder_icons: Default::default(),
             hidden_bar_items: Vec::new(),
+            icon: None,
             item_colors: Default::default(),
             keymap: Default::default(),
             theme: None,
@@ -4980,6 +5082,7 @@ mod tests {
             show_note_timestamps: true,
             folder_icons: Default::default(),
             hidden_bar_items: Vec::new(),
+            icon: None,
             item_colors: Default::default(),
             keymap: Default::default(),
             theme: None,
@@ -5105,6 +5208,7 @@ mod tests {
             show_note_timestamps: true,
             folder_icons: Default::default(),
             hidden_bar_items: Vec::new(),
+            icon: None,
             item_colors: Default::default(),
             keymap: Default::default(),
             theme: None,
@@ -5204,6 +5308,7 @@ mod tests {
             show_note_timestamps: true,
             folder_icons: Default::default(),
             hidden_bar_items: Vec::new(),
+            icon: None,
             item_colors: Default::default(),
             keymap: Default::default(),
             theme: None,
@@ -5493,6 +5598,7 @@ mod tests {
             show_note_timestamps: true,
             folder_icons: Default::default(),
             hidden_bar_items: Vec::new(),
+            icon: None,
             item_colors: Default::default(),
             keymap: Default::default(),
             theme: None,
@@ -5552,6 +5658,7 @@ mod tests {
             show_note_timestamps: true,
             folder_icons: Default::default(),
             hidden_bar_items: Vec::new(),
+            icon: None,
             item_colors: Default::default(),
             keymap: Default::default(),
             theme: None,
@@ -5869,6 +5976,7 @@ mod tests {
             &PrefsView {
                 screen_capture_protection: true,
                 bar_items_order: Vec::new(),
+                icon: None,
                 ai_enabled: false,
                 ai_excluded_folders: Vec::new(),
                 show_note_timestamps: true,
@@ -5921,6 +6029,7 @@ mod tests {
             &PrefsView {
                 screen_capture_protection: false,
                 bar_items_order: Vec::new(),
+                icon: None,
                 ai_enabled: false,
                 ai_excluded_folders: Vec::new(),
                 show_note_timestamps: true,
@@ -5980,6 +6089,7 @@ mod tests {
             show_note_timestamps: true,
             folder_icons: Default::default(),
             hidden_bar_items: Vec::new(),
+            icon: None,
             item_colors: Default::default(),
             keymap: Default::default(),
             theme: None,

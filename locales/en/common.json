@@ -1498,7 +1498,9 @@
       "vaultLabelEyebrow": "VAULT LABEL",
       "vaultLabelHelper": "A name for this vault shown in the in-app switcher. Stored encrypted inside the vault; never leaves your device in plaintext.",
       "vaultLabelPlaceholder": "Add a label…",
-      "vaultLabelSave": "Save"
+      "vaultLabelSave": "Save",
+      "vaultIconLabel": "ICON",
+      "vaultIconDefault": "Default (wordmark)"
     },
     "appearance": {
       "showEditTimesAria": "Show edit times in sidebar",
