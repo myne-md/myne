@@ -17,5 +17,6 @@ pub mod quick_unlock;
 pub mod vault_change_password;
 pub mod vault_creation;
 pub mod vault_delete;
+pub mod vault_indices;
 pub mod vault_recover;
 pub mod vault_unlock;

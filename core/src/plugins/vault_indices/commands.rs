@@ -20,7 +20,7 @@ use super::state::{
     CandidateEdge, NoteRecord, PropertyEntry, TagEntry, TagTreeNode, VaultIndicesState,
     WikilinkEdge,
 };
-use crate::plugins::notes::search_sync::scan_on_disk_manifest;
+use crate::note_nonce::scan_on_disk_manifest;
 use crate::plugins::vault_unlock::state::{SlotKind, VaultRuntimeState};
 use protocol::{derive_subkey, parse_vault_meta, SubkeyRole, VAULT_INDICES_BLOB_ACCOUNT_HASH_LEN};
 use std::path::Path;
@@ -249,7 +249,7 @@ fn read_account_number_hash(
 }
 
 // The decryption-free on-disk nonce scan (`scan_on_disk_manifest`) is shared
-// with the search index's persistence — reused from `notes::search_sync` rather
+// with the search index's persistence — reused from `crate::note_nonce` rather
 // than duplicated, since both features diff the identical `.myn` `content_nonce`
 // staleness signal.
 
