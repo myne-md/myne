@@ -15,12 +15,10 @@ use tauri::{AppHandle, Runtime, State};
 use crate::plugins::vault_unlock::state::VaultRuntimeState;
 use myne_core::plugins::quick_unlock::commands::{active_dir, disable_with_dir, wipe_files};
 use myne_core::plugins::quick_unlock::error::QuickUnlockError;
-
-// The PIN commands, status, and the status DTO are registered straight from
-// core; re-exported so `commands::quick_unlock_setup_pin` etc. resolve here.
-pub use myne_core::plugins::quick_unlock::commands::{
-    quick_unlock_setup_pin, quick_unlock_status, quick_unlock_with_pin, QuickUnlockStatus,
-};
+// The PIN/status commands are registered directly from the myne-core module path
+// in `mod.rs::init()` (a bare `pub use` of a `#[tauri::command]` fn would not
+// carry its hidden `__cmd__` items), so this module only defines the desktop
+// biometric branch + OS-credential cleanup.
 
 /// Best-effort removal of the macOS biometric Keychain credential for the vault
 /// at `dir`. No-op on non-macOS and harmless for a PIN vault (the item simply
