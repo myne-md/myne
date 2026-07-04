@@ -13,9 +13,10 @@
 //! - **export**: `note_export_as_markdown`, `note_export_html`,
 //!   `note_export_attachments`, `note_export_html_attachments` (+ their
 //!   `_with_root` / `_with_dir` inners and error-kind helpers),
-//! - **snapshot flush**: `capture_snapshot_best_effort` (the pre-overwrite
-//!   capture the core `note_update` reaches via the hooks seam),
-//!   `flush_snapshot_for_note`, `note_snapshot_flush` (+ `_with_dir`),
+//! - **snapshot flush**: `flush_snapshot_for_note`, `note_snapshot_flush`
+//!   (+ `_with_dir`) — the on-close / lock force-flush entry points that reuse
+//!   the shared `myne_core::snapshot_store::capture_snapshot_best_effort`
+//!   write-path the core `note_update` also reaches via the hooks seam,
 //! - **search**: `note_search` (+ `note_search_core`), `SearchResult`,
 //! - **attachment-reference scan**: `collect_referenced_attachment_ids` +
 //!   `ReferencedScanError` moved to `myne_core::plugins::attachments::ref_scan`.
@@ -1289,82 +1290,6 @@ fn note_export_attachments_error_kind(e: &NoteExportAttachmentsError) -> &'stati
     }
 }
 
-/// Best-effort: capture a snapshot of a note's pre-overwrite `.myn` blob
-/// (MYND-96), gated by the coalescing window. A snapshot is a recovery
-/// convenience, not part of the note write's integrity contract — so this
-/// **never** fails the caller's update (SYNC-8); every failure is logged and
-/// swallowed. `old_blob` is the verbatim `.myn` bytes about to be replaced;
-/// `vault_root` is the parent of `notes/` (the flat `snapshots/` dir is its
-/// sibling). Runs inside the caller's `spawn_blocking` + held slot read-guard,
-/// before the live note is overwritten — so a failed snapshot cannot corrupt
-/// the note. `force` bypasses the coalescing gate (on-close/lock flush, restore
-/// undo point).
-///
-/// **Returns `true` if the snapshot could not be written** (dir-create or write
-/// failure) — a non-blocking warning the caller surfaces to the frontend
-/// (SYNC-8). Returns `false` on success or a coalesced skip. A prune failure is
-/// NOT a warning (the snapshot itself already succeeded).
-pub(crate) fn capture_snapshot_best_effort(
-    vault_root: &std::path::Path,
-    note_uuid: &str,
-    old_blob: &[u8],
-    now_ms: u64,
-    force: bool,
-) -> bool {
-    let sdir = match crate::paths::snapshots_dir_under(vault_root) {
-        Ok(d) => d,
-        Err(e) => {
-            tracing::warn!(
-                stage = "snapshot_mkdir",
-                io_failure_kind = ?from_io_error_kind(e.kind()),
-                "snapshot dir create failed (best-effort; note save unaffected)"
-            );
-            return true;
-        }
-    };
-    let existing = crate::snapshot_store::list_note_snapshots(&sdir, note_uuid).unwrap_or_default();
-    let last = existing.first().map(|s| s.captured_at_ms);
-    if !crate::snapshot_policy::should_snapshot(last, now_ms, force) {
-        tracing::debug!(
-            stage = "snapshot_coalesced",
-            "snapshot skipped: within window"
-        );
-        return false;
-    }
-    let snap_uuid = crate::snapshot_store::new_snapshot_uuid().to_string();
-    if let Err(e) =
-        crate::snapshot_store::write_snapshot_blob(&sdir, note_uuid, &snap_uuid, old_blob)
-    {
-        tracing::warn!(
-            stage = "snapshot_write",
-            io_failure_kind = ?from_io_error_kind(e.kind()),
-            "snapshot write failed (best-effort; note save unaffected)"
-        );
-        return true;
-    }
-    tracing::debug!(
-        stage = "snapshot_created",
-        "pre-overwrite snapshot captured"
-    );
-
-    // Eager prune (SYNC-2): enforce retention at the single write-path source of
-    // truth, right after creating the snapshot. Best-effort; a prune failure is
-    // not surfaced as a warning (the snapshot already landed).
-    if let Err(e) = crate::snapshot_store::prune_note_snapshots(
-        &sdir,
-        note_uuid,
-        now_ms,
-        &crate::snapshot_policy::RetentionPolicy::default(),
-    ) {
-        tracing::warn!(
-            stage = "snapshot_prune",
-            io_failure_kind = ?from_io_error_kind(e.kind()),
-            "snapshot prune scan failed (best-effort; snapshot already written)"
-        );
-    }
-    false
-}
-
 /// Force-capture a snapshot of a note's CURRENT on-disk `.myn` (MYND-96
 /// on-close / vault-lock flush, SYNC-3). Unlike the `note_update` hook (which
 /// snapshots the OLD pre-overwrite content, gated by the window), this is the
@@ -1380,11 +1305,9 @@ fn flush_snapshot_for_note(notes_dir: &std::path::Path, note_uuid: &str, now_ms:
         Err(_) => return false, // nothing on disk to flush
     };
     match notes_dir.parent() {
-        Some(vault_root) => {
-            capture_snapshot_best_effort(
-                vault_root, note_uuid, &blob, now_ms, /* force = */ true,
-            )
-        }
+        Some(vault_root) => myne_core::snapshot_store::capture_snapshot_best_effort(
+            vault_root, note_uuid, &blob, now_ms, /* force = */ true,
+        ),
         None => true,
     }
 }
@@ -1628,7 +1551,9 @@ mod tests {
             now_ms: u64,
             force: bool,
         ) -> bool {
-            super::capture_snapshot_best_effort(vault_root, note_uuid, old_blob, now_ms, force)
+            myne_core::snapshot_store::capture_snapshot_best_effort(
+                vault_root, note_uuid, old_blob, now_ms, force,
+            )
         }
         fn purge_note_snapshots(
             &self,

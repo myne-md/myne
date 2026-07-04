@@ -44,11 +44,12 @@ pub(crate) use myne_core::plugins::notes::export_mtime;
 pub mod search_sync;
 
 // Surfaced at the `notes` module root so the desktop `hooks::DesktopHooks`
-// can reach the snapshot-capture free-fn and the snapshot-write-failed event
-// name without depending on whichever module currently owns them. The capture
-// free-fn now lives desktop-side (`desktop_commands`); the event-name const
-// stays in the core CRUD module (`note_update` emits it via the hook seam).
-pub(crate) use desktop_commands::capture_snapshot_best_effort;
+// can reach the snapshot-write-failed event name without depending on
+// whichever module currently owns it. The snapshot-capture free-fn now lives
+// in `myne-core` (`myne_core::snapshot_store::capture_snapshot_best_effort`,
+// shared desktop↔mobile); `hooks::DesktopHooks` calls it directly. The
+// event-name const stays in the core CRUD module (`note_update` emits it via
+// the hook seam).
 pub(crate) use myne_core::plugins::notes::commands::SNAPSHOT_WRITE_FAILED_EVENT;
 
 use tauri::plugin::{Builder, TauriPlugin};
