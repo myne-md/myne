@@ -27,7 +27,9 @@
 // (`note_id`), the title-extraction helpers (`title_extract`), and the error
 // enums (`error`) moved to `myne-core` (shared with the mobile client).
 // Re-exported so existing `crate::plugins::notes::{commands,error,note_id,
-// title_extract}::…` paths keep resolving.
+// title_extract}::…` paths keep resolving (some are consumed only cross-crate /
+// after the attachments ref-scan moved to core).
+#[allow(unused_imports)]
 pub use myne_core::plugins::notes::{commands, error, note_id, title_extract};
 
 // Desktop-only note commands: export, full-text search, snapshot flush, and the

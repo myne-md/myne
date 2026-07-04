@@ -16,7 +16,8 @@
 // The wrap-key providers, PIN provider, attempt counter, and error enum moved to
 // myne-core. Re-exported so existing `crate::plugins::quick_unlock::{attempt,
 // error, pin, provider}::…` paths keep resolving (incl. `macos.rs`'s
-// `super::provider::…`).
+// `super::provider::…`); only `provider` has an in-crate consumer today.
+#[allow(unused_imports)]
 pub use myne_core::plugins::quick_unlock::{attempt, error, pin, provider};
 
 // Desktop command surface: PIN commands re-exported from core + the macOS
