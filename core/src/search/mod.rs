@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! In-memory full-text search index core (`search-index` feature, MYND-29,
 //! Task 1).
 //!

@@ -35,6 +35,12 @@ pub mod note_txn;
 pub mod paths;
 pub mod plugins;
 pub mod protocol_error_kind;
+// The full-text search engine (MYS1) + its encrypted persistence/reconcile core.
+// Top-level (not under `plugins/`) mirroring the desktop `mod search;` it
+// replaces. The desktop crate re-exports it via `pub use myne_core::search;`;
+// mobile does not wire it (the search-index feed hangs off the desktop-only
+// `search_upsert`/`hydrate` hooks, absent in mobile's `NoopHooks`).
+pub mod search;
 pub mod snapshot_policy;
 pub mod snapshot_store;
 #[cfg(any(test, feature = "test-support"))]

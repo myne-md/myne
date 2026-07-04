@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Search-engine benchmark harness (`search-index` feature, MYND-29 Task 9).
 //!
 //! **Approach B (user decision, 2026-05-31 — see the feature `progress.md`).**
