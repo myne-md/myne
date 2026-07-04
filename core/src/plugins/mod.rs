@@ -13,6 +13,7 @@
 
 pub mod notes;
 pub mod prefs;
+pub mod quick_unlock;
 pub mod vault_change_password;
 pub mod vault_creation;
 pub mod vault_delete;

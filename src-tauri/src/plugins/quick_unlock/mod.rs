@@ -1,27 +1,29 @@
-//! Quick-unlock plugin (MYND-329) — PIN / biometric fast re-entry over the
-//! auto-lock envelope.
+//! Quick-unlock plugin (MYND-329) — desktop host.
 //!
 //! Quick-unlock stores a third wrapped copy of `root_key` in the device-local
 //! `vault.quickunlock` blob (`protocol::quick_unlock_blob`, `MYQ1`, § 9.14) so
 //! a re-lock can be reversed with Touch ID / a PIN instead of the full
 //! master-password Argon2id path — without touching the zero-knowledge root.
 //!
-//! Module layout:
-//! - `provider` — the `QuickUnlockProvider` trait + test `MockProvider` (task 3)
-//! - `pin` — the PIN (Argon2id) provider (task 4)
-//! - `attempt` — the code-enforced failed-attempt counter (task 5)
-//! - `commands` / `error` — the Tauri plugin surface (task 6)
-//! - `macos` — the macOS Keychain biometric provider (task 7)
+//! The PIN path + the OS-free `*_with_dir` cores moved to `myne-core`
+//! (`myne_core::plugins::quick_unlock`, shared with the mobile client). This
+//! crate keeps the macOS Keychain biometric provider (`macos`), the biometric
+//! command branch, and the OS-credential cleanup (`commands`), and registers all
+//! six commands. Mobile registers only the four PIN/status/disable commands.
 //!
 //! See: ../../CLAUDE.md "Secret-handling logging discipline".
 
-pub mod attempt;
+// The wrap-key providers, PIN provider, attempt counter, and error enum moved to
+// myne-core. Re-exported so existing `crate::plugins::quick_unlock::{attempt,
+// error, pin, provider}::…` paths keep resolving (incl. `macos.rs`'s
+// `super::provider::…`).
+pub use myne_core::plugins::quick_unlock::{attempt, error, pin, provider};
+
+// Desktop command surface: PIN commands re-exported from core + the macOS
+// biometric branch + OS-credential cleanup.
 pub mod commands;
-pub mod error;
 #[cfg(target_os = "macos")]
 pub mod macos;
-pub mod pin;
-pub mod provider;
 
 use tauri::plugin::{Builder, TauriPlugin};
 use tauri::Runtime;
@@ -30,13 +32,17 @@ use tauri::Runtime;
 /// (`VaultRuntimeState`) is registered by the `vault-unlock` plugin; this
 /// plugin only binds its IPC commands.
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
+    // PIN/status commands are registered via their myne-core module path so
+    // `generate_handler!` sees the `#[tauri::command]`-generated hidden items
+    // (a bare `pub use` of the fn would not carry them). Biometric + disable are
+    // defined in the desktop `commands` module.
     Builder::<R>::new("quick-unlock")
         .invoke_handler(tauri::generate_handler![
-            commands::quick_unlock_setup_pin,
-            commands::quick_unlock_with_pin,
+            myne_core::plugins::quick_unlock::commands::quick_unlock_setup_pin,
+            myne_core::plugins::quick_unlock::commands::quick_unlock_with_pin,
             commands::quick_unlock_setup_biometric,
             commands::quick_unlock_with_biometric,
-            commands::quick_unlock_status,
+            myne_core::plugins::quick_unlock::commands::quick_unlock_status,
             commands::quick_unlock_disable,
         ])
         .build()
