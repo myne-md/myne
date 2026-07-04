@@ -31,6 +31,15 @@ getrandom = "0.2"
 # (`plugins::vault_indices::persist`). Same pin the desktop crate uses for the
 # search-index blob (varint, no field names); pure-Rust, `no_std`+`alloc`.
 postcard = { version = "1", default-features = false, features = ["alloc"] }
+# Snowball stemmers for the full-text search index (MYS1, `search`). The same
+# crate tantivy uses internally; pure-Rust, EN/TR/DE among 18 languages. Moved
+# here with the search engine (was desktop-only); same pin as the shared lock.
+rust-stemmers = "1"
+# Per-note language detection for the full-text search index (MYS1, `search`).
+# Pure-Rust trigram model; the index detects each note's language and
+# single-stems it while the query stays multi-stemmed. Moved here with the
+# search engine (was desktop-only); same pin as the shared lock.
+whatlang = "0.18"
 
 [features]
 # Gates the cross-plugin test fixtures (`test_support`) so the desktop/mobile

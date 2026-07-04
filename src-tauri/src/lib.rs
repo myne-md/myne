@@ -34,7 +34,14 @@ pub use myne_core::paths;
 mod plugins;
 pub use myne_core::protocol_error_kind;
 mod screen_capture;
-mod search;
+// The full-text search engine (MYS1) + its encrypted persistence/reconcile
+// core moved to `myne-core` (shared, though only desktop wires the feed via the
+// `search_upsert`/`hydrate` hooks — mobile's `NoopHooks` leaves it hollow). The
+// desktop IO shell (`plugins::notes::search_sync`) + the `note_search` command
+// stay here and reach the engine through this re-export, so every existing
+// `crate::search::{SearchIndexState, InvertedIndex, MatchedIn, Document,
+// SearchHit, persist::…}` path keeps resolving.
+pub use myne_core::search;
 // The snapshot on-disk storage layer + pure retention policy moved to
 // `myne-core` (shared with the mobile client). Re-exported so existing
 // `crate::snapshot_store::…` / `crate::snapshot_policy::…` paths keep resolving

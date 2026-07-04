@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! Encrypted persistence + load/reconcile for the search index
 //! (`search-index` feature, MYND-29 Task 7).
 //!
@@ -28,14 +29,15 @@ use protocol::{
 };
 use serde::{Deserialize, Serialize};
 
-// The decryption-free `.myn` `content_nonce` primitives moved to `myne-core`
-// (`myne_core::note_nonce`) so the shared vault-indices plugin core can reuse
+// The decryption-free `.myn` `content_nonce` primitives live in this same
+// crate (`crate::note_nonce`) so the shared vault-indices plugin core can reuse
 // the identical scan. Re-exported so every existing
 // `crate::search::persist::{NonceManifest, read_myn_content_nonce,
 // MYN_CONTENT_NONCE_LEN, MYN_HEADER_PREFIX_FOR_NONCE}` path keeps resolving
+// desktop-side through the `pub use myne_core::search;` shim
 // (`MYN_CONTENT_NONCE_LEN` is a path-compat re-export used only by tests here).
 #[allow(unused_imports)]
-pub use myne_core::note_nonce::{
+pub use crate::note_nonce::{
     read_myn_content_nonce, NonceManifest, MYN_CONTENT_NONCE_LEN, MYN_HEADER_PREFIX_FOR_NONCE,
 };
 
