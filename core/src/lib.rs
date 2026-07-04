@@ -34,6 +34,8 @@ pub mod note_txn;
 pub mod paths;
 pub mod plugins;
 pub mod protocol_error_kind;
+pub mod snapshot_policy;
+pub mod snapshot_store;
 #[cfg(any(test, feature = "test-support"))]
 pub mod test_support;
 pub mod text;

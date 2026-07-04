@@ -31,8 +31,11 @@ mod plugins;
 pub use myne_core::protocol_error_kind;
 mod screen_capture;
 mod search;
-mod snapshot_policy;
-mod snapshot_store;
+// The snapshot on-disk storage layer + pure retention policy moved to
+// `myne-core` (shared with the mobile client). Re-exported so existing
+// `crate::snapshot_store::…` / `crate::snapshot_policy::…` paths keep resolving
+// (mirrors the `myne_core::paths` re-export above).
+pub use myne_core::{snapshot_policy, snapshot_store};
 mod spell;
 #[cfg(test)]
 pub use myne_core::test_support;

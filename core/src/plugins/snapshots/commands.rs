@@ -3,7 +3,7 @@
 //! purge-on-delete live in the `notes` plugin (the `note_update`/`note_delete`
 //! seam); this plugin owns `snapshot_list` / `snapshot_preview` /
 //! `snapshot_restore` / `snapshot_prune` and borrows `VaultRuntimeState`
-//! cross-plugin (the `vault_recover`/`notes` precedent).
+//! cross-plugin (the `vault_recover`/`notes` precedent), plus `Hooks` on restore.
 //!
 //! Slot discipline + `spawn_blocking` + DENY-list-clean tracing mirror the
 //! `notes` commands. Decode failures collapse to the single non-distinguishing
@@ -15,12 +15,10 @@ use super::error::{snapshot_error_kind, SnapshotError};
 use crate::io_failure_kind::from_io_error_kind;
 use crate::paths;
 use crate::plugins::notes::commands::note_update_with_dir;
-use crate::plugins::notes::desktop_commands::note_snapshot_flush_with_dir;
 use crate::plugins::notes::error::NoteUpdateError;
 use crate::plugins::notes::note_id::NoteId;
 use crate::plugins::notes::title_extract::resolve_note_title;
 use crate::plugins::vault_unlock::state::{Slot, VaultRuntimeState};
-use crate::search::SearchIndexState;
 use protocol::{decode_note, DecryptError};
 use serde::Serialize;
 use std::path::PathBuf;
@@ -45,8 +43,7 @@ fn valid_v7(s: &str) -> bool {
 }
 
 /// Map a `notes`-plugin `NoteUpdateError` (from the restore's reuse of
-/// `note_update_with_dir` / `note_snapshot_flush_with_dir`) into a
-/// `SnapshotError`.
+/// `note_update_with_dir`) into a `SnapshotError`.
 fn map_note_update_err(e: NoteUpdateError) -> SnapshotError {
     match e {
         NoteUpdateError::VaultNotUnlocked => SnapshotError::VaultNotUnlocked,
@@ -197,14 +194,16 @@ pub async fn snapshot_preview<R: Runtime>(
 
 /// Testable core of [`snapshot_restore`]. Atomic, guaranteed-undoable (SYNC-5):
 /// (1) decode the selected snapshot, (2) force-snapshot the current live note
-/// (the undo point), (3) overwrite the live note with the snapshot content via
-/// `note_update_with_dir` — whose creation hook is coalesced by step 2's flush,
-/// so there is no double snapshot. Keeps the live search index correct.
+/// (the undo point) through the `hooks::VaultLifecycleHooks::capture_snapshot`
+/// seam, (3) overwrite the live note with the snapshot content via
+/// `note_update_with_dir` — whose creation hook is coalesced by step 2's forced
+/// capture, so there is no double snapshot. Keeps the live search + AI indices
+/// correct via the hooks seam. Mobile installs `NoopHooks`, so steps 2 and 4 are
+/// no-ops there (mobile has no snapshot subsystem yet).
 pub(crate) async fn snapshot_restore_in(
     notes_dir: PathBuf,
     state: &VaultRuntimeState,
-    search: &SearchIndexState,
-    hooks: &myne_core::hooks::Hooks,
+    hooks: &crate::hooks::Hooks,
     note_id: String,
     snapshot_uuid: String,
 ) -> Result<(), SnapshotError> {
@@ -254,40 +253,51 @@ pub(crate) async fn snapshot_restore_in(
         Zeroizing::new(pt)
     };
 
-    // Step 2: force-snapshot the current live note (the undo point). Ignores the
-    // best-effort warning bool — restore's contract is the overwrite.
-    note_snapshot_flush_with_dir(notes_dir.clone(), state, note_id.clone())
+    // Step 2: force-snapshot the current live note (the undo point, SYNC-5)
+    // through the hooks seam (`capture_snapshot`, force=true) rather than the
+    // desktop-only flush command. Read the live `.myn` verbatim bytes and
+    // capture them so the pre-restore state is always recorded, bypassing the
+    // coalescing window. Best-effort — the warning bool is ignored (restore's
+    // contract is the overwrite, not the undo-point capture); a missing live
+    // blob is a no-op. Mobile's `NoopHooks` makes the capture a no-op. File IO
+    // runs on a blocking thread. Mirrors how `note_update` routes its
+    // pre-overwrite snapshot through `hooks.capture_snapshot`.
+    if let Some(vault_root) = notes_dir.parent().map(std::path::Path::to_path_buf) {
+        let note_uuid_str = note_id_parsed.as_uuid().to_string();
+        let live_path = notes_dir.join(format!("{note_uuid_str}.myn"));
+        let hooks_owned: crate::hooks::Hooks = hooks.clone();
+        let _ = tokio::task::spawn_blocking(move || {
+            if let Ok(old_blob) = std::fs::read(&live_path) {
+                let now_ms = crate::snapshot_store::now_unix_ms();
+                hooks_owned.capture_snapshot(
+                    &vault_root,
+                    &note_uuid_str,
+                    &old_blob,
+                    now_ms,
+                    /* force = */ true,
+                );
+            }
+        })
+        .await;
+    }
+
+    // Step 3: overwrite the live note with the snapshot content. The creation
+    // hook inside note_update is coalesced (within the window of step 2's forced
+    // capture) → no double snapshot.
+    note_update_with_dir(notes_dir, state, hooks, note_id.clone(), (*plaintext).clone())
         .await
         .map_err(map_note_update_err)?;
 
-    // Step 3: overwrite the live note with the snapshot content. The creation
-    // hook inside note_update is coalesced (within the window of step 2's
-    // flush) → no double snapshot.
-    // (Capture vault_dir before note_update_with_dir moves notes_dir — needed
-    // for the MYND-328 attachment-text fold below.)
-    let vault_dir = notes_dir.parent().map(std::path::Path::to_path_buf);
-    note_update_with_dir(
-        notes_dir,
-        state,
-        hooks,
-        note_id.clone(),
-        (*plaintext).clone(),
-    )
-    .await
-    .map_err(map_note_update_err)?;
-
-    // Step 4: keep the live in-RAM search index correct. MYND-328: fold the
-    // restored note's attachment text in (parity with note_create/update/batch)
-    // so a restore doesn't drop attachment searchability until the next unlock.
+    // Step 4: keep the live in-RAM search + AI indices correct through the hooks
+    // seam. MYND-328: fold the restored note's attachment text in (parity with
+    // note_create/update/batch) so a restore doesn't drop attachment
+    // searchability until the next unlock. Mobile's `NoopHooks` makes these
+    // no-ops.
     let title = resolve_note_title(plaintext.as_bytes()).unwrap_or_default();
-    let body = match vault_dir {
-        Some(ref vd) => {
-            crate::plugins::notes::search_sync::fold_note_body_for_index(state, vd, &plaintext)
-                .await
-        }
-        None => (*plaintext).clone(),
-    };
-    search.upsert(&note_id, &title, &body);
+    let body = hooks
+        .fold_attachment_text_for_index(state, &plaintext)
+        .await;
+    hooks.search_upsert(&note_id, &title, &body);
     // MYND-453: keep the live AI embedding index correct too — `note_update`
     // does not fire the re-index hooks itself (its callers do), and this restore
     // path re-indexed search directly above but left the AI vectors stale
@@ -305,8 +315,7 @@ pub(crate) async fn snapshot_restore_in(
 pub async fn snapshot_restore<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
-    search: State<'_, SearchIndexState>,
-    hooks: State<'_, myne_core::hooks::Hooks>,
+    hooks: State<'_, crate::hooks::Hooks>,
     note_id: String,
     snapshot_uuid: String,
 ) -> Result<(), SnapshotError> {
@@ -314,7 +323,6 @@ pub async fn snapshot_restore<R: Runtime>(
     snapshot_restore_in(
         notes_dir,
         state.inner(),
-        search.inner(),
         hooks.inner(),
         note_id,
         snapshot_uuid,
@@ -429,50 +437,49 @@ mod tests {
     const FIXTURE_ITEMS_BYTE: u8 = 0x09;
     const FIXTURE_ITEMS_ID_BYTE: u8 = 0x01;
 
-    /// A `Hooks` whose snapshot-capture / -purge methods delegate to the REAL
-    /// desktop snapshot store (exactly what `DesktopHooks` does), with every
-    /// other hook a no-op. These tests assert that `note_update_with_dir`
-    /// actually writes / purges snapshots, so the snapshot pair must be live;
-    /// the index/sync side-effects are irrelevant here. Avoids needing an
+    /// A `Hooks` whose snapshot-capture / -purge methods do the REAL snapshot
+    /// write/purge via the `myne-core` `snapshot_store` / `snapshot_policy` /
+    /// `paths` primitives (a faithful inline of the desktop
+    /// `capture_snapshot_best_effort`), with every other hook a no-op. These
+    /// tests assert that `note_update_with_dir` and `snapshot_restore_in`
+    /// actually write / purge snapshots, so the capture path must be live; the
+    /// index/sync side-effects are irrelevant here. Avoids needing an
     /// `AppHandle` / `tauri::test` harness (TB9 Cargo.lock discipline) — the
     /// `ClampHooks` precedent in `prefs/mod.rs`.
     struct SnapshotHooks;
-    impl myne_core::hooks::VaultLifecycleHooks for SnapshotHooks {
+    impl crate::hooks::VaultLifecycleHooks for SnapshotHooks {
         fn hydrate_search_index<'a>(
             &'a self,
             _: &'a VaultRuntimeState,
-        ) -> myne_core::hooks::BoxFuture<'a> {
+        ) -> crate::hooks::BoxFuture<'a> {
             Box::pin(std::future::ready(()))
         }
-        fn hydrate_spell<'a>(
-            &'a self,
-            _: &'a VaultRuntimeState,
-        ) -> myne_core::hooks::BoxFuture<'a> {
+        fn hydrate_spell<'a>(&'a self, _: &'a VaultRuntimeState) -> crate::hooks::BoxFuture<'a> {
             Box::pin(std::future::ready(()))
         }
         fn reclaim_stray_attachment_blobs<'a>(
             &'a self,
             _: &'a VaultRuntimeState,
-        ) -> myne_core::hooks::BoxFuture<'a> {
+        ) -> crate::hooks::BoxFuture<'a> {
             Box::pin(std::future::ready(()))
         }
         fn persist_search_index<'a>(
             &'a self,
             _: &'a VaultRuntimeState,
-        ) -> myne_core::hooks::BoxFuture<'a> {
+        ) -> crate::hooks::BoxFuture<'a> {
             Box::pin(std::future::ready(()))
         }
         fn hydrate_ai_vectors<'a>(
             &'a self,
             _: &'a VaultRuntimeState,
-        ) -> myne_core::hooks::BoxFuture<'a> {
+        ) -> crate::hooks::BoxFuture<'a> {
             Box::pin(std::future::ready(()))
         }
         fn fold_attachment_text_for_index<'a>(
             &'a self,
             _: &'a VaultRuntimeState,
             note_body: &'a str,
-        ) -> myne_core::hooks::BoxFuture<'a, String> {
+        ) -> crate::hooks::BoxFuture<'a, String> {
             let body = note_body.to_string();
             Box::pin(std::future::ready(body))
         }
@@ -492,13 +499,13 @@ mod tests {
         fn bump_local_change(&self) {}
         fn emit_snapshot_write_failed(&self, _: &str) {}
         fn effective_auto_lock_secs(&self, prefs_value: Option<u32>) -> u32 {
-            prefs_value.unwrap_or(myne_core::DEFAULT_AUTO_LOCK_SECS)
+            prefs_value.unwrap_or(crate::DEFAULT_AUTO_LOCK_SECS)
         }
         fn hydrate_clipper_pairing(&self, _: &[protocol::PairedExtension]) {}
         fn preempt_inflight_backup<'a>(
             &'a self,
             _: &'a VaultRuntimeState,
-        ) -> myne_core::hooks::BoxFuture<'a> {
+        ) -> crate::hooks::BoxFuture<'a> {
             Box::pin(std::future::ready(()))
         }
         fn invalidate_quick_unlock(&self, _: &std::path::Path) {}
@@ -510,9 +517,34 @@ mod tests {
             now_ms: u64,
             force: bool,
         ) -> bool {
-            crate::plugins::notes::desktop_commands::capture_snapshot_best_effort(
-                vault_root, note_uuid, old_blob, now_ms, force,
-            )
+            // Faithful inline of the desktop `capture_snapshot_best_effort`,
+            // built on the `myne-core` snapshot_store / snapshot_policy / paths
+            // primitives so these tests exercise real snapshot writes without
+            // the desktop crate. Best-effort: a dir-create / write failure
+            // returns `true` (the warning bool), a coalesced skip returns
+            // `false`, and a prune failure is swallowed (the snapshot landed).
+            let Ok(sdir) = crate::paths::snapshots_dir_under(vault_root) else {
+                return true;
+            };
+            let existing =
+                crate::snapshot_store::list_note_snapshots(&sdir, note_uuid).unwrap_or_default();
+            let last = existing.first().map(|s| s.captured_at_ms);
+            if !crate::snapshot_policy::should_snapshot(last, now_ms, force) {
+                return false;
+            }
+            let snap_uuid = crate::snapshot_store::new_snapshot_uuid().to_string();
+            if crate::snapshot_store::write_snapshot_blob(&sdir, note_uuid, &snap_uuid, old_blob)
+                .is_err()
+            {
+                return true;
+            }
+            let _ = crate::snapshot_store::prune_note_snapshots(
+                &sdir,
+                note_uuid,
+                now_ms,
+                &crate::snapshot_policy::RetentionPolicy::default(),
+            );
+            false
         }
         fn purge_note_snapshots(
             &self,
@@ -526,7 +558,7 @@ mod tests {
         }
     }
 
-    fn noop_hooks() -> myne_core::hooks::Hooks {
+    fn noop_hooks() -> crate::hooks::Hooks {
         std::sync::Arc::new(SnapshotHooks)
     }
 
@@ -680,7 +712,6 @@ mod tests {
             let notes_dir = notes_dir_under(scratch.path()).unwrap();
             let sdir = snapshots_dir_under(scratch.path()).unwrap();
             let state = unlocked().await;
-            let search = SearchIndexState::default();
 
             let v1 = "# v1\noriginal body";
             let id = note_create_with_dir(notes_dir.clone(), &state, v1.to_string())
@@ -704,16 +735,9 @@ mod tests {
                 .clone();
 
             // Restore S1 (v1).
-            snapshot_restore_in(
-                notes_dir.clone(),
-                &state,
-                &search,
-                &noop_hooks(),
-                id.clone(),
-                s1,
-            )
-            .await
-            .unwrap();
+            snapshot_restore_in(notes_dir.clone(), &state, &noop_hooks(), id.clone(), s1)
+                .await
+                .unwrap();
 
             // Live note is now v1 again.
             let note_id = NoteId::parse(&id).unwrap();
