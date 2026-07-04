@@ -63,12 +63,12 @@ interface AccountPanelProps {
   /**
    * Fired after a successful `vault_delete` IPC OR after the user
    * clicks Continue on the post-fail banner (PartialDelete / Io).
-   * Parent chain (SettingsModal → Editor → App) dispatches
-   * `editor.delete-vault-success`, which transitions Stage to
-   * `welcome`. Editor unmounts; SettingsModal unmounts in cascade.
-   * The slot is already Empty in both paths (zeroize-before-unlink
-   * fires on resolve AND reject), so the transition is consistent
-   * with the Rust slot state.
+   * Parent chain (SettingsModal → Editor → App) triggers a
+   * `reprobe()`; boot routing then selects the return surface by
+   * remaining vault count (picker at ≥2, unlock at 1, welcome at 0).
+   * Editor unmounts; SettingsModal unmounts in cascade. The slot is
+   * already Empty in both paths (zeroize-before-unlink fires on
+   * resolve AND reject), so the reprobe reads consistent state.
    */
   onDeleteVaultSuccess: () => void;
   /**
@@ -447,10 +447,10 @@ export function AccountPanel({
           await deleteVault(activeVaultId ?? undefined);
           if (!mountedRef.current) return;
           // Resolve = full success. Slot is Empty + vault dir gone.
-          // Notify parent to dispatch `editor.delete-vault-success`;
-          // Stage transitions to welcome, Editor unmounts, SettingsModal
-          // unmounts in cascade. inFlight clear is harmless because the
-          // component is about to unmount.
+          // Notify parent to reprobe; boot routing picks the return
+          // surface by remaining vault count (picker/unlock/welcome),
+          // Editor unmounts, SettingsModal unmounts in cascade. inFlight
+          // clear is harmless because the component is about to unmount.
           setInFlight(false);
           onDeleteVaultSuccess();
         } catch (raw) {
@@ -611,6 +611,7 @@ export function AccountPanel({
         <div>
           <Button
             variant="danger"
+            data-testid="settings.delete-vault-cta"
             onClick={() => {
               setDeletePartialFail(null);
               setView("delete-vault");

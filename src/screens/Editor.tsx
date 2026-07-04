@@ -303,9 +303,9 @@ interface EditorProps {
   /**
    * Pass-through to SettingsModal → AccountPanel. Fired on successful
    * `vault_delete` IPC OR Continue-after-partial-fail click. App.tsx
-   * wires this to `dispatch({ type: "editor.delete-vault-success" })`;
-   * Stage transitions to welcome, this Editor unmounts, the
-   * SettingsModal unmounts in cascade.
+   * wires this to `reprobe()`; boot routing picks the return surface by
+   * remaining vault count (picker at ≥2, unlock at 1, welcome at 0),
+   * this Editor unmounts, the SettingsModal unmounts in cascade.
    */
   onDeleteVaultSuccess: () => void;
   /**

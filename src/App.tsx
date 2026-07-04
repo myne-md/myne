@@ -286,9 +286,14 @@ function App() {
             onUnlocked={() => dispatch({ type: "unlock.success" })}
             onStartRecovery={() => dispatch({ type: "unlock.start-recovery" })}
             onResumeRecovery={() => dispatch({ type: "unlock.resume-recovery" })}
-            onDeleteVaultSuccess={() =>
-              dispatch({ type: "unlock.delete-vault-success" })
-            }
+            // Post-delete routing is reprobe-based (MYND-219 / SYNC-16):
+            // boot routing decides the return surface by remaining vault
+            // count — welcome at 0, the lone vault's unlock at 1, the
+            // picker at ≥2. A hardcoded `→ welcome` stranded multi-vault
+            // users on the create screen. The delete IPC has already
+            // resolved (dir gone, slot Empty) before this fires, so the
+            // reprobe's `listVaults()` sees the post-delete disk state.
+            onDeleteVaultSuccess={reprobe}
             onRestoreBackup={() => dispatch({ type: "unlock.restore-backup" })}
             suspicionReason={stage.suspicionReason}
           />
@@ -299,9 +304,12 @@ function App() {
             onResetRequested={reprobe}
             onLock={() => dispatch({ type: "editor.lock" })}
             onForceRelock={setStageWithSuspicion}
-            onDeleteVaultSuccess={() =>
-              dispatch({ type: "editor.delete-vault-success" })
-            }
+            // Reprobe-based post-delete routing (MYND-219 / SYNC-16) — see
+            // the Unlock screen's `onDeleteVaultSuccess` above. Deleting the
+            // active vault from Settings leaves the slot Empty, so reprobe
+            // routes by remaining count (picker at ≥2, unlock at 1, welcome
+            // at 0) instead of always landing on the create screen.
+            onDeleteVaultSuccess={reprobe}
             onSwitchVault={onSwitchVault}
             onCreateAnother={() => dispatch({ type: "editor.create-vault" })}
             onRestoreBackup={() => dispatch({ type: "editor.restore-backup" })}
@@ -316,9 +324,9 @@ function App() {
             onCompleteSuccess={(vaultId) =>
               dispatch({ type: "recover.complete-success", vaultId })
             }
-            onDeleteVaultSuccess={() =>
-              dispatch({ type: "recover.delete-vault-success" })
-            }
+            // Reprobe-based post-delete routing (MYND-219 / SYNC-16) — see
+            // the Unlock screen's `onDeleteVaultSuccess` above.
+            onDeleteVaultSuccess={reprobe}
           />
         );
       case "picker":

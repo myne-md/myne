@@ -34,8 +34,8 @@
 // Delete vault and start over" link switches the component to the
 // `delete-vault` sub-view. On Submit the IPC accepts via
 // `Slot::Empty + vault.meta-exists` (backend `delete_vault_files_no_zeroize`
-// no-keys arm); on Ok or PartialDelete-Continue the parent dispatches
-// `unlock.delete-vault-success` → Stage transitions to `welcome`.
+// no-keys arm); on Ok or PartialDelete-Continue the parent reprobes and
+// boot routing picks the return surface by remaining vault count.
 // See `decisions.md` 2026-05-26 entry "MYND-108-bis vault_delete
 // extended to accept Slot::Empty + vault.meta-exists".
 
@@ -101,14 +101,14 @@ interface UnlockProps {
    *  `recover(password-reset)`. */
   onResumeRecovery: () => void;
   /**
-   * Terminal-destructive transition (MYND-108-bis lost-credentials
-   * cul-de-sac escape). Fired on `vault_delete` IPC Ok from the
-   * `delete-vault` sub-view OR on the user's Continue click after a
-   * PartialDelete/Io banner. App.tsx sends
-   * `unlock.delete-vault-success` → Stage transitions to `welcome`.
-   * Backend accepts via `Slot::Empty + vault.meta-exists` no-keys
-   * arm per `decisions.md` 2026-05-26 entry "MYND-108-bis
-   * vault_delete extended to accept Slot::Empty + vault.meta-exists".
+   * Fired on `vault_delete` IPC Ok from the `delete-vault` sub-view
+   * (MYND-108-bis lost-credentials cul-de-sac escape) OR on the user's
+   * Continue click after a PartialDelete/Io banner. App.tsx reprobes;
+   * boot routing picks the return surface by remaining vault count
+   * (picker at ≥2, unlock at 1, welcome at 0). Backend accepts via
+   * `Slot::Empty + vault.meta-exists` no-keys arm per `decisions.md`
+   * 2026-05-26 entry "MYND-108-bis vault_delete extended to accept
+   * Slot::Empty + vault.meta-exists".
    */
   onDeleteVaultSuccess: () => void;
   /** Corrupted-state repair door → `unlock.restore-backup` (MYND-56). */
@@ -402,9 +402,9 @@ export function Unlock({
           await deleteVault();
           if (!mountedRef.current) return;
           // Resolve = full success. Slot stayed Empty (no state change);
-          // vault directory recursively removed. Parent dispatches
-          // `unlock.delete-vault-success` → Stage transitions to
-          // welcome, this component unmounts.
+          // vault directory recursively removed. Parent reprobes; boot
+          // routing picks the return surface by remaining vault count,
+          // this component unmounts.
           onDeleteVaultSuccess();
         } catch (raw) {
           if (!mountedRef.current) return;
