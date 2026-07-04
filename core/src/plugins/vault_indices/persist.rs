@@ -25,7 +25,7 @@
 //! whole snapshot as opaque bytes (AS3/AS4).
 
 use super::state::NoteRecord;
-use crate::search::persist::NonceManifest;
+use crate::note_nonce::NonceManifest;
 use protocol::{
     decode_vault_indices_blob, encode_vault_indices_blob, VaultIndicesBlobError, AEAD_KEY_LEN,
     VAULT_INDICES_BLOB_ACCOUNT_HASH_LEN,
@@ -105,8 +105,8 @@ pub fn reconcile_delta(manifest: &NonceManifest, on_disk: &NonceManifest) -> Rec
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::note_nonce::MYN_CONTENT_NONCE_LEN;
     use crate::plugins::vault_indices::state::{PropertyEntry, TagEntry, WikilinkEdge};
-    use crate::search::persist::MYN_CONTENT_NONCE_LEN;
 
     const KEY: [u8; AEAD_KEY_LEN] = [0x42; AEAD_KEY_LEN];
     const ACCOUNT_HASH: [u8; VAULT_INDICES_BLOB_ACCOUNT_HASH_LEN] =

@@ -27,6 +27,10 @@ unicode-normalization = { version = "0.1.25", default-features = false }
 # Vault-id / wrap-key CSPRNG bytes in the vault-creation core. Same version the
 # desktop crate already pins (resolved from the shared workspace lock).
 getrandom = "0.2"
+# Compact binary serialization for the vault-indices (MYI1) snapshot payload
+# (`plugins::vault_indices::persist`). Same pin the desktop crate uses for the
+# search-index blob (varint, no field names); pure-Rust, `no_std`+`alloc`.
+postcard = { version = "1", default-features = false, features = ["alloc"] }
 
 [features]
 # Gates the cross-plugin test fixtures (`test_support`) so the desktop/mobile

@@ -29,6 +29,7 @@ pub const DEFAULT_AUTO_LOCK_SECS: u32 = 300;
 pub mod atomic_write;
 pub mod hooks;
 pub mod io_failure_kind;
+pub mod note_nonce;
 pub mod note_txn;
 pub mod paths;
 pub mod plugins;

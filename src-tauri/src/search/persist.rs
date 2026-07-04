@@ -24,26 +24,20 @@
 use super::{Document, InvertedIndex, SearchIndex};
 use protocol::{
     decode_search_index_blob, encode_search_index_blob, SearchBlobError, AEAD_KEY_LEN,
-    AEAD_NONCE_LEN, SEARCH_BLOB_ACCOUNT_HASH_LEN,
+    SEARCH_BLOB_ACCOUNT_HASH_LEN,
 };
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
 
-/// `.myn` magic — sourced from `protocol::blob` (protocol.md §9.2 offset 0) so
-/// a header-format change can't silently rot this decryption-free reader.
-const MYN_MAGIC: [u8; 4] = *protocol::blob::MAGIC;
-/// Offset of `content_nonce` in the `.myn` header — `protocol::blob` *derives*
-/// it from the item-key-wrap sizes, so importing it (not a literal `112`)
-/// tracks any future layout shift (protocol.md §9.2).
-const MYN_CONTENT_NONCE_OFFSET: usize = protocol::blob::OFFSET_CONTENT_NONCE;
-/// Length of `content_nonce` (the XChaCha20-Poly1305 nonce width).
-pub const MYN_CONTENT_NONCE_LEN: usize = AEAD_NONCE_LEN;
-/// Minimum `.myn` header bytes needed to read `content_nonce`.
-pub const MYN_HEADER_PREFIX_FOR_NONCE: usize = MYN_CONTENT_NONCE_OFFSET + MYN_CONTENT_NONCE_LEN;
-
-/// note_id → the note's `.myn` `content_nonce` recorded at index time. The
-/// staleness manifest (decryption-free diffable).
-pub type NonceManifest = BTreeMap<String, [u8; MYN_CONTENT_NONCE_LEN]>;
+// The decryption-free `.myn` `content_nonce` primitives moved to `myne-core`
+// (`myne_core::note_nonce`) so the shared vault-indices plugin core can reuse
+// the identical scan. Re-exported so every existing
+// `crate::search::persist::{NonceManifest, read_myn_content_nonce,
+// MYN_CONTENT_NONCE_LEN, MYN_HEADER_PREFIX_FOR_NONCE}` path keeps resolving
+// (`MYN_CONTENT_NONCE_LEN` is a path-compat re-export used only by tests here).
+#[allow(unused_imports)]
+pub use myne_core::note_nonce::{
+    read_myn_content_nonce, NonceManifest, MYN_CONTENT_NONCE_LEN, MYN_HEADER_PREFIX_FOR_NONCE,
+};
 
 /// Borrowed snapshot for the encode side (avoids cloning the index).
 ///
@@ -65,22 +59,6 @@ struct SnapshotOwned {
     manifest: NonceManifest,
     index: InvertedIndex,
     extractor_version: u8,
-}
-
-/// Read a `.myn` file's `content_nonce` from its header bytes WITHOUT
-/// decrypting (the decryption-free staleness signal). `header` must be at
-/// least the first [`MYN_HEADER_PREFIX_FOR_NONCE`] bytes of the file; returns
-/// `None` if too short or the magic is wrong (not a `.myn`).
-pub fn read_myn_content_nonce(header: &[u8]) -> Option<[u8; MYN_CONTENT_NONCE_LEN]> {
-    if header.len() < MYN_HEADER_PREFIX_FOR_NONCE {
-        return None;
-    }
-    if header[0..4] != MYN_MAGIC {
-        return None;
-    }
-    let mut nonce = [0u8; MYN_CONTENT_NONCE_LEN];
-    nonce.copy_from_slice(&header[MYN_CONTENT_NONCE_OFFSET..MYN_HEADER_PREFIX_FOR_NONCE]);
-    Some(nonce)
 }
 
 /// Encrypt `{manifest, index}` into a `vault.search` (`MYS1`) blob. The caller
@@ -193,24 +171,6 @@ mod tests {
 
     fn ids(index: &InvertedIndex, query: &str) -> Vec<String> {
         index.query(query).into_iter().map(|h| h.id).collect()
-    }
-
-    // ---- .myn content_nonce reader ------------------------------------
-
-    #[test]
-    fn reads_content_nonce_from_valid_header() {
-        let mut header = vec![0u8; MYN_HEADER_PREFIX_FOR_NONCE];
-        header[0..4].copy_from_slice(&MYN_MAGIC);
-        header[MYN_CONTENT_NONCE_OFFSET..].copy_from_slice(&nonce(0xAB));
-        assert_eq!(read_myn_content_nonce(&header), Some(nonce(0xAB)));
-    }
-
-    #[test]
-    fn rejects_wrong_magic_and_short_header() {
-        let mut header = vec![0u8; MYN_HEADER_PREFIX_FOR_NONCE];
-        header[0..4].copy_from_slice(b"XXXX");
-        assert_eq!(read_myn_content_nonce(&header), None);
-        assert_eq!(read_myn_content_nonce(b"MY01short"), None);
     }
 
     // ---- snapshot encrypt/decrypt round-trip --------------------------
