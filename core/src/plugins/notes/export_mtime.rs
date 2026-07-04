@@ -37,7 +37,7 @@ use super::title_extract::{extract_title_slices, fm_raw_value};
 /// Absent / unparsable `updated:` → no-op (natural export time stays).
 /// An IO failure setting the mtime emits a stage-tagged warning only:
 /// the export itself already succeeded, and a wrong mtime is cosmetic.
-pub(crate) fn apply_updated_mtime(target_path: &Path, plaintext: &[u8]) {
+pub fn apply_updated_mtime(target_path: &Path, plaintext: &[u8]) {
     apply_updated_mtime_from(target_path, fm_updated_system_time(plaintext));
 }
 

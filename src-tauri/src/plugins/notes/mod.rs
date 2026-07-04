@@ -34,7 +34,11 @@ pub use myne_core::plugins::notes::{commands, error, note_id, title_extract};
 // attachment-reference scan — they reach into desktop-only subsystems (search
 // index, snapshot store, attachments) and stay in this crate.
 pub mod desktop_commands;
-pub(crate) mod export_mtime;
+// The export mtime-fidelity helper (SYNC-13 — set the exported file's mtime from
+// the note's frontmatter `updated:`) moved to `myne-core` (shared with the
+// export plugin core + mobile). Re-exported so `super::export_mtime::…` paths in
+// `desktop_commands` keep resolving.
+pub(crate) use myne_core::plugins::notes::export_mtime;
 pub mod search_sync;
 
 // Surfaced at the `notes` module root so the desktop `hooks::DesktopHooks`

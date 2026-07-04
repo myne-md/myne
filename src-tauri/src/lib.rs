@@ -11,7 +11,11 @@ mod backup_schedule;
 // of the WebView (`run_native_messaging_host_if_requested` below, called
 // from `main.rs` before the Tauri app builds).
 mod clipper;
-mod export_naming;
+// The shared export-naming vocabulary (filename sanitization, `" (1)"` suffix
+// dedup, the §6 sanctioned embed/HTML rewrite) moved to `myne-core` (shared with
+// mobile). Re-exported so existing `crate::export_naming::…` paths keep resolving
+// (desktop notes export + the export plugin core reach in through it).
+pub use myne_core::export_naming;
 // Desktop wiring of `myne_core::hooks::VaultLifecycleHooks` — the lifecycle
 // side-effects the shared command cores trigger (search/spell/attachments/
 // pdf/workspace/screen-capture/sync) that do not live in `myne-core`.

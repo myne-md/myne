@@ -22,6 +22,7 @@
 
 pub mod commands;
 pub mod error;
+pub mod export_mtime;
 pub mod note_id;
 pub mod title_extract;
 

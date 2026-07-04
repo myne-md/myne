@@ -12,6 +12,7 @@
 //! seam rather than living here.
 
 pub mod attachments;
+pub mod export;
 pub mod notes;
 pub mod prefs;
 pub mod quick_unlock;
