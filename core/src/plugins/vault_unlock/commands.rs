@@ -198,6 +198,7 @@ pub async fn unlock<R: Runtime>(
         // switch must stop surfacing the prior vault's real name (SYNC-3).
         if let Some(prior) = active_before {
             state.evict_cached_label(prior).await;
+            state.evict_cached_icon(prior).await;
         }
     }
 
@@ -373,6 +374,9 @@ pub(crate) async fn apply_persisted_prefs<R: Runtime>(
     // runtime — never persisted, never logged.
     if let Some(active) = state.active_vault_id().await {
         state.set_cached_label(active, prefs.label).await;
+        // vault-icons: same per-session RAM-cache path as the label so the
+        // switcher surfaces the just-unlocked vault's glyph immediately.
+        state.set_cached_icon(active, prefs.icon).await;
     }
 
     // MYND-443 (ext-foundation-handoff task 7): hydrate the browser-clipper
@@ -1008,6 +1012,7 @@ pub(crate) async fn lock_with_state(state: &VaultRuntimeState) -> Result<(), Vau
             // unlocked vaults; a never-this-session-unlocked vault shows the
             // neutral fallback).
             state.evict_cached_label(id).await;
+            state.evict_cached_icon(id).await;
             state.take(id).await
         }
         None => Slot::Empty,
@@ -1264,6 +1269,11 @@ pub struct VaultSummary {
     /// Decrypted human label — `Some` only for a this-session-unlocked vault
     /// (always `None` until the RAM label cache lands in sub-feature 4).
     pub label: Option<String>,
+    /// Decrypted per-vault icon glyph name (vault-icons) — `Some` only for a
+    /// this-session-unlocked vault whose `vault.prefs` carries an icon; `None`
+    /// otherwise (the switcher renders the neutral wordmark fallback). Twin of
+    /// [`VaultSummary::label`], projected from the per-session RAM icon cache.
+    pub icon: Option<String>,
     /// Last successful unlock (epoch ms) from the registry cache, if any.
     pub last_unlock: Option<u64>,
 }
@@ -1336,12 +1346,16 @@ pub(crate) async fn vault_list_from_base(
         // MYND-205: project the per-session decrypted label — `Some` only for
         // a this-session-cached vault (SYNC-3/4), `None` otherwise.
         let label = state.cached_label(discovered.id).await;
+        // vault-icons: project the per-session decrypted icon glyph the same way
+        // as the label — `Some` only for a this-session-cached vault (SYNC-3/4).
+        let icon = state.cached_icon(discovered.id).await;
         summaries.push(VaultSummary {
             // `Display` → canonical hyphenated string; the `root` PathBuf
             // (DENY-listed) is dropped on the move into this map.
             id: discovered.id.to_string(),
             status,
             label,
+            icon,
             last_unlock,
         });
     }
@@ -1596,6 +1610,7 @@ mod tests {
                     show_note_timestamps: true,
                     folder_icons: Default::default(),
                     hidden_bar_items: Vec::new(),
+                    icon: None,
                     item_colors: Default::default(),
                     theme: None,
                     deliberate_folders: Vec::new(),
@@ -1731,6 +1746,7 @@ mod tests {
                 show_note_timestamps: true,
                 folder_icons: Default::default(),
                 hidden_bar_items: Vec::new(),
+                icon: None,
                 item_colors: Default::default(),
                 theme: None,
                 deliberate_folders: Vec::new(),

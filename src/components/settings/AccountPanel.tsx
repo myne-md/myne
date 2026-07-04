@@ -39,8 +39,10 @@ import { Button } from "../primitives/Button";
 import { PasswordChangeForm } from "../PasswordChangeForm";
 import { DeleteVaultConfirmForm } from "../DeleteVaultConfirmForm";
 import { changePassword } from "../../lib/vault-change-password";
-import { prefsRead, setVaultLabel } from "../../lib/prefs";
+import { prefsRead, setVaultLabel, setVaultIcon } from "../../lib/prefs";
 import { listVaults, orderByLastUnlock } from "../../lib/vault-list";
+import { FolderGlyph } from "../../notes/components/FolderGlyph";
+import { FOLDER_ICON_NAMES } from "../../notes/folderIcons";
 import { ConnectedExtensions } from "./ConnectedExtensions";
 import {
   deleteVault,
@@ -188,6 +190,47 @@ function labelSaveButtonStyle(disabled: boolean): CSSProperties {
   };
 }
 
+// VAULT ICON picker grid (vault-icons) — a curated glyph grid mirroring the
+// folder-icon picker (DecorationPopover), laid out inline in the panel.
+const ICON_PICKER_LABEL_STYLE: CSSProperties = {
+  fontSize: 11,
+  fontWeight: 600,
+  letterSpacing: "var(--tracking-caps)",
+  textTransform: "uppercase",
+  color: "var(--ink-3)",
+  margin: 0,
+};
+
+const ICON_PICKER_GRID_STYLE: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(9, 1fr)",
+  gap: 6,
+  alignSelf: "stretch",
+};
+
+function iconPickerButtonStyle(
+  selected: boolean,
+  disabled: boolean,
+): CSSProperties {
+  return {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    aspectRatio: "1 / 1",
+    boxSizing: "border-box",
+    padding: 0,
+    background: selected ? "var(--paper-2)" : "var(--paper)",
+    border: `1px solid ${selected ? "var(--accent)" : "var(--line-2)"}`,
+    borderRadius: "var(--radius-1)",
+    fontFamily: "var(--font-sans)",
+    fontSize: 13,
+    fontWeight: 600,
+    color: selected ? "var(--accent)" : "var(--ink-1)",
+    cursor: disabled ? "default" : "pointer",
+    opacity: disabled ? 0.6 : 1,
+  };
+}
+
 const KV_ROW_STYLE: CSSProperties = {
   display: "flex",
   flexDirection: "row",
@@ -295,6 +338,14 @@ export function AccountPanel({
   const [labelInFlight, setLabelInFlight] = useState(false);
   const [labelFocused, setLabelFocused] = useState(false);
 
+  // VAULT ICON picker (vault-icons). `savedIcon` mirrors the last-persisted
+  // `vault.prefs.icon` (`null` ≡ the neutral "M" wordmark); `iconInFlight` gates
+  // the grid while a write is in progress. Twin of the label control — same
+  // unlock-gated-by-construction contract (Settings mounts only when the active
+  // vault is unlocked).
+  const [savedIcon, setSavedIcon] = useState<string | null>(null);
+  const [iconInFlight, setIconInFlight] = useState(false);
+
   // Active vault id (MYND-205 task 7). The Settings danger-zone delete targets
   // the vault you currently have unlocked — under SYNC-1 that's the lone
   // `Unlocked` slot, surfaced by `vault_list()` as the most-recent `last_unlock`
@@ -323,6 +374,7 @@ export function AccountPanel({
         const current = prefs.label ?? "";
         setSavedLabel(current);
         setLabelDraft(current);
+        setSavedIcon(prefs.icon);
       })
       .catch(() => {
         /* unlocked-stage read should not reject; leave the draft empty */
@@ -503,9 +555,8 @@ export function AccountPanel({
 
   // Persist the vault label. Empty draft ⇒ clear the label (`null`); a
   // non-empty draft sets it. On success, update `savedLabel` so the Save
-  // button re-disables (no unsaved diff) AND re-fetch `listVaults()` so the
-  // RAM label cache the backend just refreshed is reflected for the switcher
-  // (best-effort — the switcher also re-probes on open).
+  // button re-disables (no unsaved diff); setVaultLabel then dispatches
+  // VAULT_PREFS_CHANGED_EVENT so the switcher live-refreshes its chip + rows.
   const trimmedLabel = labelDraft.trim();
   const labelChanged = trimmedLabel !== savedLabel;
   const labelSaveDisabled = !labelChanged || labelInFlight;
@@ -517,12 +568,35 @@ export function AccountPanel({
         await setVaultLabel(trimmedLabel === "" ? null : trimmedLabel);
         if (!mountedRef.current) return;
         setSavedLabel(trimmedLabel);
-        // Re-fetch so the switcher's cache-backed name reflects the rename.
-        void listVaults().catch(() => {});
+        // setVaultLabel dispatches VAULT_PREFS_CHANGED_EVENT → the switcher
+        // live-refreshes its chip + rows (no explicit re-fetch needed here).
       } catch {
         /* unlocked-stage write should not reject; leave the draft as-is */
       } finally {
         if (mountedRef.current) setLabelInFlight(false);
+      }
+    })();
+  };
+
+  // Persist the vault icon (vault-icons). Selecting the already-active glyph (or
+  // "Default" when already icon-less) is a no-op. Optimistic: the grid highlight
+  // updates immediately, reverting on the (unexpected) unlocked-stage write
+  // rejection. On success setVaultIcon dispatches VAULT_PREFS_CHANGED_EVENT so
+  // the switcher live-refreshes its glyph. `null` clears back to the wordmark.
+  const handleSelectIcon = (name: string | null) => {
+    if (iconInFlight || name === savedIcon) return;
+    const prevIcon = savedIcon;
+    setIconInFlight(true);
+    setSavedIcon(name);
+    void (async () => {
+      try {
+        await setVaultIcon(name);
+        // setVaultIcon dispatches VAULT_PREFS_CHANGED_EVENT on success, so the
+        // switcher live-refreshes its chip + rows — no explicit re-fetch here.
+      } catch {
+        if (mountedRef.current) setSavedIcon(prevIcon);
+      } finally {
+        if (mountedRef.current) setIconInFlight(false);
       }
     })();
   };
@@ -596,6 +670,46 @@ export function AccountPanel({
           >
             {t("settings.account.vaultLabelSave")}
           </button>
+        </div>
+
+        <p style={ICON_PICKER_LABEL_STYLE}>{t("settings.account.vaultIconLabel")}</p>
+        <div
+          role="radiogroup"
+          aria-label={t("settings.account.vaultIconLabel")}
+          data-testid="settings.icon-picker"
+          style={ICON_PICKER_GRID_STYLE}
+        >
+          <button
+            type="button"
+            role="radio"
+            aria-checked={savedIcon === null}
+            aria-label={t("settings.account.vaultIconDefault")}
+            title={t("settings.account.vaultIconDefault")}
+            data-testid="settings.icon-option"
+            data-icon-name="default"
+            disabled={iconInFlight}
+            onClick={() => handleSelectIcon(null)}
+            style={iconPickerButtonStyle(savedIcon === null, iconInFlight)}
+          >
+            M
+          </button>
+          {FOLDER_ICON_NAMES.map((name) => (
+            <button
+              key={name}
+              type="button"
+              role="radio"
+              aria-checked={savedIcon === name}
+              aria-label={name}
+              title={name}
+              data-testid="settings.icon-option"
+              data-icon-name={name}
+              disabled={iconInFlight}
+              onClick={() => handleSelectIcon(name)}
+              style={iconPickerButtonStyle(savedIcon === name, iconInFlight)}
+            >
+              <FolderGlyph name={name} size={16} />
+            </button>
+          ))}
         </div>
       </section>
 

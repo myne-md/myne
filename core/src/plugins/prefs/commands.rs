@@ -1695,6 +1695,61 @@ pub(crate) async fn vault_set_label_with_dir(
     Ok(())
 }
 
+/// Slot::Unlocked-gated setter for the per-vault `icon` field (vault-icons) —
+/// the curated switcher glyph name shown beside this vault's name. `Some`
+/// sets/changes it; `None` clears it (back to the neutral-wordmark state). The
+/// twin of [`vault_set_label`]: read-modify-write under the per-plugin write
+/// mutex, **no native side-effect** (disk-only, like `set_theme`).
+///
+/// **Unlock-gated by construction** (SYNC-3): writing the icon needs
+/// `prefs_key`, which only exists while the vault is unlocked — and under SYNC-1
+/// the sole `Unlocked` slot is the active vault — so the user can only re-icon
+/// the vault they are currently inside. After the disk write commits, the
+/// decrypted icon is refreshed in the per-session RAM cache so the switcher
+/// (`vault_list`) reflects the change immediately. The glyph name lives ONLY
+/// inside the AEAD-sealed `vault.prefs` at rest and in that RAM cache at runtime.
+#[tauri::command]
+pub async fn vault_set_icon<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    icon: Option<String>,
+) -> Result<(), PrefsWriteError> {
+    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    vault_set_icon_with_dir(&dir, state.inner(), icon).await
+}
+
+/// Testable core of [`vault_set_icon`]. Performs the disk-side commit
+/// (read-modify-write under the per-plugin write mutex) FIRST, then refreshes
+/// the active vault's entry in the per-session RAM icon cache (the "effect") —
+/// same disk-FIRST-then-effect ordering as [`vault_set_label_with_dir`], so the
+/// switcher never reflects an icon that did not persist.
+pub(crate) async fn vault_set_icon_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    icon: Option<String>,
+) -> Result<(), PrefsWriteError> {
+    let cleared = icon.is_none();
+    update_prefs_with_dir(vault_dir, state, |prefs| {
+        prefs.icon = icon.clone();
+    })
+    .await?;
+
+    // Effect SECOND (only on disk success): refresh the active vault's entry in
+    // the per-session RAM icon cache so `vault_list` reflects the change
+    // immediately. SYNC-1: the sole `Unlocked` slot is the active vault we just
+    // wrote to; a concurrent lock race (Phase 2 only) makes `active_vault_id`
+    // return None and the cache update is skipped — disk truth is canonical.
+    if let Some(active) = state.active_vault_id().await {
+        state.set_cached_icon(active, icon).await;
+    }
+
+    // Field name + set/cleared only — the glyph name is a curated, closed-set
+    // value (not free user text), but we keep parity with label's discipline
+    // and never log the value itself.
+    tracing::info!(event = "prefs_written", field = "icon", cleared);
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1840,6 +1895,7 @@ mod tests {
                     show_note_timestamps: true,
                     folder_icons: Default::default(),
                     hidden_bar_items: Vec::new(),
+                    icon: None,
                     item_colors: Default::default(),
                     theme: None,
                     deliberate_folders: Vec::new(),
@@ -3195,6 +3251,79 @@ mod tests {
                 .expect("read after clear");
             assert_eq!(view.label, None);
             assert_eq!(state.cached_label(test_vault_id()).await, None);
+        });
+    }
+
+    // ---- vault_set_icon setter (vault-icons) ---------------------------
+
+    /// Unlock-gating: with no vault unlocked, `vault_set_icon` rejects with
+    /// `SlotNotUnlocked` (writing the icon needs `prefs_key`, only present for
+    /// the active/sole-`Unlocked` vault). Same structural gate as the label.
+    #[test]
+    fn vault_set_icon_rejects_when_slot_empty() {
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("prefs-icon-empty").expect("scoped tempdir");
+            let state = VaultRuntimeState::default();
+            let result =
+                vault_set_icon_with_dir(tmp.path(), &state, Some(String::from("book"))).await;
+            assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
+        });
+    }
+
+    /// The icon round-trips through the encrypted `vault.prefs` (disk-first),
+    /// AND the per-session RAM icon cache is refreshed so `vault_list` reflects
+    /// the change immediately. Clearing (`None`) round-trips back to no-icon and
+    /// evicts the cache entry — the switcher falls back to the neutral wordmark.
+    #[test]
+    fn vault_set_icon_round_trips_and_updates_cache() {
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x33).await;
+
+            // Before any write, the cache holds no icon for the active vault.
+            assert_eq!(state.cached_icon(test_vault_id()).await, None);
+
+            // Set an icon — persists on disk + caches in RAM.
+            vault_set_icon_with_dir(tmp.path(), &state, Some(String::from("book")))
+                .await
+                .expect("write icon");
+            assert!(
+                tmp.path().join("vault.prefs").exists(),
+                "vault_set_icon must create vault.prefs"
+            );
+            let view = prefs_read_with_dir(tmp.path(), &state)
+                .await
+                .expect("read after icon write");
+            assert_eq!(view.icon, Some(String::from("book")));
+            // The pre-existing screen_capture default is untouched.
+            assert!(view.screen_capture_protection);
+            // RAM cache reflects the icon immediately (the switcher source).
+            assert_eq!(
+                state.cached_icon(test_vault_id()).await,
+                Some(String::from("book"))
+            );
+
+            // Changing the icon overwrites both disk + cache.
+            vault_set_icon_with_dir(tmp.path(), &state, Some(String::from("code")))
+                .await
+                .expect("change icon");
+            let view = prefs_read_with_dir(tmp.path(), &state)
+                .await
+                .expect("read after change");
+            assert_eq!(view.icon, Some(String::from("code")));
+            assert_eq!(
+                state.cached_icon(test_vault_id()).await,
+                Some(String::from("code"))
+            );
+
+            // Clearing (None) removes the icon on disk AND evicts the cache.
+            vault_set_icon_with_dir(tmp.path(), &state, None)
+                .await
+                .expect("clear icon");
+            let view = prefs_read_with_dir(tmp.path(), &state)
+                .await
+                .expect("read after clear");
+            assert_eq!(view.icon, None);
+            assert_eq!(state.cached_icon(test_vault_id()).await, None);
         });
     }
 

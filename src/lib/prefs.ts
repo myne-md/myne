@@ -459,6 +459,17 @@ export interface PrefsView {
    */
   label: string | null;
   /**
+   * Per-vault decorative icon (vault-icons) — the curated stroke-glyph name the
+   * in-app vault switcher shows beside this vault's name, replacing the default
+   * `M` wordmark. `null` ≡ no icon → the switcher shows the neutral `M`
+   * fallback. Drawn from the curated folder-icon glyph set (`FOLDER_ICON_NAMES`);
+   * an unknown name is ignored at render. Twin of {@link PrefsView.label}: lives
+   * encrypted-only inside `vault.prefs` (SYNC-3), decrypted into a per-session
+   * RAM cache on unlock. Absent in vaults with no icon → the Rust decoder
+   * defaults it to `null`. Serialized from Rust `Option<String>` (null | string).
+   */
+  icon: string | null;
+  /**
    * Saved-view definitions (MYND-273) — authored filter/sort/group projections.
    * Authored content (survives an index rebuild + vault restore), persisted in
    * `vault.prefs` (SYNC-6). The backend encodes the array sorted by view id;
@@ -750,6 +761,22 @@ export async function setFolderIcons(icons: Record<string, string>): Promise<voi
 }
 
 /**
+ * Window event dispatched after a successful per-vault prefs write that the
+ * in-app vault switcher projects (icon/label). Live-refresh consumers (e.g.
+ * `VaultSwitcher`) listen for it and re-probe `listVaults()` so the chip + rows
+ * update immediately, without polling or reopening the dropdown.
+ */
+export const VAULT_PREFS_CHANGED_EVENT = "myne:vault-prefs-changed";
+
+/** Notify live-refresh listeners that a switcher-visible prefs field changed.
+ *  No-op outside a DOM context (e.g. a non-browser test runner). */
+function notifyVaultPrefsChanged(): void {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent(VAULT_PREFS_CHANGED_EVENT));
+  }
+}
+
+/**
  * Set (or clear) the active vault's human-readable label (MYND-205) — the name
  * the in-app vault switcher shows. Pass a string to set/rename it, or `null` to
  * clear it back to the neutral-fallback state. **Unlock-gated**: writing the
@@ -758,10 +785,28 @@ export async function setFolderIcons(icons: Record<string, string>): Promise<voi
  * no vault was unlocked). The backend atomic-writes `vault.prefs` disk-first
  * with no native side-effect, then refreshes the per-session RAM label cache so
  * the switcher reflects the rename immediately. The label lives encrypted-only
- * at rest — it never touches disk in plaintext except as this input.
+ * at rest — it never touches disk in plaintext except as this input. On success
+ * dispatches {@link VAULT_PREFS_CHANGED_EVENT} so the switcher live-refreshes.
  */
 export async function setVaultLabel(label: string | null): Promise<void> {
   await invoke<void>("plugin:prefs|vault_set_label", { label });
+  notifyVaultPrefsChanged();
+}
+
+/**
+ * Set (or clear) the active vault's decorative icon (vault-icons) — the curated
+ * stroke-glyph the in-app vault switcher shows beside the vault name. Pass a
+ * glyph name from {@link FOLDER_ICON_NAMES} to set it, or `null` to clear it
+ * back to the neutral `M` wordmark. Twin of {@link setVaultLabel}:
+ * **unlock-gated** (writing the icon needs the active vault's `prefs_key`, so a
+ * rejected promise with `SlotNotUnlocked` means no vault was unlocked); the
+ * backend atomic-writes `vault.prefs` disk-first with no native side-effect,
+ * then refreshes the per-session RAM icon cache so the switcher reflects the
+ * change immediately. The icon lives encrypted-only at rest.
+ */
+export async function setVaultIcon(icon: string | null): Promise<void> {
+  await invoke<void>("plugin:prefs|vault_set_icon", { icon });
+  notifyVaultPrefsChanged();
 }
 
 /**

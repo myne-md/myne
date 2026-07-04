@@ -144,6 +144,19 @@ pub struct VaultRuntimeState {
     /// this-session-unlocked vaults).
     label_cache: RwLock<HashMap<VaultId, String>>,
 
+    /// Per-session decrypted vault-icon cache (vault-icons) — the twin of
+    /// [`Self::label_cache`] for the per-vault switcher glyph name. Like the
+    /// label, the icon is **encrypted-only** at rest inside `vault.prefs`; this
+    /// cache is the ONLY place the plaintext glyph name exists outside the
+    /// editing UI, and it never persists. `vault_list` reads it to populate
+    /// `VaultSummary.icon` (`Some` iff the cache holds one for that id) so a
+    /// never-this-session-unlocked vault shows the neutral wordmark fallback.
+    /// Held in its own `RwLock` (not the slot map), same rationale as
+    /// `label_cache`; an absent key means "no cached icon". Dropped on
+    /// lock / take / switch alongside the slot teardown (SYNC-3 — icon only for
+    /// this-session-unlocked vaults).
+    icon_cache: RwLock<HashMap<VaultId, String>>,
+
     /// Spring-loaded quick-unlock gate (MYND-329 task 9). `false` at process
     /// start; set `true` the first time a **master-password unlock** succeeds
     /// this session ([`Self::mark_full_unlock_done`]). Quick-unlock
@@ -168,6 +181,7 @@ impl Default for VaultRuntimeState {
             last_activity_millis: AtomicU64::new(0),
             auto_lock_timeout_secs: AtomicU32::new(crate::DEFAULT_AUTO_LOCK_SECS),
             label_cache: RwLock::new(HashMap::new()),
+            icon_cache: RwLock::new(HashMap::new()),
             full_unlock_this_session: AtomicBool::new(false),
         }
     }
@@ -386,6 +400,43 @@ impl VaultRuntimeState {
     /// vaults). Idempotent: a missing entry is a no-op.
     pub async fn evict_cached_label(&self, id: VaultId) {
         self.label_cache.write().await.remove(&id);
+    }
+
+    /// Insert/replace the decrypted icon glyph name for `id` in the per-session
+    /// icon cache (vault-icons) — the twin of [`Self::set_cached_label`]. Called
+    /// at unlock (icon decrypted from `vault.prefs`) and by `vault_set_icon`
+    /// after a successful disk write so the switcher reflects a change
+    /// immediately. `Some(icon)` caches it; `None` removes the entry (the user
+    /// cleared the icon) so `vault_list` reports the vault as icon-less again.
+    /// The plaintext glyph name exists ONLY here at runtime; it never persists
+    /// outside the AEAD-sealed `vault.prefs`.
+    pub async fn set_cached_icon(&self, id: VaultId, icon: Option<String>) {
+        let mut cache = self.icon_cache.write().await;
+        match icon {
+            Some(i) => {
+                cache.insert(id, i);
+            }
+            None => {
+                cache.remove(&id);
+            }
+        }
+    }
+
+    /// The decrypted icon glyph name cached for `id` this session, or `None` if
+    /// no icon was cached (vault never unlocked this session, or it carries no
+    /// icon). Read by `vault_list` to project `VaultSummary.icon` (SYNC-4):
+    /// `Some` only for a this-session-cached vault, the neutral-fallback signal
+    /// otherwise. The switcher renders the neutral wordmark when `None`.
+    pub async fn cached_icon(&self, id: VaultId) -> Option<String> {
+        self.icon_cache.read().await.get(&id).cloned()
+    }
+
+    /// Drop `id`'s cached icon (vault-icons) — the icon-cache half of a lock /
+    /// take / switch teardown so a locked vault stops surfacing its real glyph
+    /// in the switcher (SYNC-3 — real icons only for this-session-unlocked
+    /// vaults). Idempotent: a missing entry is a no-op.
+    pub async fn evict_cached_icon(&self, id: VaultId) {
+        self.icon_cache.write().await.remove(&id);
     }
 
     /// TOCTOU-safe idle lock: acquire the slot write-lock and drop the

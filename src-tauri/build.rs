@@ -124,6 +124,7 @@ fn main() {
                 "set_screen_capture_protection",
                 "set_deliberate_folders",
                 "vault_set_label",
+                "vault_set_icon",
             ]),
         )
         .plugin(

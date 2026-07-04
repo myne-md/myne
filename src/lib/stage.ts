@@ -915,12 +915,14 @@ function verifyInitialStageFromProbe(): void {
     id,
     status: { kind: "Exists" },
     label: null,
+    icon: null,
     last_unlock: null,
   });
   const corruptVault = (id: VaultId): VaultSummary => ({
     id,
     status: { kind: "Corrupted" },
     label: null,
+    icon: null,
     last_unlock: null,
   });
   const okList = (...vaults: VaultSummary[]): VaultListResult => ({ ok: vaults });
