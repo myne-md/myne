@@ -17,6 +17,7 @@
 //! Logging: DENY-list clean (`src-tauri/CLAUDE.md`) — the engine seam never
 //! logs a prompt, note body, or embedding.
 
+pub mod cancel;
 pub mod chunker;
 pub mod commands;
 pub mod embeddings_persist;
@@ -61,7 +62,7 @@ const LOCAL_INFERENCE_CAPABILITY: &str = r#"{
   "identifier": "local-inference",
   "description": "On-device AI inference + retrieval + grounded Q&A commands (infer/embed/semantic_search/ask) for the main window; no core/fs/dialog/clipboard/network.",
   "windows": ["main"],
-  "permissions": ["local-inference:allow-infer", "local-inference:allow-embed", "local-inference:allow-semantic-search", "local-inference:allow-ask", "local-inference:allow-set-model-path", "local-inference:allow-get-model-path"]
+  "permissions": ["local-inference:allow-infer", "local-inference:allow-embed", "local-inference:allow-semantic-search", "local-inference:allow-ask", "local-inference:allow-chat-stream", "local-inference:allow-chat-stop", "local-inference:allow-set-model-path", "local-inference:allow-get-model-path"]
 }"#;
 
 /// Best-effort zeroize + reset of the in-RAM AI vector store on lock teardown
@@ -72,6 +73,14 @@ const LOCAL_INFERENCE_CAPABILITY: &str = r#"{
 /// idle auto-lock, `vault_delete`, and credential-rotation relock. Sync and
 /// infallible; a missing managed state is a silent no-op.
 pub fn zeroize_ai_vectors<R: Runtime>(app: &tauri::AppHandle<R>) {
+    // Abort any in-flight streaming chat generation first (conversational-ai-chat
+    // task 4/12): the chat transcript is RAM-only and dropped on lock (the
+    // frontend `clearChat` wipe), so a generation must not keep running — holding
+    // the compute lock — or emitting into a torn-down transcript after the vault
+    // locks. The publish-guarded `guarded_on_token` sees the flag and breaks.
+    if let Some(cancel) = app.try_state::<cancel::CancelToken>() {
+        cancel.cancel();
+    }
     if let Some(state) = app.try_state::<vector_store::LocalInferenceVectorState>() {
         state.clear();
     }
@@ -91,6 +100,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::embed,
             commands::semantic_search,
             commands::ask,
+            commands::chat_stream,
+            commands::chat_stop,
             commands::set_model_path,
             commands::get_model_path
         ])
@@ -115,6 +126,10 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             };
             app.manage(state::LocalInferenceState::new(engine));
             app.manage(vector_store::LocalInferenceVectorState::default());
+            // Shared cancel flag for the streaming chat surface (task 4/5): the
+            // `chat_stream` generation observes it; `chat_stop` and the vault-
+            // lock teardown (task 12) set it.
+            app.manage(cancel::CancelToken::default());
             app.add_capability(LOCAL_INFERENCE_CAPABILITY)?;
             Ok(())
         })

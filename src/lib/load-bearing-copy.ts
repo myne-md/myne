@@ -267,3 +267,15 @@ export const AI_TRUST_HEADLINE =
  *  isolation wording only when the sidecar ships (a `decisions.md` event). */
 export const AI_TRUST_DISCLOSURE =
   "Inference runs locally with no network access, so your notes are never transmitted. You pick the model file from your own disk. Like the rest of Myne, this does not protect against malware already running on your device — such software can read app memory.";
+
+/** Conversational-AI-chat honesty note (conversational-ai-chat task 13). A
+ *  load-bearing, threat-model-bounded framing shown in the chat surface: the
+ *  answers come from a SMALL on-device model and MAY BE WRONG, and are grounded
+ *  in the user's own notes (which is why citations exist). It must NOT imply
+ *  cloud-grade capability or accuracy, and — per `threat-model.md` §7 — must NOT
+ *  claim model-runtime isolation ("sandbox") until the sidecar lands. The
+ *  fallibility admission is the honest counterweight to a weak local model; the
+ *  visible citations (task 8) are how the user verifies. E2E/Vitest pin the
+ *  exact wording by full-literal equality (SYNC-8 discipline). */
+export const AI_CHAT_HONESTY_NOTE =
+  "Answers come from a small model running on your device and may be wrong — check the notes it cites.";

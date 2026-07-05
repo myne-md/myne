@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  AI_CHAT_HONESTY_NOTE,
   AI_TRUST_DISCLOSURE,
   AI_TRUST_HEADLINE,
 } from "../../src/lib/load-bearing-copy";
@@ -37,5 +38,28 @@ describe("local-AI trust affordance copy (SYNC-16, load-bearing)", () => {
     // `threat-model.md` §7: the runtime is IN-PROCESS in v0.1, so a "sandbox"
     // claim over-states the guarantee. Re-add only when the sidecar ships.
     expect(combined).not.toContain("sandbox");
+  });
+});
+
+// Conversational-AI-chat honesty note (conversational-ai-chat task 13). The
+// fallibility + grounding framing for a weak on-device model. Load-bearing:
+// full-literal `===` so an edit that over-claims capability/accuracy or claims
+// runtime isolation fails here rather than shipping.
+describe("conversational-AI-chat honesty note (task 13, load-bearing)", () => {
+  it("is the exact literal admitting fallibility + pointing at the citations", () => {
+    expect(AI_CHAT_HONESTY_NOTE).toBe(
+      "Answers come from a small model running on your device and may be wrong — check the notes it cites.",
+    );
+  });
+
+  it("admits fallibility and claims no cloud-grade capability, accuracy, or isolation", () => {
+    const lower = AI_CHAT_HONESTY_NOTE.toLowerCase();
+    // Positively admits the model can be wrong (the honest counterweight).
+    expect(lower).toContain("may be wrong");
+    // Must not over-claim capability/accuracy or imply isolation.
+    expect(lower).not.toContain("accurate");
+    expect(lower).not.toContain("sandbox");
+    expect(lower).not.toContain("fully private");
+    expect(lower).not.toContain("always");
   });
 });
