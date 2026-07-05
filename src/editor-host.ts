@@ -6,6 +6,7 @@
 // `main.tsx` (after `./i18n`, before `<App>` renders).
 
 import { openUrl } from "@tauri-apps/plugin-opener";
+import { save } from "@tauri-apps/plugin-dialog";
 import { setEditorHost, type EditorHost, type EditorPrefs } from "@myne/editor";
 import i18n from "./i18n";
 import { tagTree, isMediaTarget } from "./notes/vaultIndices";
@@ -17,7 +18,12 @@ import { spellCheck, addToPersonalDictionary, ignoreWordInVault } from "./lib/sp
 const host: EditorHost = {
   t: (key, opts) => i18n.t(key, opts ?? {}),
   notes: { tagTree, isMediaTarget },
-  attachments: { attachmentExport, attachmentRename },
+  attachments: {
+    attachmentExport,
+    attachmentRename,
+    // Desktop: native Save-As dialog (the OS confirms any overwrite).
+    pickExportDestination: (filename) => save({ defaultPath: filename }),
+  },
   prefsRead: async (): Promise<EditorPrefs> => (await prefsRead()) as EditorPrefs,
   openExternal: (url) => {
     void openUrl(url);

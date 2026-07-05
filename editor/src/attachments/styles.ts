@@ -228,7 +228,7 @@ const CSS = `
 
 .cm-attach-lightbox-close {
   position: fixed;
-  top: var(--space-4, 14px);
+  top: max(56px, calc(env(safe-area-inset-top, 0px) + 10px));
   right: var(--space-4, 14px);
   display: inline-flex;
   align-items: center;
@@ -255,7 +255,7 @@ const CSS = `
 /* Vault-wide Export (Save As) affordance pinned left of the close button. */
 .cm-attach-lightbox-export {
   position: fixed;
-  top: var(--space-4, 14px);
+  top: max(56px, calc(env(safe-area-inset-top, 0px) + 10px));
   right: calc(var(--space-4, 14px) + 40px);
   display: inline-flex;
   align-items: center;

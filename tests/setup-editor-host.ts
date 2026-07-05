@@ -32,7 +32,7 @@ const isMediaTarget = (target: string): boolean => {
 setEditorHost({
   t: (key, opts) => i18n.t(key, opts ?? {}),
   notes: { tagTree: async () => [], isMediaTarget },
-  attachments: { attachmentExport: async () => {}, attachmentRename: async () => {} },
+  attachments: { attachmentExport: async () => {}, attachmentRename: async () => {}, pickExportDestination: async () => null },
   prefsRead: async () => ({
     editor_content_width: null,
     editor_font_family: null,
