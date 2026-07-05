@@ -41,6 +41,35 @@ export type PairingError =
   | { kind: "CsprngUnavailable" };
 
 /**
+ * Mirrors `clipper::install::InstallStatus` — the browser native-messaging host
+ * install state surfaced to the Settings toggle. `installedBrowsers` are the
+ * lowercase labels ("firefox" | "chrome" | "edge") whose manifest is present.
+ */
+export interface ClipperInstallStatus {
+  /** Whether the host manifest is registered (the opt-in flag; absent ⇒ on). */
+  enabled: boolean;
+  /** The absolute path of the running host binary the manifest points at. */
+  hostPath: string | null;
+  /** Labels of the browsers currently carrying our manifest. */
+  installedBrowsers: string[];
+}
+
+/** The Rust `InstallStatus` wire shape (snake_case) → the camelCase view above. */
+interface InstallStatusWire {
+  enabled: boolean;
+  host_path: string | null;
+  installed_browsers: string[];
+}
+
+function toInstallStatus(w: InstallStatusWire): ClipperInstallStatus {
+  return {
+    enabled: w.enabled,
+    hostPath: w.host_path ?? null,
+    installedBrowsers: w.installed_browsers ?? [],
+  };
+}
+
+/**
  * Read the current pending pairing session, or `null` when no extension is
  * requesting a connection (the dialog stays unmounted).
  */
@@ -127,4 +156,29 @@ export async function listPairedExtensions(): Promise<PairedExtension[]> {
  */
 export async function revokePairedExtension(extensionId: string): Promise<void> {
   await invoke("plugin:clipper-pairing|pairing_revoke", { extensionId });
+}
+
+/**
+ * Read the browser native-messaging host install status (the opt-in flag + the
+ * resolved host binary path + which browsers currently carry the manifest). In a
+ * non-Tauri context (dev) `invoke` rejects — treat that as "disabled/unknown".
+ */
+export async function getClipperInstallStatus(): Promise<ClipperInstallStatus> {
+  const wire = await invoke<InstallStatusWire>("plugin:clipper-pairing|clipper_install_status");
+  return toInstallStatus(wire);
+}
+
+/**
+ * Register (`enabled = true`) or deregister (`false`) the browser clipper host:
+ * writes the opt-in flag and reconciles the on-disk manifests immediately (no
+ * restart). Resolves to the fresh status so the UI updates without a re-query.
+ */
+export async function setClipperInstallEnabled(
+  enabled: boolean,
+): Promise<ClipperInstallStatus> {
+  const wire = await invoke<InstallStatusWire>(
+    "plugin:clipper-pairing|clipper_install_set_enabled",
+    { enabled },
+  );
+  return toInstallStatus(wire);
 }

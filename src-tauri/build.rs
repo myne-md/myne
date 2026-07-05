@@ -400,6 +400,8 @@ fn main() {
                 "pairing_reject",
                 "pairing_revoke",
                 "pairing_list_paired",
+                "clipper_install_status",
+                "clipper_install_set_enabled",
                 "clip_dispatch_complete",
                 "pairing_dispatch_complete",
             ]),
