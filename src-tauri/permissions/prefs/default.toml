@@ -19,6 +19,7 @@ permissions = [
   "allow-prefs-read",
   "allow-set-screen-capture-protection",
   "allow-set-deliberate-folders",
+  "allow-set-archived-folders",
   "allow-set-auto-lock-timeout",
   "allow-set-item-order",
   "allow-set-hidden-bar-items",
@@ -47,6 +48,7 @@ permissions = [
   "allow-set-item-colors",
   "allow-set-folder-icons",
   "allow-vault-set-label",
+  "allow-vault-set-icon",
   "allow-set-spell-enabled",
   "allow-set-spell-languages",
   "allow-set-show-note-timestamps",
@@ -76,6 +78,14 @@ commands.allow = ["set_screen_capture_protection"]
 identifier = "allow-set-deliberate-folders"
 description = "Allow invoking prefs:set_deliberate_folders (Slot::Unlocked-gated setter for the deliberate_folders set — the carrier for empty/deliberately-created folders in the virtual-folder model; atomic-writes vault.prefs with no native side-effect)."
 commands.allow = ["set_deliberate_folders"]
+
+# Folder-archive: a write setter, so it inherits the same main-window-only
+# invariant as allow-set-deliberate-folders — v0.2 multi-window MUST NOT
+# grant this to any non-main window.
+[[permission]]
+identifier = "allow-set-archived-folders"
+description = "Allow invoking prefs:set_archived_folders (Slot::Unlocked-gated setter for the archived_folders set — folders archived as a unit in the folder-archive feature; atomic-writes vault.prefs with no native side-effect)."
+commands.allow = ["set_archived_folders"]
 
 # MYND-121: a write setter, so it inherits the same main-window-only
 # invariant as the other allow-set-* permissions.
@@ -272,6 +282,18 @@ commands.allow = ["set_folder_icons"]
 identifier = "allow-vault-set-label"
 description = "Allow invoking prefs:vault_set_label (Slot::Unlocked-gated setter for the per-vault label field — the in-app vault switcher's human-readable name; Option<String> where None clears it; atomic-writes vault.prefs with no native side-effect, then refreshes the per-session RAM label cache so vault_list reflects the rename immediately)."
 commands.allow = ["vault_set_label"]
+
+# vault-icons: a write setter for the per-vault icon glyph name — the switcher's
+# decorative glyph shown beside the vault name. Inherits the same
+# main-window-only invariant as the other allow-set-* permissions — v0.2
+# multi-window MUST NOT grant this to any non-main window. Unlock-gated by
+# construction (writing the icon needs prefs_key, which only exists for the
+# active/sole-Unlocked vault); atomic-writes vault.prefs with no native
+# side-effect, then refreshes the per-session RAM icon cache.
+[[permission]]
+identifier = "allow-vault-set-icon"
+description = "Allow invoking prefs:vault_set_icon (Slot::Unlocked-gated setter for the per-vault icon field — the in-app vault switcher's decorative glyph name; Option<String> where None clears it to the neutral wordmark; atomic-writes vault.prefs with no native side-effect, then refreshes the per-session RAM icon cache so vault_list reflects the change immediately)."
+commands.allow = ["vault_set_icon"]
 
 # MYND-267 spell-checker: two write setters for the spell-check prefs
 # (spell_enabled toggle + spell_languages set). Both inherit the same

@@ -22,7 +22,7 @@ use std::collections::HashSet;
 
 use myne_core::plugins::notes::note_id::NoteId;
 
-use super::chunker::{chunk_note, ChunkParams};
+use super::chunker::{chunk_note, is_substantive_chunk, ChunkParams};
 use super::vector_store::{AiVectorStore, ChunkKey};
 
 /// A note ready to index: its id, folder (for the exclusion check), decrypted
@@ -53,7 +53,14 @@ pub fn embed_note<E>(
     store.remove_note(&note.note_id);
     let chunks = chunk_note(note.note_id, &note.body, params);
     for c in &chunks {
-        let vector = embed(c.slice(&note.body))?;
+        let text = c.slice(&note.body);
+        // Skip pure-structural / stub chunks (separators, heading-only lines) —
+        // they embed to high-cosine noise that crowds out real content
+        // (conversational-ai-chat retrieval tuning, measured over a real vault).
+        if !is_substantive_chunk(text) {
+            continue;
+        }
+        let vector = embed(text)?;
         store.insert_vector(ChunkKey::from_chunk(c), vector);
     }
     store.set_nonce(note.note_id, note.content_nonce.clone());

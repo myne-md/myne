@@ -1,0 +1,80 @@
+// Browser-clipper host-install toggle suite (installer wiring, decisions.md
+// 2026-07-05). Drives Settings → Account → "Browser clipper" through the REAL
+// editor UI on the tauri-driver harness.
+//
+//   ci1 — TOGGLE ROUND-TRIP: the toggle renders ON by default (absent flag ⇒
+//         enabled), flips to OFF, then back ON. The `data-enabled` attribute is
+//         driven by the command's RETURNED status (optimistic value rolls back
+//         on failure), so a clean true→false→true exercises the real
+//         `clipper_install_status` (mount read) + `clipper_install_set_enabled`
+//         (write flag + reconcile the on-disk manifests) commands end-to-end.
+//
+// The manifest FILE writes land in the browser profile dirs (outside the vault),
+// which tauri-driver cannot assert directly; the Rust unit tests over a
+// `ScopedTempDir` fake browser root (`clipper::install` tests) cover the
+// filesystem reconcile. This scenario is the UI/IPC round-trip half.
+//
+// The install flag + manifests are NON-vault, NON-crypto config (host name +
+// binary path + public extension ids) — no new magic / KEK / AAD / format.
+//
+// KDF: weak generator fixtures (params are vault.meta-resident).
+
+import { it } from "vitest";
+import { describeE2E, scenario } from "./support/scenario";
+import { seedVault } from "./support/fixtures";
+import {
+  closeSettings,
+  dismissImporterOffer,
+  openSettings,
+  unlockToEditor,
+} from "./support/flows";
+import { type Session } from "./support/webdriver";
+
+/** Wait until the install block's reflected `data-enabled` equals `expected`. */
+async function waitEnabled(session: Session, expected: "true" | "false"): Promise<void> {
+  await session.waitUntil(
+    async () =>
+      (await (await session.byTestId("settings.clipper-install")).attribute("data-enabled")) ===
+      expected
+        ? true
+        : null,
+    { label: `clipper install enabled = ${expected}`, timeoutMs: 10_000 },
+  );
+}
+
+describeE2E("ci1 browser-clipper host-install toggle (decisions.md 2026-07-05)", () => {
+  // Vault-count precondition: 1 (weak KDF).
+  it("the Browser clipper toggle renders on by default and round-trips off→on", async () => {
+    let password = "";
+    await scenario(
+      "ci1-clipper-install-toggle",
+      {
+        seed: (dir) => {
+          password = seedVault(dir).password;
+        },
+      },
+      async (app) => {
+        const s = app.session;
+        await unlockToEditor(s, password);
+        await dismissImporterOffer(s);
+
+        // Settings → Account (the default panel) hosts the toggle.
+        await openSettings(s, "account");
+        await s.byTestId("settings.clipper-install");
+
+        // Default: absent flag ⇒ registered ⇒ toggle ON.
+        await waitEnabled(s, "true");
+
+        // Flip OFF — writes the flag + removes the manifests, returns enabled=false.
+        await (await s.byTestId("settings.clipper-install-toggle")).click();
+        await waitEnabled(s, "false");
+
+        // Flip back ON — re-registers, returns enabled=true.
+        await (await s.byTestId("settings.clipper-install-toggle")).click();
+        await waitEnabled(s, "true");
+
+        await closeSettings(s);
+      },
+    );
+  });
+});

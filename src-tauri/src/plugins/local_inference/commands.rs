@@ -24,14 +24,16 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
+use tauri::ipc::Channel;
 use tauri::{AppHandle, Runtime, State};
 use zeroize::Zeroizing;
 
 use myne_core::plugins::notes::commands::note_read_with_dir;
 use myne_core::plugins::notes::note_id::NoteId;
 
-use super::engine::Engine;
+use super::cancel::{guarded_on_token, CancelToken};
+use super::engine::{ChatMessage, ChatRole, Engine};
 use super::error::EngineError;
 use super::model_store::{self, ModelRole, ModelStoreError};
 use super::rag;
@@ -46,6 +48,15 @@ use crate::plugins::vault_unlock::state::VaultRuntimeState;
 pub fn local_inference_error_kind(e: &EngineError) -> &'static str {
     e.kind()
 }
+
+/// Minimum cosine score for a retrieved chunk to ground (and cite) a chat turn
+/// (conversational-ai-chat). Below this the turn answers conversationally
+/// without inventing note citations. Chosen from a real-vault measurement with a
+/// **multilingual** embedding model, where cosines discriminate (relevant
+/// ~0.5–0.8, weak/off-note ~0.2–0.35). An English-only model gives a flat
+/// ~0.83–0.98 distribution where this cutoff is a no-op — the multilingual
+/// model is the load-bearing fix; this threshold is the complementary gate.
+const CHAT_RELEVANCE_THRESHOLD: f32 = 0.30;
 
 /// One-shot completion. Blocking (no stream, SYNC-7).
 #[tauri::command]
@@ -247,6 +258,168 @@ pub async fn ask<R: Runtime>(
         answer,
         sources: to_search_hits(sources),
     })
+}
+
+/// A conversation message crossing IPC from the WebView (conversational-ai-chat
+/// task 5). `content` is UNTRUSTED plaintext (may echo note content) — never
+/// logged; the engine tokenizes it with the Special-Token-Injection defense
+/// (task 2, `chat_streaming`).
+#[derive(Debug, Clone, Deserialize)]
+pub struct ChatMessageDto {
+    pub role: String,
+    pub content: String,
+}
+
+impl ChatMessageDto {
+    /// Map to the engine `ChatMessage`. An unrecognized role is treated as
+    /// `User` — role is a quality hint only (content is always untrusted-
+    /// tokenized regardless), so a lenient default is safe.
+    fn into_message(self) -> ChatMessage {
+        let role = if self.role == "assistant" {
+            ChatRole::Assistant
+        } else {
+            ChatRole::User
+        };
+        ChatMessage {
+            role,
+            content: self.content,
+        }
+    }
+}
+
+/// Streaming grounded chat over the resident vault (conversational-ai-chat task
+/// 5). Embeds the question, retrieves top-k non-excluded chunks, reads their
+/// source note bodies, frames a grounded multi-turn conversation, and streams
+/// the assistant's answer token-by-token over `on_token` (a Tauri `Channel`).
+/// Returns the full answer + the source set for citation when generation ends.
+///
+/// Cancellation: the shared [`CancelToken`] is `reset()` at the start; the
+/// composer "Stop" command ([`chat_stop`]) and the vault-lock teardown both
+/// `cancel()` it. The [`guarded_on_token`] publish-guard checks the flag BEFORE
+/// each channel send, so a lock mid-generation never emits into a torn-down
+/// transcript.
+///
+/// Local-only, no network. Plaintext (question, history, chunk texts, tokens)
+/// never hits disk or log (DENY-list); the question is `Zeroizing`-wrapped. AI
+/// off (store not enabled) → empty answer, no model call (mirrors [`ask`]).
+#[tauri::command]
+#[allow(clippy::too_many_arguments)] // Tauri State/Channel injections, not a design smell
+pub async fn chat_stream<R: Runtime>(
+    question: String,
+    history: Vec<ChatMessageDto>,
+    k: usize,
+    on_token: Channel<String>,
+    app: AppHandle<R>,
+    vault_state: State<'_, VaultRuntimeState>,
+    engine_state: State<'_, LocalInferenceState>,
+    vector_state: State<'_, LocalInferenceVectorState>,
+    cancel_state: State<'_, CancelToken>,
+) -> Result<AskResult, EngineError> {
+    // First statement: bound the question plaintext to a Zeroizing wrapper.
+    let question = Zeroizing::new(question);
+    let engine = engine_state.engine();
+    let messages: Vec<ChatMessage> = history
+        .into_iter()
+        .map(ChatMessageDto::into_message)
+        .collect();
+
+    // Fresh generation → clear any prior Stop signal.
+    let cancel = cancel_state.inner().clone();
+    cancel.reset();
+
+    // 1. Embed the question off the async thread.
+    let query_vec = {
+        let engine = Arc::clone(&engine);
+        let q = question.clone();
+        tokio::task::spawn_blocking(move || engine.embed(&q))
+            .await
+            .map_err(|_| EngineError::EmbeddingFailed)??
+    };
+
+    // 2. Retrieve top-k (sync scan; host-side opt-in + excluded-folder gates, so
+    //    a compromised WebView cannot ground on a disabled feature / excluded
+    //    note — SYNC-14). AI off → empty answer, no model call.
+    let hits = {
+        let store = vector_state.lock();
+        if !store.is_enabled() {
+            return Ok(AskResult {
+                answer: String::new(),
+                sources: Vec::new(),
+            });
+        }
+        retrieval::top_k_matches(&query_vec, &store, k, |id| store.is_note_excluded(id))
+    };
+    // Relevance gate: drop weakly-matching chunks so chit-chat / off-note
+    // questions don't ground on — or cite — irrelevant notes. Below the
+    // threshold the turn answers conversationally (rag's empty-context branch).
+    // Tunable; MiniLM cosine for a genuinely relevant chunk is well above this.
+    let hits: Vec<ScoredChunk> = hits
+        .into_iter()
+        .filter(|h| h.score >= CHAT_RELEVANCE_THRESHOLD)
+        .collect();
+
+    // 3. Read each unique source note body via the sanctioned decrypt path.
+    let notes_dir = myne_core::paths::notes_dir_for(&app, vault_state.active_vault_id().await)
+        .map_err(|_| EngineError::NotReady)?;
+    let mut bodies: HashMap<NoteId, Zeroizing<String>> = HashMap::new();
+    for h in &hits {
+        if bodies.contains_key(&h.key.note_id) {
+            continue;
+        }
+        if let Ok(body) = note_read_with_dir(
+            notes_dir.clone(),
+            vault_state.inner(),
+            h.key.note_id.to_string(),
+        )
+        .await
+        {
+            bodies.insert(h.key.note_id, Zeroizing::new(body));
+        }
+    }
+
+    // 4. Resolve chunk texts (char-boundary-safe) + frame the grounded chat.
+    let (chunk_texts, sources) = resolve_hit_texts(&hits, |id| bodies.get(id).map(|b| b.as_str()));
+    let grounded = rag::frame_grounded_chat(
+        &messages,
+        &question,
+        &chunk_texts,
+        &sources.iter().map(|s| s.key).collect::<Vec<_>>(),
+        rag::ChatBudget::default(),
+    );
+    // The budget keeps a prefix of `sources` (same order) — take that many for
+    // citation, preserving the cosine score `frame_grounded_chat` drops.
+    let cite_sources = to_search_hits(sources.into_iter().take(grounded.sources.len()).collect());
+
+    // 5. Stream the assistant answer off the async thread. The guarded callback
+    //    forwards each token to the channel unless a Stop/lock cancelled first.
+    let system = grounded.system;
+    let messages = grounded.messages;
+    let channel = on_token;
+    let answer = {
+        let engine = Arc::clone(&engine);
+        tokio::task::spawn_blocking(move || {
+            let mut cb = guarded_on_token(&cancel, |t| {
+                let _ = channel.send(t.to_string());
+            });
+            engine.chat_streaming(system.as_str(), &messages, &mut cb)
+        })
+        .await
+        .map_err(|_| EngineError::InferenceFailed)??
+    };
+
+    Ok(AskResult {
+        answer,
+        sources: cite_sources,
+    })
+}
+
+/// Signal the active streaming generation to stop (composer "Stop" — task 5).
+/// Idempotent; a no-op when nothing is streaming. Sets the shared cancel flag
+/// the running [`chat_stream`]'s guarded callback observes before its next send.
+#[tauri::command]
+pub async fn chat_stop(cancel_state: State<'_, CancelToken>) -> Result<(), EngineError> {
+    cancel_state.cancel();
+    Ok(())
 }
 
 /// Record a user-picked model path for `role` device-locally (ai-ux-surface
@@ -467,5 +640,31 @@ mod tests {
         let (texts, sources) = resolve_hit_texts(&hits, |_| Some("😀"));
         assert!(texts.is_empty(), "mid-codepoint range must be skipped");
         assert!(sources.is_empty());
+    }
+
+    #[test]
+    fn chat_message_dto_maps_roles_leniently() {
+        let u = ChatMessageDto {
+            role: "user".into(),
+            content: "a".into(),
+        }
+        .into_message();
+        assert_eq!(u.role, ChatRole::User);
+        assert_eq!(u.content, "a");
+
+        let a = ChatMessageDto {
+            role: "assistant".into(),
+            content: "b".into(),
+        }
+        .into_message();
+        assert_eq!(a.role, ChatRole::Assistant);
+
+        // Unknown role → User (lenient; content is untrusted-tokenized anyway).
+        let s = ChatMessageDto {
+            role: "system".into(),
+            content: "c".into(),
+        }
+        .into_message();
+        assert_eq!(s.role, ChatRole::User);
     }
 }

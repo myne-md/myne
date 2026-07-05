@@ -57,22 +57,24 @@ aiDescribe("as1 AI summarize → render → insert (note-summarization)", () => 
         // Summarize from the command palette (reveals the AI Chat tab).
         await runPaletteAction(s, "ai.summarize-note", "summarize");
 
-        // The stub engine returns deterministic output → the AI Chat tab renders
-        // it (never the error state).
-        const output = await s.waitForElement(
-          testIdSelector("ai.output"),
-          { timeoutMs: 15_000 },
+        // Summarize is now FOLDED INTO the chat transcript (conversational-ai-chat
+        // task 10): the stub engine's deterministic output streams as an assistant
+        // turn — never the error state.
+        await s.waitForElement(testIdSelector("ai.transcript"), { timeoutMs: 15_000 });
+        await s.waitUntil(
+          async () => ((await s.byTestIdAll("ai.turn")).length >= 2 ? true : null),
+          { label: "summarize appended a transcript turn", timeoutMs: 15_000 },
         );
-        expect((await output.textContent()).length).toBeGreaterThan(0);
-        // Truncation notice / error state are flow-shape assertions, not content.
-        await s.waitForGone(testIdSelector("ai.output-error"), { timeoutMs: 1_000 }).catch(
-          () => {
-            /* absence is the happy path; a brief probe */
-          },
-        );
+        const turns = await s.byTestIdAll("ai.turn");
+        const last = turns[turns.length - 1]!;
+        expect(await last.attribute("data-role")).toBe("assistant");
+        expect((await last.textContent()).length).toBeGreaterThan(0);
+        // No error turn on the happy path.
+        expect((await s.byTestIdAll("ai.turn-error")).length).toBe(0);
 
-        // "Insert into note" appends a `## Summary` block via the normal save.
-        await (await s.byTestId("ai.insert-summary")).click();
+        // The per-turn "Insert into note" appends a `## Summary` block via the
+        // normal save (SYNC-17 — the insertable-turn action).
+        await (await s.byTestId("ai.insert-turn")).click();
         await s.waitUntil(
           async () => ((await editorText(s)).includes("## Summary") ? true : null),
           { label: "summary block inserted", timeoutMs: 10_000 },

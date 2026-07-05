@@ -33,7 +33,10 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 import { Icon } from "./primitives/Icon";
+import { FolderGlyph } from "../notes/components/FolderGlyph";
+import { FOLDER_ICON_PATHS } from "../notes/folderIcons";
 import { listVaults, orderByLastUnlock } from "../lib/vault-list";
+import { VAULT_PREFS_CHANGED_EVENT } from "../lib/prefs";
 import { formatRelativeTime, useTick } from "../notes/components/relativeTime";
 import type { VaultId } from "../lib/stage";
 import type { VaultSummary } from "../types/vault-summary";
@@ -94,6 +97,34 @@ const CHIP_MARK_STYLE: CSSProperties = {
   fontSize: 12,
   fontWeight: 700,
 };
+
+// The square mark shown at the lead of the chip + each dropdown row. Renders the
+// vault's chosen icon glyph (vault-icons) when set — a curated `FOLDER_ICON_PATHS`
+// name projected from `VaultSummary.icon` — otherwise the neutral "M" wordmark.
+// An unknown/stale glyph name falls back to the wordmark (never an empty box).
+// The glyph inherits the mark box's `--paper` foreground via `currentColor`.
+function VaultChipMark({
+  icon,
+  testId,
+}: {
+  icon: string | null;
+  testId?: string;
+}) {
+  const hasGlyph = icon !== null && icon in FOLDER_ICON_PATHS;
+  return (
+    <span
+      style={CHIP_MARK_STYLE}
+      aria-hidden="true"
+      data-testid={testId}
+      // E2E observability (SYNC-8): the resolved glyph name, or "wordmark" for
+      // the neutral "M" fallback. Curated closed-set value — not the user's own
+      // text (unlike the label), and the switcher only renders post-unlock.
+      data-icon={hasGlyph ? icon : "wordmark"}
+    >
+      {hasGlyph ? <FolderGlyph name={icon} size={14} /> : "M"}
+    </span>
+  );
+}
 
 const CHIP_LABEL_STYLE: CSSProperties = {
   flex: 1,
@@ -281,6 +312,30 @@ export function VaultSwitcher({
     };
   }, [open]);
 
+  // Live-refresh when the active vault's prefs change elsewhere (icon/label set
+  // in Settings) so the chip + rows update IMMEDIATELY, without needing the
+  // dropdown reopened. Settings dispatches `VAULT_PREFS_CHANGED_EVENT` after a
+  // successful write; we re-probe `listVaults()` (which reads the just-refreshed
+  // per-session RAM cache) and re-render.
+  useEffect(() => {
+    let cancelled = false;
+    const onPrefsChanged = () => {
+      void listVaults().then(
+        (res) => {
+          if (!cancelled) setVaults("ok" in res ? res.ok : []);
+        },
+        () => {
+          if (!cancelled) setVaults([]);
+        },
+      );
+    };
+    window.addEventListener(VAULT_PREFS_CHANGED_EVENT, onPrefsChanged);
+    return () => {
+      cancelled = true;
+      window.removeEventListener(VAULT_PREFS_CHANGED_EVENT, onPrefsChanged);
+    };
+  }, []);
+
   // Dismiss on Esc / outside-click while open.
   useEffect(() => {
     if (!open) return;
@@ -379,6 +434,9 @@ export function VaultSwitcher({
     activeId !== null
       ? ordered[0].label ?? t("vaultSwitcher.vaultFallback", { n: 1 })
       : t("vaultSwitcher.chipFallback");
+  // The active vault's icon glyph (vault-icons) drives the chip mark; `null`
+  // (no vault, or none set) falls back to the "M" wordmark inside VaultChipMark.
+  const chipIcon = activeId !== null ? ordered[0].icon : null;
 
   return (
     <div style={{ position: "relative", width: "100%" }} ref={containerRef}>
@@ -402,9 +460,7 @@ export function VaultSwitcher({
           cursor: switching ? "default" : "pointer",
         }}
       >
-        <span style={CHIP_MARK_STYLE} aria-hidden="true">
-          M
-        </span>
+        <VaultChipMark icon={chipIcon} testId="switcher.chip-mark" />
         <span style={CHIP_LABEL_STYLE}>{chipLabel}</span>
         <span style={CHIP_GLYPH_STYLE} aria-hidden="true">
           <Icon name="chevrons-up-down" size={14} />
@@ -472,6 +528,7 @@ export function VaultSwitcher({
                 style={rowStyle(rowState)}
               >
                 <span style={ROW_LEAD_STYLE}>
+                  <VaultChipMark icon={v.icon} />
                   <span style={ROW_TEXT_STYLE}>
                     <span
                       style={rowNameStyle({

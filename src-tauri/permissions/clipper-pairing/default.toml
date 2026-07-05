@@ -22,6 +22,8 @@ permissions = [
   "allow-pairing-reject",
   "allow-pairing-revoke",
   "allow-pairing-list-paired",
+  "allow-clipper-install-status",
+  "allow-clipper-install-set-enabled",
   "allow-clip-dispatch-complete",
   "allow-pairing-dispatch-complete",
 ]
@@ -50,6 +52,16 @@ commands.allow = ["pairing_revoke"]
 identifier = "allow-pairing-list-paired"
 description = "Allow invoking clipper-pairing:pairing_list_paired (read-only: the DISTINCT extension ids that currently hold a live pairing token, sorted, for the Settings 'Connected extensions' list; surfaces only extension ids, never token values; no side-effect)."
 commands.allow = ["pairing_list_paired"]
+
+[[permission]]
+identifier = "allow-clipper-install-status"
+description = "Allow invoking clipper-pairing:clipper_install_status (read-only: whether the browser native-messaging host manifest is registered (the opt-in flag; absent ⇒ on), the absolute path of the running host binary the manifest points at, and which browsers currently carry the manifest; no vault state, no side-effect; carries config not key material)."
+commands.allow = ["clipper_install_status"]
+
+[[permission]]
+identifier = "allow-clipper-install-set-enabled"
+description = "Allow invoking clipper-pairing:clipper_install_set_enabled (writes the per-install opt-in flag then reconciles the on-disk native-messaging host manifests immediately — enable registers the host for every installed browser so the keyless clipper extension can reach the desktop, disable removes the manifests; no vault state touched; never logs a path or any secret)."
+commands.allow = ["clipper_install_set_enabled"]
 
 [[permission]]
 identifier = "allow-clip-dispatch-complete"

@@ -1,13 +1,19 @@
-// `<ArchivePanel>` — the vault Archive view (MYND-331). A modal overlay (the
-// same backdrop envelope as `<TrashPanel>`) listing archived notes with their
-// relative archived-age, newest-first. Per row: Restore (→ live, back in its
-// folder; reversible, no confirm) + Delete (→ Trash; reversible soft-trash, no
-// scary confirm — permanent deletion happens from the Trash panel). There is
-// **no "Empty archive" action** — archive is kept indefinitely, no auto-purge.
+// `<ArchivePanel>` — the vault Archive view (MYND-331 + folder-archive). A modal
+// overlay (the same backdrop envelope as `<TrashPanel>`) listing the archive in
+// two sections:
+//   - FOLDER rows (folder-archive): folders archived as a unit (`archived_folders`
+//     prefs set), top-level only (a nested archived folder folds under its
+//     archived ancestor). Per row: Restore (→ the whole subtree returns live, no
+//     confirm) + Delete → Trash (soft-trashes the subtree, behind an inline
+//     confirm since it touches many notes).
+//   - NOTE rows: individually note-archived notes (value-strict `archived:`) that
+//     are NOT already inside an archived folder (those show under the folder row).
+//     Per row: Restore (→ live, back in its folder) + Delete (→ Trash).
 //
-// Archive state is the value-strict `archived:` marker (`archivedRecords`
-// selector); Restore = `unarchiveWithRollback`, Delete = `trashWithRollback`
-// (which clears `archived:` and sets `trashed:`, honoring archive ⊥ trash).
+// There is **no "Empty archive" action** — archive is kept indefinitely, no
+// auto-purge. Restore/Delete of notes route through `unarchiveWithRollback` /
+// `trashWithRollback`; folder Restore/Delete route through the folder-archive
+// handlers threaded from `useFolderManagement`.
 
 import {
   useCallback,
@@ -19,12 +25,16 @@ import {
   type MouseEvent as ReactMouseEvent,
 } from "react";
 import { useTranslation } from "react-i18next";
+import { Icon } from "../../components/primitives/Icon";
+import { folderKey } from "../../dialect/folderPath";
 import { useFocusTrap } from "../../hooks/useFocusTrap";
 import {
-  archivedRecords,
-  useSelectedNote,
-  type NoteId,
-} from "../sidebarState";
+  archivedFolderKeys,
+  collectSubtreeNoteIdsFromCache,
+  isNoteFolderArchived,
+  topLevelArchivedFolders,
+} from "../archivedFolders";
+import { archivedRecords, useSelectedNote, type NoteId } from "../sidebarState";
 import { BACKDROP_STYLE } from "./DeleteConfirmModal";
 import {
   AGE_STYLE,
@@ -47,37 +57,84 @@ const CLOSE_BTN_STYLE: CSSProperties = {
   marginLeft: "auto",
 };
 
+const FOLDER_TITLE_STYLE: CSSProperties = {
+  ...ROW_TITLE_STYLE,
+  display: "flex",
+  alignItems: "center",
+  gap: "6px",
+};
+
+/** Display form of a canonical trailing-slash folder path (drop the slash). */
+function folderLabel(path: string): string {
+  return path.endsWith("/") ? path.slice(0, -1) : path;
+}
+
 export type ArchivePanelProps = {
   open: boolean;
   onClose: () => void;
+  /** The `archived_folders` set (folder-archive) — raw canonical paths. */
+  archivedFolders: readonly string[];
+  /** Restore a folder (remove its subtree from `archived_folders`). */
+  onRestoreFolder: (path: string) => void;
+  /** Soft-trash an archived folder's subtree + drop it from the set. */
+  onDeleteFolderToTrash: (path: string) => void;
 };
 
-export function ArchivePanel({ open, onClose }: ArchivePanelProps) {
+export function ArchivePanel({
+  open,
+  onClose,
+  archivedFolders,
+  onRestoreFolder,
+  onDeleteFolderToTrash,
+}: ArchivePanelProps) {
   const { t } = useTranslation();
   const ctx = useSelectedNote();
   const [status, setStatus] = useState<string | null>(null);
+  // Folder path armed for the inline "Move N to Trash?" confirm (null = none).
+  const [confirmFolder, setConfirmFolder] = useState<string | null>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
   // Trap + restore focus while open (MYND-93).
   useFocusTrap(dialogRef, { enabled: open });
 
-  const records = useMemo(() => archivedRecords(ctx.cache), [ctx.cache]);
+  const archivedKeys = useMemo(
+    () => archivedFolderKeys(archivedFolders),
+    [archivedFolders],
+  );
+  // Top-level archived folders (nested ones fold under their ancestor).
+  const folderRows = useMemo(
+    () => topLevelArchivedFolders(archivedFolders),
+    [archivedFolders],
+  );
+  // Individually-archived notes NOT already under an archived folder (those are
+  // represented by their folder row — avoid listing them twice).
+  const noteRows = useMemo(
+    () =>
+      archivedRecords(ctx.cache).filter(
+        (r) => !isNoteFolderArchived(r.folder, archivedKeys),
+      ),
+    [ctx.cache, archivedKeys],
+  );
 
-  // Esc closes the panel.
+  // Esc closes the panel (or dismisses an armed folder-delete confirm first).
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.preventDefault();
-        onClose();
+        if (confirmFolder !== null) setConfirmFolder(null);
+        else onClose();
       }
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
+  }, [open, onClose, confirmFolder]);
 
-  // Clear any transient status whenever the panel reopens.
+  // Clear any transient status + armed confirm whenever the panel reopens.
   useEffect(() => {
-    if (open) setStatus(null);
+    if (open) {
+      setStatus(null);
+      setConfirmFolder(null);
+    }
   }, [open]);
 
   const handleBackdrop = useCallback(
@@ -93,11 +150,11 @@ export function ArchivePanel({ open, onClose }: ArchivePanelProps) {
         setStatus(t("notes.archive.restoreError"));
       });
     },
-    [ctx],
+    [ctx, t],
   );
 
-  // Delete from the Archive → move to Trash (reversible soft-trash; permanent
-  // deletion is a separate, deliberate step from the Trash panel). trashNote
+  // Delete a note from the Archive → move to Trash (reversible soft-trash;
+  // permanent deletion is a separate step from the Trash panel). trashNote
   // clears `archived:` and sets `trashed:`, so the note leaves the Archive.
   const deleteToTrash = useCallback(
     (id: NoteId) => {
@@ -105,12 +162,21 @@ export function ArchivePanel({ open, onClose }: ArchivePanelProps) {
         setStatus(t("notes.archive.deleteError"));
       });
     },
-    [ctx],
+    [ctx, t],
   );
+
+  const confirmDeleteFolder = useCallback(() => {
+    if (confirmFolder === null) return;
+    const path = confirmFolder;
+    setConfirmFolder(null);
+    void Promise.resolve(onDeleteFolderToTrash(path)).catch(() => {
+      setStatus(t("notes.archive.folderDeleteError"));
+    });
+  }, [confirmFolder, onDeleteFolderToTrash, t]);
 
   if (!open) return null;
 
-  const count = records.length;
+  const count = folderRows.length + noteRows.length;
 
   return (
     <div style={BACKDROP_STYLE} onClick={handleBackdrop} role="presentation">
@@ -137,7 +203,74 @@ export function ArchivePanel({ open, onClose }: ArchivePanelProps) {
           <div style={EMPTY_STATE_STYLE}>{t("notes.archive.emptyState")}</div>
         ) : (
           <div style={LIST_STYLE}>
-            {records.map((r) => (
+            {folderRows.map((path) => {
+              const armed = confirmFolder === path;
+              const subtreeCount = armed
+                ? collectSubtreeNoteIdsFromCache(ctx.cache, folderKey(path))
+                    .length
+                : 0;
+              return (
+                <div
+                  key={`folder:${path}`}
+                  style={ROW_STYLE}
+                  data-testid="archive.folder-row"
+                  data-folder-path={path}
+                >
+                  <span style={FOLDER_TITLE_STYLE} title={folderLabel(path)}>
+                    <Icon name="folder" size={14} />
+                    {folderLabel(path)}
+                  </span>
+                  {armed ? (
+                    <>
+                      <span style={AGE_STYLE}>
+                        {t("notes.archive.folderDeleteConfirm", {
+                          count: subtreeCount,
+                        })}
+                      </span>
+                      <button
+                        type="button"
+                        style={ROW_BTN_STYLE}
+                        data-testid="archive.folder-delete-confirm"
+                        data-folder-path={path}
+                        onClick={confirmDeleteFolder}
+                      >
+                        {t("notes.archive.folderDeleteConfirmCta")}
+                      </button>
+                      <button
+                        type="button"
+                        style={ROW_BTN_STYLE}
+                        data-testid="archive.folder-delete-cancel"
+                        onClick={() => setConfirmFolder(null)}
+                      >
+                        {t("notes.archive.cancel")}
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        style={ROW_BTN_STYLE}
+                        data-testid="archive.folder-restore"
+                        data-folder-path={path}
+                        onClick={() => onRestoreFolder(path)}
+                      >
+                        {t("notes.archive.restore")}
+                      </button>
+                      <button
+                        type="button"
+                        style={ROW_BTN_STYLE}
+                        data-testid="archive.folder-delete"
+                        data-folder-path={path}
+                        onClick={() => setConfirmFolder(path)}
+                      >
+                        {t("notes.archive.delete")}
+                      </button>
+                    </>
+                  )}
+                </div>
+              );
+            })}
+            {noteRows.map((r) => (
               <div key={r.noteUuid} style={ROW_STYLE}>
                 <span
                   style={ROW_TITLE_STYLE}

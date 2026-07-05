@@ -34,6 +34,7 @@
 
 pub mod commands;
 pub mod error;
+pub mod install_commands;
 pub mod state;
 
 use tauri::plugin::{Builder, TauriPlugin};
@@ -63,6 +64,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::pairing_reject,
             commands::pairing_revoke,
             commands::pairing_list_paired,
+            install_commands::clipper_install_status,
+            install_commands::clipper_install_set_enabled,
             crate::clipper::relay_app::clip_dispatch_complete,
             crate::clipper::relay_app::pairing_dispatch_complete,
         ])

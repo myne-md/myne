@@ -23,18 +23,29 @@ import { useTranslation } from "react-i18next";
 import { SECTION_HEADING_STYLE } from "./sharedStyles";
 import { noteRead } from "../readNote";
 import {
-  archivedCount,
+  archivedRecords,
   liveCache,
   trashedCount,
   useSelectedNote,
   type NoteId,
   type UseSelectedNoteReturn,
 } from "../sidebarState";
+import {
+  archivedFolderKeys,
+  filterVisibleDeliberate,
+  isNoteFolderArchived,
+  topLevelArchivedFolders,
+} from "../archivedFolders";
 import { ArchivePanel } from "./ArchivePanel";
 import { TrashPanel } from "./TrashPanel";
 import { DeleteConfirmModal } from "./DeleteConfirmModal";
 import { deriveFolderTree, type FolderNode } from "../folderTree";
-import { folderKey } from "../../dialect/folderPath";
+import {
+  ancestorPaths,
+  foldSegment,
+  folderKey,
+  normalizeFolderPath,
+} from "../../dialect/folderPath";
 import { ContextMenu, type ContextMenuItem } from "./ContextMenu";
 import {
   noteExportOptions,
@@ -658,13 +669,16 @@ export function NoteList({ onNewFromTemplate, exportHooks }: NoteListProps = {})
     [orderedViews],
   );
 
-  // Ephemeral collapse state — folded folder keys. Default empty = all
-  // expanded; reset on app restart (folder paths are AS3 → no persistence).
-  const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set());
+  // Ephemeral expansion state — the folded keys of folders the user has OPENED.
+  // Default empty = every folder collapsed; reset on app restart (folder paths
+  // are AS3 → no persistence). A folder that first appears is absent here, so it
+  // comes in closed — a fresh vault, a newly-created folder, and the whole tree
+  // materialized by an Obsidian import all open collapsed rather than sprawling.
+  const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
   // Mirror the latest committed value so `toggleFolder` can read it
   // synchronously (decide expand-vs-collapse) without a stale closure.
-  const collapsedRef = useRef(collapsed);
-  collapsedRef.current = collapsed;
+  const expandedRef = useRef(expanded);
+  expandedRef.current = expanded;
   // Active disclosure animation, if any. `nonce` guards against a stale timer
   // clearing a newer animation. `mode` picks the enter vs exit keyframe applied
   // to the toggled folder's descendant rows.
@@ -686,7 +700,9 @@ export function NoteList({ onNewFromTemplate, exportHooks }: NoteListProps = {})
     [],
   );
   const toggleFolder = useCallback((key: string) => {
-    const collapsing = !collapsedRef.current.has(key);
+    // `expanded` holds opened folders — a key present means open. Toggling an
+    // open folder collapses it (delete the key); a closed one expands (add it).
+    const collapsing = expandedRef.current.has(key);
     const reduce =
       typeof window !== "undefined" &&
       window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true;
@@ -697,9 +713,9 @@ export function NoteList({ onNewFromTemplate, exportHooks }: NoteListProps = {})
     // Flush any interrupted deferred collapse before starting a new operation.
     if (pendingCollapse.current !== null && pendingCollapse.current !== key) {
       const stuck = pendingCollapse.current;
-      setCollapsed((prev) => {
+      setExpanded((prev) => {
         const next = new Set(prev);
-        next.add(stuck);
+        next.delete(stuck);
         return next;
       });
     }
@@ -707,10 +723,10 @@ export function NoteList({ onNewFromTemplate, exportHooks }: NoteListProps = {})
     // Reduced motion (or any non-animated path): flip immediately.
     if (reduce) {
       setTreeAnim(null);
-      setCollapsed((prev) => {
+      setExpanded((prev) => {
         const next = new Set(prev);
-        if (collapsing) next.add(key);
-        else next.delete(key);
+        if (collapsing) next.delete(key);
+        else next.add(key);
         return next;
       });
       return;
@@ -724,9 +740,9 @@ export function NoteList({ onNewFromTemplate, exportHooks }: NoteListProps = {})
       setTreeAnim({ folderKey: key, mode: "out", nonce });
       treeAnimTimer.current = setTimeout(() => {
         pendingCollapse.current = null;
-        setCollapsed((prev) => {
+        setExpanded((prev) => {
           const next = new Set(prev);
-          next.add(key);
+          next.delete(key);
           return next;
         });
         setTreeAnim((a) => (a?.nonce === nonce ? null : a));
@@ -734,9 +750,9 @@ export function NoteList({ onNewFromTemplate, exportHooks }: NoteListProps = {})
       }, TREE_ANIM_TOTAL_MS);
     } else {
       // Expand now — the descendant rows mount and play `myne-tree-row-in`.
-      setCollapsed((prev) => {
+      setExpanded((prev) => {
         const next = new Set(prev);
-        next.delete(key);
+        next.add(key);
         return next;
       });
       setTreeAnim({ folderKey: key, mode: "in", nonce });
@@ -754,7 +770,19 @@ export function NoteList({ onNewFromTemplate, exportHooks }: NoteListProps = {})
   // sidebar everywhere — tree, rows, favorites — via a single derived
   // `live` view of the cache (MYND-133). The Trash panel reads the complement
   // (`trashedRecords`). Restore clears the marker → the note re-enters `live`.
-  const live = useMemo(() => liveCache(ctx.cache), [ctx.cache]);
+  // Folder-archived subtrees (archived_folders) leave the working set as a UNIT
+  // — folded keys computed once, threaded into `liveCache` (excludes their
+  // notes) and the deliberate filter (drops archived empty folders so they
+  // don't re-surface as empty nodes). resolverCache is untouched (folder-
+  // archived notes stay backlink/graph/search targets — folder-archive).
+  const archivedKeys = useMemo(
+    () => archivedFolderKeys(fm.archivedFolders),
+    [fm.archivedFolders],
+  );
+  const live = useMemo(
+    () => liveCache(ctx.cache, archivedKeys),
+    [ctx.cache, archivedKeys],
+  );
   const tree = useMemo(
     () =>
       deriveFolderTree(
@@ -763,9 +791,9 @@ export function NoteList({ onNewFromTemplate, exportHooks }: NoteListProps = {})
           folder: r.folder,
           folderIndex: r.folderIndex,
         })),
-        fm.deliberate,
+        filterVisibleDeliberate(fm.deliberate, archivedKeys),
       ),
-    [live, fm.deliberate],
+    [live, fm.deliberate, archivedKeys],
   );
   // Keep the handlers' tree reference current (delete-emptiness, case-merge).
   fm.treeRef.current = tree;
@@ -783,6 +811,59 @@ export function NoteList({ onNewFromTemplate, exportHooks }: NoteListProps = {})
     walk(tree.roots);
     return out;
   }, [tree]);
+  // Folders are closed unless opened. The flatten pass consumes a `collapsed`
+  // set, so derive it as every folder key NOT in `expanded` — keeping the pure
+  // `flattenVisibleRows` contract while making "closed" the default. A key that
+  // lingers in `expanded` for a folder that has since vanished is harmless (it
+  // matches no node); we never prune, so a folder that briefly drops out of the
+  // tree during async note loading keeps its opened state.
+  const collapsed = useMemo(() => {
+    const out = new Set<string>();
+    const walk = (nodes: readonly FolderNode[]): void => {
+      for (const n of nodes) {
+        if (!expanded.has(n.key)) out.add(n.key);
+        walk(n.children);
+      }
+    };
+    walk(tree.roots);
+    return out;
+  }, [tree, expanded]);
+  // Open a folder (and its ancestors) so a child created inside it — a new note
+  // or a new subfolder — is visible under the default-collapsed tree. Root
+  // ("" / null) has no ancestor to open.
+  const revealFolder = useCallback((path: string) => {
+    const norm = normalizeFolderPath(path);
+    if (norm === null) return;
+    const keys = ancestorPaths(norm).map(foldSegment);
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      for (const k of keys) next.add(k);
+      return next;
+    });
+  }, []);
+  // A note entering inline-rename must be VISIBLE — but under the default-
+  // collapsed tree its folder may be shut. The context-menu "new note here"
+  // reveals synchronously; this catches the rest: the root-level create entry
+  // points (Cmd+N, palette, top-bar, new tab) resolve their target folder from
+  // prefs ("current"/"specific" note location) and settle it into the cache a
+  // beat AFTER `renamingId` is set, plus a plain rename of an existing filed
+  // note. Reveal once per rename session (keyed by the note id) so a manual
+  // collapse mid-rename is not fought; the `folder === null` (root) case reveals
+  // nothing and needs nothing.
+  const revealedRenameId = useRef<NoteId | null>(null);
+  useEffect(() => {
+    const id = ctx.renamingId;
+    if (id === null) {
+      revealedRenameId.current = null;
+      return;
+    }
+    if (revealedRenameId.current === id) return;
+    const folder = ctx.cache.get(id)?.folder ?? null;
+    if (folder !== null) {
+      revealFolder(folder);
+      revealedRenameId.current = id;
+    }
+  }, [ctx.renamingId, ctx.cache, revealFolder]);
   // Unified manual order (item_order) interleaves folders + loose notes per
   // container (MYND-183); flatten owns all display ordering.
   const rows = useMemo(
@@ -871,7 +952,15 @@ export function NoteList({ onNewFromTemplate, exportHooks }: NoteListProps = {})
   // Archive panel. Count from the value-strict `archived:` set (the disjoint
   // archive raft); memoized on cache identity like `trashCount`.
   const [archiveOpen, setArchiveOpen] = useState(false);
-  const archiveCount = useMemo(() => archivedCount(ctx.cache), [ctx.cache]);
+  // Footer badge = standalone archived notes (value-strict `archived:`, NOT
+  // also inside an archived folder — those show under the folder row) + the
+  // top-level archived folder rows (folder-archive; each counts as one row).
+  const archiveCount = useMemo(() => {
+    const standalone = archivedRecords(ctx.cache).filter(
+      (r) => !isNoteFolderArchived(r.folder, archivedKeys),
+    ).length;
+    return standalone + topLevelArchivedFolders(fm.archivedFolders).length;
+  }, [ctx.cache, archivedKeys, fm.archivedFolders]);
   // Archive-feature disable toggle (archive-disable, MYND-…): when on, the
   // archive entry points (footer button, context-menu actions) are hidden. The
   // viewer footer stays available while any archived note still exists so a note
@@ -933,6 +1022,7 @@ export function NoteList({ onNewFromTemplate, exportHooks }: NoteListProps = {})
           folderIndexRoles={folderIndexRoles}
           folderIndexByKey={folderIndexByKey}
           onToggleFolder={toggleFolder}
+          onRevealFolder={revealFolder}
           onCreate={handleCreate}
           fm={fm}
           onNewFromTemplate={onNewFromTemplate}
@@ -1015,7 +1105,13 @@ export function NoteList({ onNewFromTemplate, exportHooks }: NoteListProps = {})
         )}
       </div>
       <TrashPanel open={trashOpen} onClose={() => setTrashOpen(false)} />
-      <ArchivePanel open={archiveOpen} onClose={() => setArchiveOpen(false)} />
+      <ArchivePanel
+        open={archiveOpen}
+        onClose={() => setArchiveOpen(false)}
+        archivedFolders={fm.archivedFolders}
+        onRestoreFolder={fm.restoreFolder}
+        onDeleteFolderToTrash={fm.deleteArchivedFolderToTrash}
+      />
     </aside>
   );
 }
@@ -1146,6 +1242,7 @@ function PopulatedList({
   folderIndexRoles,
   folderIndexByKey,
   onToggleFolder,
+  onRevealFolder,
   onCreate,
   fm,
   onNewFromTemplate,
@@ -1172,6 +1269,10 @@ function PopulatedList({
    *  `delay` drive that row's `DisclosureWrapper`. */
   treeAnimRows: ReadonlyMap<string, { mode: "in" | "out"; delay: number }>;
   onToggleFolder: (key: string) => void;
+  /** Open a folder + its ancestors so a child created inside it (new note or
+   *  subfolder) is visible under the default-collapsed tree. Owned by the parent
+   *  (mutates the shared expansion state alongside `onToggleFolder`). */
+  onRevealFolder: (path: string) => void;
   onCreate: () => void;
   fm: FolderManagement;
   onNewFromTemplate?: () => void;
@@ -1850,7 +1951,10 @@ function PopulatedList({
       {
         id: "new-note",
         label: t("notes.list.newNoteHere"),
-        onSelect: () => fm.newNoteHere(node.path),
+        onSelect: () => {
+          onRevealFolder(node.path);
+          fm.newNoteHere(node.path);
+        },
       },
       // Folder note (MYND-370): open the existing index, or create one.
       node.indexNoteId !== null
@@ -1879,7 +1983,10 @@ function PopulatedList({
       {
         id: "new-subfolder",
         label: t("notes.list.newSubfolder"),
-        onSelect: () => fm.startNewFolder(node.path),
+        onSelect: () => {
+          onRevealFolder(node.path);
+          fm.startNewFolder(node.path);
+        },
       },
       {
         id: "color",
@@ -1892,6 +1999,17 @@ function PopulatedList({
             folderPath: node.path,
           }),
       },
+      // Archive the folder as a unit (folder-archive) — hidden when the archive
+      // feature is disabled, mirroring the per-note "Archive" gate.
+      ...(!archiveDisabled
+        ? [
+            {
+              id: "folder.archive",
+              label: t("notes.list.archiveFolder"),
+              onSelect: () => fm.archiveFolderAction(node),
+            },
+          ]
+        : []),
       {
         id: "delete",
         label: t("notes.list.delete"),
@@ -1899,7 +2017,15 @@ function PopulatedList({
         onSelect: () => void fm.deleteFolderAction(node),
       },
     ];
-  }, [fm, handleOpenIndexNote, handleCreateFolderNote, handleUnsetIndex, t]);
+  }, [
+    fm,
+    archiveDisabled,
+    onRevealFolder,
+    handleOpenIndexNote,
+    handleCreateFolderNote,
+    handleUnsetIndex,
+    t,
+  ]);
 
   // Background (root-level) context-menu items — Story F2.
   const bgMenuItems: ContextMenuItem[] = useMemo(

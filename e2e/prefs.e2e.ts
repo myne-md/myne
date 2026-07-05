@@ -290,6 +290,69 @@ describeE2E("pf2 vault label + RAM cache round-trip (MYND-225)", () => {
   });
 });
 
+describeE2E("pf6 vault icon + RAM cache round-trip (vault-icons)", () => {
+  // Precondition: exactly 1 vault (weak KDF).
+  it("a chosen vault icon shows on the switcher chip and survives lock → unlock", async () => {
+    let password = "";
+    await scenario(
+      "pf6-icon-cache",
+      { seed: (dir) => void (password = seedVault(dir).password) },
+      async (app) => {
+        const s = app.session;
+        await unlockToEditor(s, password);
+        await dismissImporterOffer(s);
+
+        // The chip mark exposes its resolved glyph via `data-icon` ("wordmark"
+        // when none is set) — the E2E-observable projection of the RAM icon cache.
+        const chipIcon = async () =>
+          (await s.byTestId("switcher.chip-mark")).attribute("data-icon");
+
+        // Starts on the neutral wordmark (no icon set yet).
+        await s.waitUntil(async () => (await chipIcon()) === "wordmark" || null, {
+          label: "chip starts on the wordmark",
+        });
+
+        // Account panel (the modal's default tab) → icon picker → "book" glyph.
+        await openSettings(s);
+        const bookBtn = await s.waitForElement(
+          testIdSelector("settings.icon-option", { "data-icon-name": "book" }),
+        );
+        await bookBtn.click();
+        await s.waitUntil(
+          async () => (await bookBtn.attribute("aria-checked")) === "true" || null,
+          { label: "book icon reads back selected" },
+        );
+        await closeSettings(s);
+
+        // The switcher chip now projects the cached glyph (RAM icon cache).
+        await s.waitUntil(async () => (await chipIcon()) === "book" || null, {
+          label: "chip shows the book glyph",
+        });
+
+        // Lock evicts the icon cache; unlock re-reads prefs and refills it.
+        await (await s.byTestId("editor.lock-cta")).click();
+        await s.byTestId("unlock.password-input");
+        await unlockToEditor(s, password);
+        await s.waitUntil(async () => (await chipIcon()) === "book" || null, {
+          label: "chip shows the book glyph after lock → unlock",
+        });
+
+        // Re-open Settings: the picker reads the persisted selection back.
+        await openSettings(s);
+        const bookBtnAgain = await s.waitForElement(
+          testIdSelector("settings.icon-option", { "data-icon-name": "book" }),
+        );
+        await s.waitUntil(
+          async () =>
+            (await bookBtnAgain.attribute("aria-checked")) === "true" || null,
+          { label: "book icon still selected after unlock" },
+        );
+        await closeSettings(s);
+      },
+    );
+  });
+});
+
 describeE2E("pf3 per-vault isolation (MYND-225)", () => {
   // Precondition: exactly 2 vaults (weak KDF).
   it("vault A's theme and label never bleed into vault B", async () => {
