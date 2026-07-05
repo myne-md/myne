@@ -5,11 +5,13 @@
 // heading-cycle shortcut); Cmd+Shift+L opens the `[[` wikilink note picker
 // (MYND-38).
 
-import { EditorSelection, type ChangeSpec, type Text } from "@codemirror/state";
+import { EditorSelection, type Text } from "@codemirror/state";
 import { type KeyBinding, type Command } from "@codemirror/view";
 import { foldAll, unfoldAll } from "@codemirror/language";
 import { selectNextOccurrence } from "@codemirror/search";
 import { toggleWrap } from "./wrap-toggle";
+// List-prefix toggles are shared with the toolbar surfaces (single source).
+import { toggleListPrefix } from "./toolbar/commands";
 import { cachedLocateFrontmatter } from "./frontmatter-cache";
 import { openWikilinkPicker } from "./wikilink/picker";
 
@@ -47,31 +49,6 @@ const cycleHeading: Command = (view) => {
     changes: { from: line.from, to: line.to, insert: next },
     userEvent: "keymap.heading",
   });
-  return true;
-};
-
-const toggleListPrefix = (prefix: string): Command => (view) => {
-  const lines = new Set<number>();
-  for (const range of view.state.selection.ranges) {
-    const startLine = view.state.doc.lineAt(range.from).number;
-    const endLine = view.state.doc.lineAt(range.to).number;
-    for (let n = startLine; n <= endLine; n++) lines.add(n);
-  }
-  const changes: ChangeSpec[] = [];
-  for (const n of lines) {
-    const line = view.state.doc.line(n);
-    const text = view.state.doc.sliceString(line.from, line.to);
-    if (text.startsWith(prefix)) {
-      changes.push({
-        from: line.from,
-        to: line.from + prefix.length,
-        insert: "",
-      });
-    } else {
-      changes.push({ from: line.from, insert: prefix });
-    }
-  }
-  view.dispatch({ changes, userEvent: "keymap.list" });
   return true;
 };
 
