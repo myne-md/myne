@@ -1,0 +1,23 @@
+# Permissions for the in-app `vault-repair` Tauri plugin (MYND-159) — mobile.
+# Picked up under the `vault-repair:` ACL namespace only because `build.rs`
+# declares this as an `InlinedPlugin`. Capability files reference these as
+# `vault-repair:default` (or `vault-repair:allow-vault-residue-scan`).
+#
+# One permission entry per command (granular capability). Mirror of the desktop
+# plugin's permission set.
+
+"$schema" = "../../gen/schemas/mobile-schema.json"
+
+[default]
+description = "Default permission set for the vault-repair plugin."
+permissions = ["allow-vault-residue-scan", "allow-vault-repair"]
+
+[[permission]]
+identifier = "allow-vault-residue-scan"
+description = "Allow invoking vault-repair:vault_residue_scan (read-only count of orphan artefacts under app_data_dir/vault/ left by a partial-fail vault_delete). Pure read — takes no auth_permits, creates nothing, mutates nothing. Feeds the Welcome repair banner's count."
+commands.allow = ["vault_residue_scan"]
+
+[[permission]]
+identifier = "allow-vault-repair"
+description = "Allow invoking vault-repair:vault_repair (one-shot gate-free sweep of orphan vault residue). Mirror of vault_delete's dispatch_empty_arm: proceeds only when slot Empty + vault.meta byte-absent + residue present, holding the auth_permits mutex across the check and the sweep (RootDisposal::KeepRoot — leaves the create-able container). Rejects VaultPresent when a live vault exists, so it can never bypass vault_delete's typed-DELETE gate. Partial-fail surfaces as PartialDelete { remaining_count }."
+commands.allow = ["vault_repair"]

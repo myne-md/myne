@@ -1,0 +1,31 @@
+# Permissions for the mobile `export` Tauri plugin (MYND-211, epic
+# export-suite). Picked up under the `export:` ACL namespace because `build.rs`
+# declares this as an `InlinedPlugin`. Referenced by `capabilities/default.json`
+# as `export:default`.
+#
+# The plugin core is shared from `myne-core`; mobile registers the same two
+# commands the desktop registers. `vault_export_markdown` is the ONLY path that
+# writes the plaintext markdown tree: the WebView picks the destination via the
+# platform file dialog and the Rust core does all the IO — no `fs:` write scope
+# is granted for export trees (least-privilege, TB6; the backup/importer
+# narrow-seam precedent). Adding a command here without a matching `build.rs`
+# `InlinedPlugin::commands` entry is a security regression.
+
+"$schema" = "../../gen/schemas/mobile-schema.json"
+
+[default]
+description = "Default permission set for the mobile vault markdown-export plugin — export (decrypt the unlocked vault, or one folder subtree, into a plaintext Obsidian-shape markdown tree at a user-chosen destination) + cancel."
+permissions = [
+  "allow-vault-export-markdown",
+  "allow-vault-export-cancel",
+]
+
+[[permission]]
+identifier = "allow-vault-export-markdown"
+description = "Allow invoking export:vault_export_markdown (decrypt the unlocked vault — or one folder subtree — into a plaintext Obsidian-shape markdown tree at a user-chosen destination; deliberate TB3 egress, staged then atomically published, nothing appears at the destination unless complete)."
+commands.allow = ["vault_export_markdown"]
+
+[[permission]]
+identifier = "allow-vault-export-cancel"
+description = "Allow invoking export:vault_export_cancel (cooperatively cancel the in-flight markdown export; the staging tree is discarded — nothing appears at the destination)."
+commands.allow = ["vault_export_cancel"]
