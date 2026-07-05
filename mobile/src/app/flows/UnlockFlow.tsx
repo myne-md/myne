@@ -13,6 +13,8 @@ import {
 import { HAS_TAURI, closeApp } from "../../lib/app-window";
 import { unlockWithPassword } from "../../lib/commands";
 import { deleteVault } from "../../lib/vault-delete";
+import { quickUnlockStatus, quickUnlockWithPin, type QuickUnlockStatus } from "../../lib/quick-unlock";
+import { isQuickUnlockError } from "../../types/quick-unlock-error";
 import { ioBanner } from "../../lib/io-banner";
 import {
   UNLOCK_NON_DISTINGUISHING_BANNER,
@@ -111,11 +113,17 @@ function PasswordInput({
   onChange,
   onSubmit,
   error,
+  numeric = false,
+  ariaLabel = "Password",
+  testId = "unlock-password",
 }: {
   value: string;
   onChange: (v: string) => void;
   onSubmit: () => void;
   error: boolean;
+  numeric?: boolean;
+  ariaLabel?: string;
+  testId?: string;
 }) {
   const [focused, setFocused] = useState(true);
   const [revealed, setRevealed] = useState(false);
@@ -148,8 +156,9 @@ function PasswordInput({
         autoCapitalize="off"
         autoCorrect="off"
         spellCheck={false}
-        aria-label="Password"
-        data-testid="unlock-password"
+        inputMode={numeric ? "numeric" : undefined}
+        aria-label={ariaLabel}
+        data-testid={testId}
         style={{
           flex: 1,
           minWidth: 0,
@@ -157,7 +166,7 @@ function PasswordInput({
           outline: "none",
           background: "transparent",
           fontFamily: "var(--font-mono)",
-          fontSize: revealed ? 16 : 18,
+          fontSize: revealed ? 16 : 14,
           letterSpacing: revealed ? "0" : "0.14em",
           color: "var(--fg-1)",
         }}
@@ -224,9 +233,41 @@ export function UnlockFlow(props: UnlockFlowProps) {
   const [deleting, setDeleting] = useState(false);
   const [deleteFailed, setDeleteFailed] = useState(false);
 
+  // Quick-unlock (PIN) fast-path. `qu.available` is true only after a full
+  // master-password unlock happened THIS app session (the spring-loaded gate),
+  // so it appears on an auto-lock re-entry — never on a cold start. When
+  // available we default to the PIN field with a "use password" escape hatch.
+  const [qu, setQu] = useState<QuickUnlockStatus | null>(null);
+  const [pinMode, setPinMode] = useState(false);
+  const [pin, setPin] = useState("");
+  const [pinErr, setPinErr] = useState<string | null>(null);
+  const [pinSubmitting, setPinSubmitting] = useState(false);
+  const pinRef = useRef("");
+  const setPinValue = useCallback((v: string) => {
+    pinRef.current = v;
+    setPin(v);
+  }, []);
+
+  useEffect(() => {
+    if (!HAS_TAURI || initialStatus.kind !== "Exists") return;
+    let cancelled = false;
+    void quickUnlockStatus(vaultId)
+      .then((s) => {
+        if (cancelled) return;
+        setQu(s);
+        if (s.available) setPinMode(true);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [vaultId, initialStatus.kind]);
+
   const wipePassword = useCallback(() => {
     pwRef.current = "";
     setPassword("");
+    pinRef.current = "";
+    setPin("");
   }, []);
 
   const setPw = useCallback((v: string) => {
@@ -261,6 +302,44 @@ export function UnlockFlow(props: UnlockFlowProps) {
       setSubmitting(false);
     }
   }, [submitting, vaultId, wipePassword, props]);
+
+  const handlePinUnlock = useCallback(async () => {
+    if (pinSubmitting || pinRef.current.length < 6) return;
+    setPinErr(null);
+    setPinSubmitting(true);
+    try {
+      if (HAS_TAURI) {
+        await quickUnlockWithPin(pinRef.current, vaultId);
+      } else {
+        await new Promise((r) => setTimeout(r, 350));
+      }
+      wipePassword();
+      props.onUnlocked();
+    } catch (e) {
+      setPinSubmitting(false);
+      pinRef.current = "";
+      setPin("");
+      if (isQuickUnlockError(e)) {
+        if (e.kind === "WrongCredential") {
+          const n = e.detail.remaining;
+          setPinErr(`Incorrect PIN. ${n} ${n === 1 ? "try" : "tries"} left.`);
+          return;
+        }
+        if (e.kind === "AttemptsExhausted" || e.kind === "RequiresFullPassword" || e.kind === "NotConfigured") {
+          // Credential wiped / cold session / never set — drop to the password.
+          setPinMode(false);
+          setQu((s) => (s ? { ...s, available: false } : s));
+          setErrorBanner(
+            e.kind === "AttemptsExhausted"
+              ? "Too many PIN attempts. Use your password."
+              : null,
+          );
+          return;
+        }
+      }
+      setPinErr("Couldn't unlock with PIN. Use your password.");
+    }
+  }, [pinSubmitting, vaultId, wipePassword, props]);
 
   const handleStartRecovery = useCallback(() => {
     wipePassword();
@@ -321,7 +400,7 @@ export function UnlockFlow(props: UnlockFlowProps) {
 
   return (
     <Screen style={{ alignItems: "center", padding: "0 32px" }}>
-      {submitting && (
+      {(submitting || pinSubmitting) && (
         <BlockingOverlay title="Unlocking" subtitle="Decrypting your keys on this device." />
       )}
 
@@ -340,24 +419,73 @@ export function UnlockFlow(props: UnlockFlowProps) {
         </div>
       )}
 
-      <div style={{ marginTop: showSuspicion && suspicion ? 18 : 30, width: "100%" }}>
-        <FieldLabel>Password</FieldLabel>
-        <PasswordInput value={password} onChange={setPw} onSubmit={handleUnlock} error={!!errorBanner} />
-        {errorBanner && (
-          <div data-testid="unlock-error" style={{ marginTop: 10 }}>
-            <Banner kind="danger">{errorBanner}</Banner>
+      {pinMode && qu?.available ? (
+        <>
+          <div style={{ marginTop: showSuspicion && suspicion ? 18 : 30, width: "100%" }}>
+            <FieldLabel>PIN</FieldLabel>
+            <PasswordInput value={pin} onChange={setPinValue} onSubmit={handlePinUnlock} error={!!pinErr} numeric ariaLabel="PIN" testId="unlock-pin" />
+            {pinErr && (
+              <div data-testid="unlock-pin-error" style={{ marginTop: 10 }}>
+                <Banner kind="danger">{pinErr}</Banner>
+              </div>
+            )}
           </div>
-        )}
-      </div>
-
-      <Button
-        style={{ marginTop: 16 }}
-        disabled={submitting || password.length === 0}
-        onClick={() => void handleUnlock()}
-        data-testid="unlock-submit"
-      >
-        Unlock
-      </Button>
+          <Button
+            style={{ marginTop: 16 }}
+            disabled={pinSubmitting || pin.length < 6}
+            onClick={() => void handlePinUnlock()}
+            data-testid="unlock-pin-submit"
+          >
+            Unlock with PIN
+          </Button>
+          <TextButton
+            height={40}
+            style={{ marginTop: 4 }}
+            onClick={() => {
+              setPinMode(false);
+              setPinErr(null);
+              pinRef.current = "";
+              setPin("");
+            }}
+            testId="unlock-use-password"
+          >
+            Use password instead
+          </TextButton>
+        </>
+      ) : (
+        <>
+          <div style={{ marginTop: showSuspicion && suspicion ? 18 : 30, width: "100%" }}>
+            <FieldLabel>Password</FieldLabel>
+            <PasswordInput value={password} onChange={setPw} onSubmit={handleUnlock} error={!!errorBanner} />
+            {errorBanner && (
+              <div data-testid="unlock-error" style={{ marginTop: 10 }}>
+                <Banner kind="danger">{errorBanner}</Banner>
+              </div>
+            )}
+          </div>
+          <Button
+            style={{ marginTop: 16 }}
+            disabled={submitting || password.length === 0}
+            onClick={() => void handleUnlock()}
+            data-testid="unlock-submit"
+          >
+            Unlock
+          </Button>
+          {qu?.available && (
+            <TextButton
+              height={40}
+              style={{ marginTop: 4 }}
+              onClick={() => {
+                setPinMode(true);
+                setErrorBanner(null);
+              }}
+              testId="unlock-use-pin"
+            >
+              Unlock with PIN instead
+            </TextButton>
+          )}
+        </>
+      )}
 
       <div style={{ flex: 1 }} />
 
@@ -385,7 +513,7 @@ export function UnlockFlow(props: UnlockFlowProps) {
       </div>
 
       {confirmingDelete && (
-        <Sheet>
+        <Sheet onClose={deleteFailed ? undefined : () => setConfirmingDelete(false)}>
           <div style={{ fontSize: 19, fontWeight: 600, letterSpacing: "-0.01em", color: "var(--fg-display)" }}>
             Delete this vault?
           </div>

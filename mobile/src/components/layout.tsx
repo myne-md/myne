@@ -7,15 +7,23 @@ import { Icon } from "./Icon";
  * header / footer fragments the design uses on most flow screens.
  */
 
+/** Top padding for a full-page tab header — clears the notch / status bar
+ *  (safe-area-inset-top with a 60px floor for the gallery). Shared by the
+ *  list, Search, Graph, Files, and Templates pages so their titles align. */
+export const LIST_TOP = "max(60px, calc(env(safe-area-inset-top) + 12px))";
+
 export function Screen({
   children,
   style,
+  ref,
 }: {
   children: ReactNode;
   style?: CSSProperties;
+  /** Optional handle to the screen element (for view-transition animations). */
+  ref?: React.Ref<HTMLDivElement>;
 }) {
   return (
-    <div className="m-screen" style={style}>
+    <div ref={ref} className="m-screen" style={style}>
       {children}
     </div>
   );
@@ -122,7 +130,14 @@ export function Lead({ children, style }: { children: ReactNode; style?: CSSProp
   );
 }
 
-/** Bottom action bar pinned to the foot of a flow screen (Back / Continue). */
+/** Bottom action bar pinned to the foot of a flow screen (Back / Continue).
+ *
+ *  The bottom padding is enforced by the component (applied AFTER the caller's
+ *  `style`, so a `padding` shorthand override can't accidentally clip it): it
+ *  always clears the home indicator via `env(safe-area-inset-bottom)` on device,
+ *  or a 34px floor in the gallery where env() resolves to 0. This is why callers
+ *  never need to hand-tune a bottom value — every footer stays off the rounded
+ *  bottom corner on all devices. */
 export function FooterBar({
   children,
   style,
@@ -134,12 +149,13 @@ export function FooterBar({
     <div
       style={{
         flex: "none",
-        padding: "14px 20px 40px",
+        padding: "14px 20px",
         display: "flex",
         gap: 10,
         borderTop: "1px solid var(--line-1)",
         background: "var(--bg-1)",
         ...style,
+        paddingBottom: "max(34px, calc(14px + env(safe-area-inset-bottom, 0px)))",
       }}
     >
       {children}

@@ -25,6 +25,7 @@ import {
 } from "../../lib/commands";
 import { HAS_TAURI } from "../../lib/app-window";
 import { LOST_BOTH_SECRETS_SENTENCE } from "../../lib/load-bearing-copy";
+import { saveSecretToDocuments } from "../../lib/secret-export";
 import type { CreateVaultFlowProps } from "./types";
 
 // Browser-dev placeholders (no Tauri host → no IPC). Let the multi-step flow
@@ -141,7 +142,7 @@ function PasswordRow({
           outline: "none",
           background: "transparent",
           fontFamily: "var(--font-mono)",
-          fontSize: revealed ? 16 : 20,
+          fontSize: revealed ? 16 : 14,
           letterSpacing: revealed ? "0" : "0.14em",
           color: "var(--fg-1)",
         }}
@@ -187,7 +188,7 @@ function ConfirmRow({
           outline: "none",
           background: "transparent",
           fontFamily: "var(--font-mono)",
-          fontSize: 20,
+          fontSize: 14,
           letterSpacing: "0.14em",
           color: "var(--fg-1)",
         }}
@@ -371,6 +372,7 @@ function Wordmark({ size = 28 }: { size?: number }) {
  */
 export function CreateVaultFlow({
   briefing,
+  onCancel,
   onCommitSuccess,
   onAutoUnlockSuccess,
   onAutoUnlockFailed,
@@ -407,6 +409,8 @@ export function CreateVaultFlow({
 
   // OB-05 account
   const [saved, setSaved] = useState(false);
+  // Feedback for the "Save to file" (recovery phrase / account number) actions.
+  const [fileMsg, setFileMsg] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
   const wipeSecrets = () => {
@@ -525,17 +529,17 @@ export function CreateVaultFlow({
   };
 
   const saveAccountFile = () => {
-    try {
-      const blob = new Blob([account], { type: "text/plain" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "myne-account-number.txt";
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch {
-      /* best-effort — secondary affordance */
-    }
+    void (async () => {
+      const label = await saveSecretToDocuments("myne-account-number.txt", account);
+      setFileMsg(label ? `Saved to ${label}` : "Couldn't save the file.");
+    })();
+  };
+
+  const savePhraseFile = () => {
+    void (async () => {
+      const label = await saveSecretToDocuments("myne-recovery-phrase.txt", phraseRef.current.join(" "));
+      setFileMsg(label ? `Saved to ${label}` : "Couldn't save the file.");
+    })();
   };
 
   // ── OB-01 · Safety briefing ─────────────────────────────────────────────────
@@ -578,7 +582,7 @@ export function CreateVaultFlow({
           </div>
         </ScreenScroll>
         <FooterBar>
-          <Button variant="secondary" full={false}>
+          <Button variant="secondary" full={false} onClick={onCancel}>
             Back
           </Button>
           <Button disabled={!acks.every(Boolean)} onClick={() => setStep("password")}>
@@ -593,7 +597,7 @@ export function CreateVaultFlow({
   if (step === "password") {
     return (
       <Screen>
-        <FlowHeader label="Create a vault · 2 of 5" onBack={briefing ? () => setStep("briefing") : undefined} />
+        <FlowHeader label="Create a vault · 2 of 5" onBack={briefing ? () => setStep("briefing") : onCancel} />
         <div style={{ flex: 1, padding: "18px 22px 0" }}>
           <Title>Create a password</Title>
           {beginError && (
@@ -619,7 +623,7 @@ export function CreateVaultFlow({
           </div>
         </div>
         <FooterBar style={{ padding: "14px 20px" }}>
-          <Button variant="secondary" full={false} onClick={briefing ? () => setStep("briefing") : undefined}>
+          <Button variant="secondary" full={false} onClick={briefing ? () => setStep("briefing") : onCancel}>
             Back
           </Button>
           <Button disabled={!passwordValid} onClick={() => { setBeginError(null); setStep("encrypting"); }}>
@@ -646,31 +650,43 @@ export function CreateVaultFlow({
   if (step === "phrase") {
     const words = showSecondHalf ? phraseRef.current : phraseRef.current.slice(0, 12);
     return (
-      <Screen style={{ padding: "64px 24px 40px" }}>
-        <Title>Your recovery phrase</Title>
-        <p style={{ margin: "10px 0 0", fontSize: 14, lineHeight: 1.55, color: "var(--fg-3)" }}>
-          Twenty-four words, in order. Write them on paper and store them somewhere safe.
-        </p>
-        <Banner kind="danger" icon={false} style={{ marginTop: 16 }}>
-          This is the only key to your vault. We can't reset it — lose these words and the notes are
-          gone for good.
-        </Banner>
-        <div style={{ marginTop: 20 }}>
-          <RecoveryGrid words={words} />
-        </div>
-        {!showSecondHalf && (
-          <Button
-            variant="secondary"
-            onClick={() => setShowSecondHalf(true)}
-            style={{ marginTop: 14, height: 40, fontFamily: "var(--font-mono)", fontSize: 13, fontWeight: 500 }}
-          >
-            Show words 13–24
+      <Screen>
+        <ScreenScroll style={{ padding: "64px 24px 8px" }}>
+          <Title>Your recovery phrase</Title>
+          <p style={{ margin: "10px 0 0", fontSize: 14, lineHeight: 1.55, color: "var(--fg-3)" }}>
+            Twenty-four words, in order. Write them on paper and store them somewhere safe.
+          </p>
+          <Banner kind="danger" icon={false} style={{ marginTop: 16 }}>
+            This is the only key to your vault. We can't reset it — lose these words and the notes are
+            gone for good.
+          </Banner>
+          <div style={{ marginTop: 20 }}>
+            <RecoveryGrid words={words} />
+          </div>
+          {!showSecondHalf && (
+            <Button
+              variant="secondary"
+              onClick={() => setShowSecondHalf(true)}
+              style={{ marginTop: 14, height: 40, fontFamily: "var(--font-mono)", fontSize: 13, fontWeight: 500 }}
+            >
+              Show words 13–24
+            </Button>
+          )}
+          {showSecondHalf && (
+            <>
+              <Button variant="secondary" onClick={savePhraseFile} style={{ marginTop: 14, height: 40, fontSize: 13 }}>
+                <Icon name="download" size={16} color="var(--fg-2)" strokeWidth={1.5} />
+                Save to file
+              </Button>
+              {fileMsg && <p style={{ margin: "8px 0 0", fontSize: 13, color: "var(--fg-3)", textAlign: "center" }}>{fileMsg}</p>}
+            </>
+          )}
+        </ScreenScroll>
+        <FooterBar>
+          <Button disabled={!showSecondHalf} onClick={startTypeBack}>
+            I've written them down
           </Button>
-        )}
-        <div style={{ flex: 1 }} />
-        <Button style={{ marginTop: 18 }} disabled={!showSecondHalf} onClick={startTypeBack}>
-          I've written them down
-        </Button>
+        </FooterBar>
       </Screen>
     );
   }
@@ -736,6 +752,7 @@ export function CreateVaultFlow({
               Save as file
             </Button>
           </div>
+          {fileMsg && <p style={{ margin: "8px 0 0", fontSize: 13, color: "var(--fg-3)" }}>{fileMsg}</p>}
           <div style={{ marginTop: 22, display: "flex", gap: 12, paddingTop: 16, borderTop: "1px solid var(--line-1)" }}>
             <button
               type="button"

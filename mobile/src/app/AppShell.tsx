@@ -94,6 +94,7 @@ export function AppShell() {
       return (
         <CreateVaultFlow
           briefing={stage.briefing}
+          onCancel={reprobe}
           onCommitSuccess={(vaultId?: VaultId) => dispatch({ type: "create-vault.commit-success", vaultId })}
           onAutoUnlockSuccess={(vaultId?: VaultId) => dispatch({ type: "create-vault.auto-unlock-success", vaultId })}
           onAutoUnlockFailed={(vaultId?: VaultId) => dispatch({ type: "create-vault.commit-success", vaultId })}

@@ -7,8 +7,8 @@ import {
   readText as clipboardReadText,
   clear as clipboardClear,
 } from "@tauri-apps/plugin-clipboard-manager";
-import { save as dialogSave } from "@tauri-apps/plugin-dialog";
-import { writeTextFile } from "@tauri-apps/plugin-fs";
+import { invoke } from "@tauri-apps/api/core";
+import { documentDir, join } from "@tauri-apps/api/path";
 import { logErrorKind } from "./vault-creation-logging";
 
 const CLIPBOARD_AUTO_CLEAR_MS = 30_000;
@@ -45,24 +45,26 @@ export async function copySecretToClipboard(
   return () => clearTimeout(timer);
 }
 
-export async function saveSecretAsTextFile(
-  defaultPath: string,
+/**
+ * Save a secret (recovery phrase / account number) to a `.txt` file in the app's
+ * Documents directory — reachable via the iOS Files app. Uses the `myne-core`
+ * `secret_export` plugin (the Rust-side write) because the mobile backend has no
+ * fs / save-dialog plugin. The plaintext secret is written to a user-visible
+ * location by the user's explicit intent (threat-model TB3 egress exception).
+ *
+ * Resolves to a short display label (`"Documents/<file>"`) on success, or `null`
+ * on failure (the caller shows a message). `filename` should end in `.txt`.
+ */
+export async function saveSecretToDocuments(
+  filename: string,
   contents: string,
-): Promise<void> {
-  let path: string | null;
+): Promise<string | null> {
   try {
-    path = await dialogSave({
-      defaultPath,
-      filters: [{ name: "Text", extensions: ["txt"] }],
-    });
+    const path = await join(await documentDir(), filename);
+    await invoke("plugin:secret-export|save_secret_text", { path, contents });
+    return `Documents/${filename}`;
   } catch (e) {
-    logErrorKind(e, "dialog-save-failed");
-    return;
-  }
-  if (!path) return;
-  try {
-    await writeTextFile(path, contents);
-  } catch (e) {
-    logErrorKind(e, "fs-write-failed");
+    logErrorKind(e, "secret-save-failed");
+    return null;
   }
 }

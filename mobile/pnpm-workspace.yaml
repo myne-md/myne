@@ -1,0 +1,18 @@
+# Standalone pnpm workspace root for myne-mobile.
+#
+# myne-mobile is physically nested inside the parent `myne/` repo (so its Rust
+# crate can `path`-depend on `../../core` + `../../protocol`). Without this file,
+# `pnpm install` here would climb UP to the parent `myne/pnpm-workspace.yaml` and
+# operate on the DESKTOP workspace, never installing mobile's own JS deps. This
+# file pins myne-mobile as its own workspace root — the JS analog of mobile's
+# separate `Cargo.lock`: separate lockfile + node_modules, shared SOURCE only.
+#
+# The shared @myne/{editor,dialect} engines are NOT pnpm members here — they are
+# consumed as source via Vite `resolve.alias` (see vite.config.ts) pointing at
+# the sibling `../editor/src` + `../dialect/src`, so pnpm never resolves them.
+packages: []
+
+allowBuilds:
+  # esbuild (pulled in by Vite) loads its prebuilt binary without a local build
+  # step — decline the build, consistent with the parent repo.
+  esbuild: false

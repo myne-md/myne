@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactNode } from "react";
+import { type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { Icon, MyneMark, type IconName } from "./Icon";
 
 /** Pill chip / tag. */
@@ -94,45 +94,272 @@ export function Fab({ icon = "plus", style }: { icon?: IconName; style?: CSSProp
 }
 
 /**
- * Bottom sheet — a scrim + rounded card sliding from the foot of the device.
+ * Bottom sheet — a **floating rounded card** that slides up over a scrim.
  * Absolutely positioned inside the screen (`.m-screen` is the positioning
- * context). UI-only: the scrim doesn't dismiss.
+ * context). Unlike a flush edge-to-edge sheet, the card is inset on all sides
+ * (12px sides + a safe-area bottom gap) and fully rounded, so its 1px border is
+ * visible all the way around — the card reads as a distinct object on EVERY
+ * theme (AMOLED where card + scrim are both near-black, and Light where a flush
+ * sheet blended into a grey scrim band).
+ *
+ * Animated: the card slides up + the scrim fades in on mount, and reverses on
+ * dismiss. Pass `onClose` to make it dismissible — tapping the scrim (anywhere
+ * *outside* the card) runs the exit animation then calls `onClose`. To animate
+ * the exit for an in-sheet button too (Done/Cancel), use the render-prop form:
+ * `<Sheet onClose={fn}>{(close) => …onClick={close}…}</Sheet>`.
  */
+const SHEET_MS = 260;
+
 export function Sheet({
   children,
   grabber = true,
   padded = true,
+  onClose,
   style,
 }: {
-  children: ReactNode;
+  children: ReactNode | ((close: () => void) => ReactNode);
   grabber?: boolean;
   padded?: boolean;
+  onClose?: () => void;
   style?: CSSProperties;
 }) {
+  const [shown, setShown] = useState(false);
+  const closingRef = useRef(false);
+  // Drag-to-dismiss: the grabber can be pulled down; past a threshold (or a
+  // quick flick) it closes, otherwise it springs back.
+  const [dragY, setDragY] = useState(0);
+  const [dragging, setDragging] = useState(false);
+  const dragStartRef = useRef<{ y: number; t: number } | null>(null);
+
+  // Enter animation: commit the closed state first, then flip open on the next
+  // paint so the transition actually runs (double-rAF for cross-engine safety).
+  useEffect(() => {
+    let raf2 = 0;
+    const raf1 = requestAnimationFrame(() => {
+      raf2 = requestAnimationFrame(() => setShown(true));
+    });
+    return () => {
+      cancelAnimationFrame(raf1);
+      cancelAnimationFrame(raf2);
+    };
+  }, []);
+
+  const close = useCallback(() => {
+    if (!onClose || closingRef.current) return;
+    closingRef.current = true;
+    setShown(false);
+    window.setTimeout(onClose, SHEET_MS);
+  }, [onClose]);
+
+  const onGrabberDown = useCallback((e: ReactPointerEvent) => {
+    if (!onClose) return;
+    dragStartRef.current = { y: e.clientY, t: Date.now() };
+    setDragging(true);
+    (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+  }, [onClose]);
+  const onGrabberMove = useCallback((e: ReactPointerEvent) => {
+    if (!dragStartRef.current) return;
+    setDragY(Math.max(0, e.clientY - dragStartRef.current.y));
+  }, []);
+  const onGrabberUp = useCallback((e: ReactPointerEvent) => {
+    const start = dragStartRef.current;
+    if (!start) return;
+    dragStartRef.current = null;
+    setDragging(false);
+    const dy = Math.max(0, e.clientY - start.y);
+    const velocity = dy / Math.max(1, Date.now() - start.t); // px/ms
+    // Dismiss on a long pull (>110px) OR a quick downward flick.
+    if (onClose && (dy > 110 || velocity > 0.5)) close();
+    setDragY(0);
+  }, [onClose, close]);
+
+  const body = typeof children === "function" ? children(close) : children;
+
   return (
-    <div style={{ position: "absolute", inset: 0, zIndex: 40, display: "flex", flexDirection: "column" }}>
-      <div style={{ flex: 1, background: "rgba(0,0,0,0.4)" }} />
+    <div style={{ position: "absolute", inset: 0, zIndex: 40, display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
+      <div
+        onClick={onClose ? close : undefined}
+        style={{
+          position: "absolute",
+          inset: 0,
+          background: "rgba(0,0,0,0.45)",
+          opacity: shown ? Math.max(0, 1 - dragY / 400) : 0,
+          transition: dragging ? "none" : `opacity ${SHEET_MS}ms ease`,
+        }}
+      />
       <div
         style={{
+          position: "relative",
+          margin: "0 12px",
+          marginBottom: "calc(12px + env(safe-area-inset-bottom, 0px))",
           background: "var(--bg-1)",
-          borderRadius: "20px 20px 0 0",
-          padding: padded ? "10px 18px 34px" : "10px 0 34px",
+          border: "1px solid var(--line-2)",
+          borderRadius: 24,
+          padding: padded ? "10px 18px 20px" : "10px 0 20px",
           boxShadow: "var(--shadow-3)",
+          transform: shown ? `translateY(${dragY}px)` : "translateY(calc(100% + 24px))",
+          transition: dragging ? "none" : `transform ${SHEET_MS}ms cubic-bezier(0.32, 0.72, 0, 1)`,
+          willChange: "transform",
           ...style,
         }}
       >
         {grabber && (
           <div
+            onPointerDown={onGrabberDown}
+            onPointerMove={onGrabberMove}
+            onPointerUp={onGrabberUp}
+            onPointerCancel={onGrabberUp}
             style={{
-              width: 36,
-              height: 5,
-              borderRadius: 999,
-              background: "var(--line-2)",
-              margin: "0 auto 14px",
+              display: "flex",
+              justifyContent: "center",
+              padding: "8px 0 12px",
+              margin: "-6px 0 0",
+              touchAction: "none",
+              cursor: onClose ? "grab" : "default",
             }}
-          />
+          >
+            <div style={{ width: 36, height: 5, borderRadius: 999, background: "var(--line-2)" }} />
+          </div>
         )}
-        {children}
+        {body}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * A full-height side drawer that slides in from the left or right edge — the
+ * mobile stand-in for the desktop editor's side panels (left = note explorer,
+ * right = note context/actions). Same enter/exit choreography as `Sheet` but on
+ * the X axis; tapping the scrim runs the exit animation then calls `onClose`.
+ * `header` renders a fixed title row; `children` scroll beneath it.
+ */
+export function SidePanel({
+  side,
+  title,
+  header,
+  onClose,
+  children,
+  headerRight,
+  padBody = true,
+}: {
+  side: "left" | "right";
+  title?: ReactNode;
+  /** Custom header (replaces the default title/close row). Receives the animated
+   *  `close` so a collapse/close control inside it can run the exit animation. */
+  header?: (close: () => void) => ReactNode;
+  onClose: () => void;
+  children: ReactNode;
+  /** Optional trailing control in the default header (e.g. a switcher). */
+  headerRight?: ReactNode;
+  /** Pad the scroll body (default). Off for panels that manage their own padding. */
+  padBody?: boolean;
+}) {
+  const [shown, setShown] = useState(false);
+  const closingRef = useRef(false);
+
+  useEffect(() => {
+    let raf2 = 0;
+    const raf1 = requestAnimationFrame(() => {
+      raf2 = requestAnimationFrame(() => setShown(true));
+    });
+    return () => {
+      cancelAnimationFrame(raf1);
+      cancelAnimationFrame(raf2);
+    };
+  }, []);
+
+  const close = useCallback(() => {
+    if (closingRef.current) return;
+    closingRef.current = true;
+    setShown(false);
+    window.setTimeout(onClose, SHEET_MS);
+  }, [onClose]);
+
+  const hidden = side === "left" ? "translateX(-100%)" : "translateX(100%)";
+
+  return (
+    <div style={{ position: "absolute", inset: 0, zIndex: 45 }}>
+      <div
+        onClick={close}
+        style={{
+          position: "absolute",
+          inset: 0,
+          background: "rgba(0,0,0,0.45)",
+          opacity: shown ? 1 : 0,
+          transition: `opacity ${SHEET_MS}ms ease`,
+        }}
+      />
+      <div
+        style={{
+          position: "absolute",
+          top: 0,
+          bottom: 0,
+          [side]: 0,
+          width: "86%",
+          maxWidth: 360,
+          display: "flex",
+          flexDirection: "column",
+          // No background/border on the outer shell — the safe-area cap below is
+          // transparent so the status-bar strip shows the app's black backdrop,
+          // and the panel's border begins at the cap's bottom (never up into the
+          // notch). Only the drop shadow spans the full height (soft, expected).
+          boxShadow: "var(--shadow-3)",
+          transform: shown ? "translateX(0)" : hidden,
+          transition: `transform ${SHEET_MS}ms cubic-bezier(0.32, 0.72, 0, 1)`,
+          willChange: "transform",
+        }}
+      >
+        {/* Safe-area cap: transparent, no border — the status-bar zone stays the
+            app's pitch-black backdrop, with no panel chrome intruding it. */}
+        <div style={{ height: "max(60px, env(safe-area-inset-top))", flexShrink: 0 }} />
+        <div
+          style={{
+            flex: 1,
+            minHeight: 0,
+            display: "flex",
+            flexDirection: "column",
+            background: "var(--bg-1)",
+            borderLeft: side === "right" ? "1px solid var(--line-2)" : undefined,
+            borderRight: side === "left" ? "1px solid var(--line-2)" : undefined,
+            borderTop: "1px solid var(--line-2)",
+          }}
+        >
+          {header ? (
+            <div style={{ flex: "none" }}>{header(close)}</div>
+          ) : (
+            <div
+              style={{
+                flex: "none",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 10,
+                padding: "12px 16px 12px",
+                borderBottom: "1px solid var(--line-1)",
+              }}
+            >
+              <span style={{ fontSize: 17, fontWeight: 700, color: "var(--fg-1)", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {title}
+              </span>
+              <div style={{ display: "flex", alignItems: "center", gap: 4, flex: "none" }}>
+                {headerRight}
+                <button
+                  onClick={close}
+                  aria-label="Close"
+                  style={{ width: 32, height: 32, borderRadius: 8, border: "none", background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
+                >
+                  <svg width="17" height="17" viewBox="0 0 24 24">
+                    <path d="M6 6l12 12M18 6L6 18" stroke="var(--fg-2)" strokeWidth="2" strokeLinecap="round" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          )}
+          <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: padBody ? "8px 12px calc(16px + env(safe-area-inset-bottom, 0px))" : "0 0 calc(env(safe-area-inset-bottom, 0px))" }}>
+            {children}
+          </div>
+        </div>
       </div>
     </div>
   );

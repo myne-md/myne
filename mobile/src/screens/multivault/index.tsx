@@ -359,7 +359,7 @@ function JoinFromDevice() {
 
         <UpperLabel style={{ marginTop: 16 }}>Password</UpperLabel>
         <div style={{ display: "flex", alignItems: "center", height: 50, border: "1px solid var(--line-2)", borderRadius: 6, background: "var(--bg-1)", padding: "0 14px" }}>
-          <span style={{ fontFamily: "var(--font-mono)", fontSize: 18, letterSpacing: "0.14em", color: "var(--fg-1)" }}>••••••••</span>
+          <span style={{ fontFamily: "var(--font-mono)", fontSize: 14, letterSpacing: "0.14em", color: "var(--fg-1)" }}>••••••••</span>
           <div style={{ flex: 1 }} />
           <svg width="20" height="20" viewBox="0 0 22 22" fill="none">
             <path d="M2 11s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6z" stroke="var(--fg-3)" strokeWidth="1.6" />

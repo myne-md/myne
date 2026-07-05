@@ -266,7 +266,7 @@ function NewPassword() {
           <FieldLabel>Confirm password</FieldLabel>
           <Field
             value={
-              <span style={{ fontFamily: "var(--font-mono)", fontSize: 20, letterSpacing: "0.14em" }}>
+              <span style={{ fontFamily: "var(--font-mono)", fontSize: 14, letterSpacing: "0.14em" }}>
                 {"•".repeat(10)}
               </span>
             }
