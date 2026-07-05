@@ -16,7 +16,16 @@
     "strict": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
-    "noFallthroughCasesInSwitch": true
+    "noFallthroughCasesInSwitch": true,
+
+    "paths": {
+      "@myne/editor": ["../editor/src/index.ts"],
+      "@myne/editor/CMEditor": ["../editor/src/CMEditor.tsx"],
+      "@myne/editor/*": ["../editor/src/*"],
+      "@myne/dialect": ["../dialect/src/index.ts"],
+      "@myne/dialect/*": ["../dialect/src/*"],
+      "@myne/locales-en": ["../locales/en/common.json"]
+    }
   },
   "include": ["src"]
 }

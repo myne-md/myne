@@ -1,6 +1,50 @@
+import { useEffect, useState } from "react";
 import { Gallery } from "./gallery/Gallery";
 import { AppShell } from "./app/AppShell";
 import { PlatformProvider, type Platform } from "./platform/PlatformContext";
+
+/**
+ * Track the VISUAL viewport so the app fills *exactly* the space above the
+ * on-screen keyboard. Two symptoms this fixes on iOS WKWebView:
+ *
+ *   1. Header drifting behind the status bar. When a textarea autofocuses,
+ *      WKWebView scrolls its internal scroll view to reveal the caret, sliding
+ *      our position:fixed body up — the visual viewport's `offsetTop` becomes
+ *      positive while our container stays pinned at document-top, so the header
+ *      ends up above the visible area (under the notch/status bar).
+ *   2. A dead gap under the footer. Binding height alone to `visualViewport`
+ *      isn't enough if the container top no longer aligns with the visible top.
+ *
+ * Binding BOTH `height` and a `translateY(offsetTop)` makes the container follow
+ * the visible viewport precisely: footer sits right on the keyboard, header
+ * stays under the notch. `scroll` events matter as much as `resize` because the
+ * offset changes as the caret moves.
+ */
+interface Viewport {
+  height: number;
+  offsetTop: number;
+}
+function useViewport(): Viewport {
+  const [vp, setVp] = useState<Viewport>(() => ({
+    height: typeof window !== "undefined" ? window.innerHeight : 800,
+    offsetTop: 0,
+  }));
+  useEffect(() => {
+    const vv = window.visualViewport;
+    const update = () =>
+      setVp(vv ? { height: vv.height, offsetTop: vv.offsetTop } : { height: window.innerHeight, offsetTop: 0 });
+    update();
+    vv?.addEventListener("resize", update);
+    vv?.addEventListener("scroll", update);
+    window.addEventListener("resize", update);
+    return () => {
+      vv?.removeEventListener("resize", update);
+      vv?.removeEventListener("scroll", update);
+      window.removeEventListener("resize", update);
+    };
+  }, []);
+  return vp;
+}
 
 /**
  * Two entry points:
@@ -20,19 +64,33 @@ function detectPlatform(): Platform {
 export default function App() {
   const showGallery =
     typeof window !== "undefined" && new URLSearchParams(window.location.search).has("gallery");
+  const { height, offsetTop } = useViewport();
+
+  // Real app only: pin the document so iOS can't scroll the whole page up when
+  // the keyboard opens (the gallery board keeps its free scroll — class absent).
+  useEffect(() => {
+    if (showGallery) return;
+    const html = document.documentElement;
+    html.classList.add("app-locked");
+    return () => html.classList.remove("app-locked");
+  }, [showGallery]);
 
   if (showGallery) return <Gallery />;
 
   return (
     <div
       style={{
-        height: "100vh",
+        height,
         width: "100%",
         maxWidth: 480,
         margin: "0 auto",
         position: "relative",
         overflow: "hidden",
         background: "var(--bg-1)",
+        // Follow the visible viewport's top edge — see useViewport(). Keeps the
+        // header under the notch and the footer glued to the keyboard when iOS
+        // scrolls the layout viewport on input focus.
+        transform: offsetTop ? `translateY(${offsetTop}px)` : undefined,
       }}
     >
       <PlatformProvider platform={detectPlatform()}>

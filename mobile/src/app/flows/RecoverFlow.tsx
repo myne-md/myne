@@ -245,7 +245,7 @@ function EditablePassword({
         style={{
           ...inputReset,
           fontFamily: "var(--font-mono)",
-          fontSize: reveal ? 16 : 20,
+          fontSize: reveal ? 16 : 14,
           letterSpacing: reveal ? "0" : "0.14em",
           color: "var(--fg-1)",
         }}
@@ -597,7 +597,7 @@ export function RecoverFlow({ initialSubStep, onComplete, onCancel }: RecoverFlo
             </div>
           </div>
         </div>
-        <FooterBar style={{ padding: "14px 20px", borderTop: "none" }}>
+        <FooterBar style={{ padding: "14px 20px calc(14px + env(safe-area-inset-bottom, 0px))", borderTop: "none" }}>
           <Button disabled={state.accountBusy} onClick={() => void onAccountContinue()}>
             Continue
           </Button>
@@ -663,7 +663,7 @@ export function RecoverFlow({ initialSubStep, onComplete, onCancel }: RecoverFlo
           <div style={{ fontSize: 13, lineHeight: 1.5, color: "var(--fg-3)", marginBottom: 12 }}>
             Type each word, or paste all 24 at once to fill the grid.
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)", gap: 8 }}>
             {state.words.map((w, i) => (
               <WordCell
                 key={i}
@@ -678,7 +678,7 @@ export function RecoverFlow({ initialSubStep, onComplete, onCancel }: RecoverFlo
             ))}
           </div>
         </ScreenScroll>
-        <FooterBar style={{ flexDirection: "column", gap: 8, padding: "10px 16px 12px" }}>
+        <FooterBar style={{ flexDirection: "column", gap: 8, padding: "10px 16px calc(12px + env(safe-area-inset-bottom, 0px))" }}>
           <Button
             disabled={filledCount < WORD_COUNT}
             onClick={() => void onPhraseSubmit()}

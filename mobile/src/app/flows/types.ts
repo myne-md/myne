@@ -17,6 +17,10 @@ export interface WelcomeFlowProps {
 
 export interface CreateVaultFlowProps {
   briefing?: boolean;
+  /** Exit the flow back to wherever it was entered (editor / picker / welcome).
+   *  Wired to the boot re-probe, mirroring restore-backup's exit. Without it the
+   *  first step's "Back" is a dead end — a trap when entered with briefing off. */
+  onCancel: () => void;
   onCommitSuccess: (vaultId?: VaultId) => void;
   onAutoUnlockSuccess: (vaultId?: VaultId) => void;
   onAutoUnlockFailed: (vaultId?: VaultId) => void;

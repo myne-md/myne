@@ -91,7 +91,7 @@ export function PasswordField({
       <span
         style={{
           fontFamily: "var(--font-mono)",
-          fontSize: revealed ? 16 : 20,
+          fontSize: revealed ? 16 : 14,
           letterSpacing: revealed ? "0" : "0.14em",
           color: "var(--fg-1)",
         }}
@@ -231,9 +231,23 @@ export function Checkbox({ checked = false }: { checked?: boolean }) {
 }
 
 // ── Switch (iOS toggle) ──────────────────────────────────────────────────────
-export function Switch({ on = false }: { on?: boolean }) {
+// Presentational by default (gallery boards pass only `on`); pass `onToggle` to
+// make it an interactive control (wired settings).
+export function Switch({
+  on = false,
+  onToggle,
+  disabled = false,
+}: {
+  on?: boolean;
+  onToggle?: () => void;
+  disabled?: boolean;
+}) {
   return (
     <div
+      role={onToggle ? "switch" : undefined}
+      aria-checked={onToggle ? on : undefined}
+      aria-disabled={disabled || undefined}
+      onClick={onToggle && !disabled ? onToggle : undefined}
       style={{
         width: 51,
         height: 31,
@@ -241,6 +255,8 @@ export function Switch({ on = false }: { on?: boolean }) {
         background: on ? "var(--success)" : "var(--line-2)",
         position: "relative",
         flexShrink: 0,
+        cursor: onToggle && !disabled ? "pointer" : "default",
+        opacity: disabled ? 0.5 : 1,
         transition: "background var(--duration-fast) var(--ease-standard)",
       }}
     >
@@ -262,13 +278,17 @@ export function Switch({ on = false }: { on?: boolean }) {
 }
 
 // ── Segmented control ────────────────────────────────────────────────────────
+// Presentational by default (gallery boards pass only `active`); pass `onChange`
+// to make each segment tappable (wired settings).
 export function Segmented({
   options,
   active = 0,
+  onChange,
   style,
 }: {
   options: string[];
   active?: number;
+  onChange?: (index: number) => void;
   style?: CSSProperties;
 }) {
   return (
@@ -286,6 +306,7 @@ export function Segmented({
       {options.map((o, i) => (
         <div
           key={o}
+          onClick={onChange ? () => onChange(i) : undefined}
           style={{
             flex: 1,
             textAlign: "center",
@@ -293,6 +314,7 @@ export function Segmented({
             borderRadius: 6,
             fontSize: 14,
             fontWeight: 600,
+            cursor: onChange ? "pointer" : "default",
             background: i === active ? "var(--accent)" : "transparent",
             color: i === active ? "var(--accent-on)" : "var(--fg-2)",
           }}

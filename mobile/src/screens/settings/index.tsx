@@ -316,7 +316,7 @@ function ChangePassword() {
             padding: "0 14px",
           }}
         >
-          <span style={{ fontFamily: "var(--font-mono)", fontSize: 18, letterSpacing: "0.14em", color: "var(--fg-1)" }}>
+          <span style={{ fontFamily: "var(--font-mono)", fontSize: 14, letterSpacing: "0.14em", color: "var(--fg-1)" }}>
             ••••••••
           </span>
         </div>
@@ -333,7 +333,7 @@ function ChangePassword() {
             boxShadow: "0 0 0 3px color-mix(in srgb, var(--accent) 12%, transparent)",
           }}
         >
-          <span style={{ fontFamily: "var(--font-mono)", fontSize: 18, letterSpacing: "0.14em", color: "var(--fg-1)" }}>
+          <span style={{ fontFamily: "var(--font-mono)", fontSize: 14, letterSpacing: "0.14em", color: "var(--fg-1)" }}>
             ••••••••••
           </span>
           <span style={{ width: 2, height: 22, background: "var(--accent)", marginLeft: 2 }} />

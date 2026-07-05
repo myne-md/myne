@@ -227,7 +227,7 @@ function CreatePassword() {
         <div style={{ marginTop: 20 }}>
           <FieldLabel>Confirm password</FieldLabel>
           <Field
-            value={<span style={{ fontFamily: "var(--font-mono)", fontSize: 20, letterSpacing: "0.14em" }}>••••••••••••</span>}
+            value={<span style={{ fontFamily: "var(--font-mono)", fontSize: 14, letterSpacing: "0.14em" }}>••••••••••••</span>}
             trailing={<Icon name="check" size={14} color="var(--success)" strokeWidth={2} />}
           />
         </div>

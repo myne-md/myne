@@ -339,7 +339,7 @@ function EnrollDevice() {
             padding: "0 14px",
           }}
         >
-          <span style={{ fontFamily: "var(--font-mono)", fontSize: 18, letterSpacing: "0.14em", color: "var(--fg-1)" }}>
+          <span style={{ fontFamily: "var(--font-mono)", fontSize: 14, letterSpacing: "0.14em", color: "var(--fg-1)" }}>
             ••••••••
           </span>
         </div>

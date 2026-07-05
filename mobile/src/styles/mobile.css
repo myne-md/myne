@@ -94,10 +94,37 @@ body,
   min-height: 100%;
   overflow: visible;
   overscroll-behavior: auto;
+  /* App-like, not web-page: kill the double-tap-to-zoom gesture and the legacy
+     tap delay. Pinch-zoom + input-focus auto-zoom are handled at the viewport
+     meta (maximum-scale=1, user-scalable=no) so <16px inputs never trigger the
+     iOS focus zoom. Panning/scrolling stays enabled. */
+  touch-action: manipulation;
+  -webkit-text-size-adjust: 100%;
 }
 #root {
   -webkit-user-select: auto;
   user-select: auto;
+}
+
+/* Real-app scroll lock. App.tsx adds `app-locked` to <html> when NOT in the
+   gallery. The gallery board wants free page scroll (rules above); the real
+   full-screen app must NOT — otherwise iOS scrolls the whole document up when
+   the soft keyboard opens on an autoFocus field, dragging the header above the
+   status bar. Pin the document to the viewport; the App container (height =
+   visualViewport) still shrinks above the keyboard. */
+html.app-locked {
+  height: 100%;
+  overflow: hidden;
+}
+html.app-locked body {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+html.app-locked #root {
+  height: 100%;
+  overflow: hidden;
 }
 
 /* A phone "screen" — fills its device frame, scrolls its own overflow, and is
@@ -117,6 +144,10 @@ body,
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  /* Phone flow screens are vertical-only; never let content (e.g. a 2-col grid
+     whose tracks blow out under a WKWebView min-content quirk) create a
+     left/right scroll. Inner carousels opt back in with their own overflow-x. */
+  overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
 }
 
@@ -129,4 +160,77 @@ body,
 .m-screen,
 .m-scroll {
   scrollbar-width: none;
+}
+
+/* -- Native input chrome reset (WKWebView / Android WebView) ----------------
+   iOS WKWebView (and Android WebView) paint a default border + inset shadow +
+   rounded corners on text inputs / textareas even when `border: none` is set,
+   producing a DOUBLE border inside our own bordered field shells. Neutralise
+   the native appearance so the shell's border is the only one; the focus ring
+   is drawn by the field shell, not the native control. */
+input,
+textarea,
+select {
+  -webkit-appearance: none;
+  appearance: none;
+  font: inherit;
+  color: inherit;
+  outline: none;
+  border-radius: 0;
+  background-color: transparent;
+}
+/* The copied desktop tokens.css draws a 2px+4px `--ring` box-shadow on
+   `:focus-visible` inputs (a desktop keyboard-nav ring). On mobile every input
+   lives inside its own bordered field shell that already shows focus, so that
+   global ring becomes a second nested border. Neutralise it for form controls;
+   the shell owns the focus indicator. (mobile.css loads after tokens.css, so
+   this equal-specificity rule wins.) */
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  box-shadow: none;
+  border-radius: 0;
+}
+input::placeholder,
+textarea::placeholder {
+  color: var(--line-3);
+  opacity: 1;
+}
+
+/* ── Print / PDF export ───────────────────────────────────────────────────────
+   Mobile "Export PDF" calls window.print(); iOS WKWebView opens the print sheet
+   (Save to Files → PDF, AirPrint). Isolate the off-screen #myne-print container:
+   hide the app chrome, show only the note, forced to a clean light page
+   regardless of the app theme. */
+#myne-print {
+  display: none;
+}
+@media print {
+  body {
+    visibility: hidden;
+    background: #fff;
+  }
+  #myne-print {
+    display: block;
+    visibility: visible;
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    padding: 0 6mm;
+    box-sizing: border-box;
+    background: #fff;
+    color: #111;
+    font-family: var(--font-sans);
+    line-height: 1.6;
+  }
+  #myne-print * {
+    visibility: visible;
+    color: #111 !important;
+    background: transparent !important;
+    border-color: #ddd !important;
+  }
+  #myne-print img {
+    max-width: 100% !important;
+  }
 }
