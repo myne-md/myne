@@ -38,8 +38,8 @@ import i18n from "../../i18n";
 import { parser } from "../lezer/parser";
 import { locateFrontmatter } from "../lezer/frontmatter";
 import { readTitleFromFmBody } from "../surgery";
-import { foldLabel } from "../../editor/decorations/link-reference-collector";
-import { SANITIZE_CONFIG } from "../../editor/html/sanitize";
+import { foldLabel } from "@myne/editor/decorations/link-reference-collector";
+import { SANITIZE_CONFIG } from "@myne/editor/html/sanitize";
 import {
   attachmentUrl,
   parseAttachmentTarget,

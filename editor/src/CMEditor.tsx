@@ -23,7 +23,7 @@ import type { VaultHeading } from "./wikilink/vault-headings";
 import { reconfigureLineNumbers } from "./line-numbers";
 import { reconfigureViewMode, type ViewMode } from "./view-mode";
 import { resolveAnchorOffset, type WikilinkAnchor } from "./wikilink/anchor";
-import type { ResolverNote } from "../notes/resolveWikilink";
+import type { ResolverNote } from "@myne/editor/host/notes/resolveWikilink";
 
 /** A deep-link scroll request (MYND-305, SYNC-5): a generic anchor to scroll to
  *  AFTER the note body settles, plus a monotonic `nonce` so re-clicking the same

@@ -5,7 +5,10 @@ import { describe, expect, it, vi } from "vitest";
 import { EditorState } from "@codemirror/state";
 import { CompletionContext } from "@codemirror/autocomplete";
 
-vi.mock("../../src/notes/vaultIndices", () => ({
+// The completion source reads tags via the host bridge (getHost().notes.tagTree)
+// post-extraction, so mock the bridge the module imports, not the desktop index.
+vi.mock("@myne/editor/host/notes/vaultIndices", () => ({
+  isMediaTarget: () => false,
   tagTree: vi.fn(async () => [
     { key: "editor", display: "Editor", depth: 0, directCount: 2, subtreeCount: 2 },
     { key: "markdown", display: "Markdown", depth: 0, directCount: 1, subtreeCount: 1 },

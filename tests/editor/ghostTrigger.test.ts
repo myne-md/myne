@@ -10,9 +10,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 
-const invokeMock = vi.fn();
-vi.mock("@tauri-apps/api/core", () => ({
-  invoke: (...args: unknown[]) => invokeMock(...args),
+const inferMock = vi.fn();
+// Post-extraction, ghostText calls the host bridge `infer` (getHost().ai.infer),
+// not the Tauri `invoke` directly — the IPC now lives in the desktop
+// lib/writing-assistant behind the EditorHost seam. Mock the bridge and assert
+// on the prompt handed to `infer`; `buildCompletionPrompt` is a passthrough so
+// the preceding text flows into the asserted prompt.
+vi.mock("@myne/editor/host/lib/writing-assistant", () => ({
+  infer: (...args: unknown[]) => inferMock(...args),
+  buildCompletionPrompt: (preceding: string) => preceding,
 }));
 
 import {
@@ -44,7 +50,7 @@ async function flush(): Promise<void> {
 
 beforeEach(() => {
   vi.useFakeTimers();
-  invokeMock.mockReset();
+  inferMock.mockReset();
 });
 afterEach(() => {
   view?.destroy();
@@ -56,7 +62,7 @@ afterEach(() => {
 
 describe("ghost trigger (debounce/cancel)", () => {
   it("fires one completion on a paused cursor and shows the ghost", async () => {
-    invokeMock.mockResolvedValue(" continuation");
+    inferMock.mockResolvedValue(" continuation");
     mount("Some prose");
     // Type a char to schedule the debounce.
     view!.dispatch({
@@ -64,16 +70,13 @@ describe("ghost trigger (debounce/cancel)", () => {
       selection: { anchor: view!.state.doc.length + 1 },
     });
     await flush();
-    expect(invokeMock).toHaveBeenCalledTimes(1);
-    expect(invokeMock).toHaveBeenCalledWith(
-      "plugin:local-inference|infer",
-      expect.objectContaining({ prompt: expect.stringContaining("Some prose") }),
-    );
+    expect(inferMock).toHaveBeenCalledTimes(1);
+    expect(inferMock).toHaveBeenCalledWith(expect.stringContaining("Some prose"));
     expect(ghostShowing(view!)).toBe(true);
   });
 
   it("does not pile up calls: rapid edits reschedule a single timer", async () => {
-    invokeMock.mockResolvedValue("x");
+    inferMock.mockResolvedValue("x");
     mount("abc");
     for (let i = 0; i < 5; i++) {
       view!.dispatch({
@@ -84,15 +87,15 @@ describe("ghost trigger (debounce/cancel)", () => {
     }
     // Only after a full pause does exactly one call fire.
     await flush();
-    expect(invokeMock).toHaveBeenCalledTimes(1);
+    expect(inferMock).toHaveBeenCalledTimes(1);
   });
 
   it("suppresses the completion when there is a non-empty selection", async () => {
-    invokeMock.mockResolvedValue("x");
+    inferMock.mockResolvedValue("x");
     mount("abcdef");
     view!.dispatch({ selection: { anchor: 0, head: 3 } }); // a selection, not a bare cursor
     await flush();
-    expect(invokeMock).not.toHaveBeenCalled();
+    expect(inferMock).not.toHaveBeenCalled();
     expect(ghostShowing(view!)).toBe(false);
   });
 });
