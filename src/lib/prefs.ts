@@ -238,6 +238,16 @@ export interface PrefsView {
    */
   ai_excluded_folders: string[];
   /**
+   * Folders archived as a unit (folder-archive) — canonical trailing-slash
+   * form. Same encoding as `deliberate_folders` / `ai_excluded_folders`
+   * (NFC-normalized, sorted, deduped set). Absent → defaulted to `[]`. A folder
+   * in this set (and its subtree) drops out of the working-set sidebar/tree
+   * while its notes stay resolvable (backlink / graph / search) — the
+   * folder-level twin of the per-note `archived:` marker. Write via
+   * {@link setArchivedFolders}. Non-load-bearing.
+   */
+  archived_folders: string[];
+  /**
    * Active workspace slot id (MYND-308) — the workspace slot the editor restores
    * on unlock. `null` ≡ unset → the host applies its default (first / last-used)
    * workspace policy. A free string stored verbatim (NFC on the wire); the
@@ -535,6 +545,24 @@ export async function setAiEnabled(enabled: boolean): Promise<void> {
  */
 export async function setAiExcludedFolders(folders: string[]): Promise<void> {
   await invoke<void>("plugin:prefs|set_ai_excluded_folders", { folders });
+}
+
+/**
+ * Persist the full `archived_folders` set (folder-archive) — folders archived
+ * as a unit. Same canonical set encoding as `deliberate_folders` (the Rust
+ * codec NFC-sorts + exact-dedups). The caller passes the entire desired set; a
+ * rejected promise means the disk write failed and the caller's optimistic UI
+ * must revert.
+ *
+ * Bumps the prefs nonce after a successful write so the sidebar surfaces that
+ * read `archived_folders` through their OWN `usePrefs` instance (saved-view
+ * results, new-tab quick-open) re-read disk truth and drop / restore the
+ * archived subtree live (same chokepoint discipline as {@link
+ * setShowNoteTimestamps}).
+ */
+export async function setArchivedFolders(folders: string[]): Promise<void> {
+  await invoke<void>("plugin:prefs|set_archived_folders", { folders });
+  bumpPrefsNonce();
 }
 
 /**

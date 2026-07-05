@@ -66,6 +66,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::prefs_read,
             commands::set_screen_capture_protection,
             commands::set_deliberate_folders,
+            commands::set_archived_folders,
             commands::set_auto_lock_timeout,
             commands::set_item_order,
             commands::set_hidden_bar_items,

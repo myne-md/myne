@@ -684,6 +684,43 @@ pub async fn set_deliberate_folders_with_dir(
     Ok(())
 }
 
+/// Slot::Unlocked-gated setter for the `archived_folders` set (folder-archive)
+/// — folders archived as a unit (their subtree drops out of the working-set
+/// sidebar/tree while the notes stay resolvable). Read-modify-write under the
+/// per-plugin write mutex. **No native side-effect** (a pure disk commit, same
+/// shape as [`set_deliberate_folders`] — unlike `set_ai_excluded_folders` there
+/// is no AI runtime to reconcile). The caller passes the full desired set; v0.1
+/// single-device writes it verbatim (union + add-wins is a Phase 2 sync-merge
+/// concern). Folded-identity dedup is the caller's job; the codec only sorts +
+/// exact-dedups for canonical byte-stability.
+#[tauri::command]
+pub async fn set_archived_folders<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    folders: Vec<String>,
+) -> Result<(), PrefsWriteError> {
+    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_archived_folders_with_dir(&dir, state.inner(), folders).await
+}
+
+/// Testable core of [`set_archived_folders`].
+pub async fn set_archived_folders_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    folders: Vec<String>,
+) -> Result<(), PrefsWriteError> {
+    let count = folders.len();
+    update_prefs_with_dir(vault_dir, state, |prefs| {
+        prefs.archived_folders = folders;
+    })
+    .await?;
+
+    // Folder COUNT only — never the paths (folder structure is AS3
+    // Sensitive; see the `set_deliberate_folders` note + ../../CLAUDE.md).
+    tracing::info!(event = "prefs_written", field = "archived_folders", count,);
+    Ok(())
+}
+
 /// Slot::Unlocked-gated setter for the `ai_enabled` AI opt-in toggle (local-ai
 /// epic, ai-ux-surface MYND-408, SYNC-12). Read-modify-write under the
 /// per-plugin write mutex; **no native side-effect** (same shape as
@@ -1909,6 +1946,7 @@ mod tests {
                     keymap: Default::default(),
                     active_workspace: None,
                     archive_disabled: None,
+                    archived_folders: Vec::new(),
                     editor_layout: None,
                     editor_line_numbers: None,
                     editor_content_width: None,
@@ -2140,6 +2178,54 @@ mod tests {
                 .await
                 .expect("read after clear");
             assert!(cleared.deliberate_folders.is_empty());
+        });
+    }
+
+    // ---- archived_folders setter (folder-archive) ---------------------
+
+    #[test]
+    fn set_archived_folders_rejects_when_slot_empty() {
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("prefs-archived-empty").expect("scoped tempdir");
+            let state = VaultRuntimeState::default();
+            let result =
+                set_archived_folders_with_dir(tmp.path(), &state, alloc_vec(["Projects/"])).await;
+            assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
+        });
+    }
+
+    #[test]
+    fn archived_folders_round_trip_via_set_then_read() {
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x34).await;
+
+            set_archived_folders_with_dir(
+                tmp.path(),
+                &state,
+                alloc_vec(["Projects/Myne/", "Archive/2025/"]),
+            )
+            .await
+            .expect("write must succeed");
+
+            let view = prefs_read_with_dir(tmp.path(), &state)
+                .await
+                .expect("read must succeed after write");
+            // Canonical sort applies at encode → read-back is sorted.
+            assert_eq!(
+                view.archived_folders,
+                alloc_vec(["Archive/2025/", "Projects/Myne/"]),
+            );
+            // Independent of deliberate_folders (the two sets don't interfere).
+            assert!(view.deliberate_folders.is_empty());
+
+            // Empty set round-trips (and re-encodes byte-identical to pre-feature).
+            set_archived_folders_with_dir(tmp.path(), &state, Vec::new())
+                .await
+                .expect("clear must succeed");
+            let cleared = prefs_read_with_dir(tmp.path(), &state)
+                .await
+                .expect("read after clear");
+            assert!(cleared.archived_folders.is_empty());
         });
     }
 

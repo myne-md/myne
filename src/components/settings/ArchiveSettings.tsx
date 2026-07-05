@@ -18,7 +18,11 @@
 import { useEffect, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import { ControlBlock } from "./ControlBlock";
-import { prefsRead, setArchiveDisabled } from "../../lib/prefs";
+import {
+  prefsRead,
+  setArchiveDisabled,
+  setArchivedFolders,
+} from "../../lib/prefs";
 import { archivedRecords, useSelectedNote } from "../../notes/sidebarState";
 
 const TOGGLE_STYLE: CSSProperties = {
@@ -77,6 +81,11 @@ export function ArchiveSettings() {
           // the entry points visible is the safe state.
           throw new Error("bulk unarchive partially failed");
         }
+        // Folder-archived subtrees (folder-archive) hide notes WITHOUT a per-note
+        // marker, so bulkUnarchive can't reach them — clear the whole
+        // archived_folders set too, else a folder stays hidden with no entry
+        // point once the archive UI is gone.
+        await setArchivedFolders([]);
       }
       await setArchiveDisabled(!next);
       setError(null);

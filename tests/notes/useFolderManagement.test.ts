@@ -27,6 +27,7 @@ import { act, renderHook } from "@testing-library/react";
 
 const prefs = {
   deliberate_folders: [] as string[],
+  archived_folders: [] as string[],
   item_order: [] as string[],
   favorites: [] as string[],
   item_colors: {} as Record<string, string>,
@@ -37,12 +38,14 @@ vi.mock("../../src/hooks/usePrefs", () => ({
 }));
 
 const setDeliberateFolders = vi.fn(() => Promise.resolve());
+const setArchivedFolders = vi.fn(() => Promise.resolve());
 const setFavorites = vi.fn(() => Promise.resolve());
 const setFolderIcons = vi.fn(() => Promise.resolve());
 const setItemColors = vi.fn(() => Promise.resolve());
 const setItemOrder = vi.fn(() => Promise.resolve());
 vi.mock("../../src/lib/prefs", () => ({
   setDeliberateFolders: (...a: unknown[]) => setDeliberateFolders(...a),
+  setArchivedFolders: (...a: unknown[]) => setArchivedFolders(...a),
   setFavorites: (...a: unknown[]) => setFavorites(...a),
   setFolderIcons: (...a: unknown[]) => setFolderIcons(...a),
   setItemColors: (...a: unknown[]) => setItemColors(...a),
@@ -59,10 +62,20 @@ vi.mock("../../src/notes/moveNote", () => ({
 const planFolderDelete = vi.fn();
 const persistFolderDelete = vi.fn(() => Promise.resolve());
 const renameFolder = vi.fn();
+// Folder-archive planners: default to no-op returns so the existing
+// rename/delete tests are unaffected (their archived-set semantics are covered
+// directly in folderActions.test.ts). `archived_folders` is `[]` in the prefs
+// mock, so these no-ops never trigger a `setArchivedFolders` write.
+const planFolderArchive = vi.fn(() => ({ nextArchived: [], noteIds: [] }));
+const planFolderUnarchive = vi.fn(() => [] as string[]);
+const rerootArchivedFolders = vi.fn(() => ({ next: [] as string[], rewritten: 0 }));
 vi.mock("../../src/notes/folderActions", () => ({
   planFolderDelete: (...a: unknown[]) => planFolderDelete(...a),
   persistFolderDelete: (...a: unknown[]) => persistFolderDelete(...a),
   renameFolder: (...a: unknown[]) => renameFolder(...a),
+  planFolderArchive: (...a: unknown[]) => planFolderArchive(...a),
+  planFolderUnarchive: (...a: unknown[]) => planFolderUnarchive(...a),
+  rerootArchivedFolders: (...a: unknown[]) => rerootArchivedFolders(...a),
 }));
 
 import { useFolderManagement } from "../../src/notes/components/useFolderManagement";

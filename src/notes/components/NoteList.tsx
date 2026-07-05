@@ -23,13 +23,19 @@ import { useTranslation } from "react-i18next";
 import { SECTION_HEADING_STYLE } from "./sharedStyles";
 import { noteRead } from "../readNote";
 import {
-  archivedCount,
+  archivedRecords,
   liveCache,
   trashedCount,
   useSelectedNote,
   type NoteId,
   type UseSelectedNoteReturn,
 } from "../sidebarState";
+import {
+  archivedFolderKeys,
+  filterVisibleDeliberate,
+  isNoteFolderArchived,
+  topLevelArchivedFolders,
+} from "../archivedFolders";
 import { ArchivePanel } from "./ArchivePanel";
 import { TrashPanel } from "./TrashPanel";
 import { DeleteConfirmModal } from "./DeleteConfirmModal";
@@ -764,7 +770,19 @@ export function NoteList({ onNewFromTemplate, exportHooks }: NoteListProps = {})
   // sidebar everywhere — tree, rows, favorites — via a single derived
   // `live` view of the cache (MYND-133). The Trash panel reads the complement
   // (`trashedRecords`). Restore clears the marker → the note re-enters `live`.
-  const live = useMemo(() => liveCache(ctx.cache), [ctx.cache]);
+  // Folder-archived subtrees (archived_folders) leave the working set as a UNIT
+  // — folded keys computed once, threaded into `liveCache` (excludes their
+  // notes) and the deliberate filter (drops archived empty folders so they
+  // don't re-surface as empty nodes). resolverCache is untouched (folder-
+  // archived notes stay backlink/graph/search targets — folder-archive).
+  const archivedKeys = useMemo(
+    () => archivedFolderKeys(fm.archivedFolders),
+    [fm.archivedFolders],
+  );
+  const live = useMemo(
+    () => liveCache(ctx.cache, archivedKeys),
+    [ctx.cache, archivedKeys],
+  );
   const tree = useMemo(
     () =>
       deriveFolderTree(
@@ -773,9 +791,9 @@ export function NoteList({ onNewFromTemplate, exportHooks }: NoteListProps = {})
           folder: r.folder,
           folderIndex: r.folderIndex,
         })),
-        fm.deliberate,
+        filterVisibleDeliberate(fm.deliberate, archivedKeys),
       ),
-    [live, fm.deliberate],
+    [live, fm.deliberate, archivedKeys],
   );
   // Keep the handlers' tree reference current (delete-emptiness, case-merge).
   fm.treeRef.current = tree;
@@ -934,7 +952,15 @@ export function NoteList({ onNewFromTemplate, exportHooks }: NoteListProps = {})
   // Archive panel. Count from the value-strict `archived:` set (the disjoint
   // archive raft); memoized on cache identity like `trashCount`.
   const [archiveOpen, setArchiveOpen] = useState(false);
-  const archiveCount = useMemo(() => archivedCount(ctx.cache), [ctx.cache]);
+  // Footer badge = standalone archived notes (value-strict `archived:`, NOT
+  // also inside an archived folder — those show under the folder row) + the
+  // top-level archived folder rows (folder-archive; each counts as one row).
+  const archiveCount = useMemo(() => {
+    const standalone = archivedRecords(ctx.cache).filter(
+      (r) => !isNoteFolderArchived(r.folder, archivedKeys),
+    ).length;
+    return standalone + topLevelArchivedFolders(fm.archivedFolders).length;
+  }, [ctx.cache, archivedKeys, fm.archivedFolders]);
   // Archive-feature disable toggle (archive-disable, MYND-…): when on, the
   // archive entry points (footer button, context-menu actions) are hidden. The
   // viewer footer stays available while any archived note still exists so a note
@@ -1079,7 +1105,13 @@ export function NoteList({ onNewFromTemplate, exportHooks }: NoteListProps = {})
         )}
       </div>
       <TrashPanel open={trashOpen} onClose={() => setTrashOpen(false)} />
-      <ArchivePanel open={archiveOpen} onClose={() => setArchiveOpen(false)} />
+      <ArchivePanel
+        open={archiveOpen}
+        onClose={() => setArchiveOpen(false)}
+        archivedFolders={fm.archivedFolders}
+        onRestoreFolder={fm.restoreFolder}
+        onDeleteFolderToTrash={fm.deleteArchivedFolderToTrash}
+      />
     </aside>
   );
 }
@@ -1967,6 +1999,17 @@ function PopulatedList({
             folderPath: node.path,
           }),
       },
+      // Archive the folder as a unit (folder-archive) — hidden when the archive
+      // feature is disabled, mirroring the per-note "Archive" gate.
+      ...(!archiveDisabled
+        ? [
+            {
+              id: "folder.archive",
+              label: t("notes.list.archiveFolder"),
+              onSelect: () => fm.archiveFolderAction(node),
+            },
+          ]
+        : []),
       {
         id: "delete",
         label: t("notes.list.delete"),
@@ -1976,6 +2019,7 @@ function PopulatedList({
     ];
   }, [
     fm,
+    archiveDisabled,
     onRevealFolder,
     handleOpenIndexNote,
     handleCreateFolderNote,
