@@ -28,7 +28,7 @@ import {
   type DecorationSet,
   EditorView,
 } from "@codemirror/view";
-import { openUrl } from "@tauri-apps/plugin-opener";
+import { getHost } from "../host";
 import { isInsideRange } from "./cursor-aware";
 import { makeCursorAwareDecorationPlugin } from "./plugin-factory";
 
@@ -147,11 +147,7 @@ const openLinkOnClick = EditorView.domEventHandlers({
     if (linkEl === null) return false;
     const url = linkEl.getAttribute("data-cm-url");
     if (url === null || url === "") return false;
-    openUrl(url).catch((err: unknown) => {
-      if (import.meta.env.DEV) {
-        console.warn("autolink: openUrl rejected", err);
-      }
-    });
+    getHost().openExternal(url);
     event.preventDefault();
     return true;
   },
