@@ -20,6 +20,10 @@ import {
 import { resolverNotesFromCache } from "../../src/notes/resolverNotes";
 import { deriveFolderTree } from "../../src/notes/folderTree";
 import {
+  archivedFolderKeys,
+  filterVisibleDeliberate,
+} from "../../src/notes/archivedFolders";
+import {
   buildFavoriteRows,
   pruneFavorites,
 } from "../../src/notes/components/folderTreeRows";
@@ -146,6 +150,52 @@ describe("folder-tree exclusion", () => {
     const ids = JSON.stringify(tree);
     expect(ids).toContain("live");
     expect(ids).not.toContain("arch");
+  });
+});
+
+describe("folder-archive — working-set exclusion vs resolver retention", () => {
+  const keys = archivedFolderKeys(["Projects/"]);
+
+  it("liveCache drops notes under an archived folder (subtree), keeps siblings", () => {
+    const live = liveCache(
+      cacheOf([
+        rec({ noteUuid: "in", folder: "Projects/" }),
+        rec({ noteUuid: "nested", folder: "Projects/Myne/" }),
+        rec({ noteUuid: "sibling", folder: "ProjectsX/" }),
+        rec({ noteUuid: "root", folder: null }),
+      ]),
+      keys,
+    );
+    expect([...live.keys()].sort()).toEqual(["root", "sibling"]);
+  });
+
+  it("resolverCache KEEPS folder-archived notes (still backlink/graph/search targets)", () => {
+    // resolverCache takes no archivedKeys — a folder-archived note has a null
+    // `archived:` marker and is not trashed, so it stays in the discovery set.
+    const out = resolverCache(
+      cacheOf([
+        rec({ noteUuid: "in", folder: "Projects/" }),
+        rec({ noteUuid: "tr", folder: "Projects/", trashed: T1 }),
+      ]),
+    );
+    expect([...out.keys()]).toEqual(["in"]);
+  });
+
+  it("the folder tree omits an archived subtree and its archived deliberate folder", () => {
+    const cache = cacheOf([
+      rec({ noteUuid: "in", folder: "Projects/", title: "In" }),
+      rec({ noteUuid: "other", folder: "Other/", title: "Other" }),
+    ]);
+    const tree = deriveFolderTree(
+      [...liveCache(cache, keys).values()].map((r) => ({
+        noteUuid: r.noteUuid,
+        folder: r.folder,
+      })),
+      filterVisibleDeliberate(["Projects/", "Other/"], keys),
+    );
+    const json = JSON.stringify(tree);
+    expect(json).toContain("Other/");
+    expect(json).not.toContain("Projects/");
   });
 });
 

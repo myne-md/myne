@@ -12,6 +12,8 @@ import { useMemo, useState, type CSSProperties, type KeyboardEvent } from "react
 import { useTranslation } from "react-i18next";
 import { Button } from "../../components/primitives/Button";
 import { Icon } from "../../components/primitives/Icon";
+import { usePrefs } from "../../hooks/usePrefs";
+import { archivedFolderKeys } from "../archivedFolders";
 import { liveCache, useSelectedNote, type NoteId } from "../sidebarState";
 
 type NewTabChooserProps = {
@@ -97,15 +99,22 @@ export function NewTabChooser({
 }: NewTabChooserProps) {
   const { t } = useTranslation();
   const ctx = useSelectedNote();
+  const { prefs } = usePrefs();
   const [query, setQuery] = useState("");
   // Focus the whole search pill (not the bare input) — inline styles can't
   // express `:focus-within`, so track it.
   const [searchFocused, setSearchFocused] = useState(false);
 
+  const archivedKeys = useMemo(
+    () => archivedFolderKeys(prefs.archived_folders),
+    [prefs.archived_folders],
+  );
+
   const rows = useMemo(() => {
-    // `liveCache` is the canonical trash/template visibility predicate
-    // (sidebarState) — reuse it so this picker can't silently diverge.
-    const all = [...liveCache(ctx.cache).values()];
+    // `liveCache` is the canonical trash/template/archive visibility predicate
+    // (sidebarState) — reuse it (with the folder-archive keys) so this picker
+    // can't silently diverge.
+    const all = [...liveCache(ctx.cache, archivedKeys).values()];
     const q = query.trim().toLowerCase();
     const matched =
       q === ""
@@ -116,7 +125,7 @@ export function NewTabChooser({
         (a, b) => (b.updatedAt?.getTime() ?? 0) - (a.updatedAt?.getTime() ?? 0),
       )
       .slice(0, 100);
-  }, [ctx.cache, query]);
+  }, [ctx.cache, query, archivedKeys]);
 
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     if (cancellable && e.key === "Escape") {

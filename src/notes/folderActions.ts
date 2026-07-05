@@ -100,6 +100,116 @@ export async function persistFolderDelete(
   await setDeliberateFolders(plan.nextDeliberate);
 }
 
+// ---- folder archive (folder-archive) ----------------------------------
+//
+// Folder-archive is a pure `archived_folders` prefs-set mutation — NO note
+// frontmatter is rewritten (unlike delete, which soft-trashes the subtree, or
+// note-archive, which patches each note's `archived:` marker). These planners
+// keep the archived-set transform ISOLATED from `planFolderDelete` /
+// `planFolderRenameBatch` (whose signatures + vectors stay stable); the caller
+// composes them with delete/rename in `useFolderManagement`.
+
+export type FolderArchivePlan = {
+  /** The archived_folders set after adding the target (folded-subsumed). */
+  nextArchived: string[];
+  /** Every note in the target subtree — for the caller's deselect-if-open UX
+   *  ONLY. Folder-archive writes NO note frontmatter. */
+  noteIds: string[];
+};
+
+/**
+ * Compute a folder archive. Pure — no IPC. Adds the target's canonical path to
+ * the archived_folders set and drops any existing entry subsumed by it (a
+ * descendant of the target). A no-op set-change if an archived ancestor (or the
+ * target itself) already covers the target. Root (absent) is a no-op.
+ */
+export function planFolderArchive(
+  targetPath: string,
+  tree: FolderTree,
+  archivedFolders: readonly string[],
+): FolderArchivePlan {
+  const normalized = normalizeFolderPath(targetPath);
+  if (normalized === null) {
+    return { nextArchived: [...archivedFolders], noteIds: [] };
+  }
+  const targetKey = foldSegment(normalized); // trailing-slash folded form
+
+  const node = findNode(tree.roots, targetKey);
+  const noteIds = node ? collectSubtreeNoteIds(node) : [];
+
+  // Already covered by the target itself or an archived ancestor → set unchanged.
+  const covered = archivedFolders.some((f) => {
+    const norm = normalizeFolderPath(f);
+    const key = norm === null ? "" : foldSegment(norm);
+    return key.length > 0 && targetKey.startsWith(key);
+  });
+  if (covered) {
+    return { nextArchived: [...archivedFolders], noteIds };
+  }
+
+  // Keep every entry that is NOT a descendant of the target (subsume descendants),
+  // then add the target. targetKey ends with "/", so `startsWith` is sibling-safe.
+  const next: string[] = [];
+  for (const f of archivedFolders) {
+    const norm = normalizeFolderPath(f);
+    const key = norm === null ? "" : foldSegment(norm);
+    if (!key.startsWith(targetKey)) next.push(f);
+  }
+  next.push(normalized);
+  return { nextArchived: next, noteIds };
+}
+
+/**
+ * Remove `targetPath` and every archived descendant from the archived_folders
+ * set (folded-prefix cascade). Pure. Used by folder RESTORE (Archive panel) and
+ * by folder DELETE (a deleted folder's archived entries go with it). Root
+ * (absent) is a no-op.
+ */
+export function planFolderUnarchive(
+  targetPath: string,
+  archivedFolders: readonly string[],
+): string[] {
+  const normalized = normalizeFolderPath(targetPath);
+  if (normalized === null) return [...archivedFolders];
+  const targetKey = foldSegment(normalized);
+  return archivedFolders.filter((f) => {
+    const norm = normalizeFolderPath(f);
+    const key = norm === null ? "" : foldSegment(norm);
+    return !key.startsWith(targetKey);
+  });
+}
+
+/**
+ * Re-root the archived_folders set for a folder rename `oldPath` → `newPath`
+ * (folded-prefix, the SAME subtree selection as the deliberate re-root in
+ * {@link planFolderRenameBatch}). Pure. Returns the rewritten set + the count
+ * changed (0 → the caller skips the write). Without this, renaming an ancestor
+ * of an archived folder would leave a stale entry → the subtree silently
+ * un-archives.
+ */
+export function rerootArchivedFolders(
+  oldPath: string,
+  newPath: string,
+  archivedFolders: readonly string[],
+): { next: string[]; rewritten: number } {
+  const oldNorm = normalizeFolderPath(oldPath);
+  const newNorm = normalizeFolderPath(newPath);
+  if (oldNorm === null || newNorm === null || oldNorm === newNorm) {
+    return { next: [...archivedFolders], rewritten: 0 };
+  }
+  const oldKey = foldSegment(oldNorm);
+  let rewritten = 0;
+  const next = archivedFolders.map((f) => {
+    const norm = normalizeFolderPath(f);
+    if (norm !== null && foldSegment(norm).startsWith(oldKey)) {
+      rewritten++;
+      return newNorm + norm.slice(oldNorm.length);
+    }
+    return f;
+  });
+  return { next, rewritten };
+}
+
 // ---- folder rename ----------------------------------------------------
 
 export type FolderRenameResult = {

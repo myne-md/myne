@@ -381,6 +381,22 @@ pub struct PrefsView {
     #[serde(default)]
     pub archive_disabled: Option<bool>,
 
+    /// Folders archived as a unit (folder-archive) — canonical trailing-slash
+    /// display form. **Same canonical encoding as `deliberate_folders` /
+    /// `ai_excluded_folders`** (NFC-normalized, lexicographically sorted,
+    /// exact-deduped set) and **omitted entirely when empty**, so a vault with no
+    /// archived folders is byte-identical to a pre-feature `vault.prefs` (existing
+    /// golden vectors unaffected — migration-less additive field on `MYP1`, the
+    /// `ai_excluded_folders` precedent class). Default empty. A folder in this set
+    /// (and its subtree) drops out of the working-set sidebar/tree while its notes
+    /// stay resolvable (backlink / graph / search) — the folder-level twin of the
+    /// per-note `archived:` marker. Canonical key `archived_folders` — sorts after
+    /// `archive_disabled` (`archive_` `_`=0x5F < `archived` `d`=0x64), before
+    /// `auto_lock_seconds` (`ar` < `au`). **Non-load-bearing** — a tampered value
+    /// can at worst show/hide a folder subtree; no protective-envelope clamp.
+    #[serde(default)]
+    pub archived_folders: Vec<alloc::string::String>,
+
     /// Editor three-pane layout (sidebar widths + collapsed flags,
     /// MYND-137). `None` = the user never customized the layout → the
     /// field is omitted entirely from the canonical JSON, so a vault
@@ -862,6 +878,7 @@ impl Default for PrefsView {
             ai_enabled: false,
             ai_excluded_folders: Vec::new(),
             archive_disabled: None,
+            archived_folders: Vec::new(),
             editor_layout: None,
             editor_line_numbers: None,
             editor_content_width: None,
@@ -1067,6 +1084,25 @@ fn canonical_json_encode(prefs: &PrefsView) -> Vec<u8> {
         out.extend_from_slice(b"\"archive_disabled\":");
         out.extend_from_slice(if on { b"true" } else { b"false" });
         out.push(b',');
+    }
+
+    // archived_folders (canonical key 'archived_folders' — after archive_disabled
+    // ['archive_' '_'=0x5F < 'archived' 'd'=0x64], before auto_lock_seconds
+    // ['ar' < 'au']). Folders archived as a unit (folder-archive). SAME canonical
+    // encoding as deliberate_folders / ai_excluded_folders (NFC-normalized,
+    // sorted, exact-deduped set), OMITTED entirely when empty so a vault with no
+    // archived folders is byte-identical to a pre-feature vault.prefs (preserves
+    // existing KAT vectors).
+    let archived_folder_list = canonical_folder_list(&prefs.archived_folders);
+    if !archived_folder_list.is_empty() {
+        out.extend_from_slice(b"\"archived_folders\":[");
+        for (i, f) in archived_folder_list.iter().enumerate() {
+            if i > 0 {
+                out.push(b',');
+            }
+            push_json_string(&mut out, f);
+        }
+        out.extend_from_slice(b"],");
     }
 
     // auto_lock_seconds (canonically after active_workspace — 'au' > 'ac';
@@ -1730,14 +1766,34 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
         None => (None, post_ai_excluded),
     };
 
-    // ---- auto_lock_seconds (optional, after archive_disabled) ----
+    // ---- archived_folders (optional, after archive_disabled — folder-archive) ----
+    // Canonical key order archive_disabled < archived_folders < auto_lock_seconds,
+    // so when present this string array is a literal PREFIX of the
+    // post-archive_disabled bytes. Same canonical set encoding as
+    // deliberate_folders / ai_excluded_folders; absent → empty. Value MUST be a
+    // well-formed JSON string array + `,`.
+    let archived_folders_marker = b"\"archived_folders\":";
+    let (archived_folders, post_archived_folders) =
+        match post_archive.strip_prefix(archived_folders_marker) {
+            Some(after) => {
+                let (list, consumed) =
+                    parse_json_string_array(after).ok_or(PrefsBlobError::PlaintextParseFailed)?;
+                let rest = after[consumed..]
+                    .strip_prefix(b",")
+                    .ok_or(PrefsBlobError::PlaintextParseFailed)?;
+                (list, rest)
+            }
+            None => (Vec::new(), post_archive),
+        };
+
+    // ---- auto_lock_seconds (optional, after archived_folders) ----
     // Canonical key order is auto_lock_seconds < deliberate_folders <
-    // screen_capture_protection (and after archive_disabled), so when present
-    // this field is a literal PREFIX of the post-archive_disabled bytes —
+    // screen_capture_protection (and after archived_folders), so when present
+    // this field is a literal PREFIX of the post-archived_folders bytes —
     // matched by `strip_prefix` rather than `find_subslice`, so a later folder
     // name containing a `"auto_lock_seconds":`-looking substring cannot fool it.
     let auto_marker = b"\"auto_lock_seconds\":";
-    let (auto_lock_seconds, rest) = match post_archive.strip_prefix(auto_marker) {
+    let (auto_lock_seconds, rest) = match post_archived_folders.strip_prefix(auto_marker) {
         Some(after) => {
             let (val, consumed) = parse_json_uint(after)?;
             // The integer MUST be followed by `,` — screen_capture_protection
@@ -1959,6 +2015,7 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
         ai_enabled,
         ai_excluded_folders,
         archive_disabled,
+        archived_folders,
         editor_layout,
         editor_line_numbers,
         editor_content_width,
@@ -2720,6 +2777,7 @@ mod tests {
             ai_enabled: false,
             ai_excluded_folders: Vec::new(),
             archive_disabled: None,
+            archived_folders: Vec::new(),
             editor_layout: None,
             editor_line_numbers: None,
             editor_content_width: None,
@@ -2772,6 +2830,7 @@ mod tests {
             ai_enabled: false,
             ai_excluded_folders: Vec::new(),
             archive_disabled: None,
+            archived_folders: Vec::new(),
             editor_layout: None,
             editor_line_numbers: None,
             editor_content_width: None,
@@ -2931,6 +2990,7 @@ mod tests {
                 icon: None,
                 ai_enabled: false,
                 ai_excluded_folders: Vec::new(),
+                archived_folders: Vec::new(),
                 show_note_timestamps: true,
                 folder_icons: Default::default(),
                 hidden_bar_items: Vec::new(),
@@ -2985,6 +3045,7 @@ mod tests {
                 icon: None,
                 ai_enabled: false,
                 ai_excluded_folders: Vec::new(),
+                archived_folders: Vec::new(),
                 show_note_timestamps: true,
                 folder_icons: Default::default(),
                 hidden_bar_items: Vec::new(),
@@ -3581,6 +3642,75 @@ mod tests {
         assert!(decoded.ai_excluded_folders.is_empty());
     }
 
+    // ---- archived_folders (folder-archive) -----------------------------
+
+    #[test]
+    fn archived_folders_omitted_when_empty_present_when_set() {
+        let empty = canonical_json_encode(&PrefsView {
+            archived_folders: Vec::new(),
+            ..PrefsView::default()
+        });
+        assert!(!core::str::from_utf8(&empty)
+            .unwrap()
+            .contains("archived_folders"));
+        let set = canonical_json_encode(&PrefsView {
+            archived_folders: alloc::vec![alloc::string::String::from("Projects/")],
+            ..PrefsView::default()
+        });
+        assert_eq!(
+            set.as_slice(),
+            br#"{"archived_folders":["Projects/"],"screen_capture_protection":true}"#,
+        );
+    }
+
+    #[test]
+    fn archived_folders_encode_sorts_dedupes_between_archive_disabled_and_auto_lock() {
+        // Canonical key order: archive_disabled < archived_folders <
+        // auto_lock_seconds (`archive_` `_`=0x5F < `archived` `d`=0x64; `ar` < `au`).
+        // The set is NFC-sorted + exact-deduped like deliberate_folders.
+        let encoded = canonical_json_encode(&PrefsView {
+            archive_disabled: Some(true),
+            archived_folders: alloc::vec![
+                alloc::string::String::from("Zeta/"),
+                alloc::string::String::from("Alpha/"),
+                alloc::string::String::from("Alpha/"),
+            ],
+            auto_lock_seconds: Some(300),
+            ..PrefsView::default()
+        });
+        assert_eq!(
+            encoded.as_slice(),
+            br#"{"archive_disabled":true,"archived_folders":["Alpha/","Zeta/"],"auto_lock_seconds":300,"screen_capture_protection":true}"#,
+        );
+    }
+
+    #[test]
+    fn archived_folders_round_trip_through_decode() {
+        // Already-canonical (sorted) input → decode reproduces the original,
+        // alongside the neighbors that bracket it in canonical order.
+        let original = PrefsView {
+            archive_disabled: Some(false),
+            archived_folders: alloc::vec![
+                alloc::string::String::from("Archive/"),
+                alloc::string::String::from("Projects/"),
+            ],
+            auto_lock_seconds: Some(900),
+            ..PrefsView::default()
+        };
+        let encoded = canonical_json_encode(&original);
+        let decoded = canonical_json_decode(&encoded).expect("decode");
+        assert_eq!(decoded, original);
+    }
+
+    #[test]
+    fn archived_folders_default_empty_when_absent_on_decode() {
+        // A pre-feature blob (no archived_folders key) decodes to the empty
+        // default, spec § 9.5.2 forward-compat fall-back.
+        let decoded =
+            canonical_json_decode(br#"{"screen_capture_protection":true}"#).expect("decode");
+        assert!(decoded.archived_folders.is_empty());
+    }
+
     // ---- archive_disabled (archive-disable, MYND-…) --------------------
 
     #[test]
@@ -3942,6 +4072,7 @@ mod tests {
         let prefs = PrefsView {
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
+            archived_folders: Vec::new(),
             show_note_timestamps: true,
             folder_icons: Default::default(),
             hidden_bar_items: Vec::new(),
@@ -4253,6 +4384,7 @@ mod tests {
             ai_enabled: false,
             ai_excluded_folders: Vec::new(),
             archive_disabled: None,
+            archived_folders: Vec::new(),
             editor_layout: None,
             editor_line_numbers: None,
             editor_content_width: None,
@@ -4312,6 +4444,7 @@ mod tests {
             ai_enabled: false,
             ai_excluded_folders: Vec::new(),
             archive_disabled: None,
+            archived_folders: Vec::new(),
             editor_layout: None,
             editor_line_numbers: None,
             editor_content_width: None,
@@ -4369,6 +4502,7 @@ mod tests {
             ai_enabled: false,
             ai_excluded_folders: Vec::new(),
             archive_disabled: None,
+            archived_folders: Vec::new(),
             editor_layout: None,
             editor_line_numbers: None,
             editor_content_width: None,
@@ -4425,6 +4559,7 @@ mod tests {
             ai_enabled: false,
             ai_excluded_folders: Vec::new(),
             archive_disabled: None,
+            archived_folders: Vec::new(),
             editor_layout: None,
             editor_line_numbers: None,
             editor_content_width: None,
@@ -4544,6 +4679,7 @@ mod tests {
             ai_enabled: false,
             ai_excluded_folders: Vec::new(),
             archive_disabled: None,
+            archived_folders: Vec::new(),
             editor_layout: None,
             editor_line_numbers: None,
             editor_content_width: None,
@@ -4628,6 +4764,7 @@ mod tests {
             ai_enabled: false,
             ai_excluded_folders: Vec::new(),
             archive_disabled: None,
+            archived_folders: Vec::new(),
             editor_layout: None,
             editor_line_numbers: None,
             editor_content_width: None,
@@ -4691,6 +4828,7 @@ mod tests {
             ai_enabled: false,
             ai_excluded_folders: Vec::new(),
             archive_disabled: None,
+            archived_folders: Vec::new(),
             editor_layout: None,
             editor_line_numbers: None,
             editor_content_width: None,
@@ -4789,6 +4927,7 @@ mod tests {
             ai_enabled: false,
             ai_excluded_folders: Vec::new(),
             archive_disabled: None,
+            archived_folders: Vec::new(),
             editor_layout: None,
             editor_line_numbers: None,
             editor_content_width: None,
@@ -4863,6 +5002,7 @@ mod tests {
             ai_enabled: false,
             ai_excluded_folders: Vec::new(),
             archive_disabled: None,
+            archived_folders: Vec::new(),
             editor_layout: None,
             editor_line_numbers: None,
             editor_content_width: None,
@@ -4984,6 +5124,7 @@ mod tests {
             ai_enabled: false,
             ai_excluded_folders: Vec::new(),
             archive_disabled: None,
+            archived_folders: Vec::new(),
             editor_layout: None,
             editor_line_numbers: None,
             editor_content_width: None,
@@ -5040,6 +5181,7 @@ mod tests {
             ai_enabled: false,
             ai_excluded_folders: Vec::new(),
             archive_disabled: None,
+            archived_folders: Vec::new(),
             editor_layout: None,
             editor_line_numbers: None,
             editor_content_width: None,
@@ -5098,6 +5240,7 @@ mod tests {
             ai_enabled: false,
             ai_excluded_folders: Vec::new(),
             archive_disabled: None,
+            archived_folders: Vec::new(),
             editor_layout: None,
             editor_line_numbers: None,
             editor_content_width: None,
@@ -5224,6 +5367,7 @@ mod tests {
             ai_enabled: false,
             ai_excluded_folders: Vec::new(),
             archive_disabled: None,
+            archived_folders: Vec::new(),
             editor_layout: None,
             editor_line_numbers: None,
             editor_content_width: None,
@@ -5305,6 +5449,7 @@ mod tests {
         let prefs = PrefsView {
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
+            archived_folders: Vec::new(),
             show_note_timestamps: true,
             folder_icons: Default::default(),
             hidden_bar_items: Vec::new(),
@@ -5614,6 +5759,7 @@ mod tests {
             ai_enabled: false,
             ai_excluded_folders: Vec::new(),
             archive_disabled: None,
+            archived_folders: Vec::new(),
             editor_layout: None,
             editor_line_numbers: None,
             editor_content_width: None,
@@ -5674,6 +5820,7 @@ mod tests {
             ai_enabled: false,
             ai_excluded_folders: Vec::new(),
             archive_disabled: None,
+            archived_folders: Vec::new(),
             editor_layout: None,
             editor_line_numbers: None,
             editor_content_width: None,
@@ -5979,6 +6126,7 @@ mod tests {
                 icon: None,
                 ai_enabled: false,
                 ai_excluded_folders: Vec::new(),
+                archived_folders: Vec::new(),
                 show_note_timestamps: true,
                 folder_icons: Default::default(),
                 hidden_bar_items: Vec::new(),
@@ -6032,6 +6180,7 @@ mod tests {
                 icon: None,
                 ai_enabled: false,
                 ai_excluded_folders: Vec::new(),
+                archived_folders: Vec::new(),
                 show_note_timestamps: true,
                 folder_icons: Default::default(),
                 hidden_bar_items: Vec::new(),
@@ -6086,6 +6235,7 @@ mod tests {
             bar_items_order: Vec::new(),
             ai_enabled: false,
             ai_excluded_folders: Vec::new(),
+            archived_folders: Vec::new(),
             show_note_timestamps: true,
             folder_icons: Default::default(),
             hidden_bar_items: Vec::new(),
@@ -7243,6 +7393,113 @@ mod tests {
             dump.as_bytes(),
         )
         .expect("write archive_disabled prefs vector dump");
+    }
+
+    /// Generator for the `archived_folders` (folder-archive) vector cases —
+    /// appended to the companion repo's `vault-prefs` family (per-feature
+    /// generator, keeps the originals byte-stable — the
+    /// [`emit_archive_disabled_prefs_vector`] pattern):
+    ///
+    /// `cargo test -p protocol --lib emit_archived_folders_prefs_vectors -- --ignored`
+    ///
+    /// One `encrypt` + one `decrypt_ok` case for a prefs blob carrying the
+    /// folder-archive set (`archived_folders: ["Alpha/","Zeta/"]`, given unsorted
+    /// with a duplicate to pin the set-canonical sort+dedup). Its canonical key
+    /// slot sits between `archive_disabled` and `auto_lock_seconds`, so both
+    /// neighbors are present to pin the exact ordering. Nonce `0xAF` is a free
+    /// entry in the family's nonce registry. Omit-when-empty keeps an untouched
+    /// vault byte-identical to a pre-feature blob (`encrypt-default` pins the
+    /// bare form).
+    #[test]
+    #[ignore]
+    fn emit_archived_folders_prefs_vectors() {
+        extern crate std;
+
+        let root_a: [u8; 32] = [0x42; 32];
+        let account_hash_a: [u8; PREFS_BLOB_ACCOUNT_HASH_LEN] = [0x33; PREFS_BLOB_ACCOUNT_HASH_LEN];
+        let prefs_key_a = derive_subkey(&root_a, SubkeyRole::PrefsKey);
+
+        let nonce: [u8; AEAD_NONCE_LEN] = [0xAF; AEAD_NONCE_LEN];
+        let prefs = PrefsView {
+            archive_disabled: Some(true),
+            archived_folders: alloc::vec![
+                alloc::string::String::from("Zeta/"),
+                alloc::string::String::from("Alpha/"),
+                alloc::string::String::from("Alpha/"),
+            ],
+            auto_lock_seconds: Some(300),
+            ..PrefsView::default()
+        };
+        let canonical = canonical_json_encode(&prefs);
+        assert_eq!(
+            canonical.as_slice(),
+            br#"{"archive_disabled":true,"archived_folders":["Alpha/","Zeta/"],"auto_lock_seconds":300,"screen_capture_protection":true}"#.as_slice(),
+            "canonical plaintext must sort+dedupe archived_folders and place it between archive_disabled and auto_lock_seconds",
+        );
+        let blob = encode_prefs_blob_raw(&prefs_key_a, &account_hash_a, &prefs, &nonce)
+            .expect("encode archived_folders");
+        let decoded = decode_prefs_blob(&prefs_key_a, &account_hash_a, &blob).expect("decode");
+        // The encoder sorts + dedupes the set, so the decoded form carries the
+        // canonical `["Alpha/","Zeta/"]` (not the unsorted+dup input struct).
+        assert_eq!(
+            decoded.archived_folders,
+            alloc::vec![
+                alloc::string::String::from("Alpha/"),
+                alloc::string::String::from("Zeta/"),
+            ]
+        );
+        assert_eq!(decoded.archive_disabled, Some(true));
+        assert_eq!(decoded.auto_lock_seconds, Some(300));
+
+        let mut dump = alloc::string::String::new();
+        dump.push_str("---begin archived_folders prefs vectors (folder-archive)---\n\n");
+
+        dump.push_str("# case 1/2: encrypt-archived-folders\n");
+        dump.push_str(&alloc::format!("root_key_hex: {}\n", hex_lower(&root_a)));
+        dump.push_str(&alloc::format!(
+            "prefs_key_hex (informational): {}\n",
+            hex_lower(&*prefs_key_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "account_number_hash_hex: {}\n",
+            hex_lower(&account_hash_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "plaintext_canonical_utf8_hex: {}\n",
+            hex_lower(&canonical)
+        ));
+        dump.push_str(&alloc::format!(
+            "plaintext_canonical_utf8: {}\n",
+            core::str::from_utf8(&canonical).unwrap_or("<non-utf8>")
+        ));
+        dump.push_str(&alloc::format!("prefs_nonce_hex: {}\n", hex_lower(&nonce)));
+        dump.push_str(&alloc::format!(
+            "expected_prefs_blob_hex: {}\n\n",
+            hex_lower(&blob)
+        ));
+
+        dump.push_str("# case 2/2: decrypt-archived-folders (round-trip with case 1)\n");
+        dump.push_str(&alloc::format!("input_blob_hex: {}\n", hex_lower(&blob)));
+        dump.push_str(&alloc::format!("root_key_hex: {}\n", hex_lower(&root_a)));
+        dump.push_str(&alloc::format!(
+            "account_number_hash_hex: {}\n",
+            hex_lower(&account_hash_a)
+        ));
+        dump.push_str("expected_kind: ok\n");
+        dump.push_str(&alloc::format!(
+            "expected_plaintext_canonical_utf8_hex: {}\n",
+            hex_lower(&canonical)
+        ));
+        dump.push_str(
+            "expected_prefs_view: { \"archive_disabled\": true, \"archived_folders\": [\"Alpha/\", \"Zeta/\"], \"auto_lock_seconds\": 300, \"screen_capture_protection\": true }\n\n",
+        );
+
+        dump.push_str("---end archived_folders prefs vectors---\n");
+        std::fs::write(
+            "/tmp/myne_vault_prefs_archived_folders_vectors.txt",
+            dump.as_bytes(),
+        )
+        .expect("write archived_folders prefs vector dump");
     }
 
     /// Generator for the batch editor-prefs (MYND-308 / MYND-299 / MYND-348)

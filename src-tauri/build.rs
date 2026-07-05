@@ -123,6 +123,7 @@ fn main() {
                 "prefs_read",
                 "set_screen_capture_protection",
                 "set_deliberate_folders",
+                "set_archived_folders",
                 "vault_set_label",
                 "vault_set_icon",
             ]),

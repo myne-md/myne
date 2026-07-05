@@ -24,6 +24,7 @@ import {
   type ReactNode,
 } from "react";
 import { createNote } from "./createNote";
+import { isNoteFolderArchived } from "./archivedFolders";
 import { prefsRead, normalizeNewNoteLocation } from "../lib/prefs";
 import { deleteNoteRouted } from "./deleteNote";
 import {
@@ -163,18 +164,24 @@ export function applyOptimisticCreate(
  */
 export function liveCache(
   cache: ReadonlyMap<NoteId, TitleRecord>,
+  archivedKeys: readonly string[] = [],
 ): Map<NoteId, TitleRecord> {
   const live = new Map<NoteId, TitleRecord>();
   for (const [id, record] of cache) {
     // `== null` (loose) treats a missing marker as live — defensive against a
     // record constructed without the field. Templates are excluded regardless of
-    // trash/archive state (a template is never part of the working set).
+    // trash/archive state (a template is never part of the working set). A note
+    // under a FOLDER-archived path (`archived_folders`, folder-archive) is also
+    // out of the working set — the folder-level twin of the per-note `archived:`
+    // marker; like note-archive (and unlike trash) it stays in {@link
+    // resolverCache}, so `archivedKeys` deliberately does NOT touch that axis.
     if (
       record.trashed == null &&
       record.deleted == null &&
       record.archived == null &&
       record.template !== true &&
-      record.conflict !== true
+      record.conflict !== true &&
+      !isNoteFolderArchived(record.folder, archivedKeys)
     ) {
       live.set(id, record);
     }
