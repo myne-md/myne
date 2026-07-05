@@ -1,0 +1,118 @@
+// Conversational AI chat flow suite (conversational-ai-chat MYND-454, task 14).
+// Drives the end-to-end streaming chat surface through the `ai.*` testids on the
+// real tauri-driver harness, against the **`local-inference-stub` build variant**
+// (the deterministic `StubEngine` — no model file in the repo; SYNC-5). The
+// audited production bundle never enables that feature, so this suite runs ONLY
+// when the AI-feature binary is under test — gated on `MYNE_E2E_AI=1`, which the
+// feature-flagged build sets (see `docs/dev/e2e.md`).
+//
+//   ac1 — enable AI → open the AI Chat tab → send a message → a streamed
+//         assistant turn appears in the transcript → a follow-up appends another
+//         exchange (multi-turn) → lock + re-unlock clears the transcript
+//         (RAM-only, dropped on lock).
+//
+// The stub engine returns deterministic `stub-infer: …` output over the token
+// `Channel`, so the transcript is assertable without shipping a model. The hard
+// no-egress guarantee is the Rust gate (`ai-no-network-check.sh`); this
+// behavioral suite asserts the flow completes locally (no error state).
+//
+// Notes on coverage: the streaming CARET and the STOP control are covered by the
+// Vitest component tests (AiChatTab) — the stub streams too fast to reliably
+// catch a mid-stream Stop here. CITATIONS depend on embedded-note retrieval
+// (embed-on-unlock over the stub's zero-vectors); this suite asserts the core
+// send → stream → follow-up → lock-clears path, which is deterministic.
+//
+// KDF: weak generator fixture (SYNC-9 — params are vault.meta-resident).
+
+import { describe, expect, it } from "vitest";
+import { describeE2E, scenario } from "./support/scenario";
+import { seedVault } from "./support/fixtures";
+import {
+  createNote,
+  dismissImporterOffer,
+  enableAi,
+  runPaletteAction,
+  typeIntoEditor,
+  unlockToEditor,
+  waitForSaved,
+} from "./support/flows";
+import { testIdSelector } from "./support/webdriver";
+
+/** Only run when the binary under test is the AI-feature (`local-inference-stub`)
+ *  build — the default production bundle has no AI commands, so these testids
+ *  never appear there. The feature-flagged build sets `MYNE_E2E_AI=1`. */
+const aiDescribe = process.env.MYNE_E2E_AI === "1" ? describeE2E : describe.skip;
+
+aiDescribe("ac1 conversational AI chat → stream → follow-up → lock clears", () => {
+  // Vault-count precondition: 1 (weak KDF). Requires the local-inference-stub build.
+  it("streams a chat answer, remembers a follow-up, and wipes the transcript on lock", async () => {
+    let password = "";
+    await scenario(
+      "ac1-ai-chat",
+      { seed: (dir) => void (password = seedVault(dir).password) },
+      async (app) => {
+        const s = app.session;
+        await unlockToEditor(s, password);
+        await dismissImporterOffer(s);
+        await createNote(s, "ac1notealfa7k2m9qx4w8e5rj0aa");
+        await typeIntoEditor(s, "The mitochondria is the powerhouse of the cell.");
+        await waitForSaved(s);
+
+        // Turn AI on (off by default, SYNC-12) and reveal the AI Chat tab.
+        await enableAi(s);
+        await runPaletteAction(s, "ai.open-chat", "chat");
+
+        // Send the first message via the composer (click the Send button — never
+        // a synthetic Enter keystroke, which carries invisible-char footguns).
+        const composer = await s.byTestId("ai.composer-input", { timeoutMs: 10_000 });
+        await composer.sendKeys("what is this note about?");
+        await (await s.byTestId("ai.composer-send")).click();
+
+        // The transcript appears with a user turn + a streamed assistant turn.
+        await s.waitForElement(testIdSelector("ai.transcript"), { timeoutMs: 15_000 });
+        await s.waitUntil(
+          async () => ((await s.byTestIdAll("ai.turn")).length >= 2 ? true : null),
+          { label: "user + assistant turns present", timeoutMs: 15_000 },
+        );
+        const turns = await s.byTestIdAll("ai.turn");
+        expect(turns.length).toBe(2);
+        expect(await turns[0]!.attribute("data-role")).toBe("user");
+        expect(await turns[1]!.attribute("data-role")).toBe("assistant");
+        // The stub engine's deterministic marker proves the token stream arrived.
+        await s.waitUntil(
+          async () =>
+            (await (await s.byTestIdAll("ai.turn"))[1]!.textContent()).includes("stub-infer:")
+              ? true
+              : null,
+          { label: "assistant turn streamed the stub output", timeoutMs: 15_000 },
+        );
+        // No error state on the happy path.
+        expect((await s.byTestIdAll("ai.turn-error")).length).toBe(0);
+
+        // Follow-up: a second message appends another exchange (multi-turn).
+        const composer2 = await s.byTestId("ai.composer-input");
+        await composer2.sendKeys("say more");
+        await (await s.byTestId("ai.composer-send")).click();
+        await s.waitUntil(
+          async () => ((await s.byTestIdAll("ai.turn")).length >= 4 ? true : null),
+          { label: "follow-up appended a second exchange", timeoutMs: 15_000 },
+        );
+
+        // Lock the vault → the RAM-only transcript is dropped. Re-unlock and
+        // reveal the tab: the transcript is gone (fresh conversation).
+        await (await s.byTestId("editor.lock-cta")).click();
+        const pw = await s.byTestId("unlock.password-input", { timeoutMs: 15_000 });
+        await pw.sendKeys(password);
+        await (await s.byTestId("unlock.submit")).click();
+        await dismissImporterOffer(s);
+        await runPaletteAction(s, "ai.open-chat", "chat");
+        // Transcript cleared on lock (task 12): no turns, no transcript region.
+        await s.waitUntil(
+          async () => ((await s.byTestIdAll("ai.turn")).length === 0 ? true : null),
+          { label: "transcript cleared after lock", timeoutMs: 15_000 },
+        );
+        expect((await s.byTestIdAll("ai.turn")).length).toBe(0);
+      },
+    );
+  });
+});

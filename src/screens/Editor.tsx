@@ -113,13 +113,12 @@ import { UnlinkedMentionsSection } from "../notes/components/UnlinkedMentionsSec
 import { AiChatTab } from "../notes/components/AiChatTab";
 import { clearAiOutput } from "../notes/ai/aiOutputStore";
 import { clearTagSuggest } from "../notes/ai/tagSuggestStore";
-import { runSummarizeToStore } from "../notes/ai/runSummarizeToStore";
-import { runTagSuggestToStore } from "../notes/ai/runTagSuggestToStore";
-import { runAskToStore } from "../notes/ai/runAskToStore";
+import { clearChat, stopChatTurn } from "../notes/ai/chatStore";
+import { runSummarizeToChat, runTagSuggestToChat } from "../notes/ai/aiToChat";
 import { appendSummaryBlock, SUMMARIZE_BUDGET_CHARS } from "../notes/ai/summarize";
 import { appendInlineTag } from "../notes/ai/acceptTag";
 import { infer as aiInfer, computeRewrite } from "../lib/writing-assistant";
-import { askQuestion } from "../lib/ai-qa";
+import { sendChat, stopChat } from "../lib/ai-chat";
 import { isNoteAiExcluded } from "../lib/aiExcludedFolders";
 import { getActiveEditorView } from "../editor/active-view";
 import { tagTree } from "../notes/vaultIndices";
@@ -303,9 +302,9 @@ interface EditorProps {
   /**
    * Pass-through to SettingsModal → AccountPanel. Fired on successful
    * `vault_delete` IPC OR Continue-after-partial-fail click. App.tsx
-   * wires this to `dispatch({ type: "editor.delete-vault-success" })`;
-   * Stage transitions to welcome, this Editor unmounts, the
-   * SettingsModal unmounts in cascade.
+   * wires this to `reprobe()`; boot routing picks the return surface by
+   * remaining vault count (picker at ≥2, unlock at 1, welcome at 0),
+   * this Editor unmounts, the SettingsModal unmounts in cascade.
    */
   onDeleteVaultSuccess: () => void;
   /**
@@ -2145,11 +2144,15 @@ function CommandPaletteHost({
   const { prefs: aiPrefs, setRightPanelActiveTab: revealRightPanelTab } = usePrefs();
   // Drop the ephemeral AI render stores when the editor session tears down
   // (lock / vault-switch unmounts this host) — the AS1 artifacts (summary text +
-  // tag suggestions) never outlive the open vault (SYNC-8).
+  // tag suggestions + the chat transcript) never outlive the open vault (SYNC-8;
+  // conversational-ai-chat task 12: the chat transcript is RAM-only, wiped on
+  // lock. Unlike summary/tags it is vault-scoped, so it is NOT cleared on a mere
+  // note switch below — only here, on the vault teardown).
   useEffect(
     () => () => {
       clearAiOutput();
       clearTagSuggest();
+      clearChat();
     },
     [],
   );
@@ -2252,7 +2255,7 @@ function CommandPaletteHost({
         if (cached === undefined) return;
         // A cached entry with `folder === null` is a genuine root note ("").
         if (isNoteAiExcluded(cached.folder ?? "", aiPrefs.ai_excluded_folders)) return;
-        void runSummarizeToStore({
+        void runSummarizeToChat({
           state: view.state,
           budget: SUMMARIZE_BUDGET_CHARS,
           infer: aiInfer,
@@ -2276,7 +2279,7 @@ function CommandPaletteHost({
         if (isNoteAiExcluded(noteFolder, aiPrefs.ai_excluded_folders)) return;
         void (async () => {
           const existingTags = (await tagTree()).map((n) => n.display);
-          await runTagSuggestToStore({
+          await runTagSuggestToChat({
             noteBody: view.state.doc.toString(),
             noteFolder,
             existingTags,
@@ -2845,22 +2848,15 @@ function RightSidebar() {
                 userEvent: "ai.rewrite",
               });
             }}
-            onAsk={
-              prefs.ai_enabled
-                ? (q) => {
-                    // Grounded Q&A (semantic-search-qa tasks 6/7, SYNC-17): the
-                    // AI Chat tab's question box drives the tested
-                    // `runAskToStore` pipeline (THINKING → blocking on-device
-                    // `ask` → RESOLVED answer) into the shared output store. The
-                    // answer grounds ONLY on resident, non-excluded chunks
-                    // (excluded notes are never embedded). Explicit user action.
-                    void runAskToStore({
-                      question: q,
-                      ask: (question) => askQuestion(question).then((r) => r.answer),
-                    });
-                  }
-                : undefined
-            }
+            onSend={(m) => void sendChat(m)}
+            onStop={() => {
+              // Instant UI: close the turn keeping the partial; then signal the
+              // backend to abort the in-flight generation (task 4/9).
+              stopChatTurn();
+              void stopChat();
+            }}
+            onOpenNote={(noteId) => void ctx.open(noteId as NoteId).catch(() => {})}
+            titleOf={(noteId) => notes.find((n) => n.noteUuid === noteId)?.title ?? null}
           />
         ) : null}
       </div>

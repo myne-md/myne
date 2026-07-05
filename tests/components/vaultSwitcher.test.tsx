@@ -20,12 +20,14 @@ vi.mock("../../src/lib/vault-list", async () => {
 });
 
 import { VaultSwitcher } from "../../src/components/VaultSwitcher";
+import { VAULT_PREFS_CHANGED_EVENT } from "../../src/lib/prefs";
 import type { VaultSummary } from "../../src/types/vault-summary";
 
 function summary(over: Partial<VaultSummary> & { id: string }): VaultSummary {
   return {
     status: { kind: "Exists" },
     label: null,
+    icon: null,
     last_unlock: null,
     ...over,
   };
@@ -87,6 +89,66 @@ describe("VaultSwitcher — render gates", () => {
       expect(screen.getByTestId("switcher.chip").textContent).toContain(
         "Vault 1",
       ),
+    );
+  });
+
+  it("renders the active vault's icon glyph in the chip mark", async () => {
+    renderSwitcher([
+      summary({ id: "v1", label: "Work", icon: "book", last_unlock: 2000 }),
+    ]);
+    await waitFor(() =>
+      expect(
+        screen.getByTestId("switcher.chip-mark").getAttribute("data-icon"),
+      ).toBe("book"),
+    );
+  });
+
+  it("falls back to the wordmark when the active vault has no icon", async () => {
+    renderSwitcher([summary({ id: "v1", label: "Work", last_unlock: 2000 })]);
+    await waitFor(() =>
+      expect(
+        screen.getByTestId("switcher.chip-mark").getAttribute("data-icon"),
+      ).toBe("wordmark"),
+    );
+  });
+
+  it("falls back to the wordmark for an unknown/stale glyph name", async () => {
+    renderSwitcher([
+      summary({
+        id: "v1",
+        label: "Work",
+        icon: "not-a-real-glyph",
+        last_unlock: 2000,
+      }),
+    ]);
+    await waitFor(() =>
+      expect(
+        screen.getByTestId("switcher.chip-mark").getAttribute("data-icon"),
+      ).toBe("wordmark"),
+    );
+  });
+
+  it("live-refreshes the chip when a vault-prefs-changed event fires", async () => {
+    // Mount with no icon → wordmark. A prefs write elsewhere (Settings) fires
+    // VAULT_PREFS_CHANGED_EVENT; the switcher re-probes and picks up the glyph
+    // without the dropdown ever being opened.
+    renderSwitcher([summary({ id: "v1", label: "Work", last_unlock: 2000 })]);
+    await waitFor(() =>
+      expect(
+        screen.getByTestId("switcher.chip-mark").getAttribute("data-icon"),
+      ).toBe("wordmark"),
+    );
+
+    // Backend now reports the vault carrying the "book" icon.
+    listVaults.mockResolvedValue({
+      ok: [summary({ id: "v1", label: "Work", icon: "book", last_unlock: 2000 })],
+    });
+    fireEvent(window, new CustomEvent(VAULT_PREFS_CHANGED_EVENT));
+
+    await waitFor(() =>
+      expect(
+        screen.getByTestId("switcher.chip-mark").getAttribute("data-icon"),
+      ).toBe("book"),
     );
   });
 });

@@ -605,17 +605,27 @@
         "aiChat": {
           "askPlaceholder": "Ask a question about your notes…",
           "askSubmit": "Ask",
+          "assistant": "Assistant",
+          "citations": "Sources",
+          "composerPlaceholder": "Message your notes…",
           "empty": "AI output — summaries, answers, and suggestions — appears here.",
           "error": "The AI request could not be completed.",
+          "errorTurn": "The assistant could not answer.",
+          "gettingReadyHint": "Preparing your notes for AI — one moment.",
           "insert": "Insert into note",
+          "noAnswer": "No answer — try rephrasing.",
           "noModelHint": "No model selected. Choose one in Settings → Labs → AI to start.",
           "offHint": "Local AI is off. Turn it on in Settings → Labs → AI.",
+          "send": "Send",
+          "statusGettingReady": "Preparing…",
           "statusNoModel": "No model",
           "statusOff": "Off",
           "statusReady": "Ready",
+          "stop": "Stop",
           "tagsThinking": "Suggesting tags…",
           "thinking": "AI is thinking…",
-          "truncated": "Summarized the first {{count}} characters."
+          "truncated": "Summarized the first {{count}} characters.",
+          "you": "You"
         },
         "allHidden": "All tabs are hidden — right-click to restore.",
         "outline": {
@@ -939,6 +949,7 @@
   },
   "notes": {
     "archive": {
+      "cancel": "Cancel",
       "close": "Close",
       "count_one": "{{count}} note",
       "count_other": "{{count}} notes",
@@ -946,6 +957,10 @@
       "delete": "Delete",
       "deleteError": "Couldn't delete that note. Try again.",
       "emptyState": "Archive is empty.",
+      "folderDeleteConfirm_one": "Move {{count}} note to Trash?",
+      "folderDeleteConfirm_other": "Move {{count}} notes to Trash?",
+      "folderDeleteConfirmCta": "Move to Trash",
+      "folderDeleteError": "Couldn't move that folder's notes to Trash. Try again.",
       "restore": "Restore",
       "restoreError": "Couldn't restore that note. Try again.",
       "title": "Archive",
@@ -1121,6 +1136,7 @@
       "addToFavorites": "Add to favorites",
       "archive": "Archive",
       "archiveBulkError": "Couldn't archive the notes.",
+      "archiveFolder": "Archive folder",
       "archiveNote": "Archive",
       "archiveSingleError": "Couldn't archive the note.",
       "attachments": "Attachments",
@@ -1498,7 +1514,9 @@
       "vaultLabelEyebrow": "VAULT LABEL",
       "vaultLabelHelper": "A name for this vault shown in the in-app switcher. Stored encrypted inside the vault; never leaves your device in plaintext.",
       "vaultLabelPlaceholder": "Add a label…",
-      "vaultLabelSave": "Save"
+      "vaultLabelSave": "Save",
+      "vaultIconLabel": "ICON",
+      "vaultIconDefault": "Default (wordmark)"
     },
     "appearance": {
       "showEditTimesAria": "Show edit times in sidebar",
@@ -1574,6 +1592,11 @@
         "minutesAgo_other": "Connected {{count}} min ago",
         "onDate": "Connected {{date}}"
       }
+    },
+    "clipperInstall": {
+      "error": "Could not update the browser clipper setting.",
+      "helper": "Register the native-messaging host so the Myne browser extension can send clips to this app. On by default; turn off to remove it.",
+      "label": "Browser clipper"
     },
     "customThemes": {
       "appliedBadge": "Applied",

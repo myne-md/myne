@@ -16,10 +16,13 @@
 // The list/Revoke wrappers are mocked in tests; in a non-Tauri context (dev)
 // `invoke` rejects — treat that as "no connected extensions", never throw.
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
+import { useTranslation } from "react-i18next";
 import {
+  getClipperInstallStatus,
   listPairedExtensions,
   revokePairedExtension,
+  setClipperInstallEnabled,
   type PairedExtension,
 } from "../../lib/clipper-pairing";
 import {
@@ -30,9 +33,31 @@ import {
   CONNECTED_EXTENSIONS_TITLE,
 } from "../../lib/load-bearing-copy";
 import { Button } from "../primitives/Button";
+import { Switch } from "../primitives/Switch";
 import { BLOCK_STYLE, HELPER_STYLE, LABEL_STYLE } from "./panel-styles";
 import { BrowserIcon, browserLabel } from "./browser-icons";
 import i18n from "../../i18n";
+
+const INSTALL_ROW_STYLE: CSSProperties = {
+  display: "flex",
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: "var(--space-3)",
+};
+
+const INSTALL_TEXT_STYLE: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  minWidth: 0,
+};
+
+const INSTALL_ERROR_STYLE: CSSProperties = {
+  marginTop: "var(--space-2)",
+  fontFamily: "var(--font-sans)",
+  fontSize: "var(--text-sm)",
+  color: "var(--danger)",
+};
 
 const ROW_STYLE = {
   display: "flex",
@@ -99,11 +124,16 @@ function connectedWhen(pairedAt: number | null): string {
 }
 
 export function ConnectedExtensions() {
+  const { t } = useTranslation();
   const [paired, setPaired] = useState<PairedExtension[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
+  const [installEnabled, setInstallEnabled] = useState(true);
+  const [installBusy, setInstallBusy] = useState(false);
+  const [installError, setInstallError] = useState<string | null>(null);
 
-  // Fetch the paired list on mount. In a non-Tauri context (dev/tests) invoke
-  // rejects — treat that as "none connected", never throw.
+  // Fetch the paired list + install status on mount. In a non-Tauri context
+  // (dev/tests) invoke rejects — treat that as "none connected" / leave the
+  // toggle at its default, never throw.
   useEffect(() => {
     let alive = true;
     listPairedExtensions()
@@ -113,10 +143,34 @@ export function ConnectedExtensions() {
       .catch(() => {
         if (alive) setPaired([]);
       });
+    getClipperInstallStatus()
+      .then((status) => {
+        if (alive) setInstallEnabled(status.enabled);
+      })
+      .catch(() => {
+        /* dev / not registered — leave the default; the toggle is inert */
+      });
     return () => {
       alive = false;
     };
   }, []);
+
+  async function onToggleInstall(next: boolean) {
+    if (installBusy) return;
+    setInstallBusy(true);
+    setInstallError(null);
+    const prev = installEnabled;
+    setInstallEnabled(next); // optimistic
+    try {
+      const status = await setClipperInstallEnabled(next);
+      setInstallEnabled(status.enabled);
+    } catch {
+      setInstallEnabled(prev); // rollback
+      setInstallError(t("settings.clipperInstall.error"));
+    } finally {
+      setInstallBusy(false);
+    }
+  }
 
   async function refresh() {
     try {
@@ -140,9 +194,30 @@ export function ConnectedExtensions() {
   }
 
   return (
-    <div style={BLOCK_STYLE} data-testid="settings.connected-extensions">
-      <span style={LABEL_STYLE}>{CONNECTED_EXTENSIONS_TITLE}</span>
-      <p style={HELPER_STYLE}>{CONNECTED_EXTENSIONS_HELPER}</p>
+    <>
+      <div
+        style={BLOCK_STYLE}
+        data-testid="settings.clipper-install"
+        data-enabled={String(installEnabled)}
+      >
+        <div style={INSTALL_ROW_STYLE}>
+          <div style={INSTALL_TEXT_STYLE}>
+            <span style={LABEL_STYLE}>{t("settings.clipperInstall.label")}</span>
+            <p style={HELPER_STYLE}>{t("settings.clipperInstall.helper")}</p>
+          </div>
+          <Switch
+            checked={installEnabled}
+            onChange={installBusy ? undefined : (next) => void onToggleInstall(next)}
+            testId="settings.clipper-install-toggle"
+            ariaLabel={t("settings.clipperInstall.label")}
+          />
+        </div>
+        {installError !== null && <p style={INSTALL_ERROR_STYLE}>{installError}</p>}
+      </div>
+
+      <div style={BLOCK_STYLE} data-testid="settings.connected-extensions">
+        <span style={LABEL_STYLE}>{CONNECTED_EXTENSIONS_TITLE}</span>
+        <p style={HELPER_STYLE}>{CONNECTED_EXTENSIONS_HELPER}</p>
 
       {paired.length === 0 ? (
         <p style={HELPER_STYLE} data-testid="settings.connected-extensions-empty">
@@ -188,6 +263,7 @@ export function ConnectedExtensions() {
           <p style={HELPER_STYLE}>{CONNECTED_EXTENSIONS_REPAIR_HINT}</p>
         </>
       )}
-    </div>
+      </div>
+    </>
   );
 }

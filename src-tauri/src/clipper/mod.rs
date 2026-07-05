@@ -78,6 +78,7 @@ pub mod envelope;
 pub mod framing;
 pub mod host;
 pub mod ingest;
+pub mod install;
 pub mod manifest;
 pub mod rate_limit;
 pub mod relay;

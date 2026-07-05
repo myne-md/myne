@@ -18,15 +18,18 @@ import {
 } from "react";
 import {
   foldSegment,
+  folderKey,
   isLegalPathLength,
   isLegalSegment,
   normalizeFolderPath,
   validateFolderNameInput,
   type FolderInputRejection,
 } from "../../dialect/folderPath";
+import { collectSubtreeNoteIdsFromCache } from "../archivedFolders";
 import i18n from "../../i18n";
 import { usePrefs } from "../../hooks/usePrefs";
 import {
+  setArchivedFolders,
   setDeliberateFolders,
   setFavorites as persistFavorites,
   setFolderIcons as persistFolderIcons,
@@ -35,8 +38,12 @@ import {
 } from "../../lib/prefs";
 import {
   persistFolderDelete,
+  planFolderArchive,
   planFolderDelete,
+  planFolderUnarchive,
   renameFolder,
+  rerootArchivedFolders,
+  type FolderArchivePlan,
   type FolderDeletePlan,
 } from "../folderActions";
 import { moveNote } from "../moveNote";
@@ -123,6 +130,14 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
   useEffect(() => {
     setDeliberate(prefs.deliberate_folders);
   }, [prefs.deliberate_folders]);
+
+  // Folder-archive set (`archived_folders`) — the folder-level twin of the
+  // per-note `archived:` marker; synced from prefs, mutated optimistically by
+  // the archive / restore / delete / rename handlers, persisted best-effort.
+  const [archivedFolders, setArchivedFoldersState] = useState<string[]>([]);
+  useEffect(() => {
+    setArchivedFoldersState(prefs.archived_folders);
+  }, [prefs.archived_folders]);
 
   // Unified manual sidebar order (`item_order` prefs sequence) + favorites
   // (`favorites` prefs sequence, MYND-183), synced from the mount-time prefs
@@ -408,10 +423,19 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
       // never silently strips a decoration (MYND-184/185 durability).
       if (!result.invalid) {
         applyDecorationRemap((m) => rewriteFolderPrefix(m, node.path, newPath));
+        // Re-root the archived_folders set too (folder-archive) — else renaming
+        // an ancestor of an archived folder would leave a stale entry and the
+        // subtree would silently un-archive. Folded-prefix, same subtree as the
+        // deliberate re-root inside `renameFolder`.
+        const reroot = rerootArchivedFolders(node.path, newPath, archivedFolders);
+        if (reroot.rewritten > 0) {
+          setArchivedFoldersState(reroot.next);
+          void setArchivedFolders(reroot.next).catch(() => {});
+        }
       }
       await Promise.all(result.moved.map((id) => ctx.refreshOne(id)));
     },
-    [ctx, deliberate, notesForOps, applyDecorationRemap],
+    [ctx, deliberate, archivedFolders, notesForOps, applyDecorationRemap],
   );
 
   // ---- delete folder -------------------------------------------------------
@@ -430,11 +454,94 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
       }
       await persistFolderDelete(plan);
       setDeliberate(plan.nextDeliberate);
+      // A deleted folder's archived_folders entries go with it (the folder no
+      // longer exists) — cascade-remove them so no stale entry lingers
+      // (folder-archive). Folded-prefix, mirrors the deliberate trim.
+      const nextArchived = planFolderUnarchive(node.path, archivedFolders);
+      if (nextArchived.length !== archivedFolders.length) {
+        setArchivedFoldersState(nextArchived);
+        void setArchivedFolders(nextArchived).catch(() => {});
+      }
       // Prune the deleted folder's (and its deliberate descendants') color +
       // icon (MYND-184/185 durability).
       applyDecorationRemap((m) => pruneFolderPrefix(m, node.path));
     },
-    [ctx, applyDecorationRemap],
+    [ctx, archivedFolders, applyDecorationRemap],
+  );
+
+  // ---- archive / restore folder (folder-archive) ---------------------------
+  // Archive a folder as a UNIT: a pure `archived_folders` prefs-set mutation
+  // (no note frontmatter written). The subtree drops out of the working-set
+  // tree via `liveCache` while the notes stay resolvable. Restore removes the
+  // folded-prefix subtree from the set (Archive panel).
+  const performFolderArchive = useCallback(
+    (plan: FolderArchivePlan) => {
+      const prev = archivedFolders;
+      setArchivedFoldersState(plan.nextArchived);
+      void setArchivedFolders(plan.nextArchived).catch(() => {
+        setArchivedFoldersState(prev); // disk write failed → revert optimistic UI
+      });
+      // If the open/selected note just left the working set, don't dwell on it.
+      if (ctx.selectedId !== null && plan.noteIds.includes(ctx.selectedId)) {
+        ctx.select(null);
+      }
+    },
+    [ctx, archivedFolders],
+  );
+
+  const archiveFolderAction = useCallback(
+    (node: FolderNode) => {
+      setMenu(null);
+      // No confirmation — reversible (parity with note-archive).
+      const plan = planFolderArchive(node.path, treeRef.current, archivedFolders);
+      performFolderArchive(plan);
+    },
+    [archivedFolders, performFolderArchive],
+  );
+
+  const restoreFolder = useCallback(
+    (path: string) => {
+      const prev = archivedFolders;
+      const next = planFolderUnarchive(path, archivedFolders);
+      if (next.length === prev.length) return; // nothing archived under `path`
+      setArchivedFoldersState(next);
+      void setArchivedFolders(next).catch(() => {
+        setArchivedFoldersState(prev);
+      });
+    },
+    [archivedFolders],
+  );
+
+  // Archive-panel folder-row "Delete → Trash": the archived folder is absent
+  // from the live tree, so its subtree note ids come from the FULL cache by
+  // prefix (not `planFolderDelete`, which reads the tree). Soft-trashes them,
+  // then removes the folder from archived_folders + trims the deliberate set +
+  // prunes decorations — the same cleanup `performFolderDelete` does. The
+  // caller confirms first (subtree move-to-Trash).
+  const deleteArchivedFolderToTrash = useCallback(
+    async (path: string) => {
+      const key = folderKey(path);
+      if (key.length === 0) return;
+      const ids = collectSubtreeNoteIdsFromCache(ctx.cache, key);
+      if (ids.length > 0) {
+        await ctx.bulkTrashWithSync(ids);
+        if (ctx.selectedId !== null && ids.includes(ctx.selectedId)) {
+          ctx.select(null);
+        }
+      }
+      const nextArchived = planFolderUnarchive(path, archivedFolders);
+      if (nextArchived.length !== archivedFolders.length) {
+        setArchivedFoldersState(nextArchived);
+        void setArchivedFolders(nextArchived).catch(() => {});
+      }
+      const nextDeliberate = deliberate.filter((f) => !folderKey(f).startsWith(key));
+      if (nextDeliberate.length !== deliberate.length) {
+        setDeliberate(nextDeliberate);
+        void setDeliberateFolders(nextDeliberate).catch(() => {});
+      }
+      applyDecorationRemap((m) => pruneFolderPrefix(m, path));
+    },
+    [ctx, archivedFolders, deliberate, applyDecorationRemap],
   );
 
   const deleteFolderAction = useCallback(
@@ -811,6 +918,10 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
 
   return {
     deliberate,
+    archivedFolders,
+    archiveFolderAction,
+    restoreFolder,
+    deleteArchivedFolderToTrash,
     treeRef,
     menu,
     openMenu,

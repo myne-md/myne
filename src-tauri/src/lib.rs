@@ -402,6 +402,15 @@ pub fn run() {
             // is a documented seam (`clipper::relay`).
             #[cfg(unix)]
             clipper::relay_app::spawn_relay_listener(app.handle().clone());
+            // Register the browser native-messaging host manifest so the keyless
+            // clipper extension can launch this host with no hand-created file.
+            // Idempotent + best-effort + non-fatal (same discipline as the relay
+            // bind + boot migration above): honors the opt-in flag (default on),
+            // writes/refreshes for every installed browser, removes when disabled.
+            // A no-op on Windows today (registry registration is a fast-follow).
+            if let Ok(base) = app.path().app_data_dir() {
+                clipper::install::reconcile_from_flag(&base);
+            }
             Ok(())
         })
         .build(tauri::generate_context!())

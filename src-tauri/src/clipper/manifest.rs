@@ -51,13 +51,10 @@
 //! extension IDs); it is config, not key material.
 //!
 //! The generator API below is exercised by unit tests and consumed by the
-//! per-OS installer step (the desktop installer writes the emitted JSON to
-//! the documented `NativeMessagingHosts/` paths) + task 4's pairing gate
-//! (which binds the same exact extension IDs). It is therefore
-//! `allow(dead_code)` in non-test BUILDS of the library proper until that
-//! install wiring lands — the same seam discipline the `vault_registry`
-//! not-yet-wired helpers use (`lib.rs`).
-#![cfg_attr(not(test), allow(dead_code))]
+//! per-OS installer step ([`super::install`], which writes the emitted JSON
+//! to the documented `NativeMessagingHosts/` paths on startup + behind the
+//! Settings toggle) + task 4's pairing gate (which binds the same exact
+//! extension IDs).
 
 use serde::Serialize;
 
@@ -78,16 +75,20 @@ pub const HOST_DESCRIPTION: &str = "Myne keyless web-clipper native-messaging ho
 /// (`myne-clipper/src/manifest.json` → `browser_specific_settings.gecko.id`).
 pub const FIREFOX_EXTENSION_ID: &str = "clipper@myne.md";
 
-/// The Chromium extension ID to allowlist.
+/// The Chromium (Chrome / Edge) extension ID to allowlist.
 ///
-/// PLACEHOLDER — pinned at install time. A Chromium extension ID is the
-/// 32-character `[a-p]` string derived from the extension's packed public
-/// key; it is fixed once the extension is published to the Web Store (or
-/// once a stable `key` is added to the unpacked manifest). Until the
-/// extension is keyed/published, the installer substitutes the real ID;
-/// this constant documents the SHAPE and is the single place to update.
-/// (Task 4's pairing handshake binds the SAME exact ID on the host side.)
-pub const CHROMIUM_EXTENSION_ID_PLACEHOLDER: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+/// A Chromium extension ID is the 32-character `[a-p]` string deterministically
+/// derived from the extension's packed public key. This value is **pinned** from
+/// the `key` committed to the extension's unpacked manifest
+/// (`myne-clipper/src/manifest.json` → `key`), so a keyed unpacked install and a
+/// future Web Store build share the same ID and this host allowlists both.
+///
+/// Derivation (reproducible): base64-decode the manifest `key` (DER
+/// SubjectPublicKeyInfo) → SHA-256 → take the first 16 bytes → map each hex
+/// nibble `0..=f` to `a..=p`. Re-run this if the extension's `key` ever changes
+/// (a forced re-pair — see the root `CLAUDE.md` load-bearing-identifiers table).
+/// Task 4's pairing handshake binds the SAME exact ID on the host side.
+pub const CHROMIUM_EXTENSION_ID: &str = "ebbbblnjddeockegombcnbiljefmlhbh";
 
 /// The Chromium `chrome-extension://<id>/` allowed-origin for a given
 /// extension ID. The trailing slash is required by the
@@ -255,13 +256,15 @@ mod tests {
     }
 
     #[test]
-    fn placeholder_chromium_id_has_the_right_shape() {
-        // A Chromium extension ID is 32 chars in the [a-p] alphabet. The
-        // placeholder documents that shape so a reviewer recognizes it as
-        // a substitute-at-install constant, not a real ID.
-        assert_eq!(CHROMIUM_EXTENSION_ID_PLACEHOLDER.len(), 32);
-        assert!(CHROMIUM_EXTENSION_ID_PLACEHOLDER
+    fn chromium_id_has_the_right_shape_and_pinned_value() {
+        // A Chromium extension ID is 32 chars in the [a-p] alphabet, derived
+        // from the extension's committed manifest `key`. Regression-pin the
+        // exact value: if the extension's key changes, this must be re-derived
+        // in lock-step (a forced re-pair) or Chrome/Edge refuse the connection.
+        assert_eq!(CHROMIUM_EXTENSION_ID.len(), 32);
+        assert!(CHROMIUM_EXTENSION_ID
             .bytes()
             .all(|b| (b'a'..=b'p').contains(&b)));
+        assert_eq!(CHROMIUM_EXTENSION_ID, "ebbbblnjddeockegombcnbiljefmlhbh");
     }
 }

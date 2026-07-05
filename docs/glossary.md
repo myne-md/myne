@@ -113,6 +113,10 @@ Used in: `spec/markdown-dialect.md` §3.6.1
 
 The seventh Myne-managed canonical frontmatter field, `archived:` — a **value-strict** RFC 3339 UTC timestamp marking when a note was archived (the exact twin of `trashed:`; any non-timestamp value leaves the note live). Written only by the archive/unarchive actions (`src/notes/archiveNote.ts`) via `patchArchivedField` over the existing `note_update` IPC; neither transition bumps `updated:`. Mutually exclusive with `trashed:` at the action layer. Rides the existing `.myn` AEAD envelope — no `protocol.md` magic-byte / AAD / version change (MYND-331). See [archive](#archive).
 
+### **archived folder** &nbsp; 📦 *Product*
+
+A folder archived as a **unit** (folder-archive): the whole subtree leaves the working set (sidebar tree + favorites + quick-open + saved-view results) while its notes stay resolvable as backlink/graph/tag targets and in full-text search — the folder-level twin of the per-note [archived field](#archived-field). Because the virtual-folder model has no folder entity to carry a marker, an archived folder is stored as a canonical trailing-slash path in the additive `archived_folders` set inside the encrypted `vault.prefs` (`MYP1`), the same codec as [deliberate folder](#deliberate-folder) / [AI-excluded folder](#ai-excluded-folder). Archiving writes **no** note frontmatter, so it composes independently with per-note archive (a note individually archived inside a folder stays archived when the folder is restored). Matched by folded-prefix (case-fold + NFC, sibling-safe: `Projects/` archives `Projects/Myne/` but not `ProjectsX/`); rename/delete re-root/trim the set. Restore/Delete-to-Trash from the Archive panel. See [archive](#archive), [folder](#folder).
+
 ### **Argon2id** &nbsp; 🔐 *Primitive* (deep entry)
 
 The memory-hard password-based key derivation function specified in RFC 9106. Argon2id combines the side-channel resistance of Argon2i with the GPU-cracking resistance of Argon2d. Myne uses Argon2id at two call sites (deriving `password_wrap_key` from the master password, deriving `recovery_wrap_key` from the BIP-39 phrase), with parameters `m=256 MiB, t=3, p=2, version 1.3` stored in `vault.meta` rather than hardcoded so they can be tuned per platform and bound into the wrap AADs to defeat parameter-downgrade tampering. Argon2i and Argon2d are not used in this protocol — the "id" variant is the only correct choice for password-stretching in 2026.
@@ -933,6 +937,18 @@ Used in: `spec/markdown-dialect.md` §3.2; `decisions.md` 2026-05-30
 ### **local inference** &nbsp; 📦 *Product* (*Myne-divergent*)
 
 On-device AI: the local-ai epic (MYND-406–412) runs a **side-loaded** quantized Qwen2 GGUF (generation) and an all-MiniLM-L6-v2 BERT (embedding) through the [Candle](#candle) ML stack, entirely on the user's machine — no cloud model, no download, no telemetry, ever (a standing anti-feature). *Myne-divergent* because "AI" in most note apps means a server API call; here it is a local, **runtime opt-in beta** capability — it ships in the default build (`decisions.md` 2026-07-02) but stays off until the user enables it at Settings → Labs → AI (Beta) (`ai_enabled` pref, default off), and is verified to add **zero networked dependency** by an absolute denylist gate (`ai-no-network-check.sh`). The AI-free auditable binary is the `--no-default-features` build. Powers summarize, semantic search / Q&A, auto-tag, and the writing-assistant ([ghost-text](#ghost-text) + slash commands). Models are the user's own files (untrusted input); v0.1 runs the runtime in-process, with a sandboxed keyless sidecar deferred as pre-default-on hardening. AI outputs are AS1-class RAM, zeroized on lock; excluded per-folder via [AI-excluded folder](#ai-excluded-folder). See `threat-model.md` §7 "Local AI" + `decisions.md` 2026-07-01, 2026-07-02.
+
+### **conversational AI chat** &nbsp; 📦 *Product*
+
+The multi-turn chat surface of the AI Chat right-panel tab (`conversational-ai-chat`, MYND-454): a conversation the user can follow up on, with the assistant's answer **streamed** token-by-token (see [streaming token channel](#streaming-token-channel)) and grounded per-turn in the user's own notes (with visible [chat citations](#chat-citation)). It supersedes the earlier single-shot Q&A box. History is **RAM-only, dropped on lock** — no durable, at-rest chat storage in v0.1 (deferred), so no new magic byte or format. Powered by [local inference](#local-inference) (still fully on-device, no provider call); the model is small and fallible, which is why answers cite their sources. See `decisions.md` 2026-07-04; `threat-model.md` §7 (STI paragraph).
+
+### **streaming token channel** &nbsp; 📋 *Protocol*
+
+The IPC mechanism that streams a [local-inference](#local-inference) generation's tokens to the WebView as they are produced: a `tauri::ipc::Channel<String>` opened by the `chat_stream` command, each decoded token forwarded through a publish-guarded callback (checked against the shared cancel flag before every send, so a vault-lock mid-stream never emits into a torn-down transcript). It is the SYNC-7 "supersede" the local-ai ledger anticipated — streaming was deferred in the spike and added here for the [conversational AI chat](#conversational-ai-chat) surface. Each token is AS1-class plaintext (never logged, DENY-list). See `decisions.md` 2026-07-04.
+
+### **chat citation** &nbsp; 📦 *Product*
+
+A source-note reference shown beneath a grounded [conversational AI chat](#conversational-ai-chat) answer — the `{note_id, byte-range}` chunks the answer was grounded on (reusing the `AskResult.sources` set). Rendered as clickable chips (labelled with the note title) that navigate to the source note. Citations are the honesty counterweight to a small, fallible on-device model: the user verifies each claim against their own words. An answer that grounded on nothing shows no chips (no fabricated citation).
 
 ### **local graph** &nbsp; 📦 *Product*
 

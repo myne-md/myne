@@ -25,7 +25,7 @@ const cache = new Map([
 ]);
 
 vi.mock("../../src/hooks/usePrefs", () => ({
-  usePrefs: () => ({ prefs: { deliberate_folders: [] } }),
+  usePrefs: () => ({ prefs: { deliberate_folders: [], archived_folders: [] } }),
 }));
 vi.mock("../../src/notes/sidebarState", async () => {
   // Reuse the REAL liveCache / sortBatchIds (pure) so the live-set gate is the

@@ -123,7 +123,9 @@ fn main() {
                 "prefs_read",
                 "set_screen_capture_protection",
                 "set_deliberate_folders",
+                "set_archived_folders",
                 "vault_set_label",
+                "vault_set_icon",
             ]),
         )
         .plugin(
@@ -399,6 +401,8 @@ fn main() {
                 "pairing_reject",
                 "pairing_revoke",
                 "pairing_list_paired",
+                "clipper_install_status",
+                "clipper_install_set_enabled",
                 "clip_dispatch_complete",
                 "pairing_dispatch_complete",
             ]),
@@ -420,6 +424,8 @@ fn main() {
                 "embed",
                 "semantic_search",
                 "ask",
+                "chat_stream",
+                "chat_stop",
                 "set_model_path",
                 "get_model_path",
             ]),

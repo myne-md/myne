@@ -12,8 +12,8 @@
 //     Cancel/Submit row replaced by a DestructiveBanner (count + path
 //     for PartialDelete, generic disk-error for Io) and a single
 //     Continue button. The slot is already zeroized backend-side; this
-//     terminal "Continue" fires the same `editor.delete-vault-success`
-//     Action as the happy path.
+//     terminal "Continue" fires the same `onContinueAfterPartial`
+//     success signal as the happy-path Submit.
 //
 // Presentational only — owns no IPC, no Stage dispatch, no
 // `appDataDir()` call. AccountPanel (consumer) drives state.
@@ -53,8 +53,8 @@ interface DeleteVaultConfirmFormProps {
   /**
    * Post-fail Continue handler. Fired on user click after the banner
    * is shown. Same terminal effect as the happy-path Submit — the
-   * consumer dispatches `editor.delete-vault-success` so the Stage
-   * lands on `welcome`.
+   * consumer signals delete-success and App.tsx reprobes, routing by
+   * remaining vault count.
    */
   onContinueAfterPartial: () => void;
   /**

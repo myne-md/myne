@@ -268,6 +268,12 @@ const CSS = `
 .cm-fm-properties {
   padding: 2px 0 16px;
   font-family: var(--font-sans);
+  /* Base for the widget's own text: the editor-typography preset (Settings →
+     Editor → text size), matching the body text. Every child's font-size below
+     is em-relative to this base — mirroring the heading em scale in theme.ts —
+     so the Properties block scales with the text-size setting. The fallback is
+     the canonical md default (14px). */
+  font-size: var(--editor-text-size, 14px);
 }
 .cm-fm-properties-name {
   display: block;
@@ -280,7 +286,7 @@ const CSS = `
   outline-style: none;
   box-shadow: none;
   font-family: var(--font-sans);
-  font-size: 22px;
+  font-size: 1.571em;
   font-weight: 600;
   line-height: 1.3;
   color: var(--fg-1);
@@ -304,7 +310,7 @@ const CSS = `
   background: var(--paper-2, #f3f1eb);
 }
 .cm-fm-properties-title {
-  font-size: 14px;
+  font-size: 1em;
   font-weight: 600;
   color: var(--fg-1);
   margin-bottom: 10px;
@@ -326,7 +332,7 @@ const CSS = `
   align-items: center;
   justify-content: center;
   color: var(--fg-3);
-  font-size: 13px;
+  font-size: 0.929em;
 }
 .cm-fm-properties-key {
   width: 100%;
@@ -337,7 +343,7 @@ const CSS = `
   outline: 0;
   outline-style: none;
   box-shadow: none;
-  font-size: 13px;
+  font-size: 0.929em;
   color: var(--fg-2);
   font-family: var(--font-sans);
   padding: 4px 6px;
@@ -364,7 +370,7 @@ const CSS = `
   outline-style: none;
   box-shadow: none;
   font-family: var(--font-sans);
-  font-size: 13px;
+  font-size: 0.929em;
   color: var(--fg-1);
   padding: 4px 6px;
   border-radius: var(--radius-1, 3px);
@@ -393,7 +399,7 @@ const CSS = `
   background: transparent;
   color: var(--fg-3);
   font-family: var(--font-sans);
-  font-size: 13px;
+  font-size: 0.929em;
   cursor: pointer;
   padding: 4px 6px;
   border-radius: var(--radius-1, 3px);

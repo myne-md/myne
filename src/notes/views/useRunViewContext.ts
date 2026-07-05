@@ -13,6 +13,7 @@
 
 import { useMemo } from "react";
 import { usePrefs } from "../../hooks/usePrefs";
+import { archivedFolderKeys, filterVisibleDeliberate } from "../archivedFolders";
 import { deriveFolderTree } from "../folderTree";
 import { liveCache, sortBatchIds, useSelectedNote } from "../sidebarState";
 import { searchNotes } from "../searchNotes";
@@ -23,12 +24,22 @@ export function useRunViewContext(): RunViewContext {
   const { cache } = useSelectedNote();
   const { prefs } = usePrefs();
 
-  // The live (non-trashed, non-template) working set — the single trash/template
-  // gate the engine intersects every leaf with.
-  const live = useMemo(() => liveCache(cache), [cache]);
+  // Folder-archived subtrees (archived_folders) leave the working set too — the
+  // saved-view results + `inFolder` resolver must not surface them, same as the
+  // sidebar tree (folder-archive).
+  const archivedKeys = useMemo(
+    () => archivedFolderKeys(prefs.archived_folders),
+    [prefs.archived_folders],
+  );
+
+  // The live (non-trashed, non-template, non-folder-archived) working set — the
+  // single trash/template/archive gate the engine intersects every leaf with.
+  const live = useMemo(() => liveCache(cache, archivedKeys), [cache, archivedKeys]);
 
   // The folder tree (each live note's `folder:` ∪ deliberate_folders) backs the
   // subtree-inclusive `inFolder` resolver — same derivation the sidebar uses.
+  // Archived deliberate folders are filtered so they don't re-surface as empty
+  // `inFolder` targets after `liveCache` strips their notes.
   const tree = useMemo(
     () =>
       deriveFolderTree(
@@ -36,9 +47,9 @@ export function useRunViewContext(): RunViewContext {
           noteUuid: r.noteUuid,
           folder: r.folder,
         })),
-        prefs.deliberate_folders,
+        filterVisibleDeliberate(prefs.deliberate_folders, archivedKeys),
       ),
-    [live, prefs.deliberate_folders],
+    [live, prefs.deliberate_folders, archivedKeys],
   );
 
   return useMemo<RunViewContext>(() => {
