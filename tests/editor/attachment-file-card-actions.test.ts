@@ -12,7 +12,9 @@ vi.mock("@tauri-apps/plugin-dialog", () => ({ save: (...a: unknown[]) => save(..
 
 const attachmentExport = vi.fn();
 const attachmentRename = vi.fn();
-vi.mock("../../src/lib/attachments", () => ({
+// File-card export/rename go through the host bridge (getHost().attachments.*)
+// post-extraction, so mock the bridge the module imports, not the desktop lib.
+vi.mock("@myne/editor/host/lib/attachments", () => ({
   attachmentExport: (...a: unknown[]) => attachmentExport(...a),
   attachmentRename: (...a: unknown[]) => attachmentRename(...a),
 }));

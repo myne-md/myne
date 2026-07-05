@@ -2,6 +2,8 @@
 // `i18n.t(...)` calls (command catalogs, error maps) resolve against loaded
 // resources rather than returning raw keys. Keep this import first.
 import "./i18n";
+// Install the desktop EditorHost into @myne/editor before any editor mounts.
+import "./editor-host";
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";

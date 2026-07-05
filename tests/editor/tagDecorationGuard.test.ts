@@ -19,8 +19,10 @@ const repoPath = (p: string): string =>
 
 describe("SYNC-17 interactive-tag unit guard (MYND-46)", () => {
   it("registers the inline-#tag chip decoration in the editor aggregator", () => {
+    // The editor engine moved to the shared @myne/editor package; `src/editor`
+    // is now a re-export shim, so read the real aggregator in the package.
     const src = readFileSync(
-      repoPath("src/editor/decorations/index.ts"),
+      repoPath("editor/src/decorations/index.ts"),
       "utf8",
     );
     // Strip `//` line comments so the guard's own explanatory text can't trip
@@ -31,7 +33,7 @@ describe("SYNC-17 interactive-tag unit guard (MYND-46)", () => {
 
   it("decoration ⟹ browse surface present (SYNC-17 invariant)", () => {
     const decorationPresent = existsSync(
-      repoPath("src/editor/decorations/tag-chip.ts"),
+      repoPath("editor/src/decorations/tag-chip.ts"),
     );
     const browsePresent = existsSync(
       repoPath("src/notes/components/TagBrowser.tsx"),

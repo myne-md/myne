@@ -32,11 +32,14 @@ const spellCheckMock = vi.fn((args: { words: string[] }) =>
     })),
   ),
 );
-vi.mock("@tauri-apps/api/core", () => ({
-  invoke: (cmd: string, args: { words: string[] }) => {
-    if (cmd === "plugin:spell|spell_check") return spellCheckMock(args);
-    return Promise.resolve(undefined);
-  },
+// Post-extraction the spell decorations/menu call the host bridge (spellCheck +
+// the dictionary writers), not the Tauri `invoke` directly — the IPC now lives
+// in the desktop lib/spell behind the EditorHost seam. Mock the bridge the
+// modules-under-test import so squiggles + menu actions resolve.
+vi.mock("@myne/editor/host/lib/spell", () => ({
+  spellCheck: (words: string[]) => spellCheckMock({ words }),
+  addToPersonalDictionary: vi.fn(() => Promise.resolve()),
+  ignoreWordInVault: vi.fn(() => Promise.resolve()),
 }));
 
 import { EditorState } from "@codemirror/state";
