@@ -1,0 +1,72 @@
+//! `attachments` plugin — mobile host (MYND-169, the attachments epic).
+//!
+//! Owns the `MYA1` blob + `MYC1` catalog CRUD and the in-RAM reference graph
+//! for the open vault. The whole plugin core (commands, error, sniff, reconcile,
+//! reconcile_commands, text_cache, the pure `scheme_core`, the cleanup ref-scan)
+//! lives in `myne-core` (`myne_core::plugins::attachments`, shared with the
+//! desktop client). Mobile registers the CRUD subset that works without a native
+//! microphone or the desktop text extractor:
+//!
+//! - `attachment_import` — the **extraction-free** core import command (mobile
+//!   has no `lopdf`/`zip`/`quick-xml` producer, so no `MYE1` text cache is
+//!   written; desktop registers its own eager-extracting wrapper instead).
+//! - `catalog_list` / `attachment_delete` / `attachment_rename` /
+//!   `attachment_export` / `attachment_unused_list` / `attachment_clean_unused`.
+//! - the reconcile trio (`attachment_refs_apply` / `_remove` / `_referencing`).
+//!
+//! NOT registered on mobile: the `voice_record_*` commands (native `cpal` mic —
+//! a hard mobile blocker). The `attachment://` URI scheme IS registered on the
+//! mobile Tauri `Builder` in `lib.rs` (delegating to the shared
+//! `scheme_core::build_response`).
+//!
+//! The lock-teardown wipe of the reference graph is a desktop-only
+//! `hooks::VaultLifecycleHooks` side-effect; mobile installs `NoopHooks`, so the
+//! graph simply lives for the process while a vault is unlocked (same posture as
+//! the search index being absent on mobile). `AttachmentRefsState` is managed in
+//! `lib.rs` setup (like desktop).
+//!
+//! Commands are registered via the `myne_core::plugins::attachments` module path
+//! so `generate_handler!` finds each command's hidden `__cmd__` items (a bare
+//! `pub use` of the `#[tauri::command]` fns would drop them).
+//!
+//! See: the main repo's `src-tauri/CLAUDE.md` "Secret-handling logging
+//! discipline".
+
+// Re-exported for path-compatibility with any consumer referencing
+// `crate::plugins::attachments::{commands, reconcile, …}` (mirrors the desktop
+// re-export surface). `commands` + `reconcile_commands` are the symbols `init()`
+// registers; `AttachmentRefsState` is managed in `lib.rs`.
+#[allow(unused_imports)]
+pub use myne_core::plugins::attachments::{
+    commands, error, reconcile, reconcile_commands, scheme_core, sniff, text_cache,
+};
+pub use myne_core::plugins::attachments::AttachmentRefsState;
+
+// Mobile Tauri glue for the `attachment://` URI scheme (delegates to the shared
+// `scheme_core::build_response`). Registered on the Builder in `lib.rs`.
+pub mod scheme;
+
+use tauri::plugin::{Builder, TauriPlugin};
+use tauri::Runtime;
+
+/// Construct the mobile `attachments` plugin. The `VaultRuntimeState` it
+/// borrows is registered by the `vault-unlock` plugin; its own
+/// [`AttachmentRefsState`] is managed in `lib.rs` setup (like desktop). The
+/// `attachment://` scheme is registered separately on the `Builder`.
+pub fn init<R: Runtime>() -> TauriPlugin<R> {
+    Builder::<R>::new("attachments")
+        .invoke_handler(tauri::generate_handler![
+            // Extraction-free import (mobile has no text extractor).
+            commands::attachment_import,
+            commands::catalog_list,
+            commands::attachment_delete,
+            commands::attachment_rename,
+            commands::attachment_export,
+            commands::attachment_unused_list,
+            commands::attachment_clean_unused,
+            reconcile_commands::attachment_refs_apply,
+            reconcile_commands::attachment_refs_remove,
+            reconcile_commands::attachment_refs_referencing,
+        ])
+        .build()
+}

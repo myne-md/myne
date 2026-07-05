@@ -52,6 +52,14 @@ unicode-normalization = { version = "0.1.25", default-features = false }
 # protocol crate uses.
 sha2 = { version = "0.10", default-features = false }
 
+# iOS-only: Objective-C runtime access for the WKWebView keyboard-accessory-bar
+# swizzle (`ios_chrome`). NOT a new dependency to audit — `objc2` is already
+# compiled into the build transitively via `wry`; this just names the existing
+# version so we can reference it directly. Pinned to the version already in the
+# shared lock.
+[target.'cfg(target_os = "ios")'.dependencies]
+objc2 = "0.6"
+
 # Dev-dependencies — same policy bar as runtime deps. `tracing-test` captures
 # `tracing` events per-test so the plugins' tracing-level discipline is
 # asserted in unit tests rather than reviewer-inspected.
