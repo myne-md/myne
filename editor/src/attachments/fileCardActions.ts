@@ -8,9 +8,8 @@
 import { syntaxTree } from "@codemirror/language";
 import { type EditorState } from "@codemirror/state";
 import { type EditorView } from "@codemirror/view";
-import { save } from "@tauri-apps/plugin-dialog";
 import i18n from "@myne/editor/i18n";
-import { attachmentExport, attachmentRename } from "@myne/editor/host/lib/attachments";
+import { attachmentExport, attachmentRename, pickExportDestination } from "@myne/editor/host/lib/attachments";
 import { parseAttachmentTarget } from "@myne/editor/host/notes/attachmentRef";
 import { parseWikilinkParts } from "../wikilink/chip-widget";
 import { addCatalogRows, catalogField } from "./catalog";
@@ -31,7 +30,10 @@ export const REVEAL_ATTACHMENT_EVENT = "myne:reveal-attachment";
 export async function exportAttachment(id: string, filename: string): Promise<void> {
   let dest: string | null;
   try {
-    dest = await save({ defaultPath: filename });
+    // Host-picked destination: desktop opens a native Save dialog, mobile
+    // returns a Documents path (no picker). The plaintext is decrypted + written
+    // entirely host-side (it never re-enters the WebView).
+    dest = await pickExportDestination(filename);
   } catch {
     showAttachmentToast(i18n.t("editor.attachment.actions.saveDialogFailed"));
     return;

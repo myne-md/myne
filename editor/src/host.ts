@@ -50,6 +50,10 @@ export interface EditorHost {
   attachments: {
     attachmentExport: (id: string, dest: string, overwrite: boolean) => Promise<void>;
     attachmentRename: (id: string, name: string) => Promise<void>;
+    /** Pick/derive the on-device destination for exporting an attachment's
+     *  decrypted bytes: desktop opens a native Save dialog, mobile returns a
+     *  Documents path (no picker). Returns the destination, or null on cancel. */
+    pickExportDestination: (filename: string) => Promise<string | null>;
   };
 
   /** Prefs read (editor typography + spell settings — IPC). */
