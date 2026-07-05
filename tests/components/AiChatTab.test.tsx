@@ -1,12 +1,13 @@
 // @vitest-environment jsdom
 //
-// Component tests for `src/notes/components/AiChatTab.tsx` (note-summarization
-// task 4 render + ai-ux-surface MYND-408). Drives the real module-level
-// `aiOutputStore` and asserts the tab renders each lifecycle state. `usePrefs`
-// + i18n are mocked at their module boundaries (no Tauri IPC needed).
+// Component tests for `src/notes/components/AiChatTab.tsx` — the conversational
+// chat surface (conversational-ai-chat tasks 6-13). Drives the real module-level
+// `chatStore` and asserts the transcript, composer, citations, honesty note, and
+// the folded-in summary-insert + tag-accept turn actions (tasks 10/11).
+// `usePrefs` + i18n are mocked at their module boundaries (no Tauri IPC needed).
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 
 let aiEnabled = true;
 vi.mock("../../src/hooks/usePrefs", () => ({
@@ -22,31 +23,27 @@ vi.mock("react-i18next", () => ({
 
 import { AiChatTab } from "../../src/notes/components/AiChatTab";
 import {
-  dispatchAiOutput,
-  __resetAiOutputForTest,
-} from "../../src/notes/ai/aiOutputStore";
-import {
-  dispatchTagSuggest,
-  __resetTagSuggestForTest,
-} from "../../src/notes/ai/tagSuggestStore";
+  appendChatToken,
+  finalizeChatTags,
+  finalizeChatTurn,
+  sendChatMessage,
+  __resetChatForTest,
+} from "../../src/notes/ai/chatStore";
 
 beforeEach(() => {
   aiEnabled = true;
-  __resetAiOutputForTest();
-  __resetTagSuggestForTest();
+  __resetChatForTest();
 });
 afterEach(() => {
   cleanup();
-  __resetAiOutputForTest();
-  __resetTagSuggestForTest();
+  __resetChatForTest();
 });
 
 describe("AiChatTab", () => {
   it("shows the empty hint when idle and AI is enabled", () => {
     render(<AiChatTab />);
     expect(screen.getByTestId("ai.chat-tab")).toBeTruthy();
-    expect(screen.queryByTestId("ai.thinking")).toBeNull();
-    expect(screen.queryByTestId("ai.output")).toBeNull();
+    expect(screen.queryByTestId("ai.transcript")).toBeNull();
     expect(screen.getByTestId("ai.chrome-status").getAttribute("data-ai-enabled")).toBe(
       "true",
     );
@@ -60,142 +57,145 @@ describe("AiChatTab", () => {
     );
   });
 
-  it("renders the thinking affordance during a blocking call", () => {
-    dispatchAiOutput({ type: "THINKING" });
-    render(<AiChatTab />);
-    expect(screen.getByTestId("ai.thinking")).toBeTruthy();
-    expect(screen.queryByTestId("ai.output")).toBeNull();
-  });
-
-  it("renders the resolved output text", () => {
-    dispatchAiOutput({
-      type: "RESOLVED",
-      text: "This is the summary.",
-      truncated: false,
-      summarizedChars: 0,
+  describe("conversational transcript + composer", () => {
+    it("renders transcript turns from the chat store", () => {
+      const token = sendChatMessage("what did I note about rust?");
+      appendChatToken(token, "You wrote about ownership.");
+      finalizeChatTurn(token, []);
+      render(<AiChatTab />);
+      const turns = screen.getAllByTestId("ai.turn");
+      expect(turns).toHaveLength(2);
+      expect(turns[0].getAttribute("data-role")).toBe("user");
+      expect(turns[1].getAttribute("data-role")).toBe("assistant");
+      expect(turns[1].textContent).toContain("You wrote about ownership.");
     });
-    render(<AiChatTab />);
-    expect(screen.getByTestId("ai.output").textContent).toBe("This is the summary.");
-    expect(screen.queryByTestId("ai.truncation-notice")).toBeNull();
-  });
 
-  it("shows the truncation notice with the character count when truncated", () => {
-    dispatchAiOutput({
-      type: "RESOLVED",
-      text: "partial",
-      truncated: true,
-      summarizedChars: 1200,
+    it("shows the streaming caret on an in-flight assistant turn", () => {
+      const token = sendChatMessage("q");
+      appendChatToken(token, "partial…");
+      render(<AiChatTab />);
+      expect(screen.getByTestId("ai.turn-streaming")).toBeTruthy();
     });
-    render(<AiChatTab />);
-    const notice = screen.getByTestId("ai.truncation-notice");
-    expect(notice.textContent).toContain("1200");
-  });
 
-  it("shows the Insert button only when onInsert is provided and fires it with the text", () => {
-    dispatchAiOutput({
-      type: "RESOLVED",
-      text: "insert me",
-      truncated: false,
-      summarizedChars: 0,
+    it("renders the composer when onSend is wired and AI is on; hidden when AI off", () => {
+      render(<AiChatTab onSend={vi.fn()} />);
+      expect(screen.getByTestId("ai.composer-input")).toBeTruthy();
+      expect(screen.getByTestId("ai.composer-send")).toBeTruthy();
+      cleanup();
+
+      render(<AiChatTab />);
+      expect(screen.queryByTestId("ai.composer-input")).toBeNull();
+      cleanup();
+
+      aiEnabled = false;
+      render(<AiChatTab onSend={vi.fn()} />);
+      expect(screen.queryByTestId("ai.composer-input")).toBeNull();
     });
-    const onInsert = vi.fn();
-    render(<AiChatTab onInsert={onInsert} />);
-    const btn = screen.getByTestId("ai.insert-summary");
-    fireEvent.click(btn);
-    expect(onInsert).toHaveBeenCalledTimes(1);
-    expect(onInsert).toHaveBeenCalledWith("insert me");
-  });
 
-  it("hides the Insert button when no onInsert is wired", () => {
-    dispatchAiOutput({
-      type: "RESOLVED",
-      text: "x",
-      truncated: false,
-      summarizedChars: 0,
+    it("fires onSend with the trimmed message and clears the composer", () => {
+      const onSend = vi.fn();
+      render(<AiChatTab onSend={onSend} />);
+      const input = screen.getByTestId("ai.composer-input") as HTMLInputElement;
+      fireEvent.change(input, { target: { value: "  hello there  " } });
+      fireEvent.click(screen.getByTestId("ai.composer-send"));
+      expect(onSend).toHaveBeenCalledWith("hello there");
+      expect(input.value).toBe("");
     });
-    render(<AiChatTab />);
-    expect(screen.queryByTestId("ai.insert-summary")).toBeNull();
-  });
 
-  it("renders the error state on failure", () => {
-    dispatchAiOutput({ type: "FAILED" });
-    render(<AiChatTab />);
-    expect(screen.getByTestId("ai.output-error")).toBeTruthy();
-  });
-
-  it("clears the rendered output when the store is torn down (lock)", () => {
-    dispatchAiOutput({
-      type: "RESOLVED",
-      text: "held",
-      truncated: false,
-      summarizedChars: 0,
+    it("shows the Stop control (not Send) while streaming and fires onStop", () => {
+      const onStop = vi.fn();
+      const token = sendChatMessage("q");
+      appendChatToken(token, "streaming…");
+      render(<AiChatTab onSend={vi.fn()} onStop={onStop} />);
+      expect(screen.queryByTestId("ai.composer-send")).toBeNull();
+      fireEvent.click(screen.getByTestId("ai.composer-stop"));
+      expect(onStop).toHaveBeenCalledTimes(1);
     });
-    render(<AiChatTab />);
-    expect(screen.getByTestId("ai.output")).toBeTruthy();
-    act(() => {
-      dispatchAiOutput({ type: "CLEARED" });
+
+    it("renders citation chips and fires onOpenNote on click", () => {
+      const token = sendChatMessage("q");
+      appendChatToken(token, "answer");
+      finalizeChatTurn(token, [
+        { noteId: "01970e83aaaa", byteStart: 4, byteEnd: 20, score: 0.9 },
+      ]);
+      const onOpenNote = vi.fn();
+      render(<AiChatTab onOpenNote={onOpenNote} />);
+      fireEvent.click(screen.getByTestId("ai.citation"));
+      expect(onOpenNote).toHaveBeenCalledWith("01970e83aaaa", 4, 20);
     });
-    expect(screen.queryByTestId("ai.output")).toBeNull();
+
+    it("labels a citation with the note title when titleOf resolves it", () => {
+      const token = sendChatMessage("q");
+      appendChatToken(token, "a");
+      finalizeChatTurn(token, [{ noteId: "01970e83aaaa", byteStart: 0, byteEnd: 3, score: 1 }]);
+      render(
+        <AiChatTab titleOf={(id) => (id === "01970e83aaaa" ? "My Rust Notes" : null)} />,
+      );
+      expect(screen.getByTestId("ai.citation").textContent).toBe("My Rust Notes");
+    });
+
+    it("hides the empty hint once the transcript has turns", () => {
+      sendChatMessage("q");
+      render(<AiChatTab />);
+      expect(screen.getByTestId("ai.transcript")).toBeTruthy();
+    });
+
+    it("renders the load-bearing honesty note verbatim when AI is ready", () => {
+      render(<AiChatTab />);
+      expect(screen.getByTestId("ai.honesty-note").textContent).toBe(
+        "Answers come from a small model running on your device and may be wrong — check the notes it cites.",
+      );
+    });
   });
 
-  it("renders tag-suggestion chips and fires onAcceptTag on click", () => {
-    dispatchTagSuggest({
-      type: "READY",
-      suggestions: [
+  // conversational-ai-chat tasks 10/11 — summarize + tag folded into turns.
+  describe("folded-in summary insert + tag accept (tasks 10/11)", () => {
+    it("shows an Insert action on an insertable summary turn and fires onInsert", () => {
+      const token = sendChatMessage("Summarize this note", { insertable: true });
+      appendChatToken(token, "This is the summary.");
+      finalizeChatTurn(token, []);
+      const onInsert = vi.fn();
+      render(<AiChatTab onInsert={onInsert} />);
+      fireEvent.click(screen.getByTestId("ai.insert-turn"));
+      expect(onInsert).toHaveBeenCalledWith("This is the summary.");
+    });
+
+    it("shows no Insert action on an ordinary (non-insertable) chat turn", () => {
+      const token = sendChatMessage("hi");
+      appendChatToken(token, "hello");
+      finalizeChatTurn(token, []);
+      render(<AiChatTab onInsert={vi.fn()} />);
+      expect(screen.queryByTestId("ai.insert-turn")).toBeNull();
+    });
+
+    it("renders tag accept-chips on a tag turn and fires onAcceptTag on click", () => {
+      const token = sendChatMessage("Suggest tags for this note");
+      finalizeChatTags(token, [
         { tag: "work", isNew: false },
         { tag: "rust", isNew: true },
-      ],
+      ]);
+      const onAcceptTag = vi.fn();
+      render(<AiChatTab onAcceptTag={onAcceptTag} />);
+      const chips = screen.getAllByTestId("ai.tag-chip");
+      expect(chips).toHaveLength(2);
+      fireEvent.click(chips[1]);
+      expect(onAcceptTag).toHaveBeenCalledWith({ tag: "rust", isNew: true });
     });
-    const onAcceptTag = vi.fn();
-    render(<AiChatTab onAcceptTag={onAcceptTag} />);
-    const chips = screen.getAllByTestId("ai.tag-chip");
-    expect(chips).toHaveLength(2);
-    fireEvent.click(chips[1]);
-    expect(onAcceptTag).toHaveBeenCalledWith({ tag: "rust", isNew: true });
-  });
 
-  it("shows the tags-thinking affordance during a suggest pass", () => {
-    dispatchTagSuggest({ type: "THINKING" });
-    render(<AiChatTab />);
-    expect(screen.getByTestId("ai.tags-thinking")).toBeTruthy();
-    expect(screen.queryByTestId("ai.tag-chips")).toBeNull();
-  });
+    it("an empty tag turn (excluded folder) shows no chips", () => {
+      const token = sendChatMessage("Suggest tags for this note");
+      finalizeChatTags(token, []);
+      render(<AiChatTab onAcceptTag={vi.fn()} />);
+      expect(screen.queryByTestId("ai.tag-chip")).toBeNull();
+    });
 
-  // semantic-search-qa (MYND-412) tasks 6/7 — the grounded-Q&A question box.
-  it("renders the ask input + submit only when AI is on AND onAsk is wired", () => {
-    // Wired + AI on → shown.
-    render(<AiChatTab onAsk={vi.fn()} />);
-    expect(screen.getByTestId("ai.ask-input")).toBeTruthy();
-    expect(screen.getByTestId("ai.ask-submit")).toBeTruthy();
-    cleanup();
-
-    // No onAsk → not shown (isolation / read-only).
-    render(<AiChatTab />);
-    expect(screen.queryByTestId("ai.ask-input")).toBeNull();
-    cleanup();
-
-    // AI off → not shown even when onAsk is wired.
-    aiEnabled = false;
-    render(<AiChatTab onAsk={vi.fn()} />);
-    expect(screen.queryByTestId("ai.ask-input")).toBeNull();
-  });
-
-  it("fires onAsk with the trimmed question on submit and clears the input", () => {
-    const onAsk = vi.fn();
-    render(<AiChatTab onAsk={onAsk} />);
-    const input = screen.getByTestId("ai.ask-input") as HTMLInputElement;
-    fireEvent.change(input, { target: { value: "  what did I note?  " } });
-    fireEvent.click(screen.getByTestId("ai.ask-submit"));
-    expect(onAsk).toHaveBeenCalledWith("what did I note?");
-    expect(input.value).toBe("");
-  });
-
-  it("does not fire onAsk for a blank question (submit disabled / no-op)", () => {
-    const onAsk = vi.fn();
-    render(<AiChatTab onAsk={onAsk} />);
-    const input = screen.getByTestId("ai.ask-input") as HTMLInputElement;
-    fireEvent.change(input, { target: { value: "   " } });
-    fireEvent.click(screen.getByTestId("ai.ask-submit"));
-    expect(onAsk).not.toHaveBeenCalled();
+    it("shows a placeholder for an empty finalized assistant answer", () => {
+      const token = sendChatMessage("Hello");
+      finalizeChatTurn(token, []); // no tokens appended → empty answer
+      render(<AiChatTab />);
+      expect(screen.getByTestId("ai.no-answer")).toBeTruthy();
+      // The user turn is not treated as a no-answer placeholder.
+      expect(screen.getAllByTestId("ai.turn")[0].getAttribute("data-role")).toBe("user");
+    });
   });
 });

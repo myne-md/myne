@@ -92,6 +92,22 @@ impl ChunkParams {
     }
 }
 
+/// Minimum alphanumeric-character count for a chunk to be worth embedding
+/// (conversational-ai-chat retrieval tuning). A chunk below this is pure
+/// structure — a frontmatter / `---` / `***` separator, a heading-only line, or
+/// a stub like `###### P0 -` — which carries no retrievable content but embeds
+/// to a high-cosine vector that crowds out real content. Measured over a real
+/// vault: skipping these at index time is the fix, not a cosine threshold.
+pub const MIN_SUBSTANTIVE_CHARS: usize = 5;
+
+/// Whether `chunk_text` carries enough substantive content to be worth embedding
+/// (see [`MIN_SUBSTANTIVE_CHARS`]). Counts alphanumeric code points, ignoring
+/// markdown structure + whitespace, so `---` / `***` / `## ` / `###### P0 -`
+/// (structure only) are rejected while any real title or content is kept.
+pub fn is_substantive_chunk(chunk_text: &str) -> bool {
+    chunk_text.chars().filter(|c| c.is_alphanumeric()).count() >= MIN_SUBSTANTIVE_CHARS
+}
+
 /// One retrieval unit: an index into the source note. Carries **no plaintext**
 /// — [`Chunk::slice`] resolves the span from the already-resident source when a
 /// consumer needs the text (embedding, map-reduce).

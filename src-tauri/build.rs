@@ -421,6 +421,8 @@ fn main() {
                 "embed",
                 "semantic_search",
                 "ask",
+                "chat_stream",
+                "chat_stop",
                 "set_model_path",
                 "get_model_path",
             ]),
