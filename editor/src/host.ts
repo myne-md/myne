@@ -2,9 +2,15 @@
 // Everything pure (parser, decorations, wikilink resolution, fuzzy match, date
 // formatting, imperative modals, icons, attachment-ref helpers) lives in the
 // package directly. What remains here is genuine IPC / platform surface: i18n,
-// the vault tag index, spell, on-device AI, attachment IO, prefs, open-URL.
-// The consuming app installs it once at startup via `setEditorHost`; the engine's
-// thin bridge modules (./i18n, ./host/notes/vaultIndices, ./host/lib/*) forward.
+// the vault tag index, spell, on-device AI, attachment export/rename + export
+// destination-pick, prefs, open-URL. The consuming app installs it once at
+// startup via `setEditorHost`; the engine's thin bridge modules (./i18n,
+// ./host/notes/vaultIndices, ./host/lib/*) forward.
+//
+// NOT yet behind this seam (Phase A): attachment *insert*/catalog/picker/voice-
+// record + convert-command still call Tauri `invoke`/`plugin-dialog`/`event`
+// directly (see editor/package.json peerDependencies). Both clients are Tauri
+// today; routing them through the host is deferred to Phase B.
 //
 // Optional members (`ai`, `spell`) may be omitted on a platform that doesn't back
 // them — the engine then hides those affordances.
@@ -75,9 +81,6 @@ export interface EditorHost {
     addToPersonalDictionary: (word: string) => Promise<void>;
     ignoreWordInVault: (word: string) => Promise<void>;
   };
-
-  /** Dev-only logger (replaces `import.meta.env.DEV` console.warn). */
-  warn?: (...args: unknown[]) => void;
 }
 
 // ── Registry ─────────────────────────────────────────────────────────────────

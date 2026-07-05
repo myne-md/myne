@@ -243,6 +243,12 @@ importers:
       '@myne/dialect':
         specifier: workspace:*
         version: link:../dialect
+      '@tauri-apps/api':
+        specifier: ^2.11.0
+        version: 2.11.0
+      '@tauri-apps/plugin-dialog':
+        specifier: ^2.7.1
+        version: 2.7.1
       dompurify:
         specifier: 3.4.10
         version: 3.4.10

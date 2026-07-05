@@ -26,11 +26,12 @@ const host: EditorHost = {
   },
   prefsRead: async (): Promise<EditorPrefs> => (await prefsRead()) as EditorPrefs,
   openExternal: (url) => {
-    void openUrl(url);
+    void openUrl(url).catch((err: unknown) => {
+      if (import.meta.env.DEV) console.warn("openExternal: openUrl rejected", err);
+    });
   },
   ai: { infer, buildCompletionPrompt, buildTitlePrompt },
   spell: { spellCheck, addToPersonalDictionary, ignoreWordInVault },
-  warn: import.meta.env.DEV ? (...args) => console.warn(...args) : undefined,
 };
 
 setEditorHost(host);
