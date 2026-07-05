@@ -15,7 +15,7 @@ import {
 } from "@codemirror/view";
 import { computePosition } from "../positioning";
 import { ensureFloatingStyles } from "../floating-styles";
-import { toggleWrap } from "../wrap-toggle";
+import { wrapCommand, applyHeadingLevel } from "./commands";
 import { isSelectionInCode } from "../code-context";
 import { rangeOverlapsAttachmentEmbed } from "../decorations/attachment-embed";
 import i18n from "@myne/editor/i18n";
@@ -23,10 +23,10 @@ import i18n from "@myne/editor/i18n";
 type Mode = "toolbar" | "url-overlay";
 
 const TOOLBAR_BUTTONS = [
-  { id: "bold", label: "B", weight: "700", action: toggleAction("**", "**") },
-  { id: "italic", label: "I", weight: "600", italic: true, action: toggleAction("*", "*") },
-  { id: "strike", label: "S", weight: "600", strike: true, action: toggleAction("~~", "~~") },
-  { id: "code", label: "<>", weight: "600", mono: true, action: toggleAction("`", "`") },
+  { id: "bold", label: "B", weight: "700", action: wrapCommand("**", "**") },
+  { id: "italic", label: "I", weight: "600", italic: true, action: wrapCommand("*", "*") },
+  { id: "strike", label: "S", weight: "600", strike: true, action: wrapCommand("~~", "~~") },
+  { id: "code", label: "<>", weight: "600", mono: true, action: wrapCommand("`", "`") },
 ] as const;
 
 // Multi-color highlight palette (decisions.md 2026-06-15). Yellow is the
@@ -43,26 +43,7 @@ const HIGHLIGHT_SWATCHES = [
   { id: "hl-purple", labelKey: "editor.toolbar.highlight.purple", cssVar: "--highlight-purple", open: '<mark class="hl-purple">', close: "</mark>" },
 ] as const;
 
-function toggleAction(open: string, close: string) {
-  const cmd = toggleWrap(open, close);
-  return (view: EditorView): void => {
-    cmd({ state: view.state, dispatch: view.dispatch.bind(view) });
-    view.focus();
-  };
-}
 
-function applyHeadingLevel(view: EditorView, level: number): void {
-  const range = view.state.selection.main;
-  const line = view.state.doc.lineAt(range.from);
-  const text = view.state.doc.sliceString(line.from, line.to);
-  const cleaned = text.replace(/^#{1,6}\s+/, "");
-  const next = level === 0 ? cleaned : "#".repeat(level) + " " + cleaned;
-  view.dispatch({
-    changes: { from: line.from, to: line.to, insert: next },
-    userEvent: "toolbar.heading",
-  });
-  view.focus();
-}
 
 class ToolbarView implements PluginValue {
   private container: HTMLDivElement | null = null;
@@ -308,7 +289,7 @@ class ToolbarView implements PluginValue {
     mainBtn.addEventListener("mousedown", (e) => {
       e.preventDefault();
       this.openDropdown = null;
-      toggleAction("==", "==")(this.view);
+      wrapCommand("==", "==")(this.view);
     });
     wrap.appendChild(mainBtn);
 
@@ -341,7 +322,7 @@ class ToolbarView implements PluginValue {
         square.addEventListener("mousedown", (e) => {
           e.preventDefault();
           this.openDropdown = null;
-          toggleAction(sw.open, sw.close)(this.view);
+          wrapCommand(sw.open, sw.close)(this.view);
         });
         drop.appendChild(square);
       }

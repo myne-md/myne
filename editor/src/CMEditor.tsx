@@ -77,19 +77,28 @@ export type CMEditorProps = {
    *  task 6). Never set on the reading-view instance (inert in Reading view). */
   aiEnabled?: boolean;
   style?: CSSProperties;
+  /** Called once with the live `EditorView` after mount (and `null` on unmount).
+   *  Lets a host render its own toolbar/accessory bar that drives the editor
+   *  through the shared `editorCommands` (the mobile above-keyboard bar). Desktop
+   *  leaves it unset — its formatting rides the in-editor selection toolbar. */
+  onReady?: (view: EditorView | null) => void;
 };
 
 export function CMEditor(props: CMEditorProps) {
-  const { value, onChange, onBlur, onSelectionChange, extensions, noteSet, vaultHeadings, onOpenWikilink, scrollAnchor = null, lineNumbers = false, viewMode = "live", readOnly = false, aiEnabled = false, style } = props;
+  const { value, onChange, onBlur, onSelectionChange, extensions, noteSet, vaultHeadings, onOpenWikilink, scrollAnchor = null, lineNumbers = false, viewMode = "live", readOnly = false, aiEnabled = false, style, onReady } = props;
   const hostRef = useRef<HTMLDivElement | null>(null);
   const viewRef = useRef<EditorView | null>(null);
   const onChangeRef = useRef(onChange);
   const onBlurRef = useRef(onBlur);
   const onSelectionChangeRef = useRef(onSelectionChange);
   const onOpenWikilinkRef = useRef(onOpenWikilink);
+  const onReadyRef = useRef(onReady);
   useEffect(() => {
     onOpenWikilinkRef.current = onOpenWikilink;
   }, [onOpenWikilink]);
+  useEffect(() => {
+    onReadyRef.current = onReady;
+  }, [onReady]);
 
   // Keep callback refs current so the EditorView's update listener closes
   // over the latest props without rebuilding the view.
@@ -133,6 +142,8 @@ export function CMEditor(props: CMEditorProps) {
       parent: host,
     });
     viewRef.current = view;
+    // Hand the live view to a host toolbar (mobile accessory bar); desktop no-op.
+    onReadyRef.current?.(view);
 
     // The self-hosted web fonts (Inter / JetBrains Mono) finish loading AFTER
     // the editor's first paint; their metrics change line + block-widget heights,
@@ -147,6 +158,7 @@ export function CMEditor(props: CMEditorProps) {
     }
 
     return () => {
+      onReadyRef.current?.(null);
       view.destroy();
       viewRef.current = null;
     };

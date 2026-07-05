@@ -737,6 +737,27 @@ export function readTrashedFromFmBody(fmBody: string): string | null {
 }
 
 /**
+ * Read the Myne-managed `updated:` (last-edited) timestamp, **value-strict**,
+ * from a frontmatter **body** — the value-strict twin of
+ * {@link readTrashedFromFmBody}. Returns the RFC 3339 timestamp string iff an
+ * `updated:` field carries a valid RFC 3339 value, else `null`. `updated:` is
+ * the canonical last-edit stamp (§3.6.1) surgery rewrites on every save; the
+ * mobile note list renders it as a relative-time subtitle (parity with the
+ * desktop `NoteRow` last-edited meta).
+ */
+export function readUpdatedFromFmBody(fmBody: string): string | null {
+  const lines = fmBody.split(NEWLINE);
+  for (const line of lines) {
+    const m = UPDATED_KEY_RE.exec(line);
+    if (m === null) continue;
+    const value = extractTrashedScalar(m[2] ?? "");
+    if (value !== null && isValidRfc3339(value)) return value;
+    return null;
+  }
+  return null;
+}
+
+/**
  * Read the Myne-managed `deleted:` tombstone marker, **value-strict**, from a
  * frontmatter **body** — the exact value-strict twin of
  * {@link readTrashedFromFmBody}. Returns the RFC 3339 timestamp string iff a
