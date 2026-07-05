@@ -1,6 +1,6 @@
 # myne-mobile — Tauri 2 Mobile client
 
-> Companion repository to [`myne`](https://github.com/myne-md/myne). License: AGPL-3.0-or-later.
+> Companion repository to [`myne`](https://github.com/myne-md/myne). License: AGPL-3.0.
 
 ## Status
 
