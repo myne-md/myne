@@ -434,11 +434,7 @@ where
         // write must never fail the import; the lazy backfill (search rebuild)
         // retries. Unsupported formats (e.g. images) are NOT cached — their
         // O(1) dispatch is cheap to repeat and a cache blob per image is waste.
-        let extracted = extract(
-            &content_type_owned,
-            &filename_for_extract,
-            &file_bytes,
-        );
+        let extracted = extract(&content_type_owned, &filename_for_extract, &file_bytes);
         if extracted.status != super::extract_types::ExtractStatus::Unsupported
             && super::text_cache::write_extracted(
                 &vault_dir_for_cache,

@@ -125,10 +125,7 @@ pub fn rewrite_embeds_to_final_names(
 /// final name (structurally impossible — the same scan fed both) is left
 /// untouched. Every byte outside the rewritten `attachment://<id>` token
 /// is preserved.
-pub fn rewrite_html_attachment_srcs(
-    html: &str,
-    final_names: &HashMap<String, String>,
-) -> String {
+pub fn rewrite_html_attachment_srcs(html: &str, final_names: &HashMap<String, String>) -> String {
     const PREFIX: &str = "attachment://";
     let mut out = String::with_capacity(html.len());
     let mut rest = html;
