@@ -1,14 +1,16 @@
 # Dependencies
-node_modules/
+node_modules
+.pnpm-store
 
 # Build output
-dist/
-dist-ssr/
+dist
+dist-ssr
+*.tsbuildinfo
 *.local
 
-# Tauri
-src-tauri/gen/
-src-tauri/target/
+# Tauri native build artifacts + generated mobile projects
+src-tauri/target
+src-tauri/gen
 
 # Logs
 *.log
@@ -17,9 +19,13 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
+# Env
+.env
+.env.*
+
 # Editor / OS
 .DS_Store
-.idea/
+.idea
 .vscode/*
 !.vscode/extensions.json
 *.suo
