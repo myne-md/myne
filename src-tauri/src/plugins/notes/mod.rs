@@ -27,22 +27,29 @@
 // (`note_id`), the title-extraction helpers (`title_extract`), and the error
 // enums (`error`) moved to `myne-core` (shared with the mobile client).
 // Re-exported so existing `crate::plugins::notes::{commands,error,note_id,
-// title_extract}::…` paths keep resolving.
+// title_extract}::…` paths keep resolving (some are consumed only cross-crate /
+// after the attachments ref-scan moved to core).
+#[allow(unused_imports)]
 pub use myne_core::plugins::notes::{commands, error, note_id, title_extract};
 
 // Desktop-only note commands: export, full-text search, snapshot flush, and the
 // attachment-reference scan — they reach into desktop-only subsystems (search
 // index, snapshot store, attachments) and stay in this crate.
 pub mod desktop_commands;
-pub(crate) mod export_mtime;
+// The export mtime-fidelity helper (SYNC-13 — set the exported file's mtime from
+// the note's frontmatter `updated:`) moved to `myne-core` (shared with the
+// export plugin core + mobile). Re-exported so `super::export_mtime::…` paths in
+// `desktop_commands` keep resolving.
+pub(crate) use myne_core::plugins::notes::export_mtime;
 pub mod search_sync;
 
 // Surfaced at the `notes` module root so the desktop `hooks::DesktopHooks`
-// can reach the snapshot-capture free-fn and the snapshot-write-failed event
-// name without depending on whichever module currently owns them. The capture
-// free-fn now lives desktop-side (`desktop_commands`); the event-name const
-// stays in the core CRUD module (`note_update` emits it via the hook seam).
-pub(crate) use desktop_commands::capture_snapshot_best_effort;
+// can reach the snapshot-write-failed event name without depending on
+// whichever module currently owns it. The snapshot-capture free-fn now lives
+// in `myne-core` (`myne_core::snapshot_store::capture_snapshot_best_effort`,
+// shared desktop↔mobile); `hooks::DesktopHooks` calls it directly. The
+// event-name const stays in the core CRUD module (`note_update` emits it via
+// the hook seam).
 pub(crate) use myne_core::plugins::notes::commands::SNAPSHOT_WRITE_FAILED_EVENT;
 
 use tauri::plugin::{Builder, TauriPlugin};
