@@ -8,7 +8,9 @@
 // Gated by `import.meta.env.DEV` + an empty-vault check (`maybeSeedTestData`), so
 // it never ships and never clobbers real notes. Delete this file to remove it.
 
-import { noteCreate, noteUpdate, noteList } from "./notes";
+import { noteCreate, noteUpdate, noteList, noteRead } from "./notes";
+import { frontmatterTitle } from "./note-organize";
+import { WELCOME_NOTE_TITLE } from "./welcomeNote";
 import { setFavorites, upsertSavedView, setViewOrder, type SavedView } from "./prefs";
 import { attachmentImport } from "./attachments";
 import { emitAttachmentEmbed } from "./attachmentRef";
@@ -416,7 +418,15 @@ export async function maybeSeedTestData(): Promise<void> {
   if (!import.meta.env.DEV) return;
   try {
     const existing = await noteList();
-    if (existing.length > 0) return;
+    if (existing.length > 1) return;
+    // A vault created through the real flow carries exactly one note — the
+    // onboarding Welcome note (lib/welcomeNote.ts). Treat that as still
+    // empty so the dev spread keeps seeding on freshly-created vaults; any
+    // OTHER single note is real user data — leave it alone.
+    if (existing.length === 1) {
+      const only = await noteRead(existing[0]);
+      if (frontmatterTitle(only) !== WELCOME_NOTE_TITLE) return;
+    }
     await seedTestData();
   } catch (e) {
     console.error("[seed] test-data seed failed:", e);
