@@ -1,4 +1,9 @@
+import { fileURLToPath, URL } from "node:url";
 import { defineConfig } from "vitest/config";
+
+// Resolve a path relative to THIS config file (myne-mobile/), so the sibling
+// shared packages under the parent `myne/` repo resolve regardless of cwd.
+const sib = (p: string) => fileURLToPath(new URL(p, import.meta.url));
 
 // Frontend unit tests for the mobile client — mirrors the main repo's vitest
 // setup. Tests live under `tests/` (NOT `src/`), so `pnpm build` (tsc, which
@@ -9,6 +14,19 @@ import { defineConfig } from "vitest/config";
 // by construction), and the mirrored backend carries 560 Rust unit tests
 // (`cargo test`). These TS tests cover the ported state machine + helpers.
 export default defineConfig({
+  // The shared @myne/{editor,dialect} engines are source-aliased to the
+  // sibling parent-repo packages — the same aliases as vite.config.ts (vitest
+  // does not read that file, so any test transitively importing
+  // `src/dialect/*` fails to resolve without this mirror).
+  resolve: {
+    alias: [
+      { find: /^@myne\/editor$/, replacement: sib("../editor/src/index.ts") },
+      { find: /^@myne\/editor\/(.*)$/, replacement: sib("../editor/src/$1") },
+      { find: /^@myne\/dialect$/, replacement: sib("../dialect/src/index.ts") },
+      { find: /^@myne\/dialect\/(.*)$/, replacement: sib("../dialect/src/$1") },
+      { find: "@myne/locales-en", replacement: sib("../locales/en/common.json") },
+    ],
+  },
   test: {
     include: ["tests/**/*.test.ts", "tests/**/*.test.tsx"],
     environment: "node",
