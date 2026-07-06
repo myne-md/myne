@@ -36,11 +36,11 @@
 // `crate::plugins::attachments::{commands, reconcile, …}` (mirrors the desktop
 // re-export surface). `commands` + `reconcile_commands` are the symbols `init()`
 // registers; `AttachmentRefsState` is managed in `lib.rs`.
+pub use myne_core::plugins::attachments::AttachmentRefsState;
 #[allow(unused_imports)]
 pub use myne_core::plugins::attachments::{
     commands, error, reconcile, reconcile_commands, scheme_core, sniff, text_cache,
 };
-pub use myne_core::plugins::attachments::AttachmentRefsState;
 
 // Mobile Tauri glue for the `attachment://` URI scheme (delegates to the shared
 // `scheme_core::build_response`). Registered on the Builder in `lib.rs`.
