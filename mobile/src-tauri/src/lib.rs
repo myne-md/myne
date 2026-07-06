@@ -38,6 +38,14 @@ pub fn run() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        // Custom-scheme delivery for the iOS widgets (`myne://open` /
+        // `myne://capture`). Registered here so the WebView can read the launch
+        // URL (`getCurrent`) + runtime opens (`onOpenUrl`); the scheme itself is
+        // declared in the app Info.plist (`CFBundleURLTypes`, project.yml). The
+        // widget carries no plaintext — it only names an intent — so this stays
+        // inside TB6: the app decides what `myne://capture` means (a new note,
+        // after unlock), the widget cannot reach the vault.
+        .plugin(tauri_plugin_deep_link::init())
         .plugin(plugins::vault_creation::init())
         .plugin(plugins::vault_unlock::init())
         .plugin(plugins::vault_recover::init())

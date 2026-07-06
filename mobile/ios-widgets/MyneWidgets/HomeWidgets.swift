@@ -124,7 +124,10 @@ struct QuickCaptureMediumView: View {
 struct QuickCaptureWidget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: "md.myne.widget.capture", provider: MyneProvider()) { _ in
-            QuickCaptureEntryView()
+            // `.widgetURL` makes the WHOLE widget tap open capture — required for
+            // systemSmall, which does not support `Link` (only the medium view's
+            // buttons use `Link`; the small view has no other tap target).
+            QuickCaptureEntryView().widgetURL(URL(string: "myne://capture"))
         }
         .configurationDisplayName("Quick capture")
         .description("Start a new note. It is encrypted the moment you save.")

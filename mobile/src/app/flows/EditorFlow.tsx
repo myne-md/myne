@@ -10,6 +10,7 @@ import { noteList, noteRead, noteCreate, noteUpdate, noteDelete } from "../../li
 import type { NoteListError } from "../../lib/notes";
 import { listVaults, orderByLastUnlock } from "../../lib/vault-list";
 import { HAS_TAURI } from "../../lib/app-window";
+import { consumePendingCapture, CAPTURE_EVENT } from "../../lib/deep-link";
 import { ioBanner } from "../../lib/io-banner";
 import { usePrefs } from "../../lib/use-prefs";
 import { setFavorites, upsertSavedView, setViewOrder } from "../../lib/prefs";
@@ -578,6 +579,20 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
     setReadingMode(false);
     setView("editor");
   }, [currentFolder]);
+
+  // Widget deep-link capture (ios-widgets `myne://capture`): open a fresh note.
+  // Cold launch on a locked device latches the intent in `deep-link.ts` and it
+  // is consumed HERE once the editor mounts post-unlock; a tap while the app is
+  // already open fires CAPTURE_EVENT below. Voice mode has no transcription
+  // engine yet, so it opens the ordinary text editor — same as plain capture.
+  useEffect(() => {
+    if (consumePendingCapture() !== null) newNote();
+  }, [newNote]);
+  useEffect(() => {
+    const onCapture = () => newNote();
+    window.addEventListener(CAPTURE_EVENT, onCapture);
+    return () => window.removeEventListener(CAPTURE_EVENT, onCapture);
+  }, [newNote]);
 
   const openNote = useCallback(
     async (id: string) => {

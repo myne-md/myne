@@ -39,30 +39,64 @@ ios-widgets/
 app-side `CaptureSheet`; add them to **both** targets' membership (or factor them
 into a shared Swift package).
 
-## Wiring into the Tauri iOS project
+## Wiring into the Tauri iOS project — DONE (project.yml + xcodegen)
 
-`tauri ios init` already generated `src-tauri/gen/apple/myne-mobile.xcodeproj`.
-To add the widgets:
+The widgets are integrated as a real, embedded WidgetKit extension that ships
+inside `Myne.app` on every `pnpm tauri ios build`. Rather than the old
+add-a-target-in-Xcode dance (which `tauri ios init` would drop), the extension
+is declared in the **xcodegen `project.yml`** that Tauri already uses to
+generate the Xcode project — the durable layer.
 
-1. Open `src-tauri/gen/apple/myne-mobile.xcodeproj` in Xcode.
-2. **File → New → Target… → Widget Extension**, name it `MyneWidgets`
-   (uncheck "Include Live Activity"; check "Include Configuration Intent" off —
-   these are `StaticConfiguration`). Bundle id `md.myne.mobile.widgets`.
-3. Delete the stub files Xcode created; **add** the files under
-   `ios-widgets/MyneWidgets/` to the new target (drag in, "Create groups",
-   target membership = `MyneWidgets`). Add `MyneColor.swift` + `MyneMark.swift`
-   to the **app** target too.
-4. Add `ios-widgets/MyneApp/CaptureSheet.swift` to the **app** target and present
-   it from the `myne://capture` route.
-5. Register the `myne://` URL scheme on the app target (Info → URL Types) so the
-   `widgetURL` / `NewNoteIntent` open routes resolve.
-6. The Control Center control + Action Button need **iOS 18**; the bundle gates
-   `NewNoteControl()` behind `if #available(iOS 18.0, *)`.
+### The three project.yml additions (`src-tauri/gen/apple/project.yml`)
 
-> Because `gen/apple/` is regenerated, re-running `tauri ios init` drops the
-> manually-added target. For a durable setup, either keep a checked-in Xcode
-> project patch, or add the extension via the Tauri project's `project.yml`
-> (xcodegen) so it survives regeneration. Tracked as a Phase-3 follow-up.
+1. A `MyneWidgets` **app-extension target** — `deploymentTarget: "17.0"` (the
+   home/StandBy views use iOS-17 `containerBackground`), sources pointed at
+   `../../../ios-widgets/MyneWidgets`, bundle id `md.myne.mobile.widgets`, an
+   `Info.plist` with `NSExtensionPointIdentifier = com.apple.widgetkit-extension`
+   (its `CFBundleVersion` must match the app's), and `WidgetKit` / `SwiftUI` /
+   `AppIntents` framework deps.
+2. `- target: MyneWidgets` added to the **app target's** `dependencies` so
+   xcodegen embeds the `.appex` into `Myne.app/PlugIns/`.
+3. On the app target: the `myne` **URL scheme** in `info.properties`
+   (`CFBundleURLTypes`), and `DEVELOPMENT_TEAM` + `CODE_SIGN_STYLE: Automatic`
+   promoted into the `app` settingGroup so a `xcodegen generate` (which rebuilds
+   the pbxproj) keeps signing for both targets.
+
+Then `cd src-tauri/gen/apple && xcodegen generate` (Tauri also runs it on build).
+
+### The app-side deep-link half (this is what makes them *work*)
+
+The widgets only emit a `myne://` URL — everything functional is resolved
+app-side, inside the trust boundary:
+
+- `tauri-plugin-deep-link` (Cargo `[dependencies]`, `.plugin(...)` in `lib.rs`,
+  `deep-link:default` in `capabilities/default.json`, `@tauri-apps/plugin-deep-link`
+  in `package.json`) surfaces the launch/runtime URL to the WebView.
+- `src/lib/deep-link.ts` parses `myne://open` (no-op — launching suffices) and
+  `myne://capture[?mode=voice]` (latches a new-note intent), initialised in
+  `main.tsx`.
+- `EditorFlow` consumes the latch on mount (cold launch, post-unlock) and listens
+  for the runtime event, opening a fresh note either way.
+
+**The native `CaptureSheet.swift` is intentionally NOT wired.** It is a UI-only
+mock with no persistence; the real, audited capture surface is the React editor,
+so `myne://capture` routes there. Adding `CaptureSheet` to the app target would
+mean a second, native capture path bridging into the Rust core — deferred.
+
+The Control Center control + `NewNoteIntent` (which opens `myne://capture` via
+`OpenURLIntent`) are **iOS 18** APIs, gated with `@available(iOS 18.0, *)`.
+
+### Gotchas
+
+- **`tauri ios init` regenerates `project.yml`**, dropping these edits. `gen/apple/`
+  is git-ignored, so after a fresh init re-apply the three additions above
+  (they are small and self-contained) and re-run `xcodegen generate`.
+- **`Externals/arm64/{debug,release}/libapp.a` collision.** The app target globs
+  `Externals/` as sources, so if BOTH a `tauri ios dev` (debug) and a
+  `tauri ios build` (release) `libapp.a` are present, xcodegen bakes two
+  copy-commands for the same `Myne.app/libapp.a` → *"Multiple commands produce"*.
+  Before a release build after a dev run: `rm -rf src-tauri/gen/apple/Externals/*/debug`
+  and re-run `xcodegen generate`.
 
 ## Preview
 
