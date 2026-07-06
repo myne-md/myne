@@ -3254,7 +3254,9 @@ name = "myne-core"
 version = "0.1.0"
 dependencies = [
  "getrandom 0.2.17",
+ "postcard",
  "protocol",
+ "rust-stemmers",
  "serde",
  "serde_json",
  "sha2",
@@ -3265,6 +3267,7 @@ dependencies = [
  "tracing-test",
  "unicode-normalization",
  "uuid",
+ "whatlang",
  "zeroize",
 ]
 
@@ -3288,7 +3291,6 @@ dependencies = [
  "postcard",
  "protocol",
  "quick-xml 0.37.5",
- "rust-stemmers",
  "rustls",
  "rustls-pki-types",
  "security-framework",
@@ -3315,7 +3317,6 @@ dependencies = [
  "uuid",
  "webkit2gtk",
  "webview2-com",
- "whatlang",
  "windows 0.61.3",
  "windows-sys 0.60.2",
  "x11rb",

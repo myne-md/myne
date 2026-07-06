@@ -31,7 +31,7 @@ const barHandle = {
 };
 const mountRecordingBar = vi.fn(() => barHandle);
 let lastBarOpts: { onStop: () => void; onCancel: () => void } | null = null;
-vi.mock("../../src/editor/attachments/recordingBar", () => ({
+vi.mock("@myne/editor/attachments/recordingBar", () => ({
   mountRecordingBar: (opts: { onStop: () => void; onCancel: () => void }) => {
     lastBarOpts = opts;
     return mountRecordingBar();
@@ -39,7 +39,7 @@ vi.mock("../../src/editor/attachments/recordingBar", () => ({
 }));
 
 const showAttachmentToast = vi.fn();
-vi.mock("../../src/editor/attachments/toast", () => ({
+vi.mock("@myne/editor/attachments/toast", () => ({
   showAttachmentToast: (...a: unknown[]) => showAttachmentToast(...a),
 }));
 
@@ -48,8 +48,8 @@ import { EditorView } from "@codemirror/view";
 import {
   isRecording,
   startVoiceRecording,
-} from "../../src/editor/attachments/voiceRecord";
-import { catalogField } from "../../src/editor/attachments/catalog";
+} from "@myne/editor/attachments/voiceRecord";
+import { catalogField } from "@myne/editor/attachments/catalog";
 
 const ID = "c".repeat(64);
 

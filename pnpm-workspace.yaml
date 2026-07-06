@@ -1,4 +1,9 @@
-packages: []
+packages:
+  # Shared frontend source packages (consumed as source by desktop `src/` and
+  # mobile `myne-mobile/src/`) — the JS analog of the shared `core`/`protocol`
+  # Rust crates. Phase A editor/dialect extraction.
+  - dialect
+  - editor
 allowBuilds:
   # @swc/core is pulled in by the dev-only i18next-cli (string extraction). Its
   # prebuilt binary loads without a local build step (extraction runs fine), so

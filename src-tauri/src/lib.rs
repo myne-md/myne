@@ -11,7 +11,11 @@ mod backup_schedule;
 // of the WebView (`run_native_messaging_host_if_requested` below, called
 // from `main.rs` before the Tauri app builds).
 mod clipper;
-mod export_naming;
+// The shared export-naming vocabulary (filename sanitization, `" (1)"` suffix
+// dedup, the §6 sanctioned embed/HTML rewrite) moved to `myne-core` (shared with
+// mobile). Re-exported so existing `crate::export_naming::…` paths keep resolving
+// (desktop notes export + the export plugin core reach in through it).
+pub use myne_core::export_naming;
 // Desktop wiring of `myne_core::hooks::VaultLifecycleHooks` — the lifecycle
 // side-effects the shared command cores trigger (search/spell/attachments/
 // pdf/workspace/screen-capture/sync) that do not live in `myne-core`.
@@ -30,9 +34,19 @@ pub use myne_core::paths;
 mod plugins;
 pub use myne_core::protocol_error_kind;
 mod screen_capture;
-mod search;
-mod snapshot_policy;
-mod snapshot_store;
+// The full-text search engine (MYS1) + its encrypted persistence/reconcile
+// core moved to `myne-core` (shared, though only desktop wires the feed via the
+// `search_upsert`/`hydrate` hooks — mobile's `NoopHooks` leaves it hollow). The
+// desktop IO shell (`plugins::notes::search_sync`) + the `note_search` command
+// stay here and reach the engine through this re-export, so every existing
+// `crate::search::{SearchIndexState, InvertedIndex, MatchedIn, Document,
+// SearchHit, persist::…}` path keeps resolving.
+pub use myne_core::search;
+// The snapshot on-disk storage layer + pure retention policy moved to
+// `myne-core` (shared with the mobile client). Re-exported so existing
+// `crate::snapshot_store::…` / `crate::snapshot_policy::…` paths keep resolving
+// (mirrors the `myne_core::paths` re-export above).
+pub use myne_core::{snapshot_policy, snapshot_store};
 mod spell;
 #[cfg(test)]
 pub use myne_core::test_support;

@@ -51,13 +51,16 @@ JS tests run on **Vitest** (`pnpm test` → `vitest run`; config `vite.config.ts
 ```
 myne/
 ├── docs/                ← specs, threat model, glossary, decisions log (CC-BY-4.0)
-├── src/                 ← React UI (Tauri WebView)
+├── src/                 ← React UI (Tauri WebView); src/dialect + src/editor are re-export shims into the shared pkgs below
 ├── src-tauri/           ← Tauri 2 + Rust desktop core
 │   └── capabilities/    ← Tauri capability ACLs (security-load-bearing)
+├── dialect/             ← @myne/dialect: shared markdown-parser source pkg (source-consumed, no build), desktop+mobile WebView
+├── editor/              ← @myne/editor: shared CodeMirror engine; platform IO injected via the EditorHost seam (decisions.md 2026-07-05)
 ├── protocol/            ← Rust crypto crate
 ├── core/                ← myne-core: shared backend plugin cores (vault/notes/prefs), desktop+mobile
 ├── public/              ← static assets bundled into the WebView
 ├── workspace/           ← multi-repo helper scripts + manifest
+├── pnpm-workspace.yaml  ← pnpm workspace members (dialect, editor)
 ├── Cargo.toml           ← workspace root (members: src-tauri, protocol, core)
 ├── Cargo.lock           ← single shared lockfile (TB9 audit anchor)
 ├── rust-toolchain.toml  ← pinned Rust toolchain

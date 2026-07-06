@@ -33,10 +33,17 @@
 /// Budget-gated benchmark harness (MYND-31 Task 7) — test-only; see `bench.rs`.
 #[cfg(test)]
 mod bench;
-pub mod commands;
-pub mod error;
-pub mod persist;
-pub mod state;
+
+// The in-RAM index state (`state`), the query/write/persist command surface
+// (`commands`), the `MYI1` codec + Build-B reconcile-delta (`persist`), and the
+// IPC error enum (`error`) moved to `myne-core` (shared with the mobile client).
+// Re-exported so existing `crate::plugins::vault_indices::{commands, error,
+// persist, state}::…` paths keep resolving. This crate keeps the desktop
+// `init()`, the lock-teardown wipe (`zeroize_vault_indices`), and the `bench`
+// harness. `error`/`persist` are path-compat re-exports (desktop uses them only
+// via `super::` from the `bench` test module), hence the `unused_imports` allow.
+#[allow(unused_imports)]
+pub use myne_core::plugins::vault_indices::{commands, error, persist, state};
 
 pub use state::VaultIndicesState;
 

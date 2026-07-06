@@ -15,12 +15,12 @@
 // falls back to the monospace code card. Real-SVG output is exercised in the
 // app/capture path (the hidden export window), not in unit tests.
 
-import { loadMathRenderer, type MathRenderer } from "../../editor/math/render-math";
+import { loadMathRenderer, type MathRenderer } from "@myne/editor/math/render-math";
 import {
   loadMermaidRenderer,
   type MermaidRenderer,
-} from "../../editor/mermaid/render-mermaid";
-import { loadPurifier, type Purifier } from "../../editor/html/sanitize";
+} from "@myne/editor/mermaid/render-mermaid";
+import { loadPurifier, type Purifier } from "@myne/editor/html/sanitize";
 import { escapeHtml } from "./escape";
 
 /** Sync code highlighter: spans tagged with `@lezer/highlight` classHighlighter
@@ -68,7 +68,7 @@ async function loadCodeHighlighter(): Promise<CodeHighlighter> {
   const [{ highlightCode, classHighlighter }, { resolveCodeLanguage }] =
     await Promise.all([
       import("@lezer/highlight"),
-      import("../../editor/code-languages"),
+      import("@myne/editor/code-languages"),
     ]);
   return (code, info) => {
     const lang = resolveCodeLanguage(info);

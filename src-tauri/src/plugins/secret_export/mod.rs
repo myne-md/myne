@@ -9,10 +9,30 @@
 //! rejecting anything inside the app-data / vault tree. Same least-privilege
 //! posture as `export` / `backup` / `importer`.
 //!
+//! ## Extraction into `myne-core`
+//!
+//! The platform-agnostic plugin core (`commands` — including the
+//! `#[tauri::command]` `save_secret_text` and the pure
+//! `validate_secret_destination` guard — and `error`) moved to
+//! `myne_core::plugins::secret_export` (shared with the mobile client).
+//! Re-exported below so existing `crate::plugins::secret_export::{commands,
+//! error}::…` paths keep resolving. This crate keeps only the `tauri::Builder`
+//! `init()` wiring.
+//!
+//! The command is registered via the `myne_core::plugins::secret_export` module
+//! path so `generate_handler!` finds its hidden `__cmd__` item (a bare `pub use`
+//! of the `#[tauri::command]` fn would drop it).
+//!
+//! Capability ACL: `secret-export:default` (`permissions/secret-export/default.toml`
+//! and `build.rs InlinedPlugin::commands` lock-stepped — adding a command
+//! without the matching `commands.allow` entry is a security regression).
+//!
 //! See: ../../CLAUDE.md "Secret-handling logging discipline".
 
-pub mod commands;
-pub mod error;
+// Platform-agnostic plugin core, re-exported so `crate::plugins::secret_export::…`
+// paths keep resolving.
+#[allow(unused_imports)]
+pub use myne_core::plugins::secret_export::{commands, error};
 
 use tauri::plugin::{Builder, TauriPlugin};
 use tauri::Runtime;

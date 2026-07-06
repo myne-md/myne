@@ -43,16 +43,16 @@
 
 import type { SyntaxNode } from "@lezer/common";
 import { parser } from "./lezer/parser";
-import { foldLabel } from "../editor/decorations/link-reference-collector";
+import { foldLabel } from "@myne/editor/decorations/link-reference-collector";
 import { CALLOUT_HEADER_RE, CALLOUT_HTML_TYPES } from "./html/callout-types";
-import { HIGHLIGHT_CLASSES } from "../editor/html/sanitize";
+import { HIGHLIGHT_CLASSES } from "@myne/editor/html/sanitize";
 import {
   fitRow,
   parseDelimiterAlign,
   serializeTable,
   splitTableRow,
   type TableGrid,
-} from "../editor/decorations/table-model";
+} from "@myne/editor/decorations/table-model";
 import {
   escapeLinkTitle,
   formatLinkDestination,

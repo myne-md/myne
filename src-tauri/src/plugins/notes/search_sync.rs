@@ -35,19 +35,22 @@
 
 use crate::paths;
 use crate::plugins::vault_unlock::state::{SlotKind, VaultRuntimeState};
-use crate::search::persist::{
-    decode_snapshot, encode_snapshot, read_myn_content_nonce, reconcile, NonceManifest,
-    MYN_CONTENT_NONCE_LEN, MYN_HEADER_PREFIX_FOR_NONCE,
-};
+use crate::search::persist::{decode_snapshot, encode_snapshot, reconcile};
 use crate::search::SearchIndexState;
 use protocol::{derive_subkey, parse_vault_meta, SubkeyRole, VAULT_META_ACCOUNT_HASH_LEN};
 use std::collections::HashMap;
-use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 use tauri::{AppHandle, Manager, Runtime};
 
-use super::commands::{enumerate_notes_dir, note_read_with_dir};
+// The decryption-free on-disk nonce scan moved to `myne-core`
+// (`myne_core::note_nonce::scan_on_disk_manifest`, shared with the vault-indices
+// plugin). Re-exported so existing
+// `crate::plugins::notes::search_sync::scan_on_disk_manifest` paths (the sync
+// orchestrator, this module's own hydrate/persist) keep resolving.
+pub(crate) use myne_core::note_nonce::scan_on_disk_manifest;
+
+use super::commands::note_read_with_dir;
 use super::title_extract::resolve_note_title;
 
 // The account-hash we read from `vault.meta` (`VAULT_META_ACCOUNT_HASH_LEN`)
@@ -192,38 +195,6 @@ pub(crate) async fn fold_note_body_for_index(
     )
 }
 
-/// Read a single `.myn` file's `content_nonce` from its header WITHOUT
-/// decrypting — only the first [`MYN_HEADER_PREFIX_FOR_NONCE`] bytes are
-/// read. `None` on any IO failure / short file / bad magic.
-fn read_header_nonce(path: &Path) -> Option<[u8; MYN_CONTENT_NONCE_LEN]> {
-    let mut file = std::fs::File::open(path).ok()?;
-    let mut header = [0u8; MYN_HEADER_PREFIX_FOR_NONCE];
-    file.read_exact(&mut header).ok()?;
-    read_myn_content_nonce(&header)
-}
-
-/// Build the on-disk staleness manifest (`note_id → content_nonce`) by
-/// scanning every `.myn` header in `notes_dir` — the decryption-free
-/// staleness signal diffed against the persisted manifest. `pub(crate)` so the
-/// `vault-indices` plugin's MYI1 persistence (MYND-271) reuses the identical
-/// scan rather than duplicating it. An unreadable
-/// dir yields an empty manifest (treated as "no notes" — hydrate then drops
-/// everything from a loaded blob, persist writes an empty snapshot).
-pub(crate) fn scan_on_disk_manifest(notes_dir: &Path) -> NonceManifest {
-    let mut manifest = NonceManifest::new();
-    let Ok(ids) = enumerate_notes_dir(notes_dir) else {
-        return manifest;
-    };
-    for id in ids {
-        let id_str = id.as_uuid().to_string();
-        let path = notes_dir.join(format!("{id_str}.myn"));
-        if let Some(nonce) = read_header_nonce(&path) {
-            manifest.insert(id_str, nonce);
-        }
-    }
-    manifest
-}
-
 /// Testable core of [`hydrate_search_index`]. Loads `vault.search` (fast
 /// path) and reconciles it against the notes dir's current header nonces,
 /// then swaps the result into `search`. A note is decrypted ONLY when its
@@ -296,6 +267,9 @@ pub(crate) async fn hydrate_search_index_with_dir(
                     &items_key_id,
                     &attachment_catalog,
                     &mut attachment_text_memo,
+                    // The MYE1 producer is injected so the shared cache module
+                    // (myne-core) stays free of the desktop-only extractor deps.
+                    crate::plugins::attachments::extract::extract,
                 );
                 let body = crate::plugins::attachments::text_cache::fold_attachment_text(
                     &plaintext,

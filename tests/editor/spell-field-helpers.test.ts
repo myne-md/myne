@@ -12,17 +12,21 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const FLAGGED = new Map<string, string[]>();
-vi.mock("@tauri-apps/api/core", () => ({
-  invoke: (cmd: string, args: { words: string[] }) =>
-    cmd === "plugin:spell|spell_check"
-      ? Promise.resolve(
-          args.words.map((word) => ({
-            word,
-            misspelled: FLAGGED.has(word),
-            suggestions: FLAGGED.get(word) ?? [],
-          })),
-        )
-      : Promise.resolve(undefined),
+// Post-extraction the spell decorations call the host bridge `spellCheck`
+// (getHost().spell.spellCheck), not the Tauri `invoke` directly — the IPC now
+// lives in the desktop lib/spell behind the EditorHost seam. Drive the squiggle
+// field by mocking the bridge the module-under-test actually imports.
+vi.mock("@myne/editor/host/lib/spell", () => ({
+  spellCheck: (words: string[]) =>
+    Promise.resolve(
+      words.map((word) => ({
+        word,
+        misspelled: FLAGGED.has(word),
+        suggestions: FLAGGED.get(word) ?? [],
+      })),
+    ),
+  addToPersonalDictionary: vi.fn(() => Promise.resolve()),
+  ignoreWordInVault: vi.fn(() => Promise.resolve()),
 }));
 
 import { EditorState, EditorSelection } from "@codemirror/state";

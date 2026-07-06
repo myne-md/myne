@@ -7,14 +7,16 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const save = vi.fn();
-vi.mock("@tauri-apps/plugin-dialog", () => ({ save: (...a: unknown[]) => save(...a) }));
-
 const attachmentExport = vi.fn();
 const attachmentRename = vi.fn();
-vi.mock("../../src/lib/attachments", () => ({
+const pickExportDestination = vi.fn();
+// File-card export/rename + the export destination-pick go through the host
+// bridge (getHost().attachments.*) — desktop opens a Save dialog, mobile returns
+// a Documents path; the module only sees the picked destination.
+vi.mock("@myne/editor/host/lib/attachments", () => ({
   attachmentExport: (...a: unknown[]) => attachmentExport(...a),
   attachmentRename: (...a: unknown[]) => attachmentRename(...a),
+  pickExportDestination: (...a: unknown[]) => pickExportDestination(...a),
 }));
 
 const promptForName = vi.fn();
@@ -84,30 +86,30 @@ afterEach(() => {
 
 describe("exportAttachment", () => {
   it("exports the picked destination with overwrite=true and toasts success", async () => {
-    save.mockResolvedValue("/out/report.docx");
+    pickExportDestination.mockResolvedValue("/out/report.docx");
     attachmentExport.mockResolvedValue(undefined);
     await exportAttachment(ID, "report.docx");
-    expect(save).toHaveBeenCalledWith({ defaultPath: "report.docx" });
+    expect(pickExportDestination).toHaveBeenCalledWith("report.docx");
     expect(attachmentExport).toHaveBeenCalledWith(ID, "/out/report.docx", true);
     expect(showAttachmentToast).toHaveBeenCalledWith("Exported report.docx.");
   });
 
-  it("is a silent no-op when the save dialog is cancelled (null)", async () => {
-    save.mockResolvedValue(null);
+  it("is a silent no-op when the destination pick is cancelled (null)", async () => {
+    pickExportDestination.mockResolvedValue(null);
     await exportAttachment(ID, "x.docx");
     expect(attachmentExport).not.toHaveBeenCalled();
     expect(showAttachmentToast).not.toHaveBeenCalled();
   });
 
   it("toasts a dialog-open failure and does not attempt the export", async () => {
-    save.mockRejectedValue(new Error("dialog crashed"));
+    pickExportDestination.mockRejectedValue(new Error("dialog crashed"));
     await exportAttachment(ID, "x.docx");
     expect(attachmentExport).not.toHaveBeenCalled();
     expect(showAttachmentToast).toHaveBeenCalledWith("Couldn't open the save dialog.");
   });
 
   it("toasts an export failure when the host write rejects", async () => {
-    save.mockResolvedValue("/out/x.docx");
+    pickExportDestination.mockResolvedValue("/out/x.docx");
     attachmentExport.mockRejectedValue(new Error("io"));
     await exportAttachment(ID, "x.docx");
     expect(showAttachmentToast).toHaveBeenCalledWith("Couldn't export x.docx.");
