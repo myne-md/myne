@@ -1,0 +1,161 @@
+// Without `InlinedPlugin`, permissions under `permissions/<plugin>/`
+// silently flatten into `__app-acl__` and the ACL resolver registers the
+// `commands.allow` entries as bare names that never match the
+// `plugin:<plugin>|<cmd>` form Tauri uses to authorize plugin invokes
+// (tauri-utils `acl/resolved.rs::resolve_command`). Mirror of the desktop
+// `src-tauri/build.rs`, covering the plugins registered on mobile: vault
+// lifecycle + notes (CRUD/list) + prefs + quick-unlock (PIN only) + vault-indices
+// + snapshots + attachments (no voice) + search + export + secret-export. The
+// still-desktop-only surfaces (biometric quick-unlock, attachment text
+// extraction / voice, native PDF capture) are not carried over.
+fn main() {
+    tauri_build::try_build(
+        tauri_build::Attributes::new()
+            .plugin(
+                "vault-creation",
+                tauri_build::InlinedPlugin::new().commands(&["begin", "commit", "cancel"]),
+            )
+            .plugin(
+                "vault-unlock",
+                tauri_build::InlinedPlugin::new().commands(&[
+                    "unlock",
+                    "lock",
+                    "vault_status",
+                    "vault_is_unlocked",
+                    "vault_slot_kind",
+                ]),
+            )
+            .plugin(
+                "vault-recover",
+                tauri_build::InlinedPlugin::new().commands(&[
+                    "recover_with_phrase",
+                    "complete_recovery",
+                    "resolve_vault_by_account_number",
+                ]),
+            )
+            .plugin(
+                "vault-delete",
+                tauri_build::InlinedPlugin::new().commands(&["vault_delete"]),
+            )
+            .plugin(
+                "vault-repair",
+                tauri_build::InlinedPlugin::new().commands(&["vault_residue_scan", "vault_repair"]),
+            )
+            .plugin(
+                "vault-change-password",
+                tauri_build::InlinedPlugin::new().commands(&["change_password"]),
+            )
+            .plugin(
+                "prefs",
+                tauri_build::InlinedPlugin::new().commands(&[
+                    "prefs_read",
+                    "set_screen_capture_protection",
+                    "set_deliberate_folders",
+                    "vault_set_label",
+                ]),
+            )
+            .plugin(
+                "notes",
+                tauri_build::InlinedPlugin::new().commands(&[
+                    "note_create",
+                    "note_read",
+                    "note_update",
+                    "note_write_batch_transactional",
+                    "note_delete",
+                    "note_list",
+                    "note_titles_batch",
+                ]),
+            )
+            .plugin(
+                // PIN path only — biometric commands are desktop-only.
+                "quick-unlock",
+                tauri_build::InlinedPlugin::new().commands(&[
+                    "quick_unlock_setup_pin",
+                    "quick_unlock_with_pin",
+                    "quick_unlock_status",
+                    "quick_unlock_disable",
+                ]),
+            )
+            .plugin(
+                // MYND-31 (A11 — VaultIndices): shared from `myne-core`; the
+                // same 12 commands the desktop registers. Adding a command here
+                // without a matching entry in
+                // `permissions/vault-indices/default.toml` is a security bug.
+                "vault-indices",
+                tauri_build::InlinedPlugin::new().commands(&[
+                    "vault_indices_apply",
+                    "vault_indices_remove",
+                    "vault_indices_forward",
+                    "vault_indices_all_edges",
+                    "vault_indices_orphans",
+                    "vault_indices_backlink_candidates",
+                    "vault_indices_by_tag",
+                    "vault_indices_tag_tree",
+                    "vault_indices_note_properties",
+                    "vault_indices_property_values",
+                    "vault_indices_persist",
+                    "vault_indices_hydrate",
+                ]),
+            )
+            .plugin(
+                // MYS1 full-text search (frontend-fed): a NEW local mobile
+                // plugin (not a `myne-core` re-export) driving the shared BM25
+                // engine. Adding a command here without a matching entry in
+                // `permissions/search/default.toml` is a security bug.
+                "search",
+                tauri_build::InlinedPlugin::new()
+                    .commands(&["search_index_replace", "note_search"]),
+            )
+            .plugin(
+                // MYND-96 (SYNC-9): shared from `myne-core`; the same 4 commands
+                // the desktop registers. Adding a command here without a matching
+                // entry in `permissions/snapshots/default.toml` is a security bug.
+                "snapshots",
+                tauri_build::InlinedPlugin::new().commands(&[
+                    "snapshot_list",
+                    "snapshot_preview",
+                    "snapshot_restore",
+                    "snapshot_prune",
+                ]),
+            )
+            .plugin(
+                // MYND-169 (attachments): shared from `myne-core`. Mobile
+                // registers the CRUD subset that works without a native mic or
+                // the desktop text extractor — NO `voice_record_*`. Adding a
+                // command here without a matching entry in
+                // `permissions/attachments/default.toml` is a security bug.
+                "attachments",
+                tauri_build::InlinedPlugin::new().commands(&[
+                    "attachment_import",
+                    "catalog_list",
+                    "attachment_delete",
+                    "attachment_rename",
+                    "attachment_export",
+                    "attachment_unused_list",
+                    "attachment_clean_unused",
+                    "attachment_refs_apply",
+                    "attachment_refs_remove",
+                    "attachment_refs_referencing",
+                ]),
+            )
+            .plugin(
+                // MYND-211 (whole-vault plaintext markdown tree export): shared
+                // from `myne-core`; the same two commands the desktop registers.
+                // Adding a command here without a matching entry in
+                // `permissions/export/default.toml` is a security bug.
+                "export",
+                tauri_build::InlinedPlugin::new()
+                    .commands(&["vault_export_markdown", "vault_export_cancel"]),
+            )
+            .plugin(
+                // Recovery-kit / account-number `.txt` save: shared from
+                // `myne-core`; the same single `save_secret_text` command the
+                // desktop registers. Adding a command here without a matching
+                // entry in `permissions/secret-export/default.toml` is a
+                // security bug.
+                "secret-export",
+                tauri_build::InlinedPlugin::new().commands(&["save_secret_text"]),
+            ),
+    )
+    .unwrap();
+}

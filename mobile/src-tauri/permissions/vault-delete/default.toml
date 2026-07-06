@@ -1,0 +1,24 @@
+# Permissions for the in-app `vault-delete` Tauri plugin.
+# Picked up under the `vault-delete:` ACL namespace only because
+# `build.rs` declares this as an `InlinedPlugin`. Capability files
+# reference these as `vault-delete:default` (or
+# `vault-delete:allow-vault-delete`).
+#
+# Task 4 of `backend-vault-delete` (MYND-105) introduces
+# `allow-vault-delete`. The matrix-driven body (the Slot precondition
+# matrix + recursive unlink + partial-fail aggregation + Unix-only
+# durability) lands in Tasks 5–8 of the same feature. Granular
+# capability per the MYND-105 grill Q8-S2 — a single command, single
+# permission entry, no status-query (vault_status under
+# `vault-unlock:` already surfaces SlotKind).
+
+"$schema" = "../../gen/schemas/desktop-schema.json"
+
+[default]
+description = "Default permission set for the vault-delete plugin."
+permissions = ["allow-vault-delete"]
+
+[[permission]]
+identifier = "allow-vault-delete"
+description = "Allow invoking vault_delete:vault_delete (one-shot destruction of the local vault: zeroize in-memory keys via state.take() on Slot::Unlocked or Slot::Recovering, then recursively unlink every file under app_data_dir/vault/). One-shot best-effort; partial-fail surfaces as PartialDelete { remaining_count } per decisions.md 2026-05-26 'vault_delete partial-fail posture'. Caller MUST NOT pre-vault_lock."
+commands.allow = ["vault_delete"]

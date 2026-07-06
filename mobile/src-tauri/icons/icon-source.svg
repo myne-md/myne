@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" fill="none">
+  <!-- 1024x1024 source icon for `pnpm tauri icon`. The rounded-square card
+       fills ~824/1024 ≈ 0.80 of the canvas (artwork spans 100..924), the
+       macOS Big Sur+ "large rounded rectangle" app-icon grid value, leaving
+       only the small canonical transparent margin. The earlier 720/1024
+       (~0.70) card made Myne read visibly smaller than sibling card-style
+       icons (Obsidian, Linear, Finder) in the dock — a card icon must fill
+       the macOS grid, not sit inside extra padding (MYND-157). Keep the
+       ~0.80 ratio on any regeneration; do NOT revert to 720. The same SVG
+       drives Windows .ico and Linux icons via Tauri's converter; the .icns
+       file embeds all required Apple sizes (16/32/64/128/256/512/1024 + @2x).
+       The two-stroke "M" mark is scaled proportionally about the canvas
+       center (×824/720 ≈ 1.1444) so it keeps its relative position + weight
+       inside the larger card. No new metaphor — the mark stays the M (never
+       a lock / shield / key). -->
+  <rect x="100" y="100" width="824" height="824" rx="185" fill="#1a1a17"/>
+  <g transform="translate(512 512) scale(1.144444) translate(-512 -512)">
+    <path d="M300 700 V324 L512 510 L724 324 V700"
+          stroke="#fbfbfa"
+          stroke-width="56"
+          stroke-linecap="round"
+          stroke-linejoin="round"/>
+  </g>
+</svg>

@@ -1,0 +1,327 @@
+import type { CSSProperties, ReactNode } from "react";
+import { Icon } from "./Icon";
+
+/**
+ * Form controls. UI-only: nothing is interactive state-wise — `focused`,
+ * `filled`, `checked`, `value` etc. are presentational props the screens set to
+ * reproduce a particular design state. Geometry matches the design catalog.
+ */
+
+// ── Text field ───────────────────────────────────────────────────────────────
+export function Field({
+  value,
+  placeholder,
+  focused = false,
+  error = false,
+  mono = false,
+  trailing,
+  style,
+}: {
+  value?: ReactNode;
+  placeholder?: string;
+  focused?: boolean;
+  error?: boolean;
+  mono?: boolean;
+  trailing?: ReactNode;
+  style?: CSSProperties;
+}) {
+  const borderColor = error ? "var(--danger)" : focused ? "var(--accent)" : "var(--line-2)";
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        height: 52,
+        border: `${focused || error ? 1.5 : 1}px solid ${borderColor}`,
+        borderRadius: 6,
+        background: "var(--bg-1)",
+        padding: "0 14px",
+        boxShadow: focused ? "0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent)" : "none",
+        ...style,
+      }}
+    >
+      <div
+        style={{
+          flex: 1,
+          minWidth: 0,
+          fontFamily: mono ? "var(--font-mono)" : "var(--font-sans)",
+          fontSize: 16,
+          color: value ? "var(--fg-1)" : "var(--line-3)",
+          whiteSpace: "nowrap",
+          overflow: "hidden",
+        }}
+      >
+        {value ?? placeholder}
+      </div>
+      {trailing}
+    </div>
+  );
+}
+
+// ── Password field (masked monospace + caret + eye) ──────────────────────────
+export function PasswordField({
+  length = 12,
+  focused = true,
+  caret = true,
+  revealed = false,
+  value = "correct horse",
+  style,
+}: {
+  length?: number;
+  focused?: boolean;
+  caret?: boolean;
+  revealed?: boolean;
+  value?: string;
+  style?: CSSProperties;
+}) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        height: 52,
+        border: `${focused ? 1.5 : 1}px solid ${focused ? "var(--accent)" : "var(--line-2)"}`,
+        borderRadius: 6,
+        background: "var(--bg-1)",
+        padding: "0 14px",
+        boxShadow: focused ? "0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent)" : "none",
+        ...style,
+      }}
+    >
+      <span
+        style={{
+          fontFamily: "var(--font-mono)",
+          fontSize: revealed ? 16 : 14,
+          letterSpacing: revealed ? "0" : "0.14em",
+          color: "var(--fg-1)",
+        }}
+      >
+        {revealed ? value : "•".repeat(length)}
+      </span>
+      {caret && <span style={{ width: 2, height: 24, background: "var(--accent)", marginLeft: 3 }} />}
+      <div style={{ flex: 1 }} />
+      <Icon name={revealed ? "eye-off" : "eye"} size={20} color="var(--fg-3)" strokeWidth={1.6} />
+    </div>
+  );
+}
+
+// ── Password-strength meter ──────────────────────────────────────────────────
+const STRENGTH = {
+  Weak: { bars: 1, color: "var(--danger)" },
+  Fair: { bars: 2, color: "var(--warning)" },
+  Good: { bars: 3, color: "var(--accent)" },
+  Strong: { bars: 4, color: "var(--success)" },
+} as const;
+
+export function StrengthMeter({ level = "Strong" }: { level?: keyof typeof STRENGTH }) {
+  const { bars, color } = STRENGTH[level];
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+      <div style={{ flex: 1, display: "flex", gap: 4 }}>
+        {[0, 1, 2, 3].map((i) => (
+          <div
+            key={i}
+            style={{
+              flex: 1,
+              height: 4,
+              borderRadius: 999,
+              background: i < bars ? color : "var(--line-1)",
+            }}
+          />
+        ))}
+      </div>
+      <span style={{ fontSize: 13, fontWeight: 500, color: "var(--fg-2)" }}>{level}</span>
+    </div>
+  );
+}
+
+// ── PIN dots ─────────────────────────────────────────────────────────────────
+export function PinDots({ filled = 0, total = 6 }: { filled?: number; total?: number }) {
+  return (
+    <div style={{ display: "flex", gap: 14, justifyContent: "center" }}>
+      {Array.from({ length: total }).map((_, i) => (
+        <div
+          key={i}
+          style={{
+            width: 16,
+            height: 16,
+            borderRadius: "50%",
+            border: i < filled ? "none" : "1.5px solid var(--line-2)",
+            background: i < filled ? "var(--accent)" : "transparent",
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+// ── 24-word recovery grid ────────────────────────────────────────────────────
+export function RecoveryGrid({
+  words,
+  columns = 2,
+  blurred = false,
+}: {
+  words: string[];
+  columns?: number;
+  blurred?: boolean;
+}) {
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: `repeat(${columns}, 1fr)`, gap: 8 }}>
+      {words.map((w, i) => (
+        <div
+          key={i}
+          style={{
+            display: "flex",
+            alignItems: "baseline",
+            gap: 9,
+            background: "var(--bg-2)",
+            border: "1px solid var(--line-1)",
+            borderRadius: 6,
+            padding: "9px 11px",
+          }}
+        >
+          <span
+            style={{
+              fontFamily: "var(--font-mono)",
+              fontSize: 11,
+              color: "var(--line-3)",
+              width: 16,
+              textAlign: "right",
+              flexShrink: 0,
+            }}
+          >
+            {i + 1}
+          </span>
+          <span
+            style={{
+              fontFamily: "var(--font-mono)",
+              fontSize: 14,
+              fontWeight: 500,
+              color: "var(--fg-1)",
+              filter: blurred ? "blur(5px)" : "none",
+            }}
+          >
+            {w}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── Checkbox ─────────────────────────────────────────────────────────────────
+export function Checkbox({ checked = false }: { checked?: boolean }) {
+  return (
+    <div
+      style={{
+        width: 22,
+        height: 22,
+        borderRadius: 4,
+        flexShrink: 0,
+        border: checked ? "none" : "1.5px solid var(--line-2)",
+        background: checked ? "var(--accent)" : "var(--bg-1)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      {checked && <Icon name="check" size={14} color="var(--accent-on)" strokeWidth={2.4} />}
+    </div>
+  );
+}
+
+// ── Switch (iOS toggle) ──────────────────────────────────────────────────────
+// Presentational by default (gallery boards pass only `on`); pass `onToggle` to
+// make it an interactive control (wired settings).
+export function Switch({
+  on = false,
+  onToggle,
+  disabled = false,
+}: {
+  on?: boolean;
+  onToggle?: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <div
+      role={onToggle ? "switch" : undefined}
+      aria-checked={onToggle ? on : undefined}
+      aria-disabled={disabled || undefined}
+      onClick={onToggle && !disabled ? onToggle : undefined}
+      style={{
+        width: 51,
+        height: 31,
+        borderRadius: 999,
+        background: on ? "var(--success)" : "var(--line-2)",
+        position: "relative",
+        flexShrink: 0,
+        cursor: onToggle && !disabled ? "pointer" : "default",
+        opacity: disabled ? 0.5 : 1,
+        transition: "background var(--duration-fast) var(--ease-standard)",
+      }}
+    >
+      <div
+        style={{
+          position: "absolute",
+          top: 2,
+          left: on ? 22 : 2,
+          width: 27,
+          height: 27,
+          borderRadius: "50%",
+          background: "#fff",
+          boxShadow: "0 1px 3px rgba(0,0,0,0.3)",
+          transition: "left var(--duration-fast) var(--ease-standard)",
+        }}
+      />
+    </div>
+  );
+}
+
+// ── Segmented control ────────────────────────────────────────────────────────
+// Presentational by default (gallery boards pass only `active`); pass `onChange`
+// to make each segment tappable (wired settings).
+export function Segmented({
+  options,
+  active = 0,
+  onChange,
+  style,
+}: {
+  options: string[];
+  active?: number;
+  onChange?: (index: number) => void;
+  style?: CSSProperties;
+}) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        padding: 2,
+        background: "var(--bg-2)",
+        borderRadius: 8,
+        border: "1px solid var(--line-1)",
+        gap: 2,
+        ...style,
+      }}
+    >
+      {options.map((o, i) => (
+        <div
+          key={o}
+          onClick={onChange ? () => onChange(i) : undefined}
+          style={{
+            flex: 1,
+            textAlign: "center",
+            padding: "7px 12px",
+            borderRadius: 6,
+            fontSize: 14,
+            fontWeight: 600,
+            cursor: onChange ? "pointer" : "default",
+            background: i === active ? "var(--accent)" : "transparent",
+            color: i === active ? "var(--accent-on)" : "var(--fg-2)",
+          }}
+        >
+          {o}
+        </div>
+      ))}
+    </div>
+  );
+}

@@ -1,12 +1,20 @@
-# myne-mobile — Phase 3 mobile clients (placeholder)
+# myne-mobile — Tauri 2 Mobile client
 
 > Companion repository to [`myne`](https://github.com/myne-md/myne). License: AGPL-3.0.
 
 ## Status
 
-**Phase 3 — not yet started.** Empty scaffold. Phase 1 (desktop) ships first; Phase 2 (sync server) follows; this mobile client is Phase 3 alongside `myne-web`.
+**In active build — NOT an empty scaffold** (this section was stale; corrected 2026-07). The real state:
 
-## Stack target — Tauri 2 Mobile
+- **Backend**: `src-tauri/src/lib.rs` wires **7 shared `myne-core` plugins** (`vault_creation`, `vault_unlock`, `vault_recover`, `vault_change_password`, `vault_delete`, `prefs`, `notes` — 62 IPC commands) and installs `NoopHooks` (`myne_core::hooks::VaultLifecycleHooks`). Command *bodies* live in the repo-root `core/` crate (shared desktop↔mobile since `6d091ad`); the mobile `plugins/` are thin re-export wrappers. The `protocol/` crate is a direct path-dependency — zero crypto reimplementation, so `protocol/tests/vectors.rs` (the `myne-test-vectors` runner) validates mobile's blob/crypto path for free.
+- **Wired app** (`src/app/`): the `AppShell` Stage machine (`src/lib/stage.ts`) drives functional flows — Welcome, Create-vault (5-step), Unlock (+ fail-closed / lost-both-secrets delete), Recover (24-word phrase), Editor (note CRUD + plain-`<textarea>`), Picker, and a comprehensive **Settings sheet** wired to the `prefs` plugin (Appearance / Editor / Privacy — theme, editor typography, spell, screen-capture, auto-lock, vault rename). `RestoreBackupFlow` is an honest "not available yet" stub.
+- **Gallery** (`src/screens/`, `?gallery`): ~111 static design mocks — the desktop feature-parity *design target*, not backed.
+
+### Desktop parity — what's still missing (the build-out map)
+
+Reusable-for-free (link `core`/`protocol`): vault lifecycle, note CRUD, prefs, all crypto/blob codecs, vector conformance. **Absent** (desktop-only plugins needing a mobile equivalent via the hooks seam or a new plugin): real full-text **search** (MYS1; mobile Search tab is a client-side filter), **vault-indices**/backlinks/graph (MYI1; Graph tab is a placeholder), **snapshots**, **spell**+dictionary (MYD1), **workspace** (MYW1), **attachments** (MYA1/MYC1/MYE1), **backup/restore** (MYB1), **import**/export/PDF, **quick-unlock** (MYQ1 codec present, plugin unregistered + no capability), **custom themes**, **AI embeddings** (MYR1), and — the largest — **sync** (~20 desktop Rust files in `src-tauri/src/plugins/sync/`, NOT in `core/`; `protocol::{vault_head,manifest,scram}` primitives are shared). Track the phased plan in the parity effort; the `VaultLifecycleHooks` seam lets each land without forking the shared cores.
+
+## Stack — Tauri 2 Mobile
 
 - **Tauri 2 Mobile** for both iOS and Android (shared shell, native packaging per platform)
 - **Reuses `protocol/` Rust crate directly** from the main repo — no port, no separate libsodium binding to audit, no second crypto codebase

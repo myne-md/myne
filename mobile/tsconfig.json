@@ -1,0 +1,31 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "useDefineForClassFields": true,
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "skipLibCheck": true,
+
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "jsx": "react-jsx",
+
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+
+    "paths": {
+      "@myne/editor": ["../editor/src/index.ts"],
+      "@myne/editor/CMEditor": ["../editor/src/CMEditor.tsx"],
+      "@myne/editor/*": ["../editor/src/*"],
+      "@myne/dialect": ["../dialect/src/index.ts"],
+      "@myne/dialect/*": ["../dialect/src/*"],
+      "@myne/locales-en": ["../locales/en/common.json"]
+    }
+  },
+  "include": ["src"]
+}

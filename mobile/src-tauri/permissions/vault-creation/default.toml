@@ -1,0 +1,25 @@
+# Permissions for the in-app `vault-creation` Tauri plugin.
+# Picked up under the `vault-creation:` ACL namespace only because
+# `build.rs` declares this as an `InlinedPlugin`. Capability files
+# reference these as `vault-creation:default` (or `vault-creation:allow-<cmd>`).
+
+"$schema" = "../../gen/schemas/desktop-schema.json"
+
+[default]
+description = "Default permission set for the vault-creation plugin."
+permissions = ["allow-begin", "allow-commit", "allow-cancel"]
+
+[[permission]]
+identifier = "allow-begin"
+description = "Allow invoking vault_creation:begin (start a vault-creation session)."
+commands.allow = ["begin"]
+
+[[permission]]
+identifier = "allow-commit"
+description = "Allow invoking vault_creation:commit (write vault.meta to disk)."
+commands.allow = ["commit"]
+
+[[permission]]
+identifier = "allow-cancel"
+description = "Allow invoking vault_creation:cancel (drop an in-flight session)."
+commands.allow = ["cancel"]

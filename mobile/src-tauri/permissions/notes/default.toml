@@ -1,0 +1,56 @@
+# Permissions for the in-app `notes` Tauri plugin (mobile).
+# Picked up under the `notes:` ACL namespace only because `build.rs`
+# declares this as an `InlinedPlugin`. Capability files reference these
+# as `notes:default` (or `notes:allow-<cmd>`).
+#
+# Mobile carries only the CRUD + listing surface; the desktop-only
+# search / snapshot / export commands are not registered here.
+
+"$schema" = "../../gen/schemas/desktop-schema.json"
+
+[default]
+description = "Default permission set for the notes plugin."
+permissions = [
+    "allow-note-create",
+    "allow-note-read",
+    "allow-note-update",
+    "allow-note-write-batch-transactional",
+    "allow-note-delete",
+    "allow-note-list",
+    "allow-note-titles-batch",
+]
+
+[[permission]]
+identifier = "allow-note-create"
+description = "Allow invoking notes:note_create (encrypt + atomically write a new .myn note under <vault>/notes/<UUIDv7>.myn — backend-generated NoteId returned to the UI)."
+commands.allow = ["note_create"]
+
+[[permission]]
+identifier = "allow-note-read"
+description = "Allow invoking notes:note_read (read + AEAD-decrypt a .myn note by NoteId; returns the UTF-8 plaintext)."
+commands.allow = ["note_read"]
+
+[[permission]]
+identifier = "allow-note-update"
+description = "Allow invoking notes:note_update (re-encrypt an existing .myn note in place under the persistent item_key with a fresh content_nonce per protocol.md §6.3; bytes 0..47+N byte-identical across update revisions; atomic_write replace=true)."
+commands.allow = ["note_update"]
+
+[[permission]]
+identifier = "allow-note-write-batch-transactional"
+description = "Allow invoking notes:note_write_batch_transactional (MYND-85 / wikilink.md §8.3 — re-encrypt and atomically rewrite N existing .myn notes all-or-nothing for wikilink rename auto-update; same per-note AEAD pipeline as note_update, committed via the two-phase .rename-journal transaction so a crash mid-commit is roll-forward-recovered on next unlock; any per-note failure aborts the whole batch with the vault left pre-rename)."
+commands.allow = ["note_write_batch_transactional"]
+
+[[permission]]
+identifier = "allow-note-delete"
+description = "Allow invoking notes:note_delete (hard-delete a .myn note via remove_file + Unix parent-dir sync_all; cryptographic erase yapısal property of the v0.1 key hierarchy — enc_item_key removed with the file)."
+commands.allow = ["note_delete"]
+
+[[permission]]
+identifier = "allow-note-list"
+description = "Allow invoking notes:note_list (metadata-only enumeration of <vault>/notes/ — returns Vec<NoteId> sorted ascending UUIDv7; no decryption, no AEAD; the cheap half of two-tier sidebar virtualization paired with note_titles_batch per MYND-28 grill Q1)."
+commands.allow = ["note_list"]
+
+[[permission]]
+identifier = "allow-note-titles-batch"
+description = "Allow invoking notes:note_titles_batch (per-item decrypt of <=100 .myn blobs returning hybrid byte-range slices — frontmatter block + first H1 line — for sidebar title/updated_at extraction; TS dialect parses the slices on the WebView side per the MYND-82 grill Q3 hybrid byte-range decision)."
+commands.allow = ["note_titles_batch"]

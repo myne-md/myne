@@ -1,0 +1,31 @@
+# Permissions for the mobile `search` Tauri plugin (MYS1 full-text search).
+# Picked up under the `search:` ACL namespace only because `build.rs` declares
+# this as an `InlinedPlugin`. Referenced by `capabilities/default.json` as
+# `search:default`.
+#
+# A NEW local mobile plugin (not a `myne-core` re-export): it drives the shared
+# BM25 engine (`myne_core::search::SearchIndexState`), but the index is
+# frontend-fed — the WebView pushes the whole `(id, title, body)` corpus down
+# via `search_index_replace` and queries it via `note_search`. The index is
+# plaintext-derived, session-only RAM (managed in `lib.rs` setup); no persisted
+# MYS1 blob is written on mobile. These are write/query commands →
+# main-window-only invariant.
+
+"$schema" = "../../gen/schemas/mobile-schema.json"
+
+[default]
+description = "Default permission set for the mobile search plugin — WebView-fed index rebuild + BM25 query."
+permissions = [
+  "allow-search-index-replace",
+  "allow-note-search",
+]
+
+[[permission]]
+identifier = "allow-search-index-replace"
+description = "Allow invoking search:search_index_replace (bulk, atomic rebuild of the live in-RAM BM25 index from the WebView's full note corpus — the mobile client already holds every note's plaintext, so it feeds the (id, title, body) list directly; not slot-gated)."
+commands.allow = ["search_index_replace"]
+
+[[permission]]
+identifier = "allow-note-search"
+description = "Allow invoking search:note_search (BM25-ranked full-text query over the live in-RAM index; returns the top-50 {note_id, title, score} hits, highest score first; empty on an empty/absent index)."
+commands.allow = ["note_search"]
