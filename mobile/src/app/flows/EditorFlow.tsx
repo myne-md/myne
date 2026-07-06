@@ -767,6 +767,13 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
     }
   }
 
+  // Heading outline of the note body (skips fenced code so `# in code` isn't a
+  // heading). Each entry keeps the char offset so tapping jumps the caret there.
+  // MUST stay above the `view === "list"` early return — a hook called only in
+  // the editor branch renders "more hooks than the previous render" and crashes
+  // the whole flow to a blank screen on the first list→editor transition.
+  const outline = useMemo(() => deriveOutline(editorText), [editorText]);
+
   // ── List view ───────────────────────────────────────────────────────────────
   if (view === "list") {
     const viewActive = listView === "notes" && viewMatchIds != null;
@@ -1302,9 +1309,6 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
       (n) => n.id !== editing.id && !linked.has(n.id) && foldSegment(bodyAfterFrontmatter(bodies.get(n.id) ?? "")).includes(t),
     );
   })();
-  // Heading outline of the note body (skips fenced code so `# in code` isn't a
-  // heading). Each entry keeps the char offset so tapping jumps the caret there.
-  const outline = useMemo(() => deriveOutline(editorText), [editorText]);
 
   // Reading-mode wikilink tap → resolve title to a note and open it (saving the
   // current note first via openRelated).
