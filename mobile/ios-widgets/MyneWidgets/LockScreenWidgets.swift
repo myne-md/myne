@@ -7,7 +7,15 @@ import SwiftUI
 struct LockScreenView: View {
     @Environment(\.widgetFamily) private var family
 
+    // iOS 17+ requires every widget — accessories included — to declare a
+    // container background, or WidgetKit renders the "Please adopt
+    // containerBackground API" placeholder instead of the view. Lock-screen
+    // accessories are system-tinted, so the background is `.clear`.
     var body: some View {
+        content.containerBackground(.clear, for: .widget)
+    }
+
+    @ViewBuilder private var content: some View {
         switch family {
         case .accessoryInline:
             // Above the clock: a lock glyph + short label.

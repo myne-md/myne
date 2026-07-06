@@ -6,6 +6,7 @@
   "permissions": [
     "core:default",
     "opener:default",
+    "deep-link:default",
     "vault-creation:default",
     "vault-unlock:default",
     "vault-recover:default",

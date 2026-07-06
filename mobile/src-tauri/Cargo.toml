@@ -33,6 +33,14 @@ protocol = { path = "../../protocol" }
 myne-core = { path = "../../core" }
 tauri = { version = "2", features = [] }
 tauri-plugin-opener = "2"
+# Custom-URL-scheme (`myne://`) delivery for the iOS home/lock-screen widgets +
+# Control Center "New note" action. The widget process is OUTSIDE the plaintext
+# trust boundary (it can carry no vault content); all it does is hand the app a
+# `myne://open` / `myne://capture` URL, which this plugin surfaces to the WebView
+# (`getCurrent` at cold launch + `onOpenUrl` at runtime). The capture route then
+# drives the ordinary React new-note editor after unlock — no second, unaudited
+# capture path.
+tauri-plugin-deep-link = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 uuid = { version = "1", features = ["v4", "v7"] }
