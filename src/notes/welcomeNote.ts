@@ -8,6 +8,12 @@
 // discipline). Seeded exactly once, on the create→unlock path only — never
 // re-created on later unlocks.
 //
+// The note's SHAPE (frontmatter `title:` + body) and the catalog key names
+// live in the shared `@myne/dialect/welcomeNote` builder, which the mobile
+// client (`myne-mobile/src/lib/welcomeNote.ts`) consumes too — this file
+// adds only the desktop-specific parts: i18n resolution and the MYW1
+// workspace pre-seed.
+//
 // i18n: the copy is resolved at SEED TIME via the i18n runtime (NOT frozen at
 // module load), so the Welcome note is authored in whatever language is active
 // when the vault is created. The title/body/markdown are getter FUNCTIONS for
@@ -19,7 +25,11 @@
 // existing restore path opens it — no Editor changes, no first-note
 // auto-select special case.
 
-import { patchTitleField } from "../dialect";
+import {
+  buildWelcomeNoteMarkdown,
+  WELCOME_NOTE_TITLE_KEY,
+  WELCOME_NOTE_BODY_KEY,
+} from "../dialect/welcomeNote";
 import i18n from "../i18n";
 import { noteCreate } from "./createNote";
 import { emptyWorkspace, openInFocusedTab } from "./workspaceState";
@@ -30,7 +40,7 @@ import { serializeWorkspace, workspaceWrite } from "../lib/workspace-persist";
  *  Welcome note must carry it in frontmatter or it renders as "Untitled".
  *  Resolved at call time (reactive to the active language). */
 export function welcomeNoteTitle(): string {
-  return i18n.t("notes.welcome.title");
+  return i18n.t(WELCOME_NOTE_TITLE_KEY);
 }
 
 /** The Welcome note body (Markdown). No leading `# H1`: the title chip
@@ -40,23 +50,16 @@ export function welcomeNoteTitle(): string {
  *  aren't clickable, autolink.ts). A friendly welcome, not a feature tour.
  *  Resolved at call time (reactive to the active language). */
 export function welcomeNoteBody(): string {
-  return i18n.t("notes.welcome.body");
+  return i18n.t(WELCOME_NOTE_BODY_KEY);
 }
 
-const utf8Encoder = new TextEncoder();
-const utf8Decoder = new TextDecoder();
-
 /**
- * Full note plaintext: a frontmatter `title:` block (so the sidebar/tab
- * shows the title, not "Untitled") followed by the Markdown body. Built via
- * the canonical dialect helper so quoting/format match every other
- * Myne-written note. A FUNCTION (not a const) so the copy reflects the active
- * language at seed time rather than the boot language.
+ * Full note plaintext via the shared cross-client builder. A FUNCTION (not a
+ * const) so the copy reflects the active language at seed time rather than
+ * the boot language.
  */
 export function welcomeNoteMarkdown(): string {
-  return utf8Decoder.decode(
-    patchTitleField(utf8Encoder.encode(welcomeNoteBody()), welcomeNoteTitle()),
-  );
+  return buildWelcomeNoteMarkdown(welcomeNoteTitle(), welcomeNoteBody());
 }
 
 /**
