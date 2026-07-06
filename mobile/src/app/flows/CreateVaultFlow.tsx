@@ -24,6 +24,7 @@ import {
   unlockWithPassword,
 } from "../../lib/commands";
 import { HAS_TAURI } from "../../lib/app-window";
+import { seedWelcomeNote } from "../../lib/welcomeNote";
 import { LOST_BOTH_SECRETS_SENTENCE } from "../../lib/load-bearing-copy";
 import { saveSecretToDocuments } from "../../lib/secret-export";
 import type { CreateVaultFlowProps } from "./types";
@@ -510,6 +511,11 @@ export function CreateVaultFlow({
     try {
       if (HAS_TAURI) await unlockWithPassword(pwdRef.current, id);
       wipeSecrets();
+      // MYND-118 mobile mirror — seed the onboarding Welcome note now the
+      // new vault is unlocked (note_create requires an unlocked slot).
+      // Best-effort: seedWelcomeNote never throws, so a failure here can't
+      // bounce a successfully-unlocked user to the unlock-failed path.
+      if (HAS_TAURI) await seedWelcomeNote();
       onAutoUnlockSuccess(id);
     } catch {
       wipeSecrets();
