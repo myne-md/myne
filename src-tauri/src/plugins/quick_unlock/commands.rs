@@ -78,7 +78,9 @@ pub async fn quick_unlock_with_biometric<R: Runtime>(
 ) -> Result<(), QuickUnlockError> {
     #[cfg(target_os = "macos")]
     {
-        use myne_core::plugins::quick_unlock::commands::{quick_unlock_with_dir, read_meta, target_dir};
+        use myne_core::plugins::quick_unlock::commands::{
+            quick_unlock_with_dir, read_meta, target_dir,
+        };
         let dir = target_dir(&app, &state, vault_id.as_deref()).await?;
         let (_, meta) = read_meta(&dir)?;
         let id = myne_core::paths::vault_id_from_root(&dir);

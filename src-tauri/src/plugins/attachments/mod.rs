@@ -50,12 +50,12 @@
 // Platform-agnostic plugin core, re-exported so `crate::plugins::attachments::…`
 // paths keep resolving (hooks.rs, notes, export, search_sync, clipper,
 // export_naming all reach in through these).
+pub use myne_core::plugins::attachments::AttachmentRefsState;
 #[allow(unused_imports)]
 pub use myne_core::plugins::attachments::{
     commands, error, extract_types, reconcile, reconcile_commands, ref_scan, scheme_core, sniff,
     text_cache,
 };
-pub use myne_core::plugins::attachments::AttachmentRefsState;
 
 // Desktop-only modules.
 pub mod extract;

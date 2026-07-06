@@ -294,9 +294,15 @@ pub(crate) async fn snapshot_restore_in(
     // Step 3: overwrite the live note with the snapshot content. The creation
     // hook inside note_update is coalesced (within the window of step 2's forced
     // capture) → no double snapshot.
-    note_update_with_dir(notes_dir, state, hooks, note_id.clone(), (*plaintext).clone())
-        .await
-        .map_err(map_note_update_err)?;
+    note_update_with_dir(
+        notes_dir,
+        state,
+        hooks,
+        note_id.clone(),
+        (*plaintext).clone(),
+    )
+    .await
+    .map_err(map_note_update_err)?;
 
     // Step 4: keep the live in-RAM search + AI indices correct through the hooks
     // seam. MYND-328: fold the restored note's attachment text in (parity with

@@ -83,8 +83,11 @@ mod tests {
             items_key_nonce: [8u8; 24],
             enc_items_key: [9u8; 64],
         };
-        std::fs::write(dir.join("vault.meta"), protocol::serialize_vault_meta(&meta))
-            .expect("seed vault.meta");
+        std::fs::write(
+            dir.join("vault.meta"),
+            protocol::serialize_vault_meta(&meta),
+        )
+        .expect("seed vault.meta");
     }
 
     async fn temp_vault() -> (ScopedTempDir, VaultRuntimeState) {
@@ -106,8 +109,10 @@ mod tests {
         vault_dir: &Path,
         state: &VaultRuntimeState,
         source: ImportSource,
-    ) -> Result<myne_core::plugins::attachments::commands::ImportedAttachment, myne_core::plugins::attachments::error::AttachmentImportError>
-    {
+    ) -> Result<
+        myne_core::plugins::attachments::commands::ImportedAttachment,
+        myne_core::plugins::attachments::error::AttachmentImportError,
+    > {
         attachment_import_with_dir_ext(vault_dir, state, source, extract::extract).await
     }
 
@@ -128,8 +133,9 @@ mod tests {
 
             let id = hex_decode_id(&imported.id).expect("valid id");
             let key = derive_subkey(&[SEED_ROOT; 32], SubkeyRole::AttachmentTextKey);
-            let cached = text_cache::read_extracted(tmp.path(), &key, &[SEED_ACCOUNT_HASH; 16], &id)
-                .expect("MYE1 cache written at import");
+            let cached =
+                text_cache::read_extracted(tmp.path(), &key, &[SEED_ACCOUNT_HASH; 16], &id)
+                    .expect("MYE1 cache written at import");
             assert_eq!(cached.status, extract::ExtractStatus::Ok);
             assert!(cached.text.contains("searchable attachment body alpha"));
         });
