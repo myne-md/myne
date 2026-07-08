@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Gallery } from "./gallery/Gallery";
 import { AppShell } from "./app/AppShell";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 import { PlatformProvider, type Platform } from "./platform/PlatformContext";
 
 /**
@@ -94,7 +95,9 @@ export default function App() {
       }}
     >
       <PlatformProvider platform={detectPlatform()}>
-        <AppShell />
+        <ErrorBoundary>
+          <AppShell />
+        </ErrorBoundary>
       </PlatformProvider>
     </div>
   );

@@ -609,6 +609,12 @@ textarea,
 
 .myne-spinner {
   animation: myne-spinner-rotate 800ms linear infinite;
+  /* WKWebView rotates an <svg> element around the SVG user-space origin (0,0 —
+     the top-left corner) unless the reference box is pinned explicitly, so the
+     ring swings in a wide arc off its own centre and reads as "not spinning".
+     Pin the box + origin to its own centre so it rotates in place. */
+  transform-box: border-box;
+  transform-origin: 50% 50%;
 }
 
 /* -- Sidebar tree disclosure ------------------------------------------------
