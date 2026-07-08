@@ -30,11 +30,13 @@ pub use myne_core::{
 mod hooks;
 #[cfg(target_os = "ios")]
 mod ios_chrome;
+mod pdf_export;
 mod plugins;
+mod screen_guard;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    use tauri::Manager;
+    use tauri::{Listener, Manager};
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
@@ -88,7 +90,9 @@ pub fn run() {
             // captures/purges `.myn` snapshots just like desktop. Registered
             // before any command can run — mirrors the desktop `app.manage(hooks)`
             // wiring.
-            app.manage::<myne_core::hooks::Hooks>(std::sync::Arc::new(hooks::MobileHooks));
+            app.manage::<myne_core::hooks::Hooks>(std::sync::Arc::new(hooks::MobileHooks::new(
+                app.handle().clone(),
+            )));
             // MYND-31: app-level live in-RAM VaultIndices state (wikilink graph
             // + backlinks + tag index + typed properties), rebuilt on unlock by
             // the TS-orchestrated sweep. Mirrors the desktop `app.manage(...)`
@@ -114,6 +118,24 @@ pub fn run() {
             // exists for it. See `ios_chrome`. iOS-only; no-op elsewhere.
             #[cfg(target_os = "ios")]
             ios_chrome::suppress_keyboard_accessory_bar();
+
+            // Native PDF export. `window.print()` is a no-op in the mobile
+            // WebView, so the "Export as PDF" action emits EXPORT_PDF_EVENT with
+            // the note title + rendered HTML; present the platform export sheet
+            // (iOS print → Save to Files) on the main thread.
+            {
+                let handle = app.handle().clone();
+                app.listen(pdf_export::EXPORT_PDF_EVENT, move |event| {
+                    let Ok(payload) =
+                        serde_json::from_str::<pdf_export::ExportPayload>(event.payload())
+                    else {
+                        return;
+                    };
+                    let _ = handle.run_on_main_thread(move || {
+                        pdf_export::present(&payload.title, &payload.html)
+                    });
+                });
+            }
             Ok(())
         })
         .run(tauri::generate_context!())

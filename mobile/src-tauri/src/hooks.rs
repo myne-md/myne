@@ -26,9 +26,20 @@ use myne_core::hooks::{BoxFuture, VaultLifecycleHooks};
 use myne_core::plugins::vault_unlock::state::VaultRuntimeState;
 
 /// Mobile wiring for the shared command-core lifecycle hooks: no-op everywhere
-/// except the two snapshot hooks, which drive the `myne-core` snapshot store.
-#[derive(Default)]
-pub struct MobileHooks;
+/// except the two snapshot hooks (which drive the `myne-core` snapshot store)
+/// and `apply_screen_capture` (native screen-capture protection). Holds an
+/// `AppHandle` so the screen-capture hook can dispatch its UIKit/Android work
+/// onto the main thread via `run_on_main_thread`.
+pub struct MobileHooks {
+    app: tauri::AppHandle,
+}
+
+impl MobileHooks {
+    /// Construct the hooks with the app handle used to reach the main thread.
+    pub fn new(app: tauri::AppHandle) -> Self {
+        Self { app }
+    }
+}
 
 impl VaultLifecycleHooks for MobileHooks {
     // ---- Group 1: async ---------------------------------------------------
@@ -64,7 +75,16 @@ impl VaultLifecycleHooks for MobileHooks {
     fn abort_active_recording(&self) {}
     fn pdf_export_teardown_on_lock(&self) {}
     fn clear_staged_descriptor(&self) {}
-    fn apply_screen_capture(&self, _: bool, _: &'static str) {}
+    fn apply_screen_capture(&self, enabled: bool, _site: &'static str) {
+        // Native screen-capture protection lives in `crate::screen_guard`. UIKit
+        // (iOS) and `Window.setFlags` (Android) must run on the UI/main thread,
+        // but this hook fires from the async command context — hop over via
+        // Tauri's main-thread dispatch. Best-effort: a dispatch error (event loop
+        // gone mid-teardown) is swallowed, matching desktop's warn-and-drop.
+        let _ = self
+            .app
+            .run_on_main_thread(move || crate::screen_guard::apply(enabled));
+    }
 
     // ---- Group 4: note-CRUD index/sync side-effects -----------------------
     fn search_upsert(&self, _: &str, _: &str, _: &str) {}
