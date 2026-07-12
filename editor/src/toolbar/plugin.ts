@@ -29,6 +29,36 @@ const TOOLBAR_BUTTONS = [
   { id: "code", label: "<>", weight: "600", mono: true, action: wrapCommand("`", "`") },
 ] as const;
 
+/** The default floating-toolbar layout — control ids in render order — used when
+ *  no user customization has been fed via {@link setToolbarLayout} (MYND-336).
+ *  Matches the pre-customization order exactly. */
+const DEFAULT_TOOLBAR_LAYOUT: readonly string[] = [
+  "bold",
+  "italic",
+  "strike",
+  "code",
+  "highlight",
+  "link",
+  "heading",
+];
+
+/** The user's resolved toolbar layout (shown control ids, in order), or null for
+ *  {@link DEFAULT_TOOLBAR_LAYOUT}. Fed from `vault.prefs` by the host (MYND-336)
+ *  and read at each render. The floating toolbar is transient (re-renders on
+ *  selection), so a config change takes effect on the next selection — no live
+ *  reconfigure needed. */
+let toolbarLayout: readonly string[] | null = null;
+
+/** Set the resolved floating-toolbar layout (shown ids in order), or `null` to
+ *  restore the default. Called by the desktop from its `vault.prefs` sync. */
+export function setToolbarLayout(ids: readonly string[] | null): void {
+  toolbarLayout = ids;
+}
+
+function getToolbarLayout(): readonly string[] | null {
+  return toolbarLayout;
+}
+
 // Multi-color highlight palette (decisions.md 2026-06-15). Yellow is the
 // DEFAULT: it emits `==…==` (byte-identical to the pre-color behaviour, MYND-156)
 // and is what a plain click on the "H" button applies. The other four wrap the
@@ -190,26 +220,60 @@ class ToolbarView implements PluginValue {
   }
 
   private renderToolbar(container: HTMLDivElement): void {
-    for (const btn of TOOLBAR_BUTTONS) {
-      const el = document.createElement("button");
-      el.type = "button";
-      el.className = "cm-toolbar-button";
-      el.textContent = btn.label;
-      el.style.fontWeight = btn.weight;
-      if ("italic" in btn && btn.italic) el.style.fontStyle = "italic";
-      if ("strike" in btn && btn.strike) el.style.textDecoration = "line-through";
-      if ("mono" in btn && btn.mono) el.style.fontFamily = "var(--font-mono)";
-      el.addEventListener("mousedown", (e) => {
-        e.preventDefault();
-        btn.action(this.view);
-      });
-      container.appendChild(el);
+    // MYND-336: render the controls in the user's resolved layout order, hidden
+    // ones already filtered out by the host. Falls back to the default layout.
+    const layout = getToolbarLayout() ?? DEFAULT_TOOLBAR_LAYOUT;
+    for (const id of layout) {
+      switch (id) {
+        case "bold":
+        case "italic":
+        case "strike":
+        case "code": {
+          const btn = TOOLBAR_BUTTONS.find((b) => b.id === id);
+          if (btn !== undefined) this.renderSimpleButton(container, btn);
+          break;
+        }
+        case "highlight":
+          // "H" swatch: plain click = default yellow (==…==); caret opens the
+          // 5-color swatch row (MYND-156 + multi-color, decisions.md 2026-06-15).
+          this.renderHighlightControl(container);
+          break;
+        case "link":
+          this.renderLinkButton(container);
+          break;
+        case "heading":
+          this.renderHeadingDropdown(container);
+          break;
+        default:
+          // The addable list/quote/wikilink commands are not yet rendered on the
+          // floating toolbar (MYND-336 follow-up); config still persists them.
+          break;
+      }
     }
-    // Highlight (MYND-156 + multi-color, decisions.md 2026-06-15): an "H" swatch
-    // whose plain click applies the DEFAULT yellow (`==…==`), plus a caret that
-    // opens a 5-color swatch row. Mirrors the heading dropdown structure below.
-    this.renderHighlightControl(container);
-    // Link button.
+  }
+
+  /** One simple inline-formatting button (bold/italic/strike/code). */
+  private renderSimpleButton(
+    container: HTMLDivElement,
+    btn: (typeof TOOLBAR_BUTTONS)[number],
+  ): void {
+    const el = document.createElement("button");
+    el.type = "button";
+    el.className = "cm-toolbar-button";
+    el.textContent = btn.label;
+    el.style.fontWeight = btn.weight;
+    if ("italic" in btn && btn.italic) el.style.fontStyle = "italic";
+    if ("strike" in btn && btn.strike) el.style.textDecoration = "line-through";
+    if ("mono" in btn && btn.mono) el.style.fontFamily = "var(--font-mono)";
+    el.addEventListener("mousedown", (e) => {
+      e.preventDefault();
+      btn.action(this.view);
+    });
+    container.appendChild(el);
+  }
+
+  /** The link button (opens the URL overlay). */
+  private renderLinkButton(container: HTMLDivElement): void {
     const link = document.createElement("button");
     link.type = "button";
     link.className = "cm-toolbar-button cm-toolbar-button-link";
@@ -221,7 +285,10 @@ class ToolbarView implements PluginValue {
       this.openUrlOverlay();
     });
     container.appendChild(link);
-    // Heading dropdown.
+  }
+
+  /** The heading-level dropdown (H▾ → paragraph / H1..H6). */
+  private renderHeadingDropdown(container: HTMLDivElement): void {
     const headingWrap = document.createElement("div");
     headingWrap.className = "cm-toolbar-heading-wrap";
     headingWrap.style.position = "relative";
