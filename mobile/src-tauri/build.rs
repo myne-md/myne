@@ -177,9 +177,10 @@ fn main() {
                 // eye-compare substrate, exposed on mobile to match desktop F3-T4.)
                 // This list, the `generate_handler!` in `plugins/sync/mod.rs`, and
                 // `permissions/sync/default.toml` `commands.allow` MUST match
-                // exactly (all 15) or the ACL resolver fails closed. Adding a
+                // exactly (all 17) or the ACL resolver fails closed. Adding a
                 // command here without a matching permission entry is a security
-                // bug (SYNC-15).
+                // bug (SYNC-15). The lifecycle pair is mobile-only (desktop
+                // never manages the SyncLifecycleSignal).
                 "sync",
                 tauri_build::InlinedPlugin::new().commands(&[
                     "sync_get_endpoint",
@@ -197,6 +198,8 @@ fn main() {
                     "sync_join_account",
                     "sync_reset_local",
                     "sync_head_fingerprint",
+                    "sync_lifecycle_suspend",
+                    "sync_lifecycle_resume",
                 ]),
             ),
     )

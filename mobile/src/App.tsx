@@ -4,6 +4,7 @@ import { AppShell } from "./app/AppShell";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { PlatformProvider, type Platform } from "./platform/PlatformContext";
 import { SizeClassProvider, useSizeClassObserver } from "./platform/SizeClassContext";
+import { useSyncLifecycle } from "./lib/use-sync-lifecycle";
 
 /**
  * Track the VISUAL viewport so the app fills *exactly* the space above the
@@ -68,6 +69,10 @@ export default function App() {
     typeof window !== "undefined" && new URLSearchParams(window.location.search).has("gallery");
   const { height, offsetTop } = useViewport();
   const sizeClass = useSizeClassObserver();
+
+  // Background/foreground → sync scheduler suspend/resume (SYNC-37/38). Gallery
+  // previews skip it (no Tauri backend; the hook's invokes would just no-op).
+  useSyncLifecycle(!showGallery);
 
   // Real app only: pin the document so iOS can't scroll the whole page up when
   // the keyboard opens (the gallery board keeps its free scroll — class absent).

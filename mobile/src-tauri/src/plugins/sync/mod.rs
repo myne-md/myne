@@ -11,16 +11,19 @@
 //!
 //! ## Capability ACL (deny-by-default, SYNC-15)
 //!
-//! `sync:default` bundles all fifteen commands into ONE narrow, main-window-only
-//! grant — a verbatim mirror of the already-shipped desktop `sync:default`
-//! surface (no per-platform ACL, no per-command widening). The device-local
+//! `sync:default` bundles all seventeen commands into ONE narrow,
+//! main-window-only grant — the fifteen-command desktop `sync:default` surface
+//! plus the mobile-only lifecycle pair
+//! (`sync_lifecycle_suspend`/`sync_lifecycle_resume`, which flip an in-RAM
+//! scheduler flag and move no vault bytes; desktop does not register them
+//! because it never manages the `SyncLifecycleSignal`). The device-local
 //! endpoint-config pair (`sync_get_endpoint`/`sync_set_endpoint`) is intentionally
 //! reachable pre-auth (an operator configures the server before unlocking); the
 //! push/pull/status/device commands are gated on an authenticated session inside
 //! the shared core. The `build.rs` `InlinedPlugin` command list, the
 //! `permissions/sync/default.toml` `commands.allow` entries, and the
-//! `generate_handler!` list below MUST match exactly (all fifteen) — a mismatch
-//! makes Tauri **fail closed** (the ACL resolver denies the invoke).
+//! `generate_handler!` list below MUST match exactly (all seventeen) — a
+//! mismatch makes Tauri **fail closed** (the ACL resolver denies the invoke).
 //!
 //! ## R3 transport review-debt (registration ≠ verified crypto)
 //!
@@ -47,7 +50,7 @@ use tauri::plugin::{Builder, TauriPlugin};
 use tauri::Runtime;
 
 /// Construct the mobile `sync` plugin — registers the client command surface
-/// over the shared-core command bodies. All fifteen commands, matching the
+/// over the shared-core command bodies. All seventeen commands, matching the
 /// `build.rs` `InlinedPlugin` + `permissions/sync/default.toml` lists exactly.
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::<R>::new("sync")
@@ -67,6 +70,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::sync_join_account,
             commands::sync_reset_local,
             commands::sync_head_fingerprint,
+            commands::sync_lifecycle_suspend,
+            commands::sync_lifecycle_resume,
         ])
         .build()
 }
