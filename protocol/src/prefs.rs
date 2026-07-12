@@ -236,6 +236,24 @@ pub struct PrefsView {
     #[serde(default)]
     pub deliberate_folders: Vec<alloc::string::String>,
 
+    /// Friendly device names (device-management, SYNC-41) — a map of
+    /// `device_id` (hex) → user-chosen display name. **The single home** for
+    /// device names so no client ships a second default-name heuristic; both
+    /// clients read/write it and it rides the already-synced, AEAD'd `MYP1`
+    /// prefs. A `BTreeMap` so the canonical encoder emits keys in lexicographic
+    /// order (the `folder_icons` / `item_colors` precedent class). **Same
+    /// canonical string→string map encoding as `folder_icons`** (NFC-normalized
+    /// keys + values, lexicographic key order) and **omitted entirely from the
+    /// canonical JSON when empty**, so a vault that never named a device is
+    /// byte-identical to a pre-feature `vault.prefs` (existing golden vectors
+    /// unaffected — a migration-less additive field on `MYP1`). Default empty.
+    /// Canonical key `device_names` — sorts after `deliberate_folders`
+    /// (`del` < `dev`), before the `editor_*` block (`d` < `e`).
+    /// **Non-load-bearing** (a tampered/replayed value can at worst mislabel a
+    /// device in the device list) — no protective-envelope clamp.
+    #[serde(default)]
+    pub device_names: BTreeMap<String, String>,
+
     /// User-chosen auto-lock-on-idle timeout in **integer seconds**
     /// (MYND-121). `None` = unset → the caller's protective-envelope
     /// default applies (spec § 9.5.5 fall-back-to-defaults). The
@@ -869,6 +887,7 @@ impl Default for PrefsView {
             favorites: Vec::new(),
             item_order: Vec::new(),
             deliberate_folders: Vec::new(),
+            device_names: Default::default(),
             auto_lock_seconds: None,
             custom_theme: None,
             daily_date_format: None,
@@ -1169,6 +1188,20 @@ fn canonical_json_encode(prefs: &PrefsView) -> Vec<u8> {
             push_json_string(&mut out, f);
         }
         out.extend_from_slice(b"],");
+    }
+
+    // device_names (canonical key 'd' — after deliberate_folders [`del` < `dev`],
+    // before the editor_* block [`d` < `e`]). A device_id-hex → friendly-name
+    // string→string object (SYNC-41, the single home for device names); omitted
+    // entirely when empty so a vault that never named a device is byte-identical
+    // to a pre-feature vault.prefs (existing KAT vectors unaffected —
+    // migration-less additive field on MYP1, the folder_icons / item_colors
+    // precedent class). Keys emitted in lexicographic order, NFC-normalized
+    // (push_canonical_string_map).
+    if !prefs.device_names.is_empty() {
+        out.extend_from_slice(b"\"device_names\":");
+        push_canonical_string_map(&mut out, &prefs.device_names);
+        out.push(b',');
     }
 
     // editor-typography string presets (canonical key 'e'). content_width +
@@ -1835,6 +1868,10 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
     let daily_template = parse_optional_string_field(rest, &mut cursor, b"\"daily_template\":")?;
     let deliberate_folders =
         parse_optional_array_field(rest, &mut cursor, b"\"deliberate_folders\":")?;
+    // device_names (canonical key 'd' — after deliberate_folders [del < dev],
+    // before the editor_* block [d < e]). A string→string map (device_id-hex →
+    // friendly name, SYNC-41); absent → empty (the folder_icons precedent).
+    let device_names = parse_optional_string_map_field(rest, &mut cursor, b"\"device_names\":")?;
     // editor-typography string presets (canonical key 'e'). content_width +
     // font_family sort BEFORE editor_layout; line_spacing + text_size AFTER it.
     // All parsed from the same monotonic cursor so canonical key order holds.
@@ -2003,6 +2040,7 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
         icon,
         item_colors,
         deliberate_folders,
+        device_names,
         auto_lock_seconds,
         custom_theme,
         daily_date_format,
@@ -2760,6 +2798,7 @@ mod tests {
             bar_items_order: Vec::new(),
             show_note_timestamps: true,
             folder_icons: Default::default(),
+            device_names: Default::default(),
             hidden_bar_items: Vec::new(),
             icon: None,
             item_colors: Default::default(),
@@ -2813,6 +2852,7 @@ mod tests {
             bar_items_order: Vec::new(),
             show_note_timestamps: true,
             folder_icons: Default::default(),
+            device_names: Default::default(),
             hidden_bar_items: Vec::new(),
             icon: None,
             item_colors: Default::default(),
@@ -2897,6 +2937,7 @@ mod tests {
         // within each object are emitted in lexicographic order.
         let prefs = PrefsView {
             folder_icons: map_of(&[("Projects/Myne/", "book"), ("Archive/2025/", "archive")]),
+            device_names: Default::default(),
             hidden_bar_items: Vec::new(),
             item_colors: map_of(&[
                 ("Projects/Myne/", "slate"),
@@ -2924,6 +2965,7 @@ mod tests {
     fn decoration_maps_round_trip_through_blob() {
         let original = PrefsView {
             folder_icons: map_of(&[("Archive/2025/", "archive"), ("Projects/Myne/", "book")]),
+            device_names: Default::default(),
             hidden_bar_items: Vec::new(),
             item_colors: map_of(&[
                 ("0190a000-0000-7000-8000-000000000001", "moss"),
@@ -2953,11 +2995,78 @@ mod tests {
     }
 
     #[test]
+    fn device_names_encode_canonical_bytes() {
+        // device_names (SYNC-41) encodes as a canonical string→string object
+        // (lexicographic keys, NFC) at canonical key 'd' — before
+        // screen_capture_protection ('s'). Pins the new field's byte layout.
+        let prefs = PrefsView {
+            device_names: map_of(&[("bb", "Phone"), ("aa", "Laptop")]),
+            ..PrefsView::default()
+        };
+        let encoded = canonical_json_encode(&prefs);
+        assert_eq!(
+            encoded.as_slice(),
+            br#"{"device_names":{"aa":"Laptop","bb":"Phone"},"screen_capture_protection":true}"#
+        );
+    }
+
+    #[test]
+    fn device_names_canonical_position_between_deliberate_folders_and_editor() {
+        // Load-bearing canonical key order: deliberate_folders (del) <
+        // device_names (dev) < editor_content_width (e). Guards the exact slot.
+        let prefs = PrefsView {
+            deliberate_folders: alloc::vec![alloc::string::String::from("A/")],
+            device_names: map_of(&[("d1", "Mac")]),
+            editor_content_width: Some(String::from("wide")),
+            ..PrefsView::default()
+        };
+        let encoded = canonical_json_encode(&prefs);
+        assert_eq!(
+            encoded.as_slice(),
+            br#"{"deliberate_folders":["A/"],"device_names":{"d1":"Mac"},"editor_content_width":"wide","screen_capture_protection":true}"#
+        );
+    }
+
+    #[test]
+    fn device_names_omitted_when_empty_preserves_pre_feature_bytes() {
+        // A vault that never named a device must be byte-identical to the
+        // pre-feature form — the migration-less additive-field discipline.
+        let prefs = PrefsView {
+            deliberate_folders: alloc::vec![alloc::string::String::from("A/")],
+            ..PrefsView::default()
+        };
+        let encoded = canonical_json_encode(&prefs);
+        // The exact golden below has no `device_names` key — proof the empty map
+        // is omitted and the byte layout is unperturbed.
+        assert_eq!(
+            encoded.as_slice(),
+            br#"{"deliberate_folders":["A/"],"screen_capture_protection":true}"#
+        );
+    }
+
+    #[test]
+    fn device_names_round_trips_through_blob() {
+        let original = PrefsView {
+            device_names: map_of(&[("0a1b", "Work Laptop"), ("ff00", "Phone")]),
+            ..PrefsView::default()
+        };
+        let prefs_key = derive_subkey(&fixed_root_key(), SubkeyRole::PrefsKey);
+        let account_hash = fixed_account_number_hash();
+        let blob =
+            encode_prefs_blob_raw(&prefs_key, &account_hash, &original, &fixed_prefs_nonce())
+                .expect("encode");
+        let decoded = decode_prefs_blob(&prefs_key, &account_hash, &blob).expect("decode");
+        assert_eq!(decoded, original);
+        assert_eq!(decoded.device_names, original.device_names);
+    }
+
+    #[test]
     fn decoration_map_keys_and_values_are_nfc_normalized() {
         // A folder key supplied in NFD ("e" + U+0301 combining acute) must be
         // emitted in NFC (U+00E9) — byte-stability discipline.
         let prefs = PrefsView {
             folder_icons: map_of(&[("Cafe\u{301}/", "book")]),
+            device_names: Default::default(),
             hidden_bar_items: Vec::new(),
             ..PrefsView::default()
         };
@@ -2993,6 +3102,7 @@ mod tests {
                 archived_folders: Vec::new(),
                 show_note_timestamps: true,
                 folder_icons: Default::default(),
+                device_names: Default::default(),
                 hidden_bar_items: Vec::new(),
                 item_colors: Default::default(),
                 keymap: Default::default(),
@@ -3048,6 +3158,7 @@ mod tests {
                 archived_folders: Vec::new(),
                 show_note_timestamps: true,
                 folder_icons: Default::default(),
+                device_names: Default::default(),
                 hidden_bar_items: Vec::new(),
                 item_colors: Default::default(),
                 keymap: Default::default(),
@@ -4054,6 +4165,7 @@ mod tests {
             bar_items_order: Vec::new(),
             show_note_timestamps: true,
             folder_icons: Default::default(),
+            device_names: Default::default(),
             hidden_bar_items: Vec::new(),
             icon: None,
             item_colors: Default::default(),
@@ -4075,6 +4187,7 @@ mod tests {
             archived_folders: Vec::new(),
             show_note_timestamps: true,
             folder_icons: Default::default(),
+            device_names: Default::default(),
             hidden_bar_items: Vec::new(),
             icon: None,
             item_colors: Default::default(),
@@ -4364,6 +4477,7 @@ mod tests {
             bar_items_order: Vec::new(),
             show_note_timestamps: true,
             folder_icons: Default::default(),
+            device_names: Default::default(),
             hidden_bar_items: Vec::new(),
             icon: None,
             item_colors: Default::default(),
@@ -4423,6 +4537,7 @@ mod tests {
             bar_items_order: Vec::new(),
             show_note_timestamps: true,
             folder_icons: Default::default(),
+            device_names: Default::default(),
             hidden_bar_items: Vec::new(),
             icon: None,
             item_colors: Default::default(),
@@ -4485,6 +4600,7 @@ mod tests {
             bar_items_order: Vec::new(),
             show_note_timestamps: true,
             folder_icons: Default::default(),
+            device_names: Default::default(),
             hidden_bar_items: Vec::new(),
             icon: None,
             item_colors: Default::default(),
@@ -4542,6 +4658,7 @@ mod tests {
             bar_items_order: Vec::new(),
             show_note_timestamps: true,
             folder_icons: Default::default(),
+            device_names: Default::default(),
             hidden_bar_items: Vec::new(),
             icon: None,
             item_colors: Default::default(),
@@ -4659,6 +4776,7 @@ mod tests {
             bar_items_order: Vec::new(),
             show_note_timestamps: true,
             folder_icons: Default::default(),
+            device_names: Default::default(),
             hidden_bar_items: Vec::new(),
             icon: None,
             item_colors: Default::default(),
@@ -4740,6 +4858,7 @@ mod tests {
             bar_items_order: Vec::new(),
             show_note_timestamps: true,
             folder_icons: Default::default(),
+            device_names: Default::default(),
             hidden_bar_items: Vec::new(),
             icon: None,
             item_colors: Default::default(),
@@ -4806,6 +4925,7 @@ mod tests {
             bar_items_order: Vec::new(),
             show_note_timestamps: true,
             folder_icons: Default::default(),
+            device_names: Default::default(),
             hidden_bar_items: Vec::new(),
             icon: None,
             item_colors: Default::default(),
@@ -4901,6 +5021,7 @@ mod tests {
             bar_items_order: Vec::new(),
             show_note_timestamps: true,
             folder_icons: Default::default(),
+            device_names: Default::default(),
             hidden_bar_items: alloc::vec![
                 alloc::string::String::from("graph"),
                 alloc::string::String::from("word-count"),
@@ -4981,6 +5102,7 @@ mod tests {
             bar_items_order: Vec::new(),
             show_note_timestamps: true,
             folder_icons: map_of(&[("Projects/", "book")]),
+            device_names: Default::default(),
             hidden_bar_items: alloc::vec![
                 alloc::string::String::from("word-count"),
                 alloc::string::String::from("graph"),
@@ -5107,6 +5229,7 @@ mod tests {
             bar_items_order: Vec::new(),
             show_note_timestamps: true,
             folder_icons: Default::default(),
+            device_names: Default::default(),
             hidden_bar_items: Vec::new(),
             icon: None,
             item_colors: Default::default(),
@@ -5164,6 +5287,7 @@ mod tests {
             bar_items_order: Vec::new(),
             show_note_timestamps: true,
             folder_icons: Default::default(),
+            device_names: Default::default(),
             hidden_bar_items: Vec::new(),
             icon: None,
             item_colors: Default::default(),
@@ -5223,6 +5347,7 @@ mod tests {
             bar_items_order: Vec::new(),
             show_note_timestamps: true,
             folder_icons: Default::default(),
+            device_names: Default::default(),
             hidden_bar_items: Vec::new(),
             icon: None,
             item_colors: Default::default(),
@@ -5350,6 +5475,7 @@ mod tests {
             bar_items_order: Vec::new(),
             show_note_timestamps: true,
             folder_icons: Default::default(),
+            device_names: Default::default(),
             hidden_bar_items: Vec::new(),
             icon: None,
             item_colors: Default::default(),
@@ -5452,6 +5578,7 @@ mod tests {
             archived_folders: Vec::new(),
             show_note_timestamps: true,
             folder_icons: Default::default(),
+            device_names: Default::default(),
             hidden_bar_items: Vec::new(),
             icon: None,
             item_colors: Default::default(),
@@ -5742,6 +5869,7 @@ mod tests {
             bar_items_order: Vec::new(),
             show_note_timestamps: true,
             folder_icons: Default::default(),
+            device_names: Default::default(),
             hidden_bar_items: Vec::new(),
             icon: None,
             item_colors: Default::default(),
@@ -5803,6 +5931,7 @@ mod tests {
             bar_items_order: Vec::new(),
             show_note_timestamps: true,
             folder_icons: Default::default(),
+            device_names: Default::default(),
             hidden_bar_items: Vec::new(),
             icon: None,
             item_colors: Default::default(),
@@ -6129,6 +6258,7 @@ mod tests {
                 archived_folders: Vec::new(),
                 show_note_timestamps: true,
                 folder_icons: Default::default(),
+                device_names: Default::default(),
                 hidden_bar_items: Vec::new(),
                 item_colors: Default::default(),
                 keymap: Default::default(),
@@ -6183,6 +6313,7 @@ mod tests {
                 archived_folders: Vec::new(),
                 show_note_timestamps: true,
                 folder_icons: Default::default(),
+                device_names: Default::default(),
                 hidden_bar_items: Vec::new(),
                 item_colors: Default::default(),
                 keymap: Default::default(),
@@ -6238,6 +6369,7 @@ mod tests {
             archived_folders: Vec::new(),
             show_note_timestamps: true,
             folder_icons: Default::default(),
+            device_names: Default::default(),
             hidden_bar_items: Vec::new(),
             icon: None,
             item_colors: Default::default(),
@@ -6669,6 +6801,64 @@ mod tests {
         dump.push_str("---end label + tolerance prefs vectors---\n");
         std::fs::write("/tmp/myne_vault_prefs_label_vectors.txt", dump.as_bytes())
             .expect("write label prefs vectors dump");
+    }
+
+    /// Generator for the `device_names` vector pair (appended to the companion
+    /// repo's `vault-prefs` family; per-feature generator, keeps the originals
+    /// byte-stable) — pins the MYND-459 / SYNC-41 `device_names` additive field
+    /// (`docs/spec/protocol.md` §9.5). Golden AEAD bytes cannot be hand-authored,
+    /// so this `#[ignore]` emitter is the mechanism even though the companion
+    /// vectors are the deliverable — it emits, it is not a runtime test.
+    ///
+    /// `cargo test -p protocol --lib emit_device_names_prefs_vectors -- --ignored --nocapture`
+    #[test]
+    #[ignore]
+    fn emit_device_names_prefs_vectors() {
+        extern crate std;
+        // Same fixed vault-A inputs as the sibling generators. Nonce 0xF6 is the
+        // next free entry in the family's nonce registry (0x77–0xF5 taken;
+        // 0xB1/0xB2 = paired_extensions).
+        let root_a: [u8; 32] = [0x42; 32];
+        let account_hash_a: [u8; PREFS_BLOB_ACCOUNT_HASH_LEN] = [0x33; PREFS_BLOB_ACCOUNT_HASH_LEN];
+        let prefs_key_a = derive_subkey(&root_a, SubkeyRole::PrefsKey);
+        let nonce: [u8; AEAD_NONCE_LEN] = [0xF6; AEAD_NONCE_LEN];
+
+        // Two device_id (hex) → friendly-name entries. `map_of` collects into a
+        // BTreeMap; the encoder emits keys in lexicographic order regardless of
+        // insertion order, so the sort is load-bearing (1a2b… < f9e8…).
+        let prefs = PrefsView {
+            device_names: map_of(&[
+                ("f9e8d7c6b5a4938271605f4e3d2c1b0a", "Phone"),
+                ("1a2b3c4d5e6f708192a3b4c5d6e7f809", "Work Laptop"),
+            ]),
+            ..PrefsView::default()
+        };
+        let canonical = canonical_json_encode(&prefs);
+        assert_eq!(
+            canonical.as_slice(),
+            br#"{"device_names":{"1a2b3c4d5e6f708192a3b4c5d6e7f809":"Work Laptop","f9e8d7c6b5a4938271605f4e3d2c1b0a":"Phone"},"screen_capture_protection":true}"#.as_slice(),
+            "device_names sorts keys lexicographically + sits at canonical 'd' before screen_capture_protection",
+        );
+        let blob = encode_prefs_blob_raw(&prefs_key_a, &account_hash_a, &prefs, &nonce)
+            .expect("encode device_names");
+        // Round-trip self-validation.
+        let decoded = decode_prefs_blob(&prefs_key_a, &account_hash_a, &blob).expect("decode");
+        assert_eq!(decoded, prefs);
+
+        std::println!("---begin device_names prefs vectors---");
+        std::println!("input_root_key_hex: {}", hex_lower(&root_a));
+        std::println!(
+            "input_account_number_hash_hex: {}",
+            hex_lower(&account_hash_a)
+        );
+        std::println!("input_prefs_nonce_hex: {}", hex_lower(&nonce));
+        std::println!("informational_prefs_key_hex: {}", hex_lower(&*prefs_key_a));
+        std::println!(
+            "input_plaintext_canonical_utf8_hex: {}",
+            hex_lower(&canonical)
+        );
+        std::println!("expected_prefs_blob_hex: {}", hex_lower(&blob));
+        std::println!("---end device_names prefs vectors---");
     }
 
     /// Generator for the `paired_extensions` vector pair (appended to the
