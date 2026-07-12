@@ -3,9 +3,9 @@
 // the shared `myne-core` attachments plugin; images are served by the in-app
 // `attachment://` scheme (decrypt in RAM + re-sniff). No voice / text-extraction.
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Sheet, Banner, Spinner } from "../../components";
-import { catalogList, attachmentDelete, attachmentRename, attachmentUnusedList, attachmentCleanUnused, type CatalogEntry } from "../../lib/attachments";
+import { catalogList, attachmentDelete, attachmentRename, attachmentUnusedList, attachmentCleanUnused, importFile, ATTACHMENT_ACCEPT, type CatalogEntry } from "../../lib/attachments";
 import { attachmentSrc } from "../../lib/attachmentRef";
 import { HAS_TAURI } from "../../lib/app-window";
 import { formatBytes } from "../../lib/util";
@@ -43,6 +43,9 @@ export function AttachmentsSheet({
   const [cleanup, setCleanup] = useState<CatalogEntry[] | null>(null);
   const [cleaning, setCleaning] = useState(false);
   const [note, setNote] = useState<string | null>(null);
+  // Direct upload from the sheet/page (no longer paperclip-only).
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   async function reviewUnused() {
     setError(null);
@@ -87,6 +90,34 @@ export function AttachmentsSheet({
   }, []);
   useEffect(() => load(), [load]);
 
+  /** Import a picked file into the vault (MYA1) and refresh the catalog so the
+   *  new attachment appears in-place — the user no longer has to go through the
+   *  editor paperclip to add a file. */
+  async function upload(file: File) {
+    if (!HAS_TAURI) {
+      setError("Attachments need the app (not the browser preview).");
+      return;
+    }
+    setError(null);
+    setNote(null);
+    setUploading(true);
+    try {
+      await importFile(file);
+      load();
+    } catch (e) {
+      const kind = (e as { kind?: string })?.kind;
+      setError(
+        kind === "Oversize"
+          ? "That file is too large (max 64 MB)."
+          : kind === "UnsupportedType"
+            ? "Only images and PDFs can be attached."
+            : "Couldn't add that file.",
+      );
+    } finally {
+      setUploading(false);
+    }
+  }
+
   async function remove(id: string) {
     try {
       if (HAS_TAURI) await attachmentDelete(id);
@@ -111,11 +142,50 @@ export function AttachmentsSheet({
   const totalUnusedBytes = (cleanup ?? []).reduce((s, e) => s + e.size, 0);
 
   // Shared bits between the modal (sheet) and the full-page (Files tab) render.
-  const cleanAction = cleanup ? (
-    <button onClick={() => setCleanup(null)} style={actionLink}>Cancel</button>
-  ) : (
-    <button onClick={() => void reviewUnused()} style={actionLink}>Clean unused</button>
+  // `Clean unused` is a text link in the sheet header, a ghost bordered button on
+  // the Files page (where it sits beside the primary Upload).
+  const cleanBtn = (style: React.CSSProperties) =>
+    cleanup ? (
+      <button onClick={() => setCleanup(null)} style={style}>Cancel</button>
+    ) : (
+      <button onClick={() => void reviewUnused()} style={style}>Clean unused</button>
+    );
+
+  const uploadInput = (
+    <input
+      ref={fileRef}
+      type="file"
+      accept={ATTACHMENT_ACCEPT}
+      style={{ display: "none" }}
+      onChange={(e) => {
+        const f = e.target.files?.[0];
+        if (f) void upload(f);
+        e.target.value = "";
+      }}
+    />
   );
+
+  // Upload affordance — a text link in the sheet header, a filled primary button
+  // on the Files page. Hidden during the clean-unused review (nothing to upload).
+  const uploadBtn = (kind: "link" | "primary") =>
+    cleanup ? null : (
+      <button
+        onClick={() => fileRef.current?.click()}
+        disabled={uploading}
+        style={
+          kind === "primary"
+            ? { ...uploadPrimaryStyle, opacity: uploading ? 0.6 : 1 }
+            : { ...actionLink, opacity: uploading ? 0.5 : 1 }
+        }
+      >
+        {kind === "primary" && (
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}>
+            <path d="M12 16V4M7 9l5-5 5 5M5 20h14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        )}
+        {uploading ? "Adding…" : "Upload"}
+      </button>
+    );
 
   const banner = (
     <>
@@ -171,7 +241,7 @@ export function AttachmentsSheet({
           </div>
         ) : entries.length === 0 ? (
           <div style={{ textAlign: "center", padding: "30px 20px", color: "var(--fg-3)", fontSize: 14, lineHeight: 1.55 }}>
-            No attachments yet. Use the paperclip in the editor to add an image or PDF.
+            No attachments yet. Tap Upload to add an image or PDF.
           </div>
         ) : (
           entries.map((e) => (
@@ -223,11 +293,15 @@ export function AttachmentsSheet({
   if (variant === "page") {
     return (
       <>
+        {uploadInput}
         {/* Sits under the shared AppHeader (Files tab), so no safe-area top here. */}
         <div style={{ flex: "none", padding: "8px 20px 0" }}>
-          <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
             <h1 style={{ margin: 0, fontSize: 32, fontWeight: 700, letterSpacing: "-0.025em", color: "var(--fg-display)" }}>{title}</h1>
-            {cleanAction}
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+              {cleanBtn(ghostBtnStyle)}
+              {uploadBtn("primary")}
+            </div>
           </div>
           {banner}
           {cleanupPanel}
@@ -239,10 +313,11 @@ export function AttachmentsSheet({
 
   return (
     <Sheet onClose={onClose} style={{ maxHeight: "82%", display: "flex", flexDirection: "column", overflow: "hidden" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flex: "none" }}>
-        <span style={{ width: 90 }} />
+      {uploadInput}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, flex: "none" }}>
+        <span style={{ width: 90 }}>{uploadBtn("link")}</span>
         <span style={{ fontSize: 17, fontWeight: 600, color: "var(--fg-1)" }}>{title}</span>
-        <span style={{ width: 90, textAlign: "right" }}>{cleanAction}</span>
+        <span style={{ width: 90, textAlign: "right" }}>{cleanBtn(actionLink)}</span>
       </div>
       {banner}
       {cleanupPanel}
@@ -252,6 +327,18 @@ export function AttachmentsSheet({
 }
 
 const actionLink: React.CSSProperties = { border: "none", background: "transparent", color: "var(--accent)", fontSize: 14, fontWeight: 600, cursor: "pointer", padding: 0 };
+
+// Files-page primary Upload button (filled accent) + ghost bordered Clean-unused.
+const uploadPrimaryStyle: React.CSSProperties = {
+  display: "flex", alignItems: "center", gap: 6, height: 36, border: "none", borderRadius: 10,
+  background: "var(--accent)", color: "var(--accent-on)", padding: "0 14px",
+  fontFamily: "var(--font-sans)", fontSize: 14, fontWeight: 600, cursor: "pointer",
+};
+const ghostBtnStyle: React.CSSProperties = {
+  display: "flex", alignItems: "center", height: 36, border: "1px solid var(--line-2)",
+  borderRadius: 10, background: "transparent", color: "var(--fg-2)", padding: "0 14px",
+  fontFamily: "var(--font-sans)", fontSize: 14, fontWeight: 600, cursor: "pointer",
+};
 
 function actionBtn(color: string): React.CSSProperties {
   return { border: "none", background: "transparent", color, fontSize: 13, fontWeight: 600, cursor: "pointer", padding: "6px 7px" };

@@ -34,11 +34,13 @@ pub use myne_core::{
 mod hooks;
 #[cfg(target_os = "ios")]
 mod ios_chrome;
+mod pdf_export;
 mod plugins;
+mod screen_guard;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    use tauri::Manager;
+    use tauri::{Listener, Manager};
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
@@ -95,10 +97,11 @@ pub fn run() {
             // the two snapshot hooks (the snapshots subsystem lives in `myne-core`,
             // so `MobileHooks::capture_snapshot` / `purge_note_snapshots` drive the
             // real snapshot store — a note overwrite/delete captures/purges `.myn`
-            // snapshots just like desktop) AND `bump_local_change` (nudges the
-            // `SyncLocalChange` counter below). `MobileHooks` now holds the
-            // `AppHandle` so those hooks can reach managed state via `try_state` —
-            // mirrors the desktop `DesktopHooks::new(app.handle().clone())`.
+            // snapshots just like desktop), `bump_local_change` (nudges the
+            // `SyncLocalChange` counter below) AND `apply_screen_capture` (native
+            // screen-capture protection). `MobileHooks` holds the `AppHandle` so
+            // those hooks can reach managed state via `try_state` / dispatch onto
+            // the main thread — mirrors the desktop `DesktopHooks::new(...)`.
             // Registered before any command can run.
             app.manage::<myne_core::hooks::Hooks>(std::sync::Arc::new(hooks::MobileHooks::new(
                 app.handle().clone(),
@@ -150,6 +153,24 @@ pub fn run() {
             // exists for it. See `ios_chrome`. iOS-only; no-op elsewhere.
             #[cfg(target_os = "ios")]
             ios_chrome::suppress_keyboard_accessory_bar();
+
+            // Native PDF export. `window.print()` is a no-op in the mobile
+            // WebView, so the "Export as PDF" action emits EXPORT_PDF_EVENT with
+            // the note title + rendered HTML; present the platform export sheet
+            // (iOS print → Save to Files) on the main thread.
+            {
+                let handle = app.handle().clone();
+                app.listen(pdf_export::EXPORT_PDF_EVENT, move |event| {
+                    let Ok(payload) =
+                        serde_json::from_str::<pdf_export::ExportPayload>(event.payload())
+                    else {
+                        return;
+                    };
+                    let _ = handle.run_on_main_thread(move || {
+                        pdf_export::present(&payload.title, &payload.html)
+                    });
+                });
+            }
             Ok(())
         })
         .run(tauri::generate_context!())
