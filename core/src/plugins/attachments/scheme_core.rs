@@ -184,14 +184,28 @@ pub enum ReadTextOutcome {
 /// on the `attachment://` serve path). The `Zeroizing` plaintext wipes on drop;
 /// the returned `String` is the accepted non-Zeroized intermediate (V8-leak
 /// dominance, per the discipline).
-pub fn read_attachment_text(vault_dir: &Path, keys: &ServeKeys, id_hex: &str) -> ReadTextOutcome {
+/// Non-distinguishing decode failure, shared by the text + structured previews.
+pub enum DecodeError {
+    NotFound,
+    Denied,
+    ServerError,
+}
+
+/// Shared decode: id parse → catalog `content_type` hint (the inner AAD) → read
+/// blob → `decode_attachment_blob` → the Zeroizing plaintext bytes. The SAME
+/// decode as the serve path, minus the re-sniff (callers render inert text /
+/// structured previews, never an interpreted content-type). A wrong-key /
+/// tampered / cross-vault blob all collapse to `Denied` (§6.4).
+pub fn decode_attachment_plaintext(
+    vault_dir: &Path,
+    keys: &ServeKeys,
+    id_hex: &str,
+) -> Result<Zeroizing<Vec<u8>>, DecodeError> {
     let Some(attachment_id) = hex_decode_id(id_hex) else {
-        return ReadTextOutcome::Denied;
+        return Err(DecodeError::Denied);
     };
-    let account_number_hash = match read_account_number_hash(&vault_dir.join("vault.meta")) {
-        Some(h) => h,
-        None => return ReadTextOutcome::ServerError,
-    };
+    let account_number_hash =
+        read_account_number_hash(&vault_dir.join("vault.meta")).ok_or(DecodeError::ServerError)?;
     let catalog_key =
         protocol::derive_subkey(&keys.root_key, protocol::SubkeyRole::AttachmentsCatalogKey);
     let catalog = read_catalog(
@@ -199,33 +213,40 @@ pub fn read_attachment_text(vault_dir: &Path, keys: &ServeKeys, id_hex: &str) ->
         &catalog_key,
         &account_number_hash,
     );
-    let content_type_hint = match catalog.entries.get(id_hex) {
-        Some(meta) => meta.content_type.clone(),
-        None => return ReadTextOutcome::NotFound,
-    };
+    let content_type_hint = catalog
+        .entries
+        .get(id_hex)
+        .map(|meta| meta.content_type.clone())
+        .ok_or(DecodeError::NotFound)?;
     let blob_path = vault_dir.join("attachments").join(id_hex);
     let blob = match std::fs::read(&blob_path) {
         Ok(b) => b,
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return ReadTextOutcome::NotFound,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Err(DecodeError::NotFound),
         Err(e) => {
             tracing::error!(
-                stage = "read_text_blob_read",
+                stage = "read_attachment_blob_read",
                 io_failure_kind = ?crate::io_failure_kind::from_io_error_kind(e.kind()),
-                "attachment text-preview blob read failed"
+                "attachment preview blob read failed"
             );
-            return ReadTextOutcome::ServerError;
+            return Err(DecodeError::ServerError);
         }
     };
-    // Same decode as the serve path: content_type hint is the inner AAD.
-    let plaintext = match decode_attachment_blob(
+    decode_attachment_blob(
         &blob,
         &attachment_id,
         content_type_hint.as_bytes(),
         &keys.items_key,
         &keys.items_key_id,
-    ) {
-        Ok(pt) => pt,
-        Err(_) => return ReadTextOutcome::Denied,
+    )
+    .map_err(|_| DecodeError::Denied)
+}
+
+pub fn read_attachment_text(vault_dir: &Path, keys: &ServeKeys, id_hex: &str) -> ReadTextOutcome {
+    let plaintext = match decode_attachment_plaintext(vault_dir, keys, id_hex) {
+        Ok(p) => p,
+        Err(DecodeError::NotFound) => return ReadTextOutcome::NotFound,
+        Err(DecodeError::Denied) => return ReadTextOutcome::Denied,
+        Err(DecodeError::ServerError) => return ReadTextOutcome::ServerError,
     };
     let capped_len = plaintext.len().min(ATTACHMENT_TEXT_PREVIEW_CAP);
     let truncated = plaintext.len() > capped_len;

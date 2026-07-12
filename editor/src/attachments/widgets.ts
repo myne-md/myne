@@ -662,6 +662,20 @@ export function isPreviewableTextFile(filename: string): boolean {
   return PREVIEWABLE_TEXT_EXT.has(fileExt(filename));
 }
 
+/** Extensions that get a Tier-2 STRUCTURED preview (parsed in Rust to a safe
+ *  grid/block model), not a raw-text preview. */
+const PREVIEWABLE_STRUCTURED_EXT = new Set<string>(["xlsx", "docx"]);
+
+/** True when a generic attachment is a Tier-2 structured-preview type. */
+export function isPreviewableStructuredFile(filename: string): boolean {
+  return PREVIEWABLE_STRUCTURED_EXT.has(fileExt(filename));
+}
+
+/** The Rust structured model (mirror of the host's `readStructured` result). */
+type StructuredPreview =
+  | { kind: "grid"; rows: string[][] }
+  | { kind: "blocks"; blocks: { heading_level: number | null; text: string }[] };
+
 /** Minimal CSV/TSV split for a preview grid — splits rows on newlines and each
  *  row on the delimiter, unwrapping simple `"quoted"` fields. Preview-grade
  *  (not a spec-complete CSV parser); a malformed cell just reads as its raw
@@ -763,30 +777,46 @@ export class AttachmentTextPreviewWidget extends WidgetType {
     body.appendChild(makeProgressChip("loading"));
     card.appendChild(body);
 
-    const read = getHost().attachments.readText;
-    if (read === undefined) {
-      body.remove(); // no seam → behave as a plain file-card
+    const ext = fileExt(this.filename);
+    const structuredKind = ext === "xlsx" ? "xlsx" : ext === "docx" ? "docx" : null;
+    const host = getHost().attachments;
+    if (structuredKind !== null) {
+      // Tier-2: Rust parses the docx/xlsx into a safe structured model.
+      const readStructured = host.readStructured;
+      if (readStructured === undefined) {
+        body.remove();
+      } else {
+        void readStructured(this.id, structuredKind).then(
+          (content) => body.replaceChildren(this.renderStructured(content)),
+          () => body.remove(),
+        );
+      }
     } else {
-      void read(this.id).then(
-        ({ text: content, truncated }) => {
-          const ext = fileExt(this.filename);
-          const rendered =
-            ext === "csv" || ext === "tsv"
-              ? this.renderGrid(content, ext === "tsv" ? "\t" : ",")
-              : this.renderText(content);
-          body.replaceChildren(rendered);
-          if (truncated) {
-            const notice = document.createElement("span");
-            notice.className = "cm-attachment-text-preview-truncated";
-            notice.textContent = i18n.t("editor.attachment.widget.textPreview.truncated");
-            body.appendChild(notice);
-          }
-        },
-        () => {
-          // Read failed (locked / not-found / decode) — drop to the file-card.
-          body.remove();
-        },
-      );
+      // Tier-1: raw decrypted text (a <pre> for text/code, a <table> for csv/tsv).
+      const readText = host.readText;
+      if (readText === undefined) {
+        body.remove(); // no seam → behave as a plain file-card
+      } else {
+        void readText(this.id).then(
+          ({ text: content, truncated }) => {
+            const rendered =
+              ext === "csv" || ext === "tsv"
+                ? this.renderGrid(content, ext === "tsv" ? "\t" : ",")
+                : this.renderText(content);
+            body.replaceChildren(rendered);
+            if (truncated) {
+              const notice = document.createElement("span");
+              notice.className = "cm-attachment-text-preview-truncated";
+              notice.textContent = i18n.t("editor.attachment.widget.textPreview.truncated");
+              body.appendChild(notice);
+            }
+          },
+          () => {
+            // Read failed (locked / not-found / decode) — drop to the file-card.
+            body.remove();
+          },
+        );
+      }
     }
 
     return card;
@@ -821,6 +851,36 @@ export class AttachmentTextPreviewWidget extends WidgetType {
     return table;
   }
 
+  /** Inert render of the Rust structured model (Tier-2): a `<table>` grid (xlsx)
+   *  or a heading/paragraph block list (docx). `textContent` only (TB2). */
+  private renderStructured(content: StructuredPreview): HTMLElement {
+    if (content.kind === "grid") {
+      const table = document.createElement("table");
+      table.className = "cm-attachment-text-preview-table";
+      for (const row of content.rows) {
+        const tr = document.createElement("tr");
+        for (const cell of row) {
+          const td = document.createElement("td");
+          td.textContent = cell;
+          tr.appendChild(td);
+        }
+        table.appendChild(tr);
+      }
+      return table;
+    }
+    const wrap = document.createElement("div");
+    wrap.className = "cm-attachment-text-preview-doc";
+    for (const block of content.blocks) {
+      const el =
+        block.heading_level !== null
+          ? document.createElement(`h${Math.min(6, Math.max(1, block.heading_level))}`)
+          : document.createElement("p");
+      el.textContent = block.text;
+      wrap.appendChild(el);
+    }
+    return wrap;
+  }
+
   destroy(): void {
     this.menuTeardown?.();
     this.menuTeardown = null;
@@ -847,8 +907,9 @@ export function makeResolvedWidget(row: CatalogRow): WidgetType {
   if (isPlayableAudioType(row.contentType)) {
     return new AttachmentAudioWidget(row.id, row.filename);
   }
-  // Generic with a text extension → inline read-only preview (Tier-1).
-  if (isPreviewableTextFile(row.filename)) {
+  // Generic with a previewable extension → inline read-only preview (Tier-1
+  // text/code/csv, or Tier-2 Rust-parsed docx/xlsx).
+  if (isPreviewableTextFile(row.filename) || isPreviewableStructuredFile(row.filename)) {
     return new AttachmentTextPreviewWidget(row.id, row.filename, row.size);
   }
   // Otherwise generic / non-renderable → export-only file-card.

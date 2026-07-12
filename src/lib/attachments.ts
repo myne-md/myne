@@ -262,3 +262,27 @@ export async function attachmentReadText(id: string): Promise<AttachmentTextPrev
     id,
   });
 }
+
+/** A Tier-2 attachment parsed into a safe structured model — mirror of the Rust
+ *  `StructuredContent`. A row-major grid (xlsx) or a heading/paragraph block
+ *  list (docx). Only the model crosses IPC (never raw bytes / HTML). */
+export type StructuredContent =
+  | { kind: "grid"; rows: string[][] }
+  | { kind: "blocks"; blocks: { heading_level: number | null; text: string }[] };
+
+/**
+ * Decrypt + parse a Tier-2 attachment (`kind` = "xlsx" | "docx") into a safe
+ * structured model for inline preview (MYND-268 Tier-2; Slot::Unlocked-gated).
+ * Parsing happens in Rust (zip + quick-xml); render the returned model with
+ * plain components — it carries no raw bytes or HTML. Rejects with
+ * {@link AttachmentReadTextError}.
+ */
+export async function attachmentReadStructured(
+  id: string,
+  kind: "xlsx" | "docx",
+): Promise<StructuredContent> {
+  return await invoke<StructuredContent>("plugin:attachments|attachment_read_structured", {
+    id,
+    kind,
+  });
+}

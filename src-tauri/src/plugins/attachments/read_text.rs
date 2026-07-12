@@ -11,7 +11,10 @@
 //! DENY-listed and MUST NOT be logged or placed in any tracing field; see
 //! `src-tauri/CLAUDE.md` "Plaintext IPC across the WebView boundary".
 
-use crate::plugins::attachments::scheme_core::{read_attachment_text, ReadTextOutcome, ServeKeys};
+use crate::plugins::attachments::extract::{extract_docx_blocks, extract_xlsx_grid, DocxBlockKind};
+use crate::plugins::attachments::scheme_core::{
+    decode_attachment_plaintext, read_attachment_text, DecodeError, ReadTextOutcome, ServeKeys,
+};
 use crate::plugins::vault_unlock::state::VaultRuntimeState;
 use serde::Serialize;
 use tauri::{Runtime, State};
@@ -69,5 +72,72 @@ pub async fn attachment_read_text<R: Runtime>(
         ReadTextOutcome::NotFound => Err(AttachmentReadTextError::NotFound),
         ReadTextOutcome::Denied => Err(AttachmentReadTextError::Denied),
         ReadTextOutcome::ServerError => Err(AttachmentReadTextError::Io),
+    }
+}
+
+/// A Tier-2 attachment parsed into a SAFE structured model (MYND-268): a
+/// row-major grid (xlsx) or a heading/paragraph block list (docx). Only the
+/// model crosses IPC — never raw bytes or HTML — so there is no WebView XSS
+/// surface (the whole point of parsing in Rust, not the renderer).
+#[derive(Serialize)]
+#[serde(tag = "kind", rename_all = "lowercase")]
+pub enum StructuredContent {
+    Grid { rows: Vec<Vec<String>> },
+    Blocks { blocks: Vec<StructuredBlock> },
+}
+
+/// One docx block: `heading_level` is 1..=6 for a heading, `null` for body text.
+#[derive(Serialize)]
+pub struct StructuredBlock {
+    pub heading_level: Option<u8>,
+    pub text: String,
+}
+
+/// Max grid rows / doc blocks materialized for a preview (the rest is Export).
+const STRUCTURED_PREVIEW_MAX: usize = 1000;
+
+/// Decrypt + parse a Tier-2 attachment (`kind` = `"xlsx"` | `"docx"`) into a safe
+/// structured model for inline preview (MYND-268 Tier-2). Parsing runs in Rust
+/// (`zip` + `quick-xml`); only the structured model crosses IPC. Slot::Unlocked-
+/// gated. An unrecognized `kind` is a `NotFound` (nothing to render).
+#[tauri::command]
+pub async fn attachment_read_structured<R: Runtime>(
+    id: String,
+    kind: String,
+    app: tauri::AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+) -> Result<StructuredContent, AttachmentReadTextError> {
+    let keys = match state.peek_unlocked_attachment_material().await {
+        Some((items_key, items_key_id, root_key)) => ServeKeys {
+            items_key,
+            items_key_id,
+            root_key,
+        },
+        None => return Err(AttachmentReadTextError::Locked),
+    };
+    let vault_dir = crate::paths::active_vault_root_io(&app, state.active_vault_id().await)
+        .map_err(|_| AttachmentReadTextError::Io)?;
+    let bytes = decode_attachment_plaintext(&vault_dir, &keys, &id).map_err(|e| match e {
+        DecodeError::NotFound => AttachmentReadTextError::NotFound,
+        DecodeError::Denied => AttachmentReadTextError::Denied,
+        DecodeError::ServerError => AttachmentReadTextError::Io,
+    })?;
+    match kind.as_str() {
+        "xlsx" => Ok(StructuredContent::Grid {
+            rows: extract_xlsx_grid(&bytes, STRUCTURED_PREVIEW_MAX),
+        }),
+        "docx" => Ok(StructuredContent::Blocks {
+            blocks: extract_docx_blocks(&bytes, STRUCTURED_PREVIEW_MAX)
+                .into_iter()
+                .map(|b| StructuredBlock {
+                    heading_level: match b.kind {
+                        DocxBlockKind::Heading(level) => Some(level),
+                        DocxBlockKind::Paragraph => None,
+                    },
+                    text: b.text,
+                })
+                .collect(),
+        }),
+        _ => Err(AttachmentReadTextError::NotFound),
     }
 }

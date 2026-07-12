@@ -66,6 +66,17 @@ export interface EditorHost {
      *  source larger than the preview cap. Render as inert text, never
      *  interpreted. Omit to fall back to the export-only file-card. */
     readText?: (id: string) => Promise<{ text: string; truncated: boolean }>;
+    /** OPTIONAL — MYND-268 Tier-2: decrypt + parse a docx/xlsx attachment into a
+     *  SAFE structured model (grid/blocks) for inline preview. Parsed in Rust —
+     *  the model carries no raw bytes/HTML. RAM-only; rejects on failure. Omit to
+     *  fall back to the file-card. */
+    readStructured?: (
+      id: string,
+      kind: "xlsx" | "docx",
+    ) => Promise<
+      | { kind: "grid"; rows: string[][] }
+      | { kind: "blocks"; blocks: { heading_level: number | null; text: string }[] }
+    >;
   };
 
   /** Prefs read (editor typography + spell settings — IPC). */
