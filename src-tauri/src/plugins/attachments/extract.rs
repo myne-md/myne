@@ -153,6 +153,171 @@ fn extract_text_like(bytes: &[u8]) -> ExtractedText {
     )
 }
 
+// ---- structured xlsx grid (MYND-268 Tier-2 preview) -----------------------
+//
+// Unlike `extract()` (which flattens to searchable text), the Tier-2 inline
+// preview needs the sheet as a GRID. This reuses the SAME `zip` + `quick-xml`
+// deps (no new dependency) and stays a pure function over the decrypted bytes,
+// so it is unit-testable and never touches crypto/format. Preview-grade: cached
+// cell values only (no formula engine), first worksheet, bounded rows.
+
+/// Extract a `.xlsx` first sheet as a grid of cell strings (row-major). Shared-
+/// string refs are resolved; empty/sparse cells fill as `""`. Best-effort — a
+/// corrupt / absent sheet yields an empty grid.
+pub fn extract_xlsx_grid(bytes: &[u8], max_rows: usize) -> Vec<Vec<String>> {
+    use std::io::Read;
+    let mut archive = match zip::ZipArchive::new(std::io::Cursor::new(bytes)) {
+        Ok(a) => a,
+        Err(_) => return Vec::new(),
+    };
+    // Shared-strings table (optional — numeric-only sheets omit it).
+    let shared = {
+        let mut xml = String::new();
+        if let Ok(mut f) = archive.by_name("xl/sharedStrings.xml") {
+            let _ = f.read_to_string(&mut xml);
+        }
+        parse_shared_strings(&xml)
+    };
+    let mut sheet_xml = String::new();
+    match archive.by_name("xl/worksheets/sheet1.xml") {
+        Ok(mut f) => {
+            if f.read_to_string(&mut sheet_xml).is_err() {
+                return Vec::new();
+            }
+        }
+        Err(_) => return Vec::new(),
+    }
+    parse_sheet_grid(&sheet_xml, &shared, max_rows)
+}
+
+/// Zero-based column index of an A1-style cell ref (`"B3"` → 1). Non-alphabetic
+/// suffix (the row number) ends the run.
+fn col_index(cell_ref: &str) -> usize {
+    let mut idx = 0usize;
+    for c in cell_ref.chars() {
+        if c.is_ascii_alphabetic() {
+            idx = idx * 26 + (c.to_ascii_uppercase() as usize - 'A' as usize + 1);
+        } else {
+            break;
+        }
+    }
+    idx.saturating_sub(1)
+}
+
+/// Parse `xl/sharedStrings.xml` into the ordered string table (`<si><t>…</t></si>`).
+fn parse_shared_strings(xml: &str) -> Vec<String> {
+    use quick_xml::events::Event;
+    use quick_xml::reader::Reader;
+    let mut reader = Reader::from_str(xml);
+    let mut strings: Vec<String> = Vec::new();
+    let mut cur = String::new();
+    let mut in_si = false;
+    let mut in_t = false;
+    loop {
+        match reader.read_event() {
+            Ok(Event::Start(e)) => match e.local_name().as_ref() {
+                b"si" => {
+                    in_si = true;
+                    cur.clear();
+                }
+                b"t" => in_t = true,
+                _ => {}
+            },
+            Ok(Event::Text(e)) if in_si && in_t => {
+                if let Ok(t) = e.unescape() {
+                    cur.push_str(&t);
+                }
+            }
+            Ok(Event::End(e)) => match e.local_name().as_ref() {
+                b"t" => in_t = false,
+                b"si" => {
+                    in_si = false;
+                    strings.push(std::mem::take(&mut cur));
+                }
+                _ => {}
+            },
+            Ok(Event::Eof) => break,
+            Err(_) => break,
+            _ => {}
+        }
+    }
+    strings
+}
+
+/// Parse a worksheet's `<sheetData>` into a grid, resolving `t="s"` cells against
+/// `shared`. Cells are placed by their A1 column ref (sparse gaps → `""`).
+fn parse_sheet_grid(xml: &str, shared: &[String], max_rows: usize) -> Vec<Vec<String>> {
+    use quick_xml::events::Event;
+    use quick_xml::reader::Reader;
+    let mut reader = Reader::from_str(xml);
+    let mut rows: Vec<Vec<String>> = Vec::new();
+    let mut current: Vec<String> = Vec::new();
+    let mut cur_col = 0usize;
+    let mut cur_is_shared = false;
+    let mut cur_value = String::new();
+    let mut in_value = false;
+    loop {
+        match reader.read_event() {
+            Ok(Event::Start(e)) | Ok(Event::Empty(e)) if e.local_name().as_ref() == b"c" => {
+                cur_col = 0;
+                cur_is_shared = false;
+                cur_value.clear();
+                for attr in e.attributes().flatten() {
+                    match attr.key.as_ref() {
+                        b"r" => {
+                            if let Ok(v) = std::str::from_utf8(&attr.value) {
+                                cur_col = col_index(v);
+                            }
+                        }
+                        b"t" => cur_is_shared = attr.value.as_ref() == b"s",
+                        _ => {}
+                    }
+                }
+            }
+            Ok(Event::Start(e)) if e.local_name().as_ref() == b"v" => in_value = true,
+            Ok(Event::Text(e)) if in_value => {
+                if let Ok(t) = e.unescape() {
+                    cur_value.push_str(&t);
+                }
+            }
+            Ok(Event::End(e)) => match e.local_name().as_ref() {
+                b"v" => in_value = false,
+                b"c" => {
+                    let resolved = if cur_is_shared {
+                        cur_value
+                            .trim()
+                            .parse::<usize>()
+                            .ok()
+                            .and_then(|i| shared.get(i))
+                            .cloned()
+                            .unwrap_or_default()
+                    } else {
+                        cur_value.clone()
+                    };
+                    if current.len() <= cur_col {
+                        current.resize(cur_col + 1, String::new());
+                    }
+                    current[cur_col] = resolved;
+                }
+                b"row" => {
+                    rows.push(std::mem::take(&mut current));
+                    if rows.len() >= max_rows {
+                        break;
+                    }
+                }
+                _ => {}
+            },
+            Ok(Event::Eof) => break,
+            Err(_) => break,
+            _ => {}
+        }
+    }
+    if !current.is_empty() {
+        rows.push(current);
+    }
+    rows
+}
+
 /// NFC-normalize, apply the size cap, and classify (`Ok` vs `Empty`).
 fn finalize(raw: String, fmt: SourceFormat) -> ExtractedText {
     let normalized: String = raw.nfc().collect();
@@ -246,6 +411,68 @@ mod tests {
             zw.finish().unwrap();
         }
         buf
+    }
+
+    /// Build a minimal `.xlsx` (zip with `xl/sharedStrings.xml` + one worksheet)
+    /// from raw inner-XML fragments.
+    fn build_xlsx(shared_si: &str, sheet_rows: &str) -> Vec<u8> {
+        let sst = format!("<?xml version=\"1.0\"?><sst>{shared_si}</sst>");
+        let sheet = format!(
+            "<?xml version=\"1.0\"?><worksheet><sheetData>{sheet_rows}</sheetData></worksheet>"
+        );
+        let mut buf = Vec::new();
+        {
+            let mut zw = zip::ZipWriter::new(std::io::Cursor::new(&mut buf));
+            let opts = zip::write::SimpleFileOptions::default()
+                .compression_method(zip::CompressionMethod::Deflated);
+            zw.start_file("xl/sharedStrings.xml", opts).unwrap();
+            zw.write_all(sst.as_bytes()).unwrap();
+            zw.start_file("xl/worksheets/sheet1.xml", opts).unwrap();
+            zw.write_all(sheet.as_bytes()).unwrap();
+            zw.finish().unwrap();
+        }
+        buf
+    }
+
+    // --- XLSX grid (Tier-2 preview) -------------------------------------
+
+    #[test]
+    fn xlsx_grid_resolves_shared_strings_and_numbers() {
+        let sst = "<si><t>Name</t></si><si><t>Age</t></si><si><t>Alice</t></si>";
+        let rows = "<row><c r=\"A1\" t=\"s\"><v>0</v></c><c r=\"B1\" t=\"s\"><v>1</v></c></row>\
+                    <row><c r=\"A2\" t=\"s\"><v>2</v></c><c r=\"B2\"><v>30</v></c></row>";
+        let grid = extract_xlsx_grid(&build_xlsx(sst, rows), 100);
+        assert_eq!(
+            grid,
+            vec![
+                vec!["Name".to_string(), "Age".to_string()],
+                vec!["Alice".to_string(), "30".to_string()],
+            ]
+        );
+    }
+
+    #[test]
+    fn xlsx_grid_fills_sparse_cells() {
+        // A row that skips column B: A1 then C1 (col index 0 then 2).
+        let sst = "<si><t>x</t></si><si><t>z</t></si>";
+        let rows = "<row><c r=\"A1\" t=\"s\"><v>0</v></c><c r=\"C1\" t=\"s\"><v>1</v></c></row>";
+        let grid = extract_xlsx_grid(&build_xlsx(sst, rows), 100);
+        assert_eq!(grid, vec![vec!["x".to_string(), String::new(), "z".to_string()]]);
+    }
+
+    #[test]
+    fn xlsx_grid_caps_rows() {
+        let sst = "<si><t>r</t></si>";
+        let mut rows = String::new();
+        for _ in 0..10 {
+            rows.push_str("<row><c r=\"A1\" t=\"s\"><v>0</v></c></row>");
+        }
+        assert_eq!(extract_xlsx_grid(&build_xlsx(sst, &rows), 3).len(), 3);
+    }
+
+    #[test]
+    fn corrupt_xlsx_is_empty_grid_not_panic() {
+        assert!(extract_xlsx_grid(b"PK\x03\x04 not a real zip", 100).is_empty());
     }
 
     // --- PDF ------------------------------------------------------------
