@@ -1,0 +1,34 @@
+# Permissions for the mobile `captures` Tauri plugin (Apple Watch voice quick-capture, §9.18).
+# Picked up under the `captures:` ACL namespace because `build.rs` declares this
+# as an `InlinedPlugin`. Referenced by `capabilities/default.json` as
+# `captures:default`.
+#
+# The three commands are device-key based (no vault key); `seal_staged` runs
+# while the vault is locked, `take_pending` + `ack` drain the queue into notes on
+# unlock. Off Apple targets the device key is unavailable and the commands no-op.
+# Adding a command to `build.rs` without a matching entry here is a security bug.
+
+"$schema" = "../../gen/schemas/mobile-schema.json"
+
+[default]
+description = "Default permission set for the mobile captures plugin (seal/take/ack the pending-capture queue)."
+permissions = [
+    "allow-seal-staged",
+    "allow-take-pending",
+    "allow-ack",
+]
+
+[[permission]]
+identifier = "allow-seal-staged"
+description = "Allow invoking captures:seal_staged (encrypt staged watch-dictated captures into the device-local queue; runs while locked)."
+commands.allow = ["seal_staged"]
+
+[[permission]]
+identifier = "allow-take-pending"
+description = "Allow invoking captures:take_pending (decrypt pending captures for the WebView to turn into notes on unlock)."
+commands.allow = ["take_pending"]
+
+[[permission]]
+identifier = "allow-ack"
+description = "Allow invoking captures:ack (delete a drained capture once its note has been created)."
+commands.allow = ["ack"]

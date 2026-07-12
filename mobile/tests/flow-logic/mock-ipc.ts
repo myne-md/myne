@@ -56,6 +56,9 @@ export interface MockConfig {
   biometricRedeemError?: { kind: string; detail?: unknown };
   /** Reject `quick_unlock_setup_biometric` with this `QuickUnlockError`. */
   biometricSetupError?: { kind: string };
+  /** Canned pending watch captures returned ONCE by `captures|take_pending`
+   *  (§9.18 Apple Watch drain). Each becomes a `note_create` + an `ack`. */
+  pendingCaptures?: Array<{ id: string; text: string }>;
 }
 
 /** Install the mock IPC as an init script so it runs before the app's first paint. */
@@ -156,6 +159,32 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
       "plugin:quick-unlock|quick_unlock_with_pin": () => null,
       "plugin:quick-unlock|quick_unlock_disable": () => {
         quickUnlock = { configured: false, method: null, available: false };
+        return null;
+      },
+      // ── Apple Watch pending-capture surface (§9.18 drain) ──
+      // note_create records the created body so a drain test can assert the
+      // queued captures became notes; captures|take_pending returns the canned
+      // pending set ONCE (then empty, mirroring a real take+ack draining the
+      // queue); ack + seal_staged record their calls.
+      "plugin:notes|note_create": (args) => {
+        const w = window as unknown as { __noteCreates?: string[] };
+        (w.__noteCreates ??= []).push(String(args.plaintext ?? ""));
+        return "00000000-0000-7000-8000-000000000000";
+      },
+      "plugin:captures|seal_staged": () => {
+        const w = window as unknown as { __sealStagedCalls?: number };
+        w.__sealStagedCalls = (w.__sealStagedCalls ?? 0) + 1;
+        return 0;
+      },
+      "plugin:captures|take_pending": () => {
+        const w = window as unknown as { __pendingTaken?: boolean };
+        if (w.__pendingTaken) return [];
+        w.__pendingTaken = true;
+        return config.pendingCaptures ?? [];
+      },
+      "plugin:captures|ack": (args) => {
+        const w = window as unknown as { __captureAcks?: string[] };
+        (w.__captureAcks ??= []).push(String(args.id ?? ""));
         return null;
       },
       // ── Sync surface (per-test configurable) ──

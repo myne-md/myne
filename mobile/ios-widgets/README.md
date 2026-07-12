@@ -98,6 +98,13 @@ The Control Center control + `NewNoteIntent` (which opens `myne://capture` via
 - **`tauri ios init` regenerates `project.yml`**, dropping these edits. `gen/apple/`
   is git-ignored, so after a fresh init re-apply the three additions above
   (they are small and self-contained) and re-run `xcodegen generate`.
+- **The Apple Watch companion (`ios-watch/`, §9.18) adds its OWN `project.yml`
+  edits** that `tauri ios init` also drops — the `MyneWatch` + `MyneWatchComplications`
+  targets, the `- target: MyneWatch` embed + `WatchConnectivity.framework` on the
+  app target, the `../../../ios-watch/Receiver` app source, and `SWIFT_VERSION` on
+  the app target. Re-apply them alongside the widget additions after a fresh init;
+  the full checklist + the two on-device verification points live in
+  **`ios-watch/README.md`**.
 - **`Externals/arm64/{debug,release}/libapp.a` collision.** The app target globs
   `Externals/` as sources, so if BOTH a `tauri ios dev` (debug) and a
   `tauri ios build` (release) `libapp.a` are present, xcodegen bakes two
