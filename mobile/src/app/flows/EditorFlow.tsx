@@ -6,7 +6,7 @@ import { headingSections } from "@myne/dialect";
 import { undo, redo } from "@codemirror/commands";
 import type { EditorView } from "@codemirror/view";
 import { emit, listen } from "@tauri-apps/api/event";
-import { Screen, ScreenScroll, Icon, MyneMark, Banner, Spinner, Sheet, SidePanel, LIST_TOP, SyncStatusGlyph, SyncBanners, SyncStatusDetail, ConflictsSheet } from "../../components";
+import { Screen, ScreenScroll, Icon, MyneMark, Banner, Spinner, Sheet, SidePanel, useEnterTransition, LIST_TOP, SyncStatusGlyph, SyncBanners, SyncStatusDetail, ConflictsSheet } from "../../components";
 import { noteList, noteRead, noteCreate, noteUpdate, deleteNoteRouted } from "../../lib/notes";
 import type { NoteListError } from "../../lib/notes";
 import { useConflictMaterializer } from "../../lib/use-conflict-materializer";
@@ -230,9 +230,8 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
   const [editorView, setEditorView] = useState<EditorView | null>(null);
   const [manageAttachments, setManageAttachments] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
-  // Editor side panels (mobile stand-in for the desktop side sheets): left =
-  // note explorer (jump to another note), right = note context + actions.
-  const [leftPanel, setLeftPanel] = useState(false);
+  // Editor side panel (mobile stand-in for the desktop side sheet): note
+  // context + actions, sliding in from the right.
   const [rightPanel, setRightPanel] = useState(false);
   // Note actions overflow (⋯): Copy / Move / History / Export / Archive / Trash.
   const [moreOpen, setMoreOpen] = useState(false);
@@ -860,6 +859,28 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
   // the whole flow to a blank screen on the first list→editor transition.
   const outline = useMemo(() => deriveOutline(editorText), [editorText]);
 
+  // Unlinked mentions — live notes whose BODY contains this note's title as
+  // plain text but that don't already wiki-link it (excludes the backlinks +
+  // self). Feeds the right panel's `#` tab (distinct from the Tag Browser);
+  // guarded on a ≥3-char title to avoid trivial-substring noise. Two-stage memo
+  // so the all-bodies fold-scan doesn't rerun per keystroke: the folded title
+  // only changes when the note's first line does (an unchanged string is
+  // Object.is-equal, so it never invalidates the scan memo). Same hook-order
+  // constraint as `outline` above: MUST stay above the list-view early return.
+  // Quirk preserved from the pre-memo version: an untitled note folds the
+  // "Untitled"/"New note" display fallback and scans for that literal string.
+  const foldedTitle = useMemo(
+    () => foldSegment((deriveTitleSnippet(editorText).title || (editing?.id ? "Untitled" : "New note")).trim()),
+    [editorText, editing?.id],
+  );
+  const unlinkedMentions = useMemo(() => {
+    if (editing?.id == null || foldedTitle.length < 3) return [] as NoteEntry[];
+    const linked = new Set(noteGraph.backlinks.get(editing.id) ?? []);
+    return liveNotes.filter(
+      (n) => n.id !== editing.id && !linked.has(n.id) && foldSegment(bodyAfterFrontmatter(bodies.get(n.id) ?? "")).includes(foldedTitle),
+    );
+  }, [editing?.id, foldedTitle, noteGraph, liveNotes, bodies]);
+
   // ── List view ───────────────────────────────────────────────────────────────
   if (view === "list") {
     const viewActive = listView === "notes" && viewMatchIds != null;
@@ -1465,20 +1486,6 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
   const backlinkNotes = (editing?.id ? (noteGraph.backlinks.get(editing.id) ?? []) : [])
     .map((bid) => notes.find((n) => n.id === bid))
     .filter((n): n is NoteEntry => n != null);
-  // Unlinked mentions — live notes whose BODY contains this note's title as
-  // plain text but that don't already wiki-link it (excludes the backlinks +
-  // self). The right-panel `#` tab (distinct from the Tag Browser). Guarded on a
-  // ≥3-char title to avoid trivial-substring noise.
-  const unlinkedMentions = (() => {
-    if (editing?.id == null) return [] as NoteEntry[];
-    const t = foldSegment(headerTitle.trim());
-    if (t.length < 3) return [];
-    const linked = new Set(noteGraph.backlinks.get(editing.id) ?? []);
-    return liveNotes.filter(
-      (n) => n.id !== editing.id && !linked.has(n.id) && foldSegment(bodyAfterFrontmatter(bodies.get(n.id) ?? "")).includes(t),
-    );
-  })();
-
   // Reading-mode wikilink tap → resolve title to a note and open it (saving the
   // current note first via openRelated).
   const openWikilinkTarget = (target: string) => {
@@ -1490,7 +1497,6 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
     <Screen ref={screenRef}>
       <EditorTopBar
         onBack={() => void saveNote()}
-        onExplorer={() => setLeftPanel(true)}
         onContext={() => setRightPanel(true)}
         onMore={isExisting ? () => setMoreOpen(true) : undefined}
         folder={readNoteFolder(editorText)}
@@ -1564,19 +1570,6 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
           onToggleRaw={() => setRawMode((r) => !r)}
           onAttach={() => attachInputRef.current?.click()}
           onLibrary={() => setManageAttachments(true)}
-        />
-      )}
-
-      {leftPanel && (
-        <ExplorerPanel
-          notes={liveNotes}
-          folderOf={folderOf}
-          currentId={editing?.id ?? null}
-          onOpen={(id) => {
-            setLeftPanel(false);
-            void openRelated(id);
-          }}
-          onClose={() => setLeftPanel(false)}
         />
       )}
 
@@ -1787,17 +1780,15 @@ const chromeBtn: CSSProperties = {
 
 /** Minimal editor top bar (the "it's a page, not a modal" chrome). Back
  *  autosaves and returns to the list; the title lives inline as the note's first
- *  line, so the bar only carries the two panel toggles + the read/edit switch. */
+ *  line, so the bar only carries the context-panel toggle + the ⋯ actions menu. */
 function EditorTopBar({
   onBack,
-  onExplorer,
   onContext,
   onMore,
   folder,
   busy,
 }: {
   onBack: () => void;
-  onExplorer: () => void;
   onContext: () => void;
   /** Note-actions ⋯ menu. Omitted for a brand-new (unsaved) note. */
   onMore?: () => void;
@@ -1816,17 +1807,9 @@ function EditorTopBar({
         borderBottom: "1px solid var(--line-1)",
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: 2, flex: "none" }}>
-        <button onClick={onBack} disabled={busy} aria-label="Back to notes" style={{ ...chromeBtn, opacity: busy ? 0.5 : 1 }}>
-          <Icon name="chevron-left" size={22} color="var(--accent)" strokeWidth={2} />
-        </button>
-        <button onClick={onExplorer} aria-label="Open explorer" style={chromeBtn}>
-          <svg width="21" height="21" viewBox="0 0 24 24" fill="none">
-            <rect x="3.5" y="4.5" width="17" height="15" rx="2.5" stroke="var(--fg-2)" strokeWidth="1.7" />
-            <rect x="3.5" y="4.5" width="6" height="15" rx="2.5" fill="var(--fg-2)" opacity="0.85" />
-          </svg>
-        </button>
-      </div>
+      <button onClick={onBack} disabled={busy} aria-label="Back to notes" style={{ ...chromeBtn, opacity: busy ? 0.5 : 1 }}>
+        <Icon name="chevron-left" size={22} color="var(--accent)" strokeWidth={2} />
+      </button>
 
       <div style={{ flex: 1, minWidth: 0, textAlign: "center", fontSize: 12, color: "var(--fg-3)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: "var(--font-mono)" }}>
         {folder ? folder.replace(/\/$/, "").replace(/\//g, " / ") : ""}
@@ -2116,115 +2099,6 @@ function FormatBar({
   );
 }
 
-/** Left side sheet — a note explorer (folders + notes) to jump anywhere without
- *  leaving the editor. Its own folder-drill + filter state. */
-function ExplorerPanel({
-  notes,
-  folderOf,
-  currentId,
-  onOpen,
-  onClose,
-}: {
-  notes: NoteEntry[];
-  folderOf: Map<string, string | null>;
-  currentId: string | null;
-  onOpen: (id: string) => void;
-  onClose: () => void;
-}) {
-  // Its own collapse state (empty = all expanded → the whole tree is visible).
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
-  const [q, setQ] = useState("");
-  const query = q.trim().toLowerCase();
-  const titleOf = useMemo(() => new Map(notes.map((n) => [n.id, n.title])), [notes]);
-  const sortIds = (ids: string[]) => [...ids].sort((a, b) => (titleOf.get(a) ?? "").localeCompare(titleOf.get(b) ?? ""));
-  const treeRows = query ? [] : buildFolderTree(folderOf, collapsed, sortIds);
-  const flatMatches = query ? notes.filter((n) => n.title.toLowerCase().includes(query)) : [];
-  const toggle = (path: string) =>
-    setCollapsed((prev) => {
-      const nx = new Set(prev);
-      nx.has(path) ? nx.delete(path) : nx.add(path);
-      return nx;
-    });
-
-  // A note row — title only, NO icon (per the batch-4 spec); highlights the
-  // current note. `indent` matches the main-list tree geometry.
-  const noteRow = (id: string, indent: number): ReactNode => {
-    const on = id === currentId;
-    return (
-      <button
-        key={id}
-        onClick={() => onOpen(id)}
-        style={{ display: "flex", alignItems: "center", width: "100%", border: "none", background: on ? "var(--accent-soft)" : "transparent", padding: "10px 16px", paddingLeft: 20 + indent, cursor: "pointer", textAlign: "left", fontFamily: "var(--font-sans)" }}
-      >
-        <span style={{ flex: 1, minWidth: 0, fontSize: 16, color: on ? "var(--accent)" : "var(--fg-1)", fontWeight: on ? 600 : 400, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-          {titleOf.get(id) || "Untitled note"}
-        </span>
-      </button>
-    );
-  };
-  const empty = (text: string): ReactNode => (
-    <div style={{ textAlign: "center", padding: "28px 16px", color: "var(--fg-3)", fontSize: 14 }}>{text}</div>
-  );
-
-  return (
-    <SidePanel side="left" title="Explorer" onClose={onClose} padBody={false}>
-      <div style={{ padding: "8px 16px 6px" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, height: 38, border: "1px solid var(--line-2)", borderRadius: 9, background: "var(--bg-2)", padding: "0 11px" }}>
-          <Icon name="search" size={16} color="var(--fg-3)" strokeWidth={1.7} />
-          <input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Filter notes"
-            autoCapitalize="none"
-            autoCorrect="off"
-            spellCheck={false}
-            style={{ flex: 1, minWidth: 0, border: "none", outline: "none", background: "transparent", fontFamily: "var(--font-sans)", fontSize: 15, color: "var(--fg-1)" }}
-          />
-        </div>
-      </div>
-
-      {query ? (
-        flatMatches.length === 0 ? empty("No notes match.") : flatMatches.map((n) => noteRow(n.id, 0))
-      ) : treeRows.length === 0 ? (
-        empty("No notes yet.")
-      ) : (
-        treeRows.map((row) => {
-          const rails = [];
-          for (let i = 0; i < row.depth; i++) {
-            rails.push(<div key={i} style={{ position: "absolute", left: 20 + i * 18 + 6, top: 0, bottom: 0, width: 1, background: "var(--line-2)" }} />);
-          }
-          if (row.kind === "folder") {
-            return (
-              <div key={`f:${row.path}`} style={{ position: "relative" }}>
-                {rails}
-                <div
-                  onClick={() => toggle(row.path)}
-                  style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 16px", paddingLeft: 20 + row.depth * 18, cursor: "pointer" }}
-                >
-                  <svg width="12" height="12" viewBox="0 0 24 24" style={{ flexShrink: 0, transform: row.collapsed ? "rotate(0deg)" : "rotate(90deg)", transition: "transform 140ms ease" }}>
-                    <path d="M8 5l8 7-8 7" fill="none" stroke="var(--fg-3)" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                  <svg width="18" height="18" viewBox="0 0 24 24" style={{ flexShrink: 0 }}>
-                    <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" fill="none" stroke="var(--fg-2)" strokeWidth="1.6" strokeLinejoin="round" />
-                  </svg>
-                  <div style={{ flex: 1, minWidth: 0, fontSize: 16, fontWeight: 600, color: "var(--fg-1)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{row.name}</div>
-                  <span style={{ minWidth: 22, textAlign: "right", fontSize: 13, color: "var(--fg-3)", flexShrink: 0 }}>{row.count}</span>
-                </div>
-              </div>
-            );
-          }
-          return (
-            <div key={row.id} style={{ position: "relative" }}>
-              {rails}
-              {noteRow(row.id, row.depth * 18 + 12)}
-            </div>
-          );
-        })
-      )}
-    </SidePanel>
-  );
-}
-
 type ContextTab = "backlinks" | "unlinked" | "outline";
 
 /** Right side panel — the note's CONTEXT, ported to the desktop tabbed
@@ -2286,7 +2160,7 @@ function NoteContextPanel({
   );
 
   return (
-    <SidePanel side="right" header={header} onClose={onClose} padBody={false}>
+    <SidePanel header={header} onClose={onClose} padBody={false}>
       <div style={{ padding: "16px 18px" }}>
         {tab === "backlinks" && (
           <>
@@ -2843,13 +2717,11 @@ function CommandPalette({
   const rowStyle: CSSProperties = { display: "flex", alignItems: "center", gap: 11, width: "100%", border: "none", background: "transparent", padding: "10px 16px", cursor: "pointer", textAlign: "left", fontFamily: "var(--font-sans)" };
   const first = cmdMatches[0] ?? null;
 
-  // Enter animation: mount closed, flip open on the next frame so the transition
-  // runs (scrim fades, panel slides down + fades from the top).
-  const [shown, setShown] = useState(false);
-  useEffect(() => {
-    const id = requestAnimationFrame(() => setShown(true));
-    return () => cancelAnimationFrame(id);
-  }, []);
+  // Enter animation: mount closed, flip open before first paint (forced-reflow
+  // hook — see `useEnterTransition`) so the transition is guaranteed to run
+  // (scrim fades, panel slides down + fades from the top).
+  const paletteRef = useRef<HTMLDivElement>(null);
+  const [shown, setShown] = useEnterTransition(paletteRef);
   // Exit animation: reverse the enter, THEN unmount. Every dismiss path routes
   // through this instead of `onClose` directly.
   const closingRef = useRef(false);
@@ -2873,6 +2745,7 @@ function CommandPalette({
     <div style={{ position: "absolute", inset: 0, zIndex: 60, display: "flex", flexDirection: "column", justifyContent: "center" }}>
       <div onClick={requestClose} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.42)", opacity: shown ? 1 : 0, transition: "opacity 200ms ease" }} />
       <div
+        ref={paletteRef}
         style={{
           position: "relative",
           // Vertically centered (was top-anchored). The input sits at the panel
