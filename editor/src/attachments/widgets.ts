@@ -19,6 +19,7 @@
 
 import { type EditorView, WidgetType } from "@codemirror/view";
 import i18n from "@myne/editor/i18n";
+import { getHost } from "../host";
 import { attachmentUrl } from "@myne/editor/host/notes/attachmentRef";
 import { makeAttachmentIcon } from "./icons";
 import type { CatalogRow } from "./catalog";
@@ -633,10 +634,209 @@ function stripFileExtension(filename: string): string {
   return filename.replace(/\.[A-Za-z0-9]{1,8}$/, "");
 }
 
+// --- resolved text/code/csv (inline read-only preview, MYND-268 Tier-1) ----
+
+/** Filename extensions that get a Tier-1 inline TEXT preview instead of the
+ *  export-only file-card. Generic files are stored as `application/octet-stream`
+ *  (MYND-173), so the extension — not the content-type — is the routing key.
+ *  (`.svg` is absent: real SVGs import as `image/svg+xml` and take the image
+ *  path before ever reaching the generic branch.) */
+const PREVIEWABLE_TEXT_EXT = new Set<string>([
+  "txt", "log", "md", "markdown", "csv", "tsv", "json", "jsonl",
+  "js", "jsx", "ts", "tsx", "mjs", "cjs", "css", "scss", "less", "html", "htm", "xml",
+  "yml", "yaml", "toml", "ini", "env", "rs", "py", "go", "java", "kt", "c", "h",
+  "cpp", "hpp", "cc", "rb", "php", "sh", "bash", "zsh", "sql", "lua", "swift", "dart",
+]);
+
+function fileExt(filename: string): string {
+  const dot = filename.lastIndexOf(".");
+  return dot >= 0 ? filename.slice(dot + 1).toLowerCase() : "";
+}
+
+/** True when a generic attachment's filename is a Tier-1 previewable text type.
+ *  Extension-only (no `getHost()` — this runs at decoration-compute time, where
+ *  the host may not be installed yet, e.g. in tests). Whether the decrypt-to-text
+ *  seam actually exists is checked in the widget's `toDOM`, which degrades to the
+ *  file-card chrome when it's absent (mobile). */
+export function isPreviewableTextFile(filename: string): boolean {
+  return PREVIEWABLE_TEXT_EXT.has(fileExt(filename));
+}
+
+/** Minimal CSV/TSV split for a preview grid — splits rows on newlines and each
+ *  row on the delimiter, unwrapping simple `"quoted"` fields. Preview-grade
+ *  (not a spec-complete CSV parser); a malformed cell just reads as its raw
+ *  text. Rows are capped so a huge sheet doesn't build thousands of DOM nodes. */
+function parsePreviewGrid(text: string, delimiter: string, maxRows: number): string[][] {
+  const rows: string[][] = [];
+  for (const line of text.split(/\r?\n/)) {
+    if (line === "" && rows.length > 0) continue; // skip blank trailing lines
+    const cells: string[] = [];
+    for (const raw of line.split(delimiter)) {
+      const trimmed = raw.trim();
+      cells.push(
+        trimmed.startsWith('"') && trimmed.endsWith('"') && trimmed.length >= 2
+          ? trimmed.slice(1, -1).replace(/""/g, '"')
+          : raw,
+      );
+    }
+    rows.push(cells);
+    if (rows.length >= maxRows) break;
+  }
+  return rows;
+}
+
+/** Max grid rows rendered inline (the rest is available via Export). */
+const PREVIEW_GRID_MAX_ROWS = 500;
+
+/**
+ * A resolved TEXT attachment (txt/code/csv/md, stored generic) rendered as an
+ * inline READ-ONLY preview (MYND-268 Tier-1). Decrypts to text via the host
+ * seam (`attachments.readText`, RAM-only), then renders it INERT — a monospace
+ * `<pre>` for text/code, a `<table>` for csv/tsv — never as interpreted HTML.
+ * All text is set via `textContent` (never `innerHTML`) per TB2. Falls back to
+ * the file-card chrome (icon + name + Export/Rename/Remove/Reveal menu) while
+ * loading, on read failure, or when the host omits the seam.
+ */
+export class AttachmentTextPreviewWidget extends WidgetType {
+  private menuTeardown: (() => void) | null = null;
+
+  constructor(
+    private readonly id: string,
+    private readonly filename: string,
+    private readonly size: number,
+  ) {
+    super();
+  }
+
+  eq(other: AttachmentTextPreviewWidget): boolean {
+    return other.id === this.id && other.filename === this.filename && other.size === this.size;
+  }
+
+  toDOM(view: EditorView): HTMLElement {
+    const card = document.createElement("span");
+    card.className = "cm-attachment-file-card cm-attachment-text-preview";
+    card.setAttribute("data-testid", "attachment-text-preview");
+    card.setAttribute("role", "group");
+    card.setAttribute("aria-label", this.filename);
+
+    // Header row: icon + name + type·size + overflow menu (same chrome + actions
+    // as the file-card, so Export/Rename/Remove/Reveal stay available).
+    const header = document.createElement("span");
+    header.className = "cm-attachment-text-preview-header";
+
+    const icon = makeAttachmentIcon("file");
+    icon.classList.add("cm-attachment-file-card-icon");
+    header.appendChild(icon);
+
+    const text = document.createElement("span");
+    text.className = "cm-attachment-file-card-text";
+    const name = document.createElement("span");
+    name.className = "cm-attachment-file-card-name";
+    name.textContent = this.filename;
+    text.appendChild(name);
+    const meta = document.createElement("span");
+    meta.className = "cm-attachment-file-card-meta";
+    meta.textContent = `${fileTypeLabel(this.filename)} · ${formatBytes(this.size)}`;
+    text.appendChild(meta);
+    header.appendChild(text);
+
+    const menu = buildOverflowMenu(
+      [
+        { label: i18n.t("editor.attachment.widget.menu.export"), testid: "attachment-text-preview.export", run: () => void exportAttachment(this.id, this.filename) },
+        { label: i18n.t("editor.attachment.widget.menu.rename"), testid: "attachment-text-preview.rename", run: () => void renameFileCard(view, this.id, this.filename) },
+        { label: i18n.t("editor.attachment.widget.menu.remove"), testid: "attachment-text-preview.remove", run: () => removeFileCard(view, card, this.id) },
+        { label: i18n.t("editor.attachment.widget.menu.reveal"), testid: "attachment-text-preview.reveal", run: () => revealFileCard(view, this.id) },
+      ],
+      { buttonTestId: "attachment-text-preview.menu-button", menuTestId: "attachment-text-preview.menu" },
+    );
+    this.menuTeardown = menu.teardown;
+    header.appendChild(menu.wrap);
+    card.appendChild(header);
+
+    // Body: a loading chip until the decrypt+decode resolves, then the inert
+    // render. A read failure / absent seam just leaves the header (file-card).
+    const body = document.createElement("span");
+    body.className = "cm-attachment-text-preview-body";
+    body.style.display = "block";
+    body.style.maxHeight = "320px";
+    body.style.overflow = "auto";
+    body.appendChild(makeProgressChip("loading"));
+    card.appendChild(body);
+
+    const read = getHost().attachments.readText;
+    if (read === undefined) {
+      body.remove(); // no seam → behave as a plain file-card
+    } else {
+      void read(this.id).then(
+        ({ text: content, truncated }) => {
+          const ext = fileExt(this.filename);
+          const rendered =
+            ext === "csv" || ext === "tsv"
+              ? this.renderGrid(content, ext === "tsv" ? "\t" : ",")
+              : this.renderText(content);
+          body.replaceChildren(rendered);
+          if (truncated) {
+            const notice = document.createElement("span");
+            notice.className = "cm-attachment-text-preview-truncated";
+            notice.textContent = i18n.t("editor.attachment.widget.textPreview.truncated");
+            body.appendChild(notice);
+          }
+        },
+        () => {
+          // Read failed (locked / not-found / decode) — drop to the file-card.
+          body.remove();
+        },
+      );
+    }
+
+    return card;
+  }
+
+  /** Inert monospace text render (text/code/md). `textContent` only (TB2). */
+  private renderText(content: string): HTMLElement {
+    const pre = document.createElement("pre");
+    pre.className = "cm-attachment-text-preview-pre";
+    pre.style.fontFamily = "var(--font-mono, monospace)";
+    pre.style.fontSize = "12px";
+    pre.style.whiteSpace = "pre";
+    pre.style.margin = "0";
+    pre.textContent = content;
+    return pre;
+  }
+
+  /** Inert grid render (csv/tsv) — a bounded `<table>`, `textContent` cells. */
+  private renderGrid(content: string, delimiter: string): HTMLElement {
+    const rows = parsePreviewGrid(content, delimiter, PREVIEW_GRID_MAX_ROWS);
+    const table = document.createElement("table");
+    table.className = "cm-attachment-text-preview-table";
+    for (const row of rows) {
+      const tr = document.createElement("tr");
+      for (const cell of row) {
+        const td = document.createElement("td");
+        td.textContent = cell;
+        tr.appendChild(td);
+      }
+      table.appendChild(tr);
+    }
+    return table;
+  }
+
+  destroy(): void {
+    this.menuTeardown?.();
+    this.menuTeardown = null;
+  }
+
+  ignoreEvent(): boolean {
+    return false;
+  }
+}
+
 /** Build the appropriate resolved-attachment widget for a content-type. SVG +
  *  raster share the `<img>` path; PDF takes the pdf.js path; audio takes the
- *  inline player (MYND-259). A generic (non-renderable) attachment —
- *  `application/octet-stream`, MYND-173 — takes the export-only file-card path. */
+ *  inline player (MYND-259). A generic attachment with a previewable text
+ *  extension (MYND-268 Tier-1) takes the inline read-only preview; every other
+ *  generic (non-renderable) attachment — `application/octet-stream`, MYND-173 —
+ *  takes the export-only file-card path. */
 export function makeResolvedWidget(row: CatalogRow): WidgetType {
   if (row.contentType === "application/pdf") {
     return new AttachmentPdfWidget(row.id, row.filename);
@@ -647,7 +847,11 @@ export function makeResolvedWidget(row: CatalogRow): WidgetType {
   if (isPlayableAudioType(row.contentType)) {
     return new AttachmentAudioWidget(row.id, row.filename);
   }
-  // Generic / non-renderable → export-only file-card.
+  // Generic with a text extension → inline read-only preview (Tier-1).
+  if (isPreviewableTextFile(row.filename)) {
+    return new AttachmentTextPreviewWidget(row.id, row.filename, row.size);
+  }
+  // Otherwise generic / non-renderable → export-only file-card.
   return new AttachmentFileCardWidget(row.id, row.filename, row.size);
 }
 
