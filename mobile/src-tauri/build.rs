@@ -212,4 +212,21 @@ fn main() {
             .to_string(),
     )
     .expect("failed to update AndroidManifest.xml");
+
+    // Static app shortcuts ("New note" / "New voice note" on launcher-icon
+    // long-press — the android-widgets/ surface set). The <meta-data> must sit
+    // ON MainActivity, which the library module's manifest cannot reach, so it
+    // is injected here (same pattern as the mic block; "activity" targets the
+    // manifest's single <activity>). `@xml/myne_shortcuts` lives in the
+    // committed android-widgets/ module: after a fresh `tauri android init`,
+    // building WITHOUT re-running scripts/android-postinit.sh fails on this
+    // missing resource — deliberately fail-closed so the widget wiring cannot
+    // be silently dropped (android-widgets/README.md).
+    tauri_utils::build::update_android_manifest(
+        "MYNE SHORTCUTS (android-widgets)",
+        "activity",
+        r#"<meta-data android:name="android.app.shortcuts" android:resource="@xml/myne_shortcuts" />"#
+            .to_string(),
+    )
+    .expect("failed to update AndroidManifest.xml");
 }

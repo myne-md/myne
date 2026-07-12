@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The Myne "M" chevron — the same 32×32 path as ios-widgets MyneMark.swift
+     (`M8 22 V10 L16 18 L24 10 V22`), stroked with round cap/join. Paper-colored
+     for use on the ink logo tile; the path's own 25% margins are the tile
+     inset, so the vector is drawn across the full tile bounds. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="32dp"
+    android:height="32dp"
+    android:viewportWidth="32"
+    android:viewportHeight="32">
+    <path
+        android:pathData="M8,22 L8,10 L16,18 L24,10 L24,22"
+        android:strokeColor="@color/myne_paper"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+</vector>

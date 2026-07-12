@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Static app shortcuts (long-press launcher icon / pinnable) — the Android
+     stand-in for the iOS Action Button binding. Explicitly targeted at
+     MainActivity so nothing outside the app can claim the intents. Referenced
+     from MainActivity via the <meta-data> that src-tauri/build.rs injects
+     (a library manifest cannot attach meta-data to the app's activity). -->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:enabled="true"
+        android:icon="@drawable/myne_ic_shortcut_note"
+        android:shortcutId="myne_new_note"
+        android:shortcutShortLabel="@string/myne_new_note">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="myne://capture"
+            android:targetClass="md.myne.mobile.MainActivity"
+            android:targetPackage="md.myne.mobile" />
+    </shortcut>
+    <shortcut
+        android:enabled="true"
+        android:icon="@drawable/myne_ic_shortcut_voice"
+        android:shortcutId="myne_new_voice_note"
+        android:shortcutShortLabel="@string/myne_voice_note">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="myne://capture?mode=voice"
+            android:targetClass="md.myne.mobile.MainActivity"
+            android:targetPackage="md.myne.mobile" />
+    </shortcut>
+</shortcuts>
