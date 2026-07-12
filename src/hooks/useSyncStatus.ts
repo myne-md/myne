@@ -61,22 +61,31 @@ export function useSyncStatus(): SyncStatusHook {
     timer = setInterval(tick, STATUS_POLL_MS);
     // Re-read immediately when enrollment changes (e.g. a local reset) so the
     // indicator does not lag a whole poll interval behind the device panel.
-    let unlisten: (() => void) | undefined;
-    void listen("sync://enrollment-changed", tick).then((fn) => {
-      if (mounted.current) unlisten = fn;
-      else fn();
-    });
+    // Re-read promptly on enrollment changes AND on the engine's status-changed
+    // nudge (MYND-461: the loop/sync_now emit `sync://status-changed` when they
+    // publish Syncing/Error/clear), so the dot updates without waiting a whole
+    // poll interval.
+    const unlisteners: Array<() => void> = [];
+    for (const ev of ["sync://enrollment-changed", "sync://status-changed"]) {
+      void listen(ev, tick).then((fn) => {
+        if (mounted.current) unlisteners.push(fn);
+        else fn();
+      });
+    }
     return () => {
       mounted.current = false;
       if (timer) clearInterval(timer);
-      unlisten?.();
+      for (const fn of unlisteners) fn();
     };
   }, []);
 
   const syncNow = useCallback(async () => {
     setBusy(true);
-    // Optimistic: show a brief active state so the click feels responsive.
-    setStatus((prev) => (prev?.state === "disabled" ? prev : { state: "syncing" }));
+    // No optimistic fake `syncing` (MYND-461): the engine now publishes a REAL
+    // in-flight `Syncing` state (the loop + sync_now write it to the status cell),
+    // so the dot reflects real engine state and the button's `busy` flag alone
+    // signals the manual click. Faking `syncing` here would show "Synced ·" become
+    // a fake spin even when nothing is really in flight.
     try {
       const next = await invoke<SyncStatus>("plugin:sync|sync_now");
       if (mounted.current) setStatus(next);

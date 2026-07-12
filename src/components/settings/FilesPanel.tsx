@@ -11,7 +11,7 @@ import { PANEL_ROOT_STYLE } from "./panel-styles";
 
 export function FilesPanel() {
   return (
-    <div style={PANEL_ROOT_STYLE}>
+    <div style={PANEL_ROOT_STYLE} data-testid="settings.files-panel">
       {/* Default file to open on startup (MYND-462) — last opened / new note /
           a specific note. First, as the launch-time behaviour. */}
       <StartupOpenSettings />

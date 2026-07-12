@@ -58,14 +58,21 @@ export function EndpointConfig() {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [fingerprint, setFingerprint] = useState<string | null>(null);
+  // Where the pin came from (SYNC-43): `static` (pre-vetted hosted cert) vs
+  // `tofu` (self-host first-connect pin — the one the user eye-compares). Kept
+  // distinct so a hosted endpoint is never shown as a bare TOFU pin.
+  const [pinSource, setPinSource] = useState<"static" | "tofu" | null>(null);
 
   useEffect(() => {
-    void invoke<{ endpoint_url: string | null; cert_pin_hex: string | null }>(
-      "plugin:sync|sync_get_endpoint",
-    )
+    void invoke<{
+      endpoint_url: string | null;
+      cert_pin_hex: string | null;
+      pin_source: "static" | "tofu" | null;
+    }>("plugin:sync|sync_get_endpoint")
       .then((c) => {
         if (c.endpoint_url) setUrl(c.endpoint_url);
         if (c.cert_pin_hex) setFingerprint(c.cert_pin_hex);
+        setPinSource(c.pin_source);
       })
       .catch(() => {
         /* unconfigured — leave the field empty */
@@ -78,12 +85,17 @@ export function EndpointConfig() {
     setBusy(true);
     setMsg(null);
     setFingerprint(null);
-    void invoke<string | null>("plugin:sync|sync_set_endpoint", {
+    setPinSource(null);
+    void invoke<{
+      fingerprint: string | null;
+      pin_source: "static" | "tofu" | null;
+    }>("plugin:sync|sync_set_endpoint", {
       endpointUrl: trimmed,
     })
-      .then((fp) => {
-        if (fp) {
-          setFingerprint(fp);
+      .then((r) => {
+        setPinSource(r.pin_source);
+        if (r.fingerprint) {
+          setFingerprint(r.fingerprint);
           setMsg(t("sync.endpoint.connectedTls"));
         } else {
           setMsg(t("sync.endpoint.connectedLocal"));
@@ -131,6 +143,18 @@ export function EndpointConfig() {
           <span style={FP} data-testid="sync.cert-fingerprint">
             {fingerprint}
           </span>
+          {pinSource && (
+            <>
+              <br />
+              <span data-testid="sync.pin-source" data-pin-source={pinSource}>
+                {t(
+                  pinSource === "static"
+                    ? "sync.endpoint.pinStatic"
+                    : "sync.endpoint.pinTofu",
+                )}
+              </span>
+            </>
+          )}
         </p>
       )}
     </div>
