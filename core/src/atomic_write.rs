@@ -101,7 +101,19 @@ use std::path::Path;
 ///   — Slot is singleton, OS-level locking enforces single-process per
 ///   vault).
 pub fn atomic_write(path: &Path, bytes: &[u8], replace: bool) -> std::io::Result<()> {
-    atomic_write_inner(path, bytes, replace, Fault::None)
+    atomic_write_inner(path, bytes, replace, Fault::None, None)
+}
+
+/// Restricted-permission variant of [`atomic_write`]: identical durability +
+/// failure-path cleanup semantics, but the temp file is created with mode
+/// `0600` (owner-only) on Unix **from the moment it exists**, so the committed
+/// destination is never briefly group/world-readable in the window a
+/// create-then-`chmod` would open. Use this for device-local credential files
+/// (the per-device sync token, [`crate::plugins::sync::token_store`]). On
+/// non-Unix the mode is a no-op — the OS keychain is the production target and
+/// the fallback file rides the user-profile ACL (documented as weaker).
+pub fn atomic_write_private(path: &Path, bytes: &[u8], replace: bool) -> std::io::Result<()> {
+    atomic_write_inner(path, bytes, replace, Fault::None, Some(0o600))
 }
 
 /// Export-destination-safe variant of [`atomic_write`] (115-F1): same
@@ -223,6 +235,7 @@ fn atomic_write_inner(
     bytes: &[u8],
     replace: bool,
     fault: Fault,
+    mode: Option<u32>,
 ) -> std::io::Result<()> {
     if !replace && path.exists() {
         return Err(std::io::ErrorKind::AlreadyExists.into());
@@ -234,7 +247,7 @@ fn atomic_write_inner(
     // leaves a stray `<path>.tmp` sibling (best-effort; the original error
     // is the one surfaced). The single deliberate exception is the
     // `StopBeforeRename` crash simulation below.
-    if let Err(e) = write_temp(&tmp, bytes, fault) {
+    if let Err(e) = write_temp(&tmp, bytes, fault, mode) {
         let _ = std::fs::remove_file(&tmp);
         return Err(e);
     }
@@ -256,14 +269,19 @@ fn atomic_write_inner(
 
 /// Open `<tmp>`, write `bytes`, and `sync_all` so the bytes are durable
 /// before the caller commits the rename. `fault` is read only under
-/// `#[cfg(test)]`; in production it is always [`Fault::None`].
+/// `#[cfg(test)]`; in production it is always [`Fault::None`]. `mode`, when
+/// `Some` on Unix, is the create-time permission bits for the temp (used by
+/// [`atomic_write_private`] to keep a credential file owner-only from the
+/// moment it exists); `None` (ordinary ciphertext writes) uses the umask.
 #[cfg_attr(not(test), allow(unused_variables))]
-fn write_temp(tmp: &Path, bytes: &[u8], fault: Fault) -> std::io::Result<()> {
-    let mut f = std::fs::OpenOptions::new()
-        .write(true)
-        .create(true)
-        .truncate(true)
-        .open(tmp)?;
+fn write_temp(tmp: &Path, bytes: &[u8], fault: Fault, mode: Option<u32>) -> std::io::Result<()> {
+    let mut opts = std::fs::OpenOptions::new();
+    opts.write(true).create(true).truncate(true);
+    // Restrict the temp's create-time mode BEFORE it exists — never a
+    // create-then-chmod window. Platform-split via a helper so `mode` is
+    // always consumed (no unused-variable warning on any target).
+    apply_temp_mode(&mut opts, mode);
+    let mut f = opts.open(tmp)?;
 
     #[cfg(test)]
     if let Fault::FailDuringWrite(kind) = fault {
@@ -280,6 +298,21 @@ fn write_temp(tmp: &Path, bytes: &[u8], fault: Fault) -> std::io::Result<()> {
     // f drops here, releasing the file handle so the rename can proceed
     // on Windows.
 }
+
+/// Apply an optional create-time permission mode to the temp's open options.
+/// Unix honors it (owner-only credential files); every other platform is a
+/// no-op — mirrors the `set_restricted_perms` unix/no-op split in
+/// `plugins::sync::token_store`.
+#[cfg(unix)]
+fn apply_temp_mode(opts: &mut std::fs::OpenOptions, mode: Option<u32>) {
+    use std::os::unix::fs::OpenOptionsExt;
+    if let Some(m) = mode {
+        opts.mode(m);
+    }
+}
+
+#[cfg(not(unix))]
+fn apply_temp_mode(_opts: &mut std::fs::OpenOptions, _mode: Option<u32>) {}
 
 /// Commit the temp file to its destination atomically + durably.
 ///
@@ -463,6 +496,7 @@ mod tests {
             b"abcdefgh",
             true,
             Fault::FailDuringWrite(std::io::ErrorKind::StorageFull),
+            None,
         )
         .expect_err("injected write failure must surface as Err");
         assert_eq!(err.kind(), std::io::ErrorKind::StorageFull);
@@ -488,6 +522,7 @@ mod tests {
             b"NEW-PARTIAL-BYTES",
             true,
             Fault::FailDuringWrite(std::io::ErrorKind::WriteZero),
+            None,
         )
         .expect_err("injected write failure must surface as Err");
         assert_eq!(err.kind(), std::io::ErrorKind::WriteZero);
@@ -510,7 +545,7 @@ mod tests {
         let target = dir.path().join("file.bin");
         atomic_write(&target, b"OLD-VALID", true).unwrap();
 
-        let err = atomic_write_inner(&target, b"NEW-VALID", true, Fault::StopBeforeRename)
+        let err = atomic_write_inner(&target, b"NEW-VALID", true, Fault::StopBeforeRename, None)
             .expect_err("crash-before-rename simulation must surface as Err");
         assert_eq!(err.kind(), std::io::ErrorKind::Interrupted);
 
@@ -525,7 +560,7 @@ mod tests {
         let dir = ScopedTempDir::new("aw-interrupt-temp-bytes").unwrap();
         let target = dir.path().join("file.bin");
 
-        atomic_write_inner(&target, b"NEW-VALID", false, Fault::StopBeforeRename)
+        atomic_write_inner(&target, b"NEW-VALID", false, Fault::StopBeforeRename, None)
             .expect_err("crash-before-rename simulation must surface as Err");
 
         // The leftover temp (the crash artifact a real power loss would
@@ -557,6 +592,36 @@ mod tests {
             "temp must be cleaned up after finalize failure"
         );
         assert!(target.is_dir(), "destination directory must be untouched");
+    }
+
+    // ---- atomic_write_private (owner-only credential writes) ------------
+
+    /// The committed destination is `0600` — and, because the temp is created
+    /// owner-only from the start, it is never briefly group/world-readable in a
+    /// create-then-chmod window. Replacing a pre-existing loose (`0644`) file
+    /// still lands `0600` (the new temp's create-mode governs, not inheritance).
+    #[cfg(unix)]
+    #[test]
+    fn private_write_creates_and_replaces_at_0600() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = ScopedTempDir::new("aw-private-0600").unwrap();
+        let target = dir.path().join("sync-token");
+
+        atomic_write_private(&target, b"deadbeef", false).unwrap();
+        let mode = std::fs::metadata(&target).unwrap().permissions().mode();
+        assert_eq!(mode & 0o777, 0o600, "fresh private write must be 0600");
+
+        // Loosen it to 0644, then a replace via atomic_write_private must
+        // bring it back to 0600 (proves the create-mode governs the new inode).
+        std::fs::set_permissions(&target, std::fs::Permissions::from_mode(0o644)).unwrap();
+        atomic_write_private(&target, b"cafef00d", true).unwrap();
+        let mode = std::fs::metadata(&target).unwrap().permissions().mode();
+        assert_eq!(
+            mode & 0o777,
+            0o600,
+            "replace via private write must be 0600"
+        );
+        assert_eq!(read_file(&target), b"cafef00d");
     }
 
     // ---- atomic_write_unclobbered (export-destination variant, 115-F1) ----

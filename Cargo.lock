@@ -3253,10 +3253,13 @@ dependencies = [
 name = "myne-core"
 version = "0.1.0"
 dependencies = [
+ "base64 0.22.1",
  "getrandom 0.2.17",
  "postcard",
  "protocol",
  "rust-stemmers",
+ "rustls",
+ "rustls-pki-types",
  "serde",
  "serde_json",
  "sha2",
@@ -3268,6 +3271,7 @@ dependencies = [
  "unicode-normalization",
  "uuid",
  "whatlang",
+ "windows-sys 0.60.2",
  "zeroize",
 ]
 
@@ -3291,8 +3295,6 @@ dependencies = [
  "postcard",
  "protocol",
  "quick-xml 0.37.5",
- "rustls",
- "rustls-pki-types",
  "security-framework",
  "security-framework-sys",
  "serde",

@@ -53,6 +53,13 @@ pub struct SyncScheduler {
     /// Logical time of the last poll, and a one-shot poke-requested pull.
     last_poll: u64,
     poke_pending: bool,
+    /// Mobile lifecycle (SYNC-37/38): the app is backgrounded — the loop hard-idles
+    /// while suspended (foreground-only sync), retaining pending push intent.
+    suspended: bool,
+    /// One-shot immediate-poll armed on resume — guards against `Instant` not
+    /// advancing across device sleep: the next tick pulls even if no interval
+    /// elapsed, then the flag is consumed so it never re-fires.
+    resume_poll_pending: bool,
 }
 
 impl SyncScheduler {
@@ -67,6 +74,8 @@ impl SyncScheduler {
             dirty_since: None,
             last_poll: now,
             poke_pending: false,
+            suspended: false,
+            resume_poll_pending: false,
         }
     }
 
@@ -100,18 +109,44 @@ impl SyncScheduler {
         }
     }
 
+    /// Mobile app backgrounded (SYNC-37): hard-idle while suspended. Pending push
+    /// intent (`dirty_since`) is retained — it flushes after resume. Idempotent.
+    pub fn on_suspend(&mut self) {
+        self.suspended = true;
+    }
+
+    /// Mobile app foregrounded (SYNC-38): clear the suspend flag and arm a
+    /// one-shot immediate poll so the next `tick` pulls even if the injected
+    /// clock did not advance a full interval across the sleep. `now` is not read
+    /// (the arm is level-triggered, consumed on the next pull) — kept for a
+    /// symmetric, clock-injected API.
+    pub fn on_resume(&mut self, _now: u64) {
+        self.suspended = false;
+        self.resume_poll_pending = true;
+    }
+
+    /// Whether a coalesced local change is still un-pushed — the flush-on-suspend
+    /// seam (task 3) queries this to decide whether to spend the OS grace window.
+    pub fn has_pending_push(&self) -> bool {
+        self.dirty_since.is_some()
+    }
+
     /// Decide what to do at logical time `now`, advancing internal state.
     pub fn tick(&mut self, now: u64) -> SyncAction {
-        if !self.unlocked {
+        // Locked OR suspended → no action; all pending state is retained for the
+        // next unlock/resume (early return touches nothing).
+        if !self.unlocked || self.suspended {
             return SyncAction::Idle;
         }
 
-        // Pull is due on a poll interval, or when an honored poke is pending.
+        // Pull is due on a poll interval, an honored poke, or the one-shot
+        // resume poll (immediate-poll-on-foreground).
         let poll_due = now.saturating_sub(self.last_poll) >= self.poll_interval_ms;
-        let pull = poll_due || self.poke_pending;
+        let pull = poll_due || self.poke_pending || self.resume_poll_pending;
         if pull {
             self.last_poll = now;
             self.poke_pending = false;
+            self.resume_poll_pending = false;
         }
 
         // Push is due once the coalescing window has elapsed since the first
@@ -139,7 +174,7 @@ impl SyncScheduler {
 // / transport call" layer the module doc promised, mirroring `auto_lock`.
 // ---------------------------------------------------------------------------
 
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use tauri::{AppHandle, Emitter, Manager, Runtime};
 
 /// Device-local "a note changed" signal: the note-save path bumps it, the sync
@@ -156,6 +191,36 @@ impl SyncLocalChange {
     }
     fn get(&self) -> u64 {
         self.0.load(Ordering::Relaxed)
+    }
+}
+
+/// Device-local mobile-lifecycle signal (SYNC-38): the platform event source
+/// (mobile `WindowEvent::Suspended`/`Resumed`, task 2) sets it, the sync loop
+/// reads it each tick to drive `SyncScheduler::on_suspend`/`on_resume`. Desktop
+/// never registers it (`try_state` → `None` → no-op), so desktop behaviour is
+/// unchanged. `resume` arms a one-shot immediate-poll consumed by the loop.
+#[derive(Default)]
+pub struct SyncLifecycleSignal {
+    suspended: AtomicBool,
+    resume_poll_requested: AtomicBool,
+}
+
+impl SyncLifecycleSignal {
+    /// App backgrounded — the loop hard-idles the scheduler.
+    pub fn suspend(&self) {
+        self.suspended.store(true, Ordering::Relaxed);
+    }
+    /// App foregrounded — clear suspend + request the one-shot resume poll.
+    pub fn resume(&self) {
+        self.suspended.store(false, Ordering::Relaxed);
+        self.resume_poll_requested.store(true, Ordering::Relaxed);
+    }
+    fn is_suspended(&self) -> bool {
+        self.suspended.load(Ordering::Relaxed)
+    }
+    /// Consume the one-shot resume-poll request (true at most once per resume).
+    fn take_resume_poll(&self) -> bool {
+        self.resume_poll_requested.swap(false, Ordering::Relaxed)
     }
 }
 
@@ -195,18 +260,58 @@ pub fn spawn_sync_loop<R: Runtime>(app: AppHandle<R>) {
                 }
             }
 
+            // Mobile lifecycle (SYNC-37/38): suspend hard-idles the scheduler;
+            // resume arms the one-shot immediate poll. Desktop never registers
+            // the signal (`try_state` → None), so this is a no-op there.
+            if let Some(sig) = app.try_state::<SyncLifecycleSignal>() {
+                if sig.is_suspended() {
+                    sched.on_suspend();
+                } else if sig.take_resume_poll() {
+                    sched.on_resume(now);
+                }
+            }
+
             let action = sched.tick(now);
             if action == SyncAction::Idle {
                 continue;
             }
             let allow_push = matches!(action, SyncAction::Push | SyncAction::PullAndPush);
 
-            if let super::commands::CycleOutcome::Ran(summary) =
-                super::commands::run_active_cycle(&app, allow_push).await
-            {
-                if summary.pulled > 0 {
-                    // Pulled notes are on disk now — tell the UI to reload.
-                    let _ = app.emit("sync://changed", summary.pulled);
+            // Publish "a cycle is in flight" (SYNC-36) so the status indicator
+            // reflects real activity, not a poll-late guess. No-op if the cell
+            // isn't registered (try_state → None).
+            if let Some(cell) = app.try_state::<super::commands::SyncRuntimeStatusCell>() {
+                cell.set_syncing();
+                let _ = app.emit("sync://status-changed", ());
+            }
+
+            match super::commands::run_active_cycle(&app, allow_push).await {
+                super::commands::CycleOutcome::Ran(summary) => {
+                    if let Some(cell) = app.try_state::<super::commands::SyncRuntimeStatusCell>() {
+                        cell.clear();
+                    }
+                    if summary.pulled > 0 {
+                        // Pulled notes are on disk now — tell the UI to reload.
+                        let _ = app.emit("sync://changed", summary.pulled);
+                    }
+                    let _ = app.emit("sync://status-changed", ());
+                }
+                super::commands::CycleOutcome::Failed => {
+                    // The loop no longer swallows Failed — it publishes Error so
+                    // the status dot reports a failed background cycle, not only
+                    // a manual sync_now click (SYNC-36).
+                    if let Some(cell) = app.try_state::<super::commands::SyncRuntimeStatusCell>() {
+                        cell.set_error("sync_failed");
+                    }
+                    let _ = app.emit("sync://status-changed", ());
+                }
+                // NotReady (locked / unenrolled) / Disabled are not real failures
+                // — clear the overlay so status falls back to the honest base
+                // config state (Pending / NotEnrolled / Disabled / Idle).
+                _ => {
+                    if let Some(cell) = app.try_state::<super::commands::SyncRuntimeStatusCell>() {
+                        cell.clear();
+                    }
                 }
             }
         }
@@ -303,5 +408,59 @@ mod tests {
         assert_eq!(s.tick(10_000), SyncAction::Idle); // locked → nothing
         s.set_unlocked(true);
         assert_eq!(s.tick(10_001), SyncAction::Push); // window long elapsed → flush
+    }
+
+    // ── Mobile lifecycle (SYNC-37/38) ──────────────────────────────────────
+
+    #[test]
+    fn suspend_forces_idle_even_with_elapsed_interval_and_pending_change() {
+        let mut s = sched();
+        s.set_unlocked(true);
+        s.on_local_change(1_000); // pending push
+        s.on_suspend();
+        // A full poll interval elapsed AND a change is pending, but suspended → Idle.
+        assert_eq!(s.tick(100_000), SyncAction::Idle);
+        assert!(
+            s.has_pending_push(),
+            "suspend must retain pending push intent"
+        );
+    }
+
+    #[test]
+    fn resume_arms_one_shot_immediate_poll_with_non_advanced_clock() {
+        let mut s = sched();
+        s.set_unlocked(true);
+        s.on_suspend();
+        assert_eq!(s.tick(5_000), SyncAction::Idle); // suspended
+        s.on_resume(5_000);
+        // Clock has NOT advanced a full interval, but resume armed the poll → Pull.
+        assert_eq!(s.tick(5_000), SyncAction::Pull);
+        // One-shot: the next tick (still < interval) is Idle again.
+        assert_eq!(s.tick(5_100), SyncAction::Idle);
+    }
+
+    #[test]
+    fn has_pending_push_is_true_iff_a_coalesced_change_is_unpushed() {
+        let mut s = sched();
+        assert!(!s.has_pending_push());
+        s.set_unlocked(true);
+        s.on_local_change(1_000);
+        assert!(s.has_pending_push());
+        assert_eq!(s.tick(10_000), SyncAction::Push); // window elapsed → flush
+        assert!(!s.has_pending_push()); // pushed → cleared
+    }
+
+    #[test]
+    fn pending_push_survives_suspend_resume_and_flushes() {
+        let mut s = sched();
+        s.set_unlocked(true);
+        s.on_local_change(1_000); // pending push
+        s.on_suspend();
+        assert_eq!(s.tick(10_000), SyncAction::Idle); // suspended → nothing (retained)
+        assert!(s.has_pending_push());
+        s.on_resume(10_001);
+        // Resume poll + the long-elapsed coalescing window → both fire.
+        assert_eq!(s.tick(10_001), SyncAction::PullAndPush);
+        assert!(!s.has_pending_push()); // flushed after resume
     }
 }

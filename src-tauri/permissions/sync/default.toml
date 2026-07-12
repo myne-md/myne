@@ -31,6 +31,7 @@ permissions = [
     "allow-sync-enroll",
     "allow-sync-join-account",
     "allow-sync-reset-local",
+    "allow-sync-head-fingerprint",
 ]
 
 [[permission]]
@@ -102,3 +103,8 @@ commands.allow = ["sync_join_account"]
 identifier = "allow-sync-reset-local"
 description = "Allow invoking sync:sync_reset_local (reset this device's sync enrollment locally: clear the device-local per-device token + sync baseline (sync-state.json + vault.head-state) for the active vault so a stale/rejected token can be re-enrolled). NEVER touches notes/attachments/vault.meta and makes no server call."
 commands.allow = ["sync_reset_local"]
+
+[[permission]]
+identifier = "allow-sync-head-fingerprint"
+description = "Allow invoking sync:sync_head_fingerprint (return the 8-char Crockford XXXX-XXXX SAS fingerprint of this device's currently adopted vault head, read from the device-local sync-state's latest head observation; None when no head is adopted yet). The out-of-band enroll-time eye-compare substrate (SYNC-17); returns no key material and makes no server call — reveals only the already-server-visible head_id, one-way-hashed to ~40 bits."
+commands.allow = ["sync_head_fingerprint"]

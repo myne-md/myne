@@ -9,9 +9,10 @@ repository = "https://github.com/myne-md/myne"
 publish = false
 
 # std-bound (Tauri/tokio/fs) — unlike the no_std `protocol` crate, this shared
-# crate carries the host-coupled plugin cores. Desktop-only couplings (search,
-# spell, snapshots, sync, attachments, backup, clipper, pdf, workspace) attach
-# through `hooks::VaultLifecycleHooks` rather than living here.
+# crate carries the host-coupled plugin cores. Remaining desktop-only couplings
+# (search, spell, clipper, pdf, workspace) attach through
+# `hooks::VaultLifecycleHooks` rather than living here. The `sync` engine was
+# extracted into this crate (decisions.md 2026-07-07).
 [dependencies]
 protocol = { path = "../protocol" }
 tauri = { version = "2", features = [] }
@@ -40,6 +41,29 @@ rust-stemmers = "1"
 # single-stems it while the query stays multi-stemmed. Moved here with the
 # search engine (was desktop-only); same pin as the shared lock.
 whatlang = "0.18"
+# Phase 2 sync transport (extracted from the desktop crate with the sync engine,
+# decisions.md 2026-07-07). base64 = the SCRAM/enroll wire encoding; the
+# raw-rustls connection layer that SCRAM auth + sync push/pull share — one TLS
+# path with cert-pinning (A4) and keying-material export (tls-exporter, SCRAM
+# channel binding, SYNC-3). Unconditional (SYNC-33): every core consumer wanting
+# sync wants the transport; desktop + mobile inherit these via the `myne-core`
+# path dep. The `ring` provider is chosen over the default `aws-lc-rs` for a more
+# reproducible build (no C/CMake toolchain → cross-compiles for iOS/Android).
+# NOTE: the cert-pin verifier + tls-exporter wiring is R3-gated — a
+# primitive-level security review + live interop test are still owed before
+# production trust. Recorded in `docs/dependency-policy.md`. Apache-2.0/ISC/MIT.
+base64 = "0.22"
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+rustls-pki-types = "1"
+
+# Windows durability primitive: `MoveFileExW(MOVEFILE_WRITE_THROUGH)` backs the
+# Windows arm of `atomic_write::finalize_atomic` (moved here from the desktop
+# crate with the plugin cores). Only `Win32_Storage_FileSystem` is needed — the
+# desktop crate's extra features (KeyboardAndMouse / SystemInformation) stay
+# desktop-side with `auto_lock`. Same `0.60` pin already locked in the shared
+# workspace lock (zero dependency-tree expansion).
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.60", features = ["Win32_Storage_FileSystem"] }
 
 [features]
 # Gates the cross-plugin test fixtures (`test_support`) so the desktop/mobile

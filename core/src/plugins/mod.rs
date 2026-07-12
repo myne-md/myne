@@ -7,9 +7,11 @@
 //! domain isolation enforced at compile time.
 //!
 //! These cores are shared between the desktop (`myne-desktop`) and future
-//! mobile clients. Desktop-only plugins (search, snapshots, sync, …) stay in
+//! mobile clients. Remaining desktop-only plugins (search, spell, …) stay in
 //! the desktop crate and attach through the `hooks::VaultLifecycleHooks`
-//! seam rather than living here.
+//! seam rather than living here. The `sync` engine was extracted into this
+//! shared core (decisions.md 2026-07-07); each client keeps only the thin
+//! `init()`/`generate_handler!`/capability shim.
 
 pub mod attachments;
 pub mod export;
@@ -18,6 +20,7 @@ pub mod prefs;
 pub mod quick_unlock;
 pub mod secret_export;
 pub mod snapshots;
+pub mod sync;
 pub mod vault_change_password;
 pub mod vault_creation;
 pub mod vault_delete;
