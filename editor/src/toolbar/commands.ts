@@ -6,7 +6,7 @@
 // that maps to it gets the change — the desktop selection toolbar and the mobile
 // keyboard bar never drift.
 
-import { type ChangeSpec } from "@codemirror/state";
+import { EditorSelection, type ChangeSpec } from "@codemirror/state";
 import { type Command, type EditorView } from "@codemirror/view";
 import { toggleWrap } from "../wrap-toggle";
 
@@ -28,10 +28,20 @@ export function applyHeadingLevel(view: EditorView, level: number): void {
   const range = view.state.selection.main;
   const line = view.state.doc.lineAt(range.from);
   const text = view.state.doc.sliceString(line.from, line.to);
-  const cleaned = text.replace(/^#{1,6}\s+/, "");
-  const next = level === 0 ? cleaned : "#".repeat(level) + " " + cleaned;
+  const oldPrefixLen = text.match(/^#{1,6}\s+/)?.[0].length ?? 0;
+  const cleaned = text.slice(oldPrefixLen);
+  const newPrefix = level === 0 ? "" : "#".repeat(level) + " ";
+  const next = newPrefix + cleaned;
+  // Keep the caret on the same spot WITHIN the heading text rather than letting
+  // CodeMirror strand it before the "# " marker. Without an explicit selection,
+  // inserting "# " on an empty line leaves the caret at "|# " — the user then
+  // types before the hashes. Re-anchor each end past the new prefix: an empty
+  // line lands the caret right after "# ", ready for the heading text.
+  const remap = (pos: number): number =>
+    line.from + newPrefix.length + Math.max(0, pos - line.from - oldPrefixLen);
   view.dispatch({
     changes: { from: line.from, to: line.to, insert: next },
+    selection: EditorSelection.range(remap(range.anchor), remap(range.head)),
     userEvent: "toolbar.heading",
   });
   view.focus();
