@@ -3,17 +3,20 @@
 # declares this as an `InlinedPlugin`. Referenced by `capabilities/default.json`
 # as `quick-unlock:default`.
 #
-# Mobile ships the PIN path only: setup / unlock / status / disable. The macOS
-# biometric command branch is desktop-only and is NOT registered on mobile, so
-# no biometric permission identifiers appear here.
+# Mobile ships the PIN path AND the Apple biometric branch (iOS Face ID /
+# Touch ID via the shared `myne-core` Apple-Keychain provider; on Android the
+# biometric commands return HardwareUnavailable until a Keystore provider
+# lands). Threat-model trade-off: main repo `docs/decisions.md` 2026-07-12.
 
 "$schema" = "../../gen/schemas/mobile-schema.json"
 
 [default]
-description = "Default permission set for the mobile quick-unlock plugin (PIN path)."
+description = "Default permission set for the mobile quick-unlock plugin (PIN + biometric)."
 permissions = [
     "allow-quick-unlock-setup-pin",
     "allow-quick-unlock-with-pin",
+    "allow-quick-unlock-setup-biometric",
+    "allow-quick-unlock-with-biometric",
     "allow-quick-unlock-status",
     "allow-quick-unlock-disable",
 ]
@@ -27,6 +30,16 @@ commands.allow = ["quick_unlock_setup_pin"]
 identifier = "allow-quick-unlock-with-pin"
 description = "Allow invoking quick-unlock:quick_unlock_with_pin (attempt a PIN quick-unlock of the active vault)."
 commands.allow = ["quick_unlock_with_pin"]
+
+[[permission]]
+identifier = "allow-quick-unlock-setup-biometric"
+description = "Allow invoking quick-unlock:quick_unlock_setup_biometric (configure Face ID / Touch ID quick-unlock while the vault is unlocked)."
+commands.allow = ["quick_unlock_setup_biometric"]
+
+[[permission]]
+identifier = "allow-quick-unlock-with-biometric"
+description = "Allow invoking quick-unlock:quick_unlock_with_biometric (attempt a Face ID / Touch ID quick-unlock of the active vault)."
+commands.allow = ["quick_unlock_with_biometric"]
 
 [[permission]]
 identifier = "allow-quick-unlock-status"

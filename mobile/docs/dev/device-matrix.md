@@ -64,6 +64,22 @@ Walk each on a physical iPhone, against a real (or LAN self-host) server:
   here. Introducing one is a **threat-model-reviewed `decisions.md` event** (M-R7), not a test
   convenience — a bypass flag that leaks into a release build is a security regression.
 
+### 4.1 Biometric quick-unlock verification checklist (MYND-329; decisions.md 2026-07-12)
+
+The Apple-Keychain provider is **UNVERIFIED until this passes on a real device** (the Bitwarden
+CVE-2023-27706 failure class — a mis-built access control stores the wrap key WITHOUT an effective
+biometric gate, which no compile or simulator run catches). Walk on a physical iPhone:
+
+| # | Scenario | Expected |
+|---|---|---|
+| 4.1.1 | **Setup** — Settings → Privacy & security → Quick unlock → Face ID toggle on | toggle flips on, toast confirms; NO biometric prompt at setup (the gate fires on redeem) |
+| 4.1.2 | **Redeem prompts** — auto-lock, reopen the unlock screen | the Face ID sheet appears **immediately** (auto-prompt); success lands in the editor |
+| 4.1.3 | **Cancel is free** — cancel the prompt repeatedly | retry surface shows; attempts counter does NOT burn (no wipe after >5 cancels) |
+| 4.1.4 | **Cold start forces password** — kill the app, relaunch | password form only; no biometric affordance (spring-loaded gate) |
+| 4.1.5 | **Enrollment change invalidates** — add/remove a face/finger in iOS Settings, then redeem | the OS invalidates the Keychain secret; the app drops to password (credential re-setup required) |
+| 4.1.6 | **Password change invalidates** — change the master password, auto-lock, reopen | no biometric affordance; the credential (blob + Keychain item) was wiped |
+| 4.1.7 | **Non-authenticated read fails** — attempt the Keychain read without biometric auth (e.g. cancel and inspect via a debugger that the wrap key was NOT returned) | the read errors; no wrap-key bytes reach the app without a passed prompt |
+
 ## 5. Cadence
 
 **Per release.** Log device model + iOS build + server (hosted / self-host) + pass/fail per scenario

@@ -45,6 +45,17 @@ export interface MockConfig {
   /** `sync_join_account` outcome. */
   joinResult?: { vault_id: string; pending: boolean; fingerprint: string | null };
   joinError?: { kind: string };
+  /** Boot to the Unlock screen (one `Exists` vault, `Empty` slot) instead of
+   *  straight to the editor — for the quick-unlock / password unlock flows. */
+  lockedVault?: boolean;
+  /** Canned `quick_unlock_status` (defaults to not-configured). A
+   *  `quick_unlock_setup_*` / `quick_unlock_disable` call mutates the canned
+   *  value so a settings toggle flip is reflected by the next status read. */
+  quickUnlock?: { configured: boolean; method: "pin" | "biometric" | null; available: boolean };
+  /** Reject `quick_unlock_with_biometric` with this `QuickUnlockError`. */
+  biometricRedeemError?: { kind: string; detail?: unknown };
+  /** Reject `quick_unlock_setup_biometric` with this `QuickUnlockError`. */
+  biometricSetupError?: { kind: string };
 }
 
 /** Install the mock IPC as an init script so it runs before the app's first paint. */
@@ -94,17 +105,38 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
       view_order: [],
     };
 
+    // Quick-unlock canned state — mutable so a setup/disable call is reflected
+    // by the next `quick_unlock_status` read (the settings toggle round-trip).
+    let quickUnlock = config.quickUnlock ?? { configured: false, method: null, available: false };
+
     const handlers: Record<string, (args: Record<string, unknown>) => unknown> = {
       // ── Boot / editor mount ──
-      // freshDevice → boot to Welcome (no vaults, Empty slot); otherwise the
-      // Unlocked slot shortcuts `initialStageFromProbe` straight to the editor.
+      // freshDevice → boot to Welcome (no vaults, Empty slot); lockedVault →
+      // boot to Unlock (one Exists vault, Empty slot); otherwise the Unlocked
+      // slot shortcuts `initialStageFromProbe` straight to the editor.
       "plugin:vault-unlock|vault_list": () => (config.freshDevice ? [] : [{ id: "flow-vault", status: { kind: "Exists" } }]),
-      "plugin:vault-unlock|vault_slot_kind": () => (config.freshDevice ? "Empty" : "Unlocked"),
+      "plugin:vault-unlock|vault_slot_kind": () => (config.freshDevice || config.lockedVault ? "Empty" : "Unlocked"),
       "plugin:vault-unlock|vault_is_unlocked": () => true,
       "plugin:vault-unlock|report_user_activity": () => null,
+      "plugin:vault-unlock|unlock": () => null,
       "plugin:prefs|prefs_read": () => DEFAULT_PREFS,
       "plugin:notes|note_list": () => [],
-      "plugin:quick-unlock|quick_unlock_status": () => ({ configured: false, method: null }),
+      // ── Quick-unlock surface (per-test configurable) ──
+      "plugin:quick-unlock|quick_unlock_status": () => quickUnlock,
+      "plugin:quick-unlock|quick_unlock_setup_biometric": () => {
+        if (config.biometricSetupError) throw config.biometricSetupError;
+        quickUnlock = { configured: true, method: "biometric", available: true };
+        return null;
+      },
+      "plugin:quick-unlock|quick_unlock_with_biometric": () => {
+        if (config.biometricRedeemError) throw config.biometricRedeemError;
+        return null;
+      },
+      "plugin:quick-unlock|quick_unlock_with_pin": () => null,
+      "plugin:quick-unlock|quick_unlock_disable": () => {
+        quickUnlock = { configured: false, method: null, available: false };
+        return null;
+      },
       // ── Sync surface (per-test configurable) ──
       "plugin:sync|sync_status": () => config.syncStatus ?? { state: "not_enrolled" },
       "plugin:sync|sync_get_endpoint": () =>
