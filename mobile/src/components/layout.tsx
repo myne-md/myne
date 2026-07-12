@@ -43,6 +43,19 @@ export function ScreenScroll({
   );
 }
 
+/** Centered phone-width column for the single-column flows (welcome / create /
+ *  unlock / recover / picker / restore-backup). On phones (viewport ≤ 480px)
+ *  this is a no-op; on tablets it keeps those flows a sane centered column
+ *  instead of stretching edge to edge. The editor renders bare — it is the
+ *  adaptive multi-pane surface (SizeClassContext). */
+export function PhoneColumn({ children }: { children: ReactNode }) {
+  return (
+    <div style={{ height: "100%", width: "100%", maxWidth: 480, margin: "0 auto" }}>
+      {children}
+    </div>
+  );
+}
+
 /** Uppercase tracked section label (12px, 0.1em). */
 export function Eyebrow({ children, style }: { children: ReactNode; style?: CSSProperties }) {
   return (

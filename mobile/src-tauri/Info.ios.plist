@@ -37,5 +37,24 @@
 	<string>Myne uses Face ID to unlock this vault again quickly after it auto-locks. Your master password is still required after a restart.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Myne uses the microphone only while you record a voice note. Recordings are encrypted on this device and never sent anywhere.</string>
+	<!-- `myne://` custom URL scheme — the target of the home / lock-screen
+	     widgets + Control Center "New note" action (ios-widgets/). Delivered to
+	     the WebView by tauri-plugin-deep-link; resolved app-side into an unlock
+	     + new-note flow (src/lib/deep-link.ts). Lives HERE (not only in the
+	     gitignored gen/apple/project.yml) so a fresh clone's `tauri ios init`
+	     keeps it — the same regeneration-surviving channel as the usage strings
+	     above (the Android side of the same scheme comes from tauri.conf.json
+	     plugins.deep-link, injected into AndroidManifest.xml by the plugin). -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>md.myne.mobile</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>myne</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>

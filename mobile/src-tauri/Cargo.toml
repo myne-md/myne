@@ -18,8 +18,30 @@ license = "AGPL-3.0"
 name = "myne_mobile_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
+# Debug builds must stay usable on-device: an unoptimized Argon2id at
+# m=256 MiB turns unlock into minutes (observed on the iOS simulator dev
+# build). Optimize ONLY the crypto-hot leaf crates in dev — same pattern as
+# the main repo's candle override; our own crates keep full debug info.
+[profile.dev.package.argon2]
+opt-level = 3
+[profile.dev.package.blake2]
+opt-level = 3
+[profile.dev.package.chacha20]
+opt-level = 3
+[profile.dev.package.chacha20poly1305]
+opt-level = 3
+[profile.dev.package.poly1305]
+opt-level = 3
+[profile.dev.package.sha2]
+opt-level = 3
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
+# `update_android_manifest` — the committed, regeneration-surviving channel for
+# Android manifest additions (the Android mirror of `Info.ios.plist`; it edits
+# `gen/android/.../AndroidManifest.xml` on every `tauri android dev/build` and
+# no-ops on desktop/iOS where TAURI_ANDROID_PROJECT_PATH is unset).
+tauri-utils = { version = "2", features = ["build"] }
 
 [dependencies]
 # Reuse the audited Phase-1 crypto crate directly (no port). From this

@@ -21,7 +21,7 @@ import { EditorFlow } from "./flows/EditorFlow";
 import { PickerFlow } from "./flows/PickerFlow";
 import { RestoreBackupFlow } from "./flows/RestoreBackupFlow";
 import { Spinner } from "../components";
-import { Screen } from "../components";
+import { Screen, PhoneColumn } from "../components";
 
 /** Synthetic slotMap key for the active (sole-Unlocked under SYNC-1) slot. */
 const ACTIVE_SLOT = "active-slot";
@@ -76,12 +76,17 @@ export function AppShell() {
 
   if (stage === null) {
     return (
-      <Screen style={{ alignItems: "center", justifyContent: "center" }}>
-        <Spinner />
-      </Screen>
+      <PhoneColumn>
+        <Screen style={{ alignItems: "center", justifyContent: "center" }}>
+          <Spinner />
+        </Screen>
+      </PhoneColumn>
     );
   }
 
+  // Every stage except the editor renders inside <PhoneColumn> — on tablets the
+  // single-column flows stay a centered phone-width column (no-op on phones);
+  // the editor is the adaptive multi-pane surface and fills the window.
   switch (stage.name) {
     case "welcome":
       // The join flow runs full-screen while the stage is still `welcome`; on a
@@ -89,59 +94,69 @@ export function AppShell() {
       // editor. Cancel just closes the overlay back to Welcome.
       if (showJoin) {
         return (
-          <JoinFlow
-            onComplete={(vaultId) => {
-              setShowJoin(false);
-              dispatch({ type: "welcome.join-success", vaultId });
-            }}
-            onCancel={() => setShowJoin(false)}
-          />
+          <PhoneColumn>
+            <JoinFlow
+              onComplete={(vaultId) => {
+                setShowJoin(false);
+                dispatch({ type: "welcome.join-success", vaultId });
+              }}
+              onCancel={() => setShowJoin(false)}
+            />
+          </PhoneColumn>
         );
       }
       return (
-        <WelcomeFlow
-          onCreate={() => dispatch({ type: "create-vault.start" })}
-          // Out-of-band entry (no legal welcome→recover transition; same
-          // pattern as reprobe). Recovery needs a vault.meta on disk — on a
-          // fresh device with none, the backend returns the non-distinguishing
-          // "invalid phrase" state, which RecoverFlow surfaces.
-          onRecover={() => setStage({ name: "recover", subStep: "phrase-entry" })}
-          onJoin={() => setShowJoin(true)}
-        />
+        <PhoneColumn>
+          <WelcomeFlow
+            onCreate={() => dispatch({ type: "create-vault.start" })}
+            // Out-of-band entry (no legal welcome→recover transition; same
+            // pattern as reprobe). Recovery needs a vault.meta on disk — on a
+            // fresh device with none, the backend returns the non-distinguishing
+            // "invalid phrase" state, which RecoverFlow surfaces.
+            onRecover={() => setStage({ name: "recover", subStep: "phrase-entry" })}
+            onJoin={() => setShowJoin(true)}
+          />
+        </PhoneColumn>
       );
 
     case "create-vault":
       return (
-        <CreateVaultFlow
-          briefing={stage.briefing}
-          onCancel={reprobe}
-          onCommitSuccess={(vaultId?: VaultId) => dispatch({ type: "create-vault.commit-success", vaultId })}
-          onAutoUnlockSuccess={(vaultId?: VaultId) => dispatch({ type: "create-vault.auto-unlock-success", vaultId })}
-          onAutoUnlockFailed={(vaultId?: VaultId) => dispatch({ type: "create-vault.commit-success", vaultId })}
-        />
+        <PhoneColumn>
+          <CreateVaultFlow
+            briefing={stage.briefing}
+            onCancel={reprobe}
+            onCommitSuccess={(vaultId?: VaultId) => dispatch({ type: "create-vault.commit-success", vaultId })}
+            onAutoUnlockSuccess={(vaultId?: VaultId) => dispatch({ type: "create-vault.auto-unlock-success", vaultId })}
+            onAutoUnlockFailed={(vaultId?: VaultId) => dispatch({ type: "create-vault.commit-success", vaultId })}
+          />
+        </PhoneColumn>
       );
 
     case "unlock":
       return (
-        <UnlockFlow
-          initialStatus={stage.initialStatus}
-          vaultId={stage.vaultId}
-          suspicionReason={stage.suspicionReason}
-          fromPicker={stage.fromPicker}
-          onUnlocked={() => dispatch({ type: "unlock.success" })}
-          onStartRecovery={() => dispatch({ type: "unlock.start-recovery" })}
-          onBackToPicker={stage.fromPicker ? () => dispatch({ type: "unlock.back-to-picker" }) : undefined}
-          onDeleteVaultSuccess={() => dispatch({ type: "unlock.delete-vault-success" })}
-        />
+        <PhoneColumn>
+          <UnlockFlow
+            initialStatus={stage.initialStatus}
+            vaultId={stage.vaultId}
+            suspicionReason={stage.suspicionReason}
+            fromPicker={stage.fromPicker}
+            onUnlocked={() => dispatch({ type: "unlock.success" })}
+            onStartRecovery={() => dispatch({ type: "unlock.start-recovery" })}
+            onBackToPicker={stage.fromPicker ? () => dispatch({ type: "unlock.back-to-picker" }) : undefined}
+            onDeleteVaultSuccess={() => dispatch({ type: "unlock.delete-vault-success" })}
+          />
+        </PhoneColumn>
       );
 
     case "recover":
       return (
-        <RecoverFlow
-          initialSubStep={stage.subStep}
-          onComplete={(vaultId?: VaultId) => dispatch({ type: "recover.complete-success", vaultId })}
-          onCancel={() => dispatch({ type: "recover.cancel" })}
-        />
+        <PhoneColumn>
+          <RecoverFlow
+            initialSubStep={stage.subStep}
+            onComplete={(vaultId?: VaultId) => dispatch({ type: "recover.complete-success", vaultId })}
+            onCancel={() => dispatch({ type: "recover.cancel" })}
+          />
+        </PhoneColumn>
       );
 
     case "editor":
@@ -163,13 +178,19 @@ export function AppShell() {
 
     case "picker":
       return (
-        <PickerFlow
-          onSelect={(vaultId: VaultId) => dispatch({ type: "picker.select-vault", vaultId })}
-          onCreate={() => dispatch({ type: "picker.create-vault" })}
-        />
+        <PhoneColumn>
+          <PickerFlow
+            onSelect={(vaultId: VaultId) => dispatch({ type: "picker.select-vault", vaultId })}
+            onCreate={() => dispatch({ type: "picker.create-vault" })}
+          />
+        </PhoneColumn>
       );
 
     case "restore-backup":
-      return <RestoreBackupFlow entry={stage.entry} onDone={reprobe} />;
+      return (
+        <PhoneColumn>
+          <RestoreBackupFlow entry={stage.entry} onDone={reprobe} />
+        </PhoneColumn>
+      );
   }
 }
