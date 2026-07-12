@@ -417,6 +417,33 @@ fn sync_cycle_attempt(
         }
     }
 
+    // --- surface the verified head to the SAS *before* downloading note bodies ---
+    // The join head-fingerprint (`sync_head_fingerprint` reads `vv_log.last()` off
+    // disk) must not wait for the whole first-cycle content download: a fresh join's
+    // empty local manifest flags every blob `changed`, so the download loop below is
+    // O(account size). The head is already MAC-verified + rollback-checked inside
+    // `pull_to_stable`, and the SAS is a head fingerprint independent of note bodies,
+    // so record + persist it here. This does NOT advance the cursor (still
+    // `page.next_cursor`, applied after the loop), so "advance cursor only on success"
+    // holds — the same in-attempt checkpoint shape as the 410-recovery write above.
+    // `vv_log` is consumed only by the SAS command (baseline VV comes from
+    // `read_head_baseline`), so an early persist has no other side effect.
+    if let Some(vh) = &page.head {
+        let new_head_hex = hex(&vh.head_id);
+        let already_current = state
+            .vv_log
+            .last()
+            .map(|o| o.head_id_hex == new_head_hex)
+            .unwrap_or(false);
+        state.record_observation(&vh.head_id, &vh.head.version_vector);
+        // Persist only when the head actually changed — `record_observation` dedups a
+        // repeat of the latest observation, so this avoids a redundant disk write every
+        // cycle for a device already sitting on the current head.
+        if !already_current {
+            write_sync_state(vault_root, state).map_err(|_| SyncCycleError::Io)?;
+        }
+    }
+
     // --- apply remote changes: download + write each changed blob to disk ---
     let mut pulled = 0;
     for c in &page.changed {
@@ -445,10 +472,10 @@ fn sync_cycle_attempt(
         );
         pulled += 1;
     }
+    // The head observation is already recorded + persisted before the download loop
+    // above (so the join SAS surfaces without waiting for the full content download);
+    // here we only advance the cursor, which must move after a successful download.
     state.cursor = page.next_cursor;
-    if let Some(vh) = &page.head {
-        state.record_observation(&vh.head_id, &vh.head.version_vector);
-    }
 
     // --- detect local changes to push (content_nonce ≠ last-synced) ---
     // Skipped on a poll-driven Pull (`allow_push=false`): pushes are coalesced
@@ -538,7 +565,17 @@ fn sync_cycle_attempt(
     let mut head_advanced = false;
     let mut tombstones_pushed = 0;
 
-    if !to_push.is_empty() {
+    // Author a head when there are local changes to push, OR — genesis liveness — when
+    // this is a push cycle and the account has NO server head yet (an empty vault whose
+    // welcome-note seed never landed). Without the second clause a zero-note account
+    // never authors a head, so a joining device's pull returns `page.head = None`
+    // forever and its SAS (which needs an adopted head) never appears. `allow_push`
+    // keeps poll cycles push-free (resolution-blur); `page.head.is_none()` fires the
+    // genesis exactly once — once a head exists, the empty-`to_push` case adopts it via
+    // the `else` branch below. `compute_manifest_hash` over the empty manifest and a
+    // head-only push (empty `to_push`) are both well-defined; the server accepts a
+    // head-only push (blobs `[]` + `new_head`).
+    if !to_push.is_empty() || (allow_push && page.head.is_none()) {
         // Author a linear-advance head over the current (post-pull) head: bump
         // this device's VV component, seq+1, parent = the server's current head
         // (genesis = the zero prev the server's first-head CAS expects).
@@ -636,9 +673,35 @@ mod tests {
     use super::*;
     use crate::plugins::notes::note_id::NoteId;
     use crate::plugins::sync::enroll::{self, EnrollPath};
+    use crate::plugins::sync::transport::{HttpMethod, TransportError, TransportResponse};
     use protocol::{decode_note, derive_subkey, encode_new_note, SubkeyRole};
     use std::path::PathBuf;
     use std::process::Child;
+
+    /// A transport that relays everything to a wrapped real transport EXCEPT it
+    /// fails every `/sync/blob` download with a 500, so the note-body download loop
+    /// cannot complete. Used to prove the join SAS head observation is recorded +
+    /// persisted before that loop (`join_head_fingerprint_persists_before_blob_download`).
+    struct FailBlobTransport {
+        inner: Box<dyn SyncTransport>,
+    }
+    impl SyncTransport for FailBlobTransport {
+        fn request(
+            &self,
+            method: HttpMethod,
+            path: &str,
+            body: &[u8],
+            token: Option<&str>,
+        ) -> Result<TransportResponse, TransportError> {
+            if path.starts_with("/sync/blob") {
+                return Ok(TransportResponse {
+                    status: 500,
+                    body: Vec::new(),
+                });
+            }
+            self.inner.request(method, path, body, token)
+        }
+    }
 
     /// Kills the spawned server on drop (so a panicking assert doesn't leak it).
     struct ServerGuard(Child);
@@ -981,6 +1044,213 @@ mod tests {
         )
         .unwrap();
         assert_eq!(decrypted.plaintext(), plaintext);
+
+        std::fs::remove_dir_all(&dir_a).ok();
+        std::fs::remove_dir_all(&dir_b).ok();
+    }
+
+    /// #1 (SAS latency): the joining device records + PERSISTS the pulled head
+    /// observation BEFORE the note-body download loop, so its join SAS
+    /// (`sync_head_fingerprint` → `vv_log.last()`, read from disk) surfaces without
+    /// waiting for the whole first-cycle content download. Proven by failing every
+    /// `/sync/blob` GET: the cycle errors mid-download and NO note lands on disk,
+    /// yet the persisted `sync-state.json` already carries the head observation.
+    /// Before the fix the observation was recorded only AFTER the loop and persisted
+    /// only on whole-cycle success, so a failed cycle left `vv_log` empty.
+    #[test]
+    fn join_head_fingerprint_persists_before_blob_download() {
+        let Some((_guard, url)) = spawn_server() else {
+            eprintln!(
+                "SKIP join_head_fingerprint_persists_before_blob_download: server binary not found"
+            );
+            return;
+        };
+        let root_key = [0x5Au8; 32];
+        let account_hash = [0x5Bu8; 16];
+        let username = "MY-SAS-EARLY";
+        let secret = derive_subkey(&root_key, SubkeyRole::ServerAuth);
+        let items_key = [0x14u8; 32];
+        let items_key_id = [0x38u8; 16];
+
+        let dir_a = std::env::temp_dir().join(format!("myne-sasA-{}", std::process::id()));
+        let dir_b = std::env::temp_dir().join(format!("myne-sasB-{}", std::process::id()));
+        let notes_a = dir_a.join("notes");
+        let notes_b = dir_b.join("notes");
+        std::fs::create_dir_all(&notes_a).unwrap();
+        std::fs::create_dir_all(&notes_b).unwrap();
+
+        // Owner A authors a note and pushes it (server now holds A's head + blob).
+        let note = NoteId::new_v7();
+        write_note(
+            &notes_a,
+            &items_key,
+            &items_key_id,
+            &note,
+            b"owner note",
+            false,
+        );
+        let (ta, dev_a, tok_a) = enroll_device(
+            &url,
+            &account_hash,
+            username,
+            secret.as_slice(),
+            "a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0",
+            true,
+        );
+        run_sync_cycle(
+            ta.as_ref(),
+            &root_key,
+            account_hash,
+            dev_a,
+            &tok_a,
+            &notes_a,
+            &dir_a,
+            true,
+        )
+        .unwrap();
+        let a_head = read_sync_state(&dir_a)
+            .unwrap()
+            .vv_log
+            .last()
+            .cloned()
+            .expect("A recorded its head at push");
+
+        // Device B joins (recovery self-approve) and gets a token.
+        let (_tb, dev_b, tok_b) = enroll_device(
+            &url,
+            &account_hash,
+            username,
+            secret.as_slice(),
+            "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
+            false,
+        );
+
+        // B syncs through a transport that FAILS every blob download, so the
+        // content-download loop cannot complete.
+        let tb_fail = FailBlobTransport {
+            inner: crate::plugins::sync::http_transport::build_transport(&url, Vec::new()).unwrap(),
+        };
+        let res = run_sync_cycle(
+            &tb_fail,
+            &root_key,
+            account_hash,
+            dev_b,
+            &tok_b,
+            &notes_b,
+            &dir_b,
+            true,
+        );
+        assert!(
+            res.is_err(),
+            "the cycle errors because the blob download fails"
+        );
+
+        // The note body did NOT land (the download never completed)...
+        assert!(
+            !notes_b.join(format!("{}.myn", note.as_uuid())).exists(),
+            "no note body downloaded"
+        );
+        // ...yet B's persisted sync-state already carries the head observation: the
+        // SAS fingerprint is available before any note body is fetched.
+        let b_head = read_sync_state(&dir_b)
+            .unwrap()
+            .vv_log
+            .last()
+            .cloned()
+            .expect("B recorded + persisted the head BEFORE the download loop");
+        assert_eq!(
+            b_head.head_id_hex, a_head.head_id_hex,
+            "B's early-surfaced SAS fingerprint matches the owner's head"
+        );
+
+        std::fs::remove_dir_all(&dir_a).ok();
+        std::fs::remove_dir_all(&dir_b).ok();
+    }
+
+    /// #2 (empty-vault liveness): a zero-note vault still authors a genesis head on
+    /// its first push, so a joining device can pull + adopt it and its join SAS
+    /// appears. Without the genesis-on-empty gate the account never gets a head, the
+    /// joiner's pull returns `head=None` forever, and the SAS never shows (the phone
+    /// hangs on "Waiting for approval").
+    #[test]
+    fn empty_vault_authors_genesis_head_so_joiner_sees_sas() {
+        let Some((_guard, url)) = spawn_server() else {
+            eprintln!("SKIP empty_vault_authors_genesis_head...: server binary not found");
+            return;
+        };
+        let root_key = [0x61u8; 32];
+        let account_hash = [0x62u8; 16];
+        let username = "MY-GENESIS-TEST";
+        let secret = derive_subkey(&root_key, SubkeyRole::ServerAuth);
+
+        let dir_a = std::env::temp_dir().join(format!("myne-genA-{}", std::process::id()));
+        let dir_b = std::env::temp_dir().join(format!("myne-genB-{}", std::process::id()));
+        let notes_a = dir_a.join("notes");
+        let notes_b = dir_b.join("notes");
+        std::fs::create_dir_all(&notes_a).unwrap(); // EMPTY — no notes authored
+        std::fs::create_dir_all(&notes_b).unwrap();
+
+        // Owner A: empty vault, enroll, push → authors a genesis head over 0 notes.
+        let (ta, dev_a, tok_a) = enroll_device(
+            &url,
+            &account_hash,
+            username,
+            secret.as_slice(),
+            "a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0",
+            true,
+        );
+        let push = run_sync_cycle(
+            ta.as_ref(),
+            &root_key,
+            account_hash,
+            dev_a,
+            &tok_a,
+            &notes_a,
+            &dir_a,
+            true,
+        )
+        .expect("A's first cycle");
+        assert!(push.head_advanced, "an empty vault authors a genesis head");
+        assert_eq!(push.pushed, 0, "no blobs pushed for an empty vault");
+        let a_head = read_sync_state(&dir_a)
+            .unwrap()
+            .vv_log
+            .last()
+            .cloned()
+            .expect("A recorded the genesis head observation (its own SAS)");
+
+        // Device B joins (recovery self-approve) and pulls: it adopts the genesis
+        // head and its join SAS fingerprint appears — matching A's.
+        let (tb, dev_b, tok_b) = enroll_device(
+            &url,
+            &account_hash,
+            username,
+            secret.as_slice(),
+            "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
+            false,
+        );
+        let pull = run_sync_cycle(
+            tb.as_ref(),
+            &root_key,
+            account_hash,
+            dev_b,
+            &tok_b,
+            &notes_b,
+            &dir_b,
+            true,
+        )
+        .expect("B's join cycle");
+        assert_eq!(pull.pulled, 0, "nothing to download on an empty account");
+        let b_head = read_sync_state(&dir_b)
+            .unwrap()
+            .vv_log
+            .last()
+            .cloned()
+            .expect("the joining device adopts the genesis head → SAS appears");
+        assert_eq!(
+            b_head.head_id_hex, a_head.head_id_hex,
+            "both devices agree on the genesis head fingerprint"
+        );
 
         std::fs::remove_dir_all(&dir_a).ok();
         std::fs::remove_dir_all(&dir_b).ok();
@@ -1861,7 +2131,9 @@ mod tests {
     /// A `cursor_expired` (410) — the server GC'd past the device's stored cursor —
     /// resets the cursor to 0 and re-pulls a full reconcile, instead of looping on
     /// 410 forever. Driven with a fake transport: the first pull (stale cursor)
-    /// 410s, the from-0 re-pull succeeds.
+    /// 410s, the from-0 re-pull succeeds. The re-pull returns no head, so the push
+    /// phase authors a genesis head (§6.1 re-genesis / genesis-on-empty) — the two
+    /// recovery paths compose without wedging.
     #[test]
     fn cursor_expired_resets_and_full_reconciles() {
         use crate::plugins::sync::state::{write_sync_state, SyncState};
@@ -1892,12 +2164,25 @@ mod tests {
             200,
             br#"{"metas":[],"next_cursor":0}"#.to_vec(),
         );
+        // The re-pull returns no head (the server has none), so the recovery push
+        // authors a genesis head over the empty corpus (§6.1 re-genesis / genesis-on-
+        // empty liveness) — canned so the head-only push succeeds.
+        fake.on(
+            HttpMethod::Post,
+            "/sync/push",
+            200,
+            br#"{"results":[],"head_id_hex":"3333333333333333333333333333333333333333333333333333333333333333"}"#.to_vec(),
+        );
 
         let summary = run_sync_cycle(
             &fake, &[0u8; 32], [0u8; 16], [0u8; 16], "tok", &notes, &dir, true,
         )
         .expect("the cycle recovers from cursor_expired");
         assert_eq!(summary.cursor, 0, "cursor reset to a full reconcile");
+        assert!(
+            summary.head_advanced,
+            "no server head → the recovery push authors a genesis head (§6.1 re-genesis)"
+        );
         assert!(
             summary.reconcile_ran,
             "the 410-recovery full reconcile sets reconcile_ran (drives the banner events)"

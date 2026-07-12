@@ -242,6 +242,8 @@ This primitive **requires a primitive-level cryptographic review, not merely an 
 
 The **genesis** head is authored by the first device to push, at **first sync** — not at vault creation (the head is wire-only; a vault that never syncs has no head, and Phase 1 must not gain a sync artefact). Genesis commits the **entire existing local corpus**: `manifest_hash` over every current content blob's `(uuid, content_nonce)`, `VV = {author: 1}`, `seq = 1`, `parent_count = 0`. The authoring device is **authoritative** — it knows its own local state is real, so genesis carries no TOFU risk.
 
+An **empty corpus is a valid genesis.** A device with zero content blobs still authors the genesis head on its first push (the `manifest_hash` is simply computed over the empty manifest) — a **head-only push** (no blobs, `new_head` only). This is required for liveness: a device joining an as-yet-empty account must be able to adopt a verifiable head to complete its §6.3 bootstrap-fingerprint eye-compare; without a genesis-on-empty, a zero-note account would never author a head, the joiner's pull would return no head, and the enrollment compare would be unreachable (the joiner would wait indefinitely). The genesis-on-empty push is gated to **push cycles** (never a poll-only pull — the §8.3 privacy cadence is untouched) and fires **exactly once**: once any head exists, a subsequent no-local-change cycle adopts it (§5) rather than re-authoring.
+
 Head state is fully **re-derivable**: total loss of a device's head state (corrupted/cleared `MYH1`) costs at most a re-genesis (a TOFU reset, §6.2) — the vault *content* is untouched, since the head is a sync artefact, not authoritative content.
 
 ### 6.2 TOFU bootstrap
