@@ -111,6 +111,11 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             // NOTE: this new command needs a matching capabilities/default.json
             // permission entry — verify via `pnpm tauri dev` (permission autogen).
             read_text::attachment_read_text,
+            // MYND-268 Tier-2: decrypt + parse xlsx/docx into a SAFE structured
+            // model (grid/blocks) in Rust — only the model crosses IPC, no raw
+            // bytes/HTML, so no widened DOMPurify / new XSS surface. Needs its
+            // own capabilities/default.json entry — verify via `pnpm tauri dev`.
+            read_text::attachment_read_structured,
             // MYND-171: the unused-attachment query behind the "Clean
             // unused attachments" review dialog — catalog entries with zero
             // live note references, computed authoritatively (decrypts every
