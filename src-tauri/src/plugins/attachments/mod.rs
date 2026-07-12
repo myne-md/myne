@@ -60,6 +60,7 @@ pub use myne_core::plugins::attachments::{
 // Desktop-only modules.
 pub mod extract;
 pub mod import_desktop;
+pub mod read_text;
 pub mod scheme;
 pub mod voice;
 
@@ -103,6 +104,13 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             // generic file-card's Export action and the image/PDF Save-As
             // affordance both call it. TB3 user-initiated-egress exception.
             commands::attachment_export,
+            // MYND-268 Tier-1: decrypt one attachment's plaintext as TEXT for an
+            // inline read-only preview (txt/code/csv/md). Slot::Unlocked-gated;
+            // returns inert text over IPC (never re-sniffed/served) — the caller
+            // renders it in a read-only viewer, so no serve-time XSS surface.
+            // NOTE: this new command needs a matching capabilities/default.json
+            // permission entry — verify via `pnpm tauri dev` (permission autogen).
+            read_text::attachment_read_text,
             // MYND-171: the unused-attachment query behind the "Clean
             // unused attachments" review dialog — catalog entries with zero
             // live note references, computed authoritatively (decrypts every
