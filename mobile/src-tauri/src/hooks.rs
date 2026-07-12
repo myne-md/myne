@@ -128,7 +128,12 @@ impl<R: Runtime> VaultLifecycleHooks for MobileHooks<R> {
     fn preempt_inflight_backup<'a>(&'a self, _: &'a VaultRuntimeState) -> BoxFuture<'a> {
         Box::pin(std::future::ready(()))
     }
-    fn invalidate_quick_unlock(&self, _: &std::path::Path) {}
+    fn invalidate_quick_unlock(&self, vault_dir: &std::path::Path) {
+        // Master-password change wipes the quick-unlock credential (blob +
+        // attempt counter + the iOS Keychain item, if biometric) — the § 9.14.4
+        // lifecycle rule, same delegation as desktop `hooks.rs`.
+        myne_core::plugins::quick_unlock::commands::invalidate_credential(vault_dir);
+    }
 
     // ---- Group 7: note snapshot capture (the two live hooks) --------------
     fn capture_snapshot(

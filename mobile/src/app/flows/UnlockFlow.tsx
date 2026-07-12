@@ -13,8 +13,14 @@ import {
 import { HAS_TAURI, closeApp } from "../../lib/app-window";
 import { unlockWithPassword } from "../../lib/commands";
 import { deleteVault } from "../../lib/vault-delete";
-import { quickUnlockStatus, quickUnlockWithPin, type QuickUnlockStatus } from "../../lib/quick-unlock";
+import {
+  quickUnlockStatus,
+  quickUnlockWithPin,
+  quickUnlockWithBiometric,
+  type QuickUnlockStatus,
+} from "../../lib/quick-unlock";
 import { isQuickUnlockError } from "../../types/quick-unlock-error";
+import { usePlatform } from "../../platform/PlatformContext";
 import { ioBanner } from "../../lib/io-banner";
 import {
   UNLOCK_NON_DISTINGUISHING_BANNER,
@@ -103,6 +109,46 @@ function TextButton({
     >
       {children}
     </button>
+  );
+}
+
+/**
+ * Biometric scan glyph — bracket frame + either the Face ID face or a
+ * fingerprint (local copy mirroring src/screens/unlock/index.tsx's
+ * BiometricGlyph; `expression` swaps the smile for a frown on failure).
+ */
+function BiometricGlyph({
+  mode = "face",
+  color = "var(--accent)",
+  expression = "neutral",
+}: {
+  mode?: "face" | "fingerprint";
+  color?: string;
+  expression?: "neutral" | "sad";
+}) {
+  return (
+    <div style={{ width: 72, height: 72, position: "relative", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <svg width="72" height="72" viewBox="0 0 72 72" fill="none" style={{ position: "absolute", inset: 0 }}>
+        <path d="M4 22 V14 a10 10 0 0 1 10 -10 H22" stroke={color} strokeWidth="3" strokeLinecap="round" />
+        <path d="M50 4 H58 a10 10 0 0 1 10 10 V22" stroke={color} strokeWidth="3" strokeLinecap="round" />
+        <path d="M68 50 V58 a10 10 0 0 1 -10 10 H50" stroke={color} strokeWidth="3" strokeLinecap="round" />
+        <path d="M22 68 H14 a10 10 0 0 1 -10 -10 V50" stroke={color} strokeWidth="3" strokeLinecap="round" />
+        {mode === "face" && (
+          <>
+            <path d="M27 30 V34 M45 30 V34" stroke={color} strokeWidth="3" strokeLinecap="round" />
+            <path d="M36 31 V40 M32 44 h8" stroke={color} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+            <path
+              d={expression === "sad" ? "M29 52 q7 -5 14 0" : "M29 50 q7 5 14 0"}
+              stroke={color}
+              strokeWidth="3"
+              strokeLinecap="round"
+              fill="none"
+            />
+          </>
+        )}
+      </svg>
+      {mode === "fingerprint" && <Icon name="fingerprint" size={34} color={color} strokeWidth={2.2} />}
+    </div>
   );
 }
 
@@ -255,6 +301,7 @@ function messageForUnlockError(e: unknown): string {
  */
 export function UnlockFlow(props: UnlockFlowProps) {
   const { initialStatus, vaultId, suspicionReason, fromPicker, onBackToPicker } = props;
+  const { biometric, isAndroid } = usePlatform();
 
   const pwRef = useRef("");
   const [password, setPassword] = useState("");
@@ -265,10 +312,11 @@ export function UnlockFlow(props: UnlockFlowProps) {
   const [deleting, setDeleting] = useState(false);
   const [deleteFailed, setDeleteFailed] = useState(false);
 
-  // Quick-unlock (PIN) fast-path. `qu.available` is true only after a full
-  // master-password unlock happened THIS app session (the spring-loaded gate),
-  // so it appears on an auto-lock re-entry — never on a cold start. When
-  // available we default to the PIN field with a "use password" escape hatch.
+  // Quick-unlock fast-path (PIN or Face ID / Touch ID). `qu.available` is true
+  // only after a full master-password unlock happened THIS app session (the
+  // spring-loaded gate), so it appears on an auto-lock re-entry — never on a
+  // cold start. When available we default to the configured method's surface
+  // with a "use password" escape hatch.
   const [qu, setQu] = useState<QuickUnlockStatus | null>(null);
   const [pinMode, setPinMode] = useState(false);
   const [pin, setPin] = useState("");
@@ -280,6 +328,13 @@ export function UnlockFlow(props: UnlockFlowProps) {
     setPin(v);
   }, []);
 
+  // Biometric (Face ID / Touch ID) fast-path state. `failed` renders the
+  // UN-02-style retry surface; the OS sheet itself is system UI we never draw.
+  const [bioMode, setBioMode] = useState(false);
+  const [bioFailed, setBioFailed] = useState(false);
+  const [bioSubmitting, setBioSubmitting] = useState(false);
+  const bioAutoTried = useRef(false);
+
   useEffect(() => {
     if (!HAS_TAURI || initialStatus.kind !== "Exists") return;
     let cancelled = false;
@@ -287,7 +342,10 @@ export function UnlockFlow(props: UnlockFlowProps) {
       .then((s) => {
         if (cancelled) return;
         setQu(s);
-        if (s.available) setPinMode(true);
+        if (s.available) {
+          if (s.method === "biometric") setBioMode(true);
+          else setPinMode(true);
+        }
       })
       .catch(() => {});
     return () => {
@@ -334,6 +392,60 @@ export function UnlockFlow(props: UnlockFlowProps) {
       setSubmitting(false);
     }
   }, [submitting, vaultId, wipePassword, props]);
+
+  const handleBioUnlock = useCallback(async () => {
+    if (bioSubmitting) return;
+    setBioFailed(false);
+    setErrorBanner(null);
+    setBioSubmitting(true);
+    try {
+      if (HAS_TAURI) {
+        await quickUnlockWithBiometric(vaultId);
+      } else {
+        await new Promise((r) => setTimeout(r, 350));
+      }
+      wipePassword();
+      props.onUnlocked();
+    } catch (e) {
+      setBioSubmitting(false);
+      if (isQuickUnlockError(e)) {
+        // Cancelled never burns an attempt; WrongCredential (a keychain/blob
+        // mismatch) does — both land on the retry surface (UN-02).
+        if (e.kind === "Cancelled" || e.kind === "WrongCredential") {
+          setBioFailed(true);
+          return;
+        }
+        if (
+          e.kind === "AttemptsExhausted" ||
+          e.kind === "RequiresFullPassword" ||
+          e.kind === "NotConfigured" ||
+          e.kind === "HardwareUnavailable"
+        ) {
+          // Credential wiped / cold session / never set / no biometrics — drop
+          // to the password form.
+          setBioMode(false);
+          setQu((s) => (s ? { ...s, available: false } : s));
+          setErrorBanner(
+            e.kind === "AttemptsExhausted"
+              ? `Too many ${biometric} attempts. Use your password.`
+              : null,
+          );
+          return;
+        }
+      }
+      setBioFailed(true);
+    }
+  }, [bioSubmitting, vaultId, wipePassword, props, biometric]);
+
+  // Auto-prompt once per mount: entering the unlock screen with a redeemable
+  // biometric credential fires the OS sheet immediately (the 1Password /
+  // Bitwarden re-entry model). Cancel lands on the retry surface — the prompt
+  // never re-fires on its own (no prompt loop).
+  useEffect(() => {
+    if (!bioMode || !qu?.available || bioAutoTried.current) return;
+    bioAutoTried.current = true;
+    void handleBioUnlock();
+  }, [bioMode, qu, handleBioUnlock]);
 
   const handlePinUnlock = useCallback(async () => {
     if (pinSubmitting || pinRef.current.length < 6) return;
@@ -453,7 +565,65 @@ export function UnlockFlow(props: UnlockFlowProps) {
         </div>
       )}
 
-      {pinMode && qu?.available ? (
+      {bioMode && qu?.available ? (
+        <>
+          <div
+            style={{
+              marginTop: showSuspicion && suspicion ? 24 : 44,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+            }}
+            data-testid="unlock-biometric"
+            data-state={bioFailed ? "failed" : "ready"}
+          >
+            <button
+              onClick={() => void handleBioUnlock()}
+              disabled={bioSubmitting}
+              aria-label={`Unlock with ${biometric}`}
+              data-testid="unlock-biometric-prompt"
+              style={{ border: "none", background: "transparent", padding: 0, cursor: "pointer" }}
+            >
+              <BiometricGlyph
+                mode={isAndroid ? "fingerprint" : "face"}
+                color={bioFailed ? "var(--line-3)" : "var(--accent)"}
+                expression={bioFailed ? "sad" : "neutral"}
+              />
+            </button>
+            <div style={{ marginTop: 22, fontSize: 17, fontWeight: 500, color: "var(--fg-1)", textAlign: "center" }}>
+              {bioFailed
+                ? `${biometric} couldn't confirm it's you`
+                : isAndroid
+                  ? "Touch to unlock"
+                  : "Look to unlock"}
+            </div>
+            <div style={{ marginTop: 4, fontSize: 13, color: "var(--fg-3)", textAlign: "center", maxWidth: 260 }}>
+              {bioFailed ? "Try again, or unlock with your password." : biometric}
+            </div>
+          </div>
+          {bioFailed && (
+            <Button
+              style={{ marginTop: 24 }}
+              disabled={bioSubmitting}
+              onClick={() => void handleBioUnlock()}
+              data-testid="unlock-biometric-retry"
+            >
+              Try {biometric} again
+            </Button>
+          )}
+          <TextButton
+            height={40}
+            style={{ marginTop: bioFailed ? 4 : 24 }}
+            onClick={() => {
+              setBioMode(false);
+              setBioFailed(false);
+            }}
+            testId="unlock-use-password"
+          >
+            Use password instead
+          </TextButton>
+        </>
+      ) : pinMode && qu?.available ? (
         <>
           <div style={{ marginTop: showSuspicion && suspicion ? 18 : 30, width: "100%" }}>
             <FieldLabel>PIN</FieldLabel>
@@ -505,19 +675,33 @@ export function UnlockFlow(props: UnlockFlowProps) {
           >
             Unlock
           </Button>
-          {qu?.available && (
-            <TextButton
-              height={40}
-              style={{ marginTop: 4 }}
-              onClick={() => {
-                setPinMode(true);
-                setErrorBanner(null);
-              }}
-              testId="unlock-use-pin"
-            >
-              Unlock with PIN instead
-            </TextButton>
-          )}
+          {qu?.available &&
+            (qu.method === "biometric" ? (
+              <TextButton
+                height={40}
+                style={{ marginTop: 4 }}
+                onClick={() => {
+                  setBioMode(true);
+                  setBioFailed(false);
+                  setErrorBanner(null);
+                }}
+                testId="unlock-use-biometric"
+              >
+                Use {biometric} instead
+              </TextButton>
+            ) : (
+              <TextButton
+                height={40}
+                style={{ marginTop: 4 }}
+                onClick={() => {
+                  setPinMode(true);
+                  setErrorBanner(null);
+                }}
+                testId="unlock-use-pin"
+              >
+                Unlock with PIN instead
+              </TextButton>
+            ))}
         </>
       )}
 

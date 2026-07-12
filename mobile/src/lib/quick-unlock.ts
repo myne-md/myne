@@ -1,8 +1,8 @@
 // Tauri IPC wrappers for the `quick-unlock` plugin (MYND-329).
 //
-// Quick-unlock lets a re-lock be reversed with a PIN or Touch ID instead
-// of the full master password. The backend stores a third wrapped copy of
-// `root_key` in a device-local `vault.quickunlock` blob; these wrappers are
+// Quick-unlock lets a re-lock be reversed with a PIN or Face ID / Touch ID
+// instead of the full master password. The backend stores a third wrapped copy
+// of `root_key` in a device-local `vault.quickunlock` blob; these wrappers are
 // the thin TS surface over the plugin's six commands. PIN material crosses
 // IPC as a plain string (best-effort JS-side lifetime; the load-bearing
 // zeroize is the Rust-side first-line `Zeroizing<String>` wrap, same posture
@@ -11,9 +11,11 @@
 // Capability ACL `quick-unlock:default` is already in
 // `src-tauri/capabilities/default.json`.
 //
-// ⚠️ The biometric (Touch ID) path is HARDWARE-UNVERIFIED pending a Touch ID
-// device + a primitive review (see `src-tauri/.../quick_unlock/macos.rs`).
-// The UI must not present it as a trusted gate until that verification passes.
+// ⚠️ The biometric (Face ID / Touch ID) path is HARDWARE-UNVERIFIED pending a
+// biometric device test + a primitive review (see the shared provider,
+// `core/src/plugins/quick_unlock/apple.rs` in the main repo, and the
+// threat-model entry `design-notes.md` 2026-07-12). The UI must not present
+// it as a trusted gate until that verification passes.
 
 import { invoke } from "@tauri-apps/api/core";
 
@@ -64,12 +66,16 @@ export function quickUnlockWithPin(pin: string, vaultId?: string): Promise<void>
   return invoke("plugin:quick-unlock|quick_unlock_with_pin", { pin, vaultId });
 }
 
-/** Configure macOS Touch ID quick-unlock. `HardwareUnavailable` off macOS. */
+/** Configure Face ID / Touch ID quick-unlock (Apple-Keychain provider).
+ *  `HardwareUnavailable` off Apple targets (Android, until a Keystore
+ *  provider lands). Setup writes the biometry-gated Keychain item only —
+ *  the OS prompt fires on redeem, not here. */
 export function quickUnlockSetupBiometric(): Promise<void> {
   return invoke("plugin:quick-unlock|quick_unlock_setup_biometric");
 }
 
-/** Attempt a macOS Touch ID quick-unlock. `vaultId` — see {@link quickUnlockStatus}. */
+/** Attempt a Face ID / Touch ID quick-unlock (fires the OS biometric prompt).
+ *  `vaultId` — see {@link quickUnlockStatus}. */
 export function quickUnlockWithBiometric(vaultId?: string): Promise<void> {
   return invoke("plugin:quick-unlock|quick_unlock_with_biometric", { vaultId });
 }

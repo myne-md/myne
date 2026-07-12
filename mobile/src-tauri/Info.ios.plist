@@ -13,10 +13,19 @@
   permission is asked (reaching a self-hosted sync server on the local network),
   consistent with the no-telemetry / no-analytics posture. Myne opens NO other
   local-network sockets and declares no Bonjour service.
+
+  NSFaceIDUsageDescription: required by the biometric quick-unlock provider
+  (MYND-329; main repo design-notes.md 2026-07-12) — without it iOS denies
+  the Face ID evaluation behind the gated Keychain read
+  (kSecAccessControlBiometryCurrentSet) and the feature silently fails. The
+  string is honest: Face ID only gates the device-local re-unlock key; it never
+  replaces the master password and nothing biometric leaves the device.
 -->
 <plist version="1.0">
 <dict>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Myne connects to a Myne sync server on your local network only if you set one up. It never scans your network or sends any data anywhere else.</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>Myne uses Face ID to unlock this vault again quickly after it auto-locks. Your master password is still required after a restart.</string>
 </dict>
 </plist>

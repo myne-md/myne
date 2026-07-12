@@ -6,7 +6,14 @@ import type { ThemeName } from "../../platform/PlatformContext";
 import { HAS_TAURI } from "../../lib/app-window";
 import { changePassword } from "../../lib/vault-change-password";
 import { deleteVault } from "../../lib/vault-delete";
-import { quickUnlockStatus, quickUnlockSetupPin, quickUnlockDisable, type QuickUnlockStatus } from "../../lib/quick-unlock";
+import {
+  quickUnlockStatus,
+  quickUnlockSetupPin,
+  quickUnlockSetupBiometric,
+  quickUnlockDisable,
+  type QuickUnlockStatus,
+} from "../../lib/quick-unlock";
+import { usePlatform } from "../../platform/PlatformContext";
 import { vaultExportMarkdown, defaultExportDestination } from "../../lib/export";
 import { useSyncStatus, type SyncStatus } from "../../lib/use-sync-status";
 import { ioBanner } from "../../lib/io-banner";
@@ -117,14 +124,17 @@ function Row({
   children,
   first = false,
   onClick,
+  testId,
 }: {
   children: ReactNode;
   first?: boolean;
   onClick?: () => void;
+  testId?: string;
 }) {
   return (
     <div
       onClick={onClick}
+      data-testid={testId}
       style={{
         display: "flex",
         alignItems: "center",
@@ -242,15 +252,18 @@ function ToggleRow({
   on,
   onToggle,
   first = false,
+  testId,
 }: {
   title: string;
   subtitle?: string;
   on: boolean;
   onToggle: () => void;
   first?: boolean;
+  testId?: string;
 }) {
   return (
     <div
+      data-testid={testId}
       style={{
         display: "flex",
         alignItems: "center",
@@ -471,6 +484,7 @@ function strengthLevel(len: number): "Weak" | "Fair" | "Good" | "Strong" {
 }
 
 export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }: SettingsSheetProps) {
+  const { biometric, isAndroid } = usePlatform();
   const [panel, setPanel] = useState<Panel>("root");
   const [choice, setChoice] = useState<ThemeChoice>(() => readStoredChoice());
   const [toast, setToast] = useState<string | null>(null);
@@ -489,13 +503,14 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
 
-  // Quick-unlock (PIN) state. `quStatus` reflects disk truth for the active
-  // vault; the PIN fields are local secrets wiped on every exit path.
+  // Quick-unlock (PIN + biometric) state. `quStatus` reflects disk truth for
+  // the active vault; the PIN fields are local secrets wiped on every exit path.
   const [quStatus, setQuStatus] = useState<QuickUnlockStatus | null>(null);
   const [pin, setPin] = useState("");
   const [pinConfirm, setPinConfirm] = useState("");
   const [pinError, setPinError] = useState<string | null>(null);
   const [pinBusy, setPinBusy] = useState(false);
+  const [bioBusy, setBioBusy] = useState(false);
 
   // Vault → Markdown export (writes a plaintext tree to the app Documents dir).
   const [exporting, setExporting] = useState(false);
@@ -700,7 +715,7 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
     }
   }
 
-  async function disablePin() {
+  async function disableQuickUnlock() {
     setPinBusy(true);
     try {
       if (HAS_TAURI) await quickUnlockDisable();
@@ -711,6 +726,46 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
       setToast("Couldn't turn off quick unlock");
     } finally {
       setPinBusy(false);
+    }
+  }
+
+  /** Enable Face ID / Touch ID quick-unlock (replaces a PIN credential — the
+   *  device-local blob holds ONE method at a time). Setup only writes the
+   *  biometry-gated Keychain item; the OS prompt fires on redeem, not here. */
+  async function enableBiometric() {
+    if (bioBusy) return;
+    setPinError(null);
+    setBioBusy(true);
+    try {
+      if (HAS_TAURI) await quickUnlockSetupBiometric();
+      refreshQuStatus();
+      setToast(`${biometric} quick unlock is on`);
+    } catch (e) {
+      const kind = (e as { kind?: string })?.kind;
+      setPinError(
+        kind === "HardwareUnavailable"
+          ? `${biometric} isn't available on this device.`
+          : "Couldn't set up quick unlock.",
+      );
+    } finally {
+      setBioBusy(false);
+    }
+  }
+
+  /** Turn the biometric toggle off in place (stay on the panel — unlike the
+   *  PIN "Turn off" button, a toggle flip shouldn't navigate away). */
+  async function disableBiometric() {
+    if (bioBusy) return;
+    setPinError(null);
+    setBioBusy(true);
+    try {
+      if (HAS_TAURI) await quickUnlockDisable();
+      refreshQuStatus();
+      setToast("Quick unlock turned off");
+    } catch {
+      setToast("Couldn't turn off quick unlock");
+    } finally {
+      setBioBusy(false);
     }
   }
 
@@ -1048,16 +1103,16 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
               onPick={(v) => writePref("auto_lock_seconds", v, () => setAutoLockTimeout(v))}
             />
             <Group>
-              <Row first onClick={() => setPanel("quick-unlock")}>
+              <Row first onClick={() => setPanel("quick-unlock")} testId="settings.quick-unlock-row">
                 <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                   <span style={rowLabel}>Quick unlock</span>
                   <span style={{ fontSize: 13, color: "var(--fg-3)" }}>
-                    Re-enter with a PIN after auto-lock
+                    {isAndroid ? "Re-enter with a PIN after auto-lock" : `Re-enter with ${biometric} or a PIN after auto-lock`}
                   </span>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <span style={{ fontSize: 15, color: "var(--fg-3)" }}>
-                    {quStatus?.configured && quStatus.method === "pin" ? "PIN" : "Off"}
+                  <span style={{ fontSize: 15, color: "var(--fg-3)" }} data-testid="settings.quick-unlock-value">
+                    {quStatus?.configured ? (quStatus.method === "pin" ? "PIN" : biometric) : "Off"}
                   </span>
                   <RowChevron />
                 </div>
@@ -1138,27 +1193,58 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
                 {pinError}
               </Banner>
             )}
+            <div
+              style={{
+                marginTop: 4,
+                background: "var(--warning-soft)",
+                border: "1px solid color-mix(in srgb, var(--warning) 28%, transparent)",
+                borderRadius: 8,
+                padding: "11px 13px",
+                fontSize: 13,
+                lineHeight: 1.5,
+                color: "var(--warning)",
+              }}
+            >
+              A convenience gate only. Your password is still required after a restart.
+            </div>
+            {!isAndroid && (
+              <div style={{ marginTop: 12 }}>
+                <Group>
+                  <ToggleRow
+                    first
+                    title={biometric}
+                    subtitle={`Unlock with ${biometric} after auto-lock`}
+                    on={quStatus?.method === "biometric"}
+                    onToggle={() =>
+                      void (quStatus?.method === "biometric" ? disableBiometric() : enableBiometric())
+                    }
+                    testId="settings.quick-unlock-biometric-toggle"
+                  />
+                </Group>
+              </div>
+            )}
             {quStatus?.configured && quStatus.method === "pin" ? (
               <>
-                <div style={{ marginTop: 6, fontSize: 15, lineHeight: 1.55, color: "var(--fg-2)" }}>
+                <div style={{ marginTop: 14, fontSize: 15, lineHeight: 1.55, color: "var(--fg-2)" }}>
                   PIN quick unlock is <strong style={{ color: "var(--fg-1)" }}>on</strong>. After the vault
                   auto-locks you can re-enter with your PIN instead of the full password — this app session
                   only. A cold start always requires the full password.
                 </div>
                 <div style={{ marginTop: 18 }}>
-                  <Button variant="danger" onClick={disablePin} disabled={pinBusy}>
+                  <Button variant="danger" onClick={disableQuickUnlock} disabled={pinBusy}>
                     Turn off PIN
                   </Button>
                 </div>
               </>
             ) : (
               <>
-                <div style={{ marginTop: 4, fontSize: 13, lineHeight: 1.5, color: "var(--fg-3)" }}>
+                <div style={{ marginTop: 14, fontSize: 13, lineHeight: 1.5, color: "var(--fg-3)" }}>
                   Set a 6+ digit PIN to re-unlock quickly after auto-lock. The PIN wraps a device-local key —
                   it never leaves this device and never touches your recovery phrase.
+                  {quStatus?.method === "biometric" && ` Setting a PIN replaces ${biometric} unlock.`}
                 </div>
                 <FieldLabel mt={14}>PIN</FieldLabel>
-                <SheetInput type="password" inputMode="numeric" value={pin} onChange={setPin} autoFocus placeholder="At least 6 digits" />
+                <SheetInput type="password" inputMode="numeric" value={pin} onChange={setPin} placeholder="At least 6 digits" />
                 <FieldLabel mt={12}>Confirm PIN</FieldLabel>
                 <SheetInput type="password" inputMode="numeric" value={pinConfirm} onChange={setPinConfirm} placeholder="Re-enter PIN" />
                 <div style={{ marginTop: 18 }}>

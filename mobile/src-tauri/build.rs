@@ -67,11 +67,17 @@ fn main() {
                 ]),
             )
             .plugin(
-                // PIN path only — biometric commands are desktop-only.
+                // PIN + Apple biometric (iOS Face ID / Touch ID; the biometric
+                // pair returns HardwareUnavailable on Android until a Keystore
+                // provider lands). Adding a command here without a matching
+                // entry in `permissions/quick-unlock/default.toml` is a
+                // security bug.
                 "quick-unlock",
                 tauri_build::InlinedPlugin::new().commands(&[
                     "quick_unlock_setup_pin",
                     "quick_unlock_with_pin",
+                    "quick_unlock_setup_biometric",
+                    "quick_unlock_with_biometric",
                     "quick_unlock_status",
                     "quick_unlock_disable",
                 ]),
