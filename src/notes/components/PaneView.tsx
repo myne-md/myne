@@ -18,8 +18,9 @@ import {
   type DragEvent as ReactDragEvent,
 } from "react";
 import { useTranslation } from "react-i18next";
-import { CMEditor, type ScrollAnchorRequest } from "../../editor/CMEditor";
+import { CMEditor, type ScrollAnchorRequest, type CMEditorProps } from "../../editor/CMEditor";
 import { asViewMode, type ViewMode } from "../../editor/view-mode";
+import { headingSections } from "../../dialect";
 
 /** Stable no-op onChange for the read-only preview companion (MYND-299) — a fresh
  *  arrow each render would rebuild nothing here, but a module const keeps it tidy. */
@@ -27,6 +28,7 @@ const NOOP_ON_CHANGE = (_next: string): void => {};
 import { hasAnchor, type WikilinkAnchor } from "../../editor/wikilink/anchor";
 import { noteRead } from "../readNote";
 import { peekRevealHeading, useRevealHeadingNonce } from "../views/revealHeadingSignal";
+import { setActiveHeading } from "../views/activeHeadingSignal";
 import { createNote } from "../createNote";
 import { useSelectedNote, type NoteId } from "../sidebarState";
 import { useResolverNotes } from "../resolverNotes";
@@ -126,6 +128,15 @@ function zoneHighlightStyle(zone: DropZone): CSSProperties {
       return { inset: 0 };
   }
 }
+
+/** The live `EditorView | null` the primary editor hands back via `onReady`,
+ *  typed off `CMEditorProps` so no direct `@codemirror/view` import is needed. */
+type OutlineTrackView = Parameters<NonNullable<CMEditorProps["onReady"]>>[0];
+
+/** A heading counts as the current one once its block reaches within this many
+ *  px of the viewport top (outline-scroll-tracking) — a small lead so the
+ *  highlight flips as the heading arrives at the top rather than after. */
+const OUTLINE_ACTIVE_OFFSET_PX = 8;
 
 type PaneViewProps = {
   leaf: LeafPane;
@@ -252,6 +263,100 @@ export function PaneView({
 
   const [content, setContent] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
+
+  // --- Live outline scroll tracking (outline-scroll-tracking) ------------------
+  // The focused pane publishes its topmost visible heading to the panel-level
+  // Outline tab (a separate render subtree) through the `activeHeadingSignal`
+  // store, so the tab can highlight the current section and keep it in view.
+  // Heading positions come from the SAME `headingSections` parser the tab uses,
+  // so the `from` offsets join exactly once the buffer matches disk.
+  const headingFroms = useMemo(() => headingSections(content).map((h) => h.from), [content]);
+  const headingFromsRef = useRef<number[]>(headingFroms);
+  const outlineViewRef = useRef<OutlineTrackView>(null);
+  const outlineScrollerRef = useRef<HTMLDivElement | null>(null);
+  const activeIdRef = useRef(activeId);
+  const focusedRef = useRef(focused);
+  useEffect(() => {
+    activeIdRef.current = activeId;
+  }, [activeId]);
+  useEffect(() => {
+    focusedRef.current = focused;
+  }, [focused]);
+
+  // Resolve the heading currently at the top of the viewport: the last heading
+  // whose block sits at or above the viewport top. The editor GROWS to fit its
+  // content inside an OUTER scroller (`view.scrollDOM` / `.cm-scroller` does not
+  // scroll here), so measure in window coords — the content-top rect plus each
+  // heading's always-available height-map offset — against the scroller's top.
+  // Only the focused pane publishes, so the outline follows the note in view.
+  const recomputeActiveHeading = useCallback(() => {
+    const view = outlineViewRef.current;
+    const scroller = outlineScrollerRef.current;
+    if (view === null || scroller === null || !focusedRef.current) return;
+    const noteId = activeIdRef.current;
+    if (noteId === null) return;
+    const froms = headingFromsRef.current;
+    if (froms.length === 0) {
+      setActiveHeading(null);
+      return;
+    }
+    const contentTop = view.contentDOM.getBoundingClientRect().top;
+    const cutoff = scroller.getBoundingClientRect().top + OUTLINE_ACTIVE_OFFSET_PX;
+    const docLen = view.state.doc.length;
+    let activeFrom = froms[0]!; // default: above the first heading ⇒ first section
+    for (const from of froms) {
+      let blockTop: number;
+      try {
+        blockTop = view.lineBlockAt(Math.min(from, docLen)).top;
+      } catch {
+        continue;
+      }
+      if (contentTop + blockTop <= cutoff) activeFrom = from;
+      else break;
+    }
+    setActiveHeading({ noteId, from: activeFrom });
+  }, []);
+
+  // Recompute when the heading set changes (edit / note switch) or this pane
+  // gains focus, so the highlight tracks without waiting for the next scroll.
+  useEffect(() => {
+    headingFromsRef.current = headingFroms;
+    recomputeActiveHeading();
+  }, [headingFroms, recomputeActiveHeading]);
+  useEffect(() => {
+    if (focused) recomputeActiveHeading();
+  }, [focused, recomputeActiveHeading]);
+
+  // Watch the pane's real scroll container with a rAF-throttled listener. Stable
+  // across note switches — the view handle is read live via the ref, so a
+  // not-yet-ready view simply no-ops until `onReady` fires.
+  useEffect(() => {
+    const scroller = outlineScrollerRef.current;
+    if (scroller === null) return;
+    let raf = 0;
+    const onScroll = () => {
+      if (raf !== 0) return;
+      raf = requestAnimationFrame(() => {
+        raf = 0;
+        recomputeActiveHeading();
+      });
+    };
+    scroller.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      if (raf !== 0) cancelAnimationFrame(raf);
+      scroller.removeEventListener("scroll", onScroll);
+    };
+  }, [recomputeActiveHeading]);
+
+  // The primary editor hands back its live view on mount (and null on unmount);
+  // capture it and take an initial reading.
+  const handleEditorReady = useCallback(
+    (view: OutlineTrackView) => {
+      outlineViewRef.current = view;
+      if (view !== null) recomputeActiveHeading();
+    },
+    [recomputeActiveHeading],
+  );
 
   // Load the active note's body on change. Race-protected: a fetch that
   // resolves after a newer activation is dropped via `cancelled`.
@@ -546,6 +651,9 @@ export function PaneView({
             vaultHeadings={vaultHeadings}
             onOpenWikilink={handleOpenWikilink}
             scrollAnchor={activeScrollAnchor}
+            // outline-scroll-tracking: hand the live view to the pane so it can
+            // watch the scroller and report the top heading to the Outline tab.
+            onReady={handleEditorReady}
             // writing-assistant task 6: surface the AI slash commands only in the
             // editable editor, gated on ai_enabled + the excluded-folder check
             // (SYNC-14). The reading-view instance below leaves it default-false.
@@ -603,6 +711,7 @@ export function PaneView({
     vaultHeadings,
     handleOpenWikilink,
     activeScrollAnchor,
+    handleEditorReady,
   ]);
 
   return (
@@ -688,6 +797,7 @@ export function PaneView({
         insetRight={insetRight}
       />
       <div
+        ref={outlineScrollerRef}
         style={{
           flex: 1,
           minHeight: 0,
