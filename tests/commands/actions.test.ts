@@ -75,6 +75,7 @@ describe("Command palette action registry", () => {
       "note.export-html",
       "note.export-markdown",
       "note.export-pdf",
+      "note.export-selection-image",
       "note.export-txt",
       "notes.random",
       "snapshots.open",

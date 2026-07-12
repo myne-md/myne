@@ -14,6 +14,8 @@ import type { CommandAction } from "./registry";
 import { runWikilinkConvert } from "../editor/wikilink/convert-command";
 import { foldAll, unfoldAll } from "@codemirror/language";
 import { getActiveEditorView } from "../editor/active-view";
+import { exportSelectionAsImage } from "../lib/noteImageExport";
+import { showAttachmentToast } from "../editor/attachments/toast";
 import i18n from "../i18n";
 
 const lockVaultAction: CommandAction = {
@@ -197,6 +199,38 @@ const convertWikilinksAction: CommandAction = {
     ctx.stageName === "editor" && ctx.selectedNoteId !== null ? "show" : "hidden",
   run: () => {
     void runWikilinkConvert();
+  },
+};
+
+const exportSelectionImageAction: CommandAction = {
+  id: "note.export-selection-image",
+  get label() {
+    return i18n.t("commands.actions.exportSelectionImage.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.editor");
+  },
+  // MYND-361 note→image: rasterize the current editor selection to a shareable
+  // PNG "card" and save it. Editor-only + per-note; the empty-selection case
+  // toasts (never a modal), the same self-contained-feedback discipline as the
+  // wikilink-convert action above. Uses the module-level toast so no
+  // CommandContext callback / Editor plumbing is needed.
+  visibility: (ctx) =>
+    ctx.stageName === "editor" && ctx.selectedNoteId !== null ? "show" : "hidden",
+  run: () => {
+    void exportSelectionAsImage().then((outcome) => {
+      // `cancelled` (user dismissed the save dialog) is silent; every other
+      // outcome gets a coarse toast.
+      const key =
+        outcome === "ok"
+          ? "commands.actions.exportSelectionImage.saved"
+          : outcome === "no-selection"
+            ? "commands.actions.exportSelectionImage.noSelection"
+            : outcome === "error"
+              ? "commands.actions.exportSelectionImage.failed"
+              : null;
+      if (key !== null) showAttachmentToast(i18n.t(key));
+    });
   },
 };
 
@@ -690,6 +724,7 @@ export const COMMAND_ACTIONS: readonly CommandAction[] = Object.freeze([
   backupVaultAction,
   exportVaultMarkdownAction,
   convertWikilinksAction,
+  exportSelectionImageAction,
   aiOpenChatAction,
   aiSummarizeNoteAction,
   aiSuggestTagsAction,
