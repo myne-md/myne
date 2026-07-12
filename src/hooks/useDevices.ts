@@ -32,8 +32,10 @@ export interface DevicesHook {
   busy: boolean;
   /** Re-read the roster. */
   refresh: () => Promise<void>;
-  /** Approve a pending device. */
-  approve: (deviceIdHex: string) => Promise<void>;
+  /** Approve a pending device. Resolves `true` on success, `false` if the
+   *  backend call failed (the error is surfaced via `error`); callers that gate
+   *  a follow-up step on approval — e.g. the SAS verify screen — must check it. */
+  approve: (deviceIdHex: string) => Promise<boolean>;
   /** Remove (revoke) a device. */
   remove: (deviceIdHex: string) => Promise<void>;
   /** Reset THIS device's local sync enrollment — clear its stale per-device token +
@@ -92,14 +94,16 @@ export function useDevices(): DevicesHook {
   }, [load]);
 
   const approve = useCallback(
-    async (deviceIdHex: string) => {
+    async (deviceIdHex: string): Promise<boolean> => {
       setBusy(true);
       try {
         await invoke("plugin:sync|sync_approve_device", { deviceIdHex });
         await refresh();
+        return true;
       } catch (e) {
         setError(errKind(e));
         setBusy(false);
+        return false;
       }
     },
     [refresh],

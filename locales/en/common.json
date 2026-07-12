@@ -1905,6 +1905,12 @@
       "thisDevice": "This device",
       "transportHint": "If the server moved or its certificate changed, re-enter the server URL under “Sync server” above to re-trust it.",
       "unreachable": "Couldn’t reach sync ({{error}}).",
+      "verifyBody": "Check that the same code appears on the device you just approved. If it matches, they’re on your account. If it doesn’t, remove the device.",
+      "verifyMatch": "They match",
+      "verifyMismatch": "They don’t match",
+      "verifyPending": "This code appears once the new device finishes its first sync.",
+      "verifySyncing": "Syncing…",
+      "verifyTitle": "Verify the new device",
       "yourDevices": "Your devices"
     },
     "endpoint": {
@@ -1913,6 +1919,8 @@
       "connectedTls": "Connected. Check that this fingerprint matches on your other device.",
       "connecting": "Connecting…",
       "fingerprintLabel": "Server certificate fingerprint:",
+      "pinStatic": "Verified against Myne’s built-in certificate.",
+      "pinTofu": "Pinned on first connect. Compare this fingerprint across your devices.",
       "placeholder": "https://your-server.example   ·   http://127.0.0.1:8080",
       "unreachable": "Couldn’t reach that server — check the URL and that it’s running."
     },
@@ -1939,14 +1947,23 @@
     "join": {
       "accountLabel": "Account number",
       "cancel": "Cancel",
+      "continue": "Continue",
       "error": "Couldn’t add this device. Check the server URL, account number, and password — and that the server is reachable.",
       "help": "Sign in with your account number and password. This device will sync your notes once an existing device approves it. No recovery phrase needed.",
       "passwordLabel": "Password",
+      "pinnedCompare": "This device pinned your server’s certificate. Check that this fingerprint matches on your other devices.",
+      "pinnedTitle": "Server certificate pinned",
       "serverLabel": "Sync server",
       "serverPlaceholder": "https://your-server.example",
+      "sasMatch": "They match — continue",
+      "sasMismatch": "They don’t match — remove this device",
       "submit": "Add device",
       "submitting": "Adding…",
-      "title": "Add this device to an account"
+      "title": "Add this device to an account",
+      "verifyBody": "Check that this code matches the one on the device you approved from.",
+      "verifyTitle": "Verify this device",
+      "waitingHint": "Keep this window open — once approved, a verification code appears here to compare with your other device.",
+      "waitingTitle": "Waiting for approval"
     },
     "panel": {
       "addDevice": {

@@ -2,19 +2,18 @@
 // A single host placed once in the editor chrome, above the three-pane row.
 // Two honest, non-blocking, dismissable signals (PRODUCT.md tone):
 //
-//  - ReconcileBanner: lit while the engine reports an active sync — a background
-//    full-reconcile (410 cursor-expired / soft-retire) shows the reassuring
-//    "catching up" notice. Driven by the real `sync_status` poll via
-//    `useSyncStatus`, so it stays silent while sync is off (the common case).
+//  - ReconcileBanner: shown when the engine performs a background full-reconcile
+//    (410 cursor-expired / soft-retire) — the reassuring "catching up" notice.
+//    Driven by the DISTINCT `sync://reconcile-started`/`-finished` events
+//    (MYND-461), NOT the coarse `syncing` state, so it shows only during an
+//    actual reconcile — not on every ordinary sync tick — and stays silent while
+//    sync is off (the common case).
 //  - IntegrityAlertBanner: lit when the engine's head-verify rejects a rollback
-//    / non-extending head (a possible-tamper alert). The MYND-424 engine loop
-//    emits `sync://integrity-alert` when that happens; this subscribes to it.
-//    Until the loop lands (R3) the seam stays dormant — the same event-driven
-//    pattern as the `vault-lock-imminent` listener in Editor.tsx.
+//    / non-extending head (a possible-tamper alert). `run_active_cycle` emits
+//    `sync://integrity-alert` when that happens (MYND-461); this subscribes to it.
 
 import { useEffect, useState, type CSSProperties } from "react";
 import { listen } from "@tauri-apps/api/event";
-import { useSyncStatus } from "../../hooks/useSyncStatus";
 import { ReconcileBanner } from "./ReconcileBanner";
 import { IntegrityAlertBanner } from "./IntegrityAlertBanner";
 
@@ -26,41 +25,41 @@ const STACK_STYLE: CSSProperties = {
 };
 
 export function SyncBanners() {
-  const { status } = useSyncStatus();
+  const [reconcileActive, setReconcileActive] = useState(false);
   const [reconcileDismissed, setReconcileDismissed] = useState(false);
   const [integrity, setIntegrity] = useState(false);
 
-  const syncing = status?.state === "syncing";
-
-  // Re-arm the reconcile banner for each new sync episode (a fresh "catching
-  // up" notice once the next reconcile starts).
+  // Event-driven producers (MYND-461). A reconcile occurred → show the reassuring
+  // banner, re-armed, until the user dismisses it. A head-verify rejection → the
+  // integrity alert. No-op outside Tauri (browser dev shim).
   useEffect(() => {
-    if (!syncing) setReconcileDismissed(false);
-  }, [syncing]);
-
-  // Producer: the MYND-424 engine loop emits `sync://integrity-alert` on a
-  // head-verify rejection. Dormant until that lands (R3); no-op outside Tauri.
-  useEffect(() => {
-    let unlisten: (() => void) | undefined;
     let cancelled = false;
-    void (async () => {
+    const unlisteners: Array<() => void> = [];
+    const sub = async (ev: string, fn: () => void) => {
       try {
-        const handle = await listen("sync://integrity-alert", () => {
-          if (!cancelled) setIntegrity(true);
+        const handle = await listen(ev, () => {
+          if (!cancelled) fn();
         });
         if (cancelled) handle();
-        else unlisten = handle;
+        else unlisteners.push(handle);
       } catch {
-        // Not inside Tauri (browser dev shim) → no integrity channel.
+        // Not inside Tauri → no event channel.
       }
-    })();
+    };
+    const armReconcile = () => {
+      setReconcileActive(true);
+      setReconcileDismissed(false);
+    };
+    void sub("sync://reconcile-started", armReconcile);
+    void sub("sync://reconcile-finished", armReconcile);
+    void sub("sync://integrity-alert", () => setIntegrity(true));
     return () => {
       cancelled = true;
-      if (unlisten) unlisten();
+      for (const fn of unlisteners) fn();
     };
   }, []);
 
-  const showReconcile = syncing && !reconcileDismissed;
+  const showReconcile = reconcileActive && !reconcileDismissed;
   if (!showReconcile && !integrity) return null;
 
   return (

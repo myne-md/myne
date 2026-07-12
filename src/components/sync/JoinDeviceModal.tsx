@@ -5,13 +5,14 @@
 // On success the caller routes to the editor; sync starts once approved.
 // Built against design tokens; Penpot skipped per the owner directive.
 
-import { useId, useState, type CSSProperties } from "react";
+import { useEffect, useId, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import { invoke } from "@tauri-apps/api/core";
 import { Input } from "../primitives/Input";
 import { PasswordInput } from "../PasswordInput";
 import { DestructiveBanner } from "../DestructiveBanner";
 import { formatAccountNumberInput } from "../../lib/account-number-format";
+import { ENROLL_PENDING_NOTICE } from "../../lib/load-bearing-copy";
 
 interface JoinResult {
   vault_id: string;
@@ -102,6 +103,14 @@ export function JoinDeviceModal({ onCancel, onJoined }: JoinDeviceModalProps) {
   const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Post-join step machine: "pinned" surfaces the TOFU cert fingerprint (SYNC-43),
+  // "pending" waits for an existing device to approve, "verify" is the mandatory
+  // head-fingerprint SAS eye-compare (SYNC-40) before routing into the editor.
+  const [step, setStep] = useState<"form" | "pinned" | "pending" | "verify">("form");
+  const [joinedVaultId, setJoinedVaultId] = useState<string | null>(null);
+  const [certFingerprint, setCertFingerprint] = useState<string | null>(null);
+  const [headFingerprint, setHeadFingerprint] = useState<string | null>(null);
+  const [aborting, setAborting] = useState(false);
 
   const canSubmit =
     url.trim().length > 0 &&
@@ -118,10 +127,160 @@ export function JoinDeviceModal({ onCancel, onJoined }: JoinDeviceModalProps) {
       accountNumber: account.trim(),
       password,
     })
-      .then((res) => onJoined(res.vault_id))
+      .then((res) => {
+        if (!res.pending) {
+          // Bootstrap/recovery self-approve (first device) — nothing to
+          // eye-compare against, so route straight in.
+          onJoined(res.vault_id);
+          return;
+        }
+        setJoinedVaultId(res.vault_id);
+        // Show the pinned cert fingerprint first (SYNC-43) when there is one (a
+        // loopback http join has no TLS); either way we then wait for approval +
+        // the head-fingerprint verify.
+        if (res.fingerprint) {
+          setCertFingerprint(res.fingerprint);
+          setStep("pinned");
+        } else {
+          setStep("pending");
+        }
+      })
       .catch(() => setError(t("sync.join.error")))
       .finally(() => setBusy(false));
   };
+
+  // While PENDING, drive the claim + watch for the adopted-head fingerprint. The
+  // foreground loop claims the token + pulls once an existing device approves;
+  // `sync_head_fingerprint` returns non-null only after that first sync. Poll it
+  // (+ nudge sync_now) → then advance to the mandatory verify step (SYNC-40).
+  useEffect(() => {
+    if (step !== "pending") return;
+    let cancelled = false;
+    const tick = async () => {
+      try {
+        await invoke("plugin:sync|sync_now");
+        const fp = await invoke<string | null>("plugin:sync|sync_head_fingerprint");
+        if (!cancelled && fp) {
+          setHeadFingerprint(fp);
+          setStep("verify");
+        }
+      } catch {
+        /* transient — retry next tick */
+      }
+    };
+    void tick();
+    const id = setInterval(() => void tick(), 3000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [step]);
+
+  // SAS mismatch → ABORT: un-enroll this device so it stops trusting the
+  // (possibly forked) synced data, then close.
+  const onMismatch = () => {
+    setAborting(true);
+    void invoke("plugin:sync|sync_reset_local")
+      .catch(() => {})
+      .finally(() => onCancel());
+  };
+
+  // Post-join: the fresh device pinned the server's cert (TOFU) — surface the
+  // fingerprint for out-of-band cross-device eye-compare, then wait for approval.
+  if (step === "pinned" && certFingerprint) {
+    return (
+      <div role="dialog" aria-modal="true" style={BACKDROP} data-testid="join.pinned">
+        <div style={CARD}>
+          <h2 style={TITLE}>{t("sync.join.pinnedTitle")}</h2>
+          <p style={HELP}>{t("sync.join.pinnedCompare")}</p>
+          <p style={HELP}>
+            <span
+              style={{ fontFamily: "var(--font-mono)", wordBreak: "break-all" }}
+              data-testid="join.cert-fingerprint"
+            >
+              {certFingerprint}
+            </span>
+          </p>
+          <div style={ROW}>
+            <button
+              type="button"
+              onClick={() => setStep("pending")}
+              style={btn(true, false)}
+              data-testid="join.continue"
+            >
+              {t("sync.join.continue")}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Waiting for an existing device to approve — auto-polls, then advances to verify.
+  if (step === "pending") {
+    return (
+      <div role="dialog" aria-modal="true" style={BACKDROP} data-testid="join.pending">
+        <div style={CARD}>
+          <h2 style={TITLE}>{t("sync.join.waitingTitle")}</h2>
+          <p style={HELP}>{ENROLL_PENDING_NOTICE}</p>
+          <p style={HELP}>{t("sync.join.waitingHint")}</p>
+          <div style={ROW}>
+            <button type="button" onClick={onCancel} style={btn(false, false)} data-testid="join.cancel">
+              {t("sync.join.cancel")}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Mandatory head-fingerprint SAS eye-compare (SYNC-40).
+  if (step === "verify") {
+    return (
+      <div role="dialog" aria-modal="true" style={BACKDROP} data-testid="join.verify">
+        <div style={CARD}>
+          <h2 style={TITLE}>{t("sync.join.verifyTitle")}</h2>
+          <p style={HELP}>{t("sync.join.verifyBody")}</p>
+          <div
+            style={{
+              fontFamily: "var(--font-mono)",
+              fontSize: "var(--text-2xl)",
+              fontWeight: 700,
+              letterSpacing: "0.16em",
+              textAlign: "center",
+              padding: "var(--space-4)",
+              background: "var(--bg-1)",
+              border: "1px solid var(--line-1)",
+              borderRadius: "var(--radius-1)",
+            }}
+            data-testid="join.sas-fingerprint"
+          >
+            {headFingerprint}
+          </div>
+          <div style={{ ...ROW, justifyContent: "space-between" }}>
+            <button
+              type="button"
+              onClick={onMismatch}
+              disabled={aborting}
+              style={{ ...btn(false, aborting), color: "var(--danger)" }}
+              data-testid="join.sas-mismatch"
+            >
+              {t("sync.join.sasMismatch")}
+            </button>
+            <button
+              type="button"
+              onClick={() => joinedVaultId && onJoined(joinedVaultId)}
+              disabled={aborting}
+              style={btn(true, aborting)}
+              data-testid="join.sas-match"
+            >
+              {t("sync.join.sasMatch")}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
