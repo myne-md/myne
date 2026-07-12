@@ -1,7 +1,8 @@
 // Attachments library sheet (mobile) — lists the vault catalog (MYC1) with a
 // decrypt thumbnail per row, and Insert / Rename / Delete actions. Reads through
 // the shared `myne-core` attachments plugin; images are served by the in-app
-// `attachment://` scheme (decrypt in RAM + re-sniff). No voice / text-extraction.
+// `attachment://` scheme (decrypt in RAM + re-sniff). Images/PDFs open the shared
+// lightbox on tap; voice notes get an inline play/pause tile (no text-extraction).
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Sheet, Banner, Spinner } from "../../components";
@@ -12,7 +13,11 @@ import { formatBytes } from "../../lib/util";
 import { showAttachmentLightbox } from "@myne/editor/attachments/lightbox";
 
 const isImage = (t: string) => t.startsWith("image/");
-/** Which preview the shared lightbox can show for a content-type (else null). */
+/** Voice notes / audio (stored as `audio/wav`): an inline play/pause tile in the
+ *  row rather than a lightbox — playback, not a focused visual preview. */
+const isAudio = (t: string) => t.startsWith("audio/");
+/** Which preview the shared lightbox can show for a content-type (else null).
+ *  Audio is deliberately excluded here — it is handled by {@link AudioTile}. */
 const previewKind = (t: string): "image" | "pdf" | null =>
   t === "application/pdf" ? "pdf" : t.startsWith("image/") ? "image" : null;
 /** Open the shared image/PDF lightbox (same preview as tapping an embed in a note). */
@@ -247,11 +252,13 @@ export function AttachmentsSheet({
           entries.map((e) => (
             <div key={e.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 4px", borderTop: "1px solid var(--line-1)" }}>
               <div
-                onClick={() => openPreview(e)}
+                onClick={isAudio(e.content_type) ? undefined : () => openPreview(e)}
                 style={{ width: 44, height: 44, borderRadius: 8, background: "var(--bg-2)", flexShrink: 0, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", cursor: previewKind(e.content_type) ? "pointer" : "default" }}
               >
                 {isImage(e.content_type) ? (
                   <img src={attachmentSrc(e.id)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                ) : isAudio(e.content_type) ? (
+                  <AudioTile id={e.id} filename={e.filename} />
                 ) : (
                   <svg width="20" height="20" viewBox="0 0 24 24">
                     <path d="M14 3v5h5M7 3h8l5 5v11a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z" fill="none" stroke="var(--fg-3)" strokeWidth="1.6" strokeLinejoin="round" />
@@ -323,6 +330,69 @@ export function AttachmentsSheet({
       {cleanupPanel}
       <div style={{ marginTop: 12, overflowY: "auto", flex: 1, minHeight: 0 }}>{listInner}</div>
     </Sheet>
+  );
+}
+
+/** Inline play/pause tile for a voice note / audio attachment — the row thumbnail
+ *  slot (44×44). Mirrors the desktop library's AudioThumbnail: a hidden `<audio>`
+ *  streams the decrypted bytes from the in-app `attachment://` scheme (allowed by
+ *  the CSP `media-src`), and playback is paused on unmount so the sound stops —
+ *  and the decoded buffer is released — when the row scrolls out or the tab
+ *  closes (playback-residue discipline). */
+function AudioTile({ id, filename }: { id: string; filename: string }) {
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [playing, setPlaying] = useState(false);
+
+  // Stop playback when the tile unmounts (row scrolled away / Files tab closed).
+  useEffect(() => {
+    const audio = audioRef.current;
+    return () => audio?.pause();
+  }, []);
+
+  const toggle = (ev: React.MouseEvent) => {
+    // Don't let the tap bubble to the row (openPreview / rename) or select text.
+    ev.preventDefault();
+    ev.stopPropagation();
+    const audio = audioRef.current;
+    if (audio === null) return;
+    if (audio.paused) {
+      void audio.play();
+      setPlaying(true);
+    } else {
+      audio.pause();
+      setPlaying(false);
+    }
+  };
+
+  return (
+    <>
+      <audio
+        ref={audioRef}
+        src={attachmentSrc(id)}
+        preload="none"
+        onEnded={() => setPlaying(false)}
+        style={{ display: "none" }}
+      />
+      <button
+        type="button"
+        onClick={toggle}
+        data-testid="files.audio-play"
+        data-attachment-id={id}
+        aria-label={`${playing ? "Pause" : "Play"} ${filename}`}
+        style={{ width: "100%", height: "100%", border: "none", background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", padding: 0, color: "var(--accent)" }}
+      >
+        {playing ? (
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <rect x="6" y="5" width="4" height="14" rx="1" />
+            <rect x="14" y="5" width="4" height="14" rx="1" />
+          </svg>
+        ) : (
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path d="M8 5v14l11-7z" />
+          </svg>
+        )}
+      </button>
+    </>
   );
 }
 
