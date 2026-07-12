@@ -106,6 +106,34 @@ function blockMarkerRegex(blockId: string): RegExp | null {
   return new RegExp(`(?:^|[ \\t])\\^${blockId}[ \\t]*$`, "m");
 }
 
+/** One imported `^block-id` marker: its id (no leading `^`) and the LINE START
+ *  offset of the block it tags. */
+export interface BlockAnchor {
+  blockId: string;
+  from: number;
+}
+
+/**
+ * Enumerate every imported `^block-id` marker in `body`, in document order
+ * (MYND-382 `[[^^` — the enumerate-only, no-minting reading of `wikilink.md §9`).
+ * Each entry carries the marker's id and the line-start offset of the tagged
+ * block (so a picker can preview + a click can scroll there). Reads only — Myne
+ * MINTS nothing; this only surfaces anchors that ALREADY exist (e.g. imported
+ * from Obsidian). The vault-wide index (MYI1) is built from this same scan.
+ */
+export function extractBlockAnchors(body: string): BlockAnchor[] {
+  // Same marker grammar as `findBlockOffset`, globalized: an end-of-line
+  // `^<id>` where id is `[A-Za-z0-9-]+`, at line start or after a space/tab.
+  const re = /(?:^|[ \t])\^([A-Za-z0-9-]+)[ \t]*$/gm;
+  const out: BlockAnchor[] = [];
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(body)) !== null) {
+    const lineStart = body.lastIndexOf("\n", match.index - 1) + 1;
+    out.push({ blockId: match[1]!, from: lineStart });
+  }
+  return out;
+}
+
 /**
  * The byte offset of an imported `^block-id` marker in `body`, or `null` when
  * absent (§5.6 step 2). Returns the offset of the line START carrying the

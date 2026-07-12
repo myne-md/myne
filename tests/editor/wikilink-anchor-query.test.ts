@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  extractBlockAnchors,
   findQueryRange,
   resolveAnchorOffset,
   resolveAnchorRange,
@@ -67,5 +68,32 @@ describe("resolveAnchorRange dispatch (SYNC-5)", () => {
   it("null anchor or no match → null", () => {
     expect(resolveAnchorRange(body, null)).toBeNull();
     expect(resolveAnchorRange(body, { query: "zzzznotpresent" })).toBeNull();
+  });
+});
+
+// MYND-382 [[^^ — enumerate imported ^block-id markers (no minting).
+describe("extractBlockAnchors", () => {
+  it("finds all end-of-line block markers with their line-start offsets", () => {
+    const body = "First block. ^abc123\n\nSecond para.\nAnother line ^def-456\n";
+    const anchors = extractBlockAnchors(body);
+    expect(anchors.map((a) => a.blockId)).toEqual(["abc123", "def-456"]);
+    // Each `from` is the START of the line carrying the marker.
+    expect(body.slice(anchors[0]!.from).startsWith("First block")).toBe(true);
+    expect(body.slice(anchors[1]!.from).startsWith("Another line")).toBe(true);
+  });
+
+  it("matches a marker at the very line start", () => {
+    const body = "^solo\n";
+    expect(extractBlockAnchors(body)).toEqual([{ blockId: "solo", from: 0 }]);
+  });
+
+  it("ignores mid-line carets and empty bodies", () => {
+    expect(extractBlockAnchors("a ^mid caret not at EOL\n")).toEqual([]);
+    expect(extractBlockAnchors("")).toEqual([]);
+  });
+
+  it("returns anchors in document order", () => {
+    const body = "l1 ^one\nl2 ^two\nl3 ^three\n";
+    expect(extractBlockAnchors(body).map((a) => a.blockId)).toEqual(["one", "two", "three"]);
   });
 });
