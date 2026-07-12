@@ -203,6 +203,12 @@
       "exportNoteHtml": {
         "label": "Export note as HTML…"
       },
+      "exportSelectionImage": {
+        "label": "Export selection as image…",
+        "saved": "Selection saved as an image.",
+        "noSelection": "Select some text first, then export it as an image.",
+        "failed": "Could not export the selection as an image."
+      },
       "exportNoteMarkdown": {
         "label": "Export note as Markdown…"
       },
