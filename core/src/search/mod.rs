@@ -31,6 +31,7 @@ use whatlang::Lang;
 
 /// Encrypted persistence + load/reconcile/rebuild for the search index
 /// (MYND-29 Task 7) — see `persist.rs`.
+pub mod doc_id;
 pub mod persist;
 
 /// Budget-gated benchmark harness (MYND-29 Task 9) — test-only; see `bench.rs`.
