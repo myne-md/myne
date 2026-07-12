@@ -318,6 +318,111 @@ fn parse_sheet_grid(xml: &str, shared: &[String], max_rows: usize) -> Vec<Vec<St
     rows
 }
 
+// ---- structured docx block model (MYND-268 Tier-2 preview) ----------------
+
+/// One docx block for the Tier-2 preview render.
+#[derive(Debug, PartialEq, Eq)]
+pub enum DocxBlockKind {
+    Paragraph,
+    /// A heading at the given level (1..=6), from the paragraph's `w:pStyle`.
+    Heading(u8),
+}
+
+/// A docx paragraph classified as a heading or body text (MYND-268 Tier-2).
+#[derive(Debug, PartialEq, Eq)]
+pub struct DocxBlock {
+    pub kind: DocxBlockKind,
+    pub text: String,
+}
+
+/// Extract a `.docx` as a structured block list (headings + paragraphs) for the
+/// Tier-2 inline preview. Reuses the same `zip` + `quick-xml` path as the search
+/// text extractor — pure over the decrypted bytes, no crypto/format change.
+/// Best-effort: a corrupt / absent document yields an empty list. Bounded blocks.
+pub fn extract_docx_blocks(bytes: &[u8], max_blocks: usize) -> Vec<DocxBlock> {
+    use std::io::Read;
+    let mut archive = match zip::ZipArchive::new(std::io::Cursor::new(bytes)) {
+        Ok(a) => a,
+        Err(_) => return Vec::new(),
+    };
+    let mut xml = String::new();
+    match archive.by_name("word/document.xml") {
+        Ok(mut f) => {
+            if f.read_to_string(&mut xml).is_err() {
+                return Vec::new();
+            }
+        }
+        Err(_) => return Vec::new(),
+    }
+    parse_docx_blocks(&xml, max_blocks)
+}
+
+/// Map a `w:pStyle` value to a heading level (`"Heading1"`/`"Heading 2"` → 1/2,
+/// `"Title"` → 1); non-heading styles → `None`.
+fn heading_level_from_style(style: &str) -> Option<u8> {
+    let s = style.trim().to_ascii_lowercase();
+    if s == "title" {
+        return Some(1);
+    }
+    s.strip_prefix("heading")
+        .and_then(|n| n.trim().parse::<u8>().ok())
+        .map(|n| n.clamp(1, 6))
+}
+
+/// Stream `word/document.xml` into blocks: each `<w:p>` becomes one block, its
+/// `<w:t>` runs concatenated, classified by an optional `<w:pStyle>` heading.
+fn parse_docx_blocks(xml: &str, max_blocks: usize) -> Vec<DocxBlock> {
+    use quick_xml::events::Event;
+    use quick_xml::reader::Reader;
+    let mut reader = Reader::from_str(xml);
+    let mut blocks: Vec<DocxBlock> = Vec::new();
+    let mut text = String::new();
+    let mut heading: Option<u8> = None;
+    let mut in_text = false;
+    loop {
+        match reader.read_event() {
+            Ok(Event::Start(e)) | Ok(Event::Empty(e))
+                if e.local_name().as_ref() == b"pStyle" =>
+            {
+                for attr in e.attributes().flatten() {
+                    if attr.key.local_name().as_ref() == b"val" {
+                        if let Ok(v) = std::str::from_utf8(&attr.value) {
+                            heading = heading_level_from_style(v);
+                        }
+                    }
+                }
+            }
+            Ok(Event::Start(e)) if e.local_name().as_ref() == b"t" => in_text = true,
+            Ok(Event::Text(e)) if in_text => {
+                if let Ok(u) = e.unescape() {
+                    text.push_str(&u);
+                }
+            }
+            Ok(Event::End(e)) => match e.local_name().as_ref() {
+                b"t" => in_text = false,
+                b"p" => {
+                    let body = std::mem::take(&mut text);
+                    let kind = match heading.take() {
+                        Some(lvl) => DocxBlockKind::Heading(lvl),
+                        None => DocxBlockKind::Paragraph,
+                    };
+                    if !body.trim().is_empty() {
+                        blocks.push(DocxBlock { kind, text: body });
+                        if blocks.len() >= max_blocks {
+                            break;
+                        }
+                    }
+                }
+                _ => {}
+            },
+            Ok(Event::Eof) => break,
+            Err(_) => break,
+            _ => {}
+        }
+    }
+    blocks
+}
+
 /// NFC-normalize, apply the size cap, and classify (`Ok` vs `Empty`).
 fn finalize(raw: String, fmt: SourceFormat) -> ExtractedText {
     let normalized: String = raw.nfc().collect();
@@ -473,6 +578,67 @@ mod tests {
     #[test]
     fn corrupt_xlsx_is_empty_grid_not_panic() {
         assert!(extract_xlsx_grid(b"PK\x03\x04 not a real zip", 100).is_empty());
+    }
+
+    // --- DOCX block model (Tier-2 preview) ------------------------------
+
+    /// Build a `.docx` where each `(style, text)` paragraph carries an optional
+    /// heading style (`""` = plain paragraph).
+    fn build_docx_styled(items: &[(&str, &str)]) -> Vec<u8> {
+        let mut body = String::new();
+        for (style, txt) in items {
+            let ppr = if style.is_empty() {
+                String::new()
+            } else {
+                format!("<w:pPr><w:pStyle w:val=\"{style}\"/></w:pPr>")
+            };
+            body.push_str(&format!(
+                "<w:p>{ppr}<w:r><w:t xml:space=\"preserve\">{txt}</w:t></w:r></w:p>"
+            ));
+        }
+        let doc = format!(
+            "<?xml version=\"1.0\"?><w:document xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"><w:body>{body}</w:body></w:document>"
+        );
+        let mut buf = Vec::new();
+        {
+            let mut zw = zip::ZipWriter::new(std::io::Cursor::new(&mut buf));
+            let opts = zip::write::SimpleFileOptions::default()
+                .compression_method(zip::CompressionMethod::Deflated);
+            zw.start_file("word/document.xml", opts).unwrap();
+            zw.write_all(doc.as_bytes()).unwrap();
+            zw.finish().unwrap();
+        }
+        buf
+    }
+
+    #[test]
+    fn docx_blocks_classify_headings_and_paragraphs() {
+        let docx = build_docx_styled(&[
+            ("Heading1", "Title Here"),
+            ("", "Body para"),
+            ("Heading 2", "Sub"),
+        ]);
+        assert_eq!(
+            extract_docx_blocks(&docx, 100),
+            vec![
+                DocxBlock { kind: DocxBlockKind::Heading(1), text: "Title Here".to_string() },
+                DocxBlock { kind: DocxBlockKind::Paragraph, text: "Body para".to_string() },
+                DocxBlock { kind: DocxBlockKind::Heading(2), text: "Sub".to_string() },
+            ]
+        );
+    }
+
+    #[test]
+    fn docx_blocks_skip_empty_paragraphs() {
+        let docx = build_docx_styled(&[("", "one"), ("", "   "), ("", "two")]);
+        let blocks = extract_docx_blocks(&docx, 100);
+        let texts: Vec<&str> = blocks.iter().map(|b| b.text.as_str()).collect();
+        assert_eq!(texts, vec!["one", "two"]);
+    }
+
+    #[test]
+    fn corrupt_docx_blocks_is_empty_not_panic() {
+        assert!(extract_docx_blocks(b"PK not a zip", 100).is_empty());
     }
 
     // --- PDF ------------------------------------------------------------
