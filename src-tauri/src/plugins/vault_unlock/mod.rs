@@ -88,6 +88,7 @@ mod desktop_tests {
                 edges: Vec::new(),
                 tags: Vec::new(),
                 properties: Vec::new(),
+                block_anchors: Vec::new(),
             },
         );
         assert_eq!(

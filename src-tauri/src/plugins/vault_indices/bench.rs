@@ -103,6 +103,7 @@ fn build(n: usize) -> VaultIndicesState {
                         elements: None,
                     },
                 ],
+                block_anchors: Vec::new(),
             },
         );
     }

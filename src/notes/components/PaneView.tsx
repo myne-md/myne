@@ -35,6 +35,7 @@ import { useSelectedNote, type NoteId } from "../sidebarState";
 import { useResolverNotes } from "../resolverNotes";
 import { useIndexNonce } from "../indexNonce";
 import { useVaultHeadings } from "../useVaultHeadings";
+import { useVaultBlockAnchors } from "../useVaultBlockAnchors";
 import { useWorkspace } from "../workspaceContext";
 import { usePrefs } from "../../hooks/usePrefs";
 import { typographyStyle } from "../../editor/typography";
@@ -209,6 +210,11 @@ export function PaneView({
   // lazily by reading note bodies; rebuilt on the index nonce). Empty until the
   // first async build settles — `[[##` simply finds nothing until then.
   const vaultHeadings = useVaultHeadings();
+  // MYND-382: the vault-wide imported-block-anchor set the `[[^^` enumerate-only
+  // autocomplete searches (read from the persisted vault-indices index via one
+  // IPC query; refetched on the index nonce). Empty until the first query
+  // settles — `[[^^` simply finds nothing until then.
+  const vaultBlockAnchors = useVaultBlockAnchors();
   // Click-to-navigate target for a resolved wikilink chip → open the note, and
   // (MYND-305) carry the GENERIC deep-link anchor so the editor scrolls to the
   // `#heading` / imported `^block-id` AFTER the note body loads. A click focuses
@@ -664,6 +670,7 @@ export function PaneView({
             onSelectionChange={handleSelectionChange}
             noteSet={notes}
             vaultHeadings={vaultHeadings}
+            vaultBlockAnchors={vaultBlockAnchors}
             onOpenWikilink={handleOpenWikilink}
             scrollAnchor={activeScrollAnchor}
             // outline-scroll-tracking: hand the live view to the pane so it can
@@ -699,6 +706,7 @@ export function PaneView({
               onChange={NOOP_ON_CHANGE}
               noteSet={notes}
               vaultHeadings={vaultHeadings}
+              vaultBlockAnchors={vaultBlockAnchors}
               readOnly
               viewMode="reading"
               style={{ width: "100%", minHeight: 360, color: "var(--fg-1)" }}
@@ -724,6 +732,7 @@ export function PaneView({
     handleSelectionChange,
     notes,
     vaultHeadings,
+    vaultBlockAnchors,
     handleOpenWikilink,
     activeScrollAnchor,
     handleEditorReady,
