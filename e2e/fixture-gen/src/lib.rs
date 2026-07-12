@@ -342,12 +342,12 @@ pub fn write_export_suite(base: &Path, fixture: &Fixture) -> std::io::Result<Exp
         fs::write(attachments_dir.join(&id_hex), &blob)?;
         catalog.entries.insert(
             id_hex.clone(),
-            AttachmentMeta {
-                content_type: content_type.to_string(),
-                created_at: ATTACHMENT_CREATED_AT,
-                filename: filename.to_string(),
-                size: contents.len() as u64,
-            },
+            AttachmentMeta::live(
+                content_type.to_string(),
+                ATTACHMENT_CREATED_AT,
+                filename.to_string(),
+                contents.len() as u64,
+            ),
         );
         attachments.push(ExportSuiteAttachment {
             id_hex,

@@ -409,7 +409,15 @@ pub async fn run_active_cycle<R: Runtime>(app: &AppHandle<R>, allow_push: bool) 
     let (Some(account_hash), Some(device_id)) = (hex16(&acct_hex), hex16(&dev_hex)) else {
         return CycleOutcome::Failed;
     };
-    let Some(root_key) = state.peek_unlocked_root_key_clone().await else {
+    // Attachment sync (MYND-468) verifies downloaded MYA1 blobs end-to-end, so
+    // the cycle needs the itemsKey material alongside root_key. Cloned out of
+    // the slot and the guard dropped immediately (holding the read guard across
+    // the network cycle would block lock/auto-lock).
+    let Some((items_key, items_key_id, root_key)) = state
+        .hold_unlocked_attachment_material()
+        .await
+        .map(|(_guard, items_key, items_key_id, root_key)| (items_key, items_key_id, root_key))
+    else {
         return CycleOutcome::NotReady; // vault locked
     };
     // Token: the stored per-device token, or — for a still-pending device — one
@@ -455,6 +463,10 @@ pub async fn run_active_cycle<R: Runtime>(app: &AppHandle<R>, allow_push: bool) 
             &notes_dir,
             &dir,
             allow_push,
+            Some(super::orchestrator::AttachmentKeys {
+                items_key: &items_key,
+                items_key_id: &items_key_id,
+            }),
         )
         // Preserve ONLY whether the failure was an integrity event (a rejected
         // rollback / forged head, SYNC-10) across the spawn_blocking boundary —

@@ -8,8 +8,10 @@
 //! plaintext sync would be an A4 downgrade), so production https always routes to
 //! the pinned rustls layer.
 
-use super::http_codec::{build_http_request, parse_http_response, MAX_SYNC_RESPONSE_BYTES};
-use super::transport::{HttpMethod, SyncTransport, TransportError, TransportResponse};
+use super::http_codec::{build_http_request_ext, parse_http_response_ext, MAX_SYNC_RESPONSE_BYTES};
+use super::transport::{
+    HttpMethod, SyncTransport, TransportError, TransportResponse, TransportResponseExt,
+};
 use std::io::{Read, Write};
 use std::net::TcpStream;
 
@@ -37,9 +39,24 @@ impl SyncTransport for HttpTransport {
         body: &[u8],
         token: Option<&str>,
     ) -> Result<TransportResponse, TransportError> {
+        self.request_ext(method, path, &[], body, token)
+            .map(|r| TransportResponse {
+                status: r.status,
+                body: r.body,
+            })
+    }
+
+    fn request_ext(
+        &self,
+        method: HttpMethod,
+        path: &str,
+        extra_headers: &[(&str, &str)],
+        body: &[u8],
+        token: Option<&str>,
+    ) -> Result<TransportResponseExt, TransportError> {
         let mut stream = TcpStream::connect((self.host.as_str(), self.port))
             .map_err(|_| TransportError::Network)?;
-        let req = build_http_request(method, path, &self.host, body, token);
+        let req = build_http_request_ext(method, path, &self.host, extra_headers, body, token);
         stream
             .write_all(&req)
             .map_err(|_| TransportError::Network)?;
@@ -55,7 +72,7 @@ impl SyncTransport for HttpTransport {
         if raw.len() as u64 > MAX_SYNC_RESPONSE_BYTES {
             return Err(TransportError::Network);
         }
-        parse_http_response(&raw).ok_or(TransportError::Network)
+        parse_http_response_ext(&raw, method == HttpMethod::Head).ok_or(TransportError::Network)
     }
 }
 

@@ -52,7 +52,7 @@ pub const MAX_ATTACHMENT_IMPORT_LEN: usize = MAX_ATTACHMENT_LEN;
 /// read-modify-write it, so they must serialize to avoid a lost update.
 /// `OnceLock<Mutex<()>>`, lazily initialized — same shape as
 /// `prefs::commands::write_mutex`.
-fn catalog_write_mutex() -> &'static Mutex<()> {
+pub(crate) fn catalog_write_mutex() -> &'static Mutex<()> {
     static M: OnceLock<Mutex<()>> = OnceLock::new();
     M.get_or_init(|| Mutex::new(()))
 }
@@ -231,11 +231,18 @@ fn auto_filename(content_type: &str) -> String {
 pub async fn attachment_import<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
     source: ImportSource,
 ) -> Result<ImportedAttachment, AttachmentImportError> {
     let dir =
         vault_dir(&app, state.active_vault_id().await).map_err(AttachmentImportError::from)?;
-    attachment_import_with_dir(&dir, state.inner(), source).await
+    let result = attachment_import_with_dir(&dir, state.inner(), source).await;
+    // MYND-468: a fresh import (not a dedup hit) is a local sync change — the
+    // blob + catalog must push on the next coalesced cycle.
+    if matches!(&result, Ok(imported) if !imported.deduplicated) {
+        hooks.bump_local_change();
+    }
+    result
 }
 
 /// Testable core of [`attachment_import`] — the **extraction-free** import
@@ -376,7 +383,11 @@ where
     let catalog_path = vault_dir.join("vault.attachments");
     let mut catalog = read_catalog(&catalog_path, &catalog_key, &account_number_hash)?;
 
-    if let Some(existing) = catalog.entries.get(&id_hex) {
+    // A TOMBSTONED entry (deleted, awaiting sync propagation — MYND-468) is
+    // treated as absent: re-importing the same file is the deliberate re-add
+    // of `sync-protocol.md` §11.4 rule 4 — the fresh live entry's `created_at`
+    // postdates the tombstone's `deleted_at`, so the revival wins the merge.
+    if let Some(existing) = catalog.entries.get(&id_hex).filter(|e| !e.is_tombstone()) {
         tracing::debug!(stage = "dedup", outcome = "hit");
         return Ok(ImportedAttachment {
             id: id_hex,
@@ -480,12 +491,7 @@ where
     //      blob write folds AlreadyExists to Ok, re-adding the entry).
     catalog.entries.insert(
         id_hex.clone(),
-        AttachmentMeta {
-            content_type: content_type.to_string(),
-            created_at,
-            filename: filename.clone(),
-            size,
-        },
+        AttachmentMeta::live(content_type.to_string(), created_at, filename.clone(), size),
     );
     let catalog_bytes = encode_attachments_catalog(&catalog_key, &account_number_hash, &catalog)
         .map_err(|_| AttachmentImportError::EncodeFailed)?;
@@ -574,6 +580,9 @@ pub(crate) async fn catalog_list_with_dir(
     let rows: Vec<CatalogEntry> = catalog
         .entries
         .into_iter()
+        // A tombstoned entry is a sync deletion marker (MYND-468), not a
+        // library item — never listed.
+        .filter(|(_, meta)| !meta.is_tombstone())
         .map(|(id, meta)| CatalogEntry {
             id,
             content_type: meta.content_type,
@@ -668,6 +677,8 @@ pub(crate) async fn attachment_unused_list_with_dir(
     let rows: Vec<CatalogEntry> = catalog
         .entries
         .into_iter()
+        // A tombstone is already deleted — never offered for cleanup (MYND-468).
+        .filter(|(_, meta)| !meta.is_tombstone())
         .filter(|(id, _meta)| !referenced.contains(id))
         .map(|(id, meta)| CatalogEntry {
             id,
@@ -731,17 +742,27 @@ pub(crate) fn rewrite_catalog_dropping_unused(
     let mut skipped = 0usize;
     for id in requested {
         match catalog.entries.get(id) {
-            // Present + still zero-reference → erase. (Capture size before
-            // the entry is dropped so the summary can report bytes freed.)
-            Some(meta) if !referenced.contains(id) => survivors.push((id.clone(), meta.size)),
-            // Absent (already gone) OR now referenced (TOCTOU) → skip.
+            // Present, live, still zero-reference → erase. (Capture size
+            // before the scrub so the summary can report bytes freed.)
+            Some(meta) if !meta.is_tombstone() && !referenced.contains(id) => {
+                survivors.push((id.clone(), meta.size))
+            }
+            // Absent / already tombstoned (gone) OR now referenced (TOCTOU) → skip.
             _ => skipped += 1,
         }
     }
 
     if !survivors.is_empty() {
+        // MYND-468 (`sync-protocol.md` §11.4): swept entries become catalog
+        // TOMBSTONES (not removals) so the deletion propagates to the fleet
+        // and a stale catalog cannot resurrect them.
+        let deleted_at = now_unix_secs();
         for (id, _) in &survivors {
-            catalog.entries.remove(id);
+            if let Some(meta) = catalog.entries.get(id).cloned() {
+                catalog
+                    .entries
+                    .insert(id.clone(), meta.into_tombstone(deleted_at));
+            }
         }
         let catalog_bytes = encode_attachments_catalog(catalog_key, account_number_hash, &catalog)
             .map_err(|_| AttachmentCleanUnusedError::EncodeFailed)?;
@@ -768,11 +789,17 @@ pub(crate) fn rewrite_catalog_dropping_unused(
 pub async fn attachment_clean_unused<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
     ids: Vec<String>,
 ) -> Result<CleanResult, AttachmentCleanUnusedError> {
     let dir =
         vault_dir(&app, state.active_vault_id().await).map_err(AttachmentCleanUnusedError::from)?;
-    attachment_clean_unused_with_dir(&dir, state.inner(), ids).await
+    let result = attachment_clean_unused_with_dir(&dir, state.inner(), ids).await;
+    // MYND-468: swept tombstones (catalog + queued records) must push.
+    if matches!(&result, Ok(r) if r.deleted > 0) {
+        hooks.bump_local_change();
+    }
+    result
 }
 
 /// Testable core of [`attachment_clean_unused`].
@@ -829,6 +856,23 @@ pub async fn attachment_clean_unused_with_dir(
         &requested,
         &referenced,
     )?;
+
+    // Queue each swept id's §11.4 blob-plane tombstone record (idempotent).
+    // Best-effort per id — a failed queue write leaves the catalog tombstone
+    // (which still propagates the deletion) and logs; the server-side body
+    // reclaim then waits for a later re-delete or the horizon.
+    for (id, _) in &survivors {
+        if let Some(idb) = hex_decode_id(id) {
+            if crate::plugins::sync::orchestrator::add_pending_attachment_tombstone(vault_dir, &idb)
+                .is_err()
+            {
+                tracing::warn!(
+                    stage = "tombstone_queue",
+                    "attachment_clean_unused tombstone queue write failed"
+                );
+            }
+        }
+    }
 
     let attachments_dir = vault_dir.join("attachments");
     let mut bytes_reclaimed = 0u64;
@@ -958,7 +1002,16 @@ pub(crate) fn reclaim_stray_blobs(
         match std::fs::read(vault_dir.join("vault.attachments")) {
             Ok(bytes) => {
                 match decode_attachments_catalog(catalog_key, account_number_hash, &bytes) {
-                    Ok(catalog) => catalog.entries.into_keys().collect(),
+                    // Only LIVE entries protect a blob (MYND-468): a blob whose
+                    // entry is a tombstone is a crypto-erased leftover (e.g. a
+                    // crash between the catalog tombstone write and the unlink)
+                    // and is reclaimed like any stray.
+                    Ok(catalog) => catalog
+                        .entries
+                        .into_iter()
+                        .filter(|(_, meta)| !meta.is_tombstone())
+                        .map(|(id, _)| id)
+                        .collect(),
                     Err(_) => return StrayReclaimOutcome::SkipUndecodableCatalog,
                 }
             }
@@ -1048,11 +1101,17 @@ pub async fn reclaim_stray_attachment_blobs<R: Runtime>(
 pub async fn attachment_delete<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
     id: String,
 ) -> Result<(), AttachmentDeleteError> {
     let dir =
         vault_dir(&app, state.active_vault_id().await).map_err(AttachmentDeleteError::from)?;
-    attachment_delete_with_dir(&dir, state.inner(), id).await
+    let result = attachment_delete_with_dir(&dir, state.inner(), id).await;
+    // MYND-468: the catalog tombstone + queued blob-plane tombstone must push.
+    if result.is_ok() {
+        hooks.bump_local_change();
+    }
+    result
 }
 
 /// Testable core of [`attachment_delete`].
@@ -1090,8 +1149,46 @@ pub async fn attachment_delete_with_dir(
     let mut catalog = read_catalog(&catalog_path, &catalog_key, &account_number_hash)
         .map_err(AttachmentDeleteError::from)?;
 
-    // Remove the catalog entry (idempotent — absence is not an error).
-    let was_present = catalog.entries.remove(&id_hex).is_some();
+    // Deletion under sync (MYND-468, `sync-protocol.md` §11.4): the entry is
+    // NOT removed — it becomes an **attachment catalog tombstone** (`deleted_at`
+    // set, descriptive metadata scrubbed), the multi-device deletion marker
+    // that defeats stale-catalog resurrection. Order is catalog-first, then
+    // the tombstone queue, then the local erase — every crash window between
+    // them is retry-recoverable (a re-delete of a tombstoned id re-queues).
+    let (was_present, needs_queue) = match catalog.entries.get(&id_hex) {
+        Some(e) if !e.is_tombstone() => {
+            let tomb = e.clone().into_tombstone(now_unix_secs());
+            catalog.entries.insert(id_hex.clone(), tomb);
+            let catalog_bytes =
+                encode_attachments_catalog(&catalog_key, &account_number_hash, &catalog)
+                    .map_err(|_| AttachmentDeleteError::EncodeFailed)?;
+            crate::atomic_write::atomic_write(
+                &catalog_path,
+                &catalog_bytes,
+                /* replace = */ true,
+            )
+            .map_err(AttachmentDeleteError::from)?;
+            (true, true)
+        }
+        // Already tombstoned — an interrupted earlier delete; re-queue + re-erase.
+        Some(_) => (false, true),
+        None => (false, false),
+    };
+
+    // Queue the §11.4 blob-plane tombstone record for the next push cycle
+    // (idempotent per id). A failure surfaces — without the queue entry the
+    // server would never reclaim the body.
+    if needs_queue {
+        crate::plugins::sync::orchestrator::add_pending_attachment_tombstone(
+            vault_dir,
+            &attachment_id,
+        )
+        .map_err(|_| {
+            AttachmentDeleteError::from(std::io::Error::other(
+                "attachment tombstone queue write failed",
+            ))
+        })?;
+    }
 
     // Remove the blob file (idempotent on NotFound).
     let blob_path = vault_dir.join("attachments").join(&id_hex);
@@ -1123,16 +1220,6 @@ pub async fn attachment_delete_with_dir(
         return Err(AttachmentDeleteError::from(e));
     }
 
-    // Rewrite the catalog only if we actually removed an entry — avoids a
-    // pointless disk write (and a nonce churn) on an already-absent id.
-    if was_present {
-        let catalog_bytes =
-            encode_attachments_catalog(&catalog_key, &account_number_hash, &catalog)
-                .map_err(|_| AttachmentDeleteError::EncodeFailed)?;
-        crate::atomic_write::atomic_write(&catalog_path, &catalog_bytes, /* replace = */ true)
-            .map_err(AttachmentDeleteError::from)?;
-    }
-
     tracing::info!(
         stage = "success",
         event = "attachment_deleted",
@@ -1154,12 +1241,18 @@ pub async fn attachment_delete_with_dir(
 pub async fn attachment_rename<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
     id: String,
     filename: String,
 ) -> Result<(), AttachmentRenameError> {
     let dir =
         vault_dir(&app, state.active_vault_id().await).map_err(AttachmentRenameError::from)?;
-    attachment_rename_with_dir(&dir, state.inner(), id, filename).await
+    let result = attachment_rename_with_dir(&dir, state.inner(), id, filename).await;
+    // MYND-468: the catalog's filename-LWW change must push.
+    if result.is_ok() {
+        hooks.bump_local_change();
+    }
+    result
 }
 
 /// Testable core of [`attachment_rename`].
@@ -1206,10 +1299,18 @@ pub(crate) async fn attachment_rename_with_dir(
     let mut catalog = read_catalog(&catalog_path, &catalog_key, &account_number_hash)
         .map_err(AttachmentRenameError::from)?;
 
-    let Some(entry) = catalog.entries.get_mut(&id_hex) else {
+    // A tombstoned entry is deleted — renaming it is NotFound (bug-canary;
+    // the UI never lists tombstones).
+    let Some(entry) = catalog
+        .entries
+        .get_mut(&id_hex)
+        .filter(|e| !e.is_tombstone())
+    else {
         return Err(AttachmentRenameError::AttachmentNotFound);
     };
     entry.filename = filename;
+    // The filename-LWW discriminator for the sync merge (§11.4 rule 4).
+    entry.updated_at = Some(now_unix_secs());
 
     let catalog_bytes = encode_attachments_catalog(&catalog_key, &account_number_hash, &catalog)
         .map_err(|_| AttachmentRenameError::EncodeFailed)?;

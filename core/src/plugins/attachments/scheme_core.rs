@@ -319,12 +319,12 @@ mod tests {
         let mut catalog = AttachmentsCatalog::empty();
         catalog.entries.insert(
             id_hex.clone(),
-            AttachmentMeta {
-                content_type: content_type.to_string(),
-                created_at: 1_700_000_000,
-                filename: "x".to_string(),
-                size: bytes.len() as u64,
-            },
+            AttachmentMeta::live(
+                content_type.to_string(),
+                1_700_000_000,
+                "x".to_string(),
+                bytes.len() as u64,
+            ),
         );
         let catalog_key = derive_subkey(&root, SubkeyRole::AttachmentsCatalogKey);
         let cbytes = encode_attachments_catalog(&catalog_key, &account_hash, &catalog).unwrap();

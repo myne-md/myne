@@ -29,17 +29,24 @@ use tauri::{AppHandle, Runtime, State};
 pub async fn attachment_import<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, myne_core::hooks::Hooks>,
     source: ImportSource,
 ) -> Result<ImportedAttachment, AttachmentImportError> {
     let dir = crate::paths::active_vault_root_io(&app, state.active_vault_id().await)
         .map_err(AttachmentImportError::from)?;
-    attachment_import_with_dir_ext(
+    let result = attachment_import_with_dir_ext(
         &dir,
         state.inner(),
         source,
         crate::plugins::attachments::extract::extract,
     )
-    .await
+    .await;
+    // MYND-468: a fresh import (not a dedup hit) is a local sync change — the
+    // blob + catalog must push on the next coalesced cycle.
+    if matches!(&result, Ok(imported) if !imported.deduplicated) {
+        hooks.bump_local_change();
+    }
+    result
 }
 
 #[cfg(test)]
