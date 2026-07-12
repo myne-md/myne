@@ -54,7 +54,13 @@ working tree; mirror them after an init):
    sources `../../../ios-watch/MyneWatch` + `../../../ios-watch/Shared`, Info.plist
    `WKApplication` + `WKCompanionAppBundleIdentifier: md.myne.mobile`, bundle id
    `md.myne.mobile.watchkitapp`, `DEVELOPMENT_TEAM`/`CODE_SIGN_STYLE`,
-   `TARGETED_DEVICE_FAMILY: "4"`, deps `SwiftUI` + `WatchConnectivity`.
+   `TARGETED_DEVICE_FAMILY: "4"`, `ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon`,
+   deps `SwiftUI` + `WatchConnectivity`. The app icon lives in the committed
+   `MyneWatch/Assets.xcassets` (single-size 1024 watchOS `AppIcon` — the shared
+   Myne "M"); it is picked up automatically because the `MyneWatch` folder is a
+   source path, but the `ASSETCATALOG_COMPILER_APPICON_NAME` setting is required or
+   the watch app grid shows a blank placeholder (the iOS app's Tauri-generated
+   `gen/apple/Assets.xcassets` is not in this target's sources).
 2. **`MyneWatchComplications` target** — watchOS `app-extension`,
    `com.apple.widgetkit-extension`, embedded into `MyneWatch` via a
    `- target: MyneWatchComplications` dependency, bundle id
