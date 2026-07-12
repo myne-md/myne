@@ -190,6 +190,10 @@ type Row =
       title: string;
       matchedIn: NoteMatchedIn;
       archived: boolean;
+      // MYND-448a: set when this row is an EMBEDDED attachment's content hit (its
+      // own search doc). `id` is still the embedding note — opening the row opens
+      // that note; the badge tells the user the match was inside an attachment.
+      attachmentId: string | null;
     };
 
 /**
@@ -344,6 +348,11 @@ export function CommandPalette({
                 // Archived notes STAY in search (archive ≠ soft-trash) — flagged
                 // for the badge, not filtered out (MYND-331).
                 archived: isArchived?.(h.note_id) ?? false,
+                // MYND-448a: a hit on an embedded attachment's content links to
+                // the same note but is badged distinctly. Normalize a missing
+                // field (older payload / test fixture) to null so the body-match
+                // hint still renders for a plain note hit.
+                attachmentId: h.attachment_id ?? null,
               }),
             );
 
@@ -480,7 +489,11 @@ export function CommandPalette({
                     ? t("commandPalette.sectionNotes")
                     : null;
               const key =
-                row.kind === "action" ? row.action.id : `note:${row.id}`;
+                row.kind === "action"
+                  ? row.action.id
+                  : // MYND-448a: disambiguate a note-body row from its
+                    // attachment-content row(s) — both carry the same note id.
+                    `note:${row.id}:${row.attachmentId ?? ""}`;
               return (
                 <Fragment key={key}>
                   {label !== null && (
@@ -562,14 +575,31 @@ function renderRow(
               {t("commandPalette.archivedBadge")}
             </span>
           )}
-          {/* Body-only match (MYND-40): the query matched in the note body but
-              not its title, so the title here does not contain the query — a
-              quiet right-aligned marker (reusing the palette's hint slot) tells
-              the user why the row appeared. Title matches need no marker (the
-              term is in the visible title). Drives off the precise backend
-              `matched_in`, so it is correct even for stemmed/Turkish-cased hits. */}
-          {row.matchedIn.body && !row.matchedIn.title && (
-            <span style={HINT_STYLE}>{t("commandPalette.matchedInBody")}</span>
+          {/* MYND-448a: an embedded-attachment content hit — the query matched
+              inside a file embedded in this note, not the note's own text. A
+              paperclip badge distinguishes it from a body hit; opening the row
+              still opens the embedding note. Takes precedence over the body-match
+              hint (an attachment doc's "body" is the extracted file text). */}
+          {row.attachmentId !== null ? (
+            <span
+              style={ARCHIVED_BADGE_STYLE}
+              data-testid="palette.attachment-badge"
+              title={t("commandPalette.matchedInAttachmentTitle")}
+            >
+              <Icon name="paperclip" size={12} />
+              {t("commandPalette.matchedInAttachment")}
+            </span>
+          ) : (
+            /* Body-only match (MYND-40): the query matched in the note body but
+               not its title, so the title here does not contain the query — a
+               quiet right-aligned marker (reusing the palette's hint slot) tells
+               the user why the row appeared. Title matches need no marker (the
+               term is in the visible title). Drives off the precise backend
+               `matched_in`, so it is correct even for stemmed/Turkish-cased hits. */
+            row.matchedIn.body &&
+            !row.matchedIn.title && (
+              <span style={HINT_STYLE}>{t("commandPalette.matchedInBody")}</span>
+            )
           )}
         </>
       )}

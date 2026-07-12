@@ -173,13 +173,14 @@ mod desktop_tests {
         fn hydrate_ai_vectors<'a>(&'a self, _: &'a VaultRuntimeState) -> BoxFuture<'a> {
             Box::pin(std::future::ready(()))
         }
-        fn fold_attachment_text_for_index<'a>(
+        fn index_note_attachments<'a>(
             &'a self,
             _: &'a VaultRuntimeState,
-            note_body: &'a str,
-        ) -> BoxFuture<'a, String> {
-            let body = note_body.to_string();
-            Box::pin(std::future::ready(body))
+            _: &'a str,
+            _: &'a str,
+            _: &'a str,
+        ) -> BoxFuture<'a> {
+            Box::pin(std::future::ready(()))
         }
         fn zeroize_search_index(&self) {}
         fn zeroize_spell(&self) {}

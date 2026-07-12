@@ -1395,6 +1395,12 @@ pub struct SearchResult {
     pub title: String,
     pub score: f32,
     pub matched_in: MatchedIn,
+    /// MYND-448a: `None` for a note-body hit; `Some(attachment_id_hex)` when the
+    /// hit is an EMBEDDED attachment's extracted text (its own index doc,
+    /// `att:<attachment_id>:<note_id>`). `note_id` above is the embedding note in
+    /// both cases, so the palette opens the same note; a `Some` value badges the
+    /// row as an attachment-content match and lets it scroll to the embed.
+    pub attachment_id: Option<String>,
 }
 
 /// Upper bound on results returned to the WebView per query (MYND-40). The
@@ -1440,11 +1446,27 @@ pub async fn note_search_core(
         .query(query)
         .into_iter()
         .take(NOTE_SEARCH_RESULT_CAP)
-        .map(|hit| SearchResult {
-            note_id: hit.id,
-            title: hit.title,
-            score: hit.score,
-            matched_in: hit.matched_in,
+        .map(|hit| {
+            // MYND-448a: an attachment doc's id carries its provenance
+            // (`att:<attachment>:<note>`); decode it so the WebView opens the
+            // embedding note and badges an attachment-content match.
+            let (note_id, attachment_id) =
+                match crate::search::doc_id::parse_search_doc_id(&hit.id) {
+                    crate::search::doc_id::SearchDocId::Attachment {
+                        attachment_id,
+                        note_id,
+                    } => (note_id.to_string(), Some(attachment_id.to_string())),
+                    crate::search::doc_id::SearchDocId::Note { note_id } => {
+                        (note_id.to_string(), None)
+                    }
+                };
+            SearchResult {
+                note_id,
+                title: hit.title,
+                score: hit.score,
+                matched_in: hit.matched_in,
+                attachment_id,
+            }
         })
         .collect()
 }
@@ -1509,13 +1531,14 @@ mod tests {
         ) -> myne_core::hooks::BoxFuture<'a> {
             Box::pin(std::future::ready(()))
         }
-        fn fold_attachment_text_for_index<'a>(
+        fn index_note_attachments<'a>(
             &'a self,
             _: &'a VaultRuntimeState,
-            note_body: &'a str,
-        ) -> myne_core::hooks::BoxFuture<'a, String> {
-            let body = note_body.to_string();
-            Box::pin(std::future::ready(body))
+            _: &'a str,
+            _: &'a str,
+            _: &'a str,
+        ) -> myne_core::hooks::BoxFuture<'a> {
+            Box::pin(std::future::ready(()))
         }
         fn zeroize_search_index(&self) {}
         fn zeroize_spell(&self) {}

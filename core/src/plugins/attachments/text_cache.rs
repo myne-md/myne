@@ -140,6 +140,42 @@ pub fn fold_attachment_text(
     out
 }
 
+/// MYND-448a: the cached extracted text of each form-C attachment embedded in
+/// `note_body`, as `(attachment_id_hex, text)` pairs — the per-attachment form
+/// of [`fold_attachment_text`]. The search layer indexes each as its OWN doc
+/// (`att:<id>:<note_id>`) so an attachment-content hit surfaces distinctly from
+/// the embedding note's body, instead of being folded into it. Only attachments
+/// with Ok extracted text yield a pair (Empty/Failed/Unsupported/uncached
+/// contribute no doc); each unique attachment appears at most once even when
+/// embedded twice. Best-effort; `memo` dedups cache reads across notes within a
+/// rebuild, exactly as the fold does.
+pub fn collect_attachment_texts(
+    note_body: &str,
+    vault_dir: &Path,
+    attachment_text_key: &[u8; AEAD_KEY_LEN],
+    account_number_hash: &[u8; ATTACHMENT_TEXT_BLOB_ACCOUNT_HASH_LEN],
+    memo: &mut std::collections::HashMap<[u8; ATTACHMENT_ID_LEN], Option<String>>,
+) -> Vec<(String, String)> {
+    let mut out = Vec::new();
+    let mut emitted: std::collections::HashSet<[u8; ATTACHMENT_ID_LEN]> =
+        std::collections::HashSet::new();
+    for id_hex in super::reconcile::extract_att_ids(note_body) {
+        let Some(id) = super::commands::hex_decode_id(&id_hex) else {
+            continue;
+        };
+        if !emitted.insert(id) {
+            continue; // same attachment embedded twice → one doc
+        }
+        let cached = memo.entry(id).or_insert_with(|| {
+            read_extracted(vault_dir, attachment_text_key, account_number_hash, &id).and_then(ok_text)
+        });
+        if let Some(text) = cached {
+            out.push((id_hex, text.clone()));
+        }
+    }
+    out
+}
+
 /// Lazy backfill (Task 7): for each embedded attachment of `note_body` not yet
 /// resolved in `memo`, ensure its `MYE1` cache exists — extracting from the
 /// `MYA1` source blob if missing — and record the result in `memo` so the
@@ -285,6 +321,25 @@ mod tests {
         write_extracted(tmp.path(), &KEY, &ACCOUNT_HASH, &ATT_ID, &e).expect("write");
         let got = read_extracted(tmp.path(), &KEY, &ACCOUNT_HASH, &ATT_ID).expect("read");
         assert_eq!(got, e);
+    }
+
+    #[test]
+    fn collect_attachment_texts_returns_per_attachment_ok_text() {
+        // MYND-448a: an embedded attachment with cached Ok text yields one
+        // (attachment_id_hex, text) pair; an uncached embed yields nothing.
+        let tmp = ScopedTempDir::new("mye1-collect").expect("tmp");
+        write_extracted(tmp.path(), &KEY, &ACCOUNT_HASH, &ATT_ID, &sample()).expect("write");
+        let id_hex = "5a".repeat(ATTACHMENT_ID_LEN);
+        let uncached_hex = "77".repeat(ATTACHMENT_ID_LEN);
+        // Embed the cached one twice (must collapse to one doc) + one uncached.
+        let body = format!("intro ![[att:{id_hex}]] mid ![[att:{id_hex}]] ![[att:{uncached_hex}]]");
+        let mut memo = std::collections::HashMap::new();
+        let got = collect_attachment_texts(&body, tmp.path(), &KEY, &ACCOUNT_HASH, &mut memo);
+        assert_eq!(
+            got,
+            vec![(id_hex, "cached extracted text".to_string())],
+            "cached attachment yields one pair; duplicate embed collapses; uncached omitted"
+        );
     }
 
     #[test]

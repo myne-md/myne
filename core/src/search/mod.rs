@@ -361,6 +361,51 @@ impl InvertedIndex {
         self.next_doc = 0;
         self.total_len = 0;
     }
+
+    /// MYND-448a: the search doc-ids of every attachment doc that links back to
+    /// `note_id` (`att:<attachment>:<note_id>`). Scans the id set — O(total
+    /// docs), paid only on a note re-index / delete (interactive rate), never on
+    /// bulk build (whose ids are all new → the fast `add`/`remove` path). Used to
+    /// drop a note's stale attachment docs before re-deriving them, and to purge
+    /// them when the note is deleted.
+    fn attachment_doc_ids_of_note(&self, note_id: &str) -> Vec<String> {
+        self.id_to_doc
+            .keys()
+            .filter(|id| {
+                matches!(
+                    doc_id::parse_search_doc_id(id),
+                    doc_id::SearchDocId::Attachment { note_id: owner, .. } if owner == note_id
+                )
+            })
+            .cloned()
+            .collect()
+    }
+
+    /// MYND-448a: remove every attachment doc linked to `note_id` (note deleted,
+    /// or a pre-refresh clear). No-op when the note has no attachment docs. The
+    /// note's OWN body doc (keyed by the bare `note_id`) is untouched.
+    pub fn remove_note_attachments(&mut self, note_id: &str) {
+        for id in self.attachment_doc_ids_of_note(note_id) {
+            self.remove(&id);
+        }
+    }
+
+    /// MYND-448a: replace `note_id`'s attachment docs with `atts` (each
+    /// `(attachment_id_hex, title, body)`): drop the note's current attachment
+    /// docs, then add the given set as `att:<attachment_id_hex>:<note_id>` docs
+    /// so each embedded attachment's extracted text is its OWN searchable doc,
+    /// carrying its provenance in the id. The note's own body doc is untouched —
+    /// it is upserted separately with the (unfolded) note plaintext.
+    pub fn set_note_attachments(&mut self, note_id: &str, atts: &[(String, String, String)]) {
+        self.remove_note_attachments(note_id);
+        for (attachment_id_hex, title, body) in atts {
+            self.add(Document {
+                id: doc_id::make_attachment_doc_id(attachment_id_hex, note_id),
+                title: title.clone(),
+                body: body.clone(),
+            });
+        }
+    }
 }
 
 impl SearchIndex for InvertedIndex {
@@ -586,6 +631,26 @@ impl SearchIndexState {
     pub fn remove(&self, id: &str) {
         if let Ok(mut index) = self.index.lock() {
             index.remove(id);
+        }
+    }
+
+    /// MYND-448a: replace a note's attachment-derived docs in the live index
+    /// (`att:<attachment>:<note_id>`), dropping any that are no longer embedded.
+    /// The note's own body doc is upserted separately via [`Self::upsert`]. Each
+    /// tuple is `(attachment_id_hex, title, body)`.
+    pub fn set_note_attachments(&self, note_id: &str, atts: &[(String, String, String)]) {
+        if let Ok(mut index) = self.index.lock() {
+            index.set_note_attachments(note_id, atts);
+        }
+    }
+
+    /// MYND-448a: drop a note AND its attachment docs (note delete). The note
+    /// body doc is keyed by the bare `note_id`; its attachment docs are
+    /// `att:*:<note_id>`. No-op on a poisoned lock.
+    pub fn remove_note_and_attachments(&self, note_id: &str) {
+        if let Ok(mut index) = self.index.lock() {
+            index.remove(note_id);
+            index.remove_note_attachments(note_id);
         }
     }
 
@@ -1042,5 +1107,79 @@ mod tests {
 
         // Identical post-wipe scoring → no stale total_len / doc residue.
         assert_eq!(fresh.query("rust"), wiped.query("rust"));
+    }
+
+    // ---- MYND-448a: separate attachment docs --------------------------
+
+    fn att(id_hex: &str, title: &str, body: &str) -> (String, String, String) {
+        (id_hex.to_string(), title.to_string(), body.to_string())
+    }
+
+    #[test]
+    fn attachment_docs_are_searchable_and_carry_note_provenance() {
+        let mut idx = InvertedIndex::default();
+        idx.add(doc("note1", "My Note", "some prose"));
+        idx.set_note_attachments(
+            "note1",
+            &[att("deadbeef", "My Note", "quarterly revenue spreadsheet")],
+        );
+        // The attachment's text is findable as its OWN doc, whose id decodes
+        // back to (attachment, embedding-note).
+        let hits = idx.query("revenue");
+        assert_eq!(hits.len(), 1);
+        assert_eq!(
+            doc_id::parse_search_doc_id(&hits[0].id),
+            doc_id::SearchDocId::Attachment {
+                attachment_id: "deadbeef",
+                note_id: "note1",
+            }
+        );
+        // The note's own body doc is untouched + independently findable.
+        assert_eq!(
+            idx.query("prose").into_iter().map(|h| h.id).collect::<Vec<_>>(),
+            vec!["note1".to_string()]
+        );
+    }
+
+    #[test]
+    fn set_note_attachments_drops_docs_no_longer_embedded() {
+        let mut idx = InvertedIndex::default();
+        idx.add(doc("note1", "N", "prose"));
+        idx.set_note_attachments(
+            "note1",
+            &[att("aaa", "N", "alpha text"), att("bbb", "N", "beta text")],
+        );
+        assert_eq!(idx.query("alpha").len(), 1);
+        assert_eq!(idx.query("beta").len(), 1);
+        // Re-index with only "aaa": "bbb"'s doc must be gone (attachment removed
+        // from the note), "aaa" preserved, note body untouched.
+        idx.set_note_attachments("note1", &[att("aaa", "N", "alpha text")]);
+        assert_eq!(idx.query("alpha").len(), 1);
+        assert!(idx.query("beta").is_empty(), "un-embedded attachment doc dropped");
+        assert_eq!(idx.query("prose").len(), 1);
+    }
+
+    #[test]
+    fn remove_note_attachments_purges_only_that_notes_attachment_docs() {
+        let mut idx = InvertedIndex::default();
+        idx.add(doc("note1", "N1", "prose one"));
+        idx.add(doc("note2", "N2", "prose two"));
+        idx.set_note_attachments("note1", &[att("aaa", "N1", "shared keyword")]);
+        idx.set_note_attachments("note2", &[att("bbb", "N2", "shared keyword")]);
+        // Both attachments match the shared term (two distinct docs).
+        assert_eq!(idx.query("keyword").len(), 2);
+        // Purge note1's attachment docs only.
+        idx.remove_note_attachments("note1");
+        let hits = idx.query("keyword");
+        assert_eq!(hits.len(), 1);
+        assert_eq!(
+            doc_id::parse_search_doc_id(&hits[0].id),
+            doc_id::SearchDocId::Attachment {
+                attachment_id: "bbb",
+                note_id: "note2",
+            }
+        );
+        // note1's own body doc survives (remove_note_attachments is body-safe).
+        assert_eq!(idx.query("one").len(), 1);
     }
 }
