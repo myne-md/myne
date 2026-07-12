@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  iOS-only Info.plist additions, merged into the generated
+  gen/apple/myne-mobile_iOS/Info.plist by `tauri ios build` (the generated
+  plist is under the gitignored src-tauri/gen/, so this source-controlled
+  partial is the regeneration-surviving home — MYND-459 T10).
+
+  NSLocalNetworkUsageDescription: without this key iOS silently blocks any
+  connection to a host on the same LAN, so a self-hosting user could not reach a
+  Myne sync server on their home/office network (SYNC-46 iOS-only v1, SYNC-26
+  self-host). The string is honest and telemetry-free — it names exactly why the
+  permission is asked (reaching a self-hosted sync server on the local network),
+  consistent with the no-telemetry / no-analytics posture. Myne opens NO other
+  local-network sockets and declares no Bonjour service.
+-->
+<plist version="1.0">
+<dict>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Myne connects to a Myne sync server on your local network only if you set one up. It never scans your network or sends any data anywhere else.</string>
+</dict>
+</plist>

@@ -1,0 +1,111 @@
+# Permissions for the in-app `sync` Tauri plugin (MYND-424/458, Phase 2 client
+# sync engine — mobile shim). Picked up under the `sync:` ACL namespace because
+# `build.rs` declares this as an `InlinedPlugin`. Capability files reference these
+# as `sync:default` (or `sync:allow-sync-get-endpoint` /
+# `sync:allow-sync-set-endpoint`). Ported verbatim from the desktop
+# `src-tauri/permissions/sync/default.toml` — one plugin, same 15 commands
+# (MYND-459 T12 added `sync_head_fingerprint`, the SY-05 SAS eye-compare substrate).
+#
+# Deny-by-default (SYNC-15): the data-plane commands (push/pull/sync-now/status)
+# each get their own `commands.allow` entry AND remain gated on an authenticated
+# session inside the shared core. The endpoint-config pair is intentionally
+# reachable pre-auth (an operator configures the server before unlocking/
+# enrolling) but moves no vault bytes. Main-window-only, like every other vault
+# plugin.
+
+"$schema" = "../../gen/schemas/desktop-schema.json"
+
+[default]
+description = "Default permission set for the sync plugin — endpoint config (SYNC-14) + read-only status / manual-trigger affordances. No data-plane blob access."
+permissions = [
+    "allow-sync-get-endpoint",
+    "allow-sync-set-endpoint",
+    "allow-sync-status",
+    "allow-sync-now",
+    "allow-sync-list-devices",
+    "allow-sync-approve-device",
+    "allow-sync-remove-device",
+    "allow-sync-pending-conflicts",
+    "allow-sync-take-conflict",
+    "allow-sync-resolve-conflict",
+    "allow-sync-mark-tombstone",
+    "allow-sync-enroll",
+    "allow-sync-join-account",
+    "allow-sync-reset-local",
+    "allow-sync-head-fingerprint",
+]
+
+[[permission]]
+identifier = "allow-sync-get-endpoint"
+description = "Allow invoking sync:sync_get_endpoint (read the device-local sync endpoint config from app_config_dir/sync-config.json; absent → unconfigured). No vault access, no native side-effect."
+commands.allow = ["sync_get_endpoint"]
+
+[[permission]]
+identifier = "allow-sync-set-endpoint"
+description = "Allow invoking sync:sync_set_endpoint (validate against the A4/TB5 https-or-loopback policy, then atomic-write the device-local sync endpoint config). No vault access."
+commands.allow = ["sync_set_endpoint"]
+
+[[permission]]
+identifier = "allow-sync-status"
+description = "Allow invoking sync:sync_status (read-only current sync status for the status indicator: disabled / idle / syncing / error / conflicts). No vault access."
+commands.allow = ["sync_status"]
+
+[[permission]]
+identifier = "allow-sync-now"
+description = "Allow invoking sync:sync_now (request an immediate sync; returns the resulting status). No new vault access beyond the engine's authed session."
+commands.allow = ["sync_now"]
+
+[[permission]]
+identifier = "allow-sync-list-devices"
+description = "Allow invoking sync:sync_list_devices (authed device roster from GET /auth/devices). No vault-blob access."
+commands.allow = ["sync_list_devices"]
+
+[[permission]]
+identifier = "allow-sync-approve-device"
+description = "Allow invoking sync:sync_approve_device (authed: approve a pending device, POST /auth/devices/approve)."
+commands.allow = ["sync_approve_device"]
+
+[[permission]]
+identifier = "allow-sync-remove-device"
+description = "Allow invoking sync:sync_remove_device (authed: revoke a device's token, POST /auth/devices/revoke; device_id untouched, SYNC-2)."
+commands.allow = ["sync_remove_device"]
+
+[[permission]]
+identifier = "allow-sync-pending-conflicts"
+description = "Allow invoking sync:sync_pending_conflicts (list the note ids with a staged conflicting remote revision awaiting keep-both materialization). No vault-blob access beyond the device-local conflicts staging dir."
+commands.allow = ["sync_pending_conflicts"]
+
+[[permission]]
+identifier = "allow-sync-take-conflict"
+description = "Allow invoking sync:sync_take_conflict (decrypt a staged conflicting remote revision to its plaintext body so the notes layer can materialize a keep-both copy; requires the unlocked vault's items_key)."
+commands.allow = ["sync_take_conflict"]
+
+[[permission]]
+identifier = "allow-sync-resolve-conflict"
+description = "Allow invoking sync:sync_resolve_conflict (adopt the staged remote revision as the synced baseline + clear staging, so the local edit pushes as a linear advance)."
+commands.allow = ["sync_resolve_conflict"]
+
+[[permission]]
+identifier = "allow-sync-mark-tombstone"
+description = "Allow invoking sync:sync_mark_tombstone (queue a deletion's note id so the next push sets the server tombstone flag for horizon-GC). Touches only the device-local pending-tombstone queue; no vault-blob access."
+commands.allow = ["sync_mark_tombstone"]
+
+[[permission]]
+identifier = "allow-sync-enroll"
+description = "Allow invoking sync:sync_enroll (new-device enrollment: fetch vault.meta pre-auth, derive root_key from {account#+password/phrase}, SCRAM-enroll, store the per-device token)."
+commands.allow = ["sync_enroll"]
+
+[[permission]]
+identifier = "allow-sync-join-account"
+description = "Allow invoking sync:sync_join_account (add this device to an existing account: TOFU-pin the endpoint, fetch vault.meta pre-auth, bootstrap a NEW local vault from {account#+password}, unlock it, SCRAM-enroll password-path → pending). Materializes a vault dir; gated on the same A4/TB5 transport policy."
+commands.allow = ["sync_join_account"]
+
+[[permission]]
+identifier = "allow-sync-reset-local"
+description = "Allow invoking sync:sync_reset_local (reset this device's sync enrollment locally: clear the device-local per-device token + sync baseline (sync-state.json + vault.head-state) for the active vault so a stale/rejected token can be re-enrolled). NEVER touches notes/attachments/vault.meta and makes no server call."
+commands.allow = ["sync_reset_local"]
+
+[[permission]]
+identifier = "allow-sync-head-fingerprint"
+description = "Allow invoking sync:sync_head_fingerprint (return the 8-char Crockford XXXX-XXXX SAS fingerprint of this device's currently adopted vault head, read from the device-local sync-state's latest head observation; None when no head is adopted yet). The out-of-band enroll-time eye-compare substrate (SYNC-17); returns no key material and makes no server call — reveals only the already-server-visible head_id, one-way-hashed to ~40 bits."
+commands.allow = ["sync_head_fingerprint"]

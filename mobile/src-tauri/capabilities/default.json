@@ -21,6 +21,7 @@
     "snapshots:default",
     "attachments:default",
     "export:default",
-    "secret-export:default"
+    "secret-export:default",
+    "sync:default"
   ]
 }

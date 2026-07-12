@@ -9,7 +9,7 @@ version = "0.1.0"
 description = "Myne — mobile client"
 authors = ["Myne"]
 edition = "2021"
-license = "AGPL-3.0-or-later"
+license = "AGPL-3.0"
 
 # `_lib` suffix is required to avoid the Windows lib-vs-bin name collision
 # (rust-lang/cargo#8519) — same rule as the desktop crate. Don't rename.
