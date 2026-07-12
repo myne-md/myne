@@ -127,6 +127,21 @@ export type AttachmentCleanUnusedError =
   | { kind: "EncodeFailed" }
   | { kind: "JoinFailure" };
 
+/** Success payload of {@link attachmentReadText} — the decrypted preview text. */
+export interface AttachmentTextPreview {
+  /** Decrypted UTF-8 text (lossily decoded), truncated at the preview cap. */
+  text: string;
+  /** True when the source exceeded the cap and `text` holds only the head. */
+  truncated: boolean;
+}
+
+/** Error surface of {@link attachmentReadText} — mirror of `AttachmentReadTextError`. */
+export type AttachmentReadTextError =
+  | { kind: "Locked" }
+  | { kind: "NotFound" }
+  | { kind: "Denied" }
+  | { kind: "Io" };
+
 /** Outcome of {@link attachmentCleanUnused} — TS mirror of the Rust `CleanResult`. */
 export interface CleanResult {
   /** Attachments removed from the catalog (logically deleted). */
@@ -232,5 +247,18 @@ export async function attachmentUnusedList(): Promise<CatalogEntry[]> {
 export async function attachmentCleanUnused(ids: string[]): Promise<CleanResult> {
   return await invoke<CleanResult>("plugin:attachments|attachment_clean_unused", {
     ids,
+  });
+}
+
+/**
+ * Decrypt one attachment's plaintext as TEXT for a Tier-1 inline preview
+ * (MYND-268; Slot::Unlocked-gated). Returns lossy UTF-8 text capped at the
+ * preview limit (`truncated` flags a larger source). The text decrypts in Rust
+ * RAM and crosses IPC as plaintext (note-body class) — render it in a read-only
+ * viewer, never as interpreted content. Rejects with {@link AttachmentReadTextError}.
+ */
+export async function attachmentReadText(id: string): Promise<AttachmentTextPreview> {
+  return await invoke<AttachmentTextPreview>("plugin:attachments|attachment_read_text", {
+    id,
   });
 }

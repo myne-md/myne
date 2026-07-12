@@ -60,6 +60,12 @@ export interface EditorHost {
      *  decrypted bytes: desktop opens a native Save dialog, mobile returns a
      *  Documents path (no picker). Returns the destination, or null on cancel. */
     pickExportDestination: (filename: string) => Promise<string | null>;
+    /** OPTIONAL — MYND-268 Tier-1: decrypt an attachment's plaintext as TEXT for
+     *  a read-only inline preview (txt/code/csv/md). RAM-only; the promise
+     *  rejects (Locked / NotFound / Denied / Io) on failure. `truncated` flags a
+     *  source larger than the preview cap. Render as inert text, never
+     *  interpreted. Omit to fall back to the export-only file-card. */
+    readText?: (id: string) => Promise<{ text: string; truncated: boolean }>;
   };
 
   /** Prefs read (editor typography + spell settings — IPC). */

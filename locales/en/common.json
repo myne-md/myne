@@ -489,6 +489,9 @@
           "reveal": "Reveal in library"
         },
         "pdfFallback": "PDF",
+        "textPreview": {
+          "truncated": "Preview truncated — Export for the full file."
+        },
         "tombstone": {
           "brokenAria": "Broken attachment reference: {{filename}}",
           "brokenLabel": "broken",
