@@ -5,15 +5,18 @@
 //
 //   myne://open              — WG-01 / lock-screen / StandBy launcher
 //   myne://capture           — WG-02 quick capture → start a new note
-//   myne://capture?mode=voice — voice capture (no transcription engine yet →
-//                               opens the ordinary text new-note editor)
+//   myne://capture?mode=voice — voice capture (the widget mic button) → opens a
+//                               fresh note AND the voice-recording sheet
 //
 // The route is resolved entirely app-side, INSIDE the trust boundary: `open`
 // needs no work (launching already foregrounds the unlock screen), and `capture`
-// drives the ordinary React new-note editor after unlock — there is no second,
-// unaudited native capture path (the design-only `CaptureSheet.swift` is not
-// wired). Because a widget tap on a locked device cold-launches the app, the
-// capture intent is LATCHED and replayed once the editor mounts post-unlock.
+// drives the React new-note editor after unlock — `mode: "voice"` additionally
+// opens the WebView recording sheet (`RecordingSheet.tsx`), which records audio
+// with the Web Audio API and stores it as an encrypted `audio/wav` attachment.
+// There is no second, unaudited native capture path (the design-only
+// `CaptureSheet.swift` is not wired). Because a widget tap on a locked device
+// cold-launches the app, the capture intent is LATCHED and replayed once the
+// editor mounts post-unlock.
 
 import { HAS_TAURI } from "./app-window";
 

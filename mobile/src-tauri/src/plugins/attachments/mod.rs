@@ -15,9 +15,12 @@
 //! - the reconcile trio (`attachment_refs_apply` / `_remove` / `_referencing`).
 //!
 //! NOT registered on mobile: the `voice_record_*` commands (native `cpal` mic —
-//! a hard mobile blocker). The `attachment://` URI scheme IS registered on the
-//! mobile Tauri `Builder` in `lib.rs` (delegating to the shared
-//! `scheme_core::build_response`).
+//! a hard mobile blocker). Mobile voice notes still SHIP — the WebView records
+//! audio via the Web Audio API (`getUserMedia`), wraps the PCM as `audio/wav` in
+//! TS, and stores it through the ordinary `attachment_import` above (no native
+//! recorder, no new command; `decisions.md` 2026-07-12). The `attachment://` URI
+//! scheme IS registered on the mobile Tauri `Builder` in `lib.rs` (delegating to
+//! the shared `scheme_core::build_response`) and already serves `audio/wav`.
 //!
 //! The lock-teardown wipe of the reference graph is a desktop-only
 //! `hooks::VaultLifecycleHooks` side-effect; mobile installs `NoopHooks`, so the

@@ -20,6 +20,14 @@
   (kSecAccessControlBiometryCurrentSet) and the feature silently fails. The
   string is honest: Face ID only gates the device-local re-unlock key; it never
   replaces the master password and nothing biometric leaves the device.
+
+  NSMicrophoneUsageDescription: required for voice notes (mobile voice-notes
+  feature; main repo docs/decisions.md 2026-07-12). The WebView records audio
+  via getUserMedia and stores it as an encrypted audio/wav attachment in the
+  vault; without this key iOS terminates the app on the first capture. The
+  string is honest and telemetry-free: audio is recorded ONLY while the user is
+  actively recording a voice note, is encrypted on-device, and is never sent
+  anywhere (it syncs end-to-end encrypted like any other attachment).
 -->
 <plist version="1.0">
 <dict>
@@ -27,5 +35,7 @@
 	<string>Myne connects to a Myne sync server on your local network only if you set one up. It never scans your network or sends any data anywhere else.</string>
 	<key>NSFaceIDUsageDescription</key>
 	<string>Myne uses Face ID to unlock this vault again quickly after it auto-locks. Your master password is still required after a restart.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Myne uses the microphone only while you record a voice note. Recordings are encrypted on this device and never sent anywhere.</string>
 </dict>
 </plist>
