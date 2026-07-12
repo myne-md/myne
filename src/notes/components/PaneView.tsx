@@ -28,6 +28,7 @@ const NOOP_ON_CHANGE = (_next: string): void => {};
 import { hasAnchor, type WikilinkAnchor } from "../../editor/wikilink/anchor";
 import { noteRead } from "../readNote";
 import { peekRevealHeading, useRevealHeadingNonce } from "../views/revealHeadingSignal";
+import { peekRevealMatch, useRevealMatchNonce } from "../views/revealMatchSignal";
 import { setActiveHeading } from "../views/activeHeadingSignal";
 import { createNote } from "../createNote";
 import { useSelectedNote, type NoteId } from "../sidebarState";
@@ -251,6 +252,20 @@ export function PaneView({
     pendingAnchorTargetRef.current = activeId;
     setScrollAnchor({ anchor: { heading: req.heading }, nonce: req.nonce });
   }, [revealHeadingNonce, focused, activeId, leaf.id]);
+
+  // Search result → scroll-to-match bridge (MYND-448b): the command palette
+  // opens the note and emits a reveal-match request; the FOCUSED pane showing
+  // that note converts it into the same `setScrollAnchor` call, with a `{ query }`
+  // anchor the editor resolves to the earliest literal match and selects. Deps
+  // include `activeId` so the effect re-runs once the note finishes opening.
+  const revealMatchNonce = useRevealMatchNonce();
+  useEffect(() => {
+    const req = peekRevealMatch();
+    if (req === null || !focused || activeId === null) return;
+    if (req.noteId !== activeId) return;
+    pendingAnchorTargetRef.current = activeId;
+    setScrollAnchor({ anchor: { query: req.query }, nonce: req.nonce });
+  }, [revealMatchNonce, focused, activeId]);
 
   // Only feed the pending scroll into the editor once THIS pane is actually
   // showing the deep-link target (the body-load effect keys on `activeId`); a

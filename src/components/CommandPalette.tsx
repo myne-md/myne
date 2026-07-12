@@ -37,6 +37,7 @@ import type {
 } from "../commands";
 import type { NoteId } from "../notes/sidebarState";
 import { searchNotes, shouldApplyNoteSearchResult } from "../notes/searchNotes";
+import { requestRevealMatch } from "../notes/views/revealMatchSignal";
 import type { NoteMatchedIn, NoteSearchResult } from "../types/note-search-result";
 
 const BACKDROP_STYLE: CSSProperties = {
@@ -379,12 +380,17 @@ export function CommandPalette({
         close();
         try {
           await ctx.onSelectNote(row.id);
+          // MYND-448b: after the note opens, scroll the editor to the first
+          // literal occurrence of the query and select it (graceful no-op when
+          // the hit was stem-only, i.e. no term occurs literally).
+          const q = query.trim();
+          if (q !== "") requestRevealMatch(row.id, q);
         } catch {
           /* selection failure surfaces via sidebar UX */
         }
       }
     },
-    [ctx, close],
+    [ctx, close, query],
   );
 
   const onKeyDown = useCallback(
