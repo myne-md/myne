@@ -16,6 +16,7 @@ export {
 } from "./chip-widget";
 // Anchor (heading / imported block-id) deep-link resolution (MYND-305).
 export {
+  extractBlockAnchors,
   findBlockOffset,
   findHeadingOffset,
   findQueryRange,
@@ -23,5 +24,6 @@ export {
   resolveAnchorOffset,
   resolveAnchorRange,
   type AnchorRange,
+  type BlockAnchor,
   type WikilinkAnchor,
 } from "./anchor";
