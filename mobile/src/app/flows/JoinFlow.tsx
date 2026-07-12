@@ -241,13 +241,16 @@ export function JoinFlow({ onComplete, onCancel }: JoinFlowProps) {
   }
 
   // While PENDING, drive the claim + watch for the adopted-head fingerprint. The
-  // foreground loop claims the token + pulls once an existing device approves;
-  // `sync_head_fingerprint` returns non-null only after that first sync. Poll it
-  // (cheap local read) + nudge a `sync_now` each tick so approval is picked up
-  // promptly → then advance to the mandatory verify step (SYNC-40).
+  // foreground loop claims the token + pulls once an existing device approves; the
+  // pulled head observation is surfaced as soon as it MAC-verifies (before note bodies
+  // download), so `sync_head_fingerprint` returns non-null promptly → advance to the
+  // mandatory verify step (SYNC-40). Self-scheduling ~1s poll (not setInterval) so a
+  // slow claim RTT never overlaps ticks; runs ONLY while step==='pending' — the bounded
+  // enroll window, NOT the steady-state background sync cadence.
   useEffect(() => {
     if (step !== "pending" || !HAS_TAURI) return;
     let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
     const tick = async () => {
       try {
         await syncNow(); // claim + sync if approved (no-op while still pending)
@@ -255,16 +258,17 @@ export function JoinFlow({ onComplete, onCancel }: JoinFlowProps) {
         if (!cancelled && fp) {
           setFingerprint(fp);
           setStep("verify");
+          return; // adopted the head — stop polling
         }
       } catch {
         /* transient — retry next tick */
       }
+      if (!cancelled) timer = setTimeout(() => void tick(), 1000);
     };
     void tick();
-    const id = setInterval(() => void tick(), 3000);
     return () => {
       cancelled = true;
-      clearInterval(id);
+      if (timer !== null) clearTimeout(timer);
     };
   }, [step]);
 
