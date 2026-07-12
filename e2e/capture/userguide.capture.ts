@@ -391,6 +391,20 @@ runner(
         ),
       );
 
+      // Outline sample — several headings (one nested) so the Outline tab in
+      // the right panel has a legible heading structure to render.
+      await safe("note Outline sample", () =>
+        createNoteWithBody(
+          s,
+          "Outline sample",
+          "\n## Introduction\n\nWhy this note exists.\n\n" +
+            "## Background\n\nThe context behind the work.\n\n" +
+            "### Prior art\n\nWhat came before.\n\n" +
+            "## Plan\n\nWhat we will do next.\n\n" +
+            "## Conclusion\n\nWrapping up.\n",
+        ),
+      );
+
       // Hub note LAST so it stays open + selected for the first frames.
       // Its wikilinks give the graph real edges (otherwise all nodes are
       // isolated and the graph reads as blank) and seed Roadmap's backlinks.
@@ -434,7 +448,10 @@ runner(
             { timeoutMs: 6000 },
           )
         ).click();
-        await s.byTestId("notes.row-folder-index-badge", { timeoutMs: 6000 });
+        // MYND-370: setting a folder note now HIDES the note from the tree and
+        // surfaces an "Open folder note" affordance on the folder's own row
+        // (the old per-note index badge is gone). Wait for that affordance.
+        await s.byTestId("notes.folder-index-affordance", { timeoutMs: 6000 });
       });
 
       // =====================================================================
@@ -717,16 +734,17 @@ runner(
         },
       );
 
-      // ---- Frame: folder notes (a folder index-note badge) ----
-      // folder-notes.e2e.ts: the index note's row carries
-      // notes.row-folder-index-badge (created in setup above, best-effort).
+      // ---- Frame: folder notes (a folder's "Open folder note" affordance) ----
+      // MYND-370: the folder note is hidden from the tree and reached from the
+      // folder row (double-click / the inline "Open folder note" button). The
+      // affordance is created in setup above (best-effort).
       await frame(
         s,
         "folder-notes",
         "notes-and-organization/folder-notes",
-        "A note in the sidebar marked with a folder-note badge, showing it is its folder's index note.",
+        "A folder row in the sidebar with its Open folder note button, which opens the folder's hidden index note.",
         async () => {
-          await s.byTestId("notes.row-folder-index-badge", { timeoutMs: 8000 });
+          await s.byTestId("notes.folder-index-affordance", { timeoutMs: 8000 });
         },
       );
 
@@ -847,6 +865,28 @@ runner(
           await openNoteByTitle(s, "Roadmap");
           await s.byTestId("editor.backlink-row", { timeoutMs: 10000 });
           await settle(s, 500);
+        },
+      );
+
+      // ---- Frame: outline (the right-panel Outline tab) ----
+      // right-panel tabs (right-panel-tabs): each tab button carries
+      // data-panel-tab-id; the outline body rows are editor.outline-row.
+      await frame(
+        s,
+        "outline",
+        "find-and-connect/outline",
+        "The Outline tab in the right panel, listing a note's headings so you can jump to any section.",
+        async () => {
+          await openNoteByTitle(s, "Outline sample");
+          await settle(s, 400);
+          await (
+            await s.waitForElement(
+              testIdSelector("editor.right-panel-tab", { "data-panel-tab-id": "outline" }),
+              { timeoutMs: 8000 },
+            )
+          ).click();
+          await s.byTestId("editor.outline-row", { timeoutMs: 8000 });
+          await settle(s, 400);
         },
       );
 
@@ -1031,6 +1071,106 @@ runner(
           await (await s.byTestId("settings.tab-storage")).click();
           await s.byTestId("settings.backup-vault", { timeoutMs: 6000 });
           await settle(s, 400);
+        },
+      );
+
+      // ---- Frame: sync settings (the Sync panel) ----
+      // SettingsModal PANELS: `sync` → settings.tab-sync; SyncPanel renders
+      // settings.sync-panel (endpoint config + device management).
+      await frame(
+        s,
+        "sync-settings",
+        "sync-and-devices/turn-on-sync",
+        "The Sync settings panel, where a sync server is configured and this device's sync is turned on.",
+        async () => {
+          await (await s.byTestId("settings.tab-sync")).click();
+          await s.byTestId("settings.sync-panel", { timeoutMs: 6000 });
+          await settle(s, 400);
+        },
+      );
+
+      // ---- Frame: files settings (the Files panel) ----
+      await frame(
+        s,
+        "files-settings",
+        "settings-and-privacy/files",
+        "The Files settings panel, with the default file to open on startup and where new notes are created.",
+        async () => {
+          await (await s.byTestId("settings.tab-files")).click();
+          await s.byTestId("settings.files-panel", { timeoutMs: 6000 });
+          await settle(s, 400);
+        },
+      );
+
+      // ---- Frame: AI settings (the AI Labs panel, off by default) ----
+      // `ai` sits in the Labs group; the tab is always present, the panel shows
+      // the enable toggle + model pickers + trust disclosure even when AI is off.
+      await frame(
+        s,
+        "ai-settings",
+        "ai/turning-on-ai",
+        "The AI (Beta) settings panel with the enable-local-AI toggle, the model pickers, and the on-device trust disclosure.",
+        async () => {
+          await (await s.byTestId("settings.tab-ai")).click();
+          await s.byTestId("settings.ai-panel", { timeoutMs: 6000 });
+          await settle(s, 400);
+        },
+      );
+
+      // ---- Frame: language (the Appearance panel's language selector) ----
+      await frame(
+        s,
+        "language-settings",
+        "settings-and-privacy/language",
+        "The interface-language selector at the top of the Appearance settings panel.",
+        async () => {
+          await (await s.byTestId("settings.tab-appearance")).click();
+          const sel = await s.byTestId("settings.language-select", { timeoutMs: 6000 });
+          await safe("scroll language-select into view", async () => {
+            await s.execute(
+              "var el = document.querySelector(arguments[0]);" +
+                "if (el) el.scrollIntoView({ block: 'center' });",
+              [testIdSelector("settings.language-select")],
+            );
+          });
+          void sel;
+          await settle(s, 400);
+        },
+      );
+
+      // ---- Frame: account (label + icon + Argon2id + actions) ----
+      await frame(
+        s,
+        "account-panel",
+        "settings-and-privacy/account",
+        "The Account settings panel showing the vault label and icon, the key-derivation parameters, and the change-password and delete-vault actions.",
+        async () => {
+          await (await s.byTestId("settings.tab-account")).click();
+          await s.byTestId("settings.icon-picker", { timeoutMs: 6000 });
+          await settle(s, 400);
+        },
+      );
+
+      // ---- Frame: connected extensions (browser-clipper pairings) ----
+      // Lives in the Account panel; the capture vault has none paired, so the
+      // empty state (settings.connected-extensions-empty) shows.
+      await frame(
+        s,
+        "connected-extensions",
+        "attachments-and-import/browser-clipper",
+        "The Connected extensions section of the Account settings, where browsers paired with the clipper are listed and can be revoked.",
+        async () => {
+          await (await s.byTestId("settings.tab-account")).click();
+          const ext = await s.byTestId("settings.connected-extensions", { timeoutMs: 6000 });
+          await safe("scroll connected-extensions into view", async () => {
+            await s.execute(
+              "var el = document.querySelector(arguments[0]);" +
+                "if (el) el.scrollIntoView({ block: 'center' });",
+              [testIdSelector("settings.connected-extensions")],
+            );
+          });
+          void ext;
+          await settle(s, 500);
         },
       );
 

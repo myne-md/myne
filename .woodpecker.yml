@@ -41,6 +41,35 @@ steps:
     commands:
       - cargo test -p protocol --no-fail-fast
 
+  # ─── Mobile cross-compile gate (MYND-457) ────────────────────
+  # Proves the shared `myne-core` (which now carries the sync engine +
+  # rustls/ring transport, decisions.md 2026-07-07) still compiles for the
+  # mobile targets, so a change that breaks mobile-compilability fails here
+  # rather than only when someone builds the phone app.
+  #
+  # HONEST SPLIT (SYNC-46 iOS-only v1):
+  #  - The PROVEN hard gate is `cargo check -p myne-core --target
+  #    aarch64-apple-ios` run LOCALLY on the mac dev machine (ring's asm needs
+  #    the Apple clang; passes on macOS + Xcode). iOS-in-CI needs a mac runner
+  #    → deferred with the mac/iOS release matrix (not this Linux runner).
+  #  - Android (`aarch64-linux-android`) needs the NDK clang for ring; this step
+  #    self-skips when the NDK is absent (mirrors sync-sim's self-skip), so it is
+  #    non-blocking until a runner image provisions ANDROID_NDK_HOME. Android
+  #    enablement itself is MYND-465.
+  mobile-crosscheck:
+    image: rust:1.96.0-slim
+    commands:
+      - rustup target add aarch64-linux-android
+      - |
+        CLANG="$${ANDROID_NDK_HOME:+$$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android34-clang}"
+        if [ -z "$$ANDROID_NDK_HOME" ] || ! command -v "$$CLANG" >/dev/null 2>&1; then
+          echo "Android NDK not provisioned (ANDROID_NDK_HOME unset / clang missing) -> skipping android cross-check. iOS cross-check is the mac-local hard gate (MYND-457); Android enablement is MYND-465.";
+          exit 0;
+        fi
+        export CC_aarch64_linux_android="$$CLANG"
+        export CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER="$$CLANG"
+        cargo check -p myne-core --target aarch64-linux-android
+
   # ─── Rust supply-chain audit ─────────────────────────────────
   # `git` is required by cargo-deny to fetch the rustsec advisory-db.
   cargo-deny:
@@ -234,7 +263,9 @@ steps:
       - cd "$CI_WORKSPACE"
       # Point the harness at the freshly built server and run ONLY the sim suite.
       - export MYNE_E2E_SERVER="$CI_WORKSPACE/myne-server/myne-server"
-      - cargo test -p myne-desktop --lib sync::sim:: --no-fail-fast
+      # Sync moved to myne-core (decisions.md 2026-07-07); sim suite is now
+      # `myne_core::plugins::sync::sim`. Still self-skips without the server.
+      - cargo test -p myne-core --lib plugins::sync::sim:: --no-fail-fast
 
   # ─── Cross-impl vector verification (DISABLED) ───────────────
   # protocol/tests/vectors.rs reads ../myne-test-vectors fixtures and asserts
