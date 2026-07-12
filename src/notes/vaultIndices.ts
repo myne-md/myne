@@ -116,13 +116,26 @@ export function extractBlockAnchorEntries(body: string): BlockAnchorEntry[] {
   return extractBlockAnchors(body).map(({ blockId, from }) => {
     const nl = body.indexOf("\n", from);
     const line = body.slice(from, nl === -1 ? undefined : nl);
-    const preview = line
-      .replace(BLOCK_MARKER_TAIL, "")
-      .replace(/\s+/g, " ")
-      .trim()
-      .slice(0, BLOCK_ANCHOR_PREVIEW_CAP);
-    return { blockId, preview };
+    let preview = line.replace(BLOCK_MARKER_TAIL, "").replace(/\s+/g, " ").trim();
+    // An own-line marker (`^id` alone on its line) is Obsidian's form for a
+    // NON-paragraph block (table / list / callout / code): the marker refers to
+    // the PRECEDING block, so the marker line strips to empty. Fall back to the
+    // nearest preceding non-empty line so the picker still shows a real preview.
+    if (preview === "") preview = precedingNonEmptyLine(body, from);
+    return { blockId, preview: preview.slice(0, BLOCK_ANCHOR_PREVIEW_CAP) };
   });
+}
+
+/** The nearest non-empty line strictly before offset `from` (a marker line's
+ *  start), whitespace-collapsed — the preview for an own-line block marker. */
+function precedingNonEmptyLine(body: string, from: number): string {
+  const before = body.slice(0, from > 0 ? from - 1 : 0);
+  const lines = before.split("\n");
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const trimmed = lines[i]!.replace(/\s+/g, " ").trim();
+    if (trimmed !== "") return trimmed;
+  }
+  return "";
 }
 
 /** Pull frontmatter `tags:` / `tag:` values, coercing to strings. Accepts a
