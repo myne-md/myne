@@ -281,7 +281,24 @@ pub fn run() {
         .register_asynchronous_uri_scheme_protocol(
             plugins::attachments::scheme::SCHEME,
             plugins::attachments::scheme::handle,
-        );
+        )
+        // Sync focus trigger: regaining OS window focus arms a rate-limited
+        // immediate poll in the background sync loop (the scheduler enforces
+        // the FOCUS_POLL_FLOOR_MS floor, so alt-tab flapping cannot turn this
+        // into a polling channel). Host-side WindowEvent — deliberately not a
+        // WebView `visibilitychange` (which does not flip on desktop focus
+        // loss) and not a new IPC command (no ACL surface widening).
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::Focused(true) = event {
+                use tauri::Manager;
+                if let Some(sig) = window
+                    .app_handle()
+                    .try_state::<plugins::sync::loop_control::SyncFocusSignal>()
+                {
+                    sig.bump();
+                }
+            }
+        });
 
     // local-ai epic (MYND-406): register the on-device inference plugin ONLY
     // when the default-off `local-inference` cargo feature is enabled, so the
@@ -390,12 +407,23 @@ pub fn run() {
             // The local-change signal must be managed first (the loop + the
             // notes lifecycle both read it).
             app.manage(plugins::sync::loop_control::SyncLocalChange::default());
+            // Window-focus signal for the loop's rate-limited focus poll (the
+            // on_window_event handler above bumps it; try_state-None before
+            // this manage would have been a safe no-op).
+            app.manage(plugins::sync::loop_control::SyncFocusSignal::default());
             // The live sync-status overlay cell (SYNC-36) the loop + sync_now
             // publish Syncing/Error into and sync_status reads back. Without this
             // the producers are `try_state`-None no-ops (the real states never
             // light up on desktop).
             app.manage(plugins::sync::commands::SyncRuntimeStatusCell::default());
             plugins::sync::loop_control::spawn_sync_loop(app.handle().clone());
+            // The /sync/poke SSE listener (MYND-423 client half): a push on
+            // another device becomes a pull here within seconds — baseline
+            // behaviour per the amended sync-protocol §8.3 (no user toggle;
+            // polling stays the fallback cadence). The supervisor gates the
+            // stream on unlocked+enrolled and parks on a revoked token.
+            app.manage(plugins::sync::poke_listener::SsePokeSignal::default());
+            plugins::sync::poke_listener::spawn_poke_supervisor(app.handle().clone());
             // ext-foundation-handoff task 6: the host↔app relay listener. Binds
             // the owner-only (0600) Unix-domain-socket under the app-data dir
             // and serves the keyless clip ingest on a background thread. The

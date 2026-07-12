@@ -16,7 +16,6 @@
 import type { CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import { usePrefs } from "../../hooks/usePrefs";
-import { useSyncPrefs } from "../../hooks/useSyncPrefs";
 import { useLastActiveNotePref } from "../../hooks/useLastActiveNotePref";
 import { SearchableSelect } from "../primitives/SearchableSelect";
 import type { SelectOption } from "../primitives/Select";
@@ -180,20 +179,28 @@ interface PrivacyPanelProps {
   onShowToast?: (message: string) => void;
 }
 
-// MYND-423: the real-time-sync (SSE) helper discloses the A13 presence-signal
-// tradeoff honestly. Polling is the privacy-default; opening an SSE keeps a
-// continuous connection the (untrusted) server sees as "this device is online".
-function realtimeSyncHelperText(enabled: boolean): string {
-  if (enabled) {
-    return "Changes from other devices arrive within seconds. An open real-time connection keeps you continuously visible as online to the sync server (it still cannot read your notes).";
-  }
-  return "Polling (the default): changes arrive at the next check, and the server only sees you while you check. Most private; turn on real-time sync above to trade that for lower latency.";
+// Real-time sync is baseline behaviour, not a toggle (amended sync-protocol
+// §8.3): the fixed-interval polling fallback already discloses presence at
+// poll granularity while the vault is unlocked, so the continuous connection's
+// marginal presence-signal delta stopped justifying a user-facing option. The
+// panel keeps an INFO row (no switch) so the disclosure stays honest.
+function RealtimeSyncInfoRow() {
+  const { t } = useTranslation();
+  return (
+    <div style={BLOCK_STYLE} data-testid="settings.realtime-sync-info">
+      <div style={TOGGLE_ROW_STYLE}>
+        <span style={LABEL_STYLE}>{t("settings.privacy.realtimeSyncLabel")}</span>
+      </div>
+      <p id="realtime-sync-helper" style={HELPER_STYLE}>
+        {t("settings.privacy.realtimeSyncHelper")}
+      </p>
+    </div>
+  );
 }
 
 export function PrivacyPanel({ onShowToast }: PrivacyPanelProps = {}) {
   const { t } = useTranslation();
   const { prefs, toggleScreenCapture, setAutoLock } = usePrefs(onShowToast);
-  const { realtimeSse, setRealtimeSse } = useSyncPrefs();
   const { enabled: lastActiveNote, setEnabled: setLastActiveNote } =
     useLastActiveNotePref();
   return (
@@ -208,15 +215,7 @@ export function PrivacyPanel({ onShowToast }: PrivacyPanelProps = {}) {
           void toggleScreenCapture(next);
         }}
       />
-      <ToggleRow
-        label="Real-time sync"
-        ariaLabel="Real-time sync"
-        ariaDescribedBy="realtime-sync-helper"
-        helper={realtimeSyncHelperText(realtimeSse)}
-        checked={realtimeSse}
-        onToggle={setRealtimeSse}
-        testId="settings.realtime-sync-toggle"
-      />
+      <RealtimeSyncInfoRow />
       <ToggleRow
         label="Continue where you left off"
         ariaLabel="Continue where you left off"

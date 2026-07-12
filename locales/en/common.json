@@ -1763,6 +1763,8 @@
       "autoLockLabel": "Auto-lock",
       "autoLockSearchEmpty": "No durations match.",
       "autoLockSearchPlaceholder": "Search durations…",
+      "realtimeSyncHelper": "Changes from other devices arrive within seconds over a contentless signal — the server relays only “something changed”, never what. While your vault is unlocked the app checks the server regularly anyway, so this adds no meaningful visibility; there is nothing to configure.",
+      "realtimeSyncLabel": "Real-time sync",
       "screenCaptureHelperOff": "Protection always applies before unlock. After unlock, follows this preference.",
       "screenCaptureHelperOn": "Active on macOS and Windows 10 (May 2020 Update or later). Linux support coming in a future release.",
       "screenCaptureLabel": "Screen-capture protection"
