@@ -2,11 +2,12 @@
 // consumes the shared `myne-core` crate (the single source of truth for the
 // vault / notes / prefs plugin cores, extracted from the desktop crate) and the
 // audited `protocol/` crate directly (no port). The still-desktop-only
-// subsystems (clipper, screen-capture, auto-lock, backup, importer, themes,
-// workspace, spell, PDF-export, AI-embeddings, biometric quick-unlock) are not
-// carried over — the core command cores trigger those side-effects through the
-// `myne_core::hooks::VaultLifecycleHooks` seam, into which mobile installs
-// `hooks::MobileHooks` (no-op for every desktop-only side-effect). The
+// subsystems (clipper, auto-lock, backup, importer, themes, workspace, spell,
+// AI-embeddings) are not carried over — the core command cores trigger those
+// side-effects through the `myne_core::hooks::VaultLifecycleHooks` seam, into
+// which mobile installs `hooks::MobileHooks` (no-op for every desktop-only
+// side-effect; screen-capture protection is LIVE through that seam — see
+// `screen_guard`, MYND-469). The
 // `sync` plugin (MYND-458) IS registered here — a thin shim over
 // `myne_core::plugins::sync` (all 14 commands, one deny-by-default
 // `sync:default` capability, SYNC-15); its `bump_local_change` hook stays a
@@ -42,6 +43,20 @@ mod screen_guard;
 pub fn run() {
     use tauri::{Listener, Manager};
 
+    // Install the log sink so the app's `tracing::*!` events reach stdout —
+    // without this nothing is printed (the shared cores + `screen_guard` emit
+    // `tracing` but no subscriber was wired; desktop `lib.rs` parity). On iOS
+    // stdout lands in the `tauri ios dev` terminal; on Android it surfaces via
+    // `adb logcat -s RustStdoutStderr` (`docs/dev/device-matrix.md` §6.1).
+    // Honors the secret-handling logging discipline — bounded variant names /
+    // stage tags only, never key material.
+    let _ = tracing_subscriber::fmt()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
+        )
+        .try_init();
+
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         // Custom-scheme delivery for the iOS widgets (`myne://open` /
@@ -52,6 +67,11 @@ pub fn run() {
         // inside TB6: the app decides what `myne://capture` means (a new note,
         // after unlock), the widget cannot reach the vault.
         .plugin(tauri_plugin_deep_link::init())
+        // MYND-469: screen-capture protection's Android FLAG_SECURE bridge (an
+        // in-repo Kotlin plugin; Rust-only surface — no WebView commands, no
+        // capability entry). On iOS/desktop this registers a no-op; the iOS
+        // half lives in `screen_guard` (see the `.setup()` init below).
+        .plugin(tauri_plugin_screen_guard::init())
         .plugin(plugins::vault_creation::init())
         .plugin(plugins::vault_unlock::init())
         .plugin(plugins::vault_recover::init())
@@ -177,6 +197,16 @@ pub fn run() {
             // exists for it. See `ios_chrome`. iOS-only; no-op elsewhere.
             #[cfg(target_os = "ios")]
             ios_chrome::suppress_keyboard_accessory_bar();
+
+            // MYND-469: one-time secure-field layer splice, protection ON —
+            // the pre-unlock always-ON invariant from before the first painted
+            // frame. Setup runs inside the Ready dispatch AFTER the config
+            // window exists, the startup point every deployed implementation
+            // of this technique uses (the post-unlock variant crashed
+            // on-device — see `screen_guard.rs`). Android needs no call here:
+            // the Kotlin plugin's `load()` applies FLAG_SECURE itself.
+            #[cfg(target_os = "ios")]
+            screen_guard::init(app.handle());
 
             // Native PDF export. `window.print()` is a no-op in the mobile
             // WebView, so the "Export as PDF" action emits EXPORT_PDF_EVENT with

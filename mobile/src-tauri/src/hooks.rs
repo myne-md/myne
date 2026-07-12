@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0
 //! Mobile implementation of [`myne_core::hooks::VaultLifecycleHooks`].
 //!
-//! Mobile carries none of the desktop-only side-effect subsystems (search,
-//! spell, sync, attachments, workspace, screen-capture, quick-unlock, …), so
-//! almost every hook is a no-op — the same shape as `myne_core::hooks::NoopHooks`.
+//! Mobile carries few of the desktop-only side-effect subsystems (search,
+//! spell, workspace, … are still absent), so most hooks are no-ops — the same
+//! shape as `myne_core::hooks::NoopHooks`.
 //!
 //! The two exceptions wire the **snapshots** subsystem, which lives entirely in
 //! `myne-core` (`snapshot_store` + `snapshot_policy`, no desktop dependency):
@@ -25,8 +25,14 @@
 //! local note edit nudges the shared `SyncLocalChange` counter (via `try_state`)
 //! so the future background-sync loop (MYND-460) can open its coalesced-push
 //! window. Until the loop lands nothing reads the counter, so the bump is a
-//! harmless nudge. Every other hook stays a no-op until its subsystem lands on
-//! mobile (see `myne-mobile/CLAUDE.md`).
+//! harmless nudge.
+//!
+//! A fourth live hook is
+//! [`apply_screen_capture`](MobileHooks::apply_screen_capture) (MYND-469):
+//! native screen-capture protection via `crate::screen_guard` (iOS
+//! secure-field layer splice / Android FLAG_SECURE bridge). Every other hook
+//! stays a no-op until its subsystem lands on mobile (see
+//! `myne-mobile/CLAUDE.md`).
 
 use myne_core::hooks::{BoxFuture, VaultLifecycleHooks};
 use myne_core::plugins::vault_unlock::state::VaultRuntimeState;
@@ -35,11 +41,11 @@ use tauri::{AppHandle, Manager, Runtime};
 /// Mobile wiring for the shared command-core lifecycle hooks: no-op everywhere
 /// except the two snapshot hooks (which drive the `myne-core` snapshot store)
 /// and `bump_local_change` (nudges the shared `SyncLocalChange` counter) and
-/// `apply_screen_capture` (native screen-capture protection). Holds an
-/// [`AppHandle`] so `bump_local_change` reaches the managed `SyncLocalChange`
-/// via `try_state`, and the screen-capture hook dispatches its UIKit/Android
-/// work onto the main thread via `run_on_main_thread` — mirrors the desktop
-/// `DesktopHooks`.
+/// `apply_screen_capture` (native screen-capture protection, MYND-469). Holds
+/// an [`AppHandle`] so `bump_local_change` reaches the managed
+/// `SyncLocalChange` via `try_state` and the screen-capture hook reaches
+/// `screen_guard::apply` (which owns its per-platform threading) — mirrors the
+/// desktop `DesktopHooks`.
 pub struct MobileHooks<R: Runtime> {
     app: AppHandle<R>,
 }
@@ -84,15 +90,14 @@ impl<R: Runtime> VaultLifecycleHooks for MobileHooks<R> {
     fn abort_active_recording(&self) {}
     fn pdf_export_teardown_on_lock(&self) {}
     fn clear_staged_descriptor(&self) {}
-    fn apply_screen_capture(&self, enabled: bool, _site: &'static str) {
-        // Native screen-capture protection lives in `crate::screen_guard`. UIKit
-        // (iOS) and `Window.setFlags` (Android) must run on the UI/main thread,
-        // but this hook fires from the async command context — hop over via
-        // Tauri's main-thread dispatch. Best-effort: a dispatch error (event loop
-        // gone mid-teardown) is swallowed, matching desktop's warn-and-drop.
-        let _ = self
-            .app
-            .run_on_main_thread(move || crate::screen_guard::apply(enabled));
+    fn apply_screen_capture(&self, enabled: bool, site: &'static str) {
+        // Native screen-capture protection lives in `crate::screen_guard`,
+        // which owns the per-platform threading: iOS hops to the main thread
+        // itself (UIKit), while the Android arm is a blocking JNI round-trip
+        // SERVICED BY the main thread — it must run right here on the async
+        // command thread (dispatching it onto the main thread would deadlock;
+        // see `screen_guard.rs` "Threading").
+        crate::screen_guard::apply(&self.app, enabled, site);
     }
 
     // ---- Group 4: note-CRUD index/sync side-effects -----------------------
