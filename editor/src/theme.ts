@@ -46,12 +46,18 @@ export const myneTheme = EditorView.theme({
   "&.cm-focused .cm-cursor": {
     borderLeftColor: "var(--accent, #2c4a7a)",
   },
-  // Text selection (double-click word, drag, Cmd/Ctrl+A). A neutral
-  // `--paper-3` fill is invisible in dark mode — there it sits one step off
-  // the editor paper (#232220 vs #1a1a17) and the highlight vanishes. Use the
-  // same tinted accent as `.cm-table-cell-input::selection` below; the accent
-  // token flips per theme, so the wash stays visible in both light and dark.
-  "&.cm-focused .cm-selectionBackground, ::selection": {
+  // Text selection (double-click word, drag, Cmd/Ctrl+A). A neutral `--paper-3`
+  // fill is invisible in dark mode, so tint with the accent (flips per theme, so
+  // the wash stays visible in both light and dark). BOTH focus states are styled:
+  // CodeMirror's built-in UNFOCUSED selection is a light wash that washes out
+  // dark-mode text the moment focus leaves the editor (e.g. the floating
+  // selection toolbar opens) — restyle it too, dim but still contrast-safe, so a
+  // selection stays readable regardless of focus. The focused wash is fuller,
+  // keeping a subtle "focus is here" cue.
+  ".cm-selectionBackground, ::selection": {
+    backgroundColor: "color-mix(in srgb, var(--accent, #2c4a7a) 18%, transparent)",
+  },
+  "&.cm-focused .cm-selectionBackground": {
     backgroundColor: "color-mix(in srgb, var(--accent, #2c4a7a) 28%, transparent)",
   },
 
