@@ -26,7 +26,7 @@
 //! ------  ----  ----------------  ------------------------------------
 //! 0       4     magic             ASCII "MYQ1"
 //! 4       1     protocol_version  0x01
-//! 5       1     provider_kind     0x01 = macOS-biometric, 0x02 = PIN
+//! 5       1     provider_kind     0x01 = Apple-biometric, 0x02 = PIN
 //! 6       16    pin_salt          Argon2id salt for the PIN provider;
 //!                                  all-zero when provider_kind != PIN
 //! 22      24    wrap_nonce        XChaCha20-Poly1305 nonce
@@ -62,7 +62,8 @@ pub const QUICK_UNLOCK_BLOB_MAGIC: [u8; 4] = *b"MYQ1";
 /// `protocol_version` byte at offset 4 — `0x01` for v0.1.
 pub const QUICK_UNLOCK_BLOB_PROTOCOL_VERSION: u8 = 0x01;
 
-/// `provider_kind` value for the macOS-biometric (Keychain) wrap-key provider.
+/// `provider_kind` value for the Apple-biometric (Keychain; macOS Touch ID /
+/// iOS Face ID + Touch ID) wrap-key provider.
 pub const PROVIDER_KIND_BIOMETRIC: u8 = 0x01;
 
 /// `provider_kind` value for the PIN (Argon2id) wrap-key provider.
@@ -88,7 +89,7 @@ pub const QUICK_UNLOCK_CIPHERTEXT_LEN: usize = AEAD_KEY_LEN + CTX_COMMITMENT_TAG
 /// derive its `wrap_key` before decoding.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct QuickUnlockHeader {
-    /// `0x01` = macOS-biometric, `0x02` = PIN.
+    /// `0x01` = Apple-biometric, `0x02` = PIN.
     pub provider_kind: u8,
     /// Argon2id salt for the PIN provider; all-zero for biometric.
     pub pin_salt: [u8; QUICK_UNLOCK_PIN_SALT_LEN],

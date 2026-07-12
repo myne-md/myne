@@ -1,11 +1,21 @@
-//! macOS Touch ID wrap-key provider for quick-unlock (MYND-329, task 7).
+// SPDX-License-Identifier: AGPL-3.0
+//! Apple-Keychain biometric wrap-key provider for quick-unlock (MYND-329,
+//! task 7; generalized macOS → macOS + iOS when it moved here from the desktop
+//! crate so the mobile client shares it — decisions.md 2026-07-12).
 //!
-//! ⚠️ **UNVERIFIED — pending Touch ID hardware test + a primitive-level review.**
-//! This module is compile-checked on macOS but its biometric gating CANNOT be
-//! confirmed without real Touch ID hardware: a mistake here could store the
-//! wrap key WITHOUT an effective biometric requirement (the Bitwarden
-//! CVE-2023-27706 failure class), which compilation does not catch. Do not rely
-//! on it until: (1) a device with Touch ID confirms `retrieve` actually prompts
+//! One provider, two platforms behind the same `provider_kind 0x01`:
+//! - **macOS** — Touch ID via the login Keychain.
+//! - **iOS** — Face ID / Touch ID via the device Keychain (Secure-Enclave-backed
+//!   on all supported hardware). The host app MUST declare
+//!   `NSFaceIDUsageDescription` (myne-mobile `Info.ios.plist`) or the Face ID
+//!   prompt is denied by the OS.
+//!
+//! ⚠️ **UNVERIFIED — pending biometric hardware test + a primitive-level review.**
+//! This module is compile-checked on macOS/iOS but its biometric gating CANNOT
+//! be confirmed without real hardware: a mistake here could store the wrap key
+//! WITHOUT an effective biometric requirement (the Bitwarden CVE-2023-27706
+//! failure class), which compilation does not catch. Do not rely on it until:
+//! (1) a device with Touch ID / Face ID confirms `retrieve` actually prompts
 //! and that a non-authenticated read fails; (2) the design session's flagged
 //! `kSecAccessControlBiometryCurrentSet` primitive review is done (`/grill-me`).
 //! The biometric command branch IS wired (`quick_unlock_*_biometric`) precisely
@@ -20,7 +30,7 @@
 //! `biometryCurrentSet` flag invalidates the item when the enrolled biometric
 //! set changes (User Story 9, for free at the OS level).
 
-#![cfg(target_os = "macos")]
+#![cfg(any(target_os = "macos", target_os = "ios"))]
 
 use super::provider::{ProviderError, ProviderSecret, QuickUnlockProvider, WRAP_KEY_LEN};
 use getrandom::getrandom;
@@ -33,17 +43,20 @@ use zeroize::Zeroizing;
 
 /// Keychain service string for quick-unlock wrap keys. Vault identity is the
 /// account component (the hex `account_number_hash`), so one device can hold
-/// distinct items for distinct vaults.
+/// distinct items for distinct vaults. UNCHANGED from the desktop-era value —
+/// existing macOS Touch ID credentials keep resolving after the move to
+/// `myne-core`.
 const KEYCHAIN_SERVICE: &str = "md.myne.quickunlock";
 
-/// The macOS Touch ID provider. Constructed per operation from the vault's
-/// `account_number_hash` (the Keychain account key); holds no secret itself —
-/// the wrap key lives in the Keychain behind the biometric gate.
-pub struct MacosBiometricProvider {
+/// The Apple biometric provider (macOS Touch ID; iOS Face ID / Touch ID).
+/// Constructed per operation from the vault's `account_number_hash` (the
+/// Keychain account key); holds no secret itself — the wrap key lives in the
+/// Keychain behind the biometric gate.
+pub struct AppleBiometricProvider {
     account: String,
 }
 
-impl MacosBiometricProvider {
+impl AppleBiometricProvider {
     /// Build a provider keyed to a vault by its `account_number_hash`.
     pub fn new(account_number_hash: [u8; 16]) -> Self {
         Self {
@@ -53,9 +66,9 @@ impl MacosBiometricProvider {
 
     /// Build the biometry-current-set + this-device-only access control object.
     fn access_control() -> Result<SecAccessControl, ProviderError> {
-        // `kSecAccessControlBiometryCurrentSet`: require Touch ID, and invalidate
-        // if the enrolled biometric set changes. `WhenUnlockedThisDeviceOnly`:
-        // non-exportable, never leaves this device.
+        // `kSecAccessControlBiometryCurrentSet`: require Touch ID / Face ID, and
+        // invalidate if the enrolled biometric set changes.
+        // `WhenUnlockedThisDeviceOnly`: non-exportable, never leaves this device.
         SecAccessControl::create_with_protection(
             Some(ProtectionMode::AccessibleWhenUnlockedThisDeviceOnly),
             kSecAccessControlBiometryCurrentSet,
@@ -67,7 +80,7 @@ impl MacosBiometricProvider {
     }
 }
 
-impl QuickUnlockProvider for MacosBiometricProvider {
+impl QuickUnlockProvider for AppleBiometricProvider {
     fn kind(&self) -> u8 {
         PROVIDER_KIND_BIOMETRIC
     }
@@ -100,7 +113,7 @@ impl QuickUnlockProvider for MacosBiometricProvider {
         &self,
         _pin_salt: &[u8; QUICK_UNLOCK_PIN_SALT_LEN],
     ) -> Result<Zeroizing<[u8; WRAP_KEY_LEN]>, ProviderError> {
-        // Reading the gated item triggers the OS Touch ID prompt. A user-cancel
+        // Reading the gated item triggers the OS biometric prompt. A user-cancel
         // / no-hardware surfaces as an error; we map to the coarse variants the
         // command layer expects (cancel → silent password fallback).
         let bytes =
@@ -137,7 +150,7 @@ fn log_keychain_err(op: &'static str, e: &security_framework::base::Error) {
         stage = "quick_unlock_biometric",
         op,
         errsec_code = e.code(),
-        "macOS Keychain operation failed"
+        "Apple Keychain operation failed"
     );
 }
 

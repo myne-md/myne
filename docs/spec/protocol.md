@@ -229,7 +229,7 @@ In v0.1, only the singleton `itemsKey` exists. There is no epoch rotation. The r
 
 New v0.1 context strings MAY be added in future revisions of this specification; all v0.1 context strings begin with `"myne.v0.1 "` and v005 context strings will begin with `"myne.v005 "`.
 
-The **quick-unlock credential blob** (`vault.quickunlock`, §9.14) is deliberately **NOT** in this registry: its KEK is **not** a `DeriveSubkey(root_key, …)` subkey. Because the blob wraps `root_key` itself, a `root_key`-derived KEK would be circular; instead its wrap key is supplied by an external, hardware-bound provider (macOS Keychain biometric secret) or derived from a PIN (§9.14.2). It is the one §9 blob with no §3.4 row.
+The **quick-unlock credential blob** (`vault.quickunlock`, §9.14) is deliberately **NOT** in this registry: its KEK is **not** a `DeriveSubkey(root_key, …)` subkey. Because the blob wraps `root_key` itself, a `root_key`-derived KEK would be circular; instead its wrap key is supplied by an external, hardware-bound provider (Apple Keychain biometric secret) or derived from a PIN (§9.14.2). It is the one §9 blob with no §3.4 row.
 
 The deferred resolution of `server-auth` does not affect the v0.1 wire format or any blob produced under v0.1 — the subkey is derived but never used by any v0.1 client. A v0.1 vault opened by a Phase 2 client will still produce the same `server-auth` bytes deterministically; the Phase 2 protocol layer determines what to do with them.
 
@@ -1522,16 +1522,18 @@ magic; a v005 client MUST refuse `MYD1` (§10.4).
 `root_key`** — the structural realization of the §3.1 forward-look ("adding a third
 encrypted copy of `root_key` under a third wrap key, with no change to the rest of the
 protocol"). It exists so a re-lock (auto-lock-on-idle, §9.5 / `auto_lock.rs`) can be
-reversed with a fast second credential (Touch ID / Windows Hello / a PIN) instead of the
-full master-password Argon2id path, **without touching the cryptographic root**: the
+reversed with a fast second credential (Touch ID / Face ID / Windows Hello / a PIN)
+instead of the full master-password Argon2id path, **without touching the cryptographic
+root**: the
 blob wraps the already-derived `root_key`; it never participates in `root_key` derivation
 (MYND-329).
 
 Unlike every other §9 blob, `vault.quickunlock` is **NOT** wrapped under a
 `DeriveSubkey(root_key, …)` KEK — that would be circular, since the blob *is* what
 protects `root_key`. Its wrap key is supplied by an **external wrap-key provider** bound
-to OS-backed hardware (macOS Keychain item gated by `kSecAccessControlBiometryCurrentSet`,
-or a future Windows Hello / TPM challenge-response) or, as a fallback, derived from a PIN
+to OS-backed hardware (an Apple Keychain item gated by `kSecAccessControlBiometryCurrentSet`
+— macOS Touch ID or iOS Face ID / Touch ID — or a future Windows Hello / TPM
+challenge-response) or, as a fallback, derived from a PIN
 via the vault's existing Argon2id parameters. The blob therefore has **no §3.4 subkey
 role**.
 
@@ -1552,9 +1554,11 @@ Offset  Size       Field                  Description
 ------  ---------  ---------------------  -------------------------------------
 0       4 bytes    magic                  ASCII "MYQ1"
 4       1 byte     protocol_version       0x01 for this specification
-5       1 byte     provider_kind          0x01 = macOS-biometric (Keychain),
-                                          0x02 = PIN (Argon2id). Other values
-                                          reserved (Windows Hello = future).
+5       1 byte     provider_kind          0x01 = Apple-biometric (Keychain;
+                                          macOS Touch ID / iOS Face ID + Touch
+                                          ID), 0x02 = PIN (Argon2id). Other
+                                          values reserved (Windows Hello /
+                                          Android Keystore = future).
                                           Bound into the AAD (§9.14.3) so a blob
                                           minted for one provider cannot be
                                           reinterpreted under another.
@@ -1581,8 +1585,10 @@ magic-byte-before-decrypt discipline of §9.2 / §9.3 / §9.13.1).
 The on-disk blob is **provider-agnostic**: it is always `AEAD(wrap_key, root_key)`, and
 only the source of the 32-byte `wrap_key` differs. v0.1 defines:
 
-- **`0x01` macOS-biometric** — `wrap_key` is a 32-byte random secret stored in the macOS
-  Keychain under an access-control object built with `kSecAccessControlBiometryCurrentSet`
+- **`0x01` Apple-biometric** — `wrap_key` is a 32-byte random secret stored in the Apple
+  Keychain (macOS login Keychain behind Touch ID; iOS device Keychain behind Face ID /
+  Touch ID — same mechanism, one provider kind; `decisions.md` 2026-07-12) under an
+  access-control object built with `kSecAccessControlBiometryCurrentSet`
   + `kSecAttrAccessibleWhenUnlockedThisDeviceOnly`. Retrieval triggers the OS biometric
   prompt inherently (the resource is gated, not an app-level boolean — the bypass lesson
   of OWASP-MASTG / Teleport RFD 54). The `biometryCurrentSet` flag invalidates the secret
