@@ -421,11 +421,31 @@ impl SearchIndex for InvertedIndex {
         // Replace semantics: drop any prior document with this id first.
         self.remove(&doc.id);
 
+        // MYND-448a: an attachment doc (`att:<attachment>:<note>`) carries the
+        // embedding note's title for DISPLAY only (the result-row context line).
+        // Indexing that title would let the attachment match on the note's TITLE
+        // — a spurious "in attachment" content hit that also ranks high via
+        // TITLE_BOOST and multiplies per embedded attachment. So the title FIELD
+        // is indexed ONLY for note docs; an attachment doc is searchable purely
+        // by its extracted text (its `body`). `DocEntry.title` below still stores
+        // the note title, so the row's display is unaffected.
+        let index_title = !matches!(
+            doc_id::parse_search_doc_id(&doc.id),
+            doc_id::SearchDocId::Attachment { .. }
+        );
+
         // Original-case tokens (so Turkish casefolding before stemming is
         // correct); the raw index form is the default-lowercased token.
         let title_split = split_nfc(&doc.title);
         let body_split = split_nfc(&doc.body);
-        let len = (title_split.len() + body_split.len()) as u32;
+        // Un-indexed title tokens are NOT counted toward the BM25 doc length (an
+        // attachment doc's length is its body only) — counting them would dilute
+        // its term-frequency normalization against content it can't match on.
+        let len = if index_title {
+            (title_split.len() + body_split.len()) as u32
+        } else {
+            body_split.len() as u32
+        };
 
         // Detect the note's language (enough-text gated) and single-stem the
         // index in that one language; ALWAYS also index the raw token. The
@@ -438,7 +458,9 @@ impl SearchIndex for InvertedIndex {
         let stem_ctx = stemmer.as_ref().zip(algo);
 
         let mut freqs: HashMap<String, FieldFreq> = HashMap::new();
-        index_field(&mut freqs, &title_split, true, stem_ctx);
+        if index_title {
+            index_field(&mut freqs, &title_split, true, stem_ctx);
+        }
         index_field(&mut freqs, &body_split, false, stem_ctx);
 
         let docid = self.next_doc;
@@ -1157,6 +1179,36 @@ mod tests {
         assert_eq!(idx.query("alpha").len(), 1);
         assert!(idx.query("beta").is_empty(), "un-embedded attachment doc dropped");
         assert_eq!(idx.query("prose").len(), 1);
+    }
+
+    #[test]
+    fn attachment_doc_does_not_match_the_embedding_notes_title() {
+        // MYND-448a review fix: an attachment doc carries the note title for
+        // DISPLAY only — a query hitting ONLY the note title must NOT surface the
+        // attachment doc as a (falsely paperclip-badged) content match.
+        let mut idx = InvertedIndex::default();
+        idx.add(doc("note1", "Quarterly Report", "some prose"));
+        idx.set_note_attachments(
+            "note1",
+            &[att("deadbeef", "Quarterly Report", "unrelated spreadsheet rows")],
+        );
+        // "quarterly" is ONLY in the note title → the note body doc matches, the
+        // attachment doc does NOT.
+        let title_hits = idx.query("quarterly");
+        assert_eq!(title_hits.len(), 1);
+        assert_eq!(
+            doc_id::parse_search_doc_id(&title_hits[0].id),
+            doc_id::SearchDocId::Note { note_id: "note1" }
+        );
+        // The attachment doc still matches on its OWN extracted content...
+        let body_hits = idx.query("spreadsheet");
+        assert_eq!(body_hits.len(), 1);
+        assert!(matches!(
+            doc_id::parse_search_doc_id(&body_hits[0].id),
+            doc_id::SearchDocId::Attachment { .. }
+        ));
+        // ...and STILL displays the note title for the row (display preserved).
+        assert_eq!(body_hits[0].title, "Quarterly Report");
     }
 
     #[test]

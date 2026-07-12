@@ -93,4 +93,20 @@ describe("extractBlockAnchorEntries — index feed (MYND-382)", () => {
   it("mints nothing when there are no markers", () => {
     expect(extractBlockAnchorEntries("just prose, no anchors")).toEqual([]);
   });
+
+  it("own-line marker (Obsidian non-paragraph block) previews the preceding block", () => {
+    // `^tbl` on its own line refers to the table above it — the marker line
+    // strips to empty, so the preview falls back to the preceding non-empty line.
+    const body = "| a | b |\n| 1 | 2 |\n^tbl";
+    expect(extractBlockAnchorEntries(body)).toEqual([
+      { blockId: "tbl", preview: "| 1 | 2 |" },
+    ]);
+  });
+
+  it("own-line marker skips blank lines back to real content", () => {
+    const body = "The callout body.\n\n\n^cb";
+    expect(extractBlockAnchorEntries(body)).toEqual([
+      { blockId: "cb", preview: "The callout body." },
+    ]);
+  });
 });
