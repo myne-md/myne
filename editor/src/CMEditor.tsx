@@ -20,6 +20,8 @@ import { selectedRangesText } from "./selectionText";
 import { reconfigureNoteSet } from "./wikilink/note-set";
 import { reconfigureVaultHeadings } from "./wikilink/vault-headings";
 import type { VaultHeading } from "./wikilink/vault-headings";
+import { reconfigureVaultBlockAnchors } from "./wikilink/vault-block-anchors";
+import type { VaultBlockAnchor } from "./wikilink/vault-block-anchors";
 import { reconfigureLineNumbers } from "./line-numbers";
 import { reconfigureViewMode, type ViewMode } from "./view-mode";
 import { resolveAnchorRange, type WikilinkAnchor } from "./wikilink/anchor";
@@ -49,6 +51,11 @@ export type CMEditorProps = {
    *  Pushed into the editor's vault-headings compartment (re-mount-free) like
    *  `noteSet`. Optional — when absent, `[[##` simply finds nothing. */
   vaultHeadings?: readonly VaultHeading[];
+  /** MYND-382: the vault-wide imported-block-anchor set the `[[^^` enumerate-only
+   *  autocomplete searches. Pushed into the vault-block-anchors compartment
+   *  (re-mount-free) like `vaultHeadings`. Optional — when absent, `[[^^` finds
+   *  nothing. */
+  vaultBlockAnchors?: readonly VaultBlockAnchor[];
   /** Called when a resolved wikilink chip is clicked (the workspace opens the
    *  target note). The chip emits a `myne-open-wikilink` event; this relays it.
    *  MYND-305: `anchor` carries the GENERIC `#heading` / `^block-id` deep-link
@@ -85,7 +92,7 @@ export type CMEditorProps = {
 };
 
 export function CMEditor(props: CMEditorProps) {
-  const { value, onChange, onBlur, onSelectionChange, extensions, noteSet, vaultHeadings, onOpenWikilink, scrollAnchor = null, lineNumbers = false, viewMode = "live", readOnly = false, aiEnabled = false, style, onReady } = props;
+  const { value, onChange, onBlur, onSelectionChange, extensions, noteSet, vaultHeadings, vaultBlockAnchors, onOpenWikilink, scrollAnchor = null, lineNumbers = false, viewMode = "live", readOnly = false, aiEnabled = false, style, onReady } = props;
   const hostRef = useRef<HTMLDivElement | null>(null);
   const viewRef = useRef<EditorView | null>(null);
   const onChangeRef = useRef(onChange);
@@ -201,6 +208,14 @@ export function CMEditor(props: CMEditorProps) {
     if (view === null || vaultHeadings === undefined) return;
     view.dispatch({ effects: reconfigureVaultHeadings(vaultHeadings) });
   }, [vaultHeadings]);
+
+  // MYND-382: push the vault-wide imported-block-anchor set into the view's
+  // compartment (same re-mount-free pattern) so the `[[^^` picker searches it.
+  useEffect(() => {
+    const view = viewRef.current;
+    if (view === null || vaultBlockAnchors === undefined) return;
+    view.dispatch({ effects: reconfigureVaultBlockAnchors(vaultBlockAnchors) });
+  }, [vaultBlockAnchors]);
 
   // editor-line-numbers (MYND-314): push the line-number gutter toggle into the
   // view's line-number compartment whenever the `editor_line_numbers` pref

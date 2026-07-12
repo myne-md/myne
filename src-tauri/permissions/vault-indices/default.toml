@@ -20,6 +20,7 @@ permissions = [
   "allow-vault-indices-remove",
   "allow-vault-indices-forward",
   "allow-vault-indices-all-edges",
+  "allow-vault-indices-block-anchors",
   "allow-vault-indices-orphans",
   "allow-vault-indices-backlink-candidates",
   "allow-vault-indices-by-tag",
@@ -34,6 +35,11 @@ permissions = [
 identifier = "allow-vault-indices-all-edges"
 description = "Allow invoking vault-indices:vault_indices_all_edges (Slot::Unlocked-gated whole-vault edge dump — [(noteId, edges)] for every indexed note, for the graph view's whole-vault build at ≤ cap; defensive edge-ceiling). Returns vault-wide link-structure (AS4-Sensitive) → main-window-only, same invariant as the prefs setters (v0.2 multi-window MUST NOT grant it to sub-windows)."
 commands.allow = ["vault_indices_all_edges"]
+
+[[permission]]
+identifier = "allow-vault-indices-block-anchors"
+description = "Allow invoking vault-indices:vault_indices_block_anchors (Slot::Unlocked-gated whole-vault dump of imported ^block-id anchors — {noteId, noteTitle, blockId, preview} per anchor, for the [[^^ enumerate-only block-deep-link picker, MYND-382; defensive anchor-ceiling). Enumerate-only: surfaces markers that already exist (import), never mints one. Returns vault-wide block-anchor metadata (AS3/AS4-Sensitive) → main-window-only, same invariant as the prefs setters (v0.2 multi-window MUST NOT grant it to sub-windows)."
+commands.allow = ["vault_indices_block_anchors"]
 
 [[permission]]
 identifier = "allow-vault-indices-orphans"

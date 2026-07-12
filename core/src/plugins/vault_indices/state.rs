@@ -210,6 +210,49 @@ impl PropertyEntry {
     }
 }
 
+/// One imported `^block-id` anchor (MYND-382), surfaced for the `[[^^` picker.
+/// **Enumerate-only**: Myne never MINTS block ids — this indexes markers that
+/// ALREADY exist (e.g. imported from Obsidian). TS extracts them
+/// (`extractBlockAnchors`, the single dialect source, Build-B); Rust stores +
+/// serves them for the vault-wide picker. serde camelCase (TS sends camelCase).
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct BlockAnchor {
+    /// The block id, verbatim, WITHOUT the leading `^` (matches the `[[A^id]]`
+    /// deep-link form). Plaintext-derived.
+    pub block_id: String,
+    /// A short preview of the tagged block's text — the picker's secondary line
+    /// — computed TS-side (the block's first line, truncated). Plaintext-derived.
+    pub preview: String,
+}
+
+impl BlockAnchor {
+    fn zeroize_in_place(&mut self) {
+        self.block_id.zeroize();
+        self.preview.zeroize();
+    }
+}
+
+/// One resolved vault-wide block anchor for the `[[^^` picker (MYND-382): which
+/// note carries it (id + display title) plus the block id + preview. The flat
+/// row shape [`VaultIndicesState::all_block_anchors`] returns to the picker.
+#[derive(Clone, Debug, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct VaultBlockAnchor {
+    /// The embedding note's UUID (the `[[…^id]]` target the picker inserts).
+    pub note_id: String,
+    /// The embedding note's display title, if any (untitled → `None`).
+    pub note_title: Option<String>,
+    /// The embedding note's `folder:` (trailing-slash form) or `None`/root —
+    /// baked into the emitted path-form deep-link so it disambiguates same-title
+    /// notes, exactly like the vault-heading picker.
+    pub note_folder: Option<String>,
+    /// The block id (no leading `^`).
+    pub block_id: String,
+    /// The block's preview line (picker secondary text).
+    pub preview: String,
+}
+
 /// Per-note record in the index.
 ///
 /// Holds the note's `title` + `folder` (the inputs the TS resolver —
@@ -238,6 +281,15 @@ pub struct NoteRecord {
     /// arbitrary key coerced TS-side per §3.6.4. Opaque pre-typed values; Rust
     /// stores + returns them without interpretation. Plaintext-derived.
     pub properties: Vec<PropertyEntry>,
+    /// Imported `^block-id` anchors in this note (MYND-382, the `[[^^` picker).
+    /// `#[serde(default)]` so a note that sends none — or a pre-382 TS `apply`
+    /// (mobile, or an older desktop build) — deserializes to empty. The postcard
+    /// SNAPSHOT still forces a rebuild of a pre-382 `vault.indices` blob: a
+    /// missing trailing field is a postcard decode error (non-self-describing),
+    /// which the load path maps to a full TS rebuild (§9.8.4) — the intended
+    /// rebuild-on-format-change.
+    #[serde(default)]
+    pub block_anchors: Vec<BlockAnchor>,
 }
 
 impl NoteRecord {
@@ -264,6 +316,10 @@ impl NoteRecord {
             property.zeroize_in_place();
         }
         self.properties.clear();
+        for anchor in self.block_anchors.iter_mut() {
+            anchor.zeroize_in_place();
+        }
+        self.block_anchors.clear();
     }
 }
 
@@ -407,6 +463,36 @@ impl VaultIndicesState {
                 if entry.key == key {
                     out.push((id.clone(), entry.clone()));
                 }
+            }
+        }
+        out
+    }
+
+    /// Every imported block anchor across the vault (MYND-382, the `[[^^`
+    /// picker), each tagged with its embedding note's id + display title, in a
+    /// deterministic order (notes by UUID, anchors in document order as applied).
+    /// `max` is a DEFENSIVE ceiling against a pathological payload — accumulation
+    /// stops once the cap is reached (truncated). Empty on a poisoned lock. The
+    /// picker inserts `[[<note>^block_id]]`; resolution + display stay TS-side.
+    pub fn all_block_anchors(&self, max: usize) -> Vec<VaultBlockAnchor> {
+        let Ok(idx) = self.inner.lock() else {
+            return Vec::new();
+        };
+        let mut out = Vec::new();
+        // BTreeMap-free HashMap iteration is order-unstable, but the picker sorts
+        // TS-side by title; the cap makes the traversal bound explicit regardless.
+        for (id, record) in idx.notes.iter() {
+            for anchor in &record.block_anchors {
+                if out.len() >= max {
+                    return out;
+                }
+                out.push(VaultBlockAnchor {
+                    note_id: id.clone(),
+                    note_title: record.title.clone(),
+                    note_folder: record.folder.clone(),
+                    block_id: anchor.block_id.clone(),
+                    preview: anchor.preview.clone(),
+                });
             }
         }
         out
@@ -949,5 +1035,52 @@ mod tests {
         state.clear();
         assert!(state.note_properties("a").is_empty());
         assert!(state.property_values("status").is_empty());
+    }
+
+    // ---- MYND-382: vault-wide block anchors --------------------------
+
+    #[test]
+    fn all_block_anchors_flattens_with_note_provenance() {
+        let state = VaultIndicesState::default();
+        let mut a = rec("Alpha", None);
+        a.block_anchors = vec![
+            BlockAnchor {
+                block_id: "intro".to_string(),
+                preview: "The intro.".to_string(),
+            },
+            BlockAnchor {
+                block_id: "concl".to_string(),
+                preview: "The conclusion.".to_string(),
+            },
+        ];
+        state.apply("note-a", a);
+        // A note without anchors contributes none.
+        state.apply("note-b", rec("Beta", None));
+
+        let mut got = state.all_block_anchors(1000);
+        got.sort_by(|x, y| x.block_id.cmp(&y.block_id));
+        assert_eq!(got.len(), 2);
+        assert_eq!(got[0].block_id, "concl");
+        assert_eq!(got[0].note_id, "note-a");
+        assert_eq!(got[0].note_title.as_deref(), Some("Alpha"));
+        assert_eq!(got[1].block_id, "intro");
+        assert_eq!(got[1].preview, "The intro.");
+    }
+
+    #[test]
+    fn all_block_anchors_respects_the_cap_and_clear_wipes_them() {
+        let state = VaultIndicesState::default();
+        let mut a = rec("Alpha", None);
+        a.block_anchors = (0..5)
+            .map(|i| BlockAnchor {
+                block_id: format!("b{i}"),
+                preview: format!("preview {i}"),
+            })
+            .collect();
+        state.apply("note-a", a);
+        assert_eq!(state.all_block_anchors(3).len(), 3, "defensive cap truncates");
+        assert_eq!(state.all_block_anchors(1000).len(), 5);
+        state.clear();
+        assert!(state.all_block_anchors(1000).is_empty());
     }
 }

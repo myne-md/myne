@@ -11,3 +11,8 @@ export { setToolbarLayout } from "./toolbar/plugin";
 export { setEditorHost, getHost } from "./host";
 export type { EditorHost, EditorPrefs, TagTreeNode, SpellWord } from "./host";
 export type { ResolverNote } from "./host/notes/resolveWikilink";
+// MYND-382: the enumerate-only imported-block-anchor scanner (the single dialect
+// source for `^block-id` markers) — reused by the vault-indices apply path to
+// feed the vault-wide `[[^^` picker index.
+export { extractBlockAnchors } from "./wikilink/anchor";
+export type { BlockAnchor } from "./wikilink/anchor";
