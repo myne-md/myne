@@ -479,6 +479,12 @@ Myne's mandated single-helper pattern for subkey derivation. All HKDF-Expand cal
 
 Used in: `spec/protocol.md` §3.2.1
 
+### **device-approval gate** &nbsp; 📋 *Protocol*
+
+The server authorization step that admits a newly-enrolled device onto an account, **separate from** the SCRAM proof of account ownership (`spec/server-protocol.md` §3.1). The **first** device on an account and any **recovery-path** device **self-approve** (the bootstrap exception — the 24-word phrase already grants full account takeover); a new **password-path** device lands **pending** and syncs nothing until an already-approved device calls `/auth/devices/approve` for it (SYNC-9). It gates *enrollment*, not *authentication* — a pending device has proved the password but is not yet trusted to sync. Distinct from the [bootstrap-fingerprint](#bootstrap-fingerprint) eye-compare (which hardens the approval moment against a malicious server) and from the [per-device token](#per-device-token) (issued once the gate opens). Phase 2.
+
+Used in: `spec/server-protocol.md` §3.1, §4 (MYND-425)
+
 ### **device key** &nbsp; 🗝️ *Key/identifier*
 
 Reserved term for `appname-v005` multi-device support: a per-device asymmetric key pair stored in hardware (Secure Enclave / TPM / Android Keystore) that participates in MLS group formation. **Not used in v0.1** — single-device protocol does not need device keys.
@@ -1209,6 +1215,12 @@ Used in: `spec/server-protocol.md` §5
 The small, server-visible descriptor a Phase 2 [pull](#sync-cursor) returns for each changed content blob: `(uuid, version, content_nonce, size)`. The client uses it to decide what to fetch — `content_nonce` is the decryption-free staleness discriminator (§9.6.4), `version` the server's opaque per-note counter (AS6), `size` the AS17 quota unit. It exposes nothing the server doesn't already hold (the [vault head](#vault-head) commits the same `content_nonce`s); the client never trusts it for integrity — that is the head's job. Phase 2.
 
 Used in: `spec/sync-protocol.md` §8
+
+### **per-device token** &nbsp; 🗝️ *Key/identifier*
+
+The revocable bearer credential a device receives after a successful SCRAM handshake + [device-approval gate](#device-approval-gate) (`spec/server-protocol.md` §3.1), carried as `Authorization: Bearer <token_hex>` on every authed sync request. It is **distinct from** the [device_id](#device_id-vv-actor): the token is a secret, rotatable *availability* credential, whereas `device_id` is permanent, non-secret [version-vector](#version-vector-vv) history (SYNC-2 — revoking the token never touches `device_id`). Revoking it (the "Remove device" action) stops that device syncing but is **not** forward-secret and **not** a remote wipe — a removed device keeps whatever it already synced (v0.1 offers no cryptographic re-key; that is v005/MLS, `threat-model.md` §7). Stored device-locally in the OS keychain (`thisDeviceOnly`) with a documented weaker `0600`-file fallback (SYNC-16). Phase 2.
+
+Used in: `spec/server-protocol.md` §3.1, §4 (SYNC-2, MYND-425)
 
 ### **per-vault namespace** &nbsp; 📋 *Protocol*
 

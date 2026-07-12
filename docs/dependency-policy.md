@@ -208,6 +208,29 @@ The Candle ML stack + tokenizer for [local inference](../glossary.md) — the si
 - **Hash-pinning:** exact minor pins in `Cargo.toml`, single workspace `Cargo.lock` updated; the `rustls` in the tree is pre-existing sync-TLS, not a Candle-specific crate. Added to `src-tauri/` only.
 - **The `local-inference-stub` build feature** (E2E-only) keeps `local-inference` but swaps the Candle engine for the deterministic stub at compile time — it pulls the same crates but is never the shipped bundle (production uses the real Candle engine).
 
+### Phase 2 sync transport (MYND-424, extracted to core in MYND-457) — `core/Cargo.toml`
+
+The raw-TLS connection layer the SCRAM auth + sync push/pull share, plus the base64 wire
+encoding for the enroll handshake. Landed with the Phase-2 client sync engine (MYND-424) in
+`src-tauri/Cargo.toml`; **moved to `myne-core` with the sync engine extraction** (`decisions.md`
+2026-07-07) so the mobile client inherits the identical transport. Documented here formally for
+the first time (the MYND-424 landing left the entry as a gap — it was only mentioned in passing
+in the local-ai note).
+
+| Dep | Version | Used for | Transitive footprint | License | Justified-by |
+|---|---|---|---|---|---|
+| `rustls` | 0.23 (`default-features = false`, features `ring`/`std`/`tls12`) | The single TLS path for SCRAM auth + sync push/pull with cert-pinning (A4) and keying-material export (tls-exporter, the SCRAM channel binding, SYNC-3) — `core/src/plugins/sync/rustls_transport.rs` | rustls-webpki + the `ring` crypto provider (`rustls::crypto::ring`) + zeroize; the `ring` provider carries per-arch asm compiled by the platform clang | Apache-2.0/ISC/MIT | `decisions.md` 2026-07-01 (MYND-424 landing) + 2026-07-07 (core extraction) |
+| `rustls-pki-types` | 1 | Cert/key DER newtypes the rustls verifier surface takes (`CertificateDer`, …) | pure-Rust, tiny | Apache-2.0/MIT | same |
+| `base64` | 0.22 | SCRAM/enroll wire encoding (`core/src/plugins/sync/enroll.rs`) — also independently used desktop-side by `local_inference`, so it is declared in **both** `core/` and `src-tauri/` | pure-Rust, zero transitive | Apache-2.0/MIT | same |
+
+- **`ring` is NOT a direct dependency.** The sync code uses `rustls::crypto::ring::default_provider()` — a rustls submodule enabled by rustls's `ring` feature — never the standalone `ring` crate. So there is no `ring = …` line; it is a transitive of `rustls`.
+- **`ring` provider over the default `aws-lc-rs`:** chosen for a more reproducible build — `ring` needs no C/CMake toolchain, only the platform clang, so `myne-core` **cross-compiles for `aarch64-apple-ios` and `aarch64-linux-android`** (the whole point of the extraction; iOS proven locally in MYND-457, Android gated on the NDK clang and deferred to MYND-465).
+- **Relocation vs. new admission (the two-sided consequence, signed off in the MYND-457 grill, SYNC-33):** in the main `myne` repo this is a **relocation** inside the single shared `Cargo.lock` — no new third-party package enters the shared graph (TB9 audit-anchor intact), only which crate declares them changed (`src-tauri/` → `core/`). In the **`myne-mobile` companion repo's own lockfile** these are **new admissions** that mobile inherits transitively via the `myne-core` path dependency — the first C/asm-adjacent crypto crate (`ring`) the mobile build compiles. That admission was human-approved in the grill.
+- **Unconditional (no feature gate):** `myne-core` carries the transport unconditionally — every core consumer that wants sync wants the transport, and gating would break the crate's single-feature (`test-support`-only) uniformity (SYNC-33).
+- **R3 review-debt (carried, not closed here):** the cert-pin verifier + tls-exporter wiring is **R3-gated** — a primitive-level security review + a live interop test are still owed before production trust. The banner travels with `rustls_transport.rs`; relocating it into the shared core does **not** promote it to reviewed. Nothing user-facing may present cert-trust as verified until R3 closes.
+- **Not in `protocol/`:** the crypto crate's dependency surface is untouched; the closed RustCrypto primitive set (`decisions.md` 2026-04-28) is unchanged — this is transport-layer dependency surface (TB9), not protocol crypto.
+- **Hash-pinning:** exact pins in `core/Cargo.toml`, single workspace `Cargo.lock` updated (relocation, no new package); added to `core/` (and `base64` also stays in `src-tauri/` for `local_inference`), never `protocol/`.
+
 ## Reference
 
 - `threat-model.md` §6 — compensating controls
