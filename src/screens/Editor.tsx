@@ -124,6 +124,7 @@ import { getActiveEditorView } from "../editor/active-view";
 import { tagTree } from "../notes/vaultIndices";
 import { BacklinksTab } from "../notes/components/BacklinksTab";
 import { OutlineTab } from "../notes/components/OutlineTab";
+import { ToolbarLayoutSync } from "../notes/ToolbarLayoutSync";
 import {
   RIGHT_PANEL_TABS,
   RIGHT_PANEL_DEFAULT_ORDER,
@@ -1317,6 +1318,9 @@ function EditorChrome({
           three-pane row. Non-blocking + dismissable; renders nothing while sync
           is off (the common case). */}
       <SyncBanners />
+      {/* MYND-336: keep the editor toolbar plugin's layout in sync with the
+          user's vault.prefs customization (no render). */}
+      <ToolbarLayoutSync />
       {/* No separate top bar (MYND-166): the editor content fills from the top
           and each top pane's tab strip rises into the OS title-bar row,
           Obsidian-style. The sidebar toggles float in the top corners below

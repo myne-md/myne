@@ -7,6 +7,7 @@ export { myneExtensions } from "./extensions";
 // toolbar, the keymap, AND a host-supplied accessory bar (mobile keyboard bar).
 export { editorCommands } from "./toolbar/commands";
 export type { ToolbarCommand, EditorCommandId } from "./toolbar/commands";
+export { setToolbarLayout } from "./toolbar/plugin";
 export { setEditorHost, getHost } from "./host";
 export type { EditorHost, EditorPrefs, TagTreeNode, SpellWord } from "./host";
 export type { ResolverNote } from "./host/notes/resolveWikilink";

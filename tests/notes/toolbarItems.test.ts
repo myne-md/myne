@@ -17,8 +17,8 @@ describe("resolveToolbarOrder", () => {
       "strike",
       "code",
       "highlight",
-      "heading",
       "link",
+      "heading",
     ]);
   });
 
