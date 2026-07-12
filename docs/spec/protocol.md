@@ -381,6 +381,8 @@ AAD_ai_embeddings_blob =
 
 `AAD_ai_embeddings_blob` is the AAD bound into the AEAD wrap of `vault.embeddings` (`MYR1`, §9.17), the encrypted AI embedding index. It mirrors `AAD_search_index_blob` exactly, with the role string `"ai-embeddings-blob"` (length-prefixed UTF-8: 2-B big-endian length + 18 ASCII bytes, total 20 bytes) and the 16-byte `account_number_hash` from `vault.meta` (§9.3 offset 6) binding the index blob to its specific vault. As with prefs and search, `items_key_id` is **not** bound: the embeddings KEK derives directly from `root_key` via `"myne.v0.1 ai-embeddings-key"` (§3.4), independent of the `itemsKey` lineage. The model-identity tuple that invalidates the cache on a model / dimension / chunker change is carried **inside** the engine-opaque payload (§9.17.2), not in this AAD — matching the `vault.search` `extractor_version` precedent.
 
+`AAD_pending_capture_blob` is the AAD bound into the AEAD seal of a pending-capture queue entry (`captures/<capture-id>`, `MYK1`, §9.18). It is the one blob AAD that binds **neither** `account_number_hash` **nor** `items_key_id`: the queue is written while the vault is locked and is vault-agnostic (§9.18), so it instead binds the per-entry `capture_id` (16 bytes, also the queue filename) after the role string `"pending-capture-blob"` (length-prefixed UTF-8: 2-B big-endian length + 20 ASCII bytes). Total AAD length: `10 + 1 + 22 + 16 = 49 bytes`. There is no `DeriveSubkey` role — the KEK is a device-local key held in the OS keychain, not `root_key`-derived (§9.18.2).
+
 **Length-prefix encoding for variable-width AAD fields.** All length-prefixed UTF-8 fields in this section and in §3.1 — the `password-wrap` and `recovery-wrap` role strings in `AAD_password_wrap` / `AAD_recovery_wrap`, and the `content_type` field in `AAD_encrypt_content` — are encoded as a **2-byte big-endian unsigned length** followed by the UTF-8 bytes. This matches the binary-format convention elsewhere in this spec (§9.2 reads `enc_item_key_len` as 2 bytes big-endian).
 
 `content_type` in v0.1 is always `"text/markdown"`. The field is included so v005 can introduce attachments and other content types without breaking the AAD layout.
@@ -1885,6 +1887,48 @@ The snapshot additionally records the **model-identity tuple** `{model_hash, emb
 
 **At-rest leakage.** The blob's size leaks a coarse signal about embedded volume (note / chunk count), analogous to the `.myn`-count / `vault.search`-size leaks — accepted for v0.1 as a derived-cache size signal ([`../threat-model.md`](../threat-model.md) A5 / §7; the embedding-inversion analysis is recorded there). `vault.embeddings` is a **rebuildable cache**: it is **never synced and never backed up** — device-local, re-derived locally per device (`sync-protocol.md` §319, Class 3), which is also why the model-specific vectors never travel to a device that may hold a different embedding model or none.
 
+### 9.18 Pending-capture queue (`captures/<capture-id>`, `MYK1`)
+
+A **pending capture** is a short piece of dictated note text relayed from a paired Apple Watch (via WatchConnectivity) to the phone while the vault may be **locked**. It cannot be written into the vault immediately (that needs the unlocked `itemsKey`), so it is held in a **device-local, encrypted queue** — one `MYK1` file per capture at `captures/<capture-id-hex>` under the app data directory — and drained into the vault as an ordinary new note on the next unlock (client-side; the watch app is native SwiftUI and holds **no** vault key material). Landed with the mobile watch-capture feature; see `decisions.md` 2026-07-12.
+
+Unlike every other §9 blob, the queue is created while the vault is locked and is **vault-agnostic**: at enqueue time the client does not know which vault the capture will land in (nor which vault the user will unlock next), so the entry binds **neither** `account_number_hash` **nor** `items_key_id`. On unlock the queue drains into **whichever vault is unlocked** — the single-primary-vault model of the feature. The queue and its wrap key are **device-local**: never synced, never backed up (like `vault.embeddings`, `sync-protocol.md` Class 3).
+
+#### 9.18.1 On-disk layout
+
+```text
+Offset  Size  Field             Notes
+------  ----  ----------------  ------------------------------------
+0       4     magic             ASCII "MYK1"
+4       1     protocol_version  0x01
+5       16    capture_id        random UUIDv7; ALSO the queue filename; AAD-bound
+21      24    wrap_nonce        XChaCha20-Poly1305 nonce
+45      4     ciphertext_len    big-endian uint32, = plaintext_len + 32
+49      ..    ciphertext        dictated UTF-8 AEAD-sealed + 32-byte CTX tag
+```
+
+Header = 49 bytes. The 16-byte `capture_id` is a random UUIDv7 that is ALSO the queue filename (`captures/<capture-id-hex>`) and is bound into the AAD (§9.18.3), so a tampered header `capture_id` fails AEAD rather than silently re-labelling the entry. `ciphertext_len` is variable (`plaintext_len + 32`); the reserved-byte / fixed-length disciplines of `vault.prefs` / `vault.quickunlock` do not apply.
+
+#### 9.18.2 Device-local wrap key (no SubkeyRole)
+
+Like `vault.quickunlock` (§9.14), the `MYK1` entry is sealed under a **device-local 32-byte `wrap_key`** held in the OS keychain, **NOT** a `DeriveSubkey(root_key, …)` subkey — a `root_key`-derived KEK would be wrong here because the queue must be writable while `root_key` is unavailable (the vault is locked). The key is minted once per device, is **non-biometric** (so a background enqueue never triggers a biometric prompt), and is stored with `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly` — background-seal-friendly: a capture that arrives while the screen is locked can still be sealed after the first post-boot unlock, minimising the transient plaintext window (§9.18.4). There is no HKDF context string and no §10.3 subkey role for this key (the codec is provider-agnostic — it only ever sees a symmetric `wrap_key`).
+
+#### 9.18.3 AAD
+
+`AAD_pending_capture_blob` binds the per-entry `capture_id` (16 bytes) after the role string `"pending-capture-blob"` (length-prefixed UTF-8: 2-B big-endian length + 20 ASCII bytes):
+
+```text
+AAD_pending_capture_blob =
+  AAD_prefix (10 B) || protocol_version (1 B) || u16_be(20) || "pending-capture-blob" (20 B) || capture_id (16 B)
+```
+
+Total AAD length: `10 + 1 + 22 + 16 = 49 bytes`. Binding `capture_id` — **not** a vault identity — is what makes a single device key safe across every queue entry: an attacker with write access to the queue directory cannot swap or duplicate one entry's ciphertext into another `capture_id` slot, and a tampered header `capture_id` fails AEAD (§6.4, non-distinguishing).
+
+#### 9.18.4 Size cap, drain, and transient plaintext
+
+Implementations MUST reject `ciphertext_len > 16384 + 32` (16 KiB plaintext cap + 32-byte CTX tag), bounding the parser's pre-AEAD allocation — a dictated note is short. Drain is **at-least-once**: the client decrypts each entry, creates a note via the ordinary note-create path (§6.1), then deletes the entry; a crash between note-create and delete re-drains that entry into a rare duplicate note (accepted; `decisions.md` 2026-07-12).
+
+**Transient plaintext (carve-out).** The dictated text exists as plaintext in two OS-Data-Protection-only transients *before* it is sealed into `MYK1`: the watch's WatchConnectivity outbox and the phone's staging file (written by the native receiver before the Rust seal). These are short-lived, contain only not-yet-committed captures (never existing vault content), and are enumerated in [`../threat-model.md`](../threat-model.md). The watch stays crypto-free by design — encrypting the outbox would require key material on a device deliberately kept key-free (`decisions.md` 2026-07-12).
+
 ## 10. Protocol Versioning & Migration
 
 ### 10.1 Design principle: forward-incompatible by design
@@ -1926,6 +1970,7 @@ This registry is normative. Implementations MUST reject any magic byte / AAD pre
 | Extracted attachment text (`attachments-text/<id>`) | `MYE1` | `MYE5` | §9.15 | MYND-328 |
 | Device-local sync baseline (`vault.head-state`) | `MYH1` | `MYH5` | §9.16 | MYND-416 |
 | AI embeddings index (`vault.embeddings`) | `MYR1` | `MYR5` | §9.17 | MYND-453 |
+| Pending-capture queue (`captures/<id>`) | `MYK1` | `MYK5` | §9.18 | watch-capture |
 
 Section §9.8 (vault indices) **landed with MYND-271** (the persistence the MYND-31 design pre-allocated); §9.7 (workspace) landed with MYND-166, and attachments occupy §9.9/§9.10. The per-note and vault-meta families retain their historical `NT05`/`NTV5` v005 reservations; all newer blob families (prefs/search/workspace/indices/attachments/dictionary/attachment-text/head-state/ai-embeddings) use the `MY?5` v005 convention. The device-local sync baseline (`vault.head-state`, `MYH1`/`MYH5`, §9.16) landed with MYND-416; the **wire vault head itself has no magic** — it is sync-wire-only (`sync-protocol.md` §2), versioned by its `head_format_version` byte, not a §10.3 family.
 

@@ -14,6 +14,7 @@
 //! `init()`/`generate_handler!`/capability shim.
 
 pub mod attachments;
+pub mod captures;
 pub mod export;
 pub mod notes;
 pub mod prefs;
