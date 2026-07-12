@@ -13,6 +13,7 @@
 
 import { TypographySettings } from "./TypographySettings";
 import { LineNumbersSettings } from "./LineNumbersSettings";
+import { ToolbarCustomizeSettings } from "./ToolbarCustomizeSettings";
 import { DefaultViewModeSettings } from "./DefaultViewModeSettings";
 import { FocusModeSettings } from "./FocusModeSettings";
 import { SpellSettings } from "./SpellSettings";
@@ -31,6 +32,10 @@ export function EditorPanel() {
       {/* Line-number gutter toggle (editor-line-numbers, MYND-314) — off by
           default; lives next to typography as an editor-display preference. */}
       <LineNumbersSettings />
+
+      {/* Floating-toolbar customization (MYND-336) — reorder + show/hide the
+          selection toolbar's buttons over the frozen command vocabulary. */}
+      <ToolbarCustomizeSettings />
 
       {/* Default view mode (reading-source-modes, MYND-299) — Live/Reading/Source
           a note opens in; per-tab override via ⇧⌘E / the bottom-bar switcher. */}

@@ -753,6 +753,20 @@
     },
     "toolbar": {
       "apply": "Apply",
+      "customize": {
+        "bold": "Bold",
+        "bulletList": "Bullet list",
+        "checklist": "Checklist",
+        "code": "Code",
+        "heading": "Heading",
+        "highlight": "Highlight",
+        "italic": "Italic",
+        "link": "Link",
+        "numberedList": "Numbered list",
+        "quote": "Quote",
+        "strike": "Strikethrough",
+        "wikilink": "Wikilink"
+      },
       "heading": {
         "h1": "H1",
         "h2": "H2",
@@ -1736,6 +1750,13 @@
       "label": "Line numbers",
       "off": "Off",
       "on": "On"
+    },
+    "toolbarCustomize": {
+      "errorSave": "Could not save the toolbar layout.",
+      "helper": "Choose which formatting buttons appear on the selection toolbar, and their order.",
+      "label": "Toolbar buttons",
+      "moveDown": "Move down",
+      "moveUp": "Move up"
     },
     "ai": {
       "betaBadge": "Beta",
