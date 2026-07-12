@@ -17,6 +17,7 @@
 //! `sync:default` capability entry (SYNC-15).
 
 pub mod attachments;
+pub mod captures;
 pub mod export;
 pub mod notes;
 pub mod prefs;

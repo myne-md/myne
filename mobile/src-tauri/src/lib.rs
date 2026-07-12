@@ -61,6 +61,11 @@ pub fn run() {
         .plugin(plugins::prefs::init())
         .plugin(plugins::notes::init())
         .plugin(plugins::quick_unlock::init())
+        // Apple Watch voice-capture queue (MYK1, §9.18). Device-key sealed;
+        // seal_staged/take_pending/ack. No-op off Apple targets. decisions.md
+        // 2026-07-12. Commands must stay in lockstep with build.rs +
+        // permissions/captures/default.toml or the ACL resolver fails closed.
+        .plugin(plugins::captures::init())
         .plugin(plugins::vault_indices::init())
         .plugin(plugins::search::init())
         .plugin(plugins::snapshots::init())

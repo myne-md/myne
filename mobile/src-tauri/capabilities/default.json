@@ -16,6 +16,7 @@
     "prefs:default",
     "notes:default",
     "quick-unlock:default",
+    "captures:default",
     "vault-indices:default",
     "search:default",
     "snapshots:default",

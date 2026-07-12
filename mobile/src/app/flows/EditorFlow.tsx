@@ -12,6 +12,7 @@ import { listVaults, orderByLastUnlock } from "../../lib/vault-list";
 import { HAS_TAURI } from "../../lib/app-window";
 import { effectiveMobileAutoLockSecs } from "../../lib/auto-lock";
 import { consumePendingCapture, CAPTURE_EVENT, type CaptureMode } from "../../lib/deep-link";
+import { drainPendingCaptures, sealStagedCaptures } from "../../lib/captures";
 import { ioBanner } from "../../lib/io-banner";
 import { usePrefs } from "../../lib/use-prefs";
 import { setFavorites } from "../../lib/prefs";
@@ -674,6 +675,34 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
     window.addEventListener(CAPTURE_EVENT, onCapture);
     return () => window.removeEventListener(CAPTURE_EVENT, onCapture);
   }, [startCapture]);
+  // Apple Watch pending-capture drain (§9.18): this editor mounts on every unlock
+  // path (password / PIN / biometric / reload-probe), so draining here turns any
+  // queued watch-dictated captures into notes right after unlock.
+  // `drainPendingCaptures` self-serialises (StrictMode-safe) and is a no-op when
+  // the queue is empty; refresh the list if it created any so they appear.
+  useEffect(() => {
+    const runDrain = () =>
+      void (async () => {
+        // Seal any just-staged watch captures first, then drain the queue into
+        // notes (both no-op when empty / the host is absent).
+        await sealStagedCaptures();
+        const created = await drainPendingCaptures();
+        if (created > 0) await loadEntries();
+      })();
+    runDrain(); // on mount — every unlock path lands here
+    // Also drain when the app returns to the foreground: a watch capture may have
+    // been delivered + staged while we were backgrounded (there is no native
+    // event bridge to JS yet, so foreground is the prompt-seal trigger).
+    const onVisible = () => {
+      if (document.visibilityState === "visible") runDrain();
+    };
+    window.addEventListener("focus", runDrain);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.removeEventListener("focus", runDrain);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [loadEntries]);
   // The shared `@myne/editor` `/record` slash command routes through the mobile
   // EditorHost's `voiceRecord` slot, which dispatches VOICE_RECORD_EVENT (it
   // can't reach React state directly). Open the same recording sheet.

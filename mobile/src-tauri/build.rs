@@ -83,6 +83,14 @@ fn main() {
                 ]),
             )
             .plugin(
+                // Apple Watch voice-capture queue (MYK1, §9.18): device-key
+                // sealed pending captures drained into notes on unlock. Adding a
+                // command here without a matching entry in
+                // `permissions/captures/default.toml` is a security bug.
+                "captures",
+                tauri_build::InlinedPlugin::new().commands(&["seal_staged", "take_pending", "ack"]),
+            )
+            .plugin(
                 // MYND-31 (A11 — VaultIndices): shared from `myne-core`; the
                 // same 12 commands the desktop registers. Adding a command here
                 // without a matching entry in
