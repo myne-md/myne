@@ -5,8 +5,8 @@ import { REVEAL_ATTACHMENT_EVENT } from "@myne/editor/attachments/fileCardAction
 import { headingSections } from "@myne/dialect";
 import { undo, redo } from "@codemirror/commands";
 import type { EditorView } from "@codemirror/view";
+import { emit, listen } from "@tauri-apps/api/event";
 import { Screen, ScreenScroll, Icon, MyneMark, Banner, Spinner, Sheet, SidePanel, LIST_TOP, SyncStatusGlyph, SyncBanners, SyncStatusDetail, ConflictsSheet } from "../../components";
-import { listen } from "@tauri-apps/api/event";
 import { noteList, noteRead, noteCreate, noteUpdate, deleteNoteRouted } from "../../lib/notes";
 import type { NoteListError } from "../../lib/notes";
 import { useConflictMaterializer } from "../../lib/use-conflict-materializer";
@@ -236,6 +236,8 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
   const [rightPanel, setRightPanel] = useState(false);
   // Note actions overflow (⋯): Copy / Move / History / Export / Archive / Trash.
   const [moreOpen, setMoreOpen] = useState(false);
+  // Long-press action sheet target: the list-row note whose actions are open.
+  const [rowActions, setRowActions] = useState<NoteEntry | null>(null);
   // Backend vault-indices edge dump (null until the first sweep; drives the
   // Turkish-correct graph + backlinks). Falls back to the client graph in dev.
   const [backendEdges, setBackendEdges] = useState<[string, WikilinkEdge[]][] | null>(null);
@@ -797,6 +799,35 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
     setEditorText((t) => (t === "" || t.endsWith("\n") ? t : t + "\n") + text + "\n");
   }
 
+  /** Export the current note as a PDF. `window.print()` is a no-op in the mobile
+   *  WebView, so hand the rendered `#myne-print` HTML to the native export sheet
+   *  (iOS: system print → Save to Files as PDF). Browser-dev falls back to
+   *  `window.print()`. Pairs with `src-tauri/src/pdf_export.rs`. */
+  async function exportNotePdf() {
+    const bodyHtml = document.getElementById("myne-print")?.innerHTML ?? "";
+    const title = deriveTitleSnippet(editorText).title || (editing?.id ? "Untitled" : "New note");
+    // Wrap the rendered body in a minimal print stylesheet so the PDF is legible
+    // (UIMarkupTextPrintFormatter honors basic inline CSS).
+    const html =
+      `<html><head><meta charset="utf-8"><style>` +
+      `body{font-family:-apple-system,Helvetica,Arial,sans-serif;font-size:12pt;line-height:1.55;color:#111;margin:0}` +
+      `h1{font-size:20pt;margin:0 0 12pt}h2{font-size:16pt}h3{font-size:14pt}` +
+      `pre,code{font-family:Menlo,Consolas,monospace;font-size:10.5pt}` +
+      `pre{background:#f5f5f5;padding:10px;border-radius:6px;white-space:pre-wrap}` +
+      `blockquote{color:#555;border-left:3px solid #ccc;margin:0;padding-left:12px}` +
+      `img{max-width:100%}table{border-collapse:collapse}td,th{border:1px solid #ccc;padding:4px 8px}` +
+      `</style></head><body>${bodyHtml}</body></html>`;
+    if (!HAS_TAURI) {
+      window.print();
+      return;
+    }
+    try {
+      await emit("export-note-pdf", { title, html });
+    } catch {
+      setEditorError("Couldn't export this note.");
+    }
+  }
+
   /** Import a picked file into the vault (MYA1) and insert its form-C embed. */
   async function attachFile(file: File) {
     if (!HAS_TAURI) {
@@ -837,6 +868,17 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
     // expand/collapse tree). A tag/view/trash/archive filter — or an active inline
     // search — renders a flat list instead.
     const treeMode = listView === "notes" && !activeTag && !viewActive && searchNeedle === "";
+    // Beeper-style favorites strip: the starred live notes, in the user's saved
+    // favorites order. Shown only in the plain notes view (no search/tag/view);
+    // when shown they are pulled OUT of the tree below (they live in the strip,
+    // not doubled as list rows), so the tree builds from a fav-excluded folderOf.
+    const favNotes = prefs.favorites
+      .map((id) => liveNotes.find((n) => n.id === id))
+      .filter((n): n is NoteEntry => n != null);
+    const favStripVisible = treeMode && favNotes.length > 0;
+    const treeFolderOf = favStripVisible
+      ? new Map([...folderOf].filter(([id]) => !favSet.has(id)))
+      : folderOf;
     const titleOf = new Map(notes.map((n) => [n.id, n.title]));
     // Order note ids within one tree level: favourites first, then by sort mode.
     const sortIds = (ids: string[]): string[] => {
@@ -845,7 +887,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
       const base = sortMode === "az" ? [...ids].sort(byTitle) : sortMode === "za" ? [...ids].sort((a, b) => byTitle(b, a)) : ids;
       return [...base.filter((id) => favSet.has(id)), ...base.filter((id) => !favSet.has(id))];
     };
-    const treeRows = treeMode ? buildFolderTree(folderOf, collapsedFolders, sortIds) : [];
+    const treeRows = treeMode ? buildFolderTree(treeFolderOf, collapsedFolders, sortIds) : [];
 
     const filtered =
       listView === "trash"
@@ -902,7 +944,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
     // deep headers stuck in the wrong places.
     const renderTree = (current: string | null, depth: number): ReactNode[] => {
       const out: ReactNode[] = [];
-      for (const f of folderChildren(folderOf, current)) {
+      for (const f of folderChildren(treeFolderOf, current)) {
         const isCollapsed = collapsedFolders.has(f.path);
         out.push(
           <div key={`f:${f.path}`}>
@@ -931,7 +973,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
           </div>,
         );
       }
-      for (const nid of sortIds(notesDirectlyIn(folderOf, current))) {
+      for (const nid of sortIds(notesDirectlyIn(treeFolderOf, current))) {
         const n = notes.find((x) => x.id === nid);
         if (!n) continue;
         out.push(
@@ -943,6 +985,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
             indent={depth * 18 + 12}
             subtitle={subtitleFor(n.id)}
             onOpen={() => void openNote(n.id)}
+            onHold={() => setRowActions(n)}
             favorited={favSet.has(n.id)}
             onToggleFavorite={() => toggleFavorite(n.id)}
           />,
@@ -1117,7 +1160,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
               <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
                 <Spinner />
               </div>
-            ) : (treeMode ? treeRows.length === 0 : orderedNotes.length === 0) && !listError ? (
+            ) : (treeMode ? treeRows.length === 0 && !favStripVisible : orderedNotes.length === 0) && !listError ? (
               <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "0 40px", textAlign: "center" }}>
                 <div style={{ fontSize: 18, fontWeight: 600, color: "var(--fg-1)" }}>
                   {listView === "trash" ? "Trash is empty" : listView === "archive" ? "No archived notes" : viewActive ? "No matching notes" : "No notes yet"}
@@ -1134,6 +1177,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
               </div>
             ) : treeMode ? (
               <ScreenScroll style={{ marginTop: 4 }}>
+                {favStripVisible && <FavoritesStrip notes={favNotes} onOpen={(id) => void openNote(id)} />}
                 {renderTree(null, 0)}
               </ScreenScroll>
             ) : (
@@ -1145,6 +1189,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
                     last={i === orderedNotes.length - 1}
                     subtitle={listView === "notes" ? subtitleFor(n.id) : undefined}
                     onOpen={() => void openNote(n.id)}
+                    onHold={listView === "notes" ? () => setRowActions(n) : undefined}
                     favorited={listView === "notes" && favSet.has(n.id)}
                     onToggleFavorite={listView === "notes" ? () => toggleFavorite(n.id) : undefined}
                     actions={
@@ -1378,6 +1423,38 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
             }}
           />
         )}
+
+        {rowActions && (
+          <NoteRowActionsSheet
+            title={rowActions.title || "Untitled"}
+            favorited={favSet.has(rowActions.id)}
+            onClose={() => setRowActions(null)}
+            onOpen={() => {
+              const id = rowActions.id;
+              setRowActions(null);
+              void openNote(id);
+            }}
+            onToggleFavorite={() => {
+              toggleFavorite(rowActions.id);
+              setRowActions(null);
+            }}
+            onMove={() => {
+              setMoveInput(folderOf.get(rowActions.id) ?? "");
+              setMoveTarget(rowActions.id);
+              setRowActions(null);
+            }}
+            onArchive={() => {
+              const id = rowActions.id;
+              setRowActions(null);
+              void organizeRow(archiveNote, id);
+            }}
+            onTrash={() => {
+              const id = rowActions.id;
+              setRowActions(null);
+              void organizeRow(trashNote, id);
+            }}
+          />
+        )}
       </Screen>
     );
   }
@@ -1545,7 +1622,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
           }}
           onExport={() => {
             setMoreOpen(false);
-            window.print();
+            void exportNotePdf();
           }}
           onArchive={() => {
             setMoreOpen(false);
@@ -1798,11 +1875,13 @@ function NoteActionsSheet({
   onArchive: () => void;
   onTrash: () => void;
 }) {
-  const row = (text: string, onClick: () => void, first = false, danger = false): ReactNode => (
+  // Flush rows in the Sheet (already the single rounded container) — hairline
+  // dividers only, no inner bordered box (avoids the box-in-a-box look).
+  const row = (text: string, onClick: () => void, danger = false): ReactNode => (
     <button
       onClick={onClick}
       disabled={busy}
-      style={{ display: "flex", alignItems: "center", width: "100%", border: "none", background: "transparent", padding: "14px 14px", borderTop: first ? undefined : "1px solid var(--line-1)", cursor: busy ? "default" : "pointer", opacity: busy ? 0.6 : 1, fontFamily: "var(--font-sans)", fontSize: 16, color: danger ? "var(--danger)" : "var(--fg-1)" }}
+      style={{ display: "flex", alignItems: "center", width: "100%", border: "none", borderTop: "1px solid var(--line-1)", background: "transparent", padding: "15px 18px", cursor: busy ? "default" : "pointer", opacity: busy ? 0.6 : 1, fontFamily: "var(--font-sans)", fontSize: 16, color: danger ? "var(--danger)" : "var(--fg-1)" }}
     >
       {text}
     </button>
@@ -1811,15 +1890,63 @@ function NoteActionsSheet({
     <Sheet onClose={onClose} padded={false}>
       {() => (
         <>
-          <div style={{ padding: "2px 16px 10px", fontSize: 13, color: "var(--fg-3)" }}>{stat}</div>
-          <div style={{ border: "1px solid var(--line-1)", borderRadius: 12, overflow: "hidden", background: "var(--bg-1)", margin: "0 6px" }}>
-            {row(copied ? "Copied ✓" : "Copy to clipboard", onCopy, true)}
-            {row("Move to folder…", onMove)}
-            {row("Version history", onHistory)}
-            {row("Export as PDF", onExport)}
-            {row("Archive", onArchive)}
-            {row("Move to Trash", onTrash, false, true)}
-          </div>
+          <div style={{ padding: "0 18px 12px", fontSize: 13, color: "var(--fg-3)" }}>{stat}</div>
+          {row(copied ? "Copied ✓" : "Copy to clipboard", onCopy)}
+          {row("Move to folder…", onMove)}
+          {row("Version history", onHistory)}
+          {row("Export as PDF", onExport)}
+          {row("Archive", onArchive)}
+          {row("Move to Trash", onTrash, true)}
+        </>
+      )}
+    </Sheet>
+  );
+}
+
+/** Long-press action sheet for a note-list ROW (distinct from NoteActionsSheet,
+ *  which acts on the open note). Star/unstar lives here — for non-favorited rows
+ *  it is the only place to favorite, since the inline star shows on starred rows
+ *  only. Move / Archive / Trash mirror the in-editor actions. */
+function NoteRowActionsSheet({
+  title,
+  favorited,
+  onClose,
+  onOpen,
+  onToggleFavorite,
+  onMove,
+  onArchive,
+  onTrash,
+}: {
+  title: string;
+  favorited: boolean;
+  onClose: () => void;
+  onOpen: () => void;
+  onToggleFavorite: () => void;
+  onMove: () => void;
+  onArchive: () => void;
+  onTrash: () => void;
+}) {
+  // Rows sit flush inside the Sheet (which is already the single rounded,
+  // bordered container) — separated only by hairlines. No inner bordered box, or
+  // the modal reads as a box-in-a-box.
+  const row = (text: string, onClick: () => void, danger = false): ReactNode => (
+    <button
+      onClick={onClick}
+      style={{ display: "flex", alignItems: "center", width: "100%", border: "none", borderTop: "1px solid var(--line-1)", background: "transparent", padding: "15px 18px", cursor: "pointer", fontFamily: "var(--font-sans)", fontSize: 16, color: danger ? "var(--danger)" : "var(--fg-1)" }}
+    >
+      {text}
+    </button>
+  );
+  return (
+    <Sheet onClose={onClose} padded={false}>
+      {() => (
+        <>
+          <div style={{ padding: "0 18px 12px", fontSize: 13, fontWeight: 600, color: "var(--fg-2)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{title}</div>
+          {row("Open", onOpen)}
+          {row(favorited ? "Remove from favorites" : "Add to favorites", onToggleFavorite)}
+          {row("Move to folder…", onMove)}
+          {row("Archive", onArchive)}
+          {row("Move to Trash", onTrash, true)}
         </>
       )}
     </Sheet>
@@ -2192,19 +2319,8 @@ function NoteContextPanel({
 
 // ── Sub-components ─────────────────────────────────────────────────────────────
 
-/** On-device encryption / sync status — the top-right chip of every tab header.
- *  Mobile has no server sync yet, so it reports the honest local state. */
-function SyncStatus() {
-  return (
-    <div style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: 6, padding: "5px 10px", borderRadius: 999, background: "var(--bg-2)", border: "1px solid var(--line-1)" }}>
-      <span style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--success)" }} />
-      <span style={{ fontSize: 12, fontWeight: 600, color: "var(--fg-2)" }}>Encrypted</span>
-    </div>
-  );
-}
-
 /** Consistent top bar shared by the Notes / Search / Graph / Files tabs: vault
- *  switcher on the left; encryption status + Settings gear pinned to the right.
+ *  switcher on the left; command-palette search + Settings gear on the right.
  *  Stays fixed while the tab content below it animates between pages. */
 function AppHeader({ label, onSwitcher, onPalette, onSettings }: { label: string; onSwitcher: () => void; onPalette: () => void; onSettings: () => void }) {
   return (
@@ -2220,7 +2336,6 @@ function AppHeader({ label, onSwitcher, onPalette, onSettings }: { label: string
         </svg>
       </button>
       <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
-        <SyncStatus />
         <button
           onClick={onPalette}
           aria-label="Command palette"
@@ -2745,19 +2860,24 @@ function CommandPalette({
     window.setTimeout(onClose, 240);
   }, [onClose]);
 
-  // Focus the search field once open (after the enter anim commits).
+  // Focus the search field on MOUNT (not gated behind the `shown` animation
+  // flip) so the focus call stays close to the opening tap — iOS only raises the
+  // soft keyboard for a focus that isn't stranded a frame away from the gesture.
+  // `autoFocus` on the input is the belt; this effect is the suspenders.
   const paletteInputRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
-    if (shown) paletteInputRef.current?.focus();
-  }, [shown]);
+    paletteInputRef.current?.focus();
+  }, []);
 
   return (
-    <div style={{ position: "absolute", inset: 0, zIndex: 60, display: "flex", flexDirection: "column" }}>
+    <div style={{ position: "absolute", inset: 0, zIndex: 60, display: "flex", flexDirection: "column", justifyContent: "center" }}>
       <div onClick={requestClose} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.42)", opacity: shown ? 1 : 0, transition: "opacity 200ms ease" }} />
       <div
         style={{
           position: "relative",
-          margin: "max(64px, calc(env(safe-area-inset-top) + 20px)) 12px 0",
+          // Vertically centered (was top-anchored). The input sits at the panel
+          // top, so it stays above the keyboard even when the results fill out.
+          margin: "0 12px",
           display: "flex",
           flexDirection: "column",
           maxHeight: "72%",
@@ -2776,6 +2896,7 @@ function CommandPalette({
           <Icon name="search" size={18} color="var(--fg-3)" strokeWidth={1.7} />
           <input
             ref={paletteInputRef}
+            autoFocus
             value={q}
             onChange={(e) => setQ(e.target.value)}
             onKeyDown={(e) => {
@@ -2850,6 +2971,36 @@ function GraphTab({ graph, onOpen }: { graph: NoteGraph; onOpen: (id: string) =>
   );
 }
 
+/** Beeper-style favorites strip — a horizontal row of square tiles for the
+ *  starred notes, shown at the top of the notes list (above the tree). Each tile
+ *  is the note's initial over its title; tap opens it. Scrolls with the list. */
+function FavoritesStrip({ notes, onOpen }: { notes: NoteEntry[]; onOpen: (id: string) => void }) {
+  return (
+    <div style={{ padding: "6px 0 10px" }}>
+      <div style={{ padding: "0 20px 8px", fontSize: 11, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--fg-3)" }}>
+        Favorites
+      </div>
+      <div style={{ display: "flex", gap: 12, overflowX: "auto", padding: "0 20px", scrollbarWidth: "none", WebkitOverflowScrolling: "touch", touchAction: "pan-x" }}>
+        {notes.map((n) => (
+          <button
+            key={n.id}
+            onClick={() => onOpen(n.id)}
+            aria-label={n.title}
+            style={{ flex: "none", width: 64, border: "none", background: "transparent", padding: 0, cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}
+          >
+            <div style={{ width: 60, height: 60, borderRadius: 16, background: "var(--accent-soft)", border: "1px solid var(--line-1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, fontWeight: 700, color: "var(--accent)", fontFamily: "var(--font-sans)" }}>
+              {(n.title.trim()[0] ?? "•").toUpperCase()}
+            </div>
+            <span style={{ width: "100%", fontSize: 11, lineHeight: 1.25, color: "var(--fg-2)", textAlign: "center", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+              {n.title}
+            </span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /** A chronological note row (mirror notes/05 ChronoRow geometry). */
 const STAR_PATH = "M12 3l2.9 5.9 6.5.9-4.7 4.6 1.1 6.5L12 18.4 6.2 21.4l1.1-6.5L2.6 9.8l6.5-.9z";
 
@@ -2857,6 +3008,7 @@ function NoteRow({
   entry,
   last,
   onOpen,
+  onHold,
   favorited = false,
   onToggleFavorite,
   actions,
@@ -2867,6 +3019,8 @@ function NoteRow({
   entry: NoteEntry;
   last: boolean;
   onOpen: () => void;
+  /** Long-press / right-click handler — opens the row action sheet. */
+  onHold?: () => void;
   favorited?: boolean;
   onToggleFavorite?: () => void;
   actions?: ReactNode;
@@ -2880,9 +3034,43 @@ function NoteRow({
   divider?: boolean;
 }) {
   const sub = subtitle !== undefined ? subtitle : entry.snippet;
+  // Long-press (touch) / right-click reveals the row action sheet. A hold that
+  // survives ~480ms without the finger drifting (which would be a scroll) fires
+  // onHold; the ensuing click is then swallowed so the note doesn't also open.
+  const holdTimer = useRef<number | null>(null);
+  const holdAt = useRef<{ x: number; y: number } | null>(null);
+  const held = useRef(false);
+  const clearHold = () => {
+    if (holdTimer.current != null) window.clearTimeout(holdTimer.current);
+    holdTimer.current = null;
+    holdAt.current = null;
+  };
+  const startHold = (e: PressEvt) => {
+    if (!onHold) return;
+    held.current = false;
+    holdAt.current = { x: e.clientX, y: e.clientY };
+    holdTimer.current = window.setTimeout(() => {
+      held.current = true;
+      holdTimer.current = null;
+      onHold();
+    }, 480);
+  };
+  const moveHold = (e: PressEvt) => {
+    const s = holdAt.current;
+    if (s && (Math.abs(e.clientX - s.x) > 10 || Math.abs(e.clientY - s.y) > 10)) clearHold();
+  };
   return (
     <div
-      onClick={onOpen}
+      onClick={() => {
+        if (held.current) { held.current = false; return; } // consumed by the long-press
+        onOpen();
+      }}
+      onPointerDown={startHold}
+      onPointerMove={moveHold}
+      onPointerUp={clearHold}
+      onPointerLeave={clearHold}
+      onPointerCancel={clearHold}
+      onContextMenu={(e) => { if (onHold) e.preventDefault(); }}
       style={{
         display: "flex",
         alignItems: "center",
@@ -2892,6 +3080,9 @@ function NoteRow({
         borderTop: divider ? "1px solid var(--line-1)" : undefined,
         borderBottom: divider && last ? "1px solid var(--line-1)" : undefined,
         cursor: "pointer",
+        WebkitUserSelect: "none",
+        userSelect: "none",
+        WebkitTouchCallout: "none",
       }}
     >
       <div style={{ flex: 1, minWidth: 0 }}>
@@ -2911,26 +3102,26 @@ function NoteRow({
           </div>
         )}
       </div>
-      {actions ? actions : onToggleFavorite && (
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onToggleFavorite();
-          }}
-          aria-label={favorited ? "Remove from favorites" : "Add to favorites"}
-          style={{ border: "none", background: "transparent", padding: 0, width: 30, height: 30, cursor: "pointer", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}
-        >
-          <svg width="17" height="17" viewBox="0 0 24 24">
-            <path
-              d={STAR_PATH}
-              fill={favorited ? "var(--accent)" : "none"}
-              stroke={favorited ? "var(--accent)" : "var(--line-3)"}
-              strokeWidth="1.5"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </button>
-      )}
+      {actions
+        ? actions
+        : // Inline star shows ONLY for favorited notes (filled) as a quick-unstar
+          // affordance. Non-favorited rows show nothing here — "Add to favorites"
+          // lives in the long-press action sheet instead.
+          favorited &&
+          onToggleFavorite && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleFavorite();
+              }}
+              aria-label="Remove from favorites"
+              style={{ border: "none", background: "transparent", padding: 0, width: 30, height: 30, cursor: "pointer", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}
+            >
+              <svg width="17" height="17" viewBox="0 0 24 24">
+                <path d={STAR_PATH} fill="var(--accent)" stroke="var(--accent)" strokeWidth="1.5" strokeLinejoin="round" />
+              </svg>
+            </button>
+          )}
     </div>
   );
 }
