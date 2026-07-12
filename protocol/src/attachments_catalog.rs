@@ -45,7 +45,11 @@
 //!
 //! - Object keys lexicographically sorted by NFC bytes (top-level
 //!   attachment-id keys; per-entry keys are the fixed canonical order
-//!   `content_type` < `created_at` < `filename` < `size`).
+//!   `content_type` < `created_at` < `deleted_at` (optional) <
+//!   `filename` < `size` < `updated_at` (optional) — the two optional
+//!   Phase-2-sync fields, § 9.10.2 / MYND-468, are emitted only when
+//!   present, so a catalog without them is byte-identical to a
+//!   pre-sync encode).
 //! - No insignificant whitespace.
 //! - Integers as bare decimals (no leading zeros, no trailing `.0`);
 //!   floating-point FORBIDDEN at the type level (`u64` fields only).
@@ -102,9 +106,12 @@ pub const CATALOG_BLOB_HEADER_LEN: usize = 34;
 /// parallel to `prefs.rs`).
 pub const MAX_CATALOG_PLAINTEXT_LEN: usize = 16 * 1024 * 1024;
 
-/// One attachment's authoritative metadata (spec § 9.10.2). The four
-/// fields are emitted in fixed canonical (lexicographic) order:
-/// `content_type` < `created_at` < `filename` < `size`.
+/// One attachment's authoritative metadata (spec § 9.10.2). Fields are
+/// emitted in fixed canonical (lexicographic) order: `content_type` <
+/// `created_at` < `deleted_at` (when present) < `filename` < `size` <
+/// `updated_at` (when present). The two `Option` fields are the
+/// additive Phase-2-sync fields (MYND-468); absent = pre-sync shape,
+/// byte-identical to the original four-field encode.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AttachmentMeta {
     /// Import-time MIME of the file (a hint; the `attachment://` handler
@@ -112,11 +119,62 @@ pub struct AttachmentMeta {
     pub content_type: String,
     /// Creation timestamp — UNIX seconds (integer; no floats).
     pub created_at: u64,
+    /// Deletion timestamp — UNIX seconds, **optional** (§ 9.10.2 /
+    /// `sync-protocol.md` § 11.4). Presence turns the entry into an
+    /// **attachment catalog tombstone**: the multi-device deletion
+    /// marker. A tombstone's descriptive metadata is scrubbed at delete
+    /// time (see [`AttachmentMeta::into_tombstone`]).
+    pub deleted_at: Option<u64>,
     /// Display filename (NFC). Free-form; duplicates across attachments
-    /// are permitted (the id is the key).
+    /// are permitted (the id is the key). Empty on a tombstone.
     pub filename: String,
-    /// File size in bytes (integer; no floats).
+    /// File size in bytes (integer; no floats). Zero on a tombstone.
     pub size: u64,
+    /// Filename-LWW discriminator for the sync merge — UNIX seconds,
+    /// **optional** (set on rename; absent means `created_at`;
+    /// `sync-protocol.md` § 11.4 rule 4). Single-device semantics
+    /// ignore it.
+    pub updated_at: Option<u64>,
+}
+
+impl AttachmentMeta {
+    /// A live (non-tombstone) entry with no rename history — the
+    /// pre-sync four-field shape. Encodes byte-identically to a
+    /// pre-MYND-468 entry.
+    pub fn live(content_type: String, created_at: u64, filename: String, size: u64) -> Self {
+        Self {
+            content_type,
+            created_at,
+            deleted_at: None,
+            filename,
+            size,
+            updated_at: None,
+        }
+    }
+
+    /// Whether this entry is an attachment catalog tombstone
+    /// (`sync-protocol.md` § 11.4).
+    pub fn is_tombstone(&self) -> bool {
+        self.deleted_at.is_some()
+    }
+
+    /// Convert this entry into its deletion tombstone: `deleted_at` set,
+    /// descriptive metadata **scrubbed** (`filename`/`content_type`
+    /// emptied, `size` zeroed, `updated_at` dropped) so the synced
+    /// catalog keeps nothing descriptive about a crypto-erased file
+    /// (§ 9.10.2). `created_at` is retained (required field; not used by
+    /// the merge, which compares the *live* side's `created_at` against
+    /// `deleted_at`).
+    pub fn into_tombstone(self, deleted_at: u64) -> Self {
+        Self {
+            content_type: String::new(),
+            created_at: self.created_at,
+            deleted_at: Some(deleted_at),
+            filename: String::new(),
+            size: 0,
+            updated_at: None,
+        }
+    }
 }
 
 /// In-memory representation of the v0.1 `vault.attachments` plaintext:
@@ -258,10 +316,18 @@ fn canonical_json_encode(catalog: &AttachmentsCatalog) -> Vec<u8> {
         push_json_string(&mut out, &meta.content_type.nfc().collect::<String>());
         out.extend_from_slice(b",\"created_at\":");
         push_json_uint(&mut out, meta.created_at);
+        if let Some(deleted_at) = meta.deleted_at {
+            out.extend_from_slice(b",\"deleted_at\":");
+            push_json_uint(&mut out, deleted_at);
+        }
         out.extend_from_slice(b",\"filename\":");
         push_json_string(&mut out, &meta.filename.nfc().collect::<String>());
         out.extend_from_slice(b",\"size\":");
         push_json_uint(&mut out, meta.size);
+        if let Some(updated_at) = meta.updated_at {
+            out.extend_from_slice(b",\"updated_at\":");
+            push_json_uint(&mut out, updated_at);
+        }
         out.push(b'}');
     }
     out.push(b'}');
@@ -406,17 +472,21 @@ impl Parser<'_> {
         Some((id, meta))
     }
 
-    /// A metadata object. The canonical encoder emits exactly four keys
-    /// in the order content_type < created_at < filename < size, but the
-    /// parser accepts them tolerantly (any order, unknown keys ignored)
-    /// to honor the forward-compat additive-field rule (§ 9.10.2). All
-    /// four known fields are REQUIRED.
+    /// A metadata object. The canonical encoder emits the keys in the
+    /// order content_type < created_at < deleted_at? < filename < size <
+    /// updated_at?, but the parser accepts them tolerantly (any order,
+    /// unknown keys ignored) to honor the forward-compat additive-field
+    /// rule (§ 9.10.2). The four original fields are REQUIRED;
+    /// `deleted_at` / `updated_at` are the optional Phase-2-sync fields
+    /// (MYND-468).
     fn parse_meta_object(&mut self) -> Option<AttachmentMeta> {
         self.eat(b'{')?;
         let mut content_type: Option<String> = None;
         let mut created_at: Option<u64> = None;
+        let mut deleted_at: Option<u64> = None;
         let mut filename: Option<String> = None;
         let mut size: Option<u64> = None;
+        let mut updated_at: Option<u64> = None;
 
         if self.peek() == Some(b'}') {
             self.pos += 1;
@@ -429,8 +499,10 @@ impl Parser<'_> {
             match key.as_str() {
                 "content_type" => content_type = Some(self.parse_string()?),
                 "created_at" => created_at = Some(self.parse_uint()?),
+                "deleted_at" => deleted_at = Some(self.parse_uint()?),
                 "filename" => filename = Some(self.parse_string()?),
                 "size" => size = Some(self.parse_uint()?),
+                "updated_at" => updated_at = Some(self.parse_uint()?),
                 // Unknown (future additive) field — skip its value.
                 _ => self.skip_value()?,
             }
@@ -449,8 +521,10 @@ impl Parser<'_> {
         Some(AttachmentMeta {
             content_type: content_type?,
             created_at: created_at?,
+            deleted_at,
             filename: filename?,
             size: size?,
+            updated_at,
         })
     }
 
@@ -757,21 +831,21 @@ mod tests {
         let mut entries = BTreeMap::new();
         entries.insert(
             "aa11".to_string(),
-            AttachmentMeta {
-                content_type: "image/png".to_string(),
-                created_at: 1_700_000_000,
-                filename: "photo.png".to_string(),
-                size: 12345,
-            },
+            AttachmentMeta::live(
+                "image/png".to_string(),
+                1_700_000_000,
+                "photo.png".to_string(),
+                12345,
+            ),
         );
         entries.insert(
             "bb22".to_string(),
-            AttachmentMeta {
-                content_type: "application/pdf".to_string(),
-                created_at: 1_700_000_500,
-                filename: "doc.pdf".to_string(),
-                size: 98765,
-            },
+            AttachmentMeta::live(
+                "application/pdf".to_string(),
+                1_700_000_500,
+                "doc.pdf".to_string(),
+                98765,
+            ),
         );
         AttachmentsCatalog { entries }
     }
@@ -808,40 +882,20 @@ mod tests {
         let mut a = BTreeMap::new();
         a.insert(
             "ff".to_string(),
-            AttachmentMeta {
-                content_type: "t".to_string(),
-                created_at: 1,
-                filename: "f".to_string(),
-                size: 2,
-            },
+            AttachmentMeta::live("t".to_string(), 1, "f".to_string(), 2),
         );
         a.insert(
             "00".to_string(),
-            AttachmentMeta {
-                content_type: "t".to_string(),
-                created_at: 3,
-                filename: "g".to_string(),
-                size: 4,
-            },
+            AttachmentMeta::live("t".to_string(), 3, "g".to_string(), 4),
         );
         let mut b = BTreeMap::new();
         b.insert(
             "00".to_string(),
-            AttachmentMeta {
-                content_type: "t".to_string(),
-                created_at: 3,
-                filename: "g".to_string(),
-                size: 4,
-            },
+            AttachmentMeta::live("t".to_string(), 3, "g".to_string(), 4),
         );
         b.insert(
             "ff".to_string(),
-            AttachmentMeta {
-                content_type: "t".to_string(),
-                created_at: 1,
-                filename: "f".to_string(),
-                size: 2,
-            },
+            AttachmentMeta::live("t".to_string(), 1, "f".to_string(), 2),
         );
         assert_eq!(
             canonical_json_encode(&AttachmentsCatalog { entries: a }),
@@ -884,6 +938,87 @@ mod tests {
     fn decode_rejects_missing_required_field() {
         let bad = br#"{"aa":{"content_type":"t","created_at":1,"filename":"f"}}"#;
         assert!(canonical_json_decode(bad).is_err());
+    }
+
+    // ---- deleted_at / updated_at (MYND-468, §9.10.2) ----
+
+    #[test]
+    fn tombstone_entry_round_trips_with_canonical_order() {
+        // A tombstone entry (deleted_at set, metadata scrubbed) plus a
+        // live renamed entry (updated_at set) round-trip, and the encode
+        // emits the optional keys at their lexicographic positions:
+        // content_type < created_at < deleted_at < filename < size < updated_at.
+        let mut entries = BTreeMap::new();
+        entries.insert(
+            "aa11".to_string(),
+            AttachmentMeta::live("image/png".to_string(), 100, "photo.png".to_string(), 5)
+                .into_tombstone(200),
+        );
+        entries.insert("bb22".to_string(), {
+            let mut m = AttachmentMeta::live("t".to_string(), 300, "new-name.txt".to_string(), 7);
+            m.updated_at = Some(400);
+            m
+        });
+        let catalog = AttachmentsCatalog { entries };
+        let bytes = canonical_json_encode(&catalog);
+        let s = String::from_utf8(bytes.clone()).unwrap();
+        assert!(s.contains(
+            r#""aa11":{"content_type":"","created_at":100,"deleted_at":200,"filename":"","size":0}"#
+        ));
+        assert!(s.contains(r#""bb22":{"content_type":"t","created_at":300,"filename":"new-name.txt","size":7,"updated_at":400}"#));
+        let decoded = canonical_json_decode(&bytes).expect("decode tombstone");
+        assert_eq!(decoded, catalog);
+        assert!(decoded.entries["aa11"].is_tombstone());
+        assert!(!decoded.entries["bb22"].is_tombstone());
+    }
+
+    #[test]
+    fn live_entry_encodes_byte_identically_to_pre_sync_shape() {
+        // Byte-stability guarantee (§9.10.2): an entry without the two
+        // optional fields emits EXACTLY the original four-field JSON, so
+        // the existing attachments-catalog vectors stay green unchanged.
+        let mut entries = BTreeMap::new();
+        entries.insert(
+            "aa".to_string(),
+            AttachmentMeta::live("t".to_string(), 1, "f".to_string(), 2),
+        );
+        let bytes = canonical_json_encode(&AttachmentsCatalog { entries });
+        assert_eq!(
+            bytes.as_slice(),
+            br#"{"aa":{"content_type":"t","created_at":1,"filename":"f","size":2}}"#
+        );
+    }
+
+    #[test]
+    fn old_shape_decodes_with_absent_optional_fields() {
+        // A pre-sync (four-field) plaintext decodes to None for both
+        // optional fields — the additive-field discipline in action.
+        let pt = br#"{"aa":{"content_type":"t","created_at":1,"filename":"f","size":2}}"#;
+        let decoded = canonical_json_decode(pt).expect("decode old shape");
+        assert_eq!(decoded.entries["aa"].deleted_at, None);
+        assert_eq!(decoded.entries["aa"].updated_at, None);
+        assert!(!decoded.entries["aa"].is_tombstone());
+    }
+
+    #[test]
+    fn into_tombstone_scrubs_descriptive_metadata() {
+        // §9.10.2: filename/content_type emptied, size zeroed, updated_at
+        // dropped; created_at retained (required field, unused by merge).
+        let mut live = AttachmentMeta::live(
+            "application/pdf".to_string(),
+            42,
+            "secret.pdf".to_string(),
+            999,
+        );
+        live.updated_at = Some(50);
+        let tomb = live.into_tombstone(77);
+        assert_eq!(tomb.content_type, "");
+        assert_eq!(tomb.filename, "");
+        assert_eq!(tomb.size, 0);
+        assert_eq!(tomb.created_at, 42);
+        assert_eq!(tomb.deleted_at, Some(77));
+        assert_eq!(tomb.updated_at, None);
+        assert!(tomb.is_tombstone());
     }
 
     #[test]
@@ -1057,12 +1192,12 @@ mod tests {
         let mut entries = BTreeMap::new();
         entries.insert(
             "cc33".to_string(),
-            AttachmentMeta {
-                content_type: "text/plain".to_string(),
-                created_at: 7,
-                filename: "q\"\\\u{08}\u{0c}\n\r\t\u{01}.txt".to_string(),
-                size: 1,
-            },
+            AttachmentMeta::live(
+                "text/plain".to_string(),
+                7,
+                "q\"\\\u{08}\u{0c}\n\r\t\u{01}.txt".to_string(),
+                1,
+            ),
         );
         let catalog = AttachmentsCatalog { entries };
         let bytes = canonical_json_encode(&catalog);
@@ -1091,12 +1226,7 @@ mod tests {
         let mut entries = BTreeMap::new();
         entries.insert(
             "dd44".to_string(),
-            AttachmentMeta {
-                content_type: "t".to_string(),
-                created_at: 0,
-                filename: "\u{1f}".to_string(),
-                size: 0,
-            },
+            AttachmentMeta::live("t".to_string(), 0, "\u{1f}".to_string(), 0),
         );
         let bytes = canonical_json_encode(&AttachmentsCatalog { entries });
         let s = String::from_utf8(bytes).unwrap();
@@ -1459,12 +1589,12 @@ mod tests {
         assert_eq!(dec_tolerance.entries.len(), 1);
         assert_eq!(
             dec_tolerance.entries.get("aa11"),
-            Some(&AttachmentMeta {
-                content_type: "image/png".to_string(),
-                created_at: 1_700_000_000,
-                filename: "photo.png".to_string(),
-                size: 12345,
-            }),
+            Some(&AttachmentMeta::live(
+                "image/png".to_string(),
+                1_700_000_000,
+                "photo.png".to_string(),
+                12345,
+            )),
         );
         let pt_tolerance_expected = canonical_json_encode(&dec_tolerance);
 
@@ -1840,5 +1970,134 @@ mod tests {
             dump.as_bytes(),
         )
         .expect("write attachments-catalog parse_fail vectors dump");
+    }
+
+    // ---- KAT vector APPEND generator: tombstone fields (MYND-468) -----
+
+    /// Emits a JSON **array fragment** of 2 additional cases for
+    /// `myne-test-vectors/vectors/attachments-catalog/v0.1/cases.json` at
+    /// `/tmp/myne_attachments_catalog_tombstone_vectors.json`, spliced by
+    /// hand into the existing `cases` array (append-only; the original
+    /// generators stay byte-stable and are NOT re-run).
+    ///
+    /// Run with:
+    /// `cargo test -p protocol --lib emit_catalog_tombstone_vectors -- --ignored`
+    ///
+    /// Pins the §9.10.2 optional Phase-2-sync fields: an attachment
+    /// catalog tombstone entry (`deleted_at`, metadata scrubbed) beside a
+    /// live renamed entry (`updated_at`), with the canonical emit order
+    /// content_type < created_at < deleted_at < filename < size <
+    /// updated_at. Nonce 0xBB is the next free entry in this family's
+    /// nonce registry (0x77, 0x88, 0x99, 0xAA taken).
+    #[test]
+    #[ignore]
+    fn emit_catalog_tombstone_vectors() {
+        extern crate std;
+
+        let root_key: [u8; 32] = [0x42; 32];
+        let catalog_key = derive_subkey(&root_key, SubkeyRole::AttachmentsCatalogKey);
+        let account_hash: [u8; CATALOG_BLOB_ACCOUNT_HASH_LEN] =
+            [0x33; CATALOG_BLOB_ACCOUNT_HASH_LEN];
+        let nonce: [u8; AEAD_NONCE_LEN] = [0xBB; AEAD_NONCE_LEN];
+
+        let mut entries = BTreeMap::new();
+        entries.insert(
+            "aa11".to_string(),
+            AttachmentMeta::live(
+                "image/png".to_string(),
+                1_700_000_000,
+                "photo.png".to_string(),
+                12345,
+            )
+            .into_tombstone(1_700_000_900),
+        );
+        entries.insert("bb22".to_string(), {
+            let mut m = AttachmentMeta::live(
+                "application/pdf".to_string(),
+                1_700_000_500,
+                "renamed.pdf".to_string(),
+                98765,
+            );
+            m.updated_at = Some(1_700_000_800);
+            m
+        });
+        let catalog = AttachmentsCatalog { entries };
+        let pt = canonical_json_encode(&catalog);
+        let blob = encode_attachments_catalog_raw(&catalog_key, &account_hash, &catalog, &nonce)
+            .expect("encode tombstone catalog");
+
+        // Self-validate the round-trip before emitting.
+        let dec = decode_attachments_catalog(&catalog_key, &account_hash, &blob)
+            .expect("decode tombstone catalog");
+        assert_eq!(dec, catalog);
+        assert!(dec.entries["aa11"].is_tombstone());
+        assert_eq!(dec.entries["bb22"].updated_at, Some(1_700_000_800));
+
+        let mut dump = String::new();
+        dump.push_str("[\n");
+
+        dump.push_str("    {\n");
+        dump.push_str(
+            "      \"vector_id\": \"attachments-catalog/v0.1/encrypt-tombstone-and-updated-at\",\n",
+        );
+        dump.push_str("      \"description\": \"MYND-468 (§9.10.2 + sync-protocol.md §11.4): a two-entry catalog whose first entry is an attachment catalog tombstone (deleted_at set; filename/content_type emptied, size zeroed — the delete-time metadata scrub) and whose second is a live renamed entry carrying updated_at (the filename-LWW discriminator). Pins the canonical per-entry key order content_type < created_at < deleted_at < filename < size < updated_at, with the two optional fields emitted only when present.\",\n");
+        dump.push_str("      \"case_kind\": \"encrypt\",\n");
+        dump.push_str(&alloc::format!(
+            "      \"input_root_key_hex\": \"{}\",\n",
+            hex_lower(&root_key)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_account_number_hash_hex\": \"{}\",\n",
+            hex_lower(&account_hash)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_plaintext_canonical_utf8_hex\": \"{}\",\n",
+            hex_lower(&pt)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_catalog_nonce_hex\": \"{}\",\n",
+            hex_lower(&nonce)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"informational_catalog_key_hex\": \"{}\",\n",
+            hex_lower(catalog_key.as_slice())
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"expected_catalog_blob_hex\": \"{}\"\n",
+            hex_lower(&blob)
+        ));
+        dump.push_str("    },\n");
+
+        dump.push_str("    {\n");
+        dump.push_str(
+            "      \"vector_id\": \"attachments-catalog/v0.1/decrypt-ok-tombstone-and-updated-at\",\n",
+        );
+        dump.push_str("      \"description\": \"Decode the tombstone-carrying MYC1 blob back to its canonical plaintext: deleted_at and updated_at round-trip as first-class (no longer unknown) fields. A pre-sync reader would instead tolerate-and-drop them (§9.10.2 honesty note) — this case is the post-MYND-468 reader contract.\",\n");
+        dump.push_str("      \"case_kind\": \"decrypt_ok\",\n");
+        dump.push_str(&alloc::format!(
+            "      \"input_blob_hex\": \"{}\",\n",
+            hex_lower(&blob)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_root_key_hex\": \"{}\",\n",
+            hex_lower(&root_key)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_account_number_hash_hex\": \"{}\",\n",
+            hex_lower(&account_hash)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"expected_plaintext_canonical_utf8_hex\": \"{}\"\n",
+            hex_lower(&pt)
+        ));
+        dump.push_str("    }\n");
+
+        dump.push_str("]\n");
+
+        std::fs::write(
+            "/tmp/myne_attachments_catalog_tombstone_vectors.json",
+            dump.as_bytes(),
+        )
+        .expect("write attachments-catalog tombstone vectors dump");
     }
 }

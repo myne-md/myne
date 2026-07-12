@@ -152,6 +152,10 @@ Used in: `decisions.md` 2026-05-02 "Slot state machine + auth_permits generaliza
 
 An arbitrary file of **any type** stored as an encrypted blob in the vault, separate from notes (`threat-model.md` AS7). Each attachment is an [`MYA1`](#mya1) blob (`spec/protocol.md` §9.9) under `attachments/<attachment-id-hex>`, keyed by a per-attachment key wrapped under `itemsKey`; its metadata lives authoritatively in the [`vault.attachments`](#vaultattachments) catalog. Attachments ship in v0.1 (`decisions.md` 2026-06-07, superseding the 2026-04-27 skip-and-placeholder plan). A file the magic-byte sniffer recognizes as a renderable type (`image/*` + SVG + PDF) renders inline; **any other file is stored as `application/octet-stream` and surfaces as an export-only [attachment file-card](#attachment-file-card)** (`decisions.md` 2026-06-14, MYND-173). No remote URL is ever fetched; decrypted bytes never touch disk except on explicit user [export](#export). See [attachment-id](#attachment-id), [MYC1](#myc1). (MYND-164)
 
+### **attachment catalog tombstone** &nbsp; 📋 *Protocol*
+
+A [`vault.attachments`](#vaultattachments) entry whose optional `deleted_at` field is set (`spec/protocol.md` §9.10.2): the multi-device **deletion marker** for an [attachment](#attachment) under Phase 2 sync (`spec/sync-protocol.md` §11.4). Written at delete time with the entry's metadata **scrubbed** (filename/content-type emptied, size zeroed) so the synced catalog keeps nothing descriptive about a crypto-erased file; it defeats stale-catalog resurrection in the per-entry merge (a live entry wins only if its `created_at` postdates `deleted_at` — a deliberate re-add). Prunable client-side after the [tombstone horizon](#tombstone-horizon). **Distinct from** the [deleted-attachment tombstone](#deleted-attachment-tombstone), which is the *UI placeholder* an editor embed renders for an unresolvable id. Phase 2. (MYND-468)
+
 ### **attachment-id** &nbsp; 📋 *Protocol*
 
 The 32-byte content-addressed identifier of an [attachment](#attachment): `HMAC-SHA-256(DeriveSubkey(root_key, "attachments-id-hmac"), file_bytes)` (`spec/protocol.md` §9.9). Used as the on-disk filename (hex) and the dedup key — identical content yields one blob within a vault. Because it is keyed under `root_key`, a disk observer without the key cannot test whether the vault holds a specific known file (no confirmation oracle) nor link equal content across vaults (`threat-model.md` AS7/AS8). Notes reference it via the editor form-C embed `![[att:<id>|filename]]`. Dedup is an id-existence check, not convergent encryption. (MYND-164)
@@ -171,6 +175,10 @@ The Tauri command that writes one [attachment](#attachment)'s **decrypted** byte
 ### **attachment file-card** &nbsp; 📦 *Product*
 
 The editor representation of a non-renderable (generic) [attachment](#attachment) — a `.docx`, `.zip`, `.txt`, etc. stored as `application/octet-stream`. Unlike an inline image/PDF, the file's content is **never** previewed; the form-C embed `![[att:<id>|filename]]` renders as a compact atomic card showing a file-type icon, the [`vault.attachments`](#vaultattachments) filename (the single source of truth — `Rename` edits it globally via `attachment_rename`, not the per-embed alias), a "type · size" line (the type label is derived from the filename extension TS-side, since the catalog stores only `octet-stream`), and a "⋯" overflow menu: Export (→ [attachment_export](#attachment_export)), Rename, Remove from note, Reveal in library. "Using" the file means exporting it. A missing id renders the shared [deleted-attachment tombstone](#deleted-attachment-tombstone). Inline preview of other types (docx/pptx/xlsx/text) is the separate follow-up MYND-268. (MYND-173; `decisions.md` 2026-06-14)
+
+### **attachment sync-id** &nbsp; 📋 *Protocol*
+
+The **first 16 bytes** of a 32-byte [attachment-id](#attachment-id) — the key under which an [attachment](#attachment) appears in the [vault head](#vault-head) manifest and the sync metadata plane (`spec/sync-protocol.md` §4.2), which use a uniform 16-byte key for notes (UUID) and attachments alike. The full id keeps living in the `attachments/<hex>` filename, the [`vault.attachments`](#vaultattachments) catalog, and the `/attachments/{id}` byte-transport (`spec/server-protocol.md` §3.2); pull sync-meta echoes the full id so a device can resolve the prefix without the catalog. Truncation is safe intra-vault (~2^-64 birthday bound; a collision is a hard manifest encode failure, never silent). Phase 2. (MYND-468)
 
 ### **attachment text extraction** &nbsp; 📋 *Protocol*
 
@@ -288,6 +296,10 @@ The IETF AEAD specified in RFC 8439, using the ChaCha20 stream cipher and the Po
 
 Used in: `spec/protocol.md` §5.1
 Reference: RFC 8439.
+
+### **catalog sync-id** &nbsp; 📋 *Protocol*
+
+The reserved 16-byte sync-plane identifier of the [`vault.attachments`](#vaultattachments) catalog under Phase 2 sync: `DeriveSubkey(root_key, "catalog-sync-id")[0..16]` (`spec/protocol.md` §3.4; MYND-468). The catalog is a synced singleton **outside** the head manifest (`spec/sync-protocol.md` §4.2), so it needs a stable blob-id every device derives identically; because the id is `root_key`-keyed pseudorandom bytes, the server cannot distinguish the catalog's record from a note's. Derives an *identifier*, not key material — the catalog KEK stays `attachments-catalog-key`. Excluded from the manifest by construction. Phase 2.
 
 ### **chord** &nbsp; 📦 *Product*
 
@@ -459,7 +471,7 @@ The Myne-managed canonical frontmatter field `deleted:` — a **value-strict** R
 
 ### **deleted-attachment tombstone** &nbsp; 📦 *Product*
 
-The styleable placeholder an editor embed renders when its [attachment-id](#attachment-id) no longer resolves. Note bodies are **never** rewritten on deletion — the `![[att:<id>|filename]]` reference dangles intentionally and the resolver renders a tombstone, distinguishing a *deleted attachment* (id once existed, removed from the library) from a *broken reference* (id never existed). One shared component across the editor and the attachments library. Consistent with the no-auto-GC, explicit-delete-only attachment lifecycle. (MYND-164)
+The styleable placeholder an editor embed renders when its [attachment-id](#attachment-id) no longer resolves. Note bodies are **never** rewritten on deletion — the `![[att:<id>|filename]]` reference dangles intentionally and the resolver renders a tombstone, distinguishing a *deleted attachment* (id once existed, removed from the library) from a *broken reference* (id never existed). One shared component across the editor and the attachments library. Consistent with the no-auto-GC, explicit-delete-only attachment lifecycle. **Distinct from** the [attachment catalog tombstone](#attachment-catalog-tombstone), which is the *synced catalog-entry deletion marker* (Phase 2), not a UI element. (MYND-164)
 
 ### **deliberate folder** &nbsp; 📦 *Product*
 

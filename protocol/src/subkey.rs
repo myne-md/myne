@@ -43,6 +43,7 @@
 //! | [`SubkeyRole::VaultHeadMac`]           | `vault-head-mac`          |
 //! | [`SubkeyRole::ServerAuth`]             | `server-auth`             |
 //! | [`SubkeyRole::AttachmentTextKey`]      | `attachment-text-key`     |
+//! | [`SubkeyRole::CatalogSyncId`]          | `catalog-sync-id`         |
 //!
 //! Future v0.1.x revisions may register additional roles by appending
 //! variants to [`SubkeyRole`]. The `#[non_exhaustive]` attribute
@@ -135,6 +136,18 @@ const ROLE_STR_SERVER_AUTH: &[u8] = b"server-auth";
 /// distinct subkey. DISTINCT from the AAD role string `"attachment-text-blob"`.
 const ROLE_STR_ATTACHMENT_TEXT_KEY: &[u8] = b"attachment-text-key";
 
+/// Registered role string for the Phase 2 sync blob-id of the
+/// `vault.attachments` catalog (MYND-468; `protocol.md` §3.4,
+/// `sync-protocol.md` §8.1). The catalog is a synced singleton outside
+/// the head manifest, so it needs a deterministic, device-independent
+/// 16-byte identifier in the sync metadata plane:
+/// `catalog_sync_id = derive_subkey(root_key, CatalogSyncId)[0..16]`.
+/// Like `attachments-id-hmac` this derives an *identifier*, NOT key
+/// material — the catalog KEK stays `attachments-catalog-key`.
+/// Load-bearing: drift silently splits the catalog into a second sync
+/// record on every existing account.
+const ROLE_STR_CATALOG_SYNC_ID: &[u8] = b"catalog-sync-id";
+
 /// Registered role string for the v0.1 AI-embeddings blob KEK
 /// (MYND-453; encrypts the `vault.embeddings` on-device AI embedding index —
 /// `embeddings_blob.rs`, `MYR1`, `protocol.md` § 9.17 + § 3.4). Load-bearing:
@@ -223,6 +236,14 @@ pub enum SubkeyRole {
     /// a v005 epoch rotation. Distinct from every other blob KEK so the families
     /// stay domain-separated; only derived with the `local-inference` feature.
     AiEmbeddingsKey,
+    /// Phase 2 sync blob-id derivation for the `vault.attachments` catalog
+    /// (MYND-468; `protocol.md` §3.4, `sync-protocol.md` §8.1). The first 16
+    /// bytes of the derived output are the catalog's reserved sync-plane
+    /// blob-id — deterministic across the fleet, indistinguishable from a
+    /// note UUID to the server. Derives an **identifier**, NOT key material
+    /// (like `AttachmentsIdHmac`); the catalog KEK stays
+    /// `AttachmentsCatalogKey`. Domain-separated from every other role.
+    CatalogSyncId,
 }
 
 impl SubkeyRole {
@@ -243,6 +264,7 @@ impl SubkeyRole {
             SubkeyRole::ServerAuth => ROLE_STR_SERVER_AUTH,
             SubkeyRole::AttachmentTextKey => ROLE_STR_ATTACHMENT_TEXT_KEY,
             SubkeyRole::AiEmbeddingsKey => ROLE_STR_AI_EMBEDDINGS_KEY,
+            SubkeyRole::CatalogSyncId => ROLE_STR_CATALOG_SYNC_ID,
         }
     }
 }
@@ -459,6 +481,32 @@ mod tests {
     }
 
     #[test]
+    fn catalog_sync_id_role_string_matches_spec_registry() {
+        // MYND-468 registry entry "myne.v0.1 catalog-sync-id" (§3.4;
+        // sync-protocol.md §8.1). Derives the catalog's reserved 16-byte
+        // sync blob-id; drift silently splits the catalog into a second
+        // sync record on every existing account.
+        assert_eq!(SubkeyRole::CatalogSyncId.role_str(), b"catalog-sync-id");
+    }
+
+    #[test]
+    fn catalog_sync_id_is_distinct_from_other_roles() {
+        // The sync blob-id derivation must be domain-separated from the
+        // catalog KEK (an id is public-ish sync metadata; the KEK is key
+        // material) and from the other identifier derivation
+        // (attachments-id-hmac) and the head MAC key.
+        let root = [0u8; 32];
+        let cs = derive_subkey(&root, SubkeyRole::CatalogSyncId);
+        assert_ne!(
+            *cs,
+            *derive_subkey(&root, SubkeyRole::AttachmentsCatalogKey)
+        );
+        assert_ne!(*cs, *derive_subkey(&root, SubkeyRole::AttachmentsIdHmac));
+        assert_ne!(*cs, *derive_subkey(&root, SubkeyRole::VaultHeadMac));
+        assert_ne!(*cs, *derive_subkey(&root, SubkeyRole::ItemsKeyWrap));
+    }
+
+    #[test]
     fn attachment_roles_are_distinct_subkeys() {
         // The catalog KEK and the id-HMAC key MUST be different subkeys
         // (spec § 9.10.1 note: "distinct subkeys").
@@ -638,6 +686,7 @@ mod tests {
                 SubkeyRole::ServerAuth => "server-auth",
                 SubkeyRole::AttachmentTextKey => "attachment-text-key",
                 SubkeyRole::AiEmbeddingsKey => "ai-embeddings-key",
+                SubkeyRole::CatalogSyncId => "catalog-sync-id",
             }
         }
 
@@ -648,7 +697,7 @@ mod tests {
         let gamma = pseudorandom_root(b"myne-test-vectors-seed-v0.1.gamma");
 
         type Case<'a> = (&'a str, &'a str, &'a [u8; 32], SubkeyRole, bool);
-        let cases: [Case<'_>; 26] = [
+        let cases: [Case<'_>; 28] = [
             (
                 "zero-root-items-key-wrap",
                 "All-zero root_key with the ItemsKeyWrap role. Promotes the in-crate golden at protocol/src/subkey.rs:222 — same input, same expected bytes; drift in either the unit test or this integration assertion indicates HKDF prefix or role-string corruption.",
@@ -831,6 +880,20 @@ mod tests {
                 SubkeyRole::AiEmbeddingsKey,
                 true,
             ),
+            (
+                "zero-root-catalog-sync-id",
+                "All-zero root_key with the CatalogSyncId role (MYND-468, §3.4; sync-protocol.md §8.1). Derives the reserved sync-plane blob-id of the vault.attachments catalog — the FIRST 16 BYTES of this 32-byte output are the id; role string 'catalog-sync-id' (15 ASCII bytes). An identifier derivation like attachments-id-hmac, NOT a KEK — the catalog KEK stays attachments-catalog-key. Pairs with the other zero-root vectors under the same trivial root.",
+                &zero_root,
+                SubkeyRole::CatalogSyncId,
+                false,
+            ),
+            (
+                "prn-alpha-catalog-sync-id",
+                "Pseudorandom alpha root with the CatalogSyncId role. The informational_info_utf8_hex field carries the canonical 25-byte HKDF info bytes ('myne.v0.1 catalog-sync-id') so independent implementers can verify the eleventh registered role's info assembly without re-parsing the spec. Domain-separation triple with the alpha attachments-catalog-key and attachments-id-hmac vectors (same input_root_key_hex, three byte-different outputs): id derivation, catalog KEK, and attachment-id HMAC must never coincide.",
+                &alpha,
+                SubkeyRole::CatalogSyncId,
+                true,
+            ),
         ];
 
         let mut dump = alloc::string::String::new();
@@ -838,7 +901,7 @@ mod tests {
         dump.push_str("  \"schema\": \"hkdf-sha256\",\n");
         dump.push_str("  \"protocol_version\": \"v0.1\",\n");
         dump.push_str("  \"spec_section\": \"protocol.md §3.2 + §3.4\",\n");
-        dump.push_str("  \"description\": \"Pins protocol::derive_subkey byte mapping for cross-implementation conformance. Each case fixes a (root_key, role) input pair under HKDF-SHA-256 with salt=zero_32 and info='myne.v0.1 '||role, and the 32-byte subkey the helper must produce. Role registry mirrors the type-safe Rust SubkeyRole enum (spec §3.4); v0.1 registers itemsKey-wrap + prefs-key + search-index-key + attachments-catalog-key + attachments-id-hmac + session-state-key + personal-dictionary-key + vault-indices-key + attachment-text-key + ai-embeddings-key. Vectors generated by `cargo test -p protocol --lib emit_subkey_vectors_for_paste -- --ignored` (in protocol/src/subkey.rs).\",\n");
+        dump.push_str("  \"description\": \"Pins protocol::derive_subkey byte mapping for cross-implementation conformance. Each case fixes a (root_key, role) input pair under HKDF-SHA-256 with salt=zero_32 and info='myne.v0.1 '||role, and the 32-byte subkey the helper must produce. Role registry mirrors the type-safe Rust SubkeyRole enum (spec §3.4); v0.1 registers itemsKey-wrap + prefs-key + search-index-key + attachments-catalog-key + attachments-id-hmac + session-state-key + personal-dictionary-key + vault-indices-key + attachment-text-key + ai-embeddings-key + catalog-sync-id. Vectors generated by `cargo test -p protocol --lib emit_subkey_vectors_for_paste -- --ignored` (in protocol/src/subkey.rs).\",\n");
         dump.push_str("  \"cases\": [\n");
 
         for (i, (slug, desc, root, role, include_info)) in cases.iter().enumerate() {

@@ -637,6 +637,7 @@ fn hkdf_sha256_vectors() {
             "vault-indices-key" => SubkeyRole::VaultIndicesKey,
             "attachment-text-key" => SubkeyRole::AttachmentTextKey,
             "ai-embeddings-key" => SubkeyRole::AiEmbeddingsKey,
+            "catalog-sync-id" => SubkeyRole::CatalogSyncId,
             other => panic!(
                 "[{id}] unknown input_role '{other}' — schema enforces enum; if a new variant landed in SubkeyRole, update this match arm in lockstep"
             ),
@@ -689,6 +690,7 @@ fn hkdf_sha256_vectors() {
         "vault-indices-key",
         "attachment-text-key",
         "ai-embeddings-key",
+        "catalog-sync-id",
     ] {
         assert!(
             seen_roles.contains(required),

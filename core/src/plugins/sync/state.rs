@@ -165,6 +165,13 @@ pub fn clear_device_local_sync(dir: &Path) -> Result<(), SyncConfigError> {
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
         Err(e) => return Err(e.into()),
     }
+    // The attachment-deletion queue (MYND-468) is likewise stale deletion
+    // intent keyed to the old enrollment.
+    match std::fs::remove_file(dir.join("pending-attachment-tombstones")) {
+        Ok(()) => {}
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+        Err(e) => return Err(e.into()),
+    }
     match std::fs::remove_dir_all(dir.join("conflicts")) {
         Ok(()) => {}
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}

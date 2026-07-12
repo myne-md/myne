@@ -5,7 +5,7 @@
 //! HTTP/1.1 — only the byte stream underneath differs (TLS vs plain TCP). The
 //! codec is pure (no IO), so it is unit-tested once here and reused by both.
 
-use super::transport::{HttpMethod, TransportResponse};
+use super::transport::{HttpMethod, TransportResponse, TransportResponseExt};
 
 /// Hard cap on a sync response body read from the socket. TB5 treats the
 /// self-hosted/hosted relay as untrusted (a compromised server is in scope), so
@@ -22,10 +22,25 @@ pub(crate) fn build_http_request(
     body: &[u8],
     token: Option<&str>,
 ) -> Vec<u8> {
+    build_http_request_ext(method, path, host, &[], body, token)
+}
+
+/// [`build_http_request`] with caller-supplied extra headers (the attachment
+/// byte-transport sends `Range` / `Content-Type: application/octet-stream`).
+/// A caller-supplied `Content-Type` suppresses the JSON default.
+pub(crate) fn build_http_request_ext(
+    method: HttpMethod,
+    path: &str,
+    host: &str,
+    extra_headers: &[(&str, &str)],
+    body: &[u8],
+    token: Option<&str>,
+) -> Vec<u8> {
     let verb = match method {
         HttpMethod::Get => "GET",
         HttpMethod::Post => "POST",
         HttpMethod::Put => "PUT",
+        HttpMethod::Head => "HEAD",
     };
     let mut head = String::new();
     head.push_str(&format!("{verb} {path} HTTP/1.1\r\n"));
@@ -33,7 +48,13 @@ pub(crate) fn build_http_request(
     if let Some(t) = token {
         head.push_str(&format!("Authorization: Bearer {t}\r\n"));
     }
-    if !body.is_empty() {
+    let caller_content_type = extra_headers
+        .iter()
+        .any(|(n, _)| n.eq_ignore_ascii_case("content-type"));
+    for (name, value) in extra_headers {
+        head.push_str(&format!("{name}: {value}\r\n"));
+    }
+    if !body.is_empty() && !caller_content_type {
         head.push_str("Content-Type: application/json\r\n");
     }
     head.push_str(&format!("Content-Length: {}\r\n", body.len()));
@@ -53,6 +74,20 @@ pub(crate) fn build_http_request(
 /// chunked path is production-only and was the cause of large `/sync/pull` and
 /// `/sync/blob` bodies arriving JSON-corrupted (chunk-size markers inline).
 pub(crate) fn parse_http_response(raw: &[u8]) -> Option<TransportResponse> {
+    parse_http_response_ext(raw, false).map(|r| TransportResponse {
+        status: r.status,
+        body: r.body,
+    })
+}
+
+/// [`parse_http_response`] surfacing the response headers (lowercased names).
+/// `head_request` marks a HEAD response: its `Content-Length` describes the
+/// body a GET *would* return (RFC 9110 §9.3.2) and no body follows, so body
+/// framing is skipped entirely.
+pub(crate) fn parse_http_response_ext(
+    raw: &[u8],
+    head_request: bool,
+) -> Option<TransportResponseExt> {
     let sep = find_subslice(raw, b"\r\n\r\n")?;
     let head = &raw[..sep];
     let raw_body = &raw[sep + 4..];
@@ -62,10 +97,12 @@ pub(crate) fn parse_http_response(raw: &[u8]) -> Option<TransportResponse> {
     let _http = parts.next()?;
     let status: u16 = parts.next()?.parse().ok()?;
 
-    // Scan the header lines (case-insensitive) for the body framing.
+    // Scan the header lines (case-insensitive) for the body framing + collect
+    // them for the caller.
     let header_block = core::str::from_utf8(head).ok()?;
     let mut chunked = false;
     let mut content_length: Option<usize> = None;
+    let mut headers: Vec<(String, String)> = Vec::new();
     for line in header_block.split("\r\n").skip(1) {
         let Some((name, value)) = line.split_once(':') else {
             continue;
@@ -77,9 +114,12 @@ pub(crate) fn parse_http_response(raw: &[u8]) -> Option<TransportResponse> {
         } else if name == "content-length" {
             content_length = value.parse::<usize>().ok();
         }
+        headers.push((name, value.to_string()));
     }
 
-    let body = if chunked {
+    let body = if head_request {
+        Vec::new()
+    } else if chunked {
         dechunk(raw_body)?
     } else if let Some(n) = content_length {
         // Exactly N bytes; a short read (incomplete response) is a parse failure.
@@ -90,7 +130,11 @@ pub(crate) fn parse_http_response(raw: &[u8]) -> Option<TransportResponse> {
     } else {
         raw_body.to_vec()
     };
-    Some(TransportResponse { status, body })
+    Some(TransportResponseExt {
+        status,
+        body,
+        headers,
+    })
 }
 
 /// Decode an HTTP/1.1 chunked transfer-coded body (RFC 7230 §4.1): a sequence of

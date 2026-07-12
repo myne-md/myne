@@ -332,6 +332,9 @@ impl Device {
     }
 
     /// One full sync cycle (pull → detect → push), the wired engine loop.
+    /// Attachment-aware (MYND-468): the sim vault mostly has no attachments, in
+    /// which case the attachment phases are a cheap no-op scan — but the
+    /// attachment client-ops exercise them for real.
     fn sync(&self) -> SyncSummary {
         run_sync_cycle(
             self.transport.as_ref(),
@@ -342,6 +345,10 @@ impl Device {
             &self.notes_dir,
             &self.vault_dir,
             true,
+            Some(super::orchestrator::AttachmentKeys {
+                items_key: &self.acct.items_key,
+                items_key_id: &self.acct.items_key_id,
+            }),
         )
         .expect("sync cycle")
     }

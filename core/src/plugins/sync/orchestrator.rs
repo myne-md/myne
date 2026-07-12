@@ -18,15 +18,19 @@
 //! `spawn_blocking`. `vault_root` is where the device-local sync files live
 //! (`sync-state.json`, `vault.head-state`); `notes_dir` is `<vault_root>/notes`.
 
-use super::conflict::{plan_note_keep_both, ConflictCopyPlan};
-use super::engine::{self, PullError, PushBlob, PushError};
+use super::conflict::{merge_attachments_catalog, plan_note_keep_both, ConflictCopyPlan};
+use super::engine::{self, ChangedBlob, PullError, PushBlob, PushError};
 use super::state::{
     read_head_baseline, read_sync_state, write_head_baseline, write_sync_state, BlobSyncState,
     SyncState,
 };
 use super::transport::SyncTransport;
-use protocol::{compute_manifest_hash, ManifestEntry, VaultHead, VvEntry, VAULT_HEAD_FORMAT_V1};
-use std::collections::{HashMap, HashSet};
+use crate::attachment_nonce::{scan_attachments_manifest, AttachmentManifestEntry};
+use protocol::{
+    compute_manifest_hash, derive_subkey, encode_attachments_catalog, AttachmentsCatalog,
+    ManifestEntry, SubkeyRole, VaultHead, VvEntry, VAULT_HEAD_FORMAT_V1,
+};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::Path;
 
 /// What one sync cycle did (surfaced to the status indicator + tests).
@@ -53,6 +57,15 @@ pub struct SyncSummary {
     /// beyond-horizon recovery reset the cursor to 0 and re-pulled). The
     /// caller emits the reconcile banner events off this (SYNC-36).
     pub reconcile_ran: bool,
+    /// Attachment bodies downloaded + written to `attachments/` this cycle
+    /// (MYND-468).
+    pub attachments_pulled: usize,
+    /// Attachment bodies uploaded over `/attachments/{id}` + registered on the
+    /// blob plane this cycle.
+    pub attachments_pushed: usize,
+    /// Local attachment bodies erased this cycle because the merged catalog
+    /// carries their tombstone (remote-deletion propagation).
+    pub attachments_deleted: usize,
 }
 
 /// Sync-cycle failures.
@@ -237,6 +250,329 @@ fn write_pending_tombstones(
         .map_err(|_| SyncCycleError::Io)
 }
 
+// ---------------------------------------------------------------------------
+// Attachment + catalog sync (MYND-468; `sync-protocol.md` §8.1/§11.4)
+// ---------------------------------------------------------------------------
+
+/// The unlocked key material the attachment phases need: `items_key` +
+/// `items_key_id` verify a downloaded `MYA1` blob end-to-end before it is
+/// written to disk (§3.2: range slices carry no integrity — the whole-blob tag
+/// is the check). `None` skips the attachment + catalog phases entirely
+/// (legacy note-only cycles; production always passes `Some`).
+#[derive(Clone, Copy)]
+pub struct AttachmentKeys<'a> {
+    /// The vault's singleton `itemsKey` (wraps every per-attachment key).
+    pub items_key: &'a [u8; 32],
+    /// The `items_key_id` from `vault.meta` (AAD-bound into every `MYA1`).
+    pub items_key_id: &'a [u8; 16],
+}
+
+/// `<vault>/attachments` — the MYA1 blob dir (`protocol.md` §9.1).
+fn attachments_dir(vault_root: &Path) -> std::path::PathBuf {
+    vault_root.join("attachments")
+}
+
+/// `<vault>/vault.attachments` — the MYC1 catalog singleton.
+fn catalog_file_path(vault_root: &Path) -> std::path::PathBuf {
+    vault_root.join("vault.attachments")
+}
+
+/// The catalog's reserved 16-byte sync-plane blob-id:
+/// `DeriveSubkey(root_key, "catalog-sync-id")[0..16]` (`protocol.md` §3.4).
+pub fn catalog_sync_id(root_key: &[u8; 32]) -> [u8; 16] {
+    let sub = derive_subkey(root_key, SubkeyRole::CatalogSyncId);
+    let mut id = [0u8; 16];
+    id.copy_from_slice(&sub[..16]);
+    id
+}
+
+/// Read the MYC1 outer `catalog_nonce` (offset 6..30) decryption-free — the
+/// catalog's sync discriminator. `None` if the bytes are not an MYC1 header.
+fn read_catalog_nonce(bytes: &[u8]) -> Option<[u8; 24]> {
+    if bytes.len() < 30 || &bytes[0..4] != b"MYC1" {
+        return None;
+    }
+    let mut nonce = [0u8; 24];
+    nonce.copy_from_slice(&bytes[6..30]);
+    Some(nonce)
+}
+
+/// The pending **attachment**-tombstone queue (`sync-protocol.md` §11.4): one
+/// line per deletion, `"<sync-id-hex> <full-id-hex> <fresh-nonce-hex>"`. The
+/// fresh random nonce becomes the tombstone record's `content_nonce` (a
+/// visible change on the blob plane); the full id lets the server mark the
+/// stored body deleted. Written by the attachments plugin at delete time,
+/// drained by the next push cycle.
+fn pending_attachment_tombstones_path(vault_root: &Path) -> std::path::PathBuf {
+    vault_root.join("pending-attachment-tombstones")
+}
+
+/// One queued attachment tombstone.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PendingAttachmentTombstone {
+    /// The 16-byte attachment sync-id (blob-plane key).
+    pub sync_id: [u8; 16],
+    /// The full 32-byte attachment-id.
+    pub id: [u8; 32],
+    /// The fresh tombstone `content_nonce`.
+    pub content_nonce: [u8; 24],
+}
+
+fn hex_to_arr<const N: usize>(s: &str) -> Option<[u8; N]> {
+    if s.len() != N * 2 || !s.bytes().all(|b| b.is_ascii_hexdigit()) {
+        return None;
+    }
+    let mut out = [0u8; N];
+    for (i, byte) in out.iter_mut().enumerate() {
+        *byte = u8::from_str_radix(&s[i * 2..i * 2 + 2], 16).ok()?;
+    }
+    Some(out)
+}
+
+/// Read the pending attachment-tombstone queue (absent → empty; a malformed
+/// line is skipped rather than wedging the cycle).
+pub fn read_pending_attachment_tombstones(vault_root: &Path) -> Vec<PendingAttachmentTombstone> {
+    let Ok(body) = std::fs::read_to_string(pending_attachment_tombstones_path(vault_root)) else {
+        return Vec::new();
+    };
+    let mut out = Vec::new();
+    for line in body.lines() {
+        let mut parts = line.split_whitespace();
+        let (Some(p), Some(f), Some(n)) = (parts.next(), parts.next(), parts.next()) else {
+            continue;
+        };
+        let (Some(sync_id), Some(id), Some(content_nonce)) = (
+            hex_to_arr::<16>(p),
+            hex_to_arr::<32>(f),
+            hex_to_arr::<24>(n),
+        ) else {
+            continue;
+        };
+        out.push(PendingAttachmentTombstone {
+            sync_id,
+            id,
+            content_nonce,
+        });
+    }
+    out
+}
+
+/// Queue an attachment deletion for the next push (called by the attachments
+/// plugin right after the catalog-tombstone rewrite + local crypto-erase).
+/// Mints the fresh tombstone nonce internally. Idempotent per full id.
+pub fn add_pending_attachment_tombstone(
+    vault_root: &Path,
+    id: &[u8; 32],
+) -> Result<(), SyncCycleError> {
+    let mut queue = read_pending_attachment_tombstones(vault_root);
+    if queue.iter().any(|t| &t.id == id) {
+        return Ok(());
+    }
+    let mut nonce = [0u8; 24];
+    getrandom::getrandom(&mut nonce).map_err(|_| SyncCycleError::Io)?;
+    let mut sync_id = [0u8; 16];
+    sync_id.copy_from_slice(&id[..16]);
+    queue.push(PendingAttachmentTombstone {
+        sync_id,
+        id: *id,
+        content_nonce: nonce,
+    });
+    write_pending_attachment_tombstones(vault_root, &queue)
+}
+
+/// Drop queue entries (after their tombstone records pushed, or when a re-add
+/// made them stale).
+fn clear_pending_attachment_tombstones(
+    vault_root: &Path,
+    drop_ids: &HashSet<[u8; 32]>,
+) -> Result<(), SyncCycleError> {
+    if drop_ids.is_empty() {
+        return Ok(());
+    }
+    let queue: Vec<PendingAttachmentTombstone> = read_pending_attachment_tombstones(vault_root)
+        .into_iter()
+        .filter(|t| !drop_ids.contains(&t.id))
+        .collect();
+    write_pending_attachment_tombstones(vault_root, &queue)
+}
+
+fn write_pending_attachment_tombstones(
+    vault_root: &Path,
+    queue: &[PendingAttachmentTombstone],
+) -> Result<(), SyncCycleError> {
+    let mut lines: Vec<String> = queue
+        .iter()
+        .map(|t| {
+            format!(
+                "{} {} {}",
+                hex(&t.sync_id),
+                hex(&t.id),
+                hex(&t.content_nonce)
+            )
+        })
+        .collect();
+    lines.sort();
+    crate::atomic_write::atomic_write(
+        &pending_attachment_tombstones_path(vault_root),
+        lines.join("\n").as_bytes(),
+        true,
+    )
+    .map_err(|_| SyncCycleError::Io)
+}
+
+/// `download_attachment` with the same 429 backoff as [`download_blob_backoff`].
+fn download_attachment_backoff(
+    transport: &dyn SyncTransport,
+    token: &str,
+    id: &[u8; 32],
+) -> Result<Option<Vec<u8>>, PullError> {
+    let mut delay_ms = 250u64;
+    for _ in 0..6 {
+        match engine::download_attachment(transport, token, id, &[]) {
+            Err(PullError::RateLimited) => {
+                std::thread::sleep(std::time::Duration::from_millis(delay_ms));
+                delay_ms = (delay_ms * 2).min(2000);
+            }
+            other => return other,
+        }
+    }
+    engine::download_attachment(transport, token, id, &[])
+}
+
+/// `upload_attachment` with the same 429 backoff.
+fn upload_attachment_backoff(
+    transport: &dyn SyncTransport,
+    token: &str,
+    id: &[u8; 32],
+    bytes: &[u8],
+) -> Result<(), PushError> {
+    let mut delay_ms = 250u64;
+    for _ in 0..6 {
+        match engine::upload_attachment(transport, token, id, bytes) {
+            Err(PushError::RateLimited) => {
+                std::thread::sleep(std::time::Duration::from_millis(delay_ms));
+                delay_ms = (delay_ms * 2).min(2000);
+            }
+            other => return other,
+        }
+    }
+    engine::upload_attachment(transport, token, id, bytes)
+}
+
+/// The catalog phase's outcome, consumed by the attachment pull loop (the
+/// merged catalog is the §11.4 rule-5 resurrection guard) and the push phase
+/// (a dirty catalog rides the same batch).
+struct CatalogPhase {
+    /// The post-merge catalog (== the on-disk catalog when this returns).
+    merged: AttachmentsCatalog,
+    /// The catalog needs a push (local-only change, or a merge that differed
+    /// from the server's plaintext).
+    dirty: bool,
+}
+
+/// Pull-side catalog reconciliation (MUST run before any attachment record is
+/// acted on — §11.4 rule 5). Downloads a changed remote catalog, merges
+/// per-entry, and either **adopts the server bytes verbatim** (merge result
+/// canonically equal to the remote — re-encrypting would nonce-churn an
+/// endless push loop) or writes the merged catalog freshly (dirty → pushed
+/// this cycle with the server's version as CAS base). Holds the attachments
+/// plugin's catalog write mutex across the read-merge-write.
+// Each argument is a distinct cycle input (same shape as run_sync_cycle above);
+// a bundling struct would not aid clarity at this single internal call site.
+#[allow(clippy::too_many_arguments)]
+fn sync_catalog_phase(
+    transport: &dyn SyncTransport,
+    token: &str,
+    root_key: &[u8; 32],
+    account_number_hash: &[u8; 16],
+    vault_root: &Path,
+    state: &mut SyncState,
+    cat_id: &[u8; 16],
+    remote_record: Option<&ChangedBlob>,
+) -> Result<CatalogPhase, SyncCycleError> {
+    let _guard = crate::plugins::attachments::commands::catalog_write_mutex().blocking_lock();
+
+    let catalog_key = derive_subkey(root_key, SubkeyRole::AttachmentsCatalogKey);
+    let path = catalog_file_path(vault_root);
+    let local_bytes = std::fs::read(&path).ok();
+    let local_nonce = local_bytes.as_deref().and_then(read_catalog_nonce);
+    // §9.10.4 read semantic: any local decode failure falls back to empty.
+    let local_cat =
+        protocol::read_or_empty(&catalog_key, account_number_hash, local_bytes.as_deref());
+
+    let cat_hex = hex(cat_id);
+    let baseline_nonce_hex = state
+        .blobs
+        .get(&cat_hex)
+        .map(|b| b.content_nonce_hex.clone());
+
+    // A remote record whose nonce we already hold needs no download.
+    let remote_changed = remote_record
+        .map(|r| Some(r.content_nonce) != local_nonce)
+        .unwrap_or(false);
+
+    if let (Some(rec), true) = (remote_record, remote_changed) {
+        let remote_bytes =
+            download_blob_backoff(transport, token, &rec.id).map_err(SyncCycleError::Pull)?;
+        // A hostile/corrupt remote catalog collapses to empty (§9.10.4);
+        // merge(local, empty) == local, so nothing is lost and the local
+        // catalog re-pushes over it.
+        let remote_cat =
+            protocol::read_or_empty(&catalog_key, account_number_hash, Some(&remote_bytes));
+        let merged = merge_attachments_catalog(&local_cat, &remote_cat);
+
+        if merged == remote_cat {
+            // Adopt the server bytes VERBATIM — byte-identical catalog +
+            // baseline == server (version, nonce); nothing to push.
+            crate::atomic_write::atomic_write(&path, &remote_bytes, true)
+                .map_err(|_| SyncCycleError::Io)?;
+            state.blobs.insert(
+                cat_hex,
+                BlobSyncState {
+                    version: rec.version,
+                    content_nonce_hex: hex(&rec.content_nonce),
+                },
+            );
+            return Ok(CatalogPhase {
+                merged,
+                dirty: false,
+            });
+        }
+
+        // Merge differs from the server → write it fresh and push it this
+        // cycle against the server's current version.
+        let merged_bytes = encode_attachments_catalog(&catalog_key, account_number_hash, &merged)
+            .map_err(|_| SyncCycleError::Io)?;
+        crate::atomic_write::atomic_write(&path, &merged_bytes, true)
+            .map_err(|_| SyncCycleError::Io)?;
+        // Record the server's version as the CAS base WITHOUT claiming its
+        // nonce (the local file now differs → dirty).
+        state.blobs.insert(
+            cat_hex,
+            BlobSyncState {
+                version: rec.version,
+                content_nonce_hex: hex(&rec.content_nonce),
+            },
+        );
+        return Ok(CatalogPhase {
+            merged,
+            dirty: true,
+        });
+    }
+
+    // No (changed) remote catalog: dirty iff the local file drifted from the
+    // synced baseline. A virgin empty catalog (no entries, no baseline) is
+    // deliberately NOT pushed — an attachment-less vault stays catalog-silent.
+    let local_nonce_hex = local_nonce.map(|n| hex(&n));
+    let dirty = local_bytes.is_some()
+        && local_nonce_hex != baseline_nonce_hex
+        && !(local_cat.entries.is_empty() && baseline_nonce_hex.is_none());
+    Ok(CatalogPhase {
+        merged: local_cat,
+        dirty,
+    })
+}
+
 /// The engine's `local` manifest (raw 16-byte id → 24-byte content_nonce), read
 /// decryption-free from the on-disk notes dir. Converts the notes-domain
 /// [`NonceManifest`](crate::note_nonce::NonceManifest) String keys to the
@@ -300,6 +636,7 @@ pub fn run_sync_cycle(
     notes_dir: &Path,
     vault_root: &Path,
     allow_push: bool,
+    attachment_keys: Option<AttachmentKeys<'_>>,
 ) -> Result<SyncSummary, SyncCycleError> {
     let mut state = read_sync_state(vault_root).map_err(|_| SyncCycleError::Io)?;
 
@@ -327,6 +664,7 @@ pub fn run_sync_cycle(
             notes_dir,
             vault_root,
             allow_push,
+            attachment_keys,
             &mut state,
             &baseline_vv,
             baseline_seq,
@@ -364,6 +702,7 @@ fn sync_cycle_attempt(
     notes_dir: &Path,
     vault_root: &Path,
     allow_push: bool,
+    attachment_keys: Option<AttachmentKeys<'_>>,
     state: &mut SyncState,
     baseline_vv: &[VvEntry],
     baseline_seq: u64,
@@ -377,7 +716,30 @@ fn sync_cycle_attempt(
     // request of the reconcile walk itself and wedge us at 410 forever. The baseline
     // self-heal below re-establishes per-blob versions (MYND-426 task 8).
     let mut reconcile_ran = false;
-    let local = local_manifest(notes_dir);
+    // The engine's `local` map covers every synced artefact this device holds —
+    // notes, attachment sync-ids, and the catalog singleton — so an unchanged
+    // record is never flagged `changed` and the baseline self-heal below covers
+    // all three (MYND-468). The attachment/catalog phases are gated on
+    // `attachment_keys` (legacy note-only cycles pass `None`).
+    let cat_id = attachment_keys.map(|_| catalog_sync_id(root_key));
+    let att_scan: BTreeMap<[u8; 16], AttachmentManifestEntry> = if attachment_keys.is_some() {
+        scan_attachments_manifest(&attachments_dir(vault_root))
+    } else {
+        BTreeMap::new()
+    };
+    let mut local = local_manifest(notes_dir);
+    for (sid, e) in &att_scan {
+        local.insert(*sid, e.content_nonce);
+    }
+    if let Some(cid) = cat_id {
+        if let Some(n) = std::fs::read(catalog_file_path(vault_root))
+            .ok()
+            .as_deref()
+            .and_then(read_catalog_nonce)
+        {
+            local.insert(cid, n);
+        }
+    }
     let page = match engine::pull_to_stable(
         transport,
         root_key,
@@ -444,9 +806,133 @@ fn sync_cycle_attempt(
         }
     }
 
-    // --- apply remote changes: download + write each changed blob to disk ---
+    // --- catalog phase (MUST precede any attachment record — §11.4 rule 5) ---
+    // The merged catalog is the resurrection guard: a tombstoned id is erased
+    // locally instead of downloaded; an uncataloged id is deferred.
+    let mut attachments_pulled = 0usize;
+    let mut attachments_deleted = 0usize;
+    let mut catalog_phase: Option<CatalogPhase> = None;
+    if let Some(keys) = attachment_keys {
+        let cid = cat_id.expect("cat_id set whenever attachment_keys is Some");
+        let remote_cat_rec = page
+            .all_metas
+            .iter()
+            .find(|m| m.id == cid && m.attachment_id.is_none());
+        let phase = sync_catalog_phase(
+            transport,
+            token,
+            root_key,
+            &account_number_hash,
+            vault_root,
+            state,
+            &cid,
+            remote_cat_rec,
+        )?;
+
+        // --- attachment pull loop (catalog-guarded, server-wins) ---
+        for c in page.changed.iter().filter(|c| c.attachment_id.is_some()) {
+            let full_id = c.attachment_id.expect("filtered on is_some");
+            if full_id[..16] != c.id {
+                // Server inconsistency (echoed id doesn't match the record key)
+                // — never act on it.
+                continue;
+            }
+            let full_hex = hex(&full_id);
+            let prefix_hex = hex(&c.id);
+            match phase.merged.entries.get(&full_hex) {
+                // No catalog entry yet — the catalog record hasn't reached us
+                // (or its push is still in flight). Defer to a later cycle
+                // rather than downloading blind (§11.4 rule 5).
+                None => continue,
+                Some(e) if e.is_tombstone() => {
+                    // Remote deletion propagation: erase the local body (+ its
+                    // MYE1 text cache) and adopt the tombstone record as the
+                    // baseline so it is not re-processed every cycle.
+                    let p = attachments_dir(vault_root).join(&full_hex);
+                    if p.exists() && std::fs::remove_file(&p).is_ok() {
+                        attachments_deleted += 1;
+                    }
+                    let _ = crate::plugins::attachments::text_cache::remove_extracted(
+                        vault_root, &full_id,
+                    );
+                    state.blobs.insert(
+                        prefix_hex,
+                        BlobSyncState {
+                            version: c.version,
+                            content_nonce_hex: hex(&c.content_nonce),
+                        },
+                    );
+                }
+                Some(live) => {
+                    // Already holding the server's exact bytes? (nonce match)
+                    // → just self-heal the baseline.
+                    if att_scan.get(&c.id).map(|e| e.content_nonce) == Some(c.content_nonce) {
+                        state.blobs.insert(
+                            prefix_hex,
+                            BlobSyncState {
+                                version: c.version,
+                                content_nonce_hex: hex(&c.content_nonce),
+                            },
+                        );
+                        continue;
+                    }
+                    let Some(bytes) = download_attachment_backoff(transport, token, &full_id)
+                        .map_err(SyncCycleError::Pull)?
+                    else {
+                        // Body absent or still uploading — defer, no baseline.
+                        continue;
+                    };
+                    // Pre-decrypt manifest check (§4.2): the header nonce must
+                    // be the one the record advertises.
+                    if crate::attachment_nonce::read_mya1_content_nonce(&bytes)
+                        != Some(c.content_nonce)
+                    {
+                        continue;
+                    }
+                    // Full whole-blob AEAD/CTX verification BEFORE the write —
+                    // a range-reassembled body carries no integrity of its own.
+                    if protocol::decode_attachment_blob(
+                        &bytes,
+                        &full_id,
+                        live.content_type.as_bytes(),
+                        keys.items_key,
+                        keys.items_key_id,
+                    )
+                    .is_err()
+                    {
+                        continue;
+                    }
+                    let dir = attachments_dir(vault_root);
+                    std::fs::create_dir_all(&dir).map_err(|_| SyncCycleError::Io)?;
+                    // Server-wins on nonce mismatch (§4.2): a locally-held
+                    // divergent ciphertext of the same content-addressed id is
+                    // REPLACED — plaintext is identical by construction, and
+                    // adopting the server bytes is what converges the fleet's
+                    // manifests (dirty-skip would diverge them forever).
+                    crate::atomic_write::atomic_write(&dir.join(&full_hex), &bytes, true)
+                        .map_err(|_| SyncCycleError::Io)?;
+                    state.blobs.insert(
+                        prefix_hex,
+                        BlobSyncState {
+                            version: c.version,
+                            content_nonce_hex: hex(&c.content_nonce),
+                        },
+                    );
+                    attachments_pulled += 1;
+                }
+            }
+        }
+        catalog_phase = Some(phase);
+    }
+
+    // --- apply remote changes: download + write each changed NOTE blob to disk ---
     let mut pulled = 0;
     for c in &page.changed {
+        // Attachment records were handled above; the catalog record is the
+        // catalog phase's (never written as a note).
+        if c.attachment_id.is_some() || Some(c.id) == cat_id {
+            continue;
+        }
         // Skip a locally-dirty blob: our on-disk copy diverges from the synced
         // baseline, so this is an unpushed local edit (or a genuine conflict) and
         // downloading the server's copy would clobber it. The push phase below
@@ -557,7 +1043,110 @@ fn sync_cycle_attempt(
                 // it for horizon-GC (the `deleted:` field still propagates either
                 // way; the flag only governs server-side reclamation).
                 tombstone: pending_tombstones.contains(&id_hex),
+                attachment_id: None,
             });
+        }
+    }
+
+    // --- detect attachment + catalog pushes (MYND-468) ---
+    // Byte-uploads happen HERE, before the single `/sync/push` batch below, so
+    // any head the server accepts only ever commits attachment bytes already
+    // durably stored (SYNC-5 blobs-first-then-head, extended to attachments).
+    let mut attachments_pushed = 0usize;
+    let mut pushed_att_tombstones: HashSet<[u8; 32]> = HashSet::new();
+    let mut att_scan2: BTreeMap<[u8; 16], AttachmentManifestEntry> = BTreeMap::new();
+    if allow_push {
+        if let Some(_keys) = attachment_keys {
+            let cid = cat_id.expect("cat_id set whenever attachment_keys is Some");
+            // Re-scan post-pull: a server-wins adoption above already
+            // converged the file, so it no longer registers as dirty here.
+            att_scan2 = scan_attachments_manifest(&attachments_dir(vault_root));
+            for (sid, entry) in &att_scan2 {
+                let prefix_hex = hex(sid);
+                let synced = state.blobs.get(&prefix_hex);
+                if synced.map(|b| b.content_nonce_hex.as_str())
+                    == Some(hex(&entry.content_nonce).as_str())
+                {
+                    continue; // already in sync
+                }
+                // The server advanced this id past our baseline concurrently —
+                // never keep-both for an attachment (§4.2 server-wins): skip
+                // the push (it would 409 the whole batch); the next pull
+                // adopts the server's bytes.
+                if let Some(b) = synced {
+                    if let Some((server_version, _)) = server_meta.get(sid) {
+                        if *server_version > b.version {
+                            continue;
+                        }
+                    }
+                }
+                let bytes = std::fs::read(attachments_dir(vault_root).join(hex(&entry.id)))
+                    .map_err(|_| SyncCycleError::Io)?;
+                upload_attachment_backoff(transport, token, &entry.id, &bytes)
+                    .map_err(SyncCycleError::Push)?;
+                attachments_pushed += 1;
+                to_push.push(PushBlob {
+                    id: *sid,
+                    base_version: synced.map(|b| b.version).unwrap_or(0),
+                    content_nonce: entry.content_nonce,
+                    ciphertext: Vec::new(), // bytes travelled over /attachments
+                    tombstone: false,
+                    attachment_id: Some(entry.id),
+                });
+            }
+
+            // Queued attachment deletions → §11.4 tombstone records. A queued
+            // id that is live again (re-added locally, or revived by the
+            // catalog merge) is a STALE tombstone — dropped, never pushed.
+            let merged = catalog_phase
+                .as_ref()
+                .map(|p| &p.merged)
+                .expect("catalog phase ran whenever attachment_keys is Some");
+            let mut stale: HashSet<[u8; 32]> = HashSet::new();
+            for t in read_pending_attachment_tombstones(vault_root) {
+                let live_again = merged
+                    .entries
+                    .get(&hex(&t.id))
+                    .map(|e| !e.is_tombstone())
+                    .unwrap_or(false);
+                if live_again || att_scan2.contains_key(&t.sync_id) {
+                    stale.insert(t.id);
+                    continue;
+                }
+                let base = state
+                    .blobs
+                    .get(&hex(&t.sync_id))
+                    .map(|b| b.version)
+                    .unwrap_or(0);
+                to_push.push(PushBlob {
+                    id: t.sync_id,
+                    base_version: base,
+                    content_nonce: t.content_nonce,
+                    ciphertext: Vec::new(),
+                    tombstone: true,
+                    attachment_id: Some(t.id),
+                });
+                pushed_att_tombstones.insert(t.id);
+            }
+            let _ = clear_pending_attachment_tombstones(vault_root, &stale);
+
+            // A dirty catalog (local-only change, or a merge that beat the
+            // server's plaintext) rides the same batch as an inline blob.
+            if catalog_phase.as_ref().map(|p| p.dirty).unwrap_or(false) {
+                if let Ok(bytes) = std::fs::read(catalog_file_path(vault_root)) {
+                    if let Some(nonce) = read_catalog_nonce(&bytes) {
+                        let base = state.blobs.get(&hex(&cid)).map(|b| b.version).unwrap_or(0);
+                        to_push.push(PushBlob {
+                            id: cid,
+                            base_version: base,
+                            content_nonce: nonce,
+                            ciphertext: bytes,
+                            tombstone: false,
+                            attachment_id: None,
+                        });
+                    }
+                }
+            }
         }
     }
 
@@ -603,8 +1192,15 @@ fn sync_cycle_attempt(
         } else {
             Vec::new()
         };
-        let manifest_hash =
-            compute_manifest_hash(&manifest_entries(&local2)).map_err(|_| SyncCycleError::Head)?;
+        // The head manifest covers content blobs — notes ∪ live attachments
+        // (§4.2). The catalog singleton is deliberately outside it, and a
+        // tombstoned attachment has already left the disk scan.
+        let mut manifest_map = local2.clone();
+        for (sid, e) in &att_scan2 {
+            manifest_map.insert(*sid, e.content_nonce);
+        }
+        let manifest_hash = compute_manifest_hash(&manifest_entries(&manifest_map))
+            .map_err(|_| SyncCycleError::Head)?;
         let head = VaultHead {
             head_format_version: VAULT_HEAD_FORMAT_V1,
             account_number_hash,
@@ -645,6 +1241,8 @@ fn sync_cycle_attempt(
             .collect();
         tombstones_pushed = pushed_tombstones.len();
         let _ = clear_pending_tombstones(vault_root, &pushed_tombstones);
+        // The attachment-tombstone queue drains only after its records landed.
+        let _ = clear_pending_attachment_tombstones(vault_root, &pushed_att_tombstones);
         write_head_baseline(vault_root, &sealed).map_err(|_| SyncCycleError::Io)?;
         state.record_observation(&sealed.head_id, &version_vector);
     } else if let Some(vh) = &page.head {
@@ -665,6 +1263,9 @@ fn sync_cycle_attempt(
         conflicts,
         tombstones_pushed,
         reconcile_ran,
+        attachments_pulled,
+        attachments_pushed,
+        attachments_deleted,
     })
 }
 
@@ -674,9 +1275,36 @@ mod tests {
     use crate::plugins::notes::note_id::NoteId;
     use crate::plugins::sync::enroll::{self, EnrollPath};
     use crate::plugins::sync::transport::{HttpMethod, TransportError, TransportResponse};
-    use protocol::{decode_note, derive_subkey, encode_new_note, SubkeyRole};
+    use protocol::{decode_note, encode_new_note};
     use std::path::PathBuf;
     use std::process::Child;
+
+    /// The pre-MYND-468 cycle shape — a note-only cycle (no attachment keys).
+    /// The existing note-sync scenarios pin note behavior in isolation;
+    /// attachment-aware scenarios call `run_sync_cycle` with `Some(keys)`.
+    #[allow(clippy::too_many_arguments)]
+    fn run_cycle_legacy(
+        transport: &dyn SyncTransport,
+        root_key: &[u8; 32],
+        account_number_hash: [u8; 16],
+        device_id: [u8; 16],
+        token: &str,
+        notes_dir: &Path,
+        vault_root: &Path,
+        allow_push: bool,
+    ) -> Result<SyncSummary, SyncCycleError> {
+        run_sync_cycle(
+            transport,
+            root_key,
+            account_number_hash,
+            device_id,
+            token,
+            notes_dir,
+            vault_root,
+            allow_push,
+            None,
+        )
+    }
 
     /// A transport that relays everything to a wrapped real transport EXCEPT it
     /// fails every `/sync/blob` download with a 500, so the note-body download loop
@@ -874,7 +1502,7 @@ mod tests {
         let tok_b = hex32(&out_b.token);
 
         // --- A pushes; B pulls ---
-        let push = run_sync_cycle(
+        let push = run_cycle_legacy(
             ta.as_ref(),
             &root_key,
             account_hash,
@@ -888,7 +1516,7 @@ mod tests {
         assert_eq!(push.pushed, 1, "A pushed the note");
         assert!(push.head_advanced, "A advanced the head");
 
-        let pull = run_sync_cycle(
+        let pull = run_cycle_legacy(
             tb.as_ref(),
             &root_key,
             account_hash,
@@ -970,7 +1598,7 @@ mod tests {
         )
         .unwrap();
         let tok_a = hex32(&out_a.token);
-        run_sync_cycle(
+        run_cycle_legacy(
             ta.as_ref(),
             &root_key,
             account_hash,
@@ -1019,7 +1647,7 @@ mod tests {
         let tok_b = hex32(&out_b2.token);
 
         // B syncs → the owner's note lands on B's disk, decrypting to the same text.
-        let pull = run_sync_cycle(
+        let pull = run_cycle_legacy(
             mk().as_ref(),
             &root_key,
             account_hash,
@@ -1097,7 +1725,7 @@ mod tests {
             "a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0",
             true,
         );
-        run_sync_cycle(
+        run_cycle_legacy(
             ta.as_ref(),
             &root_key,
             account_hash,
@@ -1130,7 +1758,7 @@ mod tests {
         let tb_fail = FailBlobTransport {
             inner: crate::plugins::sync::http_transport::build_transport(&url, Vec::new()).unwrap(),
         };
-        let res = run_sync_cycle(
+        let res = run_cycle_legacy(
             &tb_fail,
             &root_key,
             account_hash,
@@ -1199,7 +1827,7 @@ mod tests {
             "a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0",
             true,
         );
-        let push = run_sync_cycle(
+        let push = run_cycle_legacy(
             ta.as_ref(),
             &root_key,
             account_hash,
@@ -1229,7 +1857,7 @@ mod tests {
             "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
             false,
         );
-        let pull = run_sync_cycle(
+        let pull = run_cycle_legacy(
             tb.as_ref(),
             &root_key,
             account_hash,
@@ -1303,7 +1931,7 @@ mod tests {
         )
         .unwrap();
         let tok_a = hex32(&out_a.token);
-        run_sync_cycle(
+        run_cycle_legacy(
             ta.as_ref(),
             &root_key,
             account_hash,
@@ -1333,7 +1961,7 @@ mod tests {
 
         // A syncs: self-heal the baseline + push the edit (no 409), and do NOT
         // clobber the local edit with the server's v1.
-        run_sync_cycle(
+        run_cycle_legacy(
             ta.as_ref(),
             &root_key,
             account_hash,
@@ -1366,7 +1994,7 @@ mod tests {
         )
         .unwrap();
         let tok_b = hex32(&out_b.token);
-        let pull = run_sync_cycle(
+        let pull = run_cycle_legacy(
             tb.as_ref(),
             &root_key,
             account_hash,
@@ -1491,7 +2119,7 @@ mod tests {
             "a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0",
             true,
         );
-        let push = run_sync_cycle(
+        let push = run_cycle_legacy(
             ta.as_ref(),
             &root_key,
             account_hash,
@@ -1512,7 +2140,7 @@ mod tests {
             "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
             false,
         );
-        let pull = run_sync_cycle(
+        let pull = run_cycle_legacy(
             tb.as_ref(),
             &root_key,
             account_hash,
@@ -1577,7 +2205,7 @@ mod tests {
             "a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0",
             true,
         );
-        run_sync_cycle(
+        run_cycle_legacy(
             ta.as_ref(),
             &root_key,
             account_hash,
@@ -1596,7 +2224,7 @@ mod tests {
             "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
             false,
         );
-        run_sync_cycle(
+        run_cycle_legacy(
             tb.as_ref(),
             &root_key,
             account_hash,
@@ -1623,7 +2251,7 @@ mod tests {
             b"deleted: 2026-06-21T00:00:00Z",
             true,
         );
-        run_sync_cycle(
+        run_cycle_legacy(
             ta.as_ref(),
             &root_key,
             account_hash,
@@ -1636,7 +2264,7 @@ mod tests {
         .expect("A push delete");
 
         // B syncs: must DOWNLOAD the deletion (B never edited → not locally dirty).
-        run_sync_cycle(
+        run_cycle_legacy(
             tb.as_ref(),
             &root_key,
             account_hash,
@@ -1697,7 +2325,7 @@ mod tests {
             "a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0",
             true,
         );
-        run_sync_cycle(
+        run_cycle_legacy(
             ta.as_ref(),
             &root_key,
             account_hash,
@@ -1716,7 +2344,7 @@ mod tests {
             "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
             false,
         );
-        run_sync_cycle(
+        run_cycle_legacy(
             tb.as_ref(),
             &root_key,
             account_hash,
@@ -1738,7 +2366,7 @@ mod tests {
             b"edit from A",
             true,
         );
-        run_sync_cycle(
+        run_cycle_legacy(
             ta.as_ref(),
             &root_key,
             account_hash,
@@ -1766,7 +2394,7 @@ mod tests {
             b"unrelated note",
             false,
         );
-        let summary = run_sync_cycle(
+        let summary = run_cycle_legacy(
             tb.as_ref(),
             &root_key,
             account_hash,
@@ -1803,7 +2431,7 @@ mod tests {
             "c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2",
             false,
         );
-        run_sync_cycle(
+        run_cycle_legacy(
             tc.as_ref(),
             &root_key,
             account_hash,
@@ -1868,7 +2496,7 @@ mod tests {
             "a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0",
             true,
         );
-        run_sync_cycle(
+        run_cycle_legacy(
             ta.as_ref(),
             &root_key,
             account_hash,
@@ -1887,7 +2515,7 @@ mod tests {
             "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
             false,
         );
-        run_sync_cycle(
+        run_cycle_legacy(
             tb.as_ref(),
             &root_key,
             account_hash,
@@ -1906,7 +2534,7 @@ mod tests {
             b"edit from A",
             true,
         );
-        run_sync_cycle(
+        run_cycle_legacy(
             ta.as_ref(),
             &root_key,
             account_hash,
@@ -1927,7 +2555,7 @@ mod tests {
         );
 
         // B's conflict cycle: A's revision is staged + surfaced; X is excluded.
-        let s1 = run_sync_cycle(
+        let s1 = run_cycle_legacy(
             tb.as_ref(),
             &root_key,
             account_hash,
@@ -1967,7 +2595,7 @@ mod tests {
         );
 
         // B re-syncs: X (edit-B) now pushes as a clean linear advance + the copy Z.
-        let s2 = run_sync_cycle(
+        let s2 = run_cycle_legacy(
             tb.as_ref(),
             &root_key,
             account_hash,
@@ -1994,7 +2622,7 @@ mod tests {
             "c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2",
             false,
         );
-        run_sync_cycle(
+        run_cycle_legacy(
             tc.as_ref(),
             &root_key,
             account_hash,
@@ -2056,7 +2684,7 @@ mod tests {
             "a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0",
             true,
         );
-        run_sync_cycle(
+        run_cycle_legacy(
             ta.as_ref(),
             &root_key,
             account_hash,
@@ -2075,7 +2703,7 @@ mod tests {
             "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
             false,
         );
-        run_sync_cycle(
+        run_cycle_legacy(
             tb.as_ref(),
             &root_key,
             account_hash,
@@ -2099,7 +2727,7 @@ mod tests {
             b"B unsynced edit",
             true,
         );
-        let err = run_sync_cycle(
+        let err = run_cycle_legacy(
             tb.as_ref(),
             &root_key,
             account_hash,
@@ -2174,7 +2802,7 @@ mod tests {
             br#"{"results":[],"head_id_hex":"3333333333333333333333333333333333333333333333333333333333333333"}"#.to_vec(),
         );
 
-        let summary = run_sync_cycle(
+        let summary = run_cycle_legacy(
             &fake, &[0u8; 32], [0u8; 16], [0u8; 16], "tok", &notes, &dir, true,
         )
         .expect("the cycle recovers from cursor_expired");
@@ -2191,7 +2819,7 @@ mod tests {
         let pulled_from_0 = fake
             .requests()
             .iter()
-            .any(|(m, p, _, _)| *m == HttpMethod::Get && p == "/sync/pull?cursor=0&reconcile=1");
+            .any(|(m, p, _, _, _)| *m == HttpMethod::Get && p == "/sync/pull?cursor=0&reconcile=1");
         assert!(
             pulled_from_0,
             "re-pulled from cursor 0 with reconcile=1 after the 410"
@@ -2245,7 +2873,7 @@ mod tests {
             "a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0",
             true,
         );
-        run_sync_cycle(
+        run_cycle_legacy(
             ta.as_ref(),
             &root_key,
             account_hash,
@@ -2264,7 +2892,7 @@ mod tests {
             "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
             false,
         );
-        let pull = run_sync_cycle(
+        let pull = run_cycle_legacy(
             tb.as_ref(),
             &root_key,
             account_hash,
@@ -2317,7 +2945,7 @@ mod tests {
             "a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0",
             true,
         );
-        run_sync_cycle(
+        run_cycle_legacy(
             ta.as_ref(),
             &root_key,
             account_hash,
@@ -2336,7 +2964,7 @@ mod tests {
             "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
             false,
         );
-        run_sync_cycle(
+        run_cycle_legacy(
             tb.as_ref(),
             &root_key,
             account_hash,
@@ -2360,7 +2988,7 @@ mod tests {
             true,
         );
 
-        let s = run_sync_cycle(
+        let s = run_cycle_legacy(
             ta.as_ref(),
             &root_key,
             account_hash,
@@ -2378,7 +3006,7 @@ mod tests {
         );
 
         // The deletion propagates to B.
-        run_sync_cycle(
+        run_cycle_legacy(
             tb.as_ref(),
             &root_key,
             account_hash,
@@ -2440,7 +3068,7 @@ mod tests {
             "a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0",
             true,
         );
-        run_sync_cycle(
+        run_cycle_legacy(
             ta.as_ref(),
             &root_key,
             account_hash,
@@ -2459,7 +3087,7 @@ mod tests {
             "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
             false,
         );
-        run_sync_cycle(
+        run_cycle_legacy(
             tb.as_ref(),
             &root_key,
             account_hash,
@@ -2481,7 +3109,7 @@ mod tests {
             b"edit from A",
             true,
         );
-        run_sync_cycle(
+        run_cycle_legacy(
             ta.as_ref(),
             &root_key,
             account_hash,
@@ -2504,7 +3132,7 @@ mod tests {
         // B cycle #1: pulls A's X@v2 (in window) → conflict detected, staged, and
         // excluded. B's cursor advances PAST X's change-seq. Nothing pushes (X is the
         // only dirty note), and the conflict is left UNRESOLVED (no materialization).
-        let s1 = run_sync_cycle(
+        let s1 = run_cycle_legacy(
             tb.as_ref(),
             &root_key,
             account_hash,
@@ -2540,7 +3168,7 @@ mod tests {
         // cycle 1). Before the fix, X would be re-pushed at its stale base_version →
         // 409 blob_stale → the whole batch (including Y) wedges and the cycle errors.
         // The fix excludes the still-staged X, so Y pushes cleanly and the cycle is Ok.
-        let s2 = run_sync_cycle(
+        let s2 = run_cycle_legacy(
             tb.as_ref(),
             &root_key,
             account_hash,
@@ -2576,7 +3204,7 @@ mod tests {
             "c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2",
             false,
         );
-        run_sync_cycle(
+        run_cycle_legacy(
             tc.as_ref(),
             &root_key,
             account_hash,
@@ -2640,7 +3268,7 @@ mod tests {
             "a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0",
             true,
         );
-        run_sync_cycle(
+        run_cycle_legacy(
             ta.as_ref(),
             &root_key,
             account_hash,
@@ -2659,7 +3287,7 @@ mod tests {
             "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
             false,
         );
-        run_sync_cycle(
+        run_cycle_legacy(
             tb.as_ref(),
             &root_key,
             account_hash,
@@ -2681,7 +3309,7 @@ mod tests {
             b"edit from A",
             true,
         );
-        run_sync_cycle(
+        run_cycle_legacy(
             ta.as_ref(),
             &root_key,
             account_hash,
@@ -2692,7 +3320,7 @@ mod tests {
             true,
         )
         .expect("A push v2");
-        run_sync_cycle(
+        run_cycle_legacy(
             tb.as_ref(),
             &root_key,
             account_hash,
@@ -2731,7 +3359,7 @@ mod tests {
             b"edit from B",
             true,
         );
-        let s = run_sync_cycle(
+        let s = run_cycle_legacy(
             tb.as_ref(),
             &root_key,
             account_hash,
@@ -2754,6 +3382,663 @@ mod tests {
             read_note(&notes_b, &items_key, &items_key_id, &x).as_deref(),
             Some(&b"edit from B"[..]),
             "B's local X edit survived the recovery (never clobbered)"
+        );
+
+        std::fs::remove_dir_all(&dir_a).ok();
+        std::fs::remove_dir_all(&dir_b).ok();
+    }
+
+    // -----------------------------------------------------------------------
+    // Attachment sync (MYND-468) — real-server integration
+    // -----------------------------------------------------------------------
+
+    /// The attachment-aware cycle (the production shape; the legacy wrapper
+    /// above pins note behavior in isolation).
+    #[allow(clippy::too_many_arguments)]
+    fn run_cycle_att(
+        transport: &dyn SyncTransport,
+        root_key: &[u8; 32],
+        account_number_hash: [u8; 16],
+        device_id: [u8; 16],
+        token: &str,
+        vault_root: &Path,
+        items_key: &[u8; 32],
+        items_key_id: &[u8; 16],
+    ) -> Result<SyncSummary, SyncCycleError> {
+        run_sync_cycle(
+            transport,
+            root_key,
+            account_number_hash,
+            device_id,
+            token,
+            &vault_root.join("notes"),
+            vault_root,
+            true,
+            Some(AttachmentKeys {
+                items_key,
+                items_key_id,
+            }),
+        )
+    }
+
+    /// Seed a local attachment exactly as `attachment_import` would: MYA1 blob
+    /// under `attachments/<id-hex>` + a live MYC1 catalog entry.
+    #[allow(clippy::too_many_arguments)]
+    fn seed_attachment(
+        vault: &Path,
+        root_key: &[u8; 32],
+        account_hash: &[u8; 16],
+        items_key: &[u8; 32],
+        items_key_id: &[u8; 16],
+        plaintext: &[u8],
+        filename: &str,
+        created_at: u64,
+    ) -> [u8; 32] {
+        let id = protocol::compute_attachment_id(root_key, plaintext);
+        let blob = protocol::encode_attachment_blob(
+            items_key,
+            items_key_id,
+            &id,
+            b"application/octet-stream",
+            plaintext,
+        )
+        .unwrap();
+        let att_dir = vault.join("attachments");
+        std::fs::create_dir_all(&att_dir).unwrap();
+        crate::atomic_write::atomic_write(&att_dir.join(hex(&id)), &blob, true).unwrap();
+
+        let catalog_key = derive_subkey(root_key, SubkeyRole::AttachmentsCatalogKey);
+        let existing = std::fs::read(vault.join("vault.attachments")).ok();
+        let mut catalog = protocol::read_or_empty(&catalog_key, account_hash, existing.as_deref());
+        catalog.entries.insert(
+            hex(&id),
+            protocol::AttachmentMeta::live(
+                "application/octet-stream".to_string(),
+                created_at,
+                filename.to_string(),
+                plaintext.len() as u64,
+            ),
+        );
+        let bytes =
+            protocol::encode_attachments_catalog(&catalog_key, account_hash, &catalog).unwrap();
+        crate::atomic_write::atomic_write(&vault.join("vault.attachments"), &bytes, true).unwrap();
+        id
+    }
+
+    /// Delete a local attachment exactly as `attachment_delete` would under
+    /// sync: catalog entry → tombstone (metadata scrubbed) + tombstone queue +
+    /// blob unlink.
+    fn delete_attachment_local(
+        vault: &Path,
+        root_key: &[u8; 32],
+        account_hash: &[u8; 16],
+        id: &[u8; 32],
+        deleted_at: u64,
+    ) {
+        let catalog_key = derive_subkey(root_key, SubkeyRole::AttachmentsCatalogKey);
+        let existing = std::fs::read(vault.join("vault.attachments")).ok();
+        let mut catalog = protocol::read_or_empty(&catalog_key, account_hash, existing.as_deref());
+        let id_hex = hex(id);
+        if let Some(meta) = catalog.entries.get(&id_hex).cloned() {
+            catalog
+                .entries
+                .insert(id_hex.clone(), meta.into_tombstone(deleted_at));
+        }
+        let bytes =
+            protocol::encode_attachments_catalog(&catalog_key, account_hash, &catalog).unwrap();
+        crate::atomic_write::atomic_write(&vault.join("vault.attachments"), &bytes, true).unwrap();
+        add_pending_attachment_tombstone(vault, id).unwrap();
+        let _ = std::fs::remove_file(vault.join("attachments").join(&id_hex));
+    }
+
+    fn read_catalog_of(
+        vault: &Path,
+        root_key: &[u8; 32],
+        account_hash: &[u8; 16],
+    ) -> protocol::AttachmentsCatalog {
+        let catalog_key = derive_subkey(root_key, SubkeyRole::AttachmentsCatalogKey);
+        let bytes = std::fs::read(vault.join("vault.attachments")).ok();
+        protocol::read_or_empty(&catalog_key, account_hash, bytes.as_deref())
+    }
+
+    /// Enroll two devices on a fresh server; returns everything the attachment
+    /// scenarios need. `None` → self-skip (binary not built).
+    #[allow(clippy::type_complexity)]
+    fn two_device_fixture(
+        tag: &str,
+    ) -> Option<(
+        ServerGuard,
+        Box<dyn SyncTransport>,
+        Box<dyn SyncTransport>,
+        std::path::PathBuf,
+        std::path::PathBuf,
+        [u8; 16],
+        [u8; 16],
+        String,
+        String,
+    )> {
+        let (guard, url) = spawn_server()?;
+        let root_key = [0x42u8; 32];
+        let account_hash = {
+            // Distinct account per scenario so parallel tests never share state.
+            let mut h = [0u8; 16];
+            let d = protocol::compute_attachment_id(&root_key, tag.as_bytes());
+            h.copy_from_slice(&d[..16]);
+            h
+        };
+        let username = format!("MY-ATT-{tag}");
+        let secret = derive_subkey(&root_key, SubkeyRole::ServerAuth);
+
+        let dir_a = std::env::temp_dir().join(format!("myne-att-A-{tag}-{}", std::process::id()));
+        let dir_b = std::env::temp_dir().join(format!("myne-att-B-{tag}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir_a);
+        let _ = std::fs::remove_dir_all(&dir_b);
+        std::fs::create_dir_all(dir_a.join("notes")).unwrap();
+        std::fs::create_dir_all(dir_b.join("notes")).unwrap();
+
+        let ta = crate::plugins::sync::http_transport::build_transport(&url, Vec::new()).unwrap();
+        let tb = crate::plugins::sync::http_transport::build_transport(&url, Vec::new()).unwrap();
+        enroll::register_verifier(ta.as_ref(), &account_hash, &username, secret.as_slice())
+            .unwrap();
+        let dev_a = enroll::generate_device_id();
+        let out_a = enroll::enroll(
+            ta.as_ref(),
+            &account_hash,
+            &username,
+            secret.as_slice(),
+            EnrollPath::Recovery,
+            "a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0",
+            dev_a,
+        )
+        .unwrap();
+        let dev_b = enroll::generate_device_id();
+        let out_b = enroll::enroll(
+            tb.as_ref(),
+            &account_hash,
+            &username,
+            secret.as_slice(),
+            EnrollPath::Recovery,
+            "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
+            dev_b,
+        )
+        .unwrap();
+        Some((
+            guard,
+            ta,
+            tb,
+            dir_a,
+            dir_b,
+            dev_a,
+            dev_b,
+            hex32(&out_a.token),
+            hex32(&out_b.token),
+        ))
+    }
+
+    const ATT_ROOT: [u8; 32] = [0x42u8; 32];
+    const ATT_ITEMS: [u8; 32] = [0x11u8; 32];
+    const ATT_ITEMS_ID: [u8; 16] = [0x22u8; 16];
+
+    /// A imports an attachment; B receives the exact bytes + the live catalog
+    /// entry — the end-to-end replication proof over the real byte-transport.
+    #[test]
+    fn two_devices_replicate_an_attachment() {
+        let Some((_g, ta, tb, dir_a, dir_b, dev_a, dev_b, tok_a, tok_b)) =
+            two_device_fixture("repl")
+        else {
+            eprintln!("SKIP two_devices_replicate_an_attachment: myne-server not built");
+            return;
+        };
+        let account_hash = {
+            let d = protocol::compute_attachment_id(&ATT_ROOT, b"repl");
+            let mut h = [0u8; 16];
+            h.copy_from_slice(&d[..16]);
+            h
+        };
+
+        let plaintext = b"attachment payload from device A";
+        let id = seed_attachment(
+            &dir_a,
+            &ATT_ROOT,
+            &account_hash,
+            &ATT_ITEMS,
+            &ATT_ITEMS_ID,
+            plaintext,
+            "payload.bin",
+            1_000,
+        );
+
+        let push = run_cycle_att(
+            ta.as_ref(),
+            &ATT_ROOT,
+            account_hash,
+            dev_a,
+            &tok_a,
+            &dir_a,
+            &ATT_ITEMS,
+            &ATT_ITEMS_ID,
+        )
+        .expect("A cycle");
+        assert_eq!(push.attachments_pushed, 1, "A uploaded the body");
+        assert!(
+            push.head_advanced,
+            "A authored a head over notes∪attachments"
+        );
+
+        let pull = run_cycle_att(
+            tb.as_ref(),
+            &ATT_ROOT,
+            account_hash,
+            dev_b,
+            &tok_b,
+            &dir_b,
+            &ATT_ITEMS,
+            &ATT_ITEMS_ID,
+        )
+        .expect("B cycle");
+        assert_eq!(pull.attachments_pulled, 1, "B downloaded the body");
+
+        let a_bytes = std::fs::read(dir_a.join("attachments").join(hex(&id))).unwrap();
+        let b_bytes = std::fs::read(dir_b.join("attachments").join(hex(&id))).unwrap();
+        assert_eq!(
+            a_bytes, b_bytes,
+            "B holds A's exact ciphertext (server-wins convergence)"
+        );
+
+        let cat_b = read_catalog_of(&dir_b, &ATT_ROOT, &account_hash);
+        let entry = cat_b
+            .entries
+            .get(&hex(&id))
+            .expect("B merged the catalog entry");
+        assert!(!entry.is_tombstone());
+        assert_eq!(entry.filename, "payload.bin");
+
+        // Idle cycles push nothing (nonce-churn regression): the catalog was
+        // adopted verbatim, so no re-encrypt → no endless push loop.
+        for (t, dev, tok, dir) in [
+            (ta.as_ref(), dev_a, &tok_a, &dir_a),
+            (tb.as_ref(), dev_b, &tok_b, &dir_b),
+        ] {
+            let idle = run_cycle_att(
+                t,
+                &ATT_ROOT,
+                account_hash,
+                dev,
+                tok,
+                dir,
+                &ATT_ITEMS,
+                &ATT_ITEMS_ID,
+            )
+            .expect("idle cycle");
+            assert_eq!(
+                (
+                    idle.pushed,
+                    idle.attachments_pushed,
+                    idle.attachments_pulled
+                ),
+                (0, 0, 0),
+                "an idle cycle after convergence moves nothing"
+            );
+        }
+
+        std::fs::remove_dir_all(&dir_a).ok();
+        std::fs::remove_dir_all(&dir_b).ok();
+    }
+
+    /// A deletes the attachment; B's blob is erased and its catalog entry is a
+    /// tombstone — and B's stale catalog can never resurrect it (§11.4).
+    #[test]
+    fn attachment_delete_propagates_with_resurrection_guard() {
+        let Some((_g, ta, tb, dir_a, dir_b, dev_a, dev_b, tok_a, tok_b)) =
+            two_device_fixture("del")
+        else {
+            eprintln!("SKIP attachment_delete_propagates: myne-server not built");
+            return;
+        };
+        let account_hash = {
+            let d = protocol::compute_attachment_id(&ATT_ROOT, b"del");
+            let mut h = [0u8; 16];
+            h.copy_from_slice(&d[..16]);
+            h
+        };
+
+        let plaintext = b"to be deleted everywhere";
+        let id = seed_attachment(
+            &dir_a,
+            &ATT_ROOT,
+            &account_hash,
+            &ATT_ITEMS,
+            &ATT_ITEMS_ID,
+            plaintext,
+            "doomed.bin",
+            1_000,
+        );
+        // Replicate to B first.
+        run_cycle_att(
+            ta.as_ref(),
+            &ATT_ROOT,
+            account_hash,
+            dev_a,
+            &tok_a,
+            &dir_a,
+            &ATT_ITEMS,
+            &ATT_ITEMS_ID,
+        )
+        .unwrap();
+        run_cycle_att(
+            tb.as_ref(),
+            &ATT_ROOT,
+            account_hash,
+            dev_b,
+            &tok_b,
+            &dir_b,
+            &ATT_ITEMS,
+            &ATT_ITEMS_ID,
+        )
+        .unwrap();
+        assert!(dir_b.join("attachments").join(hex(&id)).exists());
+
+        // A deletes while B is "offline" (B holds a live catalog + the blob).
+        delete_attachment_local(&dir_a, &ATT_ROOT, &account_hash, &id, 2_000);
+        let del = run_cycle_att(
+            ta.as_ref(),
+            &ATT_ROOT,
+            account_hash,
+            dev_a,
+            &tok_a,
+            &dir_a,
+            &ATT_ITEMS,
+            &ATT_ITEMS_ID,
+        )
+        .expect("A delete cycle");
+        assert!(
+            del.tombstones_pushed >= 1,
+            "the §11.4 tombstone record pushed"
+        );
+        assert!(
+            read_pending_attachment_tombstones(&dir_a).is_empty(),
+            "the queue drained after the push"
+        );
+
+        // B pulls: catalog-first merge → tombstone wins → local erase.
+        let pull = run_cycle_att(
+            tb.as_ref(),
+            &ATT_ROOT,
+            account_hash,
+            dev_b,
+            &tok_b,
+            &dir_b,
+            &ATT_ITEMS,
+            &ATT_ITEMS_ID,
+        )
+        .expect("B pull cycle");
+        assert_eq!(pull.attachments_deleted, 1, "B erased the tombstoned body");
+        assert!(
+            !dir_b.join("attachments").join(hex(&id)).exists(),
+            "B's blob is gone"
+        );
+        let cat_b = read_catalog_of(&dir_b, &ATT_ROOT, &account_hash);
+        assert!(
+            cat_b
+                .entries
+                .get(&hex(&id))
+                .is_some_and(|e| e.is_tombstone()),
+            "B's catalog entry is the tombstone"
+        );
+
+        // Resurrection guard: B's next cycles never re-push the dead entry or
+        // re-download the body.
+        let idle = run_cycle_att(
+            tb.as_ref(),
+            &ATT_ROOT,
+            account_hash,
+            dev_b,
+            &tok_b,
+            &dir_b,
+            &ATT_ITEMS,
+            &ATT_ITEMS_ID,
+        )
+        .unwrap();
+        assert_eq!(
+            (
+                idle.attachments_pulled,
+                idle.attachments_pushed,
+                idle.pushed
+            ),
+            (0, 0, 0),
+            "no resurrection churn"
+        );
+
+        std::fs::remove_dir_all(&dir_a).ok();
+        std::fs::remove_dir_all(&dir_b).ok();
+    }
+
+    /// Both devices import the SAME file independently (same content-addressed
+    /// id, different random ciphertext) — the §4.2 server-wins rule converges
+    /// both manifests on one ciphertext instead of diverging forever.
+    #[test]
+    fn double_import_converges_server_wins() {
+        let Some((_g, ta, tb, dir_a, dir_b, dev_a, dev_b, tok_a, tok_b)) =
+            two_device_fixture("dbl")
+        else {
+            eprintln!("SKIP double_import_converges: myne-server not built");
+            return;
+        };
+        let account_hash = {
+            let d = protocol::compute_attachment_id(&ATT_ROOT, b"dbl");
+            let mut h = [0u8; 16];
+            h.copy_from_slice(&d[..16]);
+            h
+        };
+
+        let plaintext = b"identical file imported on two devices";
+        let id_a = seed_attachment(
+            &dir_a,
+            &ATT_ROOT,
+            &account_hash,
+            &ATT_ITEMS,
+            &ATT_ITEMS_ID,
+            plaintext,
+            "same.bin",
+            1_000,
+        );
+        let id_b = seed_attachment(
+            &dir_b,
+            &ATT_ROOT,
+            &account_hash,
+            &ATT_ITEMS,
+            &ATT_ITEMS_ID,
+            plaintext,
+            "same.bin",
+            1_001,
+        );
+        assert_eq!(id_a, id_b, "content-addressing: same plaintext → same id");
+        assert_ne!(
+            std::fs::read(dir_a.join("attachments").join(hex(&id_a))).unwrap(),
+            std::fs::read(dir_b.join("attachments").join(hex(&id_b))).unwrap(),
+            "randomized encryption: same id, different ciphertext"
+        );
+
+        // A wins the race; B's divergent local copy must adopt A's bytes.
+        run_cycle_att(
+            ta.as_ref(),
+            &ATT_ROOT,
+            account_hash,
+            dev_a,
+            &tok_a,
+            &dir_a,
+            &ATT_ITEMS,
+            &ATT_ITEMS_ID,
+        )
+        .unwrap();
+        run_cycle_att(
+            tb.as_ref(),
+            &ATT_ROOT,
+            account_hash,
+            dev_b,
+            &tok_b,
+            &dir_b,
+            &ATT_ITEMS,
+            &ATT_ITEMS_ID,
+        )
+        .unwrap();
+
+        let a_bytes = std::fs::read(dir_a.join("attachments").join(hex(&id_a))).unwrap();
+        let b_bytes = std::fs::read(dir_b.join("attachments").join(hex(&id_a))).unwrap();
+        assert_eq!(a_bytes, b_bytes, "server-wins converged the ciphertexts");
+
+        // Convergence is stable: further cycles on both sides move nothing.
+        for (t, dev, tok, dir) in [
+            (ta.as_ref(), dev_a, &tok_a, &dir_a),
+            (tb.as_ref(), dev_b, &tok_b, &dir_b),
+        ] {
+            let idle = run_cycle_att(
+                t,
+                &ATT_ROOT,
+                account_hash,
+                dev,
+                tok,
+                dir,
+                &ATT_ITEMS,
+                &ATT_ITEMS_ID,
+            )
+            .unwrap();
+            assert_eq!(
+                (idle.attachments_pulled, idle.attachments_pushed),
+                (0, 0),
+                "no double-import churn"
+            );
+        }
+
+        std::fs::remove_dir_all(&dir_a).ok();
+        std::fs::remove_dir_all(&dir_b).ok();
+    }
+
+    /// A re-add after a propagated deletion revives the entry (created_at >
+    /// deleted_at) and re-uploads the body — the §11.4 rule-4 revival path,
+    /// including the server-side un-tombstone CAS.
+    #[test]
+    fn attachment_readd_after_delete_revives() {
+        let Some((_g, ta, tb, dir_a, dir_b, dev_a, dev_b, tok_a, tok_b)) =
+            two_device_fixture("readd")
+        else {
+            eprintln!("SKIP attachment_readd_after_delete: myne-server not built");
+            return;
+        };
+        let account_hash = {
+            let d = protocol::compute_attachment_id(&ATT_ROOT, b"readd");
+            let mut h = [0u8; 16];
+            h.copy_from_slice(&d[..16]);
+            h
+        };
+
+        let plaintext = b"deleted then deliberately re-imported";
+        let id = seed_attachment(
+            &dir_a,
+            &ATT_ROOT,
+            &account_hash,
+            &ATT_ITEMS,
+            &ATT_ITEMS_ID,
+            plaintext,
+            "phoenix.bin",
+            1_000,
+        );
+        run_cycle_att(
+            ta.as_ref(),
+            &ATT_ROOT,
+            account_hash,
+            dev_a,
+            &tok_a,
+            &dir_a,
+            &ATT_ITEMS,
+            &ATT_ITEMS_ID,
+        )
+        .unwrap();
+        run_cycle_att(
+            tb.as_ref(),
+            &ATT_ROOT,
+            account_hash,
+            dev_b,
+            &tok_b,
+            &dir_b,
+            &ATT_ITEMS,
+            &ATT_ITEMS_ID,
+        )
+        .unwrap();
+
+        // Delete + propagate.
+        delete_attachment_local(&dir_a, &ATT_ROOT, &account_hash, &id, 2_000);
+        run_cycle_att(
+            ta.as_ref(),
+            &ATT_ROOT,
+            account_hash,
+            dev_a,
+            &tok_a,
+            &dir_a,
+            &ATT_ITEMS,
+            &ATT_ITEMS_ID,
+        )
+        .unwrap();
+        run_cycle_att(
+            tb.as_ref(),
+            &ATT_ROOT,
+            account_hash,
+            dev_b,
+            &tok_b,
+            &dir_b,
+            &ATT_ITEMS,
+            &ATT_ITEMS_ID,
+        )
+        .unwrap();
+
+        // Re-import on A with a LATER created_at (the deliberate re-add).
+        let id2 = seed_attachment(
+            &dir_a,
+            &ATT_ROOT,
+            &account_hash,
+            &ATT_ITEMS,
+            &ATT_ITEMS_ID,
+            plaintext,
+            "phoenix.bin",
+            3_000,
+        );
+        assert_eq!(id, id2);
+        let readd = run_cycle_att(
+            ta.as_ref(),
+            &ATT_ROOT,
+            account_hash,
+            dev_a,
+            &tok_a,
+            &dir_a,
+            &ATT_ITEMS,
+            &ATT_ITEMS_ID,
+        )
+        .expect("A re-add cycle");
+        assert_eq!(readd.attachments_pushed, 1, "A re-uploaded the body");
+
+        // B revives: live entry wins the merge, body re-downloads.
+        let pull = run_cycle_att(
+            tb.as_ref(),
+            &ATT_ROOT,
+            account_hash,
+            dev_b,
+            &tok_b,
+            &dir_b,
+            &ATT_ITEMS,
+            &ATT_ITEMS_ID,
+        )
+        .expect("B revival cycle");
+        assert_eq!(
+            pull.attachments_pulled, 1,
+            "B re-downloaded the revived body"
+        );
+        let cat_b = read_catalog_of(&dir_b, &ATT_ROOT, &account_hash);
+        assert!(
+            cat_b
+                .entries
+                .get(&hex(&id))
+                .is_some_and(|e| !e.is_tombstone()),
+            "B's entry is live again (created_at > deleted_at)"
         );
 
         std::fs::remove_dir_all(&dir_a).ok();
