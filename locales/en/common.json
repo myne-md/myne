@@ -629,7 +629,9 @@
         },
         "allHidden": "All tabs are hidden — right-click to restore.",
         "outline": {
+          "collapse": "Collapse section",
           "empty": "No headings",
+          "expand": "Expand section",
           "heading": "Outline"
         },
         "tabs": {
