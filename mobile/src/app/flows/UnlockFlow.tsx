@@ -106,6 +106,38 @@ function TextButton({
   );
 }
 
+/** Top-left back affordance (accent chevron), shown only when the unlock screen
+ *  was reached from the vault picker. Absolutely positioned so it clears the
+ *  notch and doesn't disturb the centered column; mirrors FlowHeader's chevron
+ *  (src/components/layout.tsx). Replaces the old bottom "Choose a different
+ *  vault" text link — same destination, standard mobile placement. */
+function BackToPickerButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      aria-label="Choose a different vault"
+      data-testid="unlock-back-to-picker"
+      style={{
+        position: "absolute",
+        top: "max(52px, calc(env(safe-area-inset-top) + 8px))",
+        left: 12,
+        zIndex: 3,
+        width: 44,
+        height: 44,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        border: "none",
+        background: "transparent",
+        padding: 0,
+        cursor: "pointer",
+      }}
+    >
+      <Icon name="chevron-left" size={20} color="var(--accent)" strokeWidth={2} />
+    </button>
+  );
+}
+
 /** Functional masked password input, styled to the design's PasswordField
  *  geometry (h:52, accent focus ring, monospace, eye reveal toggle). */
 function PasswordInput({
@@ -404,6 +436,8 @@ export function UnlockFlow(props: UnlockFlowProps) {
         <BlockingOverlay title="Unlocking" subtitle="Decrypting your keys on this device." />
       )}
 
+      {fromPicker && onBackToPicker && <BackToPickerButton onClick={handleBackToPicker} />}
+
       <div style={{ paddingTop: 84 }}>
         <Wordmark />
       </div>
@@ -490,11 +524,6 @@ export function UnlockFlow(props: UnlockFlowProps) {
       <div style={{ flex: 1 }} />
 
       <div style={{ paddingBottom: 18, display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
-        {fromPicker && onBackToPicker && (
-          <TextButton height={40} onClick={handleBackToPicker} testId="unlock-back-to-picker">
-            Choose a different vault
-          </TextButton>
-        )}
         <TextButton height={40} onClick={handleStartRecovery} testId="unlock-recovery-link">
           Use your recovery phrase
         </TextButton>
@@ -578,6 +607,7 @@ function FailClosed({
 }) {
   return (
     <Screen style={{ alignItems: "center", padding: "0 32px" }}>
+      {fromPicker && onBackToPicker && <BackToPickerButton onClick={onBackToPicker} />}
       <div style={{ paddingTop: 84 }}>
         <Wordmark />
       </div>
@@ -592,11 +622,6 @@ function FailClosed({
         </p>
       </div>
       <div style={{ paddingBottom: 46, width: "100%", display: "flex", flexDirection: "column", gap: 10 }}>
-        {fromPicker && onBackToPicker && (
-          <Button variant="secondary" style={{ height: 48 }} onClick={onBackToPicker}>
-            Choose a different vault
-          </Button>
-        )}
         <Button onClick={() => void closeApp()}>Close app</Button>
       </div>
     </Screen>
