@@ -1,17 +1,19 @@
 // SPDX-License-Identifier: AGPL-3.0
-//! Quick-unlock plugin core (MYND-329) — the platform-agnostic PIN path.
+//! Quick-unlock plugin core (MYND-329) — the shared PIN + biometric paths.
 //!
 //! Extracted from the desktop crate (shared desktop↔mobile). Holds the wrap-key
 //! provider trait (`provider`), the PIN (Argon2id) provider (`pin`), the
-//! failed-attempt counter (`attempt`), the error enum (`error`), and the OS-free
-//! `*_with_dir` cores + the PIN/status/disable `#[tauri::command]` wrappers
-//! (`commands`).
+//! Apple-Keychain biometric provider (`apple`, macOS Touch ID / iOS Face ID +
+//! Touch ID — decisions.md 2026-07-12), the failed-attempt counter (`attempt`),
+//! the error enum (`error`), and the OS-free `*_with_dir` cores + all six
+//! `#[tauri::command]` wrappers (`commands` — PIN, biometric, status, disable;
+//! the biometric pair returns `HardwareUnavailable` off Apple targets).
 //!
-//! The macOS biometric provider + its command branch live in the desktop crate
-//! and layer over the `pub` cores here; mobile registers only the PIN commands.
-//! Like `notes`, `init()` is per-client — each host builds its own plugin with
-//! the command set appropriate to its platform.
+//! Like `notes`, `init()` is per-client — each host builds its own plugin and
+//! registers the shared commands from this module's paths.
 
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+pub mod apple;
 pub mod attempt;
 pub mod commands;
 pub mod error;

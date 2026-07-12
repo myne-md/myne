@@ -14,7 +14,7 @@
 // session. The `RequiresFullPassword` / `AttemptsExhausted` / `NotConfigured`
 // error self-hide below is the redeem-time backstop for the same states.
 //
-// ⚠️ Touch ID is HARDWARE-UNVERIFIED (see `quick_unlock/macos.rs`).
+// ⚠️ Touch ID is HARDWARE-UNVERIFIED (see `core/.../quick_unlock/apple.rs`).
 
 import { useEffect, useState, type CSSProperties, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
