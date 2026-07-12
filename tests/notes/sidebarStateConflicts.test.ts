@@ -11,7 +11,6 @@
 
 import { describe, expect, it } from "vitest";
 import {
-  conflictCount,
   conflictRecordsByOriginal,
   liveCache,
   resolverCache,
@@ -63,31 +62,9 @@ function mixedCache(): Map<string, TitleRecord> {
   ]);
 }
 
-describe("conflictCount", () => {
-  it("counts only conflict:true records in a mixed set", () => {
-    expect(conflictCount(mixedCache())).toBe(4);
-  });
-
-  it("returns 0 when there are no conflict copies", () => {
-    const cache = cacheWith([
-      ["live-1", false, null],
-      ["live-2", false, null],
-    ]);
-    expect(conflictCount(cache)).toBe(0);
-  });
-
-  it("does not count a deleted (discarded) conflict copy", () => {
-    const cache = cacheWith([
-      ["conf-a1", true, "orig-a"],
-      ["conf-a2", true, "orig-a", "2026-06-29T00:00:00Z"], // discarded → tombstoned
-    ]);
-    expect(conflictCount(cache)).toBe(1);
-  });
-
-  it("is 0 for an empty cache", () => {
-    expect(conflictCount(new Map())).toBe(0);
-  });
-});
+// NOTE: the `conflictCount` selector was retired (MYND-461) — the engine now
+// produces `Conflicts{count}` core-side (`sync_status`), so the WebView no longer
+// counts conflict copies from its title cache. Its tests moved with it.
 
 describe("conflictRecordsByOriginal", () => {
   it("groups conflict copies by conflictOf, including the null fallback bucket", () => {

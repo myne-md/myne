@@ -213,15 +213,6 @@ export function conflictRecordsByOriginal(
   return groups;
 }
 
-/** Total conflict-copy count — the Conflicts entry-point badge (MYND-427). */
-export function conflictCount(cache: ReadonlyMap<NoteId, TitleRecord>): number {
-  let n = 0;
-  for (const record of cache.values()) {
-    if (record.conflict === true && record.deleted == null) n += 1;
-  }
-  return n;
-}
-
 /**
  * Reference/discovery entries of the cache — the **resolver** axis of the two-axis
  * split (note-archive / MYND-331 Q3/B). Excludes trashed + template like the
