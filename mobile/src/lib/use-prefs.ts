@@ -46,6 +46,7 @@ export const DEFAULT_PREFS: PrefsView = {
   archive_disabled: null,
   theme: null,
   folder_icons: {},
+  device_names: {},
   hidden_bar_items: [],
   bar_items_order: [],
   right_panel_active_tab: null,

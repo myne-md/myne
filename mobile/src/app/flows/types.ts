@@ -13,6 +13,15 @@ import type { StageVaultStatus, SuspicionReason, RecoverSubStep, VaultId } from 
 export interface WelcomeFlowProps {
   onCreate: () => void;
   onRecover: () => void;
+  /** Enter the fresh-device sync-join flow ("Connect to my account"). */
+  onJoin: () => void;
+}
+
+export interface JoinFlowProps {
+  /** Device bootstrapped + unlocked a fresh local vault from the server —
+   *  the shell maps this to `welcome.join-success` (lands in the editor). */
+  onComplete: (vaultId?: VaultId) => void;
+  onCancel: () => void;
 }
 
 export interface CreateVaultFlowProps {

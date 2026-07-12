@@ -5,11 +5,14 @@ import { REVEAL_ATTACHMENT_EVENT } from "@myne/editor/attachments/fileCardAction
 import { headingSections } from "@myne/dialect";
 import { undo, redo } from "@codemirror/commands";
 import type { EditorView } from "@codemirror/view";
-import { Screen, ScreenScroll, Icon, MyneMark, Banner, Spinner, Sheet, SidePanel, LIST_TOP } from "../../components";
-import { noteList, noteRead, noteCreate, noteUpdate, noteDelete } from "../../lib/notes";
+import { Screen, ScreenScroll, Icon, MyneMark, Banner, Spinner, Sheet, SidePanel, LIST_TOP, SyncStatusGlyph, SyncBanners, SyncStatusDetail, ConflictsSheet } from "../../components";
+import { listen } from "@tauri-apps/api/event";
+import { noteList, noteRead, noteCreate, noteUpdate, deleteNoteRouted } from "../../lib/notes";
 import type { NoteListError } from "../../lib/notes";
+import { useConflictMaterializer } from "../../lib/use-conflict-materializer";
 import { listVaults, orderByLastUnlock } from "../../lib/vault-list";
 import { HAS_TAURI } from "../../lib/app-window";
+import { effectiveMobileAutoLockSecs } from "../../lib/auto-lock";
 import { consumePendingCapture, CAPTURE_EVENT } from "../../lib/deep-link";
 import { ioBanner } from "../../lib/io-banner";
 import { usePrefs } from "../../lib/use-prefs";
@@ -241,6 +244,10 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
   const [copied, setCopied] = useState(false);
 
   const [settingsOpen, setSettingsOpen] = useState(false);
+  // SY-08 sync status detail sheet (MYND-461 T6), opened from the header glyph.
+  const [syncDetailOpen, setSyncDetailOpen] = useState(false);
+  // Conflicts sheet (MYND-461 T8), opened from the conflicts count banner.
+  const [conflictsOpen, setConflictsOpen] = useState(false);
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const [vaults, setVaults] = useState<VaultSummary[]>([]);
   // Active `#tag` filter on the notes list (folded/lowercase key), or null.
@@ -504,6 +511,35 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
     })();
   }, [refresh]);
 
+  // SYNC-37: the foreground sync loop (and manual `sync_now`) emit `sync://changed`
+  // after a pull writes incoming notes to disk — reload the list + bodies so notes
+  // synced from another device actually appear without a manual refresh. Ported
+  // from the desktop `Editor.tsx` listener.
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const handle = await listen("sync://changed", () => {
+          if (!cancelled) void refresh();
+        });
+        if (cancelled) handle();
+        else unlisten = handle;
+      } catch {
+        // Not inside Tauri (browser dev shim) → no sync events.
+      }
+    })();
+    return () => {
+      cancelled = true;
+      if (unlisten) unlisten();
+    };
+  }, [refresh]);
+
+  // MYND-427: drain the engine's staged keep-both conflicts (materialize each
+  // remote revision as a `conflict_of:` copy, then resolve) on mount + every
+  // `sync://changed`, refreshing the list when a copy lands.
+  useConflictMaterializer(refresh);
+
   // "Reveal in library" from a note's file-card menu (shared @myne/editor) →
   // open the attachments library over the note (desktop-parity action).
   useEffect(() => {
@@ -517,8 +553,10 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
   // quick-unlock PIN fast-path actually appear on the next unlock.
   useEffect(() => {
     if (!HAS_TAURI) return;
-    const secs = prefs.auto_lock_seconds ?? 300;
-    if (secs <= 0) return;
+    // A6 envelope: the effective timeout is always in [30, 3600] — a sentinel/
+    // replayed "off" (0) can no longer disable the idle lock (matches desktop's
+    // always-on `effective_auto_lock_secs`). No disable path.
+    const secs = effectiveMobileAutoLockSecs(prefs.auto_lock_seconds);
     let timer = 0;
     const reset = () => {
       window.clearTimeout(timer);
@@ -711,7 +749,9 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
   }
 
   async function purgeNote(id: string) {
-    if (HAS_TAURI) await noteDelete(id);
+    // Route through deleteNoteRouted so a purge under sync writes a propagating
+    // `deleted:` tombstone (not a bare local unlink that resurrects on next pull).
+    if (HAS_TAURI) await deleteNoteRouted(id);
     else devStore().delete(id);
   }
 
@@ -954,16 +994,21 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
                 <h1 style={{ margin: 0, fontSize: 32, fontWeight: 700, letterSpacing: "-0.025em", color: "var(--fg-display)" }}>
                   {viewTitle}
                 </h1>
-                {listView === "notes" && (
-                  <button
-                    onClick={newNote}
-                    aria-label="New note"
-                    style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: 6, height: 36, border: "none", borderRadius: 10, background: "var(--accent)", color: "var(--accent-on)", padding: "0 14px", fontSize: 14, fontWeight: 600, cursor: "pointer" }}
-                  >
-                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" /></svg>
-                    New note
-                  </button>
-                )}
+                <div style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: 8 }}>
+                  {/* Glanceable sync-status glyph (SY-01, MYND-461); tap → SY-08
+                      status detail sheet (task 6). */}
+                  <SyncStatusGlyph onOpenDetail={() => setSyncDetailOpen(true)} />
+                  {listView === "notes" && (
+                    <button
+                      onClick={newNote}
+                      aria-label="New note"
+                      style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: 6, height: 36, border: "none", borderRadius: 10, background: "var(--accent)", color: "var(--accent-on)", padding: "0 14px", fontSize: 14, fontWeight: 600, cursor: "pointer" }}
+                    >
+                      <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" /></svg>
+                      New note
+                    </button>
+                  )}
+                </div>
               </div>
 
               {/* Secondary create/browse tiles — Template / Daily note / Views. */}
@@ -1026,6 +1071,13 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
               )}
             </div>
 
+
+            {/* Non-blocking, dismissable sync banners above the note list
+                (reconcile + integrity-alert), driven by the shared hook. The
+                "Verify devices" CTA wires to the devices surface with F3-T13. */}
+            <div style={{ flex: "none", padding: "8px 20px 0" }}>
+              <SyncBanners onOpenConflicts={() => setConflictsOpen(true)} />
+            </div>
 
             {activeView && (
               <div style={{ flex: "none", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "10px 20px 0" }}>
@@ -1171,7 +1223,9 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
             onDelete={(id) =>
               void (async () => {
                 try {
-                  if (HAS_TAURI) await noteDelete(id);
+                  // Templates are synced `.myn` notes — route the delete so it
+                  // propagates as a tombstone under sync (not a bare local unlink).
+                  if (HAS_TAURI) await deleteNoteRouted(id);
                   await refresh();
                 } catch {
                   /* no-op */
@@ -1212,6 +1266,29 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
             onLock={onLock}
             onDeleteVaultSuccess={onDeleteVaultSuccess}
           />
+        )}
+
+        {syncDetailOpen && (
+          <Sheet onClose={() => setSyncDetailOpen(false)}>
+            <h2 style={{ margin: "0 0 14px", fontSize: 20, fontWeight: 700, color: "var(--fg-display)" }}>
+              Sync status
+            </h2>
+            <SyncStatusDetail />
+          </Sheet>
+        )}
+
+        {conflictsOpen && (
+          <Sheet
+            onClose={() => setConflictsOpen(false)}
+            style={{ maxHeight: "82%", display: "flex", flexDirection: "column", overflow: "hidden" }}
+          >
+            <h2 style={{ margin: "0 0 14px", fontSize: 20, fontWeight: 700, color: "var(--fg-display)" }}>
+              Conflicts
+            </h2>
+            <div style={{ overflowY: "auto", minHeight: 0 }}>
+              <ConflictsSheet />
+            </div>
+          </Sheet>
         )}
 
         {viewEditor && (

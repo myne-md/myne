@@ -1,5 +1,6 @@
 import { type ChangeEvent, type CSSProperties, type ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Sheet, Banner, Button, Icon, Toast, StrengthMeter, Switch, Segmented, Spinner } from "../../components";
+import { SyncHubPanel, SyncEndpointPanel, SyncEnrollPanel, SyncDevicesPanel } from "../../components";
 import { applyTheme } from "../../platform/theme";
 import type { ThemeName } from "../../platform/PlatformContext";
 import { HAS_TAURI } from "../../lib/app-window";
@@ -7,6 +8,7 @@ import { changePassword } from "../../lib/vault-change-password";
 import { deleteVault } from "../../lib/vault-delete";
 import { quickUnlockStatus, quickUnlockSetupPin, quickUnlockDisable, type QuickUnlockStatus } from "../../lib/quick-unlock";
 import { vaultExportMarkdown, defaultExportDestination } from "../../lib/export";
+import { useSyncStatus, type SyncStatus } from "../../lib/use-sync-status";
 import { ioBanner } from "../../lib/io-banner";
 import { usePrefs } from "../../lib/use-prefs";
 import { bumpPrefsNonce } from "../../lib/prefsNonce";
@@ -272,6 +274,12 @@ function ToggleRow({
 /** Monochrome 20px line glyphs for the root category rows. `currentColor` so
  *  they inherit the row's muted icon tint. */
 const CAT_GLYPH: Record<string, ReactNode> = {
+  sync: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20 8a8 8 0 0 0-14.5-3M4 5v4h4" />
+      <path d="M4 16a8 8 0 0 0 14.5 3M20 19v-4h-4" />
+    </svg>
+  ),
   account: (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
       <circle cx="12" cy="8" r="3.4" />
@@ -359,7 +367,13 @@ type Panel =
   | "change-password"
   | "delete-vault"
   | "rename"
-  | "quick-unlock";
+  | "quick-unlock"
+  // Phase-2 sync (MYND-459): the sync settings panel + its sub-screens.
+  | "sync"
+  | "sync-endpoint"
+  | "sync-enroll"
+  | "sync-approve"
+  | "sync-devices";
 
 /** Parent panel for the header back button (one level up the stack). */
 const PANEL_PARENT: Record<Panel, Panel> = {
@@ -374,6 +388,11 @@ const PANEL_PARENT: Record<Panel, Panel> = {
   "change-password": "account",
   "quick-unlock": "privacy",
   "delete-vault": "root",
+  sync: "root",
+  "sync-endpoint": "sync",
+  "sync-enroll": "sync",
+  "sync-approve": "sync-devices",
+  "sync-devices": "sync",
 };
 
 /** Stack depth per panel — drives the slide direction of the panel transition
@@ -390,6 +409,11 @@ const PANEL_DEPTH: Record<Panel, number> = {
   "change-password": 2,
   "quick-unlock": 2,
   "delete-vault": 2,
+  sync: 1,
+  "sync-endpoint": 2,
+  "sync-enroll": 2,
+  "sync-devices": 2,
+  "sync-approve": 3,
 };
 
 const PANEL_TITLE: Record<Panel, string> = {
@@ -404,7 +428,33 @@ const PANEL_TITLE: Record<Panel, string> = {
   "change-password": "Change password",
   "quick-unlock": "Quick unlock",
   "delete-vault": "Delete vault",
+  sync: "Sync",
+  "sync-endpoint": "Sync server",
+  "sync-enroll": "Add this device",
+  "sync-devices": "Your devices",
+  "sync-approve": "Approve device",
 };
+
+/** Short, glanceable sync summary for the Settings row value (no wall-clock — SYNC-48). */
+function syncSummary(status: SyncStatus | null): string {
+  switch (status?.state) {
+    case "disabled":
+    case undefined:
+      return "Off";
+    case "not_enrolled":
+      return "Not set up";
+    case "pending":
+      return "Awaiting approval";
+    case "idle":
+      return "On";
+    case "syncing":
+      return "Syncing…";
+    case "error":
+      return "Offline";
+    case "conflicts":
+      return `${status.count} conflict${status.count === 1 ? "" : "s"}`;
+  }
+}
 
 export interface SettingsSheetProps {
   vaultId?: VaultId;
@@ -424,6 +474,8 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
   const [panel, setPanel] = useState<Panel>("root");
   const [choice, setChoice] = useState<ThemeChoice>(() => readStoredChoice());
   const [toast, setToast] = useState<string | null>(null);
+  // Phase-2 sync (MYND-459): honest enrollment status for the Sync section.
+  const { status: syncStatus } = useSyncStatus();
 
   // Change-password local secret state (wiped on every exit path + unmount).
   const [currentPw, setCurrentPw] = useState("");
@@ -798,6 +850,7 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
                 onClick={() => setPanel("privacy")}
               />
               <CategoryRow glyph="data" label="Data" onClick={() => setPanel("data")} />
+              <CategoryRow glyph="sync" label="Sync" value={syncSummary(syncStatus)} onClick={() => setPanel("sync")} />
               <CategoryRow glyph="about" label="About" value="0.1.0" onClick={() => setPanel("about")} />
             </Group>
 
@@ -1028,6 +1081,21 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
             </Group>
           </div>
         )}
+
+        {panel === "sync" && (
+          <SyncHubPanel
+            status={syncStatus}
+            onOpenEndpoint={() => setPanel("sync-endpoint")}
+            onOpenEnroll={() => setPanel("sync-enroll")}
+            onOpenDevices={() => setPanel("sync-devices")}
+          />
+        )}
+
+        {panel === "sync-endpoint" && <SyncEndpointPanel />}
+
+        {panel === "sync-enroll" && <SyncEnrollPanel onEnrolled={() => setPanel("sync")} />}
+
+        {panel === "sync-devices" && <SyncDevicesPanel />}
 
         {panel === "about" && (
           <div style={{ marginTop: 4 }}>

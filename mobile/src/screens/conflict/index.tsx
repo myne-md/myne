@@ -160,43 +160,21 @@ function Dot({ color }: { color: string }) {
   return <span style={{ width: 8, height: 8, borderRadius: 2, background: color, flex: "none" }} />;
 }
 
-/** Small "△ Conflict" pill that sits at the end of a conflicted note row. */
-function ConflictBadge() {
-  return (
-    <span
-      style={{
-        flex: "none",
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 4,
-        padding: "3px 8px",
-        borderRadius: 999,
-        background: "var(--danger-soft)",
-        color: "var(--danger)",
-        fontSize: 11,
-        fontWeight: 600,
-      }}
-    >
-      <svg width="11" height="11" viewBox="0 0 12 12">
-        <path d="M6 1.5l4.5 8H1.5z" stroke="var(--danger)" strokeWidth="1.1" fill="none" strokeLinejoin="round" />
-      </svg>
-      Conflict
-    </span>
-  );
-}
+// (SYNC-48) The in-feed "△ Conflict" row pill was removed — the dialect §3.6.1
+// feed-exclusion rule forbids a per-note in-feed conflict badge; the count banner
+// (`ConflictBadgeBanner` below / the real `SyncBanners`) is the only spec-
+// compatible entry point.
 
-/** A single note row in the list (dot · title · mono meta · optional badge). */
+/** A single note row in the list (dot · title · mono meta). */
 function NoteRow({
   color,
   title,
   meta,
-  conflict,
   last,
 }: {
   color: string;
   title: string;
   meta: string;
-  conflict?: boolean;
   last?: boolean;
 }) {
   return (
@@ -224,7 +202,6 @@ function NoteRow({
           {meta}
         </div>
       </div>
-      {conflict && <ConflictBadge />}
     </div>
   );
 }
@@ -297,9 +274,9 @@ function ConflictBadgeBanner() {
 
       {/* Notes list */}
       <ScreenScroll style={{ marginTop: 12 }}>
-        <NoteRow color="var(--label-slate)" title="Threat model v2" meta="2m ago · 3 links" conflict />
+        <NoteRow color="var(--label-slate)" title="Threat model v2" meta="2m ago · 3 links" />
         <NoteRow color="var(--label-moss)" title="Weekly review — 06-15" meta="Today · 5 links" />
-        <NoteRow color="var(--label-clay)" title="Project Aurora — kickoff" meta="Mon · 8 links" conflict last />
+        <NoteRow color="var(--label-clay)" title="Project Aurora — kickoff" meta="Mon · 8 links" last />
       </ScreenScroll>
 
       {/* Bottom bar */}

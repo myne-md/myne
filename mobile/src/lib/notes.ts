@@ -18,6 +18,7 @@
 // narrow a caught rejection.
 
 import { invoke } from "@tauri-apps/api/core";
+import { patchDeletedField } from "../dialect/surgery";
 import type { NoteCreateError } from "../types/note-create-error";
 import type { NoteReadError } from "../types/note-read-error";
 import type { NoteUpdateError } from "../types/note-update-error";
@@ -77,6 +78,52 @@ export async function noteUpdate(
  */
 export async function noteDelete(noteId: string): Promise<void> {
   await invoke<void>("plugin:notes|note_delete", { noteId });
+}
+
+/**
+ * Tombstone a note under sync (MYND-426) — ported from desktop
+ * `src/notes/deleteNote.ts`. Writes a `deleted: <now>` marker (RFC 3339 UTC)
+ * into the note's frontmatter via `note_update` (a new version the vault head
+ * commits) instead of a bare `unlink`: a bare absence cannot propagate through
+ * the blind server and would risk resurrection, whereas a `deleted`-marked
+ * version does. Then flags the sync engine so the next push sets the server
+ * tombstone (horizon-GC reclaims the ciphertext after other devices pull it).
+ */
+export async function tombstoneNote(noteId: string): Promise<void> {
+  const current = await noteRead(noteId);
+  const tombstoned = patchDeletedField(new TextEncoder().encode(current), new Date().toISOString());
+  await noteUpdate(noteId, new TextDecoder().decode(tombstoned));
+  try {
+    await invoke("plugin:sync|sync_mark_tombstone", { noteIdHex: noteId.replace(/-/g, "") });
+  } catch {
+    // Sync not configured / command unavailable — the `deleted:` field still propagates.
+  }
+}
+
+/** True when a sync endpoint is configured (the under-sync reroute predicate). */
+async function isSyncConfigured(): Promise<boolean> {
+  try {
+    const cfg = await invoke<{ endpoint_url: string | null }>("plugin:sync|sync_get_endpoint");
+    return cfg.endpoint_url != null;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Delete a note, rerouting under sync to a tombstone version (MYND-426) — ported
+ * from desktop `deleteNoteRouted`. When a sync endpoint is configured the deletion
+ * is a `deleted`-marked version that propagates to other devices; otherwise
+ * (local-only) it is the hard cryptographic-erase unlink. Used by the purge-from-
+ * Trash + template-delete paths so a mobile deletion actually reaches other devices
+ * (a bare `note_delete` would drop the blob locally only and resurrect on next pull).
+ */
+export async function deleteNoteRouted(noteId: string): Promise<void> {
+  if (await isSyncConfigured()) {
+    await tombstoneNote(noteId);
+  } else {
+    await noteDelete(noteId);
+  }
 }
 
 /**
