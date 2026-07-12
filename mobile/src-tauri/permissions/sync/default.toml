@@ -2,9 +2,13 @@
 # sync engine — mobile shim). Picked up under the `sync:` ACL namespace because
 # `build.rs` declares this as an `InlinedPlugin`. Capability files reference these
 # as `sync:default` (or `sync:allow-sync-get-endpoint` /
-# `sync:allow-sync-set-endpoint`). Ported verbatim from the desktop
-# `src-tauri/permissions/sync/default.toml` — one plugin, same 15 commands
-# (MYND-459 T12 added `sync_head_fingerprint`, the SY-05 SAS eye-compare substrate).
+# `sync:allow-sync-set-endpoint`). Ported from the desktop
+# `src-tauri/permissions/sync/default.toml` — the same 15 desktop commands
+# (MYND-459 T12 added `sync_head_fingerprint`, the SY-05 SAS eye-compare
+# substrate) PLUS the mobile-only lifecycle pair (`sync_lifecycle_suspend` /
+# `sync_lifecycle_resume` — in-RAM scheduler flag flips driven by the WebView's
+# visibilitychange; desktop never manages the signal so it does not register
+# them). 17 commands total.
 #
 # Deny-by-default (SYNC-15): the data-plane commands (push/pull/sync-now/status)
 # each get their own `commands.allow` entry AND remain gated on an authenticated
@@ -33,6 +37,8 @@ permissions = [
     "allow-sync-join-account",
     "allow-sync-reset-local",
     "allow-sync-head-fingerprint",
+    "allow-sync-lifecycle-suspend",
+    "allow-sync-lifecycle-resume",
 ]
 
 [[permission]]
@@ -109,3 +115,13 @@ commands.allow = ["sync_reset_local"]
 identifier = "allow-sync-head-fingerprint"
 description = "Allow invoking sync:sync_head_fingerprint (return the 8-char Crockford XXXX-XXXX SAS fingerprint of this device's currently adopted vault head, read from the device-local sync-state's latest head observation; None when no head is adopted yet). The out-of-band enroll-time eye-compare substrate (SYNC-17); returns no key material and makes no server call — reveals only the already-server-visible head_id, one-way-hashed to ~40 bits."
 commands.allow = ["sync_head_fingerprint"]
+
+[[permission]]
+identifier = "allow-sync-lifecycle-suspend"
+description = "Allow invoking sync:sync_lifecycle_suspend (WebView visibilitychange → hidden: hard-idle the foreground sync loop while the app is backgrounded, SYNC-37). Flips an in-RAM scheduler flag only — no vault access, no IO, no server call."
+commands.allow = ["sync_lifecycle_suspend"]
+
+[[permission]]
+identifier = "allow-sync-lifecycle-resume"
+description = "Allow invoking sync:sync_lifecycle_resume (WebView visibilitychange → visible: clear the suspend flag and arm the one-shot resume-immediate poll, SYNC-38). Flips an in-RAM scheduler flag only — no vault access, no IO, no server call."
+commands.allow = ["sync_lifecycle_resume"]

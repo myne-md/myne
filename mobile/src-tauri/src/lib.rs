@@ -122,6 +122,16 @@ pub fn run() {
             // reflect real in-flight sync activity or a failed cycle. Mirrors the
             // desktop `app.manage(SyncRuntimeStatusCell::default())` wiring.
             app.manage(myne_core::plugins::sync::commands::SyncRuntimeStatusCell::default());
+            // Mobile lifecycle signal (SYNC-37/38): the WebView's
+            // `visibilitychange` handler drives it via the
+            // `sync_lifecycle_suspend`/`sync_lifecycle_resume` command pair, so
+            // backgrounding hard-idles the loop and foregrounding arms the
+            // one-shot resume-immediate poll (both already implemented in the
+            // shared scheduler; this manage is what un-no-ops them). The
+            // native-grace-window flush (iOS `beginBackgroundTask`) remains the
+            // deferred MYND-460 F4 cluster — this is the WebView-visibility
+            // subset that needs no native code.
+            app.manage(myne_core::plugins::sync::loop_control::SyncLifecycleSignal::default());
             // SYNC-37 (decisions.md 2026-07-07): mobile v1 sync is **foreground-only**
             // — the loop RUNS while the app is foregrounded (unlock-gated, polling +
             // coalesced-push), which is what drives `run_active_cycle`: the sole path
@@ -133,6 +143,15 @@ pub fn run() {
             // `try_state`→None (a safe no-op) until it lands, so foreground sync
             // works today. Mirrors the desktop `spawn_sync_loop(...)` wiring.
             myne_core::plugins::sync::loop_control::spawn_sync_loop(app.handle().clone());
+            // The /sync/poke SSE listener (MYND-423 client half): while the app
+            // is foregrounded + unlocked, a push on another device becomes a
+            // pull here within seconds — baseline behaviour per the amended
+            // sync-protocol §8.3 (no user toggle; polling stays the fallback).
+            // The supervisor tears the stream down on suspend (via the
+            // SyncLifecycleSignal above) and on lock, and parks on a revoked
+            // token. Mirrors the desktop wiring.
+            app.manage(myne_core::plugins::sync::poke_listener::SsePokeSignal::default());
+            myne_core::plugins::sync::poke_listener::spawn_poke_supervisor(app.handle().clone());
             // MYND-31: app-level live in-RAM VaultIndices state (wikilink graph
             // + backlinks + tag index + typed properties), rebuilt on unlock by
             // the TS-orchestrated sweep. Mirrors the desktop `app.manage(...)`
