@@ -161,6 +161,8 @@
     "archivedBadge": "Archive",
     "archivedBadgeTitle": "Archived",
     "dialogLabel": "Command palette",
+    "matchedInAttachment": "in attachment",
+    "matchedInAttachmentTitle": "The query matched inside a file embedded in this note",
     "matchedInBody": "↳ matched in body",
     "noMatches": "No matches",
     "searchPlaceholder": "Search notes or run a command — Esc to dismiss",

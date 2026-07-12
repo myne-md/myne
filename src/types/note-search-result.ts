@@ -21,4 +21,11 @@ export type NoteSearchResult = {
   title: string;
   score: number;
   matched_in: NoteMatchedIn;
+  /**
+   * MYND-448a: `null` for a note-body hit; the attachment's id (hex) when the
+   * hit is an EMBEDDED attachment's extracted text — its own search doc that
+   * links back to `note_id` (the embedding note). Drives the palette's
+   * "in attachment" badge; opening the row opens `note_id` either way.
+   */
+  attachment_id: string | null;
 };

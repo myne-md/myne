@@ -158,41 +158,48 @@ fn read_account_number_hash(
     Ok(meta.account_number_hash)
 }
 
-/// MYND-328: build the search-index body for a note — its plaintext plus the
-/// cached extracted text of every embedded attachment — so a note (re)indexed
-/// in-session is findable by attachment content, the same fold the unlock-time
-/// rebuild applies. The single canonical home for the note-body fold; every
-/// live re-index call site (`note_create` / `note_update` /
-/// `note_write_batch_transactional` / `snapshot_restore`) routes through it, so
-/// the "re-indexing a note body folds its attachment text" contract lives once.
+/// MYND-448a: the per-attachment search docs for a note — `(attachment_id_hex,
+/// title, extracted_text)` for every embedded form-C attachment whose extracted
+/// text is cached. Replaces the old `fold_note_body_for_index`: instead of
+/// folding attachment text INTO the note body, each attachment becomes its OWN
+/// search doc (`att:<id>:<note_id>`, built by the caller from these), so an
+/// attachment-content hit surfaces as a distinct result. `title` is the
+/// embedding note's title — the result row reads as the note, badged as an
+/// attachment match via the doc-id's `att:` provenance. The single canonical
+/// home for the note→attachment-doc derivation; every live re-index call site
+/// (`note_create` / `note_update` / `note_write_batch_transactional` /
+/// `snapshot_restore`) routes through the `index_note_attachments` hook to here.
 ///
-/// Fast path — a note with no `![[att:…]]` embeds skips the `vault.meta` read
-/// and KEK derive entirely, so the common save pays nothing. It is best-effort:
-/// any failure (locked slot, missing/invalid meta) returns the body unchanged
-/// and can never break a save.
-pub(crate) async fn fold_note_body_for_index(
+/// Fast path — a note with no `![[att:…]]` embeds returns empty without the
+/// `vault.meta` read or KEK derive. Best-effort: any failure (locked slot,
+/// missing/invalid meta) returns empty and can never break a save.
+pub(crate) async fn note_attachment_docs(
     state: &VaultRuntimeState,
     vault_dir: &Path,
+    note_title: &str,
     note_body: &str,
-) -> String {
+) -> Vec<(String, String, String)> {
     if crate::plugins::attachments::reconcile::extract_att_ids(note_body).is_empty() {
-        return note_body.to_string();
+        return Vec::new();
     }
     let Some(root_key) = state.peek_unlocked_root_key_clone().await else {
-        return note_body.to_string();
+        return Vec::new();
     };
     let Ok(account_number_hash) = read_account_number_hash(&vault_dir.join("vault.meta")) else {
-        return note_body.to_string();
+        return Vec::new();
     };
     let key = derive_subkey(&root_key, SubkeyRole::AttachmentTextKey);
     let mut memo = std::collections::HashMap::new();
-    crate::plugins::attachments::text_cache::fold_attachment_text(
+    crate::plugins::attachments::text_cache::collect_attachment_texts(
         note_body,
         vault_dir,
         &key,
         &account_number_hash,
         &mut memo,
     )
+    .into_iter()
+    .map(|(att_id_hex, text)| (att_id_hex, note_title.to_string(), text))
+    .collect()
 }
 
 /// Testable core of [`hydrate_search_index`]. Loads `vault.search` (fast
@@ -236,17 +243,33 @@ pub(crate) async fn hydrate_search_index_with_dir(
     let on_disk = scan_on_disk_manifest(&notes_dir);
 
     // Fast path: decode the persisted snapshot. Absent / AEAD-fail /
-    // malformed → empty `(manifest, index)` so the reconcile below is a
-    // full rebuild against `on_disk`.
+    // malformed / stale schema → empty `(manifest, index)` so the reconcile
+    // below is a full rebuild against `on_disk`. MYND-448a: a v1 (folded-body)
+    // blob is rejected by the schema-version gate → rebuild into the v2
+    // separate-attachment-doc model.
     let (mut manifest, mut index) = std::fs::read(vault_dir.join("vault.search"))
         .ok()
         .and_then(|blob| decode_snapshot(&search_index_key, &account_number_hash, &blob))
         .unwrap_or_default();
 
+    // MYND-448a: notes that vanished from disk — reconcile drops their BODY doc;
+    // their separate attachment docs (`att:*:<note_id>`) are dropped below.
+    let deleted_note_ids: Vec<String> = manifest
+        .keys()
+        .filter(|id| !on_disk.contains_key(*id))
+        .cloned()
+        .collect();
+
     // Decrypt ONLY the changed / new notes (nonce differs from, or is absent
     // in, the loaded manifest). Unchanged notes are skipped here — and never
-    // reached by `reconcile`'s fetch either, since their nonce matches.
+    // reached by `reconcile`'s fetch either, since their nonce matches; their
+    // body doc AND attachment docs stay as loaded from the blob.
     let mut fetched: HashMap<String, (String, String)> = HashMap::new();
+    // MYND-448a: for every changed/new note, its attachment docs
+    // `(attachment_id_hex, title, text)`. An entry is inserted even when EMPTY,
+    // so `set_note_attachments` below clears attachment docs the note no longer
+    // embeds (e.g. an attachment removed from an edited note).
+    let mut note_attachments: HashMap<String, Vec<(String, String, String)>> = HashMap::new();
     for (id, nonce) in &on_disk {
         if manifest.get(id) == Some(nonce) {
             continue; // unchanged — no decrypt
@@ -255,9 +278,8 @@ pub(crate) async fn hydrate_search_index_with_dir(
             Ok(plaintext) => {
                 let title = resolve_note_title(plaintext.as_bytes()).unwrap_or_default();
                 // MYND-328: backfill any uncached embedded attachment from its
-                // MYA1 source (pre-eager-cache attachments), then fold the cached
-                // text into the indexed body so the note is findable by the
-                // contents of its embedded files.
+                // MYA1 source (pre-eager-cache attachments) so `collect` below
+                // sees its extracted text.
                 crate::plugins::attachments::text_cache::backfill_note_attachment_text(
                     &plaintext,
                     vault_dir,
@@ -271,14 +293,21 @@ pub(crate) async fn hydrate_search_index_with_dir(
                     // (myne-core) stays free of the desktop-only extractor deps.
                     crate::plugins::attachments::extract::extract,
                 );
-                let body = crate::plugins::attachments::text_cache::fold_attachment_text(
-                    &plaintext,
-                    vault_dir,
-                    &attachment_text_key,
-                    &account_number_hash,
-                    &mut attachment_text_memo,
-                );
-                fetched.insert(id.clone(), (title, body));
+                // MYND-448a: each embedded attachment becomes its OWN doc; the
+                // note's body doc carries the UNFOLDED plaintext.
+                let atts: Vec<(String, String, String)> =
+                    crate::plugins::attachments::text_cache::collect_attachment_texts(
+                        &plaintext,
+                        vault_dir,
+                        &attachment_text_key,
+                        &account_number_hash,
+                        &mut attachment_text_memo,
+                    )
+                    .into_iter()
+                    .map(|(att_id_hex, text)| (att_id_hex, title.clone(), text))
+                    .collect();
+                note_attachments.insert(id.clone(), atts);
+                fetched.insert(id.clone(), (title, plaintext));
             }
             Err(_) => {
                 // Unreadable note (locked mid-hydrate / corrupt / non-UTF-8):
@@ -289,7 +318,15 @@ pub(crate) async fn hydrate_search_index_with_dir(
     }
     let reindexed = fetched.len();
 
+    // reconcile handles NOTE body docs only (unfolded); it is the untouched
+    // shared core. MYND-448a layers the separate attachment docs on top.
     reconcile(&mut index, &mut manifest, &on_disk, |id| fetched.remove(id));
+    for id in &deleted_note_ids {
+        index.remove_note_attachments(id);
+    }
+    for (note_id, atts) in &note_attachments {
+        index.set_note_attachments(note_id, atts);
+    }
     search.replace(index);
 
     tracing::info!(

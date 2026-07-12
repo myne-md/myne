@@ -19,7 +19,7 @@
 //! intentionally NOT here — the trait grows a method (plus a one-line
 //! `NoopHooks` no-op) if a shared core ever needs one.
 //!
-//! Secret-handling: `note_body` passed to [`VaultLifecycleHooks::fold_attachment_text_for_index`]
+//! Secret-handling: `note_body` passed to [`VaultLifecycleHooks::index_note_attachments`]
 //! is plaintext — never log it (see `src-tauri/CLAUDE.md` "Secret-handling
 //! logging discipline").
 
@@ -56,15 +56,21 @@ pub trait VaultLifecycleHooks: Send + Sync + 'static {
     /// install a no-op. Best-effort — never blocks or fails unlock.
     fn hydrate_ai_vectors<'a>(&'a self, state: &'a VaultRuntimeState) -> BoxFuture<'a>;
 
-    /// Folds cached attachment text into a note body for indexing and RETURNS
-    /// the (possibly unchanged) body. `note_body` is plaintext — never log it.
-    /// Mobile returns the body verbatim (the note is still saved; only the
-    /// search-index feed is skipped).
-    fn fold_attachment_text_for_index<'a>(
+    /// MYND-448a: index each attachment embedded in `note_body` as its OWN
+    /// search doc (`att:<attachment>:<note_id>`), REPLACING the note's prior
+    /// attachment docs (so an un-embedded attachment's doc is dropped). The
+    /// note's own body doc is upserted separately with the UNFOLDED plaintext via
+    /// [`Self::search_upsert`], so an attachment-content hit surfaces as a
+    /// distinct result rather than folded into the note. `note_title` /
+    /// `note_body` are plaintext — never log them. Mobile is a no-op (the note is
+    /// still saved; only the attachment-content search feed is skipped).
+    fn index_note_attachments<'a>(
         &'a self,
         state: &'a VaultRuntimeState,
+        note_id: &'a str,
+        note_title: &'a str,
         note_body: &'a str,
-    ) -> BoxFuture<'a, String>;
+    ) -> BoxFuture<'a>;
 
     // ---- Group 2: sync, app-derived ---------------------------------------
     fn zeroize_search_index(&self);
@@ -147,8 +153,7 @@ pub trait VaultLifecycleHooks: Send + Sync + 'static {
 }
 
 /// Mobile / headless implementation: every hook is a no-op. Async hooks
-/// resolve immediately; `fold_attachment_text_for_index` returns the body
-/// unchanged.
+/// resolve immediately; `index_note_attachments` indexes nothing.
 #[derive(Default)]
 pub struct NoopHooks;
 
@@ -168,13 +173,14 @@ impl VaultLifecycleHooks for NoopHooks {
     fn hydrate_ai_vectors<'a>(&'a self, _: &'a VaultRuntimeState) -> BoxFuture<'a> {
         Box::pin(std::future::ready(()))
     }
-    fn fold_attachment_text_for_index<'a>(
+    fn index_note_attachments<'a>(
         &'a self,
         _: &'a VaultRuntimeState,
-        note_body: &'a str,
-    ) -> BoxFuture<'a, String> {
-        let body = note_body.to_string();
-        Box::pin(std::future::ready(body))
+        _: &'a str,
+        _: &'a str,
+        _: &'a str,
+    ) -> BoxFuture<'a> {
+        Box::pin(std::future::ready(()))
     }
 
     fn zeroize_search_index(&self) {}
