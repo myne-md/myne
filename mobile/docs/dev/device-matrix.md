@@ -3,8 +3,10 @@
 > Per-**release** manual protocol for the sync flows the desktop `tauri-driver` E2E harness
 > cannot reach (no iOS/Android WebDriver). This is the compensating coverage named in the
 > `design-notes.md` 2026-07-07 "Mobile-sync device-level UI E2E exemption (SYNC-44)" entry.
-> **iOS-only (v1)** — Android rows are out of scope (SYNC-46; Android enablement = MYND-465).
-> Automated device drivers are MYND-467, not this doc.
+> Sync scenario rows (§3) remain **iOS-first** (SYNC-46 shipped iOS-only v1); the **Android
+> tablet section (§6) supersedes the former "Android rows are out of scope" line** — Android
+> enablement (MYND-465) landed with the tablet-adaptive layout work, and §6 is its per-release
+> device protocol. Automated device drivers are MYND-467, not this doc.
 
 ## 0. Scope + bans
 
@@ -84,3 +86,61 @@ biometric gate, which no compile or simulator run catches). Walk on a physical i
 
 **Per release.** Log device model + iOS build + server (hosted / self-host) + pass/fail per scenario
 row. A failed row is stop-the-world for the release, same discipline as a failed vector.
+
+## 6. Android tablet (MYND-465)
+
+### 6.1 Sideload / dev-loop path
+
+```bash
+# One-time host setup (JDK 21 keg-only + SDK under ~/Library/Android/sdk):
+export JAVA_HOME="$(brew --prefix openjdk@21)/libexec/openjdk.jdk/Contents/Home"
+export ANDROID_HOME="$HOME/Library/Android/sdk"
+export NDK_HOME="$ANDROID_HOME/ndk/29.0.13846066"
+export PATH="$ANDROID_HOME/platform-tools:$PATH"
+
+# Tablet: Settings → About → tap Build number ×7 → Developer options → USB debugging.
+adb devices                          # accept the RSA prompt on the tablet ("always allow")
+
+# Primary dev loop — HMR + getUserMedia both work over the USB cable: the CLI
+# sets up `adb reverse tcp:1420`, so the WebView origin is http://localhost:1420
+# (a SECURE context). Do NOT use --host/LAN-IP mode for voice testing: an
+# insecure LAN origin leaves navigator.mediaDevices undefined (that's the mode,
+# not an app bug). The desktop repo's dev server must be DOWN (1420 strictPort).
+pnpm tauri android dev
+
+# Install-loop alternative (no dev server; production-shaped origin):
+pnpm tauri android build --debug --target aarch64 --apk
+adb install -r src-tauri/gen/android/app/build/outputs/apk/universal/debug/app-universal-debug.apk
+```
+
+Debugging: desktop Chrome `chrome://inspect` attaches to the WebView (dev/debug builds) — the main
+tool for tablet-layout iteration. Rust logs: `adb logcat -s RustStdoutStderr`.
+
+Regeneration-surviving Android config (the `Info.ios.plist` mirrors — `gen/android` is gitignored):
+mic permissions are injected by the committed `src-tauri/build.rs`
+(`tauri_utils::build::update_android_manifest`, RECORD_AUDIO + MODIFY_AUDIO_SETTINGS — wry
+batch-requests BOTH for getUserMedia audio); the `myne://` intent-filter comes from
+`tauri.conf.json` `plugins.deep-link.mobile`. After a fresh `tauri android init`, one
+`tauri android build/dev` re-applies both; icons regenerate with `pnpm tauri icon`.
+
+### 6.2 Per-release scenario rows
+
+Log **device model + Android version + System WebView version** per run
+(`adb shell dumpsys package com.google.android.webview | grep versionName`) — the WebView
+Play-updates independently of the OS and is the real rendering floor (Vite's build target
+means a stale 2021-era WebView can fail to parse the bundle at all).
+
+| # | Scenario | Expected |
+|---|---|---|
+| A.1 | **Cold start → create vault → unlock** | Argon2id (m=256 MiB) completes without an OOM kill; record unlock wall-time (calibration data for the mobile-KDF params decision) |
+| A.2 | **PIN quick-unlock** — setup + redeem after auto-lock | works (shared `myne-core` path, same as iOS) |
+| A.3 | **Biometric toggle** | absent/disabled — the backend returns `HardwareUnavailable` (no Keystore provider yet); no misleading affordance is shown |
+| A.4 | **Note CRUD + attachments + search** | parity with the iOS rows |
+| A.5 | **Voice note** | wry's runtime mic prompt appears on first record; grant → encrypted WAV attachment lands; deny → the "Microphone access is off" (SYS-02) state. Must be on the adb-reverse dev loop or an installed build (see §6.1) |
+| A.6 | **Rotation mid-edit** | no activity recreation (template `configChanges` covers orientation) — editor content, unlock state, and size-class-appropriate layout all survive |
+| A.7 | **Split-screen + freeform resize** | the layout reflows through compact ↔ medium ↔ expanded at each width; no clipped panes; the vault stays unlocked |
+| A.8 | **Hardware/gesture back** | current truth: wry's default backgrounds the app from anywhere (SPA, no history entries). Documented v1 behavior; pane-aware back is a separate work item |
+| A.9 | **IME / keyboard** | the soft keyboard does not cover the editor caret; external-keyboard basics work |
+| A.10 | **Safe-area / cutout / edge-to-edge** | targetSdk 36 on Android 15+ enforces edge-to-edge — check for content under the status bar/cutout in both orientations (WebView safe-area insets are typically 0 on Android) |
+| A.11 | **Screenshots / app-switcher preview** | **expected to WORK — known privacy gap**: FLAG_SECURE is a documented no-op on Android (`screen_guard.rs`), so the Settings screen-capture toggle does nothing here until the Kotlin/ndk-context wiring lands. Honest-disclosure: the toggle must not present itself as active protection on Android |
+| A.12 | **Background grace-lock** | background past `auto_lock_seconds` → locked before any note renders on resume (same as iOS 3.4) |

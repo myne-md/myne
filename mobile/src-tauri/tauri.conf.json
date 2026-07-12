@@ -21,6 +21,11 @@
       "csp": "default-src 'self'; img-src 'self' asset: attachment: data: blob:; media-src 'self' attachment: blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; script-src 'self' 'wasm-unsafe-eval'; object-src 'none'"
     }
   },
+  "plugins": {
+    "deep-link": {
+      "mobile": [{ "scheme": ["myne"] }]
+    }
+  },
   "bundle": {
     "active": true,
     "targets": "all",

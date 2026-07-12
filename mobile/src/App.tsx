@@ -3,6 +3,7 @@ import { Gallery } from "./gallery/Gallery";
 import { AppShell } from "./app/AppShell";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { PlatformProvider, type Platform } from "./platform/PlatformContext";
+import { SizeClassProvider, useSizeClassObserver } from "./platform/SizeClassContext";
 
 /**
  * Track the VISUAL viewport so the app fills *exactly* the space above the
@@ -66,6 +67,7 @@ export default function App() {
   const showGallery =
     typeof window !== "undefined" && new URLSearchParams(window.location.search).has("gallery");
   const { height, offsetTop } = useViewport();
+  const sizeClass = useSizeClassObserver();
 
   // Real app only: pin the document so iOS can't scroll the whole page up when
   // the keyboard opens (the gallery board keeps its free scroll — class absent).
@@ -80,14 +82,19 @@ export default function App() {
 
   return (
     <div
+      data-size-class={sizeClass}
       style={{
         height,
         width: "100%",
-        maxWidth: 480,
-        margin: "0 auto",
         position: "relative",
         overflow: "hidden",
         background: "var(--bg-1)",
+        // Landscape-tablet safe areas (rounded corners / camera housings).
+        // Resolves to 0 wherever it doesn't apply. The old phone cage
+        // (maxWidth 480) moved into <PhoneColumn> around the single-column
+        // flows (AppShell) — the editor is adaptive (SizeClassContext).
+        paddingLeft: "env(safe-area-inset-left, 0px)",
+        paddingRight: "env(safe-area-inset-right, 0px)",
         // Follow the visible viewport's top edge — see useViewport(). Keeps the
         // header under the notch and the footer glued to the keyboard when iOS
         // scrolls the layout viewport on input focus.
@@ -95,9 +102,11 @@ export default function App() {
       }}
     >
       <PlatformProvider platform={detectPlatform()}>
-        <ErrorBoundary>
-          <AppShell />
-        </ErrorBoundary>
+        <SizeClassProvider sizeClass={sizeClass}>
+          <ErrorBoundary>
+            <AppShell />
+          </ErrorBoundary>
+        </SizeClassProvider>
       </PlatformProvider>
     </div>
   );

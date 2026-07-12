@@ -76,9 +76,14 @@ async function fireCapture(page: Page, mode: "text" | "voice"): Promise<void> {
 }
 
 async function readImports(page: Page): Promise<Array<{ kind?: string; len: number; filename?: string | null }>> {
-  return page.evaluate(
+  const all = await page.evaluate(
     () => (window as unknown as { __voiceImports?: Array<{ kind?: string; len: number; filename?: string | null }> }).__voiceImports ?? [],
   );
+  // The mock records EVERY attachment_import; the DEV test-data seeder
+  // (lib/seed.ts) also imports its demo attachments through the same command
+  // when it sees the mock's empty vault. Count only the recorder's own
+  // `Voice note ….wav` imports — that is what these specs assert on.
+  return all.filter((i) => i.filename?.startsWith("Voice note "));
 }
 
 test.describe("voice note recording", () => {

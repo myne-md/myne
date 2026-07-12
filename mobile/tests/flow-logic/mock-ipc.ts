@@ -189,7 +189,7 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
       invoke: (cmd: string, args: Record<string, unknown>) => {
         const h = handlers[cmd];
         try {
-          return Promise.resolve(h ? h(args ?? {}) : null);
+          return Promise.resolve(h ? h(args ?? {}) : []);
         } catch (e) {
           return Promise.reject(e);
         }

@@ -193,4 +193,23 @@ fn main() {
             ),
     )
     .unwrap();
+
+    // Android manifest partial — the committed, regeneration-surviving mirror of
+    // `Info.ios.plist` (gen/android is gitignored and re-init clobbers it; this
+    // block is re-applied idempotently on every `tauri android dev/build`, and
+    // no-ops on desktop/iOS where TAURI_ANDROID_PROJECT_PATH is unset).
+    //
+    // BOTH permissions are required for voice notes: wry's
+    // `RustWebChromeClient.onPermissionRequest` batch-requests RECORD_AUDIO +
+    // MODIFY_AUDIO_SETTINGS for a getUserMedia audio capture, and an undeclared
+    // normal-level permission comes back denied from the launcher and fails the
+    // whole batch — silently breaking mic capture.
+    tauri_utils::build::update_android_manifest(
+        "MYNE MICROPHONE (voice notes)",
+        "manifest",
+        r#"<uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />"#
+            .to_string(),
+    )
+    .expect("failed to update AndroidManifest.xml");
 }

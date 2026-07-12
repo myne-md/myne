@@ -199,9 +199,13 @@ export function Sheet({
       />
       <div
         ref={cardRef}
+        data-testid="sheet.card"
         style={{
           position: "relative",
-          margin: "0 12px",
+          // Phone-identical below 584px (12px side margins); on tablets the
+          // card clamps to 560 and centers instead of stretching edge to edge.
+          width: "min(560px, calc(100% - 24px))",
+          margin: "0 auto",
           marginBottom: "calc(12px + env(safe-area-inset-bottom, 0px))",
           background: "var(--bg-1)",
           border: "1px solid var(--line-2)",

@@ -1,12 +1,10 @@
-import { type CSSProperties, type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { CMEditor } from "@myne/editor/CMEditor";
-import { editorCommands } from "@myne/editor/toolbar/commands";
 import { REVEAL_ATTACHMENT_EVENT } from "@myne/editor/attachments/fileCardActions";
 import { headingSections } from "@myne/dialect";
-import { undo, redo } from "@codemirror/commands";
 import type { EditorView } from "@codemirror/view";
 import { emit, listen } from "@tauri-apps/api/event";
-import { Screen, ScreenScroll, Icon, MyneMark, Banner, Spinner, Sheet, SidePanel, useEnterTransition, LIST_TOP, SyncStatusGlyph, SyncBanners, SyncStatusDetail, ConflictsSheet } from "../../components";
+import { Screen, ScreenScroll, Icon, Banner, Spinner, Sheet, SyncStatusGlyph, SyncBanners, SyncStatusDetail, ConflictsSheet } from "../../components";
 import { noteList, noteRead, noteCreate, noteUpdate, deleteNoteRouted } from "../../lib/notes";
 import type { NoteListError } from "../../lib/notes";
 import { useConflictMaterializer } from "../../lib/use-conflict-materializer";
@@ -16,9 +14,8 @@ import { effectiveMobileAutoLockSecs } from "../../lib/auto-lock";
 import { consumePendingCapture, CAPTURE_EVENT, type CaptureMode } from "../../lib/deep-link";
 import { ioBanner } from "../../lib/io-banner";
 import { usePrefs } from "../../lib/use-prefs";
-import { setFavorites, upsertSavedView, setViewOrder } from "../../lib/prefs";
+import { setFavorites } from "../../lib/prefs";
 import { bumpPrefsNonce } from "../../lib/prefsNonce";
-import type { NoteGraph } from "../../lib/wikilinks";
 import { searchNotes } from "../../lib/search-notes";
 import { buildTagIndex } from "../../lib/tags";
 import { publishEditorTagTree } from "../../lib/editor-tag-bridge";
@@ -55,15 +52,36 @@ import { SnapshotsSheet } from "./SnapshotsSheet";
 import { TemplatesSheet } from "./TemplatesSheet";
 import { unmarkTemplate, createTemplate } from "../../lib/templates";
 import { deriveTitleSnippet } from "../../lib/note-title";
-import { searchIndexReplace, noteSearch } from "../../lib/search";
+import { searchIndexReplace } from "../../lib/search";
 import { vaultIndicesApply, vaultIndicesAllEdges, type WikilinkEdge } from "../../lib/vault-indices";
 import { extractRecord } from "../../lib/indices-extract";
 import { buildGraphFromEdges, clientEdges } from "../../lib/backend-graph";
-import { WikiGraph } from "../../components/WikiGraph";
 import { MarkdownView } from "../../components/MarkdownView";
 import type { VaultSummary } from "../../types/vault-summary";
 import type { EditorFlowProps } from "./types";
 import { SettingsSheet, applyStoredTheme } from "./SettingsSheet";
+import { useSizeClass } from "../../platform/SizeClassContext";
+import { EmptyDetail } from "./editor/EmptyDetail";
+import { SidebarPane } from "./editor/SidebarPane";
+import { AppHeader } from "./editor/chrome/AppHeader";
+import { ActionPill } from "./editor/chrome/ActionPill";
+import { EditorTopBar } from "./editor/chrome/EditorTopBar";
+import { FavoritesStrip } from "./editor/chrome/FavoritesStrip";
+import { FormatBar } from "./editor/chrome/FormatBar";
+import { GraphTab } from "./editor/chrome/GraphTab";
+import { NoteRow } from "./editor/chrome/NoteRow";
+import { ReadingBar } from "./editor/chrome/ReadingBar";
+import { TabBar } from "./editor/chrome/TabBar";
+import { NoteContextPanel } from "./editor/panels/NoteContextPanel";
+import { CommandPalette } from "./editor/sheets/CommandPalette";
+import { FilterSheet } from "./editor/sheets/FilterSheet";
+import { NoteActionsSheet } from "./editor/sheets/NoteActionsSheet";
+import { NoteRowActionsSheet } from "./editor/sheets/NoteRowActionsSheet";
+import { SortSheet } from "./editor/sheets/SortSheet";
+import { TagBrowserSheet } from "./editor/sheets/TagBrowserSheet";
+import { VaultSwitcher } from "./editor/sheets/VaultSwitcher";
+import { ViewsSheet } from "./editor/sheets/ViewsSheet";
+import type { NoteEntry, OutlineItem, PaletteCommand } from "./editor/types";
 
 /**
  * Editor flow — the wired main surface after unlock. Mirrors the static
@@ -81,12 +99,6 @@ import { SettingsSheet, applyStoredTheme } from "./SettingsSheet";
  * and wiped on every exit path + on unmount (best-effort; the load-bearing
  * zeroize is Rust-side per `src-tauri/CLAUDE.md`).
  */
-
-interface NoteEntry {
-  id: string;
-  title: string;
-  snippet: string;
-}
 
 type Editing = { id: string | null };
 
@@ -118,12 +130,6 @@ function buildFolderTree(
   }
   return rows;
 }
-
-/** Status-bar clearance for a top action bar: the real OS safe-area inset on
- *  device (viewport-fit=cover), or a floor tall enough to clear the iPhone
- *  Dynamic Island where env() under-reports. Kept identical to `LIST_TOP` so the
- *  editor header, list header, and side-panel headers all line up. */
-const EDITOR_TOP = LIST_TOP;
 
 /** Left-to-right tab position — drives the slide direction of the page
  *  transition: moving to a higher-indexed tab enters from the right, a
@@ -160,6 +166,13 @@ function entryFrom(id: string, text: string): NoteEntry {
 export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDeleteVaultSuccess }: EditorFlowProps) {
   const [view, setView] = useState<"list" | "editor">("list");
   const [tab, setTab] = useState<"notes" | "search" | "graph" | "files" | "templates">("notes");
+  // Layout axis (SizeClassContext): compact = the phone's full-screen list ⇄
+  // editor swap; medium/expanded ("regular") = persistent multi-pane split.
+  // `view` stays the compact navigation intent; `editing` drives the detail
+  // pane on regular (the invariant `view === "editor" ⟺ editing != null`
+  // already holds on compact).
+  const { sizeClass } = useSizeClass();
+  const isRegular = sizeClass !== "compact";
 
   // Slide the incoming tab page in from the side its tab sits on (Notes ← … →
   // Templates). Same Web-Animations technique as the Settings drawer; the first
@@ -170,6 +183,9 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
     const prev = prevTabRef.current;
     prevTabRef.current = tab;
     if (tab === prev) return;
+    // Regular layouts don't page-flip — the prev ref still updates above so a
+    // later rotation back to compact can't replay a stale slide.
+    if (sizeClass !== "compact") return;
     const el = tabPaneRef.current;
     if (!el || typeof el.animate !== "function") return;
     const forward = TAB_ORDER[tab] >= TAB_ORDER[prev];
@@ -194,6 +210,10 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
     const prev = prevViewRef.current;
     prevViewRef.current = view;
     if (view === prev) return;
+    // The push/pop is compact-only: on regular both panes are persistent (no
+    // screen swap). Updating the prev ref unconditionally above prevents a
+    // stale animation when rotating back to compact.
+    if (sizeClass !== "compact") return;
     const el = screenRef.current;
     if (!el || typeof el.animate !== "function") return;
     const push = view === "editor"; // list → editor is "deeper"
@@ -415,6 +435,16 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
     setReadingMode(existing && prefs.editor_default_view_mode === "reading");
     setRawMode(existing && prefs.editor_default_view_mode === "source");
   }, [view, editing, prefs.editor_default_view_mode]);
+
+  // Size-class transitions (rotation, iPad Split View drag, window resize):
+  // entering compact must land on a concrete screen — the editor when a note is
+  // open, the list otherwise. Regular layouts ignore `view`, but every setView
+  // call still fires (navigation intent) so the view-keyed default-view-mode
+  // effect above keeps working on all size classes. Deps intentionally narrow:
+  // this reconciles ONLY when the size class itself flips.
+  useEffect(() => {
+    if (sizeClass === "compact") setView(editing ? "editor" : "list");
+  }, [sizeClass]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Stop filtering when the active view is deleted elsewhere (prefs refresh).
   useEffect(() => {
@@ -725,6 +755,27 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
     await openNote(id);
   }
 
+  /** Open a note from any LIST surface (rows, favorites, graph, palette, tag
+   *  browser, templates). On compact the list is only reachable with no editor
+   *  open (`exitEditor` precedes it), so this reduces to `openNote`. On regular
+   *  the editor pane stays mounted next to the list: persist the in-progress
+   *  note first — an existing note through `openRelated`'s save-then-open, a
+   *  brand-new non-empty note by creating it — so a row tap never silently
+   *  discards typed text. */
+  async function openFromList(id: string) {
+    if (isRegular && editing != null && editing.id === null && editorText.trim() !== "") {
+      try {
+        const stamped = stampUpdated(editorText);
+        if (HAS_TAURI) await noteCreate(stamped);
+        else devStore().set(crypto.randomUUID(), stamped);
+        await refresh();
+      } catch {
+        // Best-effort persist; still navigate so the tap isn't dead.
+      }
+    }
+    await openRelated(id);
+  }
+
   /** Move the open note to Trash / Archive (soft, reversible), then exit. */
   async function organizeCurrent(fn: (id: string) => Promise<void>, failMsg: string) {
     if (editing?.id == null) return;
@@ -782,7 +833,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
       const candidates = liveNotes.map((n) => ({ id: n.id, title: n.title, folder: folderOf.get(n.id) ?? null }));
       const res = resolveTodayNote(new Date(), prefs.daily_date_format, prefs.daily_folder, candidates);
       if (res.kind === "open") {
-        void openNote(res.id);
+        void openFromList(res.id);
         return;
       }
       const id =
@@ -790,7 +841,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
           ? await createNoteFromTemplate(prefs.daily_template, res.dateTitle, res.folder, new Date())
           : await createBlankNamedNote(res.dateTitle, res.folder);
       await refresh();
-      void openNote(id);
+      void openFromList(id);
     } catch (e) {
       // Never let the daily-note path crash the app — surface a message instead.
       console.error("[today] failed:", e);
@@ -901,8 +952,30 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
     );
   }, [editing?.id, foldedTitle, noteGraph, liveNotes, bodies]);
 
-  // ── List view ───────────────────────────────────────────────────────────────
-  if (view === "list") {
+  // Command-palette registry (mobile subset of the desktop action list). Used by
+  // the CommandPalette overlay, which renders at the layout level (reachable
+  // from every size class), so it lives OUTSIDE the list-pane render helper.
+  const gi = { fill: "none", stroke: "currentColor", strokeWidth: 1.7, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
+  const paletteCommands: PaletteCommand[] = [
+    { id: "new-note", label: "New note", icon: <svg width="16" height="16" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" {...gi} /></svg>, run: () => newNote() },
+    { id: "daily", label: "Daily note", icon: <svg width="16" height="16" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2" {...gi} /><path d="M3 10h18M8 3v4M16 3v4" {...gi} /></svg>, run: () => void openToday() },
+    { id: "templates", label: "Templates", icon: <svg width="16" height="16" viewBox="0 0 24 24"><rect x="8" y="4" width="11" height="14" rx="2" {...gi} /><path d="M5 8v10a2 2 0 002 2h8" {...gi} /></svg>, run: () => setTab("templates") },
+    { id: "files", label: "Attachments", icon: <svg width="16" height="16" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" {...gi} /><path d="M21 15l-5-5L5 21" {...gi} /></svg>, run: () => setTab("files") },
+    { id: "graph", label: "Graph", icon: <svg width="16" height="16" viewBox="0 0 24 24"><circle cx="6" cy="17" r="2.4" {...gi} /><circle cx="18" cy="14" r="2.4" {...gi} /><circle cx="13" cy="6" r="2.4" {...gi} /><path d="M8.3 15.6l3-7M8.4 16.2l7-1.6" {...gi} /></svg>, run: () => setTab("graph") },
+    { id: "tags", label: "Browse tags", icon: <svg width="16" height="16" viewBox="0 0 24 24"><path d="M4 4h7l9 9-7 7-9-9z" {...gi} /><circle cx="8" cy="8" r="1.1" fill="currentColor" /></svg>, run: () => setTagBrowserOpen(true) },
+    { id: "archive", label: "Archive", icon: <svg width="16" height="16" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="5" rx="1" {...gi} /><path d="M5 9v10a1 1 0 001 1h12a1 1 0 001-1V9M9 13h6" {...gi} /></svg>, run: () => { setListView("archive"); setActiveTag(null); setActiveViewId(null); } },
+    { id: "trash", label: "Trash", icon: <svg width="16" height="16" viewBox="0 0 24 24"><path d="M4 7h16M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2M6 7l1 13a1 1 0 001 1h8a1 1 0 001-1l1-13" {...gi} /></svg>, run: () => { setListView("trash"); setActiveTag(null); setActiveViewId(null); } },
+    { id: "settings", label: "Settings", icon: <svg width="16" height="16" viewBox="0 0 24 24"><path d="M4 7h11M19 7h1M4 17h1M9 17h11" {...gi} /><circle cx="17" cy="7" r="2.4" {...gi} /><circle cx="7" cy="17" r="2.4" {...gi} /></svg>, run: () => setSettingsOpen(true) },
+    { id: "lock", label: "Lock vault", icon: <svg width="16" height="16" viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="9.5" rx="2" {...gi} /><path d="M8 10.5V8a4 4 0 018 0v2.5" {...gi} /></svg>, run: () => onLock() },
+  ];
+
+  // ── List pane (the former `view === "list"` early-return branch) ────────────
+  // A render helper, not a component: it stays inside EditorFlow's scope (no
+  // prop threading), and its derivations only run when a layout actually shows
+  // the list — the compact editor screen skips it entirely, so typing there
+  // never pays for the tree/filter/sort recomputation. `chrome` strips the
+  // AppHeader / TabBar on expanded, where the sidebar absorbs both.
+  const renderNotesPane = (chrome: { header: boolean; tabBar: boolean }) => {
     const viewActive = listView === "notes" && viewMatchIds != null;
     const searchNeedle = searchQuery.trim().toLowerCase();
     // The plain live-notes view renders the whole folder HIERARCHY (an inline
@@ -1025,7 +1098,8 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
             divider={false}
             indent={depth * 18 + 12}
             subtitle={subtitleFor(n.id)}
-            onOpen={() => void openNote(n.id)}
+            onOpen={() => void openFromList(n.id)}
+            selected={isRegular && editing?.id === n.id}
             onHold={() => setRowActions(n)}
             favorited={favSet.has(n.id)}
             onToggleFavorite={() => toggleFavorite(n.id)}
@@ -1035,26 +1109,12 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
       return out;
     };
     const filterActive = activeTag != null || activeView != null;
-    // Command-palette registry (mobile subset of the desktop action list).
-    const gi = { fill: "none", stroke: "currentColor", strokeWidth: 1.7, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
-    const paletteCommands: PaletteCommand[] = [
-      { id: "new-note", label: "New note", icon: <svg width="16" height="16" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" {...gi} /></svg>, run: () => newNote() },
-      { id: "daily", label: "Daily note", icon: <svg width="16" height="16" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2" {...gi} /><path d="M3 10h18M8 3v4M16 3v4" {...gi} /></svg>, run: () => void openToday() },
-      { id: "templates", label: "Templates", icon: <svg width="16" height="16" viewBox="0 0 24 24"><rect x="8" y="4" width="11" height="14" rx="2" {...gi} /><path d="M5 8v10a2 2 0 002 2h8" {...gi} /></svg>, run: () => setTab("templates") },
-      { id: "files", label: "Attachments", icon: <svg width="16" height="16" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" {...gi} /><path d="M21 15l-5-5L5 21" {...gi} /></svg>, run: () => setTab("files") },
-      { id: "graph", label: "Graph", icon: <svg width="16" height="16" viewBox="0 0 24 24"><circle cx="6" cy="17" r="2.4" {...gi} /><circle cx="18" cy="14" r="2.4" {...gi} /><circle cx="13" cy="6" r="2.4" {...gi} /><path d="M8.3 15.6l3-7M8.4 16.2l7-1.6" {...gi} /></svg>, run: () => setTab("graph") },
-      { id: "tags", label: "Browse tags", icon: <svg width="16" height="16" viewBox="0 0 24 24"><path d="M4 4h7l9 9-7 7-9-9z" {...gi} /><circle cx="8" cy="8" r="1.1" fill="currentColor" /></svg>, run: () => setTagBrowserOpen(true) },
-      { id: "archive", label: "Archive", icon: <svg width="16" height="16" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="5" rx="1" {...gi} /><path d="M5 9v10a1 1 0 001 1h12a1 1 0 001-1V9M9 13h6" {...gi} /></svg>, run: () => { setListView("archive"); setActiveTag(null); setActiveViewId(null); } },
-      { id: "trash", label: "Trash", icon: <svg width="16" height="16" viewBox="0 0 24 24"><path d="M4 7h16M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2M6 7l1 13a1 1 0 001 1h8a1 1 0 001-1l1-13" {...gi} /></svg>, run: () => { setListView("trash"); setActiveTag(null); setActiveViewId(null); } },
-      { id: "settings", label: "Settings", icon: <svg width="16" height="16" viewBox="0 0 24 24"><path d="M4 7h11M19 7h1M4 17h1M9 17h11" {...gi} /><circle cx="17" cy="7" r="2.4" {...gi} /><circle cx="7" cy="17" r="2.4" {...gi} /></svg>, run: () => setSettingsOpen(true) },
-      { id: "lock", label: "Lock vault", icon: <svg width="16" height="16" viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="9.5" rx="2" {...gi} /><path d="M8 10.5V8a4 4 0 018 0v2.5" {...gi} /></svg>, run: () => onLock() },
-    ];
     const viewTitle = listView === "trash" ? "Trash" : listView === "archive" ? "Archive" : "Notes";
     return (
-      <Screen ref={screenRef}>
+      <>
         {/* Fixed header — sits OUTSIDE the animated pane so it stays put while
             the tab content slides between pages. */}
-        {tab !== "templates" && (
+        {chrome.header && tab !== "templates" && (
           <AppHeader
             label={prefs.label ?? "Personal"}
             onSwitcher={() => setSwitcherOpen(true)}
@@ -1218,7 +1278,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
               </div>
             ) : treeMode ? (
               <ScreenScroll style={{ marginTop: 4 }}>
-                {favStripVisible && <FavoritesStrip notes={favNotes} onOpen={(id) => void openNote(id)} />}
+                {favStripVisible && <FavoritesStrip notes={favNotes} onOpen={(id) => void openFromList(id)} />}
                 {renderTree(null, 0)}
               </ScreenScroll>
             ) : (
@@ -1229,7 +1289,8 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
                     entry={n}
                     last={i === orderedNotes.length - 1}
                     subtitle={listView === "notes" ? subtitleFor(n.id) : undefined}
-                    onOpen={() => void openNote(n.id)}
+                    onOpen={() => void openFromList(n.id)}
+            selected={isRegular && editing?.id === n.id}
                     onHold={listView === "notes" ? () => setRowActions(n) : undefined}
                     favorited={listView === "notes" && favSet.has(n.id)}
                     onToggleFavorite={listView === "notes" ? () => toggleFavorite(n.id) : undefined}
@@ -1260,7 +1321,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
           </>
         )}
 
-        {tab === "graph" && <GraphTab graph={noteGraph} onOpen={(id) => void openNote(id)} />}
+        {tab === "graph" && <GraphTab graph={noteGraph} onOpen={(id) => void openFromList(id)} />}
         {tab === "files" && <AttachmentsSheet variant="page" onClose={() => setTab("notes")} />}
         {tab === "templates" && (
           <TemplatesSheet
@@ -1270,7 +1331,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
             onClose={() => setTab("notes")}
             onEdit={(id) => {
               setTab("notes");
-              void openNote(id);
+              void openFromList(id);
             }}
             onUse={(id) => {
               setTab("notes");
@@ -1278,7 +1339,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
                 try {
                   const nid = await createNoteFromTemplate(id, "", currentFolder, new Date());
                   await refresh();
-                  void openNote(nid);
+                  void openFromList(nid);
                 } catch {
                   /* browser-dev / create failed */
                 }
@@ -1290,7 +1351,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
                 try {
                   const nid = await createTemplate("", currentFolder);
                   await refresh();
-                  void openNote(nid);
+                  void openFromList(nid);
                 } catch {
                   /* browser-dev / create failed */
                 }
@@ -1322,13 +1383,22 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
         )}
         </div>
 
-        <TabBar
-          active={tab}
-          onNotes={() => setTab("notes")}
-          onGraph={() => setTab("graph")}
-          onAttachments={() => setTab("files")}
-        />
+        {chrome.tabBar && (
+          <TabBar
+            active={tab}
+            onNotes={() => setTab("notes")}
+            onGraph={() => setTab("graph")}
+            onAttachments={() => setTab("files")}
+          />
+        )}
+      </>
+    );
+  };
 
+  // ── List overlays (sheets opened from the list surfaces). Rendered at the
+  // layout level so they cover the whole window on every size class. ──────────
+  const renderListOverlays = () => (
+    <>
         {switcherOpen && (
           <VaultSwitcher
             vaults={vaults}
@@ -1441,7 +1511,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
             commands={paletteCommands}
             notes={liveNotes}
             bodies={bodies}
-            onOpenNote={(id) => void openNote(id)}
+            onOpenNote={(id) => void openFromList(id)}
             onClose={() => setPaletteOpen(false)}
           />
         )}
@@ -1454,7 +1524,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
             liveIds={new Set(liveNotes.map((n) => n.id))}
             titleById={new Map(notes.map((n) => [n.id, n.title]))}
             viewOrder={prefs.view_order}
-            onOpenNote={(id) => void openNote(id)}
+            onOpenNote={(id) => void openFromList(id)}
             onSavedView={(id) => {
               setTagBrowserOpen(false);
               bumpPrefsNonce();
@@ -1473,7 +1543,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
             onOpen={() => {
               const id = rowActions.id;
               setRowActions(null);
-              void openNote(id);
+              void openFromList(id);
             }}
             onToggleFavorite={() => {
               toggleFavorite(rowActions.id);
@@ -1496,27 +1566,26 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
             }}
           />
         )}
-      </Screen>
-    );
-  }
+    </>
+  );
 
-  // ── Editor view ─────────────────────────────────────────────────────────────
-  const headerTitle = deriveTitleSnippet(editorText).title || (editing?.id ? "Untitled" : "New note");
-  const isExisting = editing?.id != null;
-  const backlinkNotes = (editing?.id ? (noteGraph.backlinks.get(editing.id) ?? []) : [])
-    .map((bid) => notes.find((n) => n.id === bid))
-    .filter((n): n is NoteEntry => n != null);
-  // Reading-mode wikilink tap → resolve title to a note and open it (saving the
-  // current note first via openRelated).
-  const openWikilinkTarget = (target: string) => {
-    const id = notes.find((n) => foldSegment(n.title) === foldSegment(target))?.id;
-    if (id) void openRelated(id);
-  };
+  // ── Editor pane (the former editor-view return). Same render-helper pattern
+  // as the list pane: called by the compact editor screen and by the regular
+  // detail pane; its derivations only run when an editor is actually shown. ───
+  const renderEditorPane = () => {
+    const headerTitle = deriveTitleSnippet(editorText).title || (editing?.id ? "Untitled" : "New note");
+    const isExisting = editing?.id != null;
+    // Reading-mode wikilink tap → resolve title to a note and open it (saving the
+    // current note first via openRelated).
+    const openWikilinkTarget = (target: string) => {
+      const id = notes.find((n) => foldSegment(n.title) === foldSegment(target))?.id;
+      if (id) void openRelated(id);
+    };
 
-  return (
-    <Screen ref={screenRef}>
+    return (
+      <>
       <EditorTopBar
-        onBack={() => void saveNote()}
+        onBack={sizeClass === "compact" ? () => void saveNote() : undefined}
         onContext={() => setRightPanel(true)}
         onMore={isExisting ? () => setMoreOpen(true) : undefined}
         folder={readNoteFolder(editorText)}
@@ -1572,7 +1641,13 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
             onChange={setEditorText}
             onReady={setEditorView}
             viewMode={rawMode ? "source" : "live"}
-            style={{ width: "100%", minHeight: "100%", color: "var(--fg-1)", padding: "18px 22px" }}
+            // Regular: the WS-01 prose measure — a 620px column (+ 56px gutters)
+            // centered in the detail pane. Compact keeps the phone's 18/22.
+            style={
+              isRegular
+                ? { width: "100%", maxWidth: 732, margin: "0 auto", minHeight: "100%", color: "var(--fg-1)", padding: "34px 56px" }
+                : { width: "100%", minHeight: "100%", color: "var(--fg-1)", padding: "18px 22px" }
+            }
           />
         </div>
       )}
@@ -1594,6 +1669,25 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
         />
       )}
 
+      {/* Off-screen print surface — `window.print()` (the PDF button) isolates
+          this via @media print (mobile.css). Frontmatter stripped; attachment
+          embeds render inline via the attachment:// scheme. */}
+      <div id="myne-print">
+        <h1 style={{ fontSize: 24, fontWeight: 700, margin: "0 0 16px" }}>{headerTitle}</h1>
+        <MarkdownView text={bodyAfterFrontmatter(editorText)} onOpenWikilink={() => {}} fontFamily="var(--font-sans)" fontSize={15} />
+      </div>
+      </>
+    );
+  };
+
+  // ── Editor overlays (sheets/panels opened from the editor surface). Rendered
+  // at the layout level; on regular they only mount while a note is open. ─────
+  const renderEditorOverlays = () => {
+    const backlinkNotes = (editing?.id ? (noteGraph.backlinks.get(editing.id) ?? []) : [])
+      .map((bid) => notes.find((n) => n.id === bid))
+      .filter((n): n is NoteEntry => n != null);
+    return (
+      <>
       {recordOpen && (
         <RecordingSheet onRecorded={attachFile} onClose={() => setRecordOpen(false)} />
       )}
@@ -1653,6 +1747,37 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
         />
       )}
 
+      {manageAttachments && (
+        <AttachmentsSheet
+          onClose={() => setManageAttachments(false)}
+          onInsert={(id, filename) => {
+            insertIntoEditor(emitAttachmentEmbed(id, filename));
+            setManageAttachments(false);
+          }}
+        />
+      )}
+
+      {historyOpen && editing?.id && (
+        <SnapshotsSheet
+          noteId={editing.id}
+          onClose={() => setHistoryOpen(false)}
+          onRestored={() => {
+            // The live note was overwritten on disk — re-read it into the editor.
+            if (HAS_TAURI && editing?.id) void noteRead(editing.id).then(setEditorText).catch(() => {});
+          }}
+        />
+      )}
+      </>
+    );
+  };
+
+  // ── Shared overlays — the purge + move confirm sheets. Staged from BOTH the
+  // list (trash-row Delete / long-press Move) and the editor ⋯ menu; they
+  // previously rendered only in the editor view, which left the list-staged
+  // flows without their confirm sheet — rendering them in every layout fixes
+  // that. ─────────────────────────────────────────────────────────────────────
+  const renderSharedOverlays = () => (
+    <>
       {purgeId != null && (
         <Sheet onClose={() => setPurgeId(null)}>
           {(close) => (
@@ -1738,46 +1863,81 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
           )}
         </Sheet>
       )}
+    </>
+  );
 
-      {manageAttachments && (
-        <AttachmentsSheet
-          onClose={() => setManageAttachments(false)}
-          onInsert={(id, filename) => {
-            insertIntoEditor(emitAttachmentEmbed(id, filename));
-            setManageAttachments(false);
-          }}
-        />
-      )}
+  // ── Layout switch ────────────────────────────────────────────────────────────
+  // compact: the existing full-screen list ⇄ editor swap (unchanged phone
+  // behavior, push/pop animation included). medium: list + detail side by side,
+  // the phone's AppHeader + TabBar scoped to the list column. expanded: the
+  // WS-01 three-pane — sidebar + list + detail; the sidebar absorbs the
+  // AppHeader/TabBar destinations, so neither renders. Graph / Files /
+  // Templates span the full content width on regular (a graph squeezed into a
+  // 316px column is useless).
+  if (sizeClass === "compact") {
+    if (view === "list") {
+      return (
+        <Screen ref={screenRef}>
+          {renderNotesPane({ header: true, tabBar: true })}
+          {renderListOverlays()}
+          {renderSharedOverlays()}
+        </Screen>
+      );
+    }
+    return (
+      <Screen ref={screenRef}>
+        {renderEditorPane()}
+        {renderEditorOverlays()}
+        {renderSharedOverlays()}
+      </Screen>
+    );
+  }
 
-      {historyOpen && editing?.id && (
-        <SnapshotsSheet
-          noteId={editing.id}
-          onClose={() => setHistoryOpen(false)}
-          onRestored={() => {
-            // The live note was overwritten on disk — re-read it into the editor.
-            if (HAS_TAURI && editing?.id) void noteRead(editing.id).then(setEditorText).catch(() => {});
-          }}
-        />
-      )}
-
-      {/* Off-screen print surface — `window.print()` (the PDF button) isolates
-          this via @media print (mobile.css). Frontmatter stripped; attachment
-          embeds render inline via the attachment:// scheme. */}
-      <div id="myne-print">
-        <h1 style={{ fontSize: 24, fontWeight: 700, margin: "0 0 16px" }}>{headerTitle}</h1>
-        <MarkdownView text={bodyAfterFrontmatter(editorText)} onOpenWikilink={() => {}} fontFamily="var(--font-sans)" fontSize={15} />
+  return (
+    <Screen>
+      <div data-testid="workspace.split" style={{ flex: 1, minHeight: 0, display: "flex" }}>
+        {sizeClass === "expanded" && (
+          <SidebarPane
+            label={prefs.label ?? "Personal"}
+            tab={tab}
+            listView={listView}
+            onAllNotes={() => { setTab("notes"); setListView("notes"); setActiveTag(null); setActiveViewId(null); }}
+            onGraph={() => setTab("graph")}
+            onFiles={() => setTab("files")}
+            onTemplates={() => setTab("templates")}
+            onViews={() => setViewsOpen(true)}
+            onTags={() => setTagBrowserOpen(true)}
+            onArchive={() => { setTab("notes"); setListView("archive"); setActiveTag(null); setActiveViewId(null); }}
+            onTrash={() => { setTab("notes"); setListView("trash"); setActiveTag(null); setActiveViewId(null); }}
+            onSearch={() => setPaletteOpen(true)}
+            onSwitcher={() => setSwitcherOpen(true)}
+            onSettings={() => setSettingsOpen(true)}
+            onSyncDetail={() => setSyncDetailOpen(true)}
+          />
+        )}
+        {tab === "notes" ? (
+          <>
+            <div
+              data-testid="workspace.list-pane"
+              style={{ width: sizeClass === "expanded" ? 316 : 340, flex: "none", minHeight: 0, display: "flex", flexDirection: "column", borderRight: "1px solid var(--line-1)" }}
+            >
+              {renderNotesPane({ header: sizeClass === "medium", tabBar: sizeClass === "medium" })}
+            </div>
+            <div data-testid="workspace.detail-pane" style={{ flex: 1, minWidth: 0, minHeight: 0, display: "flex", flexDirection: "column" }}>
+              {editing ? renderEditorPane() : <EmptyDetail onNew={newNote} />}
+            </div>
+          </>
+        ) : (
+          <div style={{ flex: 1, minWidth: 0, minHeight: 0, display: "flex", flexDirection: "column" }}>
+            {renderNotesPane({ header: sizeClass === "medium", tabBar: sizeClass === "medium" })}
+          </div>
+        )}
       </div>
+      {renderListOverlays()}
+      {editing != null && renderEditorOverlays()}
+      {renderSharedOverlays()}
     </Screen>
   );
-}
-
-// ── Editor chrome (Obsidian/Notion-style page, not a modal) ─────────────────
-
-interface OutlineItem {
-  level: number;
-  text: string;
-  /** Char offset of the heading line start, for caret jump. */
-  index: number;
 }
 
 /** Heading outline of a note body. Skips fenced code blocks so a `#` inside a
@@ -1788,1387 +1948,4 @@ interface OutlineItem {
 // offset, our OutlineItem `index`.
 function deriveOutline(text: string): OutlineItem[] {
   return headingSections(text).map((h) => ({ level: h.level, text: h.text, index: h.from }));
-}
-
-const chromeBtn: CSSProperties = {
-  width: 38,
-  height: 38,
-  borderRadius: 9,
-  border: "none",
-  background: "transparent",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  cursor: "pointer",
-  flex: "none",
-};
-
-/** Minimal editor top bar (the "it's a page, not a modal" chrome). Back
- *  autosaves and returns to the list; the title lives inline as the note's first
- *  line, so the bar only carries the context-panel toggle + the ⋯ actions menu. */
-function EditorTopBar({
-  onBack,
-  onContext,
-  onMore,
-  folder,
-  busy,
-}: {
-  onBack: () => void;
-  onContext: () => void;
-  /** Note-actions ⋯ menu. Omitted for a brand-new (unsaved) note. */
-  onMore?: () => void;
-  folder: string | null;
-  busy: boolean;
-}) {
-  return (
-    <div
-      style={{
-        flex: "none",
-        padding: `${EDITOR_TOP} 8px 8px`,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        gap: 6,
-        borderBottom: "1px solid var(--line-1)",
-      }}
-    >
-      <button onClick={onBack} disabled={busy} aria-label="Back to notes" style={{ ...chromeBtn, opacity: busy ? 0.5 : 1 }}>
-        <Icon name="chevron-left" size={22} color="var(--accent)" strokeWidth={2} />
-      </button>
-
-      <div style={{ flex: 1, minWidth: 0, textAlign: "center", fontSize: 12, color: "var(--fg-3)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: "var(--font-mono)" }}>
-        {folder ? folder.replace(/\/$/, "").replace(/\//g, " / ") : ""}
-      </div>
-
-      <div style={{ display: "flex", alignItems: "center", gap: 2, flex: "none" }}>
-        <button onClick={onContext} aria-label="Note details" style={chromeBtn}>
-          <svg width="21" height="21" viewBox="0 0 24 24" fill="none">
-            <rect x="3.5" y="4.5" width="17" height="15" rx="2.5" stroke="var(--fg-2)" strokeWidth="1.7" />
-            <rect x="14.5" y="4.5" width="6" height="15" rx="2.5" fill="var(--fg-2)" opacity="0.85" />
-          </svg>
-        </button>
-        {onMore && (
-          <button onClick={onMore} aria-label="Note actions" style={chromeBtn}>
-            <svg width="21" height="21" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.6" fill="var(--fg-2)" /><circle cx="12" cy="12" r="1.6" fill="var(--fg-2)" /><circle cx="19" cy="12" r="1.6" fill="var(--fg-2)" /></svg>
-          </button>
-        )}
-      </div>
-    </div>
-  );
-}
-
-/** Note-actions sheet (the ⋯ menu): Copy / Move / History / Export / Archive /
- *  Trash. Ported off the old right-panel footer so the panel matches the desktop
- *  tabbed convention (context only). */
-function NoteActionsSheet({
-  stat,
-  copied,
-  busy,
-  onClose,
-  onCopy,
-  onMove,
-  onHistory,
-  onExport,
-  onArchive,
-  onTrash,
-}: {
-  stat: string;
-  copied: boolean;
-  busy: boolean;
-  onClose: () => void;
-  onCopy: () => void;
-  onMove: () => void;
-  onHistory: () => void;
-  onExport: () => void;
-  onArchive: () => void;
-  onTrash: () => void;
-}) {
-  // Flush rows in the Sheet (already the single rounded container) — hairline
-  // dividers only, no inner bordered box (avoids the box-in-a-box look).
-  const row = (text: string, onClick: () => void, danger = false): ReactNode => (
-    <button
-      onClick={onClick}
-      disabled={busy}
-      style={{ display: "flex", alignItems: "center", width: "100%", border: "none", borderTop: "1px solid var(--line-1)", background: "transparent", padding: "15px 18px", cursor: busy ? "default" : "pointer", opacity: busy ? 0.6 : 1, fontFamily: "var(--font-sans)", fontSize: 16, color: danger ? "var(--danger)" : "var(--fg-1)" }}
-    >
-      {text}
-    </button>
-  );
-  return (
-    <Sheet onClose={onClose} padded={false}>
-      {() => (
-        <>
-          <div style={{ padding: "0 18px 12px", fontSize: 13, color: "var(--fg-3)" }}>{stat}</div>
-          {row(copied ? "Copied ✓" : "Copy to clipboard", onCopy)}
-          {row("Move to folder…", onMove)}
-          {row("Version history", onHistory)}
-          {row("Export as PDF", onExport)}
-          {row("Archive", onArchive)}
-          {row("Move to Trash", onTrash, true)}
-        </>
-      )}
-    </Sheet>
-  );
-}
-
-/** Long-press action sheet for a note-list ROW (distinct from NoteActionsSheet,
- *  which acts on the open note). Star/unstar lives here — for non-favorited rows
- *  it is the only place to favorite, since the inline star shows on starred rows
- *  only. Move / Archive / Trash mirror the in-editor actions. */
-function NoteRowActionsSheet({
-  title,
-  favorited,
-  onClose,
-  onOpen,
-  onToggleFavorite,
-  onMove,
-  onArchive,
-  onTrash,
-}: {
-  title: string;
-  favorited: boolean;
-  onClose: () => void;
-  onOpen: () => void;
-  onToggleFavorite: () => void;
-  onMove: () => void;
-  onArchive: () => void;
-  onTrash: () => void;
-}) {
-  // Rows sit flush inside the Sheet (which is already the single rounded,
-  // bordered container) — separated only by hairlines. No inner bordered box, or
-  // the modal reads as a box-in-a-box.
-  const row = (text: string, onClick: () => void, danger = false): ReactNode => (
-    <button
-      onClick={onClick}
-      style={{ display: "flex", alignItems: "center", width: "100%", border: "none", borderTop: "1px solid var(--line-1)", background: "transparent", padding: "15px 18px", cursor: "pointer", fontFamily: "var(--font-sans)", fontSize: 16, color: danger ? "var(--danger)" : "var(--fg-1)" }}
-    >
-      {text}
-    </button>
-  );
-  return (
-    <Sheet onClose={onClose} padded={false}>
-      {() => (
-        <>
-          <div style={{ padding: "0 18px 12px", fontSize: 13, fontWeight: 600, color: "var(--fg-2)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{title}</div>
-          {row("Open", onOpen)}
-          {row(favorited ? "Remove from favorites" : "Add to favorites", onToggleFavorite)}
-          {row("Move to folder…", onMove)}
-          {row("Archive", onArchive)}
-          {row("Move to Trash", onTrash, true)}
-        </>
-      )}
-    </Sheet>
-  );
-}
-
-/** Slim bottom bar shown in reading mode — the guaranteed way back to editing
- *  (the FormatBar is hidden while reading, and the outline "Jump" only works for
- *  a note that actually has headings). */
-function ReadingBar({ onEdit }: { onEdit: () => void }) {
-  return (
-    <div
-      style={{
-        flex: "none",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        borderTop: "1px solid var(--line-1)",
-        background: "var(--bg-2)",
-        padding: "6px 6px",
-        paddingBottom: "calc(6px + env(safe-area-inset-bottom, 0px))",
-      }}
-    >
-      <button
-        onClick={onEdit}
-        aria-label="Edit note"
-        style={{ display: "flex", alignItems: "center", gap: 8, height: 40, padding: "0 18px", borderRadius: 9, border: "none", background: "transparent", cursor: "pointer", color: "var(--accent)", fontFamily: "var(--font-sans)", fontSize: 15, fontWeight: 600 }}
-      >
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M4 20l4-1L18.5 8.5a2 2 0 0 0-3-3L5 16l-1 4zM14 6l3 3" stroke="var(--accent)" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" /></svg>
-        Edit
-      </button>
-    </div>
-  );
-}
-
-/** Minimal structural pointer-event shape for the tap/scroll discrimination. */
-type PressEvt = { preventDefault: () => void; clientX: number; clientY: number };
-
-/** Markdown formatting bar that rides above the keyboard (mobile's answer to the
- *  desktop selection toolbar — mirrors Obsidian's accessory bar). Every action
- *  runs a SHARED `@myne/editor` command against the live CMEditor view, so the
- *  formatting logic is identical to desktop and lives in exactly one place.
- *  Horizontally scrollable action row + a pinned keyboard-dismiss button. */
-function FormatBar({
-  view,
-  attaching,
-  rawMode,
-  onToggleRaw,
-  onAttach,
-  onLibrary,
-  onRecord,
-}: {
-  view: EditorView | null;
-  attaching: boolean;
-  rawMode: boolean;
-  onToggleRaw: () => void;
-  onAttach: () => void;
-  onLibrary: () => void;
-  onRecord: () => void;
-}) {
-  // Fire on a genuine TAP only — never while the row is being scrolled. On
-  // pointerdown we preventDefault (keeps the editor's focus + selection, so
-  // formatting applies to the current selection) and record the start; the action
-  // runs on pointerup ONLY if the pointer barely moved since (a tap, not a
-  // horizontal scroll drag over the buttons).
-  const pressRef = useRef<{ x: number; y: number } | null>(null);
-  const onPress = (e: PressEvt) => {
-    e.preventDefault();
-    pressRef.current = { x: e.clientX, y: e.clientY };
-  };
-  const isTap = (e: PressEvt): boolean => {
-    const d = pressRef.current;
-    pressRef.current = null;
-    return d != null && Math.abs(e.clientX - d.x) <= 10 && Math.abs(e.clientY - d.y) <= 10;
-  };
-  // The press is recorded in ONE shared ref, so if the finger leaves the pressed
-  // button (drifting onto a neighbor, or the row being flick-scrolled) we must
-  // drop it — otherwise releasing over a different button would fire that button.
-  const cancel = () => { pressRef.current = null; };
-  const run = (fn: (v: EditorView) => void) => ({
-    onPointerDown: onPress,
-    onPointerUp: (e: PressEvt) => { if (isTap(e) && view) fn(view); },
-    onPointerLeave: cancel,
-    onPointerCancel: cancel,
-  });
-  const tap = (cb: () => void) => ({
-    onPointerDown: onPress,
-    onPointerUp: (e: PressEvt) => { if (isTap(e)) cb(); },
-    onPointerLeave: cancel,
-    onPointerCancel: cancel,
-  });
-  const fbtn: CSSProperties = {
-    minWidth: 40,
-    height: 40,
-    padding: "0 8px",
-    borderRadius: 9,
-    border: "none",
-    background: "transparent",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    cursor: "pointer",
-    flex: "none",
-    color: "var(--fg-2)",
-    fontSize: 16,
-  };
-  const st = { stroke: "var(--fg-2)", strokeWidth: 1.7, fill: "none", strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
-  return (
-    <div
-      style={{
-        flex: "none",
-        display: "flex",
-        alignItems: "center",
-        borderTop: "1px solid var(--line-1)",
-        background: "var(--bg-2)",
-        paddingBottom: "env(safe-area-inset-bottom, 0px)",
-      }}
-    >
-      <div style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 1, overflowX: "auto", padding: "6px 6px", scrollbarWidth: "none", touchAction: "pan-x" }}>
-        <button {...run((v) => { undo(v); v.focus(); })} aria-label="Undo" style={fbtn}>
-          <svg width="20" height="20" viewBox="0 0 24 24"><path d="M7 7L3 11l4 4" {...st} /><path d="M3 11h11a6 6 0 0 1 0 12h-2" {...st} /></svg>
-        </button>
-        <button {...run((v) => { redo(v); v.focus(); })} aria-label="Redo" style={fbtn}>
-          <svg width="20" height="20" viewBox="0 0 24 24"><path d="M17 7l4 4-4 4" {...st} /><path d="M21 11H10a6 6 0 0 0 0 12h2" {...st} /></svg>
-        </button>
-        <div style={{ width: 1, height: 22, background: "var(--line-2)", margin: "0 5px", flex: "none" }} />
-        <button {...run(editorCommands.heading1)} aria-label="Heading 1" style={{ ...fbtn, fontWeight: 700 }}>H1</button>
-        <button {...run(editorCommands.heading2)} aria-label="Heading 2" style={{ ...fbtn, fontWeight: 700, fontSize: 14 }}>H2</button>
-        <button {...run(editorCommands.bold)} aria-label="Bold" style={{ ...fbtn, fontWeight: 800 }}>B</button>
-        <button {...run(editorCommands.italic)} aria-label="Italic" style={{ ...fbtn, fontStyle: "italic", fontWeight: 600 }}>I</button>
-        <button {...run(editorCommands.bulletList)} aria-label="Bullet list" style={fbtn}>
-          <svg width="20" height="20" viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11" {...st} /><circle cx="4.5" cy="6" r="1.3" fill="var(--fg-2)" /><circle cx="4.5" cy="12" r="1.3" fill="var(--fg-2)" /><circle cx="4.5" cy="18" r="1.3" fill="var(--fg-2)" /></svg>
-        </button>
-        <button {...run(editorCommands.checklist)} aria-label="Checklist" style={fbtn}>
-          <svg width="20" height="20" viewBox="0 0 24 24"><rect x="3" y="4" width="7" height="7" rx="1.5" {...st} /><path d="M4.6 7.5l1.5 1.5 2.3-2.6" {...st} /><path d="M13 7.5h8M13 16.5h8" {...st} /><rect x="3" y="13" width="7" height="7" rx="1.5" {...st} /></svg>
-        </button>
-        <button {...run(editorCommands.quote)} aria-label="Quote" style={fbtn}>
-          <svg width="20" height="20" viewBox="0 0 24 24"><path d="M5 5v14M9 8h11M9 12h11M9 16h7" {...st} /></svg>
-        </button>
-        <button {...run(editorCommands.code)} aria-label="Code" style={fbtn}>
-          <svg width="20" height="20" viewBox="0 0 24 24"><path d="M9 8l-4 4 4 4M15 8l4 4-4 4" {...st} /></svg>
-        </button>
-        <button {...run(editorCommands.wikilink)} aria-label="Wiki link" style={{ ...fbtn, fontWeight: 700, fontSize: 15 }}>[[</button>
-        <button {...run(editorCommands.link)} aria-label="Link" style={fbtn}>
-          <svg width="20" height="20" viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.6 0l3-3a4 4 0 0 0-5.6-5.6L11 7" {...st} /><path d="M14 10a4 4 0 0 0-5.6 0l-3 3a4 4 0 0 0 5.6 5.6L13 17" {...st} /></svg>
-        </button>
-        <button {...tap(onAttach)} disabled={attaching} aria-label="Attach new file" style={{ ...fbtn, opacity: attaching ? 0.5 : 1 }}>
-          {attaching ? <Spinner size={18} /> : (
-            <svg width="20" height="20" viewBox="0 0 24 24"><path d="M21 12.5 12.5 21a5 5 0 0 1-7-7l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7L9.6 18.4a1.7 1.7 0 0 1-2.4-2.4l7.6-7.6" {...st} /></svg>
-          )}
-        </button>
-        <button {...tap(onLibrary)} aria-label="Insert from library" style={fbtn}>
-          <svg width="20" height="20" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2" {...st} /><circle cx="8.5" cy="9.5" r="1.5" fill="var(--fg-2)" /><path d="M20 15l-4.5-4.5L5 20" {...st} /></svg>
-        </button>
-        <button {...tap(onRecord)} aria-label="Record voice note" style={fbtn}>
-          <svg width="20" height="20" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3" {...st} /><path d="M6 11a6 6 0 0 0 12 0M12 17v3" {...st} /></svg>
-        </button>
-      </div>
-      <button {...tap(onToggleRaw)} aria-label={rawMode ? "Show live preview" : "Show raw markdown"} style={{ ...fbtn, borderLeft: "1px solid var(--line-1)", borderRadius: 0, width: 44 }}>
-        {rawMode ? (
-          // Raw/source mode → pen (you're editing the raw markdown).
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 20l4-1L18.5 8.5a2 2 0 0 0-3-3L5 16l-1 4zM14 6l3 3" stroke="var(--accent)" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" /></svg>
-        ) : (
-          // Live/preview mode → eye (you're viewing the rendered content).
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" stroke="var(--fg-2)" strokeWidth="1.7" /><circle cx="12" cy="12" r="2.7" stroke="var(--fg-2)" strokeWidth="1.7" /></svg>
-        )}
-      </button>
-      <button {...run((v) => v.contentDOM.blur())} aria-label="Hide keyboard" style={{ ...fbtn, borderLeft: "1px solid var(--line-1)", borderRadius: 0, width: 48 }}>
-        <svg width="22" height="22" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="11" rx="2" stroke="var(--fg-2)" strokeWidth="1.6" fill="none" /><path d="M7 7.5h.01M11 7.5h.01M15 7.5h.01M7 11h.01M11 11h.01M15 11h.01M9 20l3 -3 3 3" stroke="var(--fg-2)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" fill="none" /></svg>
-      </button>
-    </div>
-  );
-}
-
-type ContextTab = "backlinks" | "unlinked" | "outline";
-
-/** Right side panel — the note's CONTEXT, ported to the desktop tabbed
- *  convention: Backlinks (🔗) / Unlinked mentions (#) / Outline (☰), with a
- *  collapse button. No AI-chat tab; note actions live in the ⋯ menu instead. */
-function NoteContextPanel({
-  backlinks,
-  unlinked,
-  outline,
-  onOpen,
-  onJump,
-  onClose,
-}: {
-  backlinks: NoteEntry[];
-  unlinked: NoteEntry[];
-  outline: OutlineItem[];
-  onOpen: (id: string) => void;
-  onJump: (charIndex: number) => void;
-  onClose: () => void;
-}) {
-  const [tab, setTab] = useState<ContextTab>("backlinks");
-  // SECTION_HEADING_STYLE (desktop sharedStyles.ts) — "LINKED FROM 0" look.
-  const heading: CSSProperties = { fontSize: 11, color: "var(--fg-3)", textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 600, marginBottom: 8 };
-  const linkRow: CSSProperties = { display: "flex", alignItems: "center", gap: 8, width: "100%", border: "none", background: "transparent", padding: "9px 4px", borderRadius: 8, cursor: "pointer", textAlign: "left", fontSize: 15, color: "var(--fg-1)", fontFamily: "var(--font-sans)" };
-  const empty = (text: string): ReactNode => <div style={{ fontSize: 13, color: "var(--fg-3)", marginTop: 4 }}>{text}</div>;
-  const noteRow = (n: NoteEntry): ReactNode => (
-    <button key={n.id} onClick={() => onOpen(n.id)} style={linkRow}>
-      <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{n.title}</span>
-    </button>
-  );
-
-  const tabBtn = (id: ContextTab, aria: string, icon: ReactNode): ReactNode => {
-    const on = tab === id;
-    return (
-      <button
-        onClick={() => setTab(id)}
-        aria-label={aria}
-        style={{ width: 40, height: 34, display: "flex", alignItems: "center", justifyContent: "center", border: "none", background: "transparent", borderBottom: on ? "2px solid var(--accent)" : "2px solid transparent", marginBottom: -1, color: on ? "var(--fg-1)" : "var(--fg-3)", cursor: "pointer" }}
-      >
-        {icon}
-      </button>
-    );
-  };
-
-  const header = (close: () => void): ReactNode => (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, padding: "0 10px", minHeight: 40, borderBottom: "1px solid var(--line-1)" }}>
-      <div style={{ display: "flex", gap: 2 }}>
-        {tabBtn("backlinks", "Backlinks", <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M10 14a4 4 0 0 0 5.6 0l3-3a4 4 0 0 0-5.6-5.6L11 7" /><path d="M14 10a4 4 0 0 0-5.6 0l-3 3a4 4 0 0 0 5.6 5.6L13 17" /></svg>)}
-        {tabBtn("unlinked", "Unlinked mentions", <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"><path d="M9 4L7 20M17 4l-2 16M5 9h15M4 15h15" /></svg>)}
-        {tabBtn("outline", "Outline", <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"><path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01" /></svg>)}
-      </div>
-      <button onClick={close} aria-label="Collapse panel" style={{ width: 32, height: 32, borderRadius: 8, border: "none", background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
-        <svg width="19" height="19" viewBox="0 0 24 24" fill="none">
-          <rect x="3.5" y="4.5" width="17" height="15" rx="2.5" stroke="var(--fg-2)" strokeWidth="1.7" />
-          <rect x="14.5" y="4.5" width="6" height="15" rx="2.5" fill="var(--fg-2)" opacity="0.85" />
-        </svg>
-      </button>
-    </div>
-  );
-
-  return (
-    <SidePanel header={header} onClose={onClose} padBody={false}>
-      <div style={{ padding: "16px 18px" }}>
-        {tab === "backlinks" && (
-          <>
-            <div style={heading}>Linked from {backlinks.length}</div>
-            {backlinks.length === 0 ? empty("No backlinks yet.") : backlinks.map(noteRow)}
-          </>
-        )}
-        {tab === "unlinked" && (
-          <>
-            <div style={heading}>Unlinked mentions {unlinked.length}</div>
-            {unlinked.length === 0 ? empty("No unlinked mentions.") : unlinked.map(noteRow)}
-          </>
-        )}
-        {tab === "outline" && (
-          <>
-            <div style={heading}>Outline</div>
-            {outline.length === 0
-              ? empty("No headings")
-              : outline.map((h, i) => (
-                  <button key={i} onClick={() => onJump(h.index)} style={{ ...linkRow, paddingLeft: 4 + (h.level - 1) * 14, color: h.level === 1 ? "var(--fg-1)" : "var(--fg-2)", fontWeight: h.level === 1 ? 600 : 400 }}>
-                    <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{h.text}</span>
-                  </button>
-                ))}
-          </>
-        )}
-      </div>
-    </SidePanel>
-  );
-}
-
-// ── Sub-components ─────────────────────────────────────────────────────────────
-
-/** Consistent top bar shared by the Notes / Search / Graph / Files tabs: vault
- *  switcher on the left; command-palette search + Settings gear on the right.
- *  Stays fixed while the tab content below it animates between pages. */
-function AppHeader({ label, onSwitcher, onPalette, onSettings }: { label: string; onSwitcher: () => void; onPalette: () => void; onSettings: () => void }) {
-  return (
-    <div style={{ flex: "none", padding: `${LIST_TOP} 14px 6px 20px`, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
-      <button
-        onClick={onSwitcher}
-        style={{ display: "flex", alignItems: "center", gap: 6, border: "none", background: "transparent", padding: 0, cursor: "pointer", minWidth: 0 }}
-      >
-        <MyneMark size={22} radius={4} />
-        <span style={{ fontSize: 15, fontWeight: 600, color: "var(--fg-1)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</span>
-        <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
-          <path d="M2 4l4 4 4-4" stroke="var(--fg-3)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      </button>
-      <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
-        <button
-          onClick={onPalette}
-          aria-label="Command palette"
-          style={{ width: 36, height: 36, borderRadius: 8, border: "none", background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
-        >
-          <Icon name="search" size={21} color="var(--fg-2)" strokeWidth={1.7} />
-        </button>
-        <button
-          onClick={onSettings}
-          aria-label="Settings"
-          style={{ width: 36, height: 36, borderRadius: 8, border: "none", background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
-        >
-          <Icon name="settings" size={21} color="var(--fg-2)" strokeWidth={1.7} />
-        </button>
-      </div>
-    </div>
-  );
-}
-
-/** A create-action tile (New note / Template / Daily note / New view) in the
- *  dashed "+ View" style — icon over label so four fit across a phone row.
- *  `children` are the inline SVG shapes for the glyph. */
-function ActionPill({ onClick, label, children }: { onClick: () => void; label: string; children: ReactNode }) {
-  return (
-    <button
-      onClick={onClick}
-      style={{
-        flex: 1,
-        minWidth: 0,
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: 5,
-        border: "1px solid var(--line-1)",
-        borderRadius: 12,
-        background: "transparent",
-        color: "var(--fg-2)",
-        fontSize: 12,
-        fontWeight: 600,
-        fontFamily: "var(--font-sans)",
-        padding: "12px 4px",
-        cursor: "pointer",
-      }}
-    >
-      <svg width="19" height="19" viewBox="0 0 24 24" style={{ flexShrink: 0 }}>{children}</svg>
-      <span style={{ maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</span>
-    </button>
-  );
-}
-
-/** The Filter sheet — the single home for the note-list scopes that would
- *  otherwise be scattered: status (live / Archive / Trash), saved Views, and
- *  Tags. Reached from the Filter button in the search·filter·sort toolbar. */
-/** The Views sheet — browse the saved views, activate one (tap), edit it, or
- *  create a new one. Reached from the "Views" tile under the Notes heading. */
-function ViewsSheet({
-  views,
-  activeViewId,
-  onPick,
-  onEdit,
-  onNew,
-  onClose,
-}: {
-  views: SavedView[];
-  activeViewId: string | null;
-  onPick: (id: string) => void;
-  onEdit: (v: SavedView) => void;
-  onNew: () => void;
-  onClose: () => void;
-}) {
-  const typeLabel: Record<string, string> = { table: "Table", cards: "Cards", list: "List" };
-  return (
-    <Sheet onClose={onClose} style={{ maxHeight: "82%", display: "flex", flexDirection: "column", overflow: "hidden" }}>
-      {(close) => (
-        <>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flex: "none", paddingBottom: 4 }}>
-            <span style={{ width: 60 }} />
-            <span style={{ fontSize: 17, fontWeight: 600, color: "var(--fg-1)" }}>Views</span>
-            <button onClick={close} style={{ width: 60, textAlign: "right", border: "none", background: "transparent", color: "var(--accent)", fontSize: 15, fontWeight: 600, cursor: "pointer" }}>Done</button>
-          </div>
-          <div style={{ overflowY: "auto", minHeight: 0 }}>
-            <button
-              onClick={() => { onNew(); close(); }}
-              style={{ display: "flex", alignItems: "center", gap: 9, width: "100%", marginTop: 8, padding: "13px 14px", border: "1px solid var(--line-1)", borderRadius: 10, background: "var(--bg-1)", color: "var(--accent)", fontFamily: "var(--font-sans)", fontSize: 16, fontWeight: 600, cursor: "pointer" }}
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
-              New view
-            </button>
-
-            {views.length === 0 ? (
-              <p style={{ margin: "16px 4px 8px", fontSize: 14, lineHeight: 1.5, color: "var(--fg-3)" }}>
-                No saved views yet. Create one to filter your notes by tag, folder, or text.
-              </p>
-            ) : (
-              <div style={{ marginTop: 12, border: "1px solid var(--line-1)", borderRadius: 10, overflow: "hidden", background: "var(--bg-1)" }}>
-                {views.map((v, i) => {
-                  const active = activeViewId === v.id;
-                  return (
-                    <div
-                      key={v.id}
-                      onClick={() => { onPick(v.id); close(); }}
-                      style={{ display: "flex", alignItems: "center", gap: 10, padding: "11px 14px", borderTop: i === 0 ? undefined : "1px solid var(--line-1)", cursor: "pointer" }}
-                    >
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 16, fontWeight: active ? 600 : 400, color: active ? "var(--accent)" : "var(--fg-1)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{v.name}</div>
-                        <div style={{ fontSize: 12, color: "var(--fg-3)", marginTop: 2 }}>{typeLabel[v.view_type] ?? v.view_type}</div>
-                      </div>
-                      {active && <svg width="16" height="16" viewBox="0 0 24 24" style={{ flexShrink: 0 }}><path d="M5 12l5 5L20 6" fill="none" stroke="var(--accent)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /></svg>}
-                      <button
-                        onClick={(e) => { e.stopPropagation(); onEdit(v); close(); }}
-                        aria-label="Edit view"
-                        style={{ flexShrink: 0, width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", border: "none", background: "transparent", cursor: "pointer" }}
-                      >
-                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M4 20l4-1 10-10-3-3L5 16l-1 4zM14 6l3 3" stroke="var(--fg-3)" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </>
-      )}
-    </Sheet>
-  );
-}
-
-/** The Sort sheet — the note-list order picker. Same modal treatment as the
- *  Filter sheet, reached from the icon-only Sort button in the toolbar. */
-function SortSheet({
-  mode,
-  onPick,
-  onClose,
-}: {
-  mode: "none" | "az" | "za";
-  onPick: (m: "none" | "az" | "za") => void;
-  onClose: () => void;
-}) {
-  const row = (content: ReactNode, on: boolean, onClick: () => void, first = false): ReactNode => (
-    <div
-      onClick={onClick}
-      style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "12px 14px", borderTop: first ? undefined : "1px solid var(--line-1)", cursor: "pointer", color: on ? "var(--accent)" : "var(--fg-1)", fontWeight: on ? 600 : 400, fontSize: 16 }}
-    >
-      {content}
-      {on && <svg width="16" height="16" viewBox="0 0 24 24" style={{ flexShrink: 0 }}><path d="M5 12l5 5L20 6" fill="none" stroke="var(--accent)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /></svg>}
-    </div>
-  );
-  return (
-    <Sheet onClose={onClose} style={{ maxHeight: "82%", display: "flex", flexDirection: "column", overflow: "hidden" }}>
-      {(close) => (
-        <>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flex: "none", paddingBottom: 4 }}>
-            <span style={{ width: 60 }} />
-            <span style={{ fontSize: 17, fontWeight: 600, color: "var(--fg-1)" }}>Sort</span>
-            <button onClick={close} style={{ width: 60, textAlign: "right", border: "none", background: "transparent", color: "var(--accent)", fontSize: 15, fontWeight: 600, cursor: "pointer" }}>Done</button>
-          </div>
-          <div style={{ overflowY: "auto", minHeight: 0 }}>
-            <div style={{ marginTop: 8, border: "1px solid var(--line-1)", borderRadius: 10, overflow: "hidden", background: "var(--bg-1)" }}>
-              {row("Manual order", mode === "none", () => { onPick("none"); close(); }, true)}
-              {row("Title · A → Z", mode === "az", () => { onPick("az"); close(); })}
-              {row("Title · Z → A", mode === "za", () => { onPick("za"); close(); })}
-            </div>
-          </div>
-        </>
-      )}
-    </Sheet>
-  );
-}
-
-function FilterSheet({
-  onClose,
-  listView,
-  onPickStatus,
-  archivedCount,
-  trashedCount,
-  views,
-  activeViewId,
-  onPickView,
-  tagCount,
-  onOpenTags,
-}: {
-  onClose: () => void;
-  listView: "notes" | "archive" | "trash";
-  onPickStatus: (v: "notes" | "archive" | "trash") => void;
-  archivedCount: number;
-  trashedCount: number;
-  views: SavedView[];
-  activeViewId: string | null;
-  onPickView: (id: string) => void;
-  tagCount: number;
-  onOpenTags: () => void;
-}) {
-  const label: CSSProperties = { fontSize: 12, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--fg-3)", padding: "16px 4px 8px" };
-  const row = (content: ReactNode, on: boolean, onClick: () => void, first = false): ReactNode => (
-    <div
-      onClick={onClick}
-      style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "12px 14px", borderTop: first ? undefined : "1px solid var(--line-1)", cursor: "pointer", color: on ? "var(--accent)" : "var(--fg-1)", fontWeight: on ? 600 : 400, fontSize: 16 }}
-    >
-      {content}
-      {on && <svg width="16" height="16" viewBox="0 0 24 24" style={{ flexShrink: 0 }}><path d="M5 12l5 5L20 6" fill="none" stroke="var(--accent)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /></svg>}
-    </div>
-  );
-  const group = (children: ReactNode): ReactNode => (
-    <div style={{ border: "1px solid var(--line-1)", borderRadius: 10, overflow: "hidden", background: "var(--bg-1)" }}>{children}</div>
-  );
-  return (
-    <Sheet onClose={onClose} style={{ maxHeight: "82%", display: "flex", flexDirection: "column", overflow: "hidden" }}>
-      {(close) => (
-        <>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flex: "none", paddingBottom: 4 }}>
-            <span style={{ width: 60 }} />
-            <span style={{ fontSize: 17, fontWeight: 600, color: "var(--fg-1)" }}>Filter</span>
-            <button onClick={close} style={{ width: 60, textAlign: "right", border: "none", background: "transparent", color: "var(--accent)", fontSize: 15, fontWeight: 600, cursor: "pointer" }}>Done</button>
-          </div>
-          <div style={{ overflowY: "auto", minHeight: 0 }}>
-            <div style={label}>Status</div>
-            {group(
-              <>
-                {row("All notes", listView === "notes", () => { onPickStatus("notes"); close(); }, true)}
-                {row(<span>Archive{archivedCount > 0 ? <span style={{ color: "var(--fg-3)", fontWeight: 400 }}> · {archivedCount}</span> : ""}</span>, listView === "archive", () => { onPickStatus("archive"); close(); })}
-                {row(<span>Trash{trashedCount > 0 ? <span style={{ color: "var(--fg-3)", fontWeight: 400 }}> · {trashedCount}</span> : ""}</span>, listView === "trash", () => { onPickStatus("trash"); close(); })}
-              </>,
-            )}
-
-            {views.length > 0 && (
-              <>
-                <div style={label}>Views</div>
-                {group(views.map((v, i) => row(v.name, activeViewId === v.id, () => { onPickView(v.id); close(); }, i === 0)))}
-              </>
-            )}
-
-            {tagCount > 0 && (
-              <>
-                <div style={label}>Tags</div>
-                {group(
-                  <div onClick={() => { onOpenTags(); close(); }} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "12px 14px", cursor: "pointer", fontSize: 16, color: "var(--fg-1)" }}>
-                    <span>Browse tags…<span style={{ color: "var(--fg-3)", fontWeight: 400 }}> · {tagCount}</span></span>
-                    <svg width="8" height="13" viewBox="0 0 8 14" style={{ flex: "none" }}><path d="M1 1l6 6-6 6" stroke="var(--line-2)" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                  </div>,
-                )}
-              </>
-            )}
-            <div style={{ height: 8 }} />
-          </div>
-        </>
-      )}
-    </Sheet>
-  );
-}
-
-/** Tag Browser (mobile port of the desktop bottom-bar TagBrowser, Image #26):
- *  multi-select tag chips + an All/Any match mode, a live matching-notes list,
- *  and Save-as-view / Clear. Distinct from the right-panel Unlinked-mentions
- *  tab — same `#` glyph, different feature. Filtering is a client-side set
- *  algebra over `byTag` (AND = intersection, OR = union), gated to live ids. */
-function TagBrowserSheet({
-  onClose,
-  tags,
-  byTag,
-  liveIds,
-  titleById,
-  viewOrder,
-  onOpenNote,
-  onSavedView,
-}: {
-  onClose: () => void;
-  tags: { tag: string; count: number }[];
-  byTag: Map<string, string[]>;
-  liveIds: Set<string>;
-  titleById: Map<string, string>;
-  viewOrder: string[];
-  onOpenNote: (id: string) => void;
-  onSavedView: (id: string) => void;
-}) {
-  const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [mode, setMode] = useState<"all" | "any">("all");
-  const [q, setQ] = useState("");
-  const [savingName, setSavingName] = useState<string | null>(null);
-  const [saveBusy, setSaveBusy] = useState(false);
-
-  const displayByKey = useMemo(() => new Map(tags.map((t) => [foldSegment(t.tag), t.tag])), [tags]);
-  const needle = foldSegment(q.trim());
-  const shownTags = needle ? tags.filter((t) => foldSegment(t.tag).includes(needle)) : tags;
-
-  const matchIds = useMemo(() => {
-    const keys = [...selected];
-    if (keys.length === 0) return [];
-    let acc: Set<string> | null = null;
-    for (const k of keys) {
-      const ids = new Set((byTag.get(k) ?? []).filter((id) => liveIds.has(id)));
-      if (acc === null) acc = ids;
-      else if (mode === "all") {
-        const nx = new Set<string>();
-        for (const id of acc) if (ids.has(id)) nx.add(id);
-        acc = nx;
-      } else {
-        for (const id of ids) acc.add(id);
-      }
-    }
-    return [...(acc ?? new Set<string>())];
-  }, [selected, mode, byTag, liveIds]);
-
-  const toggle = (k: string) =>
-    setSelected((prev) => {
-      const nx = new Set(prev);
-      nx.has(k) ? nx.delete(k) : nx.add(k);
-      return nx;
-    });
-
-  async function saveView() {
-    const name = (savingName ?? "").trim();
-    if (name === "" || selected.size === 0) return;
-    setSaveBusy(true);
-    const children = [...selected].map((k) => ({ kind: "hasTag" as const, tag: displayByKey.get(k) ?? k }));
-    const view: SavedView = {
-      id: crypto.randomUUID(),
-      name,
-      view_type: "list",
-      filters: mode === "all" ? { kind: "and", children } : { kind: "or", children },
-    };
-    try {
-      if (HAS_TAURI) {
-        await upsertSavedView(view);
-        await setViewOrder([...viewOrder, view.id]);
-      }
-      onSavedView(view.id);
-    } catch {
-      setSaveBusy(false);
-    }
-  }
-
-  const modeBtn = (m: "all" | "any", txt: string): ReactNode => (
-    <button
-      onClick={() => setMode(m)}
-      style={{ flex: 1, padding: "6px 0", borderRadius: 6, border: "none", background: mode === m ? "var(--bg-1)" : "transparent", color: mode === m ? "var(--fg-1)" : "var(--fg-3)", fontSize: 13, fontWeight: mode === m ? 600 : 500, fontFamily: "var(--font-sans)", cursor: "pointer" }}
-    >
-      {txt}
-    </button>
-  );
-
-  return (
-    <Sheet onClose={onClose} style={{ maxHeight: "86%", display: "flex", flexDirection: "column", overflow: "hidden" }}>
-      {(close) => (
-        <>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flex: "none", paddingBottom: 8 }}>
-            <span style={{ width: 60 }} />
-            <span style={{ fontSize: 17, fontWeight: 600, color: "var(--fg-1)" }}>Tags</span>
-            <button onClick={close} style={{ width: 60, textAlign: "right", border: "none", background: "transparent", color: "var(--accent)", fontSize: 15, fontWeight: 600, cursor: "pointer" }}>Done</button>
-          </div>
-
-          {/* Search + All/Any toggle */}
-          <div style={{ flex: "none", display: "flex", gap: 8, alignItems: "center" }}>
-            <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8, height: 40, border: "1px solid var(--line-2)", borderRadius: 9, background: "var(--bg-2)", padding: "0 11px" }}>
-              <Icon name="search" size={16} color="var(--fg-3)" strokeWidth={1.7} />
-              <input
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                placeholder="Search tags…"
-                autoCapitalize="none"
-                autoCorrect="off"
-                spellCheck={false}
-                style={{ flex: 1, minWidth: 0, border: "none", outline: "none", background: "transparent", fontFamily: "var(--font-sans)", fontSize: 15, color: "var(--fg-1)" }}
-              />
-            </div>
-            <div style={{ flex: "none", display: "flex", gap: 3, background: "var(--bg-2)", border: "1px solid var(--line-2)", borderRadius: 8, padding: 3, width: 110 }}>
-              {modeBtn("all", "All")}
-              {modeBtn("any", "Any")}
-            </div>
-          </div>
-
-          {/* Tag chips — tap to toggle into the filter */}
-          <div style={{ flex: "none", display: "flex", flexWrap: "wrap", gap: 8, padding: "12px 0" }}>
-            {shownTags.map((t) => {
-              const k = foldSegment(t.tag);
-              const on = selected.has(k);
-              return (
-                <button
-                  key={k}
-                  onClick={() => toggle(k)}
-                  style={{ display: "inline-flex", alignItems: "center", gap: 5, border: `1px solid ${on ? "var(--accent)" : "var(--line-2)"}`, borderRadius: 999, background: on ? "var(--accent-soft)" : "var(--bg-2)", color: on ? "var(--accent)" : "var(--fg-2)", fontSize: 13, fontFamily: "var(--font-sans)", padding: "5px 12px", cursor: "pointer" }}
-                >
-                  #{t.tag}
-                  {t.count > 1 && <span style={{ opacity: 0.6 }}>{t.count}</span>}
-                </button>
-              );
-            })}
-            {shownTags.length === 0 && <span style={{ fontSize: 14, color: "var(--fg-3)", padding: "4px 2px" }}>No tags match.</span>}
-          </div>
-
-          {/* Results: NOTES count + Save-as-view / Clear, then the matching notes */}
-          {selected.size > 0 && (
-            <>
-              <div style={{ flex: "none", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, borderTop: "1px solid var(--line-1)", paddingTop: 10 }}>
-                <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--fg-3)" }}>Notes · {matchIds.length}</span>
-                <div style={{ display: "flex", gap: 16, flexShrink: 0 }}>
-                  {matchIds.length > 0 && (
-                    <button onClick={() => setSavingName("")} style={{ border: "none", background: "transparent", color: "var(--accent)", fontSize: 13, fontWeight: 600, cursor: "pointer", padding: 0 }}>Save as view</button>
-                  )}
-                  <button onClick={() => setSelected(new Set())} style={{ border: "none", background: "transparent", color: "var(--fg-3)", fontSize: 13, fontWeight: 600, cursor: "pointer", padding: 0 }}>Clear</button>
-                </div>
-              </div>
-
-              {savingName !== null && (
-                <div style={{ flex: "none", display: "flex", gap: 8, marginTop: 10 }}>
-                  <input
-                    value={savingName}
-                    onChange={(e) => setSavingName(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && void saveView()}
-                    placeholder="View name"
-                    autoFocus
-                    autoCapitalize="none"
-                    autoCorrect="off"
-                    style={{ flex: 1, minWidth: 0, height: 40, border: "1px solid var(--line-2)", borderRadius: 9, background: "var(--bg-1)", padding: "0 12px", fontFamily: "var(--font-sans)", fontSize: 15, color: "var(--fg-1)", outline: "none", boxSizing: "border-box" }}
-                  />
-                  <button
-                    onClick={() => void saveView()}
-                    disabled={saveBusy || savingName.trim() === ""}
-                    style={{ flex: "none", height: 40, padding: "0 16px", border: "none", borderRadius: 9, background: "var(--accent)", color: "var(--accent-on)", fontFamily: "var(--font-sans)", fontSize: 14, fontWeight: 600, cursor: "pointer", opacity: saveBusy || savingName.trim() === "" ? 0.5 : 1 }}
-                  >
-                    Save
-                  </button>
-                </div>
-              )}
-
-              <div style={{ overflowY: "auto", minHeight: 0, marginTop: 8 }}>
-                {matchIds.map((id) => (
-                  <button
-                    key={id}
-                    onClick={() => { close(); onOpenNote(id); }}
-                    style={{ display: "block", width: "100%", textAlign: "left", border: "none", borderTop: "1px solid var(--line-1)", background: "transparent", padding: "12px 4px", fontFamily: "var(--font-sans)", fontSize: 16, color: "var(--fg-1)", cursor: "pointer", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
-                  >
-                    {titleById.get(id) || "Untitled note"}
-                  </button>
-                ))}
-                <div style={{ height: "calc(8px + env(safe-area-inset-bottom, 0px))" }} />
-              </div>
-            </>
-          )}
-        </>
-      )}
-    </Sheet>
-  );
-}
-
-interface PaletteCommand {
-  id: string;
-  label: string;
-  hint?: string;
-  icon: ReactNode;
-  run: () => void;
-}
-
-/** Command palette (mobile port of the desktop `CommandPalette`) — a top-anchored
- *  modal opened ONLY from the bottom bar's Search button (the list toolbar's
- *  search is a plain inline filter). Animates in on mount. A COMMANDS section
- *  (substring-filtered over the registry) sits above a NOTES section (backend
- *  MYS1 BM25 search, client fallback in browser-dev), debounced 120ms. */
-function CommandPalette({
-  commands,
-  notes,
-  bodies,
-  onOpenNote,
-  onClose,
-}: {
-  commands: PaletteCommand[];
-  notes: NoteEntry[];
-  bodies: Map<string, string>;
-  onOpenNote: (id: string) => void;
-  onClose: () => void;
-}) {
-  const [q, setQ] = useState("");
-  const query = q.trim();
-  const needle = query.toLowerCase();
-  const cmdMatches = query ? commands.filter((c) => c.label.toLowerCase().includes(needle)) : commands;
-  const snippetOf = useMemo(() => new Map(notes.map((n) => [n.id, n.snippet])), [notes]);
-  const [noteResults, setNoteResults] = useState<NoteEntry[]>([]);
-  useEffect(() => {
-    if (query === "") {
-      setNoteResults([]);
-      return;
-    }
-    let cancelled = false;
-    const t = window.setTimeout(() => {
-      if (!HAS_TAURI) {
-        setNoteResults(searchNotes(q, notes, bodies));
-        return;
-      }
-      void noteSearch(query)
-        .then((hits) => {
-          if (cancelled) return;
-          setNoteResults(hits.map((h) => ({ id: h.note_id, title: h.title || "Untitled note", snippet: snippetOf.get(h.note_id) ?? "" })));
-        })
-        .catch(() => {
-          if (!cancelled) setNoteResults(searchNotes(q, notes, bodies));
-        });
-    }, 120);
-    return () => {
-      cancelled = true;
-      window.clearTimeout(t);
-    };
-  }, [q, query, notes, bodies, snippetOf]);
-
-  const sectionLabel: CSSProperties = { fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--fg-3)", padding: "12px 16px 4px" };
-  const rowStyle: CSSProperties = { display: "flex", alignItems: "center", gap: 11, width: "100%", border: "none", background: "transparent", padding: "10px 16px", cursor: "pointer", textAlign: "left", fontFamily: "var(--font-sans)" };
-  const first = cmdMatches[0] ?? null;
-
-  // Enter animation: mount closed, flip open before first paint (forced-reflow
-  // hook — see `useEnterTransition`) so the transition is guaranteed to run
-  // (scrim fades, panel slides down + fades from the top).
-  const paletteRef = useRef<HTMLDivElement>(null);
-  const [shown, setShown] = useEnterTransition(paletteRef);
-  // Exit animation: reverse the enter, THEN unmount. Every dismiss path routes
-  // through this instead of `onClose` directly.
-  const closingRef = useRef(false);
-  const requestClose = useCallback(() => {
-    if (closingRef.current) return;
-    closingRef.current = true;
-    setShown(false);
-    window.setTimeout(onClose, 240);
-  }, [onClose]);
-
-  // Focus the search field on MOUNT (not gated behind the `shown` animation
-  // flip) so the focus call stays close to the opening tap — iOS only raises the
-  // soft keyboard for a focus that isn't stranded a frame away from the gesture.
-  // `autoFocus` on the input is the belt; this effect is the suspenders.
-  const paletteInputRef = useRef<HTMLInputElement>(null);
-  useEffect(() => {
-    paletteInputRef.current?.focus();
-  }, []);
-
-  return (
-    <div style={{ position: "absolute", inset: 0, zIndex: 60, display: "flex", flexDirection: "column", justifyContent: "center" }}>
-      <div onClick={requestClose} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.42)", opacity: shown ? 1 : 0, transition: "opacity 200ms ease" }} />
-      <div
-        ref={paletteRef}
-        style={{
-          position: "relative",
-          // Vertically centered (was top-anchored). The input sits at the panel
-          // top, so it stays above the keyboard even when the results fill out.
-          margin: "0 12px",
-          display: "flex",
-          flexDirection: "column",
-          maxHeight: "72%",
-          background: "var(--bg-1)",
-          border: "1px solid var(--line-2)",
-          borderRadius: 16,
-          boxShadow: "var(--shadow-3)",
-          overflow: "hidden",
-          transformOrigin: "top center",
-          opacity: shown ? 1 : 0,
-          transform: shown ? "translateY(0) scale(1)" : "translateY(-14px) scale(0.98)",
-          transition: "transform 240ms cubic-bezier(0.32, 0.72, 0, 1), opacity 200ms ease",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: 9, padding: "12px 14px", borderBottom: "1px solid var(--line-1)", flex: "none" }}>
-          <Icon name="search" size={18} color="var(--fg-3)" strokeWidth={1.7} />
-          <input
-            ref={paletteInputRef}
-            autoFocus
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                if (first) { requestClose(); first.run(); }
-                else if (noteResults[0]) { requestClose(); onOpenNote(noteResults[0].id); }
-              } else if (e.key === "Escape") requestClose();
-            }}
-            placeholder="Search notes or run a command…"
-            autoCapitalize="none"
-            autoCorrect="off"
-            spellCheck={false}
-            style={{ flex: 1, minWidth: 0, border: "none", outline: "none", background: "transparent", fontFamily: "var(--font-sans)", fontSize: 16, color: "var(--fg-1)" }}
-          />
-        </div>
-        <div style={{ overflowY: "auto", minHeight: 0 }}>
-          {cmdMatches.length > 0 && (
-            <>
-              <div style={sectionLabel}>Commands</div>
-              {cmdMatches.map((c) => (
-                <button key={c.id} onClick={() => { requestClose(); c.run(); }} style={rowStyle}>
-                  <span style={{ flex: "none", display: "flex", color: "var(--fg-2)" }}>{c.icon}</span>
-                  <span style={{ flex: 1, minWidth: 0, fontSize: 15, color: "var(--fg-1)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.label}</span>
-                  {c.hint && <span style={{ flex: "none", fontSize: 12, color: "var(--fg-3)" }}>{c.hint}</span>}
-                </button>
-              ))}
-            </>
-          )}
-          {noteResults.length > 0 && (
-            <>
-              <div style={sectionLabel}>Notes</div>
-              {noteResults.map((n) => (
-                <button key={n.id} onClick={() => { requestClose(); onOpenNote(n.id); }} style={rowStyle}>
-                  <span style={{ flex: "none", display: "flex" }}>
-                    <svg width="16" height="16" viewBox="0 0 24 24"><path d="M6 3h8l4 4v14a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z" fill="none" stroke="var(--fg-3)" strokeWidth="1.6" strokeLinejoin="round" /></svg>
-                  </span>
-                  <span style={{ flex: 1, minWidth: 0 }}>
-                    <span style={{ display: "block", fontSize: 15, color: "var(--fg-1)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{n.title}</span>
-                    {n.snippet && <span style={{ display: "block", fontSize: 12, color: "var(--fg-3)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{n.snippet}</span>}
-                  </span>
-                </button>
-              ))}
-            </>
-          )}
-          {query !== "" && cmdMatches.length === 0 && noteResults.length === 0 && (
-            <div style={{ padding: "24px 16px", textAlign: "center", fontSize: 14, color: "var(--fg-3)" }}>No commands or notes match.</div>
-          )}
-          <div style={{ height: "calc(8px + env(safe-area-inset-bottom, 0px))" }} />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/** Graph tab — a real wikilink graph over the loaded notes (mobile counterpart
- *  to the desktop vault-indices link layer; see lib/wikilinks.ts). */
-function GraphTab({ graph, onOpen }: { graph: NoteGraph; onOpen: (id: string) => void }) {
-  const linked = graph.nodes.filter((n) => n.degree > 0).length;
-  const links = graph.edges.length;
-  return (
-    <>
-      <div style={{ flex: "none", padding: "8px 20px 0", display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12 }}>
-        <h1 style={{ margin: 0, fontSize: 32, fontWeight: 700, letterSpacing: "-0.025em", color: "var(--fg-display)" }}>Graph</h1>
-        {linked > 0 && (
-          <span style={{ flexShrink: 0, fontSize: 13, color: "var(--fg-3)" }}>
-            {linked} linked {linked === 1 ? "note" : "notes"} · {links} {links === 1 ? "link" : "links"}
-          </span>
-        )}
-      </div>
-      <WikiGraph graph={graph} onOpen={onOpen} />
-    </>
-  );
-}
-
-/** Beeper-style favorites strip — a horizontal row of square tiles for the
- *  starred notes, shown at the top of the notes list (above the tree). Each tile
- *  is the note's initial over its title; tap opens it. Scrolls with the list. */
-function FavoritesStrip({ notes, onOpen }: { notes: NoteEntry[]; onOpen: (id: string) => void }) {
-  return (
-    <div style={{ padding: "6px 0 10px" }}>
-      <div style={{ padding: "0 20px 8px", fontSize: 11, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--fg-3)" }}>
-        Favorites
-      </div>
-      <div style={{ display: "flex", gap: 12, overflowX: "auto", padding: "0 20px", scrollbarWidth: "none", WebkitOverflowScrolling: "touch", touchAction: "pan-x" }}>
-        {notes.map((n) => (
-          <button
-            key={n.id}
-            onClick={() => onOpen(n.id)}
-            aria-label={n.title}
-            style={{ flex: "none", width: 64, border: "none", background: "transparent", padding: 0, cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}
-          >
-            <div style={{ width: 60, height: 60, borderRadius: 16, background: "var(--accent-soft)", border: "1px solid var(--line-1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, fontWeight: 700, color: "var(--accent)", fontFamily: "var(--font-sans)" }}>
-              {(n.title.trim()[0] ?? "•").toUpperCase()}
-            </div>
-            <span style={{ width: "100%", fontSize: 11, lineHeight: 1.25, color: "var(--fg-2)", textAlign: "center", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
-              {n.title}
-            </span>
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-/** A chronological note row (mirror notes/05 ChronoRow geometry). */
-const STAR_PATH = "M12 3l2.9 5.9 6.5.9-4.7 4.6 1.1 6.5L12 18.4 6.2 21.4l1.1-6.5L2.6 9.8l6.5-.9z";
-
-function NoteRow({
-  entry,
-  last,
-  onOpen,
-  onHold,
-  favorited = false,
-  onToggleFavorite,
-  actions,
-  indent = 0,
-  subtitle,
-  divider = true,
-}: {
-  entry: NoteEntry;
-  last: boolean;
-  onOpen: () => void;
-  /** Long-press / right-click handler — opens the row action sheet. */
-  onHold?: () => void;
-  favorited?: boolean;
-  onToggleFavorite?: () => void;
-  actions?: ReactNode;
-  /** Extra left padding (px) for the folder-tree hierarchy. */
-  indent?: number;
-  /** Overrides the second line. `undefined` → fall back to the body snippet
-   *  (search results); a string (incl. "") → show it verbatim (the list's
-   *  last-edited relative time). */
-  subtitle?: string;
-  /** Draw the top/last hairline. Off in the tree view (a tree-line separates). */
-  divider?: boolean;
-}) {
-  const sub = subtitle !== undefined ? subtitle : entry.snippet;
-  // Long-press (touch) / right-click reveals the row action sheet. A hold that
-  // survives ~480ms without the finger drifting (which would be a scroll) fires
-  // onHold; the ensuing click is then swallowed so the note doesn't also open.
-  const holdTimer = useRef<number | null>(null);
-  const holdAt = useRef<{ x: number; y: number } | null>(null);
-  const held = useRef(false);
-  const clearHold = () => {
-    if (holdTimer.current != null) window.clearTimeout(holdTimer.current);
-    holdTimer.current = null;
-    holdAt.current = null;
-  };
-  const startHold = (e: PressEvt) => {
-    if (!onHold) return;
-    held.current = false;
-    holdAt.current = { x: e.clientX, y: e.clientY };
-    holdTimer.current = window.setTimeout(() => {
-      held.current = true;
-      holdTimer.current = null;
-      onHold();
-    }, 480);
-  };
-  const moveHold = (e: PressEvt) => {
-    const s = holdAt.current;
-    if (s && (Math.abs(e.clientX - s.x) > 10 || Math.abs(e.clientY - s.y) > 10)) clearHold();
-  };
-  return (
-    <div
-      onClick={() => {
-        if (held.current) { held.current = false; return; } // consumed by the long-press
-        onOpen();
-      }}
-      onPointerDown={startHold}
-      onPointerMove={moveHold}
-      onPointerUp={clearHold}
-      onPointerLeave={clearHold}
-      onPointerCancel={clearHold}
-      onContextMenu={(e) => { if (onHold) e.preventDefault(); }}
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 10,
-        padding: "11px 20px",
-        paddingLeft: 20 + indent,
-        borderTop: divider ? "1px solid var(--line-1)" : undefined,
-        borderBottom: divider && last ? "1px solid var(--line-1)" : undefined,
-        cursor: "pointer",
-        WebkitUserSelect: "none",
-        userSelect: "none",
-        WebkitTouchCallout: "none",
-      }}
-    >
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 16, fontWeight: 600, color: "var(--fg-1)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{entry.title}</div>
-        {sub && (
-          <div
-            style={{
-              marginTop: 2,
-              fontSize: 13,
-              color: "var(--fg-3)",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
-            }}
-          >
-            {sub}
-          </div>
-        )}
-      </div>
-      {actions
-        ? actions
-        : // Inline star shows ONLY for favorited notes (filled) as a quick-unstar
-          // affordance. Non-favorited rows show nothing here — "Add to favorites"
-          // lives in the long-press action sheet instead.
-          favorited &&
-          onToggleFavorite && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onToggleFavorite();
-              }}
-              aria-label="Remove from favorites"
-              style={{ border: "none", background: "transparent", padding: 0, width: 30, height: 30, cursor: "pointer", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}
-            >
-              <svg width="17" height="17" viewBox="0 0 24 24">
-                <path d={STAR_PATH} fill="var(--accent)" stroke="var(--accent)" strokeWidth="1.5" strokeLinejoin="round" />
-              </svg>
-            </button>
-          )}
-    </div>
-  );
-}
-
-/** Bottom tab bar. Notes/Search/Graph switch the list-view tab; Settings opens
- *  the sheet. Active tab is accent-tinted. Bottom padding clears the home
- *  indicator via the safe-area inset (falls back to 30px in the gallery). */
-function TabBar({
-  active,
-  onNotes,
-  onGraph,
-  onAttachments,
-}: {
-  active: "notes" | "search" | "graph" | "files" | "templates";
-  onNotes: () => void;
-  onGraph: () => void;
-  onAttachments: () => void;
-}) {
-  const col = (on: boolean) => (on ? "var(--accent)" : "var(--fg-3)");
-  const tab: CSSProperties = {
-    flex: 1,
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    gap: 3,
-    border: "none",
-    background: "transparent",
-    cursor: "pointer",
-    padding: 0,
-  };
-  const label = (on: boolean): CSSProperties => ({ fontSize: 10, fontWeight: on ? 600 : 500, color: col(on) });
-  return (
-    <div
-      style={{
-        flex: "none",
-        display: "flex",
-        borderTop: "1px solid var(--line-1)",
-        background: "var(--bg-1)",
-        padding: "8px 0 max(30px, env(safe-area-inset-bottom))",
-      }}
-    >
-      <button onClick={onNotes} aria-label="Notes" style={tab}>
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-          <rect x="5" y="3" width="14" height="18" rx="2.5" stroke={col(active === "notes")} strokeWidth="1.8" />
-          <path d="M9 8h6M9 12h6M9 16h3" stroke={col(active === "notes")} strokeWidth="1.8" strokeLinecap="round" />
-        </svg>
-        <span style={label(active === "notes")}>Notes</span>
-      </button>
-      <button onClick={onGraph} aria-label="Graph" style={tab}>
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-          <circle cx="6" cy="17" r="2.6" stroke={col(active === "graph")} strokeWidth="1.8" />
-          <circle cx="18" cy="14" r="2.6" stroke={col(active === "graph")} strokeWidth="1.8" />
-          <circle cx="13" cy="6" r="2.6" stroke={col(active === "graph")} strokeWidth="1.8" />
-          <path d="M8.3 15.6l3-7M8.4 16.2l7-1.6" stroke={col(active === "graph")} strokeWidth="1.6" />
-        </svg>
-        <span style={label(active === "graph")}>Graph</span>
-      </button>
-      <button onClick={onAttachments} aria-label="Attachments" style={tab}>
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-          <rect x="3" y="3" width="18" height="18" rx="2.5" stroke={col(active === "files")} strokeWidth="1.8" />
-          <circle cx="8.5" cy="8.5" r="1.8" fill={col(active === "files")} />
-          <path d="M21 15l-5-5L5 21" stroke={col(active === "files")} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-        <span style={label(active === "files")}>Files</span>
-      </button>
-    </div>
-  );
-}
-
-/** Vault switcher sheet (the "Personal ▾" chevron's target). */
-function VaultSwitcher({
-  vaults,
-  activeId,
-  onSelect,
-  onCreate,
-  onClose,
-}: {
-  vaults: VaultSummary[];
-  activeId?: string;
-  onSelect: (id: string) => void;
-  onCreate: () => void;
-  onClose: () => void;
-}) {
-  return (
-    <Sheet onClose={onClose}>
-      {(close) => (
-        <>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 2px 12px" }}>
-        <div style={{ fontSize: 17, fontWeight: 600, color: "var(--fg-1)" }}>Vaults</div>
-        <button
-          onClick={close}
-          style={{ border: "none", background: "transparent", color: "var(--accent)", fontSize: 15, fontWeight: 600, cursor: "pointer", padding: 0 }}
-        >
-          Done
-        </button>
-      </div>
-      <div style={{ border: "1px solid var(--line-1)", borderRadius: 10, overflow: "hidden", background: "var(--bg-1)" }}>
-        {vaults.map((v, i) => {
-          const active = v.id === activeId;
-          return (
-            <div
-              key={v.id}
-              onClick={() => onSelect(v.id)}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 10,
-                padding: "13px 14px",
-                borderTop: i === 0 ? undefined : "1px solid var(--line-1)",
-                cursor: "pointer",
-              }}
-            >
-              <MyneMark size={22} radius={4} />
-              <span style={{ flex: 1, fontSize: 16, color: "var(--fg-1)" }}>{v.label ?? "Vault"}</span>
-              {active && <Icon name="check" size={18} color="var(--accent)" strokeWidth={2} />}
-            </div>
-          );
-        })}
-      </div>
-      <button
-        onClick={onCreate}
-        style={{
-          marginTop: 12,
-          width: "100%",
-          height: 48,
-          border: "1px solid var(--line-2)",
-          borderRadius: 10,
-          background: "transparent",
-          color: "var(--accent)",
-          fontFamily: "var(--font-sans)",
-          fontSize: 15,
-          fontWeight: 600,
-          cursor: "pointer",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: 8,
-        }}
-      >
-        <Icon name="plus" size={18} color="var(--accent)" strokeWidth={2} />
-        Create new vault
-      </button>
-        </>
-      )}
-    </Sheet>
-  );
 }
