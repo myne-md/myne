@@ -2708,7 +2708,10 @@ function RightSidebar() {
           alignItems: "stretch",
           gap: 2,
           padding: "0 8px",
-          minHeight: 34,
+          // Match every other top-chrome strip (note pane tab strip, sidebar
+          // clearance rows) so the bottom hairline lines up across the window.
+          height: STRIP_HEIGHT,
+          flexShrink: 0,
           borderBottom: "1px solid var(--line-1)",
         }}
       >
