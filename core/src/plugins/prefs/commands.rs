@@ -1936,6 +1936,7 @@ mod tests {
                     item_colors: Default::default(),
                     theme: None,
                     deliberate_folders: Vec::new(),
+                    device_names: Default::default(),
                     auto_lock_seconds: None,
                     custom_theme: None,
                     daily_date_format: None,
