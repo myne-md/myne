@@ -114,6 +114,48 @@ pub trait SyncTransport: Send + Sync {
             headers: Vec::new(),
         })
     }
+
+    /// Open a long-lived streaming GET (the `/sync/poke` SSE channel). Returns
+    /// after the response head is read and the status checked (200 → the live
+    /// stream, 401 → [`SseOpenError::Unauthorized`]). `read_timeout` is the
+    /// dead-connection detector — set above the server's heartbeat cadence.
+    /// Default: unsupported (the [`FakeTransport`] / any test double).
+    fn open_sse(
+        &self,
+        path: &str,
+        token: &str,
+        read_timeout: std::time::Duration,
+    ) -> Result<SseStream, SseOpenError> {
+        let _ = (path, token, read_timeout);
+        Err(SseOpenError::Unsupported)
+    }
+}
+
+/// A live SSE stream (the `/sync/poke` change-notification channel): a
+/// buffered reader over the (TLS-decrypted) response bytes positioned right
+/// after the response head, whether the body is chunk-framed (a reverse proxy
+/// streams SSE chunked), and a `try_clone` of the raw TCP socket so the owner
+/// can `shutdown()` it from another thread to unblock a blocking read.
+pub struct SseStream {
+    /// Byte stream positioned at the first body byte.
+    pub reader: Box<dyn std::io::BufRead + Send>,
+    /// `Transfer-Encoding: chunked` — the bytes need de-framing (production
+    /// sits behind a reverse proxy that streams SSE chunked).
+    pub chunked: bool,
+    /// Shutdown handle (a `try_clone` of the underlying socket).
+    pub socket: std::net::TcpStream,
+}
+
+/// Why an SSE stream could not be opened.
+#[derive(Debug)]
+pub enum SseOpenError {
+    /// The server rejected the token (401) — the caller must park, not spin.
+    Unauthorized,
+    /// Transport-level failure (connect / TLS / head read) — reconnect with
+    /// backoff.
+    Transport(TransportError),
+    /// This transport cannot stream (the [`FakeTransport`] default).
+    Unsupported,
 }
 
 /// A request the [`FakeTransport`] observed:

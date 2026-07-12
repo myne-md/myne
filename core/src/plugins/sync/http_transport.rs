@@ -3,22 +3,33 @@
 //! `RustlsTransport` is https-only, but the endpoint-config policy also permits
 //! **loopback `http`** (`127.0.0.1` / `localhost` / `[::1]`) for the dev server +
 //! the MYND-428 E2E harness (no self-signed-cert dance). This is the plain-TCP
-//! transport for exactly those endpoints — same minimal HTTP/1.1 codec
-//! (`http_codec`), no TLS. It refuses any non-loopback host (a non-loopback
-//! plaintext sync would be an A4 downgrade), so production https always routes to
-//! the pinned rustls layer.
+//! transport for exactly those endpoints — same minimal keep-alive HTTP/1.1
+//! codec (`http_codec`), no TLS. It refuses any non-loopback host (a
+//! non-loopback plaintext sync would be an A4 downgrade), so production https
+//! always routes to the pinned rustls layer.
 
-use super::http_codec::{build_http_request_ext, parse_http_response_ext, MAX_SYNC_RESPONSE_BYTES};
+use super::http_codec::{build_http_request_ext, keepalive_roundtrip, read_response_head};
 use super::transport::{
-    HttpMethod, SyncTransport, TransportError, TransportResponse, TransportResponseExt,
+    HttpMethod, SseOpenError, SseStream, SyncTransport, TransportError, TransportResponse,
+    TransportResponseExt,
 };
-use std::io::{Read, Write};
+use std::io::BufReader;
 use std::net::TcpStream;
+use std::sync::Mutex;
+use std::time::Duration;
 
-/// Plain-HTTP transport, loopback-only.
+/// Socket read/write deadline: a hung or half-dead server must fail the request
+/// instead of wedging a sync cycle forever; keep-alive reuse also needs death
+/// detection. Comfortably exceeds any legitimate response (incl. a 64 MiB blob).
+pub(crate) const SOCKET_TIMEOUT: Duration = Duration::from_secs(60);
+
+/// Plain-HTTP transport, loopback-only. Holds one keep-alive connection —
+/// within a sync cycle every request rides the same TCP session (the codec's
+/// framed reader decides reusability per response).
 pub struct HttpTransport {
     host: String,
     port: u16,
+    conn: Mutex<Option<BufReader<TcpStream>>>,
 }
 
 impl HttpTransport {
@@ -27,7 +38,16 @@ impl HttpTransport {
         Self {
             host: host.into(),
             port,
+            conn: Mutex::new(None),
         }
+    }
+
+    fn connect(&self) -> Result<TcpStream, TransportError> {
+        let sock = TcpStream::connect((self.host.as_str(), self.port))
+            .map_err(|_| TransportError::Network)?;
+        let _ = sock.set_read_timeout(Some(SOCKET_TIMEOUT));
+        let _ = sock.set_write_timeout(Some(SOCKET_TIMEOUT));
+        Ok(sock)
     }
 }
 
@@ -54,25 +74,59 @@ impl SyncTransport for HttpTransport {
         body: &[u8],
         token: Option<&str>,
     ) -> Result<TransportResponseExt, TransportError> {
-        let mut stream = TcpStream::connect((self.host.as_str(), self.port))
-            .map_err(|_| TransportError::Network)?;
         let req = build_http_request_ext(method, path, &self.host, extra_headers, body, token);
-        stream
-            .write_all(&req)
-            .map_err(|_| TransportError::Network)?;
-        stream.flush().map_err(|_| TransportError::Network)?;
-        let mut raw = Vec::new();
-        // Bound the socket read: a hostile relay can otherwise stream an unbounded
-        // body and OOM the client. Read one byte past the cap so an over-limit body
-        // is detectable rather than silently truncated.
-        (&mut stream)
-            .take(MAX_SYNC_RESPONSE_BYTES + 1)
-            .read_to_end(&mut raw)
-            .map_err(|_| TransportError::Network)?;
-        if raw.len() as u64 > MAX_SYNC_RESPONSE_BYTES {
-            return Err(TransportError::Network);
+        let mut slot = self.conn.lock().map_err(|_| TransportError::Network)?;
+        keepalive_roundtrip(
+            &mut slot,
+            || self.connect(),
+            &req,
+            method == HttpMethod::Head,
+        )
+    }
+
+    fn open_sse(
+        &self,
+        path: &str,
+        token: &str,
+        read_timeout: std::time::Duration,
+    ) -> Result<SseStream, SseOpenError> {
+        // A dedicated connection (never the keep-alive request slot — the
+        // stream occupies it indefinitely).
+        let sock = TcpStream::connect((self.host.as_str(), self.port))
+            .map_err(|_| SseOpenError::Transport(TransportError::Network))?;
+        sock.set_read_timeout(Some(read_timeout))
+            .map_err(|_| SseOpenError::Transport(TransportError::Network))?;
+        let _ = sock.set_write_timeout(Some(SOCKET_TIMEOUT));
+        let shutdown_handle = sock
+            .try_clone()
+            .map_err(|_| SseOpenError::Transport(TransportError::Network))?;
+        let mut reader = BufReader::new(sock);
+        let req = build_http_request_ext(
+            HttpMethod::Get,
+            path,
+            &self.host,
+            &[("Accept", "text/event-stream")],
+            b"",
+            Some(token),
+        );
+        {
+            use std::io::Write;
+            let w = reader.get_mut();
+            w.write_all(&req)
+                .and_then(|_| w.flush())
+                .map_err(|_| SseOpenError::Transport(TransportError::Network))?;
         }
-        parse_http_response_ext(&raw, method == HttpMethod::Head).ok_or(TransportError::Network)
+        let head = read_response_head(&mut reader)
+            .map_err(|_| SseOpenError::Transport(TransportError::Network))?;
+        match head.status {
+            200 => Ok(SseStream {
+                reader: Box::new(reader),
+                chunked: head.chunked,
+                socket: shutdown_handle,
+            }),
+            401 => Err(SseOpenError::Unauthorized),
+            _ => Err(SseOpenError::Transport(TransportError::Network)),
+        }
     }
 }
 
@@ -130,6 +184,7 @@ pub fn build_transport(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::{Read, Write};
     use std::net::TcpListener;
     use std::thread;
 
@@ -196,5 +251,105 @@ mod tests {
         let seen = handle.join().unwrap();
         assert!(seen.contains("POST /auth/scram/init HTTP/1.1"));
         assert!(seen.contains("Authorization: Bearer tok"));
+    }
+
+    /// Read one full HTTP request off the socket (headers + Content-Length body).
+    fn read_request(sock: &mut std::net::TcpStream) -> Option<String> {
+        let mut raw = Vec::new();
+        let mut buf = [0u8; 1024];
+        loop {
+            if let Some(pos) = raw.windows(4).position(|w| w == b"\r\n\r\n") {
+                let head = String::from_utf8_lossy(&raw[..pos]).into_owned();
+                let cl = head
+                    .lines()
+                    .find_map(|l| {
+                        l.to_ascii_lowercase()
+                            .strip_prefix("content-length:")
+                            .map(|v| v.trim().parse::<usize>().ok())
+                    })
+                    .flatten()
+                    .unwrap_or(0);
+                while raw.len() < pos + 4 + cl {
+                    let n = sock.read(&mut buf).ok()?;
+                    if n == 0 {
+                        return None;
+                    }
+                    raw.extend_from_slice(&buf[..n]);
+                }
+                return Some(String::from_utf8_lossy(&raw).into_owned());
+            }
+            let n = sock.read(&mut buf).ok()?;
+            if n == 0 {
+                return None;
+            }
+            raw.extend_from_slice(&buf[..n]);
+        }
+    }
+
+    fn write_keepalive_response(sock: &mut std::net::TcpStream) {
+        let body = b"{\"ok\":true}";
+        let resp = format!("HTTP/1.1 200 OK\r\nContent-Length: {}\r\n\r\n", body.len());
+        sock.write_all(resp.as_bytes()).unwrap();
+        sock.write_all(body).unwrap();
+    }
+
+    #[test]
+    fn two_requests_reuse_one_connection() {
+        // Keep-alive proof: the server accepts ONCE and serves both requests on
+        // the same socket (the pre-keep-alive codec opened one connection per
+        // request).
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let handle = thread::spawn(move || {
+            let (mut sock, _) = listener.accept().unwrap();
+            let mut served = 0;
+            while served < 2 {
+                if read_request(&mut sock).is_none() {
+                    panic!("second request must arrive on the SAME connection");
+                }
+                write_keepalive_response(&mut sock);
+                served += 1;
+            }
+            served
+        });
+
+        let t = HttpTransport::new("127.0.0.1", port);
+        for _ in 0..2 {
+            let resp = t
+                .request(HttpMethod::Get, "/sync/pull?cursor=0", b"", Some("tok"))
+                .unwrap();
+            assert_eq!(resp.status, 200);
+        }
+        assert_eq!(handle.join().unwrap(), 2);
+    }
+
+    #[test]
+    fn stale_keepalive_connection_reconnects_transparently() {
+        // The server closes the idle connection after the first response; the
+        // second request must transparently retry on a fresh connection
+        // (EofBeforeResponse → one retry), yielding TWO accepts total.
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let handle = thread::spawn(move || {
+            let mut accepts = 0;
+            for _ in 0..2 {
+                let (mut sock, _) = listener.accept().unwrap();
+                accepts += 1;
+                if read_request(&mut sock).is_some() {
+                    write_keepalive_response(&mut sock);
+                }
+                drop(sock); // close after one exchange → the cached conn goes stale
+            }
+            accepts
+        });
+
+        let t = HttpTransport::new("127.0.0.1", port);
+        for _ in 0..2 {
+            let resp = t
+                .request(HttpMethod::Get, "/sync/pull?cursor=0", b"", Some("tok"))
+                .unwrap();
+            assert_eq!(resp.status, 200);
+        }
+        assert_eq!(handle.join().unwrap(), 2);
     }
 }

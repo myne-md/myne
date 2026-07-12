@@ -721,13 +721,23 @@ fn sync_cycle_attempt(
     // record is never flagged `changed` and the baseline self-heal below covers
     // all three (MYND-468). The attachment/catalog phases are gated on
     // `attachment_keys` (legacy note-only cycles pass `None`).
+    // ONE disk scan per attempt (notes + attachments): the pull loop below
+    // maintains both manifests in memory as it writes (nonce-verified against
+    // the wire record), so the push-detect and head-manifest phases reuse them
+    // instead of re-walking every blob header a second time. `manifest_stale`
+    // is the safety valve: a downloaded note whose header nonce disagrees with
+    // its record forces a disk rescan before push-detect.
     let cat_id = attachment_keys.map(|_| catalog_sync_id(root_key));
-    let att_scan: BTreeMap<[u8; 16], AttachmentManifestEntry> = if attachment_keys.is_some() {
+    let mut att_scan: BTreeMap<[u8; 16], AttachmentManifestEntry> = if attachment_keys.is_some() {
         scan_attachments_manifest(&attachments_dir(vault_root))
     } else {
         BTreeMap::new()
     };
-    let mut local = local_manifest(notes_dir);
+    let mut notes_manifest = local_manifest(notes_dir);
+    let mut manifest_stale = false;
+    // The pre-pull union snapshot the pull-diff runs against — the dirty-skip
+    // check wants each blob's state BEFORE this cycle's writes.
+    let mut local = notes_manifest.clone();
     for (sid, e) in &att_scan {
         local.insert(*sid, e.content_nonce);
     }
@@ -852,6 +862,7 @@ fn sync_cycle_attempt(
                     if p.exists() && std::fs::remove_file(&p).is_ok() {
                         attachments_deleted += 1;
                     }
+                    att_scan.remove(&c.id); // keep the in-memory manifest current
                     let _ = crate::plugins::attachments::text_cache::remove_extracted(
                         vault_root, &full_id,
                     );
@@ -911,6 +922,17 @@ fn sync_cycle_attempt(
                     // manifests (dirty-skip would diverge them forever).
                     crate::atomic_write::atomic_write(&dir.join(&full_hex), &bytes, true)
                         .map_err(|_| SyncCycleError::Io)?;
+                    // The adopted bytes' nonce was verified against the record
+                    // above — mirror the write into the in-memory manifest so
+                    // the push-detect phase sees it as clean without a rescan.
+                    att_scan.insert(
+                        c.id,
+                        AttachmentManifestEntry {
+                            id: full_id,
+                            sync_id: c.id,
+                            content_nonce: c.content_nonce,
+                        },
+                    );
                     state.blobs.insert(
                         prefix_hex,
                         BlobSyncState {
@@ -949,6 +971,16 @@ fn sync_cycle_attempt(
         std::fs::create_dir_all(notes_dir).map_err(|_| SyncCycleError::Io)?;
         crate::atomic_write::atomic_write(&blob_path(notes_dir, &c.id), &bytes, true)
             .map_err(|_| SyncCycleError::Io)?;
+        // Mirror the write into the in-memory manifest for the push-detect
+        // phase — but only when the written header agrees with the wire record;
+        // a mismatch (hostile or buggy server bytes) flips the stale flag and
+        // forces the safety rescan instead of trusting either value.
+        match crate::note_nonce::read_myn_content_nonce(&bytes) {
+            Some(n) if n == c.content_nonce => {
+                notes_manifest.insert(c.id, n);
+            }
+            _ => manifest_stale = true,
+        }
         state.blobs.insert(
             hex(&c.id),
             BlobSyncState {
@@ -967,7 +999,18 @@ fn sync_cycle_attempt(
     // Skipped on a poll-driven Pull (`allow_push=false`): pushes are coalesced
     // and fire only after the local-change window elapses (loop_control), so a
     // poll never opens a high-resolution edit-timing channel (resolution-blur).
-    let local2 = local_manifest(notes_dir);
+    //
+    // Reuses the maintained in-memory manifest (ONE scan per attempt); the
+    // stale flag is the only path back to disk. Deliberate behavior shift: a
+    // note saved concurrently DURING this cycle no longer catches this cycle's
+    // push — its `SyncLocalChange` bump already opened the next coalescing
+    // window (and the old mid-cycle rescan could push a scan-time nonce the
+    // re-read ciphertext no longer matched).
+    let local2 = if manifest_stale {
+        local_manifest(notes_dir)
+    } else {
+        notes_manifest
+    };
     // The server's current (version, nonce) for every blob it reported — used to
     // tell a clean local edit (server still at our base) from a true conflict
     // (server advanced this blob past our synced baseline).
@@ -1054,14 +1097,14 @@ fn sync_cycle_attempt(
     // durably stored (SYNC-5 blobs-first-then-head, extended to attachments).
     let mut attachments_pushed = 0usize;
     let mut pushed_att_tombstones: HashSet<[u8; 32]> = HashSet::new();
-    let mut att_scan2: BTreeMap<[u8; 16], AttachmentManifestEntry> = BTreeMap::new();
     if allow_push {
         if let Some(_keys) = attachment_keys {
             let cid = cat_id.expect("cat_id set whenever attachment_keys is Some");
-            // Re-scan post-pull: a server-wins adoption above already
-            // converged the file, so it no longer registers as dirty here.
-            att_scan2 = scan_attachments_manifest(&attachments_dir(vault_root));
-            for (sid, entry) in &att_scan2 {
+            // No post-pull rescan: the pull loop maintained `att_scan` in
+            // memory (server-wins adoptions inserted with their verified nonce,
+            // tombstone erasures removed), so an adopted id's nonce equals its
+            // fresh baseline and no longer registers as dirty here.
+            for (sid, entry) in &att_scan {
                 let prefix_hex = hex(sid);
                 let synced = state.blobs.get(&prefix_hex);
                 if synced.map(|b| b.content_nonce_hex.as_str())
@@ -1109,7 +1152,7 @@ fn sync_cycle_attempt(
                     .get(&hex(&t.id))
                     .map(|e| !e.is_tombstone())
                     .unwrap_or(false);
-                if live_again || att_scan2.contains_key(&t.sync_id) {
+                if live_again || att_scan.contains_key(&t.sync_id) {
                     stale.insert(t.id);
                     continue;
                 }
@@ -1194,9 +1237,9 @@ fn sync_cycle_attempt(
         };
         // The head manifest covers content blobs — notes ∪ live attachments
         // (§4.2). The catalog singleton is deliberately outside it, and a
-        // tombstoned attachment has already left the disk scan.
+        // tombstoned attachment has already left the maintained manifest.
         let mut manifest_map = local2.clone();
-        for (sid, e) in &att_scan2 {
+        for (sid, e) in &att_scan {
             manifest_map.insert(*sid, e.content_nonce);
         }
         let manifest_hash = compute_manifest_hash(&manifest_entries(&manifest_map))
@@ -1542,6 +1585,270 @@ mod tests {
 
         std::fs::remove_dir_all(&dir_a).ok();
         std::fs::remove_dir_all(&dir_b).ok();
+    }
+
+    /// A transport that relays to a real server but swaps every `/sync/blob`
+    /// ciphertext for a decoy blob whose header nonce does NOT match the wire
+    /// record — the hostile/buggy-server shape the single-scan manifest's
+    /// `manifest_stale` safety valve exists for.
+    struct NonceCorruptingTransport {
+        inner: Box<dyn SyncTransport>,
+        decoy_b64: String,
+    }
+    impl SyncTransport for NonceCorruptingTransport {
+        fn request(
+            &self,
+            method: HttpMethod,
+            path: &str,
+            body: &[u8],
+            token: Option<&str>,
+        ) -> Result<TransportResponse, TransportError> {
+            let resp = self.inner.request(method, path, body, token)?;
+            if !path.starts_with("/sync/blob") || resp.status != 200 {
+                return Ok(resp);
+            }
+            let mut v: serde_json::Value =
+                serde_json::from_slice(&resp.body).expect("blob response is JSON");
+            v["ciphertext_b64"] = serde_json::Value::String(self.decoy_b64.clone());
+            Ok(TransportResponse {
+                status: 200,
+                body: serde_json::to_vec(&v).unwrap(),
+            })
+        }
+    }
+
+    /// Single-scan safety valve (C2): when a downloaded note's header nonce
+    /// disagrees with its wire record, the in-memory manifest is NOT trusted —
+    /// the stale flag forces a disk rescan before push-detect, preserving the
+    /// old double-scan semantics. The discriminating assertion is `pushed == 1`:
+    /// the rescan sees the on-disk divergence (disk nonce ≠ synced baseline) and
+    /// re-pushes, exactly like the pre-C2 code; a (buggy) unverified in-memory
+    /// adoption would report the blob clean and push nothing.
+    #[test]
+    fn corrupt_blob_nonce_forces_manifest_rescan() {
+        let Some((_guard, url)) = spawn_server() else {
+            eprintln!("SKIP corrupt_blob_nonce_forces_manifest_rescan: myne-server not built");
+            return;
+        };
+
+        let root_key = [0x42u8; 32];
+        let account_hash = [0x5Cu8; 16];
+        let username = "MY-ORCH-NONCE";
+        let secret = derive_subkey(&root_key, SubkeyRole::ServerAuth);
+        let items_key = [0x11u8; 32];
+        let items_key_id = [0x22u8; 16];
+
+        let dir_a = std::env::temp_dir().join(format!("myne-orch-nonceA-{}", std::process::id()));
+        let dir_b = std::env::temp_dir().join(format!("myne-orch-nonceB-{}", std::process::id()));
+        let notes_a = dir_a.join("notes");
+        let notes_b = dir_b.join("notes");
+        std::fs::create_dir_all(&notes_a).unwrap();
+        std::fs::create_dir_all(&notes_b).unwrap();
+
+        let note = NoteId::new_v7();
+        let note_bytes = *note.as_uuid().as_bytes();
+        let blob = encode_new_note(&items_key, &items_key_id, &note_bytes, b"real body").unwrap();
+        crate::atomic_write::atomic_write(
+            &notes_a.join(format!("{}.myn", note.as_uuid())),
+            &blob,
+            false,
+        )
+        .unwrap();
+
+        // The decoy: a valid MY01 blob for a DIFFERENT note id — its header
+        // nonce cannot match the record the server advertises for `note`.
+        let decoy_id = NoteId::new_v7();
+        let decoy = encode_new_note(
+            &items_key,
+            &items_key_id,
+            decoy_id.as_uuid().as_bytes(),
+            b"decoy",
+        )
+        .unwrap();
+        use base64::Engine as _;
+        let decoy_b64 = base64::engine::general_purpose::STANDARD.encode(&decoy);
+
+        let ta = crate::plugins::sync::http_transport::build_transport(&url, Vec::new()).unwrap();
+        enroll::register_verifier(ta.as_ref(), &account_hash, username, secret.as_slice()).unwrap();
+
+        let dev_a = enroll::generate_device_id();
+        let out_a = enroll::enroll(
+            ta.as_ref(),
+            &account_hash,
+            username,
+            secret.as_slice(),
+            EnrollPath::Recovery,
+            "a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0",
+            dev_a,
+        )
+        .unwrap();
+        let tok_a = hex32(&out_a.token);
+
+        let tb = NonceCorruptingTransport {
+            inner: crate::plugins::sync::http_transport::build_transport(&url, Vec::new()).unwrap(),
+            decoy_b64,
+        };
+        let dev_b = enroll::generate_device_id();
+        let out_b = enroll::enroll(
+            &tb,
+            &account_hash,
+            username,
+            secret.as_slice(),
+            EnrollPath::Recovery,
+            "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
+            dev_b,
+        )
+        .unwrap();
+        let tok_b = hex32(&out_b.token);
+
+        let push = run_cycle_legacy(
+            ta.as_ref(),
+            &root_key,
+            account_hash,
+            dev_a,
+            &tok_a,
+            &notes_a,
+            &dir_a,
+            true,
+        )
+        .expect("A sync cycle");
+        assert_eq!(push.pushed, 1);
+
+        // B pulls the corrupted body. The cycle must complete (no wedge), write
+        // the bytes, and — via the stale-rescan — see the on-disk divergence
+        // and re-push it, mirroring the pre-single-scan behavior exactly.
+        let pull = run_cycle_legacy(
+            &tb,
+            &root_key,
+            account_hash,
+            dev_b,
+            &tok_b,
+            &notes_b,
+            &dir_b,
+            true,
+        )
+        .expect("B sync cycle survives a nonce-corrupted download");
+        assert_eq!(pull.pulled, 1, "the corrupted body was still written");
+        assert_eq!(
+            pull.pushed, 1,
+            "the stale-flag rescan must surface the disk/record divergence \
+             (an unverified in-memory manifest adoption would hide it)"
+        );
+        let on_disk = std::fs::read(notes_b.join(format!("{}.myn", note.as_uuid()))).unwrap();
+        assert_eq!(on_disk, decoy, "disk holds the (corrupt) served bytes");
+
+        std::fs::remove_dir_all(&dir_a).ok();
+        std::fs::remove_dir_all(&dir_b).ok();
+    }
+
+    /// Live end-to-end poke: device B holds an open `/sync/poke` SSE stream
+    /// against the REAL server; device A's push must surface as a contentless
+    /// poke on B's stream within seconds (the §8.3-as-amended baseline path:
+    /// push → server Notify → SSE event → SsePokeSignal bump). Self-skips
+    /// without the server binary.
+    #[test]
+    fn push_on_device_a_pokes_device_b_over_live_sse() {
+        use crate::plugins::sync::poke_listener::{drain_stream, SsePokeSignal};
+        use std::sync::atomic::{AtomicBool, Ordering};
+
+        let Some((_guard, url)) = spawn_server() else {
+            eprintln!("SKIP push_on_device_a_pokes_device_b_over_live_sse: myne-server not built");
+            return;
+        };
+
+        let root_key = [0x42u8; 32];
+        let account_hash = [0x6Du8; 16];
+        let username = "MY-ORCH-POKE";
+        let secret = derive_subkey(&root_key, SubkeyRole::ServerAuth);
+        let items_key = [0x11u8; 32];
+        let items_key_id = [0x22u8; 16];
+
+        let dir_a = std::env::temp_dir().join(format!("myne-orch-pokeA-{}", std::process::id()));
+        let notes_a = dir_a.join("notes");
+        std::fs::create_dir_all(&notes_a).unwrap();
+        let note = NoteId::new_v7();
+        let blob = encode_new_note(
+            &items_key,
+            &items_key_id,
+            note.as_uuid().as_bytes(),
+            b"poke me",
+        )
+        .unwrap();
+        crate::atomic_write::atomic_write(
+            &notes_a.join(format!("{}.myn", note.as_uuid())),
+            &blob,
+            false,
+        )
+        .unwrap();
+
+        let ta = crate::plugins::sync::http_transport::build_transport(&url, Vec::new()).unwrap();
+        enroll::register_verifier(ta.as_ref(), &account_hash, username, secret.as_slice()).unwrap();
+        let dev_a = enroll::generate_device_id();
+        let out_a = enroll::enroll(
+            ta.as_ref(),
+            &account_hash,
+            username,
+            secret.as_slice(),
+            EnrollPath::Recovery,
+            "a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0",
+            dev_a,
+        )
+        .unwrap();
+        let tok_a = hex32(&out_a.token);
+        let tb = crate::plugins::sync::http_transport::build_transport(&url, Vec::new()).unwrap();
+        let dev_b = enroll::generate_device_id();
+        let out_b = enroll::enroll(
+            tb.as_ref(),
+            &account_hash,
+            username,
+            secret.as_slice(),
+            EnrollPath::Recovery,
+            "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
+            dev_b,
+        )
+        .unwrap();
+        let tok_b = hex32(&out_b.token);
+
+        // B opens the live SSE stream and drains it on a side thread.
+        let stream = tb
+            .open_sse("/sync/poke", &tok_b, std::time::Duration::from_secs(10))
+            .expect("open_sse against the live server");
+        let shutdown = stream.socket.try_clone().unwrap();
+        let signal = SsePokeSignal::default();
+        let signal2 = signal.clone();
+        let stop = std::sync::Arc::new(AtomicBool::new(false));
+        let stop2 = stop.clone();
+        let chunked = stream.chunked;
+        let reader = stream.reader;
+        let drainer = std::thread::spawn(move || drain_stream(reader, chunked, &stop2, &signal2));
+
+        // A pushes — the server must poke B's open stream.
+        let push = run_cycle_legacy(
+            ta.as_ref(),
+            &root_key,
+            account_hash,
+            dev_a,
+            &tok_a,
+            &notes_a,
+            &dir_a,
+            true,
+        )
+        .expect("A push cycle");
+        assert_eq!(push.pushed, 1);
+
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        while signal.get() == 0 && std::time::Instant::now() < deadline {
+            std::thread::sleep(std::time::Duration::from_millis(25));
+        }
+        assert!(
+            signal.get() >= 1,
+            "device A's push must arrive as a poke on B's live SSE stream"
+        );
+
+        stop.store(true, Ordering::Relaxed);
+        let _ = shutdown.shutdown(std::net::Shutdown::Both);
+        let _ = drainer.join();
+        std::fs::remove_dir_all(&dir_a).ok();
     }
 
     /// The "add this device" flow: device B joins an existing account by

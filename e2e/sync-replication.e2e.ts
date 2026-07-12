@@ -267,6 +267,53 @@ describeCanary("two-device sync canary (MYND-428)", () => {
     }
   });
 
+  it("unlock-edge + poke: a change pushed while B is locked appears within seconds of B's unlock — no Sync Now, no 30 s poll wait", async () => {
+    // Vault-count precondition: 1 seeded vault on A, 1 join-bootstrapped on B.
+    // Pins the sync-latency package (decisions.md 2026-07-12): the locked→
+    // unlocked edge arms a one-shot immediate pull and the always-on SSE poke
+    // stream does a catch-up pull on (re)connect, so a change that landed on
+    // the server while this device was locked surfaces right after unlock —
+    // WITHOUT a manual Sync Now and WITHOUT waiting out the 30 s poll boundary.
+    const srv = await startSyncServer();
+    try {
+      const { a, b, noteId, password, teardown } = await setupTwoSyncedDevices(srv);
+      try {
+        // B locks via the real bottom-bar CTA: the sync loop hard-idles and
+        // the poke stream tears down (locked devices hold no server stream).
+        await (await b.session.byTestId("editor.lock-cta")).click();
+        await b.session.byTestId("unlock.password-input", { timeoutMs: 20_000 });
+
+        // A edits the already-synced note and pushes while B is locked.
+        await ipcOk(a.session, "plugin:notes|note_update", {
+          noteId,
+          plaintext: "edited while B slept",
+        });
+        await ipcOk(a.session, "plugin:sync|sync_now", {});
+
+        // B unlocks through the real UI. From here on B gets NO sync nudge of
+        // any kind — the unlock-edge arm (+ SSE catch-up) must pull on its own.
+        await unlockToEditor(b.session, password);
+
+        // Discriminating budget: comfortably above container jitter, but well
+        // UNDER the 30 s poll interval — with the edge trigger and poke dead,
+        // the first chance to see the edit would be the 30 s boundary, so a
+        // green here can only come from the new immediate-pull paths.
+        let fresh = false;
+        const deadline = Date.now() + 20_000;
+        while (!fresh && Date.now() < deadline) {
+          const body = (await ipcOk(b.session, "plugin:notes|note_read", { noteId })) as string;
+          fresh = body.includes("edited while B slept");
+          if (!fresh) await new Promise((r) => setTimeout(r, 500));
+        }
+        expect(fresh, "B pulled A's edit right after unlock without a manual sync").toBe(true);
+      } finally {
+        await teardown();
+      }
+    } finally {
+      await srv.teardown();
+    }
+  });
+
   it("tombstone: a deletion on A propagates to B", async () => {
     const srv = await startSyncServer();
     try {
@@ -338,11 +385,13 @@ function clearConflictMarkersRaw(content: string): string {
 
 /** Boot A (seeded vault) + B, enroll A, write+push one note, B joins + is
  *  approved + pulls it — the shared "two synced devices, one replicated note"
- *  precondition. Returns both devices, the synced note id, and a teardown. */
+ *  precondition. Returns both devices, the synced note id, the shared vault
+ *  password (for re-unlock scenarios), and a teardown. */
 async function setupTwoSyncedDevices(srv: EphemeralServer): Promise<{
   a: AppSession;
   b: AppSession;
   noteId: string;
+  password: string;
   teardown: () => Promise<void>;
 }> {
   let account = "";
@@ -410,7 +459,7 @@ async function setupTwoSyncedDevices(srv: EphemeralServer): Promise<{
         await b.teardown();
         await a.teardown();
       };
-      return { a, b, noteId, teardown };
+      return { a, b, noteId, password, teardown };
     } catch (e) {
       await b.teardown();
       throw e;

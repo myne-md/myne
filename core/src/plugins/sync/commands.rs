@@ -54,7 +54,7 @@ pub enum SyncRuntimeStatus {
 }
 
 /// Resolve `<app_config_dir>/sync-config.json` (the `themes` plugin precedent).
-fn config_path<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, SyncConfigError> {
+pub(crate) fn config_path<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, SyncConfigError> {
     let dir = app
         .path()
         .app_config_dir()
@@ -116,7 +116,7 @@ fn parse_pin_hex(s: &str) -> Option<[u8; 32]> {
 /// hosted launch, so today this is just the captured TOFU pin; when hosted ships,
 /// a hosted endpoint additionally verifies against its pre-vetted static pin.
 /// Empty for a loopback `http` endpoint or an unpinned config.
-fn config_pins(cfg: &SyncEndpointConfig) -> Vec<[u8; 32]> {
+pub(crate) fn config_pins(cfg: &SyncEndpointConfig) -> Vec<[u8; 32]> {
     let mut pins = Vec::new();
     if let Some(url) = cfg.endpoint_url.as_deref() {
         if let Some(sp) = super::config::hosted_static_pin(url) {
@@ -535,6 +535,29 @@ pub async fn sync_now<R: Runtime>(app: AppHandle<R>) -> Result<SyncRuntimeStatus
             detail: "sync_failed".into(),
         },
     })
+}
+
+/// Mobile lifecycle ingress (SYNC-37/38): the WebView's `visibilitychange`
+/// handler reports "app backgrounded" so the sync loop hard-idles instead of
+/// ticking against a frozen clock. Flips an in-RAM scheduler flag only — no
+/// vault access, no IO, no server call; a no-op on hosts that do not manage the
+/// [`super::loop_control::SyncLifecycleSignal`] (desktop).
+#[tauri::command]
+pub async fn sync_lifecycle_suspend<R: Runtime>(app: AppHandle<R>) {
+    if let Some(sig) = app.try_state::<super::loop_control::SyncLifecycleSignal>() {
+        sig.suspend();
+    }
+}
+
+/// Foreground counterpart of [`sync_lifecycle_suspend`]: clears the suspend
+/// flag and arms the one-shot resume-immediate poll, so returning to the app
+/// pulls fresh state without waiting out the poll interval. Same no-op
+/// contract on hosts without the managed signal.
+#[tauri::command]
+pub async fn sync_lifecycle_resume<R: Runtime>(app: AppHandle<R>) {
+    if let Some(sig) = app.try_state::<super::loop_control::SyncLifecycleSignal>() {
+        sig.resume();
+    }
 }
 
 // --- Device management commands (MYND-425 tasks 7/8) ---
