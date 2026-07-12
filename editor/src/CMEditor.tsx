@@ -22,7 +22,7 @@ import { reconfigureVaultHeadings } from "./wikilink/vault-headings";
 import type { VaultHeading } from "./wikilink/vault-headings";
 import { reconfigureLineNumbers } from "./line-numbers";
 import { reconfigureViewMode, type ViewMode } from "./view-mode";
-import { resolveAnchorOffset, type WikilinkAnchor } from "./wikilink/anchor";
+import { resolveAnchorRange, type WikilinkAnchor } from "./wikilink/anchor";
 import type { ResolverNote } from "@myne/editor/host/notes/resolveWikilink";
 
 /** A deep-link scroll request (MYND-305, SYNC-5): a generic anchor to scroll to
@@ -248,8 +248,8 @@ export function CMEditor(props: CMEditorProps) {
     if (view === null || scrollAnchor === null) return;
     if (appliedScrollNonceRef.current === scrollAnchor.nonce) return;
     const body = view.state.doc.toString();
-    const offset = resolveAnchorOffset(body, scrollAnchor.anchor);
-    if (offset === null) {
+    const range = resolveAnchorRange(body, scrollAnchor.anchor);
+    if (range === null) {
       // Body may not have loaded yet (anchor not present) — wait for the next
       // `value` change to retry. If the note is loaded and the anchor genuinely
       // doesn't exist, the retry stays a no-op and the editor keeps its top
@@ -257,9 +257,13 @@ export function CMEditor(props: CMEditorProps) {
       return;
     }
     appliedScrollNonceRef.current = scrollAnchor.nonce;
+    const from = Math.min(range.from, body.length);
+    const to = Math.min(range.to, body.length);
     view.dispatch({
-      selection: { anchor: offset },
-      effects: EditorView.scrollIntoView(offset, { y: "start" }),
+      // A query anchor carries a non-empty span → SELECT the match (MYND-448 D4);
+      // heading/block anchors are zero-length → just place the caret.
+      selection: to > from ? { anchor: from, head: to } : { anchor: from },
+      effects: EditorView.scrollIntoView(from, { y: "start" }),
     });
   }, [scrollAnchor, value]);
 

@@ -18,7 +18,10 @@ export {
 export {
   findBlockOffset,
   findHeadingOffset,
+  findQueryRange,
   hasAnchor,
   resolveAnchorOffset,
+  resolveAnchorRange,
+  type AnchorRange,
   type WikilinkAnchor,
 } from "./anchor";
