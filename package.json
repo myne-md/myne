@@ -21,6 +21,7 @@
     "coverage:rust:all": "pnpm build && cargo +nightly llvm-cov --workspace --tests --html"
   },
   "dependencies": {
+    "@myne/copy": "workspace:*",
     "@myne/dialect": "workspace:*",
     "@myne/editor": "workspace:*",
     "@codemirror/autocomplete": "6.20.3",

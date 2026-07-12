@@ -4,6 +4,9 @@ packages:
   # Rust crates. Phase A editor/dialect extraction.
   - dialect
   - editor
+  # Shared load-bearing user-facing copy (SYNC-42) — privacy-property strings
+  # kept byte-identical across the desktop + mobile clients by construction.
+  - copy
 allowBuilds:
   # @swc/core is pulled in by the dev-only i18next-cli (string extraction). Its
   # prebuilt binary loads without a local build step (extraction runs fine), so

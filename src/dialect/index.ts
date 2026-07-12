@@ -78,3 +78,12 @@ export {
 } from "./surgery";
 export { parseStream } from "./worker";
 export type { ParseStreamItem, ParseStreamResult } from "./worker";
+// Conflict-copy orchestrators (SYNC-45) — shared with mobile via injected note-IO.
+export {
+  buildConflictCopyContent,
+  clearConflictMarkers,
+  createConflictCopy,
+  applyConflictVersion,
+  undoConflictVersion,
+} from "./conflictCopy";
+export type { ConflictCopyHost } from "./conflictCopy";
