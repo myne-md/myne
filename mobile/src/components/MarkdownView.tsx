@@ -2,9 +2,18 @@ import { type ReactNode, useMemo, useState } from "react";
 import { parseBlocks, type Block, type Inline } from "../lib/markdown";
 import { attachmentSrc } from "../lib/attachmentRef";
 
-/** Inline attachment embed: an image served from the in-app `attachment://`
- *  decrypt scheme, falling back to a file chip when the bytes aren't an image
- *  (e.g. a PDF) or fail to load. */
+/** Audio filename extensions rendered as an inline `<audio>` player (voice notes
+ *  are `.wav`; the others are forward-safe if a compressed path is ever added). */
+const AUDIO_EXTENSIONS = [".wav", ".m4a", ".mp3", ".ogg", ".oga", ".aac", ".webm"];
+export const isAudioLabel = (label: string): boolean => {
+  const lower = label.toLowerCase();
+  return AUDIO_EXTENSIONS.some((ext) => lower.endsWith(ext));
+};
+
+/** Inline attachment embed served from the in-app `attachment://` decrypt scheme:
+ *  an `<audio controls>` player for a voice note / audio file, an `<img>` for an
+ *  image, falling back to a file chip when the bytes aren't renderable (e.g. a
+ *  PDF) or fail to load. */
 function AttachmentInline({ id, label }: { id: string; label: string }) {
   const [failed, setFailed] = useState(false);
   if (failed) {
@@ -15,6 +24,17 @@ function AttachmentInline({ id, label }: { id: string; label: string }) {
         </svg>
         {label || "attachment"}
       </span>
+    );
+  }
+  if (isAudioLabel(label)) {
+    return (
+      <audio
+        data-testid="attachment-audio"
+        controls
+        src={attachmentSrc(id)}
+        onError={() => setFailed(true)}
+        style={{ display: "block", width: "100%", maxWidth: 360, margin: "8px 0" }}
+      />
     );
   }
   return (

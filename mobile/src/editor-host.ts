@@ -15,6 +15,7 @@ import { documentDir, join } from "@tauri-apps/api/path";
 import { attachmentExport, attachmentRename } from "./lib/attachments";
 import { prefsRead } from "./lib/prefs";
 import { currentEditorTagTree } from "./lib/editor-tag-bridge";
+import { requestVoiceRecording } from "./lib/voice-record-bridge";
 
 // ── i18n: a minimal react-i18next-compatible lookup over the SHARED English
 //    catalog (the same strings the desktop ships). Handles nested keys,
@@ -77,6 +78,13 @@ const host: EditorHost = {
       return join(await documentDir(), safe);
     },
   },
+  // The shared `/record` slash command records into the CMEditor view. Mobile
+  // has no native `cpal` recorder (the `voice_record_*` commands aren't
+  // registered), so the WebView records via `getUserMedia`: signal the React
+  // EditorFlow to open the RecordingSheet (which imports the WAV as an
+  // attachment). `view` is unused — the sheet appends the embed to the note body,
+  // matching how the paperclip attach path inserts on mobile.
+  voiceRecord: () => requestVoiceRecording(),
   // PrefsView ⊇ EditorPrefs (identical field types), so this is structurally sound.
   prefsRead: async (): Promise<EditorPrefs> => prefsRead(),
   openExternal: (url) => {

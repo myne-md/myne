@@ -121,6 +121,27 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
       "plugin:vault-unlock|unlock": () => null,
       "plugin:prefs|prefs_read": () => DEFAULT_PREFS,
       "plugin:notes|note_list": () => [],
+      // ── Attachments surface (voice-note capture flow) ──
+      // Record every import so a test can assert the capture pipeline produced a
+      // `Voice note ….wav` bytes-import; echo the filename back so the inserted
+      // form-C embed carries it. Refs/catalog reads are benign empties.
+      "plugin:attachments|attachment_import": (args) => {
+        const source = (args.source ?? {}) as { kind?: string; bytes?: number[]; filename?: string | null };
+        const w = window as unknown as { __voiceImports?: Array<{ kind?: string; len: number; filename?: string | null }> };
+        (w.__voiceImports ??= []).push({ kind: source.kind, len: source.bytes?.length ?? 0, filename: source.filename ?? null });
+        return {
+          id: "a".repeat(64),
+          content_type: "audio/wav",
+          filename: source.filename ?? "file",
+          size: source.bytes?.length ?? 0,
+          created_at: 0,
+          deduplicated: false,
+        };
+      },
+      "plugin:attachments|catalog_list": () => [],
+      "plugin:attachments|attachment_unused_list": () => [],
+      "plugin:attachments|attachment_refs_apply": () => null,
+      "plugin:attachments|attachment_refs_remove": () => null,
       // ── Quick-unlock surface (per-test configurable) ──
       "plugin:quick-unlock|quick_unlock_status": () => quickUnlock,
       "plugin:quick-unlock|quick_unlock_setup_biometric": () => {

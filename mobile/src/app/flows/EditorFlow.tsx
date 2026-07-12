@@ -13,7 +13,7 @@ import { useConflictMaterializer } from "../../lib/use-conflict-materializer";
 import { listVaults, orderByLastUnlock } from "../../lib/vault-list";
 import { HAS_TAURI } from "../../lib/app-window";
 import { effectiveMobileAutoLockSecs } from "../../lib/auto-lock";
-import { consumePendingCapture, CAPTURE_EVENT } from "../../lib/deep-link";
+import { consumePendingCapture, CAPTURE_EVENT, type CaptureMode } from "../../lib/deep-link";
 import { ioBanner } from "../../lib/io-banner";
 import { usePrefs } from "../../lib/use-prefs";
 import { setFavorites, upsertSavedView, setViewOrder } from "../../lib/prefs";
@@ -49,6 +49,8 @@ import { ViewEditorSheet } from "./ViewEditorSheet";
 import { importFile, ATTACHMENT_ACCEPT } from "../../lib/attachments";
 import { emitAttachmentEmbed } from "../../lib/attachmentRef";
 import { AttachmentsSheet } from "./AttachmentsSheet";
+import { RecordingSheet } from "./RecordingSheet";
+import { VOICE_RECORD_EVENT } from "../../lib/voice-record-bridge";
 import { SnapshotsSheet } from "./SnapshotsSheet";
 import { TemplatesSheet } from "./TemplatesSheet";
 import { unmarkTemplate, createTemplate } from "../../lib/templates";
@@ -229,6 +231,9 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
   // above-keyboard FormatBar through the shared @myne/editor commands.
   const [editorView, setEditorView] = useState<EditorView | null>(null);
   const [manageAttachments, setManageAttachments] = useState(false);
+  // Voice-note recording sheet open (mic button / widget voice capture / the
+  // shared editor's `/record` slash all raise this).
+  const [recordOpen, setRecordOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   // Editor side panel (mobile stand-in for the desktop side sheet): note
   // context + actions, sliding in from the right.
@@ -622,16 +627,31 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
   // Widget deep-link capture (ios-widgets `myne://capture`): open a fresh note.
   // Cold launch on a locked device latches the intent in `deep-link.ts` and it
   // is consumed HERE once the editor mounts post-unlock; a tap while the app is
-  // already open fires CAPTURE_EVENT below. Voice mode has no transcription
-  // engine yet, so it opens the ordinary text editor — same as plain capture.
-  useEffect(() => {
-    if (consumePendingCapture() !== null) newNote();
+  // already open fires CAPTURE_EVENT below. `mode: "voice"` (the widget's mic
+  // button, `myne://capture?mode=voice`) opens a fresh note AND the recording
+  // sheet in its ready state — the user taps Stop when done (safer than
+  // auto-arming the mic on a cold launch).
+  const startCapture = useCallback((mode: CaptureMode) => {
+    newNote();
+    if (mode === "voice") setRecordOpen(true);
   }, [newNote]);
   useEffect(() => {
-    const onCapture = () => newNote();
+    const mode = consumePendingCapture();
+    if (mode !== null) startCapture(mode);
+  }, [startCapture]);
+  useEffect(() => {
+    const onCapture = (e: Event) => startCapture((e as CustomEvent<{ mode: CaptureMode }>).detail?.mode ?? "text");
     window.addEventListener(CAPTURE_EVENT, onCapture);
     return () => window.removeEventListener(CAPTURE_EVENT, onCapture);
-  }, [newNote]);
+  }, [startCapture]);
+  // The shared `@myne/editor` `/record` slash command routes through the mobile
+  // EditorHost's `voiceRecord` slot, which dispatches VOICE_RECORD_EVENT (it
+  // can't reach React state directly). Open the same recording sheet.
+  useEffect(() => {
+    const onRecord = () => setRecordOpen(true);
+    window.addEventListener(VOICE_RECORD_EVENT, onRecord);
+    return () => window.removeEventListener(VOICE_RECORD_EVENT, onRecord);
+  }, []);
 
   const openNote = useCallback(
     async (id: string) => {
@@ -1570,7 +1590,12 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
           onToggleRaw={() => setRawMode((r) => !r)}
           onAttach={() => attachInputRef.current?.click()}
           onLibrary={() => setManageAttachments(true)}
+          onRecord={() => setRecordOpen(true)}
         />
+      )}
+
+      {recordOpen && (
+        <RecordingSheet onRecorded={attachFile} onClose={() => setRecordOpen(false)} />
       )}
 
       {rightPanel && (
@@ -1980,6 +2005,7 @@ function FormatBar({
   onToggleRaw,
   onAttach,
   onLibrary,
+  onRecord,
 }: {
   view: EditorView | null;
   attaching: boolean;
@@ -1987,6 +2013,7 @@ function FormatBar({
   onToggleRaw: () => void;
   onAttach: () => void;
   onLibrary: () => void;
+  onRecord: () => void;
 }) {
   // Fire on a genuine TAP only — never while the row is being scrolled. On
   // pointerdown we preventDefault (keeps the editor's focus + selection, so
@@ -2081,6 +2108,9 @@ function FormatBar({
         </button>
         <button {...tap(onLibrary)} aria-label="Insert from library" style={fbtn}>
           <svg width="20" height="20" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2" {...st} /><circle cx="8.5" cy="9.5" r="1.5" fill="var(--fg-2)" /><path d="M20 15l-4.5-4.5L5 20" {...st} /></svg>
+        </button>
+        <button {...tap(onRecord)} aria-label="Record voice note" style={fbtn}>
+          <svg width="20" height="20" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3" {...st} /><path d="M6 11a6 6 0 0 0 12 0M12 17v3" {...st} /></svg>
         </button>
       </div>
       <button {...tap(onToggleRaw)} aria-label={rawMode ? "Show live preview" : "Show raw markdown"} style={{ ...fbtn, borderLeft: "1px solid var(--line-1)", borderRadius: 0, width: 44 }}>
