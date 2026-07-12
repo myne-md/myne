@@ -65,16 +65,39 @@ fn config_path<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, SyncConfigErro
     Ok(dir.join("sync-config.json"))
 }
 
-/// Read the device-local sync endpoint config. Absent → `{ endpoint_url: null }`.
+/// The endpoint config plus the DERIVED pin source (SYNC-43) — not persisted;
+/// computed at read so the UI distinguishes a hosted static pin from a self-host
+/// TOFU pin without changing the on-disk config schema.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct SyncEndpointView {
+    /// The sync server base URL, or `None` when unconfigured.
+    pub endpoint_url: Option<String>,
+    /// The pinned leaf-cert fingerprint (lowercase SHA-256 hex), or `None`.
+    pub cert_pin_hex: Option<String>,
+    /// Where the pin came from: `static` (hosted) vs `tofu` (self-host).
+    pub pin_source: Option<super::config::PinSource>,
+}
+
+/// Read the device-local sync endpoint config + its derived pin source (SYNC-43).
 #[tauri::command]
 pub async fn sync_get_endpoint<R: Runtime>(
     app: AppHandle<R>,
-) -> Result<SyncEndpointConfig, SyncConfigError> {
+) -> Result<SyncEndpointView, SyncConfigError> {
     let path = config_path(&app)?;
-    read_config(&path)
+    let cfg = read_config(&path)?;
+    let pin_source = cfg
+        .endpoint_url
+        .as_deref()
+        .and_then(|u| super::config::pin_source_for(u, &cfg));
+    Ok(SyncEndpointView {
+        endpoint_url: cfg.endpoint_url,
+        cert_pin_hex: cfg.cert_pin_hex,
+        pin_source,
+    })
 }
 
 use super::to_hex as hex_lower;
+use super::token_store::TokenStore;
 
 /// Parse a 64-char lowercase-hex cert pin into raw SHA-256 bytes.
 fn parse_pin_hex(s: &str) -> Option<[u8; 32]> {
@@ -88,14 +111,22 @@ fn parse_pin_hex(s: &str) -> Option<[u8; 32]> {
     Some(out)
 }
 
-/// The TOFU-stored cert pins to verify an `https` connection against. Empty for a
-/// loopback `http` endpoint or an unpinned config (the loopback path ignores it).
+/// The cert pins to verify an `https` connection against: the **static-hosted-pin
+/// slot ∪ the TOFU pin** (SYNC-43). The static slot is deferred (`None`) until
+/// hosted launch, so today this is just the captured TOFU pin; when hosted ships,
+/// a hosted endpoint additionally verifies against its pre-vetted static pin.
+/// Empty for a loopback `http` endpoint or an unpinned config.
 fn config_pins(cfg: &SyncEndpointConfig) -> Vec<[u8; 32]> {
-    cfg.cert_pin_hex
-        .as_deref()
-        .and_then(parse_pin_hex)
-        .map(|p| vec![p])
-        .unwrap_or_default()
+    let mut pins = Vec::new();
+    if let Some(url) = cfg.endpoint_url.as_deref() {
+        if let Some(sp) = super::config::hosted_static_pin(url) {
+            pins.push(sp);
+        }
+    }
+    if let Some(tofu) = cfg.cert_pin_hex.as_deref().and_then(parse_pin_hex) {
+        pins.push(tofu);
+    }
+    pins
 }
 
 /// Set (or clear, with `None`) the sync endpoint. Validates against the A4/TB5
@@ -103,15 +134,31 @@ fn config_pins(cfg: &SyncEndpointConfig) -> Vec<[u8; 32]> {
 /// and returns its fingerprint (lowercase SHA-256 hex) for the user to
 /// eye-compare across devices (`self-host-policy.md` §6). A loopback `http`
 /// endpoint has no TLS, so it returns `None`. Clearing drops the pin too.
+/// The endpoint-set result: the pinned fingerprint + its source (SYNC-43), so the
+/// UI can render a self-host first-connect TOFU pin ("compare across devices")
+/// distinctly from a pre-vetted hosted static pin — never silently normalizing
+/// TOFU-for-hosted.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct EndpointPinInfo {
+    /// The pinned leaf-cert fingerprint (lowercase SHA-256 hex) for eye-compare,
+    /// or `None` for a loopback `http` endpoint / cleared config.
+    pub fingerprint: Option<String>,
+    /// Where the pin came from: `static` (hosted) vs `tofu` (self-host).
+    pub pin_source: Option<super::config::PinSource>,
+}
+
 #[tauri::command]
 pub async fn sync_set_endpoint<R: Runtime>(
     app: AppHandle<R>,
     endpoint_url: Option<String>,
-) -> Result<Option<String>, SyncConfigError> {
+) -> Result<EndpointPinInfo, SyncConfigError> {
     let path = config_path(&app)?;
     let Some(url) = endpoint_url else {
         write_config(&path, &SyncEndpointConfig::default())?;
-        return Ok(None);
+        return Ok(EndpointPinInfo {
+            fingerprint: None,
+            pin_source: None,
+        });
     };
     validate_endpoint_url(&url)?;
     let (scheme, host, port) =
@@ -130,15 +177,15 @@ pub async fn sync_set_endpoint<R: Runtime>(
     } else {
         None
     };
-    let fingerprint = cert_pin_hex.clone();
-    write_config(
-        &path,
-        &SyncEndpointConfig {
-            endpoint_url: Some(url),
-            cert_pin_hex,
-        },
-    )?;
-    Ok(fingerprint)
+    let cfg = SyncEndpointConfig {
+        endpoint_url: Some(url.clone()),
+        cert_pin_hex: cert_pin_hex.clone(),
+    };
+    write_config(&path, &cfg)?;
+    Ok(EndpointPinInfo {
+        fingerprint: cert_pin_hex,
+        pin_source: super::config::pin_source_for(&url, &cfg),
+    })
 }
 
 /// Pure endpoint+token+identity → status mapping (unit-testable; the `#[tauri::command]`
@@ -159,6 +206,69 @@ fn status_from(
     }
 }
 
+/// A live sync-status overlay (SYNC-36): the background loop / `sync_now`
+/// publishes `Syncing` while a cycle runs and `Error` after a failed cycle;
+/// `sync_status` overlays it on the derived base state. Cleared after a clean
+/// cycle. (`Conflicts` is derived from the on-disk staging dir, not held here.)
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) enum LiveStatus {
+    /// A pull/push is in flight.
+    Syncing,
+    /// The last cycle failed (bounded, non-secret detail tag).
+    Error(String),
+}
+
+/// Process-wide live-status cell (app-managed, like `SyncLocalChange`). The loop
+/// and `sync_now` set it; `sync_status` reads it. `None` = no overlay (fall back
+/// to the base config state / conflicts). Desktop + mobile both register it; when
+/// unregistered, `try_state` → `None`, so producers are a safe no-op.
+#[derive(Default)]
+pub struct SyncRuntimeStatusCell(std::sync::Mutex<Option<LiveStatus>>);
+
+impl SyncRuntimeStatusCell {
+    /// Publish "a cycle is in flight".
+    pub fn set_syncing(&self) {
+        *self.0.lock().unwrap() = Some(LiveStatus::Syncing);
+    }
+    /// Publish "the last cycle failed" with a bounded, non-secret detail tag.
+    pub fn set_error(&self, detail: impl Into<String>) {
+        *self.0.lock().unwrap() = Some(LiveStatus::Error(detail.into()));
+    }
+    /// Clear the overlay (a clean/idle cycle → fall back to base + conflicts).
+    pub fn clear(&self) {
+        *self.0.lock().unwrap() = None;
+    }
+    pub(crate) fn get(&self) -> Option<LiveStatus> {
+        self.0.lock().unwrap().clone()
+    }
+}
+
+/// Overlay the live status + unresolved-conflict count on the derived base state
+/// (pure — the testable heart of `sync_status`, mirroring `status_from`).
+///
+/// Precedence: a config state (`Disabled`/`NotEnrolled`/`Pending`) dominates — a
+/// device that cannot sync shows WHY, never a stale live overlay. Only for an
+/// enrolled, idle-eligible device does the overlay apply: an in-flight
+/// `Syncing` or a last-cycle `Error` wins over conflicts, and unresolved
+/// conflicts win over a bare `Idle`.
+fn overlay_status(
+    base: SyncRuntimeStatus,
+    live: Option<LiveStatus>,
+    conflict_count: u32,
+) -> SyncRuntimeStatus {
+    if !matches!(base, SyncRuntimeStatus::Idle) {
+        return base;
+    }
+    match live {
+        Some(LiveStatus::Syncing) => SyncRuntimeStatus::Syncing,
+        Some(LiveStatus::Error(detail)) => SyncRuntimeStatus::Error { detail },
+        None if conflict_count > 0 => SyncRuntimeStatus::Conflicts {
+            count: conflict_count,
+        },
+        None => SyncRuntimeStatus::Idle,
+    }
+}
+
 /// Report the current sync status for the status indicator (task 10), derived honestly:
 /// no endpoint → `Disabled`; endpoint set but no device-local token → `NotEnrolled`
 /// (cannot sync); a persisted enrollment identity without a token → `Pending` (awaiting
@@ -171,24 +281,27 @@ pub async fn sync_status<R: Runtime>(
     state: State<'_, VaultRuntimeState>,
 ) -> Result<SyncRuntimeStatus, SyncConfigError> {
     let cfg = read_config(&config_path(&app)?)?;
-    let (token_present, identity_present) =
-        match crate::paths::active_vault_root_io(&app, state.active_vault_id().await) {
-            Ok(dir) => {
-                let token = matches!(super::token_store::read_token_fallback(&dir), Ok(Some(_)));
-                // A pending device persists its identity (device_id) even before its
-                // token is issued, so identity-without-token = awaiting approval.
-                let identity = super::state::read_sync_state(&dir)
-                    .map(|s| s.device_id_hex.is_some())
-                    .unwrap_or(false);
-                (token, identity)
-            }
-            Err(_) => (false, false),
-        };
-    Ok(status_from(
-        cfg.endpoint_url.is_some(),
-        token_present,
-        identity_present,
-    ))
+    let dir_opt = crate::paths::active_vault_root_io(&app, state.active_vault_id().await).ok();
+    let (token_present, identity_present, conflict_count) = match &dir_opt {
+        Some(dir) => {
+            let token = matches!(super::token_store::default_store().read(dir), Ok(Some(_)));
+            // A pending device persists its identity (device_id) even before its
+            // token is issued, so identity-without-token = awaiting approval.
+            let identity = super::state::read_sync_state(dir)
+                .map(|s| s.device_id_hex.is_some())
+                .unwrap_or(false);
+            // Unresolved conflict copies (decryption-free — reads the staging dir).
+            let conflicts = super::orchestrator::list_pending_conflicts(dir).len() as u32;
+            (token, identity, conflicts)
+        }
+        None => (false, false, 0),
+    };
+    let base = status_from(cfg.endpoint_url.is_some(), token_present, identity_present);
+    // Overlay the live loop status (Syncing/Error) if the cell is registered.
+    let live = app
+        .try_state::<SyncRuntimeStatusCell>()
+        .and_then(|c| c.get());
+    Ok(overlay_status(base, live, conflict_count))
 }
 
 /// Outcome of one orchestrated sync cycle, shared by `sync_now` (manual) and the
@@ -239,7 +352,9 @@ async fn try_claim_token(
         )
         .ok()?;
         if out.approved && !out.token.is_empty() {
-            super::token_store::store_token_fallback(&dir, &out.token).ok()?;
+            super::token_store::default_store()
+                .store(&dir, &out.token)
+                .ok()?;
             Some(out.token)
         } else {
             None // still pending approval
@@ -300,7 +415,7 @@ pub async fn run_active_cycle<R: Runtime>(app: &AppHandle<R>, allow_push: bool) 
     // Token: the stored per-device token, or — for a still-pending device — one
     // claimed now if an existing device has just approved it (re-handshake under
     // the unlocked root_key). Still pending → nothing to sync this tick.
-    let token = match super::token_store::read_token_fallback(&dir) {
+    let token = match super::token_store::default_store().read(&dir) {
         Ok(Some(t)) => t,
         _ => {
             let Some(username) = st.account_display.clone() else {
@@ -330,7 +445,7 @@ pub async fn run_active_cycle<R: Runtime>(app: &AppHandle<R>, allow_push: bool) 
     let notes_dir = dir.join("notes");
 
     let res = tokio::task::spawn_blocking(move || {
-        let transport = super::http_transport::build_transport(&url, pins).map_err(|_| ())?;
+        let transport = super::http_transport::build_transport(&url, pins).map_err(|_| false)?;
         super::orchestrator::run_sync_cycle(
             transport.as_ref(),
             &root_key,
@@ -341,13 +456,41 @@ pub async fn run_active_cycle<R: Runtime>(app: &AppHandle<R>, allow_push: bool) 
             &dir,
             allow_push,
         )
-        .map_err(|_| ())
+        // Preserve ONLY whether the failure was an integrity event (a rejected
+        // rollback / forged head, SYNC-10) across the spawn_blocking boundary —
+        // the engine's Rust-side verdict, classified by `integrity`. Everything
+        // else collapses to a transient failure.
+        .map_err(|e| match e {
+            super::orchestrator::SyncCycleError::Pull(pe) => {
+                super::integrity::pull_error_is_integrity_failure(&pe)
+            }
+            _ => false,
+        })
     })
     .await;
 
+    // Emit the alert/reconcile events here (both `sync_now` and the loop call
+    // this) — the orchestrator stays AppHandle-free (sim.rs drives it without a
+    // Tauri app), so the emit lives at this boundary off the summary/error.
     match res {
-        Ok(Ok(summary)) => CycleOutcome::Ran(summary),
-        _ => CycleOutcome::Failed,
+        Ok(Ok(summary)) => {
+            if summary.reconcile_ran {
+                // A 410-beyond-horizon full reconcile ran this cycle — bracket it
+                // so the reconcile banner (reassuring, "caught up") can show.
+                let _ = app.emit("sync://reconcile-started", ());
+                let _ = app.emit("sync://reconcile-finished", ());
+            }
+            CycleOutcome::Ran(summary)
+        }
+        Ok(Err(is_integrity)) => {
+            if is_integrity {
+                // Hard, honest integrity alert (rollback / non-extending head).
+                // Copy is the pinned `SYNC_INTEGRITY_ALERT` literal on the UI side.
+                let _ = app.emit("sync://integrity-alert", ());
+            }
+            CycleOutcome::Failed
+        }
+        Err(_) => CycleOutcome::Failed, // join error
     }
 }
 
@@ -365,7 +508,17 @@ pub async fn sync_now<R: Runtime>(app: AppHandle<R>) -> Result<SyncRuntimeStatus
         // fix removed; clicking "Sync now" on an unenrolled device would otherwise
         // flip the dot to green. Only a genuine Ran is Idle.
         CycleOutcome::NotReady => SyncRuntimeStatus::NotEnrolled,
-        CycleOutcome::Ran(_) => SyncRuntimeStatus::Idle,
+        CycleOutcome::Ran(summary) => {
+            if summary.pulled > 0 {
+                // A manual sync pulled notes to disk — mirror the loop's refresh
+                // nudge so the UI reloads. Both clients run the foreground
+                // `spawn_sync_loop` (mobile is foreground-only, SYNC-37), which
+                // emits the same event on its own cycles; this covers the manual
+                // `sync_now` path on top of the loop.
+                let _ = app.emit("sync://changed", summary.pulled);
+            }
+            SyncRuntimeStatus::Idle
+        }
         CycleOutcome::Failed => SyncRuntimeStatus::Error {
             detail: "sync_failed".into(),
         },
@@ -433,7 +586,8 @@ async fn authed_transport<R: Runtime>(
 ) -> Result<(String, Box<dyn SyncTransport>), SyncDeviceError> {
     let dir = crate::paths::active_vault_root_io(app, state.active_vault_id().await)
         .map_err(|_| SyncDeviceError::Internal)?;
-    let token = super::token_store::read_token_fallback(&dir)
+    let token = super::token_store::default_store()
+        .read(&dir)
         .map_err(|_| SyncDeviceError::Internal)?
         .ok_or(SyncDeviceError::NotEnrolled)?;
     let mut token_hex = String::with_capacity(token.len() * 2);
@@ -536,7 +690,9 @@ pub async fn sync_reset_local<R: Runtime>(
     let _cycle_guard = sync_cycle_mutex().lock().await;
     let dir = crate::paths::active_vault_root_io(&app, state.active_vault_id().await)
         .map_err(|_| SyncDeviceError::Internal)?;
-    super::token_store::clear_token_fallback(&dir).map_err(|_| SyncDeviceError::Internal)?;
+    super::token_store::default_store()
+        .clear(&dir)
+        .map_err(|_| SyncDeviceError::Internal)?;
     super::state::clear_device_local_sync(&dir).map_err(|_| SyncDeviceError::Internal)?;
     // Nudge both the status indicator and the device roster to re-read immediately —
     // they poll independently (5s / 4s), so without this they would disagree (one still
@@ -634,10 +790,55 @@ pub async fn sync_mark_tombstone<R: Runtime>(
 use super::enroll::{self, EnrollPath};
 use protocol::{
     aad_password_wrap, aad_recovery_wrap, aead_open_ctx, derive_password_wrap_key,
-    derive_recovery_wrap_key_from_normalized, derive_subkey, normalize_user_phrase,
-    parse_account_number, parse_vault_meta, validate_kdf_params, SubkeyRole, AEAD_KEY_LEN,
+    derive_recovery_wrap_key_from_normalized, derive_subkey, head_fingerprint,
+    normalize_user_phrase, parse_account_number, parse_vault_meta, validate_kdf_params, SubkeyRole,
+    AEAD_KEY_LEN, HEAD_ID_LEN,
 };
 use zeroize::Zeroizing;
+
+/// Decode a 32-byte `head_id` hex → the frozen SAS fingerprint. Delegates to the
+/// vector-locked [`protocol::head_fingerprint`] — no re-derivation, one encoding
+/// (SYNC-17). Returns `None` only on a malformed hex string (wrong length /
+/// non-hex). Factored out so the encoding is host-unit-testable against the
+/// `head-fingerprint` golden vector without a live vault.
+fn head_fingerprint_of_hex(head_id_hex: &str) -> Option<String> {
+    if head_id_hex.len() != HEAD_ID_LEN * 2 || !head_id_hex.bytes().all(|b| b.is_ascii_hexdigit()) {
+        return None;
+    }
+    let mut head_id = [0u8; HEAD_ID_LEN];
+    for (i, b) in head_id.iter_mut().enumerate() {
+        *b = u8::from_str_radix(&head_id_hex[i * 2..i * 2 + 2], 16).ok()?;
+    }
+    Some(head_fingerprint(&head_id))
+}
+
+/// The 8-char Crockford `XXXX-XXXX` SAS fingerprint of this device's currently
+/// adopted vault head — the substrate for the enroll-time out-of-band eye-compare
+/// (SYNC-17 / bootstrap-fingerprint, `sync-protocol.md` §6.3). Reads the
+/// device-local sync-state's latest head observation (the engine records it after
+/// each pull/reconcile via `record_observation`); returns `None` when the device
+/// has adopted no head yet (never synced). This is the SINGLE encoding feeding
+/// both SAS UI ends (mobile SY-05 + desktop DeviceManagementPanel) — no word-list,
+/// no second derivation.
+///
+/// SHIP-GATE (SYNC-17): the primitive-level review of `protocol::head_fingerprint`
+/// is still flagged and MUST close before the enroll-compare ships. This command
+/// only exposes the frozen substrate; it does NOT discharge that review debt.
+#[tauri::command]
+pub async fn sync_head_fingerprint<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+) -> Result<Option<String>, SyncDeviceError> {
+    let dir = crate::paths::active_vault_root_io(&app, state.active_vault_id().await)
+        .map_err(|_| SyncDeviceError::Internal)?;
+    let sync_state = super::state::read_sync_state(&dir).map_err(|_| SyncDeviceError::Internal)?;
+    match sync_state.vv_log.last() {
+        Some(obs) => Ok(Some(
+            head_fingerprint_of_hex(&obs.head_id_hex).ok_or(SyncDeviceError::Internal)?,
+        )),
+        None => Ok(None),
+    }
+}
 
 /// Which credential the enrolling device proves account ownership with.
 #[derive(Debug, Clone, Copy, serde::Deserialize)]
@@ -820,7 +1021,8 @@ pub async fn sync_enroll<R: Runtime>(
         let _ = super::state::write_sync_state(&dir, &st);
 
         if out.approved && !out.token.is_empty() {
-            super::token_store::store_token_fallback(&dir, &out.token)
+            super::token_store::default_store()
+                .store(&dir, &out.token)
                 .map_err(|_| SyncDeviceError::Internal)?;
             let mut token_hex = String::with_capacity(out.token.len() * 2);
             for b in &out.token {
@@ -883,7 +1085,8 @@ pub async fn sync_join_account<R: Runtime>(
     // 1. Set + TOFU-pin the endpoint (https) before any transport use.
     let fingerprint = sync_set_endpoint(app.clone(), Some(server_url))
         .await
-        .map_err(|_| SyncDeviceError::NotConfigured)?;
+        .map_err(|_| SyncDeviceError::NotConfigured)?
+        .fingerprint;
     let cfg = read_config(&config_path(&app).map_err(|_| SyncDeviceError::Internal)?)
         .map_err(|_| SyncDeviceError::NotConfigured)?;
     let pins = config_pins(&cfg);
@@ -994,7 +1197,8 @@ pub async fn sync_join_account<R: Runtime>(
         st.account_display = Some(username);
         let _ = super::state::write_sync_state(&vault_dir, &st);
         if out.approved && !out.token.is_empty() {
-            super::token_store::store_token_fallback(&vault_dir, &out.token)
+            super::token_store::default_store()
+                .store(&vault_dir, &out.token)
                 .map_err(|_| SyncDeviceError::Internal)?;
         }
         Ok(out.approved)
@@ -1012,6 +1216,26 @@ pub async fn sync_join_account<R: Runtime>(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn head_fingerprint_of_hex_matches_golden_vector() {
+        // head-fingerprint/v0.1/all-zero golden: head_id = 0x00×32 → "TYRS-N318".
+        // Proves the command's encoding delegates to the vector-locked primitive
+        // verbatim (no re-derivation, one encoding — SYNC-17).
+        let all_zero = "0".repeat(HEAD_ID_LEN * 2);
+        assert_eq!(
+            head_fingerprint_of_hex(&all_zero),
+            Some(String::from("TYRS-N318"))
+        );
+        // Malformed input → None (no panic, no fallback encoding).
+        assert_eq!(
+            head_fingerprint_of_hex(
+                "not-hex-not-hex-not-hex-not-hex-not-hex-not-hex-not-hex-not-hex!"
+            ),
+            None
+        );
+        assert_eq!(head_fingerprint_of_hex("00"), None); // wrong length
+    }
 
     #[test]
     fn sync_cycle_mutex_serializes_concurrent_holders() {
@@ -1068,6 +1292,54 @@ mod tests {
             status_from(true, false, false),
             SyncRuntimeStatus::NotEnrolled
         );
+    }
+
+    #[test]
+    fn overlay_status_config_state_dominates_live_and_conflicts() {
+        // A device that cannot sync shows WHY, never a stale live/conflict overlay.
+        for base in [
+            SyncRuntimeStatus::Disabled,
+            SyncRuntimeStatus::NotEnrolled,
+            SyncRuntimeStatus::Pending,
+        ] {
+            assert_eq!(
+                overlay_status(base.clone(), Some(LiveStatus::Syncing), 5),
+                base
+            );
+        }
+    }
+
+    #[test]
+    fn overlay_status_live_wins_over_conflicts_over_idle() {
+        use SyncRuntimeStatus as S;
+        // In-flight Syncing wins even with conflicts present.
+        assert_eq!(
+            overlay_status(S::Idle, Some(LiveStatus::Syncing), 3),
+            S::Syncing
+        );
+        // A failed cycle surfaces Error (with its detail) over conflicts.
+        assert_eq!(
+            overlay_status(S::Idle, Some(LiveStatus::Error("sync_failed".into())), 3),
+            S::Error {
+                detail: "sync_failed".into()
+            }
+        );
+        // No live overlay + unresolved conflicts → Conflicts{count}.
+        assert_eq!(overlay_status(S::Idle, None, 2), S::Conflicts { count: 2 });
+        // Enrolled, nothing in flight, no conflicts → a bare Idle.
+        assert_eq!(overlay_status(S::Idle, None, 0), S::Idle);
+    }
+
+    #[test]
+    fn runtime_status_cell_transitions() {
+        let cell = SyncRuntimeStatusCell::default();
+        assert_eq!(cell.get(), None); // no overlay initially
+        cell.set_syncing();
+        assert_eq!(cell.get(), Some(LiveStatus::Syncing));
+        cell.set_error("sync_failed");
+        assert_eq!(cell.get(), Some(LiveStatus::Error("sync_failed".into())));
+        cell.clear();
+        assert_eq!(cell.get(), None); // a clean cycle clears the overlay
     }
 
     #[test]

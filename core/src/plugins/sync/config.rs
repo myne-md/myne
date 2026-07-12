@@ -38,6 +38,46 @@ pub struct SyncEndpointConfig {
     pub cert_pin_hex: Option<String>,
 }
 
+/// Where a cert pin came from — the load-bearing SYNC-43 distinction so the UI
+/// (and mobile) never silently normalizes a first-connect TOFU pin as if it were
+/// the pre-vetted hosted pin. Hosted = Myne controls the cert → a build-time
+/// static pin (verified); self-host = TOFU-pin-at-first-connect + out-of-band
+/// eye-compare (proposed-trust, R3-pending — never presented as "verified" crypto).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PinSource {
+    /// A build-time static pin for the Myne-operated hosted endpoint.
+    Static,
+    /// A TOFU pin captured at first connect (self-host / operator-owned cert).
+    Tofu,
+}
+
+/// The build-time static pin for the Myne-operated hosted endpoint (SYNC-43).
+///
+/// **Deferred to hosted launch** — the hosted cert/domain do not exist yet, so
+/// this returns `None` and every current endpoint pins via TOFU. When the hosted
+/// service ships, match `url` against the hosted base URL and return its pinned
+/// leaf-cert SHA-256; that value + this switch land together with a decisions.md
+/// entry. DO NOT fill a constant here before then.
+pub fn hosted_static_pin(_url: &str) -> Option<[u8; 32]> {
+    None
+}
+
+/// The pin SOURCE for an endpoint (SYNC-43): `Static` if the hosted static pin
+/// applies, else `Tofu` if a TOFU pin was captured, else `None` (loopback `http`
+/// or unpinned). Surfaced to the UI so a hosted endpoint is never shown as a bare
+/// first-connect TOFU pin — which is exactly the "silently normalize
+/// TOFU-for-hosted" regression SYNC-43 guards against.
+pub fn pin_source_for(url: &str, cfg: &SyncEndpointConfig) -> Option<PinSource> {
+    if hosted_static_pin(url).is_some() {
+        Some(PinSource::Static)
+    } else if cfg.cert_pin_hex.is_some() {
+        Some(PinSource::Tofu)
+    } else {
+        None
+    }
+}
+
 /// Failure surface for reading/writing/validating the endpoint config.
 #[derive(Debug, Error, Serialize, PartialEq, Eq)]
 #[serde(tag = "kind", content = "detail")]
@@ -134,6 +174,26 @@ pub fn write_config(path: &Path, cfg: &SyncEndpointConfig) -> Result<(), SyncCon
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn pin_source_is_tofu_when_pinned_none_when_not() {
+        let url = "https://s.example";
+        // No pin → no source.
+        let cfg = SyncEndpointConfig {
+            endpoint_url: Some(url.into()),
+            cert_pin_hex: None,
+        };
+        assert_eq!(pin_source_for(url, &cfg), None);
+        // A captured TOFU pin → Tofu (the hosted static slot is deferred → None,
+        // so a self-host endpoint is a TOFU pin, never silently "static").
+        let cfg = SyncEndpointConfig {
+            endpoint_url: Some(url.into()),
+            cert_pin_hex: Some("ab".repeat(32)),
+        };
+        assert_eq!(pin_source_for(url, &cfg), Some(PinSource::Tofu));
+        // SYNC-43-pending: no hosted static pin exists yet.
+        assert_eq!(hosted_static_pin(url), None);
+    }
 
     #[test]
     fn https_any_host_ok() {

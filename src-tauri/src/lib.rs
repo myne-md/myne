@@ -390,6 +390,11 @@ pub fn run() {
             // The local-change signal must be managed first (the loop + the
             // notes lifecycle both read it).
             app.manage(plugins::sync::loop_control::SyncLocalChange::default());
+            // The live sync-status overlay cell (SYNC-36) the loop + sync_now
+            // publish Syncing/Error into and sync_status reads back. Without this
+            // the producers are `try_state`-None no-ops (the real states never
+            // light up on desktop).
+            app.manage(plugins::sync::commands::SyncRuntimeStatusCell::default());
             plugins::sync::loop_control::spawn_sync_loop(app.handle().clone());
             // ext-foundation-handoff task 6: the host↔app relay listener. Binds
             // the owner-only (0600) Unix-domain-socket under the app-data dir

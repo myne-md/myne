@@ -49,6 +49,10 @@ pub struct SyncSummary {
     /// Deletions pushed this cycle WITH the tombstone flag set (the server marks
     /// them for horizon-GC). Driven by the notes-layer `sync_mark_tombstone` queue.
     pub tombstones_pushed: usize,
+    /// True if this cycle performed a full reconcile (a `410 CursorExpired`
+    /// beyond-horizon recovery reset the cursor to 0 and re-pulled). The
+    /// caller emits the reconcile banner events off this (SYNC-36).
+    pub reconcile_ran: bool,
 }
 
 /// Sync-cycle failures.
@@ -235,11 +239,11 @@ fn write_pending_tombstones(
 
 /// The engine's `local` manifest (raw 16-byte id → 24-byte content_nonce), read
 /// decryption-free from the on-disk notes dir. Converts the notes-domain
-/// [`NonceManifest`](crate::search::persist::NonceManifest) String keys to the
+/// [`NonceManifest`](crate::note_nonce::NonceManifest) String keys to the
 /// raw uuid bytes the engine wants.
 pub fn local_manifest(notes_dir: &Path) -> HashMap<[u8; 16], [u8; 24]> {
     let mut out = HashMap::new();
-    for (id_str, nonce) in crate::plugins::notes::search_sync::scan_on_disk_manifest(notes_dir) {
+    for (id_str, nonce) in crate::note_nonce::scan_on_disk_manifest(notes_dir) {
         if let Ok(u) = uuid::Uuid::parse_str(&id_str) {
             out.insert(*u.as_bytes(), nonce);
         }
@@ -372,6 +376,7 @@ fn sync_cycle_attempt(
     // whose reclaim floor sits beyond the first pull page would 410 the page-2
     // request of the reconcile walk itself and wedge us at 410 forever. The baseline
     // self-heal below re-establishes per-blob versions (MYND-426 task 8).
+    let mut reconcile_ran = false;
     let local = local_manifest(notes_dir);
     let page = match engine::pull_to_stable(
         transport,
@@ -384,6 +389,7 @@ fn sync_cycle_attempt(
     ) {
         Ok(p) => p,
         Err(PullError::CursorExpired) => {
+            reconcile_ran = true;
             state.cursor = 0;
             write_sync_state(vault_root, state).map_err(|_| SyncCycleError::Io)?;
             engine::pull_to_stable(transport, root_key, token, baseline_vv, 0, &local, true)
@@ -621,6 +627,7 @@ fn sync_cycle_attempt(
         cursor: state.cursor,
         conflicts,
         tombstones_pushed,
+        reconcile_ran,
     })
 }
 
@@ -1891,6 +1898,10 @@ mod tests {
         )
         .expect("the cycle recovers from cursor_expired");
         assert_eq!(summary.cursor, 0, "cursor reset to a full reconcile");
+        assert!(
+            summary.reconcile_ran,
+            "the 410-recovery full reconcile sets reconcile_ran (drives the banner events)"
+        );
         // The recovery re-pull from 0 actually happened, with the reconcile flag.
         let pulled_from_0 = fake
             .requests()

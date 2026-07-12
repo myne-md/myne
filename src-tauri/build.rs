@@ -373,6 +373,7 @@ fn main() {
                 "sync_enroll",
                 "sync_join_account",
                 "sync_reset_local",
+                "sync_head_fingerprint",
             ]),
         )
         .plugin(
