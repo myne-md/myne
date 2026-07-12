@@ -1,4 +1,4 @@
-import { type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
+import { type CSSProperties, type Dispatch, type PointerEvent as ReactPointerEvent, type ReactNode, type RefObject, type SetStateAction, useCallback, useLayoutEffect, useRef, useState } from "react";
 import { Icon, MyneMark, type IconName } from "./Icon";
 
 /** Pill chip / tag. */
@@ -110,6 +110,28 @@ export function Fab({ icon = "plus", style }: { icon?: IconName; style?: CSSProp
  */
 const SHEET_MS = 260;
 
+/**
+ * Mount-time enter choreography for overlays that slide/fade in: returns a
+ * `shown` flag that starts false (the hidden endpoint renders first) and flips
+ * true before the first paint. The flip happens in a layout effect AFTER a
+ * forced synchronous style+layout pass (`getBoundingClientRect` on the animated
+ * element), so the hidden transform/opacity is an established computed value
+ * and the CSS transition is guaranteed a "before" state to interpolate from.
+ * The old double-`requestAnimationFrame` idiom was a timing heuristic: under
+ * main-thread load WebKit can run both callbacks without a style recalc in
+ * between, and the overlay pops in with no animation. Exit stays caller-owned —
+ * flip `shown` back off via the returned setter, then unmount after the
+ * transition (see `Sheet`/`SidePanel`).
+ */
+export function useEnterTransition(ref: RefObject<HTMLElement | null>): [boolean, Dispatch<SetStateAction<boolean>>] {
+  const [shown, setShown] = useState(false);
+  useLayoutEffect(() => {
+    ref.current?.getBoundingClientRect();
+    setShown(true);
+  }, []);
+  return [shown, setShown];
+}
+
 export function Sheet({
   children,
   grabber = true,
@@ -123,26 +145,14 @@ export function Sheet({
   onClose?: () => void;
   style?: CSSProperties;
 }) {
-  const [shown, setShown] = useState(false);
+  const cardRef = useRef<HTMLDivElement>(null);
+  const [shown, setShown] = useEnterTransition(cardRef);
   const closingRef = useRef(false);
   // Drag-to-dismiss: the grabber can be pulled down; past a threshold (or a
   // quick flick) it closes, otherwise it springs back.
   const [dragY, setDragY] = useState(0);
   const [dragging, setDragging] = useState(false);
   const dragStartRef = useRef<{ y: number; t: number } | null>(null);
-
-  // Enter animation: commit the closed state first, then flip open on the next
-  // paint so the transition actually runs (double-rAF for cross-engine safety).
-  useEffect(() => {
-    let raf2 = 0;
-    const raf1 = requestAnimationFrame(() => {
-      raf2 = requestAnimationFrame(() => setShown(true));
-    });
-    return () => {
-      cancelAnimationFrame(raf1);
-      cancelAnimationFrame(raf2);
-    };
-  }, []);
 
   const close = useCallback(() => {
     if (!onClose || closingRef.current) return;
@@ -188,6 +198,7 @@ export function Sheet({
         }}
       />
       <div
+        ref={cardRef}
         style={{
           position: "relative",
           margin: "0 12px",
@@ -228,55 +239,35 @@ export function Sheet({
 }
 
 /**
- * A full-height side drawer that slides in from the left or right edge — the
- * mobile stand-in for the desktop editor's side panels (left = note explorer,
- * right = note context/actions). Same enter/exit choreography as `Sheet` but on
- * the X axis; tapping the scrim runs the exit animation then calls `onClose`.
- * `header` renders a fixed title row; `children` scroll beneath it.
+ * A full-height drawer that slides in from the right edge — the mobile
+ * stand-in for the desktop editor's note-context side panel. Same enter/exit
+ * choreography as `Sheet` but on the X axis; tapping the scrim runs the exit
+ * animation then calls `onClose`. `header` renders a fixed row (it receives the
+ * animated `close` so an in-header control can run the exit animation);
+ * `children` scroll beneath it.
  */
 export function SidePanel({
-  side,
-  title,
   header,
   onClose,
   children,
-  headerRight,
   padBody = true,
 }: {
-  side: "left" | "right";
-  title?: ReactNode;
-  /** Custom header (replaces the default title/close row). Receives the animated
-   *  `close` so a collapse/close control inside it can run the exit animation. */
-  header?: (close: () => void) => ReactNode;
+  header: (close: () => void) => ReactNode;
   onClose: () => void;
   children: ReactNode;
-  /** Optional trailing control in the default header (e.g. a switcher). */
-  headerRight?: ReactNode;
   /** Pad the scroll body (default). Off for panels that manage their own padding. */
   padBody?: boolean;
 }) {
-  const [shown, setShown] = useState(false);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const [shown, setShown] = useEnterTransition(panelRef);
   const closingRef = useRef(false);
-
-  useEffect(() => {
-    let raf2 = 0;
-    const raf1 = requestAnimationFrame(() => {
-      raf2 = requestAnimationFrame(() => setShown(true));
-    });
-    return () => {
-      cancelAnimationFrame(raf1);
-      cancelAnimationFrame(raf2);
-    };
-  }, []);
 
   const close = useCallback(() => {
     if (closingRef.current) return;
     closingRef.current = true;
     setShown(false);
     window.setTimeout(onClose, SHEET_MS);
-  }, [onClose]);
-
-  const hidden = side === "left" ? "translateX(-100%)" : "translateX(100%)";
+  }, [onClose, setShown]);
 
   return (
     <div style={{ position: "absolute", inset: 0, zIndex: 45 }}>
@@ -291,11 +282,12 @@ export function SidePanel({
         }}
       />
       <div
+        ref={panelRef}
         style={{
           position: "absolute",
           top: 0,
           bottom: 0,
-          [side]: 0,
+          right: 0,
           width: "86%",
           maxWidth: 360,
           display: "flex",
@@ -305,7 +297,7 @@ export function SidePanel({
           // and the panel's border begins at the cap's bottom (never up into the
           // notch). Only the drop shadow spans the full height (soft, expected).
           boxShadow: "var(--shadow-3)",
-          transform: shown ? "translateX(0)" : hidden,
+          transform: shown ? "translateX(0)" : "translateX(100%)",
           transition: `transform ${SHEET_MS}ms cubic-bezier(0.32, 0.72, 0, 1)`,
           willChange: "transform",
         }}
@@ -320,42 +312,11 @@ export function SidePanel({
             display: "flex",
             flexDirection: "column",
             background: "var(--bg-1)",
-            borderLeft: side === "right" ? "1px solid var(--line-2)" : undefined,
-            borderRight: side === "left" ? "1px solid var(--line-2)" : undefined,
+            borderLeft: "1px solid var(--line-2)",
             borderTop: "1px solid var(--line-2)",
           }}
         >
-          {header ? (
-            <div style={{ flex: "none" }}>{header(close)}</div>
-          ) : (
-            <div
-              style={{
-                flex: "none",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: 10,
-                padding: "12px 16px 12px",
-                borderBottom: "1px solid var(--line-1)",
-              }}
-            >
-              <span style={{ fontSize: 17, fontWeight: 700, color: "var(--fg-1)", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {title}
-              </span>
-              <div style={{ display: "flex", alignItems: "center", gap: 4, flex: "none" }}>
-                {headerRight}
-                <button
-                  onClick={close}
-                  aria-label="Close"
-                  style={{ width: 32, height: 32, borderRadius: 8, border: "none", background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
-                >
-                  <svg width="17" height="17" viewBox="0 0 24 24">
-                    <path d="M6 6l12 12M18 6L6 18" stroke="var(--fg-2)" strokeWidth="2" strokeLinecap="round" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-          )}
+          <div style={{ flex: "none" }}>{header(close)}</div>
           <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: padBody ? "8px 12px calc(16px + env(safe-area-inset-bottom, 0px))" : "0 0 calc(env(safe-area-inset-bottom, 0px))" }}>
             {children}
           </div>
