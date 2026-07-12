@@ -1,7 +1,10 @@
 # Standalone workspace — myne-mobile is cloned INSIDE the main `myne` repo
-# directory, so without this empty table cargo would treat src-tauri as a member
-# of the main repo's workspace (which doesn't list it) and fail.
+# directory, so without this table cargo would treat src-tauri as a member
+# of the main repo's workspace (which doesn't list it) and fail. The
+# screen-guard plugin is a member so ONE Cargo.lock governs it (TB9-style
+# single-lock discipline).
 [workspace]
+members = ["tauri-plugin-screen-guard"]
 
 [package]
 name = "myne-mobile"
@@ -63,6 +66,11 @@ tauri-plugin-opener = "2"
 # drives the ordinary React new-note editor after unlock — no second, unaudited
 # capture path.
 tauri-plugin-deep-link = "2"
+# MYND-469: in-repo Android FLAG_SECURE bridge for `screen_guard` (Kotlin
+# under the plugin's own `android/`, since gitignored `gen/android` cannot
+# carry committed code). Rust-only surface — no WebView commands, no
+# capability entry. Zero external crates.
+tauri-plugin-screen-guard = { path = "tauri-plugin-screen-guard" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 uuid = { version = "1", features = ["v4", "v7"] }
@@ -74,6 +82,12 @@ tokio = { version = "1", features = ["rt", "rt-multi-thread", "time", "sync", "m
 # variant-name fields only; see the main repo's src-tauri/CLAUDE.md
 # "Secret-handling logging discipline").
 tracing = "0.1"
+# The actual log sink (desktop `lib.rs` parity). Without it every mobile
+# `tracing::*!` event is silently dropped — the device checklists
+# (`docs/dev/device-matrix.md` §7) read these events via the iOS dev console /
+# `adb logcat -s RustStdoutStderr`. NOT a new audit surface: already in the
+# shared lock via the `tracing-test` dev-dependency.
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 # NFC/NFKD normalization shared with the protocol crate's vault.prefs folder
 # normalization. Pure-Rust, already in the shared lock.
 unicode-normalization = { version = "0.1.25", default-features = false }
@@ -83,12 +97,15 @@ unicode-normalization = { version = "0.1.25", default-features = false }
 sha2 = { version = "0.10", default-features = false }
 
 # iOS-only: Objective-C runtime access for the WKWebView keyboard-accessory-bar
-# swizzle (`ios_chrome`). NOT a new dependency to audit — `objc2` is already
-# compiled into the build transitively via `wry`; this just names the existing
-# version so we can reference it directly. Pinned to the version already in the
-# shared lock.
+# swizzle (`ios_chrome`) and the screen-capture secure-field splice
+# (`screen_guard`, MYND-469). NOT a new dependency to audit — `objc2` is
+# already compiled into the build transitively via `wry`; this just names the
+# existing version so we can reference it directly. Pinned to the version
+# already in the shared lock. The `exception` feature (objc2::exception::catch
+# around the UIKit splice) is likewise declaration-only: wry already enables it
+# for Apple targets, so feature unification adds no crates.
 [target.'cfg(target_os = "ios")'.dependencies]
-objc2 = "0.6"
+objc2 = { version = "0.6", features = ["exception"] }
 
 # Dev-dependencies — same policy bar as runtime deps. `tracing-test` captures
 # `tracing` events per-test so the plugins' tracing-level discipline is

@@ -142,5 +142,33 @@ means a stale 2021-era WebView can fail to parse the bundle at all).
 | A.8 | **Hardware/gesture back** | current truth: wry's default backgrounds the app from anywhere (SPA, no history entries). Documented v1 behavior; pane-aware back is a separate work item |
 | A.9 | **IME / keyboard** | the soft keyboard does not cover the editor caret; external-keyboard basics work |
 | A.10 | **Safe-area / cutout / edge-to-edge** | targetSdk 36 on Android 15+ enforces edge-to-edge — check for content under the status bar/cutout in both orientations (WebView safe-area insets are typically 0 on Android) |
-| A.11 | **Screenshots / app-switcher preview** | **expected to WORK — known privacy gap**: FLAG_SECURE is a documented no-op on Android (`screen_guard.rs`), so the Settings screen-capture toggle does nothing here until the Kotlin/ndk-context wiring lands. Honest-disclosure: the toggle must not present itself as active protection on Android |
+| A.11 | **Screenshots / app-switcher preview** | **blocked** — FLAG_SECURE is live via the `tauri-plugin-screen-guard` Kotlin bridge (MYND-469); walk the full §7 checklist (rows 7.8–7.11) for the authoritative pass criteria |
 | A.12 | **Background grace-lock** | background past `auto_lock_seconds` → locked before any note renders on resume (same as iOS 3.4) |
+
+## 7. Screen-capture protection verification checklist (MYND-469)
+
+The iOS secure-field layer splice is **UNVERIFIED until this passes on a real device** — the
+pre-`b904b58` automatic-apply implementation crashed on-device, and the widely-deployed equivalent
+(ScreenProtectorKit) has deprecated the identical technique "due to crashes on some devices". The
+current implementation moves the one-time splice to app startup (the timing every deployed
+implementation uses), wraps every ObjC call in `objc2::exception::catch`, and branches the
+iOS-17 sublayer-order change — but an uncatchable CoreAnimation abort remains possible in theory,
+so **a failed row 7.6 reverts the iOS `apply` call to a documented no-op (one line in
+`screen_guard.rs::apply`), not a partial ship**. Android's FLAG_SECURE is the authoritative OS
+primitive and carries no crash history; its rows run on the §6 tablet loop (`adb` criteria are
+scriptable). Record device model + OS build per run — the iOS sublayer branch differs below/at
+iOS 17, so the §2 version-matrix axis (oldest device + current iOS) applies here too.
+
+| # | Scenario | Expected |
+|---|---|---|
+| 7.1 | **iOS cold start, pre-unlock** — launch, screenshot the unlock screen | capture is blank/black (startup splice + always-ON before first frame) |
+| 7.2 | **iOS unlocked, protection ON** — screenshot in the editor with a note open | blank; note plaintext never appears in the capture |
+| 7.3 | **iOS recording + mirroring, ON** — screen-record and AirPlay-mirror while editing | recorded/mirrored frames blank while the app is frontmost |
+| 7.4 | **iOS user opt-out honored** — Settings → Privacy → screen-capture toggle OFF → screenshot | content visible (the toggle is honest both ways) |
+| 7.5 | **iOS lock resets to ON** — with the toggle OFF, lock the vault → screenshot the unlock screen | blank again (lock/unlock-fail always re-applies ON) |
+| 7.6 | **iOS stability soak (the crash regression)** — toggle ON/OFF ×10, rotate, background/foreground ×5, open/close keyboard, then lock/unlock ×5 | no crash, no black-screen, no layout/rendering artifact (the WKWebView layer-reparenting risk); a failure here is the one-line revert |
+| 7.7 | **iOS app-switcher card, ON** — background the app, inspect the switcher | best-effort: record the observed behavior per iOS version — the secure-field trick does not contractually blank the snapshot path (Android's FLAG_SECURE does) |
+| 7.8 | **Android capture, ON** — `adb exec-out screencap -p > shot.png` + an on-device screenshot attempt | screencap yields a black frame; the device shows the "can't take screenshot" / blocked-by-policy toast |
+| 7.9 | **Android recents, ON** — open the recents overview | the app card is blank |
+| 7.10 | **Android opt-out** — toggle OFF → screencap; then lock the vault → screencap | content visible while OFF; black again after lock |
+| 7.11 | **Android cold start** — fresh launch, screencap before unlock | black — the Kotlin `load()` applies FLAG_SECURE at plugin registration, before any Rust hook fires |

@@ -1,0 +1,26 @@
+# In-repo Tauri mobile plugin: the Android FLAG_SECURE bridge for
+# `screen_guard` (MYND-469). Rust-only surface — it exposes ZERO WebView-facing
+# commands, so it needs no permission file, no capability grant, and no
+# `InlinedPlugin` entry in the app's build.rs (the deep-link `setEventHandler`
+# precedent). Kotlin lives in `android/` because `src-tauri/gen` is gitignored —
+# a fresh `tauri android init` cannot clobber this module; the app build wires
+# it in automatically via the `cargo:android_library_path` metadata that
+# `tauri_plugin::Builder` emits (no scripts/android-postinit.sh step needed).
+[package]
+name = "tauri-plugin-screen-guard"
+version = "0.1.0"
+description = "Myne mobile — Android FLAG_SECURE screen-capture bridge (Rust-only, no WebView commands)"
+authors = ["Myne"]
+edition = "2021"
+license = "AGPL-3.0"
+# Mandatory for tauri-plugin build scripts (build fails without it) and must
+# equal the crate name exactly.
+links = "tauri-plugin-screen-guard"
+
+[build-dependencies]
+# Already in the shared lock (pulled by tauri-plugin-deep-link) — no new crates.
+tauri-plugin = { version = "2", features = ["build"] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde = { version = "1", features = ["derive"] }
