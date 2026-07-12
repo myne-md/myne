@@ -376,6 +376,17 @@ export interface PrefsView {
    */
   folder_icons: Record<string, string>;
   /**
+   * Per-device friendly names (MYND-459 / SYNC-41) — a map from a 16-byte
+   * `device_id` (hex) to a user-chosen display name, carried inside the AEAD'd
+   * synced `MYP1` prefs so every client resolves the same name. Absent in vaults
+   * with no named device → the Rust decoder defaults it to `{}` (the additive
+   * field shifts no bytes for name-less vaults). The single home for device
+   * friendly-names — no client ships a second default-name heuristic beyond the
+   * `device_id`-prefix fallback used until a device is explicitly named.
+   * Serialized from Rust `BTreeMap<String, String>`.
+   */
+  device_names: Record<string, string>;
+  /**
    * Hidden bottom-bar item ids (bottom-bar customization) — the set of
    * {@link BottomBar} element ids the user chose to hide via the bar's
    * right-click menu (e.g. `"graph"`, `"tags"`, `"word-count"`). The backend

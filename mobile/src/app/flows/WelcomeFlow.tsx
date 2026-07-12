@@ -6,7 +6,7 @@ import type { WelcomeFlowProps } from "./types";
 
 /** 01 · Welcome — wired. Routes into create / recover. Surfaces a repair banner
  *  when a partial-fail vault_delete left orphan residue behind (MYND-159). */
-export function WelcomeFlow({ onCreate, onRecover }: WelcomeFlowProps) {
+export function WelcomeFlow({ onCreate, onRecover, onJoin }: WelcomeFlowProps) {
   const [residue, setResidue] = useState(0);
   const [repairing, setRepairing] = useState(false);
   const [repairMsg, setRepairMsg] = useState<string | null>(null);
@@ -86,6 +86,9 @@ export function WelcomeFlow({ onCreate, onRecover }: WelcomeFlowProps) {
           <div style={{ fontSize: 13, color: "var(--fg-3)", textAlign: "center" }}>{repairMsg}</div>
         )}
         <Button onClick={onCreate}>Create a vault</Button>
+        <Button variant="ghost" onClick={onJoin}>
+          Connect to my account
+        </Button>
         <Button variant="ghost" onClick={onRecover}>
           I already have a recovery phrase
         </Button>

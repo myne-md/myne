@@ -13,6 +13,7 @@ import { lockVault } from "../lib/vault-unlock";
 import { HAS_TAURI } from "../lib/app-window";
 
 import { WelcomeFlow } from "./flows/WelcomeFlow";
+import { JoinFlow } from "./flows/JoinFlow";
 import { CreateVaultFlow } from "./flows/CreateVaultFlow";
 import { UnlockFlow } from "./flows/UnlockFlow";
 import { RecoverFlow } from "./flows/RecoverFlow";
@@ -34,6 +35,10 @@ const ACTIVE_SLOT = "active-slot";
 export function AppShell() {
   const [stage, setStage] = useState<Stage | null>(null);
   const probed = useRef(false);
+  // Fresh-device sync-join overlay. Rendered full-screen WHILE the stage stays
+  // `welcome` (the wired `welcome.join-success` arm lands the editor from there,
+  // MYND-424) — an out-of-band local toggle, like recover's out-of-band entry.
+  const [showJoin, setShowJoin] = useState(false);
 
   const boot = useCallback(async () => {
     if (!HAS_TAURI) {
@@ -79,6 +84,20 @@ export function AppShell() {
 
   switch (stage.name) {
     case "welcome":
+      // The join flow runs full-screen while the stage is still `welcome`; on a
+      // successful bootstrap it dispatches the wired `welcome.join-success` →
+      // editor. Cancel just closes the overlay back to Welcome.
+      if (showJoin) {
+        return (
+          <JoinFlow
+            onComplete={(vaultId) => {
+              setShowJoin(false);
+              dispatch({ type: "welcome.join-success", vaultId });
+            }}
+            onCancel={() => setShowJoin(false)}
+          />
+        );
+      }
       return (
         <WelcomeFlow
           onCreate={() => dispatch({ type: "create-vault.start" })}
@@ -87,6 +106,7 @@ export function AppShell() {
           // fresh device with none, the backend returns the non-distinguishing
           // "invalid phrase" state, which RecoverFlow surfaces.
           onRecover={() => setStage({ name: "recover", subStep: "phrase-entry" })}
+          onJoin={() => setShowJoin(true)}
         />
       );
 

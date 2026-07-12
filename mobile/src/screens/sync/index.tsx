@@ -1,6 +1,7 @@
 import type { CSSProperties, ReactNode } from "react";
 import { Screen, ScreenScroll, FooterBar, Button } from "../../components";
 import type { ScreenDef } from "../../gallery/types";
+import { SYNC_INTEGRITY_ALERT } from "../../lib/load-bearing-copy";
 
 // ── Shared local fragments ───────────────────────────────────────────────────
 
@@ -653,8 +654,10 @@ function IntegrityAlert() {
             </svg>
             <span style={{ fontSize: 17, fontWeight: 600, color: "var(--danger)" }}>Integrity problem</span>
           </div>
+          {/* SYNC-48: render the pinned load-bearing literal VERBATIM (never a
+              paraphrase) so the design mock cannot drift from the shipped copy. */}
           <p style={{ margin: "12px 0 0", fontSize: 14, lineHeight: 1.6, color: "var(--danger)" }}>
-            Possible sync integrity problem. Your local notes are safe. If this keeps happening, verify your devices.
+            {SYNC_INTEGRITY_ALERT}
           </p>
         </div>
 
