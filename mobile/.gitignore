@@ -33,3 +33,7 @@ pnpm-debug.log*
 *.njsproj
 *.sln
 *.sw?
+
+# Playwright flow-logic tier (MYND-462 T3) output
+test-results/
+playwright-report/

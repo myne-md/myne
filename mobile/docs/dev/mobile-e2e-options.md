@@ -35,16 +35,20 @@ the *discipline* (data-testid, fixture seeding, production-IPC, no test hooks).
 
 ## 3. What carries over regardless of the driver choice
 
-- ✅ **The `protocol` crate tests + `myne-test-vectors`** — primitives are
+- ✅ **The `protocol` crate tests (767) + `myne-test-vectors`** — primitives are
   byte-identical (shared crate); already validated upstream.
-- ✅ **The mirrored backend's 560 `cargo test`** — vault/notes/prefs logic.
-- ✅ **The new Vitest unit suite** (`tests/` — state machine, IPC contract,
-  bip39) — pure TS, platform-agnostic.
+- ✅ **The mirrored backend's `myne-core` `cargo test` (1035 as of 2026-07-07,
+  MYND-459 sync included)** — vault/notes/prefs/**sync** logic. (The 560 figure
+  here was stale; the shared cores have grown, and the whole sync engine now
+  lives in `myne-core`.) The mobile crate itself carries **13** thin-wiring Rust
+  tests over these shared bodies.
+- ✅ **The Vitest unit suite** (`tests/` — 116 tests as of 2026-07-07: state
+  machine, IPC contract, bip39, conflict-copy, etc.) — pure TS, platform-agnostic.
 - ✅ **The `data-testid` selector contract** — native mobile drivers all support
-  element lookup by attribute inside a WebView. **Prerequisite:** the wired
-  flows need a `data-testid` pass (today only the design gallery has
-  `data-screen`; the real `src/app/flows/*` need testids, same discipline as
-  desktop SYNC-8).
+  element lookup by attribute inside a WebView. **Landed:** the wired sync flows
+  now carry their `data-testid` pass (MYND-459/461 — enroll/endpoint/devices/SAS/
+  status/conflict surfaces; see `sync-test-confidence.md` for the audit), same
+  discipline as desktop SYNC-8.
 - ✅ **Fixture-seeding pattern** — write a `vault.meta` into the app's data dir.
   On mobile the dir is the app sandbox (iOS `Library/Application Support`,
   Android `files/`), reachable via the simulator/emulator filesystem; the

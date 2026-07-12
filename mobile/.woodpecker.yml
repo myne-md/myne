@@ -113,6 +113,23 @@ steps:
       - pnpm install --frozen-lockfile
       - pnpm test
 
+  # ── Sync UI flow-logic tier (MYND-462 T3) — NOT end-to-end ────────────────
+  # Playwright drives headless Chromium against the Vite DEV SERVER with a MOCK
+  # Tauri IPC (`tests/flow-logic/mock-ipc.ts`) — it exercises the sync UI's flow
+  # machine (enroll transitions, status rendering, conflict-sheet wiring) via the
+  # `data-testid` contract. There is NO device, NO Rust backend, NO real transport
+  # here, so this tier is deliberately labeled "flow-logic" and MUST NEVER be
+  # called end-to-end: device-level UI testing is the SYNC-44 exemption (MYND-467).
+  flow-logic:
+    image: mcr.microsoft.com/playwright:v1.61.1-noble
+    depends_on: [vitest]
+    commands:
+      - npm install -g pnpm@11.8.0
+      - pnpm install --frozen-lockfile
+      # The Playwright image ships the browsers; `pnpm dev` is started by the
+      # config's webServer (reuseExistingServer:true → starts one in CI).
+      - pnpm run test:flow
+
 # Native build matrix (NOT run here — needs Xcode / Android SDK+NDK):
 #   iOS:     pnpm tauri ios build      (mac runner, signing identity)
 #   Android: pnpm tauri android build  (JDK 17 + Android SDK/NDK runner)
