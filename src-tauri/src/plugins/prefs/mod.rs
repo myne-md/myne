@@ -106,6 +106,13 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::set_right_panel_active_tab,
             commands::set_right_panel_hidden_tabs,
             commands::set_right_panel_tab_order,
+            // MYND-336 editor toolbar / slash-menu customization setters. Each
+            // needs a matching capabilities/default.json permission — verify via
+            // `pnpm tauri dev` (permission autogen).
+            commands::set_editor_toolbar_order,
+            commands::set_editor_toolbar_hidden,
+            commands::set_editor_slash_order,
+            commands::set_editor_slash_hidden,
         ])
         .build()
 }

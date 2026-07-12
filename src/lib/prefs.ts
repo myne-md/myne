@@ -451,6 +451,12 @@ export interface PrefsView {
    * order) is byte-identical to a pre-feature vault. Absent → `[]`.
    */
   right_panel_tab_order: string[];
+  /** MYND-336 editor toolbar customization. `*_order` is a verbatim sequence,
+   *  `*_hidden` a sorted+deduped set; both default `[]` (today's layout). */
+  editor_toolbar_order: string[];
+  editor_toolbar_hidden: string[];
+  editor_slash_order: string[];
+  editor_slash_hidden: string[];
   /**
    * Per-item color label (MYND-184) — a map from a sidebar item key (a note UUID
    * **or** a canonical trailing-slash folder path, discriminated by the trailing
@@ -651,6 +657,26 @@ export async function setRightPanelHiddenTabs(items: string[]): Promise<void> {
  */
 export async function setRightPanelTabOrder(order: string[]): Promise<void> {
   await invoke<void>("plugin:prefs|set_right_panel_tab_order", { order });
+}
+
+/** MYND-336: persist the editor toolbar order (verbatim sequence). */
+export async function setEditorToolbarOrder(order: string[]): Promise<void> {
+  await invoke<void>("plugin:prefs|set_editor_toolbar_order", { order });
+}
+
+/** MYND-336: persist the hidden editor-toolbar items (set — sorted/deduped on encode). */
+export async function setEditorToolbarHidden(items: string[]): Promise<void> {
+  await invoke<void>("plugin:prefs|set_editor_toolbar_hidden", { items });
+}
+
+/** MYND-336: persist the slash-menu order (verbatim sequence). */
+export async function setEditorSlashOrder(order: string[]): Promise<void> {
+  await invoke<void>("plugin:prefs|set_editor_slash_order", { order });
+}
+
+/** MYND-336: persist the hidden slash-menu items (set — sorted/deduped on encode). */
+export async function setEditorSlashHidden(items: string[]): Promise<void> {
+  await invoke<void>("plugin:prefs|set_editor_slash_hidden", { items });
 }
 
 /**
