@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- WG-02 · Quick capture — 2×2 default (small layout), horizontally
+     resizable; QuickCaptureWidget.kt swaps to the two-button medium layout
+     past the width threshold. -->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:description="@string/myne_widget_capture_desc"
+    android:initialLayout="@layout/myne_widget_capture_small"
+    android:minWidth="110dp"
+    android:minHeight="110dp"
+    android:previewLayout="@layout/myne_widget_capture_small"
+    android:resizeMode="horizontal"
+    android:targetCellWidth="2"
+    android:targetCellHeight="2"
+    android:updatePeriodMillis="0"
+    android:widgetCategory="home_screen" />

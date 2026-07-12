@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- WG-03 · Encrypted — fixed 2×2 static badge. -->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:description="@string/myne_widget_encrypted_desc"
+    android:initialLayout="@layout/myne_widget_encrypted"
+    android:minWidth="110dp"
+    android:minHeight="110dp"
+    android:previewLayout="@layout/myne_widget_encrypted"
+    android:resizeMode="none"
+    android:targetCellWidth="2"
+    android:targetCellHeight="2"
+    android:updatePeriodMillis="0"
+    android:widgetCategory="home_screen" />

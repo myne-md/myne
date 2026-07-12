@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Widget receivers + the QS tile service. Merged into the app manifest by
+     the Gradle manifest merger, so nothing here needs re-applying after a
+     fresh `tauri android init` (unlike the two gradle wiring lines — see
+     android-widgets/README.md). The static-shortcuts <meta-data> is the one
+     entry that must sit ON MainActivity, which a library manifest cannot
+     reach; src-tauri/build.rs injects it. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <!-- WG-01 · Open Myne (2×2 launcher, locked default) -->
+        <receiver
+            android:name="md.myne.mobile.widgets.OpenWidget"
+            android:exported="false"
+            android:label="@string/myne_widget_open_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/myne_appwidget_open" />
+        </receiver>
+
+        <!-- WG-02 · Quick capture (2×2 default, horizontally resizable to the
+             two-button medium layout) -->
+        <receiver
+            android:name="md.myne.mobile.widgets.QuickCaptureWidget"
+            android:exported="false"
+            android:label="@string/myne_widget_capture_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/myne_appwidget_capture" />
+        </receiver>
+
+        <!-- WG-03 · Encrypted (2×2 static badge) -->
+        <receiver
+            android:name="md.myne.mobile.widgets.EncryptedWidget"
+            android:exported="false"
+            android:label="@string/myne_widget_encrypted_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/myne_appwidget_encrypted" />
+        </receiver>
+
+        <!-- Quick Settings "New note" tile — the Android analog of the iOS 18
+             Control Center control (MyneControl.swift). -->
+        <service
+            android:name="md.myne.mobile.widgets.NewNoteTileService"
+            android:exported="true"
+            android:icon="@drawable/myne_ic_plus"
+            android:label="@string/myne_tile_new_note_label"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+    </application>
+</manifest>

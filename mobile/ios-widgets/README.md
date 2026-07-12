@@ -64,6 +64,13 @@ generate the Xcode project — the durable layer.
 
 Then `cd src-tauri/gen/apple && xcodegen generate` (Tauri also runs it on build).
 
+> Note (MYND-465): the URL-scheme half of addition 3 is now REDUNDANT — the
+> `myne` `CFBundleURLTypes` moved into the committed `src-tauri/Info.ios.plist`
+> partial (and `tauri.conf.json` `plugins.deep-link.mobile` covers the Android
+> intent-filter). After a fresh init only the signing half of addition 3 still
+> needs re-applying. The Android mirror of this whole wiring story lives in
+> `android-widgets/README.md`.
+
 ### The app-side deep-link half (this is what makes them *work*)
 
 The widgets only emit a `myne://` URL — everything functional is resolved

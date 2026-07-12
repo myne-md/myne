@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The 44dp accent plus-box on the small capture widget (radius 12). -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@color/myne_accent" />
+    <corners android:radius="12dp" />
+</shape>

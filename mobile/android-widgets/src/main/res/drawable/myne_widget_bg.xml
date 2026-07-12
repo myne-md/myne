@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Widget container: paper surface, launcher-driven radius on 12+. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@color/myne_paper" />
+    <corners android:radius="@dimen/myne_widget_radius" />
+</shape>
