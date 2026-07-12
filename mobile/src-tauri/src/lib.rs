@@ -1,12 +1,16 @@
 // Myne mobile — Tauri 2 host. Phase-1 vault + notes + prefs backend that
 // consumes the shared `myne-core` crate (the single source of truth for the
 // vault / notes / prefs plugin cores, extracted from the desktop crate) and the
-// audited `protocol/` crate directly (no port). Desktop-only subsystems
-// (clipper, screen-capture, auto-lock, backup, export, importer, sync, themes,
-// attachments, workspace, spell, search) are not carried over — the core
-// command cores trigger those side-effects through the
+// audited `protocol/` crate directly (no port). The still-desktop-only
+// subsystems (clipper, screen-capture, auto-lock, backup, importer, themes,
+// workspace, spell, PDF-export, AI-embeddings, biometric quick-unlock) are not
+// carried over — the core command cores trigger those side-effects through the
 // `myne_core::hooks::VaultLifecycleHooks` seam, into which mobile installs
 // `hooks::MobileHooks` (no-op for every desktop-only side-effect). The
+// `sync` plugin (MYND-458) IS registered here — a thin shim over
+// `myne_core::plugins::sync` (all 14 commands, one deny-by-default
+// `sync:default` capability, SYNC-15); its `bump_local_change` hook stays a
+// no-op until the SyncLocalChange wiring lands (MYND-458 task 4). The
 // snapshots subsystem lives in `myne-core`, so `MobileHooks` wires its two
 // snapshot hooks to the real snapshot store — a note overwrite/delete on
 // mobile captures/purges `.myn` snapshots just like desktop. `vault-indices`
@@ -69,6 +73,12 @@ pub fn run() {
         // write — the Rust core does the only IO and rejects any destination
         // inside the app-data / vault tree (TB6). Holds no plugin-private state.
         .plugin(plugins::secret_export::init())
+        // MYND-458: the mobile `sync` shim over `myne_core::plugins::sync` — the
+        // same 14 commands the desktop registers, gated by a single
+        // deny-by-default `sync:default` capability (SYNC-15). Command bodies are
+        // the shared-core compiled code; this crate adds only the wrapper +
+        // capability entry. The scheduler/loop stays out (MYND-460).
+        .plugin(plugins::sync::init())
         // MYND-169: the `attachment://<id>` async custom-URI-scheme handler.
         // A custom protocol handler is a builder-level concern (not a plugin
         // invoke handler); it decrypts the MYA1 blob in memory, re-sniffs the
@@ -81,14 +91,40 @@ pub fn run() {
         .setup(|app| {
             // Install the mobile lifecycle hooks the shared `myne-core` command
             // cores take as `State<'_, myne_core::hooks::Hooks>`. Every desktop-
-            // only side-effect (search, spell, sync, attachments, …) is a no-op,
-            // EXCEPT the two snapshot hooks: the snapshots subsystem lives in
-            // `myne-core`, so `MobileHooks::capture_snapshot` / `purge_note_snapshots`
-            // drive the real snapshot store — a note overwrite/delete on mobile
-            // captures/purges `.myn` snapshots just like desktop. Registered
-            // before any command can run — mirrors the desktop `app.manage(hooks)`
-            // wiring.
-            app.manage::<myne_core::hooks::Hooks>(std::sync::Arc::new(hooks::MobileHooks));
+            // only side-effect (search, spell, attachments, …) is a no-op, EXCEPT
+            // the two snapshot hooks (the snapshots subsystem lives in `myne-core`,
+            // so `MobileHooks::capture_snapshot` / `purge_note_snapshots` drive the
+            // real snapshot store — a note overwrite/delete captures/purges `.myn`
+            // snapshots just like desktop) AND `bump_local_change` (nudges the
+            // `SyncLocalChange` counter below). `MobileHooks` now holds the
+            // `AppHandle` so those hooks can reach managed state via `try_state` —
+            // mirrors the desktop `DesktopHooks::new(app.handle().clone())`.
+            // Registered before any command can run.
+            app.manage::<myne_core::hooks::Hooks>(std::sync::Arc::new(hooks::MobileHooks::new(
+                app.handle().clone(),
+            )));
+            // MYND-458 task 4 (SYNC-35): app-level `SyncLocalChange` counter. A
+            // local note edit bumps it via `MobileHooks::bump_local_change` so the
+            // foreground sync loop (below) can open its coalesced-push window.
+            // Mirrors the desktop `app.manage(SyncLocalChange::default())` wiring.
+            app.manage(myne_core::plugins::sync::loop_control::SyncLocalChange::default());
+            // SYNC-36: live Syncing/Error status cell. Without it every producer
+            // (loop `set_syncing`/`set_error`) + the `sync_status` reader overlay
+            // are `try_state`-None no-ops, so the status glyph/detail could never
+            // reflect real in-flight sync activity or a failed cycle. Mirrors the
+            // desktop `app.manage(SyncRuntimeStatusCell::default())` wiring.
+            app.manage(myne_core::plugins::sync::commands::SyncRuntimeStatusCell::default());
+            // SYNC-37 (decisions.md 2026-07-07): mobile v1 sync is **foreground-only**
+            // — the loop RUNS while the app is foregrounded (unlock-gated, polling +
+            // coalesced-push), which is what drives `run_active_cycle`: the sole path
+            // (besides `sync_now`) that claims a per-device token after an existing
+            // device approves this one, then pulls/pushes. Without it an approved
+            // device stays PENDING forever. The clean background suspend/resume +
+            // flush + grace-lock (SyncLifecycleSignal) is the deferred iOS-native
+            // cluster (MYND-460 F4-T2/T3/T4); the loop reads that signal via
+            // `try_state`→None (a safe no-op) until it lands, so foreground sync
+            // works today. Mirrors the desktop `spawn_sync_loop(...)` wiring.
+            myne_core::plugins::sync::loop_control::spawn_sync_loop(app.handle().clone());
             // MYND-31: app-level live in-RAM VaultIndices state (wikilink graph
             // + backlinks + tag index + typed properties), rebuilt on unlock by
             // the TS-orchestrated sweep. Mirrors the desktop `app.manage(...)`

@@ -19,18 +19,35 @@
 //!   linger).
 //!
 //! The already-registered `snapshots` plugin (list / preview / restore / prune
-//! commands) therefore has real data to operate on. Every other hook stays a
-//! no-op until its subsystem lands on mobile (see `myne-mobile/CLAUDE.md`).
+//! commands) therefore has real data to operate on.
+//!
+//! A third live hook is [`bump_local_change`](MobileHooks::bump_local_change): a
+//! local note edit nudges the shared `SyncLocalChange` counter (via `try_state`)
+//! so the future background-sync loop (MYND-460) can open its coalesced-push
+//! window. Until the loop lands nothing reads the counter, so the bump is a
+//! harmless nudge. Every other hook stays a no-op until its subsystem lands on
+//! mobile (see `myne-mobile/CLAUDE.md`).
 
 use myne_core::hooks::{BoxFuture, VaultLifecycleHooks};
 use myne_core::plugins::vault_unlock::state::VaultRuntimeState;
+use tauri::{AppHandle, Manager, Runtime};
 
 /// Mobile wiring for the shared command-core lifecycle hooks: no-op everywhere
-/// except the two snapshot hooks, which drive the `myne-core` snapshot store.
-#[derive(Default)]
-pub struct MobileHooks;
+/// except the two snapshot hooks (which drive the `myne-core` snapshot store)
+/// and `bump_local_change` (which nudges the shared `SyncLocalChange` counter).
+/// Holds an [`AppHandle`] so `bump_local_change` can reach the managed
+/// `SyncLocalChange` via `try_state` — mirrors the desktop `DesktopHooks`.
+pub struct MobileHooks<R: Runtime> {
+    app: AppHandle<R>,
+}
 
-impl VaultLifecycleHooks for MobileHooks {
+impl<R: Runtime> MobileHooks<R> {
+    pub fn new(app: AppHandle<R>) -> Self {
+        Self { app }
+    }
+}
+
+impl<R: Runtime> VaultLifecycleHooks for MobileHooks<R> {
     // ---- Group 1: async ---------------------------------------------------
     fn hydrate_search_index<'a>(&'a self, _: &'a VaultRuntimeState) -> BoxFuture<'a> {
         Box::pin(std::future::ready(()))
@@ -72,7 +89,19 @@ impl VaultLifecycleHooks for MobileHooks {
     fn ai_note_changed(&self, _: &str, _: &str) {}
     fn ai_note_deleted(&self, _: &str) {}
     fn ai_policy_changed(&self, _: bool, _: &[String]) {}
-    fn bump_local_change(&self) {}
+    fn bump_local_change(&self) {
+        // A local note edit nudges the coalesced-push counter so that when the
+        // background sync loop lands (MYND-460) its push window actually opens.
+        // Until then nothing reads the counter, so the bump is harmless. Guarded
+        // by `try_state`: if `SyncLocalChange` is unmanaged the bump is a no-op
+        // (mirrors desktop `src-tauri/src/hooks.rs::bump_local_change`).
+        if let Some(sig) = self
+            .app
+            .try_state::<myne_core::plugins::sync::loop_control::SyncLocalChange>()
+        {
+            sig.bump();
+        }
+    }
     fn emit_snapshot_write_failed(&self, _: &str) {}
 
     // ---- Group 5: prefs application ---------------------------------------

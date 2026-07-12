@@ -1,16 +1,20 @@
 //! Tauri 2 in-app plugins for vault flows (mobile).
 //!
 //! Mirror of the desktop `src-tauri/src/plugins/` set, trimmed to the
-//! Phase-1 vault + notes + prefs flows that compile on mobile. Each
-//! plugin is a self-contained module under `plugins/` with its own
-//! commands, state, and error type. Desktop-only plugins (clipper
-//! pairing, sync, themes, workspace, importer, pdf-export) are
-//! intentionally absent — mobile reuses the audited
-//! `protocol/` crate and the same secret-handling discipline, but does
-//! search / spell / attachments / sync TS-side or in later phases.
+//! flows that compile on mobile. Each plugin is a self-contained module
+//! under `plugins/` with its own commands, state, and error type. The
+//! still-desktop-only plugins (clipper pairing, themes, workspace,
+//! importer, pdf-export, spell) are intentionally absent — mobile reuses
+//! the audited `protocol/` crate and the same secret-handling discipline,
+//! landing the rest in later phases.
 //!
 //! `quick_unlock` (PIN path) is registered here — the core moved to
-//! `myne-core`; biometric stays desktop-only.
+//! `myne-core`; biometric stays desktop-only. `search` (MYS1) runs
+//! Rust-side (frontend-fed BM25), not TS-side.
+//!
+//! `sync` (MYND-458) is the mobile shim over `myne_core::plugins::sync` —
+//! ONE plugin, all fourteen commands, a single deny-by-default
+//! `sync:default` capability entry (SYNC-15).
 
 pub mod attachments;
 pub mod export;
@@ -28,6 +32,11 @@ pub mod secret_export;
 // are defined locally in `search/mod.rs`.
 pub mod search;
 pub mod snapshots;
+// MYND-458: the mobile `sync` shim over `myne_core::plugins::sync` — a thin
+// `pub use myne_core::plugins::sync::*` + a local `init()` registering all 14
+// commands. Deny-by-default `sync:default` capability; see `sync/mod.rs` for the
+// R3 transport review-debt banner.
+pub mod sync;
 pub mod vault_change_password;
 // `vault_creation` core (commands + state + error + `init()`) lives entirely in
 // `myne-core` (shared with the desktop client) — there is no mobile-side

@@ -155,6 +155,35 @@ fn main() {
                 // security bug.
                 "secret-export",
                 tauri_build::InlinedPlugin::new().commands(&["save_secret_text"]),
+            )
+            .plugin(
+                // MYND-458: the mobile `sync` shim over `myne_core::plugins::sync`
+                // — the SAME 15 commands the desktop registers, deny-by-default.
+                // (MYND-459 T12: `sync_head_fingerprint` added — the SY-05 SAS
+                // eye-compare substrate, exposed on mobile to match desktop F3-T4.)
+                // This list, the `generate_handler!` in `plugins/sync/mod.rs`, and
+                // `permissions/sync/default.toml` `commands.allow` MUST match
+                // exactly (all 15) or the ACL resolver fails closed. Adding a
+                // command here without a matching permission entry is a security
+                // bug (SYNC-15).
+                "sync",
+                tauri_build::InlinedPlugin::new().commands(&[
+                    "sync_get_endpoint",
+                    "sync_set_endpoint",
+                    "sync_status",
+                    "sync_now",
+                    "sync_list_devices",
+                    "sync_approve_device",
+                    "sync_remove_device",
+                    "sync_pending_conflicts",
+                    "sync_take_conflict",
+                    "sync_resolve_conflict",
+                    "sync_mark_tombstone",
+                    "sync_enroll",
+                    "sync_join_account",
+                    "sync_reset_local",
+                    "sync_head_fingerprint",
+                ]),
             ),
     )
     .unwrap();
