@@ -184,7 +184,7 @@ export type Stage =
       /**
        * Set ONLY by the `picker.select-vault` transition — marks an unlock
        * screen the user reached by picking a row on the ≥2-vault picker. When
-       * true, `<Unlock>` renders a "Choose a different vault" back affordance
+       * true, `<Unlock>` renders a top-left back arrow (chevron) affordance
        * (dispatching `unlock.back-to-picker` → `picker`) so a mis-selected
        * vault is recoverable without quitting the app. EVERY other path to
        * `unlock` (single-vault boot, editor lock, vault switch, recovery
@@ -417,7 +417,7 @@ export type Action =
    */
   | { type: "picker.select-vault"; vaultId: VaultId }
   /**
-   * unlock → picker. Dispatched by the "Choose a different vault" back
+   * unlock → picker. Dispatched by the top-left back arrow (chevron)
    * affordance `<Unlock>` renders ONLY when it was reached from the picker
    * (the `unlock` Stage's `fromPicker` payload is set). Returns the user to
    * the ≥2-vault selection surface so a mis-picked vault is recoverable
@@ -656,7 +656,7 @@ export function transition(prev: Stage, action: Action): Stage {
           // re-render between dispatch and the Unlock mount.
           //
           // `fromPicker: true` marks this unlock as picker-reached so
-          // `<Unlock>` renders the "Choose a different vault" back affordance
+          // `<Unlock>` renders the top-left back arrow (chevron) affordance
           // (`unlock.back-to-picker` → picker). It is the ONLY transition that
           // sets the flag — every other path to unlock has no picker to
           // return to.
