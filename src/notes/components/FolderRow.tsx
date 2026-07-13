@@ -31,9 +31,13 @@ const rowBaseStyle: CSSProperties = {
   height: 30,
   paddingRight: 12,
   cursor: "pointer",
-  borderRadius: 3,
+  borderRadius: 6,
   marginLeft: 4,
   marginRight: 4,
+  // Matches NoteRow: a 3px bottom gap so an active/hover folder row never butts
+  // its background against an adjacent row's, keeping the interleaved tree of
+  // folder + note pills uniform.
+  marginBottom: 3,
   userSelect: "none",
   fontFamily: "var(--font-sans)",
   boxSizing: "border-box",

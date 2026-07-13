@@ -105,9 +105,15 @@ const rowBaseStyle: CSSProperties = {
   padding: "8px 14px",
   minHeight: 52,
   cursor: "pointer",
-  borderRadius: 3,
+  borderRadius: 6,
   marginLeft: 4,
   marginRight: 4,
+  // A small vertical gap so adjacent highlighted rows (hover + selected) don't
+  // butt their backgrounds together and blend — each row reads as its own
+  // rounded pill. Single-direction (bottom only) → a deterministic 3px gap
+  // regardless of flex/block margin-collapse; the row above supplies the gap
+  // above each row. Matched by `FolderRow` so the interleaved tree is uniform.
+  marginBottom: 3,
   // Subtle hover via inline `:hover` not possible without a stylesheet —
   // we toggle via state below (`hovering`) so design-token bg shifts
   // are explicit.
