@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Screen, ScreenScroll, Title, FooterBar, Button, Banner, Spinner, MyneMark } from "../../components";
 import { listVaults, orderByLastUnlock } from "../../lib/vault-list";
+import { vaultDisplayLabel } from "../../lib/vault-label";
 import { ioBanner } from "../../lib/io-banner";
 import { HAS_TAURI } from "../../lib/app-window";
 import type { VaultSummary } from "../../types/vault-summary";
@@ -225,7 +226,7 @@ export function PickerFlow({ onSelect, onCreate }: PickerFlowProps) {
                 <VaultRow
                   key={vault.id}
                   dot={labeled ? DOT_PALETTE[i % DOT_PALETTE.length] : "var(--line-2)"}
-                  name={vault.label ?? `Vault ${i + 1}`}
+                  name={vaultDisplayLabel(vault.label, i + 1)}
                   when={openedWhen(vault.last_unlock)}
                   italic={!labeled}
                   corrupted={corrupted}
