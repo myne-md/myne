@@ -83,7 +83,9 @@ const ROW_STYLE: CSSProperties = {
   fontSize: 13,
   color: "var(--fg-1)",
 };
-const ROW_SELECTED_STYLE: CSSProperties = { ...ROW_STYLE, background: "var(--paper-2)" };
+// accent-soft (not --paper-2) so the active row stays visible on AMOLED, where
+// --paper-2 collapses to the modal background — same fix as the CommandPalette.
+const ROW_SELECTED_STYLE: CSSProperties = { ...ROW_STYLE, background: "var(--accent-soft)" };
 
 const LABEL_STYLE: CSSProperties = {
   flex: 1,
@@ -115,6 +117,7 @@ export function QuickPicker({
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const listRef = useRef<HTMLDivElement>(null);
   const modalRef = useRef<HTMLDivElement>(null);
   useFocusTrap(modalRef, { enabled: open, initialFocusRef: inputRef });
 
@@ -142,6 +145,15 @@ export function QuickPicker({
       setSelectedIndex(Math.max(0, filtered.length - 1));
     }
   }, [filtered.length, selectedIndex]);
+
+  // Keep the keyboard-selected row scrolled into view (guarded — jsdom has no
+  // scrollIntoView).
+  useEffect(() => {
+    const el = listRef.current?.querySelector<HTMLElement>('[aria-selected="true"]');
+    if (el !== null && el !== undefined && typeof el.scrollIntoView === "function") {
+      el.scrollIntoView({ block: "nearest" });
+    }
+  }, [selectedIndex, filtered.length]);
 
   if (!open) return null;
 
@@ -197,7 +209,7 @@ export function QuickPicker({
           aria-label={title}
           data-testid="quick-picker.input"
         />
-        <div style={LIST_STYLE} role="listbox">
+        <div style={LIST_STYLE} role="listbox" ref={listRef}>
           {filtered.length === 0 ? (
             <div style={EMPTY_STYLE}>{emptyText}</div>
           ) : (
