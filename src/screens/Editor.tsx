@@ -1688,6 +1688,7 @@ function EditorChrome({
       <CommandPaletteHost
         open={paletteOpen}
         onClose={() => setPaletteOpen(false)}
+        onReopen={() => setPaletteOpen(true)}
         onImportObsidian={() => {
           setPaletteOpen(false);
           setImporterOpen(true);
@@ -2088,6 +2089,9 @@ function TitleBarNavButton({
 type CommandPaletteHostProps = {
   open: boolean;
   onClose: () => void;
+  /** Re-open the palette — used to pop back from a QuickPicker sub-flow on
+   *  cancel (Esc/backdrop), so the picker reads as stacked on top of the palette. */
+  onReopen: () => void;
   onOpenSettings: () => void;
   onOpenAttachments: () => void;
   onManageTemplates: () => void;
@@ -2121,6 +2125,7 @@ type CommandPaletteHostProps = {
 function CommandPaletteHost({
   open,
   onClose,
+  onReopen,
   onOpenSettings,
   onRestoreBackup,
   onOpenAttachments,
@@ -2575,8 +2580,16 @@ function CommandPaletteHost({
         placeholder={picker?.placeholder ?? ""}
         emptyText={picker?.emptyText ?? ""}
         items={picker?.items ?? []}
-        onPick={(id) => picker?.onPick(id)}
-        onClose={() => setPicker(null)}
+        onPick={(id) => {
+          picker?.onPick(id);
+          setPicker(null);
+        }}
+        // Cancel (Esc / backdrop) pops back to the command palette — the picker
+        // is stacked on top of it (the palette closed when the action ran).
+        onClose={() => {
+          setPicker(null);
+          onReopen();
+        }}
       />
     </>
   );

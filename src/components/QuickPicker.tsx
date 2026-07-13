@@ -28,7 +28,11 @@ export type QuickPickerProps = {
   placeholder: string;
   items: readonly QuickPickItem[];
   emptyText: string;
+  /** A selection was made. Does NOT auto-close — the parent closes the picker
+   *  (and decides what happens next). */
   onPick: (id: string) => void;
+  /** Cancel (Esc / backdrop). Distinct from `onPick` so the parent can treat a
+   *  cancel as "pop back one level" (e.g. reopen the command palette). */
   onClose: () => void;
 };
 
@@ -157,11 +161,13 @@ export function QuickPicker({
 
   if (!open) return null;
 
+  // A pick calls `onPick` only — the parent closes the picker. `onClose` is
+  // reserved for a CANCEL (Esc / backdrop), which the parent treats as "pop back
+  // to the command palette" (stacked navigation).
   const commit = (i: number): void => {
     const it = filtered[i];
     if (it !== undefined) {
       onPick(it.id);
-      onClose();
     }
   };
 
@@ -224,7 +230,6 @@ export function QuickPicker({
                 onMouseDown={(e) => {
                   e.preventDefault();
                   onPick(it.id);
-                  onClose();
                 }}
               >
                 <span style={LABEL_STYLE}>{it.label}</span>
