@@ -18,17 +18,21 @@
 //! `spawn_blocking`. `vault_root` is where the device-local sync files live
 //! (`sync-state.json`, `vault.head-state`); `notes_dir` is `<vault_root>/notes`.
 
-use super::conflict::{merge_attachments_catalog, plan_note_keep_both, ConflictCopyPlan};
+use super::conflict::{
+    merge_attachments_catalog, merge_vault_meta, meta_password_side_winner, plan_note_keep_both,
+    ConflictCopyPlan, MetaWinner,
+};
 use super::engine::{self, ChangedBlob, PullError, PushBlob, PushError};
 use super::state::{
-    read_head_baseline, read_sync_state, write_head_baseline, write_sync_state, BlobSyncState,
-    SyncState,
+    clear_vault_meta_dirty, read_head_baseline, read_sync_state, vault_meta_is_dirty,
+    write_head_baseline, write_sync_state, BlobSyncState, SyncState,
 };
-use super::transport::SyncTransport;
+use super::transport::{HttpMethod, SyncTransport};
 use crate::attachment_nonce::{scan_attachments_manifest, AttachmentManifestEntry};
 use protocol::{
-    compute_manifest_hash, derive_subkey, encode_attachments_catalog, AttachmentsCatalog,
-    ManifestEntry, SubkeyRole, VaultHead, VvEntry, VAULT_HEAD_FORMAT_V1,
+    compute_manifest_hash, derive_subkey, encode_attachments_catalog, parse_vault_meta,
+    serialize_vault_meta, AttachmentsCatalog, ManifestEntry, SubkeyRole, VaultHead, VvEntry,
+    VAULT_HEAD_FORMAT_V1,
 };
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::Path;
@@ -623,6 +627,150 @@ const MAX_PUSH_ATTEMPTS: usize = 3;
 /// sibling note can never get through either). Bounded by [`MAX_PUSH_ATTEMPTS`].
 /// The device-local sync state is persisted only on a fully successful attempt, so
 /// a failed retry never leaks a half-advanced cursor onto disk.
+/// SHA-256 of `bytes` as lowercase hex — the `vault.meta` baseline discriminator.
+fn sha256_hex(bytes: &[u8]) -> String {
+    use sha2::{Digest, Sha256};
+    hex(&Sha256::digest(bytes))
+}
+
+/// What the `vault.meta` reconcile did this cycle (F1 Faz B). Returned for tests
+/// and logging; the caller treats every arm as success (the phase is best-effort).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MetaPhaseOutcome {
+    /// Nothing to do (server + local already agree, or nothing to push yet).
+    NoChange,
+    /// Pushed the local meta to the server (this device's change propagated).
+    Pushed,
+    /// Adopted the server's meta locally (picked up another device's change).
+    Adopted,
+    /// Concurrent change on both devices — deterministically merged.
+    Merged,
+    /// Transient/incompatible: left local untouched (never overwrites on doubt).
+    Skipped,
+}
+
+/// F1 Faz B — reconcile `vault.meta` with the server, independent of the head /
+/// blob plane (`vault.meta` is class-2 identity, never head-committed). Runs once
+/// per successful cycle. Closes the "a password change on device A must reach the
+/// already-enrolled device B" gap that Faz A's push-on-change only half-covers.
+///
+/// Convergence with a plain last-writer-wins server (no version counter): the
+/// device-local `meta_baseline_hex` distinguishes "server unchanged since I synced"
+/// (only I changed → push) from "server also changed" (concurrent → deterministic
+/// [`meta_password_side_winner`] merge, so both devices pick the same winner and
+/// stop — CRDT-style, exactly like the attachments-catalog merge).
+///
+/// SAFETY: `root_key` is a per-vault random value that a password change never
+/// touches — only its password-side *wrap* rotates — and [`merge_vault_meta`]
+/// refuses any meta whose recovery-side / KDF params / itemsKey wrap diverges. So
+/// an adopted/merged meta always carries the SAME `root_key` + itemsKey: notes stay
+/// readable and an already-unlocked session (which holds the keys in memory) is
+/// unaffected; only the NEXT unlock uses the new password wrap. On any doubt
+/// (transport error, unparseable or invariant-incompatible server meta) the phase
+/// SKIPS — it never overwrites the local credential root on a bad input.
+pub(crate) fn sync_meta_phase(
+    transport: &dyn SyncTransport,
+    token: &str,
+    vault_root: &Path,
+    state: &mut SyncState,
+    allow_push: bool,
+) -> MetaPhaseOutcome {
+    let meta_path = vault_root.join("vault.meta");
+    let Ok(local_bytes) = std::fs::read(&meta_path) else {
+        return MetaPhaseOutcome::NoChange; // no local meta (unenrolled edge) → nothing
+    };
+    let Ok(local_meta) = parse_vault_meta(&local_bytes) else {
+        return MetaPhaseOutcome::Skipped;
+    };
+    let local_hash = sha256_hex(&local_bytes);
+    let dirty = vault_meta_is_dirty(vault_root);
+
+    // Authed GET of THIS device's own server meta (no ?account=, not pre-auth).
+    let resp = match transport.request(HttpMethod::Get, "/vault.meta", &[], Some(token)) {
+        Ok(r) => r,
+        Err(_) => return MetaPhaseOutcome::Skipped, // transient — keep dirty for next cycle
+    };
+    let server_bytes = match resp.status {
+        200 => resp.body,
+        404 => {
+            // Server holds no meta yet (pre-seed). Contribute ours if we have a
+            // pending change and may push; else nothing to do.
+            if dirty
+                && allow_push
+                && super::enroll::put_vault_meta(transport, token, &local_bytes).is_ok()
+            {
+                state.meta_baseline_hex = Some(local_hash);
+                let _ = clear_vault_meta_dirty(vault_root);
+                return MetaPhaseOutcome::Pushed;
+            }
+            return MetaPhaseOutcome::NoChange;
+        }
+        _ => return MetaPhaseOutcome::Skipped,
+    };
+    let Ok(server_meta) = parse_vault_meta(&server_bytes) else {
+        return MetaPhaseOutcome::Skipped;
+    };
+    let server_hash = sha256_hex(&server_bytes);
+
+    // Already agree → clear any pending dirt, record the baseline.
+    if server_hash == local_hash {
+        state.meta_baseline_hex = Some(local_hash);
+        let _ = clear_vault_meta_dirty(vault_root);
+        return MetaPhaseOutcome::NoChange;
+    }
+
+    let baseline = state.meta_baseline_hex.as_deref();
+    let local_changed = dirty || (baseline.is_some() && baseline != Some(local_hash.as_str()));
+    let server_changed = baseline.is_none() || baseline != Some(server_hash.as_str());
+
+    // Only the server changed (I have no pending local change) → adopt it. Validate
+    // compatibility first: never overwrite the local credential root with a meta
+    // whose recovery-side / KDF / itemsKey diverges (a hostile or corrupt server).
+    if server_changed && !local_changed {
+        if merge_vault_meta(&local_meta, &server_meta, MetaWinner::Remote).is_err() {
+            return MetaPhaseOutcome::Skipped;
+        }
+        if crate::atomic_write::atomic_write(&meta_path, &server_bytes, true).is_ok() {
+            state.meta_baseline_hex = Some(server_hash);
+            let _ = clear_vault_meta_dirty(vault_root);
+            return MetaPhaseOutcome::Adopted;
+        }
+        return MetaPhaseOutcome::Skipped;
+    }
+
+    // Only I changed (server unchanged since my baseline) → push my meta.
+    if local_changed && !server_changed {
+        if allow_push && super::enroll::put_vault_meta(transport, token, &local_bytes).is_ok() {
+            state.meta_baseline_hex = Some(local_hash);
+            let _ = clear_vault_meta_dirty(vault_root);
+            return MetaPhaseOutcome::Pushed;
+        }
+        return MetaPhaseOutcome::NoChange; // keep dirty for a later push cycle
+    }
+
+    // Both changed (concurrent) → deterministic, commutative merge so both devices
+    // converge on the same winner with no server-side version counter.
+    let winner = meta_password_side_winner(&local_meta, &server_meta);
+    let Ok(merged) = merge_vault_meta(&local_meta, &server_meta, winner) else {
+        return MetaPhaseOutcome::Skipped; // incompatible invariant → leave local alone
+    };
+    let merged_bytes = serialize_vault_meta(&merged);
+    let merged_hash = sha256_hex(&merged_bytes);
+    if crate::atomic_write::atomic_write(&meta_path, &merged_bytes, true).is_err() {
+        return MetaPhaseOutcome::Skipped;
+    }
+    state.meta_baseline_hex = Some(merged_hash.clone());
+    if merged_hash == server_hash {
+        // Server already holds the winner — nothing to push; we are converged.
+        let _ = clear_vault_meta_dirty(vault_root);
+    } else if allow_push {
+        let _ = super::enroll::put_vault_meta(transport, token, &merged_bytes);
+        let _ = clear_vault_meta_dirty(vault_root);
+    }
+    // (!allow_push && merged != server: keep dirty so a later push cycle propagates.)
+    MetaPhaseOutcome::Merged
+}
+
 // The arguments are each a distinct, independent input to the cycle (the
 // transport, the two keys/ids, the token, the two paths, the push gate); bundling
 // them into a struct would not aid clarity at this single orchestrator entry.
@@ -671,8 +819,16 @@ pub fn run_sync_cycle(
             from_cursor,
         ) {
             Ok(summary) => {
-                // Persist the advanced cursor + per-blob CAS state ONLY on success,
-                // so a failed retry never leaves a half-advanced cursor on disk.
+                // F1 Faz B: reconcile vault.meta once per successful cycle (it is
+                // independent of the head/blob CAS plane, so it runs after the notes
+                // attempt succeeds, not inside the 409-retry loop). Best-effort — a
+                // meta hiccup must not fail a cycle that already synced notes; it
+                // mutates `state.meta_baseline_hex` (persisted just below) and does
+                // its own vault.meta write / dirty-marker clear.
+                let _ = sync_meta_phase(transport, token, vault_root, &mut state, allow_push);
+                // Persist the advanced cursor + per-blob CAS state + meta baseline
+                // ONLY on success, so a failed retry never leaves a half-advanced
+                // cursor on disk.
                 write_sync_state(vault_root, &state).map_err(|_| SyncCycleError::Io)?;
                 return Ok(summary);
             }
@@ -4350,5 +4506,277 @@ mod tests {
 
         std::fs::remove_dir_all(&dir_a).ok();
         std::fs::remove_dir_all(&dir_b).ok();
+    }
+
+    // ---- F1 Faz B: vault.meta reconcile (sync_meta_phase) --------------------
+
+    mod meta_phase {
+        use super::super::*;
+        use crate::plugins::sync::state::{mark_vault_meta_dirty, vault_meta_is_dirty, SyncState};
+        use crate::plugins::sync::transport::{FakeTransport, HttpMethod};
+        use protocol::{
+            serialize_vault_meta, VaultMeta, VAULT_META_ITEMS_KEY_ID_LEN, VAULT_META_NONCE_LEN,
+            VAULT_META_SALT_RANDOM_LEN, VAULT_META_WRAPPED_ITEMS_KEY_LEN,
+            VAULT_META_WRAPPED_ROOT_KEY_LEN,
+        };
+
+        // A vault.meta with a given password-side marker. Recovery-side, KDF, and
+        // the itemsKey wrap are FIXED (the cross-device invariants) so two of these
+        // differ only in the password-side wrap — exactly a password change.
+        fn meta_bytes(pw: u8) -> Vec<u8> {
+            let m = VaultMeta {
+                account_number_hash: [0x33; 16],
+                kdf_params: protocol::DEFAULT_V0_1_KDF_PARAMS,
+                random_salt_password: [pw; VAULT_META_SALT_RANDOM_LEN],
+                random_salt_recovery: [0x55; VAULT_META_SALT_RANDOM_LEN],
+                nonce_password_wrap: [pw; VAULT_META_NONCE_LEN],
+                enc_root_key_password: [pw; VAULT_META_WRAPPED_ROOT_KEY_LEN],
+                nonce_recovery_wrap: [0x55; VAULT_META_NONCE_LEN],
+                enc_root_key_recovery: [0x55; VAULT_META_WRAPPED_ROOT_KEY_LEN],
+                items_key_id: [0x07; VAULT_META_ITEMS_KEY_ID_LEN],
+                items_key_nonce: [0x08; VAULT_META_NONCE_LEN],
+                enc_items_key: [0x09; VAULT_META_WRAPPED_ITEMS_KEY_LEN],
+            };
+            serialize_vault_meta(&m).to_vec()
+        }
+
+        fn scratch(tag: &str) -> std::path::PathBuf {
+            let d = std::env::temp_dir().join(format!(
+                "myne-metaphase-{tag}-{}-{:p}",
+                std::process::id(),
+                &tag
+            ));
+            std::fs::create_dir_all(&d).unwrap();
+            d
+        }
+
+        fn put_recorded(t: &FakeTransport) -> Vec<Vec<u8>> {
+            t.requests()
+                .into_iter()
+                .filter(|(m, p, _, _, _)| *m == HttpMethod::Put && p == "/vault.meta")
+                .map(|(_, _, body, _, _)| body)
+                .collect()
+        }
+
+        // Device B holds an old meta, made NO local change; the server carries a
+        // newer password-side (device A changed it). B must ADOPT it: the local
+        // file becomes the server bytes, and no PUT is sent.
+        #[test]
+        fn adopts_remote_change_when_not_dirty() {
+            let dir = scratch("adopt");
+            let local = meta_bytes(0xAA);
+            let server = meta_bytes(0xBB);
+            std::fs::write(dir.join("vault.meta"), &local).unwrap();
+            // Baseline = the local we last synced (so "server changed, I didn't").
+            let mut st = SyncState {
+                meta_baseline_hex: Some(sha256_hex(&local)),
+                ..Default::default()
+            };
+            let t = FakeTransport::new();
+            t.on(HttpMethod::Get, "/vault.meta", 200, server.clone());
+
+            let out = sync_meta_phase(&t, "tok", &dir, &mut st, true);
+            assert_eq!(out, MetaPhaseOutcome::Adopted);
+            assert_eq!(
+                std::fs::read(dir.join("vault.meta")).unwrap(),
+                server,
+                "B adopts the server's newer meta verbatim"
+            );
+            assert_eq!(st.meta_baseline_hex, Some(sha256_hex(&server)));
+            assert!(put_recorded(&t).is_empty(), "adoption pushes nothing");
+            std::fs::remove_dir_all(&dir).ok();
+        }
+
+        // Device A changed its password (dirty); the server still holds the old
+        // meta (== baseline). A must PUSH its local meta and clear the marker.
+        #[test]
+        fn pushes_local_change_when_only_i_changed() {
+            let dir = scratch("push");
+            let baseline = meta_bytes(0xAA); // what the server still has
+            let local = meta_bytes(0xCC); // A's new password-side
+            std::fs::write(dir.join("vault.meta"), &local).unwrap();
+            mark_vault_meta_dirty(&dir).unwrap();
+            let mut st = SyncState {
+                meta_baseline_hex: Some(sha256_hex(&baseline)),
+                ..Default::default()
+            };
+            let t = FakeTransport::new();
+            t.on(HttpMethod::Get, "/vault.meta", 200, baseline);
+            t.on(HttpMethod::Put, "/vault.meta", 200, Vec::new());
+
+            let out = sync_meta_phase(&t, "tok", &dir, &mut st, true);
+            assert_eq!(out, MetaPhaseOutcome::Pushed);
+            let puts = put_recorded(&t);
+            assert_eq!(puts.len(), 1);
+            assert_eq!(puts[0], local, "A pushes its own new meta");
+            assert_eq!(st.meta_baseline_hex, Some(sha256_hex(&local)));
+            assert!(
+                !vault_meta_is_dirty(&dir),
+                "dirty cleared after a successful push"
+            );
+            std::fs::remove_dir_all(&dir).ok();
+        }
+
+        // A poll cycle (allow_push=false) with a pending local change must NOT push
+        // yet — it keeps the dirty marker for a later push cycle.
+        #[test]
+        fn poll_cycle_defers_push_and_keeps_dirty() {
+            let dir = scratch("poll");
+            let baseline = meta_bytes(0xAA);
+            let local = meta_bytes(0xCC);
+            std::fs::write(dir.join("vault.meta"), &local).unwrap();
+            mark_vault_meta_dirty(&dir).unwrap();
+            let mut st = SyncState {
+                meta_baseline_hex: Some(sha256_hex(&baseline)),
+                ..Default::default()
+            };
+            let t = FakeTransport::new();
+            t.on(HttpMethod::Get, "/vault.meta", 200, baseline);
+
+            let out = sync_meta_phase(&t, "tok", &dir, &mut st, false);
+            assert_eq!(out, MetaPhaseOutcome::NoChange);
+            assert!(put_recorded(&t).is_empty(), "a poll cycle pushes nothing");
+            assert!(
+                vault_meta_is_dirty(&dir),
+                "dirty kept for a later push cycle"
+            );
+            std::fs::remove_dir_all(&dir).ok();
+        }
+
+        // Both devices changed concurrently: the phase merges deterministically and
+        // BOTH devices, from their own perspective, converge on the SAME winner.
+        #[test]
+        fn concurrent_change_converges_deterministically() {
+            let baseline = meta_bytes(0x10); // the shared last-synced state
+            let a_pw = meta_bytes(0xAA); // device A's new password-side
+            let b_pw = meta_bytes(0xBB); // device B's new password-side
+                                         // Deterministic winner is the greater enc_root_key_password → 0xBB.
+            let winner = b_pw.clone();
+
+            // --- A's perspective: local=A, server=B (B pushed first) ---
+            let dir_a = scratch("conc-a");
+            std::fs::write(dir_a.join("vault.meta"), &a_pw).unwrap();
+            mark_vault_meta_dirty(&dir_a).unwrap();
+            let mut st_a = SyncState {
+                meta_baseline_hex: Some(sha256_hex(&baseline)),
+                ..Default::default()
+            };
+            let ta = FakeTransport::new();
+            ta.on(HttpMethod::Get, "/vault.meta", 200, b_pw.clone());
+            ta.on(HttpMethod::Put, "/vault.meta", 200, Vec::new());
+            let out_a = sync_meta_phase(&ta, "tok", &dir_a, &mut st_a, true);
+            assert_eq!(out_a, MetaPhaseOutcome::Merged);
+            assert_eq!(
+                std::fs::read(dir_a.join("vault.meta")).unwrap(),
+                winner,
+                "A converges on the deterministic winner (0xBB)"
+            );
+
+            // --- B's perspective: local=B, server=A (A pushed first) ---
+            let dir_b = scratch("conc-b");
+            std::fs::write(dir_b.join("vault.meta"), &b_pw).unwrap();
+            mark_vault_meta_dirty(&dir_b).unwrap();
+            let mut st_b = SyncState {
+                meta_baseline_hex: Some(sha256_hex(&baseline)),
+                ..Default::default()
+            };
+            let tb = FakeTransport::new();
+            tb.on(HttpMethod::Get, "/vault.meta", 200, a_pw.clone());
+            tb.on(HttpMethod::Put, "/vault.meta", 200, Vec::new());
+            let out_b = sync_meta_phase(&tb, "tok", &dir_b, &mut st_b, true);
+            assert_eq!(out_b, MetaPhaseOutcome::Merged);
+            assert_eq!(
+                std::fs::read(dir_b.join("vault.meta")).unwrap(),
+                winner,
+                "B converges on the SAME deterministic winner (0xBB)"
+            );
+            // Both devices agree — the whole point.
+            assert_eq!(st_a.meta_baseline_hex, st_b.meta_baseline_hex);
+
+            std::fs::remove_dir_all(&dir_a).ok();
+            std::fs::remove_dir_all(&dir_b).ok();
+        }
+
+        // A server meta with a DIVERGENT itemsKey wrap (different vault / corrupt /
+        // hostile) must NEVER overwrite the local credential root — it SKIPS.
+        #[test]
+        fn refuses_to_adopt_incompatible_server_meta() {
+            let dir = scratch("incompat");
+            let local = meta_bytes(0xAA);
+            std::fs::write(dir.join("vault.meta"), &local).unwrap();
+            // Server meta with a different itemsKey → merge_vault_meta rejects it.
+            let mut bad = VaultMeta {
+                account_number_hash: [0x33; 16],
+                kdf_params: protocol::DEFAULT_V0_1_KDF_PARAMS,
+                random_salt_password: [0xBB; VAULT_META_SALT_RANDOM_LEN],
+                random_salt_recovery: [0x55; VAULT_META_SALT_RANDOM_LEN],
+                nonce_password_wrap: [0xBB; VAULT_META_NONCE_LEN],
+                enc_root_key_password: [0xBB; VAULT_META_WRAPPED_ROOT_KEY_LEN],
+                nonce_recovery_wrap: [0x55; VAULT_META_NONCE_LEN],
+                enc_root_key_recovery: [0x55; VAULT_META_WRAPPED_ROOT_KEY_LEN],
+                items_key_id: [0x07; VAULT_META_ITEMS_KEY_ID_LEN],
+                items_key_nonce: [0x08; VAULT_META_NONCE_LEN],
+                enc_items_key: [0x09; VAULT_META_WRAPPED_ITEMS_KEY_LEN],
+            };
+            bad.enc_items_key = [0xEE; VAULT_META_WRAPPED_ITEMS_KEY_LEN]; // divergent!
+            let server = serialize_vault_meta(&bad).to_vec();
+            let mut st = SyncState {
+                meta_baseline_hex: Some(sha256_hex(&local)),
+                ..Default::default()
+            };
+            let t = FakeTransport::new();
+            t.on(HttpMethod::Get, "/vault.meta", 200, server);
+
+            let out = sync_meta_phase(&t, "tok", &dir, &mut st, true);
+            assert_eq!(out, MetaPhaseOutcome::Skipped);
+            assert_eq!(
+                std::fs::read(dir.join("vault.meta")).unwrap(),
+                local,
+                "local credential root is NEVER overwritten by an incompatible meta"
+            );
+            std::fs::remove_dir_all(&dir).ok();
+        }
+
+        // Server holds no meta yet (404) + a pending local change → push it.
+        #[test]
+        fn pushes_on_404_when_dirty() {
+            let dir = scratch("seed");
+            let local = meta_bytes(0xAA);
+            std::fs::write(dir.join("vault.meta"), &local).unwrap();
+            mark_vault_meta_dirty(&dir).unwrap();
+            let mut st = SyncState::default();
+            let t = FakeTransport::new();
+            t.on(HttpMethod::Get, "/vault.meta", 404, Vec::new());
+            t.on(HttpMethod::Put, "/vault.meta", 200, Vec::new());
+
+            let out = sync_meta_phase(&t, "tok", &dir, &mut st, true);
+            assert_eq!(out, MetaPhaseOutcome::Pushed);
+            assert_eq!(put_recorded(&t), vec![local.clone()]);
+            assert_eq!(st.meta_baseline_hex, Some(sha256_hex(&local)));
+            assert!(!vault_meta_is_dirty(&dir));
+            std::fs::remove_dir_all(&dir).ok();
+        }
+
+        // Server and local already agree → clear dirt, record baseline, no push.
+        #[test]
+        fn no_op_when_already_in_sync() {
+            let dir = scratch("agree");
+            let m = meta_bytes(0xAA);
+            std::fs::write(dir.join("vault.meta"), &m).unwrap();
+            mark_vault_meta_dirty(&dir).unwrap();
+            let mut st = SyncState::default();
+            let t = FakeTransport::new();
+            t.on(HttpMethod::Get, "/vault.meta", 200, m.clone());
+
+            let out = sync_meta_phase(&t, "tok", &dir, &mut st, true);
+            assert_eq!(out, MetaPhaseOutcome::NoChange);
+            assert!(put_recorded(&t).is_empty());
+            assert_eq!(st.meta_baseline_hex, Some(sha256_hex(&m)));
+            assert!(
+                !vault_meta_is_dirty(&dir),
+                "an agreeing server clears a stale dirty flag"
+            );
+            std::fs::remove_dir_all(&dir).ok();
+        }
     }
 }
