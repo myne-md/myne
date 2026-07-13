@@ -204,6 +204,7 @@
       "themeDark": { "label": "Theme: Dark" },
       "themeAmoled": { "label": "Theme: AMOLED" },
       "themeSystem": { "label": "Theme: Follow system" },
+      "applyCustomTheme": { "label": "Apply custom theme…" },
       "splitRight": { "label": "Split pane right" },
       "splitDown": { "label": "Split pane down" },
       "closePane": { "label": "Close pane" },
@@ -223,6 +224,7 @@
       "renameNote": { "label": "Rename note" },
       "trashNote": { "label": "Move note to trash" },
       "toggleFavorite": { "label": "Toggle favorite" },
+      "moveNote": { "label": "Move note to folder…" },
       "emptyTrash": { "label": "Empty trash" },
       "showBacklinks": { "label": "Show backlinks" },
       "showOutline": { "label": "Show outline" },
@@ -379,6 +381,15 @@
     },
     "rebind": {
       "invalidChordReason": "Add a modifier (⌘, Ctrl, or Alt) — a key on its own can't be a shortcut."
+    },
+    "picker": {
+      "vaultRoot": "Vault root",
+      "moveNoteTitle": "Move note to folder",
+      "moveNotePlaceholder": "Choose a folder…",
+      "noFolders": "No folders yet",
+      "applyThemeTitle": "Apply custom theme",
+      "applyThemePlaceholder": "Choose a theme…",
+      "noCustomThemes": "No custom themes installed"
     }
   },
   "common": {

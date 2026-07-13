@@ -288,6 +288,21 @@ const switchThemeSystemAction = switchThemeAction(
   "commands.actions.themeSystem.label",
 );
 
+// Palette-gap #31: open the custom-theme picker (QuickPicker) and apply the
+// chosen saved theme. The picker + apply live in `commandCtx.onApplyCustomTheme`
+// (needs `listCustomThemes` / `readCustomTheme`, both async IPC).
+const applyCustomThemeAction: CommandAction = {
+  id: "appearance.apply-custom-theme",
+  get label() {
+    return i18n.t("commands.actions.applyCustomTheme.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.appearance");
+  },
+  visibility: editorOnly,
+  run: (c) => c.onApplyCustomTheme(),
+};
+
 // ─── Wave 2: layout / panes / tabs / navigation (palette-gap audit) ────────
 // Thin dispatchers to the workspace controller via CommandContext callbacks
 // (wired from the workspace in `commandCtx`).
@@ -423,6 +438,11 @@ const toggleFavoriteAction = notesAction(
   "note.toggle-favorite",
   "commands.actions.toggleFavorite.label",
   (c) => c.onToggleFavorite(),
+);
+// Palette-gap #32: move the selected note to a folder via the QuickPicker (the
+// folder-target list + move live in `commandCtx.onMoveNote`).
+const moveNoteAction = notesAction("note.move", "commands.actions.moveNote.label", (c) =>
+  c.onMoveNote(),
 );
 const emptyTrashAction = notesAction(
   "trash.empty",
@@ -1257,6 +1277,7 @@ export const COMMAND_ACTIONS: readonly CommandAction[] = Object.freeze([
   switchThemeDarkAction,
   switchThemeAmoledAction,
   switchThemeSystemAction,
+  applyCustomThemeAction,
   // Wave 2 — layout / panes / tabs / navigation
   splitRightAction,
   splitDownAction,
@@ -1278,6 +1299,7 @@ export const COMMAND_ACTIONS: readonly CommandAction[] = Object.freeze([
   renameNoteAction,
   trashNoteAction,
   toggleFavoriteAction,
+  moveNoteAction,
   emptyTrashAction,
   showBacklinksAction,
   showOutlineAction,
