@@ -158,6 +158,14 @@
   --syntax-meta:     #5a5478;
   --syntax-invalid:  #992018;
 
+  /* -- Editor text selection ------------------------------------------ */
+  /* A TRANSLUCENT accent so the selected text always shows through (a solid
+     fill washes text out). Explicit rgba — NOT color-mix() — so it renders on
+     every WebView (older WKWebView lacks color-mix, which would void the rule
+     and fall back to an unreadable default). A custom theme with no override
+     inherits this light value; being translucent, it stays readable on any bg. */
+  --selection-bg: rgba(44, 74, 122, 0.22);
+
   /* -- Focus ring ----------------------------------------------------- */
   --ring:        0 0 0 2px var(--bg-1), 0 0 0 4px var(--accent);
   --ring-inset:  inset 0 0 0 2px var(--accent);
@@ -387,6 +395,8 @@
   --syntax-tag:      var(--_syntax-tag-dark);
   --syntax-meta:     var(--_syntax-meta-dark);
   --syntax-invalid:  var(--_syntax-invalid-dark);
+  /* Translucent LIGHT accent so selected text stays readable on a dark surface. */
+  --selection-bg:    rgba(138, 164, 208, 0.30);
 
   --shadow-1: var(--_shadow-1-dark);
   --shadow-2: var(--_shadow-2-dark);
@@ -449,6 +459,8 @@
   --syntax-tag:      var(--_syntax-tag-amoled);
   --syntax-meta:     var(--_syntax-meta-amoled);
   --syntax-invalid:  var(--_syntax-invalid-amoled);
+  /* Translucent LIGHT accent so selected text stays readable on pitch black. */
+  --selection-bg:    rgba(138, 164, 208, 0.30);
 
   --shadow-1: var(--_shadow-1-amoled);
   --shadow-2: var(--_shadow-2-amoled);
@@ -508,6 +520,8 @@
     --syntax-tag:      var(--_syntax-tag-dark);
     --syntax-meta:     var(--_syntax-meta-dark);
     --syntax-invalid:  var(--_syntax-invalid-dark);
+    /* Translucent LIGHT accent so selected text stays readable on a dark surface. */
+    --selection-bg:    rgba(138, 164, 208, 0.30);
 
     --shadow-1: var(--_shadow-1-dark);
     --shadow-2: var(--_shadow-2-dark);
@@ -520,6 +534,11 @@
    ========================================================================= */
 
 *, *::before, *::after { box-sizing: border-box; }
+
+/* App-wide native text selection — the same theme-tuned translucent accent the
+   editor uses, so selecting anywhere (sidebar, panels, and the editor when it is
+   unfocused and falls back to native selection) stays readable on every theme. */
+::selection { background: var(--selection-bg); }
 
 html, body, #root {
   margin: 0;

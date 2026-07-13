@@ -54,11 +54,23 @@ export const myneTheme = EditorView.theme({
   // selection toolbar opens) — restyle it too, dim but still contrast-safe, so a
   // selection stays readable regardless of focus. The focused wash is fuller,
   // keeping a subtle "focus is here" cue.
+  // Theme-tuned via the `--selection-bg` token (a TRANSLUCENT accent, defined
+  // per theme in tokens.css) — NOT `color-mix()`, which older WKWebView drops,
+  // voiding the rule and leaving an unreadable default wash. Focused AND
+  // unfocused use the SAME value so opening the floating toolbar (which blurs
+  // the editor) never washes the selection out. The rgba fallback covers a
+  // WebView with no `--selection-bg` in scope.
+  // `!important` is load-bearing: CodeMirror's baseTheme styles the selection
+  // with HIGHER-specificity selectors (`&.cm-focused > .cm-scroller >
+  // .cm-selectionLayer .cm-selectionBackground` and a separate unfocused rule),
+  // which otherwise win over a plain `.cm-selectionBackground` rule — leaving the
+  // library's unreadable default wash (the bug). `!important` guarantees ours
+  // applies in both focus states.
   ".cm-selectionBackground, ::selection": {
-    backgroundColor: "color-mix(in srgb, var(--accent, #2c4a7a) 18%, transparent)",
+    backgroundColor: "var(--selection-bg, rgba(44, 74, 122, 0.24)) !important",
   },
   "&.cm-focused .cm-selectionBackground": {
-    backgroundColor: "color-mix(in srgb, var(--accent, #2c4a7a) 28%, transparent)",
+    backgroundColor: "var(--selection-bg, rgba(44, 74, 122, 0.24)) !important",
   },
 
   // Headings — apply via `Decoration.line` from heading.ts.
