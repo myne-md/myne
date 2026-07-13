@@ -48,6 +48,25 @@ export interface MockConfig {
   /** Boot to the Unlock screen (one `Exists` vault, `Empty` slot) instead of
    *  straight to the editor — for the quick-unlock / password unlock flows. */
   lockedVault?: boolean;
+  /** Boot to the fail-closed Unlock surface (one `Corrupted` vault, `Empty`
+   *  slot) — for the corrupted-vault fail-closed flow. */
+  corruptedVault?: boolean;
+  /** Boot to the ≥2-vault picker (two `Exists` vaults, `Empty` slot) — for the
+   *  multi-vault picker → select → unlock flow. */
+  multiVault?: boolean;
+  /** Reject `plugin:vault-unlock|unlock` with this `VaultUnlockError` (the
+   *  wrong-password path renders the non-distinguishing banner). */
+  unlockError?: { kind: string; detail?: unknown };
+  /** Reject `quick_unlock_with_pin` with this `QuickUnlockError` (wrong-PIN
+   *  carries `detail.remaining`). */
+  pinRedeemError?: { kind: string; detail?: unknown };
+  /** Reject `plugin:vault-delete|vault_delete` with this error (the
+   *  PartialDelete → Continue terminal exit). */
+  deleteError?: { kind: string };
+  /** Canned recovery phrase words returned by `plugin:vault-creation|begin`
+   *  (24 words). Defaults to 24× "ribbon" so the type-back challenge — which
+   *  picks 4 RANDOM positions — is satisfiable by typing "ribbon" everywhere. */
+  createPhrase?: string[];
   /** Canned `quick_unlock_status` (defaults to not-configured). A
    *  `quick_unlock_setup_*` / `quick_unlock_disable` call mutates the canned
    *  value so a settings toggle flip is reflected by the next status read. */
@@ -117,11 +136,43 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
       // freshDevice → boot to Welcome (no vaults, Empty slot); lockedVault →
       // boot to Unlock (one Exists vault, Empty slot); otherwise the Unlocked
       // slot shortcuts `initialStageFromProbe` straight to the editor.
-      "plugin:vault-unlock|vault_list": () => (config.freshDevice ? [] : [{ id: "flow-vault", status: { kind: "Exists" } }]),
-      "plugin:vault-unlock|vault_slot_kind": () => (config.freshDevice || config.lockedVault ? "Empty" : "Unlocked"),
+      "plugin:vault-unlock|vault_list": () => {
+        if (config.freshDevice) return [];
+        if (config.corruptedVault) return [{ id: "flow-vault", status: { kind: "Corrupted" } }];
+        if (config.multiVault)
+          return [
+            { id: "vault-personal", status: { kind: "Exists" }, label: "Personal", last_unlock: 0 },
+            { id: "vault-work", status: { kind: "Exists" }, label: "Work", last_unlock: null },
+          ];
+        return [{ id: "flow-vault", status: { kind: "Exists" } }];
+      },
+      "plugin:vault-unlock|vault_slot_kind": () =>
+        config.freshDevice || config.lockedVault || config.corruptedVault || config.multiVault ? "Empty" : "Unlocked",
       "plugin:vault-unlock|vault_is_unlocked": () => true,
       "plugin:vault-unlock|report_user_activity": () => null,
-      "plugin:vault-unlock|unlock": () => null,
+      "plugin:vault-unlock|unlock": () => {
+        if (config.unlockError) throw config.unlockError;
+        return null;
+      },
+      // ── Vault creation (5-step onboarding) ──
+      // begin mints the phrase + account + session; commit persists and returns
+      // the new vault id; cancel is the unmount best-effort. The phrase is 24×
+      // the same word by default so the RANDOM 4-word type-back challenge is
+      // satisfiable without reading which positions were picked.
+      "plugin:vault-creation|begin": () => ({
+        phrase: config.createPhrase ?? new Array(24).fill("ribbon"),
+        session_token: "flow-session",
+        account_number: "MY-4F2A-9C17-8E2D-1B5F-K",
+      }),
+      "plugin:vault-creation|commit": () => "flow-vault",
+      "plugin:vault-creation|cancel": () => null,
+      // ── Vault delete (lost-both-secrets escape) ──
+      "plugin:vault-delete|vault_delete": () => {
+        const w = window as unknown as { __vaultDeletes?: number };
+        w.__vaultDeletes = (w.__vaultDeletes ?? 0) + 1;
+        if (config.deleteError) throw config.deleteError;
+        return null;
+      },
       "plugin:prefs|prefs_read": () => DEFAULT_PREFS,
       "plugin:notes|note_list": () => [],
       // ── Attachments surface (voice-note capture flow) ──
@@ -156,7 +207,10 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
         if (config.biometricRedeemError) throw config.biometricRedeemError;
         return null;
       },
-      "plugin:quick-unlock|quick_unlock_with_pin": () => null,
+      "plugin:quick-unlock|quick_unlock_with_pin": () => {
+        if (config.pinRedeemError) throw config.pinRedeemError;
+        return null;
+      },
       "plugin:quick-unlock|quick_unlock_disable": () => {
         quickUnlock = { configured: false, method: null, available: false };
         return null;
@@ -171,6 +225,17 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
         (w.__noteCreates ??= []).push(String(args.plaintext ?? ""));
         return "00000000-0000-7000-8000-000000000000";
       },
+      "plugin:notes|note_update": (args) => {
+        const w = window as unknown as { __noteUpdates?: string[] };
+        (w.__noteUpdates ??= []).push(String(args.plaintext ?? ""));
+        return null;
+      },
+      "plugin:notes|note_delete": (args) => {
+        const w = window as unknown as { __noteDeletes?: string[] };
+        (w.__noteDeletes ??= []).push(String(args.id ?? ""));
+        return null;
+      },
+      "plugin:notes|note_read": () => "",
       "plugin:captures|seal_staged": () => {
         const w = window as unknown as { __sealStagedCalls?: number };
         w.__sealStagedCalls = (w.__sealStagedCalls ?? 0) + 1;

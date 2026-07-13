@@ -32,8 +32,10 @@ export const CAPTURE_EVENT = "myne-deep-link-capture";
 let pendingCapture: CaptureMode | null = null;
 
 /** Parse one incoming `myne://…` URL and dispatch/latch its intent. Unknown or
- *  non-`myne:` URLs are ignored. */
-function handleUrl(raw: string): void {
+ *  non-`myne:` URLs are ignored. Exported for unit coverage of the cold-launch
+ *  latch + `?mode=` parse (E2E-gap #39); `initDeepLinks` is the production
+ *  caller. */
+export function handleUrl(raw: string): void {
   let u: URL;
   try {
     u = new URL(raw);
