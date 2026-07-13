@@ -158,6 +158,17 @@ export type CommandContext = {
   onRestoreBackup: () => void;
   /** Toggle the device-local real-time (SSE) sync connection. */
   onToggleRealtimeSync: () => void;
+  /**
+   * Open the folder target-picker (QuickPicker) for the selected note and move
+   * it to the chosen folder (palette-gap #32). No-op when no note is selected;
+   * the action already guards on `selectedNoteId`.
+   */
+  onMoveNote: () => void;
+  /**
+   * Open the custom-theme target-picker (QuickPicker), then read + apply the
+   * chosen saved theme and persist it as the active choice (palette-gap #31).
+   */
+  onApplyCustomTheme: () => void;
   /** Collapse/expand the left (notes) sidebar (mirrors the top-bar toggle). */
   onToggleLeftSidebar: () => void;
   /** Collapse/expand the right (backlinks) sidebar (mirrors the top-bar toggle). */

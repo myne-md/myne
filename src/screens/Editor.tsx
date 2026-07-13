@@ -186,8 +186,11 @@ import {
   workspaceStage,
   workspaceWrite,
 } from "../lib/workspace-persist";
-import { setActiveWorkspace, setFavorites } from "../lib/prefs";
+import { setActiveWorkspace, setCustomTheme, setFavorites } from "../lib/prefs";
 import { promptForText } from "../lib/promptForText";
+import { QuickPicker, type QuickPickItem } from "../components/QuickPicker";
+import { listCustomThemes, readCustomTheme } from "../lib/themes";
+import { applyCustomTheme } from "../lib/theme";
 
 // Lazy-loaded so the tag-browser modal chunk stays out of the editor's initial
 // bundle (tag-system #2 / MYND-46, task-1 criterion — confirmed as a separate
@@ -2149,6 +2152,17 @@ function CommandPaletteHost({
 }: CommandPaletteHostProps) {
   const { t } = useTranslation();
   const ctx = useSelectedNote();
+  // Deferred picker sub-flows (palette-gap #31 Apply custom theme, #32 Move note
+  // to folder): the action populates this config → the QuickPicker opens. Null
+  // when no picker is active. Rendered as a sibling of the palette; independent
+  // of `open`, so it survives the palette closing on action-run.
+  const [picker, setPicker] = useState<{
+    title: string;
+    placeholder: string;
+    emptyText: string;
+    items: QuickPickItem[];
+    onPick: (id: string) => void;
+  } | null>(null);
   // AI surface (local-ai epic, ai-ux-surface MYND-408, SYNC-9): the `ai_enabled`
   // gate + the AI Chat reveal, threaded into CommandContext so AI capability
   // actions (siblings 4/6/7) gate on `stageName === "editor" && aiEnabled` and
@@ -2331,6 +2345,56 @@ function CommandPaletteHost({
       onShowUnlinked: () => void revealRightPanelTab("unlinked"),
       onRestoreBackup,
       onToggleRealtimeSync: () => setRealtimeSse(!realtimeSse),
+      // Palette-gap #32 — move the selected note to a folder via the QuickPicker.
+      // Targets are the vault's folders (from the sidebar cache) plus any empty
+      // "deliberate" folders, sorted, with "Vault root" (empty id → null) first.
+      onMoveNote: () => {
+        if (ctx.selectedId === null) return;
+        const noteId = ctx.selectedId;
+        const folders = new Set<string>();
+        for (const rec of ctx.cache.values()) {
+          if (rec.folder) folders.add(rec.folder);
+        }
+        for (const f of aiPrefs.deliberate_folders) folders.add(f);
+        const items: QuickPickItem[] = [
+          { id: "", label: t("commands.picker.vaultRoot") },
+          ...[...folders].sort().map((f) => ({ id: f, label: f })),
+        ];
+        setPicker({
+          title: t("commands.picker.moveNoteTitle"),
+          placeholder: t("commands.picker.moveNotePlaceholder"),
+          emptyText: t("commands.picker.noFolders"),
+          items,
+          onPick: (id) => {
+            void ctx.bulkMoveWithSync([noteId], id === "" ? null : id).catch(() => {});
+          },
+        });
+      },
+      // Palette-gap #31 — apply a saved custom theme via the QuickPicker. Lists
+      // the valid custom themes; picking one reads its palette, persists it as the
+      // active choice, and applies it live (the CustomThemesSection apply path).
+      onApplyCustomTheme: () => {
+        void (async () => {
+          const themes = (await listCustomThemes()).filter((th) => th.valid);
+          const items: QuickPickItem[] = themes.map((th) => ({
+            id: th.name,
+            label: th.display_name === "" ? th.name : th.display_name,
+          }));
+          setPicker({
+            title: t("commands.picker.applyThemeTitle"),
+            placeholder: t("commands.picker.applyThemePlaceholder"),
+            emptyText: t("commands.picker.noCustomThemes"),
+            items,
+            onPick: (name) => {
+              void (async () => {
+                const palette = await readCustomTheme(name);
+                await setCustomTheme(name);
+                applyCustomTheme(palette);
+              })().catch(() => {});
+            },
+          });
+        })().catch(() => {});
+      },
       onOpenAiChat: () => void revealRightPanelTab("ai-chat"),
       // Summarize the focused note into the AI Chat tab (note-summarization
       // tasks 3–4): reveal the render target, grab the focused pane's live view
@@ -2496,14 +2560,25 @@ function CommandPaletteHost({
     ],
   );
   return (
-    <CommandPalette
-      open={open}
-      onClose={onClose}
-      ctx={commandCtx}
-      isTrashed={(id) => ctx.cache.get(id)?.trashed != null}
-      isTemplate={(id) => ctx.cache.get(id)?.template === true}
-      isArchived={(id) => ctx.cache.get(id)?.archived != null}
-    />
+    <>
+      <CommandPalette
+        open={open}
+        onClose={onClose}
+        ctx={commandCtx}
+        isTrashed={(id) => ctx.cache.get(id)?.trashed != null}
+        isTemplate={(id) => ctx.cache.get(id)?.template === true}
+        isArchived={(id) => ctx.cache.get(id)?.archived != null}
+      />
+      <QuickPicker
+        open={picker !== null}
+        title={picker?.title ?? ""}
+        placeholder={picker?.placeholder ?? ""}
+        emptyText={picker?.emptyText ?? ""}
+        items={picker?.items ?? []}
+        onPick={(id) => picker?.onPick(id)}
+        onClose={() => setPicker(null)}
+      />
+    </>
   );
 }
 
