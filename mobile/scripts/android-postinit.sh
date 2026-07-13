@@ -41,3 +41,8 @@ dependencies {
 EOF
   echo "app/build.gradle.kts: myne-widgets dependency added"
 fi
+
+# App icons: init stamps stock Tauri icons into gen/; restore the Myne set.
+# (Also runs on every dev/build via the tauri.conf.json hooks — this call
+# just makes a fresh init correct immediately.)
+bash scripts/sync-icons.sh
