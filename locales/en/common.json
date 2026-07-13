@@ -203,6 +203,17 @@
       "themeDark": { "label": "Theme: Dark" },
       "themeAmoled": { "label": "Theme: AMOLED" },
       "themeSystem": { "label": "Theme: Follow system" },
+      "splitRight": { "label": "Split pane right" },
+      "splitDown": { "label": "Split pane down" },
+      "closePane": { "label": "Close pane" },
+      "closeTab": { "label": "Close tab" },
+      "nextTab": { "label": "Next tab" },
+      "prevTab": { "label": "Previous tab" },
+      "focusNextPane": { "label": "Focus next pane" },
+      "focusPrevPane": { "label": "Focus previous pane" },
+      "goBack": { "label": "Go back" },
+      "goForward": { "label": "Go forward" },
+      "togglePreview": { "label": "Toggle side-by-side preview" },
       "aiSummarizeNote": {
         "label": "Summarize note"
       },

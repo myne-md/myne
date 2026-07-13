@@ -2146,6 +2146,9 @@ function CommandPaletteHost({
   // actions (siblings 4/6/7) gate on `stageName === "editor" && aiEnabled` and
   // open the shared right-panel AI Chat tab.
   const { prefs: aiPrefs, setRightPanelActiveTab: revealRightPanelTab } = usePrefs();
+  // Wave 2: layout/pane/tab/nav palette actions dispatch straight to the
+  // workspace controller (CommandPaletteHost is inside WorkspaceProvider).
+  const paletteWs = useWorkspace();
   // Drop the ephemeral AI render stores when the editor session tears down
   // (lock / vault-switch unmounts this host) — the AS1 artifacts (summary text +
   // tag suggestions + the chat transcript) never outlive the open vault (SYNC-8;
@@ -2243,6 +2246,52 @@ function CommandPaletteHost({
       aiEnabled: aiPrefs.ai_enabled,
       // The live prefs view for the toggle/cycle/set palette actions (Wave 1+).
       prefs: aiPrefs,
+      // Wave 2 — layout / panes / tabs / navigation, dispatched to the workspace.
+      onSplitRight: () => paletteWs.splitFocused("row"),
+      onSplitDown: () => paletteWs.splitFocused("column"),
+      onClosePane: () => paletteWs.closePane(paletteWs.focusedPaneId),
+      onCloseTab: () => {
+        const a = paletteWs.focusedLeaf.activeTab;
+        if (a !== null && a.kind === "note")
+          paletteWs.closeTabInPane(paletteWs.focusedPaneId, a.id);
+      },
+      onNextTab: () => {
+        const tabs = paletteWs.focusedLeaf.tabs;
+        if (tabs.length === 0) return;
+        const cur = paletteWs.focusedLeaf.activeTab;
+        const i =
+          cur !== null && cur.kind === "note"
+            ? tabs.findIndex((t) => t.kind === "note" && t.id === cur.id)
+            : -1;
+        const next = tabs[(i + 1) % tabs.length]!;
+        if (next.kind === "note") paletteWs.activateInPane(paletteWs.focusedPaneId, next.id);
+      },
+      onPrevTab: () => {
+        const tabs = paletteWs.focusedLeaf.tabs;
+        if (tabs.length === 0) return;
+        const cur = paletteWs.focusedLeaf.activeTab;
+        const i =
+          cur !== null && cur.kind === "note"
+            ? tabs.findIndex((t) => t.kind === "note" && t.id === cur.id)
+            : -1;
+        const next = tabs[(i - 1 + tabs.length) % tabs.length]!;
+        if (next.kind === "note") paletteWs.activateInPane(paletteWs.focusedPaneId, next.id);
+      },
+      onFocusNextPane: () => {
+        const ids = paletteWs.leaves.map((l) => l.id);
+        if (ids.length < 2) return;
+        const i = ids.indexOf(paletteWs.focusedPaneId);
+        paletteWs.focusPane(ids[(i + 1) % ids.length]!);
+      },
+      onFocusPrevPane: () => {
+        const ids = paletteWs.leaves.map((l) => l.id);
+        if (ids.length < 2) return;
+        const i = ids.indexOf(paletteWs.focusedPaneId);
+        paletteWs.focusPane(ids[(i - 1 + ids.length) % ids.length]!);
+      },
+      onGoBack: () => paletteWs.goBack(),
+      onGoForward: () => paletteWs.goForward(),
+      onTogglePreview: () => paletteWs.toggleCompanion(paletteWs.focusedPaneId),
       onOpenAiChat: () => void revealRightPanelTab("ai-chat"),
       // Summarize the focused note into the AI Chat tab (note-summarization
       // tasks 3–4): reveal the render target, grab the focused pane's live view
@@ -2371,6 +2420,7 @@ function CommandPaletteHost({
       // Whole prefs object (not just ai_*): the Wave-1 toggle/cycle actions read
       // ctx.prefs, so commandCtx must re-memoize on ANY pref change.
       aiPrefs,
+      paletteWs,
       revealRightPanelTab,
       onLockFlushed,
       onOpenSettings,
