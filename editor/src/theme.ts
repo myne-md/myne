@@ -894,10 +894,11 @@ export const myneTheme = EditorView.theme({
   ".cm-wikilink-chip": {
     display: "inline-block",
     padding: "2px 8px",
-    // A little vertical margin so two chips on consecutive own-lines aren't
-    // cramped (an inline-block's vertical margin expands its line box). Small
-    // enough that a chip inline in prose barely changes that line's height.
-    margin: "2px 1px",
+    // Horizontal margin only. A VERTICAL margin here makes any line holding a
+    // chip taller than its neighbours, which gives CM6's height map variable
+    // line heights and destabilises scrolling on long docs (jitter/jumping) —
+    // reverted. Own-line chip spacing needs a height-stable approach instead.
+    margin: "0 1px",
     borderRadius: "var(--radius-2, 6px)",
     backgroundColor: "var(--paper-2, #f3f1eb)",
     border: "1px solid var(--line-1, #d8d5cc)",
