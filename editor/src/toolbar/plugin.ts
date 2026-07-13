@@ -259,6 +259,17 @@ class ToolbarView implements PluginValue {
       this.dismiss();
       return;
     }
+    // Dismiss when the selection has scrolled out of the rendered viewport, so
+    // the toolbar doesn't get clamped to and stuck at the viewport edge (QA).
+    if (this.mode === "toolbar" && this.savedSelection === null) {
+      const inView = this.view.visibleRanges.some(
+        (r) => range.head >= r.from && range.head <= r.to,
+      );
+      if (!inView) {
+        this.dismiss();
+        return;
+      }
+    }
     let rect: { left: number; top: number; right: number; bottom: number };
     if (this.mode === "toolbar" && this.savedSelection === null) {
       // Anchor to the selection HEAD (where the drag ended / the caret is) so a
@@ -273,6 +284,14 @@ class ToolbarView implements PluginValue {
         this.view.coordsAtPos(range.from);
       if (head === null) {
         this.retryRender();
+        return;
+      }
+      // Also dismiss if the head resolved to a point outside the visible editor
+      // band (partially-rendered margin above/below the viewport). Guarded on a
+      // real scroller height so jsdom (no layout → a zero rect) doesn't false-dismiss.
+      const sc = this.view.scrollDOM.getBoundingClientRect();
+      if (sc.bottom > sc.top && (head.bottom < sc.top || head.top > sc.bottom)) {
+        this.dismiss();
         return;
       }
       rect = { left: head.left, top: head.top, right: head.left, bottom: head.bottom };
