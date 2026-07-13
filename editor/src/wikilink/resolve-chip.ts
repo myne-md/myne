@@ -14,6 +14,7 @@ import {
 import { classifyTarget } from "@myne/dialect/visitors/wikilinks";
 import { foldSegment, folderKey, isFolderTarget } from "@myne/dialect/folderPath";
 import { isMediaTarget } from "@myne/editor/host/notes/vaultIndices";
+import { parseAttachmentTarget } from "@myne/editor/host/notes/attachmentRef";
 import type { WikilinkRef } from "@myne/dialect/types";
 import type { WikilinkParts } from "./chip-widget";
 
@@ -44,6 +45,11 @@ function chipRef(parts: WikilinkParts): WikilinkRef {
 function isResolvableChip(parts: WikilinkParts): boolean {
   const target = parts.target ?? "";
   if (target === "") return false;
+  // An `att:<id>` embed is an ATTACHMENT (resolved against the catalog + rendered
+  // by the attachment pipeline), NOT a note — never resolve it as one, else the
+  // hover tooltip reports "(no match)" over an embedded file (QA). `att:` has no
+  // file extension, so `isMediaTarget` misses it; check the scheme explicitly.
+  if (parseAttachmentTarget(target) !== null) return false;
   if (parts.isEmbed && isMediaTarget(target)) return false;
   return true;
 }
