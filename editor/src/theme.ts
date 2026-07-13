@@ -341,10 +341,10 @@ export const myneTheme = EditorView.theme({
     opacity: "0.5",
     fontFamily: "var(--font-mono)",
     fontSize: "0.8em",
-    // Tighter right gap: the fold gutter now sits between the number and the
-    // text (Obsidian order, see line-numbers.ts), so the number pairs with the
-    // adjacent fold arrow rather than reaching all the way to the prose.
-    padding: "0 6px 0 8px",
+    // Right gap between the number and the adjacent fold arrow (the fold gutter
+    // now sits between the number and the text, Obsidian order — see
+    // line-numbers.ts). ~10px reads comfortably; 6px was too tight (QA).
+    padding: "0 10px 0 8px",
     minWidth: "1.6em",
   },
 
@@ -580,7 +580,10 @@ export const myneTheme = EditorView.theme({
     contain: "inline-size",
     overflowX: "auto",
     overflowY: "visible",
-    padding: "16px 0 0 34px", // top = column-handle gutter, left = row-handle gutter
+    // top = column-handle gutter, left = row-handle gutter. The left gutter is
+    // as narrow as the side-by-side row grip (−16px) + delete (−24px) controls
+    // allow without clipping under `overflow-x: auto` (QA: was 34px, too indented).
+    padding: "16px 0 0 26px",
   },
   ".cm-table-editable > table": { gridArea: "tbl" },
   // Reorder handles — bare six-dot grips in the gutter (no chip), revealed only
@@ -633,7 +636,7 @@ export const myneTheme = EditorView.theme({
   ".cm-table-del::before": { content: '"\\00d7"' }, // ×
   ".cm-table-del:hover": { color: "var(--extended-color-red-600, #c0392b)" },
   ".cm-table-del-col": { top: "-16px", right: "0" },
-  ".cm-table-del-row": { left: "-31px", top: "50%", transform: "translateY(-50%)" },
+  ".cm-table-del-row": { left: "-24px", top: "50%", transform: "translateY(-50%)" },
   ".cm-table-handle-col:hover ~ .cm-table-del-col, .cm-table-del-col:hover": {
     opacity: "1",
   },
@@ -891,7 +894,10 @@ export const myneTheme = EditorView.theme({
   ".cm-wikilink-chip": {
     display: "inline-block",
     padding: "2px 8px",
-    margin: "0 1px",
+    // A little vertical margin so two chips on consecutive own-lines aren't
+    // cramped (an inline-block's vertical margin expands its line box). Small
+    // enough that a chip inline in prose barely changes that line's height.
+    margin: "2px 1px",
     borderRadius: "var(--radius-2, 6px)",
     backgroundColor: "var(--paper-2, #f3f1eb)",
     border: "1px solid var(--line-1, #d8d5cc)",
