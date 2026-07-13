@@ -30,7 +30,7 @@ import { testIdSelector, type Session } from "./support/webdriver";
  *  (`aria-selected="true"` + `data-note-id`, the byTestId-only handle). */
 async function selectedNoteId(s: Session): Promise<string> {
   const row = await s.waitForElement(
-    '[data-testid="notes.row"][aria-selected="true"]',
+    '[data-testid="notes.row"][aria-current="true"]',
   );
   const id = await row.attribute("data-note-id");
   if (id === null || id === "") {

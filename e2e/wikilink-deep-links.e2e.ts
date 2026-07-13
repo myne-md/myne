@@ -47,7 +47,7 @@ const IPC_TIMEOUT = 15_000;
 /** Read the selected sidebar row's note-id (`createNote` leaves it selected). */
 async function selectedNoteId(s: Session): Promise<string> {
   const row = await s.waitForElement(
-    '[data-testid="notes.row"][aria-selected="true"]',
+    '[data-testid="notes.row"][aria-current="true"]',
   );
   return (await row.attribute("data-note-id")) ?? "";
 }
