@@ -229,13 +229,17 @@ class BlockHtmlWidget extends WidgetType {
   constructor(
     private readonly safeHtml: string,
     private readonly key: string,
+    private readonly from: number,
   ) {
     super();
   }
   eq(other: BlockHtmlWidget): boolean {
-    return other.key === this.key;
+    // `from` is part of identity so click-to-edit always targets the live source
+    // position (a rebuild restores the <details> open state from the source-keyed
+    // map below, so preserving toggle state survives the reposition).
+    return other.key === this.key && other.from === this.from;
   }
-  toDOM(): HTMLElement {
+  toDOM(view: EditorView): HTMLElement {
     // Discriminator is the soft background tint (theme) — no label element.
     const div = document.createElement("div");
     div.className = "cm-embedded-html-block";
@@ -245,12 +249,31 @@ class BlockHtmlWidget extends WidgetType {
       if (detailsOpenState.get(this.key) === true) details.setAttribute("open", "");
       details.addEventListener("toggle", () => {
         detailsOpenState.set(this.key, details.open);
+        // The widget's height just changed (content shown/hidden) — ask CM to
+        // re-measure so the following block reflows instead of overlapping.
+        view.requestMeasure();
       });
     }
+    // Click-to-edit, same model as the code-block widget: the block is a
+    // read-only replace, so a click places the cursor at the block's source
+    // start — that touches the block's lines, drops the widget, and reveals the
+    // raw HTML for editing. A click on a <details> disclosure (<summary>) is
+    // EXCLUDED so it toggles the section natively instead of revealing raw HTML.
+    div.addEventListener("mousedown", (event) => {
+      const target = event.target;
+      if (target instanceof Element && target.closest("summary") !== null) return;
+      event.preventDefault();
+      view.dispatch({ selection: { anchor: this.from } });
+      view.focus();
+    });
     return div;
   }
   ignoreEvent(): boolean {
-    return false; // let the native <details> toggle handle clicks
+    // Editor ignores widget events (like the code-block widget) so the native
+    // <details> toggle works and our own mousedown handler above drives
+    // click-to-edit; without this, CM would move the cursor on every click and
+    // reveal raw HTML even when toggling the disclosure.
+    return true;
   }
 }
 
@@ -273,7 +296,10 @@ function buildBlockHtml(state: EditorState): DecorationSet {
     builder.add(
       fromLine.from,
       toLine.to,
-      Decoration.replace({ widget: new BlockHtmlWidget(safe, html), block: true }),
+      Decoration.replace({
+        widget: new BlockHtmlWidget(safe, html, from),
+        block: true,
+      }),
     );
   }
   return builder.finish();
