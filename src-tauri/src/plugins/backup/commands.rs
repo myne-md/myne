@@ -286,14 +286,19 @@ fn temp_sibling(destination: &Path) -> PathBuf {
 }
 
 /// Collect the §9.11.3 closed-allowlist member set from the vault
-/// directory: the three singletons when present (vault.meta REQUIRED —
+/// directory: the singletons when present (vault.meta REQUIRED —
 /// checked by the caller), plus every `notes/`, `snapshots/`, and
 /// `attachments/` entry whose name classifies. Anything else — `*.tmp`
 /// residue, `vault.search`, stranger droppings — is skipped by
 /// construction (positive match only, the SYNC-3 allowlist-not-walk rule).
 fn collect_members(vault_dir: &Path) -> Result<Vec<(String, PathBuf, bool)>, BackupExportError> {
     let mut members: Vec<(String, PathBuf, bool)> = Vec::new();
-    for singleton in ["vault.meta", "vault.prefs", "vault.attachments"] {
+    for singleton in [
+        "vault.meta",
+        "vault.prefs",
+        "vault.dictionary",
+        "vault.attachments",
+    ] {
         let path = vault_dir.join(singleton);
         if path.is_file() {
             members.push((singleton.to_string(), path, false));
