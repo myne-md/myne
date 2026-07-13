@@ -46,7 +46,6 @@ pub mod rustls_transport;
 #[cfg(test)]
 mod sim;
 pub mod state;
-pub mod taxonomy;
 pub mod token_store;
 pub mod transport;
 
