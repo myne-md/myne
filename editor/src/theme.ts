@@ -1135,7 +1135,10 @@ export const myneTheme = EditorView.theme({
     // keeps a subtle radius (.cm-attachment-img).
     // Vertical breathing room so two attachments rendered back-to-back are
     // visually separated. Token-based block spacing, `--space-3` rhythm.
-    margin: "var(--space-3, 10px) 0",
+    // Small top margin so the block widget's top lines up with the top-aligned
+    // line number (a full --space-3 top margin floated the number above the
+    // widget); the bottom keeps the --space-3 block rhythm.
+    margin: "3px 0 var(--space-3, 10px)",
   },
   ".cm-attachment-img": {
     display: "block",
@@ -1322,7 +1325,10 @@ export const myneTheme = EditorView.theme({
     border: "1px solid var(--line-1, #e3e2dd)",
     borderRadius: "var(--radius-2, 6px)",
     verticalAlign: "top",
-    margin: "var(--space-3, 10px) 0",
+    // Small top margin so the block widget's top lines up with the top-aligned
+    // line number (a full --space-3 top margin floated the number above the
+    // widget); the bottom keeps the --space-3 block rhythm.
+    margin: "3px 0 var(--space-3, 10px)",
     fontFamily: "var(--font-sans)",
     cursor: "default",
   },
@@ -1464,7 +1470,10 @@ export const myneTheme = EditorView.theme({
     border: "1px solid var(--line-1, #e3e2dd)",
     borderRadius: "var(--radius-2, 6px)",
     verticalAlign: "top",
-    margin: "var(--space-3, 10px) 0",
+    // Small top margin so the block widget's top lines up with the top-aligned
+    // line number (a full --space-3 top margin floated the number above the
+    // widget); the bottom keeps the --space-3 block rhythm.
+    margin: "3px 0 var(--space-3, 10px)",
     fontFamily: "var(--font-sans)",
     cursor: "default",
   },
