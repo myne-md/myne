@@ -6,11 +6,11 @@
 // a follow-up; this owns the config surface + persistence). The slash-menu twin
 // list is a follow-up (same shape, its own vocabulary).
 
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties, type DragEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { ControlBlock } from "./ControlBlock";
 import { prefsRead, setEditorToolbarHidden, setEditorToolbarOrder } from "../../lib/prefs";
-import { resolveBarOrder } from "../../notes/barItemsOrder";
+import { resolveBarOrder, reorderByDrop } from "../../notes/barItemsOrder";
 import {
   EDITOR_TOOLBAR_DEFAULT_HIDDEN,
   EDITOR_TOOLBAR_DEFAULT_ORDER,
@@ -33,12 +33,33 @@ const ROW_STYLE: CSSProperties = {
   fontFamily: "var(--font-sans)",
   fontSize: 13,
   color: "var(--fg-1)",
+  // A transparent top/bottom border reserves space for the drop indicator so
+  // rows don't shift when it appears.
+  borderTop: "2px solid transparent",
+  borderBottom: "2px solid transparent",
+};
+const DROP_BEFORE_STYLE: CSSProperties = { borderTopColor: "var(--accent)" };
+const DROP_AFTER_STYLE: CSSProperties = { borderBottomColor: "var(--accent)" };
+const GRIP_STYLE: CSSProperties = {
+  cursor: "grab",
+  color: "var(--fg-3)",
+  fontSize: 13,
+  lineHeight: 1,
+  userSelect: "none",
+  padding: "0 2px",
 };
 const ITEM_LABEL_STYLE: CSSProperties = {
   display: "flex",
   alignItems: "center",
   gap: 8,
   cursor: "pointer",
+  flex: 1,
+  minWidth: 0,
+};
+const CHECKBOX_STYLE: CSSProperties = {
+  // Theme the control instead of the OS default (macOS system blue) so it
+  // follows the active theme's accent (QA: the native blue was off-theme).
+  accentColor: "var(--accent)",
 };
 const ARROW_STYLE: CSSProperties = {
   background: "transparent",
@@ -48,6 +69,12 @@ const ARROW_STYLE: CSSProperties = {
   padding: "0 4px",
   fontSize: 14,
   lineHeight: 1,
+};
+const ARROW_DISABLED_STYLE: CSSProperties = {
+  ...ARROW_STYLE,
+  color: "var(--fg-3)",
+  opacity: 0.35,
+  cursor: "default",
 };
 const ERROR_STYLE: CSSProperties = {
   marginTop: "var(--space-2)",
@@ -61,6 +88,10 @@ export function ToolbarCustomizeSettings() {
   const [order, setOrder] = useState<string[]>([...EDITOR_TOOLBAR_DEFAULT_ORDER]);
   const [hidden, setHidden] = useState<string[]>([...EDITOR_TOOLBAR_DEFAULT_HIDDEN]);
   const [error, setError] = useState<string | null>(null);
+  // Drag-to-reorder transient state: the id being dragged + the current drop
+  // target (row id + which edge the drop indicator paints on).
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [dropAt, setDropAt] = useState<{ id: string; edge: "before" | "after" } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -119,6 +150,20 @@ export function ToolbarCustomizeSettings() {
     [next[idx], next[to]] = [next[to]!, next[idx]!];
     void persistOrder(next);
   }
+  function onDragOver(e: DragEvent, id: string) {
+    if (dragId === null || dragId === id) return;
+    e.preventDefault(); // allow the drop
+    const rect = e.currentTarget.getBoundingClientRect();
+    const edge = e.clientY < rect.top + rect.height / 2 ? "before" : "after";
+    setDropAt({ id, edge });
+  }
+  function onDrop(id: string) {
+    if (dragId !== null && dragId !== id && dropAt !== null) {
+      void persistOrder(reorderByDrop(fullOrder, dragId, dropAt.id, dropAt.edge));
+    }
+    setDragId(null);
+    setDropAt(null);
+  }
 
   return (
     <>
@@ -127,40 +172,66 @@ export function ToolbarCustomizeSettings() {
         helper={t("settings.toolbarCustomize.helper")}
         control={
           <div data-testid="settings.toolbar-customize" style={LIST_STYLE}>
-            {fullOrder.map((id, i) => (
-              <div key={id} style={ROW_STYLE}>
-                <label style={ITEM_LABEL_STYLE}>
-                  <input
-                    type="checkbox"
-                    checked={!hiddenSet.has(id)}
-                    onChange={() => toggleShown(id)}
-                    data-testid="settings.toolbar-customize.toggle"
-                    data-item-id={id}
-                  />
-                  {t(toolbarItemLabelKey(id) ?? id)}
-                </label>
-                <span>
-                  <button
-                    type="button"
-                    aria-label={t("settings.toolbarCustomize.moveUp")}
-                    disabled={i === 0}
-                    onClick={() => move(id, -1)}
-                    style={ARROW_STYLE}
-                  >
-                    ↑
-                  </button>
-                  <button
-                    type="button"
-                    aria-label={t("settings.toolbarCustomize.moveDown")}
-                    disabled={i === fullOrder.length - 1}
-                    onClick={() => move(id, 1)}
-                    style={ARROW_STYLE}
-                  >
-                    ↓
-                  </button>
-                </span>
-              </div>
-            ))}
+            {fullOrder.map((id, i) => {
+              const dropStyle =
+                dropAt?.id === id
+                  ? dropAt.edge === "before"
+                    ? DROP_BEFORE_STYLE
+                    : DROP_AFTER_STYLE
+                  : null;
+              const isFirst = i === 0;
+              const isLast = i === fullOrder.length - 1;
+              return (
+                <div
+                  key={id}
+                  style={{ ...ROW_STYLE, ...dropStyle, opacity: dragId === id ? 0.4 : 1 }}
+                  draggable
+                  onDragStart={() => setDragId(id)}
+                  onDragEnd={() => {
+                    setDragId(null);
+                    setDropAt(null);
+                  }}
+                  onDragOver={(e) => onDragOver(e, id)}
+                  onDrop={() => onDrop(id)}
+                  data-item-id={id}
+                >
+                  <label style={ITEM_LABEL_STYLE}>
+                    <span style={GRIP_STYLE} aria-hidden="true">
+                      ⠿
+                    </span>
+                    <input
+                      type="checkbox"
+                      checked={!hiddenSet.has(id)}
+                      onChange={() => toggleShown(id)}
+                      style={CHECKBOX_STYLE}
+                      data-testid="settings.toolbar-customize.toggle"
+                      data-item-id={id}
+                    />
+                    {t(toolbarItemLabelKey(id) ?? id)}
+                  </label>
+                  <span>
+                    <button
+                      type="button"
+                      aria-label={t("settings.toolbarCustomize.moveUp")}
+                      disabled={isFirst}
+                      onClick={() => move(id, -1)}
+                      style={isFirst ? ARROW_DISABLED_STYLE : ARROW_STYLE}
+                    >
+                      ↑
+                    </button>
+                    <button
+                      type="button"
+                      aria-label={t("settings.toolbarCustomize.moveDown")}
+                      disabled={isLast}
+                      onClick={() => move(id, 1)}
+                      style={isLast ? ARROW_DISABLED_STYLE : ARROW_STYLE}
+                    >
+                      ↓
+                    </button>
+                  </span>
+                </div>
+              );
+            })}
           </div>
         }
       />

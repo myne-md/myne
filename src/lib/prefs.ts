@@ -662,21 +662,28 @@ export async function setRightPanelTabOrder(order: string[]): Promise<void> {
 /** MYND-336: persist the editor toolbar order (verbatim sequence). */
 export async function setEditorToolbarOrder(order: string[]): Promise<void> {
   await invoke<void>("plugin:prefs|set_editor_toolbar_order", { order });
+  // Bump the nonce so `usePrefs` re-reads and `ToolbarLayoutSync` re-pushes the
+  // layout to the live floating toolbar — without this the reorder persists to
+  // disk but the running toolbar keeps the old order until a full reload.
+  bumpPrefsNonce();
 }
 
 /** MYND-336: persist the hidden editor-toolbar items (set — sorted/deduped on encode). */
 export async function setEditorToolbarHidden(items: string[]): Promise<void> {
   await invoke<void>("plugin:prefs|set_editor_toolbar_hidden", { items });
+  bumpPrefsNonce();
 }
 
 /** MYND-336: persist the slash-menu order (verbatim sequence). */
 export async function setEditorSlashOrder(order: string[]): Promise<void> {
   await invoke<void>("plugin:prefs|set_editor_slash_order", { order });
+  bumpPrefsNonce();
 }
 
 /** MYND-336: persist the hidden slash-menu items (set — sorted/deduped on encode). */
 export async function setEditorSlashHidden(items: string[]): Promise<void> {
   await invoke<void>("plugin:prefs|set_editor_slash_hidden", { items });
+  bumpPrefsNonce();
 }
 
 /**
