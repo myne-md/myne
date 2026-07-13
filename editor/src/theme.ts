@@ -74,12 +74,13 @@ export const myneTheme = EditorView.theme({
   },
   // Selection inside a fenced code-block card: the card paints an OPAQUE
   // `--paper-2` background on each body line (content layer), which sits ABOVE
-  // CM's drawn selection layer (`.cm-selectionLayer`) and hides it — so a
-  // selection over code showed nothing. Re-enable the NATIVE `::selection` for
-  // code-card lines (it paints on the text, on top of the card bg). `drawSelection`
-  // zeroes native `::selection` via a baseTheme rule, but this theme rule outranks
-  // a baseTheme rule of equal specificity, so the code selection reappears.
-  ".cm-code-card-body::selection, .cm-code-card-body ::selection": {
+  // CM's drawn selection layer and hides it — so a selection over code showed
+  // nothing. Re-enable the NATIVE `::selection` for code-card lines (it paints on
+  // the text, over the card bg). `drawSelection` zeroes native `::selection` with
+  // a `Prec.highest` rule `.cm-line ::selection { transparent !important }`
+  // (specificity 0,2,1 with the theme class); the COMPOUND `.cm-line.cm-code-card-body`
+  // here is 0,3,1, so it out-specifies that important rule regardless of order.
+  ".cm-line.cm-code-card-body::selection, .cm-line.cm-code-card-body ::selection": {
     backgroundColor: "var(--selection-bg, rgba(44, 74, 122, 0.24)) !important",
   },
 
