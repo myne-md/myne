@@ -7,6 +7,7 @@
 import type { EditorView } from "@codemirror/view";
 import { pickAndInsert } from "../attachments/picker";
 import { startVoiceRecording } from "../attachments/voiceRecord";
+import { getHost } from "../host";
 import { requestTableCellFocus } from "../decorations/table";
 import { emptyTableGrid, serializeTable } from "../decorations/table-model";
 import {
@@ -249,8 +250,12 @@ export function slashCommands(): readonly SlashCommand[] {
     },
     {
       // `/record` (MYND-259): record a voice note inline. Removes the trigger,
-      // then arms native mic capture — the floating recording bar handles
-      // Stop (insert the form-C embed at the cursor) / Cancel (discard).
+      // then arms capture. The host's optional `voiceRecord` slot wins when set
+      // (mobile's WebView `getUserMedia` recorder); otherwise the package-default
+      // desktop `cpal` recorder runs — the floating recording bar handles Stop
+      // (insert the form-C embed) / Cancel (discard). Routing through the host
+      // keeps `/record` from hitting the unregistered `voice_record_*` command on
+      // a platform (mobile) that never wired the native recorder.
       id: "record",
       label: i18n.t("editor.slash.voiceNote"),
       icon: "◉",
@@ -261,7 +266,9 @@ export function slashCommands(): readonly SlashCommand[] {
           selection: { anchor: f },
           userEvent: "slash.apply",
         });
-        void startVoiceRecording(v);
+        const host = getHost();
+        if (host.voiceRecord) host.voiceRecord(v);
+        else void startVoiceRecording(v);
       },
     },
     {

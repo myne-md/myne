@@ -8,7 +8,7 @@
 //! challenge-response, or a PIN run through the vault's Argon2id parameters.
 //!
 //! This module owns the trait + the test [`MockProvider`]. The concrete PIN
-//! and macOS providers land in their own modules (`pin.rs`, `macos.rs`).
+//! and Apple-biometric providers land in their own modules (`pin.rs`, `apple.rs`).
 //!
 //! Secret-handling discipline (see `../../CLAUDE.md`): `wrap_key` material is
 //! always carried in `Zeroizing`; no provider ever logs a wrap key, PIN, or

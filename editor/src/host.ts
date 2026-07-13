@@ -15,6 +15,8 @@
 // Optional members (`ai`, `spell`) may be omitted on a platform that doesn't back
 // them — the engine then hides those affordances.
 
+import type { EditorView } from "@codemirror/view";
+
 /** A node of the Rust-built tag tree (mirror of notes/vaultIndices). */
 export interface TagTreeNode {
   key: string;
@@ -98,6 +100,12 @@ export interface EditorHost {
     addToPersonalDictionary: (word: string) => Promise<void>;
     ignoreWordInVault: (word: string) => Promise<void>;
   };
+
+  /** OPTIONAL — record a voice note into `view`. When set, the `/record` slash
+   *  command routes through this instead of the package-default desktop `cpal`
+   *  recorder — mobile provides a WebView (`getUserMedia`) implementation. Omit
+   *  on a platform with no recorder and `/record` falls back to the default. */
+  voiceRecord?: (view: EditorView) => void;
 }
 
 // ── Registry ─────────────────────────────────────────────────────────────────

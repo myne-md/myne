@@ -478,6 +478,41 @@ pub fn aad_ai_embeddings_blob(account_number_hash: &[u8; 16]) -> Vec<u8> {
     aad
 }
 
+/// Build the AAD bound into the AEAD encryption of a pending-capture blob
+/// (`captures/<capture-id>`, `MYK1`, MYND watch-capture; `protocol.md`
+/// § 9.18.3). Unlike every other § 9 blob AAD, it binds NEITHER
+/// `account_number_hash` NOR `items_key_id`: a pending capture is enqueued
+/// while the vault is **locked** and is vault-agnostic (it drains into
+/// whichever vault unlocks first). Instead it binds the per-entry `capture_id`
+/// (the 16-byte UUIDv7 that is also the device-local queue filename), so an
+/// attacker with write access to the queue directory cannot swap or duplicate
+/// one entry's ciphertext into another `capture_id` slot.
+///
+/// Layout (49 bytes):
+///
+/// ```text
+/// "myne.v0.1|"                          10 bytes  (AAD prefix, § 5.2)
+/// 0x01                                   1 byte   (protocol_version, § 9.18.1)
+/// u16_be(20) || "pending-capture-blob"  22 bytes  (length-prefixed role)
+/// capture_id                            16 bytes  (per-entry UUIDv7, § 9.18.1)
+/// ```
+///
+/// The blob has no `DeriveSubkey` role — its KEK is a device-local key held in
+/// the OS keychain, NOT `root_key`-derived (the queue must survive while
+/// `root_key` is unavailable; § 3.4). DISTINCT from every vault-scoped blob
+/// role.
+pub fn aad_capture_blob(capture_id: &[u8; 16]) -> Vec<u8> {
+    const ROLE_STR_PENDING_CAPTURE_BLOB: &[u8] = b"pending-capture-blob";
+    let mut aad = Vec::with_capacity(
+        AAD_PREFIX_V0_1.len() + 1 + 2 + ROLE_STR_PENDING_CAPTURE_BLOB.len() + capture_id.len(),
+    );
+    aad.extend_from_slice(AAD_PREFIX_V0_1);
+    aad.push(PROTOCOL_VERSION_V0_1);
+    push_length_prefixed_u16_be(&mut aad, ROLE_STR_PENDING_CAPTURE_BLOB);
+    aad.extend_from_slice(capture_id);
+    aad
+}
+
 /// Build the AAD bound into the AEAD encryption of a note's
 /// plaintext under its per-note `item_key` (spec § 5.2 + § 6.2).
 ///
@@ -992,6 +1027,35 @@ mod tests {
         // Also distinct from prefs and workspace.
         assert_ne!(indices_aad, aad_prefs_blob(&id));
         assert_ne!(indices_aad, aad_workspace_blob(&id));
+    }
+
+    #[test]
+    fn aad_capture_blob_default_matches_pinned_hex() {
+        // § 5.2 + § 9.18.3: 49 bytes = prefix (10) + version (1) +
+        // u16_be(20) + "pending-capture-blob" (20) + capture_id (16).
+        let capture_id: [u8; 16] = [
+            0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD,
+            0xEE, 0xFF,
+        ];
+        let aad = aad_capture_blob(&capture_id);
+        let expected: [u8; 49] = [
+            // "myne.v0.1|" — 10 bytes
+            0x6D, 0x79, 0x6E, 0x65, 0x2E, 0x76, 0x30, 0x2E, 0x31, 0x7C,
+            // protocol_version
+            0x01, // length-prefixed role: u16_be(20) || "pending-capture-blob"
+            0x00, 0x14, // u16_be(20)
+            0x70, 0x65, 0x6E, 0x64, 0x69, 0x6E, 0x67, 0x2D, // "pending-"
+            0x63, 0x61, 0x70, 0x74, 0x75, 0x72, 0x65, 0x2D, // "capture-"
+            0x62, 0x6C, 0x6F, 0x62, // "blob"
+            // capture_id
+            0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD,
+            0xEE, 0xFF,
+        ];
+        assert_eq!(aad.as_slice(), &expected[..]);
+        assert_eq!(aad.len(), 49, "spec § 9.18.3 mandates 49-byte AAD");
+        // Vault-agnostic: distinct from a vault-scoped blob AAD (different role
+        // + binds capture_id, not account_number_hash).
+        assert_ne!(aad, aad_prefs_blob(&capture_id));
     }
 
     #[test]

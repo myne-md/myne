@@ -47,7 +47,8 @@ The server exposes the operations whose **wire shapes are defined in `sync-proto
 
 - **pull(cursor)** — return the per-blob sync-meta `(uuid, version, content_nonce, size)` for everything changed since `cursor`, plus the current vault head; advance the cursor. The server selects by its own version counters; it never inspects content.
 - **push(changed_blobs, new_head)** — accept iff the head CAS holds (§2.3); store the blobs in the vault namespace (§2.1), incrementing each blob's version counter (§2.2); reject a stale base with a 409-like response. **Idempotent**: a retried push with the same head is a no-op (the CAS already advanced).
-- **poke** — relay a **contentless** "vault changed" signal (zero payload — no uuid/version/count; `sync-protocol.md` §8.3) over SSE to a vault's other connected devices; polling is the privacy-default alternative the server also serves.
+- **poke** — relay a **contentless** "vault changed" signal (zero payload — no uuid/version/count; `sync-protocol.md` §8.3) over SSE to a vault's other connected devices. Clients keep the stream open while unlocked (§8.3 as amended, `decisions.md` 2026-07-12); polling remains the fallback cadence the server always serves. Server obligations for the stream: (1) a periodic **contentless heartbeat** comment-line (`:hb`, ~30 s cadence — the client's dead-connection read-timeout is calibrated against it; it carries liveness and nothing else); (2) a per-account **concurrent-subscriber cap** (an OOM/fd bound, generous against the device-approval-gated device count); (3) connection attempts spend the **same per-account token bucket** (§5.2) as push/pull — never an IP key. Cap/limit rejections are the 429 `rate` class.
+- **attachment byte-transport** — store and serve attachment ciphertext (`MYA1`) over the dedicated resumable routes of **§3.2**; attachment *metadata* records still ride pull/push (`sync-protocol.md` §8.1), and attachment deletion is a normal push tombstone (`sync-protocol.md` §11.4) — there is no separate delete route.
 
 All operations are bound to an **authenticated session**. The **v0.1 authentication mechanism** — a SCRAM-SHA-256 verifier handshake that yields a per-device bearer token — is documented in **§3.1** below (it is the `myne-server/internal/authapi` HTTP surface; MYND-420 exposure / MYND-425 client enrollment). `protocol.md` §11.1 records the forward-look (v005 canonicalizes an OPAQUE aPAKE; the v0.1 mechanism is the high-entropy-verifier SCRAM path). Every push/pull/poke MUST be tied to an authenticated session and a poke channel MUST be authenticated (a spoofed poke is at worst low-severity DoS). The server MUST NOT accept an operation that is not session-bound.
 
@@ -78,6 +79,23 @@ All request/response bodies are JSON. Every pre-auth request body is capped (`Ma
 
 **Channel binding (R3 — not yet channel-bound).** The mechanism is **SCRAM-SHA-256-PLUS** with channel binding = the **TLS exporter** (`tls-server-end-point`-class exporter keying material). Over the loopback-http test harness there is **no** TLS exporter, so the server's expected channel-binding data is **empty** and the client matches it; over real TLS both ends feed the exporter. Wiring the live exporter on both the Go server (`serverCbind`) and the client rustls transport is the **R3-pending** step. **Until R3 lands, no channel-binding / "-PLUS"-verified claim may be made** — the handshake authenticates the account and mints a token, but it is not yet bound to the TLS channel (documented so a reader does not over-read the `-PLUS` suffix). See the epic sync-ledger R3.
 
+### 3.2 Attachment byte-transport (`/attachments/{id}`; MYND-423/468)
+
+Attachment ciphertext does not travel inline in `push` (a 64 MiB blob in a one-shot base64-JSON body has no resume story). It moves over three dedicated, **session-bound** routes keyed by the full lowercase-hex 32-byte `attachment-id` (`protocol.md` §9.9). The server stores the bytes as an opaque unit in the vault namespace (§2.1); it never parses them.
+
+| Route | Request | Success response | Semantics |
+|---|---|---|---|
+| `HEAD /attachments/{id}` | — | `200` + `X-Uploaded-Length: <n>`, `X-Complete: true\|false` | Resume/dedup probe: how many bytes the server holds for this id, and whether the upload is complete. `404` for an unknown **or deleted** id (deleted-is-absent, non-distinguishing; `sync-protocol.md` §11.4). |
+| `PUT /attachments/{id}?offset=N&total=M` | raw ciphertext chunk (`application/octet-stream`) | `200` + `X-Uploaded-Length` | **Strict-sequential resumable upload**: `offset` MUST equal the server's current uploaded length (else `409` — the client re-probes with `HEAD` and resumes from the real offset); `total` is the declared final ciphertext length, checked against the 64 MiB + 32 cap (`413`) and — at `offset=0` — against the **unified AS17 quota** (§5.1) and the **per-vault attachment-id ceiling** (`507`). The upload is complete when the stored length reaches `total`. A `PUT` to a previously-deleted id restarts it as a fresh upload (re-add; `sync-protocol.md` §11.4 rule 4). |
+| `GET /attachments/{id}` | optional single `Range: bytes=start-end` | `200` (whole blob) / `206` (the range) | Download with resume. Multi-range is rejected (`400`); an unsatisfiable range is `416`; unknown/deleted id is `404`. |
+
+Normative rules:
+
+- **The AEAD unit is never chunked.** An `MYA1` blob is one atomic whole-file AEAD+CTX unit (`protocol.md` §9.9); `PUT`/`GET` offsets and ranges slice **opaque transport bytes only**. The client verifies the whole-blob tag after reassembly and discards the blob on failure — the CCS-2024 unauthenticated-chunking class is structurally excluded, and the server can corrupt nothing without detection.
+- **All three routes are authenticated** (Bearer per-device token, §3.1) and covered by the **same per-account rate-limit** as push/pull (§5.2) — the attachment path is not a second, uncounted budget (the 2026-07-03 AS17 unification, `decisions.md`).
+- **Quota reserves on declaration.** The `offset=0` check counts `total` against the account's unified ciphertext ceiling (blob bytes + attachment bytes, one number); the per-vault id ceiling counts **incomplete uploads too** (a half-uploaded 64 MiB body is the real resource).
+- **Deletion has no route here.** The lifecycle signal is the push tombstone (`sync-protocol.md` §11.4); on receiving it the server marks the body deleted (absent to `HEAD`/`GET`), and physically reclaims it — body, partial state, id-slot, quota bytes — when horizon-GC reclaims the tombstone record (§11.2 ack rule; `MYNE_EXTENDED_RETENTION` keeps bodies exactly as it keeps note ciphertext).
+
 ## 4. Device registry (AS16)
 
 The server keeps a **per-account device registry** — one record per enrolled device — because revocation requires the server to know which devices exist (AS16; this is the one place device count is necessarily server-visible). Each record is keyed by the **client-generated `device_id`** (the version-vector actor, `sync-protocol.md` §4.1), which is **distinct from the device's secret per-device token**: the `device_id` is permanent, non-secret history; the token is the revocable bearer credential.
@@ -90,7 +108,7 @@ The server keeps a **per-account device registry** — one record per enrolled d
 
 ### 5.1 Quota
 
-Storage is bounded by a **per-account quota**: aggregate **deduplicated** ciphertext bytes (AS17), counted once per stored blob (not once per referencing note — dedup is intra-vault, §2.1). On the hosted tier this is the paid-plan ceiling; a self-host operator sets their own (the protocol exposes the byte counter, the operator sets the policy — §6, TB5).
+Storage is bounded by a **per-account quota**: aggregate **deduplicated** ciphertext bytes (AS17), counted once per stored blob (not once per referencing note — dedup is intra-vault, §2.1). The counter is **one number per account** across note blobs *and* attachment bodies (§3.2) — the attachment path has no separate budget. Reclamation decrements it: when horizon-GC drops a tombstoned body (`sync-protocol.md` §11.2/§11.4), the reclaimed bytes leave the counter. On the hosted tier this is the paid-plan ceiling; a self-host operator sets their own (the protocol exposes the byte counter, the operator sets the policy — §6, TB5).
 
 ### 5.2 Rate-limit, never IP
 
@@ -112,7 +130,7 @@ TB5 means **self-host changes the operator, not the security model** — so the 
 | Conflict resolution is client-side (§1.2) | — (structural) |
 | Opaque version counter, no user timestamps (§2.2) | Do not add a side-channel that records wall-clock push times |
 | No *required* persistent IP log (§5.2) | **Do not add IP logging** (the protocol works without it; adding it is a policy violation of the AS14 commitment) |
-| Tombstone GC bounded by the §11 horizon | **Do not retain deleted ciphertext past the horizon** (cryptographic erase is the client's; the operator must not hoard old blobs) |
+| Tombstone GC bounded by the §11 horizon | **Do not retain deleted ciphertext past the horizon** — note blobs and attachment bodies alike (`sync-protocol.md` §11.4; cryptographic erase is the client's; the operator must not hoard old blobs) |
 | Quota counter exposed | Set a sane per-account ceiling; enforce fairly |
 
 The operator-log-policy limitation (a malicious self-host operator *can still* log IPs, retain old ciphertext, or correlate metadata at the policy level) is recorded in `threat-model.md` §7 (self-host known limitation); this section is its normative counterpart on the protocol side. A self-host deployment that honours the policy column is, by TB5, exactly as trustworthy (and as untrusted) as the hosted service — no more, no less.

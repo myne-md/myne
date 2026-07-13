@@ -82,7 +82,13 @@ import {
   createBlankNamedNote,
   resolveTodayNote,
 } from "../notes";
-import { prefsRead, normalizeStartupOpen } from "../lib/prefs";
+import {
+  prefsRead,
+  normalizeStartupOpen,
+  notifyVaultPrefsChanged,
+  PREFS_SYNC_APPLIED_EVENT,
+} from "../lib/prefs";
+import { bumpPrefsNonce } from "../notes/prefsNonce";
 import { showAttachmentToast } from "../editor/attachments/toast";
 import {
   exportToastAction,
@@ -149,7 +155,6 @@ import { ResizeHandle } from "../components/primitives/ResizeHandle";
 import { VaultSwitcher } from "../components/VaultSwitcher";
 import { useEditorLayout } from "./editorLayout";
 import { usePrefs } from "../hooks/usePrefs";
-import { useSyncPrefs } from "../hooks/useSyncPrefs";
 import {
   ContextMenu,
   type ContextMenuItem,
@@ -868,6 +873,34 @@ function EditorChrome({
             .catch(() => {
               /* the next sync tick / manual refresh catches up */
             });
+        });
+        if (cancelled) handle();
+        else unlisten = handle;
+      } catch {
+        // Not inside Tauri (browser dev shim) → no sync events.
+      }
+    })();
+    return () => {
+      cancelled = true;
+      if (unlisten !== undefined) unlisten();
+    };
+  }, []);
+
+  // MYND-478: the sync loop merges remote `vault.prefs` changes onto disk and
+  // emits `PREFS_SYNC_APPLIED_EVENT` (never for the user's own IPC writes —
+  // their own resolve is the signal). Bridge it into the two local refresh
+  // signals so an incoming vault rename / shared-pref change shows live: the
+  // switcher's window event (chip + rows) and the prefs nonce (usePrefs
+  // consumers). Subscribe ONCE; no-op outside Tauri.
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const handle = await listen(PREFS_SYNC_APPLIED_EVENT, () => {
+          if (cancelled) return;
+          notifyVaultPrefsChanged();
+          bumpPrefsNonce();
         });
         if (cancelled) handle();
         else unlisten = handle;
@@ -2182,8 +2215,10 @@ function CommandPaletteHost({
   // Wave 2: layout/pane/tab/nav palette actions dispatch straight to the
   // workspace controller (CommandPaletteHost is inside WorkspaceProvider).
   const paletteWs = useWorkspace();
-  // Wave 4: the device-local real-time-sync toggle (#25).
-  const { realtimeSse, setRealtimeSse } = useSyncPrefs();
+  // (The palette's real-time-sync toggle was dropped in the develop merge — the
+  // sync engine now manages SSE as an always-on baseline with an info-only
+  // Privacy row, so there is no user-toggleable pref to bind, `useSyncPrefs`
+  // mock removed on develop.)
   // Drop the ephemeral AI render stores when the editor session tears down
   // (lock / vault-switch unmounts this host) — the AS1 artifacts (summary text +
   // tag suggestions + the chat transcript) never outlive the open vault (SYNC-8;
@@ -2355,7 +2390,6 @@ function CommandPaletteHost({
       onShowOutline: () => void revealRightPanelTab("outline"),
       onShowUnlinked: () => void revealRightPanelTab("unlinked"),
       onRestoreBackup,
-      onToggleRealtimeSync: () => setRealtimeSse(!realtimeSse),
       // Palette-gap #32 — move the selected note to a folder via the QuickPicker.
       // Targets are the vault's folders (from the sidebar cache) plus any empty
       // "deliberate" folders, sorted, with "Vault root" (empty id → null) first.
@@ -2535,8 +2569,6 @@ function CommandPaletteHost({
       // ctx.prefs, so commandCtx must re-memoize on ANY pref change.
       aiPrefs,
       paletteWs,
-      realtimeSse,
-      setRealtimeSse,
       onRestoreBackup,
       revealRightPanelTab,
       onLockFlushed,

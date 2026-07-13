@@ -7,7 +7,7 @@
 // it for the active (unlocked) vault.
 //
 // ⚠️ The Touch ID path is HARDWARE-UNVERIFIED pending a Touch ID device test +
-// a primitive review (see `src-tauri/.../quick_unlock/macos.rs`). Its helper
+// a primitive review (see `core/.../quick_unlock/apple.rs`). Its helper
 // copy says so; do not present it as a trusted gate until verified.
 
 import { useEffect, useState } from "react";

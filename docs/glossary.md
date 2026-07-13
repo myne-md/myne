@@ -152,6 +152,10 @@ Used in: `decisions.md` 2026-05-02 "Slot state machine + auth_permits generaliza
 
 An arbitrary file of **any type** stored as an encrypted blob in the vault, separate from notes (`threat-model.md` AS7). Each attachment is an [`MYA1`](#mya1) blob (`spec/protocol.md` §9.9) under `attachments/<attachment-id-hex>`, keyed by a per-attachment key wrapped under `itemsKey`; its metadata lives authoritatively in the [`vault.attachments`](#vaultattachments) catalog. Attachments ship in v0.1 (`decisions.md` 2026-06-07, superseding the 2026-04-27 skip-and-placeholder plan). A file the magic-byte sniffer recognizes as a renderable type (`image/*` + SVG + PDF) renders inline; **any other file is stored as `application/octet-stream` and surfaces as an export-only [attachment file-card](#attachment-file-card)** (`decisions.md` 2026-06-14, MYND-173). No remote URL is ever fetched; decrypted bytes never touch disk except on explicit user [export](#export). See [attachment-id](#attachment-id), [MYC1](#myc1). (MYND-164)
 
+### **attachment catalog tombstone** &nbsp; 📋 *Protocol*
+
+A [`vault.attachments`](#vaultattachments) entry whose optional `deleted_at` field is set (`spec/protocol.md` §9.10.2): the multi-device **deletion marker** for an [attachment](#attachment) under Phase 2 sync (`spec/sync-protocol.md` §11.4). Written at delete time with the entry's metadata **scrubbed** (filename/content-type emptied, size zeroed) so the synced catalog keeps nothing descriptive about a crypto-erased file; it defeats stale-catalog resurrection in the per-entry merge (a live entry wins only if its `created_at` postdates `deleted_at` — a deliberate re-add). Prunable client-side after the [tombstone horizon](#tombstone-horizon). **Distinct from** the [deleted-attachment tombstone](#deleted-attachment-tombstone), which is the *UI placeholder* an editor embed renders for an unresolvable id. Phase 2. (MYND-468)
+
 ### **attachment-id** &nbsp; 📋 *Protocol*
 
 The 32-byte content-addressed identifier of an [attachment](#attachment): `HMAC-SHA-256(DeriveSubkey(root_key, "attachments-id-hmac"), file_bytes)` (`spec/protocol.md` §9.9). Used as the on-disk filename (hex) and the dedup key — identical content yields one blob within a vault. Because it is keyed under `root_key`, a disk observer without the key cannot test whether the vault holds a specific known file (no confirmation oracle) nor link equal content across vaults (`threat-model.md` AS7/AS8). Notes reference it via the editor form-C embed `![[att:<id>|filename]]`. Dedup is an id-existence check, not convergent encryption. (MYND-164)
@@ -171,6 +175,10 @@ The Tauri command that writes one [attachment](#attachment)'s **decrypted** byte
 ### **attachment file-card** &nbsp; 📦 *Product*
 
 The editor representation of a non-renderable (generic) [attachment](#attachment) — a `.docx`, `.zip`, `.txt`, etc. stored as `application/octet-stream`. Unlike an inline image/PDF, the file's content is **never** previewed; the form-C embed `![[att:<id>|filename]]` renders as a compact atomic card showing a file-type icon, the [`vault.attachments`](#vaultattachments) filename (the single source of truth — `Rename` edits it globally via `attachment_rename`, not the per-embed alias), a "type · size" line (the type label is derived from the filename extension TS-side, since the catalog stores only `octet-stream`), and a "⋯" overflow menu: Export (→ [attachment_export](#attachment_export)), Rename, Remove from note, Reveal in library. "Using" the file means exporting it. A missing id renders the shared [deleted-attachment tombstone](#deleted-attachment-tombstone). Inline preview of other types (docx/pptx/xlsx/text) is the separate follow-up MYND-268. (MYND-173; `decisions.md` 2026-06-14)
+
+### **attachment sync-id** &nbsp; 📋 *Protocol*
+
+The **first 16 bytes** of a 32-byte [attachment-id](#attachment-id) — the key under which an [attachment](#attachment) appears in the [vault head](#vault-head) manifest and the sync metadata plane (`spec/sync-protocol.md` §4.2), which use a uniform 16-byte key for notes (UUID) and attachments alike. The full id keeps living in the `attachments/<hex>` filename, the [`vault.attachments`](#vaultattachments) catalog, and the `/attachments/{id}` byte-transport (`spec/server-protocol.md` §3.2); pull sync-meta echoes the full id so a device can resolve the prefix without the catalog. Truncation is safe intra-vault (~2^-64 birthday bound; a collision is a hard manifest encode failure, never silent). Phase 2. (MYND-468)
 
 ### **attachment text extraction** &nbsp; 📋 *Protocol*
 
@@ -288,6 +296,10 @@ The IETF AEAD specified in RFC 8439, using the ChaCha20 stream cipher and the Po
 
 Used in: `spec/protocol.md` §5.1
 Reference: RFC 8439.
+
+### **catalog sync-id** &nbsp; 📋 *Protocol*
+
+The reserved 16-byte sync-plane identifier of the [`vault.attachments`](#vaultattachments) catalog under Phase 2 sync: `DeriveSubkey(root_key, "catalog-sync-id")[0..16]` (`spec/protocol.md` §3.4; MYND-468). The catalog is a synced singleton **outside** the head manifest (`spec/sync-protocol.md` §4.2), so it needs a stable blob-id every device derives identically; because the id is `root_key`-keyed pseudorandom bytes, the server cannot distinguish the catalog's record from a note's. Derives an *identifier*, not key material — the catalog KEK stays `attachments-catalog-key`. Excluded from the manifest by construction. Phase 2.
 
 ### **chord** &nbsp; 📦 *Product*
 
@@ -459,7 +471,7 @@ The Myne-managed canonical frontmatter field `deleted:` — a **value-strict** R
 
 ### **deleted-attachment tombstone** &nbsp; 📦 *Product*
 
-The styleable placeholder an editor embed renders when its [attachment-id](#attachment-id) no longer resolves. Note bodies are **never** rewritten on deletion — the `![[att:<id>|filename]]` reference dangles intentionally and the resolver renders a tombstone, distinguishing a *deleted attachment* (id once existed, removed from the library) from a *broken reference* (id never existed). One shared component across the editor and the attachments library. Consistent with the no-auto-GC, explicit-delete-only attachment lifecycle. (MYND-164)
+The styleable placeholder an editor embed renders when its [attachment-id](#attachment-id) no longer resolves. Note bodies are **never** rewritten on deletion — the `![[att:<id>|filename]]` reference dangles intentionally and the resolver renders a tombstone, distinguishing a *deleted attachment* (id once existed, removed from the library) from a *broken reference* (id never existed). One shared component across the editor and the attachments library. Consistent with the no-auto-GC, explicit-delete-only attachment lifecycle. **Distinct from** the [attachment catalog tombstone](#attachment-catalog-tombstone), which is the *synced catalog-entry deletion marker* (Phase 2), not a UI element. (MYND-164)
 
 ### **deliberate folder** &nbsp; 📦 *Product*
 
@@ -508,6 +520,12 @@ Used in: `spec/server-protocol.md` §4; `threat-model.md` AS16
 A credential that lives only on one device and is **never synchronized**, because it is bound to that device's hardware. The v0.1 instance is the [quick-unlock credential](#quick-unlock-credential) blob (`vault.quickunlock`, `spec/protocol.md` §9.14): its wrap key is held in the OS keychain with `thisDeviceOnly` accessibility, so a copy on another device is inert. Contrast the master-password and recovery-phrase credentials, which are device-portable and ride in the synced `vault.meta`. Each device that opts into quick-unlock mints its own device-local credential.
 
 Used in: `spec/protocol.md` §9.14, `decisions.md` 2026-06-16
+
+### **device-local pref** &nbsp; 📋 *Protocol*
+
+One of the two normative [vault.prefs](#vaultprefs) field classes of the Phase 2 prefs sync (`sync-protocol.md` §10.2, MYND-478): a preference that describes how *this device* presents, secures, or operates on the vault — security posture (`auto_lock_seconds`, `screen_capture_protection`), presentation (`theme`, the `editor_*` fields), input (`keymap`), screen-dependent UI layout, and device state (`last_backup_at`, `paired_extensions`). A device-local pref never crosses the merge — the local value always survives — even though the whole encrypted blob transits the server (the same bytes already leave the device inside backups). Contrast [shared pref](#shared-pref). Not to be confused with a [device-local credential](#device-local-credential), which is a *key-material* class.
+
+Used in: `sync-protocol.md` §10.2; `decisions.md` 2026-07-13
 
 ### **domain separation** &nbsp; 📋 *Protocol*
 
@@ -601,6 +619,12 @@ The recursive, **closed-allow-list** tree that expresses a [saved view](#saved-v
 
 Used in: `spec/protocol.md` §9.5.2; `decisions.md` 2026-06-15
 
+### **field clock** &nbsp; 📋 *Protocol*
+
+The per-field LWW timestamp of the Phase 2 prefs sync (`sync-protocol.md` §10.2, MYND-478): an epoch-milliseconds integer, one per [shared pref](#shared-pref) LWW field (or per `device_names/<key>` entry), stored in the additive `field_clocks` map inside the encrypted [vault.prefs](#vaultprefs) payload (`spec/protocol.md` §9.5.2) and stamped by the setter that last changed the field. The merge takes the newer clock per field, counts an absent clock as 0 (pre-feature blobs), and breaks equal clocks byte-lexicographically toward the greater value — the attachments-catalog `filename` precedent — so replicas converge without coordination. Per-field (rather than per-blob) clocks are what let concurrent edits to *different* fields both survive.
+
+Used in: `sync-protocol.md` §10.2, `spec/protocol.md` §9.5.2; `decisions.md` 2026-07-13
+
 ### **focus mode** &nbsp; 📦 *Product*
 
 The editor's distraction-free writing state (MYND-348): a `Mod-Shift-F` toggle fades the in-app chrome (sidebars, tab strip, [bottom bar](#bottom-bar), floated title-bar cluster) and centers the column, so only the words remain. The fade is **in-app only** — a CSS rule keyed on the editor root's `data-focus-active` attribute, never OS fullscreen (no Tauri window-API capability is added). The active state is **ephemeral** React state (opt in each session, never auto-entered, not persisted to any blob). Exit via the toggle or **Esc** at low keymap precedence (the editor's autocomplete / multi-cursor consume Esc first). v1 also ships [typewriter scroll](#typewriter-scroll) and [line-focus dimming](#line-focus-dimming), each a Settings → Editor toggle (the `editor_focus_typewriter` / `editor_focus_dim_inactive` MYP1 fields, default on); the command palette and Settings open over focus and return to it on close. Threat-neutral (UI state + two cosmetic prefs fields). See also [typewriter scroll](#typewriter-scroll), [line-focus dimming](#line-focus-dimming).
@@ -654,6 +678,12 @@ Used in: `spec/protocol.md` §10.1
 The property that compromise of a long-term key does not enable decryption of past messages encrypted with derived ephemeral keys. Myne v0.1 does **not** provide forward secrecy — the persistent `itemsKey` is reusable across all notes for the vault's lifetime. The `appname-v005` roadmap introduces per-epoch `itemsKey` rotation that would provide forward secrecy by deleting old epoch keys after migration.
 
 Used in: `threat-model.md` §7; `spec/protocol.md` §3.3 (forward-compat note)
+
+### **free tier** &nbsp; 📦 *Product*
+
+The permanent no-cost tier of [hosted sync](#hosted-sync): 250 MB storage / 3 devices per account, full protocol, full speed — differentiation from [Myne Sync](#myne-sync) is quantitative only (storage + device count), never speed, features, or guarantees (`decisions.md` 2026-07-13). Its existence revises the `server-protocol.md` §5.3 Sybil posture: a permanent free anonymous registration surface is accepted, bounded by the small quota, the device cap, and the registered-account ceiling — the payment gate remains the primary Sybil resistance for *meaningful* storage. Abandoned free accounts are never reclaimed: doing so would require persisting a new behavioral marker, and the zero-new-observation principle wins over the (bounded, accepted) dead-account storage cost.
+
+Used in: `decisions.md` 2026-07-13
 
 ### **frontmatter** &nbsp; 📦 *Product*
 
@@ -1031,6 +1061,12 @@ Used in: `spec/protocol.md` §9.1, §5.2; `decisions.md` 2026-05-07 "Note UUIDv7
 
 The markdown dialect Myne v0.1 reads and writes: **GFM (GitHub-Flavored Markdown) plus a footnote extension plus a wikilink extension plus YAML frontmatter recognition**. Internally referenced as **D1**. Codified in `spec/markdown-dialect.md`. The dialect is selected as the smallest pin that covers Myne v0.1's editor decoration commitments (tables, task lists, footnotes, wikilinks, frontmatter) while preserving byte-stable round-trip with Obsidian-imported notes (`vision.md` Phase 1 importer commitment). Two alternatives were considered and declined in `decisions.md` 2026-05-01: D2 (D1 + Pandoc extras — declined because the extras are not load-bearing for v0.1 and Obsidian renders them as raw text) and D3 (Djot — declined because `.dj` is not markdown and would break the "walk away into any markdown editor" wedge). Hard rule **C1**: vault imports never silently rewrite content; non-canonical syntax in imported notes is preserved byte-for-byte. Forward-incompatible with v005 by design — v005 will pin its own dialect.
 
+### **Myne Sync** &nbsp; 📦 *Product*
+
+The commercial name of the [hosted sync](#hosted-sync) paid plan — deliberately a **single** plan: 3 €/month · 30 €/year (VAT-inclusive final price everywhere; ~15 % yearly discount; 1- and 12-month SKUs only), 20 GB deduplicated-ciphertext quota (AS17) and 10 devices per account (`decisions.md` 2026-07-13). One plan because hosted and self-hosted share TB5: the only honest differentiators are quantitative (storage + devices). Prepaid and time-based — a voucher extends `paid_until`; there is **no auto-renewal**, because nothing identity-bearing is kept on file for an anonymous account. Expiry runs the [read-only grace](#read-only-grace) ladder.
+
+Used in: `decisions.md` 2026-07-13
+
 ### **Myne-managed canonical frontmatter field** &nbsp; 📋 *Protocol*
 
 A YAML frontmatter field whose value is written by the Myne dialect surgery module (`src/dialect/surgery.ts`) rather than left purely user-authored. v0.1 defines two such fields: `updated` (RFC 3339 string, UTC, **autosave-driven** — overwritten on every `note_update` via `patchUpdatedField` to record the user's last-edit timestamp on the device) and `title` (YAML string scalar, **rename-driven** — overwritten only when the user renames a note from the sidebar AND the read-precedence chain resolves to the frontmatter slot, via `patchTitleField`; the `<NoteRow>` sidebar reads from the same field per the mirror-existing source-of-truth decision tree). Both fields are **unprefixed** (no `myne_` namespace) to align with Obsidian / Logseq / Bear convention and the `PRODUCT.md` plain-markdown-portability commitment. Other frontmatter fields (`tags:`, user-defined keys) are user-authored and preserved per `markdown-dialect.md` §3.6 "Unknown frontmatter fields are preserved on write." The set of Myne-managed canonical fields is forward-incompatible-by-design with v005.
@@ -1094,6 +1130,12 @@ The aPAKE protocol standardized as RFC 9807 (March 2025). Server stores no offli
 Used in: `spec/protocol.md` §11.1
 Reference: RFC 9807.
 
+### **operator console** &nbsp; 📦 *Product*
+
+The hosted-sync admin surface (`decisions.md` 2026-07-13): an admin API bound to a **Unix domain socket** (`MYNE_ADMIN_SOCKET` — no bearer secret; access is filesystem permissions) plus a `myne-server admin` CLI; a stdlib-only web panel is a later iteration on the same API. Normative posture: the console is a **live projection of already-persisted enforcement state only** — account hash, stored bytes, device count, plan fields — never a new observation channel: no request history, no last-seen wall-clocks, no per-account time series (upholding the MYND-440 aggregate-only-metrics invariant). Open-source and shipped to self-hosters like every other component; hosted gets no proprietary tooling.
+
+Used in: `decisions.md` 2026-07-13
+
 ### **optimistic UI rollback** &nbsp; 📦 *Product*
 
 The UI pattern where a state change (sidebar row appended, removed, title overwritten) is applied to the local React cache **before** the underlying Tauri IPC call resolves, giving the user instant feedback. On IPC rejection (disk full, vault locked mid-save, structural error) the change is reverted from the cache and the user is informed via a non-blocking error toast. Myne uses optimistic UI rollback in three sidebar paths per `decisions.md` 2026-05-15 "Save-handler discipline": `createNote` (row appended optimistically), `deleteNote` (row removed optimistically), `renameNote` (title overwritten optimistically). `saveNote` (autosave) is **not** optimistic — body autosave doesn't typically alter the sidebar's title row, and the BottomBar save-status indicator (`SaveStatus` component, `Saving…` → `Saved · 2s ago` / `Save failed · Retry`) provides feedback without preempting the IPC. The pattern requires a paired rollback discipline at every optimistic call site; an IPC-rejected optimistic action that doesn't rollback is a UX-state-corruption bug.
@@ -1144,6 +1186,10 @@ Myne's product phasing. See `vision.md` Phase 1 Scope and `decisions.md` for def
 
 Used in: `vision.md`, `decisions.md`
 
+### **pending capture** &nbsp; 📦 *Product*
+
+A short piece of dictated note text captured on the native-SwiftUI Apple Watch companion and relayed to the paired phone over WatchConnectivity, held in a **device-local encrypted queue** (`MYK1`, `spec/protocol.md` §9.18 — one file per capture at `captures/<capture-id>`) until the vault is next unlocked on the phone, at which point it is drained into that vault as an ordinary new note. Sealed under a device-local keychain `wrap_key` (non-biometric, `afterFirstUnlockThisDeviceOnly`; **not** `root_key`-derived, since the queue must be writable while the vault is locked), it is **vault-agnostic** — it binds the per-entry `capture_id` rather than a vault identity, and drains into whichever vault unlocks first. The watch holds no vault keys and runs no crypto (the same outside-the-trust-boundary posture as the home-screen widget); the queue is never synced or backed up. V1 is voice quick-capture only — no reading, editing, or Siri intent. (`decisions.md` 2026-07-12)
+
 ### **plausibly-deniable encryption** &nbsp; ⚠️ *Threat*
 
 Encryption schemes (e.g., VeraCrypt's hidden volumes) where a vault can be opened to multiple distinct plaintexts depending on which password is supplied, providing deniability under coercion. Myne v0.1 does not implement plausibly-deniable encryption; coercion (A12) is explicitly out of scope. v005 may revisit but only with caution — partial deniability schemes are easy to misimplement and easy to claim falsely.
@@ -1158,15 +1204,15 @@ Used in: `spec/protocol.md` §5.1
 
 ### **quick-unlock credential** &nbsp; 🗝️ *Key/identifier*
 
-A [device-local credential](#device-local-credential) (`vault.quickunlock`, `spec/protocol.md` §9.14, magic `MYQ1`) that holds a **third wrapped copy of `root_key`** so a re-lock (auto-lock-on-idle) can be reversed with a fast second credential — Touch ID / Windows Hello, or a PIN — instead of the full master-password Argon2id path. It wraps the already-derived `root_key`; it never participates in `root_key` derivation, so it does not touch the zero-knowledge root (the master password stays the primary credential). Its wrap key comes from a [wrap-key provider](#wrap-key-provider), not a `DeriveSubkey` role. Threat class: an **A6** convenience gate over the already-encrypted store; it does **not** defend against **A7** (active local malware), and the PIN provider's blob is offline-brute-forceable by **A4** bounded only by Argon2id cost. Introduced MYND-329.
+A [device-local credential](#device-local-credential) (`vault.quickunlock`, `spec/protocol.md` §9.14, magic `MYQ1`) that holds a **third wrapped copy of `root_key`** so a re-lock (auto-lock-on-idle) can be reversed with a fast second credential — Touch ID / Face ID / Windows Hello, or a PIN — instead of the full master-password Argon2id path. It wraps the already-derived `root_key`; it never participates in `root_key` derivation, so it does not touch the zero-knowledge root (the master password stays the primary credential). Its wrap key comes from a [wrap-key provider](#wrap-key-provider), not a `DeriveSubkey` role. Threat class: an **A6** convenience gate over the already-encrypted store; it does **not** defend against **A7** (active local malware), and the PIN provider's blob is offline-brute-forceable by **A4** bounded only by Argon2id cost. Introduced MYND-329.
 
 Used in: `spec/protocol.md` §9.14, `decisions.md` 2026-06-16
 
 ### **wrap-key provider** &nbsp; 🗝️ *Key/identifier*
 
-The pluggable source of the 32-byte symmetric wrap key that protects the [quick-unlock credential](#quick-unlock-credential) blob. The on-disk blob is provider-agnostic — always `AEAD(wrap_key, root_key)` — and only the wrap-key source differs: a macOS Keychain secret gated by `kSecAccessControlBiometryCurrentSet` (biometric), a future Windows Hello / TPM challenge-response, or a PIN run through the vault's Argon2id parameters. Modeled as a single Rust trait (`QuickUnlockProvider`); adding a provider is not an on-disk-format change. The biometric provider is hardware-bound and OS-invalidated on biometric-set change; the PIN provider's strength is bounded by PIN entropy × the memory-hard Argon2id cost.
+The pluggable source of the 32-byte symmetric wrap key that protects the [quick-unlock credential](#quick-unlock-credential) blob. The on-disk blob is provider-agnostic — always `AEAD(wrap_key, root_key)` — and only the wrap-key source differs: an Apple Keychain secret gated by `kSecAccessControlBiometryCurrentSet` (biometric — macOS Touch ID, iOS Face ID / Touch ID; one provider kind, `decisions.md` 2026-07-12), a future Windows Hello / TPM challenge-response or Android Keystore secret, or a PIN run through the vault's Argon2id parameters. Modeled as a single Rust trait (`QuickUnlockProvider`); adding a provider is not an on-disk-format change. The biometric provider is hardware-bound and OS-invalidated on biometric-set change; the PIN provider's strength is bounded by PIN entropy × the memory-hard Argon2id cost.
 
-Used in: `spec/protocol.md` §9.14.2
+Used in: `spec/protocol.md` §9.14.2, `decisions.md` 2026-07-12
 
 ### **post-compromise security** &nbsp; ⚠️ *Threat*
 
@@ -1258,6 +1304,12 @@ Reference: https://react.dev
 The read-only rendered [view mode](#view-mode) of a note tab (MYND-299): all editor [decorations](#decoration-layer) are applied, but the surface is non-editable and there is **no** [cursor-aware reveal](#cursor-aware-reveal) — markdown source never lifts, so the note reads as finished prose without edit chrome or markup flicker. Keystrokes are no-ops (an optional one-time "⇧⌘E to edit" hint tells the reader how to switch back). It reuses `CMEditor`'s `readOnly` path; §6 C1 keeps the underlying bytes untouched. The primary **Edit ⇄ Reading** toggle is `Mod-Shift-E`. The read-only [preview companion](#view-mode) pane is a side-by-side Reading mirror of the *same* buffer (a linked mirror, not a second `(kind,id)` instance — it preserves the one-editable-buffer-per-note invariant). Contrast [Source mode](#source-mode) (raw markdown, decorations off) and live preview (today's cursor-aware default). See also [view mode](#view-mode), [Source mode](#source-mode), [cursor-aware reveal](#cursor-aware-reveal).
 
 Used in: `spec/protocol.md` §9.5.2, §9.7; `decisions.md` 2026-06-17 (MYND-299)
+
+### **read-only grace** &nbsp; 📦 *Product*
+
+The hosted-sync expiry ladder (`decisions.md` 2026-07-13): when a paid term lapses (or usage exceeds the tier ceiling after a downgrade), push is refused (402-class error) while **pull stays fully open for 90 days** — the user can always take their data out. At the end of grace the server-side vault ciphertext is deleted **atomically**: the server cannot see inside a vault, so selective/partial deletion is structurally meaningless — the server copy either stays whole or goes entirely. The account record (SCRAM verifier + device registry) is kept, and because Myne is local-first the deletion is not data loss — devices hold the plaintext and can re-push within the free tier or after renewal.
+
+Used in: `decisions.md` 2026-07-13
 
 ### **Recovering** (slot state) &nbsp; 📦 *Product*
 
@@ -1396,6 +1448,12 @@ A generic term referring to whatever value is sent to the sync server for authen
 
 Used in: `spec/protocol.md` §1.1, §11.1
 
+### **shared pref** &nbsp; 📋 *Protocol*
+
+One of the two normative [vault.prefs](#vaultprefs) field classes of the Phase 2 prefs sync (`sync-protocol.md` §10.2, MYND-478): a preference that describes the *vault* — identity (`label`, `icon`), content organization (`favorites`, `item_order`, `folder_icons`, `saved_views`), vault-level conventions (the `daily_*` fields), vault-wide privacy declarations (`ai_excluded_folders`), and the cross-device `device_names` map. Shared prefs sync between devices, merging per discipline (scalar/whole-value LWW on [field clocks](#field-clock), set-union, sequence-LWW-on-whole, per-key map). Contrast [device-local pref](#device-local-pref).
+
+Used in: `sync-protocol.md` §10.2; `decisions.md` 2026-07-13
+
 ### **session token** &nbsp; 🗝️ *Key/identifier*
 
 An opaque UUIDv4 identifying an in-flight vault-creation session held in the Tauri-managed `VaultCreationState` map between the `begin` and `commit` IPC calls. The session token is **not a secret** — it is a bearer reference to the session row, which contains the actual secret material (`root_key`, password and recovery wrap keys, recovery phrase, account number). Sessions live at most 10 minutes (`SESSION_TTL_SECS`); evicted tokens are tombstoned for up to 1 hour so a subsequent `commit` returns `SessionExpired` instead of the generic `SessionNotFound`.
@@ -1426,6 +1484,12 @@ Used in: `agent-tooling/features/editor-mvp-baseline/prd.md`, `agent-tooling/ses
 The Notes sidebar's hybrid refresh strategy pinned in `decisions.md` 2026-05-15: **initial-boot chunked Promise.all** (on Editor mount, call `note_list` → split returned IDs into ≤100-ID chunks per `note_titles_batch`'s `BatchTooLarge` cap → fire all chunks via `Promise.all` → populate the `Map<NoteId, TitleRecord>` cache) **plus action-driven surgical `refreshOne(id)`** (after every successful `saveNote / renameNote / createNote / deleteNote`, call `note_titles_batch([id])` for that single ID and update the matching cache entry). The pattern is event-driven, not poll-based — no periodic background re-fetch, no broadcast-channel listener. Backend events (Tauri `emit("note_updated", ...)`) were explicitly rejected for Phase 1 as premature complexity in a single-window scenario; a future multi-window Myne adopts them by replacing `refreshOne` call sites with event handlers (same function, different trigger). Pairs with `optimistic UI rollback` for instant-feedback paths.
 
 Used in: `decisions.md` 2026-05-15; MYND-82
+
+### **size class** &nbsp; 📦 *Product*
+
+The mobile client's layout axis — the discriminator that decides which pane composition the wired app renders, **derived from window geometry, never from device brand**: `compact` (the phone's full-screen list ⇄ editor swap), `medium` (≥700px: list + detail two-pane), `expanded` (≥1000px: the WS-01 three-pane — sidebar 248 / list 316 / editor). Two inputs: the **window width** (`window.innerWidth`, so an iPad Split View pane narrowed to phone width falls back to the phone layout, and the Playwright flow tier drives every layout purely by viewport) and a **phone guard** on `window.screen`'s smaller dimension (< 480px → always `compact`; reading `screen` rather than window height keeps the Android IME — which shrinks the layout viewport — from flipping the layout and remounting the editor mid-typing). Orthogonal to [platform](#platform) (`PlatformContext` keeps owning biometric copy / brand concerns; `SizeClassContext` owns layout). Breakpoint budget mirrors the desktop `layoutClamp.ts` discipline (editor pane ≥ 360px, the desktop `CENTER_MIN_WIDTH`).
+
+Used in: `decisions.md` 2026-07-12 "Mobile tablet strategy"; `myne-mobile/src/platform/SizeClassContext.tsx`
 
 ### **Slot** &nbsp; 📦 *Product*
 
@@ -1487,7 +1551,7 @@ Used in: `spec/sync-protocol.md` §8
 
 ### **sync taxonomy** &nbsp; 📋 *Protocol*
 
-The Phase 2 four-class partition of a vault's artefacts by sync disposition: **authoritative-data** (notes, snapshots, `vault.prefs`, `vault.dictionary`, attachments + `vault.attachments` — SYNC), **identity** (`vault.meta` — SYNC, bespoke merge), **rebuildable-cache** (`vault.search`, `vault.indices`, `vault.embeddings` — re-derived locally via the §9.6.4 reconcile, NEVER synced; `vault.embeddings` is additionally model-specific), **device-local** (`vault.workspace`, `vault.quickunlock`, `vault.head-state` — NEVER synced). Governed by the invariant **sync members ⊆ backup members**: sync membership is the authoritative-vs-derivable cut of the `protocol.md` §9.11.3 backup allowlist, not a separate list. Phase 2.
+The Phase 2 four-class partition of a vault's artefacts by sync disposition: **authoritative-data** (notes, `vault.prefs`, `vault.dictionary`, attachments + `vault.attachments` — SYNC), **identity** (`vault.meta` — SYNC, bespoke merge), **rebuildable-cache** (`vault.search`, `vault.indices`, `vault.embeddings` — re-derived locally via the §9.6.4 reconcile, NEVER synced; `vault.embeddings` is additionally model-specific), **device-local** (`vault.workspace`, `vault.quickunlock`, `vault.head-state` — NEVER synced). Governed by the invariant **sync members ⊆ backup members**: sync membership is the authoritative-vs-derivable cut of the `protocol.md` §9.11.3 backup allowlist, not a separate list. One deliberate carve-out: **snapshots** are authoritative and in the backup allowlist yet are *never* synced (syncing per-note snapshot cadence would leak edit timing — A13/AS6; `threat-model.md` §7 is normative, `sync-protocol.md` §9.2). Phase 2.
 
 Used in: `spec/sync-protocol.md` §9
 
@@ -1782,7 +1846,7 @@ Used in: Saved Views (MYND-271)
 
 ### **voice note** &nbsp; 📦 *Product*
 
-A note audio clip embedded inline — either a recorded microphone capture or an attached audio file. Stored as an ordinary [attachment](#attachment) (an `audio/wav` [`MYA1`](#mya1) blob — **no new on-disk format**) referenced by the form-C embed `![[att:<id>|filename]]` and played by an inline custom waveform widget. Recording captures **natively in Rust via `cpal`** (not the WebView MediaRecorder, so PCM stays Rust-side + `Zeroize`-able), encodes to WAV/PCM at the device-native rate (mono, 16-bit), buffers in RAM only (never a plaintext temp file), and auto-finalizes at the 64 MiB cap into a seamless next clip. The mic is unlock-gated, gesture-driven, and aborted on lock / auto-lock. `audio/wav` joins the [`attachment://`](#attachment) serve allowlist + the sniffer (a `RIFF`…`WAVE` arm). (MYND-259; `decisions.md` 2026-06-14)
+A note audio clip embedded inline — either a recorded microphone capture or an attached audio file. Stored as an ordinary [attachment](#attachment) (an `audio/wav` [`MYA1`](#mya1) blob — **no new on-disk format**, so a recording made on any client plays on all of them) referenced by the form-C embed `![[att:<id>|filename]]`. **Desktop** captures **natively in Rust via `cpal`** (not the WebView MediaRecorder, so PCM stays Rust-side + `Zeroize`-able) and plays via an inline custom waveform widget. **Mobile** (Tauri Mobile, where `cpal` does not cross-compile as a mic source) captures in the WebView via the **Web Audio API** (`getUserMedia`), wraps the PCM as the same `audio/wav` container in TS, imports it through the ordinary attachment path, and renders an inline `<audio controls>` in reading mode (`decisions.md` 2026-07-12). Both encode mono 16-bit and buffer in RAM only (never a plaintext temp file). `audio/wav` is in the [`attachment://`](#attachment) serve allowlist + the sniffer (a `RIFF`…`WAVE` arm). (MYND-259; `decisions.md` 2026-06-14, 2026-07-12)
 
 ### **Vite** &nbsp; 🛠️ *Tooling*
 
@@ -1919,7 +1983,7 @@ The four prefixes for a single major version are deliberately non-interchangeabl
 
 ### Theme preference
 
-The user's Light / Dark / System choice, persisted as the `theme` field of [`vault.prefs`](#prefsview) (`spec/protocol.md` §9.5.2). An optional string — `"light"` or `"dark"` — where **absence of the key is the canonical encoding of "system"** (follow the OS `prefers-color-scheme`); there is no `"system"` value, so a vault that made no explicit choice omits the field and stays byte-identical to a pre-MYND-110 blob. Rendering is a **pure-CSS hybrid**: an explicit choice sets `<html data-theme="light|dark">` (overriding the OS); System and every pre-unlock screen carry no attribute, so a `prefers-color-scheme` `@media` block follows the OS live with no JS. The preference is **non-load-bearing** — a cosmetic UI setting (AS-low) with no protective-envelope clamp (unlike [AUTO_LOCK_CEILING](#auto_lock_ceiling)); a tampered or replayed `vault.prefs` can at worst surface the wrong color, and an unrecognized value decodes to "system" rather than failing. It lives inside the encrypted blob (not plaintext) so a disk-at-rest adversary learns nothing — the same structural-privacy reasoning that keeps [auto-lock](#auto-lock-on-idle)'s timeout encrypted. On lock the attribute is removed (the UI follows the OS), the UI-layer image of zeroize-on-lock. The theme syncs with the vault (it is vault state, not a device-local preference). Introduced MYND-110. See also [PrefsView](#prefsview), [syntax color tokens](#syntax-color-tokens), [custom theme](#custom-theme).
+The user's Light / Dark / System choice, persisted as the `theme` field of [`vault.prefs`](#prefsview) (`spec/protocol.md` §9.5.2). An optional string — `"light"` or `"dark"` — where **absence of the key is the canonical encoding of "system"** (follow the OS `prefers-color-scheme`); there is no `"system"` value, so a vault that made no explicit choice omits the field and stays byte-identical to a pre-MYND-110 blob. Rendering is a **pure-CSS hybrid**: an explicit choice sets `<html data-theme="light|dark">` (overriding the OS); System and every pre-unlock screen carry no attribute, so a `prefers-color-scheme` `@media` block follows the OS live with no JS. The preference is **non-load-bearing** — a cosmetic UI setting (AS-low) with no protective-envelope clamp (unlike [AUTO_LOCK_CEILING](#auto_lock_ceiling)); a tampered or replayed `vault.prefs` can at worst surface the wrong color, and an unrecognized value decodes to "system" rather than failing. It lives inside the encrypted blob (not plaintext) so a disk-at-rest adversary learns nothing — the same structural-privacy reasoning that keeps [auto-lock](#auto-lock-on-idle)'s timeout encrypted. On lock the attribute is removed (the UI follows the OS), the UI-layer image of zeroize-on-lock. The theme is a [device-local pref](#device-local-pref) (`sync-protocol.md` §10.2, MYND-478): presentation is per-device taste, so it never crosses the Phase 2 prefs merge. Introduced MYND-110. See also [PrefsView](#prefsview), [syntax color tokens](#syntax-color-tokens), [custom theme](#custom-theme).
 
 ### custom theme
 

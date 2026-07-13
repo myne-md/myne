@@ -34,10 +34,19 @@ use std::path::Path;
 pub const SYNC_STATE_FILE: &str = "sync-state.json";
 /// Device-local `MYH1` head-baseline file name (`protocol.md` §9.15).
 pub const HEAD_STATE_FILE: &str = "vault.head-state";
+/// Device-local marker: this device made a local `vault.meta` credential change
+/// (password change / recovery reset) that may not have reached the server yet.
+/// Empty file; presence is the whole signal. The sync loop's meta phase treats a
+/// dirty local `vault.meta` as the authoritative password-side wrap to push, then
+/// clears this. Never synced (path-scoped scan walks only `notes/` + `attachments/`).
+pub const VAULT_META_DIRTY_FILE: &str = "vault.meta-dirty";
 
 /// The device-local files this module owns — NONE may ever enter the sync
-/// taxonomy (the allowlist MYND-426 enforces). Asserted by the test below and
-/// referenced by 426's taxonomy guard.
+/// taxonomy. The normative taxonomy (what syncs / what is device-local /
+/// what is a rebuildable cache) lives in the spec (`docs/spec/sync-protocol.md`
+/// §9); runtime enforcement is the path-scoped scan (the orchestrator only
+/// walks `notes/` + `attachments/`), so nothing here is ever offered to the
+/// server. Asserted by the test below.
 pub const DEVICE_LOCAL_SYNC_FILES: &[&str] = &[SYNC_STATE_FILE, HEAD_STATE_FILE];
 
 /// Upper bound on the VV-observation log (keeps the file small; 427 only needs
@@ -103,6 +112,13 @@ pub struct SyncState {
     /// re-entry needed; the unlocked `root_key` re-derives the SCRAM secret).
     #[serde(default)]
     pub account_display: Option<String>,
+    /// F1 Faz B: SHA-256 (lowercase hex) of the `vault.meta` this device last saw
+    /// as the agreed synced state. Lets the meta phase distinguish "the server's
+    /// meta is unchanged since I synced" (only I changed → push) from "the server
+    /// also changed" (concurrent → deterministic merge). `None` = never reconciled
+    /// meta yet. Device-local; not a credential (a hash of already-public bytes).
+    #[serde(default)]
+    pub meta_baseline_hex: Option<String>,
 }
 
 impl SyncState {
@@ -165,12 +181,47 @@ pub fn clear_device_local_sync(dir: &Path) -> Result<(), SyncConfigError> {
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
         Err(e) => return Err(e.into()),
     }
+    // The attachment-deletion queue (MYND-468) is likewise stale deletion
+    // intent keyed to the old enrollment.
+    match std::fs::remove_file(dir.join("pending-attachment-tombstones")) {
+        Ok(()) => {}
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+        Err(e) => return Err(e.into()),
+    }
     match std::fs::remove_dir_all(dir.join("conflicts")) {
         Ok(()) => {}
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
         Err(e) => return Err(e.into()),
     }
+    // The vault.meta-dirty marker is keyed to the old enrollment's server state;
+    // a fresh enrollment re-seeds meta, so drop it on reset.
+    clear_vault_meta_dirty(dir)?;
     Ok(())
+}
+
+/// Mark the local `vault.meta` as changed-but-maybe-not-pushed (F1). Written
+/// after a credential change so the sync loop's meta phase knows to push the
+/// local wrap even if the immediate best-effort push failed (offline). Empty
+/// file; idempotent.
+pub fn mark_vault_meta_dirty(dir: &Path) -> Result<(), SyncConfigError> {
+    crate::atomic_write::atomic_write(&dir.join(VAULT_META_DIRTY_FILE), &[], true)?;
+    Ok(())
+}
+
+/// Clear the `vault.meta-dirty` marker (after a successful server push, or on
+/// reset). Idempotent — an absent marker is fine.
+pub fn clear_vault_meta_dirty(dir: &Path) -> Result<(), SyncConfigError> {
+    match std::fs::remove_file(dir.join(VAULT_META_DIRTY_FILE)) {
+        Ok(()) => Ok(()),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(e) => Err(e.into()),
+    }
+}
+
+/// Whether the local `vault.meta` is marked dirty (a pending credential change
+/// this device should push).
+pub fn vault_meta_is_dirty(dir: &Path) -> bool {
+    dir.join(VAULT_META_DIRTY_FILE).exists()
 }
 
 /// Persist the sync state to `<dir>/sync-state.json` (atomic replace).
@@ -346,11 +397,17 @@ mod tests {
         }
         std::fs::write(dir.join("pending-tombstones"), b"id1\nid2").unwrap();
         std::fs::write(dir.join("conflicts").join("abc.myn"), b"staged").unwrap();
+        mark_vault_meta_dirty(&dir).unwrap();
         // User data the reset must NEVER touch.
         std::fs::write(dir.join("notes").join("keep.myn"), b"note").unwrap();
         std::fs::write(dir.join("vault.meta"), b"meta").unwrap();
 
         clear_device_local_sync(&dir).unwrap();
+
+        assert!(
+            !vault_meta_is_dirty(&dir),
+            "reset must clear the vault.meta-dirty marker (keyed to the old enrollment)"
+        );
 
         for f in DEVICE_LOCAL_SYNC_FILES {
             assert!(!dir.join(f).exists(), "{f} must be removed by reset");
@@ -373,6 +430,30 @@ mod tests {
         );
         // Idempotent on already-absent artifacts.
         clear_device_local_sync(&dir).unwrap();
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn vault_meta_dirty_marker_roundtrips() {
+        let dir = std::env::temp_dir().join(format!("myne-metadirty-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+
+        // Absent by default.
+        assert!(!vault_meta_is_dirty(&dir));
+        // Clear on absent is a no-op (idempotent).
+        clear_vault_meta_dirty(&dir).unwrap();
+        assert!(!vault_meta_is_dirty(&dir));
+
+        // Mark → dirty; re-mark is idempotent.
+        mark_vault_meta_dirty(&dir).unwrap();
+        assert!(vault_meta_is_dirty(&dir));
+        mark_vault_meta_dirty(&dir).unwrap();
+        assert!(vault_meta_is_dirty(&dir));
+
+        // Clear → clean.
+        clear_vault_meta_dirty(&dir).unwrap();
+        assert!(!vault_meta_is_dirty(&dir));
+
         std::fs::remove_dir_all(&dir).ok();
     }
 }

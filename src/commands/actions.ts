@@ -514,18 +514,9 @@ const restoreBackupAction: CommandAction = {
   visibility: editorOnly,
   run: (c) => c.onRestoreBackup(),
 };
-
-const toggleRealtimeSyncAction: CommandAction = {
-  id: "sync.toggle-realtime",
-  get label() {
-    return i18n.t("commands.actions.toggleRealtimeSync.label");
-  },
-  get category() {
-    return i18n.t("commands.actions.category.app");
-  },
-  visibility: editorOnly,
-  run: (c) => c.onToggleRealtimeSync(),
-};
+// (The `sync.toggle-realtime` action was removed in the develop merge — the sync
+// engine now runs SSE as an always-on baseline with no user toggle; see the
+// PrivacyPanel info-row decision on develop.)
 
 const revealVaultFolderAction: CommandAction = {
   id: "vault.reveal-folder",
@@ -1316,7 +1307,6 @@ export const COMMAND_ACTIONS: readonly CommandAction[] = Object.freeze([
   openArchiveAction,
   cycleHeadingAction,
   restoreBackupAction,
-  toggleRealtimeSyncAction,
   revealVaultFolderAction,
   aiOpenChatAction,
   aiSummarizeNoteAction,

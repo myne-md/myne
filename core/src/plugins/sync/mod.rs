@@ -39,13 +39,15 @@ pub mod http_transport;
 pub mod integrity;
 pub mod loop_control;
 pub mod orchestrator;
+pub mod poke_listener;
+pub mod prefs_classification;
+pub mod prefs_merge;
 pub mod reconcile;
 pub mod reconcile_policy;
 pub mod rustls_transport;
 #[cfg(test)]
 mod sim;
 pub mod state;
-pub mod taxonomy;
 pub mod token_store;
 pub mod transport;
 

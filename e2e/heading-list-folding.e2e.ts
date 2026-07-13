@@ -158,7 +158,7 @@ describeE2E("hlf2 fold-all / unfold-all via the command palette (MYND-300)", () 
 
         // Switch back to the first note via its sidebar row.
         const rowA = await s.waitForElement(
-          '[data-testid="notes.row"][aria-selected="false"]',
+          '[data-testid="notes.row"]:not([aria-current="true"])',
         );
         await rowA.click();
         await s.waitUntil(

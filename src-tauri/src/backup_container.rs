@@ -76,6 +76,9 @@ pub enum MemberFamily {
     VaultMeta,
     /// `vault.prefs` (§9.5).
     VaultPrefs,
+    /// `vault.dictionary` (§9.13) — personal dictionary, authoritative user
+    /// data and a Class-1 sync member, so `sync ⊆ backup` requires it here.
+    VaultDictionary,
     /// `notes/<uuid>.myn` (§9.2).
     Note,
     /// `snapshots/<note-uuid>__<snap-uuid>.myn` (§9.2 envelope).
@@ -102,6 +105,14 @@ fn family_member_cap(family: MemberFamily) -> u64 {
         MemberFamily::VaultPrefs => {
             (protocol::prefs::MAX_PREFS_PLAINTEXT_LEN + protocol::prefs::PREFS_BLOB_HEADER_LEN + 32)
                 as u64
+        }
+        // §9.13.4: 4 MiB plaintext cap + 34-byte header + 32-byte CTX tag
+        // (a strict consumer rejects an over-sized dictionary member, so the
+        // export must too — mirrors the VaultPrefs bound above).
+        MemberFamily::VaultDictionary => {
+            (protocol::dictionary_blob::MAX_DICTIONARY_PLAINTEXT_LEN
+                + protocol::dictionary_blob::DICTIONARY_BLOB_HEADER_LEN
+                + 32) as u64
         }
         // §9.10.4: 16 MiB catalog ceiling + envelope, rounded up.
         MemberFamily::AttachmentsCatalog => 17 * 1024 * 1024,
@@ -271,6 +282,7 @@ pub fn classify_member_path(path: &str) -> Option<MemberFamily> {
     match path {
         "vault.meta" => return Some(MemberFamily::VaultMeta),
         "vault.prefs" => return Some(MemberFamily::VaultPrefs),
+        "vault.dictionary" => return Some(MemberFamily::VaultDictionary),
         "vault.attachments" => return Some(MemberFamily::AttachmentsCatalog),
         _ => {}
     }
@@ -1184,11 +1196,71 @@ mod tests {
     }
 
     #[test]
+    fn vault_dictionary_round_trips_as_allowlisted_member() {
+        // §9.11.3: vault.dictionary is an IN member (Class-1 sync ⊆ backup).
+        // A container carrying it must write, re-verify, and classify cleanly.
+        let dir = ScopedTempDir::new("bc-dict").unwrap();
+        let meta = dir.path().join("vault.meta");
+        fs::write(&meta, vec![0xAB; 345]).unwrap();
+        let dict = dir.path().join("vault.dictionary");
+        let dict_body = b"dictionary-ciphertext-stand-in".to_vec();
+        fs::write(&dict, &dict_body).unwrap();
+        let dest = dir.path().join("dict.myne-backup");
+
+        let records = write_container(
+            &dest,
+            &[
+                ("vault.meta".into(), meta),
+                ("vault.dictionary".into(), dict),
+            ],
+        )
+        .expect("write with dictionary member");
+
+        // Re-verify from disk (consumer path) and pin the dictionary record.
+        let verified = read_and_verify_container(&dest).expect("re-verify");
+        assert_eq!(records, verified, "writer records must match verifier");
+        let d = verified
+            .iter()
+            .find(|r| r.path == "vault.dictionary")
+            .expect("dictionary member present");
+        assert_eq!(d.len, dict_body.len() as u64);
+        assert_eq!(
+            classify_member_path(&d.path),
+            Some(MemberFamily::VaultDictionary)
+        );
+    }
+
+    #[test]
+    fn oversized_vault_dictionary_member_is_rejected() {
+        // §9.13.4: dictionary caps at 4 MiB plaintext + envelope; a stricter
+        // consumer rejects an over-sized member, so the writer must too
+        // (mirrors oversized_vault_prefs_member_is_rejected).
+        let dir = ScopedTempDir::new("bc-dictcap").unwrap();
+        let meta = dir.path().join("vault.meta");
+        fs::write(&meta, vec![0xAB; 345]).unwrap();
+        let dict = dir.path().join("vault.dictionary");
+        // > 4 MiB + 34-byte header + 32-byte tag.
+        fs::write(&dict, vec![0x01; 4 * 1024 * 1024 + 128]).unwrap();
+        let dest = dir.path().join("out");
+        assert!(matches!(
+            write_container(
+                &dest,
+                &[
+                    ("vault.meta".into(), meta),
+                    ("vault.dictionary".into(), dict)
+                ]
+            ),
+            Err(BackupContainerError::MemberLenOverflow)
+        ));
+    }
+
+    #[test]
     fn allowlist_classifier_matches_spec_9_11_3() {
         use MemberFamily::*;
         let cases: &[(&str, Option<MemberFamily>)] = &[
             ("vault.meta", Some(VaultMeta)),
             ("vault.prefs", Some(VaultPrefs)),
+            ("vault.dictionary", Some(VaultDictionary)),
             ("vault.attachments", Some(AttachmentsCatalog)),
             ("notes/0190a000-0000-7000-8000-000000000001.myn", Some(Note)),
             (
@@ -1201,6 +1273,8 @@ mod tests {
             ),
             ("vault.search", None),
             ("vault.workspace", None),
+            ("vault.indices", None),
+            ("attachments-text/0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", None),
             ("notes/whatever.txt", None),
             ("notes/0190a000-0000-7000-8000-000000000001.myn.tmp", None),
             ("attachments/XYZ", None),
@@ -1334,6 +1408,7 @@ mod tests {
         match family {
             MemberFamily::VaultMeta => "vault-meta",
             MemberFamily::VaultPrefs => "vault-prefs",
+            MemberFamily::VaultDictionary => "vault-dictionary",
             MemberFamily::Note => "note",
             MemberFamily::Snapshot => "snapshot",
             MemberFamily::AttachmentsCatalog => "attachments-catalog",
