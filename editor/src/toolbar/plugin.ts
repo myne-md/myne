@@ -93,7 +93,8 @@ class ToolbarView implements PluginValue {
     if (
       update.selectionSet ||
       update.docChanged ||
-      update.viewportChanged
+      update.viewportChanged ||
+      update.focusChanged
     ) {
       this.refresh();
     }
@@ -122,6 +123,14 @@ class ToolbarView implements PluginValue {
     // has nothing to format, and the buttons would dispatch changes the editor
     // rejects. `EditorView.editable` is false there (view-mode.ts).
     if (!this.view.state.facet(EditorView.editable)) {
+      this.dismiss();
+      return;
+    }
+    // Dismiss when the editor loses focus — e.g. the Settings modal opens over
+    // it. Without this the body-mounted toolbar lingers on top of other UI. The
+    // URL-overlay input legitimately takes focus away from the editor, so keep
+    // the surface up while it's open.
+    if (!this.view.hasFocus && !this.urlOverlayOpen) {
       this.dismiss();
       return;
     }
