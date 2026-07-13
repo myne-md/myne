@@ -1212,13 +1212,13 @@ export const myneTheme = EditorView.theme({
     flexDirection: "column",
     alignItems: "center",
     gap: "6px",
-    color: "#6b6a64",
+    color: "var(--fg-3, #6b6a64)",
   },
   ".cm-attachment-pdf-fallback-label": {
     fontFamily: "var(--font-sans)",
     fontSize: "11px",
     letterSpacing: "0.06em",
-    color: "#6b6a64",
+    color: "var(--fg-3, #6b6a64)",
   },
 
   // Non-fetching `![](url)` / `![][ref]` chip — NEUTRAL family (per the design
@@ -1229,9 +1229,11 @@ export const myneTheme = EditorView.theme({
     gap: "6px",
     padding: "3px 8px",
     borderRadius: "6px",
-    backgroundColor: "#f4f4f2",
-    border: "1px solid #e3e2dd",
-    color: "#1a1a17",
+    // Theme tokens (was hardcoded light hex, which rendered as a white pill on
+    // dark/AMOLED themes) — same recessed-surface family as the file-card.
+    backgroundColor: "var(--bg-2, #f4f4f2)",
+    border: "1px solid var(--line-1, #e3e2dd)",
+    color: "var(--fg-1, #1a1a17)",
     fontFamily: "var(--font-sans)",
     fontSize: "13px",
     fontWeight: "500",
@@ -1257,18 +1259,21 @@ export const myneTheme = EditorView.theme({
     cursor: "default",
   },
   ".cm-attachment-tombstone-deleted": {
-    backgroundColor: "#f4f4f2",
-    border: "1px solid #e3e2dd",
-    color: "#6b6a64",
+    // Theme tokens (was hardcoded light hex) — recessed neutral surface.
+    backgroundColor: "var(--bg-2, #f4f4f2)",
+    border: "1px solid var(--line-1, #e3e2dd)",
+    color: "var(--fg-3, #6b6a64)",
   },
   ".cm-attachment-tombstone-deleted .cm-attachment-tombstone-label": {
     textDecoration: "line-through",
     textDecorationColor: "var(--line-2, #c8c7c1)",
   },
   ".cm-attachment-tombstone-broken": {
-    // danger muted tint, mirroring the footnote orphan treatment.
-    backgroundColor: "color-mix(in srgb, var(--danger, #8a2a23) 8%, #f4f4f2)",
-    border: "1px solid color-mix(in srgb, var(--danger, #8a2a23) 22%, #e3e2dd)",
+    // Danger tint via the per-theme --danger-soft token (was color-mix over a
+    // hardcoded light base, which both drops on older WKWebView AND reads light
+    // on AMOLED). --danger-soft is dark on dark themes; the callout-danger convention.
+    backgroundColor: "var(--danger-soft, #f5e7e5)",
+    border: "1px solid var(--danger, #8a2a23)",
     color: "var(--danger, #8a2a23)",
   },
   ".cm-attachment-tombstone-label": {
