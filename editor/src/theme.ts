@@ -341,7 +341,10 @@ export const myneTheme = EditorView.theme({
     opacity: "0.5",
     fontFamily: "var(--font-mono)",
     fontSize: "0.8em",
-    padding: "0 12px 0 8px",
+    // Tighter right gap: the fold gutter now sits between the number and the
+    // text (Obsidian order, see line-numbers.ts), so the number pairs with the
+    // adjacent fold arrow rather than reaching all the way to the prose.
+    padding: "0 6px 0 8px",
     minWidth: "1.6em",
   },
 
@@ -853,14 +856,17 @@ export const myneTheme = EditorView.theme({
     transition:
       "background-color var(--duration-fast, 120ms) var(--ease-standard, ease), border-color var(--duration-fast, 120ms) var(--ease-standard, ease)",
   },
+  // Solid accent fill + contrasting tick (Obsidian-style) rather than the old
+  // washed-out accent-soft tint — a checked item reads boldly as "done".
   ".cm-task-checkbox-checked": {
-    backgroundColor: "var(--accent-soft, #e8edf5)",
+    backgroundColor: "var(--accent, #2c4a7a)",
     borderColor: "var(--accent, #2c4a7a)",
   },
   // Checkmark drawn with borders (not a glyph, to avoid font-metric drift) and
   // centered with absolute positioning + transform — deterministic regardless
   // of the box's content-box quirks. translateY is biased up slightly so the
-  // tick reads optically centered (its visual mass hangs low-left).
+  // tick reads optically centered (its visual mass hangs low-left). The tick is
+  // `--accent-on` (white) for contrast on the solid accent fill.
   ".cm-task-checkbox-checked::after": {
     content: '""',
     position: "absolute",
@@ -870,7 +876,7 @@ export const myneTheme = EditorView.theme({
     height: "8px",
     boxSizing: "border-box",
     borderStyle: "solid",
-    borderColor: "var(--accent, #2c4a7a)",
+    borderColor: "var(--accent-on, #ffffff)",
     borderWidth: "0 2px 2px 0",
     transform: "translate(-50%, -60%) rotate(45deg)",
   },
