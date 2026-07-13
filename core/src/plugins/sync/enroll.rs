@@ -25,8 +25,15 @@
 //! `-PLUS` exporter feed is the R3-pending wiring (mirrors the SCRAM client).
 
 use super::transport::{HttpMethod, SyncTransport, TransportError};
-use protocol::{scram_client_final_message, scram_client_proof};
+use protocol::{scram_client_final_message, scram_client_proof, SCRAM_CBIND_NAME};
 use serde::{Deserialize, Serialize};
+
+/// RFC 9266 TLS keying-material exporter label — FROZEN, must match the Go server's
+/// `scram.ExporterLabel` byte-for-byte, or the channel binding diverges and every
+/// `-PLUS` handshake fails. Verified byte-identical Go↔rustls under TLS 1.3 (F5).
+const TLS_EXPORTER_LABEL: &[u8] = b"EXPORTER-Channel-Binding";
+/// Frozen tls-exporter output length (RFC 9266 uses 32); matches `scram.ExporterLen`.
+const TLS_EXPORTER_LEN: usize = 32;
 
 /// The account-ownership path, selecting the server's approval gate.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -59,6 +66,12 @@ struct ScramInitResp {
     combined_nonce: String,
     salt_hex: String,
     iterations: u32,
+    /// F5: `"tls-exporter"` when the server terminates TLS 1.3 and expects a real
+    /// RFC 9266 channel binding in client-final; absent/empty behind a proxy or on
+    /// loopback http, where the server binds to empty. Absent on an old server →
+    /// empty cbind (the pre-F5 behavior), so this is backward-compatible.
+    #[serde(default)]
+    cbind: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -226,28 +239,54 @@ pub fn enroll(
         serde_json::from_slice(&init_resp.body).map_err(|_| EnrollError::BadResponse)?;
     let salt = hex_decode(&init.salt_hex).ok_or(EnrollError::BadResponse)?;
 
-    // 2. compute the proof (cbind empty over http; live -PLUS exporter = R3).
-    let cbind: &[u8] = &[];
-    let out = scram_client_proof(
-        secret,
-        &salt,
-        init.iterations,
-        username,
-        client_nonce,
-        &init.combined_nonce,
-        cbind,
-    );
-    let client_final = scram_client_final_message(&init.combined_nonce, cbind, &out.client_proof);
-
-    // 3. client-final → token (or pending).
-    let final_body = serde_json::to_vec(&ScramFinalReq {
-        handshake_id: &init.handshake_id,
-        client_final: &client_final,
-        device_id_hex: &hex_encode(&device_id),
-        path: path.wire(),
-    })
-    .map_err(|_| EnrollError::BadResponse)?;
-    let final_resp = transport.request(HttpMethod::Post, "/auth/scram/final", &final_body, None)?;
+    // 2+3. Build client-final bound to the connection's tls-exporter and send it on
+    // that same connection (F5). `build_final(cbind)` computes the proof + client-
+    // final for a given channel binding: the real exporter when the server signalled
+    // `-PLUS` (`cbind == "tls-exporter"`), else an empty cbind — the pre-F5 path, and
+    // what a proxy-terminated / old server binds to as well.
+    let device_id_hex = hex_encode(&device_id);
+    // The expected server signature depends on the cbind the closure actually used
+    // (it is part of the auth message), and the closure runs inside the transport —
+    // so capture it here for the post-response mutual-auth check.
+    let expected_server_sig = std::cell::RefCell::new(Vec::new());
+    let build_final = |cbind: &[u8]| -> Vec<u8> {
+        let out = scram_client_proof(
+            secret,
+            &salt,
+            init.iterations,
+            username,
+            client_nonce,
+            &init.combined_nonce,
+            cbind,
+        );
+        *expected_server_sig.borrow_mut() = out.server_signature.to_vec();
+        let client_final =
+            scram_client_final_message(&init.combined_nonce, cbind, &out.client_proof);
+        serde_json::to_vec(&ScramFinalReq {
+            handshake_id: &init.handshake_id,
+            client_final: &client_final,
+            device_id_hex: &device_id_hex,
+            path: path.wire(),
+        })
+        .unwrap_or_default()
+    };
+    let final_resp = if init.cbind == SCRAM_CBIND_NAME {
+        transport.request_bound_to_exporter(
+            HttpMethod::Post,
+            "/auth/scram/final",
+            None,
+            TLS_EXPORTER_LABEL,
+            TLS_EXPORTER_LEN,
+            &build_final,
+        )?
+    } else {
+        transport.request(
+            HttpMethod::Post,
+            "/auth/scram/final",
+            &build_final(&[]),
+            None,
+        )?
+    };
     if final_resp.status == 401 {
         return Err(EnrollError::Unauthenticated);
     }
@@ -263,7 +302,7 @@ pub fn enroll(
     let server_sig = B64
         .decode(fr.server_signature_b64.as_bytes())
         .map_err(|_| EnrollError::BadResponse)?;
-    if server_sig != out.server_signature {
+    if server_sig != *expected_server_sig.borrow() {
         return Err(EnrollError::ServerSignatureMismatch);
     }
 
@@ -339,6 +378,42 @@ mod tests {
         let out = enroll(&t, &ACCOUNT, USER, SECRET, EnrollPath::Password, "cn", dev).unwrap();
         assert!(!out.approved);
         assert!(out.token.is_empty());
+    }
+
+    #[test]
+    fn put_vault_meta_authed_puts_raw_bytes() {
+        // F1: the credential-change push PUTs the raw vault.meta bytes under the
+        // device token. The blind server stores them verbatim (opaque ciphertext).
+        let t = FakeTransport::new();
+        t.on(HttpMethod::Put, "/vault.meta", 200, Vec::new());
+        let meta = b"opaque-meta-ciphertext-stand-in";
+        put_vault_meta(&t, "deadbeef", meta).unwrap();
+
+        let reqs = t.requests();
+        let put = reqs
+            .iter()
+            .find(|(m, p, _, _, _)| *m == HttpMethod::Put && p == "/vault.meta")
+            .expect("PUT /vault.meta recorded");
+        assert_eq!(
+            put.2.as_slice(),
+            meta,
+            "body is the raw meta bytes, unmodified"
+        );
+        assert_eq!(
+            put.3.as_deref(),
+            Some("deadbeef"),
+            "PUT is authed with the device token"
+        );
+    }
+
+    #[test]
+    fn put_vault_meta_maps_401_to_unauthenticated() {
+        let t = FakeTransport::new();
+        t.on(HttpMethod::Put, "/vault.meta", 401, Vec::new());
+        assert!(matches!(
+            put_vault_meta(&t, "tok", b"x"),
+            Err(EnrollError::Unauthenticated)
+        ));
     }
 
     #[test]

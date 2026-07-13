@@ -65,6 +65,19 @@ rustls-pki-types = "1"
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.60", features = ["Win32_Storage_FileSystem"] }
 
+# `security-framework` (+ its `-sys` for the access-control flag constant) backs
+# the MYND-329 Apple biometric quick-unlock provider (`plugins/quick_unlock/apple.rs`):
+# a Keychain item gated by `kSecAccessControlBiometryCurrentSet` (gated read =
+# the biometric prompt; the OWASP/Teleport "gate the resource, not a boolean"
+# lesson). Moved here from the desktop crate — same pins, now shared with the
+# mobile client for iOS Face ID / Touch ID (decisions.md 2026-06-17 original
+# dep decision; 2026-07-12 macOS→macOS+iOS generalization). The provider's FFI
+# is hardware-gated and pending biometric-device + primitive-level review
+# before it is trusted.
+[target.'cfg(any(target_os = "macos", target_os = "ios"))'.dependencies]
+security-framework = "3"
+security-framework-sys = "2"
+
 [features]
 # Gates the cross-plugin test fixtures (`test_support`) so the desktop/mobile
 # clients can pull them in as a dev-dependency (`features = ["test-support"]`)

@@ -332,6 +332,9 @@ impl Device {
     }
 
     /// One full sync cycle (pull → detect → push), the wired engine loop.
+    /// Attachment-aware (MYND-468): the sim vault mostly has no attachments, in
+    /// which case the attachment phases are a cheap no-op scan — but the
+    /// attachment client-ops exercise them for real.
     fn sync(&self) -> SyncSummary {
         run_sync_cycle(
             self.transport.as_ref(),
@@ -342,6 +345,10 @@ impl Device {
             &self.notes_dir,
             &self.vault_dir,
             true,
+            Some(super::orchestrator::AttachmentKeys {
+                items_key: &self.acct.items_key,
+                items_key_id: &self.acct.items_key_id,
+            }),
         )
         .expect("sync cycle")
     }
@@ -603,6 +610,63 @@ fn harness_self_check_replicates_and_converges() {
         "B received A's note"
     );
     assert_no_conflicts(&devices);
+}
+
+/// MYND-478 prefs sync end-to-end over a real server: a vault rename on A
+/// reaches B's decrypted `vault.prefs` (shared field), while B's theme stays
+/// B's own (device-local field never crosses the merge) — and the fleet
+/// converges with no push ping-pong.
+#[test]
+fn prefs_rename_replicates_and_device_local_stays_local() {
+    let (_guard, url) = server_or_skip!("prefs_rename");
+    let acct = Account::new(0x77);
+    let devices = enroll_devices(&acct, &url, 2);
+    let prefs_key = derive_subkey(&acct.root_key, SubkeyRole::PrefsKey);
+
+    let write_prefs = |d: &Device, view: &protocol::PrefsView| {
+        let bytes = protocol::encode_prefs_blob(&prefs_key, &acct.account_hash, view).unwrap();
+        std::fs::write(d.vault_dir.join("vault.prefs"), &bytes).unwrap();
+    };
+    let read_prefs = |d: &Device| -> protocol::PrefsView {
+        let bytes = std::fs::read(d.vault_dir.join("vault.prefs")).unwrap();
+        protocol::decode_prefs_blob(&prefs_key, &acct.account_hash, &bytes).unwrap()
+    };
+
+    // A renames the vault (a clocked shared edit); B holds a device-local
+    // theme choice the sync must never overwrite.
+    let mut a_view = protocol::PrefsView {
+        label: Some(String::from("Renamed On A")),
+        ..protocol::PrefsView::default()
+    };
+    a_view.field_clocks.insert(String::from("label"), 1_000);
+    write_prefs(&devices[0], &a_view);
+    let b_view = protocol::PrefsView {
+        theme: Some(protocol::ThemeChoice::Dark),
+        ..protocol::PrefsView::default()
+    };
+    write_prefs(&devices[1], &b_view);
+
+    quiesce(&devices, 8);
+
+    let b_after = read_prefs(&devices[1]);
+    assert_eq!(
+        b_after.label.as_deref(),
+        Some("Renamed On A"),
+        "A's rename reached B"
+    );
+    assert_eq!(
+        b_after.theme,
+        Some(protocol::ThemeChoice::Dark),
+        "B's device-local theme survived"
+    );
+    let a_after = read_prefs(&devices[0]);
+    assert_eq!(a_after.label.as_deref(), Some("Renamed On A"));
+    assert_eq!(a_after.theme, None, "B's theme never crossed to A");
+
+    // Steady state: further cycles push nothing (no ping-pong).
+    let s0 = devices[0].sync();
+    let s1 = devices[1].sync();
+    assert_eq!(s0.pushed + s1.pushed, 0, "quiesced fleet stays silent");
 }
 
 /// The CORRECT deletion path (`deleteNoteRouted`) converges: both devices end

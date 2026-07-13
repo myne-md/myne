@@ -54,7 +54,7 @@ pub enum SyncRuntimeStatus {
 }
 
 /// Resolve `<app_config_dir>/sync-config.json` (the `themes` plugin precedent).
-fn config_path<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, SyncConfigError> {
+pub(crate) fn config_path<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, SyncConfigError> {
     let dir = app
         .path()
         .app_config_dir()
@@ -116,7 +116,7 @@ fn parse_pin_hex(s: &str) -> Option<[u8; 32]> {
 /// hosted launch, so today this is just the captured TOFU pin; when hosted ships,
 /// a hosted endpoint additionally verifies against its pre-vetted static pin.
 /// Empty for a loopback `http` endpoint or an unpinned config.
-fn config_pins(cfg: &SyncEndpointConfig) -> Vec<[u8; 32]> {
+pub(crate) fn config_pins(cfg: &SyncEndpointConfig) -> Vec<[u8; 32]> {
     let mut pins = Vec::new();
     if let Some(url) = cfg.endpoint_url.as_deref() {
         if let Some(sp) = super::config::hosted_static_pin(url) {
@@ -409,7 +409,15 @@ pub async fn run_active_cycle<R: Runtime>(app: &AppHandle<R>, allow_push: bool) 
     let (Some(account_hash), Some(device_id)) = (hex16(&acct_hex), hex16(&dev_hex)) else {
         return CycleOutcome::Failed;
     };
-    let Some(root_key) = state.peek_unlocked_root_key_clone().await else {
+    // Attachment sync (MYND-468) verifies downloaded MYA1 blobs end-to-end, so
+    // the cycle needs the itemsKey material alongside root_key. Cloned out of
+    // the slot and the guard dropped immediately (holding the read guard across
+    // the network cycle would block lock/auto-lock).
+    let Some((items_key, items_key_id, root_key)) = state
+        .hold_unlocked_attachment_material()
+        .await
+        .map(|(_guard, items_key, items_key_id, root_key)| (items_key, items_key_id, root_key))
+    else {
         return CycleOutcome::NotReady; // vault locked
     };
     // Token: the stored per-device token, or — for a still-pending device — one
@@ -443,6 +451,7 @@ pub async fn run_active_cycle<R: Runtime>(app: &AppHandle<R>, allow_push: bool) 
         token_hex.push_str(&format!("{b:02x}"));
     }
     let notes_dir = dir.join("notes");
+    let dir_for_prefs = dir.clone();
 
     let res = tokio::task::spawn_blocking(move || {
         let transport = super::http_transport::build_transport(&url, pins).map_err(|_| false)?;
@@ -455,6 +464,10 @@ pub async fn run_active_cycle<R: Runtime>(app: &AppHandle<R>, allow_push: bool) 
             &notes_dir,
             &dir,
             allow_push,
+            Some(super::orchestrator::AttachmentKeys {
+                items_key: &items_key,
+                items_key_id: &items_key_id,
+            }),
         )
         // Preserve ONLY whether the failure was an integrity event (a rejected
         // rollback / forged head, SYNC-10) across the spawn_blocking boundary —
@@ -480,6 +493,25 @@ pub async fn run_active_cycle<R: Runtime>(app: &AppHandle<R>, allow_push: bool) 
                 let _ = app.emit("sync://reconcile-started", ());
                 let _ = app.emit("sync://reconcile-finished", ());
             }
+            if summary.prefs_applied_remote {
+                // A remote prefs change was merged onto disk this cycle
+                // (MYND-478): refresh the switcher-facing RAM caches, then tell
+                // the WebView to re-read (the same disk→cache→event choreography
+                // as a local setter; the orchestrator stays AppHandle-free so
+                // the side effects live at this boundary).
+                if let Ok(view) = crate::plugins::prefs::commands::prefs_read_with_dir(
+                    &dir_for_prefs,
+                    state.inner(),
+                )
+                .await
+                {
+                    if let Some(active) = state.active_vault_id().await {
+                        state.set_cached_label(active, view.label.clone()).await;
+                        state.set_cached_icon(active, view.icon.clone()).await;
+                    }
+                }
+                let _ = app.emit(crate::plugins::prefs::commands::PREFS_CHANGED_EVENT, ());
+            }
             CycleOutcome::Ran(summary)
         }
         Ok(Err(is_integrity)) => {
@@ -491,6 +523,68 @@ pub async fn run_active_cycle<R: Runtime>(app: &AppHandle<R>, allow_push: bool) 
             CycleOutcome::Failed
         }
         Err(_) => CycleOutcome::Failed, // join error
+    }
+}
+
+/// Best-effort: push the current on-disk `vault.meta` to the server right now, so
+/// a local credential change (password change / recovery reset) is reflected
+/// server-side immediately instead of going stale until the next device enrols
+/// (F1). A stale server `vault.meta` makes a joining device derive `root_key`
+/// against the OLD password-side wrap and fail to unlock with the new password.
+///
+/// Deliberately **best-effort and non-blocking**: it never fails the caller. Any
+/// not-ready state (sync disabled, not enrolled, vault locked / no stored token)
+/// is a silent no-op, and a transport failure only writes the `vault.meta-dirty`
+/// marker so the sync loop's meta phase (F1 Faz B) pushes it later. Returns
+/// `true` only when the server accepted the PUT. A still-pending device (no
+/// stored token yet) no-ops without marking dirty — enrolment re-seeds meta.
+pub async fn push_vault_meta_now<R: Runtime>(app: &AppHandle<R>) -> bool {
+    // Serialize with cycles / reset — same guard run_active_cycle uses, so a push
+    // never races the loop's own meta read-modify-write.
+    let _cycle_guard = sync_cycle_mutex().lock().await;
+    let Ok(cfg) = config_path(app).and_then(|p| read_config(&p)) else {
+        return false;
+    };
+    let pins = config_pins(&cfg);
+    let Some(url) = cfg.endpoint_url else {
+        return false; // sync disabled
+    };
+    let Some(state) = app.try_state::<VaultRuntimeState>() else {
+        return false;
+    };
+    let Ok(dir) = crate::paths::active_vault_root_io(app, state.active_vault_id().await) else {
+        return false;
+    };
+    // Stored per-device token only. A still-pending device no-ops (its meta is
+    // seeded when enrollment completes), and does NOT get marked dirty.
+    let token = match super::token_store::default_store().read(&dir) {
+        Ok(Some(t)) => t,
+        _ => return false,
+    };
+    let Ok(meta_bytes) = std::fs::read(dir.join("vault.meta")) else {
+        return false;
+    };
+    let mut token_hex = String::with_capacity(token.len() * 2);
+    for b in &token {
+        token_hex.push_str(&format!("{b:02x}"));
+    }
+    let url_moved = url.clone();
+    let res = tokio::task::spawn_blocking(move || {
+        let transport = super::http_transport::build_transport(&url_moved, pins).map_err(|_| ())?;
+        super::enroll::put_vault_meta(transport.as_ref(), &token_hex, &meta_bytes).map_err(|_| ())
+    })
+    .await;
+    match res {
+        Ok(Ok(())) => {
+            // Pushed — the local change reached the server; clear any prior dirt.
+            let _ = super::state::clear_vault_meta_dirty(&dir);
+            true
+        }
+        _ => {
+            // Offline / transport / join error: remember to push later (Faz B).
+            let _ = super::state::mark_vault_meta_dirty(&dir);
+            false
+        }
     }
 }
 
@@ -523,6 +617,29 @@ pub async fn sync_now<R: Runtime>(app: AppHandle<R>) -> Result<SyncRuntimeStatus
             detail: "sync_failed".into(),
         },
     })
+}
+
+/// Mobile lifecycle ingress (SYNC-37/38): the WebView's `visibilitychange`
+/// handler reports "app backgrounded" so the sync loop hard-idles instead of
+/// ticking against a frozen clock. Flips an in-RAM scheduler flag only — no
+/// vault access, no IO, no server call; a no-op on hosts that do not manage the
+/// [`super::loop_control::SyncLifecycleSignal`] (desktop).
+#[tauri::command]
+pub async fn sync_lifecycle_suspend<R: Runtime>(app: AppHandle<R>) {
+    if let Some(sig) = app.try_state::<super::loop_control::SyncLifecycleSignal>() {
+        sig.suspend();
+    }
+}
+
+/// Foreground counterpart of [`sync_lifecycle_suspend`]: clears the suspend
+/// flag and arms the one-shot resume-immediate poll, so returning to the app
+/// pulls fresh state without waiting out the poll interval. Same no-op
+/// contract on hosts without the managed signal.
+#[tauri::command]
+pub async fn sync_lifecycle_resume<R: Runtime>(app: AppHandle<R>) {
+    if let Some(sig) = app.try_state::<super::loop_control::SyncLifecycleSignal>() {
+        sig.resume();
+    }
 }
 
 // --- Device management commands (MYND-425 tasks 7/8) ---

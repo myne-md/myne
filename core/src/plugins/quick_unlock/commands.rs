@@ -2,9 +2,10 @@
 //! Quick-unlock plugin commands (MYND-329, task 6).
 //!
 //! Extracted into `myne-core` (shared desktop↔mobile). This module carries the
-//! platform-agnostic PIN path + the OS-free `*_with_dir` cores; the macOS
-//! biometric provider and its command branch stay in the desktop crate and
-//! layer over these `pub` cores. Mobile registers only the PIN commands.
+//! platform-agnostic PIN path, the OS-free `*_with_dir` cores, AND the Apple
+//! biometric command branch (macOS Touch ID / iOS Face ID + Touch ID via
+//! `super::apple`; `HardwareUnavailable` elsewhere — decisions.md 2026-07-12).
+//! Both hosts register the same six commands from this module's paths.
 //!
 //! Wires the `MYQ1` blob codec (`protocol::quick_unlock_blob`), the wrap-key
 //! providers (`super::provider` / `super::pin`), and the failed-attempt counter
@@ -132,22 +133,33 @@ pub fn wipe_files(dir: &Path) {
     let _ = std::fs::remove_file(attempt_path(dir));
 }
 
+/// Best-effort removal of the Apple-Keychain biometric credential for the
+/// vault at `dir`. No-op off Apple targets and harmless for a PIN vault (the
+/// item simply won't exist). Used by disable + invalidation so a biometric
+/// credential's OS-side item does not outlive its blob.
+fn cleanup_os_credential(dir: &Path) {
+    #[cfg(any(target_os = "macos", target_os = "ios"))]
+    if let Ok((_, meta)) = read_meta(dir) {
+        let _ = super::apple::AppleBiometricProvider::new(meta.account_number_hash).delete();
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "ios")))]
+    let _ = dir;
+}
+
 /// Cross-plugin invalidation hook (MYND-329 task 8): wipe the device-local
-/// quick-unlock credential for the vault at `dir`. Called when a security event
-/// should reset quick-unlock — currently a **master-password change** (a
-/// deliberate defense-in-depth policy: a password change signals "reset my
-/// access", so the fast second credential is cleared even though `root_key` is
-/// unchanged by the rotation — User Story 8). A best-effort no-op when nothing
-/// is configured. Vault deletion needs no call here — `vault_delete`'s recursive
-/// unlink already removes these files (User Story 12). The biometric provider's
-/// keychain item, if any, is orphaned (harmless — unlock reads the blob first,
-/// so its absence already forces the password path).
+/// quick-unlock credential — the files AND the Apple-Keychain item, if any —
+/// for the vault at `dir`. Called when a security event should reset
+/// quick-unlock — currently a **master-password change** (a deliberate
+/// defense-in-depth policy: a password change signals "reset my access", so the
+/// fast second credential is cleared even though `root_key` is unchanged by the
+/// rotation — User Story 8). A best-effort no-op when nothing is configured.
+/// Vault deletion needs no call here — `vault_delete`'s recursive unlink
+/// already removes the files, and unlock reads the blob first, so an orphaned
+/// keychain item already forces the password path.
 ///
-/// OS-free: this core only unlinks the device-local files. The desktop crate
-/// wraps this with its macOS-keychain cleanup (`cleanup_os_credential`) so a
-/// biometric credential's OS-side item is also removed; mobile (PIN-only) uses
-/// this directly.
+/// Both hosts' `VaultLifecycleHooks::invalidate_quick_unlock` delegate here.
 pub fn invalidate_credential(dir: &Path) {
+    cleanup_os_credential(dir);
     wipe_files(dir);
 }
 
@@ -218,8 +230,8 @@ fn compute_available(configured: bool, full_unlock_this_session: bool) -> bool {
     configured && full_unlock_this_session
 }
 
-/// Disable quick-unlock: remove the device-local files. (Biometric keychain
-/// removal is wired in task 7 via the matching provider's `delete`.)
+/// Disable quick-unlock: remove the device-local files. OS-free — the
+/// [`quick_unlock_disable`] command layers the Apple-Keychain cleanup on.
 pub fn disable_with_dir(dir: &Path) -> Result<(), QuickUnlockError> {
     if !blob_path(dir).exists() {
         return Err(QuickUnlockError::NotConfigured);
@@ -333,7 +345,7 @@ pub async fn quick_unlock_with_dir<P: QuickUnlockProvider + Send + 'static>(
     }
 }
 
-// ---- Tauri command wrappers (PIN path; biometric branch lands in task 7) ----
+// ---- Tauri command wrappers (PIN + Apple biometric + status/disable) --------
 
 fn map_pin_validation(e: PinValidationError) -> QuickUnlockError {
     match e {
@@ -406,6 +418,54 @@ pub async fn quick_unlock_with_pin<R: Runtime>(
     quick_unlock_with_dir(&dir, id, &state, provider).await
 }
 
+/// Configure Apple biometric quick-unlock (macOS Touch ID / iOS Face ID or
+/// Touch ID) for the active (Unlocked) vault.
+///
+/// ⚠️ The Apple provider's biometric gating is UNVERIFIED pending biometric
+/// hardware + a primitive review (see `apple.rs`). Returns
+/// `HardwareUnavailable` off Apple targets.
+#[tauri::command]
+pub async fn quick_unlock_setup_biometric<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+) -> Result<(), QuickUnlockError> {
+    #[cfg(any(target_os = "macos", target_os = "ios"))]
+    {
+        let dir = active_dir(&app, &state).await?;
+        let (_, meta) = read_meta(&dir)?;
+        let provider = super::apple::AppleBiometricProvider::new(meta.account_number_hash);
+        setup_with_dir(&dir, &state, provider, &meta.account_number_hash).await
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "ios")))]
+    {
+        let _ = (&app, &state);
+        Err(QuickUnlockError::HardwareUnavailable)
+    }
+}
+
+/// Attempt an Apple biometric quick-unlock of the active vault. (See the setup
+/// command's verification caveat.)
+#[tauri::command]
+pub async fn quick_unlock_with_biometric<R: Runtime>(
+    vault_id: Option<String>,
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+) -> Result<(), QuickUnlockError> {
+    #[cfg(any(target_os = "macos", target_os = "ios"))]
+    {
+        let dir = target_dir(&app, &state, vault_id.as_deref()).await?;
+        let (_, meta) = read_meta(&dir)?;
+        let id = crate::paths::vault_id_from_root(&dir);
+        let provider = super::apple::AppleBiometricProvider::new(meta.account_number_hash);
+        quick_unlock_with_dir(&dir, id, &state, provider).await
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "ios")))]
+    {
+        let _ = (&app, &state, &vault_id);
+        Err(QuickUnlockError::HardwareUnavailable)
+    }
+}
+
 /// Report quick-unlock status for the active vault.
 #[tauri::command]
 pub async fn quick_unlock_status<R: Runtime>(
@@ -423,15 +483,15 @@ pub async fn quick_unlock_status<R: Runtime>(
     Ok(status)
 }
 
-/// Disable quick-unlock for the active vault.
+/// Disable quick-unlock for the active vault (device-local files + the
+/// Apple-Keychain item, if any).
 #[tauri::command]
 pub async fn quick_unlock_disable<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
 ) -> Result<(), QuickUnlockError> {
-    // OS-free disable: unlink the device-local files. The desktop crate's
-    // `quick_unlock_disable` additionally cleans the macOS keychain item.
     let dir = active_dir(&app, &state).await?;
+    cleanup_os_credential(&dir);
     disable_with_dir(&dir)
 }
 

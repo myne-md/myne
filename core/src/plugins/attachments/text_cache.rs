@@ -486,12 +486,12 @@ mod tests {
         let mut catalog = protocol::AttachmentsCatalog::empty();
         catalog.entries.insert(
             id_hex.clone(),
-            protocol::AttachmentMeta {
-                content_type: "text/plain".to_string(),
-                created_at: 0,
-                filename: "n.txt".to_string(),
-                size: plaintext.len() as u64,
-            },
+            protocol::AttachmentMeta::live(
+                "text/plain".to_string(),
+                0,
+                "n.txt".to_string(),
+                plaintext.len() as u64,
+            ),
         );
 
         let body = format!("note ![[att:{id_hex}|n.txt]]");

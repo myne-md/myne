@@ -78,7 +78,7 @@ describeCanary("two-device sync canary (MYND-428)", () => {
     }
   });
 
-  it("A enrolls + writes a note; B joins, A approves, and the note replicates to B", async () => {
+  it("A enrolls + writes a note; B joins, A approves, B verifies the SAS, and the note replicates to B", async () => {
     const srv = await startSyncServer();
     let account = "";
     let password = "";
@@ -117,7 +117,7 @@ describeCanary("two-device sync canary (MYND-428)", () => {
         // e2e/CLAUDE.md).
         await pageSeatInvoke(a.session, "plugin:sync|sync_now", {}, 20_000);
 
-        // --- B: join the account (account# + password) → pending, lands in editor ---
+        // --- B: join the account (account# + password) → waits on the approval gate ---
         await b.session.byTestId("welcome.root", { timeoutMs: 20_000 });
         await (await b.session.byTestId("welcome.join-cta")).click();
         await b.session.byTestId("join.modal");
@@ -125,18 +125,31 @@ describeCanary("two-device sync canary (MYND-428)", () => {
         await (await b.session.byTestId("join.account-input")).sendKeys(account);
         await (await b.session.byTestId("join.password-input")).sendKeys(password);
         await (await b.session.byTestId("join.submit")).click();
-        await b.session.byTestId("editor.root", { timeoutMs: 30_000 });
-        await dismissImporterOffer(b.session);
+        // A loopback (http) join has no TLS cert to pin, so B lands straight on the
+        // "waiting for approval" step (no `join.pinned`).
+        await b.session.byTestId("join.pending", { timeoutMs: 30_000 });
 
-        // --- A: approve B (the device panel auto-refreshes; the pending row appears) ---
+        // --- A: approve B while it is pending (its row appears via the roster poll) ---
         await openSettings(a.session);
         await (await a.session.byTestId("settings.tab-sync")).click();
         await (await a.session.byTestId("sync.approve-device", { timeoutMs: 30_000 })).click();
         await closeSettings(a.session);
 
-        // --- B: claim token + pull → A's note replicates to B's vault on disk.
-        // The token-claim happens once the approval has propagated, so retry the
-        // cycle (page-seat IPC) a few ticks until the blob lands. ---
+        // --- B: the pending screen auto-claims its token + pulls, then advances to
+        // the mandatory head-fingerprint SAS eye-compare (SYNC-40). The fingerprint
+        // surfaces as soon as the pulled head MAC-verifies — before the note bodies
+        // finish downloading (the join-SAS latency fix) — so verify appears promptly. ---
+        await b.session.byTestId("join.verify", { timeoutMs: 30_000 });
+        const sas = (await (await b.session.byTestId("join.sas-fingerprint")).textContent()).trim();
+        expect(sas.length, "B shows a non-empty head-fingerprint SAS").toBeGreaterThan(0);
+
+        // B confirms the eye-compare match → routes into the editor.
+        await (await b.session.byTestId("join.sas-match")).click();
+        await b.session.byTestId("editor.root", { timeoutMs: 30_000 });
+        await dismissImporterOffer(b.session);
+
+        // A's note was pulled during the claim; confirm it landed on B's disk (a few
+        // extra cycles cover any body download still in flight).
         let replicated = false;
         for (let i = 0; i < 12 && !replicated; i++) {
           await pageSeatInvoke(b.session, "plugin:sync|sync_now", {}, 20_000);
@@ -254,6 +267,53 @@ describeCanary("two-device sync canary (MYND-428)", () => {
     }
   });
 
+  it("unlock-edge + poke: a change pushed while B is locked appears within seconds of B's unlock — no Sync Now, no 30 s poll wait", async () => {
+    // Vault-count precondition: 1 seeded vault on A, 1 join-bootstrapped on B.
+    // Pins the sync-latency package (decisions.md 2026-07-12): the locked→
+    // unlocked edge arms a one-shot immediate pull and the always-on SSE poke
+    // stream does a catch-up pull on (re)connect, so a change that landed on
+    // the server while this device was locked surfaces right after unlock —
+    // WITHOUT a manual Sync Now and WITHOUT waiting out the 30 s poll boundary.
+    const srv = await startSyncServer();
+    try {
+      const { a, b, noteId, password, teardown } = await setupTwoSyncedDevices(srv);
+      try {
+        // B locks via the real bottom-bar CTA: the sync loop hard-idles and
+        // the poke stream tears down (locked devices hold no server stream).
+        await (await b.session.byTestId("editor.lock-cta")).click();
+        await b.session.byTestId("unlock.password-input", { timeoutMs: 20_000 });
+
+        // A edits the already-synced note and pushes while B is locked.
+        await ipcOk(a.session, "plugin:notes|note_update", {
+          noteId,
+          plaintext: "edited while B slept",
+        });
+        await ipcOk(a.session, "plugin:sync|sync_now", {});
+
+        // B unlocks through the real UI. From here on B gets NO sync nudge of
+        // any kind — the unlock-edge arm (+ SSE catch-up) must pull on its own.
+        await unlockToEditor(b.session, password);
+
+        // Discriminating budget: comfortably above container jitter, but well
+        // UNDER the 30 s poll interval — with the edge trigger and poke dead,
+        // the first chance to see the edit would be the 30 s boundary, so a
+        // green here can only come from the new immediate-pull paths.
+        let fresh = false;
+        const deadline = Date.now() + 20_000;
+        while (!fresh && Date.now() < deadline) {
+          const body = (await ipcOk(b.session, "plugin:notes|note_read", { noteId })) as string;
+          fresh = body.includes("edited while B slept");
+          if (!fresh) await new Promise((r) => setTimeout(r, 500));
+        }
+        expect(fresh, "B pulled A's edit right after unlock without a manual sync").toBe(true);
+      } finally {
+        await teardown();
+      }
+    } finally {
+      await srv.teardown();
+    }
+  });
+
   it("tombstone: a deletion on A propagates to B", async () => {
     const srv = await startSyncServer();
     try {
@@ -325,11 +385,13 @@ function clearConflictMarkersRaw(content: string): string {
 
 /** Boot A (seeded vault) + B, enroll A, write+push one note, B joins + is
  *  approved + pulls it — the shared "two synced devices, one replicated note"
- *  precondition. Returns both devices, the synced note id, and a teardown. */
+ *  precondition. Returns both devices, the synced note id, the shared vault
+ *  password (for re-unlock scenarios), and a teardown. */
 async function setupTwoSyncedDevices(srv: EphemeralServer): Promise<{
   a: AppSession;
   b: AppSession;
   noteId: string;
+  password: string;
   teardown: () => Promise<void>;
 }> {
   let account = "";
@@ -361,7 +423,7 @@ async function setupTwoSyncedDevices(srv: EphemeralServer): Promise<{
       const ids = (await ipcOk(a.session, "plugin:notes|note_list", {})) as string[];
       const noteId = ids[0];
 
-      // B: join (account# + password) → editor (pending).
+      // B: join (account# + password) → pending (waits on the approval gate).
       await b.session.byTestId("welcome.root", { timeoutMs: 20_000 });
       await (await b.session.byTestId("welcome.join-cta")).click();
       await b.session.byTestId("join.modal");
@@ -369,14 +431,20 @@ async function setupTwoSyncedDevices(srv: EphemeralServer): Promise<{
       await (await b.session.byTestId("join.account-input")).sendKeys(account);
       await (await b.session.byTestId("join.password-input")).sendKeys(password);
       await (await b.session.byTestId("join.submit")).click();
-      await b.session.byTestId("editor.root", { timeoutMs: 30_000 });
-      await dismissImporterOffer(b.session);
+      await b.session.byTestId("join.pending", { timeoutMs: 30_000 });
 
-      // A: approve B.
+      // A: approve B while it is pending.
       await openSettings(a.session);
       await (await a.session.byTestId("settings.tab-sync")).click();
       await (await a.session.byTestId("sync.approve-device", { timeoutMs: 30_000 })).click();
       await closeSettings(a.session);
+
+      // B: auto-claim + pull → the mandatory SAS verify step → confirm the match →
+      // editor (SYNC-40).
+      await b.session.byTestId("join.verify", { timeoutMs: 30_000 });
+      await (await b.session.byTestId("join.sas-match")).click();
+      await b.session.byTestId("editor.root", { timeoutMs: 30_000 });
+      await dismissImporterOffer(b.session);
 
       // B: pull until A's note replicates.
       let replicated = false;
@@ -391,7 +459,7 @@ async function setupTwoSyncedDevices(srv: EphemeralServer): Promise<{
         await b.teardown();
         await a.teardown();
       };
-      return { a, b, noteId, teardown };
+      return { a, b, noteId, password, teardown };
     } catch (e) {
       await b.teardown();
       throw e;

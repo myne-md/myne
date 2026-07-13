@@ -12,7 +12,7 @@
 // `src-tauri/capabilities/default.json`.
 //
 // ⚠️ The biometric (Touch ID) path is HARDWARE-UNVERIFIED pending a Touch ID
-// device + a primitive review (see `src-tauri/.../quick_unlock/macos.rs`).
+// device + a primitive review (see `core/.../quick_unlock/apple.rs`).
 // The UI must not present it as a trusted gate until that verification passes.
 
 import { invoke } from "@tauri-apps/api/core";
@@ -64,12 +64,12 @@ export function quickUnlockWithPin(pin: string, vaultId?: string): Promise<void>
   return invoke("plugin:quick-unlock|quick_unlock_with_pin", { pin, vaultId });
 }
 
-/** Configure macOS Touch ID quick-unlock. `HardwareUnavailable` off macOS. */
+/** Configure Apple biometric (Touch ID) quick-unlock. `HardwareUnavailable` off Apple targets. */
 export function quickUnlockSetupBiometric(): Promise<void> {
   return invoke("plugin:quick-unlock|quick_unlock_setup_biometric");
 }
 
-/** Attempt a macOS Touch ID quick-unlock. `vaultId` — see {@link quickUnlockStatus}. */
+/** Attempt an Apple biometric (Touch ID) quick-unlock. `vaultId` — see {@link quickUnlockStatus}. */
 export function quickUnlockWithBiometric(vaultId?: string): Promise<void> {
   return invoke("plugin:quick-unlock|quick_unlock_with_biometric", { vaultId });
 }

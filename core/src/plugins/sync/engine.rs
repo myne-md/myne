@@ -45,6 +45,11 @@ struct SyncMetaWire {
     content_nonce_hex: String,
     #[serde(default)]
     size: usize,
+    /// Full 32-byte attachment-id (64 hex), echoed by the server for an
+    /// attachment record so the puller can resolve the 16-byte sync-id
+    /// prefix without waiting on the catalog (MYND-468; §8.1).
+    #[serde(default)]
+    attachment_id_hex: Option<String>,
 }
 
 /// The current head from `/sync/pull` (mirrors the Go `headWire`).
@@ -82,7 +87,8 @@ struct BlobWire {
 /// the local manifest, or it is new).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ChangedBlob {
-    /// 16-byte note UUID / attachment-id.
+    /// 16-byte note UUID / attachment sync-id (§4.2 — an attachment's key is
+    /// the first 16 bytes of its 32-byte `attachment-id`).
     pub id: [u8; 16],
     /// The server's current `content_nonce` for this blob.
     pub content_nonce: [u8; 24],
@@ -90,6 +96,9 @@ pub struct ChangedBlob {
     pub version: u64,
     /// Advertised ciphertext size (informational).
     pub size: usize,
+    /// The full 32-byte attachment-id when this record is an attachment
+    /// (server echo; MYND-468). `None` for notes.
+    pub attachment_id: Option<[u8; 32]>,
 }
 
 /// A pulled head, verified client-side, with its dominance vs the baseline.
@@ -236,11 +245,16 @@ pub fn pull_page(
         let id = hex_to_array::<16>(&m.uuid_hex).ok_or(PullError::BadResponse)?;
         let content_nonce =
             hex_to_array::<24>(&m.content_nonce_hex).ok_or(PullError::BadResponse)?;
+        let attachment_id = match &m.attachment_id_hex {
+            None => None,
+            Some(h) => Some(hex_to_array::<32>(h).ok_or(PullError::BadResponse)?),
+        };
         let blob = ChangedBlob {
             id,
             content_nonce,
             version: m.version,
             size: m.size,
+            attachment_id,
         };
         if local.get(&id) != Some(&content_nonce) {
             changed.push(blob.clone());
@@ -344,7 +358,10 @@ pub fn download_blob(
 
 /// One blob to push (mirrors the Go `pushBlob`). A `tombstone` push carries the
 /// `deleted`-version ciphertext (MYND-426 builds it); the field is the only
-/// deletion signal the blind server sees.
+/// deletion signal the blind server sees. An **attachment** record carries the
+/// full id in `attachment_id_hex` with an EMPTY inline ciphertext — the bytes
+/// travel over `/attachments/{id}` (§8.1/§11.4, MYND-468); its tombstone
+/// additionally triggers the server-side body mark-deleted.
 #[derive(Debug, Clone, Serialize)]
 struct PushBlobWire {
     blob_id_hex: String,
@@ -353,6 +370,8 @@ struct PushBlobWire {
     ciphertext_b64: String,
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     tombstone: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    attachment_id_hex: Option<String>,
 }
 
 /// The optional new head on a push (mirrors the Go `pushHead`): the pointer-CAS
@@ -390,16 +409,21 @@ struct PushRespWire {
 /// A blob the client wants to push (the coalesced batch the loop accumulates).
 #[derive(Debug, Clone)]
 pub struct PushBlob {
-    /// 16-byte note UUID / attachment-id.
+    /// 16-byte note UUID / attachment sync-id (§4.2).
     pub id: [u8; 16],
     /// The version the client last saw for this blob (the per-blob CAS base).
     pub base_version: u64,
     /// The new revision's `content_nonce`.
     pub content_nonce: [u8; 24],
-    /// The opaque sealed ciphertext.
+    /// The opaque sealed ciphertext. EMPTY for an attachment record — the
+    /// bytes already travelled over `/attachments/{id}` (MYND-468).
     pub ciphertext: Vec<u8>,
-    /// `true` for a `deleted`-marked tombstone version (MYND-426).
+    /// `true` for a `deleted`-marked tombstone version (MYND-426; for an
+    /// attachment, the §11.4 deletion signal that also marks the body).
     pub tombstone: bool,
+    /// The full 32-byte attachment-id for an attachment record (registration
+    /// or tombstone); `None` for notes.
+    pub attachment_id: Option<[u8; 32]>,
 }
 
 /// The result of a successful push.
@@ -460,6 +484,7 @@ pub fn push(
                 content_nonce_hex: hex_encode(&b.content_nonce),
                 ciphertext_b64: B64.encode(&b.ciphertext),
                 tombstone: b.tombstone,
+                attachment_id_hex: b.attachment_id.as_ref().map(|id| hex_encode(id)),
             })
             .collect(),
         new_head: new_head.map(|(prev, record)| PushHeadWire {
@@ -501,6 +526,198 @@ pub fn push(
         Some(hex_to_array::<HEAD_ID_LEN>(&wire.head_id_hex).ok_or(PushError::BadResponse)?)
     };
     Ok(PushOutcome { results, head_id })
+}
+
+// ---------------------------------------------------------------------------
+// Attachment byte-transport client (`server-protocol.md` §3.2; MYND-468)
+// ---------------------------------------------------------------------------
+
+/// Upload chunk size for `PUT /attachments/{id}?offset=N&total=M`. Small
+/// enough that a flaky link loses at most one chunk of progress, large enough
+/// that a 64 MiB blob is ≤16 requests.
+pub const ATTACHMENT_UPLOAD_CHUNK: usize = 4 * 1024 * 1024;
+
+/// One `HEAD /attachments/{id}` probe result.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AttachmentProbe {
+    /// Bytes the server currently holds for this id.
+    pub uploaded: usize,
+    /// Whether the upload is complete (the whole blob is stored).
+    pub complete: bool,
+}
+
+fn attachment_path(id: &[u8; 32]) -> String {
+    let mut p = String::with_capacity(13 + 64);
+    p.push_str("/attachments/");
+    p.push_str(&hex_encode(id));
+    p
+}
+
+/// `HEAD /attachments/{id}` — the resume/dedup probe. `Ok(None)` = the server
+/// holds nothing for this id (404: never uploaded, or deleted — the two are
+/// deliberately indistinguishable, §11.4).
+pub fn probe_attachment(
+    transport: &dyn SyncTransport,
+    token: &str,
+    id: &[u8; 32],
+) -> Result<Option<AttachmentProbe>, PushError> {
+    let resp = transport.request_ext(
+        HttpMethod::Head,
+        &attachment_path(id),
+        &[],
+        &[],
+        Some(token),
+    )?;
+    match resp.status {
+        200 => {
+            let uploaded = resp
+                .header("x-uploaded-length")
+                .and_then(|v| v.parse::<usize>().ok())
+                .ok_or(PushError::BadResponse)?;
+            let complete = resp.header("x-complete").is_some();
+            Ok(Some(AttachmentProbe { uploaded, complete }))
+        }
+        404 => Ok(None),
+        401 => Err(PushError::Unauthenticated),
+        429 => Err(PushError::RateLimited),
+        _ => Err(PushError::BadResponse),
+    }
+}
+
+/// Upload an attachment's whole ciphertext over the resumable transport:
+/// `HEAD` probe → strict-sequential `PUT` chunks from the server's current
+/// offset. Idempotent: an already-complete id returns `Ok` without a byte
+/// sent (the content-addressed dedup), and a retry resumes where the server
+/// really is. A 409 (resume-offset conflict — e.g. a concurrent upload of the
+/// same content-addressed id from another device) re-probes and continues
+/// from the server's offset, bounded so two pathological writers can't loop
+/// forever.
+pub fn upload_attachment(
+    transport: &dyn SyncTransport,
+    token: &str,
+    id: &[u8; 32],
+    bytes: &[u8],
+) -> Result<(), PushError> {
+    let path_base = attachment_path(id);
+    let total = bytes.len();
+
+    let mut offset = match probe_attachment(transport, token, id)? {
+        Some(p) if p.complete => return Ok(()),
+        Some(p) => p.uploaded.min(total),
+        None => 0,
+    };
+
+    let mut conflict_retries = 3u8;
+    while offset < total || total == 0 {
+        let end = (offset + ATTACHMENT_UPLOAD_CHUNK).min(total);
+        let path = format!("{path_base}?offset={offset}&total={total}");
+        let resp = transport.request_ext(
+            HttpMethod::Put,
+            &path,
+            &[("Content-Type", "application/octet-stream")],
+            &bytes[offset..end],
+            Some(token),
+        )?;
+        match resp.status {
+            200 => {
+                // Advance to the server's authoritative offset (falls back to
+                // our own arithmetic if the header is absent).
+                offset = resp
+                    .header("x-uploaded-length")
+                    .and_then(|v| v.parse::<usize>().ok())
+                    .unwrap_or(end);
+                if total == 0 {
+                    break; // zero-length blob: one empty PUT registers it
+                }
+            }
+            409 => {
+                // Resume-offset conflict — re-probe and continue from truth.
+                if conflict_retries == 0 {
+                    return Err(PushError::BadResponse);
+                }
+                conflict_retries -= 1;
+                match probe_attachment(transport, token, id)? {
+                    Some(p) if p.complete => return Ok(()),
+                    Some(p) => offset = p.uploaded.min(total),
+                    None => offset = 0,
+                }
+            }
+            401 => return Err(PushError::Unauthenticated),
+            429 => return Err(PushError::RateLimited),
+            413 => return Err(PushError::PayloadTooLarge),
+            507 => return Err(PushError::QuotaExceeded),
+            _ => return Err(PushError::BadResponse),
+        }
+    }
+    Ok(())
+}
+
+/// Download an attachment's whole ciphertext, resuming past `partial` (the
+/// locally-buffered prefix from an interrupted earlier attempt). Returns:
+/// - `Ok(Some(bytes))` — the complete ciphertext (partial ∥ fetched);
+/// - `Ok(None)` — the server holds no **complete** body for this id (absent,
+///   deleted, or an upload still in flight) — the caller defers to a later
+///   cycle rather than downloading a half-uploaded blob.
+///
+/// The returned bytes are OPAQUE — the caller MUST verify the whole-blob
+/// AEAD/CTX tag before persisting (§3.2: range slices carry no integrity of
+/// their own).
+pub fn download_attachment(
+    transport: &dyn SyncTransport,
+    token: &str,
+    id: &[u8; 32],
+    partial: &[u8],
+) -> Result<Option<Vec<u8>>, PullError> {
+    let probe = match probe_attachment(transport, token, id) {
+        Ok(p) => p,
+        Err(PushError::Unauthenticated) => return Err(PullError::Unauthenticated),
+        Err(PushError::RateLimited) => return Err(PullError::RateLimited),
+        Err(PushError::Transport(t)) => return Err(PullError::Transport(t)),
+        Err(_) => return Err(PullError::BadResponse),
+    };
+    let Some(probe) = probe else { return Ok(None) };
+    if !probe.complete {
+        return Ok(None);
+    }
+    let total = probe.uploaded;
+
+    // A stale/oversized partial can't be trusted — refetch whole.
+    let prefix = if partial.len() < total { partial } else { &[] };
+
+    let path = attachment_path(id);
+    if prefix.is_empty() {
+        let resp = transport.request_ext(HttpMethod::Get, &path, &[], &[], Some(token))?;
+        return match resp.status {
+            200 => Ok(Some(resp.body)),
+            404 => Ok(None),
+            401 => Err(PullError::Unauthenticated),
+            429 => Err(PullError::RateLimited),
+            _ => Err(PullError::BadResponse),
+        };
+    }
+
+    let range = format!("bytes={}-", prefix.len());
+    let resp = transport.request_ext(
+        HttpMethod::Get,
+        &path,
+        &[("Range", range.as_str())],
+        &[],
+        Some(token),
+    )?;
+    match resp.status {
+        206 => {
+            let mut full = Vec::with_capacity(total);
+            full.extend_from_slice(prefix);
+            full.extend_from_slice(&resp.body);
+            Ok(Some(full))
+        }
+        // A server that ignores the range and sends the whole body is fine.
+        200 => Ok(Some(resp.body)),
+        404 => Ok(None),
+        401 => Err(PullError::Unauthenticated),
+        429 => Err(PullError::RateLimited),
+        _ => Err(PullError::BadResponse),
+    }
 }
 
 /// Author a two-way **merge head** (§5.3) when the local and remote heads are
@@ -811,6 +1028,7 @@ mod tests {
             content_nonce: [0xaa; 24],
             ciphertext: b"ct".to_vec(),
             tombstone: false,
+            attachment_id: None,
         }
     }
 
@@ -893,6 +1111,248 @@ mod tests {
             push(&t2, "tok", &[one_blob()], None).unwrap_err(),
             PushError::PayloadTooLarge
         );
+    }
+
+    // ---- attachment byte-transport client (MYND-468) ----
+
+    const ATT_ID: [u8; 32] = [0xEE; 32];
+
+    fn att_path() -> String {
+        format!("/attachments/{}", "ee".repeat(32))
+    }
+
+    #[test]
+    fn probe_attachment_reads_headers_and_maps_absent() {
+        let t = FakeTransport::new();
+        t.on_ext(
+            HttpMethod::Head,
+            &att_path(),
+            200,
+            Vec::new(),
+            vec![
+                ("X-Uploaded-Length".to_string(), "7".to_string()),
+                ("X-Complete".to_string(), "1".to_string()),
+            ],
+        );
+        assert_eq!(
+            probe_attachment(&t, "tok", &ATT_ID).unwrap(),
+            Some(AttachmentProbe {
+                uploaded: 7,
+                complete: true
+            })
+        );
+
+        let t404 = FakeTransport::new();
+        t404.on(HttpMethod::Head, &att_path(), 404, Vec::new());
+        assert_eq!(probe_attachment(&t404, "tok", &ATT_ID).unwrap(), None);
+    }
+
+    #[test]
+    fn upload_attachment_fresh_puts_from_zero() {
+        let t = FakeTransport::new();
+        t.on(HttpMethod::Head, &att_path(), 404, Vec::new());
+        t.on_ext(
+            HttpMethod::Put,
+            &format!("{}?offset=0&total=5", att_path()),
+            200,
+            Vec::new(),
+            vec![("X-Uploaded-Length".to_string(), "5".to_string())],
+        );
+        upload_attachment(&t, "tok", &ATT_ID, b"hello").unwrap();
+        let seen = t.requests();
+        assert_eq!(seen.len(), 2); // HEAD + one PUT
+        assert_eq!(seen[1].0, HttpMethod::Put);
+        assert_eq!(seen[1].2, b"hello");
+        // The PUT carries the octet-stream content type.
+        assert!(seen[1]
+            .4
+            .iter()
+            .any(|(n, v)| n == "Content-Type" && v == "application/octet-stream"));
+    }
+
+    #[test]
+    fn upload_attachment_resumes_from_server_offset_and_dedups_complete() {
+        // Server already holds 3 of 5 bytes → one PUT from offset 3.
+        let t = FakeTransport::new();
+        t.on_ext(
+            HttpMethod::Head,
+            &att_path(),
+            200,
+            Vec::new(),
+            vec![("X-Uploaded-Length".to_string(), "3".to_string())],
+        );
+        t.on_ext(
+            HttpMethod::Put,
+            &format!("{}?offset=3&total=5", att_path()),
+            200,
+            Vec::new(),
+            vec![("X-Uploaded-Length".to_string(), "5".to_string())],
+        );
+        upload_attachment(&t, "tok", &ATT_ID, b"hello").unwrap();
+        let seen = t.requests();
+        assert_eq!(seen.len(), 2);
+        assert_eq!(seen[1].2, b"lo"); // only the tail
+
+        // Already complete → HEAD only, zero PUTs (content-addressed dedup).
+        let t2 = FakeTransport::new();
+        t2.on_ext(
+            HttpMethod::Head,
+            &att_path(),
+            200,
+            Vec::new(),
+            vec![
+                ("X-Uploaded-Length".to_string(), "5".to_string()),
+                ("X-Complete".to_string(), "1".to_string()),
+            ],
+        );
+        upload_attachment(&t2, "tok", &ATT_ID, b"hello").unwrap();
+        assert_eq!(t2.requests().len(), 1);
+    }
+
+    #[test]
+    fn upload_attachment_maps_quota_and_cap() {
+        let t = FakeTransport::new();
+        t.on(HttpMethod::Head, &att_path(), 404, Vec::new());
+        t.on(
+            HttpMethod::Put,
+            &format!("{}?offset=0&total=2", att_path()),
+            507,
+            Vec::new(),
+        );
+        assert_eq!(
+            upload_attachment(&t, "tok", &ATT_ID, b"ct").unwrap_err(),
+            PushError::QuotaExceeded
+        );
+
+        let t2 = FakeTransport::new();
+        t2.on(HttpMethod::Head, &att_path(), 404, Vec::new());
+        t2.on(
+            HttpMethod::Put,
+            &format!("{}?offset=0&total=2", att_path()),
+            413,
+            Vec::new(),
+        );
+        assert_eq!(
+            upload_attachment(&t2, "tok", &ATT_ID, b"ct").unwrap_err(),
+            PushError::PayloadTooLarge
+        );
+    }
+
+    #[test]
+    fn download_attachment_full_and_resume() {
+        // Complete on the server → plain GET returns the body.
+        let t = FakeTransport::new();
+        t.on_ext(
+            HttpMethod::Head,
+            &att_path(),
+            200,
+            Vec::new(),
+            vec![
+                ("X-Uploaded-Length".to_string(), "5".to_string()),
+                ("X-Complete".to_string(), "1".to_string()),
+            ],
+        );
+        t.on(HttpMethod::Get, &att_path(), 200, b"hello".to_vec());
+        assert_eq!(
+            download_attachment(&t, "tok", &ATT_ID, &[]).unwrap(),
+            Some(b"hello".to_vec())
+        );
+
+        // Resume: 3 bytes buffered locally → Range GET, reassembled.
+        let t2 = FakeTransport::new();
+        t2.on_ext(
+            HttpMethod::Head,
+            &att_path(),
+            200,
+            Vec::new(),
+            vec![
+                ("X-Uploaded-Length".to_string(), "5".to_string()),
+                ("X-Complete".to_string(), "1".to_string()),
+            ],
+        );
+        t2.on(HttpMethod::Get, &att_path(), 206, b"lo".to_vec());
+        assert_eq!(
+            download_attachment(&t2, "tok", &ATT_ID, b"hel").unwrap(),
+            Some(b"hello".to_vec())
+        );
+        let seen = t2.requests();
+        assert!(seen[1]
+            .4
+            .iter()
+            .any(|(n, v)| n == "Range" && v == "bytes=3-"));
+    }
+
+    #[test]
+    fn download_attachment_defers_on_absent_or_incomplete() {
+        // 404 → None (absent or deleted — non-distinguishing).
+        let t = FakeTransport::new();
+        t.on(HttpMethod::Head, &att_path(), 404, Vec::new());
+        assert_eq!(download_attachment(&t, "tok", &ATT_ID, &[]).unwrap(), None);
+
+        // Incomplete upload → None (never download a half-uploaded blob).
+        let t2 = FakeTransport::new();
+        t2.on_ext(
+            HttpMethod::Head,
+            &att_path(),
+            200,
+            Vec::new(),
+            vec![("X-Uploaded-Length".to_string(), "3".to_string())],
+        );
+        assert_eq!(download_attachment(&t2, "tok", &ATT_ID, &[]).unwrap(), None);
+    }
+
+    #[test]
+    fn push_serializes_attachment_record_with_empty_ciphertext() {
+        let t = FakeTransport::new();
+        t.on(
+            HttpMethod::Post,
+            "/sync/push",
+            200,
+            b"{\"results\":[{\"blob_id_hex\":\"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee\",\"version\":1}]}"
+                .to_vec(),
+        );
+        let record = PushBlob {
+            id: [0xEE; 16],
+            base_version: 0,
+            content_nonce: [0xaa; 24],
+            ciphertext: Vec::new(),
+            tombstone: false,
+            attachment_id: Some(ATT_ID),
+        };
+        push(&t, "tok", &[record], None).unwrap();
+        let seen = t.requests();
+        let body: serde_json::Value = serde_json::from_slice(&seen[0].2).unwrap();
+        let blob = &body["blobs"][0];
+        assert_eq!(blob["ciphertext_b64"], "");
+        assert_eq!(blob["attachment_id_hex"], "ee".repeat(32));
+        assert!(blob.get("tombstone").is_none()); // skipped when false
+                                                  // A note record omits attachment_id_hex entirely.
+        let t2 = FakeTransport::new();
+        t2.on(
+            HttpMethod::Post,
+            "/sync/push",
+            200,
+            b"{\"results\":[]}".to_vec(),
+        );
+        push(&t2, "tok", &[one_blob()], None).unwrap();
+        let body2: serde_json::Value = serde_json::from_slice(&t2.requests()[0].2).unwrap();
+        assert!(body2["blobs"][0].get("attachment_id_hex").is_none());
+    }
+
+    #[test]
+    fn pull_meta_echoes_attachment_id() {
+        let meta = "{\"uuid_hex\":\"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee\",\"version\":1,\"content_nonce_hex\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"size\":0,\"attachment_id_hex\":\"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee\"}";
+        let t = FakeTransport::new();
+        t.on(
+            HttpMethod::Get,
+            "/sync/pull?cursor=0",
+            200,
+            pull_body(meta, 1, None),
+        );
+        let page = pull_page(&t, &ROOT, "tok", &[], 0, &HashMap::new(), false).unwrap();
+        assert_eq!(page.changed.len(), 1);
+        assert_eq!(page.changed[0].id, [0xEE; 16]);
+        assert_eq!(page.changed[0].attachment_id, Some([0xEE; 32]));
     }
 
     #[test]

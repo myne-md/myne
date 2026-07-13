@@ -77,7 +77,10 @@ export function useDevices(): DevicesHook {
 
   useEffect(() => {
     void load(false);
-    const id = setInterval(() => void load(true), 4000);
+    // Silent roster poll so a newly-joined device surfaces without reopening
+    // Settings. 2s during the (bounded, user-initiated) enrollment window — NOT the
+    // steady-state background sync cadence.
+    const id = setInterval(() => void load(true), 2000);
     // Re-read immediately on a local enrollment change (e.g. reset) so the roster
     // does not lag its 4s poll behind the status indicator.
     let unlisten: (() => void) | undefined;

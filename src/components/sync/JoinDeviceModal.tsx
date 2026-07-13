@@ -150,12 +150,17 @@ export function JoinDeviceModal({ onCancel, onJoined }: JoinDeviceModalProps) {
   };
 
   // While PENDING, drive the claim + watch for the adopted-head fingerprint. The
-  // foreground loop claims the token + pulls once an existing device approves;
-  // `sync_head_fingerprint` returns non-null only after that first sync. Poll it
-  // (+ nudge sync_now) → then advance to the mandatory verify step (SYNC-40).
+  // foreground loop claims the token + pulls once an existing device approves; the
+  // pulled head observation is surfaced as soon as it MAC-verifies (before note bodies
+  // download), so `sync_head_fingerprint` returns non-null promptly → advance to the
+  // mandatory verify step (SYNC-40). Self-scheduling ~1s poll (not setInterval) so a
+  // slow claim RTT never overlaps ticks. This runs ONLY while step==='pending' — the
+  // bounded, user-initiated enroll window, NOT the steady-state background sync cadence
+  // (privacy-load-bearing, left untouched).
   useEffect(() => {
     if (step !== "pending") return;
     let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
     const tick = async () => {
       try {
         await invoke("plugin:sync|sync_now");
@@ -163,16 +168,17 @@ export function JoinDeviceModal({ onCancel, onJoined }: JoinDeviceModalProps) {
         if (!cancelled && fp) {
           setHeadFingerprint(fp);
           setStep("verify");
+          return; // adopted the head — stop polling
         }
       } catch {
         /* transient — retry next tick */
       }
+      if (!cancelled) timer = setTimeout(() => void tick(), 1000);
     };
     void tick();
-    const id = setInterval(() => void tick(), 3000);
     return () => {
       cancelled = true;
-      clearInterval(id);
+      if (timer !== undefined) clearTimeout(timer);
     };
   }, [step]);
 

@@ -5,7 +5,7 @@
 // re-enter with the PIN (NOT the master password) — then a wrong PIN reports
 // the remaining-attempts count. The biometric (Touch ID) path is deliberately
 // NOT E2E-driven: it is hardware-gated (no WebDriver path) and HARDWARE-
-// UNVERIFIED (see `src-tauri/.../quick_unlock/macos.rs`); its surrounding logic
+// UNVERIFIED (see `core/.../quick_unlock/apple.rs`); its surrounding logic
 // is covered by the Rust `cargo test` provider/command suites with a mock.
 //
 // Spring-loaded gate, two stories:

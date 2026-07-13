@@ -3,9 +3,9 @@
 //! One TLS path shared by SCRAM auth (MYND-425) and sync push/pull: a rustls
 //! `ClientConfig` with **certificate pinning** (A4) and access to the
 //! **keying-material exporter** (the SCRAM channel binding). It speaks a minimal
-//! HTTP/1.1 (`Connection: close`) over the TLS stream — deliberately NOT
-//! `reqwest` (a second TLS stack) and NOT `tauri-plugin-http` (no exporter), per
-//! the PRD.
+//! keep-alive HTTP/1.1 over the TLS stream (strict `Content-Length`/chunked
+//! framing, one cached session per transport) — deliberately NOT `reqwest` (a
+//! second TLS stack) and NOT `tauri-plugin-http` (no exporter), per the PRD.
 //!
 //! ## R3 status (READ THIS)
 //!
@@ -24,16 +24,22 @@
 //! - Fallback if `-PLUS` channel binding slips: cert-pinning only (the exporter
 //!   call is then simply unused).
 
-use super::http_codec::{build_http_request, parse_http_response, MAX_SYNC_RESPONSE_BYTES};
-use super::transport::{HttpMethod, SyncTransport, TransportError, TransportResponse};
+use super::http_codec::{
+    build_http_request_ext, keepalive_roundtrip, read_http_response, read_response_head,
+};
+use super::http_transport::SOCKET_TIMEOUT;
+use super::transport::{
+    HttpMethod, SseOpenError, SseStream, SyncTransport, TransportError, TransportResponse,
+    TransportResponseExt,
+};
 use rustls::client::danger::{HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier};
 use rustls::crypto::{verify_tls12_signature, verify_tls13_signature, WebPkiSupportedAlgorithms};
 use rustls::pki_types::{CertificateDer, ServerName, UnixTime};
 use rustls::{ClientConfig, ClientConnection, DigitallySignedStruct, SignatureScheme, StreamOwned};
 use sha2::{Digest, Sha256};
-use std::io::{Read, Write};
+use std::io::{BufReader, Write};
 use std::net::TcpStream;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 /// A pinned-certificate verifier: the leaf cert's SHA-256 (over its DER) MUST be
 /// in the pin set, replacing CA-chain validation (the pin IS the trust, A4).
@@ -187,11 +193,14 @@ pub fn tofu_fetch_pin(host: &str, port: u16) -> Result<[u8; 32], TransportError>
 }
 
 /// The raw-rustls transport: a pinned `ClientConfig` + the target host/port.
-/// One instance is the single TLS layer auth + sync share (SYNC-3).
+/// One instance is the single TLS layer auth + sync share (SYNC-3). Holds one
+/// keep-alive TLS session — within a sync cycle every request rides the same
+/// handshake (the codec's framed reader decides reusability per response).
 pub struct RustlsTransport {
     host: String,
     port: u16,
     config: Arc<ClientConfig>,
+    conn: Mutex<Option<BufReader<StreamOwned<ClientConnection, TcpStream>>>>,
 }
 
 impl RustlsTransport {
@@ -214,10 +223,13 @@ impl RustlsTransport {
             host: host.into(),
             port,
             config: Arc::new(config),
+            conn: Mutex::new(None),
         }
     }
 
-    /// Open a pinned TLS connection to the configured host.
+    /// Open a pinned TLS connection to the configured host. Read/write deadlines
+    /// on the socket keep a hung server from wedging a cycle and give keep-alive
+    /// reuse a death detector.
     fn connect(&self) -> Result<StreamOwned<ClientConnection, TcpStream>, TransportError> {
         let server_name =
             ServerName::try_from(self.host.clone()).map_err(|_| TransportError::BadRequest)?;
@@ -225,6 +237,8 @@ impl RustlsTransport {
             .map_err(|_| TransportError::Tls)?;
         let sock = TcpStream::connect((self.host.as_str(), self.port))
             .map_err(|_| TransportError::Network)?;
+        let _ = sock.set_read_timeout(Some(SOCKET_TIMEOUT));
+        let _ = sock.set_write_timeout(Some(SOCKET_TIMEOUT));
         Ok(StreamOwned::new(conn, sock))
     }
 
@@ -257,24 +271,115 @@ impl SyncTransport for RustlsTransport {
         body: &[u8],
         token: Option<&str>,
     ) -> Result<TransportResponse, TransportError> {
+        self.request_ext(method, path, &[], body, token)
+            .map(|r| TransportResponse {
+                status: r.status,
+                body: r.body,
+            })
+    }
+
+    fn request_ext(
+        &self,
+        method: HttpMethod,
+        path: &str,
+        extra_headers: &[(&str, &str)],
+        body: &[u8],
+        token: Option<&str>,
+    ) -> Result<TransportResponseExt, TransportError> {
+        let req = build_http_request_ext(method, path, &self.host, extra_headers, body, token);
+        let mut slot = self.conn.lock().map_err(|_| TransportError::Network)?;
+        keepalive_roundtrip(
+            &mut slot,
+            || self.connect(),
+            &req,
+            method == HttpMethod::Head,
+        )
+    }
+
+    fn request_bound_to_exporter(
+        &self,
+        method: HttpMethod,
+        path: &str,
+        token: Option<&str>,
+        label: &[u8],
+        out_len: usize,
+        build_body: &dyn Fn(&[u8]) -> Vec<u8>,
+    ) -> Result<TransportResponse, TransportError> {
+        // A dedicated pinned connection (like open_sse), so the tls-exporter is
+        // computed over the EXACT connection this request is sent on — independent
+        // of the shared keep-alive slot. Same PinnedVerifier config → identical A4
+        // pin. Drive the handshake to completion first so the exporter secret exists.
         let mut stream = self.connect()?;
-        let req = build_http_request(method, path, &self.host, body, token);
+        while stream.conn.is_handshaking() {
+            stream
+                .conn
+                .complete_io(&mut stream.sock)
+                .map_err(|_| TransportError::Tls)?;
+        }
+        // `None` context matches the Go server's `nil` (proven byte-identical under
+        // TLS 1.3, F5). The body embeds the exporter as the SCRAM client-final cbind.
+        let out = vec![0u8; out_len];
+        let ekm = stream
+            .conn
+            .export_keying_material(out, label, None)
+            .map_err(|_| TransportError::Tls)?;
+        let body = build_body(&ekm);
+        let req = build_http_request_ext(method, path, &self.host, &[], &body, token);
         stream
             .write_all(&req)
+            .and_then(|_| stream.flush())
             .map_err(|_| TransportError::Network)?;
-        stream.flush().map_err(|_| TransportError::Network)?;
-        let mut raw = Vec::new();
-        // `Connection: close` → read to EOF, but bound it: an untrusted relay (TB5)
-        // can otherwise stream an unbounded body and OOM the client. Read one byte
-        // past the cap so an over-limit body is detectable rather than truncated.
-        (&mut stream)
-            .take(MAX_SYNC_RESPONSE_BYTES + 1)
-            .read_to_end(&mut raw)
+        let mut reader = BufReader::new(stream);
+        let (resp, _reuse) = read_http_response(&mut reader, method == HttpMethod::Head)
             .map_err(|_| TransportError::Network)?;
-        if raw.len() as u64 > MAX_SYNC_RESPONSE_BYTES {
-            return Err(TransportError::Network);
+        Ok(TransportResponse {
+            status: resp.status,
+            body: resp.body,
+        })
+    }
+
+    fn open_sse(
+        &self,
+        path: &str,
+        token: &str,
+        read_timeout: std::time::Duration,
+    ) -> Result<SseStream, SseOpenError> {
+        // A dedicated pinned TLS connection (never the keep-alive request slot
+        // — the stream occupies it indefinitely). Same PinnedVerifier config,
+        // so the A4 pin semantics are byte-identical to request cycles.
+        let mut stream = self.connect().map_err(SseOpenError::Transport)?;
+        stream
+            .sock
+            .set_read_timeout(Some(read_timeout))
+            .map_err(|_| SseOpenError::Transport(TransportError::Network))?;
+        let shutdown_handle = stream
+            .sock
+            .try_clone()
+            .map_err(|_| SseOpenError::Transport(TransportError::Network))?;
+        let req = build_http_request_ext(
+            HttpMethod::Get,
+            path,
+            &self.host,
+            &[("Accept", "text/event-stream")],
+            b"",
+            Some(token),
+        );
+        stream
+            .write_all(&req)
+            .and_then(|_| stream.flush())
+            .map_err(|_| SseOpenError::Transport(TransportError::Network))?;
+        let mut reader = BufReader::new(stream);
+        let head = read_response_head(&mut reader)
+            .map_err(|_| SseOpenError::Transport(TransportError::Network))?;
+        match head.status {
+            200 => Ok(SseStream {
+                reader: Box::new(reader),
+                chunked: head.chunked,
+                socket: shutdown_handle,
+            }),
+            401 => Err(SseOpenError::Unauthorized),
+            _ => Err(SseOpenError::Transport(TransportError::Network)),
         }
-        parse_http_response(&raw).ok_or(TransportError::Network)
     }
 }
 

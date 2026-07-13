@@ -297,9 +297,17 @@ describeE2E("ms1 multi-select bulk move (MYND-367)", () => {
           )
         ).click();
 
-        // Both notes are now children of the folder: collapsing the (now
-        // non-empty) folder hides exactly them, leaving the folder row.
+        // The bulk move lands both notes inside the folder, which defaults to
+        // collapsed (NoteList `expanded` starts empty) — so the moved notes are
+        // already hidden. Wait for the selection to clear, then EXPAND the folder
+        // to confirm BOTH landed inside, then COLLAPSE to confirm the fold hides
+        // exactly them, leaving just the folder row.
         await s.waitForGone(testIdSelector("notes.row", { "data-multiselected": "true" }));
+        await (await s.byTestId("notes.folder-row")).click(); // expand
+        await s.waitUntil(
+          async () => ((await s.byTestIdAll("notes.row")).length === 2 ? true : null),
+          { label: "both moved notes appear under the expanded folder" },
+        );
         await (await s.byTestId("notes.folder-row")).click(); // collapse
         await s.waitForGone(testIdSelector("notes.row"));
         expect((await s.byTestIdAll("notes.folder-row")).length).toBe(1);

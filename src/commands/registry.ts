@@ -156,8 +156,6 @@ export type CommandContext = {
   // ── Wave 4 ──
   /** Route into the restore-from-backup flow (sibling of onBackupVault). */
   onRestoreBackup: () => void;
-  /** Toggle the device-local real-time (SSE) sync connection. */
-  onToggleRealtimeSync: () => void;
   /**
    * Open the folder target-picker (QuickPicker) for the selected note and move
    * it to the chosen folder (palette-gap #32). No-op when no note is selected;
