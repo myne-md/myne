@@ -275,8 +275,13 @@
      dark --paper-2 they were tuned against). The *-soft fills are nudged
      one notch darker since soft washes read brighter on true black. */
   --_paper-amoled:    #000000;
-  --_paper-2-amoled:  #0c0c0b;
-  --_paper-3-amoled:  #161614;
+  /* True pitch black: the main panels (sidebar / right rail — `--paper-2`) go to
+     #000 too, so no grey band remains beside the editor. Only the topmost
+     interactive surface (`--paper-3`: row hover / cards) keeps a barely-there
+     lift so hover/selection still registers; separation elsewhere comes from the
+     `--line-*` hairlines, not a raised grey fill. */
+  --_paper-2-amoled:  #000000;
+  --_paper-3-amoled:  #0d0d0c;
   --_line-1-amoled:   #1f1e1c;
   --_line-2-amoled:   #2c2b28;
   --_line-3-amoled:   #44423d;
