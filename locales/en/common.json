@@ -178,6 +178,7 @@
       "category": {
         "ai": "AI",
         "app": "App",
+        "appearance": "Appearance",
         "editor": "Editor",
         "vault": "Vault",
         "view": "View"
@@ -185,6 +186,23 @@
       "aiOpenChat": {
         "label": "Open AI Chat"
       },
+      "toggleLineNumbers": { "label": "Toggle line numbers" },
+      "toggleSpellCheck": { "label": "Toggle spell check" },
+      "toggleTypewriter": { "label": "Toggle typewriter scrolling" },
+      "toggleDimInactive": { "label": "Toggle dim inactive lines" },
+      "toggleEditorFont": { "label": "Toggle editor font (mono / sans)" },
+      "cycleTextSize": { "label": "Cycle editor text size" },
+      "cycleContentWidth": { "label": "Cycle editor content width" },
+      "cycleDefaultViewMode": { "label": "Cycle default view mode" },
+      "toggleTimestamps": { "label": "Toggle sidebar note timestamps" },
+      "toggleArchiving": { "label": "Toggle note archiving" },
+      "toggleAiEnabled": { "label": "Toggle AI features (beta)" },
+      "toggleScreenCapture": { "label": "Toggle screen-capture protection" },
+      "cycleTheme": { "label": "Cycle theme" },
+      "themeLight": { "label": "Theme: Light" },
+      "themeDark": { "label": "Theme: Dark" },
+      "themeAmoled": { "label": "Theme: AMOLED" },
+      "themeSystem": { "label": "Theme: Follow system" },
       "aiSummarizeNote": {
         "label": "Summarize note"
       },

@@ -2241,6 +2241,8 @@ function CommandPaletteHost({
       stageName: "editor",
       selectedNoteId: ctx.selectedId,
       aiEnabled: aiPrefs.ai_enabled,
+      // The live prefs view for the toggle/cycle/set palette actions (Wave 1+).
+      prefs: aiPrefs,
       onOpenAiChat: () => void revealRightPanelTab("ai-chat"),
       // Summarize the focused note into the AI Chat tab (note-summarization
       // tasks 3–4): reveal the render target, grab the focused pane's live view
@@ -2366,8 +2368,9 @@ function CommandPaletteHost({
       ctx.selectedId,
       ctx.open,
       ctx.cache,
-      aiPrefs.ai_enabled,
-      aiPrefs.ai_excluded_folders,
+      // Whole prefs object (not just ai_*): the Wave-1 toggle/cycle actions read
+      // ctx.prefs, so commandCtx must re-memoize on ANY pref change.
+      aiPrefs,
       revealRightPanelTab,
       onLockFlushed,
       onOpenSettings,
