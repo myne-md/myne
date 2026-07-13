@@ -1158,7 +1158,10 @@ mod tests {
         );
         // The note's own body doc is untouched + independently findable.
         assert_eq!(
-            idx.query("prose").into_iter().map(|h| h.id).collect::<Vec<_>>(),
+            idx.query("prose")
+                .into_iter()
+                .map(|h| h.id)
+                .collect::<Vec<_>>(),
             vec!["note1".to_string()]
         );
     }
@@ -1177,7 +1180,10 @@ mod tests {
         // from the note), "aaa" preserved, note body untouched.
         idx.set_note_attachments("note1", &[att("aaa", "N", "alpha text")]);
         assert_eq!(idx.query("alpha").len(), 1);
-        assert!(idx.query("beta").is_empty(), "un-embedded attachment doc dropped");
+        assert!(
+            idx.query("beta").is_empty(),
+            "un-embedded attachment doc dropped"
+        );
         assert_eq!(idx.query("prose").len(), 1);
     }
 
@@ -1190,7 +1196,11 @@ mod tests {
         idx.add(doc("note1", "Quarterly Report", "some prose"));
         idx.set_note_attachments(
             "note1",
-            &[att("deadbeef", "Quarterly Report", "unrelated spreadsheet rows")],
+            &[att(
+                "deadbeef",
+                "Quarterly Report",
+                "unrelated spreadsheet rows",
+            )],
         );
         // "quarterly" is ONLY in the note title → the note body doc matches, the
         // attachment doc does NOT.

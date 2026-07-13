@@ -106,7 +106,9 @@ pub fn reconcile_delta(manifest: &NonceManifest, on_disk: &NonceManifest) -> Rec
 mod tests {
     use super::*;
     use crate::note_nonce::MYN_CONTENT_NONCE_LEN;
-    use crate::plugins::vault_indices::state::{BlockAnchor, PropertyEntry, TagEntry, WikilinkEdge};
+    use crate::plugins::vault_indices::state::{
+        BlockAnchor, PropertyEntry, TagEntry, WikilinkEdge,
+    };
 
     const KEY: [u8; AEAD_KEY_LEN] = [0x42; AEAD_KEY_LEN];
     const ACCOUNT_HASH: [u8; VAULT_INDICES_BLOB_ACCOUNT_HASH_LEN] =

@@ -78,7 +78,8 @@ impl<R: Runtime> VaultLifecycleHooks for DesktopHooks<R> {
             // refs-first guard skips even the `vault_dir` resolution + KEK derive
             // for the common no-attachment save (it still syncs an empty set
             // below, dropping any attachment docs the note no longer embeds).
-            let atts = if crate::plugins::attachments::reconcile::extract_att_ids(&body).is_empty() {
+            let atts = if crate::plugins::attachments::reconcile::extract_att_ids(&body).is_empty()
+            {
                 Vec::new()
             } else if let Ok(vault_dir) =
                 crate::paths::vault_dir_for_id(&app, state.active_vault_id().await)
