@@ -136,6 +136,7 @@ import { SaveStatus as SaveStatusBadge } from "../notes/components/SaveStatus";
 import {
   SidebarStateProvider,
   useSelectedNote,
+  trashedRecords,
   type NoteId,
 } from "../notes/sidebarState";
 import type { SaveStatus as SaveStatusValue } from "../notes/useAutosave";
@@ -184,7 +185,7 @@ import {
   workspaceStage,
   workspaceWrite,
 } from "../lib/workspace-persist";
-import { setActiveWorkspace } from "../lib/prefs";
+import { setActiveWorkspace, setFavorites } from "../lib/prefs";
 import { promptForText } from "../lib/promptForText";
 
 // Lazy-loaded so the tag-browser modal chunk stays out of the editor's initial
@@ -2292,6 +2293,33 @@ function CommandPaletteHost({
       onGoBack: () => paletteWs.goBack(),
       onGoForward: () => paletteWs.goForward(),
       onTogglePreview: () => paletteWs.toggleCompanion(paletteWs.focusedPaneId),
+      // Wave 3 — note ops (via the sidebar-state ctx) + right-panel tabs.
+      onNewNote: () => void ctx.createAndStartRename().catch(() => {}),
+      onDuplicateNote: () => {
+        if (ctx.selectedId !== null) void ctx.duplicateAndOpen(ctx.selectedId).catch(() => {});
+      },
+      onArchiveNote: () => {
+        if (ctx.selectedId !== null) void ctx.archiveWithRollback(ctx.selectedId).catch(() => {});
+      },
+      onRenameNote: () => {
+        if (ctx.selectedId !== null) ctx.startRename(ctx.selectedId);
+      },
+      onTrashNote: () => {
+        if (ctx.selectedId !== null) void ctx.trashWithRollback(ctx.selectedId).catch(() => {});
+      },
+      onEmptyTrash: () => {
+        const ids = trashedRecords(ctx.cache).map((r) => r.noteUuid);
+        if (ids.length > 0) void ctx.emptyTrashWithSync(ids).catch(() => {});
+      },
+      onToggleFavorite: () => {
+        if (ctx.selectedId === null) return;
+        const id = ctx.selectedId;
+        const fav = aiPrefs.favorites;
+        void setFavorites(fav.includes(id) ? fav.filter((x) => x !== id) : [...fav, id]);
+      },
+      onShowBacklinks: () => void revealRightPanelTab("backlinks"),
+      onShowOutline: () => void revealRightPanelTab("outline"),
+      onShowUnlinked: () => void revealRightPanelTab("unlinked"),
       onOpenAiChat: () => void revealRightPanelTab("ai-chat"),
       // Summarize the focused note into the AI Chat tab (note-summarization
       // tasks 3–4): reveal the render target, grab the focused pane's live view

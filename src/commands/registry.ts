@@ -134,6 +134,25 @@ export type CommandContext = {
   onGoForward: () => void;
   /** Toggle the focused pane's side-by-side companion (live preview). */
   onTogglePreview: () => void;
+  // ── Wave 3: note ops + right-panel tabs (palette-gap) ──
+  /** Create a new blank note and start inline rename. */
+  onNewNote: () => void;
+  /** Duplicate the selected note (clone → open the copy). */
+  onDuplicateNote: () => void;
+  /** Archive the selected note. */
+  onArchiveNote: () => void;
+  /** Start inline rename of the selected note. */
+  onRenameNote: () => void;
+  /** Move the selected note to the trash (soft delete, recoverable). */
+  onTrashNote: () => void;
+  /** Permanently empty the trash. */
+  onEmptyTrash: () => void;
+  /** Add/remove the selected note from favorites. */
+  onToggleFavorite: () => void;
+  /** Reveal a specific right-panel tab. */
+  onShowBacklinks: () => void;
+  onShowOutline: () => void;
+  onShowUnlinked: () => void;
   /** Collapse/expand the left (notes) sidebar (mirrors the top-bar toggle). */
   onToggleLeftSidebar: () => void;
   /** Collapse/expand the right (backlinks) sidebar (mirrors the top-bar toggle). */

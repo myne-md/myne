@@ -180,6 +180,7 @@
         "app": "App",
         "appearance": "Appearance",
         "editor": "Editor",
+        "notes": "Notes",
         "vault": "Vault",
         "view": "View"
       },
@@ -214,6 +215,18 @@
       "goBack": { "label": "Go back" },
       "goForward": { "label": "Go forward" },
       "togglePreview": { "label": "Toggle side-by-side preview" },
+      "findInNote": { "label": "Find in note" },
+      "findReplace": { "label": "Find and replace in note" },
+      "newNote": { "label": "New note" },
+      "duplicateNote": { "label": "Duplicate note" },
+      "archiveNote": { "label": "Archive note" },
+      "renameNote": { "label": "Rename note" },
+      "trashNote": { "label": "Move note to trash" },
+      "toggleFavorite": { "label": "Toggle favorite" },
+      "emptyTrash": { "label": "Empty trash" },
+      "showBacklinks": { "label": "Show backlinks" },
+      "showOutline": { "label": "Show outline" },
+      "showUnlinked": { "label": "Show unlinked mentions" },
       "aiSummarizeNote": {
         "label": "Summarize note"
       },
