@@ -35,6 +35,12 @@ export function clickCollapseExtension(): Extension {
         Math.abs(event.clientY - downY) > MOVE_THRESHOLD;
       downX = null;
       downY = null;
+      // A double- / triple-click (`event.detail >= 2`) is a DELIBERATE word /
+      // line selection, not a single-click reflow artifact — never collapse it.
+      // Without this guard a double-clicked word of ≤ MAX_SPURIOUS chars was
+      // collapsed straight back to a caret, so short words never stayed selected
+      // (and the selection toolbar never opened for them).
+      if (event.detail >= 2) return false;
       if (moved) return false; // deliberate drag-select — leave it
       // Defer past CM's own selection update AND the reveal reflow.
       requestAnimationFrame(() => {
