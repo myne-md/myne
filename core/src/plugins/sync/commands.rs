@@ -322,7 +322,6 @@ pub enum CycleOutcome {
 /// under the unlocked `root_key` (the verifier is already registered). Returns
 /// the token once an existing device has approved this one, else `None` (still
 /// pending / unreachable). Stores the token device-local on success.
-#[allow(clippy::too_many_arguments)]
 async fn try_claim_token(
     url: String,
     pins: Vec<[u8; 32]>,
@@ -330,7 +329,6 @@ async fn try_claim_token(
     root_key: Zeroizing<[u8; AEAD_KEY_LEN]>,
     account_hash: [u8; 16],
     device_id: [u8; 16],
-    username: String,
 ) -> Option<Vec<u8>> {
     tokio::task::spawn_blocking(move || {
         let transport = super::http_transport::build_transport(&url, pins).ok()?;
@@ -344,7 +342,6 @@ async fn try_claim_token(
         let out = enroll::enroll(
             transport.as_ref(),
             &account_hash,
-            &username,
             secret.as_slice(),
             EnrollPath::Password,
             &client_nonce,
@@ -426,9 +423,6 @@ pub async fn run_active_cycle<R: Runtime>(app: &AppHandle<R>, allow_push: bool) 
     let token = match super::token_store::default_store().read(&dir) {
         Ok(Some(t)) => t,
         _ => {
-            let Some(username) = st.account_display.clone() else {
-                return CycleOutcome::NotReady;
-            };
             match try_claim_token(
                 url.clone(),
                 pins.clone(),
@@ -436,7 +430,6 @@ pub async fn run_active_cycle<R: Runtime>(app: &AppHandle<R>, allow_push: bool) 
                 root_key.clone(),
                 account_hash,
                 device_id,
-                username,
             )
             .await
             {
@@ -997,9 +990,8 @@ pub async fn sync_enroll<R: Runtime>(
         EnrollCredential::Password => EnrollPath::Password,
         EnrollCredential::Recovery => EnrollPath::Recovery,
     };
-    // The SCRAM username is the canonical account number (stable per account).
-    let username = account.display.clone();
-
+    // The SCRAM username is derived inside `enroll` as the account-hash hex —
+    // the display-form account number never crosses the wire (AS9).
     let outcome = tokio::task::spawn_blocking(move || -> Result<bool, SyncDeviceError> {
         let transport = super::http_transport::build_transport(&url, pins)
             .map_err(|_| SyncDeviceError::Transport)?;
@@ -1093,13 +1085,8 @@ pub async fn sync_enroll<R: Runtime>(
         //    is success; the first device's stored salt is what every later
         //    handshake reuses). Keyed on the canonical `account.hash` (the same
         //    value the server namespaces on), so register + enroll agree.
-        enroll::register_verifier(
-            transport.as_ref(),
-            &account.hash,
-            &username,
-            secret.as_slice(),
-        )
-        .map_err(|_| SyncDeviceError::Transport)?;
+        enroll::register_verifier(transport.as_ref(), &account.hash, secret.as_slice())
+            .map_err(|_| SyncDeviceError::Transport)?;
 
         // 5. SCRAM enroll.
         let device_id = enroll::generate_device_id();
@@ -1113,7 +1100,6 @@ pub async fn sync_enroll<R: Runtime>(
         let out = enroll::enroll(
             transport.as_ref(),
             &account.hash,
-            &username,
             secret.as_slice(),
             path,
             &client_nonce,
@@ -1134,7 +1120,6 @@ pub async fn sync_enroll<R: Runtime>(
             dev_hex.push_str(&format!("{b:02x}"));
         }
         st.device_id_hex = Some(dev_hex);
-        st.account_display = Some(username.clone());
         let _ = super::state::write_sync_state(&dir, &st);
 
         if out.approved && !out.token.is_empty() {
@@ -1212,7 +1197,6 @@ pub async fn sync_join_account<R: Runtime>(
     let account =
         parse_account_number(account_number.trim()).map_err(|_| SyncDeviceError::BadRequest)?;
     let account_hash = account.hash;
-    let username = account.display;
     let acct_hex = {
         let mut s = String::with_capacity(32);
         for b in &account_hash {
@@ -1278,13 +1262,8 @@ pub async fn sync_join_account<R: Runtime>(
         let transport = super::http_transport::build_transport(&url, pins)
             .map_err(|_| SyncDeviceError::Transport)?;
         let secret = derive_subkey(&root_key, SubkeyRole::ServerAuth);
-        enroll::register_verifier(
-            transport.as_ref(),
-            &account_hash,
-            &username,
-            secret.as_slice(),
-        )
-        .map_err(|_| SyncDeviceError::Transport)?;
+        enroll::register_verifier(transport.as_ref(), &account_hash, secret.as_slice())
+            .map_err(|_| SyncDeviceError::Transport)?;
         let device_id = enroll::generate_device_id();
         let mut nonce = [0u8; 16];
         getrandom::getrandom(&mut nonce).map_err(|_| SyncDeviceError::Internal)?;
@@ -1295,7 +1274,6 @@ pub async fn sync_join_account<R: Runtime>(
         let out = enroll::enroll(
             transport.as_ref(),
             &account_hash,
-            &username,
             secret.as_slice(),
             EnrollPath::Password,
             &client_nonce,
@@ -1311,7 +1289,6 @@ pub async fn sync_join_account<R: Runtime>(
             dev_hex.push_str(&format!("{b:02x}"));
         }
         st.device_id_hex = Some(dev_hex);
-        st.account_display = Some(username);
         let _ = super::state::write_sync_state(&vault_dir, &st);
         if out.approved && !out.token.is_empty() {
             super::token_store::default_store()

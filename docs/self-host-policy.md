@@ -44,7 +44,13 @@ they are violations:
   responsibility). Per `server-protocol.md` §1.3, deviating requires amending the threat model — i.e. you
   are no longer running Myne's stated security model.
 - **Retain deleted ciphertext past the retention horizon** (it defeats the user's cryptographic-erase
-  intent).
+  intent). **Encrypted, bounded-retention backups are the one compatible exception** (2026-07-13): a
+  backup taken *before* a deletion necessarily carries that ciphertext until the backup itself ages out, so
+  operational durability and cryptographic-erase are reconciled by a **bound**, not by having no backups.
+  If you back the store up, keep it **encrypted, off-box, and short-cycle** so the *effective* worst-case
+  window a deleted blob survives is `horizon + backup-retention`, and **disclose that number** (Myne's
+  hosted tier: a 14-day encrypted off-box cycle, so ≤ horizon + 14 days). An **unbounded**, plaintext, or
+  never-pruned backup re-creates the hoarding this rule forbids.
 - **Attempt to weaken the zero-knowledge protocol** in any way — you can't read content regardless, but you
   must not, e.g., add a plaintext side-channel or a metadata-correlation log.
 
