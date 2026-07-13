@@ -249,9 +249,12 @@ class BlockHtmlWidget extends WidgetType {
       if (detailsOpenState.get(this.key) === true) details.setAttribute("open", "");
       details.addEventListener("toggle", () => {
         detailsOpenState.set(this.key, details.open);
-        // The widget's height just changed (content shown/hidden) — ask CM to
-        // re-measure so the following block reflows instead of overlapping.
-        view.requestMeasure();
+        // NOTE: do NOT call view.requestMeasure() here. Restoring an open
+        // <details> sets `open` on every render, firing a toggle — so a
+        // requestMeasure here runs mid-scroll each time an open block scrolls
+        // into view, churning the height map (jitter + blank frames on long
+        // docs). CM6's ResizeObserver already re-measures on the native height
+        // change, so the following block still reflows without it.
       });
     }
     // Click-to-edit, same model as the code-block widget: the block is a
