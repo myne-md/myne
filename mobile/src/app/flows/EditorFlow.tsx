@@ -15,6 +15,7 @@ import { consumePendingCapture, CAPTURE_EVENT, type CaptureMode } from "../../li
 import { drainPendingCaptures, sealStagedCaptures } from "../../lib/captures";
 import { ioBanner } from "../../lib/io-banner";
 import { usePrefs } from "../../lib/use-prefs";
+import { useSwipeBack } from "../../lib/use-swipe-back";
 import { setFavorites } from "../../lib/prefs";
 import { bumpPrefsNonce } from "../../lib/prefsNonce";
 import { searchNotes } from "../../lib/search-notes";
@@ -244,6 +245,16 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
   const [editorText, setEditorText] = useState("");
   const [editorBusy, setEditorBusy] = useState(false);
   const [editorError, setEditorError] = useState<string | null>(null);
+  // Compact-only left-edge swipe-back: same semantics as the top-bar chevron
+  // (autosave + return to the list), same busy guard. `saveNote` is a hoisted
+  // function declaration, so referencing it here is fine.
+  useSwipeBack(
+    screenRef,
+    () => {
+      if (!editorBusy) void saveNote();
+    },
+    sizeClass === "compact" && view === "editor",
+  );
   // Attachment insert: the editor textarea + hidden file input, and a busy flag
   // while the picked file is encrypted (MYA1) on the host.
   const attachInputRef = useRef<HTMLInputElement>(null);
