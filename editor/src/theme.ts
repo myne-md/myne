@@ -1376,6 +1376,80 @@ export const myneTheme = EditorView.theme({
   // global stylesheet (`attachments/styles.ts`), not this `.cm-editor`-scoped
   // theme. Only the in-card button (`-menubtn`) is styled here.
 
+  // Inline text/structured preview (MYND-268). The widget reuses the file-card
+  // chrome for the HEADER, but a preview must STACK header-over-body — override
+  // the file-card's inline-flex ROW (+ narrow 360px cap) to a full-width column.
+  ".cm-attachment-text-preview": {
+    display: "flex", // override the file-card's inline-flex → block flex column
+    flexDirection: "column",
+    alignItems: "stretch",
+    gap: "0",
+    padding: "0",
+    width: "100%",
+    maxWidth: "560px",
+    overflow: "hidden", // keep the body scroll inside the rounded card
+  },
+  ".cm-attachment-text-preview-header": {
+    display: "flex",
+    alignItems: "center",
+    gap: "10px",
+    padding: "8px 10px",
+    borderBottom: "1px solid var(--line-1, #e3e2dd)",
+  },
+  ".cm-attachment-text-preview-body": {
+    padding: "8px 12px",
+    fontSize: "12px",
+    color: "var(--fg-1)",
+  },
+  ".cm-attachment-text-preview-pre": {
+    fontFamily: "var(--font-mono)",
+    fontSize: "12px",
+    lineHeight: "1.5",
+    whiteSpace: "pre",
+    margin: "0",
+    color: "var(--fg-1)",
+  },
+  // csv/tsv/xlsx grid — bordered, padded cells that don't wrap ("name" must not
+  // become "na⏎me"); the body's horizontal scroll handles a wide grid.
+  ".cm-attachment-text-preview-table": {
+    borderCollapse: "collapse",
+    width: "auto",
+    fontFamily: "var(--font-sans)",
+    fontSize: "12px",
+    color: "var(--fg-1)",
+  },
+  ".cm-attachment-text-preview-table td": {
+    border: "1px solid var(--line-1, #e3e2dd)",
+    padding: "4px 8px",
+    textAlign: "left",
+    verticalAlign: "top",
+    whiteSpace: "nowrap",
+  },
+  ".cm-attachment-text-preview-table tr:first-child td": {
+    fontWeight: "600",
+    backgroundColor: "var(--bg-2, #f4f4f2)",
+  },
+  // docx structured render — tame the browser-default huge headings.
+  ".cm-attachment-text-preview-doc": {
+    fontFamily: "var(--font-sans)",
+    fontSize: "13px",
+    lineHeight: "1.5",
+    color: "var(--fg-1)",
+  },
+  ".cm-attachment-text-preview-doc h1": { fontSize: "1.35em", fontWeight: "700", margin: "0.4em 0 0.2em" },
+  ".cm-attachment-text-preview-doc h2": { fontSize: "1.2em", fontWeight: "700", margin: "0.4em 0 0.2em" },
+  ".cm-attachment-text-preview-doc h3": { fontSize: "1.1em", fontWeight: "600", margin: "0.4em 0 0.2em" },
+  ".cm-attachment-text-preview-doc h4, .cm-attachment-text-preview-doc h5, .cm-attachment-text-preview-doc h6":
+    { fontSize: "1em", fontWeight: "600", margin: "0.3em 0 0.2em" },
+  ".cm-attachment-text-preview-doc p": { margin: "0.3em 0" },
+  ".cm-attachment-text-preview-truncated": {
+    display: "block",
+    marginTop: "6px",
+    fontSize: "11px",
+    fontStyle: "italic",
+    color: "var(--fg-3)",
+  },
+
   // Inline audio player (voice notes, MYND-259) — a sibling of the file-card,
   // same surface tokens. Circular accent play button, a seek track (the
   // waveform overlays this track in a later slice), and a mono time readout.
