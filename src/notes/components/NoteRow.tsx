@@ -108,6 +108,10 @@ const rowBaseStyle: CSSProperties = {
   borderRadius: 6,
   marginLeft: 4,
   marginRight: 4,
+  // Never grow past the sidebar: the flex content shrinks + the title ellipsizes
+  // (rowContentStyle clips) instead of the whole pill bleeding under the editor.
+  minWidth: 0,
+  overflow: "hidden",
   // A small vertical gap so adjacent highlighted rows (hover + selected) don't
   // butt their backgrounds together and blend — each row reads as its own
   // rounded pill. Single-direction (bottom only) → a deterministic 3px gap
@@ -137,6 +141,12 @@ const rowContentStyle: CSSProperties = {
   gap: 2,
   flex: 1,
   minWidth: 0,
+  // Clip the stacked title/subtitle to this column so a long title ELLIPSIZES
+  // (titleStyle is nowrap) instead of pushing the row wider than the sidebar —
+  // which bled the hover/active pill under the editor and shoved the star
+  // affordance off-screen on hover. With the column bounded, the star always
+  // has room (it flex-shrink:0 reserves its slot, the title truncates to fit).
+  overflow: "hidden",
 };
 
 /** Right-aligned star affordance — favorite indicator / toggle (MYND-183). */

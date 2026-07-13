@@ -1218,6 +1218,13 @@ function DisclosureWrapper({
       style={{
         display: "grid",
         gridTemplateRows: open ? "1fr" : "0fr",
+        // Bound the single column to the container (min 0 = shrinkable below the
+        // row's content, max 1fr = fill). Without this the implicit `auto` column
+        // grows to a long note title's max-content, so the row (and its hover /
+        // active pill) overflowed the sidebar under the editor. With it, the row
+        // is constrained and the title ellipsizes.
+        gridTemplateColumns: "minmax(0, 1fr)",
+        minWidth: 0,
         opacity: open ? 1 : 0,
         transition: animating
           ? `grid-template-rows var(--duration-base) ${easing} ${delay}ms, opacity var(--duration-base) ${easing} ${delay}ms`
@@ -1225,7 +1232,7 @@ function DisclosureWrapper({
         willChange: animating ? "grid-template-rows, opacity" : undefined,
       }}
     >
-      <div style={{ minHeight: 0, overflow: animating ? "hidden" : "visible" }}>
+      <div style={{ minHeight: 0, minWidth: 0, overflow: animating ? "hidden" : "visible" }}>
         {children}
       </div>
     </div>
