@@ -653,6 +653,11 @@ function OverflowMenu({
           padding: 4,
           listStyle: "none",
           minWidth: 200,
+          // Cap the width so a long tab title (e.g. a clipped web page's full
+          // headline) can't stretch the menu across the window. The items
+          // already ellipsis-truncate — but only once their box is bounded, so
+          // this maxWidth is what actually makes the truncation take effect.
+          maxWidth: 320,
           maxHeight: 320,
           overflowY: "auto",
           background: "var(--bg-1)",
@@ -668,6 +673,7 @@ function OverflowMenu({
               <button
                 type="button"
                 role="menuitem"
+                title={text}
                 onClick={() => onPick(id)}
                 style={{
                   display: "block",
