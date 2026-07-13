@@ -17,7 +17,7 @@ import { ioBanner } from "../../lib/io-banner";
 import { usePrefs } from "../../lib/use-prefs";
 import { vaultDisplayLabel } from "../../lib/vault-label";
 import { useSwipeBack } from "../../lib/use-swipe-back";
-import { setFavorites } from "../../lib/prefs";
+import { setFavorites, PREFS_SYNC_APPLIED_EVENT } from "../../lib/prefs";
 import { bumpPrefsNonce } from "../../lib/prefsNonce";
 import { searchNotes } from "../../lib/search-notes";
 import { buildTagIndex } from "../../lib/tags";
@@ -583,6 +583,31 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
       if (unlisten) unlisten();
     };
   }, [refresh]);
+
+  // MYND-478: the sync loop merges remote `vault.prefs` changes onto disk and
+  // emits `PREFS_SYNC_APPLIED_EVENT` (never for this device's own IPC writes).
+  // Bridge it into the prefs nonce so an incoming vault rename / shared-pref
+  // change refreshes the header + settings live; the switcher's vault list
+  // re-fetches on its next open (its RAM-cache label was refreshed core-side).
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const handle = await listen(PREFS_SYNC_APPLIED_EVENT, () => {
+          if (!cancelled) bumpPrefsNonce();
+        });
+        if (cancelled) handle();
+        else unlisten = handle;
+      } catch {
+        // Not inside Tauri (browser dev shim) → no sync events.
+      }
+    })();
+    return () => {
+      cancelled = true;
+      if (unlisten) unlisten();
+    };
+  }, []);
 
   // MYND-427: drain the engine's staged keep-both conflicts (materialize each
   // remote revision as a `conflict_of:` copy, then resolve) on mount + every
