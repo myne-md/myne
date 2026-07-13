@@ -1450,16 +1450,14 @@ pub async fn note_search_core(
             // MYND-448a: an attachment doc's id carries its provenance
             // (`att:<attachment>:<note>`); decode it so the WebView opens the
             // embedding note and badges an attachment-content match.
-            let (note_id, attachment_id) =
-                match crate::search::doc_id::parse_search_doc_id(&hit.id) {
-                    crate::search::doc_id::SearchDocId::Attachment {
-                        attachment_id,
-                        note_id,
-                    } => (note_id.to_string(), Some(attachment_id.to_string())),
-                    crate::search::doc_id::SearchDocId::Note { note_id } => {
-                        (note_id.to_string(), None)
-                    }
-                };
+            let (note_id, attachment_id) = match crate::search::doc_id::parse_search_doc_id(&hit.id)
+            {
+                crate::search::doc_id::SearchDocId::Attachment {
+                    attachment_id,
+                    note_id,
+                } => (note_id.to_string(), Some(attachment_id.to_string())),
+                crate::search::doc_id::SearchDocId::Note { note_id } => (note_id.to_string(), None),
+            };
             SearchResult {
                 note_id,
                 title: hit.title,

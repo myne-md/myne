@@ -1166,7 +1166,11 @@ pub(crate) async fn set_editor_toolbar_order_with_dir(
         prefs.editor_toolbar_order = order;
     })
     .await?;
-    tracing::info!(event = "prefs_written", field = "editor_toolbar_order", count);
+    tracing::info!(
+        event = "prefs_written",
+        field = "editor_toolbar_order",
+        count
+    );
     Ok(())
 }
 
@@ -1192,7 +1196,11 @@ pub(crate) async fn set_editor_toolbar_hidden_with_dir(
         prefs.editor_toolbar_hidden = items;
     })
     .await?;
-    tracing::info!(event = "prefs_written", field = "editor_toolbar_hidden", count);
+    tracing::info!(
+        event = "prefs_written",
+        field = "editor_toolbar_hidden",
+        count
+    );
     Ok(())
 }
 
@@ -1244,7 +1252,11 @@ pub(crate) async fn set_editor_slash_hidden_with_dir(
         prefs.editor_slash_hidden = items;
     })
     .await?;
-    tracing::info!(event = "prefs_written", field = "editor_slash_hidden", count);
+    tracing::info!(
+        event = "prefs_written",
+        field = "editor_slash_hidden",
+        count
+    );
     Ok(())
 }
 

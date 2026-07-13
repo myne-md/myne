@@ -5628,7 +5628,10 @@ mod tests {
         let slash = s.find("editor_slash_order").unwrap();
         let text = s.find("editor_text_size").unwrap();
         let toolbar = s.find("editor_toolbar_order").unwrap();
-        assert!(slash < text && text < toolbar, "canonical order violated: {s}");
+        assert!(
+            slash < text && text < toolbar,
+            "canonical order violated: {s}"
+        );
     }
 
     // ---- auto_lock_seconds canonical field (MYND-121) -----------------

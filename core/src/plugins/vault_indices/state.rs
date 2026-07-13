@@ -1078,7 +1078,11 @@ mod tests {
             })
             .collect();
         state.apply("note-a", a);
-        assert_eq!(state.all_block_anchors(3).len(), 3, "defensive cap truncates");
+        assert_eq!(
+            state.all_block_anchors(3).len(),
+            3,
+            "defensive cap truncates"
+        );
         assert_eq!(state.all_block_anchors(1000).len(), 5);
         state.clear();
         assert!(state.all_block_anchors(1000).is_empty());

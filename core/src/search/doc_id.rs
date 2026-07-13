@@ -74,7 +74,9 @@ mod tests {
         // No second `:` → not a valid attachment id → treated as a note id.
         assert_eq!(
             parse_search_doc_id("att:onlyone"),
-            SearchDocId::Note { note_id: "att:onlyone" }
+            SearchDocId::Note {
+                note_id: "att:onlyone"
+            }
         );
         // Empty halves → note.
         assert_eq!(

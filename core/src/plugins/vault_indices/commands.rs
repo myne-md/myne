@@ -17,8 +17,8 @@
 use super::error::VaultIndicesError;
 use super::persist::{decode_snapshot, encode_snapshot, reconcile_delta};
 use super::state::{
-    BlockAnchor, CandidateEdge, NoteRecord, PropertyEntry, TagEntry, TagTreeNode,
-    VaultBlockAnchor, VaultIndicesState, WikilinkEdge,
+    BlockAnchor, CandidateEdge, NoteRecord, PropertyEntry, TagEntry, TagTreeNode, VaultBlockAnchor,
+    VaultIndicesState, WikilinkEdge,
 };
 use crate::note_nonce::scan_on_disk_manifest;
 use crate::plugins::vault_unlock::state::{SlotKind, VaultRuntimeState};
