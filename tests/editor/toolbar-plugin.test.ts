@@ -66,7 +66,7 @@ function toolbar(): HTMLElement | null {
   return document.body.querySelector(".cm-toolbar");
 }
 
-/** A toolbar button bearing the given visible label (B / I / S / <> / H▾ / ↗). */
+/** A toolbar button bearing the given visible label (B / I / S / <> / ↗). */
 function buttonByText(label: string): HTMLButtonElement | null {
   const tb = toolbar();
   if (tb === null) return null;
@@ -75,6 +75,12 @@ function buttonByText(label: string): HTMLButtonElement | null {
       (b) => b.textContent === label,
     ) ?? null
   );
+}
+
+/** The leading block-type control (shows the current type + opens the dropdown).
+ *  Selected by class since its label is dynamic (Paragraph / H1..H6). */
+function blockTypeButton(): HTMLButtonElement | null {
+  return toolbar()?.querySelector<HTMLButtonElement>("button.cm-toolbar-blocktype") ?? null;
 }
 
 /** Fire the (preventDefault'd) mousedown the toolbar buttons listen for. */
@@ -106,7 +112,7 @@ describe("toolbar mount gating", () => {
     expect(buttonByText("I")).not.toBeNull();
     expect(buttonByText("S")).not.toBeNull();
     expect(buttonByText("<>")).not.toBeNull();
-    expect(buttonByText("H▾")).not.toBeNull();
+    expect(blockTypeButton()).not.toBeNull();
     expect(buttonByText("↗")).not.toBeNull();
   });
 
@@ -198,7 +204,7 @@ describe("heading dropdown", () => {
   it("opens on H▾ click and applies a level to the cursor line", async () => {
     m = mount("hello world", 0, 5);
     await raf();
-    press(buttonByText("H▾")!);
+    press(blockTypeButton()!);
     await raf();
     const drop = toolbar()!.querySelector(".cm-toolbar-heading-dropdown");
     expect(drop).not.toBeNull();
@@ -212,7 +218,7 @@ describe("heading dropdown", () => {
   it("Paragraph (level 0) strips an existing heading prefix", async () => {
     m = mount("### title here", 4, 9); // selection inside the heading line
     await raf();
-    press(buttonByText("H▾")!);
+    press(blockTypeButton()!);
     await raf();
     const drop = toolbar()!.querySelector(".cm-toolbar-heading-dropdown")!;
     const para = Array.from(
@@ -225,7 +231,7 @@ describe("heading dropdown", () => {
   it("re-applying H▾ replaces the prior heading level rather than stacking #", async () => {
     m = mount("# title", 2, 5);
     await raf();
-    press(buttonByText("H▾")!);
+    press(blockTypeButton()!);
     await raf();
     const drop = toolbar()!.querySelector(".cm-toolbar-heading-dropdown")!;
     const h3 = Array.from(

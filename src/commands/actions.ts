@@ -751,22 +751,28 @@ const exportSelectionImageAction: CommandAction = {
   // CommandContext callback / Editor plumbing is needed.
   visibility: (ctx) =>
     ctx.stageName === "editor" && ctx.selectedNoteId !== null ? "show" : "hidden",
-  run: () => {
-    void exportSelectionAsImage().then((outcome) => {
-      // `cancelled` (user dismissed the save dialog) is silent; every other
-      // outcome gets a coarse toast.
-      const key =
-        outcome === "ok"
-          ? "commands.actions.exportSelectionImage.saved"
-          : outcome === "no-selection"
-            ? "commands.actions.exportSelectionImage.noSelection"
-            : outcome === "error"
-              ? "commands.actions.exportSelectionImage.failed"
-              : null;
-      if (key !== null) showAttachmentToast(i18n.t(key));
-    });
-  },
+  run: () => exportSelectionImageWithToast(),
 };
+
+/**
+ * Run the selection→image export and toast the coarse outcome. Shared by the
+ * palette action above and the floating-toolbar button (wired via
+ * `setSelectionExportHandler`) so both paths behave identically. `cancelled`
+ * (user dismissed the save dialog) is silent; every other outcome toasts.
+ */
+export function exportSelectionImageWithToast(): void {
+  void exportSelectionAsImage().then((outcome) => {
+    const key =
+      outcome === "ok"
+        ? "commands.actions.exportSelectionImage.saved"
+        : outcome === "no-selection"
+          ? "commands.actions.exportSelectionImage.noSelection"
+          : outcome === "error"
+            ? "commands.actions.exportSelectionImage.failed"
+            : null;
+    if (key !== null) showAttachmentToast(i18n.t(key));
+  });
+}
 
 // Shared AI command surface (local-ai epic, ai-ux-surface MYND-408, SYNC-9).
 // The stub sibling that proves the `ai.*` surface + the shared gate: editor

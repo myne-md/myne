@@ -7,7 +7,7 @@ export { myneExtensions } from "./extensions";
 // toolbar, the keymap, AND a host-supplied accessory bar (mobile keyboard bar).
 export { editorCommands } from "./toolbar/commands";
 export type { ToolbarCommand, EditorCommandId } from "./toolbar/commands";
-export { setToolbarLayout } from "./toolbar/plugin";
+export { setToolbarLayout, setSelectionExportHandler } from "./toolbar/plugin";
 // MYND palette-gap: the heading-level cycle command (Mod-Shift-h), exposed so a
 // command-palette action can run it on the active view.
 export { cycleHeading } from "./keymap";

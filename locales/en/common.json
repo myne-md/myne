@@ -821,6 +821,7 @@
     },
     "toolbar": {
       "apply": "Apply",
+      "exportImageTitle": "Export selection as image",
       "customize": {
         "bold": "Bold",
         "bulletList": "Bullet list",

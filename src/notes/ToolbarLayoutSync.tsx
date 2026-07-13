@@ -5,8 +5,9 @@
 // toolbar re-reads the module store on its next render (transient toolbar).
 
 import { useEffect } from "react";
-import { setToolbarLayout } from "@myne/editor";
+import { setToolbarLayout, setSelectionExportHandler } from "@myne/editor";
 import { usePrefs } from "../hooks/usePrefs";
+import { exportSelectionImageWithToast } from "../commands/actions";
 import {
   EDITOR_TOOLBAR_DEFAULT_HIDDEN,
   EDITOR_TOOLBAR_DEFAULT_ORDER,
@@ -15,6 +16,12 @@ import {
 
 export function ToolbarLayoutSync(): null {
   const { prefs } = usePrefs();
+  // Wire the floating toolbar's export-selection button to the desktop export
+  // (MYND-361) once — crosses the editor→app seam like setToolbarLayout.
+  useEffect(() => {
+    setSelectionExportHandler(exportSelectionImageWithToast);
+    return () => setSelectionExportHandler(null);
+  }, []);
   useEffect(() => {
     // An un-customized vault (empty prefs) falls back to the canonical defaults,
     // matching the Settings list — so the fed layout equals today's toolbar.
