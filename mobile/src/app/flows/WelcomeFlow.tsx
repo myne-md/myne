@@ -4,9 +4,9 @@ import { HAS_TAURI } from "../../lib/app-window";
 import { vaultResidueScan, vaultRepair } from "../../lib/vault-repair";
 import type { WelcomeFlowProps } from "./types";
 
-/** 01 · Welcome — wired. Routes into create / recover. Surfaces a repair banner
+/** 01 · Welcome — wired. Routes into create / join. Surfaces a repair banner
  *  when a partial-fail vault_delete left orphan residue behind (MYND-159). */
-export function WelcomeFlow({ onCreate, onRecover, onJoin }: WelcomeFlowProps) {
+export function WelcomeFlow({ onCreate, onJoin }: WelcomeFlowProps) {
   const [residue, setResidue] = useState(0);
   const [repairing, setRepairing] = useState(false);
   const [repairMsg, setRepairMsg] = useState<string | null>(null);
@@ -88,9 +88,6 @@ export function WelcomeFlow({ onCreate, onRecover, onJoin }: WelcomeFlowProps) {
         <Button onClick={onCreate}>Create a vault</Button>
         <Button variant="ghost" onClick={onJoin}>
           Connect to my account
-        </Button>
-        <Button variant="ghost" onClick={onRecover}>
-          I already have a recovery phrase
         </Button>
       </div>
     </Screen>

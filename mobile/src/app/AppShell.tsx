@@ -109,11 +109,6 @@ export function AppShell() {
         <PhoneColumn>
           <WelcomeFlow
             onCreate={() => dispatch({ type: "create-vault.start" })}
-            // Out-of-band entry (no legal welcome→recover transition; same
-            // pattern as reprobe). Recovery needs a vault.meta on disk — on a
-            // fresh device with none, the backend returns the non-distinguishing
-            // "invalid phrase" state, which RecoverFlow surfaces.
-            onRecover={() => setStage({ name: "recover", subStep: "phrase-entry" })}
             onJoin={() => setShowJoin(true)}
           />
         </PhoneColumn>

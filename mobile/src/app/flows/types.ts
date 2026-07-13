@@ -12,7 +12,6 @@ import type { StageVaultStatus, SuspicionReason, RecoverSubStep, VaultId } from 
 
 export interface WelcomeFlowProps {
   onCreate: () => void;
-  onRecover: () => void;
   /** Enter the fresh-device sync-join flow ("Connect to my account"). */
   onJoin: () => void;
 }
