@@ -24,6 +24,7 @@ import {
   svgToDataUri,
   type ShareCardOptions,
 } from "./noteImageCard";
+import { getActiveEditorView } from "../editor/active-view";
 
 /** Card breathing room (px) around the rendered selection. */
 export const SELECTION_CARD_PADDING = 32;
@@ -48,6 +49,47 @@ export interface SerializedSelection {
  * NOT done — the card leans on the wrapper font + theme background, keeping the
  * step dependency-free (full style inlining is the QA-flagged refinement).
  */
+/**
+ * Serialize the ACTIVE EDITOR's selection — read from the CM view STATE, not the
+ * live DOM selection. This is the reliable path when the editor is blurred (e.g.
+ * the command palette has focus, so `window.getSelection()` reflects the palette
+ * input and reads empty — the "select text first" bug). The DOM range is rebuilt
+ * from `view.domAtPos`, so the rendered markup + measured size still come from
+ * the on-screen selection. `null` when no editor is active or the selection is
+ * empty / zero-area.
+ */
+export function serializeEditorSelection(): SerializedSelection | null {
+  const view = getActiveEditorView();
+  if (view === null) return null;
+  const { from, to } = view.state.selection.main;
+  if (from === to) return null;
+  let range: Range;
+  try {
+    const start = view.domAtPos(from);
+    const end = view.domAtPos(to);
+    range = document.createRange();
+    range.setStart(start.node, start.offset);
+    range.setEnd(end.node, end.offset);
+  } catch {
+    return null; // positions not in the rendered DOM (out of viewport)
+  }
+  const rect = range.getBoundingClientRect();
+  if (rect.width === 0 || rect.height === 0) return null;
+  const wrapper = document.createElement("div");
+  wrapper.appendChild(range.cloneContents());
+  let xhtml: string;
+  try {
+    xhtml = new XMLSerializer().serializeToString(wrapper);
+  } catch {
+    return null;
+  }
+  return {
+    xhtml,
+    width: Math.max(1, Math.ceil(rect.width)),
+    height: Math.max(1, Math.ceil(rect.height)),
+  };
+}
+
 export function serializeSelection(): SerializedSelection | null {
   const sel = window.getSelection();
   if (sel === null || sel.rangeCount === 0 || sel.isCollapsed) return null;
@@ -117,7 +159,10 @@ function cssVar(name: string, fallback: string): string {
  * from the design-token CSS variables at call time.
  */
 export async function exportSelectionAsImage(): Promise<ImageExportOutcome> {
-  const selection = serializeSelection();
+  // Prefer the CM view-state selection (survives the editor being blurred by the
+  // command palette); fall back to the live DOM selection (e.g. invoked from the
+  // floating toolbar while the editor is focused, or no editor registered).
+  const selection = serializeEditorSelection() ?? serializeSelection();
   if (selection === null) return "no-selection";
 
   let bytes: Uint8Array;
