@@ -15,6 +15,7 @@
 
 import {
   Compartment,
+  Prec,
   type Extension,
   type StateEffect,
 } from "@codemirror/state";
@@ -23,9 +24,16 @@ import { lineNumbers } from "@codemirror/view";
 const lineNumbersCompartment = new Compartment();
 
 /** Compose into `myneExtensions()` — seeds the gutter OFF (the prose-first
- *  default); the host reconfigures it ON post-mount when the pref is set. */
+ *  default); the host reconfigures it ON post-mount when the pref is set.
+ *
+ *  `Prec.high` puts the line-number gutter LEFT of the fold gutter (CM6 lays
+ *  gutters out in `activeGutters` precedence order; `myneFolding()` composes
+ *  earlier, so without this the fold chevron would sit left of the number). The
+ *  Obsidian layout — number, then the fold arrow next to the text it folds — is
+ *  the intended reading order. The high precedence rides across the compartment
+ *  reconfigure, so it holds when the gutter is toggled on. */
 export function lineNumbersExtension(): Extension {
-  return lineNumbersCompartment.of([]);
+  return Prec.high(lineNumbersCompartment.of([]));
 }
 
 /** The effect the host dispatches when the line-number pref changes. `on` →
