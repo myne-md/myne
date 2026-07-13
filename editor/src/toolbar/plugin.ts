@@ -121,6 +121,10 @@ class ToolbarView implements PluginValue {
   private urlOverlayOpen = false;
   private savedSelection: { from: number; to: number } | null = null;
   private rafHandle: number | null = null;
+  // How many frames the current show attempt has re-tried because the selection's
+  // screen coords weren't ready yet (transient `coordsAtPos` null right after a
+  // re-focus / measure). Bounded so a genuinely off-screen selection can't spin.
+  private coordsRetries = 0;
 
   constructor(private readonly view: EditorView) {
     ensureFloatingStyles();
@@ -140,7 +144,11 @@ class ToolbarView implements PluginValue {
       update.selectionSet ||
       update.docChanged ||
       update.viewportChanged ||
-      update.focusChanged
+      update.focusChanged ||
+      // Re-attempt positioning once the geometry settles — a double-click right
+      // after a re-focus can fire selectionSet before the layout is measured, so
+      // the first `coordsAtPos` is null; the following geometry update recovers it.
+      update.geometryChanged
     ) {
       this.refresh();
     }
@@ -197,6 +205,18 @@ class ToolbarView implements PluginValue {
     });
   }
 
+  /** Re-attempt `render()` on a later frame when the selection's screen coords
+   *  weren't ready (transient `coordsAtPos` null). Bounded so a genuinely
+   *  off-screen selection can't spin every frame. */
+  private retryRender(): void {
+    if (this.coordsRetries >= 4) {
+      this.coordsRetries = 0;
+      return;
+    }
+    this.coordsRetries += 1;
+    this.scheduleRender();
+  }
+
   private dismiss(): void {
     if (this.rafHandle !== null) {
       cancelAnimationFrame(this.rafHandle);
@@ -209,6 +229,7 @@ class ToolbarView implements PluginValue {
     this.openDropdown = null;
     this.urlOverlayOpen = false;
     this.savedSelection = null;
+    this.coordsRetries = 0;
   }
 
   private ensureContainer(): HTMLDivElement {
@@ -233,16 +254,26 @@ class ToolbarView implements PluginValue {
       // multi-line selection surfaces the toolbar near where the pointer last
       // was, not pinned to the very top of the whole selection (QA). A
       // zero-width point at the head; `computePosition` places the toolbar just
-      // above that line.
-      const head = this.view.coordsAtPos(range.head);
-      if (head === null) return;
+      // above that line. Fall back to the anchor/opposite end if the head's
+      // coords aren't ready.
+      const head =
+        this.view.coordsAtPos(range.head) ??
+        this.view.coordsAtPos(range.anchor) ??
+        this.view.coordsAtPos(range.from);
+      if (head === null) {
+        this.retryRender();
+        return;
+      }
       rect = { left: head.left, top: head.top, right: head.left, bottom: head.bottom };
     } else {
       const anchorFrom = this.savedSelection?.from ?? range.from;
       const anchorTo = this.savedSelection?.to ?? range.to;
       const startCoords = this.view.coordsAtPos(anchorFrom);
       const endCoords = this.view.coordsAtPos(anchorTo);
-      if (startCoords === null || endCoords === null) return;
+      if (startCoords === null || endCoords === null) {
+        this.retryRender();
+        return;
+      }
       rect = {
         left: Math.min(startCoords.left, endCoords.left),
         top: Math.min(startCoords.top, endCoords.top),
@@ -250,6 +281,7 @@ class ToolbarView implements PluginValue {
         bottom: Math.max(startCoords.bottom, endCoords.bottom),
       };
     }
+    this.coordsRetries = 0; // coords resolved — clear the retry budget
 
     const container = this.ensureContainer();
     container.className = this.mode === "toolbar" ? "cm-toolbar" : "cm-url-overlay";
