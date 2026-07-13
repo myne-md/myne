@@ -20,6 +20,7 @@ import { ColorDot } from "./ColorDot";
 import { FolderGlyph } from "./FolderGlyph";
 import { Icon } from "../../components/primitives/Icon";
 import { dragEdge, dragZone, insertionLineStyle } from "./reorderDnd";
+import { TreeRails } from "./TreeRails";
 
 const INDENT_PER_LEVEL = 18;
 const BASE_PADDING_LEFT = 12;
@@ -388,6 +389,7 @@ export function FolderRow({
       data-folder-path={node.path}
       title={node.path}
     >
+      <TreeRails depth={depth} />
       {reorderPlace && (
         <div style={insertionLineStyle(reorderPlace)} aria-hidden="true" />
       )}
