@@ -330,21 +330,23 @@ export const myneTheme = EditorView.theme({
     color: "var(--fg-3, #6b6a64)",
   },
   ".cm-lineNumbers .cm-gutterElement": {
-    // Vertically center the number on the line's text row so it aligns with the
-    // prose AND the fold chevron (which already centers). CM's default top-aligns
-    // the number, which floats it above the text on tall heading lines — the
-    // misalignment in the gutter (MYND-299 QA). Right-aligned toward the content.
+    // TOP-align the number to the line's FIRST visual row (Obsidian parity, QA):
+    // a wrapped/tall line keeps its number on the first row instead of floating
+    // it to the vertical centre of the whole wrapped block. `paddingTop` seats it
+    // on the text baseline of that first row (the value tracks the number's own
+    // font so it scales with the editor text-size pref). Right-aligned toward the
+    // content. This changes only vertical placement WITHIN the gutter element —
+    // never the line height — so it can't destabilise the scroll height map.
     display: "flex",
-    alignItems: "center",
+    alignItems: "flex-start",
     justifyContent: "flex-end",
     color: "var(--fg-3, #6b6a64)",
     opacity: "0.5",
     fontFamily: "var(--font-mono)",
     fontSize: "0.8em",
-    // Right gap between the number and the adjacent fold arrow (the fold gutter
-    // now sits between the number and the text, Obsidian order — see
-    // line-numbers.ts). ~10px reads comfortably; 6px was too tight (QA).
-    padding: "0 10px 0 8px",
+    // Right gap pairs the number with the adjacent fold arrow (the fold gutter
+    // sits between the number and the text, Obsidian order — see line-numbers.ts).
+    padding: "0.32em 10px 0 8px",
     minWidth: "1.6em",
   },
 
@@ -354,10 +356,12 @@ export const myneTheme = EditorView.theme({
   // EXCEPT a line that is currently folded keeps its › visible so the user can
   // always find + click to unfold. Tokens only (no hex).
   ".cm-foldGutter .cm-gutterElement": {
-    padding: "0 2px",
+    // Top-align the fold arrow to the first row too, so it lines up with the
+    // now-top-aligned line number instead of centring on a tall/wrapped line.
+    padding: "0.28em 2px 0",
     minWidth: "1.1em",
     display: "flex",
-    alignItems: "center",
+    alignItems: "flex-start",
     justifyContent: "center",
   },
   ".cm-fold-marker": {
