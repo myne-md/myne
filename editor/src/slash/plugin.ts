@@ -23,6 +23,7 @@ import {
 import { computePosition } from "../positioning";
 import { ensureFloatingStyles } from "../floating-styles";
 import { filterCommands, type SlashCommand } from "./commands";
+import { makeSlashIcon } from "./icons";
 import { aiSlashEnabledFacet, slashCommandsForContext } from "./aiSlash";
 
 const SUPPRESS_NODE_NAMES = new Set<string>([
@@ -207,7 +208,11 @@ class SlashMenuView implements PluginValue {
       });
       const icon = document.createElement("span");
       icon.className = "cm-slash-menu-icon";
-      icon.textContent = cmd.icon;
+      if (cmd.svgIcon !== undefined) {
+        icon.appendChild(makeSlashIcon(cmd.svgIcon));
+      } else {
+        icon.textContent = cmd.icon;
+      }
       const label = document.createElement("span");
       label.className = "cm-slash-menu-label";
       label.textContent = cmd.label;
