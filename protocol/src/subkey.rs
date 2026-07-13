@@ -44,6 +44,7 @@
 //! | [`SubkeyRole::ServerAuth`]             | `server-auth`             |
 //! | [`SubkeyRole::AttachmentTextKey`]      | `attachment-text-key`     |
 //! | [`SubkeyRole::CatalogSyncId`]          | `catalog-sync-id`         |
+//! | [`SubkeyRole::PrefsSyncId`]            | `prefs-sync-id`           |
 //!
 //! Future v0.1.x revisions may register additional roles by appending
 //! variants to [`SubkeyRole`]. The `#[non_exhaustive]` attribute
@@ -148,6 +149,18 @@ const ROLE_STR_ATTACHMENT_TEXT_KEY: &[u8] = b"attachment-text-key";
 /// record on every existing account.
 const ROLE_STR_CATALOG_SYNC_ID: &[u8] = b"catalog-sync-id";
 
+/// Registered role string for the Phase 2 sync blob-id of `vault.prefs`
+/// (MYND-478; `protocol.md` §3.4, `sync-protocol.md` §10.2.1). Like the
+/// attachments catalog, `vault.prefs` is a synced singleton outside the
+/// head manifest, so it needs a deterministic, device-independent
+/// 16-byte identifier in the sync metadata plane:
+/// `prefs_sync_id = derive_subkey(root_key, PrefsSyncId)[0..16]`.
+/// Like `catalog-sync-id` this derives an *identifier*, NOT key
+/// material — the prefs KEK stays `prefs-key`. Load-bearing: drift
+/// silently splits vault.prefs into a second sync record on every
+/// existing account.
+const ROLE_STR_PREFS_SYNC_ID: &[u8] = b"prefs-sync-id";
+
 /// Registered role string for the v0.1 AI-embeddings blob KEK
 /// (MYND-453; encrypts the `vault.embeddings` on-device AI embedding index —
 /// `embeddings_blob.rs`, `MYR1`, `protocol.md` § 9.17 + § 3.4). Load-bearing:
@@ -244,6 +257,14 @@ pub enum SubkeyRole {
     /// (like `AttachmentsIdHmac`); the catalog KEK stays
     /// `AttachmentsCatalogKey`. Domain-separated from every other role.
     CatalogSyncId,
+    /// Phase 2 sync blob-id derivation for `vault.prefs` (MYND-478;
+    /// `protocol.md` §3.4, `sync-protocol.md` §10.2.1). The first 16 bytes
+    /// of the derived output are the prefs blob's reserved sync-plane
+    /// blob-id — deterministic across the fleet, indistinguishable from a
+    /// note UUID to the server. Derives an **identifier**, NOT key material
+    /// (like `CatalogSyncId` / `AttachmentsIdHmac`); the prefs KEK stays
+    /// `PrefsKey`. Domain-separated from every other role.
+    PrefsSyncId,
 }
 
 impl SubkeyRole {
@@ -265,6 +286,7 @@ impl SubkeyRole {
             SubkeyRole::AttachmentTextKey => ROLE_STR_ATTACHMENT_TEXT_KEY,
             SubkeyRole::AiEmbeddingsKey => ROLE_STR_AI_EMBEDDINGS_KEY,
             SubkeyRole::CatalogSyncId => ROLE_STR_CATALOG_SYNC_ID,
+            SubkeyRole::PrefsSyncId => ROLE_STR_PREFS_SYNC_ID,
         }
     }
 }
@@ -507,6 +529,30 @@ mod tests {
     }
 
     #[test]
+    fn prefs_sync_id_role_string_matches_spec_registry() {
+        // MYND-478 registry entry "myne.v0.1 prefs-sync-id" (§3.4;
+        // sync-protocol.md §10.2.1). Derives vault.prefs' reserved 16-byte
+        // sync blob-id; drift silently splits vault.prefs into a second
+        // sync record on every existing account.
+        assert_eq!(SubkeyRole::PrefsSyncId.role_str(), b"prefs-sync-id");
+    }
+
+    #[test]
+    fn prefs_sync_id_is_distinct_from_other_roles() {
+        // The prefs sync blob-id derivation must be domain-separated from
+        // the prefs KEK (the id is public-ish sync metadata; the KEK is key
+        // material — the §9.10.1-class id/KEK pair), from the sibling
+        // identifier derivation (catalog-sync-id), and from the other
+        // non-KEK roles.
+        let root = [0u8; 32];
+        let ps = derive_subkey(&root, SubkeyRole::PrefsSyncId);
+        assert_ne!(*ps, *derive_subkey(&root, SubkeyRole::PrefsKey));
+        assert_ne!(*ps, *derive_subkey(&root, SubkeyRole::CatalogSyncId));
+        assert_ne!(*ps, *derive_subkey(&root, SubkeyRole::AttachmentsIdHmac));
+        assert_ne!(*ps, *derive_subkey(&root, SubkeyRole::ItemsKeyWrap));
+    }
+
+    #[test]
     fn attachment_roles_are_distinct_subkeys() {
         // The catalog KEK and the id-HMAC key MUST be different subkeys
         // (spec § 9.10.1 note: "distinct subkeys").
@@ -687,6 +733,7 @@ mod tests {
                 SubkeyRole::AttachmentTextKey => "attachment-text-key",
                 SubkeyRole::AiEmbeddingsKey => "ai-embeddings-key",
                 SubkeyRole::CatalogSyncId => "catalog-sync-id",
+                SubkeyRole::PrefsSyncId => "prefs-sync-id",
             }
         }
 
@@ -697,7 +744,7 @@ mod tests {
         let gamma = pseudorandom_root(b"myne-test-vectors-seed-v0.1.gamma");
 
         type Case<'a> = (&'a str, &'a str, &'a [u8; 32], SubkeyRole, bool);
-        let cases: [Case<'_>; 28] = [
+        let cases: [Case<'_>; 30] = [
             (
                 "zero-root-items-key-wrap",
                 "All-zero root_key with the ItemsKeyWrap role. Promotes the in-crate golden at protocol/src/subkey.rs:222 — same input, same expected bytes; drift in either the unit test or this integration assertion indicates HKDF prefix or role-string corruption.",
@@ -894,6 +941,20 @@ mod tests {
                 SubkeyRole::CatalogSyncId,
                 true,
             ),
+            (
+                "zero-root-prefs-sync-id",
+                "All-zero root_key with the PrefsSyncId role (MYND-478, §3.4; sync-protocol.md §10.2.1). Derives the reserved sync-plane blob-id of vault.prefs — the FIRST 16 BYTES of this 32-byte output are the id; role string 'prefs-sync-id' (13 ASCII bytes). An identifier derivation like catalog-sync-id, NOT a KEK — the prefs KEK stays prefs-key. Pairs with the other zero-root vectors under the same trivial root.",
+                &zero_root,
+                SubkeyRole::PrefsSyncId,
+                false,
+            ),
+            (
+                "prn-alpha-prefs-sync-id",
+                "Pseudorandom alpha root with the PrefsSyncId role. The informational_info_utf8_hex field carries the canonical 23-byte HKDF info bytes ('myne.v0.1 prefs-sync-id') so independent implementers can verify the twelfth registered role's info assembly without re-parsing the spec. Domain-separation pair with the alpha prefs-key vector (same input_root_key_hex, byte-different outputs): the prefs blob-id derivation and the prefs KEK must never coincide — and with the alpha catalog-sync-id vector, the two singleton sync-id lineages must never coincide either.",
+                &alpha,
+                SubkeyRole::PrefsSyncId,
+                true,
+            ),
         ];
 
         let mut dump = alloc::string::String::new();
@@ -901,7 +962,7 @@ mod tests {
         dump.push_str("  \"schema\": \"hkdf-sha256\",\n");
         dump.push_str("  \"protocol_version\": \"v0.1\",\n");
         dump.push_str("  \"spec_section\": \"protocol.md §3.2 + §3.4\",\n");
-        dump.push_str("  \"description\": \"Pins protocol::derive_subkey byte mapping for cross-implementation conformance. Each case fixes a (root_key, role) input pair under HKDF-SHA-256 with salt=zero_32 and info='myne.v0.1 '||role, and the 32-byte subkey the helper must produce. Role registry mirrors the type-safe Rust SubkeyRole enum (spec §3.4); v0.1 registers itemsKey-wrap + prefs-key + search-index-key + attachments-catalog-key + attachments-id-hmac + session-state-key + personal-dictionary-key + vault-indices-key + attachment-text-key + ai-embeddings-key + catalog-sync-id. Vectors generated by `cargo test -p protocol --lib emit_subkey_vectors_for_paste -- --ignored` (in protocol/src/subkey.rs).\",\n");
+        dump.push_str("  \"description\": \"Pins protocol::derive_subkey byte mapping for cross-implementation conformance. Each case fixes a (root_key, role) input pair under HKDF-SHA-256 with salt=zero_32 and info='myne.v0.1 '||role, and the 32-byte subkey the helper must produce. Role registry mirrors the type-safe Rust SubkeyRole enum (spec §3.4); v0.1 registers itemsKey-wrap + prefs-key + search-index-key + attachments-catalog-key + attachments-id-hmac + session-state-key + personal-dictionary-key + vault-indices-key + attachment-text-key + ai-embeddings-key + catalog-sync-id + prefs-sync-id. Vectors generated by `cargo test -p protocol --lib emit_subkey_vectors_for_paste -- --ignored` (in protocol/src/subkey.rs).\",\n");
         dump.push_str("  \"cases\": [\n");
 
         for (i, (slug, desc, root, role, include_info)) in cases.iter().enumerate() {
