@@ -233,6 +233,7 @@
       "cycleHeading": { "label": "Cycle heading level" },
       "restoreBackup": { "label": "Restore vault from backup…" },
       "toggleRealtimeSync": { "label": "Toggle real-time sync" },
+      "revealVaultFolder": { "label": "Reveal vault folder in file manager" },
       "aiSummarizeNote": {
         "label": "Summarize note"
       },
