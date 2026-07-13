@@ -70,6 +70,11 @@ pub struct SyncSummary {
     /// Local attachment bodies erased this cycle because the merged catalog
     /// carries their tombstone (remote-deletion propagation).
     pub attachments_deleted: usize,
+    /// A remote `vault.prefs` change was merged into the on-disk view this
+    /// cycle (MYND-478). The caller refreshes the RAM label/icon caches and
+    /// emits the prefs-changed event off this (the orchestrator stays
+    /// AppHandle-free).
+    pub prefs_applied_remote: bool,
 }
 
 /// Sync-cycle failures.
@@ -290,15 +295,37 @@ pub fn catalog_sync_id(root_key: &[u8; 32]) -> [u8; 16] {
     id
 }
 
-/// Read the MYC1 outer `catalog_nonce` (offset 6..30) decryption-free — the
-/// catalog's sync discriminator. `None` if the bytes are not an MYC1 header.
-fn read_catalog_nonce(bytes: &[u8]) -> Option<[u8; 24]> {
-    if bytes.len() < 30 || &bytes[0..4] != b"MYC1" {
+/// Read a vault singleton blob's outer 24-byte nonce (offset 6..30)
+/// decryption-free — the sync-plane change discriminator shared by the MYC1
+/// catalog and MYP1 prefs envelopes. `None` unless `bytes` opens with the
+/// expected 4-byte magic.
+fn read_singleton_nonce(bytes: &[u8], magic: &[u8; 4]) -> Option<[u8; 24]> {
+    if bytes.len() < 30 || &bytes[0..4] != magic {
         return None;
     }
     let mut nonce = [0u8; 24];
     nonce.copy_from_slice(&bytes[6..30]);
     Some(nonce)
+}
+
+/// The catalog's sync discriminator (`read_singleton_nonce` over MYC1).
+fn read_catalog_nonce(bytes: &[u8]) -> Option<[u8; 24]> {
+    read_singleton_nonce(bytes, b"MYC1")
+}
+
+/// `vault.prefs`' reserved 16-byte sync-plane blob-id:
+/// `DeriveSubkey(root_key, "prefs-sync-id")[0..16]` (`protocol.md` §3.4,
+/// MYND-478) — the `catalog_sync_id` twin.
+pub fn prefs_sync_id(root_key: &[u8; 32]) -> [u8; 16] {
+    let sub = derive_subkey(root_key, SubkeyRole::PrefsSyncId);
+    let mut id = [0u8; 16];
+    id.copy_from_slice(&sub[..16]);
+    id
+}
+
+/// The prefs blob's sync discriminator (`read_singleton_nonce` over MYP1).
+fn read_prefs_nonce(bytes: &[u8]) -> Option<[u8; 24]> {
+    read_singleton_nonce(bytes, b"MYP1")
 }
 
 /// The pending **attachment**-tombstone queue (`sync-protocol.md` §11.4): one
@@ -574,6 +601,261 @@ fn sync_catalog_phase(
     Ok(CatalogPhase {
         merged: local_cat,
         dirty,
+    })
+}
+
+/// Record the server's current prefs revision as the CAS baseline
+/// (version + nonce) — the one bookkeeping step every `sync_prefs_phase`
+/// branch that has seen a server record performs.
+fn record_prefs_baseline(state: &mut SyncState, id_hex: &str, rec: &ChangedBlob) {
+    state.blobs.insert(
+        id_hex.to_string(),
+        BlobSyncState {
+            version: rec.version,
+            content_nonce_hex: hex(&rec.content_nonce),
+        },
+    );
+}
+
+/// Per-process RAM baseline for the §10.2.1 prefs push gate: vault root →
+/// the shared-subset hash last pushed or adopted as synced. Deliberately
+/// **never persisted**: an unkeyed digest of decrypted shared prefs at rest
+/// would hand a filesystem observer (A5/A7) a confirmation oracle over the
+/// vault's label / folder names — the plaintext-at-rest class SYNC-3 forbids,
+/// and `sync-state.json`'s own invariant is "server-visible metadata only".
+/// A lost baseline (app restart) degrades to at most one redundant push, and
+/// only when the local blob actually changed since the last sync — the
+/// baseline-nonce short-circuit in `sync_prefs_phase` proves the no-change
+/// case without any plaintext-derived state.
+fn prefs_gate_baselines() -> &'static std::sync::Mutex<HashMap<std::path::PathBuf, String>> {
+    static M: std::sync::OnceLock<std::sync::Mutex<HashMap<std::path::PathBuf, String>>> =
+        std::sync::OnceLock::new();
+    M.get_or_init(|| std::sync::Mutex::new(HashMap::new()))
+}
+
+/// The current RAM push-gate baseline for this vault, if any.
+fn prefs_gate_baseline(vault_root: &Path) -> Option<String> {
+    prefs_gate_baselines()
+        .lock()
+        .expect("prefs gate baseline lock")
+        .get(vault_root)
+        .cloned()
+}
+
+/// Record `hash` as the RAM push-gate baseline for this vault.
+fn set_prefs_gate_baseline(vault_root: &Path, hash: String) {
+    prefs_gate_baselines()
+        .lock()
+        .expect("prefs gate baseline lock")
+        .insert(vault_root.to_path_buf(), hash);
+}
+
+/// The prefs phase's outcome (MYND-478; `sync-protocol.md` §10.2.1).
+struct PrefsPhase {
+    /// The prefs blob needs a push: the shared subset changed vs the synced
+    /// baseline, a merge beat the server's plaintext, or the server has never
+    /// held a prefs blob (the §10.2.1 initial publish).
+    dirty: bool,
+    /// A remote change was merged into the on-disk view — the caller surfaces
+    /// this so the UI layer refreshes caches + emits the prefs-changed event.
+    applied_remote: bool,
+    /// `shared_subset_hash` of the on-disk view when the phase returned; the
+    /// caller records it as the new baseline once a push lands.
+    shared_hash: String,
+}
+
+/// Pull-side `vault.prefs` reconciliation (MYND-478; `sync-protocol.md`
+/// §10.2.1). The `sync_catalog_phase` twin with one twist: the push gate is
+/// the **shared-subset hash**, not the blob nonce — a purely device-local
+/// edit re-encrypts the blob but must generate no traffic. Downloads a
+/// changed remote prefs blob, runs the §10.2 field/set merge post-decrypt,
+/// and either **adopts the server bytes verbatim** (merge canonically equal
+/// to the remote — re-encrypting would nonce-churn an endless push loop) or
+/// writes the merged view freshly (dirty → pushed this cycle with the
+/// server's version as CAS base). Holds the prefs plugin's write mutex
+/// across the read-merge-write.
+#[allow(clippy::too_many_arguments)]
+fn sync_prefs_phase(
+    transport: &dyn SyncTransport,
+    token: &str,
+    root_key: &[u8; 32],
+    account_number_hash: &[u8; 16],
+    vault_root: &Path,
+    state: &mut SyncState,
+    prefs_id: &[u8; 16],
+    remote_record: Option<&ChangedBlob>,
+) -> Result<PrefsPhase, SyncCycleError> {
+    use crate::plugins::sync::prefs_merge::{merge_prefs, shared_subset_hash};
+
+    let _guard = crate::plugins::prefs::commands::write_mutex().blocking_lock();
+
+    let prefs_key = derive_subkey(root_key, SubkeyRole::PrefsKey);
+    let path = vault_root.join("vault.prefs");
+    let local_bytes = std::fs::read(&path).ok();
+    let local_nonce = local_bytes.as_deref().and_then(read_prefs_nonce);
+    // §9.5.5 read semantic: any local decode failure falls back to defaults.
+    let local_view = local_bytes
+        .as_deref()
+        .and_then(|b| protocol::decode_prefs_blob(&prefs_key, account_number_hash, b).ok())
+        .unwrap_or_default();
+
+    let id_hex = hex(prefs_id);
+
+    // Enrollment wholesale seed (§10.2.1): a VIRGIN vault — no `vault.prefs`
+    // on disk, the just-joined-device state (`sync_join_account` materializes
+    // meta + notes but never a prefs blob) — adopts the server's blob
+    // VERBATIM, device-local fields included as starting defaults. This runs
+    // on the first authed cycle (a pending device has no token at join time)
+    // and exactly once: after the seed the file exists, so every later cycle
+    // merges. A server blob that fails decode falls through to the general
+    // path (merge with defaults — the hostile-blob posture).
+    if local_bytes.is_none() {
+        if let Some(rec) = remote_record {
+            let remote_bytes =
+                download_blob_backoff(transport, token, &rec.id).map_err(SyncCycleError::Pull)?;
+            if let Ok(seeded) =
+                protocol::decode_prefs_blob(&prefs_key, account_number_hash, &remote_bytes)
+            {
+                crate::atomic_write::atomic_write(&path, &remote_bytes, true)
+                    .map_err(|_| SyncCycleError::Io)?;
+                record_prefs_baseline(state, &id_hex, rec);
+                let shared_hash = shared_subset_hash(&seeded);
+                set_prefs_gate_baseline(vault_root, shared_hash.clone());
+                return Ok(PrefsPhase {
+                    dirty: false,
+                    applied_remote: true,
+                    shared_hash,
+                });
+            }
+        }
+    }
+
+    let baseline_nonce_hex = state
+        .blobs
+        .get(&id_hex)
+        .map(|b| b.content_nonce_hex.clone());
+    // A remote revision is worth reconciling only when it is neither our own
+    // bytes (local nonce) nor a server revision we already reconciled
+    // (baseline nonce) — without the second check, a peer's blob that differs
+    // only in DEVICE-LOCAL fields would be re-downloaded and re-merged every
+    // cycle forever.
+    let remote_changed = remote_record
+        .map(|r| {
+            Some(r.content_nonce) != local_nonce
+                && Some(hex(&r.content_nonce)) != baseline_nonce_hex
+        })
+        .unwrap_or(false);
+
+    if let (Some(rec), true) = (remote_record, remote_changed) {
+        let remote_bytes =
+            download_blob_backoff(transport, token, &rec.id).map_err(SyncCycleError::Pull)?;
+        // A hostile/corrupt remote prefs blob collapses to defaults (§9.5.5);
+        // merge(local, default) keeps every locally-clocked value and the
+        // local view re-pushes over it.
+        let remote_view =
+            protocol::decode_prefs_blob(&prefs_key, account_number_hash, &remote_bytes)
+                .unwrap_or_default();
+        let merged = merge_prefs(&local_view, &remote_view);
+        let applied_remote = merged != local_view;
+        let merged_hash = shared_subset_hash(&merged);
+        let remote_hash = shared_subset_hash(&remote_view);
+
+        if merged == remote_view {
+            // Adopt the server bytes VERBATIM — byte-identical blob + baseline
+            // == server (version, nonce); nothing to push.
+            crate::atomic_write::atomic_write(&path, &remote_bytes, true)
+                .map_err(|_| SyncCycleError::Io)?;
+            record_prefs_baseline(state, &id_hex, rec);
+            set_prefs_gate_baseline(vault_root, merged_hash.clone());
+            return Ok(PrefsPhase {
+                dirty: false,
+                applied_remote,
+                shared_hash: merged_hash,
+            });
+        }
+
+        if merged_hash == remote_hash {
+            // The server already carries the merged SHARED subset — the views
+            // differ only in device-local fields (which never sync). Persist
+            // the merged view locally iff a remote shared edit landed, record
+            // the server revision as the reconciled baseline, and push
+            // NOTHING — pushing would ping-pong device-local re-encrypts
+            // between peers forever.
+            if applied_remote {
+                let merged_bytes =
+                    protocol::encode_prefs_blob(&prefs_key, account_number_hash, &merged)
+                        .map_err(|_| SyncCycleError::Io)?;
+                crate::atomic_write::atomic_write(&path, &merged_bytes, true)
+                    .map_err(|_| SyncCycleError::Io)?;
+            }
+            record_prefs_baseline(state, &id_hex, rec);
+            set_prefs_gate_baseline(vault_root, merged_hash.clone());
+            return Ok(PrefsPhase {
+                dirty: false,
+                applied_remote,
+                shared_hash: merged_hash,
+            });
+        }
+
+        // The merge beat the server's SHARED subset → write it fresh and push
+        // it this cycle. The server's revision is recorded as the CAS base;
+        // its nonce also serves the anti-redownload check, while the local
+        // file (freshly re-encrypted) intentionally carries a different one.
+        let merged_bytes = protocol::encode_prefs_blob(&prefs_key, account_number_hash, &merged)
+            .map_err(|_| SyncCycleError::Io)?;
+        crate::atomic_write::atomic_write(&path, &merged_bytes, true)
+            .map_err(|_| SyncCycleError::Io)?;
+        record_prefs_baseline(state, &id_hex, rec);
+        return Ok(PrefsPhase {
+            dirty: true,
+            applied_remote,
+            shared_hash: merged_hash,
+        });
+    }
+
+    // No (changed) remote prefs record. NOTE this branch has TWO sub-cases:
+    // the server record can match the LOCAL file's nonce (we hold exactly the
+    // server's bytes) or only the PERSISTED baseline's nonce (an unsynced
+    // local edit re-encrypted the file while the server simply hasn't moved).
+    let shared_hash = shared_subset_hash(&local_view);
+    if let Some(rec) = remote_record {
+        // Self-heal the CAS baseline so a re-enrolled/migrated device stops
+        // registering as never-synced.
+        record_prefs_baseline(state, &id_hex, rec);
+        // Self-heal the RAM push-gate baseline ONLY when the local blob is
+        // provably the server's exact bytes (nonce match). Healing in the
+        // other sub-case would baptize an unsynced shared edit as "already
+        // synced" and silently withhold it from the fleet — the poisoned-gate
+        // lost-update. Left unset, the gate conservatively pushes once (the
+        // §10.2.1 documented degradation).
+        let local_is_server_bytes = local_nonce.map(|n| hex(&n)) == Some(hex(&rec.content_nonce));
+        if local_is_server_bytes && prefs_gate_baseline(vault_root).is_none() {
+            set_prefs_gate_baseline(vault_root, shared_hash.clone());
+        }
+    }
+    let never_synced = !state.blobs.contains_key(&id_hex);
+    // No-change short-circuit: every prefs write re-encrypts under a fresh
+    // nonce, so a local blob whose outer nonce still equals the synced
+    // baseline's is provably byte-untouched since the last sync — no
+    // plaintext-derived state consulted.
+    let baseline_nonce_now = state
+        .blobs
+        .get(&id_hex)
+        .map(|b| b.content_nonce_hex.clone());
+    let nonce_clean =
+        baseline_nonce_now.is_some() && local_nonce.map(|n| hex(&n)) == baseline_nonce_now;
+    // §10.2.1: a server that has never held a prefs blob receives this
+    // device's unconditionally (even a default view) — the initial publish —
+    // so a later enrollment gets the vault identity without waiting for a
+    // shared-pref edit. Otherwise the RAM shared-subset baseline is the push
+    // gate; a lost baseline (restart) conservatively pushes once.
+    let dirty = never_synced
+        || (!nonce_clean
+            && prefs_gate_baseline(vault_root).as_deref() != Some(shared_hash.as_str()));
+    Ok(PrefsPhase {
+        dirty,
+        applied_remote: false,
+        shared_hash,
     })
 }
 
@@ -1103,12 +1385,32 @@ fn sync_cycle_attempt(
         catalog_phase = Some(phase);
     }
 
+    // --- prefs phase (MYND-478, §10.2.1) — unconditional, every cycle ---
+    // Independent of the head/blob-manifest plane (like the catalog, the prefs
+    // singleton is never head-committed); its dirty blob rides the push batch
+    // below so the CAS/409 machinery covers it.
+    let prefs_id = prefs_sync_id(root_key);
+    let remote_prefs_rec = page
+        .all_metas
+        .iter()
+        .find(|m| m.id == prefs_id && m.attachment_id.is_none());
+    let prefs_phase = sync_prefs_phase(
+        transport,
+        token,
+        root_key,
+        &account_number_hash,
+        vault_root,
+        state,
+        &prefs_id,
+        remote_prefs_rec,
+    )?;
+
     // --- apply remote changes: download + write each changed NOTE blob to disk ---
     let mut pulled = 0;
     for c in &page.changed {
-        // Attachment records were handled above; the catalog record is the
-        // catalog phase's (never written as a note).
-        if c.attachment_id.is_some() || Some(c.id) == cat_id {
+        // Attachment records were handled above; the catalog and prefs records
+        // are their phases' (never written as notes).
+        if c.attachment_id.is_some() || Some(c.id) == cat_id || c.id == prefs_id {
             continue;
         }
         // Skip a locally-dirty blob: our on-disk copy diverges from the synced
@@ -1347,6 +1649,29 @@ fn sync_cycle_attempt(
                 }
             }
         }
+
+        // A dirty prefs blob (shared-subset change, a merge that beat the
+        // server's plaintext, or the §10.2.1 initial publish) rides the same
+        // batch as an inline blob (MYND-478).
+        if prefs_phase.dirty {
+            if let Ok(bytes) = std::fs::read(vault_root.join("vault.prefs")) {
+                if let Some(nonce) = read_prefs_nonce(&bytes) {
+                    let base = state
+                        .blobs
+                        .get(&hex(&prefs_id))
+                        .map(|b| b.version)
+                        .unwrap_or(0);
+                    to_push.push(PushBlob {
+                        id: prefs_id,
+                        base_version: base,
+                        content_nonce: nonce,
+                        ciphertext: bytes,
+                        tombstone: false,
+                        attachment_id: None,
+                    });
+                }
+            }
+        }
     }
 
     let mut pushed = 0;
@@ -1431,6 +1756,11 @@ fn sync_cycle_attempt(
         }
         pushed = outcome.results.len();
         head_advanced = outcome.head_id.is_some();
+        // The prefs push landed → its shared-subset hash is the new push-gate
+        // baseline (MYND-478, §10.2.1).
+        if outcome.results.iter().any(|(id, _)| *id == prefs_id) {
+            set_prefs_gate_baseline(vault_root, prefs_phase.shared_hash.clone());
+        }
         // The queued tombstones are now flagged on the server → drop them from the
         // device-local queue so they aren't re-flagged every cycle.
         let pushed_tombstones: Vec<String> = to_push
@@ -1465,6 +1795,7 @@ fn sync_cycle_attempt(
         attachments_pulled,
         attachments_pushed,
         attachments_deleted,
+        prefs_applied_remote: prefs_phase.applied_remote,
     })
 }
 
@@ -4509,6 +4840,323 @@ mod tests {
     }
 
     // ---- F1 Faz B: vault.meta reconcile (sync_meta_phase) --------------------
+
+    // ---- MYND-478: vault.prefs phase (sync_prefs_phase) ----------------------
+
+    mod prefs_phase {
+        use super::super::*;
+        use crate::plugins::sync::prefs_merge::shared_subset_hash;
+        use crate::plugins::sync::state::SyncState;
+        use crate::plugins::sync::transport::FakeTransport;
+        use base64::engine::general_purpose::STANDARD as B64;
+        use base64::Engine as _;
+        use protocol::PrefsView;
+
+        const ROOT: [u8; 32] = [0x42; 32];
+        const HASH: [u8; 16] = [0x33; 16];
+
+        fn scratch(tag: &str) -> std::path::PathBuf {
+            let d = std::env::temp_dir().join(format!(
+                "myne-prefsphase-{tag}-{}-{:p}",
+                std::process::id(),
+                &tag
+            ));
+            std::fs::create_dir_all(&d).unwrap();
+            d
+        }
+
+        fn prefs_key() -> zeroize::Zeroizing<[u8; 32]> {
+            derive_subkey(&ROOT, SubkeyRole::PrefsKey)
+        }
+
+        fn write_local(dir: &Path, view: &PrefsView) {
+            let bytes = protocol::encode_prefs_blob(&prefs_key(), &HASH, view).unwrap();
+            std::fs::write(dir.join("vault.prefs"), &bytes).unwrap();
+        }
+
+        fn read_local(dir: &Path) -> PrefsView {
+            let bytes = std::fs::read(dir.join("vault.prefs")).unwrap();
+            protocol::decode_prefs_blob(&prefs_key(), &HASH, &bytes).unwrap()
+        }
+
+        /// Encode a remote view and register its blob under `/sync/blob?id=…`.
+        fn serve_remote(t: &FakeTransport, pid: &[u8; 16], view: &PrefsView) -> ChangedBlob {
+            let bytes = protocol::encode_prefs_blob(&prefs_key(), &HASH, view).unwrap();
+            let nonce = read_prefs_nonce(&bytes).unwrap();
+            let body = serde_json::json!({ "ciphertext_b64": B64.encode(&bytes) });
+            t.on(
+                HttpMethod::Get,
+                &format!("/sync/blob?id={}", hex(pid)),
+                200,
+                serde_json::to_vec(&body).unwrap(),
+            );
+            ChangedBlob {
+                id: *pid,
+                content_nonce: nonce,
+                version: 7,
+                size: bytes.len(),
+                attachment_id: None,
+            }
+        }
+
+        // A server that has never held a prefs blob receives this device's
+        // unconditionally — the §10.2.1 initial publish (even a default view).
+        #[test]
+        fn initial_publish_when_server_never_held_prefs() {
+            let dir = scratch("initpub");
+            write_local(&dir, &PrefsView::default());
+            let mut st = SyncState::default();
+            let t = FakeTransport::new();
+            let pid = prefs_sync_id(&ROOT);
+
+            let phase =
+                sync_prefs_phase(&t, "tok", &ROOT, &HASH, &dir, &mut st, &pid, None).unwrap();
+            assert!(phase.dirty, "never-synced server ⇒ initial publish");
+            assert!(!phase.applied_remote);
+            std::fs::remove_dir_all(&dir).ok();
+        }
+
+        // The push gate: a purely device-local edit (theme) re-encrypts the
+        // blob but leaves the shared subset unchanged ⇒ NO push.
+        #[test]
+        fn device_local_change_generates_no_push() {
+            let dir = scratch("gate");
+            let themed = PrefsView {
+                theme: Some(protocol::ThemeChoice::Dark),
+                ..PrefsView::default()
+            };
+            write_local(&dir, &themed);
+            let mut st = SyncState::default();
+            let pid = prefs_sync_id(&ROOT);
+            st.blobs.insert(
+                hex(&pid),
+                BlobSyncState {
+                    version: 3,
+                    content_nonce_hex: "00".repeat(24),
+                },
+            );
+            // The synced baseline was the default view — whose SHARED subset
+            // equals the themed view's (theme is device-local).
+            set_prefs_gate_baseline(&dir, shared_subset_hash(&PrefsView::default()));
+            let t = FakeTransport::new();
+
+            let phase =
+                sync_prefs_phase(&t, "tok", &ROOT, &HASH, &dir, &mut st, &pid, None).unwrap();
+            assert!(!phase.dirty, "device-local edit must not push");
+            std::fs::remove_dir_all(&dir).ok();
+        }
+
+        // A shared-field edit (label) changes the shared-subset hash ⇒ push.
+        #[test]
+        fn shared_change_pushes() {
+            let dir = scratch("shared");
+            let mut labeled = PrefsView {
+                label: Some("Renamed".into()),
+                ..PrefsView::default()
+            };
+            labeled.field_clocks.insert("label".into(), 100);
+            write_local(&dir, &labeled);
+            let mut st = SyncState::default();
+            let pid = prefs_sync_id(&ROOT);
+            st.blobs.insert(
+                hex(&pid),
+                BlobSyncState {
+                    version: 3,
+                    content_nonce_hex: "00".repeat(24),
+                },
+            );
+            set_prefs_gate_baseline(&dir, shared_subset_hash(&PrefsView::default()));
+            let t = FakeTransport::new();
+
+            let phase =
+                sync_prefs_phase(&t, "tok", &ROOT, &HASH, &dir, &mut st, &pid, None).unwrap();
+            assert!(phase.dirty, "shared edit must push");
+            std::fs::remove_dir_all(&dir).ok();
+        }
+
+        // A remote rename lands: merged into the on-disk view (device-local
+        // theme preserved), applied_remote=true, and NO re-push — the server
+        // already carries the merged shared subset (the anti-ping-pong rule).
+        #[test]
+        fn remote_rename_merges_applies_and_does_not_repush() {
+            let dir = scratch("remote");
+            let themed = PrefsView {
+                theme: Some(protocol::ThemeChoice::Dark),
+                ..PrefsView::default()
+            };
+            write_local(&dir, &themed);
+            let mut st = SyncState::default();
+            let pid = prefs_sync_id(&ROOT);
+            let t = FakeTransport::new();
+            let mut remote = PrefsView {
+                label: Some("From Peer".into()),
+                ..PrefsView::default()
+            };
+            remote.field_clocks.insert("label".into(), 500);
+            let rec = serve_remote(&t, &pid, &remote);
+
+            let phase =
+                sync_prefs_phase(&t, "tok", &ROOT, &HASH, &dir, &mut st, &pid, Some(&rec)).unwrap();
+            assert!(phase.applied_remote, "remote rename must apply");
+            assert!(!phase.dirty, "shared subsets agree ⇒ no re-push");
+            let on_disk = read_local(&dir);
+            assert_eq!(on_disk.label.as_deref(), Some("From Peer"));
+            assert_eq!(
+                on_disk.theme,
+                Some(protocol::ThemeChoice::Dark),
+                "device-local theme survives the merge"
+            );
+            assert_eq!(
+                st.blobs.get(&hex(&pid)).map(|b| b.version),
+                Some(7),
+                "server revision recorded as baseline"
+            );
+            // Second cycle against the SAME server record: already reconciled
+            // (baseline nonce) ⇒ no download, no dirt, no ping-pong.
+            let phase2 =
+                sync_prefs_phase(&t, "tok", &ROOT, &HASH, &dir, &mut st, &pid, Some(&rec)).unwrap();
+            assert!(!phase2.dirty);
+            assert!(!phase2.applied_remote);
+            std::fs::remove_dir_all(&dir).ok();
+        }
+
+        // Enrollment wholesale seed: a VIRGIN vault (no vault.prefs on disk —
+        // the just-joined state) adopts the server blob VERBATIM, device-local
+        // fields included as starting defaults (Q3/Q7), and never re-seeds.
+        #[test]
+        fn virgin_vault_seeds_wholesale_from_server() {
+            let dir = scratch("seed");
+            // NO local vault.prefs — the just-joined-device state.
+            let mut st = SyncState::default();
+            let pid = prefs_sync_id(&ROOT);
+            let t = FakeTransport::new();
+            let mut remote = PrefsView {
+                label: Some("Vault Identity".into()),
+                theme: Some(protocol::ThemeChoice::Dark), // device-local!
+                ..PrefsView::default()
+            };
+            remote.field_clocks.insert("label".into(), 900);
+            let rec = serve_remote(&t, &pid, &remote);
+
+            let phase =
+                sync_prefs_phase(&t, "tok", &ROOT, &HASH, &dir, &mut st, &pid, Some(&rec)).unwrap();
+            assert!(phase.applied_remote);
+            assert!(!phase.dirty, "a seed adopts; it never pushes");
+            let seeded = read_local(&dir);
+            assert_eq!(seeded, remote, "wholesale: device-local theme included");
+            // Second cycle against the same record: file exists + baseline
+            // matches ⇒ no re-seed, no download loop.
+            let phase2 =
+                sync_prefs_phase(&t, "tok", &ROOT, &HASH, &dir, &mut st, &pid, Some(&rec)).unwrap();
+            assert!(!phase2.applied_remote);
+            assert!(!phase2.dirty);
+            std::fs::remove_dir_all(&dir).ok();
+        }
+
+        // A virgin vault against an EMPTY server proceeds on defaults — no
+        // crash, no seed, and the initial-publish intent registers as dirty.
+        #[test]
+        fn virgin_vault_with_empty_server_proceeds_on_defaults() {
+            let dir = scratch("seedempty");
+            let mut st = SyncState::default();
+            let pid = prefs_sync_id(&ROOT);
+            let t = FakeTransport::new();
+
+            let phase =
+                sync_prefs_phase(&t, "tok", &ROOT, &HASH, &dir, &mut st, &pid, None).unwrap();
+            assert!(!phase.applied_remote);
+            assert!(phase.dirty, "never-synced ⇒ initial-publish intent");
+            assert!(
+                !dir.join("vault.prefs").exists(),
+                "no file invented; defaults apply in RAM"
+            );
+            std::fs::remove_dir_all(&dir).ok();
+        }
+
+        // Poisoned-gate regression (re-review I7): an UNSYNCED shared edit +
+        // app restart (RAM baseline lost) + an unchanged server record must
+        // still push. The self-heal may only adopt the gate baseline when the
+        // local blob is provably the server's bytes — healing from the edited
+        // view would silently withhold the rename from the fleet forever.
+        #[test]
+        fn unsynced_shared_edit_survives_a_restart() {
+            let dir = scratch("restartpush");
+            // The synced state was the default view under nonce 0x11…;
+            // the user then renamed (re-encrypt, fresh nonce) and the app
+            // restarted before any cycle ran (fresh scratch dir ⇒ empty RAM
+            // baseline).
+            let mut labeled = PrefsView {
+                label: Some("Renamed Before Restart".into()),
+                ..PrefsView::default()
+            };
+            labeled.field_clocks.insert("label".into(), 100);
+            write_local(&dir, &labeled);
+            let mut st = SyncState::default();
+            let pid = prefs_sync_id(&ROOT);
+            let synced_nonce = [0x11u8; 24];
+            st.blobs.insert(
+                hex(&pid),
+                BlobSyncState {
+                    version: 3,
+                    content_nonce_hex: hex(&synced_nonce),
+                },
+            );
+            // Server unchanged: its record still carries the synced nonce.
+            let rec = ChangedBlob {
+                id: pid,
+                content_nonce: synced_nonce,
+                version: 3,
+                size: 0,
+                attachment_id: None,
+            };
+            let t = FakeTransport::new();
+
+            let phase =
+                sync_prefs_phase(&t, "tok", &ROOT, &HASH, &dir, &mut st, &pid, Some(&rec)).unwrap();
+            assert!(
+                phase.dirty,
+                "the unsynced rename must push despite the lost RAM baseline"
+            );
+            assert!(!phase.applied_remote);
+            std::fs::remove_dir_all(&dir).ok();
+        }
+
+        // Concurrent shared edits on both sides: the merge beats the server's
+        // shared subset (local newer label survives + remote icon adopted) ⇒
+        // write fresh + push against the server's version.
+        #[test]
+        fn concurrent_shared_edits_merge_and_push() {
+            let dir = scratch("concurrent");
+            let mut local = PrefsView {
+                label: Some("Local Wins".into()),
+                ..PrefsView::default()
+            };
+            local.field_clocks.insert("label".into(), 200);
+            write_local(&dir, &local);
+            let mut st = SyncState::default();
+            let pid = prefs_sync_id(&ROOT);
+            let t = FakeTransport::new();
+            let mut remote = PrefsView {
+                label: Some("Remote Loses".into()),
+                icon: Some("book".into()),
+                ..PrefsView::default()
+            };
+            remote.field_clocks.insert("label".into(), 100);
+            remote.field_clocks.insert("icon".into(), 300);
+            let rec = serve_remote(&t, &pid, &remote);
+
+            let phase =
+                sync_prefs_phase(&t, "tok", &ROOT, &HASH, &dir, &mut st, &pid, Some(&rec)).unwrap();
+            assert!(phase.dirty, "merge beat the server ⇒ push");
+            assert!(phase.applied_remote, "remote icon landed locally");
+            let on_disk = read_local(&dir);
+            assert_eq!(on_disk.label.as_deref(), Some("Local Wins"));
+            assert_eq!(on_disk.icon.as_deref(), Some("book"));
+            assert_eq!(on_disk.field_clocks.get("label"), Some(&200));
+            assert_eq!(on_disk.field_clocks.get("icon"), Some(&300));
+            std::fs::remove_dir_all(&dir).ok();
+        }
+    }
 
     mod meta_phase {
         use super::super::*;

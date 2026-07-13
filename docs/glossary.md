@@ -521,6 +521,12 @@ A credential that lives only on one device and is **never synchronized**, becaus
 
 Used in: `spec/protocol.md` §9.14, `decisions.md` 2026-06-16
 
+### **device-local pref** &nbsp; 📋 *Protocol*
+
+One of the two normative [vault.prefs](#vaultprefs) field classes of the Phase 2 prefs sync (`sync-protocol.md` §10.2, MYND-478): a preference that describes how *this device* presents, secures, or operates on the vault — security posture (`auto_lock_seconds`, `screen_capture_protection`), presentation (`theme`, the `editor_*` fields), input (`keymap`), screen-dependent UI layout, and device state (`last_backup_at`, `paired_extensions`). A device-local pref never crosses the merge — the local value always survives — even though the whole encrypted blob transits the server (the same bytes already leave the device inside backups). Contrast [shared pref](#shared-pref). Not to be confused with a [device-local credential](#device-local-credential), which is a *key-material* class.
+
+Used in: `sync-protocol.md` §10.2; `decisions.md` 2026-07-13
+
 ### **domain separation** &nbsp; 📋 *Protocol*
 
 The cryptographic principle that contexts which should not produce equal outputs from equal inputs MUST mix in a context-distinguishing string. Myne applies it pervasively: HKDF context strings (§3.2), AAD prefixes (§5.2), KDF-parameter binding (§4.3), and protocol-version magic bytes (§9, §10). Failure to domain-separate is the root cause of many published protocol vulnerabilities.
@@ -613,6 +619,12 @@ The recursive, **closed-allow-list** tree that expresses a [saved view](#saved-v
 
 Used in: `spec/protocol.md` §9.5.2; `decisions.md` 2026-06-15
 
+### **field clock** &nbsp; 📋 *Protocol*
+
+The per-field LWW timestamp of the Phase 2 prefs sync (`sync-protocol.md` §10.2, MYND-478): an epoch-milliseconds integer, one per [shared pref](#shared-pref) LWW field (or per `device_names/<key>` entry), stored in the additive `field_clocks` map inside the encrypted [vault.prefs](#vaultprefs) payload (`spec/protocol.md` §9.5.2) and stamped by the setter that last changed the field. The merge takes the newer clock per field, counts an absent clock as 0 (pre-feature blobs), and breaks equal clocks byte-lexicographically toward the greater value — the attachments-catalog `filename` precedent — so replicas converge without coordination. Per-field (rather than per-blob) clocks are what let concurrent edits to *different* fields both survive.
+
+Used in: `sync-protocol.md` §10.2, `spec/protocol.md` §9.5.2; `decisions.md` 2026-07-13
+
 ### **focus mode** &nbsp; 📦 *Product*
 
 The editor's distraction-free writing state (MYND-348): a `Mod-Shift-F` toggle fades the in-app chrome (sidebars, tab strip, [bottom bar](#bottom-bar), floated title-bar cluster) and centers the column, so only the words remain. The fade is **in-app only** — a CSS rule keyed on the editor root's `data-focus-active` attribute, never OS fullscreen (no Tauri window-API capability is added). The active state is **ephemeral** React state (opt in each session, never auto-entered, not persisted to any blob). Exit via the toggle or **Esc** at low keymap precedence (the editor's autocomplete / multi-cursor consume Esc first). v1 also ships [typewriter scroll](#typewriter-scroll) and [line-focus dimming](#line-focus-dimming), each a Settings → Editor toggle (the `editor_focus_typewriter` / `editor_focus_dim_inactive` MYP1 fields, default on); the command palette and Settings open over focus and return to it on close. Threat-neutral (UI state + two cosmetic prefs fields). See also [typewriter scroll](#typewriter-scroll), [line-focus dimming](#line-focus-dimming).
@@ -666,6 +678,12 @@ Used in: `spec/protocol.md` §10.1
 The property that compromise of a long-term key does not enable decryption of past messages encrypted with derived ephemeral keys. Myne v0.1 does **not** provide forward secrecy — the persistent `itemsKey` is reusable across all notes for the vault's lifetime. The `appname-v005` roadmap introduces per-epoch `itemsKey` rotation that would provide forward secrecy by deleting old epoch keys after migration.
 
 Used in: `threat-model.md` §7; `spec/protocol.md` §3.3 (forward-compat note)
+
+### **free tier** &nbsp; 📦 *Product*
+
+The permanent no-cost tier of [hosted sync](#hosted-sync): 250 MB storage / 3 devices per account, full protocol, full speed — differentiation from [Myne Sync](#myne-sync) is quantitative only (storage + device count), never speed, features, or guarantees (`decisions.md` 2026-07-13). Its existence revises the `server-protocol.md` §5.3 Sybil posture: a permanent free anonymous registration surface is accepted, bounded by the small quota, the device cap, and the registered-account ceiling — the payment gate remains the primary Sybil resistance for *meaningful* storage. Abandoned free accounts are never reclaimed: doing so would require persisting a new behavioral marker, and the zero-new-observation principle wins over the (bounded, accepted) dead-account storage cost.
+
+Used in: `decisions.md` 2026-07-13
 
 ### **frontmatter** &nbsp; 📦 *Product*
 
@@ -1043,6 +1061,12 @@ Used in: `spec/protocol.md` §9.1, §5.2; `decisions.md` 2026-05-07 "Note UUIDv7
 
 The markdown dialect Myne v0.1 reads and writes: **GFM (GitHub-Flavored Markdown) plus a footnote extension plus a wikilink extension plus YAML frontmatter recognition**. Internally referenced as **D1**. Codified in `spec/markdown-dialect.md`. The dialect is selected as the smallest pin that covers Myne v0.1's editor decoration commitments (tables, task lists, footnotes, wikilinks, frontmatter) while preserving byte-stable round-trip with Obsidian-imported notes (`vision.md` Phase 1 importer commitment). Two alternatives were considered and declined in `decisions.md` 2026-05-01: D2 (D1 + Pandoc extras — declined because the extras are not load-bearing for v0.1 and Obsidian renders them as raw text) and D3 (Djot — declined because `.dj` is not markdown and would break the "walk away into any markdown editor" wedge). Hard rule **C1**: vault imports never silently rewrite content; non-canonical syntax in imported notes is preserved byte-for-byte. Forward-incompatible with v005 by design — v005 will pin its own dialect.
 
+### **Myne Sync** &nbsp; 📦 *Product*
+
+The commercial name of the [hosted sync](#hosted-sync) paid plan — deliberately a **single** plan: 3 €/month · 30 €/year (VAT-inclusive final price everywhere; ~15 % yearly discount; 1- and 12-month SKUs only), 20 GB deduplicated-ciphertext quota (AS17) and 10 devices per account (`decisions.md` 2026-07-13). One plan because hosted and self-hosted share TB5: the only honest differentiators are quantitative (storage + devices). Prepaid and time-based — a voucher extends `paid_until`; there is **no auto-renewal**, because nothing identity-bearing is kept on file for an anonymous account. Expiry runs the [read-only grace](#read-only-grace) ladder.
+
+Used in: `decisions.md` 2026-07-13
+
 ### **Myne-managed canonical frontmatter field** &nbsp; 📋 *Protocol*
 
 A YAML frontmatter field whose value is written by the Myne dialect surgery module (`src/dialect/surgery.ts`) rather than left purely user-authored. v0.1 defines two such fields: `updated` (RFC 3339 string, UTC, **autosave-driven** — overwritten on every `note_update` via `patchUpdatedField` to record the user's last-edit timestamp on the device) and `title` (YAML string scalar, **rename-driven** — overwritten only when the user renames a note from the sidebar AND the read-precedence chain resolves to the frontmatter slot, via `patchTitleField`; the `<NoteRow>` sidebar reads from the same field per the mirror-existing source-of-truth decision tree). Both fields are **unprefixed** (no `myne_` namespace) to align with Obsidian / Logseq / Bear convention and the `PRODUCT.md` plain-markdown-portability commitment. Other frontmatter fields (`tags:`, user-defined keys) are user-authored and preserved per `markdown-dialect.md` §3.6 "Unknown frontmatter fields are preserved on write." The set of Myne-managed canonical fields is forward-incompatible-by-design with v005.
@@ -1105,6 +1129,12 @@ The aPAKE protocol standardized as RFC 9807 (March 2025). Server stores no offli
 
 Used in: `spec/protocol.md` §11.1
 Reference: RFC 9807.
+
+### **operator console** &nbsp; 📦 *Product*
+
+The hosted-sync admin surface (`decisions.md` 2026-07-13): an admin API bound to a **Unix domain socket** (`MYNE_ADMIN_SOCKET` — no bearer secret; access is filesystem permissions) plus a `myne-server admin` CLI; a stdlib-only web panel is a later iteration on the same API. Normative posture: the console is a **live projection of already-persisted enforcement state only** — account hash, stored bytes, device count, plan fields — never a new observation channel: no request history, no last-seen wall-clocks, no per-account time series (upholding the MYND-440 aggregate-only-metrics invariant). Open-source and shipped to self-hosters like every other component; hosted gets no proprietary tooling.
+
+Used in: `decisions.md` 2026-07-13
 
 ### **optimistic UI rollback** &nbsp; 📦 *Product*
 
@@ -1275,6 +1305,12 @@ The read-only rendered [view mode](#view-mode) of a note tab (MYND-299): all edi
 
 Used in: `spec/protocol.md` §9.5.2, §9.7; `decisions.md` 2026-06-17 (MYND-299)
 
+### **read-only grace** &nbsp; 📦 *Product*
+
+The hosted-sync expiry ladder (`decisions.md` 2026-07-13): when a paid term lapses (or usage exceeds the tier ceiling after a downgrade), push is refused (402-class error) while **pull stays fully open for 90 days** — the user can always take their data out. At the end of grace the server-side vault ciphertext is deleted **atomically**: the server cannot see inside a vault, so selective/partial deletion is structurally meaningless — the server copy either stays whole or goes entirely. The account record (SCRAM verifier + device registry) is kept, and because Myne is local-first the deletion is not data loss — devices hold the plaintext and can re-push within the free tier or after renewal.
+
+Used in: `decisions.md` 2026-07-13
+
 ### **Recovering** (slot state) &nbsp; 📦 *Product*
 
 The intermediate variant of the [`Slot`] enum representing a vault that has successfully completed phrase-based recovery (`vault_recover_with_phrase`) but has not yet committed a new master password (`vault_complete_recovery`). Carries `root_key`, `items_key`, `items_key_id`, and `recovered_at: Instant` in `Zeroizing` wrappers — both keys are derived eagerly during the recovery step so the entire credential chain is verified before the slot transitions. Editor commands cannot pattern-match `Slot::Recovering` and are therefore structurally denied access during this window per `recovery-flow.md` §4.1's non-dismissible chained step. The only legal transitions out are `Slot::Recovering → Slot::Unlocked` (via `vault_complete_recovery` success) or `Slot::Recovering → Slot::Empty` (via `vault_lock` — the §4.3 within-session bail case).
@@ -1411,6 +1447,12 @@ Used in: `spec/protocol.md` §3.4, §11.1
 A generic term referring to whatever value is sent to the sync server for authentication in Phase 2. The concrete form is one of the two options in §11.1 — a deferred decision. v0.1 defines no transmitted server credential.
 
 Used in: `spec/protocol.md` §1.1, §11.1
+
+### **shared pref** &nbsp; 📋 *Protocol*
+
+One of the two normative [vault.prefs](#vaultprefs) field classes of the Phase 2 prefs sync (`sync-protocol.md` §10.2, MYND-478): a preference that describes the *vault* — identity (`label`, `icon`), content organization (`favorites`, `item_order`, `folder_icons`, `saved_views`), vault-level conventions (the `daily_*` fields), vault-wide privacy declarations (`ai_excluded_folders`), and the cross-device `device_names` map. Shared prefs sync between devices, merging per discipline (scalar/whole-value LWW on [field clocks](#field-clock), set-union, sequence-LWW-on-whole, per-key map). Contrast [device-local pref](#device-local-pref).
+
+Used in: `sync-protocol.md` §10.2; `decisions.md` 2026-07-13
 
 ### **session token** &nbsp; 🗝️ *Key/identifier*
 
@@ -1941,7 +1983,7 @@ The four prefixes for a single major version are deliberately non-interchangeabl
 
 ### Theme preference
 
-The user's Light / Dark / System choice, persisted as the `theme` field of [`vault.prefs`](#prefsview) (`spec/protocol.md` §9.5.2). An optional string — `"light"` or `"dark"` — where **absence of the key is the canonical encoding of "system"** (follow the OS `prefers-color-scheme`); there is no `"system"` value, so a vault that made no explicit choice omits the field and stays byte-identical to a pre-MYND-110 blob. Rendering is a **pure-CSS hybrid**: an explicit choice sets `<html data-theme="light|dark">` (overriding the OS); System and every pre-unlock screen carry no attribute, so a `prefers-color-scheme` `@media` block follows the OS live with no JS. The preference is **non-load-bearing** — a cosmetic UI setting (AS-low) with no protective-envelope clamp (unlike [AUTO_LOCK_CEILING](#auto_lock_ceiling)); a tampered or replayed `vault.prefs` can at worst surface the wrong color, and an unrecognized value decodes to "system" rather than failing. It lives inside the encrypted blob (not plaintext) so a disk-at-rest adversary learns nothing — the same structural-privacy reasoning that keeps [auto-lock](#auto-lock-on-idle)'s timeout encrypted. On lock the attribute is removed (the UI follows the OS), the UI-layer image of zeroize-on-lock. The theme syncs with the vault (it is vault state, not a device-local preference). Introduced MYND-110. See also [PrefsView](#prefsview), [syntax color tokens](#syntax-color-tokens), [custom theme](#custom-theme).
+The user's Light / Dark / System choice, persisted as the `theme` field of [`vault.prefs`](#prefsview) (`spec/protocol.md` §9.5.2). An optional string — `"light"` or `"dark"` — where **absence of the key is the canonical encoding of "system"** (follow the OS `prefers-color-scheme`); there is no `"system"` value, so a vault that made no explicit choice omits the field and stays byte-identical to a pre-MYND-110 blob. Rendering is a **pure-CSS hybrid**: an explicit choice sets `<html data-theme="light|dark">` (overriding the OS); System and every pre-unlock screen carry no attribute, so a `prefers-color-scheme` `@media` block follows the OS live with no JS. The preference is **non-load-bearing** — a cosmetic UI setting (AS-low) with no protective-envelope clamp (unlike [AUTO_LOCK_CEILING](#auto_lock_ceiling)); a tampered or replayed `vault.prefs` can at worst surface the wrong color, and an unrecognized value decodes to "system" rather than failing. It lives inside the encrypted blob (not plaintext) so a disk-at-rest adversary learns nothing — the same structural-privacy reasoning that keeps [auto-lock](#auto-lock-on-idle)'s timeout encrypted. On lock the attribute is removed (the UI follows the OS), the UI-layer image of zeroize-on-lock. The theme is a [device-local pref](#device-local-pref) (`sync-protocol.md` §10.2, MYND-478): presentation is per-device taste, so it never crosses the Phase 2 prefs merge. Introduced MYND-110. See also [PrefsView](#prefsview), [syntax color tokens](#syntax-color-tokens), [custom theme](#custom-theme).
 
 ### custom theme
 
