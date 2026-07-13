@@ -101,54 +101,17 @@ pub fn read_extracted(
     ExtractedText::from_blob_plaintext(&plaintext)
 }
 
-/// Append the cached extracted text of every form-C attachment embedded in
-/// `note_body` to a copy of the body, so the search index folds attachment
-/// content into the embedding note (§ 9.6 `index_format` 0x02 behavior).
-/// Missing/uncached attachments contribute nothing — the lazy backfill (Task 7)
-/// populates them on the next rebuild. Best-effort: any read failure is skipped.
-///
-/// `memo` deduplicates cache reads across notes within a single rebuild — an
-/// attachment embedded in N notes is read + decoded once (the in-RAM memo of
-/// § 9.6.4). Pass a fresh map for a one-off fold (the live note-save path).
-pub fn fold_attachment_text(
-    note_body: &str,
-    vault_dir: &Path,
-    attachment_text_key: &[u8; AEAD_KEY_LEN],
-    account_number_hash: &[u8; ATTACHMENT_TEXT_BLOB_ACCOUNT_HASH_LEN],
-    memo: &mut std::collections::HashMap<[u8; ATTACHMENT_ID_LEN], Option<String>>,
-) -> String {
-    let ids = super::reconcile::extract_att_ids(note_body);
-    if ids.is_empty() {
-        return note_body.to_string();
-    }
-    let mut out = note_body.to_string();
-    for id_hex in ids {
-        let Some(id) = super::commands::hex_decode_id(&id_hex) else {
-            continue;
-        };
-        let cached = memo.entry(id).or_insert_with(|| {
-            // Only Ok results carry searchable text; Empty/Failed/Unsupported
-            // contribute nothing but are still "resolved" in the memo.
-            read_extracted(vault_dir, attachment_text_key, account_number_hash, &id)
-                .and_then(ok_text)
-        });
-        if let Some(text) = cached {
-            out.push('\n');
-            out.push_str(text);
-        }
-    }
-    out
-}
-
 /// MYND-448a: the cached extracted text of each form-C attachment embedded in
-/// `note_body`, as `(attachment_id_hex, text)` pairs — the per-attachment form
-/// of [`fold_attachment_text`]. The search layer indexes each as its OWN doc
-/// (`att:<id>:<note_id>`) so an attachment-content hit surfaces distinctly from
-/// the embedding note's body, instead of being folded into it. Only attachments
-/// with Ok extracted text yield a pair (Empty/Failed/Unsupported/uncached
-/// contribute no doc); each unique attachment appears at most once even when
-/// embedded twice. Best-effort; `memo` dedups cache reads across notes within a
-/// rebuild, exactly as the fold does.
+/// `note_body`, as `(attachment_id_hex, text)` pairs. The search layer indexes
+/// each as its OWN doc (`att:<id>:<note_id>`) so an attachment-content hit
+/// surfaces distinctly from the embedding note's body, instead of being folded
+/// into it. Only attachments with Ok extracted text yield a pair
+/// (Empty/Failed/Unsupported/uncached contribute no doc); each unique
+/// attachment appears at most once even when embedded twice. Best-effort:
+/// any read failure is skipped. `memo` deduplicates cache reads across notes
+/// within a single rebuild — an attachment embedded in N notes is read +
+/// decoded once (the in-RAM memo of § 9.6.4); only Ok results carry text, but
+/// negative results are still "resolved" in the memo.
 pub fn collect_attachment_texts(
     note_body: &str,
     vault_dir: &Path,
@@ -167,7 +130,8 @@ pub fn collect_attachment_texts(
             continue; // same attachment embedded twice → one doc
         }
         let cached = memo.entry(id).or_insert_with(|| {
-            read_extracted(vault_dir, attachment_text_key, account_number_hash, &id).and_then(ok_text)
+            read_extracted(vault_dir, attachment_text_key, account_number_hash, &id)
+                .and_then(ok_text)
         });
         if let Some(text) = cached {
             out.push((id_hex, text.clone()));
@@ -179,7 +143,7 @@ pub fn collect_attachment_texts(
 /// Lazy backfill (Task 7): for each embedded attachment of `note_body` not yet
 /// resolved in `memo`, ensure its `MYE1` cache exists — extracting from the
 /// `MYA1` source blob if missing — and record the result in `memo` so the
-/// subsequent [`fold_attachment_text`] uses it. This is what makes attachments
+/// subsequent [`collect_attachment_texts`] uses it. This is what makes attachments
 /// imported BEFORE the eager cache (Task 5) searchable after the first
 /// post-MYND-328 rebuild (which the snapshot `extractor_version` forces).
 /// Best-effort: an unreadable / undecryptable / unsupported attachment resolves
@@ -417,47 +381,7 @@ mod tests {
         assert!(p.ends_with(format!("{ATTACHMENT_TEXT_DIR}/{}", hex_encode(&ATT_ID))));
     }
 
-    // ---- fold (search-index integration, Task 6) -----------------------
-
-    #[test]
-    fn fold_appends_cached_attachment_text() {
-        let tmp = ScopedTempDir::new("mye1-fold").expect("tmp");
-        let mut e = sample();
-        e.text = "NEEDLEWORD from the pdf body".to_string();
-        write_extracted(tmp.path(), &KEY, &ACCOUNT_HASH, &ATT_ID, &e).expect("write");
-        let body = format!("note prose ![[att:{}|f.pdf]] tail", hex_encode(&ATT_ID));
-        let mut memo = std::collections::HashMap::new();
-        let folded = fold_attachment_text(&body, tmp.path(), &KEY, &ACCOUNT_HASH, &mut memo);
-        assert!(folded.contains("note prose"), "keeps the note body");
-        assert!(
-            folded.contains("NEEDLEWORD from the pdf body"),
-            "folds in the cached attachment text"
-        );
-    }
-
-    #[test]
-    fn fold_no_refs_returns_body_unchanged() {
-        let tmp = ScopedTempDir::new("mye1-fold-none").expect("tmp");
-        let mut memo = std::collections::HashMap::new();
-        let body = "plain note, no embeds";
-        assert_eq!(
-            fold_attachment_text(body, tmp.path(), &KEY, &ACCOUNT_HASH, &mut memo),
-            body
-        );
-    }
-
-    #[test]
-    fn fold_uncached_ref_contributes_nothing() {
-        // A ref to an attachment with no cache entry leaves the body unchanged
-        // (lazy backfill, Task 7, will populate it later) — and never panics.
-        let tmp = ScopedTempDir::new("mye1-fold-miss").expect("tmp");
-        let body = format!("text ![[att:{}|x]] end", hex_encode(&ATT_ID));
-        let mut memo = std::collections::HashMap::new();
-        assert_eq!(
-            fold_attachment_text(&body, tmp.path(), &KEY, &ACCOUNT_HASH, &mut memo),
-            body
-        );
-    }
+    // ---- backfill (search-index integration, Task 7) --------------------
 
     #[test]
     fn backfill_extracts_from_mya1_when_uncached() {
@@ -537,9 +461,9 @@ mod tests {
     }
 
     #[test]
-    fn fold_skips_negative_status_text() {
-        // An Empty/Failed/Unsupported cached result contributes no tokens.
-        let tmp = ScopedTempDir::new("mye1-fold-neg").expect("tmp");
+    fn collect_skips_negative_status_text() {
+        // An Empty/Failed/Unsupported cached result contributes no doc.
+        let tmp = ScopedTempDir::new("mye1-collect-neg").expect("tmp");
         let e = ExtractedText {
             status: ExtractStatus::Empty,
             source_format: SourceFormat::Pdf,
@@ -550,9 +474,8 @@ mod tests {
         write_extracted(tmp.path(), &KEY, &ACCOUNT_HASH, &ATT_ID, &e).expect("write");
         let body = format!("body ![[att:{}|f]]", hex_encode(&ATT_ID));
         let mut memo = std::collections::HashMap::new();
-        assert_eq!(
-            fold_attachment_text(&body, tmp.path(), &KEY, &ACCOUNT_HASH, &mut memo),
-            body
+        assert!(
+            collect_attachment_texts(&body, tmp.path(), &KEY, &ACCOUNT_HASH, &mut memo).is_empty()
         );
     }
 }

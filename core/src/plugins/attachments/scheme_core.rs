@@ -175,15 +175,6 @@ pub enum ReadTextOutcome {
     ServerError,
 }
 
-/// Testable core of the Tier-1 attachment text preview (MYND-268): decode the
-/// `MYA1` blob and return its plaintext as (lossy) UTF-8 text, capped for
-/// preview. Reuses the SAME decode path as [`build_response`] but does NOT
-/// re-sniff or allowlist — the caller renders the result as inert TEXT (a
-/// read-only viewer / table / markdown render), never as an interpreted
-/// content-type, so there is no serve-time XSS surface here (that defense stays
-/// on the `attachment://` serve path). The `Zeroizing` plaintext wipes on drop;
-/// the returned `String` is the accepted non-Zeroized intermediate (V8-leak
-/// dominance, per the discipline).
 /// Non-distinguishing decode failure, shared by the text + structured previews.
 pub enum DecodeError {
     NotFound,
@@ -241,6 +232,15 @@ pub fn decode_attachment_plaintext(
     .map_err(|_| DecodeError::Denied)
 }
 
+/// Testable core of the Tier-1 attachment text preview (MYND-268): decode the
+/// `MYA1` blob and return its plaintext as (lossy) UTF-8 text, capped for
+/// preview. Reuses the SAME decode path as [`build_response`] but does NOT
+/// re-sniff or allowlist — the caller renders the result as inert TEXT (a
+/// read-only viewer / table / markdown render), never as an interpreted
+/// content-type, so there is no serve-time XSS surface here (that defense stays
+/// on the `attachment://` serve path). The `Zeroizing` plaintext wipes on drop;
+/// the returned `String` is the accepted non-Zeroized intermediate (V8-leak
+/// dominance, per the discipline).
 pub fn read_attachment_text(vault_dir: &Path, keys: &ServeKeys, id_hex: &str) -> ReadTextOutcome {
     let plaintext = match decode_attachment_plaintext(vault_dir, keys, id_hex) {
         Ok(p) => p,

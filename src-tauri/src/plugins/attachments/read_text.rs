@@ -67,7 +67,16 @@ pub async fn attachment_read_text<R: Runtime>(
     let vault_dir = crate::paths::active_vault_root_io(&app, state.active_vault_id().await)
         .map_err(|_| AttachmentReadTextError::Io)?;
 
-    match read_attachment_text(&vault_dir, &keys, &id) {
+    // Blob read + AEAD decrypt → CPU/IO-bound → spawn_blocking (the pattern of
+    // `attachment_export` and the ref scans). `keys` (Zeroizing) moves into the
+    // closure and wipes on exit.
+    let outcome = tokio::task::spawn_blocking(move || read_attachment_text(&vault_dir, &keys, &id))
+        .await
+        .map_err(|_join| {
+            tracing::error!(stage = "spawn_blocking_join", error_kind = "JoinFailure");
+            AttachmentReadTextError::Io
+        })?;
+    match outcome {
         ReadTextOutcome::Ok { text, truncated } => Ok(AttachmentTextResponse { text, truncated }),
         ReadTextOutcome::NotFound => Err(AttachmentReadTextError::NotFound),
         ReadTextOutcome::Denied => Err(AttachmentReadTextError::Denied),
@@ -117,27 +126,37 @@ pub async fn attachment_read_structured<R: Runtime>(
     };
     let vault_dir = crate::paths::active_vault_root_io(&app, state.active_vault_id().await)
         .map_err(|_| AttachmentReadTextError::Io)?;
-    let bytes = decode_attachment_plaintext(&vault_dir, &keys, &id).map_err(|e| match e {
-        DecodeError::NotFound => AttachmentReadTextError::NotFound,
-        DecodeError::Denied => AttachmentReadTextError::Denied,
-        DecodeError::ServerError => AttachmentReadTextError::Io,
-    })?;
-    match kind.as_str() {
-        "xlsx" => Ok(StructuredContent::Grid {
-            rows: extract_xlsx_grid(&bytes, STRUCTURED_PREVIEW_MAX),
-        }),
-        "docx" => Ok(StructuredContent::Blocks {
-            blocks: extract_docx_blocks(&bytes, STRUCTURED_PREVIEW_MAX)
-                .into_iter()
-                .map(|b| StructuredBlock {
-                    heading_level: match b.kind {
-                        DocxBlockKind::Heading(level) => Some(level),
-                        DocxBlockKind::Paragraph => None,
-                    },
-                    text: b.text,
-                })
-                .collect(),
-        }),
-        _ => Err(AttachmentReadTextError::NotFound),
-    }
+    // Blob read + AEAD decrypt + zip inflate + XML parse → CPU/IO-bound →
+    // spawn_blocking (the pattern of `attachment_export` and the ref scans).
+    // `keys` (Zeroizing) moves into the closure and wipes on exit.
+    tokio::task::spawn_blocking(move || {
+        let bytes = decode_attachment_plaintext(&vault_dir, &keys, &id).map_err(|e| match e {
+            DecodeError::NotFound => AttachmentReadTextError::NotFound,
+            DecodeError::Denied => AttachmentReadTextError::Denied,
+            DecodeError::ServerError => AttachmentReadTextError::Io,
+        })?;
+        match kind.as_str() {
+            "xlsx" => Ok(StructuredContent::Grid {
+                rows: extract_xlsx_grid(&bytes, STRUCTURED_PREVIEW_MAX),
+            }),
+            "docx" => Ok(StructuredContent::Blocks {
+                blocks: extract_docx_blocks(&bytes, STRUCTURED_PREVIEW_MAX)
+                    .into_iter()
+                    .map(|b| StructuredBlock {
+                        heading_level: match b.kind {
+                            DocxBlockKind::Heading(level) => Some(level),
+                            DocxBlockKind::Paragraph => None,
+                        },
+                        text: b.text,
+                    })
+                    .collect(),
+            }),
+            _ => Err(AttachmentReadTextError::NotFound),
+        }
+    })
+    .await
+    .map_err(|_join| {
+        tracing::error!(stage = "spawn_blocking_join", error_kind = "JoinFailure");
+        AttachmentReadTextError::Io
+    })?
 }
