@@ -40,3 +40,38 @@ export function shouldApplyNoteSearchResult(
 ): boolean {
   return resultSeq === latestSeq;
 }
+
+/** A one-line match-context snippet: the text just before / after the literal
+ *  query occurrence, plus the matched span itself (so the UI can highlight it).
+ *  Answers "what did this note match?" — e.g. a hit inside an image markdown
+ *  reference reads as "…link: ![Clickable image](funny-reaction-gif…" instead
+ *  of a bare "matched in body". */
+export type MatchSnippet = { before: string; match: string; after: string };
+
+/**
+ * Build a {@link MatchSnippet} around the FIRST case-insensitive literal
+ * occurrence of `query` in `body`, with up to `radius` context chars each side
+ * (whitespace collapsed to one line, ellipses at truncation). Returns `null`
+ * when the query does not occur literally (a stem-only hit) — the caller then
+ * keeps the plain "matched in body" marker. Display-only: uses `toLowerCase`
+ * (not the engine's Turkish casefold), so a Turkish-cased match may not be
+ * located; that is an acceptable degrade to the existing badge.
+ */
+export function extractMatchSnippet(
+  body: string,
+  query: string,
+  radius = 34,
+): MatchSnippet | null {
+  const q = query.trim();
+  if (q === "") return null;
+  const idx = body.toLowerCase().indexOf(q.toLowerCase());
+  if (idx < 0) return null;
+  const start = Math.max(0, idx - radius);
+  const end = Math.min(body.length, idx + q.length + radius);
+  const clean = (s: string): string => s.replace(/\s+/g, " ");
+  return {
+    before: (start > 0 ? "…" : "") + clean(body.slice(start, idx)),
+    match: body.slice(idx, idx + q.length),
+    after: clean(body.slice(idx + q.length, end)) + (end < body.length ? "…" : ""),
+  };
+}
