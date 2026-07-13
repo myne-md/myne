@@ -36,7 +36,7 @@ function wrapCommand(open: string, close: string): Command {
     cmd({ state: view.state, dispatch: view.dispatch.bind(view) });
 }
 
-const cycleHeading: Command = (view) => {
+export const cycleHeading: Command = (view) => {
   const range = view.state.selection.main;
   const line = view.state.doc.lineAt(range.from);
   const text = view.state.doc.sliceString(line.from, line.to);

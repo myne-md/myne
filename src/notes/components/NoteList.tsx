@@ -38,6 +38,7 @@ import {
 } from "../archivedFolders";
 import { ArchivePanel } from "./ArchivePanel";
 import { TrashPanel } from "./TrashPanel";
+import { sidebarCommands } from "../sidebarCommands";
 import { DeleteConfirmModal } from "./DeleteConfirmModal";
 import { deriveFolderTree, type FolderNode } from "../folderTree";
 import {
@@ -953,6 +954,19 @@ export function NoteList({ onNewFromTemplate, exportHooks }: NoteListProps = {})
   // Archive panel. Count from the value-strict `archived:` set (the disjoint
   // archive raft); memoized on cache identity like `trashCount`.
   const [archiveOpen, setArchiveOpen] = useState(false);
+  // Palette-gap Wave 4: register the sidebar-owned surfaces so the command
+  // palette (a separate subtree) can open them. Cleared on unmount so a
+  // non-editor stage's actions no-op.
+  useEffect(() => {
+    sidebarCommands.openTrash = () => setTrashOpen(true);
+    sidebarCommands.openArchive = () => setArchiveOpen(true);
+    sidebarCommands.newFolder = () => fm.startNewFolder("");
+    return () => {
+      sidebarCommands.openTrash = undefined;
+      sidebarCommands.openArchive = undefined;
+      sidebarCommands.newFolder = undefined;
+    };
+  }, [fm]);
   // Footer badge = standalone archived notes (value-strict `archived:`, NOT
   // also inside an archived folder — those show under the folder row) + the
   // top-level archived folder rows (folder-archive; each counts as one row).

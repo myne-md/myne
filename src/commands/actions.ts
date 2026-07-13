@@ -17,6 +17,8 @@ import { getActiveEditorView } from "../editor/active-view";
 import { exportSelectionAsImage } from "../lib/noteImageExport";
 import { showAttachmentToast } from "../editor/attachments/toast";
 import { openInNoteFind } from "../editor/find/find-session";
+import { cycleHeading } from "@myne/editor";
+import { sidebarCommands } from "../notes/sidebarCommands";
 import {
   setEditorLineNumbers,
   setSpellEnabled,
@@ -442,6 +444,66 @@ const showUnlinkedAction = layoutAction(
   "commands.actions.showUnlinked.label",
   (c) => c.onShowUnlinked(),
 );
+
+// ─── Wave 4: sidebar surfaces + cycle heading + restore + sync (palette-gap) ─
+
+const newFolderAction = notesAction(
+  "folder.new",
+  "commands.actions.newFolder.label",
+  () => sidebarCommands.newFolder?.(),
+  false,
+);
+const openTrashAction = notesAction(
+  "trash.open",
+  "commands.actions.openTrash.label",
+  () => sidebarCommands.openTrash?.(),
+  false,
+);
+const openArchiveAction = notesAction(
+  "archive.open",
+  "commands.actions.openArchive.label",
+  () => sidebarCommands.openArchive?.(),
+  false,
+);
+
+const cycleHeadingAction: CommandAction = {
+  id: "editor.cycle-heading",
+  get label() {
+    return i18n.t("commands.actions.cycleHeading.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.editor");
+  },
+  visibility: editorOnly,
+  run: () => {
+    const view = getActiveEditorView();
+    if (view !== null) cycleHeading(view);
+  },
+};
+
+const restoreBackupAction: CommandAction = {
+  id: "vault.restore",
+  get label() {
+    return i18n.t("commands.actions.restoreBackup.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.vault");
+  },
+  visibility: editorOnly,
+  run: (c) => c.onRestoreBackup(),
+};
+
+const toggleRealtimeSyncAction: CommandAction = {
+  id: "sync.toggle-realtime",
+  get label() {
+    return i18n.t("commands.actions.toggleRealtimeSync.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.app");
+  },
+  visibility: editorOnly,
+  run: (c) => c.onToggleRealtimeSync(),
+};
 
 
 const lockVaultAction: CommandAction = {
@@ -1194,6 +1256,13 @@ export const COMMAND_ACTIONS: readonly CommandAction[] = Object.freeze([
   showBacklinksAction,
   showOutlineAction,
   showUnlinkedAction,
+  // Wave 4 — sidebar surfaces + cycle heading + restore + sync
+  newFolderAction,
+  openTrashAction,
+  openArchiveAction,
+  cycleHeadingAction,
+  restoreBackupAction,
+  toggleRealtimeSyncAction,
   aiOpenChatAction,
   aiSummarizeNoteAction,
   aiSuggestTagsAction,

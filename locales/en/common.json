@@ -227,6 +227,12 @@
       "showBacklinks": { "label": "Show backlinks" },
       "showOutline": { "label": "Show outline" },
       "showUnlinked": { "label": "Show unlinked mentions" },
+      "newFolder": { "label": "New folder" },
+      "openTrash": { "label": "Open trash" },
+      "openArchive": { "label": "Open archive" },
+      "cycleHeading": { "label": "Cycle heading level" },
+      "restoreBackup": { "label": "Restore vault from backup…" },
+      "toggleRealtimeSync": { "label": "Toggle real-time sync" },
       "aiSummarizeNote": {
         "label": "Summarize note"
       },

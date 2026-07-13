@@ -149,6 +149,7 @@ import { ResizeHandle } from "../components/primitives/ResizeHandle";
 import { VaultSwitcher } from "../components/VaultSwitcher";
 import { useEditorLayout } from "./editorLayout";
 import { usePrefs } from "../hooks/usePrefs";
+import { useSyncPrefs } from "../hooks/useSyncPrefs";
 import {
   ContextMenu,
   type ContextMenuItem,
@@ -1696,6 +1697,10 @@ function EditorChrome({
           setPaletteOpen(false);
           setBackupExportOpen(true);
         }}
+        onRestoreBackup={() => {
+          setPaletteOpen(false);
+          onRestoreBackup();
+        }}
         onExportVaultMarkdown={() => {
           setPaletteOpen(false);
           setVaultExportOpen(true);
@@ -2095,6 +2100,7 @@ type CommandPaletteHostProps = {
   onImportObsidian: () => void;
   onImportBaseView: () => void;
   onBackupVault: () => void;
+  onRestoreBackup: () => void;
   onExportVaultMarkdown: () => void;
   onLockFlushed: () => Promise<void>;
   onToggleLeftSidebar: () => void;
@@ -2113,6 +2119,7 @@ function CommandPaletteHost({
   open,
   onClose,
   onOpenSettings,
+  onRestoreBackup,
   onOpenAttachments,
   onManageTemplates,
   onNewNoteFromTemplate,
@@ -2150,6 +2157,8 @@ function CommandPaletteHost({
   // Wave 2: layout/pane/tab/nav palette actions dispatch straight to the
   // workspace controller (CommandPaletteHost is inside WorkspaceProvider).
   const paletteWs = useWorkspace();
+  // Wave 4: the device-local real-time-sync toggle (#25).
+  const { realtimeSse, setRealtimeSse } = useSyncPrefs();
   // Drop the ephemeral AI render stores when the editor session tears down
   // (lock / vault-switch unmounts this host) — the AS1 artifacts (summary text +
   // tag suggestions + the chat transcript) never outlive the open vault (SYNC-8;
@@ -2320,6 +2329,8 @@ function CommandPaletteHost({
       onShowBacklinks: () => void revealRightPanelTab("backlinks"),
       onShowOutline: () => void revealRightPanelTab("outline"),
       onShowUnlinked: () => void revealRightPanelTab("unlinked"),
+      onRestoreBackup,
+      onToggleRealtimeSync: () => setRealtimeSse(!realtimeSse),
       onOpenAiChat: () => void revealRightPanelTab("ai-chat"),
       // Summarize the focused note into the AI Chat tab (note-summarization
       // tasks 3–4): reveal the render target, grab the focused pane's live view
@@ -2449,6 +2460,9 @@ function CommandPaletteHost({
       // ctx.prefs, so commandCtx must re-memoize on ANY pref change.
       aiPrefs,
       paletteWs,
+      realtimeSse,
+      setRealtimeSse,
+      onRestoreBackup,
       revealRightPanelTab,
       onLockFlushed,
       onOpenSettings,
