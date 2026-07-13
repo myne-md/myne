@@ -105,6 +105,7 @@ class ToolbarView implements PluginValue {
 
   /** Public: open URL overlay programmatically (Cmd+K). */
   openUrlOverlay(): void {
+    if (!this.view.state.facet(EditorView.editable)) return; // read-only view
     const range = this.view.state.selection.main;
     if (range.empty) return;
     if (isSelectionInCode(this.view.state)) return; // no link wrapping inside code
@@ -116,6 +117,14 @@ class ToolbarView implements PluginValue {
 
   private refresh(): void {
     const range = this.view.state.selection.main;
+    // Never show the formatting toolbar in a non-editable view — reading mode (or
+    // the read-only companion mirror) still allows a selection (for copy), but
+    // has nothing to format, and the buttons would dispatch changes the editor
+    // rejects. `EditorView.editable` is false there (view-mode.ts).
+    if (!this.view.state.facet(EditorView.editable)) {
+      this.dismiss();
+      return;
+    }
     // Suppress inside code (MYND-154): formatting a code selection would inject
     // literal markdown markers into the source. Also suppress when the
     // selection touches an attachment embed — an image/PDF atom is not
