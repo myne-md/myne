@@ -780,21 +780,35 @@ export class AttachmentTextPreviewWidget extends WidgetType {
     const ext = fileExt(this.filename);
     const structuredKind = ext === "xlsx" ? "xlsx" : ext === "docx" ? "docx" : null;
     const host = getHost().attachments;
+    // DEV-only diagnostic: the inline preview silently degrades to the file-card
+    // header on any failure, which makes a broken read indistinguishable from an
+    // absent seam. Surface WHY in dev so a systematic preview failure is debuggable.
+    const warnPreview = (stage: string, reason: unknown): void => {
+      if (import.meta.env.DEV) {
+        // eslint-disable-next-line no-console
+        console.warn(`[attachment-preview] ${stage} failed for ${this.filename}:`, reason);
+      }
+    };
     if (structuredKind !== null) {
       // Tier-2: Rust parses the docx/xlsx into a safe structured model.
       const readStructured = host.readStructured;
       if (readStructured === undefined) {
+        warnPreview("readStructured", "host seam undefined");
         body.remove();
       } else {
         void readStructured(this.id, structuredKind).then(
           (content) => body.replaceChildren(this.renderStructured(content)),
-          () => body.remove(),
+          (err: unknown) => {
+            warnPreview("readStructured", err);
+            body.remove();
+          },
         );
       }
     } else {
       // Tier-1: raw decrypted text (a <pre> for text/code, a <table> for csv/tsv).
       const readText = host.readText;
       if (readText === undefined) {
+        warnPreview("readText", "host seam undefined");
         body.remove(); // no seam → behave as a plain file-card
       } else {
         void readText(this.id).then(
@@ -811,8 +825,9 @@ export class AttachmentTextPreviewWidget extends WidgetType {
               body.appendChild(notice);
             }
           },
-          () => {
+          (err: unknown) => {
             // Read failed (locked / not-found / decode) — drop to the file-card.
+            warnPreview("readText", err);
             body.remove();
           },
         );
