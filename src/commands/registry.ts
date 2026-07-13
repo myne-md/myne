@@ -114,6 +114,26 @@ export type CommandContext = {
   onBackupVault: () => void;
   /** Open the whole-vault markdown export modal (three-phase, MYND-211). */
   onExportVaultMarkdown: () => void;
+  // ── Wave 2: layout / workspace / panes / tabs / navigation (palette-gap) ──
+  /** Split the focused pane to the right (row split). */
+  onSplitRight: () => void;
+  /** Split the focused pane downward (column split). */
+  onSplitDown: () => void;
+  /** Close the focused pane (no-op on the last pane). */
+  onClosePane: () => void;
+  /** Close the focused pane's active tab. */
+  onCloseTab: () => void;
+  /** Activate the next / previous tab in the focused pane (wraps). */
+  onNextTab: () => void;
+  onPrevTab: () => void;
+  /** Move focus to the next / previous pane (wraps). */
+  onFocusNextPane: () => void;
+  onFocusPrevPane: () => void;
+  /** Step the focused pane's note history back / forward. */
+  onGoBack: () => void;
+  onGoForward: () => void;
+  /** Toggle the focused pane's side-by-side companion (live preview). */
+  onTogglePreview: () => void;
   /** Collapse/expand the left (notes) sidebar (mirrors the top-bar toggle). */
   onToggleLeftSidebar: () => void;
   /** Collapse/expand the right (backlinks) sidebar (mirrors the top-bar toggle). */

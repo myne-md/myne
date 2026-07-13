@@ -283,6 +283,62 @@ const switchThemeSystemAction = switchThemeAction(
   "commands.actions.themeSystem.label",
 );
 
+// ─── Wave 2: layout / panes / tabs / navigation (palette-gap audit) ────────
+// Thin dispatchers to the workspace controller via CommandContext callbacks
+// (wired from the workspace in `commandCtx`).
+
+function layoutAction(
+  id: string,
+  labelKey: string,
+  invoke: CommandAction["run"],
+): CommandAction {
+  return {
+    id,
+    get label() {
+      return i18n.t(labelKey);
+    },
+    get category() {
+      return i18n.t("commands.actions.category.view");
+    },
+    visibility: editorOnly,
+    run: invoke,
+  };
+}
+
+const splitRightAction = layoutAction("pane.split-right", "commands.actions.splitRight.label", (c) =>
+  c.onSplitRight(),
+);
+const splitDownAction = layoutAction("pane.split-down", "commands.actions.splitDown.label", (c) =>
+  c.onSplitDown(),
+);
+const closePaneAction = layoutAction("pane.close", "commands.actions.closePane.label", (c) =>
+  c.onClosePane(),
+);
+const closeTabAction = layoutAction("tab.close", "commands.actions.closeTab.label", (c) =>
+  c.onCloseTab(),
+);
+const nextTabAction = layoutAction("tab.next", "commands.actions.nextTab.label", (c) => c.onNextTab());
+const prevTabAction = layoutAction("tab.prev", "commands.actions.prevTab.label", (c) => c.onPrevTab());
+const focusNextPaneAction = layoutAction(
+  "pane.focus-next",
+  "commands.actions.focusNextPane.label",
+  (c) => c.onFocusNextPane(),
+);
+const focusPrevPaneAction = layoutAction(
+  "pane.focus-prev",
+  "commands.actions.focusPrevPane.label",
+  (c) => c.onFocusPrevPane(),
+);
+const goBackAction = layoutAction("nav.back", "commands.actions.goBack.label", (c) => c.onGoBack());
+const goForwardAction = layoutAction("nav.forward", "commands.actions.goForward.label", (c) =>
+  c.onGoForward(),
+);
+const togglePreviewAction = layoutAction(
+  "view.toggle-preview",
+  "commands.actions.togglePreview.label",
+  (c) => c.onTogglePreview(),
+);
+
 
 const lockVaultAction: CommandAction = {
   id: "vault.lock",
@@ -1009,6 +1065,18 @@ export const COMMAND_ACTIONS: readonly CommandAction[] = Object.freeze([
   switchThemeDarkAction,
   switchThemeAmoledAction,
   switchThemeSystemAction,
+  // Wave 2 — layout / panes / tabs / navigation
+  splitRightAction,
+  splitDownAction,
+  closePaneAction,
+  closeTabAction,
+  nextTabAction,
+  prevTabAction,
+  focusNextPaneAction,
+  focusPrevPaneAction,
+  goBackAction,
+  goForwardAction,
+  togglePreviewAction,
   aiOpenChatAction,
   aiSummarizeNoteAction,
   aiSuggestTagsAction,
