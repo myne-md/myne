@@ -41,7 +41,11 @@ const rowBaseStyle: CSSProperties = {
 
 const nameStyle: CSSProperties = {
   fontSize: 13,
-  fontWeight: 600,
+  // Matched to the note-row title weight (`NoteRow.titleStyle`, 500) so a
+  // folder heading and a note heading read at the same size — the folder icon
+  // (enlarged below) carries the container's visual weight instead of bolder
+  // text.
+  fontWeight: 500,
   color: "var(--fg-2)",
   whiteSpace: "nowrap",
   overflow: "hidden",
@@ -157,8 +161,8 @@ function FolderIconGlyph({
 }) {
   return (
     <svg
-      width={15}
-      height={15}
+      width={17}
+      height={17}
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
@@ -182,7 +186,7 @@ function FolderIconGlyph({
 function FolderIcon({ open }: { open: boolean }) {
   return (
     <span
-      style={{ position: "relative", width: 15, height: 15, flexShrink: 0 }}
+      style={{ position: "relative", width: 17, height: 17, flexShrink: 0 }}
       aria-hidden="true"
     >
       <FolderIconGlyph
@@ -384,7 +388,7 @@ export function FolderRow({
         <div style={insertionLineStyle(reorderPlace)} aria-hidden="true" />
       )}
       {iconName ? (
-        <FolderGlyph name={iconName} style={{ color: "var(--fg-3)" }} />
+        <FolderGlyph name={iconName} size={17} style={{ color: "var(--fg-3)" }} />
       ) : (
         <FolderIcon open={expanded} />
       )}
