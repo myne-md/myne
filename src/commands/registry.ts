@@ -153,6 +153,11 @@ export type CommandContext = {
   onShowBacklinks: () => void;
   onShowOutline: () => void;
   onShowUnlinked: () => void;
+  // ── Wave 4 ──
+  /** Route into the restore-from-backup flow (sibling of onBackupVault). */
+  onRestoreBackup: () => void;
+  /** Toggle the device-local real-time (SSE) sync connection. */
+  onToggleRealtimeSync: () => void;
   /** Collapse/expand the left (notes) sidebar (mirrors the top-bar toggle). */
   onToggleLeftSidebar: () => void;
   /** Collapse/expand the right (backlinks) sidebar (mirrors the top-bar toggle). */

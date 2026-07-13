@@ -8,6 +8,9 @@ export { myneExtensions } from "./extensions";
 export { editorCommands } from "./toolbar/commands";
 export type { ToolbarCommand, EditorCommandId } from "./toolbar/commands";
 export { setToolbarLayout } from "./toolbar/plugin";
+// MYND palette-gap: the heading-level cycle command (Mod-Shift-h), exposed so a
+// command-palette action can run it on the active view.
+export { cycleHeading } from "./keymap";
 export { setEditorHost, getHost } from "./host";
 export type { EditorHost, EditorPrefs, TagTreeNode, SpellWord } from "./host";
 export type { ResolverNote } from "./host/notes/resolveWikilink";
