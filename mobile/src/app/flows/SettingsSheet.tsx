@@ -19,6 +19,7 @@ import { useSyncStatus, type SyncStatus } from "../../lib/use-sync-status";
 import { ioBanner } from "../../lib/io-banner";
 import { usePrefs } from "../../lib/use-prefs";
 import { bumpPrefsNonce } from "../../lib/prefsNonce";
+import { vaultDisplayLabel, VAULT_FALLBACK_LABEL } from "../../lib/vault-label";
 import {
   setTheme as persistTheme,
   setShowNoteTimestamps,
@@ -895,7 +896,7 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
           <>
             <SectionLabel mt={6}>Options</SectionLabel>
             <Group>
-              <CategoryRow first glyph="account" label="Account" value={eff.label ?? "Personal"} onClick={() => setPanel("account")} />
+              <CategoryRow first glyph="account" label="Account" value={vaultDisplayLabel(eff.label)} onClick={() => setPanel("account")} />
               <CategoryRow glyph="appearance" label="Appearance" onClick={() => setPanel("appearance")} />
               <CategoryRow glyph="editor" label="Editor" onClick={() => setPanel("editor")} />
               <CategoryRow
@@ -965,7 +966,7 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
               >
                 <span style={rowLabel}>Vault name</span>
                 <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <span style={{ fontSize: 16, color: "var(--fg-3)" }}>{eff.label ?? "Personal"}</span>
+                  <span style={{ fontSize: 16, color: "var(--fg-3)" }}>{vaultDisplayLabel(eff.label)}</span>
                   <RowChevron />
                 </span>
               </Row>
@@ -1176,7 +1177,7 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
         {panel === "rename" && (
           <div>
             <FieldLabel mt={4}>Vault name</FieldLabel>
-            <SheetInput value={renameText} onChange={setRenameText} autoFocus placeholder="Personal" />
+            <SheetInput value={renameText} onChange={setRenameText} autoFocus placeholder={VAULT_FALLBACK_LABEL} />
             <div style={{ marginTop: 14, fontSize: 13, lineHeight: 1.5, color: "var(--fg-3)" }}>
               Shown in the vault switcher. Stored encrypted inside this vault; leave blank to clear it.
             </div>

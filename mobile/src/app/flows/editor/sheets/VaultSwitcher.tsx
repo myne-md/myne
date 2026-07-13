@@ -1,4 +1,5 @@
 import { Icon, MyneMark, Sheet } from "../../../../components";
+import { vaultDisplayLabel } from "../../../../lib/vault-label";
 import type { VaultSummary } from "../../../../types/vault-summary";
 
 /** Vault switcher sheet (the "Personal ▾" chevron's target). */
@@ -45,7 +46,7 @@ export function VaultSwitcher({
               }}
             >
               <MyneMark size={22} radius={4} />
-              <span style={{ flex: 1, fontSize: 16, color: "var(--fg-1)" }}>{v.label ?? "Vault"}</span>
+              <span style={{ flex: 1, fontSize: 16, color: "var(--fg-1)" }}>{vaultDisplayLabel(v.label)}</span>
               {active && <Icon name="check" size={18} color="var(--accent)" strokeWidth={2} />}
             </div>
           );

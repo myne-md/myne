@@ -15,6 +15,7 @@ import { consumePendingCapture, CAPTURE_EVENT, type CaptureMode } from "../../li
 import { drainPendingCaptures, sealStagedCaptures } from "../../lib/captures";
 import { ioBanner } from "../../lib/io-banner";
 import { usePrefs } from "../../lib/use-prefs";
+import { vaultDisplayLabel } from "../../lib/vault-label";
 import { useSwipeBack } from "../../lib/use-swipe-back";
 import { setFavorites } from "../../lib/prefs";
 import { bumpPrefsNonce } from "../../lib/prefsNonce";
@@ -1156,7 +1157,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
             the tab content slides between pages. */}
         {chrome.header && tab !== "templates" && (
           <AppHeader
-            label={prefs.label ?? "Personal"}
+            label={vaultDisplayLabel(prefs.label)}
             onSwitcher={() => setSwitcherOpen(true)}
             onPalette={() => setPaletteOpen(true)}
             onSettings={() => setSettingsOpen(true)}
@@ -1938,7 +1939,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
       <div data-testid="workspace.split" style={{ flex: 1, minHeight: 0, display: "flex" }}>
         {sizeClass === "expanded" && (
           <SidebarPane
-            label={prefs.label ?? "Personal"}
+            label={vaultDisplayLabel(prefs.label)}
             tab={tab}
             listView={listView}
             onAllNotes={() => { setTab("notes"); setListView("notes"); setActiveTag(null); setActiveViewId(null); }}
