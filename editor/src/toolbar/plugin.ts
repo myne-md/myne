@@ -15,7 +15,7 @@ import {
 } from "@codemirror/view";
 import { computePosition } from "../positioning";
 import { ensureFloatingStyles } from "../floating-styles";
-import { wrapCommand, applyHeadingLevel } from "./commands";
+import { wrapCommand, applyHeadingLevel, currentHeadingLevel } from "./commands";
 import { isSelectionInCode } from "../code-context";
 import { rangeOverlapsAttachmentEmbed } from "../decorations/attachment-embed";
 import i18n from "@myne/editor/i18n";
@@ -59,6 +59,43 @@ function getToolbarLayout(): readonly string[] | null {
   return toolbarLayout;
 }
 
+/** Handler the host wires to run the selection→image export (MYND-361). Crosses
+ *  the editor→app seam like {@link setToolbarLayout}; `null` when unset (mobile,
+ *  or before the host mounts) — the toolbar then omits the export button. */
+let selectionExportHandler: (() => void) | null = null;
+export function setSelectionExportHandler(fn: (() => void) | null): void {
+  selectionExportHandler = fn;
+}
+
+/** Feather-style "image" icon for the export button (static UI chrome, built via
+ *  the DOM — no innerHTML). */
+function makeExportImageIcon(): SVGElement {
+  const ns = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(ns, "svg");
+  svg.setAttribute("width", "15");
+  svg.setAttribute("height", "15");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("fill", "none");
+  svg.setAttribute("stroke", "currentColor");
+  svg.setAttribute("stroke-width", "2");
+  svg.setAttribute("stroke-linecap", "round");
+  svg.setAttribute("stroke-linejoin", "round");
+  const rect = document.createElementNS(ns, "rect");
+  rect.setAttribute("x", "3");
+  rect.setAttribute("y", "3");
+  rect.setAttribute("width", "18");
+  rect.setAttribute("height", "18");
+  rect.setAttribute("rx", "2");
+  const circle = document.createElementNS(ns, "circle");
+  circle.setAttribute("cx", "8.5");
+  circle.setAttribute("cy", "8.5");
+  circle.setAttribute("r", "1.5");
+  const path = document.createElementNS(ns, "path");
+  path.setAttribute("d", "M21 15l-5-5L5 21");
+  svg.append(rect, circle, path);
+  return svg;
+}
+
 // Multi-color highlight palette (decisions.md 2026-06-15). Yellow is the
 // DEFAULT: it emits `==…==` (byte-identical to the pre-color behaviour, MYND-156)
 // and is what a plain click on the "H" button applies. The other four wrap the
@@ -90,6 +127,15 @@ class ToolbarView implements PluginValue {
   }
 
   update(update: ViewUpdate): void {
+    // Dismiss when the editor loses focus (e.g. the Settings modal opens over
+    // it) — the body-mounted toolbar would otherwise linger on top of other UI.
+    // Only a real blur dismisses; showing is NOT gated on focus (a selection set
+    // programmatically, or before focus lands, must still surface the toolbar).
+    // The URL-overlay input legitimately holds focus, so keep it up then.
+    if (update.focusChanged && !update.view.hasFocus && !this.urlOverlayOpen) {
+      this.dismiss();
+      return;
+    }
     if (
       update.selectionSet ||
       update.docChanged ||
@@ -123,14 +169,6 @@ class ToolbarView implements PluginValue {
     // has nothing to format, and the buttons would dispatch changes the editor
     // rejects. `EditorView.editable` is false there (view-mode.ts).
     if (!this.view.state.facet(EditorView.editable)) {
-      this.dismiss();
-      return;
-    }
-    // Dismiss when the editor loses focus — e.g. the Settings modal opens over
-    // it. Without this the body-mounted toolbar lingers on top of other UI. The
-    // URL-overlay input legitimately takes focus away from the editor, so keep
-    // the surface up while it's open.
-    if (!this.view.hasFocus && !this.urlOverlayOpen) {
       this.dismiss();
       return;
     }
@@ -241,6 +279,12 @@ class ToolbarView implements PluginValue {
     // MYND-336: render the controls in the user's resolved layout order, hidden
     // ones already filtered out by the host. Falls back to the default layout.
     const layout = getToolbarLayout() ?? DEFAULT_TOOLBAR_LAYOUT;
+    // Obsidian-style leading block-type indicator: the heading control renders
+    // FIRST (far left) and shows the CURRENT block type, not a generic "H▾" on
+    // the right. It is skipped in the layout loop below so it isn't rendered twice.
+    if (layout.includes("heading")) {
+      this.renderBlockTypeControl(container);
+    }
     for (const id of layout) {
       switch (id) {
         case "bold":
@@ -260,14 +304,35 @@ class ToolbarView implements PluginValue {
           this.renderLinkButton(container);
           break;
         case "heading":
-          this.renderHeadingDropdown(container);
-          break;
+          break; // rendered as the leading block-type control above
         default:
           // The addable list/quote/wikilink commands are not yet rendered on the
           // floating toolbar (MYND-336 follow-up); config still persists them.
           break;
       }
     }
+    // Trailing export-selection-as-image button (MYND-361) — only when the host
+    // wired the handler. A separate fixed control (not part of the reorderable
+    // vocabulary) so it can't be lost from the layout.
+    if (selectionExportHandler !== null) {
+      this.renderExportButton(container);
+    }
+  }
+
+  /** The export-selection-as-image button (MYND-361). Delegates to the
+   *  host-wired handler which reads the editor-state selection + saves a PNG. */
+  private renderExportButton(container: HTMLDivElement): void {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "cm-toolbar-button cm-toolbar-button-export";
+    btn.title = i18n.t("editor.toolbar.exportImageTitle");
+    btn.setAttribute("aria-label", i18n.t("editor.toolbar.exportImageTitle"));
+    btn.appendChild(makeExportImageIcon());
+    btn.addEventListener("mousedown", (e) => {
+      e.preventDefault();
+      selectionExportHandler?.();
+    });
+    container.appendChild(btn);
   }
 
   /** One simple inline-formatting button (bold/italic/strike/code). */
@@ -305,15 +370,20 @@ class ToolbarView implements PluginValue {
     container.appendChild(link);
   }
 
-  /** The heading-level dropdown (H▾ → paragraph / H1..H6). */
-  private renderHeadingDropdown(container: HTMLDivElement): void {
+  /** Leading block-type control: shows the CURRENT block type (Text / H1..H6)
+   *  on the far left (Obsidian parity) and opens the paragraph/H1..H6 dropdown. */
+  private renderBlockTypeControl(container: HTMLDivElement): void {
+    const level = currentHeadingLevel(this.view);
+    const label =
+      level === 0 ? i18n.t("editor.toolbar.heading.paragraph") : `H${level}`;
     const headingWrap = document.createElement("div");
-    headingWrap.className = "cm-toolbar-heading-wrap";
+    headingWrap.className = "cm-toolbar-heading-wrap cm-toolbar-blocktype-wrap";
     headingWrap.style.position = "relative";
     const headingBtn = document.createElement("button");
     headingBtn.type = "button";
-    headingBtn.className = "cm-toolbar-button";
-    headingBtn.textContent = "H▾";
+    headingBtn.className = "cm-toolbar-button cm-toolbar-blocktype";
+    // Current type + a caret so it reads as an opener.
+    headingBtn.textContent = `${label} ▾`;
     headingBtn.addEventListener("mousedown", (e) => {
       e.preventDefault();
       this.openDropdown = this.openDropdown === "heading" ? null : "heading";
