@@ -24,7 +24,9 @@
 //! - Fallback if `-PLUS` channel binding slips: cert-pinning only (the exporter
 //!   call is then simply unused).
 
-use super::http_codec::{build_http_request_ext, keepalive_roundtrip, read_response_head};
+use super::http_codec::{
+    build_http_request_ext, keepalive_roundtrip, read_http_response, read_response_head,
+};
 use super::http_transport::SOCKET_TIMEOUT;
 use super::transport::{
     HttpMethod, SseOpenError, SseStream, SyncTransport, TransportError, TransportResponse,
@@ -292,6 +294,48 @@ impl SyncTransport for RustlsTransport {
             &req,
             method == HttpMethod::Head,
         )
+    }
+
+    fn request_bound_to_exporter(
+        &self,
+        method: HttpMethod,
+        path: &str,
+        token: Option<&str>,
+        label: &[u8],
+        out_len: usize,
+        build_body: &dyn Fn(&[u8]) -> Vec<u8>,
+    ) -> Result<TransportResponse, TransportError> {
+        // A dedicated pinned connection (like open_sse), so the tls-exporter is
+        // computed over the EXACT connection this request is sent on — independent
+        // of the shared keep-alive slot. Same PinnedVerifier config → identical A4
+        // pin. Drive the handshake to completion first so the exporter secret exists.
+        let mut stream = self.connect()?;
+        while stream.conn.is_handshaking() {
+            stream
+                .conn
+                .complete_io(&mut stream.sock)
+                .map_err(|_| TransportError::Tls)?;
+        }
+        // `None` context matches the Go server's `nil` (proven byte-identical under
+        // TLS 1.3, F5). The body embeds the exporter as the SCRAM client-final cbind.
+        let out = vec![0u8; out_len];
+        let ekm = stream
+            .conn
+            .export_keying_material(out, label, None)
+            .map_err(|_| TransportError::Tls)?;
+        let body = build_body(&ekm);
+        let req = build_http_request_ext(method, path, &self.host, &[], &body, token);
+        stream
+            .write_all(&req)
+            .and_then(|_| stream.flush())
+            .map_err(|_| TransportError::Network)?;
+        let mut reader = BufReader::new(stream);
+        let (resp, _reuse) = read_http_response(&mut reader, method == HttpMethod::Head)
+            .map_err(|_| TransportError::Network)?;
+        Ok(TransportResponse {
+            status: resp.status,
+            body: resp.body,
+        })
     }
 
     fn open_sse(

@@ -344,6 +344,13 @@ pub async fn complete_recovery<R: Runtime>(
     // a working search index — full-rebuild if no blob exists yet.
     hooks.hydrate_search_index(state.inner()).await;
 
+    // F1: recovery reset just rewrote the password-side wrap of `vault.meta`
+    // (root_key preserved). Best-effort push it so a second device derives
+    // root_key against the NEW password wrap, not the stale server copy — same
+    // rationale and non-blocking posture as the change-password path. Offline
+    // leaves the `vault.meta-dirty` marker for the sync loop's meta phase.
+    let _ = crate::plugins::sync::commands::push_vault_meta_now(&app).await;
+
     Ok(())
 }
 

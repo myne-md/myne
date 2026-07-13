@@ -96,6 +96,17 @@ pub async fn change_password<R: Runtime>(
         // for every plaintext surface, not just "main".
         hooks.pdf_export_teardown_on_lock();
     }
+
+    // F1: on SUCCESS the on-disk `vault.meta` had its password-side wrap rotated
+    // (root_key unchanged). Best-effort push it to the server now so a joining or
+    // second device derives root_key against the NEW wrap, not the stale one —
+    // otherwise the new password fails to unlock elsewhere. Non-blocking and
+    // failure-tolerant: offline just leaves the `vault.meta-dirty` marker for the
+    // sync loop's meta phase. Only on Ok — the force-relock / IO error paths must
+    // not push a possibly-inconsistent meta. Shared core → covers desktop + mobile.
+    if result.is_ok() {
+        let _ = crate::plugins::sync::commands::push_vault_meta_now(&app).await;
+    }
     result
 }
 

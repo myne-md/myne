@@ -129,6 +129,30 @@ pub trait SyncTransport: Send + Sync {
         let _ = (path, token, read_timeout);
         Err(SseOpenError::Unsupported)
     }
+
+    /// Send a request whose body is bound to the RFC 9266 `tls-exporter` of the
+    /// connection it is sent on — the SCRAM client-final channel binding (F5).
+    /// Opens a connection, computes the exporter, hands it to `build_body` (which
+    /// embeds it in client-final), then sends that body on the SAME connection, so
+    /// the server — computing the exporter over the connection the final arrives on
+    /// — sees the identical value. The closure shape is required because the body
+    /// depends on the exporter, which depends on the connection. Default: an EMPTY
+    /// exporter — correct for the [`FakeTransport`]/any non-TLS double AND for a
+    /// proxy-terminated deployment, where the server likewise binds to empty. Only
+    /// the real TLS transport overrides this to compute a live exporter.
+    fn request_bound_to_exporter(
+        &self,
+        method: HttpMethod,
+        path: &str,
+        token: Option<&str>,
+        label: &[u8],
+        out_len: usize,
+        build_body: &dyn Fn(&[u8]) -> Vec<u8>,
+    ) -> Result<TransportResponse, TransportError> {
+        let _ = (label, out_len);
+        let body = build_body(&[]);
+        self.request(method, path, &body, token)
+    }
 }
 
 /// A live SSE stream (the `/sync/poke` change-notification channel): a

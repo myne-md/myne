@@ -506,6 +506,68 @@ pub async fn run_active_cycle<R: Runtime>(app: &AppHandle<R>, allow_push: bool) 
     }
 }
 
+/// Best-effort: push the current on-disk `vault.meta` to the server right now, so
+/// a local credential change (password change / recovery reset) is reflected
+/// server-side immediately instead of going stale until the next device enrols
+/// (F1). A stale server `vault.meta` makes a joining device derive `root_key`
+/// against the OLD password-side wrap and fail to unlock with the new password.
+///
+/// Deliberately **best-effort and non-blocking**: it never fails the caller. Any
+/// not-ready state (sync disabled, not enrolled, vault locked / no stored token)
+/// is a silent no-op, and a transport failure only writes the `vault.meta-dirty`
+/// marker so the sync loop's meta phase (F1 Faz B) pushes it later. Returns
+/// `true` only when the server accepted the PUT. A still-pending device (no
+/// stored token yet) no-ops without marking dirty — enrolment re-seeds meta.
+pub async fn push_vault_meta_now<R: Runtime>(app: &AppHandle<R>) -> bool {
+    // Serialize with cycles / reset — same guard run_active_cycle uses, so a push
+    // never races the loop's own meta read-modify-write.
+    let _cycle_guard = sync_cycle_mutex().lock().await;
+    let Ok(cfg) = config_path(app).and_then(|p| read_config(&p)) else {
+        return false;
+    };
+    let pins = config_pins(&cfg);
+    let Some(url) = cfg.endpoint_url else {
+        return false; // sync disabled
+    };
+    let Some(state) = app.try_state::<VaultRuntimeState>() else {
+        return false;
+    };
+    let Ok(dir) = crate::paths::active_vault_root_io(app, state.active_vault_id().await) else {
+        return false;
+    };
+    // Stored per-device token only. A still-pending device no-ops (its meta is
+    // seeded when enrollment completes), and does NOT get marked dirty.
+    let token = match super::token_store::default_store().read(&dir) {
+        Ok(Some(t)) => t,
+        _ => return false,
+    };
+    let Ok(meta_bytes) = std::fs::read(dir.join("vault.meta")) else {
+        return false;
+    };
+    let mut token_hex = String::with_capacity(token.len() * 2);
+    for b in &token {
+        token_hex.push_str(&format!("{b:02x}"));
+    }
+    let url_moved = url.clone();
+    let res = tokio::task::spawn_blocking(move || {
+        let transport = super::http_transport::build_transport(&url_moved, pins).map_err(|_| ())?;
+        super::enroll::put_vault_meta(transport.as_ref(), &token_hex, &meta_bytes).map_err(|_| ())
+    })
+    .await;
+    match res {
+        Ok(Ok(())) => {
+            // Pushed — the local change reached the server; clear any prior dirt.
+            let _ = super::state::clear_vault_meta_dirty(&dir);
+            true
+        }
+        _ => {
+            // Offline / transport / join error: remember to push later (Faz B).
+            let _ = super::state::mark_vault_meta_dirty(&dir);
+            false
+        }
+    }
+}
+
 /// Request an immediate sync ("sync now" affordance, task 10). Runs one real
 /// full cycle (pull head-verify + rollback-reject → download → write to disk →
 /// push local changes under a fresh head → persist). Returns the resulting

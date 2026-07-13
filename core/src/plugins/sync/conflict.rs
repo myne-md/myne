@@ -201,6 +201,29 @@ pub enum ConflictError {
     RecoverySideDivergence,
     /// The two metas describe different vaults (account_number_hash mismatch).
     VaultMismatch,
+    /// The vault-shared invariants (KDF params or the itemsKey wrap) diverge.
+    /// Every device unwraps the SAME `root_key` and the SAME `itemsKey`, so these
+    /// must be byte-identical across devices; a divergence means the two metas are
+    /// for different credential/items epochs and merging would strand the vault.
+    InvariantDivergence,
+}
+
+/// Deterministic, commutative winner for a CONCURRENT `vault.meta` password-side
+/// change (F1 Faz B). When two devices each rotated their password before either
+/// synced, both must independently pick the SAME winner so the fleet converges
+/// with no server-side version counter and no ping-pong. The rule: the greater
+/// `enc_root_key_password` (lexicographic byte compare) wins — a total order over
+/// the only field that legitimately differs (recovery-side + itemsKey + KDF are
+/// invariant, enforced by [`merge_vault_meta`]). Ties (byte-identical wraps) are
+/// the same password anyway, so `Local` is a harmless default. NOTE: this is only
+/// the tiebreak for a genuine concurrent change; a device with no local change
+/// adopts the remote outright (it never reaches this function).
+pub fn meta_password_side_winner(local: &VaultMeta, remote: &VaultMeta) -> MetaWinner {
+    if remote.enc_root_key_password > local.enc_root_key_password {
+        MetaWinner::Remote
+    } else {
+        MetaWinner::Local
+    }
 }
 
 /// Bespoke `vault.meta` merge (story 4). The recovery-side (the recovery salt,
@@ -223,6 +246,20 @@ pub fn merge_vault_meta(
         || local.enc_root_key_recovery != remote.enc_root_key_recovery
     {
         return Err(ConflictError::RecoverySideDivergence);
+    }
+    // Vault-shared invariants (KDF params + the itemsKey wrap) MUST agree across
+    // devices — every device unwraps the SAME root_key and the SAME itemsKey. A
+    // password change rewraps ONLY the password-side, so these are byte-identical
+    // on both inputs; a divergence means one meta is for a different
+    // credential/items epoch, and picking a winner could hand back a clone whose
+    // itemsKey no longer opens the notes. Refuse rather than paper over
+    // (defense-in-depth; the old merge validated only account_hash + recovery).
+    if local.kdf_params != remote.kdf_params
+        || local.items_key_id != remote.items_key_id
+        || local.items_key_nonce != remote.items_key_nonce
+        || local.enc_items_key != remote.enc_items_key
+    {
+        return Err(ConflictError::InvariantDivergence);
     }
     // Take the winner's password-side; recovery-side (shared) rides along.
     let mut merged = match winner {
@@ -451,6 +488,74 @@ mod tests {
         assert_eq!(
             merge_vault_meta(&local, &remote, MetaWinner::Local),
             Err(ConflictError::VaultMismatch)
+        );
+    }
+
+    #[test]
+    fn vault_meta_merge_rejects_items_key_divergence() {
+        // The itemsKey wrap must be identical across devices (same shared
+        // itemsKey). A divergent enc_items_key would strand notes on the loser.
+        let local = meta(0xAA, 0x55);
+        let mut remote = meta(0xBB, 0x55);
+        remote.enc_items_key = [0xEE; VAULT_META_WRAPPED_ITEMS_KEY_LEN];
+        assert_eq!(
+            merge_vault_meta(&local, &remote, MetaWinner::Remote),
+            Err(ConflictError::InvariantDivergence)
+        );
+        // items_key_id and items_key_nonce are equally load-bearing.
+        let mut remote_id = meta(0xBB, 0x55);
+        remote_id.items_key_id = [0xEE; VAULT_META_ITEMS_KEY_ID_LEN];
+        assert_eq!(
+            merge_vault_meta(&local, &remote_id, MetaWinner::Remote),
+            Err(ConflictError::InvariantDivergence)
+        );
+        let mut remote_nonce = meta(0xBB, 0x55);
+        remote_nonce.items_key_nonce = [0xEE; VAULT_META_NONCE_LEN];
+        assert_eq!(
+            merge_vault_meta(&local, &remote_nonce, MetaWinner::Remote),
+            Err(ConflictError::InvariantDivergence)
+        );
+    }
+
+    #[test]
+    fn meta_tiebreak_is_symmetric_and_deterministic() {
+        // The concurrent-change tiebreak must pick the SAME winner regardless of
+        // which side is "local" (commutative) — the property that lets two devices
+        // converge with no server version counter.
+        let a = meta(0xAA, 0x55);
+        let b = meta(0xBB, 0x55);
+        // From A's view (local=a, remote=b) and B's view (local=b, remote=a), the
+        // WINNING bytes must be identical (0xBB, the greater password-side).
+        let win_from_a = match meta_password_side_winner(&a, &b) {
+            MetaWinner::Local => &a,
+            MetaWinner::Remote => &b,
+        };
+        let win_from_b = match meta_password_side_winner(&b, &a) {
+            MetaWinner::Local => &b,
+            MetaWinner::Remote => &a,
+        };
+        assert_eq!(
+            win_from_a.enc_root_key_password,
+            win_from_b.enc_root_key_password
+        );
+        assert_eq!(
+            win_from_a.enc_root_key_password,
+            [0xBB; VAULT_META_WRAPPED_ROOT_KEY_LEN]
+        );
+    }
+
+    #[test]
+    fn vault_meta_merge_rejects_kdf_params_divergence() {
+        // KDF params must agree — a mismatch means a different credential epoch.
+        let local = meta(0xAA, 0x55);
+        let mut remote = meta(0xBB, 0x55);
+        remote.kdf_params = protocol::KdfParams {
+            m_kib: local.kdf_params.m_kib + 1024,
+            ..local.kdf_params
+        };
+        assert_eq!(
+            merge_vault_meta(&local, &remote, MetaWinner::Remote),
+            Err(ConflictError::InvariantDivergence)
         );
     }
 }
