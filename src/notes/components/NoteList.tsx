@@ -59,6 +59,7 @@ import { DecorationPopover } from "./DecorationPopover";
 import { Toast } from "../../components/Toast";
 import { FolderRow } from "./FolderRow";
 import { NoteRow } from "./NoteRow";
+import { TreeRails } from "./TreeRails";
 import {
   createFolderNote,
   setFolderIndex,
@@ -2275,6 +2276,7 @@ function PopulatedList({
                     paddingLeft: row.depth * NOTE_INDENT_PER_LEVEL,
                   }}
                   draggable={ctx.renamingId === null}
+                  data-note-depth={row.depth}
                   onDragStart={(e) => fm.onNoteDragStart(e, id)}
                   onDragEnd={fm.onDragEndCleanup}
                   onDragOver={(e) => {
@@ -2292,6 +2294,7 @@ function PopulatedList({
                     void fm.onNoteReorder(id, dragEdge(e));
                   }}
                 >
+                  <TreeRails depth={row.depth} />
                   {reorderPlace && (
                     <div
                       style={insertionLineStyle(reorderPlace)}
