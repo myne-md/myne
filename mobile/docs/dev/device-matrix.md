@@ -82,6 +82,20 @@ biometric gate, which no compile or simulator run catches). Walk on a physical i
 | 4.1.6 | **Password change invalidates** — change the master password, auto-lock, reopen | no biometric affordance; the credential (blob + Keychain item) was wiped |
 | 4.1.7 | **Non-authenticated read fails** — attempt the Keychain read without biometric auth (e.g. cancel and inspect via a debugger that the wrap key was NOT returned) | the read errors; no wrap-key bytes reach the app without a passed prompt |
 
+### 4.2 Apple Watch capture drain (§9.18 MYK1; E2E-gap #37)
+
+The watch → WatchConnectivity → device-keychain-sealed MYK1 queue → drain-into-vault path
+crosses a transport + a device-keychain seam that no automated tier exercises (the flow-logic
+`captures/drain.flow.ts` drives only the JS `take_pending → note_create → ack` against a canned
+mock; the Rust seal/queue/decode is cargo-covered; the MYK1 byte layout is vector-covered). This
+row is the only coverage of the join between those proven ends. Requires a paired Watch + iPhone.
+
+| # | Scenario | Expected |
+|---|---|---|
+| 4.2.1 | **Dictate while phone locked** — record a note on the Watch with the iPhone locked | the capture is queued (WatchConnectivity delivered), NOT dropped; nothing decrypts on the Watch |
+| 4.2.2 | **Drain on unlock** — unlock the phone, land in the editor | each queued capture becomes a real note and is acked; the MYK1 queue empties (device-keychain `wrap_key` seal, NOT `root_key`-derived) |
+| 4.2.3 | **Multi-capture ordering** — dictate several before unlocking | all drain, none lost or duplicated (each `capture_id` acked once) |
+
 ## 5. Cadence
 
 **Per release.** Log device model + iOS build + server (hosted / self-host) + pass/fail per scenario
