@@ -796,9 +796,20 @@ export async function setFolderIcons(icons: Record<string, string>): Promise<voi
  */
 export const VAULT_PREFS_CHANGED_EVENT = "myne:vault-prefs-changed";
 
+/**
+ * Tauri event the sync loop emits after merging a REMOTE `vault.prefs` change
+ * onto disk (MYND-478; `PREFS_CHANGED_EVENT` in `core`). Never fired for the
+ * user's own IPC writes (their own resolve is the signal). Contentless — the
+ * listener re-reads. `Editor.tsx` bridges it into `VAULT_PREFS_CHANGED_EVENT`
+ * + the prefs nonce so an incoming rename shows live.
+ */
+export const PREFS_SYNC_APPLIED_EVENT = "myne://prefs-changed";
+
 /** Notify live-refresh listeners that a switcher-visible prefs field changed.
- *  No-op outside a DOM context (e.g. a non-browser test runner). */
-function notifyVaultPrefsChanged(): void {
+ *  No-op outside a DOM context (e.g. a non-browser test runner). Exported for
+ *  the `PREFS_SYNC_APPLIED_EVENT` bridge (a sync-applied change needs the same
+ *  window-level signal a local write dispatches). */
+export function notifyVaultPrefsChanged(): void {
   if (typeof window !== "undefined") {
     window.dispatchEvent(new CustomEvent(VAULT_PREFS_CHANGED_EVENT));
   }

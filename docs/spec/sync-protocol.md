@@ -346,11 +346,50 @@ A concurrent edit to the same note resolves by **keeping both versions**: the lo
 
 ### 10.2 Singletons — post-decrypt field/set merge
 
-Structured singletons merge **field-by-field after decryption**, following `protocol.md` §9.5.2 **exactly** — do not re-derive the taxonomy here, cite it:
+Structured singletons merge **field-by-field after decryption**, in RAM (SYNC-3: the plaintext never rests outside the AEAD'd blob), with field names and value shapes following `protocol.md` §9.5.2 **exactly** — do not re-derive the codec taxonomy here, cite it.
 
-- **Set-union** (sorted, deduplicated): `deliberate_folders`, `hidden_bar_items`.
-- **Sequence-LWW-on-whole** (the whole ordered list is replaced, never per-element merged): `item_order`, `favorites`, `view_order`.
-- **Scalar LWW**: every remaining `vault.prefs` field (`screen_capture_protection`, `label`, `theme`, `auto_lock_seconds`, `custom_theme`, the `daily_*` / `editor_*` fields, `active_workspace`, `editor_default_view_mode`, `editor_layout`, the `editor_focus_*` flags, and the §9.1 `last_active_note`).
+**Revised 2026-07-13 (MYND-478; supersedes this section's original "every remaining field is scalar-LWW" posture — see `decisions.md`).** `vault.prefs` fields are normatively partitioned into two classes:
+
+- a **shared pref** describes the *vault* — its identity, content organization, and vault-level conventions — and syncs;
+- a **device-local pref** describes how *this device* presents, secures, or operates on the vault — it never crosses the merge (the local value always survives), even though the whole encrypted blob transits the server (the same bytes already leave the device inside `MYB1` backups).
+
+The table below is the **single normative classification**. The implementation mirrors it in exactly one place, guarded by a conformance test that fails when a new prefs field ships unclassified. A future field lands with a row here in the same change.
+
+| Field(s) | Class | Merge discipline |
+|---|---|---|
+| `label`, `icon` | shared | scalar-LWW |
+| `archive_disabled` | shared | scalar-LWW |
+| `daily_date_format`, `daily_folder`, `daily_template` | shared | scalar-LWW |
+| `new_note_location`, `new_note_location_folder` | shared | scalar-LWW |
+| `deliberate_folders`, `archived_folders`, `ai_excluded_folders`, `spell_languages` | shared | set-union (sorted, deduplicated; clockless) |
+| `favorites`, `item_order`, `view_order` | shared | sequence-LWW-on-whole (the whole ordered list is replaced, never per-element merged; one clock per list) |
+| `saved_views` | shared | whole-value LWW (the whole array is replaced; one clock) |
+| `folder_icons`, `item_colors` | shared | whole-value LWW (the whole map is replaced; one clock) |
+| `device_names` | shared | **per-key map merge** — union of keys; a key edited on both sides resolves LWW on its own `device_names/<key>` clock |
+| `last_active_note` (§9.1; planned, opt-in) | shared | scalar-LWW |
+| `field_clocks` | — | merge metadata, not a preference: the merged blob carries the winning clock per field (see below) |
+| `auto_lock_seconds`, `screen_capture_protection` | device-local | local wins (security posture is per-device) |
+| `theme`, `custom_theme`, `show_note_timestamps`, `editor_content_width`, `editor_default_view_mode`, `editor_focus_dim_inactive`, `editor_focus_typewriter`, `editor_font_family`, `editor_layout`, `editor_line_numbers`, `editor_line_spacing`, `editor_text_size` | device-local | local wins (presentation) |
+| `keymap` | device-local | local wins (input hardware) |
+| `hidden_bar_items`, `bar_items_order`, `right_panel_active_tab`, `right_panel_hidden_tabs`, `right_panel_tab_order` | device-local | local wins (screen-size-dependent UI layout) |
+| `startup_open`, `startup_open_note`, `active_workspace` | device-local | local wins (session/startup behaviour; `active_workspace` points at the device-local `MYW1` artefact) |
+| `last_backup_at`, `paired_extensions`, `ai_enabled`, `spell_enabled` | device-local | local wins (device state / device capability) |
+
+Two rows are **deliberate reclassifications** of this section's original posture: `hidden_bar_items` (was set-union synced) and `active_workspace` (was scalar-LWW) are device-local now — the first is screen-size-dependent bar layout, the second points at an artefact (`vault.workspace`, class 4) that never syncs. And one field the original posture silently misclassified is now honest: `last_backup_at` is inherently per-device.
+
+**Field clocks.** Every shared LWW field (scalar, sequence-on-whole, whole-value, and each `device_names/<key>` entry) races on its own **field clock**: an epoch-milliseconds timestamp in the `field_clocks` map inside the encrypted payload (`protocol.md` §9.5.2), stamped by the setter that last changed the field. The newer clock wins; **an absent clock counts as 0** (the §11.4 "absent `updated_at` = `created_at`" analogue — this also defines migration: a pre-feature blob loses to the first clocked write, and a subsequent edit repairs everywhere); equal clocks tie-break **byte-lexicographically toward the greater value** (comparing the values' **§9.5.2 canonical encodings** — for a nested-object field such as `saved_views` this means the codec's canonical byte form, never an implementation's native serializer output, or independent implementations could deterministically pick opposite winners; with one refinement: an absent/unset value sorts **below** every present value — so a device that set a preference never loses it to a device that left it unset in a clockless tie), exactly like the §11.4 catalog `filename` rule, so both sides converge independently with no coordination. Set-union fields are clockless (union is conflict-free). Wall-clock skew is accepted for the same reason it is accepted for catalog filenames: prefs are non-load-bearing, and a skewed winner is repaired by the next genuine edit. The merge is deterministic and commutative on the shared subset — `merge(a,b) = merge(b,a)`.
+
+#### 10.2.1 How `vault.prefs` syncs
+
+`vault.prefs` is a synced singleton outside the vault-head manifest (§4.2), exactly like the attachments catalog, and rides the same machinery:
+
+- **Identity.** Its reserved sync blob-id is `prefs_sync_id = DeriveSubkey(root_key, "prefs-sync-id")[0..16]` (`protocol.md` §3.4) — deterministic across devices, indistinguishable from a note UUID to the server.
+- **Transport.** The at-rest `MYP1` blob is pushed/pulled verbatim on the generic `/sync/blob` channel with CAS. **Zero server changes**: the server stores an opaque blob under an opaque id.
+- **Push gate.** A device pushes only when the hash of its **shared subset** (the shared fields + their clocks, canonically encoded) differs from the last state it pushed or adopted — a purely device-local edit generates **no traffic** (A13 hygiene). The comparison baseline lives **in RAM only, never at rest**: persisting an unkeyed digest of decrypted shared prefs would hand a filesystem observer a confirmation oracle over the vault's label/folder names (the plaintext-at-rest class SYNC-3 forbids). A nonce short-circuit backs it: a local blob whose outer nonce still equals the synced baseline's is provably unchanged (every prefs write re-encrypts under a fresh nonce), so the common no-change cycle consults no plaintext-derived state at all. A lost baseline (app restart after an unsynced device-local edit) degrades to at most **one redundant push** — never a wrong merge.
+- **Conflict.** A stale push is CAS-rejected; the device pulls, runs the §10.2 merge post-decrypt, applies the result through the same single write path user edits use (disk → session cache → change event, so open UIs refresh), and re-pushes.
+- **Initial publish.** A device that finds **no** prefs blob on the server pushes its local blob unconditionally once — so a vault whose owner never changes a shared pref still delivers its identity to the next enrolled device. (One repair-only corner: a vault with no `vault.prefs` file at all has nothing to publish yet — the reference implementation eagerly writes the file at vault creation, so this arises only after manual deletion — and its first prefs write triggers the publish.)
+- **Enrollment seed.** Enrollment adopts the server's prefs blob **wholesale** as the device's initial `vault.prefs` (device-local fields included, as starting defaults); if absent, the device proceeds on its own defaults. After the seed, only merges run — steady-state sync never wholesale-adopts.
+- **Rollback bound.** Unchanged from `threat-model.md` §7: a malicious server can replay an older prefs blob; every shared field is non-load-bearing (the protective-envelope clamps stay client-side and no clamped field is shared), so the bound stays acceptable.
 
 `vault.dictionary` merges as a **set-union** of its word sets (conflict-free); the `vault.attachments` catalog merges **per-entry by attachment-id** — a union of entries (the core fields are immutable, content-addressed), refined by the **attachment-catalog-tombstone rules of §11.4** (deletion markers, the revival window, and the `filename` scalar-LWW are the only per-entry reconciliation this merge performs).
 

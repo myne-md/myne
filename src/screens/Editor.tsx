@@ -82,7 +82,13 @@ import {
   createBlankNamedNote,
   resolveTodayNote,
 } from "../notes";
-import { prefsRead, normalizeStartupOpen } from "../lib/prefs";
+import {
+  prefsRead,
+  normalizeStartupOpen,
+  notifyVaultPrefsChanged,
+  PREFS_SYNC_APPLIED_EVENT,
+} from "../lib/prefs";
+import { bumpPrefsNonce } from "../notes/prefsNonce";
 import { showAttachmentToast } from "../editor/attachments/toast";
 import {
   exportToastAction,
@@ -855,6 +861,34 @@ function EditorChrome({
             .catch(() => {
               /* the next sync tick / manual refresh catches up */
             });
+        });
+        if (cancelled) handle();
+        else unlisten = handle;
+      } catch {
+        // Not inside Tauri (browser dev shim) → no sync events.
+      }
+    })();
+    return () => {
+      cancelled = true;
+      if (unlisten !== undefined) unlisten();
+    };
+  }, []);
+
+  // MYND-478: the sync loop merges remote `vault.prefs` changes onto disk and
+  // emits `PREFS_SYNC_APPLIED_EVENT` (never for the user's own IPC writes —
+  // their own resolve is the signal). Bridge it into the two local refresh
+  // signals so an incoming vault rename / shared-pref change shows live: the
+  // switcher's window event (chip + rows) and the prefs nonce (usePrefs
+  // consumers). Subscribe ONCE; no-op outside Tauri.
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const handle = await listen(PREFS_SYNC_APPLIED_EVENT, () => {
+          if (cancelled) return;
+          notifyVaultPrefsChanged();
+          bumpPrefsNonce();
         });
         if (cancelled) handle();
         else unlisten = handle;
