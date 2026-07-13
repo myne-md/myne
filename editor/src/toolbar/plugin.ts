@@ -126,8 +126,18 @@ class ToolbarView implements PluginValue {
   // re-focus / measure). Bounded so a genuinely off-screen selection can't spin.
   private coordsRetries = 0;
 
+  // Belt-and-suspenders show trigger: after a mouse selection gesture ends,
+  // re-evaluate on the next frame. The transaction-based `update()` path can
+  // miss a double-click/drag select (e.g. a re-focus racing the selectionSet),
+  // which left the toolbar sporadically unshown after a select/deselect. A
+  // mouseup is the unambiguous "selection gesture finished" signal.
+  private readonly onMouseUp = (): void => {
+    requestAnimationFrame(() => this.refresh());
+  };
+
   constructor(private readonly view: EditorView) {
     ensureFloatingStyles();
+    this.view.dom.addEventListener("mouseup", this.onMouseUp);
   }
 
   update(update: ViewUpdate): void {
@@ -155,6 +165,7 @@ class ToolbarView implements PluginValue {
   }
 
   destroy(): void {
+    this.view.dom.removeEventListener("mouseup", this.onMouseUp);
     this.dismiss();
   }
 
