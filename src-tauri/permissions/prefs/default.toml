@@ -45,6 +45,10 @@ permissions = [
   "allow-set-editor-default-view-mode",
   "allow-set-editor-focus-dim-inactive",
   "allow-set-editor-focus-typewriter",
+  "allow-set-editor-toolbar-order",
+  "allow-set-editor-toolbar-hidden",
+  "allow-set-editor-slash-order",
+  "allow-set-editor-slash-hidden",
   "allow-set-item-colors",
   "allow-set-folder-icons",
   "allow-vault-set-label",
@@ -261,6 +265,35 @@ commands.allow = ["set_editor_focus_dim_inactive"]
 identifier = "allow-set-editor-focus-typewriter"
 description = "Allow invoking prefs:set_editor_focus_typewriter (Slot::Unlocked-gated setter for the editor_focus_typewriter toggle — the focus-mode typewriter-scrolling option; atomic-writes vault.prefs with no native side-effect; the default focus policy is applied host-side at read time)."
 commands.allow = ["set_editor_focus_typewriter"]
+
+# editor-toolbar / editor-slash customization (MYND-336): the four write setters
+# for the floating-toolbar + slash-menu reorder/hide config. Each inherits the
+# same main-window-only invariant as the other allow-set-* permissions — v0.2
+# multi-window MUST NOT grant these to any non-main window. Atomic-writes
+# vault.prefs with no native side-effect; non-load-bearing cosmetic config over
+# the FROZEN command vocabulary (order = verbatim sequence, hidden = a set).
+# These four were missing at first landing, so the Settings customization list
+# silently failed to persist (every setter invoke was ACL-rejected and the
+# frontend caught it) — the grant is what makes reorder/hide stick across reopen.
+[[permission]]
+identifier = "allow-set-editor-toolbar-order"
+description = "Allow invoking prefs:set_editor_toolbar_order (Slot::Unlocked-gated setter for the editor_toolbar_order sequence — the floating-toolbar button order over the frozen vocabulary; atomic-writes vault.prefs with no native side-effect)."
+commands.allow = ["set_editor_toolbar_order"]
+
+[[permission]]
+identifier = "allow-set-editor-toolbar-hidden"
+description = "Allow invoking prefs:set_editor_toolbar_hidden (Slot::Unlocked-gated setter for the editor_toolbar_hidden set — the floating-toolbar hidden-button ids over the frozen vocabulary; atomic-writes vault.prefs with no native side-effect)."
+commands.allow = ["set_editor_toolbar_hidden"]
+
+[[permission]]
+identifier = "allow-set-editor-slash-order"
+description = "Allow invoking prefs:set_editor_slash_order (Slot::Unlocked-gated setter for the editor_slash_order sequence — the slash-menu command order over the frozen vocabulary; atomic-writes vault.prefs with no native side-effect)."
+commands.allow = ["set_editor_slash_order"]
+
+[[permission]]
+identifier = "allow-set-editor-slash-hidden"
+description = "Allow invoking prefs:set_editor_slash_hidden (Slot::Unlocked-gated setter for the editor_slash_hidden set — the slash-menu hidden-command ids over the frozen vocabulary; atomic-writes vault.prefs with no native side-effect)."
+commands.allow = ["set_editor_slash_hidden"]
 
 [[permission]]
 identifier = "allow-set-item-colors"
