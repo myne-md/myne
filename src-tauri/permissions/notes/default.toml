@@ -81,7 +81,7 @@ commands.allow = ["note_export_as_markdown"]
 
 [[permission]]
 identifier = "allow-note-image-export"
-description = "Allow invoking notes:note_image_export (MYND-361 note→image — write a WebView-rasterized selection card, PNG/JPEG bytes, to a user-chosen path via atomic_write_unclobbered; NO decrypt here, the raster happens WebView-side, so no vault gate; a magic-byte gate refuses non-image bytes so arbitrary bytes can never reach a user path; deliberate user-initiated content egress across TB3 under dialog-plugin authority; overwrite consent travels explicitly — overwrite=false rejects an existing target with TargetAlreadyExists)."
+description = "Allow invoking notes:note_image_export (MYND-361 note→image — write a WebView-rasterized selection card, PNG/JPEG bytes, to a user-chosen path via atomic_write_unclobbered; NO decrypt here, the raster happens WebView-side, so no vault gate; a magic-byte prefix allowlist refuses payloads that do not start with a PNG/JPEG signature (a prefix gate, not full-format validation); deliberate user-initiated content egress across TB3 under dialog-plugin authority; overwrite consent travels explicitly — overwrite=false rejects an existing target with TargetAlreadyExists)."
 commands.allow = ["note_image_export"]
 
 [[permission]]

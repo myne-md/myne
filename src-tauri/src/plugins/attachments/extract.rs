@@ -51,8 +51,35 @@ fn guard(
     fmt: SourceFormat,
     f: impl FnOnce() -> ExtractedText + std::panic::UnwindSafe,
 ) -> ExtractedText {
-    std::panic::catch_unwind(f)
-        .unwrap_or_else(|_| ExtractedText::negative(ExtractStatus::Failed, fmt))
+    guard_or(ExtractedText::negative(ExtractStatus::Failed, fmt), f)
+}
+
+/// The [`guard`] pattern for parsers with a non-[`ExtractedText`] result
+/// (the Tier-2 structured extractors): a panic yields `fallback`.
+fn guard_or<T>(fallback: T, f: impl FnOnce() -> T + std::panic::UnwindSafe) -> T {
+    std::panic::catch_unwind(f).unwrap_or(fallback)
+}
+
+/// Per-XML-part inflate ceiling for the zip-backed extractors. Deflate reaches
+/// ~1030:1, so a cap-compliant attachment can hold a member that inflates to
+/// GiB inside one `String` before any row/block/text cap applies. 8 MiB
+/// comfortably covers real `document.xml` / `sheet1.xml` parts at preview and
+/// search scale (output is further capped by `MAX_EXTRACTED_TEXT_LEN` and the
+/// row/block limits) while bounding RAM to single-digit MiB.
+const MAX_XML_PART_LEN: usize = 8 * 1024 * 1024;
+
+/// Read a zip member into a `String`, inflating at most [`MAX_XML_PART_LEN`]
+/// bytes. Hitting the cap is truncation, not failure — the streaming parsers
+/// are best-effort and keep whatever parsed cleanly (a cap-split multi-byte
+/// char degrades to U+FFFD via the lossy decode). `None` only on a real
+/// inflate/IO error.
+fn read_xml_part_capped(reader: impl std::io::Read) -> Option<String> {
+    use std::io::Read;
+    let mut buf = Vec::new();
+    match reader.take(MAX_XML_PART_LEN as u64).read_to_end(&mut buf) {
+        Ok(_) => Some(String::from_utf8_lossy(&buf).into_owned()),
+        Err(_) => None,
+    }
 }
 
 fn detect_format(content_type: &str, filename: &str) -> Option<SourceFormat> {
@@ -98,20 +125,17 @@ fn extract_pdf(bytes: &[u8]) -> ExtractedText {
 }
 
 fn extract_docx(bytes: &[u8]) -> ExtractedText {
-    use std::io::Read;
     let mut archive = match zip::ZipArchive::new(std::io::Cursor::new(bytes)) {
         Ok(a) => a,
         Err(_) => return ExtractedText::negative(ExtractStatus::Failed, SourceFormat::Docx),
     };
-    let mut xml = String::new();
-    match archive.by_name("word/document.xml") {
-        Ok(mut f) => {
-            if f.read_to_string(&mut xml).is_err() {
-                return ExtractedText::negative(ExtractStatus::Failed, SourceFormat::Docx);
-            }
-        }
+    let xml = match archive.by_name("word/document.xml") {
+        Ok(f) => match read_xml_part_capped(f) {
+            Some(xml) => xml,
+            None => return ExtractedText::negative(ExtractStatus::Failed, SourceFormat::Docx),
+        },
         Err(_) => return ExtractedText::negative(ExtractStatus::Failed, SourceFormat::Docx),
-    }
+    };
     finalize(parse_docx_runs(&xml), SourceFormat::Docx)
 }
 
@@ -163,53 +187,70 @@ fn extract_text_like(bytes: &[u8]) -> ExtractedText {
 
 /// Extract a `.xlsx` first sheet as a grid of cell strings (row-major). Shared-
 /// string refs are resolved; empty/sparse cells fill as `""`. Best-effort — a
-/// corrupt / absent sheet yields an empty grid.
+/// corrupt / absent sheet yields an empty grid, and (same never-panics posture
+/// as [`extract`], § 9.15.4) so does a file that panics a third-party parser.
 pub fn extract_xlsx_grid(bytes: &[u8], max_rows: usize) -> Vec<Vec<String>> {
-    use std::io::Read;
+    guard_or(Vec::new(), || extract_xlsx_grid_inner(bytes, max_rows))
+}
+
+fn extract_xlsx_grid_inner(bytes: &[u8], max_rows: usize) -> Vec<Vec<String>> {
     let mut archive = match zip::ZipArchive::new(std::io::Cursor::new(bytes)) {
         Ok(a) => a,
         Err(_) => return Vec::new(),
     };
     // Shared-strings table (optional — numeric-only sheets omit it).
     let shared = {
-        let mut xml = String::new();
-        if let Ok(mut f) = archive.by_name("xl/sharedStrings.xml") {
-            let _ = f.read_to_string(&mut xml);
-        }
+        let xml = match archive.by_name("xl/sharedStrings.xml") {
+            Ok(f) => read_xml_part_capped(f).unwrap_or_default(),
+            Err(_) => String::new(),
+        };
         parse_shared_strings(&xml)
     };
-    let mut sheet_xml = String::new();
-    match archive.by_name("xl/worksheets/sheet1.xml") {
-        Ok(mut f) => {
-            if f.read_to_string(&mut sheet_xml).is_err() {
-                return Vec::new();
-            }
-        }
+    let sheet_xml = match archive.by_name("xl/worksheets/sheet1.xml") {
+        Ok(f) => match read_xml_part_capped(f) {
+            Some(xml) => xml,
+            None => return Vec::new(),
+        },
         Err(_) => return Vec::new(),
-    }
+    };
     parse_sheet_grid(&sheet_xml, &shared, max_rows)
 }
 
-/// Zero-based column index of an A1-style cell ref (`"B3"` → 1). Non-alphabetic
-/// suffix (the row number) ends the run.
-fn col_index(cell_ref: &str) -> usize {
+/// Excel's real column ceiling (`XFD` = 16,384 columns). A cell ref past it is
+/// crafted/corrupt input — honoring it would drive an unbounded `Vec` resize
+/// (a `<c r="ZZZZZZZZ1">` names a ~2e11 column), so such cells are skipped.
+const XLSX_MAX_COLS: usize = 16_384;
+
+/// Zero-based column index of an A1-style cell ref (`"B3"` → `Some(1)`), or
+/// `None` when the ref names a column past [`XLSX_MAX_COLS`] (the caller skips
+/// the cell). Non-alphabetic suffix (the row number) ends the run. The
+/// per-char bail also keeps the accumulation far from `usize` overflow.
+fn col_index(cell_ref: &str) -> Option<usize> {
     let mut idx = 0usize;
     for c in cell_ref.chars() {
         if c.is_ascii_alphabetic() {
             idx = idx * 26 + (c.to_ascii_uppercase() as usize - 'A' as usize + 1);
+            if idx > XLSX_MAX_COLS {
+                return None;
+            }
         } else {
             break;
         }
     }
-    idx.saturating_sub(1)
+    Some(idx.saturating_sub(1))
 }
 
 /// Parse `xl/sharedStrings.xml` into the ordered string table (`<si><t>…</t></si>`).
+/// Accumulation is bounded at [`MAX_XML_PART_LEN`] total string bytes — the
+/// input is already read-capped at that size, but the parse must stay bounded
+/// even if a future caller feeds it uncapped XML (entity expansion keeps the
+/// unescaped output within the same order as the input, so the bound holds).
 fn parse_shared_strings(xml: &str) -> Vec<String> {
     use quick_xml::events::Event;
     use quick_xml::reader::Reader;
     let mut reader = Reader::from_str(xml);
     let mut strings: Vec<String> = Vec::new();
+    let mut total_len = 0usize;
     let mut cur = String::new();
     let mut in_si = false;
     let mut in_t = false;
@@ -232,7 +273,11 @@ fn parse_shared_strings(xml: &str) -> Vec<String> {
                 b"t" => in_t = false,
                 b"si" => {
                     in_si = false;
+                    total_len = total_len.saturating_add(cur.len());
                     strings.push(std::mem::take(&mut cur));
+                    if total_len > MAX_XML_PART_LEN {
+                        break;
+                    }
                 }
                 _ => {}
             },
@@ -252,14 +297,15 @@ fn parse_sheet_grid(xml: &str, shared: &[String], max_rows: usize) -> Vec<Vec<St
     let mut reader = Reader::from_str(xml);
     let mut rows: Vec<Vec<String>> = Vec::new();
     let mut current: Vec<String> = Vec::new();
-    let mut cur_col = 0usize;
+    // `None` = the cell ref named a column past XLSX_MAX_COLS → skip the cell.
+    let mut cur_col: Option<usize> = Some(0);
     let mut cur_is_shared = false;
     let mut cur_value = String::new();
     let mut in_value = false;
     loop {
         match reader.read_event() {
             Ok(Event::Start(e)) | Ok(Event::Empty(e)) if e.local_name().as_ref() == b"c" => {
-                cur_col = 0;
+                cur_col = Some(0);
                 cur_is_shared = false;
                 cur_value.clear();
                 for attr in e.attributes().flatten() {
@@ -283,21 +329,23 @@ fn parse_sheet_grid(xml: &str, shared: &[String], max_rows: usize) -> Vec<Vec<St
             Ok(Event::End(e)) => match e.local_name().as_ref() {
                 b"v" => in_value = false,
                 b"c" => {
-                    let resolved = if cur_is_shared {
-                        cur_value
-                            .trim()
-                            .parse::<usize>()
-                            .ok()
-                            .and_then(|i| shared.get(i))
-                            .cloned()
-                            .unwrap_or_default()
-                    } else {
-                        cur_value.clone()
-                    };
-                    if current.len() <= cur_col {
-                        current.resize(cur_col + 1, String::new());
+                    if let Some(col) = cur_col {
+                        let resolved = if cur_is_shared {
+                            cur_value
+                                .trim()
+                                .parse::<usize>()
+                                .ok()
+                                .and_then(|i| shared.get(i))
+                                .cloned()
+                                .unwrap_or_default()
+                        } else {
+                            cur_value.clone()
+                        };
+                        if current.len() <= col {
+                            current.resize(col + 1, String::new());
+                        }
+                        current[col] = resolved;
                     }
-                    current[cur_col] = resolved;
                 }
                 b"row" => {
                     rows.push(std::mem::take(&mut current));
@@ -338,22 +386,25 @@ pub struct DocxBlock {
 /// Extract a `.docx` as a structured block list (headings + paragraphs) for the
 /// Tier-2 inline preview. Reuses the same `zip` + `quick-xml` path as the search
 /// text extractor — pure over the decrypted bytes, no crypto/format change.
-/// Best-effort: a corrupt / absent document yields an empty list. Bounded blocks.
+/// Best-effort: a corrupt / absent document yields an empty list, and (same
+/// never-panics posture as [`extract`], § 9.15.4) so does a file that panics a
+/// third-party parser. Bounded blocks.
 pub fn extract_docx_blocks(bytes: &[u8], max_blocks: usize) -> Vec<DocxBlock> {
-    use std::io::Read;
+    guard_or(Vec::new(), || extract_docx_blocks_inner(bytes, max_blocks))
+}
+
+fn extract_docx_blocks_inner(bytes: &[u8], max_blocks: usize) -> Vec<DocxBlock> {
     let mut archive = match zip::ZipArchive::new(std::io::Cursor::new(bytes)) {
         Ok(a) => a,
         Err(_) => return Vec::new(),
     };
-    let mut xml = String::new();
-    match archive.by_name("word/document.xml") {
-        Ok(mut f) => {
-            if f.read_to_string(&mut xml).is_err() {
-                return Vec::new();
-            }
-        }
+    let xml = match archive.by_name("word/document.xml") {
+        Ok(f) => match read_xml_part_capped(f) {
+            Some(xml) => xml,
+            None => return Vec::new(),
+        },
         Err(_) => return Vec::new(),
-    }
+    };
     parse_docx_blocks(&xml, max_blocks)
 }
 
@@ -381,9 +432,7 @@ fn parse_docx_blocks(xml: &str, max_blocks: usize) -> Vec<DocxBlock> {
     let mut in_text = false;
     loop {
         match reader.read_event() {
-            Ok(Event::Start(e)) | Ok(Event::Empty(e))
-                if e.local_name().as_ref() == b"pStyle" =>
-            {
+            Ok(Event::Start(e)) | Ok(Event::Empty(e)) if e.local_name().as_ref() == b"pStyle" => {
                 for attr in e.attributes().flatten() {
                     if attr.key.local_name().as_ref() == b"val" {
                         if let Ok(v) = std::str::from_utf8(&attr.value) {
@@ -562,7 +611,10 @@ mod tests {
         let sst = "<si><t>x</t></si><si><t>z</t></si>";
         let rows = "<row><c r=\"A1\" t=\"s\"><v>0</v></c><c r=\"C1\" t=\"s\"><v>1</v></c></row>";
         let grid = extract_xlsx_grid(&build_xlsx(sst, rows), 100);
-        assert_eq!(grid, vec![vec!["x".to_string(), String::new(), "z".to_string()]]);
+        assert_eq!(
+            grid,
+            vec![vec!["x".to_string(), String::new(), "z".to_string()]]
+        );
     }
 
     #[test]
@@ -578,6 +630,37 @@ mod tests {
     #[test]
     fn corrupt_xlsx_is_empty_grid_not_panic() {
         assert!(extract_xlsx_grid(b"PK\x03\x04 not a real zip", 100).is_empty());
+    }
+
+    #[test]
+    fn xlsx_grid_skips_absurd_column_refs() {
+        // A crafted ref like ZZZZZZZZ1 names a ~2e11 column — honoring it
+        // would attempt a huge Vec resize (allocation abort, not unwindable).
+        // The cell must be skipped; well-formed siblings still parse.
+        let sst = "<si><t>ok</t></si><si><t>evil</t></si>";
+        let rows = "<row><c r=\"A1\" t=\"s\"><v>0</v></c>\
+                    <c r=\"ZZZZZZZZ1\" t=\"s\"><v>1</v></c></row>";
+        let grid = extract_xlsx_grid(&build_xlsx(sst, rows), 100);
+        assert_eq!(grid, vec![vec!["ok".to_string()]]);
+    }
+
+    #[test]
+    fn col_index_clamps_at_excel_max() {
+        assert_eq!(col_index("XFD1"), Some(XLSX_MAX_COLS - 1)); // Excel's last column
+        assert_eq!(col_index("XFE1"), None); // one past → skipped
+        assert_eq!(col_index("ZZZZZZZZ1"), None); // absurd ref → skipped, no overflow
+    }
+
+    #[test]
+    fn xlsx_inflate_bomb_sheet_is_capped_not_oom() {
+        // A sheet1.xml member that inflates past MAX_XML_PART_LEN (deflate on
+        // repetitive XML reaches ~1000:1, so the zip itself stays tiny). The
+        // read must stop at the cap and keep whatever parsed cleanly.
+        let row = "<row><c r=\"A1\" t=\"s\"><v>0</v></c></row>";
+        let n = MAX_XML_PART_LEN / row.len() + 1000;
+        let grid = extract_xlsx_grid(&build_xlsx("<si><t>r</t></si>", &row.repeat(n)), 5);
+        assert_eq!(grid.len(), 5, "rows before the cap still parse");
+        assert_eq!(grid[0], vec!["r".to_string()]);
     }
 
     // --- DOCX block model (Tier-2 preview) ------------------------------
@@ -621,9 +704,18 @@ mod tests {
         assert_eq!(
             extract_docx_blocks(&docx, 100),
             vec![
-                DocxBlock { kind: DocxBlockKind::Heading(1), text: "Title Here".to_string() },
-                DocxBlock { kind: DocxBlockKind::Paragraph, text: "Body para".to_string() },
-                DocxBlock { kind: DocxBlockKind::Heading(2), text: "Sub".to_string() },
+                DocxBlock {
+                    kind: DocxBlockKind::Heading(1),
+                    text: "Title Here".to_string()
+                },
+                DocxBlock {
+                    kind: DocxBlockKind::Paragraph,
+                    text: "Body para".to_string()
+                },
+                DocxBlock {
+                    kind: DocxBlockKind::Heading(2),
+                    text: "Sub".to_string()
+                },
             ]
         );
     }
