@@ -34,11 +34,13 @@ import {
   AttachmentFileCardWidget,
   AttachmentImageWidget,
   AttachmentPdfWidget,
+  AttachmentTextPreviewWidget,
   AttachmentTombstoneWidget,
   UrlImageChipWidget,
   makeResolvedWidget,
 } from "../../src/editor/attachments/widgets";
 import type { CatalogRow } from "../../src/editor/attachments/catalog";
+import { type EditorHost, getHost, setEditorHost } from "../../src/editor/host";
 
 const ID = "a".repeat(64);
 
@@ -385,6 +387,120 @@ describe("AttachmentAudioWidget", () => {
     expect(pause).toHaveBeenCalled();
     expect(audio.getAttribute("src")).toBeNull();
     expect(load).toHaveBeenCalled();
+  });
+});
+
+describe("AttachmentTextPreviewWidget (preview cache)", () => {
+  // The module-level preview cache persists across tests — every test uses a
+  // FRESH attachment id so entries never collide.
+  let seq = 0;
+  const freshId = () => String(seq++).padStart(4, "0") + "c".repeat(60);
+
+  const baseHost = getHost();
+  afterEach(() => {
+    setEditorHost(baseHost);
+  });
+
+  function withHostAttachments(extra: Partial<EditorHost["attachments"]>): void {
+    setEditorHost({ ...baseHost, attachments: { ...baseHost.attachments, ...extra } });
+  }
+
+  // A macrotask drains the whole read → outcome → render microtask chain.
+  const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+  it("renders from cache synchronously on re-create: no loading chip, one IPC total", async () => {
+    const id = freshId();
+    const readText = vi.fn(async () => ({ text: "cached body", truncated: false }));
+    withHostAttachments({ readText });
+    const first = new AttachmentTextPreviewWidget(id, "notes.txt", 10).toDOM(fakeView);
+    expect(first.querySelector(".cm-attachment-progress")).not.toBeNull();
+    await flush();
+    expect(first.querySelector("pre")?.textContent).toBe("cached body");
+    // Re-created widget (embed scrolled back into view) — synchronous render.
+    const second = new AttachmentTextPreviewWidget(id, "notes.txt", 10).toDOM(fakeView);
+    expect(second.querySelector(".cm-attachment-progress")).toBeNull();
+    expect(second.querySelector("pre")?.textContent).toBe("cached body");
+    expect(readText).toHaveBeenCalledTimes(1);
+  });
+
+  it("de-dups concurrent loads: two widgets for the same attachment share one read", async () => {
+    const id = freshId();
+    let resolveRead: (v: { text: string; truncated: boolean }) => void = () => {};
+    const readText = vi.fn(
+      () =>
+        new Promise<{ text: string; truncated: boolean }>((resolve) => {
+          resolveRead = resolve;
+        }),
+    );
+    withHostAttachments({ readText });
+    const a = new AttachmentTextPreviewWidget(id, "a.txt", 1).toDOM(fakeView);
+    const b = new AttachmentTextPreviewWidget(id, "a.txt", 1).toDOM(fakeView);
+    expect(readText).toHaveBeenCalledTimes(1);
+    resolveRead({ text: "shared", truncated: false });
+    await flush();
+    expect(a.querySelector("pre")?.textContent).toBe("shared");
+    expect(b.querySelector("pre")?.textContent).toBe("shared");
+  });
+
+  it("caches a failed read as an error outcome: file-card fallback, no retry storm", async () => {
+    const id = freshId();
+    const readText = vi.fn(async (): Promise<{ text: string; truncated: boolean }> => {
+      throw new Error("locked");
+    });
+    withHostAttachments({ readText });
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const first = new AttachmentTextPreviewWidget(id, "x.txt", 1).toDOM(fakeView);
+    await flush();
+    expect(first.querySelector(".cm-attachment-text-preview-body")).toBeNull();
+    const second = new AttachmentTextPreviewWidget(id, "x.txt", 1).toDOM(fakeView);
+    expect(second.querySelector(".cm-attachment-text-preview-body")).toBeNull();
+    expect(second.querySelector(".cm-attachment-progress")).toBeNull();
+    expect(readText).toHaveBeenCalledTimes(1);
+    warn.mockRestore();
+  });
+
+  it("estimatedHeight: card-sized before load, header-only once an error is cached", async () => {
+    const id = freshId();
+    const readText = vi.fn(async (): Promise<{ text: string; truncated: boolean }> => {
+      throw new Error("nope");
+    });
+    withHostAttachments({ readText });
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const widget = new AttachmentTextPreviewWidget(id, "x.txt", 1);
+    const before = widget.estimatedHeight;
+    expect(before).toBeGreaterThan(0);
+    widget.toDOM(fakeView);
+    await flush();
+    // Error outcome → header-only card, so the estimate shrinks accordingly.
+    expect(widget.estimatedHeight).toBeLessThan(before);
+    warn.mockRestore();
+  });
+
+  it("bounds a structured grid to the JS-side row cap (does not trust the host)", async () => {
+    const id = freshId();
+    const rows = Array.from({ length: 501 }, (_, i) => [String(i)]);
+    const readStructured = vi.fn(async () => ({ kind: "grid" as const, rows }));
+    withHostAttachments({ readStructured });
+    const dom = new AttachmentTextPreviewWidget(id, "big.xlsx", 1).toDOM(fakeView);
+    await flush();
+    expect(dom.querySelectorAll("tr")).toHaveLength(500);
+  });
+
+  it("rounds a fractional heading_level instead of throwing (no stuck loading chip)", async () => {
+    const id = freshId();
+    const readStructured = vi.fn(async () => ({
+      kind: "blocks" as const,
+      blocks: [
+        { heading_level: 2.5, text: "H" },
+        { heading_level: null, text: "body" },
+      ],
+    }));
+    withHostAttachments({ readStructured });
+    const dom = new AttachmentTextPreviewWidget(id, "doc.docx", 1).toDOM(fakeView);
+    await flush();
+    expect(dom.querySelector(".cm-attachment-progress")).toBeNull();
+    expect(dom.querySelector("h3")?.textContent).toBe("H");
+    expect(dom.querySelector("p")?.textContent).toBe("body");
   });
 });
 

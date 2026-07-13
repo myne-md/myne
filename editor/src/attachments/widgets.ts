@@ -702,6 +702,97 @@ function parsePreviewGrid(text: string, delimiter: string, maxRows: number): str
 /** Max grid rows rendered inline (the rest is available via Export). */
 const PREVIEW_GRID_MAX_ROWS = 500;
 
+// --- preview result cache ---------------------------------------------------
+//
+// The attachment-embed decoration set is rebuilt over `visibleRanges` on every
+// viewport change, so without a cache each scroll-past re-issues the whole IPC
+// + AEAD decrypt (+ Rust parse for docx/xlsx) AND swaps the loading chip for
+// content AFTER CodeMirror measured the widget — a document-height mutation at
+// the viewport edge (the long-doc scroll-destabilization class). Caching the
+// RESULT (never DOM) lets a re-entering widget render synchronously in `toDOM`.
+
+/** One decrypt round trip's outcome. An error is an outcome too: a failing
+ *  read degrades to the file-card once instead of re-issuing an IPC every time
+ *  the embed scrolls back into view. */
+type PreviewOutcome =
+  | { kind: "text"; text: string; truncated: boolean }
+  | { kind: "structured"; content: StructuredPreview }
+  | { kind: "error" };
+
+interface PreviewCacheEntry {
+  outcome: PreviewOutcome;
+  /** Last measured card height (px) — feeds `estimatedHeight` so a widget
+   *  re-entering the viewport is laid out at its real height immediately. */
+  height: number | null;
+}
+
+/** Bound for {@link previewCache}. Each entry is one ≤320px preview's source
+ *  data, itself capped by the host's read cap (2 MiB on desktop —
+ *  `ATTACHMENT_TEXT_PREVIEW_CAP`), so worst-case retention stays modest. */
+const PREVIEW_CACHE_MAX = 24;
+
+/** LRU-ish preview cache keyed by {@link previewCacheKey}: `Map` iterates in
+ *  insertion order, a hit re-inserts, overflow evicts the oldest. */
+const previewCache = new Map<string, PreviewCacheEntry>();
+
+/** In-flight de-dup: concurrent `toDOM` for the same attachment (the same file
+ *  embedded twice, or a rebuild racing a slow read) share ONE IPC round trip. */
+const previewInFlight = new Map<string, Promise<PreviewOutcome>>();
+
+/** Cache key: attachment id + preview tier (the structured kinds parse
+ *  differently from the raw-text tier, so they cache separately). */
+function previewCacheKey(id: string, filename: string): string {
+  const ext = fileExt(filename);
+  return `${id}:${PREVIEWABLE_STRUCTURED_EXT.has(ext) ? ext : "text"}`;
+}
+
+function previewCacheGet(key: string): PreviewCacheEntry | undefined {
+  const entry = previewCache.get(key);
+  if (entry !== undefined) {
+    // LRU touch — re-insertion moves the key to the young end.
+    previewCache.delete(key);
+    previewCache.set(key, entry);
+  }
+  return entry;
+}
+
+function previewCachePut(key: string, outcome: PreviewOutcome): void {
+  const height = previewCache.get(key)?.height ?? null;
+  previewCache.delete(key);
+  previewCache.set(key, { outcome, height });
+  while (previewCache.size > PREVIEW_CACHE_MAX) {
+    const oldest = previewCache.keys().next().value;
+    if (oldest === undefined) break;
+    previewCache.delete(oldest);
+  }
+}
+
+/** Share (or start) the fetch for `key`. `read` must never reject — it maps
+ *  failures to the error outcome — so the promise always settles into the
+ *  cache and the in-flight entry can never leak. */
+function fetchPreviewOutcome(
+  key: string,
+  read: () => Promise<PreviewOutcome>,
+): Promise<PreviewOutcome> {
+  let inflight = previewInFlight.get(key);
+  if (inflight === undefined) {
+    inflight = read().then((outcome) => {
+      previewInFlight.delete(key);
+      previewCachePut(key, outcome);
+      return outcome;
+    });
+    previewInFlight.set(key, inflight);
+  }
+  return inflight;
+}
+
+/** `estimatedHeight` fallbacks (px) before the first real measure: the
+ *  header-only card (error → body removed) vs a card whose body typically
+ *  fills the 320px max-height. CM corrects on measure; the measured height is
+ *  then remembered per attachment so re-entry estimates are exact. */
+const PREVIEW_EST_HEADER_PX = 48;
+const PREVIEW_EST_CARD_PX = 368;
+
 /**
  * A resolved TEXT attachment (txt/code/csv/md, stored generic) rendered as an
  * inline READ-ONLY preview (MYND-268 Tier-1). Decrypts to text via the host
@@ -713,6 +804,7 @@ const PREVIEW_GRID_MAX_ROWS = 500;
  */
 export class AttachmentTextPreviewWidget extends WidgetType {
   private menuTeardown: (() => void) | null = null;
+  private resizeObserver: ResizeObserver | null = null;
 
   constructor(
     private readonly id: string,
@@ -724,6 +816,17 @@ export class AttachmentTextPreviewWidget extends WidgetType {
 
   eq(other: AttachmentTextPreviewWidget): boolean {
     return other.id === this.id && other.filename === this.filename && other.size === this.size;
+  }
+
+  // Height estimate BEFORE the first draw, so CM's height map doesn't discover
+  // the real height as a surprise mutation mid-scroll (see previewCache note).
+  get estimatedHeight(): number {
+    const entry = previewCache.get(previewCacheKey(this.id, this.filename));
+    if (entry !== undefined) {
+      if (entry.height !== null) return entry.height;
+      if (entry.outcome.kind === "error") return PREVIEW_EST_HEADER_PX;
+    }
+    return PREVIEW_EST_CARD_PX;
   }
 
   toDOM(view: EditorView): HTMLElement {
@@ -767,14 +870,15 @@ export class AttachmentTextPreviewWidget extends WidgetType {
     header.appendChild(menu.wrap);
     card.appendChild(header);
 
-    // Body: a loading chip until the decrypt+decode resolves, then the inert
-    // render. A read failure / absent seam just leaves the header (file-card).
+    // Body: rendered SYNCHRONOUSLY from the cache when this attachment already
+    // decrypted once (no loading chip, no async height swap); otherwise a
+    // loading chip until the de-duped decrypt+decode resolves. A read failure /
+    // absent seam just leaves the header (file-card).
     const body = document.createElement("span");
     body.className = "cm-attachment-text-preview-body";
     body.style.display = "block";
     body.style.maxHeight = "320px";
     body.style.overflow = "auto";
-    body.appendChild(makeProgressChip("loading"));
     card.appendChild(body);
 
     const ext = fileExt(this.filename);
@@ -789,20 +893,49 @@ export class AttachmentTextPreviewWidget extends WidgetType {
         console.warn(`[attachment-preview] ${stage} failed for ${this.filename}:`, reason);
       }
     };
-    if (structuredKind !== null) {
+    const renderOutcome = (outcome: PreviewOutcome): void => {
+      if (outcome.kind === "error") {
+        body.remove(); // drop to the file-card
+        return;
+      }
+      if (outcome.kind === "structured") {
+        body.replaceChildren(this.renderStructured(outcome.content));
+        return;
+      }
+      const rendered =
+        ext === "csv" || ext === "tsv"
+          ? this.renderGrid(outcome.text, ext === "tsv" ? "\t" : ",")
+          : this.renderText(outcome.text);
+      body.replaceChildren(rendered);
+      if (outcome.truncated) {
+        const notice = document.createElement("span");
+        notice.className = "cm-attachment-text-preview-truncated";
+        notice.textContent = i18n.t("editor.attachment.widget.textPreview.truncated");
+        body.appendChild(notice);
+      }
+    };
+
+    const key = previewCacheKey(this.id, this.filename);
+    const cached = previewCacheGet(key);
+    if (cached !== undefined) {
+      renderOutcome(cached.outcome);
+    } else if (structuredKind !== null) {
       // Tier-2: Rust parses the docx/xlsx into a safe structured model.
       const readStructured = host.readStructured;
       if (readStructured === undefined) {
         warnPreview("readStructured", "host seam undefined");
         body.remove();
       } else {
-        void readStructured(this.id, structuredKind).then(
-          (content) => body.replaceChildren(this.renderStructured(content)),
-          (err: unknown) => {
-            warnPreview("readStructured", err);
-            body.remove();
-          },
-        );
+        body.appendChild(makeProgressChip("loading"));
+        void fetchPreviewOutcome(key, () =>
+          readStructured(this.id, structuredKind).then(
+            (content): PreviewOutcome => ({ kind: "structured", content }),
+            (err: unknown): PreviewOutcome => {
+              warnPreview("readStructured", err);
+              return { kind: "error" };
+            },
+          ),
+        ).then(renderOutcome);
       }
     } else {
       // Tier-1: raw decrypted text (a <pre> for text/code, a <table> for csv/tsv).
@@ -811,27 +944,31 @@ export class AttachmentTextPreviewWidget extends WidgetType {
         warnPreview("readText", "host seam undefined");
         body.remove(); // no seam → behave as a plain file-card
       } else {
-        void readText(this.id).then(
-          ({ text: content, truncated }) => {
-            const rendered =
-              ext === "csv" || ext === "tsv"
-                ? this.renderGrid(content, ext === "tsv" ? "\t" : ",")
-                : this.renderText(content);
-            body.replaceChildren(rendered);
-            if (truncated) {
-              const notice = document.createElement("span");
-              notice.className = "cm-attachment-text-preview-truncated";
-              notice.textContent = i18n.t("editor.attachment.widget.textPreview.truncated");
-              body.appendChild(notice);
-            }
-          },
-          (err: unknown) => {
-            // Read failed (locked / not-found / decode) — drop to the file-card.
-            warnPreview("readText", err);
-            body.remove();
-          },
-        );
+        body.appendChild(makeProgressChip("loading"));
+        void fetchPreviewOutcome(key, () =>
+          readText(this.id).then(
+            ({ text, truncated }): PreviewOutcome => ({ kind: "text", text, truncated }),
+            (err: unknown): PreviewOutcome => {
+              // Read failed (locked / not-found / decode) — drop to the file-card.
+              warnPreview("readText", err);
+              return { kind: "error" };
+            },
+          ),
+        ).then(renderOutcome);
       }
+    }
+
+    // Remember the measured card height so `estimatedHeight` is exact when the
+    // embed re-enters the viewport. Recorded only once the outcome is cached —
+    // the loading-chip height is not representative.
+    if (typeof ResizeObserver !== "undefined") {
+      this.resizeObserver = new ResizeObserver(() => {
+        const entry = previewCache.get(key);
+        if (entry === undefined) return;
+        const measured = card.getBoundingClientRect().height;
+        if (measured > 0) entry.height = measured;
+      });
+      this.resizeObserver.observe(card);
     }
 
     return card;
@@ -867,12 +1004,15 @@ export class AttachmentTextPreviewWidget extends WidgetType {
   }
 
   /** Inert render of the Rust structured model (Tier-2): a `<table>` grid (xlsx)
-   *  or a heading/paragraph block list (docx). `textContent` only (TB2). */
+   *  or a heading/paragraph block list (docx). `textContent` only (TB2). The
+   *  desktop host caps rows Rust-side, but this layer bounds its own DOM build
+   *  too — it must not trust any future host with an unbounded synchronous
+   *  node build. */
   private renderStructured(content: StructuredPreview): HTMLElement {
     if (content.kind === "grid") {
       const table = document.createElement("table");
       table.className = "cm-attachment-text-preview-table";
-      for (const row of content.rows) {
+      for (const row of content.rows.slice(0, PREVIEW_GRID_MAX_ROWS)) {
         const tr = document.createElement("tr");
         for (const cell of row) {
           const td = document.createElement("td");
@@ -885,10 +1025,12 @@ export class AttachmentTextPreviewWidget extends WidgetType {
     }
     const wrap = document.createElement("div");
     wrap.className = "cm-attachment-text-preview-doc";
-    for (const block of content.blocks) {
+    for (const block of content.blocks.slice(0, PREVIEW_GRID_MAX_ROWS)) {
+      // Round before clamping — a fractional level would make createElement
+      // throw ("h2.5" is not a valid tag name), wedging the loading chip.
       const el =
         block.heading_level !== null
-          ? document.createElement(`h${Math.min(6, Math.max(1, block.heading_level))}`)
+          ? document.createElement(`h${Math.min(6, Math.max(1, Math.round(block.heading_level)))}`)
           : document.createElement("p");
       el.textContent = block.text;
       wrap.appendChild(el);
@@ -897,6 +1039,8 @@ export class AttachmentTextPreviewWidget extends WidgetType {
   }
 
   destroy(): void {
+    this.resizeObserver?.disconnect();
+    this.resizeObserver = null;
     this.menuTeardown?.();
     this.menuTeardown = null;
   }
