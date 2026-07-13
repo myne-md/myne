@@ -222,22 +222,37 @@ function collectBlockHtmlRanges(
 }
 
 /** Ephemeral `<details>` open state, keyed by source HTML. WebView-only —
- *  never persisted, never written to the note buffer. */
+ *  never persisted, never written to the note buffer. Bounded: the key is the
+ *  block's FULL source text, so an unpruned map would retain every distinct
+ *  <details> source viewed all session. `Map` iterates in insertion order and
+ *  a write re-inserts, so overflow evicts the least-recently-toggled entry. */
+const DETAILS_OPEN_STATE_MAX = 128;
 const detailsOpenState = new Map<string, boolean>();
+
+function setDetailsOpenState(key: string, open: boolean): void {
+  detailsOpenState.delete(key);
+  detailsOpenState.set(key, open);
+  while (detailsOpenState.size > DETAILS_OPEN_STATE_MAX) {
+    const oldest = detailsOpenState.keys().next().value;
+    if (oldest === undefined) break;
+    detailsOpenState.delete(oldest);
+  }
+}
 
 class BlockHtmlWidget extends WidgetType {
   constructor(
     private readonly safeHtml: string,
     private readonly key: string,
-    private readonly from: number,
   ) {
     super();
   }
   eq(other: BlockHtmlWidget): boolean {
-    // `from` is part of identity so click-to-edit always targets the live source
-    // position (a rebuild restores the <details> open state from the source-keyed
-    // map below, so preserving toggle state survives the reposition).
-    return other.key === this.key && other.from === this.from;
+    // Identity is the SOURCE only, never the position: blockHtmlField rebuilds
+    // on every doc/selection change, so a position-bearing identity would tear
+    // down + recreate the DOM of every block below the edit point once per
+    // keystroke (innerHTML re-parse, <details> restore, re-measure).
+    // Click-to-edit resolves the live position at event time via posAtDOM.
+    return other.key === this.key;
   }
   toDOM(view: EditorView): HTMLElement {
     // Discriminator is the soft background tint (theme) — no label element.
@@ -248,7 +263,7 @@ class BlockHtmlWidget extends WidgetType {
     if (details !== null) {
       if (detailsOpenState.get(this.key) === true) details.setAttribute("open", "");
       details.addEventListener("toggle", () => {
-        detailsOpenState.set(this.key, details.open);
+        setDetailsOpenState(this.key, details.open);
         // NOTE: do NOT call view.requestMeasure() here. Restoring an open
         // <details> sets `open` on every render, firing a toggle — so a
         // requestMeasure here runs mid-scroll each time an open block scrolls
@@ -266,7 +281,10 @@ class BlockHtmlWidget extends WidgetType {
       const target = event.target;
       if (target instanceof Element && target.closest("summary") !== null) return;
       event.preventDefault();
-      view.dispatch({ selection: { anchor: this.from } });
+      // The DOM is reused across rebuilds (identity is source-keyed), so a
+      // position baked in at build time would go stale as edits above shift
+      // the block — resolve the block's CURRENT start from the DOM instead.
+      view.dispatch({ selection: { anchor: view.posAtDOM(div) } });
       view.focus();
     });
     return div;
@@ -300,7 +318,7 @@ function buildBlockHtml(state: EditorState): DecorationSet {
       fromLine.from,
       toLine.to,
       Decoration.replace({
-        widget: new BlockHtmlWidget(safe, html, from),
+        widget: new BlockHtmlWidget(safe, html),
         block: true,
       }),
     );
