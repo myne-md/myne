@@ -324,6 +324,29 @@ pub struct PrefsView {
     #[serde(default)]
     pub favorites: Vec<alloc::string::String>,
 
+    /// Per-field LWW clocks for the Phase 2 prefs sync (MYND-478;
+    /// `sync-protocol.md` §10.2, spec §9.5.2). Maps a **shared** preference's
+    /// field name — or a `device_names/<key>` per-entry name — to the
+    /// epoch-**milliseconds** at which a setter last changed that field. The
+    /// merge takes the newer clock per field; an ABSENT clock counts as 0 (so
+    /// every pre-MYND-478 blob is "all clocks 0"); equal clocks tie-break
+    /// byte-lexicographically toward the greater value (the §11.4 catalog
+    /// `filename` precedent). Device-local fields (per the §10.2
+    /// classification) are never stamped. A `BTreeMap` so the canonical
+    /// encoder emits keys in lexicographic order (the `folder_icons`
+    /// precedent class); values are bare non-negative integers (floats
+    /// FORBIDDEN, §9.5.2). Default empty; **omitted entirely from the
+    /// canonical JSON when empty**, so a vault whose shared fields were never
+    /// clock-stamped is byte-identical to a pre-MYND-478 `vault.prefs`
+    /// (existing golden vectors unaffected — a migration-less additive field
+    /// on `MYP1`, the `label` precedent class). Canonical key `field_clocks`
+    /// — sorts after `favorites` (`fa` < `fi`), before `folder_icons`
+    /// (`fi` < `fo`). **Non-load-bearing** (a tampered/replayed clock can at
+    /// worst make the other replica win a preference merge — the accepted
+    /// singleton-rollback bound) — no protective-envelope clamp.
+    #[serde(default)]
+    pub field_clocks: BTreeMap<String, u64>,
+
     /// Unified manual sidebar order across the single interleaved file-tree
     /// (MYND-183, superseding the earlier `note_order` + `folder_order`
     /// pair). A flat, heterogeneous, sibling-local **sequence** whose elements
@@ -885,6 +908,7 @@ impl Default for PrefsView {
             keymap: Default::default(),
             theme: None,
             favorites: Vec::new(),
+            field_clocks: Default::default(),
             item_order: Vec::new(),
             deliberate_folders: Vec::new(),
             device_names: Default::default(),
@@ -1308,6 +1332,18 @@ fn canonical_json_encode(prefs: &PrefsView) -> Vec<u8> {
         out.push(b',');
     }
 
+    // field_clocks (canonical key 'fi' — after 'favorites' [fa < fi], before
+    // 'folder_icons' [fi < fo]). The per-field LWW clock map for the Phase 2
+    // prefs sync (MYND-478, sync-protocol.md §10.2): string key (shared field
+    // name or device_names/<key>) → epoch-ms integer. Omitted entirely when
+    // empty so a never-stamped vault is byte-identical to a pre-MYND-478
+    // vault.prefs (existing KAT vectors unaffected).
+    if !prefs.field_clocks.is_empty() {
+        out.extend_from_slice(b"\"field_clocks\":");
+        push_canonical_u64_map(&mut out, &prefs.field_clocks);
+        out.push(b',');
+    }
+
     // folder_icons (canonical key 'f' — after 'favorites' [fa < fo], before
     // 'item_colors'). A nested string→string object (folder path → icon name);
     // omitted entirely when empty so a vault with no custom folder icon stays
@@ -1619,6 +1655,31 @@ fn push_ordered_string_array(out: &mut Vec<u8>, items: &[String]) {
     out.push(b']');
 }
 
+/// Append a canonical JSON object of string→integer members (surrounding
+/// `{` / `}`, comma-joined `"key":123` members) for the `field_clocks` LWW
+/// clock map (MYND-478). Keys are NFC-normalized and emitted in lexicographic
+/// KEY order (collecting into a fresh [`BTreeMap`] re-sorts by the normalized
+/// key and collapses any post-NFC duplicate keys last-wins — canonical input
+/// never produces them); values are bare non-negative decimal integers via
+/// [`push_json_uint64`] (floats FORBIDDEN, §9.5.2). The caller omits the field
+/// entirely when the map is empty, so this never emits `{}`.
+fn push_canonical_u64_map(out: &mut Vec<u8>, map: &BTreeMap<String, u64>) {
+    let normalized: BTreeMap<String, u64> = map
+        .iter()
+        .map(|(k, v)| (k.nfc().collect::<String>(), *v))
+        .collect();
+    out.push(b'{');
+    for (i, (k, v)) in normalized.iter().enumerate() {
+        if i > 0 {
+            out.push(b',');
+        }
+        push_json_string(out, k);
+        out.push(b':');
+        push_json_uint64(out, *v);
+    }
+    out.push(b'}');
+}
+
 /// Append a canonical JSON object of string→string pairs (surrounding
 /// `{` / `}`, comma-joined `"key":"value"` members) for the
 /// decoration maps (`folder_icons`, `item_colors`). Keys + values are
@@ -1906,6 +1967,11 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
     let editor_text_size =
         parse_optional_string_field(rest, &mut cursor, b"\"editor_text_size\":")?;
     let favorites = parse_optional_array_field(rest, &mut cursor, b"\"favorites\":")?;
+    // field_clocks (key 'fi') sits between favorites (fa) and folder_icons (fo)
+    // in canonical order (MYND-478) — the per-field LWW clock map for the
+    // Phase 2 prefs sync; parsed from the same monotonic cursor. Absent →
+    // empty map (= every clock 0 to the merge, sync-protocol.md §10.2).
+    let field_clocks = parse_optional_u64_map_field(rest, &mut cursor, b"\"field_clocks\":")?;
     // folder_icons (key 'f') + item_colors (key 'i') — the decoration string
     // maps, sitting between favorites and item_order in canonical order. Parsed
     // from the same monotonic cursor so a later field's key marker is never
@@ -2047,6 +2113,7 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
         daily_folder,
         daily_template,
         favorites,
+        field_clocks,
         item_order,
         keymap,
         active_workspace,
@@ -2419,6 +2486,67 @@ fn parse_optional_string_map_field(
             Ok(map)
         }
         None => Ok(BTreeMap::new()),
+    }
+}
+
+/// Parse the OPTIONAL `field_clocks` field (MYND-478) from the monotonic
+/// cursor. Absent → empty map; present-but-malformed →
+/// [`PrefsBlobError::PlaintextParseFailed`]. Mirrors
+/// [`parse_optional_string_map_field`] but each value is a bare non-negative
+/// JSON integer (an epoch-ms LWW clock) rather than a string.
+fn parse_optional_u64_map_field(
+    rest: &[u8],
+    cursor: &mut usize,
+    marker: &[u8],
+) -> Result<BTreeMap<String, u64>, PrefsBlobError> {
+    match find_subslice(&rest[*cursor..], marker) {
+        Some(rel_idx) => {
+            let obj_start = *cursor + rel_idx + marker.len();
+            let (map, consumed) = parse_json_u64_map(&rest[obj_start..])
+                .ok_or(PrefsBlobError::PlaintextParseFailed)?;
+            *cursor = obj_start + consumed;
+            Ok(map)
+        }
+        None => Ok(BTreeMap::new()),
+    }
+}
+
+/// Parse a JSON object of string→integer members starting at `bytes[0] == '{'`.
+/// Returns the decoded map + bytes consumed (through the closing `}`), or `None`
+/// on any malformation. The u64-valued sibling of [`parse_json_string_map`]
+/// (values parse via [`parse_json_uint64`] — bare decimal, no floats, no signs).
+/// Duplicate keys collapse last-wins via `BTreeMap::insert` (canonical input
+/// never produces them).
+fn parse_json_u64_map(bytes: &[u8]) -> Option<(BTreeMap<String, u64>, usize)> {
+    if bytes.first() != Some(&b'{') {
+        return None;
+    }
+    let mut i = 1;
+    let mut out: BTreeMap<String, u64> = BTreeMap::new();
+    if bytes.get(i) == Some(&b'}') {
+        return Some((out, i + 1));
+    }
+    loop {
+        if bytes.get(i) != Some(&b'"') {
+            return None;
+        }
+        let (key, consumed) = parse_json_string(&bytes[i..])?;
+        i += consumed;
+        if bytes.get(i) != Some(&b':') {
+            return None;
+        }
+        i += 1;
+        let (value, consumed) = parse_json_uint64(&bytes[i..]).ok()?;
+        i += consumed;
+        out.insert(key, value);
+        match bytes.get(i) {
+            Some(&b',') => {
+                i += 1;
+                continue;
+            }
+            Some(&b'}') => return Some((out, i + 1)),
+            _ => return None,
+        }
     }
 }
 
@@ -2806,6 +2934,7 @@ mod tests {
             theme: None,
             item_order: Vec::new(),
             favorites: Vec::new(),
+            field_clocks: Default::default(),
             deliberate_folders: Vec::new(),
             auto_lock_seconds: None,
             custom_theme: None,
@@ -2860,6 +2989,7 @@ mod tests {
             theme: None,
             item_order: Vec::new(),
             favorites: Vec::new(),
+            field_clocks: Default::default(),
             deliberate_folders: Vec::new(),
             auto_lock_seconds: None,
             custom_theme: None,
@@ -2950,6 +3080,73 @@ mod tests {
             encoded.as_slice(),
             br#"{"folder_icons":{"Archive/2025/":"archive","Projects/Myne/":"book"},"item_colors":{"0190a000-0000-7000-8000-000000000001":"moss","Projects/Myne/":"slate"},"screen_capture_protection":true}"#
         );
+    }
+
+    #[test]
+    fn field_clocks_encodes_in_canonical_position() {
+        // field_clocks ('fi') sorts after favorites ('fa'), before
+        // folder_icons ('fo') — the §9.5.2 canonical slot (MYND-478). Keys
+        // within the object are emitted in lexicographic order; values are
+        // bare epoch-ms integers (no floats, no trailing .0).
+        let mut clocks = BTreeMap::new();
+        clocks.insert(String::from("label"), 1_765_432_099_000u64);
+        clocks.insert(
+            String::from("device_names/3f9ac2d1aabbccdd00112233445566ff"),
+            1_765_432_100_000u64,
+        );
+        let prefs = PrefsView {
+            favorites: alloc::vec![String::from("0190a000-0000-7000-8000-000000000002")],
+            field_clocks: clocks,
+            folder_icons: map_of(&[("Projects/Myne/", "book")]),
+            ..PrefsView::default()
+        };
+        let encoded = canonical_json_encode(&prefs);
+        assert_eq!(
+            encoded.as_slice(),
+            br#"{"favorites":["0190a000-0000-7000-8000-000000000002"],"field_clocks":{"device_names/3f9ac2d1aabbccdd00112233445566ff":1765432100000,"label":1765432099000},"folder_icons":{"Projects/Myne/":"book"},"screen_capture_protection":true}"#
+        );
+    }
+
+    #[test]
+    fn empty_field_clocks_is_omitted_entirely() {
+        // The omit-when-empty discipline: a vault whose shared fields were
+        // never clock-stamped (every pre-MYND-478 vault) encodes byte-identically
+        // to a build that predates the field — existing golden vectors
+        // unaffected.
+        let prefs = PrefsView::default();
+        let encoded = canonical_json_encode(&prefs);
+        assert_eq!(encoded.as_slice(), br#"{"screen_capture_protection":true}"#);
+        assert!(!encoded
+            .windows(b"field_clocks".len())
+            .any(|w| w == b"field_clocks"));
+    }
+
+    #[test]
+    fn field_clocks_round_trips() {
+        // Encode → decode preserves the full map, including a namespaced
+        // device_names/<key> entry and a max-magnitude u64 clock.
+        let mut clocks = BTreeMap::new();
+        clocks.insert(String::from("label"), 1u64);
+        clocks.insert(String::from("icon"), u64::MAX);
+        clocks.insert(String::from("device_names/00ff"), 1_765_432_100_000u64);
+        let prefs = PrefsView {
+            field_clocks: clocks.clone(),
+            ..PrefsView::default()
+        };
+        let encoded = canonical_json_encode(&prefs);
+        let decoded = canonical_json_decode(&encoded).expect("round-trip decode");
+        assert_eq!(decoded.field_clocks, clocks);
+        assert_eq!(decoded, prefs);
+    }
+
+    #[test]
+    fn absent_field_clocks_decodes_to_empty_map() {
+        // A pre-MYND-478 plaintext (no field_clocks key) MUST decode with an
+        // empty map — absent = every clock 0 to the merge (sync-protocol.md
+        // §10.2).
+        let plaintext = br#"{"favorites":["f1"],"folder_icons":{"P/":"book"},"screen_capture_protection":true}"#;
+        let decoded = canonical_json_decode(plaintext).expect("legacy decode");
+        assert!(decoded.field_clocks.is_empty());
     }
 
     #[test]
@@ -3109,6 +3306,7 @@ mod tests {
                 theme: None,
                 item_order: Vec::new(),
                 favorites: Vec::new(),
+                field_clocks: Default::default(),
                 deliberate_folders: Vec::new(),
                 auto_lock_seconds: None,
                 custom_theme: None,
@@ -3165,6 +3363,7 @@ mod tests {
                 theme: None,
                 item_order: Vec::new(),
                 favorites: Vec::new(),
+                field_clocks: Default::default(),
                 deliberate_folders: Vec::new(),
                 auto_lock_seconds: None,
                 custom_theme: None,
@@ -4199,6 +4398,7 @@ mod tests {
             daily_folder: None,
             daily_template: None,
             favorites: alloc::vec![alloc::string::String::from("f1")],
+            field_clocks: Default::default(),
             item_order: alloc::vec![alloc::string::String::from("n1")],
             editor_layout: Some(EditorLayout {
                 left_width: 312,
@@ -4485,6 +4685,7 @@ mod tests {
             theme: None,
             item_order: Vec::new(),
             favorites: Vec::new(),
+            field_clocks: Default::default(),
             deliberate_folders: alloc::vec![
                 alloc::string::String::from("Projects/"),
                 alloc::string::String::from("Archive/"),
@@ -4545,6 +4746,7 @@ mod tests {
             theme: None,
             item_order: Vec::new(),
             favorites: Vec::new(),
+            field_clocks: Default::default(),
             deliberate_folders: alloc::vec![
                 alloc::string::String::from("b/"),
                 alloc::string::String::from("a/"),
@@ -4608,6 +4810,7 @@ mod tests {
             theme: None,
             item_order: Vec::new(),
             favorites: Vec::new(),
+            field_clocks: Default::default(),
             deliberate_folders: alloc::vec![alloc::string::String::from("a\"b/")],
             auto_lock_seconds: None,
             custom_theme: None,
@@ -4666,6 +4869,7 @@ mod tests {
             theme: None,
             item_order: Vec::new(),
             favorites: Vec::new(),
+            field_clocks: Default::default(),
             deliberate_folders: alloc::vec![alloc::string::String::from("Cafe\u{0301}/")],
             auto_lock_seconds: None,
             custom_theme: None,
@@ -4784,6 +4988,7 @@ mod tests {
             theme: None,
             item_order: Vec::new(),
             favorites: Vec::new(),
+            field_clocks: Default::default(),
             deliberate_folders: alloc::vec![
                 alloc::string::String::from("Projects/Myne/"),
                 alloc::string::String::from("Archive/2025/"),
@@ -4854,6 +5059,7 @@ mod tests {
         // favorites, screen_capture_protection last. item_order is
         // HETEROGENEOUS — a folder path interleaved between note UUIDs.
         let prefs = PrefsView {
+            field_clocks: Default::default(),
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
             show_note_timestamps: true,
@@ -4938,6 +5144,7 @@ mod tests {
             daily_folder: None,
             daily_template: None,
             favorites: Vec::new(),
+            field_clocks: Default::default(),
             item_order: alloc::vec![
                 alloc::string::String::from("zzz"),
                 alloc::string::String::from("aaa"),
@@ -5017,6 +5224,7 @@ mod tests {
         let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
         let account_hash = fixed_account_number_hash();
         let original = PrefsView {
+            field_clocks: Default::default(),
             screen_capture_protection: false,
             bar_items_order: Vec::new(),
             show_note_timestamps: true,
@@ -5114,6 +5322,7 @@ mod tests {
             theme: None,
             item_order: Vec::new(),
             favorites: Vec::new(),
+            field_clocks: Default::default(),
             deliberate_folders: Vec::new(),
             auto_lock_seconds: None,
             custom_theme: None,
@@ -5237,6 +5446,7 @@ mod tests {
             theme: None,
             item_order: Vec::new(),
             favorites: Vec::new(),
+            field_clocks: Default::default(),
             deliberate_folders: Vec::new(),
             auto_lock_seconds: Some(300),
             custom_theme: None,
@@ -5295,6 +5505,7 @@ mod tests {
             theme: None,
             item_order: Vec::new(),
             favorites: Vec::new(),
+            field_clocks: Default::default(),
             deliberate_folders: alloc::vec![alloc::string::String::from("Archive/")],
             auto_lock_seconds: Some(900),
             custom_theme: None,
@@ -5355,6 +5566,7 @@ mod tests {
             theme: None,
             item_order: Vec::new(),
             favorites: Vec::new(),
+            field_clocks: Default::default(),
             deliberate_folders: Vec::new(),
             auto_lock_seconds: Some(0),
             custom_theme: None,
@@ -5483,6 +5695,7 @@ mod tests {
             theme: None,
             item_order: Vec::new(),
             favorites: Vec::new(),
+            field_clocks: Default::default(),
             deliberate_folders: alloc::vec![alloc::string::String::from("Projects/")],
             auto_lock_seconds: Some(1800),
             custom_theme: None,
@@ -5591,6 +5804,7 @@ mod tests {
             daily_folder: None,
             daily_template: None,
             favorites: alloc::vec![alloc::string::String::from("f1")],
+            field_clocks: Default::default(),
             item_order: alloc::vec![alloc::string::String::from("n1")],
             active_workspace: None,
             ai_enabled: false,
@@ -5877,6 +6091,7 @@ mod tests {
             theme: None,
             item_order: Vec::new(),
             favorites: Vec::new(),
+            field_clocks: Default::default(),
             deliberate_folders: Vec::new(),
             auto_lock_seconds: None,
             custom_theme: None,
@@ -5939,6 +6154,7 @@ mod tests {
             theme: None,
             item_order: Vec::new(),
             favorites: Vec::new(),
+            field_clocks: Default::default(),
             deliberate_folders: Vec::new(),
             auto_lock_seconds: None,
             custom_theme: None,
@@ -6265,6 +6481,7 @@ mod tests {
                 theme: None,
                 item_order: Vec::new(),
                 favorites: Vec::new(),
+                field_clocks: Default::default(),
                 deliberate_folders: Vec::new(),
                 auto_lock_seconds: None,
                 custom_theme: None,
@@ -6320,6 +6537,7 @@ mod tests {
                 theme: None,
                 item_order: Vec::new(),
                 favorites: Vec::new(),
+                field_clocks: Default::default(),
                 deliberate_folders: Vec::new(),
                 auto_lock_seconds: None,
                 custom_theme: None,
@@ -6362,6 +6580,7 @@ mod tests {
         // (not hardcoded) so the generator self-validates the canonical key
         // order + sequence discipline before emitting.
         let prefs_populated = PrefsView {
+            field_clocks: Default::default(),
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
             ai_enabled: false,
@@ -8084,6 +8303,133 @@ mod tests {
             dump.as_bytes(),
         )
         .expect("write vault-prefs right-panel vectors dump");
+    }
+
+    /// Generator for the MYND-478 `field_clocks` vault-prefs vectors (Phase 2
+    /// prefs sync; per-feature-generator pattern of
+    /// [`emit_right_panel_prefs_vectors`]). Emits a 2-case JSON **array
+    /// fragment** (encrypt + decrypt_ok) at
+    /// `/tmp/myne_vault_prefs_field_clocks_vectors.json`, spliced by hand into
+    /// the existing `cases` array. Exercises the additive
+    /// `field_clocks` map (string key → epoch-ms u64) in its canonical slot
+    /// between `favorites` (fa) and `folder_icons` (fo), including a
+    /// namespaced `device_names/<key>` entry. Same fixed vault-A inputs as the
+    /// sibling generators; prefs_nonce=0xF7 (the next free entry in the
+    /// family's nonce registry — 0x77..0xEE + 0xF1..0xF6 are taken).
+    ///
+    /// `cargo test -p protocol --lib emit_field_clocks_prefs_vectors -- --ignored`
+    #[test]
+    #[ignore]
+    fn emit_field_clocks_prefs_vectors() {
+        extern crate std;
+
+        let root_a: [u8; 32] = [0x42; 32];
+        let account_hash_a: [u8; PREFS_BLOB_ACCOUNT_HASH_LEN] = [0x33; PREFS_BLOB_ACCOUNT_HASH_LEN];
+        let prefs_key_a = derive_subkey(&root_a, SubkeyRole::PrefsKey);
+
+        let nonce_fc: [u8; AEAD_NONCE_LEN] = [0xF7; AEAD_NONCE_LEN];
+        let mut clocks = BTreeMap::new();
+        clocks.insert(String::from("label"), 1_765_432_099_000u64);
+        clocks.insert(
+            String::from("device_names/3f9ac2d1aabbccdd00112233445566ff"),
+            1_765_432_100_000u64,
+        );
+        let prefs_fc = PrefsView {
+            favorites: alloc::vec![String::from("0190a000-0000-7000-8000-000000000002")],
+            field_clocks: clocks,
+            folder_icons: {
+                let mut m = BTreeMap::new();
+                m.insert(String::from("Projects/Myne/"), String::from("book"));
+                m
+            },
+            label: Some(String::from("Work")),
+            ..PrefsView::default()
+        };
+        let canonical = canonical_json_encode(&prefs_fc);
+        assert_eq!(
+            canonical.as_slice(),
+            br#"{"favorites":["0190a000-0000-7000-8000-000000000002"],"field_clocks":{"device_names/3f9ac2d1aabbccdd00112233445566ff":1765432100000,"label":1765432099000},"folder_icons":{"Projects/Myne/":"book"},"label":"Work","screen_capture_protection":true}"#.as_slice(),
+            "canonical bytes must pin favorites (fa) < field_clocks (fi) < folder_icons (fo) < label (l) < screen_capture_protection (s), lexicographic clock keys, bare-decimal epoch-ms values",
+        );
+        let blob_fc = encode_prefs_blob_raw(&prefs_key_a, &account_hash_a, &prefs_fc, &nonce_fc)
+            .expect("encode field-clocks");
+        let decoded = decode_prefs_blob(&prefs_key_a, &account_hash_a, &blob_fc).expect("decode");
+        assert_eq!(
+            decoded, prefs_fc,
+            "field-clocks blob must round-trip exactly"
+        );
+
+        let mut dump = alloc::string::String::new();
+        dump.push_str("[\n");
+
+        // case 1/2: encrypt-field-clocks
+        dump.push_str("    {\n");
+        dump.push_str("      \"vector_id\": \"vault-prefs/v0.1/encrypt-field-clocks\",\n");
+        dump.push_str("      \"description\": \"Per-field LWW clocks (MYND-478, Phase 2 prefs sync). PrefsView carries the additive field_clocks map (string key -> epoch-ms u64; here the 'label' field clock plus a namespaced device_names/<key> per-entry clock) beside favorites, folder_icons and label, pinning the canonical key order favorites (fa) < field_clocks (fi) < folder_icons (fo) < label (l) < screen_capture_protection (s), lexicographic clock-key order inside the map, and bare-decimal integer values (floats forbidden). Same vault-A inputs as the sibling cases; prefs_nonce=0xF7x24. Generated by emit_field_clocks_prefs_vectors in protocol/src/prefs.rs.\",\n");
+        dump.push_str("      \"case_kind\": \"encrypt\",\n");
+        dump.push_str(&alloc::format!(
+            "      \"input_root_key_hex\": \"{}\",\n",
+            hex_lower(&root_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_account_number_hash_hex\": \"{}\",\n",
+            hex_lower(&account_hash_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_plaintext_canonical_utf8_hex\": \"{}\",\n",
+            hex_lower(&canonical)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_prefs_nonce_hex\": \"{}\",\n",
+            hex_lower(&nonce_fc)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"informational_prefs_key_hex\": \"{}\",\n",
+            hex_lower(&*prefs_key_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"expected_prefs_blob_hex\": \"{}\"\n",
+            hex_lower(&blob_fc)
+        ));
+        dump.push_str("    },\n");
+
+        // case 2/2: decrypt-field-clocks
+        dump.push_str("    {\n");
+        dump.push_str("      \"vector_id\": \"vault-prefs/v0.1/decrypt-field-clocks\",\n");
+        dump.push_str("      \"description\": \"Round-trip with encrypt-field-clocks: the blob decodes back to a PrefsView carrying the field_clocks map (label clock + namespaced device_names/<key> clock) under the same root_key + account_number_hash. Verifies decoders surface field_clocks from its canonical position between favorites and folder_icons and parse the inner string->integer object; a decoder that does not know the field (pre-MYND-478) tolerates it per the §9.5.2 forward-compat rule and treats every clock as absent (= 0 to the sync-protocol.md §10.2 merge).\",\n");
+        dump.push_str("      \"case_kind\": \"decrypt_ok\",\n");
+        dump.push_str(&alloc::format!(
+            "      \"input_blob_hex\": \"{}\",\n",
+            hex_lower(&blob_fc)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_root_key_hex\": \"{}\",\n",
+            hex_lower(&root_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_account_number_hash_hex\": \"{}\",\n",
+            hex_lower(&account_hash_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"expected_plaintext_canonical_utf8_hex\": \"{}\",\n",
+            hex_lower(&canonical)
+        ));
+        dump.push_str("      \"expected_prefs_view\": {\n");
+        dump.push_str("        \"screen_capture_protection\": true,\n");
+        dump.push_str("        \"favorites\": [\"0190a000-0000-7000-8000-000000000002\"],\n");
+        dump.push_str("        \"field_clocks\": { \"device_names/3f9ac2d1aabbccdd00112233445566ff\": 1765432100000, \"label\": 1765432099000 },\n");
+        dump.push_str("        \"folder_icons\": { \"Projects/Myne/\": \"book\" },\n");
+        dump.push_str("        \"label\": \"Work\"\n");
+        dump.push_str("      }\n");
+        dump.push_str("    }\n");
+
+        dump.push_str("]\n");
+
+        std::fs::write(
+            "/tmp/myne_vault_prefs_field_clocks_vectors.json",
+            dump.as_bytes(),
+        )
+        .expect("write vault-prefs field-clocks vectors dump");
     }
 
     /// Generator for the MYND-227 structural `parse_fail` vector cases

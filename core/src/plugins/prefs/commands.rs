@@ -175,7 +175,19 @@ async fn update_prefs_with_dir(
     let prefs_path = vault_dir.join("vault.prefs");
 
     let mut prefs = read_or_default(&prefs_path, &prefs_key, &account_number_hash);
+    let before = prefs.clone();
     mutate(&mut prefs);
+
+    // MYND-478 (sync-protocol.md §10.2): stamp the LWW field clock of every
+    // SHARED field this write changed — centrally, so no setter can forget.
+    // Device-local and set-union fields are never stamped; a wall-clock
+    // failure degrades to clock 0 (the legacy value) rather than blocking the
+    // write.
+    let now_ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0);
+    crate::plugins::sync::prefs_merge::stamp_changed_shared_fields(&before, &mut prefs, now_ms);
 
     let blob_bytes = encode_prefs_blob(&prefs_key, &account_number_hash, &prefs)
         .map_err(|_| PrefsWriteError::PrefsEncodeFailed)?;
@@ -185,6 +197,16 @@ async fn update_prefs_with_dir(
 
     Ok(())
 }
+
+/// Tauri event announcing a `vault.prefs` change applied OUTSIDE the user's
+/// own IPC round-trip — today the Phase 2 sync merge phase (MYND-478). A
+/// local setter needs no event (its own IPC success is the signal, and the
+/// WebView dispatches its window-level refresh itself); a sync-applied merge
+/// is invisible to the WebView without this. Frontends bridge it into their
+/// prefs re-read path (desktop: the `VAULT_PREFS_CHANGED_EVENT` window event;
+/// mobile: `bumpPrefsNonce`). Payload: none (contentless — the listener
+/// re-reads; the event never carries pref values).
+pub const PREFS_CHANGED_EVENT: &str = "myne://prefs-changed";
 
 /// Slot::Unlocked-gated read of the `vault.prefs` blob.
 ///
@@ -1809,6 +1831,30 @@ mod tests {
     }
 
     #[test]
+    fn shared_field_setter_stamps_its_field_clock() {
+        // MYND-478: every setter routed through update_prefs_with_dir stamps
+        // the changed SHARED field's clock; a device-local setter stamps
+        // nothing (sync-protocol.md §10.2).
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x33).await;
+            vault_set_label_with_dir(tmp.path(), &state, Some("Work".into()))
+                .await
+                .expect("set label");
+            let view = prefs_read_with_dir(tmp.path(), &state).await.expect("read");
+            let label_clock = *view.field_clocks.get("label").expect("label stamped");
+            assert!(label_clock > 0, "epoch-ms clock must be non-zero");
+
+            // Device-local setter: no stamp, and the label clock survives.
+            set_theme_with_dir(tmp.path(), &state, Some(protocol::ThemeChoice::Dark))
+                .await
+                .expect("set theme");
+            let view = prefs_read_with_dir(tmp.path(), &state).await.expect("read");
+            assert!(!view.field_clocks.contains_key("theme"));
+            assert_eq!(view.field_clocks.get("label"), Some(&label_clock));
+        });
+    }
+
+    #[test]
     fn record_last_backup_at_round_trips_through_prefs() {
         // MYND-58: the export engine's best-effort recorder writes the
         // §9.5.2 `last_backup_at` field via the standard setter discipline.
@@ -1943,6 +1989,7 @@ mod tests {
                     daily_folder: None,
                     daily_template: None,
                     favorites: Vec::new(),
+                    field_clocks: Default::default(),
                     item_order: Vec::new(),
                     keymap: Default::default(),
                     active_workspace: None,

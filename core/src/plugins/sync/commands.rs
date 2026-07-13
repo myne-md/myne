@@ -451,6 +451,7 @@ pub async fn run_active_cycle<R: Runtime>(app: &AppHandle<R>, allow_push: bool) 
         token_hex.push_str(&format!("{b:02x}"));
     }
     let notes_dir = dir.join("notes");
+    let dir_for_prefs = dir.clone();
 
     let res = tokio::task::spawn_blocking(move || {
         let transport = super::http_transport::build_transport(&url, pins).map_err(|_| false)?;
@@ -491,6 +492,25 @@ pub async fn run_active_cycle<R: Runtime>(app: &AppHandle<R>, allow_push: bool) 
                 // so the reconcile banner (reassuring, "caught up") can show.
                 let _ = app.emit("sync://reconcile-started", ());
                 let _ = app.emit("sync://reconcile-finished", ());
+            }
+            if summary.prefs_applied_remote {
+                // A remote prefs change was merged onto disk this cycle
+                // (MYND-478): refresh the switcher-facing RAM caches, then tell
+                // the WebView to re-read (the same disk→cache→event choreography
+                // as a local setter; the orchestrator stays AppHandle-free so
+                // the side effects live at this boundary).
+                if let Ok(view) = crate::plugins::prefs::commands::prefs_read_with_dir(
+                    &dir_for_prefs,
+                    state.inner(),
+                )
+                .await
+                {
+                    if let Some(active) = state.active_vault_id().await {
+                        state.set_cached_label(active, view.label.clone()).await;
+                        state.set_cached_icon(active, view.icon.clone()).await;
+                    }
+                }
+                let _ = app.emit(crate::plugins::prefs::commands::PREFS_CHANGED_EVENT, ());
             }
             CycleOutcome::Ran(summary)
         }
