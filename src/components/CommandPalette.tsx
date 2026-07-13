@@ -102,7 +102,11 @@ const ROW_STYLE: CSSProperties = {
 
 const ROW_SELECTED_STYLE: CSSProperties = {
   ...ROW_STYLE,
-  background: "var(--paper-2)",
+  // The active-row highlight uses the accent-soft tint (the same convention as
+  // the sidebar's open-note row) — NOT `--paper-2`, which collapses to the modal
+  // background on AMOLED (both are `#000000`), making the keyboard selection
+  // invisible. accent-soft stays visible on every theme.
+  background: "var(--accent-soft)",
 };
 
 const ROW_DISABLED_STYLE: CSSProperties = {
@@ -219,6 +223,10 @@ export function CommandPalette({
   // search effect below; empty while the query is empty.
   const [noteHits, setNoteHits] = useState<NoteSearchResult[]>([]);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  // The scrollable results container — used to keep the keyboard-selected row in
+  // view as arrow nav walks past the fold (without it, the highlight can move to
+  // a row below the visible area and read as "nothing happening").
+  const listRef = useRef<HTMLDivElement>(null);
   // Carve-out modal: trap focus directly (not via ModalShell, which would
   // strip the input + arrow/Enter list navigation). Initial focus is the
   // search input. MYND-93.
@@ -369,6 +377,16 @@ export function CommandPalette({
     }
   }, [rows.length, selectedIndex]);
 
+  // Keep the keyboard-selected row scrolled into view (block: "nearest" so it
+  // only scrolls when the row is actually outside the visible band). Guarded on
+  // the method itself — jsdom (test env) doesn't implement scrollIntoView.
+  useEffect(() => {
+    const el = listRef.current?.querySelector<HTMLElement>('[aria-selected="true"]');
+    if (el !== null && el !== undefined && typeof el.scrollIntoView === "function") {
+      el.scrollIntoView({ block: "nearest" });
+    }
+  }, [selectedIndex, rows.length]);
+
   const close = useCallback(() => {
     setQuery("");
     setSelectedIndex(0);
@@ -474,7 +492,7 @@ export function CommandPalette({
           spellCheck={false}
           data-testid="palette.input"
         />
-        <div style={LIST_STYLE} role="listbox">
+        <div style={LIST_STYLE} role="listbox" ref={listRef}>
           {rows.length === 0 ? (
             <div style={EMPTY_STYLE}>{t("commandPalette.noMatches")}</div>
           ) : (
