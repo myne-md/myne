@@ -741,6 +741,16 @@ export async function setVaultLabel(label: string | null): Promise<void> {
 }
 
 /**
+ * Tauri event the sync loop emits after merging a REMOTE `vault.prefs` change
+ * onto disk (MYND-478; `PREFS_CHANGED_EVENT` in `core`). Never fired for this
+ * device's own IPC writes (their own resolve is the signal). Contentless — the
+ * listener re-reads. `EditorFlow` bridges it into `bumpPrefsNonce()` so an
+ * incoming vault rename / shared-pref change shows live in the header and
+ * settings; the switcher list re-fetches on its next open.
+ */
+export const PREFS_SYNC_APPLIED_EVENT = "myne://prefs-changed";
+
+/**
  * Set the spell-check enabled toggle (MYND-267). Persists an explicit choice;
  * the default-ON policy (SYNC-15) is applied host-side at read time when the
  * field is unset. Disk-first, no native side-effect; a rejected promise means
