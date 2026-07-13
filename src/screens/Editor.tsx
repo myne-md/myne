@@ -139,12 +139,14 @@ import {
 import { linkMention } from "../notes/linkMention";
 import type { UnlinkedMention } from "../notes/unlinkedMentions";
 import { SaveStatus as SaveStatusBadge } from "../notes/components/SaveStatus";
+import { DeleteConfirmModal } from "../notes/components/DeleteConfirmModal";
 import {
   SidebarStateProvider,
   useSelectedNote,
   trashedRecords,
   type NoteId,
 } from "../notes/sidebarState";
+import { sidebarCommands } from "../notes/sidebarCommands";
 import type { SaveStatus as SaveStatusValue } from "../notes/useAutosave";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { listen } from "@tauri-apps/api/event";
@@ -773,6 +775,26 @@ function EditorChrome({
     }
     requestRevealViews();
   }, [layout, forced.forceLeftCollapsed]);
+
+  // Expand the left sidebar for the palette's sidebar-owned surfaces (Wave 4:
+  // new folder / trash / archive). Their UI lives inside the left SidebarPane,
+  // which is `inert` while collapsed — including focus mode — so the actions
+  // would no-op or open a ghost surface without this. Same reveal discipline as
+  // `revealViews` above: exit focus mode, un-collapse a manual collapse, and
+  // report a width-forced collapse (MYND-192) as unexpandable so the caller
+  // skips its surface instead of ghost-opening it. Registered on the Editor
+  // (not NoteList) because the layout + focus state live here.
+  useEffect(() => {
+    sidebarCommands.revealSidebar = () => {
+      if (forced.forceLeftCollapsed) return false;
+      if (focusActive) exitFocus();
+      if (layout.leftCollapsed) layout.toggleLeftCollapsed();
+      return true;
+    };
+    return () => {
+      sidebarCommands.revealSidebar = undefined;
+    };
+  }, [layout, forced.forceLeftCollapsed, focusActive, exitFocus]);
 
   // Import a `.base` saved-views file (Saved Views #6, MYND-276, task 6): pick a
   // single `.base` file (no new capability — dialog:allow-open already granted),
@@ -2207,6 +2229,12 @@ function CommandPaletteHost({
     items: QuickPickItem[];
     onPick: (id: string) => void;
   } | null>(null);
+  // Deferred empty-trash confirm (the palette `trash.empty` action): the
+  // trashed count at request time, null when closed. A permanent purge never
+  // fires straight from the palette — this renders the same count-aware
+  // DeleteConfirmModal the TrashPanel footer uses, and only confirm purges.
+  // Rendered as a sibling like `picker`, so it survives the palette closing.
+  const [emptyTrashConfirm, setEmptyTrashConfirm] = useState<number | null>(null);
   // AI surface (local-ai epic, ai-ux-surface MYND-408, SYNC-9): the `ai_enabled`
   // gate + the AI Chat reveal, threaded into CommandContext so AI capability
   // actions (siblings 4/6/7) gate on `stageName === "editor" && aiEnabled` and
@@ -2377,8 +2405,10 @@ function CommandPaletteHost({
         if (ctx.selectedId !== null) void ctx.trashWithRollback(ctx.selectedId).catch(() => {});
       },
       onEmptyTrash: () => {
-        const ids = trashedRecords(ctx.cache).map((r) => r.noteUuid);
-        if (ids.length > 0) void ctx.emptyTrashWithSync(ids).catch(() => {});
+        // Permanent purge — request the count-aware confirm instead of firing
+        // directly (the TrashPanel footer's flow); the purge runs on confirm.
+        const count = trashedRecords(ctx.cache).length;
+        if (count > 0) setEmptyTrashConfirm(count);
       },
       onToggleFavorite: () => {
         if (ctx.selectedId === null) return;
@@ -2398,6 +2428,9 @@ function CommandPaletteHost({
         const noteId = ctx.selectedId;
         const folders = new Set<string>();
         for (const rec of ctx.cache.values()) {
+          // Live, non-template notes only — a folder that survives solely on
+          // trashed/archived/template notes isn't a sidebar destination.
+          if (rec.trashed !== null || rec.archived !== null || rec.template) continue;
           if (rec.folder) folders.add(rec.folder);
         }
         for (const f of aiPrefs.deliberate_folders) folders.add(f);
@@ -2569,6 +2602,9 @@ function CommandPaletteHost({
       // ctx.prefs, so commandCtx must re-memoize on ANY pref change.
       aiPrefs,
       paletteWs,
+      // onMoveNote / onApplyCustomTheme resolve their QuickPicker strings via
+      // `t` at run time — a language switch must rebuild them.
+      t,
       onRestoreBackup,
       revealRightPanelTab,
       onLockFlushed,
@@ -2602,14 +2638,26 @@ function CommandPaletteHost({
       onDeleteWorkspace,
     ],
   );
+  // Stable note predicates (fresh identity only when the cache changes): they
+  // sit in the palette's snippet-effect deps, and an inline arrow's per-render
+  // identity would re-run that effect — re-issuing its `note_read` decrypts —
+  // on every unrelated host render.
+  const isTrashed = useCallback(
+    (id: string) => ctx.cache.get(id)?.trashed != null,
+    [ctx.cache],
+  );
+  const isTemplate = useCallback(
+    (id: string) => ctx.cache.get(id)?.template === true,
+    [ctx.cache],
+  );
   return (
     <>
       <CommandPalette
         open={open}
         onClose={onClose}
         ctx={commandCtx}
-        isTrashed={(id) => ctx.cache.get(id)?.trashed != null}
-        isTemplate={(id) => ctx.cache.get(id)?.template === true}
+        isTrashed={isTrashed}
+        isTemplate={isTemplate}
         isArchived={(id) => ctx.cache.get(id)?.archived != null}
       />
       <QuickPicker
@@ -2629,6 +2677,36 @@ function CommandPaletteHost({
           onReopen();
         }}
       />
+      {emptyTrashConfirm !== null && (
+        <DeleteConfirmModal
+          title={t("notes.trash.emptyConfirmTitle")}
+          body={t("notes.trash.emptyConfirmBody", { count: emptyTrashConfirm })}
+          confirmLabel={t("notes.trash.emptyConfirmCta")}
+          onCancel={() => setEmptyTrashConfirm(null)}
+          onConfirm={() => {
+            setEmptyTrashConfirm(null);
+            // Re-derive the kill list from the CURRENT trashed set at confirm
+            // time (the TrashPanel discipline): a note restored while the
+            // confirm was up must NOT be purged.
+            const ids = trashedRecords(ctx.cache).map((r) => r.noteUuid);
+            if (ids.length === 0) return;
+            void ctx
+              .emptyTrashWithSync(ids)
+              .then((result) => {
+                // Best-effort bulk purge — report a remaining count on partial
+                // failure (the palette has no status line, so toast it).
+                if (result.failed.length > 0) {
+                  showAttachmentToast(
+                    t("notes.trash.emptyPartialFailure", {
+                      count: result.failed.length,
+                    }),
+                  );
+                }
+              })
+              .catch(() => {});
+          }}
+        />
+      )}
     </>
   );
 }

@@ -12,10 +12,15 @@ import { ControlBlock } from "./ControlBlock";
 import { prefsRead, setEditorToolbarHidden, setEditorToolbarOrder } from "../../lib/prefs";
 import { resolveBarOrder, reorderByDrop } from "../../notes/barItemsOrder";
 import {
-  EDITOR_TOOLBAR_DEFAULT_HIDDEN,
   EDITOR_TOOLBAR_DEFAULT_ORDER,
+  EDITOR_TOOLBAR_PENDING_IDS,
+  resolveToolbarHidden,
   toolbarItemLabelKey,
 } from "../../notes/toolbarItems";
+
+// Ids the floating toolbar cannot render yet (MYND-336 follow-up): pinned
+// hidden, so their rows are visibly disabled and non-toggleable.
+const PENDING_SET = new Set(EDITOR_TOOLBAR_PENDING_IDS);
 
 const LIST_STYLE: CSSProperties = {
   display: "flex",
@@ -62,6 +67,17 @@ const ITEM_LABEL_STYLE: CSSProperties = {
   flex: 1,
   minWidth: 0,
 };
+// A pinned (not-yet-renderable) row keeps its real label, dimmed + inert.
+const ITEM_LABEL_PENDING_STYLE: CSSProperties = {
+  ...ITEM_LABEL_STYLE,
+  cursor: "default",
+  color: "var(--fg-3)",
+};
+const PENDING_HINT_STYLE: CSSProperties = {
+  fontSize: 11,
+  color: "var(--fg-3)",
+  flexShrink: 0,
+};
 const CHECKBOX_STYLE: CSSProperties = {
   // Theme the control instead of the OS default (macOS system blue) so it
   // follows the active theme's accent (QA: the native blue was off-theme).
@@ -92,7 +108,7 @@ const ERROR_STYLE: CSSProperties = {
 export function ToolbarCustomizeSettings() {
   const { t } = useTranslation();
   const [order, setOrder] = useState<string[]>([...EDITOR_TOOLBAR_DEFAULT_ORDER]);
-  const [hidden, setHidden] = useState<string[]>([...EDITOR_TOOLBAR_DEFAULT_HIDDEN]);
+  const [hidden, setHidden] = useState<string[]>(resolveToolbarHidden([]));
   const [error, setError] = useState<string | null>(null);
   // Drag-to-reorder transient state: the id being dragged + the current drop
   // target (row id + which edge the drop indicator paints on).
@@ -109,11 +125,7 @@ export function ToolbarCustomizeSettings() {
             ? p.editor_toolbar_order
             : [...EDITOR_TOOLBAR_DEFAULT_ORDER],
         );
-        setHidden(
-          p.editor_toolbar_hidden.length > 0
-            ? p.editor_toolbar_hidden
-            : [...EDITOR_TOOLBAR_DEFAULT_HIDDEN],
-        );
+        setHidden(resolveToolbarHidden(p.editor_toolbar_hidden));
       })
       .catch(() => {
         /* locked / no vault — leave defaults */
@@ -127,25 +139,33 @@ export function ToolbarCustomizeSettings() {
   const fullOrder = resolveBarOrder(order, EDITOR_TOOLBAR_DEFAULT_ORDER);
   const hiddenSet = new Set(hidden);
 
+  // Optimistic persist with rollback: the list updates immediately, but an IPC
+  // failure restores the on-disk state so the UI never shows a layout that
+  // didn't save.
   async function persistOrder(next: string[]) {
+    const prev = order;
     setOrder(next);
     try {
       await setEditorToolbarOrder(next);
       setError(null);
     } catch {
+      setOrder(prev);
       setError(t("settings.toolbarCustomize.errorSave"));
     }
   }
   async function persistHidden(next: string[]) {
+    const prev = hidden;
     setHidden(next);
     try {
       await setEditorToolbarHidden(next);
       setError(null);
     } catch {
+      setHidden(prev);
       setError(t("settings.toolbarCustomize.errorSave"));
     }
   }
   function toggleShown(id: string) {
+    if (PENDING_SET.has(id)) return; // pinned hidden — non-toggleable
     void persistHidden(hiddenSet.has(id) ? hidden.filter((h) => h !== id) : [...hidden, id]);
   }
   function move(id: string, delta: number) {
@@ -187,6 +207,7 @@ export function ToolbarCustomizeSettings() {
                   : null;
               const isFirst = i === 0;
               const isLast = i === fullOrder.length - 1;
+              const isPending = PENDING_SET.has(id);
               return (
                 <div
                   key={id}
@@ -201,7 +222,7 @@ export function ToolbarCustomizeSettings() {
                   onDrop={() => onDrop(id)}
                   data-item-id={id}
                 >
-                  <label style={ITEM_LABEL_STYLE}>
+                  <label style={isPending ? ITEM_LABEL_PENDING_STYLE : ITEM_LABEL_STYLE}>
                     <span style={GRIP_STYLE} aria-hidden="true">
                       ⠿
                     </span>
@@ -209,11 +230,17 @@ export function ToolbarCustomizeSettings() {
                       type="checkbox"
                       checked={!hiddenSet.has(id)}
                       onChange={() => toggleShown(id)}
+                      disabled={isPending}
                       style={CHECKBOX_STYLE}
                       data-testid="settings.toolbar-customize.toggle"
                       data-item-id={id}
                     />
                     {t(toolbarItemLabelKey(id) ?? id)}
+                    {isPending && (
+                      <span style={PENDING_HINT_STYLE}>
+                        {t("settings.toolbarCustomize.pendingHint")}
+                      </span>
+                    )}
                   </label>
                   <span>
                     <button
@@ -222,6 +249,8 @@ export function ToolbarCustomizeSettings() {
                       disabled={isFirst}
                       onClick={() => move(id, -1)}
                       style={isFirst ? ARROW_DISABLED_STYLE : ARROW_STYLE}
+                      data-testid="settings.toolbar-customize.move-up"
+                      data-item-id={id}
                     >
                       ↑
                     </button>
@@ -231,6 +260,8 @@ export function ToolbarCustomizeSettings() {
                       disabled={isLast}
                       onClick={() => move(id, 1)}
                       style={isLast ? ARROW_DISABLED_STYLE : ARROW_STYLE}
+                      data-testid="settings.toolbar-customize.move-down"
+                      data-item-id={id}
                     >
                       ↓
                     </button>

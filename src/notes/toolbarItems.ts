@@ -67,6 +67,37 @@ export const EDITOR_TOOLBAR_DEFAULT_HIDDEN: readonly string[] = [
   "wikilink",
 ];
 
+/**
+ * Vocabulary ids the floating toolbar cannot render yet — the addable
+ * list/quote/wikilink cluster is the MYND-336 follow-up on the editor side
+ * (`editor/src/toolbar/plugin.ts` skips them). Until that lands they are
+ * PINNED hidden: Settings shows them as disabled, non-toggleable rows, and
+ * {@link resolveToolbarHidden} forces them into every resolved hidden set, so
+ * a stored layout can never demand a button the toolbar would silently drop.
+ * When the follow-up renders one, remove it here — the pin lifts and the
+ * Settings row becomes toggleable, no migration needed.
+ */
+export const EDITOR_TOOLBAR_PENDING_IDS: readonly string[] = [
+  "bulletList",
+  "numberedList",
+  "checklist",
+  "quote",
+  "wikilink",
+];
+
+/**
+ * Resolve the EFFECTIVE hidden set from the stored `editor_toolbar_hidden`
+ * pref: the stored ids (empty = unset → {@link EDITOR_TOOLBAR_DEFAULT_HIDDEN})
+ * unioned with the pinned {@link EDITOR_TOOLBAR_PENDING_IDS}. The
+ * empty-means-unset fallback is unambiguous BECAUSE of the pin: every
+ * legitimately persisted value contains at least the pending ids, so a stored
+ * `[]` can only mean "never customized" — never "show everything".
+ */
+export function resolveToolbarHidden(stored: readonly string[]): string[] {
+  const base = stored.length > 0 ? stored : EDITOR_TOOLBAR_DEFAULT_HIDDEN;
+  return [...new Set([...base, ...EDITOR_TOOLBAR_PENDING_IDS])];
+}
+
 /** Label-key lookup for a toolbar item id (the Settings customization list). */
 export function toolbarItemLabelKey(id: string): string | null {
   return EDITOR_TOOLBAR_ITEMS.find((item) => item.id === id)?.labelKey ?? null;

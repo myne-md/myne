@@ -1825,7 +1825,8 @@
       "helper": "Choose which formatting buttons appear on the selection toolbar, and their order.",
       "label": "Toolbar buttons",
       "moveDown": "Move down",
-      "moveUp": "Move up"
+      "moveUp": "Move up",
+      "pendingHint": "Coming soon"
     },
     "ai": {
       "betaBadge": "Beta",

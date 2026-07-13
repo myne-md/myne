@@ -9,8 +9,8 @@ import { setToolbarLayout, setSelectionExportHandler } from "@myne/editor";
 import { usePrefs } from "../hooks/usePrefs";
 import { exportSelectionImageWithToast } from "../commands/actions";
 import {
-  EDITOR_TOOLBAR_DEFAULT_HIDDEN,
   EDITOR_TOOLBAR_DEFAULT_ORDER,
+  resolveToolbarHidden,
   resolveToolbarOrder,
 } from "./toolbarItems";
 
@@ -24,16 +24,16 @@ export function ToolbarLayoutSync(): null {
   }, []);
   useEffect(() => {
     // An un-customized vault (empty prefs) falls back to the canonical defaults,
-    // matching the Settings list — so the fed layout equals today's toolbar.
+    // matching the Settings list — so the fed layout equals today's toolbar. The
+    // hidden set goes through `resolveToolbarHidden`, which owns the same
+    // empty-means-unset fallback AND pins the not-yet-renderable ids.
     const order =
       prefs.editor_toolbar_order.length > 0
         ? prefs.editor_toolbar_order
         : EDITOR_TOOLBAR_DEFAULT_ORDER;
-    const hidden =
-      prefs.editor_toolbar_hidden.length > 0
-        ? prefs.editor_toolbar_hidden
-        : EDITOR_TOOLBAR_DEFAULT_HIDDEN;
-    setToolbarLayout(resolveToolbarOrder(order, hidden));
+    setToolbarLayout(
+      resolveToolbarOrder(order, resolveToolbarHidden(prefs.editor_toolbar_hidden)),
+    );
   }, [prefs.editor_toolbar_order, prefs.editor_toolbar_hidden]);
   return null;
 }

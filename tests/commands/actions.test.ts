@@ -15,6 +15,7 @@ import type {
   CommandContext,
   CommandAction,
 } from "../../src/commands";
+import { sidebarCommands } from "../../src/notes/sidebarCommands";
 
 function makeContext(over: Partial<CommandContext> = {}): CommandContext {
   return {
@@ -393,6 +394,36 @@ describe("Command palette action visibility per Stage", () => {
     }
   });
 
+  // note.archive mirrors the sidebar context menu's gate: the archive entries
+  // are omitted while the archive feature is disabled (`archive_disabled`).
+  it("\"Archive note\" is HIDDEN when the archive-disabled pref is on", () => {
+    const base = { stageName: "editor" as const, selectedNoteId: "note-1" };
+    expect(
+      find("note.archive").visibility(
+        makeContext({
+          ...base,
+          prefs: { archive_disabled: true } as CommandContext["prefs"],
+        }),
+      ),
+    ).toBe("hidden");
+    expect(
+      find("note.archive").visibility(
+        makeContext({
+          ...base,
+          prefs: { archive_disabled: false } as CommandContext["prefs"],
+        }),
+      ),
+    ).toBe("show");
+    // Unset pref (fresh vault) defaults to archive-enabled.
+    expect(find("note.archive").visibility(makeContext(base))).toBe("show");
+    // Still per-note: no selection → hidden regardless of the pref.
+    expect(
+      find("note.archive").visibility(
+        makeContext({ stageName: "editor", selectedNoteId: null }),
+      ),
+    ).toBe("hidden");
+  });
+
   it("\"Convert wikilinks…\" is HIDDEN when no note selected", () => {
     const ctx = makeContext({
       stageName: "editor",
@@ -537,5 +568,38 @@ describe("Command palette action run() side effects", () => {
     });
     const convertAction = find("wikilinks.convert-in-this-note");
     expect(await convertAction.run(ctx)).toBeUndefined();
+  });
+
+  it("\"Empty trash\" dispatches to onEmptyTrash — the Editor host opens the count-aware confirm; the purge only runs on confirm", () => {
+    const onEmptyTrash = vi.fn();
+    void find("trash.empty").run(makeContext({ onEmptyTrash }));
+    expect(onEmptyTrash).toHaveBeenCalledTimes(1);
+  });
+
+  it("Wave-4 sidebar actions expand the collapsed sidebar first, and skip their surface when expansion is impossible (MYND-192)", () => {
+    const cases = [
+      { id: "folder.new", handler: "newFolder" },
+      { id: "trash.open", handler: "openTrash" },
+      { id: "archive.open", handler: "openArchive" },
+    ] as const;
+    for (const { id, handler } of cases) {
+      const reveal = vi.fn(() => true);
+      const surface = vi.fn();
+      sidebarCommands.revealSidebar = reveal;
+      sidebarCommands[handler] = surface;
+      try {
+        void find(id).run(makeContext());
+        expect(reveal).toHaveBeenCalledTimes(1);
+        expect(surface).toHaveBeenCalledTimes(1);
+        // Width-forced collapse (reveal reports false) → the surface is skipped
+        // rather than ghost-opened inside the inert pane.
+        reveal.mockReturnValue(false);
+        void find(id).run(makeContext());
+        expect(surface).toHaveBeenCalledTimes(1);
+      } finally {
+        sidebarCommands.revealSidebar = undefined;
+        sidebarCommands[handler] = undefined;
+      }
+    }
   });
 });

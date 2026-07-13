@@ -197,7 +197,13 @@ export function QuickPicker({
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div ref={modalRef} style={MODAL_STYLE} role="dialog" aria-label={title}>
+      <div
+        ref={modalRef}
+        style={MODAL_STYLE}
+        role="dialog"
+        aria-label={title}
+        data-testid="quick-picker.dialog"
+      >
         <input
           ref={inputRef}
           style={INPUT_STYLE}
@@ -226,6 +232,8 @@ export function QuickPicker({
                 aria-selected={i === selectedIndex}
                 style={i === selectedIndex ? ROW_SELECTED_STYLE : ROW_STYLE}
                 data-testid="quick-picker.option"
+                data-value={it.id}
+                data-selected={i === selectedIndex ? "true" : "false"}
                 onMouseEnter={() => setSelectedIndex(i)}
                 onMouseDown={(e) => {
                   e.preventDefault();
