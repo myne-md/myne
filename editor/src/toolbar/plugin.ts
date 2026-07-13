@@ -227,17 +227,29 @@ class ToolbarView implements PluginValue {
       this.dismiss();
       return;
     }
-    const anchorFrom = this.savedSelection?.from ?? range.from;
-    const anchorTo = this.savedSelection?.to ?? range.to;
-    const startCoords = this.view.coordsAtPos(anchorFrom);
-    const endCoords = this.view.coordsAtPos(anchorTo);
-    if (startCoords === null || endCoords === null) return;
-    const rect = {
-      left: Math.min(startCoords.left, endCoords.left),
-      top: Math.min(startCoords.top, endCoords.top),
-      right: Math.max(startCoords.right, endCoords.right),
-      bottom: Math.max(startCoords.bottom, endCoords.bottom),
-    };
+    let rect: { left: number; top: number; right: number; bottom: number };
+    if (this.mode === "toolbar" && this.savedSelection === null) {
+      // Anchor to the selection HEAD (where the drag ended / the caret is) so a
+      // multi-line selection surfaces the toolbar near where the pointer last
+      // was, not pinned to the very top of the whole selection (QA). A
+      // zero-width point at the head; `computePosition` places the toolbar just
+      // above that line.
+      const head = this.view.coordsAtPos(range.head);
+      if (head === null) return;
+      rect = { left: head.left, top: head.top, right: head.left, bottom: head.bottom };
+    } else {
+      const anchorFrom = this.savedSelection?.from ?? range.from;
+      const anchorTo = this.savedSelection?.to ?? range.to;
+      const startCoords = this.view.coordsAtPos(anchorFrom);
+      const endCoords = this.view.coordsAtPos(anchorTo);
+      if (startCoords === null || endCoords === null) return;
+      rect = {
+        left: Math.min(startCoords.left, endCoords.left),
+        top: Math.min(startCoords.top, endCoords.top),
+        right: Math.max(startCoords.right, endCoords.right),
+        bottom: Math.max(startCoords.bottom, endCoords.bottom),
+      };
+    }
 
     const container = this.ensureContainer();
     container.className = this.mode === "toolbar" ? "cm-toolbar" : "cm-url-overlay";
