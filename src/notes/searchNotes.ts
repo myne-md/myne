@@ -48,6 +48,18 @@ export function shouldApplyNoteSearchResult(
  *  of a bare "matched in body". */
 export type MatchSnippet = { before: string; match: string; after: string };
 
+/** Strip wikilink/embed punctuation + internal ids for a READABLE snippet.
+ *  `![[att:<hex>|funny.gif]]` → `funny.gif` (the display alias) so a match
+ *  inside an embedded-attachment reference doesn't surface the raw
+ *  `att:<32-hex>` id and `![[ … ]]` brackets. `[[note|alias]]` → `alias`,
+ *  `[[note]]` → `note`. Ordinary markdown image/link URLs are left intact (they
+ *  may legitimately carry the searched filename). Display-only. */
+function cleanSnippetText(s: string): string {
+  return s
+    .replace(/!?\[\[[^\]|]*\|([^\]]+)\]\]/g, "$1") // [[target|alias]] → alias
+    .replace(/!?\[\[([^\]]+)\]\]/g, "$1"); // [[target]] → target
+}
+
 /**
  * Build a {@link MatchSnippet} around the FIRST case-insensitive literal
  * occurrence of `query` in `body`, with up to `radius` context chars each side
@@ -64,14 +76,15 @@ export function extractMatchSnippet(
 ): MatchSnippet | null {
   const q = query.trim();
   if (q === "") return null;
-  const idx = body.toLowerCase().indexOf(q.toLowerCase());
+  const text = cleanSnippetText(body);
+  const idx = text.toLowerCase().indexOf(q.toLowerCase());
   if (idx < 0) return null;
   const start = Math.max(0, idx - radius);
-  const end = Math.min(body.length, idx + q.length + radius);
+  const end = Math.min(text.length, idx + q.length + radius);
   const clean = (s: string): string => s.replace(/\s+/g, " ");
   return {
-    before: (start > 0 ? "…" : "") + clean(body.slice(start, idx)),
-    match: body.slice(idx, idx + q.length),
-    after: clean(body.slice(idx + q.length, end)) + (end < body.length ? "…" : ""),
+    before: (start > 0 ? "…" : "") + clean(text.slice(start, idx)),
+    match: text.slice(idx, idx + q.length),
+    after: clean(text.slice(idx + q.length, end)) + (end < text.length ? "…" : ""),
   };
 }
