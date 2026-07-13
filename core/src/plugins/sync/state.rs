@@ -102,16 +102,12 @@ pub struct SyncState {
     #[serde(default)]
     pub device_id_hex: Option<String>,
     /// The account's 16-byte `account_number_hash` (lowercase hex), captured at
-    /// enrollment so head authoring binds the right account (the on-disk
-    /// `vault.meta` hash is a different, 32-byte value).
+    /// enrollment. Two roles: it binds head authoring to the right account, and
+    /// its hex IS the SCRAM username (AS9 hash-only identity) — so a still-`pending`
+    /// device can re-run the handshake to claim its token with no credential
+    /// re-entry (the unlocked `root_key` re-derives the SCRAM secret).
     #[serde(default)]
     pub account_hash_hex: Option<String>,
-    /// The canonical account-number display string — the SCRAM username. Captured
-    /// at enrollment so a still-`pending` device can re-run the handshake to
-    /// **claim its token** once an existing device approves it (no credential
-    /// re-entry needed; the unlocked `root_key` re-derives the SCRAM secret).
-    #[serde(default)]
-    pub account_display: Option<String>,
     /// F1 Faz B: SHA-256 (lowercase hex) of the `vault.meta` this device last saw
     /// as the agreed synced state. Lets the meta phase distinguish "the server's
     /// meta is unchanged since I synced" (only I changed → push) from "the server
