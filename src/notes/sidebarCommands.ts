@@ -12,6 +12,15 @@ type SidebarCommands = {
   openTrash?: () => void;
   openArchive?: () => void;
   newFolder?: () => void;
+  /**
+   * Expand the left sidebar so the surfaces above are reachable — the pane is
+   * `inert` while collapsed (incl. focus mode), so an action must reveal it
+   * BEFORE opening its surface. Registered by the Editor screen (which owns
+   * the layout + focus state). Returns `false` when a width-forced collapse
+   * (MYND-192) makes expansion impossible; callers then skip their surface
+   * rather than ghost-open it.
+   */
+  revealSidebar?: () => boolean;
 };
 
 export const sidebarCommands: SidebarCommands = {};

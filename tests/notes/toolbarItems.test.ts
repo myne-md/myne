@@ -3,6 +3,8 @@ import {
   EDITOR_TOOLBAR_DEFAULT_HIDDEN,
   EDITOR_TOOLBAR_DEFAULT_ORDER,
   EDITOR_TOOLBAR_ITEMS,
+  EDITOR_TOOLBAR_PENDING_IDS,
+  resolveToolbarHidden,
   resolveToolbarOrder,
   toolbarItemLabelKey,
 } from "../../src/notes/toolbarItems";
@@ -30,9 +32,14 @@ describe("resolveToolbarOrder", () => {
     expect(order).not.toContain("quote"); // hidden by default
   });
 
-  it("dropping an id from `hidden` reveals it (add a button)", () => {
-    const hidden = EDITOR_TOOLBAR_DEFAULT_HIDDEN.filter((id) => id !== "quote");
-    expect(resolveToolbarOrder([], hidden)).toContain("quote");
+  it("dropping a RENDERABLE id from `hidden` reveals it (add a button)", () => {
+    // Hide `italic`, then drop it from the stored hidden set again — through the
+    // normalization helper, as both consumers do. The pending (not-yet-rendered)
+    // ids are pinned and can NOT be revealed this way; see the pinning suite.
+    const withItalicHidden = resolveToolbarHidden([...EDITOR_TOOLBAR_PENDING_IDS, "italic"]);
+    expect(resolveToolbarOrder([], withItalicHidden)).not.toContain("italic");
+    const revealed = resolveToolbarHidden([...EDITOR_TOOLBAR_PENDING_IDS]);
+    expect(resolveToolbarOrder([], revealed)).toContain("italic");
   });
 
   it("hiding a default-shown id removes it", () => {
@@ -45,6 +52,36 @@ describe("resolveToolbarOrder", () => {
     const order = resolveToolbarOrder(["bogus", "bold", "bold"], EDITOR_TOOLBAR_DEFAULT_HIDDEN);
     expect(order).not.toContain("bogus");
     expect(order.filter((id) => id === "bold")).toHaveLength(1);
+  });
+});
+
+// The MYND-336 follow-up gap: five vocabulary ids the floating toolbar cannot
+// render yet are PINNED hidden by `resolveToolbarHidden`, so no stored layout
+// can demand a button the toolbar would silently drop — and the empty-means-
+// unset prefs fallback stays unambiguous (a real stored value always carries
+// at least the pinned ids, so `[]` can only mean "never customized").
+describe("resolveToolbarHidden (pinned not-yet-renderable ids)", () => {
+  it("empty stored value = unset → the default hidden set", () => {
+    expect(resolveToolbarHidden([])).toEqual([...EDITOR_TOOLBAR_DEFAULT_HIDDEN]);
+  });
+
+  it("unions a stored value with the pending ids (no duplicates)", () => {
+    const resolved = resolveToolbarHidden(["italic", "quote"]);
+    expect(resolved).toContain("italic");
+    for (const id of EDITOR_TOOLBAR_PENDING_IDS) {
+      expect(resolved.filter((x) => x === id)).toHaveLength(1);
+    }
+  });
+
+  it("a stored value that tries to reveal a pending id does NOT lift the pin", () => {
+    const stored = EDITOR_TOOLBAR_DEFAULT_HIDDEN.filter((id) => id !== "quote");
+    const shown = resolveToolbarOrder([], resolveToolbarHidden(stored));
+    expect(shown).not.toContain("quote");
+  });
+
+  it("every pending id is in the vocabulary", () => {
+    const ids = new Set(EDITOR_TOOLBAR_ITEMS.map((i) => i.id));
+    for (const id of EDITOR_TOOLBAR_PENDING_IDS) expect(ids.has(id)).toBe(true);
   });
 });
 

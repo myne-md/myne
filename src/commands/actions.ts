@@ -425,9 +425,23 @@ const newNoteAction = notesAction(
 const duplicateNoteAction = notesAction("note.duplicate", "commands.actions.duplicateNote.label", (c) =>
   c.onDuplicateNote(),
 );
-const archiveNoteAction = notesAction("note.archive", "commands.actions.archiveNote.label", (c) =>
-  c.onArchiveNote(),
-);
+const archiveNoteAction: CommandAction = {
+  id: "note.archive",
+  get label() {
+    return i18n.t("commands.actions.archiveNote.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.notes");
+  },
+  // The sidebar context menu omits its archive entries while the archive
+  // feature is off (`archive_disabled`, NoteList) — mirror that gate here so
+  // the palette never offers the disabled surface.
+  visibility: (ctx) =>
+    editorWithNote(ctx) === "show" && !(ctx.prefs.archive_disabled ?? false)
+      ? "show"
+      : "hidden",
+  run: (c) => c.onArchiveNote(),
+};
 const renameNoteAction = notesAction("note.rename", "commands.actions.renameNote.label", (c) =>
   c.onRenameNote(),
 );
@@ -469,22 +483,30 @@ const showUnlinkedAction = layoutAction(
 
 // ─── Wave 4: sidebar surfaces + cycle heading + restore + sync (palette-gap) ─
 
+/** Run a sidebar-owned surface handler, expanding the collapsed (`inert`)
+ *  sidebar first — a width-forced collapse can't expand (MYND-192), in which
+ *  case the surface is skipped rather than ghost-opened. */
+function runInSidebar(invoke: () => void): void {
+  if (sidebarCommands.revealSidebar?.() === false) return;
+  invoke();
+}
+
 const newFolderAction = notesAction(
   "folder.new",
   "commands.actions.newFolder.label",
-  () => sidebarCommands.newFolder?.(),
+  () => runInSidebar(() => sidebarCommands.newFolder?.()),
   false,
 );
 const openTrashAction = notesAction(
   "trash.open",
   "commands.actions.openTrash.label",
-  () => sidebarCommands.openTrash?.(),
+  () => runInSidebar(() => sidebarCommands.openTrash?.()),
   false,
 );
 const openArchiveAction = notesAction(
   "archive.open",
   "commands.actions.openArchive.label",
-  () => sidebarCommands.openArchive?.(),
+  () => runInSidebar(() => sidebarCommands.openArchive?.()),
   false,
 );
 
