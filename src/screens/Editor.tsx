@@ -155,6 +155,7 @@ import {
   type ContextMenuItem,
 } from "../notes/components/ContextMenu";
 import { IS_MAC, TRAFFIC_LIGHT_GAP } from "./titlebar";
+import { useIsFullscreen } from "../hooks/useIsFullscreen";
 import { LEFT_BOUNDS, RIGHT_BOUNDS } from "./layoutClamp";
 import { useResponsiveCollapse } from "./responsiveCollapse";
 import { AttachmentsLibrary } from "../components/attachments/AttachmentsLibrary";
@@ -745,6 +746,12 @@ function EditorChrome({
     layout.leftCollapsed || forced.forceLeftCollapsed || focusActive;
   const rightCollapsed =
     layout.rightCollapsed || forced.forceRightCollapsed || focusActive;
+  // macOS floats the traffic lights over the top-left, so windowed builds inset
+  // the sidebar toggle past them. In fullscreen the traffic lights are hidden —
+  // drop that gap so the toggle sits flush-left (matching the non-mac layout).
+  const isFullscreen = useIsFullscreen();
+  const leftToggleX = IS_MAC && !isFullscreen ? TRAFFIC_LIGHT_GAP + 16 : 12;
+  const leftClearance = leftToggleX + LEFT_CONTROLS_WIDTH + 8;
 
   // Reveal the Saved Views surface (MYND-274) — the "Views" section lives in the
   // left (notes) sidebar, so revealing it ensures that sidebar is expanded, then
@@ -1413,7 +1420,7 @@ function EditorChrome({
             node={ws.root}
             focusedPaneId={ws.focusedPaneId}
             onReadout={onReadout}
-            leftInset={leftCollapsed ? LEFT_CLEARANCE : 0}
+            leftInset={leftCollapsed ? leftClearance : 0}
             rightInset={rightCollapsed ? RIGHT_CLEARANCE : 0}
           />
         )}
@@ -1440,7 +1447,7 @@ function EditorChrome({
         style={{
           position: "absolute",
           top: 6,
-          left: LEFT_TOGGLE_X,
+          left: leftToggleX,
           zIndex: 30,
           display: "flex",
           alignItems: "center",
@@ -1935,16 +1942,15 @@ const TITLE_BAR_BUTTON_BASE: CSSProperties = {
 // rises into that row. These constants place the toggles clear of the macOS
 // traffic lights and size the clearance the underlying top surface (sidebar
 // header or a corner pane's strip) must reserve so nothing collides.
-/** Left toggle's x offset — comfortably right of the traffic lights on macOS. */
-const LEFT_TOGGLE_X = IS_MAC ? TRAFFIC_LIGHT_GAP + 16 : 12;
+// The left toggle x-offset + left clearance are computed PER-RENDER inside
+// EditorChrome (`leftToggleX` / `leftClearance`) because they depend on the live
+// fullscreen state (the traffic-light gap collapses in fullscreen).
 /** Right toggle's x offset from the right edge. */
 const RIGHT_TOGGLE_X = 8;
 /** Full width of the top-left control cluster: the sidebar toggle plus the
  *  back + forward nav buttons (MYND-260), each preceded by a cluster gap. */
 const LEFT_CONTROLS_WIDTH =
   TITLE_BAR_TOGGLE_WIDTH + 2 * (TITLE_BAR_CLUSTER_GAP + TITLE_BAR_NAV_WIDTH);
-/** Left clearance: the top-left surface must keep its content past this. */
-const LEFT_CLEARANCE = LEFT_TOGGLE_X + LEFT_CONTROLS_WIDTH + 8;
 /** Right clearance: the top-right surface must keep its content before this. */
 const RIGHT_CLEARANCE = RIGHT_TOGGLE_X + TITLE_BAR_TOGGLE_WIDTH + 8;
 
