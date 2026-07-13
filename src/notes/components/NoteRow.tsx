@@ -263,13 +263,17 @@ const indexConflictStyle: CSSProperties = {
 const renameInputStyle: CSSProperties = {
   display: "block",
   width: "100%",
+  // border-box + width:100% so the field fits EXACTLY inside the row instead of
+  // overflowing it (the old content-box + negative horizontal margins pushed the
+  // box past the row edge — the "off" look). Only a small negative VERTICAL
+  // margin remains, to keep the row from growing taller while renaming.
+  boxSizing: "border-box",
   border: "1px solid var(--accent)",
-  borderRadius: 3,
-  padding: "1px 4px",
-  margin: "-2px -5px",
+  borderRadius: "var(--radius-1, 4px)",
+  padding: "1px 6px",
+  margin: "-2px 0",
   background: "var(--paper)",
   color: "var(--fg-1)",
-  font: "inherit",
   fontFamily: "var(--font-sans)",
   fontSize: 13,
   fontWeight: 500,

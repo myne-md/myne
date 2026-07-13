@@ -1789,6 +1789,7 @@ function PopulatedList({
       return [
         {
           id: "bulk-move",
+          group: "organize",
           label: t("notes.list.bulkMove", { count: selCount }),
           onSelect: () => setMoveTarget({ x: menu.x, y: menu.y }),
         },
@@ -1798,12 +1799,14 @@ function PopulatedList({
           : [
               {
                 id: "bulk-archive",
+                group: "danger",
                 label: t("notes.list.bulkArchive", { count: selCount }),
                 onSelect: () => void handleBulkArchive(),
               },
             ]),
         {
           id: "bulk-delete",
+          group: "danger",
           label: t("notes.list.bulkDelete", { count: selCount }),
           destructive: true,
           onSelect: () => void handleBulkDelete(),
@@ -1813,16 +1816,19 @@ function PopulatedList({
     return [
       {
         id: "open-in-new-tab",
+        group: "open",
         label: t("notes.list.openInNewTab"),
         onSelect: () => openNote(menu.id, { newTab: true }),
       },
       {
         id: "open-to-side",
+        group: "open",
         label: t("notes.list.openToSide"),
         onSelect: () => openNote(menu.id, { toSide: true }),
       },
       {
         id: "rename",
+        group: "edit",
         label: t("notes.list.rename"),
         onSelect: () => ctx.startRename(menu.id),
       },
@@ -1830,11 +1836,13 @@ function PopulatedList({
         // Clone the note in place (MYND-332) — new id + "(kopya)" title;
         // the copy opens in the focused pane.
         id: "duplicate",
+        group: "edit",
         label: t("notes.list.duplicate"),
         onSelect: () => void ctx.duplicateAndOpen(menu.id),
       },
       {
         id: "favorite",
+        group: "edit",
         label: favSet.has(menu.id)
           ? t("notes.list.removeFromFavorites")
           : t("notes.list.addToFavorites"),
@@ -1852,6 +1860,7 @@ function PopulatedList({
         return [
           {
             id: "note.set-index",
+            group: "edit",
             label: t("notes.list.setAsFolderNote"),
             onSelect: () => void handleSetIndex(menu.id),
           },
@@ -1859,6 +1868,7 @@ function PopulatedList({
       })(),
       {
         id: "color",
+        group: "edit",
         label: t("notes.list.color"),
         onSelect: () =>
           setDecoPopover({
@@ -1872,6 +1882,7 @@ function PopulatedList({
         // Per-note plaintext egress (MYND-116) — live tree note rows only;
         // Trash / Templates surfaces deliberately don't carry it.
         id: "export-markdown",
+        group: "export",
         label: t("notes.list.exportMarkdown"),
         onSelect: () =>
           void runNoteExportFlow(
@@ -1886,6 +1897,7 @@ function PopulatedList({
         // Sibling PDF egress (MYND-255) — same export group, same shared-
         // flow discipline (runNotePdfExportFlow is the palette's flow too).
         id: "export-pdf",
+        group: "export",
         label: t("notes.list.exportPdf"),
         onSelect: () =>
           void runNotePdfExportFlow(
@@ -1900,6 +1912,7 @@ function PopulatedList({
         // Sibling HTML egress (MYND-340) — same export group, same shared-
         // flow discipline (runNoteHtmlExportFlow is the palette's flow too).
         id: "export-html",
+        group: "export",
         label: t("notes.list.exportHtml"),
         onSelect: () =>
           void runNoteHtmlExportFlow(
@@ -1913,6 +1926,7 @@ function PopulatedList({
       {
         // Sibling plain-text egress (MYND-340).
         id: "export-txt",
+        group: "export",
         label: t("notes.list.exportTxt"),
         onSelect: () =>
           void runNoteTxtExportFlow(
@@ -1931,12 +1945,14 @@ function PopulatedList({
         : [
             {
               id: "archive",
+              group: "danger",
               label: t("notes.list.archiveNote"),
               onSelect: () => void handleArchive(menu.id),
             },
           ]),
       {
         id: "delete",
+        group: "danger",
         label: t("notes.list.delete"),
         destructive: true,
         onSelect: () => void handleTrash(menu.id),
