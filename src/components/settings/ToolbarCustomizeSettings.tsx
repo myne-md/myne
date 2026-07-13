@@ -28,18 +28,24 @@ const ROW_STYLE: CSSProperties = {
   alignItems: "center",
   justifyContent: "space-between",
   gap: 8,
-  padding: "4px 8px",
+  padding: "5px 8px",
   borderRadius: "var(--radius-1)",
   fontFamily: "var(--font-sans)",
   fontSize: 13,
   color: "var(--fg-1)",
-  // A transparent top/bottom border reserves space for the drop indicator so
-  // rows don't shift when it appears.
-  borderTop: "2px solid transparent",
-  borderBottom: "2px solid transparent",
 };
-const DROP_BEFORE_STYLE: CSSProperties = { borderTopColor: "var(--accent)" };
-const DROP_AFTER_STYLE: CSSProperties = { borderBottomColor: "var(--accent)" };
+// Drop indicator drawn as an inset accent bar via boxShadow — unlike a border it
+// doesn't add to the box size, so rows never reflow when it appears and there is
+// no partial-transparent-border artifact (WKWebView renders a 2px transparent
+// top/bottom border on a rounded dark row as a light line — QA screenshot).
+const DROP_BEFORE_STYLE: CSSProperties = {
+  boxShadow: "inset 0 2px 0 0 var(--accent)",
+  background: "var(--accent-soft)",
+};
+const DROP_AFTER_STYLE: CSSProperties = {
+  boxShadow: "inset 0 -2px 0 0 var(--accent)",
+  background: "var(--accent-soft)",
+};
 const GRIP_STYLE: CSSProperties = {
   cursor: "grab",
   color: "var(--fg-3)",
