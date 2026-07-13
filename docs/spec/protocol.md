@@ -723,7 +723,7 @@ The KDF parameter block at offset 22 is the canonical encoding referenced in §4
 
 The two encrypted root_key copies (`enc_root_key_password`, `enc_root_key_recovery`) hold the same 32-byte plaintext under independent wrap keys. Either is sufficient to unlock the vault.
 
-Only `vault.meta` and the `.myn` files leave the device in any future sync scenario. Both are opaque ciphertext + a small public header (magic, version, IDs, nonces, salts, account-hash). No plaintext note content, no plaintext titles, no plaintext recovery-phrase material is ever stored.
+The artefacts that leave the device under Phase-2 sync are exactly the **sync-taxonomy authoritative + identity members** (`sync-protocol.md` §9): `.myn` notes, `vault.prefs`, `vault.dictionary`, attachment blobs, the `vault.attachments` catalog, and `vault.meta` — **not** `snapshots/` (authoritative but deliberately local-only, §9.2 there) and **not** the rebuildable-cache / device-local families. Every synced artefact is opaque ciphertext + a small public header (magic, version, IDs, nonces, salts, account-hash). No plaintext note content, no plaintext titles, no plaintext recovery-phrase material is ever stored.
 
 ### 9.4 What is in plaintext on disk and why
 
@@ -1275,18 +1275,21 @@ this is the §10.6 no-extension-points discipline applied to the container).
 |---|---|---|
 | `vault.meta` | IN — REQUIRED | Credential wraps + KDF params (§9.3); a backup without it is not restorable |
 | `vault.prefs` | IN if present | User data (label, deliberate folders, ordering — AS3) |
+| `vault.dictionary` | IN if present | Personal dictionary is authoritative user data (§9.13) — a Class-1 sync member, so `sync ⊆ backup` (`sync-protocol.md` §9) requires it here |
 | `notes/<uuid>.myn` | IN | Note content; trash rides inside (`trashed:` frontmatter) |
 | `snapshots/<note-uuid>__<snap-uuid>.myn` | IN | Version history is user data (`decisions.md` 2026-06-10) |
 | `vault.attachments` | IN if present | Authoritative attachment metadata (§9.10) |
 | `attachments/<attachment-id-hex>` | IN | Attachment blobs (§9.9) |
 | `vault.search` | OUT | Pure rebuildable cache; first unlock after restore rebuilds (§9.6.4) |
+| `attachments-text/<attachment-id-hex>` | OUT | Rebuildable per-attachment extraction cache (`MYE1`, §9.15); re-extracted from the source attachment on the first index need after restore — same rebuildable-cache class as `vault.search` |
 | `vault.embeddings` | OUT | Pure rebuildable **and** model-specific cache (§9.17); re-embedded locally on the first unlock after restore (§9.17.4) — a backed-up index could be wrong on a device holding a different embedding model. Class 3 (`sync-protocol.md` §319) |
 | `vault.quickunlock` | OUT | Device-local credential (§9.14); wrap key is bound to *this* device's hardware (`thisDeviceOnly`), so a copy is inert elsewhere — re-set per device after restore |
 | `vault.head-state` | OUT | Device-local sync baseline (§9.15); a backed-up baseline would be stale on restore — the restored vault TOFU-re-bootstraps (`sync-protocol.md` §6) |
 | `*.tmp` (any directory) | OUT | Atomic-write residue, never user data |
 | `.rename-journal` (notes dir) | OUT | Empty roll-forward marker for the transactional multi-note rename (§9.12); transient WAL sentinel, never user data |
 | `vaults/registry.json` | OUT (structurally) | Per-install plaintext cache living outside the vault root |
-| `vault.workspace` (§9.7), `vault.indices` (§9.8) | RESERVED | In-flight families (§10.3); disposition decided in the same change that lands each family's spec — landing one without amending this table is a spec bug |
+| `vault.workspace` (§9.7) | OUT | Device-local editor layout (`MYW1`, Class-4 device-local, `sync-protocol.md` §9); rebuilt/reset per device, not carried across a restore |
+| `vault.indices` (§9.8) | OUT | Pure rebuildable cache (`MYI1`, Class-3, `sync-protocol.md` §9); re-derived locally from the notes on the first unlock after restore (§9.8.4), same class as `vault.search` |
 
 Members are verbatim file copies at their exact vault-relative paths. Paths are
 load-bearing: `.myn` filenames are AAD-bound note UUIDs (§6.4), attachment filenames are
@@ -1546,8 +1549,8 @@ via the vault's existing Argon2id parameters. The blob therefore has **no §3.4 
 role**.
 
 **Device-local, never synchronized.** `vault.quickunlock` lives at
-`<vault-root>/vault.quickunlock` but, unlike `vault.meta` and the `.myn` files (the only
-artifacts that leave the device, §9.3), it is **never** part of any sync set: the wrap
+`<vault-root>/vault.quickunlock` but, unlike the synced artefacts (the sync-taxonomy
+authoritative + identity members, `sync-protocol.md` §9; §9.3), it is **never** part of any sync set: the wrap
 key is bound to *this* device's hardware (`thisDeviceOnly` keychain accessibility), so a
 copy on another device is inert. Each device that opts in mints its own blob. This is the
 per-device refinement of §3.1's "third copy lives in `vault.meta`" sketch (which assumed
