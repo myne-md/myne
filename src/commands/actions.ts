@@ -16,7 +16,273 @@ import { foldAll, unfoldAll } from "@codemirror/language";
 import { getActiveEditorView } from "../editor/active-view";
 import { exportSelectionAsImage } from "../lib/noteImageExport";
 import { showAttachmentToast } from "../editor/attachments/toast";
+import {
+  setEditorLineNumbers,
+  setSpellEnabled,
+  setAiEnabled,
+  setScreenCaptureProtection,
+  setArchiveDisabled,
+  setShowNoteTimestamps,
+  setEditorFocusTypewriter,
+  setEditorFocusDimInactive,
+  setEditorFontFamily,
+  setEditorTextSize,
+  setEditorContentWidth,
+  setEditorDefaultViewMode,
+  setTheme,
+  setCustomTheme,
+  type ThemeChoice,
+} from "../lib/prefs";
+import { applyTheme } from "../lib/theme";
 import i18n from "../i18n";
+
+/** Next element after `current` (or `fallback` when unset) in a cyclic list. */
+function cycleNext<T>(order: readonly T[], current: T | null | undefined, fallback: T): T {
+  const i = order.indexOf((current ?? fallback) as T);
+  return order[(i + 1) % order.length]!;
+}
+
+/** Editor-stage-only visibility (the palette is editor-stage anyway; keeps the
+ *  action hidden on lock/unlock screens). */
+const editorOnly = (ctx: { stageName: string }): "show" | "hidden" =>
+  ctx.stageName === "editor" ? "show" : "hidden";
+
+// ─── Wave 1: preference toggles / cycles + theme (palette-gap audit) ───────
+// Self-contained: read the current value from `ctx.prefs`, compute the next,
+// call the module-level `set*` setter (the same IPC the Settings panels use, so
+// the change applies live via the prefs nonce). No CommandContext callback.
+
+const toggleLineNumbersAction: CommandAction = {
+  id: "editor.toggle-line-numbers",
+  get label() {
+    return i18n.t("commands.actions.toggleLineNumbers.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.editor");
+  },
+  visibility: editorOnly,
+  run: (ctx) => {
+    void setEditorLineNumbers(!(ctx.prefs.editor_line_numbers ?? false));
+  },
+};
+
+const toggleSpellCheckAction: CommandAction = {
+  id: "editor.toggle-spell-check",
+  get label() {
+    return i18n.t("commands.actions.toggleSpellCheck.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.editor");
+  },
+  visibility: editorOnly,
+  run: (ctx) => {
+    void setSpellEnabled(!(ctx.prefs.spell_enabled ?? true));
+  },
+};
+
+const toggleTypewriterAction: CommandAction = {
+  id: "editor.toggle-typewriter",
+  get label() {
+    return i18n.t("commands.actions.toggleTypewriter.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.editor");
+  },
+  visibility: editorOnly,
+  run: (ctx) => {
+    void setEditorFocusTypewriter(!(ctx.prefs.editor_focus_typewriter ?? true));
+  },
+};
+
+const toggleDimInactiveAction: CommandAction = {
+  id: "editor.toggle-dim-inactive",
+  get label() {
+    return i18n.t("commands.actions.toggleDimInactive.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.editor");
+  },
+  visibility: editorOnly,
+  run: (ctx) => {
+    void setEditorFocusDimInactive(!(ctx.prefs.editor_focus_dim_inactive ?? true));
+  },
+};
+
+const toggleEditorFontAction: CommandAction = {
+  id: "editor.toggle-font",
+  get label() {
+    return i18n.t("commands.actions.toggleEditorFont.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.editor");
+  },
+  visibility: editorOnly,
+  run: (ctx) => {
+    void setEditorFontFamily(ctx.prefs.editor_font_family === "sans" ? "mono" : "sans");
+  },
+};
+
+const EDITOR_TEXT_SIZES = ["sm", "md", "lg", "xl"] as const;
+const cycleTextSizeAction: CommandAction = {
+  id: "editor.cycle-text-size",
+  get label() {
+    return i18n.t("commands.actions.cycleTextSize.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.editor");
+  },
+  visibility: editorOnly,
+  run: (ctx) => {
+    void setEditorTextSize(cycleNext(EDITOR_TEXT_SIZES, ctx.prefs.editor_text_size, "md"));
+  },
+};
+
+const EDITOR_WIDTHS = ["narrow", "normal", "wide", "full"] as const;
+const cycleContentWidthAction: CommandAction = {
+  id: "editor.cycle-content-width",
+  get label() {
+    return i18n.t("commands.actions.cycleContentWidth.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.editor");
+  },
+  visibility: editorOnly,
+  run: (ctx) => {
+    void setEditorContentWidth(cycleNext(EDITOR_WIDTHS, ctx.prefs.editor_content_width, "normal"));
+  },
+};
+
+const VIEW_MODES = ["live", "reading", "source"] as const;
+const cycleDefaultViewModeAction: CommandAction = {
+  id: "editor.cycle-default-view-mode",
+  get label() {
+    return i18n.t("commands.actions.cycleDefaultViewMode.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.editor");
+  },
+  visibility: editorOnly,
+  run: (ctx) => {
+    void setEditorDefaultViewMode(cycleNext(VIEW_MODES, ctx.prefs.editor_default_view_mode, "live"));
+  },
+};
+
+const toggleTimestampsAction: CommandAction = {
+  id: "appearance.toggle-timestamps",
+  get label() {
+    return i18n.t("commands.actions.toggleTimestamps.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.appearance");
+  },
+  visibility: editorOnly,
+  run: (ctx) => {
+    void setShowNoteTimestamps(!ctx.prefs.show_note_timestamps);
+  },
+};
+
+const toggleArchivingAction: CommandAction = {
+  id: "notes.toggle-archiving",
+  get label() {
+    return i18n.t("commands.actions.toggleArchiving.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.editor");
+  },
+  visibility: editorOnly,
+  run: (ctx) => {
+    void setArchiveDisabled(!(ctx.prefs.archive_disabled ?? false));
+  },
+};
+
+const toggleAiEnabledAction: CommandAction = {
+  id: "ai.toggle-enabled",
+  get label() {
+    return i18n.t("commands.actions.toggleAiEnabled.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.app");
+  },
+  visibility: editorOnly,
+  run: (ctx) => {
+    void setAiEnabled(!ctx.prefs.ai_enabled);
+  },
+};
+
+const toggleScreenCaptureAction: CommandAction = {
+  id: "app.toggle-screen-capture",
+  get label() {
+    return i18n.t("commands.actions.toggleScreenCapture.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.app");
+  },
+  visibility: editorOnly,
+  run: (ctx) => {
+    void setScreenCaptureProtection(!ctx.prefs.screen_capture_protection);
+  },
+};
+
+/** Apply a built-in theme (or System) immediately (DOM) + persist it, clearing
+ *  any active custom theme so the built-in fully takes over. */
+function applyBuiltinTheme(choice: ThemeChoice | null): void {
+  applyTheme(choice);
+  void setCustomTheme(null);
+  void setTheme(choice);
+}
+
+const THEME_CYCLE: readonly (ThemeChoice | null)[] = [null, "light", "dark", "amoled"];
+const cycleThemeAction: CommandAction = {
+  id: "appearance.cycle-theme",
+  get label() {
+    return i18n.t("commands.actions.cycleTheme.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.appearance");
+  },
+  visibility: editorOnly,
+  run: (ctx) => {
+    // A custom theme reads as `theme: null`; cycling from it lands on Light.
+    const current = ctx.prefs.custom_theme != null ? null : ctx.prefs.theme;
+    applyBuiltinTheme(cycleNext(THEME_CYCLE, current as ThemeChoice | null, null));
+  },
+};
+
+function switchThemeAction(
+  choice: ThemeChoice | null,
+  idSuffix: string,
+  labelKey: string,
+): CommandAction {
+  return {
+    id: `appearance.theme-${idSuffix}`,
+    get label() {
+      return i18n.t(labelKey);
+    },
+    get category() {
+      return i18n.t("commands.actions.category.appearance");
+    },
+    visibility: editorOnly,
+    run: () => applyBuiltinTheme(choice),
+  };
+}
+
+const switchThemeLightAction = switchThemeAction(
+  "light",
+  "light",
+  "commands.actions.themeLight.label",
+);
+const switchThemeDarkAction = switchThemeAction("dark", "dark", "commands.actions.themeDark.label");
+const switchThemeAmoledAction = switchThemeAction(
+  "amoled",
+  "amoled",
+  "commands.actions.themeAmoled.label",
+);
+const switchThemeSystemAction = switchThemeAction(
+  null,
+  "system",
+  "commands.actions.themeSystem.label",
+);
+
 
 const lockVaultAction: CommandAction = {
   id: "vault.lock",
@@ -725,6 +991,24 @@ export const COMMAND_ACTIONS: readonly CommandAction[] = Object.freeze([
   exportVaultMarkdownAction,
   convertWikilinksAction,
   exportSelectionImageAction,
+  // Wave 1 — prefs toggles/cycles + theme (palette-gap audit)
+  toggleLineNumbersAction,
+  toggleSpellCheckAction,
+  toggleTypewriterAction,
+  toggleDimInactiveAction,
+  toggleEditorFontAction,
+  cycleTextSizeAction,
+  cycleContentWidthAction,
+  cycleDefaultViewModeAction,
+  toggleTimestampsAction,
+  toggleArchivingAction,
+  toggleAiEnabledAction,
+  toggleScreenCaptureAction,
+  cycleThemeAction,
+  switchThemeLightAction,
+  switchThemeDarkAction,
+  switchThemeAmoledAction,
+  switchThemeSystemAction,
   aiOpenChatAction,
   aiSummarizeNoteAction,
   aiSuggestTagsAction,

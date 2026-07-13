@@ -16,6 +16,7 @@
 
 import type { StageVaultStatus, SuspicionReason } from "../lib/stage";
 import type { NoteId } from "../notes/sidebarState";
+import type { PrefsView } from "../lib/prefs";
 
 export type AppStageName =
   | "welcome"
@@ -40,6 +41,13 @@ export type CommandContext = {
    * AI actions render **disabled** (not hidden — disabled-control discipline).
    */
   aiEnabled: boolean;
+  /**
+   * The live `vault.prefs` view — read by the toggle/cycle/set actions
+   * (line numbers, spell-check, theme, typography, focus, etc.) to compute the
+   * NEXT value before calling the module-level `set*` setter. Module-level
+   * actions can't use the `usePrefs` hook, so the current values ride here.
+   */
+  prefs: PrefsView;
   /**
    * Reveal the AI Chat right-panel tab (the shared render target siblings 4/6/7
    * mount output into). Sets the right-panel active tab to `ai-chat`.
