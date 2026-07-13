@@ -497,7 +497,7 @@ function RepairResidue() {
       <div style={{ flex: 1 }} />
       <div style={{ paddingBottom: 52, display: "flex", flexDirection: "column", gap: 10 }}>
         <Button>Create a vault</Button>
-        <Button variant="ghost">I already have a recovery phrase</Button>
+        <Button variant="ghost">Connect to my account</Button>
       </div>
     </Screen>
   );
