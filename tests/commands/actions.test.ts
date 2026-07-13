@@ -154,6 +154,7 @@ describe("Command palette action registry", () => {
       "vault.import-obsidian",
       "vault.lock",
       "vault.restore",
+      "vault.reveal-folder",
       "view.show-backlinks",
       "view.show-outline",
       "view.show-unlinked",

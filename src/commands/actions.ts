@@ -19,6 +19,8 @@ import { showAttachmentToast } from "../editor/attachments/toast";
 import { openInNoteFind } from "../editor/find/find-session";
 import { cycleHeading } from "@myne/editor";
 import { sidebarCommands } from "../notes/sidebarCommands";
+import { appDataDir, join } from "@tauri-apps/api/path";
+import { openPath } from "@tauri-apps/plugin-opener";
 import {
   setEditorLineNumbers,
   setSpellEnabled,
@@ -503,6 +505,30 @@ const toggleRealtimeSyncAction: CommandAction = {
   },
   visibility: editorOnly,
   run: (c) => c.onToggleRealtimeSync(),
+};
+
+const revealVaultFolderAction: CommandAction = {
+  id: "vault.reveal-folder",
+  get label() {
+    return i18n.t("commands.actions.revealVaultFolder.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.vault");
+  },
+  visibility: editorOnly,
+  // Opens the Phase-1 single-vault dir (`<app_data_dir>/vault`, the documented
+  // resolution — decisions.md "single vault per OS user in Phase 1"). Best-
+  // effort: a non-existent path (a multi-vault `vaults/<id>` layout) simply
+  // no-ops. Revisit when an active-vault-id accessor reaches the palette.
+  run: () => {
+    void (async () => {
+      try {
+        await openPath(await join(await appDataDir(), "vault"));
+      } catch {
+        /* best-effort — reveal failure is non-fatal */
+      }
+    })();
+  },
 };
 
 
@@ -1263,6 +1289,7 @@ export const COMMAND_ACTIONS: readonly CommandAction[] = Object.freeze([
   cycleHeadingAction,
   restoreBackupAction,
   toggleRealtimeSyncAction,
+  revealVaultFolderAction,
   aiOpenChatAction,
   aiSummarizeNoteAction,
   aiSuggestTagsAction,
