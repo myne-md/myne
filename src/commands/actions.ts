@@ -16,6 +16,7 @@ import { foldAll, unfoldAll } from "@codemirror/language";
 import { getActiveEditorView } from "../editor/active-view";
 import { exportSelectionAsImage } from "../lib/noteImageExport";
 import { showAttachmentToast } from "../editor/attachments/toast";
+import { openInNoteFind } from "../editor/find/find-session";
 import {
   setEditorLineNumbers,
   setSpellEnabled,
@@ -337,6 +338,109 @@ const togglePreviewAction = layoutAction(
   "view.toggle-preview",
   "commands.actions.togglePreview.label",
   (c) => c.onTogglePreview(),
+);
+
+// ─── Wave 3: find, note ops, right-panel tabs (palette-gap audit) ──────────
+
+/** Editor-stage AND a selected note. */
+const editorWithNote = (ctx: {
+  stageName: string;
+  selectedNoteId: unknown;
+}): "show" | "hidden" =>
+  ctx.stageName === "editor" && ctx.selectedNoteId !== null ? "show" : "hidden";
+
+function notesAction(
+  id: string,
+  labelKey: string,
+  invoke: CommandAction["run"],
+  needsNote = true,
+): CommandAction {
+  return {
+    id,
+    get label() {
+      return i18n.t(labelKey);
+    },
+    get category() {
+      return i18n.t("commands.actions.category.notes");
+    },
+    visibility: needsNote ? editorWithNote : editorOnly,
+    run: invoke,
+  };
+}
+
+const findInNoteAction: CommandAction = {
+  id: "editor.find",
+  get label() {
+    return i18n.t("commands.actions.findInNote.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.editor");
+  },
+  visibility: editorOnly,
+  run: () => {
+    openInNoteFind();
+  },
+};
+
+const findReplaceAction: CommandAction = {
+  id: "editor.find-replace",
+  get label() {
+    return i18n.t("commands.actions.findReplace.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.editor");
+  },
+  visibility: editorOnly,
+  // The find bar carries the replace toggle; opening it is the entry point.
+  run: () => {
+    openInNoteFind();
+  },
+};
+
+const newNoteAction = notesAction(
+  "note.new",
+  "commands.actions.newNote.label",
+  (c) => c.onNewNote(),
+  false,
+);
+const duplicateNoteAction = notesAction("note.duplicate", "commands.actions.duplicateNote.label", (c) =>
+  c.onDuplicateNote(),
+);
+const archiveNoteAction = notesAction("note.archive", "commands.actions.archiveNote.label", (c) =>
+  c.onArchiveNote(),
+);
+const renameNoteAction = notesAction("note.rename", "commands.actions.renameNote.label", (c) =>
+  c.onRenameNote(),
+);
+const trashNoteAction = notesAction("note.trash", "commands.actions.trashNote.label", (c) =>
+  c.onTrashNote(),
+);
+const toggleFavoriteAction = notesAction(
+  "note.toggle-favorite",
+  "commands.actions.toggleFavorite.label",
+  (c) => c.onToggleFavorite(),
+);
+const emptyTrashAction = notesAction(
+  "trash.empty",
+  "commands.actions.emptyTrash.label",
+  (c) => c.onEmptyTrash(),
+  false,
+);
+
+const showBacklinksAction = layoutAction(
+  "view.show-backlinks",
+  "commands.actions.showBacklinks.label",
+  (c) => c.onShowBacklinks(),
+);
+const showOutlineAction = layoutAction(
+  "view.show-outline",
+  "commands.actions.showOutline.label",
+  (c) => c.onShowOutline(),
+);
+const showUnlinkedAction = layoutAction(
+  "view.show-unlinked",
+  "commands.actions.showUnlinked.label",
+  (c) => c.onShowUnlinked(),
 );
 
 
@@ -1077,6 +1181,19 @@ export const COMMAND_ACTIONS: readonly CommandAction[] = Object.freeze([
   goBackAction,
   goForwardAction,
   togglePreviewAction,
+  // Wave 3 — find, note ops, right-panel tabs
+  findInNoteAction,
+  findReplaceAction,
+  newNoteAction,
+  duplicateNoteAction,
+  archiveNoteAction,
+  renameNoteAction,
+  trashNoteAction,
+  toggleFavoriteAction,
+  emptyTrashAction,
+  showBacklinksAction,
+  showOutlineAction,
+  showUnlinkedAction,
   aiOpenChatAction,
   aiSummarizeNoteAction,
   aiSuggestTagsAction,
