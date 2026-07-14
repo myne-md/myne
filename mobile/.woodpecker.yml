@@ -35,10 +35,14 @@ steps:
       # provision-shared: everything the mobile build reuses from the main repo
       # is one clone away — the Rust path deps (protocol, core) AND the frontend's
       # shared SOURCE packages (editor, dialect, locales; aliased by tsconfig/vite
-      # as @myne/*, NOT npm members). Clone the main repo once and symlink each
-      # next to this checkout so both `cargo` and `pnpm build` resolve them. The
-      # workspace volume is shared across steps, so the JS steps (cargo-deny,
-      # pnpm-build) reuse these via depends_on: [cargo-checks].
+      # as @myne/*, NOT npm members). `src` is symlinked too: the @myne/i18n
+      # runtime (MYND-485) aliases the desktop APP source `../src/i18n/` directly
+      # (its documented follow-up is to extract a real @myne/i18n package), so
+      # tsc/vite need ../src to exist here exactly as in the nested local layout.
+      # Clone the main repo once and symlink each next to this checkout so both
+      # `cargo` and `pnpm build` resolve them. The workspace volume is shared
+      # across steps, so the JS steps (cargo-deny, pnpm-build) reuse these via
+      # depends_on: [cargo-checks].
       - |
         PARENT="$(cd .. && pwd)"
         if [ ! -e "$PARENT/myne-main" ]; then
@@ -48,7 +52,7 @@ steps:
             git clone --depth 1 "https://github.com/myne-md/myne.git" "$PARENT/myne-main"
           fi
         fi
-        for d in protocol core editor dialect locales; do
+        for d in protocol core editor dialect locales src; do
           ln -sfn "$PARENT/myne-main/$d" "$PARENT/$d"
         done
       - rustup component add rustfmt clippy
