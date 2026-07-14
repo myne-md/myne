@@ -120,20 +120,12 @@
     "addError": "Couldn't add that file.",
     "deleteError": "Couldn't delete that attachment.",
     "renameError": "Couldn't rename that attachment.",
-    "cancel": "Cancel",
-    "cleanUnusedLabel": "Clean unused",
-    "adding": "Adding…",
-    "upload": "Upload",
     "unusedSummary_one": "{{count}} attachment is referenced by no note ({{size}}). Erasing is a permanent cryptographic delete — there is no trash.",
     "unusedSummary_other": "{{count}} attachments are referenced by no note ({{size}}). Erasing is a permanent cryptographic delete — there is no trash.",
     "eraseCta_one": "Erase {{count}} unused file",
     "eraseCta_other": "Erase {{count}} unused files",
     "emptyState": "No attachments yet. Tap Upload to add an image or PDF.",
     "insert": "Insert",
-    "rename": "Rename",
-    "delete": "Delete",
-    "filesTitle": "Files",
-    "title": "Attachments",
     "pauseLabel": "Pause {{filename}}",
     "playLabel": "Play {{filename}}"
   },
@@ -528,8 +520,8 @@
     "spinner": {
       "loadingLabel": "Loading"
     },
-    "continue": "Continue",
-    "back": "Back"
+    "back": "Back",
+    "continue": "Continue"
   },
   "editor": {
     "attachment": {
@@ -1045,20 +1037,8 @@
     },
     "nav": {
       "dailyNote": "Daily note",
-      "templates": "Templates",
-      "attachments": "Attachments",
-      "graph": "Graph",
-      "browseTags": "Browse tags",
-      "archive": "Archive",
-      "trash": "Trash",
-      "settings": "Settings",
-      "notes": "Notes",
       "openToday": "Open today",
-      "views": "Views",
-      "search": "Search",
-      "allNotes": "All notes",
-      "files": "Files",
-      "tags": "Tags"
+      "allNotes": "All notes"
     },
     "list": {
       "searchPlaceholder": "Search notes",
@@ -1076,8 +1056,7 @@
     },
     "filterSheet": {
       "title": "Filter",
-      "status": "Status",
-      "browseTags": "Browse tags…"
+      "status": "Status"
     },
     "sortSheet": {
       "title": "Sort",
@@ -1089,13 +1068,11 @@
       "emptyNote": "Empty note",
       "wordCount_one": "{{count}} word · {{minutes}} min read",
       "wordCount_other": "{{count}} words · {{minutes}} min read",
-      "open": "Open",
       "moveToFolder": "Move to folder…",
       "moveToTrash": "Move to Trash",
       "copied": "Copied ✓",
       "copyToClipboard": "Copy to clipboard",
-      "versionHistory": "Version history",
-      "exportPdf": "Export as PDF"
+      "versionHistory": "Version history"
     },
     "purge": {
       "body": "This removes the note from this device for good. This cannot be undone."
@@ -1113,59 +1090,18 @@
       "title": "Select a note",
       "body": "Choose a note from the list, or start a new one."
     },
-    "viewsSheet": {
-      "typeTable": "Table",
-      "typeCards": "Cards",
-      "typeList": "List",
-      "emptyState": "No saved views yet. Create one to filter your notes by tag, folder, or text.",
-      "editView": "Edit view"
-    },
-    "sheet": {
-      "done": "Done"
-    },
-    "vaultSwitcher": {
-      "title": "Vaults",
-      "createNewVault": "Create new vault"
-    },
-    "tagBrowser": {
-      "noTagsMatch": "No tags match.",
-      "notesCount_one": "Notes · {{count}}",
-      "notesCount_other": "Notes · {{count}}"
-    },
-    "untitledNote": "Untitled note",
-    "commandPalette": {
-      "searchPlaceholder": "Search notes or run a command…",
-      "noMatches": "No commands or notes match."
-    },
-    "noteContext": {
-      "collapsePanel": "Collapse panel",
-      "unlinkedCount_one": "Unlinked mention {{count}}",
-      "unlinkedCount_other": "Unlinked mentions {{count}}"
-    },
     "readingBar": {
       "editNote": "Edit note",
       "edit": "Edit"
     },
     "graphTab": {
-      "title": "Graph",
       "linkedNotes_one": "{{count}} linked note",
       "linkedNotes_other": "{{count}} linked notes",
       "links_one": "{{count}} link",
       "links_other": "{{count}} links"
     },
     "formatBar": {
-      "undo": "Undo",
       "redo": "Redo",
-      "heading1": "Heading 1",
-      "heading2": "Heading 2",
-      "bold": "Bold",
-      "italic": "Italic",
-      "bulletList": "Bullet list",
-      "checklist": "Checklist",
-      "quote": "Quote",
-      "code": "Code",
-      "wikiLink": "Wiki link",
-      "link": "Link",
       "attachFile": "Attach new file",
       "insertFromLibrary": "Insert from library",
       "recordVoiceNote": "Record voice note",
@@ -1178,8 +1114,32 @@
       "noteDetails": "Note details",
       "noteActions": "Note actions"
     },
-    "appHeader": {
-      "commandPalette": "Command palette"
+    "noteContext": {
+      "collapsePanel": "Collapse panel",
+      "unlinkedCount_one": "Unlinked mention {{count}}",
+      "unlinkedCount_other": "Unlinked mentions {{count}}"
+    },
+    "viewsSheet": {
+      "typeCards": "Cards",
+      "typeList": "List",
+      "emptyState": "No saved views yet. Create one to filter your notes by tag, folder, or text.",
+      "editView": "Edit view"
+    },
+    "sheet": {
+      "done": "Done"
+    },
+    "vaultSwitcher": {
+      "title": "Vaults"
+    },
+    "tagBrowser": {
+      "noTagsMatch": "No tags match.",
+      "notesCount_one": "Notes · {{count}}",
+      "notesCount_other": "Notes · {{count}}"
+    },
+    "untitledNote": "Untitled note",
+    "commandPalette": {
+      "searchPlaceholder": "Search notes or run a command…",
+      "noMatches": "No commands or notes match."
     }
   },
   "export": {
@@ -1819,24 +1779,19 @@
     "weakPassword": "Password must be at least {{min}} characters.",
     "setPasswordError": "Couldn't set your new password. Please try again.",
     "passwordMismatch": "Passwords don't match.",
-    "decryptingTitle": "Decrypting…",
     "decryptingSubtitle": "Rebuilding your vault keys with Argon2id. This takes a few seconds.",
     "restoreVaultHeader": "Restore a vault",
     "accountTitle": "Enter your account number",
     "accountLead": "Find this where you saved your recovery phrase. It identifies the vault to restore.",
-    "accountLabel": "Account number",
     "accountInvalid": "Invalid account number — please check and re-enter.",
     "accountOptionalHint": "Don't have it? Leave this blank and continue — your 24-word recovery phrase is all you need.",
-    "phraseHeader": "Recovery phrase",
     "paste": "Paste",
     "phraseGridHint": "Type each word, or paste all 24 at once to fill the grid.",
     "submitProgress": "Submit · {{filled}} of {{total}}",
     "newPasswordTitle": "Choose a new password",
     "newPasswordLead": "Your recovery phrase stays the same. This sets the password for this device.",
-    "newPasswordLabel": "New password",
     "confirmPasswordLabel": "Confirm password",
     "passwordHelper": "Never stored, never transmitted. It encrypts your keys on this device.",
-    "encryptingTitle": "Encrypting…",
     "encryptingSubtitle": "Wrapping your vault keys with your new password."
   },
   "restore": {
@@ -1920,18 +1875,13 @@
       "vaultIconDefault": "Default (wordmark)",
       "renamedToast": "Vault renamed",
       "renameError": "Couldn't rename the vault",
-      "newPasswordTooShort": "New password must be at least 12 characters.",
       "newPasswordMismatch": "New passwords don't match.",
       "samePassword": "New password is the same as the current password.",
       "passwordChangedToast": "Password changed",
       "vaultUnreadable": "Vault file is unreadable. Restore from a backup.",
       "genericChangeError": "Something went wrong. Please try again.",
       "renameHelper": "Shown in the vault switcher. Stored encrypted inside this vault; leave blank to clear it.",
-      "saveButton": "Save",
-      "currentPassword": "Current password",
-      "newPasswordField": "New password",
       "newPasswordPlaceholder": "At least 12 characters",
-      "confirmNewPassword": "Confirm new password",
       "reenterNewPassword": "Re-enter new password",
       "changePasswordFootnote": "This invalidates quick-unlock. Your recovery phrase is unchanged.",
       "changing": "Changing…"
@@ -1951,18 +1901,11 @@
       "themeOptionAria": "{{label}} theme",
       "themeSaveError": "Couldn't save theme. Please try again.",
       "timestampsSaveError": "Couldn't save preference. Please try again.",
-      "textSize": "Text size",
       "sizeS": "S",
       "sizeM": "M",
       "sizeL": "L",
       "sizeXL": "XL",
       "editorFont": "Editor font",
-      "fontMono": "Mono",
-      "fontSans": "Sans",
-      "lineSpacing": "Line spacing",
-      "spacingTight": "Tight",
-      "spacingNormal": "Normal",
-      "spacingRelaxed": "Relaxed",
       "showEditTimesSubtitle": "Timestamps under each note"
     },
     "archive": {
@@ -2091,7 +2034,6 @@
       "vaultPath": "Vault path: {{path}}",
       "deleteError": "Couldn't fully delete the vault. Please try again.",
       "warning": "This permanently deletes this vault and all of its notes from this device. This cannot be undone.",
-      "deleting": "Deleting…",
       "deleteButton": "Delete this vault"
     },
     "files": {
@@ -2211,7 +2153,6 @@
       "screenCaptureHelperOff": "Protection always applies before unlock. After unlock, follows this preference.",
       "screenCaptureHelperOn": "Active on macOS and Windows 10 (May 2020 Update or later). Linux support coming in a future release.",
       "screenCaptureLabel": "Screen-capture protection",
-      "screenCapture": "Screen-capture protection",
       "screenCaptureSubtitle": "Block screenshots and screen recording",
       "autoLockAfter": "Auto-lock after",
       "autoLock1m": "1m",
@@ -2244,7 +2185,6 @@
       "title": "Quick unlock",
       "useTouchId": "Use Touch ID",
       "pinTooShort": "PIN must be at least 6 digits.",
-      "pinNotDigits": "PIN must be digits only.",
       "pinMismatch": "PINs don't match.",
       "pinOnToast": "PIN quick unlock is on",
       "setupError": "Couldn't set up quick unlock.",
@@ -2252,7 +2192,6 @@
       "turnOffError": "Couldn't turn off quick unlock",
       "biometricOnToast": "{{method}} quick unlock is on",
       "biometricUnavailable": "{{method}} isn't available on this device.",
-      "off": "Off",
       "warningBanner": "A convenience gate only. Your password is still required after a restart.",
       "biometricToggleSubtitle": "Unlock with {{method}} after auto-lock",
       "pinOnLead": "PIN quick unlock is ",
@@ -2345,11 +2284,7 @@
     },
     "sync": {
       "summary": {
-        "off": "Off",
         "notSetUp": "Not set up",
-        "awaitingApproval": "Awaiting approval",
-        "on": "On",
-        "syncing": "Syncing…",
         "offline": "Offline",
         "conflicts_one": "{{count}} conflict",
         "conflicts_other": "{{count}} conflicts"
@@ -2365,38 +2300,18 @@
     },
     "saveSettingError": "Couldn't save that setting",
     "panelTitle": {
-      "root": "Settings",
-      "account": "Account",
-      "appearance": "Appearance",
-      "editor": "Editor",
       "privacy": "Privacy & security",
       "data": "Data",
-      "about": "About",
-      "changePassword": "Change password",
-      "deleteVault": "Delete vault",
       "vaultName": "Vault name",
-      "quickUnlock": "Quick unlock",
-      "sync": "Sync",
-      "syncServer": "Sync server",
-      "addDevice": "Add this device",
-      "approveDevice": "Approve device",
-      "yourDevices": "Your devices"
+      "approveDevice": "Approve device"
     },
     "done": "Done",
     "sectionOptions": "Options",
-    "lockVault": "Lock vault",
-    "dangerZone": "Danger zone",
     "footerTagline": "myne · encrypted on this device · open source",
     "editor": {
       "defaultView": "Default view",
-      "viewLive": "Live",
-      "viewReading": "Reading",
-      "viewSource": "Source",
-      "spellCheck": "Spell check",
-      "lineNumbers": "Line numbers",
       "typewriter": "Typewriter scrolling",
       "typewriterSubtitle": "Keep the caret vertically centered",
-      "dimInactive": "Dim inactive lines",
       "enableArchiving": "Enable archiving"
     }
   },
@@ -2542,55 +2457,34 @@
     },
     "settings": {
       "serverSection": "Server",
-      "serverLabel": "Sync server",
       "serverNotSet": "Not set",
       "statusLabel": "Status",
-      "devicesSection": "Devices",
-      "addDevice": "Add this device",
-      "yourDevices": "Your devices",
       "hubHelp": "Sync keeps your notes up to date across devices. Everything is encrypted on this device before it is sent — the server never sees your notes.",
       "connectedTls": "Connected over TLS.",
       "connectedLocal": "Connected on your local network.",
       "connectError": "Couldn't reach that server. Check the address and try again.",
       "serverAddressLabel": "Server address",
       "serverAddressPlaceholder": "https://sync.example.com",
-      "connecting": "Connecting…",
-      "connect": "Connect",
       "fingerprintLabel": "Certificate fingerprint",
       "fingerprintCompare": "Compare this against the same screen on a device you already trust — they must match.",
       "pinStatic": "Verified against this server's known certificate.",
       "pinTofu": "Pinned on first connect. Compare it across your devices to confirm.",
       "enrollNotConfigured": "Set up a sync server first, then add this device.",
       "enrollTransport": "Couldn't reach the sync server. Check your connection and try again.",
-      "accountNumberLabel": "Account number",
       "accountNumberHint": "Double-check this number — it doesn't look right.",
-      "signInWith": "Sign in with",
-      "passwordLabel": "Password",
-      "recoveryPhraseLabel": "Recovery phrase",
       "passwordPlaceholder": "Your vault password",
       "recoveryPhraseHint": "Enter or paste your 24 words. Pasting fills the cells in order.",
-      "enrollSubmit": "Add this device",
-      "verifyTitle": "Verify the new device",
       "verifyBody": "Check that the same code appears on the device you just approved. If it matches, they are on your account. If it doesn't, remove the device.",
-      "syncing": "Syncing…",
-      "sasPending": "This code appears once the new device finishes its first sync.",
-      "sasMatch": "They match",
       "sasMismatch": "They don't match",
       "removeDeviceButton": "Remove device",
       "keepDevice": "Keep it",
       "notEnrolledHelp": "This device isn't syncing yet. Add it from the previous screen to see your devices.",
       "unauthenticated": "This device's access was revoked, probably removed from another device.",
-      "resetLocal": "Reset sync on this device",
       "transportError": "Couldn't reach the sync server. If the server moved or its certificate changed, re-connect it from the Sync server screen.",
       "retiredSelf": "This device was removed from another device.",
       "resetAndAddAgain": "Reset and add again",
-      "waitingForApproval": "Waiting for approval",
-      "approve": "Approve",
-      "loading": "Loading…",
       "noDevices": "No devices yet.",
-      "thisDevice": "This device",
-      "syncingHere": "Syncing here",
-      "remove": "Remove"
+      "syncingHere": "Syncing here"
     },
     "banner": {
       "conflictsNeedReview_one": "{{count}} conflict needs review",
@@ -2617,15 +2511,10 @@
     "emptyBefore": "No templates yet. Tap ",
     "newAction": "New",
     "emptyAfter": " to create a reusable note template — then start notes from it (and pick one as your daily-note template in Settings).",
-    "untitledTemplate": "Untitled template",
     "use": "Use",
     "edit": "Edit",
     "deleteConfirm": "Delete this template?",
-    "delete": "Delete",
-    "cancel": "Cancel",
-    "convertToNote": "Convert to note",
-    "notesBack": "Notes",
-    "title": "Templates"
+    "convertToNote": "Convert to note"
   },
   "unlock": {
     "backToPicker": "Choose a different vault",
@@ -2680,18 +2569,13 @@
     "biometricRetryHint": "Try again, or unlock with your password.",
     "tryBiometricAgain": "Try {{biometric}} again",
     "usePasswordInstead": "Use password instead",
-    "pinLabel": "PIN",
     "useBiometricInstead": "Use {{biometric}} instead",
     "unlockWithPinInstead": "Unlock with PIN instead",
     "useRecoveryPhrase": "Use your recovery phrase",
-    "deleteVaultLink": "Delete vault and start over",
     "deleteConfirmTitle": "Delete this vault?",
     "deletePartialError": "Some files couldn't be removed. The vault is no longer usable — continue to start over.",
-    "deleting": "Deleting…",
-    "deleteVault": "Delete vault",
     "failClosedEyebrow": "Can't open vault",
-    "restoreHint": "Restore from a backup to continue.",
-    "closeApp": "Close app"
+    "restoreHint": "Restore from a backup to continue."
   },
   "vault": {
     "ioBanner": {
@@ -2966,7 +2850,6 @@
     "heroLine3": "no one but you.",
     "lede": "Markdown, encrypted on this device before it ever leaves it. No account email. No servers that can read a word.",
     "residueBanner": "Leftover files from an interrupted delete ({{n}}). Clean them up before creating a vault.",
-    "cleaningUp": "Cleaning up…",
     "cleanUpFiles": "Clean up leftover files",
     "create": "Create a vault",
     "connect": "Connect to my account"
@@ -2984,35 +2867,20 @@
     "empty": "No conflicts to review — your notes are in sync.",
     "groupTitle_one": "{{count}} conflicting copy",
     "groupTitle_other": "{{count}} conflicting copies",
-    "groupTitleOfNote": " of note {{hex}}",
-    "untitled": "Untitled ({{hex}})",
-    "keepAsSeparate": "Keep as separate",
-    "discard": "Discard",
-    "useThisVersion": "Use this version"
+    "groupTitleOfNote": " of note {{hex}}"
   },
   "viewEditor": {
     "saveError": "Couldn't save this view. Please try again.",
     "deleteError": "Couldn't delete this view. Please try again.",
-    "newView": "New view",
     "editView": "Edit view",
-    "namePlaceholder": "View name",
-    "match": "Match",
-    "all": "All",
-    "any": "Any",
     "condition": {
-      "tag": "Tag",
-      "folder": "Folder",
       "search": "Text"
     },
     "containsPlaceholder": "contains…",
     "tagPlaceholder": "tag",
     "folderPlaceholder": "Folder/",
-    "removeCondition": "Remove condition",
     "addCondition": "+ Add condition",
-    "createView": "Create view",
-    "save": "Save",
-    "deleteView": "Delete view",
-    "cancel": "Cancel"
+    "createView": "Create view"
   },
   "snapshots": {
     "today": "Today {{time}}",
@@ -3022,14 +2890,12 @@
     "title": "Version history",
     "emptyState": "No earlier versions yet. Snapshots are captured automatically as you edit.",
     "hide": "Hide",
-    "preview": "Preview",
     "empty": "(empty)",
     "restoreThisVersion": "Restore this version"
   },
   "restoreBackup": {
     "title": "Not available on mobile yet",
-    "body": "Restoring from a backup file is not available on mobile yet — create a vault or recover with your phrase.",
-    "back": "Back"
+    "body": "Restoring from a backup file is not available on mobile yet — create a vault or recover with your phrase."
   },
   "recording": {
     "deniedTitle": "Microphone access is off",
@@ -3038,10 +2904,7 @@
     "noDeviceBody": "No microphone was found on this device.",
     "emptyBody": "That recording was empty — nothing was captured.",
     "genericBody": "Something went wrong while recording. Please try again.",
-    "notNow": "Not now",
-    "saving": "Saving…",
-    "stopAria": "Stop recording",
-    "stop": "Stop"
+    "stopAria": "Stop recording"
   },
   "picker": {
     "neverOpened": "Never opened",
@@ -3064,30 +2927,20 @@
     "openedLastYear": "opened last year",
     "openedYearsAgo_one": "opened {{count}} year ago",
     "openedYearsAgo_other": "opened {{count}} years ago",
-    "corruptedBadge": "Corrupted",
-    "title": "Choose a vault",
-    "createAnother": "Create another vault"
+    "corruptedBadge": "Corrupted"
   },
   "join": {
     "transportError": "Couldn't reach that sync server. Check the address and your connection, then try again.",
     "passwordPlaceholder": "Your vault password",
-    "waitingTitle": "Waiting for approval",
     "waitingHint": "Keep this screen open — once approved, a verification code appears here to compare with your other device.",
-    "verifyTitle": "Verify this device",
     "verifyBody": "Check that this code is the same one shown on the device you approved from.",
-    "sasMatch": "They match — continue",
     "removing": "Removing…",
     "sasMismatch": "They don't match — remove this device",
     "title": "Connect to your account",
     "lead": "Enter your account details to bring your notes to this device. Everything stays encrypted end to end.",
-    "serverLabel": "Sync server",
     "serverPlaceholder": "https://sync.example.com",
-    "accountLabel": "Account number",
     "accountHint": "Double-check this number — it doesn't look right.",
-    "passwordLabel": "Password",
     "approvalHint": "Your notes appear once you approve this device from a device that already has your account.",
-    "connect": "Connect",
-    "connectingTitle": "Connecting…",
     "connectingSubtitle": "Fetching your account and unlocking your vault on this device."
   },
   "createVault": {
@@ -3101,10 +2954,8 @@
     "briefingTitle": "Before we begin",
     "briefingLead": "Myne encrypts everything on this device. That privacy comes with a responsibility only you can hold.",
     "passwordTitle": "Create a password",
-    "passwordLabel": "Password",
     "confirmPasswordLabel": "Confirm password",
     "passwordHelper": "Never stored, never transmitted. It encrypts your keys on this device.",
-    "encryptingTitle": "Encrypting…",
     "encryptingSubtitle": "Deriving your key with Argon2id. This takes a few seconds and can't be interrupted.",
     "phraseTitle": "Your recovery phrase",
     "phraseIntro": "Twenty-four words, in order. Write them on paper and store them somewhere safe.",
@@ -3117,9 +2968,6 @@
     "backToPhrase": "Back to phrase",
     "accountTitle": "Your account number",
     "accountLead": "Save this alongside your recovery phrase. You'll need it to restore your vault on a new device.",
-    "copied": "Copied",
-    "copy": "Copy",
-    "saveAsFile": "Save as file",
     "accountSavedAck": "I have saved my account number.",
     "commit": "Commit",
     "committingTitle": "Saving your vault…",
