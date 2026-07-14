@@ -1,4 +1,5 @@
 import type { CSSProperties, ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { Icon } from "./Icon";
 
 /**
@@ -113,7 +114,17 @@ const STRENGTH = {
   Strong: { bars: 4, color: "var(--success)" },
 } as const;
 
+/** i18n key per strength level — the `level` prop stays the enum key into
+ *  {@link STRENGTH}; only the displayed label is translated. */
+const STRENGTH_LABEL_KEY: Record<keyof typeof STRENGTH, string> = {
+  Weak: "settings.strength.weak",
+  Fair: "settings.strength.fair",
+  Good: "settings.strength.good",
+  Strong: "settings.strength.strong",
+};
+
 export function StrengthMeter({ level = "Strong" }: { level?: keyof typeof STRENGTH }) {
+  const { t } = useTranslation();
   const { bars, color } = STRENGTH[level];
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -130,7 +141,7 @@ export function StrengthMeter({ level = "Strong" }: { level?: keyof typeof STREN
           />
         ))}
       </div>
-      <span style={{ fontSize: 13, fontWeight: 500, color: "var(--fg-2)" }}>{level}</span>
+      <span style={{ fontSize: 13, fontWeight: 500, color: "var(--fg-2)" }}>{t(STRENGTH_LABEL_KEY[level])}</span>
     </div>
   );
 }

@@ -7,6 +7,7 @@
 // "Microphone access is off" state inside the sheet.
 
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Sheet, Spinner } from "../../components";
 import { Button } from "../../components/Button";
 import { startVoiceCapture, type VoiceCaptureHandle, type VoiceCaptureErrorKind, VoiceCaptureError } from "../../lib/voiceRecord";
@@ -28,6 +29,7 @@ export function RecordingSheet({
   onRecorded: (file: File) => void | Promise<void>;
   onClose: () => void;
 }) {
+  const { t } = useTranslation();
   const [phase, setPhase] = useState<"starting" | "recording" | "saving" | "error">("starting");
   const [errorKind, setErrorKind] = useState<VoiceCaptureErrorKind>("generic");
   const [elapsedMs, setElapsedMs] = useState(0);
@@ -98,14 +100,14 @@ export function RecordingSheet({
   // ── Permission-denied / error state (mirrors SYS-02) ─────────────────────────
   if (phase === "error") {
     const denied = errorKind === "permissionDenied" || errorKind === "unsupported";
-    const heading = denied ? "Microphone access is off" : "Couldn't start recording";
+    const heading = denied ? t("recording.deniedTitle") : t("recording.errorTitle");
     const body = denied
-      ? "To record a voice note, allow microphone access for Myne in Settings › Myne › Microphone."
+      ? t("recording.deniedBody")
       : errorKind === "noInputDevice"
-        ? "No microphone was found on this device."
+        ? t("recording.noDeviceBody")
         : errorKind === "empty"
-          ? "That recording was empty — nothing was captured."
-          : "Something went wrong while recording. Please try again.";
+          ? t("recording.emptyBody")
+          : t("recording.genericBody");
     return (
       <Sheet onClose={closeCancel}>
         <div data-testid="voice-record.denied" style={{ padding: "8px 6px 4px", textAlign: "center" }}>
@@ -117,7 +119,7 @@ export function RecordingSheet({
           <h2 style={{ margin: "18px 0 0", fontSize: 20, fontWeight: 600, color: "var(--fg-display)", letterSpacing: "-0.02em" }}>{heading}</h2>
           <p style={{ margin: "10px auto 20px", fontSize: 15, lineHeight: 1.6, color: "var(--fg-2)", maxWidth: 300 }}>{body}</p>
           <Button variant="ghost" onClick={closeCancel} style={{ color: "var(--fg-3)", fontWeight: 600 }}>
-            Not now
+            {t("recording.notNow")}
           </Button>
         </div>
       </Sheet>
@@ -157,14 +159,14 @@ export function RecordingSheet({
         </div>
         {phase === "saving" ? (
           <div style={{ display: "flex", alignItems: "center", gap: 8, height: 38, padding: "0 12px", color: "var(--fg-2)", fontSize: 14 }}>
-            <Spinner size={16} /> Saving…
+            <Spinner size={16} /> {t("recording.saving")}
           </div>
         ) : (
           <button
             data-testid="voice-record.stop"
             onClick={() => void stop()}
             disabled={phase !== "recording"}
-            aria-label="Stop recording"
+            aria-label={t("recording.stopAria")}
             style={{
               flex: "none",
               height: 38,
@@ -180,7 +182,7 @@ export function RecordingSheet({
               opacity: phase === "recording" ? 1 : 0.6,
             }}
           >
-            Stop
+            {t("recording.stop")}
           </button>
         )}
       </div>

@@ -5,6 +5,7 @@
 // lightbox on tap; voice notes get an inline play/pause tile (no text-extraction).
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Sheet, Banner, Spinner } from "../../components";
 import { catalogList, attachmentDelete, attachmentRename, attachmentUnusedList, attachmentCleanUnused, importFile, ATTACHMENT_ACCEPT, type CatalogEntry } from "../../lib/attachments";
 import { attachmentSrc } from "../../lib/attachmentRef";
@@ -40,6 +41,7 @@ export function AttachmentsSheet({
    *  bottom-tab page (the top-level Files library). */
   variant?: "sheet" | "page";
 }) {
+  const { t } = useTranslation();
   const [entries, setEntries] = useState<CatalogEntry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [renaming, setRenaming] = useState<string | null>(null);
@@ -56,15 +58,15 @@ export function AttachmentsSheet({
     setError(null);
     setNote(null);
     if (!HAS_TAURI) {
-      setNote("Attachment cleanup needs the app.");
+      setNote(t("attachments.needsApp"));
       return;
     }
     try {
       const unused = await attachmentUnusedList();
-      if (unused.length === 0) setNote("No unused attachments — every file is referenced.");
+      if (unused.length === 0) setNote(t("attachments.noUnused"));
       else setCleanup(unused);
     } catch {
-      setError("Couldn't scan for unused attachments.");
+      setError(t("attachments.scanError"));
     }
   }
 
@@ -74,10 +76,10 @@ export function AttachmentsSheet({
     try {
       const res = await attachmentCleanUnused(cleanup.map((e) => e.id));
       setCleanup(null);
-      setNote(`Erased ${res.deleted} unused ${res.deleted === 1 ? "file" : "files"}.`);
+      setNote(t("attachments.erasedToast", { count: res.deleted }));
       load();
     } catch {
-      setError("Couldn't erase the unused attachments.");
+      setError(t("attachments.eraseError"));
     } finally {
       setCleaning(false);
     }
@@ -91,8 +93,8 @@ export function AttachmentsSheet({
     setError(null);
     void catalogList()
       .then((e) => setEntries([...e].sort((a, b) => b.created_at - a.created_at)))
-      .catch(() => setError("Couldn't read attachments."));
-  }, []);
+      .catch(() => setError(t("attachments.readError")));
+  }, [t]);
   useEffect(() => load(), [load]);
 
   /** Import a picked file into the vault (MYA1) and refresh the catalog so the
@@ -100,7 +102,7 @@ export function AttachmentsSheet({
    *  editor paperclip to add a file. */
   async function upload(file: File) {
     if (!HAS_TAURI) {
-      setError("Attachments need the app (not the browser preview).");
+      setError(t("attachments.needAppPreview"));
       return;
     }
     setError(null);
@@ -113,10 +115,10 @@ export function AttachmentsSheet({
       const kind = (e as { kind?: string })?.kind;
       setError(
         kind === "Oversize"
-          ? "That file is too large (max 64 MB)."
+          ? t("attachments.tooLarge")
           : kind === "UnsupportedType"
-            ? "Only images and PDFs can be attached."
-            : "Couldn't add that file.",
+            ? t("attachments.unsupported")
+            : t("attachments.addError"),
       );
     } finally {
       setUploading(false);
@@ -128,7 +130,7 @@ export function AttachmentsSheet({
       if (HAS_TAURI) await attachmentDelete(id);
       setEntries((es) => (es ?? []).filter((e) => e.id !== id));
     } catch {
-      setError("Couldn't delete that attachment.");
+      setError(t("attachments.deleteError"));
     }
   }
 
@@ -140,7 +142,7 @@ export function AttachmentsSheet({
       if (HAS_TAURI) await attachmentRename(id, name);
       setEntries((es) => (es ?? []).map((e) => (e.id === id ? { ...e, filename: name } : e)));
     } catch {
-      setError("Couldn't rename that attachment.");
+      setError(t("attachments.renameError"));
     }
   }
 
@@ -151,9 +153,9 @@ export function AttachmentsSheet({
   // the Files page (where it sits beside the primary Upload).
   const cleanBtn = (style: React.CSSProperties) =>
     cleanup ? (
-      <button onClick={() => setCleanup(null)} style={style}>Cancel</button>
+      <button onClick={() => setCleanup(null)} style={style}>{t("attachments.cancel")}</button>
     ) : (
-      <button onClick={() => void reviewUnused()} style={style}>Clean unused</button>
+      <button onClick={() => void reviewUnused()} style={style}>{t("attachments.cleanUnusedLabel")}</button>
     );
 
   const uploadInput = (
@@ -188,7 +190,7 @@ export function AttachmentsSheet({
             <path d="M12 16V4M7 9l5-5 5 5M5 20h14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         )}
-        {uploading ? "Adding…" : "Upload"}
+        {uploading ? t("attachments.adding") : t("attachments.upload")}
       </button>
     );
 
@@ -208,14 +210,14 @@ export function AttachmentsSheet({
   const cleanupPanel = cleanup && (
     <div style={{ marginTop: 12, flex: "none" }}>
       <div style={{ fontSize: 14, lineHeight: 1.5, color: "var(--fg-2)" }}>
-        {cleanup.length} {cleanup.length === 1 ? "attachment is" : "attachments are"} referenced by no note ({formatBytes(totalUnusedBytes)}). Erasing is a permanent cryptographic delete — there is no trash.
+        {t("attachments.unusedSummary", { count: cleanup.length, size: formatBytes(totalUnusedBytes) })}
       </div>
       <button
         onClick={() => void eraseUnused()}
         disabled={cleaning}
         style={{ marginTop: 12, width: "100%", height: 48, border: "none", borderRadius: 8, background: "var(--danger)", color: "#fff", fontFamily: "var(--font-sans)", fontSize: 15, fontWeight: 600, cursor: "pointer", opacity: cleaning ? 0.5 : 1 }}
       >
-        Erase {cleanup.length} unused {cleanup.length === 1 ? "file" : "files"}
+        {t("attachments.eraseCta", { count: cleanup.length })}
       </button>
     </div>
   );
@@ -246,7 +248,7 @@ export function AttachmentsSheet({
           </div>
         ) : entries.length === 0 ? (
           <div style={{ textAlign: "center", padding: "30px 20px", color: "var(--fg-3)", fontSize: 14, lineHeight: 1.55 }}>
-            No attachments yet. Tap Upload to add an image or PDF.
+            {t("attachments.emptyState")}
           </div>
         ) : (
           entries.map((e) => (
@@ -284,9 +286,9 @@ export function AttachmentsSheet({
               </div>
               {renaming !== e.id && (
                 <div style={{ display: "flex", gap: 2, flexShrink: 0 }}>
-                  {onInsert && <button onClick={() => onInsert(e.id, e.filename)} style={actionBtn("var(--accent)")}>Insert</button>}
-                  <button onClick={() => { setRenaming(e.id); setRenameText(e.filename); }} style={actionBtn("var(--fg-2)")}>Rename</button>
-                  <button onClick={() => void remove(e.id)} style={actionBtn("var(--danger)")}>Delete</button>
+                  {onInsert && <button onClick={() => onInsert(e.id, e.filename)} style={actionBtn("var(--accent)")}>{t("attachments.insert")}</button>}
+                  <button onClick={() => { setRenaming(e.id); setRenameText(e.filename); }} style={actionBtn("var(--fg-2)")}>{t("attachments.rename")}</button>
+                  <button onClick={() => void remove(e.id)} style={actionBtn("var(--danger)")}>{t("attachments.delete")}</button>
                 </div>
               )}
             </div>
@@ -295,7 +297,7 @@ export function AttachmentsSheet({
     </>
   );
 
-  const title = cleanup ? "Clean unused" : variant === "page" ? "Files" : "Attachments";
+  const title = cleanup ? t("attachments.cleanUnusedLabel") : variant === "page" ? t("attachments.filesTitle") : t("attachments.title");
 
   if (variant === "page") {
     return (
@@ -340,6 +342,7 @@ export function AttachmentsSheet({
  *  and the decoded buffer is released — when the row scrolls out or the tab
  *  closes (playback-residue discipline). */
 function AudioTile({ id, filename }: { id: string; filename: string }) {
+  const { t } = useTranslation();
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [playing, setPlaying] = useState(false);
 
@@ -378,7 +381,7 @@ function AudioTile({ id, filename }: { id: string; filename: string }) {
         onClick={toggle}
         data-testid="files.audio-play"
         data-attachment-id={id}
-        aria-label={`${playing ? "Pause" : "Play"} ${filename}`}
+        aria-label={playing ? t("attachments.pauseLabel", { filename }) : t("attachments.playLabel", { filename })}
         style={{ width: "100%", height: "100%", border: "none", background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", padding: 0, color: "var(--accent)" }}
       >
         {playing ? (

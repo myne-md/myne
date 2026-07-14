@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { Icon, MyneMark, Sheet } from "../../../../components";
 import { vaultDisplayLabel } from "../../../../lib/vault-label";
 import type { VaultSummary } from "../../../../types/vault-summary";
@@ -16,17 +17,18 @@ export function VaultSwitcher({
   onCreate: () => void;
   onClose: () => void;
 }) {
+  const { t } = useTranslation();
   return (
     <Sheet onClose={onClose}>
       {(close) => (
         <>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 2px 12px" }}>
-        <div style={{ fontSize: 17, fontWeight: 600, color: "var(--fg-1)" }}>Vaults</div>
+        <div style={{ fontSize: 17, fontWeight: 600, color: "var(--fg-1)" }}>{t("editor.vaultSwitcher.title")}</div>
         <button
           onClick={close}
           style={{ border: "none", background: "transparent", color: "var(--accent)", fontSize: 15, fontWeight: 600, cursor: "pointer", padding: 0 }}
         >
-          Done
+          {t("editor.sheet.done")}
         </button>
       </div>
       <div style={{ border: "1px solid var(--line-1)", borderRadius: 10, overflow: "hidden", background: "var(--bg-1)" }}>
@@ -73,7 +75,7 @@ export function VaultSwitcher({
         }}
       >
         <Icon name="plus" size={18} color="var(--accent)" strokeWidth={2} />
-        Create new vault
+        {t("editor.vaultSwitcher.createNewVault")}
       </button>
         </>
       )}

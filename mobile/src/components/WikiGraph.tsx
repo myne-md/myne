@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useReducer, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { NoteGraph } from "../lib/wikilinks";
 
 function truncate(s: string, n: number): string {
@@ -35,6 +36,7 @@ const DAMPING = 0.86;
  * save battery and reheats whenever you touch it.
  */
 export function WikiGraph({ graph, onOpen }: { graph: NoteGraph; onOpen: (id: string) => void }) {
+  const { t } = useTranslation();
   const connected = graph.nodes.filter((n) => n.degree > 0);
 
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -164,9 +166,9 @@ export function WikiGraph({ graph, onOpen }: { graph: NoteGraph; onOpen: (id: st
   if (connected.length === 0) {
     return (
       <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "0 44px", textAlign: "center", gap: 10 }}>
-        <div style={{ fontSize: 16, fontWeight: 600, color: "var(--fg-1)" }}>No links yet</div>
+        <div style={{ fontSize: 16, fontWeight: 600, color: "var(--fg-1)" }}>{t("wikiGraph.emptyTitle")}</div>
         <div style={{ fontSize: 14, lineHeight: 1.55, color: "var(--fg-3)" }}>
-          Connect notes by writing <span style={{ fontFamily: "var(--font-mono)" }}>[[Note title]]</span> in your text. Linked notes appear here as a graph.
+          {t("wikiGraph.emptyBodyBefore")}<span style={{ fontFamily: "var(--font-mono)" }}>[[Note title]]</span>{t("wikiGraph.emptyBodyAfter")}
         </div>
       </div>
     );

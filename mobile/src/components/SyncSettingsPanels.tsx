@@ -12,6 +12,8 @@
 // R3 transport review-debt).
 
 import { type CSSProperties, type ReactNode, useEffect, useId, useState } from "react";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import type { SyncStatus } from "../lib/use-sync-status";
 import {
   syncGetEndpoint,
@@ -155,25 +157,25 @@ const HELP: CSSProperties = { marginTop: 14, fontSize: 13, lineHeight: 1.5, colo
 const NOTICE: CSSProperties = { marginTop: 14, fontSize: 14, lineHeight: 1.55, color: "var(--fg-2)" };
 
 /** Honest status dot + label — state, never a wall-clock (AS6/AS15). */
-function statusView(status: SyncStatus | null): { color: string; label: string } {
+function statusView(status: SyncStatus | null, t: TFunction): { color: string; label: string } {
   switch (status?.state) {
     case undefined:
     case "disabled":
-      return { color: "var(--line-3)", label: "Off" };
+      return { color: "var(--line-3)", label: t("settings.sync.summary.off") };
     case "not_enrolled":
-      return { color: "var(--line-3)", label: "Not set up" };
+      return { color: "var(--line-3)", label: t("settings.sync.summary.notSetUp") };
     case "pending":
-      return { color: "var(--warning)", label: "Awaiting approval" };
+      return { color: "var(--warning)", label: t("settings.sync.summary.awaitingApproval") };
     case "idle":
-      return { color: "var(--success)", label: "On" };
+      return { color: "var(--success)", label: t("settings.sync.summary.on") };
     case "syncing":
-      return { color: "var(--accent)", label: "Syncing…" };
+      return { color: "var(--accent)", label: t("settings.sync.summary.syncing") };
     case "error":
-      return { color: "var(--warning)", label: "Offline" };
+      return { color: "var(--warning)", label: t("settings.sync.summary.offline") };
     case "conflicts":
       return {
         color: "var(--danger)",
-        label: `${status.count} conflict${status.count === 1 ? "" : "s"}`,
+        label: t("settings.sync.summary.conflicts", { count: status.count }),
       };
   }
 }
@@ -189,8 +191,9 @@ export interface SyncHubPanelProps {
 
 /** SY-01: the honest enrollment status + drill-down entry points. */
 export function SyncHubPanel({ status, onOpenEndpoint, onOpenEnroll, onOpenDevices }: SyncHubPanelProps) {
+  const { t } = useTranslation();
   const [endpoint, setEndpoint] = useState<string | null>(null);
-  const view = statusView(status);
+  const view = statusView(status, t);
 
   useEffect(() => {
     if (!HAS_TAURI) return;
@@ -201,10 +204,10 @@ export function SyncHubPanel({ status, onOpenEndpoint, onOpenEnroll, onOpenDevic
 
   return (
     <div style={{ marginTop: 4 }} data-testid="sync.settings">
-      <SectionLabel mt={6}>Server</SectionLabel>
+      <SectionLabel mt={6}>{t("sync.settings.serverSection")}</SectionLabel>
       <Group>
         <Row first onClick={onOpenEndpoint} testId="sync.settings.endpoint">
-          <span style={rowLabel}>Sync server</span>
+          <span style={rowLabel}>{t("sync.settings.serverLabel")}</span>
           <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
             <span
               style={{
@@ -217,13 +220,13 @@ export function SyncHubPanel({ status, onOpenEndpoint, onOpenEnroll, onOpenDevic
                 maxWidth: 150,
               }}
             >
-              {endpoint ?? "Not set"}
+              {endpoint ?? t("sync.settings.serverNotSet")}
             </span>
             <RowChevron />
           </div>
         </Row>
         <Row testId="sync.settings.status">
-          <span style={rowLabel}>Status</span>
+          <span style={rowLabel}>{t("sync.settings.statusLabel")}</span>
           <div style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--fg-2)" }}>
             <span style={{ width: 9, height: 9, borderRadius: "50%", background: view.color, flex: "none" }} />
             <span style={{ fontSize: 15 }}>{view.label}</span>
@@ -231,22 +234,19 @@ export function SyncHubPanel({ status, onOpenEndpoint, onOpenEnroll, onOpenDevic
         </Row>
       </Group>
 
-      <SectionLabel>Devices</SectionLabel>
+      <SectionLabel>{t("sync.settings.devicesSection")}</SectionLabel>
       <Group>
         <Row first onClick={onOpenEnroll} testId="sync.settings.add-device">
-          <span style={rowLabel}>Add this device</span>
+          <span style={rowLabel}>{t("sync.settings.addDevice")}</span>
           <RowChevron />
         </Row>
         <Row onClick={onOpenDevices} testId="sync.settings.devices">
-          <span style={rowLabel}>Your devices</span>
+          <span style={rowLabel}>{t("sync.settings.yourDevices")}</span>
           <RowChevron />
         </Row>
       </Group>
 
-      <p style={{ ...HELP, marginTop: 16 }}>
-        Sync keeps your notes up to date across devices. Everything is encrypted on this device
-        before it is sent — the server never sees your notes.
-      </p>
+      <p style={{ ...HELP, marginTop: 16 }}>{t("sync.settings.hubHelp")}</p>
     </div>
   );
 }
@@ -256,6 +256,7 @@ export function SyncHubPanel({ status, onOpenEndpoint, onOpenEnroll, onOpenDevic
 /** SY-02: set/get the self-host endpoint + the TOFU cert fingerprint for
  *  out-of-band eye-compare. https-only-off-loopback is enforced in shared core. */
 export function SyncEndpointPanel() {
+  const { t } = useTranslation();
   const [url, setUrl] = useState("");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -287,22 +288,22 @@ export function SyncEndpointPanel() {
         setPinSource(r.pin_source);
         if (r.fingerprint) {
           setFingerprint(r.fingerprint);
-          setMsg("Connected over TLS.");
+          setMsg(t("sync.settings.connectedTls"));
         } else {
-          setMsg("Connected on your local network.");
+          setMsg(t("sync.settings.connectedLocal"));
         }
       })
-      .catch(() => setMsg("Couldn't reach that server. Check the address and try again."))
+      .catch(() => setMsg(t("sync.settings.connectError")))
       .finally(() => setBusy(false));
   };
 
   return (
     <div style={{ marginTop: 4 }} data-testid="sync.endpoint-config">
-      <FieldLabel mt={6}>Server address</FieldLabel>
+      <FieldLabel mt={6}>{t("sync.settings.serverAddressLabel")}</FieldLabel>
       <input
         value={url}
         onChange={(e) => setUrl(e.target.value)}
-        placeholder="https://sync.example.com"
+        placeholder={t("sync.settings.serverAddressPlaceholder")}
         spellCheck={false}
         autoCapitalize="none"
         autoCorrect="off"
@@ -318,7 +319,7 @@ export function SyncEndpointPanel() {
           style={primaryBtn(busy)}
           data-testid="sync.endpoint-connect"
         >
-          {busy ? "Connecting…" : "Connect"}
+          {busy ? t("sync.settings.connecting") : t("sync.settings.connect")}
         </button>
       </div>
 
@@ -330,9 +331,9 @@ export function SyncEndpointPanel() {
 
       {fingerprint && (
         <div style={{ marginTop: 16 }}>
-          <FieldLabel mt={0}>Certificate fingerprint</FieldLabel>
+          <FieldLabel mt={0}>{t("sync.settings.fingerprintLabel")}</FieldLabel>
           <p style={{ fontSize: 13, color: "var(--fg-3)", margin: "0 0 8px", lineHeight: 1.5 }}>
-            Compare this against the same screen on a device you already trust — they must match.
+            {t("sync.settings.fingerprintCompare")}
           </p>
           <div
             style={{
@@ -356,8 +357,8 @@ export function SyncEndpointPanel() {
               data-pin-source={pinSource}
             >
               {pinSource === "static"
-                ? "Verified against this server's known certificate."
-                : "Pinned on first connect. Compare it across your devices to confirm."}
+                ? t("sync.settings.pinStatic")
+                : t("sync.settings.pinTofu")}
             </p>
           )}
         </div>
@@ -374,12 +375,12 @@ const MODE_VALUES: EnrollCredentialKind[] = ["password", "recovery"];
 /** Map a non-secret `SyncDeviceError` kind to honest, non-distinguishing copy.
  *  Config/transport faults get their own (non-leaking) line; every
  *  credential/account/meta failure collapses to the single banner (SYNC-8). */
-function enrollFailureMessage(kind: string): string {
+function enrollFailureMessage(kind: string, t: TFunction): string {
   switch (kind) {
     case "NotConfigured":
-      return "Set up a sync server first, then add this device.";
+      return t("sync.settings.enrollNotConfigured");
     case "Transport":
-      return "Couldn't reach the sync server. Check your connection and try again.";
+      return t("sync.settings.enrollTransport");
     default:
       return ENROLL_NON_DISTINGUISHING_BANNER;
   }
@@ -410,6 +411,7 @@ function accountStructurallyPlausible(display: string): boolean {
 
 /** SY-03 enroll + SY-04 pending — account# + Password/Recovery segmented control. */
 export function SyncEnrollPanel({ onEnrolled }: SyncEnrollPanelProps) {
+  const { t } = useTranslation();
   const baseId = useId();
   const { busy, outcome, enroll, reset } = useEnroll();
 
@@ -459,7 +461,7 @@ export function SyncEnrollPanel({ onEnrolled }: SyncEnrollPanelProps) {
 
   return (
     <div style={{ marginTop: 4 }} data-testid="sync.enroll">
-      <FieldLabel mt={6}>Account number</FieldLabel>
+      <FieldLabel mt={6}>{t("sync.settings.accountNumberLabel")}</FieldLabel>
       <input
         value={accountNumber}
         onChange={(e) => {
@@ -476,13 +478,13 @@ export function SyncEnrollPanel({ onEnrolled }: SyncEnrollPanelProps) {
       />
       {!accountStructurallyPlausible(accountNumber) && (
         <p style={{ margin: "8px 2px 0", fontSize: 13, color: "var(--warning)" }} data-testid="sync.enroll.account-hint">
-          Double-check this number — it doesn't look right.
+          {t("sync.settings.accountNumberHint")}
         </p>
       )}
 
-      <FieldLabel>Sign in with</FieldLabel>
+      <FieldLabel>{t("sync.settings.signInWith")}</FieldLabel>
       <Segmented
-        options={["Password", "Recovery phrase"]}
+        options={[t("sync.settings.passwordLabel"), t("sync.settings.recoveryPhraseLabel")]}
         active={MODE_VALUES.indexOf(mode)}
         onChange={(i) => {
           clearOutcome();
@@ -492,7 +494,7 @@ export function SyncEnrollPanel({ onEnrolled }: SyncEnrollPanelProps) {
 
       {mode === "password" ? (
         <>
-          <FieldLabel>Password</FieldLabel>
+          <FieldLabel>{t("sync.settings.passwordLabel")}</FieldLabel>
           <input
             type="password"
             value={password}
@@ -500,7 +502,7 @@ export function SyncEnrollPanel({ onEnrolled }: SyncEnrollPanelProps) {
               clearOutcome();
               setPassword(e.target.value);
             }}
-            placeholder="Your vault password"
+            placeholder={t("sync.settings.passwordPlaceholder")}
             autoComplete="off"
             style={INPUT_STYLE}
             data-testid="sync.enroll.password-input"
@@ -508,9 +510,9 @@ export function SyncEnrollPanel({ onEnrolled }: SyncEnrollPanelProps) {
         </>
       ) : (
         <>
-          <FieldLabel>Recovery phrase</FieldLabel>
+          <FieldLabel>{t("sync.settings.recoveryPhraseLabel")}</FieldLabel>
           <p style={{ margin: "0 0 10px", fontSize: 13, color: "var(--fg-3)" }}>
-            Enter or paste your 24 words. Pasting fills the cells in order.
+            {t("sync.settings.recoveryPhraseHint")}
           </p>
           <div
             style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6 }}
@@ -579,7 +581,7 @@ export function SyncEnrollPanel({ onEnrolled }: SyncEnrollPanelProps) {
 
       {outcome?.state === "error" && (
         <div style={{ marginTop: 14 }} data-testid="sync.enroll.error">
-          <Banner kind="danger">{enrollFailureMessage(outcome.kind)}</Banner>
+          <Banner kind="danger">{enrollFailureMessage(outcome.kind, t)}</Banner>
         </div>
       )}
       {outcome?.state === "pending" && (
@@ -601,7 +603,7 @@ export function SyncEnrollPanel({ onEnrolled }: SyncEnrollPanelProps) {
           style={primaryBtn(!canSubmit)}
           data-testid="sync.enroll.submit"
         >
-          {busy ? "Connecting…" : "Add this device"}
+          {busy ? t("sync.settings.connecting") : t("sync.settings.enrollSubmit")}
         </button>
       </div>
     </div>
@@ -612,8 +614,8 @@ export function SyncEnrollPanel({ onEnrolled }: SyncEnrollPanelProps) {
 
 /** The device's synced friendly name (SYNC-41), or a stable `device_id`-prefix
  *  fallback until it is explicitly named (no second default-name heuristic). */
-function deviceName(d: DeviceEntry, names: Record<string, string>): string {
-  return names[d.device_id_hex] ?? `Device ${d.device_id_hex.slice(0, 6)}`;
+function deviceName(d: DeviceEntry, names: Record<string, string>, t: TFunction): string {
+  return names[d.device_id_hex] ?? t("sync.devices.shortName", { hex: d.device_id_hex.slice(0, 6) });
 }
 
 /** The device currently in the SY-05 approve-then-verify SAS step. */
@@ -628,6 +630,7 @@ interface SasState {
 /** SY-06 devices list + inline SY-05 approve-then-verify SAS + SY-07 remove
  *  confirm (verbatim revocation copy). */
 export function SyncDevicesPanel() {
+  const { t } = useTranslation();
   const { devices, pending, error, busy, approve, remove, resetLocal } = useDevices();
   const { prefs } = usePrefs();
   const names = prefs.device_names;
@@ -662,11 +665,10 @@ export function SyncDevicesPanel() {
     return (
       <div style={{ marginTop: 6 }} data-testid="sync.approve-verify">
         <h2 style={{ margin: "8px 4px 10px", fontSize: 20, fontWeight: 700, color: "var(--fg-1)" }}>
-          Verify the new device
+          {t("sync.settings.verifyTitle")}
         </h2>
         <p style={{ margin: "0 4px 18px", fontSize: 15, lineHeight: 1.6, color: "var(--fg-2)" }}>
-          Check that the same code appears on the device you just approved. If it matches, they are
-          on your account. If it doesn't, remove the device.
+          {t("sync.settings.verifyBody")}
         </p>
         <div
           style={{
@@ -679,7 +681,7 @@ export function SyncDevicesPanel() {
           }}
         >
           {sas.loading ? (
-            <span style={{ fontSize: 15, color: "var(--fg-3)" }}>Syncing…</span>
+            <span style={{ fontSize: 15, color: "var(--fg-3)" }}>{t("sync.settings.syncing")}</span>
           ) : sas.fingerprint ? (
             <span
               style={{
@@ -695,7 +697,7 @@ export function SyncDevicesPanel() {
             </span>
           ) : (
             <span style={{ fontSize: 14, color: "var(--fg-3)", textAlign: "center" }} data-testid="sync.sas-pending">
-              This code appears once the new device finishes its first sync.
+              {t("sync.settings.sasPending")}
             </span>
           )}
         </div>
@@ -706,7 +708,7 @@ export function SyncDevicesPanel() {
             style={primaryBtn(false)}
             data-testid="sync.sas-match"
           >
-            They match
+            {t("sync.settings.sasMatch")}
           </button>
           <button
             type="button"
@@ -729,7 +731,7 @@ export function SyncDevicesPanel() {
             }}
             data-testid="sync.sas-mismatch"
           >
-            They don't match
+            {t("sync.settings.sasMismatch")}
           </button>
         </div>
       </div>
@@ -769,7 +771,7 @@ export function SyncDevicesPanel() {
             }}
             data-testid="sync.remove-device-confirm"
           >
-            Remove device
+            {t("sync.settings.removeDeviceButton")}
           </button>
           <button
             type="button"
@@ -788,7 +790,7 @@ export function SyncDevicesPanel() {
             }}
             data-testid="sync.remove-device-cancel"
           >
-            Keep it
+            {t("sync.settings.keepDevice")}
           </button>
         </div>
       </div>
@@ -799,12 +801,12 @@ export function SyncDevicesPanel() {
     <div style={{ marginTop: 4 }} data-testid="sync.device-management">
       {error === "NotEnrolled" ? (
         <p style={{ ...HELP, marginTop: 10 }} data-testid="sync.device-not-enrolled">
-          This device isn't syncing yet. Add it from the previous screen to see your devices.
+          {t("sync.settings.notEnrolledHelp")}
         </p>
       ) : error === "Unauthenticated" ? (
         <div style={{ marginTop: 10 }} data-testid="sync.device-error">
           <p style={{ margin: 0, fontSize: 14, color: "var(--danger)" }}>
-            This device's access was revoked, probably removed from another device.
+            {t("sync.settings.unauthenticated")}
           </p>
           <div style={{ marginTop: 12 }}>
             <button
@@ -814,19 +816,18 @@ export function SyncDevicesPanel() {
               style={primaryBtn(busy)}
               data-testid="sync.reset-local"
             >
-              Reset sync on this device
+              {t("sync.settings.resetLocal")}
             </button>
           </div>
         </div>
       ) : error ? (
         <p style={{ ...HELP, marginTop: 10, color: "var(--danger)" }} data-testid="sync.device-error">
-          Couldn't reach the sync server. If the server moved or its certificate changed, re-connect it
-          from the Sync server screen.
+          {t("sync.settings.transportError")}
         </p>
       ) : retiredSelf ? (
         <div style={{ marginTop: 10 }} data-testid="sync.device-retired-self">
           <p style={{ margin: 0, fontSize: 14, color: "var(--danger)" }}>
-            This device was removed from another device.
+            {t("sync.settings.retiredSelf")}
           </p>
           <div style={{ marginTop: 12 }}>
             <button
@@ -836,7 +837,7 @@ export function SyncDevicesPanel() {
               style={primaryBtn(busy)}
               data-testid="sync.reset-local"
             >
-              Reset and add again
+              {t("sync.settings.resetAndAddAgain")}
             </button>
           </div>
         </div>
@@ -844,11 +845,11 @@ export function SyncDevicesPanel() {
 
       {pending.length > 0 && (
         <div data-testid="sync.pending-devices">
-          <SectionLabel mt={12}>Waiting for approval</SectionLabel>
+          <SectionLabel mt={12}>{t("sync.settings.waitingForApproval")}</SectionLabel>
           <Group>
             {pending.map((d, i) => (
               <Row key={d.device_id_hex} first={i === 0} testId="sync.pending-row">
-                <span style={rowLabel}>{deviceName(d, names)}</span>
+                <span style={rowLabel}>{deviceName(d, names, t)}</span>
                 <button
                   type="button"
                   disabled={busy}
@@ -865,7 +866,7 @@ export function SyncDevicesPanel() {
                   }}
                   data-testid="sync.approve-device"
                 >
-                  Approve
+                  {t("sync.settings.approve")}
                 </button>
               </Row>
             ))}
@@ -873,17 +874,17 @@ export function SyncDevicesPanel() {
         </div>
       )}
 
-      <SectionLabel mt={12}>Your devices</SectionLabel>
+      <SectionLabel mt={12}>{t("sync.settings.yourDevices")}</SectionLabel>
       {devices === null ? (
-        error ? null : <p style={{ ...HELP, marginTop: 4 }}>Loading…</p>
+        error ? null : <p style={{ ...HELP, marginTop: 4 }}>{t("sync.settings.loading")}</p>
       ) : approved.length === 0 ? (
-        <p style={{ ...HELP, marginTop: 4 }}>No devices yet.</p>
+        <p style={{ ...HELP, marginTop: 4 }}>{t("sync.settings.noDevices")}</p>
       ) : (
         <Group>
           {approved.map((d, i) => (
             <Row key={d.device_id_hex} first={i === 0} testId="sync.device-row">
               <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-                <span style={rowLabel}>{deviceName(d, names)}</span>
+                <span style={rowLabel}>{deviceName(d, names, t)}</span>
                 {d.is_current && (
                   <span
                     style={{
@@ -896,12 +897,12 @@ export function SyncDevicesPanel() {
                     }}
                     data-testid="sync.this-device"
                   >
-                    This device
+                    {t("sync.settings.thisDevice")}
                   </span>
                 )}
               </div>
               {d.is_current ? (
-                <span style={{ fontSize: 13, color: "var(--fg-3)" }}>Syncing here</span>
+                <span style={{ fontSize: 13, color: "var(--fg-3)" }}>{t("sync.settings.syncingHere")}</span>
               ) : (
                 <button
                   type="button"
@@ -919,7 +920,7 @@ export function SyncDevicesPanel() {
                   }}
                   data-testid="sync.remove-device"
                 >
-                  Remove
+                  {t("sync.settings.remove")}
                 </button>
               )}
             </Row>

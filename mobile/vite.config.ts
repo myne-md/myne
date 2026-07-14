@@ -31,6 +31,13 @@ export default defineConfig(async () => ({
       // mobile EditorHost `t()` so the editor's menu/toast labels read correctly
       // without standing up a full i18n runtime on mobile.
       { find: "@myne/locales-en", replacement: sib("../locales/en/common.json") },
+      // The shared react-i18next RUNTIME (MYND-485). Aliased straight to the
+      // desktop `src/i18n/` source — its `import.meta.glob("../../locales/*")`
+      // resolves relative to the desktop file's own path, so it loads all 24
+      // shared catalogs correctly no matter which client imports it: zero drift
+      // by construction (mirrors the `@myne/editor` sibling-source pattern).
+      { find: /^@myne\/i18n$/, replacement: sib("../src/i18n/index.ts") },
+      { find: /^@myne\/i18n\/(.*)$/, replacement: sib("../src/i18n/$1") },
     ],
     // The aliased editor source lives OUTSIDE this repo (../editor/src), so its
     // bare-specifier imports could otherwise resolve to the parent repo's
@@ -62,6 +69,10 @@ export default defineConfig(async () => ({
       "js-yaml",
       "react",
       "react-dom",
+      // i18n singletons: the aliased desktop runtime and mobile components must
+      // share ONE react-i18next context instance, so dedupe to mobile's copy.
+      "i18next",
+      "react-i18next",
     ],
   },
 

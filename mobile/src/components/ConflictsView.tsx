@@ -8,6 +8,7 @@
 // only (no device attribution — SYNC-11 has no such field).
 
 import type { CSSProperties } from "react";
+import { useTranslation } from "react-i18next";
 
 /** A conflict-copy row: the note id + its display title (no wall-clock / device). */
 export interface ConflictCopyRow {
@@ -63,10 +64,11 @@ export interface ConflictsViewProps {
 }
 
 export function ConflictsView({ groups, onKeepBoth, onDiscard, onTakeTheirs }: ConflictsViewProps) {
+  const { t } = useTranslation();
   if (groups.size === 0) {
     return (
       <div style={EMPTY} data-testid="conflicts.empty">
-        No conflicts to review — your notes are in sync.
+        {t("conflicts.empty")}
       </div>
     );
   }
@@ -75,18 +77,18 @@ export function ConflictsView({ groups, onKeepBoth, onDiscard, onTakeTheirs }: C
       {[...groups.entries()].map(([originalUuid, copies]) => (
         <div key={originalUuid || "unknown"} style={GROUP} data-testid="conflicts.group" data-conflict-of={originalUuid}>
           <div style={GROUP_TITLE}>
-            {copies.length} conflicting {copies.length === 1 ? "copy" : "copies"}
-            {originalUuid ? ` of note ${originalUuid.slice(0, 8)}` : ""}
+            {t("conflicts.groupTitle", { count: copies.length })}
+            {originalUuid ? t("conflicts.groupTitleOfNote", { hex: originalUuid.slice(0, 8) }) : ""}
           </div>
           {copies.map((c) => (
             <div key={c.noteId} style={ROW} data-testid="conflicts.copy" data-note-id={c.noteId}>
-              <span style={ROW_TITLE}>{c.title || `Untitled (${c.noteId.slice(0, 6)})`}</span>
+              <span style={ROW_TITLE}>{c.title || t("conflicts.untitled", { hex: c.noteId.slice(0, 6) })}</span>
               <div style={ACTIONS}>
                 <button type="button" style={BTN} onClick={() => onKeepBoth(c.noteId)} data-testid="conflicts.keep-both">
-                  Keep as separate
+                  {t("conflicts.keepAsSeparate")}
                 </button>
                 <button type="button" style={BTN} onClick={() => onDiscard(c.noteId)} data-testid="conflicts.discard">
-                  Discard
+                  {t("conflicts.discard")}
                 </button>
                 {originalUuid !== UNKNOWN_CONFLICT_ORIGINAL && (
                   <button
@@ -95,7 +97,7 @@ export function ConflictsView({ groups, onKeepBoth, onDiscard, onTakeTheirs }: C
                     onClick={() => onTakeTheirs(c.noteId, originalUuid)}
                     data-testid="conflicts.take-this"
                   >
-                    Use this version
+                    {t("conflicts.useThisVersion")}
                   </button>
                 )}
               </div>

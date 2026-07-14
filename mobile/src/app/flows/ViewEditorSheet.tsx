@@ -6,12 +6,18 @@
 // survive, so re-saving narrows a richer view to what the editor can represent.
 
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Sheet, Banner, Segmented } from "../../components";
 import { upsertSavedView, deleteSavedView, setViewOrder, type SavedView } from "../../lib/prefs";
 import { parseFilters, buildFilters, type ViewCondition } from "../../lib/view-filter";
 
 const CONDITION_TYPES: ViewCondition["type"][] = ["tag", "folder", "search"];
-const CONDITION_LABELS: Record<ViewCondition["type"], string> = { tag: "Tag", folder: "Folder", search: "Text" };
+/** i18n key per condition type (resolved with `t()` at the render site). */
+const CONDITION_LABELS: Record<ViewCondition["type"], string> = {
+  tag: "viewEditor.condition.tag",
+  folder: "viewEditor.condition.folder",
+  search: "viewEditor.condition.search",
+};
 
 export interface ViewEditorSheetProps {
   /** The view being edited, or `null` to create a new one. */
@@ -40,6 +46,7 @@ const btn = (bg: string, fg: string, border = "none"): React.CSSProperties => ({
 });
 
 export function ViewEditorSheet({ initial, tags, folders, viewOrder, onClose, onSaved }: ViewEditorSheetProps) {
+  const { t } = useTranslation();
   const [name, setName] = useState(initial?.name ?? "");
   const parsed = parseFilters(initial?.filters ?? { kind: "all" });
   const [mode, setMode] = useState<"and" | "or">(parsed.mode);
@@ -84,7 +91,7 @@ export function ViewEditorSheet({ initial, tags, folders, viewOrder, onClose, on
       onSaved();
       onClose();
     } catch {
-      setError("Couldn't save this view. Please try again.");
+      setError(t("viewEditor.saveError"));
       setBusy(false);
     }
   }
@@ -98,7 +105,7 @@ export function ViewEditorSheet({ initial, tags, folders, viewOrder, onClose, on
       onSaved();
       onClose();
     } catch {
-      setError("Couldn't delete this view. Please try again.");
+      setError(t("viewEditor.deleteError"));
       setBusy(false);
     }
   }
@@ -108,7 +115,7 @@ export function ViewEditorSheet({ initial, tags, folders, viewOrder, onClose, on
       {(close) => (
         <>
           <div style={{ fontSize: 17, fontWeight: 600, color: "var(--fg-1)", textAlign: "center" }}>
-            {initial === null ? "New view" : "Edit view"}
+            {initial === null ? t("viewEditor.newView") : t("viewEditor.editView")}
           </div>
 
           {error && (
@@ -121,7 +128,7 @@ export function ViewEditorSheet({ initial, tags, folders, viewOrder, onClose, on
             ref={nameRef}
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="View name"
+            placeholder={t("viewEditor.namePlaceholder")}
             style={{
               marginTop: 14,
               width: "100%",
@@ -140,9 +147,9 @@ export function ViewEditorSheet({ initial, tags, folders, viewOrder, onClose, on
 
           {conditions.length > 1 && (
             <div style={{ marginTop: 14, display: "flex", alignItems: "center", gap: 10 }}>
-              <span style={{ fontSize: 13, color: "var(--fg-3)", flexShrink: 0 }}>Match</span>
+              <span style={{ fontSize: 13, color: "var(--fg-3)", flexShrink: 0 }}>{t("viewEditor.match")}</span>
               <Segmented
-                options={["All", "Any"]}
+                options={[t("viewEditor.all"), t("viewEditor.any")]}
                 active={mode === "and" ? 0 : 1}
                 onChange={(i) => setMode(i === 0 ? "and" : "or")}
                 style={{ flex: 1 }}
@@ -162,9 +169,9 @@ export function ViewEditorSheet({ initial, tags, folders, viewOrder, onClose, on
                   }}
                   style={selectStyle(88)}
                 >
-                  {CONDITION_TYPES.map((t) => (
-                    <option key={t} value={t}>
-                      {CONDITION_LABELS[t]}
+                  {CONDITION_TYPES.map((ct) => (
+                    <option key={ct} value={ct}>
+                      {t(CONDITION_LABELS[ct])}
                     </option>
                   ))}
                 </select>
@@ -173,7 +180,7 @@ export function ViewEditorSheet({ initial, tags, folders, viewOrder, onClose, on
                   <input
                     value={c.value}
                     onChange={(e) => setCondition(i, { type: "search", value: e.target.value })}
-                    placeholder="contains…"
+                    placeholder={t("viewEditor.containsPlaceholder")}
                     autoCapitalize="none"
                     autoCorrect="off"
                     spellCheck={false}
@@ -195,7 +202,7 @@ export function ViewEditorSheet({ initial, tags, folders, viewOrder, onClose, on
                   <input
                     value={c.value}
                     onChange={(e) => setCondition(i, { type: c.type, value: e.target.value } as ViewCondition)}
-                    placeholder={c.type === "tag" ? "tag" : "Folder/"}
+                    placeholder={c.type === "tag" ? t("viewEditor.tagPlaceholder") : t("viewEditor.folderPlaceholder")}
                     autoCapitalize="none"
                     autoCorrect="off"
                     spellCheck={false}
@@ -205,7 +212,7 @@ export function ViewEditorSheet({ initial, tags, folders, viewOrder, onClose, on
 
                 <button
                   onClick={() => removeCondition(i)}
-                  aria-label="Remove condition"
+                  aria-label={t("viewEditor.removeCondition")}
                   style={{ flexShrink: 0, width: 34, height: 44, border: "none", background: "transparent", color: "var(--fg-3)", fontSize: 22, cursor: "pointer", padding: 0 }}
                 >
                   ×
@@ -217,21 +224,21 @@ export function ViewEditorSheet({ initial, tags, folders, viewOrder, onClose, on
               onClick={addCondition}
               style={{ alignSelf: "flex-start", border: "none", background: "transparent", color: "var(--accent)", fontSize: 14, fontWeight: 600, cursor: "pointer", padding: "4px 0" }}
             >
-              + Add condition
+              {t("viewEditor.addCondition")}
             </button>
           </div>
 
           <div style={{ marginTop: 18, display: "flex", flexDirection: "column", gap: 10 }}>
             <button onClick={() => void save()} disabled={name.trim() === "" || busy} style={{ ...btn("var(--accent)", "var(--accent-on)"), opacity: name.trim() === "" || busy ? 0.5 : 1 }}>
-              {initial === null ? "Create view" : "Save"}
+              {initial === null ? t("viewEditor.createView") : t("viewEditor.save")}
             </button>
             {initial !== null && (
               <button onClick={() => void remove()} disabled={busy} style={btn("transparent", "var(--danger)", "1px solid var(--line-2)")}>
-                Delete view
+                {t("viewEditor.deleteView")}
               </button>
             )}
             <button onClick={close} style={btn("transparent", "var(--fg-1)", "1px solid var(--line-2)")}>
-              Cancel
+              {t("viewEditor.cancel")}
             </button>
           </div>
         </>
