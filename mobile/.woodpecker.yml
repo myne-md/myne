@@ -50,7 +50,7 @@ steps:
         if [ ! -e "$PARENT/protocol" ] || [ ! -e "$PARENT/core" ]; then
           if [ ! -e "$PARENT/myne-main" ]; then
             if [ -n "$MYNE_REPO_TOKEN" ]; then
-              git clone --depth 1 "https://oauth2:$MYNE_REPO_TOKEN@git.myne.md/Myne/myne.git" "$PARENT/myne-main"
+              git clone --depth 1 "https://oauth2:$MYNE_REPO_TOKEN@github.com/myne-md/myne.git" "$PARENT/myne-main"
             else
               git clone --depth 1 "https://github.com/myne-md/myne.git" "$PARENT/myne-main"
             fi
