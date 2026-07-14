@@ -147,6 +147,7 @@ export function applyOptimisticCreate(
     conflict: false,
     conflictOf: null,
     hasSource: false,
+    kind: null,
   });
 }
 

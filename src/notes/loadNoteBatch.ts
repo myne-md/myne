@@ -31,6 +31,7 @@ import {
   readConflictOfFromFmBody,
   readDeletedFromFmBody,
   readFolderIndexFromFmBody,
+  readKindFromFmBody,
   readTemplateFromFmBody,
   readTitleFromFmBody,
   readTrashedFromFmBody,
@@ -139,6 +140,16 @@ export type TitleRecord = {
    * of `file-text`); carries no other display semantics.
    */
   hasSource: boolean;
+  /**
+   * Value-strict `kind:` marker (drawing-notes SF2, MYND-499) — `"drawing"` iff
+   * the note carries the canonical `kind: drawing` flag (an Excalidraw canvas
+   * note), else `null`. Read value-strict from the raw FM slice like
+   * `template:`/`folder_index:` (`readKindFromFmBody`); a user's own
+   * non-canonical `kind:` reads `null`, so a stray value never force-renders a
+   * markdown note as a canvas. Drives the render-surface dispatch + tab/sidebar
+   * glyph; unlike `trashed:`/`template:` it does NOT hide the note.
+   */
+  kind: "drawing" | null;
   error?: NoteTitleError;
 };
 
@@ -252,6 +263,10 @@ function recordFromSlice(slice: TitleSlice): TitleRecord {
   // malformed-YAML body parses to `{}` here, so a bookmark with broken FM falls
   // back to the ordinary `file-text` glyph rather than throwing.
   const hasSource = Object.prototype.hasOwnProperty.call(parsed, "source");
+  // `kind:` read value-strict from the raw FM slice, same rationale as
+  // `template:`/`folder_index:` — js-yaml would coerce the value and a user's
+  // `kind: "drawing"` (quoted) must NOT read as the canonical marker.
+  const kind = readKindFromFmBody(slice.frontmatter_bytes ?? "");
   return {
     noteUuid: slice.note_uuid,
     title: titleFromFm,
@@ -265,6 +280,7 @@ function recordFromSlice(slice: TitleSlice): TitleRecord {
     conflict,
     conflictOf,
     hasSource,
+    kind,
   };
 }
 
@@ -316,6 +332,7 @@ export async function loadNoteBatch(ids: string[]): Promise<TitleRecord[]> {
       conflict: false,
       conflictOf: null,
       hasSource: false,
+      kind: null,
       error: r.Err,
     };
   });

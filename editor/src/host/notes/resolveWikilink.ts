@@ -26,6 +26,10 @@ export interface ResolverNote {
    *  MYND-370). Optional so callers that don't track it still type-check; only
    *  the folder-target (`[[Projects/]]`) resolution path reads it. */
   folderIndex?: boolean;
+  /** True when the note is a `kind: drawing` Excalidraw note (drawing-notes SF2,
+   *  MYND-499). Optional so callers that don't track it still type-check; the
+   *  SF6 inline-embed path reads it to pick a thumbnail widget over a text chip. */
+  isDrawing?: boolean;
 }
 
 /** The note's vault-relative path (`<folder>/<title>.md`; root → `<title>.md`).

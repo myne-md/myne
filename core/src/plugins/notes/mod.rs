@@ -21,6 +21,7 @@
 //! See: ../../../CLAUDE.md "Secret-handling logging discipline".
 
 pub mod commands;
+pub mod drawing_text;
 pub mod error;
 pub mod export_mtime;
 pub mod note_id;

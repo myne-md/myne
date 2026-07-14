@@ -38,6 +38,7 @@ use std::time::Instant;
 use tauri::{AppHandle, Runtime, State};
 use zeroize::Zeroizing;
 
+use super::drawing_text::{is_drawing, project_drawing_text};
 use super::error::{
     NoteBatchError, NoteCreateError, NoteDeleteError, NoteListError, NoteReadError,
     NoteTitleBatchError, NoteTitleError, NoteUpdateError,
@@ -106,10 +107,19 @@ pub async fn note_create<R: Runtime>(
         // is indexed as its OWN doc (`index_note_attachments`) so an
         // attachment-content hit surfaces as a distinct result, not folded into
         // the note.
-        hooks.search_upsert(id, &title, &plaintext);
-        hooks
-            .index_note_attachments(state.inner(), id, &title, &plaintext)
-            .await;
+        // SF5 (MYND-502): a `kind: drawing` body is Excalidraw scene JSON, not
+        // markdown — index its projected text elements, never the raw JSON
+        // (SYNC-4 body-only guard) and never scan it for attachment docs. An
+        // empty/malformed scene → title-only.
+        if is_drawing(plaintext.as_bytes()) {
+            let body = project_drawing_text(plaintext.as_bytes()).unwrap_or_default();
+            hooks.search_upsert(id, &title, &body);
+        } else {
+            hooks.search_upsert(id, &title, &plaintext);
+            hooks
+                .index_note_attachments(state.inner(), id, &title, &plaintext)
+                .await;
+        }
         // MYND-453: eager per-note AI re-embed over the note prose (attachments
         // carry their own search docs now — 448a; detached, no-op unless the
         // local-inference feature + ai_enabled are on).
@@ -564,12 +574,22 @@ pub async fn note_update<R: Runtime>(
             // MYND-448a: note body indexed UNFOLDED; embedded attachments are
             // re-indexed as their own docs (dropping any no longer embedded).
             let title = resolve_note_title(plaintext.as_bytes()).unwrap_or_default();
-            hooks.search_upsert(&note_id, &title, &plaintext);
-            hooks
-                .index_note_attachments(state.inner(), &note_id, &title, &plaintext)
-                .await;
-            // MYND-453: eager per-note AI re-embed over note prose (feature/ai-gated).
-            hooks.ai_note_changed(&note_id, &plaintext);
+            // MYND-448a: unfolded note body doc + separate attachment docs.
+            // SF5 (MYND-502): a `kind: drawing` body → projected scene text, never
+            // raw JSON (SYNC-4) and no attachment docs; AI re-embeds over the same.
+            if is_drawing(plaintext.as_bytes()) {
+                let body = project_drawing_text(plaintext.as_bytes()).unwrap_or_default();
+                hooks.search_upsert(&note_id, &title, &body);
+                // MYND-453: eager per-note AI re-embed (detached; feature/ai-gated).
+                hooks.ai_note_changed(&note_id, &body);
+            } else {
+                hooks.search_upsert(&note_id, &title, &plaintext);
+                hooks
+                    .index_note_attachments(state.inner(), &note_id, &title, &plaintext)
+                    .await;
+                // MYND-453: eager per-note AI re-embed over note prose (feature/ai-gated).
+                hooks.ai_note_changed(&note_id, &plaintext);
+            }
             // MYND-424: mark the sync loop dirty so the coalesced push fires
             // (soft dependency — a no-op when the sync plugin isn't registered).
             hooks.bump_local_change();
@@ -927,12 +947,21 @@ pub async fn note_write_batch_transactional<R: Runtime>(
     for (note_id, plaintext) in &items {
         let title = resolve_note_title(plaintext.as_bytes()).unwrap_or_default();
         // MYND-448a: unfolded note body doc + separate attachment docs.
-        hooks.search_upsert(note_id, &title, plaintext);
-        hooks
-            .index_note_attachments(state.inner(), note_id, &title, plaintext)
-            .await;
-        // MYND-453: eager per-note AI re-embed over note prose (feature/ai-gated).
-        hooks.ai_note_changed(note_id, plaintext);
+        // SF5 (MYND-502): a `kind: drawing` body → projected scene text, never raw
+        // JSON (SYNC-4) and no attachment docs; AI re-embeds over the same.
+        if is_drawing(plaintext.as_bytes()) {
+            let body = project_drawing_text(plaintext.as_bytes()).unwrap_or_default();
+            hooks.search_upsert(note_id, &title, &body);
+            // MYND-453: eager per-note AI re-embed (detached; feature/ai-gated).
+            hooks.ai_note_changed(note_id, &body);
+        } else {
+            hooks.search_upsert(note_id, &title, plaintext);
+            hooks
+                .index_note_attachments(state.inner(), note_id, &title, plaintext)
+                .await;
+            // MYND-453: eager per-note AI re-embed over note prose (feature/ai-gated).
+            hooks.ai_note_changed(note_id, plaintext);
+        }
     }
     tracing::debug!(
         stage = "success",
