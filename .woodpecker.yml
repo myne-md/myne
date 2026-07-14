@@ -270,7 +270,10 @@ steps:
       - export MYNE_E2E_SERVER="$CI_WORKSPACE/myne-server/myne-server"
       # Sync moved to myne-core (decisions.md 2026-07-07); sim suite is now
       # `myne_core::plugins::sync::sim`. Still self-skips without the server.
-      - cargo test -p myne-core --lib plugins::sync::sim:: --no-fail-fast
+      # Quoted: the `:: ` (colon-colon-space) in the test-path filter is parsed
+      # as a YAML key:value map otherwise, failing config-compile ("cannot
+      # unmarshal map into string").
+      - "cargo test -p myne-core --lib plugins::sync::sim:: --no-fail-fast"
 
   # ─── Cross-impl vector verification (DISABLED) ───────────────
   # protocol/tests/vectors.rs reads ../myne-test-vectors fixtures and asserts
