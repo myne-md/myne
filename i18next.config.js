@@ -15,7 +15,12 @@ import { defineConfig } from "i18next-cli";
 export default defineConfig({
   locales: ["en","cs","da","de","el","es","fi","fr","hu","id","it","ja","ko","nb","nl","pl","pt","ro","ru","sv","tr","uk","vi","zh"],
   extract: {
-    input: ["src/**/*.{ts,tsx}"],
+    // Desktop client (`src/`) + the mobile client (`myne-mobile/src/`, MYND-485).
+    // Both clients share these repo-root catalogs, so a single `pnpm i18n:extract`
+    // keeps desktop + mobile `t("…")` keys in one Weblate-managed source. The
+    // shared `@myne/{editor,dialect}` engines carry their own keys (already
+    // resident); scanning each client's own source is what surfaces new strings.
+    input: ["src/**/*.{ts,tsx}", "myne-mobile/src/**/*.{ts,tsx}"],
     output: "locales/{{language}}/{{namespace}}.json",
     // English is the source language: its catalog is hand-maintained and is
     // the per-key runtime fallback for every other locale.
