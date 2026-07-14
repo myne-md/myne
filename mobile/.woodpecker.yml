@@ -102,6 +102,13 @@ steps:
     depends_on: [cargo-checks]
     commands:
       - npm install -g pnpm@11.8.0
+      # The frontend source-consumes @myne/{editor,dialect} from the provisioned
+      # main repo (../editor, ../dialect → myne-main/*). Those TS sources import
+      # their own npm deps (@codemirror, @lezer, …), which must resolve from
+      # THEIR location — so install the main repo's workspace into
+      # myne-main/node_modules, exactly how they resolve locally when mobile is
+      # nested inside the main repo.
+      - (cd ../myne-main && pnpm install --frozen-lockfile)
       - pnpm install --frozen-lockfile
       - pnpm build
 
