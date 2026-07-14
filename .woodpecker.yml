@@ -290,58 +290,12 @@ steps:
   #     - git clone --depth 1 https://github.com/myne-md/myne-test-vectors.git myne-test-vectors
   #     - cargo test -p protocol --test vectors
 
-  # ─── Pushover bildirimi ("myne CI" app; repo adı title'da) ────
-  # Open source: token/user YALNIZCA Woodpecker secret'larından gelir, repo'da
-  # hardcoded YOK. Secret yoksa (ör. fork PR) adım sessizce atlar; failure:ignore
-  # ile bildirim CI'ı asla kırmaz. `depends_on` TÜM adımlara optional:true ile →
-  # notify her adımın terminal durumunu bekler (yarış yok), atlanan adım sessizce
-  # düşer. Sadece bare $VAR (Woodpecker ${...}/$(...) substitution'ına girmez).
-  notify-success:
-    image: alpine:3.21
-    depends_on:
-      - name: cargo-fmt
-        optional: true
-      - name: cargo-clippy
-        optional: true
-      - name: cargo-test
-        optional: true
-      - name: cargo-deny
-        optional: true
-      - name: ai-no-network
-        optional: true
-      - name: pnpm-build
-        optional: true
-      - name: vitest
-        optional: true
-      - name: tauri-compile
-        optional: true
-      - name: cargo-test-tauri
-        optional: true
-      - name: e2e
-        optional: true
-      - name: sync-sim
-        optional: true
-    environment:
-      PUSHOVER_TOKEN:
-        from_secret: pushover_token
-      PUSHOVER_USER:
-        from_secret: pushover_user
-    commands:
-      - apk add --no-cache curl
-      - |
-        if [ -z "$PUSHOVER_TOKEN" ]; then echo "pushover: secret yok, atlandı"; exit 0; fi
-        curl -fsS -m 15 \
-          --data-urlencode "token=$PUSHOVER_TOKEN" \
-          --data-urlencode "user=$PUSHOVER_USER" \
-          --data-urlencode "title=✅ $CI_REPO_NAME passed · $CI_COMMIT_BRANCH" \
-          --data-urlencode "message=$CI_COMMIT_AUTHOR · $CI_COMMIT_MESSAGE" \
-          --data-urlencode "url=$CI_PIPELINE_URL" \
-          https://api.pushover.net/1/messages.json
-    when:
-      - event: [push, manual]
-        status: success
-    failure: ignore
-
+  # Failure notification via Pushover. The token + group come ONLY from CI
+  # secrets, never committed (public repo). A missing secret (e.g. a fork PR)
+  # makes the step skip silently, and failure:ignore keeps it from ever failing
+  # the pipeline. depends_on lists every step (optional:true) so notify waits on
+  # each terminal status without racing; a skipped step drops out silently. Only
+  # bare $VAR is used (no Woodpecker ${...}/$(...) substitution).
   notify-failure:
     image: alpine:3.21
     depends_on:
@@ -370,15 +324,15 @@ steps:
     environment:
       PUSHOVER_TOKEN:
         from_secret: pushover_token
-      PUSHOVER_USER:
-        from_secret: pushover_user
+      PUSHOVER_GROUP:
+        from_secret: pushover_group
     commands:
       - apk add --no-cache curl
       - |
-        if [ -z "$PUSHOVER_TOKEN" ]; then echo "pushover: secret yok, atlandı"; exit 0; fi
+        if [ -z "$PUSHOVER_TOKEN" ]; then echo "pushover secret absent; skipping"; exit 0; fi
         curl -fsS -m 15 \
           --data-urlencode "token=$PUSHOVER_TOKEN" \
-          --data-urlencode "user=$PUSHOVER_USER" \
+          --data-urlencode "user=$PUSHOVER_GROUP" \
           --data-urlencode "title=❌ $CI_REPO_NAME failed · $CI_COMMIT_BRANCH" \
           --data-urlencode "message=$CI_COMMIT_AUTHOR · $CI_COMMIT_MESSAGE" \
           --data-urlencode "url=$CI_PIPELINE_URL" \
