@@ -162,7 +162,6 @@ fn id_hex_to_bytes(h: &str) -> Option<[u8; 16]> {
 struct Account {
     root_key: [u8; 32],
     account_hash: [u8; 16],
-    username: String,
     items_key: [u8; 32],
     items_key_id: [u8; 16],
 }
@@ -174,7 +173,6 @@ impl Account {
         Account {
             root_key: [seed; 32],
             account_hash: [seed ^ 0x5a; 16],
-            username: format!("MY-SIM-{seed:02X}"),
             items_key: [seed ^ 0xa5; 32],
             items_key_id: [seed ^ 0x3c; 16],
         }
@@ -206,19 +204,12 @@ impl Device {
     fn enroll(label: &'static str, acct: &Account, url: &str, nonce: &str, register: bool) -> Self {
         let t = crate::plugins::sync::http_transport::build_transport(url, Vec::new()).unwrap();
         if register {
-            enroll::register_verifier(
-                t.as_ref(),
-                &acct.account_hash,
-                &acct.username,
-                &acct.secret(),
-            )
-            .unwrap();
+            enroll::register_verifier(t.as_ref(), &acct.account_hash, &acct.secret()).unwrap();
         }
         let device_id = enroll::generate_device_id();
         let out = enroll::enroll(
             t.as_ref(),
             &acct.account_hash,
-            &acct.username,
             &acct.secret(),
             EnrollPath::Recovery,
             nonce,

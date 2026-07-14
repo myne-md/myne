@@ -180,7 +180,7 @@ The 16-byte hash is stored in `vault.meta` (§9.3 of the protocol spec) and bind
   - Treat account numbers like cash: write them down, do not paste them into untrusted forms.
   - Do not display the full account number in shared screenshots; UI MAY redact middle groups after first display.
 - **Cross-account precomputation is prevented** by mixing `account_number_hash` into the Argon2id salts (`protocol.md §3.1`).
-- **Server-side storage** (Phase 2+) — the sync server stores only `SHA-256(canonical_form)[:32]` (a different truncation length than `account_number_hash`, to avoid sharing identifiers across uses). The raw number is verified once at registration and discarded.
+- **Server-side storage** (Phase 2+) — the sync server stores only `account_number_hash` (`SHA-256(canonical_form)[:16]`, §6) as its account identity — the same canonical value every other use site derives. *(Revised 2026-07-13, supersedes this bullet's earlier `[:32]` form: a longer truncation of the same digest is a strict prefix-extension of the 16-byte form — same input, same hash — so "a different truncation length to avoid sharing identifiers" provided no separation; true separation would need a domain-separated input, which buys nothing here either, because the server stores each account's `vault.meta` — embedding the 16-byte form — inside that account's own namespace. See `docs/decisions.md` 2026-07-13.)* The raw number MUST NOT cross the sync wire at all: clients authenticate with hash-derived identity (the SCRAM username is the hash form, `server-protocol.md` §3.1), and the server rejects raw-form usernames.
 
 ## 8. Anti-abuse considerations (Phase 2+, not v0.1)
 
