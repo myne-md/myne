@@ -1404,6 +1404,16 @@ function PopulatedList({
   const [undoToast, setUndoToast] = useState<NoteId | null>(null);
   // Non-blocking error toast shown when a trash IPC fails after rollback.
   const [trashError, setTrashError] = useState<string | null>(null);
+  // Confirmation gate for the keyboard Delete/Backspace path (MYND-487). An
+  // accidental keypress must not silently soft-trash the selection, so the
+  // keydown handler stages the victim(s) here and a DeleteConfirmModal
+  // confirms before `handleTrash` / `handleBulkDelete` runs. Context-menu
+  // Delete keeps its immediate + undo-toast behaviour (a deliberate click).
+  const [confirmKeyboardDelete, setConfirmKeyboardDelete] = useState<
+    | { kind: "single"; id: NoteId }
+    | { kind: "bulk"; ids: readonly NoteId[] }
+    | null
+  >(null);
   // Right-click on the sidebar background (not a row) → root-level menu
   // ("New folder" / "New note"). Story F2. A row's own context-menu handler
   // calls `preventDefault`, so we bail when the event was already handled.
@@ -2092,20 +2102,42 @@ function PopulatedList({
         if (tag === "INPUT" || tag === "TEXTAREA") return;
         if (target.isContentEditable) return;
       }
+      // A confirm modal is already open — let it own the keyboard (its own
+      // Enter/Esc handlers apply); a repeated Delete press must not re-stage.
+      if (confirmKeyboardDelete !== null) return;
       // A multi-selection takes priority — Delete trashes the whole set
-      // (MYND-367). Otherwise fall back to the single open note.
+      // (MYND-367). Otherwise fall back to the single open note. Either way we
+      // only STAGE the victim(s); a DeleteConfirmModal gates the actual trash
+      // so a stray keypress can't lose notes (MYND-487).
       if (ctx.selectedIds.size > 0) {
         e.preventDefault();
-        void handleBulkDelete();
+        setConfirmKeyboardDelete({ kind: "bulk", ids: [...ctx.selectedIds] });
         return;
       }
       if (ctx.selectedId === null) return;
       e.preventDefault();
-      void handleTrash(ctx.selectedId);
+      setConfirmKeyboardDelete({ kind: "single", id: ctx.selectedId });
     };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
-  }, [ctx.selectedId, ctx.selectedIds, ctx.renamingId, handleTrash, handleBulkDelete]);
+  }, [ctx.selectedId, ctx.selectedIds, ctx.renamingId, confirmKeyboardDelete]);
+
+  // Resolve the staged keyboard-delete confirmation. Cancel just clears the
+  // gate; confirm dispatches to the existing trash handlers (which own undo
+  // toasts, selection follow-through, and rollback on IPC failure).
+  const cancelKeyboardDelete = useCallback(() => {
+    setConfirmKeyboardDelete(null);
+  }, []);
+  const runKeyboardDelete = useCallback(() => {
+    const target = confirmKeyboardDelete;
+    setConfirmKeyboardDelete(null);
+    if (target === null) return;
+    if (target.kind === "bulk") {
+      void handleBulkDelete();
+    } else {
+      void handleTrash(target.id);
+    }
+  }, [confirmKeyboardDelete, handleBulkDelete, handleTrash]);
 
   return (
     <div
@@ -2390,6 +2422,32 @@ function PopulatedList({
           confirmLabel={t("notes.list.deleteFolderConfirm")}
           onCancel={fm.cancelFolderDelete}
           onConfirm={fm.confirmFolderDeleteAction}
+        />
+      )}
+      {confirmKeyboardDelete !== null && (
+        <DeleteConfirmModal
+          initialFocus="confirm"
+          title={t("notes.list.trashConfirmTitle")}
+          noteTitle={
+            confirmKeyboardDelete.kind === "single"
+              ? (ctx.cache.get(confirmKeyboardDelete.id)?.title ?? null)
+              : undefined
+          }
+          body={
+            confirmKeyboardDelete.kind === "bulk"
+              ? t("notes.list.trashConfirmBulkBody", {
+                  count: confirmKeyboardDelete.ids.length,
+                })
+              : undefined
+          }
+          warning={
+            confirmKeyboardDelete.kind === "bulk"
+              ? t("notes.list.trashConfirmBulkWarning")
+              : t("notes.list.trashConfirmWarning")
+          }
+          confirmLabel={t("notes.list.trashConfirmConfirm")}
+          onCancel={cancelKeyboardDelete}
+          onConfirm={runKeyboardDelete}
         />
       )}
       {menu !== null && (

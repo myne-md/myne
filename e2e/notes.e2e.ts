@@ -33,6 +33,7 @@ import {
   waitForSaved,
 } from "./support/flows";
 import { testIdSelector, type Session } from "./support/webdriver";
+import { KEY, pressKey } from "./support/keyboard";
 
 // createNote / typeIntoEditor / waitForSaved / editorText moved to
 // support/flows.ts (shared with the PS-1 plaintext-residue suite).
@@ -155,6 +156,50 @@ describeE2E("nc3 soft-trash lifecycle (MYND-223 / MYND-133)", () => {
         await s.waitForGone(testIdSelector("trash.delete"));
         await (await s.byTestId("trash.close")).click();
         expect((await s.byTestIdAll("notes.row")).length).toBe(0);
+      },
+    );
+  });
+});
+
+describeE2E("nc5 keyboard Delete confirms before soft-trash (MYND-487)", () => {
+  // Vault-count precondition: 1 (weak KDF).
+  it("Delete key opens a confirm gate; Escape cancels, Enter soft-trashes", async () => {
+    let password = "";
+    await scenario(
+      "nc5-keyboard-delete-confirm",
+      { seed: (dir) => void (password = seedVault(dir).password) },
+      async (app) => {
+        const s = app.session;
+        await unlockToEditor(s, password);
+        await dismissImporterOffer(s);
+        await createNote(s, "Klavye Adayı");
+
+        // Select the row in the sidebar so focus leaves the editor body — the
+        // document-level Delete handler deliberately ignores keypresses that
+        // originate in the CodeMirror contenteditable.
+        await (await s.byTestId("notes.row")).click();
+
+        // Delete key → confirmation gate (MYND-487), NOT an immediate trash.
+        await pressKey(s, KEY.DELETE);
+        await s.byTestId("delete-confirm.confirm");
+
+        // Escape cancels — the note stays in the live tree.
+        await pressKey(s, KEY.ESCAPE);
+        await s.waitForGone(testIdSelector("delete-confirm.confirm"));
+        await s.byTestId("notes.row");
+
+        // Delete again → confirm; the confirm button is default-focused
+        // (initialFocus="confirm"), so Enter soft-trashes it.
+        await (await s.byTestId("notes.row")).click();
+        await pressKey(s, KEY.DELETE);
+        await s.byTestId("delete-confirm.confirm");
+        await pressKey(s, KEY.ENTER);
+        await s.waitForGone(testIdSelector("notes.row"));
+
+        // Soft-trash, not gone — the note is recoverable from the Trash panel.
+        await (await s.byTestId("notes.trash-open")).click();
+        await s.byTestId("trash.panel");
+        expect((await s.byTestIdAll("trash.restore")).length).toBe(1);
       },
     );
   });
