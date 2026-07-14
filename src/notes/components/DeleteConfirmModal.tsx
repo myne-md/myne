@@ -117,20 +117,40 @@ export type DeleteConfirmModalProps = {
   warning?: string;
   /** Confirm-button label override. Default: "Delete". */
   confirmLabel?: string;
+  /**
+   * Which button receives initial focus. Default `"cancel"` — the safer
+   * choice for irreversible actions (folder delete, permanent purge), where a
+   * stray Enter must not confirm. Pass `"confirm"` for the reversible
+   * keyboard soft-trash gate (MYND-487) so Enter confirms / Escape cancels.
+   */
+  initialFocus?: "cancel" | "confirm";
   onCancel: () => void;
   onConfirm: () => void;
 };
 
 export function DeleteConfirmModal(props: DeleteConfirmModalProps) {
   const { t } = useTranslation();
-  const { noteTitle, title, body, warning, confirmLabel, onCancel, onConfirm } =
-    props;
+  const {
+    noteTitle,
+    title,
+    body,
+    warning,
+    confirmLabel,
+    initialFocus = "cancel",
+    onCancel,
+    onConfirm,
+  } = props;
   const cancelRef = useRef<HTMLButtonElement | null>(null);
+  const confirmRef = useRef<HTMLButtonElement | null>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
-  // Trap + restore focus while open; default-focus on Cancel (safer
-  // destructive UX). The modal only mounts while shown, so always enabled
-  // (MYND-93).
-  useFocusTrap(dialogRef, { enabled: true, initialFocusRef: cancelRef });
+  // Trap + restore focus while open. Default-focus Cancel (safer destructive
+  // UX); `initialFocus="confirm"` moves it to the confirm button for the
+  // reversible keyboard soft-trash gate. The modal only mounts while shown, so
+  // always enabled (MYND-93).
+  useFocusTrap(dialogRef, {
+    enabled: true,
+    initialFocusRef: initialFocus === "confirm" ? confirmRef : cancelRef,
+  });
 
   // Esc → Cancel.
   useEffect(() => {
@@ -187,6 +207,7 @@ export function DeleteConfirmModal(props: DeleteConfirmModalProps) {
             {t("notes.deleteConfirm.cancel")}
           </button>
           <button
+            ref={confirmRef}
             type="button"
             data-testid="delete-confirm.confirm"
             onClick={onConfirm}

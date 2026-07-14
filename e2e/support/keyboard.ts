@@ -19,6 +19,7 @@ export const KEY = {
   SPACE: String.fromCharCode(0xe00d),
   SHIFT: String.fromCharCode(0xe008),
   CONTROL: String.fromCharCode(0xe009),
+  DELETE: String.fromCharCode(0xe017),
 } as const;
 
 /** Press a single key (optionally with Shift held) at the focused element. */
