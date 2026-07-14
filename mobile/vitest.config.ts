@@ -25,6 +25,9 @@ export default defineConfig({
       { find: /^@myne\/dialect$/, replacement: sib("../dialect/src/index.ts") },
       { find: /^@myne\/dialect\/(.*)$/, replacement: sib("../dialect/src/$1") },
       { find: "@myne/locales-en", replacement: sib("../locales/en/common.json") },
+      // Shared react-i18next runtime (MYND-485) — mirror of vite.config.ts.
+      { find: /^@myne\/i18n$/, replacement: sib("../src/i18n/index.ts") },
+      { find: /^@myne\/i18n\/(.*)$/, replacement: sib("../src/i18n/$1") },
     ],
   },
   test: {

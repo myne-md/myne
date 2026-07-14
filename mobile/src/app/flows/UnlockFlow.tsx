@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import type { CSSProperties, ReactNode } from "react";
 import {
   Screen,
@@ -158,10 +160,11 @@ function BiometricGlyph({
  *  (src/components/layout.tsx). Replaces the old bottom "Choose a different
  *  vault" text link — same destination, standard mobile placement. */
 function BackToPickerButton({ onClick }: { onClick: () => void }) {
+  const { t } = useTranslation();
   return (
     <button
       onClick={onClick}
-      aria-label="Choose a different vault"
+      aria-label={t("unlock.backToPicker")}
       data-testid="unlock-back-to-picker"
       style={{
         position: "absolute",
@@ -192,7 +195,7 @@ function PasswordInput({
   onSubmit,
   error,
   numeric = false,
-  ariaLabel = "Password",
+  ariaLabel,
   testId = "unlock-password",
 }: {
   value: string;
@@ -203,6 +206,7 @@ function PasswordInput({
   ariaLabel?: string;
   testId?: string;
 }) {
+  const { t } = useTranslation();
   const [focused, setFocused] = useState(true);
   const [revealed, setRevealed] = useState(false);
   const active = focused || value.length > 0;
@@ -235,7 +239,7 @@ function PasswordInput({
         autoCorrect="off"
         spellCheck={false}
         inputMode={numeric ? "numeric" : undefined}
-        aria-label={ariaLabel}
+        aria-label={ariaLabel ?? t("unlock.passwordLabel")}
         data-testid={testId}
         style={{
           flex: 1,
@@ -252,7 +256,7 @@ function PasswordInput({
       <button
         type="button"
         onClick={() => setRevealed((r) => !r)}
-        aria-label={revealed ? "Hide password" : "Show password"}
+        aria-label={revealed ? t("password.input.hide") : t("password.input.show")}
         style={{ border: "none", background: "transparent", padding: 0, marginLeft: 8, cursor: "pointer", display: "flex" }}
       >
         <Icon name={revealed ? "eye-off" : "eye"} size={20} color="var(--fg-3)" strokeWidth={1.6} />
@@ -263,21 +267,23 @@ function PasswordInput({
 
 // ── Copy maps ─────────────────────────────────────────────────────────────────
 
-/** Suspicion-banner copy is LITERAL per stage.ts SuspicionReason docs. */
-const SUSPICION_COPY: Record<SuspicionReason, { text: string; kind: "danger" | "info" }> = {
+/** Suspicion-banner copy is LITERAL per stage.ts SuspicionReason docs. The map
+ *  stores i18n KEYS (resolved with `t()` at the render site); the English values
+ *  are byte-identical to the desktop `unlock.suspicion.*` catalog entries. */
+const SUSPICION_COPY: Record<SuspicionReason, { textKey: string; kind: "danger" | "info" }> = {
   "vault-meta-changed-externally": {
-    text: "Vault was modified in another session — please unlock again.",
+    textKey: "unlock.suspicion.metaChangedExternally",
     kind: "danger",
   },
   "vault-locked-during-change": {
-    text: "Password change cancelled: vault was locked.",
+    textKey: "unlock.suspicion.lockedDuringChange",
     kind: "info",
   },
 };
 
 /** Map an unlock rejection to its banner string. The `InvalidCredentialOrVault`
  *  leg is the load-bearing non-distinguishing constant (rendered verbatim). */
-function messageForUnlockError(e: unknown): string {
+function messageForUnlockError(e: unknown, t: TFunction): string {
   const err = e as VaultUnlockError;
   switch (err?.kind) {
     case "InvalidCredentialOrVault":
@@ -285,9 +291,9 @@ function messageForUnlockError(e: unknown): string {
     case "IoError":
       return ioBanner(err.detail.io_error_kind);
     case "InvalidVaultMeta":
-      return "Vault file is unreadable. Restore from a backup.";
+      return t("unlock.vaultUnreadable");
     default:
-      return "Couldn't unlock. Please try again.";
+      return t("unlock.unlockFailedGeneric");
   }
 }
 
@@ -301,6 +307,7 @@ function messageForUnlockError(e: unknown): string {
  */
 export function UnlockFlow(props: UnlockFlowProps) {
   const { initialStatus, vaultId, suspicionReason, fromPicker, onBackToPicker } = props;
+  const { t } = useTranslation();
   const { biometric, isAndroid } = usePlatform();
 
   const pwRef = useRef("");
@@ -388,10 +395,10 @@ export function UnlockFlow(props: UnlockFlowProps) {
       wipePassword();
       props.onUnlocked();
     } catch (e) {
-      setErrorBanner(messageForUnlockError(e));
+      setErrorBanner(messageForUnlockError(e, t));
       setSubmitting(false);
     }
-  }, [submitting, vaultId, wipePassword, props]);
+  }, [submitting, vaultId, wipePassword, props, t]);
 
   const handleBioUnlock = useCallback(async () => {
     if (bioSubmitting) return;
@@ -427,7 +434,7 @@ export function UnlockFlow(props: UnlockFlowProps) {
           setQu((s) => (s ? { ...s, available: false } : s));
           setErrorBanner(
             e.kind === "AttemptsExhausted"
-              ? `Too many ${biometric} attempts. Use your password.`
+              ? t("unlock.biometricTooManyAttempts", { biometric })
               : null,
           );
           return;
@@ -435,7 +442,7 @@ export function UnlockFlow(props: UnlockFlowProps) {
       }
       setBioFailed(true);
     }
-  }, [bioSubmitting, vaultId, wipePassword, props, biometric]);
+  }, [bioSubmitting, vaultId, wipePassword, props, biometric, t]);
 
   // Auto-prompt once per mount: entering the unlock screen with a redeemable
   // biometric credential fires the OS sheet immediately (the 1Password /
@@ -466,7 +473,7 @@ export function UnlockFlow(props: UnlockFlowProps) {
       if (isQuickUnlockError(e)) {
         if (e.kind === "WrongCredential") {
           const n = e.detail.remaining;
-          setPinErr(`Incorrect PIN. ${n} ${n === 1 ? "try" : "tries"} left.`);
+          setPinErr(t("unlock.pinIncorrect", { count: n }));
           return;
         }
         if (e.kind === "AttemptsExhausted" || e.kind === "RequiresFullPassword" || e.kind === "NotConfigured") {
@@ -475,15 +482,15 @@ export function UnlockFlow(props: UnlockFlowProps) {
           setQu((s) => (s ? { ...s, available: false } : s));
           setErrorBanner(
             e.kind === "AttemptsExhausted"
-              ? "Too many PIN attempts. Use your password."
+              ? t("unlock.pinTooManyAttempts")
               : null,
           );
           return;
         }
       }
-      setPinErr("Couldn't unlock with PIN. Use your password.");
+      setPinErr(t("unlock.pinFailedGeneric"));
     }
-  }, [pinSubmitting, vaultId, wipePassword, props]);
+  }, [pinSubmitting, vaultId, wipePassword, props, t]);
 
   const handleStartRecovery = useCallback(() => {
     wipePassword();
@@ -519,8 +526,8 @@ export function UnlockFlow(props: UnlockFlowProps) {
   if (initialStatus.kind === "Corrupted") {
     return (
       <FailClosed
-        heading="Vault file is unreadable"
-        message="Vault file is unreadable. Restore from a backup."
+        heading={t("unlock.corruptedHeading")}
+        message={t("unlock.vaultUnreadable")}
         fromPicker={fromPicker}
         onBackToPicker={onBackToPicker ? handleBackToPicker : undefined}
       />
@@ -531,7 +538,7 @@ export function UnlockFlow(props: UnlockFlowProps) {
   if (initialStatus.kind === "IoError") {
     return (
       <FailClosed
-        heading="Can't read this vault"
+        heading={t("unlock.ioErrorHeading")}
         message={ioBanner(initialStatus.ioKind)}
         fromPicker={fromPicker}
         onBackToPicker={onBackToPicker ? handleBackToPicker : undefined}
@@ -545,7 +552,7 @@ export function UnlockFlow(props: UnlockFlowProps) {
   return (
     <Screen style={{ alignItems: "center", padding: "0 32px" }}>
       {(submitting || pinSubmitting) && (
-        <BlockingOverlay title="Unlocking" subtitle="Decrypting your keys on this device." />
+        <BlockingOverlay title={t("unlock.blockingTitle")} subtitle={t("unlock.blockingSubtitle")} />
       )}
 
       {fromPicker && onBackToPicker && <BackToPickerButton onClick={handleBackToPicker} />}
@@ -555,13 +562,13 @@ export function UnlockFlow(props: UnlockFlowProps) {
       </div>
 
       <div style={{ marginTop: 36, textAlign: "center" }}>
-        <Eyebrow>Unlock vault</Eyebrow>
-        <VaultTitle>Your vault</VaultTitle>
+        <Eyebrow>{t("unlock.eyebrow")}</Eyebrow>
+        <VaultTitle>{t("unlock.vaultTitleFallback")}</VaultTitle>
       </div>
 
       {showSuspicion && suspicion && (
         <div data-testid="unlock-suspicion" style={{ width: "100%", marginTop: 22 }}>
-          <Banner kind={suspicion.kind}>{suspicion.text}</Banner>
+          <Banner kind={suspicion.kind}>{t(suspicion.textKey)}</Banner>
         </div>
       )}
 
@@ -580,7 +587,7 @@ export function UnlockFlow(props: UnlockFlowProps) {
             <button
               onClick={() => void handleBioUnlock()}
               disabled={bioSubmitting}
-              aria-label={`Unlock with ${biometric}`}
+              aria-label={t("unlock.unlockWithBiometric", { biometric })}
               data-testid="unlock-biometric-prompt"
               style={{ border: "none", background: "transparent", padding: 0, cursor: "pointer" }}
             >
@@ -592,13 +599,13 @@ export function UnlockFlow(props: UnlockFlowProps) {
             </button>
             <div style={{ marginTop: 22, fontSize: 17, fontWeight: 500, color: "var(--fg-1)", textAlign: "center" }}>
               {bioFailed
-                ? `${biometric} couldn't confirm it's you`
+                ? t("unlock.biometricFailed", { biometric })
                 : isAndroid
-                  ? "Touch to unlock"
-                  : "Look to unlock"}
+                  ? t("unlock.touchToUnlock")
+                  : t("unlock.lookToUnlock")}
             </div>
             <div style={{ marginTop: 4, fontSize: 13, color: "var(--fg-3)", textAlign: "center", maxWidth: 260 }}>
-              {bioFailed ? "Try again, or unlock with your password." : biometric}
+              {bioFailed ? t("unlock.biometricRetryHint") : biometric}
             </div>
           </div>
           {bioFailed && (
@@ -608,7 +615,7 @@ export function UnlockFlow(props: UnlockFlowProps) {
               onClick={() => void handleBioUnlock()}
               data-testid="unlock-biometric-retry"
             >
-              Try {biometric} again
+              {t("unlock.tryBiometricAgain", { biometric })}
             </Button>
           )}
           <TextButton
@@ -620,14 +627,14 @@ export function UnlockFlow(props: UnlockFlowProps) {
             }}
             testId="unlock-use-password"
           >
-            Use password instead
+            {t("unlock.usePasswordInstead")}
           </TextButton>
         </>
       ) : pinMode && qu?.available ? (
         <>
           <div style={{ marginTop: showSuspicion && suspicion ? 18 : 30, width: "100%" }}>
-            <FieldLabel>PIN</FieldLabel>
-            <PasswordInput value={pin} onChange={setPinValue} onSubmit={handlePinUnlock} error={!!pinErr} numeric ariaLabel="PIN" testId="unlock-pin" />
+            <FieldLabel>{t("unlock.quickUnlock.pinPlaceholder")}</FieldLabel>
+            <PasswordInput value={pin} onChange={setPinValue} onSubmit={handlePinUnlock} error={!!pinErr} numeric ariaLabel={t("unlock.quickUnlock.pinPlaceholder")} testId="unlock-pin" />
             {pinErr && (
               <div data-testid="unlock-pin-error" style={{ marginTop: 10 }}>
                 <Banner kind="danger">{pinErr}</Banner>
@@ -640,7 +647,7 @@ export function UnlockFlow(props: UnlockFlowProps) {
             onClick={() => void handlePinUnlock()}
             data-testid="unlock-pin-submit"
           >
-            Unlock with PIN
+            {t("unlock.quickUnlock.unlockWithPin")}
           </Button>
           <TextButton
             height={40}
@@ -653,13 +660,13 @@ export function UnlockFlow(props: UnlockFlowProps) {
             }}
             testId="unlock-use-password"
           >
-            Use password instead
+            {t("unlock.usePasswordInstead")}
           </TextButton>
         </>
       ) : (
         <>
           <div style={{ marginTop: showSuspicion && suspicion ? 18 : 30, width: "100%" }}>
-            <FieldLabel>Password</FieldLabel>
+            <FieldLabel>{t("unlock.passwordLabel")}</FieldLabel>
             <PasswordInput value={password} onChange={setPw} onSubmit={handleUnlock} error={!!errorBanner} />
             {errorBanner && (
               <div data-testid="unlock-error" style={{ marginTop: 10 }}>
@@ -673,7 +680,7 @@ export function UnlockFlow(props: UnlockFlowProps) {
             onClick={() => void handleUnlock()}
             data-testid="unlock-submit"
           >
-            Unlock
+            {t("unlock.submit")}
           </Button>
           {qu?.available &&
             (qu.method === "biometric" ? (
@@ -687,7 +694,7 @@ export function UnlockFlow(props: UnlockFlowProps) {
                 }}
                 testId="unlock-use-biometric"
               >
-                Use {biometric} instead
+                {t("unlock.useBiometricInstead", { biometric })}
               </TextButton>
             ) : (
               <TextButton
@@ -699,7 +706,7 @@ export function UnlockFlow(props: UnlockFlowProps) {
                 }}
                 testId="unlock-use-pin"
               >
-                Unlock with PIN instead
+                {t("unlock.unlockWithPinInstead")}
               </TextButton>
             ))}
         </>
@@ -709,7 +716,7 @@ export function UnlockFlow(props: UnlockFlowProps) {
 
       <div style={{ paddingBottom: 18, display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
         <TextButton height={40} onClick={handleStartRecovery} testId="unlock-recovery-link">
-          Use your recovery phrase
+          {t("unlock.useRecoveryPhrase")}
         </TextButton>
         <TextButton
           height={40}
@@ -721,14 +728,14 @@ export function UnlockFlow(props: UnlockFlowProps) {
           }}
           testId="unlock-delete-link"
         >
-          Delete vault and start over
+          {t("vaultRecover.phrase.deleteLink")}
         </TextButton>
       </div>
 
       {confirmingDelete && (
         <Sheet onClose={deleteFailed ? undefined : () => setConfirmingDelete(false)}>
           <div style={{ fontSize: 19, fontWeight: 600, letterSpacing: "-0.01em", color: "var(--fg-display)" }}>
-            Delete this vault?
+            {t("unlock.deleteConfirmTitle")}
           </div>
           <p style={{ margin: "10px 0 0", fontSize: 14, lineHeight: 1.55, color: "var(--fg-2)" }}>
             {LOST_BOTH_SECRETS_SENTENCE}
@@ -736,7 +743,7 @@ export function UnlockFlow(props: UnlockFlowProps) {
           {deleteFailed && (
             <div data-testid="unlock-delete-error" style={{ marginTop: 14 }}>
               <Banner kind="danger">
-                Some files couldn't be removed. The vault is no longer usable — continue to start over.
+                {t("unlock.deletePartialError")}
               </Banner>
             </div>
           )}
@@ -750,7 +757,7 @@ export function UnlockFlow(props: UnlockFlowProps) {
                 }}
                 data-testid="unlock-delete-continue"
               >
-                Continue
+                {t("common.continue")}
               </Button>
             ) : (
               <Button
@@ -759,12 +766,12 @@ export function UnlockFlow(props: UnlockFlowProps) {
                 onClick={() => void handleDelete()}
                 data-testid="unlock-delete-confirm"
               >
-                {deleting ? "Deleting…" : "Delete vault"}
+                {deleting ? t("attachments.deleteDialog.deleting") : t("settings.deleteVault.heading")}
               </Button>
             )}
             {!deleteFailed && (
               <Button variant="ghost" disabled={deleting} onClick={() => setConfirmingDelete(false)}>
-                Cancel
+                {t("common.prompt.cancel")}
               </Button>
             )}
           </div>
@@ -789,6 +796,7 @@ function FailClosed({
   fromPicker?: boolean;
   onBackToPicker?: () => void;
 }) {
+  const { t } = useTranslation();
   return (
     <Screen style={{ alignItems: "center", padding: "0 32px" }}>
       {fromPicker && onBackToPicker && <BackToPickerButton onClick={onBackToPicker} />}
@@ -796,17 +804,17 @@ function FailClosed({
         <Wordmark />
       </div>
       <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", width: "100%" }}>
-        <Eyebrow>Can't open vault</Eyebrow>
+        <Eyebrow>{t("unlock.failClosedEyebrow")}</Eyebrow>
         <VaultTitle size={24}>{heading}</VaultTitle>
         <div data-testid="unlock-fail-closed" style={{ width: "100%", marginTop: 22 }}>
           <Banner kind="danger">{message}</Banner>
         </div>
         <p style={{ margin: "14px 0 0", fontSize: 14, lineHeight: 1.55, color: "var(--fg-3)", textAlign: "center", maxWidth: 280 }}>
-          Restore from a backup to continue.
+          {t("unlock.restoreHint")}
         </p>
       </div>
       <div style={{ paddingBottom: 46, width: "100%", display: "flex", flexDirection: "column", gap: 10 }}>
-        <Button onClick={() => void closeApp()}>Close app</Button>
+        <Button onClick={() => void closeApp()}>{t("failClosed.corrupted.cta")}</Button>
       </div>
     </Screen>
   );

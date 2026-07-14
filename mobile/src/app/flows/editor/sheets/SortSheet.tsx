@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { Sheet } from "../../../../components";
 
 /** The Sort sheet — the note-list order picker. Same modal treatment as the
@@ -12,6 +13,7 @@ export function SortSheet({
   onPick: (m: "none" | "az" | "za") => void;
   onClose: () => void;
 }) {
+  const { t } = useTranslation();
   const row = (content: ReactNode, on: boolean, onClick: () => void, first = false): ReactNode => (
     <div
       onClick={onClick}
@@ -27,14 +29,14 @@ export function SortSheet({
         <>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flex: "none", paddingBottom: 4 }}>
             <span style={{ width: 60 }} />
-            <span style={{ fontSize: 17, fontWeight: 600, color: "var(--fg-1)" }}>Sort</span>
-            <button onClick={close} style={{ width: 60, textAlign: "right", border: "none", background: "transparent", color: "var(--accent)", fontSize: 15, fontWeight: 600, cursor: "pointer" }}>Done</button>
+            <span style={{ fontSize: 17, fontWeight: 600, color: "var(--fg-1)" }}>{t("editor.sortSheet.title")}</span>
+            <button onClick={close} style={{ width: 60, textAlign: "right", border: "none", background: "transparent", color: "var(--accent)", fontSize: 15, fontWeight: 600, cursor: "pointer" }}>{t("editor.sheet.done")}</button>
           </div>
           <div style={{ overflowY: "auto", minHeight: 0 }}>
             <div style={{ marginTop: 8, border: "1px solid var(--line-1)", borderRadius: 10, overflow: "hidden", background: "var(--bg-1)" }}>
-              {row("Manual order", mode === "none", () => { onPick("none"); close(); }, true)}
-              {row("Title · A → Z", mode === "az", () => { onPick("az"); close(); })}
-              {row("Title · Z → A", mode === "za", () => { onPick("za"); close(); })}
+              {row(t("editor.sortSheet.manual"), mode === "none", () => { onPick("none"); close(); }, true)}
+              {row(t("editor.sortSheet.titleAsc"), mode === "az", () => { onPick("az"); close(); })}
+              {row(t("editor.sortSheet.titleDesc"), mode === "za", () => { onPick("za"); close(); })}
             </div>
           </div>
         </>

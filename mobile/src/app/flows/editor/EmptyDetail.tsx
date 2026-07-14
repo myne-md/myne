@@ -1,9 +1,11 @@
+import { useTranslation } from "react-i18next";
 import { MyneMark } from "../../../components";
 
 /** Detail-pane placeholder on the regular (multi-pane) size classes when no
  *  note is selected — the compact layout never renders it (the editor is a
  *  full-screen push there, so a note is always open when the editor shows). */
 export function EmptyDetail({ onNew }: { onNew: () => void }) {
+  const { t } = useTranslation();
   return (
     <div
       data-testid="workspace.empty-detail"
@@ -20,9 +22,9 @@ export function EmptyDetail({ onNew }: { onNew: () => void }) {
       }}
     >
       <MyneMark size={40} radius={9} />
-      <div style={{ fontSize: 16, fontWeight: 600, color: "var(--fg-2)" }}>Select a note</div>
+      <div style={{ fontSize: 16, fontWeight: 600, color: "var(--fg-2)" }}>{t("editor.emptyDetail.title")}</div>
       <div style={{ fontSize: 14, lineHeight: 1.55, color: "var(--fg-3)", maxWidth: 300 }}>
-        Choose a note from the list, or start a new one.
+        {t("editor.emptyDetail.body")}
       </div>
       <button
         data-testid="workspace.empty-detail-new"
@@ -47,7 +49,7 @@ export function EmptyDetail({ onNew }: { onNew: () => void }) {
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none">
           <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" />
         </svg>
-        New note
+        {t("notes.list.newNote")}
       </button>
     </div>
   );

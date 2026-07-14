@@ -1,13 +1,15 @@
+import { useTranslation } from "react-i18next";
 import type { NoteEntry } from "../types";
 
 /** Beeper-style favorites strip — a horizontal row of square tiles for the
  *  starred notes, shown at the top of the notes list (above the tree). Each tile
  *  is the note's initial over its title; tap opens it. Scrolls with the list. */
 export function FavoritesStrip({ notes, onOpen }: { notes: NoteEntry[]; onOpen: (id: string) => void }) {
+  const { t } = useTranslation();
   return (
     <div style={{ padding: "6px 0 10px" }}>
       <div style={{ padding: "0 20px 8px", fontSize: 11, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--fg-3)" }}>
-        Favorites
+        {t("notes.list.favoritesHeading")}
       </div>
       <div style={{ display: "flex", gap: 12, overflowX: "auto", padding: "0 20px", scrollbarWidth: "none", WebkitOverflowScrolling: "touch", touchAction: "pan-x" }}>
         {notes.map((n) => (

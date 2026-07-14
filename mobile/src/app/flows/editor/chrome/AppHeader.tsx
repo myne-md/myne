@@ -1,9 +1,11 @@
+import { useTranslation } from "react-i18next";
 import { Icon, MyneMark, LIST_TOP } from "../../../../components";
 
 /** Consistent top bar shared by the Notes / Search / Graph / Files tabs: vault
  *  switcher on the left; command-palette search + Settings gear on the right.
  *  Stays fixed while the tab content below it animates between pages. */
 export function AppHeader({ label, onSwitcher, onPalette, onSettings }: { label: string; onSwitcher: () => void; onPalette: () => void; onSettings: () => void }) {
+  const { t } = useTranslation();
   return (
     <div data-testid="workspace.app-header" style={{ flex: "none", padding: `${LIST_TOP} 14px 6px 20px`, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
       <button
@@ -19,14 +21,14 @@ export function AppHeader({ label, onSwitcher, onPalette, onSettings }: { label:
       <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
         <button
           onClick={onPalette}
-          aria-label="Command palette"
+          aria-label={t("commandPalette.dialogLabel")}
           style={{ width: 36, height: 36, borderRadius: 8, border: "none", background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
         >
           <Icon name="search" size={21} color="var(--fg-2)" strokeWidth={1.7} />
         </button>
         <button
           onClick={onSettings}
-          aria-label="Settings"
+          aria-label={t("editor.chrome.barItems.settings")}
           style={{ width: 36, height: 36, borderRadius: 8, border: "none", background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
         >
           <Icon name="settings" size={21} color="var(--fg-2)" strokeWidth={1.7} />

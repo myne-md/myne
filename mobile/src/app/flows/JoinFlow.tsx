@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import type { CSSProperties, ReactNode } from "react";
 import { Screen, FlowHeader, Title, Lead, FooterBar, Button, Banner, BlockingOverlay, Icon } from "../../components";
 import { syncJoinAccount, syncNow, syncHeadFingerprint, syncResetLocal, errKind, type JoinResult } from "../../lib/sync";
@@ -36,9 +38,9 @@ function accountStructurallyPlausible(display: string): boolean {
 /** Map a non-secret `SyncDeviceError` kind to honest copy. Only a transport
  *  fault gets a distinct (non-leaking) line; every account/password/existence
  *  failure collapses to the single non-distinguishing banner. */
-function joinFailureMessage(kind: string): string {
+function joinFailureMessage(kind: string, t: TFunction): string {
   if (kind === "Transport" || kind === "NotConfigured") {
-    return "Couldn't reach that sync server. Check the address and your connection, then try again.";
+    return t("join.transportError");
   }
   return ENROLL_NON_DISTINGUISHING_BANNER;
 }
@@ -119,6 +121,7 @@ function MonoField({
 
 /** Masked password field with a reveal eye (mirrors RecoverFlow's). */
 function PasswordField({ value, onChange, onEnter, testId }: { value: string; onChange: (v: string) => void; onEnter: () => void; testId: string }) {
+  const { t } = useTranslation();
   const [focused, setFocused] = useState(false);
   const [revealed, setRevealed] = useState(false);
   return (
@@ -143,7 +146,7 @@ function PasswordField({ value, onChange, onEnter, testId }: { value: string; on
         onKeyDown={(e) => {
           if (e.key === "Enter") onEnter();
         }}
-        placeholder="Your vault password"
+        placeholder={t("join.passwordPlaceholder")}
         autoCapitalize="none"
         autoComplete="current-password"
         spellCheck={false}
@@ -159,7 +162,7 @@ function PasswordField({ value, onChange, onEnter, testId }: { value: string; on
       <button
         type="button"
         onClick={() => setRevealed((r) => !r)}
-        aria-label={revealed ? "Hide password" : "Show password"}
+        aria-label={revealed ? t("password.input.hide") : t("password.input.show")}
         style={{ border: "none", background: "transparent", padding: 0, marginLeft: 6, cursor: "pointer", display: "flex" }}
       >
         <Icon name={revealed ? "eye-off" : "eye"} size={20} color="var(--fg-3)" strokeWidth={1.6} />
@@ -169,6 +172,7 @@ function PasswordField({ value, onChange, onEnter, testId }: { value: string; on
 }
 
 export function JoinFlow({ onComplete, onCancel }: JoinFlowProps) {
+  const { t } = useTranslation();
   const [serverUrl, setServerUrl] = useState("");
   const [accountNumber, setAccountNumber] = useState("");
   const [password, setPassword] = useState("");
@@ -230,7 +234,7 @@ export function JoinFlow({ onComplete, onCancel }: JoinFlowProps) {
       landOn(result);
     } catch (e) {
       setBusy(false);
-      setError(joinFailureMessage(errKind(e)));
+      setError(joinFailureMessage(errKind(e), t));
     }
   }
 
@@ -293,17 +297,17 @@ export function JoinFlow({ onComplete, onCancel }: JoinFlowProps) {
             <circle cx="28" cy="28" r="24" stroke="var(--line-1)" strokeWidth="2" />
             <path d="M28 4a24 24 0 0 1 24 24" stroke="var(--accent)" strokeWidth="2.4" strokeLinecap="round" />
           </svg>
-          <Title>Waiting for approval</Title>
+          <Title>{t("sync.join.waitingTitle")}</Title>
           <div style={{ marginTop: 12, fontSize: 15, lineHeight: 1.6, color: "var(--fg-2)", maxWidth: 320 }}>
             {ENROLL_PENDING_NOTICE}
           </div>
           <div style={{ marginTop: 14, fontSize: 13, lineHeight: 1.5, color: "var(--fg-3)", maxWidth: 320 }}>
-            Keep this screen open — once approved, a verification code appears here to compare with your other device.
+            {t("join.waitingHint")}
           </div>
         </div>
         <FooterBar style={{ padding: "14px 20px calc(14px + env(safe-area-inset-bottom, 0px))", borderTop: "none" }}>
           <Button variant="ghost" onClick={onBack} data-testid="sync.join.cancel">
-            Cancel
+            {t("common.prompt.cancel")}
           </Button>
         </FooterBar>
       </Screen>
@@ -315,9 +319,9 @@ export function JoinFlow({ onComplete, onCancel }: JoinFlowProps) {
     return (
       <Screen style={{ alignItems: "center", justifyContent: "center", padding: "0 32px" }}>
         <div data-testid="sync.join.verify" style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center" }}>
-          <Title>Verify this device</Title>
+          <Title>{t("sync.join.verifyTitle")}</Title>
           <div style={{ marginTop: 12, fontSize: 15, lineHeight: 1.6, color: "var(--fg-2)", maxWidth: 320 }}>
-            Check that this code is the same one shown on the device you approved from.
+            {t("join.verifyBody")}
           </div>
           <div
             style={{
@@ -339,7 +343,7 @@ export function JoinFlow({ onComplete, onCancel }: JoinFlowProps) {
         </div>
         <FooterBar style={{ padding: "14px 20px calc(14px + env(safe-area-inset-bottom, 0px))", borderTop: "none", flexDirection: "column", gap: 10 }}>
           <Button disabled={aborting} onClick={() => onComplete(joinedVaultId)} data-testid="sync.join.sas-match">
-            They match — continue
+            {t("sync.join.sasMatch")}
           </Button>
           <Button
             variant="ghost"
@@ -348,7 +352,7 @@ export function JoinFlow({ onComplete, onCancel }: JoinFlowProps) {
             style={{ color: "var(--danger)" }}
             data-testid="sync.join.sas-mismatch"
           >
-            {aborting ? "Removing…" : "They don't match — remove this device"}
+            {aborting ? t("join.removing") : t("join.sasMismatch")}
           </Button>
         </FooterBar>
       </Screen>
@@ -359,27 +363,27 @@ export function JoinFlow({ onComplete, onCancel }: JoinFlowProps) {
   const accountHint = !accountStructurallyPlausible(accountNumber);
   return (
     <Screen>
-      <FlowHeader label="Connect to your account" onBack={onBack} />
+      <FlowHeader label={t("join.title")} onBack={onBack} />
       <div style={{ flex: 1, padding: "18px 22px 0", overflowY: "auto" }} data-testid="sync.join">
-        <Title>Connect to your account</Title>
-        <Lead>Enter your account details to bring your notes to this device. Everything stays encrypted end to end.</Lead>
+        <Title>{t("join.title")}</Title>
+        <Lead>{t("join.lead")}</Lead>
 
         <div style={{ marginTop: 22 }}>
-          <FieldLabel>Sync server</FieldLabel>
+          <FieldLabel>{t("sync.join.serverLabel")}</FieldLabel>
           <MonoField
             value={serverUrl}
             onChange={(v) => {
               setError(null);
               setServerUrl(v);
             }}
-            placeholder="https://sync.example.com"
+            placeholder={t("join.serverPlaceholder")}
             inputMode="url"
             testId="sync.join.server-input"
           />
         </div>
 
         <div style={{ marginTop: 18 }}>
-          <FieldLabel>Account number</FieldLabel>
+          <FieldLabel>{t("sync.join.accountLabel")}</FieldLabel>
           <MonoField
             value={accountNumber}
             onChange={(v) => {
@@ -392,13 +396,13 @@ export function JoinFlow({ onComplete, onCancel }: JoinFlowProps) {
           />
           {accountHint && (
             <div style={{ marginTop: 8, fontSize: 13, color: "var(--warning)" }} data-testid="sync.join.account-hint">
-              Double-check this number — it doesn't look right.
+              {t("join.accountHint")}
             </div>
           )}
         </div>
 
         <div style={{ marginTop: 18 }}>
-          <FieldLabel>Password</FieldLabel>
+          <FieldLabel>{t("sync.join.passwordLabel")}</FieldLabel>
           <PasswordField
             value={password}
             onChange={(v) => {
@@ -417,15 +421,15 @@ export function JoinFlow({ onComplete, onCancel }: JoinFlowProps) {
         )}
 
         <div style={{ marginTop: 14, fontSize: 13, lineHeight: 1.5, color: "var(--fg-3)" }}>
-          Your notes appear once you approve this device from a device that already has your account.
+          {t("join.approvalHint")}
         </div>
       </div>
       <FooterBar style={{ padding: "14px 20px calc(14px + env(safe-area-inset-bottom, 0px))", borderTop: "none" }}>
         <Button disabled={!canSubmit} onClick={() => void onSubmit()} data-testid="sync.join.submit">
-          Connect
+          {t("sync.endpoint.connect")}
         </Button>
       </FooterBar>
-      {busy && <BlockingOverlay title="Connecting…" subtitle="Fetching your account and unlocking your vault on this device." />}
+      {busy && <BlockingOverlay title={t("sync.endpoint.connecting")} subtitle={t("join.connectingSubtitle")} />}
     </Screen>
   );
 }

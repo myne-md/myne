@@ -6,44 +6,17 @@
 // Mobile reuses what already exists (attachment export/rename, prefs) and OMITS
 // the surfaces mobile has no backend for yet (AI, spell, voice) — those slots
 // are optional in the EditorHost contract, so leaving them off simply keeps the
-// corresponding editor affordances inert. `t()`, `isMediaTarget`, `tagTree`, and
-// `openExternal` are built here since mobile has no direct equivalent.
+// corresponding editor affordances inert. `t()` delegates to the shared
+// react-i18next runtime (`@myne/i18n`, MYND-485); `isMediaTarget`, `tagTree`,
+// and `openExternal` are built here since mobile has no direct equivalent.
 
 import { setEditorHost, type EditorHost, type EditorPrefs } from "@myne/editor/host";
-import enCatalog from "@myne/locales-en";
+import i18n from "@myne/i18n";
 import { documentDir, join } from "@tauri-apps/api/path";
 import { attachmentExport, attachmentRename } from "./lib/attachments";
 import { prefsRead } from "./lib/prefs";
 import { currentEditorTagTree } from "./lib/editor-tag-bridge";
 import { requestVoiceRecording } from "./lib/voice-record-bridge";
-
-// ── i18n: a minimal react-i18next-compatible lookup over the SHARED English
-//    catalog (the same strings the desktop ships). Handles nested keys,
-//    `{{var}}` interpolation, and `_one`/`_other` count plurals — enough for the
-//    editor's menu/toast labels. Falls back to the raw key if unmapped.
-type Dict = { [k: string]: string | Dict };
-const CATALOG = enCatalog as unknown as Dict;
-
-function lookupKey(key: string): string | undefined {
-  let node: string | Dict | undefined = CATALOG;
-  for (const seg of key.split(".")) {
-    if (typeof node !== "object" || node === null) return undefined;
-    node = node[seg];
-  }
-  return typeof node === "string" ? node : undefined;
-}
-
-function translate(key: string, opts?: Record<string, unknown>): string {
-  const count = typeof opts?.count === "number" ? opts.count : undefined;
-  let raw: string | undefined;
-  if (count !== undefined) raw = lookupKey(`${key}_${count === 1 ? "one" : "other"}`);
-  raw ??= lookupKey(key);
-  if (raw === undefined) return key;
-  return raw.replace(/\{\{\s*(\w+)\s*\}\}/g, (_m, name: string) => {
-    const v = opts?.[name];
-    return v === undefined || v === null ? "" : String(v);
-  });
-}
 
 // ── isMediaTarget: pure extension check (faithful copy of the desktop
 //    src/notes/vaultIndices.ts::MEDIA_EXTENSIONS list).
@@ -58,7 +31,11 @@ function isMediaTarget(target: string): boolean {
 }
 
 const host: EditorHost = {
-  t: (key, opts) => translate(key, opts as Record<string, unknown> | undefined),
+  // Delegate to the shared react-i18next runtime (MYND-485) — replaces the
+  // former English-only hand-rolled catalog lookup, so the editor's menu/toast
+  // labels honor the active UI language + Weblate translations. i18next handles
+  // nested keys, `{{var}}` interpolation, and `_one`/`_other` count plurals.
+  t: (key, opts) => i18n.t(key, opts ?? {}),
   notes: {
     // The editor flow publishes its live flat tag index (built from decrypted
     // note bodies) into the bridge; the #tag autocomplete reads the latest here.
