@@ -44,6 +44,13 @@ ignore = [
     "RUSTSEC-2025-0081",  # transitive (Tauri); no upgrade path
     "RUSTSEC-2025-0098",  # unic-ucd-version (rust-unic) unmaintained; via urlpattern
     "RUSTSEC-2025-0100",  # unic-ucd-ident (rust-unic) unmaintained; via urlpattern
+    "RUSTSEC-2024-0436",  # paste unmaintained; build-time proc-macro via gemm →
+                          # candle (on-device AI). No safe upgrade; not a runtime path.
+    "RUSTSEC-2026-0192",  # ttf-parser unmaintained; via lopdf (PDF export). No safe
+                          # upgrade. Revisit when lopdf migrates to skrifa.
+    "RUSTSEC-2026-0194",  # quick-xml DoS (quadratic duplicate-attr scan)
+    "RUSTSEC-2026-0195",  # quick-xml DoS (NsReader namespace-alloc); both transitive
+                          # via wry/Tauri, no upgrade path. SECURITY: drop on Tauri bump.
 ]
 
 # ─────────────────────────────────────────────────────────────────────
