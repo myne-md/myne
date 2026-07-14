@@ -32,25 +32,25 @@ steps:
       - apt-get update && apt-get install -y --no-install-recommends
         git ca-certificates pkg-config libssl-dev
         libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
-      # provision-protocol+core: make ../../protocol AND ../../core (relative to
-      # src-tauri) resolve. Mobile depends on `myne-core` directly, and core in
-      # turn depends on `../protocol`; both crates live in the main `myne` repo.
-      # One clone of the main repo backs both symlinks. The `core` symlink points
-      # INTO the cloned tree (myne-main/core) so core's own `../protocol`
-      # path-dep resolves to myne-main/protocol without a second checkout.
+      # provision-shared: everything the mobile build reuses from the main repo
+      # is one clone away — the Rust path deps (protocol, core) AND the frontend's
+      # shared SOURCE packages (editor, dialect, locales; aliased by tsconfig/vite
+      # as @myne/*, NOT npm members). Clone the main repo once and symlink each
+      # next to this checkout so both `cargo` and `pnpm build` resolve them. The
+      # workspace volume is shared across steps, so the JS steps (cargo-deny,
+      # pnpm-build) reuse these via depends_on: [cargo-checks].
       - |
         PARENT="$(cd .. && pwd)"
-        if [ ! -e "$PARENT/protocol" ] || [ ! -e "$PARENT/core" ]; then
-          if [ ! -e "$PARENT/myne-main" ]; then
-            if [ -n "$MYNE_REPO_TOKEN" ]; then
-              git clone --depth 1 "https://oauth2:$MYNE_REPO_TOKEN@github.com/myne-md/myne.git" "$PARENT/myne-main"
-            else
-              git clone --depth 1 "https://github.com/myne-md/myne.git" "$PARENT/myne-main"
-            fi
+        if [ ! -e "$PARENT/myne-main" ]; then
+          if [ -n "$MYNE_REPO_TOKEN" ]; then
+            git clone --depth 1 "https://oauth2:$MYNE_REPO_TOKEN@github.com/myne-md/myne.git" "$PARENT/myne-main"
+          else
+            git clone --depth 1 "https://github.com/myne-md/myne.git" "$PARENT/myne-main"
           fi
-          ln -sfn "$PARENT/myne-main/protocol" "$PARENT/protocol"
-          ln -sfn "$PARENT/myne-main/core" "$PARENT/core"
         fi
+        for d in protocol core editor dialect locales; do
+          ln -sfn "$PARENT/myne-main/$d" "$PARENT/$d"
+        done
       - rustup component add rustfmt clippy
       # fmt runs here (not a standalone step) because `cargo fmt --all` resolves
       # the ../../core + ../../protocol path deps, which exist only after the
@@ -86,6 +86,8 @@ steps:
   # ── Rust supply-chain audit ───────────────────────────────────────────────
   cargo-deny:
     image: rust:1.96.0-slim
+    # Needs protocol/core provisioned by cargo-checks (shared workspace volume).
+    depends_on: [cargo-checks]
     commands:
       - apt-get update && apt-get install -y --no-install-recommends git ca-certificates
       - cargo install --locked cargo-deny
@@ -94,6 +96,10 @@ steps:
   # ── Frontend build (tsc typecheck + vite bundle) ──────────────────────────
   pnpm-build:
     image: node:25
+    # Needs editor/dialect/locales provisioned by cargo-checks (the @myne/*
+    # aliases resolve to ../editor/src, ../dialect/src, ../locales), shared via
+    # the workspace volume.
+    depends_on: [cargo-checks]
     commands:
       - npm install -g pnpm@11.8.0
       - pnpm install --frozen-lockfile

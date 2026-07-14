@@ -13,6 +13,10 @@ description = "Myne — mobile client"
 authors = ["Myne"]
 edition = "2021"
 license = "AGPL-3.0"
+# App crate, never published — lets cargo-deny's allow-wildcard-paths apply to
+# the `../../{protocol,core}` path deps (crates.io disallows path deps, so it
+# rejects wildcard paths on publishable crates). Matches the desktop crate.
+publish = false
 
 # `_lib` suffix is required to avoid the Windows lib-vs-bin name collision
 # (rust-lang/cargo#8519) — same rule as the desktop crate. Don't rename.
