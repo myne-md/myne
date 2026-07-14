@@ -22,10 +22,18 @@ import {
 
 const listPairedExtensions = vi.fn();
 const revokePairedExtension = vi.fn();
+// The component also reads the host-manifest install status on mount (and can
+// toggle it). These tests don't exercise the install toggle, but the mount
+// effect calls getClipperInstallStatus(), so the mock must provide it — else
+// the whole component throws ("No export defined on the mock").
+const getClipperInstallStatus = vi.fn();
+const setClipperInstallEnabled = vi.fn();
 
 vi.mock("../../src/lib/clipper-pairing", () => ({
   listPairedExtensions: (...a: unknown[]) => listPairedExtensions(...a),
   revokePairedExtension: (...a: unknown[]) => revokePairedExtension(...a),
+  getClipperInstallStatus: (...a: unknown[]) => getClipperInstallStatus(...a),
+  setClipperInstallEnabled: (...a: unknown[]) => setClipperInstallEnabled(...a),
 }));
 
 import { ConnectedExtensions } from "../../src/components/settings/ConnectedExtensions";
@@ -43,6 +51,14 @@ const NOW = Math.floor(Date.now() / 1000);
 beforeEach(() => {
   listPairedExtensions.mockReset();
   revokePairedExtension.mockReset().mockResolvedValue(undefined);
+  // Default: registered, no browsers — the install toggle sits at its default
+  // and is irrelevant to the list/revoke assertions below.
+  getClipperInstallStatus
+    .mockReset()
+    .mockResolvedValue({ enabled: true, hostPath: null, installedBrowsers: [] });
+  setClipperInstallEnabled
+    .mockReset()
+    .mockResolvedValue({ enabled: true, hostPath: null, installedBrowsers: [] });
 });
 
 afterEach(cleanup);
