@@ -57,24 +57,24 @@ export function FilterSheet({
             {group(
               <>
                 {row(t("editor.nav.allNotes"), listView === "notes", () => { onPickStatus("notes"); close(); }, true)}
-                {row(<span>{t("editor.nav.archive")}{archivedCount > 0 ? <span style={{ color: "var(--fg-3)", fontWeight: 400 }}> · {archivedCount}</span> : ""}</span>, listView === "archive", () => { onPickStatus("archive"); close(); })}
-                {row(<span>{t("editor.nav.trash")}{trashedCount > 0 ? <span style={{ color: "var(--fg-3)", fontWeight: 400 }}> · {trashedCount}</span> : ""}</span>, listView === "trash", () => { onPickStatus("trash"); close(); })}
+                {row(<span>{t("notes.archive.title")}{archivedCount > 0 ? <span style={{ color: "var(--fg-3)", fontWeight: 400 }}> · {archivedCount}</span> : ""}</span>, listView === "archive", () => { onPickStatus("archive"); close(); })}
+                {row(<span>{t("notes.list.trash")}{trashedCount > 0 ? <span style={{ color: "var(--fg-3)", fontWeight: 400 }}> · {trashedCount}</span> : ""}</span>, listView === "trash", () => { onPickStatus("trash"); close(); })}
               </>,
             )}
 
             {views.length > 0 && (
               <>
-                <div style={label}>{t("editor.nav.views")}</div>
+                <div style={label}>{t("editor.chrome.barItems.views")}</div>
                 {group(views.map((v, i) => row(v.name, activeViewId === v.id, () => { onPickView(v.id); close(); }, i === 0)))}
               </>
             )}
 
             {tagCount > 0 && (
               <>
-                <div style={label}>{t("editor.nav.tags")}</div>
+                <div style={label}>{t("editor.chrome.barItems.tags")}</div>
                 {group(
                   <div onClick={() => { onOpenTags(); close(); }} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "12px 14px", cursor: "pointer", fontSize: 16, color: "var(--fg-1)" }}>
-                    <span>{t("editor.filterSheet.browseTags")}<span style={{ color: "var(--fg-3)", fontWeight: 400 }}> · {tagCount}</span></span>
+                    <span>{t("commands.actions.showTags.label")}<span style={{ color: "var(--fg-3)", fontWeight: 400 }}> · {tagCount}</span></span>
                     <svg width="8" height="13" viewBox="0 0 8 14" style={{ flex: "none" }}><path d="M1 1l6 6-6 6" stroke="var(--line-2)" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" /></svg>
                   </div>,
                 )}

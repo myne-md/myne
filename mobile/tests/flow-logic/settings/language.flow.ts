@@ -33,11 +33,10 @@ test.describe("mobile display-language picker", () => {
 
     // The choice survives a reload AND the app actually BOOTS from the stored
     // override (detectInitialLanguage reads myne.lang before the tree mounts):
-    // after reload, the picker re-reflects Turkish with no re-selection.
+    // after reload the chrome comes up already localized — the settings affordance
+    // renders its Turkish label, proving tr was applied at boot, not just persisted.
     await page.reload();
     expect(await page.evaluate(() => localStorage.getItem("myne.lang"))).toBe("tr");
-    await page.getByRole("button", { name: "Settings" }).first().click();
-    await page.getByText("Appearance", { exact: true }).click();
-    await expect(page.getByTestId("settings.language-select")).toHaveValue("tr");
+    await expect(page.getByRole("button", { name: "Ayarlar" })).toBeVisible();
   });
 });

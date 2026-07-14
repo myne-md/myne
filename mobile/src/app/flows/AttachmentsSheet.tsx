@@ -153,9 +153,9 @@ export function AttachmentsSheet({
   // the Files page (where it sits beside the primary Upload).
   const cleanBtn = (style: React.CSSProperties) =>
     cleanup ? (
-      <button onClick={() => setCleanup(null)} style={style}>{t("attachments.cancel")}</button>
+      <button onClick={() => setCleanup(null)} style={style}>{t("attachments.cleanUnused.cancel")}</button>
     ) : (
-      <button onClick={() => void reviewUnused()} style={style}>{t("attachments.cleanUnusedLabel")}</button>
+      <button onClick={() => void reviewUnused()} style={style}>{t("attachments.library.cleanUnused")}</button>
     );
 
   const uploadInput = (
@@ -190,7 +190,7 @@ export function AttachmentsSheet({
             <path d="M12 16V4M7 9l5-5 5 5M5 20h14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         )}
-        {uploading ? t("attachments.adding") : t("attachments.upload")}
+        {uploading ? t("sync.join.submitting") : t("attachments.coverPicker.upload")}
       </button>
     );
 
@@ -287,8 +287,8 @@ export function AttachmentsSheet({
               {renaming !== e.id && (
                 <div style={{ display: "flex", gap: 2, flexShrink: 0 }}>
                   {onInsert && <button onClick={() => onInsert(e.id, e.filename)} style={actionBtn("var(--accent)")}>{t("attachments.insert")}</button>}
-                  <button onClick={() => { setRenaming(e.id); setRenameText(e.filename); }} style={actionBtn("var(--fg-2)")}>{t("attachments.rename")}</button>
-                  <button onClick={() => void remove(e.id)} style={actionBtn("var(--danger)")}>{t("attachments.delete")}</button>
+                  <button onClick={() => { setRenaming(e.id); setRenameText(e.filename); }} style={actionBtn("var(--fg-2)")}>{t("attachments.library.menuRename")}</button>
+                  <button onClick={() => void remove(e.id)} style={actionBtn("var(--danger)")}>{t("attachments.deleteDialog.delete")}</button>
                 </div>
               )}
             </div>
@@ -297,7 +297,7 @@ export function AttachmentsSheet({
     </>
   );
 
-  const title = cleanup ? t("attachments.cleanUnusedLabel") : variant === "page" ? t("attachments.filesTitle") : t("attachments.title");
+  const title = cleanup ? t("attachments.library.cleanUnused") : variant === "page" ? t("settings.shell.panels.files") : t("attachments.library.title");
 
   if (variant === "page") {
     return (

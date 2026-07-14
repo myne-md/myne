@@ -39,7 +39,7 @@ export function RestoreBackupFlow({ onDone }: RestoreBackupFlowProps) {
         </Lead>
       </div>
       <div style={{ paddingBottom: 52 }}>
-        <Button onClick={onDone}>{t("restoreBackup.back")}</Button>
+        <Button onClick={onDone}>{t("restore.backLabel")}</Button>
       </div>
     </Screen>
   );

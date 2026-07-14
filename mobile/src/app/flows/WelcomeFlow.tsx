@@ -79,7 +79,7 @@ export function WelcomeFlow({ onCreate, onJoin }: WelcomeFlowProps) {
               {t("welcome.residueBanner", { n: residue })}
             </div>
             <Button variant="secondary" onClick={() => void repair()} disabled={repairing}>
-              {repairing ? t("welcome.cleaningUp") : t("welcome.cleanUpFiles")}
+              {repairing ? t("welcome.repairResidue.cleaningUp") : t("welcome.cleanUpFiles")}
             </Button>
           </Banner>
         )}

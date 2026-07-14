@@ -14,8 +14,8 @@ import { parseFilters, buildFilters, type ViewCondition } from "../../lib/view-f
 const CONDITION_TYPES: ViewCondition["type"][] = ["tag", "folder", "search"];
 /** i18n key per condition type (resolved with `t()` at the render site). */
 const CONDITION_LABELS: Record<ViewCondition["type"], string> = {
-  tag: "viewEditor.condition.tag",
-  folder: "viewEditor.condition.folder",
+  tag: "notes.filterBuilder.type.tag",
+  folder: "notes.filterBuilder.type.folder",
   search: "viewEditor.condition.search",
 };
 
@@ -115,7 +115,7 @@ export function ViewEditorSheet({ initial, tags, folders, viewOrder, onClose, on
       {(close) => (
         <>
           <div style={{ fontSize: 17, fontWeight: 600, color: "var(--fg-1)", textAlign: "center" }}>
-            {initial === null ? t("viewEditor.newView") : t("viewEditor.editView")}
+            {initial === null ? t("notes.list.newViewTitle") : t("viewEditor.editView")}
           </div>
 
           {error && (
@@ -128,7 +128,7 @@ export function ViewEditorSheet({ initial, tags, folders, viewOrder, onClose, on
             ref={nameRef}
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder={t("viewEditor.namePlaceholder")}
+            placeholder={t("notes.tagBrowser.viewNamePlaceholder")}
             style={{
               marginTop: 14,
               width: "100%",
@@ -147,9 +147,9 @@ export function ViewEditorSheet({ initial, tags, folders, viewOrder, onClose, on
 
           {conditions.length > 1 && (
             <div style={{ marginTop: 14, display: "flex", alignItems: "center", gap: 10 }}>
-              <span style={{ fontSize: 13, color: "var(--fg-3)", flexShrink: 0 }}>{t("viewEditor.match")}</span>
+              <span style={{ fontSize: 13, color: "var(--fg-3)", flexShrink: 0 }}>{t("notes.filterBuilder.match")}</span>
               <Segmented
-                options={[t("viewEditor.all"), t("viewEditor.any")]}
+                options={[t("notes.tagBrowser.modeAll"), t("notes.tagBrowser.modeAny")]}
                 active={mode === "and" ? 0 : 1}
                 onChange={(i) => setMode(i === 0 ? "and" : "or")}
                 style={{ flex: 1 }}
@@ -212,7 +212,7 @@ export function ViewEditorSheet({ initial, tags, folders, viewOrder, onClose, on
 
                 <button
                   onClick={() => removeCondition(i)}
-                  aria-label={t("viewEditor.removeCondition")}
+                  aria-label={t("notes.filterBuilder.removeCondition")}
                   style={{ flexShrink: 0, width: 34, height: 44, border: "none", background: "transparent", color: "var(--fg-3)", fontSize: 22, cursor: "pointer", padding: 0 }}
                 >
                   ×
@@ -230,15 +230,15 @@ export function ViewEditorSheet({ initial, tags, folders, viewOrder, onClose, on
 
           <div style={{ marginTop: 18, display: "flex", flexDirection: "column", gap: 10 }}>
             <button onClick={() => void save()} disabled={name.trim() === "" || busy} style={{ ...btn("var(--accent)", "var(--accent-on)"), opacity: name.trim() === "" || busy ? 0.5 : 1 }}>
-              {initial === null ? t("viewEditor.createView") : t("viewEditor.save")}
+              {initial === null ? t("viewEditor.createView") : t("notes.filterBuilder.save")}
             </button>
             {initial !== null && (
               <button onClick={() => void remove()} disabled={busy} style={btn("transparent", "var(--danger)", "1px solid var(--line-2)")}>
-                {t("viewEditor.deleteView")}
+                {t("notes.views.menu.deleteView")}
               </button>
             )}
             <button onClick={close} style={btn("transparent", "var(--fg-1)", "1px solid var(--line-2)")}>
-              {t("viewEditor.cancel")}
+              {t("common.prompt.cancel")}
             </button>
           </div>
         </>

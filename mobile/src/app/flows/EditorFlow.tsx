@@ -1027,13 +1027,13 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
   const paletteCommands: PaletteCommand[] = [
     { id: "new-note", label: t("notes.list.newNote"), icon: <svg width="16" height="16" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" {...gi} /></svg>, run: () => newNote() },
     { id: "daily", label: t("editor.nav.dailyNote"), icon: <svg width="16" height="16" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2" {...gi} /><path d="M3 10h18M8 3v4M16 3v4" {...gi} /></svg>, run: () => void openToday() },
-    { id: "templates", label: t("editor.nav.templates"), icon: <svg width="16" height="16" viewBox="0 0 24 24"><rect x="8" y="4" width="11" height="14" rx="2" {...gi} /><path d="M5 8v10a2 2 0 002 2h8" {...gi} /></svg>, run: () => setTab("templates") },
-    { id: "files", label: t("editor.nav.attachments"), icon: <svg width="16" height="16" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" {...gi} /><path d="M21 15l-5-5L5 21" {...gi} /></svg>, run: () => setTab("files") },
-    { id: "graph", label: t("editor.nav.graph"), icon: <svg width="16" height="16" viewBox="0 0 24 24"><circle cx="6" cy="17" r="2.4" {...gi} /><circle cx="18" cy="14" r="2.4" {...gi} /><circle cx="13" cy="6" r="2.4" {...gi} /><path d="M8.3 15.6l3-7M8.4 16.2l7-1.6" {...gi} /></svg>, run: () => setTab("graph") },
-    { id: "tags", label: t("editor.nav.browseTags"), icon: <svg width="16" height="16" viewBox="0 0 24 24"><path d="M4 4h7l9 9-7 7-9-9z" {...gi} /><circle cx="8" cy="8" r="1.1" fill="currentColor" /></svg>, run: () => setTagBrowserOpen(true) },
-    { id: "archive", label: t("editor.nav.archive"), icon: <svg width="16" height="16" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="5" rx="1" {...gi} /><path d="M5 9v10a1 1 0 001 1h12a1 1 0 001-1V9M9 13h6" {...gi} /></svg>, run: () => { setListView("archive"); setActiveTag(null); setActiveViewId(null); } },
-    { id: "trash", label: t("editor.nav.trash"), icon: <svg width="16" height="16" viewBox="0 0 24 24"><path d="M4 7h16M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2M6 7l1 13a1 1 0 001 1h8a1 1 0 001-1l1-13" {...gi} /></svg>, run: () => { setListView("trash"); setActiveTag(null); setActiveViewId(null); } },
-    { id: "settings", label: t("editor.nav.settings"), icon: <svg width="16" height="16" viewBox="0 0 24 24"><path d="M4 7h11M19 7h1M4 17h1M9 17h11" {...gi} /><circle cx="17" cy="7" r="2.4" {...gi} /><circle cx="7" cy="17" r="2.4" {...gi} /></svg>, run: () => setSettingsOpen(true) },
+    { id: "templates", label: t("templates.manager.listLabel"), icon: <svg width="16" height="16" viewBox="0 0 24 24"><rect x="8" y="4" width="11" height="14" rx="2" {...gi} /><path d="M5 8v10a2 2 0 002 2h8" {...gi} /></svg>, run: () => setTab("templates") },
+    { id: "files", label: t("attachments.library.title"), icon: <svg width="16" height="16" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" {...gi} /><path d="M21 15l-5-5L5 21" {...gi} /></svg>, run: () => setTab("files") },
+    { id: "graph", label: t("editor.chrome.barItems.graph"), icon: <svg width="16" height="16" viewBox="0 0 24 24"><circle cx="6" cy="17" r="2.4" {...gi} /><circle cx="18" cy="14" r="2.4" {...gi} /><circle cx="13" cy="6" r="2.4" {...gi} /><path d="M8.3 15.6l3-7M8.4 16.2l7-1.6" {...gi} /></svg>, run: () => setTab("graph") },
+    { id: "tags", label: t("editor.chrome.bottomBar.browseTags"), icon: <svg width="16" height="16" viewBox="0 0 24 24"><path d="M4 4h7l9 9-7 7-9-9z" {...gi} /><circle cx="8" cy="8" r="1.1" fill="currentColor" /></svg>, run: () => setTagBrowserOpen(true) },
+    { id: "archive", label: t("notes.archive.title"), icon: <svg width="16" height="16" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="5" rx="1" {...gi} /><path d="M5 9v10a1 1 0 001 1h12a1 1 0 001-1V9M9 13h6" {...gi} /></svg>, run: () => { setListView("archive"); setActiveTag(null); setActiveViewId(null); } },
+    { id: "trash", label: t("notes.list.trash"), icon: <svg width="16" height="16" viewBox="0 0 24 24"><path d="M4 7h16M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2M6 7l1 13a1 1 0 001 1h8a1 1 0 001-1l1-13" {...gi} /></svg>, run: () => { setListView("trash"); setActiveTag(null); setActiveViewId(null); } },
+    { id: "settings", label: t("editor.chrome.barItems.settings"), icon: <svg width="16" height="16" viewBox="0 0 24 24"><path d="M4 7h11M19 7h1M4 17h1M9 17h11" {...gi} /><circle cx="17" cy="7" r="2.4" {...gi} /><circle cx="7" cy="17" r="2.4" {...gi} /></svg>, run: () => setSettingsOpen(true) },
     { id: "lock", label: t("commands.actions.lockVault.label"), icon: <svg width="16" height="16" viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="9.5" rx="2" {...gi} /><path d="M8 10.5V8a4 4 0 018 0v2.5" {...gi} /></svg>, run: () => onLock() },
   ];
 
@@ -1177,7 +1177,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
       return out;
     };
     const filterActive = activeTag != null || activeView != null;
-    const viewTitle = listView === "trash" ? t("editor.nav.trash") : listView === "archive" ? t("editor.nav.archive") : t("editor.nav.notes");
+    const viewTitle = listView === "trash" ? t("notes.list.trash") : listView === "archive" ? t("notes.archive.title") : t("notes.list.notesHeading");
     return (
       <>
         {/* Fixed header — sits OUTSIDE the animated pane so it stays put while
@@ -1199,7 +1199,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
                   onClick={() => setListView("notes")}
                   style={{ display: "flex", alignItems: "center", gap: 3, border: "none", background: "transparent", color: "var(--accent)", fontSize: 15, fontWeight: 600, cursor: "pointer", padding: 0, marginBottom: 8 }}
                 >
-                  <Icon name="chevron-left" size={18} color="var(--accent)" strokeWidth={2} /> {t("editor.nav.notes")}
+                  <Icon name="chevron-left" size={18} color="var(--accent)" strokeWidth={2} /> {t("notes.list.notesHeading")}
                 </button>
               )}
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
@@ -1226,7 +1226,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
               {/* Secondary create/browse tiles — Template / Daily note / Views. */}
               {listView === "notes" && (
                 <div style={{ marginTop: 12, display: "flex", gap: 8 }}>
-                  <ActionPill onClick={() => setTab("templates")} label={t("editor.nav.templates")}>
+                  <ActionPill onClick={() => setTab("templates")} label={t("templates.manager.listLabel")}>
                     <rect x="8" y="4" width="11" height="14" rx="2" stroke="currentColor" strokeWidth="1.7" fill="none" />
                     <path d="M5 8v10a2 2 0 002 2h8" stroke="currentColor" strokeWidth="1.7" fill="none" strokeLinecap="round" strokeLinejoin="round" />
                   </ActionPill>
@@ -1234,7 +1234,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
                     <rect x="3" y="5" width="18" height="16" rx="2" fill="none" stroke="currentColor" strokeWidth="1.7" />
                     <path d="M3 10h18M8 3v4M16 3v4" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
                   </ActionPill>
-                  <ActionPill onClick={() => setViewsOpen(true)} label={t("editor.nav.views")}>
+                  <ActionPill onClick={() => setViewsOpen(true)} label={t("editor.chrome.barItems.views")}>
                     <path d="M12 2 2 7l10 5 10-5-10-5z" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
                     <path d="M2 12l10 5 10-5" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
                     <path d="M2 17l10 5 10-5" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />

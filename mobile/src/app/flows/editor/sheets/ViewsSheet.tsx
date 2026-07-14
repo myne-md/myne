@@ -20,14 +20,14 @@ export function ViewsSheet({
   onClose: () => void;
 }) {
   const { t } = useTranslation();
-  const typeLabel: Record<string, string> = { table: t("editor.viewsSheet.typeTable"), cards: t("editor.viewsSheet.typeCards"), list: t("editor.viewsSheet.typeList") };
+  const typeLabel: Record<string, string> = { table: t("editor.slash.table"), cards: t("editor.viewsSheet.typeCards"), list: t("editor.viewsSheet.typeList") };
   return (
     <Sheet onClose={onClose} style={{ maxHeight: "82%", display: "flex", flexDirection: "column", overflow: "hidden" }}>
       {(close) => (
         <>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flex: "none", paddingBottom: 4 }}>
             <span style={{ width: 60 }} />
-            <span style={{ fontSize: 17, fontWeight: 600, color: "var(--fg-1)" }}>{t("editor.nav.views")}</span>
+            <span style={{ fontSize: 17, fontWeight: 600, color: "var(--fg-1)" }}>{t("editor.chrome.barItems.views")}</span>
             <button onClick={close} style={{ width: 60, textAlign: "right", border: "none", background: "transparent", color: "var(--accent)", fontSize: 15, fontWeight: 600, cursor: "pointer" }}>{t("editor.sheet.done")}</button>
           </div>
           <div style={{ overflowY: "auto", minHeight: 0 }}>

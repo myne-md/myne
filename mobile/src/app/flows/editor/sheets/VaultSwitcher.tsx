@@ -75,7 +75,7 @@ export function VaultSwitcher({
         }}
       >
         <Icon name="plus" size={18} color="var(--accent)" strokeWidth={2} />
-        {t("editor.vaultSwitcher.createNewVault")}
+        {t("welcome.createCta")}
       </button>
         </>
       )}

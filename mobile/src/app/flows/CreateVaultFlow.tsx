@@ -617,7 +617,7 @@ export function CreateVaultFlow({
             </Banner>
           )}
           <div style={{ marginTop: 22 }}>
-            <FieldLabel>{t("createVault.passwordLabel")}</FieldLabel>
+            <FieldLabel>{t("sync.enroll.passwordLabel")}</FieldLabel>
             <PasswordRow value={pwd} onChange={setPassword} revealed={reveal} onToggleReveal={() => setReveal((v) => !v)} autoFocus />
           </div>
           {pwd.length > 0 && (
@@ -650,7 +650,7 @@ export function CreateVaultFlow({
     return (
       <Screen>
         <BlockingOverlay
-          title={t("createVault.encryptingTitle")}
+          title={t("editor.attachment.progress.encrypting")}
           subtitle={t("createVault.encryptingSubtitle")}
         />
       </Screen>
@@ -755,11 +755,11 @@ export function CreateVaultFlow({
           <div style={{ marginTop: 14, display: "flex", gap: 10 }}>
             <Button variant="secondary" style={{ height: 46, fontSize: 14 }} onClick={copyAccount}>
               <Icon name={copied ? "check" : "copy"} size={16} color={copied ? "var(--success)" : "var(--fg-2)"} strokeWidth={1.5} />
-              {copied ? t("createVault.copied") : t("createVault.copy")}
+              {copied ? t("vaultCreation.account.copied") : t("vaultCreation.account.copy")}
             </Button>
             <Button variant="secondary" style={{ height: 46, fontSize: 14 }} onClick={saveAccountFile}>
               <Icon name="download" size={16} color="var(--fg-2)" strokeWidth={1.5} />
-              {t("createVault.saveAsFile")}
+              {t("vaultCreation.account.saveAsFile")}
             </Button>
           </div>
           {fileMsg && <p style={{ margin: "8px 0 0", fontSize: 13, color: "var(--fg-3)" }}>{fileMsg}</p>}

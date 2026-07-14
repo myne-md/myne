@@ -21,14 +21,14 @@ export function AppHeader({ label, onSwitcher, onPalette, onSettings }: { label:
       <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
         <button
           onClick={onPalette}
-          aria-label={t("editor.appHeader.commandPalette")}
+          aria-label={t("commandPalette.dialogLabel")}
           style={{ width: 36, height: 36, borderRadius: 8, border: "none", background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
         >
           <Icon name="search" size={21} color="var(--fg-2)" strokeWidth={1.7} />
         </button>
         <button
           onClick={onSettings}
-          aria-label={t("editor.nav.settings")}
+          aria-label={t("editor.chrome.barItems.settings")}
           style={{ width: 36, height: 36, borderRadius: 8, border: "none", background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
         >
           <Icon name="settings" size={21} color="var(--fg-2)" strokeWidth={1.7} />

@@ -105,7 +105,7 @@ export function SnapshotsSheet({
                       <div style={{ fontSize: 12, color: "var(--fg-3)" }}>{formatBytes(s.size_bytes)}</div>
                     </div>
                     <span style={{ fontSize: 13, color: "var(--accent)", fontWeight: 600, flexShrink: 0 }}>
-                      {openUuid === s.snapshot_uuid ? t("snapshots.hide") : t("snapshots.preview")}
+                      {openUuid === s.snapshot_uuid ? t("snapshots.hide") : t("attachments.library.menuPreview")}
                     </span>
                   </div>
                   {openUuid === s.snapshot_uuid && (
