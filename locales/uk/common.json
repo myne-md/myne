@@ -5,25 +5,19 @@
       "cleaning": "Очищення…",
       "close": "Закрити",
       "completeTitle": "Очищення завершено",
+      "deleteCta": "Видалити {{count}} невикористаний файл",
       "deleteCta_one": "Видалити {{count}} невикористане",
-      "deleteCta_few": "Видалити {{count}} невикористані",
-      "deleteCta_many": "Видалити {{count}} невикористаних",
-      "deleteCta_other": "",
+      "deleteCta_other": "Видалити {{count}} невикористаних файлів",
       "error": "Не вдалося виконати очищення. Деякі нотатки можуть бути нечитабельними — нічого не видалено.",
       "intro_one": "Це вкладення не використовується в жодній нотатці. Його видалення є остаточним і його не можна скасувати.",
-      "intro_few": "Ці {{count}} вкладення не використовуються в жодній нотатці. Їх видалення є остаточним і його не можна скасувати.",
-      "intro_many": "Ці {{count}} вкладень не використовуються в жодній нотатці. Їх видалення є остаточним і його не можна скасувати.",
-      "intro_other": "",
+      "intro_other": "Ці {{count}} вкладень не використовуються в жодній нотатці. Їх видалення є остаточним і не може бути скасоване.",
       "summaryFreed": " · звільнено {{size}}",
       "summaryPeriod": ".",
       "summaryRemoved_one": "Видалено {{count}} вкладення",
-      "summaryRemoved_few": "Видалено {{count}} вкладення",
-      "summaryRemoved_many": "Видалено {{count}} вкладень",
-      "summaryRemoved_other": "",
+      "summaryRemoved_other": "Видалено {{count}} вкладень",
+      "summarySkipped": " · {{count}} пропущено (зараз використовується)",
       "summarySkipped_one": " · {{count}} пропущено (тепер використовується)",
-      "summarySkipped_few": " · {{count}} пропущено (тепер використовуються)",
-      "summarySkipped_many": " · {{count}} пропущено (тепер використовуються)",
-      "summarySkipped_other": "",
+      "summarySkipped_other": " · {{count}} пропущено (зараз використовуються)",
       "title": "Очистити невикористані вкладення",
       "willBeReclaimed": "Буде звільнено {{size}}."
     },
@@ -44,9 +38,7 @@
       "error": "Не вдалося видалити вкладення. Спробуйте ще раз.",
       "notUsed": "Не використовується в жодній нотатці.",
       "stillUsed_one": "Воно й досі використовується в {{count}} нотатці. Його видалення залишить позначку там, де воно було вбудоване:",
-      "stillUsed_few": "Воно й досі використовується в {{count}} нотатках. Його видалення залишить позначку там, де воно було вбудоване:",
-      "stillUsed_many": "Воно й досі використовується в {{count}} нотатках. Його видалення залишить позначку там, де воно було вбудоване:",
-      "stillUsed_other": "",
+      "stillUsed_other": "Воно досі використовується в {{count}} нотатках. Його видалення залишить заглушку там, де воно було вбудоване:",
       "title": "Видалити вкладення",
       "untitled": "Без назви"
     },
@@ -100,9 +92,7 @@
         "pdf": "PDF"
       },
       "usedInCount_one": "Використовується в {{count}} нотатці",
-      "usedInCount_few": "Використовується в {{count}} нотатках",
-      "usedInCount_many": "Використовується в {{count}} нотатках",
-      "usedInCount_other": "",
+      "usedInCount_other": "Використовується в {{count}} нотатках",
       "usedInLoading": "…"
     },
     "thumbnail": {
@@ -116,7 +106,28 @@
     "usedInNotesPopover": {
       "empty": "Не використовується в жодній нотатці.",
       "untitled": "Без назви"
-    }
+    },
+    "needsApp": "Очищення вкладень потребує застосунку.",
+    "noUnused": "Немає невикористаних вкладень — на кожен файл є посилання.",
+    "scanError": "Не вдалося перевірити наявність невикористаних вкладень.",
+    "erasedToast_one": "Стерто {{count}} невикористаний файл.",
+    "erasedToast_other": "Стерто {{count}} невикористаних файлів.",
+    "eraseError": "Не вдалося стерти невикористані вкладення.",
+    "readError": "Не вдалося прочитати вкладення.",
+    "needAppPreview": "Вкладення потребують застосунку (а не браузерного перегляду).",
+    "tooLarge": "Цей файл завеликий (максимум 64 МБ).",
+    "unsupported": "Прикріпити можна лише зображення та PDF.",
+    "addError": "Не вдалося додати цей файл.",
+    "deleteError": "Не вдалося видалити це вкладення.",
+    "renameError": "Не вдалося перейменувати це вкладення.",
+    "unusedSummary_one": "На {{count}} вкладення не посилається жодна нотатка ({{size}}). Стирання — це остаточне криптографічне видалення, кошика немає.",
+    "unusedSummary_other": "На {{count}} вкладень не посилається жодна нотатка ({{size}}). Стирання — це остаточне криптографічне видалення, кошика немає.",
+    "eraseCta_one": "Стерти {{count}} невикористаний файл",
+    "eraseCta_other": "Стерти {{count}} невикористаних файлів",
+    "emptyState": "Ще немає вкладень. Торкніться «Завантажити», щоб додати зображення або PDF.",
+    "insert": "Вставити",
+    "pauseLabel": "Призупинити {{filename}}",
+    "playLabel": "Відтворити {{filename}}"
   },
   "backup": {
     "errors": {
@@ -171,6 +182,8 @@
     "archivedBadge": "Архів",
     "archivedBadgeTitle": "Архівовано",
     "dialogLabel": "Палітра команд",
+    "matchedInAttachment": "у вкладенні",
+    "matchedInAttachmentTitle": "Запит збігся всередині файлу, вбудованого в цю нотатку",
     "matchedInBody": "↳ знайдено в тексті",
     "noMatches": "Немає збігів",
     "searchPlaceholder": "Шукайте нотатки або виконуйте команду — Esc, щоб закрити",
@@ -184,10 +197,172 @@
         "label": "Резервне копіювання сейфа…"
       },
       "category": {
+        "ai": "ШІ",
         "app": "Програма",
+        "appearance": "Вигляд",
         "editor": "Редактор",
+        "notes": "Нотатки",
         "vault": "Сейф",
         "view": "Перегляд"
+      },
+      "aiOpenChat": {
+        "label": "Відкрити чат зі ШІ"
+      },
+      "toggleLineNumbers": {
+        "label": "Перемкнути нумерацію рядків"
+      },
+      "toggleSpellCheck": {
+        "label": "Перемкнути перевірку правопису"
+      },
+      "toggleTypewriter": {
+        "label": "Перемкнути друкарське прокручування"
+      },
+      "toggleDimInactive": {
+        "label": "Перемкнути затемнення неактивних рядків"
+      },
+      "toggleEditorFont": {
+        "label": "Перемкнути шрифт редактора (моно / без засічок)"
+      },
+      "cycleTextSize": {
+        "label": "Циклічно змінити розмір тексту редактора"
+      },
+      "cycleContentWidth": {
+        "label": "Циклічно змінити ширину вмісту редактора"
+      },
+      "cycleDefaultViewMode": {
+        "label": "Циклічно змінити типовий режим перегляду"
+      },
+      "toggleTimestamps": {
+        "label": "Перемкнути позначки часу нотаток на бічній панелі"
+      },
+      "toggleArchiving": {
+        "label": "Перемкнути архівування нотаток"
+      },
+      "toggleAiEnabled": {
+        "label": "Перемкнути функції ШІ (бета)"
+      },
+      "toggleScreenCapture": {
+        "label": "Перемкнути захист від захоплення екрана"
+      },
+      "cycleTheme": {
+        "label": "Циклічно змінити тему"
+      },
+      "themeLight": {
+        "label": "Тема: світла"
+      },
+      "themeDark": {
+        "label": "Тема: темна"
+      },
+      "themeAmoled": {
+        "label": "Тема: AMOLED"
+      },
+      "themeSystem": {
+        "label": "Тема: як у системі"
+      },
+      "applyCustomTheme": {
+        "label": "Застосувати власну тему…"
+      },
+      "splitRight": {
+        "label": "Розділити панель праворуч"
+      },
+      "splitDown": {
+        "label": "Розділити панель донизу"
+      },
+      "closePane": {
+        "label": "Закрити панель"
+      },
+      "closeTab": {
+        "label": "Закрити вкладку"
+      },
+      "nextTab": {
+        "label": "Наступна вкладка"
+      },
+      "prevTab": {
+        "label": "Попередня вкладка"
+      },
+      "focusNextPane": {
+        "label": "Перейти до наступної панелі"
+      },
+      "focusPrevPane": {
+        "label": "Перейти до попередньої панелі"
+      },
+      "goBack": {
+        "label": "Назад"
+      },
+      "goForward": {
+        "label": "Уперед"
+      },
+      "togglePreview": {
+        "label": "Перемкнути перегляд поруч"
+      },
+      "findInNote": {
+        "label": "Знайти в нотатці"
+      },
+      "findReplace": {
+        "label": "Знайти й замінити в нотатці"
+      },
+      "newNote": {
+        "label": "Нова нотатка"
+      },
+      "duplicateNote": {
+        "label": "Дублювати нотатку"
+      },
+      "archiveNote": {
+        "label": "Архівувати нотатку"
+      },
+      "renameNote": {
+        "label": "Перейменувати нотатку"
+      },
+      "trashNote": {
+        "label": "Перемістити нотатку в кошик"
+      },
+      "toggleFavorite": {
+        "label": "Перемкнути обране"
+      },
+      "moveNote": {
+        "label": "Перемістити нотатку в теку…"
+      },
+      "emptyTrash": {
+        "label": "Спорожнити кошик"
+      },
+      "showBacklinks": {
+        "label": "Показати зворотні посилання"
+      },
+      "showOutline": {
+        "label": "Показати структуру"
+      },
+      "showUnlinked": {
+        "label": "Показати непов’язані згадки"
+      },
+      "newFolder": {
+        "label": "Нова тека"
+      },
+      "openTrash": {
+        "label": "Відкрити кошик"
+      },
+      "openArchive": {
+        "label": "Відкрити архів"
+      },
+      "cycleHeading": {
+        "label": "Циклічно змінити рівень заголовка"
+      },
+      "restoreBackup": {
+        "label": "Відновити сховище з резервної копії…"
+      },
+      "toggleRealtimeSync": {
+        "label": "Перемкнути синхронізацію в реальному часі"
+      },
+      "revealVaultFolder": {
+        "label": "Показати теку сховища у файловому менеджері"
+      },
+      "aiSummarizeNote": {
+        "label": "Підсумувати нотатку"
+      },
+      "aiSuggestTags": {
+        "label": "Запропонувати теги"
+      },
+      "aiRewriteSelection": {
+        "label": "Переписати виділене"
       },
       "convertWikilinks": {
         "label": "Перетворити імпортовані вікі-посилання в цій нотатці…"
@@ -197,6 +372,12 @@
       },
       "exportNoteHtml": {
         "label": "Експортувати нотатку як HTML…"
+      },
+      "exportSelectionImage": {
+        "label": "Експортувати виділене як зображення…",
+        "saved": "Виділене збережено як зображення.",
+        "noSelection": "Спочатку виділіть текст, потім експортуйте його як зображення.",
+        "failed": "Не вдалося експортувати виділене як зображення."
       },
       "exportNoteMarkdown": {
         "label": "Експортувати нотатку як Markdown…"
@@ -319,6 +500,15 @@
     },
     "rebind": {
       "invalidChordReason": "Додайте модифікатор (⌘, Ctrl або Alt) — окрема клавіша не може бути комбінацією."
+    },
+    "picker": {
+      "vaultRoot": "Корінь сховища",
+      "moveNoteTitle": "Перемістити нотатку в теку",
+      "moveNotePlaceholder": "Виберіть теку…",
+      "noFolders": "Ще немає тек",
+      "applyThemeTitle": "Застосувати власну тему",
+      "applyThemePlaceholder": "Виберіть тему…",
+      "noCustomThemes": "Немає встановлених власних тем"
     }
   },
   "common": {
@@ -329,7 +519,9 @@
     },
     "spinner": {
       "loadingLabel": "Завантаження"
-    }
+    },
+    "back": "Назад",
+    "continue": "Продовжити"
   },
   "editor": {
     "attachment": {
@@ -345,9 +537,7 @@
         "confirm": "Перетворити",
         "skipped": "пропущено — {{note}}",
         "subtitle_one": "Буде перезаписано 1 посилання. Перегляньте перед застосуванням.",
-        "subtitle_few": "Буде перезаписано {{count}} посилання. Перегляньте перед застосуванням.",
-        "subtitle_many": "Буде перезаписано {{count}} посилань. Перегляньте перед застосуванням.",
-        "subtitle_other": "",
+        "subtitle_other": "{{count}} посилань буде переписано. Перегляньте перед підтвердженням.",
         "subtitleEmpty": "Немає що перетворювати — жодного вихідного файлу не знайдено.",
         "title": "Перетворити імпортовані вкладення"
       },
@@ -355,10 +545,9 @@
         "pickerSourceFilter": "Джерело вкладення"
       },
       "convertCore": {
+        "converted": "{{count}} перетворено",
         "converted_one": "{{count}} перетворено",
-        "converted_few": "{{count}} перетворено",
-        "converted_many": "{{count}} перетворено",
-        "converted_other": "",
+        "converted_other": "{{count}} перетворено",
         "noneToConvert": "У цій нотатці немає імпортованих вкладень для перетворення.",
         "skipNote": {
           "failed": "не вдалося імпортувати",
@@ -367,10 +556,9 @@
           "tooLarge": "завеликий (макс. 64 МіБ)",
           "unsupported": "непідтримуваний тип"
         },
+        "skippedSuffix": " · {{count}} пропущено",
         "skippedSuffix_one": " · {{count}} пропущено",
-        "skippedSuffix_few": " · {{count}} пропущено",
-        "skippedSuffix_many": " · {{count}} пропущено",
-        "skippedSuffix_other": ""
+        "skippedSuffix_other": " · {{count}} пропущено"
       },
       "fileKind": {
         "generic": "Файл",
@@ -449,20 +637,18 @@
         "title": "Перейменувати вкладення"
       },
       "summary": {
+        "added": "{{count}} додано",
         "added_one": "{{count}} додано",
-        "added_few": "{{count}} додано",
-        "added_many": "{{count}} додано",
-        "added_other": "",
+        "added_other": "{{count}} додано",
         "reason": {
           "failed": "помилка",
           "locked": "сейф заблоковано",
           "tooLarge": "завеликий",
           "unsupported": "непідтримуваний тип"
         },
+        "skipped": "{{count}} пропущено: {{noun}}",
         "skipped_one": "{{count}} пропущено: {{noun}}",
-        "skipped_few": "{{count}} пропущено: {{noun}}",
-        "skipped_many": "{{count}} пропущено: {{noun}}",
-        "skipped_other": ""
+        "skipped_other": "{{count}} пропущено: {{noun}}"
       },
       "voice": {
         "startError": {
@@ -492,6 +678,9 @@
           "reveal": "Показати в бібліотеці"
         },
         "pdfFallback": "PDF",
+        "textPreview": {
+          "truncated": "Перегляд скорочено — експортуйте, щоб отримати повний файл."
+        },
         "tombstone": {
           "brokenAria": "Зламане посилання на вкладення: {{filename}}",
           "brokenLabel": "зламано",
@@ -529,18 +718,17 @@
       "backlinks": {
         "archivedBadge": "Архівовано",
         "empty": "Поки немає зворотних посилань.",
+        "linkedFrom": "Вхідних посилань: {{count}}",
         "linkedFrom_one": "Згадується в {{count}}",
-        "linkedFrom_few": "Згадується в {{count}}",
-        "linkedFrom_many": "Згадується в {{count}}",
-        "linkedFrom_other": "",
+        "linkedFrom_other": "Вхідних посилань: {{count}}",
         "untitled": "Без назви"
       },
       "barItems": {
         "graph": "Граф",
-        "hide": "",
+        "hide": "Сховати",
         "lock": "Заблокувати",
-        "moveLeft": "",
-        "moveRight": "",
+        "moveLeft": "Перемістити ліворуч",
+        "moveRight": "Перемістити праворуч",
         "saveStatus": "Стан збереження",
         "settings": "Налаштування",
         "syncStatus": "Стан синхронізації",
@@ -551,25 +739,21 @@
         "workspace": "Робоча область"
       },
       "baseImport": {
+        "droppedFiltersSuffix": " · {{count}} фільтр відкинуто",
         "droppedFiltersSuffix_one": " · {{count}} фільтр відкинуто",
-        "droppedFiltersSuffix_few": " · {{count}} фільтри відкинуто",
-        "droppedFiltersSuffix_many": " · {{count}} фільтрів відкинуто",
-        "droppedFiltersSuffix_other": "",
+        "droppedFiltersSuffix_other": " · {{count}} фільтрів відкинуто",
         "failed": "Імпорт не вдався.",
         "fileFilterName": "Obsidian Base",
+        "imported": "Імпортовано {{count}} подання",
         "imported_one": "Імпортовано {{count}} подання",
-        "imported_few": "Імпортовано {{count}} подання",
-        "imported_many": "Імпортовано {{count}} подань",
-        "imported_other": "",
+        "imported_other": "Імпортовано {{count}} подань",
         "notValid": "Недійсний файл .base.",
+        "skippedSuffix": " · {{count}} пропущено",
         "skippedSuffix_one": " · {{count}} пропущено",
-        "skippedSuffix_few": " · {{count}} пропущено",
-        "skippedSuffix_many": " · {{count}} пропущено",
-        "skippedSuffix_other": "",
+        "skippedSuffix_other": " · {{count}} пропущено",
+        "stoppedAfter": "Імпорт зупинено після {{count}} подання.",
         "stoppedAfter_one": "Імпорт зупинено після {{count}} подання.",
-        "stoppedAfter_few": "Імпорт зупинено після {{count}} подань.",
-        "stoppedAfter_many": "Імпорт зупинено після {{count}} подань.",
-        "stoppedAfter_other": ""
+        "stoppedAfter_other": "Імпорт зупинено після {{count}} подань."
       },
       "bottomBar": {
         "browseTags": "Огляд тегів",
@@ -577,14 +761,10 @@
         "cycleViewMode": "Перемкнути режим перегляду",
         "docStats": {
           "summary_one": "{{count}} слово · {{characters}} симв.",
-          "summary_few": "{{count}} слова · {{characters}} симв.",
-          "summary_many": "{{count}} слів · {{characters}} симв.",
-          "summary_other": "",
+          "summary_other": "{{count}} слів · {{characters}} символів",
           "summarySelectionSuffix": " (виділення)",
           "title_one": "{{characters}} символів · {{words}} слів · {{spaces}} пробілів · {{count}} абзац",
-          "title_few": "{{characters}} символів · {{words}} слів · {{spaces}} пробілів · {{count}} абзаци",
-          "title_many": "{{characters}} символів · {{words}} слів · {{spaces}} пробілів · {{count}} абзаців",
-          "title_other": "",
+          "title_other": "{{characters}} символів · {{words}} слів · {{spaces}} пробілів · {{count}} абзаців",
           "titleSelectionSuffix": " (виділення)"
         },
         "graphTitle": "Граф (⌘⇧G)",
@@ -601,13 +781,10 @@
       },
       "import": {
         "imported_one": "Імпортовано {{count}} нотатку{{skipped}}",
-        "imported_few": "Імпортовано {{count}} нотатки{{skipped}}",
-        "imported_many": "Імпортовано {{count}} нотаток{{skipped}}",
-        "imported_other": "",
+        "imported_other": "Імпортовано {{count}} нотаток{{skipped}}",
+        "skippedSuffix": " · {{count}} пропущено",
         "skippedSuffix_one": " · {{count}} пропущено",
-        "skippedSuffix_few": " · {{count}} пропущено",
-        "skippedSuffix_many": " · {{count}} пропущено",
-        "skippedSuffix_other": ""
+        "skippedSuffix_other": " · {{count}} пропущено"
       },
       "nav": {
         "goBack": "Назад",
@@ -617,10 +794,43 @@
       "resizeBacklinksSidebar": "Змінити розмір панелі зворотних посилань",
       "resizeNotesSidebar": "Змінити розмір панелі нотаток",
       "rightPanel": {
-        "allHidden": "",
+        "aiChat": {
+          "askPlaceholder": "Поставте запитання про свої нотатки…",
+          "askSubmit": "Запитати",
+          "assistant": "Асистент",
+          "citations": "Джерела",
+          "composerPlaceholder": "Напишіть своїм нотаткам…",
+          "empty": "Результати ШІ — підсумки, відповіді та пропозиції — з’являться тут.",
+          "error": "Не вдалося виконати запит до ШІ.",
+          "errorTurn": "Асистент не зміг відповісти.",
+          "gettingReadyHint": "Готуємо ваші нотатки для ШІ — хвилинку.",
+          "insert": "Вставити в нотатку",
+          "noAnswer": "Немає відповіді — спробуйте переформулювати.",
+          "noModelHint": "Модель не вибрано. Виберіть її в Налаштування → Лабораторія → ШІ, щоб почати.",
+          "offHint": "Локальний ШІ вимкнено. Увімкніть його в Налаштування → Лабораторія → ШІ.",
+          "send": "Надіслати",
+          "statusGettingReady": "Готуємо…",
+          "statusNoModel": "Немає моделі",
+          "statusOff": "Вимкнено",
+          "statusReady": "Готово",
+          "stop": "Зупинити",
+          "tagsThinking": "Пропонуємо теги…",
+          "thinking": "ШІ думає…",
+          "truncated": "Підсумовано перші {{count}} символів.",
+          "you": "Ви"
+        },
+        "allHidden": "Усі вкладки сховані — клацніть правою кнопкою, щоб відновити.",
         "outline": {
-          "empty": "",
-          "heading": ""
+          "collapse": "Згорнути розділ",
+          "empty": "Немає заголовків",
+          "expand": "Розгорнути розділ",
+          "heading": "Структура"
+        },
+        "tabs": {
+          "aiChat": "Чат зі ШІ",
+          "backlinks": "Зворотні посилання",
+          "outline": "Структура",
+          "unlinked": "Непов’язані згадки"
         }
       },
       "sidebarToggle": {
@@ -689,6 +899,8 @@
       "rendering": "Відтворення діаграми…"
     },
     "slash": {
+      "aiContinue": "Продовжити писати (ШІ)",
+      "aiTitle": "Запропонувати заголовок (ШІ)",
       "attachFile": "Прикріпити файл",
       "bulletList": "Маркований список",
       "callout": "Виноска",
@@ -730,6 +942,21 @@
     },
     "toolbar": {
       "apply": "Застосувати",
+      "exportImageTitle": "Експортувати виділене як зображення",
+      "customize": {
+        "bold": "Жирний",
+        "bulletList": "Маркований список",
+        "checklist": "Контрольний список",
+        "code": "Код",
+        "heading": "Заголовок",
+        "highlight": "Виділення",
+        "italic": "Курсив",
+        "link": "Посилання",
+        "numberedList": "Нумерований список",
+        "quote": "Цитата",
+        "strike": "Закреслений",
+        "wikilink": "Вікі-посилання"
+      },
       "heading": {
         "h1": "H1",
         "h2": "H2",
@@ -778,27 +1005,141 @@
       "convert": {
         "cancel": "Скасувати",
         "choiceClause_one": " · {{count}} потребує вибору.",
-        "choiceClause_few": " · {{count}} потребують вибору.",
-        "choiceClause_many": " · {{count}} потребують вибору.",
-        "choiceClause_other": "",
+        "choiceClause_other": " · {{count}} потребують вибору.",
         "chooseTarget": "Виберіть ціль…",
         "convert": "Перетворити",
         "convertedToast_one": "{{count}} вікі-посилання перетворено",
-        "convertedToast_few": "{{count}} вікі-посилання перетворено",
-        "convertedToast_many": "{{count}} вікі-посилань перетворено",
-        "convertedToast_other": "",
+        "convertedToast_other": "{{count}} вікі-посилань перетворено",
         "noneToConvert": "У цій нотатці немає імпортованих вікі-посилань для перетворення.",
         "nothingToConvert": "Немає що перетворювати — жодне імпортоване вікі-посилання не розв’язується.",
         "rewriteCount_one": "Буде перезаписано {{count}} посилання",
-        "rewriteCount_few": "Буде перезаписано {{count}} посилання",
-        "rewriteCount_many": "Буде перезаписано {{count}} посилань",
-        "rewriteCount_other": "",
+        "rewriteCount_other": "{{count}} посилань буде переписано",
         "skipped": "пропущено — {{reason}}",
         "title": "Перетворити імпортовані вікі-посилання в цій нотатці"
       },
       "convertCore": {
         "noMatch": "немає збігу"
       }
+    },
+    "flow": {
+      "loadFailed": "Не вдалося завантажити ваші нотатки.",
+      "openFailed": "Не вдалося відкрити цю нотатку.",
+      "saveFailed": "Не вдалося зберегти цю нотатку.",
+      "moveFailed": "Не вдалося перемістити цю нотатку.",
+      "openTodayFailed": "Не вдалося відкрити сьогоднішню нотатку.",
+      "exportFailed": "Не вдалося експортувати цю нотатку.",
+      "attachNeedsApp": "Вкладення потребують застосунку (а не браузерного перегляду).",
+      "attachTooLarge": "Цей файл завеликий (максимум 64 МБ).",
+      "attachUnsupported": "Прикріпити можна лише зображення та PDF.",
+      "attachFailed": "Не вдалося прикріпити цей файл.",
+      "archiveFailed": "Не вдалося архівувати цю нотатку.",
+      "trashFailed": "Не вдалося перемістити цю нотатку в кошик."
+    },
+    "nav": {
+      "dailyNote": "Щоденна нотатка",
+      "openToday": "Відкрити сьогодні",
+      "allNotes": "Усі нотатки"
+    },
+    "list": {
+      "searchPlaceholder": "Пошук нотаток",
+      "clearSearch": "Очистити пошук",
+      "viewNoteCount_one": "{{count}} нотатка в «{{name}}»",
+      "viewNoteCount_other": "{{count}} нотаток у «{{name}}»",
+      "edit": "Редагувати",
+      "trashEmpty": "Кошик порожній",
+      "archiveEmpty": "Немає архівованих нотаток",
+      "noMatchingNotes": "Немає відповідних нотаток",
+      "noNotesYet": "Ще немає нотаток",
+      "noMatchBody": "Нічого не відповідає «{{name}}». Змініть подання або очистіть його, щоб побачити всі нотатки.",
+      "emptyBody": "Торкніться «Нова нотатка», щоб написати першу нотатку. Усе шифрується на цьому пристрої перед збереженням.",
+      "unarchive": "Розархівувати"
+    },
+    "filterSheet": {
+      "title": "Фільтр",
+      "status": "Стан"
+    },
+    "sortSheet": {
+      "title": "Сортування",
+      "manual": "Ручний порядок",
+      "titleAsc": "Назва · А → Я",
+      "titleDesc": "Назва · Я → А"
+    },
+    "noteMenu": {
+      "emptyNote": "Порожня нотатка",
+      "wordCount_one": "{{count}} слово · {{minutes}} хв читання",
+      "wordCount_other": "{{count}} слів · {{minutes}} хв читання",
+      "moveToFolder": "Перемістити в теку…",
+      "moveToTrash": "Перемістити в кошик",
+      "copied": "Скопійовано ✓",
+      "copyToClipboard": "Копіювати в буфер обміну",
+      "versionHistory": "Історія версій"
+    },
+    "purge": {
+      "body": "Це остаточно видаляє нотатку з цього пристрою. Цю дію не можна скасувати."
+    },
+    "move": {
+      "title": "Перемістити в теку",
+      "body": "Введіть шлях до теки (напр., Projects/Myne). Залиште порожнім для кореня сховища.",
+      "placeholder": "Projects/Myne",
+      "confirm": "Перемістити"
+    },
+    "sidebar": {
+      "browse": "Огляд"
+    },
+    "emptyDetail": {
+      "title": "Виберіть нотатку",
+      "body": "Виберіть нотатку зі списку або створіть нову."
+    },
+    "readingBar": {
+      "editNote": "Редагувати нотатку",
+      "edit": "Редагувати"
+    },
+    "graphTab": {
+      "linkedNotes_one": "{{count}} пов’язана нотатка",
+      "linkedNotes_other": "{{count}} пов’язаних нотаток",
+      "links_one": "{{count}} посилання",
+      "links_other": "{{count}} посилань"
+    },
+    "formatBar": {
+      "redo": "Повторити",
+      "attachFile": "Прикріпити новий файл",
+      "insertFromLibrary": "Вставити з бібліотеки",
+      "recordVoiceNote": "Записати голосову нотатку",
+      "showLivePreview": "Показати живий перегляд",
+      "showRawMarkdown": "Показати сирий Markdown",
+      "hideKeyboard": "Сховати клавіатуру"
+    },
+    "topBar": {
+      "backToNotes": "Назад до нотаток",
+      "noteDetails": "Деталі нотатки",
+      "noteActions": "Дії з нотаткою"
+    },
+    "noteContext": {
+      "collapsePanel": "Згорнути панель",
+      "unlinkedCount_one": "Непов’язана згадка {{count}}",
+      "unlinkedCount_other": "Непов’язані згадки {{count}}"
+    },
+    "viewsSheet": {
+      "typeCards": "Картки",
+      "typeList": "Список",
+      "emptyState": "Ще немає збережених подань. Створіть одне, щоб фільтрувати нотатки за тегом, текою або текстом.",
+      "editView": "Редагувати подання"
+    },
+    "sheet": {
+      "done": "Готово"
+    },
+    "vaultSwitcher": {
+      "title": "Сховища"
+    },
+    "tagBrowser": {
+      "noTagsMatch": "Немає відповідних тегів.",
+      "notesCount_one": "Нотатки · {{count}}",
+      "notesCount_other": "Нотатки · {{count}}"
+    },
+    "untitledNote": "Нотатка без назви",
+    "commandPalette": {
+      "searchPlaceholder": "Шукайте нотатки або виконайте команду…",
+      "noMatches": "Немає відповідних команд чи нотаток."
     }
   },
   "export": {
@@ -830,13 +1171,9 @@
         "couldNotRead": "Не вдалося прочитати цю нотатку.",
         "exportedTo": "Експортовано до {{filename}}",
         "exportedToWithAttachments_one": "Експортовано до {{filename}} + {{count}} вкладення",
-        "exportedToWithAttachments_few": "Експортовано до {{filename}} + {{count}} вкладення",
-        "exportedToWithAttachments_many": "Експортовано до {{filename}} + {{count}} вкладень",
-        "exportedToWithAttachments_other": "",
+        "exportedToWithAttachments_other": "Експортовано до {{filename}} + {{count}} вкладень",
         "exportedToWithImages_one": "Експортовано до {{filename}} + {{count}} зображення",
-        "exportedToWithImages_few": "Експортовано до {{filename}} + {{count}} зображення",
-        "exportedToWithImages_many": "Експортовано до {{filename}} + {{count}} зображень",
-        "exportedToWithImages_other": "",
+        "exportedToWithImages_other": "Експортовано до {{filename}} + {{count}} зображень",
         "filterHtml": "HTML",
         "filterMarkdown": "Markdown",
         "filterPdf": "PDF",
@@ -847,9 +1184,7 @@
         "cancel": "Скасувати",
         "export": "Експортувати…",
         "includeAttachments_one": "Включити {{count}} вкладення",
-        "includeAttachments_few": "Включити {{count}} вкладення",
-        "includeAttachments_many": "Включити {{count}} вкладень",
-        "includeAttachments_other": "",
+        "includeAttachments_other": "Включити {{count}} вкладень",
         "title": "Експортувати як Markdown"
       }
     },
@@ -877,26 +1212,16 @@
       },
       "flow": {
         "countAttachments_one": "{{count}} вкладення",
-        "countAttachments_few": "{{count}} вкладення",
-        "countAttachments_many": "{{count}} вкладень",
-        "countAttachments_other": "",
+        "countAttachments_other": "{{count}} вкладень",
         "countFolders_one": "{{count}} папка",
-        "countFolders_few": "{{count}} папки",
-        "countFolders_many": "{{count}} папок",
-        "countFolders_other": "",
+        "countFolders_other": "{{count}} тек",
         "countNotes_one": "{{count}} нотатка",
-        "countNotes_few": "{{count}} нотатки",
-        "countNotes_many": "{{count}} нотаток",
-        "countNotes_other": "",
+        "countNotes_other": "{{count}} нотаток",
         "exclusionsHistory": "Історію версій не включено.",
         "exclusionsTrashed_one": "{{count}} нотатку в кошику не включено.",
-        "exclusionsTrashed_few": "{{count}} нотатки в кошику не включено.",
-        "exclusionsTrashed_many": "{{count}} нотаток у кошику не включено.",
-        "exclusionsTrashed_other": "",
+        "exclusionsTrashed_other": "{{count}} нотаток із кошика не включено.",
         "exclusionsTrashedAndHistory_one": "{{count}} нотатку в кошику та історію версій не включено.",
-        "exclusionsTrashedAndHistory_few": "{{count}} нотатки в кошику та історію версій не включено.",
-        "exclusionsTrashedAndHistory_many": "{{count}} нотаток у кошику та історію версій не включено.",
-        "exclusionsTrashedAndHistory_other": "",
+        "exclusionsTrashedAndHistory_other": "{{count}} нотаток із кошика та історію версій не включено.",
         "phaseAttachments": "вкладення",
         "phaseNotes": "нотатки",
         "preparing": "Підготовка…",
@@ -953,15 +1278,18 @@
   },
   "notes": {
     "archive": {
+      "cancel": "Скасувати",
       "close": "Закрити",
       "count_one": "{{count}} нотатка",
-      "count_few": "{{count}} нотатки",
-      "count_many": "{{count}} нотаток",
-      "count_other": "",
+      "count_other": "{{count}} нотаток",
       "countEmpty": "Порожньо",
       "delete": "Видалити",
       "deleteError": "Не вдалося видалити цю нотатку. Спробуйте ще раз.",
       "emptyState": "Архів порожній.",
+      "folderDeleteConfirm_one": "Перемістити {{count}} нотатку в кошик?",
+      "folderDeleteConfirm_other": "Перемістити {{count}} нотаток у кошик?",
+      "folderDeleteConfirmCta": "Перемістити в кошик",
+      "folderDeleteError": "Не вдалося перемістити нотатки цієї теки в кошик. Спробуйте ще раз.",
       "restore": "Відновити",
       "restoreError": "Не вдалося відновити цю нотатку. Спробуйте ще раз.",
       "title": "Архів",
@@ -1012,9 +1340,7 @@
       },
       "noConditions": "Поки немає умов — це подання показує всі сторінки.",
       "noteCount_one": "{{count}} нотатка",
-      "noteCount_few": "{{count}} нотатки",
-      "noteCount_many": "{{count}} нотаток",
-      "noteCount_other": "",
+      "noteCount_other": "{{count}} нотаток",
       "of": "з:",
       "ofTheGroups": "з груп:",
       "removeCondition": "Видалити умову",
@@ -1066,10 +1392,9 @@
       },
       "modal": {
         "cancel": "Скасувати",
+        "cancelledNotImported": "{{count}} не імпортовано",
         "cancelledNotImported_one": "{{count}} не імпортовано",
-        "cancelledNotImported_few": "{{count}} не імпортовано",
-        "cancelledNotImported_many": "{{count}} не імпортовано",
-        "cancelledNotImported_other": "",
+        "cancelledNotImported_other": "{{count}} не імпортовано",
         "cancelling": "Скасування…",
         "chooseFolder": "Виберіть папку…",
         "close": "Закрити",
@@ -1083,9 +1408,7 @@
         "flagKindTitle": "Назва",
         "folderPickerTitle": "Виберіть папку сейфа Obsidian",
         "hiddenIgnoredPrefix_one": "{{count}} конфігураційний / прихований елемент проігноровано (напр. ",
-        "hiddenIgnoredPrefix_few": "{{count}} конфігураційні / приховані елементи проігноровано (напр. ",
-        "hiddenIgnoredPrefix_many": "{{count}} конфігураційних / прихованих елементів проігноровано (напр. ",
-        "hiddenIgnoredPrefix_other": "",
+        "hiddenIgnoredPrefix_other": "{{count}} конфігураційних / прихованих елементів проігноровано (напр., ",
         "hiddenIgnoredSuffix": ", приховані файли).",
         "ifNoteExistsLabel": "Якщо нотатка вже існує",
         "import": "Імпортувати",
@@ -1093,21 +1416,17 @@
         "importing": "Імпортування вашого сейфа…",
         "markDone": "Позначити готовим",
         "markedDone": "Позначено готовим",
+        "mediaImported": "{{count}} імпортовано",
         "mediaImported_one": "{{count}} імпортовано",
-        "mediaImported_few": "{{count}} імпортовано",
-        "mediaImported_many": "{{count}} імпортовано",
-        "mediaImported_other": "",
+        "mediaImported_other": "{{count}} імпортовано",
+        "mediaOmittedSuffix": " · {{count}} опущено",
         "mediaOmittedSuffix_one": " · {{count}} пропущено",
-        "mediaOmittedSuffix_few": " · {{count}} пропущено",
-        "mediaOmittedSuffix_many": " · {{count}} пропущено",
-        "mediaOmittedSuffix_other": "",
+        "mediaOmittedSuffix_other": " · {{count}} опущено",
         "needsAttention": "Потребує уваги",
         "needsAttentionHelp": "Ці нотатки імпортовано без змін. Запропоновані виправлення — це лише відправні точки; скопіюйте одне, а потім перейменуйте нотатку, коли відкриєте її.",
         "noFolderChosen": "Папку не вибрано",
         "notesImported_one": "нотатку імпортовано",
-        "notesImported_few": "нотатки імпортовано",
-        "notesImported_many": "нотаток імпортовано",
-        "notesImported_other": "",
+        "notesImported_other": "нотаток імпортовано",
         "policyCopyHint": "Додати її поруч з наявною нотаткою.",
         "policyCopyLabel": "Імпортувати як копію",
         "policySkipHint": "Рекомендовано — повторний запуск імпорту ніколи не дублює й не перезаписує.",
@@ -1146,21 +1465,19 @@
       "addToFavorites": "Додати до обраного",
       "archive": "Архівувати",
       "archiveBulkError": "Не вдалося архівувати нотатки.",
+      "archiveFolder": "Архівувати теку",
       "archiveNote": "Архівувати",
       "archiveSingleError": "Не вдалося архівувати нотатку.",
       "attachments": "Вкладення",
+      "bulkArchive": "Архівувати {{count}} нотатку",
       "bulkArchive_one": "Архівувати {{count}} нотатку",
-      "bulkArchive_few": "Архівувати {{count}} нотатки",
-      "bulkArchive_many": "Архівувати {{count}} нотаток",
-      "bulkArchive_other": "",
+      "bulkArchive_other": "Архівувати {{count}} нотаток",
+      "bulkDelete": "Видалити {{count}} нотатку",
       "bulkDelete_one": "Видалити {{count}} нотатку",
-      "bulkDelete_few": "Видалити {{count}} нотатки",
-      "bulkDelete_many": "Видалити {{count}} нотаток",
-      "bulkDelete_other": "",
+      "bulkDelete_other": "Видалити {{count}} нотаток",
+      "bulkMove": "Перемістити {{count}} нотатку в…",
       "bulkMove_one": "Перемістити {{count}} нотатку до…",
-      "bulkMove_few": "Перемістити {{count}} нотатки до…",
-      "bulkMove_many": "Перемістити {{count}} нотаток до…",
-      "bulkMove_other": "",
+      "bulkMove_other": "Перемістити {{count}} нотаток у…",
       "caseMergeBody": "Папка з назвою «{{name}}» уже існує. Їх буде об’єднано — перейменувати одну, щоб тримати їх окремо?",
       "color": "Колір…",
       "createFirstNote": "+ Створіть свою першу нотатку",
@@ -1168,9 +1485,7 @@
       "customize": "Налаштувати…",
       "delete": "Видалити",
       "deleteFolderBody_one": "«{{name}}» та її {{count}} нотатку",
-      "deleteFolderBody_few": "«{{name}}» та її {{count}} нотатки",
-      "deleteFolderBody_many": "«{{name}}» та її {{count}} нотаток",
-      "deleteFolderBody_other": "",
+      "deleteFolderBody_other": "«{{name}}» та її {{count}} нотаток",
       "deleteFolderConfirm": "Видалити папку",
       "deleteFolderTitle": "Видалити цю папку?",
       "deleteFolderWarning": "Нотатки буде переміщено до кошика — ви зможете відновити їх пізніше.",
@@ -1196,22 +1511,25 @@
       "noteMovedToTrash": "Нотатку переміщено до кошика",
       "notesHeading": "Нотатки",
       "notesMovedToTrash_one": "{{count}} нотатку переміщено до кошика",
-      "notesMovedToTrash_few": "{{count}} нотатки переміщено до кошика",
-      "notesMovedToTrash_many": "{{count}} нотаток переміщено до кошика",
-      "notesMovedToTrash_other": "",
+      "notesMovedToTrash_other": "{{count}} нотаток переміщено в кошик",
       "openArchive": "Відкрити архів",
       "openAttachments": "Відкрити вкладення",
       "openFolderNote": "Відкрити нотатку папки",
       "openInNewTab": "Відкрити в новій вкладці",
       "openToSide": "Відкрити збоку",
       "openTrash": "Відкрити кошик",
-      "removeAsFolderNote": "Скасувати призначення нотаткою папки",
-      "removeFolderNote": "",
+      "removeFolderNote": "Вилучити нотатку теки",
       "removeFromFavorites": "Видалити з обраного",
       "rename": "Перейменувати",
       "setAsFolderNote": "Призначити нотаткою папки",
       "trash": "Кошик",
       "trashBulkError": "Не вдалося перемістити нотатки до кошика.",
+      "trashConfirmBulkBody_one": "{{count}} нотатку буде переміщено в кошик.",
+      "trashConfirmBulkBody_other": "{{count}} нотаток буде переміщено в кошик.",
+      "trashConfirmBulkWarning": "Ви зможете відновити їх із кошика пізніше.",
+      "trashConfirmConfirm": "Перемістити в кошик",
+      "trashConfirmTitle": "Перемістити в кошик?",
+      "trashConfirmWarning": "Ви зможете відновити її з кошика пізніше.",
       "trashSingleError": "Не вдалося перемістити нотатку до кошика.",
       "undo": "Скасувати",
       "vaultRoot": "Корінь сейфа",
@@ -1286,9 +1604,7 @@
     "snapshots": {
       "cancel": "Скасувати",
       "changeCount_one": "{{count}} зміна з часу цього знімка",
-      "changeCount_few": "{{count}} зміни з часу цього знімка",
-      "changeCount_many": "{{count}} змін з часу цього знімка",
-      "changeCount_other": "",
+      "changeCount_other": "{{count}} змін від цього знімка",
       "close": "Закрити",
       "confirmBody": "Вашу поточну нотатку спершу буде збережено як знімок, тож ви зможете скасувати цю дію.",
       "confirmTitle": "Відновити цей знімок?",
@@ -1333,9 +1649,7 @@
       "noTagsMatch": "Немає тегів, що відповідають «{{query}}».",
       "noTagsYet": "Поки немає тегів.",
       "noteCount_one": "{{count}} нотатка",
-      "noteCount_few": "{{count}} нотатки",
-      "noteCount_many": "{{count}} нотаток",
-      "noteCount_other": "",
+      "noteCount_other": "{{count}} нотаток",
       "notes": "Нотатки",
       "pickTag": "Виберіть тег для фільтрування.",
       "save": "Зберегти",
@@ -1348,23 +1662,17 @@
     "trash": {
       "close": "Закрити",
       "count_one": "{{count}} нотатка",
-      "count_few": "{{count}} нотатки",
-      "count_many": "{{count}} нотаток",
-      "count_other": "",
+      "count_other": "{{count}} нотаток",
       "countEmpty": "Порожньо",
       "delete": "Видалити",
       "deleteError": "Не вдалося видалити цю нотатку. Спробуйте ще раз.",
       "empty": "Очистити кошик",
       "emptyConfirmBody_one": "{{count}} нотатку буде остаточно видалено.",
-      "emptyConfirmBody_few": "{{count}} нотатки буде остаточно видалено.",
-      "emptyConfirmBody_many": "{{count}} нотаток буде остаточно видалено.",
-      "emptyConfirmBody_other": "",
+      "emptyConfirmBody_other": "{{count}} нотаток буде остаточно видалено.",
       "emptyConfirmCta": "Очистити кошик",
       "emptyConfirmTitle": "Очистити кошик?",
       "emptyPartialFailure_one": "{{count}} нотатку не вдалося видалити, і вона залишається в кошику.",
-      "emptyPartialFailure_few": "{{count}} нотатки не вдалося видалити, і вони залишаються в кошику.",
-      "emptyPartialFailure_many": "{{count}} нотаток не вдалося видалити, і вони залишаються в кошику.",
-      "emptyPartialFailure_other": "",
+      "emptyPartialFailure_other": "{{count}} нотаток не вдалося видалити, і вони залишаються в кошику.",
       "emptyState": "Кошик порожній.",
       "purgeConfirmCta": "Видалити назавжди",
       "purgeConfirmTitle": "Видалити назавжди?",
@@ -1465,7 +1773,26 @@
       "operationInProgress": "Операція триває. Зачекайте, будь ласка.",
       "unexpected": "Неочікувана помилка. Спробуйте ще раз.",
       "vaultNotFound": "Файл сейфа не знайдено. Перезапустіть програму."
-    }
+    },
+    "vaultUnreadable": "Файл сховища неможливо прочитати. Відновіть із резервної копії.",
+    "genericError": "Щось пішло не так. Спробуйте ще раз.",
+    "weakPassword": "Пароль має містити щонайменше {{min}} символів.",
+    "setPasswordError": "Не вдалося встановити новий пароль. Спробуйте ще раз.",
+    "passwordMismatch": "Паролі не збігаються.",
+    "decryptingSubtitle": "Відновлюємо ключі сховища за допомогою Argon2id. Це триває кілька секунд.",
+    "restoreVaultHeader": "Відновити сховище",
+    "accountTitle": "Введіть номер акаунта",
+    "accountLead": "Знайдіть його там, де ви зберегли фразу відновлення. Він визначає сховище для відновлення.",
+    "accountInvalid": "Недійсний номер акаунта — перевірте й введіть ще раз.",
+    "accountOptionalHint": "Немає його? Залиште поле порожнім і продовжте — вашої фрази відновлення з 24 слів достатньо.",
+    "paste": "Вставити",
+    "phraseGridHint": "Введіть кожне слово або вставте всі 24 одразу, щоб заповнити сітку.",
+    "submitProgress": "Надіслати · {{filled}} з {{total}}",
+    "newPasswordTitle": "Виберіть новий пароль",
+    "newPasswordLead": "Ваша фраза відновлення залишається незмінною. Це встановлює пароль для цього пристрою.",
+    "confirmPasswordLabel": "Підтвердьте пароль",
+    "passwordHelper": "Ніколи не зберігається, ніколи не передається. Він шифрує ваші ключі на цьому пристрої.",
+    "encryptingSubtitle": "Обгортаємо ключі сховища вашим новим паролем."
   },
   "restore": {
     "backLabel": "Назад",
@@ -1494,9 +1821,7 @@
       "notes": "Нотаток: {{n}}",
       "openVaultList": "Відкрити список сейфів",
       "partialHeader_one": "Відновлено частково — {{count}} елемент не вдалося прочитати.",
-      "partialHeader_few": "Відновлено частково — {{count}} елементи не вдалося прочитати.",
-      "partialHeader_many": "Відновлено частково — {{count}} елементів не вдалося прочитати.",
-      "partialHeader_other": "",
+      "partialHeader_other": "Відновлено частково — {{count}} елементів не вдалося прочитати.",
       "restored": "Сейф відновлено.",
       "versionHistory": "Записів історії версій: {{n}}"
     },
@@ -1520,7 +1845,9 @@
       "licenseLabel": "Ліцензія",
       "tagline": "Передальфа · настільний клієнт Фази 1",
       "threatModelHelper": "Відкрити публічний документ моделі загроз у браузері.",
-      "threatModelLabel": "Модель загроз"
+      "threatModelLabel": "Модель загроз",
+      "version": "Версія",
+      "dev": "Dev"
     },
     "account": {
       "argon2idHeading": "Параметри Argon2id",
@@ -1543,7 +1870,21 @@
       "vaultLabelEyebrow": "МІТКА СЕЙФА",
       "vaultLabelHelper": "Назва цього сейфа, що показується у вбудованому перемикачі. Зберігається зашифрованою всередині сейфа; ніколи не залишає ваш пристрій у відкритому вигляді.",
       "vaultLabelPlaceholder": "Додайте мітку…",
-      "vaultLabelSave": "Зберегти"
+      "vaultLabelSave": "Зберегти",
+      "vaultIconLabel": "ЗНАЧОК",
+      "vaultIconDefault": "Типовий (текстовий логотип)",
+      "renamedToast": "Сховище перейменовано",
+      "renameError": "Не вдалося перейменувати сховище",
+      "newPasswordMismatch": "Нові паролі не збігаються.",
+      "samePassword": "Новий пароль такий самий, як поточний.",
+      "passwordChangedToast": "Пароль змінено",
+      "vaultUnreadable": "Файл сховища неможливо прочитати. Відновіть із резервної копії.",
+      "genericChangeError": "Щось пішло не так. Спробуйте ще раз.",
+      "renameHelper": "Показується в перемикачі сховищ. Зберігається зашифрованим усередині цього сховища; залиште порожнім, щоб очистити.",
+      "newPasswordPlaceholder": "Щонайменше 12 символів",
+      "reenterNewPassword": "Введіть новий пароль ще раз",
+      "changePasswordFootnote": "Це скасовує швидке розблокування. Ваша фраза відновлення не змінюється.",
+      "changing": "Змінюємо…"
     },
     "appearance": {
       "showEditTimesAria": "Показувати час редагування на бічній панелі",
@@ -1559,7 +1900,13 @@
       "themeLabel": "Тема",
       "themeOptionAria": "Тема {{label}}",
       "themeSaveError": "Не вдалося зберегти тему. Спробуйте ще раз.",
-      "timestampsSaveError": "Не вдалося зберегти налаштування. Спробуйте ще раз."
+      "timestampsSaveError": "Не вдалося зберегти налаштування. Спробуйте ще раз.",
+      "sizeS": "S",
+      "sizeM": "M",
+      "sizeL": "L",
+      "sizeXL": "XL",
+      "editorFont": "Шрифт редактора",
+      "showEditTimesSubtitle": "Позначки часу під кожною нотаткою"
     },
     "archive": {
       "helper": "Дозволити переміщати нотатки до архіву, не показуючи їх в основному списку. Вимкнення цього повертає кожну архівовану нотатку до її папки й приховує елементи керування архівом.",
@@ -1609,20 +1956,21 @@
       "when": {
         "bare": "Під’єднано",
         "daysAgo_one": "Під’єднано {{count}} день тому",
-        "daysAgo_few": "Під’єднано {{count}} дні тому",
-        "daysAgo_many": "Під’єднано {{count}} днів тому",
-        "daysAgo_other": "",
+        "daysAgo_other": "Підключено {{count}} днів тому",
+        "hoursAgo": "Підключено {{count}} год тому",
         "hoursAgo_one": "Під’єднано {{count}} год тому",
-        "hoursAgo_few": "Під’єднано {{count}} год тому",
-        "hoursAgo_many": "Під’єднано {{count}} год тому",
-        "hoursAgo_other": "",
+        "hoursAgo_other": "Підключено {{count}} год тому",
         "justNow": "Під’єднано щойно",
+        "minutesAgo": "Підключено {{count}} хв тому",
         "minutesAgo_one": "Під’єднано {{count}} хв тому",
-        "minutesAgo_few": "Під’єднано {{count}} хв тому",
-        "minutesAgo_many": "Під’єднано {{count}} хв тому",
-        "minutesAgo_other": "",
+        "minutesAgo_other": "Підключено {{count}} хв тому",
         "onDate": "Під’єднано {{date}}"
       }
+    },
+    "clipperInstall": {
+      "error": "Не вдалося оновити налаштування браузерного кліпера.",
+      "helper": "Зареєструйте хост нативного обміну повідомленнями, щоб браузерне розширення Myne могло надсилати кліпи в цей застосунок. Увімкнено за замовчуванням; вимкніть, щоб видалити.",
+      "label": "Браузерний кліпер"
     },
     "customThemes": {
       "appliedBadge": "Застосовано",
@@ -1678,38 +2026,39 @@
       "ioFailBody": "Не вдалося отримати доступ до файлів сейфа для видалення. Ключі сейфа вже стерто з пам’яті; будь-які дані сейфа, що лишаються на диску, є невідновлюваним сміттям, обгорнутим Argon2id.",
       "ioFailTitle": "Помилка диска під час видалення",
       "partialFailBody_one": "{{count}} файл не вдалося видалити з диска. Ключі сейфа вже стерто з пам’яті, тож будь-який залишковий шифротекст є невідновлюваним сміттям, обгорнутим Argon2id.",
-      "partialFailBody_few": "{{count}} файли не вдалося видалити з диска. Ключі сейфа вже стерто з пам’яті, тож будь-який залишковий шифротекст є невідновлюваним сміттям, обгорнутим Argon2id.",
-      "partialFailBody_many": "{{count}} файлів не вдалося видалити з диска. Ключі сейфа вже стерто з пам’яті, тож будь-який залишковий шифротекст є невідновлюваним сміттям, обгорнутим Argon2id.",
-      "partialFailBody_other": "",
+      "partialFailBody_other": "{{count}} файлів не вдалося видалити з диска. Ключі сховища вже обнулено в пам’яті, тож будь-який залишковий шифротекст — це невідновлюване сміття, обгорнуте Argon2id.",
       "partialFailTitle": "Видалення сейфа частково не вдалося",
       "submit": "Видалити сейф",
       "submitInFlight": "Видалення сейфа…",
       "typeToConfirmLabel": "Введіть DELETE для підтвердження",
-      "vaultPath": "Шлях до сейфа: {{path}}"
+      "vaultPath": "Шлях до сейфа: {{path}}",
+      "deleteError": "Не вдалося повністю видалити сховище. Спробуйте ще раз.",
+      "warning": "Це остаточно видаляє це сховище та всі його нотатки з цього пристрою. Цю дію не можна скасувати.",
+      "deleteButton": "Видалити це сховище"
     },
     "files": {
       "newNote": {
-        "folderLabel": "",
-        "folderPlaceholder": "",
-        "helper": "",
-        "label": "",
-        "optionCurrent": "",
-        "optionRoot": "",
-        "optionSpecific": "",
-        "saveError": ""
+        "folderLabel": "Тека для нових нотаток",
+        "folderPlaceholder": "напр., Inbox/",
+        "helper": "Куди розміщуються щойно створені нотатки.",
+        "label": "Типове розташування для нових нотаток",
+        "optionCurrent": "Та сама тека, що й поточна нотатка",
+        "optionRoot": "Тека сховища",
+        "optionSpecific": "У теці, вказаній нижче",
+        "saveError": "Не вдалося зберегти розташування для нових нотаток."
       },
       "startup": {
-        "helper": "",
-        "label": "",
-        "noteLabel": "",
-        "notePlaceholder": "",
-        "optionEmpty": "",
-        "optionLast": "",
-        "optionSpecific": "",
-        "saveError": "",
-        "searchEmpty": "",
-        "searchPlaceholder": "",
-        "untitledNote": ""
+        "helper": "Виберіть, який файл відкривати під час запуску застосунку.",
+        "label": "Типовий файл для відкриття",
+        "noteLabel": "Нотатка для відкриття під час запуску",
+        "notePlaceholder": "Виберіть нотатку…",
+        "optionEmpty": "Нова нотатка",
+        "optionLast": "Востаннє відкрита",
+        "optionSpecific": "Певна нотатка",
+        "saveError": "Не вдалося зберегти налаштування запуску.",
+        "searchEmpty": "Нотаток не знайдено.",
+        "searchPlaceholder": "Пошук нотаток…",
+        "untitledNote": "Без назви"
       }
     },
     "focusMode": {
@@ -1760,6 +2109,37 @@
       "off": "Вимкнено",
       "on": "Увімкнено"
     },
+    "toolbarCustomize": {
+      "errorSave": "Не вдалося зберегти розкладку панелі інструментів.",
+      "helper": "Виберіть, які кнопки форматування з’являються на панелі виділення та їхній порядок.",
+      "label": "Кнопки панелі інструментів",
+      "moveDown": "Перемістити вниз",
+      "moveUp": "Перемістити вгору",
+      "pendingHint": "Незабаром"
+    },
+    "ai": {
+      "betaBadge": "Бета",
+      "disclosureToggle": "Як це працює?",
+      "enableHelper": "Запускає надану вами модель повністю на вашому пристрої. Експериментально, вимкнено за замовчуванням.",
+      "enableLabel": "Увімкнути локальний ШІ",
+      "excludedHelper": "Нотатки в цих теках ніколи не читаються та не індексуються ШІ. Один шлях до теки на рядок.",
+      "excludedLabel": "Виключені теки",
+      "excludedPlaceholder": "Private/\nJournal/",
+      "modelChoose": "Виберіть файл…",
+      "modelEmbeddingLabel": "Модель пошуку — семантичний пошук і запитання-відповіді",
+      "modelFilter": {
+        "gguf": "Модель GGUF",
+        "safetensors": "Модель Safetensors"
+      },
+      "modelGenerationLabel": "Текстова модель — чат, підсумки, письмо",
+      "modelNone": "Файл не вибрано",
+      "modelSaveFailed": "Не вдалося зберегти шлях до моделі (він має бути поза вашим сховищем).",
+      "modelsHelper": "Myne ніколи не завантажує моделі — це означало б надсилання даних через мережу. Відкрийте посилання, щоб отримати модель у браузері, а потім виберіть завантажені файли тут. Усе працює на вашому пристрої.",
+      "modelsLabel": "Моделі",
+      "recommendedFilesEmbedding": "Потрібні model.safetensors + config.json + tokenizer.json в одній теці.",
+      "recommendedFilesGeneration": "Потрібні файл .gguf + tokenizer.json в одній теці.",
+      "title": "ШІ"
+    },
     "prefs": {
       "saveError": "Не вдалося зберегти налаштування — спробуйте ще раз"
     },
@@ -1768,9 +2148,20 @@
       "autoLockLabel": "Автоблокування",
       "autoLockSearchEmpty": "Немає тривалостей, що відповідають запиту.",
       "autoLockSearchPlaceholder": "Пошук тривалостей…",
+      "realtimeSyncHelper": "Зміни з інших пристроїв надходять за секунди через сигнал без вмісту — сервер передає лише «щось змінилося», ніколи що саме. Поки ваше сховище розблоковане, застосунок і так регулярно перевіряє сервер, тож це не додає жодної суттєвої видимості; налаштовувати нічого.",
+      "realtimeSyncLabel": "Синхронізація в реальному часі",
       "screenCaptureHelperOff": "Захист завжди діє до розблокування. Після розблокування дотримується цього налаштування.",
       "screenCaptureHelperOn": "Активний на macOS і Windows 10 (оновлення за травень 2020 чи новіше). Підтримка Linux з’явиться в одному з наступних випусків.",
-      "screenCaptureLabel": "Захист від знімків екрана"
+      "screenCaptureLabel": "Захист від знімків екрана",
+      "screenCaptureSubtitle": "Блокувати знімки екрана та запис екрана",
+      "autoLockAfter": "Автоблокування після",
+      "autoLock1m": "1 хв",
+      "autoLock5m": "5 хв",
+      "autoLock15m": "15 хв",
+      "autoLock30m": "30 хв",
+      "autoLock1h": "1 год",
+      "quickUnlockSubtitleAndroid": "Повторний вхід за PIN після автоблокування",
+      "quickUnlockSubtitle": "Повторний вхід за {{method}} або PIN після автоблокування"
     },
     "quickUnlock": {
       "errorCancelled": "Скасовано.",
@@ -1778,32 +2169,55 @@
       "errorHardwareUnavailable": "Touch ID недоступний на цьому пристрої.",
       "errorNotUnlocked": "Спочатку розблокуйте сейф.",
       "errorPinNotDigits": "PIN-код має містити лише цифри.",
+      "errorPinTooShort": "PIN має містити щонайменше {{count}} цифру.",
       "errorPinTooShort_one": "PIN-код має містити щонайменше {{count}} цифру.",
-      "errorPinTooShort_few": "PIN-код має містити щонайменше {{count}} цифри.",
-      "errorPinTooShort_many": "PIN-код має містити щонайменше {{count}} цифр.",
-      "errorPinTooShort_other": "",
+      "errorPinTooShort_other": "PIN має містити щонайменше {{count}} цифр.",
       "helperConfigured": "Налаштовано через {{method}}. Повторне введення після автоблокування не потребує головного пароля. Головний пароль усе одно потрібен після перезапуску.",
       "helperNotConfigured": "Повторно вводьте після автоблокування PIN-код або Touch ID замість повного головного пароля. Це зручність поверх зашифрованого сейфа — головний пароль усе одно потрібен після перезапуску.",
       "methodPin": "PIN-код",
       "methodTouchId": "Touch ID",
       "pinAriaLabel": "PIN-код швидкого розблокування",
+      "pinPlaceholder": "PIN (щонайменше {{count}} цифра)",
       "pinPlaceholder_one": "PIN-код (щонайменше {{count}} цифру)",
-      "pinPlaceholder_few": "PIN-код (щонайменше {{count}} цифри)",
-      "pinPlaceholder_many": "PIN-код (щонайменше {{count}} цифр)",
-      "pinPlaceholder_other": "",
+      "pinPlaceholder_other": "PIN (щонайменше {{count}} цифр)",
       "setPin": "Установити PIN-код",
       "setupHelper": "Touch ID доступний лише на macOS і наразі є експериментальним (очікує апаратної перевірки). PIN-код працює всюди.",
       "title": "Швидке розблокування",
-      "useTouchId": "Використати Touch ID"
+      "useTouchId": "Використати Touch ID",
+      "pinTooShort": "PIN має містити щонайменше 6 цифр.",
+      "pinMismatch": "PIN-коди не збігаються.",
+      "pinOnToast": "Швидке розблокування за PIN увімкнено",
+      "setupError": "Не вдалося налаштувати швидке розблокування.",
+      "turnedOffToast": "Швидке розблокування вимкнено",
+      "turnOffError": "Не вдалося вимкнути швидке розблокування",
+      "biometricOnToast": "Швидке розблокування за {{method}} увімкнено",
+      "biometricUnavailable": "{{method}} недоступне на цьому пристрої.",
+      "warningBanner": "Лише для зручності. Після перезапуску пароль усе одно потрібен.",
+      "biometricToggleSubtitle": "Розблокування за {{method}} після автоблокування",
+      "pinOnLead": "Швидке розблокування за PIN ",
+      "pinOnEmphasis": "увімкнено",
+      "pinOnRest": ". Після автоблокування сховища ви можете повторно входити за PIN замість повного пароля — лише в цьому сеансі застосунку. Холодний запуск завжди потребує повного пароля.",
+      "turnOffPin": "Вимкнути PIN",
+      "pinSetupHelper": "Установіть PIN із 6+ цифр, щоб швидко розблоковувати після автоблокування. PIN обгортає локальний ключ пристрою — він ніколи не залишає цей пристрій і ніколи не торкається вашої фрази відновлення.",
+      "pinReplacesBiometric": " Установлення PIN замінює розблокування за {{method}}.",
+      "pinPlaceholder6": "Щонайменше 6 цифр",
+      "confirmPin": "Підтвердьте PIN",
+      "reenterPin": "Введіть PIN ще раз",
+      "setupButton": "Налаштувати швидке розблокування"
     },
     "shell": {
       "closeLabel": "Закрити налаштування",
+      "groups": {
+        "labs": "Лабораторія"
+      },
       "navLabel": "Панелі налаштувань",
       "panels": {
         "about": "Про програму",
         "account": "Обліковий запис",
+        "ai": "ШІ",
         "appearance": "Вигляд",
         "editor": "Редактор",
+        "files": "Файли",
         "hotkeys": "Комбінації клавіш",
         "privacy": "Конфіденційність",
         "storage": "Сховище",
@@ -1861,6 +2275,44 @@
       "optionLive": "Жива передача",
       "optionReading": "Читання",
       "optionSource": "Код"
+    },
+    "strength": {
+      "weak": "Слабкий",
+      "fair": "Посередній",
+      "good": "Хороший",
+      "strong": "Надійний"
+    },
+    "sync": {
+      "summary": {
+        "notSetUp": "Не налаштовано",
+        "offline": "Офлайн",
+        "conflicts_one": "{{count}} конфлікт",
+        "conflicts_other": "{{count}} конфліктів"
+      }
+    },
+    "data": {
+      "exported_one": "Експортовано {{count}} нотатку → {{label}}",
+      "exported_other": "Експортовано {{count}} нотаток → {{label}}",
+      "exportNeedsApp": "Експорт потребує застосунку (а не браузерного перегляду).",
+      "exportFailed": "Не вдалося експортувати сховище.",
+      "exportToMarkdown": "Експорт у Markdown",
+      "exportToMarkdownSubtitle": "Розшифрувати кожну нотатку в звичайну теку в Документах"
+    },
+    "saveSettingError": "Не вдалося зберегти це налаштування",
+    "panelTitle": {
+      "privacy": "Приватність і безпека",
+      "data": "Дані",
+      "vaultName": "Назва сховища",
+      "approveDevice": "Схвалити пристрій"
+    },
+    "done": "Готово",
+    "sectionOptions": "Параметри",
+    "footerTagline": "myne · зашифровано на цьому пристрої · відкритий код",
+    "editor": {
+      "defaultView": "Типове подання",
+      "typewriter": "Друкарське прокручування",
+      "typewriterSubtitle": "Тримати курсор вертикально по центру",
+      "enableArchiving": "Увімкнути архівування"
     }
   },
   "sync": {
@@ -1884,18 +2336,17 @@
       "discard": "Відхилити",
       "empty": "Конфліктів немає — ваші пристрої синхронізовано.",
       "groupTitle_one": "{{count}} конфліктна копія {{original}}",
-      "groupTitle_few": "{{count}} конфліктні копії {{original}}",
-      "groupTitle_many": "{{count}} конфліктних копій {{original}}",
-      "groupTitle_other": "",
+      "groupTitle_other": "{{count}} конфліктних копій «{{original}}»",
       "keepAsSeparate": "Зберегти окремо",
-      "untitled": "Без назви ({{hex}})"
+      "tookTheirsToast": "Локальну версію переміщено в кошик.",
+      "tookTheirsUndo": "Скасувати",
+      "untitled": "Без назви ({{hex}})",
+      "useThisVersion": "Використати цю версію"
     },
     "devices": {
       "approve": "Схвалити",
       "awaitingApproval_one": "{{count}} пристрій очікує схвалення",
-      "awaitingApproval_few": "{{count}} пристрої очікують схвалення",
-      "awaitingApproval_many": "{{count}} пристроїв очікують схвалення",
-      "awaitingApproval_other": "",
+      "awaitingApproval_other": "{{count}} пристроїв очікують схвалення",
       "loading": "Завантаження…",
       "noDevices": "Жодного пристрою ще не синхронізовано.",
       "notEnrolled": "Цей пристрій ще не під’єднано. Якщо ви щойно додали його, дочекайтеся схвалення з іншого пристрою; інакше додайте його за допомогою форми «Додати пристрій» вище.",
@@ -1908,6 +2359,12 @@
       "thisDevice": "Цей пристрій",
       "transportHint": "Якщо сервер змінив адресу або його сертифікат змінився, повторно введіть URL-адресу сервера в розділі «Сервер синхронізації» вище, щоб знову довіряти йому.",
       "unreachable": "Не вдалося зв’язатися із синхронізацією ({{error}}).",
+      "verifyBody": "Перевірте, що той самий код з’являється на пристрої, який ви щойно схвалили. Якщо збігається — він у вашому акаунті. Якщо ні — вилучіть пристрій.",
+      "verifyMatch": "Збігаються",
+      "verifyMismatch": "Не збігаються",
+      "verifyPending": "Цей код з’явиться, коли новий пристрій завершить першу синхронізацію.",
+      "verifySyncing": "Синхронізація…",
+      "verifyTitle": "Підтвердьте новий пристрій",
       "yourDevices": "Ваші пристрої"
     },
     "endpoint": {
@@ -1916,6 +2373,8 @@
       "connectedTls": "Під’єднано. Переконайтеся, що цей відбиток збігається на вашому іншому пристрої.",
       "connecting": "З’єднання…",
       "fingerprintLabel": "Відбиток сертифіката сервера:",
+      "pinStatic": "Перевірено за вбудованим сертифікатом Myne.",
+      "pinTofu": "Закріплено під час першого підключення. Порівняйте цей відбиток на всіх ваших пристроях.",
       "placeholder": "https://your-server.example   ·   http://127.0.0.1:8080",
       "unreachable": "Не вдалося зв’язатися з цим сервером — перевірте URL-адресу та чи він запущений."
     },
@@ -1942,14 +2401,23 @@
     "join": {
       "accountLabel": "Номер облікового запису",
       "cancel": "Скасувати",
+      "continue": "Продовжити",
       "error": "Не вдалося додати цей пристрій. Перевірте URL-адресу сервера, номер облікового запису й пароль — і чи доступний сервер.",
       "help": "Увійдіть за допомогою номера облікового запису та пароля. Цей пристрій синхронізує ваші нотатки, щойно його схвалить наявний пристрій. Фраза відновлення не потрібна.",
       "passwordLabel": "Пароль",
+      "pinnedCompare": "Цей пристрій закріпив сертифікат вашого сервера. Перевірте, що цей відбиток збігається на інших ваших пристроях.",
+      "pinnedTitle": "Сертифікат сервера закріплено",
       "serverLabel": "Сервер синхронізації",
       "serverPlaceholder": "https://your-server.example",
+      "sasMatch": "Збігаються — продовжити",
+      "sasMismatch": "Не збігаються — вилучити цей пристрій",
       "submit": "Додати пристрій",
       "submitting": "Додавання…",
-      "title": "Додати цей пристрій до облікового запису"
+      "title": "Додати цей пристрій до облікового запису",
+      "verifyBody": "Перевірте, що цей код збігається з тим, що на пристрої, з якого ви схвалили.",
+      "verifyTitle": "Підтвердьте цей пристрій",
+      "waitingHint": "Тримайте це вікно відкритим — після схвалення тут з’явиться код підтвердження для порівняння з іншим пристроєм.",
+      "waitingTitle": "Очікування схвалення"
     },
     "panel": {
       "addDevice": {
@@ -1978,9 +2446,7 @@
     "status": {
       "awaitingApproval": "Очікування схвалення",
       "conflicts_one": "{{count}} конфлікт на розгляд",
-      "conflicts_few": "{{count}} конфлікти на розгляд",
-      "conflicts_many": "{{count}} конфліктів на розгляд",
-      "conflicts_other": "",
+      "conflicts_other": "{{count}} конфліктів для перегляду",
       "error": "Помилка синхронізації",
       "loading": "Стан синхронізації…",
       "notEnrolled": "Не під’єднано",
@@ -1988,6 +2454,43 @@
       "synced": "Синхронізовано",
       "syncing": "Синхронізація…",
       "syncNow": "Синхронізувати зараз"
+    },
+    "settings": {
+      "serverSection": "Сервер",
+      "serverNotSet": "Не встановлено",
+      "statusLabel": "Стан",
+      "hubHelp": "Синхронізація підтримує ваші нотатки актуальними на всіх пристроях. Усе шифрується на цьому пристрої перед надсиланням — сервер ніколи не бачить ваших нотаток.",
+      "connectedTls": "Підключено через TLS.",
+      "connectedLocal": "Підключено у вашій локальній мережі.",
+      "connectError": "Не вдалося зв’язатися з цим сервером. Перевірте адресу та спробуйте ще раз.",
+      "serverAddressLabel": "Адреса сервера",
+      "serverAddressPlaceholder": "https://sync.example.com",
+      "fingerprintLabel": "Відбиток сертифіката",
+      "fingerprintCompare": "Порівняйте це з тим самим екраном на пристрої, якому ви вже довіряєте — вони мають збігатися.",
+      "pinStatic": "Перевірено за відомим сертифікатом цього сервера.",
+      "pinTofu": "Закріплено під час першого підключення. Порівняйте його на всіх ваших пристроях для підтвердження.",
+      "enrollNotConfigured": "Спочатку налаштуйте сервер синхронізації, потім додайте цей пристрій.",
+      "enrollTransport": "Не вдалося зв’язатися із сервером синхронізації. Перевірте з’єднання та спробуйте ще раз.",
+      "accountNumberHint": "Ще раз перевірте цей номер — він виглядає неправильним.",
+      "passwordPlaceholder": "Пароль вашого сховища",
+      "recoveryPhraseHint": "Введіть або вставте свої 24 слова. Вставлення заповнює клітинки по порядку.",
+      "verifyBody": "Перевірте, що той самий код з’являється на пристрої, який ви щойно схвалили. Якщо збігається — він у вашому акаунті. Якщо ні — вилучіть пристрій.",
+      "sasMismatch": "Не збігаються",
+      "removeDeviceButton": "Вилучити пристрій",
+      "keepDevice": "Залишити",
+      "notEnrolledHelp": "Цей пристрій ще не синхронізується. Додайте його з попереднього екрана, щоб побачити свої пристрої.",
+      "unauthenticated": "Доступ цього пристрою було скасовано, ймовірно, його вилучили з іншого пристрою.",
+      "transportError": "Не вдалося зв’язатися із сервером синхронізації. Якщо сервер змінив адресу або його сертифікат змінився, перепідключіть його з екрана сервера синхронізації.",
+      "retiredSelf": "Цей пристрій було вилучено з іншого пристрою.",
+      "resetAndAddAgain": "Скинути й додати знову",
+      "noDevices": "Ще немає пристроїв.",
+      "syncingHere": "Синхронізується тут"
+    },
+    "banner": {
+      "conflictsNeedReview_one": "{{count}} конфлікт потребує перегляду",
+      "conflictsNeedReview_other": "{{count}} конфліктів потребують перегляду",
+      "catchingUp": "Наздоганяємо синхронізацію — ваші нотатки в безпеці.",
+      "verifyDevices": "Підтвердити пристрої"
     }
   },
   "templates": {
@@ -2004,7 +2507,14 @@
       "removeFromTemplates": "Видалити з шаблонів",
       "removeRowLabel": "Видалити {{name}} з шаблонів (нотатка залишається)",
       "title": "Шаблони нотаток"
-    }
+    },
+    "emptyBefore": "Ще немає шаблонів. Торкніться ",
+    "newAction": "Новий",
+    "emptyAfter": ", щоб створити багаторазовий шаблон нотатки — а потім створюйте нотатки з нього (і виберіть один як шаблон щоденної нотатки в Налаштуваннях).",
+    "use": "Використати",
+    "edit": "Редагувати",
+    "deleteConfirm": "Видалити цей шаблон?",
+    "convertToNote": "Перетворити на нотатку"
   },
   "unlock": {
     "backToPicker": "Вибрати інший сейф",
@@ -2038,7 +2548,34 @@
       "lockedDuringChange": "Зміну пароля скасовано: сейф було заблоковано.",
       "metaChangedExternally": "Сейф було змінено в іншому сеансі — будь ласка, розблокуйте знову."
     },
-    "title": "Розблокуйте свій сейф."
+    "title": "Розблокуйте свій сейф.",
+    "vaultUnreadable": "Файл сховища неможливо прочитати. Відновіть із резервної копії.",
+    "unlockFailedGeneric": "Не вдалося розблокувати. Спробуйте ще раз.",
+    "biometricTooManyAttempts": "Забагато спроб {{biometric}}. Скористайтеся паролем.",
+    "pinIncorrect_one": "Неправильний PIN. Залишилася {{count}} спроба.",
+    "pinIncorrect_other": "Неправильний PIN. Залишилося {{count}} спроб.",
+    "pinTooManyAttempts": "Забагато спроб PIN. Скористайтеся паролем.",
+    "pinFailedGeneric": "Не вдалося розблокувати за PIN. Скористайтеся паролем.",
+    "corruptedHeading": "Файл сховища неможливо прочитати",
+    "ioErrorHeading": "Не вдається прочитати це сховище",
+    "blockingTitle": "Розблокування",
+    "blockingSubtitle": "Розшифровуємо ваші ключі на цьому пристрої.",
+    "eyebrow": "Розблокувати сховище",
+    "vaultTitleFallback": "Ваше сховище",
+    "unlockWithBiometric": "Розблокувати за {{biometric}}",
+    "biometricFailed": "{{biometric}} не змогла підтвердити, що це ви",
+    "touchToUnlock": "Торкніться, щоб розблокувати",
+    "lookToUnlock": "Погляньте, щоб розблокувати",
+    "biometricRetryHint": "Спробуйте ще раз або розблокуйте паролем.",
+    "tryBiometricAgain": "Спробувати {{biometric}} ще раз",
+    "usePasswordInstead": "Скористатися паролем натомість",
+    "useBiometricInstead": "Скористатися {{biometric}} натомість",
+    "unlockWithPinInstead": "Розблокувати за PIN натомість",
+    "useRecoveryPhrase": "Скористатися фразою відновлення",
+    "deleteConfirmTitle": "Видалити це сховище?",
+    "deletePartialError": "Деякі файли не вдалося вилучити. Сховище більше непридатне для використання — продовжте, щоб почати заново.",
+    "failClosedEyebrow": "Не вдається відкрити сховище",
+    "restoreHint": "Відновіть із резервної копії, щоб продовжити."
   },
   "vault": {
     "ioBanner": {
@@ -2289,29 +2826,158 @@
       "cleaningUp": "Очищення…",
       "cleanUp": "Очистити",
       "confirmBody_one": "{{count}} файл буде видалено. Він уже нечитабельний; нічого, що можна відновити, не втрачено.",
-      "confirmBody_few": "{{count}} файли буде видалено. Вони вже нечитабельні; нічого, що можна відновити, не втрачено.",
-      "confirmBody_many": "{{count}} файлів буде видалено. Вони вже нечитабельні; нічого, що можна відновити, не втрачено.",
-      "confirmBody_other": "",
+      "confirmBody_other": "{{count}} файлів буде вилучено. Їх уже неможливо прочитати; нічого відновлюваного не втрачається.",
       "confirmTitle": "Очистити залишкові файли?",
       "doneBody_one": "Видалено {{count}} залишковий файл. Тепер ви можете створити новий сейф.",
-      "doneBody_few": "Видалено {{count}} залишкові файли. Тепер ви можете створити новий сейф.",
-      "doneBody_many": "Видалено {{count}} залишкових файлів. Тепер ви можете створити новий сейф.",
-      "doneBody_other": "",
+      "doneBody_other": "Вилучено {{count}} залишкових файлів. Тепер ви можете створити нове сховище.",
       "doneTitle": "Очищено",
       "errorBody": "Щось пішло не так. Закрийте програму та спробуйте ще раз.",
       "errorTitle": "Очищення не вдалося",
       "foundBody_one": "{{count}} залишковий файл від попереднього видалення, яке не завершилося. Він уже нечитабельний — ви не втратите нічого, що можна відновити.",
-      "foundBody_few": "{{count}} залишкові файли від попереднього видалення, яке не завершилося. Вони вже нечитабельні — ви не втратите нічого, що можна відновити.",
-      "foundBody_many": "{{count}} залишкових файлів від попереднього видалення, яке не завершилося. Вони вже нечитабельні — ви не втратите нічого, що можна відновити.",
-      "foundBody_other": "",
+      "foundBody_other": "{{count}} залишкових файлів від попереднього видалення, яке не завершилося. Їх уже неможливо прочитати — ви не втратите нічого відновлюваного.",
       "foundTitle": "Залишкові файли від незавершеного видалення",
       "partialBody_one": "{{count}} файл може бути заблокований іншою програмою (антивірусом, синхронізацією файлів чи індексуванням пошуку). Закрийте програму та спробуйте за мить ще раз або видаліть папку сейфа вручну.",
-      "partialBody_few": "{{count}} файли можуть бути заблоковані іншою програмою (антивірусом, синхронізацією файлів чи індексуванням пошуку). Закрийте програму та спробуйте за мить ще раз або видаліть папку сейфа вручну.",
-      "partialBody_many": "{{count}} файлів можуть бути заблоковані іншою програмою (антивірусом, синхронізацією файлів чи індексуванням пошуку). Закрийте програму та спробуйте за мить ще раз або видаліть папку сейфа вручну.",
-      "partialBody_other": "",
+      "partialBody_other": "{{count}} файлів можуть бути заблоковані іншим застосунком (антивірус, синхронізація файлів або індексування пошуку). Закрийте застосунок і спробуйте ще раз за мить або вилучіть теку сховища вручну.",
       "partialTitle": "Деякі файли не вдалося видалити"
     },
     "restoreCta": "Відновити з резервної копії",
-    "subtitle": "Ваші нотатки шифруються на цьому пристрої, перш ніж залишити його. Сервер зберігає лише шифротекст."
+    "subtitle": "Ваші нотатки шифруються на цьому пристрої, перш ніж залишити його. Сервер зберігає лише шифротекст.",
+    "repairCleanedUp_one": "Очищено {{count}} залишковий файл.",
+    "repairCleanedUp_other": "Очищено {{count}} залишкових файлів.",
+    "repairFailed": "Не вдалося завершити очищення. Спробуйте ще раз.",
+    "heroLine1": "Нотатки, що",
+    "heroLine2": "належать",
+    "heroLine3": "лише вам.",
+    "lede": "Markdown, зашифрований на цьому пристрої, перш ніж він його покине. Без електронної пошти для акаунта. Жодних серверів, які можуть прочитати хоч слово.",
+    "residueBanner": "Залишкові файли від перерваного видалення ({{n}}). Очистіть їх перед створенням сховища.",
+    "cleanUpFiles": "Очистити залишкові файли",
+    "create": "Створити сховище",
+    "connect": "Підключитися до мого акаунта"
+  },
+  "wikiGraph": {
+    "emptyTitle": "Ще немає посилань",
+    "emptyBodyBefore": "Пов’язуйте нотатки, пишучи ",
+    "emptyBodyAfter": " у своєму тексті. Пов’язані нотатки з’являться тут як граф."
+  },
+  "markdown": {
+    "attachmentFallback": "вкладення",
+    "nothingToPreview": "Поки немає чого переглядати."
+  },
+  "conflicts": {
+    "empty": "Немає конфліктів для перегляду — ваші нотатки синхронізовані.",
+    "groupTitle_one": "{{count}} конфліктна копія",
+    "groupTitle_other": "{{count}} конфліктних копій",
+    "groupTitleOfNote": " нотатки {{hex}}"
+  },
+  "viewEditor": {
+    "saveError": "Не вдалося зберегти це подання. Спробуйте ще раз.",
+    "deleteError": "Не вдалося видалити це подання. Спробуйте ще раз.",
+    "editView": "Редагувати подання",
+    "condition": {
+      "search": "Текст"
+    },
+    "containsPlaceholder": "містить…",
+    "tagPlaceholder": "тег",
+    "folderPlaceholder": "Тека/",
+    "addCondition": "+ Додати умову",
+    "createView": "Створити подання"
+  },
+  "snapshots": {
+    "today": "Сьогодні {{time}}",
+    "readError": "Не вдалося прочитати історію версій.",
+    "decryptError": "Не вдалося розшифрувати цю версію.",
+    "restoreError": "Не вдалося відновити цю версію.",
+    "title": "Історія версій",
+    "emptyState": "Ще немає попередніх версій. Знімки створюються автоматично під час редагування.",
+    "hide": "Сховати",
+    "empty": "(порожньо)",
+    "restoreThisVersion": "Відновити цю версію"
+  },
+  "restoreBackup": {
+    "title": "Ще недоступно на мобільних",
+    "body": "Відновлення з файлу резервної копії ще недоступне на мобільних — створіть сховище або відновіть за фразою."
+  },
+  "recording": {
+    "deniedTitle": "Доступ до мікрофона вимкнено",
+    "errorTitle": "Не вдалося почати запис",
+    "deniedBody": "Щоб записати голосову нотатку, дозвольте доступ до мікрофона для Myne в Налаштування › Myne › Мікрофон.",
+    "noDeviceBody": "На цьому пристрої не знайдено мікрофона.",
+    "emptyBody": "Цей запис був порожнім — нічого не зафіксовано.",
+    "genericBody": "Під час запису щось пішло не так. Спробуйте ще раз.",
+    "stopAria": "Зупинити запис"
+  },
+  "picker": {
+    "neverOpened": "Ніколи не відкривалося",
+    "openedJustNow": "відкрито щойно",
+    "openedMinuteAgo": "відкрито хвилину тому",
+    "openedMinutesAgo_one": "відкрито {{count}} хвилину тому",
+    "openedMinutesAgo_other": "відкрито {{count}} хвилин тому",
+    "openedHourAgo": "відкрито годину тому",
+    "openedHoursAgo_one": "відкрито {{count}} годину тому",
+    "openedHoursAgo_other": "відкрито {{count}} годин тому",
+    "openedYesterday": "відкрито вчора",
+    "openedDaysAgo_one": "відкрито {{count}} день тому",
+    "openedDaysAgo_other": "відкрито {{count}} днів тому",
+    "openedLastWeek": "відкрито минулого тижня",
+    "openedWeeksAgo_one": "відкрито {{count}} тиждень тому",
+    "openedWeeksAgo_other": "відкрито {{count}} тижнів тому",
+    "openedLastMonth": "відкрито минулого місяця",
+    "openedMonthsAgo_one": "відкрито {{count}} місяць тому",
+    "openedMonthsAgo_other": "відкрито {{count}} місяців тому",
+    "openedLastYear": "відкрито минулого року",
+    "openedYearsAgo_one": "відкрито {{count}} рік тому",
+    "openedYearsAgo_other": "відкрито {{count}} років тому",
+    "corruptedBadge": "Пошкоджено"
+  },
+  "join": {
+    "transportError": "Не вдалося зв’язатися з цим сервером синхронізації. Перевірте адресу та з’єднання, потім спробуйте ще раз.",
+    "passwordPlaceholder": "Пароль вашого сховища",
+    "waitingHint": "Тримайте цей екран відкритим — після схвалення тут з’явиться код підтвердження для порівняння з іншим пристроєм.",
+    "verifyBody": "Перевірте, що цей код такий самий, як показаний на пристрої, з якого ви схвалили.",
+    "removing": "Вилучаємо…",
+    "sasMismatch": "Не збігаються — вилучити цей пристрій",
+    "title": "Підключитися до вашого акаунта",
+    "lead": "Введіть дані свого акаунта, щоб перенести нотатки на цей пристрій. Усе залишається зашифрованим наскрізно.",
+    "serverPlaceholder": "https://sync.example.com",
+    "accountHint": "Ще раз перевірте цей номер — він виглядає неправильним.",
+    "approvalHint": "Ваші нотатки з’являться, коли ви схвалите цей пристрій з пристрою, який уже має ваш акаунт.",
+    "connectingSubtitle": "Отримуємо ваш акаунт і розблоковуємо ваше сховище на цьому пристрої."
+  },
+  "createVault": {
+    "beginWeakPassword": "Виберіть надійніший пароль і спробуйте ще раз.",
+    "beginGeneric": "Не вдалося почати створення сховища. Спробуйте ще раз.",
+    "wordNumber": "СЛОВО №{{position}}",
+    "commitError": "Не вдалося зберегти ваше сховище. Спробуйте ще раз.",
+    "savedToFile": "Збережено в {{label}}",
+    "saveFileError": "Не вдалося зберегти файл.",
+    "stepLabel": "Створення сховища · {{current}} з {{total}}",
+    "briefingTitle": "Перш ніж почати",
+    "briefingLead": "Myne шифрує все на цьому пристрої. Ця приватність передбачає відповідальність, яку можете нести лише ви.",
+    "passwordTitle": "Створіть пароль",
+    "confirmPasswordLabel": "Підтвердьте пароль",
+    "passwordHelper": "Ніколи не зберігається, ніколи не передається. Він шифрує ваші ключі на цьому пристрої.",
+    "encryptingSubtitle": "Виводимо ваш ключ за допомогою Argon2id. Це триває кілька секунд і не може бути перервано.",
+    "phraseTitle": "Ваша фраза відновлення",
+    "phraseIntro": "Двадцять чотири слова, по порядку. Запишіть їх на папері та зберігайте в безпечному місці.",
+    "showSecondHalf": "Показати слова 13–24",
+    "saveToFile": "Зберегти у файл",
+    "writtenThemDown": "Я їх записав(-ла)",
+    "typebackTitle": "Підтвердьте фразу",
+    "typebackLead": "Введіть ці чотири слова з фрази відновлення, яку ви щойно зберегли.",
+    "wordMismatch": "Не збігається зі словом №{{pos}}",
+    "backToPhrase": "Назад до фрази",
+    "accountTitle": "Ваш номер акаунта",
+    "accountLead": "Збережіть його разом із фразою відновлення. Він знадобиться, щоб відновити ваше сховище на новому пристрої.",
+    "accountSavedAck": "Я зберіг(-ла) свій номер акаунта.",
+    "commit": "Підтвердити",
+    "committingTitle": "Зберігаємо ваше сховище…",
+    "committingSubtitle": "Записуємо зашифроване сховище на цей пристрій.",
+    "unlockingTitle": "Розблокування…",
+    "unlockingSubtitle": "Відкриваємо ваше сховище.",
+    "readyTitle": "Ваше сховище готове",
+    "readyBody": "Усе, що ви пишете відтепер, шифрується на цьому пристрої перед збереженням або синхронізацією.",
+    "personalLabel": "Особисте",
+    "openVault": "Відкрити сховище",
+    "backUpNow": "Створити резервну копію зараз"
   }
 }

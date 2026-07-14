@@ -5,6 +5,7 @@
       "cleaning": "Wird bereinigt…",
       "close": "Schließen",
       "completeTitle": "Bereinigung abgeschlossen",
+      "deleteCta": "{{count}} ungenutzte löschen",
       "deleteCta_one": "{{count}} ungenutzten löschen",
       "deleteCta_other": "{{count}} ungenutzte löschen",
       "error": "Bereinigung nicht möglich. Einige Notizen sind möglicherweise unlesbar – es wurde nichts gelöscht.",
@@ -14,6 +15,7 @@
       "summaryPeriod": ".",
       "summaryRemoved_one": "{{count}} Anhang entfernt",
       "summaryRemoved_other": "{{count}} Anhänge entfernt",
+      "summarySkipped": " · {{count}} übersprungen (jetzt in Verwendung)",
       "summarySkipped_one": " · {{count}} übersprungen (jetzt in Verwendung)",
       "summarySkipped_other": " · {{count}} übersprungen (jetzt in Verwendung)",
       "title": "Ungenutzte Anhänge bereinigen",
@@ -104,7 +106,28 @@
     "usedInNotesPopover": {
       "empty": "Wird in keiner Notiz verwendet.",
       "untitled": "Ohne Titel"
-    }
+    },
+    "needsApp": "Die Anhang-Bereinigung erfordert die App.",
+    "noUnused": "Keine ungenutzten Anhänge – auf jede Datei wird verwiesen.",
+    "scanError": "Ungenutzte Anhänge konnten nicht gesucht werden.",
+    "erasedToast_one": "{{count}} ungenutzte Datei endgültig gelöscht.",
+    "erasedToast_other": "{{count}} ungenutzte Dateien endgültig gelöscht.",
+    "eraseError": "Die ungenutzten Anhänge konnten nicht endgültig gelöscht werden.",
+    "readError": "Anhänge konnten nicht gelesen werden.",
+    "needAppPreview": "Anhänge erfordern die App (nicht die Browser-Vorschau).",
+    "tooLarge": "Diese Datei ist zu groß (max. 64 MB).",
+    "unsupported": "Nur Bilder und PDFs können angehängt werden.",
+    "addError": "Diese Datei konnte nicht hinzugefügt werden.",
+    "deleteError": "Dieser Anhang konnte nicht gelöscht werden.",
+    "renameError": "Dieser Anhang konnte nicht umbenannt werden.",
+    "unusedSummary_one": "Auf {{count}} Anhang verweist keine Notiz ({{size}}). Endgültiges Löschen ist eine dauerhafte kryptografische Löschung – es gibt keinen Papierkorb.",
+    "unusedSummary_other": "Auf {{count}} Anhänge verweist keine Notiz ({{size}}). Endgültiges Löschen ist eine dauerhafte kryptografische Löschung – es gibt keinen Papierkorb.",
+    "eraseCta_one": "{{count}} ungenutzte Datei endgültig löschen",
+    "eraseCta_other": "{{count}} ungenutzte Dateien endgültig löschen",
+    "emptyState": "Noch keine Anhänge. Tippe auf „Hochladen“, um ein Bild oder PDF hinzuzufügen.",
+    "insert": "Einfügen",
+    "pauseLabel": "{{filename}} pausieren",
+    "playLabel": "{{filename}} abspielen"
   },
   "backup": {
     "errors": {
@@ -159,6 +182,8 @@
     "archivedBadge": "Archiv",
     "archivedBadgeTitle": "Archiviert",
     "dialogLabel": "Befehlspalette",
+    "matchedInAttachment": "im Anhang",
+    "matchedInAttachmentTitle": "Die Suchanfrage wurde in einer Datei gefunden, die in dieser Notiz eingebettet ist",
     "matchedInBody": "↳ im Text gefunden",
     "noMatches": "Keine Treffer",
     "searchPlaceholder": "Notizen durchsuchen oder Befehl ausführen – Esc zum Schließen",
@@ -172,10 +197,172 @@
         "label": "Tresor sichern…"
       },
       "category": {
+        "ai": "KI",
         "app": "App",
+        "appearance": "Darstellung",
         "editor": "Editor",
+        "notes": "Notizen",
         "vault": "Tresor",
         "view": "Ansicht"
+      },
+      "aiOpenChat": {
+        "label": "KI-Chat öffnen"
+      },
+      "toggleLineNumbers": {
+        "label": "Zeilennummern umschalten"
+      },
+      "toggleSpellCheck": {
+        "label": "Rechtschreibprüfung umschalten"
+      },
+      "toggleTypewriter": {
+        "label": "Schreibmaschinen-Scrollen umschalten"
+      },
+      "toggleDimInactive": {
+        "label": "Inaktive Zeilen abdunkeln umschalten"
+      },
+      "toggleEditorFont": {
+        "label": "Editor-Schriftart umschalten (Mono / Sans)"
+      },
+      "cycleTextSize": {
+        "label": "Editor-Textgröße durchschalten"
+      },
+      "cycleContentWidth": {
+        "label": "Editor-Inhaltsbreite durchschalten"
+      },
+      "cycleDefaultViewMode": {
+        "label": "Standard-Ansichtsmodus durchschalten"
+      },
+      "toggleTimestamps": {
+        "label": "Notiz-Zeitstempel in der Seitenleiste umschalten"
+      },
+      "toggleArchiving": {
+        "label": "Notiz-Archivierung umschalten"
+      },
+      "toggleAiEnabled": {
+        "label": "KI-Funktionen umschalten (Beta)"
+      },
+      "toggleScreenCapture": {
+        "label": "Schutz vor Bildschirmaufnahmen umschalten"
+      },
+      "cycleTheme": {
+        "label": "Design durchschalten"
+      },
+      "themeLight": {
+        "label": "Design: Hell"
+      },
+      "themeDark": {
+        "label": "Design: Dunkel"
+      },
+      "themeAmoled": {
+        "label": "Design: AMOLED"
+      },
+      "themeSystem": {
+        "label": "Design: System folgen"
+      },
+      "applyCustomTheme": {
+        "label": "Eigenes Design anwenden…"
+      },
+      "splitRight": {
+        "label": "Bereich nach rechts teilen"
+      },
+      "splitDown": {
+        "label": "Bereich nach unten teilen"
+      },
+      "closePane": {
+        "label": "Bereich schließen"
+      },
+      "closeTab": {
+        "label": "Tab schließen"
+      },
+      "nextTab": {
+        "label": "Nächster Tab"
+      },
+      "prevTab": {
+        "label": "Vorheriger Tab"
+      },
+      "focusNextPane": {
+        "label": "Nächsten Bereich fokussieren"
+      },
+      "focusPrevPane": {
+        "label": "Vorherigen Bereich fokussieren"
+      },
+      "goBack": {
+        "label": "Zurück"
+      },
+      "goForward": {
+        "label": "Vorwärts"
+      },
+      "togglePreview": {
+        "label": "Nebeneinander-Vorschau umschalten"
+      },
+      "findInNote": {
+        "label": "In Notiz suchen"
+      },
+      "findReplace": {
+        "label": "In Notiz suchen und ersetzen"
+      },
+      "newNote": {
+        "label": "Neue Notiz"
+      },
+      "duplicateNote": {
+        "label": "Notiz duplizieren"
+      },
+      "archiveNote": {
+        "label": "Notiz archivieren"
+      },
+      "renameNote": {
+        "label": "Notiz umbenennen"
+      },
+      "trashNote": {
+        "label": "Notiz in den Papierkorb verschieben"
+      },
+      "toggleFavorite": {
+        "label": "Favorit umschalten"
+      },
+      "moveNote": {
+        "label": "Notiz in Ordner verschieben…"
+      },
+      "emptyTrash": {
+        "label": "Papierkorb leeren"
+      },
+      "showBacklinks": {
+        "label": "Backlinks anzeigen"
+      },
+      "showOutline": {
+        "label": "Gliederung anzeigen"
+      },
+      "showUnlinked": {
+        "label": "Nicht verknüpfte Erwähnungen anzeigen"
+      },
+      "newFolder": {
+        "label": "Neuer Ordner"
+      },
+      "openTrash": {
+        "label": "Papierkorb öffnen"
+      },
+      "openArchive": {
+        "label": "Archiv öffnen"
+      },
+      "cycleHeading": {
+        "label": "Überschriftsebene durchschalten"
+      },
+      "restoreBackup": {
+        "label": "Tresor aus Backup wiederherstellen…"
+      },
+      "toggleRealtimeSync": {
+        "label": "Echtzeit-Synchronisierung umschalten"
+      },
+      "revealVaultFolder": {
+        "label": "Tresor-Ordner im Dateimanager anzeigen"
+      },
+      "aiSummarizeNote": {
+        "label": "Notiz zusammenfassen"
+      },
+      "aiSuggestTags": {
+        "label": "Tags vorschlagen"
+      },
+      "aiRewriteSelection": {
+        "label": "Auswahl umschreiben"
       },
       "convertWikilinks": {
         "label": "Importierte Wikilinks in dieser Notiz umwandeln…"
@@ -185,6 +372,12 @@
       },
       "exportNoteHtml": {
         "label": "Notiz als HTML exportieren…"
+      },
+      "exportSelectionImage": {
+        "label": "Auswahl als Bild exportieren…",
+        "saved": "Auswahl als Bild gespeichert.",
+        "noSelection": "Wähle zuerst Text aus und exportiere ihn dann als Bild.",
+        "failed": "Die Auswahl konnte nicht als Bild exportiert werden."
       },
       "exportNoteMarkdown": {
         "label": "Notiz als Markdown exportieren…"
@@ -307,6 +500,15 @@
     },
     "rebind": {
       "invalidChordReason": "Fügen Sie einen Modifikator hinzu (⌘, Ctrl oder Alt) – eine Taste allein kann kein Kürzel sein."
+    },
+    "picker": {
+      "vaultRoot": "Tresor-Stamm",
+      "moveNoteTitle": "Notiz in Ordner verschieben",
+      "moveNotePlaceholder": "Ordner auswählen…",
+      "noFolders": "Noch keine Ordner",
+      "applyThemeTitle": "Eigenes Design anwenden",
+      "applyThemePlaceholder": "Design auswählen…",
+      "noCustomThemes": "Keine eigenen Designs installiert"
     }
   },
   "common": {
@@ -317,7 +519,9 @@
     },
     "spinner": {
       "loadingLabel": "Wird geladen"
-    }
+    },
+    "back": "Zurück",
+    "continue": "Weiter"
   },
   "editor": {
     "attachment": {
@@ -341,6 +545,7 @@
         "pickerSourceFilter": "Anhangsquelle"
       },
       "convertCore": {
+        "converted": "{{count}} konvertiert",
         "converted_one": "{{count}} umgewandelt",
         "converted_other": "{{count}} umgewandelt",
         "noneToConvert": "Keine importierten Anhänge in dieser Notiz zum Umwandeln.",
@@ -351,6 +556,7 @@
           "tooLarge": "zu groß (max. 64 MiB)",
           "unsupported": "nicht unterstützter Typ"
         },
+        "skippedSuffix": " · {{count}} übersprungen",
         "skippedSuffix_one": " · {{count}} übersprungen",
         "skippedSuffix_other": " · {{count}} übersprungen"
       },
@@ -431,6 +637,7 @@
         "title": "Anhang umbenennen"
       },
       "summary": {
+        "added": "{{count}} hinzugefügt",
         "added_one": "{{count}} hinzugefügt",
         "added_other": "{{count}} hinzugefügt",
         "reason": {
@@ -439,6 +646,7 @@
           "tooLarge": "zu groß",
           "unsupported": "nicht unterstützter Typ"
         },
+        "skipped": "{{count}} übersprungen: {{noun}}",
         "skipped_one": "{{count}} übersprungen: {{noun}}",
         "skipped_other": "{{count}} übersprungen: {{noun}}"
       },
@@ -470,6 +678,9 @@
           "reveal": "In Bibliothek anzeigen"
         },
         "pdfFallback": "PDF",
+        "textPreview": {
+          "truncated": "Vorschau gekürzt – Exportiere die vollständige Datei."
+        },
         "tombstone": {
           "brokenAria": "Defekter Anhangsverweis: {{filename}}",
           "brokenLabel": "defekt",
@@ -507,16 +718,17 @@
       "backlinks": {
         "archivedBadge": "Archiviert",
         "empty": "Noch keine Backlinks.",
+        "linkedFrom": "Verknüpft von {{count}}",
         "linkedFrom_one": "Verlinkt von {{count}}",
         "linkedFrom_other": "Verlinkt von {{count}}",
         "untitled": "Ohne Titel"
       },
       "barItems": {
         "graph": "Graph",
-        "hide": "",
+        "hide": "Ausblenden",
         "lock": "Sperren",
-        "moveLeft": "",
-        "moveRight": "",
+        "moveLeft": "Nach links verschieben",
+        "moveRight": "Nach rechts verschieben",
         "saveStatus": "Speicherstatus",
         "settings": "Einstellungen",
         "syncStatus": "Sync-Status",
@@ -527,15 +739,19 @@
         "workspace": "Arbeitsbereich"
       },
       "baseImport": {
+        "droppedFiltersSuffix": " · {{count}} Filter verworfen",
         "droppedFiltersSuffix_one": " · {{count}} Filter verworfen",
         "droppedFiltersSuffix_other": " · {{count}} Filter verworfen",
         "failed": "Import fehlgeschlagen.",
         "fileFilterName": "Obsidian Base",
+        "imported": "{{count}} Ansicht(en) importiert",
         "imported_one": "{{count}} Ansicht importiert",
         "imported_other": "{{count}} Ansichten importiert",
         "notValid": "Keine gültige .base-Datei.",
+        "skippedSuffix": " · {{count}} übersprungen",
         "skippedSuffix_one": " · {{count}} übersprungen",
         "skippedSuffix_other": " · {{count}} übersprungen",
+        "stoppedAfter": "Import nach {{count}} Ansicht(en) gestoppt.",
         "stoppedAfter_one": "Import nach {{count}} Ansicht gestoppt.",
         "stoppedAfter_other": "Import nach {{count}} Ansichten gestoppt."
       },
@@ -566,6 +782,7 @@
       "import": {
         "imported_one": "{{count}} Notiz importiert{{skipped}}",
         "imported_other": "{{count}} Notizen importiert{{skipped}}",
+        "skippedSuffix": " · {{count}} übersprungen",
         "skippedSuffix_one": " · {{count}} übersprungen",
         "skippedSuffix_other": " · {{count}} übersprungen"
       },
@@ -577,10 +794,43 @@
       "resizeBacklinksSidebar": "Größe der Backlinks-Seitenleiste ändern",
       "resizeNotesSidebar": "Größe der Notizen-Seitenleiste ändern",
       "rightPanel": {
-        "allHidden": "",
+        "aiChat": {
+          "askPlaceholder": "Stelle eine Frage zu deinen Notizen…",
+          "askSubmit": "Fragen",
+          "assistant": "Assistent",
+          "citations": "Quellen",
+          "composerPlaceholder": "Nachricht an deine Notizen…",
+          "empty": "KI-Ausgaben – Zusammenfassungen, Antworten und Vorschläge – erscheinen hier.",
+          "error": "Die KI-Anfrage konnte nicht abgeschlossen werden.",
+          "errorTurn": "Der Assistent konnte nicht antworten.",
+          "gettingReadyHint": "Deine Notizen werden für die KI vorbereitet – einen Moment.",
+          "insert": "In Notiz einfügen",
+          "noAnswer": "Keine Antwort – versuche es anders zu formulieren.",
+          "noModelHint": "Kein Modell ausgewählt. Wähle eines unter Einstellungen → Labs → KI, um zu beginnen.",
+          "offHint": "Lokale KI ist aus. Aktiviere sie unter Einstellungen → Labs → KI.",
+          "send": "Senden",
+          "statusGettingReady": "Wird vorbereitet…",
+          "statusNoModel": "Kein Modell",
+          "statusOff": "Aus",
+          "statusReady": "Bereit",
+          "stop": "Stopp",
+          "tagsThinking": "Tags werden vorgeschlagen…",
+          "thinking": "KI denkt nach…",
+          "truncated": "Die ersten {{count}} Zeichen zusammengefasst.",
+          "you": "Du"
+        },
+        "allHidden": "Alle Tabs sind ausgeblendet – Rechtsklick zum Wiederherstellen.",
         "outline": {
-          "empty": "",
-          "heading": ""
+          "collapse": "Abschnitt einklappen",
+          "empty": "Keine Überschriften",
+          "expand": "Abschnitt ausklappen",
+          "heading": "Gliederung"
+        },
+        "tabs": {
+          "aiChat": "KI-Chat",
+          "backlinks": "Backlinks",
+          "outline": "Gliederung",
+          "unlinked": "Nicht verknüpfte Erwähnungen"
         }
       },
       "sidebarToggle": {
@@ -649,6 +899,8 @@
       "rendering": "Diagramm wird gerendert…"
     },
     "slash": {
+      "aiContinue": "Weiterschreiben (KI)",
+      "aiTitle": "Titel vorschlagen (KI)",
       "attachFile": "Datei anhängen",
       "bulletList": "Aufzählung",
       "callout": "Hinweisbox",
@@ -690,6 +942,21 @@
     },
     "toolbar": {
       "apply": "Anwenden",
+      "exportImageTitle": "Auswahl als Bild exportieren",
+      "customize": {
+        "bold": "Fett",
+        "bulletList": "Aufzählungsliste",
+        "checklist": "Checkliste",
+        "code": "Code",
+        "heading": "Überschrift",
+        "highlight": "Hervorheben",
+        "italic": "Kursiv",
+        "link": "Link",
+        "numberedList": "Nummerierte Liste",
+        "quote": "Zitat",
+        "strike": "Durchgestrichen",
+        "wikilink": "Wikilink"
+      },
       "heading": {
         "h1": "H1",
         "h2": "H2",
@@ -753,6 +1020,126 @@
       "convertCore": {
         "noMatch": "kein Treffer"
       }
+    },
+    "flow": {
+      "loadFailed": "Deine Notizen konnten nicht geladen werden.",
+      "openFailed": "Diese Notiz konnte nicht geöffnet werden.",
+      "saveFailed": "Diese Notiz konnte nicht gespeichert werden.",
+      "moveFailed": "Diese Notiz konnte nicht verschoben werden.",
+      "openTodayFailed": "Die heutige Notiz konnte nicht geöffnet werden.",
+      "exportFailed": "Diese Notiz konnte nicht exportiert werden.",
+      "attachNeedsApp": "Anhänge erfordern die App (nicht die Browser-Vorschau).",
+      "attachTooLarge": "Diese Datei ist zu groß (max. 64 MB).",
+      "attachUnsupported": "Nur Bilder und PDFs können angehängt werden.",
+      "attachFailed": "Diese Datei konnte nicht angehängt werden.",
+      "archiveFailed": "Diese Notiz konnte nicht archiviert werden.",
+      "trashFailed": "Diese Notiz konnte nicht in den Papierkorb verschoben werden."
+    },
+    "nav": {
+      "dailyNote": "Tagesnotiz",
+      "openToday": "Heute öffnen",
+      "allNotes": "Alle Notizen"
+    },
+    "list": {
+      "searchPlaceholder": "Notizen durchsuchen",
+      "clearSearch": "Suche löschen",
+      "viewNoteCount_one": "{{count}} Notiz in „{{name}}“",
+      "viewNoteCount_other": "{{count}} Notizen in „{{name}}“",
+      "edit": "Bearbeiten",
+      "trashEmpty": "Papierkorb ist leer",
+      "archiveEmpty": "Keine archivierten Notizen",
+      "noMatchingNotes": "Keine passenden Notizen",
+      "noNotesYet": "Noch keine Notizen",
+      "noMatchBody": "Nichts passt zu „{{name}}“. Bearbeite die Ansicht oder setze sie zurück, um alle Notizen zu sehen.",
+      "emptyBody": "Tippe auf „Neue Notiz“, um deine erste Notiz zu schreiben. Alles wird auf diesem Gerät verschlüsselt, bevor es gespeichert wird.",
+      "unarchive": "Aus Archiv holen"
+    },
+    "filterSheet": {
+      "title": "Filter",
+      "status": "Status"
+    },
+    "sortSheet": {
+      "title": "Sortieren",
+      "manual": "Manuelle Reihenfolge",
+      "titleAsc": "Titel · A → Z",
+      "titleDesc": "Titel · Z → A"
+    },
+    "noteMenu": {
+      "emptyNote": "Leere Notiz",
+      "wordCount_one": "{{count}} Wort · {{minutes}} Min. Lesezeit",
+      "wordCount_other": "{{count}} Wörter · {{minutes}} Min. Lesezeit",
+      "moveToFolder": "In Ordner verschieben…",
+      "moveToTrash": "In den Papierkorb verschieben",
+      "copied": "Kopiert ✓",
+      "copyToClipboard": "In die Zwischenablage kopieren",
+      "versionHistory": "Versionsverlauf"
+    },
+    "purge": {
+      "body": "Dies entfernt die Notiz endgültig von diesem Gerät. Dies kann nicht rückgängig gemacht werden."
+    },
+    "move": {
+      "title": "In Ordner verschieben",
+      "body": "Gib einen Ordnerpfad ein (z. B. Projects/Myne). Leer lassen für den Tresor-Stamm.",
+      "placeholder": "Projects/Myne",
+      "confirm": "Verschieben"
+    },
+    "sidebar": {
+      "browse": "Durchsuchen"
+    },
+    "emptyDetail": {
+      "title": "Notiz auswählen",
+      "body": "Wähle eine Notiz aus der Liste oder beginne eine neue."
+    },
+    "readingBar": {
+      "editNote": "Notiz bearbeiten",
+      "edit": "Bearbeiten"
+    },
+    "graphTab": {
+      "linkedNotes_one": "{{count}} verknüpfte Notiz",
+      "linkedNotes_other": "{{count}} verknüpfte Notizen",
+      "links_one": "{{count}} Verknüpfung",
+      "links_other": "{{count}} Verknüpfungen"
+    },
+    "formatBar": {
+      "redo": "Wiederholen",
+      "attachFile": "Neue Datei anhängen",
+      "insertFromLibrary": "Aus Bibliothek einfügen",
+      "recordVoiceNote": "Sprachnotiz aufnehmen",
+      "showLivePreview": "Live-Vorschau anzeigen",
+      "showRawMarkdown": "Rohes Markdown anzeigen",
+      "hideKeyboard": "Tastatur ausblenden"
+    },
+    "topBar": {
+      "backToNotes": "Zurück zu den Notizen",
+      "noteDetails": "Notizdetails",
+      "noteActions": "Notizaktionen"
+    },
+    "noteContext": {
+      "collapsePanel": "Panel einklappen",
+      "unlinkedCount_one": "Nicht verknüpfte Erwähnung {{count}}",
+      "unlinkedCount_other": "Nicht verknüpfte Erwähnungen {{count}}"
+    },
+    "viewsSheet": {
+      "typeCards": "Karten",
+      "typeList": "Liste",
+      "emptyState": "Noch keine gespeicherten Ansichten. Erstelle eine, um deine Notizen nach Tag, Ordner oder Text zu filtern.",
+      "editView": "Ansicht bearbeiten"
+    },
+    "sheet": {
+      "done": "Fertig"
+    },
+    "vaultSwitcher": {
+      "title": "Tresore"
+    },
+    "tagBrowser": {
+      "noTagsMatch": "Keine passenden Tags.",
+      "notesCount_one": "Notizen · {{count}}",
+      "notesCount_other": "Notizen · {{count}}"
+    },
+    "untitledNote": "Notiz ohne Titel",
+    "commandPalette": {
+      "searchPlaceholder": "Notizen durchsuchen oder Befehl ausführen…",
+      "noMatches": "Keine passenden Befehle oder Notizen."
     }
   },
   "export": {
@@ -891,6 +1278,7 @@
   },
   "notes": {
     "archive": {
+      "cancel": "Abbrechen",
       "close": "Schließen",
       "count_one": "{{count}} Notiz",
       "count_other": "{{count}} Notizen",
@@ -898,6 +1286,10 @@
       "delete": "Löschen",
       "deleteError": "Diese Notiz konnte nicht gelöscht werden. Versuchen Sie es erneut.",
       "emptyState": "Das Archiv ist leer.",
+      "folderDeleteConfirm_one": "{{count}} Notiz in den Papierkorb verschieben?",
+      "folderDeleteConfirm_other": "{{count}} Notizen in den Papierkorb verschieben?",
+      "folderDeleteConfirmCta": "In den Papierkorb verschieben",
+      "folderDeleteError": "Die Notizen dieses Ordners konnten nicht in den Papierkorb verschoben werden. Versuche es erneut.",
       "restore": "Wiederherstellen",
       "restoreError": "Diese Notiz konnte nicht wiederhergestellt werden. Versuchen Sie es erneut.",
       "title": "Archiv",
@@ -1000,6 +1392,7 @@
       },
       "modal": {
         "cancel": "Abbrechen",
+        "cancelledNotImported": "{{count}} nicht importiert",
         "cancelledNotImported_one": "{{count}} nicht importiert",
         "cancelledNotImported_other": "{{count}} nicht importiert",
         "cancelling": "Wird abgebrochen…",
@@ -1023,8 +1416,10 @@
         "importing": "Ihr Tresor wird importiert…",
         "markDone": "Als erledigt markieren",
         "markedDone": "Als erledigt markiert",
+        "mediaImported": "{{count}} importiert",
         "mediaImported_one": "{{count}} importiert",
         "mediaImported_other": "{{count}} importiert",
+        "mediaOmittedSuffix": " · {{count}} ausgelassen",
         "mediaOmittedSuffix_one": " · {{count}} ausgelassen",
         "mediaOmittedSuffix_other": " · {{count}} ausgelassen",
         "needsAttention": "Erfordert Aufmerksamkeit",
@@ -1070,13 +1465,17 @@
       "addToFavorites": "Zu Favoriten hinzufügen",
       "archive": "Archivieren",
       "archiveBulkError": "Die Notizen konnten nicht archiviert werden.",
+      "archiveFolder": "Ordner archivieren",
       "archiveNote": "Archivieren",
       "archiveSingleError": "Die Notiz konnte nicht archiviert werden.",
       "attachments": "Anhänge",
+      "bulkArchive": "{{count}} Notizen archivieren",
       "bulkArchive_one": "{{count}} Notiz archivieren",
       "bulkArchive_other": "{{count}} Notizen archivieren",
+      "bulkDelete": "{{count}} Notizen löschen",
       "bulkDelete_one": "{{count}} Notiz löschen",
       "bulkDelete_other": "{{count}} Notizen löschen",
+      "bulkMove": "{{count}} Notizen verschieben nach…",
       "bulkMove_one": "{{count}} Notiz verschieben nach…",
       "bulkMove_other": "{{count}} Notizen verschieben nach…",
       "caseMergeBody": "Ein Ordner namens „{{name}}“ existiert bereits. Diese werden zusammengeführt – einen umbenennen, um sie getrennt zu halten?",
@@ -1119,13 +1518,18 @@
       "openInNewTab": "In neuem Tab öffnen",
       "openToSide": "Seitlich öffnen",
       "openTrash": "Papierkorb öffnen",
-      "removeAsFolderNote": "Als Ordnernotiz entfernen",
-      "removeFolderNote": "",
+      "removeFolderNote": "Ordnernotiz entfernen",
       "removeFromFavorites": "Aus Favoriten entfernen",
       "rename": "Umbenennen",
       "setAsFolderNote": "Als Ordnernotiz festlegen",
       "trash": "Papierkorb",
       "trashBulkError": "Die Notizen konnten nicht in den Papierkorb verschoben werden.",
+      "trashConfirmBulkBody_one": "{{count}} Notiz wird in den Papierkorb verschoben.",
+      "trashConfirmBulkBody_other": "{{count}} Notizen werden in den Papierkorb verschoben.",
+      "trashConfirmBulkWarning": "Du kannst sie später aus dem Papierkorb wiederherstellen.",
+      "trashConfirmConfirm": "In den Papierkorb verschieben",
+      "trashConfirmTitle": "In den Papierkorb verschieben?",
+      "trashConfirmWarning": "Du kannst sie später aus dem Papierkorb wiederherstellen.",
       "trashSingleError": "Die Notiz konnte nicht in den Papierkorb verschoben werden.",
       "undo": "Rückgängig",
       "vaultRoot": "Tresorwurzel",
@@ -1369,7 +1773,26 @@
       "operationInProgress": "Vorgang läuft. Bitte warten.",
       "unexpected": "Unerwarteter Fehler. Bitte versuchen Sie es erneut.",
       "vaultNotFound": "Tresordatei nicht gefunden. Bitte starten Sie die App neu."
-    }
+    },
+    "vaultUnreadable": "Tresordatei ist nicht lesbar. Aus einem Backup wiederherstellen.",
+    "genericError": "Etwas ist schiefgelaufen. Bitte versuche es erneut.",
+    "weakPassword": "Das Passwort muss mindestens {{min}} Zeichen lang sein.",
+    "setPasswordError": "Dein neues Passwort konnte nicht festgelegt werden. Bitte versuche es erneut.",
+    "passwordMismatch": "Die Passwörter stimmen nicht überein.",
+    "decryptingSubtitle": "Deine Tresorschlüssel werden mit Argon2id neu aufgebaut. Das dauert einige Sekunden.",
+    "restoreVaultHeader": "Tresor wiederherstellen",
+    "accountTitle": "Gib deine Kontonummer ein",
+    "accountLead": "Du findest sie dort, wo du deine Wiederherstellungsphrase gespeichert hast. Sie identifiziert den wiederherzustellenden Tresor.",
+    "accountInvalid": "Ungültige Kontonummer – bitte überprüfen und erneut eingeben.",
+    "accountOptionalHint": "Du hast sie nicht? Lass dieses Feld leer und fahre fort – deine 24-Wort-Wiederherstellungsphrase ist alles, was du brauchst.",
+    "paste": "Einfügen",
+    "phraseGridHint": "Gib jedes Wort ein oder füge alle 24 auf einmal ein, um das Raster zu füllen.",
+    "submitProgress": "Absenden · {{filled}} von {{total}}",
+    "newPasswordTitle": "Neues Passwort wählen",
+    "newPasswordLead": "Deine Wiederherstellungsphrase bleibt gleich. Dies legt das Passwort für dieses Gerät fest.",
+    "confirmPasswordLabel": "Passwort bestätigen",
+    "passwordHelper": "Wird nie gespeichert, nie übertragen. Es verschlüsselt deine Schlüssel auf diesem Gerät.",
+    "encryptingSubtitle": "Deine Tresorschlüssel werden mit deinem neuen Passwort umschlossen."
   },
   "restore": {
     "backLabel": "Zurück",
@@ -1422,7 +1845,9 @@
       "licenseLabel": "Lizenz",
       "tagline": "Pre-Alpha · Phase-1-Desktop-Client",
       "threatModelHelper": "Öffnen Sie das öffentliche Bedrohungsmodell-Dokument in Ihrem Browser.",
-      "threatModelLabel": "Bedrohungsmodell"
+      "threatModelLabel": "Bedrohungsmodell",
+      "version": "Version",
+      "dev": "Dev"
     },
     "account": {
       "argon2idHeading": "Argon2id-Parameter",
@@ -1445,7 +1870,21 @@
       "vaultLabelEyebrow": "TRESORBEZEICHNUNG",
       "vaultLabelHelper": "Ein Name für diesen Tresor, der im In-App-Umschalter angezeigt wird. Wird verschlüsselt im Tresor gespeichert; verlässt Ihr Gerät niemals im Klartext.",
       "vaultLabelPlaceholder": "Bezeichnung hinzufügen…",
-      "vaultLabelSave": "Speichern"
+      "vaultLabelSave": "Speichern",
+      "vaultIconLabel": "SYMBOL",
+      "vaultIconDefault": "Standard (Wortmarke)",
+      "renamedToast": "Tresor umbenannt",
+      "renameError": "Tresor konnte nicht umbenannt werden",
+      "newPasswordMismatch": "Die neuen Passwörter stimmen nicht überein.",
+      "samePassword": "Das neue Passwort ist mit dem aktuellen Passwort identisch.",
+      "passwordChangedToast": "Passwort geändert",
+      "vaultUnreadable": "Tresordatei ist nicht lesbar. Aus einem Backup wiederherstellen.",
+      "genericChangeError": "Etwas ist schiefgelaufen. Bitte versuche es erneut.",
+      "renameHelper": "Wird im Tresor-Umschalter angezeigt. Verschlüsselt in diesem Tresor gespeichert; leer lassen, um ihn zu entfernen.",
+      "newPasswordPlaceholder": "Mindestens 12 Zeichen",
+      "reenterNewPassword": "Neues Passwort erneut eingeben",
+      "changePasswordFootnote": "Dies macht die Schnellentsperrung ungültig. Deine Wiederherstellungsphrase bleibt unverändert.",
+      "changing": "Wird geändert…"
     },
     "appearance": {
       "showEditTimesAria": "Bearbeitungszeiten in der Seitenleiste anzeigen",
@@ -1461,7 +1900,13 @@
       "themeLabel": "Design",
       "themeOptionAria": "Design {{label}}",
       "themeSaveError": "Das Design konnte nicht gespeichert werden. Bitte versuchen Sie es erneut.",
-      "timestampsSaveError": "Die Einstellung konnte nicht gespeichert werden. Bitte versuchen Sie es erneut."
+      "timestampsSaveError": "Die Einstellung konnte nicht gespeichert werden. Bitte versuchen Sie es erneut.",
+      "sizeS": "S",
+      "sizeM": "M",
+      "sizeL": "L",
+      "sizeXL": "XL",
+      "editorFont": "Editor-Schriftart",
+      "showEditTimesSubtitle": "Zeitstempel unter jeder Notiz"
     },
     "archive": {
       "helper": "Erlaubt es, Notizen in ein Archiv zu verschieben, das aus der Hauptliste herausgehalten wird. Beim Deaktivieren wird jede archivierte Notiz in ihren Ordner zurückgestellt und die Archiv-Bedienelemente werden ausgeblendet.",
@@ -1512,13 +1957,20 @@
         "bare": "Verbunden",
         "daysAgo_one": "Vor {{count}} Tag verbunden",
         "daysAgo_other": "Vor {{count}} Tagen verbunden",
+        "hoursAgo": "Verbunden vor {{count}} Std.",
         "hoursAgo_one": "Vor {{count}} Std. verbunden",
         "hoursAgo_other": "Vor {{count}} Std. verbunden",
         "justNow": "Gerade eben verbunden",
+        "minutesAgo": "Verbunden vor {{count}} Min.",
         "minutesAgo_one": "Vor {{count}} Min. verbunden",
         "minutesAgo_other": "Vor {{count}} Min. verbunden",
         "onDate": "Verbunden am {{date}}"
       }
+    },
+    "clipperInstall": {
+      "error": "Die Einstellung für den Browser-Clipper konnte nicht aktualisiert werden.",
+      "helper": "Registriere den Native-Messaging-Host, damit die Myne-Browsererweiterung Clips an diese App senden kann. Standardmäßig an; zum Entfernen ausschalten.",
+      "label": "Browser-Clipper"
     },
     "customThemes": {
       "appliedBadge": "Angewendet",
@@ -1579,31 +2031,34 @@
       "submit": "Tresor löschen",
       "submitInFlight": "Tresor wird gelöscht…",
       "typeToConfirmLabel": "Geben Sie zur Bestätigung DELETE ein",
-      "vaultPath": "Tresorpfad: {{path}}"
+      "vaultPath": "Tresorpfad: {{path}}",
+      "deleteError": "Der Tresor konnte nicht vollständig gelöscht werden. Bitte versuche es erneut.",
+      "warning": "Dies löscht diesen Tresor und alle seine Notizen dauerhaft von diesem Gerät. Dies kann nicht rückgängig gemacht werden.",
+      "deleteButton": "Diesen Tresor löschen"
     },
     "files": {
       "newNote": {
-        "folderLabel": "",
-        "folderPlaceholder": "",
-        "helper": "",
-        "label": "",
-        "optionCurrent": "",
-        "optionRoot": "",
-        "optionSpecific": "",
-        "saveError": ""
+        "folderLabel": "Ordner für neue Notizen",
+        "folderPlaceholder": "z. B. Inbox/",
+        "helper": "Wo neu erstellte Notizen abgelegt werden.",
+        "label": "Standardspeicherort für neue Notizen",
+        "optionCurrent": "Gleicher Ordner wie aktuelle Notiz",
+        "optionRoot": "Tresor-Ordner",
+        "optionSpecific": "Im unten angegebenen Ordner",
+        "saveError": "Der Speicherort für neue Notizen konnte nicht gespeichert werden."
       },
       "startup": {
-        "helper": "",
-        "label": "",
-        "noteLabel": "",
-        "notePlaceholder": "",
-        "optionEmpty": "",
-        "optionLast": "",
-        "optionSpecific": "",
-        "saveError": "",
-        "searchEmpty": "",
-        "searchPlaceholder": "",
-        "untitledNote": ""
+        "helper": "Wähle, welche Datei beim Start der App geöffnet wird.",
+        "label": "Standardmäßig zu öffnende Datei",
+        "noteLabel": "Beim Start zu öffnende Notiz",
+        "notePlaceholder": "Notiz auswählen…",
+        "optionEmpty": "Neue Notiz",
+        "optionLast": "Zuletzt geöffnet",
+        "optionSpecific": "Bestimmte Notiz",
+        "saveError": "Die Starteinstellung konnte nicht gespeichert werden.",
+        "searchEmpty": "Keine Notizen gefunden.",
+        "searchPlaceholder": "Notizen durchsuchen…",
+        "untitledNote": "Ohne Titel"
       }
     },
     "focusMode": {
@@ -1654,6 +2109,37 @@
       "off": "Aus",
       "on": "Ein"
     },
+    "toolbarCustomize": {
+      "errorSave": "Das Layout der Symbolleiste konnte nicht gespeichert werden.",
+      "helper": "Wähle, welche Formatierungsschaltflächen in der Auswahl-Symbolleiste erscheinen und in welcher Reihenfolge.",
+      "label": "Symbolleisten-Schaltflächen",
+      "moveDown": "Nach unten verschieben",
+      "moveUp": "Nach oben verschieben",
+      "pendingHint": "Demnächst verfügbar"
+    },
+    "ai": {
+      "betaBadge": "Beta",
+      "disclosureToggle": "Wie funktioniert das?",
+      "enableHelper": "Führt ein von dir bereitgestelltes Modell vollständig auf deinem Gerät aus. Experimentell, standardmäßig aus.",
+      "enableLabel": "Lokale KI aktivieren",
+      "excludedHelper": "Notizen in diesen Ordnern werden von der KI nie gelesen oder indexiert. Ein Ordnerpfad pro Zeile.",
+      "excludedLabel": "Ausgeschlossene Ordner",
+      "excludedPlaceholder": "Privat/\nTagebuch/",
+      "modelChoose": "Datei auswählen…",
+      "modelEmbeddingLabel": "Suchmodell – semantische Suche & Q&A",
+      "modelFilter": {
+        "gguf": "GGUF-Modell",
+        "safetensors": "Safetensors-Modell"
+      },
+      "modelGenerationLabel": "Textmodell – Chat, Zusammenfassungen, Schreiben",
+      "modelNone": "Keine Datei ausgewählt",
+      "modelSaveFailed": "Der Modellpfad konnte nicht gespeichert werden (er muss außerhalb deines Tresors liegen).",
+      "modelsHelper": "Myne lädt niemals Modelle herunter – das würde bedeuten, Daten über das Netzwerk zu senden. Öffne einen Link, um eines in deinem Browser zu holen, und wähle dann hier die heruntergeladenen Dateien aus. Alles läuft auf deinem Gerät.",
+      "modelsLabel": "Modelle",
+      "recommendedFilesEmbedding": "Benötigt model.safetensors + config.json + tokenizer.json in einem Ordner.",
+      "recommendedFilesGeneration": "Benötigt die .gguf-Datei + tokenizer.json im selben Ordner.",
+      "title": "KI"
+    },
     "prefs": {
       "saveError": "Die Einstellung konnte nicht gespeichert werden – versuchen Sie es erneut"
     },
@@ -1662,9 +2148,20 @@
       "autoLockLabel": "Automatische Sperre",
       "autoLockSearchEmpty": "Keine Dauern passen.",
       "autoLockSearchPlaceholder": "Dauern durchsuchen…",
+      "realtimeSyncHelper": "Änderungen von anderen Geräten treffen innerhalb von Sekunden über ein inhaltsloses Signal ein – der Server leitet nur „etwas hat sich geändert“ weiter, niemals, was sich geändert hat. Während dein Tresor entsperrt ist, prüft die App den Server ohnehin regelmäßig, sodass dies keine nennenswerte zusätzliche Sichtbarkeit schafft; es gibt nichts zu konfigurieren.",
+      "realtimeSyncLabel": "Echtzeit-Synchronisierung",
       "screenCaptureHelperOff": "Der Schutz gilt vor dem Entsperren immer. Nach dem Entsperren folgt er dieser Einstellung.",
       "screenCaptureHelperOn": "Aktiv unter macOS und Windows 10 (Mai-2020-Update oder neuer). Linux-Unterstützung folgt in einer zukünftigen Version.",
-      "screenCaptureLabel": "Bildschirmaufnahme-Schutz"
+      "screenCaptureLabel": "Bildschirmaufnahme-Schutz",
+      "screenCaptureSubtitle": "Screenshots und Bildschirmaufnahmen blockieren",
+      "autoLockAfter": "Automatisch sperren nach",
+      "autoLock1m": "1 Min",
+      "autoLock5m": "5 Min",
+      "autoLock15m": "15 Min",
+      "autoLock30m": "30 Min",
+      "autoLock1h": "1 Std",
+      "quickUnlockSubtitleAndroid": "Nach dem automatischen Sperren mit einer PIN erneut entsperren",
+      "quickUnlockSubtitle": "Nach dem automatischen Sperren mit {{method}} oder einer PIN erneut entsperren"
     },
     "quickUnlock": {
       "errorCancelled": "Abgebrochen.",
@@ -1672,6 +2169,7 @@
       "errorHardwareUnavailable": "Touch ID ist auf diesem Gerät nicht verfügbar.",
       "errorNotUnlocked": "Entsperren Sie zuerst den Tresor.",
       "errorPinNotDigits": "Die PIN darf nur aus Ziffern bestehen.",
+      "errorPinTooShort": "Die PIN muss mindestens {{count}} Ziffern haben.",
       "errorPinTooShort_one": "Die PIN muss mindestens {{count}} Ziffer lang sein.",
       "errorPinTooShort_other": "Die PIN muss mindestens {{count}} Ziffern lang sein.",
       "helperConfigured": "Eingerichtet über {{method}}. Bei der erneuten Eingabe nach automatischer Sperre wird das Master-Passwort übersprungen. Nach einem Neustart ist das Master-Passwort weiterhin erforderlich.",
@@ -1679,21 +2177,47 @@
       "methodPin": "PIN",
       "methodTouchId": "Touch ID",
       "pinAriaLabel": "Schnellentsperrungs-PIN",
+      "pinPlaceholder": "PIN (mindestens {{count}} Ziffern)",
       "pinPlaceholder_one": "PIN (mindestens {{count}} Ziffer)",
       "pinPlaceholder_other": "PIN (mindestens {{count}} Ziffern)",
       "setPin": "PIN festlegen",
       "setupHelper": "Touch ID ist nur für macOS und derzeit experimentell (Hardware-Überprüfung ausstehend). Die PIN funktioniert überall.",
       "title": "Schnellentsperrung",
-      "useTouchId": "Touch ID verwenden"
+      "useTouchId": "Touch ID verwenden",
+      "pinTooShort": "Die PIN muss mindestens 6 Ziffern haben.",
+      "pinMismatch": "Die PINs stimmen nicht überein.",
+      "pinOnToast": "PIN-Schnellentsperrung ist aktiviert",
+      "setupError": "Die Schnellentsperrung konnte nicht eingerichtet werden.",
+      "turnedOffToast": "Schnellentsperrung deaktiviert",
+      "turnOffError": "Die Schnellentsperrung konnte nicht deaktiviert werden",
+      "biometricOnToast": "{{method}}-Schnellentsperrung ist aktiviert",
+      "biometricUnavailable": "{{method}} ist auf diesem Gerät nicht verfügbar.",
+      "warningBanner": "Nur eine Komfortsperre. Nach einem Neustart ist weiterhin dein Passwort erforderlich.",
+      "biometricToggleSubtitle": "Nach dem automatischen Sperren mit {{method}} entsperren",
+      "pinOnLead": "PIN-Schnellentsperrung ist ",
+      "pinOnEmphasis": "aktiviert",
+      "pinOnRest": ". Nachdem der Tresor automatisch gesperrt wurde, kannst du ihn mit deiner PIN statt des vollständigen Passworts erneut entsperren – nur für diese App-Sitzung. Ein Kaltstart erfordert immer das vollständige Passwort.",
+      "turnOffPin": "PIN deaktivieren",
+      "pinSetupHelper": "Lege eine PIN mit 6 oder mehr Ziffern fest, um nach dem automatischen Sperren schnell wieder zu entsperren. Die PIN umschließt einen gerätelokalen Schlüssel – sie verlässt dieses Gerät nie und berührt deine Wiederherstellungsphrase nie.",
+      "pinReplacesBiometric": " Das Festlegen einer PIN ersetzt die Entsperrung mit {{method}}.",
+      "pinPlaceholder6": "Mindestens 6 Ziffern",
+      "confirmPin": "PIN bestätigen",
+      "reenterPin": "PIN erneut eingeben",
+      "setupButton": "Schnellentsperrung einrichten"
     },
     "shell": {
       "closeLabel": "Einstellungen schließen",
+      "groups": {
+        "labs": "Labs"
+      },
       "navLabel": "Einstellungsbereiche",
       "panels": {
         "about": "Über",
         "account": "Konto",
+        "ai": "KI",
         "appearance": "Darstellung",
         "editor": "Editor",
+        "files": "Dateien",
         "hotkeys": "Tastenkürzel",
         "privacy": "Datenschutz",
         "storage": "Speicher",
@@ -1751,6 +2275,44 @@
       "optionLive": "Live-Vorschau",
       "optionReading": "Lesen",
       "optionSource": "Quelltext"
+    },
+    "strength": {
+      "weak": "Schwach",
+      "fair": "Mäßig",
+      "good": "Gut",
+      "strong": "Stark"
+    },
+    "sync": {
+      "summary": {
+        "notSetUp": "Nicht eingerichtet",
+        "offline": "Offline",
+        "conflicts_one": "{{count}} Konflikt",
+        "conflicts_other": "{{count}} Konflikte"
+      }
+    },
+    "data": {
+      "exported_one": "{{count}} Notiz exportiert → {{label}}",
+      "exported_other": "{{count}} Notizen exportiert → {{label}}",
+      "exportNeedsApp": "Der Export erfordert die App (nicht die Browser-Vorschau).",
+      "exportFailed": "Der Tresor konnte nicht exportiert werden.",
+      "exportToMarkdown": "Als Markdown exportieren",
+      "exportToMarkdownSubtitle": "Jede Notiz in einen unverschlüsselten Ordner in „Dokumente“ entschlüsseln"
+    },
+    "saveSettingError": "Diese Einstellung konnte nicht gespeichert werden",
+    "panelTitle": {
+      "privacy": "Datenschutz & Sicherheit",
+      "data": "Daten",
+      "vaultName": "Tresorname",
+      "approveDevice": "Gerät genehmigen"
+    },
+    "done": "Fertig",
+    "sectionOptions": "Optionen",
+    "footerTagline": "myne · auf diesem Gerät verschlüsselt · Open Source",
+    "editor": {
+      "defaultView": "Standardansicht",
+      "typewriter": "Schreibmaschinen-Scrollen",
+      "typewriterSubtitle": "Cursor vertikal zentriert halten",
+      "enableArchiving": "Archivierung aktivieren"
     }
   },
   "sync": {
@@ -1776,7 +2338,10 @@
       "groupTitle_one": "{{count}} konfliktbehaftete Kopie von {{original}}",
       "groupTitle_other": "{{count}} konfliktbehaftete Kopien von {{original}}",
       "keepAsSeparate": "Als separate behalten",
-      "untitled": "Ohne Titel ({{hex}})"
+      "tookTheirsToast": "Lokale Version in den Papierkorb verschoben.",
+      "tookTheirsUndo": "Rückgängig",
+      "untitled": "Ohne Titel ({{hex}})",
+      "useThisVersion": "Diese Version verwenden"
     },
     "devices": {
       "approve": "Genehmigen",
@@ -1794,6 +2359,12 @@
       "thisDevice": "Dieses Gerät",
       "transportHint": "Wenn der Server umgezogen ist oder sein Zertifikat sich geändert hat, geben Sie die Server-URL oben unter „Sync-Server“ erneut ein, um ihm wieder zu vertrauen.",
       "unreachable": "Sync nicht erreichbar ({{error}}).",
+      "verifyBody": "Prüfe, ob auf dem gerade genehmigten Gerät derselbe Code erscheint. Wenn er übereinstimmt, gehört es zu deinem Konto. Wenn nicht, entferne das Gerät.",
+      "verifyMatch": "Sie stimmen überein",
+      "verifyMismatch": "Sie stimmen nicht überein",
+      "verifyPending": "Dieser Code erscheint, sobald das neue Gerät seine erste Synchronisierung abgeschlossen hat.",
+      "verifySyncing": "Wird synchronisiert…",
+      "verifyTitle": "Neues Gerät verifizieren",
       "yourDevices": "Ihre Geräte"
     },
     "endpoint": {
@@ -1802,6 +2373,8 @@
       "connectedTls": "Verbunden. Prüfen Sie, ob dieser Fingerabdruck auf Ihrem anderen Gerät übereinstimmt.",
       "connecting": "Wird verbunden…",
       "fingerprintLabel": "Fingerabdruck des Serverzertifikats:",
+      "pinStatic": "Gegen Mynes integriertes Zertifikat verifiziert.",
+      "pinTofu": "Beim ersten Verbinden angeheftet. Vergleiche diesen Fingerabdruck auf all deinen Geräten.",
       "placeholder": "https://your-server.example   ·   http://127.0.0.1:8080",
       "unreachable": "Dieser Server ist nicht erreichbar – prüfen Sie die URL und ob er läuft."
     },
@@ -1828,14 +2401,23 @@
     "join": {
       "accountLabel": "Kontonummer",
       "cancel": "Abbrechen",
+      "continue": "Weiter",
       "error": "Dieses Gerät konnte nicht hinzugefügt werden. Prüfen Sie die Server-URL, die Kontonummer und das Passwort – und ob der Server erreichbar ist.",
       "help": "Melden Sie sich mit Ihrer Kontonummer und Ihrem Passwort an. Dieses Gerät synchronisiert Ihre Notizen, sobald ein vorhandenes Gerät es genehmigt. Keine Wiederherstellungsphrase nötig.",
       "passwordLabel": "Passwort",
+      "pinnedCompare": "Dieses Gerät hat das Zertifikat deines Servers angeheftet. Prüfe, ob dieser Fingerabdruck auf deinen anderen Geräten übereinstimmt.",
+      "pinnedTitle": "Serverzertifikat angeheftet",
       "serverLabel": "Sync-Server",
       "serverPlaceholder": "https://your-server.example",
+      "sasMatch": "Sie stimmen überein – fortfahren",
+      "sasMismatch": "Sie stimmen nicht überein – dieses Gerät entfernen",
       "submit": "Gerät hinzufügen",
       "submitting": "Wird hinzugefügt…",
-      "title": "Dieses Gerät zu einem Konto hinzufügen"
+      "title": "Dieses Gerät zu einem Konto hinzufügen",
+      "verifyBody": "Prüfe, ob dieser Code mit dem auf dem Gerät übereinstimmt, von dem aus du genehmigt hast.",
+      "verifyTitle": "Dieses Gerät verifizieren",
+      "waitingHint": "Lass dieses Fenster geöffnet – sobald genehmigt, erscheint hier ein Verifizierungscode zum Vergleich mit deinem anderen Gerät.",
+      "waitingTitle": "Warten auf Genehmigung"
     },
     "panel": {
       "addDevice": {
@@ -1872,6 +2454,43 @@
       "synced": "Synchronisiert",
       "syncing": "Wird synchronisiert…",
       "syncNow": "Jetzt synchronisieren"
+    },
+    "settings": {
+      "serverSection": "Server",
+      "serverNotSet": "Nicht festgelegt",
+      "statusLabel": "Status",
+      "hubHelp": "Die Synchronisierung hält deine Notizen auf allen Geräten aktuell. Alles wird auf diesem Gerät verschlüsselt, bevor es gesendet wird – der Server sieht deine Notizen nie.",
+      "connectedTls": "Über TLS verbunden.",
+      "connectedLocal": "Mit deinem lokalen Netzwerk verbunden.",
+      "connectError": "Der Server konnte nicht erreicht werden. Überprüfe die Adresse und versuche es erneut.",
+      "serverAddressLabel": "Serveradresse",
+      "serverAddressPlaceholder": "https://sync.example.com",
+      "fingerprintLabel": "Zertifikat-Fingerabdruck",
+      "fingerprintCompare": "Vergleiche dies mit demselben Bildschirm auf einem Gerät, dem du bereits vertraust – sie müssen übereinstimmen.",
+      "pinStatic": "Gegen das bekannte Zertifikat dieses Servers verifiziert.",
+      "pinTofu": "Beim ersten Verbinden angeheftet. Vergleiche ihn auf all deinen Geräten zur Bestätigung.",
+      "enrollNotConfigured": "Richte zuerst einen Sync-Server ein und füge dann dieses Gerät hinzu.",
+      "enrollTransport": "Der Sync-Server konnte nicht erreicht werden. Überprüfe deine Verbindung und versuche es erneut.",
+      "accountNumberHint": "Überprüfe diese Nummer noch einmal – sie sieht nicht richtig aus.",
+      "passwordPlaceholder": "Dein Tresor-Passwort",
+      "recoveryPhraseHint": "Gib deine 24 Wörter ein oder füge sie ein. Beim Einfügen werden die Felder der Reihe nach ausgefüllt.",
+      "verifyBody": "Prüfe, ob auf dem gerade genehmigten Gerät derselbe Code erscheint. Wenn er übereinstimmt, gehört es zu deinem Konto. Wenn nicht, entferne das Gerät.",
+      "sasMismatch": "Sie stimmen nicht überein",
+      "removeDeviceButton": "Gerät entfernen",
+      "keepDevice": "Behalten",
+      "notEnrolledHelp": "Dieses Gerät synchronisiert noch nicht. Füge es über den vorherigen Bildschirm hinzu, um deine Geräte zu sehen.",
+      "unauthenticated": "Der Zugriff dieses Geräts wurde widerrufen, wahrscheinlich von einem anderen Gerät entfernt.",
+      "transportError": "Der Sync-Server konnte nicht erreicht werden. Falls der Server umgezogen ist oder sich sein Zertifikat geändert hat, verbinde ihn über den Bildschirm „Sync-Server“ erneut.",
+      "retiredSelf": "Dieses Gerät wurde von einem anderen Gerät entfernt.",
+      "resetAndAddAgain": "Zurücksetzen und erneut hinzufügen",
+      "noDevices": "Noch keine Geräte.",
+      "syncingHere": "Synchronisiert hier"
+    },
+    "banner": {
+      "conflictsNeedReview_one": "{{count}} Konflikt muss überprüft werden",
+      "conflictsNeedReview_other": "{{count}} Konflikte müssen überprüft werden",
+      "catchingUp": "Synchronisierung wird nachgeholt – deine Notizen sind sicher.",
+      "verifyDevices": "Geräte verifizieren"
     }
   },
   "templates": {
@@ -1888,7 +2507,14 @@
       "removeFromTemplates": "Aus Vorlagen entfernen",
       "removeRowLabel": "{{name}} aus Vorlagen entfernen (die Notiz bleibt erhalten)",
       "title": "Notizvorlagen"
-    }
+    },
+    "emptyBefore": "Noch keine Vorlagen. Tippe auf ",
+    "newAction": "Neu",
+    "emptyAfter": ", um eine wiederverwendbare Notizvorlage zu erstellen – dann starte Notizen daraus (und wähle in den Einstellungen eine als deine Tagesnotiz-Vorlage).",
+    "use": "Verwenden",
+    "edit": "Bearbeiten",
+    "deleteConfirm": "Diese Vorlage löschen?",
+    "convertToNote": "In Notiz umwandeln"
   },
   "unlock": {
     "backToPicker": "Einen anderen Tresor wählen",
@@ -1922,7 +2548,34 @@
       "lockedDuringChange": "Passwortänderung abgebrochen: Der Tresor wurde gesperrt.",
       "metaChangedExternally": "Der Tresor wurde in einer anderen Sitzung geändert – bitte erneut entsperren."
     },
-    "title": "Entsperren Sie Ihren Tresor."
+    "title": "Entsperren Sie Ihren Tresor.",
+    "vaultUnreadable": "Tresordatei ist nicht lesbar. Aus einem Backup wiederherstellen.",
+    "unlockFailedGeneric": "Entsperren fehlgeschlagen. Bitte versuche es erneut.",
+    "biometricTooManyAttempts": "Zu viele {{biometric}}-Versuche. Verwende dein Passwort.",
+    "pinIncorrect_one": "Falsche PIN. Noch {{count}} Versuch übrig.",
+    "pinIncorrect_other": "Falsche PIN. Noch {{count}} Versuche übrig.",
+    "pinTooManyAttempts": "Zu viele PIN-Versuche. Verwende dein Passwort.",
+    "pinFailedGeneric": "Entsperren mit PIN fehlgeschlagen. Verwende dein Passwort.",
+    "corruptedHeading": "Tresordatei ist nicht lesbar",
+    "ioErrorHeading": "Dieser Tresor kann nicht gelesen werden",
+    "blockingTitle": "Wird entsperrt",
+    "blockingSubtitle": "Deine Schlüssel werden auf diesem Gerät entschlüsselt.",
+    "eyebrow": "Tresor entsperren",
+    "vaultTitleFallback": "Dein Tresor",
+    "unlockWithBiometric": "Mit {{biometric}} entsperren",
+    "biometricFailed": "{{biometric}} konnte deine Identität nicht bestätigen",
+    "touchToUnlock": "Zum Entsperren berühren",
+    "lookToUnlock": "Zum Entsperren ansehen",
+    "biometricRetryHint": "Versuche es erneut oder entsperre mit deinem Passwort.",
+    "tryBiometricAgain": "{{biometric}} erneut versuchen",
+    "usePasswordInstead": "Stattdessen Passwort verwenden",
+    "useBiometricInstead": "Stattdessen {{biometric}} verwenden",
+    "unlockWithPinInstead": "Stattdessen mit PIN entsperren",
+    "useRecoveryPhrase": "Wiederherstellungsphrase verwenden",
+    "deleteConfirmTitle": "Diesen Tresor löschen?",
+    "deletePartialError": "Einige Dateien konnten nicht entfernt werden. Der Tresor ist nicht mehr verwendbar – fahre fort, um neu zu beginnen.",
+    "failClosedEyebrow": "Tresor kann nicht geöffnet werden",
+    "restoreHint": "Zum Fortfahren aus einem Backup wiederherstellen."
   },
   "vault": {
     "ioBanner": {
@@ -2188,6 +2841,143 @@
       "partialTitle": "Einige Dateien konnten nicht entfernt werden"
     },
     "restoreCta": "Aus Sicherung wiederherstellen",
-    "subtitle": "Ihre Notizen werden auf diesem Gerät verschlüsselt, bevor sie es verlassen. Der Server speichert nur Chiffretext."
+    "subtitle": "Ihre Notizen werden auf diesem Gerät verschlüsselt, bevor sie es verlassen. Der Server speichert nur Chiffretext.",
+    "repairCleanedUp_one": "{{count}} übrig gebliebene Datei bereinigt.",
+    "repairCleanedUp_other": "{{count}} übrig gebliebene Dateien bereinigt.",
+    "repairFailed": "Die Bereinigung konnte nicht abgeschlossen werden. Bitte versuche es erneut.",
+    "heroLine1": "Notizen, die",
+    "heroLine2": "nur dir",
+    "heroLine3": "gehören.",
+    "lede": "Markdown, auf diesem Gerät verschlüsselt, bevor es das Gerät je verlässt. Keine Konto-E-Mail. Keine Server, die ein einziges Wort lesen können.",
+    "residueBanner": "Übrig gebliebene Dateien von einem unterbrochenen Löschvorgang ({{n}}). Bereinige sie, bevor du einen Tresor erstellst.",
+    "cleanUpFiles": "Übrig gebliebene Dateien bereinigen",
+    "create": "Tresor erstellen",
+    "connect": "Mit meinem Konto verbinden"
+  },
+  "wikiGraph": {
+    "emptyTitle": "Noch keine Verknüpfungen",
+    "emptyBodyBefore": "Verbinde Notizen, indem du ",
+    "emptyBodyAfter": " in deinen Text schreibst. Verknüpfte Notizen erscheinen hier als Graph."
+  },
+  "markdown": {
+    "attachmentFallback": "Anhang",
+    "nothingToPreview": "Noch nichts für eine Vorschau vorhanden."
+  },
+  "conflicts": {
+    "empty": "Keine Konflikte zu überprüfen – deine Notizen sind synchron.",
+    "groupTitle_one": "{{count}} widersprüchliche Kopie",
+    "groupTitle_other": "{{count}} widersprüchliche Kopien",
+    "groupTitleOfNote": " von Notiz {{hex}}"
+  },
+  "viewEditor": {
+    "saveError": "Diese Ansicht konnte nicht gespeichert werden. Bitte versuche es erneut.",
+    "deleteError": "Diese Ansicht konnte nicht gelöscht werden. Bitte versuche es erneut.",
+    "editView": "Ansicht bearbeiten",
+    "condition": {
+      "search": "Text"
+    },
+    "containsPlaceholder": "enthält…",
+    "tagPlaceholder": "Tag",
+    "folderPlaceholder": "Ordner/",
+    "addCondition": "+ Bedingung hinzufügen",
+    "createView": "Ansicht erstellen"
+  },
+  "snapshots": {
+    "today": "Heute {{time}}",
+    "readError": "Der Versionsverlauf konnte nicht gelesen werden.",
+    "decryptError": "Diese Version konnte nicht entschlüsselt werden.",
+    "restoreError": "Diese Version konnte nicht wiederhergestellt werden.",
+    "title": "Versionsverlauf",
+    "emptyState": "Noch keine früheren Versionen. Snapshots werden automatisch erfasst, während du bearbeitest.",
+    "hide": "Ausblenden",
+    "empty": "(leer)",
+    "restoreThisVersion": "Diese Version wiederherstellen"
+  },
+  "restoreBackup": {
+    "title": "Auf Mobilgeräten noch nicht verfügbar",
+    "body": "Das Wiederherstellen aus einer Backup-Datei ist auf Mobilgeräten noch nicht verfügbar – erstelle einen Tresor oder stelle mit deiner Phrase wieder her."
+  },
+  "recording": {
+    "deniedTitle": "Mikrofonzugriff ist aus",
+    "errorTitle": "Aufnahme konnte nicht gestartet werden",
+    "deniedBody": "Um eine Sprachnotiz aufzunehmen, erlaube Myne den Mikrofonzugriff unter Einstellungen › Myne › Mikrofon.",
+    "noDeviceBody": "Auf diesem Gerät wurde kein Mikrofon gefunden.",
+    "emptyBody": "Diese Aufnahme war leer – es wurde nichts aufgenommen.",
+    "genericBody": "Bei der Aufnahme ist etwas schiefgelaufen. Bitte versuche es erneut.",
+    "stopAria": "Aufnahme stoppen"
+  },
+  "picker": {
+    "neverOpened": "Nie geöffnet",
+    "openedJustNow": "gerade eben geöffnet",
+    "openedMinuteAgo": "vor einer Minute geöffnet",
+    "openedMinutesAgo_one": "vor {{count}} Minute geöffnet",
+    "openedMinutesAgo_other": "vor {{count}} Minuten geöffnet",
+    "openedHourAgo": "vor einer Stunde geöffnet",
+    "openedHoursAgo_one": "vor {{count}} Stunde geöffnet",
+    "openedHoursAgo_other": "vor {{count}} Stunden geöffnet",
+    "openedYesterday": "gestern geöffnet",
+    "openedDaysAgo_one": "vor {{count}} Tag geöffnet",
+    "openedDaysAgo_other": "vor {{count}} Tagen geöffnet",
+    "openedLastWeek": "letzte Woche geöffnet",
+    "openedWeeksAgo_one": "vor {{count}} Woche geöffnet",
+    "openedWeeksAgo_other": "vor {{count}} Wochen geöffnet",
+    "openedLastMonth": "letzten Monat geöffnet",
+    "openedMonthsAgo_one": "vor {{count}} Monat geöffnet",
+    "openedMonthsAgo_other": "vor {{count}} Monaten geöffnet",
+    "openedLastYear": "letztes Jahr geöffnet",
+    "openedYearsAgo_one": "vor {{count}} Jahr geöffnet",
+    "openedYearsAgo_other": "vor {{count}} Jahren geöffnet",
+    "corruptedBadge": "Beschädigt"
+  },
+  "join": {
+    "transportError": "Der Sync-Server konnte nicht erreicht werden. Überprüfe die Adresse und deine Verbindung und versuche es dann erneut.",
+    "passwordPlaceholder": "Dein Tresor-Passwort",
+    "waitingHint": "Lass diesen Bildschirm geöffnet – sobald genehmigt, erscheint hier ein Verifizierungscode zum Vergleich mit deinem anderen Gerät.",
+    "verifyBody": "Prüfe, ob dieser Code derselbe ist wie auf dem Gerät, von dem aus du genehmigt hast.",
+    "removing": "Wird entfernt…",
+    "sasMismatch": "Sie stimmen nicht überein – dieses Gerät entfernen",
+    "title": "Mit deinem Konto verbinden",
+    "lead": "Gib deine Kontodaten ein, um deine Notizen auf dieses Gerät zu holen. Alles bleibt Ende-zu-Ende-verschlüsselt.",
+    "serverPlaceholder": "https://sync.example.com",
+    "accountHint": "Überprüfe diese Nummer noch einmal – sie sieht nicht richtig aus.",
+    "approvalHint": "Deine Notizen erscheinen, sobald du dieses Gerät von einem Gerät aus genehmigst, das bereits dein Konto hat.",
+    "connectingSubtitle": "Dein Konto wird abgerufen und dein Tresor auf diesem Gerät entsperrt."
+  },
+  "createVault": {
+    "beginWeakPassword": "Wähle ein stärkeres Passwort und versuche es erneut.",
+    "beginGeneric": "Die Tresorerstellung konnte nicht gestartet werden. Bitte versuche es erneut.",
+    "wordNumber": "WORT #{{position}}",
+    "commitError": "Dein Tresor konnte nicht gespeichert werden. Bitte versuche es erneut.",
+    "savedToFile": "Gespeichert in {{label}}",
+    "saveFileError": "Die Datei konnte nicht gespeichert werden.",
+    "stepLabel": "Tresor erstellen · {{current}} von {{total}}",
+    "briefingTitle": "Bevor wir beginnen",
+    "briefingLead": "Myne verschlüsselt alles auf diesem Gerät. Diese Privatsphäre bringt eine Verantwortung mit sich, die nur du tragen kannst.",
+    "passwordTitle": "Passwort erstellen",
+    "confirmPasswordLabel": "Passwort bestätigen",
+    "passwordHelper": "Wird nie gespeichert, nie übertragen. Es verschlüsselt deine Schlüssel auf diesem Gerät.",
+    "encryptingSubtitle": "Dein Schlüssel wird mit Argon2id abgeleitet. Das dauert einige Sekunden und kann nicht unterbrochen werden.",
+    "phraseTitle": "Deine Wiederherstellungsphrase",
+    "phraseIntro": "Vierundzwanzig Wörter, in Reihenfolge. Schreibe sie auf Papier und bewahre sie an einem sicheren Ort auf.",
+    "showSecondHalf": "Wörter 13–24 anzeigen",
+    "saveToFile": "In Datei speichern",
+    "writtenThemDown": "Ich habe sie aufgeschrieben",
+    "typebackTitle": "Bestätige deine Phrase",
+    "typebackLead": "Gib diese vier Wörter aus der gerade gespeicherten Wiederherstellungsphrase ein.",
+    "wordMismatch": "Stimmt nicht mit Wort #{{pos}} überein",
+    "backToPhrase": "Zurück zur Phrase",
+    "accountTitle": "Deine Kontonummer",
+    "accountLead": "Speichere diese zusammen mit deiner Wiederherstellungsphrase. Du benötigst sie, um deinen Tresor auf einem neuen Gerät wiederherzustellen.",
+    "accountSavedAck": "Ich habe meine Kontonummer gespeichert.",
+    "commit": "Erstellen",
+    "committingTitle": "Dein Tresor wird gespeichert…",
+    "committingSubtitle": "Der verschlüsselte Tresor wird auf dieses Gerät geschrieben.",
+    "unlockingTitle": "Wird entsperrt…",
+    "unlockingSubtitle": "Dein Tresor wird geöffnet.",
+    "readyTitle": "Dein Tresor ist bereit",
+    "readyBody": "Alles, was du ab hier schreibst, wird auf diesem Gerät verschlüsselt, bevor es gespeichert oder synchronisiert wird.",
+    "personalLabel": "Persönlich",
+    "openVault": "Tresor öffnen",
+    "backUpNow": "Jetzt sichern"
   }
 }

@@ -5,20 +5,18 @@
       "cleaning": "A limpar…",
       "close": "Fechar",
       "completeTitle": "Limpeza concluída",
+      "deleteCta": "Eliminar {{count}} não utilizados",
       "deleteCta_one": "Apagar {{count}} não utilizado",
-      "deleteCta_many": "Apagar {{count}} não utilizados",
       "deleteCta_other": "Apagar {{count}} não utilizados",
       "error": "Não foi possível limpar. Algumas notas podem estar ilegíveis — nada foi apagado.",
       "intro_one": "Este anexo não é usado em nenhuma nota. Apagá-lo é permanente e não pode ser desfeito.",
-      "intro_many": "Estes {{count}} anexos não são usados em nenhuma nota. Apagá-los é permanente e não pode ser desfeito.",
       "intro_other": "Estes {{count}} anexos não são usados em nenhuma nota. Apagá-los é permanente e não pode ser desfeito.",
       "summaryFreed": " · {{size}} libertados",
       "summaryPeriod": ".",
       "summaryRemoved_one": "{{count}} anexo removido",
-      "summaryRemoved_many": "{{count}} anexos removidos",
       "summaryRemoved_other": "{{count}} anexos removidos",
+      "summarySkipped": " · {{count}} ignorados (agora em uso)",
       "summarySkipped_one": " · {{count}} ignorado (agora em uso)",
-      "summarySkipped_many": " · {{count}} ignorados (agora em uso)",
       "summarySkipped_other": " · {{count}} ignorados (agora em uso)",
       "title": "Limpar anexos não utilizados",
       "willBeReclaimed": "{{size}} serão recuperados."
@@ -40,7 +38,6 @@
       "error": "Não foi possível apagar o anexo. Tente novamente.",
       "notUsed": "Não utilizado em nenhuma nota.",
       "stillUsed_one": "Ainda é usado em {{count}} nota. Apagá-lo deixa uma lápide onde estava incorporado:",
-      "stillUsed_many": "Ainda é usado em {{count}} notas. Apagá-lo deixa uma lápide onde estava incorporado:",
       "stillUsed_other": "Ainda é usado em {{count}} notas. Apagá-lo deixa uma lápide onde estava incorporado:",
       "title": "Apagar anexo",
       "untitled": "Sem título"
@@ -95,7 +92,6 @@
         "pdf": "PDFs"
       },
       "usedInCount_one": "Usado em {{count}} nota",
-      "usedInCount_many": "Usado em {{count}} notas",
       "usedInCount_other": "Usado em {{count}} notas",
       "usedInLoading": "…"
     },
@@ -110,7 +106,28 @@
     "usedInNotesPopover": {
       "empty": "Não utilizado em nenhuma nota.",
       "untitled": "Sem título"
-    }
+    },
+    "needsApp": "A limpeza de anexos precisa da aplicação.",
+    "noUnused": "Nenhum anexo não utilizado — todos os ficheiros estão referenciados.",
+    "scanError": "Não foi possível procurar anexos não utilizados.",
+    "erasedToast_one": "Apagado {{count}} ficheiro não utilizado.",
+    "erasedToast_other": "Apagados {{count}} ficheiros não utilizados.",
+    "eraseError": "Não foi possível apagar os anexos não utilizados.",
+    "readError": "Não foi possível ler os anexos.",
+    "needAppPreview": "Os anexos precisam da aplicação (não da pré-visualização no navegador).",
+    "tooLarge": "Esse ficheiro é demasiado grande (máx. 64 MB).",
+    "unsupported": "Só é possível anexar imagens e PDF.",
+    "addError": "Não foi possível adicionar esse ficheiro.",
+    "deleteError": "Não foi possível eliminar esse anexo.",
+    "renameError": "Não foi possível mudar o nome desse anexo.",
+    "unusedSummary_one": "{{count}} anexo não é referenciado por nenhuma nota ({{size}}). Apagar é uma eliminação criptográfica permanente — não existe lixeira.",
+    "unusedSummary_other": "{{count}} anexos não são referenciados por nenhuma nota ({{size}}). Apagar é uma eliminação criptográfica permanente — não existe lixeira.",
+    "eraseCta_one": "Apagar {{count}} ficheiro não utilizado",
+    "eraseCta_other": "Apagar {{count}} ficheiros não utilizados",
+    "emptyState": "Ainda não há anexos. Toque em Carregar para adicionar uma imagem ou PDF.",
+    "insert": "Inserir",
+    "pauseLabel": "Pausar {{filename}}",
+    "playLabel": "Reproduzir {{filename}}"
   },
   "backup": {
     "errors": {
@@ -165,6 +182,8 @@
     "archivedBadge": "Arquivo",
     "archivedBadgeTitle": "Arquivado",
     "dialogLabel": "Paleta de comandos",
+    "matchedInAttachment": "no anexo",
+    "matchedInAttachmentTitle": "A pesquisa correspondeu dentro de um ficheiro incorporado nesta nota",
     "matchedInBody": "↳ correspondência no corpo",
     "noMatches": "Sem correspondências",
     "searchPlaceholder": "Pesquisar notas ou executar um comando — Esc para fechar",
@@ -178,10 +197,172 @@
         "label": "Fazer cópia de segurança do cofre…"
       },
       "category": {
+        "ai": "IA",
         "app": "Aplicação",
+        "appearance": "Aparência",
         "editor": "Editor",
+        "notes": "Notas",
         "vault": "Cofre",
         "view": "Ver"
+      },
+      "aiOpenChat": {
+        "label": "Abrir chat de IA"
+      },
+      "toggleLineNumbers": {
+        "label": "Alternar números de linha"
+      },
+      "toggleSpellCheck": {
+        "label": "Alternar verificação ortográfica"
+      },
+      "toggleTypewriter": {
+        "label": "Alternar deslocamento tipo máquina de escrever"
+      },
+      "toggleDimInactive": {
+        "label": "Alternar esbatimento de linhas inativas"
+      },
+      "toggleEditorFont": {
+        "label": "Alternar tipo de letra do editor (mono / sans)"
+      },
+      "cycleTextSize": {
+        "label": "Percorrer tamanho de texto do editor"
+      },
+      "cycleContentWidth": {
+        "label": "Percorrer largura do conteúdo do editor"
+      },
+      "cycleDefaultViewMode": {
+        "label": "Percorrer modo de visualização predefinido"
+      },
+      "toggleTimestamps": {
+        "label": "Alternar datas/horas das notas na barra lateral"
+      },
+      "toggleArchiving": {
+        "label": "Alternar arquivamento de notas"
+      },
+      "toggleAiEnabled": {
+        "label": "Alternar funcionalidades de IA (beta)"
+      },
+      "toggleScreenCapture": {
+        "label": "Alternar proteção contra captura de ecrã"
+      },
+      "cycleTheme": {
+        "label": "Percorrer temas"
+      },
+      "themeLight": {
+        "label": "Tema: Claro"
+      },
+      "themeDark": {
+        "label": "Tema: Escuro"
+      },
+      "themeAmoled": {
+        "label": "Tema: AMOLED"
+      },
+      "themeSystem": {
+        "label": "Tema: Seguir o sistema"
+      },
+      "applyCustomTheme": {
+        "label": "Aplicar tema personalizado…"
+      },
+      "splitRight": {
+        "label": "Dividir painel à direita"
+      },
+      "splitDown": {
+        "label": "Dividir painel para baixo"
+      },
+      "closePane": {
+        "label": "Fechar painel"
+      },
+      "closeTab": {
+        "label": "Fechar separador"
+      },
+      "nextTab": {
+        "label": "Separador seguinte"
+      },
+      "prevTab": {
+        "label": "Separador anterior"
+      },
+      "focusNextPane": {
+        "label": "Focar painel seguinte"
+      },
+      "focusPrevPane": {
+        "label": "Focar painel anterior"
+      },
+      "goBack": {
+        "label": "Recuar"
+      },
+      "goForward": {
+        "label": "Avançar"
+      },
+      "togglePreview": {
+        "label": "Alternar pré-visualização lado a lado"
+      },
+      "findInNote": {
+        "label": "Localizar na nota"
+      },
+      "findReplace": {
+        "label": "Localizar e substituir na nota"
+      },
+      "newNote": {
+        "label": "Nova nota"
+      },
+      "duplicateNote": {
+        "label": "Duplicar nota"
+      },
+      "archiveNote": {
+        "label": "Arquivar nota"
+      },
+      "renameNote": {
+        "label": "Mudar o nome da nota"
+      },
+      "trashNote": {
+        "label": "Mover nota para a Lixeira"
+      },
+      "toggleFavorite": {
+        "label": "Alternar favorito"
+      },
+      "moveNote": {
+        "label": "Mover nota para pasta…"
+      },
+      "emptyTrash": {
+        "label": "Esvaziar Lixeira"
+      },
+      "showBacklinks": {
+        "label": "Mostrar backlinks"
+      },
+      "showOutline": {
+        "label": "Mostrar estrutura"
+      },
+      "showUnlinked": {
+        "label": "Mostrar menções não vinculadas"
+      },
+      "newFolder": {
+        "label": "Nova pasta"
+      },
+      "openTrash": {
+        "label": "Abrir Lixeira"
+      },
+      "openArchive": {
+        "label": "Abrir arquivo"
+      },
+      "cycleHeading": {
+        "label": "Percorrer nível de título"
+      },
+      "restoreBackup": {
+        "label": "Restaurar cofre a partir de backup…"
+      },
+      "toggleRealtimeSync": {
+        "label": "Alternar sincronização em tempo real"
+      },
+      "revealVaultFolder": {
+        "label": "Mostrar pasta do cofre no gestor de ficheiros"
+      },
+      "aiSummarizeNote": {
+        "label": "Resumir nota"
+      },
+      "aiSuggestTags": {
+        "label": "Sugerir etiquetas"
+      },
+      "aiRewriteSelection": {
+        "label": "Reescrever seleção"
       },
       "convertWikilinks": {
         "label": "Converter wikilinks importados nesta nota…"
@@ -191,6 +372,12 @@
       },
       "exportNoteHtml": {
         "label": "Exportar nota como HTML…"
+      },
+      "exportSelectionImage": {
+        "label": "Exportar seleção como imagem…",
+        "saved": "Seleção guardada como imagem.",
+        "noSelection": "Selecione primeiro algum texto e depois exporte-o como imagem.",
+        "failed": "Não foi possível exportar a seleção como imagem."
       },
       "exportNoteMarkdown": {
         "label": "Exportar nota como Markdown…"
@@ -313,6 +500,15 @@
     },
     "rebind": {
       "invalidChordReason": "Adicione um modificador (⌘, Ctrl ou Alt) — uma tecla isolada não pode ser um atalho."
+    },
+    "picker": {
+      "vaultRoot": "Raiz do cofre",
+      "moveNoteTitle": "Mover nota para pasta",
+      "moveNotePlaceholder": "Escolha uma pasta…",
+      "noFolders": "Ainda não há pastas",
+      "applyThemeTitle": "Aplicar tema personalizado",
+      "applyThemePlaceholder": "Escolha um tema…",
+      "noCustomThemes": "Nenhum tema personalizado instalado"
     }
   },
   "common": {
@@ -323,7 +519,9 @@
     },
     "spinner": {
       "loadingLabel": "A carregar"
-    }
+    },
+    "back": "Voltar",
+    "continue": "Continuar"
   },
   "editor": {
     "attachment": {
@@ -339,7 +537,6 @@
         "confirm": "Converter",
         "skipped": "ignorado — {{note}}",
         "subtitle_one": "Será reescrita 1 referência. Reveja antes de confirmar.",
-        "subtitle_many": "{{count}} referências serão reescritas. Reveja antes de confirmar.",
         "subtitle_other": "{{count}} referências serão reescritas. Reveja antes de confirmar.",
         "subtitleEmpty": "Nada para converter — nenhum ficheiro de origem resolvido.",
         "title": "Converter anexos importados"
@@ -348,8 +545,8 @@
         "pickerSourceFilter": "Origem do anexo"
       },
       "convertCore": {
+        "converted": "{{count}} convertidos",
         "converted_one": "{{count}} convertido",
-        "converted_many": "{{count}} convertidos",
         "converted_other": "{{count}} convertidos",
         "noneToConvert": "Não há anexos importados para converter nesta nota.",
         "skipNote": {
@@ -359,8 +556,8 @@
           "tooLarge": "demasiado grande (máx. 64 MiB)",
           "unsupported": "tipo não suportado"
         },
+        "skippedSuffix": " · {{count}} ignorados",
         "skippedSuffix_one": " · {{count}} ignorado",
-        "skippedSuffix_many": " · {{count}} ignorados",
         "skippedSuffix_other": " · {{count}} ignorados"
       },
       "fileKind": {
@@ -440,8 +637,8 @@
         "title": "Mudar o nome do anexo"
       },
       "summary": {
+        "added": "{{count}} adicionados",
         "added_one": "{{count}} adicionado",
-        "added_many": "{{count}} adicionados",
         "added_other": "{{count}} adicionados",
         "reason": {
           "failed": "falhou",
@@ -449,8 +646,8 @@
           "tooLarge": "demasiado grande",
           "unsupported": "tipo não suportado"
         },
+        "skipped": "{{count}} ignorados: {{noun}}",
         "skipped_one": "{{count}} ignorado: {{noun}}",
-        "skipped_many": "{{count}} ignorados: {{noun}}",
         "skipped_other": "{{count}} ignorados: {{noun}}"
       },
       "voice": {
@@ -481,6 +678,9 @@
           "reveal": "Revelar na biblioteca"
         },
         "pdfFallback": "PDF",
+        "textPreview": {
+          "truncated": "Pré-visualização truncada — Exporte para obter o ficheiro completo."
+        },
         "tombstone": {
           "brokenAria": "Referência de anexo quebrada: {{filename}}",
           "brokenLabel": "quebrado",
@@ -518,17 +718,17 @@
       "backlinks": {
         "archivedBadge": "Arquivado",
         "empty": "Ainda não há backlinks.",
+        "linkedFrom": "Ligado a partir de {{count}}",
         "linkedFrom_one": "Ligado a partir de {{count}}",
-        "linkedFrom_many": "Ligado a partir de {{count}}",
         "linkedFrom_other": "Ligado a partir de {{count}}",
         "untitled": "Sem título"
       },
       "barItems": {
         "graph": "Gráfico",
-        "hide": "",
+        "hide": "Ocultar",
         "lock": "Bloquear",
-        "moveLeft": "",
-        "moveRight": "",
+        "moveLeft": "Mover para a esquerda",
+        "moveRight": "Mover para a direita",
         "saveStatus": "Estado de gravação",
         "settings": "Definições",
         "syncStatus": "Estado de sincronização",
@@ -539,20 +739,20 @@
         "workspace": "Área de trabalho"
       },
       "baseImport": {
+        "droppedFiltersSuffix": " · {{count}} filtros descartados",
         "droppedFiltersSuffix_one": " · {{count}} filtro descartado",
-        "droppedFiltersSuffix_many": " · {{count}} filtros descartados",
         "droppedFiltersSuffix_other": " · {{count}} filtros descartados",
         "failed": "A importação falhou.",
         "fileFilterName": "Base do Obsidian",
+        "imported": "{{count}} vista(s) importada(s)",
         "imported_one": "{{count}} vista importada",
-        "imported_many": "{{count}} vistas importadas",
         "imported_other": "{{count}} vistas importadas",
         "notValid": "Não é um ficheiro .base válido.",
+        "skippedSuffix": " · {{count}} ignoradas",
         "skippedSuffix_one": " · {{count}} ignorada",
-        "skippedSuffix_many": " · {{count}} ignoradas",
         "skippedSuffix_other": " · {{count}} ignoradas",
+        "stoppedAfter": "Importação interrompida após {{count}} vista(s).",
         "stoppedAfter_one": "A importação parou após {{count}} vista.",
-        "stoppedAfter_many": "A importação parou após {{count}} vistas.",
         "stoppedAfter_other": "A importação parou após {{count}} vistas."
       },
       "bottomBar": {
@@ -561,11 +761,9 @@
         "cycleViewMode": "Percorrer modos de visualização",
         "docStats": {
           "summary_one": "{{count}} palavra · {{characters}} carateres",
-          "summary_many": "{{count}} palavras · {{characters}} carateres",
           "summary_other": "{{count}} palavras · {{characters}} carateres",
           "summarySelectionSuffix": " (sel.)",
           "title_one": "{{characters}} carateres · {{words}} palavras · {{spaces}} espaços · {{count}} parágrafo",
-          "title_many": "{{characters}} carateres · {{words}} palavras · {{spaces}} espaços · {{count}} parágrafos",
           "title_other": "{{characters}} carateres · {{words}} palavras · {{spaces}} espaços · {{count}} parágrafos",
           "titleSelectionSuffix": " (seleção)"
         },
@@ -583,10 +781,9 @@
       },
       "import": {
         "imported_one": "{{count}} nota importada{{skipped}}",
-        "imported_many": "{{count}} notas importadas{{skipped}}",
         "imported_other": "{{count}} notas importadas{{skipped}}",
+        "skippedSuffix": " · {{count}} ignoradas",
         "skippedSuffix_one": " · {{count}} ignorada",
-        "skippedSuffix_many": " · {{count}} ignoradas",
         "skippedSuffix_other": " · {{count}} ignoradas"
       },
       "nav": {
@@ -597,10 +794,43 @@
       "resizeBacklinksSidebar": "Redimensionar barra lateral de backlinks",
       "resizeNotesSidebar": "Redimensionar barra lateral de notas",
       "rightPanel": {
-        "allHidden": "",
+        "aiChat": {
+          "askPlaceholder": "Faça uma pergunta sobre as suas notas…",
+          "askSubmit": "Perguntar",
+          "assistant": "Assistente",
+          "citations": "Fontes",
+          "composerPlaceholder": "Converse com as suas notas…",
+          "empty": "O resultado da IA — resumos, respostas e sugestões — aparece aqui.",
+          "error": "Não foi possível concluir o pedido de IA.",
+          "errorTurn": "O assistente não conseguiu responder.",
+          "gettingReadyHint": "A preparar as suas notas para a IA — um momento.",
+          "insert": "Inserir na nota",
+          "noAnswer": "Sem resposta — tente reformular.",
+          "noModelHint": "Nenhum modelo selecionado. Escolha um em Definições → Labs → IA para começar.",
+          "offHint": "A IA local está desligada. Ligue-a em Definições → Labs → IA.",
+          "send": "Enviar",
+          "statusGettingReady": "A preparar…",
+          "statusNoModel": "Sem modelo",
+          "statusOff": "Desligada",
+          "statusReady": "Pronta",
+          "stop": "Parar",
+          "tagsThinking": "A sugerir etiquetas…",
+          "thinking": "A IA está a pensar…",
+          "truncated": "Foram resumidos os primeiros {{count}} caracteres.",
+          "you": "Você"
+        },
+        "allHidden": "Todos os separadores estão ocultos — clique com o botão direito para restaurar.",
         "outline": {
-          "empty": "",
-          "heading": ""
+          "collapse": "Recolher secção",
+          "empty": "Sem títulos",
+          "expand": "Expandir secção",
+          "heading": "Estrutura"
+        },
+        "tabs": {
+          "aiChat": "Chat de IA",
+          "backlinks": "Backlinks",
+          "outline": "Estrutura",
+          "unlinked": "Menções não vinculadas"
         }
       },
       "sidebarToggle": {
@@ -669,6 +899,8 @@
       "rendering": "A processar diagrama…"
     },
     "slash": {
+      "aiContinue": "Continuar a escrever (IA)",
+      "aiTitle": "Sugerir título (IA)",
       "attachFile": "Anexar ficheiro",
       "bulletList": "Lista com marcas",
       "callout": "Destaque",
@@ -710,6 +942,21 @@
     },
     "toolbar": {
       "apply": "Aplicar",
+      "exportImageTitle": "Exportar seleção como imagem",
+      "customize": {
+        "bold": "Negrito",
+        "bulletList": "Lista com marcadores",
+        "checklist": "Lista de verificação",
+        "code": "Código",
+        "heading": "Título",
+        "highlight": "Realce",
+        "italic": "Itálico",
+        "link": "Ligação",
+        "numberedList": "Lista numerada",
+        "quote": "Citação",
+        "strike": "Rasurado",
+        "wikilink": "Wikilink"
+      },
       "heading": {
         "h1": "H1",
         "h2": "H2",
@@ -758,17 +1005,14 @@
       "convert": {
         "cancel": "Cancelar",
         "choiceClause_one": " · {{count}} precisa de uma escolha.",
-        "choiceClause_many": " · {{count}} precisam de uma escolha.",
         "choiceClause_other": " · {{count}} precisam de uma escolha.",
         "chooseTarget": "Escolher destino…",
         "convert": "Converter",
         "convertedToast_one": "{{count}} wikilink convertido",
-        "convertedToast_many": "{{count}} wikilinks convertidos",
         "convertedToast_other": "{{count}} wikilinks convertidos",
         "noneToConvert": "Não há wikilinks importados para converter nesta nota.",
         "nothingToConvert": "Nada para converter — nenhum wikilink importado é resolvido.",
         "rewriteCount_one": "{{count}} ligação será reescrita",
-        "rewriteCount_many": "{{count}} ligações serão reescritas",
         "rewriteCount_other": "{{count}} ligações serão reescritas",
         "skipped": "ignorado — {{reason}}",
         "title": "Converter wikilinks importados nesta nota"
@@ -776,6 +1020,126 @@
       "convertCore": {
         "noMatch": "sem correspondência"
       }
+    },
+    "flow": {
+      "loadFailed": "Não foi possível carregar as suas notas.",
+      "openFailed": "Não foi possível abrir esta nota.",
+      "saveFailed": "Não foi possível guardar esta nota.",
+      "moveFailed": "Não foi possível mover esta nota.",
+      "openTodayFailed": "Não foi possível abrir a nota de hoje.",
+      "exportFailed": "Não foi possível exportar esta nota.",
+      "attachNeedsApp": "Os anexos precisam da aplicação (não da pré-visualização no navegador).",
+      "attachTooLarge": "Esse ficheiro é demasiado grande (máx. 64 MB).",
+      "attachUnsupported": "Só é possível anexar imagens e PDF.",
+      "attachFailed": "Não foi possível anexar esse ficheiro.",
+      "archiveFailed": "Não foi possível arquivar esta nota.",
+      "trashFailed": "Não foi possível mover esta nota para a Lixeira."
+    },
+    "nav": {
+      "dailyNote": "Nota diária",
+      "openToday": "Abrir hoje",
+      "allNotes": "Todas as notas"
+    },
+    "list": {
+      "searchPlaceholder": "Pesquisar notas",
+      "clearSearch": "Limpar pesquisa",
+      "viewNoteCount_one": "{{count}} nota em “{{name}}”",
+      "viewNoteCount_other": "{{count}} notas em “{{name}}”",
+      "edit": "Editar",
+      "trashEmpty": "A Lixeira está vazia",
+      "archiveEmpty": "Nenhuma nota arquivada",
+      "noMatchingNotes": "Nenhuma nota corresponde",
+      "noNotesYet": "Ainda não há notas",
+      "noMatchBody": "Nada corresponde a “{{name}}”. Edite a vista ou limpe-a para ver todas as notas.",
+      "emptyBody": "Toque em “Nova nota” para escrever a sua primeira nota. Tudo é encriptado neste dispositivo antes de ser armazenado.",
+      "unarchive": "Desarquivar"
+    },
+    "filterSheet": {
+      "title": "Filtrar",
+      "status": "Estado"
+    },
+    "sortSheet": {
+      "title": "Ordenar",
+      "manual": "Ordem manual",
+      "titleAsc": "Título · A → Z",
+      "titleDesc": "Título · Z → A"
+    },
+    "noteMenu": {
+      "emptyNote": "Nota vazia",
+      "wordCount_one": "{{count}} palavra · {{minutes}} min de leitura",
+      "wordCount_other": "{{count}} palavras · {{minutes}} min de leitura",
+      "moveToFolder": "Mover para pasta…",
+      "moveToTrash": "Mover para a Lixeira",
+      "copied": "Copiado ✓",
+      "copyToClipboard": "Copiar para a área de transferência",
+      "versionHistory": "Histórico de versões"
+    },
+    "purge": {
+      "body": "Isto remove a nota deste dispositivo definitivamente. Não é possível anular esta ação."
+    },
+    "move": {
+      "title": "Mover para pasta",
+      "body": "Escreva um caminho de pasta (ex.: Projects/Myne). Deixe em branco para a raiz do cofre.",
+      "placeholder": "Projects/Myne",
+      "confirm": "Mover"
+    },
+    "sidebar": {
+      "browse": "Explorar"
+    },
+    "emptyDetail": {
+      "title": "Selecione uma nota",
+      "body": "Escolha uma nota da lista ou comece uma nova."
+    },
+    "readingBar": {
+      "editNote": "Editar nota",
+      "edit": "Editar"
+    },
+    "graphTab": {
+      "linkedNotes_one": "{{count}} nota ligada",
+      "linkedNotes_other": "{{count}} notas ligadas",
+      "links_one": "{{count}} ligação",
+      "links_other": "{{count}} ligações"
+    },
+    "formatBar": {
+      "redo": "Refazer",
+      "attachFile": "Anexar novo ficheiro",
+      "insertFromLibrary": "Inserir da biblioteca",
+      "recordVoiceNote": "Gravar nota de voz",
+      "showLivePreview": "Mostrar pré-visualização ao vivo",
+      "showRawMarkdown": "Mostrar Markdown em bruto",
+      "hideKeyboard": "Ocultar teclado"
+    },
+    "topBar": {
+      "backToNotes": "Voltar às notas",
+      "noteDetails": "Detalhes da nota",
+      "noteActions": "Ações da nota"
+    },
+    "noteContext": {
+      "collapsePanel": "Recolher painel",
+      "unlinkedCount_one": "Menção não vinculada {{count}}",
+      "unlinkedCount_other": "Menções não vinculadas {{count}}"
+    },
+    "viewsSheet": {
+      "typeCards": "Cartões",
+      "typeList": "Lista",
+      "emptyState": "Ainda não há vistas guardadas. Crie uma para filtrar as suas notas por etiqueta, pasta ou texto.",
+      "editView": "Editar vista"
+    },
+    "sheet": {
+      "done": "Concluído"
+    },
+    "vaultSwitcher": {
+      "title": "Cofres"
+    },
+    "tagBrowser": {
+      "noTagsMatch": "Nenhuma etiqueta corresponde.",
+      "notesCount_one": "Notas · {{count}}",
+      "notesCount_other": "Notas · {{count}}"
+    },
+    "untitledNote": "Nota sem título",
+    "commandPalette": {
+      "searchPlaceholder": "Pesquisar notas ou executar um comando…",
+      "noMatches": "Nenhum comando ou nota corresponde."
     }
   },
   "export": {
@@ -807,10 +1171,8 @@
         "couldNotRead": "Não foi possível ler esta nota.",
         "exportedTo": "Exportado para {{filename}}",
         "exportedToWithAttachments_one": "Exportado para {{filename}} + {{count}} anexo",
-        "exportedToWithAttachments_many": "Exportado para {{filename}} + {{count}} anexos",
         "exportedToWithAttachments_other": "Exportado para {{filename}} + {{count}} anexos",
         "exportedToWithImages_one": "Exportado para {{filename}} + {{count}} imagem",
-        "exportedToWithImages_many": "Exportado para {{filename}} + {{count}} imagens",
         "exportedToWithImages_other": "Exportado para {{filename}} + {{count}} imagens",
         "filterHtml": "HTML",
         "filterMarkdown": "Markdown",
@@ -822,7 +1184,6 @@
         "cancel": "Cancelar",
         "export": "Exportar…",
         "includeAttachments_one": "Incluir {{count}} anexo",
-        "includeAttachments_many": "Incluir {{count}} anexos",
         "includeAttachments_other": "Incluir {{count}} anexos",
         "title": "Exportar como Markdown"
       }
@@ -851,20 +1212,15 @@
       },
       "flow": {
         "countAttachments_one": "{{count}} anexo",
-        "countAttachments_many": "{{count}} anexos",
         "countAttachments_other": "{{count}} anexos",
         "countFolders_one": "{{count}} pasta",
-        "countFolders_many": "{{count}} pastas",
         "countFolders_other": "{{count}} pastas",
         "countNotes_one": "{{count}} nota",
-        "countNotes_many": "{{count}} notas",
         "countNotes_other": "{{count}} notas",
         "exclusionsHistory": "Histórico de versões não incluído.",
         "exclusionsTrashed_one": "{{count}} nota no lixo não incluída.",
-        "exclusionsTrashed_many": "{{count}} notas no lixo não incluídas.",
         "exclusionsTrashed_other": "{{count}} notas no lixo não incluídas.",
         "exclusionsTrashedAndHistory_one": "{{count}} nota no lixo e histórico de versões não incluídos.",
-        "exclusionsTrashedAndHistory_many": "{{count}} notas no lixo e histórico de versões não incluídos.",
         "exclusionsTrashedAndHistory_other": "{{count}} notas no lixo e histórico de versões não incluídos.",
         "phaseAttachments": "anexos",
         "phaseNotes": "notas",
@@ -922,14 +1278,18 @@
   },
   "notes": {
     "archive": {
+      "cancel": "Cancelar",
       "close": "Fechar",
       "count_one": "{{count}} nota",
-      "count_many": "{{count}} notas",
       "count_other": "{{count}} notas",
       "countEmpty": "Vazio",
       "delete": "Apagar",
       "deleteError": "Não foi possível apagar essa nota. Tente novamente.",
       "emptyState": "O arquivo está vazio.",
+      "folderDeleteConfirm_one": "Mover {{count}} nota para a Lixeira?",
+      "folderDeleteConfirm_other": "Mover {{count}} notas para a Lixeira?",
+      "folderDeleteConfirmCta": "Mover para a Lixeira",
+      "folderDeleteError": "Não foi possível mover as notas dessa pasta para a Lixeira. Tente novamente.",
       "restore": "Restaurar",
       "restoreError": "Não foi possível restaurar essa nota. Tente novamente.",
       "title": "Arquivo",
@@ -980,7 +1340,6 @@
       },
       "noConditions": "Ainda não há condições — esta vista mostra todas as páginas.",
       "noteCount_one": "{{count}} nota",
-      "noteCount_many": "{{count}} notas",
       "noteCount_other": "{{count}} notas",
       "of": "de:",
       "ofTheGroups": "dos grupos:",
@@ -1033,8 +1392,8 @@
       },
       "modal": {
         "cancel": "Cancelar",
+        "cancelledNotImported": "{{count}} não importadas",
         "cancelledNotImported_one": "{{count}} não importada",
-        "cancelledNotImported_many": "{{count}} não importadas",
         "cancelledNotImported_other": "{{count}} não importadas",
         "cancelling": "A cancelar…",
         "chooseFolder": "Escolher pasta…",
@@ -1049,7 +1408,6 @@
         "flagKindTitle": "Título",
         "folderPickerTitle": "Escolha a pasta do seu cofre do Obsidian",
         "hiddenIgnoredPrefix_one": "{{count}} item de configuração / oculto ignorado (ex.: ",
-        "hiddenIgnoredPrefix_many": "{{count}} itens de configuração / ocultos ignorados (ex.: ",
         "hiddenIgnoredPrefix_other": "{{count}} itens de configuração / ocultos ignorados (ex.: ",
         "hiddenIgnoredSuffix": ", dotfiles).",
         "ifNoteExistsLabel": "Se já existir uma nota",
@@ -1058,17 +1416,16 @@
         "importing": "A importar o seu cofre…",
         "markDone": "Marcar como concluído",
         "markedDone": "Marcado como concluído",
+        "mediaImported": "{{count}} importados",
         "mediaImported_one": "{{count}} importado",
-        "mediaImported_many": "{{count}} importados",
         "mediaImported_other": "{{count}} importados",
+        "mediaOmittedSuffix": " · {{count}} omitidos",
         "mediaOmittedSuffix_one": " · {{count}} omitido",
-        "mediaOmittedSuffix_many": " · {{count}} omitidos",
         "mediaOmittedSuffix_other": " · {{count}} omitidos",
         "needsAttention": "Requer atenção",
         "needsAttentionHelp": "Estas notas foram importadas sem alterações. As correções sugeridas são pontos de partida — copie uma e depois mude o nome da nota quando a abrir.",
         "noFolderChosen": "Nenhuma pasta escolhida",
         "notesImported_one": "nota importada",
-        "notesImported_many": "notas importadas",
         "notesImported_other": "notas importadas",
         "policyCopyHint": "Importe-a junto da nota existente.",
         "policyCopyLabel": "Importar como cópia",
@@ -1108,17 +1465,18 @@
       "addToFavorites": "Adicionar aos favoritos",
       "archive": "Arquivar",
       "archiveBulkError": "Não foi possível arquivar as notas.",
+      "archiveFolder": "Arquivar pasta",
       "archiveNote": "Arquivar",
       "archiveSingleError": "Não foi possível arquivar a nota.",
       "attachments": "Anexos",
+      "bulkArchive": "Arquivar {{count}} notas",
       "bulkArchive_one": "Arquivar {{count}} nota",
-      "bulkArchive_many": "Arquivar {{count}} notas",
       "bulkArchive_other": "Arquivar {{count}} notas",
+      "bulkDelete": "Eliminar {{count}} notas",
       "bulkDelete_one": "Apagar {{count}} nota",
-      "bulkDelete_many": "Apagar {{count}} notas",
       "bulkDelete_other": "Apagar {{count}} notas",
+      "bulkMove": "Mover {{count}} notas para…",
       "bulkMove_one": "Mover {{count}} nota para…",
-      "bulkMove_many": "Mover {{count}} notas para…",
       "bulkMove_other": "Mover {{count}} notas para…",
       "caseMergeBody": "Já existe uma pasta chamada “{{name}}”. Estas vão fundir-se — mudar o nome de uma para as manter separadas?",
       "color": "Cor…",
@@ -1127,7 +1485,6 @@
       "customize": "Personalizar…",
       "delete": "Apagar",
       "deleteFolderBody_one": "“{{name}}” e a sua {{count}} nota",
-      "deleteFolderBody_many": "“{{name}}” e as suas {{count}} notas",
       "deleteFolderBody_other": "“{{name}}” e as suas {{count}} notas",
       "deleteFolderConfirm": "Apagar pasta",
       "deleteFolderTitle": "Apagar esta pasta?",
@@ -1154,7 +1511,6 @@
       "noteMovedToTrash": "Nota movida para o Lixo",
       "notesHeading": "Notas",
       "notesMovedToTrash_one": "{{count}} nota movida para o Lixo",
-      "notesMovedToTrash_many": "{{count}} notas movidas para o Lixo",
       "notesMovedToTrash_other": "{{count}} notas movidas para o Lixo",
       "openArchive": "Abrir o arquivo",
       "openAttachments": "Abrir anexos",
@@ -1162,13 +1518,18 @@
       "openInNewTab": "Abrir num novo separador",
       "openToSide": "Abrir ao lado",
       "openTrash": "Abrir o lixo",
-      "removeAsFolderNote": "Remover como nota de pasta",
-      "removeFolderNote": "",
+      "removeFolderNote": "Remover nota da pasta",
       "removeFromFavorites": "Remover dos favoritos",
       "rename": "Mudar o nome",
       "setAsFolderNote": "Definir como nota de pasta",
       "trash": "Lixo",
       "trashBulkError": "Não foi possível mover as notas para o Lixo.",
+      "trashConfirmBulkBody_one": "{{count}} nota será movida para a Lixeira.",
+      "trashConfirmBulkBody_other": "{{count}} notas serão movidas para a Lixeira.",
+      "trashConfirmBulkWarning": "Pode restaurá-las da Lixeira mais tarde.",
+      "trashConfirmConfirm": "Mover para a Lixeira",
+      "trashConfirmTitle": "Mover para a Lixeira?",
+      "trashConfirmWarning": "Pode restaurá-la da Lixeira mais tarde.",
       "trashSingleError": "Não foi possível mover a nota para o Lixo.",
       "undo": "Anular",
       "vaultRoot": "Raiz do cofre",
@@ -1243,7 +1604,6 @@
     "snapshots": {
       "cancel": "Cancelar",
       "changeCount_one": "{{count}} alteração desde este instantâneo",
-      "changeCount_many": "{{count}} alterações desde este instantâneo",
       "changeCount_other": "{{count}} alterações desde este instantâneo",
       "close": "Fechar",
       "confirmBody": "A sua nota atual será guardada primeiro como um instantâneo, para que possa anular esta ação.",
@@ -1289,7 +1649,6 @@
       "noTagsMatch": "Nenhuma etiqueta corresponde a “{{query}}”.",
       "noTagsYet": "Ainda não há etiquetas.",
       "noteCount_one": "{{count}} nota",
-      "noteCount_many": "{{count}} notas",
       "noteCount_other": "{{count}} notas",
       "notes": "Notas",
       "pickTag": "Escolha uma etiqueta para filtrar.",
@@ -1303,19 +1662,16 @@
     "trash": {
       "close": "Fechar",
       "count_one": "{{count}} nota",
-      "count_many": "{{count}} notas",
       "count_other": "{{count}} notas",
       "countEmpty": "Vazio",
       "delete": "Apagar",
       "deleteError": "Não foi possível apagar essa nota. Tente novamente.",
       "empty": "Esvaziar o lixo",
       "emptyConfirmBody_one": "{{count}} nota será apagada permanentemente.",
-      "emptyConfirmBody_many": "{{count}} notas serão apagadas permanentemente.",
       "emptyConfirmBody_other": "{{count}} notas serão apagadas permanentemente.",
       "emptyConfirmCta": "Esvaziar o lixo",
       "emptyConfirmTitle": "Esvaziar o lixo?",
       "emptyPartialFailure_one": "{{count}} nota não pôde ser apagada e permanece no lixo.",
-      "emptyPartialFailure_many": "{{count}} notas não puderam ser apagadas e permanecem no lixo.",
       "emptyPartialFailure_other": "{{count}} notas não puderam ser apagadas e permanecem no lixo.",
       "emptyState": "O lixo está vazio.",
       "purgeConfirmCta": "Apagar permanentemente",
@@ -1417,7 +1773,26 @@
       "operationInProgress": "Operação em curso. Aguarde, por favor.",
       "unexpected": "Erro inesperado. Tente novamente, por favor.",
       "vaultNotFound": "Ficheiro do cofre não encontrado. Reinicie a aplicação, por favor."
-    }
+    },
+    "vaultUnreadable": "O ficheiro do cofre é ilegível. Restaure a partir de um backup.",
+    "genericError": "Algo correu mal. Tente novamente.",
+    "weakPassword": "A palavra-passe tem de ter, no mínimo, {{min}} caracteres.",
+    "setPasswordError": "Não foi possível definir a sua nova palavra-passe. Tente novamente.",
+    "passwordMismatch": "As palavras-passe não coincidem.",
+    "decryptingSubtitle": "A reconstruir as chaves do seu cofre com Argon2id. Isto demora alguns segundos.",
+    "restoreVaultHeader": "Restaurar um cofre",
+    "accountTitle": "Introduza o seu número da conta",
+    "accountLead": "Encontra-o onde guardou a sua frase de recuperação. Identifica o cofre a restaurar.",
+    "accountInvalid": "Número da conta inválido — verifique e introduza novamente.",
+    "accountOptionalHint": "Não o tem? Deixe em branco e continue — a sua frase de recuperação de 24 palavras é tudo o que precisa.",
+    "paste": "Colar",
+    "phraseGridHint": "Escreva cada palavra ou cole todas as 24 de uma vez para preencher a grelha.",
+    "submitProgress": "Submeter · {{filled}} de {{total}}",
+    "newPasswordTitle": "Escolha uma nova palavra-passe",
+    "newPasswordLead": "A sua frase de recuperação permanece a mesma. Isto define a palavra-passe para este dispositivo.",
+    "confirmPasswordLabel": "Confirmar palavra-passe",
+    "passwordHelper": "Nunca armazenada, nunca transmitida. Encripta as suas chaves neste dispositivo.",
+    "encryptingSubtitle": "A proteger as chaves do seu cofre com a sua nova palavra-passe."
   },
   "restore": {
     "backLabel": "Voltar",
@@ -1446,7 +1821,6 @@
       "notes": "Notas: {{n}}",
       "openVaultList": "Abrir lista de cofres",
       "partialHeader_one": "Restaurado parcialmente — {{count}} item não pôde ser lido.",
-      "partialHeader_many": "Restaurado parcialmente — {{count}} itens não puderam ser lidos.",
       "partialHeader_other": "Restaurado parcialmente — {{count}} itens não puderam ser lidos.",
       "restored": "Cofre restaurado.",
       "versionHistory": "Entradas do histórico de versões: {{n}}"
@@ -1471,7 +1845,9 @@
       "licenseLabel": "Licença",
       "tagline": "Pré-alfa · cliente de ambiente de trabalho da Fase 1",
       "threatModelHelper": "Abra o documento público do modelo de ameaças no seu navegador.",
-      "threatModelLabel": "Modelo de ameaças"
+      "threatModelLabel": "Modelo de ameaças",
+      "version": "Versão",
+      "dev": "Dev"
     },
     "account": {
       "argon2idHeading": "Parâmetros do Argon2id",
@@ -1494,7 +1870,21 @@
       "vaultLabelEyebrow": "ETIQUETA DO COFRE",
       "vaultLabelHelper": "Um nome para este cofre mostrado no seletor da aplicação. Armazenado encriptado dentro do cofre; nunca sai do seu dispositivo em texto simples.",
       "vaultLabelPlaceholder": "Adicionar uma etiqueta…",
-      "vaultLabelSave": "Guardar"
+      "vaultLabelSave": "Guardar",
+      "vaultIconLabel": "ÍCONE",
+      "vaultIconDefault": "Predefinido (logótipo)",
+      "renamedToast": "Cofre renomeado",
+      "renameError": "Não foi possível mudar o nome do cofre",
+      "newPasswordMismatch": "As novas palavras-passe não coincidem.",
+      "samePassword": "A nova palavra-passe é igual à palavra-passe atual.",
+      "passwordChangedToast": "Palavra-passe alterada",
+      "vaultUnreadable": "O ficheiro do cofre é ilegível. Restaure a partir de um backup.",
+      "genericChangeError": "Algo correu mal. Tente novamente.",
+      "renameHelper": "Mostrado no seletor de cofres. Armazenado encriptado dentro deste cofre; deixe em branco para o limpar.",
+      "newPasswordPlaceholder": "Pelo menos 12 caracteres",
+      "reenterNewPassword": "Reintroduza a nova palavra-passe",
+      "changePasswordFootnote": "Isto invalida o desbloqueio rápido. A sua frase de recuperação permanece inalterada.",
+      "changing": "A alterar…"
     },
     "appearance": {
       "showEditTimesAria": "Mostrar horas de edição na barra lateral",
@@ -1510,7 +1900,13 @@
       "themeLabel": "Tema",
       "themeOptionAria": "Tema {{label}}",
       "themeSaveError": "Não foi possível guardar o tema. Tente novamente.",
-      "timestampsSaveError": "Não foi possível guardar a preferência. Tente novamente."
+      "timestampsSaveError": "Não foi possível guardar a preferência. Tente novamente.",
+      "sizeS": "S",
+      "sizeM": "M",
+      "sizeL": "L",
+      "sizeXL": "XL",
+      "editorFont": "Tipo de letra do editor",
+      "showEditTimesSubtitle": "Datas/horas por baixo de cada nota"
     },
     "archive": {
       "helper": "Permite que as notas sejam movidas para um Arquivo, mantido fora da lista principal. Ao desativar isto, todas as notas arquivadas voltam à sua pasta e os controlos do arquivo ficam ocultos.",
@@ -1560,17 +1956,21 @@
       "when": {
         "bare": "Ligada",
         "daysAgo_one": "Ligada há {{count}} dia",
-        "daysAgo_many": "Ligada há {{count}} dias",
         "daysAgo_other": "Ligada há {{count}} dias",
+        "hoursAgo": "Ligado há {{count}} h",
         "hoursAgo_one": "Ligada há {{count}} h",
-        "hoursAgo_many": "Ligada há {{count}} h",
         "hoursAgo_other": "Ligada há {{count}} h",
         "justNow": "Ligada agora mesmo",
+        "minutesAgo": "Ligado há {{count}} min",
         "minutesAgo_one": "Ligada há {{count}} min",
-        "minutesAgo_many": "Ligada há {{count}} min",
         "minutesAgo_other": "Ligada há {{count}} min",
         "onDate": "Ligada em {{date}}"
       }
+    },
+    "clipperInstall": {
+      "error": "Não foi possível atualizar a definição do clipper do navegador.",
+      "helper": "Registe o anfitrião de mensagens nativas para que a extensão Myne do navegador possa enviar recortes para esta aplicação. Ativado por predefinição; desative para o remover.",
+      "label": "Clipper do navegador"
     },
     "customThemes": {
       "appliedBadge": "Aplicado",
@@ -1626,37 +2026,39 @@
       "ioFailBody": "Não foi possível aceder aos ficheiros do cofre para os apagar. As chaves do cofre já foram apagadas da memória; quaisquer dados do cofre que permaneçam no disco são lixo inrecuperável protegido com Argon2id.",
       "ioFailTitle": "Erro de disco durante a eliminação",
       "partialFailBody_one": "{{count}} ficheiro não pôde ser apagado do disco. As chaves do cofre já foram apagadas da memória, por isso qualquer texto cifrado órfão que permaneça é lixo inrecuperável protegido com Argon2id.",
-      "partialFailBody_many": "{{count}} ficheiros não puderam ser apagados do disco. As chaves do cofre já foram apagadas da memória, por isso qualquer texto cifrado órfão que permaneça é lixo inrecuperável protegido com Argon2id.",
       "partialFailBody_other": "{{count}} ficheiros não puderam ser apagados do disco. As chaves do cofre já foram apagadas da memória, por isso qualquer texto cifrado órfão que permaneça é lixo inrecuperável protegido com Argon2id.",
       "partialFailTitle": "A eliminação do cofre falhou parcialmente",
       "submit": "Apagar cofre",
       "submitInFlight": "A apagar o cofre…",
       "typeToConfirmLabel": "Escreva DELETE para confirmar",
-      "vaultPath": "Caminho do cofre: {{path}}"
+      "vaultPath": "Caminho do cofre: {{path}}",
+      "deleteError": "Não foi possível eliminar totalmente o cofre. Tente novamente.",
+      "warning": "Isto elimina permanentemente este cofre e todas as suas notas deste dispositivo. Não é possível anular esta ação.",
+      "deleteButton": "Eliminar este cofre"
     },
     "files": {
       "newNote": {
-        "folderLabel": "",
-        "folderPlaceholder": "",
-        "helper": "",
-        "label": "",
-        "optionCurrent": "",
-        "optionRoot": "",
-        "optionSpecific": "",
-        "saveError": ""
+        "folderLabel": "Pasta para novas notas",
+        "folderPlaceholder": "ex.: Inbox/",
+        "helper": "Onde são colocadas as notas recém-criadas.",
+        "label": "Localização predefinida para novas notas",
+        "optionCurrent": "Mesma pasta da nota atual",
+        "optionRoot": "Pasta do cofre",
+        "optionSpecific": "Na pasta especificada abaixo",
+        "saveError": "Não foi possível guardar a localização das novas notas."
       },
       "startup": {
-        "helper": "",
-        "label": "",
-        "noteLabel": "",
-        "notePlaceholder": "",
-        "optionEmpty": "",
-        "optionLast": "",
-        "optionSpecific": "",
-        "saveError": "",
-        "searchEmpty": "",
-        "searchPlaceholder": "",
-        "untitledNote": ""
+        "helper": "Escolha que ficheiro abrir quando a aplicação arranca.",
+        "label": "Ficheiro predefinido para abrir",
+        "noteLabel": "Nota a abrir no arranque",
+        "notePlaceholder": "Selecione uma nota…",
+        "optionEmpty": "Nova nota",
+        "optionLast": "Última aberta",
+        "optionSpecific": "Nota específica",
+        "saveError": "Não foi possível guardar a definição de arranque.",
+        "searchEmpty": "Nenhuma nota encontrada.",
+        "searchPlaceholder": "Pesquisar notas…",
+        "untitledNote": "Sem título"
       }
     },
     "focusMode": {
@@ -1707,6 +2109,37 @@
       "off": "Desativado",
       "on": "Ativado"
     },
+    "toolbarCustomize": {
+      "errorSave": "Não foi possível guardar a disposição da barra de ferramentas.",
+      "helper": "Escolha que botões de formatação aparecem na barra de ferramentas de seleção e a sua ordem.",
+      "label": "Botões da barra de ferramentas",
+      "moveDown": "Mover para baixo",
+      "moveUp": "Mover para cima",
+      "pendingHint": "Brevemente"
+    },
+    "ai": {
+      "betaBadge": "Beta",
+      "disclosureToggle": "Como funciona?",
+      "enableHelper": "Executa inteiramente no seu dispositivo um modelo fornecido por si. Experimental, desativado por predefinição.",
+      "enableLabel": "Ativar IA local",
+      "excludedHelper": "As notas nestas pastas nunca são lidas nem indexadas pela IA. Um caminho de pasta por linha.",
+      "excludedLabel": "Pastas excluídas",
+      "excludedPlaceholder": "Private/\nJournal/",
+      "modelChoose": "Escolher ficheiro…",
+      "modelEmbeddingLabel": "Modelo de pesquisa — pesquisa semântica e perguntas e respostas",
+      "modelFilter": {
+        "gguf": "Modelo GGUF",
+        "safetensors": "Modelo Safetensors"
+      },
+      "modelGenerationLabel": "Modelo de texto — chat, resumos, escrita",
+      "modelNone": "Nenhum ficheiro selecionado",
+      "modelSaveFailed": "Não foi possível guardar o caminho do modelo (tem de estar fora do seu cofre).",
+      "modelsHelper": "O Myne nunca descarrega modelos — isso implicaria enviar dados através da rede. Abra uma ligação para obter um no seu navegador e depois selecione aqui os ficheiros descarregados. Tudo é executado no seu dispositivo.",
+      "modelsLabel": "Modelos",
+      "recommendedFilesEmbedding": "Precisa de model.safetensors + config.json + tokenizer.json numa pasta.",
+      "recommendedFilesGeneration": "Precisa do ficheiro .gguf + tokenizer.json na mesma pasta.",
+      "title": "IA"
+    },
     "prefs": {
       "saveError": "Não foi possível guardar a preferência — tente novamente"
     },
@@ -1715,9 +2148,20 @@
       "autoLockLabel": "Bloqueio automático",
       "autoLockSearchEmpty": "Nenhuma duração corresponde.",
       "autoLockSearchPlaceholder": "Pesquisar durações…",
+      "realtimeSyncHelper": "As alterações de outros dispositivos chegam em segundos através de um sinal sem conteúdo — o servidor transmite apenas “algo mudou”, nunca o quê. Enquanto o seu cofre está desbloqueado, a aplicação verifica o servidor regularmente de qualquer forma, pelo que isto não acrescenta visibilidade significativa; não há nada para configurar.",
+      "realtimeSyncLabel": "Sincronização em tempo real",
       "screenCaptureHelperOff": "A proteção aplica-se sempre antes do desbloqueio. Após o desbloqueio, segue esta preferência.",
       "screenCaptureHelperOn": "Ativa no macOS e no Windows 10 (atualização de maio de 2020 ou posterior). O suporte para Linux chegará numa versão futura.",
-      "screenCaptureLabel": "Proteção contra captura de ecrã"
+      "screenCaptureLabel": "Proteção contra captura de ecrã",
+      "screenCaptureSubtitle": "Bloquear capturas de ecrã e gravação de ecrã",
+      "autoLockAfter": "Bloqueio automático após",
+      "autoLock1m": "1 min",
+      "autoLock5m": "5 min",
+      "autoLock15m": "15 min",
+      "autoLock30m": "30 min",
+      "autoLock1h": "1 h",
+      "quickUnlockSubtitleAndroid": "Reintroduzir com um PIN após bloqueio automático",
+      "quickUnlockSubtitle": "Reintroduzir com {{method}} ou um PIN após bloqueio automático"
     },
     "quickUnlock": {
       "errorCancelled": "Cancelado.",
@@ -1725,30 +2169,55 @@
       "errorHardwareUnavailable": "O Touch ID não está disponível neste dispositivo.",
       "errorNotUnlocked": "Desbloqueie o cofre primeiro.",
       "errorPinNotDigits": "O PIN deve conter apenas dígitos.",
+      "errorPinTooShort": "O PIN tem de ter, no mínimo, {{count}} dígitos.",
       "errorPinTooShort_one": "O PIN deve ter pelo menos {{count}} dígito.",
-      "errorPinTooShort_many": "O PIN deve ter pelo menos {{count}} dígitos.",
       "errorPinTooShort_other": "O PIN deve ter pelo menos {{count}} dígitos.",
       "helperConfigured": "Configurado via {{method}}. A reentrada após o bloqueio automático dispensa a palavra-passe mestra. A palavra-passe mestra continua a ser necessária após reiniciar.",
       "helperNotConfigured": "Volte a entrar após o bloqueio automático com um PIN ou o Touch ID em vez da palavra-passe mestra completa. Uma comodidade sobre o cofre encriptado — a palavra-passe mestra continua a ser necessária após reiniciar.",
       "methodPin": "PIN",
       "methodTouchId": "Touch ID",
       "pinAriaLabel": "PIN de desbloqueio rápido",
+      "pinPlaceholder": "PIN (pelo menos {{count}} dígitos)",
       "pinPlaceholder_one": "PIN (pelo menos {{count}} dígito)",
-      "pinPlaceholder_many": "PIN (pelo menos {{count}} dígitos)",
       "pinPlaceholder_other": "PIN (pelo menos {{count}} dígitos)",
       "setPin": "Definir PIN",
       "setupHelper": "O Touch ID é exclusivo do macOS e atualmente experimental (a aguardar verificação de hardware). O PIN funciona em todo o lado.",
       "title": "Desbloqueio rápido",
-      "useTouchId": "Usar o Touch ID"
+      "useTouchId": "Usar o Touch ID",
+      "pinTooShort": "O PIN tem de ter, no mínimo, 6 dígitos.",
+      "pinMismatch": "Os PIN não coincidem.",
+      "pinOnToast": "O desbloqueio rápido por PIN está ativado",
+      "setupError": "Não foi possível configurar o desbloqueio rápido.",
+      "turnedOffToast": "Desbloqueio rápido desativado",
+      "turnOffError": "Não foi possível desativar o desbloqueio rápido",
+      "biometricOnToast": "O desbloqueio rápido por {{method}} está ativado",
+      "biometricUnavailable": "{{method}} não está disponível neste dispositivo.",
+      "warningBanner": "Apenas uma barreira de conveniência. A sua palavra-passe continua a ser necessária após reiniciar.",
+      "biometricToggleSubtitle": "Desbloquear com {{method}} após bloqueio automático",
+      "pinOnLead": "O desbloqueio rápido por PIN está ",
+      "pinOnEmphasis": "ativado",
+      "pinOnRest": ". Após o cofre se bloquear automaticamente, pode reintroduzir com o seu PIN em vez da palavra-passe completa — apenas nesta sessão da aplicação. Um arranque a frio requer sempre a palavra-passe completa.",
+      "turnOffPin": "Desativar PIN",
+      "pinSetupHelper": "Defina um PIN de 6 ou mais dígitos para voltar a desbloquear rapidamente após o bloqueio automático. O PIN protege uma chave local do dispositivo — nunca sai deste dispositivo e nunca toca na sua frase de recuperação.",
+      "pinReplacesBiometric": " Definir um PIN substitui o desbloqueio por {{method}}.",
+      "pinPlaceholder6": "Pelo menos 6 dígitos",
+      "confirmPin": "Confirmar PIN",
+      "reenterPin": "Reintroduzir PIN",
+      "setupButton": "Configurar desbloqueio rápido"
     },
     "shell": {
       "closeLabel": "Fechar definições",
+      "groups": {
+        "labs": "Labs"
+      },
       "navLabel": "Painéis de definições",
       "panels": {
         "about": "Sobre",
         "account": "Conta",
+        "ai": "IA",
         "appearance": "Aparência",
         "editor": "Editor",
+        "files": "Ficheiros",
         "hotkeys": "Atalhos",
         "privacy": "Privacidade",
         "storage": "Armazenamento",
@@ -1806,6 +2275,44 @@
       "optionLive": "Pré-visualização ao vivo",
       "optionReading": "Leitura",
       "optionSource": "Origem"
+    },
+    "strength": {
+      "weak": "Fraca",
+      "fair": "Razoável",
+      "good": "Boa",
+      "strong": "Forte"
+    },
+    "sync": {
+      "summary": {
+        "notSetUp": "Não configurado",
+        "offline": "Offline",
+        "conflicts_one": "{{count}} conflito",
+        "conflicts_other": "{{count}} conflitos"
+      }
+    },
+    "data": {
+      "exported_one": "Exportada {{count}} nota → {{label}}",
+      "exported_other": "Exportadas {{count}} notas → {{label}}",
+      "exportNeedsApp": "A exportação precisa da aplicação (não da pré-visualização no navegador).",
+      "exportFailed": "Não foi possível exportar o cofre.",
+      "exportToMarkdown": "Exportar para Markdown",
+      "exportToMarkdownSubtitle": "Desencriptar todas as notas para uma pasta simples em Documentos"
+    },
+    "saveSettingError": "Não foi possível guardar essa definição",
+    "panelTitle": {
+      "privacy": "Privacidade e segurança",
+      "data": "Dados",
+      "vaultName": "Nome do cofre",
+      "approveDevice": "Aprovar dispositivo"
+    },
+    "done": "Concluído",
+    "sectionOptions": "Opções",
+    "footerTagline": "myne · encriptado neste dispositivo · código aberto",
+    "editor": {
+      "defaultView": "Visualização predefinida",
+      "typewriter": "Deslocamento tipo máquina de escrever",
+      "typewriterSubtitle": "Manter o cursor centrado verticalmente",
+      "enableArchiving": "Ativar arquivamento"
     }
   },
   "sync": {
@@ -1829,15 +2336,16 @@
       "discard": "Descartar",
       "empty": "Sem conflitos — os seus dispositivos estão sincronizados.",
       "groupTitle_one": "{{count}} cópia em conflito de {{original}}",
-      "groupTitle_many": "{{count}} cópias em conflito de {{original}}",
       "groupTitle_other": "{{count}} cópias em conflito de {{original}}",
       "keepAsSeparate": "Manter separadas",
-      "untitled": "Sem título ({{hex}})"
+      "tookTheirsToast": "Versão local movida para a Lixeira.",
+      "tookTheirsUndo": "Anular",
+      "untitled": "Sem título ({{hex}})",
+      "useThisVersion": "Usar esta versão"
     },
     "devices": {
       "approve": "Aprovar",
       "awaitingApproval_one": "{{count}} dispositivo a aguardar aprovação",
-      "awaitingApproval_many": "{{count}} dispositivos a aguardar aprovação",
       "awaitingApproval_other": "{{count}} dispositivos a aguardar aprovação",
       "loading": "A carregar…",
       "noDevices": "Ainda não há dispositivos sincronizados.",
@@ -1851,6 +2359,12 @@
       "thisDevice": "Este dispositivo",
       "transportHint": "Se o servidor mudou ou o seu certificado foi alterado, volte a introduzir o URL do servidor em “Servidor de sincronização” acima para voltar a confiar nele.",
       "unreachable": "Não foi possível contactar a sincronização ({{error}}).",
+      "verifyBody": "Verifique se o mesmo código aparece no dispositivo que acabou de aprovar. Se coincidir, está na sua conta. Se não coincidir, remova o dispositivo.",
+      "verifyMatch": "Coincidem",
+      "verifyMismatch": "Não coincidem",
+      "verifyPending": "Este código aparece assim que o novo dispositivo concluir a sua primeira sincronização.",
+      "verifySyncing": "A sincronizar…",
+      "verifyTitle": "Verificar o novo dispositivo",
       "yourDevices": "Os seus dispositivos"
     },
     "endpoint": {
@@ -1859,6 +2373,8 @@
       "connectedTls": "Ligado. Confirme que esta impressão digital corresponde no seu outro dispositivo.",
       "connecting": "A ligar…",
       "fingerprintLabel": "Impressão digital do certificado do servidor:",
+      "pinStatic": "Verificado com o certificado incorporado do Myne.",
+      "pinTofu": "Fixado na primeira ligação. Compare esta impressão digital entre os seus dispositivos.",
       "placeholder": "https://your-server.example   ·   http://127.0.0.1:8080",
       "unreachable": "Não foi possível contactar esse servidor — verifique o URL e se está em funcionamento."
     },
@@ -1885,14 +2401,23 @@
     "join": {
       "accountLabel": "Número de conta",
       "cancel": "Cancelar",
+      "continue": "Continuar",
       "error": "Não foi possível adicionar este dispositivo. Verifique o URL do servidor, o número de conta e a palavra-passe — e se o servidor está acessível.",
       "help": "Inicie sessão com o seu número de conta e palavra-passe. Este dispositivo vai sincronizar as suas notas assim que um dispositivo existente o aprovar. Não é necessária frase de recuperação.",
       "passwordLabel": "Palavra-passe",
+      "pinnedCompare": "Este dispositivo fixou o certificado do seu servidor. Verifique se esta impressão digital coincide nos seus outros dispositivos.",
+      "pinnedTitle": "Certificado do servidor fixado",
       "serverLabel": "Servidor de sincronização",
       "serverPlaceholder": "https://your-server.example",
+      "sasMatch": "Coincidem — continuar",
+      "sasMismatch": "Não coincidem — remover este dispositivo",
       "submit": "Adicionar dispositivo",
       "submitting": "A adicionar…",
-      "title": "Adicionar este dispositivo a uma conta"
+      "title": "Adicionar este dispositivo a uma conta",
+      "verifyBody": "Verifique se este código coincide com o do dispositivo a partir do qual aprovou.",
+      "verifyTitle": "Verificar este dispositivo",
+      "waitingHint": "Mantenha esta janela aberta — assim que for aprovado, aparece aqui um código de verificação para comparar com o seu outro dispositivo.",
+      "waitingTitle": "A aguardar aprovação"
     },
     "panel": {
       "addDevice": {
@@ -1921,7 +2446,6 @@
     "status": {
       "awaitingApproval": "A aguardar aprovação",
       "conflicts_one": "{{count}} conflito a rever",
-      "conflicts_many": "{{count}} conflitos a rever",
       "conflicts_other": "{{count}} conflitos a rever",
       "error": "Erro de sincronização",
       "loading": "Estado de sincronização…",
@@ -1930,6 +2454,43 @@
       "synced": "Sincronizado",
       "syncing": "A sincronizar…",
       "syncNow": "Sincronizar agora"
+    },
+    "settings": {
+      "serverSection": "Servidor",
+      "serverNotSet": "Não definido",
+      "statusLabel": "Estado",
+      "hubHelp": "A sincronização mantém as suas notas atualizadas em todos os dispositivos. Tudo é encriptado neste dispositivo antes de ser enviado — o servidor nunca vê as suas notas.",
+      "connectedTls": "Ligado através de TLS.",
+      "connectedLocal": "Ligado na sua rede local.",
+      "connectError": "Não foi possível contactar esse servidor. Verifique o endereço e tente novamente.",
+      "serverAddressLabel": "Endereço do servidor",
+      "serverAddressPlaceholder": "https://sync.example.com",
+      "fingerprintLabel": "Impressão digital do certificado",
+      "fingerprintCompare": "Compare isto com o mesmo ecrã num dispositivo em que já confia — têm de coincidir.",
+      "pinStatic": "Verificado com o certificado conhecido deste servidor.",
+      "pinTofu": "Fixado na primeira ligação. Compare-o entre os seus dispositivos para confirmar.",
+      "enrollNotConfigured": "Configure primeiro um servidor de sincronização e depois adicione este dispositivo.",
+      "enrollTransport": "Não foi possível contactar o servidor de sincronização. Verifique a sua ligação e tente novamente.",
+      "accountNumberHint": "Verifique bem este número — não parece correto.",
+      "passwordPlaceholder": "A palavra-passe do seu cofre",
+      "recoveryPhraseHint": "Introduza ou cole as suas 24 palavras. Ao colar, preenche as células por ordem.",
+      "verifyBody": "Verifique se o mesmo código aparece no dispositivo que acabou de aprovar. Se coincidir, está na sua conta. Se não coincidir, remova o dispositivo.",
+      "sasMismatch": "Não coincidem",
+      "removeDeviceButton": "Remover dispositivo",
+      "keepDevice": "Manter",
+      "notEnrolledHelp": "Este dispositivo ainda não está a sincronizar. Adicione-o a partir do ecrã anterior para ver os seus dispositivos.",
+      "unauthenticated": "O acesso deste dispositivo foi revogado, provavelmente removido a partir de outro dispositivo.",
+      "transportError": "Não foi possível contactar o servidor de sincronização. Se o servidor mudou ou o seu certificado foi alterado, volte a ligá-lo a partir do ecrã Servidor de sincronização.",
+      "retiredSelf": "Este dispositivo foi removido a partir de outro dispositivo.",
+      "resetAndAddAgain": "Repor e adicionar novamente",
+      "noDevices": "Ainda não há dispositivos.",
+      "syncingHere": "A sincronizar aqui"
+    },
+    "banner": {
+      "conflictsNeedReview_one": "{{count}} conflito precisa de revisão",
+      "conflictsNeedReview_other": "{{count}} conflitos precisam de revisão",
+      "catchingUp": "A pôr a sincronização em dia — as suas notas estão seguras.",
+      "verifyDevices": "Verificar dispositivos"
     }
   },
   "templates": {
@@ -1946,7 +2507,14 @@
       "removeFromTemplates": "Remover dos modelos",
       "removeRowLabel": "Remover {{name}} dos modelos (mantém a nota)",
       "title": "Modelos de notas"
-    }
+    },
+    "emptyBefore": "Ainda não há modelos. Toque em ",
+    "newAction": "Novo",
+    "emptyAfter": " para criar um modelo de nota reutilizável — e depois começar notas a partir dele (e escolher um como modelo da sua nota diária em Definições).",
+    "use": "Usar",
+    "edit": "Editar",
+    "deleteConfirm": "Eliminar este modelo?",
+    "convertToNote": "Converter em nota"
   },
   "unlock": {
     "backToPicker": "Escolher um cofre diferente",
@@ -1980,7 +2548,34 @@
       "lockedDuringChange": "Alteração de palavra-passe cancelada: o cofre estava bloqueado.",
       "metaChangedExternally": "O cofre foi modificado noutra sessão — desbloqueie novamente, por favor."
     },
-    "title": "Desbloqueie o seu cofre."
+    "title": "Desbloqueie o seu cofre.",
+    "vaultUnreadable": "O ficheiro do cofre é ilegível. Restaure a partir de um backup.",
+    "unlockFailedGeneric": "Não foi possível desbloquear. Tente novamente.",
+    "biometricTooManyAttempts": "Demasiadas tentativas de {{biometric}}. Use a sua palavra-passe.",
+    "pinIncorrect_one": "PIN incorreto. Resta {{count}} tentativa.",
+    "pinIncorrect_other": "PIN incorreto. Restam {{count}} tentativas.",
+    "pinTooManyAttempts": "Demasiadas tentativas de PIN. Use a sua palavra-passe.",
+    "pinFailedGeneric": "Não foi possível desbloquear com o PIN. Use a sua palavra-passe.",
+    "corruptedHeading": "O ficheiro do cofre é ilegível",
+    "ioErrorHeading": "Não é possível ler este cofre",
+    "blockingTitle": "A desbloquear",
+    "blockingSubtitle": "A desencriptar as suas chaves neste dispositivo.",
+    "eyebrow": "Desbloquear cofre",
+    "vaultTitleFallback": "O seu cofre",
+    "unlockWithBiometric": "Desbloquear com {{biometric}}",
+    "biometricFailed": "{{biometric}} não conseguiu confirmar que é você",
+    "touchToUnlock": "Toque para desbloquear",
+    "lookToUnlock": "Olhe para desbloquear",
+    "biometricRetryHint": "Tente novamente ou desbloqueie com a sua palavra-passe.",
+    "tryBiometricAgain": "Tentar {{biometric}} novamente",
+    "usePasswordInstead": "Usar a palavra-passe",
+    "useBiometricInstead": "Usar {{biometric}}",
+    "unlockWithPinInstead": "Desbloquear com PIN",
+    "useRecoveryPhrase": "Usar a sua frase de recuperação",
+    "deleteConfirmTitle": "Eliminar este cofre?",
+    "deletePartialError": "Não foi possível remover alguns ficheiros. O cofre já não é utilizável — continue para recomeçar.",
+    "failClosedEyebrow": "Não é possível abrir o cofre",
+    "restoreHint": "Restaure a partir de um backup para continuar."
   },
   "vault": {
     "ioBanner": {
@@ -2231,25 +2826,158 @@
       "cleaningUp": "A limpar…",
       "cleanUp": "Limpar",
       "confirmBody_one": "{{count}} ficheiro será removido. Já está ilegível; nada recuperável se perde.",
-      "confirmBody_many": "{{count}} ficheiros serão removidos. Já estão ilegíveis; nada recuperável se perde.",
       "confirmBody_other": "{{count}} ficheiros serão removidos. Já estão ilegíveis; nada recuperável se perde.",
       "confirmTitle": "Limpar os ficheiros restantes?",
       "doneBody_one": "Removido {{count}} ficheiro restante. Já pode criar um novo cofre.",
-      "doneBody_many": "Removidos {{count}} ficheiros restantes. Já pode criar um novo cofre.",
       "doneBody_other": "Removidos {{count}} ficheiros restantes. Já pode criar um novo cofre.",
       "doneTitle": "Limpeza concluída",
       "errorBody": "Algo correu mal. Feche a aplicação e tente novamente.",
       "errorTitle": "A limpeza falhou",
       "foundBody_one": "{{count}} ficheiro restante de uma eliminação anterior que não terminou. Já está ilegível — não vai perder nada recuperável.",
-      "foundBody_many": "{{count}} ficheiros restantes de uma eliminação anterior que não terminou. Já estão ilegíveis — não vai perder nada recuperável.",
       "foundBody_other": "{{count}} ficheiros restantes de uma eliminação anterior que não terminou. Já estão ilegíveis — não vai perder nada recuperável.",
       "foundTitle": "Ficheiros restantes de uma eliminação incompleta",
       "partialBody_one": "{{count}} ficheiro pode estar bloqueado por outra aplicação (antivírus, sincronização de ficheiros ou indexação de pesquisa). Feche a aplicação e tente novamente daqui a pouco, ou remova a pasta do cofre manualmente.",
-      "partialBody_many": "{{count}} ficheiros podem estar bloqueados por outra aplicação (antivírus, sincronização de ficheiros ou indexação de pesquisa). Feche a aplicação e tente novamente daqui a pouco, ou remova a pasta do cofre manualmente.",
       "partialBody_other": "{{count}} ficheiros podem estar bloqueados por outra aplicação (antivírus, sincronização de ficheiros ou indexação de pesquisa). Feche a aplicação e tente novamente daqui a pouco, ou remova a pasta do cofre manualmente.",
       "partialTitle": "Alguns ficheiros não puderam ser removidos"
     },
     "restoreCta": "Restaurar a partir de cópia de segurança",
-    "subtitle": "As suas notas são encriptadas neste dispositivo antes de o deixarem. O servidor só armazena texto cifrado."
+    "subtitle": "As suas notas são encriptadas neste dispositivo antes de o deixarem. O servidor só armazena texto cifrado.",
+    "repairCleanedUp_one": "Limpo {{count}} ficheiro residual.",
+    "repairCleanedUp_other": "Limpos {{count}} ficheiros residuais.",
+    "repairFailed": "Não foi possível concluir a limpeza. Tente novamente.",
+    "heroLine1": "Notas que",
+    "heroLine2": "pertencem",
+    "heroLine3": "apenas a si.",
+    "lede": "Markdown, encriptado neste dispositivo antes de sequer sair dele. Sem e-mail de conta. Sem servidores que possam ler uma palavra.",
+    "residueBanner": "Ficheiros residuais de uma eliminação interrompida ({{n}}). Limpe-os antes de criar um cofre.",
+    "cleanUpFiles": "Limpar ficheiros residuais",
+    "create": "Criar um cofre",
+    "connect": "Ligar à minha conta"
+  },
+  "wikiGraph": {
+    "emptyTitle": "Ainda não há ligações",
+    "emptyBodyBefore": "Ligue notas escrevendo ",
+    "emptyBodyAfter": " no seu texto. As notas ligadas aparecem aqui como um grafo."
+  },
+  "markdown": {
+    "attachmentFallback": "anexo",
+    "nothingToPreview": "Ainda não há nada para pré-visualizar."
+  },
+  "conflicts": {
+    "empty": "Nenhum conflito para rever — as suas notas estão sincronizadas.",
+    "groupTitle_one": "{{count}} cópia em conflito",
+    "groupTitle_other": "{{count}} cópias em conflito",
+    "groupTitleOfNote": " da nota {{hex}}"
+  },
+  "viewEditor": {
+    "saveError": "Não foi possível guardar esta vista. Tente novamente.",
+    "deleteError": "Não foi possível eliminar esta vista. Tente novamente.",
+    "editView": "Editar vista",
+    "condition": {
+      "search": "Texto"
+    },
+    "containsPlaceholder": "contém…",
+    "tagPlaceholder": "etiqueta",
+    "folderPlaceholder": "Pasta/",
+    "addCondition": "+ Adicionar condição",
+    "createView": "Criar vista"
+  },
+  "snapshots": {
+    "today": "Hoje {{time}}",
+    "readError": "Não foi possível ler o histórico de versões.",
+    "decryptError": "Não foi possível desencriptar essa versão.",
+    "restoreError": "Não foi possível restaurar essa versão.",
+    "title": "Histórico de versões",
+    "emptyState": "Ainda não há versões anteriores. Os instantâneos são captados automaticamente à medida que edita.",
+    "hide": "Ocultar",
+    "empty": "(vazio)",
+    "restoreThisVersion": "Restaurar esta versão"
+  },
+  "restoreBackup": {
+    "title": "Ainda não disponível no telemóvel",
+    "body": "A restauração a partir de um ficheiro de backup ainda não está disponível no telemóvel — crie um cofre ou recupere com a sua frase."
+  },
+  "recording": {
+    "deniedTitle": "O acesso ao microfone está desativado",
+    "errorTitle": "Não foi possível iniciar a gravação",
+    "deniedBody": "Para gravar uma nota de voz, permita o acesso ao microfone para o Myne em Definições › Myne › Microfone.",
+    "noDeviceBody": "Não foi encontrado nenhum microfone neste dispositivo.",
+    "emptyBody": "Essa gravação estava vazia — nada foi captado.",
+    "genericBody": "Algo correu mal durante a gravação. Tente novamente.",
+    "stopAria": "Parar gravação"
+  },
+  "picker": {
+    "neverOpened": "Nunca aberto",
+    "openedJustNow": "aberto agora mesmo",
+    "openedMinuteAgo": "aberto há um minuto",
+    "openedMinutesAgo_one": "aberto há {{count}} minuto",
+    "openedMinutesAgo_other": "aberto há {{count}} minutos",
+    "openedHourAgo": "aberto há uma hora",
+    "openedHoursAgo_one": "aberto há {{count}} hora",
+    "openedHoursAgo_other": "aberto há {{count}} horas",
+    "openedYesterday": "aberto ontem",
+    "openedDaysAgo_one": "aberto há {{count}} dia",
+    "openedDaysAgo_other": "aberto há {{count}} dias",
+    "openedLastWeek": "aberto na semana passada",
+    "openedWeeksAgo_one": "aberto há {{count}} semana",
+    "openedWeeksAgo_other": "aberto há {{count}} semanas",
+    "openedLastMonth": "aberto no mês passado",
+    "openedMonthsAgo_one": "aberto há {{count}} mês",
+    "openedMonthsAgo_other": "aberto há {{count}} meses",
+    "openedLastYear": "aberto no ano passado",
+    "openedYearsAgo_one": "aberto há {{count}} ano",
+    "openedYearsAgo_other": "aberto há {{count}} anos",
+    "corruptedBadge": "Corrompido"
+  },
+  "join": {
+    "transportError": "Não foi possível contactar esse servidor de sincronização. Verifique o endereço e a sua ligação e tente novamente.",
+    "passwordPlaceholder": "A palavra-passe do seu cofre",
+    "waitingHint": "Mantenha este ecrã aberto — assim que for aprovado, aparece aqui um código de verificação para comparar com o seu outro dispositivo.",
+    "verifyBody": "Verifique se este código é o mesmo que aparece no dispositivo a partir do qual aprovou.",
+    "removing": "A remover…",
+    "sasMismatch": "Não coincidem — remover este dispositivo",
+    "title": "Ligar à sua conta",
+    "lead": "Introduza os dados da sua conta para trazer as suas notas para este dispositivo. Tudo permanece encriptado de ponta a ponta.",
+    "serverPlaceholder": "https://sync.example.com",
+    "accountHint": "Verifique bem este número — não parece correto.",
+    "approvalHint": "As suas notas aparecem assim que aprovar este dispositivo a partir de um dispositivo que já tem a sua conta.",
+    "connectingSubtitle": "A obter a sua conta e a desbloquear o seu cofre neste dispositivo."
+  },
+  "createVault": {
+    "beginWeakPassword": "Escolha uma palavra-passe mais forte e tente novamente.",
+    "beginGeneric": "Não foi possível iniciar a criação do cofre. Tente novamente.",
+    "wordNumber": "PALAVRA #{{position}}",
+    "commitError": "Não foi possível guardar o seu cofre. Tente novamente.",
+    "savedToFile": "Guardado em {{label}}",
+    "saveFileError": "Não foi possível guardar o ficheiro.",
+    "stepLabel": "Criar um cofre · {{current}} de {{total}}",
+    "briefingTitle": "Antes de começar",
+    "briefingLead": "O Myne encripta tudo neste dispositivo. Essa privacidade traz uma responsabilidade que só você pode assumir.",
+    "passwordTitle": "Crie uma palavra-passe",
+    "confirmPasswordLabel": "Confirmar palavra-passe",
+    "passwordHelper": "Nunca armazenada, nunca transmitida. Encripta as suas chaves neste dispositivo.",
+    "encryptingSubtitle": "A derivar a sua chave com Argon2id. Isto demora alguns segundos e não pode ser interrompido.",
+    "phraseTitle": "A sua frase de recuperação",
+    "phraseIntro": "Vinte e quatro palavras, por ordem. Escreva-as em papel e guarde-as num local seguro.",
+    "showSecondHalf": "Mostrar palavras 13–24",
+    "saveToFile": "Guardar num ficheiro",
+    "writtenThemDown": "Já as escrevi",
+    "typebackTitle": "Confirme a sua frase",
+    "typebackLead": "Introduza estas quatro palavras da frase de recuperação que acabou de guardar.",
+    "wordMismatch": "Não corresponde à palavra #{{pos}}",
+    "backToPhrase": "Voltar à frase",
+    "accountTitle": "O seu número da conta",
+    "accountLead": "Guarde-o juntamente com a sua frase de recuperação. Vai precisar dele para restaurar o seu cofre num novo dispositivo.",
+    "accountSavedAck": "Guardei o meu número da conta.",
+    "commit": "Concluir",
+    "committingTitle": "A guardar o seu cofre…",
+    "committingSubtitle": "A escrever o cofre encriptado neste dispositivo.",
+    "unlockingTitle": "A desbloquear…",
+    "unlockingSubtitle": "A abrir o seu cofre.",
+    "readyTitle": "O seu cofre está pronto",
+    "readyBody": "Tudo o que escrever a partir de agora é encriptado neste dispositivo antes de ser armazenado ou sincronizado.",
+    "personalLabel": "Pessoal",
+    "openVault": "Abrir cofre",
+    "backUpNow": "Fazer backup agora"
   }
 }

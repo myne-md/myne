@@ -182,6 +182,8 @@
     "archivedBadge": "Arşiv",
     "archivedBadgeTitle": "Arşivlendi",
     "dialogLabel": "Komut paleti",
+    "matchedInAttachment": "ekte",
+    "matchedInAttachmentTitle": "Sorgu, bu nota gömülü bir dosyanın içinde eşleşti",
     "matchedInBody": "↳ gövdede eşleşti",
     "noMatches": "Eşleşme yok",
     "searchPlaceholder": "Notlarda ara veya bir komut çalıştır — kapatmak için Esc",
@@ -195,10 +197,172 @@
         "label": "Kasayı yedekle…"
       },
       "category": {
+        "ai": "Yapay Zeka",
         "app": "Uygulama",
+        "appearance": "Görünüm",
         "editor": "Düzenleyici",
+        "notes": "Notlar",
         "vault": "Kasa",
         "view": "Görünüm"
+      },
+      "aiOpenChat": {
+        "label": "Yapay Zeka Sohbetini Aç"
+      },
+      "toggleLineNumbers": {
+        "label": "Satır numaralarını aç/kapat"
+      },
+      "toggleSpellCheck": {
+        "label": "Yazım denetimini aç/kapat"
+      },
+      "toggleTypewriter": {
+        "label": "Daktilo kaydırmayı aç/kapat"
+      },
+      "toggleDimInactive": {
+        "label": "Etkin olmayan satırları soluklaştırmayı aç/kapat"
+      },
+      "toggleEditorFont": {
+        "label": "Düzenleyici yazı tipini değiştir (mono / sans)"
+      },
+      "cycleTextSize": {
+        "label": "Düzenleyici metin boyutunu değiştir"
+      },
+      "cycleContentWidth": {
+        "label": "Düzenleyici içerik genişliğini değiştir"
+      },
+      "cycleDefaultViewMode": {
+        "label": "Varsayılan görünüm modunu değiştir"
+      },
+      "toggleTimestamps": {
+        "label": "Kenar çubuğu not zaman damgalarını aç/kapat"
+      },
+      "toggleArchiving": {
+        "label": "Not arşivlemeyi aç/kapat"
+      },
+      "toggleAiEnabled": {
+        "label": "Yapay zeka özelliklerini aç/kapat (beta)"
+      },
+      "toggleScreenCapture": {
+        "label": "Ekran yakalama korumasını aç/kapat"
+      },
+      "cycleTheme": {
+        "label": "Temayı değiştir"
+      },
+      "themeLight": {
+        "label": "Tema: Açık"
+      },
+      "themeDark": {
+        "label": "Tema: Koyu"
+      },
+      "themeAmoled": {
+        "label": "Tema: AMOLED"
+      },
+      "themeSystem": {
+        "label": "Tema: Sistemi izle"
+      },
+      "applyCustomTheme": {
+        "label": "Özel tema uygula…"
+      },
+      "splitRight": {
+        "label": "Bölmeyi sağa böl"
+      },
+      "splitDown": {
+        "label": "Bölmeyi aşağı böl"
+      },
+      "closePane": {
+        "label": "Bölmeyi kapat"
+      },
+      "closeTab": {
+        "label": "Sekmeyi kapat"
+      },
+      "nextTab": {
+        "label": "Sonraki sekme"
+      },
+      "prevTab": {
+        "label": "Önceki sekme"
+      },
+      "focusNextPane": {
+        "label": "Sonraki bölmeye odaklan"
+      },
+      "focusPrevPane": {
+        "label": "Önceki bölmeye odaklan"
+      },
+      "goBack": {
+        "label": "Geri git"
+      },
+      "goForward": {
+        "label": "İleri git"
+      },
+      "togglePreview": {
+        "label": "Yan yana önizlemeyi aç/kapat"
+      },
+      "findInNote": {
+        "label": "Notta bul"
+      },
+      "findReplace": {
+        "label": "Notta bul ve değiştir"
+      },
+      "newNote": {
+        "label": "Yeni not"
+      },
+      "duplicateNote": {
+        "label": "Notu çoğalt"
+      },
+      "archiveNote": {
+        "label": "Notu arşivle"
+      },
+      "renameNote": {
+        "label": "Notu yeniden adlandır"
+      },
+      "trashNote": {
+        "label": "Notu çöp kutusuna taşı"
+      },
+      "toggleFavorite": {
+        "label": "Favoriyi aç/kapat"
+      },
+      "moveNote": {
+        "label": "Notu klasöre taşı…"
+      },
+      "emptyTrash": {
+        "label": "Çöp kutusunu boşalt"
+      },
+      "showBacklinks": {
+        "label": "Geri bağlantıları göster"
+      },
+      "showOutline": {
+        "label": "Ana hatları göster"
+      },
+      "showUnlinked": {
+        "label": "Bağlantısız bahsetmeleri göster"
+      },
+      "newFolder": {
+        "label": "Yeni klasör"
+      },
+      "openTrash": {
+        "label": "Çöp kutusunu aç"
+      },
+      "openArchive": {
+        "label": "Arşivi aç"
+      },
+      "cycleHeading": {
+        "label": "Başlık düzeyini değiştir"
+      },
+      "restoreBackup": {
+        "label": "Kasayı yedekten geri yükle…"
+      },
+      "toggleRealtimeSync": {
+        "label": "Gerçek zamanlı eşitlemeyi aç/kapat"
+      },
+      "revealVaultFolder": {
+        "label": "Kasa klasörünü dosya yöneticisinde göster"
+      },
+      "aiSummarizeNote": {
+        "label": "Notu özetle"
+      },
+      "aiSuggestTags": {
+        "label": "Etiket öner"
+      },
+      "aiRewriteSelection": {
+        "label": "Seçimi yeniden yaz"
       },
       "convertWikilinks": {
         "label": "Bu nottaki içe aktarılmış wikilink’leri dönüştür…"
@@ -208,6 +372,12 @@
       },
       "exportNoteHtml": {
         "label": "Notu HTML olarak dışa aktar…"
+      },
+      "exportSelectionImage": {
+        "label": "Seçimi görüntü olarak dışa aktar…",
+        "saved": "Seçim görüntü olarak kaydedildi.",
+        "noSelection": "Önce biraz metin seçin, ardından görüntü olarak dışa aktarın.",
+        "failed": "Seçim görüntü olarak dışa aktarılamadı."
       },
       "exportNoteMarkdown": {
         "label": "Notu Markdown olarak dışa aktar…"
@@ -330,6 +500,15 @@
     },
     "rebind": {
       "invalidChordReason": "Bir değiştirici ekleyin (⌘, Ctrl veya Alt) — tek başına bir tuş kısayol olamaz."
+    },
+    "picker": {
+      "vaultRoot": "Kasa kökü",
+      "moveNoteTitle": "Notu klasöre taşı",
+      "moveNotePlaceholder": "Bir klasör seçin…",
+      "noFolders": "Henüz klasör yok",
+      "applyThemeTitle": "Özel tema uygula",
+      "applyThemePlaceholder": "Bir tema seçin…",
+      "noCustomThemes": "Yüklü özel tema yok"
     }
   },
   "common": {
@@ -499,6 +678,9 @@
           "reveal": "Kitaplıkta göster"
         },
         "pdfFallback": "PDF",
+        "textPreview": {
+          "truncated": "Önizleme kısaltıldı — Tam dosya için dışa aktarın."
+        },
         "tombstone": {
           "brokenAria": "Bozuk ek referansı: {{filename}}",
           "brokenLabel": "bozuk",
@@ -543,10 +725,10 @@
       },
       "barItems": {
         "graph": "Grafik",
-        "hide": "",
+        "hide": "Gizle",
         "lock": "Kilitle",
-        "moveLeft": "",
-        "moveRight": "",
+        "moveLeft": "Sola taşı",
+        "moveRight": "Sağa taşı",
         "saveStatus": "Kayıt durumu",
         "settings": "Ayarlar",
         "syncStatus": "Eşitleme durumu",
@@ -612,15 +794,43 @@
       "resizeBacklinksSidebar": "Geri bağlantılar kenar çubuğunu yeniden boyutlandır",
       "resizeNotesSidebar": "Notlar kenar çubuğunu yeniden boyutlandır",
       "rightPanel": {
-        "allHidden": "",
+        "aiChat": {
+          "askPlaceholder": "Notlarınız hakkında bir soru sorun…",
+          "askSubmit": "Sor",
+          "assistant": "Asistan",
+          "citations": "Kaynaklar",
+          "composerPlaceholder": "Notlarınıza mesaj yazın…",
+          "empty": "Yapay zeka çıktısı — özetler, yanıtlar ve öneriler — burada görünür.",
+          "error": "Yapay zeka isteği tamamlanamadı.",
+          "errorTurn": "Asistan yanıt veremedi.",
+          "gettingReadyHint": "Notlarınız yapay zeka için hazırlanıyor — bir dakika.",
+          "insert": "Nota ekle",
+          "noAnswer": "Yanıt yok — farklı ifade etmeyi deneyin.",
+          "noModelHint": "Model seçilmedi. Başlamak için Ayarlar → Labs → Yapay Zeka bölümünden bir tane seçin.",
+          "offHint": "Yerel yapay zeka kapalı. Ayarlar → Labs → Yapay Zeka bölümünden açın.",
+          "send": "Gönder",
+          "statusGettingReady": "Hazırlanıyor…",
+          "statusNoModel": "Model yok",
+          "statusOff": "Kapalı",
+          "statusReady": "Hazır",
+          "stop": "Durdur",
+          "tagsThinking": "Etiketler öneriliyor…",
+          "thinking": "Yapay zeka düşünüyor…",
+          "truncated": "İlk {{count}} karakter özetlendi.",
+          "you": "Siz"
+        },
+        "allHidden": "Tüm sekmeler gizli — geri yüklemek için sağ tıklayın.",
         "outline": {
-          "empty": "",
-          "heading": ""
+          "collapse": "Bölümü daralt",
+          "empty": "Başlık yok",
+          "expand": "Bölümü genişlet",
+          "heading": "Ana hatlar"
         },
         "tabs": {
+          "aiChat": "Yapay Zeka Sohbeti",
           "backlinks": "Geri bağlantılar",
-          "unlinked": "Bağlantısız sözler",
-          "outline": "Ana hat"
+          "outline": "Ana hat",
+          "unlinked": "Bağlantısız sözler"
         }
       },
       "sidebarToggle": {
@@ -689,6 +899,8 @@
       "rendering": "Şema oluşturuluyor…"
     },
     "slash": {
+      "aiContinue": "Yazmaya devam et (Yapay Zeka)",
+      "aiTitle": "Başlık öner (Yapay Zeka)",
       "attachFile": "Dosya ekle",
       "bulletList": "Madde işaretli liste",
       "callout": "Vurgu kutusu",
@@ -730,6 +942,21 @@
     },
     "toolbar": {
       "apply": "Uygula",
+      "exportImageTitle": "Seçimi görüntü olarak dışa aktar",
+      "customize": {
+        "bold": "Kalın",
+        "bulletList": "Madde işaretli liste",
+        "checklist": "Yapılacaklar listesi",
+        "code": "Kod",
+        "heading": "Başlık",
+        "highlight": "Vurgu",
+        "italic": "İtalik",
+        "link": "Bağlantı",
+        "numberedList": "Numaralı liste",
+        "quote": "Alıntı",
+        "strike": "Üstü çizili",
+        "wikilink": "Wiki bağlantısı"
+      },
       "heading": {
         "h1": "H1",
         "h2": "H2",
@@ -746,13 +973,7 @@
         "purple": "Mor",
         "yellow": "Sarı"
       },
-      "urlPlaceholder": "Bağlantı URL’sini yapıştır",
-      "customize": {
-        "bold": "Kalın",
-        "italic": "İtalik",
-        "checklist": "Yapılacaklar listesi",
-        "code": "Kod"
-      }
+      "urlPlaceholder": "Bağlantı URL’sini yapıştır"
     },
     "typography": {
       "contentWidth": {
@@ -869,28 +1090,6 @@
       "title": "Bir not seçin",
       "body": "Listeden bir not seçin ya da yeni bir tane başlatın."
     },
-    "viewsSheet": {
-      "typeCards": "Kartlar",
-      "typeList": "Liste",
-      "emptyState": "Henüz kaydedilmiş görünüm yok. Notlarınızı etikete, klasöre veya metne göre filtrelemek için bir tane oluşturun.",
-      "editView": "Görünümü düzenle"
-    },
-    "sheet": {
-      "done": "Bitti"
-    },
-    "vaultSwitcher": {
-      "title": "Kasalar"
-    },
-    "tagBrowser": {
-      "noTagsMatch": "Eşleşen etiket yok.",
-      "notesCount_one": "Notlar · {{count}}",
-      "notesCount_other": "Notlar · {{count}}"
-    },
-    "untitledNote": "Başlıksız not",
-    "commandPalette": {
-      "searchPlaceholder": "Notlarda ara veya bir komut çalıştır…",
-      "noMatches": "Eşleşen komut veya not yok."
-    },
     "readingBar": {
       "editNote": "Notu düzenle",
       "edit": "Düzenle"
@@ -919,6 +1118,28 @@
       "collapsePanel": "Paneli daralt",
       "unlinkedCount_one": "{{count}} bağlantısız söz",
       "unlinkedCount_other": "{{count}} bağlantısız söz"
+    },
+    "viewsSheet": {
+      "typeCards": "Kartlar",
+      "typeList": "Liste",
+      "emptyState": "Henüz kaydedilmiş görünüm yok. Notlarınızı etikete, klasöre veya metne göre filtrelemek için bir tane oluşturun.",
+      "editView": "Görünümü düzenle"
+    },
+    "sheet": {
+      "done": "Bitti"
+    },
+    "vaultSwitcher": {
+      "title": "Kasalar"
+    },
+    "tagBrowser": {
+      "noTagsMatch": "Eşleşen etiket yok.",
+      "notesCount_one": "Notlar · {{count}}",
+      "notesCount_other": "Notlar · {{count}}"
+    },
+    "untitledNote": "Başlıksız not",
+    "commandPalette": {
+      "searchPlaceholder": "Notlarda ara veya bir komut çalıştır…",
+      "noMatches": "Eşleşen komut veya not yok."
     }
   },
   "export": {
@@ -1057,6 +1278,7 @@
   },
   "notes": {
     "archive": {
+      "cancel": "İptal",
       "close": "Kapat",
       "count_one": "{{count}} not",
       "count_other": "{{count}} not",
@@ -1064,6 +1286,10 @@
       "delete": "Sil",
       "deleteError": "Bu not silinemedi. Tekrar deneyin.",
       "emptyState": "Arşiv boş.",
+      "folderDeleteConfirm_one": "{{count}} not Çöp Kutusu'na taşınsın mı?",
+      "folderDeleteConfirm_other": "{{count}} not Çöp Kutusu'na taşınsın mı?",
+      "folderDeleteConfirmCta": "Çöp Kutusu'na taşı",
+      "folderDeleteError": "O klasörün notları Çöp Kutusu'na taşınamadı. Tekrar deneyin.",
       "restore": "Geri yükle",
       "restoreError": "Bu not geri yüklenemedi. Tekrar deneyin.",
       "title": "Arşiv",
@@ -1239,6 +1465,7 @@
       "addToFavorites": "Favorilere ekle",
       "archive": "Arşivle",
       "archiveBulkError": "Notlar arşivlenemedi.",
+      "archiveFolder": "Klasörü arşivle",
       "archiveNote": "Arşivle",
       "archiveSingleError": "Not arşivlenemedi.",
       "attachments": "Ekler",
@@ -1291,13 +1518,18 @@
       "openInNewTab": "Yeni sekmede aç",
       "openToSide": "Yan tarafta aç",
       "openTrash": "Çöp Kutusu’nu aç",
-      "removeAsFolderNote": "Klasör notu olmaktan çıkar",
-      "removeFolderNote": "",
+      "removeFolderNote": "Klasör notunu kaldır",
       "removeFromFavorites": "Favorilerden çıkar",
       "rename": "Yeniden adlandır",
       "setAsFolderNote": "Klasör notu olarak ayarla",
       "trash": "Çöp Kutusu",
       "trashBulkError": "Notlar Çöp Kutusu’na taşınamadı.",
+      "trashConfirmBulkBody_one": "{{count}} not Çöp Kutusu'na taşınacak.",
+      "trashConfirmBulkBody_other": "{{count}} not Çöp Kutusu'na taşınacak.",
+      "trashConfirmBulkWarning": "Bunları daha sonra Çöp Kutusu'ndan geri yükleyebilirsiniz.",
+      "trashConfirmConfirm": "Çöp Kutusu'na taşı",
+      "trashConfirmTitle": "Çöp Kutusu'na taşınsın mı?",
+      "trashConfirmWarning": "Bunu daha sonra Çöp Kutusu'ndan geri yükleyebilirsiniz.",
       "trashSingleError": "Not Çöp Kutusu’na taşınamadı.",
       "undo": "Geri al",
       "vaultRoot": "Kasa kökü",
@@ -1639,6 +1871,8 @@
       "vaultLabelHelper": "Uygulama içi geçiş aracında gösterilen bu kasanın adı. Kasanın içinde şifreli olarak saklanır; cihazınızdan asla düz metin olarak çıkmaz.",
       "vaultLabelPlaceholder": "Bir etiket ekleyin…",
       "vaultLabelSave": "Kaydet",
+      "vaultIconLabel": "SİMGE",
+      "vaultIconDefault": "Varsayılan (kelime logosu)",
       "renamedToast": "Kasa yeniden adlandırıldı",
       "renameError": "Kasa yeniden adlandırılamadı",
       "newPasswordMismatch": "Yeni parolalar eşleşmiyor.",
@@ -1733,6 +1967,11 @@
         "onDate": "{{date}} tarihinde bağlandı"
       }
     },
+    "clipperInstall": {
+      "error": "Tarayıcı kırpıcısı ayarı güncellenemedi.",
+      "helper": "Myne tarayıcı uzantısının bu uygulamaya kırpıntı gönderebilmesi için yerel mesajlaşma ana makinesini kaydeder. Varsayılan olarak açıktır; kaldırmak için kapatın.",
+      "label": "Tarayıcı kırpıcısı"
+    },
     "customThemes": {
       "appliedBadge": "Uygulandı",
       "apply": "Uygula",
@@ -1799,27 +2038,27 @@
     },
     "files": {
       "newNote": {
-        "folderLabel": "",
-        "folderPlaceholder": "",
-        "helper": "",
-        "label": "",
-        "optionCurrent": "",
-        "optionRoot": "",
-        "optionSpecific": "",
-        "saveError": ""
+        "folderLabel": "Yeni notlar için klasör",
+        "folderPlaceholder": "örn. Gelen Kutusu/",
+        "helper": "Yeni oluşturulan notların yerleştirileceği yer.",
+        "label": "Yeni notlar için varsayılan konum",
+        "optionCurrent": "Geçerli notla aynı klasör",
+        "optionRoot": "Kasa klasörü",
+        "optionSpecific": "Aşağıda belirtilen klasörde",
+        "saveError": "Yeni not konumu kaydedilemedi."
       },
       "startup": {
-        "helper": "",
-        "label": "",
-        "noteLabel": "",
-        "notePlaceholder": "",
-        "optionEmpty": "",
-        "optionLast": "",
-        "optionSpecific": "",
-        "saveError": "",
-        "searchEmpty": "",
-        "searchPlaceholder": "",
-        "untitledNote": ""
+        "helper": "Uygulama başladığında hangi dosyanın açılacağını seçin.",
+        "label": "Açılacak varsayılan dosya",
+        "noteLabel": "Başlangıçta açılacak not",
+        "notePlaceholder": "Bir not seçin…",
+        "optionEmpty": "Yeni not",
+        "optionLast": "Son açılan",
+        "optionSpecific": "Belirli bir not",
+        "saveError": "Başlangıç ayarı kaydedilemedi.",
+        "searchEmpty": "Not bulunamadı.",
+        "searchPlaceholder": "Notlarda ara…",
+        "untitledNote": "Başlıksız"
       }
     },
     "focusMode": {
@@ -1870,6 +2109,37 @@
       "off": "Kapalı",
       "on": "Açık"
     },
+    "toolbarCustomize": {
+      "errorSave": "Araç çubuğu düzeni kaydedilemedi.",
+      "helper": "Seçim araç çubuğunda hangi biçimlendirme düğmelerinin görüneceğini ve sıralarını seçin.",
+      "label": "Araç çubuğu düğmeleri",
+      "moveDown": "Aşağı taşı",
+      "moveUp": "Yukarı taşı",
+      "pendingHint": "Yakında"
+    },
+    "ai": {
+      "betaBadge": "Beta",
+      "disclosureToggle": "Bu nasıl çalışır?",
+      "enableHelper": "Sağladığınız bir modeli tamamen cihazınızda çalıştırır. Deneyseldir, varsayılan olarak kapalıdır.",
+      "enableLabel": "Yerel yapay zekayı etkinleştir",
+      "excludedHelper": "Bu klasörlerdeki notlar yapay zeka tarafından asla okunmaz veya dizinlenmez. Her satıra bir klasör yolu.",
+      "excludedLabel": "Hariç tutulan klasörler",
+      "excludedPlaceholder": "Özel/\nGünlük/",
+      "modelChoose": "Dosya seç…",
+      "modelEmbeddingLabel": "Arama modeli — anlamsal arama ve Soru-Cevap",
+      "modelFilter": {
+        "gguf": "GGUF modeli",
+        "safetensors": "Safetensors modeli"
+      },
+      "modelGenerationLabel": "Metin modeli — sohbet, özetler, yazma",
+      "modelNone": "Dosya seçilmedi",
+      "modelSaveFailed": "Model yolu kaydedilemedi (kasanızın dışında olmalı).",
+      "modelsHelper": "Myne modelleri asla indirmez — bu, ağ üzerinden veri göndermek anlamına gelir. Bir tane edinmek için tarayıcınızda bir bağlantı açın, ardından indirilen dosyaları buradan seçin. Her şey cihazınızda çalışır.",
+      "modelsLabel": "Modeller",
+      "recommendedFilesEmbedding": "Tek bir klasörde model.safetensors + config.json + tokenizer.json gerektirir.",
+      "recommendedFilesGeneration": "Aynı klasörde .gguf dosyası + tokenizer.json gerektirir.",
+      "title": "Yapay Zeka"
+    },
     "prefs": {
       "saveError": "Tercih kaydedilemedi — tekrar deneyin"
     },
@@ -1878,6 +2148,8 @@
       "autoLockLabel": "Otomatik kilit",
       "autoLockSearchEmpty": "Eşleşen süre yok.",
       "autoLockSearchPlaceholder": "Sürelerde ara…",
+      "realtimeSyncHelper": "Diğer cihazlardan gelen değişiklikler, içeriksiz bir sinyal üzerinden saniyeler içinde ulaşır — sunucu yalnızca “bir şey değişti” bilgisini iletir, asla neyin değiştiğini değil. Kasanızın kilidi açıkken uygulama zaten sunucuyu düzenli olarak kontrol eder, bu nedenle bu, anlamlı bir görünürlük eklemez; yapılandırılacak bir şey yoktur.",
+      "realtimeSyncLabel": "Gerçek zamanlı eşitleme",
       "screenCaptureHelperOff": "Koruma, kilit açılmadan önce her zaman geçerlidir. Kilit açıldıktan sonra bu tercihi izler.",
       "screenCaptureHelperOn": "macOS ve Windows 10’da (Mayıs 2020 Güncellemesi veya sonrası) etkindir. Linux desteği ileriki bir sürümde gelecek.",
       "screenCaptureLabel": "Ekran görüntüsü koruması",
@@ -1935,17 +2207,21 @@
     },
     "shell": {
       "closeLabel": "Ayarları kapat",
+      "groups": {
+        "labs": "Labs"
+      },
       "navLabel": "Ayarlar panelleri",
       "panels": {
         "about": "Hakkında",
         "account": "Hesap",
+        "ai": "Yapay Zeka",
         "appearance": "Görünüm",
         "editor": "Düzenleyici",
+        "files": "Dosyalar",
         "hotkeys": "Kısayollar",
         "privacy": "Gizlilik",
         "storage": "Depolama",
-        "sync": "Eşitleme",
-        "files": "Dosyalar"
+        "sync": "Eşitleme"
       },
       "passwordUpdatedToast": "Parola güncellendi",
       "title": "Ayarlar"
@@ -2062,6 +2338,8 @@
       "groupTitle_one": "{{original}} için {{count}} çakışan kopya",
       "groupTitle_other": "{{original}} için {{count}} çakışan kopya",
       "keepAsSeparate": "Ayrı olarak tut",
+      "tookTheirsToast": "Yerel sürüm Çöp Kutusu'na taşındı.",
+      "tookTheirsUndo": "Geri al",
       "untitled": "Başlıksız ({{hex}})",
       "useThisVersion": "Bu sürümü kullan"
     },
@@ -2081,10 +2359,13 @@
       "thisDevice": "Bu cihaz",
       "transportHint": "Sunucu taşındıysa veya sertifikası değiştiyse, yeniden güvenmek için yukarıdaki “Eşitleme sunucusu” altına sunucu URL’sini yeniden girin.",
       "unreachable": "Eşitlemeye ulaşılamadı ({{error}}).",
-      "yourDevices": "Cihazlarınız",
-      "verifyTitle": "Yeni cihazı doğrula",
+      "verifyBody": "Az önce onayladığınız cihazda aynı kodun göründüğünü doğrulayın. Eşleşiyorsa cihaz hesabınızdadır. Eşleşmiyorsa cihazı kaldırın.",
+      "verifyMatch": "Eşleşiyor",
+      "verifyMismatch": "Eşleşmiyor",
       "verifyPending": "Bu kod, yeni cihaz ilk eşitlemesini tamamladığında görünür.",
-      "verifyMatch": "Eşleşiyor"
+      "verifySyncing": "Eşitleniyor…",
+      "verifyTitle": "Yeni cihazı doğrula",
+      "yourDevices": "Cihazlarınız"
     },
     "endpoint": {
       "connect": "Bağlan",
@@ -2092,6 +2373,8 @@
       "connectedTls": "Bağlandı. Bu parmak izinin diğer cihazınızdakiyle eşleştiğini doğrulayın.",
       "connecting": "Bağlanıyor…",
       "fingerprintLabel": "Sunucu sertifikası parmak izi:",
+      "pinStatic": "Myne'nin yerleşik sertifikasına karşı doğrulandı.",
+      "pinTofu": "İlk bağlantıda sabitlendi. Bu parmak izini cihazlarınız arasında karşılaştırın.",
       "placeholder": "https://your-server.example   ·   http://127.0.0.1:8080",
       "unreachable": "O sunucuya ulaşılamadı — URL’yi ve sunucunun çalıştığını kontrol edin."
     },
@@ -2118,17 +2401,23 @@
     "join": {
       "accountLabel": "Hesap numarası",
       "cancel": "İptal",
+      "continue": "Devam et",
       "error": "Bu cihaz eklenemedi. Sunucu URL’sini, hesap numarasını ve parolayı — ve sunucuya erişilebildiğini — kontrol edin.",
       "help": "Hesap numaranız ve parolanızla giriş yapın. Mevcut bir cihaz onayladığında bu cihaz notlarınızı eşitlemeye başlar. Kurtarma ifadesi gerekmez.",
       "passwordLabel": "Parola",
+      "pinnedCompare": "Bu cihaz, sunucunuzun sertifikasını sabitledi. Bu parmak izinin diğer cihazlarınızda eşleştiğini doğrulayın.",
+      "pinnedTitle": "Sunucu sertifikası sabitlendi",
       "serverLabel": "Eşitleme sunucusu",
       "serverPlaceholder": "https://your-server.example",
+      "sasMatch": "Eşleşiyor — devam et",
+      "sasMismatch": "Eşleşmiyor — bu cihazı kaldırın",
       "submit": "Cihaz ekle",
       "submitting": "Ekleniyor…",
       "title": "Bu cihazı bir hesaba ekle",
-      "waitingTitle": "Onay bekleniyor",
+      "verifyBody": "Bu kodun, onayladığınız cihazdaki kodla eşleştiğini doğrulayın.",
       "verifyTitle": "Bu cihazı doğrula",
-      "sasMatch": "Eşleşiyor — devam et"
+      "waitingHint": "Bu pencereyi açık tutun — onaylandığında, diğer cihazınızla karşılaştırmak için burada bir doğrulama kodu görünür.",
+      "waitingTitle": "Onay bekleniyor"
     },
     "panel": {
       "addDevice": {

@@ -6,14 +6,18 @@
       "close": "닫기",
       "completeTitle": "정리 완료",
       "deleteCta": "미사용 {{count}}개 삭제",
-      "deleteCta_other": "",
+      "deleteCta_one": "미사용 {{count}}개 삭제",
+      "deleteCta_other": "미사용 {{count}}개 삭제",
       "error": "정리하지 못했습니다. 일부 노트를 읽을 수 없을 수 있습니다 — 아무것도 삭제되지 않았습니다.",
+      "intro_one": "이 첨부 파일은 어떤 노트에서도 사용되지 않습니다. 삭제는 영구적이며 되돌릴 수 없습니다.",
       "intro_other": "이 첨부 파일 {{count}}개는 어떤 노트에서도 사용되지 않습니다. 삭제하면 영구적이며 되돌릴 수 없습니다.",
       "summaryFreed": " · {{size}} 확보됨",
       "summaryPeriod": ".",
+      "summaryRemoved_one": "첨부 파일 {{count}}개 삭제됨",
       "summaryRemoved_other": "첨부 파일 {{count}}개 삭제됨",
       "summarySkipped": " · {{count}}개 건너뜀(지금 사용 중)",
-      "summarySkipped_other": "",
+      "summarySkipped_one": " · {{count}}개 건너뜀 (현재 사용 중)",
+      "summarySkipped_other": " · {{count}}개 건너뜀 (현재 사용 중)",
       "title": "미사용 첨부 파일 정리",
       "willBeReclaimed": "{{size}}가 확보됩니다."
     },
@@ -33,6 +37,7 @@
       "deleting": "삭제하는 중…",
       "error": "첨부 파일을 삭제하지 못했습니다. 다시 시도하세요.",
       "notUsed": "어떤 노트에서도 사용되지 않습니다.",
+      "stillUsed_one": "이 파일은 아직 {{count}}개 노트에서 사용 중입니다. 삭제하면 삽입되었던 자리에 표식이 남습니다:",
       "stillUsed_other": "이 첨부 파일은 아직 노트 {{count}}개에서 사용 중입니다. 삭제하면 삽입되어 있던 자리에 흔적이 남습니다:",
       "title": "첨부 파일 삭제",
       "untitled": "제목 없음"
@@ -86,6 +91,7 @@
         "other": "기타",
         "pdf": "PDF"
       },
+      "usedInCount_one": "{{count}}개 노트에서 사용됨",
       "usedInCount_other": "노트 {{count}}개에서 사용",
       "usedInLoading": "…"
     },
@@ -100,7 +106,28 @@
     "usedInNotesPopover": {
       "empty": "어떤 노트에서도 사용되지 않습니다.",
       "untitled": "제목 없음"
-    }
+    },
+    "needsApp": "첨부 파일 정리는 앱이 필요합니다.",
+    "noUnused": "미사용 첨부 파일이 없습니다 — 모든 파일이 참조되고 있습니다.",
+    "scanError": "미사용 첨부 파일을 검사하지 못했습니다.",
+    "erasedToast_one": "미사용 파일 {{count}}개를 완전히 삭제했습니다.",
+    "erasedToast_other": "미사용 파일 {{count}}개를 완전히 삭제했습니다.",
+    "eraseError": "미사용 첨부 파일을 완전히 삭제하지 못했습니다.",
+    "readError": "첨부 파일을 읽지 못했습니다.",
+    "needAppPreview": "첨부 파일은 앱이 필요합니다 (브라우저 미리보기가 아님).",
+    "tooLarge": "파일이 너무 큽니다 (최대 64MB).",
+    "unsupported": "이미지와 PDF만 첨부할 수 있습니다.",
+    "addError": "그 파일을 추가하지 못했습니다.",
+    "deleteError": "그 첨부 파일을 삭제하지 못했습니다.",
+    "renameError": "그 첨부 파일의 이름을 변경하지 못했습니다.",
+    "unusedSummary_one": "첨부 파일 {{count}}개가 어떤 노트에서도 참조되지 않습니다 ({{size}}). 완전 삭제는 영구적인 암호학적 삭제입니다 — 휴지통이 없습니다.",
+    "unusedSummary_other": "첨부 파일 {{count}}개가 어떤 노트에서도 참조되지 않습니다 ({{size}}). 완전 삭제는 영구적인 암호학적 삭제입니다 — 휴지통이 없습니다.",
+    "eraseCta_one": "미사용 파일 {{count}}개 완전 삭제",
+    "eraseCta_other": "미사용 파일 {{count}}개 완전 삭제",
+    "emptyState": "아직 첨부 파일이 없습니다. 업로드를 눌러 이미지나 PDF를 추가하세요.",
+    "insert": "삽입",
+    "pauseLabel": "{{filename}} 일시정지",
+    "playLabel": "{{filename}} 재생"
   },
   "backup": {
     "errors": {
@@ -155,6 +182,8 @@
     "archivedBadge": "보관됨",
     "archivedBadgeTitle": "보관됨",
     "dialogLabel": "명령 팔레트",
+    "matchedInAttachment": "첨부 파일에서",
+    "matchedInAttachmentTitle": "이 노트에 삽입된 파일 안에서 검색어가 일치했습니다",
     "matchedInBody": "↳ 본문에서 일치",
     "noMatches": "일치하는 항목 없음",
     "searchPlaceholder": "노트를 검색하거나 명령을 실행하세요 — Esc로 닫기",
@@ -168,10 +197,172 @@
         "label": "보관함 백업…"
       },
       "category": {
+        "ai": "AI",
         "app": "앱",
+        "appearance": "모양",
         "editor": "편집기",
+        "notes": "노트",
         "vault": "보관함",
         "view": "보기"
+      },
+      "aiOpenChat": {
+        "label": "AI 채팅 열기"
+      },
+      "toggleLineNumbers": {
+        "label": "줄 번호 켜기/끄기"
+      },
+      "toggleSpellCheck": {
+        "label": "맞춤법 검사 켜기/끄기"
+      },
+      "toggleTypewriter": {
+        "label": "타자기 스크롤 켜기/끄기"
+      },
+      "toggleDimInactive": {
+        "label": "비활성 줄 흐리게 켜기/끄기"
+      },
+      "toggleEditorFont": {
+        "label": "편집기 글꼴 전환 (고정폭 / 산세리프)"
+      },
+      "cycleTextSize": {
+        "label": "편집기 글자 크기 순환"
+      },
+      "cycleContentWidth": {
+        "label": "편집기 콘텐츠 너비 순환"
+      },
+      "cycleDefaultViewMode": {
+        "label": "기본 보기 모드 순환"
+      },
+      "toggleTimestamps": {
+        "label": "사이드바 노트 타임스탬프 켜기/끄기"
+      },
+      "toggleArchiving": {
+        "label": "노트 보관 켜기/끄기"
+      },
+      "toggleAiEnabled": {
+        "label": "AI 기능 켜기/끄기 (베타)"
+      },
+      "toggleScreenCapture": {
+        "label": "화면 캡처 보호 켜기/끄기"
+      },
+      "cycleTheme": {
+        "label": "테마 순환"
+      },
+      "themeLight": {
+        "label": "테마: 라이트"
+      },
+      "themeDark": {
+        "label": "테마: 다크"
+      },
+      "themeAmoled": {
+        "label": "테마: AMOLED"
+      },
+      "themeSystem": {
+        "label": "테마: 시스템 따르기"
+      },
+      "applyCustomTheme": {
+        "label": "사용자 지정 테마 적용…"
+      },
+      "splitRight": {
+        "label": "오른쪽으로 창 분할"
+      },
+      "splitDown": {
+        "label": "아래로 창 분할"
+      },
+      "closePane": {
+        "label": "창 닫기"
+      },
+      "closeTab": {
+        "label": "탭 닫기"
+      },
+      "nextTab": {
+        "label": "다음 탭"
+      },
+      "prevTab": {
+        "label": "이전 탭"
+      },
+      "focusNextPane": {
+        "label": "다음 창으로 포커스"
+      },
+      "focusPrevPane": {
+        "label": "이전 창으로 포커스"
+      },
+      "goBack": {
+        "label": "뒤로 가기"
+      },
+      "goForward": {
+        "label": "앞으로 가기"
+      },
+      "togglePreview": {
+        "label": "나란히 미리보기 켜기/끄기"
+      },
+      "findInNote": {
+        "label": "노트에서 찾기"
+      },
+      "findReplace": {
+        "label": "노트에서 찾아 바꾸기"
+      },
+      "newNote": {
+        "label": "새 노트"
+      },
+      "duplicateNote": {
+        "label": "노트 복제"
+      },
+      "archiveNote": {
+        "label": "노트 보관"
+      },
+      "renameNote": {
+        "label": "노트 이름 변경"
+      },
+      "trashNote": {
+        "label": "노트를 휴지통으로 이동"
+      },
+      "toggleFavorite": {
+        "label": "즐겨찾기 켜기/끄기"
+      },
+      "moveNote": {
+        "label": "노트를 폴더로 이동…"
+      },
+      "emptyTrash": {
+        "label": "휴지통 비우기"
+      },
+      "showBacklinks": {
+        "label": "백링크 표시"
+      },
+      "showOutline": {
+        "label": "개요 표시"
+      },
+      "showUnlinked": {
+        "label": "연결되지 않은 언급 표시"
+      },
+      "newFolder": {
+        "label": "새 폴더"
+      },
+      "openTrash": {
+        "label": "휴지통 열기"
+      },
+      "openArchive": {
+        "label": "보관함 열기"
+      },
+      "cycleHeading": {
+        "label": "제목 수준 순환"
+      },
+      "restoreBackup": {
+        "label": "백업에서 볼트 복원…"
+      },
+      "toggleRealtimeSync": {
+        "label": "실시간 동기화 켜기/끄기"
+      },
+      "revealVaultFolder": {
+        "label": "파일 관리자에서 볼트 폴더 표시"
+      },
+      "aiSummarizeNote": {
+        "label": "노트 요약"
+      },
+      "aiSuggestTags": {
+        "label": "태그 제안"
+      },
+      "aiRewriteSelection": {
+        "label": "선택 영역 다시 쓰기"
       },
       "convertWikilinks": {
         "label": "이 노트에서 가져온 위키링크 변환…"
@@ -181,6 +372,12 @@
       },
       "exportNoteHtml": {
         "label": "노트를 HTML로 내보내기…"
+      },
+      "exportSelectionImage": {
+        "label": "선택 영역을 이미지로 내보내기…",
+        "saved": "선택 영역을 이미지로 저장했습니다.",
+        "noSelection": "먼저 텍스트를 선택한 다음 이미지로 내보내세요.",
+        "failed": "선택 영역을 이미지로 내보내지 못했습니다."
       },
       "exportNoteMarkdown": {
         "label": "노트를 Markdown으로 내보내기…"
@@ -303,6 +500,15 @@
     },
     "rebind": {
       "invalidChordReason": "수정자(⌘, Ctrl 또는 Alt)를 추가하세요 — 키 하나만으로는 단축키가 될 수 없습니다."
+    },
+    "picker": {
+      "vaultRoot": "볼트 루트",
+      "moveNoteTitle": "노트를 폴더로 이동",
+      "moveNotePlaceholder": "폴더 선택…",
+      "noFolders": "아직 폴더가 없습니다",
+      "applyThemeTitle": "사용자 지정 테마 적용",
+      "applyThemePlaceholder": "테마 선택…",
+      "noCustomThemes": "설치된 사용자 지정 테마가 없습니다"
     }
   },
   "common": {
@@ -313,7 +519,9 @@
     },
     "spinner": {
       "loadingLabel": "불러오는 중"
-    }
+    },
+    "back": "뒤로",
+    "continue": "계속"
   },
   "editor": {
     "attachment": {
@@ -328,6 +536,7 @@
         "cancel": "취소",
         "confirm": "변환",
         "skipped": "건너뜀 — {{note}}",
+        "subtitle_one": "참조 1개가 다시 작성됩니다. 적용하기 전에 검토하세요.",
         "subtitle_other": "참조 {{count}}개가 다시 작성됩니다. 적용하기 전에 확인하세요.",
         "subtitleEmpty": "변환할 항목이 없습니다 — 확인된 원본 파일이 없습니다.",
         "title": "가져온 첨부 파일 변환"
@@ -337,7 +546,8 @@
       },
       "convertCore": {
         "converted": "{{count}}개 변환됨",
-        "converted_other": "",
+        "converted_one": "{{count}}개 변환됨",
+        "converted_other": "{{count}}개 변환됨",
         "noneToConvert": "이 노트에 변환할 가져온 첨부 파일이 없습니다.",
         "skipNote": {
           "failed": "가져오기 실패",
@@ -347,7 +557,8 @@
           "unsupported": "지원되지 않는 유형"
         },
         "skippedSuffix": " · {{count}}개 건너뜀",
-        "skippedSuffix_other": ""
+        "skippedSuffix_one": " · {{count}}개 건너뜀",
+        "skippedSuffix_other": " · {{count}}개 건너뜀"
       },
       "fileKind": {
         "generic": "파일",
@@ -427,7 +638,8 @@
       },
       "summary": {
         "added": "{{count}}개 추가됨",
-        "added_other": "",
+        "added_one": "{{count}}개 추가됨",
+        "added_other": "{{count}}개 추가됨",
         "reason": {
           "failed": "실패",
           "locked": "보관함 잠김",
@@ -435,7 +647,8 @@
           "unsupported": "지원되지 않는 유형"
         },
         "skipped": "{{count}}개 건너뜀: {{noun}}",
-        "skipped_other": ""
+        "skipped_one": "{{count}}개 건너뜀: {{noun}}",
+        "skipped_other": "{{count}}개 건너뜀: {{noun}}"
       },
       "voice": {
         "startError": {
@@ -465,6 +678,9 @@
           "reveal": "라이브러리에서 보기"
         },
         "pdfFallback": "PDF",
+        "textPreview": {
+          "truncated": "미리보기가 잘렸습니다 — 전체 파일은 내보내기를 사용하세요."
+        },
         "tombstone": {
           "brokenAria": "손상된 첨부 파일 참조: {{filename}}",
           "brokenLabel": "손상됨",
@@ -503,15 +719,16 @@
         "archivedBadge": "보관됨",
         "empty": "아직 백링크가 없습니다.",
         "linkedFrom": "{{count}}개에서 연결됨",
-        "linkedFrom_other": "",
+        "linkedFrom_one": "{{count}}개에서 연결됨",
+        "linkedFrom_other": "{{count}}개에서 연결됨",
         "untitled": "제목 없음"
       },
       "barItems": {
         "graph": "그래프",
-        "hide": "",
+        "hide": "숨기기",
         "lock": "잠그기",
-        "moveLeft": "",
-        "moveRight": "",
+        "moveLeft": "왼쪽으로 이동",
+        "moveRight": "오른쪽으로 이동",
         "saveStatus": "저장 상태",
         "settings": "설정",
         "syncStatus": "동기화 상태",
@@ -523,24 +740,30 @@
       },
       "baseImport": {
         "droppedFiltersSuffix": " · 필터 {{count}}개 제외됨",
-        "droppedFiltersSuffix_other": "",
+        "droppedFiltersSuffix_one": " · 필터 {{count}}개 제외됨",
+        "droppedFiltersSuffix_other": " · 필터 {{count}}개 제외됨",
         "failed": "가져오기에 실패했습니다.",
         "fileFilterName": "Obsidian Base",
         "imported": "뷰 {{count}}개 가져옴",
-        "imported_other": "",
+        "imported_one": "뷰 {{count}}개 가져옴",
+        "imported_other": "뷰 {{count}}개 가져옴",
         "notValid": "올바른 .base 파일이 아닙니다.",
         "skippedSuffix": " · {{count}}개 건너뜀",
-        "skippedSuffix_other": "",
+        "skippedSuffix_one": " · {{count}}개 건너뜀",
+        "skippedSuffix_other": " · {{count}}개 건너뜀",
         "stoppedAfter": "뷰 {{count}}개 후 가져오기가 중단되었습니다.",
-        "stoppedAfter_other": ""
+        "stoppedAfter_one": "뷰 {{count}}개 이후 가져오기가 중단되었습니다.",
+        "stoppedAfter_other": "뷰 {{count}}개 이후 가져오기가 중단되었습니다."
       },
       "bottomBar": {
         "browseTags": "태그 탐색",
         "browseViews": "뷰 탐색",
         "cycleViewMode": "보기 모드 순환",
         "docStats": {
+          "summary_one": "{{count}}단어 · {{characters}}자",
           "summary_other": "{{count}}개 단어 · {{characters}}자",
           "summarySelectionSuffix": " (선택)",
+          "title_one": "{{characters}}자 · {{words}}단어 · {{spaces}}공백 · {{count}}단락",
           "title_other": "{{characters}}자 · 단어 {{words}}개 · 공백 {{spaces}}개 · 단락 {{count}}개",
           "titleSelectionSuffix": " (선택 영역)"
         },
@@ -557,9 +780,11 @@
         "viewsTitle": "뷰"
       },
       "import": {
+        "imported_one": "노트 {{count}}개 가져옴{{skipped}}",
         "imported_other": "노트 {{count}}개 가져옴{{skipped}}",
         "skippedSuffix": " · {{count}}개 건너뜀",
-        "skippedSuffix_other": ""
+        "skippedSuffix_one": " · {{count}}개 건너뜀",
+        "skippedSuffix_other": " · {{count}}개 건너뜀"
       },
       "nav": {
         "goBack": "뒤로",
@@ -569,10 +794,43 @@
       "resizeBacklinksSidebar": "백링크 사이드바 크기 조절",
       "resizeNotesSidebar": "노트 사이드바 크기 조절",
       "rightPanel": {
-        "allHidden": "",
+        "aiChat": {
+          "askPlaceholder": "노트에 대해 질문하세요…",
+          "askSubmit": "질문",
+          "assistant": "어시스턴트",
+          "citations": "출처",
+          "composerPlaceholder": "노트에 메시지 보내기…",
+          "empty": "AI 결과(요약, 답변, 제안)가 여기에 표시됩니다.",
+          "error": "AI 요청을 완료하지 못했습니다.",
+          "errorTurn": "어시스턴트가 답변하지 못했습니다.",
+          "gettingReadyHint": "AI를 위해 노트를 준비하는 중 — 잠시만 기다려 주세요.",
+          "insert": "노트에 삽입",
+          "noAnswer": "답변이 없습니다 — 다르게 표현해 보세요.",
+          "noModelHint": "선택된 모델이 없습니다. 시작하려면 설정 → 실험실 → AI에서 하나를 선택하세요.",
+          "offHint": "로컬 AI가 꺼져 있습니다. 설정 → 실험실 → AI에서 켜세요.",
+          "send": "보내기",
+          "statusGettingReady": "준비 중…",
+          "statusNoModel": "모델 없음",
+          "statusOff": "꺼짐",
+          "statusReady": "준비됨",
+          "stop": "중지",
+          "tagsThinking": "태그 제안 중…",
+          "thinking": "AI가 생각 중…",
+          "truncated": "처음 {{count}}자를 요약했습니다.",
+          "you": "나"
+        },
+        "allHidden": "모든 탭이 숨겨졌습니다 — 마우스 오른쪽 버튼으로 복원하세요.",
         "outline": {
-          "empty": "",
-          "heading": ""
+          "collapse": "섹션 접기",
+          "empty": "제목 없음",
+          "expand": "섹션 펼치기",
+          "heading": "개요"
+        },
+        "tabs": {
+          "aiChat": "AI 채팅",
+          "backlinks": "백링크",
+          "outline": "개요",
+          "unlinked": "연결되지 않은 언급"
         }
       },
       "sidebarToggle": {
@@ -641,6 +899,8 @@
       "rendering": "다이어그램을 렌더링하는 중…"
     },
     "slash": {
+      "aiContinue": "이어서 쓰기 (AI)",
+      "aiTitle": "제목 제안 (AI)",
       "attachFile": "파일 첨부",
       "bulletList": "글머리 기호 목록",
       "callout": "콜아웃",
@@ -682,6 +942,21 @@
     },
     "toolbar": {
       "apply": "적용",
+      "exportImageTitle": "선택 영역을 이미지로 내보내기",
+      "customize": {
+        "bold": "굵게",
+        "bulletList": "글머리 기호 목록",
+        "checklist": "체크리스트",
+        "code": "코드",
+        "heading": "제목",
+        "highlight": "형광펜",
+        "italic": "기울임",
+        "link": "링크",
+        "numberedList": "번호 매기기 목록",
+        "quote": "인용",
+        "strike": "취소선",
+        "wikilink": "위키링크"
+      },
       "heading": {
         "h1": "H1",
         "h2": "H2",
@@ -729,12 +1004,15 @@
       },
       "convert": {
         "cancel": "취소",
+        "choiceClause_one": " · {{count}}개는 선택이 필요합니다.",
         "choiceClause_other": " · {{count}}개는 선택이 필요합니다.",
         "chooseTarget": "대상 선택…",
         "convert": "변환",
+        "convertedToast_one": "위키링크 {{count}}개 변환됨",
         "convertedToast_other": "위키링크 {{count}}개 변환됨",
         "noneToConvert": "이 노트에 변환할 가져온 위키링크가 없습니다.",
         "nothingToConvert": "변환할 항목이 없습니다 — 확인된 가져온 위키링크가 없습니다.",
+        "rewriteCount_one": "링크 {{count}}개가 다시 작성됩니다",
         "rewriteCount_other": "링크 {{count}}개가 다시 작성됩니다",
         "skipped": "건너뜀 — {{reason}}",
         "title": "이 노트에서 가져온 위키링크 변환"
@@ -742,6 +1020,126 @@
       "convertCore": {
         "noMatch": "일치 항목 없음"
       }
+    },
+    "flow": {
+      "loadFailed": "노트를 불러오지 못했습니다.",
+      "openFailed": "이 노트를 열지 못했습니다.",
+      "saveFailed": "이 노트를 저장하지 못했습니다.",
+      "moveFailed": "이 노트를 이동하지 못했습니다.",
+      "openTodayFailed": "오늘의 노트를 열지 못했습니다.",
+      "exportFailed": "이 노트를 내보내지 못했습니다.",
+      "attachNeedsApp": "첨부 파일은 앱이 필요합니다 (브라우저 미리보기가 아님).",
+      "attachTooLarge": "파일이 너무 큽니다 (최대 64MB).",
+      "attachUnsupported": "이미지와 PDF만 첨부할 수 있습니다.",
+      "attachFailed": "그 파일을 첨부하지 못했습니다.",
+      "archiveFailed": "이 노트를 보관하지 못했습니다.",
+      "trashFailed": "이 노트를 휴지통으로 이동하지 못했습니다."
+    },
+    "nav": {
+      "dailyNote": "일일 노트",
+      "openToday": "오늘 열기",
+      "allNotes": "모든 노트"
+    },
+    "list": {
+      "searchPlaceholder": "노트 검색",
+      "clearSearch": "검색 지우기",
+      "viewNoteCount_one": "“{{name}}”에 노트 {{count}}개",
+      "viewNoteCount_other": "“{{name}}”에 노트 {{count}}개",
+      "edit": "편집",
+      "trashEmpty": "휴지통이 비어 있습니다",
+      "archiveEmpty": "보관된 노트가 없습니다",
+      "noMatchingNotes": "일치하는 노트가 없습니다",
+      "noNotesYet": "아직 노트가 없습니다",
+      "noMatchBody": "“{{name}}”과(와) 일치하는 항목이 없습니다. 뷰를 편집하거나 지워서 모든 노트를 보세요.",
+      "emptyBody": "“새 노트”를 눌러 첫 노트를 작성하세요. 모든 것은 저장되기 전에 이 기기에서 암호화됩니다.",
+      "unarchive": "보관 해제"
+    },
+    "filterSheet": {
+      "title": "필터",
+      "status": "상태"
+    },
+    "sortSheet": {
+      "title": "정렬",
+      "manual": "수동 정렬",
+      "titleAsc": "제목 · A → Z",
+      "titleDesc": "제목 · Z → A"
+    },
+    "noteMenu": {
+      "emptyNote": "빈 노트",
+      "wordCount_one": "{{count}}단어 · 읽기 {{minutes}}분",
+      "wordCount_other": "{{count}}단어 · 읽기 {{minutes}}분",
+      "moveToFolder": "폴더로 이동…",
+      "moveToTrash": "휴지통으로 이동",
+      "copied": "복사됨 ✓",
+      "copyToClipboard": "클립보드에 복사",
+      "versionHistory": "버전 기록"
+    },
+    "purge": {
+      "body": "이 작업은 이 기기에서 노트를 완전히 제거합니다. 되돌릴 수 없습니다."
+    },
+    "move": {
+      "title": "폴더로 이동",
+      "body": "폴더 경로를 입력하세요 (예: Projects/Myne). 볼트 루트로 하려면 비워 두세요.",
+      "placeholder": "Projects/Myne",
+      "confirm": "이동"
+    },
+    "sidebar": {
+      "browse": "찾아보기"
+    },
+    "emptyDetail": {
+      "title": "노트 선택",
+      "body": "목록에서 노트를 선택하거나 새 노트를 시작하세요."
+    },
+    "readingBar": {
+      "editNote": "노트 편집",
+      "edit": "편집"
+    },
+    "graphTab": {
+      "linkedNotes_one": "연결된 노트 {{count}}개",
+      "linkedNotes_other": "연결된 노트 {{count}}개",
+      "links_one": "링크 {{count}}개",
+      "links_other": "링크 {{count}}개"
+    },
+    "formatBar": {
+      "redo": "다시 실행",
+      "attachFile": "새 파일 첨부",
+      "insertFromLibrary": "라이브러리에서 삽입",
+      "recordVoiceNote": "음성 노트 녹음",
+      "showLivePreview": "실시간 미리보기 표시",
+      "showRawMarkdown": "원본 Markdown 표시",
+      "hideKeyboard": "키보드 숨기기"
+    },
+    "topBar": {
+      "backToNotes": "노트로 돌아가기",
+      "noteDetails": "노트 세부 정보",
+      "noteActions": "노트 작업"
+    },
+    "noteContext": {
+      "collapsePanel": "패널 접기",
+      "unlinkedCount_one": "연결되지 않은 언급 {{count}}",
+      "unlinkedCount_other": "연결되지 않은 언급 {{count}}"
+    },
+    "viewsSheet": {
+      "typeCards": "카드",
+      "typeList": "목록",
+      "emptyState": "아직 저장된 뷰가 없습니다. 태그, 폴더 또는 텍스트로 노트를 필터링하려면 하나를 만드세요.",
+      "editView": "뷰 편집"
+    },
+    "sheet": {
+      "done": "완료"
+    },
+    "vaultSwitcher": {
+      "title": "볼트"
+    },
+    "tagBrowser": {
+      "noTagsMatch": "일치하는 태그가 없습니다.",
+      "notesCount_one": "노트 · {{count}}",
+      "notesCount_other": "노트 · {{count}}"
+    },
+    "untitledNote": "제목 없는 노트",
+    "commandPalette": {
+      "searchPlaceholder": "노트를 검색하거나 명령을 실행하세요…",
+      "noMatches": "일치하는 명령이나 노트가 없습니다."
     }
   },
   "export": {
@@ -772,7 +1170,9 @@
       "flow": {
         "couldNotRead": "이 노트를 읽을 수 없습니다.",
         "exportedTo": "{{filename}}(으)로 내보냄",
+        "exportedToWithAttachments_one": "{{filename}} + 첨부 파일 {{count}}개로 내보냄",
         "exportedToWithAttachments_other": "{{filename}} + 첨부 파일 {{count}}개로 내보냄",
+        "exportedToWithImages_one": "{{filename}} + 이미지 {{count}}개로 내보냄",
         "exportedToWithImages_other": "{{filename}} + 이미지 {{count}}개로 내보냄",
         "filterHtml": "HTML",
         "filterMarkdown": "Markdown",
@@ -783,6 +1183,7 @@
       "modal": {
         "cancel": "취소",
         "export": "내보내기…",
+        "includeAttachments_one": "첨부 파일 {{count}}개 포함",
         "includeAttachments_other": "첨부 파일 {{count}}개 포함",
         "title": "Markdown으로 내보내기"
       }
@@ -810,11 +1211,16 @@
         "vaultNotFound": "내보낼 보관함을 찾을 수 없습니다."
       },
       "flow": {
+        "countAttachments_one": "첨부 파일 {{count}}개",
         "countAttachments_other": "첨부 파일 {{count}}개",
+        "countFolders_one": "폴더 {{count}}개",
         "countFolders_other": "폴더 {{count}}개",
+        "countNotes_one": "노트 {{count}}개",
         "countNotes_other": "노트 {{count}}개",
         "exclusionsHistory": "버전 기록은 포함되지 않습니다.",
+        "exclusionsTrashed_one": "휴지통에 있는 노트 {{count}}개는 포함되지 않습니다.",
         "exclusionsTrashed_other": "휴지통의 노트 {{count}}개는 포함되지 않습니다.",
+        "exclusionsTrashedAndHistory_one": "휴지통에 있는 노트 {{count}}개와 버전 기록은 포함되지 않습니다.",
         "exclusionsTrashedAndHistory_other": "휴지통의 노트 {{count}}개와 버전 기록은 포함되지 않습니다.",
         "phaseAttachments": "첨부 파일",
         "phaseNotes": "노트",
@@ -872,12 +1278,18 @@
   },
   "notes": {
     "archive": {
+      "cancel": "취소",
       "close": "닫기",
+      "count_one": "노트 {{count}}개",
       "count_other": "노트 {{count}}개",
       "countEmpty": "비어 있음",
       "delete": "삭제",
       "deleteError": "해당 노트를 삭제하지 못했습니다. 다시 시도하세요.",
       "emptyState": "보관함이 비어 있습니다.",
+      "folderDeleteConfirm_one": "노트 {{count}}개를 휴지통으로 이동할까요?",
+      "folderDeleteConfirm_other": "노트 {{count}}개를 휴지통으로 이동할까요?",
+      "folderDeleteConfirmCta": "휴지통으로 이동",
+      "folderDeleteError": "그 폴더의 노트를 휴지통으로 이동하지 못했습니다. 다시 시도하세요.",
       "restore": "복원",
       "restoreError": "해당 노트를 복원하지 못했습니다. 다시 시도하세요.",
       "title": "아카이브",
@@ -927,6 +1339,7 @@
         "isNot": "아님"
       },
       "noConditions": "아직 조건이 없습니다 — 이 뷰는 모든 페이지를 표시합니다.",
+      "noteCount_one": "노트 {{count}}개",
       "noteCount_other": "노트 {{count}}개",
       "of": "다음 조건:",
       "ofTheGroups": "다음 그룹 중:",
@@ -980,7 +1393,8 @@
       "modal": {
         "cancel": "취소",
         "cancelledNotImported": "{{count}}개 가져오지 않음",
-        "cancelledNotImported_other": "",
+        "cancelledNotImported_one": "{{count}}개 가져오지 않음",
+        "cancelledNotImported_other": "{{count}}개 가져오지 않음",
         "cancelling": "취소하는 중…",
         "chooseFolder": "폴더 선택…",
         "close": "닫기",
@@ -993,6 +1407,7 @@
         "flagKindFolder": "폴더",
         "flagKindTitle": "제목",
         "folderPickerTitle": "Obsidian 보관함 폴더를 선택하세요",
+        "hiddenIgnoredPrefix_one": "구성/숨김 항목 {{count}}개 무시됨 (예: ",
         "hiddenIgnoredPrefix_other": "구성/숨김 항목 {{count}}개 무시됨(예: ",
         "hiddenIgnoredSuffix": ", 점 파일).",
         "ifNoteExistsLabel": "노트가 이미 있는 경우",
@@ -1002,12 +1417,15 @@
         "markDone": "완료로 표시",
         "markedDone": "완료로 표시됨",
         "mediaImported": "{{count}}개 가져옴",
-        "mediaImported_other": "",
+        "mediaImported_one": "{{count}}개 가져옴",
+        "mediaImported_other": "{{count}}개 가져옴",
         "mediaOmittedSuffix": " · {{count}}개 생략됨",
-        "mediaOmittedSuffix_other": "",
+        "mediaOmittedSuffix_one": " · {{count}}개 생략됨",
+        "mediaOmittedSuffix_other": " · {{count}}개 생략됨",
         "needsAttention": "확인 필요",
         "needsAttentionHelp": "이 노트들은 변경 없이 가져왔습니다. 제안된 수정은 시작점일 뿐이니, 하나를 복사한 후 노트를 열어 이름을 바꾸세요.",
         "noFolderChosen": "선택한 폴더 없음",
+        "notesImported_one": "노트 가져옴",
         "notesImported_other": "개 노트 가져옴",
         "policyCopyHint": "기존 노트와 함께 가져옵니다.",
         "policyCopyLabel": "사본으로 가져오기",
@@ -1047,21 +1465,26 @@
       "addToFavorites": "즐겨찾기에 추가",
       "archive": "보관",
       "archiveBulkError": "노트를 보관하지 못했습니다.",
+      "archiveFolder": "폴더 보관",
       "archiveNote": "보관",
       "archiveSingleError": "노트를 보관하지 못했습니다.",
       "attachments": "첨부 파일",
       "bulkArchive": "노트 {{count}}개 보관",
-      "bulkArchive_other": "",
+      "bulkArchive_one": "노트 {{count}}개 보관",
+      "bulkArchive_other": "노트 {{count}}개 보관",
       "bulkDelete": "노트 {{count}}개 삭제",
-      "bulkDelete_other": "",
+      "bulkDelete_one": "노트 {{count}}개 삭제",
+      "bulkDelete_other": "노트 {{count}}개 삭제",
       "bulkMove": "노트 {{count}}개 이동…",
-      "bulkMove_other": "",
+      "bulkMove_one": "노트 {{count}}개를 이동…",
+      "bulkMove_other": "노트 {{count}}개를 이동…",
       "caseMergeBody": "“{{name}}”(이)라는 폴더가 이미 있습니다. 병합됩니다 — 따로 유지하려면 하나의 이름을 바꿀까요?",
       "color": "색상…",
       "createFirstNote": "+ 첫 노트 만들기",
       "createFolderNote": "폴더 노트 만들기",
       "customize": "사용자 지정…",
       "delete": "삭제",
+      "deleteFolderBody_one": "“{{name}}”과(와) 그 안의 노트 {{count}}개",
       "deleteFolderBody_other": "“{{name}}”와(과) 그 안의 노트 {{count}}개",
       "deleteFolderConfirm": "폴더 삭제",
       "deleteFolderTitle": "이 폴더를 삭제할까요?",
@@ -1087,6 +1510,7 @@
       "newViewTitle": "새 뷰",
       "noteMovedToTrash": "노트를 휴지통으로 이동함",
       "notesHeading": "노트",
+      "notesMovedToTrash_one": "노트 {{count}}개를 휴지통으로 이동함",
       "notesMovedToTrash_other": "노트 {{count}}개를 휴지통으로 이동함",
       "openArchive": "아카이브 열기",
       "openAttachments": "첨부 파일 열기",
@@ -1094,13 +1518,18 @@
       "openInNewTab": "새 탭에서 열기",
       "openToSide": "옆에서 열기",
       "openTrash": "휴지통 열기",
-      "removeAsFolderNote": "폴더 노트에서 해제",
-      "removeFolderNote": "",
+      "removeFolderNote": "폴더 노트 제거",
       "removeFromFavorites": "즐겨찾기에서 제거",
       "rename": "이름 바꾸기",
       "setAsFolderNote": "폴더 노트로 설정",
       "trash": "휴지통으로 이동",
       "trashBulkError": "노트를 휴지통으로 이동하지 못했습니다.",
+      "trashConfirmBulkBody_one": "노트 {{count}}개가 휴지통으로 이동됩니다.",
+      "trashConfirmBulkBody_other": "노트 {{count}}개가 휴지통으로 이동됩니다.",
+      "trashConfirmBulkWarning": "나중에 휴지통에서 복원할 수 있습니다.",
+      "trashConfirmConfirm": "휴지통으로 이동",
+      "trashConfirmTitle": "휴지통으로 이동할까요?",
+      "trashConfirmWarning": "나중에 휴지통에서 복원할 수 있습니다.",
       "trashSingleError": "노트를 휴지통으로 이동하지 못했습니다.",
       "undo": "실행 취소",
       "vaultRoot": "보관함 루트",
@@ -1174,6 +1603,7 @@
     },
     "snapshots": {
       "cancel": "취소",
+      "changeCount_one": "이 스냅샷 이후 변경 {{count}}건",
       "changeCount_other": "이 스냅샷 이후 변경 {{count}}건",
       "close": "닫기",
       "confirmBody": "현재 노트가 먼저 스냅샷으로 저장되므로 이 작업을 되돌릴 수 있습니다.",
@@ -1218,6 +1648,7 @@
       "noNotesForFilter": "이 필터에 해당하는 노트가 없습니다.",
       "noTagsMatch": "“{{query}}”와(과) 일치하는 태그가 없습니다.",
       "noTagsYet": "아직 태그가 없습니다.",
+      "noteCount_one": "노트 {{count}}개",
       "noteCount_other": "노트 {{count}}개",
       "notes": "노트",
       "pickTag": "필터링할 태그를 선택하세요.",
@@ -1230,14 +1661,17 @@
     },
     "trash": {
       "close": "닫기",
+      "count_one": "노트 {{count}}개",
       "count_other": "노트 {{count}}개",
       "countEmpty": "비어 있음",
       "delete": "삭제",
       "deleteError": "해당 노트를 삭제하지 못했습니다. 다시 시도하세요.",
       "empty": "휴지통 비우기",
+      "emptyConfirmBody_one": "노트 {{count}}개가 영구적으로 삭제됩니다.",
       "emptyConfirmBody_other": "노트 {{count}}개가 영구적으로 삭제됩니다.",
       "emptyConfirmCta": "휴지통 비우기",
       "emptyConfirmTitle": "휴지통을 비울까요?",
+      "emptyPartialFailure_one": "노트 {{count}}개를 삭제하지 못해 휴지통에 남아 있습니다.",
       "emptyPartialFailure_other": "노트 {{count}}개를 삭제하지 못해 휴지통에 남아 있습니다.",
       "emptyState": "휴지통이 비어 있습니다.",
       "purgeConfirmCta": "영구 삭제",
@@ -1339,7 +1773,26 @@
       "operationInProgress": "작업이 진행 중입니다. 잠시 기다려 주세요.",
       "unexpected": "예기치 않은 오류입니다. 다시 시도하세요.",
       "vaultNotFound": "보관함 파일을 찾을 수 없습니다. 앱을 다시 시작하세요."
-    }
+    },
+    "vaultUnreadable": "볼트 파일을 읽을 수 없습니다. 백업에서 복원하세요.",
+    "genericError": "문제가 발생했습니다. 다시 시도하세요.",
+    "weakPassword": "비밀번호는 최소 {{min}}자 이상이어야 합니다.",
+    "setPasswordError": "새 비밀번호를 설정하지 못했습니다. 다시 시도하세요.",
+    "passwordMismatch": "비밀번호가 일치하지 않습니다.",
+    "decryptingSubtitle": "Argon2id로 볼트 키를 다시 생성하는 중입니다. 몇 초 정도 걸립니다.",
+    "restoreVaultHeader": "볼트 복원",
+    "accountTitle": "계정 번호를 입력하세요",
+    "accountLead": "복구 문구를 저장한 곳에서 찾을 수 있습니다. 이것으로 복원할 볼트를 식별합니다.",
+    "accountInvalid": "잘못된 계정 번호입니다 — 확인 후 다시 입력하세요.",
+    "accountOptionalHint": "없으신가요? 비워 두고 계속하세요 — 24단어 복구 문구만 있으면 됩니다.",
+    "paste": "붙여넣기",
+    "phraseGridHint": "각 단어를 입력하거나 24개를 한 번에 붙여넣어 격자를 채우세요.",
+    "submitProgress": "제출 · {{total}}개 중 {{filled}}개",
+    "newPasswordTitle": "새 비밀번호 선택",
+    "newPasswordLead": "복구 문구는 그대로 유지됩니다. 이것은 이 기기의 비밀번호를 설정합니다.",
+    "confirmPasswordLabel": "비밀번호 확인",
+    "passwordHelper": "저장되지도 전송되지도 않습니다. 이 기기에서 키를 암호화합니다.",
+    "encryptingSubtitle": "새 비밀번호로 볼트 키를 감싸는 중입니다."
   },
   "restore": {
     "backLabel": "뒤로",
@@ -1367,6 +1820,7 @@
       "collidedNote": "이 보관함의 이전 사본이 아직 보관함 목록에 있습니다. 복원된 보관함이 열리는 것을 확인한 후, 목록에서 이전 보관함을 제거할 수 있습니다(제거 시 DELETE를 입력하라고 요청합니다).",
       "notes": "노트: {{n}}개",
       "openVaultList": "보관함 목록 열기",
+      "partialHeader_one": "부분적으로 복원됨 — 항목 {{count}}개를 읽지 못했습니다.",
       "partialHeader_other": "부분적으로 복원됨 — 항목 {{count}}개를 읽을 수 없었습니다.",
       "restored": "보관함이 복원되었습니다.",
       "versionHistory": "버전 기록 항목: {{n}}개"
@@ -1391,7 +1845,9 @@
       "licenseLabel": "라이선스",
       "tagline": "프리알파 · 1단계 데스크톱 클라이언트",
       "threatModelHelper": "공개 위협 모델 문서를 브라우저에서 엽니다.",
-      "threatModelLabel": "위협 모델"
+      "threatModelLabel": "위협 모델",
+      "version": "버전",
+      "dev": "개발"
     },
     "account": {
       "argon2idHeading": "Argon2id 매개변수",
@@ -1414,7 +1870,21 @@
       "vaultLabelEyebrow": "보관함 레이블",
       "vaultLabelHelper": "앱 내 전환기에 표시되는 이 보관함의 이름입니다. 보관함 내부에 암호화되어 저장되며, 평문으로는 기기를 떠나지 않습니다.",
       "vaultLabelPlaceholder": "레이블 추가…",
-      "vaultLabelSave": "저장"
+      "vaultLabelSave": "저장",
+      "vaultIconLabel": "아이콘",
+      "vaultIconDefault": "기본값 (워드마크)",
+      "renamedToast": "볼트 이름이 변경됨",
+      "renameError": "볼트 이름을 변경하지 못했습니다",
+      "newPasswordMismatch": "새 비밀번호가 일치하지 않습니다.",
+      "samePassword": "새 비밀번호가 현재 비밀번호와 같습니다.",
+      "passwordChangedToast": "비밀번호가 변경됨",
+      "vaultUnreadable": "볼트 파일을 읽을 수 없습니다. 백업에서 복원하세요.",
+      "genericChangeError": "문제가 발생했습니다. 다시 시도하세요.",
+      "renameHelper": "볼트 전환기에 표시됩니다. 이 볼트 안에 암호화되어 저장됩니다; 지우려면 비워 두세요.",
+      "newPasswordPlaceholder": "최소 12자",
+      "reenterNewPassword": "새 비밀번호 다시 입력",
+      "changePasswordFootnote": "이 작업은 빠른 잠금 해제를 무효화합니다. 복구 문구는 변경되지 않습니다.",
+      "changing": "변경 중…"
     },
     "appearance": {
       "showEditTimesAria": "사이드바에 편집 시간 표시",
@@ -1430,7 +1900,13 @@
       "themeLabel": "테마",
       "themeOptionAria": "{{label}} 테마",
       "themeSaveError": "테마를 저장하지 못했습니다. 다시 시도하세요.",
-      "timestampsSaveError": "설정을 저장하지 못했습니다. 다시 시도하세요."
+      "timestampsSaveError": "설정을 저장하지 못했습니다. 다시 시도하세요.",
+      "sizeS": "S",
+      "sizeM": "M",
+      "sizeL": "L",
+      "sizeXL": "XL",
+      "editorFont": "편집기 글꼴",
+      "showEditTimesSubtitle": "각 노트 아래에 타임스탬프 표시"
     },
     "archive": {
       "helper": "노트를 아카이브로 옮겨 기본 목록에서 보이지 않게 합니다. 이 설정을 끄면 보관된 모든 노트가 원래 폴더로 복원되고 아카이브 컨트롤이 숨겨집니다.",
@@ -1479,14 +1955,22 @@
       },
       "when": {
         "bare": "연결됨",
+        "daysAgo_one": "{{count}}일 전에 연결됨",
         "daysAgo_other": "{{count}}일 전 연결됨",
         "hoursAgo": "{{count}}시간 전 연결됨",
-        "hoursAgo_other": "",
+        "hoursAgo_one": "{{count}}시간 전에 연결됨",
+        "hoursAgo_other": "{{count}}시간 전에 연결됨",
         "justNow": "방금 연결됨",
         "minutesAgo": "{{count}}분 전 연결됨",
-        "minutesAgo_other": "",
+        "minutesAgo_one": "{{count}}분 전에 연결됨",
+        "minutesAgo_other": "{{count}}분 전에 연결됨",
         "onDate": "{{date}}에 연결됨"
       }
+    },
+    "clipperInstall": {
+      "error": "브라우저 클리퍼 설정을 업데이트하지 못했습니다.",
+      "helper": "Myne 브라우저 확장 프로그램이 이 앱으로 클립을 보낼 수 있도록 네이티브 메시징 호스트를 등록합니다. 기본적으로 켜져 있으며, 제거하려면 끄세요.",
+      "label": "브라우저 클리퍼"
     },
     "customThemes": {
       "appliedBadge": "적용됨",
@@ -1541,36 +2025,40 @@
       "heading": "보관함 삭제",
       "ioFailBody": "삭제할 보관함 파일에 접근하지 못했습니다. 보관함 키는 이미 메모리에서 0으로 지워졌으며, 디스크에 남는 보관함 데이터는 복구 불가능한 Argon2id로 감싸진 쓰레기 데이터입니다.",
       "ioFailTitle": "삭제 중 디스크 오류",
+      "partialFailBody_one": "파일 {{count}}개를 디스크에서 삭제하지 못했습니다. 볼트 키는 이미 메모리에서 0으로 지워졌으므로, 남아 있는 고아 암호문은 복구할 수 없는 Argon2id로 감싼 쓰레기입니다.",
       "partialFailBody_other": "파일 {{count}}개를 디스크에서 삭제하지 못했습니다. 보관함 키는 이미 메모리에서 0으로 지워졌으므로, 남는 고아 암호문이 있더라도 복구 불가능한 Argon2id로 감싸진 쓰레기 데이터입니다.",
       "partialFailTitle": "보관함 삭제가 일부 실패함",
       "submit": "보관함 삭제",
       "submitInFlight": "보관함을 삭제하는 중…",
       "typeToConfirmLabel": "확인하려면 DELETE를 입력하세요",
-      "vaultPath": "보관함 경로: {{path}}"
+      "vaultPath": "보관함 경로: {{path}}",
+      "deleteError": "볼트를 완전히 삭제하지 못했습니다. 다시 시도하세요.",
+      "warning": "이 작업은 이 볼트와 그 안의 모든 노트를 이 기기에서 영구적으로 삭제합니다. 되돌릴 수 없습니다.",
+      "deleteButton": "이 볼트 삭제"
     },
     "files": {
       "newNote": {
-        "folderLabel": "",
-        "folderPlaceholder": "",
-        "helper": "",
-        "label": "",
-        "optionCurrent": "",
-        "optionRoot": "",
-        "optionSpecific": "",
-        "saveError": ""
+        "folderLabel": "새 노트용 폴더",
+        "folderPlaceholder": "예: Inbox/",
+        "helper": "새로 만든 노트가 저장되는 위치입니다.",
+        "label": "새 노트의 기본 위치",
+        "optionCurrent": "현재 노트와 같은 폴더",
+        "optionRoot": "볼트 폴더",
+        "optionSpecific": "아래에 지정한 폴더",
+        "saveError": "새 노트 위치를 저장하지 못했습니다."
       },
       "startup": {
-        "helper": "",
-        "label": "",
-        "noteLabel": "",
-        "notePlaceholder": "",
-        "optionEmpty": "",
-        "optionLast": "",
-        "optionSpecific": "",
-        "saveError": "",
-        "searchEmpty": "",
-        "searchPlaceholder": "",
-        "untitledNote": ""
+        "helper": "앱이 시작될 때 열 파일을 선택하세요.",
+        "label": "열 기본 파일",
+        "noteLabel": "시작 시 열 노트",
+        "notePlaceholder": "노트 선택…",
+        "optionEmpty": "새 노트",
+        "optionLast": "마지막으로 연 항목",
+        "optionSpecific": "특정 노트",
+        "saveError": "시작 설정을 저장하지 못했습니다.",
+        "searchEmpty": "노트를 찾을 수 없습니다.",
+        "searchPlaceholder": "노트 검색…",
+        "untitledNote": "제목 없음"
       }
     },
     "focusMode": {
@@ -1621,6 +2109,37 @@
       "off": "끔",
       "on": "켬"
     },
+    "toolbarCustomize": {
+      "errorSave": "도구 모음 레이아웃을 저장하지 못했습니다.",
+      "helper": "선택 도구 모음에 표시할 서식 버튼과 그 순서를 선택하세요.",
+      "label": "도구 모음 버튼",
+      "moveDown": "아래로 이동",
+      "moveUp": "위로 이동",
+      "pendingHint": "곧 제공 예정"
+    },
+    "ai": {
+      "betaBadge": "베타",
+      "disclosureToggle": "어떻게 작동하나요?",
+      "enableHelper": "사용자가 제공한 모델을 전적으로 기기에서 실행합니다. 실험적이며 기본적으로 꺼져 있습니다.",
+      "enableLabel": "로컬 AI 사용",
+      "excludedHelper": "이 폴더에 있는 노트는 AI가 읽거나 색인하지 않습니다. 한 줄에 폴더 경로 하나씩 입력하세요.",
+      "excludedLabel": "제외된 폴더",
+      "excludedPlaceholder": "Private/\nJournal/",
+      "modelChoose": "파일 선택…",
+      "modelEmbeddingLabel": "검색 모델 — 의미 기반 검색 및 Q&A",
+      "modelFilter": {
+        "gguf": "GGUF 모델",
+        "safetensors": "Safetensors 모델"
+      },
+      "modelGenerationLabel": "텍스트 모델 — 채팅, 요약, 작성",
+      "modelNone": "선택된 파일 없음",
+      "modelSaveFailed": "모델 경로를 저장하지 못했습니다 (볼트 밖에 있어야 합니다).",
+      "modelsHelper": "Myne는 모델을 다운로드하지 않습니다 — 그렇게 하면 네트워크로 데이터를 보내게 됩니다. 브라우저에서 링크를 열어 모델을 받은 다음, 다운로드한 파일을 여기서 선택하세요. 모든 것은 기기에서 실행됩니다.",
+      "modelsLabel": "모델",
+      "recommendedFilesEmbedding": "한 폴더에 model.safetensors + config.json + tokenizer.json이 필요합니다.",
+      "recommendedFilesGeneration": "같은 폴더에 .gguf 파일 + tokenizer.json이 필요합니다.",
+      "title": "AI"
+    },
     "prefs": {
       "saveError": "설정을 저장하지 못했습니다 — 다시 시도하세요"
     },
@@ -1629,9 +2148,20 @@
       "autoLockLabel": "자동 잠금",
       "autoLockSearchEmpty": "일치하는 시간이 없습니다.",
       "autoLockSearchPlaceholder": "시간 검색…",
+      "realtimeSyncHelper": "다른 기기의 변경 사항은 내용 없는 신호를 통해 몇 초 내에 도착합니다 — 서버는 오직 “무언가 바뀌었다”만 전달하고, 무엇이 바뀌었는지는 절대 전달하지 않습니다. 볼트가 잠금 해제된 동안 앱은 어차피 정기적으로 서버를 확인하므로, 이 기능은 의미 있는 노출을 추가하지 않습니다; 설정할 것은 없습니다.",
+      "realtimeSyncLabel": "실시간 동기화",
       "screenCaptureHelperOff": "보호는 잠금 해제 전에는 항상 적용됩니다. 잠금 해제 후에는 이 설정을 따릅니다.",
       "screenCaptureHelperOn": "macOS 및 Windows 10(2020년 5월 업데이트 이상)에서 작동합니다. Linux 지원은 향후 출시 예정입니다.",
-      "screenCaptureLabel": "화면 캡처 방지"
+      "screenCaptureLabel": "화면 캡처 방지",
+      "screenCaptureSubtitle": "스크린샷 및 화면 녹화 차단",
+      "autoLockAfter": "자동 잠금 시간",
+      "autoLock1m": "1분",
+      "autoLock5m": "5분",
+      "autoLock15m": "15분",
+      "autoLock30m": "30분",
+      "autoLock1h": "1시간",
+      "quickUnlockSubtitleAndroid": "자동 잠금 후 PIN으로 다시 진입",
+      "quickUnlockSubtitle": "자동 잠금 후 {{method}} 또는 PIN으로 다시 진입"
     },
     "quickUnlock": {
       "errorCancelled": "취소되었습니다.",
@@ -1640,27 +2170,54 @@
       "errorNotUnlocked": "먼저 보관함을 잠금 해제하세요.",
       "errorPinNotDigits": "PIN은 숫자만 입력할 수 있습니다.",
       "errorPinTooShort": "PIN은 최소 {{count}}자리여야 합니다.",
-      "errorPinTooShort_other": "",
+      "errorPinTooShort_one": "PIN은 최소 {{count}}자리 이상이어야 합니다.",
+      "errorPinTooShort_other": "PIN은 최소 {{count}}자리 이상이어야 합니다.",
       "helperConfigured": "{{method}}(으)로 설정됨. 자동 잠금 후 다시 들어올 때 마스터 비밀번호를 건너뜁니다. 재시작 후에는 여전히 마스터 비밀번호가 필요합니다.",
       "helperNotConfigured": "자동 잠금 후 전체 마스터 비밀번호 대신 PIN 또는 Touch ID로 다시 들어옵니다. 암호화된 보관함에 대한 편의 기능이며, 재시작 후에는 여전히 마스터 비밀번호가 필요합니다.",
       "methodPin": "PIN",
       "methodTouchId": "Touch ID",
       "pinAriaLabel": "빠른 잠금 해제 PIN",
       "pinPlaceholder": "PIN({{count}}자리 이상)",
-      "pinPlaceholder_other": "",
+      "pinPlaceholder_one": "PIN (최소 {{count}}자리)",
+      "pinPlaceholder_other": "PIN (최소 {{count}}자리)",
       "setPin": "PIN 설정",
       "setupHelper": "Touch ID는 macOS 전용이며 현재 실험적 기능입니다(하드웨어 검증 대기 중). PIN은 어디에서나 작동합니다.",
       "title": "빠른 잠금 해제",
-      "useTouchId": "Touch ID 사용"
+      "useTouchId": "Touch ID 사용",
+      "pinTooShort": "PIN은 최소 6자리 이상이어야 합니다.",
+      "pinMismatch": "PIN이 일치하지 않습니다.",
+      "pinOnToast": "PIN 빠른 잠금 해제가 켜졌습니다",
+      "setupError": "빠른 잠금 해제를 설정하지 못했습니다.",
+      "turnedOffToast": "빠른 잠금 해제가 꺼졌습니다",
+      "turnOffError": "빠른 잠금 해제를 끄지 못했습니다",
+      "biometricOnToast": "{{method}} 빠른 잠금 해제가 켜졌습니다",
+      "biometricUnavailable": "{{method}}은(는) 이 기기에서 사용할 수 없습니다.",
+      "warningBanner": "편의를 위한 관문일 뿐입니다. 재시작 후에는 여전히 비밀번호가 필요합니다.",
+      "biometricToggleSubtitle": "자동 잠금 후 {{method}}(으)로 잠금 해제",
+      "pinOnLead": "PIN 빠른 잠금 해제가 ",
+      "pinOnEmphasis": "켜짐",
+      "pinOnRest": " 상태입니다. 볼트가 자동 잠금된 후에는 전체 비밀번호 대신 PIN으로 다시 진입할 수 있습니다 — 이 앱 세션에서만 가능합니다. 콜드 스타트에서는 항상 전체 비밀번호가 필요합니다.",
+      "turnOffPin": "PIN 끄기",
+      "pinSetupHelper": "자동 잠금 후 빠르게 다시 잠금 해제하려면 6자리 이상의 PIN을 설정하세요. PIN은 기기 로컬 키를 감쌉니다 — 이 기기를 절대 벗어나지 않으며 복구 문구에는 절대 접근하지 않습니다.",
+      "pinReplacesBiometric": " PIN을 설정하면 {{method}} 잠금 해제를 대체합니다.",
+      "pinPlaceholder6": "최소 6자리",
+      "confirmPin": "PIN 확인",
+      "reenterPin": "PIN 다시 입력",
+      "setupButton": "빠른 잠금 해제 설정"
     },
     "shell": {
       "closeLabel": "설정 닫기",
+      "groups": {
+        "labs": "실험실"
+      },
       "navLabel": "설정 패널",
       "panels": {
         "about": "정보",
         "account": "계정",
+        "ai": "AI",
         "appearance": "모양",
         "editor": "편집기",
+        "files": "파일",
         "hotkeys": "단축키",
         "privacy": "개인정보",
         "storage": "저장소",
@@ -1718,6 +2275,44 @@
       "optionLive": "실시간 미리보기",
       "optionReading": "읽기",
       "optionSource": "소스"
+    },
+    "strength": {
+      "weak": "약함",
+      "fair": "보통",
+      "good": "좋음",
+      "strong": "강함"
+    },
+    "sync": {
+      "summary": {
+        "notSetUp": "설정되지 않음",
+        "offline": "오프라인",
+        "conflicts_one": "충돌 {{count}}건",
+        "conflicts_other": "충돌 {{count}}건"
+      }
+    },
+    "data": {
+      "exported_one": "노트 {{count}}개 내보냄 → {{label}}",
+      "exported_other": "노트 {{count}}개 내보냄 → {{label}}",
+      "exportNeedsApp": "내보내기는 앱이 필요합니다 (브라우저 미리보기가 아님).",
+      "exportFailed": "볼트를 내보내지 못했습니다.",
+      "exportToMarkdown": "Markdown으로 내보내기",
+      "exportToMarkdownSubtitle": "모든 노트를 복호화하여 문서의 일반 폴더에 저장"
+    },
+    "saveSettingError": "그 설정을 저장하지 못했습니다",
+    "panelTitle": {
+      "privacy": "개인정보 및 보안",
+      "data": "데이터",
+      "vaultName": "볼트 이름",
+      "approveDevice": "기기 승인"
+    },
+    "done": "완료",
+    "sectionOptions": "옵션",
+    "footerTagline": "myne · 이 기기에서 암호화됨 · 오픈 소스",
+    "editor": {
+      "defaultView": "기본 보기",
+      "typewriter": "타자기 스크롤",
+      "typewriterSubtitle": "커서를 세로로 가운데에 유지",
+      "enableArchiving": "보관 사용"
     }
   },
   "sync": {
@@ -1740,12 +2335,17 @@
     "conflicts": {
       "discard": "버리기",
       "empty": "충돌 없음 — 기기 간 동기화가 완료되었습니다.",
+      "groupTitle_one": "{{original}}의 충돌 사본 {{count}}개",
       "groupTitle_other": "“{{original}}”의 충돌 사본 {{count}}개",
       "keepAsSeparate": "별도로 유지",
-      "untitled": "제목 없음 ({{hex}})"
+      "tookTheirsToast": "로컬 버전을 휴지통으로 이동했습니다.",
+      "tookTheirsUndo": "실행 취소",
+      "untitled": "제목 없음 ({{hex}})",
+      "useThisVersion": "이 버전 사용"
     },
     "devices": {
       "approve": "승인",
+      "awaitingApproval_one": "승인 대기 중인 기기 {{count}}대",
       "awaitingApproval_other": "승인 대기 중인 기기 {{count}}개",
       "loading": "불러오는 중…",
       "noDevices": "아직 동기화된 기기가 없습니다.",
@@ -1759,6 +2359,12 @@
       "thisDevice": "이 기기",
       "transportHint": "서버가 이전되었거나 인증서가 변경된 경우, 위의 “동기화 서버”에 서버 URL을 다시 입력하여 신뢰를 재설정하세요.",
       "unreachable": "동기화에 연결하지 못했습니다 ({{error}}).",
+      "verifyBody": "방금 승인한 기기에 같은 코드가 표시되는지 확인하세요. 일치하면 해당 기기가 계정에 있는 것입니다. 일치하지 않으면 기기를 제거하세요.",
+      "verifyMatch": "일치합니다",
+      "verifyMismatch": "일치하지 않습니다",
+      "verifyPending": "이 코드는 새 기기가 첫 동기화를 마치면 표시됩니다.",
+      "verifySyncing": "동기화 중…",
+      "verifyTitle": "새 기기 확인",
       "yourDevices": "내 기기"
     },
     "endpoint": {
@@ -1767,6 +2373,8 @@
       "connectedTls": "연결되었습니다. 다른 기기에서 이 지문이 일치하는지 확인하세요.",
       "connecting": "연결하는 중…",
       "fingerprintLabel": "서버 인증서 지문:",
+      "pinStatic": "Myne에 내장된 인증서로 검증되었습니다.",
+      "pinTofu": "첫 연결 시 고정되었습니다. 이 지문을 기기 간에 비교하세요.",
       "placeholder": "https://your-server.example   ·   http://127.0.0.1:8080",
       "unreachable": "해당 서버에 연결하지 못했습니다 — URL과 서버 실행 여부를 확인하세요."
     },
@@ -1793,14 +2401,23 @@
     "join": {
       "accountLabel": "계정 번호",
       "cancel": "취소",
+      "continue": "계속",
       "error": "이 기기를 추가하지 못했습니다. 서버 URL, 계정 번호, 비밀번호와 서버 연결 가능 여부를 확인하세요.",
       "help": "계정 번호와 비밀번호로 로그인하세요. 기존 기기가 승인하면 이 기기에 노트가 동기화됩니다. 복구 구문은 필요하지 않습니다.",
       "passwordLabel": "비밀번호",
+      "pinnedCompare": "이 기기가 서버의 인증서를 고정했습니다. 이 지문이 다른 기기에서 일치하는지 확인하세요.",
+      "pinnedTitle": "서버 인증서 고정됨",
       "serverLabel": "동기화 서버",
       "serverPlaceholder": "https://your-server.example",
+      "sasMatch": "일치합니다 — 계속",
+      "sasMismatch": "일치하지 않습니다 — 이 기기 제거",
       "submit": "기기 추가",
       "submitting": "추가하는 중…",
-      "title": "이 기기를 계정에 추가"
+      "title": "이 기기를 계정에 추가",
+      "verifyBody": "이 코드가 승인한 기기의 코드와 일치하는지 확인하세요.",
+      "verifyTitle": "이 기기 확인",
+      "waitingHint": "이 창을 열어 두세요 — 승인되면 다른 기기와 비교할 확인 코드가 여기에 표시됩니다.",
+      "waitingTitle": "승인 대기 중"
     },
     "panel": {
       "addDevice": {
@@ -1828,6 +2445,7 @@
     },
     "status": {
       "awaitingApproval": "승인 대기 중",
+      "conflicts_one": "검토할 충돌 {{count}}건",
       "conflicts_other": "검토할 충돌 {{count}}개",
       "error": "동기화 오류",
       "loading": "동기화 상태…",
@@ -1836,6 +2454,43 @@
       "synced": "동기화됨",
       "syncing": "동기화하는 중…",
       "syncNow": "지금 동기화"
+    },
+    "settings": {
+      "serverSection": "서버",
+      "serverNotSet": "설정되지 않음",
+      "statusLabel": "상태",
+      "hubHelp": "동기화는 여러 기기에서 노트를 최신 상태로 유지합니다. 모든 것은 전송되기 전에 이 기기에서 암호화됩니다 — 서버는 노트를 절대 볼 수 없습니다.",
+      "connectedTls": "TLS로 연결됨.",
+      "connectedLocal": "로컬 네트워크에서 연결됨.",
+      "connectError": "그 서버에 연결하지 못했습니다. 주소를 확인하고 다시 시도하세요.",
+      "serverAddressLabel": "서버 주소",
+      "serverAddressPlaceholder": "https://sync.example.com",
+      "fingerprintLabel": "인증서 지문",
+      "fingerprintCompare": "이미 신뢰하는 기기의 같은 화면과 비교하세요 — 반드시 일치해야 합니다.",
+      "pinStatic": "이 서버의 알려진 인증서로 검증되었습니다.",
+      "pinTofu": "첫 연결 시 고정되었습니다. 확인하려면 기기 간에 비교하세요.",
+      "enrollNotConfigured": "먼저 동기화 서버를 설정한 다음 이 기기를 추가하세요.",
+      "enrollTransport": "동기화 서버에 연결하지 못했습니다. 연결을 확인하고 다시 시도하세요.",
+      "accountNumberHint": "이 번호를 다시 확인하세요 — 올바르지 않아 보입니다.",
+      "passwordPlaceholder": "볼트 비밀번호",
+      "recoveryPhraseHint": "24개 단어를 입력하거나 붙여넣으세요. 붙여넣으면 셀이 순서대로 채워집니다.",
+      "verifyBody": "방금 승인한 기기에 같은 코드가 표시되는지 확인하세요. 일치하면 해당 기기가 계정에 있는 것입니다. 일치하지 않으면 기기를 제거하세요.",
+      "sasMismatch": "일치하지 않습니다",
+      "removeDeviceButton": "기기 제거",
+      "keepDevice": "유지",
+      "notEnrolledHelp": "이 기기는 아직 동기화하지 않습니다. 기기 목록을 보려면 이전 화면에서 추가하세요.",
+      "unauthenticated": "이 기기의 접근 권한이 취소되었습니다. 아마 다른 기기에서 제거되었을 것입니다.",
+      "transportError": "동기화 서버에 연결하지 못했습니다. 서버가 이동했거나 인증서가 변경된 경우, 동기화 서버 화면에서 다시 연결하세요.",
+      "retiredSelf": "이 기기는 다른 기기에서 제거되었습니다.",
+      "resetAndAddAgain": "재설정하고 다시 추가",
+      "noDevices": "아직 기기가 없습니다.",
+      "syncingHere": "여기서 동기화 중"
+    },
+    "banner": {
+      "conflictsNeedReview_one": "충돌 {{count}}건이 검토가 필요합니다",
+      "conflictsNeedReview_other": "충돌 {{count}}건이 검토가 필요합니다",
+      "catchingUp": "동기화를 따라잡는 중 — 노트는 안전합니다.",
+      "verifyDevices": "기기 확인"
     }
   },
   "templates": {
@@ -1852,7 +2507,14 @@
       "removeFromTemplates": "템플릿에서 제거",
       "removeRowLabel": "{{name}}을(를) 템플릿에서 제거(노트는 유지)",
       "title": "노트 템플릿"
-    }
+    },
+    "emptyBefore": "아직 템플릿이 없습니다. ",
+    "newAction": "새로 만들기",
+    "emptyAfter": " 버튼을 눌러 재사용 가능한 노트 템플릿을 만드세요 — 그런 다음 그것으로 노트를 시작하세요 (설정에서 하나를 일일 노트 템플릿으로 선택할 수 있습니다).",
+    "use": "사용",
+    "edit": "편집",
+    "deleteConfirm": "이 템플릿을 삭제할까요?",
+    "convertToNote": "노트로 변환"
   },
   "unlock": {
     "backToPicker": "다른 보관함 선택",
@@ -1886,7 +2548,34 @@
       "lockedDuringChange": "비밀번호 변경이 취소되었습니다: 보관함이 잠겼습니다.",
       "metaChangedExternally": "다른 세션에서 보관함이 변경되었습니다 — 다시 잠금 해제하세요."
     },
-    "title": "보관함을 잠금 해제하세요."
+    "title": "보관함을 잠금 해제하세요.",
+    "vaultUnreadable": "볼트 파일을 읽을 수 없습니다. 백업에서 복원하세요.",
+    "unlockFailedGeneric": "잠금을 해제하지 못했습니다. 다시 시도하세요.",
+    "biometricTooManyAttempts": "{{biometric}} 시도가 너무 많습니다. 비밀번호를 사용하세요.",
+    "pinIncorrect_one": "잘못된 PIN입니다. {{count}}번 남았습니다.",
+    "pinIncorrect_other": "잘못된 PIN입니다. {{count}}번 남았습니다.",
+    "pinTooManyAttempts": "PIN 시도가 너무 많습니다. 비밀번호를 사용하세요.",
+    "pinFailedGeneric": "PIN으로 잠금을 해제하지 못했습니다. 비밀번호를 사용하세요.",
+    "corruptedHeading": "볼트 파일을 읽을 수 없습니다",
+    "ioErrorHeading": "이 볼트를 읽을 수 없습니다",
+    "blockingTitle": "잠금 해제 중",
+    "blockingSubtitle": "이 기기에서 키를 복호화하는 중입니다.",
+    "eyebrow": "볼트 잠금 해제",
+    "vaultTitleFallback": "내 볼트",
+    "unlockWithBiometric": "{{biometric}}(으)로 잠금 해제",
+    "biometricFailed": "{{biometric}}이(가) 본인 확인에 실패했습니다",
+    "touchToUnlock": "터치하여 잠금 해제",
+    "lookToUnlock": "바라보아 잠금 해제",
+    "biometricRetryHint": "다시 시도하거나 비밀번호로 잠금을 해제하세요.",
+    "tryBiometricAgain": "{{biometric}} 다시 시도",
+    "usePasswordInstead": "대신 비밀번호 사용",
+    "useBiometricInstead": "대신 {{biometric}} 사용",
+    "unlockWithPinInstead": "대신 PIN으로 잠금 해제",
+    "useRecoveryPhrase": "복구 문구 사용",
+    "deleteConfirmTitle": "이 볼트를 삭제할까요?",
+    "deletePartialError": "일부 파일을 제거하지 못했습니다. 이 볼트는 더 이상 사용할 수 없습니다 — 계속하여 다시 시작하세요.",
+    "failClosedEyebrow": "볼트를 열 수 없습니다",
+    "restoreHint": "계속하려면 백업에서 복원하세요."
   },
   "vault": {
     "ioBanner": {
@@ -2136,18 +2825,159 @@
       "cancel": "취소",
       "cleaningUp": "정리하는 중…",
       "cleanUp": "정리",
+      "confirmBody_one": "파일 {{count}}개가 제거됩니다. 이미 읽을 수 없는 상태이며, 복구 가능한 것은 손실되지 않습니다.",
       "confirmBody_other": "파일 {{count}}개가 제거됩니다. 이미 읽을 수 없는 파일이므로 복구 가능한 것은 잃지 않습니다.",
       "confirmTitle": "남은 파일을 정리할까요?",
+      "doneBody_one": "남은 파일 {{count}}개를 제거했습니다. 이제 새 볼트를 만들 수 있습니다.",
       "doneBody_other": "남은 파일 {{count}}개를 제거했습니다. 이제 새 보관함을 만들 수 있습니다.",
       "doneTitle": "정리됨",
       "errorBody": "문제가 발생했습니다. 앱을 닫고 다시 시도하세요.",
       "errorTitle": "정리 실패",
+      "foundBody_one": "완료되지 않은 이전 삭제에서 남은 파일 {{count}}개가 있습니다. 이미 읽을 수 없는 상태입니다 — 복구 가능한 것은 잃지 않습니다.",
       "foundBody_other": "완료되지 않은 이전 삭제로 인해 남은 파일 {{count}}개가 있습니다. 이미 읽을 수 없는 파일이므로 복구 가능한 것은 잃지 않습니다.",
       "foundTitle": "완료되지 않은 삭제로 인한 남은 파일",
+      "partialBody_one": "파일 {{count}}개가 다른 앱(백신, 파일 동기화 또는 검색 색인)에 의해 잠겨 있을 수 있습니다. 앱을 닫고 잠시 후 다시 시도하거나, 볼트 폴더를 수동으로 제거하세요.",
       "partialBody_other": "파일 {{count}}개가 다른 앱(백신, 파일 동기화, 검색 색인 등)에 의해 잠겨 있을 수 있습니다. 앱을 닫고 잠시 후 다시 시도하거나, 보관함 폴더를 수동으로 제거하세요.",
       "partialTitle": "일부 파일을 제거하지 못했습니다"
     },
     "restoreCta": "백업에서 복원",
-    "subtitle": "노트는 기기를 떠나기 전에 이 기기에서 암호화됩니다. 서버는 암호문만 저장합니다."
+    "subtitle": "노트는 기기를 떠나기 전에 이 기기에서 암호화됩니다. 서버는 암호문만 저장합니다.",
+    "repairCleanedUp_one": "남은 파일 {{count}}개를 정리했습니다.",
+    "repairCleanedUp_other": "남은 파일 {{count}}개를 정리했습니다.",
+    "repairFailed": "정리를 완료하지 못했습니다. 다시 시도하세요.",
+    "heroLine1": "오직 당신에게만",
+    "heroLine2": "속하는",
+    "heroLine3": "노트.",
+    "lede": "Markdown, 기기를 떠나기 전에 이 기기에서 암호화됩니다. 계정 이메일 없음. 단 한 글자도 읽을 수 있는 서버 없음.",
+    "residueBanner": "중단된 삭제에서 남은 파일이 있습니다 ({{n}}). 볼트를 만들기 전에 정리하세요.",
+    "cleanUpFiles": "남은 파일 정리",
+    "create": "볼트 만들기",
+    "connect": "내 계정에 연결"
+  },
+  "wikiGraph": {
+    "emptyTitle": "아직 링크가 없습니다",
+    "emptyBodyBefore": "노트를 연결하려면 ",
+    "emptyBodyAfter": "를 텍스트에 작성하세요. 연결된 노트가 여기에 그래프로 표시됩니다."
+  },
+  "markdown": {
+    "attachmentFallback": "첨부 파일",
+    "nothingToPreview": "아직 미리볼 내용이 없습니다."
+  },
+  "conflicts": {
+    "empty": "검토할 충돌이 없습니다 — 노트가 동기화되어 있습니다.",
+    "groupTitle_one": "충돌 사본 {{count}}개",
+    "groupTitle_other": "충돌 사본 {{count}}개",
+    "groupTitleOfNote": " (노트 {{hex}})"
+  },
+  "viewEditor": {
+    "saveError": "이 뷰를 저장하지 못했습니다. 다시 시도하세요.",
+    "deleteError": "이 뷰를 삭제하지 못했습니다. 다시 시도하세요.",
+    "editView": "뷰 편집",
+    "condition": {
+      "search": "텍스트"
+    },
+    "containsPlaceholder": "포함…",
+    "tagPlaceholder": "태그",
+    "folderPlaceholder": "폴더/",
+    "addCondition": "+ 조건 추가",
+    "createView": "뷰 만들기"
+  },
+  "snapshots": {
+    "today": "오늘 {{time}}",
+    "readError": "버전 기록을 읽지 못했습니다.",
+    "decryptError": "그 버전을 복호화하지 못했습니다.",
+    "restoreError": "그 버전을 복원하지 못했습니다.",
+    "title": "버전 기록",
+    "emptyState": "아직 이전 버전이 없습니다. 스냅샷은 편집하는 동안 자동으로 캡처됩니다.",
+    "hide": "숨기기",
+    "empty": "(비어 있음)",
+    "restoreThisVersion": "이 버전 복원"
+  },
+  "restoreBackup": {
+    "title": "아직 모바일에서 사용할 수 없습니다",
+    "body": "백업 파일에서 복원하는 기능은 아직 모바일에서 사용할 수 없습니다 — 볼트를 만들거나 복구 문구로 복구하세요."
+  },
+  "recording": {
+    "deniedTitle": "마이크 접근이 꺼져 있습니다",
+    "errorTitle": "녹음을 시작하지 못했습니다",
+    "deniedBody": "음성 노트를 녹음하려면 설정 › Myne › 마이크에서 Myne의 마이크 접근을 허용하세요.",
+    "noDeviceBody": "이 기기에서 마이크를 찾을 수 없습니다.",
+    "emptyBody": "그 녹음은 비어 있습니다 — 아무것도 캡처되지 않았습니다.",
+    "genericBody": "녹음 중 문제가 발생했습니다. 다시 시도하세요.",
+    "stopAria": "녹음 중지"
+  },
+  "picker": {
+    "neverOpened": "연 적 없음",
+    "openedJustNow": "방금 열림",
+    "openedMinuteAgo": "1분 전에 열림",
+    "openedMinutesAgo_one": "{{count}}분 전에 열림",
+    "openedMinutesAgo_other": "{{count}}분 전에 열림",
+    "openedHourAgo": "1시간 전에 열림",
+    "openedHoursAgo_one": "{{count}}시간 전에 열림",
+    "openedHoursAgo_other": "{{count}}시간 전에 열림",
+    "openedYesterday": "어제 열림",
+    "openedDaysAgo_one": "{{count}}일 전에 열림",
+    "openedDaysAgo_other": "{{count}}일 전에 열림",
+    "openedLastWeek": "지난주에 열림",
+    "openedWeeksAgo_one": "{{count}}주 전에 열림",
+    "openedWeeksAgo_other": "{{count}}주 전에 열림",
+    "openedLastMonth": "지난달에 열림",
+    "openedMonthsAgo_one": "{{count}}개월 전에 열림",
+    "openedMonthsAgo_other": "{{count}}개월 전에 열림",
+    "openedLastYear": "작년에 열림",
+    "openedYearsAgo_one": "{{count}}년 전에 열림",
+    "openedYearsAgo_other": "{{count}}년 전에 열림",
+    "corruptedBadge": "손상됨"
+  },
+  "join": {
+    "transportError": "그 동기화 서버에 연결하지 못했습니다. 주소와 연결을 확인한 다음 다시 시도하세요.",
+    "passwordPlaceholder": "볼트 비밀번호",
+    "waitingHint": "이 화면을 열어 두세요 — 승인되면 다른 기기와 비교할 확인 코드가 여기에 표시됩니다.",
+    "verifyBody": "이 코드가 승인한 기기에 표시된 코드와 같은지 확인하세요.",
+    "removing": "제거 중…",
+    "sasMismatch": "일치하지 않습니다 — 이 기기 제거",
+    "title": "계정에 연결",
+    "lead": "이 기기로 노트를 가져오려면 계정 정보를 입력하세요. 모든 것은 종단 간 암호화된 상태로 유지됩니다.",
+    "serverPlaceholder": "https://sync.example.com",
+    "accountHint": "이 번호를 다시 확인하세요 — 올바르지 않아 보입니다.",
+    "approvalHint": "계정이 이미 있는 기기에서 이 기기를 승인하면 노트가 표시됩니다.",
+    "connectingSubtitle": "계정을 가져오고 이 기기에서 볼트의 잠금을 해제하는 중입니다."
+  },
+  "createVault": {
+    "beginWeakPassword": "더 강력한 비밀번호를 선택하고 다시 시도하세요.",
+    "beginGeneric": "볼트 생성을 시작하지 못했습니다. 다시 시도하세요.",
+    "wordNumber": "단어 #{{position}}",
+    "commitError": "볼트를 저장하지 못했습니다. 다시 시도하세요.",
+    "savedToFile": "{{label}}에 저장됨",
+    "saveFileError": "파일을 저장하지 못했습니다.",
+    "stepLabel": "볼트 만들기 · {{total}}단계 중 {{current}}",
+    "briefingTitle": "시작하기 전에",
+    "briefingLead": "Myne는 모든 것을 이 기기에서 암호화합니다. 그 프라이버시에는 오직 당신만이 질 수 있는 책임이 따릅니다.",
+    "passwordTitle": "비밀번호 만들기",
+    "confirmPasswordLabel": "비밀번호 확인",
+    "passwordHelper": "저장되지도 전송되지도 않습니다. 이 기기에서 키를 암호화합니다.",
+    "encryptingSubtitle": "Argon2id로 키를 유도하는 중입니다. 몇 초 정도 걸리며 중단할 수 없습니다.",
+    "phraseTitle": "복구 문구",
+    "phraseIntro": "24개 단어, 순서대로. 종이에 적어 안전한 곳에 보관하세요.",
+    "showSecondHalf": "13–24번 단어 표시",
+    "saveToFile": "파일로 저장",
+    "writtenThemDown": "적어 두었습니다",
+    "typebackTitle": "복구 문구 확인",
+    "typebackLead": "방금 저장한 복구 문구에서 이 네 단어를 입력하세요.",
+    "wordMismatch": "{{pos}}번 단어와 일치하지 않습니다",
+    "backToPhrase": "복구 문구로 돌아가기",
+    "accountTitle": "계정 번호",
+    "accountLead": "복구 문구와 함께 저장하세요. 새 기기에서 볼트를 복원할 때 필요합니다.",
+    "accountSavedAck": "계정 번호를 저장했습니다.",
+    "commit": "확정",
+    "committingTitle": "볼트를 저장하는 중…",
+    "committingSubtitle": "암호화된 볼트를 이 기기에 기록하는 중입니다.",
+    "unlockingTitle": "잠금 해제 중…",
+    "unlockingSubtitle": "볼트를 여는 중입니다.",
+    "readyTitle": "볼트가 준비되었습니다",
+    "readyBody": "지금부터 작성하는 모든 것은 저장되거나 동기화되기 전에 이 기기에서 암호화됩니다.",
+    "personalLabel": "개인",
+    "openVault": "볼트 열기",
+    "backUpNow": "지금 백업"
   }
 }
