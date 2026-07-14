@@ -106,7 +106,28 @@
     "usedInNotesPopover": {
       "empty": "Används inte i någon anteckning.",
       "untitled": "Namnlös"
-    }
+    },
+    "needsApp": "Rensning av bilagor kräver appen.",
+    "noUnused": "Inga oanvända bilagor – alla filer refereras.",
+    "scanError": "Det gick inte att söka efter oanvända bilagor.",
+    "erasedToast_one": "Raderade {{count}} oanvänd fil.",
+    "erasedToast_other": "Raderade {{count}} oanvända filer.",
+    "eraseError": "Det gick inte att radera de oanvända bilagorna.",
+    "readError": "Det gick inte att läsa bilagorna.",
+    "needAppPreview": "Bilagor kräver appen (inte webbläsarförhandsvisningen).",
+    "tooLarge": "Filen är för stor (max 64 MB).",
+    "unsupported": "Endast bilder och PDF-filer kan bifogas.",
+    "addError": "Det gick inte att lägga till filen.",
+    "deleteError": "Det gick inte att ta bort bilagan.",
+    "renameError": "Det gick inte att byta namn på bilagan.",
+    "unusedSummary_one": "{{count}} bilaga refereras inte av någon anteckning ({{size}}). Radering är en permanent kryptografisk borttagning – det finns ingen papperskorg.",
+    "unusedSummary_other": "{{count}} bilagor refereras inte av någon anteckning ({{size}}). Radering är en permanent kryptografisk borttagning – det finns ingen papperskorg.",
+    "eraseCta_one": "Radera {{count}} oanvänd fil",
+    "eraseCta_other": "Radera {{count}} oanvända filer",
+    "emptyState": "Inga bilagor ännu. Tryck på Ladda upp för att lägga till en bild eller PDF.",
+    "insert": "Infoga",
+    "pauseLabel": "Pausa {{filename}}",
+    "playLabel": "Spela upp {{filename}}"
   },
   "backup": {
     "errors": {
@@ -161,6 +182,8 @@
     "archivedBadge": "Arkiv",
     "archivedBadgeTitle": "Arkiverad",
     "dialogLabel": "Kommandopalett",
+    "matchedInAttachment": "i bilaga",
+    "matchedInAttachmentTitle": "Sökningen matchade inuti en fil som är inbäddad i den här anteckningen",
     "matchedInBody": "↳ matchade i brödtexten",
     "noMatches": "Inga träffar",
     "searchPlaceholder": "Sök anteckningar eller kör ett kommando — Esc för att stänga",
@@ -174,10 +197,172 @@
         "label": "Säkerhetskopiera valv…"
       },
       "category": {
+        "ai": "AI",
         "app": "App",
+        "appearance": "Utseende",
         "editor": "Redigerare",
+        "notes": "Anteckningar",
         "vault": "Valv",
         "view": "Vy"
+      },
+      "aiOpenChat": {
+        "label": "Öppna AI-chatt"
+      },
+      "toggleLineNumbers": {
+        "label": "Växla radnummer"
+      },
+      "toggleSpellCheck": {
+        "label": "Växla stavningskontroll"
+      },
+      "toggleTypewriter": {
+        "label": "Växla skrivmaskinsrullning"
+      },
+      "toggleDimInactive": {
+        "label": "Växla nedtoning av inaktiva rader"
+      },
+      "toggleEditorFont": {
+        "label": "Växla redigerartypsnitt (mono/sans)"
+      },
+      "cycleTextSize": {
+        "label": "Bläddra textstorlek i redigeraren"
+      },
+      "cycleContentWidth": {
+        "label": "Bläddra innehållsbredd i redigeraren"
+      },
+      "cycleDefaultViewMode": {
+        "label": "Bläddra standardvyläge"
+      },
+      "toggleTimestamps": {
+        "label": "Växla tidsstämplar i sidofältet"
+      },
+      "toggleArchiving": {
+        "label": "Växla arkivering av anteckningar"
+      },
+      "toggleAiEnabled": {
+        "label": "Växla AI-funktioner (beta)"
+      },
+      "toggleScreenCapture": {
+        "label": "Växla skydd mot skärmdump"
+      },
+      "cycleTheme": {
+        "label": "Bläddra tema"
+      },
+      "themeLight": {
+        "label": "Tema: Ljust"
+      },
+      "themeDark": {
+        "label": "Tema: Mörkt"
+      },
+      "themeAmoled": {
+        "label": "Tema: AMOLED"
+      },
+      "themeSystem": {
+        "label": "Tema: Följ systemet"
+      },
+      "applyCustomTheme": {
+        "label": "Tillämpa anpassat tema…"
+      },
+      "splitRight": {
+        "label": "Dela ruta åt höger"
+      },
+      "splitDown": {
+        "label": "Dela ruta nedåt"
+      },
+      "closePane": {
+        "label": "Stäng ruta"
+      },
+      "closeTab": {
+        "label": "Stäng flik"
+      },
+      "nextTab": {
+        "label": "Nästa flik"
+      },
+      "prevTab": {
+        "label": "Föregående flik"
+      },
+      "focusNextPane": {
+        "label": "Fokusera nästa ruta"
+      },
+      "focusPrevPane": {
+        "label": "Fokusera föregående ruta"
+      },
+      "goBack": {
+        "label": "Gå bakåt"
+      },
+      "goForward": {
+        "label": "Gå framåt"
+      },
+      "togglePreview": {
+        "label": "Växla förhandsvisning sida vid sida"
+      },
+      "findInNote": {
+        "label": "Sök i anteckning"
+      },
+      "findReplace": {
+        "label": "Sök och ersätt i anteckning"
+      },
+      "newNote": {
+        "label": "Ny anteckning"
+      },
+      "duplicateNote": {
+        "label": "Duplicera anteckning"
+      },
+      "archiveNote": {
+        "label": "Arkivera anteckning"
+      },
+      "renameNote": {
+        "label": "Byt namn på anteckning"
+      },
+      "trashNote": {
+        "label": "Flytta anteckning till papperskorgen"
+      },
+      "toggleFavorite": {
+        "label": "Växla favorit"
+      },
+      "moveNote": {
+        "label": "Flytta anteckning till mapp…"
+      },
+      "emptyTrash": {
+        "label": "Töm papperskorgen"
+      },
+      "showBacklinks": {
+        "label": "Visa bakåtlänkar"
+      },
+      "showOutline": {
+        "label": "Visa disposition"
+      },
+      "showUnlinked": {
+        "label": "Visa olänkade omnämnanden"
+      },
+      "newFolder": {
+        "label": "Ny mapp"
+      },
+      "openTrash": {
+        "label": "Öppna papperskorgen"
+      },
+      "openArchive": {
+        "label": "Öppna arkivet"
+      },
+      "cycleHeading": {
+        "label": "Bläddra rubriknivå"
+      },
+      "restoreBackup": {
+        "label": "Återställ valv från säkerhetskopia…"
+      },
+      "toggleRealtimeSync": {
+        "label": "Växla realtidssynkronisering"
+      },
+      "revealVaultFolder": {
+        "label": "Visa valvmappen i filhanteraren"
+      },
+      "aiSummarizeNote": {
+        "label": "Sammanfatta anteckning"
+      },
+      "aiSuggestTags": {
+        "label": "Föreslå taggar"
+      },
+      "aiRewriteSelection": {
+        "label": "Skriv om markering"
       },
       "convertWikilinks": {
         "label": "Konvertera importerade wikilänkar i den här anteckningen…"
@@ -187,6 +372,12 @@
       },
       "exportNoteHtml": {
         "label": "Exportera anteckning som HTML…"
+      },
+      "exportSelectionImage": {
+        "label": "Exportera markering som bild…",
+        "saved": "Markeringen sparades som en bild.",
+        "noSelection": "Markera text först och exportera den sedan som en bild.",
+        "failed": "Det gick inte att exportera markeringen som en bild."
       },
       "exportNoteMarkdown": {
         "label": "Exportera anteckning som Markdown…"
@@ -309,6 +500,15 @@
     },
     "rebind": {
       "invalidChordReason": "Lägg till en modifierare (⌘, Ctrl eller Alt) — en tangent på egen hand kan inte vara en genväg."
+    },
+    "picker": {
+      "vaultRoot": "Valvets rot",
+      "moveNoteTitle": "Flytta anteckning till mapp",
+      "moveNotePlaceholder": "Välj en mapp…",
+      "noFolders": "Inga mappar ännu",
+      "applyThemeTitle": "Tillämpa anpassat tema",
+      "applyThemePlaceholder": "Välj ett tema…",
+      "noCustomThemes": "Inga anpassade teman installerade"
     }
   },
   "common": {
@@ -319,7 +519,9 @@
     },
     "spinner": {
       "loadingLabel": "Läser in"
-    }
+    },
+    "back": "Tillbaka",
+    "continue": "Fortsätt"
   },
   "editor": {
     "attachment": {
@@ -476,6 +678,9 @@
           "reveal": "Visa i biblioteket"
         },
         "pdfFallback": "PDF",
+        "textPreview": {
+          "truncated": "Förhandsvisningen är avkortad – exportera för hela filen."
+        },
         "tombstone": {
           "brokenAria": "Trasig bilagereferens: {{filename}}",
           "brokenLabel": "trasig",
@@ -513,16 +718,17 @@
       "backlinks": {
         "archivedBadge": "Arkiverad",
         "empty": "Inga bakåtlänkar ännu.",
+        "linkedFrom": "Länkad från {{count}}",
         "linkedFrom_one": "Länkad från {{count}}",
         "linkedFrom_other": "Länkad från {{count}}",
         "untitled": "Namnlös"
       },
       "barItems": {
         "graph": "Graf",
-        "hide": "",
+        "hide": "Dölj",
         "lock": "Lås",
-        "moveLeft": "",
-        "moveRight": "",
+        "moveLeft": "Flytta åt vänster",
+        "moveRight": "Flytta åt höger",
         "saveStatus": "Sparstatus",
         "settings": "Inställningar",
         "syncStatus": "Synkstatus",
@@ -533,15 +739,19 @@
         "workspace": "Arbetsyta"
       },
       "baseImport": {
+        "droppedFiltersSuffix": " · {{count}} filter borttagna",
         "droppedFiltersSuffix_one": " · {{count}} filter slopades",
         "droppedFiltersSuffix_other": " · {{count}} filter slopades",
         "failed": "Importen misslyckades.",
         "fileFilterName": "Obsidian Base",
+        "imported": "Importerade {{count}} vy(er)",
         "imported_one": "Importerade {{count}} vy",
         "imported_other": "Importerade {{count}} vyer",
         "notValid": "Inte en giltig .base-fil.",
+        "skippedSuffix": " · {{count}} överhoppade",
         "skippedSuffix_one": " · {{count}} hoppades över",
         "skippedSuffix_other": " · {{count}} hoppades över",
+        "stoppedAfter": "Importen stoppades efter {{count}} vy(er).",
         "stoppedAfter_one": "Importen stoppades efter {{count}} vy.",
         "stoppedAfter_other": "Importen stoppades efter {{count}} vyer."
       },
@@ -572,6 +782,7 @@
       "import": {
         "imported_one": "Importerade {{count}} anteckning{{skipped}}",
         "imported_other": "Importerade {{count}} anteckningar{{skipped}}",
+        "skippedSuffix": " · {{count}} överhoppade",
         "skippedSuffix_one": " · {{count}} hoppades över",
         "skippedSuffix_other": " · {{count}} hoppades över"
       },
@@ -583,10 +794,43 @@
       "resizeBacklinksSidebar": "Ändra storlek på bakåtlänkssidofältet",
       "resizeNotesSidebar": "Ändra storlek på anteckningssidofältet",
       "rightPanel": {
-        "allHidden": "",
+        "aiChat": {
+          "askPlaceholder": "Ställ en fråga om dina anteckningar…",
+          "askSubmit": "Fråga",
+          "assistant": "Assistent",
+          "citations": "Källor",
+          "composerPlaceholder": "Chatta med dina anteckningar…",
+          "empty": "AI-resultat – sammanfattningar, svar och förslag – visas här.",
+          "error": "AI-begäran kunde inte slutföras.",
+          "errorTurn": "Assistenten kunde inte svara.",
+          "gettingReadyHint": "Förbereder dina anteckningar för AI – ett ögonblick.",
+          "insert": "Infoga i anteckning",
+          "noAnswer": "Inget svar – prova att formulera om.",
+          "noModelHint": "Ingen modell vald. Välj en i Inställningar → Labb → AI för att börja.",
+          "offHint": "Lokal AI är av. Slå på den i Inställningar → Labb → AI.",
+          "send": "Skicka",
+          "statusGettingReady": "Förbereder…",
+          "statusNoModel": "Ingen modell",
+          "statusOff": "Av",
+          "statusReady": "Redo",
+          "stop": "Stoppa",
+          "tagsThinking": "Föreslår taggar…",
+          "thinking": "AI tänker…",
+          "truncated": "Sammanfattade de första {{count}} tecknen.",
+          "you": "Du"
+        },
+        "allHidden": "Alla flikar är dolda – högerklicka för att återställa.",
         "outline": {
-          "empty": "",
-          "heading": ""
+          "collapse": "Fäll ihop avsnitt",
+          "empty": "Inga rubriker",
+          "expand": "Expandera avsnitt",
+          "heading": "Disposition"
+        },
+        "tabs": {
+          "aiChat": "AI-chatt",
+          "backlinks": "Bakåtlänkar",
+          "outline": "Disposition",
+          "unlinked": "Olänkade omnämnanden"
         }
       },
       "sidebarToggle": {
@@ -655,6 +899,8 @@
       "rendering": "Renderar diagram…"
     },
     "slash": {
+      "aiContinue": "Fortsätt skriva (AI)",
+      "aiTitle": "Föreslå titel (AI)",
       "attachFile": "Bifoga fil",
       "bulletList": "Punktlista",
       "callout": "Notruta",
@@ -696,6 +942,21 @@
     },
     "toolbar": {
       "apply": "Använd",
+      "exportImageTitle": "Exportera markering som bild",
+      "customize": {
+        "bold": "Fet",
+        "bulletList": "Punktlista",
+        "checklist": "Checklista",
+        "code": "Kod",
+        "heading": "Rubrik",
+        "highlight": "Överstrykning",
+        "italic": "Kursiv",
+        "link": "Länk",
+        "numberedList": "Numrerad lista",
+        "quote": "Citat",
+        "strike": "Genomstruken",
+        "wikilink": "Wikilänk"
+      },
       "heading": {
         "h1": "H1",
         "h2": "H2",
@@ -759,6 +1020,126 @@
       "convertCore": {
         "noMatch": "ingen träff"
       }
+    },
+    "flow": {
+      "loadFailed": "Det gick inte att läsa in dina anteckningar.",
+      "openFailed": "Det gick inte att öppna anteckningen.",
+      "saveFailed": "Det gick inte att spara anteckningen.",
+      "moveFailed": "Det gick inte att flytta anteckningen.",
+      "openTodayFailed": "Det gick inte att öppna dagens anteckning.",
+      "exportFailed": "Det gick inte att exportera anteckningen.",
+      "attachNeedsApp": "Bilagor kräver appen (inte webbläsarförhandsvisningen).",
+      "attachTooLarge": "Filen är för stor (max 64 MB).",
+      "attachUnsupported": "Endast bilder och PDF-filer kan bifogas.",
+      "attachFailed": "Det gick inte att bifoga filen.",
+      "archiveFailed": "Det gick inte att arkivera anteckningen.",
+      "trashFailed": "Det gick inte att flytta anteckningen till papperskorgen."
+    },
+    "nav": {
+      "dailyNote": "Dagsanteckning",
+      "openToday": "Öppna dagens",
+      "allNotes": "Alla anteckningar"
+    },
+    "list": {
+      "searchPlaceholder": "Sök anteckningar",
+      "clearSearch": "Rensa sökning",
+      "viewNoteCount_one": "{{count}} anteckning i ”{{name}}”",
+      "viewNoteCount_other": "{{count}} anteckningar i ”{{name}}”",
+      "edit": "Redigera",
+      "trashEmpty": "Papperskorgen är tom",
+      "archiveEmpty": "Inga arkiverade anteckningar",
+      "noMatchingNotes": "Inga matchande anteckningar",
+      "noNotesYet": "Inga anteckningar ännu",
+      "noMatchBody": "Inget matchar ”{{name}}”. Redigera vyn eller rensa den för att se alla anteckningar.",
+      "emptyBody": "Tryck på ”Ny anteckning” för att skriva din första anteckning. Allt krypteras på den här enheten innan det lagras.",
+      "unarchive": "Avarkivera"
+    },
+    "filterSheet": {
+      "title": "Filter",
+      "status": "Status"
+    },
+    "sortSheet": {
+      "title": "Sortera",
+      "manual": "Manuell ordning",
+      "titleAsc": "Titel · A → Ö",
+      "titleDesc": "Titel · Ö → A"
+    },
+    "noteMenu": {
+      "emptyNote": "Tom anteckning",
+      "wordCount_one": "{{count}} ord · {{minutes}} min läsning",
+      "wordCount_other": "{{count}} ord · {{minutes}} min läsning",
+      "moveToFolder": "Flytta till mapp…",
+      "moveToTrash": "Flytta till papperskorgen",
+      "copied": "Kopierad ✓",
+      "copyToClipboard": "Kopiera till urklipp",
+      "versionHistory": "Versionshistorik"
+    },
+    "purge": {
+      "body": "Detta tar bort anteckningen från den här enheten för gott. Detta kan inte ångras."
+    },
+    "move": {
+      "title": "Flytta till mapp",
+      "body": "Ange en mappsökväg (t.ex. Projekt/Myne). Lämna tomt för valvets rot.",
+      "placeholder": "Projekt/Myne",
+      "confirm": "Flytta"
+    },
+    "sidebar": {
+      "browse": "Bläddra"
+    },
+    "emptyDetail": {
+      "title": "Välj en anteckning",
+      "body": "Välj en anteckning i listan, eller börja en ny."
+    },
+    "readingBar": {
+      "editNote": "Redigera anteckning",
+      "edit": "Redigera"
+    },
+    "graphTab": {
+      "linkedNotes_one": "{{count}} länkad anteckning",
+      "linkedNotes_other": "{{count}} länkade anteckningar",
+      "links_one": "{{count}} länk",
+      "links_other": "{{count}} länkar"
+    },
+    "formatBar": {
+      "redo": "Gör om",
+      "attachFile": "Bifoga ny fil",
+      "insertFromLibrary": "Infoga från bibliotek",
+      "recordVoiceNote": "Spela in röstanteckning",
+      "showLivePreview": "Visa liveförhandsvisning",
+      "showRawMarkdown": "Visa rå Markdown",
+      "hideKeyboard": "Dölj tangentbord"
+    },
+    "topBar": {
+      "backToNotes": "Tillbaka till anteckningar",
+      "noteDetails": "Anteckningsdetaljer",
+      "noteActions": "Anteckningsåtgärder"
+    },
+    "noteContext": {
+      "collapsePanel": "Fäll ihop panelen",
+      "unlinkedCount_one": "Olänkat omnämnande {{count}}",
+      "unlinkedCount_other": "Olänkade omnämnanden {{count}}"
+    },
+    "viewsSheet": {
+      "typeCards": "Kort",
+      "typeList": "Lista",
+      "emptyState": "Inga sparade vyer ännu. Skapa en för att filtrera dina anteckningar efter tagg, mapp eller text.",
+      "editView": "Redigera vy"
+    },
+    "sheet": {
+      "done": "Klar"
+    },
+    "vaultSwitcher": {
+      "title": "Valv"
+    },
+    "tagBrowser": {
+      "noTagsMatch": "Inga taggar matchar.",
+      "notesCount_one": "Anteckningar · {{count}}",
+      "notesCount_other": "Anteckningar · {{count}}"
+    },
+    "untitledNote": "Namnlös anteckning",
+    "commandPalette": {
+      "searchPlaceholder": "Sök anteckningar eller kör ett kommando…",
+      "noMatches": "Inga kommandon eller anteckningar matchar."
     }
   },
   "export": {
@@ -897,6 +1278,7 @@
   },
   "notes": {
     "archive": {
+      "cancel": "Avbryt",
       "close": "Stäng",
       "count_one": "{{count}} anteckning",
       "count_other": "{{count}} anteckningar",
@@ -904,6 +1286,10 @@
       "delete": "Ta bort",
       "deleteError": "Kunde inte ta bort den anteckningen. Försök igen.",
       "emptyState": "Arkivet är tomt.",
+      "folderDeleteConfirm_one": "Flytta {{count}} anteckning till papperskorgen?",
+      "folderDeleteConfirm_other": "Flytta {{count}} anteckningar till papperskorgen?",
+      "folderDeleteConfirmCta": "Flytta till papperskorgen",
+      "folderDeleteError": "Det gick inte att flytta mappens anteckningar till papperskorgen. Försök igen.",
       "restore": "Återställ",
       "restoreError": "Kunde inte återställa den anteckningen. Försök igen.",
       "title": "Arkiv",
@@ -1006,6 +1392,7 @@
       },
       "modal": {
         "cancel": "Avbryt",
+        "cancelledNotImported": "{{count}} importerades inte",
         "cancelledNotImported_one": "{{count}} importerades inte",
         "cancelledNotImported_other": "{{count}} importerades inte",
         "cancelling": "Avbryter…",
@@ -1029,8 +1416,10 @@
         "importing": "Importerar ditt valv…",
         "markDone": "Markera som klar",
         "markedDone": "Markerad som klar",
+        "mediaImported": "{{count}} importerade",
         "mediaImported_one": "{{count}} importerad",
         "mediaImported_other": "{{count}} importerade",
+        "mediaOmittedSuffix": " · {{count}} utelämnade",
         "mediaOmittedSuffix_one": " · {{count}} utelämnad",
         "mediaOmittedSuffix_other": " · {{count}} utelämnade",
         "needsAttention": "Behöver åtgärdas",
@@ -1076,13 +1465,17 @@
       "addToFavorites": "Lägg till i favoriter",
       "archive": "Arkivera",
       "archiveBulkError": "Kunde inte arkivera anteckningarna.",
+      "archiveFolder": "Arkivera mapp",
       "archiveNote": "Arkivera",
       "archiveSingleError": "Kunde inte arkivera anteckningen.",
       "attachments": "Bilagor",
+      "bulkArchive": "Arkivera {{count}} anteckningar",
       "bulkArchive_one": "Arkivera {{count}} anteckning",
       "bulkArchive_other": "Arkivera {{count}} anteckningar",
+      "bulkDelete": "Ta bort {{count}} anteckningar",
       "bulkDelete_one": "Ta bort {{count}} anteckning",
       "bulkDelete_other": "Ta bort {{count}} anteckningar",
+      "bulkMove": "Flytta {{count}} anteckningar till…",
       "bulkMove_one": "Flytta {{count}} anteckning till…",
       "bulkMove_other": "Flytta {{count}} anteckningar till…",
       "caseMergeBody": "En mapp med namnet ”{{name}}” finns redan. Dessa kommer att slås samman — byt namn på en för att hålla dem åtskilda?",
@@ -1125,13 +1518,18 @@
       "openInNewTab": "Öppna i ny flik",
       "openToSide": "Öppna vid sidan",
       "openTrash": "Öppna papperskorgen",
-      "removeAsFolderNote": "Ta bort som mappanteckning",
-      "removeFolderNote": "",
+      "removeFolderNote": "Ta bort mappanteckning",
       "removeFromFavorites": "Ta bort från favoriter",
       "rename": "Byt namn",
       "setAsFolderNote": "Ange som mappanteckning",
       "trash": "Papperskorg",
       "trashBulkError": "Kunde inte flytta anteckningarna till papperskorgen.",
+      "trashConfirmBulkBody_one": "{{count}} anteckning flyttas till papperskorgen.",
+      "trashConfirmBulkBody_other": "{{count}} anteckningar flyttas till papperskorgen.",
+      "trashConfirmBulkWarning": "Du kan återställa dem från papperskorgen senare.",
+      "trashConfirmConfirm": "Flytta till papperskorgen",
+      "trashConfirmTitle": "Flytta till papperskorgen?",
+      "trashConfirmWarning": "Du kan återställa den från papperskorgen senare.",
       "trashSingleError": "Kunde inte flytta anteckningen till papperskorgen.",
       "undo": "Ångra",
       "vaultRoot": "Valvrot",
@@ -1375,7 +1773,26 @@
       "operationInProgress": "Åtgärd pågår. Vänta.",
       "unexpected": "Oväntat fel. Försök igen.",
       "vaultNotFound": "Valvfilen hittades inte. Starta om appen."
-    }
+    },
+    "vaultUnreadable": "Valvfilen går inte att läsa. Återställ från en säkerhetskopia.",
+    "genericError": "Något gick fel. Försök igen.",
+    "weakPassword": "Lösenordet måste innehålla minst {{min}} tecken.",
+    "setPasswordError": "Det gick inte att ange ditt nya lösenord. Försök igen.",
+    "passwordMismatch": "Lösenorden stämmer inte överens.",
+    "decryptingSubtitle": "Bygger om dina valvnycklar med Argon2id. Det tar några sekunder.",
+    "restoreVaultHeader": "Återställ ett valv",
+    "accountTitle": "Ange ditt kontonummer",
+    "accountLead": "Hitta det där du sparade din återställningsfras. Det identifierar valvet som ska återställas.",
+    "accountInvalid": "Ogiltigt kontonummer – kontrollera och ange på nytt.",
+    "accountOptionalHint": "Har du det inte? Lämna tomt och fortsätt – din 24-ords återställningsfras är allt du behöver.",
+    "paste": "Klistra in",
+    "phraseGridHint": "Skriv varje ord, eller klistra in alla 24 på en gång för att fylla rutnätet.",
+    "submitProgress": "Skicka · {{filled}} av {{total}}",
+    "newPasswordTitle": "Välj ett nytt lösenord",
+    "newPasswordLead": "Din återställningsfras förblir densamma. Detta anger lösenordet för den här enheten.",
+    "confirmPasswordLabel": "Bekräfta lösenord",
+    "passwordHelper": "Lagras aldrig, överförs aldrig. Det krypterar dina nycklar på den här enheten.",
+    "encryptingSubtitle": "Omsluter dina valvnycklar med ditt nya lösenord."
   },
   "restore": {
     "backLabel": "Tillbaka",
@@ -1428,7 +1845,9 @@
       "licenseLabel": "Licens",
       "tagline": "Pre-alpha · Fas 1 skrivbordsklient",
       "threatModelHelper": "Öppna det offentliga hotmodelldokumentet i din webbläsare.",
-      "threatModelLabel": "Hotmodell"
+      "threatModelLabel": "Hotmodell",
+      "version": "Version",
+      "dev": "Dev"
     },
     "account": {
       "argon2idHeading": "Argon2id-parametrar",
@@ -1451,7 +1870,21 @@
       "vaultLabelEyebrow": "VALVETIKETT",
       "vaultLabelHelper": "Ett namn för det här valvet som visas i växlaren i appen. Lagras krypterat inuti valvet; lämnar aldrig din enhet i klartext.",
       "vaultLabelPlaceholder": "Lägg till en etikett…",
-      "vaultLabelSave": "Spara"
+      "vaultLabelSave": "Spara",
+      "vaultIconLabel": "IKON",
+      "vaultIconDefault": "Standard (ordmärke)",
+      "renamedToast": "Valvet har bytt namn",
+      "renameError": "Det gick inte att byta namn på valvet",
+      "newPasswordMismatch": "De nya lösenorden stämmer inte överens.",
+      "samePassword": "Det nya lösenordet är samma som det nuvarande lösenordet.",
+      "passwordChangedToast": "Lösenordet har ändrats",
+      "vaultUnreadable": "Valvfilen går inte att läsa. Återställ från en säkerhetskopia.",
+      "genericChangeError": "Något gick fel. Försök igen.",
+      "renameHelper": "Visas i valvväxlaren. Lagras krypterat inuti det här valvet; lämna tomt för att rensa.",
+      "newPasswordPlaceholder": "Minst 12 tecken",
+      "reenterNewPassword": "Ange nytt lösenord igen",
+      "changePasswordFootnote": "Detta ogiltigförklarar snabbupplåsning. Din återställningsfras är oförändrad.",
+      "changing": "Ändrar…"
     },
     "appearance": {
       "showEditTimesAria": "Visa redigeringstider i sidofältet",
@@ -1467,7 +1900,13 @@
       "themeLabel": "Tema",
       "themeOptionAria": "{{label}}-tema",
       "themeSaveError": "Kunde inte spara tema. Försök igen.",
-      "timestampsSaveError": "Kunde inte spara inställningen. Försök igen."
+      "timestampsSaveError": "Kunde inte spara inställningen. Försök igen.",
+      "sizeS": "S",
+      "sizeM": "M",
+      "sizeL": "L",
+      "sizeXL": "XL",
+      "editorFont": "Redigerartypsnitt",
+      "showEditTimesSubtitle": "Tidsstämplar under varje anteckning"
     },
     "archive": {
       "helper": "Låt anteckningar flyttas till ett arkiv, utanför huvudlistan. Att stänga av detta återställer varje arkiverad anteckning till sin mapp och döljer arkivkontrollerna.",
@@ -1518,13 +1957,20 @@
         "bare": "Ansluten",
         "daysAgo_one": "Anslöt för {{count}} dag sedan",
         "daysAgo_other": "Anslöt för {{count}} dagar sedan",
+        "hoursAgo": "Ansluten för {{count}} h sedan",
         "hoursAgo_one": "Anslöt för {{count}} tim sedan",
         "hoursAgo_other": "Anslöt för {{count}} tim sedan",
         "justNow": "Anslöt just nu",
+        "minutesAgo": "Ansluten för {{count}} min sedan",
         "minutesAgo_one": "Anslöt för {{count}} min sedan",
         "minutesAgo_other": "Anslöt för {{count}} min sedan",
         "onDate": "Anslöt {{date}}"
       }
+    },
+    "clipperInstall": {
+      "error": "Det gick inte att uppdatera inställningen för webbläsarklipparen.",
+      "helper": "Registrera värden för native messaging så att Myne-webbläsartillägget kan skicka klipp till den här appen. På som standard; stäng av för att ta bort den.",
+      "label": "Webbläsarklippare"
     },
     "customThemes": {
       "appliedBadge": "Tillämpat",
@@ -1585,31 +2031,34 @@
       "submit": "Ta bort valv",
       "submitInFlight": "Tar bort valv…",
       "typeToConfirmLabel": "Skriv DELETE för att bekräfta",
-      "vaultPath": "Valvsökväg: {{path}}"
+      "vaultPath": "Valvsökväg: {{path}}",
+      "deleteError": "Det gick inte att ta bort valvet helt. Försök igen.",
+      "warning": "Detta tar permanent bort det här valvet och alla dess anteckningar från den här enheten. Detta kan inte ångras.",
+      "deleteButton": "Ta bort det här valvet"
     },
     "files": {
       "newNote": {
-        "folderLabel": "",
-        "folderPlaceholder": "",
-        "helper": "",
-        "label": "",
-        "optionCurrent": "",
-        "optionRoot": "",
-        "optionSpecific": "",
-        "saveError": ""
+        "folderLabel": "Mapp för nya anteckningar",
+        "folderPlaceholder": "t.ex. Inkorg/",
+        "helper": "Var nyskapade anteckningar placeras.",
+        "label": "Standardplats för nya anteckningar",
+        "optionCurrent": "Samma mapp som aktuell anteckning",
+        "optionRoot": "Valvmapp",
+        "optionSpecific": "I mappen som anges nedan",
+        "saveError": "Det gick inte att spara platsen för nya anteckningar."
       },
       "startup": {
-        "helper": "",
-        "label": "",
-        "noteLabel": "",
-        "notePlaceholder": "",
-        "optionEmpty": "",
-        "optionLast": "",
-        "optionSpecific": "",
-        "saveError": "",
-        "searchEmpty": "",
-        "searchPlaceholder": "",
-        "untitledNote": ""
+        "helper": "Välj vilken fil som ska öppnas när appen startar.",
+        "label": "Standardfil att öppna",
+        "noteLabel": "Anteckning att öppna vid start",
+        "notePlaceholder": "Välj en anteckning…",
+        "optionEmpty": "Ny anteckning",
+        "optionLast": "Senast öppnad",
+        "optionSpecific": "Specifik anteckning",
+        "saveError": "Det gick inte att spara startinställningen.",
+        "searchEmpty": "Inga anteckningar hittades.",
+        "searchPlaceholder": "Sök anteckningar…",
+        "untitledNote": "Namnlös"
       }
     },
     "focusMode": {
@@ -1660,6 +2109,37 @@
       "off": "Av",
       "on": "På"
     },
+    "toolbarCustomize": {
+      "errorSave": "Det gick inte att spara verktygsfältslayouten.",
+      "helper": "Välj vilka formateringsknappar som visas i markeringsverktygsfältet, och deras ordning.",
+      "label": "Verktygsfältsknappar",
+      "moveDown": "Flytta ned",
+      "moveUp": "Flytta upp",
+      "pendingHint": "Kommer snart"
+    },
+    "ai": {
+      "betaBadge": "Beta",
+      "disclosureToggle": "Hur fungerar det här?",
+      "enableHelper": "Kör en modell du tillhandahåller helt på din enhet. Experimentell, av som standard.",
+      "enableLabel": "Aktivera lokal AI",
+      "excludedHelper": "Anteckningar i dessa mappar läses eller indexeras aldrig av AI. En mappsökväg per rad.",
+      "excludedLabel": "Undantagna mappar",
+      "excludedPlaceholder": "Privat/\nDagbok/",
+      "modelChoose": "Välj fil…",
+      "modelEmbeddingLabel": "Sökmodell – semantisk sökning och frågor och svar",
+      "modelFilter": {
+        "gguf": "GGUF-modell",
+        "safetensors": "Safetensors-modell"
+      },
+      "modelGenerationLabel": "Textmodell – chatt, sammanfattningar, skrivande",
+      "modelNone": "Ingen fil vald",
+      "modelSaveFailed": "Det gick inte att spara modellsökvägen (den måste ligga utanför ditt valv).",
+      "modelsHelper": "Myne laddar aldrig ner modeller – det skulle innebära att data skickas över nätverket. Öppna en länk för att hämta en i din webbläsare och välj sedan de nedladdade filerna här. Allt körs på din enhet.",
+      "modelsLabel": "Modeller",
+      "recommendedFilesEmbedding": "Behöver model.safetensors + config.json + tokenizer.json i en och samma mapp.",
+      "recommendedFilesGeneration": "Behöver .gguf-filen + tokenizer.json i samma mapp.",
+      "title": "AI"
+    },
     "prefs": {
       "saveError": "Kunde inte spara inställningen — försök igen"
     },
@@ -1668,9 +2148,20 @@
       "autoLockLabel": "Autolås",
       "autoLockSearchEmpty": "Inga tidslängder matchar.",
       "autoLockSearchPlaceholder": "Sök tidslängder…",
+      "realtimeSyncHelper": "Ändringar från andra enheter anländer inom sekunder via en innehållslös signal – servern förmedlar bara ”något ändrades”, aldrig vad. Medan ditt valv är upplåst kontrollerar appen ändå servern regelbundet, så detta ger ingen betydande insyn; det finns inget att konfigurera.",
+      "realtimeSyncLabel": "Realtidssynkronisering",
       "screenCaptureHelperOff": "Skyddet gäller alltid före upplåsning. Efter upplåsning följs den här inställningen.",
       "screenCaptureHelperOn": "Aktivt på macOS och Windows 10 (May 2020 Update eller senare). Stöd för Linux kommer i en framtida version.",
-      "screenCaptureLabel": "Skydd mot skärminspelning"
+      "screenCaptureLabel": "Skydd mot skärminspelning",
+      "screenCaptureSubtitle": "Blockera skärmdumpar och skärminspelning",
+      "autoLockAfter": "Lås automatiskt efter",
+      "autoLock1m": "1 min",
+      "autoLock5m": "5 min",
+      "autoLock15m": "15 min",
+      "autoLock30m": "30 min",
+      "autoLock1h": "1 tim",
+      "quickUnlockSubtitleAndroid": "Ange på nytt med en PIN-kod efter automatisk låsning",
+      "quickUnlockSubtitle": "Ange på nytt med {{method}} eller en PIN-kod efter automatisk låsning"
     },
     "quickUnlock": {
       "errorCancelled": "Avbruten.",
@@ -1678,6 +2169,7 @@
       "errorHardwareUnavailable": "Touch ID är inte tillgängligt på den här enheten.",
       "errorNotUnlocked": "Lås upp valvet först.",
       "errorPinNotDigits": "PIN-koden får bara innehålla siffror.",
+      "errorPinTooShort": "PIN-koden måste innehålla minst {{count}} siffror.",
       "errorPinTooShort_one": "PIN-koden måste vara minst {{count}} siffra.",
       "errorPinTooShort_other": "PIN-koden måste vara minst {{count}} siffror.",
       "helperConfigured": "Konfigurerad via {{method}}. Återinträde efter autolås hoppar över huvudlösenordet. Huvudlösenordet krävs fortfarande efter omstart.",
@@ -1685,21 +2177,47 @@
       "methodPin": "PIN-kod",
       "methodTouchId": "Touch ID",
       "pinAriaLabel": "PIN-kod för snabb upplåsning",
+      "pinPlaceholder": "PIN-kod (minst {{count}} siffror)",
       "pinPlaceholder_one": "PIN-kod (minst {{count}} siffra)",
       "pinPlaceholder_other": "PIN-kod (minst {{count}} siffror)",
       "setPin": "Ange PIN-kod",
       "setupHelper": "Touch ID finns bara på macOS och är för närvarande experimentellt (i väntan på hårdvaruverifiering). PIN-kod fungerar överallt.",
       "title": "Snabb upplåsning",
-      "useTouchId": "Använd Touch ID"
+      "useTouchId": "Använd Touch ID",
+      "pinTooShort": "PIN-koden måste innehålla minst 6 siffror.",
+      "pinMismatch": "PIN-koderna stämmer inte överens.",
+      "pinOnToast": "Snabbupplåsning med PIN är på",
+      "setupError": "Det gick inte att konfigurera snabbupplåsning.",
+      "turnedOffToast": "Snabbupplåsning avstängd",
+      "turnOffError": "Det gick inte att stänga av snabbupplåsning",
+      "biometricOnToast": "Snabbupplåsning med {{method}} är på",
+      "biometricUnavailable": "{{method}} är inte tillgängligt på den här enheten.",
+      "warningBanner": "Endast en bekvämlighetsspärr. Ditt lösenord krävs fortfarande efter en omstart.",
+      "biometricToggleSubtitle": "Lås upp med {{method}} efter automatisk låsning",
+      "pinOnLead": "Snabbupplåsning med PIN är ",
+      "pinOnEmphasis": "på",
+      "pinOnRest": ". När valvet låses automatiskt kan du ange på nytt med din PIN-kod istället för hela lösenordet – endast under den här appsessionen. En kallstart kräver alltid hela lösenordet.",
+      "turnOffPin": "Stäng av PIN",
+      "pinSetupHelper": "Ange en PIN-kod på minst 6 siffror för att snabbt låsa upp igen efter automatisk låsning. PIN-koden omsluter en enhetslokal nyckel – den lämnar aldrig den här enheten och rör aldrig din återställningsfras.",
+      "pinReplacesBiometric": " Att ange en PIN-kod ersätter upplåsning med {{method}}.",
+      "pinPlaceholder6": "Minst 6 siffror",
+      "confirmPin": "Bekräfta PIN-kod",
+      "reenterPin": "Ange PIN-kod igen",
+      "setupButton": "Konfigurera snabbupplåsning"
     },
     "shell": {
       "closeLabel": "Stäng inställningar",
+      "groups": {
+        "labs": "Labb"
+      },
       "navLabel": "Inställningspaneler",
       "panels": {
         "about": "Om",
         "account": "Konto",
+        "ai": "AI",
         "appearance": "Utseende",
         "editor": "Redigerare",
+        "files": "Filer",
         "hotkeys": "Kortkommandon",
         "privacy": "Sekretess",
         "storage": "Lagring",
@@ -1757,6 +2275,44 @@
       "optionLive": "Direkt förhandsgranskning",
       "optionReading": "Läsning",
       "optionSource": "Källa"
+    },
+    "strength": {
+      "weak": "Svagt",
+      "fair": "Hyfsat",
+      "good": "Bra",
+      "strong": "Starkt"
+    },
+    "sync": {
+      "summary": {
+        "notSetUp": "Inte konfigurerat",
+        "offline": "Offline",
+        "conflicts_one": "{{count}} konflikt",
+        "conflicts_other": "{{count}} konflikter"
+      }
+    },
+    "data": {
+      "exported_one": "Exporterade {{count}} anteckning → {{label}}",
+      "exported_other": "Exporterade {{count}} anteckningar → {{label}}",
+      "exportNeedsApp": "Export kräver appen (inte webbläsarförhandsvisningen).",
+      "exportFailed": "Det gick inte att exportera valvet.",
+      "exportToMarkdown": "Exportera till Markdown",
+      "exportToMarkdownSubtitle": "Dekryptera varje anteckning till en vanlig mapp i Dokument"
+    },
+    "saveSettingError": "Det gick inte att spara inställningen",
+    "panelTitle": {
+      "privacy": "Integritet och säkerhet",
+      "data": "Data",
+      "vaultName": "Valvnamn",
+      "approveDevice": "Godkänn enhet"
+    },
+    "done": "Klar",
+    "sectionOptions": "Alternativ",
+    "footerTagline": "myne · krypterat på den här enheten · öppen källkod",
+    "editor": {
+      "defaultView": "Standardvy",
+      "typewriter": "Skrivmaskinsrullning",
+      "typewriterSubtitle": "Håll markören vertikalt centrerad",
+      "enableArchiving": "Aktivera arkivering"
     }
   },
   "sync": {
@@ -1782,7 +2338,10 @@
       "groupTitle_one": "{{count}} motstridig kopia av {{original}}",
       "groupTitle_other": "{{count}} motstridiga kopior av {{original}}",
       "keepAsSeparate": "Behåll som separata",
-      "untitled": "Namnlös ({{hex}})"
+      "tookTheirsToast": "Den lokala versionen flyttades till papperskorgen.",
+      "tookTheirsUndo": "Ångra",
+      "untitled": "Namnlös ({{hex}})",
+      "useThisVersion": "Använd den här versionen"
     },
     "devices": {
       "approve": "Godkänn",
@@ -1800,6 +2359,12 @@
       "thisDevice": "Den här enheten",
       "transportHint": "Om servern flyttades eller dess certifikat ändrades anger du serveradressen på nytt under ”Synkserver” ovan för att lita på den igen.",
       "unreachable": "Kunde inte nå synkroniseringen ({{error}}).",
+      "verifyBody": "Kontrollera att samma kod visas på enheten du just godkände. Om den stämmer överens är de på ditt konto. Om inte, ta bort enheten.",
+      "verifyMatch": "De stämmer överens",
+      "verifyMismatch": "De stämmer inte överens",
+      "verifyPending": "Den här koden visas när den nya enheten har slutfört sin första synkronisering.",
+      "verifySyncing": "Synkroniserar…",
+      "verifyTitle": "Verifiera den nya enheten",
       "yourDevices": "Dina enheter"
     },
     "endpoint": {
@@ -1808,6 +2373,8 @@
       "connectedTls": "Ansluten. Kontrollera att det här fingeravtrycket matchar på din andra enhet.",
       "connecting": "Ansluter…",
       "fingerprintLabel": "Serverns certifikatfingeravtryck:",
+      "pinStatic": "Verifierat mot Mynes inbyggda certifikat.",
+      "pinTofu": "Fäst vid första anslutningen. Jämför det här fingeravtrycket mellan dina enheter.",
       "placeholder": "https://your-server.example   ·   http://127.0.0.1:8080",
       "unreachable": "Kunde inte nå den servern — kontrollera adressen och att den är igång."
     },
@@ -1834,14 +2401,23 @@
     "join": {
       "accountLabel": "Kontonummer",
       "cancel": "Avbryt",
+      "continue": "Fortsätt",
       "error": "Kunde inte lägga till den här enheten. Kontrollera serveradressen, kontonumret och lösenordet — och att servern går att nå.",
       "help": "Logga in med ditt kontonummer och lösenord. Den här enheten synkroniserar dina anteckningar så snart en befintlig enhet godkänner den. Ingen återställningsfras behövs.",
       "passwordLabel": "Lösenord",
+      "pinnedCompare": "Den här enheten fäste din servers certifikat. Kontrollera att det här fingeravtrycket stämmer överens på dina andra enheter.",
+      "pinnedTitle": "Servercertifikatet är fäst",
       "serverLabel": "Synkserver",
       "serverPlaceholder": "https://your-server.example",
+      "sasMatch": "De stämmer överens – fortsätt",
+      "sasMismatch": "De stämmer inte överens – ta bort den här enheten",
       "submit": "Lägg till enhet",
       "submitting": "Lägger till…",
-      "title": "Lägg till den här enheten till ett konto"
+      "title": "Lägg till den här enheten till ett konto",
+      "verifyBody": "Kontrollera att den här koden stämmer överens med den på enheten du godkände från.",
+      "verifyTitle": "Verifiera den här enheten",
+      "waitingHint": "Håll det här fönstret öppet – när det har godkänts visas en verifieringskod här att jämföra med din andra enhet.",
+      "waitingTitle": "Väntar på godkännande"
     },
     "panel": {
       "addDevice": {
@@ -1878,6 +2454,43 @@
       "synced": "Synkroniserad",
       "syncing": "Synkroniserar…",
       "syncNow": "Synkronisera nu"
+    },
+    "settings": {
+      "serverSection": "Server",
+      "serverNotSet": "Inte angiven",
+      "statusLabel": "Status",
+      "hubHelp": "Synkronisering håller dina anteckningar uppdaterade mellan enheter. Allt krypteras på den här enheten innan det skickas – servern ser aldrig dina anteckningar.",
+      "connectedTls": "Ansluten via TLS.",
+      "connectedLocal": "Ansluten på ditt lokala nätverk.",
+      "connectError": "Det gick inte att nå servern. Kontrollera adressen och försök igen.",
+      "serverAddressLabel": "Serveradress",
+      "serverAddressPlaceholder": "https://sync.example.com",
+      "fingerprintLabel": "Certifikatets fingeravtryck",
+      "fingerprintCompare": "Jämför detta med samma skärm på en enhet du redan litar på – de måste stämma överens.",
+      "pinStatic": "Verifierat mot den här serverns kända certifikat.",
+      "pinTofu": "Fäst vid första anslutningen. Jämför det mellan dina enheter för att bekräfta.",
+      "enrollNotConfigured": "Konfigurera en synkroniseringsserver först, lägg sedan till den här enheten.",
+      "enrollTransport": "Det gick inte att nå synkroniseringsservern. Kontrollera din anslutning och försök igen.",
+      "accountNumberHint": "Dubbelkolla numret – det ser inte rätt ut.",
+      "passwordPlaceholder": "Ditt valvlösenord",
+      "recoveryPhraseHint": "Ange eller klistra in dina 24 ord. Inklistring fyller cellerna i ordning.",
+      "verifyBody": "Kontrollera att samma kod visas på enheten du just godkände. Om den stämmer överens är de på ditt konto. Om inte, ta bort enheten.",
+      "sasMismatch": "De stämmer inte överens",
+      "removeDeviceButton": "Ta bort enhet",
+      "keepDevice": "Behåll den",
+      "notEnrolledHelp": "Den här enheten synkroniserar inte ännu. Lägg till den från föregående skärm för att se dina enheter.",
+      "unauthenticated": "Den här enhetens åtkomst har återkallats, förmodligen borttagen från en annan enhet.",
+      "transportError": "Det gick inte att nå synkroniseringsservern. Om servern har flyttats eller dess certifikat har ändrats, återanslut den från skärmen Synkroniseringsserver.",
+      "retiredSelf": "Den här enheten togs bort från en annan enhet.",
+      "resetAndAddAgain": "Återställ och lägg till igen",
+      "noDevices": "Inga enheter ännu.",
+      "syncingHere": "Synkroniserar här"
+    },
+    "banner": {
+      "conflictsNeedReview_one": "{{count}} konflikt behöver granskas",
+      "conflictsNeedReview_other": "{{count}} konflikter behöver granskas",
+      "catchingUp": "Hämtar in synkronisering – dina anteckningar är säkra.",
+      "verifyDevices": "Verifiera enheter"
     }
   },
   "templates": {
@@ -1894,7 +2507,14 @@
       "removeFromTemplates": "Ta bort från mallar",
       "removeRowLabel": "Ta bort {{name}} från mallar (behåller anteckningen)",
       "title": "Anteckningsmallar"
-    }
+    },
+    "emptyBefore": "Inga mallar ännu. Tryck på ",
+    "newAction": "Ny",
+    "emptyAfter": " för att skapa en återanvändbar anteckningsmall – börja sedan anteckningar från den (och välj en som din mall för dagsanteckningar i Inställningar).",
+    "use": "Använd",
+    "edit": "Redigera",
+    "deleteConfirm": "Ta bort den här mallen?",
+    "convertToNote": "Konvertera till anteckning"
   },
   "unlock": {
     "backToPicker": "Välj ett annat valv",
@@ -1928,7 +2548,34 @@
       "lockedDuringChange": "Lösenordsändring avbruten: valvet var låst.",
       "metaChangedExternally": "Valvet ändrades i en annan session — lås upp igen."
     },
-    "title": "Lås upp ditt valv."
+    "title": "Lås upp ditt valv.",
+    "vaultUnreadable": "Valvfilen går inte att läsa. Återställ från en säkerhetskopia.",
+    "unlockFailedGeneric": "Det gick inte att låsa upp. Försök igen.",
+    "biometricTooManyAttempts": "För många {{biometric}}-försök. Använd ditt lösenord.",
+    "pinIncorrect_one": "Felaktig PIN-kod. {{count}} försök kvar.",
+    "pinIncorrect_other": "Felaktig PIN-kod. {{count}} försök kvar.",
+    "pinTooManyAttempts": "För många PIN-försök. Använd ditt lösenord.",
+    "pinFailedGeneric": "Det gick inte att låsa upp med PIN-kod. Använd ditt lösenord.",
+    "corruptedHeading": "Valvfilen går inte att läsa",
+    "ioErrorHeading": "Det går inte att läsa det här valvet",
+    "blockingTitle": "Låser upp",
+    "blockingSubtitle": "Dekrypterar dina nycklar på den här enheten.",
+    "eyebrow": "Lås upp valv",
+    "vaultTitleFallback": "Ditt valv",
+    "unlockWithBiometric": "Lås upp med {{biometric}}",
+    "biometricFailed": "{{biometric}} kunde inte bekräfta att det är du",
+    "touchToUnlock": "Tryck för att låsa upp",
+    "lookToUnlock": "Titta för att låsa upp",
+    "biometricRetryHint": "Försök igen, eller lås upp med ditt lösenord.",
+    "tryBiometricAgain": "Försök med {{biometric}} igen",
+    "usePasswordInstead": "Använd lösenord istället",
+    "useBiometricInstead": "Använd {{biometric}} istället",
+    "unlockWithPinInstead": "Lås upp med PIN-kod istället",
+    "useRecoveryPhrase": "Använd din återställningsfras",
+    "deleteConfirmTitle": "Ta bort det här valvet?",
+    "deletePartialError": "Vissa filer kunde inte tas bort. Valvet går inte längre att använda – fortsätt för att börja om.",
+    "failClosedEyebrow": "Det går inte att öppna valvet",
+    "restoreHint": "Återställ från en säkerhetskopia för att fortsätta."
   },
   "vault": {
     "ioBanner": {
@@ -2194,6 +2841,143 @@
       "partialTitle": "Vissa filer kunde inte tas bort"
     },
     "restoreCta": "Återställ från säkerhetskopia",
-    "subtitle": "Dina anteckningar krypteras på den här enheten innan de lämnar den. Servern lagrar bara chiffertext."
+    "subtitle": "Dina anteckningar krypteras på den här enheten innan de lämnar den. Servern lagrar bara chiffertext.",
+    "repairCleanedUp_one": "Rensade {{count}} kvarvarande fil.",
+    "repairCleanedUp_other": "Rensade {{count}} kvarvarande filer.",
+    "repairFailed": "Det gick inte att slutföra rensningen. Försök igen.",
+    "heroLine1": "Anteckningar som",
+    "heroLine2": "tillhör",
+    "heroLine3": "ingen annan än dig.",
+    "lede": "Markdown, krypterat på den här enheten innan det någonsin lämnar den. Ingen konto-e-post. Inga servrar som kan läsa ett ord.",
+    "residueBanner": "Kvarvarande filer från en avbruten borttagning ({{n}}). Rensa dem innan du skapar ett valv.",
+    "cleanUpFiles": "Rensa kvarvarande filer",
+    "create": "Skapa ett valv",
+    "connect": "Anslut till mitt konto"
+  },
+  "wikiGraph": {
+    "emptyTitle": "Inga länkar ännu",
+    "emptyBodyBefore": "Koppla samman anteckningar genom att skriva ",
+    "emptyBodyAfter": " i din text. Länkade anteckningar visas här som en graf."
+  },
+  "markdown": {
+    "attachmentFallback": "bilaga",
+    "nothingToPreview": "Inget att förhandsvisa ännu."
+  },
+  "conflicts": {
+    "empty": "Inga konflikter att granska – dina anteckningar är synkroniserade.",
+    "groupTitle_one": "{{count}} motstridig kopia",
+    "groupTitle_other": "{{count}} motstridiga kopior",
+    "groupTitleOfNote": " av anteckning {{hex}}"
+  },
+  "viewEditor": {
+    "saveError": "Det gick inte att spara den här vyn. Försök igen.",
+    "deleteError": "Det gick inte att ta bort den här vyn. Försök igen.",
+    "editView": "Redigera vy",
+    "condition": {
+      "search": "Text"
+    },
+    "containsPlaceholder": "innehåller…",
+    "tagPlaceholder": "tagg",
+    "folderPlaceholder": "Mapp/",
+    "addCondition": "+ Lägg till villkor",
+    "createView": "Skapa vy"
+  },
+  "snapshots": {
+    "today": "Idag {{time}}",
+    "readError": "Det gick inte att läsa versionshistoriken.",
+    "decryptError": "Det gick inte att dekryptera den versionen.",
+    "restoreError": "Det gick inte att återställa den versionen.",
+    "title": "Versionshistorik",
+    "emptyState": "Inga tidigare versioner ännu. Ögonblicksbilder tas automatiskt medan du redigerar.",
+    "hide": "Dölj",
+    "empty": "(tom)",
+    "restoreThisVersion": "Återställ den här versionen"
+  },
+  "restoreBackup": {
+    "title": "Inte tillgängligt på mobil ännu",
+    "body": "Att återställa från en säkerhetskopiefil är inte tillgängligt på mobil ännu – skapa ett valv eller återställ med din fras."
+  },
+  "recording": {
+    "deniedTitle": "Mikrofonåtkomst är avstängd",
+    "errorTitle": "Det gick inte att starta inspelningen",
+    "deniedBody": "För att spela in en röstanteckning, tillåt mikrofonåtkomst för Myne i Inställningar › Myne › Mikrofon.",
+    "noDeviceBody": "Ingen mikrofon hittades på den här enheten.",
+    "emptyBody": "Inspelningen var tom – ingenting fångades.",
+    "genericBody": "Något gick fel under inspelningen. Försök igen.",
+    "stopAria": "Stoppa inspelning"
+  },
+  "picker": {
+    "neverOpened": "Aldrig öppnad",
+    "openedJustNow": "öppnad just nu",
+    "openedMinuteAgo": "öppnad för en minut sedan",
+    "openedMinutesAgo_one": "öppnad för {{count}} minut sedan",
+    "openedMinutesAgo_other": "öppnad för {{count}} minuter sedan",
+    "openedHourAgo": "öppnad för en timme sedan",
+    "openedHoursAgo_one": "öppnad för {{count}} timme sedan",
+    "openedHoursAgo_other": "öppnad för {{count}} timmar sedan",
+    "openedYesterday": "öppnad igår",
+    "openedDaysAgo_one": "öppnad för {{count}} dag sedan",
+    "openedDaysAgo_other": "öppnad för {{count}} dagar sedan",
+    "openedLastWeek": "öppnad förra veckan",
+    "openedWeeksAgo_one": "öppnad för {{count}} vecka sedan",
+    "openedWeeksAgo_other": "öppnad för {{count}} veckor sedan",
+    "openedLastMonth": "öppnad förra månaden",
+    "openedMonthsAgo_one": "öppnad för {{count}} månad sedan",
+    "openedMonthsAgo_other": "öppnad för {{count}} månader sedan",
+    "openedLastYear": "öppnad förra året",
+    "openedYearsAgo_one": "öppnad för {{count}} år sedan",
+    "openedYearsAgo_other": "öppnad för {{count}} år sedan",
+    "corruptedBadge": "Skadad"
+  },
+  "join": {
+    "transportError": "Det gick inte att nå synkroniseringsservern. Kontrollera adressen och din anslutning och försök igen.",
+    "passwordPlaceholder": "Ditt valvlösenord",
+    "waitingHint": "Håll den här skärmen öppen – när det har godkänts visas en verifieringskod här att jämföra med din andra enhet.",
+    "verifyBody": "Kontrollera att den här koden är samma som visas på enheten du godkände från.",
+    "removing": "Tar bort…",
+    "sasMismatch": "De stämmer inte överens – ta bort den här enheten",
+    "title": "Anslut till ditt konto",
+    "lead": "Ange dina kontouppgifter för att hämta dina anteckningar till den här enheten. Allt förblir krypterat från ände till ände.",
+    "serverPlaceholder": "https://sync.example.com",
+    "accountHint": "Dubbelkolla numret – det ser inte rätt ut.",
+    "approvalHint": "Dina anteckningar visas när du godkänner den här enheten från en enhet som redan har ditt konto.",
+    "connectingSubtitle": "Hämtar ditt konto och låser upp ditt valv på den här enheten."
+  },
+  "createVault": {
+    "beginWeakPassword": "Välj ett starkare lösenord och försök igen.",
+    "beginGeneric": "Det gick inte att starta skapandet av valvet. Försök igen.",
+    "wordNumber": "ORD #{{position}}",
+    "commitError": "Det gick inte att spara ditt valv. Försök igen.",
+    "savedToFile": "Sparat till {{label}}",
+    "saveFileError": "Det gick inte att spara filen.",
+    "stepLabel": "Skapa ett valv · {{current}} av {{total}}",
+    "briefingTitle": "Innan vi börjar",
+    "briefingLead": "Myne krypterar allt på den här enheten. Den integriteten medför ett ansvar som bara du kan bära.",
+    "passwordTitle": "Skapa ett lösenord",
+    "confirmPasswordLabel": "Bekräfta lösenord",
+    "passwordHelper": "Lagras aldrig, överförs aldrig. Det krypterar dina nycklar på den här enheten.",
+    "encryptingSubtitle": "Härleder din nyckel med Argon2id. Det tar några sekunder och kan inte avbrytas.",
+    "phraseTitle": "Din återställningsfras",
+    "phraseIntro": "Tjugofyra ord, i ordning. Skriv ner dem på papper och förvara dem på en säker plats.",
+    "showSecondHalf": "Visa ord 13–24",
+    "saveToFile": "Spara till fil",
+    "writtenThemDown": "Jag har skrivit ner dem",
+    "typebackTitle": "Bekräfta din fras",
+    "typebackLead": "Ange dessa fyra ord från återställningsfrasen du just sparade.",
+    "wordMismatch": "Stämmer inte med ord #{{pos}}",
+    "backToPhrase": "Tillbaka till frasen",
+    "accountTitle": "Ditt kontonummer",
+    "accountLead": "Spara detta tillsammans med din återställningsfras. Du behöver det för att återställa ditt valv på en ny enhet.",
+    "accountSavedAck": "Jag har sparat mitt kontonummer.",
+    "commit": "Slutför",
+    "committingTitle": "Sparar ditt valv…",
+    "committingSubtitle": "Skriver det krypterade valvet till den här enheten.",
+    "unlockingTitle": "Låser upp…",
+    "unlockingSubtitle": "Öppnar ditt valv.",
+    "readyTitle": "Ditt valv är klart",
+    "readyBody": "Allt du skriver härifrån krypteras på den här enheten innan det lagras eller synkroniseras.",
+    "personalLabel": "Personligt",
+    "openVault": "Öppna valv",
+    "backUpNow": "Säkerhetskopiera nu"
   }
 }

@@ -6,14 +6,18 @@
       "close": "关闭",
       "completeTitle": "清理完成",
       "deleteCta": "删除 {{count}} 个未使用",
-      "deleteCta_other": "",
+      "deleteCta_one": "删除 {{count}} 个未使用",
+      "deleteCta_other": "删除 {{count}} 个未使用",
       "error": "无法清理。部分笔记可能无法读取——未删除任何内容。",
+      "intro_one": "此附件未被任何笔记使用。删除它是永久性的，无法撤销。",
       "intro_other": "这 {{count}} 个附件未在任何笔记中使用。删除后将永久生效，无法撤销。",
       "summaryFreed": " · 释放了 {{size}}",
       "summaryPeriod": "。",
+      "summaryRemoved_one": "已移除 {{count}} 个附件",
       "summaryRemoved_other": "已删除 {{count}} 个附件",
       "summarySkipped": " · 跳过 {{count}} 个（现已在使用中）",
-      "summarySkipped_other": "",
+      "summarySkipped_one": " · 已跳过 {{count}} 个（现正使用中）",
+      "summarySkipped_other": " · 已跳过 {{count}} 个（现正使用中）",
       "title": "清理未使用的附件",
       "willBeReclaimed": "将回收 {{size}}。"
     },
@@ -33,6 +37,7 @@
       "deleting": "正在删除…",
       "error": "无法删除附件。请重试。",
       "notUsed": "未在任何笔记中使用。",
+      "stillUsed_one": "它仍在 {{count}} 篇笔记中使用。删除它会在其原本嵌入的位置留下一个占位标记：",
       "stillUsed_other": "它仍在 {{count}} 篇笔记中使用。删除后会在其嵌入位置留下一个墓碑标记：",
       "title": "删除附件",
       "untitled": "无标题"
@@ -86,6 +91,7 @@
         "other": "其他",
         "pdf": "PDF"
       },
+      "usedInCount_one": "在 {{count}} 篇笔记中使用",
       "usedInCount_other": "用于 {{count}} 篇笔记",
       "usedInLoading": "…"
     },
@@ -100,7 +106,28 @@
     "usedInNotesPopover": {
       "empty": "未在任何笔记中使用。",
       "untitled": "无标题"
-    }
+    },
+    "needsApp": "附件清理需要使用应用。",
+    "noUnused": "没有未使用的附件——每个文件都被引用。",
+    "scanError": "无法扫描未使用的附件。",
+    "erasedToast_one": "已抹除 {{count}} 个未使用的文件。",
+    "erasedToast_other": "已抹除 {{count}} 个未使用的文件。",
+    "eraseError": "无法抹除未使用的附件。",
+    "readError": "无法读取附件。",
+    "needAppPreview": "附件需要使用应用（而非浏览器预览）。",
+    "tooLarge": "该文件过大（最大 64 MB）。",
+    "unsupported": "只能附加图片和 PDF。",
+    "addError": "无法添加该文件。",
+    "deleteError": "无法删除该附件。",
+    "renameError": "无法重命名该附件。",
+    "unusedSummary_one": "有 {{count}} 个附件未被任何笔记引用（{{size}}）。抹除是一次永久性的加密删除——没有回收站。",
+    "unusedSummary_other": "有 {{count}} 个附件未被任何笔记引用（{{size}}）。抹除是一次永久性的加密删除——没有回收站。",
+    "eraseCta_one": "抹除 {{count}} 个未使用的文件",
+    "eraseCta_other": "抹除 {{count}} 个未使用的文件",
+    "emptyState": "尚无附件。点按“上传”以添加图片或 PDF。",
+    "insert": "插入",
+    "pauseLabel": "暂停 {{filename}}",
+    "playLabel": "播放 {{filename}}"
   },
   "backup": {
     "errors": {
@@ -155,6 +182,8 @@
     "archivedBadge": "存档",
     "archivedBadgeTitle": "已存档",
     "dialogLabel": "命令面板",
+    "matchedInAttachment": "在附件中",
+    "matchedInAttachmentTitle": "查询在此笔记嵌入的文件中匹配",
     "matchedInBody": "↳ 在正文中匹配",
     "noMatches": "无匹配项",
     "searchPlaceholder": "搜索笔记或运行命令——按 Esc 关闭",
@@ -168,10 +197,172 @@
         "label": "备份保险库…"
       },
       "category": {
+        "ai": "AI",
         "app": "应用",
+        "appearance": "外观",
         "editor": "编辑器",
+        "notes": "笔记",
         "vault": "保险库",
         "view": "视图"
+      },
+      "aiOpenChat": {
+        "label": "打开 AI 聊天"
+      },
+      "toggleLineNumbers": {
+        "label": "切换行号"
+      },
+      "toggleSpellCheck": {
+        "label": "切换拼写检查"
+      },
+      "toggleTypewriter": {
+        "label": "切换打字机滚动"
+      },
+      "toggleDimInactive": {
+        "label": "切换非活动行变暗"
+      },
+      "toggleEditorFont": {
+        "label": "切换编辑器字体（等宽 / 无衬线）"
+      },
+      "cycleTextSize": {
+        "label": "循环切换编辑器文字大小"
+      },
+      "cycleContentWidth": {
+        "label": "循环切换编辑器内容宽度"
+      },
+      "cycleDefaultViewMode": {
+        "label": "循环切换默认视图模式"
+      },
+      "toggleTimestamps": {
+        "label": "切换侧栏笔记时间戳"
+      },
+      "toggleArchiving": {
+        "label": "切换笔记归档"
+      },
+      "toggleAiEnabled": {
+        "label": "切换 AI 功能（测试版）"
+      },
+      "toggleScreenCapture": {
+        "label": "切换屏幕捕捉保护"
+      },
+      "cycleTheme": {
+        "label": "循环切换主题"
+      },
+      "themeLight": {
+        "label": "主题：浅色"
+      },
+      "themeDark": {
+        "label": "主题：深色"
+      },
+      "themeAmoled": {
+        "label": "主题：AMOLED"
+      },
+      "themeSystem": {
+        "label": "主题：跟随系统"
+      },
+      "applyCustomTheme": {
+        "label": "应用自定义主题…"
+      },
+      "splitRight": {
+        "label": "向右拆分窗格"
+      },
+      "splitDown": {
+        "label": "向下拆分窗格"
+      },
+      "closePane": {
+        "label": "关闭窗格"
+      },
+      "closeTab": {
+        "label": "关闭标签页"
+      },
+      "nextTab": {
+        "label": "下一个标签页"
+      },
+      "prevTab": {
+        "label": "上一个标签页"
+      },
+      "focusNextPane": {
+        "label": "聚焦下一个窗格"
+      },
+      "focusPrevPane": {
+        "label": "聚焦上一个窗格"
+      },
+      "goBack": {
+        "label": "后退"
+      },
+      "goForward": {
+        "label": "前进"
+      },
+      "togglePreview": {
+        "label": "切换并排预览"
+      },
+      "findInNote": {
+        "label": "在笔记中查找"
+      },
+      "findReplace": {
+        "label": "在笔记中查找和替换"
+      },
+      "newNote": {
+        "label": "新建笔记"
+      },
+      "duplicateNote": {
+        "label": "复制笔记"
+      },
+      "archiveNote": {
+        "label": "归档笔记"
+      },
+      "renameNote": {
+        "label": "重命名笔记"
+      },
+      "trashNote": {
+        "label": "将笔记移至回收站"
+      },
+      "toggleFavorite": {
+        "label": "切换收藏"
+      },
+      "moveNote": {
+        "label": "将笔记移至文件夹…"
+      },
+      "emptyTrash": {
+        "label": "清空回收站"
+      },
+      "showBacklinks": {
+        "label": "显示反向链接"
+      },
+      "showOutline": {
+        "label": "显示大纲"
+      },
+      "showUnlinked": {
+        "label": "显示未链接的提及"
+      },
+      "newFolder": {
+        "label": "新建文件夹"
+      },
+      "openTrash": {
+        "label": "打开回收站"
+      },
+      "openArchive": {
+        "label": "打开归档"
+      },
+      "cycleHeading": {
+        "label": "循环切换标题级别"
+      },
+      "restoreBackup": {
+        "label": "从备份恢复保险库…"
+      },
+      "toggleRealtimeSync": {
+        "label": "切换实时同步"
+      },
+      "revealVaultFolder": {
+        "label": "在文件管理器中显示保险库文件夹"
+      },
+      "aiSummarizeNote": {
+        "label": "总结笔记"
+      },
+      "aiSuggestTags": {
+        "label": "建议标签"
+      },
+      "aiRewriteSelection": {
+        "label": "重写所选内容"
       },
       "convertWikilinks": {
         "label": "转换此笔记中导入的 wiki 链接…"
@@ -181,6 +372,12 @@
       },
       "exportNoteHtml": {
         "label": "将笔记导出为 HTML…"
+      },
+      "exportSelectionImage": {
+        "label": "将所选内容导出为图片…",
+        "saved": "所选内容已保存为图片。",
+        "noSelection": "请先选择一些文字，然后将其导出为图片。",
+        "failed": "无法将所选内容导出为图片。"
       },
       "exportNoteMarkdown": {
         "label": "将笔记导出为 Markdown…"
@@ -303,6 +500,15 @@
     },
     "rebind": {
       "invalidChordReason": "请加上一个修饰键（⌘、Ctrl 或 Alt）——单个按键不能作为快捷键。"
+    },
+    "picker": {
+      "vaultRoot": "保险库根目录",
+      "moveNoteTitle": "将笔记移至文件夹",
+      "moveNotePlaceholder": "选择一个文件夹…",
+      "noFolders": "尚无文件夹",
+      "applyThemeTitle": "应用自定义主题",
+      "applyThemePlaceholder": "选择一个主题…",
+      "noCustomThemes": "未安装自定义主题"
     }
   },
   "common": {
@@ -313,7 +519,9 @@
     },
     "spinner": {
       "loadingLabel": "正在加载"
-    }
+    },
+    "back": "返回",
+    "continue": "继续"
   },
   "editor": {
     "attachment": {
@@ -328,6 +536,7 @@
         "cancel": "取消",
         "confirm": "转换",
         "skipped": "已跳过——{{note}}",
+        "subtitle_one": "将重写 1 处引用。提交前请检查。",
         "subtitle_other": "将重写 {{count}} 处引用。提交前请检查。",
         "subtitleEmpty": "没有可转换的内容——未解析到任何源文件。",
         "title": "转换导入的附件"
@@ -337,7 +546,8 @@
       },
       "convertCore": {
         "converted": "已转换 {{count}} 个",
-        "converted_other": "",
+        "converted_one": "已转换 {{count}} 个",
+        "converted_other": "已转换 {{count}} 个",
         "noneToConvert": "此笔记中没有可转换的导入附件。",
         "skipNote": {
           "failed": "导入失败",
@@ -347,7 +557,8 @@
           "unsupported": "不支持的类型"
         },
         "skippedSuffix": " · 跳过 {{count}} 个",
-        "skippedSuffix_other": ""
+        "skippedSuffix_one": " · 已跳过 {{count}} 个",
+        "skippedSuffix_other": " · 已跳过 {{count}} 个"
       },
       "fileKind": {
         "generic": "文件",
@@ -427,7 +638,8 @@
       },
       "summary": {
         "added": "已添加 {{count}} 个",
-        "added_other": "",
+        "added_one": "已添加 {{count}} 个",
+        "added_other": "已添加 {{count}} 个",
         "reason": {
           "failed": "失败",
           "locked": "保险库已锁定",
@@ -435,7 +647,8 @@
           "unsupported": "不支持的类型"
         },
         "skipped": "跳过 {{count}} 个：{{noun}}",
-        "skipped_other": ""
+        "skipped_one": "已跳过 {{count}} 个：{{noun}}",
+        "skipped_other": "已跳过 {{count}} 个：{{noun}}"
       },
       "voice": {
         "startError": {
@@ -465,6 +678,9 @@
           "reveal": "在附件库中显示"
         },
         "pdfFallback": "PDF",
+        "textPreview": {
+          "truncated": "预览已截断——导出以获取完整文件。"
+        },
         "tombstone": {
           "brokenAria": "失效的附件引用：{{filename}}",
           "brokenLabel": "已失效",
@@ -503,15 +719,16 @@
         "archivedBadge": "已存档",
         "empty": "暂无反向链接。",
         "linkedFrom": "来自 {{count}} 处的链接",
-        "linkedFrom_other": "",
+        "linkedFrom_one": "来自 {{count}} 处链接",
+        "linkedFrom_other": "来自 {{count}} 处链接",
         "untitled": "无标题"
       },
       "barItems": {
         "graph": "关系图",
-        "hide": "",
+        "hide": "隐藏",
         "lock": "锁定",
-        "moveLeft": "",
-        "moveRight": "",
+        "moveLeft": "左移",
+        "moveRight": "右移",
         "saveStatus": "保存状态",
         "settings": "设置",
         "syncStatus": "同步状态",
@@ -523,24 +740,30 @@
       },
       "baseImport": {
         "droppedFiltersSuffix": " · 已舍弃 {{count}} 个筛选条件",
-        "droppedFiltersSuffix_other": "",
+        "droppedFiltersSuffix_one": " · 已丢弃 {{count}} 个筛选条件",
+        "droppedFiltersSuffix_other": " · 已丢弃 {{count}} 个筛选条件",
         "failed": "导入失败。",
         "fileFilterName": "Obsidian Base",
         "imported": "已导入 {{count}} 个视图",
-        "imported_other": "",
+        "imported_one": "已导入 {{count}} 个视图",
+        "imported_other": "已导入 {{count}} 个视图",
         "notValid": "不是有效的 .base 文件。",
         "skippedSuffix": " · 跳过 {{count}} 个",
-        "skippedSuffix_other": "",
+        "skippedSuffix_one": " · 已跳过 {{count}} 个",
+        "skippedSuffix_other": " · 已跳过 {{count}} 个",
         "stoppedAfter": "导入在 {{count}} 个视图后停止。",
-        "stoppedAfter_other": ""
+        "stoppedAfter_one": "在 {{count}} 个视图后停止导入。",
+        "stoppedAfter_other": "在 {{count}} 个视图后停止导入。"
       },
       "bottomBar": {
         "browseTags": "浏览标签",
         "browseViews": "浏览视图",
         "cycleViewMode": "循环切换查看模式",
         "docStats": {
+          "summary_one": "{{count}} 个单词 · {{characters}} 个字符",
           "summary_other": "{{count}} 个字 · {{characters}} 个字符",
           "summarySelectionSuffix": "（选中）",
+          "title_one": "{{characters}} 个字符 · {{words}} 个单词 · {{spaces}} 个空格 · {{count}} 个段落",
           "title_other": "{{characters}} 个字符 · {{words}} 个字 · {{spaces}} 个空格 · {{count}} 个段落",
           "titleSelectionSuffix": "（选区）"
         },
@@ -557,9 +780,11 @@
         "viewsTitle": "视图"
       },
       "import": {
+        "imported_one": "已导入 {{count}} 篇笔记{{skipped}}",
         "imported_other": "已导入 {{count}} 篇笔记{{skipped}}",
         "skippedSuffix": " · 跳过 {{count}} 个",
-        "skippedSuffix_other": ""
+        "skippedSuffix_one": " · 已跳过 {{count}} 个",
+        "skippedSuffix_other": " · 已跳过 {{count}} 个"
       },
       "nav": {
         "goBack": "后退",
@@ -569,10 +794,43 @@
       "resizeBacklinksSidebar": "调整反向链接侧边栏大小",
       "resizeNotesSidebar": "调整笔记侧边栏大小",
       "rightPanel": {
-        "allHidden": "",
+        "aiChat": {
+          "askPlaceholder": "就你的笔记提一个问题…",
+          "askSubmit": "提问",
+          "assistant": "助手",
+          "citations": "来源",
+          "composerPlaceholder": "向你的笔记发消息…",
+          "empty": "AI 输出——摘要、答案和建议——会显示在这里。",
+          "error": "AI 请求无法完成。",
+          "errorTurn": "助手无法回答。",
+          "gettingReadyHint": "正在为 AI 准备你的笔记——请稍候。",
+          "insert": "插入到笔记",
+          "noAnswer": "没有答案——请尝试换个说法。",
+          "noModelHint": "未选择模型。请在设置 → 实验室 → AI 中选择一个以开始。",
+          "offHint": "本地 AI 已关闭。请在设置 → 实验室 → AI 中开启。",
+          "send": "发送",
+          "statusGettingReady": "正在准备…",
+          "statusNoModel": "无模型",
+          "statusOff": "已关闭",
+          "statusReady": "就绪",
+          "stop": "停止",
+          "tagsThinking": "正在建议标签…",
+          "thinking": "AI 正在思考…",
+          "truncated": "已总结前 {{count}} 个字符。",
+          "you": "你"
+        },
+        "allHidden": "所有标签页均已隐藏——右键单击以恢复。",
         "outline": {
-          "empty": "",
-          "heading": ""
+          "collapse": "折叠此节",
+          "empty": "没有标题",
+          "expand": "展开此节",
+          "heading": "大纲"
+        },
+        "tabs": {
+          "aiChat": "AI 聊天",
+          "backlinks": "反向链接",
+          "outline": "大纲",
+          "unlinked": "未链接的提及"
         }
       },
       "sidebarToggle": {
@@ -641,6 +899,8 @@
       "rendering": "正在渲染图表…"
     },
     "slash": {
+      "aiContinue": "继续写作（AI）",
+      "aiTitle": "建议标题（AI）",
       "attachFile": "附加文件",
       "bulletList": "无序列表",
       "callout": "标注框",
@@ -682,6 +942,21 @@
     },
     "toolbar": {
       "apply": "应用",
+      "exportImageTitle": "将所选内容导出为图片",
+      "customize": {
+        "bold": "加粗",
+        "bulletList": "无序列表",
+        "checklist": "清单",
+        "code": "代码",
+        "heading": "标题",
+        "highlight": "高亮",
+        "italic": "斜体",
+        "link": "链接",
+        "numberedList": "有序列表",
+        "quote": "引用",
+        "strike": "删除线",
+        "wikilink": "Wiki 链接"
+      },
       "heading": {
         "h1": "H1",
         "h2": "H2",
@@ -729,12 +1004,15 @@
       },
       "convert": {
         "cancel": "取消",
+        "choiceClause_one": " · {{count}} 个需要选择。",
         "choiceClause_other": " · {{count}} 处需要选择。",
         "chooseTarget": "选择目标…",
         "convert": "转换",
+        "convertedToast_one": "已转换 {{count}} 个 Wiki 链接",
         "convertedToast_other": "已转换 {{count}} 个 wiki 链接",
         "noneToConvert": "此笔记中没有可转换的导入 wiki 链接。",
         "nothingToConvert": "没有可转换的内容——没有可解析的导入 wiki 链接。",
+        "rewriteCount_one": "将重写 {{count}} 个链接",
         "rewriteCount_other": "将重写 {{count}} 个链接",
         "skipped": "已跳过——{{reason}}",
         "title": "转换此笔记中导入的 wiki 链接"
@@ -742,6 +1020,126 @@
       "convertCore": {
         "noMatch": "无匹配"
       }
+    },
+    "flow": {
+      "loadFailed": "无法加载你的笔记。",
+      "openFailed": "无法打开此笔记。",
+      "saveFailed": "无法保存此笔记。",
+      "moveFailed": "无法移动此笔记。",
+      "openTodayFailed": "无法打开今天的笔记。",
+      "exportFailed": "无法导出此笔记。",
+      "attachNeedsApp": "附件需要使用应用（而非浏览器预览）。",
+      "attachTooLarge": "该文件过大（最大 64 MB）。",
+      "attachUnsupported": "只能附加图片和 PDF。",
+      "attachFailed": "无法附加该文件。",
+      "archiveFailed": "无法归档此笔记。",
+      "trashFailed": "无法将此笔记移至回收站。"
+    },
+    "nav": {
+      "dailyNote": "每日笔记",
+      "openToday": "打开今天",
+      "allNotes": "所有笔记"
+    },
+    "list": {
+      "searchPlaceholder": "搜索笔记",
+      "clearSearch": "清除搜索",
+      "viewNoteCount_one": "“{{name}}”中有 {{count}} 篇笔记",
+      "viewNoteCount_other": "“{{name}}”中有 {{count}} 篇笔记",
+      "edit": "编辑",
+      "trashEmpty": "回收站为空",
+      "archiveEmpty": "没有已归档的笔记",
+      "noMatchingNotes": "没有匹配的笔记",
+      "noNotesYet": "尚无笔记",
+      "noMatchBody": "没有与“{{name}}”匹配的内容。编辑或清除该视图以查看所有笔记。",
+      "emptyBody": "点按“新建笔记”以撰写你的第一篇笔记。所有内容在存储前都会在此设备上加密。",
+      "unarchive": "取消归档"
+    },
+    "filterSheet": {
+      "title": "筛选",
+      "status": "状态"
+    },
+    "sortSheet": {
+      "title": "排序",
+      "manual": "手动排序",
+      "titleAsc": "标题 · A → Z",
+      "titleDesc": "标题 · Z → A"
+    },
+    "noteMenu": {
+      "emptyNote": "空笔记",
+      "wordCount_one": "{{count}} 个单词 · 阅读 {{minutes}} 分钟",
+      "wordCount_other": "{{count}} 个单词 · 阅读 {{minutes}} 分钟",
+      "moveToFolder": "移至文件夹…",
+      "moveToTrash": "移至回收站",
+      "copied": "已复制 ✓",
+      "copyToClipboard": "复制到剪贴板",
+      "versionHistory": "版本历史"
+    },
+    "purge": {
+      "body": "这将从此设备永久移除该笔记。此操作无法撤销。"
+    },
+    "move": {
+      "title": "移至文件夹",
+      "body": "输入文件夹路径（例如 Projects/Myne）。留空表示保险库根目录。",
+      "placeholder": "Projects/Myne",
+      "confirm": "移动"
+    },
+    "sidebar": {
+      "browse": "浏览"
+    },
+    "emptyDetail": {
+      "title": "选择一篇笔记",
+      "body": "从列表中选择一篇笔记，或新建一篇。"
+    },
+    "readingBar": {
+      "editNote": "编辑笔记",
+      "edit": "编辑"
+    },
+    "graphTab": {
+      "linkedNotes_one": "{{count}} 篇已链接笔记",
+      "linkedNotes_other": "{{count}} 篇已链接笔记",
+      "links_one": "{{count}} 个链接",
+      "links_other": "{{count}} 个链接"
+    },
+    "formatBar": {
+      "redo": "重做",
+      "attachFile": "附加新文件",
+      "insertFromLibrary": "从库中插入",
+      "recordVoiceNote": "录制语音笔记",
+      "showLivePreview": "显示实时预览",
+      "showRawMarkdown": "显示原始 Markdown",
+      "hideKeyboard": "隐藏键盘"
+    },
+    "topBar": {
+      "backToNotes": "返回笔记",
+      "noteDetails": "笔记详情",
+      "noteActions": "笔记操作"
+    },
+    "noteContext": {
+      "collapsePanel": "折叠面板",
+      "unlinkedCount_one": "未链接的提及 {{count}}",
+      "unlinkedCount_other": "未链接的提及 {{count}}"
+    },
+    "viewsSheet": {
+      "typeCards": "卡片",
+      "typeList": "列表",
+      "emptyState": "尚无已保存的视图。创建一个以按标签、文件夹或文本筛选你的笔记。",
+      "editView": "编辑视图"
+    },
+    "sheet": {
+      "done": "完成"
+    },
+    "vaultSwitcher": {
+      "title": "保险库"
+    },
+    "tagBrowser": {
+      "noTagsMatch": "没有匹配的标签。",
+      "notesCount_one": "笔记 · {{count}}",
+      "notesCount_other": "笔记 · {{count}}"
+    },
+    "untitledNote": "无标题笔记",
+    "commandPalette": {
+      "searchPlaceholder": "搜索笔记或运行命令…",
+      "noMatches": "没有匹配的命令或笔记。"
     }
   },
   "export": {
@@ -772,7 +1170,9 @@
       "flow": {
         "couldNotRead": "无法读取此笔记。",
         "exportedTo": "已导出到 {{filename}}",
+        "exportedToWithAttachments_one": "已导出到 {{filename}} + {{count}} 个附件",
         "exportedToWithAttachments_other": "已导出到 {{filename}} + {{count}} 个附件",
+        "exportedToWithImages_one": "已导出到 {{filename}} + {{count}} 张图片",
         "exportedToWithImages_other": "已导出到 {{filename}} + {{count}} 张图片",
         "filterHtml": "HTML",
         "filterMarkdown": "Markdown",
@@ -783,6 +1183,7 @@
       "modal": {
         "cancel": "取消",
         "export": "导出…",
+        "includeAttachments_one": "包含 {{count}} 个附件",
         "includeAttachments_other": "包含 {{count}} 个附件",
         "title": "导出为 Markdown"
       }
@@ -810,11 +1211,16 @@
         "vaultNotFound": "未找到可导出的保险库。"
       },
       "flow": {
+        "countAttachments_one": "{{count}} 个附件",
         "countAttachments_other": "{{count}} 个附件",
+        "countFolders_one": "{{count}} 个文件夹",
         "countFolders_other": "{{count}} 个文件夹",
+        "countNotes_one": "{{count}} 篇笔记",
         "countNotes_other": "{{count}} 篇笔记",
         "exclusionsHistory": "未包含版本历史。",
+        "exclusionsTrashed_one": "未包含 {{count}} 篇回收站中的笔记。",
         "exclusionsTrashed_other": "未包含 {{count}} 篇回收站中的笔记。",
+        "exclusionsTrashedAndHistory_one": "未包含 {{count}} 篇回收站中的笔记及版本历史。",
         "exclusionsTrashedAndHistory_other": "未包含 {{count}} 篇回收站中的笔记和版本历史。",
         "phaseAttachments": "附件",
         "phaseNotes": "笔记",
@@ -872,12 +1278,18 @@
   },
   "notes": {
     "archive": {
+      "cancel": "取消",
       "close": "关闭",
+      "count_one": "{{count}} 篇笔记",
       "count_other": "{{count}} 篇笔记",
       "countEmpty": "空",
       "delete": "删除",
       "deleteError": "无法删除该笔记。请重试。",
       "emptyState": "存档为空。",
+      "folderDeleteConfirm_one": "将 {{count}} 篇笔记移至回收站？",
+      "folderDeleteConfirm_other": "将 {{count}} 篇笔记移至回收站？",
+      "folderDeleteConfirmCta": "移至回收站",
+      "folderDeleteError": "无法将该文件夹的笔记移至回收站。请重试。",
       "restore": "恢复",
       "restoreError": "无法恢复该笔记。请重试。",
       "title": "存档",
@@ -927,6 +1339,7 @@
         "isNot": "不是"
       },
       "noConditions": "暂无条件——此视图显示所有页面。",
+      "noteCount_one": "{{count}} 篇笔记",
       "noteCount_other": "{{count}} 篇笔记",
       "of": "以下条件：",
       "ofTheGroups": "以下条件组：",
@@ -980,7 +1393,8 @@
       "modal": {
         "cancel": "取消",
         "cancelledNotImported": "{{count}} 个未导入",
-        "cancelledNotImported_other": "",
+        "cancelledNotImported_one": "{{count}} 个未导入",
+        "cancelledNotImported_other": "{{count}} 个未导入",
         "cancelling": "正在取消…",
         "chooseFolder": "选择文件夹…",
         "close": "关闭",
@@ -993,6 +1407,7 @@
         "flagKindFolder": "文件夹",
         "flagKindTitle": "标题",
         "folderPickerTitle": "选择你的 Obsidian 保险库文件夹",
+        "hiddenIgnoredPrefix_one": "已忽略 {{count}} 个配置 / 隐藏项目（例如 ",
         "hiddenIgnoredPrefix_other": "已忽略 {{count}} 个配置/隐藏项（例如 ",
         "hiddenIgnoredSuffix": "、点文件）。",
         "ifNoteExistsLabel": "如果笔记已存在",
@@ -1002,12 +1417,15 @@
         "markDone": "标记为完成",
         "markedDone": "已标记为完成",
         "mediaImported": "已导入 {{count}} 个",
-        "mediaImported_other": "",
+        "mediaImported_one": "已导入 {{count}} 个",
+        "mediaImported_other": "已导入 {{count}} 个",
         "mediaOmittedSuffix": " · 省略 {{count}} 个",
-        "mediaOmittedSuffix_other": "",
+        "mediaOmittedSuffix_one": " · 已略去 {{count}} 个",
+        "mediaOmittedSuffix_other": " · 已略去 {{count}} 个",
         "needsAttention": "需要注意",
         "needsAttentionHelp": "这些笔记按原样导入。建议的修复只是起点——复制其中一个，然后在打开笔记后重命名。",
         "noFolderChosen": "未选择文件夹",
+        "notesImported_one": "篇笔记已导入",
         "notesImported_other": "篇笔记已导入",
         "policyCopyHint": "在现有笔记旁边一并导入。",
         "policyCopyLabel": "作为副本导入",
@@ -1047,21 +1465,26 @@
       "addToFavorites": "添加到收藏",
       "archive": "存档",
       "archiveBulkError": "无法存档这些笔记。",
+      "archiveFolder": "归档文件夹",
       "archiveNote": "存档",
       "archiveSingleError": "无法存档该笔记。",
       "attachments": "附件",
       "bulkArchive": "存档 {{count}} 篇笔记",
-      "bulkArchive_other": "",
+      "bulkArchive_one": "归档 {{count}} 篇笔记",
+      "bulkArchive_other": "归档 {{count}} 篇笔记",
       "bulkDelete": "删除 {{count}} 篇笔记",
-      "bulkDelete_other": "",
+      "bulkDelete_one": "删除 {{count}} 篇笔记",
+      "bulkDelete_other": "删除 {{count}} 篇笔记",
       "bulkMove": "将 {{count}} 篇笔记移动到…",
-      "bulkMove_other": "",
+      "bulkMove_one": "将 {{count}} 篇笔记移至…",
+      "bulkMove_other": "将 {{count}} 篇笔记移至…",
       "caseMergeBody": "已存在名为“{{name}}”的文件夹。它们会合并——是否重命名其中一个以将它们分开？",
       "color": "颜色…",
       "createFirstNote": "+ 创建你的第一篇笔记",
       "createFolderNote": "创建文件夹笔记",
       "customize": "自定义…",
       "delete": "删除",
+      "deleteFolderBody_one": "“{{name}}”及其 {{count}} 篇笔记",
       "deleteFolderBody_other": "“{{name}}”及其 {{count}} 篇笔记",
       "deleteFolderConfirm": "删除文件夹",
       "deleteFolderTitle": "删除此文件夹？",
@@ -1087,6 +1510,7 @@
       "newViewTitle": "新建视图",
       "noteMovedToTrash": "笔记已移入回收站",
       "notesHeading": "笔记",
+      "notesMovedToTrash_one": "已将 {{count}} 篇笔记移至回收站",
       "notesMovedToTrash_other": "{{count}} 篇笔记已移入回收站",
       "openArchive": "打开存档",
       "openAttachments": "打开附件",
@@ -1094,13 +1518,18 @@
       "openInNewTab": "在新标签页中打开",
       "openToSide": "在侧边打开",
       "openTrash": "打开回收站",
-      "removeAsFolderNote": "取消设为文件夹笔记",
-      "removeFolderNote": "",
+      "removeFolderNote": "移除文件夹笔记",
       "removeFromFavorites": "从收藏中移除",
       "rename": "重命名",
       "setAsFolderNote": "设为文件夹笔记",
       "trash": "回收站",
       "trashBulkError": "无法将这些笔记移入回收站。",
+      "trashConfirmBulkBody_one": "将把 {{count}} 篇笔记移至回收站。",
+      "trashConfirmBulkBody_other": "将把 {{count}} 篇笔记移至回收站。",
+      "trashConfirmBulkWarning": "你之后可以从回收站恢复它们。",
+      "trashConfirmConfirm": "移至回收站",
+      "trashConfirmTitle": "移至回收站？",
+      "trashConfirmWarning": "你之后可以从回收站恢复它。",
       "trashSingleError": "无法将该笔记移入回收站。",
       "undo": "撤销",
       "vaultRoot": "保险库根目录",
@@ -1174,6 +1603,7 @@
     },
     "snapshots": {
       "cancel": "取消",
+      "changeCount_one": "自此快照以来有 {{count}} 处更改",
       "changeCount_other": "自此快照以来有 {{count}} 处更改",
       "close": "关闭",
       "confirmBody": "你当前的笔记会先保存为一个快照，这样你可以撤销此操作。",
@@ -1218,6 +1648,7 @@
       "noNotesForFilter": "此筛选条件下没有笔记。",
       "noTagsMatch": "没有标签与“{{query}}”匹配。",
       "noTagsYet": "暂无标签。",
+      "noteCount_one": "{{count}} 篇笔记",
       "noteCount_other": "{{count}} 篇笔记",
       "notes": "笔记",
       "pickTag": "选择一个标签进行筛选。",
@@ -1230,14 +1661,17 @@
     },
     "trash": {
       "close": "关闭",
+      "count_one": "{{count}} 篇笔记",
       "count_other": "{{count}} 篇笔记",
       "countEmpty": "空",
       "delete": "删除",
       "deleteError": "无法删除该笔记。请重试。",
       "empty": "清空回收站",
+      "emptyConfirmBody_one": "将永久删除 {{count}} 篇笔记。",
       "emptyConfirmBody_other": "{{count}} 篇笔记将被永久删除。",
       "emptyConfirmCta": "清空回收站",
       "emptyConfirmTitle": "清空回收站？",
+      "emptyPartialFailure_one": "有 {{count}} 篇笔记无法删除，仍留在回收站中。",
       "emptyPartialFailure_other": "{{count}} 篇笔记无法删除，仍保留在回收站中。",
       "emptyState": "回收站为空。",
       "purgeConfirmCta": "永久删除",
@@ -1339,7 +1773,26 @@
       "operationInProgress": "操作正在进行中。请稍候。",
       "unexpected": "出现意外错误。请重试。",
       "vaultNotFound": "未找到保险库文件。请重新启动应用。"
-    }
+    },
+    "vaultUnreadable": "保险库文件无法读取。请从备份恢复。",
+    "genericError": "出了点问题。请重试。",
+    "weakPassword": "密码必须至少为 {{min}} 个字符。",
+    "setPasswordError": "无法设置你的新密码。请重试。",
+    "passwordMismatch": "两次输入的密码不一致。",
+    "decryptingSubtitle": "正在使用 Argon2id 重建你的保险库密钥。这需要几秒钟。",
+    "restoreVaultHeader": "恢复保险库",
+    "accountTitle": "输入你的账户编号",
+    "accountLead": "在你保存恢复短语的地方可以找到它。它用于标识要恢复的保险库。",
+    "accountInvalid": "账户编号无效——请检查后重新输入。",
+    "accountOptionalHint": "没有它？将此处留空并继续——你只需要 24 个单词的恢复短语。",
+    "paste": "粘贴",
+    "phraseGridHint": "逐个输入每个单词，或一次性粘贴全部 24 个以填满网格。",
+    "submitProgress": "提交 · {{filled}} / {{total}}",
+    "newPasswordTitle": "设置新密码",
+    "newPasswordLead": "你的恢复短语保持不变。这将设置此设备的密码。",
+    "confirmPasswordLabel": "确认密码",
+    "passwordHelper": "从不存储，从不传输。它在此设备上加密你的密钥。",
+    "encryptingSubtitle": "正在用你的新密码封装你的保险库密钥。"
   },
   "restore": {
     "backLabel": "返回",
@@ -1367,6 +1820,7 @@
       "collidedNote": "此保险库原有的副本仍在你的保险库列表中。一旦确认恢复的保险库能正常打开，你就可以从保险库列表中移除旧的那个（届时会要求你输入 DELETE）。",
       "notes": "笔记：{{n}}",
       "openVaultList": "打开保险库列表",
+      "partialHeader_one": "部分恢复——有 {{count}} 个项目无法读取。",
       "partialHeader_other": "部分恢复——有 {{count}} 项无法读取。",
       "restored": "保险库已恢复。",
       "versionHistory": "版本历史条目：{{n}}"
@@ -1391,7 +1845,9 @@
       "licenseLabel": "许可证",
       "tagline": "预览版（pre-alpha）· 第 1 阶段桌面客户端",
       "threatModelHelper": "在浏览器中打开公开的威胁模型文档。",
-      "threatModelLabel": "威胁模型"
+      "threatModelLabel": "威胁模型",
+      "version": "版本",
+      "dev": "开发版"
     },
     "account": {
       "argon2idHeading": "Argon2id 参数",
@@ -1414,7 +1870,21 @@
       "vaultLabelEyebrow": "保险库标签",
       "vaultLabelHelper": "在应用内切换器中显示的此保险库名称。以加密形式存储于保险库内部；绝不会以明文形式离开你的设备。",
       "vaultLabelPlaceholder": "添加标签…",
-      "vaultLabelSave": "保存"
+      "vaultLabelSave": "保存",
+      "vaultIconLabel": "图标",
+      "vaultIconDefault": "默认（文字标志）",
+      "renamedToast": "保险库已重命名",
+      "renameError": "无法重命名保险库",
+      "newPasswordMismatch": "两次输入的新密码不一致。",
+      "samePassword": "新密码与当前密码相同。",
+      "passwordChangedToast": "密码已更改",
+      "vaultUnreadable": "保险库文件无法读取。请从备份恢复。",
+      "genericChangeError": "出了点问题。请重试。",
+      "renameHelper": "显示在保险库切换器中。以加密方式存储在此保险库内；留空即可清除。",
+      "newPasswordPlaceholder": "至少 12 个字符",
+      "reenterNewPassword": "重新输入新密码",
+      "changePasswordFootnote": "这将使快速解锁失效。你的恢复短语保持不变。",
+      "changing": "正在更改…"
     },
     "appearance": {
       "showEditTimesAria": "在侧边栏显示编辑时间",
@@ -1430,7 +1900,13 @@
       "themeLabel": "主题",
       "themeOptionAria": "{{label}}主题",
       "themeSaveError": "无法保存主题。请重试。",
-      "timestampsSaveError": "无法保存偏好设置。请重试。"
+      "timestampsSaveError": "无法保存偏好设置。请重试。",
+      "sizeS": "S",
+      "sizeM": "M",
+      "sizeL": "L",
+      "sizeXL": "XL",
+      "editorFont": "编辑器字体",
+      "showEditTimesSubtitle": "每篇笔记下方的时间戳"
     },
     "archive": {
       "helper": "允许将笔记移入存档，使其不出现在主列表中。关闭此项会将每篇已存档的笔记恢复到其所在文件夹，并隐藏存档控件。",
@@ -1479,14 +1955,22 @@
       },
       "when": {
         "bare": "已连接",
+        "daysAgo_one": "{{count}} 天前连接",
         "daysAgo_other": "已于 {{count}} 天前连接",
         "hoursAgo": "已于 {{count}} 小时前连接",
-        "hoursAgo_other": "",
+        "hoursAgo_one": "{{count}} 小时前连接",
+        "hoursAgo_other": "{{count}} 小时前连接",
         "justNow": "刚刚连接",
         "minutesAgo": "已于 {{count}} 分钟前连接",
-        "minutesAgo_other": "",
+        "minutesAgo_one": "{{count}} 分钟前连接",
+        "minutesAgo_other": "{{count}} 分钟前连接",
         "onDate": "已于 {{date}} 连接"
       }
+    },
+    "clipperInstall": {
+      "error": "无法更新浏览器剪藏设置。",
+      "helper": "注册原生消息宿主，以便 Myne 浏览器扩展可以将剪藏发送到此应用。默认开启；关闭即可移除。",
+      "label": "浏览器剪藏"
     },
     "customThemes": {
       "appliedBadge": "已应用",
@@ -1541,36 +2025,40 @@
       "heading": "删除保险库",
       "ioFailBody": "无法访问要删除的保险库文件。保险库密钥已从内存中清零；磁盘上残留的任何保险库数据都是无法恢复的、经 Argon2id 封装的无意义数据。",
       "ioFailTitle": "删除时发生磁盘错误",
+      "partialFailBody_one": "有 {{count}} 个文件无法从磁盘删除。保险库密钥已从内存中清零，因此任何残留的孤立密文都是无法恢复的、由 Argon2id 封装的垃圾数据。",
       "partialFailBody_other": "有 {{count}} 个文件无法从磁盘删除。保险库密钥已从内存中清零，因此任何残留的孤立密文都是无法恢复的、经 Argon2id 封装的无意义数据。",
       "partialFailTitle": "保险库删除部分失败",
       "submit": "删除保险库",
       "submitInFlight": "正在删除保险库…",
       "typeToConfirmLabel": "输入 DELETE 以确认",
-      "vaultPath": "保险库路径：{{path}}"
+      "vaultPath": "保险库路径：{{path}}",
+      "deleteError": "无法完全删除保险库。请重试。",
+      "warning": "这将从此设备永久删除此保险库及其所有笔记。此操作无法撤销。",
+      "deleteButton": "删除此保险库"
     },
     "files": {
       "newNote": {
-        "folderLabel": "",
-        "folderPlaceholder": "",
-        "helper": "",
-        "label": "",
-        "optionCurrent": "",
-        "optionRoot": "",
-        "optionSpecific": "",
-        "saveError": ""
+        "folderLabel": "新笔记的文件夹",
+        "folderPlaceholder": "例如 Inbox/",
+        "helper": "新建笔记的存放位置。",
+        "label": "新笔记的默认位置",
+        "optionCurrent": "与当前笔记相同的文件夹",
+        "optionRoot": "保险库文件夹",
+        "optionSpecific": "在下方指定的文件夹中",
+        "saveError": "无法保存新笔记位置。"
       },
       "startup": {
-        "helper": "",
-        "label": "",
-        "noteLabel": "",
-        "notePlaceholder": "",
-        "optionEmpty": "",
-        "optionLast": "",
-        "optionSpecific": "",
-        "saveError": "",
-        "searchEmpty": "",
-        "searchPlaceholder": "",
-        "untitledNote": ""
+        "helper": "选择应用启动时打开哪个文件。",
+        "label": "默认打开的文件",
+        "noteLabel": "启动时打开的笔记",
+        "notePlaceholder": "选择一篇笔记…",
+        "optionEmpty": "新建笔记",
+        "optionLast": "上次打开的",
+        "optionSpecific": "指定笔记",
+        "saveError": "无法保存启动设置。",
+        "searchEmpty": "未找到笔记。",
+        "searchPlaceholder": "搜索笔记…",
+        "untitledNote": "无标题"
       }
     },
     "focusMode": {
@@ -1621,6 +2109,37 @@
       "off": "关闭",
       "on": "开启"
     },
+    "toolbarCustomize": {
+      "errorSave": "无法保存工具栏布局。",
+      "helper": "选择哪些格式按钮出现在选择工具栏上，以及它们的顺序。",
+      "label": "工具栏按钮",
+      "moveDown": "下移",
+      "moveUp": "上移",
+      "pendingHint": "即将推出"
+    },
+    "ai": {
+      "betaBadge": "测试版",
+      "disclosureToggle": "这是如何运作的？",
+      "enableHelper": "完全在你的设备上运行你提供的模型。实验性功能，默认关闭。",
+      "enableLabel": "启用本地 AI",
+      "excludedHelper": "这些文件夹中的笔记永远不会被 AI 读取或索引。每行一个文件夹路径。",
+      "excludedLabel": "排除的文件夹",
+      "excludedPlaceholder": "Private/\nJournal/",
+      "modelChoose": "选择文件…",
+      "modelEmbeddingLabel": "搜索模型——语义搜索和问答",
+      "modelFilter": {
+        "gguf": "GGUF 模型",
+        "safetensors": "Safetensors 模型"
+      },
+      "modelGenerationLabel": "文本模型——聊天、摘要、写作",
+      "modelNone": "未选择文件",
+      "modelSaveFailed": "无法保存模型路径（它必须位于你的保险库之外）。",
+      "modelsHelper": "Myne 从不下载模型——那意味着通过网络发送数据。在浏览器中打开链接获取一个模型，然后在此处选择下载好的文件。所有内容都在你的设备上运行。",
+      "modelsLabel": "模型",
+      "recommendedFilesEmbedding": "需要 model.safetensors + config.json + tokenizer.json 位于同一文件夹中。",
+      "recommendedFilesGeneration": "需要 .gguf 文件 + tokenizer.json 位于同一文件夹中。",
+      "title": "AI"
+    },
     "prefs": {
       "saveError": "无法保存偏好设置——请重试"
     },
@@ -1629,9 +2148,20 @@
       "autoLockLabel": "自动锁定",
       "autoLockSearchEmpty": "没有匹配的时长。",
       "autoLockSearchPlaceholder": "搜索时长…",
+      "realtimeSyncHelper": "来自其他设备的更改会通过一个无内容的信号在几秒内到达——服务器只转发“有内容发生了变化”，而绝不会转发变化的内容。无论如何，在你的保险库解锁期间，应用都会定期检查服务器，因此这不会增加任何实质性的可见性；无需进行任何配置。",
+      "realtimeSyncLabel": "实时同步",
       "screenCaptureHelperOff": "在解锁前始终启用此保护。解锁后则遵循此偏好设置。",
       "screenCaptureHelperOn": "在 macOS 和 Windows 10（2020 年 5 月更新或更高版本）上有效。Linux 支持将在未来版本中推出。",
-      "screenCaptureLabel": "屏幕捕获保护"
+      "screenCaptureLabel": "屏幕捕获保护",
+      "screenCaptureSubtitle": "阻止截屏和屏幕录制",
+      "autoLockAfter": "自动锁定间隔",
+      "autoLock1m": "1 分钟",
+      "autoLock5m": "5 分钟",
+      "autoLock15m": "15 分钟",
+      "autoLock30m": "30 分钟",
+      "autoLock1h": "1 小时",
+      "quickUnlockSubtitleAndroid": "自动锁定后使用 PIN 重新进入",
+      "quickUnlockSubtitle": "自动锁定后使用 {{method}} 或 PIN 重新进入"
     },
     "quickUnlock": {
       "errorCancelled": "已取消。",
@@ -1640,27 +2170,54 @@
       "errorNotUnlocked": "请先解锁保险库。",
       "errorPinNotDigits": "PIN 只能包含数字。",
       "errorPinTooShort": "PIN 至少需要 {{count}} 位数字。",
-      "errorPinTooShort_other": "",
+      "errorPinTooShort_one": "PIN 必须至少为 {{count}} 位数字。",
+      "errorPinTooShort_other": "PIN 必须至少为 {{count}} 位数字。",
       "helperConfigured": "已通过 {{method}} 配置。自动锁定后重新进入时可跳过主密码。重新启动后仍需要主密码。",
       "helperNotConfigured": "自动锁定后，用 PIN 或 Touch ID 代替完整主密码重新进入。这是在加密保险库之上的便捷功能——重新启动后仍需要主密码。",
       "methodPin": "PIN",
       "methodTouchId": "Touch ID",
       "pinAriaLabel": "快速解锁 PIN",
       "pinPlaceholder": "PIN（至少 {{count}} 位数字）",
-      "pinPlaceholder_other": "",
+      "pinPlaceholder_one": "PIN（至少 {{count}} 位数字）",
+      "pinPlaceholder_other": "PIN（至少 {{count}} 位数字）",
       "setPin": "设置 PIN",
       "setupHelper": "Touch ID 仅支持 macOS，目前为实验性功能（有待硬件验证）。PIN 在所有平台均可使用。",
       "title": "快速解锁",
-      "useTouchId": "使用 Touch ID"
+      "useTouchId": "使用 Touch ID",
+      "pinTooShort": "PIN 必须至少为 6 位数字。",
+      "pinMismatch": "两次输入的 PIN 不一致。",
+      "pinOnToast": "PIN 快速解锁已开启",
+      "setupError": "无法设置快速解锁。",
+      "turnedOffToast": "快速解锁已关闭",
+      "turnOffError": "无法关闭快速解锁",
+      "biometricOnToast": "{{method}} 快速解锁已开启",
+      "biometricUnavailable": "{{method}} 在此设备上不可用。",
+      "warningBanner": "这只是一道便捷的关卡。重启后仍需要你的密码。",
+      "biometricToggleSubtitle": "自动锁定后使用 {{method}} 解锁",
+      "pinOnLead": "PIN 快速解锁已",
+      "pinOnEmphasis": "开启",
+      "pinOnRest": "。保险库自动锁定后，你可以使用 PIN 而非完整密码重新进入——仅限本次应用会话。冷启动始终需要完整密码。",
+      "turnOffPin": "关闭 PIN",
+      "pinSetupHelper": "设置一个 6 位以上的 PIN，以便在自动锁定后快速重新解锁。该 PIN 封装一个设备本地密钥——它绝不会离开此设备，也绝不会触及你的恢复短语。",
+      "pinReplacesBiometric": " 设置 PIN 会取代 {{method}} 解锁。",
+      "pinPlaceholder6": "至少 6 位数字",
+      "confirmPin": "确认 PIN",
+      "reenterPin": "重新输入 PIN",
+      "setupButton": "设置快速解锁"
     },
     "shell": {
       "closeLabel": "关闭设置",
+      "groups": {
+        "labs": "实验室"
+      },
       "navLabel": "设置面板",
       "panels": {
         "about": "关于",
         "account": "账户",
+        "ai": "AI",
         "appearance": "外观",
         "editor": "编辑器",
+        "files": "文件",
         "hotkeys": "快捷键",
         "privacy": "隐私",
         "storage": "存储",
@@ -1718,6 +2275,44 @@
       "optionLive": "实时预览",
       "optionReading": "阅读",
       "optionSource": "源代码"
+    },
+    "strength": {
+      "weak": "弱",
+      "fair": "一般",
+      "good": "良好",
+      "strong": "强"
+    },
+    "sync": {
+      "summary": {
+        "notSetUp": "未设置",
+        "offline": "离线",
+        "conflicts_one": "{{count}} 个冲突",
+        "conflicts_other": "{{count}} 个冲突"
+      }
+    },
+    "data": {
+      "exported_one": "已导出 {{count}} 篇笔记 → {{label}}",
+      "exported_other": "已导出 {{count}} 篇笔记 → {{label}}",
+      "exportNeedsApp": "导出需要使用应用（而非浏览器预览）。",
+      "exportFailed": "无法导出保险库。",
+      "exportToMarkdown": "导出为 Markdown",
+      "exportToMarkdownSubtitle": "将每篇笔记解密到“文档”中的一个普通文件夹"
+    },
+    "saveSettingError": "无法保存该设置",
+    "panelTitle": {
+      "privacy": "隐私与安全",
+      "data": "数据",
+      "vaultName": "保险库名称",
+      "approveDevice": "批准设备"
+    },
+    "done": "完成",
+    "sectionOptions": "选项",
+    "footerTagline": "myne · 在此设备上加密 · 开源",
+    "editor": {
+      "defaultView": "默认视图",
+      "typewriter": "打字机滚动",
+      "typewriterSubtitle": "使光标保持垂直居中",
+      "enableArchiving": "启用归档"
     }
   },
   "sync": {
@@ -1740,12 +2335,17 @@
     "conflicts": {
       "discard": "丢弃",
       "empty": "没有冲突——你的设备已同步。",
+      "groupTitle_one": "{{original}} 的 {{count}} 个冲突副本",
       "groupTitle_other": "{{original}} 有 {{count}} 个冲突副本",
       "keepAsSeparate": "保留为独立副本",
-      "untitled": "无标题（{{hex}}）"
+      "tookTheirsToast": "本地版本已移至回收站。",
+      "tookTheirsUndo": "撤销",
+      "untitled": "无标题（{{hex}}）",
+      "useThisVersion": "使用此版本"
     },
     "devices": {
       "approve": "批准",
+      "awaitingApproval_one": "{{count}} 台设备等待批准",
       "awaitingApproval_other": "{{count}} 台设备等待批准",
       "loading": "正在加载…",
       "noDevices": "尚未同步任何设备。",
@@ -1759,6 +2359,12 @@
       "thisDevice": "此设备",
       "transportHint": "如果服务器已迁移或其证书已更改，请在上方的“同步服务器”中重新输入服务器 URL 以重新信任它。",
       "unreachable": "无法连接到同步（{{error}}）。",
+      "verifyBody": "检查你刚刚批准的设备上是否出现相同的验证码。如果匹配，它们就在你的账户上。如果不匹配，请移除该设备。",
+      "verifyMatch": "它们匹配",
+      "verifyMismatch": "它们不匹配",
+      "verifyPending": "此验证码将在新设备完成首次同步后出现。",
+      "verifySyncing": "正在同步…",
+      "verifyTitle": "验证新设备",
       "yourDevices": "你的设备"
     },
     "endpoint": {
@@ -1767,6 +2373,8 @@
       "connectedTls": "已连接。请确认此指纹与你另一台设备上显示的一致。",
       "connecting": "正在连接…",
       "fingerprintLabel": "服务器证书指纹：",
+      "pinStatic": "已根据 Myne 的内置证书进行验证。",
+      "pinTofu": "在首次连接时固定。请在你的各设备之间比对此指纹。",
       "placeholder": "https://your-server.example   ·   http://127.0.0.1:8080",
       "unreachable": "无法连接到该服务器——请检查 URL 以及它是否正在运行。"
     },
@@ -1793,14 +2401,23 @@
     "join": {
       "accountLabel": "账号",
       "cancel": "取消",
+      "continue": "继续",
       "error": "无法添加此设备。请检查服务器 URL、账号和密码——以及服务器是否可以连接。",
       "help": "使用你的账号和密码登录。在某台现有设备批准后，此设备便会同步你的笔记。无需恢复短语。",
       "passwordLabel": "密码",
+      "pinnedCompare": "此设备已固定你服务器的证书。请检查此指纹在你的其他设备上是否匹配。",
+      "pinnedTitle": "服务器证书已固定",
       "serverLabel": "同步服务器",
       "serverPlaceholder": "https://your-server.example",
+      "sasMatch": "它们匹配——继续",
+      "sasMismatch": "它们不匹配——移除此设备",
       "submit": "添加设备",
       "submitting": "正在添加…",
-      "title": "将此设备添加到账号"
+      "title": "将此设备添加到账号",
+      "verifyBody": "检查此验证码是否与你用于批准的设备上的验证码一致。",
+      "verifyTitle": "验证此设备",
+      "waitingHint": "请保持此窗口打开——一旦获得批准，此处会出现一个验证码，可与你的其他设备进行比对。",
+      "waitingTitle": "等待批准"
     },
     "panel": {
       "addDevice": {
@@ -1828,6 +2445,7 @@
     },
     "status": {
       "awaitingApproval": "等待批准",
+      "conflicts_one": "{{count}} 个待审阅的冲突",
       "conflicts_other": "{{count}} 个冲突待处理",
       "error": "同步出错",
       "loading": "正在获取同步状态…",
@@ -1836,6 +2454,43 @@
       "synced": "已同步",
       "syncing": "正在同步…",
       "syncNow": "立即同步"
+    },
+    "settings": {
+      "serverSection": "服务器",
+      "serverNotSet": "未设置",
+      "statusLabel": "状态",
+      "hubHelp": "同步让你的笔记在各设备之间保持最新。所有内容在发送前都会在此设备上加密——服务器永远看不到你的笔记。",
+      "connectedTls": "已通过 TLS 连接。",
+      "connectedLocal": "已在你的本地网络上连接。",
+      "connectError": "无法连接到该服务器。请检查地址后重试。",
+      "serverAddressLabel": "服务器地址",
+      "serverAddressPlaceholder": "https://sync.example.com",
+      "fingerprintLabel": "证书指纹",
+      "fingerprintCompare": "请将此与你已信任设备上的同一屏幕进行比对——它们必须一致。",
+      "pinStatic": "已根据此服务器的已知证书进行验证。",
+      "pinTofu": "在首次连接时固定。请在你的各设备之间进行比对以确认。",
+      "enrollNotConfigured": "请先设置同步服务器，然后再添加此设备。",
+      "enrollTransport": "无法连接到同步服务器。请检查你的网络连接后重试。",
+      "accountNumberHint": "请仔细核对此编号——它看起来不太对。",
+      "passwordPlaceholder": "你的保险库密码",
+      "recoveryPhraseHint": "输入或粘贴你的 24 个单词。粘贴会按顺序填入各单元格。",
+      "verifyBody": "检查你刚刚批准的设备上是否出现相同的验证码。如果匹配，它们就在你的账户上。如果不匹配，请移除该设备。",
+      "sasMismatch": "它们不匹配",
+      "removeDeviceButton": "移除设备",
+      "keepDevice": "保留它",
+      "notEnrolledHelp": "此设备尚未同步。请从上一个屏幕添加它以查看你的设备。",
+      "unauthenticated": "此设备的访问权限已被撤销，可能是从另一台设备上移除的。",
+      "transportError": "无法连接到同步服务器。如果服务器已迁移或其证书已更改，请从“同步服务器”屏幕重新连接。",
+      "retiredSelf": "此设备已从另一台设备上移除。",
+      "resetAndAddAgain": "重置并重新添加",
+      "noDevices": "尚无设备。",
+      "syncingHere": "正在此处同步"
+    },
+    "banner": {
+      "conflictsNeedReview_one": "{{count}} 个冲突需要审阅",
+      "conflictsNeedReview_other": "{{count}} 个冲突需要审阅",
+      "catchingUp": "正在赶上同步进度——你的笔记是安全的。",
+      "verifyDevices": "验证设备"
     }
   },
   "templates": {
@@ -1852,7 +2507,14 @@
       "removeFromTemplates": "从模板中移除",
       "removeRowLabel": "将 {{name}} 从模板中移除（保留该笔记）",
       "title": "笔记模板"
-    }
+    },
+    "emptyBefore": "尚无模板。点按 ",
+    "newAction": "新建",
+    "emptyAfter": " 以创建可重复使用的笔记模板——然后基于它创建笔记（并在设置中选择一个作为你的每日笔记模板）。",
+    "use": "使用",
+    "edit": "编辑",
+    "deleteConfirm": "删除此模板？",
+    "convertToNote": "转换为笔记"
   },
   "unlock": {
     "backToPicker": "选择其他保险库",
@@ -1886,7 +2548,34 @@
       "lockedDuringChange": "密码更改已取消：保险库已锁定。",
       "metaChangedExternally": "保险库已在另一个会话中被修改——请重新解锁。"
     },
-    "title": "解锁你的保险库。"
+    "title": "解锁你的保险库。",
+    "vaultUnreadable": "保险库文件无法读取。请从备份恢复。",
+    "unlockFailedGeneric": "无法解锁。请重试。",
+    "biometricTooManyAttempts": "{{biometric}} 尝试次数过多。请使用你的密码。",
+    "pinIncorrect_one": "PIN 不正确。还剩 {{count}} 次尝试。",
+    "pinIncorrect_other": "PIN 不正确。还剩 {{count}} 次尝试。",
+    "pinTooManyAttempts": "PIN 尝试次数过多。请使用你的密码。",
+    "pinFailedGeneric": "无法使用 PIN 解锁。请使用你的密码。",
+    "corruptedHeading": "保险库文件无法读取",
+    "ioErrorHeading": "无法读取此保险库",
+    "blockingTitle": "正在解锁",
+    "blockingSubtitle": "正在此设备上解密你的密钥。",
+    "eyebrow": "解锁保险库",
+    "vaultTitleFallback": "你的保险库",
+    "unlockWithBiometric": "使用 {{biometric}} 解锁",
+    "biometricFailed": "{{biometric}} 无法确认是你本人",
+    "touchToUnlock": "触摸以解锁",
+    "lookToUnlock": "注视以解锁",
+    "biometricRetryHint": "请重试，或使用你的密码解锁。",
+    "tryBiometricAgain": "再次尝试 {{biometric}}",
+    "usePasswordInstead": "改用密码",
+    "useBiometricInstead": "改用 {{biometric}}",
+    "unlockWithPinInstead": "改用 PIN 解锁",
+    "useRecoveryPhrase": "使用你的恢复短语",
+    "deleteConfirmTitle": "删除此保险库？",
+    "deletePartialError": "部分文件无法移除。此保险库已无法使用——继续以重新开始。",
+    "failClosedEyebrow": "无法打开保险库",
+    "restoreHint": "从备份恢复以继续。"
   },
   "vault": {
     "ioBanner": {
@@ -2136,18 +2825,159 @@
       "cancel": "取消",
       "cleaningUp": "正在清理…",
       "cleanUp": "清理",
+      "confirmBody_one": "将移除 {{count}} 个文件。它们已经无法读取；不会丢失任何可恢复的内容。",
       "confirmBody_other": "将移除 {{count}} 个文件。它们已经无法读取；不会丢失任何可恢复的内容。",
       "confirmTitle": "清理残留文件？",
+      "doneBody_one": "已移除 {{count}} 个残留文件。你现在可以创建新的保险库。",
       "doneBody_other": "已移除 {{count}} 个残留文件。你现在可以创建新的保险库了。",
       "doneTitle": "已清理",
       "errorBody": "出了点问题。请关闭应用后重试。",
       "errorTitle": "清理失败",
+      "foundBody_one": "有 {{count}} 个残留文件来自上次未完成的删除。它们已经无法读取——你不会丢失任何可恢复的内容。",
       "foundBody_other": "有 {{count}} 个文件残留自上次未完成的删除。它们已经无法读取——你不会丢失任何可恢复的内容。",
       "foundTitle": "上次未完成删除的残留文件",
+      "partialBody_one": "有 {{count}} 个文件可能被另一个应用锁定（杀毒软件、文件同步或搜索索引）。请关闭该应用后稍等片刻重试，或手动移除保险库文件夹。",
       "partialBody_other": "有 {{count}} 个文件可能被其他应用（杀毒软件、文件同步或搜索索引）锁定。请关闭应用，稍后重试，或手动移除该保险库文件夹。",
       "partialTitle": "部分文件无法移除"
     },
     "restoreCta": "从备份恢复",
-    "subtitle": "你的笔记在离开本设备之前就已在设备上加密。服务器只存储密文。"
+    "subtitle": "你的笔记在离开本设备之前就已在设备上加密。服务器只存储密文。",
+    "repairCleanedUp_one": "已清理 {{count}} 个残留文件。",
+    "repairCleanedUp_other": "已清理 {{count}} 个残留文件。",
+    "repairFailed": "无法完成清理。请重试。",
+    "heroLine1": "笔记",
+    "heroLine2": "只属于",
+    "heroLine3": "你一个人。",
+    "lede": "Markdown，在离开此设备之前就已在本设备上加密。没有账户邮箱。没有任何服务器能读到一个字。",
+    "residueBanner": "上次中断的删除留下的残留文件（{{n}}）。请在创建保险库前清理它们。",
+    "cleanUpFiles": "清理残留文件",
+    "create": "创建保险库",
+    "connect": "连接到我的账户"
+  },
+  "wikiGraph": {
+    "emptyTitle": "尚无链接",
+    "emptyBodyBefore": "通过书写 ",
+    "emptyBodyAfter": " 来连接笔记。已链接的笔记会以图谱形式显示在此处。"
+  },
+  "markdown": {
+    "attachmentFallback": "附件",
+    "nothingToPreview": "暂无可预览的内容。"
+  },
+  "conflicts": {
+    "empty": "没有需要审阅的冲突——你的笔记已同步。",
+    "groupTitle_one": "{{count}} 个冲突副本",
+    "groupTitle_other": "{{count}} 个冲突副本",
+    "groupTitleOfNote": "（笔记 {{hex}}）"
+  },
+  "viewEditor": {
+    "saveError": "无法保存此视图。请重试。",
+    "deleteError": "无法删除此视图。请重试。",
+    "editView": "编辑视图",
+    "condition": {
+      "search": "文本"
+    },
+    "containsPlaceholder": "包含…",
+    "tagPlaceholder": "标签",
+    "folderPlaceholder": "文件夹/",
+    "addCondition": "+ 添加条件",
+    "createView": "创建视图"
+  },
+  "snapshots": {
+    "today": "今天 {{time}}",
+    "readError": "无法读取版本历史。",
+    "decryptError": "无法解密该版本。",
+    "restoreError": "无法恢复该版本。",
+    "title": "版本历史",
+    "emptyState": "尚无更早的版本。快照会在你编辑时自动捕获。",
+    "hide": "隐藏",
+    "empty": "（空）",
+    "restoreThisVersion": "恢复此版本"
+  },
+  "restoreBackup": {
+    "title": "移动端尚不可用",
+    "body": "从备份文件恢复在移动端尚不可用——请创建保险库或使用你的恢复短语恢复。"
+  },
+  "recording": {
+    "deniedTitle": "麦克风访问权限已关闭",
+    "errorTitle": "无法开始录制",
+    "deniedBody": "要录制语音笔记，请在“设置 › Myne › 麦克风”中允许 Myne 访问麦克风。",
+    "noDeviceBody": "在此设备上未找到麦克风。",
+    "emptyBody": "该录音为空——未捕获任何内容。",
+    "genericBody": "录制时出了点问题。请重试。",
+    "stopAria": "停止录制"
+  },
+  "picker": {
+    "neverOpened": "从未打开",
+    "openedJustNow": "刚刚打开",
+    "openedMinuteAgo": "一分钟前打开",
+    "openedMinutesAgo_one": "{{count}} 分钟前打开",
+    "openedMinutesAgo_other": "{{count}} 分钟前打开",
+    "openedHourAgo": "一小时前打开",
+    "openedHoursAgo_one": "{{count}} 小时前打开",
+    "openedHoursAgo_other": "{{count}} 小时前打开",
+    "openedYesterday": "昨天打开",
+    "openedDaysAgo_one": "{{count}} 天前打开",
+    "openedDaysAgo_other": "{{count}} 天前打开",
+    "openedLastWeek": "上周打开",
+    "openedWeeksAgo_one": "{{count}} 周前打开",
+    "openedWeeksAgo_other": "{{count}} 周前打开",
+    "openedLastMonth": "上个月打开",
+    "openedMonthsAgo_one": "{{count}} 个月前打开",
+    "openedMonthsAgo_other": "{{count}} 个月前打开",
+    "openedLastYear": "去年打开",
+    "openedYearsAgo_one": "{{count}} 年前打开",
+    "openedYearsAgo_other": "{{count}} 年前打开",
+    "corruptedBadge": "已损坏"
+  },
+  "join": {
+    "transportError": "无法连接到该同步服务器。请检查地址和你的网络连接，然后重试。",
+    "passwordPlaceholder": "你的保险库密码",
+    "waitingHint": "请保持此屏幕打开——一旦获得批准，此处会出现一个验证码，可与你的其他设备进行比对。",
+    "verifyBody": "检查此验证码是否与你用于批准的设备上显示的验证码相同。",
+    "removing": "正在移除…",
+    "sasMismatch": "它们不匹配——移除此设备",
+    "title": "连接到你的账户",
+    "lead": "输入你的账户详情，将你的笔记带到此设备。一切都保持端到端加密。",
+    "serverPlaceholder": "https://sync.example.com",
+    "accountHint": "请仔细核对此编号——它看起来不太对。",
+    "approvalHint": "当你从一台已拥有你账户的设备上批准此设备后，你的笔记就会出现。",
+    "connectingSubtitle": "正在获取你的账户并在此设备上解锁你的保险库。"
+  },
+  "createVault": {
+    "beginWeakPassword": "请设置一个更强的密码后重试。",
+    "beginGeneric": "无法开始创建保险库。请重试。",
+    "wordNumber": "第 {{position}} 个单词",
+    "commitError": "无法保存你的保险库。请重试。",
+    "savedToFile": "已保存到 {{label}}",
+    "saveFileError": "无法保存文件。",
+    "stepLabel": "创建保险库 · {{current}} / {{total}}",
+    "briefingTitle": "在开始之前",
+    "briefingLead": "Myne 在此设备上加密所有内容。这份隐私伴随着一份只有你才能承担的责任。",
+    "passwordTitle": "创建密码",
+    "confirmPasswordLabel": "确认密码",
+    "passwordHelper": "从不存储，从不传输。它在此设备上加密你的密钥。",
+    "encryptingSubtitle": "正在使用 Argon2id 派生你的密钥。这需要几秒钟，并且无法中断。",
+    "phraseTitle": "你的恢复短语",
+    "phraseIntro": "二十四个单词，按顺序排列。请把它们写在纸上，并存放在安全的地方。",
+    "showSecondHalf": "显示第 13–24 个单词",
+    "saveToFile": "保存到文件",
+    "writtenThemDown": "我已经写下来了",
+    "typebackTitle": "确认你的恢复短语",
+    "typebackLead": "从你刚刚保存的恢复短语中输入这四个单词。",
+    "wordMismatch": "与第 {{pos}} 个单词不匹配",
+    "backToPhrase": "返回恢复短语",
+    "accountTitle": "你的账户编号",
+    "accountLead": "请将它与你的恢复短语一起保存。你在新设备上恢复保险库时会需要它。",
+    "accountSavedAck": "我已保存我的账户编号。",
+    "commit": "提交",
+    "committingTitle": "正在保存你的保险库…",
+    "committingSubtitle": "正在将加密的保险库写入此设备。",
+    "unlockingTitle": "正在解锁…",
+    "unlockingSubtitle": "正在打开你的保险库。",
+    "readyTitle": "你的保险库已就绪",
+    "readyBody": "从现在起你写的所有内容，在存储或同步之前都会在此设备上加密。",
+    "personalLabel": "个人",
+    "openVault": "打开保险库",
+    "backUpNow": "立即备份"
   }
 }

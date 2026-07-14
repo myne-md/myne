@@ -106,7 +106,28 @@
     "usedInNotesPopover": {
       "empty": "In geen enkele notitie gebruikt.",
       "untitled": "Naamloos"
-    }
+    },
+    "needsApp": "Bijlagen opschonen vereist de app.",
+    "noUnused": "Geen ongebruikte bijlagen — naar elk bestand wordt verwezen.",
+    "scanError": "Kon niet scannen op ongebruikte bijlagen.",
+    "erasedToast_one": "{{count}} ongebruikt bestand gewist.",
+    "erasedToast_other": "{{count}} ongebruikte bestanden gewist.",
+    "eraseError": "Kon de ongebruikte bijlagen niet wissen.",
+    "readError": "Kon bijlagen niet lezen.",
+    "needAppPreview": "Bijlagen vereisen de app (niet de browservoorvertoning).",
+    "tooLarge": "Dat bestand is te groot (max. 64 MB).",
+    "unsupported": "Alleen afbeeldingen en PDF's kunnen worden toegevoegd.",
+    "addError": "Kon dat bestand niet toevoegen.",
+    "deleteError": "Kon die bijlage niet verwijderen.",
+    "renameError": "Kon die bijlage niet hernoemen.",
+    "unusedSummary_one": "Naar {{count}} bijlage wordt door geen enkele notitie verwezen ({{size}}). Wissen is een permanente cryptografische verwijdering — er is geen prullenbak.",
+    "unusedSummary_other": "Naar {{count}} bijlagen wordt door geen enkele notitie verwezen ({{size}}). Wissen is een permanente cryptografische verwijdering — er is geen prullenbak.",
+    "eraseCta_one": "{{count}} ongebruikt bestand wissen",
+    "eraseCta_other": "{{count}} ongebruikte bestanden wissen",
+    "emptyState": "Nog geen bijlagen. Tik op Uploaden om een afbeelding of PDF toe te voegen.",
+    "insert": "Invoegen",
+    "pauseLabel": "{{filename}} pauzeren",
+    "playLabel": "{{filename}} afspelen"
   },
   "backup": {
     "errors": {
@@ -161,6 +182,8 @@
     "archivedBadge": "Archief",
     "archivedBadgeTitle": "Gearchiveerd",
     "dialogLabel": "Opdrachtpalet",
+    "matchedInAttachment": "in bijlage",
+    "matchedInAttachmentTitle": "De zoekopdracht kwam overeen in een bestand dat in deze notitie is ingesloten",
     "matchedInBody": "↳ gevonden in tekst",
     "noMatches": "Geen overeenkomsten",
     "searchPlaceholder": "Zoek notities of voer een opdracht uit — Esc om te sluiten",
@@ -174,10 +197,172 @@
         "label": "Back-up van kluis maken…"
       },
       "category": {
+        "ai": "AI",
         "app": "App",
+        "appearance": "Vormgeving",
         "editor": "Editor",
+        "notes": "Notities",
         "vault": "Kluis",
         "view": "Weergave"
+      },
+      "aiOpenChat": {
+        "label": "AI-chat openen"
+      },
+      "toggleLineNumbers": {
+        "label": "Regelnummers in-/uitschakelen"
+      },
+      "toggleSpellCheck": {
+        "label": "Spellingcontrole in-/uitschakelen"
+      },
+      "toggleTypewriter": {
+        "label": "Typemachine-scrollen in-/uitschakelen"
+      },
+      "toggleDimInactive": {
+        "label": "Inactieve regels dimmen in-/uitschakelen"
+      },
+      "toggleEditorFont": {
+        "label": "Editorlettertype wisselen (mono / sans)"
+      },
+      "cycleTextSize": {
+        "label": "Tekstgrootte van editor doorlopen"
+      },
+      "cycleContentWidth": {
+        "label": "Inhoudsbreedte van editor doorlopen"
+      },
+      "cycleDefaultViewMode": {
+        "label": "Standaardweergavemodus doorlopen"
+      },
+      "toggleTimestamps": {
+        "label": "Tijdstempels van notities in de zijbalk in-/uitschakelen"
+      },
+      "toggleArchiving": {
+        "label": "Notities archiveren in-/uitschakelen"
+      },
+      "toggleAiEnabled": {
+        "label": "AI-functies in-/uitschakelen (bèta)"
+      },
+      "toggleScreenCapture": {
+        "label": "Bescherming tegen schermopname in-/uitschakelen"
+      },
+      "cycleTheme": {
+        "label": "Thema doorlopen"
+      },
+      "themeLight": {
+        "label": "Thema: Licht"
+      },
+      "themeDark": {
+        "label": "Thema: Donker"
+      },
+      "themeAmoled": {
+        "label": "Thema: AMOLED"
+      },
+      "themeSystem": {
+        "label": "Thema: Systeem volgen"
+      },
+      "applyCustomTheme": {
+        "label": "Aangepast thema toepassen…"
+      },
+      "splitRight": {
+        "label": "Deelvenster naar rechts splitsen"
+      },
+      "splitDown": {
+        "label": "Deelvenster naar beneden splitsen"
+      },
+      "closePane": {
+        "label": "Deelvenster sluiten"
+      },
+      "closeTab": {
+        "label": "Tabblad sluiten"
+      },
+      "nextTab": {
+        "label": "Volgend tabblad"
+      },
+      "prevTab": {
+        "label": "Vorig tabblad"
+      },
+      "focusNextPane": {
+        "label": "Volgend deelvenster focussen"
+      },
+      "focusPrevPane": {
+        "label": "Vorig deelvenster focussen"
+      },
+      "goBack": {
+        "label": "Teruggaan"
+      },
+      "goForward": {
+        "label": "Vooruitgaan"
+      },
+      "togglePreview": {
+        "label": "Voorvertoning naast elkaar in-/uitschakelen"
+      },
+      "findInNote": {
+        "label": "Zoeken in notitie"
+      },
+      "findReplace": {
+        "label": "Zoeken en vervangen in notitie"
+      },
+      "newNote": {
+        "label": "Nieuwe notitie"
+      },
+      "duplicateNote": {
+        "label": "Notitie dupliceren"
+      },
+      "archiveNote": {
+        "label": "Notitie archiveren"
+      },
+      "renameNote": {
+        "label": "Notitie hernoemen"
+      },
+      "trashNote": {
+        "label": "Notitie naar prullenbak verplaatsen"
+      },
+      "toggleFavorite": {
+        "label": "Favoriet in-/uitschakelen"
+      },
+      "moveNote": {
+        "label": "Notitie naar map verplaatsen…"
+      },
+      "emptyTrash": {
+        "label": "Prullenbak legen"
+      },
+      "showBacklinks": {
+        "label": "Backlinks tonen"
+      },
+      "showOutline": {
+        "label": "Overzicht tonen"
+      },
+      "showUnlinked": {
+        "label": "Niet-gekoppelde vermeldingen tonen"
+      },
+      "newFolder": {
+        "label": "Nieuwe map"
+      },
+      "openTrash": {
+        "label": "Prullenbak openen"
+      },
+      "openArchive": {
+        "label": "Archief openen"
+      },
+      "cycleHeading": {
+        "label": "Kopniveau doorlopen"
+      },
+      "restoreBackup": {
+        "label": "Kluis herstellen vanuit back-up…"
+      },
+      "toggleRealtimeSync": {
+        "label": "Realtime synchronisatie in-/uitschakelen"
+      },
+      "revealVaultFolder": {
+        "label": "Kluismap tonen in bestandsbeheer"
+      },
+      "aiSummarizeNote": {
+        "label": "Notitie samenvatten"
+      },
+      "aiSuggestTags": {
+        "label": "Tags voorstellen"
+      },
+      "aiRewriteSelection": {
+        "label": "Selectie herschrijven"
       },
       "convertWikilinks": {
         "label": "Geïmporteerde wikilinks in deze notitie omzetten…"
@@ -187,6 +372,12 @@
       },
       "exportNoteHtml": {
         "label": "Notitie exporteren als HTML…"
+      },
+      "exportSelectionImage": {
+        "label": "Selectie exporteren als afbeelding…",
+        "saved": "Selectie opgeslagen als afbeelding.",
+        "noSelection": "Selecteer eerst wat tekst en exporteer die vervolgens als afbeelding.",
+        "failed": "Kon de selectie niet exporteren als afbeelding."
       },
       "exportNoteMarkdown": {
         "label": "Notitie exporteren als Markdown…"
@@ -309,6 +500,15 @@
     },
     "rebind": {
       "invalidChordReason": "Voeg een modifier toe (⌘, Ctrl of Alt) — een toets op zichzelf kan geen sneltoets zijn."
+    },
+    "picker": {
+      "vaultRoot": "Kluishoofdmap",
+      "moveNoteTitle": "Notitie naar map verplaatsen",
+      "moveNotePlaceholder": "Kies een map…",
+      "noFolders": "Nog geen mappen",
+      "applyThemeTitle": "Aangepast thema toepassen",
+      "applyThemePlaceholder": "Kies een thema…",
+      "noCustomThemes": "Geen aangepaste thema's geïnstalleerd"
     }
   },
   "common": {
@@ -319,7 +519,9 @@
     },
     "spinner": {
       "loadingLabel": "Laden"
-    }
+    },
+    "back": "Terug",
+    "continue": "Doorgaan"
   },
   "editor": {
     "attachment": {
@@ -476,6 +678,9 @@
           "reveal": "Tonen in bibliotheek"
         },
         "pdfFallback": "PDF",
+        "textPreview": {
+          "truncated": "Voorvertoning ingekort — exporteer voor het volledige bestand."
+        },
         "tombstone": {
           "brokenAria": "Verbroken bijlageverwijzing: {{filename}}",
           "brokenLabel": "verbroken",
@@ -520,10 +725,10 @@
       },
       "barItems": {
         "graph": "Grafiek",
-        "hide": "",
+        "hide": "Verbergen",
         "lock": "Vergrendelen",
-        "moveLeft": "",
-        "moveRight": "",
+        "moveLeft": "Naar links verplaatsen",
+        "moveRight": "Naar rechts verplaatsen",
         "saveStatus": "Opslagstatus",
         "settings": "Instellingen",
         "syncStatus": "Synchronisatiestatus",
@@ -589,10 +794,43 @@
       "resizeBacklinksSidebar": "Backlinkszijbalk vergroten/verkleinen",
       "resizeNotesSidebar": "Notitiezijbalk vergroten/verkleinen",
       "rightPanel": {
-        "allHidden": "",
+        "aiChat": {
+          "askPlaceholder": "Stel een vraag over je notities…",
+          "askSubmit": "Vragen",
+          "assistant": "Assistent",
+          "citations": "Bronnen",
+          "composerPlaceholder": "Bericht aan je notities…",
+          "empty": "AI-uitvoer — samenvattingen, antwoorden en suggesties — verschijnt hier.",
+          "error": "Het AI-verzoek kon niet worden voltooid.",
+          "errorTurn": "De assistent kon niet antwoorden.",
+          "gettingReadyHint": "Je notities worden voorbereid voor AI — een moment.",
+          "insert": "Invoegen in notitie",
+          "noAnswer": "Geen antwoord — probeer het anders te formuleren.",
+          "noModelHint": "Geen model geselecteerd. Kies er een in Instellingen → Labs → AI om te beginnen.",
+          "offHint": "Lokale AI is uit. Schakel het in via Instellingen → Labs → AI.",
+          "send": "Verzenden",
+          "statusGettingReady": "Voorbereiden…",
+          "statusNoModel": "Geen model",
+          "statusOff": "Uit",
+          "statusReady": "Klaar",
+          "stop": "Stoppen",
+          "tagsThinking": "Tags voorstellen…",
+          "thinking": "AI denkt na…",
+          "truncated": "De eerste {{count}} tekens zijn samengevat.",
+          "you": "Jij"
+        },
+        "allHidden": "Alle tabbladen zijn verborgen — klik met de rechtermuisknop om ze te herstellen.",
         "outline": {
-          "empty": "",
-          "heading": ""
+          "collapse": "Sectie samenvouwen",
+          "empty": "Geen koppen",
+          "expand": "Sectie uitvouwen",
+          "heading": "Overzicht"
+        },
+        "tabs": {
+          "aiChat": "AI-chat",
+          "backlinks": "Backlinks",
+          "outline": "Overzicht",
+          "unlinked": "Niet-gekoppelde vermeldingen"
         }
       },
       "sidebarToggle": {
@@ -661,6 +899,8 @@
       "rendering": "Diagram renderen…"
     },
     "slash": {
+      "aiContinue": "Doorschrijven (AI)",
+      "aiTitle": "Titel voorstellen (AI)",
       "attachFile": "Bestand bijvoegen",
       "bulletList": "Opsommingslijst",
       "callout": "Callout",
@@ -702,6 +942,21 @@
     },
     "toolbar": {
       "apply": "Toepassen",
+      "exportImageTitle": "Selectie exporteren als afbeelding",
+      "customize": {
+        "bold": "Vet",
+        "bulletList": "Opsommingslijst",
+        "checklist": "Checklist",
+        "code": "Code",
+        "heading": "Kop",
+        "highlight": "Markeren",
+        "italic": "Cursief",
+        "link": "Link",
+        "numberedList": "Genummerde lijst",
+        "quote": "Citaat",
+        "strike": "Doorhalen",
+        "wikilink": "Wikilink"
+      },
       "heading": {
         "h1": "H1",
         "h2": "H2",
@@ -765,6 +1020,126 @@
       "convertCore": {
         "noMatch": "geen overeenkomst"
       }
+    },
+    "flow": {
+      "loadFailed": "Kon je notities niet laden.",
+      "openFailed": "Kon deze notitie niet openen.",
+      "saveFailed": "Kon deze notitie niet opslaan.",
+      "moveFailed": "Kon deze notitie niet verplaatsen.",
+      "openTodayFailed": "Kon de notitie van vandaag niet openen.",
+      "exportFailed": "Kon deze notitie niet exporteren.",
+      "attachNeedsApp": "Bijlagen vereisen de app (niet de browservoorvertoning).",
+      "attachTooLarge": "Dat bestand is te groot (max. 64 MB).",
+      "attachUnsupported": "Alleen afbeeldingen en PDF's kunnen worden toegevoegd.",
+      "attachFailed": "Kon dat bestand niet toevoegen.",
+      "archiveFailed": "Kon deze notitie niet archiveren.",
+      "trashFailed": "Kon deze notitie niet naar de prullenbak verplaatsen."
+    },
+    "nav": {
+      "dailyNote": "Dagelijkse notitie",
+      "openToday": "Vandaag openen",
+      "allNotes": "Alle notities"
+    },
+    "list": {
+      "searchPlaceholder": "Notities zoeken",
+      "clearSearch": "Zoekopdracht wissen",
+      "viewNoteCount_one": "{{count}} notitie in “{{name}}”",
+      "viewNoteCount_other": "{{count}} notities in “{{name}}”",
+      "edit": "Bewerken",
+      "trashEmpty": "De prullenbak is leeg",
+      "archiveEmpty": "Geen gearchiveerde notities",
+      "noMatchingNotes": "Geen overeenkomende notities",
+      "noNotesYet": "Nog geen notities",
+      "noMatchBody": "Niets komt overeen met “{{name}}”. Bewerk de weergave of wis deze om alle notities te zien.",
+      "emptyBody": "Tik op “Nieuwe notitie” om je eerste notitie te schrijven. Alles wordt op dit apparaat versleuteld voordat het wordt opgeslagen.",
+      "unarchive": "Dearchiveren"
+    },
+    "filterSheet": {
+      "title": "Filteren",
+      "status": "Status"
+    },
+    "sortSheet": {
+      "title": "Sorteren",
+      "manual": "Handmatige volgorde",
+      "titleAsc": "Titel · A → Z",
+      "titleDesc": "Titel · Z → A"
+    },
+    "noteMenu": {
+      "emptyNote": "Lege notitie",
+      "wordCount_one": "{{count}} woord · {{minutes}} min leestijd",
+      "wordCount_other": "{{count}} woorden · {{minutes}} min leestijd",
+      "moveToFolder": "Naar map verplaatsen…",
+      "moveToTrash": "Naar prullenbak verplaatsen",
+      "copied": "Gekopieerd ✓",
+      "copyToClipboard": "Kopiëren naar klembord",
+      "versionHistory": "Versiegeschiedenis"
+    },
+    "purge": {
+      "body": "Hiermee wordt de notitie definitief van dit apparaat verwijderd. Dit kan niet ongedaan worden gemaakt."
+    },
+    "move": {
+      "title": "Naar map verplaatsen",
+      "body": "Typ een mappad (bijv. Projecten/Myne). Laat leeg voor de kluishoofdmap.",
+      "placeholder": "Projecten/Myne",
+      "confirm": "Verplaatsen"
+    },
+    "sidebar": {
+      "browse": "Bladeren"
+    },
+    "emptyDetail": {
+      "title": "Selecteer een notitie",
+      "body": "Kies een notitie uit de lijst of begin een nieuwe."
+    },
+    "readingBar": {
+      "editNote": "Notitie bewerken",
+      "edit": "Bewerken"
+    },
+    "graphTab": {
+      "linkedNotes_one": "{{count}} gekoppelde notitie",
+      "linkedNotes_other": "{{count}} gekoppelde notities",
+      "links_one": "{{count}} link",
+      "links_other": "{{count}} links"
+    },
+    "formatBar": {
+      "redo": "Opnieuw",
+      "attachFile": "Nieuw bestand toevoegen",
+      "insertFromLibrary": "Invoegen uit bibliotheek",
+      "recordVoiceNote": "Spraaknotitie opnemen",
+      "showLivePreview": "Live voorvertoning tonen",
+      "showRawMarkdown": "Ruwe markdown tonen",
+      "hideKeyboard": "Toetsenbord verbergen"
+    },
+    "topBar": {
+      "backToNotes": "Terug naar notities",
+      "noteDetails": "Notitiedetails",
+      "noteActions": "Notitieacties"
+    },
+    "noteContext": {
+      "collapsePanel": "Paneel samenvouwen",
+      "unlinkedCount_one": "Niet-gekoppelde vermelding {{count}}",
+      "unlinkedCount_other": "Niet-gekoppelde vermeldingen {{count}}"
+    },
+    "viewsSheet": {
+      "typeCards": "Kaarten",
+      "typeList": "Lijst",
+      "emptyState": "Nog geen opgeslagen weergaven. Maak er een om je notities te filteren op tag, map of tekst.",
+      "editView": "Weergave bewerken"
+    },
+    "sheet": {
+      "done": "Klaar"
+    },
+    "vaultSwitcher": {
+      "title": "Kluizen"
+    },
+    "tagBrowser": {
+      "noTagsMatch": "Geen overeenkomende tags.",
+      "notesCount_one": "Notities · {{count}}",
+      "notesCount_other": "Notities · {{count}}"
+    },
+    "untitledNote": "Naamloze notitie",
+    "commandPalette": {
+      "searchPlaceholder": "Notities zoeken of een opdracht uitvoeren…",
+      "noMatches": "Geen overeenkomende opdrachten of notities."
     }
   },
   "export": {
@@ -903,6 +1278,7 @@
   },
   "notes": {
     "archive": {
+      "cancel": "Annuleren",
       "close": "Sluiten",
       "count_one": "{{count}} notitie",
       "count_other": "{{count}} notities",
@@ -910,6 +1286,10 @@
       "delete": "Verwijderen",
       "deleteError": "Die notitie kon niet worden verwijderd. Probeer het opnieuw.",
       "emptyState": "Het archief is leeg.",
+      "folderDeleteConfirm_one": "{{count}} notitie naar de prullenbak verplaatsen?",
+      "folderDeleteConfirm_other": "{{count}} notities naar de prullenbak verplaatsen?",
+      "folderDeleteConfirmCta": "Naar prullenbak verplaatsen",
+      "folderDeleteError": "Kon de notities van die map niet naar de prullenbak verplaatsen. Probeer het opnieuw.",
       "restore": "Herstellen",
       "restoreError": "Die notitie kon niet worden hersteld. Probeer het opnieuw.",
       "title": "Archief",
@@ -1085,6 +1465,7 @@
       "addToFavorites": "Aan favorieten toevoegen",
       "archive": "Archief",
       "archiveBulkError": "De notities konden niet worden gearchiveerd.",
+      "archiveFolder": "Map archiveren",
       "archiveNote": "Archiveren",
       "archiveSingleError": "De notitie kon niet worden gearchiveerd.",
       "attachments": "Bijlagen",
@@ -1137,13 +1518,18 @@
       "openInNewTab": "In nieuw tabblad openen",
       "openToSide": "Naast elkaar openen",
       "openTrash": "Prullenbak openen",
-      "removeAsFolderNote": "Niet meer als mapnotitie gebruiken",
-      "removeFolderNote": "",
+      "removeFolderNote": "Mapnotitie verwijderen",
       "removeFromFavorites": "Uit favorieten verwijderen",
       "rename": "Hernoemen",
       "setAsFolderNote": "Instellen als mapnotitie",
       "trash": "Prullenbak",
       "trashBulkError": "De notities konden niet naar de prullenbak worden verplaatst.",
+      "trashConfirmBulkBody_one": "{{count}} notitie wordt naar de prullenbak verplaatst.",
+      "trashConfirmBulkBody_other": "{{count}} notities worden naar de prullenbak verplaatst.",
+      "trashConfirmBulkWarning": "Je kunt ze later herstellen vanuit de prullenbak.",
+      "trashConfirmConfirm": "Naar prullenbak verplaatsen",
+      "trashConfirmTitle": "Naar prullenbak verplaatsen?",
+      "trashConfirmWarning": "Je kunt het later herstellen vanuit de prullenbak.",
       "trashSingleError": "De notitie kon niet naar de prullenbak worden verplaatst.",
       "undo": "Ongedaan maken",
       "vaultRoot": "Kluiswortel",
@@ -1387,7 +1773,26 @@
       "operationInProgress": "Er is een bewerking bezig. Even geduld.",
       "unexpected": "Onverwachte fout. Probeer het opnieuw.",
       "vaultNotFound": "Kluisbestand niet gevonden. Start de app opnieuw op."
-    }
+    },
+    "vaultUnreadable": "Kluisbestand is onleesbaar. Herstel vanuit een back-up.",
+    "genericError": "Er is iets misgegaan. Probeer het opnieuw.",
+    "weakPassword": "Wachtwoord moet minstens {{min}} tekens bevatten.",
+    "setPasswordError": "Kon je nieuwe wachtwoord niet instellen. Probeer het opnieuw.",
+    "passwordMismatch": "Wachtwoorden komen niet overeen.",
+    "decryptingSubtitle": "Je kluissleutels worden opnieuw opgebouwd met Argon2id. Dit duurt een paar seconden.",
+    "restoreVaultHeader": "Een kluis herstellen",
+    "accountTitle": "Voer je accountnummer in",
+    "accountLead": "Vind dit waar je je herstelzin hebt opgeslagen. Het identificeert de kluis die je wilt herstellen.",
+    "accountInvalid": "Ongeldig accountnummer — controleer het en voer het opnieuw in.",
+    "accountOptionalHint": "Heb je het niet? Laat dit leeg en ga door — je herstelzin van 24 woorden is alles wat je nodig hebt.",
+    "paste": "Plakken",
+    "phraseGridHint": "Typ elk woord, of plak alle 24 tegelijk om het raster te vullen.",
+    "submitProgress": "Verzenden · {{filled}} van {{total}}",
+    "newPasswordTitle": "Kies een nieuw wachtwoord",
+    "newPasswordLead": "Je herstelzin blijft hetzelfde. Dit stelt het wachtwoord voor dit apparaat in.",
+    "confirmPasswordLabel": "Wachtwoord bevestigen",
+    "passwordHelper": "Wordt nooit opgeslagen, nooit verzonden. Het versleutelt je sleutels op dit apparaat.",
+    "encryptingSubtitle": "Je kluissleutels worden omhuld met je nieuwe wachtwoord."
   },
   "restore": {
     "backLabel": "Terug",
@@ -1440,7 +1845,9 @@
       "licenseLabel": "Licentie",
       "tagline": "Pre-alpha · Desktopclient fase 1",
       "threatModelHelper": "Open het openbare dreigingsmodeldocument in je browser.",
-      "threatModelLabel": "Dreigingsmodel"
+      "threatModelLabel": "Dreigingsmodel",
+      "version": "Versie",
+      "dev": "Dev"
     },
     "account": {
       "argon2idHeading": "Argon2id-parameters",
@@ -1463,7 +1870,21 @@
       "vaultLabelEyebrow": "KLUISLABEL",
       "vaultLabelHelper": "Een naam voor deze kluis die in de wisselaar in de app wordt getoond. Versleuteld opgeslagen in de kluis; verlaat je apparaat nooit in platte tekst.",
       "vaultLabelPlaceholder": "Een label toevoegen…",
-      "vaultLabelSave": "Opslaan"
+      "vaultLabelSave": "Opslaan",
+      "vaultIconLabel": "PICTOGRAM",
+      "vaultIconDefault": "Standaard (woordmerk)",
+      "renamedToast": "Kluis hernoemd",
+      "renameError": "Kon de kluis niet hernoemen",
+      "newPasswordMismatch": "Nieuwe wachtwoorden komen niet overeen.",
+      "samePassword": "Het nieuwe wachtwoord is hetzelfde als het huidige wachtwoord.",
+      "passwordChangedToast": "Wachtwoord gewijzigd",
+      "vaultUnreadable": "Kluisbestand is onleesbaar. Herstel vanuit een back-up.",
+      "genericChangeError": "Er is iets misgegaan. Probeer het opnieuw.",
+      "renameHelper": "Wordt getoond in de kluiswisselaar. Versleuteld opgeslagen in deze kluis; laat leeg om het te wissen.",
+      "newPasswordPlaceholder": "Minstens 12 tekens",
+      "reenterNewPassword": "Nieuw wachtwoord opnieuw invoeren",
+      "changePasswordFootnote": "Dit maakt snel ontgrendelen ongeldig. Je herstelzin blijft ongewijzigd.",
+      "changing": "Wijzigen…"
     },
     "appearance": {
       "showEditTimesAria": "Bewerktijden in zijbalk tonen",
@@ -1479,7 +1900,13 @@
       "themeLabel": "Thema",
       "themeOptionAria": "Thema {{label}}",
       "themeSaveError": "Het thema kon niet worden opgeslagen. Probeer het opnieuw.",
-      "timestampsSaveError": "De voorkeur kon niet worden opgeslagen. Probeer het opnieuw."
+      "timestampsSaveError": "De voorkeur kon niet worden opgeslagen. Probeer het opnieuw.",
+      "sizeS": "S",
+      "sizeM": "M",
+      "sizeL": "L",
+      "sizeXL": "XL",
+      "editorFont": "Editorlettertype",
+      "showEditTimesSubtitle": "Tijdstempels onder elke notitie"
     },
     "archive": {
       "helper": "Laat notities naar een archief verplaatsen, buiten de hoofdlijst gehouden. Dit uitschakelen herstelt elke gearchiveerde notitie naar zijn map en verbergt de archiefknoppen.",
@@ -1540,6 +1967,11 @@
         "onDate": "Verbonden op {{date}}"
       }
     },
+    "clipperInstall": {
+      "error": "Kon de instelling voor de browserclipper niet bijwerken.",
+      "helper": "Registreer de native-messaging-host zodat de Myne-browserextensie clips naar deze app kan sturen. Standaard aan; schakel uit om deze te verwijderen.",
+      "label": "Browserclipper"
+    },
     "customThemes": {
       "appliedBadge": "Toegepast",
       "apply": "Toepassen",
@@ -1599,31 +2031,34 @@
       "submit": "Kluis verwijderen",
       "submitInFlight": "Kluis verwijderen…",
       "typeToConfirmLabel": "Typ DELETE om te bevestigen",
-      "vaultPath": "Kluispad: {{path}}"
+      "vaultPath": "Kluispad: {{path}}",
+      "deleteError": "Kon de kluis niet volledig verwijderen. Probeer het opnieuw.",
+      "warning": "Hiermee worden deze kluis en al haar notities definitief van dit apparaat verwijderd. Dit kan niet ongedaan worden gemaakt.",
+      "deleteButton": "Deze kluis verwijderen"
     },
     "files": {
       "newNote": {
-        "folderLabel": "",
-        "folderPlaceholder": "",
-        "helper": "",
-        "label": "",
-        "optionCurrent": "",
-        "optionRoot": "",
-        "optionSpecific": "",
-        "saveError": ""
+        "folderLabel": "Map voor nieuwe notities",
+        "folderPlaceholder": "bijv. Inbox/",
+        "helper": "Waar nieuw aangemaakte notities worden geplaatst.",
+        "label": "Standaardlocatie voor nieuwe notities",
+        "optionCurrent": "Zelfde map als huidige notitie",
+        "optionRoot": "Kluismap",
+        "optionSpecific": "In de hieronder opgegeven map",
+        "saveError": "Kon de locatie voor nieuwe notities niet opslaan."
       },
       "startup": {
-        "helper": "",
-        "label": "",
-        "noteLabel": "",
-        "notePlaceholder": "",
-        "optionEmpty": "",
-        "optionLast": "",
-        "optionSpecific": "",
-        "saveError": "",
-        "searchEmpty": "",
-        "searchPlaceholder": "",
-        "untitledNote": ""
+        "helper": "Kies welk bestand wordt geopend wanneer de app start.",
+        "label": "Standaardbestand om te openen",
+        "noteLabel": "Notitie om te openen bij opstarten",
+        "notePlaceholder": "Selecteer een notitie…",
+        "optionEmpty": "Nieuwe notitie",
+        "optionLast": "Laatst geopend",
+        "optionSpecific": "Specifieke notitie",
+        "saveError": "Kon de opstartinstelling niet opslaan.",
+        "searchEmpty": "Geen notities gevonden.",
+        "searchPlaceholder": "Notities zoeken…",
+        "untitledNote": "Naamloos"
       }
     },
     "focusMode": {
@@ -1674,6 +2109,37 @@
       "off": "Uit",
       "on": "Aan"
     },
+    "toolbarCustomize": {
+      "errorSave": "Kon de werkbalkindeling niet opslaan.",
+      "helper": "Kies welke opmaakknoppen op de selectiewerkbalk verschijnen en in welke volgorde.",
+      "label": "Werkbalkknoppen",
+      "moveDown": "Omlaag verplaatsen",
+      "moveUp": "Omhoog verplaatsen",
+      "pendingHint": "Binnenkort beschikbaar"
+    },
+    "ai": {
+      "betaBadge": "Bèta",
+      "disclosureToggle": "Hoe werkt dit?",
+      "enableHelper": "Draait een model dat je zelf aanlevert volledig op je apparaat. Experimenteel, standaard uit.",
+      "enableLabel": "Lokale AI inschakelen",
+      "excludedHelper": "Notities in deze mappen worden nooit door AI gelezen of geïndexeerd. Eén mappad per regel.",
+      "excludedLabel": "Uitgesloten mappen",
+      "excludedPlaceholder": "Privé/\nDagboek/",
+      "modelChoose": "Bestand kiezen…",
+      "modelEmbeddingLabel": "Zoekmodel — semantisch zoeken en vraag-en-antwoord",
+      "modelFilter": {
+        "gguf": "GGUF-model",
+        "safetensors": "Safetensors-model"
+      },
+      "modelGenerationLabel": "Tekstmodel — chat, samenvattingen, schrijven",
+      "modelNone": "Geen bestand geselecteerd",
+      "modelSaveFailed": "Kon het modelpad niet opslaan (het moet buiten je kluis liggen).",
+      "modelsHelper": "Myne downloadt nooit modellen — dat zou betekenen dat er gegevens over het netwerk worden verzonden. Open een link om er een in je browser op te halen en kies vervolgens de gedownloade bestanden hier. Alles draait op je apparaat.",
+      "modelsLabel": "Modellen",
+      "recommendedFilesEmbedding": "Vereist model.safetensors + config.json + tokenizer.json in één map.",
+      "recommendedFilesGeneration": "Vereist het .gguf-bestand + tokenizer.json in dezelfde map.",
+      "title": "AI"
+    },
     "prefs": {
       "saveError": "De voorkeur kon niet worden opgeslagen — probeer het opnieuw"
     },
@@ -1682,9 +2148,20 @@
       "autoLockLabel": "Automatisch vergrendelen",
       "autoLockSearchEmpty": "Geen tijdsduren komen overeen.",
       "autoLockSearchPlaceholder": "Tijdsduren zoeken…",
+      "realtimeSyncHelper": "Wijzigingen van andere apparaten arriveren binnen enkele seconden via een inhoudsloos signaal — de server geeft alleen door dat “er iets is veranderd”, nooit wat. Terwijl je kluis ontgrendeld is, controleert de app de server toch al regelmatig, dus dit voegt geen betekenisvolle zichtbaarheid toe; er is niets in te stellen.",
+      "realtimeSyncLabel": "Realtime synchronisatie",
       "screenCaptureHelperOff": "Bescherming geldt altijd vóór ontgrendeling. Na ontgrendeling volgt het deze voorkeur.",
       "screenCaptureHelperOn": "Actief op macOS en Windows 10 (mei 2020-update of later). Linux-ondersteuning volgt in een toekomstige release.",
-      "screenCaptureLabel": "Bescherming tegen schermopname"
+      "screenCaptureLabel": "Bescherming tegen schermopname",
+      "screenCaptureSubtitle": "Schermafbeeldingen en schermopname blokkeren",
+      "autoLockAfter": "Automatisch vergrendelen na",
+      "autoLock1m": "1 min",
+      "autoLock5m": "5 min",
+      "autoLock15m": "15 min",
+      "autoLock30m": "30 min",
+      "autoLock1h": "1 u",
+      "quickUnlockSubtitleAndroid": "Opnieuw invoeren met een PIN na automatisch vergrendelen",
+      "quickUnlockSubtitle": "Opnieuw invoeren met {{method}} of een PIN na automatisch vergrendelen"
     },
     "quickUnlock": {
       "errorCancelled": "Geannuleerd.",
@@ -1706,16 +2183,41 @@
       "setPin": "Pincode instellen",
       "setupHelper": "Touch ID is alleen voor macOS en momenteel experimenteel (in afwachting van hardwareverificatie). Een pincode werkt overal.",
       "title": "Snel ontgrendelen",
-      "useTouchId": "Touch ID gebruiken"
+      "useTouchId": "Touch ID gebruiken",
+      "pinTooShort": "PIN moet minstens 6 cijfers bevatten.",
+      "pinMismatch": "PINs komen niet overeen.",
+      "pinOnToast": "Snel ontgrendelen met PIN staat aan",
+      "setupError": "Kon snel ontgrendelen niet instellen.",
+      "turnedOffToast": "Snel ontgrendelen uitgeschakeld",
+      "turnOffError": "Kon snel ontgrendelen niet uitschakelen",
+      "biometricOnToast": "Snel ontgrendelen met {{method}} staat aan",
+      "biometricUnavailable": "{{method}} is niet beschikbaar op dit apparaat.",
+      "warningBanner": "Slechts een gemaksslot. Na een herstart is je wachtwoord nog steeds vereist.",
+      "biometricToggleSubtitle": "Ontgrendelen met {{method}} na automatisch vergrendelen",
+      "pinOnLead": "Snel ontgrendelen met PIN staat ",
+      "pinOnEmphasis": "aan",
+      "pinOnRest": ". Nadat de kluis automatisch vergrendelt, kun je opnieuw invoeren met je PIN in plaats van het volledige wachtwoord — alleen tijdens deze app-sessie. Een koude start vereist altijd het volledige wachtwoord.",
+      "turnOffPin": "PIN uitschakelen",
+      "pinSetupHelper": "Stel een PIN van 6+ cijfers in om na automatisch vergrendelen snel opnieuw te ontgrendelen. De PIN omhult een apparaatlokale sleutel — die verlaat dit apparaat nooit en raakt je herstelzin nooit.",
+      "pinReplacesBiometric": " Het instellen van een PIN vervangt ontgrendelen met {{method}}.",
+      "pinPlaceholder6": "Minstens 6 cijfers",
+      "confirmPin": "PIN bevestigen",
+      "reenterPin": "PIN opnieuw invoeren",
+      "setupButton": "Snel ontgrendelen instellen"
     },
     "shell": {
       "closeLabel": "Instellingen sluiten",
+      "groups": {
+        "labs": "Labs"
+      },
       "navLabel": "Instellingenpanelen",
       "panels": {
         "about": "Over",
         "account": "Account",
+        "ai": "AI",
         "appearance": "Weergave",
         "editor": "Editor",
+        "files": "Bestanden",
         "hotkeys": "Sneltoetsen",
         "privacy": "Privacy",
         "storage": "Opslag",
@@ -1773,6 +2275,44 @@
       "optionLive": "Live-voorbeeld",
       "optionReading": "Lezen",
       "optionSource": "Bron"
+    },
+    "strength": {
+      "weak": "Zwak",
+      "fair": "Redelijk",
+      "good": "Goed",
+      "strong": "Sterk"
+    },
+    "sync": {
+      "summary": {
+        "notSetUp": "Niet ingesteld",
+        "offline": "Offline",
+        "conflicts_one": "{{count}} conflict",
+        "conflicts_other": "{{count}} conflicten"
+      }
+    },
+    "data": {
+      "exported_one": "{{count}} notitie geëxporteerd → {{label}}",
+      "exported_other": "{{count}} notities geëxporteerd → {{label}}",
+      "exportNeedsApp": "Exporteren vereist de app (niet de browservoorvertoning).",
+      "exportFailed": "Kon de kluis niet exporteren.",
+      "exportToMarkdown": "Exporteren naar Markdown",
+      "exportToMarkdownSubtitle": "Elke notitie ontsleutelen naar een gewone map in Documenten"
+    },
+    "saveSettingError": "Kon die instelling niet opslaan",
+    "panelTitle": {
+      "privacy": "Privacy en beveiliging",
+      "data": "Gegevens",
+      "vaultName": "Kluisnaam",
+      "approveDevice": "Apparaat goedkeuren"
+    },
+    "done": "Klaar",
+    "sectionOptions": "Opties",
+    "footerTagline": "myne · versleuteld op dit apparaat · opensource",
+    "editor": {
+      "defaultView": "Standaardweergave",
+      "typewriter": "Typemachine-scrollen",
+      "typewriterSubtitle": "Houd de cursor verticaal gecentreerd",
+      "enableArchiving": "Archiveren inschakelen"
     }
   },
   "sync": {
@@ -1798,7 +2338,10 @@
       "groupTitle_one": "{{count}} conflicterende kopie van {{original}}",
       "groupTitle_other": "{{count}} conflicterende kopieën van {{original}}",
       "keepAsSeparate": "Apart bewaren",
-      "untitled": "Naamloos ({{hex}})"
+      "tookTheirsToast": "Lokale versie naar de prullenbak verplaatst.",
+      "tookTheirsUndo": "Ongedaan maken",
+      "untitled": "Naamloos ({{hex}})",
+      "useThisVersion": "Deze versie gebruiken"
     },
     "devices": {
       "approve": "Goedkeuren",
@@ -1816,6 +2359,12 @@
       "thisDevice": "Dit apparaat",
       "transportHint": "Als de server is verplaatst of het certificaat is gewijzigd, voer de server-URL dan opnieuw in onder “Synchronisatieserver” hierboven om hem opnieuw te vertrouwen.",
       "unreachable": "Synchronisatie was niet bereikbaar ({{error}}).",
+      "verifyBody": "Controleer of dezelfde code verschijnt op het apparaat dat je zojuist hebt goedgekeurd. Als deze overeenkomt, staan ze op je account. Zo niet, verwijder dan het apparaat.",
+      "verifyMatch": "Ze komen overeen",
+      "verifyMismatch": "Ze komen niet overeen",
+      "verifyPending": "Deze code verschijnt zodra het nieuwe apparaat zijn eerste synchronisatie voltooit.",
+      "verifySyncing": "Synchroniseren…",
+      "verifyTitle": "Verifieer het nieuwe apparaat",
       "yourDevices": "Je apparaten"
     },
     "endpoint": {
@@ -1824,6 +2373,8 @@
       "connectedTls": "Verbonden. Controleer of deze vingerafdruk overeenkomt met die op je andere apparaat.",
       "connecting": "Verbinden…",
       "fingerprintLabel": "Vingerafdruk van servercertificaat:",
+      "pinStatic": "Geverifieerd aan de hand van het ingebouwde certificaat van Myne.",
+      "pinTofu": "Vastgezet bij de eerste verbinding. Vergelijk deze vingerafdruk op al je apparaten.",
       "placeholder": "https://your-server.example   ·   http://127.0.0.1:8080",
       "unreachable": "Die server was niet bereikbaar — controleer de URL en of de server draait."
     },
@@ -1850,14 +2401,23 @@
     "join": {
       "accountLabel": "Accountnummer",
       "cancel": "Annuleren",
+      "continue": "Doorgaan",
       "error": "Dit apparaat kon niet worden toegevoegd. Controleer de server-URL, het accountnummer en het wachtwoord — en of de server bereikbaar is.",
       "help": "Meld je aan met je accountnummer en wachtwoord. Dit apparaat synchroniseert je notities zodra een bestaand apparaat het goedkeurt. Er is geen herstelzin nodig.",
       "passwordLabel": "Wachtwoord",
+      "pinnedCompare": "Dit apparaat heeft het certificaat van je server vastgezet. Controleer of deze vingerafdruk overeenkomt op je andere apparaten.",
+      "pinnedTitle": "Servercertificaat vastgezet",
       "serverLabel": "Synchronisatieserver",
       "serverPlaceholder": "https://your-server.example",
+      "sasMatch": "Ze komen overeen — doorgaan",
+      "sasMismatch": "Ze komen niet overeen — verwijder dit apparaat",
       "submit": "Apparaat toevoegen",
       "submitting": "Toevoegen…",
-      "title": "Dit apparaat aan een account toevoegen"
+      "title": "Dit apparaat aan een account toevoegen",
+      "verifyBody": "Controleer of deze code overeenkomt met die op het apparaat waarvandaan je hebt goedgekeurd.",
+      "verifyTitle": "Verifieer dit apparaat",
+      "waitingHint": "Houd dit venster open — zodra het is goedgekeurd, verschijnt hier een verificatiecode om te vergelijken met je andere apparaat.",
+      "waitingTitle": "Wachten op goedkeuring"
     },
     "panel": {
       "addDevice": {
@@ -1894,6 +2454,43 @@
       "synced": "Gesynchroniseerd",
       "syncing": "Synchroniseren…",
       "syncNow": "Nu synchroniseren"
+    },
+    "settings": {
+      "serverSection": "Server",
+      "serverNotSet": "Niet ingesteld",
+      "statusLabel": "Status",
+      "hubHelp": "Synchronisatie houdt je notities op al je apparaten up-to-date. Alles wordt op dit apparaat versleuteld voordat het wordt verzonden — de server ziet je notities nooit.",
+      "connectedTls": "Verbonden via TLS.",
+      "connectedLocal": "Verbonden op je lokale netwerk.",
+      "connectError": "Kon die server niet bereiken. Controleer het adres en probeer het opnieuw.",
+      "serverAddressLabel": "Serveradres",
+      "serverAddressPlaceholder": "https://sync.example.com",
+      "fingerprintLabel": "Certificaatvingerafdruk",
+      "fingerprintCompare": "Vergelijk dit met hetzelfde scherm op een apparaat dat je al vertrouwt — ze moeten overeenkomen.",
+      "pinStatic": "Geverifieerd aan de hand van het bekende certificaat van deze server.",
+      "pinTofu": "Vastgezet bij de eerste verbinding. Vergelijk het op al je apparaten om het te bevestigen.",
+      "enrollNotConfigured": "Stel eerst een synchronisatieserver in en voeg vervolgens dit apparaat toe.",
+      "enrollTransport": "Kon de synchronisatieserver niet bereiken. Controleer je verbinding en probeer het opnieuw.",
+      "accountNumberHint": "Controleer dit nummer nog eens — het lijkt niet te kloppen.",
+      "passwordPlaceholder": "Je kluiswachtwoord",
+      "recoveryPhraseHint": "Voer je 24 woorden in of plak ze. Plakken vult de cellen op volgorde.",
+      "verifyBody": "Controleer of dezelfde code verschijnt op het apparaat dat je zojuist hebt goedgekeurd. Als deze overeenkomt, staan ze op je account. Zo niet, verwijder dan het apparaat.",
+      "sasMismatch": "Ze komen niet overeen",
+      "removeDeviceButton": "Apparaat verwijderen",
+      "keepDevice": "Behouden",
+      "notEnrolledHelp": "Dit apparaat synchroniseert nog niet. Voeg het toe via het vorige scherm om je apparaten te zien.",
+      "unauthenticated": "De toegang van dit apparaat is ingetrokken, waarschijnlijk verwijderd vanaf een ander apparaat.",
+      "transportError": "Kon de synchronisatieserver niet bereiken. Als de server is verplaatst of het certificaat is gewijzigd, verbind hem dan opnieuw via het scherm Synchronisatieserver.",
+      "retiredSelf": "Dit apparaat is verwijderd vanaf een ander apparaat.",
+      "resetAndAddAgain": "Opnieuw instellen en opnieuw toevoegen",
+      "noDevices": "Nog geen apparaten.",
+      "syncingHere": "Synchroniseert hier"
+    },
+    "banner": {
+      "conflictsNeedReview_one": "{{count}} conflict vereist beoordeling",
+      "conflictsNeedReview_other": "{{count}} conflicten vereisen beoordeling",
+      "catchingUp": "Synchronisatie wordt bijgewerkt — je notities zijn veilig.",
+      "verifyDevices": "Apparaten verifiëren"
     }
   },
   "templates": {
@@ -1910,7 +2507,14 @@
       "removeFromTemplates": "Uit sjablonen verwijderen",
       "removeRowLabel": "{{name}} uit sjablonen verwijderen (notitie blijft behouden)",
       "title": "Notitiesjablonen"
-    }
+    },
+    "emptyBefore": "Nog geen sjablonen. Tik op ",
+    "newAction": "Nieuw",
+    "emptyAfter": " om een herbruikbaar notitiesjabloon te maken — en begin er vervolgens notities mee (en kies er een als sjabloon voor je dagelijkse notitie in Instellingen).",
+    "use": "Gebruiken",
+    "edit": "Bewerken",
+    "deleteConfirm": "Dit sjabloon verwijderen?",
+    "convertToNote": "Omzetten naar notitie"
   },
   "unlock": {
     "backToPicker": "Kies een andere kluis",
@@ -1944,7 +2548,34 @@
       "lockedDuringChange": "Wachtwoordwijziging geannuleerd: de kluis was vergrendeld.",
       "metaChangedExternally": "De kluis is in een andere sessie gewijzigd — ontgrendel opnieuw."
     },
-    "title": "Ontgrendel je kluis."
+    "title": "Ontgrendel je kluis.",
+    "vaultUnreadable": "Kluisbestand is onleesbaar. Herstel vanuit een back-up.",
+    "unlockFailedGeneric": "Kon niet ontgrendelen. Probeer het opnieuw.",
+    "biometricTooManyAttempts": "Te veel {{biometric}}-pogingen. Gebruik je wachtwoord.",
+    "pinIncorrect_one": "Onjuiste PIN. Nog {{count}} poging over.",
+    "pinIncorrect_other": "Onjuiste PIN. Nog {{count}} pogingen over.",
+    "pinTooManyAttempts": "Te veel PIN-pogingen. Gebruik je wachtwoord.",
+    "pinFailedGeneric": "Kon niet ontgrendelen met PIN. Gebruik je wachtwoord.",
+    "corruptedHeading": "Kluisbestand is onleesbaar",
+    "ioErrorHeading": "Kan deze kluis niet lezen",
+    "blockingTitle": "Ontgrendelen",
+    "blockingSubtitle": "Je sleutels worden ontsleuteld op dit apparaat.",
+    "eyebrow": "Kluis ontgrendelen",
+    "vaultTitleFallback": "Je kluis",
+    "unlockWithBiometric": "Ontgrendelen met {{biometric}}",
+    "biometricFailed": "{{biometric}} kon niet bevestigen dat jij het bent",
+    "touchToUnlock": "Raak aan om te ontgrendelen",
+    "lookToUnlock": "Kijk om te ontgrendelen",
+    "biometricRetryHint": "Probeer het opnieuw of ontgrendel met je wachtwoord.",
+    "tryBiometricAgain": "{{biometric}} opnieuw proberen",
+    "usePasswordInstead": "Gebruik in plaats daarvan je wachtwoord",
+    "useBiometricInstead": "Gebruik in plaats daarvan {{biometric}}",
+    "unlockWithPinInstead": "Ontgrendel in plaats daarvan met PIN",
+    "useRecoveryPhrase": "Gebruik je herstelzin",
+    "deleteConfirmTitle": "Deze kluis verwijderen?",
+    "deletePartialError": "Sommige bestanden konden niet worden verwijderd. De kluis is niet meer bruikbaar — ga door om opnieuw te beginnen.",
+    "failClosedEyebrow": "Kan kluis niet openen",
+    "restoreHint": "Herstel vanuit een back-up om door te gaan."
   },
   "vault": {
     "ioBanner": {
@@ -2210,6 +2841,143 @@
       "partialTitle": "Sommige bestanden konden niet worden verwijderd"
     },
     "restoreCta": "Herstellen vanuit back-up",
-    "subtitle": "Je notities worden op dit apparaat versleuteld voordat ze het verlaten. De server slaat alleen ciphertext op."
+    "subtitle": "Je notities worden op dit apparaat versleuteld voordat ze het verlaten. De server slaat alleen ciphertext op.",
+    "repairCleanedUp_one": "{{count}} achtergebleven bestand opgeruimd.",
+    "repairCleanedUp_other": "{{count}} achtergebleven bestanden opgeruimd.",
+    "repairFailed": "Kon het opruimen niet voltooien. Probeer het opnieuw.",
+    "heroLine1": "Notities die",
+    "heroLine2": "alleen van",
+    "heroLine3": "jou zijn.",
+    "lede": "Markdown, versleuteld op dit apparaat voordat het het ooit verlaat. Geen account-e-mail. Geen servers die er ook maar een woord van kunnen lezen.",
+    "residueBanner": "Achtergebleven bestanden van een onderbroken verwijdering ({{n}}). Ruim ze op voordat je een kluis aanmaakt.",
+    "cleanUpFiles": "Achtergebleven bestanden opruimen",
+    "create": "Een kluis aanmaken",
+    "connect": "Verbinden met mijn account"
+  },
+  "wikiGraph": {
+    "emptyTitle": "Nog geen links",
+    "emptyBodyBefore": "Verbind notities door ",
+    "emptyBodyAfter": " in je tekst te schrijven. Gekoppelde notities verschijnen hier als een grafiek."
+  },
+  "markdown": {
+    "attachmentFallback": "bijlage",
+    "nothingToPreview": "Nog niets om voor te vertonen."
+  },
+  "conflicts": {
+    "empty": "Geen conflicten om te beoordelen — je notities zijn gesynchroniseerd.",
+    "groupTitle_one": "{{count}} conflicterende kopie",
+    "groupTitle_other": "{{count}} conflicterende kopieën",
+    "groupTitleOfNote": " van notitie {{hex}}"
+  },
+  "viewEditor": {
+    "saveError": "Kon deze weergave niet opslaan. Probeer het opnieuw.",
+    "deleteError": "Kon deze weergave niet verwijderen. Probeer het opnieuw.",
+    "editView": "Weergave bewerken",
+    "condition": {
+      "search": "Tekst"
+    },
+    "containsPlaceholder": "bevat…",
+    "tagPlaceholder": "tag",
+    "folderPlaceholder": "Map/",
+    "addCondition": "+ Voorwaarde toevoegen",
+    "createView": "Weergave maken"
+  },
+  "snapshots": {
+    "today": "Vandaag {{time}}",
+    "readError": "Kon versiegeschiedenis niet lezen.",
+    "decryptError": "Kon die versie niet ontsleutelen.",
+    "restoreError": "Kon die versie niet herstellen.",
+    "title": "Versiegeschiedenis",
+    "emptyState": "Nog geen eerdere versies. Momentopnamen worden automatisch vastgelegd terwijl je bewerkt.",
+    "hide": "Verbergen",
+    "empty": "(leeg)",
+    "restoreThisVersion": "Deze versie herstellen"
+  },
+  "restoreBackup": {
+    "title": "Nog niet beschikbaar op mobiel",
+    "body": "Herstellen vanuit een back-upbestand is nog niet beschikbaar op mobiel — maak een kluis aan of herstel met je herstelzin."
+  },
+  "recording": {
+    "deniedTitle": "Microfoontoegang staat uit",
+    "errorTitle": "Kon de opname niet starten",
+    "deniedBody": "Om een spraaknotitie op te nemen, geef Myne toegang tot de microfoon in Instellingen › Myne › Microfoon.",
+    "noDeviceBody": "Er is geen microfoon op dit apparaat gevonden.",
+    "emptyBody": "Die opname was leeg — er is niets vastgelegd.",
+    "genericBody": "Er is iets misgegaan tijdens het opnemen. Probeer het opnieuw.",
+    "stopAria": "Opname stoppen"
+  },
+  "picker": {
+    "neverOpened": "Nooit geopend",
+    "openedJustNow": "zojuist geopend",
+    "openedMinuteAgo": "een minuut geleden geopend",
+    "openedMinutesAgo_one": "{{count}} minuut geleden geopend",
+    "openedMinutesAgo_other": "{{count}} minuten geleden geopend",
+    "openedHourAgo": "een uur geleden geopend",
+    "openedHoursAgo_one": "{{count}} uur geleden geopend",
+    "openedHoursAgo_other": "{{count}} uur geleden geopend",
+    "openedYesterday": "gisteren geopend",
+    "openedDaysAgo_one": "{{count}} dag geleden geopend",
+    "openedDaysAgo_other": "{{count}} dagen geleden geopend",
+    "openedLastWeek": "vorige week geopend",
+    "openedWeeksAgo_one": "{{count}} week geleden geopend",
+    "openedWeeksAgo_other": "{{count}} weken geleden geopend",
+    "openedLastMonth": "vorige maand geopend",
+    "openedMonthsAgo_one": "{{count}} maand geleden geopend",
+    "openedMonthsAgo_other": "{{count}} maanden geleden geopend",
+    "openedLastYear": "vorig jaar geopend",
+    "openedYearsAgo_one": "{{count}} jaar geleden geopend",
+    "openedYearsAgo_other": "{{count}} jaar geleden geopend",
+    "corruptedBadge": "Beschadigd"
+  },
+  "join": {
+    "transportError": "Kon die synchronisatieserver niet bereiken. Controleer het adres en je verbinding en probeer het opnieuw.",
+    "passwordPlaceholder": "Je kluiswachtwoord",
+    "waitingHint": "Houd dit scherm open — zodra het is goedgekeurd, verschijnt hier een verificatiecode om te vergelijken met je andere apparaat.",
+    "verifyBody": "Controleer of deze code dezelfde is als die op het apparaat waarvandaan je hebt goedgekeurd.",
+    "removing": "Verwijderen…",
+    "sasMismatch": "Ze komen niet overeen — verwijder dit apparaat",
+    "title": "Verbinden met je account",
+    "lead": "Voer je accountgegevens in om je notities naar dit apparaat te halen. Alles blijft end-to-end versleuteld.",
+    "serverPlaceholder": "https://sync.example.com",
+    "accountHint": "Controleer dit nummer nog eens — het lijkt niet te kloppen.",
+    "approvalHint": "Je notities verschijnen zodra je dit apparaat goedkeurt vanaf een apparaat dat je account al heeft.",
+    "connectingSubtitle": "Je account wordt opgehaald en je kluis wordt ontgrendeld op dit apparaat."
+  },
+  "createVault": {
+    "beginWeakPassword": "Kies een sterker wachtwoord en probeer het opnieuw.",
+    "beginGeneric": "Kon het aanmaken van de kluis niet starten. Probeer het opnieuw.",
+    "wordNumber": "WOORD #{{position}}",
+    "commitError": "Kon je kluis niet opslaan. Probeer het opnieuw.",
+    "savedToFile": "Opgeslagen in {{label}}",
+    "saveFileError": "Kon het bestand niet opslaan.",
+    "stepLabel": "Een kluis aanmaken · {{current}} van {{total}}",
+    "briefingTitle": "Voordat we beginnen",
+    "briefingLead": "Myne versleutelt alles op dit apparaat. Die privacy brengt een verantwoordelijkheid met zich mee die alleen jij kunt dragen.",
+    "passwordTitle": "Maak een wachtwoord aan",
+    "confirmPasswordLabel": "Wachtwoord bevestigen",
+    "passwordHelper": "Wordt nooit opgeslagen, nooit verzonden. Het versleutelt je sleutels op dit apparaat.",
+    "encryptingSubtitle": "Je sleutel wordt afgeleid met Argon2id. Dit duurt een paar seconden en kan niet worden onderbroken.",
+    "phraseTitle": "Je herstelzin",
+    "phraseIntro": "Vierentwintig woorden, op volgorde. Schrijf ze op papier en bewaar ze op een veilige plek.",
+    "showSecondHalf": "Woorden 13–24 tonen",
+    "saveToFile": "Opslaan in bestand",
+    "writtenThemDown": "Ik heb ze opgeschreven",
+    "typebackTitle": "Bevestig je herstelzin",
+    "typebackLead": "Voer deze vier woorden in uit de herstelzin die je zojuist hebt opgeslagen.",
+    "wordMismatch": "Komt niet overeen met woord #{{pos}}",
+    "backToPhrase": "Terug naar herstelzin",
+    "accountTitle": "Je accountnummer",
+    "accountLead": "Bewaar dit samen met je herstelzin. Je hebt het nodig om je kluis op een nieuw apparaat te herstellen.",
+    "accountSavedAck": "Ik heb mijn accountnummer opgeslagen.",
+    "commit": "Vastleggen",
+    "committingTitle": "Je kluis wordt opgeslagen…",
+    "committingSubtitle": "De versleutelde kluis wordt naar dit apparaat geschreven.",
+    "unlockingTitle": "Ontgrendelen…",
+    "unlockingSubtitle": "Je kluis wordt geopend.",
+    "readyTitle": "Je kluis is klaar",
+    "readyBody": "Alles wat je vanaf hier schrijft, wordt op dit apparaat versleuteld voordat het wordt opgeslagen of gesynchroniseerd.",
+    "personalLabel": "Persoonlijk",
+    "openVault": "Kluis openen",
+    "backUpNow": "Nu een back-up maken"
   }
 }
