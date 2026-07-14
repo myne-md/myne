@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { Sheet } from "../../../../components";
 
 /** Note-actions sheet (the ⋯ menu): Copy / Move / History / Export / Archive /
@@ -27,6 +28,7 @@ export function NoteActionsSheet({
   onArchive: () => void;
   onTrash: () => void;
 }) {
+  const { t } = useTranslation();
   // Flush rows in the Sheet (already the single rounded container) — hairline
   // dividers only, no inner bordered box (avoids the box-in-a-box look).
   const row = (text: string, onClick: () => void, danger = false): ReactNode => (
@@ -43,12 +45,12 @@ export function NoteActionsSheet({
       {() => (
         <>
           <div style={{ padding: "0 18px 12px", fontSize: 13, color: "var(--fg-3)" }}>{stat}</div>
-          {row(copied ? "Copied ✓" : "Copy to clipboard", onCopy)}
-          {row("Move to folder…", onMove)}
-          {row("Version history", onHistory)}
-          {row("Export as PDF", onExport)}
-          {row("Archive", onArchive)}
-          {row("Move to Trash", onTrash, true)}
+          {row(copied ? t("editor.noteMenu.copied") : t("editor.noteMenu.copyToClipboard"), onCopy)}
+          {row(t("editor.noteMenu.moveToFolder"), onMove)}
+          {row(t("editor.noteMenu.versionHistory"), onHistory)}
+          {row(t("export.pdf.title"), onExport)}
+          {row(t("notes.archive.title"), onArchive)}
+          {row(t("editor.noteMenu.moveToTrash"), onTrash, true)}
         </>
       )}
     </Sheet>

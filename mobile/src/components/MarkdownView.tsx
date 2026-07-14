@@ -1,4 +1,5 @@
 import { type ReactNode, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { parseBlocks, type Block, type Inline } from "../lib/markdown";
 import { attachmentSrc } from "../lib/attachmentRef";
 
@@ -15,6 +16,7 @@ export const isAudioLabel = (label: string): boolean => {
  *  image, falling back to a file chip when the bytes aren't renderable (e.g. a
  *  PDF) or fail to load. */
 function AttachmentInline({ id, label }: { id: string; label: string }) {
+  const { t } = useTranslation();
   const [failed, setFailed] = useState(false);
   if (failed) {
     return (
@@ -22,7 +24,7 @@ function AttachmentInline({ id, label }: { id: string; label: string }) {
         <svg width="14" height="14" viewBox="0 0 24 24" style={{ flexShrink: 0 }}>
           <path d="M14 3v5h5M7 3h8l5 5v11a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z" fill="none" stroke="var(--fg-3)" strokeWidth="1.6" strokeLinejoin="round" />
         </svg>
-        {label || "attachment"}
+        {label || t("markdown.attachmentFallback")}
       </span>
     );
   }
@@ -155,11 +157,12 @@ export function MarkdownView({
   fontFamily?: string;
   fontSize?: number;
 }) {
+  const { t } = useTranslation();
   const blocks = useMemo(() => parseBlocks(text), [text]);
   return (
     <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "18px 22px", color: "var(--fg-1)", fontFamily, fontSize, boxSizing: "border-box" }}>
       {blocks.length === 0 ? (
-        <div style={{ color: "var(--fg-3)" }}>Nothing to preview yet.</div>
+        <div style={{ color: "var(--fg-3)" }}>{t("markdown.nothingToPreview")}</div>
       ) : (
         blocks.map((b, i) => renderBlock(b, i, fontSize, onOpenWikilink))
       )}

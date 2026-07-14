@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import { Screen, ScreenScroll, Title, FooterBar, Button, Banner, Spinner, MyneMark } from "../../components";
 import { listVaults, orderByLastUnlock } from "../../lib/vault-list";
 import { vaultDisplayLabel } from "../../lib/vault-label";
@@ -43,28 +45,28 @@ const PLACEHOLDER_VAULTS: VaultSummary[] = [
 ];
 
 /** Relative "opened …" copy from an epoch-ms last-unlock (mirrors the MV-01 static copy). */
-function openedWhen(ms: number | null): string {
-  if (ms === null) return "Never opened";
+function openedWhen(ms: number | null, t: TFunction): string {
+  if (ms === null) return t("picker.neverOpened");
   const sec = Math.max(0, Math.round((Date.now() - ms) / 1000));
-  if (sec < 45) return "opened just now";
+  if (sec < 45) return t("picker.openedJustNow");
   const min = Math.round(sec / 60);
-  if (min < 2) return "opened a minute ago";
-  if (min < 60) return `opened ${min} minutes ago`;
+  if (min < 2) return t("picker.openedMinuteAgo");
+  if (min < 60) return t("picker.openedMinutesAgo", { count: min });
   const hr = Math.round(min / 60);
-  if (hr < 2) return "opened an hour ago";
-  if (hr < 24) return `opened ${hr} hours ago`;
+  if (hr < 2) return t("picker.openedHourAgo");
+  if (hr < 24) return t("picker.openedHoursAgo", { count: hr });
   const day = Math.round(hr / 24);
-  if (day < 2) return "opened yesterday";
-  if (day < 7) return `opened ${day} days ago`;
+  if (day < 2) return t("picker.openedYesterday");
+  if (day < 7) return t("picker.openedDaysAgo", { count: day });
   const wk = Math.round(day / 7);
-  if (wk < 2) return "opened last week";
-  if (wk < 5) return `opened ${wk} weeks ago`;
+  if (wk < 2) return t("picker.openedLastWeek");
+  if (wk < 5) return t("picker.openedWeeksAgo", { count: wk });
   const mo = Math.round(day / 30);
-  if (mo < 2) return "opened last month";
-  if (mo < 12) return `opened ${mo} months ago`;
+  if (mo < 2) return t("picker.openedLastMonth");
+  if (mo < 12) return t("picker.openedMonthsAgo", { count: mo });
   const yr = Math.round(day / 365);
-  if (yr < 2) return "opened last year";
-  return `opened ${yr} years ago`;
+  if (yr < 2) return t("picker.openedLastYear");
+  return t("picker.openedYearsAgo", { count: yr });
 }
 
 /** Thin chevron-right (8×14, line-2 stroke) — the MV-01 row affordance. */
@@ -98,6 +100,7 @@ function VaultRow({
   corrupted: boolean;
   onClick: () => void;
 }) {
+  const { t } = useTranslation();
   return (
     <button
       onClick={onClick}
@@ -160,7 +163,7 @@ function VaultRow({
                 color: "var(--danger)",
               }}
             >
-              Corrupted
+              {t("picker.corruptedBadge")}
             </span>
           )}
         </div>
@@ -172,6 +175,7 @@ function VaultRow({
 }
 
 export function PickerFlow({ onSelect, onCreate }: PickerFlowProps) {
+  const { t } = useTranslation();
   const [vaults, setVaults] = useState<VaultSummary[] | null>(null);
   const [ioError, setIoError] = useState<string | null>(null);
 
@@ -208,7 +212,7 @@ export function PickerFlow({ onSelect, onCreate }: PickerFlowProps) {
         <span style={{ fontSize: 19, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--fg-1)" }}>myne</span>
       </div>
       <div style={{ flex: "none", padding: "22px 24px 6px" }}>
-        <Title style={{ fontSize: 27 }}>Choose a vault</Title>
+        <Title style={{ fontSize: 27 }}>{t("vaultPicker.heading")}</Title>
       </div>
 
       <ScreenScroll style={{ padding: "10px 16px" }}>
@@ -227,7 +231,7 @@ export function PickerFlow({ onSelect, onCreate }: PickerFlowProps) {
                   key={vault.id}
                   dot={labeled ? DOT_PALETTE[i % DOT_PALETTE.length] : "var(--line-2)"}
                   name={vaultDisplayLabel(vault.label, i + 1)}
-                  when={openedWhen(vault.last_unlock)}
+                  when={openedWhen(vault.last_unlock, t)}
                   italic={!labeled}
                   corrupted={corrupted}
                   onClick={() => onSelect(vault.id, true)}
@@ -240,7 +244,7 @@ export function PickerFlow({ onSelect, onCreate }: PickerFlowProps) {
 
       <FooterBar style={{ flexDirection: "column", padding: "14px 20px 44px" }}>
         <Button variant="secondary" style={{ height: 48, color: "var(--fg-1)" }} onClick={onCreate}>
-          Create another vault
+          {t("vaultPicker.createAnother")}
         </Button>
       </FooterBar>
     </Screen>

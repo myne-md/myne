@@ -1,4 +1,5 @@
 import { type ReactNode, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import type { NoteEntry, PressEvt } from "../types";
 
 /** A chronological note row (mirror notes/05 ChronoRow geometry). */
@@ -37,6 +38,7 @@ export function NoteRow({
    *  compact list never coexists with an open editor). */
   selected?: boolean;
 }) {
+  const { t } = useTranslation();
   const sub = subtitle !== undefined ? subtitle : entry.snippet;
   // Long-press (touch) / right-click reveals the row action sheet. A hold that
   // survives ~480ms without the finger drifting (which would be a scroll) fires
@@ -122,7 +124,7 @@ export function NoteRow({
                 e.stopPropagation();
                 onToggleFavorite();
               }}
-              aria-label="Remove from favorites"
+              aria-label={t("notes.row.removeFromFavorites")}
               style={{ border: "none", background: "transparent", padding: 0, width: 30, height: 30, cursor: "pointer", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}
             >
               <svg width="17" height="17" viewBox="0 0 24 24">

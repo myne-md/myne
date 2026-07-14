@@ -1,4 +1,5 @@
 import type { CSSProperties } from "react";
+import { useTranslation } from "react-i18next";
 import { Icon, LIST_TOP } from "../../../../components";
 
 /** Status-bar clearance for a top action bar: the real OS safe-area inset on
@@ -41,6 +42,7 @@ export function EditorTopBar({
   folder: string | null;
   busy: boolean;
 }) {
+  const { t } = useTranslation();
   return (
     <div
       data-testid="editor.top-bar"
@@ -55,7 +57,7 @@ export function EditorTopBar({
       }}
     >
       {onBack && (
-        <button onClick={onBack} disabled={busy} data-testid="editor.back" aria-label="Back to notes" style={{ ...chromeBtn, opacity: busy ? 0.5 : 1 }}>
+        <button onClick={onBack} disabled={busy} data-testid="editor.back" aria-label={t("editor.topBar.backToNotes")} style={{ ...chromeBtn, opacity: busy ? 0.5 : 1 }}>
           <Icon name="chevron-left" size={22} color="var(--accent)" strokeWidth={2} />
         </button>
       )}
@@ -65,14 +67,14 @@ export function EditorTopBar({
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: 2, flex: "none" }}>
-        <button onClick={onContext} aria-label="Note details" style={chromeBtn}>
+        <button onClick={onContext} aria-label={t("editor.topBar.noteDetails")} style={chromeBtn}>
           <svg width="21" height="21" viewBox="0 0 24 24" fill="none">
             <rect x="3.5" y="4.5" width="17" height="15" rx="2.5" stroke="var(--fg-2)" strokeWidth="1.7" />
             <rect x="14.5" y="4.5" width="6" height="15" rx="2.5" fill="var(--fg-2)" opacity="0.85" />
           </svg>
         </button>
         {onMore && (
-          <button onClick={onMore} aria-label="Note actions" style={chromeBtn}>
+          <button onClick={onMore} aria-label={t("editor.topBar.noteActions")} style={chromeBtn}>
             <svg width="21" height="21" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.6" fill="var(--fg-2)" /><circle cx="12" cy="12" r="1.6" fill="var(--fg-2)" /><circle cx="19" cy="12" r="1.6" fill="var(--fg-2)" /></svg>
           </button>
         )}

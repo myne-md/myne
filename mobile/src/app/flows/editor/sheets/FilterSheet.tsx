@@ -1,4 +1,5 @@
 import type { CSSProperties, ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { Sheet } from "../../../../components";
 import type { SavedView } from "../../../../lib/prefs";
 
@@ -28,6 +29,7 @@ export function FilterSheet({
   tagCount: number;
   onOpenTags: () => void;
 }) {
+  const { t } = useTranslation();
   const label: CSSProperties = { fontSize: 12, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--fg-3)", padding: "16px 4px 8px" };
   const row = (content: ReactNode, on: boolean, onClick: () => void, first = false): ReactNode => (
     <div
@@ -47,32 +49,32 @@ export function FilterSheet({
         <>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flex: "none", paddingBottom: 4 }}>
             <span style={{ width: 60 }} />
-            <span style={{ fontSize: 17, fontWeight: 600, color: "var(--fg-1)" }}>Filter</span>
-            <button onClick={close} style={{ width: 60, textAlign: "right", border: "none", background: "transparent", color: "var(--accent)", fontSize: 15, fontWeight: 600, cursor: "pointer" }}>Done</button>
+            <span style={{ fontSize: 17, fontWeight: 600, color: "var(--fg-1)" }}>{t("editor.filterSheet.title")}</span>
+            <button onClick={close} style={{ width: 60, textAlign: "right", border: "none", background: "transparent", color: "var(--accent)", fontSize: 15, fontWeight: 600, cursor: "pointer" }}>{t("editor.sheet.done")}</button>
           </div>
           <div style={{ overflowY: "auto", minHeight: 0 }}>
-            <div style={label}>Status</div>
+            <div style={label}>{t("editor.filterSheet.status")}</div>
             {group(
               <>
-                {row("All notes", listView === "notes", () => { onPickStatus("notes"); close(); }, true)}
-                {row(<span>Archive{archivedCount > 0 ? <span style={{ color: "var(--fg-3)", fontWeight: 400 }}> · {archivedCount}</span> : ""}</span>, listView === "archive", () => { onPickStatus("archive"); close(); })}
-                {row(<span>Trash{trashedCount > 0 ? <span style={{ color: "var(--fg-3)", fontWeight: 400 }}> · {trashedCount}</span> : ""}</span>, listView === "trash", () => { onPickStatus("trash"); close(); })}
+                {row(t("editor.nav.allNotes"), listView === "notes", () => { onPickStatus("notes"); close(); }, true)}
+                {row(<span>{t("notes.archive.title")}{archivedCount > 0 ? <span style={{ color: "var(--fg-3)", fontWeight: 400 }}> · {archivedCount}</span> : ""}</span>, listView === "archive", () => { onPickStatus("archive"); close(); })}
+                {row(<span>{t("notes.list.trash")}{trashedCount > 0 ? <span style={{ color: "var(--fg-3)", fontWeight: 400 }}> · {trashedCount}</span> : ""}</span>, listView === "trash", () => { onPickStatus("trash"); close(); })}
               </>,
             )}
 
             {views.length > 0 && (
               <>
-                <div style={label}>Views</div>
+                <div style={label}>{t("editor.chrome.barItems.views")}</div>
                 {group(views.map((v, i) => row(v.name, activeViewId === v.id, () => { onPickView(v.id); close(); }, i === 0)))}
               </>
             )}
 
             {tagCount > 0 && (
               <>
-                <div style={label}>Tags</div>
+                <div style={label}>{t("editor.chrome.barItems.tags")}</div>
                 {group(
                   <div onClick={() => { onOpenTags(); close(); }} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "12px 14px", cursor: "pointer", fontSize: 16, color: "var(--fg-1)" }}>
-                    <span>Browse tags…<span style={{ color: "var(--fg-3)", fontWeight: 400 }}> · {tagCount}</span></span>
+                    <span>{t("commands.actions.showTags.label")}<span style={{ color: "var(--fg-3)", fontWeight: 400 }}> · {tagCount}</span></span>
                     <svg width="8" height="13" viewBox="0 0 8 14" style={{ flex: "none" }}><path d="M1 1l6 6-6 6" stroke="var(--line-2)" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" /></svg>
                   </div>,
                 )}

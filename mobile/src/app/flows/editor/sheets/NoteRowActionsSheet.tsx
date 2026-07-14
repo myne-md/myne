@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { Sheet } from "../../../../components";
 
 /** Long-press action sheet for a note-list ROW (distinct from NoteActionsSheet,
@@ -24,6 +25,7 @@ export function NoteRowActionsSheet({
   onArchive: () => void;
   onTrash: () => void;
 }) {
+  const { t } = useTranslation();
   // Rows sit flush inside the Sheet (which is already the single rounded,
   // bordered container) — separated only by hairlines. No inner bordered box, or
   // the modal reads as a box-in-a-box.
@@ -40,11 +42,11 @@ export function NoteRowActionsSheet({
       {() => (
         <>
           <div style={{ padding: "0 18px 12px", fontSize: 13, fontWeight: 600, color: "var(--fg-2)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{title}</div>
-          {row("Open", onOpen)}
-          {row(favorited ? "Remove from favorites" : "Add to favorites", onToggleFavorite)}
-          {row("Move to folder…", onMove)}
-          {row("Archive", onArchive)}
-          {row("Move to Trash", onTrash, true)}
+          {row(t("notes.cardMenu.open"), onOpen)}
+          {row(favorited ? t("notes.row.removeFromFavorites") : t("notes.row.addToFavorites"), onToggleFavorite)}
+          {row(t("editor.noteMenu.moveToFolder"), onMove)}
+          {row(t("notes.archive.title"), onArchive)}
+          {row(t("editor.noteMenu.moveToTrash"), onTrash, true)}
         </>
       )}
     </Sheet>

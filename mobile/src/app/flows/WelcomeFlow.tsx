@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Screen, Button, MyneMark, Banner } from "../../components";
 import { HAS_TAURI } from "../../lib/app-window";
 import { vaultResidueScan, vaultRepair } from "../../lib/vault-repair";
@@ -7,6 +8,7 @@ import type { WelcomeFlowProps } from "./types";
 /** 01 · Welcome — wired. Routes into create / join. Surfaces a repair banner
  *  when a partial-fail vault_delete left orphan residue behind (MYND-159). */
 export function WelcomeFlow({ onCreate, onJoin }: WelcomeFlowProps) {
+  const { t } = useTranslation();
   const [residue, setResidue] = useState(0);
   const [repairing, setRepairing] = useState(false);
   const [repairMsg, setRepairMsg] = useState<string | null>(null);
@@ -30,14 +32,14 @@ export function WelcomeFlow({ onCreate, onJoin }: WelcomeFlowProps) {
     try {
       const removed = await vaultRepair();
       setResidue(0);
-      setRepairMsg(`Cleaned up ${removed} leftover ${removed === 1 ? "file" : "files"}.`);
+      setRepairMsg(t("welcome.repairCleanedUp", { count: removed }));
     } catch {
       try {
         setResidue(await vaultResidueScan());
       } catch {
         /* keep the last-known count */
       }
-      setRepairMsg("Couldn't finish cleaning up. Please try again.");
+      setRepairMsg(t("welcome.repairFailed"));
     } finally {
       setRepairing(false);
     }
@@ -60,34 +62,33 @@ export function WelcomeFlow({ onCreate, onJoin }: WelcomeFlowProps) {
             color: "var(--fg-display)",
           }}
         >
-          Notes that
+          {t("welcome.heroLine1")}
           <br />
-          belong to
+          {t("welcome.heroLine2")}
           <br />
-          no one but you.
+          {t("welcome.heroLine3")}
         </h1>
         <p style={{ margin: "22px 0 0", fontSize: 16, lineHeight: 1.6, color: "var(--fg-2)", maxWidth: 300 }}>
-          Markdown, encrypted on this device before it ever leaves it. No account email. No servers
-          that can read a word.
+          {t("welcome.lede")}
         </p>
       </div>
       <div style={{ paddingBottom: 52, display: "flex", flexDirection: "column", gap: 10 }}>
         {residue > 0 && (
           <Banner kind="warning">
             <div style={{ marginBottom: 10 }}>
-              Leftover files from an interrupted delete ({residue}). Clean them up before creating a vault.
+              {t("welcome.residueBanner", { n: residue })}
             </div>
             <Button variant="secondary" onClick={() => void repair()} disabled={repairing}>
-              {repairing ? "Cleaning up…" : "Clean up leftover files"}
+              {repairing ? t("welcome.repairResidue.cleaningUp") : t("welcome.cleanUpFiles")}
             </Button>
           </Banner>
         )}
         {repairMsg && (
           <div style={{ fontSize: 13, color: "var(--fg-3)", textAlign: "center" }}>{repairMsg}</div>
         )}
-        <Button onClick={onCreate}>Create a vault</Button>
+        <Button onClick={onCreate}>{t("welcome.create")}</Button>
         <Button variant="ghost" onClick={onJoin}>
-          Connect to my account
+          {t("welcome.connect")}
         </Button>
       </div>
     </Screen>
