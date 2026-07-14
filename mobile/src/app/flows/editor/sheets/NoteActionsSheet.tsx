@@ -48,8 +48,8 @@ export function NoteActionsSheet({
           {row(copied ? t("editor.noteMenu.copied") : t("editor.noteMenu.copyToClipboard"), onCopy)}
           {row(t("editor.noteMenu.moveToFolder"), onMove)}
           {row(t("editor.noteMenu.versionHistory"), onHistory)}
-          {row(t("editor.noteMenu.exportPdf"), onExport)}
-          {row(t("editor.nav.archive"), onArchive)}
+          {row(t("export.pdf.title"), onExport)}
+          {row(t("notes.archive.title"), onArchive)}
           {row(t("editor.noteMenu.moveToTrash"), onTrash, true)}
         </>
       )}

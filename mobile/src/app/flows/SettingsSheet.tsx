@@ -483,21 +483,21 @@ const PANEL_DEPTH: Record<Panel, number> = {
 /** i18n key per panel for the sheet header title (resolved with `t()` at the
  *  render site — never call `t()` at module scope). */
 const PANEL_TITLE: Record<Panel, string> = {
-  root: "settings.panelTitle.root",
-  account: "settings.panelTitle.account",
-  appearance: "settings.panelTitle.appearance",
-  editor: "settings.panelTitle.editor",
+  root: "settings.shell.title",
+  account: "settings.shell.panels.account",
+  appearance: "settings.shell.panels.appearance",
+  editor: "settings.shell.panels.editor",
   privacy: "settings.panelTitle.privacy",
   data: "settings.panelTitle.data",
-  about: "settings.panelTitle.about",
+  about: "settings.shell.panels.about",
   rename: "settings.panelTitle.vaultName",
-  "change-password": "settings.panelTitle.changePassword",
-  "quick-unlock": "settings.panelTitle.quickUnlock",
-  "delete-vault": "settings.panelTitle.deleteVault",
-  sync: "settings.panelTitle.sync",
-  "sync-endpoint": "settings.panelTitle.syncServer",
-  "sync-enroll": "settings.panelTitle.addDevice",
-  "sync-devices": "settings.panelTitle.yourDevices",
+  "change-password": "settings.changePassword.title",
+  "quick-unlock": "settings.quickUnlock.title",
+  "delete-vault": "settings.deleteVault.heading",
+  sync: "settings.shell.panels.sync",
+  "sync-endpoint": "sync.join.serverLabel",
+  "sync-enroll": "sync.enroll.submit",
+  "sync-devices": "sync.devices.yourDevices",
   "sync-approve": "settings.panelTitle.approveDevice",
 };
 
@@ -507,15 +507,15 @@ function syncSummary(status: SyncStatus | null, t: (key: string, opts?: Record<s
   switch (status?.state) {
     case "disabled":
     case undefined:
-      return t("settings.sync.summary.off");
+      return t("settings.archive.off");
     case "not_enrolled":
       return t("settings.sync.summary.notSetUp");
     case "pending":
-      return t("settings.sync.summary.awaitingApproval");
+      return t("sync.status.awaitingApproval");
     case "idle":
-      return t("settings.sync.summary.on");
+      return t("settings.archive.on");
     case "syncing":
-      return t("settings.sync.summary.syncing");
+      return t("sync.status.syncing");
     case "error":
       return t("settings.sync.summary.offline");
     case "conflicts":
@@ -741,7 +741,7 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
       return;
     }
     if (!/^\d+$/.test(pin)) {
-      setPinError(t("settings.quickUnlock.pinNotDigits"));
+      setPinError(t("settings.quickUnlock.errorPinNotDigits"));
       return;
     }
     if (pin !== pinConfirm) {
@@ -762,7 +762,7 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
         kind === "PinTooShort"
           ? t("settings.quickUnlock.pinTooShort")
           : kind === "PinNotDigits"
-            ? t("settings.quickUnlock.pinNotDigits")
+            ? t("settings.quickUnlock.errorPinNotDigits")
             : t("settings.quickUnlock.setupError"),
       );
     } finally {
@@ -830,7 +830,7 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
     const nw = newPw;
     const cf = confirmPw;
     if (nw.length < 12) {
-      setPwError(t("settings.account.newPasswordTooShort"));
+      setPwError(t("settings.account.changePasswordError.weakNewPassword"));
       return;
     }
     if (nw !== cf) {
@@ -858,7 +858,7 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
           setPwError("Wrong current password or vault file is corrupted.");
           break;
         case "WeakNewPassword":
-          setPwError(t("settings.account.newPasswordTooShort"));
+          setPwError(t("settings.account.changePasswordError.weakNewPassword"));
           break;
         case "SamePasswordRejected":
           setPwError(t("settings.account.samePassword"));
@@ -951,9 +951,9 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
           <>
             <SectionLabel mt={6}>{t("settings.sectionOptions")}</SectionLabel>
             <Group>
-              <CategoryRow first glyph="account" label={t("settings.panelTitle.account")} value={vaultDisplayLabel(eff.label)} onClick={() => setPanel("account")} />
-              <CategoryRow glyph="appearance" label={t("settings.panelTitle.appearance")} onClick={() => setPanel("appearance")} />
-              <CategoryRow glyph="editor" label={t("settings.panelTitle.editor")} onClick={() => setPanel("editor")} />
+              <CategoryRow first glyph="account" label={t("settings.shell.panels.account")} value={vaultDisplayLabel(eff.label)} onClick={() => setPanel("account")} />
+              <CategoryRow glyph="appearance" label={t("settings.shell.panels.appearance")} onClick={() => setPanel("appearance")} />
+              <CategoryRow glyph="editor" label={t("settings.shell.panels.editor")} onClick={() => setPanel("editor")} />
               <CategoryRow
                 glyph="privacy"
                 label={t("settings.panelTitle.privacy")}
@@ -961,8 +961,8 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
                 onClick={() => setPanel("privacy")}
               />
               <CategoryRow glyph="data" label={t("settings.panelTitle.data")} onClick={() => setPanel("data")} />
-              <CategoryRow glyph="sync" label={t("settings.panelTitle.sync")} value={syncSummary(syncStatus, t)} onClick={() => setPanel("sync")} />
-              <CategoryRow glyph="about" label={t("settings.panelTitle.about")} value="0.1.0" onClick={() => setPanel("about")} />
+              <CategoryRow glyph="sync" label={t("settings.shell.panels.sync")} value={syncSummary(syncStatus, t)} onClick={() => setPanel("sync")} />
+              <CategoryRow glyph="about" label={t("settings.shell.panels.about")} value="0.1.0" onClick={() => setPanel("about")} />
             </Group>
 
             <button
@@ -981,10 +981,10 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
                 cursor: "pointer",
               }}
             >
-              {t("settings.lockVault")}
+              {t("commands.actions.lockVault.label")}
             </button>
 
-            <SectionLabel>{t("settings.dangerZone")}</SectionLabel>
+            <SectionLabel>{t("settings.account.dangerZoneHeading")}</SectionLabel>
             <button
               onClick={() => setPanel("delete-vault")}
               style={{
@@ -1000,7 +1000,7 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
                 cursor: "pointer",
               }}
             >
-              {t("settings.panelTitle.deleteVault")}
+              {t("settings.deleteVault.heading")}
             </button>
 
             <div style={{ marginTop: 16, textAlign: "center", fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--line-3)" }}>
@@ -1026,7 +1026,7 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
                 </span>
               </Row>
               <Row onClick={() => setPanel("change-password")}>
-                <span style={rowLabel}>{t("settings.panelTitle.changePassword")}</span>
+                <span style={rowLabel}>{t("settings.changePassword.title")}</span>
                 <RowChevron />
               </Row>
             </Group>
@@ -1065,7 +1065,7 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
             </div>
             <LanguageBlock />
             <SegmentBlock
-              label={t("settings.appearance.textSize")}
+              label={t("settings.typography.textSizeLabel")}
               options={["sm", "md", "lg", "xl"]}
               labels={[t("settings.appearance.sizeS"), t("settings.appearance.sizeM"), t("settings.appearance.sizeL"), t("settings.appearance.sizeXL")]}
               value={eff.editor_text_size ?? "md"}
@@ -1074,14 +1074,14 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
             <SegmentBlock
               label={t("settings.appearance.editorFont")}
               options={["mono", "sans"]}
-              labels={[t("settings.appearance.fontMono"), t("settings.appearance.fontSans")]}
+              labels={[t("editor.typography.font.mono"), t("editor.typography.font.sans")]}
               value={eff.editor_font_family ?? "mono"}
               onPick={(v) => writePref("editor_font_family", v, () => setEditorFontFamily(v))}
             />
             <SegmentBlock
-              label={t("settings.appearance.lineSpacing")}
+              label={t("settings.typography.lineSpacingLabel")}
               options={["tight", "normal", "relaxed"]}
-              labels={[t("settings.appearance.spacingTight"), t("settings.appearance.spacingNormal"), t("settings.appearance.spacingRelaxed")]}
+              labels={[t("editor.typography.lineSpacing.tight"), t("editor.typography.lineSpacing.normal"), t("editor.typography.lineSpacing.relaxed")]}
               value={eff.editor_line_spacing ?? "normal"}
               onPick={(v) => writePref("editor_line_spacing", v, () => setEditorLineSpacing(v))}
             />
@@ -1102,19 +1102,19 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
             <SegmentBlock
               label={t("settings.editor.defaultView")}
               options={["live", "reading", "source"]}
-              labels={[t("settings.editor.viewLive"), t("settings.editor.viewReading"), t("settings.editor.viewSource")]}
+              labels={[t("editor.chrome.viewMode.live"), t("settings.viewMode.optionReading"), t("settings.viewMode.optionSource")]}
               value={eff.editor_default_view_mode ?? "live"}
               onPick={(v) => writePref("editor_default_view_mode", v, () => setEditorDefaultViewMode(v))}
             />
             <Group>
               <ToggleRow
                 first
-                title={t("settings.editor.spellCheck")}
+                title={t("settings.spell.label")}
                 on={eff.spell_enabled ?? true}
                 onToggle={() => writePref("spell_enabled", !(eff.spell_enabled ?? true), () => setSpellEnabled(!(eff.spell_enabled ?? true)))}
               />
               <ToggleRow
-                title={t("settings.editor.lineNumbers")}
+                title={t("settings.lineNumbers.label")}
                 on={eff.editor_line_numbers ?? false}
                 onToggle={() => writePref("editor_line_numbers", !(eff.editor_line_numbers ?? false), () => setEditorLineNumbers(!(eff.editor_line_numbers ?? false)))}
               />
@@ -1125,7 +1125,7 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
                 onToggle={() => writePref("editor_focus_typewriter", !(eff.editor_focus_typewriter ?? false), () => setEditorFocusTypewriter(!(eff.editor_focus_typewriter ?? false)))}
               />
               <ToggleRow
-                title={t("settings.editor.dimInactive")}
+                title={t("settings.focusMode.dimAria")}
                 on={eff.editor_focus_dim_inactive ?? false}
                 onToggle={() => writePref("editor_focus_dim_inactive", !(eff.editor_focus_dim_inactive ?? false), () => setEditorFocusDimInactive(!(eff.editor_focus_dim_inactive ?? false)))}
               />
@@ -1146,7 +1146,7 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
             <Group>
               <ToggleRow
                 first
-                title={t("settings.privacy.screenCapture")}
+                title={t("settings.privacy.screenCaptureLabel")}
                 subtitle={t("settings.privacy.screenCaptureSubtitle")}
                 on={eff.screen_capture_protection}
                 onToggle={() => writePref("screen_capture_protection", !eff.screen_capture_protection, () => setScreenCaptureProtection(!eff.screen_capture_protection))}
@@ -1162,14 +1162,14 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
             <Group>
               <Row first onClick={() => setPanel("quick-unlock")} testId="settings.quick-unlock-row">
                 <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                  <span style={rowLabel}>{t("settings.panelTitle.quickUnlock")}</span>
+                  <span style={rowLabel}>{t("settings.quickUnlock.title")}</span>
                   <span style={{ fontSize: 13, color: "var(--fg-3)" }}>
                     {isAndroid ? t("settings.privacy.quickUnlockSubtitleAndroid") : t("settings.privacy.quickUnlockSubtitle", { method: biometric })}
                   </span>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                   <span style={{ fontSize: 15, color: "var(--fg-3)" }} data-testid="settings.quick-unlock-value">
-                    {quStatus?.configured ? (quStatus.method === "pin" ? t("settings.quickUnlock.methodPin") : biometric) : t("settings.quickUnlock.off")}
+                    {quStatus?.configured ? (quStatus.method === "pin" ? t("settings.quickUnlock.methodPin") : biometric) : t("settings.archive.off")}
                   </span>
                   <RowChevron />
                 </div>
@@ -1238,7 +1238,7 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
               {t("settings.account.renameHelper")}
             </div>
             <div style={{ marginTop: 18 }}>
-              <Button onClick={submitRename}>{t("settings.account.saveButton")}</Button>
+              <Button onClick={submitRename}>{t("settings.account.vaultLabelSave")}</Button>
             </div>
           </div>
         )}
@@ -1320,23 +1320,23 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
                 {pwError}
               </Banner>
             )}
-            <FieldLabel mt={pwError ? 10 : 4}>{t("settings.account.currentPassword")}</FieldLabel>
-            <SheetInput type="password" value={currentPw} onChange={setCurrentPw} autoFocus placeholder={t("settings.account.currentPassword")} />
-            <FieldLabel mt={16}>{t("settings.account.newPasswordField")}</FieldLabel>
+            <FieldLabel mt={pwError ? 10 : 4}>{t("settings.changePassword.currentLabel")}</FieldLabel>
+            <SheetInput type="password" value={currentPw} onChange={setCurrentPw} autoFocus placeholder={t("settings.changePassword.currentLabel")} />
+            <FieldLabel mt={16}>{t("settings.changePassword.newLabel")}</FieldLabel>
             <SheetInput type="password" value={newPw} onChange={setNewPw} placeholder={t("settings.account.newPasswordPlaceholder")} />
             {newPw.length > 0 && (
               <div style={{ marginTop: 10 }}>
                 <StrengthMeter level={strengthLevel(newPw.length)} />
               </div>
             )}
-            <FieldLabel mt={16}>{t("settings.account.confirmNewPassword")}</FieldLabel>
+            <FieldLabel mt={16}>{t("settings.changePassword.confirmLabel")}</FieldLabel>
             <SheetInput type="password" value={confirmPw} onChange={setConfirmPw} placeholder={t("settings.account.reenterNewPassword")} />
             <div style={{ marginTop: 14, fontSize: 13, lineHeight: 1.5, color: "var(--fg-3)" }}>
               {t("settings.account.changePasswordFootnote")}
             </div>
             <div style={{ marginTop: 18 }}>
               <Button onClick={submitChangePassword} disabled={pwBusy}>
-                {pwBusy ? t("settings.account.changing") : t("settings.panelTitle.changePassword")}
+                {pwBusy ? t("settings.account.changing") : t("settings.changePassword.title")}
               </Button>
             </div>
           </div>
@@ -1372,7 +1372,7 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
                   opacity: canDelete ? 1 : 0.7,
                 }}
               >
-                {deleteBusy ? t("settings.deleteVault.deleting") : t("settings.deleteVault.deleteButton")}
+                {deleteBusy ? t("attachments.deleteDialog.deleting") : t("settings.deleteVault.deleteButton")}
               </button>
             </div>
           </div>

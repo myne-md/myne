@@ -42,10 +42,10 @@ export function NoteRowActionsSheet({
       {() => (
         <>
           <div style={{ padding: "0 18px 12px", fontSize: 13, fontWeight: 600, color: "var(--fg-2)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{title}</div>
-          {row(t("editor.noteMenu.open"), onOpen)}
+          {row(t("notes.cardMenu.open"), onOpen)}
           {row(favorited ? t("notes.row.removeFromFavorites") : t("notes.row.addToFavorites"), onToggleFavorite)}
           {row(t("editor.noteMenu.moveToFolder"), onMove)}
-          {row(t("editor.nav.archive"), onArchive)}
+          {row(t("notes.archive.title"), onArchive)}
           {row(t("editor.noteMenu.moveToTrash"), onTrash, true)}
         </>
       )}

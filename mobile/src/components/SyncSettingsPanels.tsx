@@ -161,15 +161,15 @@ function statusView(status: SyncStatus | null, t: TFunction): { color: string; l
   switch (status?.state) {
     case undefined:
     case "disabled":
-      return { color: "var(--line-3)", label: t("settings.sync.summary.off") };
+      return { color: "var(--line-3)", label: t("settings.archive.off") };
     case "not_enrolled":
       return { color: "var(--line-3)", label: t("settings.sync.summary.notSetUp") };
     case "pending":
-      return { color: "var(--warning)", label: t("settings.sync.summary.awaitingApproval") };
+      return { color: "var(--warning)", label: t("sync.status.awaitingApproval") };
     case "idle":
-      return { color: "var(--success)", label: t("settings.sync.summary.on") };
+      return { color: "var(--success)", label: t("settings.archive.on") };
     case "syncing":
-      return { color: "var(--accent)", label: t("settings.sync.summary.syncing") };
+      return { color: "var(--accent)", label: t("sync.status.syncing") };
     case "error":
       return { color: "var(--warning)", label: t("settings.sync.summary.offline") };
     case "conflicts":
@@ -207,7 +207,7 @@ export function SyncHubPanel({ status, onOpenEndpoint, onOpenEnroll, onOpenDevic
       <SectionLabel mt={6}>{t("sync.settings.serverSection")}</SectionLabel>
       <Group>
         <Row first onClick={onOpenEndpoint} testId="sync.settings.endpoint">
-          <span style={rowLabel}>{t("sync.settings.serverLabel")}</span>
+          <span style={rowLabel}>{t("sync.join.serverLabel")}</span>
           <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
             <span
               style={{
@@ -234,14 +234,14 @@ export function SyncHubPanel({ status, onOpenEndpoint, onOpenEnroll, onOpenDevic
         </Row>
       </Group>
 
-      <SectionLabel>{t("sync.settings.devicesSection")}</SectionLabel>
+      <SectionLabel>{t("sync.panel.devices.label")}</SectionLabel>
       <Group>
         <Row first onClick={onOpenEnroll} testId="sync.settings.add-device">
-          <span style={rowLabel}>{t("sync.settings.addDevice")}</span>
+          <span style={rowLabel}>{t("sync.enroll.submit")}</span>
           <RowChevron />
         </Row>
         <Row onClick={onOpenDevices} testId="sync.settings.devices">
-          <span style={rowLabel}>{t("sync.settings.yourDevices")}</span>
+          <span style={rowLabel}>{t("sync.devices.yourDevices")}</span>
           <RowChevron />
         </Row>
       </Group>
@@ -319,7 +319,7 @@ export function SyncEndpointPanel() {
           style={primaryBtn(busy)}
           data-testid="sync.endpoint-connect"
         >
-          {busy ? t("sync.settings.connecting") : t("sync.settings.connect")}
+          {busy ? t("sync.endpoint.connecting") : t("sync.endpoint.connect")}
         </button>
       </div>
 
@@ -461,7 +461,7 @@ export function SyncEnrollPanel({ onEnrolled }: SyncEnrollPanelProps) {
 
   return (
     <div style={{ marginTop: 4 }} data-testid="sync.enroll">
-      <FieldLabel mt={6}>{t("sync.settings.accountNumberLabel")}</FieldLabel>
+      <FieldLabel mt={6}>{t("sync.enroll.accountNumberLabel")}</FieldLabel>
       <input
         value={accountNumber}
         onChange={(e) => {
@@ -482,9 +482,9 @@ export function SyncEnrollPanel({ onEnrolled }: SyncEnrollPanelProps) {
         </p>
       )}
 
-      <FieldLabel>{t("sync.settings.signInWith")}</FieldLabel>
+      <FieldLabel>{t("sync.enroll.signInWith")}</FieldLabel>
       <Segmented
-        options={[t("sync.settings.passwordLabel"), t("sync.settings.recoveryPhraseLabel")]}
+        options={[t("sync.enroll.passwordLabel"), t("sync.enroll.recoveryPhraseLabel")]}
         active={MODE_VALUES.indexOf(mode)}
         onChange={(i) => {
           clearOutcome();
@@ -494,7 +494,7 @@ export function SyncEnrollPanel({ onEnrolled }: SyncEnrollPanelProps) {
 
       {mode === "password" ? (
         <>
-          <FieldLabel>{t("sync.settings.passwordLabel")}</FieldLabel>
+          <FieldLabel>{t("sync.enroll.passwordLabel")}</FieldLabel>
           <input
             type="password"
             value={password}
@@ -510,7 +510,7 @@ export function SyncEnrollPanel({ onEnrolled }: SyncEnrollPanelProps) {
         </>
       ) : (
         <>
-          <FieldLabel>{t("sync.settings.recoveryPhraseLabel")}</FieldLabel>
+          <FieldLabel>{t("sync.enroll.recoveryPhraseLabel")}</FieldLabel>
           <p style={{ margin: "0 0 10px", fontSize: 13, color: "var(--fg-3)" }}>
             {t("sync.settings.recoveryPhraseHint")}
           </p>
@@ -603,7 +603,7 @@ export function SyncEnrollPanel({ onEnrolled }: SyncEnrollPanelProps) {
           style={primaryBtn(!canSubmit)}
           data-testid="sync.enroll.submit"
         >
-          {busy ? t("sync.settings.connecting") : t("sync.settings.enrollSubmit")}
+          {busy ? t("sync.endpoint.connecting") : t("sync.enroll.submit")}
         </button>
       </div>
     </div>
@@ -665,7 +665,7 @@ export function SyncDevicesPanel() {
     return (
       <div style={{ marginTop: 6 }} data-testid="sync.approve-verify">
         <h2 style={{ margin: "8px 4px 10px", fontSize: 20, fontWeight: 700, color: "var(--fg-1)" }}>
-          {t("sync.settings.verifyTitle")}
+          {t("sync.devices.verifyTitle")}
         </h2>
         <p style={{ margin: "0 4px 18px", fontSize: 15, lineHeight: 1.6, color: "var(--fg-2)" }}>
           {t("sync.settings.verifyBody")}
@@ -681,7 +681,7 @@ export function SyncDevicesPanel() {
           }}
         >
           {sas.loading ? (
-            <span style={{ fontSize: 15, color: "var(--fg-3)" }}>{t("sync.settings.syncing")}</span>
+            <span style={{ fontSize: 15, color: "var(--fg-3)" }}>{t("sync.status.syncing")}</span>
           ) : sas.fingerprint ? (
             <span
               style={{
@@ -697,7 +697,7 @@ export function SyncDevicesPanel() {
             </span>
           ) : (
             <span style={{ fontSize: 14, color: "var(--fg-3)", textAlign: "center" }} data-testid="sync.sas-pending">
-              {t("sync.settings.sasPending")}
+              {t("sync.devices.verifyPending")}
             </span>
           )}
         </div>
@@ -708,7 +708,7 @@ export function SyncDevicesPanel() {
             style={primaryBtn(false)}
             data-testid="sync.sas-match"
           >
-            {t("sync.settings.sasMatch")}
+            {t("sync.devices.verifyMatch")}
           </button>
           <button
             type="button"
@@ -816,7 +816,7 @@ export function SyncDevicesPanel() {
               style={primaryBtn(busy)}
               data-testid="sync.reset-local"
             >
-              {t("sync.settings.resetLocal")}
+              {t("sync.devices.resetSyncOnThisDevice")}
             </button>
           </div>
         </div>
@@ -845,7 +845,7 @@ export function SyncDevicesPanel() {
 
       {pending.length > 0 && (
         <div data-testid="sync.pending-devices">
-          <SectionLabel mt={12}>{t("sync.settings.waitingForApproval")}</SectionLabel>
+          <SectionLabel mt={12}>{t("sync.join.waitingTitle")}</SectionLabel>
           <Group>
             {pending.map((d, i) => (
               <Row key={d.device_id_hex} first={i === 0} testId="sync.pending-row">
@@ -866,7 +866,7 @@ export function SyncDevicesPanel() {
                   }}
                   data-testid="sync.approve-device"
                 >
-                  {t("sync.settings.approve")}
+                  {t("sync.devices.approve")}
                 </button>
               </Row>
             ))}
@@ -874,9 +874,9 @@ export function SyncDevicesPanel() {
         </div>
       )}
 
-      <SectionLabel mt={12}>{t("sync.settings.yourDevices")}</SectionLabel>
+      <SectionLabel mt={12}>{t("sync.devices.yourDevices")}</SectionLabel>
       {devices === null ? (
-        error ? null : <p style={{ ...HELP, marginTop: 4 }}>{t("sync.settings.loading")}</p>
+        error ? null : <p style={{ ...HELP, marginTop: 4 }}>{t("sync.devices.loading")}</p>
       ) : approved.length === 0 ? (
         <p style={{ ...HELP, marginTop: 4 }}>{t("sync.settings.noDevices")}</p>
       ) : (
@@ -897,7 +897,7 @@ export function SyncDevicesPanel() {
                     }}
                     data-testid="sync.this-device"
                   >
-                    {t("sync.settings.thisDevice")}
+                    {t("sync.devices.thisDevice")}
                   </span>
                 )}
               </div>
@@ -920,7 +920,7 @@ export function SyncDevicesPanel() {
                   }}
                   data-testid="sync.remove-device"
                 >
-                  {t("sync.settings.remove")}
+                  {t("sync.devices.remove")}
                 </button>
               )}
             </Row>

@@ -128,7 +128,7 @@ export function SidebarPane({
         style={{ display: "flex", alignItems: "center", gap: 8, height: 34, border: "1px solid var(--line-2)", borderRadius: 8, background: "var(--bg-1)", color: "var(--fg-3)", padding: "0 10px", fontFamily: "var(--font-sans)", fontSize: 13, cursor: "pointer", textAlign: "left" }}
       >
         <Icon name="search" size={15} color="var(--fg-3)" strokeWidth={1.7} />
-        {t("editor.nav.search")}
+        {t("notes.filterBuilder.type.search")}
       </button>
 
       <div style={{ marginTop: 12, flex: 1, minHeight: 0, overflowY: "auto" }}>
@@ -141,21 +141,21 @@ export function SidebarPane({
         />
         <NavItem
           testid="sidebar.nav-graph"
-          label={t("editor.nav.graph")}
+          label={t("editor.chrome.barItems.graph")}
           active={tab === "graph"}
           onClick={onGraph}
           icon={<svg width="17" height="17" viewBox="0 0 24 24"><circle cx="6" cy="17" r="2.4" {...gi} /><circle cx="18" cy="14" r="2.4" {...gi} /><circle cx="13" cy="6" r="2.4" {...gi} /><path d="M8.3 15.6l3-7M8.4 16.2l7-1.6" {...gi} /></svg>}
         />
         <NavItem
           testid="sidebar.nav-files"
-          label={t("editor.nav.files")}
+          label={t("settings.shell.panels.files")}
           active={tab === "files"}
           onClick={onFiles}
           icon={<svg width="17" height="17" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" {...gi} /><path d="M21 15l-5-5L5 21" {...gi} /></svg>}
         />
         <NavItem
           testid="sidebar.nav-templates"
-          label={t("editor.nav.templates")}
+          label={t("templates.manager.listLabel")}
           active={tab === "templates"}
           onClick={onTemplates}
           icon={<svg width="17" height="17" viewBox="0 0 24 24"><rect x="8" y="4" width="11" height="14" rx="2" {...gi} /><path d="M5 8v10a2 2 0 002 2h8" {...gi} /></svg>}
@@ -164,26 +164,26 @@ export function SidebarPane({
         <GroupLabel>{t("editor.sidebar.browse")}</GroupLabel>
         <NavItem
           testid="sidebar.nav-views"
-          label={t("editor.nav.views")}
+          label={t("editor.chrome.barItems.views")}
           onClick={onViews}
           icon={<svg width="17" height="17" viewBox="0 0 24 24"><path d="M12 2 2 7l10 5 10-5-10-5z" {...gi} /><path d="M2 12l10 5 10-5" {...gi} /><path d="M2 17l10 5 10-5" {...gi} /></svg>}
         />
         <NavItem
           testid="sidebar.nav-tags"
-          label={t("editor.nav.tags")}
+          label={t("editor.chrome.barItems.tags")}
           onClick={onTags}
           icon={<svg width="17" height="17" viewBox="0 0 24 24"><path d="M4 4h7l9 9-7 7-9-9z" {...gi} /><circle cx="8" cy="8" r="1.1" fill="currentColor" /></svg>}
         />
         <NavItem
           testid="sidebar.nav-archive"
-          label={t("editor.nav.archive")}
+          label={t("notes.archive.title")}
           active={tab === "notes" && listView === "archive"}
           onClick={onArchive}
           icon={<svg width="17" height="17" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="5" rx="1" {...gi} /><path d="M5 9v10a1 1 0 001 1h12a1 1 0 001-1V9M9 13h6" {...gi} /></svg>}
         />
         <NavItem
           testid="sidebar.nav-trash"
-          label={t("editor.nav.trash")}
+          label={t("notes.list.trash")}
           active={tab === "notes" && listView === "trash"}
           onClick={onTrash}
           icon={<svg width="17" height="17" viewBox="0 0 24 24"><path d="M4 7h16M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2M6 7l1 13a1 1 0 001 1h8a1 1 0 001-1l1-13" {...gi} /></svg>}
@@ -199,7 +199,7 @@ export function SidebarPane({
         <button
           data-testid="sidebar.settings"
           onClick={onSettings}
-          aria-label={t("editor.nav.settings")}
+          aria-label={t("editor.chrome.barItems.settings")}
           style={{ width: 34, height: 34, borderRadius: 8, border: "none", background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
         >
           <Icon name="settings" size={19} color="var(--fg-2)" strokeWidth={1.7} />

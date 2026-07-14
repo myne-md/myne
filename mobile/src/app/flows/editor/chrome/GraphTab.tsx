@@ -11,7 +11,7 @@ export function GraphTab({ graph, onOpen }: { graph: NoteGraph; onOpen: (id: str
   return (
     <>
       <div style={{ flex: "none", padding: "8px 20px 0", display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12 }}>
-        <h1 style={{ margin: 0, fontSize: 32, fontWeight: 700, letterSpacing: "-0.025em", color: "var(--fg-display)" }}>{t("editor.graphTab.title")}</h1>
+        <h1 style={{ margin: 0, fontSize: 32, fontWeight: 700, letterSpacing: "-0.025em", color: "var(--fg-display)" }}>{t("editor.chrome.barItems.graph")}</h1>
         {linked > 0 && (
           <span style={{ flexShrink: 0, fontSize: 13, color: "var(--fg-3)" }}>
             {t("editor.graphTab.linkedNotes", { count: linked })} · {t("editor.graphTab.links", { count: links })}

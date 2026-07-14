@@ -212,7 +212,7 @@ export function PickerFlow({ onSelect, onCreate }: PickerFlowProps) {
         <span style={{ fontSize: 19, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--fg-1)" }}>myne</span>
       </div>
       <div style={{ flex: "none", padding: "22px 24px 6px" }}>
-        <Title style={{ fontSize: 27 }}>{t("picker.title")}</Title>
+        <Title style={{ fontSize: 27 }}>{t("vaultPicker.heading")}</Title>
       </div>
 
       <ScreenScroll style={{ padding: "10px 16px" }}>
@@ -244,7 +244,7 @@ export function PickerFlow({ onSelect, onCreate }: PickerFlowProps) {
 
       <FooterBar style={{ flexDirection: "column", padding: "14px 20px 44px" }}>
         <Button variant="secondary" style={{ height: 48, color: "var(--fg-1)" }} onClick={onCreate}>
-          {t("picker.createAnother")}
+          {t("vaultPicker.createAnother")}
         </Button>
       </FooterBar>
     </Screen>

@@ -50,7 +50,7 @@ export function TemplatesSheet({
         <div key={tpl.id} style={{ borderTop: "1px solid var(--line-1)", padding: "10px 4px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <div style={{ flex: 1, minWidth: 0, fontSize: 16, fontWeight: 600, color: "var(--fg-1)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-              {tpl.title || t("templates.untitledTemplate")}
+              {tpl.title || t("templates.manager.newTemplateName")}
             </div>
             <button onClick={() => onUse(tpl.id)} style={btn("var(--accent)")}>{t("templates.use")}</button>
             <button onClick={() => onEdit(tpl.id)} style={btn("var(--fg-2)")}>{t("templates.edit")}</button>
@@ -58,13 +58,13 @@ export function TemplatesSheet({
           {confirmDelete === tpl.id ? (
             <div style={{ marginTop: 6, display: "flex", alignItems: "center", gap: 12, justifyContent: "flex-end" }}>
               <span style={{ fontSize: 13, color: "var(--fg-3)", marginRight: "auto" }}>{t("templates.deleteConfirm")}</span>
-              <button onClick={() => { setConfirmDelete(null); onDelete(tpl.id); }} style={btn("var(--danger)")}>{t("templates.delete")}</button>
-              <button onClick={() => setConfirmDelete(null)} style={btn("var(--fg-3)")}>{t("templates.cancel")}</button>
+              <button onClick={() => { setConfirmDelete(null); onDelete(tpl.id); }} style={btn("var(--danger)")}>{t("attachments.deleteDialog.delete")}</button>
+              <button onClick={() => setConfirmDelete(null)} style={btn("var(--fg-3)")}>{t("common.prompt.cancel")}</button>
             </div>
           ) : (
             <div style={{ marginTop: 4, display: "flex", gap: 14, justifyContent: "flex-end" }}>
               <button onClick={() => onUnmark(tpl.id)} style={btn("var(--fg-3)")}>{t("templates.convertToNote")}</button>
-              <button onClick={() => setConfirmDelete(tpl.id)} style={btn("var(--danger)")}>{t("templates.delete")}</button>
+              <button onClick={() => setConfirmDelete(tpl.id)} style={btn("var(--danger)")}>{t("attachments.deleteDialog.delete")}</button>
             </div>
           )}
         </div>
@@ -86,11 +86,11 @@ export function TemplatesSheet({
               onClick={onBack}
               style={{ display: "flex", alignItems: "center", gap: 3, border: "none", background: "transparent", color: "var(--accent)", fontSize: 15, fontWeight: 600, cursor: "pointer", padding: 0 }}
             >
-              <Icon name="chevron-left" size={18} color="var(--accent)" strokeWidth={2} /> {t("templates.notesBack")}
+              <Icon name="chevron-left" size={18} color="var(--accent)" strokeWidth={2} /> {t("commandPalette.sectionNotes")}
             </button>
           )}
           <div style={{ marginTop: onBack ? 14 : 0, display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12 }}>
-            <h1 style={{ margin: 0, fontSize: 32, fontWeight: 700, letterSpacing: "-0.025em", color: "var(--fg-display)" }}>{t("templates.title")}</h1>
+            <h1 style={{ margin: 0, fontSize: 32, fontWeight: 700, letterSpacing: "-0.025em", color: "var(--fg-display)" }}>{t("templates.manager.listLabel")}</h1>
             {newAction}
           </div>
         </div>
@@ -103,7 +103,7 @@ export function TemplatesSheet({
     <Sheet onClose={onClose} style={{ maxHeight: "82%", display: "flex", flexDirection: "column", overflow: "hidden" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flex: "none" }}>
         <span style={{ width: 72 }} />
-        <span style={{ fontSize: 17, fontWeight: 600, color: "var(--fg-1)" }}>{t("templates.title")}</span>
+        <span style={{ fontSize: 17, fontWeight: 600, color: "var(--fg-1)" }}>{t("templates.manager.listLabel")}</span>
         <span style={{ width: 72, textAlign: "right" }}>{newAction}</span>
       </div>
 

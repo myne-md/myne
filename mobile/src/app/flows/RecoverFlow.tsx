@@ -555,7 +555,7 @@ export function RecoverFlow({ initialSubStep, onComplete, onCancel }: RecoverFlo
     return (
       <Screen>
         <BlockingOverlay
-          title={t("recover.decryptingTitle")}
+          title={t("unlock.decrypting")}
           subtitle={t("recover.decryptingSubtitle")}
         />
       </Screen>
@@ -570,7 +570,7 @@ export function RecoverFlow({ initialSubStep, onComplete, onCancel }: RecoverFlo
           <Title>{t("recover.accountTitle")}</Title>
           <Lead>{t("recover.accountLead")}</Lead>
           <div style={{ marginTop: 22 }}>
-            <FieldLabel>{t("recover.accountLabel")}</FieldLabel>
+            <FieldLabel>{t("sync.enroll.accountNumberLabel")}</FieldLabel>
             <AccountField
               value={state.accountInput}
               error={state.accountError}
@@ -635,7 +635,7 @@ export function RecoverFlow({ initialSubStep, onComplete, onCancel }: RecoverFlo
           >
             {t("common.prompt.cancel")}
           </button>
-          <div style={{ fontSize: 15, fontWeight: 600, color: "var(--fg-1)" }}>{t("recover.phraseHeader")}</div>
+          <div style={{ fontSize: 15, fontWeight: 600, color: "var(--fg-1)" }}>{t("sync.enroll.recoveryPhraseLabel")}</div>
           <button
             onClick={() => void onPasteClipboard()}
             style={{
@@ -704,7 +704,7 @@ export function RecoverFlow({ initialSubStep, onComplete, onCancel }: RecoverFlo
         <Title>{t("recover.newPasswordTitle")}</Title>
         <Lead>{t("recover.newPasswordLead")}</Lead>
         <div style={{ marginTop: 20 }}>
-          <FieldLabel>{t("recover.newPasswordLabel")}</FieldLabel>
+          <FieldLabel>{t("settings.changePassword.newLabel")}</FieldLabel>
           <EditablePassword
             value={state.newPassword}
             onChange={(v) => dispatch({ type: "pw.new", value: v })}
@@ -740,7 +740,7 @@ export function RecoverFlow({ initialSubStep, onComplete, onCancel }: RecoverFlo
       </FooterBar>
       {state.busy && (
         <BlockingOverlay
-          title={t("recover.encryptingTitle")}
+          title={t("editor.attachment.progress.encrypting")}
           subtitle={t("recover.encryptingSubtitle")}
         />
       )}

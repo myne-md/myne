@@ -633,8 +633,8 @@ export function UnlockFlow(props: UnlockFlowProps) {
       ) : pinMode && qu?.available ? (
         <>
           <div style={{ marginTop: showSuspicion && suspicion ? 18 : 30, width: "100%" }}>
-            <FieldLabel>{t("unlock.pinLabel")}</FieldLabel>
-            <PasswordInput value={pin} onChange={setPinValue} onSubmit={handlePinUnlock} error={!!pinErr} numeric ariaLabel={t("unlock.pinLabel")} testId="unlock-pin" />
+            <FieldLabel>{t("unlock.quickUnlock.pinPlaceholder")}</FieldLabel>
+            <PasswordInput value={pin} onChange={setPinValue} onSubmit={handlePinUnlock} error={!!pinErr} numeric ariaLabel={t("unlock.quickUnlock.pinPlaceholder")} testId="unlock-pin" />
             {pinErr && (
               <div data-testid="unlock-pin-error" style={{ marginTop: 10 }}>
                 <Banner kind="danger">{pinErr}</Banner>
@@ -728,7 +728,7 @@ export function UnlockFlow(props: UnlockFlowProps) {
           }}
           testId="unlock-delete-link"
         >
-          {t("unlock.deleteVaultLink")}
+          {t("vaultRecover.phrase.deleteLink")}
         </TextButton>
       </div>
 
@@ -766,7 +766,7 @@ export function UnlockFlow(props: UnlockFlowProps) {
                 onClick={() => void handleDelete()}
                 data-testid="unlock-delete-confirm"
               >
-                {deleting ? t("unlock.deleting") : t("unlock.deleteVault")}
+                {deleting ? t("attachments.deleteDialog.deleting") : t("settings.deleteVault.heading")}
               </Button>
             )}
             {!deleteFailed && (
@@ -814,7 +814,7 @@ function FailClosed({
         </p>
       </div>
       <div style={{ paddingBottom: 46, width: "100%", display: "flex", flexDirection: "column", gap: 10 }}>
-        <Button onClick={() => void closeApp()}>{t("unlock.closeApp")}</Button>
+        <Button onClick={() => void closeApp()}>{t("failClosed.corrupted.cta")}</Button>
       </div>
     </Screen>
   );

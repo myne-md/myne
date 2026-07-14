@@ -119,7 +119,7 @@ export function RecordingSheet({
           <h2 style={{ margin: "18px 0 0", fontSize: 20, fontWeight: 600, color: "var(--fg-display)", letterSpacing: "-0.02em" }}>{heading}</h2>
           <p style={{ margin: "10px auto 20px", fontSize: 15, lineHeight: 1.6, color: "var(--fg-2)", maxWidth: 300 }}>{body}</p>
           <Button variant="ghost" onClick={closeCancel} style={{ color: "var(--fg-3)", fontWeight: 600 }}>
-            {t("recording.notNow")}
+            {t("notes.import.offer.notNow")}
           </Button>
         </div>
       </Sheet>
@@ -159,7 +159,7 @@ export function RecordingSheet({
         </div>
         {phase === "saving" ? (
           <div style={{ display: "flex", alignItems: "center", gap: 8, height: 38, padding: "0 12px", color: "var(--fg-2)", fontSize: 14 }}>
-            <Spinner size={16} /> {t("recording.saving")}
+            <Spinner size={16} /> {t("editor.attachment.recording.saving")}
           </div>
         ) : (
           <button
@@ -182,7 +182,7 @@ export function RecordingSheet({
               opacity: phase === "recording" ? 1 : 0.6,
             }}
           >
-            {t("recording.stop")}
+            {t("editor.attachment.recording.stop")}
           </button>
         )}
       </div>

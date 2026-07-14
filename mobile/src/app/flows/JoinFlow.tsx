@@ -297,7 +297,7 @@ export function JoinFlow({ onComplete, onCancel }: JoinFlowProps) {
             <circle cx="28" cy="28" r="24" stroke="var(--line-1)" strokeWidth="2" />
             <path d="M28 4a24 24 0 0 1 24 24" stroke="var(--accent)" strokeWidth="2.4" strokeLinecap="round" />
           </svg>
-          <Title>{t("join.waitingTitle")}</Title>
+          <Title>{t("sync.join.waitingTitle")}</Title>
           <div style={{ marginTop: 12, fontSize: 15, lineHeight: 1.6, color: "var(--fg-2)", maxWidth: 320 }}>
             {ENROLL_PENDING_NOTICE}
           </div>
@@ -319,7 +319,7 @@ export function JoinFlow({ onComplete, onCancel }: JoinFlowProps) {
     return (
       <Screen style={{ alignItems: "center", justifyContent: "center", padding: "0 32px" }}>
         <div data-testid="sync.join.verify" style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center" }}>
-          <Title>{t("join.verifyTitle")}</Title>
+          <Title>{t("sync.join.verifyTitle")}</Title>
           <div style={{ marginTop: 12, fontSize: 15, lineHeight: 1.6, color: "var(--fg-2)", maxWidth: 320 }}>
             {t("join.verifyBody")}
           </div>
@@ -343,7 +343,7 @@ export function JoinFlow({ onComplete, onCancel }: JoinFlowProps) {
         </div>
         <FooterBar style={{ padding: "14px 20px calc(14px + env(safe-area-inset-bottom, 0px))", borderTop: "none", flexDirection: "column", gap: 10 }}>
           <Button disabled={aborting} onClick={() => onComplete(joinedVaultId)} data-testid="sync.join.sas-match">
-            {t("join.sasMatch")}
+            {t("sync.join.sasMatch")}
           </Button>
           <Button
             variant="ghost"
@@ -369,7 +369,7 @@ export function JoinFlow({ onComplete, onCancel }: JoinFlowProps) {
         <Lead>{t("join.lead")}</Lead>
 
         <div style={{ marginTop: 22 }}>
-          <FieldLabel>{t("join.serverLabel")}</FieldLabel>
+          <FieldLabel>{t("sync.join.serverLabel")}</FieldLabel>
           <MonoField
             value={serverUrl}
             onChange={(v) => {
@@ -383,7 +383,7 @@ export function JoinFlow({ onComplete, onCancel }: JoinFlowProps) {
         </div>
 
         <div style={{ marginTop: 18 }}>
-          <FieldLabel>{t("join.accountLabel")}</FieldLabel>
+          <FieldLabel>{t("sync.join.accountLabel")}</FieldLabel>
           <MonoField
             value={accountNumber}
             onChange={(v) => {
@@ -402,7 +402,7 @@ export function JoinFlow({ onComplete, onCancel }: JoinFlowProps) {
         </div>
 
         <div style={{ marginTop: 18 }}>
-          <FieldLabel>{t("join.passwordLabel")}</FieldLabel>
+          <FieldLabel>{t("sync.join.passwordLabel")}</FieldLabel>
           <PasswordField
             value={password}
             onChange={(v) => {
@@ -426,10 +426,10 @@ export function JoinFlow({ onComplete, onCancel }: JoinFlowProps) {
       </div>
       <FooterBar style={{ padding: "14px 20px calc(14px + env(safe-area-inset-bottom, 0px))", borderTop: "none" }}>
         <Button disabled={!canSubmit} onClick={() => void onSubmit()} data-testid="sync.join.submit">
-          {t("join.connect")}
+          {t("sync.endpoint.connect")}
         </Button>
       </FooterBar>
-      {busy && <BlockingOverlay title={t("join.connectingTitle")} subtitle={t("join.connectingSubtitle")} />}
+      {busy && <BlockingOverlay title={t("sync.endpoint.connecting")} subtitle={t("join.connectingSubtitle")} />}
     </Screen>
   );
 }

@@ -88,31 +88,31 @@ export function FormatBar({
       }}
     >
       <div style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 1, overflowX: "auto", padding: "6px 6px", scrollbarWidth: "none", touchAction: "pan-x" }}>
-        <button {...run((v) => { undo(v); v.focus(); })} aria-label={t("editor.formatBar.undo")} style={fbtn}>
+        <button {...run((v) => { undo(v); v.focus(); })} aria-label={t("notes.list.undo")} style={fbtn}>
           <svg width="20" height="20" viewBox="0 0 24 24"><path d="M7 7L3 11l4 4" {...st} /><path d="M3 11h11a6 6 0 0 1 0 12h-2" {...st} /></svg>
         </button>
         <button {...run((v) => { redo(v); v.focus(); })} aria-label={t("editor.formatBar.redo")} style={fbtn}>
           <svg width="20" height="20" viewBox="0 0 24 24"><path d="M17 7l4 4-4 4" {...st} /><path d="M21 11H10a6 6 0 0 0 0 12h2" {...st} /></svg>
         </button>
         <div style={{ width: 1, height: 22, background: "var(--line-2)", margin: "0 5px", flex: "none" }} />
-        <button {...run(editorCommands.heading1)} aria-label={t("editor.formatBar.heading1")} style={{ ...fbtn, fontWeight: 700 }}>H1</button>
-        <button {...run(editorCommands.heading2)} aria-label={t("editor.formatBar.heading2")} style={{ ...fbtn, fontWeight: 700, fontSize: 14 }}>H2</button>
-        <button {...run(editorCommands.bold)} aria-label={t("editor.formatBar.bold")} style={{ ...fbtn, fontWeight: 800 }}>B</button>
-        <button {...run(editorCommands.italic)} aria-label={t("editor.formatBar.italic")} style={{ ...fbtn, fontStyle: "italic", fontWeight: 600 }}>I</button>
-        <button {...run(editorCommands.bulletList)} aria-label={t("editor.formatBar.bulletList")} style={fbtn}>
+        <button {...run(editorCommands.heading1)} aria-label={t("editor.slash.heading1")} style={{ ...fbtn, fontWeight: 700 }}>H1</button>
+        <button {...run(editorCommands.heading2)} aria-label={t("editor.slash.heading2")} style={{ ...fbtn, fontWeight: 700, fontSize: 14 }}>H2</button>
+        <button {...run(editorCommands.bold)} aria-label={t("editor.toolbar.customize.bold")} style={{ ...fbtn, fontWeight: 800 }}>B</button>
+        <button {...run(editorCommands.italic)} aria-label={t("editor.toolbar.customize.italic")} style={{ ...fbtn, fontStyle: "italic", fontWeight: 600 }}>I</button>
+        <button {...run(editorCommands.bulletList)} aria-label={t("editor.slash.bulletList")} style={fbtn}>
           <svg width="20" height="20" viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11" {...st} /><circle cx="4.5" cy="6" r="1.3" fill="var(--fg-2)" /><circle cx="4.5" cy="12" r="1.3" fill="var(--fg-2)" /><circle cx="4.5" cy="18" r="1.3" fill="var(--fg-2)" /></svg>
         </button>
-        <button {...run(editorCommands.checklist)} aria-label={t("editor.formatBar.checklist")} style={fbtn}>
+        <button {...run(editorCommands.checklist)} aria-label={t("editor.toolbar.customize.checklist")} style={fbtn}>
           <svg width="20" height="20" viewBox="0 0 24 24"><rect x="3" y="4" width="7" height="7" rx="1.5" {...st} /><path d="M4.6 7.5l1.5 1.5 2.3-2.6" {...st} /><path d="M13 7.5h8M13 16.5h8" {...st} /><rect x="3" y="13" width="7" height="7" rx="1.5" {...st} /></svg>
         </button>
-        <button {...run(editorCommands.quote)} aria-label={t("editor.formatBar.quote")} style={fbtn}>
+        <button {...run(editorCommands.quote)} aria-label={t("editor.slash.quote")} style={fbtn}>
           <svg width="20" height="20" viewBox="0 0 24 24"><path d="M5 5v14M9 8h11M9 12h11M9 16h7" {...st} /></svg>
         </button>
-        <button {...run(editorCommands.code)} aria-label={t("editor.formatBar.code")} style={fbtn}>
+        <button {...run(editorCommands.code)} aria-label={t("editor.toolbar.customize.code")} style={fbtn}>
           <svg width="20" height="20" viewBox="0 0 24 24"><path d="M9 8l-4 4 4 4M15 8l4 4-4 4" {...st} /></svg>
         </button>
-        <button {...run(editorCommands.wikilink)} aria-label={t("editor.formatBar.wikiLink")} style={{ ...fbtn, fontWeight: 700, fontSize: 15 }}>[[</button>
-        <button {...run(editorCommands.link)} aria-label={t("editor.formatBar.link")} style={fbtn}>
+        <button {...run(editorCommands.wikilink)} aria-label={t("editor.slash.wikiLink")} style={{ ...fbtn, fontWeight: 700, fontSize: 15 }}>[[</button>
+        <button {...run(editorCommands.link)} aria-label={t("editor.slash.link")} style={fbtn}>
           <svg width="20" height="20" viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.6 0l3-3a4 4 0 0 0-5.6-5.6L11 7" {...st} /><path d="M14 10a4 4 0 0 0-5.6 0l-3 3a4 4 0 0 0 5.6 5.6L13 17" {...st} /></svg>
         </button>
         <button {...tap(onAttach)} disabled={attaching} aria-label={t("editor.formatBar.attachFile")} style={{ ...fbtn, opacity: attaching ? 0.5 : 1 }}>

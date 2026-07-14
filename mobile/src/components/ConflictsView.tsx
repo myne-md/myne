@@ -82,13 +82,13 @@ export function ConflictsView({ groups, onKeepBoth, onDiscard, onTakeTheirs }: C
           </div>
           {copies.map((c) => (
             <div key={c.noteId} style={ROW} data-testid="conflicts.copy" data-note-id={c.noteId}>
-              <span style={ROW_TITLE}>{c.title || t("conflicts.untitled", { hex: c.noteId.slice(0, 6) })}</span>
+              <span style={ROW_TITLE}>{c.title || t("sync.conflicts.untitled", { hex: c.noteId.slice(0, 6) })}</span>
               <div style={ACTIONS}>
                 <button type="button" style={BTN} onClick={() => onKeepBoth(c.noteId)} data-testid="conflicts.keep-both">
-                  {t("conflicts.keepAsSeparate")}
+                  {t("sync.conflicts.keepAsSeparate")}
                 </button>
-                <button type="button" style={BTN} onClick={() => onDiscard(c.noteId)} data-testid="conflicts.discard">
-                  {t("conflicts.discard")}
+                <button type="button" style={BTN} onClick={() => onDiscard(c.noteId)} data-testid="sync.conflicts.discard">
+                  {t("sync.conflicts.discard")}
                 </button>
                 {originalUuid !== UNKNOWN_CONFLICT_ORIGINAL && (
                   <button
@@ -97,7 +97,7 @@ export function ConflictsView({ groups, onKeepBoth, onDiscard, onTakeTheirs }: C
                     onClick={() => onTakeTheirs(c.noteId, originalUuid)}
                     data-testid="conflicts.take-this"
                   >
-                    {t("conflicts.useThisVersion")}
+                    {t("sync.conflicts.useThisVersion")}
                   </button>
                 )}
               </div>
