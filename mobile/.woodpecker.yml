@@ -107,8 +107,10 @@ steps:
       # their own npm deps (@codemirror, @lezer, …), which must resolve from
       # THEIR location — so install the main repo's workspace into
       # myne-main/node_modules, exactly how they resolve locally when mobile is
-      # nested inside the main repo.
-      - (cd ../myne-main && pnpm install --frozen-lockfile)
+      # nested inside the main repo. Use a HOISTED (flat, npm-style) node_modules
+      # so tsc resolves the source's deps + @types from one place without pnpm's
+      # symlinked-store ambiguity across the ../editor, ../dialect boundary.
+      - (cd ../myne-main && npm_config_node_linker=hoisted pnpm install --frozen-lockfile)
       - pnpm install --frozen-lockfile
       - pnpm build
 
