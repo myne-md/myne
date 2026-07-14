@@ -241,12 +241,17 @@ steps:
     depends_on: [e2e]
     environment:
       CI: "true"
-      MYNE_SERVER_TOKEN:
-        from_secret: myne_server_token
+      # NOTE: the myne_server_token from_secret is intentionally omitted for now.
+      # A from_secret pointing at a secret this repo can't see errors the WHOLE
+      # pipeline at config-compile stage (no step runs, not even notify), which
+      # was blocking every push here. Without the env the guard below skips
+      # sync-sim cleanly and the rest of the pipeline runs. Re-add
+      #   MYNE_SERVER_TOKEN: { from_secret: myne_server_token }
+      # once that secret is available to THIS repo (org-level or repo-level).
     commands:
       - |
-        if [ -z "$MYNE_SERVER_TOKEN" ]; then
-          echo "myne_server_token secret not set -> skipping sync-sim (add it in Woodpecker to enable)";
+        if [ -z "${MYNE_SERVER_TOKEN:-}" ]; then
+          echo "myne_server_token not provided -> skipping sync-sim (re-add the from_secret to enable)";
           exit 0;
         fi
       # fd soft limit -> hard cap (EMFILE guard, see tauri-compile).
