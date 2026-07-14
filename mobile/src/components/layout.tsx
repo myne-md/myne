@@ -1,4 +1,5 @@
 import type { CSSProperties, ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { Icon } from "./Icon";
 
 /**
@@ -84,6 +85,7 @@ export function FlowHeader({
   onBack?: () => void;
   style?: CSSProperties;
 }) {
+  const { t } = useTranslation();
   return (
     <div
       style={{
@@ -97,7 +99,7 @@ export function FlowHeader({
     >
       <button
         onClick={onBack}
-        aria-label="Back"
+        aria-label={t("common.back")}
         style={{ border: "none", background: "transparent", padding: 0, cursor: "pointer", display: "flex" }}
       >
         <Icon name="chevron-left" size={18} color="var(--accent)" strokeWidth={2} />

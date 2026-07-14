@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { Icon, MyneMark, LIST_TOP, SyncStatusGlyph } from "../../../components";
 
 /** Expanded-only workspace sidebar (the WS-01 iPad three-pane reference:
@@ -92,6 +93,7 @@ export function SidebarPane({
   onSettings: () => void;
   onSyncDetail: () => void;
 }) {
+  const { t } = useTranslation();
   return (
     <div
       data-testid="workspace.sidebar"
@@ -126,62 +128,62 @@ export function SidebarPane({
         style={{ display: "flex", alignItems: "center", gap: 8, height: 34, border: "1px solid var(--line-2)", borderRadius: 8, background: "var(--bg-1)", color: "var(--fg-3)", padding: "0 10px", fontFamily: "var(--font-sans)", fontSize: 13, cursor: "pointer", textAlign: "left" }}
       >
         <Icon name="search" size={15} color="var(--fg-3)" strokeWidth={1.7} />
-        Search
+        {t("editor.nav.search")}
       </button>
 
       <div style={{ marginTop: 12, flex: 1, minHeight: 0, overflowY: "auto" }}>
         <NavItem
           testid="sidebar.nav-notes"
-          label="All notes"
+          label={t("editor.nav.allNotes")}
           active={tab === "notes" && listView === "notes"}
           onClick={onAllNotes}
           icon={<svg width="17" height="17" viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="2.5" {...gi} /><path d="M9 8h6M9 12h6M9 16h3" {...gi} /></svg>}
         />
         <NavItem
           testid="sidebar.nav-graph"
-          label="Graph"
+          label={t("editor.nav.graph")}
           active={tab === "graph"}
           onClick={onGraph}
           icon={<svg width="17" height="17" viewBox="0 0 24 24"><circle cx="6" cy="17" r="2.4" {...gi} /><circle cx="18" cy="14" r="2.4" {...gi} /><circle cx="13" cy="6" r="2.4" {...gi} /><path d="M8.3 15.6l3-7M8.4 16.2l7-1.6" {...gi} /></svg>}
         />
         <NavItem
           testid="sidebar.nav-files"
-          label="Files"
+          label={t("editor.nav.files")}
           active={tab === "files"}
           onClick={onFiles}
           icon={<svg width="17" height="17" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" {...gi} /><path d="M21 15l-5-5L5 21" {...gi} /></svg>}
         />
         <NavItem
           testid="sidebar.nav-templates"
-          label="Templates"
+          label={t("editor.nav.templates")}
           active={tab === "templates"}
           onClick={onTemplates}
           icon={<svg width="17" height="17" viewBox="0 0 24 24"><rect x="8" y="4" width="11" height="14" rx="2" {...gi} /><path d="M5 8v10a2 2 0 002 2h8" {...gi} /></svg>}
         />
 
-        <GroupLabel>Browse</GroupLabel>
+        <GroupLabel>{t("editor.sidebar.browse")}</GroupLabel>
         <NavItem
           testid="sidebar.nav-views"
-          label="Views"
+          label={t("editor.nav.views")}
           onClick={onViews}
           icon={<svg width="17" height="17" viewBox="0 0 24 24"><path d="M12 2 2 7l10 5 10-5-10-5z" {...gi} /><path d="M2 12l10 5 10-5" {...gi} /><path d="M2 17l10 5 10-5" {...gi} /></svg>}
         />
         <NavItem
           testid="sidebar.nav-tags"
-          label="Tags"
+          label={t("editor.nav.tags")}
           onClick={onTags}
           icon={<svg width="17" height="17" viewBox="0 0 24 24"><path d="M4 4h7l9 9-7 7-9-9z" {...gi} /><circle cx="8" cy="8" r="1.1" fill="currentColor" /></svg>}
         />
         <NavItem
           testid="sidebar.nav-archive"
-          label="Archive"
+          label={t("editor.nav.archive")}
           active={tab === "notes" && listView === "archive"}
           onClick={onArchive}
           icon={<svg width="17" height="17" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="5" rx="1" {...gi} /><path d="M5 9v10a1 1 0 001 1h12a1 1 0 001-1V9M9 13h6" {...gi} /></svg>}
         />
         <NavItem
           testid="sidebar.nav-trash"
-          label="Trash"
+          label={t("editor.nav.trash")}
           active={tab === "notes" && listView === "trash"}
           onClick={onTrash}
           icon={<svg width="17" height="17" viewBox="0 0 24 24"><path d="M4 7h16M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2M6 7l1 13a1 1 0 001 1h8a1 1 0 001-1l1-13" {...gi} /></svg>}
@@ -197,7 +199,7 @@ export function SidebarPane({
         <button
           data-testid="sidebar.settings"
           onClick={onSettings}
-          aria-label="Settings"
+          aria-label={t("editor.nav.settings")}
           style={{ width: 34, height: 34, borderRadius: 8, border: "none", background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
         >
           <Icon name="settings" size={19} color="var(--fg-2)" strokeWidth={1.7} />

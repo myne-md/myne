@@ -1,4 +1,5 @@
 import { type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { CMEditor } from "@myne/editor/CMEditor";
 import { REVEAL_ATTACHMENT_EVENT } from "@myne/editor/attachments/fileCardActions";
 import { headingSections } from "@myne/dialect";
@@ -167,6 +168,7 @@ function entryFrom(id: string, text: string): NoteEntry {
 
 
 export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDeleteVaultSuccess }: EditorFlowProps) {
+  const { t } = useTranslation();
   const [view, setView] = useState<"list" | "editor">("list");
   const [tab, setTab] = useState<"notes" | "search" | "graph" | "files" | "templates">("notes");
   // Layout axis (SizeClassContext): compact = the phone's full-screen list ⇄
@@ -544,7 +546,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
       setListError(
         e && typeof e === "object" && e.kind === "Io"
           ? ioBanner(e.detail.io_error_kind)
-          : "Couldn't load your notes.",
+          : t("editor.flow.loadFailed"),
       );
     } finally {
       setLoading(false);
@@ -756,7 +758,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
       try {
         text = HAS_TAURI ? await noteRead(id) : devStore().get(id) ?? "";
       } catch {
-        setEditorError("Couldn't open this note.");
+        setEditorError(t("editor.flow.openFailed"));
       }
       setEditorText(text);
       setEditing({ id });
@@ -787,7 +789,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
       await refresh();
       exitEditor();
     } catch {
-      setEditorError("Couldn't save this note.");
+      setEditorError(t("editor.flow.saveFailed"));
       setEditorBusy(false);
     }
   }
@@ -872,7 +874,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
       if (editing?.id === id) exitEditor();
     } catch {
       setMoveTarget(null);
-      setEditorError("Couldn't move this note.");
+      setEditorError(t("editor.flow.moveFailed"));
     }
   }
 
@@ -911,7 +913,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
     } catch (e) {
       // Never let the daily-note path crash the app — surface a message instead.
       console.error("[today] failed:", e);
-      if (HAS_TAURI) setListError("Couldn't open today's note.");
+      if (HAS_TAURI) setListError(t("editor.flow.openTodayFailed"));
     }
   }
 
@@ -960,14 +962,14 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
     try {
       await emit("export-note-pdf", { title, html });
     } catch {
-      setEditorError("Couldn't export this note.");
+      setEditorError(t("editor.flow.exportFailed"));
     }
   }
 
   /** Import a picked file into the vault (MYA1) and insert its form-C embed. */
   async function attachFile(file: File) {
     if (!HAS_TAURI) {
-      setEditorError("Attachments need the app (not the browser preview).");
+      setEditorError(t("editor.flow.attachNeedsApp"));
       return;
     }
     setAttaching(true);
@@ -979,10 +981,10 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
       const kind = (e as { kind?: string })?.kind;
       setEditorError(
         kind === "Oversize"
-          ? "That file is too large (max 64 MB)."
+          ? t("editor.flow.attachTooLarge")
           : kind === "UnsupportedType"
-            ? "Only images and PDFs can be attached."
-            : "Couldn't attach that file.",
+            ? t("editor.flow.attachUnsupported")
+            : t("editor.flow.attachFailed"),
       );
     } finally {
       setAttaching(false);
@@ -1023,16 +1025,16 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
   // from every size class), so it lives OUTSIDE the list-pane render helper.
   const gi = { fill: "none", stroke: "currentColor", strokeWidth: 1.7, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
   const paletteCommands: PaletteCommand[] = [
-    { id: "new-note", label: "New note", icon: <svg width="16" height="16" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" {...gi} /></svg>, run: () => newNote() },
-    { id: "daily", label: "Daily note", icon: <svg width="16" height="16" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2" {...gi} /><path d="M3 10h18M8 3v4M16 3v4" {...gi} /></svg>, run: () => void openToday() },
-    { id: "templates", label: "Templates", icon: <svg width="16" height="16" viewBox="0 0 24 24"><rect x="8" y="4" width="11" height="14" rx="2" {...gi} /><path d="M5 8v10a2 2 0 002 2h8" {...gi} /></svg>, run: () => setTab("templates") },
-    { id: "files", label: "Attachments", icon: <svg width="16" height="16" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" {...gi} /><path d="M21 15l-5-5L5 21" {...gi} /></svg>, run: () => setTab("files") },
-    { id: "graph", label: "Graph", icon: <svg width="16" height="16" viewBox="0 0 24 24"><circle cx="6" cy="17" r="2.4" {...gi} /><circle cx="18" cy="14" r="2.4" {...gi} /><circle cx="13" cy="6" r="2.4" {...gi} /><path d="M8.3 15.6l3-7M8.4 16.2l7-1.6" {...gi} /></svg>, run: () => setTab("graph") },
-    { id: "tags", label: "Browse tags", icon: <svg width="16" height="16" viewBox="0 0 24 24"><path d="M4 4h7l9 9-7 7-9-9z" {...gi} /><circle cx="8" cy="8" r="1.1" fill="currentColor" /></svg>, run: () => setTagBrowserOpen(true) },
-    { id: "archive", label: "Archive", icon: <svg width="16" height="16" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="5" rx="1" {...gi} /><path d="M5 9v10a1 1 0 001 1h12a1 1 0 001-1V9M9 13h6" {...gi} /></svg>, run: () => { setListView("archive"); setActiveTag(null); setActiveViewId(null); } },
-    { id: "trash", label: "Trash", icon: <svg width="16" height="16" viewBox="0 0 24 24"><path d="M4 7h16M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2M6 7l1 13a1 1 0 001 1h8a1 1 0 001-1l1-13" {...gi} /></svg>, run: () => { setListView("trash"); setActiveTag(null); setActiveViewId(null); } },
-    { id: "settings", label: "Settings", icon: <svg width="16" height="16" viewBox="0 0 24 24"><path d="M4 7h11M19 7h1M4 17h1M9 17h11" {...gi} /><circle cx="17" cy="7" r="2.4" {...gi} /><circle cx="7" cy="17" r="2.4" {...gi} /></svg>, run: () => setSettingsOpen(true) },
-    { id: "lock", label: "Lock vault", icon: <svg width="16" height="16" viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="9.5" rx="2" {...gi} /><path d="M8 10.5V8a4 4 0 018 0v2.5" {...gi} /></svg>, run: () => onLock() },
+    { id: "new-note", label: t("notes.list.newNote"), icon: <svg width="16" height="16" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" {...gi} /></svg>, run: () => newNote() },
+    { id: "daily", label: t("editor.nav.dailyNote"), icon: <svg width="16" height="16" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2" {...gi} /><path d="M3 10h18M8 3v4M16 3v4" {...gi} /></svg>, run: () => void openToday() },
+    { id: "templates", label: t("editor.nav.templates"), icon: <svg width="16" height="16" viewBox="0 0 24 24"><rect x="8" y="4" width="11" height="14" rx="2" {...gi} /><path d="M5 8v10a2 2 0 002 2h8" {...gi} /></svg>, run: () => setTab("templates") },
+    { id: "files", label: t("editor.nav.attachments"), icon: <svg width="16" height="16" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" {...gi} /><path d="M21 15l-5-5L5 21" {...gi} /></svg>, run: () => setTab("files") },
+    { id: "graph", label: t("editor.nav.graph"), icon: <svg width="16" height="16" viewBox="0 0 24 24"><circle cx="6" cy="17" r="2.4" {...gi} /><circle cx="18" cy="14" r="2.4" {...gi} /><circle cx="13" cy="6" r="2.4" {...gi} /><path d="M8.3 15.6l3-7M8.4 16.2l7-1.6" {...gi} /></svg>, run: () => setTab("graph") },
+    { id: "tags", label: t("editor.nav.browseTags"), icon: <svg width="16" height="16" viewBox="0 0 24 24"><path d="M4 4h7l9 9-7 7-9-9z" {...gi} /><circle cx="8" cy="8" r="1.1" fill="currentColor" /></svg>, run: () => setTagBrowserOpen(true) },
+    { id: "archive", label: t("editor.nav.archive"), icon: <svg width="16" height="16" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="5" rx="1" {...gi} /><path d="M5 9v10a1 1 0 001 1h12a1 1 0 001-1V9M9 13h6" {...gi} /></svg>, run: () => { setListView("archive"); setActiveTag(null); setActiveViewId(null); } },
+    { id: "trash", label: t("editor.nav.trash"), icon: <svg width="16" height="16" viewBox="0 0 24 24"><path d="M4 7h16M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2M6 7l1 13a1 1 0 001 1h8a1 1 0 001-1l1-13" {...gi} /></svg>, run: () => { setListView("trash"); setActiveTag(null); setActiveViewId(null); } },
+    { id: "settings", label: t("editor.nav.settings"), icon: <svg width="16" height="16" viewBox="0 0 24 24"><path d="M4 7h11M19 7h1M4 17h1M9 17h11" {...gi} /><circle cx="17" cy="7" r="2.4" {...gi} /><circle cx="7" cy="17" r="2.4" {...gi} /></svg>, run: () => setSettingsOpen(true) },
+    { id: "lock", label: t("commands.actions.lockVault.label"), icon: <svg width="16" height="16" viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="9.5" rx="2" {...gi} /><path d="M8 10.5V8a4 4 0 018 0v2.5" {...gi} /></svg>, run: () => onLock() },
   ];
 
   // ── List pane (the former `view === "list"` early-return branch) ────────────
@@ -1175,7 +1177,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
       return out;
     };
     const filterActive = activeTag != null || activeView != null;
-    const viewTitle = listView === "trash" ? "Trash" : listView === "archive" ? "Archive" : "Notes";
+    const viewTitle = listView === "trash" ? t("editor.nav.trash") : listView === "archive" ? t("editor.nav.archive") : t("editor.nav.notes");
     return (
       <>
         {/* Fixed header — sits OUTSIDE the animated pane so it stays put while
@@ -1197,7 +1199,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
                   onClick={() => setListView("notes")}
                   style={{ display: "flex", alignItems: "center", gap: 3, border: "none", background: "transparent", color: "var(--accent)", fontSize: 15, fontWeight: 600, cursor: "pointer", padding: 0, marginBottom: 8 }}
                 >
-                  <Icon name="chevron-left" size={18} color="var(--accent)" strokeWidth={2} /> Notes
+                  <Icon name="chevron-left" size={18} color="var(--accent)" strokeWidth={2} /> {t("editor.nav.notes")}
                 </button>
               )}
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
@@ -1211,11 +1213,11 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
                   {listView === "notes" && (
                     <button
                       onClick={newNote}
-                      aria-label="New note"
+                      aria-label={t("notes.list.newNote")}
                       style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: 6, height: 36, border: "none", borderRadius: 10, background: "var(--accent)", color: "var(--accent-on)", padding: "0 14px", fontSize: 14, fontWeight: 600, cursor: "pointer" }}
                     >
                       <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" /></svg>
-                      New note
+                      {t("notes.list.newNote")}
                     </button>
                   )}
                 </div>
@@ -1224,15 +1226,15 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
               {/* Secondary create/browse tiles — Template / Daily note / Views. */}
               {listView === "notes" && (
                 <div style={{ marginTop: 12, display: "flex", gap: 8 }}>
-                  <ActionPill onClick={() => setTab("templates")} label="Templates">
+                  <ActionPill onClick={() => setTab("templates")} label={t("editor.nav.templates")}>
                     <rect x="8" y="4" width="11" height="14" rx="2" stroke="currentColor" strokeWidth="1.7" fill="none" />
                     <path d="M5 8v10a2 2 0 002 2h8" stroke="currentColor" strokeWidth="1.7" fill="none" strokeLinecap="round" strokeLinejoin="round" />
                   </ActionPill>
-                  <ActionPill onClick={() => void openToday()} label="Open today">
+                  <ActionPill onClick={() => void openToday()} label={t("editor.nav.openToday")}>
                     <rect x="3" y="5" width="18" height="16" rx="2" fill="none" stroke="currentColor" strokeWidth="1.7" />
                     <path d="M3 10h18M8 3v4M16 3v4" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
                   </ActionPill>
-                  <ActionPill onClick={() => setViewsOpen(true)} label="Views">
+                  <ActionPill onClick={() => setViewsOpen(true)} label={t("editor.nav.views")}>
                     <path d="M12 2 2 7l10 5 10-5-10-5z" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
                     <path d="M2 12l10 5 10-5" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
                     <path d="M2 17l10 5 10-5" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
@@ -1250,18 +1252,18 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
                     <input
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      placeholder="Search notes"
+                      placeholder={t("editor.list.searchPlaceholder")}
                       style={{ flex: 1, minWidth: 0, border: "none", outline: "none", background: "transparent", color: "var(--fg-1)", fontSize: 14 }}
                     />
                     {searchQuery !== "" && (
-                      <button onClick={() => setSearchQuery("")} aria-label="Clear search" style={{ border: "none", background: "transparent", padding: 0, cursor: "pointer", display: "flex", flexShrink: 0 }}>
+                      <button onClick={() => setSearchQuery("")} aria-label={t("editor.list.clearSearch")} style={{ border: "none", background: "transparent", padding: 0, cursor: "pointer", display: "flex", flexShrink: 0 }}>
                         <svg width="15" height="15" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" stroke="var(--fg-3)" strokeWidth="1.8" strokeLinecap="round" /></svg>
                       </button>
                     )}
                   </div>
                   <button
                     onClick={() => setFilterOpen(true)}
-                    aria-label="Filter"
+                    aria-label={t("editor.filterSheet.title")}
                     style={{ flexShrink: 0, width: 44, display: "flex", alignItems: "center", justifyContent: "center", height: 38, border: "1px solid var(--line-2)", borderRadius: 10, background: filterActive ? "var(--accent-soft)" : "var(--bg-2)", color: filterActive ? "var(--accent)" : "var(--fg-2)", cursor: "pointer" }}
                   >
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
@@ -1270,7 +1272,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
                   </button>
                   <button
                     onClick={() => setSortOpen(true)}
-                    aria-label="Sort"
+                    aria-label={t("editor.sortSheet.title")}
                     style={{ flexShrink: 0, width: 44, display: "flex", alignItems: "center", justifyContent: "center", height: 38, border: "1px solid var(--line-2)", borderRadius: 10, background: sortMode !== "none" ? "var(--accent-soft)" : "var(--bg-2)", color: sortMode !== "none" ? "var(--accent)" : "var(--fg-2)", cursor: "pointer" }}
                   >
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
@@ -1292,14 +1294,14 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
             {activeView && (
               <div style={{ flex: "none", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "10px 20px 0" }}>
                 <span style={{ fontSize: 13, color: "var(--fg-3)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {filtered.length} {filtered.length === 1 ? "note" : "notes"} in “{activeView.name}”
+                  {t("editor.list.viewNoteCount", { count: filtered.length, name: activeView.name })}
                 </span>
                 <div style={{ display: "flex", gap: 14, flexShrink: 0 }}>
                   <button onClick={() => setViewEditor({ initial: activeView })} style={{ border: "none", background: "transparent", color: "var(--accent)", fontSize: 13, fontWeight: 600, cursor: "pointer", padding: 0 }}>
-                    Edit
+                    {t("editor.list.edit")}
                   </button>
                   <button onClick={() => setActiveViewId(null)} style={{ border: "none", background: "transparent", color: "var(--fg-3)", fontSize: 13, fontWeight: 600, cursor: "pointer", padding: 0 }}>
-                    Clear
+                    {t("notes.tagBrowser.clear")}
                   </button>
                 </div>
               </div>
@@ -1330,15 +1332,15 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
             ) : (treeMode ? treeRows.length === 0 && !favStripVisible : orderedNotes.length === 0) && !listError ? (
               <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "0 40px", textAlign: "center" }}>
                 <div style={{ fontSize: 18, fontWeight: 600, color: "var(--fg-1)" }}>
-                  {listView === "trash" ? "Trash is empty" : listView === "archive" ? "No archived notes" : viewActive ? "No matching notes" : "No notes yet"}
+                  {listView === "trash" ? t("editor.list.trashEmpty") : listView === "archive" ? t("editor.list.archiveEmpty") : viewActive ? t("editor.list.noMatchingNotes") : t("editor.list.noNotesYet")}
                 </div>
                 {listView === "notes" && viewActive ? (
                   <div style={{ marginTop: 8, fontSize: 14, lineHeight: 1.55, color: "var(--fg-3)" }}>
-                    Nothing matches “{activeView!.name}”. Edit the view or clear it to see all notes.
+                    {t("editor.list.noMatchBody", { name: activeView!.name })}
                   </div>
                 ) : listView === "notes" ? (
                   <div style={{ marginTop: 8, fontSize: 14, lineHeight: 1.55, color: "var(--fg-3)" }}>
-                    Tap “New note” to write your first note. Everything is encrypted on this device before it is stored.
+                    {t("editor.list.emptyBody")}
                   </div>
                 ) : null}
               </div>
@@ -1366,15 +1368,15 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
                           {listView === "trash" ? (
                             <>
                               <button onClick={() => void organizeRow(restoreNote, n.id)} style={{ border: "none", background: "transparent", color: "var(--accent)", fontSize: 14, fontWeight: 600, cursor: "pointer", padding: "6px 8px" }}>
-                                Restore
+                                {t("notes.trash.restore")}
                               </button>
                               <button onClick={() => setPurgeId(n.id)} style={{ border: "none", background: "transparent", color: "var(--danger)", fontSize: 14, fontWeight: 600, cursor: "pointer", padding: "6px 8px" }}>
-                                Delete
+                                {t("notes.trash.delete")}
                               </button>
                             </>
                           ) : (
                             <button onClick={() => void organizeRow(unarchiveNote, n.id)} style={{ border: "none", background: "transparent", color: "var(--accent)", fontSize: 14, fontWeight: 600, cursor: "pointer", padding: "6px 8px" }}>
-                              Unarchive
+                              {t("editor.list.unarchive")}
                             </button>
                           )}
                         </div>
@@ -1493,7 +1495,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
         {syncDetailOpen && (
           <Sheet onClose={() => setSyncDetailOpen(false)}>
             <h2 style={{ margin: "0 0 14px", fontSize: 20, fontWeight: 700, color: "var(--fg-display)" }}>
-              Sync status
+              {t("editor.chrome.barItems.syncStatus")}
             </h2>
             <SyncStatusDetail />
           </Sheet>
@@ -1505,7 +1507,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
             style={{ maxHeight: "82%", display: "flex", flexDirection: "column", overflow: "hidden" }}
           >
             <h2 style={{ margin: "0 0 14px", fontSize: 20, fontWeight: 700, color: "var(--fg-display)" }}>
-              Conflicts
+              {t("sync.panel.conflicts.label")}
             </h2>
             <div style={{ overflowY: "auto", minHeight: 0 }}>
               <ConflictsSheet />
@@ -1603,7 +1605,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
 
         {rowActions && (
           <NoteRowActionsSheet
-            title={rowActions.title || "Untitled"}
+            title={rowActions.title || t("notes.row.untitled")}
             favorited={favSet.has(rowActions.id)}
             onClose={() => setRowActions(null)}
             onOpen={() => {
@@ -1782,7 +1784,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
         <NoteActionsSheet
           stat={(() => {
             const s = countWords(editorText);
-            return s.words === 0 ? "Empty note" : `${s.words} ${s.words === 1 ? "word" : "words"} · ${s.readingMinutes} min read`;
+            return s.words === 0 ? t("editor.noteMenu.emptyNote") : t("editor.noteMenu.wordCount", { count: s.words, minutes: s.readingMinutes });
           })()}
           copied={copied}
           busy={editorBusy}
@@ -1804,11 +1806,11 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
           }}
           onArchive={() => {
             setMoreOpen(false);
-            void organizeCurrent(archiveNote, "Couldn't archive this note.");
+            void organizeCurrent(archiveNote, t("editor.flow.archiveFailed"));
           }}
           onTrash={() => {
             setMoreOpen(false);
-            void organizeCurrent(trashNote, "Couldn't move this note to Trash.");
+            void organizeCurrent(trashNote, t("editor.flow.trashFailed"));
           }}
         />
       )}
@@ -1848,9 +1850,9 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
         <Sheet onClose={() => setPurgeId(null)}>
           {(close) => (
             <>
-          <div style={{ fontSize: 17, fontWeight: 600, color: "var(--fg-1)", textAlign: "center" }}>Delete permanently?</div>
+          <div style={{ fontSize: 17, fontWeight: 600, color: "var(--fg-1)", textAlign: "center" }}>{t("notes.trash.purgeConfirmTitle")}</div>
           <div style={{ marginTop: 8, fontSize: 14, lineHeight: 1.5, color: "var(--fg-3)", textAlign: "center" }}>
-            This removes the note from this device for good. This cannot be undone.
+            {t("editor.purge.body")}
           </div>
           <div style={{ marginTop: 18, display: "flex", flexDirection: "column", gap: 10 }}>
             <button
@@ -1868,7 +1870,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
                 cursor: "pointer",
               }}
             >
-              Delete permanently
+              {t("notes.trash.purgeConfirmCta")}
             </button>
             <button
               onClick={close}
@@ -1885,7 +1887,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
                 cursor: "pointer",
               }}
             >
-              Cancel
+              {t("common.prompt.cancel")}
             </button>
           </div>
             </>
@@ -1897,14 +1899,14 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
         <Sheet onClose={() => setMoveTarget(null)}>
           {(close) => (
             <>
-              <div style={{ fontSize: 17, fontWeight: 600, color: "var(--fg-1)", textAlign: "center" }}>Move to folder</div>
+              <div style={{ fontSize: 17, fontWeight: 600, color: "var(--fg-1)", textAlign: "center" }}>{t("editor.move.title")}</div>
               <div style={{ marginTop: 8, fontSize: 13, lineHeight: 1.5, color: "var(--fg-3)", textAlign: "center" }}>
-                Type a folder path (e.g. Projects/Myne). Leave blank for the vault root.
+                {t("editor.move.body")}
               </div>
               <input
                 value={moveInput}
                 onChange={(e) => setMoveInput(e.target.value)}
-                placeholder="Projects/Myne"
+                placeholder={t("editor.move.placeholder")}
                 autoFocus
                 autoCapitalize="none"
                 autoCorrect="off"
@@ -1916,13 +1918,13 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
                   onClick={() => void confirmMove()}
                   style={{ width: "100%", height: 50, border: "none", borderRadius: 8, background: "var(--accent)", color: "var(--accent-on)", fontFamily: "var(--font-sans)", fontSize: 16, fontWeight: 600, cursor: "pointer" }}
                 >
-                  Move
+                  {t("editor.move.confirm")}
                 </button>
                 <button
                   onClick={close}
                   style={{ width: "100%", height: 50, border: "1px solid var(--line-2)", borderRadius: 8, background: "transparent", color: "var(--fg-1)", fontFamily: "var(--font-sans)", fontSize: 16, fontWeight: 500, cursor: "pointer" }}
                 >
-                  Cancel
+                  {t("common.prompt.cancel")}
                 </button>
               </div>
             </>

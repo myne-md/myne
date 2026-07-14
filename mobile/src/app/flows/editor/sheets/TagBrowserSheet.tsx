@@ -1,4 +1,5 @@
 import { type ReactNode, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Icon, Sheet } from "../../../../components";
 import { HAS_TAURI } from "../../../../lib/app-window";
 import { upsertSavedView, setViewOrder } from "../../../../lib/prefs";
@@ -29,6 +30,7 @@ export function TagBrowserSheet({
   onOpenNote: (id: string) => void;
   onSavedView: (id: string) => void;
 }) {
+  const { t } = useTranslation();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [mode, setMode] = useState<"all" | "any">("all");
   const [q, setQ] = useState("");
@@ -101,8 +103,8 @@ export function TagBrowserSheet({
         <>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flex: "none", paddingBottom: 8 }}>
             <span style={{ width: 60 }} />
-            <span style={{ fontSize: 17, fontWeight: 600, color: "var(--fg-1)" }}>Tags</span>
-            <button onClick={close} style={{ width: 60, textAlign: "right", border: "none", background: "transparent", color: "var(--accent)", fontSize: 15, fontWeight: 600, cursor: "pointer" }}>Done</button>
+            <span style={{ fontSize: 17, fontWeight: 600, color: "var(--fg-1)" }}>{t("notes.tagBrowser.title")}</span>
+            <button onClick={close} style={{ width: 60, textAlign: "right", border: "none", background: "transparent", color: "var(--accent)", fontSize: 15, fontWeight: 600, cursor: "pointer" }}>{t("editor.sheet.done")}</button>
           </div>
 
           {/* Search + All/Any toggle */}
@@ -112,7 +114,7 @@ export function TagBrowserSheet({
               <input
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
-                placeholder="Search tags…"
+                placeholder={t("notes.tagBrowser.searchPlaceholder")}
                 autoCapitalize="none"
                 autoCorrect="off"
                 spellCheck={false}
@@ -120,8 +122,8 @@ export function TagBrowserSheet({
               />
             </div>
             <div style={{ flex: "none", display: "flex", gap: 3, background: "var(--bg-2)", border: "1px solid var(--line-2)", borderRadius: 8, padding: 3, width: 110 }}>
-              {modeBtn("all", "All")}
-              {modeBtn("any", "Any")}
+              {modeBtn("all", t("notes.tagBrowser.modeAll"))}
+              {modeBtn("any", t("notes.tagBrowser.modeAny"))}
             </div>
           </div>
 
@@ -141,19 +143,19 @@ export function TagBrowserSheet({
                 </button>
               );
             })}
-            {shownTags.length === 0 && <span style={{ fontSize: 14, color: "var(--fg-3)", padding: "4px 2px" }}>No tags match.</span>}
+            {shownTags.length === 0 && <span style={{ fontSize: 14, color: "var(--fg-3)", padding: "4px 2px" }}>{t("editor.tagBrowser.noTagsMatch")}</span>}
           </div>
 
           {/* Results: NOTES count + Save-as-view / Clear, then the matching notes */}
           {selected.size > 0 && (
             <>
               <div style={{ flex: "none", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, borderTop: "1px solid var(--line-1)", paddingTop: 10 }}>
-                <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--fg-3)" }}>Notes · {matchIds.length}</span>
+                <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--fg-3)" }}>{t("editor.tagBrowser.notesCount", { count: matchIds.length })}</span>
                 <div style={{ display: "flex", gap: 16, flexShrink: 0 }}>
                   {matchIds.length > 0 && (
-                    <button onClick={() => setSavingName("")} style={{ border: "none", background: "transparent", color: "var(--accent)", fontSize: 13, fontWeight: 600, cursor: "pointer", padding: 0 }}>Save as view</button>
+                    <button onClick={() => setSavingName("")} style={{ border: "none", background: "transparent", color: "var(--accent)", fontSize: 13, fontWeight: 600, cursor: "pointer", padding: 0 }}>{t("notes.tagBrowser.saveAsView")}</button>
                   )}
-                  <button onClick={() => setSelected(new Set())} style={{ border: "none", background: "transparent", color: "var(--fg-3)", fontSize: 13, fontWeight: 600, cursor: "pointer", padding: 0 }}>Clear</button>
+                  <button onClick={() => setSelected(new Set())} style={{ border: "none", background: "transparent", color: "var(--fg-3)", fontSize: 13, fontWeight: 600, cursor: "pointer", padding: 0 }}>{t("notes.tagBrowser.clear")}</button>
                 </div>
               </div>
 
@@ -163,7 +165,7 @@ export function TagBrowserSheet({
                     value={savingName}
                     onChange={(e) => setSavingName(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && void saveView()}
-                    placeholder="View name"
+                    placeholder={t("notes.tagBrowser.viewNamePlaceholder")}
                     autoFocus
                     autoCapitalize="none"
                     autoCorrect="off"
@@ -174,7 +176,7 @@ export function TagBrowserSheet({
                     disabled={saveBusy || savingName.trim() === ""}
                     style={{ flex: "none", height: 40, padding: "0 16px", border: "none", borderRadius: 9, background: "var(--accent)", color: "var(--accent-on)", fontFamily: "var(--font-sans)", fontSize: 14, fontWeight: 600, cursor: "pointer", opacity: saveBusy || savingName.trim() === "" ? 0.5 : 1 }}
                   >
-                    Save
+                    {t("notes.tagBrowser.save")}
                   </button>
                 </div>
               )}
@@ -186,7 +188,7 @@ export function TagBrowserSheet({
                     onClick={() => { close(); onOpenNote(id); }}
                     style={{ display: "block", width: "100%", textAlign: "left", border: "none", borderTop: "1px solid var(--line-1)", background: "transparent", padding: "12px 4px", fontFamily: "var(--font-sans)", fontSize: 16, color: "var(--fg-1)", cursor: "pointer", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
                   >
-                    {titleById.get(id) || "Untitled note"}
+                    {titleById.get(id) || t("editor.untitledNote")}
                   </button>
                 ))}
                 <div style={{ height: "calc(8px + env(safe-area-inset-bottom, 0px))" }} />

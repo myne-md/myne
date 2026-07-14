@@ -24,7 +24,9 @@
       "@myne/editor/*": ["../editor/src/*"],
       "@myne/dialect": ["../dialect/src/index.ts"],
       "@myne/dialect/*": ["../dialect/src/*"],
-      "@myne/locales-en": ["../locales/en/common.json"]
+      "@myne/locales-en": ["../locales/en/common.json"],
+      "@myne/i18n": ["../src/i18n/index.ts"],
+      "@myne/i18n/*": ["../src/i18n/*"]
     }
   },
   "include": ["src"]

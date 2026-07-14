@@ -7,6 +7,7 @@
 // bottom-tab page reached from the header (`variant="page"`, with a back chevron).
 
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Sheet, Icon, LIST_TOP } from "../../components";
 
 export interface TemplateItem {
@@ -36,33 +37,34 @@ export function TemplatesSheet({
   onBack?: () => void;
   variant?: "sheet" | "page";
 }) {
+  const { t } = useTranslation();
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
   const listInner =
     templates.length === 0 ? (
       <div style={{ textAlign: "center", padding: "30px 20px", color: "var(--fg-3)", fontSize: 14, lineHeight: 1.55 }}>
-        No templates yet. Tap <span style={{ color: "var(--accent)", fontWeight: 600 }}>New</span> to create a reusable note template — then start notes from it (and pick one as your daily-note template in Settings).
+        {t("templates.emptyBefore")}<span style={{ color: "var(--accent)", fontWeight: 600 }}>{t("templates.newAction")}</span>{t("templates.emptyAfter")}
       </div>
     ) : (
-      templates.map((t) => (
-        <div key={t.id} style={{ borderTop: "1px solid var(--line-1)", padding: "10px 4px" }}>
+      templates.map((tpl) => (
+        <div key={tpl.id} style={{ borderTop: "1px solid var(--line-1)", padding: "10px 4px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <div style={{ flex: 1, minWidth: 0, fontSize: 16, fontWeight: 600, color: "var(--fg-1)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-              {t.title || "Untitled template"}
+              {tpl.title || t("templates.untitledTemplate")}
             </div>
-            <button onClick={() => onUse(t.id)} style={btn("var(--accent)")}>Use</button>
-            <button onClick={() => onEdit(t.id)} style={btn("var(--fg-2)")}>Edit</button>
+            <button onClick={() => onUse(tpl.id)} style={btn("var(--accent)")}>{t("templates.use")}</button>
+            <button onClick={() => onEdit(tpl.id)} style={btn("var(--fg-2)")}>{t("templates.edit")}</button>
           </div>
-          {confirmDelete === t.id ? (
+          {confirmDelete === tpl.id ? (
             <div style={{ marginTop: 6, display: "flex", alignItems: "center", gap: 12, justifyContent: "flex-end" }}>
-              <span style={{ fontSize: 13, color: "var(--fg-3)", marginRight: "auto" }}>Delete this template?</span>
-              <button onClick={() => { setConfirmDelete(null); onDelete(t.id); }} style={btn("var(--danger)")}>Delete</button>
-              <button onClick={() => setConfirmDelete(null)} style={btn("var(--fg-3)")}>Cancel</button>
+              <span style={{ fontSize: 13, color: "var(--fg-3)", marginRight: "auto" }}>{t("templates.deleteConfirm")}</span>
+              <button onClick={() => { setConfirmDelete(null); onDelete(tpl.id); }} style={btn("var(--danger)")}>{t("templates.delete")}</button>
+              <button onClick={() => setConfirmDelete(null)} style={btn("var(--fg-3)")}>{t("templates.cancel")}</button>
             </div>
           ) : (
             <div style={{ marginTop: 4, display: "flex", gap: 14, justifyContent: "flex-end" }}>
-              <button onClick={() => onUnmark(t.id)} style={btn("var(--fg-3)")}>Convert to note</button>
-              <button onClick={() => setConfirmDelete(t.id)} style={btn("var(--danger)")}>Delete</button>
+              <button onClick={() => onUnmark(tpl.id)} style={btn("var(--fg-3)")}>{t("templates.convertToNote")}</button>
+              <button onClick={() => setConfirmDelete(tpl.id)} style={btn("var(--danger)")}>{t("templates.delete")}</button>
             </div>
           )}
         </div>
@@ -71,7 +73,7 @@ export function TemplatesSheet({
 
   const newAction = (
     <button onClick={onNew} style={{ border: "none", background: "transparent", color: "var(--accent)", fontSize: 14, fontWeight: 600, cursor: "pointer", padding: 0 }}>
-      New
+      {t("templates.newAction")}
     </button>
   );
 
@@ -84,11 +86,11 @@ export function TemplatesSheet({
               onClick={onBack}
               style={{ display: "flex", alignItems: "center", gap: 3, border: "none", background: "transparent", color: "var(--accent)", fontSize: 15, fontWeight: 600, cursor: "pointer", padding: 0 }}
             >
-              <Icon name="chevron-left" size={18} color="var(--accent)" strokeWidth={2} /> Notes
+              <Icon name="chevron-left" size={18} color="var(--accent)" strokeWidth={2} /> {t("templates.notesBack")}
             </button>
           )}
           <div style={{ marginTop: onBack ? 14 : 0, display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12 }}>
-            <h1 style={{ margin: 0, fontSize: 32, fontWeight: 700, letterSpacing: "-0.025em", color: "var(--fg-display)" }}>Templates</h1>
+            <h1 style={{ margin: 0, fontSize: 32, fontWeight: 700, letterSpacing: "-0.025em", color: "var(--fg-display)" }}>{t("templates.title")}</h1>
             {newAction}
           </div>
         </div>
@@ -101,7 +103,7 @@ export function TemplatesSheet({
     <Sheet onClose={onClose} style={{ maxHeight: "82%", display: "flex", flexDirection: "column", overflow: "hidden" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flex: "none" }}>
         <span style={{ width: 72 }} />
-        <span style={{ fontSize: 17, fontWeight: 600, color: "var(--fg-1)" }}>Templates</span>
+        <span style={{ fontSize: 17, fontWeight: 600, color: "var(--fg-1)" }}>{t("templates.title")}</span>
         <span style={{ width: 72, textAlign: "right" }}>{newAction}</span>
       </div>
 

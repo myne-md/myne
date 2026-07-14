@@ -1,4 +1,5 @@
 import { useEffect, useReducer, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { ClipboardEvent, CSSProperties, ReactNode } from "react";
 import {
   Screen,
@@ -214,6 +215,7 @@ function EditablePassword({
   withReveal?: boolean;
   onEnter?: () => void;
 }) {
+  const { t } = useTranslation();
   const [focused, setFocused] = useState(false);
   const [revealed, setRevealed] = useState(false);
   const reveal = withReveal && revealed;
@@ -254,7 +256,7 @@ function EditablePassword({
         <button
           type="button"
           onClick={() => setRevealed((r) => !r)}
-          aria-label={revealed ? "Hide password" : "Show password"}
+          aria-label={revealed ? t("password.input.hide") : t("password.input.show")}
           style={{
             border: "none",
             background: "transparent",
@@ -376,6 +378,7 @@ function reducer(s: State, a: Action): State {
 }
 
 export function RecoverFlow({ initialSubStep, onComplete, onCancel }: RecoverFlowProps) {
+  const { t } = useTranslation();
   const [state, dispatch] = useReducer(reducer, initialSubStep, (sub): State => ({
     step: initStep(sub),
     resolvedVaultId: undefined,
@@ -483,9 +486,9 @@ export function RecoverFlow({ initialSubStep, onComplete, onCancel }: RecoverFlo
       return { message: ioBanner(ioKind), wipe: false };
     }
     if (kind === "InvalidVaultMeta") {
-      return { message: "Vault file is unreadable. Restore from a backup.", wipe: false };
+      return { message: t("recover.vaultUnreadable"), wipe: false };
     }
-    return { message: "Something went wrong. Please try again.", wipe: false };
+    return { message: t("recover.genericError"), wipe: false };
   }
 
   async function onPhraseSubmit() {
@@ -517,18 +520,18 @@ export function RecoverFlow({ initialSubStep, onComplete, onCancel }: RecoverFlo
   // ── Password reset (RC-04) ────────────────────────────────────────────────
   function mapPasswordError(e: unknown): string {
     const kind = (e as { kind?: string } | null)?.kind;
-    if (kind === "WeakNewPassword") return `Password must be at least ${MIN_PASSWORD_LEN} characters.`;
-    return "Couldn't set your new password. Please try again.";
+    if (kind === "WeakNewPassword") return t("recover.weakPassword", { min: MIN_PASSWORD_LEN });
+    return t("recover.setPasswordError");
   }
 
   async function onPasswordContinue() {
     const pw = state.newPassword;
     if ([...pw].length < MIN_PASSWORD_LEN) {
-      dispatch({ type: "pw.error", message: `Password must be at least ${MIN_PASSWORD_LEN} characters.` });
+      dispatch({ type: "pw.error", message: t("recover.weakPassword", { min: MIN_PASSWORD_LEN }) });
       return;
     }
     if (pw !== state.confirmPassword) {
-      dispatch({ type: "pw.error", message: "Passwords don't match." });
+      dispatch({ type: "pw.error", message: t("recover.passwordMismatch") });
       return;
     }
     const vaultId = state.resolvedVaultId;
@@ -552,8 +555,8 @@ export function RecoverFlow({ initialSubStep, onComplete, onCancel }: RecoverFlo
     return (
       <Screen>
         <BlockingOverlay
-          title="Decrypting…"
-          subtitle="Rebuilding your vault keys with Argon2id. This takes a few seconds."
+          title={t("recover.decryptingTitle")}
+          subtitle={t("recover.decryptingSubtitle")}
         />
       </Screen>
     );
@@ -562,12 +565,12 @@ export function RecoverFlow({ initialSubStep, onComplete, onCancel }: RecoverFlo
   if (state.step === "account") {
     return (
       <Screen>
-        <FlowHeader label="Restore a vault" />
+        <FlowHeader label={t("recover.restoreVaultHeader")} />
         <div style={{ flex: 1, padding: "18px 22px 0" }}>
-          <Title>Enter your account number</Title>
-          <Lead>Find this where you saved your recovery phrase. It identifies the vault to restore.</Lead>
+          <Title>{t("recover.accountTitle")}</Title>
+          <Lead>{t("recover.accountLead")}</Lead>
           <div style={{ marginTop: 22 }}>
-            <FieldLabel>Account number</FieldLabel>
+            <FieldLabel>{t("recover.accountLabel")}</FieldLabel>
             <AccountField
               value={state.accountInput}
               error={state.accountError}
@@ -589,17 +592,17 @@ export function RecoverFlow({ initialSubStep, onComplete, onCancel }: RecoverFlo
                   <circle cx="8" cy="8" r="6.5" stroke="var(--danger)" strokeWidth="1.4" />
                   <path d="M8 5v4M8 11h.01" stroke="var(--danger)" strokeWidth="1.4" strokeLinecap="round" />
                 </svg>
-                Invalid account number — please check and re-enter.
+                {t("recover.accountInvalid")}
               </div>
             )}
             <div style={{ marginTop: 12, fontSize: 13, lineHeight: 1.5, color: "var(--fg-3)" }}>
-              Don't have it? Leave this blank and continue — your 24-word recovery phrase is all you need.
+              {t("recover.accountOptionalHint")}
             </div>
           </div>
         </div>
         <FooterBar style={{ padding: "14px 20px calc(14px + env(safe-area-inset-bottom, 0px))", borderTop: "none" }}>
           <Button disabled={state.accountBusy} onClick={() => void onAccountContinue()}>
-            Continue
+            {t("common.continue")}
           </Button>
         </FooterBar>
       </Screen>
@@ -630,9 +633,9 @@ export function RecoverFlow({ initialSubStep, onComplete, onCancel }: RecoverFlo
               cursor: "pointer",
             }}
           >
-            Cancel
+            {t("common.prompt.cancel")}
           </button>
-          <div style={{ fontSize: 15, fontWeight: 600, color: "var(--fg-1)" }}>Recovery phrase</div>
+          <div style={{ fontSize: 15, fontWeight: 600, color: "var(--fg-1)" }}>{t("recover.phraseHeader")}</div>
           <button
             onClick={() => void onPasteClipboard()}
             style={{
@@ -651,7 +654,7 @@ export function RecoverFlow({ initialSubStep, onComplete, onCancel }: RecoverFlo
               <rect x="6" y="6" width="11" height="11" rx="2" stroke="var(--accent)" strokeWidth="1.5" />
               <path d="M3 12V4a1 1 0 0 1 1-1h8" stroke="var(--accent)" strokeWidth="1.5" />
             </svg>
-            Paste
+            {t("recover.paste")}
           </button>
         </div>
         <ScreenScroll style={{ padding: "14px 16px 8px" }}>
@@ -661,7 +664,7 @@ export function RecoverFlow({ initialSubStep, onComplete, onCancel }: RecoverFlo
             </Banner>
           )}
           <div style={{ fontSize: 13, lineHeight: 1.5, color: "var(--fg-3)", marginBottom: 12 }}>
-            Type each word, or paste all 24 at once to fill the grid.
+            {t("recover.phraseGridHint")}
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)", gap: 8 }}>
             {state.words.map((w, i) => (
@@ -684,7 +687,7 @@ export function RecoverFlow({ initialSubStep, onComplete, onCancel }: RecoverFlo
             onClick={() => void onPhraseSubmit()}
             style={{ height: 50 }}
           >
-            Submit · {filledCount} of {WORD_COUNT}
+            {t("recover.submitProgress", { filled: filledCount, total: WORD_COUNT })}
           </Button>
         </FooterBar>
       </Screen>
@@ -695,13 +698,13 @@ export function RecoverFlow({ initialSubStep, onComplete, onCancel }: RecoverFlo
   return (
     <Screen>
       <div style={{ flex: "none", padding: "56px 20px 0" }}>
-        <Eyebrow>Restore a vault</Eyebrow>
+        <Eyebrow>{t("recover.restoreVaultHeader")}</Eyebrow>
       </div>
       <div style={{ flex: 1, padding: "14px 22px 0" }}>
-        <Title>Choose a new password</Title>
-        <Lead>Your recovery phrase stays the same. This sets the password for this device.</Lead>
+        <Title>{t("recover.newPasswordTitle")}</Title>
+        <Lead>{t("recover.newPasswordLead")}</Lead>
         <div style={{ marginTop: 20 }}>
-          <FieldLabel>New password</FieldLabel>
+          <FieldLabel>{t("recover.newPasswordLabel")}</FieldLabel>
           <EditablePassword
             value={state.newPassword}
             onChange={(v) => dispatch({ type: "pw.new", value: v })}
@@ -714,7 +717,7 @@ export function RecoverFlow({ initialSubStep, onComplete, onCancel }: RecoverFlo
           </div>
         )}
         <div style={{ marginTop: 20 }}>
-          <FieldLabel>Confirm password</FieldLabel>
+          <FieldLabel>{t("recover.confirmPasswordLabel")}</FieldLabel>
           <EditablePassword
             value={state.confirmPassword}
             onChange={(v) => dispatch({ type: "pw.confirm", value: v })}
@@ -727,18 +730,18 @@ export function RecoverFlow({ initialSubStep, onComplete, onCancel }: RecoverFlo
           </Banner>
         )}
         <div style={{ marginTop: 10, fontSize: 13, lineHeight: 1.5, color: "var(--fg-3)" }}>
-          Never stored, never transmitted. It encrypts your keys on this device.
+          {t("recover.passwordHelper")}
         </div>
       </div>
       <FooterBar style={{ padding: "14px 20px", borderTop: "none" }}>
         <Button disabled={state.busy} onClick={() => void onPasswordContinue()}>
-          Continue
+          {t("common.continue")}
         </Button>
       </FooterBar>
       {state.busy && (
         <BlockingOverlay
-          title="Encrypting…"
-          subtitle="Wrapping your vault keys with your new password."
+          title={t("recover.encryptingTitle")}
+          subtitle={t("recover.encryptingSubtitle")}
         />
       )}
     </Screen>

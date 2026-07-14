@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { Sheet } from "../../../../components";
 import type { SavedView } from "../../../../lib/prefs";
 
@@ -18,15 +19,16 @@ export function ViewsSheet({
   onNew: () => void;
   onClose: () => void;
 }) {
-  const typeLabel: Record<string, string> = { table: "Table", cards: "Cards", list: "List" };
+  const { t } = useTranslation();
+  const typeLabel: Record<string, string> = { table: t("editor.viewsSheet.typeTable"), cards: t("editor.viewsSheet.typeCards"), list: t("editor.viewsSheet.typeList") };
   return (
     <Sheet onClose={onClose} style={{ maxHeight: "82%", display: "flex", flexDirection: "column", overflow: "hidden" }}>
       {(close) => (
         <>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flex: "none", paddingBottom: 4 }}>
             <span style={{ width: 60 }} />
-            <span style={{ fontSize: 17, fontWeight: 600, color: "var(--fg-1)" }}>Views</span>
-            <button onClick={close} style={{ width: 60, textAlign: "right", border: "none", background: "transparent", color: "var(--accent)", fontSize: 15, fontWeight: 600, cursor: "pointer" }}>Done</button>
+            <span style={{ fontSize: 17, fontWeight: 600, color: "var(--fg-1)" }}>{t("editor.nav.views")}</span>
+            <button onClick={close} style={{ width: 60, textAlign: "right", border: "none", background: "transparent", color: "var(--accent)", fontSize: 15, fontWeight: 600, cursor: "pointer" }}>{t("editor.sheet.done")}</button>
           </div>
           <div style={{ overflowY: "auto", minHeight: 0 }}>
             <button
@@ -34,12 +36,12 @@ export function ViewsSheet({
               style={{ display: "flex", alignItems: "center", gap: 9, width: "100%", marginTop: 8, padding: "13px 14px", border: "1px solid var(--line-1)", borderRadius: 10, background: "var(--bg-1)", color: "var(--accent)", fontFamily: "var(--font-sans)", fontSize: 16, fontWeight: 600, cursor: "pointer" }}
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
-              New view
+              {t("notes.views.newView")}
             </button>
 
             {views.length === 0 ? (
               <p style={{ margin: "16px 4px 8px", fontSize: 14, lineHeight: 1.5, color: "var(--fg-3)" }}>
-                No saved views yet. Create one to filter your notes by tag, folder, or text.
+                {t("editor.viewsSheet.emptyState")}
               </p>
             ) : (
               <div style={{ marginTop: 12, border: "1px solid var(--line-1)", borderRadius: 10, overflow: "hidden", background: "var(--bg-1)" }}>
@@ -58,7 +60,7 @@ export function ViewsSheet({
                       {active && <svg width="16" height="16" viewBox="0 0 24 24" style={{ flexShrink: 0 }}><path d="M5 12l5 5L20 6" fill="none" stroke="var(--accent)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /></svg>}
                       <button
                         onClick={(e) => { e.stopPropagation(); onEdit(v); close(); }}
-                        aria-label="Edit view"
+                        aria-label={t("editor.viewsSheet.editView")}
                         style={{ flexShrink: 0, width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", border: "none", background: "transparent", cursor: "pointer" }}
                       >
                         <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M4 20l4-1 10-10-3-3L5 16l-1 4zM14 6l3 3" stroke="var(--fg-3)" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" /></svg>

@@ -1,4 +1,5 @@
 import { type CSSProperties, type ReactNode, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { SidePanel } from "../../../../components";
 import type { NoteEntry, OutlineItem } from "../types";
 
@@ -22,6 +23,7 @@ export function NoteContextPanel({
   onJump: (charIndex: number) => void;
   onClose: () => void;
 }) {
+  const { t } = useTranslation();
   const [tab, setTab] = useState<ContextTab>("backlinks");
   // SECTION_HEADING_STYLE (desktop sharedStyles.ts) — "LINKED FROM 0" look.
   const heading: CSSProperties = { fontSize: 11, color: "var(--fg-3)", textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 600, marginBottom: 8 };
@@ -49,11 +51,11 @@ export function NoteContextPanel({
   const header = (close: () => void): ReactNode => (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, padding: "0 10px", minHeight: 40, borderBottom: "1px solid var(--line-1)" }}>
       <div style={{ display: "flex", gap: 2 }}>
-        {tabBtn("backlinks", "Backlinks", <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M10 14a4 4 0 0 0 5.6 0l3-3a4 4 0 0 0-5.6-5.6L11 7" /><path d="M14 10a4 4 0 0 0-5.6 0l-3 3a4 4 0 0 0 5.6 5.6L13 17" /></svg>)}
-        {tabBtn("unlinked", "Unlinked mentions", <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"><path d="M9 4L7 20M17 4l-2 16M5 9h15M4 15h15" /></svg>)}
-        {tabBtn("outline", "Outline", <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"><path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01" /></svg>)}
+        {tabBtn("backlinks", t("editor.chrome.rightPanel.tabs.backlinks"), <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M10 14a4 4 0 0 0 5.6 0l3-3a4 4 0 0 0-5.6-5.6L11 7" /><path d="M14 10a4 4 0 0 0-5.6 0l-3 3a4 4 0 0 0 5.6 5.6L13 17" /></svg>)}
+        {tabBtn("unlinked", t("editor.chrome.rightPanel.tabs.unlinked"), <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"><path d="M9 4L7 20M17 4l-2 16M5 9h15M4 15h15" /></svg>)}
+        {tabBtn("outline", t("editor.chrome.rightPanel.tabs.outline"), <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"><path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01" /></svg>)}
       </div>
-      <button onClick={close} aria-label="Collapse panel" style={{ width: 32, height: 32, borderRadius: 8, border: "none", background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+      <button onClick={close} aria-label={t("editor.noteContext.collapsePanel")} style={{ width: 32, height: 32, borderRadius: 8, border: "none", background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
         <svg width="19" height="19" viewBox="0 0 24 24" fill="none">
           <rect x="3.5" y="4.5" width="17" height="15" rx="2.5" stroke="var(--fg-2)" strokeWidth="1.7" />
           <rect x="14.5" y="4.5" width="6" height="15" rx="2.5" fill="var(--fg-2)" opacity="0.85" />
@@ -67,21 +69,21 @@ export function NoteContextPanel({
       <div style={{ padding: "16px 18px" }}>
         {tab === "backlinks" && (
           <>
-            <div style={heading}>Linked from {backlinks.length}</div>
-            {backlinks.length === 0 ? empty("No backlinks yet.") : backlinks.map(noteRow)}
+            <div style={heading}>{t("editor.chrome.backlinks.linkedFrom", { count: backlinks.length })}</div>
+            {backlinks.length === 0 ? empty(t("editor.chrome.backlinks.empty")) : backlinks.map(noteRow)}
           </>
         )}
         {tab === "unlinked" && (
           <>
-            <div style={heading}>Unlinked mentions {unlinked.length}</div>
-            {unlinked.length === 0 ? empty("No unlinked mentions.") : unlinked.map(noteRow)}
+            <div style={heading}>{t("editor.noteContext.unlinkedCount", { count: unlinked.length })}</div>
+            {unlinked.length === 0 ? empty(t("notes.unlinkedMentions.empty")) : unlinked.map(noteRow)}
           </>
         )}
         {tab === "outline" && (
           <>
-            <div style={heading}>Outline</div>
+            <div style={heading}>{t("editor.chrome.rightPanel.outline.heading")}</div>
             {outline.length === 0
-              ? empty("No headings")
+              ? empty(t("editor.chrome.rightPanel.outline.empty"))
               : outline.map((h, i) => (
                   <button key={i} onClick={() => onJump(h.index)} style={{ ...linkRow, paddingLeft: 4 + (h.level - 1) * 14, color: h.level === 1 ? "var(--fg-1)" : "var(--fg-2)", fontWeight: h.level === 1 ? 600 : 400 }}>
                     <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{h.text}</span>

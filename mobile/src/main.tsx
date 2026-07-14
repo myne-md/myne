@@ -1,5 +1,9 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
+// Initialise the shared react-i18next runtime (side-effect: detects the boot
+// language + loads the 24 shared catalogs) before the React tree mounts, so the
+// first render is already localized. Shared verbatim with desktop (MYND-485).
+import "@myne/i18n";
 // Install the mobile EditorHost into @myne/editor before any editor mounts.
 import "./editor-host";
 import App from "./App";

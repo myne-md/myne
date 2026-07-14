@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { Screen, Title, Lead, Button, MyneMark } from "../../components";
 import type { RestoreBackupFlowProps } from "./types";
 
@@ -12,6 +13,7 @@ import type { RestoreBackupFlowProps } from "./types";
  * out-of-band re-probe, which lands on welcome or the picker as appropriate.
  */
 export function RestoreBackupFlow({ onDone }: RestoreBackupFlowProps) {
+  const { t } = useTranslation();
   return (
     <Screen style={{ padding: "0 30px" }}>
       <div style={{ paddingTop: 96, display: "flex", alignItems: "center", gap: 10 }}>
@@ -31,14 +33,13 @@ export function RestoreBackupFlow({ onDone }: RestoreBackupFlowProps) {
           paddingBottom: 40,
         }}
       >
-        <Title style={{ fontSize: 30 }}>Not available on mobile yet</Title>
+        <Title style={{ fontSize: 30 }}>{t("restoreBackup.title")}</Title>
         <Lead style={{ marginTop: 14, fontSize: 16, maxWidth: 320 }}>
-          Restoring from a backup file is not available on mobile yet — create a vault or recover
-          with your phrase.
+          {t("restoreBackup.body")}
         </Lead>
       </div>
       <div style={{ paddingBottom: 52 }}>
-        <Button onClick={onDone}>Back</Button>
+        <Button onClick={onDone}>{t("restoreBackup.back")}</Button>
       </div>
     </Screen>
   );

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { CSSProperties, ReactNode } from "react";
 import {
   Screen,
@@ -61,11 +62,12 @@ function strengthLevel(pw: string): StrengthLevel {
   return "Weak";
 }
 
-/** Read the `.kind` discriminant off a rejected invoke into user copy. */
+/** Read the `.kind` discriminant off a rejected invoke into a copy KEY (resolved
+ *  with `t()` at the render site — never at module top level). */
 function beginErrorMessage(e: unknown): string {
   const kind = (e as { kind?: string } | null)?.kind;
-  if (kind === "WeakNewPassword") return "Choose a stronger password and try again.";
-  return "Couldn't start vault creation. Please try again.";
+  if (kind === "WeakNewPassword") return "createVault.beginWeakPassword";
+  return "createVault.beginGeneric";
 }
 
 /** Four distinct random word positions (0-based) to confirm by type-back. */
@@ -123,6 +125,7 @@ function PasswordRow({
   onToggleReveal: () => void;
   autoFocus?: boolean;
 }) {
+  const { t } = useTranslation();
   const [focused, setFocused] = useState(false);
   return (
     <FieldShell focused={focused}>
@@ -151,7 +154,7 @@ function PasswordRow({
       <button
         type="button"
         onClick={onToggleReveal}
-        aria-label={revealed ? "Hide password" : "Show password"}
+        aria-label={revealed ? t("password.input.hide") : t("password.input.show")}
         style={{ border: "none", background: "transparent", padding: 0, marginLeft: 8, cursor: "pointer", display: "flex" }}
       >
         <Icon name={revealed ? "eye-off" : "eye"} size={20} color="var(--fg-3)" strokeWidth={1.6} />
@@ -211,11 +214,12 @@ function WordEntry({
   onChange: (v: string) => void;
   error?: string;
 }) {
+  const { t } = useTranslation();
   const [focused, setFocused] = useState(false);
   return (
     <div>
       <div style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--line-3)", marginBottom: 6 }}>
-        WORD #{position}
+        {t("createVault.wordNumber", { position })}
       </div>
       <FieldShell focused={focused} error={!!error} height={50}>
         <input
@@ -267,6 +271,7 @@ function AckRow({
   onToggleWhy?: () => void;
   last?: boolean;
 }) {
+  const { t } = useTranslation();
   return (
     <div
       style={{
@@ -311,7 +316,7 @@ function AckRow({
                 cursor: "pointer",
               }}
             >
-              Why?
+              {t("vaultCreation.briefing.why")}
               <Icon name={whyOpen ? "chevron-up" : "chevron-down"} size={11} color="var(--accent)" strokeWidth={1.6} />
             </button>
             {whyOpen && (
@@ -378,6 +383,7 @@ export function CreateVaultFlow({
   onAutoUnlockSuccess,
   onAutoUnlockFailed,
 }: CreateVaultFlowProps) {
+  const { t } = useTranslation();
   const [step, setStep] = useState<Step>(briefing ? "briefing" : "password");
 
   // OB-01 acknowledgements
@@ -500,7 +506,7 @@ export function CreateVaultFlow({
       committedRef.current = true;
       setStep("ready");
     } catch {
-      setCommitError("Couldn't save your vault. Please try again.");
+      setCommitError(t("createVault.commitError"));
       setStep("account");
     }
   };
@@ -537,14 +543,14 @@ export function CreateVaultFlow({
   const saveAccountFile = () => {
     void (async () => {
       const label = await saveSecretToDocuments("myne-account-number.txt", account);
-      setFileMsg(label ? `Saved to ${label}` : "Couldn't save the file.");
+      setFileMsg(label ? t("createVault.savedToFile", { label }) : t("createVault.saveFileError"));
     })();
   };
 
   const savePhraseFile = () => {
     void (async () => {
       const label = await saveSecretToDocuments("myne-recovery-phrase.txt", phraseRef.current.join(" "));
-      setFileMsg(label ? `Saved to ${label}` : "Couldn't save the file.");
+      setFileMsg(label ? t("createVault.savedToFile", { label }) : t("createVault.saveFileError"));
     })();
   };
 
@@ -552,12 +558,11 @@ export function CreateVaultFlow({
   if (step === "briefing") {
     return (
       <Screen>
-        <FlowHeader label="Create a vault · 1 of 5" />
+        <FlowHeader label={t("createVault.stepLabel", { current: 1, total: 5 })} />
         <ScreenScroll style={{ padding: "18px 22px 0" }}>
-          <Title>Before we begin</Title>
+          <Title>{t("createVault.briefingTitle")}</Title>
           <Lead>
-            Myne encrypts everything on this device. That privacy comes with a responsibility only you
-            can hold.
+            {t("createVault.briefingLead")}
           </Lead>
           <Banner kind="danger" icon={false} style={{ marginTop: 16 }}>
             {LOST_BOTH_SECRETS_SENTENCE}
@@ -589,10 +594,10 @@ export function CreateVaultFlow({
         </ScreenScroll>
         <FooterBar>
           <Button variant="secondary" full={false} onClick={onCancel}>
-            Back
+            {t("common.back")}
           </Button>
           <Button disabled={!acks.every(Boolean)} onClick={() => setStep("password")}>
-            Continue
+            {t("common.continue")}
           </Button>
         </FooterBar>
       </Screen>
@@ -603,16 +608,16 @@ export function CreateVaultFlow({
   if (step === "password") {
     return (
       <Screen>
-        <FlowHeader label="Create a vault · 2 of 5" onBack={briefing ? () => setStep("briefing") : onCancel} />
+        <FlowHeader label={t("createVault.stepLabel", { current: 2, total: 5 })} onBack={briefing ? () => setStep("briefing") : onCancel} />
         <div style={{ flex: 1, padding: "18px 22px 0" }}>
-          <Title>Create a password</Title>
+          <Title>{t("createVault.passwordTitle")}</Title>
           {beginError && (
             <Banner kind="danger" style={{ marginTop: 16 }}>
-              {beginError}
+              {t(beginError)}
             </Banner>
           )}
           <div style={{ marginTop: 22 }}>
-            <FieldLabel>Password</FieldLabel>
+            <FieldLabel>{t("createVault.passwordLabel")}</FieldLabel>
             <PasswordRow value={pwd} onChange={setPassword} revealed={reveal} onToggleReveal={() => setReveal((v) => !v)} autoFocus />
           </div>
           {pwd.length > 0 && (
@@ -621,19 +626,19 @@ export function CreateVaultFlow({
             </div>
           )}
           <div style={{ marginTop: 20 }}>
-            <FieldLabel>Confirm password</FieldLabel>
+            <FieldLabel>{t("createVault.confirmPasswordLabel")}</FieldLabel>
             <ConfirmRow value={confirm} onChange={setConfirm} match={confirmMatch} />
           </div>
           <div style={{ marginTop: 10, fontSize: 13, lineHeight: 1.5, color: "var(--fg-3)" }}>
-            Never stored, never transmitted. It encrypts your keys on this device.
+            {t("createVault.passwordHelper")}
           </div>
         </div>
         <FooterBar style={{ padding: "14px 20px" }}>
           <Button variant="secondary" full={false} onClick={briefing ? () => setStep("briefing") : onCancel}>
-            Back
+            {t("common.back")}
           </Button>
           <Button disabled={!passwordValid} onClick={() => { setBeginError(null); setStep("encrypting"); }}>
-            Continue
+            {t("common.continue")}
           </Button>
         </FooterBar>
       </Screen>
@@ -645,8 +650,8 @@ export function CreateVaultFlow({
     return (
       <Screen>
         <BlockingOverlay
-          title="Encrypting…"
-          subtitle="Deriving your key with Argon2id. This takes a few seconds and can't be interrupted."
+          title={t("createVault.encryptingTitle")}
+          subtitle={t("createVault.encryptingSubtitle")}
         />
       </Screen>
     );
@@ -658,9 +663,9 @@ export function CreateVaultFlow({
     return (
       <Screen>
         <ScreenScroll style={{ padding: "64px 24px 8px" }}>
-          <Title>Your recovery phrase</Title>
+          <Title>{t("createVault.phraseTitle")}</Title>
           <p style={{ margin: "10px 0 0", fontSize: 14, lineHeight: 1.55, color: "var(--fg-3)" }}>
-            Twenty-four words, in order. Write them on paper and store them somewhere safe.
+            {t("createVault.phraseIntro")}
           </p>
           <Banner kind="danger" icon={false} style={{ marginTop: 16 }}>
             This is the only key to your vault. We can't reset it — lose these words and the notes are
@@ -675,14 +680,14 @@ export function CreateVaultFlow({
               onClick={() => setShowSecondHalf(true)}
               style={{ marginTop: 14, height: 40, fontFamily: "var(--font-mono)", fontSize: 13, fontWeight: 500 }}
             >
-              Show words 13–24
+              {t("createVault.showSecondHalf")}
             </Button>
           )}
           {showSecondHalf && (
             <>
               <Button variant="secondary" onClick={savePhraseFile} style={{ marginTop: 14, height: 40, fontSize: 13 }}>
                 <Icon name="download" size={16} color="var(--fg-2)" strokeWidth={1.5} />
-                Save to file
+                {t("createVault.saveToFile")}
               </Button>
               {fileMsg && <p style={{ margin: "8px 0 0", fontSize: 13, color: "var(--fg-3)", textAlign: "center" }}>{fileMsg}</p>}
             </>
@@ -690,7 +695,7 @@ export function CreateVaultFlow({
         </ScreenScroll>
         <FooterBar>
           <Button disabled={!showSecondHalf} onClick={startTypeBack}>
-            I've written them down
+            {t("createVault.writtenThemDown")}
           </Button>
         </FooterBar>
       </Screen>
@@ -701,10 +706,10 @@ export function CreateVaultFlow({
   if (step === "typeback") {
     return (
       <Screen>
-        <FlowHeader label="Create a vault · 3 of 5" onBack={() => setStep("phrase")} />
+        <FlowHeader label={t("createVault.stepLabel", { current: 3, total: 5 })} onBack={() => setStep("phrase")} />
         <div style={{ flex: 1, padding: "18px 22px 0" }}>
-          <Title>Confirm your phrase</Title>
-          <Lead>Enter these four words from the recovery phrase you just saved.</Lead>
+          <Title>{t("createVault.typebackTitle")}</Title>
+          <Lead>{t("createVault.typebackLead")}</Lead>
           <div style={{ marginTop: 22, display: "flex", flexDirection: "column", gap: 16 }}>
             {challenge.map((idx, i) => (
               <WordEntry
@@ -712,17 +717,17 @@ export function CreateVaultFlow({
                 position={idx + 1}
                 value={answers[i]}
                 onChange={(v) => setAnswers((prev) => prev.map((a, j) => (j === i ? v : a)))}
-                error={norms[i].length > 0 && !corrects[i] ? `Doesn't match word #${idx + 1}` : undefined}
+                error={norms[i].length > 0 && !corrects[i] ? t("createVault.wordMismatch", { pos: idx + 1 }) : undefined}
               />
             ))}
           </div>
         </div>
         <FooterBar style={{ padding: "14px 20px" }}>
           <Button variant="secondary" full={false} style={{ fontSize: 14, padding: "0 18px" }} onClick={() => setStep("phrase")}>
-            Back to phrase
+            {t("createVault.backToPhrase")}
           </Button>
           <Button disabled={!allCorrect} onClick={() => setStep("account")}>
-            Continue
+            {t("common.continue")}
           </Button>
         </FooterBar>
       </Screen>
@@ -733,12 +738,11 @@ export function CreateVaultFlow({
   if (step === "account") {
     return (
       <Screen>
-        <FlowHeader label="Create a vault · 4 of 5" onBack={startTypeBack} />
+        <FlowHeader label={t("createVault.stepLabel", { current: 4, total: 5 })} onBack={startTypeBack} />
         <div style={{ flex: 1, padding: "18px 22px 0" }}>
-          <Title>Your account number</Title>
+          <Title>{t("createVault.accountTitle")}</Title>
           <Lead>
-            Save this alongside your recovery phrase. You'll need it to restore your vault on a new
-            device.
+            {t("createVault.accountLead")}
           </Lead>
           {commitError && (
             <Banner kind="danger" style={{ marginTop: 16 }}>
@@ -751,11 +755,11 @@ export function CreateVaultFlow({
           <div style={{ marginTop: 14, display: "flex", gap: 10 }}>
             <Button variant="secondary" style={{ height: 46, fontSize: 14 }} onClick={copyAccount}>
               <Icon name={copied ? "check" : "copy"} size={16} color={copied ? "var(--success)" : "var(--fg-2)"} strokeWidth={1.5} />
-              {copied ? "Copied" : "Copy"}
+              {copied ? t("createVault.copied") : t("createVault.copy")}
             </Button>
             <Button variant="secondary" style={{ height: 46, fontSize: 14 }} onClick={saveAccountFile}>
               <Icon name="download" size={16} color="var(--fg-2)" strokeWidth={1.5} />
-              Save as file
+              {t("createVault.saveAsFile")}
             </Button>
           </div>
           {fileMsg && <p style={{ margin: "8px 0 0", fontSize: 13, color: "var(--fg-3)" }}>{fileMsg}</p>}
@@ -769,16 +773,16 @@ export function CreateVaultFlow({
               <Checkbox checked={saved} />
             </button>
             <div onClick={() => setSaved((v) => !v)} style={{ flex: 1, fontSize: 15, lineHeight: 1.45, color: "var(--fg-1)", cursor: "pointer" }}>
-              I have saved my account number.
+              {t("createVault.accountSavedAck")}
             </div>
           </div>
         </div>
         <FooterBar>
           <Button variant="secondary" full={false} onClick={startTypeBack}>
-            Back
+            {t("common.back")}
           </Button>
           <Button disabled={!saved} onClick={() => void commit()}>
-            Commit
+            {t("createVault.commit")}
           </Button>
         </FooterBar>
       </Screen>
@@ -789,7 +793,7 @@ export function CreateVaultFlow({
   if (step === "committing") {
     return (
       <Screen>
-        <BlockingOverlay title="Saving your vault…" subtitle="Writing the encrypted vault to this device." />
+        <BlockingOverlay title={t("createVault.committingTitle")} subtitle={t("createVault.committingSubtitle")} />
       </Screen>
     );
   }
@@ -798,7 +802,7 @@ export function CreateVaultFlow({
   if (step === "unlocking") {
     return (
       <Screen>
-        <BlockingOverlay title="Unlocking…" subtitle="Opening your vault." />
+        <BlockingOverlay title={t("createVault.unlockingTitle")} subtitle={t("createVault.unlockingSubtitle")} />
       </Screen>
     );
   }
@@ -827,10 +831,10 @@ export function CreateVaultFlow({
             color: "var(--fg-display)",
           }}
         >
-          Your vault is ready
+          {t("createVault.readyTitle")}
         </h1>
         <p style={{ margin: "12px 0 0", fontSize: 16, lineHeight: 1.6, color: "var(--fg-2)", maxWidth: 300 }}>
-          Everything you write from here is encrypted on this device before it's stored or synced.
+          {t("createVault.readyBody")}
         </p>
         <div
           style={{
@@ -845,14 +849,14 @@ export function CreateVaultFlow({
           }}
         >
           <span style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--success)" }} />
-          <span style={{ fontSize: 13, color: "var(--fg-2)" }}>Personal · </span>
+          <span style={{ fontSize: 13, color: "var(--fg-2)" }}>{t("createVault.personalLabel")} · </span>
           <span style={{ fontFamily: "var(--font-mono)", fontSize: 13, color: "var(--fg-2)" }}>{account}</span>
         </div>
       </div>
       <div style={{ flex: "none", paddingBottom: 52, width: "100%", display: "flex", flexDirection: "column", gap: 10 }}>
-        <Button onClick={() => void openVault()}>Open vault</Button>
+        <Button onClick={() => void openVault()}>{t("createVault.openVault")}</Button>
         <Button variant="secondary" onClick={backUpNow}>
-          Back up now
+          {t("createVault.backUpNow")}
         </Button>
       </div>
     </Screen>

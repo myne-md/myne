@@ -1,4 +1,5 @@
 import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Icon, useEnterTransition } from "../../../../components";
 import { HAS_TAURI } from "../../../../lib/app-window";
 import { searchNotes } from "../../../../lib/search-notes";
@@ -23,6 +24,7 @@ export function CommandPalette({
   onOpenNote: (id: string) => void;
   onClose: () => void;
 }) {
+  const { t } = useTranslation();
   const [q, setQ] = useState("");
   const query = q.trim();
   const needle = query.toLowerCase();
@@ -35,7 +37,7 @@ export function CommandPalette({
       return;
     }
     let cancelled = false;
-    const t = window.setTimeout(() => {
+    const timer = window.setTimeout(() => {
       if (!HAS_TAURI) {
         setNoteResults(searchNotes(q, notes, bodies));
         return;
@@ -43,7 +45,7 @@ export function CommandPalette({
       void noteSearch(query)
         .then((hits) => {
           if (cancelled) return;
-          setNoteResults(hits.map((h) => ({ id: h.note_id, title: h.title || "Untitled note", snippet: snippetOf.get(h.note_id) ?? "" })));
+          setNoteResults(hits.map((h) => ({ id: h.note_id, title: h.title || t("editor.untitledNote"), snippet: snippetOf.get(h.note_id) ?? "" })));
         })
         .catch(() => {
           if (!cancelled) setNoteResults(searchNotes(q, notes, bodies));
@@ -51,7 +53,7 @@ export function CommandPalette({
     }, 120);
     return () => {
       cancelled = true;
-      window.clearTimeout(t);
+      window.clearTimeout(timer);
     };
   }, [q, query, notes, bodies, snippetOf]);
 
@@ -122,7 +124,7 @@ export function CommandPalette({
                 else if (noteResults[0]) { requestClose(); onOpenNote(noteResults[0].id); }
               } else if (e.key === "Escape") requestClose();
             }}
-            placeholder="Search notes or run a command…"
+            placeholder={t("editor.commandPalette.searchPlaceholder")}
             autoCapitalize="none"
             autoCorrect="off"
             spellCheck={false}
@@ -132,7 +134,7 @@ export function CommandPalette({
         <div style={{ overflowY: "auto", minHeight: 0 }}>
           {cmdMatches.length > 0 && (
             <>
-              <div style={sectionLabel}>Commands</div>
+              <div style={sectionLabel}>{t("commandPalette.sectionCommands")}</div>
               {cmdMatches.map((c) => (
                 <button key={c.id} onClick={() => { requestClose(); c.run(); }} style={rowStyle}>
                   <span style={{ flex: "none", display: "flex", color: "var(--fg-2)" }}>{c.icon}</span>
@@ -144,7 +146,7 @@ export function CommandPalette({
           )}
           {noteResults.length > 0 && (
             <>
-              <div style={sectionLabel}>Notes</div>
+              <div style={sectionLabel}>{t("commandPalette.sectionNotes")}</div>
               {noteResults.map((n) => (
                 <button key={n.id} onClick={() => { requestClose(); onOpenNote(n.id); }} style={rowStyle}>
                   <span style={{ flex: "none", display: "flex" }}>
@@ -159,7 +161,7 @@ export function CommandPalette({
             </>
           )}
           {query !== "" && cmdMatches.length === 0 && noteResults.length === 0 && (
-            <div style={{ padding: "24px 16px", textAlign: "center", fontSize: 14, color: "var(--fg-3)" }}>No commands or notes match.</div>
+            <div style={{ padding: "24px 16px", textAlign: "center", fontSize: 14, color: "var(--fg-3)" }}>{t("editor.commandPalette.noMatches")}</div>
           )}
           <div style={{ height: "calc(8px + env(safe-area-inset-bottom, 0px))" }} />
         </div>

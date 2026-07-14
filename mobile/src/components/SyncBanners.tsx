@@ -10,6 +10,7 @@
 // EXCEPT the load-bearing literal, which is never i18n'd or paraphrased anyway.
 
 import { useEffect, useState, type CSSProperties } from "react";
+import { useTranslation } from "react-i18next";
 import { useSyncStatus } from "../lib/use-sync-status";
 import { SYNC_INTEGRITY_ALERT } from "../lib/load-bearing-copy";
 
@@ -93,6 +94,7 @@ export interface SyncBannersProps {
 
 /** Host: the three banners above the note list, driven by the shared hook. */
 export function SyncBanners({ onVerifyDevices, onOpenConflicts }: SyncBannersProps) {
+  const { t } = useTranslation();
   const { status, reconciling, integrityAlert } = useSyncStatus();
   const [reconcileDismissed, setReconcileDismissed] = useState(false);
   const [integrityDismissed, setIntegrityDismissed] = useState(false);
@@ -118,16 +120,16 @@ export function SyncBanners({ onVerifyDevices, onOpenConflicts }: SyncBannersPro
           style={CONFLICT}
           data-testid="sync.conflict-count-banner"
         >
-          {conflictCount} conflict{conflictCount === 1 ? "" : "s"} need review
+          {t("sync.banner.conflictsNeedReview", { count: conflictCount })}
         </button>
       )}
       {showReconcile && (
         <div role="status" data-testid="sync.reconcile-banner" style={RECONCILE}>
           {/* Reassuring, non-alarming — re-syncing is routine, never data loss. */}
-          <span>Catching up on sync — your notes are safe.</span>
+          <span>{t("sync.banner.catchingUp")}</span>
           <button
             type="button"
-            aria-label="Dismiss"
+            aria-label={t("common.dismiss")}
             onClick={() => setReconcileDismissed(true)}
             style={DISMISS}
             data-testid="sync.reconcile-banner-dismiss"
@@ -148,13 +150,13 @@ export function SyncBanners({ onVerifyDevices, onOpenConflicts }: SyncBannersPro
                 style={CTA}
                 data-testid="sync.integrity-verify-devices"
               >
-                Verify devices
+                {t("sync.banner.verifyDevices")}
               </button>
             )}
           </div>
           <button
             type="button"
-            aria-label="Dismiss"
+            aria-label={t("common.dismiss")}
             onClick={() => setIntegrityDismissed(true)}
             style={DISMISS}
             data-testid="sync.integrity-alert-dismiss"
