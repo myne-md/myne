@@ -258,7 +258,7 @@ steps:
       # Go toolchain (matches myne-server go.mod 1.26.x) to build the server.
       - curl -fsSL https://go.dev/dl/go1.26.4.linux-amd64.tar.gz | tar -C /usr/local -xz
       # Clone the private companion via the Forgejo mirror + build a static binary.
-      - git clone --depth 1 "https://oauth2:$MYNE_SERVER_TOKEN@git.myne.md/Myne/myne-server.git" "$CI_WORKSPACE/myne-server"
+      - git clone --depth 1 "https://oauth2:$MYNE_SERVER_TOKEN@github.com/myne-md/myne-server.git" "$CI_WORKSPACE/myne-server"
       - cd "$CI_WORKSPACE/myne-server" && CGO_ENABLED=0 /usr/local/go/bin/go build -o myne-server ./cmd/myne-server
       - cd "$CI_WORKSPACE"
       # Point the harness at the freshly built server and run ONLY the sim suite.
