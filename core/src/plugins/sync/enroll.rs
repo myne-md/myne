@@ -11,6 +11,12 @@
 //! 3. `POST /auth/scram/final` {handshake_id, client_final, device_id, path} →
 //!    {approved, token?, server_signature}.
 //!
+//! The SCRAM `username` is **derived in this module** as the hex-encoded 16-byte
+//! account hash — never accepted from a caller — so the raw account number
+//! (bearer-token semantics, threat-model AS9) structurally cannot reach the wire
+//! or the server's persisted auth state (`account-number.md` §7, revised
+//! 2026-07-13).
+//!
 //! The `secret` is the server-auth subkey (`DeriveSubkey(root_key, ServerAuth)`),
 //! derived upstream from {account# + password} OR {account# + 24-word phrase}
 //! after the vault.meta unwrap — both paths converge on the same `root_key`, so
@@ -167,16 +173,17 @@ pub const SCRAM_REGISTER_ITERATIONS: u32 = 4096;
 pub fn register_verifier(
     transport: &dyn SyncTransport,
     account_hash: &[u8; 16],
-    username: &str,
     secret: &[u8],
 ) -> Result<(), EnrollError> {
+    // AS9 username (see module doc): hex(account_hash), used for both wire fields.
+    let account_hash_hex = hex_encode(account_hash);
     let mut salt = [0u8; 16];
     getrandom::getrandom(&mut salt).map_err(|_| EnrollError::BadResponse)?;
     let iterations = SCRAM_REGISTER_ITERATIONS;
-    let v = scram_client_proof(secret, &salt, iterations, username, "", "", &[]);
+    let v = scram_client_proof(secret, &salt, iterations, &account_hash_hex, "", "", &[]);
     let body = serde_json::to_vec(&RegisterReq {
-        account_hash_hex: &hex_encode(account_hash),
-        username,
+        account_hash_hex: &account_hash_hex,
+        username: &account_hash_hex,
         salt_hex: &hex_encode(&salt),
         iterations,
         stored_key_hex: &hex_encode(&v.stored_key),
@@ -213,13 +220,14 @@ pub fn put_vault_meta(
 pub fn enroll(
     transport: &dyn SyncTransport,
     account_hash: &[u8; 16],
-    username: &str,
     secret: &[u8],
     path: EnrollPath,
     client_nonce: &str,
     device_id: [u8; 16],
 ) -> Result<EnrollOutcome, EnrollError> {
     let account_hash_hex = hex_encode(account_hash);
+    // AS9 username (see module doc): hex(account_hash), derived here.
+    let username: &str = &account_hash_hex;
 
     // 1. client-first → server-first.
     let init_body = serde_json::to_vec(&ScramInitReq {
@@ -329,7 +337,6 @@ mod tests {
     const SECRET: &[u8] = &[0xab; 32];
     const ACCOUNT: [u8; 16] = [0x42; 16];
     const SALT: &[u8] = &[0x11; 16];
-    const USER: &str = "MY-TEST";
 
     // Build the canned init + final responses a correct server would send, so the
     // enroll flow's proof + mutual-auth check exercise the real crypto.
@@ -342,8 +349,17 @@ mod tests {
         );
         t.on(HttpMethod::Post, "/auth/scram/init", 200, init.into_bytes());
 
-        // The server signature the client will verify (same crypto).
-        let out = scram_client_proof(SECRET, SALT, 1, USER, client_nonce, combined, &[]);
+        // The server signature the client will verify (same crypto). The SCRAM
+        // username the client derives is hex(ACCOUNT) — mirror it here.
+        let out = scram_client_proof(
+            SECRET,
+            SALT,
+            1,
+            &hex_encode(&ACCOUNT),
+            client_nonce,
+            combined,
+            &[],
+        );
         let final_json = format!(
             "{{\"approved\":{approved},\"token_hex\":\"{token_hex}\",\"server_signature_b64\":\"{}\"}}",
             B64.encode(out.server_signature)
@@ -362,7 +378,7 @@ mod tests {
         let t = FakeTransport::new();
         let dev = [0x07u8; 16];
         wire_server(&t, &dev, true, "deadbeef");
-        let out = enroll(&t, &ACCOUNT, USER, SECRET, EnrollPath::Recovery, "cn", dev).unwrap();
+        let out = enroll(&t, &ACCOUNT, SECRET, EnrollPath::Recovery, "cn", dev).unwrap();
         assert!(out.approved);
         assert_eq!(out.token, vec![0xde, 0xad, 0xbe, 0xef]);
         assert_eq!(out.device_id, dev);
@@ -375,7 +391,7 @@ mod tests {
         let t = FakeTransport::new();
         let dev = [0x08u8; 16];
         wire_server(&t, &dev, false, "");
-        let out = enroll(&t, &ACCOUNT, USER, SECRET, EnrollPath::Password, "cn", dev).unwrap();
+        let out = enroll(&t, &ACCOUNT, SECRET, EnrollPath::Password, "cn", dev).unwrap();
         assert!(!out.approved);
         assert!(out.token.is_empty());
     }
@@ -431,16 +447,7 @@ mod tests {
         );
         t.on(HttpMethod::Post, "/auth/scram/final", 200, bad.into_bytes());
         assert_eq!(
-            enroll(
-                &t,
-                &ACCOUNT,
-                USER,
-                SECRET,
-                EnrollPath::Recovery,
-                "cn",
-                [0x09; 16]
-            )
-            .unwrap_err(),
+            enroll(&t, &ACCOUNT, SECRET, EnrollPath::Recovery, "cn", [0x09; 16]).unwrap_err(),
             EnrollError::ServerSignatureMismatch
         );
     }
@@ -455,16 +462,7 @@ mod tests {
             b"{\"error_code\":\"unauthenticated\"}".to_vec(),
         );
         assert_eq!(
-            enroll(
-                &t,
-                &ACCOUNT,
-                USER,
-                SECRET,
-                EnrollPath::Password,
-                "cn",
-                [0x0a; 16]
-            )
-            .unwrap_err(),
+            enroll(&t, &ACCOUNT, SECRET, EnrollPath::Password, "cn", [0x0a; 16]).unwrap_err(),
             EnrollError::Unauthenticated
         );
     }
@@ -472,5 +470,46 @@ mod tests {
     #[test]
     fn generated_device_ids_are_distinct() {
         assert_ne!(generate_device_id(), generate_device_id());
+    }
+
+    #[test]
+    fn register_sends_hash_hex_username_never_display() {
+        // AS9: the SCRAM username IS the 16-byte account hash, hex-encoded —
+        // the raw account number (display form) never crosses the wire.
+        let t = FakeTransport::new();
+        t.on(HttpMethod::Post, "/auth/register", 200, Vec::new());
+        register_verifier(&t, &ACCOUNT, SECRET).unwrap();
+        let reqs = t.requests();
+        let req = reqs
+            .iter()
+            .find(|(m, p, _, _, _)| *m == HttpMethod::Post && p == "/auth/register")
+            .expect("register recorded");
+        let body = std::str::from_utf8(&req.2).unwrap();
+        assert!(
+            body.contains(&format!("\"username\":\"{}\"", hex_encode(&ACCOUNT))),
+            "username must be the account-hash hex: {body}"
+        );
+        assert!(
+            !body.contains("MY-"),
+            "no display-form account number on the wire: {body}"
+        );
+    }
+
+    #[test]
+    fn enroll_init_sends_hash_hex_username() {
+        let t = FakeTransport::new();
+        let dev = [0x07u8; 16];
+        wire_server(&t, &dev, true, "deadbeef");
+        enroll(&t, &ACCOUNT, SECRET, EnrollPath::Recovery, "cn", dev).unwrap();
+        let reqs = t.requests();
+        let req = reqs
+            .iter()
+            .find(|(m, p, _, _, _)| *m == HttpMethod::Post && p == "/auth/scram/init")
+            .expect("init recorded");
+        let body = std::str::from_utf8(&req.2).unwrap();
+        assert!(
+            body.contains(&format!("\"username\":\"{}\"", hex_encode(&ACCOUNT))),
+            "init username must be the account-hash hex: {body}"
+        );
     }
 }

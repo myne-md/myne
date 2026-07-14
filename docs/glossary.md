@@ -64,9 +64,9 @@ Used in: `spec/account-number.md`, `spec/protocol.md` §8
 
 ### **account_number_hash** &nbsp; 🗝️ *Key/identifier* (deep entry, *Myne-divergent*)
 
-*(Aliases: account hash. Myne-divergent: yes — two different truncation lengths in different roles.)*
+*(Aliases: account hash. Myne-divergent: yes — one canonical truncation since 2026-07-13.)*
 
-A SHA-256 hash of the canonical account number. **Truncation differs by use site**: for Argon2id salt construction (§3.1 of the protocol spec) it is 16 bytes — `SHA-256(canonical_account_number)[:16]` — and stored in `vault.meta`. For Phase 2+ server-side identification (`spec/account-number.md` §7) it is 32 bytes — `SHA-256(canonical)[:32]` — stored in the sync server registration table. The two lengths are deliberate to avoid identifier reuse across uses; readers must check which length applies in context. In **multi-vault recovery** the 16-byte `vault.meta` value doubles as an *optional* vault selector: when a user types their account number, the host recomputes `SHA-256(canonical)[:16]` and byte-matches it against each discovered vault's plaintext header field to jump to that vault (header-read only — no decrypt, no `auth_permits`; `decisions.md` 2026-06-09 "Multi-vault recovery").
+A SHA-256 hash of the canonical account number, truncated to 16 bytes: `SHA-256(canonical_account_number)[:16]`. **One canonical form for every use site** (revised 2026-07-13, `decisions.md`): Argon2id salt construction (§3.1 of the protocol spec, stored in `vault.meta`) and Phase 2+ server-side identification (`spec/account-number.md` §7 — the storage-namespace key, rate-limit key, and SCRAM identity) use the same value. An earlier draft specified a 32-byte truncation server-side "to avoid identifier reuse across uses"; that was superseded because a longer truncation of the same digest is a strict prefix-extension of the shorter one — it provides no separation (and a domain-separated input would buy nothing either, since the server stores each account's `vault.meta`, which embeds this hash, in that account's namespace). In **multi-vault recovery** the 16-byte `vault.meta` value doubles as an *optional* vault selector: when a user types their account number, the host recomputes `SHA-256(canonical)[:16]` and byte-matches it against each discovered vault's plaintext header field to jump to that vault (header-read only — no decrypt, no `auth_permits`; `decisions.md` 2026-06-09 "Multi-vault recovery").
 
 Used in: `spec/protocol.md` §3.1, §8.3; `spec/account-number.md` §6, §7
 
@@ -1075,7 +1075,7 @@ The markdown dialect Myne v0.1 reads and writes: **GFM (GitHub-Flavored Markdown
 
 ### **Myne Sync** &nbsp; 📦 *Product*
 
-The commercial name of the [hosted sync](#hosted-sync) paid plan — deliberately a **single** plan: 3 €/month · 30 €/year (VAT-inclusive final price everywhere; ~15 % yearly discount; 1- and 12-month SKUs only), 20 GB deduplicated-ciphertext quota (AS17) and 10 devices per account (`decisions.md` 2026-07-13). One plan because hosted and self-hosted share TB5: the only honest differentiators are quantitative (storage + devices). Prepaid and time-based — a voucher extends `paid_until`; there is **no auto-renewal**, because nothing identity-bearing is kept on file for an anonymous account. Expiry runs the [read-only grace](#read-only-grace) ladder.
+The commercial name of the [hosted sync](#hosted-sync) paid plan — deliberately a **single** plan: 20 GB deduplicated-ciphertext quota (AS17) and 10 devices per account (`decisions.md` 2026-07-13; price points are business-sensitive and live outside this repo). One plan because hosted and self-hosted share TB5: the only honest differentiators are quantitative (storage + devices). Prepaid and time-based — a voucher extends `paid_until`; there is **no auto-renewal**, because nothing identity-bearing is kept on file for an anonymous account. Expiry runs the [read-only grace](#read-only-grace) ladder.
 
 Used in: `decisions.md` 2026-07-13
 

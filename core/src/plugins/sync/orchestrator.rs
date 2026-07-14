@@ -1967,7 +1967,6 @@ mod tests {
         // --- shared account crypto (both devices share root_key + items_key) ---
         let root_key = [0x42u8; 32];
         let account_hash = [0x7Au8; 16];
-        let username = "MY-ORCH-TEST";
         let secret = derive_subkey(&root_key, SubkeyRole::ServerAuth);
         let items_key = [0x11u8; 32];
         let items_key_id = [0x22u8; 16];
@@ -1995,13 +1994,12 @@ mod tests {
         let tb = crate::plugins::sync::http_transport::build_transport(&url, Vec::new()).unwrap();
 
         // Register the SCRAM verifier (idempotent) then enroll both devices.
-        enroll::register_verifier(ta.as_ref(), &account_hash, username, secret.as_slice()).unwrap();
+        enroll::register_verifier(ta.as_ref(), &account_hash, secret.as_slice()).unwrap();
 
         let dev_a = enroll::generate_device_id();
         let out_a = enroll::enroll(
             ta.as_ref(),
             &account_hash,
-            username,
             secret.as_slice(),
             EnrollPath::Recovery,
             "a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0",
@@ -2018,7 +2016,6 @@ mod tests {
         let out_b = enroll::enroll(
             tb.as_ref(),
             &account_hash,
-            username,
             secret.as_slice(),
             EnrollPath::Recovery,
             "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
@@ -2120,7 +2117,6 @@ mod tests {
 
         let root_key = [0x42u8; 32];
         let account_hash = [0x5Cu8; 16];
-        let username = "MY-ORCH-NONCE";
         let secret = derive_subkey(&root_key, SubkeyRole::ServerAuth);
         let items_key = [0x11u8; 32];
         let items_key_id = [0x22u8; 16];
@@ -2156,13 +2152,12 @@ mod tests {
         let decoy_b64 = base64::engine::general_purpose::STANDARD.encode(&decoy);
 
         let ta = crate::plugins::sync::http_transport::build_transport(&url, Vec::new()).unwrap();
-        enroll::register_verifier(ta.as_ref(), &account_hash, username, secret.as_slice()).unwrap();
+        enroll::register_verifier(ta.as_ref(), &account_hash, secret.as_slice()).unwrap();
 
         let dev_a = enroll::generate_device_id();
         let out_a = enroll::enroll(
             ta.as_ref(),
             &account_hash,
-            username,
             secret.as_slice(),
             EnrollPath::Recovery,
             "a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0",
@@ -2179,7 +2174,6 @@ mod tests {
         let out_b = enroll::enroll(
             &tb,
             &account_hash,
-            username,
             secret.as_slice(),
             EnrollPath::Recovery,
             "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
@@ -2245,7 +2239,6 @@ mod tests {
 
         let root_key = [0x42u8; 32];
         let account_hash = [0x6Du8; 16];
-        let username = "MY-ORCH-POKE";
         let secret = derive_subkey(&root_key, SubkeyRole::ServerAuth);
         let items_key = [0x11u8; 32];
         let items_key_id = [0x22u8; 16];
@@ -2269,12 +2262,11 @@ mod tests {
         .unwrap();
 
         let ta = crate::plugins::sync::http_transport::build_transport(&url, Vec::new()).unwrap();
-        enroll::register_verifier(ta.as_ref(), &account_hash, username, secret.as_slice()).unwrap();
+        enroll::register_verifier(ta.as_ref(), &account_hash, secret.as_slice()).unwrap();
         let dev_a = enroll::generate_device_id();
         let out_a = enroll::enroll(
             ta.as_ref(),
             &account_hash,
-            username,
             secret.as_slice(),
             EnrollPath::Recovery,
             "a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0",
@@ -2287,7 +2279,6 @@ mod tests {
         let out_b = enroll::enroll(
             tb.as_ref(),
             &account_hash,
-            username,
             secret.as_slice(),
             EnrollPath::Recovery,
             "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
@@ -2352,7 +2343,6 @@ mod tests {
 
         let root_key = [0x55u8; 32];
         let account_hash = [0x6Bu8; 16];
-        let username = "MY-JOIN-TEST";
         let secret = derive_subkey(&root_key, SubkeyRole::ServerAuth);
         let items_key = [0x12u8; 32];
         let items_key_id = [0x34u8; 16];
@@ -2379,12 +2369,11 @@ mod tests {
         )
         .unwrap();
         let ta = mk();
-        enroll::register_verifier(ta.as_ref(), &account_hash, username, secret.as_slice()).unwrap();
+        enroll::register_verifier(ta.as_ref(), &account_hash, secret.as_slice()).unwrap();
         let dev_a = enroll::generate_device_id();
         let out_a = enroll::enroll(
             ta.as_ref(),
             &account_hash,
-            username,
             secret.as_slice(),
             EnrollPath::Recovery,
             "a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0",
@@ -2409,7 +2398,6 @@ mod tests {
         let out_b = enroll::enroll(
             mk().as_ref(),
             &account_hash,
-            username,
             secret.as_slice(),
             EnrollPath::Password,
             "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
@@ -2426,7 +2414,6 @@ mod tests {
         let out_b2 = enroll::enroll(
             mk().as_ref(),
             &account_hash,
-            username,
             secret.as_slice(),
             EnrollPath::Password,
             "b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
@@ -2489,7 +2476,6 @@ mod tests {
         };
         let root_key = [0x5Au8; 32];
         let account_hash = [0x5Bu8; 16];
-        let username = "MY-SAS-EARLY";
         let secret = derive_subkey(&root_key, SubkeyRole::ServerAuth);
         let items_key = [0x14u8; 32];
         let items_key_id = [0x38u8; 16];
@@ -2514,7 +2500,6 @@ mod tests {
         let (ta, dev_a, tok_a) = enroll_device(
             &url,
             &account_hash,
-            username,
             secret.as_slice(),
             "a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0",
             true,
@@ -2541,7 +2526,6 @@ mod tests {
         let (_tb, dev_b, tok_b) = enroll_device(
             &url,
             &account_hash,
-            username,
             secret.as_slice(),
             "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
             false,
@@ -2602,7 +2586,6 @@ mod tests {
         };
         let root_key = [0x61u8; 32];
         let account_hash = [0x62u8; 16];
-        let username = "MY-GENESIS-TEST";
         let secret = derive_subkey(&root_key, SubkeyRole::ServerAuth);
 
         let dir_a = std::env::temp_dir().join(format!("myne-genA-{}", std::process::id()));
@@ -2616,7 +2599,6 @@ mod tests {
         let (ta, dev_a, tok_a) = enroll_device(
             &url,
             &account_hash,
-            username,
             secret.as_slice(),
             "a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0",
             true,
@@ -2646,7 +2628,6 @@ mod tests {
         let (tb, dev_b, tok_b) = enroll_device(
             &url,
             &account_hash,
-            username,
             secret.as_slice(),
             "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
             false,
@@ -2693,7 +2674,6 @@ mod tests {
 
         let root_key = [0x33u8; 32];
         let account_hash = [0x44u8; 16];
-        let username = "MY-HEAL-TEST";
         let secret = derive_subkey(&root_key, SubkeyRole::ServerAuth);
         let items_key = [0x13u8; 32];
         let items_key_id = [0x37u8; 16];
@@ -2712,12 +2692,11 @@ mod tests {
         let blob_v1 = encode_new_note(&items_key, &items_key_id, &note_bytes, b"original").unwrap();
         crate::atomic_write::atomic_write(&notes_a.join(&fname), &blob_v1, false).unwrap();
         let ta = crate::plugins::sync::http_transport::build_transport(&url, Vec::new()).unwrap();
-        enroll::register_verifier(ta.as_ref(), &account_hash, username, secret.as_slice()).unwrap();
+        enroll::register_verifier(ta.as_ref(), &account_hash, secret.as_slice()).unwrap();
         let dev_a = enroll::generate_device_id();
         let out_a = enroll::enroll(
             ta.as_ref(),
             &account_hash,
-            username,
             secret.as_slice(),
             EnrollPath::Recovery,
             "a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0",
@@ -2780,7 +2759,6 @@ mod tests {
         let out_b = enroll::enroll(
             tb.as_ref(),
             &account_hash,
-            username,
             secret.as_slice(),
             EnrollPath::Recovery,
             "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
@@ -2817,20 +2795,18 @@ mod tests {
     fn enroll_device(
         url: &str,
         account_hash: &[u8; 16],
-        username: &str,
         secret: &[u8],
         nonce: &str,
         register: bool,
     ) -> (Box<dyn SyncTransport>, [u8; 16], String) {
         let t = crate::plugins::sync::http_transport::build_transport(url, Vec::new()).unwrap();
         if register {
-            enroll::register_verifier(t.as_ref(), account_hash, username, secret).unwrap();
+            enroll::register_verifier(t.as_ref(), account_hash, secret).unwrap();
         }
         let dev = enroll::generate_device_id();
         let out = enroll::enroll(
             t.as_ref(),
             account_hash,
-            username,
             secret,
             EnrollPath::Recovery,
             nonce,
@@ -2881,7 +2857,6 @@ mod tests {
         };
         let root_key = [0x71u8; 32];
         let account_hash = [0x72u8; 16];
-        let username = "MY-LARGE-TEST";
         let secret = derive_subkey(&root_key, SubkeyRole::ServerAuth);
         let items_key = [0x73u8; 32];
         let items_key_id = [0x74u8; 16];
@@ -2908,7 +2883,6 @@ mod tests {
         let (ta, dev_a, tok_a) = enroll_device(
             &url,
             &account_hash,
-            username,
             secret.as_slice(),
             "a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0",
             true,
@@ -2929,7 +2903,6 @@ mod tests {
         let (tb, dev_b, tok_b) = enroll_device(
             &url,
             &account_hash,
-            username,
             secret.as_slice(),
             "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
             false,
@@ -2970,7 +2943,6 @@ mod tests {
         };
         let root_key = [0x61u8; 32];
         let account_hash = [0x62u8; 16];
-        let username = "MY-DEL-TEST";
         let secret = derive_subkey(&root_key, SubkeyRole::ServerAuth);
         let items_key = [0x63u8; 32];
         let items_key_id = [0x64u8; 16];
@@ -2994,7 +2966,6 @@ mod tests {
         let (ta, dev_a, tok_a) = enroll_device(
             &url,
             &account_hash,
-            username,
             secret.as_slice(),
             "a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0",
             true,
@@ -3013,7 +2984,6 @@ mod tests {
         let (tb, dev_b, tok_b) = enroll_device(
             &url,
             &account_hash,
-            username,
             secret.as_slice(),
             "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
             false,
@@ -3094,7 +3064,6 @@ mod tests {
         };
         let root_key = [0x81u8; 32];
         let account_hash = [0x82u8; 16];
-        let username = "MY-CONFLICT-TEST";
         let secret = derive_subkey(&root_key, SubkeyRole::ServerAuth);
         let items_key = [0x83u8; 32];
         let items_key_id = [0x84u8; 16];
@@ -3114,7 +3083,6 @@ mod tests {
         let (ta, dev_a, tok_a) = enroll_device(
             &url,
             &account_hash,
-            username,
             secret.as_slice(),
             "a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0",
             true,
@@ -3133,7 +3101,6 @@ mod tests {
         let (tb, dev_b, tok_b) = enroll_device(
             &url,
             &account_hash,
-            username,
             secret.as_slice(),
             "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
             false,
@@ -3220,7 +3187,6 @@ mod tests {
         let (tc, dev_c, tok_c) = enroll_device(
             &url,
             &account_hash,
-            username,
             secret.as_slice(),
             "c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2",
             false,
@@ -3265,7 +3231,6 @@ mod tests {
         };
         let root_key = [0x91u8; 32];
         let account_hash = [0x92u8; 16];
-        let username = "MY-KEEPBOTH-TEST";
         let secret = derive_subkey(&root_key, SubkeyRole::ServerAuth);
         let items_key = [0x93u8; 32];
         let items_key_id = [0x94u8; 16];
@@ -3285,7 +3250,6 @@ mod tests {
         let (ta, dev_a, tok_a) = enroll_device(
             &url,
             &account_hash,
-            username,
             secret.as_slice(),
             "a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0",
             true,
@@ -3304,7 +3268,6 @@ mod tests {
         let (tb, dev_b, tok_b) = enroll_device(
             &url,
             &account_hash,
-            username,
             secret.as_slice(),
             "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
             false,
@@ -3411,7 +3374,6 @@ mod tests {
         let (tc, dev_c, tok_c) = enroll_device(
             &url,
             &account_hash,
-            username,
             secret.as_slice(),
             "c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2",
             false,
@@ -3455,7 +3417,6 @@ mod tests {
         };
         let root_key = [0xa1u8; 32];
         let account_hash = [0xa2u8; 16];
-        let username = "MY-REVOKE-TEST";
         let secret = derive_subkey(&root_key, SubkeyRole::ServerAuth);
         let items_key = [0xa3u8; 32];
         let items_key_id = [0xa4u8; 16];
@@ -3473,7 +3434,6 @@ mod tests {
         let (ta, dev_a, tok_a) = enroll_device(
             &url,
             &account_hash,
-            username,
             secret.as_slice(),
             "a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0",
             true,
@@ -3492,7 +3452,6 @@ mod tests {
         let (tb, dev_b, tok_b) = enroll_device(
             &url,
             &account_hash,
-            username,
             secret.as_slice(),
             "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
             false,
@@ -3634,7 +3593,6 @@ mod tests {
         };
         let root_key = [0xb1u8; 32];
         let account_hash = [0xb2u8; 16];
-        let username = "MY-RL-TEST";
         let secret = derive_subkey(&root_key, SubkeyRole::ServerAuth);
         let items_key = [0xb3u8; 32];
         let items_key_id = [0xb4u8; 16];
@@ -3662,7 +3620,6 @@ mod tests {
         let (ta, dev_a, tok_a) = enroll_device(
             &url,
             &account_hash,
-            username,
             secret.as_slice(),
             "a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0",
             true,
@@ -3681,7 +3638,6 @@ mod tests {
         let (tb, dev_b, tok_b) = enroll_device(
             &url,
             &account_hash,
-            username,
             secret.as_slice(),
             "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
             false,
@@ -3717,7 +3673,6 @@ mod tests {
         };
         let root_key = [0xc1u8; 32];
         let account_hash = [0xc2u8; 16];
-        let username = "MY-TOMB-TEST";
         let secret = derive_subkey(&root_key, SubkeyRole::ServerAuth);
         let items_key = [0xc3u8; 32];
         let items_key_id = [0xc4u8; 16];
@@ -3734,7 +3689,6 @@ mod tests {
         let (ta, dev_a, tok_a) = enroll_device(
             &url,
             &account_hash,
-            username,
             secret.as_slice(),
             "a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0",
             true,
@@ -3753,7 +3707,6 @@ mod tests {
         let (tb, dev_b, tok_b) = enroll_device(
             &url,
             &account_hash,
-            username,
             secret.as_slice(),
             "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
             false,
@@ -3836,7 +3789,6 @@ mod tests {
         };
         let root_key = [0x91u8; 32];
         let account_hash = [0x92u8; 16];
-        let username = "MY-WEDGE-TEST";
         let secret = derive_subkey(&root_key, SubkeyRole::ServerAuth);
         let items_key = [0x93u8; 32];
         let items_key_id = [0x94u8; 16];
@@ -3857,7 +3809,6 @@ mod tests {
         let (ta, dev_a, tok_a) = enroll_device(
             &url,
             &account_hash,
-            username,
             secret.as_slice(),
             "a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0",
             true,
@@ -3876,7 +3827,6 @@ mod tests {
         let (tb, dev_b, tok_b) = enroll_device(
             &url,
             &account_hash,
-            username,
             secret.as_slice(),
             "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
             false,
@@ -3993,7 +3943,6 @@ mod tests {
         let (tc, dev_c, tok_c) = enroll_device(
             &url,
             &account_hash,
-            username,
             secret.as_slice(),
             "c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2",
             false,
@@ -4039,7 +3988,6 @@ mod tests {
         };
         let root_key = [0xA1u8; 32];
         let account_hash = [0xA2u8; 16];
-        let username = "MY-RETRY-TEST";
         let secret = derive_subkey(&root_key, SubkeyRole::ServerAuth);
         let items_key = [0xA3u8; 32];
         let items_key_id = [0xA4u8; 16];
@@ -4057,7 +4005,6 @@ mod tests {
         let (ta, dev_a, tok_a) = enroll_device(
             &url,
             &account_hash,
-            username,
             secret.as_slice(),
             "a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0",
             true,
@@ -4076,7 +4023,6 @@ mod tests {
         let (tb, dev_b, tok_b) = enroll_device(
             &url,
             &account_hash,
-            username,
             secret.as_slice(),
             "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
             false,
@@ -4320,7 +4266,6 @@ mod tests {
             h.copy_from_slice(&d[..16]);
             h
         };
-        let username = format!("MY-ATT-{tag}");
         let secret = derive_subkey(&root_key, SubkeyRole::ServerAuth);
 
         let dir_a = std::env::temp_dir().join(format!("myne-att-A-{tag}-{}", std::process::id()));
@@ -4332,13 +4277,11 @@ mod tests {
 
         let ta = crate::plugins::sync::http_transport::build_transport(&url, Vec::new()).unwrap();
         let tb = crate::plugins::sync::http_transport::build_transport(&url, Vec::new()).unwrap();
-        enroll::register_verifier(ta.as_ref(), &account_hash, &username, secret.as_slice())
-            .unwrap();
+        enroll::register_verifier(ta.as_ref(), &account_hash, secret.as_slice()).unwrap();
         let dev_a = enroll::generate_device_id();
         let out_a = enroll::enroll(
             ta.as_ref(),
             &account_hash,
-            &username,
             secret.as_slice(),
             EnrollPath::Recovery,
             "a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0",
@@ -4349,7 +4292,6 @@ mod tests {
         let out_b = enroll::enroll(
             tb.as_ref(),
             &account_hash,
-            &username,
             secret.as_slice(),
             EnrollPath::Recovery,
             "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
