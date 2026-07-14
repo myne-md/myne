@@ -18,14 +18,7 @@ when:
     branch: [develop, main]
 
 steps:
-  # ── Rust style (no compile) ───────────────────────────────────────────────
-  cargo-fmt:
-    image: rust:1.96.0-slim
-    commands:
-      - rustup component add rustfmt
-      - cd src-tauri && cargo fmt --all -- --check
-
-  # ── Rust lint + unit tests (mirrored vault/notes/prefs plugins) ───────────
+  # ── Rust style + lint + unit tests (mirrored vault/notes/prefs plugins) ───
   # Compiling the mobile Tauri lib for the Linux host exercises the platform-
   # agnostic Rust logic; it needs the Tauri Linux WebView sysdeps + the protocol
   # crate provisioned adjacently.
@@ -58,8 +51,12 @@ steps:
           ln -sfn "$PARENT/myne-main/protocol" "$PARENT/protocol"
           ln -sfn "$PARENT/myne-main/core" "$PARENT/core"
         fi
-      - rustup component add clippy
-      - cd src-tauri && cargo clippy --all-targets -- -D warnings
+      - rustup component add rustfmt clippy
+      # fmt runs here (not a standalone step) because `cargo fmt --all` resolves
+      # the ../../core + ../../protocol path deps, which exist only after the
+      # provisioning above.
+      - cd src-tauri && cargo fmt --all -- --check
+      - cargo clippy --all-targets -- -D warnings
       - cargo test --no-fail-fast
 
   # ── Cross-implementation vector conformance (protocol crate) ──────────────
@@ -136,8 +133,6 @@ steps:
   notify-failure:
     image: alpine:3.21
     depends_on:
-      - name: cargo-fmt
-        optional: true
       - name: cargo-checks
         optional: true
       - name: cargo-deny
