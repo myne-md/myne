@@ -4,12 +4,13 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import { Sheet, Banner, Spinner } from "../../components";
 import { snapshotList, snapshotPreview, snapshotRestore, type SnapshotMeta } from "../../lib/snapshots";
 import { HAS_TAURI } from "../../lib/app-window";
 import { formatBytes } from "../../lib/util";
 
-function formatWhen(ms: number, t: (key: string, opts?: Record<string, unknown>) => string): string {
+function formatWhen(ms: number, t: TFunction): string {
   const d = new Date(ms);
   const now = new Date();
   const sameDay = d.toDateString() === now.toDateString();

@@ -27,15 +27,19 @@ export default defineConfig(async () => ({
       { find: /^@myne\/editor\/(.*)$/, replacement: sib("../editor/src/$1") },
       { find: /^@myne\/dialect$/, replacement: sib("../dialect/src/index.ts") },
       { find: /^@myne\/dialect\/(.*)$/, replacement: sib("../dialect/src/$1") },
-      // The shared English i18n catalog (desktop source strings) — reused by the
-      // mobile EditorHost `t()` so the editor's menu/toast labels read correctly
-      // without standing up a full i18n runtime on mobile.
+      // The shared English catalog (repo-root `locales/en`) — now consumed only
+      // by `src/lib/welcomeNote.ts` for its seed-time welcome-note copy. (The
+      // editor host resolved its labels through this too until MYND-485 moved it
+      // onto the full `@myne/i18n` runtime below.)
       { find: "@myne/locales-en", replacement: sib("../locales/en/common.json") },
-      // The shared react-i18next RUNTIME (MYND-485). Aliased straight to the
-      // desktop `src/i18n/` source — its `import.meta.glob("../../locales/*")`
-      // resolves relative to the desktop file's own path, so it loads all 24
-      // shared catalogs correctly no matter which client imports it: zero drift
-      // by construction (mirrors the `@myne/editor` sibling-source pattern).
+      // The shared react-i18next RUNTIME (MYND-485). NOTE — unlike @myne/editor /
+      // dialect / copy (extracted top-level workspace packages), this aliases the
+      // desktop APP source `../src/i18n/` directly, so mobile source-depends on
+      // desktop internals with no package contract. It works because that runtime
+      // is Tauri-free + portable (its `import.meta.glob("../../locales/*")` is
+      // file-relative → loads all 24 shared catalogs whichever client imports it).
+      // FOLLOW-UP: extract `src/i18n/` into a real `@myne/i18n` package (like
+      // `copy/`) and make desktop's `src/i18n` a re-export shim.
       { find: /^@myne\/i18n$/, replacement: sib("../src/i18n/index.ts") },
       { find: /^@myne\/i18n\/(.*)$/, replacement: sib("../src/i18n/$1") },
     ],
