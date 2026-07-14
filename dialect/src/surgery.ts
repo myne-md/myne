@@ -25,6 +25,7 @@ const CONFLICT_OF_KEY_RE = /^([ \t]*conflict_of[ \t]*:[ \t]*)(.*)$/;
 const CONFLICT_FLAG_VALUE = "true";
 const TEMPLATE_KEY_RE = /^([ \t]*template[ \t]*:[ \t]*)(.*)$/;
 const FOLDER_INDEX_KEY_RE = /^([ \t]*folder_index[ \t]*:[ \t]*)(.*)$/;
+const KIND_KEY_RE = /^([ \t]*kind[ \t]*:[ \t]*)(.*)$/;
 
 // The single canonical value that marks a note a template. Value-strict:
 // `readTemplateFromFmBody` accepts only this literal, unquoted form
@@ -1269,6 +1270,62 @@ function isCanonicalFolderIndexFlag(valuePortion: string): boolean {
   const commentM = /^([^#]*?)([ \t]+#.*)$/.exec(valuePortion);
   const raw = commentM !== null ? (commentM[1] ?? "") : valuePortion;
   return raw.trim() === FOLDER_INDEX_FLAG_VALUE;
+}
+
+// === kind: drawing — the drawing-note marker (drawing-notes SF2, MYND-499) ===
+//
+// `kind:` is the 11th Myne-managed canonical FM field (markdown-dialect.md
+// §3.6.1). Unlike the boolean flags it is a string enum; v1 defines exactly one
+// value, `drawing`, which routes the note to the Excalidraw canvas surface
+// instead of CodeMirror. The READ is value-strict (bespoke, mirrors
+// `readTemplateFromFmBody`): a user's own non-canonical `kind:` (`kind: "drawing"`,
+// `kind: Drawing`, `kind: task`) reads as an ordinary note, so a stray `kind:`
+// never force-renders someone's markdown as a canvas — a collision footgun that
+// matters MORE here than for `template:`/`trashed:` because it drives the render
+// surface, not just visibility (§3.6.1). The WRITE is the generic keyed
+// `patchFrontmatterField` (the only value Myne writes is the canonical `drawing`,
+// a plain scalar).
+
+/** The single canonical `kind:` value that marks a drawing note. Value-strict. */
+export const DRAWING_KIND_VALUE = "drawing";
+
+/**
+ * Set or clear the Myne-managed `kind:` frontmatter field. `"drawing"` writes the
+ * canonical `kind: drawing`; `null` deletes it (with empty-block collapse).
+ * Touches only the `kind:` line, composing with `title:` / `template:` / … without
+ * clobbering. Thin wrapper over {@link patchFrontmatterField}.
+ */
+export function patchKindField(
+  bytes: Uint8Array,
+  kind: "drawing" | null,
+): Uint8Array {
+  return patchFrontmatterField(bytes, "kind", kind);
+}
+
+/**
+ * Read the Myne-managed `kind:` marker, **value-strict**, from a frontmatter
+ * **body** (the slice shape `loadNoteBatch` parses, identical to
+ * {@link readTemplateFromFmBody}). Returns `"drawing"` iff a `kind:` field carries
+ * the canonical, unquoted {@link DRAWING_KIND_VALUE}, else `null`. A user's own
+ * non-canonical `kind:` (`"drawing"`, `Drawing`, `task`) reads as `null`.
+ */
+export function readKindFromFmBody(fmBody: string): "drawing" | null {
+  const lines = fmBody.split(NEWLINE);
+  for (const line of lines) {
+    const m = KIND_KEY_RE.exec(line);
+    if (m === null) continue;
+    return isCanonicalDrawingKind(m[2] ?? "") ? DRAWING_KIND_VALUE : null;
+  }
+  return null;
+}
+
+// Value-strict canonical check for a `kind:` scalar. Strips a trailing
+// `# comment` and requires the literal unquoted `drawing`; a quoted `"drawing"`
+// is a YAML string, not the canonical marker, so it is rejected.
+function isCanonicalDrawingKind(valuePortion: string): boolean {
+  const commentM = /^([^#]*?)([ \t]+#.*)$/.exec(valuePortion);
+  const raw = commentM !== null ? (commentM[1] ?? "") : valuePortion;
+  return raw.trim() === DRAWING_KIND_VALUE;
 }
 
 // === patchFrontmatterField — generic keyed scalar surgery ===

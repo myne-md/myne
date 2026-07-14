@@ -32,6 +32,9 @@ export function resolverNotesFromCache(
       title: r.title,
       folder: r.folder,
       folderIndex: r.folderIndex,
+      // SF6 inline-embed reads this to pick a drawing-thumbnail widget over a
+      // text chip synchronously from the note-set (drawing-notes SF2, MYND-499).
+      isDrawing: r.kind === "drawing",
     });
   }
   return out;
