@@ -216,7 +216,13 @@ Used in: `decisions.md` 2026-06-18; `agent-tooling/features/scheduled-local-back
 
 ### **backup-key** &nbsp; 🗝️ *Key/identifier*
 
-A subkey context string (`"myne.v0.1 backup-key"`) **reserved but not used in v0.1** (demoted 2026-06-10; the entry previously claimed it encrypts exported backup files). The v0.1 [vault backup file](#vault-backup-file) is a verbatim ciphertext copy with no outer encryption layer; the demotion rationale lives in the §3.4 registry row and `decisions.md` 2026-06-10. Retained, like `server-auth`, so the context string stays allocated for a potential future sealed-backup variant.
+A subkey context string (`"myne.v0.1 backup-key"`) **reserved but not used in v0.1** (demoted 2026-06-10; the entry previously claimed it encrypts exported backup files). The v0.1 [vault backup file](#vault-backup-file) is a verbatim ciphertext copy with no outer encryption layer; the demotion rationale lives in the §3.4 registry row and `decisions.md` 2026-06-10. Retained, like `server-auth`, so the context string stays allocated for a potential future sealed-backup variant. **Unrelated to [built-in backup](#built-in-backup)** — that is the operator's restic repository, not a Myne subkey.
+
+### **built-in backup** &nbsp; 📦 *Product*
+
+The Phase 2 sync server's **server-native** encrypted off-box backup (`decisions.md` 2026-07-14; MYND-505): when the operator sets `MYNE_BACKUP_*` (repository, password file, interval), [`myne-server`](#blind-blob-store) drives a **bundled restic** to snapshot its own fs store to an off-box target on a schedule, pruned to a disclosed retention window (default 14 days). **Disabled by default**; enabling requires the fs backend + a repository + a password file. Hosted and self-host use the **same mechanism** (TB5 parity) — a self-hoster gets the same durability with no separate tooling. Confidentiality is unchanged: blobs are already client-encrypted and the server holds no `root_key`, so restic's encryption's load-bearing job is protecting `auth.json` and bounding how long a deleted blob survives off-box (`threat-model.md` §7). Distinct from **[backup-key](#backup-key)** (a reserved client subkey for a future sealed-backup variant) and the client **[vault backup file](#vault-backup-file)** (`.myne-backup`, a device-side whole-vault export) — a different actor (the operator) and a different asset (already-encrypted server ciphertext).
+
+Used in: `decisions.md` 2026-07-14; `self-host-policy.md` §4
 
 Used in: `spec/protocol.md` §3.4, §9.11; `decisions.md` 2026-06-10
 

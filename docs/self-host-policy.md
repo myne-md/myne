@@ -50,7 +50,9 @@ they are violations:
   If you back the store up, keep it **encrypted, off-box, and short-cycle** so the *effective* worst-case
   window a deleted blob survives is `horizon + backup-retention`, and **disclose that number** (Myne's
   hosted tier: a 14-day encrypted off-box cycle, so ≤ horizon + 14 days). An **unbounded**, plaintext, or
-  never-pruned backup re-creates the hoarding this rule forbids.
+  never-pruned backup re-creates the hoarding this rule forbids. The server ships a **built-in feature that
+  implements this correctly** (`MYNE_BACKUP_*`, §4) — encrypted, off-box, pruned to a disclosed window — so
+  you do not hand-roll it.
 - **Attempt to weaken the zero-knowledge protocol** in any way — you can't read content regardless, but you
   must not, e.g., add a plaintext side-channel or a metadata-correlation log.
 
@@ -70,6 +72,17 @@ abuse, not confidentiality** — none of them can weaken the zero-knowledge prot
   reclamation. **⚠️ Warning:** turning this on means deleted ciphertext is kept longer than the horizon —
   it **weakens your users' "delete means gone" expectation**. It is a documented, deliberate policy
   deviation, not a default; enable it only if you understand the trade-off and tell your users.
+- **Encrypted off-box backup** (`MYNE_BACKUP_*`). Built-in, server-native backup (`decisions.md`
+  2026-07-14): set `MYNE_BACKUP_ENABLED` + a `MYNE_BACKUP_REPOSITORY` + a `MYNE_BACKUP_PASSWORD_FILE` and
+  the server drives a bundled restic to snapshot the store to an off-box target on a schedule
+  (`MYNE_BACKUP_INTERVAL_SECONDS`), pruned to a disclosed retention window (`MYNE_BACKUP_RETENTION_DAYS`,
+  default 14). **Off by default.** This is the mechanism that satisfies §3's "encrypted, off-box,
+  short-cycle" requirement without hand-rolling anything — you provide the repository (SFTP / Storage Box
+  works out of the box) and hold its key; the server holds no vault keys, and the backup carries only
+  already-encrypted ciphertext. It is best-effort (a failed run is logged and retried, never blocks
+  serving), and `myne-server restore` / `backup-check` are first-class commands. **Widening the retention
+  window past what you disclose re-creates the hoarding §3 forbids** — if you must, re-disclose it
+  (threat-model §7 + this section) as §3 requires.
 
 Numeric *recommended* quota/rate values for the hosted tier are set elsewhere (the billing epic); for
 self-host, this document gives you the **mechanism**, and you choose the number for your deployment.
