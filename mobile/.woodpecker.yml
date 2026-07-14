@@ -104,13 +104,19 @@ steps:
       - npm install -g pnpm@11.8.0
       # The frontend source-consumes @myne/{editor,dialect} from the provisioned
       # main repo (../editor, ../dialect → myne-main/*). Those TS sources import
-      # their own npm deps (@codemirror, @lezer, …), which must resolve from
-      # THEIR location — so install the main repo's workspace into
-      # myne-main/node_modules, exactly how they resolve locally when mobile is
-      # nested inside the main repo. Use a HOISTED (flat, npm-style) node_modules
-      # so tsc resolves the source's deps + @types from one place without pnpm's
-      # symlinked-store ambiguity across the ../editor, ../dialect boundary.
-      - (cd ../myne-main && npm_config_node_linker=hoisted pnpm install --frozen-lockfile)
+      # their own npm deps (react, js-yaml, pdfjs-dist, @types/*), so install the
+      # main repo's workspace first — that populates myne-main/node_modules with
+      # every dep the shared source needs.
+      - (cd ../myne-main && pnpm install --frozen-lockfile)
+      # tsc (moduleResolution: bundler) resolves the shared source's deps by
+      # walking node_modules up from the ../editor SYMLINK path, NOT its realpath
+      # under myne-main. That walk-up lands in the checkout's PARENT dir — so
+      # mirror myne-main's node_modules there. Without this, tsc finds react/
+      # js-yaml's .js in the pnpm store but not their adjacent @types (TS7016),
+      # and pdfjs-dist doesn't resolve at all (TS2307). Locally this "just works"
+      # because mobile is nested INSIDE the main checkout, so the walk-up hits
+      # the main repo's node_modules; the symlink reproduces that layout in CI.
+      - ln -sfn "$(cd .. && pwd)/myne-main/node_modules" "$(cd .. && pwd)/node_modules"
       - pnpm install --frozen-lockfile
       - pnpm build
 
