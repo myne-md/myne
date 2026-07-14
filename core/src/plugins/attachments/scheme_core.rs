@@ -151,6 +151,112 @@ pub fn build_response(vault_dir: &Path, keys: &ServeKeys, id_hex: &str) -> http:
         .unwrap_or_else(|_| server_error())
 }
 
+// ---- text preview (MYND-268 Tier-1) -------------------------------------
+
+/// Preview size cap. A Tier-1 text/code/csv preview is a READER, not an editor;
+/// a multi-MiB dump would jank the WebView, so decrypted text beyond this is
+/// truncated (the user still has full-fidelity Export). Measured in bytes of the
+/// decrypted plaintext, pre-decode.
+pub const ATTACHMENT_TEXT_PREVIEW_CAP: usize = 2 * 1024 * 1024;
+
+/// Outcome of reading an attachment's decrypted TEXT for an inline preview. The
+/// text crosses IPC as plaintext — same secret class as a note body
+/// (`src-tauri/CLAUDE.md` "Plaintext IPC"); the caller must never log it. Non-`Ok`
+/// variants are non-distinguishing at the boundary (a wrong-key / tampered /
+/// cross-vault blob all collapse to `Denied`, mirroring the serve path's §6.4).
+pub enum ReadTextOutcome {
+    /// Decrypted text, lossily UTF-8-decoded, truncated at the preview cap.
+    Ok { text: String, truncated: bool },
+    /// The id / catalog entry / blob file was absent.
+    NotFound,
+    /// Malformed id, or a decode failure (non-distinguishing).
+    Denied,
+    /// Host / IO failure reading `vault.meta` or the blob.
+    ServerError,
+}
+
+/// Non-distinguishing decode failure, shared by the text + structured previews.
+pub enum DecodeError {
+    NotFound,
+    Denied,
+    ServerError,
+}
+
+/// Shared decode: id parse → catalog `content_type` hint (the inner AAD) → read
+/// blob → `decode_attachment_blob` → the Zeroizing plaintext bytes. The SAME
+/// decode as the serve path, minus the re-sniff (callers render inert text /
+/// structured previews, never an interpreted content-type). A wrong-key /
+/// tampered / cross-vault blob all collapse to `Denied` (§6.4).
+pub fn decode_attachment_plaintext(
+    vault_dir: &Path,
+    keys: &ServeKeys,
+    id_hex: &str,
+) -> Result<Zeroizing<Vec<u8>>, DecodeError> {
+    let Some(attachment_id) = hex_decode_id(id_hex) else {
+        return Err(DecodeError::Denied);
+    };
+    let account_number_hash =
+        read_account_number_hash(&vault_dir.join("vault.meta")).ok_or(DecodeError::ServerError)?;
+    let catalog_key =
+        protocol::derive_subkey(&keys.root_key, protocol::SubkeyRole::AttachmentsCatalogKey);
+    let catalog = read_catalog(
+        &vault_dir.join("vault.attachments"),
+        &catalog_key,
+        &account_number_hash,
+    );
+    let content_type_hint = catalog
+        .entries
+        .get(id_hex)
+        .map(|meta| meta.content_type.clone())
+        .ok_or(DecodeError::NotFound)?;
+    let blob_path = vault_dir.join("attachments").join(id_hex);
+    let blob = match std::fs::read(&blob_path) {
+        Ok(b) => b,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Err(DecodeError::NotFound),
+        Err(e) => {
+            tracing::error!(
+                stage = "read_attachment_blob_read",
+                io_failure_kind = ?crate::io_failure_kind::from_io_error_kind(e.kind()),
+                "attachment preview blob read failed"
+            );
+            return Err(DecodeError::ServerError);
+        }
+    };
+    decode_attachment_blob(
+        &blob,
+        &attachment_id,
+        content_type_hint.as_bytes(),
+        &keys.items_key,
+        &keys.items_key_id,
+    )
+    .map_err(|_| DecodeError::Denied)
+}
+
+/// Testable core of the Tier-1 attachment text preview (MYND-268): decode the
+/// `MYA1` blob and return its plaintext as (lossy) UTF-8 text, capped for
+/// preview. Reuses the SAME decode path as [`build_response`] but does NOT
+/// re-sniff or allowlist — the caller renders the result as inert TEXT (a
+/// read-only viewer / table / markdown render), never as an interpreted
+/// content-type, so there is no serve-time XSS surface here (that defense stays
+/// on the `attachment://` serve path). The `Zeroizing` plaintext wipes on drop;
+/// the returned `String` is the accepted non-Zeroized intermediate (V8-leak
+/// dominance, per the discipline).
+pub fn read_attachment_text(vault_dir: &Path, keys: &ServeKeys, id_hex: &str) -> ReadTextOutcome {
+    let plaintext = match decode_attachment_plaintext(vault_dir, keys, id_hex) {
+        Ok(p) => p,
+        Err(DecodeError::NotFound) => return ReadTextOutcome::NotFound,
+        Err(DecodeError::Denied) => return ReadTextOutcome::Denied,
+        Err(DecodeError::ServerError) => return ReadTextOutcome::ServerError,
+    };
+    let capped_len = plaintext.len().min(ATTACHMENT_TEXT_PREVIEW_CAP);
+    let truncated = plaintext.len() > capped_len;
+    // Lossy UTF-8: text/code/csv are usually UTF-8; invalid or cap-split bytes
+    // become U+FFFD rather than failing (a preview, not a byte-exact round-trip).
+    let text = String::from_utf8_lossy(&plaintext[..capped_len]).into_owned();
+    drop(plaintext); // explicit wipe of the Zeroizing source
+    ReadTextOutcome::Ok { text, truncated }
+}
+
 // ---- URI id extraction --------------------------------------------------
 
 /// Extract the attachment-id from an `attachment://<id>` URI. Tauri
@@ -475,6 +581,77 @@ mod tests {
                 "error responses must never be a scriptable content-type"
             );
             assert!(r.body().is_empty());
+        }
+    }
+
+    // ---- read_attachment_text (MYND-268 Tier-1) ------------------------
+
+    #[test]
+    fn reads_text_attachment_roundtrip() {
+        let tmp = ScopedTempDir::new("scheme-text").unwrap();
+        seed_vault_meta(tmp.path());
+        let body = "line one\nsecond line\n";
+        let id = seed_attachment(tmp.path(), body.as_bytes(), "text/plain");
+
+        match read_attachment_text(tmp.path(), &keys(), &id) {
+            ReadTextOutcome::Ok { text, truncated } => {
+                assert_eq!(text, body);
+                assert!(!truncated);
+            }
+            _ => panic!("expected Ok text"),
+        }
+    }
+
+    #[test]
+    fn read_text_absent_id_is_not_found() {
+        let tmp = ScopedTempDir::new("scheme-text-missing").unwrap();
+        seed_vault_meta(tmp.path());
+        // Syntactically valid (64 hex chars) but never seeded → catalog miss.
+        let absent = "ab".repeat(32);
+        assert!(matches!(
+            read_attachment_text(tmp.path(), &keys(), &absent),
+            ReadTextOutcome::NotFound
+        ));
+    }
+
+    #[test]
+    fn read_text_malformed_id_is_denied() {
+        let tmp = ScopedTempDir::new("scheme-text-bad").unwrap();
+        seed_vault_meta(tmp.path());
+        assert!(matches!(
+            read_attachment_text(tmp.path(), &keys(), "not-hex!!"),
+            ReadTextOutcome::Denied
+        ));
+    }
+
+    #[test]
+    fn read_text_tampered_blob_is_denied() {
+        let tmp = ScopedTempDir::new("scheme-text-tamper").unwrap();
+        seed_vault_meta(tmp.path());
+        let id = seed_attachment(tmp.path(), b"hello world", "text/plain");
+        let blob_path = tmp.path().join("attachments").join(&id);
+        let mut blob = std::fs::read(&blob_path).unwrap();
+        let last = blob.len() - 1;
+        blob[last] ^= 0xFF;
+        std::fs::write(&blob_path, &blob).unwrap();
+        assert!(matches!(
+            read_attachment_text(tmp.path(), &keys(), &id),
+            ReadTextOutcome::Denied
+        ));
+    }
+
+    #[test]
+    fn read_text_truncates_at_cap() {
+        let tmp = ScopedTempDir::new("scheme-text-cap").unwrap();
+        seed_vault_meta(tmp.path());
+        let big = "a".repeat(ATTACHMENT_TEXT_PREVIEW_CAP + 100);
+        let id = seed_attachment(tmp.path(), big.as_bytes(), "text/plain");
+        match read_attachment_text(tmp.path(), &keys(), &id) {
+            ReadTextOutcome::Ok { text, truncated } => {
+                assert_eq!(text.len(), ATTACHMENT_TEXT_PREVIEW_CAP);
+                assert!(truncated);
+            }
+            _ => panic!("expected Ok truncated"),
         }
     }
 }

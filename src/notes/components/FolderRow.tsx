@@ -1,5 +1,6 @@
-// `<FolderRow>` — a single folder row in the sidebar tree (chevron disclosure
-// + folder icon + name), indented by depth. Supports: click-to-collapse,
+// `<FolderRow>` — a single folder row in the sidebar tree (folder icon + name,
+// with the disclosure chevron right-aligned at the row's trailing edge),
+// indented by depth. Supports: click-to-collapse,
 // right-click context menu, inline rename, and being a drag-drop target.
 // Empty deliberate folders render dimmed with an "empty" hint and no
 // disclosure. Token-bound per `colors_and_type.css`; matched to the MYND-144
@@ -19,6 +20,7 @@ import { ColorDot } from "./ColorDot";
 import { FolderGlyph } from "./FolderGlyph";
 import { Icon } from "../../components/primitives/Icon";
 import { dragEdge, dragZone, insertionLineStyle } from "./reorderDnd";
+import { TreeRails } from "./TreeRails";
 
 const INDENT_PER_LEVEL = 18;
 const BASE_PADDING_LEFT = 12;
@@ -30,9 +32,13 @@ const rowBaseStyle: CSSProperties = {
   height: 30,
   paddingRight: 12,
   cursor: "pointer",
-  borderRadius: 3,
+  borderRadius: 6,
   marginLeft: 4,
   marginRight: 4,
+  // Matches NoteRow: a 3px bottom gap so an active/hover folder row never butts
+  // its background against an adjacent row's, keeping the interleaved tree of
+  // folder + note pills uniform.
+  marginBottom: 3,
   userSelect: "none",
   fontFamily: "var(--font-sans)",
   boxSizing: "border-box",
@@ -40,11 +46,25 @@ const rowBaseStyle: CSSProperties = {
 
 const nameStyle: CSSProperties = {
   fontSize: 13,
-  fontWeight: 600,
+  // Matched to the note-row title weight (`NoteRow.titleStyle`, 500) so a
+  // folder heading and a note heading read at the same size — the folder icon
+  // (enlarged below) carries the container's visual weight instead of bolder
+  // text.
+  fontWeight: 500,
   color: "var(--fg-2)",
   whiteSpace: "nowrap",
   overflow: "hidden",
   textOverflow: "ellipsis",
+};
+
+// A non-empty folder's name GROWS to fill the row so the trailing cluster
+// (folder-note affordance + the disclosure chevron) is pushed to the right edge
+// — the chevron sits right-most. Kept off `emptyNameStyle` so an empty folder's
+// dimmed name + "empty" hint stay packed next to each other on the left.
+const nameGrowStyle: CSSProperties = {
+  ...nameStyle,
+  flex: 1,
+  minWidth: 0,
 };
 
 const emptyNameStyle: CSSProperties = {
@@ -146,8 +166,8 @@ function FolderIconGlyph({
 }) {
   return (
     <svg
-      width={15}
-      height={15}
+      width={17}
+      height={17}
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
@@ -171,7 +191,7 @@ function FolderIconGlyph({
 function FolderIcon({ open }: { open: boolean }) {
   return (
     <span
-      style={{ position: "relative", width: 15, height: 15, flexShrink: 0 }}
+      style={{ position: "relative", width: 17, height: 17, flexShrink: 0 }}
       aria-hidden="true"
     >
       <FolderIconGlyph
@@ -369,16 +389,12 @@ export function FolderRow({
       data-folder-path={node.path}
       title={node.path}
     >
+      <TreeRails depth={depth} />
       {reorderPlace && (
         <div style={insertionLineStyle(reorderPlace)} aria-hidden="true" />
       )}
-      {empty ? (
-        <span style={{ width: 12, flexShrink: 0 }} aria-hidden="true" />
-      ) : (
-        <Chevron collapsed={collapsed} />
-      )}
       {iconName ? (
-        <FolderGlyph name={iconName} style={{ color: "var(--fg-3)" }} />
+        <FolderGlyph name={iconName} size={17} style={{ color: "var(--fg-3)" }} />
       ) : (
         <FolderIcon open={expanded} />
       )}
@@ -399,7 +415,7 @@ export function FolderRow({
         />
       ) : (
         <>
-          <span style={empty ? emptyNameStyle : nameStyle}>{node.name}</span>
+          <span style={empty ? emptyNameStyle : nameGrowStyle}>{node.name}</span>
           {empty && (
             <span style={emptyHintStyle}>{t("notes.folderRow.empty")}</span>
           )}
@@ -444,6 +460,10 @@ export function FolderRow({
           )}
         </>
       )}
+      {/* Disclosure chevron, right-most: the grown name (or the rename input's
+          own `flex:1`) pushes it — and the folder-note affordance — to the far
+          right. Empty folders don't disclose, so they show none. */}
+      {!empty && <Chevron collapsed={collapsed} />}
     </div>
   );
 }

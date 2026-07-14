@@ -462,6 +462,40 @@ pub struct PrefsView {
     #[serde(default)]
     pub editor_line_numbers: Option<bool>,
 
+    /// Slash-menu HIDDEN item set (MYND-336 editor-command customization).
+    /// `sequence`-adjacent to `editor_slash_order`; a set field (sorted+deduped
+    /// on encode, `canonical_folder_list`). Default empty (nothing hidden).
+    /// Canonical key `editor_slash_hidden` — sorts after `editor_line_spacing`
+    /// (`editor_li` < `editor_s`), before `editor_slash_order`
+    /// (`editor_slash_h` < `editor_slash_o`). Existing golden vectors unaffected
+    /// — a migration-less additive field on `MYP1`, the `hidden_bar_items`
+    /// precedent class. Non-load-bearing (a tampered/absent value degrades to the
+    /// default toolbar/slash layout, never a crypto or safety property).
+    #[serde(default)]
+    pub editor_slash_hidden: Vec<alloc::string::String>,
+
+    /// Slash-menu ORDER (MYND-336). Reorder twin of `editor_slash_hidden`; a
+    /// `sequence` field preserved VERBATIM (not sorted/deduped, like
+    /// `bar_items_order`). Default empty (canonical order). Canonical key
+    /// `editor_slash_order` — after `editor_slash_hidden`, before
+    /// `editor_text_size` (`editor_s` < `editor_te`). Migration-less additive.
+    #[serde(default)]
+    pub editor_slash_order: Vec<alloc::string::String>,
+
+    /// Toolbar HIDDEN item set (MYND-336). Set field (sorted+deduped). Default
+    /// empty. Canonical key `editor_toolbar_hidden` — after `editor_text_size`
+    /// (`editor_te` < `editor_to`), before `editor_toolbar_order`. Migration-less
+    /// additive; non-load-bearing.
+    #[serde(default)]
+    pub editor_toolbar_hidden: Vec<alloc::string::String>,
+
+    /// Toolbar ORDER (MYND-336). Reorder twin of `editor_toolbar_hidden`; a
+    /// `sequence` field preserved VERBATIM. Default empty. Canonical key
+    /// `editor_toolbar_order` — after `editor_toolbar_hidden`, before `favorites`
+    /// (`editor_t` < `f`). Migration-less additive.
+    #[serde(default)]
+    pub editor_toolbar_order: Vec<alloc::string::String>,
+
     /// Editor content max-width preset (editor-typography). `None` ≡ the
     /// canonical default `normal`, applied host-side. A closed enum string
     /// (`narrow`/`normal`/`wide`/`full`); stored as a free `Option<String>`
@@ -939,6 +973,10 @@ impl Default for PrefsView {
             right_panel_active_tab: None,
             right_panel_hidden_tabs: Vec::new(),
             right_panel_tab_order: Vec::new(),
+            editor_slash_hidden: Vec::new(),
+            editor_slash_order: Vec::new(),
+            editor_toolbar_hidden: Vec::new(),
+            editor_toolbar_order: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
             startup_open: None,
@@ -1315,9 +1353,48 @@ fn canonical_json_encode(prefs: &PrefsView) -> Vec<u8> {
         push_json_string(&mut out, &v.nfc().collect::<String>());
         out.push(b',');
     }
+    // editor_slash_hidden (set — sorted+deduped, canonical_folder_list) then
+    // editor_slash_order (sequence — verbatim). MYND-336. Both omitted when empty
+    // so a vault that never customized the slash menu is byte-identical to a
+    // pre-feature vault.prefs. Canonical: after editor_line_spacing, before
+    // editor_text_size (editor_li < editor_s < editor_te).
+    let editor_slash_hidden = canonical_folder_list(&prefs.editor_slash_hidden);
+    if !editor_slash_hidden.is_empty() {
+        out.extend_from_slice(b"\"editor_slash_hidden\":[");
+        for (i, id) in editor_slash_hidden.iter().enumerate() {
+            if i > 0 {
+                out.push(b',');
+            }
+            push_json_string(&mut out, id);
+        }
+        out.extend_from_slice(b"],");
+    }
+    if !prefs.editor_slash_order.is_empty() {
+        out.extend_from_slice(b"\"editor_slash_order\":");
+        push_ordered_string_array(&mut out, &prefs.editor_slash_order);
+        out.push(b',');
+    }
     if let Some(ref v) = prefs.editor_text_size {
         out.extend_from_slice(b"\"editor_text_size\":");
         push_json_string(&mut out, &v.nfc().collect::<String>());
+        out.push(b',');
+    }
+    // editor_toolbar_hidden (set) then editor_toolbar_order (sequence). MYND-336.
+    // Canonical: after editor_text_size, before favorites (editor_te < editor_to < f).
+    let editor_toolbar_hidden = canonical_folder_list(&prefs.editor_toolbar_hidden);
+    if !editor_toolbar_hidden.is_empty() {
+        out.extend_from_slice(b"\"editor_toolbar_hidden\":[");
+        for (i, id) in editor_toolbar_hidden.iter().enumerate() {
+            if i > 0 {
+                out.push(b',');
+            }
+            push_json_string(&mut out, id);
+        }
+        out.extend_from_slice(b"],");
+    }
+    if !prefs.editor_toolbar_order.is_empty() {
+        out.extend_from_slice(b"\"editor_toolbar_order\":");
+        push_ordered_string_array(&mut out, &prefs.editor_toolbar_order);
         out.push(b',');
     }
 
@@ -1964,8 +2041,19 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
         parse_optional_bool_field(rest, &mut cursor, b"\"editor_line_numbers\":")?;
     let editor_line_spacing =
         parse_optional_string_field(rest, &mut cursor, b"\"editor_line_spacing\":")?;
+    // MYND-336: editor_slash_hidden/order sit between editor_line_spacing and
+    // editor_text_size in canonical key order.
+    let editor_slash_hidden =
+        parse_optional_array_field(rest, &mut cursor, b"\"editor_slash_hidden\":")?;
+    let editor_slash_order =
+        parse_optional_array_field(rest, &mut cursor, b"\"editor_slash_order\":")?;
     let editor_text_size =
         parse_optional_string_field(rest, &mut cursor, b"\"editor_text_size\":")?;
+    // editor_toolbar_hidden/order sit between editor_text_size and favorites.
+    let editor_toolbar_hidden =
+        parse_optional_array_field(rest, &mut cursor, b"\"editor_toolbar_hidden\":")?;
+    let editor_toolbar_order =
+        parse_optional_array_field(rest, &mut cursor, b"\"editor_toolbar_order\":")?;
     let favorites = parse_optional_array_field(rest, &mut cursor, b"\"favorites\":")?;
     // field_clocks (key 'fi') sits between favorites (fa) and folder_icons (fo)
     // in canonical order (MYND-478) — the per-field LWW clock map for the
@@ -2129,7 +2217,11 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
         editor_focus_typewriter,
         editor_font_family,
         editor_line_spacing,
+        editor_slash_hidden,
+        editor_slash_order,
         editor_text_size,
+        editor_toolbar_hidden,
+        editor_toolbar_order,
         theme,
         label,
         last_backup_at,
@@ -2963,6 +3055,10 @@ mod tests {
             right_panel_active_tab: None,
             right_panel_hidden_tabs: Vec::new(),
             right_panel_tab_order: Vec::new(),
+            editor_slash_hidden: Vec::new(),
+            editor_slash_order: Vec::new(),
+            editor_toolbar_hidden: Vec::new(),
+            editor_toolbar_order: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
             startup_open: None,
@@ -3018,6 +3114,10 @@ mod tests {
             right_panel_active_tab: None,
             right_panel_hidden_tabs: Vec::new(),
             right_panel_tab_order: Vec::new(),
+            editor_slash_hidden: Vec::new(),
+            editor_slash_order: Vec::new(),
+            editor_toolbar_hidden: Vec::new(),
+            editor_toolbar_order: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
             startup_open: None,
@@ -3332,6 +3432,10 @@ mod tests {
                 right_panel_active_tab: None,
                 right_panel_hidden_tabs: Vec::new(),
                 right_panel_tab_order: Vec::new(),
+                editor_slash_hidden: Vec::new(),
+                editor_slash_order: Vec::new(),
+                editor_toolbar_hidden: Vec::new(),
+                editor_toolbar_order: Vec::new(),
                 spell_enabled: None,
                 spell_languages: Vec::new(),
                 startup_open: None,
@@ -3389,6 +3493,10 @@ mod tests {
                 right_panel_active_tab: None,
                 right_panel_hidden_tabs: Vec::new(),
                 right_panel_tab_order: Vec::new(),
+                editor_slash_hidden: Vec::new(),
+                editor_slash_order: Vec::new(),
+                editor_toolbar_hidden: Vec::new(),
+                editor_toolbar_order: Vec::new(),
                 spell_enabled: None,
                 spell_languages: Vec::new(),
                 startup_open: None,
@@ -4291,6 +4399,10 @@ mod tests {
             right_panel_active_tab: None,
             right_panel_hidden_tabs: Vec::new(),
             right_panel_tab_order: Vec::new(),
+            editor_slash_hidden: Vec::new(),
+            editor_slash_order: Vec::new(),
+            editor_toolbar_hidden: Vec::new(),
+            editor_toolbar_order: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
             ..PrefsView::default()
@@ -4309,6 +4421,10 @@ mod tests {
             right_panel_active_tab: None,
             right_panel_hidden_tabs: Vec::new(),
             right_panel_tab_order: Vec::new(),
+            editor_slash_hidden: Vec::new(),
+            editor_slash_order: Vec::new(),
+            editor_toolbar_hidden: Vec::new(),
+            editor_toolbar_order: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
             ..PrefsView::default()
@@ -4328,6 +4444,10 @@ mod tests {
             right_panel_active_tab: None,
             right_panel_hidden_tabs: Vec::new(),
             right_panel_tab_order: Vec::new(),
+            editor_slash_hidden: Vec::new(),
+            editor_slash_order: Vec::new(),
+            editor_toolbar_hidden: Vec::new(),
+            editor_toolbar_order: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
             ..PrefsView::default()
@@ -4427,6 +4547,10 @@ mod tests {
             right_panel_active_tab: None,
             right_panel_hidden_tabs: Vec::new(),
             right_panel_tab_order: Vec::new(),
+            editor_slash_hidden: Vec::new(),
+            editor_slash_order: Vec::new(),
+            editor_toolbar_hidden: Vec::new(),
+            editor_toolbar_order: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
             startup_open: None,
@@ -4717,6 +4841,10 @@ mod tests {
             right_panel_active_tab: None,
             right_panel_hidden_tabs: Vec::new(),
             right_panel_tab_order: Vec::new(),
+            editor_slash_hidden: Vec::new(),
+            editor_slash_order: Vec::new(),
+            editor_toolbar_hidden: Vec::new(),
+            editor_toolbar_order: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
             startup_open: None,
@@ -4779,6 +4907,10 @@ mod tests {
             right_panel_active_tab: None,
             right_panel_hidden_tabs: Vec::new(),
             right_panel_tab_order: Vec::new(),
+            editor_slash_hidden: Vec::new(),
+            editor_slash_order: Vec::new(),
+            editor_toolbar_hidden: Vec::new(),
+            editor_toolbar_order: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
             startup_open: None,
@@ -4839,6 +4971,10 @@ mod tests {
             right_panel_active_tab: None,
             right_panel_hidden_tabs: Vec::new(),
             right_panel_tab_order: Vec::new(),
+            editor_slash_hidden: Vec::new(),
+            editor_slash_order: Vec::new(),
+            editor_toolbar_hidden: Vec::new(),
+            editor_toolbar_order: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
             startup_open: None,
@@ -4898,6 +5034,10 @@ mod tests {
             right_panel_active_tab: None,
             right_panel_hidden_tabs: Vec::new(),
             right_panel_tab_order: Vec::new(),
+            editor_slash_hidden: Vec::new(),
+            editor_slash_order: Vec::new(),
+            editor_toolbar_hidden: Vec::new(),
+            editor_toolbar_order: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
             startup_open: None,
@@ -5020,6 +5160,10 @@ mod tests {
             right_panel_active_tab: None,
             right_panel_hidden_tabs: Vec::new(),
             right_panel_tab_order: Vec::new(),
+            editor_slash_hidden: Vec::new(),
+            editor_slash_order: Vec::new(),
+            editor_toolbar_hidden: Vec::new(),
+            editor_toolbar_order: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
             startup_open: None,
@@ -5107,6 +5251,10 @@ mod tests {
             right_panel_active_tab: None,
             right_panel_hidden_tabs: Vec::new(),
             right_panel_tab_order: Vec::new(),
+            editor_slash_hidden: Vec::new(),
+            editor_slash_order: Vec::new(),
+            editor_toolbar_hidden: Vec::new(),
+            editor_toolbar_order: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
             startup_open: None,
@@ -5173,6 +5321,10 @@ mod tests {
             right_panel_active_tab: None,
             right_panel_hidden_tabs: Vec::new(),
             right_panel_tab_order: Vec::new(),
+            editor_slash_hidden: Vec::new(),
+            editor_slash_order: Vec::new(),
+            editor_toolbar_hidden: Vec::new(),
+            editor_toolbar_order: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
             startup_open: None,
@@ -5274,6 +5426,10 @@ mod tests {
             right_panel_active_tab: None,
             right_panel_hidden_tabs: Vec::new(),
             right_panel_tab_order: Vec::new(),
+            editor_slash_hidden: Vec::new(),
+            editor_slash_order: Vec::new(),
+            editor_toolbar_hidden: Vec::new(),
+            editor_toolbar_order: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
             startup_open: None,
@@ -5351,6 +5507,10 @@ mod tests {
             right_panel_active_tab: None,
             right_panel_hidden_tabs: Vec::new(),
             right_panel_tab_order: Vec::new(),
+            editor_slash_hidden: Vec::new(),
+            editor_slash_order: Vec::new(),
+            editor_toolbar_hidden: Vec::new(),
+            editor_toolbar_order: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
             startup_open: None,
@@ -5420,6 +5580,60 @@ mod tests {
         assert_eq!(decoded.bar_items_order, order);
     }
 
+    // ---- editor toolbar / slash customization (MYND-336) ---------------
+
+    #[test]
+    fn editor_toolbar_slash_customization_round_trips() {
+        // order fields are verbatim sequences; hidden fields are sorted+deduped
+        // sets (canonical_folder_list), exactly like bar_items_order / hidden_bar_items.
+        let prefs = PrefsView {
+            editor_toolbar_order: alloc::vec!["link".into(), "bold".into()],
+            editor_toolbar_hidden: alloc::vec!["quote".into(), "bold".into(), "quote".into()],
+            editor_slash_order: alloc::vec!["table".into()],
+            editor_slash_hidden: alloc::vec!["callout".into()],
+            ..PrefsView::default()
+        };
+        let decoded = canonical_json_decode(&canonical_json_encode(&prefs)).expect("decode");
+        assert_eq!(decoded.editor_toolbar_order, alloc::vec!["link", "bold"]); // verbatim
+        assert_eq!(decoded.editor_slash_order, alloc::vec!["table"]);
+        assert_eq!(decoded.editor_toolbar_hidden, alloc::vec!["bold", "quote"]); // sorted+deduped
+        assert_eq!(decoded.editor_slash_hidden, alloc::vec!["callout"]);
+    }
+
+    #[test]
+    fn editor_customization_absent_decodes_to_empty_migration_less() {
+        // A default (un-customized) vault.prefs OMITS all four keys — byte-
+        // identical to a pre-MYND-336 blob — and decodes with them empty.
+        let bytes = canonical_json_encode(&PrefsView::default());
+        let s = alloc::string::String::from_utf8(bytes.clone()).unwrap();
+        assert!(!s.contains("editor_toolbar"), "omitted when empty: {s}");
+        assert!(!s.contains("editor_slash"), "omitted when empty: {s}");
+        let decoded = canonical_json_decode(&bytes).expect("decode");
+        assert!(decoded.editor_toolbar_order.is_empty());
+        assert!(decoded.editor_toolbar_hidden.is_empty());
+        assert!(decoded.editor_slash_order.is_empty());
+        assert!(decoded.editor_slash_hidden.is_empty());
+    }
+
+    #[test]
+    fn editor_customization_canonical_key_positions() {
+        // editor_slash_* < editor_text_size < editor_toolbar_* in canonical order.
+        let prefs = PrefsView {
+            editor_text_size: Some("large".into()),
+            editor_slash_order: alloc::vec!["a".into()],
+            editor_toolbar_order: alloc::vec!["b".into()],
+            ..PrefsView::default()
+        };
+        let s = alloc::string::String::from_utf8(canonical_json_encode(&prefs)).unwrap();
+        let slash = s.find("editor_slash_order").unwrap();
+        let text = s.find("editor_text_size").unwrap();
+        let toolbar = s.find("editor_toolbar_order").unwrap();
+        assert!(
+            slash < text && text < toolbar,
+            "canonical order violated: {s}"
+        );
+    }
+
     // ---- auto_lock_seconds canonical field (MYND-121) -----------------
 
     #[test]
@@ -5475,6 +5689,10 @@ mod tests {
             right_panel_active_tab: None,
             right_panel_hidden_tabs: Vec::new(),
             right_panel_tab_order: Vec::new(),
+            editor_slash_hidden: Vec::new(),
+            editor_slash_order: Vec::new(),
+            editor_toolbar_hidden: Vec::new(),
+            editor_toolbar_order: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
             startup_open: None,
@@ -5534,6 +5752,10 @@ mod tests {
             right_panel_active_tab: None,
             right_panel_hidden_tabs: Vec::new(),
             right_panel_tab_order: Vec::new(),
+            editor_slash_hidden: Vec::new(),
+            editor_slash_order: Vec::new(),
+            editor_toolbar_hidden: Vec::new(),
+            editor_toolbar_order: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
             startup_open: None,
@@ -5595,6 +5817,10 @@ mod tests {
             right_panel_active_tab: None,
             right_panel_hidden_tabs: Vec::new(),
             right_panel_tab_order: Vec::new(),
+            editor_slash_hidden: Vec::new(),
+            editor_slash_order: Vec::new(),
+            editor_toolbar_hidden: Vec::new(),
+            editor_toolbar_order: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
             startup_open: None,
@@ -5724,6 +5950,10 @@ mod tests {
             right_panel_active_tab: None,
             right_panel_hidden_tabs: Vec::new(),
             right_panel_tab_order: Vec::new(),
+            editor_slash_hidden: Vec::new(),
+            editor_slash_order: Vec::new(),
+            editor_toolbar_hidden: Vec::new(),
+            editor_toolbar_order: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
             startup_open: None,
@@ -5827,6 +6057,10 @@ mod tests {
             right_panel_active_tab: None,
             right_panel_hidden_tabs: Vec::new(),
             right_panel_tab_order: Vec::new(),
+            editor_slash_hidden: Vec::new(),
+            editor_slash_order: Vec::new(),
+            editor_toolbar_hidden: Vec::new(),
+            editor_toolbar_order: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
             startup_open: None,
@@ -6120,6 +6354,10 @@ mod tests {
             right_panel_active_tab: None,
             right_panel_hidden_tabs: Vec::new(),
             right_panel_tab_order: Vec::new(),
+            editor_slash_hidden: Vec::new(),
+            editor_slash_order: Vec::new(),
+            editor_toolbar_hidden: Vec::new(),
+            editor_toolbar_order: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
             startup_open: None,
@@ -6183,6 +6421,10 @@ mod tests {
             right_panel_active_tab: None,
             right_panel_hidden_tabs: Vec::new(),
             right_panel_tab_order: Vec::new(),
+            editor_slash_hidden: Vec::new(),
+            editor_slash_order: Vec::new(),
+            editor_toolbar_hidden: Vec::new(),
+            editor_toolbar_order: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
             startup_open: None,
@@ -6507,6 +6749,10 @@ mod tests {
                 right_panel_active_tab: None,
                 right_panel_hidden_tabs: Vec::new(),
                 right_panel_tab_order: Vec::new(),
+                editor_slash_hidden: Vec::new(),
+                editor_slash_order: Vec::new(),
+                editor_toolbar_hidden: Vec::new(),
+                editor_toolbar_order: Vec::new(),
                 spell_enabled: None,
                 spell_languages: Vec::new(),
                 startup_open: None,
@@ -6563,6 +6809,10 @@ mod tests {
                 right_panel_active_tab: None,
                 right_panel_hidden_tabs: Vec::new(),
                 right_panel_tab_order: Vec::new(),
+                editor_slash_hidden: Vec::new(),
+                editor_slash_order: Vec::new(),
+                editor_toolbar_hidden: Vec::new(),
+                editor_toolbar_order: Vec::new(),
                 spell_enabled: None,
                 spell_languages: Vec::new(),
                 startup_open: None,
@@ -6638,6 +6888,10 @@ mod tests {
             right_panel_active_tab: None,
             right_panel_hidden_tabs: Vec::new(),
             right_panel_tab_order: Vec::new(),
+            editor_slash_hidden: Vec::new(),
+            editor_slash_order: Vec::new(),
+            editor_toolbar_hidden: Vec::new(),
+            editor_toolbar_order: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
             startup_open: None,
@@ -7550,6 +7804,10 @@ mod tests {
             right_panel_active_tab: None,
             right_panel_hidden_tabs: Vec::new(),
             right_panel_tab_order: Vec::new(),
+            editor_slash_hidden: Vec::new(),
+            editor_slash_order: Vec::new(),
+            editor_toolbar_hidden: Vec::new(),
+            editor_toolbar_order: Vec::new(),
             spell_enabled: None,
             spell_languages: Vec::new(),
             ..PrefsView::default()

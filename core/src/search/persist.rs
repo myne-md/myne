@@ -41,18 +41,29 @@ pub use crate::note_nonce::{
     read_myn_content_nonce, NonceManifest, MYN_CONTENT_NONCE_LEN, MYN_HEADER_PREFIX_FOR_NONCE,
 };
 
+/// Search snapshot SCHEMA generation (MYND-448a) — bumped when the index's doc
+/// MODEL changes, INDEPENDENT of `extractor_version` (which tracks the
+/// attachment-text extractor and also gates the MYE1 caches). `v2` = attachment
+/// text lives in SEPARATE docs (`att:<id>:<note_id>`) with UNFOLDED note bodies;
+/// a `v1` blob (folded bodies, no attachment docs) fails the version gate below
+/// → full rebuild into the new model. Keeping this separate from
+/// `extractor_version` means the doc-model change forces a search rebuild
+/// WITHOUT invalidating every MYE1 extracted-text cache.
+const SEARCH_SNAPSHOT_SCHEMA_SEPARATE_ATTACHMENT_DOCS: u8 = 2;
+
 /// Borrowed snapshot for the encode side (avoids cloning the index).
 ///
-/// `extractor_version` (MYND-328) is the attachment-text extractor generation
-/// whose output is folded into the indexed note bodies (§ 9.6.4). It rides LAST
-/// so a pre-MYND-328 snapshot (no field) fails postcard decode → full rebuild,
-/// which backfills attachment text into every note. A later bump (e.g. the OCR
-/// layer, MYND-441) likewise forces a rebuild.
+/// `extractor_version` (MYND-328) is the attachment-text extractor generation.
+/// `schema_version` (MYND-448a) is the index doc-model generation. Both ride at
+/// the tail so a snapshot serialized before either field existed fails postcard
+/// decode → full rebuild (postcard is non-self-describing, so a missing trailing
+/// field is a decode error).
 #[derive(Serialize)]
 struct SnapshotRef<'a> {
     manifest: &'a NonceManifest,
     index: &'a InvertedIndex,
     extractor_version: u8,
+    schema_version: u8,
 }
 
 /// Owned snapshot for the decode side.
@@ -61,6 +72,7 @@ struct SnapshotOwned {
     manifest: NonceManifest,
     index: InvertedIndex,
     extractor_version: u8,
+    schema_version: u8,
 }
 
 /// Encrypt `{manifest, index}` into a `vault.search` (`MYS1`) blob. The caller
@@ -75,6 +87,7 @@ pub fn encode_snapshot(
         manifest,
         index,
         extractor_version: protocol::ATTACHMENT_TEXT_BLOB_EXTRACTOR_V1,
+        schema_version: SEARCH_SNAPSHOT_SCHEMA_SEPARATE_ATTACHMENT_DOCS,
     })
     .unwrap_or_default();
     encode_search_index_blob(search_index_key, account_number_hash, &plaintext)
@@ -92,9 +105,14 @@ pub fn decode_snapshot(
     let snap: SnapshotOwned = postcard::from_bytes(&plaintext).ok()?;
     // A snapshot built under a different attachment-text extractor generation is
     // stale (§ 9.6.4): reject → caller rebuilds so the current extractor's text
-    // is re-folded. A pre-MYND-328 snapshot lacks the field and already fails the
-    // `from_bytes` above (postcard is non-self-describing) → same rebuild.
+    // is re-extracted. A pre-MYND-328 snapshot lacks the field and already fails
+    // the `from_bytes` above (postcard is non-self-describing) → same rebuild.
     if snap.extractor_version != protocol::ATTACHMENT_TEXT_BLOB_EXTRACTOR_V1 {
+        return None;
+    }
+    // MYND-448a: a snapshot from a different index doc-model is stale — a v1
+    // (folded-body) blob must rebuild into the v2 separate-attachment-doc model.
+    if snap.schema_version != SEARCH_SNAPSHOT_SCHEMA_SEPARATE_ATTACHMENT_DOCS {
         return None;
     }
     Some((snap.manifest, snap.index))
@@ -227,6 +245,34 @@ mod tests {
         assert!(
             decode_snapshot(&KEY, &ACCOUNT_HASH, &blob).is_none(),
             "old snapshot must force a rebuild"
+        );
+    }
+
+    #[test]
+    fn pre_mynd448a_snapshot_with_folded_bodies_forces_rebuild() {
+        // MYND-448a: a post-328 / pre-448a snapshot ({manifest, index,
+        // extractor_version}) carries folded note bodies and no attachment docs.
+        // It lacks the trailing `schema_version` field, so postcard decode fails
+        // → the caller rebuilds into the v2 separate-attachment-doc model.
+        #[derive(serde::Serialize)]
+        struct PreV2Snap<'a> {
+            manifest: &'a NonceManifest,
+            index: &'a InvertedIndex,
+            extractor_version: u8,
+        }
+        let mut manifest = NonceManifest::new();
+        manifest.insert("a".into(), nonce(1));
+        let index = InvertedIndex::default();
+        let plaintext = postcard::to_allocvec(&PreV2Snap {
+            manifest: &manifest,
+            index: &index,
+            extractor_version: protocol::ATTACHMENT_TEXT_BLOB_EXTRACTOR_V1,
+        })
+        .expect("encode pre-v2 snapshot");
+        let blob = encode_search_index_blob(&KEY, &ACCOUNT_HASH, &plaintext).expect("seal");
+        assert!(
+            decode_snapshot(&KEY, &ACCOUNT_HASH, &blob).is_none(),
+            "a folded-body (pre-448a) snapshot must force a rebuild"
         );
     }
 

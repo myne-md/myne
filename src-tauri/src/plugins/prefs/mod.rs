@@ -106,6 +106,13 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::set_right_panel_active_tab,
             commands::set_right_panel_hidden_tabs,
             commands::set_right_panel_tab_order,
+            // MYND-336 editor toolbar / slash-menu customization setters. Each
+            // needs a matching capabilities/default.json permission — verify via
+            // `pnpm tauri dev` (permission autogen).
+            commands::set_editor_toolbar_order,
+            commands::set_editor_toolbar_hidden,
+            commands::set_editor_slash_order,
+            commands::set_editor_slash_hidden,
         ])
         .build()
 }
@@ -166,13 +173,14 @@ mod desktop_tests {
         fn hydrate_ai_vectors<'a>(&'a self, _: &'a VaultRuntimeState) -> BoxFuture<'a> {
             Box::pin(std::future::ready(()))
         }
-        fn fold_attachment_text_for_index<'a>(
+        fn index_note_attachments<'a>(
             &'a self,
             _: &'a VaultRuntimeState,
-            note_body: &'a str,
-        ) -> BoxFuture<'a, String> {
-            let body = note_body.to_string();
-            Box::pin(std::future::ready(body))
+            _: &'a str,
+            _: &'a str,
+            _: &'a str,
+        ) -> BoxFuture<'a> {
+            Box::pin(std::future::ready(()))
         }
         fn zeroize_search_index(&self) {}
         fn zeroize_spell(&self) {}

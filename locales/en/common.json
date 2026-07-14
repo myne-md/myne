@@ -161,6 +161,8 @@
     "archivedBadge": "Archive",
     "archivedBadgeTitle": "Archived",
     "dialogLabel": "Command palette",
+    "matchedInAttachment": "in attachment",
+    "matchedInAttachmentTitle": "The query matched inside a file embedded in this note",
     "matchedInBody": "↳ matched in body",
     "noMatches": "No matches",
     "searchPlaceholder": "Search notes or run a command — Esc to dismiss",
@@ -176,13 +178,64 @@
       "category": {
         "ai": "AI",
         "app": "App",
+        "appearance": "Appearance",
         "editor": "Editor",
+        "notes": "Notes",
         "vault": "Vault",
         "view": "View"
       },
       "aiOpenChat": {
         "label": "Open AI Chat"
       },
+      "toggleLineNumbers": { "label": "Toggle line numbers" },
+      "toggleSpellCheck": { "label": "Toggle spell check" },
+      "toggleTypewriter": { "label": "Toggle typewriter scrolling" },
+      "toggleDimInactive": { "label": "Toggle dim inactive lines" },
+      "toggleEditorFont": { "label": "Toggle editor font (mono / sans)" },
+      "cycleTextSize": { "label": "Cycle editor text size" },
+      "cycleContentWidth": { "label": "Cycle editor content width" },
+      "cycleDefaultViewMode": { "label": "Cycle default view mode" },
+      "toggleTimestamps": { "label": "Toggle sidebar note timestamps" },
+      "toggleArchiving": { "label": "Toggle note archiving" },
+      "toggleAiEnabled": { "label": "Toggle AI features (beta)" },
+      "toggleScreenCapture": { "label": "Toggle screen-capture protection" },
+      "cycleTheme": { "label": "Cycle theme" },
+      "themeLight": { "label": "Theme: Light" },
+      "themeDark": { "label": "Theme: Dark" },
+      "themeAmoled": { "label": "Theme: AMOLED" },
+      "themeSystem": { "label": "Theme: Follow system" },
+      "applyCustomTheme": { "label": "Apply custom theme…" },
+      "splitRight": { "label": "Split pane right" },
+      "splitDown": { "label": "Split pane down" },
+      "closePane": { "label": "Close pane" },
+      "closeTab": { "label": "Close tab" },
+      "nextTab": { "label": "Next tab" },
+      "prevTab": { "label": "Previous tab" },
+      "focusNextPane": { "label": "Focus next pane" },
+      "focusPrevPane": { "label": "Focus previous pane" },
+      "goBack": { "label": "Go back" },
+      "goForward": { "label": "Go forward" },
+      "togglePreview": { "label": "Toggle side-by-side preview" },
+      "findInNote": { "label": "Find in note" },
+      "findReplace": { "label": "Find and replace in note" },
+      "newNote": { "label": "New note" },
+      "duplicateNote": { "label": "Duplicate note" },
+      "archiveNote": { "label": "Archive note" },
+      "renameNote": { "label": "Rename note" },
+      "trashNote": { "label": "Move note to trash" },
+      "toggleFavorite": { "label": "Toggle favorite" },
+      "moveNote": { "label": "Move note to folder…" },
+      "emptyTrash": { "label": "Empty trash" },
+      "showBacklinks": { "label": "Show backlinks" },
+      "showOutline": { "label": "Show outline" },
+      "showUnlinked": { "label": "Show unlinked mentions" },
+      "newFolder": { "label": "New folder" },
+      "openTrash": { "label": "Open trash" },
+      "openArchive": { "label": "Open archive" },
+      "cycleHeading": { "label": "Cycle heading level" },
+      "restoreBackup": { "label": "Restore vault from backup…" },
+      "toggleRealtimeSync": { "label": "Toggle real-time sync" },
+      "revealVaultFolder": { "label": "Reveal vault folder in file manager" },
       "aiSummarizeNote": {
         "label": "Summarize note"
       },
@@ -200,6 +253,12 @@
       },
       "exportNoteHtml": {
         "label": "Export note as HTML…"
+      },
+      "exportSelectionImage": {
+        "label": "Export selection as image…",
+        "saved": "Selection saved as an image.",
+        "noSelection": "Select some text first, then export it as an image.",
+        "failed": "Could not export the selection as an image."
       },
       "exportNoteMarkdown": {
         "label": "Export note as Markdown…"
@@ -322,6 +381,15 @@
     },
     "rebind": {
       "invalidChordReason": "Add a modifier (⌘, Ctrl, or Alt) — a key on its own can't be a shortcut."
+    },
+    "picker": {
+      "vaultRoot": "Vault root",
+      "moveNoteTitle": "Move note to folder",
+      "moveNotePlaceholder": "Choose a folder…",
+      "noFolders": "No folders yet",
+      "applyThemeTitle": "Apply custom theme",
+      "applyThemePlaceholder": "Choose a theme…",
+      "noCustomThemes": "No custom themes installed"
     }
   },
   "common": {
@@ -489,6 +557,9 @@
           "reveal": "Reveal in library"
         },
         "pdfFallback": "PDF",
+        "textPreview": {
+          "truncated": "Preview truncated — Export for the full file."
+        },
         "tombstone": {
           "brokenAria": "Broken attachment reference: {{filename}}",
           "brokenLabel": "broken",
@@ -629,7 +700,9 @@
         },
         "allHidden": "All tabs are hidden — right-click to restore.",
         "outline": {
+          "collapse": "Collapse section",
           "empty": "No headings",
+          "expand": "Expand section",
           "heading": "Outline"
         },
         "tabs": {
@@ -748,6 +821,21 @@
     },
     "toolbar": {
       "apply": "Apply",
+      "exportImageTitle": "Export selection as image",
+      "customize": {
+        "bold": "Bold",
+        "bulletList": "Bullet list",
+        "checklist": "Checklist",
+        "code": "Code",
+        "heading": "Heading",
+        "highlight": "Highlight",
+        "italic": "Italic",
+        "link": "Link",
+        "numberedList": "Numbered list",
+        "quote": "Quote",
+        "strike": "Strikethrough",
+        "wikilink": "Wikilink"
+      },
       "heading": {
         "h1": "H1",
         "h2": "H2",
@@ -1731,6 +1819,14 @@
       "label": "Line numbers",
       "off": "Off",
       "on": "On"
+    },
+    "toolbarCustomize": {
+      "errorSave": "Could not save the toolbar layout.",
+      "helper": "Choose which formatting buttons appear on the selection toolbar, and their order.",
+      "label": "Toolbar buttons",
+      "moveDown": "Move down",
+      "moveUp": "Move up",
+      "pendingHint": "Coming soon"
     },
     "ai": {
       "betaBadge": "Beta",

@@ -36,6 +36,10 @@ pub use myne_core::plugins::notes::{commands, error, note_id, title_extract};
 // attachment-reference scan — they reach into desktop-only subsystems (search
 // index, snapshot store, attachments) and stay in this crate.
 pub mod desktop_commands;
+// MYND-361: the note→image "share selection as image" export command — writes a
+// WebView-rasterized PNG/JPEG card to a user path (no decrypt; the raster is
+// WebView-side).
+pub mod image_export;
 // The export mtime-fidelity helper (SYNC-13 — set the exported file's mtime from
 // the note's frontmatter `updated:`) moved to `myne-core` (shared with the
 // export plugin core + mobile). Re-exported so `super::export_mtime::…` paths in
@@ -72,6 +76,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             desktop_commands::note_export_attachments,
             desktop_commands::note_export_html,
             desktop_commands::note_export_html_attachments,
+            image_export::note_image_export,
         ])
         .build()
 }

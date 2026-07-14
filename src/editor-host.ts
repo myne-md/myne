@@ -10,7 +10,12 @@ import { save } from "@tauri-apps/plugin-dialog";
 import { setEditorHost, type EditorHost, type EditorPrefs } from "@myne/editor";
 import i18n from "./i18n";
 import { tagTree, isMediaTarget } from "./notes/vaultIndices";
-import { attachmentExport, attachmentRename } from "./lib/attachments";
+import {
+  attachmentExport,
+  attachmentRename,
+  attachmentReadText,
+  attachmentReadStructured,
+} from "./lib/attachments";
 import { prefsRead } from "./lib/prefs";
 import { infer, buildCompletionPrompt, buildTitlePrompt } from "./lib/writing-assistant";
 import { spellCheck, addToPersonalDictionary, ignoreWordInVault } from "./lib/spell";
@@ -23,6 +28,10 @@ const host: EditorHost = {
     attachmentRename,
     // Desktop: native Save-As dialog (the OS confirms any overwrite).
     pickExportDestination: (filename) => save({ defaultPath: filename }),
+    // MYND-268 Tier-1: decrypt-to-text for the inline read-only preview.
+    readText: attachmentReadText,
+    // MYND-268 Tier-2: decrypt + Rust-parse docx/xlsx into a structured model.
+    readStructured: attachmentReadStructured,
   },
   prefsRead: async (): Promise<EditorPrefs> => (await prefsRead()) as EditorPrefs,
   openExternal: (url) => {

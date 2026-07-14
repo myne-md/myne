@@ -36,7 +36,14 @@ import type {
   CommandContext,
 } from "../commands";
 import type { NoteId } from "../notes/sidebarState";
-import { searchNotes, shouldApplyNoteSearchResult } from "../notes/searchNotes";
+import {
+  searchNotes,
+  shouldApplyNoteSearchResult,
+  extractMatchSnippet,
+  type MatchSnippet,
+} from "../notes/searchNotes";
+import { noteRead } from "../notes/readNote";
+import { requestRevealMatch } from "../notes/views/revealMatchSignal";
 import type { NoteMatchedIn, NoteSearchResult } from "../types/note-search-result";
 
 const BACKDROP_STYLE: CSSProperties = {
@@ -101,7 +108,11 @@ const ROW_STYLE: CSSProperties = {
 
 const ROW_SELECTED_STYLE: CSSProperties = {
   ...ROW_STYLE,
-  background: "var(--paper-2)",
+  // The active-row highlight uses the accent-soft tint (the same convention as
+  // the sidebar's open-note row) — NOT `--paper-2`, which collapses to the modal
+  // background on AMOLED (both are `#000000`), making the keyboard selection
+  // invisible. accent-soft stays visible on every theme.
+  background: "var(--accent-soft)",
 };
 
 const ROW_DISABLED_STYLE: CSSProperties = {
@@ -152,6 +163,29 @@ const EMPTY_STYLE: CSSProperties = {
   textAlign: "center",
 };
 
+// One-line match-context snippet under a note-body result (so the user sees
+// WHAT matched, not just "matched in body"). Mono + muted; the matched span
+// lifts to full foreground with a soft highlight.
+const SNIPPET_STYLE: CSSProperties = {
+  fontSize: 11,
+  color: "var(--fg-3)",
+  fontFamily: "var(--font-mono)",
+  whiteSpace: "nowrap",
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  lineHeight: 1.5,
+};
+const SNIPPET_MATCH_STYLE: CSSProperties = {
+  color: "var(--fg-1)",
+  background: "var(--highlight, rgba(240, 220, 120, 0.28))",
+  borderRadius: 2,
+  padding: "0 1px",
+};
+
+/** Cap on how many visible body-hits get a client-side snippet per search — each
+ *  is one `note_read` decrypt, so this bounds the per-query cost. */
+const SNIPPET_FETCH_CAP = 8;
+
 export type CommandPaletteProps = {
   open: boolean;
   onClose: () => void;
@@ -189,6 +223,10 @@ type Row =
       title: string;
       matchedIn: NoteMatchedIn;
       archived: boolean;
+      // MYND-448a: set when this row is an EMBEDDED attachment's content hit (its
+      // own search doc). `id` is still the embedding note — opening the row opens
+      // that note; the badge tells the user the match was inside an attachment.
+      attachmentId: string | null;
     };
 
 /**
@@ -213,7 +251,15 @@ export function CommandPalette({
   // Backend full-text results for the NOTES section (MYND-40). Populated by the
   // search effect below; empty while the query is empty.
   const [noteHits, setNoteHits] = useState<NoteSearchResult[]>([]);
+  // Client-side match-context snippets keyed by note id (only for body hits —
+  // the index stores no body text, so each snippet is a `note_read` decrypt of a
+  // VISIBLE result, generation-guarded by the effect's `cancelled` flag).
+  const [snippets, setSnippets] = useState<Map<string, MatchSnippet>>(new Map());
   const inputRef = useRef<HTMLInputElement | null>(null);
+  // The scrollable results container — used to keep the keyboard-selected row in
+  // view as arrow nav walks past the fold (without it, the highlight can move to
+  // a row below the visible area and read as "nothing happening").
+  const listRef = useRef<HTMLDivElement>(null);
   // Carve-out modal: trap focus directly (not via ModalShell, which would
   // strip the input + arrow/Enter list navigation). Initial focus is the
   // search input. MYND-93.
@@ -291,6 +337,51 @@ export function CommandPalette({
     }
   }, [query, runNoteSearch]);
 
+  // Fetch match-context snippets for the visible body-hits (see `snippets`). The
+  // BM25 index carries no body text, so each snippet is a `note_read` of a shown
+  // result — capped, and dropped if the query/results change mid-flight
+  // (`cancelled`). Attachment-content hits are excluded (their text isn't the
+  // note body); title-only hits need no snippet (the term is in the title).
+  useEffect(() => {
+    const q = query.trim();
+    if (!open || q === "" || noteHits.length === 0) {
+      setSnippets(new Map());
+      return;
+    }
+    const bodyHits = noteHits
+      .filter(
+        (h) =>
+          (h.attachment_id ?? null) === null &&
+          h.matched_in.body &&
+          !(isTrashed?.(h.note_id) ?? false) &&
+          !(isTemplate?.(h.note_id) ?? false),
+      )
+      .slice(0, SNIPPET_FETCH_CAP);
+    if (bodyHits.length === 0) {
+      setSnippets(new Map());
+      return;
+    }
+    let cancelled = false;
+    void Promise.all(
+      bodyHits.map(async (h) => {
+        try {
+          const snip = extractMatchSnippet(await noteRead(h.note_id), q);
+          return snip !== null ? ([h.note_id, snip] as const) : null;
+        } catch {
+          return null;
+        }
+      }),
+    ).then((pairs) => {
+      if (cancelled) return;
+      const next = new Map<string, MatchSnippet>();
+      for (const p of pairs) if (p !== null) next.set(p[0], p[1]);
+      setSnippets(next);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, query, noteHits, isTrashed, isTemplate]);
+
   // Unified row list (MYND-40): COMMANDS (frontend fuzzy over the visible action
   // registry) followed by NOTES (backend full-text hits, only while the query is
   // non-empty). Scores are NOT mixed across sections — each is sorted by its own
@@ -343,6 +434,11 @@ export function CommandPalette({
                 // Archived notes STAY in search (archive ≠ soft-trash) — flagged
                 // for the badge, not filtered out (MYND-331).
                 archived: isArchived?.(h.note_id) ?? false,
+                // MYND-448a: a hit on an embedded attachment's content links to
+                // the same note but is badged distinctly. Normalize a missing
+                // field (older payload / test fixture) to null so the body-match
+                // hint still renders for a plain note hit.
+                attachmentId: h.attachment_id ?? null,
               }),
             );
 
@@ -358,6 +454,16 @@ export function CommandPalette({
       setSelectedIndex(Math.max(0, rows.length - 1));
     }
   }, [rows.length, selectedIndex]);
+
+  // Keep the keyboard-selected row scrolled into view (block: "nearest" so it
+  // only scrolls when the row is actually outside the visible band). Guarded on
+  // the method itself — jsdom (test env) doesn't implement scrollIntoView.
+  useEffect(() => {
+    const el = listRef.current?.querySelector<HTMLElement>('[aria-selected="true"]');
+    if (el !== null && el !== undefined && typeof el.scrollIntoView === "function") {
+      el.scrollIntoView({ block: "nearest" });
+    }
+  }, [selectedIndex, rows.length]);
 
   const close = useCallback(() => {
     setQuery("");
@@ -379,12 +485,17 @@ export function CommandPalette({
         close();
         try {
           await ctx.onSelectNote(row.id);
+          // MYND-448b: after the note opens, scroll the editor to the first
+          // literal occurrence of the query and select it (graceful no-op when
+          // the hit was stem-only, i.e. no term occurs literally).
+          const q = query.trim();
+          if (q !== "") requestRevealMatch(row.id, q);
         } catch {
           /* selection failure surfaces via sidebar UX */
         }
       }
     },
-    [ctx, close],
+    [ctx, close, query],
   );
 
   const onKeyDown = useCallback(
@@ -459,7 +570,7 @@ export function CommandPalette({
           spellCheck={false}
           data-testid="palette.input"
         />
-        <div style={LIST_STYLE} role="listbox">
+        <div style={LIST_STYLE} role="listbox" ref={listRef}>
           {rows.length === 0 ? (
             <div style={EMPTY_STYLE}>{t("commandPalette.noMatches")}</div>
           ) : (
@@ -474,13 +585,26 @@ export function CommandPalette({
                     ? t("commandPalette.sectionNotes")
                     : null;
               const key =
-                row.kind === "action" ? row.action.id : `note:${row.id}`;
+                row.kind === "action"
+                  ? row.action.id
+                  : // MYND-448a: disambiguate a note-body row from its
+                    // attachment-content row(s) — both carry the same note id.
+                    `note:${row.id}:${row.attachmentId ?? ""}`;
               return (
                 <Fragment key={key}>
                   {label !== null && (
                     <div style={SECTION_LABEL_STYLE}>{label}</div>
                   )}
-                  {renderRow(row, i, i === selectedIndex, runRow, t)}
+                  {renderRow(
+                    row,
+                    i,
+                    i === selectedIndex,
+                    runRow,
+                    t,
+                    row.kind === "note" && row.attachmentId === null
+                      ? snippets.get(row.id)
+                      : undefined,
+                  )}
                 </Fragment>
               );
             })
@@ -497,13 +621,20 @@ function renderRow(
   selected: boolean,
   runRow: (row: Row) => void | Promise<void>,
   t: (key: string) => string,
+  snippet?: MatchSnippet,
 ) {
   const isDisabled = row.kind === "action" && row.visibility === "disabled";
-  const style = isDisabled
+  const baseStyle = isDisabled
     ? ROW_DISABLED_STYLE
     : selected
       ? ROW_SELECTED_STYLE
       : ROW_STYLE;
+  // A note row carrying a snippet stacks title-line over snippet-line (column);
+  // every other row stays the single centred flex row.
+  const style =
+    snippet !== undefined
+      ? { ...baseStyle, flexDirection: "column" as const, alignItems: "stretch" as const, gap: 3 }
+      : baseStyle;
   // Keystroke hint for an enabled action row: derive from the command's default
   // binding via the shared formatChord util (SYNC-3), with the hand-typed `kbd`
   // literal as a fallback only — so the hint can't drift from the canonical chord.
@@ -542,28 +673,58 @@ function renderRow(
         </>
       ) : (
         <>
-          <span style={{ flex: 1 }}>{row.title}</span>
-          {/* Archived marker (MYND-331): an archived note still appears in search
-              (archive ≠ soft-trash) — a small badge tells the user why it is not
-              in the working tree. */}
-          {row.archived && (
+          <div style={{ display: "flex", alignItems: "center", gap: 8, width: "100%" }}>
             <span
-              style={ARCHIVED_BADGE_STYLE}
-              data-testid="palette.archived-badge"
-              title={t("commandPalette.archivedBadgeTitle")}
+              style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
             >
-              <Icon name="archive" size={12} />
-              {t("commandPalette.archivedBadge")}
+              {row.title}
             </span>
-          )}
-          {/* Body-only match (MYND-40): the query matched in the note body but
-              not its title, so the title here does not contain the query — a
-              quiet right-aligned marker (reusing the palette's hint slot) tells
-              the user why the row appeared. Title matches need no marker (the
-              term is in the visible title). Drives off the precise backend
-              `matched_in`, so it is correct even for stemmed/Turkish-cased hits. */}
-          {row.matchedIn.body && !row.matchedIn.title && (
-            <span style={HINT_STYLE}>{t("commandPalette.matchedInBody")}</span>
+            {/* Archived marker (MYND-331): an archived note still appears in search
+                (archive ≠ soft-trash) — a small badge tells the user why it is not
+                in the working tree. */}
+            {row.archived && (
+              <span
+                style={ARCHIVED_BADGE_STYLE}
+                data-testid="palette.archived-badge"
+                title={t("commandPalette.archivedBadgeTitle")}
+              >
+                <Icon name="archive" size={12} />
+                {t("commandPalette.archivedBadge")}
+              </span>
+            )}
+            {/* MYND-448a: an embedded-attachment content hit — the query matched
+                inside a file embedded in this note, not the note's own text. A
+                paperclip badge distinguishes it from a body hit; opening the row
+                still opens the embedding note. Takes precedence over the body-match
+                hint (an attachment doc's "body" is the extracted file text). */}
+            {row.attachmentId !== null ? (
+              <span
+                style={ARCHIVED_BADGE_STYLE}
+                data-testid="palette.attachment-badge"
+                title={t("commandPalette.matchedInAttachmentTitle")}
+              >
+                <Icon name="paperclip" size={12} />
+                {t("commandPalette.matchedInAttachment")}
+              </span>
+            ) : (
+              /* Body-only match (MYND-40): shown only when there is no inline
+                 snippet below (a stem-only hit the client-side snippet couldn't
+                 locate literally) — otherwise the snippet itself IS the "why". */
+              snippet === undefined &&
+              row.matchedIn.body &&
+              !row.matchedIn.title && (
+                <span style={HINT_STYLE}>{t("commandPalette.matchedInBody")}</span>
+              )
+            )}
+          </div>
+          {/* The match-context snippet (client-side; body hits only) — the
+              matched span lifts to full foreground so "what matched" is obvious. */}
+          {snippet !== undefined && (
+            <div style={SNIPPET_STYLE} data-testid="palette.snippet">
+              {snippet.before}
+              <mark style={SNIPPET_MATCH_STYLE}>{snippet.match}</mark>
+              {snippet.after}
+            </div>
           )}
         </>
       )}

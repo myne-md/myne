@@ -15,12 +15,16 @@ import type {
   CommandContext,
   CommandAction,
 } from "../../src/commands";
+import { sidebarCommands } from "../../src/notes/sidebarCommands";
 
 function makeContext(over: Partial<CommandContext> = {}): CommandContext {
   return {
     stageName: "editor",
     selectedNoteId: null,
     aiEnabled: false,
+    // Wave-1 toggle/cycle actions read ctx.prefs; the registry/visibility tests
+    // never invoke their run(), so an empty stub is enough (defaults fill in).
+    prefs: {} as CommandContext["prefs"],
     onOpenAiChat: vi.fn(),
     onSummarizeNote: vi.fn(),
     onSuggestTags: vi.fn(),
@@ -48,6 +52,30 @@ function makeContext(over: Partial<CommandContext> = {}): CommandContext {
     onSwitchWorkspace: vi.fn(),
     onRenameWorkspace: vi.fn(),
     onDeleteWorkspace: vi.fn(),
+    onSplitRight: vi.fn(),
+    onSplitDown: vi.fn(),
+    onClosePane: vi.fn(),
+    onCloseTab: vi.fn(),
+    onNextTab: vi.fn(),
+    onPrevTab: vi.fn(),
+    onFocusNextPane: vi.fn(),
+    onFocusPrevPane: vi.fn(),
+    onGoBack: vi.fn(),
+    onGoForward: vi.fn(),
+    onTogglePreview: vi.fn(),
+    onNewNote: vi.fn(),
+    onDuplicateNote: vi.fn(),
+    onArchiveNote: vi.fn(),
+    onRenameNote: vi.fn(),
+    onTrashNote: vi.fn(),
+    onEmptyTrash: vi.fn(),
+    onToggleFavorite: vi.fn(),
+    onShowBacklinks: vi.fn(),
+    onShowOutline: vi.fn(),
+    onShowUnlinked: vi.fn(),
+    onRestoreBackup: vi.fn(),
+    onMoveNote: vi.fn(),
+    onApplyCustomTheme: vi.fn(),
     onSelectNote: vi.fn(async () => {}),
     ...over,
   };
@@ -66,28 +94,77 @@ describe("Command palette action registry", () => {
       "ai.rewrite-selection",
       "ai.suggest-tags",
       "ai.summarize-note",
+      "ai.toggle-enabled",
       "app.open-settings",
+      "app.toggle-screen-capture",
+      "appearance.apply-custom-theme",
+      "appearance.cycle-theme",
+      "appearance.theme-amoled",
+      "appearance.theme-dark",
+      "appearance.theme-light",
+      "appearance.theme-system",
+      "appearance.toggle-timestamps",
+      "archive.open",
       "attachments.open",
       "daily.open-today",
+      "editor.cycle-content-width",
+      "editor.cycle-default-view-mode",
+      "editor.cycle-heading",
+      "editor.cycle-text-size",
+      "editor.find",
+      "editor.find-replace",
       "editor.fold-all",
+      "editor.toggle-dim-inactive",
+      "editor.toggle-font",
+      "editor.toggle-line-numbers",
+      "editor.toggle-spell-check",
+      "editor.toggle-typewriter",
       "editor.unfold-all",
+      "folder.new",
       "graph.show",
+      "nav.back",
+      "nav.forward",
+      "note.archive",
+      "note.duplicate",
       "note.export-html",
       "note.export-markdown",
       "note.export-pdf",
+      "note.export-selection-image",
       "note.export-txt",
+      "note.move",
+      "note.new",
+      "note.rename",
+      "note.toggle-favorite",
+      "note.trash",
       "notes.random",
+      "notes.toggle-archiving",
+      "pane.close",
+      "pane.focus-next",
+      "pane.focus-prev",
+      "pane.split-down",
+      "pane.split-right",
       "snapshots.open",
+      "tab.close",
+      "tab.next",
+      "tab.prev",
       "tags.show",
       "templates.manage",
       "templates.new-note",
-    "vault.backup",
+      "trash.empty",
+      "trash.open",
+      "vault.backup",
       "vault.export-markdown",
       "vault.import-obsidian",
       "vault.lock",
+      "vault.restore",
+      "vault.reveal-folder",
+      "view.show-backlinks",
+      "view.show-outline",
+      "view.show-unlinked",
       "view.toggle-backlinks-sidebar",
       "view.toggle-focus",
       "view.toggle-notes-sidebar",
+      "view.toggle-preview",
       "view.toggle-reading",
       "view.toggle-source",
       "view.toggle-stacked-tabs",
@@ -317,6 +394,36 @@ describe("Command palette action visibility per Stage", () => {
     }
   });
 
+  // note.archive mirrors the sidebar context menu's gate: the archive entries
+  // are omitted while the archive feature is disabled (`archive_disabled`).
+  it("\"Archive note\" is HIDDEN when the archive-disabled pref is on", () => {
+    const base = { stageName: "editor" as const, selectedNoteId: "note-1" };
+    expect(
+      find("note.archive").visibility(
+        makeContext({
+          ...base,
+          prefs: { archive_disabled: true } as CommandContext["prefs"],
+        }),
+      ),
+    ).toBe("hidden");
+    expect(
+      find("note.archive").visibility(
+        makeContext({
+          ...base,
+          prefs: { archive_disabled: false } as CommandContext["prefs"],
+        }),
+      ),
+    ).toBe("show");
+    // Unset pref (fresh vault) defaults to archive-enabled.
+    expect(find("note.archive").visibility(makeContext(base))).toBe("show");
+    // Still per-note: no selection → hidden regardless of the pref.
+    expect(
+      find("note.archive").visibility(
+        makeContext({ stageName: "editor", selectedNoteId: null }),
+      ),
+    ).toBe("hidden");
+  });
+
   it("\"Convert wikilinks…\" is HIDDEN when no note selected", () => {
     const ctx = makeContext({
       stageName: "editor",
@@ -461,5 +568,38 @@ describe("Command palette action run() side effects", () => {
     });
     const convertAction = find("wikilinks.convert-in-this-note");
     expect(await convertAction.run(ctx)).toBeUndefined();
+  });
+
+  it("\"Empty trash\" dispatches to onEmptyTrash — the Editor host opens the count-aware confirm; the purge only runs on confirm", () => {
+    const onEmptyTrash = vi.fn();
+    void find("trash.empty").run(makeContext({ onEmptyTrash }));
+    expect(onEmptyTrash).toHaveBeenCalledTimes(1);
+  });
+
+  it("Wave-4 sidebar actions expand the collapsed sidebar first, and skip their surface when expansion is impossible (MYND-192)", () => {
+    const cases = [
+      { id: "folder.new", handler: "newFolder" },
+      { id: "trash.open", handler: "openTrash" },
+      { id: "archive.open", handler: "openArchive" },
+    ] as const;
+    for (const { id, handler } of cases) {
+      const reveal = vi.fn(() => true);
+      const surface = vi.fn();
+      sidebarCommands.revealSidebar = reveal;
+      sidebarCommands[handler] = surface;
+      try {
+        void find(id).run(makeContext());
+        expect(reveal).toHaveBeenCalledTimes(1);
+        expect(surface).toHaveBeenCalledTimes(1);
+        // Width-forced collapse (reveal reports false) → the surface is skipped
+        // rather than ghost-opened inside the inert pane.
+        reveal.mockReturnValue(false);
+        void find(id).run(makeContext());
+        expect(surface).toHaveBeenCalledTimes(1);
+      } finally {
+        sidebarCommands.revealSidebar = undefined;
+        sidebarCommands[handler] = undefined;
+      }
+    }
   });
 });

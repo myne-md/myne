@@ -14,6 +14,7 @@
 // - Click on an item → fires its action then onClose.
 
 import {
+  Fragment,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -27,6 +28,13 @@ export type ContextMenuItem = {
   id: string;
   /** Visible label. */
   label: string;
+  /**
+   * Logical group tag. A divider is drawn between two adjacent items whose
+   * `group` differs, so callers separate the menu into sections (open / edit /
+   * organize / destructive, Obsidian-style) just by tagging items — no explicit
+   * separator entries. `undefined` groups with its neighbours (no divider).
+   */
+  group?: string;
   /** Optional `var(--*)` color override for destructive items. */
   destructive?: boolean;
   /**
@@ -83,6 +91,13 @@ const ITEM_STYLE_BASE: CSSProperties = {
 const ITEM_STYLE_DESTRUCTIVE: CSSProperties = {
   ...ITEM_STYLE_BASE,
   color: "var(--warning)",
+};
+
+const DIVIDER_STYLE: CSSProperties = {
+  height: 1,
+  background: "var(--line-1)",
+  margin: "4px 6px",
+  border: 0,
 };
 
 export function ContextMenu({ x, y, items, onClose }: ContextMenuProps) {
@@ -172,7 +187,7 @@ export function ContextMenu({ x, y, items, onClose }: ContextMenuProps) {
         its[next]?.focus();
       }}
     >
-      {items.map((item) => {
+      {items.map((item, i) => {
         const isHovering = hoverId === item.id;
         const baseStyle = item.destructive
           ? ITEM_STYLE_DESTRUCTIVE
@@ -183,9 +198,12 @@ export function ContextMenu({ x, y, items, onClose }: ContextMenuProps) {
         const style: CSSProperties = isHovering
           ? { ...baseStyle, background: hoverBg }
           : baseStyle;
+        // Divider before an item that opens a new logical group.
+        const showDivider = i > 0 && item.group !== items[i - 1]?.group;
         return (
-          <button
-            key={item.id}
+          <Fragment key={item.id}>
+            {showDivider && <div style={DIVIDER_STYLE} role="separator" />}
+            <button
             type="button"
             role={item.checked === undefined ? "menuitem" : "menuitemcheckbox"}
             aria-checked={item.checked === undefined ? undefined : item.checked}
@@ -210,7 +228,8 @@ export function ContextMenu({ x, y, items, onClose }: ContextMenuProps) {
                 {item.label}
               </span>
             )}
-          </button>
+            </button>
+          </Fragment>
         );
       })}
     </div>

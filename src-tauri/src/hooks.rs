@@ -62,26 +62,43 @@ impl<R: Runtime> VaultLifecycleHooks for DesktopHooks<R> {
         }
     }
 
-    fn fold_attachment_text_for_index<'a>(
+    fn index_note_attachments<'a>(
         &'a self,
         state: &'a VaultRuntimeState,
+        note_id: &'a str,
+        note_title: &'a str,
         note_body: &'a str,
-    ) -> BoxFuture<'a, String> {
+    ) -> BoxFuture<'a> {
         let app = self.app.clone();
+        let note_id = note_id.to_string();
+        let note_title = note_title.to_string();
         let body = note_body.to_string();
         Box::pin(async move {
-            // Moved-out body of the old `fold_attachment_text_for_index`
-            // free-fn: the refs-first guard skips even the `vault_dir`
-            // resolution for the common no-attachment save.
-            if crate::plugins::attachments::reconcile::extract_att_ids(&body).is_empty() {
-                return body;
-            }
-            let Ok(vault_dir) = crate::paths::vault_dir_for_id(&app, state.active_vault_id().await)
-            else {
-                return body;
-            };
-            crate::plugins::notes::search_sync::fold_note_body_for_index(state, &vault_dir, &body)
+            // MYND-448a: derive this note's per-attachment search docs. The
+            // refs-first guard skips even the `vault_dir` resolution + KEK derive
+            // for the common no-attachment save (it still syncs an empty set
+            // below, dropping any attachment docs the note no longer embeds).
+            let atts = if crate::plugins::attachments::reconcile::extract_att_ids(&body).is_empty()
+            {
+                Vec::new()
+            } else if let Ok(vault_dir) =
+                crate::paths::vault_dir_for_id(&app, state.active_vault_id().await)
+            {
+                crate::plugins::notes::search_sync::note_attachment_docs(
+                    state,
+                    &vault_dir,
+                    &note_title,
+                    &body,
+                )
                 .await
+            } else {
+                Vec::new()
+            };
+            // Always reconcile the live index: an empty set removes the docs of
+            // any attachment this save un-embedded.
+            if let Some(s) = app.try_state::<crate::search::SearchIndexState>() {
+                s.set_note_attachments(&note_id, &atts);
+            }
         })
     }
 
@@ -125,7 +142,9 @@ impl<R: Runtime> VaultLifecycleHooks for DesktopHooks<R> {
     }
     fn search_remove(&self, id: &str) {
         if let Some(s) = self.app.try_state::<crate::search::SearchIndexState>() {
-            s.remove(id);
+            // MYND-448a: a note delete drops its body doc AND its separate
+            // attachment docs (`att:*:<id>`).
+            s.remove_note_and_attachments(id);
         }
     }
     fn ai_note_changed(&self, id: &str, body: &str) {

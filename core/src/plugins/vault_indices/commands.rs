@@ -17,8 +17,8 @@
 use super::error::VaultIndicesError;
 use super::persist::{decode_snapshot, encode_snapshot, reconcile_delta};
 use super::state::{
-    CandidateEdge, NoteRecord, PropertyEntry, TagEntry, TagTreeNode, VaultIndicesState,
-    WikilinkEdge,
+    BlockAnchor, CandidateEdge, NoteRecord, PropertyEntry, TagEntry, TagTreeNode, VaultBlockAnchor,
+    VaultIndicesState, WikilinkEdge,
 };
 use crate::note_nonce::scan_on_disk_manifest;
 use crate::plugins::vault_unlock::state::{SlotKind, VaultRuntimeState};
@@ -45,6 +45,11 @@ pub async fn vault_indices_apply(
     wikilinks: Vec<WikilinkEdge>,
     tags: Vec<TagEntry>,
     properties: Vec<PropertyEntry>,
+    // MYND-382: imported `^block-id` anchors TS extracted (`extractBlockAnchors`).
+    // `Option` (not a bare `Vec`) so a caller that omits it — mobile, or an older
+    // desktop build — is `None` → `[]`, exactly the `title: Option` pattern Tauri
+    // already relies on for an absent optional invoke arg (no wire break).
+    block_anchors: Option<Vec<BlockAnchor>>,
     runtime: State<'_, VaultRuntimeState>,
     indices: State<'_, VaultIndicesState>,
 ) -> Result<(), VaultIndicesError> {
@@ -63,6 +68,8 @@ pub async fn vault_indices_apply(
             // §3.6.4; Rust stores these opaque pre-typed values, never parsing
             // YAML (TB9) nor interpreting the type.
             properties,
+            // MYND-382: enumerate-only imported block anchors for the `[[^^` picker.
+            block_anchors: block_anchors.unwrap_or_default(),
         },
     );
     Ok(())
@@ -88,6 +95,28 @@ pub async fn vault_indices_all_edges(
         return Err(VaultIndicesError::SlotNotUnlocked);
     }
     Ok(indices.all_edges(MAX_GRAPH_EDGES))
+}
+
+/// Defensive ceiling on a single whole-vault block-anchor dump (MYND-382).
+/// Imported block anchors are sparse (only imported notes carry them), so a
+/// real vault stays far under this; the cap only bounds a pathological payload.
+const MAX_BLOCK_ANCHORS: usize = 100_000;
+
+/// Every imported `^block-id` anchor across the vault (MYND-382, the `[[^^`
+/// picker) — `{note_id, note_title, block_id, preview}` per anchor. The picker
+/// sorts + filters TS-side and inserts a `[[<note>^block_id]]` deep-link on
+/// pick. Enumerate-only: this surfaces markers that already exist (import),
+/// never mints one. Rejected with [`VaultIndicesError::SlotNotUnlocked`] when no
+/// vault is unlocked (the index is plaintext-derived RAM, unlocked-only).
+#[tauri::command]
+pub async fn vault_indices_block_anchors(
+    runtime: State<'_, VaultRuntimeState>,
+    indices: State<'_, VaultIndicesState>,
+) -> Result<Vec<VaultBlockAnchor>, VaultIndicesError> {
+    if runtime.slot_kind_active().await != SlotKind::Unlocked {
+        return Err(VaultIndicesError::SlotNotUnlocked);
+    }
+    Ok(indices.all_block_anchors(MAX_BLOCK_ANCHORS))
 }
 
 /// Structurally-isolated ("orphan") note ids — zero in+out raw edges

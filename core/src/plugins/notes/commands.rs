@@ -102,13 +102,18 @@ pub async fn note_create<R: Runtime>(
     let result = note_create_with_dir(notes_dir, state.inner(), (*plaintext).clone()).await;
     if let Ok(id) = &result {
         let title = resolve_note_title(plaintext.as_bytes()).unwrap_or_default();
-        let body = hooks
-            .fold_attachment_text_for_index(state.inner(), &plaintext)
+        // MYND-448a: the note body is indexed UNFOLDED; each embedded attachment
+        // is indexed as its OWN doc (`index_note_attachments`) so an
+        // attachment-content hit surfaces as a distinct result, not folded into
+        // the note.
+        hooks.search_upsert(id, &title, &plaintext);
+        hooks
+            .index_note_attachments(state.inner(), id, &title, &plaintext)
             .await;
-        hooks.search_upsert(id, &title, &body);
-        // MYND-453: eager per-note AI re-embed (detached; no-op unless the
+        // MYND-453: eager per-note AI re-embed over the note prose (attachments
+        // carry their own search docs now — 448a; detached, no-op unless the
         // local-inference feature + ai_enabled are on).
-        hooks.ai_note_changed(id, &body);
+        hooks.ai_note_changed(id, &plaintext);
         // MYND-424: mark the sync loop dirty so the new note pushes (soft dep).
         hooks.bump_local_change();
     }
@@ -556,14 +561,15 @@ pub async fn note_update<R: Runtime>(
     match result {
         Ok(outcome) => {
             // MYND-29: re-index the edited note after a successful write.
-            // MYND-328: fold in cached attachment text for in-session parity.
+            // MYND-448a: note body indexed UNFOLDED; embedded attachments are
+            // re-indexed as their own docs (dropping any no longer embedded).
             let title = resolve_note_title(plaintext.as_bytes()).unwrap_or_default();
-            let body = hooks
-                .fold_attachment_text_for_index(state.inner(), &plaintext)
+            hooks.search_upsert(&note_id, &title, &plaintext);
+            hooks
+                .index_note_attachments(state.inner(), &note_id, &title, &plaintext)
                 .await;
-            hooks.search_upsert(&note_id, &title, &body);
-            // MYND-453: eager per-note AI re-embed (detached; feature/ai-gated).
-            hooks.ai_note_changed(&note_id, &body);
+            // MYND-453: eager per-note AI re-embed over note prose (feature/ai-gated).
+            hooks.ai_note_changed(&note_id, &plaintext);
             // MYND-424: mark the sync loop dirty so the coalesced push fires
             // (soft dependency — a no-op when the sync plugin isn't registered).
             hooks.bump_local_change();
@@ -920,12 +926,13 @@ pub async fn note_write_batch_transactional<R: Runtime>(
     // follow-up (it bumps the index nonce once this resolves).
     for (note_id, plaintext) in &items {
         let title = resolve_note_title(plaintext.as_bytes()).unwrap_or_default();
-        let body = hooks
-            .fold_attachment_text_for_index(state.inner(), plaintext)
+        // MYND-448a: unfolded note body doc + separate attachment docs.
+        hooks.search_upsert(note_id, &title, plaintext);
+        hooks
+            .index_note_attachments(state.inner(), note_id, &title, plaintext)
             .await;
-        hooks.search_upsert(note_id, &title, &body);
-        // MYND-453: eager per-note AI re-embed (detached; feature/ai-gated).
-        hooks.ai_note_changed(note_id, &body);
+        // MYND-453: eager per-note AI re-embed over note prose (feature/ai-gated).
+        hooks.ai_note_changed(note_id, plaintext);
     }
     tracing::debug!(
         stage = "success",
