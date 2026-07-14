@@ -524,12 +524,18 @@ export async function setScreenCaptureProtection(enabled: boolean): Promise<void
  * deliberately-created folders, MYND-144). The caller passes the entire
  * desired set; v0.1 single-device writes it verbatim. Folded-identity dedup
  * (case-insensitivity) is the caller's responsibility — the Rust codec only
- * sorts + exact-dedups for canonical byte-stability. No native side-effect; a
- * rejected promise means the disk write failed and the caller's optimistic UI
- * must revert.
+ * sorts + exact-dedups for canonical byte-stability. A rejected promise means
+ * the disk write failed and the caller's optimistic UI must revert.
+ *
+ * Bumps the prefs nonce on success (like every sibling folder-set setter, e.g.
+ * {@link setArchivedFolders}) so OTHER `usePrefs` consumers — the palette's
+ * "Move note to folder…" picker reads `deliberate_folders` from the prefs blob,
+ * not the sidebar's local set — see a freshly-created empty folder without an
+ * app reload.
  */
 export async function setDeliberateFolders(folders: string[]): Promise<void> {
   await invoke<void>("plugin:prefs|set_deliberate_folders", { folders });
+  bumpPrefsNonce();
 }
 
 /**

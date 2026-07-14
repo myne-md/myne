@@ -26,6 +26,7 @@ import {
   prefsRead,
   setAutoLockTimeout,
   setDailyTemplate,
+  setDeliberateFolders,
   setEditorContentWidth,
   setEditorFontFamily,
   setEditorLayout,
@@ -144,6 +145,17 @@ describe("prefs-nonce bump discipline", () => {
       "plugin:prefs|set_show_note_timestamps",
       { enabled: false },
     );
+    expect(bumpPrefsNonceMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("setDeliberateFolders bumps the nonce so non-sidebar consumers see new empty folders", async () => {
+    // The "Move note to folder…" picker reads deliberate_folders from the prefs
+    // blob, not the sidebar's local set — without this bump a freshly-created
+    // empty folder is invisible to it until an app reload.
+    await setDeliberateFolders(["Arsiv/"]);
+    expect(invokeMock).toHaveBeenCalledWith("plugin:prefs|set_deliberate_folders", {
+      folders: ["Arsiv/"],
+    });
     expect(bumpPrefsNonceMock).toHaveBeenCalledTimes(1);
   });
 
