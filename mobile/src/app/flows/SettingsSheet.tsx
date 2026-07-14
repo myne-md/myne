@@ -1,5 +1,6 @@
 import { type ChangeEvent, type CSSProperties, type ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import { setLanguage } from "@myne/i18n";
 import { SUPPORTED_LANGUAGES, SUPPORTED_CODES, type LanguageCode } from "@myne/i18n/config";
 import { Sheet, Banner, Button, Icon, Toast, StrengthMeter, Switch, Segmented, Spinner } from "../../components";
@@ -503,7 +504,7 @@ const PANEL_TITLE: Record<Panel, string> = {
 
 /** Short, glanceable sync summary for the Settings row value (no wall-clock — SYNC-48).
  *  `t` is passed in from the render site so this stays free of module-scope `t()`. */
-function syncSummary(status: SyncStatus | null, t: (key: string, opts?: Record<string, unknown>) => string): string {
+function syncSummary(status: SyncStatus | null, t: TFunction): string {
   switch (status?.state) {
     case "disabled":
     case undefined:
