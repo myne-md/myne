@@ -300,7 +300,10 @@ steps:
   # makes the step skip silently, and failure:ignore keeps it from ever failing
   # the pipeline. depends_on lists every step (optional:true) so notify waits on
   # each terminal status without racing; a skipped step drops out silently. Only
-  # bare $VAR is used (no Woodpecker ${...}/$(...) substitution).
+  # bare dollar-VAR is used here, never Woodpecker brace- or paren-substitution
+  # syntax — even inside a comment, a literal brace-substitution token makes
+  # Woodpecker's envsubst pass fail config-compile ("unable to parse variable
+  # name"), erroring the WHOLE pipeline before any step runs.
   notify-failure:
     image: alpine:3.21
     depends_on:
