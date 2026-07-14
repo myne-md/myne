@@ -2017,10 +2017,10 @@
     "data": {
       "exported_one": "{{count}} not dışa aktarıldı → {{label}}",
       "exported_other": "{{count}} not dışa aktarıldı → {{label}}",
-      "exportNeedsApp": "Dışa aktarma uygulamayı gerektirir (tarayıcı önizlemesini değil).",
+      "exportNeedsApp": "Dışa aktarma için uygulama gerekir (tarayıcı önizlemesi değil).",
       "exportFailed": "Kasa dışa aktarılamadı.",
       "exportToMarkdown": "Markdown olarak dışa aktar",
-      "exportToMarkdownSubtitle": "Her notu çözerek Belgeler’de sade bir klasöre aktarır"
+      "exportToMarkdownSubtitle": "Her notu şifresini çözerek Belgeler’de sade bir klasöre aktarır"
     },
     "saveSettingError": "O ayar kaydedilemedi",
     "panelTitle": {
@@ -2260,7 +2260,7 @@
       "metaChangedExternally": "Kasa başka bir oturumda değiştirildi — lütfen tekrar kilidini açın."
     },
     "title": "Kasanızın kilidini açın.",
-    "vaultUnreadable": "Kasa dosyası okunamıyor. Bir yedeklemeden geri yükleyin.",
+    "vaultUnreadable": "Kasa dosyası okunamıyor. Bir yedekten geri yükleyin.",
     "unlockFailedGeneric": "Kilidi açılamadı. Lütfen tekrar deneyin.",
     "biometricTooManyAttempts": "Çok fazla {{biometric}} denemesi. Parolanızı kullanın.",
     "pinIncorrect_one": "Yanlış PIN. {{count}} deneme kaldı.",
@@ -2655,7 +2655,9 @@
     "connectingSubtitle": "Hesabınız getiriliyor ve kasanızın kilidi bu cihazda açılıyor."
   },
   "createVault": {
-    "wordNumber": "{{position}}. KELİME",
+    "beginWeakPassword": "Daha güçlü bir parola seçip tekrar deneyin.",
+    "beginGeneric": "Kasa oluşturma başlatılamadı. Lütfen tekrar deneyin.",
+    "wordNumber": "{{position}}. SÖZCÜK",
     "commitError": "Kasanız kaydedilemedi. Lütfen tekrar deneyin.",
     "savedToFile": "{{label}} konumuna kaydedildi",
     "saveFileError": "Dosya kaydedilemedi.",
@@ -2664,7 +2666,7 @@
     "briefingLead": "Myne bu cihazdaki her şeyi şifreler. Bu gizlilik, yalnızca sizin taşıyabileceğiniz bir sorumlulukla gelir.",
     "passwordTitle": "Parola oluşturun",
     "confirmPasswordLabel": "Parolayı onaylayın",
-    "passwordHelper": "Hiçbir zaman saklanmaz, hiçbir zaman iletilmez. Anahtarlarınızı bu cihazda şifreler.",
+    "passwordHelper": "Asla saklanmaz, asla iletilmez. Anahtarlarınızı bu cihazda şifreler.",
     "encryptingSubtitle": "Anahtarınız Argon2id ile türetiliyor. Bu birkaç saniye sürer ve kesilemez.",
     "phraseTitle": "Kurtarma ifadeniz",
     "phraseIntro": "Yirmi dört sözcük, sırasıyla. Bunları kağıda yazıp güvenli bir yerde saklayın.",
