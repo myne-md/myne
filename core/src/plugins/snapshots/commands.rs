@@ -305,23 +305,23 @@ pub(crate) async fn snapshot_restore_in(
     .map_err(map_note_update_err)?;
 
     // Step 4: keep the live in-RAM search + AI indices correct through the hooks
-    // seam. MYND-328: fold the restored note's attachment text in (parity with
-    // note_create/update/batch) so a restore doesn't drop attachment
-    // searchability until the next unlock. Mobile's `MobileHooks` no-ops these
-    // search/AI hooks (its index is fed TS-side), so the fold returns the body
-    // unchanged there.
+    // seam. MYND-448a: re-index the restored note body UNFOLDED and re-derive its
+    // separate attachment docs (parity with note_create/update/batch) so a
+    // restore doesn't drop attachment searchability until the next unlock.
+    // Mobile's `MobileHooks` no-ops these search/AI hooks (its index is fed
+    // TS-side), so `index_note_attachments` indexes nothing there.
     let title = resolve_note_title(plaintext.as_bytes()).unwrap_or_default();
-    let body = hooks
-        .fold_attachment_text_for_index(state, &plaintext)
+    hooks.search_upsert(&note_id, &title, &plaintext);
+    hooks
+        .index_note_attachments(state, &note_id, &title, &plaintext)
         .await;
-    hooks.search_upsert(&note_id, &title, &body);
     // MYND-453: keep the live AI embedding index correct too — `note_update`
     // does not fire the re-index hooks itself (its callers do), and this restore
     // path re-indexed search directly above but left the AI vectors stale
-    // (pre-restore content). Re-embed the restored note the same way (folded
-    // body, matching `note_write_batch`); feature/ai-gated + detached, no-op when
-    // AI is off.
-    hooks.ai_note_changed(&note_id, &body);
+    // (pre-restore content). Re-embed the restored note over its prose (parity
+    // with the create/update path — 448a); feature/ai-gated + detached, no-op
+    // when AI is off.
+    hooks.ai_note_changed(&note_id, &plaintext);
 
     Ok(())
 }
@@ -492,13 +492,14 @@ mod tests {
         ) -> crate::hooks::BoxFuture<'a> {
             Box::pin(std::future::ready(()))
         }
-        fn fold_attachment_text_for_index<'a>(
+        fn index_note_attachments<'a>(
             &'a self,
             _: &'a VaultRuntimeState,
-            note_body: &'a str,
-        ) -> crate::hooks::BoxFuture<'a, String> {
-            let body = note_body.to_string();
-            Box::pin(std::future::ready(body))
+            _: &'a str,
+            _: &'a str,
+            _: &'a str,
+        ) -> crate::hooks::BoxFuture<'a> {
+            Box::pin(std::future::ready(()))
         }
         fn zeroize_search_index(&self) {}
         fn zeroize_spell(&self) {}

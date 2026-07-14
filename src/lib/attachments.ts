@@ -127,6 +127,21 @@ export type AttachmentCleanUnusedError =
   | { kind: "EncodeFailed" }
   | { kind: "JoinFailure" };
 
+/** Success payload of {@link attachmentReadText} — the decrypted preview text. */
+export interface AttachmentTextPreview {
+  /** Decrypted UTF-8 text (lossily decoded), truncated at the preview cap. */
+  text: string;
+  /** True when the source exceeded the cap and `text` holds only the head. */
+  truncated: boolean;
+}
+
+/** Error surface of {@link attachmentReadText} — mirror of `AttachmentReadTextError`. */
+export type AttachmentReadTextError =
+  | { kind: "Locked" }
+  | { kind: "NotFound" }
+  | { kind: "Denied" }
+  | { kind: "Io" };
+
 /** Outcome of {@link attachmentCleanUnused} — TS mirror of the Rust `CleanResult`. */
 export interface CleanResult {
   /** Attachments removed from the catalog (logically deleted). */
@@ -232,5 +247,42 @@ export async function attachmentUnusedList(): Promise<CatalogEntry[]> {
 export async function attachmentCleanUnused(ids: string[]): Promise<CleanResult> {
   return await invoke<CleanResult>("plugin:attachments|attachment_clean_unused", {
     ids,
+  });
+}
+
+/**
+ * Decrypt one attachment's plaintext as TEXT for a Tier-1 inline preview
+ * (MYND-268; Slot::Unlocked-gated). Returns lossy UTF-8 text capped at the
+ * preview limit (`truncated` flags a larger source). The text decrypts in Rust
+ * RAM and crosses IPC as plaintext (note-body class) — render it in a read-only
+ * viewer, never as interpreted content. Rejects with {@link AttachmentReadTextError}.
+ */
+export async function attachmentReadText(id: string): Promise<AttachmentTextPreview> {
+  return await invoke<AttachmentTextPreview>("plugin:attachments|attachment_read_text", {
+    id,
+  });
+}
+
+/** A Tier-2 attachment parsed into a safe structured model — mirror of the Rust
+ *  `StructuredContent`. A row-major grid (xlsx) or a heading/paragraph block
+ *  list (docx). Only the model crosses IPC (never raw bytes / HTML). */
+export type StructuredContent =
+  | { kind: "grid"; rows: string[][] }
+  | { kind: "blocks"; blocks: { heading_level: number | null; text: string }[] };
+
+/**
+ * Decrypt + parse a Tier-2 attachment (`kind` = "xlsx" | "docx") into a safe
+ * structured model for inline preview (MYND-268 Tier-2; Slot::Unlocked-gated).
+ * Parsing happens in Rust (zip + quick-xml); render the returned model with
+ * plain components — it carries no raw bytes or HTML. Rejects with
+ * {@link AttachmentReadTextError}.
+ */
+export async function attachmentReadStructured(
+  id: string,
+  kind: "xlsx" | "docx",
+): Promise<StructuredContent> {
+  return await invoke<StructuredContent>("plugin:attachments|attachment_read_structured", {
+    id,
+    kind,
   });
 }

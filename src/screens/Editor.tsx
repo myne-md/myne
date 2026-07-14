@@ -130,6 +130,7 @@ import { getActiveEditorView } from "../editor/active-view";
 import { tagTree } from "../notes/vaultIndices";
 import { BacklinksTab } from "../notes/components/BacklinksTab";
 import { OutlineTab } from "../notes/components/OutlineTab";
+import { ToolbarLayoutSync } from "../notes/ToolbarLayoutSync";
 import {
   RIGHT_PANEL_TABS,
   RIGHT_PANEL_DEFAULT_ORDER,
@@ -138,11 +139,14 @@ import {
 import { linkMention } from "../notes/linkMention";
 import type { UnlinkedMention } from "../notes/unlinkedMentions";
 import { SaveStatus as SaveStatusBadge } from "../notes/components/SaveStatus";
+import { DeleteConfirmModal } from "../notes/components/DeleteConfirmModal";
 import {
   SidebarStateProvider,
   useSelectedNote,
+  trashedRecords,
   type NoteId,
 } from "../notes/sidebarState";
+import { sidebarCommands } from "../notes/sidebarCommands";
 import type { SaveStatus as SaveStatusValue } from "../notes/useAutosave";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { listen } from "@tauri-apps/api/event";
@@ -158,6 +162,7 @@ import {
   type ContextMenuItem,
 } from "../notes/components/ContextMenu";
 import { IS_MAC, TRAFFIC_LIGHT_GAP } from "./titlebar";
+import { useIsFullscreen } from "../hooks/useIsFullscreen";
 import { LEFT_BOUNDS, RIGHT_BOUNDS } from "./layoutClamp";
 import { useResponsiveCollapse } from "./responsiveCollapse";
 import { AttachmentsLibrary } from "../components/attachments/AttachmentsLibrary";
@@ -189,8 +194,11 @@ import {
   workspaceStage,
   workspaceWrite,
 } from "../lib/workspace-persist";
-import { setActiveWorkspace } from "../lib/prefs";
+import { setActiveWorkspace, setCustomTheme, setFavorites } from "../lib/prefs";
 import { promptForText } from "../lib/promptForText";
+import { QuickPicker, type QuickPickItem } from "../components/QuickPicker";
+import { listCustomThemes, readCustomTheme } from "../lib/themes";
+import { applyCustomTheme } from "../lib/theme";
 
 // Lazy-loaded so the tag-browser modal chunk stays out of the editor's initial
 // bundle (tag-system #2 / MYND-46, task-1 criterion — confirmed as a separate
@@ -745,6 +753,12 @@ function EditorChrome({
     layout.leftCollapsed || forced.forceLeftCollapsed || focusActive;
   const rightCollapsed =
     layout.rightCollapsed || forced.forceRightCollapsed || focusActive;
+  // macOS floats the traffic lights over the top-left, so windowed builds inset
+  // the sidebar toggle past them. In fullscreen the traffic lights are hidden —
+  // drop that gap so the toggle sits flush-left (matching the non-mac layout).
+  const isFullscreen = useIsFullscreen();
+  const leftToggleX = IS_MAC && !isFullscreen ? TRAFFIC_LIGHT_GAP + 16 : 12;
+  const leftClearance = leftToggleX + LEFT_CONTROLS_WIDTH + 8;
 
   // Reveal the Saved Views surface (MYND-274) — the "Views" section lives in the
   // left (notes) sidebar, so revealing it ensures that sidebar is expanded, then
@@ -761,6 +775,26 @@ function EditorChrome({
     }
     requestRevealViews();
   }, [layout, forced.forceLeftCollapsed]);
+
+  // Expand the left sidebar for the palette's sidebar-owned surfaces (Wave 4:
+  // new folder / trash / archive). Their UI lives inside the left SidebarPane,
+  // which is `inert` while collapsed — including focus mode — so the actions
+  // would no-op or open a ghost surface without this. Same reveal discipline as
+  // `revealViews` above: exit focus mode, un-collapse a manual collapse, and
+  // report a width-forced collapse (MYND-192) as unexpandable so the caller
+  // skips its surface instead of ghost-opening it. Registered on the Editor
+  // (not NoteList) because the layout + focus state live here.
+  useEffect(() => {
+    sidebarCommands.revealSidebar = () => {
+      if (forced.forceLeftCollapsed) return false;
+      if (focusActive) exitFocus();
+      if (layout.leftCollapsed) layout.toggleLeftCollapsed();
+      return true;
+    };
+    return () => {
+      sidebarCommands.revealSidebar = undefined;
+    };
+  }, [layout, forced.forceLeftCollapsed, focusActive, exitFocus]);
 
   // Import a `.base` saved-views file (Saved Views #6, MYND-276, task 6): pick a
   // single `.base` file (no new capability — dialog:allow-open already granted),
@@ -1351,6 +1385,9 @@ function EditorChrome({
           three-pane row. Non-blocking + dismissable; renders nothing while sync
           is off (the common case). */}
       <SyncBanners />
+      {/* MYND-336: keep the editor toolbar plugin's layout in sync with the
+          user's vault.prefs customization (no render). */}
+      <ToolbarLayoutSync />
       {/* No separate top bar (MYND-166): the editor content fills from the top
           and each top pane's tab strip rises into the OS title-bar row,
           Obsidian-style. The sidebar toggles float in the top corners below
@@ -1438,7 +1475,7 @@ function EditorChrome({
             node={ws.root}
             focusedPaneId={ws.focusedPaneId}
             onReadout={onReadout}
-            leftInset={leftCollapsed ? LEFT_CLEARANCE : 0}
+            leftInset={leftCollapsed ? leftClearance : 0}
             rightInset={rightCollapsed ? RIGHT_CLEARANCE : 0}
           />
         )}
@@ -1465,7 +1502,7 @@ function EditorChrome({
         style={{
           position: "absolute",
           top: 6,
-          left: LEFT_TOGGLE_X,
+          left: leftToggleX,
           zIndex: 30,
           display: "flex",
           alignItems: "center",
@@ -1713,6 +1750,7 @@ function EditorChrome({
       <CommandPaletteHost
         open={paletteOpen}
         onClose={() => setPaletteOpen(false)}
+        onReopen={() => setPaletteOpen(true)}
         onImportObsidian={() => {
           setPaletteOpen(false);
           setImporterOpen(true);
@@ -1724,6 +1762,10 @@ function EditorChrome({
         onBackupVault={() => {
           setPaletteOpen(false);
           setBackupExportOpen(true);
+        }}
+        onRestoreBackup={() => {
+          setPaletteOpen(false);
+          onRestoreBackup();
         }}
         onExportVaultMarkdown={() => {
           setPaletteOpen(false);
@@ -1955,16 +1997,15 @@ const TITLE_BAR_BUTTON_BASE: CSSProperties = {
 // rises into that row. These constants place the toggles clear of the macOS
 // traffic lights and size the clearance the underlying top surface (sidebar
 // header or a corner pane's strip) must reserve so nothing collides.
-/** Left toggle's x offset — comfortably right of the traffic lights on macOS. */
-const LEFT_TOGGLE_X = IS_MAC ? TRAFFIC_LIGHT_GAP + 16 : 12;
+// The left toggle x-offset + left clearance are computed PER-RENDER inside
+// EditorChrome (`leftToggleX` / `leftClearance`) because they depend on the live
+// fullscreen state (the traffic-light gap collapses in fullscreen).
 /** Right toggle's x offset from the right edge. */
 const RIGHT_TOGGLE_X = 8;
 /** Full width of the top-left control cluster: the sidebar toggle plus the
  *  back + forward nav buttons (MYND-260), each preceded by a cluster gap. */
 const LEFT_CONTROLS_WIDTH =
   TITLE_BAR_TOGGLE_WIDTH + 2 * (TITLE_BAR_CLUSTER_GAP + TITLE_BAR_NAV_WIDTH);
-/** Left clearance: the top-left surface must keep its content past this. */
-const LEFT_CLEARANCE = LEFT_TOGGLE_X + LEFT_CONTROLS_WIDTH + 8;
 /** Right clearance: the top-right surface must keep its content before this. */
 const RIGHT_CLEARANCE = RIGHT_TOGGLE_X + TITLE_BAR_TOGGLE_WIDTH + 8;
 
@@ -2109,6 +2150,9 @@ function TitleBarNavButton({
 type CommandPaletteHostProps = {
   open: boolean;
   onClose: () => void;
+  /** Re-open the palette — used to pop back from a QuickPicker sub-flow on
+   *  cancel (Esc/backdrop), so the picker reads as stacked on top of the palette. */
+  onReopen: () => void;
   onOpenSettings: () => void;
   onOpenAttachments: () => void;
   onManageTemplates: () => void;
@@ -2124,6 +2168,7 @@ type CommandPaletteHostProps = {
   onImportObsidian: () => void;
   onImportBaseView: () => void;
   onBackupVault: () => void;
+  onRestoreBackup: () => void;
   onExportVaultMarkdown: () => void;
   onLockFlushed: () => Promise<void>;
   onToggleLeftSidebar: () => void;
@@ -2141,7 +2186,9 @@ type CommandPaletteHostProps = {
 function CommandPaletteHost({
   open,
   onClose,
+  onReopen,
   onOpenSettings,
+  onRestoreBackup,
   onOpenAttachments,
   onManageTemplates,
   onNewNoteFromTemplate,
@@ -2171,11 +2218,35 @@ function CommandPaletteHost({
 }: CommandPaletteHostProps) {
   const { t } = useTranslation();
   const ctx = useSelectedNote();
+  // Deferred picker sub-flows (palette-gap #31 Apply custom theme, #32 Move note
+  // to folder): the action populates this config → the QuickPicker opens. Null
+  // when no picker is active. Rendered as a sibling of the palette; independent
+  // of `open`, so it survives the palette closing on action-run.
+  const [picker, setPicker] = useState<{
+    title: string;
+    placeholder: string;
+    emptyText: string;
+    items: QuickPickItem[];
+    onPick: (id: string) => void;
+  } | null>(null);
+  // Deferred empty-trash confirm (the palette `trash.empty` action): the
+  // trashed count at request time, null when closed. A permanent purge never
+  // fires straight from the palette — this renders the same count-aware
+  // DeleteConfirmModal the TrashPanel footer uses, and only confirm purges.
+  // Rendered as a sibling like `picker`, so it survives the palette closing.
+  const [emptyTrashConfirm, setEmptyTrashConfirm] = useState<number | null>(null);
   // AI surface (local-ai epic, ai-ux-surface MYND-408, SYNC-9): the `ai_enabled`
   // gate + the AI Chat reveal, threaded into CommandContext so AI capability
   // actions (siblings 4/6/7) gate on `stageName === "editor" && aiEnabled` and
   // open the shared right-panel AI Chat tab.
   const { prefs: aiPrefs, setRightPanelActiveTab: revealRightPanelTab } = usePrefs();
+  // Wave 2: layout/pane/tab/nav palette actions dispatch straight to the
+  // workspace controller (CommandPaletteHost is inside WorkspaceProvider).
+  const paletteWs = useWorkspace();
+  // (The palette's real-time-sync toggle was dropped in the develop merge — the
+  // sync engine now manages SSE as an always-on baseline with an info-only
+  // Privacy row, so there is no user-toggleable pref to bind, `useSyncPrefs`
+  // mock removed on develop.)
   // Drop the ephemeral AI render stores when the editor session tears down
   // (lock / vault-switch unmounts this host) — the AS1 artifacts (summary text +
   // tag suggestions + the chat transcript) never outlive the open vault (SYNC-8;
@@ -2271,6 +2342,137 @@ function CommandPaletteHost({
       stageName: "editor",
       selectedNoteId: ctx.selectedId,
       aiEnabled: aiPrefs.ai_enabled,
+      // The live prefs view for the toggle/cycle/set palette actions (Wave 1+).
+      prefs: aiPrefs,
+      // Wave 2 — layout / panes / tabs / navigation, dispatched to the workspace.
+      onSplitRight: () => paletteWs.splitFocused("row"),
+      onSplitDown: () => paletteWs.splitFocused("column"),
+      onClosePane: () => paletteWs.closePane(paletteWs.focusedPaneId),
+      onCloseTab: () => {
+        const a = paletteWs.focusedLeaf.activeTab;
+        if (a !== null && a.kind === "note")
+          paletteWs.closeTabInPane(paletteWs.focusedPaneId, a.id);
+      },
+      onNextTab: () => {
+        const tabs = paletteWs.focusedLeaf.tabs;
+        if (tabs.length === 0) return;
+        const cur = paletteWs.focusedLeaf.activeTab;
+        const i =
+          cur !== null && cur.kind === "note"
+            ? tabs.findIndex((t) => t.kind === "note" && t.id === cur.id)
+            : -1;
+        const next = tabs[(i + 1) % tabs.length]!;
+        if (next.kind === "note") paletteWs.activateInPane(paletteWs.focusedPaneId, next.id);
+      },
+      onPrevTab: () => {
+        const tabs = paletteWs.focusedLeaf.tabs;
+        if (tabs.length === 0) return;
+        const cur = paletteWs.focusedLeaf.activeTab;
+        const i =
+          cur !== null && cur.kind === "note"
+            ? tabs.findIndex((t) => t.kind === "note" && t.id === cur.id)
+            : -1;
+        const next = tabs[(i - 1 + tabs.length) % tabs.length]!;
+        if (next.kind === "note") paletteWs.activateInPane(paletteWs.focusedPaneId, next.id);
+      },
+      onFocusNextPane: () => {
+        const ids = paletteWs.leaves.map((l) => l.id);
+        if (ids.length < 2) return;
+        const i = ids.indexOf(paletteWs.focusedPaneId);
+        paletteWs.focusPane(ids[(i + 1) % ids.length]!);
+      },
+      onFocusPrevPane: () => {
+        const ids = paletteWs.leaves.map((l) => l.id);
+        if (ids.length < 2) return;
+        const i = ids.indexOf(paletteWs.focusedPaneId);
+        paletteWs.focusPane(ids[(i - 1 + ids.length) % ids.length]!);
+      },
+      onGoBack: () => paletteWs.goBack(),
+      onGoForward: () => paletteWs.goForward(),
+      onTogglePreview: () => paletteWs.toggleCompanion(paletteWs.focusedPaneId),
+      // Wave 3 — note ops (via the sidebar-state ctx) + right-panel tabs.
+      onNewNote: () => void ctx.createAndStartRename().catch(() => {}),
+      onDuplicateNote: () => {
+        if (ctx.selectedId !== null) void ctx.duplicateAndOpen(ctx.selectedId).catch(() => {});
+      },
+      onArchiveNote: () => {
+        if (ctx.selectedId !== null) void ctx.archiveWithRollback(ctx.selectedId).catch(() => {});
+      },
+      onRenameNote: () => {
+        if (ctx.selectedId !== null) ctx.startRename(ctx.selectedId);
+      },
+      onTrashNote: () => {
+        if (ctx.selectedId !== null) void ctx.trashWithRollback(ctx.selectedId).catch(() => {});
+      },
+      onEmptyTrash: () => {
+        // Permanent purge — request the count-aware confirm instead of firing
+        // directly (the TrashPanel footer's flow); the purge runs on confirm.
+        const count = trashedRecords(ctx.cache).length;
+        if (count > 0) setEmptyTrashConfirm(count);
+      },
+      onToggleFavorite: () => {
+        if (ctx.selectedId === null) return;
+        const id = ctx.selectedId;
+        const fav = aiPrefs.favorites;
+        void setFavorites(fav.includes(id) ? fav.filter((x) => x !== id) : [...fav, id]);
+      },
+      onShowBacklinks: () => void revealRightPanelTab("backlinks"),
+      onShowOutline: () => void revealRightPanelTab("outline"),
+      onShowUnlinked: () => void revealRightPanelTab("unlinked"),
+      onRestoreBackup,
+      // Palette-gap #32 — move the selected note to a folder via the QuickPicker.
+      // Targets are the vault's folders (from the sidebar cache) plus any empty
+      // "deliberate" folders, sorted, with "Vault root" (empty id → null) first.
+      onMoveNote: () => {
+        if (ctx.selectedId === null) return;
+        const noteId = ctx.selectedId;
+        const folders = new Set<string>();
+        for (const rec of ctx.cache.values()) {
+          // Live, non-template notes only — a folder that survives solely on
+          // trashed/archived/template notes isn't a sidebar destination.
+          if (rec.trashed !== null || rec.archived !== null || rec.template) continue;
+          if (rec.folder) folders.add(rec.folder);
+        }
+        for (const f of aiPrefs.deliberate_folders) folders.add(f);
+        const items: QuickPickItem[] = [
+          { id: "", label: t("commands.picker.vaultRoot") },
+          ...[...folders].sort().map((f) => ({ id: f, label: f })),
+        ];
+        setPicker({
+          title: t("commands.picker.moveNoteTitle"),
+          placeholder: t("commands.picker.moveNotePlaceholder"),
+          emptyText: t("commands.picker.noFolders"),
+          items,
+          onPick: (id) => {
+            void ctx.bulkMoveWithSync([noteId], id === "" ? null : id).catch(() => {});
+          },
+        });
+      },
+      // Palette-gap #31 — apply a saved custom theme via the QuickPicker. Lists
+      // the valid custom themes; picking one reads its palette, persists it as the
+      // active choice, and applies it live (the CustomThemesSection apply path).
+      onApplyCustomTheme: () => {
+        void (async () => {
+          const themes = (await listCustomThemes()).filter((th) => th.valid);
+          const items: QuickPickItem[] = themes.map((th) => ({
+            id: th.name,
+            label: th.display_name === "" ? th.name : th.display_name,
+          }));
+          setPicker({
+            title: t("commands.picker.applyThemeTitle"),
+            placeholder: t("commands.picker.applyThemePlaceholder"),
+            emptyText: t("commands.picker.noCustomThemes"),
+            items,
+            onPick: (name) => {
+              void (async () => {
+                const palette = await readCustomTheme(name);
+                await setCustomTheme(name);
+                applyCustomTheme(palette);
+              })().catch(() => {});
+            },
+          });
+        })().catch(() => {});
+      },
       onOpenAiChat: () => void revealRightPanelTab("ai-chat"),
       // Summarize the focused note into the AI Chat tab (note-summarization
       // tasks 3–4): reveal the render target, grab the focused pane's live view
@@ -2396,8 +2598,14 @@ function CommandPaletteHost({
       ctx.selectedId,
       ctx.open,
       ctx.cache,
-      aiPrefs.ai_enabled,
-      aiPrefs.ai_excluded_folders,
+      // Whole prefs object (not just ai_*): the Wave-1 toggle/cycle actions read
+      // ctx.prefs, so commandCtx must re-memoize on ANY pref change.
+      aiPrefs,
+      paletteWs,
+      // onMoveNote / onApplyCustomTheme resolve their QuickPicker strings via
+      // `t` at run time — a language switch must rebuild them.
+      t,
+      onRestoreBackup,
       revealRightPanelTab,
       onLockFlushed,
       onOpenSettings,
@@ -2430,15 +2638,76 @@ function CommandPaletteHost({
       onDeleteWorkspace,
     ],
   );
+  // Stable note predicates (fresh identity only when the cache changes): they
+  // sit in the palette's snippet-effect deps, and an inline arrow's per-render
+  // identity would re-run that effect — re-issuing its `note_read` decrypts —
+  // on every unrelated host render.
+  const isTrashed = useCallback(
+    (id: string) => ctx.cache.get(id)?.trashed != null,
+    [ctx.cache],
+  );
+  const isTemplate = useCallback(
+    (id: string) => ctx.cache.get(id)?.template === true,
+    [ctx.cache],
+  );
   return (
-    <CommandPalette
-      open={open}
-      onClose={onClose}
-      ctx={commandCtx}
-      isTrashed={(id) => ctx.cache.get(id)?.trashed != null}
-      isTemplate={(id) => ctx.cache.get(id)?.template === true}
-      isArchived={(id) => ctx.cache.get(id)?.archived != null}
-    />
+    <>
+      <CommandPalette
+        open={open}
+        onClose={onClose}
+        ctx={commandCtx}
+        isTrashed={isTrashed}
+        isTemplate={isTemplate}
+        isArchived={(id) => ctx.cache.get(id)?.archived != null}
+      />
+      <QuickPicker
+        open={picker !== null}
+        title={picker?.title ?? ""}
+        placeholder={picker?.placeholder ?? ""}
+        emptyText={picker?.emptyText ?? ""}
+        items={picker?.items ?? []}
+        onPick={(id) => {
+          picker?.onPick(id);
+          setPicker(null);
+        }}
+        // Cancel (Esc / backdrop) pops back to the command palette — the picker
+        // is stacked on top of it (the palette closed when the action ran).
+        onClose={() => {
+          setPicker(null);
+          onReopen();
+        }}
+      />
+      {emptyTrashConfirm !== null && (
+        <DeleteConfirmModal
+          title={t("notes.trash.emptyConfirmTitle")}
+          body={t("notes.trash.emptyConfirmBody", { count: emptyTrashConfirm })}
+          confirmLabel={t("notes.trash.emptyConfirmCta")}
+          onCancel={() => setEmptyTrashConfirm(null)}
+          onConfirm={() => {
+            setEmptyTrashConfirm(null);
+            // Re-derive the kill list from the CURRENT trashed set at confirm
+            // time (the TrashPanel discipline): a note restored while the
+            // confirm was up must NOT be purged.
+            const ids = trashedRecords(ctx.cache).map((r) => r.noteUuid);
+            if (ids.length === 0) return;
+            void ctx
+              .emptyTrashWithSync(ids)
+              .then((result) => {
+                // Best-effort bulk purge — report a remaining count on partial
+                // failure (the palette has no status line, so toast it).
+                if (result.failed.length > 0) {
+                  showAttachmentToast(
+                    t("notes.trash.emptyPartialFailure", {
+                      count: result.failed.length,
+                    }),
+                  );
+                }
+              })
+              .catch(() => {});
+          }}
+        />
+      )}
+    </>
   );
 }
 
@@ -2742,7 +3011,10 @@ function RightSidebar() {
           alignItems: "stretch",
           gap: 2,
           padding: "0 8px",
-          minHeight: 34,
+          // Match every other top-chrome strip (note pane tab strip, sidebar
+          // clearance rows) so the bottom hairline lines up across the window.
+          height: STRIP_HEIGHT,
+          flexShrink: 0,
           borderBottom: "1px solid var(--line-1)",
         }}
       >

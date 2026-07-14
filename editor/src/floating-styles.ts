@@ -174,6 +174,20 @@ const CSS = `
 .cm-toolbar-button:hover {
   background-color: var(--paper-2, #f3f1eb);
 }
+/* The leading block-type control carries a word label ("Paragraph" / "H2"), so
+   it overrides the fixed 28px square button width — auto width, no wrap, a
+   little horizontal padding, and a divider separating it from the format
+   buttons (Obsidian-style). */
+.cm-toolbar-blocktype {
+  width: auto;
+  min-width: 0;
+  padding: 0 8px;
+  gap: 3px;
+  white-space: nowrap;
+  margin-right: 4px;
+  border-right: 1px solid var(--line-1, #e3e2dd);
+  border-radius: var(--radius-1, 3px) 0 0 var(--radius-1, 3px);
+}
 .cm-toolbar-heading-wrap {
   position: relative;
 }

@@ -16,6 +16,7 @@
 
 import type { StageVaultStatus, SuspicionReason } from "../lib/stage";
 import type { NoteId } from "../notes/sidebarState";
+import type { PrefsView } from "../lib/prefs";
 
 export type AppStageName =
   | "welcome"
@@ -40,6 +41,13 @@ export type CommandContext = {
    * AI actions render **disabled** (not hidden — disabled-control discipline).
    */
   aiEnabled: boolean;
+  /**
+   * The live `vault.prefs` view — read by the toggle/cycle/set actions
+   * (line numbers, spell-check, theme, typography, focus, etc.) to compute the
+   * NEXT value before calling the module-level `set*` setter. Module-level
+   * actions can't use the `usePrefs` hook, so the current values ride here.
+   */
+  prefs: PrefsView;
   /**
    * Reveal the AI Chat right-panel tab (the shared render target siblings 4/6/7
    * mount output into). Sets the right-panel active tab to `ai-chat`.
@@ -106,6 +114,59 @@ export type CommandContext = {
   onBackupVault: () => void;
   /** Open the whole-vault markdown export modal (three-phase, MYND-211). */
   onExportVaultMarkdown: () => void;
+  // ── Wave 2: layout / workspace / panes / tabs / navigation (palette-gap) ──
+  /** Split the focused pane to the right (row split). */
+  onSplitRight: () => void;
+  /** Split the focused pane downward (column split). */
+  onSplitDown: () => void;
+  /** Close the focused pane (no-op on the last pane). */
+  onClosePane: () => void;
+  /** Close the focused pane's active tab. */
+  onCloseTab: () => void;
+  /** Activate the next / previous tab in the focused pane (wraps). */
+  onNextTab: () => void;
+  onPrevTab: () => void;
+  /** Move focus to the next / previous pane (wraps). */
+  onFocusNextPane: () => void;
+  onFocusPrevPane: () => void;
+  /** Step the focused pane's note history back / forward. */
+  onGoBack: () => void;
+  onGoForward: () => void;
+  /** Toggle the focused pane's side-by-side companion (live preview). */
+  onTogglePreview: () => void;
+  // ── Wave 3: note ops + right-panel tabs (palette-gap) ──
+  /** Create a new blank note and start inline rename. */
+  onNewNote: () => void;
+  /** Duplicate the selected note (clone → open the copy). */
+  onDuplicateNote: () => void;
+  /** Archive the selected note. */
+  onArchiveNote: () => void;
+  /** Start inline rename of the selected note. */
+  onRenameNote: () => void;
+  /** Move the selected note to the trash (soft delete, recoverable). */
+  onTrashNote: () => void;
+  /** Permanently empty the trash. */
+  onEmptyTrash: () => void;
+  /** Add/remove the selected note from favorites. */
+  onToggleFavorite: () => void;
+  /** Reveal a specific right-panel tab. */
+  onShowBacklinks: () => void;
+  onShowOutline: () => void;
+  onShowUnlinked: () => void;
+  // ── Wave 4 ──
+  /** Route into the restore-from-backup flow (sibling of onBackupVault). */
+  onRestoreBackup: () => void;
+  /**
+   * Open the folder target-picker (QuickPicker) for the selected note and move
+   * it to the chosen folder (palette-gap #32). No-op when no note is selected;
+   * the action already guards on `selectedNoteId`.
+   */
+  onMoveNote: () => void;
+  /**
+   * Open the custom-theme target-picker (QuickPicker), then read + apply the
+   * chosen saved theme and persist it as the active choice (palette-gap #31).
+   */
+  onApplyCustomTheme: () => void;
   /** Collapse/expand the left (notes) sidebar (mirrors the top-bar toggle). */
   onToggleLeftSidebar: () => void;
   /** Collapse/expand the right (backlinks) sidebar (mirrors the top-bar toggle). */

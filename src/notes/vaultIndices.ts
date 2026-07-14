@@ -8,6 +8,7 @@
 // second resolver, so chip-vs-panel resolution can never diverge.
 
 import { invoke } from "@tauri-apps/api/core";
+import { extractBlockAnchors } from "@myne/editor";
 import { foldSegment, normalizeFolderPath } from "../dialect/folderPath";
 import { parse } from "../dialect/parse";
 import type {
@@ -87,6 +88,55 @@ export type TagEntry = {
   folded: string;
   display: string;
 };
+
+/** One imported `^block-id` anchor — TS mirror of the Rust `BlockAnchor`
+ *  (MYND-382). Enumerate-only: surfaces markers that already exist (import),
+ *  never mints one. `preview` is the tagged block's first-line text (picker
+ *  secondary line). serde camelCase. */
+export type BlockAnchorEntry = {
+  blockId: string;
+  preview: string;
+};
+
+/** Max characters of block text kept as the picker preview line. */
+const BLOCK_ANCHOR_PREVIEW_CAP = 120;
+
+/** The line-tail marker grammar (mirrors `extractBlockAnchors`) — used only to
+ *  strip the ` ^id` suffix from a preview line. */
+const BLOCK_MARKER_TAIL = /(?:^|[ \t])\^[A-Za-z0-9-]+[ \t]*$/;
+
+/**
+ * Enumerate a note's imported `^block-id` anchors as `{blockId, preview}`
+ * entries for the vault-wide `[[^^` index (MYND-382). Reuses the single dialect
+ * scanner `extractBlockAnchors` for the marker grammar, then derives each
+ * preview from the tagged block's line (marker stripped, whitespace-collapsed,
+ * capped). Enumerate-only — mints nothing.
+ */
+export function extractBlockAnchorEntries(body: string): BlockAnchorEntry[] {
+  return extractBlockAnchors(body).map(({ blockId, from }) => {
+    const nl = body.indexOf("\n", from);
+    const line = body.slice(from, nl === -1 ? undefined : nl);
+    let preview = line.replace(BLOCK_MARKER_TAIL, "").replace(/\s+/g, " ").trim();
+    // An own-line marker (`^id` alone on its line) is Obsidian's form for a
+    // NON-paragraph block (table / list / callout / code): the marker refers to
+    // the PRECEDING block, so the marker line strips to empty. Fall back to the
+    // nearest preceding non-empty line so the picker still shows a real preview.
+    if (preview === "") preview = precedingNonEmptyLine(body, from);
+    return { blockId, preview: preview.slice(0, BLOCK_ANCHOR_PREVIEW_CAP) };
+  });
+}
+
+/** The nearest non-empty line strictly before offset `from` (a marker line's
+ *  start), whitespace-collapsed — the preview for an own-line block marker. */
+function precedingNonEmptyLine(body: string, from: number): string {
+  const before = body.slice(0, from > 0 ? from - 1 : 0);
+  const lines = before.split("\n");
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const trimmed = lines[i]!.replace(/\s+/g, " ").trim();
+    if (trimmed !== "") return trimmed;
+  }
+  return "";
+}
 
 /** Pull frontmatter `tags:` / `tag:` values, coercing to strings. Accepts a
  *  single scalar, a YAML list, or numbers (frontmatter numeric tags are
@@ -171,6 +221,7 @@ export async function vaultIndicesApply(
   wikilinks: ReadonlyArray<WikilinkEdge>,
   tags: ReadonlyArray<TagEntry>,
   properties: ReadonlyArray<PropertyEntry>,
+  blockAnchors: ReadonlyArray<BlockAnchorEntry>,
 ): Promise<void> {
   await invoke<void>("plugin:vault-indices|vault_indices_apply", {
     noteId,
@@ -184,6 +235,8 @@ export async function vaultIndicesApply(
     // Build-B (MYND-271): TS types every frontmatter property (§3.6.4); Rust
     // stores these opaque pre-typed values and never parses YAML (TB9).
     properties,
+    // MYND-382: enumerate-only imported block anchors for the `[[^^` picker.
+    blockAnchors,
   });
   // SYNC-5: bump the index-changed nonce AFTER the slice updated (single
   // post-mutation chokepoint) so reader surfaces re-query.
@@ -213,6 +266,29 @@ export async function vaultIndicesAllEdges(): Promise<
  */
 export async function vaultIndicesOrphans(): Promise<string[]> {
   return await invoke<string[]>("plugin:vault-indices|vault_indices_orphans");
+}
+
+/** One resolved vault-wide block anchor — TS mirror of the Rust
+ *  `VaultBlockAnchor` (MYND-382). The `[[^^` picker row: which note carries the
+ *  anchor (id + title) + the block id + preview. Opening inserts a
+ *  `[[<note>^blockId]]` deep-link. */
+export type VaultBlockAnchor = {
+  noteId: string;
+  noteTitle: string | null;
+  noteFolder: string | null;
+  blockId: string;
+  preview: string;
+};
+
+/**
+ * Every imported `^block-id` anchor across the vault (MYND-382, the `[[^^`
+ * picker). Enumerate-only — surfaces markers that already exist (import), never
+ * mints one. The picker sorts + filters these TS-side; resolution stays TS-side.
+ */
+export async function vaultBlockAnchors(): Promise<VaultBlockAnchor[]> {
+  return await invoke<VaultBlockAnchor[]>(
+    "plugin:vault-indices|vault_indices_block_anchors",
+  );
 }
 
 /** Every note carrying a frontmatter property named `key`, as
@@ -302,6 +378,8 @@ export async function reindexNoteFromBody(
       // §3.6.4 typed properties from the raw frontmatter (re-parsed CORE-schema
       // TS-side; deriveTitleFolder above reads the project-default parse).
       extractProperties(parsed.frontmatter.raw),
+      // MYND-382: imported `^block-id` anchors for the vault-wide `[[^^` picker.
+      extractBlockAnchorEntries(body),
     );
   } catch {
     // Best-effort — self-healed by a later apply / the next reconcile.

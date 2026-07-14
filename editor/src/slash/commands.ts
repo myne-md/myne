@@ -17,11 +17,17 @@ import {
   formatLocalWeekday,
 } from "@myne/editor/host/notes/localDateTime";
 import i18n from "@myne/editor/i18n";
+import type { SlashIconName } from "./icons";
 
 export type SlashCommand = {
   id: string;
   label: string;
+  /** Text-glyph icon (H1–H6, quote, …). Used when `svgIcon` is absent. */
   icon: string;
+  /** Preferred Lucide SVG icon (clearer than a glyph for date/day/time/now,
+   *  table, to-do, attach, voice, wiki-link). Rendered by the menu in place of
+   *  {@link icon} when set. */
+  svgIcon?: SlashIconName;
   /** Optional keyboard hint to render in the right column. */
   kbd?: string;
   apply: (view: EditorView, triggerFrom: number, triggerTo: number) => void;
@@ -164,24 +170,28 @@ export function slashCommands(): readonly SlashCommand[] {
       id: "date",
       label: i18n.t("editor.slash.date"),
       icon: "D",
+      svgIcon: "calendar",
       apply: (v, f, t) => insertAtTrigger(v, f, t, formatLocalDate(new Date())),
     },
     {
       id: "day",
       label: i18n.t("editor.slash.day"),
       icon: "W",
+      svgIcon: "sun",
       apply: (v, f, t) => insertAtTrigger(v, f, t, formatLocalWeekday(new Date())),
     },
     {
       id: "time",
       label: i18n.t("editor.slash.time"),
       icon: "T",
+      svgIcon: "clock",
       apply: (v, f, t) => insertAtTrigger(v, f, t, formatLocalTime(new Date())),
     },
     {
       id: "now",
       label: i18n.t("editor.slash.now"),
       icon: "N",
+      svgIcon: "alarm-clock",
       apply: (v, f, t) => insertAtTrigger(v, f, t, formatLocalDateTime(new Date())),
     },
     {
@@ -191,6 +201,7 @@ export function slashCommands(): readonly SlashCommand[] {
       id: "table",
       label: i18n.t("editor.slash.table"),
       icon: "▦",
+      svgIcon: "table",
       apply: (v, f, t) => insertTable(v, f, t),
     },
     {
@@ -216,6 +227,7 @@ export function slashCommands(): readonly SlashCommand[] {
       id: "todo",
       label: i18n.t("editor.slash.todoList"),
       icon: "☐",
+      svgIcon: "check-square",
       apply: (v, f, t) => replaceLinePrefix(v, f, t, "- [ ] "),
     },
     {
@@ -226,6 +238,7 @@ export function slashCommands(): readonly SlashCommand[] {
       id: "attach",
       label: i18n.t("editor.slash.attachFile"),
       icon: "▣",
+      svgIcon: "paperclip",
       apply: (v, f, t) => {
         v.dispatch({
           changes: { from: f, to: t, insert: "" },
@@ -246,6 +259,7 @@ export function slashCommands(): readonly SlashCommand[] {
       id: "record",
       label: i18n.t("editor.slash.voiceNote"),
       icon: "◉",
+      svgIcon: "mic",
       apply: (v, f, t) => {
         v.dispatch({
           changes: { from: f, to: t, insert: "" },
@@ -264,6 +278,7 @@ export function slashCommands(): readonly SlashCommand[] {
       id: "wiki",
       label: i18n.t("editor.slash.wikiLink"),
       icon: "[[",
+      svgIcon: "link-2",
       apply: (v, f, t) => {
         v.dispatch({
           changes: { from: f, to: t, insert: "[[" },

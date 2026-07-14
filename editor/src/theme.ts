@@ -46,13 +46,42 @@ export const myneTheme = EditorView.theme({
   "&.cm-focused .cm-cursor": {
     borderLeftColor: "var(--accent, #2c4a7a)",
   },
-  // Text selection (double-click word, drag, Cmd/Ctrl+A). A neutral
-  // `--paper-3` fill is invisible in dark mode — there it sits one step off
-  // the editor paper (#232220 vs #1a1a17) and the highlight vanishes. Use the
-  // same tinted accent as `.cm-table-cell-input::selection` below; the accent
-  // token flips per theme, so the wash stays visible in both light and dark.
-  "&.cm-focused .cm-selectionBackground, ::selection": {
-    backgroundColor: "color-mix(in srgb, var(--accent, #2c4a7a) 28%, transparent)",
+  // Text selection (double-click word, drag, Cmd/Ctrl+A). A neutral `--paper-3`
+  // fill is invisible in dark mode, so tint with the accent (flips per theme, so
+  // the wash stays visible in both light and dark). BOTH focus states are styled:
+  // CodeMirror's built-in UNFOCUSED selection is a light wash that washes out
+  // dark-mode text the moment focus leaves the editor (e.g. the floating
+  // selection toolbar opens) — restyle it too, dim but still contrast-safe, so a
+  // selection stays readable regardless of focus. The focused wash is fuller,
+  // keeping a subtle "focus is here" cue.
+  // Theme-tuned via the `--selection-bg` token (a TRANSLUCENT accent, defined
+  // per theme in tokens.css) — NOT `color-mix()`, which older WKWebView drops,
+  // voiding the rule and leaving an unreadable default wash. Focused AND
+  // unfocused use the SAME value so opening the floating toolbar (which blurs
+  // the editor) never washes the selection out. The rgba fallback covers a
+  // WebView with no `--selection-bg` in scope.
+  // `!important` is load-bearing: CodeMirror's baseTheme styles the selection
+  // with HIGHER-specificity selectors (`&.cm-focused > .cm-scroller >
+  // .cm-selectionLayer .cm-selectionBackground` and a separate unfocused rule),
+  // which otherwise win over a plain `.cm-selectionBackground` rule — leaving the
+  // library's unreadable default wash (the bug). `!important` guarantees ours
+  // applies in both focus states.
+  ".cm-selectionBackground, ::selection": {
+    backgroundColor: "var(--selection-bg, rgba(44, 74, 122, 0.24)) !important",
+  },
+  "&.cm-focused .cm-selectionBackground": {
+    backgroundColor: "var(--selection-bg, rgba(44, 74, 122, 0.24)) !important",
+  },
+  // Selection inside a fenced code-block card: the card paints an OPAQUE
+  // `--paper-2` background on each body line (content layer), which sits ABOVE
+  // CM's drawn selection layer and hides it — so a selection over code showed
+  // nothing. Re-enable the NATIVE `::selection` for code-card lines (it paints on
+  // the text, over the card bg). `drawSelection` zeroes native `::selection` with
+  // a `Prec.highest` rule `.cm-line ::selection { transparent !important }`
+  // (specificity 0,2,1 with the theme class); the COMPOUND `.cm-line.cm-code-card-body`
+  // here is 0,3,1, so it out-specifies that important rule regardless of order.
+  ".cm-line.cm-code-card-body::selection, .cm-line.cm-code-card-body ::selection": {
+    backgroundColor: "var(--selection-bg, rgba(44, 74, 122, 0.24)) !important",
   },
 
   // Headings — apply via `Decoration.line` from heading.ts.
@@ -312,18 +341,23 @@ export const myneTheme = EditorView.theme({
     color: "var(--fg-3, #6b6a64)",
   },
   ".cm-lineNumbers .cm-gutterElement": {
-    // Vertically center the number on the line's text row so it aligns with the
-    // prose AND the fold chevron (which already centers). CM's default top-aligns
-    // the number, which floats it above the text on tall heading lines — the
-    // misalignment in the gutter (MYND-299 QA). Right-aligned toward the content.
+    // TOP-align the number to the line's FIRST visual row (Obsidian parity, QA):
+    // a wrapped/tall line keeps its number on the first row instead of floating
+    // it to the vertical centre of the whole wrapped block. `paddingTop` seats it
+    // on the text baseline of that first row (the value tracks the number's own
+    // font so it scales with the editor text-size pref). Right-aligned toward the
+    // content. This changes only vertical placement WITHIN the gutter element —
+    // never the line height — so it can't destabilise the scroll height map.
     display: "flex",
-    alignItems: "center",
+    alignItems: "flex-start",
     justifyContent: "flex-end",
     color: "var(--fg-3, #6b6a64)",
     opacity: "0.5",
     fontFamily: "var(--font-mono)",
     fontSize: "0.8em",
-    padding: "0 12px 0 8px",
+    // Right gap pairs the number with the adjacent fold arrow (the fold gutter
+    // sits between the number and the text, Obsidian order — see line-numbers.ts).
+    padding: "0.32em 10px 0 8px",
     minWidth: "1.6em",
   },
 
@@ -333,10 +367,12 @@ export const myneTheme = EditorView.theme({
   // EXCEPT a line that is currently folded keeps its › visible so the user can
   // always find + click to unfold. Tokens only (no hex).
   ".cm-foldGutter .cm-gutterElement": {
-    padding: "0 2px",
+    // Top-align the fold arrow to the first row too, so it lines up with the
+    // now-top-aligned line number instead of centring on a tall/wrapped line.
+    padding: "0.28em 2px 0",
     minWidth: "1.1em",
     display: "flex",
-    alignItems: "center",
+    alignItems: "flex-start",
     justifyContent: "center",
   },
   ".cm-fold-marker": {
@@ -559,7 +595,10 @@ export const myneTheme = EditorView.theme({
     contain: "inline-size",
     overflowX: "auto",
     overflowY: "visible",
-    padding: "16px 0 0 34px", // top = column-handle gutter, left = row-handle gutter
+    // top = column-handle gutter, left = row-handle gutter. The left gutter is
+    // as narrow as the side-by-side row grip (−16px) + delete (−24px) controls
+    // allow without clipping under `overflow-x: auto` (QA: was 34px, too indented).
+    padding: "16px 0 0 26px",
   },
   ".cm-table-editable > table": { gridArea: "tbl" },
   // Reorder handles — bare six-dot grips in the gutter (no chip), revealed only
@@ -612,7 +651,7 @@ export const myneTheme = EditorView.theme({
   ".cm-table-del::before": { content: '"\\00d7"' }, // ×
   ".cm-table-del:hover": { color: "var(--extended-color-red-600, #c0392b)" },
   ".cm-table-del-col": { top: "-16px", right: "0" },
-  ".cm-table-del-row": { left: "-31px", top: "50%", transform: "translateY(-50%)" },
+  ".cm-table-del-row": { left: "-24px", top: "50%", transform: "translateY(-50%)" },
   ".cm-table-handle-col:hover ~ .cm-table-del-col, .cm-table-del-col:hover": {
     opacity: "1",
   },
@@ -835,14 +874,17 @@ export const myneTheme = EditorView.theme({
     transition:
       "background-color var(--duration-fast, 120ms) var(--ease-standard, ease), border-color var(--duration-fast, 120ms) var(--ease-standard, ease)",
   },
+  // Solid accent fill + contrasting tick (Obsidian-style) rather than the old
+  // washed-out accent-soft tint — a checked item reads boldly as "done".
   ".cm-task-checkbox-checked": {
-    backgroundColor: "var(--accent-soft, #e8edf5)",
+    backgroundColor: "var(--accent, #2c4a7a)",
     borderColor: "var(--accent, #2c4a7a)",
   },
   // Checkmark drawn with borders (not a glyph, to avoid font-metric drift) and
   // centered with absolute positioning + transform — deterministic regardless
   // of the box's content-box quirks. translateY is biased up slightly so the
-  // tick reads optically centered (its visual mass hangs low-left).
+  // tick reads optically centered (its visual mass hangs low-left). The tick is
+  // `--accent-on` (white) for contrast on the solid accent fill.
   ".cm-task-checkbox-checked::after": {
     content: '""',
     position: "absolute",
@@ -852,7 +894,7 @@ export const myneTheme = EditorView.theme({
     height: "8px",
     boxSizing: "border-box",
     borderStyle: "solid",
-    borderColor: "var(--accent, #2c4a7a)",
+    borderColor: "var(--accent-on, #ffffff)",
     borderWidth: "0 2px 2px 0",
     transform: "translate(-50%, -60%) rotate(45deg)",
   },
@@ -867,6 +909,10 @@ export const myneTheme = EditorView.theme({
   ".cm-wikilink-chip": {
     display: "inline-block",
     padding: "2px 8px",
+    // Horizontal margin only. A VERTICAL margin here makes any line holding a
+    // chip taller than its neighbours, which gives CM6's height map variable
+    // line heights and destabilises scrolling on long docs (jitter/jumping) —
+    // reverted. Own-line chip spacing needs a height-stable approach instead.
     margin: "0 1px",
     borderRadius: "var(--radius-2, 6px)",
     backgroundColor: "var(--paper-2, #f3f1eb)",
@@ -1089,7 +1135,10 @@ export const myneTheme = EditorView.theme({
     // keeps a subtle radius (.cm-attachment-img).
     // Vertical breathing room so two attachments rendered back-to-back are
     // visually separated. Token-based block spacing, `--space-3` rhythm.
-    margin: "var(--space-3, 10px) 0",
+    // Small top margin so the block widget's top lines up with the top-aligned
+    // line number (a full --space-3 top margin floated the number above the
+    // widget); the bottom keeps the --space-3 block rhythm.
+    margin: "3px 0 var(--space-3, 10px)",
   },
   ".cm-attachment-img": {
     display: "block",
@@ -1194,13 +1243,13 @@ export const myneTheme = EditorView.theme({
     flexDirection: "column",
     alignItems: "center",
     gap: "6px",
-    color: "#6b6a64",
+    color: "var(--fg-3, #6b6a64)",
   },
   ".cm-attachment-pdf-fallback-label": {
     fontFamily: "var(--font-sans)",
     fontSize: "11px",
     letterSpacing: "0.06em",
-    color: "#6b6a64",
+    color: "var(--fg-3, #6b6a64)",
   },
 
   // Non-fetching `![](url)` / `![][ref]` chip — NEUTRAL family (per the design
@@ -1211,9 +1260,11 @@ export const myneTheme = EditorView.theme({
     gap: "6px",
     padding: "3px 8px",
     borderRadius: "6px",
-    backgroundColor: "#f4f4f2",
-    border: "1px solid #e3e2dd",
-    color: "#1a1a17",
+    // Theme tokens (was hardcoded light hex, which rendered as a white pill on
+    // dark/AMOLED themes) — same recessed-surface family as the file-card.
+    backgroundColor: "var(--bg-2, #f4f4f2)",
+    border: "1px solid var(--line-1, #e3e2dd)",
+    color: "var(--fg-1, #1a1a17)",
     fontFamily: "var(--font-sans)",
     fontSize: "13px",
     fontWeight: "500",
@@ -1239,18 +1290,21 @@ export const myneTheme = EditorView.theme({
     cursor: "default",
   },
   ".cm-attachment-tombstone-deleted": {
-    backgroundColor: "#f4f4f2",
-    border: "1px solid #e3e2dd",
-    color: "#6b6a64",
+    // Theme tokens (was hardcoded light hex) — recessed neutral surface.
+    backgroundColor: "var(--bg-2, #f4f4f2)",
+    border: "1px solid var(--line-1, #e3e2dd)",
+    color: "var(--fg-3, #6b6a64)",
   },
   ".cm-attachment-tombstone-deleted .cm-attachment-tombstone-label": {
     textDecoration: "line-through",
     textDecorationColor: "var(--line-2, #c8c7c1)",
   },
   ".cm-attachment-tombstone-broken": {
-    // danger muted tint, mirroring the footnote orphan treatment.
-    backgroundColor: "color-mix(in srgb, var(--danger, #8a2a23) 8%, #f4f4f2)",
-    border: "1px solid color-mix(in srgb, var(--danger, #8a2a23) 22%, #e3e2dd)",
+    // Danger tint via the per-theme --danger-soft token (was color-mix over a
+    // hardcoded light base, which both drops on older WKWebView AND reads light
+    // on AMOLED). --danger-soft is dark on dark themes; the callout-danger convention.
+    backgroundColor: "var(--danger-soft, #f5e7e5)",
+    border: "1px solid var(--danger, #8a2a23)",
     color: "var(--danger, #8a2a23)",
   },
   ".cm-attachment-tombstone-label": {
@@ -1271,7 +1325,10 @@ export const myneTheme = EditorView.theme({
     border: "1px solid var(--line-1, #e3e2dd)",
     borderRadius: "var(--radius-2, 6px)",
     verticalAlign: "top",
-    margin: "var(--space-3, 10px) 0",
+    // Small top margin so the block widget's top lines up with the top-aligned
+    // line number (a full --space-3 top margin floated the number above the
+    // widget); the bottom keeps the --space-3 block rhythm.
+    margin: "3px 0 var(--space-3, 10px)",
     fontFamily: "var(--font-sans)",
     cursor: "default",
   },
@@ -1325,6 +1382,80 @@ export const myneTheme = EditorView.theme({
   // global stylesheet (`attachments/styles.ts`), not this `.cm-editor`-scoped
   // theme. Only the in-card button (`-menubtn`) is styled here.
 
+  // Inline text/structured preview (MYND-268). The widget reuses the file-card
+  // chrome for the HEADER, but a preview must STACK header-over-body — override
+  // the file-card's inline-flex ROW (+ narrow 360px cap) to a full-width column.
+  ".cm-attachment-text-preview": {
+    display: "flex", // override the file-card's inline-flex → block flex column
+    flexDirection: "column",
+    alignItems: "stretch",
+    gap: "0",
+    padding: "0",
+    width: "100%",
+    maxWidth: "560px",
+    overflow: "hidden", // keep the body scroll inside the rounded card
+  },
+  ".cm-attachment-text-preview-header": {
+    display: "flex",
+    alignItems: "center",
+    gap: "10px",
+    padding: "8px 10px",
+    borderBottom: "1px solid var(--line-1, #e3e2dd)",
+  },
+  ".cm-attachment-text-preview-body": {
+    padding: "8px 12px",
+    fontSize: "12px",
+    color: "var(--fg-1)",
+  },
+  ".cm-attachment-text-preview-pre": {
+    fontFamily: "var(--font-mono)",
+    fontSize: "12px",
+    lineHeight: "1.5",
+    whiteSpace: "pre",
+    margin: "0",
+    color: "var(--fg-1)",
+  },
+  // csv/tsv/xlsx grid — bordered, padded cells that don't wrap ("name" must not
+  // become "na⏎me"); the body's horizontal scroll handles a wide grid.
+  ".cm-attachment-text-preview-table": {
+    borderCollapse: "collapse",
+    width: "auto",
+    fontFamily: "var(--font-sans)",
+    fontSize: "12px",
+    color: "var(--fg-1)",
+  },
+  ".cm-attachment-text-preview-table td": {
+    border: "1px solid var(--line-1, #e3e2dd)",
+    padding: "4px 8px",
+    textAlign: "left",
+    verticalAlign: "top",
+    whiteSpace: "nowrap",
+  },
+  ".cm-attachment-text-preview-table tr:first-child td": {
+    fontWeight: "600",
+    backgroundColor: "var(--bg-2, #f4f4f2)",
+  },
+  // docx structured render — tame the browser-default huge headings.
+  ".cm-attachment-text-preview-doc": {
+    fontFamily: "var(--font-sans)",
+    fontSize: "13px",
+    lineHeight: "1.5",
+    color: "var(--fg-1)",
+  },
+  ".cm-attachment-text-preview-doc h1": { fontSize: "1.35em", fontWeight: "700", margin: "0.4em 0 0.2em" },
+  ".cm-attachment-text-preview-doc h2": { fontSize: "1.2em", fontWeight: "700", margin: "0.4em 0 0.2em" },
+  ".cm-attachment-text-preview-doc h3": { fontSize: "1.1em", fontWeight: "600", margin: "0.4em 0 0.2em" },
+  ".cm-attachment-text-preview-doc h4, .cm-attachment-text-preview-doc h5, .cm-attachment-text-preview-doc h6":
+    { fontSize: "1em", fontWeight: "600", margin: "0.3em 0 0.2em" },
+  ".cm-attachment-text-preview-doc p": { margin: "0.3em 0" },
+  ".cm-attachment-text-preview-truncated": {
+    display: "block",
+    marginTop: "6px",
+    fontSize: "11px",
+    fontStyle: "italic",
+    color: "var(--fg-3)",
+  },
+
   // Inline audio player (voice notes, MYND-259) — a sibling of the file-card,
   // same surface tokens. Circular accent play button, a seek track (the
   // waveform overlays this track in a later slice), and a mono time readout.
@@ -1339,7 +1470,10 @@ export const myneTheme = EditorView.theme({
     border: "1px solid var(--line-1, #e3e2dd)",
     borderRadius: "var(--radius-2, 6px)",
     verticalAlign: "top",
-    margin: "var(--space-3, 10px) 0",
+    // Small top margin so the block widget's top lines up with the top-aligned
+    // line number (a full --space-3 top margin floated the number above the
+    // widget); the bottom keeps the --space-3 block rhythm.
+    margin: "3px 0 var(--space-3, 10px)",
     fontFamily: "var(--font-sans)",
     cursor: "default",
   },

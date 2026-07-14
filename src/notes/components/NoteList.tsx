@@ -38,6 +38,7 @@ import {
 } from "../archivedFolders";
 import { ArchivePanel } from "./ArchivePanel";
 import { TrashPanel } from "./TrashPanel";
+import { sidebarCommands } from "../sidebarCommands";
 import { DeleteConfirmModal } from "./DeleteConfirmModal";
 import { deriveFolderTree, type FolderNode } from "../folderTree";
 import {
@@ -59,6 +60,7 @@ import { DecorationPopover } from "./DecorationPopover";
 import { Toast } from "../../components/Toast";
 import { FolderRow } from "./FolderRow";
 import { NoteRow } from "./NoteRow";
+import { TreeRails } from "./TreeRails";
 import {
   createFolderNote,
   setFolderIndex,
@@ -952,6 +954,19 @@ export function NoteList({ onNewFromTemplate, exportHooks }: NoteListProps = {})
   // Archive panel. Count from the value-strict `archived:` set (the disjoint
   // archive raft); memoized on cache identity like `trashCount`.
   const [archiveOpen, setArchiveOpen] = useState(false);
+  // Palette-gap Wave 4: register the sidebar-owned surfaces so the command
+  // palette (a separate subtree) can open them. Cleared on unmount so a
+  // non-editor stage's actions no-op.
+  useEffect(() => {
+    sidebarCommands.openTrash = () => setTrashOpen(true);
+    sidebarCommands.openArchive = () => setArchiveOpen(true);
+    sidebarCommands.newFolder = () => fm.startNewFolder("");
+    return () => {
+      sidebarCommands.openTrash = undefined;
+      sidebarCommands.openArchive = undefined;
+      sidebarCommands.newFolder = undefined;
+    };
+  }, [fm]);
   // Footer badge = standalone archived notes (value-strict `archived:`, NOT
   // also inside an archived folder — those show under the folder row) + the
   // top-level archived folder rows (folder-archive; each counts as one row).
@@ -1217,6 +1232,13 @@ function DisclosureWrapper({
       style={{
         display: "grid",
         gridTemplateRows: open ? "1fr" : "0fr",
+        // Bound the single column to the container (min 0 = shrinkable below the
+        // row's content, max 1fr = fill). Without this the implicit `auto` column
+        // grows to a long note title's max-content, so the row (and its hover /
+        // active pill) overflowed the sidebar under the editor. With it, the row
+        // is constrained and the title ellipsizes.
+        gridTemplateColumns: "minmax(0, 1fr)",
+        minWidth: 0,
         opacity: open ? 1 : 0,
         transition: animating
           ? `grid-template-rows var(--duration-base) ${easing} ${delay}ms, opacity var(--duration-base) ${easing} ${delay}ms`
@@ -1224,7 +1246,7 @@ function DisclosureWrapper({
         willChange: animating ? "grid-template-rows, opacity" : undefined,
       }}
     >
-      <div style={{ minHeight: 0, overflow: animating ? "hidden" : "visible" }}>
+      <div style={{ minHeight: 0, minWidth: 0, overflow: animating ? "hidden" : "visible" }}>
         {children}
       </div>
     </div>
@@ -1767,6 +1789,7 @@ function PopulatedList({
       return [
         {
           id: "bulk-move",
+          group: "organize",
           label: t("notes.list.bulkMove", { count: selCount }),
           onSelect: () => setMoveTarget({ x: menu.x, y: menu.y }),
         },
@@ -1776,12 +1799,14 @@ function PopulatedList({
           : [
               {
                 id: "bulk-archive",
+                group: "danger",
                 label: t("notes.list.bulkArchive", { count: selCount }),
                 onSelect: () => void handleBulkArchive(),
               },
             ]),
         {
           id: "bulk-delete",
+          group: "danger",
           label: t("notes.list.bulkDelete", { count: selCount }),
           destructive: true,
           onSelect: () => void handleBulkDelete(),
@@ -1791,16 +1816,19 @@ function PopulatedList({
     return [
       {
         id: "open-in-new-tab",
+        group: "open",
         label: t("notes.list.openInNewTab"),
         onSelect: () => openNote(menu.id, { newTab: true }),
       },
       {
         id: "open-to-side",
+        group: "open",
         label: t("notes.list.openToSide"),
         onSelect: () => openNote(menu.id, { toSide: true }),
       },
       {
         id: "rename",
+        group: "edit",
         label: t("notes.list.rename"),
         onSelect: () => ctx.startRename(menu.id),
       },
@@ -1808,11 +1836,13 @@ function PopulatedList({
         // Clone the note in place (MYND-332) — new id + "(kopya)" title;
         // the copy opens in the focused pane.
         id: "duplicate",
+        group: "edit",
         label: t("notes.list.duplicate"),
         onSelect: () => void ctx.duplicateAndOpen(menu.id),
       },
       {
         id: "favorite",
+        group: "edit",
         label: favSet.has(menu.id)
           ? t("notes.list.removeFromFavorites")
           : t("notes.list.addToFavorites"),
@@ -1830,6 +1860,7 @@ function PopulatedList({
         return [
           {
             id: "note.set-index",
+            group: "edit",
             label: t("notes.list.setAsFolderNote"),
             onSelect: () => void handleSetIndex(menu.id),
           },
@@ -1837,6 +1868,7 @@ function PopulatedList({
       })(),
       {
         id: "color",
+        group: "edit",
         label: t("notes.list.color"),
         onSelect: () =>
           setDecoPopover({
@@ -1850,6 +1882,7 @@ function PopulatedList({
         // Per-note plaintext egress (MYND-116) — live tree note rows only;
         // Trash / Templates surfaces deliberately don't carry it.
         id: "export-markdown",
+        group: "export",
         label: t("notes.list.exportMarkdown"),
         onSelect: () =>
           void runNoteExportFlow(
@@ -1864,6 +1897,7 @@ function PopulatedList({
         // Sibling PDF egress (MYND-255) — same export group, same shared-
         // flow discipline (runNotePdfExportFlow is the palette's flow too).
         id: "export-pdf",
+        group: "export",
         label: t("notes.list.exportPdf"),
         onSelect: () =>
           void runNotePdfExportFlow(
@@ -1878,6 +1912,7 @@ function PopulatedList({
         // Sibling HTML egress (MYND-340) — same export group, same shared-
         // flow discipline (runNoteHtmlExportFlow is the palette's flow too).
         id: "export-html",
+        group: "export",
         label: t("notes.list.exportHtml"),
         onSelect: () =>
           void runNoteHtmlExportFlow(
@@ -1891,6 +1926,7 @@ function PopulatedList({
       {
         // Sibling plain-text egress (MYND-340).
         id: "export-txt",
+        group: "export",
         label: t("notes.list.exportTxt"),
         onSelect: () =>
           void runNoteTxtExportFlow(
@@ -1909,12 +1945,14 @@ function PopulatedList({
         : [
             {
               id: "archive",
+              group: "danger",
               label: t("notes.list.archiveNote"),
               onSelect: () => void handleArchive(menu.id),
             },
           ]),
       {
         id: "delete",
+        group: "danger",
         label: t("notes.list.delete"),
         destructive: true,
         onSelect: () => void handleTrash(menu.id),
@@ -2275,6 +2313,7 @@ function PopulatedList({
                     paddingLeft: row.depth * NOTE_INDENT_PER_LEVEL,
                   }}
                   draggable={ctx.renamingId === null}
+                  data-note-depth={row.depth}
                   onDragStart={(e) => fm.onNoteDragStart(e, id)}
                   onDragEnd={fm.onDragEndCleanup}
                   onDragOver={(e) => {
@@ -2292,6 +2331,7 @@ function PopulatedList({
                     void fm.onNoteReorder(id, dragEdge(e));
                   }}
                 >
+                  <TreeRails depth={row.depth} />
                   {reorderPlace && (
                     <div
                       style={insertionLineStyle(reorderPlace)}

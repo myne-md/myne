@@ -74,3 +74,26 @@ export function emitVaultHeadingWikilink(
   const label = display ?? `${title} › ${heading}`;
   return `[[${path}#${heading}|${label}]]`;
 }
+
+/**
+ * Emit the FULL cross-note BLOCK deep-link (MYND-382, `wikilink.md` §9). The
+ * `[[^^` vault-wide enumerate-only autocomplete inserts the canonical §3 path
+ * form extended with a `^blockId` anchor: `[[<folder>/<title>.md^blockId|Display]]`.
+ * The path keeps the link self-resolving; the `^blockId` scrolls to the tagged
+ * block inside the resolved note. Enumerate-only — the block id is one that
+ * ALREADY exists (import), never minted here.
+ * @param folder  the target note's `folder:` (trailing-slash form) or null/"".
+ * @param title   the target note's title.
+ * @param blockId the imported block id (no leading `^`).
+ * @param display optional alias; defaults to `"<title> › ^blockId"`.
+ */
+export function emitVaultBlockAnchorWikilink(
+  folder: string | null,
+  title: string,
+  blockId: string,
+  display?: string,
+): string {
+  const path = (folder ?? "") + titleToFilename(title);
+  const label = display ?? `${title} › ^${blockId}`;
+  return `[[${path}^${blockId}|${label}]]`;
+}

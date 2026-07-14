@@ -41,6 +41,9 @@ function buildCtx(over: Partial<CommandContext> = {}): CommandContext {
   return {
     stageName: "editor",
     selectedNoteId: null,
+    // Visibility predicates may read ctx.prefs (e.g. note.archive's
+    // archive_disabled gate) — an empty stub means "all defaults".
+    prefs: {} as CommandContext["prefs"],
     onLock: vi.fn(async () => {}),
     onOpenSettings: vi.fn(),
     onManageTemplates: vi.fn(),

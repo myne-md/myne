@@ -222,8 +222,22 @@ function collectBlockHtmlRanges(
 }
 
 /** Ephemeral `<details>` open state, keyed by source HTML. WebView-only —
- *  never persisted, never written to the note buffer. */
+ *  never persisted, never written to the note buffer. Bounded: the key is the
+ *  block's FULL source text, so an unpruned map would retain every distinct
+ *  <details> source viewed all session. `Map` iterates in insertion order and
+ *  a write re-inserts, so overflow evicts the least-recently-toggled entry. */
+const DETAILS_OPEN_STATE_MAX = 128;
 const detailsOpenState = new Map<string, boolean>();
+
+function setDetailsOpenState(key: string, open: boolean): void {
+  detailsOpenState.delete(key);
+  detailsOpenState.set(key, open);
+  while (detailsOpenState.size > DETAILS_OPEN_STATE_MAX) {
+    const oldest = detailsOpenState.keys().next().value;
+    if (oldest === undefined) break;
+    detailsOpenState.delete(oldest);
+  }
+}
 
 class BlockHtmlWidget extends WidgetType {
   constructor(
@@ -233,9 +247,14 @@ class BlockHtmlWidget extends WidgetType {
     super();
   }
   eq(other: BlockHtmlWidget): boolean {
+    // Identity is the SOURCE only, never the position: blockHtmlField rebuilds
+    // on every doc/selection change, so a position-bearing identity would tear
+    // down + recreate the DOM of every block below the edit point once per
+    // keystroke (innerHTML re-parse, <details> restore, re-measure).
+    // Click-to-edit resolves the live position at event time via posAtDOM.
     return other.key === this.key;
   }
-  toDOM(): HTMLElement {
+  toDOM(view: EditorView): HTMLElement {
     // Discriminator is the soft background tint (theme) — no label element.
     const div = document.createElement("div");
     div.className = "cm-embedded-html-block";
@@ -244,13 +263,38 @@ class BlockHtmlWidget extends WidgetType {
     if (details !== null) {
       if (detailsOpenState.get(this.key) === true) details.setAttribute("open", "");
       details.addEventListener("toggle", () => {
-        detailsOpenState.set(this.key, details.open);
+        setDetailsOpenState(this.key, details.open);
+        // NOTE: do NOT call view.requestMeasure() here. Restoring an open
+        // <details> sets `open` on every render, firing a toggle — so a
+        // requestMeasure here runs mid-scroll each time an open block scrolls
+        // into view, churning the height map (jitter + blank frames on long
+        // docs). CM6's ResizeObserver already re-measures on the native height
+        // change, so the following block still reflows without it.
       });
     }
+    // Click-to-edit, same model as the code-block widget: the block is a
+    // read-only replace, so a click places the cursor at the block's source
+    // start — that touches the block's lines, drops the widget, and reveals the
+    // raw HTML for editing. A click on a <details> disclosure (<summary>) is
+    // EXCLUDED so it toggles the section natively instead of revealing raw HTML.
+    div.addEventListener("mousedown", (event) => {
+      const target = event.target;
+      if (target instanceof Element && target.closest("summary") !== null) return;
+      event.preventDefault();
+      // The DOM is reused across rebuilds (identity is source-keyed), so a
+      // position baked in at build time would go stale as edits above shift
+      // the block — resolve the block's CURRENT start from the DOM instead.
+      view.dispatch({ selection: { anchor: view.posAtDOM(div) } });
+      view.focus();
+    });
     return div;
   }
   ignoreEvent(): boolean {
-    return false; // let the native <details> toggle handle clicks
+    // Editor ignores widget events (like the code-block widget) so the native
+    // <details> toggle works and our own mousedown handler above drives
+    // click-to-edit; without this, CM would move the cursor on every click and
+    // reveal raw HTML even when toggling the disclosure.
+    return true;
   }
 }
 
@@ -273,7 +317,10 @@ function buildBlockHtml(state: EditorState): DecorationSet {
     builder.add(
       fromLine.from,
       toLine.to,
-      Decoration.replace({ widget: new BlockHtmlWidget(safe, html), block: true }),
+      Decoration.replace({
+        widget: new BlockHtmlWidget(safe, html),
+        block: true,
+      }),
     );
   }
   return builder.finish();

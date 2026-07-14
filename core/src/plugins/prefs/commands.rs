@@ -1140,6 +1140,126 @@ pub(crate) async fn set_right_panel_tab_order_with_dir(
     Ok(())
 }
 
+// ---- MYND-336 editor toolbar / slash-menu customization ----------------
+// Four count-only setters mirroring the right-panel-tabs pattern: *_order is a
+// verbatim sequence, *_hidden is a set the codec canonicalizes on encode.
+
+/// Slot::Unlocked-gated setter for `editor_toolbar_order` (verbatim sequence).
+#[tauri::command]
+pub async fn set_editor_toolbar_order<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    order: Vec<String>,
+) -> Result<(), PrefsWriteError> {
+    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_editor_toolbar_order_with_dir(&dir, state.inner(), order).await
+}
+
+/// Testable core of [`set_editor_toolbar_order`].
+pub(crate) async fn set_editor_toolbar_order_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    order: Vec<String>,
+) -> Result<(), PrefsWriteError> {
+    let count = order.len();
+    update_prefs_with_dir(vault_dir, state, |prefs| {
+        prefs.editor_toolbar_order = order;
+    })
+    .await?;
+    tracing::info!(
+        event = "prefs_written",
+        field = "editor_toolbar_order",
+        count
+    );
+    Ok(())
+}
+
+/// Slot::Unlocked-gated setter for `editor_toolbar_hidden` (sorted+deduped set).
+#[tauri::command]
+pub async fn set_editor_toolbar_hidden<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    items: Vec<String>,
+) -> Result<(), PrefsWriteError> {
+    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_editor_toolbar_hidden_with_dir(&dir, state.inner(), items).await
+}
+
+/// Testable core of [`set_editor_toolbar_hidden`].
+pub(crate) async fn set_editor_toolbar_hidden_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    items: Vec<String>,
+) -> Result<(), PrefsWriteError> {
+    let count = items.len();
+    update_prefs_with_dir(vault_dir, state, |prefs| {
+        prefs.editor_toolbar_hidden = items;
+    })
+    .await?;
+    tracing::info!(
+        event = "prefs_written",
+        field = "editor_toolbar_hidden",
+        count
+    );
+    Ok(())
+}
+
+/// Slot::Unlocked-gated setter for `editor_slash_order` (verbatim sequence).
+#[tauri::command]
+pub async fn set_editor_slash_order<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    order: Vec<String>,
+) -> Result<(), PrefsWriteError> {
+    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_editor_slash_order_with_dir(&dir, state.inner(), order).await
+}
+
+/// Testable core of [`set_editor_slash_order`].
+pub(crate) async fn set_editor_slash_order_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    order: Vec<String>,
+) -> Result<(), PrefsWriteError> {
+    let count = order.len();
+    update_prefs_with_dir(vault_dir, state, |prefs| {
+        prefs.editor_slash_order = order;
+    })
+    .await?;
+    tracing::info!(event = "prefs_written", field = "editor_slash_order", count);
+    Ok(())
+}
+
+/// Slot::Unlocked-gated setter for `editor_slash_hidden` (sorted+deduped set).
+#[tauri::command]
+pub async fn set_editor_slash_hidden<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    items: Vec<String>,
+) -> Result<(), PrefsWriteError> {
+    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_editor_slash_hidden_with_dir(&dir, state.inner(), items).await
+}
+
+/// Testable core of [`set_editor_slash_hidden`].
+pub(crate) async fn set_editor_slash_hidden_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    items: Vec<String>,
+) -> Result<(), PrefsWriteError> {
+    let count = items.len();
+    update_prefs_with_dir(vault_dir, state, |prefs| {
+        prefs.editor_slash_hidden = items;
+    })
+    .await?;
+    tracing::info!(
+        event = "prefs_written",
+        field = "editor_slash_hidden",
+        count
+    );
+    Ok(())
+}
+
 /// Slot::Unlocked-gated setter for the `daily_date_format` field (MYND-191) —
 /// the daily-notes date-format string (e.g. `YYYY-MM-DD`). Read-modify-write
 /// under the per-plugin write mutex; no native side-effect. Disk-first. The
@@ -1975,6 +2095,10 @@ mod tests {
                     ai_enabled: false,
                     ai_excluded_folders: Vec::new(),
                     bar_items_order: Vec::new(),
+                    editor_toolbar_order: Vec::new(),
+                    editor_toolbar_hidden: Vec::new(),
+                    editor_slash_order: Vec::new(),
+                    editor_slash_hidden: Vec::new(),
                     show_note_timestamps: true,
                     folder_icons: Default::default(),
                     hidden_bar_items: Vec::new(),

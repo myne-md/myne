@@ -32,12 +32,18 @@ import { ensureFloatingStyles } from "../floating-styles";
 import { isSlashSuppressed } from "../slash/plugin";
 import { readNoteSet } from "./note-set";
 import { readVaultHeadings, vaultHeadingsExtension } from "./vault-headings";
+import {
+  readVaultBlockAnchors,
+  vaultBlockAnchorsExtension,
+} from "./vault-block-anchors";
 import { rankNotes, type PickerRow } from "./picker-rank";
 import {
   rankCurrentHeadings,
   rankVaultHeadings,
+  rankVaultBlockAnchors,
   type CurrentHeadingRow,
   type VaultHeadingRow,
+  type VaultBlockAnchorRow,
 } from "./picker-heading-rank";
 import { headingSections } from "@myne/dialect";
 import {
@@ -45,23 +51,28 @@ import {
   emitFolderWikilink,
   emitHeadingAnchorWikilink,
   emitVaultHeadingWikilink,
+  emitVaultBlockAnchorWikilink,
 } from "./emit";
 
 // MYND-305: the picker has three modes, discriminated by the filter prefix after
 // `[[`. `##query` → vault-wide headings; `#query` → current-note headings; else
 // the default note picker. The union row type the render/move/confirm path
 // agrees on.
-type AnchorPickerRow = CurrentHeadingRow | VaultHeadingRow;
+type AnchorPickerRow = CurrentHeadingRow | VaultHeadingRow | VaultBlockAnchorRow;
 type AnyPickerRow = PickerRow | AnchorPickerRow;
 
 type PickerMode =
   | { kind: "note"; query: string }
   | { kind: "current-heading"; query: string }
-  | { kind: "vault-heading"; query: string };
+  | { kind: "vault-heading"; query: string }
+  | { kind: "vault-block-anchor"; query: string };
 
 /** Classify the raw filter (the text after `[[`) into a picker mode + its query.
- *  `##x` → vault-heading "x"; `#x` → current-heading "x"; otherwise note "x". */
+ *  `^^x` → vault-block-anchor "x" (MYND-382); `##x` → vault-heading "x";
+ *  `#x` → current-heading "x"; otherwise note "x". */
 export function classifyPickerFilter(filter: string): PickerMode {
+  if (filter.startsWith("^^"))
+    return { kind: "vault-block-anchor", query: filter.slice(2) };
   if (filter.startsWith("##")) return { kind: "vault-heading", query: filter.slice(2) };
   if (filter.startsWith("#")) return { kind: "current-heading", query: filter.slice(1) };
   return { kind: "note", query: filter };
@@ -157,6 +168,13 @@ class WikilinkPickerView implements PluginValue {
     }
     if (mode.kind === "vault-heading") {
       return rankVaultHeadings(mode.query, readVaultHeadings(this.view.state));
+    }
+    if (mode.kind === "vault-block-anchor") {
+      // MYND-382: `[[^^` — vault-wide imported block anchors (enumerate-only).
+      return rankVaultBlockAnchors(
+        mode.query,
+        readVaultBlockAnchors(this.view.state),
+      );
     }
     return rankNotes(mode.query, readNoteSet(this.view.state));
   }
@@ -349,6 +367,32 @@ class WikilinkPickerView implements PluginValue {
       el.append(heading, context);
       return;
     }
+    if (row.kind === "vault-block-anchor") {
+      // `[[^^` (MYND-382) — a VAULT-WIDE imported block anchor. The block's
+      // preview text (a `^` glyph prefix hints it's a block) over a smaller
+      // context line naming the owning note + block id.
+      el.classList.add(
+        "cm-wiki-picker-heading-row",
+        "cm-wiki-picker-vault-heading-row",
+      );
+      el.setAttribute("data-testid", "picker.vault-block-anchor-row");
+      el.setAttribute("data-heading-scope", "vault");
+      const glyph = document.createElement("span");
+      glyph.className = "cm-slash-menu-icon cm-wiki-picker-heading-glyph";
+      glyph.setAttribute("aria-hidden", "true");
+      glyph.textContent = "^";
+      const label = document.createElement("span");
+      label.className = "cm-slash-menu-label cm-wiki-picker-title";
+      label.textContent =
+        row.entry.preview !== "" ? row.entry.preview : `^${row.entry.blockId}`;
+      const context = document.createElement("span");
+      context.className = "cm-wiki-picker-path";
+      const noteName = row.entry.title ?? "";
+      context.textContent =
+        noteName !== "" ? `${noteName} · ^${row.entry.blockId}` : `^${row.entry.blockId}`;
+      el.append(glyph, label, context);
+      return;
+    }
     // Default: a note row — title over a smaller vault-path line.
     el.setAttribute("data-testid", "picker.note-row");
     const title = document.createElement("span");
@@ -371,6 +415,12 @@ class WikilinkPickerView implements PluginValue {
           row.entry.folder,
           row.entry.title ?? "",
           row.entry.heading,
+        );
+      case "vault-block-anchor":
+        return emitVaultBlockAnchorWikilink(
+          row.entry.folder,
+          row.entry.title ?? "",
+          row.entry.blockId,
         );
       default:
         return emitNoteWikilink(row.note.folder, row.note.title ?? "");
@@ -472,6 +522,9 @@ export function wikilinkPickerExtension(): Extension {
     // MYND-305: the vault-wide heading facet the `[[##` mode reads (seeded empty;
     // the host reconfigures it). Composed here so the picker plugin can read it.
     vaultHeadingsExtension(),
+    // MYND-382: the vault-wide imported-block-anchor facet the `[[^^` mode reads
+    // (seeded empty; the host reconfigures it), same injection mechanism.
+    vaultBlockAnchorsExtension(),
     wikilinkPickerPlugin,
     Prec.highest(keymap.of(wikilinkPickerKeymap())),
   ];

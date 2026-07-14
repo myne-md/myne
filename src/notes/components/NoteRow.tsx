@@ -105,9 +105,19 @@ const rowBaseStyle: CSSProperties = {
   padding: "8px 14px",
   minHeight: 52,
   cursor: "pointer",
-  borderRadius: 3,
+  borderRadius: 6,
   marginLeft: 4,
   marginRight: 4,
+  // Never grow past the sidebar: the flex content shrinks + the title ellipsizes
+  // (rowContentStyle clips) instead of the whole pill bleeding under the editor.
+  minWidth: 0,
+  overflow: "hidden",
+  // A small vertical gap so adjacent highlighted rows (hover + selected) don't
+  // butt their backgrounds together and blend — each row reads as its own
+  // rounded pill. Single-direction (bottom only) → a deterministic 3px gap
+  // regardless of flex/block margin-collapse; the row above supplies the gap
+  // above each row. Matched by `FolderRow` so the interleaved tree is uniform.
+  marginBottom: 3,
   // Subtle hover via inline `:hover` not possible without a stylesheet —
   // we toggle via state below (`hovering`) so design-token bg shifts
   // are explicit.
@@ -131,6 +141,12 @@ const rowContentStyle: CSSProperties = {
   gap: 2,
   flex: 1,
   minWidth: 0,
+  // Clip the stacked title/subtitle to this column so a long title ELLIPSIZES
+  // (titleStyle is nowrap) instead of pushing the row wider than the sidebar —
+  // which bled the hover/active pill under the editor and shoved the star
+  // affordance off-screen on hover. With the column bounded, the star always
+  // has room (it flex-shrink:0 reserves its slot, the title truncates to fit).
+  overflow: "hidden",
 };
 
 /** Right-aligned star affordance — favorite indicator / toggle (MYND-183). */
@@ -247,13 +263,17 @@ const indexConflictStyle: CSSProperties = {
 const renameInputStyle: CSSProperties = {
   display: "block",
   width: "100%",
+  // border-box + width:100% so the field fits EXACTLY inside the row instead of
+  // overflowing it (the old content-box + negative horizontal margins pushed the
+  // box past the row edge — the "off" look). Only a small negative VERTICAL
+  // margin remains, to keep the row from growing taller while renaming.
+  boxSizing: "border-box",
   border: "1px solid var(--accent)",
-  borderRadius: 3,
-  padding: "1px 4px",
-  margin: "-2px -5px",
+  borderRadius: "var(--radius-1, 4px)",
+  padding: "1px 6px",
+  margin: "-2px 0",
   background: "var(--paper)",
   color: "var(--fg-1)",
-  font: "inherit",
   fontFamily: "var(--font-sans)",
   fontSize: 13,
   fontWeight: 500,

@@ -23,6 +23,14 @@ export function wrapCommand(open: string, close: string): ToolbarCommand {
   };
 }
 
+/** The ATX heading level (1–6) of the cursor's line, or 0 for a plain
+ *  paragraph — drives the toolbar's leading block-type indicator. */
+export function currentHeadingLevel(view: EditorView): number {
+  const line = view.state.doc.lineAt(view.state.selection.main.from);
+  const m = view.state.doc.sliceString(line.from, line.to).match(/^(#{1,6})\s/);
+  return m ? m[1]!.length : 0;
+}
+
 /** Set (or clear, `level === 0`) the ATX heading level of the cursor's line. */
 export function applyHeadingLevel(view: EditorView, level: number): void {
   const range = view.state.selection.main;

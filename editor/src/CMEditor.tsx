@@ -20,9 +20,11 @@ import { selectedRangesText } from "./selectionText";
 import { reconfigureNoteSet } from "./wikilink/note-set";
 import { reconfigureVaultHeadings } from "./wikilink/vault-headings";
 import type { VaultHeading } from "./wikilink/vault-headings";
+import { reconfigureVaultBlockAnchors } from "./wikilink/vault-block-anchors";
+import type { VaultBlockAnchor } from "./wikilink/vault-block-anchors";
 import { reconfigureLineNumbers } from "./line-numbers";
 import { reconfigureViewMode, type ViewMode } from "./view-mode";
-import { resolveAnchorOffset, type WikilinkAnchor } from "./wikilink/anchor";
+import { resolveAnchorRange, type WikilinkAnchor } from "./wikilink/anchor";
 import type { ResolverNote } from "@myne/editor/host/notes/resolveWikilink";
 
 /** A deep-link scroll request (MYND-305, SYNC-5): a generic anchor to scroll to
@@ -49,6 +51,11 @@ export type CMEditorProps = {
    *  Pushed into the editor's vault-headings compartment (re-mount-free) like
    *  `noteSet`. Optional — when absent, `[[##` simply finds nothing. */
   vaultHeadings?: readonly VaultHeading[];
+  /** MYND-382: the vault-wide imported-block-anchor set the `[[^^` enumerate-only
+   *  autocomplete searches. Pushed into the vault-block-anchors compartment
+   *  (re-mount-free) like `vaultHeadings`. Optional — when absent, `[[^^` finds
+   *  nothing. */
+  vaultBlockAnchors?: readonly VaultBlockAnchor[];
   /** Called when a resolved wikilink chip is clicked (the workspace opens the
    *  target note). The chip emits a `myne-open-wikilink` event; this relays it.
    *  MYND-305: `anchor` carries the GENERIC `#heading` / `^block-id` deep-link
@@ -85,7 +92,7 @@ export type CMEditorProps = {
 };
 
 export function CMEditor(props: CMEditorProps) {
-  const { value, onChange, onBlur, onSelectionChange, extensions, noteSet, vaultHeadings, onOpenWikilink, scrollAnchor = null, lineNumbers = false, viewMode = "live", readOnly = false, aiEnabled = false, style, onReady } = props;
+  const { value, onChange, onBlur, onSelectionChange, extensions, noteSet, vaultHeadings, vaultBlockAnchors, onOpenWikilink, scrollAnchor = null, lineNumbers = false, viewMode = "live", readOnly = false, aiEnabled = false, style, onReady } = props;
   const hostRef = useRef<HTMLDivElement | null>(null);
   const viewRef = useRef<EditorView | null>(null);
   const onChangeRef = useRef(onChange);
@@ -202,6 +209,14 @@ export function CMEditor(props: CMEditorProps) {
     view.dispatch({ effects: reconfigureVaultHeadings(vaultHeadings) });
   }, [vaultHeadings]);
 
+  // MYND-382: push the vault-wide imported-block-anchor set into the view's
+  // compartment (same re-mount-free pattern) so the `[[^^` picker searches it.
+  useEffect(() => {
+    const view = viewRef.current;
+    if (view === null || vaultBlockAnchors === undefined) return;
+    view.dispatch({ effects: reconfigureVaultBlockAnchors(vaultBlockAnchors) });
+  }, [vaultBlockAnchors]);
+
   // editor-line-numbers (MYND-314): push the line-number gutter toggle into the
   // view's line-number compartment whenever the `editor_line_numbers` pref
   // changes (re-mount-free reconfigure — cursor / scroll / undo preserved). The
@@ -248,8 +263,8 @@ export function CMEditor(props: CMEditorProps) {
     if (view === null || scrollAnchor === null) return;
     if (appliedScrollNonceRef.current === scrollAnchor.nonce) return;
     const body = view.state.doc.toString();
-    const offset = resolveAnchorOffset(body, scrollAnchor.anchor);
-    if (offset === null) {
+    const range = resolveAnchorRange(body, scrollAnchor.anchor);
+    if (range === null) {
       // Body may not have loaded yet (anchor not present) — wait for the next
       // `value` change to retry. If the note is loaded and the anchor genuinely
       // doesn't exist, the retry stays a no-op and the editor keeps its top
@@ -257,9 +272,13 @@ export function CMEditor(props: CMEditorProps) {
       return;
     }
     appliedScrollNonceRef.current = scrollAnchor.nonce;
+    const from = Math.min(range.from, body.length);
+    const to = Math.min(range.to, body.length);
     view.dispatch({
-      selection: { anchor: offset },
-      effects: EditorView.scrollIntoView(offset, { y: "start" }),
+      // A query anchor carries a non-empty span → SELECT the match (MYND-448 D4);
+      // heading/block anchors are zero-length → just place the caret.
+      selection: to > from ? { anchor: from, head: to } : { anchor: from },
+      effects: EditorView.scrollIntoView(from, { y: "start" }),
     });
   }, [scrollAnchor, value]);
 

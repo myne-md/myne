@@ -14,7 +14,556 @@ import type { CommandAction } from "./registry";
 import { runWikilinkConvert } from "../editor/wikilink/convert-command";
 import { foldAll, unfoldAll } from "@codemirror/language";
 import { getActiveEditorView } from "../editor/active-view";
+import { exportSelectionAsImage } from "../lib/noteImageExport";
+import { showAttachmentToast } from "../editor/attachments/toast";
+import { openInNoteFind } from "../editor/find/find-session";
+import { cycleHeading } from "@myne/editor";
+import { sidebarCommands } from "../notes/sidebarCommands";
+import { appDataDir, join } from "@tauri-apps/api/path";
+import { openPath } from "@tauri-apps/plugin-opener";
+import {
+  setEditorLineNumbers,
+  setSpellEnabled,
+  setAiEnabled,
+  setScreenCaptureProtection,
+  setArchiveDisabled,
+  setShowNoteTimestamps,
+  setEditorFocusTypewriter,
+  setEditorFocusDimInactive,
+  setEditorFontFamily,
+  setEditorTextSize,
+  setEditorContentWidth,
+  setEditorDefaultViewMode,
+  setTheme,
+  setCustomTheme,
+  type ThemeChoice,
+} from "../lib/prefs";
+import { applyTheme } from "../lib/theme";
 import i18n from "../i18n";
+
+/** Next element after `current` (or `fallback` when unset) in a cyclic list. */
+function cycleNext<T>(order: readonly T[], current: T | null | undefined, fallback: T): T {
+  const i = order.indexOf((current ?? fallback) as T);
+  return order[(i + 1) % order.length]!;
+}
+
+/** Editor-stage-only visibility (the palette is editor-stage anyway; keeps the
+ *  action hidden on lock/unlock screens). */
+const editorOnly = (ctx: { stageName: string }): "show" | "hidden" =>
+  ctx.stageName === "editor" ? "show" : "hidden";
+
+// ─── Wave 1: preference toggles / cycles + theme (palette-gap audit) ───────
+// Self-contained: read the current value from `ctx.prefs`, compute the next,
+// call the module-level `set*` setter (the same IPC the Settings panels use, so
+// the change applies live via the prefs nonce). No CommandContext callback.
+
+const toggleLineNumbersAction: CommandAction = {
+  id: "editor.toggle-line-numbers",
+  get label() {
+    return i18n.t("commands.actions.toggleLineNumbers.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.editor");
+  },
+  visibility: editorOnly,
+  run: (ctx) => {
+    void setEditorLineNumbers(!(ctx.prefs.editor_line_numbers ?? false));
+  },
+};
+
+const toggleSpellCheckAction: CommandAction = {
+  id: "editor.toggle-spell-check",
+  get label() {
+    return i18n.t("commands.actions.toggleSpellCheck.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.editor");
+  },
+  visibility: editorOnly,
+  run: (ctx) => {
+    void setSpellEnabled(!(ctx.prefs.spell_enabled ?? true));
+  },
+};
+
+const toggleTypewriterAction: CommandAction = {
+  id: "editor.toggle-typewriter",
+  get label() {
+    return i18n.t("commands.actions.toggleTypewriter.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.editor");
+  },
+  visibility: editorOnly,
+  run: (ctx) => {
+    void setEditorFocusTypewriter(!(ctx.prefs.editor_focus_typewriter ?? true));
+  },
+};
+
+const toggleDimInactiveAction: CommandAction = {
+  id: "editor.toggle-dim-inactive",
+  get label() {
+    return i18n.t("commands.actions.toggleDimInactive.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.editor");
+  },
+  visibility: editorOnly,
+  run: (ctx) => {
+    void setEditorFocusDimInactive(!(ctx.prefs.editor_focus_dim_inactive ?? true));
+  },
+};
+
+const toggleEditorFontAction: CommandAction = {
+  id: "editor.toggle-font",
+  get label() {
+    return i18n.t("commands.actions.toggleEditorFont.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.editor");
+  },
+  visibility: editorOnly,
+  run: (ctx) => {
+    void setEditorFontFamily(ctx.prefs.editor_font_family === "sans" ? "mono" : "sans");
+  },
+};
+
+const EDITOR_TEXT_SIZES = ["sm", "md", "lg", "xl"] as const;
+const cycleTextSizeAction: CommandAction = {
+  id: "editor.cycle-text-size",
+  get label() {
+    return i18n.t("commands.actions.cycleTextSize.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.editor");
+  },
+  visibility: editorOnly,
+  run: (ctx) => {
+    void setEditorTextSize(cycleNext(EDITOR_TEXT_SIZES, ctx.prefs.editor_text_size, "md"));
+  },
+};
+
+const EDITOR_WIDTHS = ["narrow", "normal", "wide", "full"] as const;
+const cycleContentWidthAction: CommandAction = {
+  id: "editor.cycle-content-width",
+  get label() {
+    return i18n.t("commands.actions.cycleContentWidth.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.editor");
+  },
+  visibility: editorOnly,
+  run: (ctx) => {
+    void setEditorContentWidth(cycleNext(EDITOR_WIDTHS, ctx.prefs.editor_content_width, "normal"));
+  },
+};
+
+const VIEW_MODES = ["live", "reading", "source"] as const;
+const cycleDefaultViewModeAction: CommandAction = {
+  id: "editor.cycle-default-view-mode",
+  get label() {
+    return i18n.t("commands.actions.cycleDefaultViewMode.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.editor");
+  },
+  visibility: editorOnly,
+  run: (ctx) => {
+    void setEditorDefaultViewMode(cycleNext(VIEW_MODES, ctx.prefs.editor_default_view_mode, "live"));
+  },
+};
+
+const toggleTimestampsAction: CommandAction = {
+  id: "appearance.toggle-timestamps",
+  get label() {
+    return i18n.t("commands.actions.toggleTimestamps.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.appearance");
+  },
+  visibility: editorOnly,
+  run: (ctx) => {
+    void setShowNoteTimestamps(!ctx.prefs.show_note_timestamps);
+  },
+};
+
+const toggleArchivingAction: CommandAction = {
+  id: "notes.toggle-archiving",
+  get label() {
+    return i18n.t("commands.actions.toggleArchiving.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.editor");
+  },
+  visibility: editorOnly,
+  run: (ctx) => {
+    void setArchiveDisabled(!(ctx.prefs.archive_disabled ?? false));
+  },
+};
+
+const toggleAiEnabledAction: CommandAction = {
+  id: "ai.toggle-enabled",
+  get label() {
+    return i18n.t("commands.actions.toggleAiEnabled.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.app");
+  },
+  visibility: editorOnly,
+  run: (ctx) => {
+    void setAiEnabled(!ctx.prefs.ai_enabled);
+  },
+};
+
+const toggleScreenCaptureAction: CommandAction = {
+  id: "app.toggle-screen-capture",
+  get label() {
+    return i18n.t("commands.actions.toggleScreenCapture.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.app");
+  },
+  visibility: editorOnly,
+  run: (ctx) => {
+    void setScreenCaptureProtection(!ctx.prefs.screen_capture_protection);
+  },
+};
+
+/** Apply a built-in theme (or System) immediately (DOM) + persist it, clearing
+ *  any active custom theme so the built-in fully takes over. */
+function applyBuiltinTheme(choice: ThemeChoice | null): void {
+  applyTheme(choice);
+  void setCustomTheme(null);
+  void setTheme(choice);
+}
+
+const THEME_CYCLE: readonly (ThemeChoice | null)[] = [null, "light", "dark", "amoled"];
+const cycleThemeAction: CommandAction = {
+  id: "appearance.cycle-theme",
+  get label() {
+    return i18n.t("commands.actions.cycleTheme.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.appearance");
+  },
+  visibility: editorOnly,
+  run: (ctx) => {
+    // A custom theme reads as `theme: null`; cycling from it lands on Light.
+    const current = ctx.prefs.custom_theme != null ? null : ctx.prefs.theme;
+    applyBuiltinTheme(cycleNext(THEME_CYCLE, current as ThemeChoice | null, null));
+  },
+};
+
+function switchThemeAction(
+  choice: ThemeChoice | null,
+  idSuffix: string,
+  labelKey: string,
+): CommandAction {
+  return {
+    id: `appearance.theme-${idSuffix}`,
+    get label() {
+      return i18n.t(labelKey);
+    },
+    get category() {
+      return i18n.t("commands.actions.category.appearance");
+    },
+    visibility: editorOnly,
+    run: () => applyBuiltinTheme(choice),
+  };
+}
+
+const switchThemeLightAction = switchThemeAction(
+  "light",
+  "light",
+  "commands.actions.themeLight.label",
+);
+const switchThemeDarkAction = switchThemeAction("dark", "dark", "commands.actions.themeDark.label");
+const switchThemeAmoledAction = switchThemeAction(
+  "amoled",
+  "amoled",
+  "commands.actions.themeAmoled.label",
+);
+const switchThemeSystemAction = switchThemeAction(
+  null,
+  "system",
+  "commands.actions.themeSystem.label",
+);
+
+// Palette-gap #31: open the custom-theme picker (QuickPicker) and apply the
+// chosen saved theme. The picker + apply live in `commandCtx.onApplyCustomTheme`
+// (needs `listCustomThemes` / `readCustomTheme`, both async IPC).
+const applyCustomThemeAction: CommandAction = {
+  id: "appearance.apply-custom-theme",
+  get label() {
+    return i18n.t("commands.actions.applyCustomTheme.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.appearance");
+  },
+  visibility: editorOnly,
+  run: (c) => c.onApplyCustomTheme(),
+};
+
+// ─── Wave 2: layout / panes / tabs / navigation (palette-gap audit) ────────
+// Thin dispatchers to the workspace controller via CommandContext callbacks
+// (wired from the workspace in `commandCtx`).
+
+function layoutAction(
+  id: string,
+  labelKey: string,
+  invoke: CommandAction["run"],
+): CommandAction {
+  return {
+    id,
+    get label() {
+      return i18n.t(labelKey);
+    },
+    get category() {
+      return i18n.t("commands.actions.category.view");
+    },
+    visibility: editorOnly,
+    run: invoke,
+  };
+}
+
+const splitRightAction = layoutAction("pane.split-right", "commands.actions.splitRight.label", (c) =>
+  c.onSplitRight(),
+);
+const splitDownAction = layoutAction("pane.split-down", "commands.actions.splitDown.label", (c) =>
+  c.onSplitDown(),
+);
+const closePaneAction = layoutAction("pane.close", "commands.actions.closePane.label", (c) =>
+  c.onClosePane(),
+);
+const closeTabAction = layoutAction("tab.close", "commands.actions.closeTab.label", (c) =>
+  c.onCloseTab(),
+);
+const nextTabAction = layoutAction("tab.next", "commands.actions.nextTab.label", (c) => c.onNextTab());
+const prevTabAction = layoutAction("tab.prev", "commands.actions.prevTab.label", (c) => c.onPrevTab());
+const focusNextPaneAction = layoutAction(
+  "pane.focus-next",
+  "commands.actions.focusNextPane.label",
+  (c) => c.onFocusNextPane(),
+);
+const focusPrevPaneAction = layoutAction(
+  "pane.focus-prev",
+  "commands.actions.focusPrevPane.label",
+  (c) => c.onFocusPrevPane(),
+);
+const goBackAction = layoutAction("nav.back", "commands.actions.goBack.label", (c) => c.onGoBack());
+const goForwardAction = layoutAction("nav.forward", "commands.actions.goForward.label", (c) =>
+  c.onGoForward(),
+);
+const togglePreviewAction = layoutAction(
+  "view.toggle-preview",
+  "commands.actions.togglePreview.label",
+  (c) => c.onTogglePreview(),
+);
+
+// ─── Wave 3: find, note ops, right-panel tabs (palette-gap audit) ──────────
+
+/** Editor-stage AND a selected note. */
+const editorWithNote = (ctx: {
+  stageName: string;
+  selectedNoteId: unknown;
+}): "show" | "hidden" =>
+  ctx.stageName === "editor" && ctx.selectedNoteId !== null ? "show" : "hidden";
+
+function notesAction(
+  id: string,
+  labelKey: string,
+  invoke: CommandAction["run"],
+  needsNote = true,
+): CommandAction {
+  return {
+    id,
+    get label() {
+      return i18n.t(labelKey);
+    },
+    get category() {
+      return i18n.t("commands.actions.category.notes");
+    },
+    visibility: needsNote ? editorWithNote : editorOnly,
+    run: invoke,
+  };
+}
+
+const findInNoteAction: CommandAction = {
+  id: "editor.find",
+  get label() {
+    return i18n.t("commands.actions.findInNote.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.editor");
+  },
+  visibility: editorOnly,
+  run: () => {
+    openInNoteFind();
+  },
+};
+
+const findReplaceAction: CommandAction = {
+  id: "editor.find-replace",
+  get label() {
+    return i18n.t("commands.actions.findReplace.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.editor");
+  },
+  visibility: editorOnly,
+  // The find bar carries the replace toggle; opening it is the entry point.
+  run: () => {
+    openInNoteFind();
+  },
+};
+
+const newNoteAction = notesAction(
+  "note.new",
+  "commands.actions.newNote.label",
+  (c) => c.onNewNote(),
+  false,
+);
+const duplicateNoteAction = notesAction("note.duplicate", "commands.actions.duplicateNote.label", (c) =>
+  c.onDuplicateNote(),
+);
+const archiveNoteAction: CommandAction = {
+  id: "note.archive",
+  get label() {
+    return i18n.t("commands.actions.archiveNote.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.notes");
+  },
+  // The sidebar context menu omits its archive entries while the archive
+  // feature is off (`archive_disabled`, NoteList) — mirror that gate here so
+  // the palette never offers the disabled surface.
+  visibility: (ctx) =>
+    editorWithNote(ctx) === "show" && !(ctx.prefs.archive_disabled ?? false)
+      ? "show"
+      : "hidden",
+  run: (c) => c.onArchiveNote(),
+};
+const renameNoteAction = notesAction("note.rename", "commands.actions.renameNote.label", (c) =>
+  c.onRenameNote(),
+);
+const trashNoteAction = notesAction("note.trash", "commands.actions.trashNote.label", (c) =>
+  c.onTrashNote(),
+);
+const toggleFavoriteAction = notesAction(
+  "note.toggle-favorite",
+  "commands.actions.toggleFavorite.label",
+  (c) => c.onToggleFavorite(),
+);
+// Palette-gap #32: move the selected note to a folder via the QuickPicker (the
+// folder-target list + move live in `commandCtx.onMoveNote`).
+const moveNoteAction = notesAction("note.move", "commands.actions.moveNote.label", (c) =>
+  c.onMoveNote(),
+);
+const emptyTrashAction = notesAction(
+  "trash.empty",
+  "commands.actions.emptyTrash.label",
+  (c) => c.onEmptyTrash(),
+  false,
+);
+
+const showBacklinksAction = layoutAction(
+  "view.show-backlinks",
+  "commands.actions.showBacklinks.label",
+  (c) => c.onShowBacklinks(),
+);
+const showOutlineAction = layoutAction(
+  "view.show-outline",
+  "commands.actions.showOutline.label",
+  (c) => c.onShowOutline(),
+);
+const showUnlinkedAction = layoutAction(
+  "view.show-unlinked",
+  "commands.actions.showUnlinked.label",
+  (c) => c.onShowUnlinked(),
+);
+
+// ─── Wave 4: sidebar surfaces + cycle heading + restore + sync (palette-gap) ─
+
+/** Run a sidebar-owned surface handler, expanding the collapsed (`inert`)
+ *  sidebar first — a width-forced collapse can't expand (MYND-192), in which
+ *  case the surface is skipped rather than ghost-opened. */
+function runInSidebar(invoke: () => void): void {
+  if (sidebarCommands.revealSidebar?.() === false) return;
+  invoke();
+}
+
+const newFolderAction = notesAction(
+  "folder.new",
+  "commands.actions.newFolder.label",
+  () => runInSidebar(() => sidebarCommands.newFolder?.()),
+  false,
+);
+const openTrashAction = notesAction(
+  "trash.open",
+  "commands.actions.openTrash.label",
+  () => runInSidebar(() => sidebarCommands.openTrash?.()),
+  false,
+);
+const openArchiveAction = notesAction(
+  "archive.open",
+  "commands.actions.openArchive.label",
+  () => runInSidebar(() => sidebarCommands.openArchive?.()),
+  false,
+);
+
+const cycleHeadingAction: CommandAction = {
+  id: "editor.cycle-heading",
+  get label() {
+    return i18n.t("commands.actions.cycleHeading.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.editor");
+  },
+  visibility: editorOnly,
+  run: () => {
+    const view = getActiveEditorView();
+    if (view !== null) cycleHeading(view);
+  },
+};
+
+const restoreBackupAction: CommandAction = {
+  id: "vault.restore",
+  get label() {
+    return i18n.t("commands.actions.restoreBackup.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.vault");
+  },
+  visibility: editorOnly,
+  run: (c) => c.onRestoreBackup(),
+};
+// (The `sync.toggle-realtime` action was removed in the develop merge — the sync
+// engine now runs SSE as an always-on baseline with no user toggle; see the
+// PrivacyPanel info-row decision on develop.)
+
+const revealVaultFolderAction: CommandAction = {
+  id: "vault.reveal-folder",
+  get label() {
+    return i18n.t("commands.actions.revealVaultFolder.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.vault");
+  },
+  visibility: editorOnly,
+  // Opens the Phase-1 single-vault dir (`<app_data_dir>/vault`, the documented
+  // resolution — decisions.md "single vault per OS user in Phase 1"). Best-
+  // effort: a non-existent path (a multi-vault `vaults/<id>` layout) simply
+  // no-ops. Revisit when an active-vault-id accessor reaches the palette.
+  run: () => {
+    void (async () => {
+      try {
+        await openPath(await join(await appDataDir(), "vault"));
+      } catch {
+        /* best-effort — reveal failure is non-fatal */
+      }
+    })();
+  },
+};
+
 
 const lockVaultAction: CommandAction = {
   id: "vault.lock",
@@ -199,6 +748,44 @@ const convertWikilinksAction: CommandAction = {
     void runWikilinkConvert();
   },
 };
+
+const exportSelectionImageAction: CommandAction = {
+  id: "note.export-selection-image",
+  get label() {
+    return i18n.t("commands.actions.exportSelectionImage.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.editor");
+  },
+  // MYND-361 note→image: rasterize the current editor selection to a shareable
+  // PNG "card" and save it. Editor-only + per-note; the empty-selection case
+  // toasts (never a modal), the same self-contained-feedback discipline as the
+  // wikilink-convert action above. Uses the module-level toast so no
+  // CommandContext callback / Editor plumbing is needed.
+  visibility: (ctx) =>
+    ctx.stageName === "editor" && ctx.selectedNoteId !== null ? "show" : "hidden",
+  run: () => exportSelectionImageWithToast(),
+};
+
+/**
+ * Run the selection→image export and toast the coarse outcome. Shared by the
+ * palette action above and the floating-toolbar button (wired via
+ * `setSelectionExportHandler`) so both paths behave identically. `cancelled`
+ * (user dismissed the save dialog) is silent; every other outcome toasts.
+ */
+export function exportSelectionImageWithToast(): void {
+  void exportSelectionAsImage().then((outcome) => {
+    const key =
+      outcome === "ok"
+        ? "commands.actions.exportSelectionImage.saved"
+        : outcome === "no-selection"
+          ? "commands.actions.exportSelectionImage.noSelection"
+          : outcome === "error"
+            ? "commands.actions.exportSelectionImage.failed"
+            : null;
+    if (key !== null) showAttachmentToast(i18n.t(key));
+  });
+}
 
 // Shared AI command surface (local-ai epic, ai-ux-surface MYND-408, SYNC-9).
 // The stub sibling that proves the `ai.*` surface + the shared gate: editor
@@ -690,6 +1277,59 @@ export const COMMAND_ACTIONS: readonly CommandAction[] = Object.freeze([
   backupVaultAction,
   exportVaultMarkdownAction,
   convertWikilinksAction,
+  exportSelectionImageAction,
+  // Wave 1 — prefs toggles/cycles + theme (palette-gap audit)
+  toggleLineNumbersAction,
+  toggleSpellCheckAction,
+  toggleTypewriterAction,
+  toggleDimInactiveAction,
+  toggleEditorFontAction,
+  cycleTextSizeAction,
+  cycleContentWidthAction,
+  cycleDefaultViewModeAction,
+  toggleTimestampsAction,
+  toggleArchivingAction,
+  toggleAiEnabledAction,
+  toggleScreenCaptureAction,
+  cycleThemeAction,
+  switchThemeLightAction,
+  switchThemeDarkAction,
+  switchThemeAmoledAction,
+  switchThemeSystemAction,
+  applyCustomThemeAction,
+  // Wave 2 — layout / panes / tabs / navigation
+  splitRightAction,
+  splitDownAction,
+  closePaneAction,
+  closeTabAction,
+  nextTabAction,
+  prevTabAction,
+  focusNextPaneAction,
+  focusPrevPaneAction,
+  goBackAction,
+  goForwardAction,
+  togglePreviewAction,
+  // Wave 3 — find, note ops, right-panel tabs
+  findInNoteAction,
+  findReplaceAction,
+  newNoteAction,
+  duplicateNoteAction,
+  archiveNoteAction,
+  renameNoteAction,
+  trashNoteAction,
+  toggleFavoriteAction,
+  moveNoteAction,
+  emptyTrashAction,
+  showBacklinksAction,
+  showOutlineAction,
+  showUnlinkedAction,
+  // Wave 4 — sidebar surfaces + cycle heading + restore + sync
+  newFolderAction,
+  openTrashAction,
+  openArchiveAction,
+  cycleHeadingAction,
+  restoreBackupAction,
+  revealVaultFolderAction,
   aiOpenChatAction,
   aiSummarizeNoteAction,
   aiSuggestTagsAction,
