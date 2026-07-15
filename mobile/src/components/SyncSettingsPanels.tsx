@@ -184,16 +184,25 @@ function statusView(status: SyncStatus | null, t: TFunction): { color: string; l
 
 export interface SyncHubPanelProps {
   status: SyncStatus | null;
+  /** Trigger an immediate sync (MYND-481). Result is reflected in `status`. */
+  onSyncNow: () => void;
+  /** True while a manual sync is in flight. */
+  syncing: boolean;
   onOpenEndpoint: () => void;
   onOpenEnroll: () => void;
   onOpenDevices: () => void;
 }
 
-/** SY-01: the honest enrollment status + drill-down entry points. */
-export function SyncHubPanel({ status, onOpenEndpoint, onOpenEnroll, onOpenDevices }: SyncHubPanelProps) {
+/** SY-01: the honest enrollment status + force-sync + drill-down entry points. */
+export function SyncHubPanel({ status, onSyncNow, syncing, onOpenEndpoint, onOpenEnroll, onOpenDevices }: SyncHubPanelProps) {
   const { t } = useTranslation();
   const [endpoint, setEndpoint] = useState<string | null>(null);
   const view = statusView(status, t);
+  // "Sync now" is only meaningful with an authed session to sync — a cycle while
+  // disabled / not-enrolled / pending returns NotReady, so hide it there rather
+  // than promise a sync that can't run (mirrors the old SY-08 detail sheet).
+  const canSyncNow =
+    status?.state !== "disabled" && status?.state !== "not_enrolled" && status?.state !== "pending";
 
   useEffect(() => {
     if (!HAS_TAURI) return;
@@ -232,6 +241,16 @@ export function SyncHubPanel({ status, onOpenEndpoint, onOpenEnroll, onOpenDevic
             <span style={{ fontSize: 15 }}>{view.label}</span>
           </div>
         </Row>
+        {canSyncNow && (
+          // Force sync (MYND-481). The outcome surfaces in the status row above
+          // (Synced / Offline / N conflicts) + the SyncBanners error channel —
+          // never a silent no-op. Disabled while a sync is in flight.
+          <Row onClick={syncing ? undefined : onSyncNow} testId="sync.settings.sync-now">
+            <span style={{ ...rowLabel, color: syncing ? "var(--fg-3)" : "var(--accent)" }}>
+              {syncing ? t("sync.status.syncing") : t("sync.status.syncNow")}
+            </span>
+          </Row>
+        )}
       </Group>
 
       <SectionLabel>{t("sync.panel.devices.label")}</SectionLabel>
