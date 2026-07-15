@@ -247,6 +247,7 @@ export function ViewsSection({
         {
           id: "edit-filter",
           label: t("notes.views.menu.editFilter"),
+          group: "edit",
           onSelect: () => onEditFilter(menu.id),
         },
         ...(menuView?.view_type === "cards"
@@ -254,6 +255,7 @@ export function ViewsSection({
               {
                 id: "view-settings",
                 label: t("notes.views.menu.viewSettings"),
+                group: "edit",
                 onSelect: () => onViewSettings(menu.id),
               },
             ]
@@ -261,21 +263,25 @@ export function ViewsSection({
         {
           id: "rename",
           label: t("notes.views.menu.rename"),
+          group: "edit",
           onSelect: () => setRenamingId(menu.id),
         },
         {
           id: "move-up",
           label: t("notes.views.menu.moveUp"),
+          group: "reorder",
           onSelect: () => onMoveView(menu.id, -1),
         },
         {
           id: "move-down",
           label: t("notes.views.menu.moveDown"),
+          group: "reorder",
           onSelect: () => onMoveView(menu.id, 1),
         },
         {
           id: "delete",
           label: t("notes.views.menu.deleteView"),
+          group: "danger",
           destructive: true,
           onSelect: () => onDelete(menu.id),
         },
