@@ -3,11 +3,18 @@
 // projection, so the menu must never carry a delete / move / trash / rename
 // verb. Deletion stays at the note's own location (the sidebar).
 
-import { describe, expect, it, vi } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
+import i18n from "../../src/i18n";
 import {
   CARD_MENU_ITEM_IDS,
   buildCardMenuItems,
 } from "../../src/notes/views/cardMenu";
+
+// Pin English so the label assertions are host-locale-independent — this boots
+// `navigator.language` otherwise, so a non-English machine gets translated labels.
+beforeAll(async () => {
+  await i18n.changeLanguage("en");
+});
 
 const noopHandlers = () => ({
   open: vi.fn(),
