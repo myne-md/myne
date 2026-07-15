@@ -52,4 +52,17 @@ describe("buildDrawingNoteBytes", () => {
     expect(readTitleFromFmBody(fmBodyOf(source))).toBeNull();
     expect(readKindFromFmBody(fmBodyOf(source))).toBe("drawing");
   });
+
+  it("writes the folder field for a foldered create, still kind: drawing", () => {
+    const source = dec.decode(buildDrawingNoteBytes("Sketch", "Projects"));
+    expect(readKindFromFmBody(fmBodyOf(source))).toBe("drawing");
+    // normalizeFolderPath canonicalizes to a trailing-slash path.
+    expect(fmBodyOf(source)).toMatch(/^folder:\s*Projects\/\s*$/m);
+  });
+
+  it("omits the folder field for a root drawing (omitted / null / empty)", () => {
+    for (const f of [undefined, null, ""] as const) {
+      expect(fmBodyOf(dec.decode(buildDrawingNoteBytes("X", f)))).not.toMatch(/^folder:/m);
+    }
+  });
 });

@@ -388,6 +388,13 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
     },
     [ctx],
   );
+  const newDrawingHere = useCallback(
+    (folderPath: string) => {
+      setMenu(null);
+      void ctx.createDrawingAndStartRename(folderPath).catch(() => {});
+    },
+    [ctx],
+  );
 
   // ---- rename folder -------------------------------------------------------
   const startRenameFolder = useCallback((node: FolderNode) => {
@@ -940,6 +947,7 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
     confirmCaseMerge,
     cancelCaseMerge,
     newNoteHere,
+    newDrawingHere,
     deleteFolderAction,
     confirmFolderDelete,
     confirmFolderDeleteAction,

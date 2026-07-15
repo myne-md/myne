@@ -11,7 +11,13 @@
 // FM per "İlk save inject etmez"), a drawing MUST carry `kind: drawing` from
 // creation so the very first open routes to the canvas surface, not CodeMirror.
 
-import { patchKindField, patchTitleField, DRAWING_KIND_VALUE } from "../dialect";
+import {
+  patchKindField,
+  patchTitleField,
+  patchFolderField,
+  DRAWING_KIND_VALUE,
+} from "../dialect";
+import { normalizeFolderPath } from "../dialect/folderPath";
 import { noteCreate } from "./createNote";
 
 const encoder = new TextEncoder();
@@ -40,12 +46,22 @@ export function buildInitialDrawingBody(): string {
  * `title:`) frontmatter over the initial fenced scene. Pure; `createDrawing`
  * decodes + sends it. Mirrors `createTemplate`'s title-then-flag patch order.
  */
-export function buildDrawingNoteBytes(name?: string): Uint8Array {
+export function buildDrawingNoteBytes(
+  name?: string,
+  folder?: string | null,
+): Uint8Array {
   let bytes: Uint8Array = encoder.encode(buildInitialDrawingBody());
   if (name !== undefined && name.length > 0) {
     bytes = patchTitleField(bytes, name);
   }
   bytes = patchKindField(bytes, DRAWING_KIND_VALUE);
+  // Foldered create (a2 timing, mirrors `createNote`): write `folder:` FM at
+  // create so the drawing lands under its folder before the first edit. A root
+  // drawing (folder omitted / null / empty) carries no `folder:` field.
+  const normFolder = normalizeFolderPath(folder ?? null);
+  if (normFolder !== null) {
+    bytes = patchFolderField(bytes, normFolder);
+  }
   return bytes;
 }
 
@@ -55,6 +71,9 @@ export function buildDrawingNoteBytes(name?: string): Uint8Array {
  * rename (empty-title UX, grill Q3). Returns the new `NoteId`. Rejects with
  * whatever `note_create` propagates.
  */
-export async function createDrawing(name?: string): Promise<string> {
-  return await noteCreate(decoder.decode(buildDrawingNoteBytes(name)));
+export async function createDrawing(
+  name?: string,
+  folder?: string | null,
+): Promise<string> {
+  return await noteCreate(decoder.decode(buildDrawingNoteBytes(name, folder)));
 }

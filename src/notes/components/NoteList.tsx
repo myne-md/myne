@@ -2004,6 +2004,14 @@ function PopulatedList({
           fm.newNoteHere(node.path);
         },
       },
+      {
+        id: "new-drawing",
+        label: t("notes.list.newDrawingHere"),
+        onSelect: () => {
+          onRevealFolder(node.path);
+          fm.newDrawingHere(node.path);
+        },
+      },
       // Folder note (MYND-370): open the existing index, or create one.
       node.indexNoteId !== null
         ? {
@@ -2084,8 +2092,13 @@ function PopulatedList({
         onSelect: () => fm.startNewFolder(""),
       },
       { id: "new-note", label: t("notes.list.newNoteMenu"), onSelect: onCreate },
+      {
+        id: "new-drawing",
+        label: t("notes.list.newDrawingMenu"),
+        onSelect: () => void ctx.createDrawingAndStartRename().catch(() => {}),
+      },
     ],
-    [fm, onCreate, t],
+    [ctx, fm, onCreate, t],
   );
 
   // Delete/Backspace keyboard trigger on the selected row.

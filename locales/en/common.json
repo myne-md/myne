@@ -1498,6 +1498,8 @@
       "exportTxt": "Export as Plain Text…",
       "favoritesHeading": "Favorites",
       "mergeAnyway": "Merge anyway",
+      "newDrawingHere": "New drawing here",
+      "newDrawingMenu": "New drawing",
       "newFolder": "New folder",
       "newFolderInPlaceholder": "New folder in {{path}}",
       "newFolderPlaceholder": "New folder",
