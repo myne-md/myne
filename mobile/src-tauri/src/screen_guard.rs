@@ -83,6 +83,31 @@ pub fn init<R: Runtime>(app: &AppHandle<R>) {
     let _ = app.run_on_main_thread(|| ios::apply(true, "startup_init"));
 }
 
+/// Frontend event fired when the user takes a screenshot WHILE screen-capture
+/// protection is engaged (MYND-476). The OS-level protection already blacked out
+/// the captured image (and text can't be drawn into that OS-owned frame), so the
+/// only honest remedy is an in-app notice — the WebView shows a short banner.
+pub const SCREENSHOT_EVENT: &str = "screen-capture-blocked";
+
+/// Observe `userDidTakeScreenshotNotification` and, when protection is engaged,
+/// emit [`SCREENSHOT_EVENT`] so the WebView can explain the black screenshot.
+/// Call once from the app `.setup()`. iOS-only — Android has no equivalent
+/// screenshot-taken callback below API 34, and its FLAG_SECURE already blocks
+/// the capture; a Kotlin `ScreenCaptureCallback` is a documented follow-up.
+#[cfg(target_os = "ios")]
+pub fn init_screenshot_detection<R: Runtime>(app: &AppHandle<R>) {
+    use tauri::Emitter;
+    let handle = app.clone();
+    let _ = app.run_on_main_thread(move || {
+        ios::observe_screenshots(move || {
+            let _ = handle.emit(SCREENSHOT_EVENT, ());
+        });
+    });
+}
+
+#[cfg(not(target_os = "ios"))]
+pub fn init_screenshot_detection<R: Runtime>(_app: &AppHandle<R>) {}
+
 /// Apply (or remove) screen-capture protection on the app's main window.
 /// `site` is the tracing tag (`"startup_init"` / `"runtime_apply"` /
 /// `"lock_reset"`) — the same labels desktop `screen_capture.rs` emits.
@@ -108,7 +133,62 @@ pub fn apply<R: Runtime>(app: &AppHandle<R>, enabled: bool, site: &'static str) 
 mod ios {
     use objc2::msg_send;
     use objc2::runtime::{AnyClass, AnyObject};
+    use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::Mutex;
+
+    /// The last-applied protection state (pre-unlock is always-ON, so `true` is
+    /// the honest default). The screenshot observer (MYND-476) reads this so the
+    /// "capture blocked" notice only fires when protection was actually engaged —
+    /// a protection-OFF vault takes a normal screenshot and gets no notice.
+    static ENABLED: AtomicBool = AtomicBool::new(true);
+
+    /// Whether screen-capture protection is currently engaged.
+    pub fn is_protected() -> bool {
+        ENABLED.load(Ordering::Relaxed)
+    }
+
+    /// Register a process-lifetime observer for the OS "user took a screenshot"
+    /// notification (MYND-476). Fires `on_shot` ONLY while protection is engaged
+    /// (a protection-OFF vault takes a normal screenshot and warrants no notice).
+    /// The notification posts on the main thread, so `on_shot` runs there; the
+    /// block is process-lifetime (`mem::forget`) like the secure-field splice.
+    pub fn observe_screenshots(on_shot: impl Fn() + 'static) {
+        unsafe {
+            let Some(nc_cls) = AnyClass::get(c"NSNotificationCenter") else {
+                return;
+            };
+            let center: *mut AnyObject = msg_send![nc_cls, defaultCenter];
+            if center.is_null() {
+                return;
+            }
+            // The notification-name constant's value IS this string.
+            let Some(str_cls) = AnyClass::get(c"NSString") else {
+                return;
+            };
+            let Ok(cstr) = std::ffi::CString::new("UIApplicationUserDidTakeScreenshotNotification")
+            else {
+                return;
+            };
+            let name: *mut AnyObject = msg_send![str_cls, stringWithUTF8String: cstr.as_ptr()];
+            if name.is_null() {
+                return;
+            }
+            let block = block2::RcBlock::new(move |_note: *mut AnyObject| {
+                if is_protected() {
+                    on_shot();
+                }
+            });
+            let null: *mut AnyObject = core::ptr::null_mut();
+            let _observer: *mut AnyObject = msg_send![
+                center,
+                addObserverForName: name,
+                object: null,
+                queue: null,
+                usingBlock: &*block
+            ];
+            core::mem::forget(block);
+        }
+    }
 
     /// The spliced secure `UITextField`, stored as a raw pointer (`usize`
     /// because `*mut AnyObject` is not `Sync`). Access is confined to the main
@@ -134,6 +214,7 @@ mod ios {
     }
 
     pub fn apply(enabled: bool, site: &'static str) {
+        ENABLED.store(enabled, Ordering::Relaxed);
         // `objc2/exception` is already enabled for Apple targets through wry's
         // feature unification — declaring it in Cargo.toml added no crates.
         let outcome = objc2::exception::catch(|| unsafe { apply_unguarded(enabled) });
