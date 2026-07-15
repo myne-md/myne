@@ -90,6 +90,19 @@ steps:
       - apt-get update && apt-get install -y --no-install-recommends git
       - bash src-tauri/scripts/ai-no-network-check.sh
 
+  # ─── Hook-parity backstop ────────────────────────────────────
+  # SPDX headers, EOF newline, trailing whitespace live ONLY in the lefthook
+  # pre-commit set (bypassable via --no-verify) and had no remote gate. This
+  # step is that gate. Git-only, so cheap; all logic is in the committed script
+  # (NOT inline) — like ai-no-network above — so Woodpecker's env-substitution
+  # never sees shell dollar-brace expansions and can't error config-compile.
+  # i18n-catalog is gated in pnpm-build (needs node); damm32 VALUE drift by cargo-test.
+  hooks-parity:
+    image: rust:1.96.0-slim
+    commands:
+      - apt-get update && apt-get install -y --no-install-recommends git file
+      - bash scripts/hooks-parity-check.sh
+
   # ─── TypeScript typecheck + Vite build ───────────────────────
   # `node:25` does not ship corepack; install pnpm directly via npm.
   pnpm-build:
@@ -98,6 +111,10 @@ steps:
       - npm install -g pnpm@11.8.0
       - pnpm install --frozen-lockfile
       - pnpm build
+      # i18n-catalog parity (hook-only otherwise): fails on empty English source
+      # values or static t()/i18n.t() keys missing from locales/en/common.json.
+      # Node-builtins only (no extra deps); folded here since node is set up.
+      - node scripts/check-i18n.mjs
 
   # ─── Frontend unit tests (Vitest) ────────────────────────────
   # 59 test files under tests/ (markdown dialect, editor, notes, commands;
@@ -319,6 +336,8 @@ steps:
       - name: cargo-deny
         optional: true
       - name: ai-no-network
+        optional: true
+      - name: hooks-parity
         optional: true
       - name: pnpm-build
         optional: true
