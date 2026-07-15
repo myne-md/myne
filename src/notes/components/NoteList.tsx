@@ -138,6 +138,12 @@ export function makeF2KeydownHandler(
 ): (e: KeyboardEvent) => void {
   return (e: KeyboardEvent) => {
     if (e.key !== "F2") return;
+    // A modal dialog (e.g. the keyboard-delete confirm gate) owns the keyboard
+    // while open — don't start an inline rename underneath it. `typeof document`
+    // keeps the handler node-testable (triggerHandlers.test.ts has no DOM).
+    if (typeof document !== "undefined" && document.querySelector('[role="alertdialog"]') !== null) {
+      return;
+    }
     if (ctx.selectedId === null) return;
     if (ctx.renamingId !== null) return;
     e.preventDefault();
@@ -197,6 +203,16 @@ export function makeKeyboardNavHandler(opts: {
 
   return (e: KeyboardEvent) => {
     if (renamingId !== null) return; // rename mode owns keys
+    // A modal dialog (role="alertdialog", e.g. the keyboard-delete confirm gate)
+    // owns the keyboard while open: its own Enter/Escape handlers must win, and
+    // background list nav (arrows / Enter-open) must not run underneath it.
+    // Without this bail-out the nav handler's `case "Enter"` preventDefault()s
+    // the event and opens the selected note, swallowing the modal's confirm-on-
+    // Enter (Escape was unaffected because nav ignores it) — the MYND-487 E2E
+    // regression. `typeof document` keeps the factory node-testable.
+    if (typeof document !== "undefined" && document.querySelector('[role="alertdialog"]') !== null) {
+      return;
+    }
     if (isEditableTarget(e.target)) return;
     if (sortedIds.length === 0) return;
     const idx = selectedId === null ? -1 : sortedIds.indexOf(selectedId);

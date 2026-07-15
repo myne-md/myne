@@ -164,6 +164,26 @@ export function DeleteConfirmModal(props: DeleteConfirmModalProps) {
     return () => document.removeEventListener("keydown", onKey);
   }, [onCancel]);
 
+  // Enter → Confirm, but ONLY for the confirm-focused keyboard soft-trash gate
+  // (MYND-487): `initialFocus="confirm"` promises "Enter confirms / Escape
+  // cancels". An explicit handler is load-bearing — the focus trap places the
+  // confirm button's focus asynchronously and a focused <button>'s Enter→click
+  // default action is not fired reliably across WebViews (WebKitGTK under the
+  // E2E harness), so relying on button focus alone drops the confirm. The
+  // default cancel-focused modals (irreversible folder delete / permanent
+  // purge) deliberately do NOT get this — a stray Enter must never confirm
+  // there; Escape is their documented cancel path.
+  useEffect(() => {
+    if (initialFocus !== "confirm") return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Enter") return;
+      e.preventDefault();
+      onConfirm();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [initialFocus, onConfirm]);
+
   const handleBackdropClick = useCallback(
     (e: ReactMouseEvent<HTMLDivElement>) => {
       // Only cancel if the click target IS the backdrop (not a child).
