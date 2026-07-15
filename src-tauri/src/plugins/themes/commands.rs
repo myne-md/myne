@@ -19,7 +19,7 @@ use tauri::{AppHandle, Manager, Runtime};
 use super::error::ThemeCommandError;
 use super::info::ThemeInfo;
 use super::name::is_valid_theme_name;
-use super::value::validate_theme;
+use super::validate_theme;
 
 /// Resolve `<app_config_dir>/themes/` for the running app.
 fn themes_dir<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, ThemeCommandError> {
@@ -178,8 +178,7 @@ pub async fn ensure_themes_dir<R: Runtime>(app: AppHandle<R>) -> Result<String, 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::plugins::themes::error::ThemeErrorKind;
-    use crate::plugins::themes::schema::REQUIRED_KEYS;
+    use crate::plugins::themes::{ThemeErrorKind, REQUIRED_KEYS};
     use crate::test_support::ScopedTempDir;
 
     fn valid_theme_json() -> String {

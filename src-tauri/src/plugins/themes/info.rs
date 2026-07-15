@@ -9,11 +9,10 @@
 
 use serde::Serialize;
 
-use super::error::ThemeError;
-use super::schema::ParsedTheme;
+use super::{ParsedTheme, ThemeError};
 
 /// A small, fixed set of representative swatch colors for the picker's chiplet
-/// thumbnail. Every key is a member of [`super::schema::REQUIRED_KEYS`], so on a
+/// thumbnail. Every key is a member of [`super::REQUIRED_KEYS`], so on a
 /// valid theme all five are guaranteed present.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct ThemePreview {
@@ -34,7 +33,7 @@ impl ThemePreview {
     /// of the (about-to-be-dropped) map rather than cloning. Each is a member of
     /// the required core, so the lookups never miss on a valid theme; the
     /// `unwrap_or_default` is a defensive fallback that cannot fire after
-    /// [`super::value::validate_theme`].
+    /// [`super::validate_theme`].
     pub fn from_theme(mut theme: ParsedTheme) -> Self {
         let mut take = |k: &str| theme.vars.remove(k).unwrap_or_default();
         ThemePreview {
