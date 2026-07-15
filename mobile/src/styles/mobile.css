@@ -127,6 +127,27 @@ html.app-locked #root {
   overflow: hidden;
 }
 
+/* MYND-472: in the real app a long-press must open ONLY the app's own context
+   menus — never iOS's native text-selection callout (Copy / Look Up / Translate),
+   which WKWebView otherwise fires on any long-pressed text. Per-element
+   `user-select:none` on a row isn't enough; default the whole locked app to
+   non-selectable + callout-off, and opt the editor + form inputs back in. (The
+   gallery leaves `#root` selectable via the rule above.) */
+html.app-locked #root {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+html.app-locked .cm-editor,
+html.app-locked .cm-content,
+html.app-locked input,
+html.app-locked textarea,
+html.app-locked [contenteditable="true"] {
+  -webkit-user-select: text;
+  user-select: text;
+  -webkit-touch-callout: default;
+}
+
 /* A phone "screen" — fills its device frame, scrolls its own overflow, and is
    the positioning context for sheets/overlays anchored to the device. */
 .m-screen {
