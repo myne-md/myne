@@ -134,3 +134,18 @@ TB5 means **self-host changes the operator, not the security model** — so the 
 | Quota counter exposed | Set a sane per-account ceiling; enforce fairly |
 
 The operator-log-policy limitation (a malicious self-host operator *can still* log IPs, retain old ciphertext, or correlate metadata at the policy level) is recorded in `threat-model.md` §7 (self-host known limitation); this section is its normative counterpart on the protocol side. A self-host deployment that honours the policy column is, by TB5, exactly as trustworthy (and as untrusted) as the hosted service — no more, no less.
+
+## 7. Operator console (admin API) + account status (MYND-506)
+
+The server exposes an operator admin API over a **local Unix domain socket** (`MYNE_ADMIN_SOCKET`; no bearer secret — access is filesystem permissions; **disabled by default**). It is never a TCP port or the public edge. A `myne-server admin` CLI is a thin client over it (server-mediated only). The API is a **live projection of already-persisted enforcement state only** (account hash, stored bytes, device count, policy) — never request history, last-seen wall-clocks, or per-account time series (§5 / `threat-model.md` §7 aggregate-only invariant).
+
+Routes (JSON over the socket):
+
+- `GET /admin/accounts` · `GET /admin/accounts/{hash}` — accounts merged with live stats (stored bytes = the blob + attachment AS17 total; device count) + policy (frozen, quota/device overrides).
+- `GET /admin/stats` — aggregates (total accounts, total stored bytes, `MYNE_MAX_ACCOUNTS`).
+- `POST /admin/accounts/{hash}/{freeze,unfreeze,quota,max-devices}` — enforcement writes; `0` clears an override. `frozen` blocks push + enroll, **never pull** ("frozen is minimal").
+- `DELETE /admin/accounts/{hash}` — irreversible; removes the account's vault + attachments + device registry + SCRAM verifier + policy (the MYND-496 self-service-deletion primitive).
+
+Enforcement policy persists in a **sparse top-level `accounts.json`** (server-side plaintext, `schema_version`; not synced; captured by the built-in backup). A per-account quota override also gates the attachment transport (one AS17 total, no bypass).
+
+`GET /account/status` (on the normal **authed** HTTPS API, *not* the admin socket) returns the authenticated user's own `{stored bytes, device count, frozen, effective quota + device ceilings}`. The account is **resolved from the device token — never from the URL or query** (an identifier placed there is ignored, not a selector), so the account number never appears in a request line or log. API-only in v0.1 (no client UI yet). Enforcement fields carry no cryptographically load-bearing identifier; `accounts.json` is a new server-side plaintext format, forward-incompatible-by-design with v005.
