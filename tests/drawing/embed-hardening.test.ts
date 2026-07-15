@@ -9,7 +9,7 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { HARDENED_EXCALIDRAW_PROPS } from "../../src/drawing/excalidrawConfig";
+import { HARDENED_EXCALIDRAW_PROPS } from "@myne/editor/drawing/excalidrawConfig";
 
 describe("excalidraw embed hardening", () => {
   it("rejects every embeddable element (the one HTML/iframe egress surface)", () => {
@@ -24,7 +24,7 @@ describe("excalidraw embed hardening", () => {
   });
 
   it("repoints the font loader to the self-hosted same-origin asset base", async () => {
-    await import("../../src/drawing/excalidraw-asset-path");
+    await import("@myne/editor/drawing/excalidraw-asset-path");
     expect(window.EXCALIDRAW_ASSET_PATH).toBe("/excalidraw-assets/");
     // Never a CDN / external origin.
     expect(String(window.EXCALIDRAW_ASSET_PATH)).not.toMatch(/^https?:/);

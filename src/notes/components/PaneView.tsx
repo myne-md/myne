@@ -62,10 +62,12 @@ import { CoverPicker, type CoverChoice } from "../../components/attachments/Cove
 import { ContextMenu, type ContextMenuItem } from "./ContextMenu";
 import { buildCardMenuItems } from "../views/cardMenu";
 import { writeText as clipboardWriteText } from "@tauri-apps/plugin-clipboard-manager";
-import { DrawingCanvasLazy } from "../../drawing/DrawingCanvasLazy";
-import { extractSceneJson, writeSceneJson } from "../../drawing/sceneContent";
-import { readKindFromFmBody } from "../../dialect";
-import { locateFrontmatter } from "../../dialect/lezer/frontmatter";
+import {
+  DrawingCanvasLazy,
+  extractSceneJson,
+  writeSceneJson,
+  isDrawingBody,
+} from "@myne/editor/drawing";
 
 export type PaneReadout = {
   status: SaveStatus;
@@ -421,15 +423,7 @@ export function PaneView({
   // `kind: drawing` in the loaded body routes this pane to the Excalidraw canvas
   // instead of CodeMirror. Derived from `content` (authoritative over the sidebar
   // cache); a note WITHOUT the canonical marker is unaffected (guard is exact).
-  const isDrawing = useMemo(() => {
-    // Use the canonical dialect frontmatter locator (not a bespoke regex) so the
-    // render-dispatch path can never diverge from loadNoteBatch / the readers.
-    const fm = locateFrontmatter(content);
-    return (
-      fm !== null &&
-      readKindFromFmBody(content.slice(fm.bodyStart, fm.bodyEnd)) === "drawing"
-    );
-  }, [content]);
+  const isDrawing = useMemo(() => isDrawingBody(content), [content]);
   // Latest autosave handle for the reload effect, which keys only on the reload
   // nonce (so it must NOT take `autosave` as a dep — its identity changes every
   // render). Read through the ref at fire time.

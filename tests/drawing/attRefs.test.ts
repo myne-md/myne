@@ -2,7 +2,7 @@
 // mechanism: the block written here is exactly what the fail-closed ref_scan
 // counts, so a live drawing's images are never cryptographically erased.
 import { describe, it, expect } from "vitest";
-import { buildAttRefBlock, upsertAttRefs } from "../../src/drawing/attRefs";
+import { buildAttRefBlock, upsertAttRefs } from "@myne/editor/drawing/attRefs";
 import { buildDrawingNoteBytes } from "../../src/notes/createDrawing";
 
 const dec = new TextDecoder();
