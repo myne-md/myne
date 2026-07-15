@@ -154,3 +154,22 @@ pre-push:
 
     pnpm-build:
       run: pnpm build
+
+    vitest:
+      # Frontend unit tests (Vitest). `tests/` lives OUTSIDE `tsc`'s
+      # include:["src"], so `pnpm-build` above type-checks src but never runs
+      # or type-checks the specs — Vitest is their only local gate (CI runs it
+      # too). Closes the "JS test red only surfaces after push" gap.
+      run: pnpm test
+
+# Reject accidental AI co-author / attribution trailers in commit messages
+# (project policy — see root guidance). Lefthook passes the commit-message
+# file path as {1}.
+commit-msg:
+  commands:
+    no-ai-coauthor:
+      run: |
+        if grep -qiE 'Co-Authored-By:.*(Claude|Anthropic)|Generated with .*Claude|🤖 Generated' "{1}"; then
+          echo "commit message carries an AI co-author/attribution trailer — remove it (project policy)."
+          exit 1
+        fi
