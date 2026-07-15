@@ -13,9 +13,13 @@ import type { CSSProperties } from "react";
 /** Horizontal step per depth level — matches `NoteList.NOTE_INDENT_PER_LEVEL`
  *  and `FolderRow.INDENT_PER_LEVEL` (18). */
 const RAIL_STEP = 18;
-/** X of the FIRST ancestor rail — sits within a top-level folder's icon so the
- *  line reads as descending from that folder. */
-const RAIL_X0 = 17;
+/** X of the FIRST ancestor rail — centered under a top-level folder's icon so
+ *  the line reads as descending from that folder. A folder row's icon spans
+ *  `[BASE_PADDING_LEFT, +iconSize]` = `[8, 25]` (FolderRow), so its center is
+ *  `8 + 17/2 = 16.5`; a 1px rail at `left:16` renders its own center at 16.5,
+ *  landing on the icon center. The folder icon was moved left (padding 12→8) to
+ *  meet the rail rather than pushing the rail right into the note area. */
+const RAIL_X0 = 16;
 /** Inter-row gap the rail bridges — matches `rowBaseStyle.marginBottom` (3). */
 const ROW_GAP = 3;
 

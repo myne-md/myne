@@ -1603,6 +1603,7 @@ function EditorChrome({
                 items.push({
                   id: "move-left",
                   label: t("editor.chrome.barItems.moveLeft"),
+                  group: "reorder",
                   onSelect: () =>
                     void setBarItemsOrder(
                       moveBarItem(resolved, visibleIds, itemId, -1),
@@ -1613,6 +1614,7 @@ function EditorChrome({
                 items.push({
                   id: "move-right",
                   label: t("editor.chrome.barItems.moveRight"),
+                  group: "reorder",
                   onSelect: () =>
                     void setBarItemsOrder(
                       moveBarItem(resolved, visibleIds, itemId, 1),
@@ -1622,6 +1624,7 @@ function EditorChrome({
               items.push({
                 id: "hide",
                 label: t("editor.chrome.barItems.hide"),
+                group: "hide",
                 onSelect: () =>
                   void setHiddenBarItems(
                     hiddenBarItems.includes(itemId)

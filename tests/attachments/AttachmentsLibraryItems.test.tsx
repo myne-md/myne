@@ -143,40 +143,54 @@ describe("AttachmentsLibrary per-item ⋮ menu (Fix 2 + Fix 3)", () => {
   });
 });
 
-describe("AttachmentsLibrary hover-preview is grid-only (MYND-164 Fix 2)", () => {
-  // Surface the hover-preview button by hovering the thumbnail's wrapper (the
-  // element whose onMouseEnter flips the hovering state).
-  function hoverThumb(container: HTMLElement) {
-    const img = container.querySelector('img[alt="alpha.png"]');
-    // The image renders as the direct child of the hover wrapper
-    // (THUMB_HOVER_WRAP) whose onMouseEnter flips the hovering state.
-    const wrap = img?.parentElement ?? container;
-    fireEvent.mouseEnter(wrap);
-  }
+describe("AttachmentsLibrary thumbnail click-to-open (MYND-164 revised)", () => {
+  // MYND-164 revised: the hover-revealed expand button is gone. A previewable
+  // (image / PDF) thumbnail is itself the click target — role="button",
+  // aria-label "Preview attachment", data-testid "attachments.tile-preview-target"
+  // — in BOTH grid and list view (no hover state, no view gating).
 
-  it("shows the preview button on hover in GRID view", async () => {
+  it("the image thumbnail is a preview button in GRID view (no hover)", async () => {
     mockedCatalog.mockResolvedValue([ENTRY_A]);
-    const { container } = renderLibrary();
+    renderLibrary();
     await waitFor(() => expect(screen.getByText("alpha.png")).toBeTruthy());
 
-    // Default view is grid. Before hover the affordance is hidden.
-    expect(screen.queryByLabelText("Preview attachment")).toBeNull();
-    hoverThumb(container);
-    expect(screen.getByLabelText("Preview attachment")).toBeTruthy();
+    // Default view is grid — the affordance is present immediately, not on hover.
+    const target = screen.getByTestId("attachments.tile-preview-target");
+    expect(target.getAttribute("role")).toBe("button");
+    expect(target.getAttribute("aria-label")).toBe("Preview attachment");
   });
 
-  it("does NOT show the preview button on hover in LIST view", async () => {
+  it("clicking the image thumbnail opens the image lightbox", async () => {
     mockedCatalog.mockResolvedValue([ENTRY_A]);
-    const { container } = renderLibrary();
+    renderLibrary();
     await waitFor(() => expect(screen.getByText("alpha.png")).toBeTruthy());
 
-    // Switch to list view.
+    fireEvent.click(screen.getByTestId("attachments.tile-preview-target"));
+
+    expect(mockedLightbox).toHaveBeenCalledWith({
+      url: `attachment://${ENTRY_A.id}`,
+      alt: "alpha.png",
+      kind: "image",
+      id: ENTRY_A.id,
+    });
+  });
+
+  it("the image thumbnail is ALSO a preview button in LIST view", async () => {
+    mockedCatalog.mockResolvedValue([ENTRY_A]);
+    renderLibrary();
+    await waitFor(() => expect(screen.getByText("alpha.png")).toBeTruthy());
+
+    // Switch to list view — the small row thumbnail stays click-to-open now.
     fireEvent.click(screen.getByLabelText("List view"));
     await waitFor(() => expect(screen.getByLabelText("Grid view")).toBeTruthy());
 
-    hoverThumb(container);
-    // List rows pass showPreview={false}: no hover-preview affordance ever.
-    expect(screen.queryByLabelText("Preview attachment")).toBeNull();
+    fireEvent.click(screen.getByTestId("attachments.tile-preview-target"));
+    expect(mockedLightbox).toHaveBeenCalledWith({
+      url: `attachment://${ENTRY_A.id}`,
+      alt: "alpha.png",
+      kind: "image",
+      id: ENTRY_A.id,
+    });
   });
 });
 
@@ -189,30 +203,25 @@ describe("AttachmentsLibrary PDF tile preview → scrollable reader (MYND-164)",
     size: 8192,
   };
 
-  it("shows the hover-preview button on a PDF tile in GRID view", async () => {
+  it("the PDF thumbnail is a preview button in GRID view", async () => {
     mockedCatalog.mockResolvedValue([PDF_ENTRY]);
-    const { container } = renderLibrary();
+    renderLibrary();
     await waitFor(() => expect(screen.getByText("report.pdf")).toBeTruthy());
 
     // The PDF tile's thumbnail box still renders the first-page-render placeholder
-    // (the "PDF document" icon while the mocked renderer never resolves).
-    const placeholder = screen.getAllByLabelText("PDF document")[0]!;
-    const wrap = placeholder.closest("div")!.parentElement!;
-
-    expect(screen.queryByLabelText("Preview attachment")).toBeNull();
-    fireEvent.mouseEnter(wrap);
-    expect(screen.getByLabelText("Preview attachment")).toBeTruthy();
+    // (the "PDF document" icon while the mocked renderer never resolves), wrapped
+    // in the click-to-open preview target.
+    const target = screen.getByTestId("attachments.tile-preview-target");
+    expect(target.getAttribute("role")).toBe("button");
+    expect(within(target).getAllByLabelText("PDF document")[0]).toBeTruthy();
   });
 
-  it("clicking the PDF preview opens the lightbox in pdf (scrollable reader) mode", async () => {
+  it("clicking the PDF thumbnail opens the lightbox in pdf (scrollable reader) mode", async () => {
     mockedCatalog.mockResolvedValue([PDF_ENTRY]);
-    const { container } = renderLibrary();
+    renderLibrary();
     await waitFor(() => expect(screen.getByText("report.pdf")).toBeTruthy());
 
-    const placeholder = screen.getAllByLabelText("PDF document")[0]!;
-    const wrap = placeholder.closest("div")!.parentElement!;
-    fireEvent.mouseEnter(wrap);
-    fireEvent.click(screen.getByLabelText("Preview attachment"));
+    fireEvent.click(screen.getByTestId("attachments.tile-preview-target"));
 
     expect(mockedLightbox).toHaveBeenCalledWith({
       url: `attachment://${PDF_ENTRY.id}`,
@@ -235,6 +244,9 @@ describe("AttachmentsLibrary PDF tile preview → scrollable reader (MYND-164)",
     mockedCatalog.mockResolvedValue([generic]);
     renderLibrary();
     await waitFor(() => expect(screen.getByText("notes.docx")).toBeTruthy());
+
+    // Non-previewable → the thumbnail is NOT a click-to-open target.
+    expect(screen.queryByTestId("attachments.tile-preview-target")).toBeNull();
 
     fireEvent.click(screen.getByLabelText("Attachment actions"));
     const items = within(screen.getByRole("menu"))

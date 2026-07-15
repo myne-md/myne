@@ -178,9 +178,17 @@ export function showAttachmentLightbox(opts: LightboxOptions): void {
   // IntersectionObserver has a connected, laid-out root.
   if (pdfSurface !== null) {
     const surface = pdfSurface;
+    // Fit each page to the ACTUAL reader surface instead of a fixed 900px — on a
+    // phone the surface is only ~300–360px wide, so 900 overflowed/clipped
+    // horizontally (MYND-477). The surface is already in the live layout; read
+    // its content box (clientWidth includes padding, so subtract it). Desktop
+    // surfaces stay wide, so this still resolves to the 900 cap there.
+    const padX = parseFloat(getComputedStyle(surface).paddingLeft) || 0;
+    const avail = surface.clientWidth - padX * 2;
+    const pageWidth = avail > 0 ? Math.max(240, Math.min(LIGHTBOX_PDF_PAGE_WIDTH, Math.floor(avail))) : LIGHTBOX_PDF_PAGE_WIDTH;
     activePdfCleanup = mountPdfScroller(surface, {
       url: opts.url,
-      pageWidth: LIGHTBOX_PDF_PAGE_WIDTH,
+      pageWidth,
       onError: () => {
         // Reader failed to load/parse → swap in the generic-PDF-icon fallback so
         // the lightbox isn't an empty box. DENY-list-safe; already warned.
