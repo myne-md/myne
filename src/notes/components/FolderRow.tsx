@@ -23,7 +23,11 @@ import { dragEdge, dragZone, insertionLineStyle } from "./reorderDnd";
 import { TreeRails } from "./TreeRails";
 
 const INDENT_PER_LEVEL = 18;
-const BASE_PADDING_LEFT = 12;
+// Left inset of a top-level folder icon. Kept small so the folder glyph sits
+// close to the sidebar edge (just past the section eyebrow) rather than looking
+// indented, and so its center (BASE_PADDING_LEFT + iconSize/2 = 8 + 8.5 = 16.5)
+// lines up with the descending indent rail (`TreeRails.RAIL_X0`).
+const BASE_PADDING_LEFT = 8;
 
 const rowBaseStyle: CSSProperties = {
   display: "flex",

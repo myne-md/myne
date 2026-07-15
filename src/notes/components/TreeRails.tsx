@@ -15,10 +15,11 @@ import type { CSSProperties } from "react";
 const RAIL_STEP = 18;
 /** X of the FIRST ancestor rail — centered under a top-level folder's icon so
  *  the line reads as descending from that folder. A folder row's icon spans
- *  `[BASE_PADDING_LEFT, +iconSize]` = `[12, 29]` (FolderRow), so its center is
- *  `12 + 17/2 = 20.5`; a 1px rail at `left:20` renders its own center at 20.5,
- *  landing exactly on the icon center. (Was 17 — visibly left of the glyph.) */
-const RAIL_X0 = 20;
+ *  `[BASE_PADDING_LEFT, +iconSize]` = `[8, 25]` (FolderRow), so its center is
+ *  `8 + 17/2 = 16.5`; a 1px rail at `left:16` renders its own center at 16.5,
+ *  landing on the icon center. The folder icon was moved left (padding 12→8) to
+ *  meet the rail rather than pushing the rail right into the note area. */
+const RAIL_X0 = 16;
 /** Inter-row gap the rail bridges — matches `rowBaseStyle.marginBottom` (3). */
 const ROW_GAP = 3;
 
