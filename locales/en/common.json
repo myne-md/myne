@@ -1887,6 +1887,7 @@
       "changing": "Changing…"
     },
     "appearance": {
+      "homeQuickActions": "Home quick actions",
       "showEditTimesAria": "Show edit times in sidebar",
       "showEditTimesHelper": "Display each note's last-edited time beneath its title in the sidebar.",
       "showEditTimesLabel": "Show edit times",
@@ -2154,6 +2155,7 @@
       "screenCaptureHelperOn": "Active on macOS and Windows 10 (May 2020 Update or later). Linux support coming in a future release.",
       "screenCaptureLabel": "Screen-capture protection",
       "screenCaptureSubtitle": "Block screenshots and screen recording",
+      "screenshotBlocked": "Screen protection is on — screenshots of Myne come out blank.",
       "autoLockAfter": "Auto-lock after",
       "autoLock1m": "1m",
       "autoLock5m": "5m",
