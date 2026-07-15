@@ -24,8 +24,8 @@
 //! - `<number><unit>`: optional sign, digits with optional single `.`, optional
 //!   unit (ASCII letters ≤ 4, or `%`) — e.g. `0`, `12px`, `0.5rem`, `100%`
 
-use super::error::ThemeError;
-use super::schema::{parse_theme, ParsedTheme};
+use crate::error::ThemeError;
+use crate::schema::{parse_theme, ParsedTheme};
 
 /// Parse + required-core validate (task 1) AND value-shape validate (this task).
 /// The single entry point the command layer (MYND-297) calls to turn an
@@ -126,8 +126,8 @@ fn is_number_unit(v: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::plugins::themes::error::ThemeErrorKind;
-    use crate::plugins::themes::schema::REQUIRED_KEYS;
+    use crate::error::ThemeErrorKind;
+    use crate::schema::REQUIRED_KEYS;
 
     #[test]
     fn accepts_every_valid_value_shape() {
