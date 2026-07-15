@@ -1150,9 +1150,21 @@ Reference: RFC 9807.
 
 ### **operator console** &nbsp; 📦 *Product*
 
-The hosted-sync admin surface (`decisions.md` 2026-07-13): an admin API bound to a **Unix domain socket** (`MYNE_ADMIN_SOCKET` — no bearer secret; access is filesystem permissions) plus a `myne-server admin` CLI; a stdlib-only web panel is a later iteration on the same API. Normative posture: the console is a **live projection of already-persisted enforcement state only** — account hash, stored bytes, device count, plan fields — never a new observation channel: no request history, no last-seen wall-clocks, no per-account time series (upholding the MYND-440 aggregate-only-metrics invariant). Open-source and shipped to self-hosters like every other component; hosted gets no proprietary tooling.
+The hosted-sync admin surface (`decisions.md` 2026-07-13; **built 2026-07-15, MYND-506**): an admin API bound to a **Unix domain socket** (`MYNE_ADMIN_SOCKET` — no bearer secret; access is filesystem permissions; disabled by default) plus a `myne-server admin` CLI (thin client; a stdlib web panel is a later iteration on the same API). Normative posture: the console is a **live projection of already-persisted enforcement state only** — account hash, stored bytes, device count, policy fields — never a new observation channel: no request history, no last-seen wall-clocks, no per-account time series (upholding the MYND-440 aggregate-only-metrics invariant). Shipped enforcement: `list`/`show`/`stats` + `freeze`/`unfreeze`/`set-quota`/`set-max-devices`/`delete` (`plan_id`/`paid_until` reserved for MYND-430 billing). Open-source and shipped to self-hosters like every other component; hosted gets no proprietary tooling. The client-facing counterpart is the authed, token-derived [account status endpoint](#account-status-endpoint). Enforcement state persists in the [account policy store](#account-policy-store).
 
-Used in: `decisions.md` 2026-07-13
+Used in: `decisions.md` 2026-07-13, 2026-07-15
+
+### **account policy store** &nbsp; 📦 *Product*
+
+The sparse top-level `accounts.json` file (server root, `decisions.md` 2026-07-15; MYND-506) holding per-account operator enforcement policy — `{frozen, quota_override_bytes, max_devices_override, plan_id (reserved), paid_until_day (reserved)}` keyed by [account_number_hash](#account_number_hash). Server-side **plaintext** operator metadata of the same class as the already-visible device count / stored-byte size (AS16/AS17) — never user content. Mirrors `auth.json` (in-memory map + consistent-cut atomic snapshot + coalescing flusher; no magic byte, `schema_version`, forward-incompatible-by-design with v005). **Sparse**: only accounts with non-default policy keep an entry (absence = all defaults). Read by the request-path enforcement (quota guard, enroll cap, push/enroll freeze) and by the [operator console](#operator-console). **Not synced** (operator policy, not user data); captured by the [built-in backup](#built-in-backup) (same volume).
+
+Used in: `decisions.md` 2026-07-15; `spec/server-protocol.md` §7
+
+### **account status endpoint** &nbsp; 📋 *Protocol*
+
+`GET /account/status` (`decisions.md` 2026-07-15; MYND-506; `spec/server-protocol.md` §7): the authed, client-facing counterpart to the [operator console](#operator-console). Returns the caller's own `{stored bytes, device count, frozen, effective quota + device ceilings}`. The account is **resolved from the device token — never from the URL or query** (an identifier there is ignored), so the account number never appears in a request line or log. API-only in v0.1 (no client UI yet).
+
+Used in: `decisions.md` 2026-07-15; `spec/server-protocol.md` §7
 
 ### **optimistic UI rollback** &nbsp; 📦 *Product*
 
