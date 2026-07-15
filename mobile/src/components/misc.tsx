@@ -296,34 +296,25 @@ export function SidePanel({
           maxWidth: 360,
           display: "flex",
           flexDirection: "column",
-          // No background/border on the outer shell — the safe-area cap below is
-          // transparent so the status-bar strip shows the app's black backdrop,
-          // and the panel's border begins at the cap's bottom (never up into the
-          // notch). Only the drop shadow spans the full height (soft, expected).
+          // A clean full-height right drawer separated from the dimmed backdrop by
+          // its DROP SHADOW only — no border. A left/top border ran a hard line up
+          // into the status-bar (clock) zone, which read as chrome intruding the
+          // notch; the shadow gives the edge without any line near the top.
+          background: "var(--bg-1)",
           boxShadow: "var(--shadow-3)",
           transform: shown ? "translateX(0)" : "translateX(100%)",
           transition: `transform ${SHEET_MS}ms cubic-bezier(0.32, 0.72, 0, 1)`,
           willChange: "transform",
         }}
       >
-        {/* Safe-area cap: transparent, no border — the status-bar zone stays the
-            app's pitch-black backdrop, with no panel chrome intruding it. */}
+        {/* Safe-area spacer — reserves the status-bar (clock/battery) zone so the
+            tabs header never rides up into it. At least 60px because the WebView
+            often reports `env(safe-area-inset-top)` as 0; the panel bg fills it,
+            so it reads as clean safe space, not a floating border. */}
         <div style={{ height: "max(60px, env(safe-area-inset-top))", flexShrink: 0 }} />
-        <div
-          style={{
-            flex: 1,
-            minHeight: 0,
-            display: "flex",
-            flexDirection: "column",
-            background: "var(--bg-1)",
-            borderLeft: "1px solid var(--line-2)",
-            borderTop: "1px solid var(--line-2)",
-          }}
-        >
-          <div style={{ flex: "none" }}>{header(close)}</div>
-          <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: padBody ? "8px 12px calc(16px + env(safe-area-inset-bottom, 0px))" : "0 0 calc(env(safe-area-inset-bottom, 0px))" }}>
-            {children}
-          </div>
+        <div style={{ flex: "none" }}>{header(close)}</div>
+        <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: padBody ? "8px 12px calc(16px + env(safe-area-inset-bottom, 0px))" : "0 0 calc(env(safe-area-inset-bottom, 0px))" }}>
+          {children}
         </div>
       </div>
     </div>

@@ -26,27 +26,32 @@ export function NoteRowActionsSheet({
   onTrash: () => void;
 }) {
   const { t } = useTranslation();
-  // Rows sit flush inside the Sheet (which is already the single rounded,
-  // bordered container) — separated only by hairlines. No inner bordered box, or
-  // the modal reads as a box-in-a-box.
-  const row = (text: string, onClick: () => void, danger = false): ReactNode => (
+  // Rows sit flush inside the Sheet — separated by hairlines WITHIN a logical
+  // group, and by a heavier group separator BETWEEN groups (open / organize /
+  // destructive, Obsidian-style), the mobile twin of the desktop ContextMenu's
+  // `group` dividers. `groupTop` drops a row's top hairline when a separator
+  // already precedes it (no double line).
+  const row = (text: string, onClick: () => void, opts?: { danger?: boolean; groupTop?: boolean }): ReactNode => (
     <button
       onClick={onClick}
-      style={{ display: "flex", alignItems: "center", width: "100%", border: "none", borderTop: "1px solid var(--line-1)", background: "transparent", padding: "15px 18px", cursor: "pointer", fontFamily: "var(--font-sans)", fontSize: 16, color: danger ? "var(--danger)" : "var(--fg-1)" }}
+      style={{ display: "flex", alignItems: "center", width: "100%", border: "none", borderTop: opts?.groupTop ? "none" : "1px solid var(--line-1)", background: "transparent", padding: "15px 18px", cursor: "pointer", fontFamily: "var(--font-sans)", fontSize: 16, color: opts?.danger ? "var(--danger)" : "var(--fg-1)" }}
     >
       {text}
     </button>
   );
+  const sep: ReactNode = <div aria-hidden style={{ height: 1, background: "var(--line-2)", margin: "7px 0" }} />;
   return (
     <Sheet onClose={onClose} padded={false}>
       {() => (
         <>
           <div style={{ padding: "0 18px 12px", fontSize: 13, fontWeight: 600, color: "var(--fg-2)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{title}</div>
           {row(t("notes.cardMenu.open"), onOpen)}
-          {row(favorited ? t("notes.row.removeFromFavorites") : t("notes.row.addToFavorites"), onToggleFavorite)}
+          {sep}
+          {row(favorited ? t("notes.row.removeFromFavorites") : t("notes.row.addToFavorites"), onToggleFavorite, { groupTop: true })}
           {row(t("editor.noteMenu.moveToFolder"), onMove)}
           {row(t("notes.archive.title"), onArchive)}
-          {row(t("editor.noteMenu.moveToTrash"), onTrash, true)}
+          {sep}
+          {row(t("editor.noteMenu.moveToTrash"), onTrash, { danger: true, groupTop: true })}
         </>
       )}
     </Sheet>

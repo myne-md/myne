@@ -68,7 +68,7 @@ async function installFakeMedia(page: Page, opts: { deny?: boolean } = {}): Prom
  *  Waits for the app to boot to the main surface first, so the EditorFlow
  *  CAPTURE_EVENT listener is attached before the event fires. */
 async function fireCapture(page: Page, mode: "text" | "voice"): Promise<void> {
-  await expect(page.getByTestId("sync.header-glyph")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Settings" }).first()).toBeVisible();
   await page.evaluate(
     (m) => window.dispatchEvent(new CustomEvent("myne-deep-link-capture", { detail: { mode: m } })),
     mode,

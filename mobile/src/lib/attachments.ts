@@ -6,6 +6,7 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import type { IoFailureKind } from "../types/vault-unlock-error";
+import { shareFile } from "./share";
 
 /** One catalog row — mirror of the Rust `CatalogEntry`. */
 export interface CatalogEntry {
@@ -75,9 +76,12 @@ export function attachmentRename(id: string, filename: string): Promise<void> {
   return invoke("plugin:attachments|attachment_rename", { id, filename });
 }
 
-/** Decrypt one attachment's bytes to a user-chosen destination path. */
-export function attachmentExport(id: string, destination: string, overwrite: boolean): Promise<void> {
-  return invoke("plugin:attachments|attachment_export", { id, destination, overwrite });
+/** Decrypt one attachment's bytes to a destination path, then (mobile, MYND-475)
+ *  present the native share sheet so the user can pick where to save it. The
+ *  Documents write always lands first, so the share is purely additive. */
+export async function attachmentExport(id: string, destination: string, overwrite: boolean): Promise<void> {
+  await invoke("plugin:attachments|attachment_export", { id, destination, overwrite });
+  await shareFile(destination);
 }
 
 /** Catalog entries referenced by zero live notes (fail-closed). */

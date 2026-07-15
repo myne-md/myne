@@ -44,7 +44,7 @@ test.describe("Apple Watch pending-capture drain", () => {
       ],
     });
     await page.goto("/");
-    await expect(page.getByTestId("sync.header-glyph")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Settings" }).first()).toBeVisible();
 
     // Both captures were turned into notes (the DEV seeder may create other
     // notes too, so assert containment, not equality).
@@ -62,7 +62,7 @@ test.describe("Apple Watch pending-capture drain", () => {
   test("no queued captures → no notes created, no acks", async ({ page }) => {
     await installMockIpc(page, { pendingCaptures: [] });
     await page.goto("/");
-    await expect(page.getByTestId("sync.header-glyph")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Settings" }).first()).toBeVisible();
     // Give the drain a beat to run; it must not ack anything with an empty queue.
     await page.waitForTimeout(150);
     expect(await readAcks(page)).toHaveLength(0);
@@ -71,7 +71,7 @@ test.describe("Apple Watch pending-capture drain", () => {
   test("a staged-capture event triggers a seal", async ({ page }) => {
     await installMockIpc(page, {});
     await page.goto("/");
-    await expect(page.getByTestId("sync.header-glyph")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Settings" }).first()).toBeVisible();
 
     const before = await readSealCount(page);
     await page.evaluate(() => window.dispatchEvent(new CustomEvent("myne-capture-staged")));

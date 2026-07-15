@@ -186,3 +186,44 @@ iOS 17, so the §2 version-matrix axis (oldest device + current iOS) applies her
 | 7.9 | **Android recents, ON** — open the recents overview | the app card is blank |
 | 7.10 | **Android opt-out** — toggle OFF → screencap; then lock the vault → screencap | content visible while OFF; black again after lock |
 | 7.11 | **Android cold start** — fresh launch, screencap before unlock | black — the Kotlin `load()` applies FLAG_SECURE at plugin registration, before any Rust hook fires |
+
+## 8. Attach-camera + export/share verification checklist (MYND-474 / MYND-475)
+
+Two device-only surfaces with no automated coverage (the same posture as `pdf_export.rs`
+— native present, device-verified here). Record device model + OS build per run.
+
+**MYND-474** is a plist-only fix (`NSCameraUsageDescription` in `Info.ios.plist`); without it iOS
+hard-crashes on first camera access from the WKWebView file picker. **MYND-475** adds the native
+share sheet (`share_file.rs`, `UIActivityViewController`) on top of the guaranteed Documents write,
+so every row must confirm BOTH that the file lands (no regression) AND that the destination chooser
+appears. iOS-first: Android share is a documented no-op (file stays in Documents + a toast names
+the location) — its rows confirm the non-silent fallback, not a SAF picker.
+
+| # | Scenario | Expected |
+|---|---|---|
+| 8.1 | **iOS "Take Photo" attach (MYND-474)** — Files/attach → file picker → Take Photo, grant camera | camera opens, photo captures, lands as an encrypted image attachment; **no crash** (the pre-fix `NSInvalidArgumentException`) |
+| 8.2 | **iOS camera permission prompt copy** — first camera use | the `NSCameraUsageDescription` string shows, honest + telemetry-free |
+| 8.3 | **iOS Export Markdown (MYND-475)** — Settings → Export to Markdown | success toast names `Documents/…`; share sheet opens on the export folder; "Save to Files" writes it to the chosen location |
+| 8.4 | **iOS Export PDF** — note → Export as PDF | the note renders to a legible A4 `.pdf` and the **share sheet** opens on it directly (NOT the print dialog); Save to Files writes it; multi-page notes paginate |
+| 8.5 | **iOS Download recovery phrase** — vault creation → save recovery phrase | share sheet opens on the `.txt`; Save to Files writes the correct plaintext; the Documents copy also exists |
+| 8.6 | **iOS Export attachment** — attachment → export | share sheet opens on the file with its correct extension; Save to Files writes the decrypted bytes |
+| 8.7 | **iOS share cancel is non-silent** — open any export share sheet, cancel it | the file is still saved in Documents (the success toast already fired); no silent no-op |
+| 8.8 | **Android export fallback (no SAF yet)** — run each export flow | file writes to Documents; a toast names the location; no crash, no silent no-op (SAF picker deferred, see `share_file.rs` module docs) |
+
+## 9. Folder-archive parity checklist (MYND-470)
+
+The `archived_folders` set (folder-archive) rides in on `vault.prefs` sync. The pure fold/predicate
+logic is unit-tested (`tests/archived-folders.test.ts`); the note-list UI is device-verified here
+because the flow-logic mock harness does not seed note-list content (`note_list` returns `[]` — no
+existing flow test exercises real notes). Needs a desktop + phone pair on the same account, synced.
+
+| # | Scenario | Expected |
+|---|---|---|
+| 9.1 | **Sync-in** — on desktop, archive a folder with notes; wait for the phone to sync | the folder appears as a row in the phone's Archive view (`data-testid=archive.folder-row`) |
+| 9.2 | **Decluttered from the tree** — after 9.1, open the phone's Notes tab | the archived folder + its notes are GONE from the working tree (hidden, not trashed) |
+| 9.3 | **Still resolvable** — search / open a wikilink to a note inside the archived folder | the note still resolves + opens (archive ≠ trash — it stays live) |
+| 9.4 | **Drill-in** — tap the archived folder row | navigates into it; its notes list; the back affordance returns to the archive root |
+| 9.5 | **Restore** — tap Restore on a folder row | the folder + its notes return to the live tree; the row disappears; survives a round-trip sync back to desktop |
+| 9.6 | **Delete → Trash** — tap Delete on a folder row → confirm ("Move N notes to Trash?") | every note in the subtree moves to Trash (recoverable there); the folder leaves the archive |
+| 9.7 | **Nested fold** — archive `A/` and `A/B/` on desktop | only `A/` shows as a top-level row; restoring `A/` un-archives `A/B/` too |
+| 9.8 | **Loose archived notes** — individually archive a note (not folder) outside any archived folder | it still shows as a note row (with Unarchive) alongside the folder rows |

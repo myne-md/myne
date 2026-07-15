@@ -1,11 +1,13 @@
 import { type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { CMEditor } from "@myne/editor/CMEditor";
+import { typographyStyle } from "@myne/editor/typography";
 import { REVEAL_ATTACHMENT_EVENT } from "@myne/editor/attachments/fileCardActions";
 import { headingSections } from "@myne/dialect";
 import type { EditorView } from "@codemirror/view";
 import { emit, listen } from "@tauri-apps/api/event";
-import { Screen, ScreenScroll, Icon, Banner, Spinner, Sheet, SyncStatusGlyph, SyncBanners, SyncStatusDetail, ConflictsSheet } from "../../components";
+import { documentDir, join } from "@tauri-apps/api/path";
+import { Screen, ScreenScroll, Icon, Banner, Spinner, Sheet, SyncBanners, ConflictsSheet } from "../../components";
 import { noteList, noteRead, noteCreate, noteUpdate, deleteNoteRouted } from "../../lib/notes";
 import type { NoteListError } from "../../lib/notes";
 import { useConflictMaterializer } from "../../lib/use-conflict-materializer";
@@ -18,8 +20,9 @@ import { ioBanner } from "../../lib/io-banner";
 import { usePrefs } from "../../lib/use-prefs";
 import { vaultDisplayLabel } from "../../lib/vault-label";
 import { useSwipeBack } from "../../lib/use-swipe-back";
-import { setFavorites, PREFS_SYNC_APPLIED_EVENT } from "../../lib/prefs";
+import { setFavorites, setArchivedFolders, setDeliberateFolders, PREFS_SYNC_APPLIED_EVENT } from "../../lib/prefs";
 import { bumpPrefsNonce } from "../../lib/prefsNonce";
+import { useHiddenHomeTiles } from "../../lib/home-tiles";
 import { searchNotes } from "../../lib/search-notes";
 import { buildTagIndex } from "../../lib/tags";
 import { publishEditorTagTree } from "../../lib/editor-tag-bridge";
@@ -41,7 +44,14 @@ import {
 } from "../../lib/note-organize";
 import { folderChildren, notesDirectlyIn, notesInSubtree } from "../../lib/folders";
 import { resolveTodayNote, createNoteFromTemplate, createBlankNamedNote } from "../../lib/daily";
-import { normalizeFolderPath, ancestorPaths, foldSegment } from "../../dialect/folderPath";
+import { normalizeFolderPath, ancestorPaths, foldSegment, folderKey } from "../../dialect/folderPath";
+import {
+  archivedFolderKeys,
+  isNoteFolderArchived,
+  topLevelArchivedFolders,
+  removeFolderFromArchive,
+  collectSubtreeNoteIds,
+} from "../../lib/archivedFolders";
 import { buildInitialPlaintext, readUpdatedFromFmBody } from "../../dialect/surgery";
 import { formatRelativeTime } from "../../lib/relative-time";
 import { evaluateFilter } from "../../lib/query-engine";
@@ -74,6 +84,7 @@ import { FavoritesStrip } from "./editor/chrome/FavoritesStrip";
 import { FormatBar } from "./editor/chrome/FormatBar";
 import { GraphTab } from "./editor/chrome/GraphTab";
 import { NoteRow } from "./editor/chrome/NoteRow";
+import { FolderTreeRow } from "./editor/chrome/FolderTreeRow";
 import { ReadingBar } from "./editor/chrome/ReadingBar";
 import { TabBar } from "./editor/chrome/TabBar";
 import { NoteContextPanel } from "./editor/panels/NoteContextPanel";
@@ -81,6 +92,7 @@ import { CommandPalette } from "./editor/sheets/CommandPalette";
 import { FilterSheet } from "./editor/sheets/FilterSheet";
 import { NoteActionsSheet } from "./editor/sheets/NoteActionsSheet";
 import { NoteRowActionsSheet } from "./editor/sheets/NoteRowActionsSheet";
+import { FolderActionsSheet } from "./editor/sheets/FolderActionsSheet";
 import { SortSheet } from "./editor/sheets/SortSheet";
 import { TagBrowserSheet } from "./editor/sheets/TagBrowserSheet";
 import { VaultSwitcher } from "./editor/sheets/VaultSwitcher";
@@ -148,8 +160,10 @@ const TAB_ORDER: Record<"notes" | "search" | "graph" | "files" | "templates", nu
 
 /** Editor typography presets (mirror the desktop `editor-typography` prefs), so
  *  the Appearance settings tangibly change the note editor. */
-const EDITOR_TEXT_PX: Record<string, number> = { sm: 14, md: 16, lg: 18, xl: 20 };
-const EDITOR_LINE_HEIGHT: Record<string, number> = { tight: 1.5, normal: 1.75, relaxed: 2 };
+// Reading-view (MarkdownView) base font px — matches the shared editor-typography
+// TEXT_SIZE presets so reading mode + the live editor + desktop stay consistent
+// (MYND-483). The live editor itself uses `typographyStyle` CSS vars, not this.
+const EDITOR_TEXT_PX: Record<string, number> = { sm: 13, md: 14, lg: 16, xl: 18 };
 
 const DEV_SEED: string[] = [
   "# Threat model v2\n\nWe assume a powerful network adversary that can observe all traffic and compromise the relay. The vault key never leaves the device.",
@@ -286,7 +300,6 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
 
   const [settingsOpen, setSettingsOpen] = useState(false);
   // SY-08 sync status detail sheet (MYND-461 T6), opened from the header glyph.
-  const [syncDetailOpen, setSyncDetailOpen] = useState(false);
   // Conflicts sheet (MYND-461 T8), opened from the conflicts count banner.
   const [conflictsOpen, setConflictsOpen] = useState(false);
   const [switcherOpen, setSwitcherOpen] = useState(false);
@@ -297,6 +310,11 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
   const [sortMode, setSortMode] = useState<"none" | "az" | "za">("none");
   // Which slice of the notes tab is shown: live notes / archive / trash.
   const [listView, setListView] = useState<"notes" | "archive" | "trash">("notes");
+  // Archive-view folder drill (MYND-470): null = archive root (folder rows +
+  // loose archived notes); a folder path = browsing that archived folder's notes.
+  const [archiveFolder, setArchiveFolder] = useState<string | null>(null);
+  // Folder path armed for the inline "Move N notes to Trash?" confirm (null = none).
+  const [confirmArchiveFolder, setConfirmArchiveFolder] = useState<string | null>(null);
   // Current folder for NEW-note placement (root by default; the tree no longer
   // drills, so this stays null unless a future "new note in folder" sets it).
   const [currentFolder, setCurrentFolder] = useState<string | null>(null);
@@ -318,6 +336,17 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
   // Editor "Move to folder": the note id being moved + the folder-path input.
   const [moveTarget, setMoveTarget] = useState<string | null>(null);
   const [moveInput, setMoveInput] = useState("");
+  // Folder create + long-press actions (MYND-473 / MYND-480).
+  const [folderActions, setFolderActions] = useState<{ path: string; name: string } | null>(null);
+  const [folderPrompt, setFolderPrompt] = useState<
+    | { mode: "new" }
+    | { mode: "subfolder"; parent: string }
+    | { mode: "rename"; path: string }
+    | null
+  >(null);
+  const [folderPromptInput, setFolderPromptInput] = useState("");
+  // Home quick-action tiles hidden per-tile from Settings → Appearance (MYND-479).
+  const hiddenHomeTiles = useHiddenHomeTiles();
   // Active saved view (its id) filtering the notes list, or null. Mutually
   // exclusive with the folder drill-down + tag filter.
   const [activeViewId, setActiveViewId] = useState<string | null>(null);
@@ -364,6 +393,53 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
     for (const n of liveNotes) m.set(n.id, readNoteFolder(bodies.get(n.id) ?? ""));
     return m;
   }, [liveNotes, bodies]);
+
+  // Folder-archive (MYND-470): the synced `archived_folders` set decluttered from
+  // the working tree. A note under an archived folder keeps NO note-level flag
+  // (folder-archive never rewrites notes), so it sits in `liveNotes` — split those
+  // out so the Notes tree hides them (matching desktop) while they stay live +
+  // resolvable (graph/tags/search), and browse them under the Archive view.
+  const archivedKeys = useMemo(
+    () => archivedFolderKeys(prefs.archived_folders),
+    [prefs.archived_folders],
+  );
+  // Live notes hidden by folder-archive (id → folder), and the working set that
+  // remains after removing them. Empty `archivedKeys` → no split (zero overhead).
+  const folderArchivedOf = useMemo(() => {
+    const m = new Map<string, string | null>();
+    if (archivedKeys.length === 0) return m;
+    for (const n of liveNotes) {
+      const f = folderOf.get(n.id) ?? null;
+      if (isNoteFolderArchived(f, archivedKeys)) m.set(n.id, f);
+    }
+    return m;
+  }, [liveNotes, folderOf, archivedKeys]);
+  const workingNotes = useMemo(
+    () => (folderArchivedOf.size === 0 ? liveNotes : liveNotes.filter((n) => !folderArchivedOf.has(n.id))),
+    [liveNotes, folderArchivedOf],
+  );
+  // Top-level archived folders (nested ones fold under their ancestor) for the
+  // Archive view's folder rows.
+  const archivedFolders = useMemo(
+    () => topLevelArchivedFolders(prefs.archived_folders),
+    [prefs.archived_folders],
+  );
+  // Folder of each note shown by the Archive view — folder-archived LIVE notes
+  // plus note-flag `archived:` notes — so the root can drop notes already under a
+  // folder row, and a folder drill can gather its subtree. id → folder.
+  const archiveNoteFolderOf = useMemo(() => {
+    const m = new Map<string, string | null>(folderArchivedOf);
+    for (const n of archivedNotes) m.set(n.id, readNoteFolder(bodies.get(n.id) ?? ""));
+    return m;
+  }, [folderArchivedOf, archivedNotes, bodies]);
+  // Leaving the Archive view resets the folder drill + any armed delete confirm,
+  // so re-entering Archive always starts at its root.
+  useEffect(() => {
+    if (listView !== "archive") {
+      setArchiveFolder(null);
+      setConfirmArchiveFolder(null);
+    }
+  }, [listView]);
 
   // The wikilink graph over the LIVE notes — feeds both the Graph tab and the
   // in-editor "Linked from" backlinks.
@@ -878,12 +954,142 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
     }
   }
 
+  // ── Folder create + actions (MYND-473 / MYND-480) ───────────────────────────
+  /** Parent of a canonical trailing-slash folder path (`A/B/` → `A/`; top → null). */
+  function folderParent(path: string): string | null {
+    const t2 = path.endsWith("/") ? path.slice(0, -1) : path;
+    const i = t2.lastIndexOf("/");
+    return i < 0 ? null : t2.slice(0, i + 1);
+  }
+
+  function openFolderPrompt(p: { mode: "new" } | { mode: "subfolder"; parent: string } | { mode: "rename"; path: string }) {
+    setFolderActions(null);
+    setFolderPromptInput(
+      p.mode === "rename" ? (folderParent(p.path) ? p.path.slice(folderParent(p.path)!.length) : p.path).replace(/\/$/, "") : "",
+    );
+    setFolderPrompt(p);
+  }
+
+  /** New note directly in `path` (folder long-press → "New note"). Mirrors
+   *  `newNote` but seeds the note's `folder:` with the target folder. */
+  function newNoteInFolder(path: string) {
+    setFolderActions(null);
+    setEditorText(buildInitialPlaintext(normalizeFolderPath(path)));
+    setEditing({ id: null });
+    setEditorError(null);
+    setReadingMode(false);
+    setView("editor");
+  }
+
+  /** Re-root every LIVE note (+ the deliberate/archived folder sets) under
+   *  `oldPath` to the matching path under `newPath` — the mobile folder rename/
+   *  move primitive. Paths come from the tree (derived from the notes' own
+   *  `folder:`), so a case-exact prefix match is reliable. */
+  async function reRootFolderSubtree(oldPath: string, newPath: string) {
+    if (folderKey(oldPath) === folderKey(newPath)) return;
+    for (const [id, folder] of folderOf) {
+      if (folder != null && folder.startsWith(oldPath)) {
+        const dest = normalizeFolderPath(newPath + folder.slice(oldPath.length));
+        await moveNoteToFolder(id, dest);
+      }
+    }
+    const reroot = (arr: readonly string[]) =>
+      arr.map((f) => (f.startsWith(oldPath) ? normalizeFolderPath(newPath + f.slice(oldPath.length)) ?? f : f));
+    if (HAS_TAURI) {
+      await setDeliberateFolders(reroot(prefs.deliberate_folders));
+      if (prefs.archived_folders.some((f) => f.startsWith(oldPath))) {
+        await setArchivedFolders(reroot(prefs.archived_folders));
+      }
+      bumpPrefsNonce();
+    }
+    await refresh();
+  }
+
+  /** Apply the folder-name prompt (new / subfolder / rename). Empty = cancel. */
+  async function submitFolderPrompt() {
+    const p = folderPrompt;
+    if (p == null) return;
+    const name = folderPromptInput.trim();
+    setFolderPrompt(null);
+    if (name === "") return;
+    try {
+      if (p.mode === "rename") {
+        const dest = normalizeFolderPath((folderParent(p.path) ?? "") + name);
+        if (dest) await reRootFolderSubtree(p.path, dest);
+        return;
+      }
+      const base = p.mode === "subfolder" ? p.parent : "";
+      const path = normalizeFolderPath(base + name);
+      // A deliberate folder persists even while empty (the virtual-folder model).
+      if (path != null && HAS_TAURI) {
+        await setDeliberateFolders([...prefs.deliberate_folders, path]).then(bumpPrefsNonce).catch(bumpPrefsNonce);
+      }
+    } catch {
+      setEditorError(t("editor.flow.moveFailed"));
+    }
+  }
+
+  /** Archive a folder as a unit (folder long-press → Archive). */
+  async function archiveFolderFromMenu(path: string) {
+    setFolderActions(null);
+    const canonical = normalizeFolderPath(path) ?? path;
+    if (HAS_TAURI) {
+      await setArchivedFolders([...prefs.archived_folders, canonical]).then(bumpPrefsNonce).catch(bumpPrefsNonce);
+    }
+  }
+
+  /** Move a folder's whole subtree to Trash (folder long-press → Delete folder). */
+  async function trashFolderFromMenu(path: string) {
+    setFolderActions(null);
+    const ids = notesInSubtree(folderOf, path);
+    try {
+      for (const id of ids) await trashNote(id);
+      if (HAS_TAURI) {
+        const key = folderKey(path);
+        await setDeliberateFolders(prefs.deliberate_folders.filter((f) => !folderKey(f).startsWith(key)));
+        bumpPrefsNonce();
+      }
+    } catch {
+      setEditorError(t("editor.flow.trashFailed"));
+    }
+    await refresh();
+  }
+
   /** Row action in the trash/archive views (restore / unarchive / purge). */
   async function organizeRow(fn: (id: string) => Promise<void>, id: string) {
     try {
       await fn(id);
     } catch {
       /* best-effort */
+    }
+    await refresh();
+  }
+
+  /** Restore an archived folder (MYND-470): drop it (and any nested archived
+   *  descendant) from `archived_folders` so its subtree returns to the live tree.
+   *  Prefs-only — no note bodies change. */
+  async function restoreArchivedFolder(path: string) {
+    const next = removeFolderFromArchive(prefs.archived_folders, path);
+    if (HAS_TAURI) await setArchivedFolders(next).then(bumpPrefsNonce).catch(bumpPrefsNonce);
+    if (archiveFolder !== null && folderKey(archiveFolder).startsWith(folderKey(path))) {
+      setArchiveFolder(null);
+    }
+  }
+
+  /** Delete an archived folder to Trash (MYND-470): soft-trash every note in its
+   *  subtree, then drop it from `archived_folders`. Reversible from Trash. */
+  async function deleteArchivedFolderToTrash(path: string) {
+    const ids = collectSubtreeNoteIds(archiveNoteFolderOf, folderKey(path));
+    try {
+      for (const id of ids) await trashNote(id);
+      const next = removeFolderFromArchive(prefs.archived_folders, path);
+      if (HAS_TAURI) await setArchivedFolders(next).then(bumpPrefsNonce).catch(bumpPrefsNonce);
+    } catch {
+      setEditorError(t("editor.flow.trashFailed"));
+    }
+    setConfirmArchiveFolder(null);
+    if (archiveFolder !== null && folderKey(archiveFolder).startsWith(folderKey(path))) {
+      setArchiveFolder(null);
     }
     await refresh();
   }
@@ -939,8 +1145,9 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
 
   /** Export the current note as a PDF. `window.print()` is a no-op in the mobile
    *  WebView, so hand the rendered `#myne-print` HTML to the native export sheet
-   *  (iOS: system print → Save to Files as PDF). Browser-dev falls back to
-   *  `window.print()`. Pairs with `src-tauri/src/pdf_export.rs`. */
+   *  (iOS: render to a PDF file → native share sheet → Save to Files/AirDrop,
+   *  MYND-475). Browser-dev falls back to `window.print()`. Pairs with
+   *  `src-tauri/src/pdf_export.rs`. */
   async function exportNotePdf() {
     const bodyHtml = document.getElementById("myne-print")?.innerHTML ?? "";
     const title = deriveTitleSnippet(editorText).title || (editing?.id ? "Untitled" : "New note");
@@ -960,7 +1167,13 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
       return;
     }
     try {
-      await emit("export-note-pdf", { title, html });
+      // Save the PDF under Documents (reachable even if the share sheet is
+      // cancelled), then the native share sheet lets the user pick where to keep
+      // it (MYND-475). Sanitize the title to a bare basename first — a title with
+      // `/`, `\`, or a leading `..` must not let join() escape Documents.
+      const safe = title.replace(/[/\\]/g, "_").replace(/^\.+/, "").trim() || "note";
+      const path = await join(await documentDir(), `${safe}.pdf`);
+      await emit("export-note-pdf", { title, html, path });
     } catch {
       setEditorError(t("editor.flow.exportFailed"));
     }
@@ -1055,12 +1268,19 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
     // when shown they are pulled OUT of the tree below (they live in the strip,
     // not doubled as list rows), so the tree builds from a fav-excluded folderOf.
     const favNotes = prefs.favorites
-      .map((id) => liveNotes.find((n) => n.id === id))
+      .map((id) => workingNotes.find((n) => n.id === id))
       .filter((n): n is NoteEntry => n != null);
     const favStripVisible = treeMode && favNotes.length > 0;
-    const treeFolderOf = favStripVisible
-      ? new Map([...folderOf].filter(([id]) => !favSet.has(id)))
-      : folderOf;
+    // The tree hides folder-archived notes (they live under the Archive view) and,
+    // when the strip is shown, the favourites (they live in the strip).
+    const treeFolderOf =
+      favStripVisible || folderArchivedOf.size > 0
+        ? new Map(
+            [...folderOf].filter(
+              ([id]) => !folderArchivedOf.has(id) && !(favStripVisible && favSet.has(id)),
+            ),
+          )
+        : folderOf;
     const titleOf = new Map(notes.map((n) => [n.id, n.title]));
     // Order note ids within one tree level: favourites first, then by sort mode.
     const sortIds = (ids: string[]): string[] => {
@@ -1071,16 +1291,28 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
     };
     const treeRows = treeMode ? buildFolderTree(treeFolderOf, collapsedFolders, sortIds) : [];
 
+    const archiveDrillKey = archiveFolder !== null ? folderKey(archiveFolder) : "";
     const filtered =
       listView === "trash"
         ? trashedNotes
         : listView === "archive"
-          ? archivedNotes
+          ? archiveFolder !== null
+            // Drilled into an archived folder: every note in its subtree (browse).
+            ? notes.filter(
+                (n) =>
+                  archiveNoteFolderOf.has(n.id) &&
+                  folderKey(archiveNoteFolderOf.get(n.id) ?? null).startsWith(archiveDrillKey),
+              )
+            // Archive root: individually-archived notes NOT already under an
+            // archived folder (those are represented by their folder row).
+            : archivedNotes.filter(
+                (n) => !isNoteFolderArchived(archiveNoteFolderOf.get(n.id) ?? null, archivedKeys),
+              )
           : viewActive
-            ? liveNotes.filter((n) => viewMatchIds!.has(n.id))
+            ? workingNotes.filter((n) => viewMatchIds!.has(n.id))
             : activeTag
-              ? liveNotes.filter((n) => (tagIndex.byTag.get(activeTag) ?? []).includes(n.id))
-              : liveNotes;
+              ? workingNotes.filter((n) => (tagIndex.byTag.get(activeTag) ?? []).includes(n.id))
+              : workingNotes;
     // Inline search — matches the note title or its decrypted body, on-device.
     const searched =
       searchNeedle === ""
@@ -1101,6 +1333,13 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
       listView === "notes"
         ? [...sorted.filter((n) => favSet.has(n.id)), ...sorted.filter((n) => !favSet.has(n.id))]
         : sorted;
+    // Archive root (MYND-470) shows folder rows above the loose notes; it is only
+    // "empty" when it has neither. Drill-in + drilled-in note rows drop the
+    // per-note unarchive action (folder-archived notes restore via the folder).
+    const archiveRoot = listView === "archive" && archiveFolder === null;
+    const archiveHasFolders = archiveRoot && archivedFolders.length > 0;
+    const inArchiveFolder = listView === "archive" && archiveFolder !== null;
+    const folderLabel = (path: string) => (path.endsWith("/") ? path.slice(0, -1) : path);
     const toggleFolder = (path: string) =>
       setCollapsedFolders((prev) => {
         const next = new Set(prev);
@@ -1132,19 +1371,14 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
           <div key={`f:${f.path}`}>
             <div style={{ position: "sticky", top: depth * 44, zIndex: 30 - depth, background: "var(--bg-1)" }}>
               {Array.from({ length: depth }, (_, i) => railAt(i))}
-              <div
-                onClick={() => toggleFolder(f.path)}
-                style={{ position: "relative", display: "flex", alignItems: "center", gap: 8, padding: "11px 20px", paddingLeft: 20 + depth * 18, cursor: "pointer" }}
-              >
-                <svg width="12" height="12" viewBox="0 0 24 24" style={{ flexShrink: 0, transform: isCollapsed ? "rotate(0deg)" : "rotate(90deg)", transition: "transform 140ms ease" }}>
-                  <path d="M8 5l8 7-8 7" fill="none" stroke="var(--fg-3)" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-                <svg width="18" height="18" viewBox="0 0 24 24" style={{ flexShrink: 0 }}>
-                  <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" fill="none" stroke="var(--fg-2)" strokeWidth="1.6" strokeLinejoin="round" />
-                </svg>
-                <div style={{ flex: 1, minWidth: 0, fontSize: 16, fontWeight: 600, color: "var(--fg-1)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.name}</div>
-                <span style={{ width: 30, textAlign: "center", fontSize: 13, color: "var(--fg-3)", flexShrink: 0 }}>{f.count}</span>
-              </div>
+              <FolderTreeRow
+                name={f.name}
+                count={f.count}
+                collapsed={isCollapsed}
+                indentPx={20 + depth * 18}
+                onToggle={() => toggleFolder(f.path)}
+                onHold={() => setFolderActions({ path: f.path, name: f.name })}
+              />
             </div>
             {!isCollapsed && (
               <div style={{ position: "relative" }}>
@@ -1207,9 +1441,22 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
                   {viewTitle}
                 </h1>
                 <div style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: 8 }}>
-                  {/* Glanceable sync-status glyph (SY-01, MYND-461); tap → SY-08
-                      status detail sheet (task 6). */}
-                  <SyncStatusGlyph onOpenDetail={() => setSyncDetailOpen(true)} />
+                  {/* Sync status lives in Settings → Sync (MYND-481); the general
+                      UI no longer shows a sync glyph. Critical errors/conflicts
+                      still surface via <SyncBanners /> below. */}
+                  {listView === "notes" && (
+                    <button
+                      onClick={() => openFolderPrompt({ mode: "new" })}
+                      aria-label={t("notes.list.newFolder")}
+                      data-testid="notes.new-folder"
+                      style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", width: 36, height: 36, border: "1px solid var(--line-2)", borderRadius: 10, background: "transparent", color: "var(--fg-2)", cursor: "pointer" }}
+                    >
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                        <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+                        <path d="M12 11v5M9.5 13.5h5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                      </svg>
+                    </button>
+                  )}
                   {listView === "notes" && (
                     <button
                       onClick={newNote}
@@ -1223,22 +1470,30 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
                 </div>
               </div>
 
-              {/* Secondary create/browse tiles — Template / Daily note / Views. */}
-              {listView === "notes" && (
+              {/* Secondary create/browse tiles — Template / Daily note / Views.
+                  Each tile is individually hideable from Settings → Appearance
+                  (MYND-479); the row hides entirely when all three are off. */}
+              {listView === "notes" && hiddenHomeTiles.size < 3 && (
                 <div style={{ marginTop: 12, display: "flex", gap: 8 }}>
-                  <ActionPill onClick={() => setTab("templates")} label={t("templates.manager.listLabel")}>
-                    <rect x="8" y="4" width="11" height="14" rx="2" stroke="currentColor" strokeWidth="1.7" fill="none" />
-                    <path d="M5 8v10a2 2 0 002 2h8" stroke="currentColor" strokeWidth="1.7" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-                  </ActionPill>
-                  <ActionPill onClick={() => void openToday()} label={t("editor.nav.openToday")}>
-                    <rect x="3" y="5" width="18" height="16" rx="2" fill="none" stroke="currentColor" strokeWidth="1.7" />
-                    <path d="M3 10h18M8 3v4M16 3v4" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
-                  </ActionPill>
-                  <ActionPill onClick={() => setViewsOpen(true)} label={t("editor.chrome.barItems.views")}>
-                    <path d="M12 2 2 7l10 5 10-5-10-5z" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
-                    <path d="M2 12l10 5 10-5" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
-                    <path d="M2 17l10 5 10-5" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
-                  </ActionPill>
+                  {!hiddenHomeTiles.has("templates") && (
+                    <ActionPill onClick={() => setTab("templates")} label={t("templates.manager.listLabel")}>
+                      <rect x="8" y="4" width="11" height="14" rx="2" stroke="currentColor" strokeWidth="1.7" fill="none" />
+                      <path d="M5 8v10a2 2 0 002 2h8" stroke="currentColor" strokeWidth="1.7" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                    </ActionPill>
+                  )}
+                  {!hiddenHomeTiles.has("open-today") && (
+                    <ActionPill onClick={() => void openToday()} label={t("editor.nav.openToday")}>
+                      <rect x="3" y="5" width="18" height="16" rx="2" fill="none" stroke="currentColor" strokeWidth="1.7" />
+                      <path d="M3 10h18M8 3v4M16 3v4" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+                    </ActionPill>
+                  )}
+                  {!hiddenHomeTiles.has("views") && (
+                    <ActionPill onClick={() => setViewsOpen(true)} label={t("editor.chrome.barItems.views")}>
+                      <path d="M12 2 2 7l10 5 10-5-10-5z" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
+                      <path d="M2 12l10 5 10-5" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+                      <path d="M2 17l10 5 10-5" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+                    </ActionPill>
+                  )}
                 </div>
               )}
 
@@ -1329,7 +1584,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
               <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
                 <Spinner />
               </div>
-            ) : (treeMode ? treeRows.length === 0 && !favStripVisible : orderedNotes.length === 0) && !listError ? (
+            ) : (treeMode ? treeRows.length === 0 && !favStripVisible : orderedNotes.length === 0 && !archiveHasFolders && !inArchiveFolder) && !listError ? (
               <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "0 40px", textAlign: "center" }}>
                 <div style={{ fontSize: 18, fontWeight: 600, color: "var(--fg-1)" }}>
                   {listView === "trash" ? t("editor.list.trashEmpty") : listView === "archive" ? t("editor.list.archiveEmpty") : viewActive ? t("editor.list.noMatchingNotes") : t("editor.list.noNotesYet")}
@@ -1351,6 +1606,68 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
               </ScreenScroll>
             ) : (
               <ScreenScroll style={{ marginTop: 8 }}>
+                {/* Archive drill-in: back to the archive root (MYND-470). */}
+                {inArchiveFolder && (
+                  <button
+                    type="button"
+                    onClick={() => setArchiveFolder(null)}
+                    data-testid="archive.folder-back"
+                    style={{ display: "flex", alignItems: "center", gap: 6, border: "none", background: "transparent", color: "var(--accent)", fontSize: 15, fontWeight: 600, cursor: "pointer", padding: "8px 20px 12px" }}
+                  >
+                    <Icon name="chevron-left" size={18} color="var(--accent)" strokeWidth={2} />
+                    {folderLabel(archiveFolder!)}
+                  </button>
+                )}
+                {/* Archive root: the archived-folder rows above the loose notes. */}
+                {archiveRoot &&
+                  archivedFolders.map((path) => {
+                    const armed = confirmArchiveFolder === path;
+                    const subtreeCount = armed
+                      ? collectSubtreeNoteIds(archiveNoteFolderOf, folderKey(path)).length
+                      : 0;
+                    return (
+                      <div
+                        key={`arch-folder:${path}`}
+                        data-testid="archive.folder-row"
+                        data-folder-path={path}
+                        style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 20px", borderTop: "1px solid var(--line-1)" }}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => setArchiveFolder(path)}
+                          data-testid="archive.folder-open"
+                          style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 10, border: "none", background: "transparent", cursor: "pointer", textAlign: "left", padding: 0 }}
+                        >
+                          <Icon name="folder" size={17} color="var(--fg-2)" strokeWidth={1.7} />
+                          <span style={{ fontSize: 16, color: "var(--fg-1)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {folderLabel(path)}
+                          </span>
+                        </button>
+                        {armed ? (
+                          <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
+                            <span style={{ fontSize: 13, color: "var(--fg-3)" }}>
+                              {t("notes.archive.folderDeleteConfirm", { count: subtreeCount })}
+                            </span>
+                            <button onClick={() => void deleteArchivedFolderToTrash(path)} data-testid="archive.folder-delete-confirm" data-folder-path={path} style={{ border: "none", background: "transparent", color: "var(--danger)", fontSize: 14, fontWeight: 600, cursor: "pointer", padding: "6px 8px" }}>
+                              {t("notes.archive.folderDeleteConfirmCta")}
+                            </button>
+                            <button onClick={() => setConfirmArchiveFolder(null)} style={{ border: "none", background: "transparent", color: "var(--accent)", fontSize: 14, fontWeight: 600, cursor: "pointer", padding: "6px 8px" }}>
+                              {t("notes.archive.cancel")}
+                            </button>
+                          </div>
+                        ) : (
+                          <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
+                            <button onClick={() => void restoreArchivedFolder(path)} data-testid="archive.folder-restore" data-folder-path={path} style={{ border: "none", background: "transparent", color: "var(--accent)", fontSize: 14, fontWeight: 600, cursor: "pointer", padding: "6px 8px" }}>
+                              {t("notes.archive.restore")}
+                            </button>
+                            <button onClick={() => setConfirmArchiveFolder(path)} data-testid="archive.folder-delete" data-folder-path={path} style={{ border: "none", background: "transparent", color: "var(--danger)", fontSize: 14, fontWeight: 600, cursor: "pointer", padding: "6px 8px" }}>
+                              {t("notes.archive.delete")}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 {orderedNotes.map((n, i) => (
                   <NoteRow
                     key={n.id}
@@ -1363,7 +1680,9 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
                     favorited={listView === "notes" && favSet.has(n.id)}
                     onToggleFavorite={listView === "notes" ? () => toggleFavorite(n.id) : undefined}
                     actions={
-                      listView === "notes" ? undefined : (
+                      // Notes tab + drilled-into an archived folder: no per-row
+                      // action (folder-archived notes restore via the folder row).
+                      listView === "notes" || inArchiveFolder ? undefined : (
                         <div style={{ display: "flex", gap: 4, flexShrink: 0 }} onClick={(e) => e.stopPropagation()}>
                           {listView === "trash" ? (
                             <>
@@ -1490,15 +1809,6 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
             onLock={onLock}
             onDeleteVaultSuccess={onDeleteVaultSuccess}
           />
-        )}
-
-        {syncDetailOpen && (
-          <Sheet onClose={() => setSyncDetailOpen(false)}>
-            <h2 style={{ margin: "0 0 14px", fontSize: 20, fontWeight: 700, color: "var(--fg-display)" }}>
-              {t("editor.chrome.barItems.syncStatus")}
-            </h2>
-            <SyncStatusDetail />
-          </Sheet>
         )}
 
         {conflictsOpen && (
@@ -1634,6 +1944,59 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
             }}
           />
         )}
+
+        {/* Folder long-press actions (MYND-480). */}
+        {folderActions && (
+          <FolderActionsSheet
+            name={folderActions.name}
+            onClose={() => setFolderActions(null)}
+            onNewNote={() => newNoteInFolder(folderActions.path)}
+            onNewSubfolder={() => openFolderPrompt({ mode: "subfolder", parent: folderActions.path })}
+            onRename={() => openFolderPrompt({ mode: "rename", path: folderActions.path })}
+            onArchive={() => void archiveFolderFromMenu(folderActions.path)}
+            onTrash={() => void trashFolderFromMenu(folderActions.path)}
+          />
+        )}
+
+        {/* New folder / New subfolder / Rename name prompt (MYND-473 / MYND-480). */}
+        {folderPrompt && (
+          <Sheet onClose={() => setFolderPrompt(null)}>
+            {() => (
+              <>
+                <div style={{ fontSize: 17, fontWeight: 600, color: "var(--fg-1)", textAlign: "center" }}>
+                  {folderPrompt.mode === "rename"
+                    ? t("attachments.library.menuRename")
+                    : folderPrompt.mode === "subfolder"
+                      ? t("notes.list.newSubfolder")
+                      : t("notes.list.newFolder")}
+                </div>
+                <input
+                  value={folderPromptInput}
+                  onChange={(e) => setFolderPromptInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") void submitFolderPrompt(); }}
+                  placeholder={
+                    folderPrompt.mode === "subfolder"
+                      ? t("notes.list.newFolderInPlaceholder", { path: folderPrompt.parent.replace(/\/$/, "") })
+                      : t("notes.list.newFolderPlaceholder")
+                  }
+                  autoFocus
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  style={{ marginTop: 14, width: "100%", height: 48, border: "1px solid var(--line-2)", borderRadius: 8, background: "var(--bg-1)", padding: "0 14px", fontFamily: "var(--font-sans)", fontSize: 16, color: "var(--fg-1)", outline: "none", boxSizing: "border-box" }}
+                />
+                <div style={{ marginTop: 16 }}>
+                  <button
+                    onClick={() => void submitFolderPrompt()}
+                    style={{ width: "100%", height: 50, border: "none", borderRadius: 8, background: "var(--accent)", color: "var(--accent-on)", fontFamily: "var(--font-sans)", fontSize: 16, fontWeight: 600, cursor: "pointer" }}
+                  >
+                    {folderPrompt.mode === "rename" ? t("attachments.library.menuRename") : t("notes.list.newFolder")}
+                  </button>
+                </div>
+              </>
+            )}
+          </Sheet>
+        )}
     </>
   );
 
@@ -1689,9 +2052,12 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
         // Shared live-preview editor (@myne/editor): raw-on-edit CodeMirror with
         // tables / KaTeX / syntax highlighting / frontmatter-as-properties, plus
         // its own in-editor selection toolbar + slash menu + keymaps — so mobile
-        // no longer needs a separate FormatBar. Typography (font/size/spacing)
-        // is applied on the wrapper like the desktop `typographyStyle` wrapper;
-        // the engine also reads prefs via the injected EditorHost.
+        // no longer needs a separate FormatBar. Typography is applied via the
+        // canonical `typographyStyle(prefs)` CSS custom properties
+        // (`--editor-text-size` / `--editor-font-family` / `--editor-line-spacing`)
+        // that the shared CM theme reads (MYND-483) — direct `fontSize`/etc. on
+        // the wrapper are OVERRIDDEN by CM's own `var(--editor-*)` rules, so a
+        // change never reached the editor. `maxWidth` stays off (full-width phone).
         <div
           style={{
             flex: 1,
@@ -1699,9 +2065,8 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
             overflowY: "auto",
             WebkitOverflowScrolling: "touch",
             background: "var(--bg-1)",
-            fontFamily: prefs.editor_font_family === "sans" ? "var(--font-sans)" : "var(--font-mono)",
-            fontSize: EDITOR_TEXT_PX[prefs.editor_text_size ?? "md"] ?? 16,
-            lineHeight: EDITOR_LINE_HEIGHT[prefs.editor_line_spacing ?? "normal"] ?? 1.75,
+            ...typographyStyle(prefs),
+            maxWidth: undefined,
           }}
         >
           <CMEditor
@@ -1980,7 +2345,6 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
             onSearch={() => setPaletteOpen(true)}
             onSwitcher={() => setSwitcherOpen(true)}
             onSettings={() => setSettingsOpen(true)}
-            onSyncDetail={() => setSyncDetailOpen(true)}
           />
         )}
         {tab === "notes" ? (
