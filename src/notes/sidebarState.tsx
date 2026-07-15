@@ -24,6 +24,7 @@ import {
   type ReactNode,
 } from "react";
 import { createNote } from "./createNote";
+import { createDrawing } from "./createDrawing";
 import { isNoteFolderArchived } from "./archivedFolders";
 import { prefsRead, normalizeNewNoteLocation } from "../lib/prefs";
 import { deleteNoteRouted } from "./deleteNote";
@@ -719,6 +720,9 @@ export type UseSelectedNoteReturn = {
   ) => Promise<void>;
   /** Create-from-scratch flow — calls `createNote` + auto-select + auto-rename. */
   createAndStartRename: (folder?: string | null) => Promise<NoteId>;
+  /** Like {@link createAndStartRename} but mints a `kind: drawing` note (opens on
+   *  the canvas surface). Same default-location + auto-select + inline-rename. */
+  createDrawingAndStartRename: (folder?: string | null) => Promise<NoteId>;
   /**
    * Duplicate `sourceId` in place (MYND-332) — clones the `.myn` via
    * `duplicateNote`, registers + caches the copy, and selects it (the Editor
@@ -903,11 +907,17 @@ export function SidebarStateProvider({ children }: { children: ReactNode }) {
     [refreshOne],
   );
 
-  const createAndStartRename = useCallback(
-    async (folder: string | null = null): Promise<NoteId> => {
+  // Shared create-then-select-then-rename core, parameterized by the `mint`
+  // function so notes (`createNote`) and drawings (`createDrawing`) reuse the
+  // identical default-location resolution + optimistic UI + rename entry.
+  const createWithMintAndStartRename = useCallback(
+    async (
+      mint: (folder: string | null) => Promise<NoteId>,
+      folder: string | null = null,
+    ): Promise<NoteId> => {
       // MYND-462 — resolve the configured "Default location for new notes" when
       // the caller did NOT name a folder. An explicit `folder` argument (the
-      // right-click "New note here" path) is AUTHORITATIVE and bypasses the pref:
+      // right-click "New … here" path) is AUTHORITATIVE and bypasses the pref:
       // "here" means here, regardless of the default. The pref only applies to
       // the root-level create entry points (Cmd+N, palette, "+ New Note", new tab).
       let target = folder;
@@ -925,7 +935,7 @@ export function SidebarStateProvider({ children }: { children: ReactNode }) {
           // Pref read failure → fall back to root (target stays null).
         }
       }
-      const newId = await createNote(target);
+      const newId = await mint(target);
       // MYND-31: register the new note in the index (live).
       void reindexNote(newId);
       setState((prev) => {
@@ -938,6 +948,17 @@ export function SidebarStateProvider({ children }: { children: ReactNode }) {
       return newId;
     },
     [refreshOne],
+  );
+  const createAndStartRename = useCallback(
+    (folder: string | null = null): Promise<NoteId> =>
+      createWithMintAndStartRename(createNote, folder),
+    [createWithMintAndStartRename],
+  );
+  const createDrawingAndStartRename = useCallback(
+    (folder: string | null = null): Promise<NoteId> =>
+      // Unnamed (empty-title → inline rename, like createNote's empty note).
+      createWithMintAndStartRename((f) => createDrawing(undefined, f), folder),
+    [createWithMintAndStartRename],
   );
 
   const duplicateAndOpen = useCallback(
@@ -1271,6 +1292,7 @@ export function SidebarStateProvider({ children }: { children: ReactNode }) {
       cancelRename,
       commitRename,
       createAndStartRename,
+      createDrawingAndStartRename,
       duplicateAndOpen,
       deleteWithRollback,
       trashWithRollback,
@@ -1298,6 +1320,7 @@ export function SidebarStateProvider({ children }: { children: ReactNode }) {
       cancelRename,
       commitRename,
       createAndStartRename,
+      createDrawingAndStartRename,
       duplicateAndOpen,
       deleteWithRollback,
       trashWithRollback,

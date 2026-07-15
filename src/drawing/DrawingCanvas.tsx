@@ -15,6 +15,7 @@ import { Excalidraw, serializeAsJSON } from "@excalidraw/excalidraw";
 import "@excalidraw/excalidraw/index.css";
 import { useRef, type ComponentProps, type CSSProperties } from "react";
 import { HARDENED_EXCALIDRAW_PROPS } from "./excalidrawConfig";
+import { withPersistedTheme } from "./sceneContent";
 
 type InitialData = ComponentProps<typeof Excalidraw>["initialData"];
 
@@ -23,6 +24,25 @@ const WRAP_STYLE: CSSProperties = {
   height: "100%",
   minHeight: 0,
 };
+
+/** The resolved app theme, for seeding a themeless drawing so it matches the rest
+ *  of the app (the SF2 "wire theme from prefs" intent). Excalidraw only knows
+ *  `"light"`/`"dark"` — Myne's `amoled` maps to dark; no explicit `<html
+ *  data-theme>` means follow the OS (`prefers-color-scheme`). A per-drawing theme
+ *  persisted in the scene overrides this default. */
+function currentAppTheme(): "light" | "dark" {
+  const dt =
+    typeof document !== "undefined"
+      ? document.documentElement.getAttribute("data-theme")
+      : null;
+  if (dt === "dark" || dt === "amoled") return "dark";
+  if (dt === "light") return "light";
+  return typeof window !== "undefined" &&
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(prefers-color-scheme: dark)").matches
+    ? "dark"
+    : "light";
+}
 
 export type DrawingCanvasProps = {
   /** Scene JSON (the ```excalidraw fence contents) loaded as the canvas's
@@ -37,11 +57,14 @@ function parseInitialData(json: string | undefined): InitialData {
   if (json === undefined) return undefined;
   try {
     const scene = JSON.parse(json) as Record<string, unknown>;
+    const persistedAppState = (scene.appState ?? {}) as Record<string, unknown>;
     // Single boundary cast: the parsed scene carries Excalidraw's own precise
     // element/appState/file types that we can't reconstruct structurally here.
     return {
       elements: scene.elements ?? [],
-      appState: scene.appState ?? {},
+      // Seed the resolved app theme as the DEFAULT so a themeless drawing matches
+      // the app; a per-drawing theme persisted in the scene (spread last) wins.
+      appState: { theme: currentAppTheme(), ...persistedAppState },
       files: scene.files ?? {},
     } as unknown as InitialData;
   } catch {
@@ -71,7 +94,14 @@ export default function DrawingCanvas({
                   primed.current = true;
                   return;
                 }
-                onSceneChange(serializeAsJSON(elements, appState, files, "local"));
+                // Persist the live theme too (serializeAsJSON drops it) so a
+                // per-drawing light/dark choice survives note switches.
+                onSceneChange(
+                  withPersistedTheme(
+                    serializeAsJSON(elements, appState, files, "local"),
+                    (appState as { theme?: unknown }).theme,
+                  ),
+                );
               }
             : undefined
         }

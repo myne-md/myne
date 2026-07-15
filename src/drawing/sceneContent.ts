@@ -33,3 +33,21 @@ export function writeSceneJson(content: string, sceneJson: string): string {
   const sep = content.endsWith("\n") ? "" : "\n";
   return `${content}${sep}\`\`\`excalidraw\n${sceneJson}\n\`\`\`\n`;
 }
+
+/**
+ * Re-inject `appState.theme` into a serialized scene. Excalidraw marks `theme` as
+ * `export: false`, so `serializeAsJSON(…, "local")` DROPS it — without this a
+ * per-drawing light/dark choice is never written to the note body and resets on
+ * every remount (a note switch). Only `"light"` / `"dark"` are persisted; any
+ * other value (or malformed JSON) returns the input untouched. Pure + unit-tested.
+ */
+export function withPersistedTheme(sceneJson: string, theme: unknown): string {
+  if (theme !== "light" && theme !== "dark") return sceneJson;
+  try {
+    const scene = JSON.parse(sceneJson) as { appState?: Record<string, unknown> };
+    scene.appState = { ...(scene.appState ?? {}), theme };
+    return JSON.stringify(scene);
+  } catch {
+    return sceneJson;
+  }
+}

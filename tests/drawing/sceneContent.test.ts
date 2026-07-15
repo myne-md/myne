@@ -2,7 +2,11 @@
 // bearing data path for canvas load + autosave — must preserve frontmatter and
 // the trailing SF3 att-ref block byte-for-byte.
 import { describe, it, expect } from "vitest";
-import { extractSceneJson, writeSceneJson } from "../../src/drawing/sceneContent";
+import {
+  extractSceneJson,
+  writeSceneJson,
+  withPersistedTheme,
+} from "../../src/drawing/sceneContent";
 import { buildDrawingNoteBytes } from "../../src/notes/createDrawing";
 
 const dec = new TextDecoder();
@@ -43,5 +47,40 @@ describe("writeSceneJson", () => {
     const content = dec.decode(buildDrawingNoteBytes());
     const tricky = '{"text":"$1 $& $`"}';
     expect(extractSceneJson(writeSceneJson(content, tricky))).toBe(tricky);
+  });
+});
+
+describe("withPersistedTheme", () => {
+  const themeOf = (json: string) =>
+    (JSON.parse(json) as { appState?: { theme?: string } }).appState?.theme;
+
+  it("re-injects a dark theme serializeAsJSON would have dropped", () => {
+    expect(themeOf(withPersistedTheme('{"type":"excalidraw","appState":{}}', "dark"))).toBe(
+      "dark",
+    );
+  });
+  it("re-injects a light theme, preserving other appState keys", () => {
+    const out = withPersistedTheme('{"appState":{"gridSize":20}}', "light");
+    const parsed = JSON.parse(out) as { appState: { theme: string; gridSize: number } };
+    expect(parsed.appState.theme).toBe("light");
+    expect(parsed.appState.gridSize).toBe(20);
+  });
+  it("adds an appState object when the scene has none", () => {
+    expect(themeOf(withPersistedTheme('{"type":"excalidraw"}', "dark"))).toBe("dark");
+  });
+  it("leaves the scene untouched for a non-light/dark theme value", () => {
+    const json = '{"appState":{"x":1}}';
+    expect(withPersistedTheme(json, undefined)).toBe(json);
+    expect(withPersistedTheme(json, "system")).toBe(json);
+  });
+  it("returns malformed JSON untouched (never throws)", () => {
+    expect(withPersistedTheme("not json", "dark")).toBe("not json");
+  });
+  it("round-trips through the note body so the theme survives a remount", () => {
+    // The real persistence path: serialize (theme injected) → writeSceneJson into
+    // the body → extractSceneJson on remount → appState.theme is still there.
+    const scene = withPersistedTheme('{"type":"excalidraw","appState":{}}', "dark");
+    const body = writeSceneJson(dec.decode(buildDrawingNoteBytes()), scene);
+    expect(themeOf(extractSceneJson(body) as string)).toBe("dark");
   });
 });
