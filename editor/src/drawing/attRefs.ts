@@ -17,7 +17,7 @@
 // count → the attachment reads as unreferenced → cryptographic-erase of a live
 // image (SYNC-8's only dangerous direction). So we reuse the canonical
 // `isAttachmentId` (`/^[0-9a-f]{64}$/`) and a matching 64-hex strip regex.
-import { isAttachmentId } from "@myne/editor/host/notes/attachmentRef";
+import { isAttachmentId } from "../host/notes/attachmentRef";
 
 const ATT_REF_LINE = (id: string): string => `![[att:${id}]]`;
 const ATT_REF_RE = /^!\[\[att:[0-9a-f]{64}\]\]$/;

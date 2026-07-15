@@ -6,7 +6,7 @@ import {
   extractSceneJson,
   writeSceneJson,
   withPersistedTheme,
-} from "../../src/drawing/sceneContent";
+} from "@myne/editor/drawing";
 import { buildDrawingNoteBytes } from "../../src/notes/createDrawing";
 
 const dec = new TextDecoder();
