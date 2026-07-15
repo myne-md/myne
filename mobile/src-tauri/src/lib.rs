@@ -246,8 +246,7 @@ pub fn run() {
                     else {
                         return;
                     };
-                    let _ = handle
-                        .run_on_main_thread(move || share_file::present(&payload.path));
+                    let _ = handle.run_on_main_thread(move || share_file::present(&payload.path));
                 });
             }
             Ok(())

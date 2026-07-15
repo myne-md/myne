@@ -161,7 +161,11 @@ mod ios {
         let printable_val = ns_value_rect(printable);
         let paper_key = ns_string("paperRect");
         let printable_key = ns_string("printableRect");
-        if paper_val.is_null() || printable_val.is_null() || paper_key.is_null() || printable_key.is_null() {
+        if paper_val.is_null()
+            || printable_val.is_null()
+            || paper_key.is_null()
+            || printable_key.is_null()
+        {
             return false;
         }
         let _: () = msg_send![renderer, setValue: paper_val, forKey: paper_key];

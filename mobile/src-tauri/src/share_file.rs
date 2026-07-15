@@ -160,8 +160,7 @@ mod ios {
         };
         let avc_alloc: *mut AnyObject = msg_send![avc_cls, alloc];
         let null_activities: *mut AnyObject = core::ptr::null_mut();
-        let avc: *mut AnyObject =
-            msg_send![avc_alloc, initWithActivityItems: items, applicationActivities: null_activities];
+        let avc: *mut AnyObject = msg_send![avc_alloc, initWithActivityItems: items, applicationActivities: null_activities];
         if avc.is_null() {
             return;
         }

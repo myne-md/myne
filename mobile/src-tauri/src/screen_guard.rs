@@ -87,6 +87,11 @@ pub fn init<R: Runtime>(app: &AppHandle<R>) {
 /// protection is engaged (MYND-476). The OS-level protection already blacked out
 /// the captured image (and text can't be drawn into that OS-owned frame), so the
 /// only honest remedy is an in-app notice — the WebView shows a short banner.
+/// iOS-only for now: it is emitted solely from the `#[cfg(target_os = "ios")]`
+/// `init_screenshot_detection` below (Android's screenshot-taken callback is a
+/// documented follow-up), so gate the constant to iOS too — otherwise the
+/// non-iOS build treats it as dead code (`-D warnings`).
+#[cfg(target_os = "ios")]
 pub const SCREENSHOT_EVENT: &str = "screen-capture-blocked";
 
 /// Observe `userDidTakeScreenshotNotification` and, when protection is engaged,
