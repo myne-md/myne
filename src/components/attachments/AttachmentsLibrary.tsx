@@ -1096,55 +1096,45 @@ const THUMB_HOVER_WRAP_STYLE: CSSProperties = {
   height: "100%",
 };
 
-const PREVIEW_OVERLAY_BTN_STYLE: CSSProperties = {
-  position: "absolute",
-  top: "var(--space-2)",
-  right: "var(--space-2)",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  width: 28,
-  height: 28,
-  padding: 0,
-  color: "var(--fg-1)",
-  background: "var(--bg-1)",
-  border: "1px solid var(--line-2)",
-  borderRadius: "var(--radius-1)",
-  cursor: "pointer",
-};
-
 /**
- * Thumbnail with a hover-revealed preview/expand button (Fix 4). Hovering the
- * thumbnail box surfaces a small expand button; clicking it opens the shared
- * lightbox (the same overlay the editor uses). Raster + SVG open the image
- * lightbox; PDF opens the scrollable multi-page reader (MYND-164) — the tile
- * thumbnail itself stays the first-page render (no inline scroll in the tile).
- * `previewable` gates the affordance.
- *
- * `showPreview` gates the affordance to GRID view only (MYND-164 Fix 2): the
- * 28px list-row thumbnails are too small for the overlay button, so list rows
- * pass `false` and never render it.
+ * Thumbnail that opens the shared lightbox on CLICK (MYND-164 revised): clicking
+ * the image/PDF thumbnail opens the same overlay the editor uses — raster + SVG
+ * open the image lightbox, PDF opens the scrollable multi-page reader — with no
+ * separate hover-revealed expand button. The tile thumbnail itself stays the
+ * first-page render. Non-previewable kinds (audio, generic files) stay
+ * non-interactive (audio's own play button already stops propagation).
+ * Keyboard-accessible (Enter / Space); the ⋮ menu keeps an explicit Preview item.
  */
 function ThumbnailWithPreview({
   entry,
   size,
   onPreview,
-  showPreview,
 }: {
   entry: CatalogEntry;
   size: number;
   onPreview: () => void;
-  showPreview: boolean;
 }) {
   const { t } = useTranslation();
-  const [hovering, setHovering] = useState(false);
   const kind = kindOf(entry.content_type);
-  const previewable = showPreview && (kind === "image" || kind === "pdf");
+  const previewable = kind === "image" || kind === "pdf";
   return (
     <div
-      style={THUMB_HOVER_WRAP_STYLE}
-      onMouseEnter={() => setHovering(true)}
-      onMouseLeave={() => setHovering(false)}
+      style={{ ...THUMB_HOVER_WRAP_STYLE, cursor: previewable ? "pointer" : "default" }}
+      data-testid={previewable ? "attachments.tile-preview-target" : undefined}
+      role={previewable ? "button" : undefined}
+      tabIndex={previewable ? 0 : undefined}
+      aria-label={previewable ? t("attachments.library.previewAttachment") : undefined}
+      onClick={previewable ? () => onPreview() : undefined}
+      onKeyDown={
+        previewable
+          ? (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onPreview();
+              }
+            }
+          : undefined
+      }
     >
       <AttachmentThumbnail
         id={entry.id}
@@ -1152,20 +1142,6 @@ function ThumbnailWithPreview({
         filename={entry.filename}
         size={size}
       />
-      {previewable && hovering && (
-        <button
-          type="button"
-          aria-label={t("attachments.library.previewAttachment")}
-          title={t("attachments.library.preview")}
-          style={PREVIEW_OVERLAY_BTN_STYLE}
-          onClick={(e) => {
-            e.stopPropagation();
-            onPreview();
-          }}
-        >
-          <Icon name="maximize-2" size={15} />
-        </button>
-      )}
     </div>
   );
 }
@@ -1247,7 +1223,6 @@ function AttachmentTile({
           entry={entry}
           size={160}
           onPreview={onPreview}
-          showPreview
         />
       </div>
       <div style={TILE_META_STYLE}>
@@ -1367,7 +1342,6 @@ function AttachmentListRow({
           entry={entry}
           size={28}
           onPreview={onPreview}
-          showPreview={false}
         />
       </div>
       {renaming ? (
