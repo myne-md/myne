@@ -38,6 +38,7 @@ mod ios_chrome;
 mod pdf_export;
 mod plugins;
 mod screen_guard;
+mod share_file;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -208,6 +209,12 @@ pub fn run() {
             #[cfg(target_os = "ios")]
             screen_guard::init(app.handle());
 
+            // Screenshot-taken notice (MYND-476): when protection is engaged a
+            // screenshot comes out black with no explanation, so observe the OS
+            // "user took a screenshot" notification and emit SCREENSHOT_EVENT for
+            // the WebView to surface an in-app banner. No-op off iOS.
+            screen_guard::init_screenshot_detection(app.handle());
+
             // Native PDF export. `window.print()` is a no-op in the mobile
             // WebView, so the "Export as PDF" action emits EXPORT_PDF_EVENT with
             // the note title + rendered HTML; present the platform export sheet
@@ -221,8 +228,26 @@ pub fn run() {
                         return;
                     };
                     let _ = handle.run_on_main_thread(move || {
-                        pdf_export::present(&payload.title, &payload.html)
+                        pdf_export::present(&payload.title, &payload.html, &payload.path)
                     });
+                });
+            }
+
+            // Native file share/save (MYND-475). Export/download flows write the
+            // file to Documents (reachable, no regression) and then emit
+            // SHARE_FILE_EVENT with the path; present the platform share sheet
+            // (iOS: UIActivityViewController → Save to Files) on the main thread
+            // so the user can pick a destination. Android is a documented no-op.
+            {
+                let handle = app.handle().clone();
+                app.listen(share_file::SHARE_FILE_EVENT, move |event| {
+                    let Ok(payload) =
+                        serde_json::from_str::<share_file::SharePayload>(event.payload())
+                    else {
+                        return;
+                    };
+                    let _ = handle
+                        .run_on_main_thread(move || share_file::present(&payload.path));
                 });
             }
             Ok(())

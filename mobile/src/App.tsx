@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Gallery } from "./gallery/Gallery";
 import { AppShell } from "./app/AppShell";
+import { ScreenshotNotice } from "./components/ScreenshotNotice";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { PlatformProvider, type Platform } from "./platform/PlatformContext";
 import { SizeClassProvider, useSizeClassObserver } from "./platform/SizeClassContext";
@@ -111,6 +112,8 @@ export default function App() {
           <ErrorBoundary>
             <AppShell />
           </ErrorBoundary>
+          {/* Global screenshot-blocked banner (MYND-476) — overlays every stage. */}
+          <ScreenshotNotice />
         </SizeClassProvider>
       </PlatformProvider>
     </div>
