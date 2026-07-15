@@ -26,6 +26,7 @@ export const DEFAULT_PREFS: PrefsView = {
   startup_open: null,
   startup_open_note: null,
   deliberate_folders: [],
+  archived_folders: [],
   active_workspace: null,
   auto_lock_seconds: null,
   custom_theme: null,

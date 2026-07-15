@@ -224,6 +224,16 @@ export interface PrefsView {
    */
   deliberate_folders: string[];
   /**
+   * Folder-archive set (MYND-331 / MYND-470): canonical trailing-slash folder
+   * paths archived as a UNIT. A folder is archived by adding its path here; its
+   * notes are NOT rewritten — they stay live (searchable/resolvable) but drop out
+   * of the working-set tree. A note is folder-archived when its folder equals or
+   * is nested under any entry. Absent in pre-folder-archive vaults → the Rust
+   * decoder defaults it to `[]`. Synced via `vault.prefs`, so desktop-archived
+   * folders arrive here after sync.
+   */
+  archived_folders: string[];
+  /**
    * Active workspace slot id (MYND-308) — the workspace slot the editor restores
    * on unlock. `null` ≡ unset → the host applies its default (first / last-used)
    * workspace policy. A free string stored verbatim (NFC on the wire); the
@@ -500,6 +510,18 @@ export async function setScreenCaptureProtection(enabled: boolean): Promise<void
  */
 export async function setDeliberateFolders(folders: string[]): Promise<void> {
   await invoke<void>("plugin:prefs|set_deliberate_folders", { folders });
+}
+
+/**
+ * Persist the full archived_folders set (folder-archive, MYND-470). The caller
+ * passes the entire desired set — restoring a folder means calling this with the
+ * folder (and its nested archived descendants) removed. The Rust codec sorts +
+ * exact-dedups for canonical byte-stability; folded-identity dedup is the
+ * caller's responsibility. No native side-effect; a rejected promise means the
+ * disk write failed and the caller's optimistic UI must revert.
+ */
+export async function setArchivedFolders(folders: string[]): Promise<void> {
+  await invoke<void>("plugin:prefs|set_archived_folders", { folders });
 }
 
 /**

@@ -19,6 +19,7 @@ permissions = [
   "allow-prefs-read",
   "allow-set-screen-capture-protection",
   "allow-set-deliberate-folders",
+  "allow-set-archived-folders",
   "allow-set-auto-lock-timeout",
   "allow-set-item-order",
   "allow-set-hidden-bar-items",
@@ -74,6 +75,14 @@ commands.allow = ["set_screen_capture_protection"]
 identifier = "allow-set-deliberate-folders"
 description = "Allow invoking prefs:set_deliberate_folders (Slot::Unlocked-gated setter for the deliberate_folders set — the carrier for empty/deliberately-created folders in the virtual-folder model; atomic-writes vault.prefs with no native side-effect)."
 commands.allow = ["set_deliberate_folders"]
+
+# MYND-470 mobile folder-archive parity: a write setter, so it inherits the same
+# main-window-only invariant as the other allow-set-* permissions — v0.2
+# multi-window MUST NOT grant this to any non-main window.
+[[permission]]
+identifier = "allow-set-archived-folders"
+description = "Allow invoking prefs:set_archived_folders (Slot::Unlocked-gated setter for the archived_folders set — the folder-level twin of the per-note archived marker; folders archived as a unit drop out of the working set while their notes stay live; atomic-writes vault.prefs with no native side-effect)."
+commands.allow = ["set_archived_folders"]
 
 # MYND-121: a write setter, so it inherits the same main-window-only
 # invariant as the other allow-set-* permissions.
