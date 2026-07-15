@@ -86,9 +86,9 @@ describe("FolderRow — disclosure + depth", () => {
       <FolderRow node={node()} depth={2} collapsed={false} empty={false} onToggle={vi.fn()} />,
     );
     const at2 = screen.getByTestId("notes.folder-row").style.paddingLeft;
-    // BASE_PADDING_LEFT=12, INDENT_PER_LEVEL=18 → depth 0 = 12px, depth 2 = 48px.
-    expect(at0).toBe("12px");
-    expect(at2).toBe("48px");
+    // BASE_PADDING_LEFT=8, INDENT_PER_LEVEL=18 → depth 0 = 8px, depth 2 = 44px.
+    expect(at0).toBe("8px");
+    expect(at2).toBe("44px");
   });
 
   it("expanded folder → aria-expanded=true", () => {
