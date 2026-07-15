@@ -29,6 +29,7 @@ const chromeBtn: CSSProperties = {
  *  change / archive / lock instead. */
 export function EditorTopBar({
   onBack,
+  onToggleList,
   onContext,
   onMore,
   folder,
@@ -36,6 +37,9 @@ export function EditorTopBar({
 }: {
   /** Back chevron (autosave + return to the list). Compact-only. */
   onBack?: () => void;
+  /** Reveal/hide the note list + sidebar. Regular size classes only — a focused
+   *  note collapses the left panes; this toggle brings them back. */
+  onToggleList?: () => void;
   onContext: () => void;
   /** Note-actions ⋯ menu. Omitted for a brand-new (unsaved) note. */
   onMore?: () => void;
@@ -59,6 +63,14 @@ export function EditorTopBar({
       {onBack && (
         <button onClick={onBack} disabled={busy} data-testid="editor.back" aria-label={t("editor.topBar.backToNotes")} style={{ ...chromeBtn, opacity: busy ? 0.5 : 1 }}>
           <Icon name="chevron-left" size={22} color="var(--accent)" strokeWidth={2} />
+        </button>
+      )}
+      {onToggleList && (
+        <button onClick={onToggleList} data-testid="editor.toggle-list" aria-label={t("notes.list.notesHeading")} style={chromeBtn}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+            <rect x="3" y="4.5" width="18" height="15" rx="2" stroke="var(--fg-2)" strokeWidth="1.7" />
+            <path d="M9 4.5v15" stroke="var(--fg-2)" strokeWidth="1.7" />
+          </svg>
         </button>
       )}
 

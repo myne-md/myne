@@ -6,6 +6,9 @@ import ReactDOM from "react-dom/client";
 import "@myne/i18n";
 // Install the mobile EditorHost into @myne/editor before any editor mounts.
 import "./editor-host";
+// Repoint Excalidraw's font loader to the self-hosted /excalidraw-assets/ base
+// (boot side-effect, before any drawing chunk loads) — same as desktop main.tsx.
+import "@myne/editor/drawing/excalidraw-asset-path";
 import App from "./App";
 import { initDeepLinks } from "./lib/deep-link";
 import { initCaptures } from "./lib/captures";
