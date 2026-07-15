@@ -33,9 +33,9 @@ test.describe("sync join flow", () => {
     await expect(page.getByTestId("sync.join.verify")).toBeVisible();
     await expect(page.getByTestId("sync.join.sas-fingerprint")).toHaveText("TYRS-N318");
 
-    // "They match" dispatches welcome.join-success → editor mounts (its header glyph).
+    // "They match" dispatches welcome.join-success → editor mounts (main surface up).
     await page.getByTestId("sync.join.sas-match").click();
-    await expect(page.getByTestId("sync.header-glyph")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Settings" }).first()).toBeVisible();
   });
 
   test("wrong account → the single non-distinguishing banner", async ({ page }) => {

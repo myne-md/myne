@@ -14,9 +14,7 @@ export {
 } from "./inputs";
 export { Banner, Toast, Spinner, BlockingOverlay } from "./feedback";
 export { Chip, AccountNumber, Fab, Sheet, SidePanel, useEnterTransition } from "./misc";
-export { SyncStatusGlyph, type SyncStatusGlyphProps } from "./SyncStatusGlyph";
 export { SyncBanners, type SyncBannersProps } from "./SyncBanners";
-export { SyncStatusDetail } from "./SyncStatusDetail";
 export { ConflictsView, type ConflictsViewProps, type ConflictCopyRow } from "./ConflictsView";
 export { ConflictsSheet } from "./ConflictsSheet";
 export {
