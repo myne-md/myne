@@ -278,7 +278,10 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
   // them, and the next note open auto-collapses again (the effect below). On
   // medium the main nav (TabBar) stays as a full-width bottom bar while collapsed.
   const [panesRevealed, setPanesRevealed] = useState(false);
-  const panesCollapsed = isRegular && tab === "notes" && editing != null && !panesRevealed;
+  // Collapse only for an EXISTING focused note (`editing.id` set) — a brand-new
+  // note keeps the list on screen (you're still placing it; matches the tablet
+  // flow-logic UX), so `editing?.id` not `editing`.
+  const panesCollapsed = isRegular && tab === "notes" && editing?.id != null && !panesRevealed;
   useEffect(() => {
     setPanesRevealed(false);
   }, [editing?.id]);
@@ -1806,7 +1809,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
         {chrome.tabBar && (
           <TabBar
             active={tab}
-            onNotes={() => setTab("notes")}
+            onNotes={() => { setTab("notes"); setPanesRevealed(true); }}
             onGraph={() => setTab("graph")}
             onAttachments={() => setTab("files")}
           />

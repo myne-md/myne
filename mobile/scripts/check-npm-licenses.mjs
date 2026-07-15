@@ -51,8 +51,11 @@ const norm = (s) => s.trim().replace(/^\(+|\)+$/g, "").trim();
 function isAllowed(expr) {
   const e = norm(expr);
   if (ALLOW.has(e)) return true;
-  if (/\bOR\b/i.test(e)) return e.split(/\bOR\b/i).some(isAllowed);
-  if (/\bAND\b/i.test(e)) return e.split(/\bAND\b/i).every(isAllowed);
+  // SPDX operators are spec-mandated UPPERCASE and whitespace-delimited — anchor
+  // on ` OR `/` AND ` (no /i) so the lowercase `or` in ids like `GPL-3.0-or-later`
+  // is never mis-split.
+  if (/\s+OR\s+/.test(e)) return e.split(/\s+OR\s+/).some(isAllowed);
+  if (/\s+AND\s+/.test(e)) return e.split(/\s+AND\s+/).every(isAllowed);
   return false;
 }
 
