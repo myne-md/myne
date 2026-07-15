@@ -34,17 +34,19 @@ export const CARD_MENU_ITEM_IDS = [
  */
 export function buildCardMenuItems(h: CardMenuHandlers): ContextMenuItem[] {
   return [
-    { id: "open", label: i18n.t("notes.cardMenu.open"), onSelect: h.open },
+    { id: "open", label: i18n.t("notes.cardMenu.open"), group: "open", onSelect: h.open },
     {
       id: "open-in-new-tab",
       label: i18n.t("notes.cardMenu.openInNewTab"),
+      group: "open",
       onSelect: h.openInNewTab,
     },
     {
       id: "reveal-in-folder",
       label: i18n.t("notes.cardMenu.revealInFolder"),
+      group: "navigate",
       onSelect: h.revealInFolder,
     },
-    { id: "copy-link", label: i18n.t("notes.cardMenu.copyLink"), onSelect: h.copyLink },
+    { id: "copy-link", label: i18n.t("notes.cardMenu.copyLink"), group: "utility", onSelect: h.copyLink },
   ];
 }
