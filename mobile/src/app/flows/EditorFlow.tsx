@@ -1,6 +1,7 @@
 import { type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { CMEditor } from "@myne/editor/CMEditor";
+import { typographyStyle } from "@myne/editor/typography";
 import { REVEAL_ATTACHMENT_EVENT } from "@myne/editor/attachments/fileCardActions";
 import { headingSections } from "@myne/dialect";
 import type { EditorView } from "@codemirror/view";
@@ -159,8 +160,10 @@ const TAB_ORDER: Record<"notes" | "search" | "graph" | "files" | "templates", nu
 
 /** Editor typography presets (mirror the desktop `editor-typography` prefs), so
  *  the Appearance settings tangibly change the note editor. */
-const EDITOR_TEXT_PX: Record<string, number> = { sm: 14, md: 16, lg: 18, xl: 20 };
-const EDITOR_LINE_HEIGHT: Record<string, number> = { tight: 1.5, normal: 1.75, relaxed: 2 };
+// Reading-view (MarkdownView) base font px — matches the shared editor-typography
+// TEXT_SIZE presets so reading mode + the live editor + desktop stay consistent
+// (MYND-483). The live editor itself uses `typographyStyle` CSS vars, not this.
+const EDITOR_TEXT_PX: Record<string, number> = { sm: 13, md: 14, lg: 16, xl: 18 };
 
 const DEV_SEED: string[] = [
   "# Threat model v2\n\nWe assume a powerful network adversary that can observe all traffic and compromise the relay. The vault key never leaves the device.",
@@ -2049,9 +2052,12 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
         // Shared live-preview editor (@myne/editor): raw-on-edit CodeMirror with
         // tables / KaTeX / syntax highlighting / frontmatter-as-properties, plus
         // its own in-editor selection toolbar + slash menu + keymaps — so mobile
-        // no longer needs a separate FormatBar. Typography (font/size/spacing)
-        // is applied on the wrapper like the desktop `typographyStyle` wrapper;
-        // the engine also reads prefs via the injected EditorHost.
+        // no longer needs a separate FormatBar. Typography is applied via the
+        // canonical `typographyStyle(prefs)` CSS custom properties
+        // (`--editor-text-size` / `--editor-font-family` / `--editor-line-spacing`)
+        // that the shared CM theme reads (MYND-483) — direct `fontSize`/etc. on
+        // the wrapper are OVERRIDDEN by CM's own `var(--editor-*)` rules, so a
+        // change never reached the editor. `maxWidth` stays off (full-width phone).
         <div
           style={{
             flex: 1,
@@ -2059,9 +2065,8 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
             overflowY: "auto",
             WebkitOverflowScrolling: "touch",
             background: "var(--bg-1)",
-            fontFamily: prefs.editor_font_family === "sans" ? "var(--font-sans)" : "var(--font-mono)",
-            fontSize: EDITOR_TEXT_PX[prefs.editor_text_size ?? "md"] ?? 16,
-            lineHeight: EDITOR_LINE_HEIGHT[prefs.editor_line_spacing ?? "normal"] ?? 1.75,
+            ...typographyStyle(prefs),
+            maxWidth: undefined,
           }}
         >
           <CMEditor
