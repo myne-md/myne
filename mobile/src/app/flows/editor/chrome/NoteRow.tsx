@@ -81,20 +81,28 @@ export function NoteRow({
       onPointerCancel={clearHold}
       onContextMenu={(e) => { if (onHold) e.preventDefault(); }}
       style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 10,
-        padding: "11px 20px",
-        paddingLeft: 20 + indent,
         borderTop: divider ? "1px solid var(--line-1)" : undefined,
         borderBottom: divider && last ? "1px solid var(--line-1)" : undefined,
-        background: selected ? "var(--accent-soft)" : undefined,
         cursor: "pointer",
         WebkitUserSelect: "none",
         userSelect: "none",
         WebkitTouchCallout: "none",
       }}
     >
+      {/* The selected highlight is a rounded block INSET to the content x (after
+          the folder-tree rail), so an indented note never paints its background
+          over the indent rail — parity with the desktop rounded-pill rows. */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          margin: `3px 8px 3px ${8 + indent}px`,
+          padding: "8px 12px",
+          borderRadius: 8,
+          background: selected ? "var(--accent-soft)" : undefined,
+        }}
+      >
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 16, fontWeight: 600, color: "var(--fg-1)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{entry.title}</div>
         {sub && (
@@ -132,6 +140,7 @@ export function NoteRow({
               </svg>
             </button>
           )}
+      </div>
     </div>
   );
 }

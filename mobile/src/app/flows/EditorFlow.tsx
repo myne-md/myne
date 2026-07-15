@@ -9,6 +9,13 @@ import { emit, listen } from "@tauri-apps/api/event";
 import { documentDir, join } from "@tauri-apps/api/path";
 import { Screen, ScreenScroll, Icon, Banner, Spinner, Sheet, SyncBanners, ConflictsSheet } from "../../components";
 import { noteList, noteRead, noteCreate, noteUpdate, deleteNoteRouted } from "../../lib/notes";
+import {
+  DrawingCanvasLazy,
+  extractSceneJson,
+  writeSceneJson,
+  isDrawingBody,
+  buildDrawingNoteBytes,
+} from "@myne/editor/drawing";
 import type { NoteListError } from "../../lib/notes";
 import { useConflictMaterializer } from "../../lib/use-conflict-materializer";
 import { listVaults, orderByLastUnlock } from "../../lib/vault-list";
@@ -262,6 +269,19 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
   const [editorText, setEditorText] = useState("");
   const [editorBusy, setEditorBusy] = useState(false);
   const [editorError, setEditorError] = useState<string | null>(null);
+  // Drawing dispatch (SF2): a value-strict `kind: drawing` body routes the editor
+  // pane to the shared Excalidraw canvas instead of CMEditor (parity w/ PaneView).
+  const isDrawing = useMemo(() => isDrawingBody(editorText), [editorText]);
+
+  // Regular size classes: focusing a note collapses the left panes (sidebar +
+  // note list) so the editor gets the full width — the EditorTopBar toggle reveals
+  // them, and the next note open auto-collapses again (the effect below). On
+  // medium the main nav (TabBar) stays as a full-width bottom bar while collapsed.
+  const [panesRevealed, setPanesRevealed] = useState(false);
+  const panesCollapsed = isRegular && tab === "notes" && editing != null && !panesRevealed;
+  useEffect(() => {
+    setPanesRevealed(false);
+  }, [editing?.id]);
   // Compact-only left-edge swipe-back: same semantics as the top-bar chevron
   // (autosave + return to the list), same busy guard. `saveNote` is a hoisted
   // function declaration, so referencing it here is fine.
@@ -770,6 +790,18 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
     setView("editor");
   }, [currentFolder]);
 
+  const newDrawing = useCallback(() => {
+    // Seed a `kind: drawing` body so the first render routes to the canvas (SF2);
+    // saveNote persists it through the same note_create path as a text note.
+    setEditorText(
+      new TextDecoder().decode(buildDrawingNoteBytes(undefined, currentFolder)),
+    );
+    setEditing({ id: null });
+    setEditorError(null);
+    setReadingMode(false);
+    setView("editor");
+  }, [currentFolder]);
+
   // Widget deep-link capture (ios-widgets `myne://capture`): open a fresh note.
   // Cold launch on a locked device latches the intent in `deep-link.ts` and it
   // is consumed HERE once the editor mounts post-unlock; a tap while the app is
@@ -1239,6 +1271,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
   const gi = { fill: "none", stroke: "currentColor", strokeWidth: 1.7, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
   const paletteCommands: PaletteCommand[] = [
     { id: "new-note", label: t("notes.list.newNote"), icon: <svg width="16" height="16" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" {...gi} /></svg>, run: () => newNote() },
+    { id: "new-drawing", label: t("notes.newTab.createDrawing"), icon: <svg width="16" height="16" viewBox="0 0 24 24"><path d="M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" {...gi} /></svg>, run: () => newDrawing() },
     { id: "daily", label: t("editor.nav.dailyNote"), icon: <svg width="16" height="16" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2" {...gi} /><path d="M3 10h18M8 3v4M16 3v4" {...gi} /></svg>, run: () => void openToday() },
     { id: "templates", label: t("templates.manager.listLabel"), icon: <svg width="16" height="16" viewBox="0 0 24 24"><rect x="8" y="4" width="11" height="14" rx="2" {...gi} /><path d="M5 8v10a2 2 0 002 2h8" {...gi} /></svg>, run: () => setTab("templates") },
     { id: "files", label: t("attachments.library.title"), icon: <svg width="16" height="16" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" {...gi} /><path d="M21 15l-5-5L5 21" {...gi} /></svg>, run: () => setTab("files") },
@@ -1428,7 +1461,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
         {tab === "notes" && (
           <>
             <div style={{ flex: "none", padding: "8px 20px 0" }}>
-              {listView !== "notes" && (
+              {listView !== "notes" && sizeClass !== "expanded" && (
                 <button
                   onClick={() => setListView("notes")}
                   style={{ display: "flex", alignItems: "center", gap: 3, border: "none", background: "transparent", color: "var(--accent)", fontSize: 15, fontWeight: 600, cursor: "pointer", padding: 0, marginBottom: 8 }}
@@ -2017,6 +2050,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
       <>
       <EditorTopBar
         onBack={sizeClass === "compact" ? () => void saveNote() : undefined}
+        onToggleList={isRegular ? () => setPanesRevealed((r) => !r) : undefined}
         onContext={() => setRightPanel(true)}
         onMore={isExisting ? () => setMoreOpen(true) : undefined}
         folder={readNoteFolder(editorText)}
@@ -2041,7 +2075,21 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
         </div>
       )}
 
-      {readingMode ? (
+      {isDrawing ? (
+        // Drawing note (SF2) — the shared hardened Excalidraw canvas replaces
+        // CodeMirror. The scene loads from the body and re-serializes on change
+        // into editorText, which saveNote persists (same path as a text note).
+        <div
+          style={{ flex: 1, minHeight: 0, display: "flex", background: "var(--bg-1)" }}
+          data-testid="drawing.pane"
+        >
+          <DrawingCanvasLazy
+            key={editing?.id ?? "drawing"}
+            initialSceneJson={extractSceneJson(editorText) ?? undefined}
+            onSceneChange={(json) => setEditorText((prev) => writeSceneJson(prev, json))}
+          />
+        </div>
+      ) : readingMode ? (
         <MarkdownView
           text={editorText}
           onOpenWikilink={openWikilinkTarget}
@@ -2085,7 +2133,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
         </div>
       )}
 
-      {readingMode ? (
+      {isDrawing ? null : readingMode ? (
         // Reading mode hides the FormatBar (nothing to format) — but it must not
         // be a one-way trap: a headingless note has an empty outline, so the
         // outline "Jump" can't get you out. A pinned Edit control always can.
@@ -2329,7 +2377,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
   return (
     <Screen>
       <div data-testid="workspace.split" style={{ flex: 1, minHeight: 0, display: "flex" }}>
-        {sizeClass === "expanded" && (
+        {sizeClass === "expanded" && !panesCollapsed && (
           <SidebarPane
             label={vaultDisplayLabel(prefs.label)}
             tab={tab}
@@ -2349,12 +2397,14 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
         )}
         {tab === "notes" ? (
           <>
-            <div
-              data-testid="workspace.list-pane"
-              style={{ width: sizeClass === "expanded" ? 316 : 340, flex: "none", minHeight: 0, display: "flex", flexDirection: "column", borderRight: "1px solid var(--line-1)" }}
-            >
-              {renderNotesPane({ header: sizeClass === "medium", tabBar: sizeClass === "medium" })}
-            </div>
+            {!panesCollapsed && (
+              <div
+                data-testid="workspace.list-pane"
+                style={{ width: sizeClass === "expanded" ? 316 : 340, flex: "none", minHeight: 0, display: "flex", flexDirection: "column", borderRight: "1px solid var(--line-1)" }}
+              >
+                {renderNotesPane({ header: sizeClass === "medium", tabBar: sizeClass === "medium" })}
+              </div>
+            )}
             <div data-testid="workspace.detail-pane" style={{ flex: 1, minWidth: 0, minHeight: 0, display: "flex", flexDirection: "column" }}>
               {editing ? renderEditorPane() : <EmptyDetail onNew={newNote} />}
             </div>
@@ -2365,6 +2415,16 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
           </div>
         )}
       </div>
+      {/* Medium (vertical tablet): a focused note collapses the file tree but the
+          main nav stays as a full-width bottom bar (the phone TabBar). */}
+      {sizeClass === "medium" && panesCollapsed && (
+        <TabBar
+          active={tab}
+          onNotes={() => { setTab("notes"); setPanesRevealed(true); }}
+          onGraph={() => setTab("graph")}
+          onAttachments={() => setTab("files")}
+        />
+      )}
       {renderListOverlays()}
       {editing != null && renderEditorOverlays()}
       {renderSharedOverlays()}
