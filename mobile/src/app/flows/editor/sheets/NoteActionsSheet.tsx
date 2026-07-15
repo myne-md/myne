@@ -29,28 +29,32 @@ export function NoteActionsSheet({
   onTrash: () => void;
 }) {
   const { t } = useTranslation();
-  // Flush rows in the Sheet (already the single rounded container) — hairline
-  // dividers only, no inner bordered box (avoids the box-in-a-box look).
-  const row = (text: string, onClick: () => void, danger = false): ReactNode => (
+  // Rows split into logical groups (produce / organize / destructive) by a
+  // heavier group separator — the mobile twin of the desktop ContextMenu `group`
+  // dividers. `groupTop` drops a row's top hairline when a separator precedes it.
+  const row = (text: string, onClick: () => void, opts?: { danger?: boolean; groupTop?: boolean }): ReactNode => (
     <button
       onClick={onClick}
       disabled={busy}
-      style={{ display: "flex", alignItems: "center", width: "100%", border: "none", borderTop: "1px solid var(--line-1)", background: "transparent", padding: "15px 18px", cursor: busy ? "default" : "pointer", opacity: busy ? 0.6 : 1, fontFamily: "var(--font-sans)", fontSize: 16, color: danger ? "var(--danger)" : "var(--fg-1)" }}
+      style={{ display: "flex", alignItems: "center", width: "100%", border: "none", borderTop: opts?.groupTop ? "none" : "1px solid var(--line-1)", background: "transparent", padding: "15px 18px", cursor: busy ? "default" : "pointer", opacity: busy ? 0.6 : 1, fontFamily: "var(--font-sans)", fontSize: 16, color: opts?.danger ? "var(--danger)" : "var(--fg-1)" }}
     >
       {text}
     </button>
   );
+  const sep: ReactNode = <div aria-hidden style={{ height: 1, background: "var(--line-2)", margin: "7px 0" }} />;
   return (
     <Sheet onClose={onClose} padded={false}>
       {() => (
         <>
           <div style={{ padding: "0 18px 12px", fontSize: 13, color: "var(--fg-3)" }}>{stat}</div>
           {row(copied ? t("editor.noteMenu.copied") : t("editor.noteMenu.copyToClipboard"), onCopy)}
-          {row(t("editor.noteMenu.moveToFolder"), onMove)}
           {row(t("editor.noteMenu.versionHistory"), onHistory)}
           {row(t("export.pdf.title"), onExport)}
+          {sep}
+          {row(t("editor.noteMenu.moveToFolder"), onMove, { groupTop: true })}
           {row(t("notes.archive.title"), onArchive)}
-          {row(t("editor.noteMenu.moveToTrash"), onTrash, true)}
+          {sep}
+          {row(t("editor.noteMenu.moveToTrash"), onTrash, { danger: true, groupTop: true })}
         </>
       )}
     </Sheet>
