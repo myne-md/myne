@@ -19,9 +19,11 @@ import {
 } from "../../lib/quick-unlock";
 import { usePlatform } from "../../platform/PlatformContext";
 import { vaultExportMarkdown, defaultExportDestination } from "../../lib/export";
+import { shareFile } from "../../lib/share";
 import { useSyncStatus, type SyncStatus } from "../../lib/use-sync-status";
 import { ioBanner } from "../../lib/io-banner";
 import { usePrefs } from "../../lib/use-prefs";
+import { useHiddenHomeTiles, setHomeTileHidden } from "../../lib/home-tiles";
 import { bumpPrefsNonce } from "../../lib/prefsNonce";
 import { vaultDisplayLabel, VAULT_FALLBACK_LABEL } from "../../lib/vault-label";
 import {
@@ -544,8 +546,10 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
   const [panel, setPanel] = useState<Panel>("root");
   const [choice, setChoice] = useState<ThemeChoice>(() => readStoredChoice());
   const [toast, setToast] = useState<string | null>(null);
-  // Phase-2 sync (MYND-459): honest enrollment status for the Sync section.
-  const { status: syncStatus } = useSyncStatus();
+  // Phase-2 sync (MYND-459): honest enrollment status for the Sync section, plus
+  // the force-sync trigger surfaced there now that the general-UI glyph is gone
+  // (MYND-481).
+  const { status: syncStatus, syncNow, busy: syncBusy } = useSyncStatus();
 
   // Change-password local secret state (wiped on every exit path + unmount).
   const [currentPw, setCurrentPw] = useState("");
@@ -579,6 +583,9 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
         const dest = await defaultExportDestination();
         const summary = await vaultExportMarkdown(dest.path);
         setToast(t("settings.data.exported", { count: summary.notes, label: dest.label }));
+        // Offer the native destination chooser for the exported folder (MYND-475);
+        // additive on top of the guaranteed Documents write above.
+        await shareFile(dest.path);
       } else {
         setToast(t("settings.data.exportNeedsApp"));
       }
@@ -599,6 +606,8 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
 
   // ── Vault prefs (Appearance / Editor / Privacy) ────────────────────────────
   const { prefs } = usePrefs();
+  // Home quick-action tile visibility toggles (MYND-479, Appearance panel).
+  const hiddenHomeTiles = useHiddenHomeTiles();
   const [draft, setDraft] = useState<Partial<PrefsView>>({});
   const eff: PrefsView = { ...prefs, ...draft };
   const [renameText, setRenameText] = useState("");
@@ -1095,6 +1104,26 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
                 onToggle={() => writePref("show_note_timestamps", !eff.show_note_timestamps, () => setShowNoteTimestamps(!eff.show_note_timestamps))}
               />
             </Group>
+            {/* Home quick-action tiles — show/hide each individually (MYND-479). */}
+            <SectionLabel>{t("settings.appearance.homeQuickActions")}</SectionLabel>
+            <Group>
+              <ToggleRow
+                first
+                title={t("templates.manager.listLabel")}
+                on={!hiddenHomeTiles.has("templates")}
+                onToggle={() => setHomeTileHidden("templates", !hiddenHomeTiles.has("templates"))}
+              />
+              <ToggleRow
+                title={t("editor.nav.openToday")}
+                on={!hiddenHomeTiles.has("open-today")}
+                onToggle={() => setHomeTileHidden("open-today", !hiddenHomeTiles.has("open-today"))}
+              />
+              <ToggleRow
+                title={t("editor.chrome.barItems.views")}
+                on={!hiddenHomeTiles.has("views")}
+                onToggle={() => setHomeTileHidden("views", !hiddenHomeTiles.has("views"))}
+              />
+            </Group>
           </div>
         )}
 
@@ -1198,6 +1227,8 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
         {panel === "sync" && (
           <SyncHubPanel
             status={syncStatus}
+            onSyncNow={syncNow}
+            syncing={syncBusy}
             onOpenEndpoint={() => setPanel("sync-endpoint")}
             onOpenEnroll={() => setPanel("sync-enroll")}
             onOpenDevices={() => setPanel("sync-devices")}
@@ -1294,11 +1325,18 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
                   </Button>
                 </div>
               </>
+            ) : quStatus?.method === "biometric" ? (
+              // Biometric quick-unlock is configured (MYND-482): quick-unlock is
+              // already set up, so DON'T show a "Set up" PIN form (setting a PIN
+              // would silently overwrite the biometric credential). Reflect the
+              // state + point to the toggle above as the explicit way to switch.
+              <div data-testid="settings.quick-unlock-biometric-configured" style={{ marginTop: 14, fontSize: 13, lineHeight: 1.5, color: "var(--fg-3)" }}>
+                {t("settings.quickUnlock.helperConfigured", { method: biometric })}
+              </div>
             ) : (
               <>
                 <div style={{ marginTop: 14, fontSize: 13, lineHeight: 1.5, color: "var(--fg-3)" }}>
                   {t("settings.quickUnlock.pinSetupHelper")}
-                  {quStatus?.method === "biometric" && t("settings.quickUnlock.pinReplacesBiometric", { method: biometric })}
                 </div>
                 <FieldLabel mt={14}>{t("settings.quickUnlock.methodPin")}</FieldLabel>
                 <SheetInput type="password" inputMode="numeric" value={pin} onChange={setPin} placeholder={t("settings.quickUnlock.pinPlaceholder6")} />
