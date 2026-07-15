@@ -1,5 +1,5 @@
 [workspace]
-members = ["src-tauri", "protocol", "core", "e2e/fixture-gen"]
+members = ["src-tauri", "protocol", "core", "e2e/fixture-gen", "theme-validator"]
 resolver = "2"
 
 # Optimize the on-device AI math crates even in DEV builds. Candle + its `gemm`

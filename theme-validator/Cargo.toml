@@ -1,0 +1,18 @@
+[package]
+name = "theme-validator"
+version = "0.1.0"
+edition = "2021"
+license = "AGPL-3.0"
+description = "Myne custom-theme value-shape allowlist validator — the single source of truth shared by the desktop client (src-tauri themes plugin) and the myne-themes marketplace CI. Behaviour-preserving extraction of the security-load-bearing injection guard (threat-model §149)."
+
+[lib]
+name = "theme_validator"
+path = "src/lib.rs"
+
+[[bin]]
+name = "validate"
+path = "src/bin/validate.rs"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
