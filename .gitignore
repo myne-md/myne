@@ -62,3 +62,4 @@ manual-fixes-needed.md
 .pnpm-store/
 # E2E failure artifacts (screenshots, page source, driver logs)
 e2e/artifacts/
+/myne-themes/

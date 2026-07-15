@@ -22,7 +22,7 @@
 
 use std::collections::BTreeMap;
 
-use super::error::ThemeError;
+use crate::error::ThemeError;
 
 /// The minimal required-core CSS-variable tokens a custom theme MUST define
 /// (grill 2026-06-16, SYNC-1: minimal core). These are the **raw ramp** tokens
@@ -126,7 +126,7 @@ fn line_of(e: &serde_json::Error) -> Option<usize> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::plugins::themes::error::ThemeErrorKind;
+    use crate::error::ThemeErrorKind;
 
     /// A complete, well-formed minimal-core theme (every required key, valid
     /// hex values), as a JSON string.
