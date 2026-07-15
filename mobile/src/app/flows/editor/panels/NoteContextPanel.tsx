@@ -1,9 +1,36 @@
-import { type CSSProperties, type ReactNode, useState } from "react";
+import { type CSSProperties, type ReactNode, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { SidePanel } from "../../../../components";
+import { computeOutlineMeta } from "../../../../lib/outlineTree";
 import type { NoteEntry, OutlineItem } from "../types";
 
 type ContextTab = "backlinks" | "unlinked" | "outline";
+
+/** Width (px) of one indentation step — also the width of each tree-rail cell. */
+const INDENT_WIDTH = 14;
+/** Width (px) reserved for the disclosure chevron (or its spacer) so labels
+ *  align whether or not a row can fold. */
+const CHEVRON_WIDTH = 16;
+
+/** Right-pointing chevron that rotates down when expanded — same disclosure
+ *  motion as the sidebar folder tree (matches desktop `OutlineChevron`). */
+function OutlineChevron({ collapsed }: { collapsed: boolean }) {
+  return (
+    <span
+      aria-hidden="true"
+      style={{
+        display: "inline-flex",
+        transform: collapsed ? "rotate(0deg)" : "rotate(90deg)",
+        transformOrigin: "50% 50%",
+        transition: "transform var(--duration-base) var(--ease-standard)",
+      }}
+    >
+      <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.25} strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--fg-3)", display: "block" }}>
+        <path d="m9 18 6-6-6-6" />
+      </svg>
+    </span>
+  );
+}
 
 /** Right side panel — the note's CONTEXT, ported to the desktop tabbed
  *  convention: Backlinks (🔗) / Unlinked mentions (#) / Outline (☰), with a
@@ -25,6 +52,19 @@ export function NoteContextPanel({
 }) {
   const { t } = useTranslation();
   const [tab, setTab] = useState<ContextTab>("backlinks");
+  // Ephemeral outline fold state by row index; reset when the heading shape
+  // changes (note switch or an edit that adds/removes headings) since indices
+  // don't carry across snapshots — the desktop OutlineTab posture.
+  const [collapsed, setCollapsed] = useState<ReadonlySet<number>>(() => new Set());
+  const outlineSig = useMemo(() => outline.map((h) => `${h.level}:${h.text}`).join("|"), [outline]);
+  useEffect(() => setCollapsed(new Set()), [outlineSig]);
+  const outlineMeta = useMemo(() => computeOutlineMeta(outline.map((h) => h.level), collapsed), [outline, collapsed]);
+  const toggleOutline = (i: number) =>
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      next.has(i) ? next.delete(i) : next.add(i);
+      return next;
+    });
   // SECTION_HEADING_STYLE (desktop sharedStyles.ts) — "LINKED FROM 0" look.
   const heading: CSSProperties = { fontSize: 11, color: "var(--fg-3)", textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 600, marginBottom: 8 };
   const linkRow: CSSProperties = { display: "flex", alignItems: "center", gap: 8, width: "100%", border: "none", background: "transparent", padding: "9px 4px", borderRadius: 8, cursor: "pointer", textAlign: "left", fontSize: 15, color: "var(--fg-1)", fontFamily: "var(--font-sans)" };
@@ -82,13 +122,54 @@ export function NoteContextPanel({
         {tab === "outline" && (
           <>
             <div style={heading}>{t("editor.chrome.rightPanel.outline.heading")}</div>
-            {outline.length === 0
-              ? empty(t("editor.chrome.rightPanel.outline.empty"))
-              : outline.map((h, i) => (
-                  <button key={i} onClick={() => onJump(h.index)} style={{ ...linkRow, paddingLeft: 4 + (h.level - 1) * 14, color: h.level === 1 ? "var(--fg-1)" : "var(--fg-2)", fontWeight: h.level === 1 ? 600 : 400 }}>
-                    <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{h.text}</span>
-                  </button>
-                ))}
+            {outline.length === 0 ? (
+              empty(t("editor.chrome.rightPanel.outline.empty"))
+            ) : (
+              // gap:0 so each row's indent rails touch the next and read as
+              // continuous vertical tree lines (desktop OutlineTab parity).
+              <div style={{ display: "flex", flexDirection: "column" }}>
+                {outline.map((h, i) => {
+                  const m = outlineMeta[i]!;
+                  if (m.hidden) return null;
+                  const isCollapsed = collapsed.has(i);
+                  return (
+                    <div key={i} style={{ display: "flex", alignItems: "stretch", width: "100%" }}>
+                      {/* One full-height vertical guide per ancestor level. */}
+                      {Array.from({ length: Math.max(0, h.level - 1) }, (_, d) => (
+                        <span key={d} aria-hidden style={{ flexShrink: 0, width: INDENT_WIDTH, borderLeft: "1px solid var(--line-1)" }} />
+                      ))}
+                      {/* Disclosure chevron for foldable rows; spacer keeps leaf
+                          labels aligned with foldable siblings. */}
+                      {m.hasChildren ? (
+                        <button
+                          type="button"
+                          data-testid="editor.outline-toggle"
+                          aria-label={t(isCollapsed ? "editor.chrome.rightPanel.outline.expand" : "editor.chrome.rightPanel.outline.collapse")}
+                          aria-expanded={!isCollapsed}
+                          onClick={() => toggleOutline(i)}
+                          style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", width: CHEVRON_WIDTH, background: "transparent", border: 0, padding: 0, cursor: "pointer" }}
+                        >
+                          <OutlineChevron collapsed={isCollapsed} />
+                        </button>
+                      ) : (
+                        <span aria-hidden style={{ flexShrink: 0, width: CHEVRON_WIDTH }} />
+                      )}
+                      {/* Label — tap scrolls the editor to the heading. */}
+                      <button
+                        type="button"
+                        data-testid="editor.outline-row"
+                        data-heading-level={h.level}
+                        onClick={() => onJump(h.index)}
+                        title={h.text}
+                        style={{ flex: 1, minWidth: 0, textAlign: "left", background: "transparent", border: 0, padding: "8px 6px 8px 2px", fontSize: 15, lineHeight: 1.4, color: h.level === 1 ? "var(--fg-1)" : "var(--fg-2)", fontWeight: h.level === 1 ? 600 : 400, cursor: "pointer", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", fontFamily: "var(--font-sans)" }}
+                      >
+                        {h.text}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </>
         )}
       </div>

@@ -12,8 +12,12 @@ import { attachmentSrc } from "../../lib/attachmentRef";
 import { HAS_TAURI } from "../../lib/app-window";
 import { formatBytes } from "../../lib/util";
 import { showAttachmentLightbox } from "@myne/editor/attachments/lightbox";
+import { renderPdfFirstPage } from "@myne/editor/attachments/pdf-render";
 
 const isImage = (t: string) => t.startsWith("image/");
+/** PDFs render a first-page thumbnail (MYND-477) — parity with the desktop
+ *  library — instead of the generic file glyph. */
+const isPdf = (t: string) => t === "application/pdf";
 /** Voice notes / audio (stored as `audio/wav`): an inline play/pause tile in the
  *  row rather than a lightbox — playback, not a focused visual preview. */
 const isAudio = (t: string) => t.startsWith("audio/");
@@ -230,10 +234,10 @@ export function AttachmentsSheet({
               <div style={{ width: 36, height: 36, borderRadius: 8, background: "var(--bg-2)", flexShrink: 0, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
                 {isImage(e.content_type) ? (
                   <img src={attachmentSrc(e.id)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                ) : isPdf(e.content_type) ? (
+                  <PdfThumbnail id={e.id} size={36} glyphSize={18} />
                 ) : (
-                  <svg width="18" height="18" viewBox="0 0 24 24">
-                    <path d="M14 3v5h5M7 3h8l5 5v11a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z" fill="none" stroke="var(--fg-3)" strokeWidth="1.6" strokeLinejoin="round" />
-                  </svg>
+                  <FileGlyph size={18} />
                 )}
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
@@ -261,10 +265,10 @@ export function AttachmentsSheet({
                   <img src={attachmentSrc(e.id)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                 ) : isAudio(e.content_type) ? (
                   <AudioTile id={e.id} filename={e.filename} />
+                ) : isPdf(e.content_type) ? (
+                  <PdfThumbnail id={e.id} size={44} glyphSize={20} />
                 ) : (
-                  <svg width="20" height="20" viewBox="0 0 24 24">
-                    <path d="M14 3v5h5M7 3h8l5 5v11a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z" fill="none" stroke="var(--fg-3)" strokeWidth="1.6" strokeLinejoin="round" />
-                  </svg>
+                  <FileGlyph size={20} />
                 )}
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
@@ -397,6 +401,48 @@ function AudioTile({ id, filename }: { id: string; filename: string }) {
       </button>
     </>
   );
+}
+
+/** The generic document glyph — the always-works fallback for non-image,
+ *  non-audio files and for a PDF whose first page can't render. */
+function FileGlyph({ size = 20 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M14 3v5h5M7 3h8l5 5v11a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z" fill="none" stroke="var(--fg-3)" strokeWidth="1.6" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+/** PDF tile: renders the decrypted first page to a canvas via the shared
+ *  `renderPdfFirstPage()` (SYNC-5) and paints it as an `<img>` data URL — the
+ *  same reusable render path the desktop library uses (MYND-477). Any failure
+ *  (pdf.js absent, parse error, unmount abort) falls back to {@link FileGlyph};
+ *  `renderPdfFirstPage` rejects rather than throwing, so the catch is the
+ *  mandatory fallback. The render is aborted on unmount (row scrolled away). */
+function PdfThumbnail({ id, size, glyphSize }: { id: string; size: number; glyphSize: number }) {
+  const [src, setSrc] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    let cancelled = false;
+    void renderPdfFirstPage({ url: attachmentSrc(id), width: size, signal: controller.signal })
+      .then((canvas) => {
+        if (!cancelled) setSrc(canvas.toDataURL("image/png"));
+      })
+      .catch(() => {
+        if (!cancelled) setFailed(true);
+      });
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [id, size]);
+
+  // Until the first page resolves (or on any failure), show the generic glyph —
+  // it doubles as the loading placeholder and the terminal fallback.
+  if (failed || src === null) return <FileGlyph size={glyphSize} />;
+  return <img src={src} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />;
 }
 
 const actionLink: React.CSSProperties = { border: "none", background: "transparent", color: "var(--accent)", fontSize: 14, fontWeight: 600, cursor: "pointer", padding: 0 };

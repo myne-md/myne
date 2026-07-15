@@ -28,6 +28,15 @@
   string is honest and telemetry-free: audio is recorded ONLY while the user is
   actively recording a voice note, is encrypted on-device, and is never sent
   anywhere (it syncs end-to-end encrypted like any other attachment).
+
+  NSCameraUsageDescription: required for the "Take Photo" option in the WKWebView
+  file picker when attaching an image (MYND-474). Tapping an <input type="file">
+  and choosing "Take Photo" opens the camera; without this key iOS TERMINATES the
+  app on first camera access (a hard NSInvalidArgumentException crash, not a
+  permission prompt). The picker's "Photo Library" option uses PHPicker
+  (out-of-process, needs no usage string), so only the camera key is required.
+  The string is honest and telemetry-free: the camera is used ONLY while you take
+  a photo to attach; the photo is encrypted on-device and never sent anywhere.
 -->
 <plist version="1.0">
 <dict>
@@ -37,6 +46,8 @@
 	<string>Myne uses Face ID to unlock this vault again quickly after it auto-locks. Your master password is still required after a restart.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Myne uses the microphone only while you record a voice note. Recordings are encrypted on this device and never sent anywhere.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Myne uses the camera only when you take a photo to attach it to a note. Photos are encrypted on this device and never sent anywhere.</string>
 	<!-- `myne://` custom URL scheme — the target of the home / lock-screen
 	     widgets + Control Center "New note" action (ios-widgets/). Delivered to
 	     the WebView by tauri-plugin-deep-link; resolved app-side into an unlock

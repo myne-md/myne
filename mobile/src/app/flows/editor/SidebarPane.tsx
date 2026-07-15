@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { Icon, MyneMark, LIST_TOP, SyncStatusGlyph } from "../../../components";
+import { Icon, MyneMark, LIST_TOP } from "../../../components";
 
 /** Expanded-only workspace sidebar (the WS-01 iPad three-pane reference:
  *  sidebar 248 / list 316 / editor flex — `src/ipad/index.tsx`). It absorbs the
@@ -75,7 +75,6 @@ export function SidebarPane({
   onSearch,
   onSwitcher,
   onSettings,
-  onSyncDetail,
 }: {
   label: string;
   tab: "notes" | "search" | "graph" | "files" | "templates";
@@ -91,7 +90,6 @@ export function SidebarPane({
   onSearch: () => void;
   onSwitcher: () => void;
   onSettings: () => void;
-  onSyncDetail: () => void;
 }) {
   const { t } = useTranslation();
   return (
@@ -190,12 +188,12 @@ export function SidebarPane({
         />
       </div>
 
-      {/* Footer — sync status + settings (the phone puts these in the header). */}
+      {/* Footer — settings (the phone puts this in the header). Sync status moved
+          out of the general UI into Settings → Sync (MYND-481). */}
       <div
-        data-testid="sidebar.sync-footer"
-        style={{ flex: "none", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, borderTop: "1px solid var(--line-1)", padding: "10px 10px calc(10px + env(safe-area-inset-bottom, 0px))" }}
+        data-testid="sidebar.footer"
+        style={{ flex: "none", display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8, borderTop: "1px solid var(--line-1)", padding: "10px 10px calc(10px + env(safe-area-inset-bottom, 0px))" }}
       >
-        <SyncStatusGlyph onOpenDetail={onSyncDetail} />
         <button
           data-testid="sidebar.settings"
           onClick={onSettings}

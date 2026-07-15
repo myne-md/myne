@@ -10,6 +10,7 @@ import {
 import { invoke } from "@tauri-apps/api/core";
 import { documentDir, join } from "@tauri-apps/api/path";
 import { logErrorKind } from "./vault-creation-logging";
+import { shareFile } from "./share";
 
 const CLIPBOARD_AUTO_CLEAR_MS = 30_000;
 
@@ -47,10 +48,12 @@ export async function copySecretToClipboard(
 
 /**
  * Save a secret (recovery phrase / account number) to a `.txt` file in the app's
- * Documents directory — reachable via the iOS Files app. Uses the `myne-core`
- * `secret_export` plugin (the Rust-side write) because the mobile backend has no
- * fs / save-dialog plugin. The plaintext secret is written to a user-visible
- * location by the user's explicit intent (threat-model TB3 egress exception).
+ * Documents directory — reachable via the iOS Files app — then present the
+ * native share sheet (MYND-475) so the user can pick a destination ("Save to
+ * Files" elsewhere, AirDrop, etc.). Uses the `myne-core` `secret_export` plugin
+ * (the Rust-side write) because the mobile backend has no fs / save-dialog
+ * plugin. The plaintext secret is written to a user-visible location by the
+ * user's explicit intent (threat-model TB3 egress exception).
  *
  * Resolves to a short display label (`"Documents/<file>"`) on success, or `null`
  * on failure (the caller shows a message). `filename` should end in `.txt`.
@@ -62,6 +65,9 @@ export async function saveSecretToDocuments(
   try {
     const path = await join(await documentDir(), filename);
     await invoke("plugin:secret-export|save_secret_text", { path, contents });
+    // Offer the native destination chooser on top of the guaranteed Documents
+    // write; additive, so a share cancel still leaves the file saved.
+    await shareFile(path);
     return `Documents/${filename}`;
   } catch (e) {
     logErrorKind(e, "secret-save-failed");

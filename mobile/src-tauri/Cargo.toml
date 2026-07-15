@@ -110,6 +110,21 @@ sha2 = { version = "0.10", default-features = false }
 # for Apple targets, so feature unification adds no crates.
 [target.'cfg(target_os = "ios")'.dependencies]
 objc2 = { version = "0.6", features = ["exception"] }
+# CoreGraphics geometry types (CGRect/CGPoint/CGSize) for the note→PDF render
+# (`pdf_export`, MYND-475): they carry the correct `objc2::Encode` impls so a
+# CGRect can cross `msg_send!` + the `UIGraphics*PDF*` C ABI without hand-rolled
+# encodings. Same policy as `objc2` above — already compiled into the build
+# transitively via `wry`/`objc2-ui-kit`; this only names it for direct use.
+# default-features off + just the geometry module (`CFCGTypes`) and its
+# `objc2::Encode` impls (`objc2`): both are already enabled transitively via
+# `objc2-ui-kit`, so this adds a dependency edge but NO new crate/feature to the
+# build (keeps the minimal-surface discipline — `threat-model.md` §6).
+objc2-core-foundation = { version = "0.3", default-features = false, features = ["CFCGTypes", "objc2"] }
+# ObjC block support for the `userDidTakeScreenshotNotification` observer
+# (`screen_guard`, MYND-476) — `addObserverForName:...usingBlock:` needs a heap
+# block. Already in the shared lock (pulled transitively via `objc2-*`); this
+# only names it for direct use. Pairs with objc2 0.6.
+block2 = "0.6"
 
 # Dev-dependencies — same policy bar as runtime deps. `tracing-test` captures
 # `tracing` events per-test so the plugins' tracing-level discipline is
