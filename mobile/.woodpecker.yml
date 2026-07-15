@@ -124,6 +124,19 @@ steps:
       - pnpm install --frozen-lockfile
       - pnpm build
 
+  # ── npm dependency-license gate (MYND-504) — npm analogue of cargo-deny ────
+  # Fails on any transitive npm license outside the allowlist in
+  # scripts/check-npm-licenses.mjs, which mirrors deny.toml's [licenses].allow.
+  # Depends on pnpm-build so the deps are already provisioned in the shared
+  # workspace volume; re-installs frozen to populate node_modules for the query.
+  npm-licenses:
+    image: node:25
+    depends_on: [pnpm-build]
+    commands:
+      - npm install -g pnpm@11.8.0
+      - pnpm install --frozen-lockfile
+      - node scripts/check-npm-licenses.mjs
+
   # ── Frontend unit tests (TS↔Rust mirrors, dialect, etc.) ──────────────────
   # Serialized after pnpm-build so the two pnpm-install steps stay linear (the
   # desktop pipeline does the same to avoid pnpm lockdir ENOENT races).
