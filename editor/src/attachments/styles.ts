@@ -183,6 +183,18 @@ const CSS = `
   border-radius: var(--radius-3, 8px);
   box-shadow: var(--shadow-3, 0 8px 24px rgba(0,0,0,0.12));
 }
+/* Phone / compact: the 80vw surface is too narrow to read a PDF page — use
+   almost the full width + height with a tight gutter so pages render at a
+   legible size (paired with the surface-fit pageWidth in lightbox.ts). MYND-477. */
+@media (max-width: 700px) {
+  .cm-attach-lightbox-pdf {
+    width: 96vw;
+    max-width: 96vw;
+    height: 88vh;
+    max-height: 88vh;
+    padding: 8px;
+  }
+}
 /* "Loading…" chip shown inside the (always-visible) reader surface until the
    document loads + the first page paints. */
 .cm-attach-lightbox-pdf .cm-attachment-pdf-loading {
@@ -236,15 +248,22 @@ const CSS = `
   width: 32px;
   height: 32px;
   padding: 0;
-  border: none;
+  border: 1px solid rgba(255, 255, 255, 0.28);
   border-radius: var(--radius-2, 6px);
-  background: rgba(255, 255, 255, 0.1);
-  color: rgba(255, 255, 255, 0.82);
+  /* A solid dark scrim + border so the button stays legible over BOTH the dark
+     image backdrop AND the light PDF paper surface (the old 10% white fill was
+     nearly invisible at rest — MYND-477 / attachment-window polish). */
+  background: rgba(18, 18, 20, 0.66);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  color: #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
   cursor: pointer;
   line-height: 0;
 }
 .cm-attach-lightbox-close:hover {
-  background: rgba(255, 255, 255, 0.18);
+  background: rgba(40, 40, 44, 0.82);
+  border-color: rgba(255, 255, 255, 0.45);
   color: #fff;
 }
 .cm-attach-lightbox-close:focus-visible {
@@ -261,17 +280,21 @@ const CSS = `
   align-items: center;
   height: 32px;
   padding: 0 12px;
-  border: none;
+  border: 1px solid rgba(255, 255, 255, 0.28);
   border-radius: var(--radius-2, 6px);
-  background: rgba(255, 255, 255, 0.1);
-  color: rgba(255, 255, 255, 0.82);
+  background: rgba(18, 18, 20, 0.66);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  color: #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
   font-family: var(--font-sans);
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
 }
 .cm-attach-lightbox-export:hover {
-  background: rgba(255, 255, 255, 0.18);
+  background: rgba(40, 40, 44, 0.82);
+  border-color: rgba(255, 255, 255, 0.45);
   color: #fff;
 }
 .cm-attach-lightbox-export:focus-visible {
