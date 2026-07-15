@@ -29,7 +29,9 @@ const WRAP_STYLE: CSSProperties = {
  *  of the app (the SF2 "wire theme from prefs" intent). Excalidraw only knows
  *  `"light"`/`"dark"` — Myne's `amoled` maps to dark; no explicit `<html
  *  data-theme>` means follow the OS (`prefers-color-scheme`). A per-drawing theme
- *  persisted in the scene overrides this default. */
+ *  persisted in the scene overrides this default. Best-effort: an active CUSTOM
+ *  theme paints via CSSOM vars and removes `data-theme`, so we fall through to the
+ *  OS preference there (a dark custom theme under a light OS seeds light). */
 function currentAppTheme(): "light" | "dark" {
   const dt =
     typeof document !== "undefined"
@@ -94,14 +96,16 @@ export default function DrawingCanvas({
                   primed.current = true;
                   return;
                 }
-                // Persist the live theme too (serializeAsJSON drops it) so a
-                // per-drawing light/dark choice survives note switches.
-                onSceneChange(
-                  withPersistedTheme(
-                    serializeAsJSON(elements, appState, files, "local"),
-                    (appState as { theme?: unknown }).theme,
-                  ),
-                );
+                const json = serializeAsJSON(elements, appState, files, "local");
+                // Persist the theme ONLY when the user picked one that DEVIATES
+                // from the current app theme (serializeAsJSON drops it either way).
+                // A drawing matching the app default stays themeless so it keeps
+                // following light/dark — otherwise the first onChange (which fires
+                // on ANY interaction, not just a theme toggle) would bake the
+                // seeded default in and freeze it against a later OS/app switch.
+                const theme = (appState as { theme?: unknown }).theme;
+                const deviating = theme !== currentAppTheme() ? theme : undefined;
+                onSceneChange(withPersistedTheme(json, deviating));
               }
             : undefined
         }
