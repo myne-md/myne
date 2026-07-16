@@ -427,7 +427,11 @@ pub fn aad_workspace_blob(account_number_hash: &[u8; 16]) -> Vec<u8> {
 pub fn aad_graph_layout_blob(account_number_hash: &[u8; 16]) -> Vec<u8> {
     const ROLE_STR_GRAPH_LAYOUT_BLOB: &[u8] = b"graph-layout-blob";
     let mut aad = Vec::with_capacity(
-        AAD_PREFIX_V0_1.len() + 1 + 2 + ROLE_STR_GRAPH_LAYOUT_BLOB.len() + account_number_hash.len(),
+        AAD_PREFIX_V0_1.len()
+            + 1
+            + 2
+            + ROLE_STR_GRAPH_LAYOUT_BLOB.len()
+            + account_number_hash.len(),
     );
     aad.extend_from_slice(AAD_PREFIX_V0_1);
     aad.push(PROTOCOL_VERSION_V0_1);

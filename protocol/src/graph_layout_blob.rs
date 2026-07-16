@@ -130,9 +130,7 @@ impl From<EnvelopeError> for GraphLayoutBlobError {
         match e {
             EnvelopeError::HeaderTooShort => GraphLayoutBlobError::HeaderTooShort,
             EnvelopeError::MagicMismatch => GraphLayoutBlobError::MagicMismatch,
-            EnvelopeError::ProtocolVersionMismatch => {
-                GraphLayoutBlobError::ProtocolVersionMismatch
-            }
+            EnvelopeError::ProtocolVersionMismatch => GraphLayoutBlobError::ProtocolVersionMismatch,
             EnvelopeError::FormatUnsupported => GraphLayoutBlobError::FormatUnsupported,
             EnvelopeError::CiphertextLenOverflow => GraphLayoutBlobError::CiphertextLenOverflow,
             EnvelopeError::CiphertextTruncated => GraphLayoutBlobError::CiphertextTruncated,
@@ -377,12 +375,20 @@ mod tests {
             (*br#"{"v":1,"pos":[["n1",12.5,-8.0],["n2",100.0,42.0]]}"#).to_vec();
         let plaintext_1kb: alloc::vec::Vec<u8> = (0..1024u32).map(|i| (i % 256) as u8).collect();
 
-        let blob_empty =
-            encode_graph_layout_blob_raw(&graph_layout_key, &account_hash, &plaintext_empty, &nonce)
-                .expect("encode empty");
-        let blob_small =
-            encode_graph_layout_blob_raw(&graph_layout_key, &account_hash, &plaintext_small, &nonce)
-                .expect("encode small");
+        let blob_empty = encode_graph_layout_blob_raw(
+            &graph_layout_key,
+            &account_hash,
+            &plaintext_empty,
+            &nonce,
+        )
+        .expect("encode empty");
+        let blob_small = encode_graph_layout_blob_raw(
+            &graph_layout_key,
+            &account_hash,
+            &plaintext_small,
+            &nonce,
+        )
+        .expect("encode small");
         let blob_1kb =
             encode_graph_layout_blob_raw(&graph_layout_key, &account_hash, &plaintext_1kb, &nonce)
                 .expect("encode 1kb");

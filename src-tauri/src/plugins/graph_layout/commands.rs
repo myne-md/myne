@@ -160,7 +160,8 @@ pub async fn graph_layout_write<R: Runtime>(
     // First non-doc statement: bound the payload (position map derived from
     // note structure) to a Zeroizing wrapper so every early-return path wipes it.
     let payload = Zeroizing::new(payload);
-    let dir = vault_dir(&app, state.active_vault_id().await).map_err(GraphLayoutWriteError::from)?;
+    let dir =
+        vault_dir(&app, state.active_vault_id().await).map_err(GraphLayoutWriteError::from)?;
     graph_layout_write_with_dir(&dir, state.inner(), &payload).await
 }
 
