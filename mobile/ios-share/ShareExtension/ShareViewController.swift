@@ -19,7 +19,17 @@ import UniformTypeIdentifiers
 
 /// Diagnostic log via NSLog so it lands in the DEVICE SYSLOG (visible in the
 /// `tauri ios dev` terminal / `idevicesyslog`, and Console.app) — grep `MYNE-SHARE`.
-private func shareLogInfo(_ msg: String) { NSLog("MYNE-SHARE %@", msg) }
+///
+/// DEBUG-only: some call sites pass a shared file's name / MIME / size, which are
+/// confidential (they live inside the encrypted `MYF1` plaintext, `protocol.md`
+/// §9.19.3). NSLog is unredacted and persists in the OS unified log, so in a
+/// RELEASE build this must never fire — the whole body compiles out. Full
+/// diagnostics remain for the on-device verification, which runs debug builds.
+private func shareLogInfo(_ msg: String) {
+    #if DEBUG
+    NSLog("MYNE-SHARE %@", msg)
+    #endif
+}
 
 /// Headless principal class for the Myne "Save to Myne" Share Extension
 /// (`NSExtensionPrincipalClass`). Presents no UI (SYNC-13): it stages each shared

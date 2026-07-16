@@ -43,6 +43,7 @@ import app.tauri.plugin.JSObject
 import app.tauri.plugin.Plugin
 import org.json.JSONArray
 import java.io.ByteArrayOutputStream
+import java.io.InputStream
 import java.security.KeyStore
 import java.security.SecureRandom
 import javax.crypto.Cipher
@@ -118,11 +119,11 @@ class ShareIntentPlugin(private val activity: Activity) : Plugin(activity) {
 
     private fun deliver(uri: Uri) {
         val resolver = activity.contentResolver
-        val bytes = resolver.openInputStream(uri)?.use { input ->
-            val sink = ByteArrayOutputStream()
-            input.copyTo(sink)
-            sink.toByteArray()
-        } ?: return
+        // `readCapped` aborts (null) once the stream exceeds MAX_SHARE_BYTES, so a
+        // huge/hostile content:// stream cannot OOM the app before the Rust seal
+        // caps it. An over-cap item is dropped (best-effort per item, like a read
+        // failure) — it never sinks the rest of a multi-share batch.
+        val bytes = resolver.openInputStream(uri)?.use { readCapped(it) } ?: return
         // An empty stream would seal to nothing (the Rust `seal_share` drops it),
         // so skip it early.
         if (bytes.isEmpty()) return
@@ -135,6 +136,25 @@ class ShareIntentPlugin(private val activity: Activity) : Plugin(activity) {
         payload.put("mime", mime)
         payload.put("dataB64", Base64.encodeToString(bytes, Base64.NO_WRAP))
         channel?.send(payload)
+    }
+
+    /** Read the whole stream into memory, aborting (returning null) the moment it
+     *  exceeds [MAX_SHARE_BYTES]. The ceiling is enforced during the copy — NOT
+     *  from `OpenableColumns.SIZE`, which a hostile provider can under-report — so
+     *  an unbounded `content://` stream cannot OOM the app before the Rust
+     *  `seal_share` codec cap (64 MiB) would reject it. */
+    private fun readCapped(input: InputStream): ByteArray? {
+        val sink = ByteArrayOutputStream()
+        val buf = ByteArray(COPY_BUF_LEN)
+        var total = 0L
+        while (true) {
+            val n = input.read(buf)
+            if (n < 0) break
+            total += n
+            if (total > MAX_SHARE_BYTES) return null
+            sink.write(buf, 0, n)
+        }
+        return sink.toByteArray()
     }
 
     // Resolve the human display name via OpenableColumns.DISPLAY_NAME, falling
@@ -250,5 +270,11 @@ class ShareIntentPlugin(private val activity: Activity) : Plugin(activity) {
         const val GCM_IV_LEN = 12
         const val GCM_TAG_BITS = 128
         const val DEVICE_KEY_LEN = 32
+        // Accept cap (matches the iOS extension's 48 MiB `maxShareBytes`, and stays
+        // under the 64 MiB MYF1 codec cap). Enforced DURING the copy so a hostile
+        // or lying `content://` provider cannot buffer an unbounded stream into
+        // the heap (OOM/DoS) before the Rust `seal_share` would reject it.
+        const val MAX_SHARE_BYTES = 48L * 1024 * 1024
+        const val COPY_BUF_LEN = 64 * 1024
     }
 }
