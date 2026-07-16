@@ -1938,6 +1938,30 @@ Implementations MUST reject `ciphertext_len > 16384 + 32` (16 KiB plaintext cap 
 
 **Transient plaintext (carve-out).** The dictated text exists as plaintext in two OS-Data-Protection-only transients *before* it is sealed into `MYK1`: the watch's WatchConnectivity outbox and the phone's staging file (written by the native receiver before the Rust seal). These are short-lived, contain only not-yet-committed captures (never existing vault content), and are enumerated in [`../threat-model.md`](../threat-model.md). The watch stays crypto-free by design — encrypting the outbox would require key material on a device deliberately kept key-free (`decisions.md` 2026-07-12).
 
+### 9.19 Share-import staging queue (`pending-shares/<share-id>`, `MYF1`)
+
+> **Magic allocation.** `MYF1`/`MYF5` is a free-pool §10.3 allocation (F = *file*, MYND-507), chosen the same way every family's magic is (implementer-picked from the free pool). A later letter change would be a mechanical rename, not a format change.
+
+A file shared into Myne via the OS share sheet (iOS Share Extension / Android `ACTION_SEND`) arrives at a process that does not hold `root_key` — the iOS extension is a separate sandbox, and on Android the vault may be locked when the intent fires. It cannot enter the attachment library yet (that needs the unlocked `items_key`, §9.9), so it is held in a **device-local encrypted queue** until the next unlock, when it drains into the library via the ordinary `attachment_import` path. This is the file-carrying sibling of §9.18 (pending-capture): same device-key seal and vault-agnostic per-entry-id AAD binding, but the plaintext is a **binary file** (framed with its filename + declared MIME), the cap is **64 MiB** (matching the `MYA1` attachment cap, not 16 KiB), and it drains to an attachment (not a note).
+
+#### 9.19.1 Layout
+
+`<app-container>/pending-shares/sealed/` holds `MYF1` blobs named by the hex `share_id`. Unlike §9.18 there is **no plaintext `staging/` directory**: the seal is synchronous-at-arrival (the iOS extension seals in-process via a linked codec; the Android native side hands bytes straight to the Rust seal), so a shared file's plaintext exists only transiently in RAM before sealing (§9.19.4), never as a persistent plaintext file. On iOS the `sealed/` directory resolves to the shared **App Group** container so the extension (writer) and the app drain (reader) agree.
+
+#### 9.19.2 Key
+
+Like §9.18, the `MYF1` entry is sealed under a **device-local 32-byte `wrap_key`** held in the OS keychain (Apple) / Keystore (Android), **NOT** a `DeriveSubkey(root_key, …)` subkey — the queue must be writable while `root_key` is unavailable. Non-biometric, `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly` on Apple; the equivalent device-only, non-biometric Android Keystore key on Android. The keychain service string is `md.myne.shareimport`, DISTINCT from `md.myne.captures`. No HKDF context and no §10.3 subkey role (provider-agnostic).
+
+#### 9.19.3 Blob format
+
+Header (49 bytes): `magic "MYF1"(4) ∥ protocol_version 0x01(1) ∥ share_id(16) ∥ wrap_nonce(24) ∥ ciphertext_len(u32 BE)`, then the CTX-committed XChaCha20-Poly1305 ciphertext. AAD = `aad_share_import_blob(share_id)` (length-prefixed role `"share-import-blob"`, AAD prefix `"myne.v0.1|"`), binding the per-entry `share_id` only (vault-agnostic — no `account_number_hash`/`items_key_id`). The sealed plaintext is an opaque, core-framed record `filename_len(u16 BE) ∥ filename(utf8) ∥ mime_len(u16 BE) ∥ mime(utf8) ∥ file_bytes`; filename + MIME are hints (the drain re-sniffs MIME authoritatively per §9.9), so they are confidential-but-not-AAD-bound. The header `share_id` is AAD-bound, so tampering with it fails AEAD rather than re-labelling the entry.
+
+#### 9.19.4 Size cap, drain, and transient plaintext
+
+Implementations MUST reject `ciphertext_len > 67108864 + 32` (64 MiB plaintext cap + 32-byte CTX tag) before allocating. The seal drops any entry whose framed plaintext exceeds the cap (no poison-oversize entry that re-fails every drain). Drain is **at-least-once**: the client decrypts each entry, imports it via `attachment_import` (§9.9), then deletes the entry; a crash between import and delete re-drains into a content-addressed dedup hit (harmless). Landing is the active unlocked vault (as §9.18, "whichever vault unlocks first"). The queue never syncs and is never in a backup (TB2).
+
+**Transient plaintext (carve-out).** The shared bytes exist as plaintext in OS-Data-Protection-only transients *before* sealing: on Android the sender's `content://` stream read into RAM by the native receiver; on iOS the in-extension buffer (no App-Group plaintext hand-off — the seal happens in-process). These are short-lived, contain only the just-shared file (never existing vault content), and are enumerated in [`../threat-model.md`](../threat-model.md), analogous to the §9.18.4 carve-out.
+
 ## 10. Protocol Versioning & Migration
 
 ### 10.1 Design principle: forward-incompatible by design
@@ -1980,6 +2004,7 @@ This registry is normative. Implementations MUST reject any magic byte / AAD pre
 | Device-local sync baseline (`vault.head-state`) | `MYH1` | `MYH5` | §9.16 | MYND-416 |
 | AI embeddings index (`vault.embeddings`) | `MYR1` | `MYR5` | §9.17 | MYND-453 |
 | Pending-capture queue (`captures/<id>`) | `MYK1` | `MYK5` | §9.18 | watch-capture |
+| Share-import staging queue (`pending-shares/<id>`) | `MYF1` | `MYF5` | §9.19 | MYND-507 |
 
 Section §9.8 (vault indices) **landed with MYND-271** (the persistence the MYND-31 design pre-allocated); §9.7 (workspace) landed with MYND-166, and attachments occupy §9.9/§9.10. The per-note and vault-meta families retain their historical `NT05`/`NTV5` v005 reservations; all newer blob families (prefs/search/workspace/indices/attachments/dictionary/attachment-text/head-state/ai-embeddings) use the `MY?5` v005 convention. The device-local sync baseline (`vault.head-state`, `MYH1`/`MYH5`, §9.16) landed with MYND-416; the **wire vault head itself has no magic** — it is sync-wire-only (`sync-protocol.md` §2), versioned by its `head_format_version` byte, not a §10.3 family.
 
