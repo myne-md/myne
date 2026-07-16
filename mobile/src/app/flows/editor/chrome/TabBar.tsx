@@ -43,14 +43,14 @@ export function TabBar({
         padding: "6px 0 calc(6px + env(safe-area-inset-bottom, 0px))",
       }}
     >
-      <button onClick={onNotes} aria-label={t("notes.list.notesHeading")} style={tab}>
+      <button data-testid="workspace.tab-notes" onClick={onNotes} aria-label={t("notes.list.notesHeading")} style={tab}>
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
           <rect x="5" y="3" width="14" height="18" rx="2.5" stroke={col(active === "notes")} strokeWidth="1.8" />
           <path d="M9 8h6M9 12h6M9 16h3" stroke={col(active === "notes")} strokeWidth="1.8" strokeLinecap="round" />
         </svg>
         <span style={label(active === "notes")}>{t("notes.list.notesHeading")}</span>
       </button>
-      <button onClick={onGraph} aria-label={t("editor.chrome.barItems.graph")} style={tab}>
+      <button data-testid="workspace.tab-graph" onClick={onGraph} aria-label={t("editor.chrome.barItems.graph")} style={tab}>
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
           <circle cx="6" cy="17" r="2.6" stroke={col(active === "graph")} strokeWidth="1.8" />
           <circle cx="18" cy="14" r="2.6" stroke={col(active === "graph")} strokeWidth="1.8" />
@@ -59,7 +59,7 @@ export function TabBar({
         </svg>
         <span style={label(active === "graph")}>{t("editor.chrome.barItems.graph")}</span>
       </button>
-      <button onClick={onAttachments} aria-label={t("attachments.library.title")} style={tab}>
+      <button data-testid="workspace.tab-files" onClick={onAttachments} aria-label={t("attachments.library.title")} style={tab}>
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
           <rect x="3" y="3" width="18" height="18" rx="2.5" stroke={col(active === "files")} strokeWidth="1.8" />
           <circle cx="8.5" cy="8.5" r="1.8" fill={col(active === "files")} />

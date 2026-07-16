@@ -186,6 +186,15 @@ fn main() {
                 tauri_build::InlinedPlugin::new().commands(&["save_secret_text"]),
             )
             .plugin(
+                // Knowledge-graph layout cache (MYG1, §9.19): shared from
+                // `myne-core`; the same two commands the desktop registers.
+                // Adding a command here without a matching entry in
+                // `permissions/graph-layout/default.toml` is a security bug.
+                "graph-layout",
+                tauri_build::InlinedPlugin::new()
+                    .commands(&["graph_layout_read", "graph_layout_write"]),
+            )
+            .plugin(
                 // MYND-458: the mobile `sync` shim over `myne_core::plugins::sync`
                 // — the SAME 15 commands the desktop registers, deny-by-default.
                 // (MYND-459 T12: `sync_head_fingerprint` added — the SY-05 SAS

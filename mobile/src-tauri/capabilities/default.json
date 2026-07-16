@@ -19,6 +19,7 @@
     "captures:default",
     "share-import:default",
     "vault-indices:default",
+    "graph-layout:default",
     "search:default",
     "snapshots:default",
     "attachments:default",

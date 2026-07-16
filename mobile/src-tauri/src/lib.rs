@@ -144,6 +144,12 @@ pub fn run() {
         // permissions/share-import/default.toml or the ACL resolver fails closed.
         .plugin(plugins::share_import::init())
         .plugin(plugins::vault_indices::init())
+        // Knowledge-graph layout cache (MYG1, §9.19): read/write of the
+        // encrypted vault.graph node-position cache. Shared from `myne-core`;
+        // the same two commands the desktop registers. Commands must stay in
+        // lockstep with build.rs + permissions/graph-layout/default.toml or
+        // the ACL resolver fails closed.
+        .plugin(plugins::graph_layout::init())
         .plugin(plugins::search::init())
         .plugin(plugins::snapshots::init())
         .plugin(plugins::attachments::init())

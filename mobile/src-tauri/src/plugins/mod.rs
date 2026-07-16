@@ -19,6 +19,10 @@
 pub mod attachments;
 pub mod captures;
 pub mod export;
+// Knowledge-graph layout cache (MYG1, §9.19): a thin re-export wrapper over
+// `myne_core::plugins::graph_layout` — read/write of the encrypted
+// `vault.graph` node-position cache (Class 3, never synced/backed up).
+pub mod graph_layout;
 pub mod notes;
 pub mod prefs;
 pub mod quick_unlock;
