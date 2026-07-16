@@ -1118,6 +1118,7 @@ mod tests {
             crate::plugins::prefs::commands::set_deliberate_folders_with_dir(
                 &vault_dir,
                 &state,
+                &(std::sync::Arc::new(crate::hooks::NoopHooks) as crate::hooks::Hooks),
                 vec!["Empty/Nested/".to_string(), "Projects/".to_string()],
             )
             .await
@@ -1594,6 +1595,7 @@ mod tests {
             crate::plugins::prefs::commands::set_deliberate_folders_with_dir(
                 &vault_dir,
                 &state,
+                &(std::sync::Arc::new(crate::hooks::NoopHooks) as crate::hooks::Hooks),
                 vec!["A/Empty/".to_string(), "C/Empty/".to_string()],
             )
             .await

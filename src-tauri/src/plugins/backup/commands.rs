@@ -60,6 +60,7 @@ pub struct ExportSummary {
 pub async fn vault_export_backup<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
+    lifecycle_hooks: State<'_, myne_core::hooks::Hooks>,
     vault_id: Option<String>,
     destination: String,
 ) -> Result<ExportSummary, BackupExportError> {
@@ -101,7 +102,14 @@ pub async fn vault_export_backup<R: Runtime>(
         cancelled: Some(runtime.cancel.clone()),
     };
 
-    let result = export_backup_core(vault_dir, state.inner(), destination, hooks).await;
+    let result = export_backup_core(
+        vault_dir,
+        state.inner(),
+        lifecycle_hooks.inner(),
+        destination,
+        hooks,
+    )
+    .await;
 
     match &result {
         Ok(summary) => {
@@ -128,6 +136,7 @@ pub async fn vault_export_backup<R: Runtime>(
 pub(crate) async fn export_backup_core(
     vault_dir: PathBuf,
     state: &VaultRuntimeState,
+    lifecycle_hooks: &myne_core::hooks::Hooks,
     destination: PathBuf,
     hooks: ContainerHooks,
 ) -> Result<ExportSummary, BackupExportError> {
@@ -184,6 +193,7 @@ pub(crate) async fn export_backup_core(
         if let Err(e) = crate::plugins::prefs::commands::record_last_backup_at_with_dir(
             &vault_dir,
             state,
+            lifecycle_hooks,
             epoch_seconds,
         )
         .await
@@ -555,6 +565,13 @@ mod tests {
             .expect("current-thread runtime build")
     }
 
+    /// No-op lifecycle hooks for the `record_last_backup_at` seam (MYND-517:
+    /// the prefs write path takes hooks; `last_backup_at` is device-local so
+    /// the sync bump never fires here anyway).
+    fn noop_lifecycle_hooks() -> myne_core::hooks::Hooks {
+        std::sync::Arc::new(myne_core::hooks::NoopHooks)
+    }
+
     #[test]
     fn export_rejects_while_auth_permit_is_held() {
         // SYNC-6 mutual exclusion, direction 1: a running unlock /
@@ -571,6 +588,7 @@ mod tests {
                 export_backup_core(
                     vault.clone(),
                     &state,
+                    &noop_lifecycle_hooks(),
                     dest.clone(),
                     ContainerHooks::default()
                 )
@@ -580,9 +598,15 @@ mod tests {
             drop(held);
 
             // Permit released → export proceeds and returns it.
-            export_backup_core(vault, &state, dest, ContainerHooks::default())
-                .await
-                .expect("export");
+            export_backup_core(
+                vault,
+                &state,
+                &noop_lifecycle_hooks(),
+                dest,
+                ContainerHooks::default(),
+            )
+            .await
+            .expect("export");
             assert_eq!(state.auth_permits().available_permits(), 1);
         });
     }
@@ -609,7 +633,14 @@ mod tests {
             // across its atomic_write).
             let writer_guard = state.hold_unlocked_root_key().await.expect("unlocked");
 
-            let export = export_backup_core(vault, &state, dest.clone(), ContainerHooks::default());
+            let lifecycle_hooks = noop_lifecycle_hooks();
+            let export = export_backup_core(
+                vault,
+                &state,
+                &lifecycle_hooks,
+                dest.clone(),
+                ContainerHooks::default(),
+            );
             tokio::pin!(export);
             assert!(
                 tokio::time::timeout(std::time::Duration::from_millis(50), &mut export)
@@ -644,7 +675,7 @@ mod tests {
                 progress: Some(tx),
                 cancelled: None,
             };
-            let summary = export_backup_core(vault, &state, dest, hooks)
+            let summary = export_backup_core(vault, &state, &noop_lifecycle_hooks(), dest, hooks)
                 .await
                 .expect("export");
 
@@ -688,7 +719,8 @@ mod tests {
                 cancelled: Some(flag),
             };
             assert!(matches!(
-                export_backup_core(vault, &state, dest.clone(), hooks).await,
+                export_backup_core(vault, &state, &noop_lifecycle_hooks(), dest.clone(), hooks)
+                    .await,
                 Err(BackupExportError::Cancelled)
             ));
             assert!(!dest.exists(), "cancel must discard partial output");

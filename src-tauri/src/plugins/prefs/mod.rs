@@ -253,9 +253,14 @@ mod desktop_tests {
 
             let mut reg = TokenRegistry::new();
             let token = reg.issue(EXT).unwrap();
-            persist_paired_extensions_with_dir(tmp.path(), &state, reg.to_paired_extensions())
-                .await
-                .expect("persist issued");
+            persist_paired_extensions_with_dir(
+                tmp.path(),
+                &state,
+                &clamp_hooks(),
+                reg.to_paired_extensions(),
+            )
+            .await
+            .expect("persist issued");
 
             let view = prefs_read_with_dir(tmp.path(), &state).await.expect("read");
             assert_eq!(view.paired_extensions.len(), 1);
@@ -266,9 +271,14 @@ mod desktop_tests {
             );
 
             reg.revoke_extension(EXT);
-            persist_paired_extensions_with_dir(tmp.path(), &state, reg.to_paired_extensions())
-                .await
-                .expect("persist revoked");
+            persist_paired_extensions_with_dir(
+                tmp.path(),
+                &state,
+                &clamp_hooks(),
+                reg.to_paired_extensions(),
+            )
+            .await
+            .expect("persist revoked");
             let view = prefs_read_with_dir(tmp.path(), &state).await.expect("read");
             let restored = TokenRegistry::from_paired_extensions(&view.paired_extensions);
             let gate = RegistryGate::new(&restored, EXT, token.value());
@@ -289,9 +299,13 @@ mod desktop_tests {
             let state = VaultRuntimeState::default(); // never unlocked
             let mut reg = TokenRegistry::new();
             reg.issue(EXT).unwrap();
-            let result =
-                persist_paired_extensions_with_dir(tmp.path(), &state, reg.to_paired_extensions())
-                    .await;
+            let result = persist_paired_extensions_with_dir(
+                tmp.path(),
+                &state,
+                &clamp_hooks(),
+                reg.to_paired_extensions(),
+            )
+            .await;
             assert!(matches!(
                 result,
                 Err(myne_core::plugins::prefs::error::PrefsWriteError::SlotNotUnlocked)
