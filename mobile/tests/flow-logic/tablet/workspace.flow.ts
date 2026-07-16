@@ -67,13 +67,13 @@ test.describe("tablet workspace layout", () => {
     // sidebar collapses too on expanded).
     await page.getByTestId("notes.row").first().click();
     await expect(page.getByTestId("editor.top-bar")).toBeVisible();
-    await expect(page.getByTestId("workspace.list-pane")).toHaveCount(0);
-    if (isExpanded(page)) {
-      await expect(page.getByTestId("workspace.sidebar")).toHaveCount(0);
-    }
+    // The pane stays mounted for the width animation — the collapsed state rides
+    // on `data-collapsed` (width 0), not an unmount.
+    await expect(page.getByTestId("workspace.list-pane")).toHaveAttribute("data-collapsed", "true");
 
     // The EditorTopBar toggle brings the list back.
     await page.getByTestId("editor.toggle-list").click();
+    await expect(page.getByTestId("workspace.list-pane")).not.toHaveAttribute("data-collapsed", "true");
     await expect(page.getByTestId("workspace.list-pane")).toBeVisible();
   });
 

@@ -37,7 +37,10 @@ export function TabBar({
         display: "flex",
         borderTop: "1px solid var(--line-1)",
         background: "var(--bg-1)",
-        padding: "8px 0 max(30px, env(safe-area-inset-bottom))",
+        // Height matched to the editor FormatBar (~52px + safe-area) so the two
+        // bottom bars line up on the tablet split — was taller via an 8px top +
+        // 30px floor.
+        padding: "6px 0 calc(6px + env(safe-area-inset-bottom, 0px))",
       }}
     >
       <button onClick={onNotes} aria-label={t("notes.list.notesHeading")} style={tab}>

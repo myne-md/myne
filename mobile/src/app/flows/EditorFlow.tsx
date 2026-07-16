@@ -285,6 +285,45 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
   useEffect(() => {
     setPanesRevealed(false);
   }, [editing?.id]);
+
+  // Flush the open note to disk when the app is BACKGROUNDED / hidden. Mobile
+  // otherwise persists only on an explicit exit (back / swipe-back / switching
+  // notes) — but a drawing has no such exit on tablet (you just draw and leave),
+  // so an edit was lost to an app suspend/kill before it ever hit disk (and thus
+  // never synced). This closes that window: best-effort + detached; the foreground
+  // sync loop pushes it on resume. `flushRef` reads the latest state so the
+  // listeners register once. A brand-new note is create-flushed at most once
+  // (guarded) to avoid duplicate blobs across repeated backgrounding.
+  const newNoteFlushedRef = useRef(false);
+  useEffect(() => {
+    newNoteFlushedRef.current = false;
+  }, [editing?.id]);
+  const flushRef = useRef<() => void>(() => {});
+  flushRef.current = () => {
+    if (!HAS_TAURI || !editing) return;
+    const stamped = stampUpdated(editorText);
+    if (editing.id != null) {
+      void noteUpdate(editing.id, stamped).catch(() => {});
+    } else if (editorText.trim() !== "" && !newNoteFlushedRef.current) {
+      newNoteFlushedRef.current = true;
+      void noteCreate(stamped).catch(() => {
+        newNoteFlushedRef.current = false;
+      });
+    }
+  };
+  useEffect(() => {
+    const onHidden = () => {
+      if (document.visibilityState === "hidden") flushRef.current();
+    };
+    const onHide = () => flushRef.current();
+    document.addEventListener("visibilitychange", onHidden);
+    window.addEventListener("pagehide", onHide);
+    return () => {
+      document.removeEventListener("visibilitychange", onHidden);
+      window.removeEventListener("pagehide", onHide);
+    };
+  }, []);
+
   // Compact-only left-edge swipe-back: same semantics as the top-bar chevron
   // (autosave + return to the list), same busy guard. `saveNote` is a hoisted
   // function declaration, so referencing it here is fine.
@@ -2380,7 +2419,10 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
   return (
     <Screen>
       <div data-testid="workspace.split" style={{ flex: 1, minHeight: 0, display: "flex" }}>
-        {sizeClass === "expanded" && !panesCollapsed && (
+        {sizeClass === "expanded" && (
+          <div
+            style={{ width: panesCollapsed ? 0 : 248, flex: "none", minHeight: 0, overflow: "hidden", transition: "width 220ms cubic-bezier(0.4, 0, 0.2, 1)" }}
+          >
           <SidebarPane
             label={vaultDisplayLabel(prefs.label)}
             tab={tab}
@@ -2397,17 +2439,28 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
             onSwitcher={() => setSwitcherOpen(true)}
             onSettings={() => setSettingsOpen(true)}
           />
+          </div>
         )}
         {tab === "notes" ? (
           <>
-            {!panesCollapsed && (
-              <div
-                data-testid="workspace.list-pane"
-                style={{ width: sizeClass === "expanded" ? 316 : 340, flex: "none", minHeight: 0, display: "flex", flexDirection: "column", borderRight: "1px solid var(--line-1)" }}
-              >
-                {renderNotesPane({ header: sizeClass === "medium", tabBar: sizeClass === "medium" })}
-              </div>
-            )}
+            {/* Always mounted so the collapse ANIMATES its width (0 ⇄ pane) rather
+                than snapping; `data-collapsed` is the state hook for tests. */}
+            <div
+              data-testid="workspace.list-pane"
+              data-collapsed={panesCollapsed || undefined}
+              style={{
+                width: panesCollapsed ? 0 : sizeClass === "expanded" ? 316 : 340,
+                flex: "none",
+                minHeight: 0,
+                display: "flex",
+                flexDirection: "column",
+                borderRight: panesCollapsed ? "none" : "1px solid var(--line-1)",
+                overflow: "hidden",
+                transition: "width 220ms cubic-bezier(0.4, 0, 0.2, 1)",
+              }}
+            >
+              {renderNotesPane({ header: sizeClass === "medium", tabBar: sizeClass === "medium" })}
+            </div>
             <div data-testid="workspace.detail-pane" style={{ flex: 1, minWidth: 0, minHeight: 0, display: "flex", flexDirection: "column" }}>
               {editing ? renderEditorPane() : <EmptyDetail onNew={newNote} />}
             </div>
