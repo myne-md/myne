@@ -42,10 +42,7 @@ fn push_u16_prefixed(out: &mut Vec<u8>, s: &str) {
 /// codec seals.
 pub fn frame_record(filename: &str, mime: &str, file_bytes: &[u8]) -> Vec<u8> {
     let mut out = Vec::with_capacity(
-        2 + filename.len().min(MAX_HINT_LEN)
-            + 2
-            + mime.len().min(MAX_HINT_LEN)
-            + file_bytes.len(),
+        2 + filename.len().min(MAX_HINT_LEN) + 2 + mime.len().min(MAX_HINT_LEN) + file_bytes.len(),
     );
     push_u16_prefixed(&mut out, filename);
     push_u16_prefixed(&mut out, mime);

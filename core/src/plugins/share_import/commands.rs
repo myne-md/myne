@@ -84,7 +84,8 @@ pub fn seal_share_in_dir(
     queue::ensure_dir(sealed)?;
     let mut id = [0u8; 16];
     getrandom(&mut id).map_err(|_| ShareImportError::Backend)?;
-    let blob = encode_share_import_blob(key, &id, &framed).map_err(|_| ShareImportError::Backend)?;
+    let blob =
+        encode_share_import_blob(key, &id, &framed).map_err(|_| ShareImportError::Backend)?;
     let out = sealed.join(queue::hex_lower(&id));
     crate::atomic_write::atomic_write_private(&out, &blob, true).map_err(io)?;
     Ok(Some(id))
@@ -328,7 +329,8 @@ mod tests {
     fn tmp() -> std::path::PathBuf {
         let mut sfx = [0u8; 8];
         getrandom(&mut sfx).unwrap();
-        let d = std::env::temp_dir().join(format!("myne-share-import-test-{}", queue::hex_lower(&sfx)));
+        let d =
+            std::env::temp_dir().join(format!("myne-share-import-test-{}", queue::hex_lower(&sfx)));
         std::fs::create_dir_all(&d).unwrap();
         d
     }
@@ -374,21 +376,35 @@ mod tests {
         )
         .unwrap();
         // A byte file with NO meta (extension crashed mid-write) — must still seal.
-        std::fs::write(staging.join("22222222-2222-2222-2222-222222222222"), b"hello").unwrap();
+        std::fs::write(
+            staging.join("22222222-2222-2222-2222-222222222222"),
+            b"hello",
+        )
+        .unwrap();
 
         let n = seal_staged_in_dir(&staging, &sealed, &KEY).unwrap();
         assert_eq!(n, 2, "both staged files sealed");
-        assert_eq!(queue::list_files(&staging).len(), 0, "staging drained (plaintext deleted)");
+        assert_eq!(
+            queue::list_files(&staging).len(),
+            0,
+            "staging drained (plaintext deleted)"
+        );
         assert_eq!(queue::list_files(&sealed).len(), 2, "two MYF1 blobs");
 
         // The sealed blobs drain + unframe correctly, meta preserved.
         let staged = drain_in_dir(&sealed, &KEY).unwrap();
         assert_eq!(staged.len(), 2);
-        let png = staged.iter().find(|s| s.filename == "photo.png").expect("photo.png");
+        let png = staged
+            .iter()
+            .find(|s| s.filename == "photo.png")
+            .expect("photo.png");
         assert_eq!(png.mime, "image/png");
         assert_eq!(png.bytes.as_slice(), &bytes);
         // The meta-less entry got the defaults.
-        let dflt = staged.iter().find(|s| s.filename == "shared").expect("default-named");
+        let dflt = staged
+            .iter()
+            .find(|s| s.filename == "shared")
+            .expect("default-named");
         assert_eq!(dflt.mime, "application/octet-stream");
         assert_eq!(dflt.bytes.as_slice(), b"hello");
         let _ = std::fs::remove_dir_all(&root);
@@ -407,9 +423,11 @@ mod tests {
         // Over-cap framed plaintext → dropped (None). Build a file that pushes
         // the framed record just past the cap.
         let big = vec![0x61u8; MAX_SHARE_IMPORT_PLAINTEXT_LEN + 1];
-        assert!(seal_share_in_dir(&sealed, &KEY, "big.bin", "application/octet-stream", &big)
-            .unwrap()
-            .is_none());
+        assert!(
+            seal_share_in_dir(&sealed, &KEY, "big.bin", "application/octet-stream", &big)
+                .unwrap()
+                .is_none()
+        );
 
         assert_eq!(queue::list_files(&sealed).len(), 0, "neither was sealed");
         let _ = std::fs::remove_dir_all(&root);
@@ -419,7 +437,14 @@ mod tests {
     fn wrong_key_entry_is_dropped_not_errored() {
         let root = tmp();
         let sealed = root.join("sealed");
-        seal_share_in_dir(&sealed, &KEY, "s.dat", "application/octet-stream", b"secret").unwrap();
+        seal_share_in_dir(
+            &sealed,
+            &KEY,
+            "s.dat",
+            "application/octet-stream",
+            b"secret",
+        )
+        .unwrap();
 
         // Drain under a DIFFERENT key → the entry is undecryptable, so it is
         // dropped (empty result, file removed) rather than surfacing an error.

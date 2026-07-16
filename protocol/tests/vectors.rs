@@ -3859,9 +3859,7 @@ fn share_import_vectors() {
                 let expected = hex_decode(
                     case["expected_share_import_blob_hex"]
                         .as_str()
-                        .unwrap_or_else(|| {
-                            panic!("[{id}] missing expected_share_import_blob_hex")
-                        }),
+                        .unwrap_or_else(|| panic!("[{id}] missing expected_share_import_blob_hex")),
                 );
 
                 let actual = encode_share_import_blob_raw(&wrap_key, &share_id, &plaintext, &nonce)
