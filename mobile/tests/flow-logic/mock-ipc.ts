@@ -105,6 +105,14 @@ export interface MockConfig {
     string,
     Array<[string, { key: string; type: string; value?: string; elements?: Array<{ type: string; value: string }> }]>
   >;
+  /** Make `vault_indices_all_edges` reject so the graph falls back to
+   *  client-extracted wikilink edges over the seeded `notes` bodies (the graph
+   *  flow's edge source — real extraction, no canned edge dump to drift). */
+  backendEdgesUnavailable?: boolean;
+  /** Canned `graph_layout_read` payload — the encrypted `vault.graph` cache's
+   *  plaintext (`{"v":1,"pos":[[id,x,y],…]}`), or `null` for a cold vault.
+   *  Writes are recorded on `window.__graphLayoutWrites` (payload strings). */
+  graphLayoutPayload?: string | null;
 }
 
 /** Install the mock IPC as an init script so it runs before the app's first paint. */
@@ -231,6 +239,21 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
       // fall back to the drawing flow's `noteIds`-only seed.
       "plugin:notes|note_list": () =>
         seededNotes.length > 0 ? seededNotes.map((n) => n.id) : config.noteIds ?? [],
+      // ── Vault-indices graph surface ──
+      // Default [] keeps `backendEdges` an empty dump (degree-0 graph); the
+      // graph flow sets `backendEdgesUnavailable` so the sweep rejects and
+      // EditorFlow falls back to `clientEdges` over the seeded bodies.
+      "plugin:vault-indices|vault_indices_all_edges": () => {
+        if (config.backendEdgesUnavailable) throw { kind: "unavailable" };
+        return [];
+      },
+      // ── Graph-layout persistence (vault.graph MYG1 cache) ──
+      "plugin:graph-layout|graph_layout_read": () => config.graphLayoutPayload ?? null,
+      "plugin:graph-layout|graph_layout_write": (args) => {
+        const w = window as unknown as { __graphLayoutWrites?: string[] };
+        (w.__graphLayoutWrites ??= []).push(String(args.payload ?? ""));
+        return null;
+      },
       // ── Vault-indices property surface (saved-view property conditions) ──
       "plugin:vault-indices|vault_indices_property_keys": () => config.propertyKeys ?? [],
       "plugin:vault-indices|vault_indices_property_values": (args) =>
