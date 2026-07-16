@@ -133,6 +133,12 @@ pub use embeddings_blob::{
     MAX_EMBEDDINGS_PLAINTEXT_LEN,
 };
 pub use error::ProtocolError;
+pub use graph_layout_blob::{
+    decode_graph_layout_blob, encode_graph_layout_blob, encode_graph_layout_blob_raw,
+    GraphLayoutBlobError, GRAPH_LAYOUT_BLOB_ACCOUNT_HASH_LEN, GRAPH_LAYOUT_BLOB_FORMAT_VERSION,
+    GRAPH_LAYOUT_BLOB_HEADER_LEN, GRAPH_LAYOUT_BLOB_MAGIC, GRAPH_LAYOUT_BLOB_PROTOCOL_VERSION,
+    MAX_GRAPH_LAYOUT_PLAINTEXT_LEN,
+};
 pub use kdf::{
     derive_password_wrap_key, derive_recovery_wrap_key, derive_recovery_wrap_key_from_normalized,
     ARGON2_OUTPUT_LEN, ARGON2_SALT_LEN,
@@ -196,12 +202,6 @@ pub use vault_meta::{
     VaultMeta, VAULT_META_ACCOUNT_HASH_LEN, VAULT_META_ITEMS_KEY_ID_LEN, VAULT_META_LEN,
     VAULT_META_MAGIC, VAULT_META_NONCE_LEN, VAULT_META_PROTOCOL_VERSION, VAULT_META_RESERVED,
     VAULT_META_SALT_RANDOM_LEN, VAULT_META_WRAPPED_ITEMS_KEY_LEN, VAULT_META_WRAPPED_ROOT_KEY_LEN,
-};
-pub use graph_layout_blob::{
-    decode_graph_layout_blob, encode_graph_layout_blob, encode_graph_layout_blob_raw,
-    GraphLayoutBlobError, GRAPH_LAYOUT_BLOB_ACCOUNT_HASH_LEN, GRAPH_LAYOUT_BLOB_FORMAT_VERSION,
-    GRAPH_LAYOUT_BLOB_HEADER_LEN, GRAPH_LAYOUT_BLOB_MAGIC, GRAPH_LAYOUT_BLOB_PROTOCOL_VERSION,
-    MAX_GRAPH_LAYOUT_PLAINTEXT_LEN,
 };
 pub use workspace_blob::{
     decode_workspace_blob, encode_workspace_blob, encode_workspace_blob_raw, WorkspaceBlobError,

@@ -342,10 +342,8 @@ fn main() {
             // command needs a matching `commands.allow` entry in
             // `permissions/graph-layout/default.toml` or the ACL resolver
             // never authorizes the `plugin:graph-layout|<cmd>` invoke.
-            tauri_build::InlinedPlugin::new().commands(&[
-                "graph_layout_read",
-                "graph_layout_write",
-            ]),
+            tauri_build::InlinedPlugin::new()
+                .commands(&["graph_layout_read", "graph_layout_write"]),
         )
         .plugin(
             "spell",
