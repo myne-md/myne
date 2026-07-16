@@ -55,6 +55,28 @@ test.describe("tablet workspace layout", () => {
     await expect(page.getByTestId("workspace.empty-detail")).toHaveCount(0);
   });
 
+  test("focusing an existing note collapses the left panes; the top-bar toggle reveals them", async ({ page }) => {
+    // Seed one existing note so we can focus a saved note (a brand-new note
+    // deliberately keeps the list up — see the previous test).
+    await installMockIpc(page, { syncStatus: { state: "idle" }, noteIds: ["n1"] });
+    await page.goto("/");
+    await expect(page.getByTestId("workspace.split")).toBeVisible();
+    await expect(page.getByTestId("workspace.list-pane")).toBeVisible();
+
+    // Open it → the left panes collapse so the editor gets the full width (the
+    // sidebar collapses too on expanded).
+    await page.getByTestId("notes.row").first().click();
+    await expect(page.getByTestId("editor.top-bar")).toBeVisible();
+    // The pane stays mounted for the width animation — the collapsed state rides
+    // on `data-collapsed` (width 0), not an unmount.
+    await expect(page.getByTestId("workspace.list-pane")).toHaveAttribute("data-collapsed", "true");
+
+    // The EditorTopBar toggle brings the list back.
+    await page.getByTestId("editor.toggle-list").click();
+    await expect(page.getByTestId("workspace.list-pane")).not.toHaveAttribute("data-collapsed", "true");
+    await expect(page.getByTestId("workspace.list-pane")).toBeVisible();
+  });
+
   test("sidebar navigation drives the full-width tabs and the list slices (expanded only)", async ({ page }) => {
     test.skip(!isExpanded(page), "sidebar renders only on the expanded size class");
     await bootToWorkspace(page);

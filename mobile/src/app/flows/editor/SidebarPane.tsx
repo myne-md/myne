@@ -119,16 +119,6 @@ export function SidebarPane({
         </svg>
       </button>
 
-      {/* Search — opens the command palette (SC-01), same as the header glass. */}
-      <button
-        data-testid="sidebar.search"
-        onClick={onSearch}
-        style={{ display: "flex", alignItems: "center", gap: 8, height: 34, border: "1px solid var(--line-2)", borderRadius: 8, background: "var(--bg-1)", color: "var(--fg-3)", padding: "0 10px", fontFamily: "var(--font-sans)", fontSize: 13, cursor: "pointer", textAlign: "left" }}
-      >
-        <Icon name="search" size={15} color="var(--fg-3)" strokeWidth={1.7} />
-        {t("notes.filterBuilder.type.search")}
-      </button>
-
       <div style={{ marginTop: 12, flex: 1, minHeight: 0, overflowY: "auto" }}>
         <NavItem
           testid="sidebar.nav-notes"
@@ -136,6 +126,14 @@ export function SidebarPane({
           active={tab === "notes" && listView === "notes"}
           onClick={onAllNotes}
           icon={<svg width="17" height="17" viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="2.5" {...gi} /><path d="M9 8h6M9 12h6M9 16h3" {...gi} /></svg>}
+        />
+        {/* Search — a plain nav button under All Notes that opens the full command
+            palette (SC-01), not an inline search field. */}
+        <NavItem
+          testid="sidebar.search"
+          label={t("notes.filterBuilder.type.search")}
+          onClick={onSearch}
+          icon={<svg width="17" height="17" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7" {...gi} /><path d="M21 21l-4.3-4.3" {...gi} /></svg>}
         />
         <NavItem
           testid="sidebar.nav-graph"
@@ -192,16 +190,14 @@ export function SidebarPane({
           out of the general UI into Settings → Sync (MYND-481). */}
       <div
         data-testid="sidebar.footer"
-        style={{ flex: "none", display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8, borderTop: "1px solid var(--line-1)", padding: "10px 10px calc(10px + env(safe-area-inset-bottom, 0px))" }}
+        style={{ flex: "none", borderTop: "1px solid var(--line-1)", paddingTop: 8, paddingBottom: "calc(8px + env(safe-area-inset-bottom, 0px))" }}
       >
-        <button
-          data-testid="sidebar.settings"
+        <NavItem
+          testid="sidebar.settings"
+          label={t("editor.chrome.barItems.settings")}
           onClick={onSettings}
-          aria-label={t("editor.chrome.barItems.settings")}
-          style={{ width: 34, height: 34, borderRadius: 8, border: "none", background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
-        >
-          <Icon name="settings" size={19} color="var(--fg-2)" strokeWidth={1.7} />
-        </button>
+          icon={<Icon name="settings" size={17} color="var(--fg-2)" strokeWidth={1.7} />}
+        />
       </div>
     </div>
   );
