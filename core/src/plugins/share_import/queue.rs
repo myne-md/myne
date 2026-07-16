@@ -1,19 +1,24 @@
 // SPDX-License-Identifier: AGPL-3.0
 //! Device-local on-disk layout for the share-import staging queue.
 //!
-//! One directory under `<app_data_dir>/pending-shares/`:
+//! Directories under `<app_data_dir>/pending-shares/` (on iOS, under the shared
+//! App-Group container instead):
 //! - `sealed/` — `MYF1` blobs (`protocol::share_import_blob`), one per shared
 //!   file, named by the hex `share_id`; drained by
 //!   [`super::commands::drain_in_dir`].
+//! - `staging/` — **iOS only**, plaintext files the Share Extension drops (raw
+//!   bytes + a `.meta` sidecar); the app seals each into `sealed/` and deletes
+//!   the plaintext on the next drain ([`super::commands::seal_staged_in_dir`]).
 //!
-//! Unlike `captures` there is **no plaintext `staging/` directory**: the seal is
-//! synchronous-at-arrival (the iOS extension seals in-process; the Android
-//! Kotlin plugin hands bytes straight to the Rust seal), so a shared file's
-//! plaintext exists only transiently in RAM before sealing (§ 9.19.4), never as
-//! a persistent plaintext file.
+//! iOS uses **plaintext-staging** (like the watch-capture staging file, § 9.18.4
+//! / § 9.19.4): the extension can't practically link the crypto, so it stages
+//! plaintext (protected at rest by iOS Data Protection in the App-Group
+//! container) and the app seals. Android has no `staging/` directory — its
+//! `ACTION_SEND` receiver hands the bytes to the WebView, which seals straight
+//! into `sealed/` (§ 9.19.1); the plaintext is a RAM + WebView-transit transient.
 //!
 //! The queue is device-global (NOT per-vault): it is created while the vault is
-//! locked and drains into whichever vault unlocks first (§ 9.19.5).
+//! locked and drains into whichever vault unlocks first (§ 9.19.4).
 
 use crate::io_failure_kind::from_io_error_kind;
 use crate::plugins::share_import::error::ShareImportError;

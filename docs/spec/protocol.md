@@ -1946,7 +1946,10 @@ A file shared into Myne via the OS share sheet (iOS Share Extension / Android `A
 
 #### 9.19.1 Layout
 
-`<app-container>/pending-shares/sealed/` holds `MYF1` blobs named by the hex `share_id`. Unlike §9.18 there is **no plaintext `staging/` directory**: the seal is synchronous-at-arrival (the iOS extension seals in-process via a linked codec; the Android native side hands bytes straight to the Rust seal), so a shared file's plaintext exists only transiently in RAM before sealing (§9.19.4), never as a persistent plaintext file. On iOS the `sealed/` directory resolves to the shared **App Group** container so the extension (writer) and the app drain (reader) agree.
+`<app-container>/pending-shares/sealed/` holds `MYF1` blobs named by the hex `share_id`. How a shared file reaches `sealed/` differs per platform:
+
+- **iOS — plaintext-staging (like §9.18.4).** The Share Extension is a separate sandboxed process that cannot practically link the Rust crypto (doing so pulls the whole WebView runtime into a ~105 MiB extension the OS jetsams on launch), so it does **not** seal in-process. Instead it writes each shared file's bytes plus a `.meta` sidecar as **plaintext** into `<app-group>/pending-shares/staging/` (with `.completeFileProtection`, so iOS encrypts it at rest while the device is locked); the **app** seals each staged file into an `MYF1` blob under `sealed/` and deletes the plaintext on next open. This is the same native-side-stages-plaintext / app-seals pattern as the §9.18.4 watch-capture staging file (a persistent OS-Data-Protection-only plaintext window, not a RAM-only transient). On iOS both directories resolve to the shared **App Group** container so the extension (writer) and the app (reader/sealer) agree.
+- **Android — no persistent plaintext file.** The `ACTION_SEND` receiver reads the `content://` bytes, base64-encodes them, and delivers them to the WebView as a `share-intent` event; the JS layer invokes `seal_share`, which seals straight into `sealed/`. There is no `staging/` directory on Android — the plaintext exists only transiently in RAM (and, en route, as a base64 string that crosses the WebView; see §9.19.4).
 
 #### 9.19.2 Key
 
@@ -1960,7 +1963,12 @@ Header (49 bytes): `magic "MYF1"(4) ∥ protocol_version 0x01(1) ∥ share_id(16
 
 Implementations MUST reject `ciphertext_len > 67108864 + 32` (64 MiB plaintext cap + 32-byte CTX tag) before allocating. The seal drops any entry whose framed plaintext exceeds the cap (no poison-oversize entry that re-fails every drain). Drain is **at-least-once**: the client decrypts each entry, imports it via `attachment_import` (§9.9), then deletes the entry; a crash between import and delete re-drains into a content-addressed dedup hit (harmless). Landing is the active unlocked vault (as §9.18, "whichever vault unlocks first"). The queue never syncs and is never in a backup (TB2).
 
-**Transient plaintext (carve-out).** The shared bytes exist as plaintext in OS-Data-Protection-only transients *before* sealing: on Android the sender's `content://` stream read into RAM by the native receiver; on iOS the in-extension buffer (no App-Group plaintext hand-off — the seal happens in-process). These are short-lived, contain only the just-shared file (never existing vault content), and are enumerated in [`../threat-model.md`](../threat-model.md), analogous to the §9.18.4 carve-out.
+**Transient plaintext (carve-out).** The shared bytes exist as plaintext, protected only by OS Data Protection, *before* they are sealed into `MYF1`:
+
+- **iOS: a persistent plaintext staging file.** The Share Extension writes the file's bytes + a `.meta` sidecar into `<app-group>/pending-shares/staging/` (`.completeFileProtection`), where it persists until the app next opens, seals it, and deletes it — the same at-rest plaintext window as the §9.18.4 watch-capture staging file, not a RAM-only transient. Device-local, in the App-Group container, never synced.
+- **Android: a RAM + WebView-transit transient.** The `content://` bytes are read into RAM by the native receiver and cross the WebView as a base64 string (§9.19.1) before `seal_share` seals them; no persistent plaintext file is written.
+
+Both hold only the just-shared file (never existing vault content), are device-local, and are enumerated in [`../threat-model.md`](../threat-model.md) (AS19), analogous to the §9.18.4 carve-out.
 
 ## 10. Protocol Versioning & Migration
 

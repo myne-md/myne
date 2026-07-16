@@ -2479,18 +2479,30 @@ mod tests {
             let a = import_tagged(&tmp, &state, 3).await;
 
             // Within the grace window → withheld.
-            let within =
-                attachment_unused_list_with_dir(tmp.path(), &state, t0 + UNUSED_CLEANUP_GRACE_SECS - 10)
-                    .await
-                    .expect("unused_list");
-            assert!(!within.iter().any(|e| e.id == a), "recent import is withheld");
+            let within = attachment_unused_list_with_dir(
+                tmp.path(),
+                &state,
+                t0 + UNUSED_CLEANUP_GRACE_SECS - 10,
+            )
+            .await
+            .expect("unused_list");
+            assert!(
+                !within.iter().any(|e| e.id == a),
+                "recent import is withheld"
+            );
 
             // Past the grace window → offered for cleanup again.
-            let past =
-                attachment_unused_list_with_dir(tmp.path(), &state, t0 + UNUSED_CLEANUP_GRACE_SECS + 10)
-                    .await
-                    .expect("unused_list");
-            assert!(past.iter().any(|e| e.id == a), "aged-out import is cleanable");
+            let past = attachment_unused_list_with_dir(
+                tmp.path(),
+                &state,
+                t0 + UNUSED_CLEANUP_GRACE_SECS + 10,
+            )
+            .await
+            .expect("unused_list");
+            assert!(
+                past.iter().any(|e| e.id == a),
+                "aged-out import is cleanable"
+            );
         });
     }
 

@@ -80,7 +80,7 @@ pub const SHARE_IMPORT_BLOB_HEADER_LEN: usize = 49;
 /// pipeline. The framed plaintext is `filename_len ∥ filename ∥ mime_len ∥ mime
 /// ∥ file_bytes`, so the actual file is a few hundred bytes under this ceiling.
 /// The decoder rejects `ciphertext_len > MAX_SHARE_IMPORT_PLAINTEXT_LEN + 32`
-/// before allocating. See spec § 9.19.5.
+/// before allocating. See spec § 9.19.4.
 pub const MAX_SHARE_IMPORT_PLAINTEXT_LEN: usize = 64 * 1024 * 1024;
 
 /// Public (pre-decrypt) header field of a share-import blob. Exposed by
