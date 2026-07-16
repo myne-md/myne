@@ -34,10 +34,10 @@ const STAGING_SUBDIR: &str = "staging";
 /// On iOS the share-import queue is NOT under `<app_data_dir>` — it lives in the
 /// shared **App-Group container** (`group.md.myne.mobile`), because the Share
 /// Extension is a *separate process* that cannot see the app's private data
-/// container. The extension seals into `<app-group>/pending-shares/sealed/`
-/// in-process (SYNC-2), and the app's `drain_pending_shares` (this core, run on
-/// unlock) must read the SAME directory — so writer + reader must agree on the
-/// path.
+/// container. The extension stages plaintext into `<app-group>/pending-shares/
+/// staging/` (it links no crypto — §9.19.1); the app's `drain_pending_shares`
+/// (this core, run on unlock) seals each into `sealed/` and reads that SAME
+/// directory — so writer + reader must agree on the path.
 ///
 /// The App-Group container path is not derivable without the OS
 /// (`FileManager.containerURL(forSecurityApplicationGroupIdentifier:)`), so it
