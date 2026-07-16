@@ -4,15 +4,7 @@
 //! the knowledge-graph view's laid-out node positions (the `vault.graph`
 //! rebuildable cache, `MYG1`, `protocol.md` § 9.19). Both Slot::Unlocked-gated;
 //! both borrow the existing `VaultRuntimeState` singleton (registered by
-//! `vault_unlock::init`) via `tauri::State<...>`. The payload is the frontend's
-//! serialized position map + a staleness marker, sealed opaque under
-//! `graph_layout_key = DeriveSubkey(root_key, GraphLayoutKey)` into
-//! `vault.graph`.
-//!
-//! Class 3 rebuildable cache — never synced, never backed up. A device that
-//! lacks it (or finds it stale vs the current index) re-runs the force layout;
-//! this plugin exposes the primitives and the frontend decides cadence
-//! (write after a fresh layout / a node drag; read on graph mount).
+//! `vault_unlock::init`) via `tauri::State<...>`.
 //!
 //! ## Capability ACL
 //!
@@ -21,8 +13,12 @@
 //!
 //! See: ../../CLAUDE.md "Secret-handling logging discipline".
 
-pub mod commands;
-pub mod error;
+// The `graph_layout` command core and its `error` enums moved to `myne-core`
+// (shared with the mobile client — the `prefs`/`snapshots` extraction
+// precedent). Re-exported so existing `crate::plugins::graph_layout::…` paths
+// keep resolving. The `init()` wiring stays desktop-side.
+#[allow(unused_imports)]
+pub use myne_core::plugins::graph_layout::{commands, error};
 
 use tauri::plugin::{Builder, TauriPlugin};
 use tauri::Runtime;

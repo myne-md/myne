@@ -128,7 +128,7 @@ pub async fn graph_layout_read<R: Runtime>(
 }
 
 /// Testable core of [`graph_layout_read`].
-pub(crate) async fn graph_layout_read_with_dir(
+pub async fn graph_layout_read_with_dir(
     vault_dir: &Path,
     state: &VaultRuntimeState,
 ) -> Result<Option<String>, GraphLayoutReadError> {
@@ -166,7 +166,7 @@ pub async fn graph_layout_write<R: Runtime>(
 }
 
 /// Testable core of [`graph_layout_write`].
-pub(crate) async fn graph_layout_write_with_dir(
+pub async fn graph_layout_write_with_dir(
     vault_dir: &Path,
     state: &VaultRuntimeState,
     payload: &str,

@@ -16,6 +16,7 @@
 pub mod attachments;
 pub mod captures;
 pub mod export;
+pub mod graph_layout;
 pub mod notes;
 pub mod prefs;
 pub mod quick_unlock;
