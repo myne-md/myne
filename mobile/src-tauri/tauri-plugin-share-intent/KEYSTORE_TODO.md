@@ -1,6 +1,6 @@
 # Android Keystore device-key for share-import — status & wiring TODO
 
-**Feature:** share-import staging queue (`MYF1`, `spec/protocol.md` §9.19), SF3 / SYNC-3.
+**Feature:** share-import staging queue (`MYF1`, `spec/protocol.md` §9.20), SF3 / SYNC-3.
 **Status of the Android device key:** **seam implemented (Kotlin + plugin-side Rust), NOT wired into `myne-core`** — the last hop needs a shared-core signature change (an `AppHandle` threaded into `core`'s `device_key::get_or_create`), which is out of scope for this change per the task's "STOP and document" gate.
 
 ## Why a native provider is needed at all

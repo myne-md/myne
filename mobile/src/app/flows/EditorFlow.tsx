@@ -873,7 +873,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
   // the queue is empty; refresh the list if it created any so they appear.
   useEffect(() => {
     const runDrain = () => {
-      // Share-import drain (§9.19, SYNC-4/6): decrypt + import any files shared
+      // Share-import drain (§9.20, SYNC-4/6): decrypt + import any files shared
       // via the OS share sheet into the attachment library, host-side. A sibling
       // of the capture drain — independent (it refreshes the library, not the
       // notes list) and self-serialising; its SF5 toast is rendered by
@@ -2310,7 +2310,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
   // that. ─────────────────────────────────────────────────────────────────────
   const renderSharedOverlays = () => (
     <>
-      {/* SF5 share-import confirmation toast (§9.19, SYNC-18) — self-contained,
+      {/* SF5 share-import confirmation toast (§9.20, SYNC-18) — self-contained,
           listens for the drain result; renders in every layout branch. */}
       <ShareImportToast />
       {purgeId != null && (

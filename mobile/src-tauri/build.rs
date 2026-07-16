@@ -92,7 +92,7 @@ fn main() {
                 tauri_build::InlinedPlugin::new().commands(&["seal_staged", "take_pending", "ack"]),
             )
             .plugin(
-                // Share-import staging queue (MYF1, §9.19): device-key sealed
+                // Share-import staging queue (MYF1, §9.20): device-key sealed
                 // files shared via the OS share sheet, drained into the
                 // attachment library on unlock. Adding a command here without a
                 // matching entry in `permissions/share-import/default.toml` is a
@@ -255,7 +255,7 @@ fn main() {
     )
     .expect("failed to update AndroidManifest.xml");
 
-    // Share-import (SF3, §9.19): register Myne as an OS share target. The
+    // Share-import (SF3, §9.20): register Myne as an OS share target. The
     // ACTION_SEND / ACTION_SEND_MULTIPLE intent-filters go ON MainActivity
     // (singleTask) so a share to a live process is delivered to onNewIntent and
     // a cold-launch share foregrounds the app — the in-repo Kotlin plugin
@@ -265,7 +265,7 @@ fn main() {
     // cannot act on, and EXTRA_TEXT is out of scope. NO <uses-permission> — the
     // sender grants a transient FLAG_GRANT_READ_URI_PERMISSION on the URI.
     tauri_utils::build::update_android_manifest(
-        "MYNE SHARE TARGET (share-import, §9.19)",
+        "MYNE SHARE TARGET (share-import, §9.20)",
         "activity",
         r#"<intent-filter>
                 <action android:name="android.intent.action.SEND" />

@@ -27,7 +27,7 @@ pub mod quick_unlock;
 // guard + error enum) lives in `myne-core`; this is a thin re-export wrapper
 // with a mobile `init()`.
 pub mod secret_export;
-// Share-import staging queue (MYF1, §9.19): a thin re-export wrapper over
+// Share-import staging queue (MYF1, §9.20): a thin re-export wrapper over
 // `myne_core::plugins::share_import` (device-key seal + host-side drain into the
 // attachment library). Files shared via the OS share sheet (SF2 iOS extension /
 // SF3 Android intent) are sealed here while locked and drained on unlock.
