@@ -128,11 +128,61 @@ describe("filterNodeToDraft (parse) + node→draft→node identity", () => {
       ],
     });
   });
+
+  it("round-trips a bare property leaf under every engine operator", () => {
+    const ops = ["==", "!=", ">", "<", ">=", "<=", "contains"] as const;
+    for (const op of ops) {
+      roundTrips({ kind: "property", key: "status", op, value: "done" });
+    }
+  });
+
+  it("round-trips a flat AND mixing tag and property leaves (Tags shape + property)", () => {
+    roundTrips({
+      kind: "and",
+      children: [
+        { kind: "hasTag", tag: "work" },
+        { kind: "property", key: "status", op: "==", value: "done" },
+      ],
+    });
+  });
+
+  it("round-trips a 2-level AST with a property leaf inside a group", () => {
+    roundTrips({
+      kind: "or",
+      children: [
+        {
+          kind: "and",
+          children: [
+            { kind: "property", key: "rating", op: ">=", value: "4" },
+            { kind: "hasTag", tag: "book" },
+          ],
+        },
+        { kind: "inFolder", path: "Reading" },
+      ],
+    });
+  });
 });
 
 describe("isRepresentable / fail-safe guard", () => {
-  it("classifies a property leaf as unrepresentable (v1.1 forward-compat)", () => {
+  it("classifies a property leaf as representable (builder row: key + op + value)", () => {
     const node: FilterNode = { kind: "property", key: "priority", op: "==", value: "high" };
+    expect(isRepresentable(node)).toBe(true);
+    expect(filterNodeToDraft(node)).toEqual({
+      combinator: "and",
+      groups: [
+        {
+          combinator: "and",
+          conditions: [{ type: "property", key: "priority", op: "==", value: "high" }],
+        },
+      ],
+    });
+  });
+
+  it("classifies not(property) as unrepresentable (the property row has no negation — `!=` covers it)", () => {
+    const node: FilterNode = {
+      kind: "not",
+      child: { kind: "property", key: "priority", op: "==", value: "high" },
+    };
     expect(isRepresentable(node)).toBe(false);
     expect(filterNodeToDraft(node)).toBeNull();
   });
@@ -163,12 +213,12 @@ describe("isRepresentable / fail-safe guard", () => {
     expect(isRepresentable(node)).toBe(false);
   });
 
-  it("classifies a property leaf nested inside a group as unrepresentable", () => {
+  it("classifies not(property) nested inside a group as unrepresentable", () => {
     const node: FilterNode = {
       kind: "and",
       children: [
         { kind: "hasTag", tag: "a" },
-        { kind: "property", key: "k", op: "contains", value: "v" },
+        { kind: "not", child: { kind: "property", key: "k", op: "contains", value: "v" } },
       ],
     };
     expect(isRepresentable(node)).toBe(false);
@@ -180,6 +230,15 @@ describe("isRepresentable / fail-safe guard", () => {
     expect(isRepresentable({ kind: "not", child: { kind: "inFolder", path: "p" } })).toBe(true);
     expect(
       isRepresentable({ kind: "or", children: [{ kind: "search", query: "q" }, { kind: "hasTag", tag: "a" }] }),
+    ).toBe(true);
+    expect(
+      isRepresentable({
+        kind: "and",
+        children: [
+          { kind: "hasTag", tag: "a" },
+          { kind: "property", key: "k", op: "contains", value: "v" },
+        ],
+      }),
     ).toBe(true);
   });
 });
@@ -216,5 +275,37 @@ describe("sanitizeDraft (the live-count + save input)", () => {
     const sanitized = sanitizeDraft(draft);
     expect(sanitized.groups).toEqual([]);
     expect(draftToFilterNode(sanitized)).toEqual({ kind: "all" });
+  });
+
+  it("drops a property condition with a blank key", () => {
+    const draft: FilterDraft = {
+      combinator: "and",
+      groups: [
+        {
+          combinator: "and",
+          conditions: [{ type: "property", key: "  ", op: "==", value: "high" }],
+        },
+      ],
+    };
+    expect(sanitizeDraft(draft).groups).toEqual([]);
+  });
+
+  it("keeps a property condition with a blank VALUE (`== \"\"` / `!= \"\"` are legitimate queries)", () => {
+    const draft: FilterDraft = {
+      combinator: "and",
+      groups: [
+        {
+          combinator: "and",
+          conditions: [{ type: "property", key: "status", op: "!=", value: "" }],
+        },
+      ],
+    };
+    expect(sanitizeDraft(draft)).toEqual(draft);
+    expect(draftToFilterNode(sanitizeDraft(draft))).toEqual({
+      kind: "property",
+      key: "status",
+      op: "!=",
+      value: "",
+    });
   });
 });
