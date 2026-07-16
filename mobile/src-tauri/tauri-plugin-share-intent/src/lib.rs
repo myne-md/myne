@@ -133,8 +133,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
                     SetEventHandlerArgs {
                         handler: Channel::new(move |event| {
                             if let InvokeResponseBody::Json(payload) = event {
-                                if let Ok(p) =
-                                    serde_json::from_str::<ShareIntentPayload>(&payload)
+                                if let Ok(p) = serde_json::from_str::<ShareIntentPayload>(&payload)
                                 {
                                     let _ = app_handle.emit("share-intent", p);
                                 }
