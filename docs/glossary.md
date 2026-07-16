@@ -563,6 +563,10 @@ Myne's pattern for unlocking the vault under either of two independent credentia
 
 Used in: `spec/protocol.md` §3.1, §9.3
 
+### **drawing note** &nbsp; 📦 *Product*
+
+A note whose editing surface is an **Excalidraw canvas** instead of the CodeMirror markdown editor. Stored as an ordinary `.myn` note carrying a value-strict `kind: drawing` frontmatter marker (the 11th Myne-managed canonical field, [`spec/markdown-dialect.md`](spec/markdown-dialect.md) §3.6.1) with the Excalidraw scene serialized into a ` ```excalidraw ` fenced body — so it rides the existing `MY01` envelope with **no protocol change**, syncs/exports like any note, and its text elements are searchable (projected to plain text). Embedded raster images are externalized to attachments (`MYA1`), referenced by a superset `![[att:<id>]]` block so the fail-closed GC never erases a live image. Powered by the vendored, egress-hardened Excalidraw engine (`decisions.md` 2026-07-14). Epic MYND-497.
+
 ### **Ed25519** &nbsp; 🔐 *Primitive*
 
 The EdDSA signature scheme over the twisted Edwards form of Curve25519 (RFC 8032). Not used by Myne's at-rest cryptography in v0.1; reserved for code-signing of releases (`threat-model.md` §3 TB7) and for v005 multi-device identity.

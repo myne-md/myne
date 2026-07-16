@@ -8,10 +8,12 @@
   "exports": {
     ".": "./src/index.ts",
     "./CMEditor": "./src/CMEditor.tsx",
+    "./drawing": "./src/drawing/index.ts",
     "./*": "./src/*.ts"
   },
   "dependencies": {
     "@myne/dialect": "workspace:*",
+    "@excalidraw/excalidraw": "0.18.1",
     "@codemirror/autocomplete": "6.20.3",
     "@codemirror/commands": "6.10.3",
     "@codemirror/lang-css": "6.3.1",

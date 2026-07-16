@@ -167,6 +167,18 @@ One JS dep for the Phase-1 minimal graph view's force-directed layout. Not crypt
 - **Security:** `securityLevel:'strict'` + `htmlLabels:false` → mermaid sanitizes its own SVG via its bundled DOMPurify (no click/script/`<foreignObject>`, no raw-HTML labels). No remote fetch. `threat-model.md` §6.
 - **Mandatory fallback:** parse-error / load-failure → monospace code card (mermaid is never a hard dependency of the render surface).
 
+### Excalidraw drawing canvas (MYND-498, drawing-notes SF1) — `package.json` — ⚠️ RED-FLAG DEPENDENCY
+
+| Dep | Version | Used for | Transitive footprint | License | Justified-by |
+|---|---|---|---|---|---|
+| `@excalidraw/excalidraw` | 0.18.1 (exact-pinned) | Native drawing/canvas note type — the hardened, lazy-loaded Excalidraw shell (`src/drawing/`) | **+119 packages** (`pnpm add` report) — roughjs (already in-tree via mermaid → deduped), its own hand-drawn fonts, etc. | MIT | epic `drawing-notes` (MYND-497); grill 2026-07-14 `excalidraw-embed-hardening` (MYND-498); `decisions.md` override (user-owned, pending) |
+
+- **"The bar" Q1 (hand-roll?):** a whiteboard/canvas engine is not hand-rollable — same class as mermaid/pdf.js/katex. User pre-approved the dependency surface (2026-07-14).
+- **"The bar" Q4 (transitive tree):** RED FLAG by the policy's own ≥50-transitive heuristic (**+119**). roughjs is deduped (already pulled by mermaid). Accepted as a **conscious decision** (user override, 2026-07-14); the `decisions.md` override entry is user-owned and pending (autopilot flags, does not auto-write).
+- **Bundle size:** **lazy-loaded via `React.lazy(() => import(...))`** (`src/drawing/DrawingCanvasLazy.tsx`) — a drawing-free session pays **zero** bytes (verified: `@excalidraw` library code absent from the cold `main` chunk). Now that SF2 wires `<DrawingCanvasLazy>` reachable, the vite build code-splits it into a dedicated **`DrawingCanvas-*.js` ≈ 568 KB** chunk (+ a shared ≈ 520 KB Excalidraw chunk), confirmed out of `main`. (Owed at PR: a byte-stable-across-builds reproducibility check.)
+- **CSP / safety:** no `eval` needed; renders to `<canvas>` (not `innerHTML`), so no DOMPurify pass here; embeddables rejected (`validateEmbeddable: () => false`, SYNC-5); collaboration / library-CDN / image-from-URL / font-CDN all foreclosed by CSP + the self-hosted `EXCALIDRAW_ASSET_PATH`. Fonts self-hosted under `public/excalidraw-assets/fonts` (SIL OFL 1.1, no CDN — reproducible-build-safe).
+- **License artifact:** the repo's first bundled `public/THIRD-PARTY-LICENSES.txt` (Excalidraw MIT + OFL fonts). The whole-npm-tree license CI gate is spun out to **MYND-504**.
+
 ### PDF footer stamping (MYND-255 hotfix) — `src-tauri/Cargo.toml`
 
 | Dep | Version | Used for | Transitive footprint | License | Justified-by |

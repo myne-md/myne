@@ -311,10 +311,21 @@ pub(crate) async fn snapshot_restore_in(
     // Mobile's `MobileHooks` no-ops these search/AI hooks (its index is fed
     // TS-side), so `index_note_attachments` indexes nothing there.
     let title = resolve_note_title(plaintext.as_bytes()).unwrap_or_default();
-    hooks.search_upsert(&note_id, &title, &plaintext);
-    hooks
-        .index_note_attachments(state, &note_id, &title, &plaintext)
-        .await;
+    // MYND-448a: re-index the restored note body UNFOLDED + separate attachment docs.
+    // SF5 (MYND-502): a restored `kind: drawing` note must index its projected
+    // scene text, not the raw ```excalidraw JSON (SYNC-4 body-only) and no
+    // attachment docs — parity with note_create/update/batch, else a restore
+    // repollutes the index.
+    if crate::plugins::notes::drawing_text::is_drawing(plaintext.as_bytes()) {
+        let body = crate::plugins::notes::drawing_text::project_drawing_text(plaintext.as_bytes())
+            .unwrap_or_default();
+        hooks.search_upsert(&note_id, &title, &body);
+    } else {
+        hooks.search_upsert(&note_id, &title, &plaintext);
+        hooks
+            .index_note_attachments(state, &note_id, &title, &plaintext)
+            .await;
+    }
     // MYND-453: keep the live AI embedding index correct too — `note_update`
     // does not fire the re-index hooks itself (its callers do), and this restore
     // path re-indexed search directly above but left the AI vectors stale

@@ -21,6 +21,8 @@ type NewTabChooserProps = {
   onPick: (id: NoteId) => void;
   /** Create a fresh note into the new tab (then inline-rename it). */
   onCreate: () => void;
+  /** Create a fresh drawing (kind: drawing) into the new tab, then inline-rename. */
+  onCreateDrawing: () => void;
   /** When true (the pane still has other tabs), Esc returns to the
    *  previously-active tab. A tabless pane has nowhere to fall back to. */
   cancellable: boolean;
@@ -94,6 +96,7 @@ const EMPTY: CSSProperties = {
 export function NewTabChooser({
   onPick,
   onCreate,
+  onCreateDrawing,
   cancellable,
   onCancel,
 }: NewTabChooserProps) {
@@ -197,14 +200,19 @@ export function NewTabChooser({
           ))
         )}
       </div>
-      <Button
-        variant="primary"
-        icon="plus"
-        onClick={onCreate}
-        style={{ alignSelf: "center", marginTop: 4 }}
-      >
-        {t("notes.newTab.createNote")}
-      </Button>
+      <div style={{ display: "flex", gap: 8, alignSelf: "center", marginTop: 4 }}>
+        <Button variant="primary" icon="plus" onClick={onCreate}>
+          {t("notes.newTab.createNote")}
+        </Button>
+        <Button
+          variant="secondary"
+          icon="pencil"
+          onClick={onCreateDrawing}
+          data-testid="notes.newTab.create-drawing"
+        >
+          {t("notes.newTab.createDrawing")}
+        </Button>
+      </div>
     </div>
   );
 }
