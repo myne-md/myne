@@ -3786,6 +3786,207 @@ fn pending_capture_vectors() {
 }
 
 #[test]
+fn share_import_vectors() {
+    // share_import_blob is NOT re-exported at the crate root (it is a `pub mod`
+    // with no flattened `pub use`), so the codec items are imported via the full
+    // module path — same convention as capture_blob / quick_unlock_blob.
+    use protocol::share_import_blob::{
+        decode_share_import_blob, encode_share_import_blob_raw, ShareImportBlobError,
+    };
+
+    let path = companion_vectors_root()
+        .join("share-import")
+        .join("v0.1")
+        .join("cases.json");
+
+    if !path.exists() {
+        eprintln!(
+            "[skip] share-import: companion repo fixture not present at {}",
+            path.display()
+        );
+        return;
+    }
+
+    let raw = fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
+    let doc: serde_json::Value =
+        serde_json::from_str(&raw).unwrap_or_else(|e| panic!("parse {}: {e}", path.display()));
+
+    assert_eq!(doc["schema"], "share-import");
+    assert_eq!(doc["protocol_version"], "v0.1");
+
+    let cases = doc["cases"].as_array().expect("cases must be a JSON array");
+    assert!(
+        cases.len() >= 11,
+        "share-import must carry at least 11 vectors (2 encrypt + 1 decrypt_ok + 3 decrypt_aead_fail + 5 parse_fail); found {}",
+        cases.len()
+    );
+    assert_unique_vector_ids("share-import", cases);
+
+    let mut seen_kinds = std::collections::HashSet::new();
+    let mut seen_parse_errors = std::collections::HashSet::new();
+
+    for case in cases {
+        let id = case["vector_id"]
+            .as_str()
+            .expect("vector_id must be a string");
+        let case_kind = case["case_kind"]
+            .as_str()
+            .unwrap_or_else(|| panic!("[{id}] missing case_kind"));
+        seen_kinds.insert(case_kind.to_string());
+
+        match case_kind {
+            "encrypt" => {
+                let wrap_key: [u8; 32] = hex_decode_array(
+                    case["input_wrap_key_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing input_wrap_key_hex")),
+                );
+                let share_id: [u8; 16] = hex_decode_array(
+                    case["input_share_id_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing input_share_id_hex")),
+                );
+                let plaintext = hex_decode(
+                    case["input_plaintext_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing input_plaintext_hex")),
+                );
+                let nonce: [u8; 24] = hex_decode_array(
+                    case["input_nonce_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing input_nonce_hex")),
+                );
+                let expected = hex_decode(
+                    case["expected_share_import_blob_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| {
+                            panic!("[{id}] missing expected_share_import_blob_hex")
+                        }),
+                );
+
+                let actual = encode_share_import_blob_raw(&wrap_key, &share_id, &plaintext, &nonce)
+                    .unwrap_or_else(|e| panic!("[{id}] encode failed: {e:?}"));
+
+                assert_eq!(
+                    actual.as_slice(),
+                    expected.as_slice(),
+                    "[{id}] share-import encrypt mismatch ({} bytes)\n  expected_hex: {}\n  actual_hex:   {}",
+                    expected.len(),
+                    hex_encode(&expected),
+                    hex_encode(&actual),
+                );
+            }
+            "decrypt_ok" => {
+                let blob = hex_decode(
+                    case["input_blob_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing input_blob_hex")),
+                );
+                let wrap_key: [u8; 32] = hex_decode_array(
+                    case["input_wrap_key_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing input_wrap_key_hex")),
+                );
+                let expected_plaintext = hex_decode(
+                    case["expected_plaintext_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing expected_plaintext_hex")),
+                );
+
+                let decoded = decode_share_import_blob(&wrap_key, &blob)
+                    .unwrap_or_else(|e| panic!("[{id}] decode failed: {e:?}"));
+
+                assert_eq!(
+                    decoded.as_slice(),
+                    expected_plaintext.as_slice(),
+                    "[{id}] share-import decrypt plaintext mismatch",
+                );
+            }
+            "decrypt_aead_fail" => {
+                let blob = hex_decode(
+                    case["input_blob_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing input_blob_hex")),
+                );
+                let wrap_key: [u8; 32] = hex_decode_array(
+                    case["input_wrap_key_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing input_wrap_key_hex")),
+                );
+
+                match decode_share_import_blob(&wrap_key, &blob) {
+                    Err(ShareImportBlobError::CannotDecrypt) => {}
+                    Err(other) => panic!(
+                        "[{id}] expected ShareImportBlobError::CannotDecrypt (non-distinguishing AEAD failure per spec §6.4), got {other:?}"
+                    ),
+                    Ok(_) => {
+                        panic!("[{id}] expected aead_fail, decode_share_import_blob returned Ok")
+                    }
+                }
+            }
+            "parse_fail" => {
+                let blob = hex_decode(
+                    case["input_blob_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing input_blob_hex")),
+                );
+                let expected_error = case["expected_error"]
+                    .as_str()
+                    .unwrap_or_else(|| panic!("[{id}] missing expected_error"));
+                seen_parse_errors.insert(expected_error.to_string());
+
+                let expected_variant = match expected_error {
+                    "magic_mismatch" => ShareImportBlobError::MagicMismatch,
+                    "protocol_version_mismatch" => ShareImportBlobError::ProtocolVersionMismatch,
+                    "ciphertext_len_overflow" => ShareImportBlobError::CiphertextLenOverflow,
+                    "header_too_short" => ShareImportBlobError::HeaderTooShort,
+                    "ciphertext_truncated" => ShareImportBlobError::CiphertextTruncated,
+                    other => panic!(
+                        "[{id}] unknown expected_error '{other}' — schema enforces enum; update this match arm in lockstep with ShareImportBlobError"
+                    ),
+                };
+
+                // Structural rejects run BEFORE the AEAD stage, so a dummy key
+                // suffices — a port that skips a check surfaces a (wrong)
+                // CannotDecrypt, which this assertion catches.
+                let dummy_key = [0u8; 32];
+                match decode_share_import_blob(&dummy_key, &blob) {
+                    Err(e) if e == expected_variant => {}
+                    Err(other) => panic!(
+                        "[{id}] expected parse_fail '{expected_error}' ({expected_variant:?}), got {other:?}"
+                    ),
+                    Ok(_) => panic!(
+                        "[{id}] expected parse_fail '{expected_error}', decode_share_import_blob returned Ok"
+                    ),
+                }
+            }
+            other => panic!("[{id}] unknown case_kind '{other}' — schema enforces enum"),
+        }
+    }
+
+    let required_kinds: [&str; 4] = ["encrypt", "decrypt_ok", "decrypt_aead_fail", "parse_fail"];
+    for kind in required_kinds {
+        assert!(
+            seen_kinds.contains(kind),
+            "share-import missing every case of case_kind '{kind}' — coverage regression"
+        );
+    }
+    let required_parse_errors: [&str; 5] = [
+        "magic_mismatch",
+        "protocol_version_mismatch",
+        "ciphertext_len_overflow",
+        "header_too_short",
+        "ciphertext_truncated",
+    ];
+    for err in required_parse_errors {
+        assert!(
+            seen_parse_errors.contains(err),
+            "share-import missing parse_fail coverage for ShareImportBlobError '{err}' — every structural reject must be pinned"
+        );
+    }
+}
+
+#[test]
 fn attachment_blob_vectors() {
     use protocol::{
         aad_encrypt_attachment, aad_wrap_attachment_key, compute_attachment_id,

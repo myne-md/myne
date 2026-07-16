@@ -72,6 +72,7 @@ pub mod quick_unlock_blob;
 pub mod saved_view;
 pub mod scram;
 pub mod search_blob;
+pub mod share_import_blob;
 pub mod subkey;
 pub mod template;
 pub mod types;
