@@ -1,0 +1,45 @@
+# In-repo Tauri mobile plugin: the Android OS-share-sheet receiver for the
+# share-import feature (SF3, MYND-511). It is the INBOUND half — a file the user
+# shares INTO Myne from another app via `ACTION_SEND` / `ACTION_SEND_MULTIPLE`
+# (the outbound "share a file OUT" half is `src-tauri/src/share_file.rs`, the
+# opposite direction — do not conflate).
+#
+# Rust-only WebView surface: the plugin exposes ZERO WebView-facing commands
+# (its `setEventHandler` + `getOrCreateDeviceKey` are internal Rust→Kotlin
+# bridges reached via `run_mobile_plugin`, the `tauri-plugin-deep-link`
+# precedent). It therefore needs no permission file, no capability grant, and no
+# `InlinedPlugin` entry in the app's build.rs — same shape as
+# `tauri-plugin-screen-guard`. It delivers each received file to the WebView as
+# a GLOBAL `share-intent` event, which the JS half (`src/lib/shareImport.ts`
+# `initShareIntent`) listens for and forwards to `plugin:share-import|seal_share`
+# (the already-shipped seal command in the separate `share-import` plugin).
+#
+# Kotlin lives in `android/` because `src-tauri/gen` is gitignored — a fresh
+# `tauri android init` cannot clobber this module; the app build wires it in
+# automatically via the `cargo:android_library_path` metadata that
+# `tauri_plugin::Builder` emits (no scripts/android-postinit.sh step needed).
+[package]
+name = "tauri-plugin-share-intent"
+version = "0.1.0"
+description = "Myne mobile — Android OS-share-sheet (ACTION_SEND) receiver for share-import (Rust-only WebView surface)"
+authors = ["Myne"]
+edition = "2021"
+license = "AGPL-3.0"
+# Mandatory for tauri-plugin build scripts (build fails without it) and must
+# equal the crate name exactly.
+links = "tauri-plugin-share-intent"
+
+[build-dependencies]
+# Already in the shared lock (pulled by tauri-plugin-deep-link) — no new crates.
+tauri-plugin = { version = "2", features = ["build"] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde = { version = "1", features = ["derive"] }
+# The Channel closure parses the Kotlin `{filename, mime, dataB64}` JSON before
+# re-emitting it as a global event (the deep-link bridge precedent). Already in
+# the shared lock — no new crate.
+serde_json = "1"
+# Device-key seam holds the returned 32 bytes in a zeroizing buffer. Already in
+# the shared lock (the mobile crate depends on it) — no new crate.
+zeroize = { version = "1.8", features = ["alloc"] }

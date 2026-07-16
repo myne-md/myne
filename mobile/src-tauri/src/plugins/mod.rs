@@ -27,6 +27,11 @@ pub mod quick_unlock;
 // guard + error enum) lives in `myne-core`; this is a thin re-export wrapper
 // with a mobile `init()`.
 pub mod secret_export;
+// Share-import staging queue (MYF1, §9.19): a thin re-export wrapper over
+// `myne_core::plugins::share_import` (device-key seal + host-side drain into the
+// attachment library). Files shared via the OS share sheet (SF2 iOS extension /
+// SF3 Android intent) are sealed here while locked and drained on unlock.
+pub mod share_import;
 // MYS1 full-text search — a NEW local plugin (not a `myne-core` re-export): the
 // index engine lives in `myne_core::search`, but the mobile plugin that drives
 // it is frontend-fed (the WebView pushes the corpus down), so its two commands
