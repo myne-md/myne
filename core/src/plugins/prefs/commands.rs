@@ -160,8 +160,11 @@ fn read_account_number_hash_for_write(
 async fn update_prefs_with_dir(
     vault_dir: &Path,
     state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
     mutate: impl FnOnce(&mut PrefsView),
 ) -> Result<(), PrefsWriteError> {
+    use crate::plugins::sync::prefs_merge::shared_subset_hash;
+
     let _write_guard = write_mutex().lock().await;
 
     // SYNC-6 writer-guard (MYND-32): see state::hold_unlocked_root_key_and_hash.
@@ -189,11 +192,30 @@ async fn update_prefs_with_dir(
         .unwrap_or(0);
     crate::plugins::sync::prefs_merge::stamp_changed_shared_fields(&before, &mut prefs, now_ms);
 
+    // MYND-517: did this write change the SHARED subset? Compared via
+    // `shared_subset_hash` — the §10.2.1 push gate's own discriminator — so
+    // the bump below fires exactly when the sync phase would see a dirty
+    // prefs blob: shared LWW edits (via their stamped clock), set-union edits
+    // (clockless, via the value itself), and `device_names` key changes all
+    // register; a device-local-only or no-op write never does.
+    let shared_changed = shared_subset_hash(&prefs) != shared_subset_hash(&before);
+
     let blob_bytes = encode_prefs_blob(&prefs_key, &account_number_hash, &prefs)
         .map_err(|_| PrefsWriteError::PrefsEncodeFailed)?;
 
     crate::atomic_write::atomic_write(&prefs_path, &blob_bytes, true)
         .map_err(PrefsWriteError::from)?;
+
+    // MYND-517: a shared-pref edit opens the same coalesced push window a note
+    // edit does — without this, a prefs-only change (vault rename, favorites,
+    // saved views, …) waits for an unrelated note push to ride along, which on
+    // mobile is effectively never. Device-local edits must NOT bump (no-traffic
+    // discipline / resolution-blur, §10.2.1). After the atomic write, per the
+    // disk-FIRST-then-side-effect ordering contract above (soft dep — no-op if
+    // the sync plugin is unmanaged).
+    if shared_changed {
+        hooks.bump_local_change();
+    }
 
     Ok(())
 }
@@ -256,9 +278,10 @@ pub async fn prefs_read_with_dir(
 pub async fn record_last_backup_at_with_dir(
     vault_dir: &Path,
     state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
     epoch_seconds: u64,
 ) -> Result<(), PrefsWriteError> {
-    update_prefs_with_dir(vault_dir, state, |prefs| {
+    update_prefs_with_dir(vault_dir, state, hooks, |prefs| {
         prefs.last_backup_at = Some(epoch_seconds);
     })
     .await?;
@@ -282,10 +305,11 @@ pub async fn record_last_backup_at_with_dir(
 pub async fn persist_paired_extensions_with_dir(
     vault_dir: &Path,
     state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
     records: Vec<protocol::PairedExtension>,
 ) -> Result<(), PrefsWriteError> {
     let count = records.len();
-    update_prefs_with_dir(vault_dir, state, |prefs| {
+    update_prefs_with_dir(vault_dir, state, hooks, |prefs| {
         prefs.paired_extensions = records;
     })
     .await?;
@@ -311,7 +335,7 @@ pub async fn set_screen_capture_protection<R: Runtime>(
 ) -> Result<(), PrefsWriteError> {
     let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
     // Disk-side commit FIRST, under the mutex.
-    set_screen_capture_protection_with_dir(&dir, state.inner(), enabled).await?;
+    set_screen_capture_protection_with_dir(&dir, state.inner(), hooks.inner(), enabled).await?;
     // Native side-effect SECOND, only on disk-side success (desktop-only;
     // mobile no-op through the hook).
     hooks.apply_screen_capture(enabled, "runtime_apply");
@@ -327,9 +351,10 @@ pub async fn set_screen_capture_protection<R: Runtime>(
 pub(crate) async fn set_screen_capture_protection_with_dir(
     vault_dir: &Path,
     state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
     enabled: bool,
 ) -> Result<(), PrefsWriteError> {
-    update_prefs_with_dir(vault_dir, state, |prefs| {
+    update_prefs_with_dir(vault_dir, state, hooks, |prefs| {
         prefs.screen_capture_protection = enabled;
     })
     .await?;
@@ -351,19 +376,21 @@ pub(crate) async fn set_screen_capture_protection_with_dir(
 pub async fn set_spell_enabled<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
     enabled: bool,
 ) -> Result<(), PrefsWriteError> {
     let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    set_spell_enabled_with_dir(&dir, state.inner(), enabled).await
+    set_spell_enabled_with_dir(&dir, state.inner(), hooks.inner(), enabled).await
 }
 
 /// Testable core of [`set_spell_enabled`].
 pub(crate) async fn set_spell_enabled_with_dir(
     vault_dir: &Path,
     state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
     enabled: bool,
 ) -> Result<(), PrefsWriteError> {
-    update_prefs_with_dir(vault_dir, state, |prefs| {
+    update_prefs_with_dir(vault_dir, state, hooks, |prefs| {
         prefs.spell_enabled = Some(enabled);
     })
     .await?;
@@ -385,19 +412,21 @@ pub(crate) async fn set_spell_enabled_with_dir(
 pub async fn set_editor_line_numbers<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
     enabled: bool,
 ) -> Result<(), PrefsWriteError> {
     let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    set_editor_line_numbers_with_dir(&dir, state.inner(), enabled).await
+    set_editor_line_numbers_with_dir(&dir, state.inner(), hooks.inner(), enabled).await
 }
 
 /// Testable core of [`set_editor_line_numbers`].
 pub(crate) async fn set_editor_line_numbers_with_dir(
     vault_dir: &Path,
     state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
     enabled: bool,
 ) -> Result<(), PrefsWriteError> {
-    update_prefs_with_dir(vault_dir, state, |prefs| {
+    update_prefs_with_dir(vault_dir, state, hooks, |prefs| {
         prefs.editor_line_numbers = Some(enabled);
     })
     .await?;
@@ -422,19 +451,21 @@ pub(crate) async fn set_editor_line_numbers_with_dir(
 pub async fn set_archive_disabled<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
     enabled: bool,
 ) -> Result<(), PrefsWriteError> {
     let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    set_archive_disabled_with_dir(&dir, state.inner(), enabled).await
+    set_archive_disabled_with_dir(&dir, state.inner(), hooks.inner(), enabled).await
 }
 
 /// Testable core of [`set_archive_disabled`].
 pub(crate) async fn set_archive_disabled_with_dir(
     vault_dir: &Path,
     state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
     enabled: bool,
 ) -> Result<(), PrefsWriteError> {
-    update_prefs_with_dir(vault_dir, state, |prefs| {
+    update_prefs_with_dir(vault_dir, state, hooks, |prefs| {
         prefs.archive_disabled = Some(enabled);
     })
     .await?;
@@ -456,12 +487,19 @@ pub(crate) async fn set_archive_disabled_with_dir(
 pub async fn set_active_workspace<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
     value: Option<String>,
 ) -> Result<(), PrefsWriteError> {
     let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    set_typography_field_with_dir(&dir, state.inner(), "active_workspace", |p| {
-        p.active_workspace = value;
-    })
+    set_typography_field_with_dir(
+        &dir,
+        state.inner(),
+        hooks.inner(),
+        "active_workspace",
+        |p| {
+            p.active_workspace = value;
+        },
+    )
     .await
 }
 
@@ -474,12 +512,19 @@ pub async fn set_active_workspace<R: Runtime>(
 pub async fn set_editor_default_view_mode<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
     value: Option<String>,
 ) -> Result<(), PrefsWriteError> {
     let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    set_typography_field_with_dir(&dir, state.inner(), "editor_default_view_mode", |p| {
-        p.editor_default_view_mode = value;
-    })
+    set_typography_field_with_dir(
+        &dir,
+        state.inner(),
+        hooks.inner(),
+        "editor_default_view_mode",
+        |p| {
+            p.editor_default_view_mode = value;
+        },
+    )
     .await
 }
 
@@ -492,19 +537,21 @@ pub async fn set_editor_default_view_mode<R: Runtime>(
 pub async fn set_editor_focus_dim_inactive<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
     enabled: bool,
 ) -> Result<(), PrefsWriteError> {
     let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    set_editor_focus_dim_inactive_with_dir(&dir, state.inner(), enabled).await
+    set_editor_focus_dim_inactive_with_dir(&dir, state.inner(), hooks.inner(), enabled).await
 }
 
 /// Testable core of [`set_editor_focus_dim_inactive`].
 pub(crate) async fn set_editor_focus_dim_inactive_with_dir(
     vault_dir: &Path,
     state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
     enabled: bool,
 ) -> Result<(), PrefsWriteError> {
-    update_prefs_with_dir(vault_dir, state, |prefs| {
+    update_prefs_with_dir(vault_dir, state, hooks, |prefs| {
         prefs.editor_focus_dim_inactive = Some(enabled);
     })
     .await?;
@@ -526,19 +573,21 @@ pub(crate) async fn set_editor_focus_dim_inactive_with_dir(
 pub async fn set_editor_focus_typewriter<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
     enabled: bool,
 ) -> Result<(), PrefsWriteError> {
     let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    set_editor_focus_typewriter_with_dir(&dir, state.inner(), enabled).await
+    set_editor_focus_typewriter_with_dir(&dir, state.inner(), hooks.inner(), enabled).await
 }
 
 /// Testable core of [`set_editor_focus_typewriter`].
 pub(crate) async fn set_editor_focus_typewriter_with_dir(
     vault_dir: &Path,
     state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
     enabled: bool,
 ) -> Result<(), PrefsWriteError> {
-    update_prefs_with_dir(vault_dir, state, |prefs| {
+    update_prefs_with_dir(vault_dir, state, hooks, |prefs| {
         prefs.editor_focus_typewriter = Some(enabled);
     })
     .await?;
@@ -561,19 +610,21 @@ pub(crate) async fn set_editor_focus_typewriter_with_dir(
 pub async fn set_show_note_timestamps<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
     enabled: bool,
 ) -> Result<(), PrefsWriteError> {
     let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    set_show_note_timestamps_with_dir(&dir, state.inner(), enabled).await
+    set_show_note_timestamps_with_dir(&dir, state.inner(), hooks.inner(), enabled).await
 }
 
 /// Testable core of [`set_show_note_timestamps`].
 pub(crate) async fn set_show_note_timestamps_with_dir(
     vault_dir: &Path,
     state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
     enabled: bool,
 ) -> Result<(), PrefsWriteError> {
-    update_prefs_with_dir(vault_dir, state, |prefs| {
+    update_prefs_with_dir(vault_dir, state, hooks, |prefs| {
         prefs.show_note_timestamps = enabled;
     })
     .await?;
@@ -597,20 +648,22 @@ pub(crate) async fn set_show_note_timestamps_with_dir(
 pub async fn set_spell_languages<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
     languages: Vec<String>,
 ) -> Result<(), PrefsWriteError> {
     let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    set_spell_languages_with_dir(&dir, state.inner(), languages).await
+    set_spell_languages_with_dir(&dir, state.inner(), hooks.inner(), languages).await
 }
 
 /// Testable core of [`set_spell_languages`].
 pub(crate) async fn set_spell_languages_with_dir(
     vault_dir: &Path,
     state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
     languages: Vec<String>,
 ) -> Result<(), PrefsWriteError> {
     let count = languages.len();
-    update_prefs_with_dir(vault_dir, state, |prefs| {
+    update_prefs_with_dir(vault_dir, state, hooks, |prefs| {
         prefs.spell_languages = languages;
     })
     .await?;
@@ -638,23 +691,25 @@ pub(crate) async fn set_spell_languages_with_dir(
 pub async fn set_keymap_binding<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
     command_id: String,
     chords: Option<Vec<String>>,
 ) -> Result<(), PrefsWriteError> {
     let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    set_keymap_binding_with_dir(&dir, state.inner(), command_id, chords).await
+    set_keymap_binding_with_dir(&dir, state.inner(), hooks.inner(), command_id, chords).await
 }
 
 /// Testable core of [`set_keymap_binding`].
 pub(crate) async fn set_keymap_binding_with_dir(
     vault_dir: &Path,
     state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
     command_id: String,
     chords: Option<Vec<String>>,
 ) -> Result<(), PrefsWriteError> {
     let removed = chords.is_none();
     let count = chords.as_ref().map(Vec::len).unwrap_or(0);
-    update_prefs_with_dir(vault_dir, state, |prefs| match chords {
+    update_prefs_with_dir(vault_dir, state, hooks, |prefs| match chords {
         Some(c) => {
             prefs.keymap.insert(command_id, c);
         }
@@ -682,20 +737,22 @@ pub(crate) async fn set_keymap_binding_with_dir(
 pub async fn set_deliberate_folders<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
     folders: Vec<String>,
 ) -> Result<(), PrefsWriteError> {
     let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    set_deliberate_folders_with_dir(&dir, state.inner(), folders).await
+    set_deliberate_folders_with_dir(&dir, state.inner(), hooks.inner(), folders).await
 }
 
 /// Testable core of [`set_deliberate_folders`].
 pub async fn set_deliberate_folders_with_dir(
     vault_dir: &Path,
     state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
     folders: Vec<String>,
 ) -> Result<(), PrefsWriteError> {
     let count = folders.len();
-    update_prefs_with_dir(vault_dir, state, |prefs| {
+    update_prefs_with_dir(vault_dir, state, hooks, |prefs| {
         prefs.deliberate_folders = folders;
     })
     .await?;
@@ -719,20 +776,22 @@ pub async fn set_deliberate_folders_with_dir(
 pub async fn set_archived_folders<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
     folders: Vec<String>,
 ) -> Result<(), PrefsWriteError> {
     let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    set_archived_folders_with_dir(&dir, state.inner(), folders).await
+    set_archived_folders_with_dir(&dir, state.inner(), hooks.inner(), folders).await
 }
 
 /// Testable core of [`set_archived_folders`].
 pub async fn set_archived_folders_with_dir(
     vault_dir: &Path,
     state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
     folders: Vec<String>,
 ) -> Result<(), PrefsWriteError> {
     let count = folders.len();
-    update_prefs_with_dir(vault_dir, state, |prefs| {
+    update_prefs_with_dir(vault_dir, state, hooks, |prefs| {
         prefs.archived_folders = folders;
     })
     .await?;
@@ -757,7 +816,7 @@ pub async fn set_ai_enabled<R: Runtime>(
 ) -> Result<(), PrefsWriteError> {
     let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
     // Disk-side commit FIRST, under the mutex.
-    set_ai_enabled_with_dir(&dir, state.inner(), enabled).await?;
+    set_ai_enabled_with_dir(&dir, state.inner(), hooks.inner(), enabled).await?;
     // Reflect the new policy into the AI runtime SECOND (desktop-only; mobile
     // no-op). Read back the authoritative post-write policy so both the opt-in
     // and the current exclusion set are consistent (SYNC-14).
@@ -771,9 +830,10 @@ pub async fn set_ai_enabled<R: Runtime>(
 pub(crate) async fn set_ai_enabled_with_dir(
     vault_dir: &Path,
     state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
     enabled: bool,
 ) -> Result<(), PrefsWriteError> {
-    update_prefs_with_dir(vault_dir, state, |prefs| {
+    update_prefs_with_dir(vault_dir, state, hooks, |prefs| {
         prefs.ai_enabled = enabled;
     })
     .await?;
@@ -795,7 +855,7 @@ pub async fn set_ai_excluded_folders<R: Runtime>(
 ) -> Result<(), PrefsWriteError> {
     let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
     // Disk-side commit FIRST, under the mutex.
-    set_ai_excluded_folders_with_dir(&dir, state.inner(), folders).await?;
+    set_ai_excluded_folders_with_dir(&dir, state.inner(), hooks.inner(), folders).await?;
     // Reflect the new exclusion set into the AI runtime SECOND: purge any
     // now-excluded note from the resident store + persisted blob (SYNC-14).
     // Read back the authoritative policy (opt-in may be off).
@@ -809,10 +869,11 @@ pub async fn set_ai_excluded_folders<R: Runtime>(
 pub(crate) async fn set_ai_excluded_folders_with_dir(
     vault_dir: &Path,
     state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
     folders: Vec<String>,
 ) -> Result<(), PrefsWriteError> {
     let count = folders.len();
-    update_prefs_with_dir(vault_dir, state, |prefs| {
+    update_prefs_with_dir(vault_dir, state, hooks, |prefs| {
         prefs.ai_excluded_folders = folders;
     })
     .await?;
@@ -840,20 +901,22 @@ pub(crate) async fn set_ai_excluded_folders_with_dir(
 pub async fn set_item_order<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
     order: Vec<String>,
 ) -> Result<(), PrefsWriteError> {
     let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    set_item_order_with_dir(&dir, state.inner(), order).await
+    set_item_order_with_dir(&dir, state.inner(), hooks.inner(), order).await
 }
 
 /// Testable core of [`set_item_order`].
 pub(crate) async fn set_item_order_with_dir(
     vault_dir: &Path,
     state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
     order: Vec<String>,
 ) -> Result<(), PrefsWriteError> {
     let count = order.len();
-    update_prefs_with_dir(vault_dir, state, |prefs| {
+    update_prefs_with_dir(vault_dir, state, hooks, |prefs| {
         prefs.item_order = order;
     })
     .await?;
@@ -876,20 +939,22 @@ pub(crate) async fn set_item_order_with_dir(
 pub async fn set_hidden_bar_items<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
     items: Vec<String>,
 ) -> Result<(), PrefsWriteError> {
     let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    set_hidden_bar_items_with_dir(&dir, state.inner(), items).await
+    set_hidden_bar_items_with_dir(&dir, state.inner(), hooks.inner(), items).await
 }
 
 /// Testable core of [`set_hidden_bar_items`].
 pub(crate) async fn set_hidden_bar_items_with_dir(
     vault_dir: &Path,
     state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
     items: Vec<String>,
 ) -> Result<(), PrefsWriteError> {
     let count = items.len();
-    update_prefs_with_dir(vault_dir, state, |prefs| {
+    update_prefs_with_dir(vault_dir, state, hooks, |prefs| {
         prefs.hidden_bar_items = items;
     })
     .await?;
@@ -914,20 +979,22 @@ pub(crate) async fn set_hidden_bar_items_with_dir(
 pub async fn upsert_saved_view<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
     view: SavedView,
 ) -> Result<(), PrefsWriteError> {
     let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    upsert_saved_view_with_dir(&dir, state.inner(), view).await
+    upsert_saved_view_with_dir(&dir, state.inner(), hooks.inner(), view).await
 }
 
 /// Testable core of [`upsert_saved_view`].
 pub(crate) async fn upsert_saved_view_with_dir(
     vault_dir: &Path,
     state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
     view: SavedView,
 ) -> Result<(), PrefsWriteError> {
     let mut count = 0usize;
-    update_prefs_with_dir(vault_dir, state, |prefs| {
+    update_prefs_with_dir(vault_dir, state, hooks, |prefs| {
         // Upsert by id: replace in place, else append. No duplicate ids.
         match prefs.saved_views.iter_mut().find(|v| v.id == view.id) {
             Some(existing) => *existing = view,
@@ -951,20 +1018,22 @@ pub(crate) async fn upsert_saved_view_with_dir(
 pub async fn delete_saved_view<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
     id: String,
 ) -> Result<(), PrefsWriteError> {
     let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    delete_saved_view_with_dir(&dir, state.inner(), id).await
+    delete_saved_view_with_dir(&dir, state.inner(), hooks.inner(), id).await
 }
 
 /// Testable core of [`delete_saved_view`].
 pub(crate) async fn delete_saved_view_with_dir(
     vault_dir: &Path,
     state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
     id: String,
 ) -> Result<(), PrefsWriteError> {
     let mut count = 0usize;
-    update_prefs_with_dir(vault_dir, state, |prefs| {
+    update_prefs_with_dir(vault_dir, state, hooks, |prefs| {
         prefs.saved_views.retain(|v| v.id != id);
         // Prune the id from the display order too (no dangling entry).
         prefs.view_order.retain(|vid| *vid != id);
@@ -988,20 +1057,22 @@ pub(crate) async fn delete_saved_view_with_dir(
 pub async fn set_view_order<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
     order: Vec<String>,
 ) -> Result<(), PrefsWriteError> {
     let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    set_view_order_with_dir(&dir, state.inner(), order).await
+    set_view_order_with_dir(&dir, state.inner(), hooks.inner(), order).await
 }
 
 /// Testable core of [`set_view_order`].
 pub(crate) async fn set_view_order_with_dir(
     vault_dir: &Path,
     state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
     order: Vec<String>,
 ) -> Result<(), PrefsWriteError> {
     let count = order.len();
-    update_prefs_with_dir(vault_dir, state, |prefs| {
+    update_prefs_with_dir(vault_dir, state, hooks, |prefs| {
         prefs.view_order = order;
     })
     .await?;
@@ -1022,20 +1093,22 @@ pub(crate) async fn set_view_order_with_dir(
 pub async fn set_bar_items_order<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
     order: Vec<String>,
 ) -> Result<(), PrefsWriteError> {
     let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    set_bar_items_order_with_dir(&dir, state.inner(), order).await
+    set_bar_items_order_with_dir(&dir, state.inner(), hooks.inner(), order).await
 }
 
 /// Testable core of [`set_bar_items_order`].
 pub(crate) async fn set_bar_items_order_with_dir(
     vault_dir: &Path,
     state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
     order: Vec<String>,
 ) -> Result<(), PrefsWriteError> {
     let count = order.len();
-    update_prefs_with_dir(vault_dir, state, |prefs| {
+    update_prefs_with_dir(vault_dir, state, hooks, |prefs| {
         prefs.bar_items_order = order;
     })
     .await?;
@@ -1055,12 +1128,19 @@ pub(crate) async fn set_bar_items_order_with_dir(
 pub async fn set_right_panel_active_tab<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
     value: Option<String>,
 ) -> Result<(), PrefsWriteError> {
     let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    set_typography_field_with_dir(&dir, state.inner(), "right_panel_active_tab", |p| {
-        p.right_panel_active_tab = value;
-    })
+    set_typography_field_with_dir(
+        &dir,
+        state.inner(),
+        hooks.inner(),
+        "right_panel_active_tab",
+        |p| {
+            p.right_panel_active_tab = value;
+        },
+    )
     .await
 }
 
@@ -1074,20 +1154,22 @@ pub async fn set_right_panel_active_tab<R: Runtime>(
 pub async fn set_right_panel_hidden_tabs<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
     items: Vec<String>,
 ) -> Result<(), PrefsWriteError> {
     let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    set_right_panel_hidden_tabs_with_dir(&dir, state.inner(), items).await
+    set_right_panel_hidden_tabs_with_dir(&dir, state.inner(), hooks.inner(), items).await
 }
 
 /// Testable core of [`set_right_panel_hidden_tabs`].
 pub(crate) async fn set_right_panel_hidden_tabs_with_dir(
     vault_dir: &Path,
     state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
     items: Vec<String>,
 ) -> Result<(), PrefsWriteError> {
     let count = items.len();
-    update_prefs_with_dir(vault_dir, state, |prefs| {
+    update_prefs_with_dir(vault_dir, state, hooks, |prefs| {
         prefs.right_panel_hidden_tabs = items;
     })
     .await?;
@@ -1112,20 +1194,22 @@ pub(crate) async fn set_right_panel_hidden_tabs_with_dir(
 pub async fn set_right_panel_tab_order<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
     order: Vec<String>,
 ) -> Result<(), PrefsWriteError> {
     let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    set_right_panel_tab_order_with_dir(&dir, state.inner(), order).await
+    set_right_panel_tab_order_with_dir(&dir, state.inner(), hooks.inner(), order).await
 }
 
 /// Testable core of [`set_right_panel_tab_order`].
 pub(crate) async fn set_right_panel_tab_order_with_dir(
     vault_dir: &Path,
     state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
     order: Vec<String>,
 ) -> Result<(), PrefsWriteError> {
     let count = order.len();
-    update_prefs_with_dir(vault_dir, state, |prefs| {
+    update_prefs_with_dir(vault_dir, state, hooks, |prefs| {
         prefs.right_panel_tab_order = order;
     })
     .await?;
@@ -1149,20 +1233,22 @@ pub(crate) async fn set_right_panel_tab_order_with_dir(
 pub async fn set_editor_toolbar_order<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
     order: Vec<String>,
 ) -> Result<(), PrefsWriteError> {
     let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    set_editor_toolbar_order_with_dir(&dir, state.inner(), order).await
+    set_editor_toolbar_order_with_dir(&dir, state.inner(), hooks.inner(), order).await
 }
 
 /// Testable core of [`set_editor_toolbar_order`].
 pub(crate) async fn set_editor_toolbar_order_with_dir(
     vault_dir: &Path,
     state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
     order: Vec<String>,
 ) -> Result<(), PrefsWriteError> {
     let count = order.len();
-    update_prefs_with_dir(vault_dir, state, |prefs| {
+    update_prefs_with_dir(vault_dir, state, hooks, |prefs| {
         prefs.editor_toolbar_order = order;
     })
     .await?;
@@ -1179,20 +1265,22 @@ pub(crate) async fn set_editor_toolbar_order_with_dir(
 pub async fn set_editor_toolbar_hidden<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
     items: Vec<String>,
 ) -> Result<(), PrefsWriteError> {
     let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    set_editor_toolbar_hidden_with_dir(&dir, state.inner(), items).await
+    set_editor_toolbar_hidden_with_dir(&dir, state.inner(), hooks.inner(), items).await
 }
 
 /// Testable core of [`set_editor_toolbar_hidden`].
 pub(crate) async fn set_editor_toolbar_hidden_with_dir(
     vault_dir: &Path,
     state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
     items: Vec<String>,
 ) -> Result<(), PrefsWriteError> {
     let count = items.len();
-    update_prefs_with_dir(vault_dir, state, |prefs| {
+    update_prefs_with_dir(vault_dir, state, hooks, |prefs| {
         prefs.editor_toolbar_hidden = items;
     })
     .await?;
@@ -1209,20 +1297,22 @@ pub(crate) async fn set_editor_toolbar_hidden_with_dir(
 pub async fn set_editor_slash_order<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
     order: Vec<String>,
 ) -> Result<(), PrefsWriteError> {
     let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    set_editor_slash_order_with_dir(&dir, state.inner(), order).await
+    set_editor_slash_order_with_dir(&dir, state.inner(), hooks.inner(), order).await
 }
 
 /// Testable core of [`set_editor_slash_order`].
 pub(crate) async fn set_editor_slash_order_with_dir(
     vault_dir: &Path,
     state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
     order: Vec<String>,
 ) -> Result<(), PrefsWriteError> {
     let count = order.len();
-    update_prefs_with_dir(vault_dir, state, |prefs| {
+    update_prefs_with_dir(vault_dir, state, hooks, |prefs| {
         prefs.editor_slash_order = order;
     })
     .await?;
@@ -1235,20 +1325,22 @@ pub(crate) async fn set_editor_slash_order_with_dir(
 pub async fn set_editor_slash_hidden<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
     items: Vec<String>,
 ) -> Result<(), PrefsWriteError> {
     let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    set_editor_slash_hidden_with_dir(&dir, state.inner(), items).await
+    set_editor_slash_hidden_with_dir(&dir, state.inner(), hooks.inner(), items).await
 }
 
 /// Testable core of [`set_editor_slash_hidden`].
 pub(crate) async fn set_editor_slash_hidden_with_dir(
     vault_dir: &Path,
     state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
     items: Vec<String>,
 ) -> Result<(), PrefsWriteError> {
     let count = items.len();
-    update_prefs_with_dir(vault_dir, state, |prefs| {
+    update_prefs_with_dir(vault_dir, state, hooks, |prefs| {
         prefs.editor_slash_hidden = items;
     })
     .await?;
@@ -1268,19 +1360,21 @@ pub(crate) async fn set_editor_slash_hidden_with_dir(
 pub async fn set_daily_date_format<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
     format: String,
 ) -> Result<(), PrefsWriteError> {
     let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    set_daily_date_format_with_dir(&dir, state.inner(), format).await
+    set_daily_date_format_with_dir(&dir, state.inner(), hooks.inner(), format).await
 }
 
 /// Testable core of [`set_daily_date_format`].
 pub(crate) async fn set_daily_date_format_with_dir(
     vault_dir: &Path,
     state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
     format: String,
 ) -> Result<(), PrefsWriteError> {
-    update_prefs_with_dir(vault_dir, state, |prefs| {
+    update_prefs_with_dir(vault_dir, state, hooks, |prefs| {
         prefs.daily_date_format = Some(format);
     })
     .await?;
@@ -1298,19 +1392,21 @@ pub(crate) async fn set_daily_date_format_with_dir(
 pub async fn set_daily_folder<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
     folder: String,
 ) -> Result<(), PrefsWriteError> {
     let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    set_daily_folder_with_dir(&dir, state.inner(), folder).await
+    set_daily_folder_with_dir(&dir, state.inner(), hooks.inner(), folder).await
 }
 
 /// Testable core of [`set_daily_folder`].
 pub(crate) async fn set_daily_folder_with_dir(
     vault_dir: &Path,
     state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
     folder: String,
 ) -> Result<(), PrefsWriteError> {
-    update_prefs_with_dir(vault_dir, state, |prefs| {
+    update_prefs_with_dir(vault_dir, state, hooks, |prefs| {
         prefs.daily_folder = Some(folder.clone());
         // Register as a deliberate folder so the daily folder survives empty
         // (MYND-144). Exact-dedup here; the codec sorts + exact-dedups on encode.
@@ -1334,20 +1430,22 @@ pub(crate) async fn set_daily_folder_with_dir(
 pub async fn set_daily_template<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
     template_id: Option<String>,
 ) -> Result<(), PrefsWriteError> {
     let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    set_daily_template_with_dir(&dir, state.inner(), template_id).await
+    set_daily_template_with_dir(&dir, state.inner(), hooks.inner(), template_id).await
 }
 
 /// Testable core of [`set_daily_template`].
 pub(crate) async fn set_daily_template_with_dir(
     vault_dir: &Path,
     state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
     template_id: Option<String>,
 ) -> Result<(), PrefsWriteError> {
     let cleared = template_id.is_none();
-    update_prefs_with_dir(vault_dir, state, |prefs| {
+    update_prefs_with_dir(vault_dir, state, hooks, |prefs| {
         prefs.daily_template = template_id;
     })
     .await?;
@@ -1371,21 +1469,23 @@ pub(crate) async fn set_daily_template_with_dir(
 pub async fn set_new_note_location<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
     location: Option<String>,
     folder: Option<String>,
 ) -> Result<(), PrefsWriteError> {
     let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    set_new_note_location_with_dir(&dir, state.inner(), location, folder).await
+    set_new_note_location_with_dir(&dir, state.inner(), hooks.inner(), location, folder).await
 }
 
 /// Testable core of [`set_new_note_location`].
 pub(crate) async fn set_new_note_location_with_dir(
     vault_dir: &Path,
     state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
     location: Option<String>,
     folder: Option<String>,
 ) -> Result<(), PrefsWriteError> {
-    update_prefs_with_dir(vault_dir, state, |prefs| {
+    update_prefs_with_dir(vault_dir, state, hooks, |prefs| {
         prefs.new_note_location = location;
         prefs.new_note_location_folder = folder.clone();
         // When a specific target folder is named, register it as a deliberate folder
@@ -1415,10 +1515,11 @@ pub(crate) async fn set_new_note_location_with_dir(
 async fn set_typography_field_with_dir(
     vault_dir: &Path,
     state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
     field_label: &'static str,
     mutate: impl FnOnce(&mut PrefsView),
 ) -> Result<(), PrefsWriteError> {
-    update_prefs_with_dir(vault_dir, state, mutate).await?;
+    update_prefs_with_dir(vault_dir, state, hooks, mutate).await?;
 
     // Field name only — never the value (a typography preset is not secret, but
     // the field-name-only discipline is uniform across prefs setters).
@@ -1433,12 +1534,19 @@ async fn set_typography_field_with_dir(
 pub async fn set_editor_text_size<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
     value: Option<String>,
 ) -> Result<(), PrefsWriteError> {
     let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    set_typography_field_with_dir(&dir, state.inner(), "editor_text_size", |p| {
-        p.editor_text_size = value;
-    })
+    set_typography_field_with_dir(
+        &dir,
+        state.inner(),
+        hooks.inner(),
+        "editor_text_size",
+        |p| {
+            p.editor_text_size = value;
+        },
+    )
     .await
 }
 
@@ -1448,12 +1556,19 @@ pub async fn set_editor_text_size<R: Runtime>(
 pub async fn set_editor_line_spacing<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
     value: Option<String>,
 ) -> Result<(), PrefsWriteError> {
     let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    set_typography_field_with_dir(&dir, state.inner(), "editor_line_spacing", |p| {
-        p.editor_line_spacing = value;
-    })
+    set_typography_field_with_dir(
+        &dir,
+        state.inner(),
+        hooks.inner(),
+        "editor_line_spacing",
+        |p| {
+            p.editor_line_spacing = value;
+        },
+    )
     .await
 }
 
@@ -1463,12 +1578,19 @@ pub async fn set_editor_line_spacing<R: Runtime>(
 pub async fn set_editor_content_width<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
     value: Option<String>,
 ) -> Result<(), PrefsWriteError> {
     let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    set_typography_field_with_dir(&dir, state.inner(), "editor_content_width", |p| {
-        p.editor_content_width = value;
-    })
+    set_typography_field_with_dir(
+        &dir,
+        state.inner(),
+        hooks.inner(),
+        "editor_content_width",
+        |p| {
+            p.editor_content_width = value;
+        },
+    )
     .await
 }
 
@@ -1478,12 +1600,19 @@ pub async fn set_editor_content_width<R: Runtime>(
 pub async fn set_editor_font_family<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
     value: Option<String>,
 ) -> Result<(), PrefsWriteError> {
     let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    set_typography_field_with_dir(&dir, state.inner(), "editor_font_family", |p| {
-        p.editor_font_family = value;
-    })
+    set_typography_field_with_dir(
+        &dir,
+        state.inner(),
+        hooks.inner(),
+        "editor_font_family",
+        |p| {
+            p.editor_font_family = value;
+        },
+    )
     .await
 }
 
@@ -1498,11 +1627,12 @@ pub async fn set_editor_font_family<R: Runtime>(
 pub async fn set_startup_open<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
     mode: Option<String>,
     note: Option<String>,
 ) -> Result<(), PrefsWriteError> {
     let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    set_startup_open_with_dir(&dir, state.inner(), mode, note).await
+    set_startup_open_with_dir(&dir, state.inner(), hooks.inner(), mode, note).await
 }
 
 /// Testable core of [`set_startup_open`]. Writes the `startup_open` mode +
@@ -1510,10 +1640,11 @@ pub async fn set_startup_open<R: Runtime>(
 pub(crate) async fn set_startup_open_with_dir(
     vault_dir: &Path,
     state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
     mode: Option<String>,
     note: Option<String>,
 ) -> Result<(), PrefsWriteError> {
-    set_typography_field_with_dir(vault_dir, state, "startup_open", |p| {
+    set_typography_field_with_dir(vault_dir, state, hooks, "startup_open", |p| {
         p.startup_open = mode;
         p.startup_open_note = note;
     })
@@ -1529,20 +1660,22 @@ pub(crate) async fn set_startup_open_with_dir(
 pub async fn set_favorites<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
     order: Vec<String>,
 ) -> Result<(), PrefsWriteError> {
     let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    set_favorites_with_dir(&dir, state.inner(), order).await
+    set_favorites_with_dir(&dir, state.inner(), hooks.inner(), order).await
 }
 
 /// Testable core of [`set_favorites`].
 pub(crate) async fn set_favorites_with_dir(
     vault_dir: &Path,
     state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
     order: Vec<String>,
 ) -> Result<(), PrefsWriteError> {
     let count = order.len();
-    update_prefs_with_dir(vault_dir, state, |prefs| {
+    update_prefs_with_dir(vault_dir, state, hooks, |prefs| {
         prefs.favorites = order;
     })
     .await?;
@@ -1584,7 +1717,7 @@ pub async fn set_auto_lock_timeout_with_dir(
     hooks: &crate::hooks::Hooks,
     seconds: u32,
 ) -> Result<(), PrefsWriteError> {
-    update_prefs_with_dir(vault_dir, state, |prefs| {
+    update_prefs_with_dir(vault_dir, state, hooks, |prefs| {
         prefs.auto_lock_seconds = Some(seconds);
     })
     .await?;
@@ -1615,20 +1748,22 @@ pub async fn set_auto_lock_timeout_with_dir(
 pub async fn set_editor_layout<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
     layout: EditorLayout,
 ) -> Result<(), PrefsWriteError> {
     let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    set_editor_layout_with_dir(&dir, state.inner(), layout).await
+    set_editor_layout_with_dir(&dir, state.inner(), hooks.inner(), layout).await
 }
 
 /// Testable core of [`set_editor_layout`].
 pub(crate) async fn set_editor_layout_with_dir(
     vault_dir: &Path,
     state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
     layout: EditorLayout,
 ) -> Result<(), PrefsWriteError> {
     let (left_collapsed, right_collapsed) = (layout.left_collapsed, layout.right_collapsed);
-    update_prefs_with_dir(vault_dir, state, |prefs| {
+    update_prefs_with_dir(vault_dir, state, hooks, |prefs| {
         prefs.editor_layout = Some(layout);
     })
     .await?;
@@ -1674,19 +1809,21 @@ fn theme_label(theme: Option<ThemeChoice>) -> &'static str {
 pub async fn set_theme<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
     theme: Option<ThemeChoice>,
 ) -> Result<(), PrefsWriteError> {
     let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    set_theme_with_dir(&dir, state.inner(), theme).await
+    set_theme_with_dir(&dir, state.inner(), hooks.inner(), theme).await
 }
 
 /// Testable core of [`set_theme`].
 pub(crate) async fn set_theme_with_dir(
     vault_dir: &Path,
     state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
     theme: Option<ThemeChoice>,
 ) -> Result<(), PrefsWriteError> {
-    update_prefs_with_dir(vault_dir, state, |prefs| {
+    update_prefs_with_dir(vault_dir, state, hooks, |prefs| {
         prefs.theme = theme;
     })
     .await?;
@@ -1717,20 +1854,22 @@ pub(crate) async fn set_theme_with_dir(
 pub async fn set_custom_theme<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
     custom_theme: Option<String>,
 ) -> Result<(), PrefsWriteError> {
     let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    set_custom_theme_with_dir(&dir, state.inner(), custom_theme).await
+    set_custom_theme_with_dir(&dir, state.inner(), hooks.inner(), custom_theme).await
 }
 
 /// Testable core of [`set_custom_theme`].
 pub(crate) async fn set_custom_theme_with_dir(
     vault_dir: &Path,
     state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
     custom_theme: Option<String>,
 ) -> Result<(), PrefsWriteError> {
     let is_set = custom_theme.is_some();
-    update_prefs_with_dir(vault_dir, state, |prefs| {
+    update_prefs_with_dir(vault_dir, state, hooks, |prefs| {
         prefs.custom_theme = custom_theme;
     })
     .await?;
@@ -1757,20 +1896,22 @@ pub(crate) async fn set_custom_theme_with_dir(
 pub async fn set_item_colors<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
     colors: std::collections::BTreeMap<String, String>,
 ) -> Result<(), PrefsWriteError> {
     let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    set_item_colors_with_dir(&dir, state.inner(), colors).await
+    set_item_colors_with_dir(&dir, state.inner(), hooks.inner(), colors).await
 }
 
 /// Testable core of [`set_item_colors`].
 pub(crate) async fn set_item_colors_with_dir(
     vault_dir: &Path,
     state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
     colors: std::collections::BTreeMap<String, String>,
 ) -> Result<(), PrefsWriteError> {
     let count = colors.len();
-    update_prefs_with_dir(vault_dir, state, |prefs| {
+    update_prefs_with_dir(vault_dir, state, hooks, |prefs| {
         prefs.item_colors = colors;
     })
     .await?;
@@ -1791,20 +1932,22 @@ pub(crate) async fn set_item_colors_with_dir(
 pub async fn set_folder_icons<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
     icons: std::collections::BTreeMap<String, String>,
 ) -> Result<(), PrefsWriteError> {
     let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    set_folder_icons_with_dir(&dir, state.inner(), icons).await
+    set_folder_icons_with_dir(&dir, state.inner(), hooks.inner(), icons).await
 }
 
 /// Testable core of [`set_folder_icons`].
 pub(crate) async fn set_folder_icons_with_dir(
     vault_dir: &Path,
     state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
     icons: std::collections::BTreeMap<String, String>,
 ) -> Result<(), PrefsWriteError> {
     let count = icons.len();
-    update_prefs_with_dir(vault_dir, state, |prefs| {
+    update_prefs_with_dir(vault_dir, state, hooks, |prefs| {
         prefs.folder_icons = icons;
     })
     .await?;
@@ -1833,10 +1976,11 @@ pub(crate) async fn set_folder_icons_with_dir(
 pub async fn vault_set_label<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
     label: Option<String>,
 ) -> Result<(), PrefsWriteError> {
     let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    vault_set_label_with_dir(&dir, state.inner(), label).await
+    vault_set_label_with_dir(&dir, state.inner(), hooks.inner(), label).await
 }
 
 /// Testable core of [`vault_set_label`]. Performs the disk-side commit
@@ -1849,10 +1993,11 @@ pub async fn vault_set_label<R: Runtime>(
 pub(crate) async fn vault_set_label_with_dir(
     vault_dir: &Path,
     state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
     label: Option<String>,
 ) -> Result<(), PrefsWriteError> {
     let cleared = label.is_none();
-    update_prefs_with_dir(vault_dir, state, |prefs| {
+    update_prefs_with_dir(vault_dir, state, hooks, |prefs| {
         prefs.label = label.clone();
     })
     .await?;
@@ -1891,10 +2036,11 @@ pub(crate) async fn vault_set_label_with_dir(
 pub async fn vault_set_icon<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
     icon: Option<String>,
 ) -> Result<(), PrefsWriteError> {
     let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    vault_set_icon_with_dir(&dir, state.inner(), icon).await
+    vault_set_icon_with_dir(&dir, state.inner(), hooks.inner(), icon).await
 }
 
 /// Testable core of [`vault_set_icon`]. Performs the disk-side commit
@@ -1905,10 +2051,11 @@ pub async fn vault_set_icon<R: Runtime>(
 pub(crate) async fn vault_set_icon_with_dir(
     vault_dir: &Path,
     state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
     icon: Option<String>,
 ) -> Result<(), PrefsWriteError> {
     let cleared = icon.is_none();
-    update_prefs_with_dir(vault_dir, state, |prefs| {
+    update_prefs_with_dir(vault_dir, state, hooks, |prefs| {
         prefs.icon = icon.clone();
     })
     .await?;
@@ -1950,6 +2097,162 @@ mod tests {
         std::sync::Arc::new(crate::hooks::NoopHooks)
     }
 
+    /// A `Hooks` that counts `bump_local_change` calls and no-ops everything
+    /// else (the snapshots test-mock pattern) — asserts the MYND-517 wiring:
+    /// a shared-pref edit opens the coalesced sync push window, a device-local
+    /// or no-op edit never does.
+    struct CountingHooks(std::sync::Arc<std::sync::atomic::AtomicU64>);
+
+    impl crate::hooks::VaultLifecycleHooks for CountingHooks {
+        fn hydrate_search_index<'a>(
+            &'a self,
+            _: &'a VaultRuntimeState,
+        ) -> crate::hooks::BoxFuture<'a> {
+            Box::pin(std::future::ready(()))
+        }
+        fn hydrate_spell<'a>(&'a self, _: &'a VaultRuntimeState) -> crate::hooks::BoxFuture<'a> {
+            Box::pin(std::future::ready(()))
+        }
+        fn reclaim_stray_attachment_blobs<'a>(
+            &'a self,
+            _: &'a VaultRuntimeState,
+        ) -> crate::hooks::BoxFuture<'a> {
+            Box::pin(std::future::ready(()))
+        }
+        fn persist_search_index<'a>(
+            &'a self,
+            _: &'a VaultRuntimeState,
+        ) -> crate::hooks::BoxFuture<'a> {
+            Box::pin(std::future::ready(()))
+        }
+        fn hydrate_ai_vectors<'a>(
+            &'a self,
+            _: &'a VaultRuntimeState,
+        ) -> crate::hooks::BoxFuture<'a> {
+            Box::pin(std::future::ready(()))
+        }
+        fn index_note_attachments<'a>(
+            &'a self,
+            _: &'a VaultRuntimeState,
+            _: &'a str,
+            _: &'a str,
+            _: &'a str,
+        ) -> crate::hooks::BoxFuture<'a> {
+            Box::pin(std::future::ready(()))
+        }
+        fn zeroize_search_index(&self) {}
+        fn zeroize_spell(&self) {}
+        fn zeroize_vault_indices(&self) {}
+        fn zeroize_attachment_refs(&self) {}
+        fn abort_active_recording(&self) {}
+        fn pdf_export_teardown_on_lock(&self) {}
+        fn clear_staged_descriptor(&self) {}
+        fn apply_screen_capture(&self, _: bool, _: &'static str) {}
+        fn search_upsert(&self, _: &str, _: &str, _: &str) {}
+        fn search_remove(&self, _: &str) {}
+        fn ai_note_changed(&self, _: &str, _: &str) {}
+        fn ai_note_deleted(&self, _: &str) {}
+        fn ai_policy_changed(&self, _: bool, _: &[String]) {}
+        fn bump_local_change(&self) {
+            self.0.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        }
+        fn emit_snapshot_write_failed(&self, _: &str) {}
+        fn effective_auto_lock_secs(&self, prefs_value: Option<u32>) -> u32 {
+            prefs_value.unwrap_or(crate::DEFAULT_AUTO_LOCK_SECS)
+        }
+        fn hydrate_clipper_pairing(&self, _: &[protocol::PairedExtension]) {}
+        fn preempt_inflight_backup<'a>(
+            &'a self,
+            _: &'a VaultRuntimeState,
+        ) -> crate::hooks::BoxFuture<'a> {
+            Box::pin(std::future::ready(()))
+        }
+        fn invalidate_quick_unlock(&self, _: &Path) {}
+        fn capture_snapshot(&self, _: &Path, _: &str, _: &[u8], _: u64, _: bool) -> bool {
+            false
+        }
+        fn purge_note_snapshots(&self, _: &Path, _: &str) -> std::io::Result<usize> {
+            Ok(0)
+        }
+    }
+
+    fn counting_hooks() -> (
+        crate::hooks::Hooks,
+        std::sync::Arc<std::sync::atomic::AtomicU64>,
+    ) {
+        let counter = std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0));
+        (std::sync::Arc::new(CountingHooks(counter.clone())), counter)
+    }
+
+    #[test]
+    fn shared_pref_edit_bumps_the_sync_push_window() {
+        // MYND-517: a shared-LWW edit (the vault rename that motivated the
+        // bug) must call bump_local_change so the sync scheduler opens the
+        // coalesced push window — without it a prefs-only change waits for an
+        // unrelated note push forever.
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x33).await;
+            let (hooks, bumps) = counting_hooks();
+            vault_set_label_with_dir(tmp.path(), &state, &hooks, Some("Renamed".into()))
+                .await
+                .expect("set label");
+            assert_eq!(bumps.load(std::sync::atomic::Ordering::Relaxed), 1);
+        });
+    }
+
+    #[test]
+    fn set_union_pref_edit_bumps_the_sync_push_window() {
+        // MYND-517: set-union fields are SHARED but clockless (never stamped
+        // by stamp_changed_shared_fields) — the bump gate is the shared-subset
+        // hash, which sees the value change itself, so they bump too.
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x33).await;
+            let (hooks, bumps) = counting_hooks();
+            set_spell_languages_with_dir(tmp.path(), &state, &hooks, vec!["en".into()])
+                .await
+                .expect("set spell languages");
+            assert_eq!(bumps.load(std::sync::atomic::Ordering::Relaxed), 1);
+        });
+    }
+
+    #[test]
+    fn device_local_pref_edit_never_bumps() {
+        // MYND-517 no-traffic discipline (§10.2.1): a device-local edit
+        // re-encrypts the blob but leaves the shared subset unchanged — it
+        // must NOT open a push window (resolution-blur; a poll-only device
+        // stays poll-only).
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x33).await;
+            let (hooks, bumps) = counting_hooks();
+            set_theme_with_dir(
+                tmp.path(),
+                &state,
+                &hooks,
+                Some(protocol::ThemeChoice::Dark),
+            )
+            .await
+            .expect("set theme");
+            assert_eq!(bumps.load(std::sync::atomic::Ordering::Relaxed), 0);
+        });
+    }
+
+    #[test]
+    fn noop_shared_pref_write_never_bumps() {
+        // MYND-517: re-writing the SAME shared value changes neither the field
+        // clocks nor the shared subset — no pointless push cycle.
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x33).await;
+            let (hooks, bumps) = counting_hooks();
+            vault_set_label_with_dir(tmp.path(), &state, &hooks, Some("Same".into()))
+                .await
+                .expect("first set");
+            vault_set_label_with_dir(tmp.path(), &state, &hooks, Some("Same".into()))
+                .await
+                .expect("no-op re-set");
+            assert_eq!(bumps.load(std::sync::atomic::Ordering::Relaxed), 1);
+        });
+    }
+
     #[test]
     fn shared_field_setter_stamps_its_field_clock() {
         // MYND-478: every setter routed through update_prefs_with_dir stamps
@@ -1957,7 +2260,7 @@ mod tests {
         // nothing (sync-protocol.md §10.2).
         rt().block_on(async {
             let (tmp, state) = make_temp_vault_with_unlocked_state(0x33).await;
-            vault_set_label_with_dir(tmp.path(), &state, Some("Work".into()))
+            vault_set_label_with_dir(tmp.path(), &state, &noop_hooks(), Some("Work".into()))
                 .await
                 .expect("set label");
             let view = prefs_read_with_dir(tmp.path(), &state).await.expect("read");
@@ -1965,9 +2268,14 @@ mod tests {
             assert!(label_clock > 0, "epoch-ms clock must be non-zero");
 
             // Device-local setter: no stamp, and the label clock survives.
-            set_theme_with_dir(tmp.path(), &state, Some(protocol::ThemeChoice::Dark))
-                .await
-                .expect("set theme");
+            set_theme_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                Some(protocol::ThemeChoice::Dark),
+            )
+            .await
+            .expect("set theme");
             let view = prefs_read_with_dir(tmp.path(), &state).await.expect("read");
             assert!(!view.field_clocks.contains_key("theme"));
             assert_eq!(view.field_clocks.get("label"), Some(&label_clock));
@@ -1980,7 +2288,7 @@ mod tests {
         // §9.5.2 `last_backup_at` field via the standard setter discipline.
         rt().block_on(async {
             let (tmp, state) = make_temp_vault_with_unlocked_state(0x33).await;
-            record_last_backup_at_with_dir(tmp.path(), &state, 1765432100)
+            record_last_backup_at_with_dir(tmp.path(), &state, &noop_hooks(), 1765432100)
                 .await
                 .expect("record");
             let view = prefs_read_with_dir(tmp.path(), &state).await.expect("read");
@@ -2057,7 +2365,9 @@ mod tests {
         rt().block_on(async {
             let tmp = ScopedTempDir::new("prefs-write-empty").expect("scoped tempdir");
             let state = VaultRuntimeState::default();
-            let result = set_screen_capture_protection_with_dir(tmp.path(), &state, false).await;
+            let result =
+                set_screen_capture_protection_with_dir(tmp.path(), &state, &noop_hooks(), false)
+                    .await;
             assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
         });
     }
@@ -2164,7 +2474,7 @@ mod tests {
             let (tmp, state) = make_temp_vault_with_unlocked_state(0x33).await;
 
             // Toggle off via the plugin.
-            set_screen_capture_protection_with_dir(tmp.path(), &state, false)
+            set_screen_capture_protection_with_dir(tmp.path(), &state, &noop_hooks(), false)
                 .await
                 .expect("write must succeed");
 
@@ -2184,7 +2494,7 @@ mod tests {
             );
 
             // Toggle back on.
-            set_screen_capture_protection_with_dir(tmp.path(), &state, true)
+            set_screen_capture_protection_with_dir(tmp.path(), &state, &noop_hooks(), true)
                 .await
                 .expect("second write must succeed");
             let view = prefs_read_with_dir(tmp.path(), &state)
@@ -2207,6 +2517,7 @@ mod tests {
             let result = set_editor_layout_with_dir(
                 tmp.path(),
                 &state,
+                &noop_hooks(),
                 EditorLayout {
                     left_width: 260,
                     right_width: 280,
@@ -2230,7 +2541,7 @@ mod tests {
                 left_collapsed: false,
                 right_collapsed: true,
             };
-            set_editor_layout_with_dir(tmp.path(), &state, layout)
+            set_editor_layout_with_dir(tmp.path(), &state, &noop_hooks(), layout)
                 .await
                 .expect("write must succeed");
 
@@ -2255,7 +2566,7 @@ mod tests {
                 left_collapsed: true,
                 right_collapsed: false,
             };
-            set_editor_layout_with_dir(tmp.path(), &state, layout2)
+            set_editor_layout_with_dir(tmp.path(), &state, &noop_hooks(), layout2)
                 .await
                 .expect("second write must succeed");
             let view = prefs_read_with_dir(tmp.path(), &state)
@@ -2272,8 +2583,13 @@ mod tests {
         rt().block_on(async {
             let tmp = ScopedTempDir::new("prefs-folders-empty").expect("scoped tempdir");
             let state = VaultRuntimeState::default();
-            let result =
-                set_deliberate_folders_with_dir(tmp.path(), &state, alloc_vec(["Projects/"])).await;
+            let result = set_deliberate_folders_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                alloc_vec(["Projects/"]),
+            )
+            .await;
             assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
         });
     }
@@ -2326,6 +2642,7 @@ mod tests {
             set_deliberate_folders_with_dir(
                 tmp.path(),
                 &state,
+                &noop_hooks(),
                 alloc_vec(["Projects/Myne/", "Archive/2025/"]),
             )
             .await
@@ -2343,7 +2660,7 @@ mod tests {
             assert!(view.screen_capture_protection);
 
             // Empty set round-trips (and re-encodes byte-identical to v0.1.0).
-            set_deliberate_folders_with_dir(tmp.path(), &state, Vec::new())
+            set_deliberate_folders_with_dir(tmp.path(), &state, &noop_hooks(), Vec::new())
                 .await
                 .expect("clear must succeed");
             let cleared = prefs_read_with_dir(tmp.path(), &state)
@@ -2360,8 +2677,13 @@ mod tests {
         rt().block_on(async {
             let tmp = ScopedTempDir::new("prefs-archived-empty").expect("scoped tempdir");
             let state = VaultRuntimeState::default();
-            let result =
-                set_archived_folders_with_dir(tmp.path(), &state, alloc_vec(["Projects/"])).await;
+            let result = set_archived_folders_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                alloc_vec(["Projects/"]),
+            )
+            .await;
             assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
         });
     }
@@ -2374,6 +2696,7 @@ mod tests {
             set_archived_folders_with_dir(
                 tmp.path(),
                 &state,
+                &noop_hooks(),
                 alloc_vec(["Projects/Myne/", "Archive/2025/"]),
             )
             .await
@@ -2391,7 +2714,7 @@ mod tests {
             assert!(view.deliberate_folders.is_empty());
 
             // Empty set round-trips (and re-encodes byte-identical to pre-feature).
-            set_archived_folders_with_dir(tmp.path(), &state, Vec::new())
+            set_archived_folders_with_dir(tmp.path(), &state, &noop_hooks(), Vec::new())
                 .await
                 .expect("clear must succeed");
             let cleared = prefs_read_with_dir(tmp.path(), &state)
@@ -2414,12 +2737,13 @@ mod tests {
             assert!(base.ai_excluded_folders.is_empty());
 
             // Enable + set exclusions (unsorted input).
-            set_ai_enabled_with_dir(tmp.path(), &state, true)
+            set_ai_enabled_with_dir(tmp.path(), &state, &noop_hooks(), true)
                 .await
                 .expect("enable must succeed");
             set_ai_excluded_folders_with_dir(
                 tmp.path(),
                 &state,
+                &noop_hooks(),
                 alloc_vec(["Private/", "Archive/2025/"]),
             )
             .await
@@ -2438,10 +2762,10 @@ mod tests {
             assert!(view.screen_capture_protection);
 
             // Disable + clear → back to defaults (byte-identical to pre-field).
-            set_ai_enabled_with_dir(tmp.path(), &state, false)
+            set_ai_enabled_with_dir(tmp.path(), &state, &noop_hooks(), false)
                 .await
                 .expect("disable must succeed");
-            set_ai_excluded_folders_with_dir(tmp.path(), &state, Vec::new())
+            set_ai_excluded_folders_with_dir(tmp.path(), &state, &noop_hooks(), Vec::new())
                 .await
                 .expect("clear must succeed");
             let cleared = prefs_read_with_dir(tmp.path(), &state)
@@ -2459,9 +2783,14 @@ mod tests {
         rt().block_on(async {
             let tmp = ScopedTempDir::new("prefs-newnote-empty").expect("scoped tempdir");
             let state = VaultRuntimeState::default();
-            let result =
-                set_new_note_location_with_dir(tmp.path(), &state, Some("root".to_string()), None)
-                    .await;
+            let result = set_new_note_location_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                Some("root".to_string()),
+                None,
+            )
+            .await;
             assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
         });
     }
@@ -2471,8 +2800,14 @@ mod tests {
         rt().block_on(async {
             let tmp = ScopedTempDir::new("prefs-startup-empty").expect("scoped tempdir");
             let state = VaultRuntimeState::default();
-            let result =
-                set_startup_open_with_dir(tmp.path(), &state, Some("last".to_string()), None).await;
+            let result = set_startup_open_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                Some("last".to_string()),
+                None,
+            )
+            .await;
             assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
         });
     }
@@ -2487,6 +2822,7 @@ mod tests {
             set_new_note_location_with_dir(
                 tmp.path(),
                 &state,
+                &noop_hooks(),
                 Some("specific".to_string()),
                 Some("Inbox/".to_string()),
             )
@@ -2501,9 +2837,15 @@ mod tests {
             assert!(view.deliberate_folders.contains(&"Inbox/".to_string()));
 
             // Switching back to "root" clears the target (caller passes None).
-            set_new_note_location_with_dir(tmp.path(), &state, Some("root".to_string()), None)
-                .await
-                .expect("second write must succeed");
+            set_new_note_location_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                Some("root".to_string()),
+                None,
+            )
+            .await
+            .expect("second write must succeed");
             let view = prefs_read_with_dir(tmp.path(), &state)
                 .await
                 .expect("read after second write");
@@ -2523,6 +2865,7 @@ mod tests {
             set_startup_open_with_dir(
                 tmp.path(),
                 &state,
+                &noop_hooks(),
                 Some("specific".to_string()),
                 Some("0192f1a0-0000-7000-8000-000000000000".to_string()),
             )
@@ -2539,9 +2882,15 @@ mod tests {
             );
 
             // "empty" mode clears the note pointer (caller passes None).
-            set_startup_open_with_dir(tmp.path(), &state, Some("empty".to_string()), None)
-                .await
-                .expect("second write must succeed");
+            set_startup_open_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                Some("empty".to_string()),
+                None,
+            )
+            .await
+            .expect("second write must succeed");
             let view = prefs_read_with_dir(tmp.path(), &state)
                 .await
                 .expect("read after second write");
@@ -2564,7 +2913,7 @@ mod tests {
                 ),
                 (String::from("Projects/Myne/"), String::from("slate")),
             ]);
-            set_item_colors_with_dir(tmp.path(), &state, colors.clone())
+            set_item_colors_with_dir(tmp.path(), &state, &noop_hooks(), colors.clone())
                 .await
                 .expect("write must succeed");
 
@@ -2576,9 +2925,14 @@ mod tests {
             assert!(view.screen_capture_protection);
 
             // Empty map round-trips (re-encodes byte-identical to a pre-feature blob).
-            set_item_colors_with_dir(tmp.path(), &state, std::collections::BTreeMap::new())
-                .await
-                .expect("clear must succeed");
+            set_item_colors_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                std::collections::BTreeMap::new(),
+            )
+            .await
+            .expect("clear must succeed");
             let cleared = prefs_read_with_dir(tmp.path(), &state)
                 .await
                 .expect("read after clear");
@@ -2595,7 +2949,7 @@ mod tests {
                 (String::from("Archive/2025/"), String::from("archive")),
                 (String::from("Projects/Myne/"), String::from("book")),
             ]);
-            set_folder_icons_with_dir(tmp.path(), &state, icons.clone())
+            set_folder_icons_with_dir(tmp.path(), &state, &noop_hooks(), icons.clone())
                 .await
                 .expect("write must succeed");
 
@@ -2604,9 +2958,14 @@ mod tests {
                 .expect("read after write");
             assert_eq!(view.folder_icons, icons);
 
-            set_folder_icons_with_dir(tmp.path(), &state, std::collections::BTreeMap::new())
-                .await
-                .expect("clear must succeed");
+            set_folder_icons_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                std::collections::BTreeMap::new(),
+            )
+            .await
+            .expect("clear must succeed");
             let cleared = prefs_read_with_dir(tmp.path(), &state)
                 .await
                 .expect("read after clear");
@@ -2621,7 +2980,9 @@ mod tests {
         rt().block_on(async {
             let tmp = ScopedTempDir::new("prefs-item-order-empty").expect("scoped tempdir");
             let state = VaultRuntimeState::default();
-            let result = set_item_order_with_dir(tmp.path(), &state, alloc_vec(["a", "b"])).await;
+            let result =
+                set_item_order_with_dir(tmp.path(), &state, &noop_hooks(), alloc_vec(["a", "b"]))
+                    .await;
             assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
         });
     }
@@ -2635,12 +2996,22 @@ mod tests {
             // — element order is the payload, so it round-trips VERBATIM (not
             // sorted, unlike deliberate_folders). A folder path is interleaved
             // between note UUIDs to exercise the heterogeneity.
-            set_item_order_with_dir(tmp.path(), &state, alloc_vec(["n-zzz", "Zebra/", "n-aaa"]))
-                .await
-                .expect("write item_order");
-            set_favorites_with_dir(tmp.path(), &state, alloc_vec(["n-zzz", "n-aaa"]))
-                .await
-                .expect("write favorites");
+            set_item_order_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                alloc_vec(["n-zzz", "Zebra/", "n-aaa"]),
+            )
+            .await
+            .expect("write item_order");
+            set_favorites_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                alloc_vec(["n-zzz", "n-aaa"]),
+            )
+            .await
+            .expect("write favorites");
 
             let view = prefs_read_with_dir(tmp.path(), &state)
                 .await
@@ -2652,7 +3023,7 @@ mod tests {
 
             // Clearing item_order round-trips back to empty; favorites is
             // an independent field and stays set.
-            set_item_order_with_dir(tmp.path(), &state, Vec::new())
+            set_item_order_with_dir(tmp.path(), &state, &noop_hooks(), Vec::new())
                 .await
                 .expect("clear item_order");
             let cleared = prefs_read_with_dir(tmp.path(), &state)
@@ -2674,8 +3045,13 @@ mod tests {
         rt().block_on(async {
             let tmp = ScopedTempDir::new("prefs-hidden-bar-empty").expect("scoped tempdir");
             let state = VaultRuntimeState::default();
-            let result =
-                set_hidden_bar_items_with_dir(tmp.path(), &state, alloc_vec(["graph"])).await;
+            let result = set_hidden_bar_items_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                alloc_vec(["graph"]),
+            )
+            .await;
             assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
         });
     }
@@ -2690,6 +3066,7 @@ mod tests {
             set_hidden_bar_items_with_dir(
                 tmp.path(),
                 &state,
+                &noop_hooks(),
                 alloc_vec(["word-count", "graph", "graph"]),
             )
             .await
@@ -2702,7 +3079,7 @@ mod tests {
             assert!(view.screen_capture_protection);
 
             // Clearing round-trips back to empty (bar fully visible default).
-            set_hidden_bar_items_with_dir(tmp.path(), &state, Vec::new())
+            set_hidden_bar_items_with_dir(tmp.path(), &state, &noop_hooks(), Vec::new())
                 .await
                 .expect("clear hidden_bar_items");
             let cleared = prefs_read_with_dir(tmp.path(), &state)
@@ -2737,7 +3114,9 @@ mod tests {
         rt().block_on(async {
             let tmp = ScopedTempDir::new("prefs-sv-empty").expect("scoped tempdir");
             let state = VaultRuntimeState::default();
-            let result = upsert_saved_view_with_dir(tmp.path(), &state, test_view("v1", "A")).await;
+            let result =
+                upsert_saved_view_with_dir(tmp.path(), &state, &noop_hooks(), test_view("v1", "A"))
+                    .await;
             assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
         });
     }
@@ -2748,7 +3127,7 @@ mod tests {
             let (tmp, state) = make_temp_vault_with_unlocked_state(0x44).await;
 
             // Save v1 → read returns it.
-            upsert_saved_view_with_dir(tmp.path(), &state, test_view("v1", "Books"))
+            upsert_saved_view_with_dir(tmp.path(), &state, &noop_hooks(), test_view("v1", "Books"))
                 .await
                 .expect("save v1");
             let view = prefs_read_with_dir(tmp.path(), &state).await.expect("read");
@@ -2756,15 +3135,20 @@ mod tests {
             assert_eq!(view.saved_views[0].name, "Books");
 
             // Edit v1 (same id, new name) → still one view, updated (no duplicate).
-            upsert_saved_view_with_dir(tmp.path(), &state, test_view("v1", "Reading"))
-                .await
-                .expect("edit v1");
+            upsert_saved_view_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                test_view("v1", "Reading"),
+            )
+            .await
+            .expect("edit v1");
             let view = prefs_read_with_dir(tmp.path(), &state).await.expect("read");
             assert_eq!(view.saved_views.len(), 1);
             assert_eq!(view.saved_views[0].name, "Reading");
 
             // Save a second view → two distinct entries.
-            upsert_saved_view_with_dir(tmp.path(), &state, test_view("v2", "Films"))
+            upsert_saved_view_with_dir(tmp.path(), &state, &noop_hooks(), test_view("v2", "Films"))
                 .await
                 .expect("save v2");
             let view = prefs_read_with_dir(tmp.path(), &state).await.expect("read");
@@ -2789,14 +3173,14 @@ mod tests {
         // view set is untouched.
         rt().block_on(async {
             let (tmp, state) = make_temp_vault_with_unlocked_state(0x45).await;
-            upsert_saved_view_with_dir(tmp.path(), &state, test_view("v1", "Small"))
+            upsert_saved_view_with_dir(tmp.path(), &state, &noop_hooks(), test_view("v1", "Small"))
                 .await
                 .expect("save small");
 
             // A view with a >64 KiB name blows the cap on encode.
             let mut huge = test_view("v2", "");
             huge.name = "x".repeat(70 * 1024);
-            let result = upsert_saved_view_with_dir(tmp.path(), &state, huge).await;
+            let result = upsert_saved_view_with_dir(tmp.path(), &state, &noop_hooks(), huge).await;
             assert!(matches!(result, Err(PrefsWriteError::PrefsEncodeFailed)));
 
             // Prior prefs intact: still exactly the one small view.
@@ -2812,11 +3196,12 @@ mod tests {
             let tmp = ScopedTempDir::new("prefs-sv-del-empty").expect("scoped tempdir");
             let state = VaultRuntimeState::default();
             assert!(matches!(
-                delete_saved_view_with_dir(tmp.path(), &state, String::from("v1")).await,
+                delete_saved_view_with_dir(tmp.path(), &state, &noop_hooks(), String::from("v1"))
+                    .await,
                 Err(PrefsWriteError::SlotNotUnlocked)
             ));
             assert!(matches!(
-                set_view_order_with_dir(tmp.path(), &state, alloc_vec(["v1"])).await,
+                set_view_order_with_dir(tmp.path(), &state, &noop_hooks(), alloc_vec(["v1"])).await,
                 Err(PrefsWriteError::SlotNotUnlocked)
             ));
         });
@@ -2826,18 +3211,18 @@ mod tests {
     fn delete_saved_view_removes_and_prunes_view_order() {
         rt().block_on(async {
             let (tmp, state) = make_temp_vault_with_unlocked_state(0x46).await;
-            upsert_saved_view_with_dir(tmp.path(), &state, test_view("v1", "A"))
+            upsert_saved_view_with_dir(tmp.path(), &state, &noop_hooks(), test_view("v1", "A"))
                 .await
                 .expect("save v1");
-            upsert_saved_view_with_dir(tmp.path(), &state, test_view("v2", "B"))
+            upsert_saved_view_with_dir(tmp.path(), &state, &noop_hooks(), test_view("v2", "B"))
                 .await
                 .expect("save v2");
-            set_view_order_with_dir(tmp.path(), &state, alloc_vec(["v2", "v1"]))
+            set_view_order_with_dir(tmp.path(), &state, &noop_hooks(), alloc_vec(["v2", "v1"]))
                 .await
                 .expect("order");
 
             // Delete v1 → gone from saved_views AND pruned from view_order.
-            delete_saved_view_with_dir(tmp.path(), &state, String::from("v1"))
+            delete_saved_view_with_dir(tmp.path(), &state, &noop_hooks(), String::from("v1"))
                 .await
                 .expect("delete v1");
             let view = prefs_read_with_dir(tmp.path(), &state).await.expect("read");
@@ -2846,7 +3231,7 @@ mod tests {
             assert_eq!(view.view_order, alloc_vec(["v2"]));
 
             // Deleting an absent id is an idempotent no-op success.
-            delete_saved_view_with_dir(tmp.path(), &state, String::from("ghost"))
+            delete_saved_view_with_dir(tmp.path(), &state, &noop_hooks(), String::from("ghost"))
                 .await
                 .expect("delete absent is ok");
             let view = prefs_read_with_dir(tmp.path(), &state).await.expect("read");
@@ -2859,9 +3244,14 @@ mod tests {
         rt().block_on(async {
             let (tmp, state) = make_temp_vault_with_unlocked_state(0x47).await;
             // A reorder over ids that don't (yet) exist is tolerated — no codec GC.
-            set_view_order_with_dir(tmp.path(), &state, alloc_vec(["v3", "v1", "v3"]))
-                .await
-                .expect("set order");
+            set_view_order_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                alloc_vec(["v3", "v1", "v3"]),
+            )
+            .await
+            .expect("set order");
             let view = prefs_read_with_dir(tmp.path(), &state).await.expect("read");
             assert_eq!(view.view_order, alloc_vec(["v3", "v1", "v3"]));
         });
@@ -2874,8 +3264,13 @@ mod tests {
         rt().block_on(async {
             let tmp = ScopedTempDir::new("prefs-bar-order-empty").expect("scoped tempdir");
             let state = VaultRuntimeState::default();
-            let result =
-                set_bar_items_order_with_dir(tmp.path(), &state, alloc_vec(["graph"])).await;
+            let result = set_bar_items_order_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                alloc_vec(["graph"]),
+            )
+            .await;
             assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
         });
     }
@@ -2889,6 +3284,7 @@ mod tests {
             set_bar_items_order_with_dir(
                 tmp.path(),
                 &state,
+                &noop_hooks(),
                 alloc_vec(["word-count", "graph", "tags", "view-mode"]),
             )
             .await
@@ -2900,7 +3296,7 @@ mod tests {
             );
 
             // Clearing round-trips back to empty.
-            set_bar_items_order_with_dir(tmp.path(), &state, Vec::new())
+            set_bar_items_order_with_dir(tmp.path(), &state, &noop_hooks(), Vec::new())
                 .await
                 .expect("clear order");
             let cleared = prefs_read_with_dir(tmp.path(), &state).await.expect("read");
@@ -2915,7 +3311,9 @@ mod tests {
         rt().block_on(async {
             let tmp = ScopedTempDir::new("prefs-theme-empty").expect("scoped tempdir");
             let state = VaultRuntimeState::default();
-            let result = set_theme_with_dir(tmp.path(), &state, Some(ThemeChoice::Dark)).await;
+            let result =
+                set_theme_with_dir(tmp.path(), &state, &noop_hooks(), Some(ThemeChoice::Dark))
+                    .await;
             assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
         });
     }
@@ -2926,7 +3324,7 @@ mod tests {
             let (tmp, state) = make_temp_vault_with_unlocked_state(0x33).await;
 
             // Explicit Dark persists (disk-first) + round-trips.
-            set_theme_with_dir(tmp.path(), &state, Some(ThemeChoice::Dark))
+            set_theme_with_dir(tmp.path(), &state, &noop_hooks(), Some(ThemeChoice::Dark))
                 .await
                 .expect("write theme");
             assert!(
@@ -2941,7 +3339,7 @@ mod tests {
             assert!(view.screen_capture_protection);
 
             // Switching to Light overwrites.
-            set_theme_with_dir(tmp.path(), &state, Some(ThemeChoice::Light))
+            set_theme_with_dir(tmp.path(), &state, &noop_hooks(), Some(ThemeChoice::Light))
                 .await
                 .expect("write light");
             let view = prefs_read_with_dir(tmp.path(), &state)
@@ -2950,7 +3348,7 @@ mod tests {
             assert_eq!(view.theme, Some(ThemeChoice::Light));
 
             // System (None) clears the field back to "no explicit choice".
-            set_theme_with_dir(tmp.path(), &state, None)
+            set_theme_with_dir(tmp.path(), &state, &noop_hooks(), None)
                 .await
                 .expect("write system");
             let view = prefs_read_with_dir(tmp.path(), &state)
@@ -2965,9 +3363,13 @@ mod tests {
         rt().block_on(async {
             let tmp = ScopedTempDir::new("prefs-custom-theme-empty").expect("scoped tempdir");
             let state = VaultRuntimeState::default();
-            let result =
-                set_custom_theme_with_dir(tmp.path(), &state, Some(String::from("solarized")))
-                    .await;
+            let result = set_custom_theme_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                Some(String::from("solarized")),
+            )
+            .await;
             assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
         });
     }
@@ -2978,9 +3380,14 @@ mod tests {
             let (tmp, state) = make_temp_vault_with_unlocked_state(0x33).await;
 
             // Select a custom theme (disk-first) + round-trip.
-            set_custom_theme_with_dir(tmp.path(), &state, Some(String::from("solarized-dark")))
-                .await
-                .expect("write custom_theme");
+            set_custom_theme_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                Some(String::from("solarized-dark")),
+            )
+            .await
+            .expect("write custom_theme");
             let view = prefs_read_with_dir(tmp.path(), &state)
                 .await
                 .expect("read after custom_theme write");
@@ -2988,7 +3395,7 @@ mod tests {
 
             // A built-in theme can be set alongside it; both persist (precedence
             // — custom_theme winning — is resolved client-side).
-            set_theme_with_dir(tmp.path(), &state, Some(ThemeChoice::Dark))
+            set_theme_with_dir(tmp.path(), &state, &noop_hooks(), Some(ThemeChoice::Dark))
                 .await
                 .expect("write theme");
             let view = prefs_read_with_dir(tmp.path(), &state)
@@ -2998,7 +3405,7 @@ mod tests {
             assert_eq!(view.theme, Some(ThemeChoice::Dark));
 
             // Clearing custom_theme (None) drops the field back to "no custom".
-            set_custom_theme_with_dir(tmp.path(), &state, None)
+            set_custom_theme_with_dir(tmp.path(), &state, &noop_hooks(), None)
                 .await
                 .expect("clear custom_theme");
             let view = prefs_read_with_dir(tmp.path(), &state)
@@ -3016,11 +3423,16 @@ mod tests {
         rt().block_on(async {
             let tmp = ScopedTempDir::new("prefs-typo-empty").expect("scoped tempdir");
             let state = VaultRuntimeState::default();
-            let result =
-                set_typography_field_with_dir(tmp.path(), &state, "editor_text_size", |p| {
+            let result = set_typography_field_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                "editor_text_size",
+                |p| {
                     p.editor_text_size = Some(String::from("lg"));
-                })
-                .await;
+                },
+            )
+            .await;
             assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
         });
     }
@@ -3030,14 +3442,26 @@ mod tests {
         rt().block_on(async {
             let (tmp, state) = make_temp_vault_with_unlocked_state(0x44).await;
 
-            set_typography_field_with_dir(tmp.path(), &state, "editor_text_size", |p| {
-                p.editor_text_size = Some(String::from("lg"));
-            })
+            set_typography_field_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                "editor_text_size",
+                |p| {
+                    p.editor_text_size = Some(String::from("lg"));
+                },
+            )
             .await
             .expect("write text size");
-            set_typography_field_with_dir(tmp.path(), &state, "editor_font_family", |p| {
-                p.editor_font_family = Some(String::from("sans"));
-            })
+            set_typography_field_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                "editor_font_family",
+                |p| {
+                    p.editor_font_family = Some(String::from("sans"));
+                },
+            )
             .await
             .expect("write font family");
             assert!(tmp.path().join("vault.prefs").exists());
@@ -3051,9 +3475,15 @@ mod tests {
             assert!(view.screen_capture_protection);
 
             // None clears the field back to the default (omitted on disk).
-            set_typography_field_with_dir(tmp.path(), &state, "editor_text_size", |p| {
-                p.editor_text_size = None;
-            })
+            set_typography_field_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                "editor_text_size",
+                |p| {
+                    p.editor_text_size = None;
+                },
+            )
             .await
             .expect("clear text size");
             let view = prefs_read_with_dir(tmp.path(), &state)
@@ -3071,7 +3501,7 @@ mod tests {
         rt().block_on(async {
             let tmp = ScopedTempDir::new("prefs-spell-empty").expect("scoped tempdir");
             let state = VaultRuntimeState::default();
-            let result = set_spell_enabled_with_dir(tmp.path(), &state, true).await;
+            let result = set_spell_enabled_with_dir(tmp.path(), &state, &noop_hooks(), true).await;
             assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
         });
     }
@@ -3082,7 +3512,7 @@ mod tests {
             let (tmp, state) = make_temp_vault_with_unlocked_state(0x44).await;
 
             // Enable persists (disk-first) + round-trips.
-            set_spell_enabled_with_dir(tmp.path(), &state, true)
+            set_spell_enabled_with_dir(tmp.path(), &state, &noop_hooks(), true)
                 .await
                 .expect("write spell_enabled");
             let view = prefs_read_with_dir(tmp.path(), &state)
@@ -3097,6 +3527,7 @@ mod tests {
             set_spell_languages_with_dir(
                 tmp.path(),
                 &state,
+                &noop_hooks(),
                 vec!["tr".to_string(), "en-US".to_string(), "tr".to_string()],
             )
             .await
@@ -3112,7 +3543,7 @@ mod tests {
             assert_eq!(view.spell_enabled, Some(true));
 
             // Disable overwrites.
-            set_spell_enabled_with_dir(tmp.path(), &state, false)
+            set_spell_enabled_with_dir(tmp.path(), &state, &noop_hooks(), false)
                 .await
                 .expect("write disable");
             let view = prefs_read_with_dir(tmp.path(), &state)
@@ -3129,7 +3560,8 @@ mod tests {
         rt().block_on(async {
             let tmp = ScopedTempDir::new("prefs-timestamps-empty").expect("scoped tempdir");
             let state = VaultRuntimeState::default();
-            let result = set_show_note_timestamps_with_dir(tmp.path(), &state, false).await;
+            let result =
+                set_show_note_timestamps_with_dir(tmp.path(), &state, &noop_hooks(), false).await;
             assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
         });
     }
@@ -3146,7 +3578,7 @@ mod tests {
             assert!(view.show_note_timestamps);
 
             // Turn OFF persists (disk-first) + round-trips.
-            set_show_note_timestamps_with_dir(tmp.path(), &state, false)
+            set_show_note_timestamps_with_dir(tmp.path(), &state, &noop_hooks(), false)
                 .await
                 .expect("write off");
             let view = prefs_read_with_dir(tmp.path(), &state)
@@ -3157,7 +3589,7 @@ mod tests {
             assert!(view.screen_capture_protection);
 
             // Turn back ON overwrites (re-encodes byte-identical to pre-feature).
-            set_show_note_timestamps_with_dir(tmp.path(), &state, true)
+            set_show_note_timestamps_with_dir(tmp.path(), &state, &noop_hooks(), true)
                 .await
                 .expect("write on");
             let view = prefs_read_with_dir(tmp.path(), &state)
@@ -3174,7 +3606,8 @@ mod tests {
         rt().block_on(async {
             let tmp = ScopedTempDir::new("prefs-line-numbers-empty").expect("scoped tempdir");
             let state = VaultRuntimeState::default();
-            let result = set_editor_line_numbers_with_dir(tmp.path(), &state, true).await;
+            let result =
+                set_editor_line_numbers_with_dir(tmp.path(), &state, &noop_hooks(), true).await;
             assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
         });
     }
@@ -3191,7 +3624,7 @@ mod tests {
             assert_eq!(view.editor_line_numbers, None);
 
             // Turn ON persists (disk-first) + round-trips.
-            set_editor_line_numbers_with_dir(tmp.path(), &state, true)
+            set_editor_line_numbers_with_dir(tmp.path(), &state, &noop_hooks(), true)
                 .await
                 .expect("write on");
             let view = prefs_read_with_dir(tmp.path(), &state)
@@ -3202,7 +3635,7 @@ mod tests {
             assert!(view.screen_capture_protection);
 
             // Turn OFF overwrites (explicit Some(false), not back to None).
-            set_editor_line_numbers_with_dir(tmp.path(), &state, false)
+            set_editor_line_numbers_with_dir(tmp.path(), &state, &noop_hooks(), false)
                 .await
                 .expect("write off");
             let view = prefs_read_with_dir(tmp.path(), &state)
@@ -3219,7 +3652,8 @@ mod tests {
         rt().block_on(async {
             let tmp = ScopedTempDir::new("prefs-archive-disabled-empty").expect("scoped tempdir");
             let state = VaultRuntimeState::default();
-            let result = set_archive_disabled_with_dir(tmp.path(), &state, true).await;
+            let result =
+                set_archive_disabled_with_dir(tmp.path(), &state, &noop_hooks(), true).await;
             assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
         });
     }
@@ -3237,7 +3671,7 @@ mod tests {
             assert_eq!(view.archive_disabled, None);
 
             // Turn ON persists (disk-first) + round-trips.
-            set_archive_disabled_with_dir(tmp.path(), &state, true)
+            set_archive_disabled_with_dir(tmp.path(), &state, &noop_hooks(), true)
                 .await
                 .expect("write on");
             let view = prefs_read_with_dir(tmp.path(), &state)
@@ -3248,7 +3682,7 @@ mod tests {
             assert!(view.screen_capture_protection);
 
             // Turn OFF overwrites (explicit Some(false), not back to None).
-            set_archive_disabled_with_dir(tmp.path(), &state, false)
+            set_archive_disabled_with_dir(tmp.path(), &state, &noop_hooks(), false)
                 .await
                 .expect("write off");
             let view = prefs_read_with_dir(tmp.path(), &state)
@@ -3265,7 +3699,9 @@ mod tests {
         rt().block_on(async {
             let tmp = ScopedTempDir::new("prefs-focus-dim-empty").expect("scoped tempdir");
             let state = VaultRuntimeState::default();
-            let result = set_editor_focus_dim_inactive_with_dir(tmp.path(), &state, true).await;
+            let result =
+                set_editor_focus_dim_inactive_with_dir(tmp.path(), &state, &noop_hooks(), true)
+                    .await;
             assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
         });
     }
@@ -3275,7 +3711,8 @@ mod tests {
         rt().block_on(async {
             let tmp = ScopedTempDir::new("prefs-focus-tw-empty").expect("scoped tempdir");
             let state = VaultRuntimeState::default();
-            let result = set_editor_focus_typewriter_with_dir(tmp.path(), &state, true).await;
+            let result =
+                set_editor_focus_typewriter_with_dir(tmp.path(), &state, &noop_hooks(), true).await;
             assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
         });
     }
@@ -3293,10 +3730,10 @@ mod tests {
             assert_eq!(view.editor_focus_typewriter, None);
 
             // Enable both persists (disk-first) + round-trips.
-            set_editor_focus_dim_inactive_with_dir(tmp.path(), &state, true)
+            set_editor_focus_dim_inactive_with_dir(tmp.path(), &state, &noop_hooks(), true)
                 .await
                 .expect("write dim on");
-            set_editor_focus_typewriter_with_dir(tmp.path(), &state, false)
+            set_editor_focus_typewriter_with_dir(tmp.path(), &state, &noop_hooks(), false)
                 .await
                 .expect("write typewriter off");
             let view = prefs_read_with_dir(tmp.path(), &state)
@@ -3316,14 +3753,26 @@ mod tests {
 
             // Set both string fields (via the shared typography core, the
             // command wrappers' read-modify-write helper).
-            set_typography_field_with_dir(tmp.path(), &state, "active_workspace", |p| {
-                p.active_workspace = Some(String::from("ws-7"));
-            })
+            set_typography_field_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                "active_workspace",
+                |p| {
+                    p.active_workspace = Some(String::from("ws-7"));
+                },
+            )
             .await
             .expect("write active_workspace");
-            set_typography_field_with_dir(tmp.path(), &state, "editor_default_view_mode", |p| {
-                p.editor_default_view_mode = Some(String::from("reading"));
-            })
+            set_typography_field_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                "editor_default_view_mode",
+                |p| {
+                    p.editor_default_view_mode = Some(String::from("reading"));
+                },
+            )
             .await
             .expect("write default view mode");
 
@@ -3335,9 +3784,15 @@ mod tests {
             assert!(view.screen_capture_protection);
 
             // None clears active_workspace back to the default (omitted on disk).
-            set_typography_field_with_dir(tmp.path(), &state, "active_workspace", |p| {
-                p.active_workspace = None;
-            })
+            set_typography_field_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                "active_workspace",
+                |p| {
+                    p.active_workspace = None;
+                },
+            )
             .await
             .expect("clear active_workspace");
             let view = prefs_read_with_dir(tmp.path(), &state)
@@ -3358,6 +3813,7 @@ mod tests {
             let result = set_keymap_binding_with_dir(
                 tmp.path(),
                 &state,
+                &noop_hooks(),
                 "graph.show".to_string(),
                 Some(vec!["Mod-Shift-g".to_string()]),
             )
@@ -3382,6 +3838,7 @@ mod tests {
             set_keymap_binding_with_dir(
                 tmp.path(),
                 &state,
+                &noop_hooks(),
                 "app.command-palette".to_string(),
                 Some(vec![
                     "Mod-p".to_string(),
@@ -3405,6 +3862,7 @@ mod tests {
             set_keymap_binding_with_dir(
                 tmp.path(),
                 &state,
+                &noop_hooks(),
                 "vault.lock".to_string(),
                 Some(Vec::new()),
             )
@@ -3424,6 +3882,7 @@ mod tests {
             set_keymap_binding_with_dir(
                 tmp.path(),
                 &state,
+                &noop_hooks(),
                 "app.command-palette".to_string(),
                 None,
             )
@@ -3449,8 +3908,13 @@ mod tests {
         rt().block_on(async {
             let tmp = ScopedTempDir::new("prefs-label-empty").expect("scoped tempdir");
             let state = VaultRuntimeState::default();
-            let result =
-                vault_set_label_with_dir(tmp.path(), &state, Some(String::from("Work"))).await;
+            let result = vault_set_label_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                Some(String::from("Work")),
+            )
+            .await;
             assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
         });
     }
@@ -3468,9 +3932,14 @@ mod tests {
             assert_eq!(state.cached_label(test_vault_id()).await, None);
 
             // Set a label — persists on disk + caches in RAM.
-            vault_set_label_with_dir(tmp.path(), &state, Some(String::from("Work")))
-                .await
-                .expect("write label");
+            vault_set_label_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                Some(String::from("Work")),
+            )
+            .await
+            .expect("write label");
             assert!(
                 tmp.path().join("vault.prefs").exists(),
                 "vault_set_label must create vault.prefs"
@@ -3488,9 +3957,14 @@ mod tests {
             );
 
             // Rename overwrites both disk + cache.
-            vault_set_label_with_dir(tmp.path(), &state, Some(String::from("Personal")))
-                .await
-                .expect("rename label");
+            vault_set_label_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                Some(String::from("Personal")),
+            )
+            .await
+            .expect("rename label");
             let view = prefs_read_with_dir(tmp.path(), &state)
                 .await
                 .expect("read after rename");
@@ -3501,7 +3975,7 @@ mod tests {
             );
 
             // Clearing (None) removes the label on disk AND evicts the cache.
-            vault_set_label_with_dir(tmp.path(), &state, None)
+            vault_set_label_with_dir(tmp.path(), &state, &noop_hooks(), None)
                 .await
                 .expect("clear label");
             let view = prefs_read_with_dir(tmp.path(), &state)
@@ -3522,8 +3996,13 @@ mod tests {
         rt().block_on(async {
             let tmp = ScopedTempDir::new("prefs-icon-empty").expect("scoped tempdir");
             let state = VaultRuntimeState::default();
-            let result =
-                vault_set_icon_with_dir(tmp.path(), &state, Some(String::from("book"))).await;
+            let result = vault_set_icon_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                Some(String::from("book")),
+            )
+            .await;
             assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
         });
     }
@@ -3541,9 +4020,14 @@ mod tests {
             assert_eq!(state.cached_icon(test_vault_id()).await, None);
 
             // Set an icon — persists on disk + caches in RAM.
-            vault_set_icon_with_dir(tmp.path(), &state, Some(String::from("book")))
-                .await
-                .expect("write icon");
+            vault_set_icon_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                Some(String::from("book")),
+            )
+            .await
+            .expect("write icon");
             assert!(
                 tmp.path().join("vault.prefs").exists(),
                 "vault_set_icon must create vault.prefs"
@@ -3561,9 +4045,14 @@ mod tests {
             );
 
             // Changing the icon overwrites both disk + cache.
-            vault_set_icon_with_dir(tmp.path(), &state, Some(String::from("code")))
-                .await
-                .expect("change icon");
+            vault_set_icon_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                Some(String::from("code")),
+            )
+            .await
+            .expect("change icon");
             let view = prefs_read_with_dir(tmp.path(), &state)
                 .await
                 .expect("read after change");
@@ -3574,7 +4063,7 @@ mod tests {
             );
 
             // Clearing (None) removes the icon on disk AND evicts the cache.
-            vault_set_icon_with_dir(tmp.path(), &state, None)
+            vault_set_icon_with_dir(tmp.path(), &state, &noop_hooks(), None)
                 .await
                 .expect("clear icon");
             let view = prefs_read_with_dir(tmp.path(), &state)
@@ -3594,9 +4083,14 @@ mod tests {
         rt().block_on(async {
             let (tmp, state) = make_temp_vault_with_unlocked_state(0x33).await;
             let secret_label = "TopSecretProjectName";
-            vault_set_label_with_dir(tmp.path(), &state, Some(String::from(secret_label)))
-                .await
-                .expect("write label");
+            vault_set_label_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                Some(String::from(secret_label)),
+            )
+            .await
+            .expect("write label");
             assert!(
                 logs_contain("field=\"label\""),
                 "expected the prefs_written event with field=label"

@@ -47,6 +47,7 @@ async fn persist_registry<R: Runtime>(
     app: &AppHandle<R>,
     pairing: &PairingState,
     vault_state: &VaultRuntimeState,
+    hooks: &myne_core::hooks::Hooks,
 ) -> Result<(), PairingError> {
     let vault_dir = crate::paths::active_vault_root_io(app, vault_state.active_vault_id().await)
         .map_err(|_| PairingError::PersistFailed)?;
@@ -54,6 +55,7 @@ async fn persist_registry<R: Runtime>(
     crate::plugins::prefs::commands::persist_paired_extensions_with_dir(
         &vault_dir,
         vault_state,
+        hooks,
         records,
     )
     .await
@@ -110,12 +112,13 @@ pub async fn pairing_accept<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, PairingState>,
     vault_state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, myne_core::hooks::Hooks>,
 ) -> Result<String, PairingError> {
     match state.accept_pending()? {
         Some(token) => {
             // Persist the new registry (issued token) BEFORE handing the value
             // back, so a durability failure is surfaced to the dialog.
-            persist_registry(&app, state.inner(), vault_state.inner()).await?;
+            persist_registry(&app, state.inner(), vault_state.inner(), hooks.inner()).await?;
             // Bounded outcome only — never the token value or extension id.
             tracing::debug!(stage = "ext_pairing", outcome = "accepted");
             Ok(token.value().to_string())
@@ -180,6 +183,7 @@ pub async fn pairing_revoke<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, PairingState>,
     vault_state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, myne_core::hooks::Hooks>,
     extension_id: String,
 ) -> Result<(), PairingError> {
     let revoked = state.revoke_extension(&extension_id);
@@ -187,7 +191,7 @@ pub async fn pairing_revoke<R: Runtime>(
     // re-write of the unchanged snapshot (idempotent), and persisting keeps the
     // disk state authoritative even if the in-memory and on-disk views had
     // drifted (e.g. a prior accept's persist had failed).
-    persist_registry(&app, state.inner(), vault_state.inner()).await?;
+    persist_registry(&app, state.inner(), vault_state.inner(), hooks.inner()).await?;
     tracing::debug!(stage = "ext_pairing", outcome = "revoked", count = revoked);
     Ok(())
 }
