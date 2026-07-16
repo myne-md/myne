@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Myne "Save to Myne" Share Extension — Info.plist (SF2, MYND-510).
+
+  ⚠️ DEVICE-VERIFY-PENDING: this target only signs/runs with Apple-Developer
+  provisioning (App-Group + shared keychain-access-group). See ios-share/README.md.
+
+  NSExtensionPointIdentifier = com.apple.share-services makes this a share
+  extension (surfaced in the OS share sheet).
+
+  NSExtensionPrincipalClass = $(PRODUCT_MODULE_NAME).ShareViewController — the
+  headless UIViewController subclass (ShareViewController.swift) that seals each
+  shared file in-process and completes immediately (SYNC-13, no rich UI). The
+  $(PRODUCT_MODULE_NAME) substitution resolves to the extension target's module
+  (MyneShareExtension), so the principal class survives an xcodegen regenerate.
+
+  NSExtensionActivationRule (SYNC-14): a predicate that activates on ANY shared
+  attachment conforming to public.image, com.adobe.pdf, or public.data, across
+  one OR MORE items (multi-item). public.data is the broad base type for
+  arbitrary files (so "Save any file to Myne" works); the image/pdf clauses are
+  named explicitly per the SF2 spec for intent + so a future tightening has the
+  hooks in place. The `>= 1` multi-item shape lets a batch share (e.g. several
+  photos) activate and be sealed one-by-one by the principal class.
+-->
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<key>CFBundleDisplayName</key>
+	<string>Save to Myne</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>$(PRODUCT_NAME)</string>
+	<key>CFBundlePackageType</key>
+	<string>XPC!</string>
+	<key>CFBundleShortVersionString</key>
+	<string>0.1.0</string>
+	<key>CFBundleVersion</key>
+	<string>0.1.0</string>
+	<key>NSExtension</key>
+	<dict>
+		<key>NSExtensionPointIdentifier</key>
+		<string>com.apple.share-services</string>
+		<key>NSExtensionPrincipalClass</key>
+		<string>$(PRODUCT_MODULE_NAME).ShareViewController</string>
+		<key>NSExtensionAttributes</key>
+		<dict>
+			<key>NSExtensionActivationRule</key>
+			<string>SUBQUERY (
+    extensionItems,
+    $item,
+    SUBQUERY (
+        $item.attachments,
+        $attachment,
+        ANY $attachment.registeredTypeIdentifiers UTI-CONFORMS-TO "public.image"
+        || ANY $attachment.registeredTypeIdentifiers UTI-CONFORMS-TO "com.adobe.pdf"
+        || ANY $attachment.registeredTypeIdentifiers UTI-CONFORMS-TO "public.data"
+    ).@count &gt;= 1
+).@count &gt;= 1</string>
+		</dict>
+	</dict>
+</dict>
+</plist>

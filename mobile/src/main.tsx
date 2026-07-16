@@ -12,6 +12,7 @@ import "@myne/editor/drawing/excalidraw-asset-path";
 import App from "./App";
 import { initDeepLinks } from "./lib/deep-link";
 import { initCaptures } from "./lib/captures";
+import { initShareIntent } from "./lib/shareImport";
 import "./styles/tokens.css";
 import "./styles/mobile.css";
 
@@ -24,6 +25,12 @@ void initDeepLinks();
 // Runs while the vault is locked (device-key based); the drain into notes
 // happens later, on unlock, from EditorFlow.
 void initCaptures();
+
+// Subscribe to OS-share-sheet deliveries (SF3): a file shared into Myne from
+// another app (Android ACTION_SEND) is sealed into the share-import staging
+// queue here (device-key based, runs while the vault is locked); the drain into
+// the attachment library happens later, on unlock, from EditorFlow.
+void initShareIntent();
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
