@@ -1965,7 +1965,7 @@ The 34-byte fixed-offset header is the shared blob-envelope framing of §9.6/§9
 
 #### 9.19.2 Inner plaintext (engine-opaque)
 
-The plaintext is a client-serialized position map + a schema version; the codec is byte-transparent. The desktop client's v0.1 form is `{ "v": 1, "pos": [[<note_id>, x, y], …] }`. A different `graph_layout_format_version` (offset 5) lets a future serialization be recognized and dropped (→ recompute) rather than mis-parsed. Maximum plaintext is **16 MiB** (`MAX_GRAPH_LAYOUT_PLAINTEXT_LEN`) — generous for one small record per note (≈ 200k notes) while still bounding the pre-AEAD allocation.
+The plaintext is a client-serialized position map + a schema version; the codec is byte-transparent. The desktop client's v0.1 form is `{ "v": 1, "pos": [[<note_id>, x, y], …] }`; the mobile client (Phase 3) writes the same form under the same `graph_layout_format_version` `0x01` into its own device-local `vault.graph` — the file never crosses devices (Class 3, never synced/backed up), so the shared form is a convenience, not a cross-device compatibility requirement. A different `graph_layout_format_version` (offset 5) lets a future serialization be recognized and dropped (→ recompute) rather than mis-parsed. Maximum plaintext is **16 MiB** (`MAX_GRAPH_LAYOUT_PLAINTEXT_LEN`) — generous for one small record per note (≈ 200k notes) while still bounding the pre-AEAD allocation.
 
 #### 9.19.3 AAD construction
 
