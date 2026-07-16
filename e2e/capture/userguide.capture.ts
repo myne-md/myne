@@ -41,6 +41,7 @@ import { seedVault } from "./../support/fixtures";
 import {
   closeSettings,
   dismissImporterOffer,
+  pageSeatInvoke,
   runPaletteAction,
   unlockToEditor,
 } from "./../support/flows";
@@ -55,6 +56,8 @@ const CTRL = String.fromCharCode(0xe009); // W3C modifier (sticky until repeated
 const ALT = String.fromCharCode(0xe00a); // W3C modifier (open-to-side / split)
 const HOME = String.fromCharCode(0xe011); // W3C Home key
 const END = String.fromCharCode(0xe010); // W3C End key
+const SHIFT = String.fromCharCode(0xe008); // W3C modifier (extend selection)
+const ARROW_RIGHT = String.fromCharCode(0xe014); // W3C ArrowRight
 
 interface FrameRecord {
   name: string;
@@ -250,6 +253,31 @@ async function pressKey(session: Session, key: string): Promise<void> {
   });
 }
 
+/** Press `key` while holding every modifier in `mods` (all down, key, all up)
+ *  via the W3C Actions API. Used by the multi-cursor frame (Shift+ArrowRight to
+ *  select a word, then Ctrl+d to add occurrences). */
+async function pressChord(session: Session, mods: string[], key: string): Promise<void> {
+  const downs = [...mods, key].map((value) => ({ type: "keyDown", value }));
+  const ups = [...mods, key].reverse().map((value) => ({ type: "keyUp", value }));
+  await session.send("POST", "/actions", {
+    actions: [{ type: "key", id: "kbd", actions: [...downs, ...ups] }],
+  });
+}
+
+/** Right-click the sidebar row titled `title` and click the context-menu item
+ *  whose `data-item-id` is `itemId`. The row context-menu idiom recurs across
+ *  the new notes-organization frames (favourite / delete / archive / export). */
+async function rowContextAction(session: Session, title: string, itemId: string): Promise<void> {
+  const row = await noteRowByTitle(session, title);
+  await row.rightClick();
+  await (
+    await session.waitForElement(
+      testIdSelector("notes.context-menu-item", { "data-item-id": itemId }),
+      { timeoutMs: 6000 },
+    )
+  ).click();
+}
+
 /** Open the sidebar note titled `title` by matching the row textContent.
  *  Note rows share `data-testid="notes.row"`; there is no public
  *  title→id map, so scan the rows' text (the byTestIdAll idiom from
@@ -262,7 +290,10 @@ async function openNoteByTitle(session: Session, title: string): Promise<Element
       }
       return null;
     },
-    { label: `notes.row titled "${title}"`, timeoutMs: 12000 },
+    // 20s: the guide vault carries ~20 notes and byTestIdAll scans every row's
+    // textContent per poll — under the @2x retina render that occasionally
+    // exceeds the old 12s (best-effort frames then flaked "row timed out").
+    { label: `notes.row titled "${title}"`, timeoutMs: 20000 },
   );
   await row.click();
   await sleep(500); // let the editor swap to the selected note
@@ -279,7 +310,8 @@ async function noteRowByTitle(session: Session, title: string): Promise<Element>
       }
       return null;
     },
-    { label: `notes.row titled "${title}" (no click)`, timeoutMs: 12000 },
+    // 20s to match openNoteByTitle — see the note there (row-scan under @2x load).
+    { label: `notes.row titled "${title}" (no click)`, timeoutMs: 20000 },
   );
 }
 
@@ -402,6 +434,16 @@ runner(
             "### Prior art\n\nWhat came before.\n\n" +
             "## Plan\n\nWhat we will do next.\n\n" +
             "## Conclusion\n\nWrapping up.\n",
+        ),
+      );
+
+      // Unlinked-mention seed: a note that names "Roadmap" in PLAIN TEXT (not a
+      // [[wikilink]]) so the Unlinked mentions panel has a candidate to surface.
+      await safe("note Meeting notes", () =>
+        createNoteWithBody(
+          s,
+          "Meeting notes",
+          "\nWe walked through the Roadmap at standup and agreed on the next milestone.\n",
         ),
       );
 
@@ -545,25 +587,17 @@ runner(
           await settle(s, 300);
           await openNoteByTitle(s, "Folding sample");
           await settle(s, 600);
-          const editor = await s.waitForElement(CM_EDITOR);
-          await editor.hover();
-          await settle(s, 300);
-          // The gutter fold marker is hover-revealed; WebDriver reports it
-          // "not interactable", so wait for it to exist then fold via a
-          // synthetic DOM click (bypasses the interactability check).
-          await s.waitUntil(
-            async () =>
-              (await s.findElements(testIdSelector("editor.fold-gutter-marker"))).length > 0 || null,
-            { label: "fold-gutter marker present", timeoutMs: 10000 },
-          );
-          await s.execute(
-            "var el = document.querySelector(arguments[0]); if (el) el.click();",
-            [testIdSelector("editor.fold-gutter-marker")],
-          );
+          // Fold via the palette action (heading-list-folding.e2e.ts hlf2) —
+          // robust and coordinate-free. The prior synthetic `.click()` fired at
+          // (0,0), which CM6's foldGutter mapped to the non-foldable frontmatter
+          // line, so nothing folded and the placeholder never appeared (ok:false).
+          await runPaletteAction(s, "editor.fold-all", "Fold all");
           await s.byTestId("editor.fold-placeholder", { timeoutMs: 8000 });
           await settle(s, 400);
         },
       );
+      // Unfold so later editor frames start from a fully-expanded document.
+      await safe("unfold all", () => runPaletteAction(s, "editor.unfold-all", "Unfold all"));
 
       // ---- Frame: find and replace (the find bar open with a query) ----
       // find-replace.e2e.ts: Ctrl+F opens find.input; reveal replace too.
@@ -711,6 +745,33 @@ runner(
             "\nA simple flow:\n\n```mermaid\nflowchart TD\n" +
             "  A[Write note] --> B[Autosave]\n  B --> C[Encrypt at rest]\n```\n",
         },
+        {
+          name: "markdown-basics",
+          slug: "markdown/markdown-basics",
+          alt: "A note showing rendered Markdown basics: a heading, bold and italic text, and a bulleted list.",
+          title: "Markdown basics sample",
+          body:
+            "\n## A heading\n\nText can be **bold**, *italic*, or ~~struck through~~.\n\n" +
+            "- First item\n- Second item\n- Third item\n\n1. Step one\n2. Step two\n",
+        },
+        {
+          name: "markdown-code-block",
+          slug: "markdown/code-blocks",
+          alt: "A note showing a fenced code block with syntax highlighting.",
+          title: "Code block sample",
+          body:
+            "\nInline `code` sits in a sentence. A fenced block renders highlighted:\n\n" +
+            "```js\nfunction greet(name) {\n  return `Hello, ${name}`;\n}\n\ngreet(\"world\");\n```\n",
+        },
+        {
+          name: "markdown-footnotes",
+          slug: "markdown/footnotes-and-reference-links",
+          alt: "A note showing a footnote reference with its rendered Footnotes list, plus a reference-style link.",
+          title: "Footnotes sample",
+          body:
+            "\nLocal-first software keeps data on your device.[^1] More on the [project site][home].\n\n" +
+            "[^1]: Your notes never require a server.\n\n[home]: https://myne.md\n",
+        },
       ];
       for (const m of mdSamples) {
         await frame(s, m.name, m.slug, m.alt, async () => {
@@ -718,6 +779,110 @@ runner(
           await settle(s, 1500); // lazy KaTeX / mermaid render
         });
       }
+
+      // ---- Frame: frontmatter properties (the Properties panel atop a note) ----
+      // frontmatter.ts renders a PropertiesWidget (.cm-fm-properties) whenever a
+      // note carries frontmatter — every capture note has managed title/updated.
+      await frame(
+        s,
+        "frontmatter-properties",
+        "markdown/frontmatter-properties",
+        "The Properties panel at the top of a note, showing its title and frontmatter fields.",
+        async () => {
+          await openNoteByTitle(s, "Welcome to Myne");
+          await s.waitForElement(".cm-fm-properties", { timeoutMs: 8000 });
+          await settle(s, 400);
+        },
+      );
+
+      // ---- Frame: wikilinks (rendered [[wikilink]] pills) ----
+      // wikilink/chip-widget.ts renders .cm-wikilink-chip when the caret is off
+      // that line. "Welcome to Myne" already contains three wikilinks.
+      await frame(
+        s,
+        "wikilinks",
+        "find-and-connect/wikilinks",
+        "A note with rendered wikilink pills that link to other notes in the vault.",
+        async () => {
+          await openNoteByTitle(s, "Welcome to Myne");
+          await s.waitForElement(".cm-wikilink-chip", { timeoutMs: 8000 });
+          await settle(s, 400);
+        },
+      );
+
+      // ---- Frame: multiple cursors (same word selected in 3 places) ----
+      // multi-cursor.e2e.ts mc2: select a word, Ctrl+d twice → data-selection-count=3.
+      await frame(
+        s,
+        "multiple-cursors",
+        "editor-and-writing/multiple-cursors",
+        "A note with the same word selected in three places at once for simultaneous editing.",
+        async () => {
+          await createNoteWithBody(s, "Multiple cursors", "\nwidget widget widget in one line");
+          await settle(s, 500);
+          const content = await s.waitForElement(CM_CONTENT);
+          await content.click();
+          await content.sendKeys(CTRL + END + CTRL); // end of body
+          await pressChord(s, [], HOME); // start of the "widget…" line
+          for (let i = 0; i < 6; i++) await pressChord(s, [SHIFT], ARROW_RIGHT); // select "widget"
+          await pressChord(s, [CTRL], "d"); // + 2nd occurrence
+          await pressChord(s, [CTRL], "d"); // + 3rd occurrence
+          await s.waitUntil(
+            async () =>
+              (await (await s.waitForElement(CM_EDITOR)).attribute("data-selection-count")) ===
+                "3" || null,
+            { label: "three selections", timeoutMs: 8000 },
+          );
+          await settle(s, 400);
+        },
+      );
+      await safe("collapse multicursor", () => pressKey(s, ESCAPE));
+
+      // ---- Frame: export a note (the context-menu Export as Markdown entry) ----
+      // note-export.e2e.ts: the in-app export pre-flight modal renders only for
+      // attachment-bearing notes; a plain note goes to the native save dialog
+      // (undriveable). The reachable in-app surface is the row context-menu item.
+      await frame(
+        s,
+        "export-notes",
+        "editor-and-writing/export-notes",
+        "The note context menu with the Export as Markdown option, which saves a note as a Markdown file.",
+        async () => {
+          const row = await noteRowByTitle(s, "Welcome to Myne");
+          await row.rightClick();
+          await s.waitForElement(
+            testIdSelector("notes.context-menu-item", { "data-item-id": "export-markdown" }),
+            { timeoutMs: 6000 },
+          );
+          await settle(s, 400);
+        },
+      );
+      await safe("close export menu", () => pressKey(s, ESCAPE));
+
+      // ---- Frame: note snapshots (the version-history panel) ----
+      // snapshots-restore.e2e.ts: a fresh vault has no snapshots, so seed ONE via
+      // the sanctioned page-seat production IPC note_snapshot_flush, then open the
+      // panel and select the row to show the preview pane.
+      await frame(
+        s,
+        "note-snapshots",
+        "safety-and-recovery/note-snapshots",
+        "The note snapshots panel listing earlier saved versions of a note, with a preview of the selected one.",
+        async () => {
+          const row = await openNoteByTitle(s, "Roadmap");
+          const noteId = await row.attribute("data-note-id");
+          await pageSeatInvoke(s, "plugin:notes|note_snapshot_flush", { noteId }, 15000);
+          await runPaletteAction(s, "snapshots.open", "snap");
+          await s.byTestId("snapshots.panel", { timeoutMs: 8000 });
+          await (await s.byTestId("snapshots.row", { timeoutMs: 8000 })).click();
+          await s.byTestId("snapshots.preview", { timeoutMs: 8000 });
+          await settle(s, 500);
+        },
+      );
+      await safe("close snapshots panel", async () => {
+        await pressKey(s, ESCAPE);
+        await s.waitForGone(testIdSelector("snapshots.panel"));
+      });
 
       // =====================================================================
       // SIDEBAR / NOTES-ORGANIZATION FRAMES
@@ -734,6 +899,123 @@ runner(
         },
       );
 
+      // ---- Frame: notes and folders (the sidebar tree) ----
+      await frame(
+        s,
+        "notes-and-folders",
+        "notes-and-organization/notes-and-folders",
+        "The sidebar with notes organized into folders alongside loose top-level notes.",
+        async () => {
+          await pressKey(s, ESCAPE);
+          await openNoteByTitle(s, "Welcome to Myne");
+          await s.byTestId("editor.root");
+          await settle(s, 400);
+        },
+      );
+
+      // ---- Frame: daily notes (today's dated note opened from the palette) ----
+      // daily.open-today is an idempotent open-or-create in the Daily/ folder.
+      await frame(
+        s,
+        "daily-notes",
+        "notes-and-organization/daily-notes",
+        "Today's dated note, opened from the command palette and filed in the Daily folder.",
+        async () => {
+          await runPaletteAction(s, "daily.open-today", "today");
+          await s.byTestId("editor.root");
+          await settle(s, 800);
+        },
+      );
+
+      // ---- Frame: favorites (a note starred into the Favorites section) ----
+      // Favoriting is the note-row context item favorite; the Favorites section
+      // renders above the tree when non-empty (the note then appears twice).
+      await frame(
+        s,
+        "favorites",
+        "notes-and-organization/favorites",
+        "A note starred into the Favorites section pinned at the top of the sidebar.",
+        async () => {
+          await rowContextAction(s, "Welcome to Myne", "favorite");
+          await s.waitUntil(
+            async () => {
+              let n = 0;
+              for (const r of await s.byTestIdAll("notes.row"))
+                if ((await r.textContent()).includes("Welcome to Myne")) n++;
+              return n >= 2 ? true : null;
+            },
+            { label: "note shown in Favorites + tree", timeoutMs: 8000 },
+          );
+          await settle(s, 400);
+        },
+      );
+      // Un-favourite so the sidebar returns to its plain shape for later frames.
+      await safe("un-favourite", () => rowContextAction(s, "Welcome to Myne", "favorite"));
+
+      // ---- Frame: templates (the Manage templates modal) ----
+      // templates.manage → TemplatesManager (ModalShell, aria-labelledby). The
+      // capture vault has no templates, so the first-run empty state shows.
+      await frame(
+        s,
+        "templates",
+        "notes-and-organization/templates",
+        "The Manage templates modal, where note templates are created, renamed, and removed.",
+        async () => {
+          await runPaletteAction(s, "templates.manage", "template");
+          await s.waitForElement('[aria-labelledby="templates-modal-title"]', { timeoutMs: 8000 });
+          await settle(s, 500);
+        },
+      );
+      await safe("close templates modal", async () => {
+        await pressKey(s, ESCAPE);
+        await s.waitForGone('[aria-labelledby="templates-modal-title"]');
+      });
+
+      // ---- Frame: trash (a soft-deleted note in the Trash panel) ----
+      // notes.e2e.ts nc3: context delete soft-trashes (no confirm); the footer
+      // notes.trash-open opens trash.panel. Use a throwaway so later frames keep
+      // their notes.
+      await frame(
+        s,
+        "trash",
+        "notes-and-organization/trash",
+        "The Trash panel listing a soft-deleted note with its restore and delete-forever actions.",
+        async () => {
+          await createNote(s, "Old draft");
+          await rowContextAction(s, "Old draft", "delete");
+          await (await s.byTestId("notes.trash-open")).click();
+          await s.byTestId("trash.panel", { timeoutMs: 8000 });
+          await s.byTestId("trash.restore", { timeoutMs: 8000 });
+          await settle(s, 400);
+        },
+      );
+      await safe("close trash panel", async () => {
+        await (await s.byTestId("trash.close")).click();
+        await s.waitForGone(testIdSelector("trash.panel"));
+      });
+
+      // ---- Frame: archive (a note kept out of the working set) ----
+      // archive.e2e.ts ar1: context archive removes from the tree; footer
+      // notes.archive-open opens archive.panel. Throwaway note (safe anywhere).
+      await frame(
+        s,
+        "archive",
+        "notes-and-organization/archive",
+        "The Archive panel listing a note kept out of the working set, with restore and delete actions.",
+        async () => {
+          await createNote(s, "Archived draft");
+          await rowContextAction(s, "Archived draft", "archive");
+          await (await s.byTestId("notes.archive-open")).click();
+          await s.byTestId("archive.panel", { timeoutMs: 8000 });
+          await s.byTestId("archive.restore", { timeoutMs: 8000 });
+          await settle(s, 400);
+        },
+      );
+      await safe("close archive panel", async () => {
+        await (await s.byTestId("archive.close")).click();
+        await s.waitForGone(testIdSelector("archive.panel"));
+      });
+
       // ---- Frame: folder notes (a folder's "Open folder note" affordance) ----
       // MYND-370: the folder note is hidden from the tree and reached from the
       // folder row (double-click / the inline "Open folder note" button). The
@@ -744,6 +1026,11 @@ runner(
         "notes-and-organization/folder-notes",
         "A folder row in the sidebar with its Open folder note button, which opens the folder's hidden index note.",
         async () => {
+          // Hover the folder row first: when the index note IS set the "Open
+          // folder note" affordance is unconditional, but when the set-index
+          // setup didn't take, the "Create folder note" affordance is
+          // hover-gated (FolderRow.tsx) — hovering surfaces it either way.
+          await (await s.byTestId("notes.folder-row")).hover();
           await s.byTestId("notes.folder-index-affordance", { timeoutMs: 8000 });
         },
       );
@@ -890,6 +1177,28 @@ runner(
         },
       );
 
+      // ---- Frame: unlinked mentions (the right-panel Unlinked tab) ----
+      // Same right-panel-tab idiom as outline (tab id "unlinked"). Open Roadmap,
+      // which "Meeting notes" names in plain text (an unlinked mention). Rows
+      // carry no testid, so gate on the tab + a settle (best-effort).
+      await frame(
+        s,
+        "unlinked-mentions",
+        "find-and-connect/unlinked-mentions",
+        "The Unlinked mentions tab listing other notes that name this note without linking it.",
+        async () => {
+          await openNoteByTitle(s, "Roadmap");
+          await settle(s, 400);
+          await (
+            await s.waitForElement(
+              testIdSelector("editor.right-panel-tab", { "data-panel-tab-id": "unlinked" }),
+              { timeoutMs: 8000 },
+            )
+          ).click();
+          await settle(s, 1800); // async recall + decrypt-verify; no row testid to gate on
+        },
+      );
+
       // ---- Frame: search (command palette with a query + results) ----
       // search-palette.e2e.ts: Ctrl+K → palette.input → type → palette.option.
       await frame(
@@ -949,6 +1258,24 @@ runner(
       // CRITICAL cleanup: the New view dialog is a modal overlay. If left open
       // it intercepts every later click (settings, graph). Dismiss it.
       await safe("close new-view dialog", () => pressKey(s, ESCAPE));
+
+      // ---- Frame: multiple vaults (the account-chip vault switcher menu) ----
+      // VaultSwitcher: switcher.chip opens a menu with switcher.vault-row(s) +
+      // switcher.create-cta. The capture seeds one vault, so the menu shows one
+      // row + "Create another vault" — demonstrates the switcher mechanism.
+      await frame(
+        s,
+        "multiple-vaults",
+        "safety-and-recovery/multiple-vaults",
+        "The vault switcher menu open from the sidebar, listing your vaults with an option to create or switch to another.",
+        async () => {
+          await openNoteByTitle(s, "Welcome to Myne");
+          await (await s.byTestId("switcher.chip")).click();
+          await s.byTestId("switcher.vault-row", { timeoutMs: 6000 });
+          await settle(s, 400);
+        },
+      );
+      await safe("close switcher menu", () => pressKey(s, ESCAPE));
 
       // =====================================================================
       // ALL SETTINGS FRAMES inside ONE modal open (account → privacy →
@@ -1089,6 +1416,68 @@ runner(
         },
       );
 
+      // ---- Frame: sync status (the local-only / Sync off indicator) ----
+      // The capture vault has no endpoint → sync_status = disabled ("Sync off").
+      // Scope the scroll to the panel — sync.status-indicator also lives in the
+      // bottom bar, so an unscoped query would hit the wrong one.
+      await frame(
+        s,
+        "sync-status",
+        "sync-and-devices/sync-status",
+        "The Sync status row in Sync settings, showing this device is local-only with sync turned off.",
+        async () => {
+          await (await s.byTestId("settings.tab-sync")).click();
+          await s.byTestId("settings.sync-panel", { timeoutMs: 6000 });
+          await safe("scroll sync status into view", async () => {
+            await s.execute(
+              "var el=document.querySelector(arguments[0]); if (el) el.scrollIntoView({ block: 'center' });",
+              ['[data-testid="settings.sync-panel"] [data-testid="sync.status-indicator"]'],
+            );
+          });
+          await settle(s, 400);
+        },
+      );
+
+      // ---- Frame: add a device (the enroll form, best-effort empty state) ----
+      await frame(
+        s,
+        "add-a-device",
+        "sync-and-devices/add-a-device",
+        "The Add a device form in Sync settings, where you sign a new device in to your account.",
+        async () => {
+          await (await s.byTestId("settings.tab-sync")).click();
+          await s.byTestId("settings.sync-panel", { timeoutMs: 6000 });
+          const enroll = await s.byTestId("sync.enroll", { timeoutMs: 6000 });
+          await safe("scroll enroll into view", async () => {
+            await s.execute(
+              "var el=document.querySelector(arguments[0]); if (el) el.scrollIntoView({ block: 'center' });",
+              [testIdSelector("sync.enroll")],
+            );
+          });
+          void enroll;
+          await settle(s, 400);
+        },
+      );
+
+      // ---- Frame: managing devices (the device list, empty until sync is set up) ----
+      await frame(
+        s,
+        "managing-devices",
+        "sync-and-devices/managing-devices",
+        "The Devices section of Sync settings, which lists the devices on your account.",
+        async () => {
+          await (await s.byTestId("settings.tab-sync")).click();
+          await s.byTestId("settings.sync-panel", { timeoutMs: 6000 });
+          await safe("scroll device management into view", async () => {
+            await s.execute(
+              "var el=document.querySelector(arguments[0]); if (el) el.scrollIntoView({ block: 'center' });",
+              [testIdSelector("sync.device-management")],
+            );
+          });
+          await settle(s, 400);
+        },
+      );
+
       // ---- Frame: files settings (the Files panel) ----
       await frame(
         s,
@@ -1174,6 +1563,45 @@ runner(
         },
       );
 
+      // ---- Frame: change password (the Change password form, Account tab) ----
+      // AccountPanel: settings.change-password-cta reveals PasswordChangeForm
+      // (change-password.submit). Cancel back to idle — never submit.
+      await frame(
+        s,
+        "change-password",
+        "settings-and-privacy/change-your-password",
+        "The Change password form in Account settings, with fields for the current password, the new password, and confirmation.",
+        async () => {
+          await (await s.byTestId("settings.tab-account")).click();
+          await (await s.byTestId("settings.change-password-cta")).click();
+          await s.byTestId("change-password.submit", { timeoutMs: 6000 });
+          await settle(s, 400);
+        },
+      );
+      await safe("cancel change-password", async () => {
+        await (await s.byTestId("change-password.cancel")).click();
+      });
+
+      // ---- Frame: delete a vault (the confirm form, Account tab) ----
+      // AccountPanel: settings.delete-vault-cta reveals DeleteVaultConfirmForm
+      // (delete-vault.confirm-input). Submit is gated on the typed phrase, so
+      // capturing the empty form + cancelling never deletes anything.
+      await frame(
+        s,
+        "delete-a-vault",
+        "settings-and-privacy/delete-a-vault",
+        "The delete-vault confirmation form in Account settings, which requires typing a confirmation phrase before the vault is erased.",
+        async () => {
+          await (await s.byTestId("settings.tab-account")).click();
+          await (await s.byTestId("settings.delete-vault-cta")).click();
+          await s.byTestId("delete-vault.confirm-input", { timeoutMs: 6000 });
+          await settle(s, 400);
+        },
+      );
+      await safe("cancel delete-vault", async () => {
+        await (await s.byTestId("delete-vault.cancel")).click();
+      });
+
       await safe("close settings", () => closeSettings(s));
 
       // =====================================================================
@@ -1256,6 +1684,27 @@ runner(
         },
       );
 
+      // =====================================================================
+      // RESTORE-FROM-BACKUP — TERMINAL (it dispatches a Stage change that
+      // unmounts the editor + settings modal, so nothing after it can touch the
+      // editor; only the manifest write follows).
+      // =====================================================================
+      await frame(
+        s,
+        "restore-backup",
+        "safety-and-recovery/restore-from-a-backup",
+        "The Restore from backup screen, where a Myne backup file is chosen to rebuild a vault.",
+        async () => {
+          await pressKey(s, ESCAPE);
+          await (await s.byTestId("editor.settings-cta")).click();
+          await s.byTestId("settings.modal", { timeoutMs: 8000 });
+          await (await s.byTestId("settings.tab-storage")).click();
+          await (await s.byTestId("settings.restore-backup")).click(); // Stage change
+          await s.byTestId("restore.root", { timeoutMs: 8000 });
+          await settle(s, 500);
+        },
+      );
+
       // ---- Manifest ----
       writeFileSync(
         join(OUT_DIR, "manifest.json"),
@@ -1276,5 +1725,9 @@ runner(
       await app.teardown();
     }
   },
-  600_000,
+  // Per-test timeout (this arg overrides vitest.capture.config.ts's testTimeout
+  // for THIS test). The expanded ~60-frame pass at @2x runs ~10-14 min — the
+  // original 600s aborted it mid-pass (manifest never written). Keep in sync
+  // with the config's testTimeout.
+  900_000,
 );

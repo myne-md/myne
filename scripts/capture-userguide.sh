@@ -17,12 +17,29 @@ cd "$(dirname "$0")/.."
 
 IMAGE=myne-e2e
 SKIP_BUILD=0
+RETINA=0
 for arg in "$@"; do
   case "$arg" in
     --skip-build) SKIP_BUILD=1 ;;
+    # Retina (@2x) capture: drive WebKitGTK at device-scale-factor 2 so the
+    # WebDriver /screenshot returns a 2200x1440 (vs 1100x720) frame — genuine
+    # crispness, still fully automated. The xvfb screen must grow to fit the
+    # doubled physical window. SPIKE: WebKitGTK's headless/offscreen path may
+    # ignore GDK_SCALE and return 1100x720 anyway — verify the PNG dimensions.
+    --retina) RETINA=1 ;;
     *) echo "unknown arg: $arg" >&2; exit 2 ;;
   esac
 done
+
+# xvfb screen + GTK scale are retina-gated. At 1x: 1280x800 fits the 1100x720
+# window. At 2x: GDK_SCALE=2 makes the window 2200x1440 physical, so the screen
+# grows to 2560x1600. GDK_DPI_SCALE=1 stops GTK counter-scaling the text.
+SCREEN="1280x800x24"
+SCALE_ENV=""
+if [[ "$RETINA" == 1 ]]; then
+  SCREEN="2560x1600x24"
+  SCALE_ENV="GDK_SCALE=2 GDK_DPI_SCALE=1 "
+fi
 
 docker build -t "$IMAGE" -f e2e/Dockerfile e2e
 
@@ -36,7 +53,7 @@ RUN_FLAGS=(
   --user root
 )
 
-E2E_ENV='export HOME=/home/e2e CARGO_HOME=/home/e2e/.cargo RUSTUP_HOME=/usr/local/rustup PATH=/usr/local/cargo/bin:/usr/local/bin:/usr/bin:/bin CI=true npm_config_store_dir=/home/e2e/.pnpm-store'
+E2E_ENV="export ${SCALE_ENV}HOME=/home/e2e CARGO_HOME=/home/e2e/.cargo RUSTUP_HOME=/usr/local/rustup PATH=/usr/local/cargo/bin:/usr/local/bin:/usr/bin:/bin CI=true npm_config_store_dir=/home/e2e/.pnpm-store"
 # Chown ALL of /work (not just the volumes): on a native-Linux bind mount the
 # repo root stays host-owned (root), so the unprivileged `e2e` build user can't
 # create /work/dist and `vite build` fails with EACCES. (Docker Desktop on macOS
@@ -53,6 +70,6 @@ exec docker run "${RUN_FLAGS[@]}" "$IMAGE" bash -c "
     $E2E_ENV &&
     cd /work &&
     $BUILD_CMD &&
-    xvfb-run -a -s \"-screen 0 1280x800x24\" pnpm exec vitest run --config vitest.capture.config.ts
+    xvfb-run -a -s \"-screen 0 $SCREEN\" pnpm exec vitest run --config vitest.capture.config.ts
   '
 "

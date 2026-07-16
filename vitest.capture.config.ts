@@ -19,8 +19,11 @@ export default defineConfig({
     fileParallelism: false,
     maxConcurrency: 1,
     // One app boot builds a vault through the UI and snaps every frame —
-    // budget generously (Argon2id unlock + lazy KaTeX/mermaid mounts).
-    testTimeout: 600_000,
+    // budget generously (Argon2id unlock + lazy KaTeX/mermaid mounts). The
+    // expanded ~60-frame pass at @2x (--retina) needs headroom beyond the
+    // original 600s: best-effort frames each wait out their timeout, and 2x
+    // rendering is slower, so the full pass can run ~10-14 min.
+    testTimeout: 900_000,
     hookTimeout: 120_000,
     reporters: ["verbose"],
   },
