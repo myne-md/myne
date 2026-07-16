@@ -6,9 +6,10 @@
 //! while the vault is locked), except `drain_pending_shares`, which needs the
 //! unlocked vault to import:
 //! - **`seal_share`** — frame `{filename, mime, bytes}` and seal it into a
-//!   `MYF1` blob under `sealed/`. The Android entry point (the Kotlin plugin
-//!   hands the `content://` bytes in); on iOS the Share Extension calls the
-//!   same seal core in-process via the linked codec.
+//!   `MYF1` blob under `sealed/`. This is the **Android** entry point (the
+//!   Kotlin plugin hands the `content://` bytes to the WebView, which invokes
+//!   it). On iOS the Share Extension links no crypto — it stages plaintext
+//!   (§9.19.1), and `drain_pending_shares` seals those via `seal_staged_in_dir`.
 //! - **`drain_pending_shares`** — decrypt every `sealed/` blob and import each
 //!   into the vault's attachment library via `attachment_import_with_dir`
 //!   (host-side — the up-to-64 MiB bytes never cross the WebView, SYNC-4),
@@ -203,10 +204,11 @@ pub fn ack_in_dir(sealed: &Path, id: &str) -> Result<(), ShareImportError> {
 }
 
 /// Seal a shared file into the encrypted queue. Device-key based, so it runs
-/// while the vault is locked. The Android Kotlin plugin calls this with the
-/// `content://` bytes; the iOS Share Extension calls the seal core in-process.
-/// Returns the hex `share_id`, or `None` when the file was dropped (empty /
-/// over the 64 MiB cap).
+/// while the vault is locked. The **Android** Kotlin plugin calls this (via the
+/// WebView) with the `content://` bytes; on iOS the Share Extension links no
+/// crypto and instead stages plaintext, which `drain_pending_shares` seals via
+/// `seal_staged_in_dir` (§9.19.1). Returns the hex `share_id`, or `None` when the
+/// file was dropped (empty / over the 64 MiB cap).
 #[tauri::command]
 pub async fn seal_share<R: Runtime>(
     app: AppHandle<R>,
