@@ -2421,7 +2421,11 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
       <div data-testid="workspace.split" style={{ flex: 1, minHeight: 0, display: "flex" }}>
         {sizeClass === "expanded" && (
           <div
-            style={{ width: panesCollapsed ? 0 : 248, flex: "none", minHeight: 0, overflow: "hidden", transition: "width 220ms cubic-bezier(0.4, 0, 0.2, 1)" }}
+            // display:flex so the SidebarPane STRETCHES to full height (its
+            // flex:1 nav pushes the settings footer to the bottom, where its
+            // divider lines up with the editor FormatBar). Without it the block
+            // wrapper let the sidebar shrink to ~60% content height.
+            style={{ width: panesCollapsed ? 0 : 248, flex: "none", minHeight: 0, display: "flex", overflow: "hidden", transition: "width 220ms cubic-bezier(0.4, 0, 0.2, 1)" }}
           >
           <SidebarPane
             label={vaultDisplayLabel(prefs.label)}
