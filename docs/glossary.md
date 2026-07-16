@@ -1484,15 +1484,15 @@ Used in: `spec/protocol.md` §1.1, §11.1
 
 ### **share-import staging queue** &nbsp; 📋 *Protocol*
 
-The device-local, `MYF1`-sealed queue (`pending-shares/sealed/`, `protocol.md` §9.19) holding a file shared into Myne via the OS share sheet (iOS Share Extension / Android `ACTION_SEND`) until the vault unlocks and it drains into the [attachment library](#attachment) via `attachment_import`. The file-carrying sibling of the [pending-capture queue](#pending-capture) (`MYK1`): same device-key seal and vault-agnostic per-entry-id AAD binding, but a binary payload framed with its filename + declared MIME, a 64 MiB cap, and an attachment (not note) drain target. Device-local (TB2), never synced or backed up.
+The device-local, `MYF1`-sealed queue (`pending-shares/sealed/`, `protocol.md` §9.20) holding a file shared into Myne via the OS share sheet (iOS Share Extension / Android `ACTION_SEND`) until the vault unlocks and it drains into the [attachment library](#attachment) via `attachment_import`. The file-carrying sibling of the [pending-capture queue](#pending-capture) (`MYK1`): same device-key seal and vault-agnostic per-entry-id AAD binding, but a binary payload framed with its filename + declared MIME, a 64 MiB cap, and an attachment (not note) drain target. Device-local (TB2), never synced or backed up.
 
-Used in: `protocol.md` §9.19; `decisions.md` 2026-07-16
+Used in: `protocol.md` §9.20; `decisions.md` 2026-07-16
 
 ### **share_id** &nbsp; 🗝️ *Key/identifier*
 
-The 16-byte random per-entry identifier of a [share-import staging queue](#share-import-staging-queue) blob (`MYF1`, `protocol.md` §9.19.3). Its lowercase-hex form is the on-disk filename under `pending-shares/sealed/`, and it is bound into the blob's AAD (role `"share-import-blob"`) so an attacker with write access to the queue directory cannot swap or duplicate one entry's ciphertext under another entry's slot. Vault-agnostic — it binds no `account_number_hash` or `items_key_id`.
+The 16-byte random per-entry identifier of a [share-import staging queue](#share-import-staging-queue) blob (`MYF1`, `protocol.md` §9.20.3). Its lowercase-hex form is the on-disk filename under `pending-shares/sealed/`, and it is bound into the blob's AAD (role `"share-import-blob"`) so an attacker with write access to the queue directory cannot swap or duplicate one entry's ciphertext under another entry's slot. Vault-agnostic — it binds no `account_number_hash` or `items_key_id`.
 
-Used in: `protocol.md` §9.19.3; `decisions.md` 2026-07-16
+Used in: `protocol.md` §9.20.3; `decisions.md` 2026-07-16
 
 ### **shared pref** &nbsp; 📋 *Protocol*
 

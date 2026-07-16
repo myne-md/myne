@@ -11,14 +11,14 @@
 //!   the plaintext on the next drain ([`super::commands::seal_staged_in_dir`]).
 //!
 //! iOS uses **plaintext-staging** (like the watch-capture staging file, § 9.18.4
-//! / § 9.19.4): the extension can't practically link the crypto, so it stages
+//! / § 9.20.4): the extension can't practically link the crypto, so it stages
 //! plaintext (protected at rest by iOS Data Protection in the App-Group
 //! container) and the app seals. Android has no `staging/` directory — its
 //! `ACTION_SEND` receiver hands the bytes to the WebView, which seals straight
-//! into `sealed/` (§ 9.19.1); the plaintext is a RAM + WebView-transit transient.
+//! into `sealed/` (§ 9.20.1); the plaintext is a RAM + WebView-transit transient.
 //!
 //! The queue is device-global (NOT per-vault): it is created while the vault is
-//! locked and drains into whichever vault unlocks first (§ 9.19.4).
+//! locked and drains into whichever vault unlocks first (§ 9.20.4).
 
 use crate::io_failure_kind::from_io_error_kind;
 use crate::plugins::share_import::error::ShareImportError;
@@ -35,7 +35,7 @@ const STAGING_SUBDIR: &str = "staging";
 /// shared **App-Group container** (`group.md.myne.mobile`), because the Share
 /// Extension is a *separate process* that cannot see the app's private data
 /// container. The extension stages plaintext into `<app-group>/pending-shares/
-/// staging/` (it links no crypto — §9.19.1); the app's `drain_pending_shares`
+/// staging/` (it links no crypto — §9.20.1); the app's `drain_pending_shares`
 /// (this core, run on unlock) seals each into `sealed/` and reads that SAME
 /// directory — so writer + reader must agree on the path.
 ///
@@ -104,7 +104,7 @@ pub fn sealed_dir<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, ShareImport
 /// native iOS Share Extension drops (raw bytes + a `.meta` sidecar). The app's
 /// seal step ([`super::commands::seal_staged_in_dir`]) frames + seals each into a
 /// `MYF1` blob under `sealed/` and deletes the plaintext, on next app open. This
-/// mirrors the watch-capture `staging/` plaintext carve-out (§9.18.4 / §9.19.4):
+/// mirrors the watch-capture `staging/` plaintext carve-out (§9.18.4 / §9.20.4):
 /// the extension can't practically link the crypto, so it stages plaintext
 /// (protected by iOS Data Protection in the shared container) and the app seals.
 pub fn staging_dir<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, ShareImportError> {

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0
 //! Device-local wrap key for the share-import staging queue (`MYF1`,
-//! `protocol.md` § 9.19.2).
+//! `protocol.md` § 9.20.2).
 //!
 //! A single **device-global** 32-byte symmetric key held in the OS keychain
 //! (Apple) / Keystore (Android), used to seal not-yet-imported shared files
@@ -43,7 +43,7 @@ mod imp {
     const KEYCHAIN_SERVICE: &str = "md.myne.shareimport";
     /// Single device-global account key (the queue is not per-vault — it is
     /// created while locked and drains into whichever vault unlocks first,
-    /// § 9.19).
+    /// § 9.20).
     const KEYCHAIN_ACCOUNT: &str = "device-wrap-key";
 
     /// `errSecItemNotFound` — the keychain item is absent (never created / wiped).
