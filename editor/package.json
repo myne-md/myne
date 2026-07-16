@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "license": "AGPL-3.0",
-  "//": "Shared CodeMirror editor ENGINE — the frontend `core` to `@myne/dialect`'s `protocol`. Most desktop/mobile coupling (i18n, tag index, prefs, attachment export/rename, open-URL, AI, spell) is injected through the `EditorHost` in ./src/host.ts. NOT yet through the seam (Phase A): attachment insert/catalog/picker/voice-record + convert-command still call Tauri `invoke`/`plugin-dialog`/`event` directly (declared as peerDependencies below) — both clients happen to be Tauri, so this works; routing them through the host is deferred to Phase B. Consumed as SOURCE by both clients (Vite compiles it); the desktop keeps re-export shims in `src/editor/*` so its importers stay unchanged.",
+  "//": "Shared CodeMirror editor ENGINE — the frontend `core` to `@myne/dialect`'s `protocol`. Most desktop/mobile coupling (i18n, tag index, prefs, attachment export/rename, open-URL, AI, spell) is injected through the `EditorHost` in ./src/host.ts. NOT yet through the seam (Phase A): attachment insert/catalog/picker/voice-record + convert-command still call Tauri `invoke`/`plugin-dialog`/`event` directly, and host/notes/attachmentRef reads `convertFileSrc` at call time (declared as peerDependencies below) — both clients happen to be Tauri, so this works; routing them through the host is deferred to Phase B. Consumed as SOURCE by both clients (Vite compiles it); the desktop keeps re-export shims in `src/editor/*` so its importers stay unchanged.",
   "exports": {
     ".": "./src/index.ts",
     "./CMEditor": "./src/CMEditor.tsx",

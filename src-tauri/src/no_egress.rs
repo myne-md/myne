@@ -28,8 +28,19 @@
 /// The exact set of tokens the CSP `connect-src` directive may contain.
 /// Anything else — `https:`, any external host, any `*` wildcard, `data:`,
 /// `blob:` in `connect-src` — is a violation. Mirrors `tauri.conf.json`.
-pub const CSP_CONNECT_SRC_ALLOWLIST: &[&str] =
-    &["'self'", "ipc:", "http://ipc.localhost", "attachment:"];
+///
+/// `http://attachment.localhost` is the Windows/Android http-mapped form of
+/// the in-app `attachment:` scheme (those WebViews cannot intercept custom
+/// schemes; Tauri serves registered protocols there as
+/// `http://<scheme>.localhost` — same class as `http://ipc.localhost`,
+/// MYND-519). It resolves to the local Rust handler, never the network.
+pub const CSP_CONNECT_SRC_ALLOWLIST: &[&str] = &[
+    "'self'",
+    "ipc:",
+    "http://ipc.localhost",
+    "attachment:",
+    "http://attachment.localhost",
+];
 
 /// Crates whose presence anywhere in the dependency closure means the client
 /// gained an outbound-request or telemetry capability. HTTP clients +
