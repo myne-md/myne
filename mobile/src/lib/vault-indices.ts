@@ -7,6 +7,8 @@
 // camelCase both ways.
 
 import { invoke } from "@tauri-apps/api/core";
+import type { PropertyEntry } from "@myne/editor/host/notes/propertyTyping";
+import type { StoredProperty } from "@myne/editor/host/notes/queryEngine";
 
 /** One outbound wikilink edge — mirror of Rust `WikilinkEdge` (camelCase). */
 export interface WikilinkEdge {
@@ -41,6 +43,11 @@ export interface IndexRecord {
   titleKey: string | null;
   wikilinks: WikilinkEdge[];
   tags: TagEntry[];
+  /** §3.6.4 typed frontmatter properties (MYND-271). Feeds the by-key property
+   *  accessor the saved-view query engine reads for groupBy / sort / columns /
+   *  the `property` filter leaf. Previously always `[]` — a saved view could
+   *  only filter by tag/folder/search on mobile; now it reaches parity. */
+  properties: PropertyEntry[];
 }
 
 /** Replace-semantics upsert of a note's index contribution. */
@@ -52,8 +59,28 @@ export function vaultIndicesApply(r: IndexRecord): Promise<void> {
     titleKey: r.titleKey,
     wikilinks: r.wikilinks,
     tags: r.tags,
-    properties: [],
+    properties: r.properties,
   });
+}
+
+/** Every note carrying a frontmatter property named `key`, as
+ *  `[noteId, StoredProperty]` — the saved-view query engine's by-key primitive.
+ *  Mirrors the desktop wrapper + the Rust `vault_indices_property_values`
+ *  accessor; the engine compares the opaque pre-typed values type-awarely. */
+export function vaultIndicesPropertyValues(
+  key: string,
+): Promise<Array<[string, StoredProperty]>> {
+  return invoke<Array<[string, StoredProperty]>>(
+    "plugin:vault-indices|vault_indices_property_values",
+    { key },
+  );
+}
+
+/** Every DISTINCT frontmatter property key present across the vault — the
+ *  saved-view authoring UI's groupBy / sort / column picker source. Mirrors the
+ *  desktop wrapper + the Rust `vault_indices_property_keys` accessor. */
+export function vaultIndicesPropertyKeys(): Promise<string[]> {
+  return invoke<string[]>("plugin:vault-indices|vault_indices_property_keys");
 }
 
 /** Drop a hard-deleted note from the index. */
