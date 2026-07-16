@@ -2,9 +2,10 @@
 # directory, so without this table cargo would treat src-tauri as a member
 # of the main repo's workspace (which doesn't list it) and fail. The
 # screen-guard plugin is a member so ONE Cargo.lock governs it (TB9-style
-# single-lock discipline).
+# single-lock discipline). The share-intent plugin (MYND-511) is a member for
+# the same reason.
 [workspace]
-members = ["tauri-plugin-screen-guard"]
+members = ["tauri-plugin-screen-guard", "tauri-plugin-share-intent"]
 
 [package]
 name = "myne-mobile"
@@ -75,6 +76,12 @@ tauri-plugin-deep-link = "2"
 # carry committed code). Rust-only surface — no WebView commands, no
 # capability entry. Zero external crates.
 tauri-plugin-screen-guard = { path = "tauri-plugin-screen-guard" }
+# MYND-511: in-repo Android OS-share-sheet (ACTION_SEND) receiver for the
+# share-import feature (SF3). Committed Kotlin under the plugin's own `android/`
+# (gitignored `gen/android` cannot carry committed code). Rust-only WebView
+# surface — no WebView commands, no capability entry; it delivers each shared
+# file to the WebView as a global `share-intent` event. Zero external crates.
+tauri-plugin-share-intent = { path = "tauri-plugin-share-intent" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 uuid = { version = "1", features = ["v4", "v7"] }
@@ -125,6 +132,16 @@ objc2-core-foundation = { version = "0.3", default-features = false, features = 
 # block. Already in the shared lock (pulled transitively via `objc2-*`); this
 # only names it for direct use. Pairs with objc2 0.6.
 block2 = "0.6"
+# SF2 (MYND-510): typed `NSFileManager` binding to resolve the share-import
+# App-Group container path (`FileManager.containerURL(forSecurityApplication
+# GroupIdentifier:)`) on the app's DRAIN side (`share_import_ffi`). The path is
+# then injected into the shared-core queue seam so the app reads the SAME
+# `pending-shares/sealed/` dir the Share Extension wrote. Same policy as the
+# `objc2*` deps above — already compiled into the build transitively via `wry`
+# (present in the resolved lock), so naming it here adds a dependency EDGE but NO
+# new crate/feature to the build (minimal-surface discipline, `threat-model.md`
+# §6). default-features off + only the three classes we touch.
+objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSFileManager", "NSString", "NSURL"] }
 
 # Dev-dependencies — same policy bar as runtime deps. `tracing-test` captures
 # `tracing` events per-test so the plugins' tracing-level discipline is

@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Share Extension entitlements (SF2, MYND-510) — PLAINTEXT-STAGING design.
+
+  The extension is pure Swift: it writes each shared file into the shared
+  App-Group container's pending-shares/staging/ dir, and the APP seals it into
+  MYF1 on next open. So the extension needs ONLY the App-Group entitlement — NO
+  keychain-access-groups (it does no crypto and touches no keychain; the device
+  wrap key lives entirely app-side now, which removed the cross-process keychain
+  handoff that the in-extension-seal design needed).
+
+  com.apple.security.application-groups (group.md.myne.mobile): the shared
+  container both processes read/write. MUST byte-match the app entitlement +
+  share_import_ffi::APP_GROUP_ID + ShareViewController.appGroupID.
+
+  ⚠️ DEVICE-VERIFY-PENDING: the App-Group entitlement only takes effect on a
+  signed build with matching provisioning.
+-->
+<plist version="1.0">
+<dict>
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>group.md.myne.mobile</string>
+	</array>
+</dict>
+</plist>

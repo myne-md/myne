@@ -92,6 +92,19 @@ fn main() {
                 tauri_build::InlinedPlugin::new().commands(&["seal_staged", "take_pending", "ack"]),
             )
             .plugin(
+                // Share-import staging queue (MYF1, §9.20): device-key sealed
+                // files shared via the OS share sheet, drained into the
+                // attachment library on unlock. Adding a command here without a
+                // matching entry in `permissions/share-import/default.toml` is a
+                // security bug.
+                "share-import",
+                tauri_build::InlinedPlugin::new().commands(&[
+                    "seal_share",
+                    "drain_pending_shares",
+                    "share_ack",
+                ]),
+            )
+            .plugin(
                 // MYND-31 (A11 — VaultIndices): shared from `myne-core`; the
                 // same 12 commands the desktop registers. Adding a command here
                 // without a matching entry in
@@ -239,6 +252,34 @@ fn main() {
         "MYNE SHORTCUTS (android-widgets)",
         "activity",
         r#"<meta-data android:name="android.app.shortcuts" android:resource="@xml/myne_shortcuts" />"#
+            .to_string(),
+    )
+    .expect("failed to update AndroidManifest.xml");
+
+    // Share-import (SF3, §9.20): register Myne as an OS share target. The
+    // ACTION_SEND / ACTION_SEND_MULTIPLE intent-filters go ON MainActivity
+    // (singleTask) so a share to a live process is delivered to onNewIntent and
+    // a cold-launch share foregrounds the app — the in-repo Kotlin plugin
+    // (SF3 native, pending) reads the content:// stream and calls
+    // `share-import:seal_share`. Scope is `image/*` + `application/*` and
+    // explicitly NOT `text/*` (SYNC-16): Myne never surfaces in a share sheet it
+    // cannot act on, and EXTRA_TEXT is out of scope. NO <uses-permission> — the
+    // sender grants a transient FLAG_GRANT_READ_URI_PERMISSION on the URI.
+    tauri_utils::build::update_android_manifest(
+        "MYNE SHARE TARGET (share-import, §9.20)",
+        "activity",
+        r#"<intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="image/*" />
+                <data android:mimeType="application/*" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND_MULTIPLE" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="image/*" />
+                <data android:mimeType="application/*" />
+            </intent-filter>"#
             .to_string(),
     )
     .expect("failed to update AndroidManifest.xml");

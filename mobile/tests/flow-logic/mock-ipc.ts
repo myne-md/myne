@@ -82,6 +82,11 @@ export interface MockConfig {
   /** Canned pending watch captures returned ONCE by `captures|take_pending`
    *  (§9.18 Apple Watch drain). Each becomes a `note_create` + an `ack`. */
   pendingCaptures?: Array<{ id: string; text: string }>;
+  /** Canned imported shares returned ONCE by
+   *  `share-import|drain_pending_shares` (§9.20 OS share-sheet drain). The
+   *  host-side drain does decrypt→import→ack, so the mock just returns the
+   *  SYNC-9 confirmation list; a non-dedup entry drives the SF5 toast. */
+  pendingShares?: Array<{ id: string; filename: string; deduplicated?: boolean }>;
   /** Seed the note list — `note_list` returns these ids and `note_read` returns
    *  the matching `text` (raw frontmatter + body). For the saved-view render
    *  flow: the view's filter runs over these live notes. */
@@ -291,6 +296,26 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
       "plugin:captures|ack": (args) => {
         const w = window as unknown as { __captureAcks?: string[] };
         (w.__captureAcks ??= []).push(String(args.id ?? ""));
+        return null;
+      },
+      // ── Share-import surface (§9.20 OS share-sheet drain) ──
+      // drain_pending_shares returns the canned imported set ONCE (then empty,
+      // mirroring a real host-side drain that acks each entry after import), and
+      // records the number of drain calls.
+      "plugin:share-import|drain_pending_shares": () => {
+        const w = window as unknown as { __shareDrains?: number; __sharesTaken?: boolean };
+        w.__shareDrains = (w.__shareDrains ?? 0) + 1;
+        if (w.__sharesTaken) return [];
+        w.__sharesTaken = true;
+        return (config.pendingShares ?? []).map((s) => ({
+          id: s.id,
+          filename: s.filename,
+          deduplicated: s.deduplicated ?? false,
+        }));
+      },
+      "plugin:share-import|share_ack": (args) => {
+        const w = window as unknown as { __shareAcks?: string[] };
+        (w.__shareAcks ??= []).push(String(args.id ?? ""));
         return null;
       },
       // ── Sync surface (per-test configurable) ──
