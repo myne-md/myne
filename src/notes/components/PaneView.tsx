@@ -31,6 +31,7 @@ import { peekRevealHeading, useRevealHeadingNonce } from "../views/revealHeading
 import { peekRevealMatch, useRevealMatchNonce } from "../views/revealMatchSignal";
 import { setActiveHeading } from "../views/activeHeadingSignal";
 import { createNote } from "../createNote";
+import { createDrawing } from "../createDrawing";
 import { useSelectedNote, type NoteId } from "../sidebarState";
 import { useResolverNotes } from "../resolverNotes";
 import { useIndexNonce } from "../indexNonce";
@@ -61,6 +62,12 @@ import { CoverPicker, type CoverChoice } from "../../components/attachments/Cove
 import { ContextMenu, type ContextMenuItem } from "./ContextMenu";
 import { buildCardMenuItems } from "../views/cardMenu";
 import { writeText as clipboardWriteText } from "@tauri-apps/plugin-clipboard-manager";
+import {
+  DrawingCanvasLazy,
+  extractSceneJson,
+  writeSceneJson,
+  isDrawingBody,
+} from "@myne/editor/drawing";
 
 export type PaneReadout = {
   status: SaveStatus;
@@ -411,6 +418,12 @@ export function PaneView({
   }, [activeId]);
 
   const autosave = useAutosave(activeId, content, undefined, setContent);
+
+  // Render-surface dispatch (drawing-notes SF2, MYND-499; SYNC-2): a value-strict
+  // `kind: drawing` in the loaded body routes this pane to the Excalidraw canvas
+  // instead of CodeMirror. Derived from `content` (authoritative over the sidebar
+  // cache); a note WITHOUT the canonical marker is unaffected (guard is exact).
+  const isDrawing = useMemo(() => isDrawingBody(content), [content]);
   // Latest autosave handle for the reload effect, which keys only on the reload
   // nonce (so it must NOT take `autosave` as a dep — its identity changes every
   // render). Read through the ref at fire time.
@@ -533,22 +546,34 @@ export function PaneView({
     [ws],
   );
 
-  const onCreateNote = useCallback(() => {
-    void (async () => {
-      try {
-        // `createNote` (not `ctx.createAndStartRename`) so the note is NOT
-        // auto-selected — that would route through Editor.tsx's bridge A and
-        // open it in the focused pane's ACTIVE slot (reuse), defeating the
-        // new-tab intent. Open it explicitly into a new tab, then rename.
-        const id = await createNote(null);
-        ws.openNewTabInFocused(id);
-        await ctx.refreshOne(id).catch(() => {});
-        ctx.startRename(id);
-      } catch {
-        /* creation failure surfaces via the sidebar UX on next refresh */
-      }
-    })();
-  }, [ws, ctx]);
+  // Mint a note via `mint` (createNote / createDrawing — NOT
+  // `ctx.createAndStartRename`, which auto-selects into the focused pane's ACTIVE
+  // slot via Editor.tsx's bridge A and defeats the new-tab intent), open it
+  // explicitly into a NEW tab, then inline-rename. Shared by the note + drawing
+  // chooser buttons (drawing-notes SF2, MYND-499).
+  const createIntoNewTab = useCallback(
+    (mint: () => Promise<string>) => {
+      void (async () => {
+        try {
+          const id = await mint();
+          ws.openNewTabInFocused(id);
+          await ctx.refreshOne(id).catch(() => {});
+          ctx.startRename(id);
+        } catch {
+          /* creation failure surfaces via the sidebar UX on next refresh */
+        }
+      })();
+    },
+    [ws, ctx],
+  );
+  const onCreateNote = useCallback(
+    () => createIntoNewTab(() => createNote(null)),
+    [createIntoNewTab],
+  );
+  const onCreateDrawing = useCallback(
+    () => createIntoNewTab(() => createDrawing()),
+    [createIntoNewTab],
+  );
 
   const focusThisPane = useCallback(() => {
     if (!focused) ws.focusPane(leaf.id);
@@ -633,6 +658,7 @@ export function PaneView({
         <NewTabChooser
           onPick={onPickNote}
           onCreate={onCreateNote}
+          onCreateDrawing={onCreateDrawing}
           cancellable={leaf.tabs.length > 0}
           onCancel={clearPending}
         />
@@ -646,6 +672,26 @@ export function PaneView({
     }
     if (loading) {
       return <PaneLoading />;
+    }
+    if (isDrawing) {
+      // The Excalidraw canvas surface (SF2). Scene loads from the note body and
+      // re-serializes on change back into `content`, which the existing autosave
+      // (above) debounces + persists — no separate save path. RUNTIME-FLAGGED:
+      // the canvas round-trip + onChange debounce need a `pnpm tauri dev` check.
+      return (
+        <div
+          data-testid="editor.content-frame"
+          style={{ height: "100%", minHeight: 0 }}
+        >
+          <DrawingCanvasLazy
+            // Key by note id so switching to a different drawing remounts the
+            // canvas with the new scene (initialData is read once at mount).
+            key={activeId ?? "drawing"}
+            initialSceneJson={extractSceneJson(content) ?? undefined}
+            onSceneChange={(json) => setContent(writeSceneJson(content, json))}
+          />
+        </div>
+      );
     }
     return (
       // Editor-typography: the content max-width + the three CSS custom
@@ -724,6 +770,7 @@ export function PaneView({
     isGraph,
     onPickNote,
     onCreateNote,
+    onCreateDrawing,
     clearPending,
     leaf.tabs.length,
     loading,
@@ -736,6 +783,8 @@ export function PaneView({
     handleOpenWikilink,
     activeScrollAnchor,
     handleEditorReady,
+    isDrawing,
+    setContent,
   ]);
 
   return (
@@ -801,6 +850,9 @@ export function PaneView({
           // url-bookmark (SYNC-16): a note carrying an unmanaged `source:`
           // provenance key is a clipped link-only bookmark → bookmark glyph;
           // every ordinary note keeps the default `file-text`.
+          // Drawing note (kind: drawing) → a pencil glyph so a canvas tab reads
+          // distinctly from a markdown note in the tab strip (SF2, MYND-499).
+          if (ctx.cache.get(it.id)?.kind === "drawing") return "pencil";
           if (ctx.cache.get(it.id)?.hasSource === true) return "bookmark";
           return "file-text";
         }}
@@ -825,16 +877,22 @@ export function PaneView({
         style={{
           flex: 1,
           minHeight: 0,
-          overflow: "auto",
+          // A drawing needs a full-bleed, EXPLICIT-height, non-scrolling frame:
+          // Excalidraw has no intrinsic height (it fills its parent) and pans
+          // internally, so the markdown scroll + gutter padding would collapse it
+          // to a 0-height (invisible) canvas. Markdown keeps the scroll + padding.
+          overflow: isDrawing ? "hidden" : "auto",
           // No TOP padding here: this div is the scroll parent of the in-note
           // find bar's sticky top panel, and a top padding leaves a band above the
           // bar where scrolled text bleeds through (MYND-299 QA). The 12px top
           // breathing-room moves onto the inner wrapper below, so it scrolls UNDER
           // the now-flush sticky bar instead of opening a gap above it.
-          padding: "0 24px 32px",
+          padding: isDrawing ? 0 : "0 24px 32px",
         }}
       >
-        <div style={{ paddingTop: 12 }}>{editorEl}</div>
+        <div style={isDrawing ? { height: "100%" } : { paddingTop: 12 }}>
+          {editorEl}
+        </div>
       </div>
       {dragActive && (
         // Capture overlay — only mounted during a tab/note drag, covering the

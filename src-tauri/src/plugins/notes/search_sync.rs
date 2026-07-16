@@ -295,19 +295,32 @@ pub(crate) async fn hydrate_search_index_with_dir(
                 );
                 // MYND-448a: each embedded attachment becomes its OWN doc; the
                 // note's body doc carries the UNFOLDED plaintext.
-                let atts: Vec<(String, String, String)> =
-                    crate::plugins::attachments::text_cache::collect_attachment_texts(
-                        &plaintext,
-                        vault_dir,
-                        &attachment_text_key,
-                        &account_number_hash,
-                        &mut attachment_text_memo,
+                // SF5 (MYND-502): a `kind: drawing` note has no markdown embeds —
+                // rebuild its body doc from projected scene text, never the raw
+                // ```excalidraw JSON (SYNC-4 body-only), and skip attachment docs,
+                // so the projection survives lock→unlock and never repollutes the
+                // index (parity with the incremental path).
+                if myne_core::plugins::notes::drawing_text::is_drawing(plaintext.as_bytes()) {
+                    let body = myne_core::plugins::notes::drawing_text::project_drawing_text(
+                        plaintext.as_bytes(),
                     )
-                    .into_iter()
-                    .map(|(att_id_hex, text)| (att_id_hex, title.clone(), text))
-                    .collect();
-                note_attachments.insert(id.clone(), atts);
-                fetched.insert(id.clone(), (title, plaintext));
+                    .unwrap_or_default();
+                    fetched.insert(id.clone(), (title, body));
+                } else {
+                    let atts: Vec<(String, String, String)> =
+                        crate::plugins::attachments::text_cache::collect_attachment_texts(
+                            &plaintext,
+                            vault_dir,
+                            &attachment_text_key,
+                            &account_number_hash,
+                            &mut attachment_text_memo,
+                        )
+                        .into_iter()
+                        .map(|(att_id_hex, text)| (att_id_hex, title.clone(), text))
+                        .collect();
+                    note_attachments.insert(id.clone(), atts);
+                    fetched.insert(id.clone(), (title, plaintext));
+                }
             }
             Err(_) => {
                 // Unreadable note (locked mid-hydrate / corrupt / non-UTF-8):

@@ -1,5 +1,6 @@
 // SYNC-1: the canonical resolver note-set is the live (non-trashed, non-template)
-// cache projected to {noteUuid, title, folder}. Covers the projection + exclusion.
+// cache projected to {noteUuid, title, folder, folderIndex, isDrawing}. Covers the
+// projection + exclusion + the drawing-notes SF2 `isDrawing` projection (MYND-499).
 
 import { describe, expect, it } from "vitest";
 
@@ -15,6 +16,7 @@ function rec(p: Partial<TitleRecord> & { noteUuid: string }): TitleRecord {
     updatedAt: null,
     trashed: p.trashed ?? null,
     template: p.template ?? false,
+    kind: p.kind ?? null,
   };
 }
 
@@ -27,7 +29,9 @@ describe("resolverNotesFromCache", () => {
     const out = resolverNotesFromCache(
       cache([rec({ noteUuid: "a", title: "Alpha", folder: "f/" })]),
     );
-    expect(out).toEqual([{ noteUuid: "a", title: "Alpha", folder: "f/" }]);
+    expect(out).toEqual([
+      { noteUuid: "a", title: "Alpha", folder: "f/", isDrawing: false },
+    ]);
   });
 
   it("excludes trashed and template records (live-set only)", () => {
@@ -43,6 +47,19 @@ describe("resolverNotesFromCache", () => {
 
   it("carries null title/folder for untitled, unfiled notes", () => {
     const out = resolverNotesFromCache(cache([rec({ noteUuid: "a" })]));
-    expect(out).toEqual([{ noteUuid: "a", title: null, folder: null }]);
+    expect(out).toEqual([
+      { noteUuid: "a", title: null, folder: null, isDrawing: false },
+    ]);
+  });
+
+  it("projects isDrawing:true for a kind:drawing note (SF6 embed picks widget vs chip)", () => {
+    const out = resolverNotesFromCache(
+      cache([
+        rec({ noteUuid: "d", title: "Sketch", kind: "drawing" }),
+        rec({ noteUuid: "n", title: "Note" }),
+      ]),
+    );
+    expect(out.find((n) => n.noteUuid === "d")?.isDrawing).toBe(true);
+    expect(out.find((n) => n.noteUuid === "n")?.isDrawing).toBe(false);
   });
 });

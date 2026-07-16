@@ -4,6 +4,9 @@
 import "./i18n";
 // Install the desktop EditorHost into @myne/editor before any editor mounts.
 import "./editor-host";
+// Repoint Excalidraw's font loader to the self-hosted /excalidraw-assets/ base
+// before any lazy drawing chunk loads (drawing-notes SF1, MYND-498).
+import "@myne/editor/drawing/excalidraw-asset-path";
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
