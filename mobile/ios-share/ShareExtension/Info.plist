@@ -10,8 +10,9 @@
   extension (surfaced in the OS share sheet).
 
   NSExtensionPrincipalClass = $(PRODUCT_MODULE_NAME).ShareViewController — the
-  headless UIViewController subclass (ShareViewController.swift) that seals each
-  shared file in-process and completes immediately (SYNC-13, no rich UI). The
+  headless UIViewController subclass (ShareViewController.swift) that stages each
+  shared file as plaintext (the app seals it later, §9.19.1) and completes
+  immediately (SYNC-13, no rich UI). The
   $(PRODUCT_MODULE_NAME) substitution resolves to the extension target's module
   (MyneShareExtension), so the principal class survives an xcodegen regenerate.
 
