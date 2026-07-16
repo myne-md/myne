@@ -9,6 +9,7 @@
 
 import { describe, it, expect } from "vitest";
 import {
+  buildResolverIndex,
   resolveWikilink,
   resolutionHint,
   type ResolverNote,
@@ -273,4 +274,60 @@ describe("resolveWikilink — folder target", () => {
     ]);
     expect(r.status === "resolved" && r.noteUuid).toBe("n-a");
   });
+});
+
+// === A3 scale fix: the prebuilt ResolverIndex is a pure speed shortcut. It
+// MUST resolve byte-identically to the fresh-scan path across every case, or
+// the whole-vault graph build would silently change edges. ===
+describe("resolveWikilink — index path is identical to the scan path", () => {
+  const idxNote = (
+    noteUuid: string,
+    title: string | null,
+    folder: string | null,
+    folderIndex: boolean,
+  ): ResolverNote => ({ noteUuid, title, folder, folderIndex });
+
+  const matrix: Array<{ name: string; r: WikilinkRef; notes: ResolverNote[] }> = [
+    {
+      name: "single title hit",
+      r: ref("Wednesday", "title"),
+      notes: [note("a", "Wednesday", null), note("b", "Other", null)],
+    },
+    {
+      name: "broken (no title match)",
+      r: ref("Ghost", "title"),
+      notes: [note("a", "Other", null)],
+    },
+    {
+      name: "collision → folder disambiguates",
+      r: ref("Projects/Foo.md", "vault-path"),
+      notes: [note("a", "Foo", "Projects/"), note("b", "Foo", "Archive/")],
+    },
+    {
+      name: "collision → shortest-path + ambiguous",
+      r: ref("Nowhere/Foo.md", "vault-path"),
+      notes: [note("a", "Foo", "Archive/Sub/"), note("b", "Foo", "Archive/")],
+    },
+    {
+      name: "folder target → index note",
+      r: ref("Projects/", "vault-path"),
+      notes: [
+        idxNote("idx", "Projects", "Projects/", true),
+        note("other", "Notes", "Projects/"),
+      ],
+    },
+    {
+      name: "folder target → broken (no folder note)",
+      r: ref("Projects/", "vault-path"),
+      notes: [note("a", "Notes", "Projects/")],
+    },
+  ];
+
+  for (const { name, r, notes } of matrix) {
+    it(name, () => {
+      const scan = resolveWikilink(r, notes);
+      const indexed = resolveWikilink(r, notes, buildResolverIndex(notes));
+      expect(indexed).toEqual(scan);
+    });
+  }
 });

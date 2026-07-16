@@ -240,8 +240,8 @@ export function ViewsSection({
     setMenu({ x: e.clientX, y: e.clientY, id });
   };
 
-  // The settings item is cards-only (table/list renderers have no cover concept).
-  const menuView = menu ? views.find((v) => v.id === menu.id) : undefined;
+  // "View settings…" applies to every view type now — it hosts the view_type
+  // picker + group / sort / column config (not just the cards cover settings).
   const menuItems: ContextMenuItem[] = menu
     ? [
         {
@@ -250,16 +250,12 @@ export function ViewsSection({
           group: "edit",
           onSelect: () => onEditFilter(menu.id),
         },
-        ...(menuView?.view_type === "cards"
-          ? [
-              {
-                id: "view-settings",
-                label: t("notes.views.menu.viewSettings"),
-                group: "edit",
-                onSelect: () => onViewSettings(menu.id),
-              },
-            ]
-          : []),
+        {
+          id: "view-settings",
+          label: t("notes.views.menu.viewSettings"),
+          group: "edit",
+          onSelect: () => onViewSettings(menu.id),
+        },
         {
           id: "rename",
           label: t("notes.views.menu.rename"),

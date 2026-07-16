@@ -1381,7 +1381,6 @@
       "hop": "{{depth}} hop",
       "loading": "Loading graph…",
       "noNotes": "No notes to graph yet.",
-      "overCap": "This vault is large — the whole-vault graph is capped. Filter to a tag or show isolated notes to explore.",
       "refresh": "Refresh",
       "refreshTitle": "The vault changed — rebuild the graph",
       "tagPlaceholder": "Tag…"
@@ -1711,6 +1710,10 @@
       "host": {
         "unsupported": "This view type arrives in a later update."
       },
+      "list": {
+        "empty": "No notes match this view",
+        "noValue": "No value"
+      },
       "menu": {
         "deleteView": "Delete view",
         "editFilter": "Edit filter…",
@@ -1720,6 +1723,11 @@
         "viewSettings": "View settings…"
       },
       "newView": "New view",
+      "table": {
+        "empty": "No notes match this view",
+        "name": "Name",
+        "noValue": "No value"
+      },
       "untitledView": "Untitled view"
     },
     "viewSettings": {
@@ -1733,12 +1741,26 @@
       "cancel": "Cancel",
       "cardSize": "Card size",
       "cardSizeValue": "{{size}} px",
+      "columns": "Columns",
+      "columnsEmpty": "No properties found",
+      "columnsHint": "Frontmatter properties shown as columns (table) or as a detail line (list / cards).",
+      "columnsPlaceholder": "Add columns…",
       "coverImageHint": "The frontmatter property whose value is an image — shown as each card's cover. Leave empty for no cover.",
       "coverImagePlaceholder": "e.g. cover",
       "coverImageProperty": "Cover image property",
+      "groupBy": "Group by",
       "imageAspectRatio": "Image aspect ratio",
+      "propertyNone": "None",
       "reset": "Reset",
-      "save": "Save"
+      "save": "Save",
+      "sortAsc": "Ascending",
+      "sortBy": "Sort by",
+      "sortDesc": "Descending",
+      "sortDirection": "Sort direction",
+      "viewType": "View type",
+      "viewTypeCards": "Cards",
+      "viewTypeList": "List",
+      "viewTypeTable": "Table"
     },
     "welcome": {
       "body": "Welcome to Myne, your private space to think and write.\n\nEverything you save here is encrypted and stays on your device. Your **password** and **recovery phrase** are the only keys to it, so keep them somewhere safe. If both are ever lost, no one can get your notes back, not even us.\n\nThis is just a regular note, so make it your own. Edit it, rename it, or delete it whenever you like, and add new notes as your ideas grow.\n\nWe're glad you're here. To learn more about Myne, visit https://myne.md\n",
