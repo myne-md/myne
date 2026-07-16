@@ -31,6 +31,9 @@ export interface MockDevice {
 /** Per-test canned responses for the sync command surface. */
 export interface MockConfig {
   syncStatus?: MockSyncStatus;
+  /** Note ids `note_list` returns — seeds existing rows for tablet-layout tests
+   *  (each renders a clickable `notes.row`; body is empty via `note_read`). */
+  noteIds?: string[];
   endpoint?: { endpoint_url: string | null; cert_pin_hex: string | null; pin_source: "static" | "tofu" | null };
   setEndpoint?: { fingerprint: string | null; pin_source: "static" | "tofu" | null };
   devices?: MockDevice[];
@@ -175,7 +178,7 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
         return null;
       },
       "plugin:prefs|prefs_read": () => DEFAULT_PREFS,
-      "plugin:notes|note_list": () => [],
+      "plugin:notes|note_list": () => config.noteIds ?? [],
       // ── Attachments surface (voice-note capture flow) ──
       // Record every import so a test can assert the capture pipeline produced a
       // `Voice note ….wav` bytes-import; echo the filename back so the inserted
