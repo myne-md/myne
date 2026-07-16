@@ -10,6 +10,7 @@
 // empty value so the editor mount never throws on an unmocked command.
 
 import type { Page } from "@playwright/test";
+import type { SavedView } from "../../src/lib/prefs";
 
 /** The runtime `SyncRuntimeStatus` shape (mirrors `lib/use-sync-status`). */
 export type MockSyncStatus =
@@ -81,6 +82,14 @@ export interface MockConfig {
   /** Canned pending watch captures returned ONCE by `captures|take_pending`
    *  (§9.18 Apple Watch drain). Each becomes a `note_create` + an `ack`. */
   pendingCaptures?: Array<{ id: string; text: string }>;
+  /** Seed the note list — `note_list` returns these ids and `note_read` returns
+   *  the matching `text` (raw frontmatter + body). For the saved-view render
+   *  flow: the view's filter runs over these live notes. */
+  notes?: Array<{ id: string; text: string }>;
+  /** Preseed saved views into `prefs_read`. The prefs store is STATEFUL —
+   *  `upsert_saved_view` / `set_view_order` / `delete_saved_view` mutate it, so
+   *  a view created through the UI appears on the next `usePrefs` re-read. */
+  savedViews?: SavedView[];
 }
 
 /** Install the mock IPC as an init script so it runs before the app's first paint. */
@@ -135,6 +144,14 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
     // by the next `quick_unlock_status` read (the settings toggle round-trip).
     let quickUnlock = config.quickUnlock ?? { configured: false, method: null, available: false };
 
+    // Seeded notes + a STATEFUL saved-views store (so a view created through the
+    // UI persists into the next `prefs_read`, mirroring the real prefs setter +
+    // nonce-bump round-trip). `note_read` looks the body up by id.
+    const seededNotes = config.notes ?? [];
+    const noteText = new Map(seededNotes.map((n) => [n.id, n.text]));
+    let savedViews: SavedView[] = config.savedViews ? [...config.savedViews] : [];
+    let viewOrder: string[] = savedViews.map((v) => v.id);
+
     const handlers: Record<string, (args: Record<string, unknown>) => unknown> = {
       // ── Boot / editor mount ──
       // freshDevice → boot to Welcome (no vaults, Empty slot); lockedVault →
@@ -177,8 +194,28 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
         if (config.deleteError) throw config.deleteError;
         return null;
       },
-      "plugin:prefs|prefs_read": () => DEFAULT_PREFS,
-      "plugin:notes|note_list": () => config.noteIds ?? [],
+      "plugin:prefs|prefs_read": () => ({ ...DEFAULT_PREFS, saved_views: savedViews, view_order: viewOrder }),
+      "plugin:prefs|upsert_saved_view": (args) => {
+        const view = args.view as SavedView;
+        const i = savedViews.findIndex((v) => v.id === view.id);
+        if (i >= 0) savedViews[i] = view;
+        else savedViews.push(view);
+        return null;
+      },
+      "plugin:prefs|set_view_order": (args) => {
+        viewOrder = (args.order as string[] | undefined) ?? [];
+        return null;
+      },
+      "plugin:prefs|delete_saved_view": (args) => {
+        const id = String(args.id ?? "");
+        savedViews = savedViews.filter((v) => v.id !== id);
+        viewOrder = viewOrder.filter((x) => x !== id);
+        return null;
+      },
+      // note_list: prefer the richer `notes` seed (id + body for the view render);
+      // fall back to the drawing flow's `noteIds`-only seed.
+      "plugin:notes|note_list": () =>
+        seededNotes.length > 0 ? seededNotes.map((n) => n.id) : config.noteIds ?? [],
       // ── Attachments surface (voice-note capture flow) ──
       // Record every import so a test can assert the capture pipeline produced a
       // `Voice note ….wav` bytes-import; echo the filename back so the inserted
@@ -239,7 +276,7 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
         (w.__noteDeletes ??= []).push(String(args.id ?? ""));
         return null;
       },
-      "plugin:notes|note_read": () => "",
+      "plugin:notes|note_read": (args) => noteText.get(String(args.noteId ?? "")) ?? "",
       "plugin:captures|seal_staged": () => {
         const w = window as unknown as { __sealStagedCalls?: number };
         w.__sealStagedCalls = (w.__sealStagedCalls ?? 0) + 1;

@@ -108,6 +108,7 @@ fn main() {
                     "vault_indices_tag_tree",
                     "vault_indices_note_properties",
                     "vault_indices_property_values",
+                    "vault_indices_property_keys",
                     "vault_indices_persist",
                     "vault_indices_hydrate",
                 ]),
