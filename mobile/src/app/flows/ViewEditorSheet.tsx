@@ -1,17 +1,18 @@
 // Create / edit one saved view (MYND-273, mobile). A flat condition builder over
 // the {@link ViewDraft} bridge — the common single-level AND/OR of tag / folder /
-// text leaves. Persists via the `prefs` plugin setters (`upsertSavedView`, plus
-// `setViewOrder` to append a brand-new view to the display order). Editing an
-// AST authored on desktop is lossy (see `view-filter.ts`): only editable leaves
-// survive, so re-saving narrows a richer view to what the editor can represent.
+// text / property leaves. Persists via the `prefs` plugin setters
+// (`upsertSavedView`, plus `setViewOrder` to append a brand-new view to the
+// display order). Editing an AST authored on desktop is lossy (see
+// `view-filter.ts`): only editable leaves survive, so re-saving narrows a richer
+// view to what the editor can represent.
 
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Sheet, Banner, Segmented, Chip } from "../../components";
-import { upsertSavedView, deleteSavedView, setViewOrder, type SavedView } from "../../lib/prefs";
+import { upsertSavedView, deleteSavedView, setViewOrder, type SavedView, type PropertyOp } from "../../lib/prefs";
 import { parseFilters, buildFilters, type ViewCondition } from "../../lib/view-filter";
 
-const CONDITION_TYPES: ViewCondition["type"][] = ["tag", "folder", "search"];
+const CONDITION_TYPES: ViewCondition["type"][] = ["tag", "folder", "search", "property"];
 /** view_type picker order (Segmented is index-based on mobile). */
 const VIEW_TYPES: SavedView["view_type"][] = ["list", "cards", "table"];
 /** i18n key per condition type (resolved with `t()` at the render site). */
@@ -19,7 +20,12 @@ const CONDITION_LABELS: Record<ViewCondition["type"], string> = {
   tag: "notes.filterBuilder.type.tag",
   folder: "notes.filterBuilder.type.folder",
   search: "viewEditor.condition.search",
+  property: "notes.filterBuilder.type.property",
 };
+/** Engine operator order for the property-condition op picker. The comparison
+ *  symbols are literal (never translated); only `contains` goes through i18n
+ *  at the render site — same rule as the desktop builder. */
+const PROPERTY_OPS: PropertyOp[] = ["==", "!=", ">", "<", ">=", "<=", "contains"];
 
 export interface ViewEditorSheetProps {
   /** The view being edited, or `null` to create a new one. */
@@ -273,9 +279,16 @@ export function ViewEditorSheet({ initial, tags, folders, propertyKeys, viewOrde
                   value={c.type}
                   onChange={(e) => {
                     const type = e.target.value as ViewCondition["type"];
+                    if (type === "property") {
+                      // A native <select> needs a valid selected value, so a
+                      // fresh property row starts on the first known key.
+                      setCondition(i, { type: "property", key: propertyKeys[0] ?? "", op: "==", value: "" });
+                      return;
+                    }
                     const value = type === "tag" ? (tags[0] ?? "") : type === "folder" ? (folders[0] ?? "") : "";
                     setCondition(i, { type, value } as ViewCondition);
                   }}
+                  data-testid="view-editor.condition-type"
                   style={selectStyle(88)}
                 >
                   {CONDITION_TYPES.map((ct) => (
@@ -285,7 +298,67 @@ export function ViewEditorSheet({ initial, tags, folders, propertyKeys, viewOrde
                   ))}
                 </select>
 
-                {c.type === "search" ? (
+                {c.type === "property" ? (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8, flex: 1, minWidth: 0 }}>
+                    {propertyKeys.length > 0 || c.key !== "" ? (
+                      <select
+                        value={c.key}
+                        onChange={(e) => setCondition(i, { ...c, key: e.target.value })}
+                        data-testid="view-editor.condition-prop-key"
+                        style={{ ...selectStyle(0), width: "100%" }}
+                      >
+                        {/* A stored key the index no longer knows (deleted
+                            property / desktop-authored) is kept as the first
+                            option — a native <select> renders an unknown value
+                            blank and silently snaps to another option on first
+                            touch, which would be silent data change. */}
+                        {!propertyKeys.includes(c.key) && c.key !== "" && (
+                          <option value={c.key}>{c.key}</option>
+                        )}
+                        {propertyKeys.map((k) => (
+                          <option key={k} value={k}>
+                            {k}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input
+                        value={c.key}
+                        onChange={(e) => setCondition(i, { ...c, key: e.target.value })}
+                        placeholder={t("viewEditor.propertyKeyPlaceholder")}
+                        autoCapitalize="none"
+                        autoCorrect="off"
+                        spellCheck={false}
+                        data-testid="view-editor.condition-prop-key"
+                        style={{ ...selectStyle(0), width: "100%", fontFamily: "var(--font-mono)" }}
+                      />
+                    )}
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <select
+                        value={c.op}
+                        onChange={(e) => setCondition(i, { ...c, op: e.target.value as PropertyOp })}
+                        data-testid="view-editor.condition-prop-op"
+                        style={selectStyle(96)}
+                      >
+                        {PROPERTY_OPS.map((op) => (
+                          <option key={op} value={op}>
+                            {op === "contains" ? t("notes.filterBuilder.op.contains") : op}
+                          </option>
+                        ))}
+                      </select>
+                      <input
+                        value={c.value}
+                        onChange={(e) => setCondition(i, { ...c, value: e.target.value })}
+                        placeholder={t("notes.filterBuilder.propertyValuePlaceholder")}
+                        autoCapitalize="none"
+                        autoCorrect="off"
+                        spellCheck={false}
+                        data-testid="view-editor.condition-prop-value"
+                        style={{ ...selectStyle(0), flex: 1, minWidth: 0, fontFamily: "var(--font-sans)" }}
+                      />
+                    </div>
+                  </div>
+                ) : c.type === "search" ? (
                   <input
                     value={c.value}
                     onChange={(e) => setCondition(i, { type: "search", value: e.target.value })}

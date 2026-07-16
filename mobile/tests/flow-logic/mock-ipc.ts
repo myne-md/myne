@@ -95,6 +95,16 @@ export interface MockConfig {
    *  `upsert_saved_view` / `set_view_order` / `delete_saved_view` mutate it, so
    *  a view created through the UI appears on the next `usePrefs` re-read. */
   savedViews?: SavedView[];
+  /** Canned `vault_indices_property_keys` — the view editor's property /
+   *  groupBy / sort / column picker universe. */
+  propertyKeys?: string[];
+  /** Canned `vault_indices_property_values`, keyed by property key: the
+   *  `[noteId, StoredProperty]` pairs the query engine's property resolver
+   *  reads (a property-filtered view matches nothing without it). */
+  propertyValues?: Record<
+    string,
+    Array<[string, { key: string; type: string; value?: string; elements?: Array<{ type: string; value: string }> }]>
+  >;
 }
 
 /** Install the mock IPC as an init script so it runs before the app's first paint. */
@@ -221,6 +231,10 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
       // fall back to the drawing flow's `noteIds`-only seed.
       "plugin:notes|note_list": () =>
         seededNotes.length > 0 ? seededNotes.map((n) => n.id) : config.noteIds ?? [],
+      // ── Vault-indices property surface (saved-view property conditions) ──
+      "plugin:vault-indices|vault_indices_property_keys": () => config.propertyKeys ?? [],
+      "plugin:vault-indices|vault_indices_property_values": (args) =>
+        config.propertyValues?.[String(args.key ?? "")] ?? [],
       // ── Attachments surface (voice-note capture flow) ──
       // Record every import so a test can assert the capture pipeline produced a
       // `Voice note ….wav` bytes-import; echo the filename back so the inserted
