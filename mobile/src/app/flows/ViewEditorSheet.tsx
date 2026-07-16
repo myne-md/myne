@@ -7,11 +7,13 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Sheet, Banner, Segmented } from "../../components";
+import { Sheet, Banner, Segmented, Chip } from "../../components";
 import { upsertSavedView, deleteSavedView, setViewOrder, type SavedView } from "../../lib/prefs";
 import { parseFilters, buildFilters, type ViewCondition } from "../../lib/view-filter";
 
 const CONDITION_TYPES: ViewCondition["type"][] = ["tag", "folder", "search"];
+/** view_type picker order (Segmented is index-based on mobile). */
+const VIEW_TYPES: SavedView["view_type"][] = ["list", "cards", "table"];
 /** i18n key per condition type (resolved with `t()` at the render site). */
 const CONDITION_LABELS: Record<ViewCondition["type"], string> = {
   tag: "notes.filterBuilder.type.tag",
@@ -26,6 +28,9 @@ export interface ViewEditorSheetProps {
   tags: string[];
   /** Available folder paths (canonical trailing-slash) for the folder picker. */
   folders: string[];
+  /** Vault frontmatter property keys (the `vault_indices_property_keys` universe)
+   *  — the option set for the group / sort / column pickers. */
+  propertyKeys: string[];
   /** Current display order — a new view's id is appended to it. */
   viewOrder: string[];
   onClose: () => void;
@@ -45,12 +50,24 @@ const btn = (bg: string, fg: string, border = "none"): React.CSSProperties => ({
   cursor: "pointer",
 });
 
-export function ViewEditorSheet({ initial, tags, folders, viewOrder, onClose, onSaved }: ViewEditorSheetProps) {
+const FIELD_LABEL_STYLE: React.CSSProperties = {
+  fontSize: 13,
+  color: "var(--fg-3)",
+  fontWeight: 600,
+};
+
+export function ViewEditorSheet({ initial, tags, folders, propertyKeys, viewOrder, onClose, onSaved }: ViewEditorSheetProps) {
   const { t } = useTranslation();
   const [name, setName] = useState(initial?.name ?? "");
   const parsed = parseFilters(initial?.filters ?? { kind: "all" });
   const [mode, setMode] = useState<"and" | "or">(parsed.mode);
   const [conditions, setConditions] = useState<ViewCondition[]>(parsed.conditions);
+  // Structural render config (desktop parity): view_type + group / sort / columns.
+  const [viewType, setViewType] = useState<SavedView["view_type"]>(initial?.view_type ?? "list");
+  const [groupBy, setGroupBy] = useState(initial?.group_by ?? "");
+  const [sortKey, setSortKey] = useState(initial?.sort?.key ?? "");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">(initial?.sort?.direction ?? "asc");
+  const [columns, setColumns] = useState<string[]>(initial?.columns ?? []);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -82,8 +99,11 @@ export function ViewEditorSheet({ initial, tags, folders, viewOrder, onClose, on
       ...(initial ?? {}),
       id,
       name: trimmed,
-      view_type: initial?.view_type ?? "list",
+      view_type: viewType,
       filters: buildFilters({ mode, conditions }),
+      group_by: groupBy === "" ? undefined : groupBy,
+      sort: sortKey === "" ? undefined : { key: sortKey, direction: sortDir },
+      columns: columns.length === 0 ? undefined : columns,
     };
     try {
       await upsertSavedView(view);
@@ -144,6 +164,95 @@ export function ViewEditorSheet({ initial, tags, folders, viewOrder, onClose, on
               boxSizing: "border-box",
             }}
           />
+
+          {/* Render config (desktop parity): view type + group / sort / columns. */}
+          <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 12 }}>
+            <div>
+              <div style={FIELD_LABEL_STYLE}>{t("notes.viewSettings.viewType")}</div>
+              <Segmented
+                options={[
+                  t("notes.viewSettings.viewTypeList"),
+                  t("notes.viewSettings.viewTypeCards"),
+                  t("notes.viewSettings.viewTypeTable"),
+                ]}
+                active={Math.max(0, VIEW_TYPES.indexOf(viewType))}
+                onChange={(i) => setViewType(VIEW_TYPES[i] ?? "list")}
+                style={{ marginTop: 6 }}
+              />
+            </div>
+
+            {propertyKeys.length > 0 && (
+              <>
+                <div>
+                  <div style={FIELD_LABEL_STYLE}>{t("notes.viewSettings.groupBy")}</div>
+                  <select
+                    value={groupBy}
+                    onChange={(e) => setGroupBy(e.target.value)}
+                    data-testid="view-editor.group-by"
+                    style={{ ...selectStyle(0), width: "100%", marginTop: 6 }}
+                  >
+                    <option value="">{t("notes.viewSettings.propertyNone")}</option>
+                    {propertyKeys.map((k) => (
+                      <option key={k} value={k}>
+                        {k}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <div style={FIELD_LABEL_STYLE}>{t("notes.viewSettings.sortBy")}</div>
+                  <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
+                    <select
+                      value={sortKey}
+                      onChange={(e) => setSortKey(e.target.value)}
+                      data-testid="view-editor.sort-key"
+                      style={{ ...selectStyle(0), flex: 1 }}
+                    >
+                      <option value="">{t("notes.viewSettings.propertyNone")}</option>
+                      {propertyKeys.map((k) => (
+                        <option key={k} value={k}>
+                          {k}
+                        </option>
+                      ))}
+                    </select>
+                    {sortKey !== "" && (
+                      <Segmented
+                        options={[t("notes.viewSettings.sortAsc"), t("notes.viewSettings.sortDesc")]}
+                        active={sortDir === "asc" ? 0 : 1}
+                        onChange={(i) => setSortDir(i === 0 ? "asc" : "desc")}
+                        style={{ flex: 1 }}
+                      />
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <div style={FIELD_LABEL_STYLE}>{t("notes.viewSettings.columns")}</div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 6 }}>
+                    {propertyKeys.map((k) => {
+                      const on = columns.includes(k);
+                      return (
+                        <button
+                          key={k}
+                          type="button"
+                          onClick={() =>
+                            setColumns((cs) => (on ? cs.filter((c) => c !== k) : [...cs, k]))
+                          }
+                          data-testid="view-editor.column-chip"
+                          data-value={k}
+                          data-on={on ? "true" : "false"}
+                          style={{ border: "none", background: "transparent", padding: 0, cursor: "pointer" }}
+                        >
+                          <Chip active={on}>{k}</Chip>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
 
           {conditions.length > 1 && (
             <div style={{ marginTop: 14, display: "flex", alignItems: "center", gap: 10 }}>

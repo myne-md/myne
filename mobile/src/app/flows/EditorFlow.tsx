@@ -61,7 +61,8 @@ import {
 } from "../../lib/archivedFolders";
 import { buildInitialPlaintext, readUpdatedFromFmBody } from "../../dialect/surgery";
 import { formatRelativeTime } from "../../lib/relative-time";
-import { evaluateFilter } from "../../lib/query-engine";
+import { runView, type RunViewContext, type ViewResult } from "@myne/editor/host/notes/queryEngine";
+import { MobileViewRenderHost } from "./editor/views/MobileViewRenderHost";
 import type { SavedView } from "../../lib/prefs";
 import { ViewEditorSheet } from "./ViewEditorSheet";
 import { importFile, ATTACHMENT_ACCEPT } from "../../lib/attachments";
@@ -74,7 +75,7 @@ import { TemplatesSheet } from "./TemplatesSheet";
 import { unmarkTemplate, createTemplate } from "../../lib/templates";
 import { deriveTitleSnippet } from "../../lib/note-title";
 import { searchIndexReplace } from "../../lib/search";
-import { vaultIndicesApply, vaultIndicesAllEdges, type WikilinkEdge } from "../../lib/vault-indices";
+import { vaultIndicesApply, vaultIndicesAllEdges, vaultIndicesPropertyValues, vaultIndicesPropertyKeys, type WikilinkEdge } from "../../lib/vault-indices";
 import { extractRecord } from "../../lib/indices-extract";
 import { buildGraphFromEdges, clientEdges } from "../../lib/backend-graph";
 import { MarkdownView } from "../../components/MarkdownView";
@@ -414,6 +415,24 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
   const [activeViewId, setActiveViewId] = useState<string | null>(null);
   // The view-editor sheet: `{ initial }` open (null initial = create), or null.
   const [viewEditor, setViewEditor] = useState<{ initial: SavedView | null } | null>(null);
+  // Vault property-key universe for the view editor's group / sort / column
+  // pickers (the `vault_indices_property_keys` accessor). Loaded when the editor
+  // sheet opens (fresh, so the pickers reflect the current index).
+  const [viewPropertyKeys, setViewPropertyKeys] = useState<string[]>([]);
+  useEffect(() => {
+    if (viewEditor === null) return;
+    let cancelled = false;
+    void vaultIndicesPropertyKeys()
+      .then((keys) => {
+        if (!cancelled) setViewPropertyKeys(keys);
+      })
+      .catch(() => {
+        /* index hiccup → empty pickers; tag/folder/search conditions still work */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [viewEditor]);
 
 
   // Managed frontmatter flags per note (trashed/archived/template/…) — the
@@ -547,17 +566,70 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
     () => orderedViews.find((v) => v.id === activeViewId) ?? null,
     [orderedViews, activeViewId],
   );
-  // Live note ids matching the active view's filter (query engine over the same
-  // resolvers the tag/folder chips use). Null when no view is active.
-  const viewMatchIds = useMemo(() => {
+  // The active view's grouped/sorted rows, computed by the SHARED query engine
+  // (`runView`) over the same resolvers the tag/folder chips use — so a saved
+  // view honours view_type + group_by + sort + columns identically to desktop.
+  // The `property` leaf + grouping/sort/columns now resolve against the MYI1
+  // property index (which the mobile sweep feeds since MYND-277/278). Null when
+  // no view is active. `runView` never throws (locked vault → empty groups).
+  const viewCtx = useMemo<RunViewContext | null>(() => {
     if (!activeView) return null;
-    return evaluateFilter(activeView.filters, {
-      liveIds: new Set(liveNotes.map((n) => n.id)),
-      tagMembers: (tag) => tagIndex.byTag.get(tag) ?? [],
-      folderMembers: (path) => notesInSubtree(folderOf, path),
-      searchMembers: (query) => searchNotes(query, liveNotes, bodies).map((h) => h.id),
+    const liveIds = new Set(liveNotes.map((n) => n.id));
+    const titleById = new Map(notes.map((n) => [n.id, n.title]));
+    return {
+      liveIds,
+      resolvers: {
+        // The shared engine passes the raw tag; mobile's tag index is keyed by
+        // the folded form (the desktop `byTag` folds internally), so fold here.
+        hasTag: async (tag) => tagIndex.byTag.get(foldSegment(tag)) ?? [],
+        inFolder: async (path) => notesInSubtree(folderOf, path),
+        search: async (query) => searchNotes(query, liveNotes, bodies).map((h) => h.id),
+        propertyValues: (key) => vaultIndicesPropertyValues(key),
+      },
+      rowFor: (id) => ({
+        title: titleById.get(id) ?? null,
+        folder: folderOf.get(id) ?? null,
+      }),
+      recencyFallback: (ids) => {
+        const at = (id: string) => updatedById.get(id)?.getTime() ?? 0;
+        return [...ids].sort((a, b) => at(b) - at(a));
+      },
+    };
+  }, [activeView, liveNotes, notes, tagIndex, folderOf, bodies, updatedById]);
+
+  const [viewResult, setViewResult] = useState<ViewResult | null>(null);
+  useEffect(() => {
+    if (!activeView || !viewCtx) {
+      setViewResult(null);
+      return;
+    }
+    let cancelled = false;
+    void runView(
+      {
+        filter: activeView.filters,
+        groupBy: activeView.group_by,
+        sort: activeView.sort,
+        columns: activeView.columns,
+      },
+      viewCtx,
+    ).then((r) => {
+      if (!cancelled) setViewResult(r);
     });
-  }, [activeView, liveNotes, tagIndex, folderOf, bodies]);
+    return () => {
+      cancelled = true;
+    };
+  }, [activeView, viewCtx]);
+
+  // Distinct note count for the view's "N notes" bar (fan-out rows across a
+  // list-valued groupBy collapse to distinct notes). 0 while the async run
+  // resolves. Memoized so it isn't rebuilt on every render.
+  const viewNoteCount = useMemo(
+    () =>
+      viewResult
+        ? new Set(viewResult.groups.flatMap((g) => g.rows.map((r) => r.noteId))).size
+        : 0,
+    [viewResult],
+  );
 
   // All folder paths (ancestor-expanded), for the view editor's folder picker.
   const allFolderPaths = useMemo(() => {
@@ -1332,7 +1404,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
   // never pays for the tree/filter/sort recomputation. `chrome` strips the
   // AppHeader / TabBar on expanded, where the sidebar absorbs both.
   const renderNotesPane = (chrome: { header: boolean; tabBar: boolean }) => {
-    const viewActive = listView === "notes" && viewMatchIds != null;
+    const viewActive = listView === "notes" && activeView != null;
     const searchNeedle = searchQuery.trim().toLowerCase();
     // The plain live-notes view renders the whole folder HIERARCHY (an inline
     // expand/collapse tree). A tag/view/trash/archive filter — or an active inline
@@ -1384,7 +1456,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
                 (n) => !isNoteFolderArchived(archiveNoteFolderOf.get(n.id) ?? null, archivedKeys),
               )
           : viewActive
-            ? workingNotes.filter((n) => viewMatchIds!.has(n.id))
+            ? [] // flat list bypassed for a view — MobileViewRenderHost renders it
             : activeTag
               ? workingNotes.filter((n) => (tagIndex.byTag.get(activeTag) ?? []).includes(n.id))
               : workingNotes;
@@ -1624,7 +1696,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
             {activeView && (
               <div style={{ flex: "none", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "10px 20px 0" }}>
                 <span style={{ fontSize: 13, color: "var(--fg-3)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {t("editor.list.viewNoteCount", { count: filtered.length, name: activeView.name })}
+                  {t("editor.list.viewNoteCount", { count: viewNoteCount, name: activeView.name })}
                 </span>
                 <div style={{ display: "flex", gap: 14, flexShrink: 0 }}>
                   <button onClick={() => setViewEditor({ initial: activeView })} style={{ border: "none", background: "transparent", color: "var(--accent)", fontSize: 13, fontWeight: 600, cursor: "pointer", padding: 0 }}>
@@ -1659,16 +1731,27 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
               <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
                 <Spinner />
               </div>
+            ) : viewActive ? (
+              // A saved view renders its own grouped/typed surface (cards / table
+              // / list) in place of the flat note list — desktop parity. The host
+              // owns its empty state (`view.empty`).
+              activeView && viewResult ? (
+                <MobileViewRenderHost
+                  def={activeView}
+                  result={viewResult}
+                  onOpen={(id) => void openFromList(id)}
+                />
+              ) : (
+                <div style={{ flex: 1 }} />
+              )
             ) : (treeMode ? treeRows.length === 0 && !favStripVisible : orderedNotes.length === 0 && !archiveHasFolders && !inArchiveFolder) && !listError ? (
               <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "0 40px", textAlign: "center" }}>
                 <div style={{ fontSize: 18, fontWeight: 600, color: "var(--fg-1)" }}>
-                  {listView === "trash" ? t("editor.list.trashEmpty") : listView === "archive" ? t("editor.list.archiveEmpty") : viewActive ? t("editor.list.noMatchingNotes") : t("editor.list.noNotesYet")}
+                  {listView === "trash" ? t("editor.list.trashEmpty") : listView === "archive" ? t("editor.list.archiveEmpty") : t("editor.list.noNotesYet")}
                 </div>
-                {listView === "notes" && viewActive ? (
-                  <div style={{ marginTop: 8, fontSize: 14, lineHeight: 1.55, color: "var(--fg-3)" }}>
-                    {t("editor.list.noMatchBody", { name: activeView!.name })}
-                  </div>
-                ) : listView === "notes" ? (
+                {/* A view renders its own `view.empty` via MobileViewRenderHost
+                    above, so this generic empty-state is only the flat-list case. */}
+                {listView === "notes" ? (
                   <div style={{ marginTop: 8, fontSize: 14, lineHeight: 1.55, color: "var(--fg-3)" }}>
                     {t("editor.list.emptyBody")}
                   </div>
@@ -1905,6 +1988,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
             initial={viewEditor.initial}
             tags={tagIndex.tags.map((t) => t.tag)}
             folders={allFolderPaths}
+            propertyKeys={viewPropertyKeys}
             viewOrder={prefs.view_order}
             onClose={() => setViewEditor(null)}
             onSaved={() => {
