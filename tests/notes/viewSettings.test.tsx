@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
 //
-// Unit tests for the cards-view display settings modal (Saved Views follow-on).
-// Pure presentational component — no IPC. Covers seed/render, the omit-when-empty
-// save patch, the suggestion chips, the card-size clamp bounds, and Cancel.
+// Unit tests for the saved-view settings modal (Saved Views authoring). Pure
+// presentational component — no IPC. Covers seed/render, the omit-when-default
+// save patch (now including view_type / group_by / sort / columns), the
+// cards-only cover section, the suggestion chips, the card-size clamp, and Cancel.
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
@@ -21,36 +22,56 @@ function pickAspect(value: string) {
 }
 
 describe("ViewSettings", () => {
-  it("seeds the controls from the initial values", () => {
+  it("seeds the controls from the initial values (cards)", () => {
     render(
       <ViewSettings
         title="Books"
-        initial={{ image: "cover", image_aspect_ratio: "1", card_size: 300 }}
-        propertySuggestions={[]}
+        initial={{ view_type: "cards", image: "cover", image_aspect_ratio: "1", card_size: 300 }}
+        propertyKeys={[]}
         onCancel={vi.fn()}
         onSave={vi.fn()}
       />,
     );
     expect(
-      (screen.getByTestId("view-settings.image-input") as HTMLInputElement)
-        .value,
+      (screen.getByTestId("view-settings.image-input") as HTMLInputElement).value,
     ).toBe("cover");
     expect(screen.getByTestId("view-settings.card-size-value").textContent).toBe(
       "300 px",
     );
-    // The aspect trigger summarises the selected preset's label.
     expect(screen.getByTestId("view-settings.aspect-select").textContent).toContain(
       "1:1",
     );
+    // view_type + group/sort/column pickers are always present.
+    expect(screen.getByTestId("view-settings.view-type")).toBeTruthy();
+    expect(screen.getByTestId("view-settings.group-by")).toBeTruthy();
+    expect(screen.getByTestId("view-settings.columns")).toBeTruthy();
   });
 
-  it("composes a full patch when every field is set", () => {
+  it("hides the cover section for a non-cards view", () => {
+    render(
+      <ViewSettings
+        title="Tasks"
+        initial={{ view_type: "table", columns: ["status"] }}
+        propertyKeys={["status", "due"]}
+        onCancel={vi.fn()}
+        onSave={vi.fn()}
+      />,
+    );
+    // Cover controls are cards-only.
+    expect(screen.queryByTestId("view-settings.image-input")).toBeNull();
+    expect(screen.queryByTestId("view-settings.card-size")).toBeNull();
+    // Structural pickers remain, and the seeded column shows.
+    expect(screen.getByTestId("view-settings.view-type")).toBeTruthy();
+    expect(screen.getByTestId("view-settings.columns").textContent).toContain("status");
+  });
+
+  it("composes a full patch when every cards field is set", () => {
     const onSave = vi.fn();
     render(
       <ViewSettings
         title="Books"
         initial={{}}
-        propertySuggestions={[]}
+        propertyKeys={[]}
         onCancel={vi.fn()}
         onSave={onSave}
       />,
@@ -64,24 +85,55 @@ describe("ViewSettings", () => {
     });
     fireEvent.click(screen.getByTestId("view-settings.save"));
     expect(onSave).toHaveBeenCalledWith({
+      view_type: "cards", // the default
+      group_by: undefined,
+      sort: undefined,
+      columns: undefined,
       image: "photo", // trimmed
       image_aspect_ratio: "1.78",
       card_size: 320,
     });
   });
 
-  it("omits fields left at their default (empty image / default aspect / default size)", () => {
+  it("carries seeded view_type / group_by / sort / columns through an unedited save", () => {
     const onSave = vi.fn();
     render(
       <ViewSettings
-        title="Books"
-        initial={{ image: "cover", image_aspect_ratio: "1.78", card_size: 300 }}
-        propertySuggestions={[]}
+        title="Tasks"
+        initial={{
+          view_type: "table",
+          group_by: "status",
+          sort: { key: "due", direction: "desc" },
+          columns: ["status", "due"],
+        }}
+        propertyKeys={["status", "due"]}
         onCancel={vi.fn()}
         onSave={onSave}
       />,
     );
-    // Clear the image, reset aspect to Default, reset card size to the default.
+    fireEvent.click(screen.getByTestId("view-settings.save"));
+    expect(onSave).toHaveBeenCalledWith({
+      view_type: "table",
+      group_by: "status",
+      sort: { key: "due", direction: "desc" },
+      columns: ["status", "due"],
+      image: undefined,
+      image_aspect_ratio: undefined,
+      card_size: undefined,
+    });
+  });
+
+  it("omits cards fields left at their default", () => {
+    const onSave = vi.fn();
+    render(
+      <ViewSettings
+        title="Books"
+        initial={{ view_type: "cards", image: "cover", image_aspect_ratio: "1.78", card_size: 300 }}
+        propertyKeys={[]}
+        onCancel={vi.fn()}
+        onSave={onSave}
+      />,
+    );
     fireEvent.change(screen.getByTestId("view-settings.image-input"), {
       target: { value: "" },
     });
@@ -89,6 +141,10 @@ describe("ViewSettings", () => {
     fireEvent.click(screen.getByTestId("view-settings.card-size-reset"));
     fireEvent.click(screen.getByTestId("view-settings.save"));
     expect(onSave).toHaveBeenCalledWith({
+      view_type: "cards",
+      group_by: undefined,
+      sort: undefined,
+      columns: undefined,
       image: undefined,
       image_aspect_ratio: undefined,
       card_size: undefined,
@@ -99,8 +155,8 @@ describe("ViewSettings", () => {
     render(
       <ViewSettings
         title="Books"
-        initial={{}}
-        propertySuggestions={["cover", "banner"]}
+        initial={{ view_type: "cards" }}
+        propertyKeys={["cover", "banner"]}
         onCancel={vi.fn()}
         onSave={vi.fn()}
       />,
@@ -109,8 +165,7 @@ describe("ViewSettings", () => {
     const cover = chips.find((c) => c.getAttribute("data-value") === "cover")!;
     fireEvent.click(cover);
     expect(
-      (screen.getByTestId("view-settings.image-input") as HTMLInputElement)
-        .value,
+      (screen.getByTestId("view-settings.image-input") as HTMLInputElement).value,
     ).toBe("cover");
   });
 
@@ -118,8 +173,8 @@ describe("ViewSettings", () => {
     render(
       <ViewSettings
         title="Books"
-        initial={{}}
-        propertySuggestions={[]}
+        initial={{ view_type: "cards" }}
+        propertyKeys={[]}
         onCancel={vi.fn()}
         onSave={vi.fn()}
       />,
@@ -136,7 +191,7 @@ describe("ViewSettings", () => {
       <ViewSettings
         title="Books"
         initial={{}}
-        propertySuggestions={[]}
+        propertyKeys={[]}
         onCancel={onCancel}
         onSave={onSave}
       />,

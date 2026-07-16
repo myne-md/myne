@@ -26,6 +26,7 @@ import {
   liveIdSet,
   parseTarget,
   resolveWikilink,
+  type ResolverIndex,
   type ResolverNote,
   type WikilinkResolution,
 } from "./resolveWikilink";
@@ -304,6 +305,15 @@ export async function vaultIndicesPropertyValues(
   );
 }
 
+/** Every DISTINCT frontmatter property key present across the vault — the
+ *  saved-view authoring UI's groupBy / sort / column picker source. Mirrors the
+ *  Rust `vault_indices_property_keys` accessor (sorted + deduped). */
+export async function vaultIndicesPropertyKeys(): Promise<string[]> {
+  return await invoke<string[]>(
+    "plugin:vault-indices|vault_indices_property_keys",
+  );
+}
+
 /** Remove a hard-deleted note from the index. Trash does NOT route here —
  *  a trashed note stays indexed and is filtered TS-side via `isTrashed`. */
 export async function vaultIndicesRemove(noteId: string): Promise<void> {
@@ -472,12 +482,13 @@ function edgeToRef(edge: WikilinkEdge): WikilinkRef {
 export async function forward(
   noteId: string,
   notes: ReadonlyArray<ResolverNote>,
+  index?: ResolverIndex,
 ): Promise<ForwardLink[]> {
   const edges = await invoke<WikilinkEdge[]>(
     "plugin:vault-indices|vault_indices_forward",
     { noteId },
   );
-  return resolveEdges(edges, notes);
+  return resolveEdges(edges, notes, index);
 }
 
 /**
@@ -489,10 +500,11 @@ export async function forward(
 export function resolveEdges(
   edges: ReadonlyArray<WikilinkEdge>,
   notes: ReadonlyArray<ResolverNote>,
+  index?: ResolverIndex,
 ): ForwardLink[] {
   return edges.map((edge) => ({
     edge,
-    resolution: resolveWikilink(edgeToRef(edge), notes),
+    resolution: resolveWikilink(edgeToRef(edge), notes, index),
   }));
 }
 
@@ -516,6 +528,7 @@ export type BacklinkGroup = {
 export async function backlinks(
   noteId: string,
   notes: ReadonlyArray<ResolverNote>,
+  index?: ResolverIndex,
 ): Promise<BacklinkGroup[]> {
   const target = notes.find((n) => n.noteUuid === noteId);
   if (target === undefined || target.title === null) return [];
@@ -533,7 +546,7 @@ export async function backlinks(
   const groups = new Map<string, BacklinkGroup>();
   for (const candidate of candidates) {
     if (!liveIds.has(candidate.source)) continue; // trashed source
-    const res = resolveWikilink(edgeToRef(candidate.edge), notes);
+    const res = resolveWikilink(edgeToRef(candidate.edge), notes, index);
     if (res.status !== "resolved" || res.noteUuid !== noteId) continue;
     let group = groups.get(candidate.source);
     if (group === undefined) {

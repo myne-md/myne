@@ -27,6 +27,7 @@ permissions = [
   "allow-vault-indices-tag-tree",
   "allow-vault-indices-note-properties",
   "allow-vault-indices-property-values",
+  "allow-vault-indices-property-keys",
   "allow-vault-indices-persist",
   "allow-vault-indices-hydrate",
 ]
@@ -85,6 +86,11 @@ commands.allow = ["vault_indices_note_properties"]
 identifier = "allow-vault-indices-property-values"
 description = "Allow invoking vault-indices:vault_indices_property_values (Slot::Unlocked-gated vault-wide by-key property accessor — (noteId, entry) for every note carrying a key, the query engine's primitive; comparison + filtering happen TS-side, no expression eval in Rust). Returns vault-wide property metadata (AS3/AS4-Sensitive) → main-window-only, same invariant as the prefs setters (v0.2 multi-window MUST NOT grant it to sub-windows)."
 commands.allow = ["vault_indices_property_values"]
+
+[[permission]]
+identifier = "allow-vault-indices-property-keys"
+description = "Allow invoking vault-indices:vault_indices_property_keys (Slot::Unlocked-gated vault-wide DISTINCT frontmatter property-key list — the saved-view authoring UI's picker source for groupBy / sort / columns; no values, no comparison, no expression eval in Rust). Returns vault-wide property-key metadata (AS3/AS4-Sensitive) → main-window-only, same invariant as the prefs setters (v0.2 multi-window MUST NOT grant it to sub-windows)."
+commands.allow = ["vault_indices_property_keys"]
 
 [[permission]]
 identifier = "allow-vault-indices-persist"

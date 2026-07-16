@@ -4,6 +4,7 @@
 // is visible at the boundary.
 
 import { invoke } from "@tauri-apps/api/core";
+import { resetGraphLayoutOnLock } from "../notes/graphLayoutPersist";
 
 /** Read-only probe of the `UnlockedVault` slot. */
 export async function isVaultUnlocked(): Promise<boolean> {
@@ -12,6 +13,10 @@ export async function isVaultUnlocked(): Promise<boolean> {
 
 /** Drop the slot. Idempotent on already-locked. */
 export async function lockVault(): Promise<void> {
+  // Drop the in-memory graph layout + cancel any pending disk flush BEFORE the
+  // slot goes away, so a vault switch can't carry one vault's positions into
+  // another's encrypted cache (see `resetGraphLayoutOnLock`).
+  resetGraphLayoutOnLock();
   await invoke<void>("plugin:vault-unlock|lock");
 }
 
