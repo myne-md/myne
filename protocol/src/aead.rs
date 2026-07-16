@@ -542,6 +542,34 @@ pub fn aad_capture_blob(capture_id: &[u8; 16]) -> Vec<u8> {
     aad
 }
 
+/// Build the AAD bound into the AEAD encryption of a share-import staging blob
+/// (`MYF1`, § 9.20.3). Binds the per-entry `share_id`; a DISTINCT device-local
+/// role from every vault-scoped blob AND from `pending-capture-blob`.
+///
+/// Layout (46 bytes):
+///
+/// ```text
+/// "myne.v0.1|"                      10 bytes  (AAD prefix, § 5.2)
+/// 0x01                               1 byte   (protocol_version, § 9.20.3)
+/// u16_be(17) || "share-import-blob" 19 bytes  (length-prefixed role)
+/// share_id                          16 bytes  (per-entry id, § 9.20.3)
+/// ```
+///
+/// Like `aad_capture_blob`, no `DeriveSubkey` role — the KEK is a device-local
+/// key held in the OS keychain / Android Keystore, NOT `root_key`-derived (the
+/// queue must survive while `root_key` is unavailable; § 3.4).
+pub fn aad_share_import_blob(share_id: &[u8; 16]) -> Vec<u8> {
+    const ROLE_STR_SHARE_IMPORT_BLOB: &[u8] = b"share-import-blob";
+    let mut aad = Vec::with_capacity(
+        AAD_PREFIX_V0_1.len() + 1 + 2 + ROLE_STR_SHARE_IMPORT_BLOB.len() + share_id.len(),
+    );
+    aad.extend_from_slice(AAD_PREFIX_V0_1);
+    aad.push(PROTOCOL_VERSION_V0_1);
+    push_length_prefixed_u16_be(&mut aad, ROLE_STR_SHARE_IMPORT_BLOB);
+    aad.extend_from_slice(share_id);
+    aad
+}
+
 /// Build the AAD bound into the AEAD encryption of a note's
 /// plaintext under its per-note `item_key` (spec § 5.2 + § 6.2).
 ///
@@ -1085,6 +1113,35 @@ mod tests {
         // Vault-agnostic: distinct from a vault-scoped blob AAD (different role
         // + binds capture_id, not account_number_hash).
         assert_ne!(aad, aad_prefs_blob(&capture_id));
+    }
+
+    #[test]
+    fn aad_share_import_blob_default_matches_pinned_hex() {
+        // § 5.2 + § 9.20.3: 46 bytes = prefix (10) + version (1) +
+        // u16_be(17) + "share-import-blob" (17) + share_id (16).
+        let share_id: [u8; 16] = [
+            0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD,
+            0xEE, 0xFF,
+        ];
+        let aad = aad_share_import_blob(&share_id);
+        let expected: [u8; 46] = [
+            // "myne.v0.1|" — 10 bytes
+            0x6D, 0x79, 0x6E, 0x65, 0x2E, 0x76, 0x30, 0x2E, 0x31, 0x7C,
+            // protocol_version
+            0x01, // length-prefixed role: u16_be(17) || "share-import-blob"
+            0x00, 0x11, // u16_be(17)
+            0x73, 0x68, 0x61, 0x72, 0x65, 0x2D, // "share-"
+            0x69, 0x6D, 0x70, 0x6F, 0x72, 0x74, 0x2D, // "import-"
+            0x62, 0x6C, 0x6F, 0x62, // "blob"
+            // share_id
+            0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD,
+            0xEE, 0xFF,
+        ];
+        assert_eq!(aad.as_slice(), &expected[..]);
+        assert_eq!(aad.len(), 46, "spec § 9.20.3 mandates 46-byte AAD");
+        // Vault-agnostic + distinct from the capture role (one-role-per-family).
+        assert_ne!(aad, aad_prefs_blob(&share_id));
+        assert_ne!(aad, aad_capture_blob(&share_id));
     }
 
     #[test]

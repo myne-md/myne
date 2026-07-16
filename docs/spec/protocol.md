@@ -1975,6 +1975,38 @@ The plaintext is a client-serialized position map + a schema version; the codec 
 
 A missing, unreadable, unsupported-format, or AEAD-failing `vault.graph` is **always recoverable** by recomputing the layout — the `.myn` files (via the wikilink graph) are the source of truth. The reader collapses every such failure to "no restored layout" and recomputes; it never surfaces as data loss. Unlike `vault.search`/`vault.embeddings`, there is **no `content_nonce` reconcile manifest**: the layout is a visual aid whose staleness degrades gracefully (a note added since the last save simply gets a fresh seed on next layout), so precise invalidation is unnecessary. Positions are RAM-resident while the graph is open and are dropped on vault lock (so vault A's layout never seeds vault B). It is **never synced and never backed up** — a device that lacks it re-runs the layout locally (Class 3 rebuildable cache; `sync-protocol.md` §326, backup allowlist §9.11.3).
 
+### 9.20 Share-import staging queue (`pending-shares/<share-id>`, `MYF1`)
+
+> **Magic allocation.** `MYF1`/`MYF5` is a free-pool §10.3 allocation (F = *file*, MYND-507), chosen the same way every family's magic is (implementer-picked from the free pool). A later letter change would be a mechanical rename, not a format change.
+
+A file shared into Myne via the OS share sheet (iOS Share Extension / Android `ACTION_SEND`) arrives at a process that does not hold `root_key` — the iOS extension is a separate sandbox, and on Android the vault may be locked when the intent fires. It cannot enter the attachment library yet (that needs the unlocked `items_key`, §9.9), so it is held in a **device-local encrypted queue** until the next unlock, when it drains into the library via the ordinary `attachment_import` path. This is the file-carrying sibling of §9.18 (pending-capture): same device-key seal and vault-agnostic per-entry-id AAD binding, but the plaintext is a **binary file** (framed with its filename + declared MIME), the cap is **64 MiB** (matching the `MYA1` attachment cap, not 16 KiB), and it drains to an attachment (not a note).
+
+#### 9.20.1 Layout
+
+`<app-container>/pending-shares/sealed/` holds `MYF1` blobs named by the hex `share_id`. How a shared file reaches `sealed/` differs per platform:
+
+- **iOS — plaintext-staging (like §9.18.4).** The Share Extension is a separate sandboxed process that cannot practically link the Rust crypto (doing so pulls the whole WebView runtime into a ~105 MiB extension the OS jetsams on launch), so it does **not** seal in-process. Instead it writes each shared file's bytes plus a `.meta` sidecar as **plaintext** into `<app-group>/pending-shares/staging/` (with `.completeFileProtection`, so iOS encrypts it at rest while the device is locked); the **app** seals each staged file into an `MYF1` blob under `sealed/` and deletes the plaintext on next open. This is the same native-side-stages-plaintext / app-seals pattern as the §9.18.4 watch-capture staging file (a persistent OS-Data-Protection-only plaintext window, not a RAM-only transient). On iOS both directories resolve to the shared **App Group** container so the extension (writer) and the app (reader/sealer) agree.
+- **Android — no persistent plaintext file.** The `ACTION_SEND` receiver reads the `content://` bytes, base64-encodes them, and delivers them to the WebView as a `share-intent` event; the JS layer invokes `seal_share`, which seals straight into `sealed/`. There is no `staging/` directory on Android — the plaintext exists only transiently in RAM (and, en route, as a base64 string that crosses the WebView; see §9.20.4).
+
+#### 9.20.2 Key
+
+Like §9.18, the `MYF1` entry is sealed under a **device-local 32-byte `wrap_key`** held in the OS keychain (Apple) / Keystore (Android), **NOT** a `DeriveSubkey(root_key, …)` subkey — the queue must be writable while `root_key` is unavailable. Non-biometric, `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly` on Apple; the equivalent device-only, non-biometric Android Keystore key on Android. The keychain service string is `md.myne.shareimport`, DISTINCT from `md.myne.captures`. No HKDF context and no §10.3 subkey role (provider-agnostic).
+
+#### 9.20.3 Blob format
+
+Header (49 bytes): `magic "MYF1"(4) ∥ protocol_version 0x01(1) ∥ share_id(16) ∥ wrap_nonce(24) ∥ ciphertext_len(u32 BE)`, then the CTX-committed XChaCha20-Poly1305 ciphertext. AAD = `aad_share_import_blob(share_id)` (length-prefixed role `"share-import-blob"`, AAD prefix `"myne.v0.1|"`), binding the per-entry `share_id` only (vault-agnostic — no `account_number_hash`/`items_key_id`). The sealed plaintext is an opaque, core-framed record `filename_len(u16 BE) ∥ filename(utf8) ∥ mime_len(u16 BE) ∥ mime(utf8) ∥ file_bytes`; filename + MIME are hints (the drain re-sniffs MIME authoritatively per §9.9), so they are confidential-but-not-AAD-bound. The header `share_id` is AAD-bound, so tampering with it fails AEAD rather than re-labelling the entry.
+
+#### 9.20.4 Size cap, drain, and transient plaintext
+
+Implementations MUST reject `ciphertext_len > 67108864 + 32` (64 MiB plaintext cap + 32-byte CTX tag) before allocating. The seal drops any entry whose framed plaintext exceeds the cap (no poison-oversize entry that re-fails every drain). Drain is **at-least-once**: the client decrypts each entry, imports it via `attachment_import` (§9.9), then deletes the entry; a crash between import and delete re-drains into a content-addressed dedup hit (harmless). Landing is the active unlocked vault (as §9.18, "whichever vault unlocks first"). The queue never syncs and is never in a backup (TB2).
+
+**Transient plaintext (carve-out).** The shared bytes exist as plaintext, protected only by OS Data Protection, *before* they are sealed into `MYF1`:
+
+- **iOS: a persistent plaintext staging file.** The Share Extension writes the file's bytes + a `.meta` sidecar into `<app-group>/pending-shares/staging/` (`.completeFileProtection`), where it persists until the app next opens, seals it, and deletes it — the same at-rest plaintext window as the §9.18.4 watch-capture staging file, not a RAM-only transient. Device-local, in the App-Group container, never synced.
+- **Android: a RAM + WebView-transit transient.** The `content://` bytes are read into RAM by the native receiver and cross the WebView as a base64 string (§9.20.1) before `seal_share` seals them; no persistent plaintext file is written.
+
+Both hold only the just-shared file (never existing vault content), are device-local, and are enumerated in [`../threat-model.md`](../threat-model.md) (AS19), analogous to the §9.18.4 carve-out.
+
 ## 10. Protocol Versioning & Migration
 
 ### 10.1 Design principle: forward-incompatible by design
@@ -2018,6 +2050,7 @@ This registry is normative. Implementations MUST reject any magic byte / AAD pre
 | AI embeddings index (`vault.embeddings`) | `MYR1` | `MYR5` | §9.17 | MYND-453 |
 | Pending-capture queue (`captures/<id>`) | `MYK1` | `MYK5` | §9.18 | watch-capture |
 | Graph layout cache (`vault.graph`) | `MYG1` | `MYG5` | §9.19 | graph-rework |
+| Share-import staging queue (`pending-shares/<id>`) | `MYF1` | `MYF5` | §9.20 | MYND-507 |
 
 Section §9.8 (vault indices) **landed with MYND-271** (the persistence the MYND-31 design pre-allocated); §9.7 (workspace) landed with MYND-166, and attachments occupy §9.9/§9.10. The per-note and vault-meta families retain their historical `NT05`/`NTV5` v005 reservations; all newer blob families (prefs/search/workspace/indices/attachments/dictionary/attachment-text/head-state/ai-embeddings/graph-layout) use the `MY?5` v005 convention. The device-local sync baseline (`vault.head-state`, `MYH1`/`MYH5`, §9.16) landed with MYND-416; the **wire vault head itself has no magic** — it is sync-wire-only (`sync-protocol.md` §2), versioned by its `head_format_version` byte, not a §10.3 family.
 
