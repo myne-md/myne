@@ -62,6 +62,7 @@ pub mod capture_blob;
 pub mod dictionary_blob;
 pub mod embeddings_blob;
 pub mod error;
+pub mod graph_layout_blob;
 pub mod kdf;
 pub mod manifest;
 pub mod paired_extension;
@@ -91,11 +92,11 @@ pub use account_number::{
     ACCOUNT_NUMBER_HASH_LEN,
 };
 pub use aead::{
-    aad_ai_embeddings_blob, aad_attachment_text_blob, aad_note_content_encrypt,
-    aad_note_item_key_wrap, aad_password_wrap, aad_personal_dictionary_blob, aad_prefs_blob,
-    aad_quick_unlock_blob, aad_recovery_wrap, aad_search_index_blob, aad_vault_indices_blob,
-    aad_vault_items_key_wrap, aad_workspace_blob, aead_open_ctx, aead_seal_ctx, AEAD_KEY_LEN,
-    AEAD_NONCE_LEN, CTX_COMMITMENT_TAG_LEN,
+    aad_ai_embeddings_blob, aad_attachment_text_blob, aad_graph_layout_blob,
+    aad_note_content_encrypt, aad_note_item_key_wrap, aad_password_wrap,
+    aad_personal_dictionary_blob, aad_prefs_blob, aad_quick_unlock_blob, aad_recovery_wrap,
+    aad_search_index_blob, aad_vault_indices_blob, aad_vault_items_key_wrap, aad_workspace_blob,
+    aead_open_ctx, aead_seal_ctx, AEAD_KEY_LEN, AEAD_NONCE_LEN, CTX_COMMITMENT_TAG_LEN,
 };
 pub use attachment_blob::{
     aad_encrypt_attachment, aad_wrap_attachment_key, compute_attachment_id, decode_attachment_blob,
@@ -195,6 +196,12 @@ pub use vault_meta::{
     VaultMeta, VAULT_META_ACCOUNT_HASH_LEN, VAULT_META_ITEMS_KEY_ID_LEN, VAULT_META_LEN,
     VAULT_META_MAGIC, VAULT_META_NONCE_LEN, VAULT_META_PROTOCOL_VERSION, VAULT_META_RESERVED,
     VAULT_META_SALT_RANDOM_LEN, VAULT_META_WRAPPED_ITEMS_KEY_LEN, VAULT_META_WRAPPED_ROOT_KEY_LEN,
+};
+pub use graph_layout_blob::{
+    decode_graph_layout_blob, encode_graph_layout_blob, encode_graph_layout_blob_raw,
+    GraphLayoutBlobError, GRAPH_LAYOUT_BLOB_ACCOUNT_HASH_LEN, GRAPH_LAYOUT_BLOB_FORMAT_VERSION,
+    GRAPH_LAYOUT_BLOB_HEADER_LEN, GRAPH_LAYOUT_BLOB_MAGIC, GRAPH_LAYOUT_BLOB_PROTOCOL_VERSION,
+    MAX_GRAPH_LAYOUT_PLAINTEXT_LEN,
 };
 pub use workspace_blob::{
     decode_workspace_blob, encode_workspace_blob, encode_workspace_blob_raw, WorkspaceBlobError,

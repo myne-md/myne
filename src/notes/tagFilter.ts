@@ -8,51 +8,18 @@
 import type { TitleRecord } from "./loadNoteBatch";
 import { sortBatchIds, type NoteId } from "./sidebarState";
 import { byTag } from "./vaultIndices";
+// `combineTagSets` + `FilterMode` + `DEFAULT_FILTER_MODE` now live in the shared
+// `@myne/editor` package (`host/notes/tagCombine`) — one set-algebra core shared
+// with the query engine (no fork, no drift). Imported for local use below +
+// re-exported so existing `./tagFilter` importers stay unchanged.
+import {
+  combineTagSets,
+  DEFAULT_FILTER_MODE,
+  type FilterMode,
+} from "@myne/editor/host/notes/tagCombine";
 
-export type FilterMode = "and" | "or";
-
-/** Default combination mode (TS-2): AND = "narrow to notes with ALL tags". */
-export const DEFAULT_FILTER_MODE: FilterMode = "and";
-
-/**
- * Pure set combination over per-tag id lists (each already subtree-inclusive +
- * trash-excluded by `byTag`). AND = intersection, OR = union.
- *
- * - 0 lists → `[]` (the 0-tag "no filter" identity, TS-2 — NOT all-notes).
- * - 1 list → that list (n=1 collapses to a single `byTag`).
- * - Raw set-algebra (TS-2): selecting a parent AND its descendant yields the
- *   descendant's set (a parent's subtree-inclusive set ⊇ its descendant's, so
- *   the intersection is the descendant); the union symmetrically collapses to
- *   the parent. No redundancy detection.
- *
- * Order: the first list's order is preserved (AND filters it; OR appends
- * first-seen ids from later lists).
- */
-export function combineTagSets(
-  idLists: ReadonlyArray<ReadonlyArray<string>>,
-  mode: FilterMode,
-): string[] {
-  if (idLists.length === 0) return [];
-  if (idLists.length === 1) return [...idLists[0]];
-
-  if (mode === "or") {
-    const seen = new Set<string>();
-    const out: string[] = [];
-    for (const list of idLists) {
-      for (const id of list) {
-        if (!seen.has(id)) {
-          seen.add(id);
-          out.push(id);
-        }
-      }
-    }
-    return out;
-  }
-
-  // AND: ids from the first list present in every other list.
-  const others = idLists.slice(1).map((l) => new Set(l));
-  return idLists[0].filter((id) => others.every((s) => s.has(id)));
-}
+export { combineTagSets, DEFAULT_FILTER_MODE };
+export type { FilterMode };
 
 // ============================================================
 // Rich contract (TS-1): { rows: {noteId, title, matchedKeys[]}[], count }.

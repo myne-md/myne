@@ -228,6 +228,12 @@ export function searchIndexPath(appDataDir: string, vaultId: string): string {
   return join(appDataDir, "vaults", vaultId, "vault.search");
 }
 
+/** Path to the MYG1 graph-layout cache: `vaults/<id>/vault.graph`
+ *  (`protocol/src/graph_layout_blob.rs`; spec § 9.19.1). */
+export function graphLayoutPath(appDataDir: string, vaultId: string): string {
+  return join(appDataDir, "vaults", vaultId, "vault.graph");
+}
+
 /**
  * Assert a blob's leading 4 bytes equal `magic` (latin1). The generic shape
  * every at-rest format check reuses — MYA1 (per-attachment blob), MYC1

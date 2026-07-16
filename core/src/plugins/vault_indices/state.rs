@@ -468,6 +468,30 @@ impl VaultIndicesState {
         out
     }
 
+    /// Vault-wide DISTINCT frontmatter property-key list — every key present
+    /// across the vault's typed properties, sorted + deduped (`BTreeSet`). The
+    /// key-universe companion to `property_values`: it surfaces WHICH properties
+    /// exist so the saved-view authoring UI can offer groupBy / sort / column
+    /// pickers over real keys. No values, no comparison, no expression eval.
+    /// Empty on a poisoned lock.
+    pub fn property_keys(&self) -> Vec<String> {
+        let Ok(idx) = self.inner.lock() else {
+            return Vec::new();
+        };
+        let mut keys = std::collections::BTreeSet::new();
+        for record in idx.notes.values() {
+            for entry in &record.properties {
+                // Clone only the first time a key is seen — a key shared across
+                // many notes (the common case) then costs a `&str` lookup, not a
+                // heap allocation discarded by the set.
+                if !keys.contains(entry.key.as_str()) {
+                    keys.insert(entry.key.clone());
+                }
+            }
+        }
+        keys.into_iter().collect()
+    }
+
     /// Every imported block anchor across the vault (MYND-382, the `[[^^`
     /// picker), each tagged with its embedding note's id + display title, in a
     /// deterministic order (notes by UUID, anchors in document order as applied).
@@ -1004,6 +1028,34 @@ mod tests {
             ]
         );
         assert!(state.property_values("nonexistent").is_empty());
+    }
+
+    #[test]
+    fn property_keys_lists_distinct_keys_sorted() {
+        let state = VaultIndicesState::default();
+        let mut a = rec("Alpha", None);
+        a.properties = vec![
+            prop("status", "string", "todo"),
+            prop("rating", "number", "5"),
+        ];
+        let mut b = rec("Beta", None);
+        b.properties = vec![prop("status", "string", "done")]; // key repeats across notes
+        state.apply("a", a);
+        state.apply("b", b);
+        state.apply("c", rec("Gamma", None)); // no properties
+
+        // distinct + sorted; "status" spans two notes but appears once.
+        assert_eq!(
+            state.property_keys(),
+            vec!["rating".to_string(), "status".to_string()]
+        );
+    }
+
+    #[test]
+    fn property_keys_empty_when_no_properties() {
+        let state = VaultIndicesState::default();
+        state.apply("a", rec("Alpha", None));
+        assert!(state.property_keys().is_empty());
     }
 
     #[test]

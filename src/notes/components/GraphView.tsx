@@ -4,7 +4,7 @@
 // via `ws.openGraph()` from a command-palette action, a persistent BottomBar
 // affordance (SYNC-7 — graph is wedge-first-class), and the ⌘⇧G shortcut.
 
-import { lazy, Suspense, useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -15,6 +15,7 @@ import {
   type GraphModel,
 } from "../graphAdapter";
 import { getIndexNonce, useIndexNonce } from "../indexNonce";
+import { loadGraphLayoutFromDisk } from "../graphLayoutPersist";
 import { useResolverNotes } from "../resolverNotes";
 import { liveIdSet } from "../resolveWikilink";
 import { useSelectedNote } from "../sidebarState";
@@ -52,13 +53,32 @@ const MESSAGE_STYLE = {
 export function GraphPane() {
   const { t } = useTranslation();
   const notes = useResolverNotes();
+  // `notes` identity changes on EVERY sidebar-cache update (every note applied
+  // during a sync / initial index). Read it through a ref inside the build
+  // effect so that churn does NOT re-run the build and re-jumble the layout —
+  // the graph freezes until the user explicitly Refreshes (SYNC-14 intent). The
+  // build still captures the LATEST notes whenever it does run (filter change /
+  // Refresh), because the ref is updated every render.
+  const notesRef = useRef(notes);
+  notesRef.current = notes;
+  // Whether the persisted layout has been hydrated this mount (Tier 3). One
+  // disk read per GraphPane mount, before the first build.
+  const hydratedRef = useRef(false);
   const ctx = useSelectedNote();
   const ws = useWorkspace();
   const indexNonce = useIndexNonce();
   const [filter, setFilter] = useState<Filter>({ kind: "all" });
   const [model, setModel] = useState<GraphModel | null>(null);
-  const [overCap, setOverCap] = useState(false);
   const [tags, setTags] = useState<TagTreeNode[]>([]);
+  // E2E test-observability (SYNC-8; modeled on AiHydrationProbe). Reflected onto
+  // `data-*` on the graph pane — bounded totals + a boolean + an opaque monotonic
+  // nonce, all post-unlock and DENY-list clean (never a note id or x/y coord):
+  //   layoutHydrated — the disk-hydrate path ran this mount (Tier 3 restore);
+  //   layoutNonce    — bumped ONLY when the model is (re)built, so a test can
+  //                    prove the layout did NOT re-run on an ordinary re-render
+  //                    (the flashbang-free property).
+  const [layoutHydrated, setLayoutHydrated] = useState(false);
+  const [layoutNonce, setLayoutNonce] = useState(0);
   const [buildNonce, setBuildNonce] = useState(0);
   const [buildTrigger, setBuildTrigger] = useState(0);
 
@@ -82,9 +102,10 @@ export function GraphPane() {
   useEffect(() => {
     let cancelled = false;
     setModel(null);
-    setOverCap(false);
+    // Snapshot the note-set at build time (see `notesRef` note above).
+    const notes = notesRef.current;
     const liveIds = liveIdSet(notes);
-    const build = async (): Promise<GraphModel | null> => {
+    const build = async (): Promise<GraphModel> => {
       if (filter.kind === "orphans") {
         // Degree-0 index query — works at any vault size, no dump (SYNC-13).
         return isolatedModel(await vaultIndicesOrphans(), notes);
@@ -97,23 +118,37 @@ export function GraphPane() {
         // The open-note neighborhood — bounded per-note BFS, any vault size.
         return loadNeighborhood(filter.seed, filter.depth, "both", notes);
       }
-      return loadWholeVaultGraph(notes); // "all" — null when over the cap
+      return loadWholeVaultGraph(notes); // "all" — whole vault, no cap
     };
-    void build().then(
-      (m) => {
-        if (cancelled) return;
-        setBuildNonce(getIndexNonce());
-        if (m === null) setOverCap(true);
-        else setModel(m);
-      },
-      () => {
-        if (!cancelled) setBuildNonce(getIndexNonce());
-      },
-    );
+    const run = async () => {
+      // Hydrate persisted positions ONCE per mount so the layout warm-starts
+      // from the last session's arrangement (Tier 3) instead of a fresh random
+      // scatter; clears the store first (cross-vault safety). The disk read and
+      // the model build are INDEPENDENT IPCs (the build never reads the store),
+      // so overlap them — both still resolve before `setModel`, so GraphCanvas
+      // sees the restored positions on mount. Filter changes reuse the store.
+      const hydrate = hydratedRef.current
+        ? Promise.resolve()
+        : loadGraphLayoutFromDisk().then(() => {
+            hydratedRef.current = true;
+            if (!cancelled) setLayoutHydrated(true);
+          });
+      const [, m] = await Promise.all([hydrate, build()]);
+      if (cancelled) return;
+      setBuildNonce(getIndexNonce());
+      setModel(m);
+      setLayoutNonce((n) => n + 1); // one bump per (re)build — the flashbang probe
+    };
+    void run().catch(() => {
+      if (!cancelled) setBuildNonce(getIndexNonce());
+    });
     return () => {
       cancelled = true;
     };
-  }, [filter, notes, buildTrigger]);
+    // Deliberately NOT depending on `notes`: a vault-cache update must not
+    // rebuild the frozen graph (SYNC-14). Rebuild only on filter change or an
+    // explicit Refresh (`buildTrigger`).
+  }, [filter, buildTrigger]);
 
   // SYNC-14: stale when the index changed since the layout was built. The
   // expensive re-layout is gated to an explicit refresh, never the nonce.
@@ -125,13 +160,7 @@ export function GraphPane() {
   };
 
   let content: ReactNode;
-  if (overCap) {
-    content = (
-      <div style={MESSAGE_STYLE}>
-        {t("notes.graph.overCap")}
-      </div>
-    );
-  } else if (model === null) {
+  if (model === null) {
     content = <div style={MESSAGE_STYLE}>{t("notes.graph.building")}</div>;
   } else if (model.nodes.length === 0) {
     content = (
@@ -162,6 +191,9 @@ export function GraphPane() {
   return (
     <div
       data-testid="editor.graph-pane"
+      data-node-count={String(model?.nodes.length ?? 0)}
+      data-layout-hydrated={String(layoutHydrated)}
+      data-layout-nonce={String(layoutNonce)}
       style={{
         display: "flex",
         flexDirection: "column",

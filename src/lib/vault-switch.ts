@@ -26,6 +26,7 @@
 // needs a "you have unsaved changes" prompt.
 
 import { resetSessionIgnored } from "../editor/decorations/spell";
+import { flushGraphLayoutNow } from "../notes/graphLayoutPersist";
 import type { Action, VaultId } from "./stage";
 import { lockVault } from "./vault-unlock";
 
@@ -77,6 +78,10 @@ export async function switchVault(
   const { onSavingChange, dispatch } = deps;
   onSavingChange(true);
   try {
+    // Persist the current graph layout to the ACTIVE (still-unlocked) vault
+    // before locking it — this path bypasses the Editor graceful-teardown trio,
+    // so it needs its own flush (best-effort, mirrors the trio's flushes).
+    await flushGraphLayoutNow();
     // Param-less lock = "lock the sole unlocked (active) vault" (SYNC-8).
     // Its `flushIfDirty` covers unsaved edits — no confirm-discard dialog.
     await lockVault();
