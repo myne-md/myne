@@ -39,6 +39,48 @@ mod pdf_export;
 mod plugins;
 mod screen_guard;
 mod share_file;
+// SF2 (MYND-510): iOS Share Extension seam — the C-ABI seal shim the extension
+// links + the App-Group container resolver the app's drain reads. iOS-only.
+#[cfg(target_os = "ios")]
+mod share_import_ffi;
+
+// SF3 (MYND-511 / SYNC-3): the Android Keystore device-key provider for
+// share-import. The shared-core seal/drain resolve their device wrap key through
+// `myne_core::…::device_key::resolve` → the `AndroidShareDeviceKey` managed state
+// registered below; this bridges that seam to the `tauri-plugin-share-intent`
+// Kotlin Keystore plugin. Keeping the impl in the mobile host (not `core`) means
+// `core` never depends on the mobile plugin. Android-only.
+// ⚠️ DEVICE-VERIFY-PENDING — the Keystore behaviour needs a real device
+// (`tauri-plugin-share-intent/KEYSTORE_TODO.md`).
+#[cfg(target_os = "android")]
+mod share_import_android {
+    use tauri::{Manager, Runtime};
+
+    pub struct KeystoreProvider<R: Runtime> {
+        pub app: tauri::AppHandle<R>,
+    }
+
+    impl<R: Runtime> myne_core::plugins::share_import::device_key::AndroidShareDeviceKeyProvider
+        for KeystoreProvider<R>
+    {
+        fn get_or_create(
+            &self,
+        ) -> Result<
+            zeroize::Zeroizing<
+                [u8; myne_core::plugins::share_import::device_key::SHARE_WRAP_KEY_LEN],
+            >,
+            myne_core::plugins::share_import::error::ShareImportError,
+        > {
+            use myne_core::plugins::share_import::error::ShareImportError;
+            let si = self
+                .app
+                .try_state::<tauri_plugin_share_intent::ShareIntent<R>>()
+                .ok_or(ShareImportError::HardwareUnavailable)?;
+            si.get_or_create_device_key()
+                .map_err(|_| ShareImportError::Backend)
+        }
+    }
+}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -73,6 +115,14 @@ pub fn run() {
         // capability entry). On iOS/desktop this registers a no-op; the iOS
         // half lives in `screen_guard` (see the `.setup()` init below).
         .plugin(tauri_plugin_screen_guard::init())
+        // MYND-511: the Android OS-share-sheet (ACTION_SEND / ACTION_SEND_MULTIPLE)
+        // receiver for share-import (SF3). An in-repo Kotlin plugin; Rust-only
+        // WebView surface — no WebView commands, no capability entry. It reads the
+        // shared file's bytes off the main thread and emits a global `share-intent`
+        // event; the JS half (`shareImport.ts` `initShareIntent`) seals it via
+        // `plugin:share-import|seal_share`. On iOS/desktop this registers a no-op
+        // (the iOS Share Extension is a separate app-extension target).
+        .plugin(tauri_plugin_share_intent::init())
         .plugin(plugins::vault_creation::init())
         .plugin(plugins::vault_unlock::init())
         .plugin(plugins::vault_recover::init())
@@ -87,6 +137,12 @@ pub fn run() {
         // 2026-07-12. Commands must stay in lockstep with build.rs +
         // permissions/captures/default.toml or the ACL resolver fails closed.
         .plugin(plugins::captures::init())
+        // Share-import staging queue (MYF1, §9.20). Device-key sealed;
+        // seal_share / drain_pending_shares / share_ack. A file shared via the
+        // OS share sheet is sealed while locked and drained into the attachment
+        // library on unlock. Commands must stay in lockstep with build.rs +
+        // permissions/share-import/default.toml or the ACL resolver fails closed.
+        .plugin(plugins::share_import::init())
         .plugin(plugins::vault_indices::init())
         .plugin(plugins::search::init())
         .plugin(plugins::snapshots::init())
@@ -208,6 +264,29 @@ pub fn run() {
             // the Kotlin plugin's `load()` applies FLAG_SECURE itself.
             #[cfg(target_os = "ios")]
             screen_guard::init(app.handle());
+
+            // SF2 (MYND-510): resolve the shared App-Group container once at
+            // startup and inject it into the shared-core share-import queue seam,
+            // so the drain (`drain_pending_shares`, run on unlock) reads the SAME
+            // `pending-shares/sealed/` dir the headless Share Extension wrote in
+            // its own process. No-op + app_data_dir fallback on an unprovisioned
+            // build (no App-Group entitlement). iOS-only; see `share_import_ffi`.
+            #[cfg(target_os = "ios")]
+            share_import_ffi::init_app_group_queue();
+
+            // SF3 (MYND-511 / SYNC-3): register the Android Keystore device-key
+            // provider so the shared-core share-import seal/drain can reach the
+            // Keystore-held wrap key while the vault is locked. Without it the
+            // Android device-key arm returns HardwareUnavailable and every
+            // share-import seal no-ops. Android-only; see `share_import_android`.
+            #[cfg(target_os = "android")]
+            app.manage(
+                myne_core::plugins::share_import::device_key::AndroidShareDeviceKey(
+                    std::sync::Arc::new(share_import_android::KeystoreProvider {
+                        app: app.handle().clone(),
+                    }),
+                ),
+            );
 
             // Screenshot-taken notice (MYND-476): when protection is engaged a
             // screenshot comes out black with no explanation, so observe the OS

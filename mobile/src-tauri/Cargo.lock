@@ -2394,6 +2394,7 @@ dependencies = [
  "myne-core",
  "objc2",
  "objc2-core-foundation",
+ "objc2-foundation",
  "protocol",
  "serde",
  "serde_json",
@@ -2403,6 +2404,7 @@ dependencies = [
  "tauri-plugin-deep-link",
  "tauri-plugin-opener",
  "tauri-plugin-screen-guard",
+ "tauri-plugin-share-intent",
  "tauri-utils",
  "thiserror 2.0.18",
  "tokio",
@@ -4339,6 +4341,17 @@ dependencies = [
  "serde",
  "tauri",
  "tauri-plugin",
+]
+
+[[package]]
+name = "tauri-plugin-share-intent"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-plugin",
+ "zeroize",
 ]
 
 [[package]]

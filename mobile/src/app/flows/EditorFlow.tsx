@@ -23,6 +23,8 @@ import { HAS_TAURI } from "../../lib/app-window";
 import { effectiveMobileAutoLockSecs } from "../../lib/auto-lock";
 import { consumePendingCapture, CAPTURE_EVENT, type CaptureMode } from "../../lib/deep-link";
 import { drainPendingCaptures, sealStagedCaptures } from "../../lib/captures";
+import { drainPendingShares } from "../../lib/shareImport";
+import { ShareImportToast } from "./ShareImportToast";
 import { ioBanner } from "../../lib/io-banner";
 import { usePrefs } from "../../lib/use-prefs";
 import { vaultDisplayLabel } from "../../lib/vault-label";
@@ -942,7 +944,13 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
   // `drainPendingCaptures` self-serialises (StrictMode-safe) and is a no-op when
   // the queue is empty; refresh the list if it created any so they appear.
   useEffect(() => {
-    const runDrain = () =>
+    const runDrain = () => {
+      // Share-import drain (§9.20, SYNC-4/6): decrypt + import any files shared
+      // via the OS share sheet into the attachment library, host-side. A sibling
+      // of the capture drain — independent (it refreshes the library, not the
+      // notes list) and self-serialising; its SF5 toast is rendered by
+      // <ShareImportToast/>.
+      void drainPendingShares();
       void (async () => {
         // Seal any just-staged watch captures first, then drain the queue into
         // notes (both no-op when empty / the host is absent).
@@ -950,6 +958,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
         const created = await drainPendingCaptures();
         if (created > 0) await loadEntries();
       })();
+    };
     runDrain(); // on mount — every unlock path lands here
     // Also drain when the app returns to the foreground: a watch capture may have
     // been delivered + staged while we were backgrounded (there is no native
@@ -2385,6 +2394,9 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
   // that. ─────────────────────────────────────────────────────────────────────
   const renderSharedOverlays = () => (
     <>
+      {/* SF5 share-import confirmation toast (§9.20, SYNC-18) — self-contained,
+          listens for the drain result; renders in every layout branch. */}
+      <ShareImportToast />
       {purgeId != null && (
         <Sheet onClose={() => setPurgeId(null)}>
           {(close) => (
