@@ -14,7 +14,11 @@
 // the caller (task 3): the default export leaves them as-is (they resolve
 // only in-app), and the attachments-included export rewrites them to
 // relative sidecar filenames Rust-side. This assembler is pure over the
-// body it is given.
+// body it is given — but it PINS the projection to the canonical
+// `attachment://<id>` form (`canonicalAttachmentUrl`), never the
+// platform-aware runtime form (MYND-519): the Rust rewriter
+// (`html_referenced_attachment_ids`) scans for exactly that shape, and a
+// deterministic export must not vary by the platform it was written on.
 //
 // SYNC-2: this is a LOSSY projection (derived artifact), not the `.md`
 // source — the `%%`-comment strip (SYNC-1, owned by editor-comments #5)
@@ -22,6 +26,7 @@
 // strip for free once #5 lands.
 
 import i18n from "../../i18n";
+import { canonicalAttachmentUrl } from "../../notes/attachmentRef";
 import { emitNoteHtml, type EmitNoteHtmlOptions } from "./emitNoteHtml";
 import { composePrintStylesheet } from "./page-geometry";
 import { FONT_FACE_CSS } from "./font-face";
@@ -56,7 +61,12 @@ export async function emitStandaloneHtml(
   plaintext: string,
   opts: EmitStandaloneHtmlOptions = {},
 ): Promise<StandaloneHtmlResult> {
-  const emitted = await emitNoteHtml(plaintext, opts);
+  // Canonical attachment srcs — the export-projection contract (see the
+  // module header). A caller-supplied builder still wins if ever passed.
+  const emitted = await emitNoteHtml(plaintext, {
+    attachmentUrl: canonicalAttachmentUrl,
+    ...opts,
+  });
   const locale = opts.locale ?? "en-US";
 
   let css = FONT_FACE_CSS + composePrintStylesheet(locale);

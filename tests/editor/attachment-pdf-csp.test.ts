@@ -52,4 +52,15 @@ describe("WebView CSP supports inline pdf.js render", () => {
     expect(d["img-src"].split(/\s+/)).toContain("attachment:");
     expect(d["media-src"].split(/\s+/)).toContain("attachment:");
   });
+
+  it("every attachment: directive also lists http://attachment.localhost (Windows http-mapped form, MYND-519)", () => {
+    // WebView2 (and Android WebView) cannot intercept custom schemes — Tauri
+    // serves registered protocols there as `http://<scheme>.localhost`, so
+    // the runtime `convertFileSrc` form needs the dual origin, exactly like
+    // the existing `ipc: http://ipc.localhost` pair in connect-src.
+    const d = csp();
+    for (const dir of ["img-src", "media-src", "connect-src", "frame-src"]) {
+      expect(d[dir].split(/\s+/)).toContain("http://attachment.localhost");
+    }
+  });
 });

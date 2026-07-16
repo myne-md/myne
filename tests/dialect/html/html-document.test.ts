@@ -4,7 +4,7 @@
 // inline print stylesheet + @font-face, and KaTeX CSS only when the note
 // contains math.
 
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { emitStandaloneHtml } from "../../../src/dialect/html/htmlDocument";
 
 describe("standalone document shell", () => {
@@ -90,5 +90,28 @@ describe("purity", () => {
     );
     expect(typeof document).toBe("string");
     expect(document.length).toBeGreaterThan(0);
+  });
+});
+
+describe("attachment src pinning (MYND-519)", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("pins image srcs to the canonical attachment://<id> form even inside Tauri", async () => {
+    // The export projection must be deterministic across platforms and match
+    // the exact shape the Rust sidecar rewriter scans for
+    // (`html_referenced_attachment_ids`) — never the platform-aware runtime
+    // form `convertFileSrc` would emit.
+    vi.stubGlobal("window", {
+      __TAURI_INTERNALS__: {
+        convertFileSrc: (path: string, protocol: string) =>
+          `http://${protocol}.localhost/${path}`,
+      },
+    });
+    const id = "a".repeat(64);
+    const { document } = await emitStandaloneHtml(`![[att:${id}|pic.png]]\n`);
+    expect(document).toContain(`src="attachment://${id}"`);
+    expect(document).not.toContain("attachment.localhost");
   });
 });

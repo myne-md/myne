@@ -71,6 +71,13 @@ export interface EmitNoteHtmlOptions {
    *  inject a renderer via `setMermaidLoader`), `"off"`. Default `"auto"`.
    *  Failures always fall back to the monospace code card. */
   readonly mermaid?: "auto" | "force" | "off";
+  /** Builder for inlined image-attachment `src` URLs. Default: the
+   *  platform-aware `attachmentUrl` (display surfaces — reading mode, the
+   *  PDF hidden print window — need the WebView-servable per-platform form;
+   *  MYND-519). The standalone HTML export overrides this with
+   *  `canonicalAttachmentUrl` so the exported projection stays the stable
+   *  `attachment://<id>` shape the Rust sidecar rewriter scans for. */
+  readonly attachmentUrl?: (id: string) => string;
 }
 
 export interface EmitNoteHtmlResult {
@@ -145,6 +152,7 @@ export async function emitNoteHtml(
     mermaidSvg,
     excluded: [],
     excludedIds: new Set(),
+    attachmentUrl: opts.attachmentUrl ?? attachmentUrl,
   };
 
   const parts: string[] = [];
@@ -356,6 +364,8 @@ interface Ctx {
   readonly mermaidSvg: ReadonlyMap<number, string>;
   readonly excluded: ExcludedAttachment[];
   readonly excludedIds: Set<string>;
+  /** Image-attachment `src` builder — `EmitNoteHtmlOptions.attachmentUrl`. */
+  readonly attachmentUrl: (id: string) => string;
 }
 
 function slice(ctx: Ctx, node: SyntaxNode): string {
@@ -966,7 +976,7 @@ function renderAttachmentEmbed(
 ): string {
   const name = attachmentEmbedDisplayName(filename);
   if (IMAGE_EXT_RE.test(name)) {
-    return `<img class="att-image" src="${escapeAttr(attachmentUrl(id))}" alt="${escapeAttr(name)}">`;
+    return `<img class="att-image" src="${escapeAttr(ctx.attachmentUrl(id))}" alt="${escapeAttr(name)}">`;
   }
   collectExcluded(ctx, id, name);
   const excludedPdf = PDF_EXT_RE.test(name);
