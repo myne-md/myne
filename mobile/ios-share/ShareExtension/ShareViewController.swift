@@ -22,7 +22,7 @@ import UniformTypeIdentifiers
 ///
 /// DEBUG-only: some call sites pass a shared file's name / MIME / size, which are
 /// confidential (they live inside the encrypted `MYF1` plaintext, `protocol.md`
-/// §9.19.3). NSLog is unredacted and persists in the OS unified log, so in a
+/// §9.20.3). NSLog is unredacted and persists in the OS unified log, so in a
 /// RELEASE build this must never fire — the whole body compiles out. Full
 /// diagnostics remain for the on-device verification, which runs debug builds.
 private func shareLogInfo(_ msg: String) {

@@ -1,5 +1,5 @@
 // Share-import drain bridge for files shared into Myne via the OS share sheet
-// (`spec/protocol.md` §9.19). The native side (iOS Share Extension / Android
+// (`spec/protocol.md` §9.20). The native side (iOS Share Extension / Android
 // ACTION_SEND intent) seals a shared file into a device-local encrypted `MYF1`
 // queue while the vault may be locked; this module drives the drain that lives
 // inside the WebView trust boundary:

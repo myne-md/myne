@@ -3,7 +3,7 @@
 //! `ACTION_SEND`).
 //!
 //! A shared file is sealed into a device-local encrypted `MYF1` queue
-//! (`myne_core::plugins::share_import`, `protocol.md` § 9.19) while the vault
+//! (`myne_core::plugins::share_import`, `protocol.md` § 9.20) while the vault
 //! may be locked, and drained into the vault's attachment library
 //! (`attachment_import`, MYA1/MYC1) on unlock. The whole core (device-key seal +
 //! queue + host-side drain) lives in `myne-core`; this crate only registers the

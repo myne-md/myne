@@ -1,4 +1,4 @@
-// SF5 confirmation surface for the share-import flow (§9.19, ledger SYNC-6/18):
+// SF5 confirmation surface for the share-import flow (§9.20, ledger SYNC-6/18):
 // a calm, non-modal toast shown after a SILENT drain imports one or more shared
 // files into the attachment library. Stay-put — no navigation (SYNC-18); it
 // auto-dismisses. The drain itself lives in `lib/shareImport.ts`; this component

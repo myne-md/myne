@@ -1,5 +1,5 @@
 # Permissions for the mobile `share-import` Tauri plugin (OS share-sheet file
-# import staging queue, MYF1 §9.19). Picked up under the `share-import:` ACL
+# import staging queue, MYF1 §9.20). Picked up under the `share-import:` ACL
 # namespace because `build.rs` declares this as an `InlinedPlugin`. Referenced by
 # `capabilities/default.json` as `share-import:default`.
 #

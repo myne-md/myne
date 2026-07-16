@@ -137,7 +137,7 @@ pub fn run() {
         // 2026-07-12. Commands must stay in lockstep with build.rs +
         // permissions/captures/default.toml or the ACL resolver fails closed.
         .plugin(plugins::captures::init())
-        // Share-import staging queue (MYF1, §9.19). Device-key sealed;
+        // Share-import staging queue (MYF1, §9.20). Device-key sealed;
         // seal_share / drain_pending_shares / share_ack. A file shared via the
         // OS share sheet is sealed while locked and drained into the attachment
         // library on unlock. Commands must stay in lockstep with build.rs +

@@ -1,4 +1,4 @@
-// Flow-logic: the OS share-sheet drain (§9.19). Drives headless Chromium against
+// Flow-logic: the OS share-sheet drain (§9.20). Drives headless Chromium against
 // the dev server with mock IPC — NOT an end-to-end suite. The native iOS Share
 // Extension / Android ACTION_SEND intent + the device-key seal are the manual
 // device-E2E exemption (they cannot run in this harness); what IS JS-testable is
