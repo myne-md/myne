@@ -73,7 +73,7 @@ import { IconButton } from "../../components/primitives/IconButton";
 import { ViewsSection } from "./ViewsSection";
 import { FilterBuilder, type FolderOption } from "./FilterBuilder";
 import { ViewSettings, type ViewDisplayPatch } from "./ViewSettings";
-import { useViewResult } from "../views/useViewResult";
+import { vaultIndicesPropertyKeys } from "../vaultIndices";
 import {
   draftToFilterNode,
   filterNodeToDraft,
@@ -625,19 +625,25 @@ export function NoteList({ onNewFromTemplate, exportHooks }: NoteListProps = {})
     },
     [viewSettings],
   );
-  // Property-name suggestions for the cover-image field: the frontmatter keys
-  // present in the open settings view's current result (no new IPC — same
-  // projection the cards render). `""` id → the hook yields no result (inert).
-  const settingsViewResult = useViewResult(viewSettings?.id ?? "");
-  const viewPropertySuggestions = useMemo<string[]>(() => {
-    const keys = new Set<string>();
-    for (const group of settingsViewResult.result?.groups ?? []) {
-      for (const row of group.rows) {
-        for (const key of Object.keys(row.values)) keys.add(key);
-      }
-    }
-    return [...keys].sort();
-  }, [settingsViewResult.result]);
+  // The vault's frontmatter property-key universe — the option set for the view
+  // settings' group / sort / column pickers + cover-image suggestions. Loaded
+  // from the `vault_indices_property_keys` accessor when the modal opens (fresh
+  // each open, so the pickers reflect the current index).
+  const [viewPropertyKeys, setViewPropertyKeys] = useState<string[]>([]);
+  useEffect(() => {
+    if (viewSettings === null) return;
+    let cancelled = false;
+    void vaultIndicesPropertyKeys()
+      .then((keys) => {
+        if (!cancelled) setViewPropertyKeys(keys);
+      })
+      .catch(() => {
+        /* index hiccup → empty pickers; the free-text cover field still works */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [viewSettings]);
 
   // Task 6 — view management: rename / delete / reorder, each persisted via
   // #3's prefs API then reflected immediately by re-reading prefs. A deleted
@@ -1071,7 +1077,7 @@ export function NoteList({ onNewFromTemplate, exportHooks }: NoteListProps = {})
         onDelete={handleDeleteView}
         onMoveView={handleMoveView}
       />
-      {viewSettings !== null && viewSettings.view_type === "cards" && (
+      {viewSettings !== null && (
         <ViewSettings
           title={
             viewSettings.name.trim() === ""
@@ -1079,11 +1085,15 @@ export function NoteList({ onNewFromTemplate, exportHooks }: NoteListProps = {})
               : viewSettings.name
           }
           initial={{
+            view_type: viewSettings.view_type,
+            group_by: viewSettings.group_by,
+            sort: viewSettings.sort,
+            columns: viewSettings.columns,
             image: viewSettings.image,
             image_aspect_ratio: viewSettings.image_aspect_ratio,
             card_size: viewSettings.card_size,
           }}
-          propertySuggestions={viewPropertySuggestions}
+          propertyKeys={viewPropertyKeys}
           onCancel={() => setViewSettings(null)}
           onSave={handleSaveViewSettings}
         />

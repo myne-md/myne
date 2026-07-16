@@ -9,6 +9,7 @@
     ".": "./src/index.ts",
     "./CMEditor": "./src/CMEditor.tsx",
     "./drawing": "./src/drawing/index.ts",
+    "./host/notes/propertyFormat": "./src/host/notes/propertyFormat.tsx",
     "./*": "./src/*.ts"
   },
   "dependencies": {

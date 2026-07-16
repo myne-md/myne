@@ -33,6 +33,7 @@
     "export:default",
     "pdf-export:default",
     "workspace:default",
+    "graph-layout:default",
     "spell:default",
     "clipper-pairing:default",
     "clipboard-manager:allow-write-text",

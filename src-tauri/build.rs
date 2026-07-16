@@ -206,6 +206,7 @@ fn main() {
                 "vault_indices_tag_tree",
                 "vault_indices_note_properties",
                 "vault_indices_property_values",
+                "vault_indices_property_keys",
                 "vault_indices_persist",
                 "vault_indices_hydrate",
             ]),
@@ -331,6 +332,19 @@ fn main() {
                 "workspace_read",
                 "workspace_write",
                 "workspace_stage",
+            ]),
+        )
+        .plugin(
+            "graph-layout",
+            // The `graph_layout_read` + `graph_layout_write` commands
+            // (encrypted vault.graph knowledge-graph layout cache, MYG1).
+            // Same InlinedPlugin discipline as the plugins above — each
+            // command needs a matching `commands.allow` entry in
+            // `permissions/graph-layout/default.toml` or the ACL resolver
+            // never authorizes the `plugin:graph-layout|<cmd>` invoke.
+            tauri_build::InlinedPlugin::new().commands(&[
+                "graph_layout_read",
+                "graph_layout_write",
             ]),
         )
         .plugin(

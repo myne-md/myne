@@ -49,6 +49,46 @@ export function liveIdSet(notes: ReadonlyArray<ResolverNote>): Set<string> {
   return new Set(notes.map((n) => n.noteUuid));
 }
 
+/**
+ * A prebuilt lookup over a note-set so bulk resolution (the graph whole-vault
+ * build, `forward`/`backlinks` over many notes) is O(1) per link instead of a
+ * fresh `notes.filter(...)` scan per link — the O(edges × notes) → O(edges)
+ * win. Keys mirror the two scans in {@link resolveWikilink} / `resolveFolderTarget`
+ * EXACTLY (`foldSegment(title)` and `folderKey(folder)`), and each bucket
+ * preserves the note-set's original order, so passing an index is
+ * behaviour-identical to the filter path — it is purely a speed shortcut.
+ */
+export interface ResolverIndex {
+  /** `foldSegment(title)` → notes with that folded title, in note-set order. */
+  byTitleKey: Map<string, ResolverNote[]>;
+  /** `folderKey(folder)` → notes in that folder, in note-set order (the
+   *  folder-target `[[Projects/]]` resolution path). */
+  byFolderKey: Map<string, ResolverNote[]>;
+}
+
+/** Build a {@link ResolverIndex} once for a note-set. Callers that resolve many
+ *  links against the SAME note-set build this once and thread it through
+ *  `resolveWikilink` / `resolveEdges` / `forward` / `backlinks`. Pure. */
+export function buildResolverIndex(
+  notes: ReadonlyArray<ResolverNote>,
+): ResolverIndex {
+  const byTitleKey = new Map<string, ResolverNote[]>();
+  const byFolderKey = new Map<string, ResolverNote[]>();
+  for (const n of notes) {
+    if (n.title !== null) {
+      const k = foldSegment(n.title);
+      const bucket = byTitleKey.get(k);
+      if (bucket) bucket.push(n);
+      else byTitleKey.set(k, [n]);
+    }
+    const fk = folderKey(n.folder);
+    const fbucket = byFolderKey.get(fk);
+    if (fbucket) fbucket.push(n);
+    else byFolderKey.set(fk, [n]);
+  }
+  return { byTitleKey, byFolderKey };
+}
+
 export type WikilinkResolution =
   | {
       status: "resolved";
@@ -110,9 +150,12 @@ function folderDepth(folder: string | null): number {
 function resolveFolderTarget(
   ref: WikilinkRef,
   notes: ReadonlyArray<ResolverNote>,
+  index?: ResolverIndex,
 ): WikilinkResolution {
   const fk = folderKey(ref.target);
-  const inFolder = notes.filter((n) => folderKey(n.folder) === fk);
+  const inFolder = index
+    ? (index.byFolderKey.get(fk) ?? [])
+    : notes.filter((n) => folderKey(n.folder) === fk);
   const indexNotes = inFolder.filter((n) => n.folderIndex === true);
 
   if (indexNotes.length === 0) {
@@ -145,18 +188,20 @@ function resolveFolderTarget(
 export function resolveWikilink(
   ref: WikilinkRef,
   notes: ReadonlyArray<ResolverNote>,
+  index?: ResolverIndex,
 ): WikilinkResolution {
   // Folder-target form (`[[Projects/]]`) resolves to the folder's index note —
   // a separate path from title-keyed note resolution (MYND-370).
-  if (isFolderTarget(ref.target)) return resolveFolderTarget(ref, notes);
+  if (isFolderTarget(ref.target)) return resolveFolderTarget(ref, notes, index);
 
   const { title, folder } = parseTarget(ref);
   const titleKey = foldSegment(title);
 
-  // (1) title lookup
-  const candidates = notes.filter(
-    (n) => n.title !== null && foldSegment(n.title) === titleKey,
-  );
+  // (1) title lookup — via the prebuilt index (O(1), bulk paths) or a fresh
+  // scan (single-link callers). Both yield the same note-set-ordered bucket.
+  const candidates = index
+    ? (index.byTitleKey.get(titleKey) ?? [])
+    : notes.filter((n) => n.title !== null && foldSegment(n.title) === titleKey);
 
   // (5) zero hits → broken
   if (candidates.length === 0) return { status: "broken", matchCount: 0, candidates: [] };

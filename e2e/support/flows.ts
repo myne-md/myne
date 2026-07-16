@@ -204,6 +204,17 @@ export async function dismissImporterOfferIfPresent(session: Session): Promise<v
   await session.waitForGone(testIdSelector("importer.offer-root"));
 }
 
+/** Lock the vault via the editor Lock CTA and re-unlock to the editor — the
+ *  in-session round-trip that forces a full remount (backend re-hydrates its
+ *  session state from disk). The importer offer does not re-appear on a
+ *  populated vault, so the second mount uses `dismissImporterOfferIfPresent`. */
+export async function lockAndReunlock(session: Session, password: string): Promise<void> {
+  await (await session.byTestId("editor.lock-cta")).click();
+  await session.byTestId("unlock.password-input", { timeoutMs: 30_000 });
+  await unlockToEditor(session, password);
+  await dismissImporterOfferIfPresent(session);
+}
+
 /** Open the Settings modal from the editor's gear button and wait for
  *  the dialog root. Optionally switch to a rail tab (the modal always
  *  opens on Account). */

@@ -61,8 +61,8 @@ import { seedVault } from "./support/fixtures";
 import {
   createNote,
   dismissImporterOffer,
-  dismissImporterOfferIfPresent,
   enableAi,
+  lockAndReunlock,
   pageSeatInvoke,
   typeIntoEditor,
   unlockToEditor,
@@ -134,20 +134,6 @@ async function currentHydrationSeq(s: Session): Promise<number> {
   return seq === null ? -1 : Number(seq);
 }
 
-/** Lock the vault via the editor Lock CTA and re-unlock to the editor — the
- *  in-session round-trip that re-runs `hydrate_ai_vectors`. The unlock walk is
- *  the ONLY writer of `vault.embeddings` (there is no on-lock/per-save flush —
- *  task 5's eager path is RAM-only), so each cycle's cold-build/hit outcome is
- *  written by THIS unlock and read by the NEXT. Same `appDataDir` throughout, so
- *  the blob written on one cycle is present on the next. */
-async function lockAndReunlock(s: Session, password: string): Promise<void> {
-  await (await s.byTestId("editor.lock-cta")).click();
-  await s.byTestId("unlock.password-input", { timeoutMs: 30_000 });
-  await unlockToEditor(s, password);
-  // The importer offer is a fresh-vault first-editor overlay; after a lock →
-  // unlock on a vault that already has notes it does not re-appear — tolerate both.
-  await dismissImporterOfferIfPresent(s);
-}
 
 /** Wait for the NEXT hydrate event (a `data-seq` strictly greater than
  *  `afterSeq`) and return the probe's asserted counters. A generous budget: the
