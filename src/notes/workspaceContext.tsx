@@ -131,6 +131,19 @@ export type WorkspaceApi = {
    *  sees a stale snapshot. Mirrors the `stateRef` discipline. */
   workspacesSnapshot: () => NamedWorkspaces;
 
+  // ── sidebar folder-expand set (MYND-455) — container-level, window-global ──
+  /** The persisted set of OPEN folder keys (stable reference; empty = collapsed).
+   *  This is the SINGLE owner — the sidebar renders straight off it rather than
+   *  mirroring it into local state, so the async restore just replaces it. */
+  expandedFolders: readonly string[];
+  /** Persist the sidebar folder-expand set (staged into the workspace blob on the
+   *  next graceful-exit / coalesced flush). Empty clears it (omit-when-default).
+   *  Takes an updater (like `setState`) so a caller can toggle against the live
+   *  set without reading it first. */
+  setExpandedFolders: (
+    next: ReadonlySet<string> | ((prev: ReadonlySet<string>) => ReadonlySet<string>),
+  ) => void;
+
   // ── back/forward history (focused pane; ephemeral, never persisted) ──
   /** Step the focused pane back to the previously viewed note (no-op when
    *  there is no history in that direction). */
@@ -212,6 +225,10 @@ export type WorkspaceApi = {
   /** Flush every registered pane editor's pending save (lock / close). */
   flushAll: () => Promise<void>;
 };
+
+/** Stable empty reference for `expandedFolders` when unset, so the sidebar's
+ *  `Set` memo keys on a value that only changes when the container does. */
+const EMPTY_EXPANDED: readonly string[] = [];
 
 const WorkspaceContext = createContext<WorkspaceApi | null>(null);
 
@@ -317,6 +334,20 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const deleteWorkspace = useCallback((id: SlotId) => {
     setContainer((c) => deleteSlotOp(c, id));
   }, []);
+  // MYND-455: the sidebar folder-expand set, owned at the container level.
+  // Empty → drop the field (omit-when-default). Container ops spread `{...c}`,
+  // so this survives slot switch/save/rename. The updater resolves against the
+  // live container, so a toggle can never race a restore that lands mid-flight.
+  const setExpandedFolders = useCallback(
+    (next: ReadonlySet<string> | ((prev: ReadonlySet<string>) => ReadonlySet<string>)) => {
+      setContainer((c) => {
+        const resolved =
+          typeof next === "function" ? next(new Set(c.expandedFolders ?? [])) : next;
+        return { ...c, expandedFolders: resolved.size > 0 ? [...resolved] : undefined };
+      });
+    },
+    [],
+  );
   // Ref-backed live container so a persistence caller reading it never sees a
   // stale snapshot (mirrors `stateRef` below; the graceful-exit + coalesced-flush
   // paths in Editor.tsx call this from captured closures).
@@ -569,6 +600,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       restore,
       slots: listSlots(container),
       activeWorkspaceId: container.activeId,
+      expandedFolders: container.expandedFolders ?? EMPTY_EXPANDED,
+      setExpandedFolders,
       restoreContainer,
       saveWorkspaceAs,
       switchWorkspace,
@@ -620,6 +653,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       renameWorkspace,
       deleteWorkspace,
       workspacesSnapshot,
+      setExpandedFolders,
       goBack,
       goForward,
       canGoBack,
