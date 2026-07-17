@@ -26,6 +26,17 @@ RUN_FLAGS=(
   --user root
 )
 E2E_ENV='export HOME=/home/e2e CARGO_HOME=/home/e2e/.cargo RUSTUP_HOME=/usr/local/rustup PATH=/usr/local/cargo/bin:/usr/local/bin:/usr/bin:/bin CI=true npm_config_store_dir=/home/e2e/.pnpm-store'
+
+# The multi-device sync specs need a LINUX myne-server binary inside the
+# container (the host binary is the dev OS's arch) — same wiring as
+# e2e-local.sh. Missing binary => the sync specs self-skip with a reason.
+case "$(docker info --format '{{.Architecture}}' 2>/dev/null)" in
+  x86_64|amd64) SRVARCH=amd64 ;;
+  *) SRVARCH=arm64 ;;
+esac
+if [[ -f "myne-server/myne-server-linux-$SRVARCH" ]]; then
+  E2E_ENV="$E2E_ENV MYNE_E2E_SERVER=/work/myne-server/myne-server-linux-$SRVARCH"
+fi
 FIX_PERMS='chown -R e2e:e2e /work/node_modules /work/dialect/node_modules /work/editor/node_modules /work/copy/node_modules /work/target /usr/local/cargo/registry'
 
 exec docker run "${RUN_FLAGS[@]}" "$IMAGE" bash -c "

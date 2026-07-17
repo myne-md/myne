@@ -417,7 +417,18 @@ export function PaneView({
     };
   }, [activeId]);
 
-  const autosave = useAutosave(activeId, content, undefined, setContent);
+  // While the body is still loading, autosave sees NO note (`null`): a pane
+  // that MOUNTS with an active note (a split/remount — the initial single pane
+  // mounts with no selection) otherwise burns useAutosave's "first body change
+  // is loaded content" token on the transient empty body, so the real body's
+  // arrival registered as a user edit and γ1 silently REWROTE the note ~1s
+  // later — a no-op body with a fresh nonce + fresh `updated:`, which the sync
+  // engine can only read as a local edit (false-conflict fodder; caught by the
+  // unfocused-split-pane E2E). The id flip to `null` resets the token; the
+  // loaded body then lands in the same commit as the id flip back, so it is
+  // classified as loaded content. Tab switches flush BEFORE the switch (the
+  // workspace flush registry), so the transient `null` never drops real edits.
+  const autosave = useAutosave(loading ? null : activeId, content, undefined, setContent);
 
   // Render-surface dispatch (drawing-notes SF2, MYND-499; SYNC-2): a value-strict
   // `kind: drawing` in the loaded body routes this pane to the Excalidraw canvas
@@ -432,8 +443,13 @@ export function PaneView({
 
   // Re-sync this pane's body when the open note's `.myn` changed out of band —
   // a rename (MYND-140), a snapshot restore, OR a sync pull (`sync://changed` →
-  // `reloadOpenNote`). Only relevant when this pane shows the note the sidebar
-  // acted on (`selectedId`). Skips the initial mount.
+  // `reloadOpenNote`). EVERY pane with an open note re-reads, not just the
+  // selected one: a sync pull can rewrite a note held by an UNFOCUSED pane, and
+  // a buffer left stale there would autosave the pre-pull body back over the
+  // remote edit on the user's next keystroke (the stale-pane overwrite bug).
+  // Cheap by construction: the workspace forbids duplicate tabs, so a bump
+  // costs at most one noteRead per pane, and an unchanged body settles as a
+  // setContent identity no-op. Skips the initial mount.
   const reloadNonce = ctx.contentReloadNonce;
   const reloadInit = useRef(true);
   useEffect(() => {
@@ -441,7 +457,7 @@ export function PaneView({
       reloadInit.current = false;
       return;
     }
-    if (activeId === null || activeId !== ctx.selectedId) return;
+    if (activeId === null) return;
     // Never clobber unsaved local edits: a dirty buffer means the engine kept
     // OUR on-disk version (it skips a locally-dirty blob on pull), so reloading
     // would either resurrect stale bytes or discard the user's work. Leave the
@@ -453,6 +469,11 @@ export function PaneView({
       try {
         const body = await noteRead(activeId);
         if (cancelled) return;
+        // Re-check dirtiness AFTER the await: typing may have started while the
+        // read was in flight, and re-baselining now would clobber those keys
+        // with the just-read (already-stale) bytes.
+        const st2 = autosaveRef.current.status.status;
+        if (st2 === "editing" || st2 === "saving" || st2 === "error") return;
         // Re-baseline autosave to the reloaded body BEFORE swapping it in, so the
         // content change registers as freshly-loaded content, not a user edit.
         // Without this, a sync-pulled reload looks locally-dirty and the next
@@ -467,7 +488,7 @@ export function PaneView({
     return () => {
       cancelled = true;
     };
-    // nonce is the trigger; activeId/selectedId read at fire time.
+    // nonce is the trigger; activeId read at fire time.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reloadNonce]);
 

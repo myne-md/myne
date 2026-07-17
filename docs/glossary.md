@@ -629,6 +629,12 @@ The Phase 2 sync recovery mode a device enters when incremental catch-up is impo
 
 Used in: `spec/sync-protocol.md` §11
 
+### **sync quarantine** &nbsp; 📋 *Protocol*
+
+The client-side **drop disposition** of a [full-reconcile](#full-reconcile): a previously-synced note absent from the authoritative roster (deleted + horizon-GC-reclaimed remotely) is **moved aside** into the device-local `quarantine/` directory — never destroyed, never re-uploaded (`spec/sync-protocol.md` §11.3 "Reclaimed-record visibility"). Re-uploading would resurrect deleted content server-side and lose the reclaimed record's version CAS; destroying would let a lying server erase user data. Doubles as the hostile-server ceiling for roster manipulation: hiding records from the roster can at most cause a recoverable local move, gated to reconcile walks, never echoed back. A sync reset (`clear_device_local_sync`) deliberately does not touch it — it holds user data.
+
+Used in: `spec/sync-protocol.md` §11.3, `decisions.md` 2026-07-17
+
 ### **favorites** &nbsp; 📦 *Product*
 
 The user's chosen shortcut list of notes, surfaced in a dedicated Favorites section pinned above the sidebar tree. Persisted as the `favorites` field of `vault.prefs` — a **sequence** array of note UUIDs only (display order is the payload; NFC-normalized, not sorted, not deduped, omitted-when-empty), so favoriting is cheap view-state (a prefs write, no `.myn` re-encrypt) that reverts to empty on a tampered/absent blob (`spec/protocol.md` §9.5.2, §9.5.5). A favorited note **also** keeps its normal position in the tree — favoriting is a shortcut, not a move — so it renders in two rows (disambiguated by section-qualified keys); selection is keyed by note-id (both rows highlight) and keyboard navigation visits it once. Add via a hover star, the context menu, or dragging a note into the section; remove via star/menu only. A favorite UUID with no live note is ignored at render and pruned on the next write. See also [item order](#item-order), [PrefsView](#prefsview). (MYND-183)

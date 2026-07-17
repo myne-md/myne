@@ -8,10 +8,19 @@
 // server via the REAL endpoint-config surface (SYNC-14 `sync-config.json` seeded
 // into each device's app_config_dir — no test hook).
 
-import { writeFileSync } from "node:fs";
+import { readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { type AppSession, type LaunchOptions, launchApp } from "./session";
 import type { EphemeralServer } from "./sync-server";
+import { seedVault } from "./fixtures";
+import {
+  closeSettings,
+  createNote,
+  dismissImporterOffer,
+  ipcOk,
+  openSettings,
+  unlockToEditor,
+} from "./flows";
 
 const DRIVER_BASE = Number(process.env.MYNE_E2E_DRIVER_PORT ?? 4444);
 const NATIVE_BASE = Number(process.env.MYNE_E2E_NATIVE_PORT ?? 4445);
@@ -71,4 +80,141 @@ export async function withTwoDevices(
   } finally {
     await a.teardown();
   }
+}
+
+/** The two-synced-devices precondition — see [`setupTwoSyncedDevices`]. */
+export type TwoSyncedDevices = {
+  a: AppSession;
+  b: AppSession;
+  /** Id of the note seeded on A + replicated to B; `null` with `seedNote: false`. */
+  noteId: string | null;
+  /** The shared vault password (for re-unlock scenarios). */
+  password: string;
+  teardown: () => Promise<void>;
+};
+
+/** Boot A (seeded vault) + B, enroll A, write+push one note, B joins + is
+ *  approved + pulls it — the shared "two synced devices, one replicated note"
+ *  precondition used by the sync-replication / prefs-sync / sync-attachments
+ *  suites. Returns both devices, the synced note id, the shared vault password
+ *  (for re-unlock scenarios), and a teardown.
+ *
+ *  `seedNote: false` skips the note-creation block AND B's note-replication
+ *  wait, for variants whose scenario seeds its own synced state. A's explicit
+ *  `sync_now` still runs — an empty vault authors a genesis head on push
+ *  (§6.1 genesis-on-empty), which B's join gate needs: `join.verify` surfaces
+ *  only once `sync_head_fingerprint` observes a pulled head. */
+export async function setupTwoSyncedDevices(
+  srv: EphemeralServer,
+  opts?: { seedNote?: true },
+): Promise<TwoSyncedDevices & { noteId: string }>;
+export async function setupTwoSyncedDevices(
+  srv: EphemeralServer,
+  opts: { seedNote: boolean },
+): Promise<TwoSyncedDevices>;
+export async function setupTwoSyncedDevices(
+  srv: EphemeralServer,
+  opts: { seedNote?: boolean } = {},
+): Promise<TwoSyncedDevices> {
+  const seedNote = opts.seedNote ?? true;
+  let account = "";
+  let password = "";
+  const a = await launchDevice(0, {
+    seedConfig: syncConfigSeed(srv.url),
+    seed: (appDataDir) => {
+      const v = seedVault(appDataDir, { password: "CanaryPass-9-animals!" });
+      account = v.account;
+      password = v.password;
+    },
+  });
+  try {
+    const b = await launchDevice(1, { seedConfig: syncConfigSeed(srv.url) });
+    try {
+      // A: unlock → enroll (self-approves) → create a note → push.
+      await unlockToEditor(a.session, password);
+      await dismissImporterOffer(a.session);
+      await openSettings(a.session);
+      await (await a.session.byTestId("settings.tab-sync")).click();
+      await (await a.session.byTestId("sync.enroll.account-input")).sendKeys(account);
+      await (await a.session.byTestId("sync.enroll.password-input")).sendKeys(password);
+      await (await a.session.byTestId("sync.enroll.submit")).click();
+      await a.session.byTestId("sync.enroll.approved", { timeoutMs: 30_000 });
+      await closeSettings(a.session);
+      let noteId: string | null = null;
+      if (seedNote) {
+        await createNote(a.session, "SyncedNote");
+        await new Promise((r) => setTimeout(r, 1500));
+      }
+      await ipcOk(a.session, "plugin:sync|sync_now", {});
+      if (seedNote) {
+        const ids = (await ipcOk(a.session, "plugin:notes|note_list", {})) as string[];
+        noteId = ids[0];
+      }
+
+      // B: join (account# + password) → pending (waits on the approval gate).
+      await b.session.byTestId("welcome.root", { timeoutMs: 20_000 });
+      await (await b.session.byTestId("welcome.join-cta")).click();
+      await b.session.byTestId("join.modal");
+      await (await b.session.byTestId("join.server-input")).sendKeys(srv.url);
+      await (await b.session.byTestId("join.account-input")).sendKeys(account);
+      await (await b.session.byTestId("join.password-input")).sendKeys(password);
+      await (await b.session.byTestId("join.submit")).click();
+      await b.session.byTestId("join.pending", { timeoutMs: 30_000 });
+
+      // A: approve B while it is pending.
+      await openSettings(a.session);
+      await (await a.session.byTestId("settings.tab-sync")).click();
+      await (await a.session.byTestId("sync.approve-device", { timeoutMs: 30_000 })).click();
+      await closeSettings(a.session);
+
+      // B: auto-claim + pull → the mandatory SAS verify step → confirm the match →
+      // editor (SYNC-40).
+      await b.session.byTestId("join.verify", { timeoutMs: 30_000 });
+      await (await b.session.byTestId("join.sas-match")).click();
+      await b.session.byTestId("editor.root", { timeoutMs: 30_000 });
+      await dismissImporterOffer(b.session);
+
+      if (seedNote) {
+        // B: pull until A's note replicates (the synced-baseline precondition).
+        let replicated = false;
+        for (let i = 0; i < 12 && !replicated; i++) {
+          await ipcOk(b.session, "plugin:sync|sync_now", {});
+          await new Promise((r) => setTimeout(r, 1500));
+          replicated = noteBlobCount(b.appDataDir) >= 1;
+        }
+        if (!replicated) throw new Error("setup: A's note never replicated to B");
+      }
+
+      const teardown = async () => {
+        await b.teardown();
+        await a.teardown();
+      };
+      return { a, b, noteId, password, teardown };
+    } catch (e) {
+      await b.teardown();
+      throw e;
+    }
+  } catch (e) {
+    await a.teardown();
+    throw e;
+  }
+}
+
+/** Count `.myn` note blobs across every vault under a device's app-data dir. */
+export function noteBlobCount(appDataDir: string): number {
+  let count = 0;
+  try {
+    for (const v of readdirSync(join(appDataDir, "vaults"))) {
+      try {
+        for (const f of readdirSync(join(appDataDir, "vaults", v, "notes"))) {
+          if (f.endsWith(".myn")) count++;
+        }
+      } catch {
+        /* this vault has no notes dir yet */
+      }
+    }
+  } catch {
+    /* no vaults dir */
+  }
+  return count;
 }

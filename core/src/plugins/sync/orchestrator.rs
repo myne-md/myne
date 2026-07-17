@@ -75,6 +75,16 @@ pub struct SyncSummary {
     /// emits the prefs-changed event off this (the orchestrator stays
     /// AppHandle-free).
     pub prefs_applied_remote: bool,
+    /// Changed-note downloads skipped WITHOUT any local mutation this cycle:
+    /// the body was 404/410 (reclaimed, §11.3) or its bytes failed the header
+    /// nonce-vs-record check (empty / junk / mismatch). Never written to disk,
+    /// never adopted as a baseline — the honest counter for bounded staleness
+    /// against a broken or hostile server.
+    pub pull_skipped: usize,
+    /// Previously-synced notes quarantined by the reconcile drop-leg this cycle
+    /// (absent from the authoritative roster ⇒ deleted + reclaimed remotely).
+    /// Moved to `<vault>/quarantine/` — never destroyed, never re-uploaded.
+    pub dropped: usize,
 }
 
 /// Sync-cycle failures.
@@ -91,6 +101,19 @@ pub enum SyncCycleError {
 }
 
 use super::to_hex as hex;
+
+/// Parse a 32-hex blob-id key from `state.blobs` back to its 16 bytes. `None`
+/// for anything malformed (defensive — the state file is device-local JSON).
+fn from_hex16(s: &str) -> Option<[u8; 16]> {
+    if s.len() != 32 || !s.bytes().all(|b| b.is_ascii_hexdigit()) {
+        return None;
+    }
+    let mut out = [0u8; 16];
+    for (i, byte) in out.iter_mut().enumerate() {
+        *byte = u8::from_str_radix(&s[i * 2..i * 2 + 2], 16).ok()?;
+    }
+    Some(out)
+}
 
 /// The `<vault>/notes/<uuid>.myn` path for a 16-byte blob id.
 fn blob_path(notes_dir: &Path, id: &[u8; 16]) -> std::path::PathBuf {
@@ -127,6 +150,40 @@ fn download_blob_backoff(
 /// a keep-both copy (`conflict_of:`). The local edit is never touched.
 fn conflict_staging_dir(vault_root: &Path) -> std::path::PathBuf {
     vault_root.join("conflicts")
+}
+
+/// The device-local quarantine dir (§11.3 drop disposition): a previously-synced
+/// note the reconcile drop-leg removed from `notes/` because the authoritative
+/// roster no longer carries it (deleted + horizon-GC-reclaimed remotely). The
+/// ciphertext is MOVED here — never destroyed, never re-uploaded (re-uploading
+/// would resurrect deleted content server-side AND lose the push batch's CAS).
+/// Deliberately NOT wiped by `clear_device_local_sync` — it holds user data.
+fn quarantine_dir(vault_root: &Path) -> std::path::PathBuf {
+    vault_root.join("quarantine")
+}
+
+/// Move a note's on-disk blob into the quarantine dir. A missing source is a
+/// no-op `Ok` (the id may be baseline-only); an occupied target gets a `-<n>`
+/// suffix so repeated drops of re-created ids never overwrite older evidence.
+fn quarantine_note(
+    vault_root: &Path,
+    notes_dir: &Path,
+    id: &[u8; 16],
+) -> Result<(), SyncCycleError> {
+    let src = blob_path(notes_dir, id);
+    if !src.exists() {
+        return Ok(());
+    }
+    let dir = quarantine_dir(vault_root);
+    std::fs::create_dir_all(&dir).map_err(|_| SyncCycleError::Io)?;
+    let uuid = uuid::Uuid::from_bytes(*id);
+    let mut target = dir.join(format!("{uuid}.myn"));
+    let mut n = 1u32;
+    while target.exists() {
+        target = dir.join(format!("{uuid}-{n}.myn"));
+        n += 1;
+    }
+    std::fs::rename(&src, &target).map_err(|_| SyncCycleError::Io)
 }
 
 /// Persist a conflicting remote revision: `conflicts/<id>.myn` (the ciphertext the
@@ -1160,11 +1217,12 @@ fn sync_cycle_attempt(
     // all three (MYND-468). The attachment/catalog phases are gated on
     // `attachment_keys` (legacy note-only cycles pass `None`).
     // ONE disk scan per attempt (notes + attachments): the pull loop below
-    // maintains both manifests in memory as it writes (nonce-verified against
-    // the wire record), so the push-detect and head-manifest phases reuse them
-    // instead of re-walking every blob header a second time. `manifest_stale`
-    // is the safety valve: a downloaded note whose header nonce disagrees with
-    // its record forces a disk rescan before push-detect.
+    // maintains both manifests in memory as it writes, and (§11.3) ONLY ever
+    // writes bytes whose header nonce matched the wire record — mismatching
+    // bytes are skipped without touching disk, so the in-memory manifest can
+    // never diverge from disk and the old `manifest_stale` rescan valve is no
+    // longer needed. The push-detect and head-manifest phases reuse the
+    // maintained manifests instead of re-walking every blob header.
     let cat_id = attachment_keys.map(|_| catalog_sync_id(root_key));
     let mut att_scan: BTreeMap<[u8; 16], AttachmentManifestEntry> = if attachment_keys.is_some() {
         scan_attachments_manifest(&attachments_dir(vault_root))
@@ -1172,7 +1230,6 @@ fn sync_cycle_attempt(
         BTreeMap::new()
     };
     let mut notes_manifest = local_manifest(notes_dir);
-    let mut manifest_stale = false;
     // The pre-pull union snapshot the pull-diff runs against — the dirty-skip
     // check wants each blob's state BEFORE this cycle's writes.
     let mut local = notes_manifest.clone();
@@ -1407,6 +1464,7 @@ fn sync_cycle_attempt(
 
     // --- apply remote changes: download + write each changed NOTE blob to disk ---
     let mut pulled = 0;
+    let mut pull_skipped = 0usize;
     for c in &page.changed {
         // Attachment records were handled above; the catalog and prefs records
         // are their phases' (never written as notes).
@@ -1425,50 +1483,110 @@ fn sync_cycle_attempt(
         if baseline_nonce.is_some() && baseline_nonce != local_nonce {
             continue;
         }
-        let bytes = download_blob_backoff(transport, token, &c.id).map_err(SyncCycleError::Pull)?;
-        std::fs::create_dir_all(notes_dir).map_err(|_| SyncCycleError::Io)?;
-        crate::atomic_write::atomic_write(&blob_path(notes_dir, &c.id), &bytes, true)
-            .map_err(|_| SyncCycleError::Io)?;
-        // Mirror the write into the in-memory manifest for the push-detect
-        // phase — but only when the written header agrees with the wire record;
-        // a mismatch (hostile or buggy server bytes) flips the stale flag and
-        // forces the safety rescan instead of trusting either value.
+        let bytes = match download_blob_backoff(transport, token, &c.id) {
+            Ok(b) => b,
+            // Per-blob unavailability (unknown id / horizon-GC reclaimed body,
+            // §11.3): skip the record WITHOUT any local mutation — no write, no
+            // baseline adoption — and keep the cycle alive. Against a pre-§11.3
+            // server the reclaimed body arrives as an empty 200 instead; the
+            // nonce guard below catches that shape the same way.
+            Err(PullError::BlobNotFound | PullError::BlobReclaimed) => {
+                pull_skipped += 1;
+                continue;
+            }
+            Err(e) => return Err(SyncCycleError::Pull(e)),
+        };
+        // Validate BEFORE the write (§11.3): the downloaded header must carry
+        // the exact `content_nonce` the pulled record advertised. Empty bytes
+        // (a reclaimed body served as `""`), junk, and a nonce mismatch all
+        // fail one check (`read_myn_content_nonce` → None for <header-size or
+        // bad magic). On failure NOTHING is mutated: the live local copy stays
+        // intact and the old baseline stays authoritative — the old behavior
+        // (write unverified bytes, adopt the server baseline) is what made
+        // this bug destroy live notes and self-seal.
         match crate::note_nonce::read_myn_content_nonce(&bytes) {
             Some(n) if n == c.content_nonce => {
+                std::fs::create_dir_all(notes_dir).map_err(|_| SyncCycleError::Io)?;
+                crate::atomic_write::atomic_write(&blob_path(notes_dir, &c.id), &bytes, true)
+                    .map_err(|_| SyncCycleError::Io)?;
+                // Mirror the write into the in-memory manifest for the
+                // push-detect phase (ONE scan per attempt).
                 notes_manifest.insert(c.id, n);
+                state.blobs.insert(
+                    hex(&c.id),
+                    BlobSyncState {
+                        version: c.version,
+                        content_nonce_hex: hex(&c.content_nonce),
+                    },
+                );
+                pulled += 1;
             }
-            _ => manifest_stale = true,
+            _ => {
+                pull_skipped += 1;
+            }
         }
-        state.blobs.insert(
-            hex(&c.id),
-            BlobSyncState {
-                version: c.version,
-                content_nonce_hex: hex(&c.content_nonce),
-            },
-        );
-        pulled += 1;
     }
     // The head observation is already recorded + persisted before the download loop
     // above (so the join SAS surfaces without waiting for the full content download);
     // here we only advance the cursor, which must move after a successful download.
+    // A skipped (unavailable/invalid) blob does NOT hold the cursor back — bounded
+    // staleness, honestly counted in `pull_skipped`, is accepted over junk writes.
     state.cursor = page.next_cursor;
+
+    // --- reconcile drop-leg (§11.2/§11.3) — only on a full-manifest walk ---
+    // The reconcile walk's roster (`all_metas`, reclaimed records omitted by a
+    // §11.3 server) is the authoritative live set: a previously-synced local
+    // note absent from it was deleted AND horizon-GC-reclaimed remotely. The
+    // 3-way classify (`reconcile_policy`) separates that from never-synced
+    // local work; only the drop leg is acted on here — the download leg is
+    // already `page.changed`, and keep-local-only notes push naturally below.
+    // Drop = move to `quarantine/` (never destroy, never re-upload — pushing
+    // the ghost would lose the reclaimed record's CAS and resurrect deleted
+    // content). A staged keep-both conflict is never dropped.
+    let mut dropped = 0usize;
+    if reconcile_ran {
+        let authoritative: HashMap<[u8; 16], [u8; 24]> = page
+            .all_metas
+            .iter()
+            .filter(|m| m.attachment_id.is_none() && Some(m.id) != cat_id && m.id != prefs_id)
+            .map(|m| (m.id, m.content_nonce))
+            .collect();
+        let previously_synced: HashSet<[u8; 16]> =
+            state.blobs.keys().filter_map(|k| from_hex16(k)).collect();
+        let staged: HashSet<String> = list_pending_conflicts(vault_root).into_iter().collect();
+        let plan = super::reconcile_policy::plan_full_reconcile(
+            super::reconcile_policy::ReconcileTrigger::CursorExpired,
+            &authoritative,
+            &notes_manifest,
+            &previously_synced,
+        );
+        let mut dropped_hex: Vec<String> = Vec::new();
+        for id in &plan.drop {
+            let id_hex = hex(id);
+            if staged.contains(&id_hex) {
+                continue; // unresolved keep-both — never quarantine user work
+            }
+            quarantine_note(vault_root, notes_dir, id)?;
+            notes_manifest.remove(id);
+            state.blobs.remove(&id_hex);
+            dropped_hex.push(id_hex);
+            dropped += 1;
+        }
+        // The ids are gone locally — their queued tombstone flags (if any) are moot.
+        let _ = clear_pending_tombstones(vault_root, &dropped_hex);
+    }
 
     // --- detect local changes to push (content_nonce ≠ last-synced) ---
     // Skipped on a poll-driven Pull (`allow_push=false`): pushes are coalesced
     // and fire only after the local-change window elapses (loop_control), so a
     // poll never opens a high-resolution edit-timing channel (resolution-blur).
     //
-    // Reuses the maintained in-memory manifest (ONE scan per attempt); the
-    // stale flag is the only path back to disk. Deliberate behavior shift: a
-    // note saved concurrently DURING this cycle no longer catches this cycle's
-    // push — its `SyncLocalChange` bump already opened the next coalescing
-    // window (and the old mid-cycle rescan could push a scan-time nonce the
-    // re-read ciphertext no longer matched).
-    let local2 = if manifest_stale {
-        local_manifest(notes_dir)
-    } else {
-        notes_manifest
-    };
+    // Reuses the maintained in-memory manifest (ONE scan per attempt).
+    // Deliberate behavior shift: a note saved concurrently DURING this cycle no
+    // longer catches this cycle's push — its `SyncLocalChange` bump already
+    // opened the next coalescing window (and the old mid-cycle rescan could
+    // push a scan-time nonce the re-read ciphertext no longer matched).
+    let local2 = notes_manifest;
     // The server's current (version, nonce) for every blob it reported — used to
     // tell a clean local edit (server still at our base) from a true conflict
     // (server advanced this blob past our synced baseline).
@@ -1531,6 +1649,27 @@ fn sync_cycle_attempt(
                         conflicts.push(plan_note_keep_both(id, *remote_nonce));
                         continue;
                     }
+                }
+            }
+            // F4 fresh-cursor probe (§11.3): a re-enrolled device (wiped sync
+            // state, cursor 0 → floor-exempt, no 410/reconcile) holding a local
+            // copy of a RECLAIMED record would push it at `base_version 0` —
+            // the CAS loses against the tombstone's final version and, because
+            // the batch is atomic, wedges every push forever. Probe the blob
+            // route first; 410 `blob_reclaimed` → quarantine + exclude. Gated
+            // to baseline-less ids on cursor-0/reconcile cycles OF AN ACCOUNT
+            // WITH HISTORY (`page.head` present — a virgin account cannot hold
+            // reclaimed records, and its genesis bulk-push must not spend one
+            // probe round-trip per seeded note). Steady-state pushes never pay
+            // the extra round-trip. Fail-open: any other probe outcome (404 =
+            // genuinely new note, errors) proceeds to push.
+            if synced.is_none() && page.head.is_some() && (from_cursor == 0 || reconcile_ran) {
+                if let Err(PullError::BlobReclaimed) = engine::download_blob(transport, token, id) {
+                    quarantine_note(vault_root, notes_dir, id)?;
+                    state.blobs.remove(&id_hex);
+                    let _ = clear_pending_tombstones(vault_root, &[id_hex]);
+                    dropped += 1;
+                    continue;
                 }
             }
             let ciphertext =
@@ -1796,6 +1935,8 @@ fn sync_cycle_attempt(
         attachments_pushed,
         attachments_deleted,
         prefs_applied_remote: prefs_phase.applied_remote,
+        pull_skipped,
+        dropped,
     })
 }
 
@@ -2073,8 +2214,8 @@ mod tests {
 
     /// A transport that relays to a real server but swaps every `/sync/blob`
     /// ciphertext for a decoy blob whose header nonce does NOT match the wire
-    /// record — the hostile/buggy-server shape the single-scan manifest's
-    /// `manifest_stale` safety valve exists for.
+    /// record — the hostile/buggy-server shape the §11.3 pre-write nonce guard
+    /// exists for.
     struct NonceCorruptingTransport {
         inner: Box<dyn SyncTransport>,
         decoy_b64: String,
@@ -2101,15 +2242,15 @@ mod tests {
         }
     }
 
-    /// Single-scan safety valve (C2): when a downloaded note's header nonce
-    /// disagrees with its wire record, the in-memory manifest is NOT trusted —
-    /// the stale flag forces a disk rescan before push-detect, preserving the
-    /// old double-scan semantics. The discriminating assertion is `pushed == 1`:
-    /// the rescan sees the on-disk divergence (disk nonce ≠ synced baseline) and
-    /// re-pushes, exactly like the pre-C2 code; a (buggy) unverified in-memory
-    /// adoption would report the blob clean and push nothing.
+    /// §11.3 pre-write nonce guard: bytes whose header nonce disagrees with the
+    /// wire record are NEVER written and NEVER adopted as a baseline — the
+    /// record is skipped (counted in `pull_skipped`) and the cycle completes.
+    /// Pre-guard, the corrupt bytes were written + the server baseline adopted,
+    /// which is exactly the shape that let a reclaimed empty body destroy a
+    /// live local note and self-seal. The discriminating assertions: nothing on
+    /// disk, `pulled == 0`, `pull_skipped == 1`, no wedge.
     #[test]
-    fn corrupt_blob_nonce_forces_manifest_rescan() {
+    fn corrupt_blob_nonce_is_skipped_never_written() {
         let Some((_guard, url)) = spawn_server() else {
             eprintln!("SKIP corrupt_blob_nonce_forces_manifest_rescan: myne-server not built");
             return;
@@ -2195,9 +2336,9 @@ mod tests {
         .expect("A sync cycle");
         assert_eq!(push.pushed, 1);
 
-        // B pulls the corrupted body. The cycle must complete (no wedge), write
-        // the bytes, and — via the stale-rescan — see the on-disk divergence
-        // and re-push it, mirroring the pre-single-scan behavior exactly.
+        // B pulls the corrupted body. The cycle must complete (no wedge) and
+        // must NOT write the mismatching bytes or adopt the server baseline —
+        // the record is skipped, honestly counted.
         let pull = run_cycle_legacy(
             &tb,
             &root_key,
@@ -2209,17 +2350,577 @@ mod tests {
             true,
         )
         .expect("B sync cycle survives a nonce-corrupted download");
-        assert_eq!(pull.pulled, 1, "the corrupted body was still written");
         assert_eq!(
-            pull.pushed, 1,
-            "the stale-flag rescan must surface the disk/record divergence \
-             (an unverified in-memory manifest adoption would hide it)"
+            pull.pulled, 0,
+            "mismatching bytes are never counted as pulled"
+        );
+        assert_eq!(pull.pull_skipped, 1, "the skip is honestly counted");
+        assert_eq!(pull.pushed, 0, "nothing local to push — no phantom re-push");
+        assert!(
+            !notes_b.join(format!("{}.myn", note.as_uuid())).exists(),
+            "corrupt served bytes must never reach disk"
+        );
+        // No baseline adoption → after a cursor reset (the reconcile/fresh-walk
+        // shape) an HONEST transport still sees the note as changed and
+        // materializes it correctly. (The incremental cursor advanced past the
+        // record on the corrupt cycle — bounded staleness by design — so the
+        // self-heal is proven via the walk-from-0 path.)
+        let mut st_b = read_sync_state(&dir_b).unwrap();
+        assert!(
+            !st_b.blobs.contains_key(&hex(note.as_uuid().as_bytes())),
+            "the corrupt record's baseline was never adopted"
+        );
+        st_b.cursor = 0;
+        write_sync_state(&dir_b, &st_b).unwrap();
+        let heal = run_cycle_legacy(
+            crate::plugins::sync::http_transport::build_transport(&url, Vec::new())
+                .unwrap()
+                .as_ref(),
+            &root_key,
+            account_hash,
+            dev_b,
+            &tok_b,
+            &notes_b,
+            &dir_b,
+            true,
+        )
+        .expect("B heals against an honest transport");
+        assert_eq!(
+            heal.pulled, 1,
+            "self-heals once the server serves real bytes"
         );
         let on_disk = std::fs::read(notes_b.join(format!("{}.myn", note.as_uuid()))).unwrap();
-        assert_eq!(on_disk, decoy, "disk holds the (corrupt) served bytes");
+        assert_eq!(on_disk, blob, "disk holds the REAL bytes after the heal");
 
         std::fs::remove_dir_all(&dir_a).ok();
         std::fs::remove_dir_all(&dir_b).ok();
+    }
+
+    // ── §11.3 reclaimed-blob pipeline (Guard A + drop-leg + F4 probe) ──────
+    // These run against the in-process FakeTransport — no server binary needed.
+
+    use crate::plugins::sync::transport::FakeTransport;
+
+    fn meta_json(id: &[u8; 16], version: u64, nonce: &[u8; 24]) -> String {
+        format!(
+            "{{\"uuid_hex\":\"{}\",\"version\":{version},\"content_nonce_hex\":\"{}\",\"size\":1}}",
+            hex(id),
+            hex(nonce)
+        )
+    }
+
+    fn pull_body(metas_json: &str, next_cursor: u64) -> Vec<u8> {
+        format!("{{\"metas\":[{metas_json}],\"next_cursor\":{next_cursor}}}").into_bytes()
+    }
+
+    fn fresh_vault(tag: &str) -> (PathBuf, PathBuf) {
+        let dir = std::env::temp_dir().join(format!("myne-orch-{tag}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let notes = dir.join("notes");
+        std::fs::create_dir_all(&notes).unwrap();
+        (dir, notes)
+    }
+
+    /// A valid v7 note id as the 16 raw bytes (files named off non-v7 ids are
+    /// skipped by `enumerate_notes_dir`, so on-disk fixtures must use these).
+    fn v7_id() -> [u8; 16] {
+        *NoteId::new_v7().as_uuid().as_bytes()
+    }
+
+    /// A sealed head fragment (`record_b64`, `head_id_hex`) another device
+    /// might have authored — makes the canned pull carry verifiable history
+    /// (the F4 probe is gated on `page.head.is_some()`).
+    fn sealed_head_fragment(
+        root_key: &[u8; 32],
+        account_number_hash: [u8; 16],
+    ) -> (String, String) {
+        use base64::Engine as _;
+        let head = VaultHead {
+            head_format_version: VAULT_HEAD_FORMAT_V1,
+            account_number_hash,
+            manifest_hash: [0u8; 32],
+            seq: 1,
+            prev_head_hash: Vec::new(),
+            version_vector: vec![VvEntry {
+                device_id: [0x99; 16],
+                counter: 1,
+            }],
+        };
+        let sealed = head.seal(root_key).unwrap();
+        (
+            base64::engine::general_purpose::STANDARD.encode(&sealed.record),
+            hex(&sealed.head_id),
+        )
+    }
+
+    fn pull_body_with_head(metas_json: &str, next_cursor: u64, head: &(String, String)) -> Vec<u8> {
+        format!(
+            "{{\"metas\":[{metas_json}],\"next_cursor\":{next_cursor},\"head\":{{\"record_b64\":\"{}\",\"head_id_hex\":\"{}\"}}}}",
+            head.0, head.1
+        )
+        .into_bytes()
+    }
+
+    /// Guard A, fresh-join shape: a reclaimed record served as an empty 200
+    /// (pre-§11.3 server) must be skipped — no 0-byte junk file, no baseline
+    /// adoption, cycle completes with the skip honestly counted.
+    #[test]
+    fn empty_ciphertext_download_is_skipped_not_written() {
+        let (dir, notes) = fresh_vault("emptyct");
+        let id = [0x01u8; 16];
+        let t = FakeTransport::new();
+        t.on(
+            HttpMethod::Get,
+            "/sync/pull?cursor=0",
+            200,
+            pull_body(&meta_json(&id, 3, &[0xaa; 24]), 1),
+        );
+        t.on(
+            HttpMethod::Get,
+            "/sync/pull?cursor=1",
+            200,
+            pull_body("", 1),
+        );
+        t.on(
+            HttpMethod::Get,
+            &format!("/sync/blob?id={}", hex(&id)),
+            200,
+            b"{\"ciphertext_b64\":\"\"}".to_vec(),
+        );
+
+        let s = run_cycle_legacy(
+            &t,
+            &[0x42; 32],
+            [0x5c; 16],
+            [0x0a; 16],
+            "tok",
+            &notes,
+            &dir,
+            false,
+        )
+        .expect("cycle survives the empty body");
+        assert_eq!(s.pulled, 0, "an empty body is never counted as pulled");
+        assert_eq!(s.pull_skipped, 1);
+        assert!(
+            !blob_path(&notes, &id).exists(),
+            "no 0-byte junk file may be written"
+        );
+        let st = read_sync_state(&dir).unwrap();
+        assert!(
+            !st.blobs.contains_key(&hex(&id)),
+            "the tombstone baseline must NOT be adopted (adoption is what made the bug self-seal)"
+        );
+        assert_eq!(
+            st.cursor, 1,
+            "the cursor still advances (bounded staleness)"
+        );
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    /// Guard A, the headline data-loss repro: a CLEAN live local note whose
+    /// server record was reclaimed (served empty) must survive byte-identical.
+    /// Pre-guard, the empty bytes overwrote it and the adopted baseline sealed
+    /// the destruction.
+    #[test]
+    fn junk_download_never_overwrites_live_note() {
+        let (dir, notes) = fresh_vault("junkct");
+        let id = v7_id();
+        let items_key = [0x11u8; 32];
+        let items_key_id = [0x22u8; 16];
+        let blob = encode_new_note(&items_key, &items_key_id, &id, b"precious body").unwrap();
+        let disk_nonce = crate::note_nonce::read_myn_content_nonce(&blob).unwrap();
+        crate::atomic_write::atomic_write(&blob_path(&notes, &id), &blob, false).unwrap();
+        // Clean baseline: state matches disk (an in-sync note, dirty-skip must NOT fire).
+        let mut st = SyncState::default();
+        st.blobs.insert(
+            hex(&id),
+            BlobSyncState {
+                version: 1,
+                content_nonce_hex: hex(&disk_nonce),
+            },
+        );
+        write_sync_state(&dir, &st).unwrap();
+
+        let t = FakeTransport::new();
+        // The server advanced the record (tombstone version, different nonce)…
+        t.on(
+            HttpMethod::Get,
+            "/sync/pull?cursor=0",
+            200,
+            pull_body(&meta_json(&id, 2, &[0xbb; 24]), 1),
+        );
+        t.on(
+            HttpMethod::Get,
+            "/sync/pull?cursor=1",
+            200,
+            pull_body("", 1),
+        );
+        // …but the body is gone (reclaimed → empty 200 on an old server).
+        t.on(
+            HttpMethod::Get,
+            &format!("/sync/blob?id={}", hex(&id)),
+            200,
+            b"{\"ciphertext_b64\":\"\"}".to_vec(),
+        );
+
+        let s = run_cycle_legacy(
+            &t,
+            &[0x42; 32],
+            [0x5c; 16],
+            [0x0a; 16],
+            "tok",
+            &notes,
+            &dir,
+            false,
+        )
+        .expect("cycle survives");
+        assert_eq!(s.pull_skipped, 1);
+        let on_disk = std::fs::read(blob_path(&notes, &id)).unwrap();
+        assert_eq!(on_disk, blob, "the live note must survive byte-identical");
+        let st2 = read_sync_state(&dir).unwrap();
+        assert_eq!(
+            st2.blobs.get(&hex(&id)).map(|b| b.version),
+            Some(1),
+            "the old baseline stays authoritative — no tombstone adoption"
+        );
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    /// Guard A, §11.3 server shape: `/sync/blob` → 410 `blob_reclaimed` is a
+    /// per-record skip, never a whole-cycle failure.
+    #[test]
+    fn blob_reclaimed_410_is_skipped_not_cycle_failure() {
+        let (dir, notes) = fresh_vault("blob410");
+        let id = [0x03u8; 16];
+        let t = FakeTransport::new();
+        t.on(
+            HttpMethod::Get,
+            "/sync/pull?cursor=0",
+            200,
+            pull_body(&meta_json(&id, 4, &[0xcc; 24]), 1),
+        );
+        t.on(
+            HttpMethod::Get,
+            "/sync/pull?cursor=1",
+            200,
+            pull_body("", 1),
+        );
+        t.on(
+            HttpMethod::Get,
+            &format!("/sync/blob?id={}", hex(&id)),
+            410,
+            b"{\"error_code\":\"blob_reclaimed\"}".to_vec(),
+        );
+
+        let s = run_cycle_legacy(
+            &t,
+            &[0x42; 32],
+            [0x5c; 16],
+            [0x0a; 16],
+            "tok",
+            &notes,
+            &dir,
+            false,
+        )
+        .expect("410 blob_reclaimed must not fail the cycle");
+        assert_eq!(s.pull_skipped, 1);
+        assert!(!blob_path(&notes, &id).exists());
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    /// Drop-leg: a previously-synced note absent from the reconcile roster is
+    /// QUARANTINED (moved, never destroyed), its baseline and queued tombstone
+    /// flag dropped, the authored state consistent — and `dropped` counted.
+    #[test]
+    fn reconcile_drop_quarantines_previously_synced_absentee() {
+        let (dir, notes) = fresh_vault("dropleg");
+        let id = v7_id();
+        let items_key = [0x11u8; 32];
+        let items_key_id = [0x22u8; 16];
+        let blob = encode_new_note(&items_key, &items_key_id, &id, b"ghost note").unwrap();
+        let disk_nonce = crate::note_nonce::read_myn_content_nonce(&blob).unwrap();
+        crate::atomic_write::atomic_write(&blob_path(&notes, &id), &blob, false).unwrap();
+        let mut st = SyncState {
+            cursor: 5,
+            ..Default::default()
+        };
+        st.blobs.insert(
+            hex(&id),
+            BlobSyncState {
+                version: 1,
+                content_nonce_hex: hex(&disk_nonce),
+            },
+        );
+        write_sync_state(&dir, &st).unwrap();
+        add_pending_tombstone(&dir, &hex(&id)).unwrap();
+
+        let t = FakeTransport::new();
+        // Stale cursor → 410 → reconcile walk whose roster no longer carries the id.
+        t.on(
+            HttpMethod::Get,
+            "/sync/pull?cursor=5",
+            410,
+            b"{\"error_code\":\"cursor_expired\"}".to_vec(),
+        );
+        t.on(
+            HttpMethod::Get,
+            "/sync/pull?cursor=0&reconcile=1",
+            200,
+            pull_body("", 6),
+        );
+        t.on(
+            HttpMethod::Get,
+            "/sync/pull?cursor=6&reconcile=1",
+            200,
+            pull_body("", 6),
+        );
+
+        let s = run_cycle_legacy(
+            &t,
+            &[0x42; 32],
+            [0x5c; 16],
+            [0x0a; 16],
+            "tok",
+            &notes,
+            &dir,
+            false,
+        )
+        .expect("reconcile cycle");
+        assert!(s.reconcile_ran);
+        assert_eq!(s.dropped, 1);
+        assert!(
+            !blob_path(&notes, &id).exists(),
+            "the ghost left the live notes dir"
+        );
+        let uuid = uuid::Uuid::from_bytes(id);
+        assert!(
+            dir.join("quarantine").join(format!("{uuid}.myn")).exists(),
+            "…but its ciphertext is preserved in quarantine/"
+        );
+        let st2 = read_sync_state(&dir).unwrap();
+        assert!(!st2.blobs.contains_key(&hex(&id)), "baseline dropped");
+        assert!(
+            !read_pending_tombstones(&dir).contains(&hex(&id)),
+            "the moot tombstone flag is dequeued"
+        );
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    /// Drop-leg discriminator: a never-synced local note absent from the
+    /// roster is NEW LOCAL WORK — kept on disk, never quarantined.
+    #[test]
+    fn reconcile_keeps_never_synced_local_note() {
+        let (dir, notes) = fresh_vault("keeplocal");
+        let id = v7_id();
+        let items_key = [0x11u8; 32];
+        let items_key_id = [0x22u8; 16];
+        let blob = encode_new_note(&items_key, &items_key_id, &id, b"fresh local work").unwrap();
+        crate::atomic_write::atomic_write(&blob_path(&notes, &id), &blob, false).unwrap();
+        // Enrolled before (cursor advanced), but this note never synced (no baseline).
+        let st = SyncState {
+            cursor: 5,
+            ..Default::default()
+        };
+        write_sync_state(&dir, &st).unwrap();
+
+        let t = FakeTransport::new();
+        t.on(
+            HttpMethod::Get,
+            "/sync/pull?cursor=5",
+            410,
+            b"{\"error_code\":\"cursor_expired\"}".to_vec(),
+        );
+        t.on(
+            HttpMethod::Get,
+            "/sync/pull?cursor=0&reconcile=1",
+            200,
+            pull_body("", 6),
+        );
+        t.on(
+            HttpMethod::Get,
+            "/sync/pull?cursor=6&reconcile=1",
+            200,
+            pull_body("", 6),
+        );
+
+        let s = run_cycle_legacy(
+            &t,
+            &[0x42; 32],
+            [0x5c; 16],
+            [0x0a; 16],
+            "tok",
+            &notes,
+            &dir,
+            false,
+        )
+        .expect("reconcile cycle");
+        assert!(s.reconcile_ran);
+        assert_eq!(s.dropped, 0, "new local work is never dropped");
+        assert!(blob_path(&notes, &id).exists(), "…and stays in notes/");
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    /// Drop-leg guard: an id with a staged (unresolved) keep-both conflict is
+    /// never quarantined — conflict resolution owns it.
+    #[test]
+    fn staged_conflict_id_is_not_dropped() {
+        let (dir, notes) = fresh_vault("stagedskip");
+        let id = v7_id();
+        let items_key = [0x11u8; 32];
+        let items_key_id = [0x22u8; 16];
+        let blob = encode_new_note(&items_key, &items_key_id, &id, b"conflicted local").unwrap();
+        let disk_nonce = crate::note_nonce::read_myn_content_nonce(&blob).unwrap();
+        crate::atomic_write::atomic_write(&blob_path(&notes, &id), &blob, false).unwrap();
+        let mut st = SyncState {
+            cursor: 5,
+            ..Default::default()
+        };
+        st.blobs.insert(
+            hex(&id),
+            BlobSyncState {
+                version: 1,
+                content_nonce_hex: hex(&disk_nonce),
+            },
+        );
+        write_sync_state(&dir, &st).unwrap();
+        stage_conflict(&dir, &id, 2, &[0xee; 24], b"staged remote bytes").unwrap();
+
+        let t = FakeTransport::new();
+        t.on(
+            HttpMethod::Get,
+            "/sync/pull?cursor=5",
+            410,
+            b"{\"error_code\":\"cursor_expired\"}".to_vec(),
+        );
+        t.on(
+            HttpMethod::Get,
+            "/sync/pull?cursor=0&reconcile=1",
+            200,
+            pull_body("", 6),
+        );
+        t.on(
+            HttpMethod::Get,
+            "/sync/pull?cursor=6&reconcile=1",
+            200,
+            pull_body("", 6),
+        );
+
+        let s = run_cycle_legacy(
+            &t,
+            &[0x42; 32],
+            [0x5c; 16],
+            [0x0a; 16],
+            "tok",
+            &notes,
+            &dir,
+            false,
+        )
+        .expect("reconcile cycle");
+        assert_eq!(
+            s.dropped, 0,
+            "a staged conflict is conflict-resolution's, not the drop-leg's"
+        );
+        assert!(blob_path(&notes, &id).exists());
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    /// F4 fresh-cursor probe: a re-enrolled device (cursor 0, wiped baselines)
+    /// holding a local copy of a RECLAIMED record must quarantine it instead of
+    /// pushing `base_version 0` into a guaranteed 409 batch-wedge.
+    #[test]
+    fn fresh_cursor_push_probe_quarantines_reclaimed() {
+        let (dir, notes) = fresh_vault("probe410");
+        let id = v7_id();
+        let root_key = [0x42u8; 32];
+        let account = [0x5cu8; 16];
+        let items_key = [0x11u8; 32];
+        let items_key_id = [0x22u8; 16];
+        let blob = encode_new_note(&items_key, &items_key_id, &id, b"reclaimed ghost").unwrap();
+        crate::atomic_write::atomic_write(&blob_path(&notes, &id), &blob, false).unwrap();
+
+        let head = sealed_head_fragment(&root_key, account);
+        let t = FakeTransport::new();
+        // An account WITH history (head present) whose roster no longer carries
+        // the ghost — the §11.3 server omitted the reclaimed record.
+        t.on(
+            HttpMethod::Get,
+            "/sync/pull?cursor=0",
+            200,
+            pull_body_with_head("", 0, &head),
+        );
+        // The probe: the server knows this id as a reclaimed record.
+        t.on(
+            HttpMethod::Get,
+            &format!("/sync/blob?id={}", hex(&id)),
+            410,
+            b"{\"error_code\":\"blob_reclaimed\"}".to_vec(),
+        );
+
+        let s = run_cycle_legacy(
+            &t, &root_key, account, [0x0a; 16], "tok", &notes, &dir, true,
+        )
+        .expect("cycle");
+        assert_eq!(s.dropped, 1, "the reclaimed ghost is quarantined");
+        assert_eq!(
+            s.pushed, 0,
+            "…and never pushed (base_version 0 would 409-wedge the batch)"
+        );
+        assert!(!blob_path(&notes, &id).exists());
+        let uuid = uuid::Uuid::from_bytes(id);
+        assert!(dir.join("quarantine").join(format!("{uuid}.myn")).exists());
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    /// F4 sibling: a 404 probe answer means "genuinely new note" — it pushes
+    /// exactly as before (fail-open).
+    #[test]
+    fn fresh_cursor_push_probe_404_pushes_normally() {
+        let (dir, notes) = fresh_vault("probe404");
+        let id = v7_id();
+        let root_key = [0x42u8; 32];
+        let account = [0x5cu8; 16];
+        let items_key = [0x11u8; 32];
+        let items_key_id = [0x22u8; 16];
+        let blob = encode_new_note(&items_key, &items_key_id, &id, b"genuinely new").unwrap();
+        crate::atomic_write::atomic_write(&blob_path(&notes, &id), &blob, false).unwrap();
+
+        let head = sealed_head_fragment(&root_key, account);
+        let t = FakeTransport::new();
+        t.on(
+            HttpMethod::Get,
+            "/sync/pull?cursor=0",
+            200,
+            pull_body_with_head("", 0, &head),
+        );
+        t.on(
+            HttpMethod::Get,
+            &format!("/sync/blob?id={}", hex(&id)),
+            404,
+            b"{\"error_code\":\"not_found\"}".to_vec(),
+        );
+        t.on(
+            HttpMethod::Post,
+            "/sync/push",
+            200,
+            format!(
+                "{{\"results\":[{{\"blob_id_hex\":\"{}\",\"version\":1}}],\"head_id_hex\":\"{}\"}}",
+                hex(&id),
+                "cd".repeat(32)
+            )
+            .into_bytes(),
+        );
+
+        let s = run_cycle_legacy(
+            &t, &root_key, account, [0x0a; 16], "tok", &notes, &dir, true,
+        )
+        .expect("cycle");
+        assert_eq!(
+            s.pushed, 1,
+            "a 404 probe is fail-open — the new note pushes"
+        );
+        assert_eq!(s.dropped, 0);
+        assert!(blob_path(&notes, &id).exists());
+        std::fs::remove_dir_all(&dir).ok();
     }
 
     /// Live end-to-end poke: device B holds an open `/sync/poke` SSE stream

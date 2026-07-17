@@ -52,6 +52,14 @@ use crate::plugins::sync::transport::SyncTransport;
 
 /// Kills the spawned server on drop so a panicking assert never leaks it.
 struct ServerGuard(Child);
+impl ServerGuard {
+    /// Kill the server NOW without dropping the guard binding — the crash /
+    /// restart scenarios kill mid-test and later respawn on the same port.
+    fn kill_now(&mut self) {
+        let _ = self.0.kill();
+        let _ = self.0.wait();
+    }
+}
 impl Drop for ServerGuard {
     fn drop(&mut self) {
         let _ = self.0.kill();
@@ -69,10 +77,20 @@ fn server_binary() -> Option<PathBuf> {
     p.exists().then_some(p)
 }
 
-/// Spawn an ephemeral in-memory server; return (guard, base_url). Per-call
-/// unique portfile dir so concurrent tests don't race. Rate limit is lifted —
-/// these tests exercise sync correctness, not abuse throttling.
-fn spawn_server() -> Option<(ServerGuard, String)> {
+/// Server spawn options. `Default` = today's shape: ephemeral port, in-memory
+/// store. `addr` pins a fixed listen address (a respawn re-binding the port a
+/// killed instance used); `storage_dir` switches to the FSStore backend rooted
+/// there (the production topology — state survives kill+respawn).
+#[derive(Default)]
+struct ServerOpts {
+    addr: Option<String>,
+    storage_dir: Option<PathBuf>,
+}
+
+/// Spawn an ephemeral server; return (guard, base_url). Per-call unique
+/// portfile dir so concurrent tests don't race. Rate limit is lifted — these
+/// tests exercise sync correctness, not abuse throttling.
+fn spawn_server_with(opts: &ServerOpts) -> Option<(ServerGuard, String)> {
     use std::sync::atomic::{AtomicU64, Ordering};
     static SEQ: AtomicU64 = AtomicU64::new(0);
     let bin = server_binary()?;
@@ -84,11 +102,20 @@ fn spawn_server() -> Option<(ServerGuard, String)> {
     std::fs::create_dir_all(&dir).ok()?;
     let portfile = dir.join("port");
     let _ = std::fs::remove_file(&portfile);
-    let child = std::process::Command::new(&bin)
-        .env("MYNE_SERVER_ADDR", "127.0.0.1:0")
-        .env("MYNE_SERVER_PORTFILE", &portfile)
-        .env("MYNE_RATELIMIT_BURST", "1000000")
-        .env("MYNE_RATELIMIT_REFILL", "1000000")
+    let mut cmd = std::process::Command::new(&bin);
+    cmd.env(
+        "MYNE_SERVER_ADDR",
+        opts.addr.as_deref().unwrap_or("127.0.0.1:0"),
+    )
+    .env("MYNE_SERVER_PORTFILE", &portfile)
+    .env("MYNE_RATELIMIT_BURST", "1000000")
+    .env("MYNE_RATELIMIT_REFILL", "1000000");
+    if let Some(storage) = &opts.storage_dir {
+        std::fs::create_dir_all(storage).ok()?;
+        cmd.env("MYNE_STORAGE_BACKEND", "fs")
+            .env("MYNE_STORAGE_PATH", storage);
+    }
+    let child = cmd
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())
         .spawn()
@@ -117,6 +144,11 @@ fn spawn_server() -> Option<(ServerGuard, String)> {
         std::thread::sleep(std::time::Duration::from_millis(40));
     }
     Some((guard, format!("http://127.0.0.1:{port}")))
+}
+
+/// Spawn an ephemeral in-memory server (the default shape).
+fn spawn_server() -> Option<(ServerGuard, String)> {
+    spawn_server_with(&ServerOpts::default())
 }
 
 /// Skip-or-run gate: returns the spawned server, or prints a skip line and
@@ -324,9 +356,14 @@ impl Device {
 
     /// One full sync cycle (pull → detect → push), the wired engine loop.
     /// Attachment-aware (MYND-468): the sim vault mostly has no attachments, in
-    /// which case the attachment phases are a cheap no-op scan — but the
-    /// attachment client-ops exercise them for real.
+    /// which case the attachment phases are a cheap no-op scan.
     fn sync(&self) -> SyncSummary {
+        self.try_sync().expect("sync cycle")
+    }
+
+    /// [`Device::sync`] without the panic-on-error — the fault-injection
+    /// scenarios assert on the error shape instead.
+    fn try_sync(&self) -> Result<SyncSummary, super::orchestrator::SyncCycleError> {
         run_sync_cycle(
             self.transport.as_ref(),
             &self.acct.root_key,
@@ -341,7 +378,6 @@ impl Device {
                 items_key_id: &self.acct.items_key_id,
             }),
         )
-        .expect("sync cycle")
     }
 
     fn read_note(&self, id: &NoteId) -> Option<Vec<u8>> {
@@ -1501,4 +1537,143 @@ fn discovery_rapid_edit_delete_edit_converges() {
     assert_converged(&devices, &[n]);
     assert_same_blob_sets(&devices);
     assert_no_conflicts(&devices);
+}
+
+// ---------------------------------------------------------------------------
+// Fault-injection tier (P0-4): transport faults + server crash/restart. The
+// orchestrator/transport-layer complement to loop_control's re-arm unit tests.
+// ---------------------------------------------------------------------------
+
+/// A push that fails transiently (socket-level, mid-outage) must neither lose
+/// nor duplicate the edit: the failed attempts leave the baseline untouched, the
+/// recovered attempt pushes exactly once, and the fleet converges conflict-free.
+#[test]
+fn sim_push_fail_then_recover_converges() {
+    use crate::plugins::sync::engine::PushError;
+    use crate::plugins::sync::orchestrator::SyncCycleError;
+    use crate::plugins::sync::transport::{FaultInjectingTransport, FaultMode};
+
+    let (_guard, url) = server_or_skip!("push_fail_recover");
+    let acct = Account::new(0xE1);
+    let mut devices = enroll_devices(&acct, &url, 2);
+
+    let n = devices[0].create_note(b"survives the outage");
+    devices[0].sync();
+    devices[1].sync();
+
+    // The edit whose push will hit the outage.
+    devices[0].edit_note(&n, b"edited during the outage");
+    let inner = crate::plugins::sync::http_transport::build_transport(&url, Vec::new()).unwrap();
+    devices[0].transport = Box::new(FaultInjectingTransport::fail_path(
+        inner,
+        "/sync/push",
+        2,
+        FaultMode::Network,
+    ));
+
+    // Two faulted attempts: the pull leg succeeds, the push leg fails below
+    // HTTP — the exact offline-blip shape.
+    for attempt in 0..2 {
+        match devices[0].try_sync() {
+            Err(SyncCycleError::Push(PushError::Transport(_))) => {}
+            other => panic!("attempt {attempt}: expected Push(Transport), got {other:?}"),
+        }
+    }
+
+    // Healed: the third attempt pushes the edit exactly once (a failed attempt
+    // must not have advanced the baseline behind the server's back).
+    let s = devices[0].try_sync().expect("healed cycle");
+    assert_eq!(s.pushed, 1, "the stranded edit pushes exactly once");
+
+    devices[1].sync();
+    assert_eq!(
+        devices[1].read_note(&n).as_deref(),
+        Some(&b"edited during the outage"[..])
+    );
+    assert_converged(&devices, &[n]);
+    assert_same_blob_sets(&devices);
+    assert_no_conflicts(&devices);
+    for d in &devices {
+        d.assert_all_blobs_decrypt();
+    }
+}
+
+/// FSStore server kill + same-port respawn (the production systemd topology):
+/// tokens survive (auth continuity), cursors survive (B pulls ONLY the delta,
+/// no re-download, no 410/reconcile), and the head chain extends cleanly.
+#[test]
+fn sim_fs_server_restart_preserves_cursor_and_head() {
+    use crate::plugins::sync::orchestrator::SyncCycleError;
+
+    let storage = std::env::temp_dir().join(format!("myne-sim-fsrestart-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&storage);
+    let opts = ServerOpts {
+        addr: None,
+        storage_dir: Some(storage.clone()),
+    };
+    let Some((mut guard, url)) = spawn_server_with(&opts) else {
+        eprintln!(
+            "SKIP sim_fs_server_restart: myne-server binary not found \
+             (cd myne-server && go build -o myne-server ./cmd/myne-server)"
+        );
+        return;
+    };
+    let port: u16 = url.rsplit(':').next().unwrap().parse().unwrap();
+
+    let acct = Account::new(0xE7);
+    let devices = enroll_devices(&acct, &url, 2);
+    let n1 = devices[0].create_note(b"note one");
+    let n2 = devices[0].create_note(b"note two");
+    let n3 = devices[0].create_note(b"note three");
+    devices[0].sync();
+    let pulled = devices[1].sync();
+    assert_eq!(pulled.pulled, 3, "B holds the full vault pre-crash");
+
+    // The auth state is persisted by a DEBOUNCED coalescer (authpersist) — wait
+    // for auth.json to land so the crash models the realistic shape (devices
+    // enrolled long before the crash), not a kill inside the first debounce
+    // window (whose loss is documented, accepted coalescer behavior).
+    let auth_json = storage.join("auth.json");
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    while !auth_json.exists() && std::time::Instant::now() < deadline {
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+    assert!(auth_json.exists(), "authpersist flushed before the crash");
+
+    // Crash. An edit made during the outage fails with a transport error.
+    guard.kill_now();
+    devices[0].edit_note(&n1, b"edited across the restart");
+    match devices[0].try_sync() {
+        Err(SyncCycleError::Pull(_) | SyncCycleError::Push(_)) => {}
+        other => panic!("expected a transport-shaped failure, got {other:?}"),
+    }
+
+    // Respawn on the SAME port over the SAME FSStore root.
+    let reopts = ServerOpts {
+        addr: Some(format!("127.0.0.1:{port}")),
+        storage_dir: Some(storage.clone()),
+    };
+    let Some((_guard2, url2)) = spawn_server_with(&reopts) else {
+        eprintln!("SKIP sim_fs_server_restart: fixed-port respawn did not come up");
+        return;
+    };
+    assert_eq!(url2, url, "respawn re-bound the original address");
+
+    // Auth continuity: the stored token still works — no re-enroll.
+    let s_a = devices[0].try_sync().expect("A pushes after the restart");
+    assert_eq!(s_a.pushed, 1, "exactly the stranded edit");
+    assert!(!s_a.reconcile_ran, "no 410/reconcile — the cursor survived");
+
+    // Cursor continuity: B pulls ONLY the delta, not the whole vault again.
+    let s_b = devices[1].try_sync().expect("B pulls after the restart");
+    assert_eq!(s_b.pulled, 1, "delta only — cursors survived the restart");
+    assert!(!s_b.reconcile_ran);
+
+    assert_converged(&devices, &[n1, n2, n3]);
+    assert_same_blob_sets(&devices);
+    assert_no_conflicts(&devices);
+    for d in &devices {
+        d.assert_all_blobs_decrypt();
+    }
+    let _ = std::fs::remove_dir_all(&storage);
 }

@@ -314,8 +314,29 @@ pub enum CycleOutcome {
     NotReady,
     /// One cycle ran; carries what it moved (pulled / pushed counts).
     Ran(super::orchestrator::SyncSummary),
-    /// A transport / protocol failure.
-    Failed,
+    /// A transport / protocol failure, coarsened to the class the scheduler's
+    /// retry policy needs (429 / 401 / socket / other).
+    Failed(super::loop_control::FailureClass),
+}
+
+/// Coarsen a cycle error to its scheduler-facing retry class. Lives at this
+/// boundary (not in `loop_control`) because it is the one place that still
+/// holds the full `SyncCycleError` before it crosses to the loop.
+fn classify_cycle_error(
+    e: &super::orchestrator::SyncCycleError,
+) -> super::loop_control::FailureClass {
+    use super::engine::{PullError, PushError};
+    use super::loop_control::FailureClass;
+    use super::orchestrator::SyncCycleError;
+    match e {
+        SyncCycleError::Pull(PullError::RateLimited)
+        | SyncCycleError::Push(PushError::RateLimited) => FailureClass::RateLimited,
+        SyncCycleError::Pull(PullError::Unauthenticated)
+        | SyncCycleError::Push(PushError::Unauthenticated) => FailureClass::Unauthenticated,
+        SyncCycleError::Pull(PullError::Transport(_))
+        | SyncCycleError::Push(PushError::Transport(_)) => FailureClass::Transport,
+        _ => FailureClass::Other,
+    }
 }
 
 /// A still-`pending` device claims its token by re-running the SCRAM handshake
@@ -386,7 +407,7 @@ pub async fn run_active_cycle<R: Runtime>(app: &AppHandle<R>, allow_push: bool) 
     // spawn_blocking so the token claim is serialized too.
     let _cycle_guard = sync_cycle_mutex().lock().await;
     let Ok(cfg) = config_path(app).and_then(|p| read_config(&p)) else {
-        return CycleOutcome::Failed;
+        return CycleOutcome::Failed(super::loop_control::FailureClass::Other);
     };
     let pins = config_pins(&cfg);
     let Some(url) = cfg.endpoint_url else {
@@ -404,7 +425,7 @@ pub async fn run_active_cycle<R: Runtime>(app: &AppHandle<R>, allow_push: bool) 
         return CycleOutcome::NotReady; // not enrolled
     };
     let (Some(account_hash), Some(device_id)) = (hex16(&acct_hex), hex16(&dev_hex)) else {
-        return CycleOutcome::Failed;
+        return CycleOutcome::Failed(super::loop_control::FailureClass::Other);
     };
     // Attachment sync (MYND-468) verifies downloaded MYA1 blobs end-to-end, so
     // the cycle needs the itemsKey material alongside root_key. Cloned out of
@@ -447,7 +468,14 @@ pub async fn run_active_cycle<R: Runtime>(app: &AppHandle<R>, allow_push: bool) 
     let dir_for_prefs = dir.clone();
 
     let res = tokio::task::spawn_blocking(move || {
-        let transport = super::http_transport::build_transport(&url, pins).map_err(|_| false)?;
+        // A transport that cannot even be built is a Transport-class failure
+        // (same retry posture as an unreachable socket).
+        let transport = super::http_transport::build_transport(&url, pins).map_err(|e| {
+            super::orchestrator::SyncCycleError::Pull(super::engine::PullError::Transport(e))
+        })?;
+        // The full `SyncCycleError` crosses the spawn_blocking boundary intact —
+        // the integrity verdict (SYNC-10) and the scheduler's retry class are
+        // both derived from it on the other side.
         super::orchestrator::run_sync_cycle(
             transport.as_ref(),
             &root_key,
@@ -462,16 +490,6 @@ pub async fn run_active_cycle<R: Runtime>(app: &AppHandle<R>, allow_push: bool) 
                 items_key_id: &items_key_id,
             }),
         )
-        // Preserve ONLY whether the failure was an integrity event (a rejected
-        // rollback / forged head, SYNC-10) across the spawn_blocking boundary —
-        // the engine's Rust-side verdict, classified by `integrity`. Everything
-        // else collapses to a transient failure.
-        .map_err(|e| match e {
-            super::orchestrator::SyncCycleError::Pull(pe) => {
-                super::integrity::pull_error_is_integrity_failure(&pe)
-            }
-            _ => false,
-        })
     })
     .await;
 
@@ -507,15 +525,18 @@ pub async fn run_active_cycle<R: Runtime>(app: &AppHandle<R>, allow_push: bool) 
             }
             CycleOutcome::Ran(summary)
         }
-        Ok(Err(is_integrity)) => {
-            if is_integrity {
+        Ok(Err(e)) => {
+            if matches!(&e, super::orchestrator::SyncCycleError::Pull(pe)
+                if super::integrity::pull_error_is_integrity_failure(pe))
+            {
                 // Hard, honest integrity alert (rollback / non-extending head).
                 // Copy is the pinned `SYNC_INTEGRITY_ALERT` literal on the UI side.
                 let _ = app.emit("sync://integrity-alert", ());
             }
-            CycleOutcome::Failed
+            CycleOutcome::Failed(classify_cycle_error(&e))
         }
-        Err(_) => CycleOutcome::Failed, // join error
+        // Join error — no class information survives a panicked task.
+        Err(_) => CycleOutcome::Failed(super::loop_control::FailureClass::Other),
     }
 }
 
@@ -596,18 +617,19 @@ pub async fn sync_now<R: Runtime>(app: AppHandle<R>) -> Result<SyncRuntimeStatus
         // flip the dot to green. Only a genuine Ran is Idle.
         CycleOutcome::NotReady => SyncRuntimeStatus::NotEnrolled,
         CycleOutcome::Ran(summary) => {
-            if summary.pulled > 0 {
-                // A manual sync pulled notes to disk — mirror the loop's refresh
-                // nudge so the UI reloads. Both clients run the foreground
-                // `spawn_sync_loop` (mobile is foreground-only, SYNC-37), which
-                // emits the same event on its own cycles; this covers the manual
-                // `sync_now` path on top of the loop.
+            if summary.pulled > 0 || summary.dropped > 0 {
+                // A manual sync pulled notes to disk (or reconcile quarantined
+                // absentees) — mirror the loop's refresh nudge so the UI
+                // reloads. Both clients run the foreground `spawn_sync_loop`
+                // (mobile is foreground-only, SYNC-37), which emits the same
+                // event on its own cycles; this covers the manual `sync_now`
+                // path on top of the loop.
                 let _ = app.emit("sync://changed", summary.pulled);
             }
             SyncRuntimeStatus::Idle
         }
-        CycleOutcome::Failed => SyncRuntimeStatus::Error {
-            detail: "sync_failed".into(),
+        CycleOutcome::Failed(class) => SyncRuntimeStatus::Error {
+            detail: class.status_detail().into(),
         },
     })
 }

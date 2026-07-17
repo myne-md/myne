@@ -66,6 +66,15 @@ function present(status: SyncStatus | null): Presentation {
     case "syncing":
       return { dotColor: "var(--accent)", label: i18n.t("sync.status.syncing") };
     case "error":
+      // Class-scoped details from the Rust failure gate (FailureClass::status_detail):
+      // auth needs the user (re-enroll / re-approve), rate-limit self-heals on the
+      // stretched retry — both deserve honest copy instead of a generic "error".
+      if (status.detail === "auth_failed") {
+        return { dotColor: "var(--danger)", label: i18n.t("sync.status.errorAuth") };
+      }
+      if (status.detail === "rate_limited") {
+        return { dotColor: "var(--warning)", label: i18n.t("sync.status.errorRateLimited") };
+      }
       return { dotColor: "var(--danger)", label: i18n.t("sync.status.error") };
     case "conflicts":
       return {

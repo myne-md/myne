@@ -26,6 +26,14 @@
 //!   server sees edit timing blurred to the window granularity (resolution-blur,
 //!   NOT decorrelation — documented in the spec staging). No high-resolution
 //!   edit-timing channel beyond at-rest mtime is opened.
+//! - **Failures re-arm and back off** — a failed cycle re-arms the push intent
+//!   it consumed (a transient outage must never strand an edit locally) and
+//!   opens a class-based retry gate that *delays* the next scheduled action
+//!   (exponential per [`retry_delay_ms`], reset on success). The gate only ever
+//!   stretches intervals relative to the baseline cadence — no action fires
+//!   earlier than it would today, so the A13 timing posture is unchanged. Pokes
+//!   and one-shot immediate polls bypass the gate (a pull is cheap and a
+//!   successful bypass pull clears the gate, unstranding any pending push).
 //!
 //! The actual `tokio` glue (spawn, timer, Slot read, transport call) is thin
 //! orchestration over this state machine + the `engine` pull/push functions; it
@@ -38,6 +46,76 @@ pub const DEFAULT_COALESCE_WINDOW_MS: u64 = 5_000;
 /// Minimum age of the last poll before a window-focus event may arm an
 /// immediate poll — alt-tab flapping collapses to at most one pull per floor.
 pub const FOCUS_POLL_FLOOR_MS: u64 = 10_000;
+
+/// First retry delay after a transport/other failure (doubles per consecutive
+/// failure). Extend-only relative to the baseline cadence — see the module doc.
+pub const FAILURE_RETRY_START_MS: u64 = 1_000;
+/// Cap for the transport/other failure retry delay.
+pub const FAILURE_RETRY_CAP_MS: u64 = 120_000;
+/// First retry delay after a 429 — the server explicitly asked to slow down,
+/// so the ladder starts at a full extra poll interval.
+pub const RATE_LIMIT_RETRY_START_MS: u64 = 60_000;
+/// Cap for the 429 retry delay.
+pub const RATE_LIMIT_RETRY_CAP_MS: u64 = 300_000;
+/// Flat park after a 401 — retrying is pointless until re-auth; the focus /
+/// unlock / resume / poke edges all bypass the gate, so any user interaction
+/// (or a peer's push) re-probes immediately.
+pub const AUTH_PARK_MS: u64 = 900_000;
+
+/// Why a cycle failed, coarsened to what the retry policy needs. Derived from
+/// `SyncCycleError` at the `commands` boundary (`classify_cycle_error`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FailureClass {
+    /// 429 on pull or push — the server's own throttle.
+    RateLimited,
+    /// 401 — the stored token is dead; only re-auth helps.
+    Unauthenticated,
+    /// Socket/TLS-level failure — offline or the server is unreachable.
+    Transport,
+    /// Everything else (bad response, CAS races, protocol errors, local IO).
+    Other,
+}
+
+impl FailureClass {
+    /// The `SyncRuntimeStatus::Error` detail string for this class — shared by
+    /// the loop's status cell and `sync_now` so the UI sees one vocabulary.
+    pub fn status_detail(self) -> &'static str {
+        match self {
+            FailureClass::Unauthenticated => "auth_failed",
+            FailureClass::RateLimited => "rate_limited",
+            FailureClass::Transport | FailureClass::Other => "sync_failed",
+        }
+    }
+}
+
+/// One cycle's outcome as the scheduler sees it (fed via
+/// [`SyncScheduler::on_cycle_outcome`]).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CycleResult {
+    /// The cycle ran to completion.
+    Success,
+    /// The cycle did not really run (locked / unenrolled / disabled) — neutral:
+    /// neither counts as a failure nor resets the failure gate.
+    Skipped,
+    /// The cycle ran and failed.
+    Failed(FailureClass),
+}
+
+/// Pure retry-delay ladder: exponential per class, deterministic (no jitter —
+/// retries are quantized to the loop tick and rate-limited per account
+/// server-side, so decorrelation buys nothing here, unlike the SSE reconnect).
+fn retry_delay_ms(class: FailureClass, consecutive_failures: u32) -> u64 {
+    let (start, cap) = match class {
+        FailureClass::Unauthenticated => return AUTH_PARK_MS,
+        FailureClass::RateLimited => (RATE_LIMIT_RETRY_START_MS, RATE_LIMIT_RETRY_CAP_MS),
+        FailureClass::Transport | FailureClass::Other => {
+            (FAILURE_RETRY_START_MS, FAILURE_RETRY_CAP_MS)
+        }
+    };
+    // 2^(n-1) with a shift guard; n counts from 1 (first failure).
+    let n = consecutive_failures.saturating_sub(1).min(16);
+    start.saturating_mul(1u64 << n).min(cap)
+}
 
 /// What a tick decides to do.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -71,6 +149,11 @@ pub struct SyncScheduler {
     /// edge, and a rate-limited window focus: the next eligible tick pulls even
     /// if no interval elapsed, then the flag is consumed so it never re-fires.
     immediate_poll_pending: bool,
+    /// Consecutive failed cycles (reset on success; `Skipped` is neutral).
+    consecutive_failures: u32,
+    /// Failure gate: no *scheduled* action (poll pull / coalesced push) fires
+    /// before this logical time. Pokes and immediate polls bypass it.
+    next_retry_at: Option<u64>,
 }
 
 impl SyncScheduler {
@@ -89,6 +172,8 @@ impl SyncScheduler {
             poke_pending: false,
             suspended: false,
             immediate_poll_pending: false,
+            consecutive_failures: 0,
+            next_retry_at: None,
         }
     }
 
@@ -160,10 +245,14 @@ impl SyncScheduler {
             return SyncAction::Idle;
         }
 
-        // Pull is due on a poll interval, an honored poke, or the one-shot
-        // immediate poll (unlock edge / focus / resume-on-foreground).
+        // Failure gate: scheduled actions wait it out; pokes / immediate polls
+        // bypass it (a bypassing pull that succeeds clears the gate).
+        let gated = self.next_retry_at.is_some_and(|t| now < t);
+
+        // Pull is due on a poll interval (unless gated), an honored poke, or the
+        // one-shot immediate poll (unlock edge / focus / resume-on-foreground).
         let poll_due = now.saturating_sub(self.last_poll) >= self.poll_interval_ms;
-        let pull = poll_due || self.poke_pending || self.immediate_poll_pending;
+        let pull = (poll_due && !gated) || self.poke_pending || self.immediate_poll_pending;
         if pull {
             self.last_poll = now;
             self.poke_pending = false;
@@ -171,9 +260,10 @@ impl SyncScheduler {
         }
 
         // Push is due once the coalescing window has elapsed since the first
-        // pending change (resolution-blur).
+        // pending change (resolution-blur). While gated the intent is RETAINED,
+        // not consumed — a failed cycle must never strand an edit locally.
         let push = match self.dirty_since {
-            Some(t) if now.saturating_sub(t) >= self.coalesce_window_ms => {
+            Some(t) if !gated && now.saturating_sub(t) >= self.coalesce_window_ms => {
                 self.dirty_since = None;
                 true
             }
@@ -185,6 +275,33 @@ impl SyncScheduler {
             (true, false) => SyncAction::Pull,
             (false, true) => SyncAction::Push,
             (false, false) => SyncAction::Idle,
+        }
+    }
+
+    /// Feed one cycle's outcome back into the scheduler (the loop calls this
+    /// after every non-idle tick). On failure of a push-carrying action the
+    /// consumed push intent is re-armed **pre-aged** (the edit already served
+    /// its full coalescing window once — retry timing is then governed solely
+    /// by the failure gate, and an edit that arrived mid-cycle keeps its own,
+    /// newer anchor so its window is never shortened).
+    pub fn on_cycle_outcome(&mut self, action: SyncAction, result: CycleResult, now: u64) {
+        match result {
+            CycleResult::Success => {
+                self.consecutive_failures = 0;
+                self.next_retry_at = None;
+            }
+            // Locked / unenrolled / disabled — the cycle never really ran.
+            CycleResult::Skipped => {}
+            CycleResult::Failed(class) => {
+                if matches!(action, SyncAction::Push | SyncAction::PullAndPush)
+                    && self.dirty_since.is_none()
+                {
+                    self.dirty_since = Some(now.saturating_sub(self.coalesce_window_ms));
+                }
+                self.consecutive_failures = self.consecutive_failures.saturating_add(1);
+                self.next_retry_at =
+                    Some(now.saturating_add(retry_delay_ms(class, self.consecutive_failures)));
+            }
         }
     }
 }
@@ -356,23 +473,37 @@ pub fn spawn_sync_loop<R: Runtime>(app: AppHandle<R>) {
                 let _ = app.emit("sync://status-changed", ());
             }
 
-            match super::commands::run_active_cycle(&app, allow_push).await {
+            let outcome = super::commands::run_active_cycle(&app, allow_push).await;
+            // Re-read the clock — the cycle takes real time, and the failure
+            // gate / re-armed push anchor must be relative to its END.
+            let now_after = start.elapsed().as_millis() as u64;
+            let result = match &outcome {
+                super::commands::CycleOutcome::Ran(_) => CycleResult::Success,
+                super::commands::CycleOutcome::Failed(class) => CycleResult::Failed(*class),
+                super::commands::CycleOutcome::NotReady
+                | super::commands::CycleOutcome::Disabled => CycleResult::Skipped,
+            };
+            sched.on_cycle_outcome(action, result, now_after);
+
+            match outcome {
                 super::commands::CycleOutcome::Ran(summary) => {
                     if let Some(cell) = app.try_state::<super::commands::SyncRuntimeStatusCell>() {
                         cell.clear();
                     }
-                    if summary.pulled > 0 {
-                        // Pulled notes are on disk now — tell the UI to reload.
+                    if summary.pulled > 0 || summary.dropped > 0 {
+                        // Pulled notes are on disk (or reconcile quarantined
+                        // absentees) — tell the UI to reload.
                         let _ = app.emit("sync://changed", summary.pulled);
                     }
                     let _ = app.emit("sync://status-changed", ());
                 }
-                super::commands::CycleOutcome::Failed => {
+                super::commands::CycleOutcome::Failed(class) => {
                     // The loop no longer swallows Failed — it publishes Error so
                     // the status dot reports a failed background cycle, not only
-                    // a manual sync_now click (SYNC-36).
+                    // a manual sync_now click (SYNC-36). Detail is class-scoped
+                    // so the UI can distinguish auth/throttle from a plain blip.
                     if let Some(cell) = app.try_state::<super::commands::SyncRuntimeStatusCell>() {
-                        cell.set_error("sync_failed");
+                        cell.set_error(class.status_detail());
                     }
                     let _ = app.emit("sync://status-changed", ());
                 }
@@ -568,5 +699,224 @@ mod tests {
         // Resume poll + the long-elapsed coalescing window → both fire.
         assert_eq!(s.tick(10_001), SyncAction::PullAndPush);
         assert!(!s.has_pending_push()); // flushed after resume
+    }
+
+    // ── Failure re-arm + class-based retry gate ────────────────────────────
+
+    #[test]
+    fn failed_push_rearms_dirty_and_retries_after_gate() {
+        let mut s = sched();
+        s.set_unlocked(true);
+        s.on_local_change(0);
+        assert_eq!(s.tick(5_000), SyncAction::Push); // window elapsed, dirty consumed
+                                                     // The cycle fails — intent must be re-armed, gated 1 s (first failure).
+        s.on_cycle_outcome(
+            SyncAction::Push,
+            CycleResult::Failed(FailureClass::Transport),
+            5_000,
+        );
+        assert!(s.has_pending_push(), "failed push must re-arm the intent");
+        assert_eq!(s.tick(5_500), SyncAction::Idle); // gated
+        assert_eq!(s.tick(6_100), SyncAction::Push); // gate passed → retry
+    }
+
+    #[test]
+    fn push_retry_gate_doubles_and_caps() {
+        // The pure ladder: 1s, 2s, 4s … capped at 120s; no shift overflow.
+        assert_eq!(retry_delay_ms(FailureClass::Transport, 1), 1_000);
+        assert_eq!(retry_delay_ms(FailureClass::Transport, 2), 2_000);
+        assert_eq!(retry_delay_ms(FailureClass::Transport, 3), 4_000);
+        assert_eq!(retry_delay_ms(FailureClass::Transport, 8), 120_000); // 128s → cap
+        assert_eq!(retry_delay_ms(FailureClass::Transport, 500), 120_000); // shift guard
+        assert_eq!(retry_delay_ms(FailureClass::Other, 1), 1_000); // Other shares the ladder
+                                                                   // Behavioral doubling through the scheduler.
+        let mut s = sched();
+        s.set_unlocked(true);
+        s.on_local_change(0);
+        assert_eq!(s.tick(5_000), SyncAction::Push);
+        s.on_cycle_outcome(
+            SyncAction::Push,
+            CycleResult::Failed(FailureClass::Transport),
+            5_000,
+        );
+        assert_eq!(s.tick(6_000), SyncAction::Push); // retry after 1s
+        s.on_cycle_outcome(
+            SyncAction::Push,
+            CycleResult::Failed(FailureClass::Transport),
+            6_000,
+        );
+        assert_eq!(s.tick(7_000), SyncAction::Idle); // second gate is 2s
+        assert_eq!(s.tick(8_000), SyncAction::Push);
+    }
+
+    #[test]
+    fn success_resets_gate_and_counter() {
+        let mut s = sched();
+        s.set_unlocked(true);
+        s.on_local_change(0);
+        assert_eq!(s.tick(5_000), SyncAction::Push);
+        s.on_cycle_outcome(
+            SyncAction::Push,
+            CycleResult::Failed(FailureClass::Transport),
+            5_000,
+        );
+        s.on_cycle_outcome(
+            SyncAction::Push,
+            CycleResult::Failed(FailureClass::Transport),
+            6_000,
+        );
+        assert_eq!(s.tick(8_000), SyncAction::Push); // 2s gate passed
+        s.on_cycle_outcome(SyncAction::Push, CycleResult::Success, 8_000);
+        // Counter reset: a NEW failure starts the ladder at 1s again, and no
+        // gate is pending now (interval poll at 30s fires normally).
+        assert_eq!(s.tick(30_000), SyncAction::Pull);
+    }
+
+    #[test]
+    fn failed_pull_does_not_rearm_dirty() {
+        let mut s = sched();
+        s.set_unlocked(true);
+        assert_eq!(s.tick(30_000), SyncAction::Pull); // interval poll
+        s.on_cycle_outcome(
+            SyncAction::Pull,
+            CycleResult::Failed(FailureClass::Transport),
+            30_000,
+        );
+        assert!(
+            !s.has_pending_push(),
+            "a pull-only failure must not invent push intent"
+        );
+    }
+
+    #[test]
+    fn dirty_retained_not_consumed_while_gated() {
+        let mut s = sched();
+        s.set_unlocked(true);
+        assert_eq!(s.tick(30_000), SyncAction::Pull);
+        s.on_cycle_outcome(
+            SyncAction::Pull,
+            CycleResult::Failed(FailureClass::RateLimited),
+            30_000,
+        );
+        s.on_local_change(31_000);
+        // Window elapses inside the 60s rate-limit gate: intent retained, not consumed.
+        assert_eq!(s.tick(40_000), SyncAction::Idle);
+        assert!(
+            s.has_pending_push(),
+            "gated tick must retain, not consume, the intent"
+        );
+        assert_eq!(s.tick(90_000), SyncAction::PullAndPush); // gate passed → both
+    }
+
+    #[test]
+    fn rate_limited_stretches_polls() {
+        let mut s = sched();
+        s.set_unlocked(true);
+        assert_eq!(s.tick(30_000), SyncAction::Pull);
+        s.on_cycle_outcome(
+            SyncAction::Pull,
+            CycleResult::Failed(FailureClass::RateLimited),
+            30_000,
+        );
+        assert_eq!(s.tick(60_000), SyncAction::Idle); // poll due but gated (60s ladder)
+        assert_eq!(s.tick(90_000), SyncAction::Pull); // gate passed
+        s.on_cycle_outcome(
+            SyncAction::Pull,
+            CycleResult::Failed(FailureClass::RateLimited),
+            90_000,
+        );
+        assert_eq!(s.tick(150_000), SyncAction::Idle); // second gate = 120s
+        assert_eq!(s.tick(210_000), SyncAction::Pull);
+    }
+
+    #[test]
+    fn unauthenticated_parks_for_auth_park_ms() {
+        let mut s = sched();
+        s.set_unlocked(true);
+        assert_eq!(s.tick(30_000), SyncAction::Pull);
+        s.on_cycle_outcome(
+            SyncAction::Pull,
+            CycleResult::Failed(FailureClass::Unauthenticated),
+            30_000,
+        );
+        assert_eq!(s.tick(500_000), SyncAction::Idle); // parked
+        assert_eq!(s.tick(930_000), SyncAction::Pull); // AUTH_PARK_MS elapsed
+    }
+
+    #[test]
+    fn poke_bypasses_failure_gate_and_success_ungates_push() {
+        let mut s = sched();
+        s.set_unlocked(true);
+        s.on_local_change(0);
+        assert_eq!(s.tick(5_000), SyncAction::Push);
+        s.on_cycle_outcome(
+            SyncAction::Push,
+            CycleResult::Failed(FailureClass::Unauthenticated),
+            5_000,
+        );
+        // Parked for 900s — but a poke still pulls immediately (push stays gated).
+        s.on_poke();
+        assert_eq!(s.tick(6_000), SyncAction::Pull);
+        // The bypassing pull succeeds → gate cleared → pending push flows next tick.
+        s.on_cycle_outcome(SyncAction::Pull, CycleResult::Success, 6_000);
+        assert_eq!(s.tick(7_000), SyncAction::Push);
+    }
+
+    #[test]
+    fn immediate_poll_bypasses_failure_gate() {
+        let mut s = sched();
+        s.set_unlocked(true);
+        assert_eq!(s.tick(30_000), SyncAction::Pull);
+        s.on_cycle_outcome(
+            SyncAction::Pull,
+            CycleResult::Failed(FailureClass::RateLimited),
+            30_000,
+        );
+        s.arm_immediate_poll(); // unlock edge / focus / resume
+        assert_eq!(s.tick(31_000), SyncAction::Pull); // gate bypassed
+    }
+
+    #[test]
+    fn consumed_poke_not_restored_on_failure() {
+        let mut s = sched();
+        s.set_unlocked(true);
+        s.on_poke();
+        assert_eq!(s.tick(1_000), SyncAction::Pull); // poke consumed
+        s.on_cycle_outcome(
+            SyncAction::Pull,
+            CycleResult::Failed(FailureClass::Transport),
+            1_000,
+        );
+        // No 1s-tick retry storm: the poke is NOT restored; past the gate there
+        // is still no pull until the regular interval.
+        assert_eq!(s.tick(1_500), SyncAction::Idle); // gated
+        assert_eq!(s.tick(3_000), SyncAction::Idle); // gate passed, interval not due
+        assert_eq!(s.tick(31_000), SyncAction::Pull); // interval poll covers recovery
+    }
+
+    #[test]
+    fn skipped_outcome_is_neutral() {
+        let mut s = sched();
+        s.set_unlocked(true);
+        s.on_local_change(0);
+        assert_eq!(s.tick(5_000), SyncAction::Push);
+        s.on_cycle_outcome(
+            SyncAction::Push,
+            CycleResult::Failed(FailureClass::Transport),
+            5_000,
+        );
+        // A Skipped outcome (vault locked mid-flight) must not RESET the gate…
+        s.on_cycle_outcome(SyncAction::Push, CycleResult::Skipped, 5_100);
+        assert_eq!(s.tick(5_500), SyncAction::Idle); // still gated (1s from the failure)
+        assert_eq!(s.tick(6_100), SyncAction::Push); // retry
+                                                     // …and must not COUNT as a failure: this next failure is n=2 → a 2s
+                                                     // gate (a 4s gate here would mean Skipped was counted as n=2).
+        s.on_cycle_outcome(
+            SyncAction::Push,
+            CycleResult::Failed(FailureClass::Transport),
+            6_100,
+        );
+        assert_eq!(s.tick(7_500), SyncAction::Idle); // inside the 2s gate
+        assert_eq!(s.tick(8_200), SyncAction::Push); // 2s gate passed (4s would still Idle)
     }
 }

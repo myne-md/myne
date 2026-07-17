@@ -36,6 +36,18 @@ export async function pageSeatInvoke(
   );
 }
 
+/** Page-seat IPC that unwraps the result (throws on `err`, returns `ok`). */
+export async function ipcOk(
+  session: Session,
+  cmd: string,
+  args: Record<string, unknown> = {},
+  timeoutMs = 20_000,
+): Promise<unknown> {
+  const r = await pageSeatInvoke(session, cmd, args, timeoutMs);
+  if (r.err !== undefined) throw new Error(`${cmd} failed: ${JSON.stringify(r.err)}`);
+  return r.ok;
+}
+
 /**
  * Unlock the currently-targeted vault and wait for the editor: the
  * canonical password → submit → `editor.root` sequence shared by every
