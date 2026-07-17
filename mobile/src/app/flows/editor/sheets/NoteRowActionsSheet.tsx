@@ -13,6 +13,7 @@ export function NoteRowActionsSheet({
   onOpen,
   onToggleFavorite,
   onMove,
+  onColor,
   onArchive,
   onTrash,
 }: {
@@ -22,6 +23,8 @@ export function NoteRowActionsSheet({
   onOpen: () => void;
   onToggleFavorite: () => void;
   onMove: () => void;
+  /** Open the note color-label picker (MYND-516). */
+  onColor: () => void;
   onArchive: () => void;
   onTrash: () => void;
 }) {
@@ -31,9 +34,10 @@ export function NoteRowActionsSheet({
   // destructive, Obsidian-style), the mobile twin of the desktop ContextMenu's
   // `group` dividers. `groupTop` drops a row's top hairline when a separator
   // already precedes it (no double line).
-  const row = (text: string, onClick: () => void, opts?: { danger?: boolean; groupTop?: boolean }): ReactNode => (
+  const row = (text: string, onClick: () => void, opts?: { danger?: boolean; groupTop?: boolean; testId?: string }): ReactNode => (
     <button
       onClick={onClick}
+      data-testid={opts?.testId}
       style={{ display: "flex", alignItems: "center", width: "100%", border: "none", borderTop: opts?.groupTop ? "none" : "1px solid var(--line-1)", background: "transparent", padding: "15px 18px", cursor: "pointer", fontFamily: "var(--font-sans)", fontSize: 16, color: opts?.danger ? "var(--danger)" : "var(--fg-1)" }}
     >
       {text}
@@ -49,6 +53,7 @@ export function NoteRowActionsSheet({
           {sep}
           {row(favorited ? t("notes.row.removeFromFavorites") : t("notes.row.addToFavorites"), onToggleFavorite, { groupTop: true })}
           {row(t("editor.noteMenu.moveToFolder"), onMove)}
+          {row(t("notes.list.color"), onColor, { testId: "notes.note-color-action" })}
           {row(t("notes.archive.title"), onArchive)}
           {sep}
           {row(t("editor.noteMenu.moveToTrash"), onTrash, { danger: true, groupTop: true })}

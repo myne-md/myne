@@ -26,7 +26,9 @@
       "@myne/dialect/*": ["../dialect/src/*"],
       "@myne/locales-en": ["../locales/en/common.json"],
       "@myne/i18n": ["../src/i18n/index.ts"],
-      "@myne/i18n/*": ["../src/i18n/*"]
+      "@myne/i18n/*": ["../src/i18n/*"],
+      "@myne/decorations": ["../src/notes/decorations.ts"],
+      "@myne/decorations/folderIcons": ["../src/notes/folderIcons.ts"]
     }
   },
   "include": ["src"]

@@ -3,10 +3,11 @@ import type { ReactNode } from "react";
 /** A create-action tile (New note / Template / Daily note / New view) in the
  *  dashed "+ View" style — icon over label so four fit across a phone row.
  *  `children` are the inline SVG shapes for the glyph. */
-export function ActionPill({ onClick, label, children }: { onClick: () => void; label: string; children: ReactNode }) {
+export function ActionPill({ onClick, label, children, testid }: { onClick: () => void; label: string; children: ReactNode; testid?: string }) {
   return (
     <button
       onClick={onClick}
+      data-testid={testid}
       style={{
         flex: 1,
         minWidth: 0,
