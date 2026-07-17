@@ -2481,6 +2481,8 @@
       "conflicts_one": "{{count}} conflict to review",
       "conflicts_other": "{{count}} conflicts to review",
       "error": "Sync error",
+      "errorAuth": "Sync sign-in expired",
+      "errorRateLimited": "Sync throttled — retrying",
       "loading": "Sync status…",
       "notEnrolled": "Not enrolled",
       "off": "Sync off",
