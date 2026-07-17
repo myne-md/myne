@@ -255,7 +255,16 @@ steps:
   # dormant until their fix lands and un-ignores them.
   sync-sim:
     image: rust:1.96.0-slim
-    depends_on: [e2e]
+    # `optional: true`: run AFTER e2e (keeps the heavy steps serial on the
+    # shared host) but REGARDLESS of e2e's result. e2e is chronically flaky on
+    # develop (a plain `depends_on: [e2e]` skips sync-sim whenever e2e is red),
+    # and the sync engine's cross-device correctness is independent of the UI
+    # E2E suite — so gate sync-sim on the SERVER binary + its own tests, never
+    # on e2e passing. Same pattern notify-failure uses to run on upstream
+    # failure.
+    depends_on:
+      - name: e2e
+        optional: true
     environment:
       CI: "true"
       # Forgejo PAT (read:repository on Myne/myne-server) for the private-
