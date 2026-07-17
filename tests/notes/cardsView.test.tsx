@@ -548,26 +548,27 @@ describe("ViewRenderHost dispatch", () => {
     expect(screen.queryByTestId("view.unsupported")).toBeNull();
   });
 
-  it("renders the fallback for a table view, not CardsView", () => {
+  it("renders TableView for a table view, not CardsView", () => {
     const result: ViewResult = {
       groups: [{ key: "", type: "none", rows: [row("n1", "Alpha")] }],
     };
     render(
       <ViewRenderHost def={cardsDef({ view_type: "table" })} result={result} />,
     );
-    expect(screen.getByTestId("view.unsupported")).toBeTruthy();
+    expect(screen.getByTestId("view.table")).toBeTruthy();
     expect(screen.queryByTestId("view.cards")).toBeNull();
     expect(screen.queryByTestId("view.card")).toBeNull();
   });
 
-  it("renders the fallback for a list view, not CardsView", () => {
+  it("renders ListView for a list view, not CardsView", () => {
+    const result: ViewResult = {
+      groups: [{ key: "", type: "none", rows: [row("n1", "Alpha")] }],
+    };
     render(
-      <ViewRenderHost
-        def={cardsDef({ view_type: "list" })}
-        result={{ groups: [] }}
-      />,
+      <ViewRenderHost def={cardsDef({ view_type: "list" })} result={result} />,
     );
-    expect(screen.getByTestId("view.unsupported")).toBeTruthy();
+    expect(screen.getByTestId("view.list")).toBeTruthy();
+    expect(screen.queryByTestId("view.cards")).toBeNull();
   });
 });
 

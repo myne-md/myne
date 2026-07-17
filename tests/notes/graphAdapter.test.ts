@@ -189,20 +189,23 @@ describe("isolatedModel (orphans-only)", () => {
   });
 });
 
-describe("loadWholeVaultGraph (route-by-count, SYNC-11)", () => {
-  it("returns null and does NOT dump when the vault is over the cap", async () => {
-    const notes = [note("a", "A"), note("b", "B"), note("c", "C")];
-    const result = await loadWholeVaultGraph(notes, 2);
-    expect(result).toBeNull();
-    expect(invokeMock).not.toHaveBeenCalled(); // no all_edges dump at scale
-  });
-
-  it("dumps + builds at or below the cap", async () => {
+describe("loadWholeVaultGraph (whole vault, no cap)", () => {
+  it("dumps + builds the whole vault", async () => {
     invokeMock.mockResolvedValueOnce([["a", [edge("B")]]]);
     const notes = [note("a", "A"), note("b", "B")];
-    const result = await loadWholeVaultGraph(notes, 10);
+    const result = await loadWholeVaultGraph(notes);
     expect(invokeMock).toHaveBeenCalledTimes(1);
-    expect(result?.edges).toEqual([{ source: "a", target: "b", weight: 1 }]);
+    expect(result.edges).toEqual([{ source: "a", target: "b", weight: 1 }]);
+  });
+
+  it("still dumps for a large vault — the node cap is gone", async () => {
+    // Previously a > 1500-note vault returned null without dumping; now the
+    // whole vault always dumps + builds (scale handled by the worker + culling).
+    invokeMock.mockResolvedValueOnce([]);
+    const notes = Array.from({ length: 2000 }, (_, i) => note(`n${i}`, `N${i}`));
+    const result = await loadWholeVaultGraph(notes);
+    expect(invokeMock).toHaveBeenCalledTimes(1); // dumped, not short-circuited
+    expect(result.nodes.length).toBe(2000);
   });
 });
 

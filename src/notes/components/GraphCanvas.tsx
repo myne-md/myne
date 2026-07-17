@@ -1,31 +1,38 @@
-// The d3-force graph renderer (knowledge-graph-ux #4 / MYND-198, task 2). The
-// lazy-loaded chunk that carries d3-force (kept out of the initial bundle).
-// PARAMETERIZED by `model` (SYNC-16) so local-graph (#5) reuses it with a
-// BFS-bounded subgraph. Hand-rolled canvas: d3-force computes node POSITIONS
-// only; render + pan/zoom/hit-test/drag are ours (the dep is scoped to the
-// genuinely-hard n-body math — dependency-policy.md Q1).
+// The graph renderer (knowledge-graph-ux #4 / MYND-198, task 2). The
+// lazy-loaded chunk (kept out of the initial bundle). PARAMETERIZED by `model`
+// (SYNC-16) so local-graph (#5) reuses it with a BFS-bounded subgraph.
+// Hand-rolled canvas: layout computes node POSITIONS only; render + pan/zoom/
+// hit-test/drag are ours (the dep is scoped to the genuinely-hard n-body math —
+// dependency-policy.md Q1).
 //
 // Scale posture (SYNC-12): the force sim runs a BOUNDED tick loop then FREEZES
-// (no perpetual rAF loop — d3-force's default would peg a CPU core, unacceptable
-// for a calm privacy-notes app). Directed edges (arrowheads) preserve
-// who-links-whom. Navigation-only: click opens; node-drag is view-state, never
-// persisted.
+// (no perpetual rAF loop). As of Phase A it runs OFF the main thread in a Web
+// Worker (`graphLayout.worker.ts`) — the WebView never blocks on layout — and
+// positions WARM-START from `graphLayoutStore` so a re-layout gently settles
+// instead of re-scattering from `Math.random()` (the "flashbang" cause).
+// Directed edges (arrowheads) preserve who-links-whom. Navigation-only: click
+// opens; node-drag is persisted to the layout store (Phase A) so a manual
+// arrangement survives filter switches / tab open-close.
 
-import {
-  forceCenter,
-  forceLink,
-  forceManyBody,
-  forceSimulation,
-  type Simulation,
-} from "d3-force";
 import { useEffect, useRef } from "react";
 import type { GraphEdge, GraphModel, GraphNode } from "../graphAdapter";
+import {
+  getGraphPosition,
+  seedInitialPosition,
+  seedPositions,
+  setGraphPositions,
+} from "../graphLayoutStore";
+import type {
+  LayoutRequest,
+  LayoutResponse,
+} from "../graphLayoutProtocol";
+import { isEdgeVisible, isNodeVisible, visibleBounds } from "../graphCulling";
+import { scheduleGraphLayoutFlush } from "../graphLayoutPersist";
 
 type SimNode = GraphNode & { x: number; y: number };
 type SimLink = { source: SimNode; target: SimNode; weight: number };
 
 const NODE_RADIUS = 5;
-const TICKS = 240; // bounded → freeze; enough for a low-thousands layout to settle
 
 export default function GraphCanvas({
   model,
@@ -46,6 +53,11 @@ export default function GraphCanvas({
   const viewRef = useRef({ x: 0, y: 0, k: 1 });
   const nodesRef = useRef<SimNode[]>([]);
   const linksRef = useRef<SimLink[]>([]);
+  // The click callbacks in a ref so the layout/render effect does NOT re-run
+  // (and re-scatter the graph) every time the parent re-renders and hands down
+  // fresh callback identities — the effect keys on `model` ALONE.
+  const cbRef = useRef({ onNodeClick, onNodeDoubleClick });
+  cbRef.current = { onNodeClick, onNodeDoubleClick };
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -64,22 +76,35 @@ export default function GraphCanvas({
     const colArrow = token("--fg-3", "#888");
     const colLabel = token("--fg-3", "#bdbdbd");
 
-    // Size the backing store to the element (DPR-aware).
+    // Coarse-pointer (touch / mobile) → tighter LOD thresholds (less to draw).
+    const coarse =
+      window.matchMedia?.("(pointer: coarse)")?.matches === true;
+
+    // Size the backing store to the element (DPR-aware) and cache the CSS box
+    // (culling reads it every frame — never call getBoundingClientRect in the
+    // render loop; that forces a layout reflow).
     const dpr = window.devicePixelRatio || 1;
+    let cssW = 0;
+    let cssH = 0;
     const resize = () => {
-      const rect = canvas.getBoundingClientRect();
-      canvas.width = Math.max(1, Math.floor(rect.width * dpr));
-      canvas.height = Math.max(1, Math.floor(rect.height * dpr));
+      const r = canvas.getBoundingClientRect();
+      cssW = r.width;
+      cssH = r.height;
+      canvas.width = Math.max(1, Math.floor(r.width * dpr));
+      canvas.height = Math.max(1, Math.floor(r.height * dpr));
     };
     resize();
 
-    // d3-force node/link objects (it mutates x/y). Center the layout.
-    const rect = canvas.getBoundingClientRect();
-    const nodes: SimNode[] = model.nodes.map((n) => ({
-      ...n,
-      x: rect.width / 2 + (Math.random() - 0.5) * rect.width,
-      y: rect.height / 2 + (Math.random() - 0.5) * rect.height,
-    }));
+    // Node objects for render/hit-test. WARM-START from the layout store: a
+    // node keeps its last position (continuity, no re-scatter); a brand-new
+    // node seeds at center + jitter until the worker settles it. Uses the
+    // cached CSS box (no second getBoundingClientRect).
+    const cx = cssW / 2;
+    const cy = cssH / 2;
+    const nodes: SimNode[] = model.nodes.map((n) => {
+      const p = seedInitialPosition(getGraphPosition(n.id), cx, cy, cssW, cssH);
+      return { ...n, x: p.x, y: p.y };
+    });
     const byId = new Map(nodes.map((n) => [n.id, n]));
     const links: SimLink[] = model.edges
       .map((e: GraphEdge) => {
@@ -93,20 +118,45 @@ export default function GraphCanvas({
     nodesRef.current = nodes;
     linksRef.current = links;
 
-    // Run a BOUNDED simulation then STOP (static layout, no animation loop).
-    const sim: Simulation<SimNode, undefined> = forceSimulation(nodes)
-      .force("charge", forceManyBody().strength(-120))
-      // links already carry resolved node objects (not ids), so forceLink uses
-      // them directly — no `.id()` accessor needed.
-      .force("link", forceLink<SimNode, SimLink>(links).distance(60))
-      .force("center", forceCenter(rect.width / 2, rect.height / 2))
-      .stop();
-    sim.tick(TICKS);
-    sim.stop();
-
+    // Render immediately at warm-start positions (never a blank frame), then
+    // compute the settled layout OFF the main thread. The worker cannot call
+    // Tauri IPC, so it only receives this already-resolved model + seed.
     let raf = 0;
+    const worker = new Worker(
+      new URL("../graphLayout.worker.ts", import.meta.url),
+      { type: "module" },
+    );
+    worker.onmessage = (e: MessageEvent<LayoutResponse>) => {
+      const pos = new Map(e.data.positions.map((p) => [p.id, p]));
+      for (const n of nodesRef.current) {
+        const p = pos.get(n.id);
+        if (p !== undefined) {
+          n.x = p.x;
+          n.y = p.y;
+        }
+      }
+      setGraphPositions(e.data.positions); // persist for warm-start next open
+      scheduleGraphLayoutFlush(); // debounced flush to the encrypted vault.graph
+      schedule();
+    };
+    const nodeIds = model.nodes.map((n) => n.id);
+    worker.postMessage({
+      nodes: nodeIds.map((id) => ({ id })),
+      edges: model.edges,
+      seed: seedPositions(nodeIds),
+      width: cssW,
+      height: cssH,
+    } satisfies LayoutRequest);
+
+    // Cull bookkeeping reused across frames (reset per render, never
+    // re-allocated) and filled ONLY when its LOD consumer is active — so an
+    // overview pan (arrows + labels off) does zero per-frame array work.
+    const visibleLinks: SimLink[] = [];
+    const visibleNodes: SimNode[] = [];
     const render = () => {
       raf = 0;
+      visibleLinks.length = 0;
+      visibleNodes.length = 0;
       const v = viewRef.current;
       ctx.save();
       ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -114,45 +164,69 @@ export default function GraphCanvas({
       ctx.translate(v.x, v.y);
       ctx.scale(v.k, v.k);
 
-      // Edges (directed: a short arrowhead near the target).
+      // Cull to the visible graph box (margin = a few radii so partly-visible
+      // nodes/labels aren't clipped). At high zoom this drops most of a large
+      // graph; at overview everything is visible and batching carries the load.
+      const bounds = visibleBounds(v, cssW, cssH, NODE_RADIUS * 4);
+      // Level-of-detail thresholds — tighter on coarse pointers (mobile).
+      const showLabels = v.k >= (coarse ? 2.2 : 1.4);
+      const showArrows = v.k >= (coarse ? 1.2 : 0.6);
+
+      // --- Edges: ONE batched stroke path for every visible line (was a
+      // beginPath+stroke PER edge — the dominant Canvas cost at scale). Collect
+      // the drawn edges for the arrowhead pass ONLY when arrows are shown. ---
       ctx.lineWidth = 1 / v.k;
       ctx.strokeStyle = colEdge;
-      ctx.fillStyle = colArrow;
+      ctx.beginPath();
       for (const l of linksRef.current) {
-        ctx.beginPath();
+        if (!isEdgeVisible(l.source, l.target, bounds)) continue;
+        if (showArrows) visibleLinks.push(l);
         ctx.moveTo(l.source.x, l.source.y);
         ctx.lineTo(l.target.x, l.target.y);
-        ctx.stroke();
-        // Arrowhead: a small triangle just before the target node.
-        const dx = l.target.x - l.source.x;
-        const dy = l.target.y - l.source.y;
-        const len = Math.hypot(dx, dy) || 1;
-        const ux = dx / len;
-        const uy = dy / len;
-        const tipX = l.target.x - ux * (NODE_RADIUS + 1);
-        const tipY = l.target.y - uy * (NODE_RADIUS + 1);
+      }
+      ctx.stroke();
+
+      // --- Arrowheads: ONE batched fill path (LOD: only when zoomed enough —
+      // sub-pixel at overview). Directed edges keep who-links-whom. ---
+      if (showArrows) {
         const ah = 4 / v.k;
+        ctx.fillStyle = colArrow;
         ctx.beginPath();
-        ctx.moveTo(tipX, tipY);
-        ctx.lineTo(tipX - ux * ah - uy * ah * 0.6, tipY - uy * ah + ux * ah * 0.6);
-        ctx.lineTo(tipX - ux * ah + uy * ah * 0.6, tipY - uy * ah - ux * ah * 0.6);
-        ctx.closePath();
+        for (const l of visibleLinks) {
+          const dx = l.target.x - l.source.x;
+          const dy = l.target.y - l.source.y;
+          const len = Math.hypot(dx, dy) || 1;
+          const ux = dx / len;
+          const uy = dy / len;
+          const tipX = l.target.x - ux * (NODE_RADIUS + 1);
+          const tipY = l.target.y - uy * (NODE_RADIUS + 1);
+          ctx.moveTo(tipX, tipY);
+          ctx.lineTo(tipX - ux * ah - uy * ah * 0.6, tipY - uy * ah + ux * ah * 0.6);
+          ctx.lineTo(tipX - ux * ah + uy * ah * 0.6, tipY - uy * ah - ux * ah * 0.6);
+          ctx.closePath();
+        }
         ctx.fill();
       }
 
-      // Nodes.
+      // --- Nodes: ONE batched fill path for every visible disc. `moveTo` to
+      // each arc's start first so consecutive circles aren't joined by a line.
+      // Collect the drawn nodes for the label pass ONLY when labels are shown. ---
+      ctx.fillStyle = colNode;
+      ctx.beginPath();
       for (const n of nodesRef.current) {
-        ctx.beginPath();
+        if (!isNodeVisible(n, bounds)) continue;
+        if (showLabels) visibleNodes.push(n);
+        ctx.moveTo(n.x + NODE_RADIUS, n.y);
         ctx.arc(n.x, n.y, NODE_RADIUS, 0, Math.PI * 2);
-        ctx.fillStyle = colNode;
-        ctx.fill();
       }
+      ctx.fill();
 
-      // Labels only when zoomed in (level-of-detail, calm at overview).
-      if (v.k >= 1.4) {
+      // --- Labels: only when zoomed in (calm at overview) and only for the
+      // visible nodes. ---
+      if (showLabels) {
         ctx.fillStyle = colLabel;
         ctx.font = `${11 / v.k}px sans-serif`;
-        for (const n of nodesRef.current) {
+        for (const n of visibleNodes) {
           if (n.title) ctx.fillText(n.title, n.x + NODE_RADIUS + 2, n.y + 3);
         }
       }
@@ -215,7 +289,6 @@ export default function GraphCanvas({
         viewRef.current.x += dx;
         viewRef.current.y += dy;
       } else if (mode === "drag" && dragNode) {
-        // Node drag is view-state only — never persisted.
         dragNode.x += dx / viewRef.current.k;
         dragNode.y += dy / viewRef.current.k;
       }
@@ -224,16 +297,23 @@ export default function GraphCanvas({
     const onPointerUp = (e: PointerEvent) => {
       if (mode === "drag" && dragNode && !moved) {
         const id = dragNode.id;
-        if (onNodeDoubleClick) {
+        if (cbRef.current.onNodeDoubleClick) {
           // Defer: a dblclick within the window cancels this (pivot vs navigate).
           cancelPendingClick();
           clickTimer = setTimeout(() => {
             clickTimer = null;
-            onNodeClick(id);
+            cbRef.current.onNodeClick(id);
           }, 250);
         } else {
-          onNodeClick(id); // whole graph: single click navigates, fire at once
+          cbRef.current.onNodeClick(id); // whole graph: single click navigates
         }
+      } else if (mode === "drag" && dragNode && moved) {
+        // A real node drag — persist the new arrangement so it survives a
+        // filter switch / reopen (warm-start), instead of being discarded.
+        setGraphPositions(
+          nodesRef.current.map((n) => ({ id: n.id, x: n.x, y: n.y })),
+        );
+        scheduleGraphLayoutFlush(); // debounced flush to disk (survives restart)
       }
       mode = "none";
       dragNode = null;
@@ -241,10 +321,10 @@ export default function GraphCanvas({
     };
     const onDblClick = (e: MouseEvent) => {
       cancelPendingClick(); // a double-click is navigate, never the pivot
-      if (!onNodeDoubleClick) return;
+      if (!cbRef.current.onNodeDoubleClick) return;
       const g = toGraph(e.clientX, e.clientY);
       const n = hitNode(g.x, g.y);
-      if (n) onNodeDoubleClick(n.id);
+      if (n) cbRef.current.onNodeDoubleClick(n.id);
     };
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
@@ -263,7 +343,7 @@ export default function GraphCanvas({
 
     const onResize = () => {
       resize();
-      schedule();
+      schedule(); // re-render at current positions — never re-layout on resize.
     };
 
     canvas.addEventListener("pointerdown", onPointerDown);
@@ -274,7 +354,7 @@ export default function GraphCanvas({
     window.addEventListener("resize", onResize);
 
     return () => {
-      sim.stop();
+      worker.terminate();
       if (raf !== 0) cancelAnimationFrame(raf);
       cancelPendingClick();
       canvas.removeEventListener("pointerdown", onPointerDown);
@@ -286,7 +366,7 @@ export default function GraphCanvas({
       // per effect re-run (every model/filter change).
       window.removeEventListener("resize", onResize);
     };
-  }, [model, onNodeClick, onNodeDoubleClick]);
+  }, [model]);
 
   return (
     <canvas

@@ -79,7 +79,7 @@ pub enum MemberFamily {
     /// `vault.dictionary` (§9.13) — personal dictionary, authoritative user
     /// data and a Class-1 sync member, so `sync ⊆ backup` requires it here.
     VaultDictionary,
-    /// `vault.themes` (§9.20) — custom-theme palettes (`MYT1`), authoritative
+    /// `vault.themes` (§9.21) — custom-theme palettes (`MYT1`), authoritative
     /// user data and a Class-1 sync member, so `sync ⊆ backup` requires it here
     /// (MYND-486).
     VaultThemes,
@@ -118,7 +118,7 @@ fn family_member_cap(family: MemberFamily) -> u64 {
                 + protocol::dictionary_blob::DICTIONARY_BLOB_HEADER_LEN
                 + 32) as u64
         }
-        // §9.20.4: 4 MiB plaintext cap + 34-byte header + 32-byte CTX tag
+        // §9.21.4: 4 MiB plaintext cap + 34-byte header + 32-byte CTX tag
         // (a strict consumer rejects an over-sized themes member, so the
         // export must too — mirrors the VaultDictionary bound above).
         MemberFamily::VaultThemes => {

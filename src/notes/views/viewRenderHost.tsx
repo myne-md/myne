@@ -1,15 +1,14 @@
-// `ViewRenderHost` — the single viewType-dispatch branch for the saved-view
-// renderer (MYND-275, Saved Views #5, task 2). It maps `def.view_type` to a
-// concrete renderer:
+// `ViewRenderHost` — the single `view_type`-dispatch branch for the saved-view
+// renderer (Saved Views #5). It maps `def.view_type` to a concrete renderer:
 //
-//   "cards"          → <CardsView/>  (this task)
-//   "table" / "list" → a calm "arrives in a later update" fallback
+//   "cards" → <CardsView/>   (MYND-275)
+//   "table" → <TableView/>   (MYND-277)
+//   "list"  → <ListView/>    (MYND-278)
 //
-// The table renderer (MYND-277) and the list renderer (MYND-278) slot in
-// beside CardsView here — one dispatch site, never crash on an unhandled type.
+// One dispatch site; all three view types render. Every renderer consumes the
+// same query-engine `ViewResult` + the same navigation handlers (`onOpenNote`,
+// `onCardContextMenu`); only cards uses `onSetCover` (table/list have no cover).
 
-import type { CSSProperties } from "react";
-import { useTranslation } from "react-i18next";
 import type { SavedView } from "../../lib/prefs";
 import type { ViewResult } from "../queryEngine";
 import {
@@ -18,16 +17,8 @@ import {
   type OpenNoteHandler,
   type SetCoverHandler,
 } from "./cardsView";
-
-const FALLBACK_STYLE: CSSProperties = {
-  margin: "12vh auto 0",
-  maxWidth: 420,
-  textAlign: "center",
-  fontFamily: "var(--font-sans)",
-  fontSize: 13,
-  color: "var(--fg-3)",
-  lineHeight: 1.6,
-};
+import { TableView } from "./tableView";
+import { ListView } from "./listView";
 
 export function ViewRenderHost({
   def,
@@ -42,7 +33,6 @@ export function ViewRenderHost({
   onCardContextMenu?: CardContextMenuHandler;
   onSetCover?: SetCoverHandler;
 }) {
-  const { t } = useTranslation();
   switch (def.view_type) {
     case "cards":
       return (
@@ -55,11 +45,22 @@ export function ViewRenderHost({
         />
       );
     case "table":
+      return (
+        <TableView
+          def={def}
+          result={result}
+          onOpenNote={onOpenNote}
+          onContextMenu={onCardContextMenu}
+        />
+      );
     case "list":
       return (
-        <div data-testid="view.unsupported" style={FALLBACK_STYLE}>
-          {t("notes.views.host.unsupported")}
-        </div>
+        <ListView
+          def={def}
+          result={result}
+          onOpenNote={onOpenNote}
+          onContextMenu={onCardContextMenu}
+        />
       );
   }
 }

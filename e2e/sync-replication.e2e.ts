@@ -14,25 +14,29 @@
 import { describe, expect, it } from "vitest";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { type AppSession, harnessSupported } from "./support/session";
+import { harnessSupported } from "./support/session";
+import { startSyncServer, syncServerSupported } from "./support/sync-server";
 import {
-  type EphemeralServer,
-  startSyncServer,
-  syncServerSupported,
-} from "./support/sync-server";
-import { launchDevice, syncConfigSeed, withTwoDevices } from "./support/multi-device";
-import type { Session } from "./support/webdriver";
+  launchDevice,
+  noteBlobCount,
+  setupTwoSyncedDevices,
+  syncConfigSeed,
+  withTwoDevices,
+} from "./support/multi-device";
+import { type Element, type Session, testIdSelector } from "./support/webdriver";
 import { seedVault } from "./support/fixtures";
 import { patchDeletedField, patchFrontmatterField } from "../src/dialect";
 import {
   closeSettings,
   createNote,
   dismissImporterOffer,
+  ipcOk,
   openSettings,
   pageSeatInvoke,
+  typeIntoEditor,
   unlockToEditor,
+  waitForSaved,
 } from "./support/flows";
-import { readdirSync } from "node:fs";
 
 const driver = harnessSupported();
 const server = syncServerSupported();
@@ -47,6 +51,13 @@ if (!ready) {
 }
 
 const describeCanary = ready ? describe : describe.skip;
+
+// Stale-pane scenario constants — single lowercase-alnum tokens ≥24 chars (the
+// plaintext-scan needle-design rule: tokenizer-survivable, in-source scenario
+// constants, not credentials).
+const REMOTE_MARKER = "remoteeditalpha7k2m9qx4w8e5rj0";
+const LOCAL_MARKER = "stalepanebravo3f6h1zn8c2vb5kk9";
+const SPLIT_SIDE_TITLE = "splitsidenote1d4t7yp2mq6xs9zz0";
 
 describeCanary("two-device sync canary (MYND-428)", () => {
   it("boots one server + two isolated devices, each carrying the SYNC-14 endpoint", async () => {
@@ -351,19 +362,113 @@ describeCanary("two-device sync canary (MYND-428)", () => {
       await srv.teardown();
     }
   });
-});
 
-/** Page-seat IPC that unwraps the result (throws on `err`, returns `ok`). */
-async function ipcOk(
-  session: Session,
-  cmd: string,
-  args: Record<string, unknown> = {},
-  timeoutMs = 20_000,
-): Promise<unknown> {
-  const r = await pageSeatInvoke(session, cmd, args, timeoutMs);
-  if (r.err !== undefined) throw new Error(`${cmd} failed: ${JSON.stringify(r.err)}`);
-  return r.ok;
-}
+  it("unfocused split pane reloads on pull and never clobbers the remote edit", async () => {
+    // Vault-count precondition: 1 seeded vault on A, 1 join-bootstrapped on B.
+    // The stale-pane overwrite story: B parks the synced note X in an UNFOCUSED
+    // split pane (X is NOT the selected note), A rewrites X remotely, B pulls.
+    // The unfocused pane must re-read the pulled body — and an edit then typed
+    // INTO that pane must build on the pulled body, so B's push never turns the
+    // stale buffer into a clean linear advance that silently erases A's edit
+    // (pre-fix: only the SELECTED pane reloaded on pull).
+    const srv = await startSyncServer();
+    try {
+      const { a, b, noteId, teardown } = await setupTwoSyncedDevices(srv);
+      try {
+        // B: create a local side note, put X in the focused pane, then split
+        // the side note out via the row context menu (the workspace-state
+        // suite's driver-addressable split gesture). The side pane takes focus
+        // AND selection, leaving X's pane unfocused (X ≠ selectedId).
+        await createNote(b.session, SPLIT_SIDE_TITLE);
+        await (await noteRow(b.session, noteId)).click();
+        const sideId = await otherNoteRowId(b.session, noteId);
+        await rowMenuPick(b.session, sideId, "open-to-side");
+        const xPaneId = await unfocusedPaneIdShowing(b.session, noteId);
+
+        // A: rewrite X with the remote marker and push (deterministic
+        // note_update — the keep-both pattern, no flaky remote typing).
+        await ipcOk(a.session, "plugin:notes|note_update", {
+          noteId,
+          plaintext: `${REMOTE_MARKER}\n`,
+        });
+        const aDisk = (await ipcOk(a.session, "plugin:notes|note_read", {
+          noteId,
+        })) as string;
+        expect(aDisk.includes(REMOTE_MARKER), "A's update landed on A's own disk").toBe(true);
+        // sync_now resolves Ok even for a failed cycle (the status IS the
+        // result) — assert the push cycle actually succeeded.
+        const stA = (await ipcOk(a.session, "plugin:sync|sync_now", {})) as {
+          state?: string;
+        };
+        expect(
+          stA?.state,
+          `A's push cycle after the update (got ${JSON.stringify(stA)})`,
+        ).toBe("idle");
+
+        // B: pull until A's edit is on DISK (the engine leg), then until the
+        // UNFOCUSED pane's live document shows it (the reload half of the fix
+        // — pre-fix this pane kept the stale buffer and this poll timed out).
+        // Two-stage on purpose: a disk-stage failure is a sync-engine problem,
+        // a pane-stage failure is the UI reload chain.
+        let onDisk = false;
+        let lastStB: unknown = null;
+        let lastBody = "";
+        for (let i = 0; i < 12 && !onDisk; i++) {
+          lastStB = await ipcOk(b.session, "plugin:sync|sync_now", {});
+          await new Promise((r) => setTimeout(r, 1500));
+          lastBody = (await ipcOk(b.session, "plugin:notes|note_read", {
+            noteId,
+          })) as string;
+          onDisk = lastBody.includes(REMOTE_MARKER);
+        }
+        const bPending = (await ipcOk(
+          b.session,
+          "plugin:sync|sync_pending_conflicts",
+          {},
+        )) as string[];
+        expect(
+          onDisk,
+          `A's edit reached B's disk (engine leg; B last status ${JSON.stringify(lastStB)}; ` +
+            `B pending conflicts ${JSON.stringify(bPending)}; B blob count ${noteBlobCount(b.appDataDir)}; ` +
+            `B X body head ${JSON.stringify(lastBody.slice(0, 80))})`,
+        ).toBe(true);
+        let reloaded = false;
+        for (let i = 0; i < 12 && !reloaded; i++) {
+          reloaded = (await paneText(b.session, xPaneId)).includes(REMOTE_MARKER);
+          if (!reloaded) await new Promise((r) => setTimeout(r, 1000));
+        }
+        expect(reloaded, "the unfocused pane re-read A's pulled edit").toBe(true);
+
+        // B: type a second marker into X's pane through the real editor — the
+        // buffer that pre-fix still held the pre-pull body. X's pane is the
+        // FIRST pane in DOM order, so the shared typing helper (which targets
+        // the first CodeMirror surface, and whose click also moves pane focus
+        // there) lands in it. Autosave, then push.
+        await typeIntoEditor(b.session, `\n${LOCAL_MARKER}\n`);
+        await waitForSaved(b.session);
+        await ipcOk(b.session, "plugin:sync|sync_now", {});
+
+        // A: pull until BOTH markers coexist in X. The pre-fix failure mode
+        // pushed B's stale-based buffer as a clean linear advance (no conflict
+        // staged, nothing to keep-both), erasing A's marker — so both-markers
+        // is the whole point. Generous budget under full-suite cumulative load
+        // (the take-theirs pattern).
+        let both = false;
+        for (let i = 0; i < 24 && !both; i++) {
+          await ipcOk(a.session, "plugin:sync|sync_now", {});
+          await new Promise((r) => setTimeout(r, 2_000));
+          const onA = (await ipcOk(a.session, "plugin:notes|note_read", { noteId })) as string;
+          both = onA.includes(REMOTE_MARKER) && onA.includes(LOCAL_MARKER);
+        }
+        expect(both, "B's follow-up edit preserved A's pulled edit on A").toBe(true);
+      } finally {
+        await teardown();
+      }
+    } finally {
+      await srv.teardown();
+    }
+  });
+});
 
 /** Build a keep-both conflict copy's content (remote body + the managed conflict
  *  frontmatter) — the same composition as `src/notes/conflictCopy.ts`. */
@@ -383,108 +488,72 @@ function clearConflictMarkersRaw(content: string): string {
   return new TextDecoder().decode(cleared);
 }
 
-/** Boot A (seeded vault) + B, enroll A, write+push one note, B joins + is
- *  approved + pulls it — the shared "two synced devices, one replicated note"
- *  precondition. Returns both devices, the synced note id, the shared vault
- *  password (for re-unlock scenarios), and a teardown. */
-async function setupTwoSyncedDevices(srv: EphemeralServer): Promise<{
-  a: AppSession;
-  b: AppSession;
-  noteId: string;
-  password: string;
-  teardown: () => Promise<void>;
-}> {
-  let account = "";
-  let password = "";
-  const a = await launchDevice(0, {
-    seedConfig: syncConfigSeed(srv.url),
-    seed: (appDataDir) => {
-      const v = seedVault(appDataDir, { password: "CanaryPass-9-animals!" });
-      account = v.account;
-      password = v.password;
-    },
-  });
-  try {
-    const b = await launchDevice(1, { seedConfig: syncConfigSeed(srv.url) });
-    try {
-      // A: unlock → enroll (self-approves) → create a note → push.
-      await unlockToEditor(a.session, password);
-      await dismissImporterOffer(a.session);
-      await openSettings(a.session);
-      await (await a.session.byTestId("settings.tab-sync")).click();
-      await (await a.session.byTestId("sync.enroll.account-input")).sendKeys(account);
-      await (await a.session.byTestId("sync.enroll.password-input")).sendKeys(password);
-      await (await a.session.byTestId("sync.enroll.submit")).click();
-      await a.session.byTestId("sync.enroll.approved", { timeoutMs: 30_000 });
-      await closeSettings(a.session);
-      await createNote(a.session, "SyncedNote");
-      await new Promise((r) => setTimeout(r, 1500));
-      await ipcOk(a.session, "plugin:sync|sync_now", {});
-      const ids = (await ipcOk(a.session, "plugin:notes|note_list", {})) as string[];
-      const noteId = ids[0];
+// ── stale-pane scenario helpers (the workspace-state suite's row/split
+//    driving pattern, scoped to what this one story needs) ────────────────
 
-      // B: join (account# + password) → pending (waits on the approval gate).
-      await b.session.byTestId("welcome.root", { timeoutMs: 20_000 });
-      await (await b.session.byTestId("welcome.join-cta")).click();
-      await b.session.byTestId("join.modal");
-      await (await b.session.byTestId("join.server-input")).sendKeys(srv.url);
-      await (await b.session.byTestId("join.account-input")).sendKeys(account);
-      await (await b.session.byTestId("join.password-input")).sendKeys(password);
-      await (await b.session.byTestId("join.submit")).click();
-      await b.session.byTestId("join.pending", { timeoutMs: 30_000 });
-
-      // A: approve B while it is pending.
-      await openSettings(a.session);
-      await (await a.session.byTestId("settings.tab-sync")).click();
-      await (await a.session.byTestId("sync.approve-device", { timeoutMs: 30_000 })).click();
-      await closeSettings(a.session);
-
-      // B: auto-claim + pull → the mandatory SAS verify step → confirm the match →
-      // editor (SYNC-40).
-      await b.session.byTestId("join.verify", { timeoutMs: 30_000 });
-      await (await b.session.byTestId("join.sas-match")).click();
-      await b.session.byTestId("editor.root", { timeoutMs: 30_000 });
-      await dismissImporterOffer(b.session);
-
-      // B: pull until A's note replicates.
-      let replicated = false;
-      for (let i = 0; i < 12 && !replicated; i++) {
-        await ipcOk(b.session, "plugin:sync|sync_now", {});
-        await new Promise((r) => setTimeout(r, 1500));
-        replicated = noteBlobCount(b.appDataDir) >= 1;
-      }
-      if (!replicated) throw new Error("setup: A's note never replicated to B");
-
-      const teardown = async () => {
-        await b.teardown();
-        await a.teardown();
-      };
-      return { a, b, noteId, password, teardown };
-    } catch (e) {
-      await b.teardown();
-      throw e;
-    }
-  } catch (e) {
-    await a.teardown();
-    throw e;
-  }
+/** The sidebar row for `noteId` (`data-note-id` discriminator). */
+async function noteRow(session: Session, noteId: string): Promise<Element> {
+  return session.waitForElement(
+    testIdSelector("notes.row", { "data-note-id": noteId }),
+    { timeoutMs: 20_000 },
+  );
 }
 
-/** Count `.myn` note blobs across every vault under a device's app-data dir. */
-function noteBlobCount(appDataDir: string): number {
-  let count = 0;
-  try {
-    for (const v of readdirSync(join(appDataDir, "vaults"))) {
-      try {
-        for (const f of readdirSync(join(appDataDir, "vaults", v, "notes"))) {
-          if (f.endsWith(".myn")) count++;
-        }
-      } catch {
-        /* this vault has no notes dir yet */
+/** The first sidebar row whose note-id differs from `notId` — the B-local
+ *  side note created just before (two rows total in this scenario). */
+async function otherNoteRowId(session: Session, notId: string): Promise<string> {
+  return session.waitUntil(
+    async () => {
+      const rows = await session.byTestIdAll("notes.row");
+      for (const r of rows) {
+        const id = (await r.attribute("data-note-id")) ?? "";
+        if (id && id !== notId) return id;
       }
-    }
-  } catch {
-    /* no vaults dir */
-  }
-  return count;
+      return null;
+    },
+    { label: "side note row present", timeoutMs: 15_000 },
+  );
+}
+
+/** Right-click a note row and pick a context-menu item by `data-item-id` —
+ *  the driver-addressable split gesture (WebDriver middle/Alt-click never
+ *  reaches WebKit; see workspace-state.e2e.ts). */
+async function rowMenuPick(session: Session, noteId: string, itemId: string): Promise<void> {
+  await (await noteRow(session, noteId)).rightClick();
+  await (
+    await session.waitForElement(
+      testIdSelector("notes.context-menu-item", { "data-item-id": itemId }),
+    )
+  ).click();
+}
+
+/** Poll until `noteId`'s tab sits in an UNFOCUSED pane (`data-focused="false"`)
+ *  and return that pane's `data-pane-id`. */
+async function unfocusedPaneIdShowing(session: Session, noteId: string): Promise<string> {
+  return session.waitUntil(
+    async () => {
+      const panes = await session.byTestIdAll("editor.pane");
+      for (const p of panes) {
+        if ((await p.attribute("data-focused")) !== "false") continue;
+        const paneId = (await p.attribute("data-pane-id")) ?? "";
+        const tabs = await session.findElements(
+          `${testIdSelector("editor.pane", { "data-pane-id": paneId })} ` +
+            testIdSelector("editor.tab", { "data-tab-id": `note:${noteId}` }),
+        );
+        if (tabs.length > 0) return paneId;
+      }
+      return null;
+    },
+    { label: "note parked in an unfocused pane", timeoutMs: 15_000 },
+  );
+}
+
+/** ONE pane's live CodeMirror document text, scoped by `data-pane-id` (the
+ *  pane-qualified form of the shared `editorText` readout). */
+async function paneText(session: Session, paneId: string): Promise<string> {
+  const els = await session.findElements(
+    `${testIdSelector("editor.pane", { "data-pane-id": paneId })} ` +
+      '[data-testid="editor.content"] .cm-content',
+  );
+  return els.length > 0 ? els[0].textContent() : "";
 }

@@ -72,6 +72,11 @@ export type VirtualListProps<T> = {
    *  stale cached height until scrolled back into view, so the cumulative
    *  offsets jump mid-scroll (visible render glitches). */
   heightResetToken?: unknown;
+  /** Horizontal overflow of the scroll container. Default `"hidden"` (the
+   *  sidebar + cards render byte-unchanged). The saved-view TABLE passes
+   *  `"auto"` so a wide column set scrolls horizontally with its Name column
+   *  pinned (`position:sticky; left:0`) to this scroll container. */
+  overflowX?: "hidden" | "auto";
 };
 
 const DEFAULT_ESTIMATED_HEIGHT = 52;
@@ -85,6 +90,7 @@ export function VirtualList<T>(props: VirtualListProps<T>): ReactNode {
     estimatedRowHeight = DEFAULT_ESTIMATED_HEIGHT,
     buffer = DEFAULT_BUFFER,
     heightResetToken,
+    overflowX = "hidden",
   } = props;
 
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -264,7 +270,7 @@ export function VirtualList<T>(props: VirtualListProps<T>): ReactNode {
   const containerStyle: CSSProperties = {
     height: "100%",
     overflowY: "auto",
-    overflowX: "hidden",
+    overflowX,
     position: "relative",
   };
 

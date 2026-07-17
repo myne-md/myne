@@ -23,14 +23,10 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 import type { SavedView } from "../../lib/prefs";
-import type { StoredProperty, ViewResult, ViewRow } from "../queryEngine";
-import {
-  attachmentUrl,
-  extractAttachmentRefs,
-  isAttachmentId,
-  parseAttachmentTarget,
-} from "../attachmentRef";
+import type { ViewResult, ViewRow } from "../queryEngine";
+import { attachmentUrl } from "../attachmentRef";
 import { PropertyValue, hasDisplayableValue } from "./propertyFormat";
+import { dedupeRowsByNote, displayColumns, resolveCoverAttachmentId } from "./viewLayout";
 import { VirtualList } from "../components/VirtualList";
 import { Icon } from "../../components/primitives/Icon";
 
@@ -40,31 +36,10 @@ import { Icon } from "../../components/primitives/Icon";
  *  assertion anchor and matches the English catalog value. */
 export const CARDS_EMPTY_COPY = "No notes match this view";
 
-/**
- * Resolve a card cover to an attachment-id from the frontmatter `image:`
- * property value (task 4, SYNC-11). Accepts the forms a user can write:
- *   - a form-C embed `![[att:<id>|filename]]`  (first ref wins)
- *   - a bare/bracketed attachment target `att:<id>` or `[[att:<id>]]`
- *   - a bare 64-hex attachment-id
- * Returns the id, or `null` when the property is absent / a list / unparseable
- * — the caller then renders an IMAGE-LESS card (no placeholder, no broken-image
- * glyph). The cover is resolved through the EXISTING `attachment://` scheme
- * (`attachmentUrl`); no new decrypt path, no new Tauri command, no body scan.
- */
-export function resolveCoverAttachmentId(
-  prop: StoredProperty | undefined,
-): string | null {
-  if (prop === undefined || prop.type === "list") return null;
-  const raw = (prop.value ?? "").trim();
-  if (raw === "") return null;
-  const embeds = extractAttachmentRefs(raw);
-  if (embeds.length > 0) return embeds[0]!.id;
-  // Strip a surrounding `[[ … ]]` then try an `att:<id>` target.
-  const target = raw.replace(/^!?\[\[/, "").replace(/\]\]$/, "").split("|")[0]!;
-  const fromTarget = parseAttachmentTarget(target);
-  if (fromTarget !== null) return fromTarget;
-  return isAttachmentId(raw) ? raw : null;
-}
+// `resolveCoverAttachmentId` moved to the shared `viewLayout` (the mobile card
+// renderer reuses it verbatim for its cover). Re-exported so existing importers
+// of `./cardsView` (PaneView + the cards tests) stay unchanged.
+export { resolveCoverAttachmentId };
 
 /** Default card column width (px) when the view sets no `card_size`. */
 export const DEFAULT_CARD_WIDTH = 220;
@@ -177,28 +152,10 @@ export function resolveAspectRatio(ratio: string | undefined): string {
   return Number.isFinite(n) && n > 0 ? ratio.trim() : DEFAULT_ASPECT_RATIO;
 }
 
-/**
- * Within-group dedupe by note id (task 3, query-engine fan-out constraint).
- * The engine OWNS which groups a note lands in — a note legitimately fans out
- * across MULTIPLE group sections (a list-valued groupBy), and the render must
- * paint each of those cross-group appearances untouched. The ONLY thing the
- * render guards is the same note appearing twice WITHIN ONE section's row list:
- * those collapse to the first occurrence (also keeping React keys unique inside
- * a group's card grid). It never collapses a note's cross-group appearances and
- * never re-derives grouping — it only paints the engine's grouped output.
- */
-export function dedupeRowsByNote(
-  rows: ReadonlyArray<ViewRow>,
-): ViewRow[] {
-  const seen = new Set<string>();
-  const out: ViewRow[] = [];
-  for (const row of rows) {
-    if (seen.has(row.noteId)) continue;
-    seen.add(row.noteId);
-    out.push(row);
-  }
-  return out;
-}
+// `dedupeRowsByNote` moved to the shared `viewLayout` (the table + list
+// renderers reuse it verbatim). Re-exported so existing importers of
+// `./cardsView` (the cards tests) stay unchanged.
+export { dedupeRowsByNote };
 
 const GROUP_HEADING_STYLE: CSSProperties = {
   display: "flex",
@@ -443,10 +400,7 @@ export function CardsView({
   };
   // Text property rows exclude the cover-image property (`def.image`) — its
   // value is the attachment ref, painted as the cover, never as a text row.
-  const columns = useMemo(
-    () => (def.columns ?? []).filter((c) => c !== def.image),
-    [def.columns, def.image],
-  );
+  const columns = useMemo(() => displayColumns(def), [def]);
   // Per-view sizing from the schema (task 5) — pure consumers, sane fallbacks.
   const cardWidth = resolveCardWidth(def.card_size);
   const aspectRatio = resolveAspectRatio(def.image_aspect_ratio);

@@ -145,6 +145,12 @@ pub enum PullError {
     /// **Rollback rejected** — the head's VV regressed below the baseline
     /// (`Dominance::Rollback`). Never silently accepted (story 5).
     RollbackRejected,
+    /// 404 on `/sync/blob` — the server does not know this id at all.
+    BlobNotFound,
+    /// 410 `blob_reclaimed` on `/sync/blob` — the body was Layer-2 reclaimed
+    /// (horizon-GC); §11.3 makes this fail-closed instead of an empty 200. The
+    /// caller skips the record without any local mutation.
+    BlobReclaimed,
     /// A malformed / unparseable server response.
     BadResponse,
     /// Transport-level failure (below HTTP).
@@ -347,6 +353,11 @@ pub fn download_blob(
                 .map_err(|_| PullError::BadResponse)
         }
         401 => Err(PullError::Unauthenticated),
+        // 404/410 are per-blob outcomes (unknown id / horizon-GC reclaimed body,
+        // §11.3) — first-class so the apply loop can SKIP the record instead of
+        // failing the whole cycle.
+        404 => Err(PullError::BlobNotFound),
+        410 => Err(PullError::BlobReclaimed),
         429 => Err(PullError::RateLimited),
         _ => Err(PullError::BadResponse),
     }
@@ -1005,6 +1016,67 @@ mod tests {
         let page = pull_to_stable(&t, &ROOT, "tok", &baseline, 0, &HashMap::new(), true).unwrap();
         assert_eq!(page.next_cursor, 1);
         assert_eq!(page.changed.len(), 2);
+    }
+
+    // §11.3/F2 wire shape: a page window whose records were ALL reclaimed
+    // returns ZERO metas with an ADVANCING cursor (the server omits reclaimed
+    // records but still walks the cursor across them). The drain must keep
+    // going — stalling here would strand the cursor below the reclaim floor
+    // and 410-loop forever.
+    #[test]
+    fn pull_to_stable_tolerates_empty_page_with_advancing_cursor() {
+        let m = "{\"uuid_hex\":\"03030303030303030303030303030303\",\"version\":1,\"content_nonce_hex\":\"cccccccccccccccccccccccccccccccccccccccccccccccc\",\"size\":1}";
+        let t = FakeTransport::new();
+        t.on(
+            HttpMethod::Get,
+            "/sync/pull?cursor=0",
+            200,
+            pull_body("", 5, None),
+        );
+        t.on(
+            HttpMethod::Get,
+            "/sync/pull?cursor=5",
+            200,
+            pull_body(m, 6, None),
+        );
+        t.on(
+            HttpMethod::Get,
+            "/sync/pull?cursor=6",
+            200,
+            pull_body("", 6, None),
+        );
+        let page = pull_to_stable(&t, &ROOT, "tok", &[], 0, &HashMap::new(), false).unwrap();
+        assert_eq!(page.next_cursor, 6);
+        assert_eq!(
+            page.changed.len(),
+            1,
+            "the live record past the gap still arrives"
+        );
+    }
+
+    #[test]
+    fn download_blob_maps_reclaimed_and_missing() {
+        let t = FakeTransport::new();
+        t.on(
+            HttpMethod::Get,
+            "/sync/blob?id=04040404040404040404040404040404",
+            410,
+            b"{\"error_code\":\"blob_reclaimed\"}".to_vec(),
+        );
+        t.on(
+            HttpMethod::Get,
+            "/sync/blob?id=05050505050505050505050505050505",
+            404,
+            b"{\"error_code\":\"not_found\"}".to_vec(),
+        );
+        assert_eq!(
+            download_blob(&t, "tok", &[0x04; 16]).unwrap_err(),
+            PullError::BlobReclaimed
+        );
+        assert_eq!(
+            download_blob(&t, "tok", &[0x05; 16]).unwrap_err(),
+            PullError::BlobNotFound
+        );
     }
 
     #[test]

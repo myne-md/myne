@@ -174,7 +174,7 @@ const ROLE_STR_AI_EMBEDDINGS_KEY: &[u8] = b"ai-embeddings-key";
 
 /// Registered role string for the v0.1 custom-themes blob KEK
 /// (MYND-486; encrypts the `vault.themes` custom-theme palette store —
-/// `themes_blob.rs`, `MYT1`, `protocol.md` § 9.20 + § 3.4). Load-bearing:
+/// `themes_blob.rs`, `MYT1`, `protocol.md` § 9.21 + § 3.4). Load-bearing:
 /// drift silently changes the KEK. `root_key`-derived (like prefs/search/
 /// dictionary), so it is `itemsKey`-independent and survives a v005 epoch
 /// rotation. DISTINCT from the AAD role string `"custom-themes-blob"`.
@@ -191,6 +191,14 @@ const ROLE_STR_CUSTOM_THEMES_KEY: &[u8] = b"custom-themes-key";
 /// Load-bearing: drift silently splits vault.themes into a second sync
 /// record on every existing account.
 const ROLE_STR_THEMES_SYNC_ID: &[u8] = b"themes-sync-id";
+/// Registered role string for the v0.1 graph-layout blob KEK (encrypts the
+/// `vault.graph` on-device knowledge-graph layout cache — `graph_layout_blob.rs`,
+/// `MYG1`, `protocol.md` § 9.19). Load-bearing: drift silently changes the KEK.
+/// `root_key`-derived (like prefs/search/indices/embeddings), so it is
+/// `itemsKey`-independent and survives a v005 epoch rotation. A rebuildable
+/// cache — never synced, never backed up. DISTINCT from the AAD role string
+/// `"graph-layout-blob"`.
+const ROLE_STR_GRAPH_LAYOUT_KEY: &[u8] = b"graph-layout-key";
 
 /// Identifies which subkey is being derived from `root_key`.
 ///
@@ -303,6 +311,14 @@ pub enum SubkeyRole {
     /// `PrefsSyncId` / `CatalogSyncId` / `AttachmentsIdHmac`); the themes KEK
     /// stays `CustomThemesKey`. Domain-separated from every other role.
     ThemesSyncId,
+    /// KEK for the v0.1 graph-layout blob (`vault.graph`, `MYG1`). Encrypts the
+    /// on-device knowledge-graph layout cache (node positions + a staleness
+    /// marker) under XChaCha20-Poly1305 (CTX commitment outer). `root_key`-derived
+    /// (like prefs/search/indices/embeddings), so it is `itemsKey`-independent and
+    /// survives a v005 epoch rotation. A rebuildable cache — never synced, never
+    /// backed up. Distinct from every other blob KEK so the families stay
+    /// domain-separated.
+    GraphLayoutKey,
 }
 
 impl SubkeyRole {
@@ -327,6 +343,7 @@ impl SubkeyRole {
             SubkeyRole::PrefsSyncId => ROLE_STR_PREFS_SYNC_ID,
             SubkeyRole::CustomThemesKey => ROLE_STR_CUSTOM_THEMES_KEY,
             SubkeyRole::ThemesSyncId => ROLE_STR_THEMES_SYNC_ID,
+            SubkeyRole::GraphLayoutKey => ROLE_STR_GRAPH_LAYOUT_KEY,
         }
     }
 }
@@ -619,7 +636,7 @@ mod tests {
 
     #[test]
     fn custom_themes_key_role_string_matches_spec_registry() {
-        // MYND-486 registry entry "myne.v0.1 custom-themes-key" (§ 9.20).
+        // MYND-486 registry entry "myne.v0.1 custom-themes-key" (§ 9.21).
         // Frozen + load-bearing: drift silently changes the vault.themes KEK.
         assert_eq!(SubkeyRole::CustomThemesKey.role_str(), b"custom-themes-key");
     }
@@ -639,6 +656,30 @@ mod tests {
         assert_ne!(*ct, *derive_subkey(&root, SubkeyRole::SessionStateKey));
         assert_ne!(*ct, *derive_subkey(&root, SubkeyRole::VaultIndicesKey));
         assert_ne!(*ct, *derive_subkey(&root, SubkeyRole::ItemsKeyWrap));
+        assert_ne!(*ct, *derive_subkey(&root, SubkeyRole::GraphLayoutKey));
+    }
+
+    #[test]
+    fn graph_layout_key_role_string_matches_spec_registry() {
+        // Registry entry "myne.v0.1 graph-layout-key" (§3.4; §9.19). KEK for
+        // the vault.graph layout cache; drift silently changes the KEK.
+        assert_eq!(SubkeyRole::GraphLayoutKey.role_str(), b"graph-layout-key");
+    }
+
+    #[test]
+    fn graph_layout_key_is_distinct_from_other_root_key_blobs() {
+        // vault.graph (layout cache) is its own blob family — its KEK must be
+        // domain-separated from its structural siblings, most importantly the
+        // other rebuildable caches (search / indices / embeddings) whose blobs
+        // sit next to it, so a blob of one kind can never AEAD-verify as another.
+        let root = [0u8; 32];
+        let gl = derive_subkey(&root, SubkeyRole::GraphLayoutKey);
+        assert_ne!(*gl, *derive_subkey(&root, SubkeyRole::SearchIndexKey));
+        assert_ne!(*gl, *derive_subkey(&root, SubkeyRole::VaultIndicesKey));
+        assert_ne!(*gl, *derive_subkey(&root, SubkeyRole::AiEmbeddingsKey));
+        assert_ne!(*gl, *derive_subkey(&root, SubkeyRole::SessionStateKey));
+        assert_ne!(*gl, *derive_subkey(&root, SubkeyRole::PrefsKey));
+        assert_ne!(*gl, *derive_subkey(&root, SubkeyRole::CustomThemesKey));
     }
 
     #[test]
@@ -825,6 +866,7 @@ mod tests {
                 SubkeyRole::PrefsSyncId => "prefs-sync-id",
                 SubkeyRole::CustomThemesKey => "custom-themes-key",
                 SubkeyRole::ThemesSyncId => "themes-sync-id",
+                SubkeyRole::GraphLayoutKey => "graph-layout-key",
             }
         }
 
@@ -835,7 +877,7 @@ mod tests {
         let gamma = pseudorandom_root(b"myne-test-vectors-seed-v0.1.gamma");
 
         type Case<'a> = (&'a str, &'a str, &'a [u8; 32], SubkeyRole, bool);
-        let cases: [Case<'_>; 30] = [
+        let cases: [Case<'_>; 32] = [
             (
                 "zero-root-items-key-wrap",
                 "All-zero root_key with the ItemsKeyWrap role. Promotes the in-crate golden at protocol/src/subkey.rs:222 — same input, same expected bytes; drift in either the unit test or this integration assertion indicates HKDF prefix or role-string corruption.",
@@ -1046,6 +1088,20 @@ mod tests {
                 SubkeyRole::PrefsSyncId,
                 true,
             ),
+            (
+                "zero-root-graph-layout-key",
+                "All-zero root_key with the GraphLayoutKey role (§3.4; §9.19). KEK for the vault.graph knowledge-graph layout cache (MYG1); role string 'graph-layout-key' (16 ASCII bytes). root_key-derived (like prefs/search/indices/embeddings), a rebuildable cache — never synced, never backed up. Pairs with the other zero-root vectors under the same trivial root — catches a role-confusion bug that would collapse the graph-layout lineage onto another role's info string.",
+                &zero_root,
+                SubkeyRole::GraphLayoutKey,
+                false,
+            ),
+            (
+                "prn-alpha-graph-layout-key",
+                "Pseudorandom alpha root with the GraphLayoutKey role. The informational_info_utf8_hex field carries the canonical 26-byte HKDF info bytes ('myne.v0.1 graph-layout-key') so independent implementers can verify the thirteenth registered role's info assembly without re-parsing the spec. NOTE: the HKDF role string 'graph-layout-key' is DISTINCT from the AAD role string 'graph-layout-blob' (aad_graph_layout_blob), AND distinct from its rebuildable-cache siblings search-index-key / vault-indices-key / ai-embeddings-key — vault.graph (layout), vault.search (BM25), vault.indices (metadata), vault.embeddings (AI vectors) are separate blob families, one KEK each.",
+                &alpha,
+                SubkeyRole::GraphLayoutKey,
+                true,
+            ),
         ];
 
         let mut dump = alloc::string::String::new();
@@ -1053,7 +1109,7 @@ mod tests {
         dump.push_str("  \"schema\": \"hkdf-sha256\",\n");
         dump.push_str("  \"protocol_version\": \"v0.1\",\n");
         dump.push_str("  \"spec_section\": \"protocol.md §3.2 + §3.4\",\n");
-        dump.push_str("  \"description\": \"Pins protocol::derive_subkey byte mapping for cross-implementation conformance. Each case fixes a (root_key, role) input pair under HKDF-SHA-256 with salt=zero_32 and info='myne.v0.1 '||role, and the 32-byte subkey the helper must produce. Role registry mirrors the type-safe Rust SubkeyRole enum (spec §3.4); v0.1 registers itemsKey-wrap + prefs-key + search-index-key + attachments-catalog-key + attachments-id-hmac + session-state-key + personal-dictionary-key + vault-indices-key + attachment-text-key + ai-embeddings-key + catalog-sync-id + prefs-sync-id. Vectors generated by `cargo test -p protocol --lib emit_subkey_vectors_for_paste -- --ignored` (in protocol/src/subkey.rs).\",\n");
+        dump.push_str("  \"description\": \"Pins protocol::derive_subkey byte mapping for cross-implementation conformance. Each case fixes a (root_key, role) input pair under HKDF-SHA-256 with salt=zero_32 and info='myne.v0.1 '||role, and the 32-byte subkey the helper must produce. Role registry mirrors the type-safe Rust SubkeyRole enum (spec §3.4); v0.1 registers itemsKey-wrap + prefs-key + search-index-key + attachments-catalog-key + attachments-id-hmac + session-state-key + personal-dictionary-key + vault-indices-key + attachment-text-key + ai-embeddings-key + catalog-sync-id + prefs-sync-id + graph-layout-key. Vectors generated by `cargo test -p protocol --lib emit_subkey_vectors_for_paste -- --ignored` (in protocol/src/subkey.rs).\",\n");
         dump.push_str("  \"cases\": [\n");
 
         for (i, (slug, desc, root, role, include_info)) in cases.iter().enumerate() {

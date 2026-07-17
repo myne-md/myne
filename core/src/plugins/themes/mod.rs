@@ -20,7 +20,7 @@
 //! wrappers fetch `root_key`/hash from the unlocked `VaultRuntimeState` and
 //! derive the KEK; the `#[tauri::command]` wrappers resolve the active vault dir
 //! and are `Slot::Unlocked`-gated. Any failure on read collapses to the empty
-//! theme store (fall-back-to-empty, § 9.20.4).
+//! theme store (fall-back-to-empty, § 9.21.4).
 //!
 //! Every imported palette is validated through the shared
 //! [`theme_validator::validate_theme`] injection guard (the exact same

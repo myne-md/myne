@@ -4,7 +4,7 @@
 # (or the individual `themes:allow-*` permissions).
 #
 # As of MYND-486 the custom-theme palettes are VAULT CONTENT (the encrypted
-# `vault.themes` `MYT1` blob, protocol.md § 9.20), NOT device-local plaintext.
+# `vault.themes` `MYT1` blob, protocol.md § 9.21), NOT device-local plaintext.
 # Every command is Slot::Unlocked-gated. The mutating commands (import / delete)
 # are write setters, so — like the other write-capable plugins — v0.2
 # multi-window MUST NOT grant `allow-themes-import` or `allow-themes-delete` to
@@ -24,7 +24,7 @@ permissions = [
 
 [[permission]]
 identifier = "allow-themes-list"
-description = "Allow invoking themes:themes_list (Slot::Unlocked-gated read of the sorted custom-theme names in the vault.themes MYT1 blob; falls back to an empty list on absence / AEAD-fail / parse-fail per protocol.md § 9.20.4)."
+description = "Allow invoking themes:themes_list (Slot::Unlocked-gated read of the sorted custom-theme names in the vault.themes MYT1 blob; falls back to an empty list on absence / AEAD-fail / parse-fail per protocol.md § 9.21.4)."
 commands.allow = ["themes_list"]
 
 [[permission]]

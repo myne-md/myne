@@ -43,6 +43,7 @@ coverage/
 /myne-ops/
 /myne-agents/
 /myne-clipper/
+/myne-status/
 
 # Vite dep-optimization cache (regenerated each build).
 .vite/

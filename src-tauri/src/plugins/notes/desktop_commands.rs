@@ -938,7 +938,8 @@ pub async fn note_export_html_attachments<R: Runtime>(
 /// HTML document, in FIRST-appearance order (the deterministic
 /// naming/dedup order, mirroring the markdown export's document-order
 /// span scan). Only 64-char lowercase-hex runs are accepted — the exact
-/// shape the emitter writes (`attachmentUrl(id)`).
+/// shape the export emitter writes (`canonicalAttachmentUrl(id)`; the
+/// platform-aware runtime form never reaches this scan — MYND-519).
 fn html_referenced_attachment_ids(html: &str) -> Vec<String> {
     const PREFIX: &str = "attachment://";
     let mut ids: Vec<String> = Vec::new();

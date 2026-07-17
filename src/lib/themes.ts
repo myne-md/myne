@@ -2,7 +2,7 @@
 // `themes` Tauri plugin (`myne-core::plugins::themes`, surfaced on desktop by
 // `src-tauri/src/plugins/themes/`). As of MYND-486 the palettes are VAULT
 // CONTENT: they live in the encrypted `vault.themes` (`MYT1`) singleton blob
-// (protocol.md § 9.20), not device-local plaintext files. Consumed by the apply
+// (protocol.md § 9.21), not device-local plaintext files. Consumed by the apply
 // path (`App.tsx` via `readCustomTheme`) and the picker UI
 // (`CustomThemesSection.tsx`).
 //
