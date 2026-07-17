@@ -11,9 +11,12 @@
 //!
 //! ## Capability ACL (deny-by-default, SYNC-15)
 //!
-//! `sync:default` bundles all seventeen commands into ONE narrow,
-//! main-window-only grant — the fifteen-command desktop `sync:default` surface
-//! plus the mobile-only lifecycle pair
+//! `sync:default` bundles all twenty-one commands into ONE narrow,
+//! main-window-only grant — the nineteen-command desktop `sync:default` surface
+//! (including the recovered-notes quarantine quartet
+//! `sync_list_quarantine`/`sync_read_quarantine`/`sync_restore_quarantine`/
+//! `sync_delete_quarantine`, registered here for parity even though no mobile
+//! UI surfaces it yet) plus the mobile-only lifecycle pair
 //! (`sync_lifecycle_suspend`/`sync_lifecycle_resume`, which flip an in-RAM
 //! scheduler flag and move no vault bytes; desktop does not register them
 //! because it never manages the `SyncLifecycleSignal`). The device-local
@@ -22,7 +25,7 @@
 //! push/pull/status/device commands are gated on an authenticated session inside
 //! the shared core. The `build.rs` `InlinedPlugin` command list, the
 //! `permissions/sync/default.toml` `commands.allow` entries, and the
-//! `generate_handler!` list below MUST match exactly (all seventeen) — a
+//! `generate_handler!` list below MUST match exactly (all twenty-one) — a
 //! mismatch makes Tauri **fail closed** (the ACL resolver denies the invoke).
 //!
 //! ## R3 transport review-debt (registration ≠ verified crypto)
@@ -50,7 +53,7 @@ use tauri::plugin::{Builder, TauriPlugin};
 use tauri::Runtime;
 
 /// Construct the mobile `sync` plugin — registers the client command surface
-/// over the shared-core command bodies. All seventeen commands, matching the
+/// over the shared-core command bodies. All twenty-one commands, matching the
 /// `build.rs` `InlinedPlugin` + `permissions/sync/default.toml` lists exactly.
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::<R>::new("sync")
@@ -70,6 +73,10 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::sync_join_account,
             commands::sync_reset_local,
             commands::sync_head_fingerprint,
+            commands::sync_list_quarantine,
+            commands::sync_read_quarantine,
+            commands::sync_restore_quarantine,
+            commands::sync_delete_quarantine,
             commands::sync_lifecycle_suspend,
             commands::sync_lifecycle_resume,
         ])

@@ -289,6 +289,20 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
     setPanesRevealed(false);
   }, [editing?.id]);
 
+  // No-op-write guard: the open note's RAW buffer text as of its last
+  // successful read or write, keyed by id so a stale in-flight write can never
+  // stamp another note's baseline. Every save path checks it and skips the
+  // disk write when the buffer is untouched — a rewrite of identical content
+  // would burn a fresh nonce and bump `updated:`, which sync reads as a
+  // phantom edit (conflict bait on every open+background). `updated:` is
+  // stamped at write time, so the baseline deliberately stores the PRE-stamp
+  // buffer and every comparison is raw-vs-raw.
+  const loadedTextRef = useRef<{ id: string; text: string } | null>(null);
+  /** True when the note's buffer is byte-identical to its last read/written
+   *  body — i.e. persisting now would be a pure no-op rewrite. */
+  const editorUnchanged = (id: string) =>
+    loadedTextRef.current?.id === id && loadedTextRef.current.text === editorText;
+
   // Flush the open note to disk when the app is BACKGROUNDED / hidden. Mobile
   // otherwise persists only on an explicit exit (back / swipe-back / switching
   // notes) — but a drawing has no such exit on tablet (you just draw and leave),
@@ -304,12 +318,21 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
   const flushRef = useRef<() => void>(() => {});
   flushRef.current = () => {
     if (!HAS_TAURI || !editing) return;
-    const stamped = stampUpdated(editorText);
     if (editing.id != null) {
-      void noteUpdate(editing.id, stamped).catch(() => {});
+      const id = editing.id;
+      const raw = editorText;
+      // Untouched since load / last write → nothing to persist. Updating the
+      // baseline BEFORE the write resolves also collapses the visibilitychange
+      // + pagehide double-fire into a single write.
+      if (editorUnchanged(id)) return;
+      loadedTextRef.current = { id, text: raw };
+      void noteUpdate(id, stampUpdated(raw)).catch(() => {
+        // Failed write: drop the baseline so a later flush/save retries.
+        if (loadedTextRef.current?.id === id) loadedTextRef.current = null;
+      });
     } else if (editorText.trim() !== "" && !newNoteFlushedRef.current) {
       newNoteFlushedRef.current = true;
-      void noteCreate(stamped).catch(() => {
+      void noteCreate(stampUpdated(editorText)).catch(() => {
         newNoteFlushedRef.current = false;
       });
     }
@@ -985,12 +1008,18 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
   const openNote = useCallback(
     async (id: string) => {
       setEditorError(null);
-      let text = "";
+      let text: string;
       try {
         text = HAS_TAURI ? await noteRead(id) : devStore().get(id) ?? "";
       } catch {
-        setEditorError(t("editor.flow.openFailed"));
+        // A failed read must NOT bind the editor: committing an empty buffer
+        // under the note's id would hand every later flush/save that id with a
+        // blank body — overwriting the real note (silent data loss). Stay on
+        // the list and surface the failure there instead.
+        setListError(t("editor.flow.openFailed"));
+        return;
       }
+      loadedTextRef.current = { id, text };
       setEditorText(text);
       setEditing({ id });
       setView("editor");
@@ -1005,6 +1034,12 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
       exitEditor();
       return;
     }
+    // Untouched existing note → exit without rewriting (a save here would burn
+    // a fresh nonce + bump `updated:` for zero content change).
+    if (editing.id !== null && editorUnchanged(editing.id)) {
+      exitEditor();
+      return;
+    }
     setEditorBusy(true);
     setEditorError(null);
     try {
@@ -1012,10 +1047,10 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
       if (editing.id === null) {
         if (HAS_TAURI) await noteCreate(stamped);
         else devStore().set(crypto.randomUUID(), stamped);
-      } else if (HAS_TAURI) {
-        await noteUpdate(editing.id, stamped);
       } else {
-        devStore().set(editing.id, stamped);
+        if (HAS_TAURI) await noteUpdate(editing.id, stamped);
+        else devStore().set(editing.id, stamped);
+        loadedTextRef.current = { id: editing.id, text: editorText };
       }
       await refresh();
       exitEditor();
@@ -1041,11 +1076,12 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
   /** Open a linked note without losing the current edit: persist the open note
    *  first (existing notes only), then switch to the target. */
   async function openRelated(id: string) {
-    if (editing?.id != null) {
+    if (editing?.id != null && !editorUnchanged(editing.id)) {
       try {
         const stamped = stampUpdated(editorText);
         if (HAS_TAURI) await noteUpdate(editing.id, stamped);
         else devStore().set(editing.id, stamped);
+        loadedTextRef.current = { id: editing.id, text: editorText };
         await refresh();
       } catch {
         // Best-effort save; still navigate so the backlink isn't a dead tap.
@@ -1094,9 +1130,10 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
     if (id == null) return;
     const dest = normalizeFolderPath(moveInput.trim() || null);
     try {
-      if (editing?.id === id) {
+      if (editing?.id === id && !editorUnchanged(id)) {
         if (HAS_TAURI) await noteUpdate(id, editorText);
         else devStore().set(id, editorText);
+        loadedTextRef.current = { id, text: editorText };
       }
       await moveNoteToFolder(id, dest);
       await refresh();
