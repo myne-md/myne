@@ -1,8 +1,10 @@
 // Settings → Appearance → Custom themes subsection (custom-themes epic,
-// MYND-112). Lists user-authored themes from `app_config_dir/themes/`, each with
-// a palette-chiplet preview, Apply / Delete (inline two-step confirm), plus
-// Import and Open-themes-folder actions. Invalid files still list (greyed, with
-// their validation error) rather than vanishing.
+// MYND-112; promoted to vault content by MYND-486). Lists the user's custom
+// themes from the encrypted `vault.themes` (`MYT1`) store, each with a
+// palette-chiplet preview, Apply / Export / Delete (inline two-step confirm),
+// plus an Import action. Every stored theme is valid (import validates through
+// the shared value-shape allowlist before sealing), so there are no greyed
+// invalid rows.
 //
 // Design reference: Penpot "MYNE Design" page "4b - Settings & Vault",
 // frame `section------settings--appearance--custom-themes (MYND-112)`. All
@@ -15,20 +17,24 @@
 import { useEffect, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import { open as openFileDialog } from "@tauri-apps/plugin-dialog";
-import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { Button } from "../primitives/Button";
 import { LABEL_STYLE, HELPER_STYLE, BLOCK_STYLE } from "./panel-styles";
 import {
   listCustomThemes,
   readCustomTheme,
-  deleteCustomTheme,
+  exportCustomTheme,
   importCustomTheme,
-  ensureThemesDir,
-  type ThemeInfo,
+  deleteCustomTheme,
+  readPickedThemeFile,
+  themePreview,
+  type ThemePreview,
   type ThemeError,
+  type ThemesError,
 } from "../../lib/themes";
 import { prefsRead, setCustomTheme } from "../../lib/prefs";
 import { applyCustomTheme, applyTheme } from "../../lib/theme";
+import { saveJsonAsFile } from "../../lib/secret-export";
+import { exportedBasename } from "../../notes/exportFlow";
 import i18n from "../../i18n";
 
 const ERROR_STYLE: CSSProperties = {
@@ -61,11 +67,6 @@ const ROW_ACTIVE_STYLE: CSSProperties = {
   borderColor: "var(--accent)",
 };
 
-const ROW_INVALID_STYLE: CSSProperties = {
-  ...ROW_STYLE,
-  borderStyle: "dashed",
-};
-
 const NAME_STYLE: CSSProperties = {
   fontFamily: "var(--font-sans)",
   fontSize: "var(--text-sm)",
@@ -74,20 +75,11 @@ const NAME_STYLE: CSSProperties = {
   flex: 1,
 };
 
-const NAME_INVALID_STYLE: CSSProperties = { ...NAME_STYLE, color: "var(--line-3)" };
-
 const APPLIED_BADGE_STYLE: CSSProperties = {
   fontFamily: "var(--font-sans)",
   fontSize: "var(--text-xs)",
   color: "var(--accent)",
   fontWeight: "var(--weight-medium)" as CSSProperties["fontWeight"],
-};
-
-const ROW_ERROR_STYLE: CSSProperties = {
-  fontFamily: "var(--font-mono)",
-  fontSize: "var(--text-xs)",
-  color: "var(--danger)",
-  flex: 1,
 };
 
 const ACTIONS_STYLE: CSSProperties = {
@@ -114,19 +106,21 @@ const CHIPLET_STYLE: CSSProperties = {
   flexShrink: 0,
 };
 
-const CHIPLET_PLACEHOLDER_STYLE: CSSProperties = {
-  ...CHIPLET_STYLE,
-  border: "1px dashed var(--line-3)",
-};
-
 const EMPTY_STYLE: CSSProperties = {
   ...HELPER_STYLE,
   marginTop: "var(--space-3)",
   fontStyle: "italic",
 };
 
+/** One custom-theme list row: name + the 5-swatch preview derived from its
+ *  palette. Every stored theme is valid, so there is no invalid-row state. */
+interface ThemeRow {
+  name: string;
+  preview: ThemePreview;
+}
+
 /** Render a 5-swatch palette chiplet from a theme's preview colors. */
-function Chiplet({ preview }: { preview: NonNullable<ThemeInfo["preview"]> }) {
+function Chiplet({ preview }: { preview: ThemePreview }) {
   const swatches = [
     preview.background,
     preview.surface,
@@ -143,9 +137,8 @@ function Chiplet({ preview }: { preview: NonNullable<ThemeInfo["preview"]> }) {
   );
 }
 
-/** Human-readable one-liner for a rich validation error. */
-function describeError(error: ThemeError | null): string {
-  if (!error) return i18n.t("settings.customThemes.error.invalidFile");
+/** Human-readable one-liner for a rich validation error (import failures). */
+function describeError(error: ThemeError): string {
   switch (error.kind) {
     case "MissingKey":
       return i18n
@@ -173,6 +166,24 @@ function describeError(error: ThemeError | null): string {
   }
 }
 
+/** Map a caught `themes_import` failure to a message: a validation failure
+ *  (`Invalid`) points at the offending token; anything else is the generic
+ *  "not a valid theme" copy. */
+function describeImportError(caught: unknown): string {
+  const err = caught as ThemesError | null;
+  if (err && err.kind === "Invalid" && err.detail?.error) {
+    return describeError(err.detail.error);
+  }
+  return i18n.t("settings.customThemes.importError");
+}
+
+/** The imported theme's name: the picked file's base name minus a trailing
+ *  `.json`. `exportedBasename` is the shared separator scanner (POSIX `/` and
+ *  Windows `\`), so this file does not re-roll one. */
+function themeNameFromPath(absolutePath: string): string {
+  return exportedBasename(absolutePath).replace(/\.json$/i, "");
+}
+
 interface CustomThemesSectionProps {
   /** The active custom-theme name (lifted to AppearancePanel so picking a
    *  built-in theme can clear it). `null` ≡ no custom theme active. */
@@ -184,17 +195,25 @@ export function CustomThemesSection({
   activeCustom,
   onActiveCustomChange,
 }: CustomThemesSectionProps) {
-  // Aliased to `translate` because the theme-list `.map((t) => …)` below binds a
-  // loop variable named `t` (a `ThemeInfo`), which would otherwise shadow the
-  // translation function inside the row JSX.
   const { t: translate } = useTranslation();
-  const [themes, setThemes] = useState<ThemeInfo[]>([]);
+  const [rows, setRows] = useState<ThemeRow[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [confirmingDelete, setConfirmingDelete] = useState<string | null>(null);
 
   async function refresh() {
     try {
-      setThemes(await listCustomThemes());
+      // ONE decrypt of `vault.themes` yields every live theme's palette, so the
+      // chiplet previews derive from what the list already returned — no
+      // per-name read-back.
+      const entries = await listCustomThemes();
+      const loaded = entries.map(
+        ({ name, palette }): ThemeRow => ({ name, preview: themePreview(palette) }),
+      );
+      // The host hands these back in `BTreeMap` order — UTF-8 byte order, which
+      // sorts "Şafak" after "Zed". Theme names are user-authored, so the list
+      // collates in the reader's locale, not the store's byte order.
+      loaded.sort((a, b) => a.name.localeCompare(b.name));
+      setRows(loaded);
     } catch {
       setError(translate("settings.customThemes.readError"));
     }
@@ -214,6 +233,21 @@ export function CustomThemesSection({
       onActiveCustomChange(name);
     } catch {
       setError(translate("settings.customThemes.applyError"));
+    }
+  }
+
+  async function exportTheme(name: string) {
+    setError(null);
+    try {
+      const palette = await exportCustomTheme(name);
+      const json = `${JSON.stringify(palette, null, 2)}\n`;
+      await saveJsonAsFile(
+        `${name}.json`,
+        json,
+        translate("settings.customThemes.fileFilterName"),
+      );
+    } catch {
+      setError(translate("settings.customThemes.exportError"));
     }
   }
 
@@ -249,20 +283,13 @@ export function CustomThemesSection({
       ],
     }).catch(() => null);
     if (typeof picked !== "string") return;
+    const name = themeNameFromPath(picked);
     try {
-      await importCustomTheme(picked);
+      const paletteJson = await readPickedThemeFile(picked);
+      await importCustomTheme(name, paletteJson);
       await refresh();
-    } catch {
-      setError(translate("settings.customThemes.importError"));
-    }
-  }
-
-  async function openFolder() {
-    try {
-      const dir = await ensureThemesDir();
-      await revealItemInDir(dir);
-    } catch {
-      setError(translate("settings.customThemes.openFolderError"));
+    } catch (e) {
+      setError(describeImportError(e));
     }
   }
 
@@ -272,75 +299,62 @@ export function CustomThemesSection({
       <p style={HELPER_STYLE}>{translate("settings.customThemes.helper")}</p>
 
       <div style={{ ...BUTTON_ROW_STYLE, marginTop: "var(--space-3)" }}>
-        <Button variant="secondary" onClick={() => void importTheme()} data-testid="settings.custom-theme-import">
+        <Button
+          variant="secondary"
+          onClick={() => void importTheme()}
+          data-testid="settings.custom-theme-import"
+        >
           {translate("settings.customThemes.importButton")}
-        </Button>
-        <Button variant="ghost" onClick={() => void openFolder()} data-testid="settings.custom-theme-open-folder">
-          {translate("settings.customThemes.openFolderButton")}
         </Button>
       </div>
 
-      {themes.length === 0 ? (
+      {rows.length === 0 ? (
         <p style={EMPTY_STYLE} data-testid="settings.custom-theme-empty">
           {translate("settings.customThemes.empty")}
         </p>
       ) : (
         <div style={LIST_STYLE}>
-          {themes.map((t) => {
-            const isActive = t.valid && activeCustom === t.name;
-            const rowStyle = !t.valid
-              ? ROW_INVALID_STYLE
-              : isActive
-                ? ROW_ACTIVE_STYLE
-                : ROW_STYLE;
+          {rows.map((row) => {
+            const isActive = activeCustom === row.name;
             return (
               <div
-                key={t.name}
-                style={rowStyle}
+                key={row.name}
+                style={isActive ? ROW_ACTIVE_STYLE : ROW_STYLE}
                 data-testid="settings.custom-theme-row"
-                data-theme-name={t.name}
+                data-theme-name={row.name}
                 data-active={isActive ? "true" : "false"}
-                data-valid={t.valid ? "true" : "false"}
               >
-                {t.valid && t.preview ? (
-                  <Chiplet preview={t.preview} />
-                ) : (
-                  <span style={CHIPLET_PLACEHOLDER_STYLE} aria-hidden="true" />
-                )}
+                <Chiplet preview={row.preview} />
+                <span style={NAME_STYLE}>{row.name}</span>
 
-                {t.valid ? (
-                  <span style={NAME_STYLE}>{t.display_name}</span>
-                ) : (
-                  <span style={NAME_INVALID_STYLE}>{t.display_name}</span>
-                )}
-
-                {t.valid && isActive && (
+                {isActive && (
                   <span style={APPLIED_BADGE_STYLE}>
                     {translate("settings.customThemes.appliedBadge")}
                   </span>
                 )}
 
-                {!t.valid && (
-                  <span style={ROW_ERROR_STYLE} role="alert">
-                    {describeError(t.error)}
-                  </span>
-                )}
-
                 <div style={ACTIONS_STYLE}>
-                  {t.valid && !isActive && (
+                  {!isActive && (
                     <Button
                       variant="secondary"
-                      onClick={() => void apply(t.name)}
+                      onClick={() => void apply(row.name)}
                       data-testid="settings.custom-theme-apply"
                     >
                       {translate("settings.customThemes.apply")}
                     </Button>
                   )}
-                  {confirmingDelete === t.name ? (
+                  <Button
+                    variant="ghost"
+                    onClick={() => void exportTheme(row.name)}
+                    data-testid="settings.custom-theme-export"
+                  >
+                    {translate("settings.customThemes.export")}
+                  </Button>
+                  {confirmingDelete === row.name ? (
                     <>
                       <Button
                         variant="secondary"
-                        onClick={() => void confirmDelete(t.name)}
+                        onClick={() => void confirmDelete(row.name)}
                         data-testid="settings.custom-theme-delete-confirm"
                       >
                         {translate("settings.customThemes.confirm")}
@@ -356,7 +370,7 @@ export function CustomThemesSection({
                   ) : (
                     <Button
                       variant="ghost"
-                      onClick={() => setConfirmingDelete(t.name)}
+                      onClick={() => setConfirmingDelete(row.name)}
                       data-testid="settings.custom-theme-delete"
                     >
                       {translate("settings.customThemes.delete")}

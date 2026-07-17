@@ -1003,7 +1003,10 @@ mod tests {
     #[test]
     fn into_tombstone_scrubs_descriptive_metadata() {
         // §9.10.2: filename/content_type emptied, size zeroed, updated_at
-        // dropped; created_at retained (required field, unused by merge).
+        // dropped; created_at retained (required field). NOTE: `created_at` IS
+        // used by the merge — both as the resurrection guard's live-side clock
+        // and, since it survives this scrub and can differ across devices, as
+        // part of the tombstone tie-break's total order.
         let mut live = AttachmentMeta::live(
             "application/pdf".to_string(),
             42,

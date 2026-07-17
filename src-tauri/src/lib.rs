@@ -444,6 +444,17 @@ pub fn run() {
             if let Ok(base) = app.path().app_data_dir() {
                 clipper::install::reconcile_from_flag(&base);
             }
+            // MYND-486: the custom-theme palettes moved from device-local
+            // plaintext files (`app_config_dir/themes/<name>.json`) into the
+            // encrypted `vault.themes` (`MYT1`) blob. Pre-alpha means NO
+            // migration (`decisions.md` 2026-07-16) — the old directory is just
+            // stale plaintext, so remove it best-effort. Tolerant of absence
+            // (an `Err` when the dir never existed is the common case) and
+            // deliberately NOT a read+migrate: the decision was to drop, not
+            // carry forward. Never touches vault content (a different tree).
+            if let Ok(config_dir) = app.path().app_config_dir() {
+                let _ = std::fs::remove_dir_all(config_dir.join("themes"));
+            }
             Ok(())
         })
         .build(tauri::generate_context!())
