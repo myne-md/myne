@@ -3,12 +3,15 @@
 # `build.rs` declares this as an `InlinedPlugin`. Capability files reference these
 # as `sync:default` (or `sync:allow-sync-get-endpoint` /
 # `sync:allow-sync-set-endpoint`). Ported from the desktop
-# `src-tauri/permissions/sync/default.toml` — the same 15 desktop commands
+# `src-tauri/permissions/sync/default.toml` — the same 19 desktop commands
 # (MYND-459 T12 added `sync_head_fingerprint`, the SY-05 SAS eye-compare
 # substrate) PLUS the mobile-only lifecycle pair (`sync_lifecycle_suspend` /
 # `sync_lifecycle_resume` — in-RAM scheduler flag flips driven by the WebView's
 # visibilitychange; desktop never manages the signal so it does not register
-# them). 17 commands total.
+# them). 21 commands total (the recovered-notes quarantine quartet —
+# `sync_list_quarantine` / `sync_read_quarantine` / `sync_restore_quarantine` /
+# `sync_delete_quarantine` — is registered for parity even though the mobile UI
+# does not surface it yet).
 #
 # Deny-by-default (SYNC-15): the data-plane commands (push/pull/sync-now/status)
 # each get their own `commands.allow` entry AND remain gated on an authenticated
@@ -37,6 +40,10 @@ permissions = [
     "allow-sync-join-account",
     "allow-sync-reset-local",
     "allow-sync-head-fingerprint",
+    "allow-sync-list-quarantine",
+    "allow-sync-read-quarantine",
+    "allow-sync-restore-quarantine",
+    "allow-sync-delete-quarantine",
     "allow-sync-lifecycle-suspend",
     "allow-sync-lifecycle-resume",
 ]
@@ -115,6 +122,26 @@ commands.allow = ["sync_reset_local"]
 identifier = "allow-sync-head-fingerprint"
 description = "Allow invoking sync:sync_head_fingerprint (return the 8-char Crockford XXXX-XXXX SAS fingerprint of this device's currently adopted vault head, read from the device-local sync-state's latest head observation; None when no head is adopted yet). The out-of-band enroll-time eye-compare substrate (SYNC-17); returns no key material and makes no server call — reveals only the already-server-visible head_id, one-way-hashed to ~40 bits."
 commands.allow = ["sync_head_fingerprint"]
+
+[[permission]]
+identifier = "allow-sync-list-quarantine"
+description = "Allow invoking sync:sync_list_quarantine (list the quarantined note blobs the reconcile drop-leg moved to the device-local quarantine/ dir — file name, suffix-stripped note id, size, device-local mtime). Decrypt-free; no vault-blob access beyond the quarantine dir listing."
+commands.allow = ["sync_list_quarantine"]
+
+[[permission]]
+identifier = "allow-sync-read-quarantine"
+description = "Allow invoking sync:sync_read_quarantine (decrypt ONE quarantined note blob to its plaintext body for the Recovered-notes preview; file name validated against the strict <uuid>[-<n>].myn shape — path traversal rejected). Requires the unlocked vault's items_key."
+commands.allow = ["sync_read_quarantine"]
+
+[[permission]]
+identifier = "allow-sync-restore-quarantine"
+description = "Allow invoking sync:sync_restore_quarantine (restore a quarantined note blob as a NEW note — fresh UUIDv7 via the shared note-create pipeline; the reclaimed original id is never re-pushed — then remove the quarantine source on success). Requires the unlocked vault's items_key."
+commands.allow = ["sync_restore_quarantine"]
+
+[[permission]]
+identifier = "allow-sync-delete-quarantine"
+description = "Allow invoking sync:sync_delete_quarantine (permanently remove ONE quarantined note blob; strict file-name validation, UI confirm-gated — the single path that destroys quarantine evidence). No decrypt, no vault-blob access beyond the quarantine dir."
+commands.allow = ["sync_delete_quarantine"]
 
 [[permission]]
 identifier = "allow-sync-lifecycle-suspend"

@@ -91,6 +91,10 @@ export interface MockConfig {
    *  the matching `text` (raw frontmatter + body). For the saved-view render
    *  flow: the view's filter runs over these live notes. */
   notes?: Array<{ id: string; text: string }>;
+  /** Reject `note_read` for these ids (the failed-open flow). The list load's
+   *  per-note read falls back to `""` on rejection, so a seeded row still
+   *  renders — only the open itself fails. */
+  noteReadErrorIds?: string[];
   /** Preseed saved views into `prefs_read`. The prefs store is STATEFUL —
    *  `upsert_saved_view` / `set_view_order` / `delete_saved_view` mutate it, so
    *  a view created through the UI appears on the next `usePrefs` re-read. */
@@ -318,7 +322,11 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
         (w.__noteDeletes ??= []).push(String(args.id ?? ""));
         return null;
       },
-      "plugin:notes|note_read": (args) => noteText.get(String(args.noteId ?? "")) ?? "",
+      "plugin:notes|note_read": (args) => {
+        const id = String(args.noteId ?? "");
+        if (config.noteReadErrorIds?.includes(id)) throw { kind: "Io", detail: { io_error_kind: "NotFound" } };
+        return noteText.get(id) ?? "";
+      },
       "plugin:captures|seal_staged": () => {
         const w = window as unknown as { __sealStagedCalls?: number };
         w.__sealStagedCalls = (w.__sealStagedCalls ?? 0) + 1;
