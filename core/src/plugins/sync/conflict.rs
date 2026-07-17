@@ -16,12 +16,17 @@
 //!   toolkit prefs/dictionary/catalog fields reconcile with (set-union for
 //!   tag/word/folder sets, scalar-LWW for single values, sequence-LWW for
 //!   ordered lists). Pure, deterministic, tie-broken without a clock dependency.
+//! - **Map singletons → per-key union** ([`merge_attachments_catalog`] by
+//!   attachment-id, [`merge_custom_themes`] by theme name): both reconcile per
+//!   entry and share the §11.4 tombstone rule — a live entry beats a tombstone
+//!   only on a strict re-add; ties keep the tombstone (the resurrection guard).
 //! - **`vault.meta` → bespoke** ([`merge_vault_meta`]): the recovery-side wrap is
 //!   **phrase-invariant** (it never changes after vault creation), so a
 //!   concurrent password change rewrites only the password-side. The merge keeps
 //!   the winner's password-side and a **valid recovery-side**, so a password
 //!   change on one device can never strand the recovery path (story 4).
 
+use crate::plugins::themes::commands::{ThemeEntry, ThemesMap};
 use protocol::{AttachmentMeta, AttachmentsCatalog, VaultMeta};
 
 /// Managed-frontmatter key marking a note a conflict copy (value-strict
@@ -97,9 +102,12 @@ pub fn merge_sequence_lww<T: Clone>(a: (&[T], u64), b: (&[T], u64)) -> Vec<T> {
 
 /// `vault.attachments` catalog merge — per-entry union by attachment-id with
 /// the `sync-protocol.md` §11.4 rule-4 reconciliations (MYND-468). Pure,
-/// deterministic, **commutative** (`merge(a,b) == merge(b,a)`) and idempotent,
-/// so any two devices converge on the same catalog bytes regardless of merge
-/// order:
+/// deterministic, **commutative** (`merge(a,b) == merge(b,a)`) and
+/// **idempotent** (`merge(a,a) == a`), so a PAIR of devices converges on the
+/// same catalog bytes whichever way round it reconciles. It is **not
+/// associative** — see [`merge_custom_themes`] for the counterexample and why
+/// that limit belongs to the §11.4 resurrection guard rather than to either
+/// merge function.
 ///
 /// - **only one side has the id** → keep it (union; entries are
 ///   content-addressed and the core fields immutable).
@@ -145,9 +153,28 @@ pub fn merge_attachments_catalog(
 /// [`merge_attachments_catalog`] for the full rule table).
 fn merge_attachment_entry(a: &AttachmentMeta, b: &AttachmentMeta) -> AttachmentMeta {
     match (a.deleted_at, b.deleted_at) {
-        // tombstone vs tombstone → greater deleted_at.
+        // tombstone vs tombstone → greater deleted_at, then EVERY remaining
+        // field. §11.4 scrubs filename/content_type/size, but `created_at`
+        // survives the scrub and DOES diverge: the id is content-addressed, so
+        // two devices that imported the same bytes at different times hold the
+        // same key with different `created_at`. Delete on both in the same
+        // second and `deleted_at` alone would let the argument order pick.
         (Some(da), Some(db)) => {
-            if db > da {
+            if (
+                db,
+                b.created_at,
+                b.updated_at,
+                &b.filename,
+                &b.content_type,
+                b.size,
+            ) > (
+                da,
+                a.created_at,
+                a.updated_at,
+                &a.filename,
+                &a.content_type,
+                a.size,
+            ) {
                 b.clone()
             } else {
                 a.clone()
@@ -168,12 +195,153 @@ fn merge_attachment_entry(a: &AttachmentMeta, b: &AttachmentMeta) -> AttachmentM
                 b.clone()
             }
         }
-        // live vs live → filename-LWW on updated_at (default created_at),
-        // tie → lexicographically greater filename (commutative tie-break).
+        // live vs live → filename-LWW on updated_at (default created_at), tie →
+        // lexicographically greater filename, then EVERY remaining field. The
+        // trailing fields are what make this a TOTAL order: `ts` collapses
+        // `updated_at`/`created_at` into one value, so two entries can tie on
+        // (ts, filename) while still differing — and then the argument order,
+        // not the data, would decide.
         (None, None) => {
             let ts_a = a.updated_at.unwrap_or(a.created_at);
             let ts_b = b.updated_at.unwrap_or(b.created_at);
-            if (ts_b, &b.filename) > (ts_a, &a.filename) {
+            if (
+                ts_b,
+                &b.filename,
+                b.created_at,
+                b.updated_at,
+                &b.content_type,
+                b.size,
+            ) > (
+                ts_a,
+                &a.filename,
+                a.created_at,
+                a.updated_at,
+                &a.content_type,
+                a.size,
+            ) {
+                b.clone()
+            } else {
+                a.clone()
+            }
+        }
+    }
+}
+
+/// `vault.themes` custom-theme merge — per-entry union by theme **name**
+/// (MYND-486). The `merge_attachments_catalog` twin: pure, deterministic,
+/// **commutative** (`merge(a,b) == merge(b,a)`) and **idempotent**
+/// (`merge(a,a) == a`), so a PAIR of devices converges whichever way round it
+/// reconciles.
+///
+/// It is **not associative**, and that limit is inherited from the
+/// resurrection guard (`sync-protocol.md` §11.4), not from this function — the
+/// catalog twin below has the identical property. A tombstone filters a live
+/// entry by `created_at` vs `deleted_at`, so a three-way reconcile can depend
+/// on the pairing order:
+///
+/// ```text
+/// L1{created:10, updated:10}  T{deleted:5}  L2{created:1, updated:100}
+/// (L1 ∨ T) ∨ L2 = L1 ∨ L2 = L2      // L1 survives the guard, then loses LWW
+/// L1 ∨ (T ∨ L2) = L1 ∨ T  = L1      // L2 fails the guard, then T loses to L1
+/// ```
+///
+/// A three-device fleet in that shape can therefore CAS-ping-pong. It needs a
+/// spec-level answer (a richer tombstone or a different structure), not a local
+/// tie-break tweak — see the open risk noted against MYND-486.
+///
+/// - **only one side has the name** → keep it (union). A concurrent add of
+///   "Nord" on A and "Solarized" on B leaves BOTH — the reason `vault.themes`
+///   is a per-name map merge and not whole-value LWW (a theme is dozens of
+///   tokens of hand authoring; silently losing one to a concurrent add is real
+///   data loss).
+/// - **tombstone vs live** → the live entry survives iff its `created_at`
+///   strictly postdates the tombstone's `deleted_at` (a deliberate re-add of
+///   the name); otherwise — equality included — the **tombstone wins** (the
+///   stale-store resurrection guard: without it, deleting a theme on A would
+///   have B's still-live copy resurrect it).
+/// - **tombstone vs tombstone** → keep the greater `deleted_at`.
+/// - **live vs live** → content-LWW on `updated_at`, ties broken toward the
+///   **greater palette** (`BTreeMap` `Ord`). The winner's whole palette is kept:
+///   a palette is ONE coherent design, so it is LWW **within** a name and never
+///   merged token-by-token (a per-token merge of two edits would produce an
+///   incoherent Frankenstein palette).
+///
+/// **How commutativity is actually delivered:** both same-state arms compare a
+/// TOTAL order over every retained field (tombstones: `deleted_at`, then
+/// `created_at`/`updated_at`/palette; live: `updated_at`, then palette, then
+/// `created_at`). "Pick the max under a total order" is commutative by
+/// construction. Leaving any field out — as a plain [`merge_scalar_lww`]
+/// tie-to-`a` rule does — makes the ARGUMENT ORDER the tie-breaker, and that is
+/// not cosmetic: `sync_themes_phase` gates its push on `merged == remote_map`,
+/// so two devices that merge to different bytes would each see a mismatch and
+/// re-push forever, churning a fresh nonce and upload every cycle instead of
+/// converging.
+///
+/// There is no tombstone GC: a themes tombstone is a name plus a timestamp and
+/// themes number in the single digits, so the map stays trivially small.
+///
+/// Clock honesty (per §11.4, inherited from the catalog): `created_at` /
+/// `updated_at` / `deleted_at` are client wall-clocks from different devices;
+/// skew can make the "wrong" side win a revival or edit race. Deterministic
+/// convergence is the contract, not clock truth.
+pub fn merge_custom_themes(local: &ThemesMap, remote: &ThemesMap) -> ThemesMap {
+    let mut merged = ThemesMap::new();
+    let names = merge_set_union(
+        &local.keys().cloned().collect::<Vec<_>>(),
+        &remote.keys().cloned().collect::<Vec<_>>(),
+    );
+    for name in names {
+        let entry = match (local.get(&name), remote.get(&name)) {
+            (Some(l), None) => l.clone(),
+            (None, Some(r)) => r.clone(),
+            (Some(l), Some(r)) => merge_theme_entry(l, r),
+            (None, None) => unreachable!("name came from the key union"),
+        };
+        merged.insert(name, entry);
+    }
+    merged
+}
+
+/// The per-name reconciliation (see [`merge_custom_themes`] for the full rule
+/// table) — structurally the catalog's [`merge_attachment_entry`].
+fn merge_theme_entry(a: &ThemeEntry, b: &ThemeEntry) -> ThemeEntry {
+    match (a.deleted_at, b.deleted_at) {
+        // tombstone vs tombstone → greater deleted_at, then EVERY remaining
+        // field. Scrubbing the palette does NOT make two tombstones of the same
+        // name byte-identical — `updated_at` survives the scrub and diverges
+        // whenever one device had an unsynced edit — so `deleted_at` alone is a
+        // PARTIAL order and the argument order would pick the winner.
+        (Some(da), Some(db)) => {
+            if (db, b.created_at, b.updated_at, &b.palette)
+                > (da, a.created_at, a.updated_at, &a.palette)
+            {
+                b.clone()
+            } else {
+                a.clone()
+            }
+        }
+        // tombstone vs live → live survives only on a strict re-add.
+        (Some(da), None) => {
+            if b.created_at > da {
+                b.clone()
+            } else {
+                a.clone()
+            }
+        }
+        (None, Some(db)) => {
+            if a.created_at > db {
+                a.clone()
+            } else {
+                b.clone()
+            }
+        }
+        // live vs live → palette-LWW on updated_at, tie → the greater palette,
+        // then the greater created_at. `created_at` has to be in the key: two
+        // devices can import the same name at different times and later hold an
+        // identical palette at an identical `updated_at`, and without it the
+        // argument order decides.
+        (None, None) => {
+            if (b.updated_at, &b.palette, b.created_at) > (a.updated_at, &a.palette, a.created_at) {
                 b.clone()
             } else {
                 a.clone()
@@ -398,6 +566,37 @@ mod tests {
     }
 
     #[test]
+    fn catalog_merge_tombstone_tie_is_commutative_despite_divergent_created_at() {
+        // The id is content-addressed, so two devices that imported the SAME
+        // bytes at different times hold the same key with a DIFFERENT
+        // `created_at` — and §11.4's scrub (filename/content_type/size) does not
+        // touch it. Delete on both in the same second and `deleted_at` alone
+        // leaves the winner to the argument order.
+        let a = catalog(vec![("aa", live(1, "doc.pdf").into_tombstone(100))]);
+        let b = catalog(vec![("aa", live(50, "doc.pdf").into_tombstone(100))]);
+        assert_eq!(
+            merge_attachments_catalog(&a, &b),
+            merge_attachments_catalog(&b, &a)
+        );
+    }
+
+    #[test]
+    fn catalog_merge_live_tie_is_commutative_despite_divergent_created_at() {
+        // Equal `updated_at` AND equal filename, different `created_at`: the
+        // (ts, filename) key ties, so everything else has to be in the order.
+        let mut n1 = live(1, "doc.pdf");
+        n1.updated_at = Some(100);
+        let mut n2 = live(50, "doc.pdf");
+        n2.updated_at = Some(100);
+        let a = catalog(vec![("aa", n1)]);
+        let b = catalog(vec![("aa", n2)]);
+        assert_eq!(
+            merge_attachments_catalog(&a, &b),
+            merge_attachments_catalog(&b, &a)
+        );
+    }
+
+    #[test]
     fn catalog_merge_is_commutative_and_idempotent() {
         let mut renamed = live(5, "r.txt");
         renamed.updated_at = Some(7);
@@ -428,6 +627,169 @@ mod tests {
         assert_eq!(ab.entries["bb"].filename, "b2.png");
         // The unilateral tombstone survives union.
         assert!(ab.entries["dd"].is_tombstone());
+    }
+
+    // ---- merge_custom_themes (MYND-486, per-theme-name map merge) ----
+
+    fn palette(accent: &str) -> crate::plugins::themes::commands::ThemePalette {
+        crate::plugins::themes::commands::ThemePalette::from([("--accent".into(), accent.into())])
+    }
+
+    /// A live entry: imported at `created_at`, last edited at `updated_at`.
+    fn theme(created_at: u64, updated_at: u64, accent: &str) -> ThemeEntry {
+        ThemeEntry {
+            created_at,
+            deleted_at: None,
+            palette: palette(accent),
+            updated_at,
+        }
+    }
+
+    fn themes(entries: Vec<(&str, ThemeEntry)>) -> ThemesMap {
+        entries
+            .into_iter()
+            .map(|(n, e)| (n.to_string(), e))
+            .collect()
+    }
+
+    #[test]
+    fn themes_merge_keeps_both_concurrent_adds_of_different_names() {
+        // THE reason vault.themes is a per-name map merge and not whole-map
+        // LWW: A's "nord" and B's "solarized" were authored concurrently and
+        // BOTH must survive — a whole-map LWW would silently drop one.
+        let a = themes(vec![("nord", theme(10, 10, "#88c0d0"))]);
+        let b = themes(vec![("solarized", theme(11, 11, "#268bd2"))]);
+        let merged = merge_custom_themes(&a, &b);
+        assert_eq!(merged.len(), 2);
+        assert_eq!(merged["nord"], theme(10, 10, "#88c0d0"));
+        assert_eq!(merged["solarized"], theme(11, 11, "#268bd2"));
+    }
+
+    #[test]
+    fn themes_merge_same_name_concurrent_edit_is_lww() {
+        // A same-name concurrent edit falls to content-LWW: the greater
+        // updated_at wins, whole palette intact (never merged token-by-token —
+        // a palette is one coherent design).
+        let older = theme(1, 50, "#111111");
+        let newer = theme(1, 60, "#222222");
+        let a = themes(vec![("nord", older.clone())]);
+        let b = themes(vec![("nord", newer.clone())]);
+        assert_eq!(merge_custom_themes(&a, &b)["nord"], newer);
+        assert_eq!(merge_custom_themes(&b, &a)["nord"], newer);
+        // The winner's palette rides along whole — no per-token mixing.
+        assert_eq!(
+            merge_custom_themes(&a, &b)["nord"].palette,
+            palette("#222222")
+        );
+    }
+
+    #[test]
+    fn themes_merge_tombstone_beats_stale_live_no_resurrection() {
+        // Delete on A vs a still-live copy on B: the live entry predates the
+        // deletion (created_at <= deleted_at) → the tombstone wins. Without
+        // this guard, deleting a theme on A would resurrect it from B.
+        let tomb = theme(100, 100, "#abcabc").into_tombstone(200);
+        let a = themes(vec![("nord", tomb.clone())]);
+        let b = themes(vec![("nord", theme(150, 150, "#abcabc"))]);
+        assert_eq!(merge_custom_themes(&a, &b)["nord"], tomb);
+        assert_eq!(merge_custom_themes(&b, &a)["nord"], tomb);
+        // Equality: created_at == deleted_at → still the tombstone.
+        let b_eq = themes(vec![("nord", theme(200, 200, "#abcabc"))]);
+        assert_eq!(merge_custom_themes(&a, &b_eq)["nord"], tomb);
+    }
+
+    #[test]
+    fn themes_merge_deliberate_readd_beats_tombstone() {
+        // A live entry whose created_at STRICTLY postdates deleted_at is a
+        // deliberate re-add of the name — it wins and the theme is live again.
+        let tomb = theme(100, 100, "#old").into_tombstone(200);
+        let readd = theme(201, 201, "#new");
+        let a = themes(vec![("nord", tomb)]);
+        let b = themes(vec![("nord", readd.clone())]);
+        assert_eq!(merge_custom_themes(&a, &b)["nord"], readd);
+        assert_eq!(merge_custom_themes(&b, &a)["nord"], readd);
+        assert!(!merge_custom_themes(&a, &b)["nord"].is_tombstone());
+    }
+
+    #[test]
+    fn themes_merge_tombstone_pair_keeps_greater_deleted_at() {
+        let t1 = theme(1, 1, "#x").into_tombstone(10);
+        let t2 = theme(1, 1, "#x").into_tombstone(20);
+        let a = themes(vec![("nord", t1)]);
+        let b = themes(vec![("nord", t2.clone())]);
+        assert_eq!(merge_custom_themes(&a, &b)["nord"], t2);
+        assert_eq!(merge_custom_themes(&b, &a)["nord"], t2);
+    }
+
+    #[test]
+    fn themes_merge_lww_tie_breaks_commutatively_on_palette() {
+        // Equal updated_at → the greater palette wins on BOTH sides (a
+        // tie-to-local rule would not be commutative and the fleet would not
+        // converge).
+        let n1 = theme(5, 50, "#aaaaaa");
+        let n2 = theme(5, 50, "#bbbbbb");
+        let a = themes(vec![("nord", n1)]);
+        let b = themes(vec![("nord", n2.clone())]);
+        assert_eq!(merge_custom_themes(&a, &b)["nord"], n2);
+        assert_eq!(merge_custom_themes(&b, &a)["nord"], n2);
+    }
+
+    #[test]
+    fn themes_merge_tombstone_tie_is_commutative_despite_divergent_updated_at() {
+        // Both devices delete "nord" in the same wall-clock second, but A had an
+        // unsynced palette edit at t=50 while B still carried t=40. Scrubbing the
+        // palette does NOT make the two tombstones byte-identical — `updated_at`
+        // still diverges — so the tie-break must be a total order over every
+        // retained field. Otherwise each device keeps its own entry, the
+        // orchestrator's `merged == remote_map` gate fails on both, and they
+        // CAS-ping-pong forever instead of converging.
+        let a = themes(vec![("nord", theme(1, 50, "#aaaaaa").into_tombstone(100))]);
+        let b = themes(vec![("nord", theme(1, 40, "#bbbbbb").into_tombstone(100))]);
+        assert_eq!(merge_custom_themes(&a, &b), merge_custom_themes(&b, &a));
+    }
+
+    #[test]
+    fn themes_merge_live_tie_is_commutative_despite_divergent_created_at() {
+        // Equal `updated_at` AND equal palette, different `created_at` — two
+        // devices independently imported the same name. `created_at` must sit in
+        // the tie-break key too, or the winner depends on argument order.
+        let a = themes(vec![("nord", theme(5, 50, "#aaaaaa"))]);
+        let b = themes(vec![("nord", theme(6, 50, "#aaaaaa"))]);
+        assert_eq!(merge_custom_themes(&a, &b), merge_custom_themes(&b, &a));
+    }
+
+    #[test]
+    fn themes_merge_is_commutative_and_idempotent() {
+        let a = themes(vec![
+            ("nord", theme(1, 1, "#88c0d0")),
+            ("gruvbox", theme(100, 100, "#fabd2f").into_tombstone(200)),
+            ("dracula", theme(5, 7, "#bd93f9")),
+        ]);
+        let b = themes(vec![
+            ("nord", theme(1, 1, "#88c0d0")),
+            ("gruvbox", theme(300, 300, "#d79921")), // re-add: 300 > 200
+            ("solarized", theme(4, 4, "#268bd2").into_tombstone(9)),
+        ]);
+        let ab = merge_custom_themes(&a, &b);
+        let ba = merge_custom_themes(&b, &a);
+        assert_eq!(ab, ba, "merge must be commutative");
+        assert_eq!(
+            merge_custom_themes(&ab, &b),
+            ab,
+            "merge must be idempotent once converged"
+        );
+        assert_eq!(
+            merge_custom_themes(&ab, &ThemesMap::new()),
+            ab,
+            "merging with empty is identity"
+        );
+        // The re-add won over the tombstone.
+        assert!(!ab["gruvbox"].is_tombstone());
+        assert_eq!(ab["gruvbox"].palette, palette("#d79921"));
+        // The unilateral tombstone survives the union.
+        assert!(ab["solarized"].is_tombstone());
+        // The unilateral live entry survives the union.
+        assert_eq!(ab["dracula"], theme(5, 7, "#bd93f9"));
     }
 
     fn meta(password_marker: u8, recovery_marker: u8) -> VaultMeta {
