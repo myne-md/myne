@@ -45,12 +45,23 @@ steps:
       # depends_on: [cargo-checks].
       - |
         PARENT="$(cd .. && pwd)"
-        if [ ! -e "$PARENT/myne-main" ]; then
-          if [ -n "$MYNE_REPO_TOKEN" ]; then
-            git clone --depth 1 "https://oauth2:$MYNE_REPO_TOKEN@github.com/myne-md/myne.git" "$PARENT/myne-main"
-          else
-            git clone --depth 1 "https://github.com/myne-md/myne.git" "$PARENT/myne-main"
-          fi
+        MYNE_URL="https://github.com/myne-md/myne.git"
+        if [ -n "$MYNE_REPO_TOKEN" ]; then
+          MYNE_URL="https://oauth2:$MYNE_REPO_TOKEN@github.com/myne-md/myne.git"
+        fi
+        # ALWAYS refresh the shared-source checkout to the current develop. The
+        # old `if [ ! -e ] clone` reused a workspace-cached myne-main across
+        # runs and NEVER updated it, so every time a shared command / type / hook
+        # landed in core on develop the mobile build broke against the stale
+        # clone (e.g. `cannot find __cmd__sync_*` after new sync commands land).
+        # fetch+reset an existing checkout; clone fresh otherwise.
+        if [ -e "$PARENT/myne-main/.git" ]; then
+          git -C "$PARENT/myne-main" remote set-url origin "$MYNE_URL"
+          git -C "$PARENT/myne-main" fetch --depth 1 origin develop
+          git -C "$PARENT/myne-main" reset --hard FETCH_HEAD
+        else
+          rm -rf "$PARENT/myne-main"
+          git clone --depth 1 "$MYNE_URL" "$PARENT/myne-main"
         fi
         for d in protocol core editor dialect locales src; do
           ln -sfn "$PARENT/myne-main/$d" "$PARENT/$d"
