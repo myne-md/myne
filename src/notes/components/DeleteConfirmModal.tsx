@@ -118,6 +118,13 @@ export type DeleteConfirmModalProps = {
   /** Confirm-button label override. Default: "Delete". */
   confirmLabel?: string;
   /**
+   * Confirm-button `data-testid` override (curated-prop testid discipline,
+   * src/CLAUDE.md "Test observability"). Default: `"delete-confirm.confirm"`.
+   * Callers whose E2E contract names a scoped confirm id (e.g. the
+   * recovered-notes `sync.recovered-delete-confirm`) pass it here.
+   */
+  confirmTestId?: string;
+  /**
    * Which button receives initial focus. Default `"cancel"` — the safer
    * choice for irreversible actions (folder delete, permanent purge), where a
    * stray Enter must not confirm. Pass `"confirm"` for the reversible
@@ -136,6 +143,7 @@ export function DeleteConfirmModal(props: DeleteConfirmModalProps) {
     body,
     warning,
     confirmLabel,
+    confirmTestId,
     initialFocus = "cancel",
     onCancel,
     onConfirm,
@@ -229,7 +237,7 @@ export function DeleteConfirmModal(props: DeleteConfirmModalProps) {
           <button
             ref={confirmRef}
             type="button"
-            data-testid="delete-confirm.confirm"
+            data-testid={confirmTestId ?? "delete-confirm.confirm"}
             onClick={onConfirm}
             style={DELETE_BUTTON_STYLE}
           >

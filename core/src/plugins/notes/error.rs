@@ -198,7 +198,8 @@ impl From<std::io::Error> for NoteReadError {
 ///
 /// Asymmetry vs [`NoteCreateError`] is intentional and pinned by
 /// `decisions.md` 2026-05-07 "`note_update` error surface: 8 variant,
-/// p1 + q1, drift-free MYND-26 mirror":
+/// p1 + q1, drift-free MYND-26 mirror" (now 9 with [`Self::BaseMismatch`]
+/// — the expected-base guard closing the pull-write↔reload ms race):
 ///
 /// - ⊕ `NoteNotFound` — file missing. Distinct from `CannotDecrypt`
 ///   (q1 decision): the §6.4 non-distinguishing rule covers credential-
@@ -284,6 +285,19 @@ pub enum NoteUpdateError {
     /// is "try again".
     #[error("blocking task join failure")]
     JoinFailure,
+
+    /// The on-disk plaintext no longer matches the caller-declared base
+    /// (`expected_base_hash_hex`): a sync pull-apply landed between the
+    /// editor's last save/reload and this save. **Nothing was written** —
+    /// the caller preserves its buffer via the local keep-both path
+    /// (conflict copy + reload). Only the desktop autosave opts in; every
+    /// other caller (and mobile) omits the base and keeps legacy
+    /// last-write-wins. No §6.4 concern: fires post-unlock and leaks no
+    /// credential-validity information; distinct from `CannotDecrypt` /
+    /// `NoteNotFound` because the UI affordance differs (keep-both vs
+    /// deleted-note fold).
+    #[error("expected base mismatch")]
+    BaseMismatch,
 }
 
 impl From<std::io::Error> for NoteUpdateError {
@@ -1202,6 +1216,7 @@ mod tests {
                 NoteUpdateError::NotesDirNotADirectory => {}
                 NoteUpdateError::Io { io_error_kind: _ } => {}
                 NoteUpdateError::JoinFailure => {}
+                NoteUpdateError::BaseMismatch => {}
             }
         }
         assert_closed(&NoteUpdateError::VaultNotUnlocked);

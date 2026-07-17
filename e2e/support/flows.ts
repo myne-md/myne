@@ -235,6 +235,7 @@ export async function openSettings(
   tab?:
     | "account"
     | "privacy"
+    | "sync"
     | "editor"
     | "files"
     | "hotkeys"

@@ -54,10 +54,12 @@ fn map_note_update_err(e: NoteUpdateError) -> SnapshotError {
         NoteUpdateError::Io { io_error_kind } => SnapshotError::Io { io_error_kind },
         // PlaintextTooLarge is unreachable (the snapshot content was already a
         // valid <=16 MiB note); JoinFailure is the panic-equivalent for v0.1
-        // invariant violations.
-        NoteUpdateError::PlaintextTooLarge | NoteUpdateError::JoinFailure => {
-            SnapshotError::JoinFailure
-        }
+        // invariant violations. BaseMismatch is likewise unreachable: restore
+        // passes `expected_base_hash = None` (an explicit user overwrite must
+        // never be base-guarded), so this arm fires only via a bug.
+        NoteUpdateError::PlaintextTooLarge
+        | NoteUpdateError::JoinFailure
+        | NoteUpdateError::BaseMismatch => SnapshotError::JoinFailure,
     }
 }
 
@@ -300,6 +302,8 @@ pub(crate) async fn snapshot_restore_in(
         hooks,
         note_id.clone(),
         (*plaintext).clone(),
+        // Restore is an explicit user overwrite — never base-guarded.
+        None,
     )
     .await
     .map_err(map_note_update_err)?;
@@ -637,6 +641,7 @@ mod tests {
                 &noop_hooks(),
                 id.clone(),
                 "v2".to_string(),
+                None,
             )
             .await
             .unwrap();
@@ -679,6 +684,7 @@ mod tests {
                 &noop_hooks(),
                 id.clone(),
                 "# v2".to_string(),
+                None,
             )
             .await
             .unwrap();
@@ -752,6 +758,7 @@ mod tests {
                 &noop_hooks(),
                 id.clone(),
                 "# v2\nedited".to_string(),
+                None,
             )
             .await
             .unwrap();
@@ -808,6 +815,7 @@ mod tests {
                 &noop_hooks(),
                 id.clone(),
                 "v2".to_string(),
+                None,
             )
             .await
             .unwrap();

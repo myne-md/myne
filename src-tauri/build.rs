@@ -386,6 +386,10 @@ fn main() {
                 "sync_join_account",
                 "sync_reset_local",
                 "sync_head_fingerprint",
+                "sync_list_quarantine",
+                "sync_read_quarantine",
+                "sync_restore_quarantine",
+                "sync_delete_quarantine",
             ]),
         )
         .plugin(
