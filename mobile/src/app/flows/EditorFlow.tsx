@@ -27,7 +27,7 @@ import { ioBanner } from "../../lib/io-banner";
 import { usePrefs } from "../../lib/use-prefs";
 import { vaultDisplayLabel } from "../../lib/vault-label";
 import { useSwipeBack } from "../../lib/use-swipe-back";
-import { setFavorites, setArchivedFolders, setDeliberateFolders, PREFS_SYNC_APPLIED_EVENT } from "../../lib/prefs";
+import { setFavorites, setArchivedFolders, setDeliberateFolders, setFolderIcons, setItemColors, PREFS_SYNC_APPLIED_EVENT } from "../../lib/prefs";
 import { bumpPrefsNonce } from "../../lib/prefsNonce";
 import { useHiddenHomeTiles } from "../../lib/home-tiles";
 import { searchNotes } from "../../lib/search-notes";
@@ -100,6 +100,7 @@ import { FilterSheet } from "./editor/sheets/FilterSheet";
 import { NoteActionsSheet } from "./editor/sheets/NoteActionsSheet";
 import { NoteRowActionsSheet } from "./editor/sheets/NoteRowActionsSheet";
 import { FolderActionsSheet } from "./editor/sheets/FolderActionsSheet";
+import { DecorationSheet } from "./editor/sheets/DecorationSheet";
 import { SortSheet } from "./editor/sheets/SortSheet";
 import { TagBrowserSheet } from "./editor/sheets/TagBrowserSheet";
 import { VaultSwitcher } from "./editor/sheets/VaultSwitcher";
@@ -407,6 +408,13 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
     | null
   >(null);
   const [folderPromptInput, setFolderPromptInput] = useState("");
+  // Color / folder-icon picker target (MYND-516) — a note (color only) or a
+  // folder (color + icon). Opened from the long-press action sheets.
+  const [decoTarget, setDecoTarget] = useState<
+    | { kind: "note"; id: string }
+    | { kind: "folder"; path: string }
+    | null
+  >(null);
   // Home quick-action tiles hidden per-tile from Settings → Appearance (MYND-479).
   const hiddenHomeTiles = useHiddenHomeTiles();
   // Active saved view (its id) filtering the notes list, or null. Mutually
@@ -1055,6 +1063,46 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
     setView("editor");
   }
 
+  /** New drawing note directly in `path` (folder long-press → "New drawing").
+   *  Mirrors `newDrawing` but seeds the drawing note's `folder:` (MYND-515). */
+  function newDrawingInFolder(path: string) {
+    setFolderActions(null);
+    setEditorText(
+      new TextDecoder().decode(buildDrawingNoteBytes(undefined, normalizeFolderPath(path))),
+    );
+    setEditing({ id: null });
+    setEditorError(null);
+    setReadingMode(false);
+    setView("editor");
+  }
+
+  // ── Decoration: per-item color labels + per-folder icons (MYND-516) ───────
+  // Whole-map prefs writes (the `set_item_colors` / `set_folder_icons` setters
+  // take the full desired map). Assign = splice the one key; "None"/"Default" =
+  // delete it. Key discipline: item_colors is keyed by note UUID OR the folder's
+  // canonical trailing-slash path (`f.path`); folder_icons by that folder path
+  // only — byte-identical to the keys desktop writes, so a desktop-assigned
+  // decoration round-trips. bumpPrefsNonce after a successful write so `usePrefs`
+  // re-reads disk truth and the row re-renders — the favorites-writer chokepoint.
+  function assignItemColor(key: string, slot: string | null) {
+    const next = { ...prefs.item_colors };
+    if (slot === null) delete next[key];
+    else next[key] = slot;
+    if (HAS_TAURI) void setItemColors(next).then(bumpPrefsNonce).catch(bumpPrefsNonce);
+  }
+  function assignFolderIcon(path: string, name: string | null) {
+    const next = { ...prefs.folder_icons };
+    if (name === null) delete next[path];
+    else next[path] = name;
+    if (HAS_TAURI) void setFolderIcons(next).then(bumpPrefsNonce).catch(bumpPrefsNonce);
+  }
+  /** Open the color/icon picker for a folder (color + icon), closing the folder
+   *  action sheet first — the `openFolderPrompt` close-then-open idiom. */
+  function openFolderDecoration(path: string) {
+    setFolderActions(null);
+    setDecoTarget({ kind: "folder", path });
+  }
+
   /** Re-root every LIVE note (+ the deliberate/archived folder sets) under
    *  `oldPath` to the matching path under `newPath` — the mobile folder rename/
    *  move primitive. Paths come from the tree (derived from the notes' own
@@ -1451,6 +1499,8 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
                 count={f.count}
                 collapsed={isCollapsed}
                 indentPx={20 + depth * 18}
+                icon={prefs.folder_icons[f.path]}
+                color={prefs.item_colors[f.path]}
                 onToggle={() => toggleFolder(f.path)}
                 onHold={() => setFolderActions({ path: f.path, name: f.name })}
               />
@@ -1475,6 +1525,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
             divider={false}
             indent={depth * 18 + 12}
             subtitle={subtitleFor(n.id)}
+            color={prefs.item_colors[n.id]}
             onOpen={() => void openFromList(n.id)}
             selected={isRegular && editing?.id === n.id}
             onHold={() => setRowActions(n)}
@@ -1545,11 +1596,16 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
                 </div>
               </div>
 
-              {/* Secondary create/browse tiles — Template / Daily note / Views.
-                  Each tile is individually hideable from Settings → Appearance
-                  (MYND-479); the row hides entirely when all three are off. */}
-              {listView === "notes" && hiddenHomeTiles.size < 3 && (
+              {/* Secondary create/browse tiles — New drawing / Template / Daily
+                  note / Views. New drawing (MYND-515) is a first-class create
+                  affordance so it always shows; Template/Daily/Views are each
+                  hideable from Settings → Appearance (MYND-479). */}
+              {listView === "notes" && (
                 <div style={{ marginTop: 12, display: "flex", gap: 8 }}>
+                  <ActionPill onClick={newDrawing} label={t("notes.newTab.createDrawing")} testid="notes.new-drawing-tile">
+                    <path d="M12 20h9" stroke="currentColor" strokeWidth="1.7" fill="none" strokeLinecap="round" />
+                    <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" stroke="currentColor" strokeWidth="1.7" fill="none" strokeLinejoin="round" />
+                  </ActionPill>
                   {!hiddenHomeTiles.has("templates") && (
                     <ActionPill onClick={() => setTab("templates")} label={t("templates.manager.listLabel")}>
                       <rect x="8" y="4" width="11" height="14" rx="2" stroke="currentColor" strokeWidth="1.7" fill="none" />
@@ -1749,6 +1805,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
                     entry={n}
                     last={i === orderedNotes.length - 1}
                     subtitle={listView === "notes" ? subtitleFor(n.id) : undefined}
+                    color={prefs.item_colors[n.id]}
                     onOpen={() => void openFromList(n.id)}
             selected={isRegular && editing?.id === n.id}
                     onHold={listView === "notes" ? () => setRowActions(n) : undefined}
@@ -2007,6 +2064,11 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
               setMoveTarget(rowActions.id);
               setRowActions(null);
             }}
+            onColor={() => {
+              const id = rowActions.id;
+              setRowActions(null);
+              setDecoTarget({ kind: "note", id });
+            }}
             onArchive={() => {
               const id = rowActions.id;
               setRowActions(null);
@@ -2026,10 +2088,35 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
             name={folderActions.name}
             onClose={() => setFolderActions(null)}
             onNewNote={() => newNoteInFolder(folderActions.path)}
+            onNewDrawing={() => newDrawingInFolder(folderActions.path)}
             onNewSubfolder={() => openFolderPrompt({ mode: "subfolder", parent: folderActions.path })}
             onRename={() => openFolderPrompt({ mode: "rename", path: folderActions.path })}
+            onDecorate={() => openFolderDecoration(folderActions.path)}
             onArchive={() => void archiveFolderFromMenu(folderActions.path)}
             onTrash={() => void trashFolderFromMenu(folderActions.path)}
+          />
+        )}
+
+        {/* Color-label + folder-icon picker (MYND-516). */}
+        {decoTarget && (
+          <DecorationSheet
+            color={
+              (decoTarget.kind === "note"
+                ? prefs.item_colors[decoTarget.id]
+                : prefs.item_colors[decoTarget.path]) ?? null
+            }
+            onSelectColor={(slot) =>
+              assignItemColor(decoTarget.kind === "note" ? decoTarget.id : decoTarget.path, slot)
+            }
+            icon={
+              decoTarget.kind === "folder"
+                ? {
+                    value: prefs.folder_icons[decoTarget.path] ?? null,
+                    onSelect: (name) => assignFolderIcon(decoTarget.path, name),
+                  }
+                : undefined
+            }
+            onClose={() => setDecoTarget(null)}
           />
         )}
 

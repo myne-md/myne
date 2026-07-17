@@ -42,6 +42,22 @@ export default defineConfig(async () => ({
       // `copy/`) and make desktop's `src/i18n` a re-export shim.
       { find: /^@myne\/i18n$/, replacement: sib("../src/i18n/index.ts") },
       { find: /^@myne\/i18n\/(.*)$/, replacement: sib("../src/i18n/$1") },
+      // The shared DECORATION VOCABULARY (MYND-516) — the color-label slot list
+      // and the folder-icon glyph table. Like @myne/i18n above, this aliases
+      // desktop APP source (`../src/notes/`) with no package contract.
+      // WHY it must be shared rather than copied: `folder_icons` / `item_colors`
+      // are SYNCED prefs maps, so the VALUE crosses the client boundary. A
+      // hand-copy lets the vocabulary drift silently — desktop adds a 17th glyph,
+      // a user assigns it, the name syncs, and mobile's FolderGlyph resolves
+      // `undefined` and falls back to the default folder. No type error, no test,
+      // no build failure catches that; one alias does.
+      // NOTE — deliberately EXACT specifiers, not the `/(.*)$` subpath form the
+      // i18n alias uses: `../src/notes/` also holds Tauri-coupled modules
+      // (readNote, vaultExport, …), and a wildcard would let those resolve into
+      // the mobile bundle. Only the two PURE DATA modules are shared; the
+      // presentational wrappers (FolderGlyph, ColorDot) stay mobile-local.
+      { find: /^@myne\/decorations$/, replacement: sib("../src/notes/decorations.ts") },
+      { find: /^@myne\/decorations\/folderIcons$/, replacement: sib("../src/notes/folderIcons.ts") },
     ],
     // The aliased editor source lives OUTSIDE this repo (../editor/src), so its
     // bare-specifier imports could otherwise resolve to the parent repo's
@@ -69,6 +85,11 @@ export default defineConfig(async () => ({
       "@lezer/markdown",
       "katex",
       "mermaid",
+      // Excalidraw canvas (drawing notes, MYND-515) — the aliased @myne/editor
+      // source lives outside the repo, so its bare `@excalidraw/excalidraw`
+      // import otherwise resolves to editor/node_modules' copy; dedupe to
+      // mobile's single copy (same class as the CodeMirror engine deps above).
+      "@excalidraw/excalidraw",
       "dompurify",
       "js-yaml",
       "react",

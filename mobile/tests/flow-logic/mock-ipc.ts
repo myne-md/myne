@@ -34,6 +34,14 @@ export interface MockConfig {
   /** Note ids `note_list` returns — seeds existing rows for tablet-layout tests
    *  (each renders a clickable `notes.row`; body is empty via `note_read`). */
   noteIds?: string[];
+  /** Per-note bodies `note_read` returns, keyed by note id. A body carrying
+   *  `folder:` frontmatter builds the folder tree (folder-decoration display
+   *  tests). Absent ids fall back to "". */
+  noteBodies?: Record<string, string>;
+  /** Shallow-merged over the default prefs by `prefs_read` — seed e.g.
+   *  `folder_icons` / `item_colors` so a display test asserts the row renders
+   *  the assigned glyph / color dot. */
+  prefs?: Record<string, unknown>;
   endpoint?: { endpoint_url: string | null; cert_pin_hex: string | null; pin_source: "static" | "tofu" | null };
   setEndpoint?: { fingerprint: string | null; pin_source: "static" | "tofu" | null };
   devices?: MockDevice[];
@@ -177,7 +185,21 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
         if (config.deleteError) throw config.deleteError;
         return null;
       },
-      "plugin:prefs|prefs_read": () => DEFAULT_PREFS,
+      "plugin:prefs|prefs_read": () => ({ ...DEFAULT_PREFS, ...(config.prefs ?? {}) }),
+      // Record whole-map decoration writes (MYND-516) so a flow test asserts a
+      // pick invoked the setter with the spliced key — the `__voiceImports` /
+      // `__noteCreates` capture pattern. The payload keys mirror the Rust
+      // command params: set_folder_icons({ icons }) / set_item_colors({ colors }).
+      "plugin:prefs|set_folder_icons": (args) => {
+        const w = window as unknown as { __folderIconWrites?: Array<Record<string, string>> };
+        (w.__folderIconWrites ??= []).push((args.icons ?? {}) as Record<string, string>);
+        return null;
+      },
+      "plugin:prefs|set_item_colors": (args) => {
+        const w = window as unknown as { __itemColorWrites?: Array<Record<string, string>> };
+        (w.__itemColorWrites ??= []).push((args.colors ?? {}) as Record<string, string>);
+        return null;
+      },
       "plugin:notes|note_list": () => config.noteIds ?? [],
       // ── Attachments surface (voice-note capture flow) ──
       // Record every import so a test can assert the capture pipeline produced a
@@ -239,7 +261,7 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
         (w.__noteDeletes ??= []).push(String(args.id ?? ""));
         return null;
       },
-      "plugin:notes|note_read": () => "",
+      "plugin:notes|note_read": (args) => config.noteBodies?.[String(args.noteId ?? "")] ?? "",
       "plugin:captures|seal_staged": () => {
         const w = window as unknown as { __sealStagedCalls?: number };
         w.__sealStagedCalls = (w.__sealStagedCalls ?? 0) + 1;

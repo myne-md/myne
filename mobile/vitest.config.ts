@@ -28,6 +28,11 @@ export default defineConfig({
       // Shared react-i18next runtime (MYND-485) — mirror of vite.config.ts.
       { find: /^@myne\/i18n$/, replacement: sib("../src/i18n/index.ts") },
       { find: /^@myne\/i18n\/(.*)$/, replacement: sib("../src/i18n/$1") },
+      // Shared decoration vocabulary for the synced `folder_icons` / `item_colors`
+      // prefs maps (MYND-516) — mirror of vite.config.ts, which carries the
+      // rationale for sharing these rather than copying them.
+      { find: /^@myne\/decorations$/, replacement: sib("../src/notes/decorations.ts") },
+      { find: /^@myne\/decorations\/folderIcons$/, replacement: sib("../src/notes/folderIcons.ts") },
     ],
   },
   test: {
