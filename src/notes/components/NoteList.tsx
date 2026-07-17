@@ -687,12 +687,22 @@ export function NoteList({ onNewFromTemplate, exportHooks }: NoteListProps = {})
     [orderedViews],
   );
 
-  // Ephemeral expansion state — the folded keys of folders the user has OPENED.
-  // Default empty = every folder collapsed; reset on app restart (folder paths
-  // are AS3 → no persistence). A folder that first appears is absent here, so it
-  // comes in closed — a fresh vault, a newly-created folder, and the whole tree
-  // materialized by an Obsidian import all open collapsed rather than sprawling.
-  const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
+  // Expansion state — the folded keys of folders the user has OPENED. Default
+  // empty = every folder collapsed; a folder that first appears is absent here,
+  // so it comes in closed (a fresh vault, a newly-created folder, and an Obsidian
+  // import all open collapsed rather than sprawling). PERSISTED across restart
+  // (MYND-455): the set is carried at the container level of the workspace blob
+  // (MYW1, §9.7 — window-global session/view state, AS3, already inside the AEAD
+  // envelope). The container is the SINGLE owner — the sidebar renders straight
+  // off it rather than mirroring it into local state. That is what makes the two
+  // invariants structural rather than bookkeeping: the async restore simply
+  // replaces the value (nothing to "hydrate"), and there is no initial empty
+  // local set that could clobber the persisted one before restore lands.
+  const expanded = useMemo<ReadonlySet<string>>(
+    () => new Set(ws.expandedFolders),
+    [ws.expandedFolders],
+  );
+  const setExpanded = ws.setExpandedFolders;
   // Mirror the latest committed value so `toggleFolder` can read it
   // synchronously (decide expand-vs-collapse) without a stale closure.
   const expandedRef = useRef(expanded);

@@ -322,3 +322,53 @@ describe("useWorkspace — graph tab (MYND-198)", () => {
     expect(result.current.focusedLeaf.tabs).toEqual([{ kind: "note", id: "n1" }]);
   });
 });
+
+describe("useWorkspace — sidebar folder-expand set (MYND-455)", () => {
+  const add = (key: string) => (prev: ReadonlySet<string>) => new Set(prev).add(key);
+
+  it("the updater resolves against the live container, so toggles accumulate", () => {
+    const { result } = renderHook(() => useWorkspace(), { wrapper });
+    expect(result.current.expandedFolders).toEqual([]);
+
+    act(() => result.current.setExpandedFolders(add("a/")));
+    act(() => result.current.setExpandedFolders(add("b/")));
+    expect([...result.current.expandedFolders].sort()).toEqual(["a/", "b/"]);
+  });
+
+  it("a toggle that lands BEFORE the async restore never resurrects the pre-restore set", () => {
+    // The regression this pins: the expand set has ONE owner (the container).
+    // A sidebar toggle firing in the window before `restoreContainer` lands must
+    // not survive the restore — the persisted set wins, and the next toggle must
+    // build on IT, not on the value the early toggle produced. A local mirror
+    // would strand the pre-restore value and clobber the blob on the next push.
+    const { result } = renderHook(() => useWorkspace(), { wrapper });
+
+    act(() => result.current.setExpandedFolders(add("early/")));
+    expect(result.current.expandedFolders).toEqual(["early/"]);
+
+    act(() =>
+      result.current.restoreContainer({
+        ...result.current.workspacesSnapshot(),
+        expandedFolders: ["persisted-1/", "persisted-2/"],
+      }),
+    );
+    expect(result.current.expandedFolders).toEqual(["persisted-1/", "persisted-2/"]);
+
+    act(() => result.current.setExpandedFolders(add("after/")));
+    expect([...result.current.expandedFolders].sort()).toEqual([
+      "after/",
+      "persisted-1/",
+      "persisted-2/",
+    ]);
+    expect(result.current.expandedFolders).not.toContain("early/");
+  });
+
+  it("emptying the set drops the field (omit-when-default)", () => {
+    const { result } = renderHook(() => useWorkspace(), { wrapper });
+    act(() => result.current.setExpandedFolders(add("a/")));
+    expect(result.current.workspacesSnapshot().expandedFolders).toEqual(["a/"]);
+
+    act(() => result.current.setExpandedFolders(new Set()));
+    expect(result.current.workspacesSnapshot().expandedFolders).toBeUndefined();
+  });
+});
