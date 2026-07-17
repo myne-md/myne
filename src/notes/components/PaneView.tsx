@@ -28,6 +28,7 @@ const NOOP_ON_CHANGE = (_next: string): void => {};
 import { hasAnchor, type WikilinkAnchor } from "../../editor/wikilink/anchor";
 import { noteRead } from "../readNote";
 import { handleBaseMismatch, productionBaseMismatchDeps } from "../baseMismatch";
+import { useSyncStatus } from "../../hooks/useSyncStatus";
 import { peekRevealHeading, useRevealHeadingNonce } from "../views/revealHeadingSignal";
 import { peekRevealMatch, useRevealMatchNonce } from "../views/revealMatchSignal";
 import { setActiveHeading } from "../views/activeHeadingSignal";
@@ -449,12 +450,25 @@ export function PaneView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [activeId],
   );
+  // §11.3 expected-base guard only makes sense while a sync endpoint is
+  // enrolled — a remote pull-apply is the sole writer it defends against. With
+  // sync off the guard can only misfire on the editor's own local base churn
+  // (a create→rename hop the autosave loop never saw, an out-of-band reload
+  // racing a keystroke), turning a routine edit into a false conflict, so gate
+  // it on sync being active. `null` (status not read yet) counts as inactive:
+  // fail toward last-write-wins rather than risk a spurious conflict at boot.
+  const { status: syncStatus } = useSyncStatus();
+  const syncGuardEnabled =
+    syncStatus !== null &&
+    syncStatus.state !== "disabled" &&
+    syncStatus.state !== "not_enrolled";
   const autosave = useAutosave(
     loading ? null : activeId,
     content,
     undefined,
     setContent,
     onBaseMismatch,
+    syncGuardEnabled,
   );
 
   // Render-surface dispatch (drawing-notes SF2, MYND-499; SYNC-2): a value-strict

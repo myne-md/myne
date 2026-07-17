@@ -508,4 +508,27 @@ describe("useAutosave γ1+γ2 hybrid state machine", () => {
       error: BASE_MISMATCH,
     });
   });
+
+  it("guard disabled (sync off) → no expected-base hash is sent", async () => {
+    // With `guardEnabled = false` (PaneView passes this when sync is
+    // disabled/not-enrolled), the §11.3 fingerprint is omitted entirely — the
+    // save falls back to plain last-write-wins, so the editor's own local base
+    // churn (a create→rename hop, an out-of-band reload racing a keystroke)
+    // can never manufacture a false BaseMismatch.
+    const saveImpl = vi.fn((_id: string, body: string) => Promise.resolve(body));
+    const { rerender } = renderHook(
+      ({ body }: { body: string }) =>
+        useAutosave("note-1", body, saveImpl, undefined, undefined, false),
+      { initialProps: { body: "initial" } },
+    );
+
+    rerender({ body: "initial edit" });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(AUTOSAVE_IDLE_MS);
+    });
+
+    expect(saveImpl).toHaveBeenCalledTimes(1);
+    // Third arg (the expected-base hash) is undefined — guard skipped.
+    expect(saveImpl).toHaveBeenCalledWith("note-1", "initial edit", undefined);
+  });
 });

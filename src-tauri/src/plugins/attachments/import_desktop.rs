@@ -31,6 +31,12 @@ pub async fn attachment_import<R: Runtime>(
     state: State<'_, VaultRuntimeState>,
     hooks: State<'_, myne_core::hooks::Hooks>,
     source: ImportSource,
+    // Optional original-creation timestamp (UNIX seconds) for the imported file;
+    // omitted by the ordinary paste/drop/import path (stamps "now"). Set when
+    // re-materializing a file that carries its own creation time (a restore /
+    // migration import) so the unused-cleanup grace window measures from the
+    // file's real age, not the moment of import.
+    created_at: Option<u64>,
 ) -> Result<ImportedAttachment, AttachmentImportError> {
     let dir = crate::paths::active_vault_root_io(&app, state.active_vault_id().await)
         .map_err(AttachmentImportError::from)?;
@@ -38,6 +44,7 @@ pub async fn attachment_import<R: Runtime>(
         &dir,
         state.inner(),
         source,
+        created_at,
         crate::plugins::attachments::extract::extract,
     )
     .await;
@@ -120,7 +127,7 @@ mod tests {
         myne_core::plugins::attachments::commands::ImportedAttachment,
         myne_core::plugins::attachments::error::AttachmentImportError,
     > {
-        attachment_import_with_dir_ext(vault_dir, state, source, extract::extract).await
+        attachment_import_with_dir_ext(vault_dir, state, source, None, extract::extract).await
     }
 
     #[test]

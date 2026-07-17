@@ -50,15 +50,24 @@ function pngBytes(tag: number): number[] {
   return [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, tag];
 }
 
+// Backdate imports well past the unused-cleanup grace window
+// (`UNUSED_CLEANUP_GRACE_SECS` = 7 days): a freshly-imported, never-referenced
+// attachment is deliberately withheld from the "unused" list until it has aged
+// out of that window (share-import ledger SYNC-10), so a same-second import +
+// clean-unused would otherwise find NOTHING to clean and open no dialog. Import
+// with an original timestamp ~30 days old so the orphan is immediately eligible.
+const THIRTY_DAYS_SECS = 30 * 24 * 60 * 60;
+
 async function importBytes(
   s: Session,
   tag: number,
   filename: string,
 ): Promise<string> {
+  const createdAt = Math.floor(Date.now() / 1000) - THIRTY_DAYS_SECS;
   const r = await pageSeatInvoke(
     s,
     "plugin:attachments|attachment_import",
-    { source: { kind: "bytes", bytes: pngBytes(tag), filename } },
+    { source: { kind: "bytes", bytes: pngBytes(tag), filename }, createdAt },
     IPC_TIMEOUT,
   );
   expect(r.err, "attachment_import should succeed").toBeUndefined();

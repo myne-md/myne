@@ -37,7 +37,13 @@ async function pickSelectOption(
   root: string,
   value: string,
 ): Promise<void> {
-  await (await s.byTestId(root)).click();
+  // The settings modal grew a view-type / group / sort / columns section above
+  // the cover controls, so the aspect `SearchableSelect` now sits near the
+  // bottom of the modal's scrolling body — bring its trigger into view before
+  // clicking (W3C `/click` alone leaves it clipped → "not interactable").
+  const trigger = await s.byTestId(root);
+  await trigger.scrollIntoView();
+  await trigger.click();
   await (
     await s.waitForElement(
       testIdSelector(`${root}-option`, { "data-value": value }),

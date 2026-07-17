@@ -77,6 +77,17 @@ export function useAutosave(
   saveImpl: SaveFn = DEFAULT_SAVE_FN,
   onSaved?: (patchedBody: string) => void,
   onBaseMismatch?: (staleBufferBody: string) => Promise<void>,
+  // §11.3 expected-base guard toggle. The guard exists to catch a SYNC
+  // pull-apply landing under the editor between the last save and the next
+  // keystroke — its whole purpose is a remote writer. With sync off no remote
+  // writer exists, so the on-disk base can only diverge from `savedBodyRef`
+  // through the editor's OWN local churn (a create→rename hop the autosave
+  // loop never observed, an out-of-band reload that raced a keystroke); every
+  // such divergence is a FALSE BaseMismatch that wipes the user's fresh edit
+  // into a conflict copy. The caller (PaneView) passes `false` when sync is
+  // disabled/not-enrolled, restoring plain last-write-wins. Defaults `true` so
+  // existing unit tests (and any guard-opted caller) keep their behavior.
+  guardEnabled = true,
 ): UseAutosaveReturn {
   const [status, setStatus] = useState<SaveStatus>({ status: "clean" });
 
@@ -160,7 +171,7 @@ export function useAutosave(
         // hiccup — autosave must never break on the guard's plumbing;
         // an omitted hash just means legacy last-write-wins for this fire.
         let expectedBaseHashHex: string | undefined;
-        if (savedBodyRef.current !== null) {
+        if (guardEnabled && savedBodyRef.current !== null) {
           try {
             expectedBaseHashHex = await sha256Hex(savedBodyRef.current);
           } catch {
@@ -230,7 +241,7 @@ export function useAutosave(
     })();
     inFlightRef.current = promise;
     return promise;
-  }, [clearTimers, saveImpl]);
+  }, [clearTimers, saveImpl, guardEnabled]);
 
   // Body-change effect — handles dirty marking + timer arming.
   useEffect(() => {
