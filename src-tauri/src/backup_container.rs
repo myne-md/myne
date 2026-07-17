@@ -79,6 +79,10 @@ pub enum MemberFamily {
     /// `vault.dictionary` (§9.13) — personal dictionary, authoritative user
     /// data and a Class-1 sync member, so `sync ⊆ backup` requires it here.
     VaultDictionary,
+    /// `vault.themes` (§9.21) — custom-theme palettes (`MYT1`), authoritative
+    /// user data and a Class-1 sync member, so `sync ⊆ backup` requires it here
+    /// (MYND-486).
+    VaultThemes,
     /// `notes/<uuid>.myn` (§9.2).
     Note,
     /// `snapshots/<note-uuid>__<snap-uuid>.myn` (§9.2 envelope).
@@ -112,6 +116,14 @@ fn family_member_cap(family: MemberFamily) -> u64 {
         MemberFamily::VaultDictionary => {
             (protocol::dictionary_blob::MAX_DICTIONARY_PLAINTEXT_LEN
                 + protocol::dictionary_blob::DICTIONARY_BLOB_HEADER_LEN
+                + 32) as u64
+        }
+        // §9.21.4: 4 MiB plaintext cap + 34-byte header + 32-byte CTX tag
+        // (a strict consumer rejects an over-sized themes member, so the
+        // export must too — mirrors the VaultDictionary bound above).
+        MemberFamily::VaultThemes => {
+            (protocol::themes_blob::MAX_THEMES_PLAINTEXT_LEN
+                + protocol::themes_blob::THEMES_BLOB_HEADER_LEN
                 + 32) as u64
         }
         // §9.10.4: 16 MiB catalog ceiling + envelope, rounded up.
@@ -283,6 +295,7 @@ pub fn classify_member_path(path: &str) -> Option<MemberFamily> {
         "vault.meta" => return Some(MemberFamily::VaultMeta),
         "vault.prefs" => return Some(MemberFamily::VaultPrefs),
         "vault.dictionary" => return Some(MemberFamily::VaultDictionary),
+        "vault.themes" => return Some(MemberFamily::VaultThemes),
         "vault.attachments" => return Some(MemberFamily::AttachmentsCatalog),
         _ => {}
     }
@@ -1261,6 +1274,7 @@ mod tests {
             ("vault.meta", Some(VaultMeta)),
             ("vault.prefs", Some(VaultPrefs)),
             ("vault.dictionary", Some(VaultDictionary)),
+            ("vault.themes", Some(VaultThemes)),
             ("vault.attachments", Some(AttachmentsCatalog)),
             ("notes/0190a000-0000-7000-8000-000000000001.myn", Some(Note)),
             (
@@ -1409,6 +1423,7 @@ mod tests {
             MemberFamily::VaultMeta => "vault-meta",
             MemberFamily::VaultPrefs => "vault-prefs",
             MemberFamily::VaultDictionary => "vault-dictionary",
+            MemberFamily::VaultThemes => "vault-themes",
             MemberFamily::Note => "note",
             MemberFamily::Snapshot => "snapshot",
             MemberFamily::AttachmentsCatalog => "attachments-catalog",

@@ -76,6 +76,7 @@ pub mod search_blob;
 pub mod share_import_blob;
 pub mod subkey;
 pub mod template;
+pub mod themes_blob;
 pub mod types;
 pub mod vault_head;
 pub mod vault_indices_blob;
@@ -92,8 +93,8 @@ pub use account_number::{
     ACCOUNT_NUMBER_HASH_LEN,
 };
 pub use aead::{
-    aad_ai_embeddings_blob, aad_attachment_text_blob, aad_graph_layout_blob,
-    aad_note_content_encrypt, aad_note_item_key_wrap, aad_password_wrap,
+    aad_ai_embeddings_blob, aad_attachment_text_blob, aad_custom_themes_blob,
+    aad_graph_layout_blob, aad_note_content_encrypt, aad_note_item_key_wrap, aad_password_wrap,
     aad_personal_dictionary_blob, aad_prefs_blob, aad_quick_unlock_blob, aad_recovery_wrap,
     aad_search_index_blob, aad_vault_indices_blob, aad_vault_items_key_wrap, aad_workspace_blob,
     aead_open_ctx, aead_seal_ctx, AEAD_KEY_LEN, AEAD_NONCE_LEN, CTX_COMMITMENT_TAG_LEN,
@@ -178,6 +179,11 @@ pub use search_blob::{
 };
 pub use subkey::{derive_subkey, SubkeyRole};
 pub use template::{render, supported_tokens, RenderContext};
+pub use themes_blob::{
+    decode_themes_blob, encode_themes_blob, encode_themes_blob_raw, ThemesBlobError,
+    MAX_THEMES_PLAINTEXT_LEN, THEMES_BLOB_ACCOUNT_HASH_LEN, THEMES_BLOB_FORMAT_V1,
+    THEMES_BLOB_HEADER_LEN, THEMES_BLOB_MAGIC, THEMES_BLOB_PROTOCOL_VERSION,
+};
 pub use types::{
     generate_root_key, parse_kdf_params, serialize_kdf_params, validate_kdf_params, KdfParams,
     DEFAULT_V0_1_KDF_PARAMS, KDF_PARAMS_CANONICAL_LEN, MAX_KDF_M_KIB, MAX_KDF_P, MAX_KDF_T,

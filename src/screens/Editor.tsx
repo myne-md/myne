@@ -1153,7 +1153,18 @@ function EditorChrome({
     });
     // `slots` identity changes on save-as/switch/rename/delete; `root` /
     // `focusedPaneId` change on every layout edit of the active slot.
-  }, [restoreSettled, ws.slots, ws.activeWorkspaceId, ws.root, ws.focusedPaneId]);
+    // `expandedFolders` (MYND-455) is its OWN dep: the container ops spread
+    // `{...c}`, which preserves `slots`/`activeId` identity, so a sidebar
+    // folder toggle would otherwise never mark the blob dirty — and a Cmd+Q
+    // would flush the stale staged container and lose the expand set.
+  }, [
+    restoreSettled,
+    ws.slots,
+    ws.activeWorkspaceId,
+    ws.root,
+    ws.focusedPaneId,
+    ws.expandedFolders,
+  ]);
 
   // MYND-308 (SYNC-6, mtime-defense) — coalesced background flush. The
   // graceful-exit save (lock / close / quit / switch-vault) is the always-flush
@@ -2456,14 +2467,17 @@ function CommandPaletteHost({
         });
       },
       // Palette-gap #31 — apply a saved custom theme via the QuickPicker. Lists
-      // the valid custom themes; picking one reads its palette, persists it as the
-      // active choice, and applies it live (the CustomThemesSection apply path).
+      // the vault's custom themes (MYND-486: names from the vault.themes store —
+      // every stored theme is valid); picking one reads its palette, persists it
+      // as the active choice, and applies it live (the CustomThemesSection apply
+      // path).
       onApplyCustomTheme: () => {
         void (async () => {
-          const themes = (await listCustomThemes()).filter((th) => th.valid);
-          const items: QuickPickItem[] = themes.map((th) => ({
-            id: th.name,
-            label: th.display_name === "" ? th.name : th.display_name,
+          // The picker lists names only; the palette each entry carries is read
+          // back on pick (below) rather than held in the closure.
+          const items: QuickPickItem[] = (await listCustomThemes()).map(({ name }) => ({
+            id: name,
+            label: name,
           }));
           setPicker({
             title: t("commands.picker.applyThemeTitle"),

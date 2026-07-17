@@ -19,8 +19,8 @@
 //! (`sync-state.json`, `vault.head-state`); `notes_dir` is `<vault_root>/notes`.
 
 use super::conflict::{
-    merge_attachments_catalog, merge_vault_meta, meta_password_side_winner, plan_note_keep_both,
-    ConflictCopyPlan, MetaWinner,
+    merge_attachments_catalog, merge_custom_themes, merge_vault_meta, meta_password_side_winner,
+    plan_note_keep_both, ConflictCopyPlan, MetaWinner,
 };
 use super::engine::{self, ChangedBlob, PullError, PushBlob, PushError};
 use super::state::{
@@ -75,6 +75,15 @@ pub struct SyncSummary {
     /// emits the prefs-changed event off this (the orchestrator stays
     /// AppHandle-free).
     pub prefs_applied_remote: bool,
+    /// A remote `vault.themes` change was merged onto the on-disk store this
+    /// cycle (MYND-486) — a theme added, edited or deleted on a peer. Reported
+    /// for the same reason as `prefs_applied_remote` (the orchestrator stays
+    /// AppHandle-free, so any refresh choreography lives at the command
+    /// boundary). NOTE: no listener is wired yet — a same-name concurrent edit
+    /// resolves silently by LWW (a theme is not a note: no keep-both, no
+    /// conflict surface), and the WebView re-reads themes over IPC on demand.
+    /// The live-refresh event is a follow-on that needs a frontend listener.
+    pub themes_applied_remote: bool,
     /// Changed-note downloads skipped WITHOUT any local mutation this cycle:
     /// the body was 404/410 (reclaimed, §11.3) or its bytes failed the header
     /// nonce-vs-record check (empty / junk / mismatch). Never written to disk,
@@ -389,13 +398,23 @@ fn catalog_file_path(vault_root: &Path) -> std::path::PathBuf {
     vault_root.join("vault.attachments")
 }
 
-/// The catalog's reserved 16-byte sync-plane blob-id:
-/// `DeriveSubkey(root_key, "catalog-sync-id")[0..16]` (`protocol.md` §3.4).
-pub fn catalog_sync_id(root_key: &[u8; 32]) -> [u8; 16] {
-    let sub = derive_subkey(root_key, SubkeyRole::CatalogSyncId);
+/// A vault singleton's reserved 16-byte sync-plane blob-id:
+/// `DeriveSubkey(root_key, <role>)[0..16]` (`protocol.md` §3.4). `role` MUST be
+/// an **identifier** derivation (`catalog-sync-id` / `prefs-sync-id` /
+/// `themes-sync-id`), never a KEK role — the blob-id is server-visible, so
+/// truncating a key-derivation into it would leak key material to the sync
+/// plane.
+fn sync_id_for(root_key: &[u8; 32], role: SubkeyRole) -> [u8; 16] {
+    let sub = derive_subkey(root_key, role);
     let mut id = [0u8; 16];
     id.copy_from_slice(&sub[..16]);
     id
+}
+
+/// The catalog's reserved 16-byte sync-plane blob-id:
+/// `DeriveSubkey(root_key, "catalog-sync-id")[0..16]` (`protocol.md` §3.4).
+pub fn catalog_sync_id(root_key: &[u8; 32]) -> [u8; 16] {
+    sync_id_for(root_key, SubkeyRole::CatalogSyncId)
 }
 
 /// Read a vault singleton blob's outer 24-byte nonce (offset 6..30)
@@ -420,15 +439,29 @@ fn read_catalog_nonce(bytes: &[u8]) -> Option<[u8; 24]> {
 /// `DeriveSubkey(root_key, "prefs-sync-id")[0..16]` (`protocol.md` §3.4,
 /// MYND-478) — the `catalog_sync_id` twin.
 pub fn prefs_sync_id(root_key: &[u8; 32]) -> [u8; 16] {
-    let sub = derive_subkey(root_key, SubkeyRole::PrefsSyncId);
-    let mut id = [0u8; 16];
-    id.copy_from_slice(&sub[..16]);
-    id
+    sync_id_for(root_key, SubkeyRole::PrefsSyncId)
 }
 
 /// The prefs blob's sync discriminator (`read_singleton_nonce` over MYP1).
 fn read_prefs_nonce(bytes: &[u8]) -> Option<[u8; 24]> {
     read_singleton_nonce(bytes, b"MYP1")
+}
+
+/// `vault.themes`' reserved 16-byte sync-plane blob-id:
+/// `DeriveSubkey(root_key, "themes-sync-id")[0..16]` (`protocol.md` §3.4,
+/// MYND-486) — the `catalog_sync_id` / `prefs_sync_id` twin.
+pub fn themes_sync_id(root_key: &[u8; 32]) -> [u8; 16] {
+    sync_id_for(root_key, SubkeyRole::ThemesSyncId)
+}
+
+/// The themes blob's sync discriminator (`read_singleton_nonce` over MYT1).
+fn read_themes_nonce(bytes: &[u8]) -> Option<[u8; 24]> {
+    read_singleton_nonce(bytes, b"MYT1")
+}
+
+/// `<vault>/vault.themes` — the MYT1 custom-themes singleton.
+fn themes_file_path(vault_root: &Path) -> std::path::PathBuf {
+    vault_root.join("vault.themes")
 }
 
 /// The pending **attachment**-tombstone queue (`sync-protocol.md` §11.4): one
@@ -660,13 +693,7 @@ fn sync_catalog_phase(
             // baseline == server (version, nonce); nothing to push.
             crate::atomic_write::atomic_write(&path, &remote_bytes, true)
                 .map_err(|_| SyncCycleError::Io)?;
-            state.blobs.insert(
-                cat_hex,
-                BlobSyncState {
-                    version: rec.version,
-                    content_nonce_hex: hex(&rec.content_nonce),
-                },
-            );
+            record_blob_baseline(state, &cat_hex, rec);
             return Ok(CatalogPhase {
                 merged,
                 dirty: false,
@@ -681,13 +708,7 @@ fn sync_catalog_phase(
             .map_err(|_| SyncCycleError::Io)?;
         // Record the server's version as the CAS base WITHOUT claiming its
         // nonce (the local file now differs → dirty).
-        state.blobs.insert(
-            cat_hex,
-            BlobSyncState {
-                version: rec.version,
-                content_nonce_hex: hex(&rec.content_nonce),
-            },
-        );
+        record_blob_baseline(state, &cat_hex, rec);
         return Ok(CatalogPhase {
             merged,
             dirty: true,
@@ -707,10 +728,14 @@ fn sync_catalog_phase(
     })
 }
 
-/// Record the server's current prefs revision as the CAS baseline
-/// (version + nonce) — the one bookkeeping step every `sync_prefs_phase`
-/// branch that has seen a server record performs.
-fn record_prefs_baseline(state: &mut SyncState, id_hex: &str, rec: &ChangedBlob) {
+/// Record the server's current revision of a vault singleton as the CAS
+/// baseline (version + nonce) — the one bookkeeping step every phase branch
+/// (catalog / prefs / themes) that has seen a server record performs.
+///
+/// Recording the server's nonce does NOT claim the local file matches it: a
+/// merge branch writes freshly-re-encrypted local bytes (a different nonce) and
+/// reports `dirty`, using the recorded version purely as the push's CAS base.
+fn record_blob_baseline(state: &mut SyncState, id_hex: &str, rec: &ChangedBlob) {
     state.blobs.insert(
         id_hex.to_string(),
         BlobSyncState {
@@ -821,7 +846,7 @@ fn sync_prefs_phase(
             {
                 crate::atomic_write::atomic_write(&path, &remote_bytes, true)
                     .map_err(|_| SyncCycleError::Io)?;
-                record_prefs_baseline(state, &id_hex, rec);
+                record_blob_baseline(state, &id_hex, rec);
                 let shared_hash = shared_subset_hash(&seeded);
                 set_prefs_gate_baseline(vault_root, shared_hash.clone());
                 return Ok(PrefsPhase {
@@ -868,7 +893,7 @@ fn sync_prefs_phase(
             // == server (version, nonce); nothing to push.
             crate::atomic_write::atomic_write(&path, &remote_bytes, true)
                 .map_err(|_| SyncCycleError::Io)?;
-            record_prefs_baseline(state, &id_hex, rec);
+            record_blob_baseline(state, &id_hex, rec);
             set_prefs_gate_baseline(vault_root, merged_hash.clone());
             return Ok(PrefsPhase {
                 dirty: false,
@@ -891,7 +916,7 @@ fn sync_prefs_phase(
                 crate::atomic_write::atomic_write(&path, &merged_bytes, true)
                     .map_err(|_| SyncCycleError::Io)?;
             }
-            record_prefs_baseline(state, &id_hex, rec);
+            record_blob_baseline(state, &id_hex, rec);
             set_prefs_gate_baseline(vault_root, merged_hash.clone());
             return Ok(PrefsPhase {
                 dirty: false,
@@ -908,7 +933,7 @@ fn sync_prefs_phase(
             .map_err(|_| SyncCycleError::Io)?;
         crate::atomic_write::atomic_write(&path, &merged_bytes, true)
             .map_err(|_| SyncCycleError::Io)?;
-        record_prefs_baseline(state, &id_hex, rec);
+        record_blob_baseline(state, &id_hex, rec);
         return Ok(PrefsPhase {
             dirty: true,
             applied_remote,
@@ -924,7 +949,7 @@ fn sync_prefs_phase(
     if let Some(rec) = remote_record {
         // Self-heal the CAS baseline so a re-enrolled/migrated device stops
         // registering as never-synced.
-        record_prefs_baseline(state, &id_hex, rec);
+        record_blob_baseline(state, &id_hex, rec);
         // Self-heal the RAM push-gate baseline ONLY when the local blob is
         // provably the server's exact bytes (nonce match). Healing in the
         // other sub-case would baptize an unsynced shared edit as "already
@@ -959,6 +984,129 @@ fn sync_prefs_phase(
         dirty,
         applied_remote: false,
         shared_hash,
+    })
+}
+
+/// The themes phase's outcome (MYND-486).
+struct ThemesPhase {
+    /// The themes blob needs a push: a local-only change, or a merge that
+    /// differed from the server's plaintext.
+    dirty: bool,
+    /// A remote change was merged onto the on-disk store this cycle.
+    applied_remote: bool,
+}
+
+/// Pull-side `vault.themes` reconciliation (MYND-486). The `sync_catalog_phase`
+/// twin: `vault.themes` carries **no device-local subset** (every theme is
+/// shared vault content), so the push gate is the blob nonce vs the synced
+/// baseline — no shared-subset hash, which is the one twist `sync_prefs_phase`
+/// needs and this phase does not. Downloads a changed remote themes blob, runs
+/// the per-theme-name [`merge_custom_themes`] post-decrypt, and either **adopts
+/// the server bytes verbatim** (merge equal to the remote — re-encrypting would
+/// nonce-churn an endless push loop) or writes the merged store freshly (dirty
+/// → pushed this cycle with the server's version as CAS base). Holds the themes
+/// plugin's write mutex across the read-merge-write.
+// Each argument is a distinct cycle input (the same shape as the sibling
+// catalog/prefs phases); a bundling struct would not aid clarity here.
+#[allow(clippy::too_many_arguments)]
+fn sync_themes_phase(
+    transport: &dyn SyncTransport,
+    token: &str,
+    root_key: &[u8; 32],
+    account_number_hash: &[u8; 16],
+    vault_root: &Path,
+    state: &mut SyncState,
+    themes_id: &[u8; 16],
+    remote_record: Option<&ChangedBlob>,
+) -> Result<ThemesPhase, SyncCycleError> {
+    use crate::plugins::themes::commands::{decode_themes_map_or_empty, encode_themes_map};
+
+    let _guard = crate::plugins::themes::commands::write_mutex().blocking_lock();
+
+    let path = themes_file_path(vault_root);
+    let local_bytes = std::fs::read(&path).ok();
+    let local_nonce = local_bytes.as_deref().and_then(read_themes_nonce);
+
+    // Decrypting the local store costs an HKDF + a full AEAD open + a whole-map
+    // JSON parse, so it happens ONLY on the two paths that read the plaintext:
+    // the remote-reconcile branch (which merges) and the virgin-store check
+    // below. The steady state — no remote change, local nonce == baseline —
+    // proves byte-cleanliness from the nonce alone and never decrypts. (The
+    // `sync_catalog_phase` twin decodes eagerly for a reason this phase lacks:
+    // it RETURNS the merged catalog to the downstream attachment loop, while
+    // `ThemesPhase` returns only flags.)
+    // §9.21.4 read semantic: any local decode failure falls back to empty.
+    let decode_local = || {
+        let themes_key = derive_subkey(root_key, SubkeyRole::CustomThemesKey);
+        let map =
+            decode_themes_map_or_empty(&themes_key, account_number_hash, local_bytes.as_deref());
+        (themes_key, map)
+    };
+
+    let id_hex = hex(themes_id);
+    let baseline_nonce_hex = state
+        .blobs
+        .get(&id_hex)
+        .map(|b| b.content_nonce_hex.clone());
+
+    // A remote record whose nonce we already hold needs no download.
+    let remote_changed = remote_record
+        .map(|r| Some(r.content_nonce) != local_nonce)
+        .unwrap_or(false);
+
+    if let (Some(rec), true) = (remote_record, remote_changed) {
+        let remote_bytes =
+            download_blob_backoff(transport, token, &rec.id).map_err(SyncCycleError::Pull)?;
+        let (themes_key, local_map) = decode_local();
+        // A hostile/corrupt remote store collapses to empty (§9.21.4);
+        // merge(local, empty) == local, so nothing is lost and the local store
+        // re-pushes over it.
+        let remote_map =
+            decode_themes_map_or_empty(&themes_key, account_number_hash, Some(&remote_bytes));
+        let merged = merge_custom_themes(&local_map, &remote_map);
+        let applied_remote = merged != local_map;
+
+        let (bytes, dirty) = if merged == remote_map {
+            // Adopt the server bytes VERBATIM — byte-identical store + baseline
+            // == server (version, nonce); nothing to push. Re-encrypting an
+            // already-agreeing store would churn the nonce and push forever.
+            (remote_bytes, false)
+        } else {
+            // The merge beat the server's store → write it fresh and push it
+            // this cycle against the server's current version. The local file
+            // (freshly re-encrypted) intentionally carries a different nonce
+            // from the recorded CAS base.
+            (
+                encode_themes_map(&themes_key, account_number_hash, &merged)
+                    .map_err(|_| SyncCycleError::Io)?,
+                true,
+            )
+        };
+        crate::atomic_write::atomic_write(&path, &bytes, true).map_err(|_| SyncCycleError::Io)?;
+        record_blob_baseline(state, &id_hex, rec);
+        return Ok(ThemesPhase {
+            dirty,
+            applied_remote,
+        });
+    }
+
+    // No (changed) remote themes record: dirty iff the local file drifted from
+    // the synced baseline. Every themes write re-encrypts under a fresh nonce,
+    // so a local blob whose outer nonce still equals the baseline's is provably
+    // byte-untouched since the last sync. A virgin empty store (no themes, no
+    // baseline) is deliberately NOT pushed — a theme-less vault stays
+    // themes-silent, exactly as an attachment-less vault stays catalog-silent.
+    let local_nonce_hex = local_nonce.map(|n| hex(&n));
+    // The virgin-store conjunct is ordered baseline-first so the cheap `is_none`
+    // gates the expensive decode: only a never-synced vault pays it, and only
+    // after the nonce check already proved the file drifted. Both conjuncts are
+    // pure, so the order swap is semantics-preserving.
+    let dirty = local_bytes.is_some()
+        && local_nonce_hex != baseline_nonce_hex
+        && !(baseline_nonce_hex.is_none() && decode_local().1.is_empty());
+    Ok(ThemesPhase {
+        dirty,
+        applied_remote: false,
     })
 }
 
@@ -1258,10 +1406,11 @@ fn sync_cycle_attempt(
     // self-heal below re-establishes per-blob versions (MYND-426 task 8).
     let mut reconcile_ran = false;
     // The engine's `local` map covers every synced artefact this device holds —
-    // notes, attachment sync-ids, and the catalog singleton — so an unchanged
-    // record is never flagged `changed` and the baseline self-heal below covers
-    // all three (MYND-468). The attachment/catalog phases are gated on
-    // `attachment_keys` (legacy note-only cycles pass `None`).
+    // notes, attachment sync-ids, and the catalog + themes singletons — so an
+    // unchanged record is never flagged `changed` and the baseline self-heal
+    // below covers them all (MYND-468, MYND-486). The attachment/catalog phases
+    // are gated on `attachment_keys` (legacy note-only cycles pass `None`);
+    // the themes phase is unconditional.
     // ONE disk scan per attempt (notes + attachments): the pull loop below
     // maintains both manifests in memory as it writes, and (§11.3) ONLY ever
     // writes bytes whose header nonce matched the wire record — mismatching
@@ -1270,6 +1419,7 @@ fn sync_cycle_attempt(
     // longer needed. The push-detect and head-manifest phases reuse the
     // maintained manifests instead of re-walking every blob header.
     let cat_id = attachment_keys.map(|_| catalog_sync_id(root_key));
+    let themes_id = themes_sync_id(root_key);
     let mut att_scan: BTreeMap<[u8; 16], AttachmentManifestEntry> = if attachment_keys.is_some() {
         scan_attachments_manifest(&attachments_dir(vault_root))
     } else {
@@ -1290,6 +1440,13 @@ fn sync_cycle_attempt(
         {
             local.insert(cid, n);
         }
+    }
+    if let Some(n) = std::fs::read(themes_file_path(vault_root))
+        .ok()
+        .as_deref()
+        .and_then(read_themes_nonce)
+    {
+        local.insert(themes_id, n);
     }
     let page = match engine::pull_to_stable(
         transport,
@@ -1508,13 +1665,36 @@ fn sync_cycle_attempt(
         remote_prefs_rec,
     )?;
 
+    // --- themes phase (MYND-486) — unconditional, every cycle ---
+    // Like the catalog + prefs singletons, `vault.themes` is never
+    // head-committed; its dirty blob rides the push batch below so the CAS/409
+    // machinery covers it. (`themes_id` is derived once per attempt, above.)
+    let remote_themes_rec = page
+        .all_metas
+        .iter()
+        .find(|m| m.id == themes_id && m.attachment_id.is_none());
+    let themes_phase = sync_themes_phase(
+        transport,
+        token,
+        root_key,
+        &account_number_hash,
+        vault_root,
+        state,
+        &themes_id,
+        remote_themes_rec,
+    )?;
+
     // --- apply remote changes: download + write each changed NOTE blob to disk ---
     let mut pulled = 0;
     let mut pull_skipped = 0usize;
     for c in &page.changed {
-        // Attachment records were handled above; the catalog and prefs records
-        // are their phases' (never written as notes).
-        if c.attachment_id.is_some() || Some(c.id) == cat_id || c.id == prefs_id {
+        // Attachment records were handled above; the catalog, prefs and themes
+        // records are their phases' (never written as notes).
+        if c.attachment_id.is_some()
+            || Some(c.id) == cat_id
+            || c.id == prefs_id
+            || c.id == themes_id
+        {
             continue;
         }
         // Skip a locally-dirty blob: our on-disk copy diverges from the synced
@@ -1865,6 +2045,28 @@ fn sync_cycle_attempt(
                 }
             }
         }
+
+        // A dirty themes blob (local-only change, or a merge that beat the
+        // server's store) rides the same batch as an inline blob (MYND-486).
+        if themes_phase.dirty {
+            if let Ok(bytes) = std::fs::read(themes_file_path(vault_root)) {
+                if let Some(nonce) = read_themes_nonce(&bytes) {
+                    let base = state
+                        .blobs
+                        .get(&hex(&themes_id))
+                        .map(|b| b.version)
+                        .unwrap_or(0);
+                    to_push.push(PushBlob {
+                        id: themes_id,
+                        base_version: base,
+                        content_nonce: nonce,
+                        ciphertext: bytes,
+                        tombstone: false,
+                        attachment_id: None,
+                    });
+                }
+            }
+        }
     }
 
     let mut pushed = 0;
@@ -1989,6 +2191,7 @@ fn sync_cycle_attempt(
         attachments_pushed,
         attachments_deleted,
         prefs_applied_remote: prefs_phase.applied_remote,
+        themes_applied_remote: themes_phase.applied_remote,
         pull_skipped,
         dropped,
     })
@@ -5918,6 +6121,264 @@ mod tests {
             assert_eq!(on_disk.icon.as_deref(), Some("book"));
             assert_eq!(on_disk.field_clocks.get("label"), Some(&200));
             assert_eq!(on_disk.field_clocks.get("icon"), Some(&300));
+            std::fs::remove_dir_all(&dir).ok();
+        }
+    }
+
+    // ---- MYND-486: vault.themes phase (sync_themes_phase) --------------------
+
+    mod themes_phase {
+        use super::super::*;
+        use crate::plugins::sync::state::SyncState;
+        use crate::plugins::sync::transport::FakeTransport;
+        use crate::plugins::themes::commands::{
+            encode_themes_map, ThemeEntry, ThemePalette, ThemesMap,
+        };
+        use base64::engine::general_purpose::STANDARD as B64;
+        use base64::Engine as _;
+
+        const ROOT: [u8; 32] = [0x42; 32];
+        const HASH: [u8; 16] = [0x33; 16];
+        const T0: u64 = 1_700_000_000;
+
+        fn scratch(tag: &str) -> std::path::PathBuf {
+            let d = std::env::temp_dir().join(format!(
+                "myne-themesphase-{tag}-{}-{:p}",
+                std::process::id(),
+                &tag
+            ));
+            std::fs::create_dir_all(&d).unwrap();
+            d
+        }
+
+        fn themes_key() -> zeroize::Zeroizing<[u8; 32]> {
+            derive_subkey(&ROOT, SubkeyRole::CustomThemesKey)
+        }
+
+        fn theme(name: &str, accent: &str, now: u64) -> (String, ThemeEntry) {
+            (
+                name.to_string(),
+                ThemeEntry::live(
+                    ThemePalette::from([("--accent".into(), accent.into())]),
+                    now,
+                ),
+            )
+        }
+
+        fn write_local(dir: &Path, map: &ThemesMap) {
+            let bytes = encode_themes_map(&themes_key(), &HASH, map).unwrap();
+            std::fs::write(dir.join("vault.themes"), &bytes).unwrap();
+        }
+
+        fn read_local(dir: &Path) -> ThemesMap {
+            let bytes = std::fs::read(dir.join("vault.themes")).unwrap();
+            crate::plugins::themes::commands::decode_themes_map_or_empty(
+                &themes_key(),
+                &HASH,
+                Some(&bytes),
+            )
+        }
+
+        /// Encode a remote store and register its blob under `/sync/blob?id=…`.
+        fn serve_remote(t: &FakeTransport, tid: &[u8; 16], map: &ThemesMap) -> ChangedBlob {
+            let bytes = encode_themes_map(&themes_key(), &HASH, map).unwrap();
+            let nonce = read_themes_nonce(&bytes).unwrap();
+            let body = serde_json::json!({ "ciphertext_b64": B64.encode(&bytes) });
+            t.on(
+                HttpMethod::Get,
+                &format!("/sync/blob?id={}", hex(tid)),
+                200,
+                serde_json::to_vec(&body).unwrap(),
+            );
+            ChangedBlob {
+                id: *tid,
+                content_nonce: nonce,
+                version: 7,
+                size: bytes.len(),
+                attachment_id: None,
+            }
+        }
+
+        // The themes sync-id is the reserved DeriveSubkey(root, "themes-sync-id")
+        // [0..16] — deterministic across the fleet and distinct from the sibling
+        // singletons' ids (a collision would merge two blob families).
+        #[test]
+        fn themes_sync_id_is_deterministic_and_distinct() {
+            assert_eq!(themes_sync_id(&ROOT), themes_sync_id(&ROOT));
+            assert_ne!(themes_sync_id(&ROOT), prefs_sync_id(&ROOT));
+            assert_ne!(themes_sync_id(&ROOT), catalog_sync_id(&ROOT));
+            assert_ne!(themes_sync_id(&ROOT), themes_sync_id(&[0x11; 32]));
+        }
+
+        // A theme-less vault stays themes-silent: no local blob, no server
+        // record ⇒ nothing to push (no §10.2.1-style initial publish here —
+        // vault.themes carries no vault identity a joiner needs).
+        #[test]
+        fn virgin_store_is_not_pushed() {
+            let dir = scratch("virgin");
+            let mut st = SyncState::default();
+            let t = FakeTransport::new();
+            let tid = themes_sync_id(&ROOT);
+
+            let phase =
+                sync_themes_phase(&t, "tok", &ROOT, &HASH, &dir, &mut st, &tid, None).unwrap();
+            assert!(!phase.dirty, "a theme-less vault generates no traffic");
+            assert!(!phase.applied_remote);
+            std::fs::remove_dir_all(&dir).ok();
+        }
+
+        // A local import the server has never seen ⇒ push.
+        #[test]
+        fn local_only_theme_is_dirty() {
+            let dir = scratch("localonly");
+            write_local(&dir, &ThemesMap::from([theme("nord", "#88c0d0", T0)]));
+            let mut st = SyncState::default();
+            let t = FakeTransport::new();
+            let tid = themes_sync_id(&ROOT);
+
+            let phase =
+                sync_themes_phase(&t, "tok", &ROOT, &HASH, &dir, &mut st, &tid, None).unwrap();
+            assert!(phase.dirty, "an unsynced local theme must push");
+            std::fs::remove_dir_all(&dir).ok();
+        }
+
+        // The push gate: a local blob whose nonce still equals the synced
+        // baseline's is provably untouched since the last sync ⇒ no push.
+        #[test]
+        fn unchanged_local_blob_generates_no_push() {
+            let dir = scratch("clean");
+            let map = ThemesMap::from([theme("nord", "#88c0d0", T0)]);
+            write_local(&dir, &map);
+            let nonce = read_themes_nonce(&std::fs::read(dir.join("vault.themes")).unwrap())
+                .expect("MYT1 nonce");
+            let mut st = SyncState::default();
+            let tid = themes_sync_id(&ROOT);
+            st.blobs.insert(
+                hex(&tid),
+                BlobSyncState {
+                    version: 3,
+                    content_nonce_hex: hex(&nonce),
+                },
+            );
+            let t = FakeTransport::new();
+
+            let phase =
+                sync_themes_phase(&t, "tok", &ROOT, &HASH, &dir, &mut st, &tid, None).unwrap();
+            assert!(!phase.dirty, "byte-untouched blob must not push");
+            std::fs::remove_dir_all(&dir).ok();
+        }
+
+        // A concurrent add on each side: the merge keeps BOTH themes, beats the
+        // server's store ⇒ written fresh + pushed this cycle, with the server's
+        // version recorded as the CAS base.
+        #[test]
+        fn concurrent_adds_merge_and_push() {
+            let dir = scratch("merge");
+            write_local(&dir, &ThemesMap::from([theme("nord", "#88c0d0", T0)]));
+            let mut st = SyncState::default();
+            let t = FakeTransport::new();
+            let tid = themes_sync_id(&ROOT);
+            let remote = ThemesMap::from([theme("solarized", "#268bd2", T0 + 1)]);
+            let rec = serve_remote(&t, &tid, &remote);
+
+            let phase = sync_themes_phase(&t, "tok", &ROOT, &HASH, &dir, &mut st, &tid, Some(&rec))
+                .unwrap();
+            assert!(phase.dirty, "merge beat the server ⇒ push");
+            assert!(phase.applied_remote, "the peer's theme landed locally");
+            let on_disk = read_local(&dir);
+            assert_eq!(on_disk.len(), 2, "both themes survive");
+            assert!(on_disk.contains_key("nord"));
+            assert!(on_disk.contains_key("solarized"));
+            // The server's revision is the CAS base for this cycle's push.
+            assert_eq!(st.blobs[&hex(&tid)].version, 7);
+            std::fs::remove_dir_all(&dir).ok();
+        }
+
+        // The merge equals the remote (a virgin device pulling a peer's store):
+        // adopt the server bytes VERBATIM — re-encrypting would nonce-churn an
+        // endless push loop.
+        #[test]
+        fn merge_equal_to_remote_adopts_server_bytes_verbatim() {
+            let dir = scratch("adopt");
+            let mut st = SyncState::default();
+            let t = FakeTransport::new();
+            let tid = themes_sync_id(&ROOT);
+            let remote = ThemesMap::from([theme("nord", "#88c0d0", T0)]);
+            let rec = serve_remote(&t, &tid, &remote);
+
+            let phase = sync_themes_phase(&t, "tok", &ROOT, &HASH, &dir, &mut st, &tid, Some(&rec))
+                .unwrap();
+            assert!(!phase.dirty, "adopting the server's bytes pushes nothing");
+            assert!(phase.applied_remote);
+            assert_eq!(read_local(&dir), remote);
+            // Baseline == the server's exact revision (version + nonce), so the
+            // next cycle sees the blob as clean.
+            let on_disk_nonce =
+                read_themes_nonce(&std::fs::read(dir.join("vault.themes")).unwrap()).unwrap();
+            assert_eq!(st.blobs[&hex(&tid)].content_nonce_hex, hex(&on_disk_nonce));
+            assert_eq!(st.blobs[&hex(&tid)].version, 7);
+            std::fs::remove_dir_all(&dir).ok();
+        }
+
+        // A remote delete vs a stale local live copy: the tombstone wins the
+        // merge (no resurrection) and the theme leaves the local list.
+        #[test]
+        fn remote_tombstone_applies_locally_without_resurrection() {
+            let dir = scratch("tomb");
+            write_local(&dir, &ThemesMap::from([theme("nord", "#88c0d0", T0)]));
+            let mut st = SyncState::default();
+            let t = FakeTransport::new();
+            let tid = themes_sync_id(&ROOT);
+            let (name, entry) = theme("nord", "#88c0d0", T0);
+            let remote = ThemesMap::from([(name, entry.into_tombstone(T0 + 10))]);
+            let rec = serve_remote(&t, &tid, &remote);
+
+            let phase = sync_themes_phase(&t, "tok", &ROOT, &HASH, &dir, &mut st, &tid, Some(&rec))
+                .unwrap();
+            assert!(phase.applied_remote, "the peer's delete landed");
+            let on_disk = read_local(&dir);
+            assert!(
+                on_disk["nord"].is_tombstone(),
+                "the local live copy did NOT resurrect the theme"
+            );
+            assert!(
+                crate::plugins::themes::commands::themes_list_in_dir(&dir, &themes_key(), &HASH)
+                    .is_empty(),
+                "a tombstoned theme is gone from the user's list"
+            );
+            std::fs::remove_dir_all(&dir).ok();
+        }
+
+        // A hostile/corrupt remote store collapses to empty (§9.21.4):
+        // merge(local, empty) == local, so nothing is lost and the local store
+        // re-pushes over it.
+        #[test]
+        fn corrupt_remote_store_loses_nothing() {
+            let dir = scratch("hostile");
+            let local = ThemesMap::from([theme("nord", "#88c0d0", T0)]);
+            write_local(&dir, &local);
+            let mut st = SyncState::default();
+            let t = FakeTransport::new();
+            let tid = themes_sync_id(&ROOT);
+            let body = serde_json::json!({ "ciphertext_b64": B64.encode(b"not a MYT1 blob") });
+            t.on(
+                HttpMethod::Get,
+                &format!("/sync/blob?id={}", hex(&tid)),
+                200,
+                serde_json::to_vec(&body).unwrap(),
+            );
+            let rec = ChangedBlob {
+                id: tid,
+                content_nonce: [0x9e; 24],
+                version: 7,
+                size: 15,
+                attachment_id: None,
+            };
+
+            let phase = sync_themes_phase(&t, "tok", &ROOT, &HASH, &dir, &mut st, &tid, Some(&rec))
+                .unwrap();
+            assert!(phase.dirty, "the local store re-pushes over the garbage");
+            assert_eq!(read_local(&dir), local, "nothing lost");
             std::fs::remove_dir_all(&dir).ok();
         }
     }

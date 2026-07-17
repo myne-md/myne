@@ -436,4 +436,26 @@ describe("named-workspaces container (de)serialization", () => {
       ),
     ).toBeNull();
   });
+
+  // MYND-455: sidebar folder-expand set at the container level.
+  it("round-trips the sidebar folder-expand set (MYND-455)", () => {
+    const c: NamedWorkspaces = { ...emptyNamedWorkspaces("p1", "s1"), expandedFolders: ["work/", "work/docs/"] };
+    const restored = deserializeWorkspaces(serializeWorkspaces(c));
+    expect(restored!.expandedFolders).toEqual(["work/", "work/docs/"]);
+  });
+
+  it("omits the folder-expand set when empty (no format bump)", () => {
+    const empty = emptyNamedWorkspaces("p1", "s1");
+    const json = serializeWorkspaces(empty);
+    // Absent from the wire when empty — byte-compatible with a pre-455 reader.
+    expect(JSON.parse(json)).not.toHaveProperty("expandedFolders");
+    expect(deserializeWorkspaces(json)!.expandedFolders).toBeUndefined();
+    // A serialized empty-array field is also tolerated as "unset" on read.
+    const withEmptyArr = JSON.stringify({ ...JSON.parse(json), expandedFolders: [] });
+    expect(deserializeWorkspaces(withEmptyArr)!.expandedFolders).toBeUndefined();
+    // A malformed field is tolerated (treated as unset), never a hard reject.
+    const withGarbage = JSON.stringify({ ...JSON.parse(json), expandedFolders: [1, 2] });
+    expect(deserializeWorkspaces(withGarbage)).not.toBeNull();
+    expect(deserializeWorkspaces(withGarbage)!.expandedFolders).toBeUndefined();
+  });
 });

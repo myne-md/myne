@@ -45,6 +45,8 @@
 //! | [`SubkeyRole::AttachmentTextKey`]      | `attachment-text-key`     |
 //! | [`SubkeyRole::CatalogSyncId`]          | `catalog-sync-id`         |
 //! | [`SubkeyRole::PrefsSyncId`]            | `prefs-sync-id`           |
+//! | [`SubkeyRole::CustomThemesKey`]        | `custom-themes-key`       |
+//! | [`SubkeyRole::ThemesSyncId`]           | `themes-sync-id`          |
 //!
 //! Future v0.1.x revisions may register additional roles by appending
 //! variants to [`SubkeyRole`]. The `#[non_exhaustive]` attribute
@@ -170,6 +172,25 @@ const ROLE_STR_PREFS_SYNC_ID: &[u8] = b"prefs-sync-id";
 /// `ai_enabled` on. DISTINCT from the AAD role string `"ai-embeddings-blob"`.
 const ROLE_STR_AI_EMBEDDINGS_KEY: &[u8] = b"ai-embeddings-key";
 
+/// Registered role string for the v0.1 custom-themes blob KEK
+/// (MYND-486; encrypts the `vault.themes` custom-theme palette store —
+/// `themes_blob.rs`, `MYT1`, `protocol.md` § 9.21 + § 3.4). Load-bearing:
+/// drift silently changes the KEK. `root_key`-derived (like prefs/search/
+/// dictionary), so it is `itemsKey`-independent and survives a v005 epoch
+/// rotation. DISTINCT from the AAD role string `"custom-themes-blob"`.
+const ROLE_STR_CUSTOM_THEMES_KEY: &[u8] = b"custom-themes-key";
+
+/// Registered role string for the Phase 2 sync blob-id of `vault.themes`
+/// (MYND-486; `protocol.md` §3.4, `sync-protocol.md` §10.x). Like the
+/// attachments catalog and `vault.prefs`, `vault.themes` is a synced
+/// singleton outside the head manifest, so it needs a deterministic,
+/// device-independent 16-byte identifier in the sync metadata plane:
+/// `themes_sync_id = derive_subkey(root_key, ThemesSyncId)[0..16]`.
+/// Like `catalog-sync-id` / `prefs-sync-id` this derives an *identifier*,
+/// NOT key material — the themes KEK stays `custom-themes-key`.
+/// Load-bearing: drift silently splits vault.themes into a second sync
+/// record on every existing account.
+const ROLE_STR_THEMES_SYNC_ID: &[u8] = b"themes-sync-id";
 /// Registered role string for the v0.1 graph-layout blob KEK (encrypts the
 /// `vault.graph` on-device knowledge-graph layout cache — `graph_layout_blob.rs`,
 /// `MYG1`, `protocol.md` § 9.19). Load-bearing: drift silently changes the KEK.
@@ -274,6 +295,22 @@ pub enum SubkeyRole {
     /// (like `CatalogSyncId` / `AttachmentsIdHmac`); the prefs KEK stays
     /// `PrefsKey`. Domain-separated from every other role.
     PrefsSyncId,
+    /// KEK for the v0.1 custom-themes blob (`vault.themes`, `MYT1`,
+    /// MYND-486). Encrypts the `{theme_name → palette_map}` custom-theme
+    /// store under XChaCha20-Poly1305 (CTX commitment outer). `root_key`-derived
+    /// (like prefs/search/dictionary), so it is `itemsKey`-independent and
+    /// survives a v005 epoch rotation. Distinct from every other
+    /// `root_key`-derived blob KEK so every blob family is cryptographically
+    /// domain-separated; distinct from the AAD role `"custom-themes-blob"`.
+    CustomThemesKey,
+    /// Phase 2 sync blob-id derivation for `vault.themes` (MYND-486;
+    /// `protocol.md` §3.4, `sync-protocol.md` §10.x). The first 16 bytes of
+    /// the derived output are the themes blob's reserved sync-plane blob-id —
+    /// deterministic across the fleet, indistinguishable from a note UUID to
+    /// the server. Derives an **identifier**, NOT key material (like
+    /// `PrefsSyncId` / `CatalogSyncId` / `AttachmentsIdHmac`); the themes KEK
+    /// stays `CustomThemesKey`. Domain-separated from every other role.
+    ThemesSyncId,
     /// KEK for the v0.1 graph-layout blob (`vault.graph`, `MYG1`). Encrypts the
     /// on-device knowledge-graph layout cache (node positions + a staleness
     /// marker) under XChaCha20-Poly1305 (CTX commitment outer). `root_key`-derived
@@ -304,6 +341,8 @@ impl SubkeyRole {
             SubkeyRole::AiEmbeddingsKey => ROLE_STR_AI_EMBEDDINGS_KEY,
             SubkeyRole::CatalogSyncId => ROLE_STR_CATALOG_SYNC_ID,
             SubkeyRole::PrefsSyncId => ROLE_STR_PREFS_SYNC_ID,
+            SubkeyRole::CustomThemesKey => ROLE_STR_CUSTOM_THEMES_KEY,
+            SubkeyRole::ThemesSyncId => ROLE_STR_THEMES_SYNC_ID,
             SubkeyRole::GraphLayoutKey => ROLE_STR_GRAPH_LAYOUT_KEY,
         }
     }
@@ -571,6 +610,56 @@ mod tests {
     }
 
     #[test]
+    fn themes_sync_id_role_string_matches_spec_registry() {
+        // MYND-486 registry entry "myne.v0.1 themes-sync-id" (§3.4;
+        // sync-protocol.md §10.x). Derives vault.themes' reserved 16-byte
+        // sync blob-id; drift silently splits vault.themes into a second
+        // sync record on every existing account.
+        assert_eq!(SubkeyRole::ThemesSyncId.role_str(), b"themes-sync-id");
+    }
+
+    #[test]
+    fn themes_sync_id_is_distinct_from_other_roles() {
+        // The themes sync blob-id derivation must be domain-separated from
+        // the themes KEK (the id is public-ish sync metadata; the KEK is key
+        // material — the §9.10.1-class id/KEK pair), from the sibling
+        // identifier derivations (catalog-sync-id / prefs-sync-id), and from
+        // the other non-KEK roles.
+        let root = [0u8; 32];
+        let ts = derive_subkey(&root, SubkeyRole::ThemesSyncId);
+        assert_ne!(*ts, *derive_subkey(&root, SubkeyRole::CustomThemesKey));
+        assert_ne!(*ts, *derive_subkey(&root, SubkeyRole::PrefsSyncId));
+        assert_ne!(*ts, *derive_subkey(&root, SubkeyRole::CatalogSyncId));
+        assert_ne!(*ts, *derive_subkey(&root, SubkeyRole::AttachmentsIdHmac));
+        assert_ne!(*ts, *derive_subkey(&root, SubkeyRole::ItemsKeyWrap));
+    }
+
+    #[test]
+    fn custom_themes_key_role_string_matches_spec_registry() {
+        // MYND-486 registry entry "myne.v0.1 custom-themes-key" (§ 9.21).
+        // Frozen + load-bearing: drift silently changes the vault.themes KEK.
+        assert_eq!(SubkeyRole::CustomThemesKey.role_str(), b"custom-themes-key");
+    }
+
+    #[test]
+    fn custom_themes_key_is_distinct_from_other_root_key_blobs() {
+        // The custom-themes KEK must differ from EVERY other root_key-derived
+        // blob KEK so the blob families are domain-separated (HKDF info-string
+        // property). Most load-bearing: distinctness from personal-dictionary-key
+        // — vault.themes (MYT1) is the structural twin of vault.dictionary (MYD1),
+        // one KEK each.
+        let root = [0u8; 32];
+        let ct = derive_subkey(&root, SubkeyRole::CustomThemesKey);
+        assert_ne!(*ct, *derive_subkey(&root, SubkeyRole::PersonalDictKey));
+        assert_ne!(*ct, *derive_subkey(&root, SubkeyRole::PrefsKey));
+        assert_ne!(*ct, *derive_subkey(&root, SubkeyRole::SearchIndexKey));
+        assert_ne!(*ct, *derive_subkey(&root, SubkeyRole::SessionStateKey));
+        assert_ne!(*ct, *derive_subkey(&root, SubkeyRole::VaultIndicesKey));
+        assert_ne!(*ct, *derive_subkey(&root, SubkeyRole::ItemsKeyWrap));
+        assert_ne!(*ct, *derive_subkey(&root, SubkeyRole::GraphLayoutKey));
+    }
+
+    #[test]
     fn graph_layout_key_role_string_matches_spec_registry() {
         // Registry entry "myne.v0.1 graph-layout-key" (§3.4; §9.19). KEK for
         // the vault.graph layout cache; drift silently changes the KEK.
@@ -590,6 +679,7 @@ mod tests {
         assert_ne!(*gl, *derive_subkey(&root, SubkeyRole::AiEmbeddingsKey));
         assert_ne!(*gl, *derive_subkey(&root, SubkeyRole::SessionStateKey));
         assert_ne!(*gl, *derive_subkey(&root, SubkeyRole::PrefsKey));
+        assert_ne!(*gl, *derive_subkey(&root, SubkeyRole::CustomThemesKey));
     }
 
     #[test]
@@ -774,6 +864,8 @@ mod tests {
                 SubkeyRole::AiEmbeddingsKey => "ai-embeddings-key",
                 SubkeyRole::CatalogSyncId => "catalog-sync-id",
                 SubkeyRole::PrefsSyncId => "prefs-sync-id",
+                SubkeyRole::CustomThemesKey => "custom-themes-key",
+                SubkeyRole::ThemesSyncId => "themes-sync-id",
                 SubkeyRole::GraphLayoutKey => "graph-layout-key",
             }
         }

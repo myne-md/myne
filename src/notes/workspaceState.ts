@@ -885,6 +885,12 @@ export type WorkspaceSlot = {
 export type NamedWorkspaces = {
   slots: WorkspaceSlot[];
   activeId: SlotId;
+  /** Sidebar file-tree folder-expand state (MYND-455) — the folded keys of
+   *  OPEN folders. Window-global (one set for the sidebar, not per-slot), so it
+   *  lives at the container level. Omit-when-empty on serialize (no format
+   *  bump). Container ops spread `{...c}`, so it survives switch/save/rename;
+   *  `emptyNamedWorkspaces` omits it (a fresh vault opens collapsed). */
+  expandedFolders?: readonly string[];
 };
 
 /** Caller-supplied slot-id factory (the app wires `crypto.randomUUID`). */
