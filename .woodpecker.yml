@@ -258,13 +258,16 @@ steps:
     depends_on: [e2e]
     environment:
       CI: "true"
-      # NOTE: the myne_server_token from_secret is intentionally omitted for now.
-      # A from_secret pointing at a secret this repo can't see errors the WHOLE
-      # pipeline at config-compile stage (no step runs, not even notify), which
-      # was blocking every push here. Without the env the guard below skips
-      # sync-sim cleanly and the rest of the pipeline runs. Re-add
-      #   MYNE_SERVER_TOKEN: { from_secret: myne_server_token }
-      # once that secret is available to THIS repo (org-level or repo-level).
+      # Forgejo PAT (read:repository on Myne/myne-server) for the private-
+      # companion clone below. The secret `myne_server_token` is configured on
+      # THIS repo (Woodpecker → repo → Settings → Secrets). The guard below
+      # still `exit 0`s when it resolves empty (e.g. a fork PR), so sync-sim
+      # never blocks a merge. CAUTION for future edits: a from_secret pointing
+      # at a secret this repo cannot see errors the WHOLE pipeline at
+      # config-compile (no step runs) — never reference a secret before it is
+      # configured on the repo.
+      MYNE_SERVER_TOKEN:
+        from_secret: myne_server_token
     commands:
       - |
         if [ -z "${MYNE_SERVER_TOKEN:-}" ]; then
@@ -279,8 +282,11 @@ steps:
       - apt-get update && apt-get install -y --no-install-recommends curl ca-certificates git xz-utils pkg-config libssl-dev libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev libasound2-dev
       # Go toolchain (matches myne-server go.mod 1.26.x) to build the server.
       - curl -fsSL https://go.dev/dl/go1.26.4.linux-amd64.tar.gz | tar -C /usr/local -xz
-      # Clone the private companion via the Forgejo mirror + build a static binary.
-      - git clone --depth 1 "https://oauth2:$MYNE_SERVER_TOKEN@github.com/myne-md/myne-server.git" "$CI_WORKSPACE/myne-server"
+      # Clone the private companion via the Forgejo mirror (git.myne.md/Myne/
+      # myne-server — the in-house source a Forgejo PAT authenticates against,
+      # NOT github.com; it tracks develop on a 10-minute interval) + build a
+      # static binary.
+      - git clone --depth 1 "https://oauth2:$MYNE_SERVER_TOKEN@git.myne.md/Myne/myne-server.git" "$CI_WORKSPACE/myne-server"
       - cd "$CI_WORKSPACE/myne-server" && CGO_ENABLED=0 /usr/local/go/bin/go build -o myne-server ./cmd/myne-server
       - cd "$CI_WORKSPACE"
       # Point the harness at the freshly built server and run ONLY the sim suite.
