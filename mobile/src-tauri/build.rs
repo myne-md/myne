@@ -186,13 +186,25 @@ fn main() {
                 tauri_build::InlinedPlugin::new().commands(&["save_secret_text"]),
             )
             .plugin(
+                // Knowledge-graph layout cache (MYG1, §9.19): shared from
+                // `myne-core`; the same two commands the desktop registers.
+                // Adding a command here without a matching entry in
+                // `permissions/graph-layout/default.toml` is a security bug.
+                "graph-layout",
+                tauri_build::InlinedPlugin::new()
+                    .commands(&["graph_layout_read", "graph_layout_write"]),
+            )
+            .plugin(
                 // MYND-458: the mobile `sync` shim over `myne_core::plugins::sync`
-                // — the SAME 15 commands the desktop registers, deny-by-default.
+                // — the SAME 19 commands the desktop registers, deny-by-default.
                 // (MYND-459 T12: `sync_head_fingerprint` added — the SY-05 SAS
-                // eye-compare substrate, exposed on mobile to match desktop F3-T4.)
+                // eye-compare substrate, exposed on mobile to match desktop F3-T4.
+                // MYND-427 follow-up: the recovered-notes quarantine quartet —
+                // list/read/restore/delete — registered for parity; no mobile UI
+                // surfaces it yet.)
                 // This list, the `generate_handler!` in `plugins/sync/mod.rs`, and
                 // `permissions/sync/default.toml` `commands.allow` MUST match
-                // exactly (all 17) or the ACL resolver fails closed. Adding a
+                // exactly (all 21) or the ACL resolver fails closed. Adding a
                 // command here without a matching permission entry is a security
                 // bug (SYNC-15). The lifecycle pair is mobile-only (desktop
                 // never manages the SyncLifecycleSignal).
@@ -213,6 +225,10 @@ fn main() {
                     "sync_join_account",
                     "sync_reset_local",
                     "sync_head_fingerprint",
+                    "sync_list_quarantine",
+                    "sync_read_quarantine",
+                    "sync_restore_quarantine",
+                    "sync_delete_quarantine",
                     "sync_lifecycle_suspend",
                     "sync_lifecycle_resume",
                 ]),

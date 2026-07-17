@@ -99,6 +99,10 @@ export interface MockConfig {
    *  the matching `text` (raw frontmatter + body). For the saved-view render
    *  flow: the view's filter runs over these live notes. */
   notes?: Array<{ id: string; text: string }>;
+  /** Reject `note_read` for these ids (the failed-open flow). The list load's
+   *  per-note read falls back to `""` on rejection, so a seeded row still
+   *  renders — only the open itself fails. */
+  noteReadErrorIds?: string[];
   /** Preseed saved views into `prefs_read`. The prefs store is STATEFUL —
    *  `upsert_saved_view` / `set_view_order` / `delete_saved_view` mutate it, so
    *  a view created through the UI appears on the next `usePrefs` re-read. */
@@ -113,6 +117,14 @@ export interface MockConfig {
     string,
     Array<[string, { key: string; type: string; value?: string; elements?: Array<{ type: string; value: string }> }]>
   >;
+  /** Make `vault_indices_all_edges` reject so the graph falls back to
+   *  client-extracted wikilink edges over the seeded `notes` bodies (the graph
+   *  flow's edge source — real extraction, no canned edge dump to drift). */
+  backendEdgesUnavailable?: boolean;
+  /** Canned `graph_layout_read` payload — the encrypted `vault.graph` cache's
+   *  plaintext (`{"v":1,"pos":[[id,x,y],…]}`), or `null` for a cold vault.
+   *  Writes are recorded on `window.__graphLayoutWrites` (payload strings). */
+  graphLayoutPayload?: string | null;
 }
 
 /** Install the mock IPC as an init script so it runs before the app's first paint. */
@@ -258,6 +270,21 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
       // fall back to the drawing flow's `noteIds`-only seed.
       "plugin:notes|note_list": () =>
         seededNotes.length > 0 ? seededNotes.map((n) => n.id) : config.noteIds ?? [],
+      // ── Vault-indices graph surface ──
+      // Default [] keeps `backendEdges` an empty dump (degree-0 graph); the
+      // graph flow sets `backendEdgesUnavailable` so the sweep rejects and
+      // EditorFlow falls back to `clientEdges` over the seeded bodies.
+      "plugin:vault-indices|vault_indices_all_edges": () => {
+        if (config.backendEdgesUnavailable) throw { kind: "unavailable" };
+        return [];
+      },
+      // ── Graph-layout persistence (vault.graph MYG1 cache) ──
+      "plugin:graph-layout|graph_layout_read": () => config.graphLayoutPayload ?? null,
+      "plugin:graph-layout|graph_layout_write": (args) => {
+        const w = window as unknown as { __graphLayoutWrites?: string[] };
+        (w.__graphLayoutWrites ??= []).push(String(args.payload ?? ""));
+        return null;
+      },
       // ── Vault-indices property surface (saved-view property conditions) ──
       "plugin:vault-indices|vault_indices_property_keys": () => config.propertyKeys ?? [],
       "plugin:vault-indices|vault_indices_property_values": (args) =>
@@ -322,10 +349,11 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
         (w.__noteDeletes ??= []).push(String(args.id ?? ""));
         return null;
       },
-      "plugin:notes|note_read": (args) =>
-        noteText.get(String(args.noteId ?? "")) ??
-        config.noteBodies?.[String(args.noteId ?? "")] ??
-        "",
+      "plugin:notes|note_read": (args) => {
+        const id = String(args.noteId ?? "");
+        if (config.noteReadErrorIds?.includes(id)) throw { kind: "Io", detail: { io_error_kind: "NotFound" } };
+        return noteText.get(id) ?? config.noteBodies?.[id] ?? "";
+      },
       "plugin:captures|seal_staged": () => {
         const w = window as unknown as { __sealStagedCalls?: number };
         w.__sealStagedCalls = (w.__sealStagedCalls ?? 0) + 1;

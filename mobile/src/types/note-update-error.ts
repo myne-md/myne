@@ -50,7 +50,15 @@ export type NoteUpdateError =
    */
   | { kind: "Io"; detail: { io_error_kind: IoFailureKind } }
   /** `tokio::task::spawn_blocking` panic / runtime shutdown. */
-  | { kind: "JoinFailure" };
+  | { kind: "JoinFailure" }
+  /**
+   * The on-disk plaintext no longer matches the caller-declared base
+   * (`expectedBaseHashHex` — the desktop autosave's §11.3 expected-base
+   * guard). MOBILE NEVER SENDS THE BASE HASH, so this variant is
+   * unreachable on mobile today; it is mirrored only to keep the closed
+   * union byte-identical with the Rust enum (drift discipline).
+   */
+  | { kind: "BaseMismatch" };
 
 /** Type-narrowing helper for the `Io` variant. */
 export function isUpdateIoError(
