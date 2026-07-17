@@ -15,6 +15,13 @@ publish = false
 # extracted into this crate (decisions.md 2026-07-07).
 [dependencies]
 protocol = { path = "../protocol" }
+# The single source-of-truth custom-theme value-shape allowlist (MYND-508),
+# shared with the desktop client + the myne-themes marketplace CI. The
+# `themes` core plugin (MYND-486) validates every imported palette through
+# `theme_validator::validate_theme` before sealing it into the MYT1
+# `vault.themes` blob — no reimplementation of the security-load-bearing
+# injection guard (threat-model §149).
+theme-validator = { path = "../theme-validator" }
 tauri = { version = "2", features = [] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

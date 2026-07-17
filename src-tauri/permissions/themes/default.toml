@@ -1,48 +1,48 @@
-# Permissions for the in-app `themes` Tauri plugin (custom-themes epic,
-# MYND-297). Picked up under the `themes:` ACL namespace only because `build.rs`
-# declares this as an `InlinedPlugin`. Capability files reference these as
-# `themes:default` (or the individual `themes:allow-*` permissions).
+# Permissions for the in-app `themes` Tauri plugin (MYND-486).
+# Picked up under the `themes:` ACL namespace only because `build.rs` declares
+# this as an `InlinedPlugin`. Capability files reference these as `themes:default`
+# (or the individual `themes:allow-*` permissions).
 #
-# Theme files are device-local plaintext app-config (not vault content, not
-# Slot-gated). These three commands are read/list/delete over
-# `app_config_dir/themes/`; each runs the `is_valid_theme_name` path-traversal
-# guard before any path join (TB6). The `default` bundle is the only one
-# consumed in v0.1; like the other write-capable plugins, v0.2 multi-window MUST
-# NOT grant `allow-delete-custom-theme` to any non-main window.
+# As of MYND-486 the custom-theme palettes are VAULT CONTENT (the encrypted
+# `vault.themes` `MYT1` blob, protocol.md § 9.21), NOT device-local plaintext.
+# Every command is Slot::Unlocked-gated. The mutating commands (import / delete)
+# are write setters, so — like the other write-capable plugins — v0.2
+# multi-window MUST NOT grant `allow-themes-import` or `allow-themes-delete` to
+# any non-main window. The `default` bundle is the only one consumed in v0.1.
 
 "$schema" = "../../gen/schemas/desktop-schema.json"
 
 [default]
-description = "Default permission set for the themes plugin — list + read + delete custom theme files."
+description = "Default permission set for the themes plugin — list + read + export (read) and import + delete (write) of vault-content custom themes."
 permissions = [
-  "allow-list-custom-themes",
-  "allow-read-custom-theme",
-  "allow-delete-custom-theme",
-  "allow-import-custom-theme",
-  "allow-ensure-themes-dir",
+  "allow-themes-list",
+  "allow-themes-read",
+  "allow-themes-export",
+  "allow-themes-import",
+  "allow-themes-delete",
 ]
 
 [[permission]]
-identifier = "allow-list-custom-themes"
-description = "Allow invoking themes:list_custom_themes (lists validated custom themes in app_config_dir/themes/ as ThemeInfo rows with preview swatches; invalid files surface greyed with their error; an absent directory yields an empty list; no native side-effect)."
-commands.allow = ["list_custom_themes"]
+identifier = "allow-themes-list"
+description = "Allow invoking themes:themes_list (Slot::Unlocked-gated read of the sorted custom-theme names in the vault.themes MYT1 blob; falls back to an empty list on absence / AEAD-fail / parse-fail per protocol.md § 9.21.4)."
+commands.allow = ["themes_list"]
 
 [[permission]]
-identifier = "allow-read-custom-theme"
-description = "Allow invoking themes:read_custom_theme (reads + validates one theme file by name, returning its CSS-variable palette map; rejects an unsafe name via is_valid_theme_name before any path join; NotFound when absent)."
-commands.allow = ["read_custom_theme"]
+identifier = "allow-themes-read"
+description = "Allow invoking themes:themes_read (Slot::Unlocked-gated read of one custom theme's CSS-variable palette by name from vault.themes; NotFound when the name is absent from the store)."
+commands.allow = ["themes_read"]
 
 [[permission]]
-identifier = "allow-delete-custom-theme"
-description = "Allow invoking themes:delete_custom_theme (deletes one theme file by name; rejects an unsafe name via is_valid_theme_name before any path join; idempotent — deleting an absent theme is a no-op success)."
-commands.allow = ["delete_custom_theme"]
+identifier = "allow-themes-export"
+description = "Allow invoking themes:themes_export (Slot::Unlocked-gated read of one custom theme's palette for a plaintext .json export — byte-identical to themes_read; the caller writes the returned palette to a user-chosen file, a TB3 egress the user initiated)."
+commands.allow = ["themes_export"]
 
 [[permission]]
-identifier = "allow-import-custom-theme"
-description = "Allow invoking themes:import_custom_theme (reads a user-picked .json file, validates it, derives a safe name from its file-stem, and places it in app_config_dir/themes/; rejects an unsafe name or invalid content before writing; no native side-effect)."
-commands.allow = ["import_custom_theme"]
+identifier = "allow-themes-import"
+description = "Allow invoking themes:themes_import (Slot::Unlocked-gated upsert of a validated custom theme under a name; the raw .json is validated through the shared theme_validator value-shape allowlist — the security-load-bearing injection guard — BEFORE it is sealed into vault.themes; an invalid palette rejects with Invalid before any write)."
+commands.allow = ["themes_import"]
 
 [[permission]]
-identifier = "allow-ensure-themes-dir"
-description = "Allow invoking themes:ensure_themes_dir (creates app_config_dir/themes/ if missing and returns its path for the picker's Open-themes-folder reveal; no native side-effect)."
-commands.allow = ["ensure_themes_dir"]
+identifier = "allow-themes-delete"
+description = "Allow invoking themes:themes_delete (Slot::Unlocked-gated delete of one custom theme by name from vault.themes; idempotent — deleting an absent name is a no-op success)."
+commands.allow = ["themes_delete"]

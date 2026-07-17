@@ -121,6 +121,12 @@ export function serializeWorkspaces(container: NamedWorkspaces): string {
       state: { root: s.state.root, focusedPaneId: s.state.focusedPaneId },
     })),
     activeId: container.activeId,
+    // MYND-455: sidebar folder-expand set, omit-when-empty (no format bump —
+    // the named-workspaces omit-when-default discipline). A pre-455 reader
+    // tolerates the unknown field; a post-455 reader tolerates its absence.
+    ...(container.expandedFolders && container.expandedFolders.length > 0
+      ? { expandedFolders: [...container.expandedFolders] }
+      : {}),
   });
 }
 
@@ -177,7 +183,17 @@ export function deserializeWorkspaces(
   // a self-inconsistent blob is corruption and rejects here).
   if (!slotIds.has(obj.activeId)) return null;
 
-  return { slots, activeId: obj.activeId };
+  // MYND-455: sidebar folder-expand set (optional, forward/backward compatible).
+  // A malformed field is tolerated as absent (a stray value is not corruption —
+  // worst case the sidebar opens collapsed), keeping it strictly additive.
+  const expandedFolders =
+    Array.isArray(obj.expandedFolders) && obj.expandedFolders.every((k) => typeof k === "string")
+      ? (obj.expandedFolders as string[])
+      : undefined;
+
+  return expandedFolders && expandedFolders.length > 0
+    ? { slots, activeId: obj.activeId, expandedFolders }
+    : { slots, activeId: obj.activeId };
 }
 
 /** One parsed tab: a valid item, a well-formed-but-unknown-kind tab to DROP

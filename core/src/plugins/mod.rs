@@ -24,6 +24,7 @@ pub mod secret_export;
 pub mod share_import;
 pub mod snapshots;
 pub mod sync;
+pub mod themes;
 pub mod vault_change_password;
 pub mod vault_creation;
 pub mod vault_delete;

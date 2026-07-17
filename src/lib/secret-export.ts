@@ -69,3 +69,33 @@ export async function saveSecretAsTextFile(
     logErrorKind(e, "fs-write-failed");
   }
 }
+
+/**
+ * Save plaintext `contents` as a user-chosen `.json` file via the same
+ * narrow save-seam as {@link saveSecretAsTextFile} (the Rust core does the only
+ * IO; the WebView holds no fs-write scope, and the command re-validates the
+ * destination against the app-data / vault tree). Used by the custom-theme
+ * export (MYND-486) — a palette is not secret, but reusing this one file-write
+ * path keeps the seam narrow. A cancelled dialog resolves silently; a write
+ * failure REJECTS so the caller can surface it.
+ */
+export async function saveJsonAsFile(
+  defaultPath: string,
+  contents: string,
+  filterName: string,
+): Promise<void> {
+  let path: string | null;
+  try {
+    path = await dialogSave({
+      defaultPath,
+      filters: [{ name: filterName, extensions: ["json"] }],
+    });
+  } catch (e) {
+    // A dialog-open failure is indistinguishable from a cancel to the user;
+    // swallow it (nothing was written) rather than surfacing a scary error.
+    logErrorKind(e, "dialog-save-failed");
+    return;
+  }
+  if (!path) return; // user cancelled the save dialog
+  await invoke("plugin:secret-export|save_secret_text", { path, contents });
+}

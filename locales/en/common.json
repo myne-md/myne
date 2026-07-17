@@ -1502,6 +1502,7 @@
       "exportPdf": "Export as PDF…",
       "exportTxt": "Export as Plain Text…",
       "favoritesHeading": "Favorites",
+      "icon": "Icon…",
       "mergeAnyway": "Merge anyway",
       "newDrawingHere": "New drawing here",
       "newDrawingMenu": "New drawing",
@@ -2014,7 +2015,7 @@
       "confirm": "Confirm",
       "delete": "Delete",
       "deleteError": "Couldn't delete that theme. Please try again.",
-      "empty": "No custom themes yet. Import one, or open the themes folder and add a theme file.",
+      "empty": "No custom themes yet. Import a theme file to get started.",
       "error": {
         "aColorFallback": "a color",
         "invalidFile": "Invalid theme file.",
@@ -2025,14 +2026,14 @@
         "parseError": "Not valid JSON",
         "parseErrorWithLine": "Not valid JSON (line {{line}})"
       },
+      "export": "Export",
+      "exportError": "Couldn't export that theme. Please try again.",
       "fileFilterName": "Myne theme",
       "helper": "Use your own color palette. Themes are validated on this device before use — nothing is uploaded.",
       "importButton": "Import theme…",
       "importError": "That file isn't a valid theme. Open the reference to see the format.",
       "label": "Custom themes",
-      "openFolderButton": "Open themes folder",
-      "openFolderError": "Couldn't open the themes folder.",
-      "readError": "Couldn't read your themes folder."
+      "readError": "Couldn't read your custom themes."
     },
     "dailyNotes": {
       "blankTemplate": "Blank (no template)",

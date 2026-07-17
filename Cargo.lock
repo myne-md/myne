@@ -3266,6 +3266,7 @@ dependencies = [
  "serde_json",
  "sha2",
  "tauri",
+ "theme-validator",
  "thiserror 2.0.18",
  "tokio",
  "tracing",

@@ -1,32 +1,44 @@
 // @vitest-environment jsdom
 //
 // Component tests for `src/components/settings/CustomThemesSection.tsx` (custom-
-// themes epic, MYND-112). Drives the picker's real handler wiring against mocked
-// IPC-boundary wrappers: empty state, valid/active/invalid rows, Apply (read →
-// persist → apply → mark active), the inline two-step delete confirm, and Import
-// (file dialog → import → refresh). The Tauri dialog/opener plugins are mocked.
+// themes epic, MYND-112; vault-content promotion MYND-486). Drives the picker's
+// real handler wiring against mocked IPC-boundary wrappers: empty state, a
+// row + preview, Apply (read → persist → apply → mark active), Export (read →
+// save .json), the inline two-step delete confirm, and Import (file dialog →
+// read picked file → import → refresh). Every stored theme is valid (import
+// validates before sealing), so there is no invalid-row case.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 const listCustomThemes = vi.fn();
 const readCustomTheme = vi.fn();
-const deleteCustomTheme = vi.fn();
+const exportCustomTheme = vi.fn();
 const importCustomTheme = vi.fn();
-const ensureThemesDir = vi.fn();
+const deleteCustomTheme = vi.fn();
+const readPickedThemeFile = vi.fn();
 const setCustomTheme = vi.fn();
 const prefsRead = vi.fn();
 const applyCustomTheme = vi.fn();
 const applyTheme = vi.fn();
+const saveJsonAsFile = vi.fn();
 const openFileDialog = vi.fn();
-const revealItemInDir = vi.fn();
 
 vi.mock("../../src/lib/themes", () => ({
   listCustomThemes: (...a: unknown[]) => listCustomThemes(...a),
   readCustomTheme: (...a: unknown[]) => readCustomTheme(...a),
-  deleteCustomTheme: (...a: unknown[]) => deleteCustomTheme(...a),
+  exportCustomTheme: (...a: unknown[]) => exportCustomTheme(...a),
   importCustomTheme: (...a: unknown[]) => importCustomTheme(...a),
-  ensureThemesDir: (...a: unknown[]) => ensureThemesDir(...a),
+  deleteCustomTheme: (...a: unknown[]) => deleteCustomTheme(...a),
+  readPickedThemeFile: (...a: unknown[]) => readPickedThemeFile(...a),
+  // Pure helper — a light real-ish impl so the row's preview chiplet renders.
+  themePreview: (palette: Record<string, string>) => ({
+    background: palette["--paper"] ?? "",
+    surface: palette["--paper-2"] ?? "",
+    foreground: palette["--ink-1"] ?? "",
+    accent: palette["--accent"] ?? "",
+    line: palette["--line-1"] ?? "",
+  }),
 }));
 vi.mock("../../src/lib/prefs", () => ({
   setCustomTheme: (...a: unknown[]) => setCustomTheme(...a),
@@ -36,34 +48,21 @@ vi.mock("../../src/lib/theme", () => ({
   applyCustomTheme: (...a: unknown[]) => applyCustomTheme(...a),
   applyTheme: (...a: unknown[]) => applyTheme(...a),
 }));
+vi.mock("../../src/lib/secret-export", () => ({
+  saveJsonAsFile: (...a: unknown[]) => saveJsonAsFile(...a),
+}));
 vi.mock("@tauri-apps/plugin-dialog", () => ({
   open: (...a: unknown[]) => openFileDialog(...a),
-}));
-vi.mock("@tauri-apps/plugin-opener", () => ({
-  revealItemInDir: (...a: unknown[]) => revealItemInDir(...a),
 }));
 
 import { CustomThemesSection } from "../../src/components/settings/CustomThemesSection";
 
-const VALID = {
-  name: "solar",
-  display_name: "solar",
-  preview: {
-    background: "#111111",
-    surface: "#222222",
-    foreground: "#333333",
-    accent: "#444444",
-    line: "#555555",
-  },
-  valid: true,
-  error: null,
-};
-const INVALID = {
-  name: "broken",
-  display_name: "broken",
-  preview: null,
-  valid: false,
-  error: { kind: "MissingKey", key: "--accent" },
+const PALETTE = {
+  "--paper": "#111111",
+  "--paper-2": "#222222",
+  "--ink-1": "#333333",
+  "--accent": "#444444",
+  "--line-1": "#555555",
 };
 
 function renderSection(activeCustom: string | null = null) {
@@ -76,16 +75,17 @@ function renderSection(activeCustom: string | null = null) {
 
 beforeEach(() => {
   listCustomThemes.mockReset().mockResolvedValue([]);
-  readCustomTheme.mockReset().mockResolvedValue({ "--paper": "#111111" });
+  readCustomTheme.mockReset().mockResolvedValue(PALETTE);
+  exportCustomTheme.mockReset().mockResolvedValue(PALETTE);
+  importCustomTheme.mockReset().mockResolvedValue(undefined);
   deleteCustomTheme.mockReset().mockResolvedValue(undefined);
-  importCustomTheme.mockReset().mockResolvedValue(VALID);
-  ensureThemesDir.mockReset().mockResolvedValue("/cfg/themes");
+  readPickedThemeFile.mockReset().mockResolvedValue(JSON.stringify(PALETTE));
   setCustomTheme.mockReset().mockResolvedValue(undefined);
   prefsRead.mockReset().mockResolvedValue({ theme: "dark", custom_theme: null });
   applyCustomTheme.mockReset();
   applyTheme.mockReset();
+  saveJsonAsFile.mockReset().mockResolvedValue(undefined);
   openFileDialog.mockReset().mockResolvedValue(null);
-  revealItemInDir.mockReset().mockResolvedValue(undefined);
 });
 
 afterEach(cleanup);
@@ -96,18 +96,18 @@ describe("CustomThemesSection", () => {
     await waitFor(() => expect(screen.getByTestId("settings.custom-theme-empty")).toBeTruthy());
   });
 
-  it("renders a valid theme row with a preview chiplet and Apply", async () => {
-    listCustomThemes.mockResolvedValue([VALID]);
+  it("renders a theme row with a preview chiplet, Apply, and Export", async () => {
+    listCustomThemes.mockResolvedValue([{ name: "solar", palette: PALETTE }]);
     renderSection();
     const row = await screen.findByTestId("settings.custom-theme-row");
     expect(row.getAttribute("data-theme-name")).toBe("solar");
-    expect(row.getAttribute("data-valid")).toBe("true");
     expect(row.getAttribute("data-active")).toBe("false");
     expect(screen.getByTestId("settings.custom-theme-apply")).toBeTruthy();
+    expect(screen.getByTestId("settings.custom-theme-export")).toBeTruthy();
   });
 
   it("marks the active theme row Applied and hides its Apply button", async () => {
-    listCustomThemes.mockResolvedValue([VALID]);
+    listCustomThemes.mockResolvedValue([{ name: "solar", palette: PALETTE }]);
     renderSection("solar");
     const row = await screen.findByTestId("settings.custom-theme-row");
     expect(row.getAttribute("data-active")).toBe("true");
@@ -115,7 +115,7 @@ describe("CustomThemesSection", () => {
   });
 
   it("Apply reads the palette, persists the selection, applies it, and marks it active", async () => {
-    listCustomThemes.mockResolvedValue([VALID]);
+    listCustomThemes.mockResolvedValue([{ name: "solar", palette: PALETTE }]);
     const { onActiveCustomChange } = renderSection();
     fireEvent.click(await screen.findByTestId("settings.custom-theme-apply"));
     await waitFor(() => expect(setCustomTheme).toHaveBeenCalledWith("solar"));
@@ -124,8 +124,19 @@ describe("CustomThemesSection", () => {
     expect(onActiveCustomChange).toHaveBeenCalledWith("solar");
   });
 
+  it("Export reads the palette and saves it as a .json file", async () => {
+    listCustomThemes.mockResolvedValue([{ name: "solar", palette: PALETTE }]);
+    renderSection();
+    fireEvent.click(await screen.findByTestId("settings.custom-theme-export"));
+    await waitFor(() => expect(exportCustomTheme).toHaveBeenCalledWith("solar"));
+    await waitFor(() => expect(saveJsonAsFile).toHaveBeenCalled());
+    const [defaultPath, contents] = saveJsonAsFile.mock.calls[0];
+    expect(defaultPath).toBe("solar.json");
+    expect(JSON.parse(contents as string)).toEqual(PALETTE);
+  });
+
   it("Delete is a two-step inline confirm", async () => {
-    listCustomThemes.mockResolvedValue([VALID]);
+    listCustomThemes.mockResolvedValue([{ name: "solar", palette: PALETTE }]);
     renderSection();
     fireEvent.click(await screen.findByTestId("settings.custom-theme-delete"));
     // First click arms the confirm; nothing deleted yet.
@@ -134,27 +145,12 @@ describe("CustomThemesSection", () => {
     await waitFor(() => expect(deleteCustomTheme).toHaveBeenCalledWith("solar"));
   });
 
-  it("renders an invalid theme greyed with its error and no Apply", async () => {
-    listCustomThemes.mockResolvedValue([INVALID]);
-    renderSection();
-    const row = await screen.findByTestId("settings.custom-theme-row");
-    expect(row.getAttribute("data-valid")).toBe("false");
-    expect(screen.queryByTestId("settings.custom-theme-apply")).toBeNull();
-    expect(row.textContent).toContain("--accent");
-  });
-
-  it("Import opens the file dialog and imports the picked file", async () => {
+  it("Import opens the file dialog, reads the picked file, and imports it under its stem", async () => {
     openFileDialog.mockResolvedValue("/tmp/my-theme.json");
     renderSection();
     await waitFor(() => expect(listCustomThemes).toHaveBeenCalled());
     fireEvent.click(screen.getByTestId("settings.custom-theme-import"));
-    await waitFor(() => expect(importCustomTheme).toHaveBeenCalledWith("/tmp/my-theme.json"));
-  });
-
-  it("Open themes folder ensures the dir then reveals it", async () => {
-    renderSection();
-    await waitFor(() => expect(listCustomThemes).toHaveBeenCalled());
-    fireEvent.click(screen.getByTestId("settings.custom-theme-open-folder"));
-    await waitFor(() => expect(revealItemInDir).toHaveBeenCalledWith("/cfg/themes"));
+    await waitFor(() => expect(readPickedThemeFile).toHaveBeenCalledWith("/tmp/my-theme.json"));
+    expect(importCustomTheme).toHaveBeenCalledWith("my-theme", JSON.stringify(PALETTE));
   });
 });
