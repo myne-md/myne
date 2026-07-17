@@ -36,6 +36,18 @@ export async function pageSeatInvoke(
   );
 }
 
+/** Page-seat IPC that unwraps the result (throws on `err`, returns `ok`). */
+export async function ipcOk(
+  session: Session,
+  cmd: string,
+  args: Record<string, unknown> = {},
+  timeoutMs = 20_000,
+): Promise<unknown> {
+  const r = await pageSeatInvoke(session, cmd, args, timeoutMs);
+  if (r.err !== undefined) throw new Error(`${cmd} failed: ${JSON.stringify(r.err)}`);
+  return r.ok;
+}
+
 /**
  * Unlock the currently-targeted vault and wait for the editor: the
  * canonical password → submit → `editor.root` sequence shared by every
@@ -202,6 +214,17 @@ export async function dismissImporterOfferIfPresent(session: Session): Promise<v
   }
   await dismiss.click();
   await session.waitForGone(testIdSelector("importer.offer-root"));
+}
+
+/** Lock the vault via the editor Lock CTA and re-unlock to the editor — the
+ *  in-session round-trip that forces a full remount (backend re-hydrates its
+ *  session state from disk). The importer offer does not re-appear on a
+ *  populated vault, so the second mount uses `dismissImporterOfferIfPresent`. */
+export async function lockAndReunlock(session: Session, password: string): Promise<void> {
+  await (await session.byTestId("editor.lock-cta")).click();
+  await session.byTestId("unlock.password-input", { timeoutMs: 30_000 });
+  await unlockToEditor(session, password);
+  await dismissImporterOfferIfPresent(session);
 }
 
 /** Open the Settings modal from the editor's gear button and wait for

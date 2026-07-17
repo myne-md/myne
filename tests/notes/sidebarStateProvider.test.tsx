@@ -363,15 +363,17 @@ describe("useSelectedNote — rename re-sync", () => {
 });
 
 describe("useSelectedNote — reloadOpenNote", () => {
-  it("bumps the nonce only when a note is selected", () => {
+  it("bumps the nonce unconditionally — even with nothing selected", () => {
     const { result } = renderHook(() => useSelectedNote(), { wrapper });
-    // No selection → no-op.
+    // No selection still bumps: a sync pull can rewrite notes parked in
+    // unfocused panes (or behind a focused view/graph tab) while nothing is
+    // selected; panes apply their own dirty guards (stale-pane overwrite fix).
     act(() => result.current.reloadOpenNote());
-    expect(result.current.contentReloadNonce).toBe(0);
+    expect(result.current.contentReloadNonce).toBe(1);
 
     act(() => result.current.select("open-note"));
     act(() => result.current.reloadOpenNote());
-    expect(result.current.contentReloadNonce).toBe(1);
+    expect(result.current.contentReloadNonce).toBe(2);
   });
 });
 

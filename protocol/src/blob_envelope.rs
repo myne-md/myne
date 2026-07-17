@@ -4,7 +4,7 @@
 //! "opaque inner plaintext" blob codecs: `vault.search` (`MYS1`, §9.6),
 //! `vault.workspace` (`MYW1`, §9.7), `vault.indices` (`MYI1`, §9.8),
 //! `vault.dictionary` (`MYD1`, §9.13), `vault.embeddings` (`MYR1`, §9.17), and
-//! `vault.themes` (`MYT1`, §9.20).
+//! `vault.themes` (`MYT1`, §9.21).
 //!
 //! All six share a BYTE-IDENTICAL framing:
 //!

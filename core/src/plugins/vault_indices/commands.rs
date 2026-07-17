@@ -75,17 +75,19 @@ pub async fn vault_indices_apply(
     Ok(())
 }
 
-/// Defensive ceiling on a single whole-vault edge dump. The normal path
-/// routes by `note_count()` so this never trips at ≤ cap; it exists only to
-/// bound a pathological payload (cf. the per-blob pre-alloc caps §9.2/§9.6.5).
-const MAX_GRAPH_EDGES: usize = 500_000;
+/// Defensive ceiling on a single whole-vault edge dump. The client no longer
+/// caps the graph by note count (the whole vault renders at any size), so this
+/// is the SOLE guard bounding a pathological IPC payload — a high, finite
+/// DoS/memory backstop, NOT a render limit (cf. per-blob pre-alloc caps
+/// §9.2/§9.6.5). Sized well above any realistic vault (~200k notes × ~10 links).
+const MAX_GRAPH_EDGES: usize = 2_000_000;
 
 /// Whole-vault edge dump — `[(note_id, edges)]` for every indexed note
 /// (MYND-197). The TS graph adapter resolves the raw edges once against the
-/// resident note-set. The client routes by note count BEFORE calling this (a
-/// `> cap` vault takes the per-note subgraph path), so this only runs at
-/// ≤ cap; the [`MAX_GRAPH_EDGES`] ceiling is a defensive backstop. Rejected
-/// with [`VaultIndicesError::SlotNotUnlocked`] when no vault is unlocked.
+/// resident note-set and lays the graph out off-thread. The client dumps the
+/// WHOLE vault (no node cap); the [`MAX_GRAPH_EDGES`] ceiling is the sole
+/// defensive backstop against a pathological payload. Rejected with
+/// [`VaultIndicesError::SlotNotUnlocked`] when no vault is unlocked.
 #[tauri::command]
 pub async fn vault_indices_all_edges(
     runtime: State<'_, VaultRuntimeState>,
@@ -235,6 +237,23 @@ pub async fn vault_indices_property_values(
         return Err(VaultIndicesError::SlotNotUnlocked);
     }
     Ok(indices.property_values(&key))
+}
+
+/// Vault-wide DISTINCT frontmatter property-key list — the saved-view authoring
+/// UI's picker source (groupBy / sort / columns are chosen from the keys that
+/// actually exist). Returns vault-wide property-key metadata (AS3/AS4-Sensitive)
+/// → main-window-only, same invariant as `vault_indices_property_values`. No
+/// values, no comparison, no expression eval. Rejected with
+/// [`VaultIndicesError::SlotNotUnlocked`] when no vault is unlocked.
+#[tauri::command]
+pub async fn vault_indices_property_keys(
+    runtime: State<'_, VaultRuntimeState>,
+    indices: State<'_, VaultIndicesState>,
+) -> Result<Vec<String>, VaultIndicesError> {
+    if runtime.slot_kind_active().await != SlotKind::Unlocked {
+        return Err(VaultIndicesError::SlotNotUnlocked);
+    }
+    Ok(indices.property_keys())
 }
 
 /// Remove a hard-deleted note from the index (no-op if absent).

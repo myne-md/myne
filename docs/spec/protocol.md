@@ -224,10 +224,11 @@ In v0.1, only the singleton `itemsKey` exists. There is no epoch rotation. The r
 | `"myne.v0.1 personal-dictionary-key"` | KEK for `vault.dictionary` blob (§9.13) | Active when `vault.dictionary` is written (MYND-266). `root_key`-derived (itemsKey-independent), like prefs/search/workspace. |
 | `"myne.v0.1 attachment-text-key"` | KEK for the per-attachment extracted-text blobs (§9.15, `MYE1`) | Active when an attachment's extracted text is cached (MYND-328). `root_key`-derived (itemsKey-independent), like prefs/search/workspace. One KEK for all attachment-text blobs; per-blob separation comes from the `attachment_id` AAD binding (§9.15.3). |
 | `"myne.v0.1 ai-embeddings-key"` | KEK for `vault.embeddings` blob (§9.17, `MYR1`) | Active when `vault.embeddings` is written (MYND-453) — i.e. only when the runtime beta opt-in `ai_enabled` is on (AI ships in the default build as of `decisions.md` 2026-07-02; a `--no-default-features` build never writes it). `root_key`-derived (itemsKey-independent), like prefs/search/indices. |
+| `"myne.v0.1 graph-layout-key"` | KEK for `vault.graph` blob (§9.19, `MYG1`) | Active when the knowledge-graph layout cache is written. `root_key`-derived (itemsKey-independent), like prefs/search/indices/embeddings. A rebuildable cache — never synced, never backed up. |
 | `"myne.v0.1 vault-head-mac"` | HMAC-SHA-256 key for the sync **vault head** fork-consistency MAC (§9.16; full primitive in `sync-protocol.md`) — **placeholder, Phase 2** | Derived locally; **not used in Phase 1** (no sync server exists), exactly like `server-auth`. Keys the monotonic, git-like hash-DAG vault head that hardens multi-device sync against a malicious server (rollback / withholding / equivocation; TB5). The context string is **allocated now** so it stays stable and **activates when Phase 2 sync ships**. The device-local last-seen baseline (`vault.head-state`, `MYH1`, §9.16) re-verifies the head's own MAC under this **same** key — no second context. **HMAC-not-signature** is deliberate: single-user → all devices share `root_key` → a symmetric MAC suffices and stays in the closed RustCrypto primitive set (no Ed25519, no new dependency; `head_mac_key = DeriveSubkey(root_key, "vault-head-mac")`, used like `attachments-id-hmac`). See `sync-protocol.md` (MYND-416). |
 | `"myne.v0.1 catalog-sync-id"` | Reserved sync blob-id for the `vault.attachments` catalog (Phase 2 sync; `sync-protocol.md` §8.1) — **not a KEK, not a MAC key** | Active when Phase 2 sync pushes/pulls the catalog (MYND-468). The catalog is a synced singleton outside the head manifest (`sync-protocol.md` §4.2), so it needs a deterministic, device-independent 16-byte identifier in the sync metadata plane: `catalog_sync_id = DeriveSubkey(root_key, "catalog-sync-id")[0..16]`. `root_key`-derived so every device computes the same id while the server cannot distinguish it from a note UUID (it is keyed pseudorandom bytes, not a recognizable sentinel). Like `attachments-id-hmac`, this derives an *identifier*, not key material — the catalog's KEK remains `attachments-catalog-key`. |
 | `"myne.v0.1 prefs-sync-id"` | Reserved sync blob-id for `vault.prefs` (Phase 2 sync; `sync-protocol.md` §10.2.1) — **not a KEK, not a MAC key** | Active when Phase 2 sync pushes/pulls `vault.prefs` (MYND-478). Like the attachments catalog, `vault.prefs` is a synced singleton outside the head manifest (`sync-protocol.md` §4.2), so it needs a deterministic, device-independent 16-byte identifier in the sync metadata plane: `prefs_sync_id = DeriveSubkey(root_key, "prefs-sync-id")[0..16]`. `root_key`-derived so every device computes the same id while the server cannot distinguish it from a note UUID (keyed pseudorandom bytes, not a recognizable sentinel). Like `catalog-sync-id`, this derives an *identifier*, not key material — the prefs KEK remains `prefs-key`. |
-| `"myne.v0.1 custom-themes-key"` | KEK for the `vault.themes` blob (§9.20) | Active when `vault.themes` is written (MYND-486). `root_key`-derived (itemsKey-independent), like prefs/search/workspace/dictionary — so a custom-theme palette survives the v005 epoch-rotation `itemsKey` evolution. |
+| `"myne.v0.1 custom-themes-key"` | KEK for the `vault.themes` blob (§9.21) | Active when `vault.themes` is written (MYND-486). `root_key`-derived (itemsKey-independent), like prefs/search/workspace/dictionary — so a custom-theme palette survives the v005 epoch-rotation `itemsKey` evolution. |
 | `"myne.v0.1 themes-sync-id"` | Reserved sync blob-id for `vault.themes` (Phase 2 sync; `sync-protocol.md` §10.2.2) — **not a KEK, not a MAC key** | Active when Phase 2 sync pushes/pulls `vault.themes` (MYND-486). Like `vault.prefs` and the attachments catalog, `vault.themes` is a synced singleton outside the head manifest (`sync-protocol.md` §4.2), so it needs a deterministic, device-independent 16-byte identifier in the sync metadata plane: `themes_sync_id = DeriveSubkey(root_key, "themes-sync-id")[0..16]`. `root_key`-derived so every device computes the same id while the server cannot distinguish it from a note UUID (keyed pseudorandom bytes, not a recognizable sentinel). Like `catalog-sync-id` / `prefs-sync-id`, this derives an *identifier*, not key material — the themes KEK remains `custom-themes-key`. |
 | (future v005 contexts) | reserved | not derived in v0.1. |
 
@@ -382,11 +383,13 @@ AAD_ai_embeddings_blob =
 
 `AAD_attachments_catalog` is the AAD bound into the AEAD wrap of `vault.attachments` (`MYC1`, §9.10). It mirrors `AAD_prefs_blob`, with the role string `"attachments-catalog"` (length-prefixed UTF-8: 2-B big-endian length + 19 ASCII bytes) and the 16-byte `account_number_hash` binding the catalog to its vault. As with prefs and search, `items_key_id` is **not** bound: the catalog KEK derives directly from `root_key` via `"myne.v0.1 attachments-catalog-key"` (§3.4), independent of the `itemsKey` lineage.
 
-`AAD_custom_themes_blob` is the AAD bound into the AEAD wrap of `vault.themes` (`MYT1`, §9.20), the encrypted custom-theme palette blob. It mirrors `AAD_prefs_blob` exactly, with the role string `"custom-themes-blob"` (length-prefixed UTF-8: 2-B big-endian length + 18 ASCII bytes) and the same 16-byte `account_number_hash` from `vault.meta` (§9.3 offset 6) binding the blob to its specific vault. As with prefs, search, and the dictionary, `items_key_id` is **not** bound: the themes KEK derives directly from `root_key` via `"myne.v0.1 custom-themes-key"` (§3.4), independent of the `itemsKey` lineage.
+`AAD_custom_themes_blob` is the AAD bound into the AEAD wrap of `vault.themes` (`MYT1`, §9.21), the encrypted custom-theme palette blob. It mirrors `AAD_prefs_blob` exactly, with the role string `"custom-themes-blob"` (length-prefixed UTF-8: 2-B big-endian length + 18 ASCII bytes) and the same 16-byte `account_number_hash` from `vault.meta` (§9.3 offset 6) binding the blob to its specific vault. As with prefs, search, and the dictionary, `items_key_id` is **not** bound: the themes KEK derives directly from `root_key` via `"myne.v0.1 custom-themes-key"` (§3.4), independent of the `itemsKey` lineage.
 
 `AAD_ai_embeddings_blob` is the AAD bound into the AEAD wrap of `vault.embeddings` (`MYR1`, §9.17), the encrypted AI embedding index. It mirrors `AAD_search_index_blob` exactly, with the role string `"ai-embeddings-blob"` (length-prefixed UTF-8: 2-B big-endian length + 18 ASCII bytes, total 20 bytes) and the 16-byte `account_number_hash` from `vault.meta` (§9.3 offset 6) binding the index blob to its specific vault. As with prefs and search, `items_key_id` is **not** bound: the embeddings KEK derives directly from `root_key` via `"myne.v0.1 ai-embeddings-key"` (§3.4), independent of the `itemsKey` lineage. The model-identity tuple that invalidates the cache on a model / dimension / chunker change is carried **inside** the engine-opaque payload (§9.17.2), not in this AAD — matching the `vault.search` `extractor_version` precedent.
 
 `AAD_pending_capture_blob` is the AAD bound into the AEAD seal of a pending-capture queue entry (`captures/<capture-id>`, `MYK1`, §9.18). It is the one blob AAD that binds **neither** `account_number_hash` **nor** `items_key_id`: the queue is written while the vault is locked and is vault-agnostic (§9.18), so it instead binds the per-entry `capture_id` (16 bytes, also the queue filename) after the role string `"pending-capture-blob"` (length-prefixed UTF-8: 2-B big-endian length + 20 ASCII bytes). Total AAD length: `10 + 1 + 22 + 16 = 49 bytes`. There is no `DeriveSubkey` role — the KEK is a device-local key held in the OS keychain, not `root_key`-derived (§9.18.2).
+
+`AAD_graph_layout_blob` is the AAD bound into the AEAD seal of `vault.graph` (`MYG1`, §9.19), the encrypted knowledge-graph layout cache. It mirrors `AAD_workspace_blob` exactly, with the role string `"graph-layout-blob"` (length-prefixed UTF-8: 2-B big-endian length + 17 ASCII bytes, total 19 bytes) and the 16-byte `account_number_hash` from `vault.meta` (§9.3 offset 6) binding the layout blob to its specific vault. Total AAD length: `10 + 1 + 19 + 16 = 46 bytes`. As with prefs/search/workspace, `items_key_id` is **not** bound: `graph_layout_key` derives directly from `root_key` via `"myne.v0.1 graph-layout-key"` (§3.4), independent of the `itemsKey` lineage.
 
 **Length-prefix encoding for variable-width AAD fields.** All length-prefixed UTF-8 fields in this section and in §3.1 — the `password-wrap` and `recovery-wrap` role strings in `AAD_password_wrap` / `AAD_recovery_wrap`, and the `content_type` field in `AAD_encrypt_content` — are encoded as a **2-byte big-endian unsigned length** followed by the UTF-8 bytes. This matches the binary-format convention elsewhere in this spec (§9.2 reads `enc_item_key_len` as 2 bytes big-endian).
 
@@ -1288,7 +1291,7 @@ this is the §10.6 no-extension-points discipline applied to the container).
 | `vault.meta` | IN — REQUIRED | Credential wraps + KDF params (§9.3); a backup without it is not restorable |
 | `vault.prefs` | IN if present | User data (label, deliberate folders, ordering — AS3) |
 | `vault.dictionary` | IN if present | Personal dictionary is authoritative user data (§9.13) — a Class-1 sync member, so `sync ⊆ backup` (`sync-protocol.md` §9) requires it here |
-| `vault.themes` | IN if present | Custom themes are authoritative user data (§9.20) — hand-authored palettes, a Class-1 sync member, so `sync ⊆ backup` (`sync-protocol.md` §9) requires it here |
+| `vault.themes` | IN if present | Custom themes are authoritative user data (§9.21) — hand-authored palettes, a Class-1 sync member, so `sync ⊆ backup` (`sync-protocol.md` §9) requires it here |
 | `notes/<uuid>.myn` | IN | Note content; trash rides inside (`trashed:` frontmatter) |
 | `snapshots/<note-uuid>__<snap-uuid>.myn` | IN | Version history is user data (`decisions.md` 2026-06-10) |
 | `vault.attachments` | IN if present | Authoritative attachment metadata (§9.10) |
@@ -1296,6 +1299,7 @@ this is the §10.6 no-extension-points discipline applied to the container).
 | `vault.search` | OUT | Pure rebuildable cache; first unlock after restore rebuilds (§9.6.4) |
 | `attachments-text/<attachment-id-hex>` | OUT | Rebuildable per-attachment extraction cache (`MYE1`, §9.15); re-extracted from the source attachment on the first index need after restore — same rebuildable-cache class as `vault.search` |
 | `vault.embeddings` | OUT | Pure rebuildable **and** model-specific cache (§9.17); re-embedded locally on the first unlock after restore (§9.17.4) — a backed-up index could be wrong on a device holding a different embedding model. Class 3 (`sync-protocol.md` §319) |
+| `vault.graph` | OUT | Pure rebuildable knowledge-graph layout cache (`MYG1`, §9.19); re-laid-out locally on the next graph open. Class 3 (`sync-protocol.md` §326) |
 | `vault.quickunlock` | OUT | Device-local credential (§9.14); wrap key is bound to *this* device's hardware (`thisDeviceOnly`), so a copy is inert elsewhere — re-set per device after restore |
 | `vault.head-state` | OUT | Device-local sync baseline (§9.15); a backed-up baseline would be stale on restore — the restored vault TOFU-re-bootstraps (`sync-protocol.md` §6) |
 | `*.tmp` (any directory) | OUT | Atomic-write residue, never user data |
@@ -1945,15 +1949,78 @@ Implementations MUST reject `ciphertext_len > 16384 + 32` (16 KiB plaintext cap 
 
 **Transient plaintext (carve-out).** The dictated text exists as plaintext in two OS-Data-Protection-only transients *before* it is sealed into `MYK1`: the watch's WatchConnectivity outbox and the phone's staging file (written by the native receiver before the Rust seal). These are short-lived, contain only not-yet-committed captures (never existing vault content), and are enumerated in [`../threat-model.md`](../threat-model.md). The watch stays crypto-free by design — encrypting the outbox would require key material on a device deliberately kept key-free (`decisions.md` 2026-07-12).
 
-> **§9.19 is reserved** for the share-import staging queue (`pending-shares/<share-id>`, `MYF1`, MYND-507), which is in flight on its own branch. Themes took §9.20 to avoid a collision; whichever lands second keeps its assigned number.
+### 9.19 Graph layout cache (`vault.graph`, `MYG1`)
 
-### 9.20 Custom-themes blob (`vault.themes`, `MYT1`)
+`vault.graph` is a vault-level singleton **rebuildable cache** holding the knowledge-graph view's laid-out node positions (`note_id → x/y`) plus a schema-version marker, so reopening the app restores the previous force-directed layout instead of recomputing it. It lives next to `vault.meta` at `<vault-root>/vault.graph` and is AEAD-encrypted under a `root_key`-derived KEK. It is a structural sibling of `vault.workspace` (§9.7): same outer-envelope discipline, same **engine-opaque** inner plaintext (the desktop client serializes the position map; the codec sees only bytes), same fall-to-rebuild posture. It differs in that its payload is node coordinates and its staleness handling is **caller-side and loose** — a layout carrying positions for a note-set that has since drifted is still usable (missing notes are seeded fresh, extra positions ignored), and the user can force a full re-layout via the graph's Refresh control.
 
-A **custom theme** is a user-authored palette — a flat map of CSS custom properties (`{ "--token": "value" }`, `decisions.md` 2026-06-16) — that overrides the built-in Light/Dark ramp. The palette is **vault content**: it is sealed into a single encrypted `vault.themes` blob, so it is encrypted at rest, synced (§9.20.5), and included in a backup. This supersedes the original device-local-plaintext storage (`app_config_dir/themes/<name>.json`); see `decisions.md` 2026-07-16. The *selection* (which theme is active) remains the `custom_theme` field of `vault.prefs` (§9.5.2) — the blob holds the palettes, prefs holds the pointer.
+#### 9.19.1 Outer envelope layout
+
+```text
+Offset  Size  Field                        Notes
+------  ----  ---------------------------  --------------------------------
+0       4     magic                        ASCII "MYG1"
+4       1     protocol_version             0x01
+5       1     graph_layout_format_version  0x01 = the initial position-map inner
+                                           schema; any other value → the client
+                                           falls back to recomputing the layout
+6       24    nonce                        XChaCha20-Poly1305 nonce
+30      4     ciphertext_len               big-endian uint32, plaintext_len + 32
+34      M     ciphertext                   AEAD ciphertext + 32-byte CTX tag T'
+```
+
+The 34-byte fixed-offset header is the shared blob-envelope framing of §9.6/§9.7. Magic / `protocol_version` / `graph_layout_format_version` / `ciphertext_len` are all validated **before** any decryption; `ciphertext_len` is bounds-checked against `MAX_GRAPH_LAYOUT_PLAINTEXT_LEN + 32` before any slice indexing (DoS-allocation defense).
+
+#### 9.19.2 Inner plaintext (engine-opaque)
+
+The plaintext is a client-serialized position map + a schema version; the codec is byte-transparent. The desktop client's v0.1 form is `{ "v": 1, "pos": [[<note_id>, x, y], …] }`; the mobile client (Phase 3) writes the same form under the same `graph_layout_format_version` `0x01` into its own device-local `vault.graph` — the file never crosses devices (Class 3, never synced/backed up), so the shared form is a convenience, not a cross-device compatibility requirement. A different `graph_layout_format_version` (offset 5) lets a future serialization be recognized and dropped (→ recompute) rather than mis-parsed. Maximum plaintext is **16 MiB** (`MAX_GRAPH_LAYOUT_PLAINTEXT_LEN`) — generous for one small record per note (≈ 200k notes) while still bounding the pre-AEAD allocation.
+
+#### 9.19.3 AAD construction
+
+`AAD_graph_layout_blob` mirrors `AAD_workspace_blob` exactly, with the role string `"graph-layout-blob"` (length-prefixed UTF-8: 2-B big-endian length + 17 ASCII bytes, total 19 bytes) and the 16-byte `account_number_hash` from `vault.meta` (§9.3 offset 6). Total AAD length: `10 + 1 + 19 + 16 = 46 bytes`. As with prefs/search/workspace, `items_key_id` is **not** bound — `graph_layout_key` derives directly from `root_key` via `"myne.v0.1 graph-layout-key"` (§3.4), independent of the `itemsKey` lineage (so it survives a v005 epoch rotation).
+
+#### 9.19.4 Staleness + rebuild + residency
+
+A missing, unreadable, unsupported-format, or AEAD-failing `vault.graph` is **always recoverable** by recomputing the layout — the `.myn` files (via the wikilink graph) are the source of truth. The reader collapses every such failure to "no restored layout" and recomputes; it never surfaces as data loss. Unlike `vault.search`/`vault.embeddings`, there is **no `content_nonce` reconcile manifest**: the layout is a visual aid whose staleness degrades gracefully (a note added since the last save simply gets a fresh seed on next layout), so precise invalidation is unnecessary. Positions are RAM-resident while the graph is open and are dropped on vault lock (so vault A's layout never seeds vault B). It is **never synced and never backed up** — a device that lacks it re-runs the layout locally (Class 3 rebuildable cache; `sync-protocol.md` §326, backup allowlist §9.11.3).
+
+### 9.20 Share-import staging queue (`pending-shares/<share-id>`, `MYF1`)
+
+> **Magic allocation.** `MYF1`/`MYF5` is a free-pool §10.3 allocation (F = *file*, MYND-507), chosen the same way every family's magic is (implementer-picked from the free pool). A later letter change would be a mechanical rename, not a format change.
+
+A file shared into Myne via the OS share sheet (iOS Share Extension / Android `ACTION_SEND`) arrives at a process that does not hold `root_key` — the iOS extension is a separate sandbox, and on Android the vault may be locked when the intent fires. It cannot enter the attachment library yet (that needs the unlocked `items_key`, §9.9), so it is held in a **device-local encrypted queue** until the next unlock, when it drains into the library via the ordinary `attachment_import` path. This is the file-carrying sibling of §9.18 (pending-capture): same device-key seal and vault-agnostic per-entry-id AAD binding, but the plaintext is a **binary file** (framed with its filename + declared MIME), the cap is **64 MiB** (matching the `MYA1` attachment cap, not 16 KiB), and it drains to an attachment (not a note).
+
+#### 9.20.1 Layout
+
+`<app-container>/pending-shares/sealed/` holds `MYF1` blobs named by the hex `share_id`. How a shared file reaches `sealed/` differs per platform:
+
+- **iOS — plaintext-staging (like §9.18.4).** The Share Extension is a separate sandboxed process that cannot practically link the Rust crypto (doing so pulls the whole WebView runtime into a ~105 MiB extension the OS jetsams on launch), so it does **not** seal in-process. Instead it writes each shared file's bytes plus a `.meta` sidecar as **plaintext** into `<app-group>/pending-shares/staging/` (with `.completeFileProtection`, so iOS encrypts it at rest while the device is locked); the **app** seals each staged file into an `MYF1` blob under `sealed/` and deletes the plaintext on next open. This is the same native-side-stages-plaintext / app-seals pattern as the §9.18.4 watch-capture staging file (a persistent OS-Data-Protection-only plaintext window, not a RAM-only transient). On iOS both directories resolve to the shared **App Group** container so the extension (writer) and the app (reader/sealer) agree.
+- **Android — no persistent plaintext file.** The `ACTION_SEND` receiver reads the `content://` bytes, base64-encodes them, and delivers them to the WebView as a `share-intent` event; the JS layer invokes `seal_share`, which seals straight into `sealed/`. There is no `staging/` directory on Android — the plaintext exists only transiently in RAM (and, en route, as a base64 string that crosses the WebView; see §9.20.4).
+
+#### 9.20.2 Key
+
+Like §9.18, the `MYF1` entry is sealed under a **device-local 32-byte `wrap_key`** held in the OS keychain (Apple) / Keystore (Android), **NOT** a `DeriveSubkey(root_key, …)` subkey — the queue must be writable while `root_key` is unavailable. Non-biometric, `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly` on Apple; the equivalent device-only, non-biometric Android Keystore key on Android. The keychain service string is `md.myne.shareimport`, DISTINCT from `md.myne.captures`. No HKDF context and no §10.3 subkey role (provider-agnostic).
+
+#### 9.20.3 Blob format
+
+Header (49 bytes): `magic "MYF1"(4) ∥ protocol_version 0x01(1) ∥ share_id(16) ∥ wrap_nonce(24) ∥ ciphertext_len(u32 BE)`, then the CTX-committed XChaCha20-Poly1305 ciphertext. AAD = `aad_share_import_blob(share_id)` (length-prefixed role `"share-import-blob"`, AAD prefix `"myne.v0.1|"`), binding the per-entry `share_id` only (vault-agnostic — no `account_number_hash`/`items_key_id`). The sealed plaintext is an opaque, core-framed record `filename_len(u16 BE) ∥ filename(utf8) ∥ mime_len(u16 BE) ∥ mime(utf8) ∥ file_bytes`; filename + MIME are hints (the drain re-sniffs MIME authoritatively per §9.9), so they are confidential-but-not-AAD-bound. The header `share_id` is AAD-bound, so tampering with it fails AEAD rather than re-labelling the entry.
+
+#### 9.20.4 Size cap, drain, and transient plaintext
+
+Implementations MUST reject `ciphertext_len > 67108864 + 32` (64 MiB plaintext cap + 32-byte CTX tag) before allocating. The seal drops any entry whose framed plaintext exceeds the cap (no poison-oversize entry that re-fails every drain). Drain is **at-least-once**: the client decrypts each entry, imports it via `attachment_import` (§9.9), then deletes the entry; a crash between import and delete re-drains into a content-addressed dedup hit (harmless). Landing is the active unlocked vault (as §9.18, "whichever vault unlocks first"). The queue never syncs and is never in a backup (TB2).
+
+**Transient plaintext (carve-out).** The shared bytes exist as plaintext, protected only by OS Data Protection, *before* they are sealed into `MYF1`:
+
+- **iOS: a persistent plaintext staging file.** The Share Extension writes the file's bytes + a `.meta` sidecar into `<app-group>/pending-shares/staging/` (`.completeFileProtection`), where it persists until the app next opens, seals it, and deletes it — the same at-rest plaintext window as the §9.18.4 watch-capture staging file, not a RAM-only transient. Device-local, in the App-Group container, never synced.
+- **Android: a RAM + WebView-transit transient.** The `content://` bytes are read into RAM by the native receiver and cross the WebView as a base64 string (§9.20.1) before `seal_share` seals them; no persistent plaintext file is written.
+
+Both hold only the just-shared file (never existing vault content), are device-local, and are enumerated in [`../threat-model.md`](../threat-model.md) (AS19), analogous to the §9.18.4 carve-out.
+
+### 9.21 Custom-themes blob (`vault.themes`, `MYT1`)
+
+A **custom theme** is a user-authored palette — a flat map of CSS custom properties (`{ "--token": "value" }`, `decisions.md` 2026-06-16) — that overrides the built-in Light/Dark ramp. The palette is **vault content**: it is sealed into a single encrypted `vault.themes` blob, so it is encrypted at rest, synced (§9.21.5), and included in a backup. This supersedes the original device-local-plaintext storage (`app_config_dir/themes/<name>.json`); see `decisions.md` 2026-07-16. The *selection* (which theme is active) remains the `custom_theme` field of `vault.prefs` (§9.5.2) — the blob holds the palettes, prefs holds the pointer.
 
 Like `vault.dictionary` (§9.13), this is a **singleton** blob, not a per-item family with a catalog: a vault has a handful of themes, so the attachment-style separate-blob + catalog (`MYA1`+`MYC1`) would be overkill.
 
-#### 9.20.1 Layout
+#### 9.21.1 Layout
 
 ```text
 Offset  Size       Field                  Description
@@ -1961,7 +2028,7 @@ Offset  Size       Field                  Description
 0       4 bytes    magic                  ASCII "MYT1"
 4       1 byte     protocol_version       0x01 for this specification
 5       1 byte     themes_format_version  0x01 = the v0.1 inner palette-map format
-                                          (§9.20.2). Distinct from protocol_version:
+                                          (§9.21.2). Distinct from protocol_version:
                                           the crypto framing (magic, version, AEAD,
                                           AAD) is fixed by this spec, while the inner
                                           plaintext may evolve behind this byte. An
@@ -1973,11 +2040,11 @@ Offset  Size       Field                  Description
 
 Header = 34 bytes — the minimal vault-singleton envelope shared with `vault.dictionary` (§9.13.1), not §9.2's 50-byte per-note prefix.
 
-There is **no public `account_number_hash` byte** (and no `custom_themes_key_id`): both bind cryptographically — the vault through `AAD_custom_themes_blob` (§9.20.3), the key through `root_key` derivation — without spending header bytes or putting a vault-linkable field on disk in plaintext (§9.4). This is §9.13.1's rule, inherited verbatim.
+There is **no public `account_number_hash` byte** (and no `custom_themes_key_id`): both bind cryptographically — the vault through `AAD_custom_themes_blob` (§9.21.3), the key through `root_key` derivation — without spending header bytes or putting a vault-linkable field on disk in plaintext (§9.4). This is §9.13.1's rule, inherited verbatim.
 
-The size cap and the read semantic are §9.20.4.
+The size cap and the read semantic are §9.21.4.
 
-#### 9.20.2 Inner format (`themes_format_version = 0x01`) — per-name entries
+#### 9.21.2 Inner format (`themes_format_version = 0x01`) — per-name entries
 
 The sealed plaintext is a deterministic (canonical-key-order) JSON map keyed by theme name:
 
@@ -1991,17 +2058,17 @@ The sealed plaintext is a deterministic (canonical-key-order) JSON map keyed by 
 
 Keys are emitted in lexicographic order (the canonical-JSON rule of §9.5.2); `deleted_at` is **omitted** unless the entry is a tombstone, so a live entry stays compact and its *presence* is the tombstone discriminator.
 
-Each name carries its **own clocks**. This is load-bearing for the merge (§9.20.5): without per-name clocks, two devices that concurrently add different themes would lose one of them. The clocks are wall-clock **seconds** — the same clock the attachments catalog uses (§9.10), whose tombstone rules this format reuses; note this differs from the `vault.prefs` `field_clocks`, which are milliseconds (§9.5.2). They inherit the clock-honesty caveat of `sync-protocol.md` §11.4 verbatim — they order edits, they are not a security property.
+Each name carries its **own clocks**. This is load-bearing for the merge (§9.21.5): without per-name clocks, two devices that concurrently add different themes would lose one of them. The clocks are wall-clock **seconds** — the same clock the attachments catalog uses (§9.10), whose tombstone rules this format reuses; note this differs from the `vault.prefs` `field_clocks`, which are milliseconds (§9.5.2). They inherit the clock-honesty caveat of `sync-protocol.md` §11.4 verbatim — they order edits, they are not a security property.
 
 A **tombstone** is an entry whose `deleted_at` is set. Deleting a theme writes a tombstone rather than removing the key, so the deletion propagates instead of the theme resurrecting from another device. The tombstone **MUST scrub the `palette`** so the synced store retains nothing descriptive about a deleted theme (the `AttachmentMeta` rule of §9.10). Scrubbing is a confidentiality measure and **does not** by itself make two tombstones byte-identical — `created_at` and `updated_at` survive it and diverge whenever one device carried an unsynced edit; convergence is delivered by the total-order tie-break of `sync-protocol.md` §10.2.2, not by the scrub. Tombstones are not garbage-collected: a tombstone is a name plus timestamps, and a vault holds single-digit theme counts. Readers (list / read / export) MUST skip tombstoned entries.
 
 Theme names are constrained to `1..=64` characters of `[A-Za-z0-9_-]` (`decisions.md` 2026-06-16 clause (e)) — no `.`, no separators, no traversal. The **value-shape allowlist** (2026-06-16 clause (d)) still gates every palette value at import; promotion to vault content does not relax it. A custom theme remains **validated, not sandboxed**.
 
-#### 9.20.3 Key + AAD
+#### 9.21.3 Key + AAD
 
 `custom_themes_key = DeriveSubkey(root_key, "custom-themes-key")` (§3.2 + §3.4) — `root_key`-derived and `itemsKey`-independent, like prefs/search/workspace/dictionary. The AAD is `AAD_custom_themes_blob` (§5.2), binding `account_number_hash`; `items_key_id` is **not** bound.
 
-#### 9.20.4 Size cap, fall-back-to-empty, and non-load-bearing class
+#### 9.21.4 Size cap, fall-back-to-empty, and non-load-bearing class
 
 Implementations MUST reject `ciphertext_len > 4 MiB + 32` **before allocating**. 4 MiB is
 generous headroom over a realistic theme store (a palette is a flat map of a few dozen short
@@ -2019,7 +2086,7 @@ load-bearing**: it is a validated (not sandboxed) cosmetic palette, so the worst
 it is the app rendering in the default theme. This is the same class as `vault.dictionary`
 (§9.13.4), and it is why an unreadable themes blob must never block unlock.
 
-#### 9.20.5 Sync + backup
+#### 9.21.5 Sync + backup
 
 `vault.themes` is **Class-1 Authoritative data** (`sync-protocol.md` §9) — a synced singleton outside the head manifest, addressed by the reserved blob-id `themes_sync_id = DeriveSubkey(root_key, "themes-sync-id")[0..16]` (§3.4). Merge is **per-theme-name**, with the palette **LWW within a name** (a palette is one coherent design; merging it token-by-token would produce an incoherent result). Deletion follows the attachments-catalog tombstone rule (`sync-protocol.md` §10.2.2 + §11.4): a live entry survives a tombstone **iff** its `created_at` strictly postdates the tombstone's `deleted_at` (a deliberate re-add) — on ties the tombstone wins (the resurrection guard). It is also a §9.11.3 backup-allowlist member, preserving the `sync ⊆ backup` invariant.
 
@@ -2065,9 +2132,11 @@ This registry is normative. Implementations MUST reject any magic byte / AAD pre
 | Device-local sync baseline (`vault.head-state`) | `MYH1` | `MYH5` | §9.16 | MYND-416 |
 | AI embeddings index (`vault.embeddings`) | `MYR1` | `MYR5` | §9.17 | MYND-453 |
 | Pending-capture queue (`captures/<id>`) | `MYK1` | `MYK5` | §9.18 | watch-capture |
-| Custom-themes blob (`vault.themes`) | `MYT1` | `MYT5` | §9.20 | MYND-486 |
+| Graph layout cache (`vault.graph`) | `MYG1` | `MYG5` | §9.19 | graph-rework |
+| Share-import staging queue (`pending-shares/<id>`) | `MYF1` | `MYF5` | §9.20 | MYND-507 |
+| Custom-themes blob (`vault.themes`) | `MYT1` | `MYT5` | §9.21 | MYND-486 |
 
-Section §9.8 (vault indices) **landed with MYND-271** (the persistence the MYND-31 design pre-allocated); §9.7 (workspace) landed with MYND-166, and attachments occupy §9.9/§9.10. The per-note and vault-meta families retain their historical `NT05`/`NTV5` v005 reservations; all newer blob families (prefs/search/workspace/indices/attachments/dictionary/attachment-text/head-state/ai-embeddings) use the `MY?5` v005 convention. The device-local sync baseline (`vault.head-state`, `MYH1`/`MYH5`, §9.16) landed with MYND-416; the **wire vault head itself has no magic** — it is sync-wire-only (`sync-protocol.md` §2), versioned by its `head_format_version` byte, not a §10.3 family.
+Section §9.8 (vault indices) **landed with MYND-271** (the persistence the MYND-31 design pre-allocated); §9.7 (workspace) landed with MYND-166, and attachments occupy §9.9/§9.10. The per-note and vault-meta families retain their historical `NT05`/`NTV5` v005 reservations; all newer blob families (prefs/search/workspace/indices/attachments/dictionary/attachment-text/head-state/ai-embeddings/graph-layout) use the `MY?5` v005 convention. The device-local sync baseline (`vault.head-state`, `MYH1`/`MYH5`, §9.16) landed with MYND-416; the **wire vault head itself has no magic** — it is sync-wire-only (`sync-protocol.md` §2), versioned by its `head_format_version` byte, not a §10.3 family.
 
 ### 10.4 Migration procedure (cross-major)
 

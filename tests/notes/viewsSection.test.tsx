@@ -152,8 +152,9 @@ describe("ViewsSection — management (MYND-274 task 6)", () => {
     expect(onViewSettings).toHaveBeenCalledWith("v2");
   });
 
-  it("omits View settings… for non-cards views", () => {
-    const listView: SavedView = {
+  it("includes View settings… for every view type (table)", () => {
+    const onViewSettings = vi.fn();
+    const tableView: SavedView = {
       id: "vl",
       name: "Table",
       view_type: "table",
@@ -161,11 +162,11 @@ describe("ViewsSection — management (MYND-274 task 6)", () => {
     };
     render(
       <ViewsSection
-        views={[listView]}
+        views={[tableView]}
         onOpenView={vi.fn()}
         onNewView={vi.fn()}
         onEditFilter={vi.fn()}
-        onViewSettings={vi.fn()}
+        onViewSettings={onViewSettings}
         onRename={vi.fn()}
         onDelete={vi.fn()}
         onMoveView={vi.fn()}
@@ -175,7 +176,13 @@ describe("ViewsSection — management (MYND-274 task 6)", () => {
     const ids = screen
       .getAllByTestId("notes.context-menu-item")
       .map((el) => el.getAttribute("data-item-id"));
-    expect(ids).not.toContain("view-settings");
+    expect(ids).toContain("view-settings");
+    fireEvent.click(
+      screen
+        .getAllByTestId("notes.context-menu-item")
+        .find((el) => el.getAttribute("data-item-id") === "view-settings")!,
+    );
+    expect(onViewSettings).toHaveBeenCalledWith("vl");
   });
 
   it("delete dispatches onDelete with the row id", () => {

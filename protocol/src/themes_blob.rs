@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0
 
 //! `vault.themes` 34-byte-header encrypted custom-themes codec
-//! (MYND-486; `docs/spec/protocol.md` § 9.20).
+//! (MYND-486; `docs/spec/protocol.md` § 9.21).
 //!
 //! `vault.themes` is a vault-level singleton artifact holding the user's
 //! custom-theme palettes — the `{theme_name → palette_map}` store that was,
@@ -26,7 +26,7 @@
 //! inner shape is documented here for orientation only and a future revision
 //! bumps the format byte rather than this module.
 //!
-//! ## On-disk layout (spec § 9.20.1)
+//! ## On-disk layout (spec § 9.21.1)
 //!
 //! ```text
 //! Offset  Size  Field                 Notes
@@ -42,10 +42,10 @@
 //! ```
 //!
 //! Total = 34 + M bytes. No public `account_number_hash` byte — it binds via
-//! the AAD (§ 9.20.3) without consuming header bytes, exactly like
+//! the AAD (§ 9.21.3) without consuming header bytes, exactly like
 //! `vault.dictionary` / `vault.prefs`.
 //!
-//! ## Fall-back-to-empty semantic (spec § 9.20.4)
+//! ## Fall-back-to-empty semantic (spec § 9.21.4)
 //!
 //! Like `dictionary_blob.rs` / `search_blob.rs`, this module emits **honest
 //! errors** for each failure mode; the client caller collapses any error (absent
@@ -88,12 +88,12 @@ pub const THEMES_BLOB_HEADER_LEN: usize = 34;
 /// realistic custom-theme store (a palette is a flat map of a few dozen short
 /// CSS-variable strings; hundreds of themes are still well under a MiB). Ample
 /// headroom that turns a hostile `ciphertext_len` into a clean error instead of
-/// an absurd allocation / panicking slice index (§ 9.20.4).
+/// an absurd allocation / panicking slice index (§ 9.21.4).
 pub const MAX_THEMES_PLAINTEXT_LEN: usize = 4 * 1024 * 1024;
 
 /// Failure modes of the `vault.themes` codec. Distinct variants for
 /// observability; the client caller collapses all of them to the empty theme
-/// store (fall-back-to-empty, § 9.20.4).
+/// store (fall-back-to-empty, § 9.21.4).
 #[derive(Debug, Error, PartialEq, Eq)]
 pub enum ThemesBlobError {
     /// Input shorter than [`THEMES_BLOB_HEADER_LEN`] bytes.
@@ -137,7 +137,7 @@ impl From<ProtocolError> for ThemesBlobError {
 impl From<EnvelopeError> for ThemesBlobError {
     /// Map the shared-envelope error into this codec's public variant so the
     /// distinguishable-reject surface (and its vectors) stay unchanged. Note the
-    /// `FormatUnsupported` → `ThemesFormatUnsupported` rename (§9.20 spelling).
+    /// `FormatUnsupported` → `ThemesFormatUnsupported` rename (§9.21 spelling).
     fn from(e: EnvelopeError) -> Self {
         match e {
             EnvelopeError::HeaderTooShort => ThemesBlobError::HeaderTooShort,
@@ -385,7 +385,7 @@ mod tests {
     /// side effect of `cargo test`. Run with:
     /// `cargo test -p protocol --lib emit_themes_blob_vectors_for_paste -- --ignored`
     ///
-    /// 12 cases pin (MYND-486 / §9.20), mirroring the `vault-dictionary` shape:
+    /// 12 cases pin (MYND-486 / §9.21), mirroring the `vault-dictionary` shape:
     /// - 3 `encrypt` × {empty / small `{name→palette}` map / 1-KB opaque
     ///   plaintext} — pin the `MYT1` byte output. `custom_themes_key` is derived
     ///   from `root_key` via `SubkeyRole::CustomThemesKey` so the vector
@@ -398,7 +398,7 @@ mod tests {
     ///   (`MagicMismatch`, `ProtocolVersionMismatch`, `ThemesFormatUnsupported`,
     ///   `HeaderTooShort`, `CiphertextTruncated`, `CiphertextLenOverflow`).
     ///   `ThemesFormatUnsupported` (vector `format_unsupported`) is the
-    ///   load-bearing forward hook (§9.20.4).
+    ///   load-bearing forward hook (§9.21.4).
     ///
     /// `PlaintextTooLarge` + `RandomnessUnavailable` are encode-side and cannot
     /// be expressed as a decode-a-blob case, so they are not vectored.
@@ -513,8 +513,8 @@ mod tests {
         dump.push_str("{\n");
         dump.push_str("  \"schema\": \"vault-themes\",\n");
         dump.push_str("  \"protocol_version\": \"v0.1\",\n");
-        dump.push_str("  \"spec_section\": \"protocol.md §9.20 + §3.4 + §5.2 + §6.4\",\n");
-        dump.push_str("  \"description\": \"Pins protocol::encode_themes_blob_raw + protocol::decode_themes_blob byte mapping for the MYT1 vault.themes encrypted custom-themes codec (MYND-486; §9.20). A near-clone of vault-dictionary: the inner plaintext is OPAQUE (the client layer's deterministic JSON {theme_name -> palette_map} map) — the structural twin of vault.dictionary/vault.search/vault.workspace/vault.indices. custom_themes_key = derive_subkey(root_key, SubkeyRole::CustomThemesKey) (HKDF role 'custom-themes-key'); account_number_hash binds via aad_custom_themes_blob (AAD role 'custom-themes-blob' — a DISTINCT load-bearing string from the HKDF role). 12 cases: 3 encrypt (empty / small map / 1-KB) + 1 decrypt_ok + 2 decrypt_aead_fail (tag-tamper + cross-vault, both non-distinguishing per §6.4, real-key fixtures) + 6 parse_fail (one per distinguishable pre-decryption structural reject incl. the load-bearing format_unsupported forward hook, §9.20.4). Cases generated by `cargo test -p protocol --lib emit_themes_blob_vectors_for_paste -- --ignored` (in protocol/src/themes_blob.rs).\",\n");
+        dump.push_str("  \"spec_section\": \"protocol.md §9.21 + §3.4 + §5.2 + §6.4\",\n");
+        dump.push_str("  \"description\": \"Pins protocol::encode_themes_blob_raw + protocol::decode_themes_blob byte mapping for the MYT1 vault.themes encrypted custom-themes codec (MYND-486; §9.21). A near-clone of vault-dictionary: the inner plaintext is OPAQUE (the client layer's deterministic JSON {theme_name -> palette_map} map) — the structural twin of vault.dictionary/vault.search/vault.workspace/vault.indices. custom_themes_key = derive_subkey(root_key, SubkeyRole::CustomThemesKey) (HKDF role 'custom-themes-key'); account_number_hash binds via aad_custom_themes_blob (AAD role 'custom-themes-blob' — a DISTINCT load-bearing string from the HKDF role). 12 cases: 3 encrypt (empty / small map / 1-KB) + 1 decrypt_ok + 2 decrypt_aead_fail (tag-tamper + cross-vault, both non-distinguishing per §6.4, real-key fixtures) + 6 parse_fail (one per distinguishable pre-decryption structural reject incl. the load-bearing format_unsupported forward hook, §9.21.4). Cases generated by `cargo test -p protocol --lib emit_themes_blob_vectors_for_paste -- --ignored` (in protocol/src/themes_blob.rs).\",\n");
         dump.push_str("  \"cases\": [\n");
 
         // ---- encrypt closure ----------------------------------------
@@ -721,7 +721,7 @@ mod tests {
         emit_parse_fail(
             &mut dump,
             "parse-fail-magic-mismatch",
-            "First byte of the MYT1 magic corrupted to 'X'. Rejected at offset 0 before any decryption (magic-byte-before-decrypt discipline, §9.20.1).",
+            "First byte of the MYT1 magic corrupted to 'X'. Rejected at offset 0 before any decryption (magic-byte-before-decrypt discipline, §9.21.1).",
             &pf_magic,
             "magic_mismatch",
             true,
@@ -737,7 +737,7 @@ mod tests {
         emit_parse_fail(
             &mut dump,
             "parse-fail-format-unsupported",
-            "themes_format_version byte (offset 5) set to 0x02 — a future map serialization a v0.1 client does not understand. The decoder rejects cleanly so the caller falls back to the empty theme store (§9.20.4). This is the forward-migration hook and is load-bearing (Rust reference: ThemesBlobError::ThemesFormatUnsupported).",
+            "themes_format_version byte (offset 5) set to 0x02 — a future map serialization a v0.1 client does not understand. The decoder rejects cleanly so the caller falls back to the empty theme store (§9.21.4). This is the forward-migration hook and is load-bearing (Rust reference: ThemesBlobError::ThemesFormatUnsupported).",
             &pf_themes_format,
             "format_unsupported",
             true,

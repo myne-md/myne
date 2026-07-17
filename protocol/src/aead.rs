@@ -445,6 +445,39 @@ pub fn aad_workspace_blob(account_number_hash: &[u8; 16]) -> Vec<u8> {
     aad
 }
 
+/// Build the AAD bound into the AEAD encryption of the v0.1 graph-layout blob
+/// (`vault.graph`, `MYG1`, § 9.19). Same shape as [`aad_workspace_blob`] /
+/// [`aad_prefs_blob`] with a distinct role string `"graph-layout-blob"`, so the
+/// knowledge-graph layout cache is cryptographically domain-separated from
+/// prefs / search / workspace / indices / embeddings — a blob of one kind can
+/// never AEAD-verify under another's KEK + AAD.
+///
+/// ```text
+/// "myne.v0.1|"                     10 bytes  (AAD prefix, § 5.2)
+/// 0x01                              1 byte   (protocol_version, § 9.3)
+/// u16_be(17) || "graph-layout-blob" 19 bytes (length-prefixed role)
+/// account_number_hash              16 bytes  (vault identity binding, § 9.3 offset 6)
+/// ```
+///
+/// `account_number_hash` (NOT `items_key_id`) binds vault identity — the
+/// graph-layout blob lives outside the `items_key` lineage, same rationale as
+/// `aad_prefs_blob` / `aad_workspace_blob`.
+pub fn aad_graph_layout_blob(account_number_hash: &[u8; 16]) -> Vec<u8> {
+    const ROLE_STR_GRAPH_LAYOUT_BLOB: &[u8] = b"graph-layout-blob";
+    let mut aad = Vec::with_capacity(
+        AAD_PREFIX_V0_1.len()
+            + 1
+            + 2
+            + ROLE_STR_GRAPH_LAYOUT_BLOB.len()
+            + account_number_hash.len(),
+    );
+    aad.extend_from_slice(AAD_PREFIX_V0_1);
+    aad.push(PROTOCOL_VERSION_V0_1);
+    push_length_prefixed_u16_be(&mut aad, ROLE_STR_GRAPH_LAYOUT_BLOB);
+    aad.extend_from_slice(account_number_hash);
+    aad
+}
+
 /// Build the AAD bound into the AEAD encryption of the v0.1 vault-indices
 /// blob (`vault.indices`, `MYI1`, MYND-271; design MYND-31). Same shape as
 /// [`aad_prefs_blob`] / [`aad_search_index_blob`] / [`aad_workspace_blob`] with
@@ -548,6 +581,34 @@ pub fn aad_capture_blob(capture_id: &[u8; 16]) -> Vec<u8> {
     aad.push(PROTOCOL_VERSION_V0_1);
     push_length_prefixed_u16_be(&mut aad, ROLE_STR_PENDING_CAPTURE_BLOB);
     aad.extend_from_slice(capture_id);
+    aad
+}
+
+/// Build the AAD bound into the AEAD encryption of a share-import staging blob
+/// (`MYF1`, § 9.20.3). Binds the per-entry `share_id`; a DISTINCT device-local
+/// role from every vault-scoped blob AND from `pending-capture-blob`.
+///
+/// Layout (46 bytes):
+///
+/// ```text
+/// "myne.v0.1|"                      10 bytes  (AAD prefix, § 5.2)
+/// 0x01                               1 byte   (protocol_version, § 9.20.3)
+/// u16_be(17) || "share-import-blob" 19 bytes  (length-prefixed role)
+/// share_id                          16 bytes  (per-entry id, § 9.20.3)
+/// ```
+///
+/// Like `aad_capture_blob`, no `DeriveSubkey` role — the KEK is a device-local
+/// key held in the OS keychain / Android Keystore, NOT `root_key`-derived (the
+/// queue must survive while `root_key` is unavailable; § 3.4).
+pub fn aad_share_import_blob(share_id: &[u8; 16]) -> Vec<u8> {
+    const ROLE_STR_SHARE_IMPORT_BLOB: &[u8] = b"share-import-blob";
+    let mut aad = Vec::with_capacity(
+        AAD_PREFIX_V0_1.len() + 1 + 2 + ROLE_STR_SHARE_IMPORT_BLOB.len() + share_id.len(),
+    );
+    aad.extend_from_slice(AAD_PREFIX_V0_1);
+    aad.push(PROTOCOL_VERSION_V0_1);
+    push_length_prefixed_u16_be(&mut aad, ROLE_STR_SHARE_IMPORT_BLOB);
+    aad.extend_from_slice(share_id);
     aad
 }
 
@@ -1069,7 +1130,7 @@ mod tests {
 
     #[test]
     fn aad_custom_themes_blob_default_matches_pinned_hex() {
-        // Spec § 5.2 + § 9.20.3: 47 bytes = prefix (10) + version (1) +
+        // Spec § 5.2 + § 9.21.3: 47 bytes = prefix (10) + version (1) +
         // u16_be(18) + "custom-themes-blob" (18) + account_number_hash (16).
         let account_number_hash: [u8; 16] = [
             0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD,
@@ -1090,7 +1151,7 @@ mod tests {
             0xEE, 0xFF,
         ];
         assert_eq!(aad.as_slice(), &expected[..]);
-        assert_eq!(aad.len(), 47, "spec § 9.20.3 mandates 47-byte AAD");
+        assert_eq!(aad.len(), 47, "spec § 9.21.3 mandates 47-byte AAD");
         // Domain-separation: distinct from the structurally-identical dictionary
         // AAD (different role string) and from prefs — no cross-family verify.
         assert_ne!(aad, aad_personal_dictionary_blob(&account_number_hash));
@@ -1129,6 +1190,35 @@ mod tests {
         // Vault-agnostic: distinct from a vault-scoped blob AAD (different role
         // + binds capture_id, not account_number_hash).
         assert_ne!(aad, aad_prefs_blob(&capture_id));
+    }
+
+    #[test]
+    fn aad_share_import_blob_default_matches_pinned_hex() {
+        // § 5.2 + § 9.20.3: 46 bytes = prefix (10) + version (1) +
+        // u16_be(17) + "share-import-blob" (17) + share_id (16).
+        let share_id: [u8; 16] = [
+            0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD,
+            0xEE, 0xFF,
+        ];
+        let aad = aad_share_import_blob(&share_id);
+        let expected: [u8; 46] = [
+            // "myne.v0.1|" — 10 bytes
+            0x6D, 0x79, 0x6E, 0x65, 0x2E, 0x76, 0x30, 0x2E, 0x31, 0x7C,
+            // protocol_version
+            0x01, // length-prefixed role: u16_be(17) || "share-import-blob"
+            0x00, 0x11, // u16_be(17)
+            0x73, 0x68, 0x61, 0x72, 0x65, 0x2D, // "share-"
+            0x69, 0x6D, 0x70, 0x6F, 0x72, 0x74, 0x2D, // "import-"
+            0x62, 0x6C, 0x6F, 0x62, // "blob"
+            // share_id
+            0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD,
+            0xEE, 0xFF,
+        ];
+        assert_eq!(aad.as_slice(), &expected[..]);
+        assert_eq!(aad.len(), 46, "spec § 9.20.3 mandates 46-byte AAD");
+        // Vault-agnostic + distinct from the capture role (one-role-per-family).
+        assert_ne!(aad, aad_prefs_blob(&share_id));
+        assert_ne!(aad, aad_capture_blob(&share_id));
     }
 
     #[test]
@@ -1565,6 +1655,7 @@ mod tests {
         let aad_pb = aad_prefs_blob(&account_number_hash);
         let aad_sib = aad_search_index_blob(&account_number_hash);
         let aad_wsb = aad_workspace_blob(&account_number_hash);
+        let aad_glb = aad_graph_layout_blob(&account_number_hash);
         let aad_vib = aad_vault_indices_blob(&account_number_hash);
         let aad_pdb = aad_personal_dictionary_blob(&account_number_hash);
         let aad_aeb = aad_ai_embeddings_blob(&account_number_hash);
@@ -1582,7 +1673,7 @@ mod tests {
         dump.push_str("  \"schema\": \"ctx-aead\",\n");
         dump.push_str("  \"protocol_version\": \"v0.1\",\n");
         dump.push_str("  \"spec_section\": \"protocol.md §5.1 + §5.2 + §6.4\",\n");
-        dump.push_str("  \"description\": \"Pins protocol::aead_seal_ctx + protocol::aead_open_ctx byte mapping (XChaCha20-Poly1305 + CTX commitment outer per Chan & Rogaway 2022) AND each of the 12 pub aad_* builder functions' canonical byte assembly. 17 cases: 12 aad_canonical_bytes (one per builder) + 2 encrypt (short empty-AAD + medium content-AAD plaintext) + 1 decrypt_ok (round-trip) + 2 decrypt_aead_fail (tag-tamper + AAD-tamper). Cases generated by `cargo test -p protocol --lib emit_ctx_aead_vectors_for_paste -- --ignored` (in protocol/src/aead.rs).\",\n");
+        dump.push_str("  \"description\": \"Pins protocol::aead_seal_ctx + protocol::aead_open_ctx byte mapping (XChaCha20-Poly1305 + CTX commitment outer per Chan & Rogaway 2022) AND each of the 13 pub aad_* builder functions' canonical byte assembly. 18 cases: 13 aad_canonical_bytes (one per builder) + 2 encrypt (short empty-AAD + medium content-AAD plaintext) + 1 decrypt_ok (round-trip) + 2 decrypt_aead_fail (tag-tamper + AAD-tamper). Cases generated by `cargo test -p protocol --lib emit_ctx_aead_vectors_for_paste -- --ignored` (in protocol/src/aead.rs).\",\n");
         dump.push_str("  \"cases\": [\n");
 
         // Helper: emit aad_canonical_bytes case.
@@ -1725,6 +1816,17 @@ mod tests {
             "aad_workspace_blob",
             &account_hash_lines,
             &aad_wsb,
+            true,
+        );
+
+        // 8b: aad_graph_layout_blob
+        emit_aad(
+            &mut dump,
+            "aad-graph-layout-blob",
+            "Canonical bytes from aad_graph_layout_blob with account_number_hash = 0x12×16 (§9.19). Pins the 46-byte vault.graph AAD: 'myne.v0.1|' prefix (10) + version byte (1) + length-prefixed UTF-8 role 'graph-layout-blob' (2+17) + account_number_hash (16). Same shape as aad_workspace_blob but a distinct 17-byte role string — domain-separates the knowledge-graph layout cache from the other vault singletons. NOTE: the AAD role 'graph-layout-blob' is DISTINCT from the HKDF KEK role 'graph-layout-key' (hkdf-sha256 vectors); they are different load-bearing constants.",
+            "aad_graph_layout_blob",
+            &account_hash_lines,
+            &aad_glb,
             true,
         );
 
@@ -1961,6 +2063,7 @@ mod tests {
         let aad_prefs = aad_prefs_blob(&account_number_hash);
         let aad_search = aad_search_index_blob(&account_number_hash);
         let aad_workspace = aad_workspace_blob(&account_number_hash);
+        let aad_graph = aad_graph_layout_blob(&account_number_hash);
         let aad_indices = aad_vault_indices_blob(&account_number_hash);
         let aad_embeddings = aad_ai_embeddings_blob(&account_number_hash);
         let aad_dictionary = aad_personal_dictionary_blob(&account_number_hash);
@@ -2003,7 +2106,7 @@ mod tests {
         dump.push_str("  \"schema\": \"aad-construction\",\n");
         dump.push_str("  \"protocol_version\": \"v0.1\",\n");
         dump.push_str("  \"spec_section\": \"protocol.md §5.2\",\n");
-        dump.push_str("  \"description\": \"Per-call-site AAD framing decomposition for every pub aad_* builder (protocol/src/aead.rs). Pins the full AAD bytes (as ctx-aead does) PLUS the structural segment breakdown — aad_prefix (myne.v0.1|) / protocol_version / u16-be length prefix / role_label / bound parameters — with byte offsets. Complements ctx-aead's aad_canonical_bytes cases (which pin only the total bytes) by making the assembly structure verifiable. 13 cases, one per builder. Cases generated by `cargo test -p protocol --lib emit_aad_construction_vectors_for_paste -- --ignored` (in protocol/src/aead.rs).\",\n");
+        dump.push_str("  \"description\": \"Per-call-site AAD framing decomposition for every pub aad_* builder (protocol/src/aead.rs). Pins the full AAD bytes (as ctx-aead does) PLUS the structural segment breakdown — aad_prefix (myne.v0.1|) / protocol_version / u16-be length prefix / role_label / bound parameters — with byte offsets. Complements ctx-aead's aad_canonical_bytes cases (which pin only the total bytes) by making the assembly structure verifiable. 14 cases, one per builder. Cases generated by `cargo test -p protocol --lib emit_aad_construction_vectors_for_paste -- --ignored` (in protocol/src/aead.rs).\",\n");
         dump.push_str("  \"cases\": [\n");
 
         let emit_case = |dump: &mut String,
@@ -2158,6 +2261,21 @@ mod tests {
                 ("protocol_version", 1),
                 ("role_length_be16", 2),
                 ("role_label", 14),
+                ("account_number_hash", 16),
+            ],
+            &account_hash_json,
+            true,
+        );
+        emit_case(
+            &mut dump,
+            "aad_graph_layout_blob",
+            "AAD bound into the AEAD encryption of the vault.graph knowledge-graph layout cache (§9.19). Same shape as aad_workspace_blob with the distinct role 'graph-layout-blob' (17 bytes) — domain-separates the layout cache from the other vault singletons so none AEAD-verifies under another's key/AAD.",
+            &aad_graph,
+            &[
+                ("aad_prefix", 10),
+                ("protocol_version", 1),
+                ("role_length_be16", 2),
+                ("role_label", 17),
                 ("account_number_hash", 16),
             ],
             &account_hash_json,

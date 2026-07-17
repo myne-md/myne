@@ -690,10 +690,13 @@ export type UseSelectedNoteReturn = {
   /** Re-sync signal for the open note's body — see [`SidebarState.contentReloadNonce`]. */
   contentReloadNonce: number;
   /**
-   * Force the currently-open note's editor body to re-read from disk by bumping
-   * `contentReloadNonce`. Used when an action mutates the open note's `.myn`
-   * out-of-band of the editor's own autosave — e.g. snapshot restore (MYND-97),
-   * the same re-sync `commitRename` performs. No-op when nothing is selected.
+   * Force every pane's open note body to re-read from disk by bumping
+   * `contentReloadNonce`. Used when an action mutates open-note `.myn` files
+   * out-of-band of the editor's own autosave — e.g. snapshot restore (MYND-97)
+   * or a sync pull, the same re-sync `commitRename` performs. Unconditional:
+   * notes can sit in unfocused panes (or panes behind a view/graph tab) with
+   * nothing selected, and each pane guards its own reload (dirty buffers are
+   * never clobbered; unchanged bodies settle as identity no-ops).
    */
   reloadOpenNote: () => void;
   /** Update selection. Does NOT load editor content; caller orchestrates. */
@@ -1262,15 +1265,15 @@ export function SidebarStateProvider({ children }: { children: ReactNode }) {
     [refreshOne],
   );
 
-  // MYND-97: re-read the open note's body after an out-of-band mutation
-  // (snapshot restore overwrites the `.myn` via the backend, not the editor's
-  // autosave). Mirrors the re-sync `commitRename` performs after a rename.
+  // MYND-97: re-read open notes' bodies after an out-of-band mutation
+  // (snapshot restore / a sync pull overwrite `.myn` files via the backend,
+  // not the editor's autosave). Mirrors the re-sync `commitRename` performs
+  // after a rename. Unconditionally — a pull must reload notes parked in
+  // unfocused panes (or behind a focused view/graph tab, where nothing is
+  // selected); every pane applies its own dirty guard, so a blanket bump
+  // never clobbers in-flight typing.
   const reloadOpenNote = useCallback(() => {
-    setState((prev) =>
-      prev.selectedId === null
-        ? prev
-        : { ...prev, contentReloadNonce: prev.contentReloadNonce + 1 },
-    );
+    setState((prev) => ({ ...prev, contentReloadNonce: prev.contentReloadNonce + 1 }));
   }, []);
 
   const value = useMemo<UseSelectedNoteReturn>(

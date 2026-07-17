@@ -195,6 +195,20 @@ fn now_unix_secs() -> u64 {
         .unwrap_or(0)
 }
 
+/// Grace window (7 days) during which a freshly-added but never-referenced
+/// attachment is withheld from the "unused" list (share-import ledger SYNC-10):
+/// a file shared via the OS share sheet lands in the library UNATTACHED (zero
+/// note references), which would otherwise place it in the Clean-Unused
+/// cryptographic-erase set the instant it arrives. Excluding recent additions
+/// keeps a just-shared, not-yet-filed file out of the erase review until the
+/// user has had a week to file it; a genuinely-old unfiled attachment becomes
+/// cleanable again after the window (accepted as correct). Uses the catalog's
+/// existing `created_at` — no on-disk format change (SYNC-10). Since the
+/// Clean-Unused dialog only ever erases ids it was shown from this list, the
+/// list guard is the effective protection; a direct `attachment_clean_unused`
+/// call with a hand-picked recent id is not covered (defense-in-depth follow-up).
+pub const UNUSED_CLEANUP_GRACE_SECS: u64 = 7 * 24 * 60 * 60;
+
 /// Stored `content_type` for an import whose bytes the sniffer does not
 /// recognize (MYND-173). It is a catalog hint only — it is NOT a member
 /// of [`sniff::ALLOWLISTED_CONTENT_TYPES`], so the `attachment://` handler
@@ -627,13 +641,17 @@ pub async fn attachment_unused_list<R: Runtime>(
 ) -> Result<Vec<CatalogEntry>, AttachmentUnusedListError> {
     let dir =
         vault_dir(&app, state.active_vault_id().await).map_err(AttachmentUnusedListError::from)?;
-    attachment_unused_list_with_dir(&dir, state.inner()).await
+    attachment_unused_list_with_dir(&dir, state.inner(), now_unix_secs()).await
 }
 
-/// Testable core of [`attachment_unused_list`].
+/// Testable core of [`attachment_unused_list`]. `now` is the current UNIX time
+/// (the wrapper passes [`now_unix_secs`]); entries added within
+/// [`UNUSED_CLEANUP_GRACE_SECS`] of it are withheld (SYNC-10). Pass
+/// `u64::MAX` to disable the grace window (unbounded "now" ⇒ nothing is recent).
 pub(crate) async fn attachment_unused_list_with_dir(
     vault_dir: &Path,
     state: &VaultRuntimeState,
+    now: u64,
 ) -> Result<Vec<CatalogEntry>, AttachmentUnusedListError> {
     // Hold the slot guard across the whole compute (catalog read + note
     // scan) — the import/delete writer-guard pattern. Clone the material
@@ -680,6 +698,11 @@ pub(crate) async fn attachment_unused_list_with_dir(
         // A tombstone is already deleted — never offered for cleanup (MYND-468).
         .filter(|(_, meta)| !meta.is_tombstone())
         .filter(|(id, _meta)| !referenced.contains(id))
+        // SYNC-10 grace: withhold a freshly-added, never-referenced attachment
+        // (e.g. a just-shared, not-yet-filed file) from the erase review for
+        // UNUSED_CLEANUP_GRACE_SECS so it cannot be cleaned before the user
+        // files it. `now.saturating_sub` guards a created_at ahead of `now`.
+        .filter(|(_, meta)| now.saturating_sub(meta.created_at) >= UNUSED_CLEANUP_GRACE_SECS)
         .map(|(id, meta)| CatalogEntry {
             id,
             content_type: meta.content_type,
@@ -2385,7 +2408,9 @@ mod tests {
         tmp: &ScopedTempDir,
         state: &VaultRuntimeState,
     ) -> std::collections::BTreeSet<String> {
-        attachment_unused_list_with_dir(tmp.path(), state)
+        // u64::MAX disables the SYNC-10 grace window so these tests see every
+        // never-referenced attachment regardless of its (just-set) created_at.
+        attachment_unused_list_with_dir(tmp.path(), state, u64::MAX)
             .await
             .expect("unused_list")
             .into_iter()
@@ -2398,7 +2423,7 @@ mod tests {
         rt().block_on(async {
             let tmp = ScopedTempDir::new("attach-unused-locked").unwrap();
             let state = VaultRuntimeState::default(); // Empty slot
-            let result = attachment_unused_list_with_dir(tmp.path(), &state).await;
+            let result = attachment_unused_list_with_dir(tmp.path(), &state, u64::MAX).await;
             assert!(matches!(result, Err(AttachmentUnusedListError::Locked)));
         });
     }
@@ -2444,6 +2469,44 @@ mod tests {
     }
 
     #[test]
+    fn unused_list_withholds_recently_added_within_grace() {
+        rt().block_on(async {
+            let (tmp, state) = temp_vault().await;
+            let t0 = now_unix_secs();
+            // A never-referenced import — "unused", but freshly added (e.g. a
+            // just-shared, not-yet-filed file). SYNC-10: it must not appear in
+            // the Clean-Unused review until the grace window elapses.
+            let a = import_tagged(&tmp, &state, 3).await;
+
+            // Within the grace window → withheld.
+            let within = attachment_unused_list_with_dir(
+                tmp.path(),
+                &state,
+                t0 + UNUSED_CLEANUP_GRACE_SECS - 10,
+            )
+            .await
+            .expect("unused_list");
+            assert!(
+                !within.iter().any(|e| e.id == a),
+                "recent import is withheld"
+            );
+
+            // Past the grace window → offered for cleanup again.
+            let past = attachment_unused_list_with_dir(
+                tmp.path(),
+                &state,
+                t0 + UNUSED_CLEANUP_GRACE_SECS + 10,
+            )
+            .await
+            .expect("unused_list");
+            assert!(
+                past.iter().any(|e| e.id == a),
+                "aged-out import is cleanable"
+            );
+        });
+    }
+
+    #[test]
     fn unused_list_excludes_deduped_shared_attachment() {
         rt().block_on(async {
             let (tmp, state) = temp_vault().await;
@@ -2478,7 +2541,7 @@ mod tests {
                 b"not a valid MY01 blob",
             )
             .unwrap();
-            let result = attachment_unused_list_with_dir(tmp.path(), &state).await;
+            let result = attachment_unused_list_with_dir(tmp.path(), &state, u64::MAX).await;
             assert!(matches!(
                 result,
                 Err(AttachmentUnusedListError::NoteScanFailed)

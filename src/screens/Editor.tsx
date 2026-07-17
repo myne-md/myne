@@ -89,6 +89,7 @@ import {
   PREFS_SYNC_APPLIED_EVENT,
 } from "../lib/prefs";
 import { bumpPrefsNonce } from "../notes/prefsNonce";
+import { flushGraphLayoutNow } from "../notes/graphLayoutPersist";
 import { showAttachmentToast } from "../editor/attachments/toast";
 import {
   exportToastAction,
@@ -1208,6 +1209,7 @@ function EditorChrome({
           await flushAll();
           await persistWorkspace();
           await persistVaultIndices();
+          await flushGraphLayoutNow();
           // `destroy()`, NOT `close()`: the capability ACL grants
           // `core:window:allow-destroy` but deliberately NOT `allow-close`
           // (TB6 surface — see lib/app-window.ts). `close()` rejects under the
@@ -1261,6 +1263,7 @@ function EditorChrome({
             await flushAll();
             await persistWorkspace();
             await persistVaultIndices();
+            await flushGraphLayoutNow();
           })();
         });
         if (cancelled) {
@@ -1284,6 +1287,7 @@ function EditorChrome({
     await flushAll();
     await persistWorkspace();
     await persistVaultIndices();
+    await flushGraphLayoutNow();
     await lockVault().catch(() => {
       /* lock is best-effort, parent callback still fires */
     });

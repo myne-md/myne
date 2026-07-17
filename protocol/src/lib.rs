@@ -62,6 +62,7 @@ pub mod capture_blob;
 pub mod dictionary_blob;
 pub mod embeddings_blob;
 pub mod error;
+pub mod graph_layout_blob;
 pub mod kdf;
 pub mod manifest;
 pub mod paired_extension;
@@ -72,6 +73,7 @@ pub mod quick_unlock_blob;
 pub mod saved_view;
 pub mod scram;
 pub mod search_blob;
+pub mod share_import_blob;
 pub mod subkey;
 pub mod template;
 pub mod themes_blob;
@@ -92,7 +94,7 @@ pub use account_number::{
 };
 pub use aead::{
     aad_ai_embeddings_blob, aad_attachment_text_blob, aad_custom_themes_blob,
-    aad_note_content_encrypt, aad_note_item_key_wrap, aad_password_wrap,
+    aad_graph_layout_blob, aad_note_content_encrypt, aad_note_item_key_wrap, aad_password_wrap,
     aad_personal_dictionary_blob, aad_prefs_blob, aad_quick_unlock_blob, aad_recovery_wrap,
     aad_search_index_blob, aad_vault_indices_blob, aad_vault_items_key_wrap, aad_workspace_blob,
     aead_open_ctx, aead_seal_ctx, AEAD_KEY_LEN, AEAD_NONCE_LEN, CTX_COMMITMENT_TAG_LEN,
@@ -132,6 +134,12 @@ pub use embeddings_blob::{
     MAX_EMBEDDINGS_PLAINTEXT_LEN,
 };
 pub use error::ProtocolError;
+pub use graph_layout_blob::{
+    decode_graph_layout_blob, encode_graph_layout_blob, encode_graph_layout_blob_raw,
+    GraphLayoutBlobError, GRAPH_LAYOUT_BLOB_ACCOUNT_HASH_LEN, GRAPH_LAYOUT_BLOB_FORMAT_VERSION,
+    GRAPH_LAYOUT_BLOB_HEADER_LEN, GRAPH_LAYOUT_BLOB_MAGIC, GRAPH_LAYOUT_BLOB_PROTOCOL_VERSION,
+    MAX_GRAPH_LAYOUT_PLAINTEXT_LEN,
+};
 pub use kdf::{
     derive_password_wrap_key, derive_recovery_wrap_key, derive_recovery_wrap_key_from_normalized,
     ARGON2_OUTPUT_LEN, ARGON2_SALT_LEN,

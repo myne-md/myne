@@ -7,11 +7,12 @@
 // view, preserving the prior "+ New view" behavior as the empty case.
 //
 // Composition model: a top-level All/Any combinator across GROUPS, each group its
-// own All/Any across CONDITIONS, one level of nesting. v1 condition types: tag
+// own All/Any across CONDITIONS, one level of nesting. Condition types: tag
 // (picked from the tag tree), folder (picked from the folder tree), search (free
-// text); each carries an "is / is not" negation. `property` is deferred (task 1's
-// representability guard keeps it out). The live count + edge states layer on in
-// tasks 4/6.
+// text) — each carrying an "is / is not" negation — and property (key picked
+// from the vault-indices key list, one of the 7 engine operators, free-text
+// value; no negation row — `!=` covers it, so `not(property)` stays
+// unrepresentable). The live count + edge states layer on in tasks 4/6.
 
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
@@ -22,8 +23,9 @@ import { Icon } from "../../components/primitives/Icon";
 import { SearchableSelect } from "../../components/primitives/SearchableSelect";
 import type { SelectOption } from "../../components/primitives/Select";
 import { tagRows, type TagRow } from "../tagBrowser";
-import { tagTree } from "../vaultIndices";
+import { tagTree, vaultIndicesPropertyKeys } from "../vaultIndices";
 import { useFilterCount } from "../views/useFilterCount";
+import type { PropertyOp } from "../../lib/prefs";
 import {
   draftToFilterNode,
   sanitizeDraft,
@@ -146,6 +148,14 @@ const EMPTY_DRAFT: FilterDraft = { combinator: "and", groups: [] };
 
 const newCondition = (): DraftCondition => ({ type: "tag", value: "", negated: false });
 
+/** A fresh condition of the given type. Switching type resets the payload —
+ *  tag key / folder path / search text / property triple are not
+ *  interchangeable — and property rows start on `==` with an empty key. */
+const conditionWithType = (type: ConditionType): DraftCondition =>
+  type === "property"
+    ? { type: "property", key: "", op: "==", value: "" }
+    : { type, value: "", negated: false };
+
 export function FilterBuilder({
   title,
   initialDraft,
@@ -163,13 +173,26 @@ export function FilterBuilder({
     { value: "tag", label: t("notes.filterBuilder.type.tag") },
     { value: "folder", label: t("notes.filterBuilder.type.folder") },
     { value: "search", label: t("notes.filterBuilder.type.search") },
+    { value: "property", label: t("notes.filterBuilder.type.property") },
   ];
   const NEGATE_OPTIONS: readonly SelectOption<"is" | "not">[] = [
     { value: "is", label: t("notes.filterBuilder.negate.is") },
     { value: "not", label: t("notes.filterBuilder.negate.isNot") },
   ];
+  // Comparison symbols are literal (not translated) — they mirror the engine's
+  // `PropertyOp` set; only the word-like `contains` goes through i18n.
+  const OP_OPTIONS: readonly SelectOption<PropertyOp>[] = [
+    { value: "==", label: "==" },
+    { value: "!=", label: "!=" },
+    { value: ">", label: ">" },
+    { value: "<", label: "<" },
+    { value: ">=", label: ">=" },
+    { value: "<=", label: "<=" },
+    { value: "contains", label: t("notes.filterBuilder.op.contains") },
+  ];
   const [draft, setDraft] = useState<FilterDraft>(initialDraft);
   const [tagOptions, setTagOptions] = useState<TagRow[]>([]);
+  const [propertyKeys, setPropertyKeys] = useState<string[]>([]);
   // An unrepresentable filter (`representable === false`) opens read-only. The
   // user can deliberately "Replace filter" — that discards the opaque AST and
   // starts a fresh editable draft (never a silent best-effort parse).
@@ -197,34 +220,63 @@ export function FilterBuilder({
     };
   }, []);
 
+  // Property-key choices come from the vault-indices distinct-key list — the
+  // same source the ViewSettings groupBy/sort/columns pickers read.
+  useEffect(() => {
+    let cancelled = false;
+    void vaultIndicesPropertyKeys().then(
+      (keys) => {
+        if (!cancelled) setPropertyKeys(keys);
+      },
+      () => {
+        /* index unavailable → empty picker, other condition types still work */
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const hasGroups = draft.groups.length > 0;
   const hasConditions = useMemo(
     () => draft.groups.some((g) => g.conditions.length > 0),
     [draft.groups],
   );
 
-  // A tag/folder condition whose stored value no longer exists (deleted folder,
-  // tag now absent from every note) is shown with a quiet "unresolved" badge —
-  // the engine already yields 0 matches for it, so this is informational only.
+  // A condition whose stored value no longer exists (deleted folder, tag now
+  // absent from every note, property key no note carries) is shown with a quiet
+  // "unresolved" badge — the engine already yields 0 matches for it, so this is
+  // informational only.
   const tagKeySet = useMemo(() => new Set(tagOptions.map((t) => t.key)), [tagOptions]);
   const folderPathSet = useMemo(
     () => new Set(folderOptions.map((f) => f.path)),
     [folderOptions],
   );
+  const propertyKeySet = useMemo(() => new Set(propertyKeys), [propertyKeys]);
   const isUnresolved = (c: DraftCondition): boolean =>
-    c.value.trim() !== "" &&
-    ((c.type === "tag" && !tagKeySet.has(c.value)) ||
-      (c.type === "folder" && !folderPathSet.has(c.value)));
+    c.type === "property"
+      ? c.key.trim() !== "" && !propertyKeySet.has(c.key)
+      : c.value.trim() !== "" &&
+        ((c.type === "tag" && !tagKeySet.has(c.value)) ||
+          (c.type === "folder" && !folderPathSet.has(c.value)));
 
-  // Options for a condition's value picker. A stored-but-missing value (deleted
-  // folder / absent tag) is kept as the first option so it stays visible and
-  // editable rather than silently snapping to another.
-  const valueOptionsFor = (c: DraftCondition): SelectOption<string>[] => {
+  // Options for a tag/folder condition's value picker (search rows render an
+  // Input and never reach this). A stored-but-missing value (deleted folder /
+  // absent tag) is kept as the first option so it stays visible and editable
+  // rather than silently snapping to another.
+  const valueOptionsFor = (c: Extract<DraftCondition, { negated: boolean }>): SelectOption<string>[] => {
     const base: SelectOption<string>[] =
       c.type === "tag"
         ? tagOptions.map((t) => ({ value: t.key, label: t.display }))
         : folderOptions.map((f) => ({ value: f.path, label: f.label }));
     return isUnresolved(c) ? [{ value: c.value, label: c.value }, ...base] : base;
+  };
+
+  // Options for a property condition's key picker — same stored-but-missing
+  // rule as `valueOptionsFor`.
+  const keyOptionsFor = (c: DraftCondition & { type: "property" }): SelectOption<string>[] => {
+    const base = propertyKeys.map((k) => ({ value: k, label: k }));
+    return isUnresolved(c) ? [{ value: c.key, label: c.key }, ...base] : base;
   };
 
   // ---- immutable draft mutators -------------------------------------------
@@ -330,31 +382,63 @@ export function FilterBuilder({
                   options={TYPE_OPTIONS}
                   selected={[cond.type]}
                   onChange={(next) =>
-                    // Changing type clears the value (tag key / folder path /
-                    // search text are not interchangeable).
-                    mutateCondition(gi, ci, (c) => ({
-                      ...c,
-                      type: next[0] ?? c.type,
-                      value: "",
-                    }))
+                    // Changing type resets the payload (tag key / folder path /
+                    // search text / property triple are not interchangeable).
+                    mutateCondition(gi, ci, (c) => conditionWithType(next[0] ?? c.type))
                   }
                 />
 
-                <SearchableSelect
-                  testId="view-filter.condition-negate"
-                  options={NEGATE_OPTIONS}
-                  selected={[cond.negated ? "not" : "is"]}
-                  onChange={(next) =>
-                    mutateCondition(gi, ci, (c) => ({ ...c, negated: next[0] === "not" }))
-                  }
-                />
+                {cond.type !== "property" && (
+                  // Property rows have no is/is-not control — the `!=` operator
+                  // covers negation (and keeps `not(property)` unrepresentable).
+                  <SearchableSelect
+                    testId="view-filter.condition-negate"
+                    options={NEGATE_OPTIONS}
+                    selected={[cond.negated ? "not" : "is"]}
+                    onChange={(next) =>
+                      mutateCondition(gi, ci, (c) =>
+                        c.type === "property" ? c : { ...c, negated: next[0] === "not" },
+                      )
+                    }
+                  />
+                )}
 
-                {cond.type === "search" ? (
+                {cond.type === "property" && (
+                  <>
+                    <SearchableSelect
+                      testId="view-filter.condition-key"
+                      options={keyOptionsFor(cond)}
+                      selected={cond.key ? [cond.key] : []}
+                      onChange={(next) =>
+                        mutateCondition(gi, ci, (c) =>
+                          c.type === "property" ? { ...c, key: next[0] ?? "" } : c,
+                        )
+                      }
+                      placeholder={t("notes.filterBuilder.selectPropertyPlaceholder")}
+                    />
+                    <SearchableSelect
+                      testId="view-filter.condition-op"
+                      options={OP_OPTIONS}
+                      selected={[cond.op]}
+                      onChange={(next) =>
+                        mutateCondition(gi, ci, (c) =>
+                          c.type === "property" ? { ...c, op: next[0] ?? c.op } : c,
+                        )
+                      }
+                    />
+                  </>
+                )}
+
+                {cond.type === "search" || cond.type === "property" ? (
                   <Input
                     type="text"
                     data-testid="view-filter.condition-value"
                     value={cond.value}
-                    placeholder={t("notes.filterBuilder.searchTextPlaceholder")}
+                    placeholder={
+                      cond.type === "property"
+                        ? t("notes.filterBuilder.propertyValuePlaceholder")
+                        : t("notes.filterBuilder.searchTextPlaceholder")
+                    }
                     onChange={(e) => mutateCondition(gi, ci, (c) => ({ ...c, value: e.target.value }))}
                     style={{ flex: "1 1 auto", minWidth: 0 }}
                   />

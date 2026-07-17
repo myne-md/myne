@@ -320,6 +320,117 @@ impl SyncTransport for FakeTransport {
     }
 }
 
+/// Test-only fault-injection decorator: wraps any [`SyncTransport`] and fails
+/// the next `n` matching requests (path-prefix match; empty prefix = every
+/// request), then heals and forwards transparently — fail-next-N, fail-by-path
+/// and N-fail-then-recover in one struct. Faults apply to `request` AND
+/// `request_ext` (both explicitly overridden — the trait's `request_ext`
+/// default would tunnel through the decorator's `request` and drop headers on
+/// the healed path); `open_sse` / exporter-bound requests forward untouched.
+#[cfg(test)]
+#[derive(Clone, Copy)]
+pub(crate) enum FaultMode {
+    /// Fail below HTTP (`TransportError::Network`) — the offline/socket shape.
+    Network,
+    /// Serve a synthetic empty-body HTTP status (e.g. 429/500 bursts).
+    Http(u16),
+}
+
+#[cfg(test)]
+pub(crate) struct FaultInjectingTransport {
+    inner: Box<dyn SyncTransport>,
+    path_prefix: String,
+    fail_remaining: std::sync::atomic::AtomicU32,
+    mode: FaultMode,
+}
+
+#[cfg(test)]
+impl FaultInjectingTransport {
+    /// Fail the next `n` requests regardless of path.
+    #[allow(dead_code)]
+    pub(crate) fn fail_next(inner: Box<dyn SyncTransport>, n: u32, mode: FaultMode) -> Self {
+        Self::fail_path(inner, "", n, mode)
+    }
+
+    /// Fail the next `n` requests whose path starts with `prefix`.
+    pub(crate) fn fail_path(
+        inner: Box<dyn SyncTransport>,
+        prefix: &str,
+        n: u32,
+        mode: FaultMode,
+    ) -> Self {
+        FaultInjectingTransport {
+            inner,
+            path_prefix: prefix.to_string(),
+            fail_remaining: std::sync::atomic::AtomicU32::new(n),
+            mode,
+        }
+    }
+
+    /// Consume one fault charge iff the path matches and charges remain.
+    fn take_fault(&self, path: &str) -> Option<FaultMode> {
+        use std::sync::atomic::Ordering;
+        if !path.starts_with(&self.path_prefix) {
+            return None;
+        }
+        // fetch_update: decrement only while > 0 (no underflow race).
+        self.fail_remaining
+            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |v| v.checked_sub(1))
+            .ok()
+            .map(|_| self.mode)
+    }
+}
+
+#[cfg(test)]
+impl SyncTransport for FaultInjectingTransport {
+    fn request(
+        &self,
+        method: HttpMethod,
+        path: &str,
+        body: &[u8],
+        token: Option<&str>,
+    ) -> Result<TransportResponse, TransportError> {
+        match self.take_fault(path) {
+            Some(FaultMode::Network) => Err(TransportError::Network),
+            Some(FaultMode::Http(status)) => Ok(TransportResponse {
+                status,
+                body: Vec::new(),
+            }),
+            None => self.inner.request(method, path, body, token),
+        }
+    }
+
+    fn request_ext(
+        &self,
+        method: HttpMethod,
+        path: &str,
+        extra_headers: &[(&str, &str)],
+        body: &[u8],
+        token: Option<&str>,
+    ) -> Result<TransportResponseExt, TransportError> {
+        match self.take_fault(path) {
+            Some(FaultMode::Network) => Err(TransportError::Network),
+            Some(FaultMode::Http(status)) => Ok(TransportResponseExt {
+                status,
+                body: Vec::new(),
+                headers: Vec::new(),
+            }),
+            None => self
+                .inner
+                .request_ext(method, path, extra_headers, body, token),
+        }
+    }
+
+    fn open_sse(
+        &self,
+        path: &str,
+        token: &str,
+        read_timeout: std::time::Duration,
+    ) -> Result<SseStream, SseOpenError> {
+        self.inner.open_sse(path, token, read_timeout)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

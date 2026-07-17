@@ -14,7 +14,7 @@
 //! unit-testable against a `ScopedTempDir`); the thin `*_with_dir` wrappers
 //! fetch `root_key`/hash from the unlocked `VaultRuntimeState`; the
 //! `#[tauri::command]` wrappers resolve the active vault dir. Any failure on read
-//! collapses to the empty theme store (fall-back-to-empty, § 9.20.4).
+//! collapses to the empty theme store (fall-back-to-empty, § 9.21.4).
 //!
 //! See: ../../CLAUDE.md "Secret-handling logging discipline".
 
@@ -184,7 +184,7 @@ fn now_unix_secs() -> u64 {
 }
 
 /// Read `vault.meta` and return its `account_number_hash` (offset 6, 16 bytes),
-/// used to build the themes-blob AAD per § 9.20.3.
+/// used to build the themes-blob AAD per § 9.21.3.
 fn read_account_number_hash(
     vault_meta_path: &Path,
 ) -> Result<[u8; VAULT_META_ACCOUNT_HASH_LEN], ThemesError> {
@@ -219,7 +219,7 @@ pub fn encode_themes_map(
 /// PURE CORE — decode `bytes` (a `MYT1` blob, or `None` for an absent file)
 /// into the map, collapsing ANY failure — absent / truncated / AEAD-fail /
 /// unsupported-format / malformed inner JSON — to the empty store
-/// (fall-back-to-empty, § 9.20.4). The `protocol::read_or_empty` analog for the
+/// (fall-back-to-empty, § 9.21.4). The `protocol::read_or_empty` analog for the
 /// client-owned inner format: the sync phase decodes the *remote* blob with it,
 /// so a hostile or corrupt remote store collapses to empty (and `merge(local,
 /// empty) == local`, losing nothing).
@@ -241,7 +241,7 @@ pub fn decode_themes_map_or_empty(
 
 /// PURE CORE — read + decrypt `vault.themes` under `vault_dir` into the
 /// `{name → palette}` map. Absent file / AEAD-fail / malformed payload → empty
-/// map (the fall-back-to-empty semantic, § 9.20.4).
+/// map (the fall-back-to-empty semantic, § 9.21.4).
 pub fn read_themes_map_in_dir(
     vault_dir: &Path,
     themes_key: &[u8; AEAD_KEY_LEN],

@@ -189,6 +189,10 @@ pub fn clear_device_local_sync(dir: &Path) -> Result<(), SyncConfigError> {
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
         Err(e) => return Err(e.into()),
     }
+    // Deliberately NOT removed: `quarantine/` (reconcile drop-leg, §11.3). Unlike
+    // every artifact above it holds USER DATA — the ciphertext of notes that were
+    // deleted+reclaimed remotely while this device was offline. A sync reset must
+    // never destroy it.
     // The vault.meta-dirty marker is keyed to the old enrollment's server state;
     // a fresh enrollment re-seeds meta, so drop it on reset.
     clear_vault_meta_dirty(dir)?;

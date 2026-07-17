@@ -6,7 +6,7 @@
 //! a thin desktop shim over the vault-content core in
 //! [`myne_core::plugins::themes`]: the palettes live in the encrypted
 //! `vault.themes` (`MYT1`) singleton blob, `Slot::Unlocked`-gated and
-//! `root_key`-derived (`protocol.md` § 9.20). The device-local files are retired
+//! `root_key`-derived (`protocol.md` § 9.21). The device-local files are retired
 //! (no migration — pre-alpha; the old `app_config_dir/themes/` dir is
 //! best-effort removed on boot in `lib.rs`).
 //!

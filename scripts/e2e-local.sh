@@ -52,6 +52,15 @@ RUN_FLAGS=(
   -v "$(pwd):/work"
   # Linux-only node_modules (pnpm refuses macOS artifacts and vice versa).
   -v myne-e2e-node-modules:/work/node_modules
+  # Workspace-MEMBER node_modules need the same isolation: the members are
+  # bind-mounted, so the container's `pnpm install` would otherwise rewrite
+  # their symlinks to container-side .pnpm hashes and break the HOST install
+  # (and vice versa). Latent until a member gained a real external dependency
+  # (editor/ → @excalidraw); bites as `Cannot find module` on whichever side
+  # ran `pnpm install` second.
+  -v myne-e2e-nm-dialect:/work/dialect/node_modules
+  -v myne-e2e-nm-editor:/work/editor/node_modules
+  -v myne-e2e-nm-copy:/work/copy/node_modules
   # Incremental Rust builds across runs.
   -v myne-e2e-target:/work/target
   -v myne-e2e-cargo-registry:/usr/local/cargo/registry
@@ -70,7 +79,7 @@ E2E_ENV='export HOME=/home/e2e CARGO_HOME=/home/e2e/.cargo RUSTUP_HOME=/usr/loca
 if [[ -n "$SERVER_BIN" ]]; then
   E2E_ENV="$E2E_ENV MYNE_E2E_SERVER=/work/$SERVER_BIN"
 fi
-FIX_PERMS='chown -R e2e:e2e /work/node_modules /work/target /usr/local/cargo/registry'
+FIX_PERMS='chown -R e2e:e2e /work/node_modules /work/dialect/node_modules /work/editor/node_modules /work/copy/node_modules /work/target /usr/local/cargo/registry'
 
 if [[ "$SHELL_MODE" == 1 ]]; then
   exec docker run -it "${RUN_FLAGS[@]}" "$IMAGE" \

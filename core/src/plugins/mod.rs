@@ -16,10 +16,12 @@
 pub mod attachments;
 pub mod captures;
 pub mod export;
+pub mod graph_layout;
 pub mod notes;
 pub mod prefs;
 pub mod quick_unlock;
 pub mod secret_export;
+pub mod share_import;
 pub mod snapshots;
 pub mod sync;
 pub mod themes;

@@ -16,8 +16,13 @@
 //   - the library "insert into note" action (attachments-library).
 //
 // It is PURE (no IPC, no DOM) so every consumer can import it without a
-// load order dependency. The attachment-id is a 32-byte value rendered as
-// 64 lowercase hex chars (`spec/protocol.md` §9.9).
+// load order dependency — the one exception is `attachmentUrl`, which
+// consults the Tauri global at CALL time (never at import time) to pick
+// the platform's serving form, so importing still carries no load-order
+// dependency. The attachment-id is a 32-byte value rendered as 64
+// lowercase hex chars (`spec/protocol.md` §9.9).
+
+import { convertFileSrc } from "@tauri-apps/api/core";
 
 /** The scheme prefix that marks a wikilink target as an attachment ref. */
 export const ATT_SCHEME = "att:";
@@ -93,12 +98,35 @@ export function extractAttachmentIds(body: string): string[] {
 }
 
 /**
+ * The canonical, platform-INDEPENDENT `attachment://<id>` form — the
+ * stable projection contract of the standalone HTML export: the Rust
+ * rewriter (`desktop_commands.rs::html_referenced_attachment_ids`) scans
+ * for exactly this shape, so exports stay deterministic across platforms.
+ * Runtime display surfaces must use [`attachmentUrl`] instead.
+ */
+export function canonicalAttachmentUrl(id: string): string {
+  return `attachment://${id}`;
+}
+
+/**
  * The custom-protocol URL that the editor/library use as an `<img src>` (or
  * pdf.js source) to fetch the decrypted bytes of an attachment. The Rust
  * `attachment://` handler decrypts in memory, re-sniffs the content-type,
  * and streams an allowlisted type — no plaintext ever touches disk
  * (`spec/protocol.md` §9.9, sync-ledger SYNC-4).
+ *
+ * Platform-aware (MYND-519): Android WebView and Windows WebView2 cannot
+ * intercept custom schemes — Tauri serves registered protocols there as
+ * `http://attachment.localhost/<id>`, so a literal `attachment://<id>`
+ * dies in the WebView before ever reaching the Rust handler. Inside Tauri
+ * this delegates to `convertFileSrc`, which emits the per-platform form
+ * (`attachment://localhost/<id>` on macOS/Linux/iOS); `extract_id`
+ * (scheme_core.rs) accepts every form. Outside Tauri (vitest/jsdom,
+ * plain-browser dev) it falls back to the canonical literal.
  */
 export function attachmentUrl(id: string): string {
-  return `attachment://${id}`;
+  if (typeof window !== "undefined" && "__TAURI_INTERNALS__" in window) {
+    return convertFileSrc(id, "attachment");
+  }
+  return canonicalAttachmentUrl(id);
 }

@@ -11,7 +11,7 @@
 //!
 //! The read cores (`themes_list` / `themes_read` / `themes_export`) collapse
 //! absent / AEAD-fail / parse-fail to the **empty theme store** per
-//! `docs/spec/protocol.md` § 9.20.4 — those conditions do NOT surface here. Only
+//! `docs/spec/protocol.md` § 9.21.4 — those conditions do NOT surface here. Only
 //! Slot precondition violations, unrecoverable `vault.meta` IO, and a
 //! `themes_read`/`themes_export` on a name that is absent from the store
 //! (`NotFound`) become read errors. The write cores (`themes_import` /
@@ -47,7 +47,7 @@ pub enum ThemesError {
     /// Unrecoverable filesystem error reading `vault.meta` (needed for the
     /// `account_number_hash` that binds the blob AAD) or writing `vault.themes`.
     /// The `vault.themes` READ itself never surfaces `Io` — absent / truncated /
-    /// AEAD-fail collapses to the empty store per § 9.20.4.
+    /// AEAD-fail collapses to the empty store per § 9.21.4.
     #[error("filesystem error during themes access")]
     Io {
         /// Closed-enum mapping of `std::io::Error::kind()`.

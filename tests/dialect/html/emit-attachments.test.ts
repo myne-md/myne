@@ -6,7 +6,7 @@
 // projects the muted exclusion line; every other extension projects a
 // filename placeholder line. Non-image embeds join `excludedAttachments`.
 
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { emitNoteHtml } from "../../../src/dialect/html/emitNoteHtml";
 import { scanExcludedAttachments } from "../../../src/dialect/html/attachment-classification";
 
@@ -44,6 +44,33 @@ describe("image attachment embeds", () => {
   it("escapes the filename in the alt attribute", async () => {
     const { html } = await emitNoteHtml(`${embed(ID_A, 'we"ird.png')}\n`);
     expect(html).toContain('alt="we&quot;ird.png"');
+  });
+});
+
+describe("attachment src form (MYND-519)", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("the default builder is platform-aware: delegates to convertFileSrc inside Tauri", async () => {
+    // Display surfaces (reading mode, the PDF hidden print window) call
+    // emitNoteHtml without an attachmentUrl override — inside Tauri the
+    // emitted src must be the per-platform servable form.
+    vi.stubGlobal("window", {
+      __TAURI_INTERNALS__: {
+        convertFileSrc: (path: string, protocol: string) =>
+          `http://${protocol}.localhost/${path}`,
+      },
+    });
+    const { html } = await emitNoteHtml(`${embed(ID_A, "pic.png")}\n`);
+    expect(html).toContain(`src="http://attachment.localhost/${ID_A}"`);
+  });
+
+  it("an explicit attachmentUrl option overrides the default builder", async () => {
+    const { html } = await emitNoteHtml(`${embed(ID_A, "pic.png")}\n`, {
+      attachmentUrl: (id) => `attachment://${id}`,
+    });
+    expect(html).toContain(`src="attachment://${ID_A}"`);
   });
 });
 

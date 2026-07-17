@@ -260,6 +260,7 @@ pub fn run() {
         .plugin(plugins::quick_unlock::init())
         .plugin(plugins::attachments::init())
         .plugin(plugins::importer::init())
+        .plugin(plugins::graph_layout::init())
         .plugin(plugins::workspace::init())
         .plugin(plugins::pdf_export::init())
         // ext-foundation-handoff task 4: the browser-extension pairing
