@@ -276,7 +276,7 @@ pub async fn attachment_import_with_dir(
     state: &VaultRuntimeState,
     source: ImportSource,
 ) -> Result<ImportedAttachment, AttachmentImportError> {
-    attachment_import_with_dir_ext(vault_dir, state, source, no_op_extract).await
+    attachment_import_with_dir_ext(vault_dir, state, source, None, no_op_extract).await
 }
 
 /// No-op text extractor: reports every input as `Unsupported`, so the eager
@@ -299,6 +299,14 @@ pub async fn attachment_import_with_dir_ext<F>(
     vault_dir: &Path,
     state: &VaultRuntimeState,
     source: ImportSource,
+    // Optional override for the fresh entry's `created_at` (UNIX seconds). `None`
+    // stamps the current time — the ordinary paste/drop/import path. A caller
+    // that is re-materializing a file with its own original timestamp (a backup
+    // restore / migration import) passes `Some`, which also governs the
+    // unused-cleanup grace window (`UNUSED_CLEANUP_GRACE_SECS`): a restored file
+    // whose original creation predates the window is not withheld as "recently
+    // added". Ignored on a dedup hit (the existing entry's `created_at` wins).
+    created_at_override: Option<u64>,
     extract: F,
 ) -> Result<ImportedAttachment, AttachmentImportError>
 where
@@ -419,7 +427,7 @@ where
         .filter(|f| !f.trim().is_empty())
         .unwrap_or_else(|| auto_filename(content_type));
     let size = file_bytes.len() as u64;
-    let created_at = now_unix_secs();
+    let created_at = created_at_override.unwrap_or_else(now_unix_secs);
 
     // (10) Encode the MYA1 blob on a blocking thread (random key + nonces
     //      from getrandom; AEAD seal under items_key → attachment_key).

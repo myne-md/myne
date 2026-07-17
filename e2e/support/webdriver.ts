@@ -362,6 +362,20 @@ export class Element {
     return (await this.property<string>("textContent")) ?? "";
   }
 
+  /** Scroll this element to the centre of its nearest scroll container. The
+   *  W3C `/click` "scroll into view" step only guarantees the element's border
+   *  box intersects the VIEWPORT — it does not reliably reveal an element that
+   *  is clipped inside an overflowing modal body (the `SearchableSelect` trigger
+   *  near the bottom of a tall settings modal), so `/click` there can report
+   *  "element not interactable" indefinitely. Call this first to bring the
+   *  target into its container's centre before clicking. */
+  async scrollIntoView(): Promise<void> {
+    await this.session.execute(
+      "arguments[0].scrollIntoView({ block: 'center', inline: 'center' })",
+      [{ [ELEMENT_KEY]: this.elementId }],
+    );
+  }
+
   /** DOM attribute as serialized in markup (e.g. `data-vault-id`). */
   attribute(name: string): Promise<string | null> {
     return this.session.send("GET", this.path(`/attribute/${name}`));
