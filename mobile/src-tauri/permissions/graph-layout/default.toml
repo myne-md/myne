@@ -1,0 +1,26 @@
+# Permissions for the in-app `graph_layout` Tauri plugin (mobile).
+# Picked up under the `graph-layout:` ACL namespace because `build.rs`
+# declares this as an `InlinedPlugin`. Capability files reference these
+# as `graph-layout:default` (or `graph-layout:allow-graph-layout-read` /
+# `graph-layout:allow-graph-layout-write`).
+#
+# Both commands are read/write of the encrypted vault.graph blob and
+# inherit the main-window-only invariant shared by the other vault plugins
+# — v0.2 multi-window MUST NOT grant `graph-layout:allow-graph-layout-write`
+# to any non-main window.
+
+"$schema" = "../../gen/schemas/mobile-schema.json"
+
+[default]
+description = "Default permission set for the graph-layout plugin — read + write of the encrypted knowledge-graph layout cache."
+permissions = ["allow-graph-layout-read", "allow-graph-layout-write"]
+
+[[permission]]
+identifier = "allow-graph-layout-read"
+description = "Allow invoking graph-layout:graph_layout_read (Slot::Unlocked-gated read of the vault.graph blob; returns the layout payload string or None with fall-back-to-recompute per protocol.md § 9.19.4)."
+commands.allow = ["graph_layout_read"]
+
+[[permission]]
+identifier = "allow-graph-layout-write"
+description = "Allow invoking graph-layout:graph_layout_write (Slot::Unlocked-gated write of the graph layout payload; atomic-writes vault.graph, no native side-effect)."
+commands.allow = ["graph_layout_write"]
