@@ -50,11 +50,30 @@ export type NoteUpdateError =
    */
   | { kind: "Io"; detail: { io_error_kind: IoFailureKind } }
   /** `tokio::task::spawn_blocking` panic / runtime shutdown. */
-  | { kind: "JoinFailure" };
+  | { kind: "JoinFailure" }
+  /**
+   * The on-disk plaintext no longer matches the caller-declared base
+   * (`expectedBaseHashHex`): a sync pull-apply landed between the
+   * editor's last save/reload and this save. Nothing was written — the
+   * caller preserves the buffer via the local keep-both path (conflict
+   * copy + reload). The desktop autosave is the ONLY sender of the base
+   * hash; every other caller (and mobile) omits it and keeps legacy
+   * last-write-wins, so they never see this variant.
+   */
+  | { kind: "BaseMismatch" };
 
 /** Type-narrowing helper for the `Io` variant. */
 export function isUpdateIoError(
   e: NoteUpdateError,
 ): e is { kind: "Io"; detail: { io_error_kind: IoFailureKind } } {
   return e.kind === "Io";
+}
+
+/** Type-narrowing helper for the expected-base guard rejection. */
+export function isBaseMismatchError(e: unknown): e is { kind: "BaseMismatch" } {
+  return (
+    typeof e === "object" &&
+    e !== null &&
+    (e as { kind?: unknown }).kind === "BaseMismatch"
+  );
 }

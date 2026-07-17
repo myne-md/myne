@@ -19,11 +19,23 @@ import { invoke } from "@tauri-apps/api/core";
  * overwrite primitive — autosave coalescing lives at the React-hook
  * layer, not here.
  *
+ * `expectedBaseHashHex` (optional, §11.3 expected-base guard): SHA-256
+ * hex of the UTF-8 plaintext the caller believes is currently on disk.
+ * When present and the disk has moved on (a sync pull-apply raced the
+ * editor), the backend rejects with `{kind:"BaseMismatch"}` and writes
+ * NOTHING. Omitted → legacy last-write-wins (every non-autosave caller).
+ *
  * Rejects with a `NoteUpdateError` (see `src/types/note-update-error.ts`).
  */
 export async function noteUpdate(
   noteId: string,
   plaintext: string,
+  expectedBaseHashHex?: string,
 ): Promise<void> {
-  await invoke<void>("plugin:notes|note_update", { noteId, plaintext });
+  await invoke<void>(
+    "plugin:notes|note_update",
+    expectedBaseHashHex === undefined
+      ? { noteId, plaintext }
+      : { noteId, plaintext, expectedBaseHashHex },
+  );
 }

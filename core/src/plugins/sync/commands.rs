@@ -13,7 +13,7 @@ use super::config::{
     read_config, validate_endpoint_url, write_config, SyncConfigError, SyncEndpointConfig,
 };
 use serde::Serialize;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 use tauri::{AppHandle, Emitter, Manager, Runtime};
 use tokio::sync::Mutex;
@@ -909,6 +909,237 @@ pub async fn sync_mark_tombstone<R: Runtime>(
         .map_err(|_| SyncDeviceError::Internal)
 }
 
+// --- Recovered notes: quarantine visibility (MYND-427 follow-up) ---
+//
+// The reconcile drop-leg moves a previously-synced note whose server record
+// was deleted + horizon-GC-reclaimed into `<vault>/quarantine/` instead of
+// destroying it (§11.3 drop disposition — never destroyed, never re-uploaded).
+// The four commands below give the user a window into that dir: list the
+// quarantined blobs, decrypt one for preview, restore one as a NEW note (a
+// fresh UUIDv7 — re-pushing the reclaimed id would resurrect deleted content
+// server-side), or delete one permanently. `sync_delete_quarantine` is the
+// ONLY destroyer of `quarantine/` content (`clear_device_local_sync`
+// deliberately skips the dir, sync/state.rs — it holds user data), so the UI
+// gates it behind an explicit confirm.
+
+/// One quarantined note blob, as listed to the "Recovered notes" UI.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct QuarantineEntry {
+    /// Exact file name under `quarantine/` — the read/restore/delete key.
+    /// Duplicates of a re-created id carry a `-<n>` suffix (`quarantine_note`).
+    pub file_name: String,
+    /// The suffix-stripped base note uuid (36-char lowercase hyphenated) —
+    /// display only; a `-<n>` duplicate shares its base id.
+    pub note_id_hex: String,
+    /// Encrypted blob size in bytes.
+    pub size: u64,
+    /// Device-local mtime (ms since epoch) — display only, never synced
+    /// (AS6 untouched). `None` when the filesystem yields no mtime.
+    pub modified_epoch_ms: Option<u64>,
+}
+
+/// Validate + parse a UI-supplied quarantine file name. Accepts ONLY the
+/// exact shape `quarantine_note` writes — `<uuid>[-<n>].myn`, where `<uuid>`
+/// is the 36-char lowercase hyphenated form and `<n>` a decimal duplicate
+/// suffix. Anything else (path separators, `..`, absolute paths, other
+/// extensions, uppercase) is rejected: this is the path-traversal guard for
+/// the read/restore/delete commands. Returns the SUFFIX-STRIPPED base uuid's
+/// 16 bytes — the decode AAD (`protocol.md` §9.1: the `.myn` filename is the
+/// canonical uuid, so a `-<n>` duplicate still decodes under its base id).
+fn parse_quarantine_file_name(name: &str) -> Option<[u8; 16]> {
+    let stem = name.strip_suffix(".myn")?;
+    let base = stem.get(..36)?;
+    let rest = stem.get(36..)?;
+    if !rest.is_empty() {
+        let digits = rest.strip_prefix('-')?;
+        if digits.is_empty() || !digits.bytes().all(|b| b.is_ascii_digit()) {
+            return None;
+        }
+    }
+    let mut hex = String::with_capacity(32);
+    for (i, b) in base.bytes().enumerate() {
+        match i {
+            8 | 13 | 18 | 23 => {
+                if b != b'-' {
+                    return None;
+                }
+            }
+            _ => {
+                if !matches!(b, b'0'..=b'9' | b'a'..=b'f') {
+                    return None;
+                }
+                hex.push(b as char);
+            }
+        }
+    }
+    hex16(&hex)
+}
+
+/// Enumerate `<vault>/quarantine/`, sorted by file name (deterministic
+/// across calls and platforms). Non-conforming names are skipped — the dir
+/// is engine-written, so anything else is stray (e.g. `.DS_Store`).
+fn list_quarantine_entries(vault_root: &Path) -> Vec<QuarantineEntry> {
+    let mut out = Vec::new();
+    if let Ok(entries) = std::fs::read_dir(super::orchestrator::quarantine_dir(vault_root)) {
+        for e in entries.flatten() {
+            let name = match e.file_name().to_str() {
+                Some(n) => n.to_string(),
+                None => continue,
+            };
+            if parse_quarantine_file_name(&name).is_none() {
+                continue;
+            }
+            let meta = e.metadata().ok();
+            let size = meta.as_ref().map(|m| m.len()).unwrap_or(0);
+            let modified_epoch_ms = meta
+                .and_then(|m| m.modified().ok())
+                .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                .map(|d| d.as_millis() as u64);
+            out.push(QuarantineEntry {
+                note_id_hex: name[..36].to_string(),
+                file_name: name,
+                size,
+                modified_epoch_ms,
+            });
+        }
+    }
+    out.sort_by(|a, b| a.file_name.cmp(&b.file_name));
+    out
+}
+
+/// Read + decrypt one quarantined blob to its plaintext body. The decode AAD
+/// is the suffix-stripped base uuid (see [`parse_quarantine_file_name`]).
+/// The body is the user's note plaintext (same secret class as `note_read`)
+/// — never logged. See the repo `src-tauri/CLAUDE.md` "Secret-handling
+/// logging discipline".
+async fn read_quarantine_with_dir(
+    vault_root: &Path,
+    state: &VaultRuntimeState,
+    file_name: &str,
+) -> Result<String, SyncDeviceError> {
+    let id = parse_quarantine_file_name(file_name).ok_or(SyncDeviceError::BadRequest)?;
+    let blob = std::fs::read(super::orchestrator::quarantine_dir(vault_root).join(file_name))
+        .map_err(|_| SyncDeviceError::BadRequest)?;
+    let (items_key, items_key_id, _root) = state
+        .peek_unlocked_attachment_material()
+        .await
+        .ok_or(SyncDeviceError::Internal)?;
+    tokio::task::spawn_blocking(move || {
+        let decrypted = protocol::decode_note(&blob, &id, &items_key, &items_key_id)
+            .map_err(|_| SyncDeviceError::Internal)?;
+        let body = String::from_utf8(decrypted.plaintext().to_vec())
+            .map_err(|_| SyncDeviceError::Internal)?;
+        drop(decrypted);
+        Ok::<String, SyncDeviceError>(body)
+    })
+    .await
+    .map_err(|_| SyncDeviceError::Internal)?
+}
+
+/// Restore core: decode the quarantined blob, create a NEW note from its
+/// body via the shared `note_create_with_dir` pipeline (fresh backend-minted
+/// UUIDv7; slot guard → AEAD → create-only atomic_write), then remove the
+/// quarantine source. The source is removed ONLY after the create succeeded
+/// — a failed create leaves the evidence intact. Returns the new note's
+/// 36-char id plus the body (the Tauri wrapper feeds it to the note-create
+/// hooks). No frontmatter marker is added — this is the user's deliberate
+/// recovery, not a conflict copy.
+async fn restore_quarantine_with_dirs(
+    vault_root: &Path,
+    notes_dir: PathBuf,
+    state: &VaultRuntimeState,
+    file_name: &str,
+) -> Result<(String, Zeroizing<String>), SyncDeviceError> {
+    let body = Zeroizing::new(read_quarantine_with_dir(vault_root, state, file_name).await?);
+    let new_id =
+        crate::plugins::notes::commands::note_create_with_dir(notes_dir, state, (*body).clone())
+            .await
+            .map_err(|_| SyncDeviceError::Internal)?;
+    std::fs::remove_file(super::orchestrator::quarantine_dir(vault_root).join(file_name))
+        .map_err(|_| SyncDeviceError::Internal)?;
+    Ok((new_id, body))
+}
+
+/// Validate the name, then remove one quarantined blob. See the section
+/// comment: this command is the only destroyer of `quarantine/` content.
+fn delete_quarantine_in(vault_root: &Path, file_name: &str) -> Result<(), SyncDeviceError> {
+    parse_quarantine_file_name(file_name).ok_or(SyncDeviceError::BadRequest)?;
+    std::fs::remove_file(super::orchestrator::quarantine_dir(vault_root).join(file_name))
+        .map_err(|_| SyncDeviceError::Internal)
+}
+
+/// List the quarantined note blobs for the "Recovered notes" surface.
+#[tauri::command]
+pub async fn sync_list_quarantine<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+) -> Result<Vec<QuarantineEntry>, SyncDeviceError> {
+    let dir = crate::paths::active_vault_root_io(&app, state.active_vault_id().await)
+        .map_err(|_| SyncDeviceError::Internal)?;
+    Ok(list_quarantine_entries(&dir))
+}
+
+/// Decrypt one quarantined blob to its plaintext body for the preview modal.
+/// The body is note plaintext (the `note_read` secret class) — never logged.
+#[tauri::command]
+pub async fn sync_read_quarantine<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    file_name: String,
+) -> Result<String, SyncDeviceError> {
+    let dir = crate::paths::active_vault_root_io(&app, state.active_vault_id().await)
+        .map_err(|_| SyncDeviceError::Internal)?;
+    read_quarantine_with_dir(&dir, state.inner(), &file_name).await
+}
+
+/// Restore a quarantined blob as a NEW note and remove the quarantine source
+/// on success. Returns the new note's 36-char id.
+#[tauri::command]
+pub async fn sync_restore_quarantine<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
+    file_name: String,
+) -> Result<String, SyncDeviceError> {
+    let dir = crate::paths::active_vault_root_io(&app, state.active_vault_id().await)
+        .map_err(|_| SyncDeviceError::Internal)?;
+    let notes_dir = crate::paths::notes_dir_under(&dir).map_err(|_| SyncDeviceError::Internal)?;
+    let (new_id, body) =
+        restore_quarantine_with_dirs(&dir, notes_dir, state.inner(), &file_name).await?;
+    // Mirror `note_create`'s post-write side-effects (the Tauri wrapper there
+    // owns them, so calling the `_with_dir` core directly means wiring them
+    // here): search/AI indexing so the restored note is findable in-session,
+    // and the sync dirty-bump so the restore pushes on the next cycle.
+    let title = crate::plugins::notes::title_extract::resolve_note_title(body.as_bytes())
+        .unwrap_or_default();
+    if crate::plugins::notes::drawing_text::is_drawing(body.as_bytes()) {
+        let projected = crate::plugins::notes::drawing_text::project_drawing_text(body.as_bytes())
+            .unwrap_or_default();
+        hooks.search_upsert(&new_id, &title, &projected);
+    } else {
+        hooks.search_upsert(&new_id, &title, &body);
+        hooks
+            .index_note_attachments(state.inner(), &new_id, &title, &body)
+            .await;
+    }
+    hooks.ai_note_changed(&new_id, &body);
+    hooks.bump_local_change();
+    Ok(new_id)
+}
+
+/// Delete a quarantined blob permanently (UI confirms first — this is the
+/// only path that destroys quarantine evidence).
+#[tauri::command]
+pub async fn sync_delete_quarantine<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    file_name: String,
+) -> Result<(), SyncDeviceError> {
+    let dir = crate::paths::active_vault_root_io(&app, state.active_vault_id().await)
+        .map_err(|_| SyncDeviceError::Internal)?;
+    delete_quarantine_in(&dir, &file_name)
+}
+
 // --- Enrollment command (MYND-425 task 5; bootstrap resolved) ---
 //
 // New-device enrollment: fetch vault.meta (pre-auth, by account_number_hash) →
@@ -1516,6 +1747,255 @@ mod tests {
         assert!(hex16("0123456789abcdeffedcba98765432-0").is_none());
         // Whitespace is not a hex digit.
         assert!(hex16("0123456789abcdef fedcba9876543210").is_none());
+    }
+
+    // ---- Recovered-notes quarantine commands ------------------------------
+
+    use crate::plugins::vault_unlock::state::{fixture_unlocked_with_keys, test_vault_id};
+    use crate::test_support::ScopedTempDir;
+
+    const SEED_ROOT: u8 = 0x42;
+    const SEED_ITEMS: u8 = 0x99;
+    const SEED_ITEMS_ID: u8 = 1;
+    const QUAR_BODY: &[u8] = b"# Recovered\n\nquarantined body";
+
+    fn rt() -> tokio::runtime::Runtime {
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("current-thread runtime")
+    }
+
+    async fn unlocked_state() -> VaultRuntimeState {
+        let state = VaultRuntimeState::default();
+        state
+            .set_unlocked(
+                test_vault_id(),
+                fixture_unlocked_with_keys(SEED_ROOT, SEED_ITEMS, SEED_ITEMS_ID),
+            )
+            .await;
+        state
+    }
+
+    /// Seal `QUAR_BODY` under the fixture items key with `uuid` as the AAD
+    /// and drop it into `<vault>/quarantine/<file_name>`.
+    fn seed_quarantined_blob(vault_root: &Path, uuid: &uuid::Uuid, file_name: &str) {
+        let blob = protocol::encode_new_note(
+            &[SEED_ITEMS; 32],
+            &[SEED_ITEMS_ID; 16],
+            uuid.as_bytes(),
+            QUAR_BODY,
+        )
+        .expect("encode quarantined note blob");
+        let dir = super::super::orchestrator::quarantine_dir(vault_root);
+        std::fs::create_dir_all(&dir).expect("create quarantine dir");
+        std::fs::write(dir.join(file_name), blob).expect("write quarantined blob");
+    }
+
+    const QUAR_UUID_A: &str = "01970e83-4f2f-7000-8000-00000000000a";
+    const QUAR_UUID_B: &str = "01970e83-4f2f-7000-8000-00000000000b";
+
+    #[test]
+    fn parse_quarantine_file_name_accepts_base_and_duplicate_suffix() {
+        let expected = *uuid::Uuid::parse_str(QUAR_UUID_A).unwrap().as_bytes();
+        assert_eq!(
+            parse_quarantine_file_name(&format!("{QUAR_UUID_A}.myn")),
+            Some(expected)
+        );
+        // A `-<n>` duplicate parses to the SAME base uuid — the decode AAD is
+        // the suffix-stripped id (blob filename rule, protocol.md §9.1).
+        assert_eq!(
+            parse_quarantine_file_name(&format!("{QUAR_UUID_A}-1.myn")),
+            Some(expected)
+        );
+        assert_eq!(
+            parse_quarantine_file_name(&format!("{QUAR_UUID_A}-12.myn")),
+            Some(expected)
+        );
+    }
+
+    #[test]
+    fn parse_quarantine_file_name_rejects_traversal_and_wrong_shape() {
+        // Path traversal / absolute paths.
+        assert!(parse_quarantine_file_name("../vault.meta").is_none());
+        assert!(parse_quarantine_file_name(&format!("../{QUAR_UUID_A}.myn")).is_none());
+        assert!(parse_quarantine_file_name(&format!("/tmp/{QUAR_UUID_A}.myn")).is_none());
+        // Wrong / missing extension.
+        assert!(parse_quarantine_file_name(QUAR_UUID_A).is_none());
+        assert!(parse_quarantine_file_name(&format!("{QUAR_UUID_A}.txt")).is_none());
+        // Malformed duplicate suffix.
+        assert!(parse_quarantine_file_name(&format!("{QUAR_UUID_A}-.myn")).is_none());
+        assert!(parse_quarantine_file_name(&format!("{QUAR_UUID_A}-1x.myn")).is_none());
+        // Uppercase / non-uuid stems.
+        assert!(parse_quarantine_file_name("01970E83-4F2F-7000-8000-00000000000A.myn").is_none());
+        assert!(parse_quarantine_file_name("not-a-uuid.myn").is_none());
+        assert!(parse_quarantine_file_name(".myn").is_none());
+        assert!(parse_quarantine_file_name("").is_none());
+    }
+
+    #[test]
+    fn quarantine_list_empty_then_sorted_with_duplicate_suffix() {
+        let tmp = ScopedTempDir::new("quar-list").expect("scoped tempdir");
+        // No quarantine/ dir at all → empty, no error.
+        assert!(list_quarantine_entries(tmp.path()).is_empty());
+
+        let qdir = super::super::orchestrator::quarantine_dir(tmp.path());
+        std::fs::create_dir_all(&qdir).unwrap();
+        std::fs::write(qdir.join(format!("{QUAR_UUID_B}.myn")), b"bbbb").unwrap();
+        std::fs::write(qdir.join(format!("{QUAR_UUID_A}-1.myn")), b"aaaaa").unwrap();
+        std::fs::write(qdir.join(format!("{QUAR_UUID_A}.myn")), b"aaa").unwrap();
+        // Stray entries are skipped, not surfaced.
+        std::fs::write(qdir.join(".DS_Store"), b"x").unwrap();
+        std::fs::write(qdir.join("not-a-uuid.myn"), b"x").unwrap();
+
+        let entries = list_quarantine_entries(tmp.path());
+        assert_eq!(
+            entries
+                .iter()
+                .map(|e| e.file_name.as_str())
+                .collect::<Vec<_>>(),
+            vec![
+                // Deterministic file-name sort: `-` (0x2d) < `.` (0x2e).
+                format!("{QUAR_UUID_A}-1.myn"),
+                format!("{QUAR_UUID_A}.myn"),
+                format!("{QUAR_UUID_B}.myn"),
+            ]
+        );
+        // The duplicate row strips its `-1` suffix down to the base uuid.
+        assert_eq!(entries[0].note_id_hex, QUAR_UUID_A);
+        assert_eq!(entries[1].note_id_hex, QUAR_UUID_A);
+        assert_eq!(entries[2].note_id_hex, QUAR_UUID_B);
+        assert_eq!(entries[0].size, 5);
+        assert_eq!(entries[1].size, 3);
+        assert!(entries[0].modified_epoch_ms.is_some());
+    }
+
+    #[test]
+    fn quarantine_read_opens_duplicate_with_base_uuid_aad() {
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("quar-read").expect("scoped tempdir");
+            let state = unlocked_state().await;
+            let uuid = uuid::Uuid::parse_str(QUAR_UUID_A).unwrap();
+            // Sealed under the BASE uuid, stored under the `-1` duplicate name
+            // — exactly what `quarantine_note` produces on a repeated drop.
+            seed_quarantined_blob(tmp.path(), &uuid, &format!("{QUAR_UUID_A}-1.myn"));
+
+            let body =
+                read_quarantine_with_dir(tmp.path(), &state, &format!("{QUAR_UUID_A}-1.myn"))
+                    .await
+                    .expect("duplicate decodes under its base-uuid AAD");
+            assert_eq!(body.as_bytes(), QUAR_BODY);
+        });
+    }
+
+    #[test]
+    fn quarantine_read_locked_vault_errors() {
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("quar-locked").expect("scoped tempdir");
+            let state = VaultRuntimeState::default(); // no unlocked slot
+            let uuid = uuid::Uuid::parse_str(QUAR_UUID_A).unwrap();
+            seed_quarantined_blob(tmp.path(), &uuid, &format!("{QUAR_UUID_A}.myn"));
+
+            let err = read_quarantine_with_dir(tmp.path(), &state, &format!("{QUAR_UUID_A}.myn"))
+                .await
+                .expect_err("locked vault must not decrypt quarantine content");
+            assert_eq!(err, SyncDeviceError::Internal);
+        });
+    }
+
+    #[test]
+    fn quarantine_restore_mints_new_id_removes_source_and_preserves_content() {
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("quar-restore").expect("scoped tempdir");
+            let state = unlocked_state().await;
+            let uuid = uuid::Uuid::parse_str(QUAR_UUID_A).unwrap();
+            let file_name = format!("{QUAR_UUID_A}.myn");
+            seed_quarantined_blob(tmp.path(), &uuid, &file_name);
+            let notes_dir = crate::paths::notes_dir_under(tmp.path()).expect("notes dir");
+
+            let (new_id, body) =
+                restore_quarantine_with_dirs(tmp.path(), notes_dir.clone(), &state, &file_name)
+                    .await
+                    .expect("restore succeeds");
+
+            // A NEW id — the reclaimed original is never re-pushed.
+            assert_ne!(new_id, QUAR_UUID_A);
+            assert_eq!(body.as_bytes(), QUAR_BODY);
+            // The quarantine source is gone…
+            assert!(!super::super::orchestrator::quarantine_dir(tmp.path())
+                .join(&file_name)
+                .exists());
+            // …and the new `.myn` decodes byte-identically under the new id.
+            let new_blob =
+                std::fs::read(notes_dir.join(format!("{new_id}.myn"))).expect("new note blob");
+            let new_uuid = *uuid::Uuid::parse_str(&new_id).unwrap().as_bytes();
+            let decrypted = protocol::decode_note(
+                &new_blob,
+                &new_uuid,
+                &[SEED_ITEMS; 32],
+                &[SEED_ITEMS_ID; 16],
+            )
+            .expect("restored note decodes");
+            assert_eq!(decrypted.plaintext(), QUAR_BODY);
+        });
+    }
+
+    #[test]
+    fn quarantine_restore_failed_create_keeps_source() {
+        rt().block_on(async {
+            // Locked vault → note_create_with_dir rejects → the quarantine
+            // source must remain untouched (evidence never destroyed on a
+            // failed restore).
+            let tmp = ScopedTempDir::new("quar-restore-fail").expect("scoped tempdir");
+            let state = VaultRuntimeState::default();
+            let uuid = uuid::Uuid::parse_str(QUAR_UUID_A).unwrap();
+            let file_name = format!("{QUAR_UUID_A}.myn");
+            seed_quarantined_blob(tmp.path(), &uuid, &file_name);
+            let notes_dir = crate::paths::notes_dir_under(tmp.path()).expect("notes dir");
+
+            let err = restore_quarantine_with_dirs(tmp.path(), notes_dir, &state, &file_name)
+                .await
+                .expect_err("locked vault must not restore");
+            assert_eq!(err, SyncDeviceError::Internal);
+            assert!(super::super::orchestrator::quarantine_dir(tmp.path())
+                .join(&file_name)
+                .exists());
+        });
+    }
+
+    #[test]
+    fn quarantine_delete_rejects_pattern_violations_and_removes_valid() {
+        let tmp = ScopedTempDir::new("quar-delete").expect("scoped tempdir");
+        let qdir = super::super::orchestrator::quarantine_dir(tmp.path());
+        std::fs::create_dir_all(&qdir).unwrap();
+        let file_name = format!("{QUAR_UUID_A}.myn");
+        std::fs::write(qdir.join(&file_name), b"ciphertext").unwrap();
+
+        // Pattern violations are BadRequest — nothing outside quarantine/ is
+        // reachable through this command.
+        for bad in [
+            "../vault.meta".to_string(),
+            format!("../{QUAR_UUID_A}.myn"),
+            format!("/tmp/{QUAR_UUID_A}.myn"),
+            QUAR_UUID_A.to_string(), // no .myn
+            format!("{QUAR_UUID_A}.txt"),
+        ] {
+            assert_eq!(
+                delete_quarantine_in(tmp.path(), &bad),
+                Err(SyncDeviceError::BadRequest),
+                "must reject {bad:?}"
+            );
+        }
+        assert!(qdir.join(&file_name).exists(), "rejections must not delete");
+
+        // The valid name removes exactly that file.
+        delete_quarantine_in(tmp.path(), &file_name).expect("valid delete");
+        assert!(!qdir.join(&file_name).exists());
+        // A second delete of the now-missing file surfaces Internal (fs error).
+        assert_eq!(
+            delete_quarantine_in(tmp.path(), &file_name),
+            Err(SyncDeviceError::Internal)
+        );
     }
 
     #[test]

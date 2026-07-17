@@ -25,6 +25,8 @@
 // with the latest body. No IPC thrashing.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { isBaseMismatchError } from "../types/note-update-error";
+import { sha256Hex } from "./baseHash";
 import { AUTOSAVE_IDLE_MS, AUTOSAVE_MAX_MS, saveNote } from "./saveNote";
 import { reindexNoteFromBody } from "./vaultIndices";
 
@@ -33,7 +35,11 @@ export type SaveStatus =
   | { status: "editing" }
   | { status: "saving" }
   | { status: "saved"; at: Date }
-  | { status: "error"; error: unknown };
+  | { status: "error"; error: unknown }
+  /** A `BaseMismatch` rejection is being resolved (conflict copy + reload —
+   *  the `onBaseMismatch` handler is in flight). Transient; ends `clean`
+   *  once the pane adopts the pulled disk body. */
+  | { status: "conflict" };
 
 export type UseAutosaveReturn = {
   status: SaveStatus;
@@ -52,8 +58,16 @@ export type UseAutosaveReturn = {
  * patched body (with the fresh `updated:` frontmatter timestamp); the
  * hook mirrors this back via the optional `onSaved` callback so the
  * editor's local state reflects the patch without close-reopen.
+ *
+ * The third parameter is the §11.3 expected-base fingerprint (SHA-256 hex
+ * of the body the hook believes is on disk — `savedBodyRef`); `undefined`
+ * = legacy last-write-wins.
  */
-export type SaveFn = (noteId: string, body: string) => Promise<string>;
+export type SaveFn = (
+  noteId: string,
+  body: string,
+  expectedBaseHashHex?: string,
+) => Promise<string>;
 
 const DEFAULT_SAVE_FN: SaveFn = saveNote;
 
@@ -62,6 +76,7 @@ export function useAutosave(
   body: string,
   saveImpl: SaveFn = DEFAULT_SAVE_FN,
   onSaved?: (patchedBody: string) => void,
+  onBaseMismatch?: (staleBufferBody: string) => Promise<void>,
 ): UseAutosaveReturn {
   const [status, setStatus] = useState<SaveStatus>({ status: "clean" });
 
@@ -82,6 +97,11 @@ export function useAutosave(
   /** Saved body that produced the current `saved` status — lets us tell
    *  if a fresh edit happened during in-flight (latest-wins). */
   const savedBodyRef = useRef<string | null>(null);
+  /** Latest `onBaseMismatch` handler — read through a ref at fire time so
+   *  `fireSave`'s identity doesn't churn with per-render callbacks (the
+   *  `autosaveRef` pattern PaneView already uses in the other direction). */
+  const onBaseMismatchRef = useRef(onBaseMismatch);
+  onBaseMismatchRef.current = onBaseMismatch;
 
   const clearTimers = useCallback(() => {
     if (idleTimerRef.current !== null) {
@@ -135,7 +155,19 @@ export function useAutosave(
     setStatus({ status: "saving" });
     const promise = (async () => {
       try {
-        const patchedBody = await saveImpl(id, bodyAtFire);
+        // §11.3 expected-base fingerprint: hash of the body this hook
+        // believes is on disk (`savedBodyRef`). Fail-open on any hashing
+        // hiccup — autosave must never break on the guard's plumbing;
+        // an omitted hash just means legacy last-write-wins for this fire.
+        let expectedBaseHashHex: string | undefined;
+        if (savedBodyRef.current !== null) {
+          try {
+            expectedBaseHashHex = await sha256Hex(savedBodyRef.current);
+          } catch {
+            expectedBaseHashHex = undefined;
+          }
+        }
+        const patchedBody = await saveImpl(id, bodyAtFire, expectedBaseHashHex);
         // Latest-wins gate: if the body changed during the IPC, the
         // current body differs from `bodyAtFire`. Re-arm the idle timer
         // (the body change handler would have armed it if it fired
@@ -173,6 +205,23 @@ export function useAutosave(
           onSaved(patchedBody);
         }
       } catch (err) {
+        // §11.3 BaseMismatch → local keep-both, awaited INSIDE the catch:
+        // `inFlightRef` stays non-null until the handler finishes, so
+        // `retry()` and duplicate fires no-op, and `flushIfDirty()` (lock /
+        // close / quit) transitively awaits the conflict-copy creation —
+        // no lost keystrokes on a close-flush. The handler ends by adopting
+        // the pulled disk body via `acceptReloadedBody` (→ clean); a handler
+        // throw falls through to the plain error state, and Retry re-runs
+        // the whole path (mismatch again → handler retried — converges).
+        if (isBaseMismatchError(err) && onBaseMismatchRef.current !== undefined) {
+          setStatus({ status: "conflict" });
+          try {
+            await onBaseMismatchRef.current(latestBodyRef.current);
+            return;
+          } catch {
+            // fall through to the error state below
+          }
+        }
         dirtyRef.current = true;
         setStatus({ status: "error", error: err });
       } finally {
@@ -238,7 +287,9 @@ export function useAutosave(
    * and stages a spurious keep-both conflict for a note the user never touched
    * (the false-conflict bug, MYND sync Bug 1). Callers MUST invoke this ONLY
    * when the buffer is clean — re-baselining over real unsaved edits would lose
-   * them.
+   * them. Second sanctioned caller: the `onBaseMismatch` keep-both handler —
+   * there the "unsaved edits" have ALREADY been preserved into a conflict copy
+   * before this re-baseline runs (`src/notes/baseMismatch.ts`).
    */
   const acceptReloadedBody = useCallback(
     (reloadedBody: string) => {
@@ -283,6 +334,12 @@ export function useAutosave(
   // no save is currently in flight. Skipping when in-flight prevents
   // the second concurrent save that could land out-of-order and
   // clobber the user's most recent edit.
+  //
+  // Deliberately HASHLESS (legacy last-write-wins): on unmount there is no
+  // live pane to run the keep-both handler, so a BaseMismatch rejection here
+  // would drop the keystrokes irrecoverably — whereas a legacy clobber is
+  // later reconciled by the sync engine's own server-side keep-both (the
+  // remote revision still exists on the server).
   useEffect(() => {
     return () => {
       clearTimers();

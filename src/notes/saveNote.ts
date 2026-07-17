@@ -50,10 +50,14 @@ const decoder = new TextDecoder();
  * body is bounded by the protocol's 16 MiB plaintext cap, and the
  * autosave cadence is at most every `AUTOSAVE_IDLE_MS`).
  */
-export async function saveNote(noteId: string, body: string): Promise<string> {
+export async function saveNote(
+  noteId: string,
+  body: string,
+  expectedBaseHashHex?: string,
+): Promise<string> {
   const stamped = decoder.decode(
     patchUpdatedField(encoder.encode(body), new Date().toISOString()),
   );
-  await noteUpdate(noteId, stamped);
+  await noteUpdate(noteId, stamped, expectedBaseHashHex);
   return stamped;
 }

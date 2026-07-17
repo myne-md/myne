@@ -35,6 +35,20 @@ describe("saveNote — timing constants", () => {
   });
 });
 
+describe("saveNote — expected-base pass-through (§11.3)", () => {
+  it("forwards the base hash into the invoke payload only when provided", async () => {
+    invokeMock.mockResolvedValue(undefined);
+    await saveNote("note-1", "body", "ab".repeat(32));
+    expect(invokeMock).toHaveBeenLastCalledWith(
+      "plugin:notes|note_update",
+      expect.objectContaining({ expectedBaseHashHex: "ab".repeat(32) }),
+    );
+    await saveNote("note-1", "body");
+    const [, payload] = invokeMock.mock.calls.at(-1) as [string, object];
+    expect("expectedBaseHashHex" in payload).toBe(false);
+  });
+});
+
 describe("saveNote — surgery composition", () => {
   it("calls note_update with body that has `updated:` frontmatter stamped", async () => {
     invokeMock.mockResolvedValueOnce(undefined);
