@@ -17,6 +17,17 @@ import {
 } from "../../src/notes/workspaceBuffers";
 import { AUTOSAVE_IDLE_MS } from "../../src/notes/saveNote";
 
+// useAutosave now computes an expected-base SHA-256 (`sha256Hex`) before each
+// save (the §11.3 guard). The REAL crypto.subtle digest is a genuine async
+// task that fake timers do NOT flush, so under `advanceTimersByTimeAsync` a
+// coalesced save could straddle it and miss the window — a timing flake (green
+// locally, red in CI). Mock the hash to a synchronously-resolved promise so
+// the save timing stays deterministic (the third `saveImpl` arg becomes
+// "h:<base>"); the hash itself is pinned in `tests/notes/baseHash.test.ts`.
+vi.mock("../../src/notes/baseHash", () => ({
+  sha256Hex: (text: string) => Promise.resolve(`h:${text}`),
+}));
+
 /** Latest render-props per noteId, captured by the test render-prop. */
 function makeHarness() {
   const handles = new Map<string, NoteBufferRenderProps>();
