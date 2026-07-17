@@ -1684,6 +1684,7 @@ mod tests {
                 &noop_hooks(),
                 id.clone(),
                 v2.to_string(),
+                None,
             )
             .await
             .unwrap();
@@ -1755,6 +1756,7 @@ mod tests {
                 &noop_hooks(),
                 id.clone(),
                 "v2".to_string(),
+                None,
             )
             .await
             .unwrap();
@@ -1765,6 +1767,7 @@ mod tests {
                 &noop_hooks(),
                 id.clone(),
                 "v3".to_string(),
+                None,
             )
             .await
             .unwrap();
@@ -1992,6 +1995,7 @@ mod tests {
                 &noop_hooks(),
                 id.clone(),
                 "v2".to_string(),
+                None,
             )
             .await
             .expect("update must succeed despite a failing snapshot");
@@ -2044,6 +2048,7 @@ mod tests {
                 &noop_hooks(),
                 id.clone(),
                 "v2".to_string(),
+                None,
             )
             .await
             .unwrap();
@@ -2128,6 +2133,7 @@ mod tests {
                 &noop_hooks(),
                 id.clone(),
                 "v2".to_string(),
+                None,
             )
             .await
             .unwrap();
@@ -2816,6 +2822,7 @@ mod tests {
                 &noop_hooks(),
                 note_id_str.clone(),
                 updated.to_string(),
+                None,
             )
             .await
             .expect("update must succeed on a fresh note");
@@ -2861,6 +2868,7 @@ mod tests {
                 &noop_hooks(),
                 "01970e83-4f2f-7000-8000-000000000000".to_string(),
                 "x".to_string(),
+                None,
             )
             .await;
             assert!(matches!(result, Err(NoteUpdateError::VaultNotUnlocked)));
@@ -2886,6 +2894,7 @@ mod tests {
                 &noop_hooks(),
                 "01970e83-4f2f-7000-8000-000000000000".to_string(),
                 "x".to_string(),
+                None,
             )
             .await;
             assert!(matches!(result, Err(NoteUpdateError::VaultNotUnlocked)));
@@ -2921,6 +2930,7 @@ mod tests {
                 &noop_hooks(),
                 "too-short".to_string(),
                 "x".to_string(),
+                None,
             )
             .await;
             assert!(matches!(result, Err(NoteUpdateError::InvalidNoteId)));
@@ -2957,6 +2967,7 @@ mod tests {
                 &noop_hooks(),
                 phantom.to_string(),
                 "x".to_string(),
+                None,
             )
             .await;
             assert!(matches!(result, Err(NoteUpdateError::NoteNotFound)));
@@ -3004,6 +3015,7 @@ mod tests {
                 &noop_hooks(),
                 note_id_str,
                 "rewrite".to_string(),
+                None,
             )
             .await;
             assert!(matches!(result, Err(NoteUpdateError::CannotDecrypt)));
@@ -3103,6 +3115,7 @@ mod tests {
                 &noop_hooks(),
                 note_id_str,
                 updated,
+                None,
             )
             .await
             .expect("update must succeed");
@@ -3150,6 +3163,7 @@ mod tests {
                 &noop_hooks(),
                 note_id_str.clone(),
                 "rewrite that cannot land".to_string(),
+                None,
             )
             .await;
             // Restore write perms BEFORE asserting so a failing assert can
@@ -3243,7 +3257,8 @@ mod tests {
 
             let big = String::from_utf8(vec![b'a'; protocol::MAX_PLAINTEXT_LEN]).unwrap();
             let result =
-                note_update_with_dir(notes_dir, &state, &noop_hooks(), note_id_str, big).await;
+                note_update_with_dir(notes_dir, &state, &noop_hooks(), note_id_str, big, None)
+                    .await;
             assert!(
                 result.is_ok(),
                 "MAX_PLAINTEXT_LEN must succeed; got {result:?}"
@@ -3274,7 +3289,8 @@ mod tests {
 
             let too_big = String::from_utf8(vec![b'a'; protocol::MAX_PLAINTEXT_LEN + 1]).unwrap();
             let result =
-                note_update_with_dir(notes_dir, &state, &noop_hooks(), note_id_str, too_big).await;
+                note_update_with_dir(notes_dir, &state, &noop_hooks(), note_id_str, too_big, None)
+                    .await;
             assert!(matches!(result, Err(NoteUpdateError::PlaintextTooLarge)));
         });
     }
@@ -3322,6 +3338,7 @@ mod tests {
                     &noop_hooks(),
                     update_id,
                     "rewrite".to_string(),
+                    None,
                 )
                 .await
             });

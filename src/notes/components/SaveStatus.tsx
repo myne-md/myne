@@ -159,6 +159,25 @@ export function SaveStatus({ status, onRetry }: SaveStatusProps) {
           </button>
         </span>
       );
+
+    // §11.3 keep-both in flight: the save lost to a sync pull; the buffer is
+    // being preserved as a conflict copy and the pane re-based. Transient —
+    // ends `clean` once the pulled body is adopted. Same pulsing affordance
+    // as `saving` (work is happening, no action needed).
+    case "conflict":
+      return (
+        <span
+          data-testid="editor.save-status"
+          style={ROOT_STYLE}
+          aria-label={t("notes.saveStatus.conflict")}
+          title={t("notes.saveStatus.conflictTitle")}
+        >
+          <span style={DOT_SAVING_STYLE} />
+          <span style={{ color: "var(--fg-1)" }}>
+            {t("notes.saveStatus.conflict")}
+          </span>
+        </span>
+      );
   }
 }
 

@@ -27,6 +27,7 @@ import { headingSections } from "../../dialect";
 const NOOP_ON_CHANGE = (_next: string): void => {};
 import { hasAnchor, type WikilinkAnchor } from "../../editor/wikilink/anchor";
 import { noteRead } from "../readNote";
+import { handleBaseMismatch, productionBaseMismatchDeps } from "../baseMismatch";
 import { peekRevealHeading, useRevealHeadingNonce } from "../views/revealHeadingSignal";
 import { peekRevealMatch, useRevealMatchNonce } from "../views/revealMatchSignal";
 import { setActiveHeading } from "../views/activeHeadingSignal";
@@ -428,7 +429,33 @@ export function PaneView({
   // loaded body then lands in the same commit as the id flip back, so it is
   // classified as loaded content. Tab switches flush BEFORE the switch (the
   // workspace flush registry), so the transient `null` never drops real edits.
-  const autosave = useAutosave(loading ? null : activeId, content, undefined, setContent);
+  // §11.3 BaseMismatch keep-both handler: a save rejected because a sync
+  // pull-apply re-based the note underneath the editor. Order is load-bearing
+  // (copy FIRST — a copy failure leaves the buffer untouched, zero keystroke
+  // loss); the orchestration lives in `baseMismatch.ts` (unit-tested). Read
+  // through a ref-stable callback: `activeId` is captured per render, which is
+  // correct — the handler resolves the pane's CURRENT note.
+  const onBaseMismatch = useCallback(
+    async (staleBufferBody: string) => {
+      if (activeId === null) return;
+      await handleBaseMismatch(
+        { noteId: activeId, bufferBody: staleBufferBody },
+        productionBaseMismatchDeps((diskBody) => {
+          autosaveRef.current.acceptReloadedBody(diskBody);
+          setContent(diskBody);
+        }, (copyId) => ctx.refreshOne(copyId)),
+      );
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [activeId],
+  );
+  const autosave = useAutosave(
+    loading ? null : activeId,
+    content,
+    undefined,
+    setContent,
+    onBaseMismatch,
+  );
 
   // Render-surface dispatch (drawing-notes SF2, MYND-499; SYNC-2): a value-strict
   // `kind: drawing` in the loaded body routes this pane to the Excalidraw canvas

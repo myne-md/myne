@@ -14,6 +14,7 @@ import { EndpointConfig } from "../sync/EndpointConfig";
 import { EnrollDeviceForm } from "../sync/EnrollDeviceForm";
 import { DeviceManagementPanel } from "../sync/DeviceManagementPanel";
 import { BuildingIndexState } from "../sync/BuildingIndexState";
+import { RecoveredNotes } from "../sync/RecoveredNotes";
 import { ConflictsView } from "../../notes/components/ConflictsView";
 import {
   useSelectedNote,
@@ -226,6 +227,14 @@ export function SyncPanel() {
           onDiscard={handleDiscard}
           onTakeTheirs={handleTakeTheirs}
         />
+      </div>
+
+      <div style={BLOCK_STYLE}>
+        <span style={SECTION_TITLE_STYLE}>
+          {t("sync.panel.recovered.label")}
+        </span>
+        <p style={HELPER_STYLE}>{t("sync.panel.recovered.helper")}</p>
+        <RecoveredNotes onRestored={refreshSidebar} />
       </div>
 
       <Toast

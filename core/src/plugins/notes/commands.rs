@@ -34,8 +34,10 @@ use crate::plugins::vault_unlock::state::{Slot, VaultRuntimeState};
 use protocol::{decode_note, encode_new_note, encode_update, DecryptError, ProtocolError};
 use serde::Deserialize;
 use std::path::PathBuf;
+use std::sync::OnceLock;
 use std::time::Instant;
 use tauri::{AppHandle, Runtime, State};
+use tokio::sync::Mutex;
 use zeroize::Zeroizing;
 
 use super::drawing_text::{is_drawing, project_drawing_text};
@@ -481,6 +483,35 @@ pub fn note_read_error_kind(e: &NoteReadError) -> &'static str {
     }
 }
 
+/// In-process serializer for every note-blob WRITE that must be atomic with
+/// respect to its own read (read → decode → guard → re-encode → write): the
+/// [`note_update_with_dir`] pipeline and the sync pull-apply writer
+/// (`sync::orchestrator::apply_pulled_note_blob`). Without it the two writers
+/// interleave and the expected-base guard's decision can go stale between its
+/// check and its write. `OnceLock<Mutex<()>>`, lazily initialized — same shape
+/// as `attachments::commands::catalog_write_mutex` / prefs `write_mutex`.
+/// Review invariant: NEVER held across network I/O (the orchestrator locks
+/// per-blob, download outside the lock).
+pub(crate) fn notes_write_mutex() -> &'static Mutex<()> {
+    static M: OnceLock<Mutex<()>> = OnceLock::new();
+    M.get_or_init(|| Mutex::new(()))
+}
+
+/// Strict 64-hex → 32-byte parse for the expected-base hash. `None` on any
+/// malformation — the only writer is our own autosave hook, so a bad value is
+/// a frontend bug; the caller logs the canary and skips the guard (fail-open
+/// to legacy overwrite beats manufacturing a spurious conflict from a bug).
+fn parse_base_hash_hex(s: &str) -> Option<[u8; 32]> {
+    if s.len() != 64 || !s.bytes().all(|b| b.is_ascii_hexdigit()) {
+        return None;
+    }
+    let mut out = [0u8; 32];
+    for (i, byte) in out.iter_mut().enumerate() {
+        *byte = u8::from_str_radix(&s[i * 2..i * 2 + 2], 16).ok()?;
+    }
+    Some(out)
+}
+
 /// Update an existing encrypted `.myn` note in place. See module-level
 /// docs for the broader pipeline narration.
 ///
@@ -527,6 +558,7 @@ pub async fn note_update<R: Runtime>(
     hooks: State<'_, crate::hooks::Hooks>,
     note_id: String,
     plaintext: String,
+    expected_base_hash_hex: Option<String>,
 ) -> Result<(), NoteUpdateError> {
     // First-line Plaintext-IPC wrap (`src-tauri/CLAUDE.md`): bound the
     // index-feeding copy to `Zeroizing` so it wipes on every early-return and
@@ -558,6 +590,23 @@ pub async fn note_update<R: Runtime>(
             }
         }
     })?;
+    // Expected-base guard input (§11.3 ms-race closure): strict-parse or skip.
+    // A malformed value is a frontend bug — canary-trace + fail-open to the
+    // legacy overwrite (never manufacture a spurious BaseMismatch from a bug).
+    let expected_base_hash = match expected_base_hash_hex.as_deref() {
+        None => None,
+        Some(s) => match parse_base_hash_hex(s) {
+            Some(h) => Some(h),
+            None => {
+                tracing::error!(
+                    stage = "base_guard",
+                    outcome = "malformed_hash",
+                    "note_update expected_base_hash_hex failed strict parse — guard skipped"
+                );
+                None
+            }
+        },
+    };
     // MYND-29 Task 4: re-index the edited note (replace semantics drop the
     // stale terms and add the new ones) after a successful write.
     let result = note_update_with_dir(
@@ -566,6 +615,7 @@ pub async fn note_update<R: Runtime>(
         hooks.inner(),
         note_id.clone(),
         (*plaintext).clone(),
+        expected_base_hash,
     )
     .await;
     match result {
@@ -623,12 +673,20 @@ pub struct NoteUpdateOutcome {
 
 /// Inner — pure-and-testable helper. Mirror of
 /// [`note_create_with_dir`] / [`note_read_with_dir`].
+///
+/// `expected_base_hash` (the §11.3 expected-base guard): when `Some`, the
+/// SHA-256 of the CURRENT on-disk plaintext must equal it or the update is
+/// rejected as [`NoteUpdateError::BaseMismatch`] with **no write, no snapshot,
+/// no index touch** — a sync pull-apply advanced the note underneath the
+/// editor and the caller resolves via local keep-both. `None` = legacy
+/// last-write-wins (every non-autosave caller, snapshots restore, mobile).
 pub async fn note_update_with_dir(
     notes_dir: PathBuf,
     state: &VaultRuntimeState,
     hooks: &crate::hooks::Hooks,
     note_id: String,
     plaintext: String,
+    expected_base_hash: Option<[u8; 32]>,
 ) -> Result<NoteUpdateOutcome, NoteUpdateError> {
     // First non-doc statement: bound the lifetime of plaintext bytes
     // to a `Zeroizing<String>` wrapper. Same Plaintext-IPC discipline
@@ -660,6 +718,14 @@ pub async fn note_update_with_dir(
         }
     };
     tracing::debug!(stage = "slot_check", outcome = "vault_unlocked");
+
+    // Serialize this read→decode→guard→re-encode→write pipeline against the
+    // sync pull-apply writer (see `notes_write_mutex` doc). Acquired AFTER the
+    // slot guard — the only site taking both, so the slot→notes order can
+    // never invert (the orchestrator locks with keys already cloned, no slot
+    // guard held). Held through the post-closure `atomic_write`; dropped
+    // explicitly before the slot guard below. CPU-only under the lock.
+    let notes_guard = notes_write_mutex().lock().await;
 
     let path = notes_dir.join(format!("{}.myn", note_id.as_uuid()));
     let note_uuid_bytes = *note_id.as_uuid().as_bytes();
@@ -727,6 +793,25 @@ pub async fn note_update_with_dir(
                     );
                     NoteUpdateError::CannotDecrypt
                 })?;
+            // Expected-base guard (§11.3): the current on-disk plaintext must
+            // still be the base the caller edited from. Checked BEFORE the
+            // snapshot capture and `encode_update` — a rejected save leaves
+            // disk, snapshots, and indices untouched. The hash VALUE is
+            // plaintext-derived and never logged (outcome only). Plain `==`:
+            // both sides are the same trust domain, no timing-oracle concern.
+            if let Some(expected) = expected_base_hash {
+                use sha2::{Digest, Sha256};
+                let disk_hash: [u8; 32] = Sha256::digest(decrypted.plaintext()).into();
+                if disk_hash != expected {
+                    tracing::debug!(
+                        stage = "base_guard",
+                        outcome = "mismatch",
+                        "note_update rejected: on-disk base advanced past the caller's declared base"
+                    );
+                    return Err(NoteUpdateError::BaseMismatch);
+                }
+                tracing::debug!(stage = "base_guard", outcome = "match");
+            }
             // `encode_update` consumes `decrypted` and pulls a fresh
             // 24-byte `content_nonce` from `getrandom` internally.
             match encode_update(decrypted, plaintext.as_bytes()) {
@@ -815,7 +900,9 @@ pub async fn note_update_with_dir(
         return Err(mapped);
     }
 
-    // Explicit drop — make the lock-release point visible.
+    // Explicit drops — make both lock-release points visible (notes-write
+    // mutex first, then the slot read guard: inverse of acquisition).
+    drop(notes_guard);
     drop(slot);
 
     tracing::debug!(stage = "success", event = "note_updated");
@@ -835,6 +922,7 @@ pub fn note_update_error_kind(e: &NoteUpdateError) -> &'static str {
         NoteUpdateError::NotesDirNotADirectory => "NotesDirNotADirectory",
         NoteUpdateError::Io { .. } => "Io",
         NoteUpdateError::JoinFailure => "JoinFailure",
+        NoteUpdateError::BaseMismatch => "BaseMismatch",
     }
 }
 
@@ -1898,6 +1986,150 @@ mod tests {
     use super::enumerate_notes_dir;
     use crate::paths::notes_dir_under;
     use crate::test_support::ScopedTempDir;
+
+    // ---- expected-base guard (§11.3 ms-race closure) -----------------------
+    // The base-guard unit tests live core-side (they need only the vault-unlock
+    // fixture + the notes with_dir cores); the broader CRUD integration tests
+    // stay desktop-side as documented above.
+
+    use super::{note_create_with_dir, note_read_with_dir, note_update_with_dir};
+    use crate::plugins::vault_unlock::state::{
+        fixture_unlocked_with_keys, test_vault_id, VaultRuntimeState,
+    };
+    use sha2::{Digest, Sha256};
+
+    fn noop_hooks() -> crate::hooks::Hooks {
+        std::sync::Arc::new(crate::hooks::NoopHooks)
+    }
+
+    /// Current-thread runtime per test — the crate convention (no
+    /// `#[tokio::test]`; cf. vault_unlock).
+    fn rt() -> tokio::runtime::Runtime {
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+    }
+
+    async fn unlocked() -> VaultRuntimeState {
+        let state = VaultRuntimeState::default();
+        state
+            .set_unlocked(test_vault_id(), fixture_unlocked_with_keys(7, 9, 1))
+            .await;
+        state
+    }
+
+    fn hash_of(s: &str) -> [u8; 32] {
+        Sha256::digest(s.as_bytes()).into()
+    }
+
+    #[test]
+    fn note_update_base_mismatch_rejects_without_write() {
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("base-guard-mismatch").unwrap();
+            let notes_dir = notes_dir_under(tmp.path()).unwrap();
+            let state = unlocked().await;
+            let id = note_create_with_dir(notes_dir.clone(), &state, "base body".to_string())
+                .await
+                .unwrap();
+            // Another writer (the sync pull-apply shape) advances the note…
+            note_update_with_dir(
+                notes_dir.clone(),
+                &state,
+                &noop_hooks(),
+                id.clone(),
+                "moved on".to_string(),
+                None,
+            )
+            .await
+            .unwrap();
+            // …then the editor saves against its STALE base → rejected, no write.
+            let err = note_update_with_dir(
+                notes_dir.clone(),
+                &state,
+                &noop_hooks(),
+                id.clone(),
+                "my racing edit".to_string(),
+                Some(hash_of("base body")),
+            )
+            .await
+            .unwrap_err();
+            assert!(matches!(err, super::NoteUpdateError::BaseMismatch));
+            let on_disk = note_read_with_dir(notes_dir, &state, id).await.unwrap();
+            assert_eq!(on_disk, "moved on", "a rejected save must not touch disk");
+        })
+    }
+
+    #[test]
+    fn note_update_matching_base_hash_writes() {
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("base-guard-match").unwrap();
+            let notes_dir = notes_dir_under(tmp.path()).unwrap();
+            let state = unlocked().await;
+            let id = note_create_with_dir(notes_dir.clone(), &state, "base body".to_string())
+                .await
+                .unwrap();
+            note_update_with_dir(
+                notes_dir.clone(),
+                &state,
+                &noop_hooks(),
+                id.clone(),
+                "edited".to_string(),
+                Some(hash_of("base body")),
+            )
+            .await
+            .unwrap();
+            let on_disk = note_read_with_dir(notes_dir, &state, id).await.unwrap();
+            assert_eq!(on_disk, "edited");
+        })
+    }
+
+    #[test]
+    fn note_update_none_hash_skips_guard_legacy_pin() {
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("base-guard-none").unwrap();
+            let notes_dir = notes_dir_under(tmp.path()).unwrap();
+            let state = unlocked().await;
+            let id = note_create_with_dir(notes_dir.clone(), &state, "base body".to_string())
+                .await
+                .unwrap();
+            // Disk moves on; a guardless caller (mobile / trash / templates /
+            // snapshots restore) still overwrites — the pinned legacy semantic.
+            note_update_with_dir(
+                notes_dir.clone(),
+                &state,
+                &noop_hooks(),
+                id.clone(),
+                "moved on".to_string(),
+                None,
+            )
+            .await
+            .unwrap();
+            note_update_with_dir(
+                notes_dir.clone(),
+                &state,
+                &noop_hooks(),
+                id.clone(),
+                "guardless overwrite".to_string(),
+                None,
+            )
+            .await
+            .unwrap();
+            let on_disk = note_read_with_dir(notes_dir, &state, id).await.unwrap();
+            assert_eq!(on_disk, "guardless overwrite");
+        })
+    }
+
+    #[test]
+    fn parse_base_hash_hex_is_strict() {
+        let valid = "ab".repeat(32);
+        assert!(super::parse_base_hash_hex(&valid).is_some());
+        assert!(super::parse_base_hash_hex(&valid.to_uppercase()).is_some());
+        assert!(super::parse_base_hash_hex("").is_none());
+        assert!(super::parse_base_hash_hex(&"ab".repeat(31)).is_none());
+        assert!(super::parse_base_hash_hex(&"ab".repeat(33)).is_none());
+        assert!(super::parse_base_hash_hex(&("zz".to_string() + &"ab".repeat(31))).is_none());
+    }
 
     // ---- enumerate_notes_dir tracing tests --------------------------------
 
