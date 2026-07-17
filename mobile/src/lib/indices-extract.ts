@@ -4,6 +4,8 @@
 // model the backend index resolves against.
 
 import { foldSegment } from "../dialect/folderPath";
+import { locateFrontmatter } from "../dialect/lezer/frontmatter";
+import { extractProperties } from "@myne/editor/host/notes/propertyTyping";
 import { parseTags } from "./tags";
 import type { WikilinkEdge, TagEntry, IndexRecord } from "./vault-indices";
 
@@ -71,8 +73,16 @@ export function extractTagEntries(body: string): TagEntry[] {
   return out;
 }
 
+/** The raw frontmatter YAML (between the line-1 `---` delimiters) of a note, or
+ *  `null` when there is no frontmatter block — the input `extractProperties`
+ *  re-parses under CORE_SCHEMA. */
+function rawFrontmatter(body: string): string | null {
+  const fm = locateFrontmatter(body);
+  return fm === null ? null : body.slice(fm.bodyStart, fm.bodyEnd);
+}
+
 /** Full apply payload for one note. `title` is the display title (fm or first
- *  line); `body` is the raw note plaintext. */
+ *  line); `body` is the raw note plaintext (frontmatter + body). */
 export function extractRecord(noteId: string, title: string, folder: string | null, body: string): IndexRecord {
   return {
     noteId,
@@ -81,5 +91,9 @@ export function extractRecord(noteId: string, title: string, folder: string | nu
     titleKey: title ? foldSegment(title) : null,
     wikilinks: extractWikilinks(body),
     tags: extractTagEntries(body),
+    // §3.6.4 typed frontmatter properties — the same coercion desktop's
+    // `reindexNoteFromBody` feeds the index, so a saved view's groupBy / sort /
+    // columns / property-filter resolve identically on both clients.
+    properties: extractProperties(rawFrontmatter(body)),
   };
 }

@@ -33,6 +33,18 @@ describe("mobile CSP", () => {
     expect(directives.get("media-src")).toContain("attachment:");
   });
 
+  it("lists http://attachment.localhost wherever attachment: appears (MYND-519)", () => {
+    // Android WebView cannot intercept custom schemes — Tauri serves the
+    // attachment protocol there as `http://attachment.localhost/<id>` (the
+    // form `convertFileSrc` emits), a DIFFERENT origin from the app, so the
+    // scheme-source `attachment:` alone does not cover it. Dropping any of
+    // these re-breaks Android attachment render (images/audio) and PDF
+    // preview (pdf.js byte fetch).
+    expect(directives.get("img-src")).toContain("http://attachment.localhost");
+    expect(directives.get("media-src")).toContain("http://attachment.localhost");
+    expect(directives.get("connect-src")).toContain("http://attachment.localhost");
+  });
+
   it("leaves the defense-in-depth XSS directives intact", () => {
     expect(directives.get("default-src")).toBe("default-src 'self'");
     expect(directives.get("object-src")).toBe("object-src 'none'");

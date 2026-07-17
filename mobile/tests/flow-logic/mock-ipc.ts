@@ -10,6 +10,7 @@
 // empty value so the editor mount never throws on an unmocked command.
 
 import type { Page } from "@playwright/test";
+import type { SavedView } from "../../src/lib/prefs";
 
 /** The runtime `SyncRuntimeStatus` shape (mirrors `lib/use-sync-status`). */
 export type MockSyncStatus =
@@ -89,6 +90,29 @@ export interface MockConfig {
   /** Canned pending watch captures returned ONCE by `captures|take_pending`
    *  (§9.18 Apple Watch drain). Each becomes a `note_create` + an `ack`. */
   pendingCaptures?: Array<{ id: string; text: string }>;
+  /** Canned imported shares returned ONCE by
+   *  `share-import|drain_pending_shares` (§9.20 OS share-sheet drain). The
+   *  host-side drain does decrypt→import→ack, so the mock just returns the
+   *  SYNC-9 confirmation list; a non-dedup entry drives the SF5 toast. */
+  pendingShares?: Array<{ id: string; filename: string; deduplicated?: boolean }>;
+  /** Seed the note list — `note_list` returns these ids and `note_read` returns
+   *  the matching `text` (raw frontmatter + body). For the saved-view render
+   *  flow: the view's filter runs over these live notes. */
+  notes?: Array<{ id: string; text: string }>;
+  /** Preseed saved views into `prefs_read`. The prefs store is STATEFUL —
+   *  `upsert_saved_view` / `set_view_order` / `delete_saved_view` mutate it, so
+   *  a view created through the UI appears on the next `usePrefs` re-read. */
+  savedViews?: SavedView[];
+  /** Canned `vault_indices_property_keys` — the view editor's property /
+   *  groupBy / sort / column picker universe. */
+  propertyKeys?: string[];
+  /** Canned `vault_indices_property_values`, keyed by property key: the
+   *  `[noteId, StoredProperty]` pairs the query engine's property resolver
+   *  reads (a property-filtered view matches nothing without it). */
+  propertyValues?: Record<
+    string,
+    Array<[string, { key: string; type: string; value?: string; elements?: Array<{ type: string; value: string }> }]>
+  >;
 }
 
 /** Install the mock IPC as an init script so it runs before the app's first paint. */
@@ -143,6 +167,14 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
     // by the next `quick_unlock_status` read (the settings toggle round-trip).
     let quickUnlock = config.quickUnlock ?? { configured: false, method: null, available: false };
 
+    // Seeded notes + a STATEFUL saved-views store (so a view created through the
+    // UI persists into the next `prefs_read`, mirroring the real prefs setter +
+    // nonce-bump round-trip). `note_read` looks the body up by id.
+    const seededNotes = config.notes ?? [];
+    const noteText = new Map(seededNotes.map((n) => [n.id, n.text]));
+    let savedViews: SavedView[] = config.savedViews ? [...config.savedViews] : [];
+    let viewOrder: string[] = savedViews.map((v) => v.id);
+
     const handlers: Record<string, (args: Record<string, unknown>) => unknown> = {
       // ── Boot / editor mount ──
       // freshDevice → boot to Welcome (no vaults, Empty slot); lockedVault →
@@ -185,7 +217,12 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
         if (config.deleteError) throw config.deleteError;
         return null;
       },
-      "plugin:prefs|prefs_read": () => ({ ...DEFAULT_PREFS, ...(config.prefs ?? {}) }),
+      "plugin:prefs|prefs_read": () => ({
+        ...DEFAULT_PREFS,
+        ...(config.prefs ?? {}),
+        saved_views: savedViews,
+        view_order: viewOrder,
+      }),
       // Record whole-map decoration writes (MYND-516) so a flow test asserts a
       // pick invoked the setter with the spliced key — the `__voiceImports` /
       // `__noteCreates` capture pattern. The payload keys mirror the Rust
@@ -200,7 +237,31 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
         (w.__itemColorWrites ??= []).push((args.colors ?? {}) as Record<string, string>);
         return null;
       },
-      "plugin:notes|note_list": () => config.noteIds ?? [],
+      "plugin:prefs|upsert_saved_view": (args) => {
+        const view = args.view as SavedView;
+        const i = savedViews.findIndex((v) => v.id === view.id);
+        if (i >= 0) savedViews[i] = view;
+        else savedViews.push(view);
+        return null;
+      },
+      "plugin:prefs|set_view_order": (args) => {
+        viewOrder = (args.order as string[] | undefined) ?? [];
+        return null;
+      },
+      "plugin:prefs|delete_saved_view": (args) => {
+        const id = String(args.id ?? "");
+        savedViews = savedViews.filter((v) => v.id !== id);
+        viewOrder = viewOrder.filter((x) => x !== id);
+        return null;
+      },
+      // note_list: prefer the richer `notes` seed (id + body for the view render);
+      // fall back to the drawing flow's `noteIds`-only seed.
+      "plugin:notes|note_list": () =>
+        seededNotes.length > 0 ? seededNotes.map((n) => n.id) : config.noteIds ?? [],
+      // ── Vault-indices property surface (saved-view property conditions) ──
+      "plugin:vault-indices|vault_indices_property_keys": () => config.propertyKeys ?? [],
+      "plugin:vault-indices|vault_indices_property_values": (args) =>
+        config.propertyValues?.[String(args.key ?? "")] ?? [],
       // ── Attachments surface (voice-note capture flow) ──
       // Record every import so a test can assert the capture pipeline produced a
       // `Voice note ….wav` bytes-import; echo the filename back so the inserted
@@ -261,7 +322,10 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
         (w.__noteDeletes ??= []).push(String(args.id ?? ""));
         return null;
       },
-      "plugin:notes|note_read": (args) => config.noteBodies?.[String(args.noteId ?? "")] ?? "",
+      "plugin:notes|note_read": (args) =>
+        noteText.get(String(args.noteId ?? "")) ??
+        config.noteBodies?.[String(args.noteId ?? "")] ??
+        "",
       "plugin:captures|seal_staged": () => {
         const w = window as unknown as { __sealStagedCalls?: number };
         w.__sealStagedCalls = (w.__sealStagedCalls ?? 0) + 1;
@@ -276,6 +340,26 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
       "plugin:captures|ack": (args) => {
         const w = window as unknown as { __captureAcks?: string[] };
         (w.__captureAcks ??= []).push(String(args.id ?? ""));
+        return null;
+      },
+      // ── Share-import surface (§9.20 OS share-sheet drain) ──
+      // drain_pending_shares returns the canned imported set ONCE (then empty,
+      // mirroring a real host-side drain that acks each entry after import), and
+      // records the number of drain calls.
+      "plugin:share-import|drain_pending_shares": () => {
+        const w = window as unknown as { __shareDrains?: number; __sharesTaken?: boolean };
+        w.__shareDrains = (w.__shareDrains ?? 0) + 1;
+        if (w.__sharesTaken) return [];
+        w.__sharesTaken = true;
+        return (config.pendingShares ?? []).map((s) => ({
+          id: s.id,
+          filename: s.filename,
+          deduplicated: s.deduplicated ?? false,
+        }));
+      },
+      "plugin:share-import|share_ack": (args) => {
+        const w = window as unknown as { __shareAcks?: string[] };
+        (w.__shareAcks ??= []).push(String(args.id ?? ""));
         return null;
       },
       // ── Sync surface (per-test configurable) ──

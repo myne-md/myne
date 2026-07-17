@@ -18,7 +18,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; img-src 'self' asset: attachment: data: blob:; media-src 'self' attachment: blob:; connect-src 'self' attachment:; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; script-src 'self' 'wasm-unsafe-eval'; object-src 'none'"
+      "csp": "default-src 'self'; img-src 'self' asset: attachment: http://attachment.localhost data: blob:; media-src 'self' attachment: http://attachment.localhost blob:; connect-src 'self' attachment: http://attachment.localhost; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; script-src 'self' 'wasm-unsafe-eval'; object-src 'none'"
     }
   },
   "plugins": {
