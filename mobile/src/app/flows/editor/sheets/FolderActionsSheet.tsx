@@ -10,16 +10,24 @@ export function FolderActionsSheet({
   name,
   onClose,
   onNewNote,
+  onNewDrawing,
   onNewSubfolder,
   onRename,
+  onDecorate,
   onArchive,
   onTrash,
 }: {
   name: string;
   onClose: () => void;
   onNewNote: () => void;
+  onNewDrawing: () => void;
   onNewSubfolder: () => void;
   onRename: () => void;
+  /** Open the folder decoration sheet (MYND-516). Two rows ("Icon…" / "Color")
+   *  are deliberately kept as separate entry points, but both open the one
+   *  sheet — which shows the icon grid AND the color row — so they share a
+   *  single prop rather than two callbacks wired to identical calls. */
+  onDecorate: () => void;
   onArchive: () => void;
   onTrash: () => void;
 }) {
@@ -27,9 +35,10 @@ export function FolderActionsSheet({
   // Logical groups (create / edit / destructive) split by a heavier separator —
   // the mobile twin of the desktop ContextMenu `group` dividers. `groupTop`
   // drops a row's top hairline when a separator already precedes it.
-  const row = (text: string, onClick: () => void, opts?: { danger?: boolean; groupTop?: boolean }): ReactNode => (
+  const row = (text: string, onClick: () => void, opts?: { danger?: boolean; groupTop?: boolean; testId?: string }): ReactNode => (
     <button
       onClick={onClick}
+      data-testid={opts?.testId}
       style={{ display: "flex", alignItems: "center", width: "100%", border: "none", borderTop: opts?.groupTop ? "none" : "1px solid var(--line-1)", background: "transparent", padding: "15px 18px", cursor: "pointer", fontFamily: "var(--font-sans)", fontSize: 16, color: opts?.danger ? "var(--danger)" : "var(--fg-1)" }}
     >
       {text}
@@ -42,9 +51,12 @@ export function FolderActionsSheet({
         <>
           <div style={{ padding: "0 18px 12px", fontSize: 13, fontWeight: 600, color: "var(--fg-2)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</div>
           {row(t("notes.list.newNote"), onNewNote)}
+          {row(t("notes.newTab.createDrawing"), onNewDrawing)}
           {row(t("notes.list.newSubfolder"), onNewSubfolder)}
           {sep}
           {row(t("attachments.library.menuRename"), onRename, { groupTop: true })}
+          {row(t("notes.list.icon"), onDecorate, { testId: "notes.folder-icon-action" })}
+          {row(t("notes.list.color"), onDecorate, { testId: "notes.folder-color-action" })}
           {row(t("notes.list.archiveFolder"), onArchive)}
           {sep}
           {row(t("notes.list.deleteFolderConfirm"), onTrash, { danger: true, groupTop: true })}
