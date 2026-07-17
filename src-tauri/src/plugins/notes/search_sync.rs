@@ -637,6 +637,7 @@ mod tests {
                 &noop_hooks(),
                 id_a.clone(),
                 "# Alpha\nrust tokio reactor".into(),
+                None,
             )
             .await
             .expect("edit A");

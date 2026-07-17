@@ -18,6 +18,13 @@ import { renderHook, act } from "@testing-library/react";
 import { useAutosave } from "../../src/notes/useAutosave";
 import { AUTOSAVE_IDLE_MS, AUTOSAVE_MAX_MS } from "../../src/notes/saveNote";
 
+// Deterministic expected-base fingerprint: jsdom's `crypto.subtle` availability
+// varies across runners, and the hook fail-opens on hash errors — mock the
+// hash so the third `saveImpl` argument is assertable ("h:<base body>").
+vi.mock("../../src/notes/baseHash", () => ({
+  sha256Hex: (text: string) => Promise.resolve(`h:${text}`),
+}));
+
 type Deferred = {
   promise: Promise<string>;
   resolve: (value: string) => void;
@@ -69,7 +76,7 @@ describe("useAutosave γ1+γ2 hybrid state machine", () => {
     });
 
     expect(saveImpl).toHaveBeenCalledTimes(1);
-    expect(saveImpl).toHaveBeenCalledWith("note-1", "initial edit");
+    expect(saveImpl).toHaveBeenCalledWith("note-1", "initial edit", "h:initial");
     expect(result.current.status).toMatchObject({ status: "saved" });
   });
 
@@ -119,7 +126,7 @@ describe("useAutosave γ1+γ2 hybrid state machine", () => {
 
     // First save is in flight; edit again.
     expect(saveImpl).toHaveBeenCalledTimes(1);
-    expect(saveImpl).toHaveBeenNthCalledWith(1, "note-1", "v1");
+    expect(saveImpl).toHaveBeenNthCalledWith(1, "note-1", "v1", "h:v0");
     expect(result.current.status).toEqual({ status: "saving" });
 
     rerender({ body: "v2" });
@@ -135,7 +142,8 @@ describe("useAutosave γ1+γ2 hybrid state machine", () => {
     });
 
     expect(saveImpl).toHaveBeenCalledTimes(2);
-    expect(saveImpl).toHaveBeenNthCalledWith(2, "note-1", "v2");
+    // The follow-up fires after the first save re-baselined to "v1".
+    expect(saveImpl).toHaveBeenNthCalledWith(2, "note-1", "v2", "h:v1");
 
     // Resolve the second save → saved.
     await act(async () => {
@@ -199,7 +207,7 @@ describe("useAutosave γ1+γ2 hybrid state machine", () => {
     });
 
     expect(saveImpl).toHaveBeenCalledTimes(2);
-    expect(saveImpl).toHaveBeenNthCalledWith(2, "note-1", "v1-updated");
+    expect(saveImpl).toHaveBeenNthCalledWith(2, "note-1", "v1-updated", expect.any(String));
     expect(result.current.status).toMatchObject({ status: "saved" });
   });
 
@@ -415,6 +423,89 @@ describe("useAutosave γ1+γ2 hybrid state machine", () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(AUTOSAVE_IDLE_MS);
     });
-    expect(saveImpl).toHaveBeenCalledWith("note-1", "v2 + user edit");
+    // Baseline at fire time = the accepted reloaded body "v2".
+      expect(saveImpl).toHaveBeenCalledWith("note-1", "v2 + user edit", "h:v2");
+  });
+
+  // ── §11.3 expected-base guard: BaseMismatch → local keep-both ──────────
+  // A save that lost to a sync pull is rejected backend-side; the hook hands
+  // the stale buffer to `onBaseMismatch` (conflict copy + reload) and shows
+  // the transient `conflict` status while the handler runs.
+
+  const BASE_MISMATCH = { kind: "BaseMismatch" } as const;
+
+  it("BaseMismatch → conflict status, handler awaited with the latest buffer", async () => {
+    const saveImpl = vi
+      .fn<(id: string, body: string, h?: string) => Promise<string>>()
+      .mockRejectedValueOnce(BASE_MISMATCH);
+    const handler = defer();
+    const onBaseMismatch = vi.fn(() => handler.promise.then(() => undefined));
+
+    const { result, rerender } = renderHook(
+      ({ body }: { body: string }) =>
+        useAutosave("note-1", body, saveImpl, undefined, onBaseMismatch),
+      { initialProps: { body: "base" } },
+    );
+    rerender({ body: "typed on stale base" });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(AUTOSAVE_IDLE_MS);
+    });
+
+    // Handler received the buffer body; status is the transient `conflict`.
+    expect(onBaseMismatch).toHaveBeenCalledWith("typed on stale base");
+    expect(result.current.status).toEqual({ status: "conflict" });
+
+    // While the handler is in flight, retry() must no-op (inFlight non-null).
+    act(() => result.current.retry());
+    expect(saveImpl).toHaveBeenCalledTimes(1);
+
+    // Handler finishes (in production it ends via acceptReloadedBody → clean).
+    await act(async () => {
+      handler.resolve("done");
+      await handler.promise;
+    });
+    act(() => result.current.acceptReloadedBody("pulled disk body"));
+    expect(result.current.status).toEqual({ status: "clean" });
+    expect(saveImpl).toHaveBeenCalledTimes(1); // no phantom re-save
+  });
+
+  it("BaseMismatch with a THROWING handler falls back to the error state", async () => {
+    const saveImpl = vi
+      .fn<(id: string, body: string, h?: string) => Promise<string>>()
+      .mockRejectedValueOnce(BASE_MISMATCH);
+    const onBaseMismatch = vi.fn(() => Promise.reject(new Error("copy failed")));
+
+    const { result, rerender } = renderHook(
+      ({ body }: { body: string }) =>
+        useAutosave("note-1", body, saveImpl, undefined, onBaseMismatch),
+      { initialProps: { body: "base" } },
+    );
+    rerender({ body: "typed on stale base" });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(AUTOSAVE_IDLE_MS);
+    });
+
+    expect(onBaseMismatch).toHaveBeenCalledTimes(1);
+    // Buffer untouched, dirty retained, plain error with Retry available.
+    expect(result.current.status).toMatchObject({ status: "error" });
+  });
+
+  it("BaseMismatch WITHOUT a handler is a plain error (workspaceBuffers/tests path)", async () => {
+    const saveImpl = vi
+      .fn<(id: string, body: string, h?: string) => Promise<string>>()
+      .mockRejectedValueOnce(BASE_MISMATCH);
+
+    const { result, rerender } = renderHook(
+      ({ body }: { body: string }) => useAutosave("note-1", body, saveImpl),
+      { initialProps: { body: "base" } },
+    );
+    rerender({ body: "typed on stale base" });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(AUTOSAVE_IDLE_MS);
+    });
+    expect(result.current.status).toMatchObject({
+      status: "error",
+      error: BASE_MISMATCH,
+    });
   });
 });

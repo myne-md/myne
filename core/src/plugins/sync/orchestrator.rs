@@ -145,6 +145,52 @@ fn download_blob_backoff(
     engine::download_blob(transport, token, id)
 }
 
+/// Outcome of one pulled-note write attempt under the notes-write mutex.
+enum PulledNoteApply {
+    /// The blob was written; adopt the manifest + baseline bookkeeping.
+    Applied,
+    /// The on-disk note diverged from the synced baseline while this cycle was
+    /// in flight (a `note_update` raced the pull) — an unpushed local edit now;
+    /// nothing was written.
+    SkippedDirty,
+}
+
+/// Write one pulled note blob to disk under `notes::commands::notes_write_mutex`,
+/// re-running the dirty-skip test against the CURRENT on-disk header nonce
+/// INSIDE the lock. The pre-download check upstream reads the cycle-start
+/// manifest, which goes stale the moment a local save lands mid-cycle; this
+/// in-lock re-check is what makes the editor's {read → base-guard → write}
+/// (`note_update_with_dir`) and the pull's {check → write} linearizable — the
+/// §11.3 expected-base guard's whole premise. The download already happened
+/// OUTSIDE the lock (review invariant: never network I/O under this mutex).
+///
+/// Divergence semantics mirror the pre-download filter: a synced baseline
+/// exists and the disk no longer matches it (including "file vanished" — a
+/// mid-cycle local delete must not be resurrected) → skip without mutation.
+/// No baseline (fresh pull of a never-held note) → write unconditionally.
+fn apply_pulled_note_blob(
+    notes_dir: &Path,
+    id: &[u8; 16],
+    bytes: &[u8],
+    baseline_nonce_hex: Option<&str>,
+) -> Result<PulledNoteApply, SyncCycleError> {
+    let _guard = crate::plugins::notes::commands::notes_write_mutex().blocking_lock();
+    if let Some(base) = baseline_nonce_hex {
+        let disk_nonce_hex = std::fs::read(blob_path(notes_dir, id))
+            .ok()
+            .as_deref()
+            .and_then(crate::note_nonce::read_myn_content_nonce)
+            .map(|n| hex(&n));
+        if disk_nonce_hex.as_deref() != Some(base) {
+            return Ok(PulledNoteApply::SkippedDirty);
+        }
+    }
+    std::fs::create_dir_all(notes_dir).map_err(|_| SyncCycleError::Io)?;
+    crate::atomic_write::atomic_write(&blob_path(notes_dir, id), bytes, true)
+        .map_err(|_| SyncCycleError::Io)?;
+    Ok(PulledNoteApply::Applied)
+}
+
 /// The device-local conflict-staging dir: a downloaded *remote* revision of a note
 /// that lost a concurrent-edit race, held until the notes layer materializes it as
 /// a keep-both copy (`conflict_of:`). The local edit is never touched.
@@ -158,7 +204,7 @@ fn conflict_staging_dir(vault_root: &Path) -> std::path::PathBuf {
 /// ciphertext is MOVED here — never destroyed, never re-uploaded (re-uploading
 /// would resurrect deleted content server-side AND lose the push batch's CAS).
 /// Deliberately NOT wiped by `clear_device_local_sync` — it holds user data.
-fn quarantine_dir(vault_root: &Path) -> std::path::PathBuf {
+pub(crate) fn quarantine_dir(vault_root: &Path) -> std::path::PathBuf {
     vault_root.join("quarantine")
 }
 
@@ -1474,7 +1520,10 @@ fn sync_cycle_attempt(
         // Skip a locally-dirty blob: our on-disk copy diverges from the synced
         // baseline, so this is an unpushed local edit (or a genuine conflict) and
         // downloading the server's copy would clobber it. The push phase below
-        // sends it; a real concurrent edit surfaces later via keep-both.
+        // sends it; a real concurrent edit surfaces later via keep-both. This
+        // pre-download form is only the CHEAP FILTER (it reads the cycle-start
+        // manifest); the authoritative re-check runs against the live disk
+        // inside `apply_pulled_note_blob`'s lock.
         let baseline_nonce = state
             .blobs
             .get(&hex(&c.id))
@@ -1506,20 +1555,25 @@ fn sync_cycle_attempt(
         // this bug destroy live notes and self-seal.
         match crate::note_nonce::read_myn_content_nonce(&bytes) {
             Some(n) if n == c.content_nonce => {
-                std::fs::create_dir_all(notes_dir).map_err(|_| SyncCycleError::Io)?;
-                crate::atomic_write::atomic_write(&blob_path(notes_dir, &c.id), &bytes, true)
-                    .map_err(|_| SyncCycleError::Io)?;
-                // Mirror the write into the in-memory manifest for the
-                // push-detect phase (ONE scan per attempt).
-                notes_manifest.insert(c.id, n);
-                state.blobs.insert(
-                    hex(&c.id),
-                    BlobSyncState {
-                        version: c.version,
-                        content_nonce_hex: hex(&c.content_nonce),
-                    },
-                );
-                pulled += 1;
+                match apply_pulled_note_blob(notes_dir, &c.id, &bytes, baseline_nonce.as_deref())? {
+                    PulledNoteApply::Applied => {
+                        // Mirror the write into the in-memory manifest for the
+                        // push-detect phase (ONE scan per attempt).
+                        notes_manifest.insert(c.id, n);
+                        state.blobs.insert(
+                            hex(&c.id),
+                            BlobSyncState {
+                                version: c.version,
+                                content_nonce_hex: hex(&c.content_nonce),
+                            },
+                        );
+                        pulled += 1;
+                    }
+                    // A local save landed between the cycle-start scan and this
+                    // write — the note is an unpushed local edit now; the push
+                    // phase (or keep-both) owns it. No write, no baseline move.
+                    PulledNoteApply::SkippedDirty => {}
+                }
             }
             _ => {
                 pull_skipped += 1;
@@ -2868,6 +2922,73 @@ mod tests {
         assert!(!blob_path(&notes, &id).exists());
         let uuid = uuid::Uuid::from_bytes(id);
         assert!(dir.join("quarantine").join(format!("{uuid}.myn")).exists());
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    // ── apply_pulled_note_blob: in-lock dirty re-check (A1 linearization) ──
+    // Two-thread race pin deliberately downgraded: `run_sync_cycle` is
+    // monolithic over a transport with no mid-loop injection seam, so a
+    // barrier-based race test would need test-only hooks in production code.
+    // Coverage instead: both writers share `notes_write_mutex` (compile-level),
+    // and these units pin the in-lock decision both ways.
+
+    /// The cycle-start manifest said "clean", but a local save landed before
+    /// the write: the in-lock re-read sees the diverged disk nonce and skips —
+    /// the pulled bytes must never clobber the fresh local edit.
+    #[test]
+    fn apply_pulled_note_blob_skips_when_disk_nonce_diverged_from_scan() {
+        let (dir, notes) = fresh_vault("applylock-dirty");
+        let id = v7_id();
+        let items_key = [0x11u8; 32];
+        let items_key_id = [0x22u8; 16];
+        let original = encode_new_note(&items_key, &items_key_id, &id, b"scanned base").unwrap();
+        let scanned_nonce = crate::note_nonce::read_myn_content_nonce(&original).unwrap();
+        // …but by write time the disk already holds a NEWER local edit.
+        let local_edit = encode_new_note(&items_key, &items_key_id, &id, b"local edit").unwrap();
+        crate::atomic_write::atomic_write(&blob_path(&notes, &id), &local_edit, false).unwrap();
+
+        let server_bytes = encode_new_note(&items_key, &items_key_id, &id, b"server v2").unwrap();
+        let outcome = apply_pulled_note_blob(
+            &notes,
+            &id,
+            &server_bytes,
+            Some(hex(&scanned_nonce).as_str()),
+        )
+        .unwrap();
+        assert!(matches!(outcome, PulledNoteApply::SkippedDirty));
+        let on_disk = std::fs::read(blob_path(&notes, &id)).unwrap();
+        assert_eq!(on_disk, local_edit, "the racing local edit survives");
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    /// Clean case: disk still matches the synced baseline → the pulled bytes land.
+    #[test]
+    fn apply_pulled_note_blob_writes_when_clean() {
+        let (dir, notes) = fresh_vault("applylock-clean");
+        let id = v7_id();
+        let items_key = [0x11u8; 32];
+        let items_key_id = [0x22u8; 16];
+        let base = encode_new_note(&items_key, &items_key_id, &id, b"synced base").unwrap();
+        let base_nonce = crate::note_nonce::read_myn_content_nonce(&base).unwrap();
+        crate::atomic_write::atomic_write(&blob_path(&notes, &id), &base, false).unwrap();
+
+        let server_bytes = encode_new_note(&items_key, &items_key_id, &id, b"server v2").unwrap();
+        let outcome =
+            apply_pulled_note_blob(&notes, &id, &server_bytes, Some(hex(&base_nonce).as_str()))
+                .unwrap();
+        assert!(matches!(outcome, PulledNoteApply::Applied));
+        let on_disk = std::fs::read(blob_path(&notes, &id)).unwrap();
+        assert_eq!(on_disk, server_bytes);
+        // A vanished file under a live baseline is likewise dirty (a mid-cycle
+        // local delete must not be resurrected).
+        std::fs::remove_file(blob_path(&notes, &id)).unwrap();
+        let outcome2 =
+            apply_pulled_note_blob(&notes, &id, &server_bytes, Some(hex(&base_nonce).as_str()))
+                .unwrap();
+        assert!(matches!(outcome2, PulledNoteApply::SkippedDirty));
+        // No baseline (fresh pull) writes unconditionally.
+        let outcome3 = apply_pulled_note_blob(&notes, &id, &server_bytes, None).unwrap();
+        assert!(matches!(outcome3, PulledNoteApply::Applied));
         std::fs::remove_dir_all(&dir).ok();
     }
 

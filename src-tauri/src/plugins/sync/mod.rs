@@ -43,6 +43,10 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::sync_join_account,
             commands::sync_reset_local,
             commands::sync_head_fingerprint,
+            commands::sync_list_quarantine,
+            commands::sync_read_quarantine,
+            commands::sync_restore_quarantine,
+            commands::sync_delete_quarantine,
         ])
         .build()
 }

@@ -65,7 +65,7 @@ describe("WorkspaceBuffers residency", () => {
       await vi.advanceTimersByTimeAsync(AUTOSAVE_IDLE_MS);
     });
     expect(saveImpl).toHaveBeenCalledTimes(1);
-    expect(saveImpl).toHaveBeenCalledWith("A", "body:A edited");
+    expect(saveImpl).toHaveBeenCalledWith("A", "body:A edited", expect.anything());
 
     // Edit only B → only B autosaves, with B's body. A is untouched.
     await act(async () => {
@@ -75,7 +75,7 @@ describe("WorkspaceBuffers residency", () => {
       await vi.advanceTimersByTimeAsync(AUTOSAVE_IDLE_MS);
     });
     expect(saveImpl).toHaveBeenCalledTimes(2);
-    expect(saveImpl).toHaveBeenLastCalledWith("B", "body:B edited");
+    expect(saveImpl).toHaveBeenLastCalledWith("B", "body:B edited", expect.anything());
     // No save ever crossed wires (A never saved B's body or vice-versa).
     expect(saveImpl).not.toHaveBeenCalledWith("A", "body:B edited");
     expect(saveImpl).not.toHaveBeenCalledWith("B", "body:A edited");

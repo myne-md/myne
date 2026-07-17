@@ -1593,6 +1593,8 @@
       "defaultName": "Filtered view"
     },
     "saveStatus": {
+      "conflict": "Resolving edit conflict…",
+      "conflictTitle": "This note changed on another device — keeping both versions",
       "editing": "Editing",
       "editingEllipsis": "Editing…",
       "editingTitle": "Editing — autosave is armed",
@@ -2464,6 +2466,19 @@
       "devices": {
         "label": "Devices"
       },
+      "recovered": {
+        "close": "Close",
+        "decrypting": "Decrypting…",
+        "deleteConfirmTitle": "Delete this recovered note?",
+        "deleteConfirmWarning": "This permanently deletes the only copy kept on this device. This cannot be undone.",
+        "deleteCta": "Delete",
+        "errorGeneric": "Something went wrong. Try again.",
+        "helper": "When a note deleted on another device is removed here, its encrypted copy is kept on this device. Restore one as a new note, or delete it permanently.",
+        "label": "Recovered notes",
+        "previewCta": "Preview",
+        "previewTitle": "Recovered note",
+        "restoreCta": "Restore"
+      },
       "server": {
         "helper": "Enter the same server URL on every device. For a self-hosted server use its <1>https://</1> address; verify the certificate fingerprint matches across your devices.",
         "label": "Sync server"
@@ -2475,6 +2490,9 @@
     },
     "reconcile": {
       "message": "This device was offline for a while — catching up on sync. Your notes are safe."
+    },
+    "recovered": {
+      "restoredToast": "Restored as a new note."
     },
     "status": {
       "awaitingApproval": "Awaiting approval",
