@@ -59,3 +59,18 @@ pre-push:
       run: cargo test --manifest-path src-tauri/Cargo.toml --no-fail-fast
     pnpm-build:
       run: pnpm build
+    vitest:
+      # Frontend unit tests (Vitest). Only `pnpm test` — NOT `test:flow`
+      # (Playwright starts a webServer; too heavy/flaky for a push hook).
+      run: pnpm test
+
+# Reject accidental AI co-author / attribution trailers in commit messages
+# (project policy). Lefthook passes the commit-message file path as {1}.
+commit-msg:
+  commands:
+    no-ai-coauthor:
+      run: |
+        if grep -qiE 'Co-Authored-By:.*(Claude|Anthropic)|Generated with .*Claude|🤖 Generated' "{1}"; then
+          echo "commit message carries an AI co-author/attribution trailer — remove it (project policy)."
+          exit 1
+        fi

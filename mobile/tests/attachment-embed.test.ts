@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
-import { emitAttachmentEmbed, parseAttachmentTarget, isAttachmentId, extractAttachmentIds } from "../src/lib/attachmentRef";
+import { describe, it, expect, afterEach, vi } from "vitest";
+import { emitAttachmentEmbed, parseAttachmentTarget, isAttachmentId, extractAttachmentIds, attachmentSrc } from "../src/lib/attachmentRef";
 import { parseBlocks } from "../src/lib/markdown";
 import { isAudioLabel } from "../src/components/MarkdownView";
 
@@ -26,6 +26,29 @@ describe("attachmentRef", () => {
   it("extracts embedded ids deduped in first-seen order", () => {
     const body = `intro ![[att:${ID}|a.png]] mid ![[att:${ID2}|b.pdf]] again ![[att:${ID}|a.png]]`;
     expect(extractAttachmentIds(body)).toEqual([ID, ID2]);
+  });
+});
+
+describe("attachmentSrc (platform-aware, MYND-519)", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("falls back to the literal attachment:// form outside Tauri", () => {
+    expect(attachmentSrc(ID)).toBe(`attachment://${ID}`);
+  });
+
+  it("delegates to convertFileSrc inside Tauri (Android http-mapped form)", () => {
+    // Android WebView cannot intercept custom schemes — the runtime form
+    // there is `http://attachment.localhost/<id>`; convertFileSrc reads the
+    // Tauri global at CALL time, so stubbing it here exercises the branch.
+    vi.stubGlobal("window", {
+      __TAURI_INTERNALS__: {
+        convertFileSrc: (path: string, protocol: string) =>
+          `http://${protocol}.localhost/${path}`,
+      },
+    });
+    expect(attachmentSrc(ID)).toBe(`http://attachment.localhost/${ID}`);
   });
 });
 

@@ -7,7 +7,10 @@
 // A wikilink *embed* whose target carries the `att:` scheme prefix (routing to
 // the vault.attachments catalog, NOT the note index) and whose alias is the
 // cosmetic display filename. Byte-identical to desktop so an attachment
-// embedded on mobile renders on desktop and rides sync unchanged. Pure — no IPC.
+// embedded on mobile renders on desktop and rides sync unchanged. Pure — no
+// IPC; `attachmentSrc` consults the Tauri global at CALL time only.
+
+import { convertFileSrc } from "@tauri-apps/api/core";
 
 /** The scheme prefix that marks a wikilink target as an attachment ref. */
 export const ATT_SCHEME = "att:";
@@ -35,8 +38,19 @@ export function parseAttachmentTarget(target: string): string | null {
 }
 
 /** The in-app decrypt URL the `attachment://` scheme resolves (matches desktop —
- *  the handler decrypts in RAM + re-sniffs the served content-type). */
+ *  the handler decrypts in RAM + re-sniffs the served content-type).
+ *
+ *  Platform-aware (MYND-519): Android WebView cannot intercept custom
+ *  schemes — Tauri serves registered protocols there as
+ *  `http://attachment.localhost/<id>`, so a literal `attachment://<id>`
+ *  dies in the WebView before reaching the Rust handler. Inside Tauri this
+ *  delegates to `convertFileSrc` (iOS emits `attachment://localhost/<id>`;
+ *  `extract_id` in the shared scheme_core accepts every form); outside
+ *  Tauri (vitest/browser dev) it falls back to the literal. */
 export function attachmentSrc(id: string): string {
+  if (typeof window !== "undefined" && "__TAURI_INTERNALS__" in window) {
+    return convertFileSrc(id, "attachment");
+  }
   return `attachment://${id}`;
 }
 

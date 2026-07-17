@@ -1,0 +1,36 @@
+# Permissions for the mobile `share-import` Tauri plugin (OS share-sheet file
+# import staging queue, MYF1 §9.20). Picked up under the `share-import:` ACL
+# namespace because `build.rs` declares this as an `InlinedPlugin`. Referenced by
+# `capabilities/default.json` as `share-import:default`.
+#
+# `seal_share` is device-key based (no vault key) and runs while the vault is
+# locked; `drain_pending_shares` imports the queue into the attachment library on
+# unlock; `share_ack` deletes a drained entry. Off Apple targets the device key
+# is currently unavailable (Android Keystore provider pending) and the seal
+# commands no-op. Adding a command to `build.rs` without a matching entry here is
+# a security bug.
+
+"$schema" = "../../gen/schemas/mobile-schema.json"
+
+[default]
+description = "Default permission set for the mobile share-import plugin (seal/drain/ack the share-import staging queue)."
+permissions = [
+    "allow-seal-share",
+    "allow-drain-pending-shares",
+    "allow-share-ack",
+]
+
+[[permission]]
+identifier = "allow-seal-share"
+description = "Allow invoking share-import:seal_share (seal a file shared via the OS share sheet into the device-local queue; runs while locked)."
+commands.allow = ["seal_share"]
+
+[[permission]]
+identifier = "allow-drain-pending-shares"
+description = "Allow invoking share-import:drain_pending_shares (import staged shared files into the attachment library on unlock)."
+commands.allow = ["drain_pending_shares"]
+
+[[permission]]
+identifier = "allow-share-ack"
+description = "Allow invoking share-import:share_ack (delete a drained share once its attachment has been imported)."
+commands.allow = ["share_ack"]
