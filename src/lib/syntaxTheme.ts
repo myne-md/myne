@@ -9,8 +9,11 @@
 // theme's background is dark and, if so, alias the syntax tokens to the existing
 // `--_syntax-*-dark` raw ramp (the same design-tuned, AA-checked values the
 // built-in dark theme uses, defined unconditionally in `:root`) — reusing
-// approved colors, inventing none. A theme that ships its OWN `--syntax-*` (a
-// future gallery theme) is left untouched; a light theme keeps the light default.
+// approved colors, inventing none. The fill is PER-ROLE: a role the theme
+// defines itself is kept; only the roles it omits are aliased to the dark ramp.
+// A light theme keeps the light default. (MYND-527: the earlier all-or-nothing
+// gate — any `--syntax-*` → no derivation — left the 7 roles that the shipped
+// gallery themes omit on the unreadable light `:root` defaults.)
 
 /** The 12 code-syntax token roles — mirrors `--syntax-*` in `styles/tokens.css`. */
 export const SYNTAX_TOKEN_ROLES = [
@@ -73,21 +76,30 @@ export function isDarkBackground(background: string): boolean {
 
 /**
  * The `--syntax-*` overrides to apply for a custom-theme `palette`, or `{}` for
- * none. Returns aliases to the built-in dark syntax ramp ONLY when the theme
- * (a) does not define any `--syntax-*` token itself AND (b) has a dark
- * background (`--paper`, a required core token). Pure — no DOM; the apply path
+ * none. On a dark background (`--paper`, a required core token) aliases each of
+ * the 12 syntax roles the theme does NOT define itself to the built-in dark
+ * syntax ramp; roles the theme defines are left to its own value. Returns `{}`
+ * for a light theme, a theme with no `--paper`, or a dark theme that already
+ * defines all 12 roles. Pure — no DOM; the apply path
  * (`theme.ts::applyCustomTheme`) writes the result via the CSSOM.
+ *
+ * Per-role rather than all-or-nothing (MYND-527): the shipped gallery themes
+ * define only 5 of the 12 roles, so an all-or-nothing gate disengaged entirely
+ * and left the other 7 on the light `:root` defaults — unreadable on a dark
+ * surface. Filling only the omitted roles closes that partial-set gap without
+ * ever overriding a color the theme chose for itself.
  */
 export function deriveSyntaxTokensForTheme(
   palette: Record<string, string>,
 ): Record<string, string> {
-  const providesSyntax = Object.keys(palette).some((k) => k.startsWith("--syntax-"));
-  if (providesSyntax) return {};
   const background = palette["--paper"];
   if (background === undefined || !isDarkBackground(background)) return {};
   const out: Record<string, string> = {};
   for (const role of SYNTAX_TOKEN_ROLES) {
-    out[`--syntax-${role}`] = `var(--_syntax-${role}-dark)`;
+    const key = `--syntax-${role}`;
+    if (palette[key] === undefined) {
+      out[key] = `var(--_syntax-${role}-dark)`;
+    }
   }
   return out;
 }

@@ -63,13 +63,15 @@ export function applyCustomTheme(palette: Record<string, string>): void {
       keys.push(key);
     }
   }
-  // MYND-356: a DARK custom theme that ships no `--syntax-*` palette would else
+  // MYND-356: a DARK custom theme's syntax roles that lack an override would else
   // inherit the built-in LIGHT syntax colors (unreadable on a dark surface).
-  // Alias the syntax tokens to the design-tuned dark ramp instead — reusing
-  // approved colors, deriving light-vs-dark from the theme's own background
-  // luminance. Applied AFTER the palette; `deriveSyntaxTokensForTheme` returns
-  // `{}` when the theme provides its OWN syntax tokens (never overridden) or is
-  // light. Tracked in `keys` so `clearCustomTheme` reverts them on switch/lock.
+  // Alias those roles to the design-tuned dark ramp instead — reusing approved
+  // colors, deriving light-vs-dark from the theme's own background luminance.
+  // Applied AFTER the palette so it never clobbers a role the theme set itself;
+  // `deriveSyntaxTokensForTheme` fills only the roles the theme omits (MYND-527:
+  // per-role, since the gallery themes define just 5 of 12) and returns `{}` for
+  // a light theme. Tracked in `keys` so `clearCustomTheme` reverts them on
+  // switch/lock.
   for (const [key, value] of Object.entries(deriveSyntaxTokensForTheme(palette))) {
     root.style.setProperty(key, value);
     keys.push(key);
