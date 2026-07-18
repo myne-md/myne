@@ -40,6 +40,17 @@ steps:
   cargo-clippy:
     image: rust:1.96.0-slim
     when: *code-paths
+    # Shared compile cache (H1) — root front-lane steps use the top-level cache
+    # dirs. cargo-clippy and cargo-test get the SAME config on purpose: they share
+    # the workspace target/, so a mismatched RUSTC_WRAPPER between them would churn
+    # cargo fingerprints. (sccache passes clippy-driver through, but the dep rustc
+    # compiles it caches are what cargo-test then reuses.)
+    environment:
+      RUSTC_WRAPPER: /cache/bin/sccache
+      SCCACHE_DIR: /cache/sccache
+      SCCACHE_CACHE_SIZE: "20G"
+      CARGO_INCREMENTAL: "0"
+      CARGO_HOME: /cache/cargo
     commands:
       - rustup component add clippy
       - cargo clippy -p protocol --all-targets -- -D warnings
@@ -49,6 +60,16 @@ steps:
   cargo-test:
     image: rust:1.96.0-slim
     when: *code-paths
+    # Shared compile cache (H1) — the front-lane gate (~100s; ~cargo-deny went
+    # prebuilt so this now bounds when the heavy chain starts). Same cache config
+    # as cargo-clippy above (shared workspace target/). Argon2id KATs dominate the
+    # runtime and stay uncached; only the compile portion caches (~20-40s).
+    environment:
+      RUSTC_WRAPPER: /cache/bin/sccache
+      SCCACHE_DIR: /cache/sccache
+      SCCACHE_CACHE_SIZE: "20G"
+      CARGO_INCREMENTAL: "0"
+      CARGO_HOME: /cache/cargo
     commands:
       - cargo test -p protocol --no-fail-fast
 
