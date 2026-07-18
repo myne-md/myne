@@ -64,7 +64,7 @@ steps:
           rm -rf "$PARENT/myne-main"
           git clone --depth 1 "$MYNE_URL" "$PARENT/myne-main"
         fi
-        for d in protocol core editor dialect locales src; do
+        for d in protocol core editor dialect locales src theme-validator; do
           ln -sfn "$PARENT/myne-main/$d" "$PARENT/$d"
         done
       - rustup component add rustfmt clippy
