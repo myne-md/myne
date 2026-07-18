@@ -72,7 +72,7 @@ The list of explicit non-goals is longer than usual because privacy products die
 
 **Definition of done.** v1.0 ships when a real user can install the desktop app, generate a recovery phrase, write notes for 30 days, deliberately lose their password, recover the vault from the phrase, and at no point have plaintext touched the disk outside the in-memory editor session (user-initiated export excepted — see `threat-model.md` §3 TB3).
 
-Everything else — sync server, mobile, web, sharing, real-time collaboration, plugin API — is explicitly out of scope for v1.0 and lives in later phases.
+Everything else — the **managed hosted sync service** (the paid convenience tier), mobile, web, sharing, real-time collaboration, plugin API — is explicitly out of scope for v1.0 and lives in later phases. (Self-hostable multi-device sync is itself the v1 commitment — see "No real-time collaborative editing in v1" above and the Decisions-Log "Sync" note; only the *managed/paid* offering is deferred.)
 
 ---
 
@@ -96,7 +96,7 @@ A record of the choices made while drafting this document, captured for the next
 - Real-time collaboration (CRDT, Yjs) — Phase 4 at the earliest.
 - Plugin API — possibly never; if it lands, sandboxed and capability-scoped from the first design.
 - Mobile — Phase 3.
-- Sync server, hosted account, paid tier — Phase 2.
+- **Sync — reconsidered (2026-07-18).** Single-user multi-device sync is the v1 commitment (see "No real-time collaborative editing in v1" above), and the **self-hostable open-source sync server ships in Phase 1** — it is in production hardening now (`sync-protocol.md`; the 2026-07-16/17 sync entries in `decisions.md`). What stays **Phase 2** is the **managed hosted account + paid tier**; the hosted `sync.myne.md` service currently runs as a free invite-only beta. The paid tier remains exclusively the hosted-sync convenience. (See `decisions.md` 2026-07-18.)
 
 **Open risks to revisit**
 - Recovery-phrase-only model: Standard Notes and Bitwarden both bleed users at this exact step. Worth checking 12 months in whether the team holds the line or quietly adds an encrypted recovery file as a compensating control.
