@@ -71,7 +71,7 @@ steps:
       CARGO_INCREMENTAL: "0"
       CARGO_HOME: /cache/cargo
     commands:
-      - cargo test -p protocol --no-fail-fast
+      - /cache/bin/cargo-nextest nextest run --profile ci -p protocol --no-fail-fast
 
   # ─── Mobile cross-compile gate (MYND-457) ────────────────────
   # Proves the shared `myne-core` (which now carries the sync engine +
@@ -269,7 +269,7 @@ steps:
       # tauri-compile) inside the unprivileged shell where the build actually runs.
       # RUSTFLAGS=mold (Q6) folded into the su env; `{ test -d dist || pnpm build; }`
       # reuses the dist/ from tauri-compile instead of rebuilding it (Q3).
-      - su ci -c 'export HOME=/home/ci CARGO_HOME=/cache/cargo/ci RUSTUP_HOME=/usr/local/rustup PATH=/usr/local/cargo/bin:/usr/local/bin:$PATH RUSTFLAGS="-C link-arg=-fuse-ld=mold" RUSTC_WRAPPER=/cache/bin/sccache SCCACHE_DIR=/cache/sccache/ci SCCACHE_CACHE_SIZE=20G CARGO_INCREMENTAL=0 ; ulimit -n $(ulimit -Hn) 2>/dev/null || true ; pnpm install --frozen-lockfile --store-dir /cache/cargo/ci/pnpm-store && { test -d dist || pnpm build; } && cargo test -p myne-desktop -p myne-core --no-fail-fast'
+      - su ci -c 'export HOME=/home/ci CARGO_HOME=/cache/cargo/ci RUSTUP_HOME=/usr/local/rustup PATH=/usr/local/cargo/bin:/usr/local/bin:$PATH RUSTFLAGS="-C link-arg=-fuse-ld=mold" RUSTC_WRAPPER=/cache/bin/sccache SCCACHE_DIR=/cache/sccache/ci SCCACHE_CACHE_SIZE=20G CARGO_INCREMENTAL=0 ; ulimit -n $(ulimit -Hn) 2>/dev/null || true ; pnpm install --frozen-lockfile --store-dir /cache/cargo/ci/pnpm-store && { test -d dist || pnpm build; } && /cache/bin/cargo-nextest nextest run --profile ci -p myne-desktop -p myne-core --no-fail-fast'
 
   # ─── E2E suite (real binary via tauri-driver) ────────────────
   # MYND-129 (e2e-harness). Drives the production binary built by
@@ -388,7 +388,7 @@ steps:
       # Quoted: the `:: ` (colon-colon-space) in the test-path filter is parsed
       # as a YAML key:value map otherwise, failing config-compile ("cannot
       # unmarshal map into string").
-      - "cargo test -p myne-core --lib plugins::sync::sim:: --no-fail-fast"
+      - "/cache/bin/cargo-nextest nextest run --profile ci -p myne-core -E 'test(plugins::sync::sim)' --no-fail-fast"
 
   # ─── Cross-impl vector verification (DISABLED) ───────────────
   # protocol/tests/vectors.rs reads ../myne-test-vectors fixtures and asserts
