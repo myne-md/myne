@@ -1109,6 +1109,11 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
             <Group>
               <ToggleRow
                 first
+                title={t("notes.newTab.createDrawing")}
+                on={!hiddenHomeTiles.has("new-drawing")}
+                onToggle={() => setHomeTileHidden("new-drawing", !hiddenHomeTiles.has("new-drawing"))}
+              />
+              <ToggleRow
                 title={t("templates.manager.listLabel")}
                 on={!hiddenHomeTiles.has("templates")}
                 onToggle={() => setHomeTileHidden("templates", !hiddenHomeTiles.has("templates"))}
