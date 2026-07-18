@@ -6,7 +6,7 @@
 
 This is the main repository of the [Myne](https://github.com/myne-md/myne) project — an end-to-end-encrypted, local-first markdown notes app with optional zero-knowledge sync. It holds three things: the Tauri 2 + Vite + React + TypeScript desktop client ([`src/`](src/), [`src-tauri/`](src-tauri/)), the Rust cryptographic protocol crate ([`protocol/`](protocol/)), and the canonical v0.1 specification, threat model, and decisions log ([`docs/`](docs/)). The browser-clipper native host and clip pipeline also live here ([`src-tauri/src/clipper/`](src-tauri/src/clipper), [`src/clip/`](src/clip)).
 
-The companion repos (server, web, mobile, website, ops, agents, clipper extension, test vectors) live under the [`myne-md`](https://github.com/myne-md) organization and are described below. The specs in this repo's [`docs/`](docs/) are the source of truth across every client and implementation.
+The companion repos (server, web, mobile, website, ops, agents, clipper extension, themes, branding assets, test vectors) live under the [`myne-md`](https://github.com/myne-md) organization and are described below. The specs in this repo's [`docs/`](docs/) are the source of truth across every client and implementation.
 
 ## What Myne commits to
 
@@ -86,6 +86,8 @@ The full project spans several repos under the [`myne-md`](https://github.com/my
 | [`myne-clipper`](https://github.com/myne-md/myne-clipper) | Browser-extension clipper — the paired channel that talks to this repo's native host |
 | [`myne-website`](https://github.com/myne-md/myne-website) | Marketing site (myne.md) |
 | [`myne-test-vectors`](https://github.com/myne-md/myne-test-vectors) | Language-agnostic vectors that pin byte-level cross-implementation agreement on the protocol |
+| [`myne-themes`](https://github.com/myne-md/myne-themes) | Community theme marketplace — validated design-token palettes, distribution side |
+| [`myne-branding`](https://github.com/myne-md/myne-branding) | Brand assets — logo, wordmark, app-icon exports, color/type exports, fonts, press imagery |
 | [`myne-ops`](https://github.com/myne-md/myne-ops) | Internal operations and infrastructure |
 | [`myne-agents`](https://github.com/myne-md/myne-agents) | Internal tooling and agent definitions |
 
