@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" fill="none">
+  <!-- Mobile app-icon source for `pnpm tauri icon`. Unlike the desktop card
+       (icon-source.svg — inset rounded square with a transparent margin, tuned
+       for the macOS dock grid), mobile icons are FULL-BLEED: iOS masks its own
+       superellipse corners and Android uses adaptive foreground/background, so
+       the ink must reach every edge or the home screen shows a smaller tile
+       floating on a flat fill. Same brand: ink (#1a1a17) field + paper (#fbfbfa)
+       "M" chevron (path from the 32-vB `M8 22 V10 L16 18 L24 10 V22`, here in
+       1024 space and scaled ×1.1444 about centre to match the desktop mark's
+       weight). No new metaphor — the mark stays the M. -->
+  <rect width="1024" height="1024" fill="#1a1a17"/>
+  <g transform="translate(512 512) scale(1.144444) translate(-512 -512)">
+    <path d="M300 700 V324 L512 510 L724 324 V700"
+          stroke="#fbfbfa"
+          stroke-width="56"
+          stroke-linecap="round"
+          stroke-linejoin="round"/>
+  </g>
+</svg>
