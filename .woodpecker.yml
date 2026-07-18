@@ -307,7 +307,7 @@ steps:
       # silently inside the first seeding test's 180 s budget.
       # ulimit -n: raise the fd soft limit to the hard cap (EMFILE guard, see
       # tauri-compile) inside the unprivileged shell where the build runs.
-      - su ci -c 'export HOME=/home/ci CARGO_HOME=/cache/cargo/ci RUSTUP_HOME=/usr/local/rustup PATH=/usr/local/cargo/bin:/usr/local/bin:$PATH CI=true MYNE_E2E_SHARDS=3 RUSTFLAGS="-C link-arg=-fuse-ld=mold" RUSTC_WRAPPER=/cache/bin/sccache SCCACHE_DIR=/cache/sccache/ci SCCACHE_CACHE_SIZE=20G CARGO_INCREMENTAL=0 ; ulimit -n $(ulimit -Hn) 2>/dev/null || true ; pnpm install --frozen-lockfile --store-dir /cache/cargo/ci/pnpm-store && cargo build --release -p e2e-fixture-gen && xvfb-run -a pnpm test:e2e'
+      - su ci -c 'export HOME=/home/ci CARGO_HOME=/cache/cargo/ci RUSTUP_HOME=/usr/local/rustup PATH=/usr/local/cargo/bin:/usr/local/bin:$PATH CI=true MYNE_E2E_SHARDS=2 RUSTFLAGS="-C link-arg=-fuse-ld=mold" RUSTC_WRAPPER=/cache/bin/sccache SCCACHE_DIR=/cache/sccache/ci SCCACHE_CACHE_SIZE=20G CARGO_INCREMENTAL=0 ; ulimit -n $(ulimit -Hn) 2>/dev/null || true ; pnpm install --frozen-lockfile --store-dir /cache/cargo/ci/pnpm-store && cargo build --release -p e2e-fixture-gen && xvfb-run -a pnpm test:e2e'
 
   # ─── Sync simulation harness (multi-device, real myne-server) ─
   # Runs the Phase-1 sync harness `src-tauri/src/plugins/sync/sim.rs` against a
