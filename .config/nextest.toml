@@ -1,0 +1,14 @@
+# cargo-nextest configuration — used by the CI Rust-test steps (.woodpecker.yml
+# cargo-test / cargo-test-tauri / sync-sim run `cargo-nextest nextest run
+# --profile ci`).
+#
+# retries=2 absorbs a SINGLE flaky test (e.g. the sync::http_transport
+# network-timing unit test that fails-then-passes on a stale-keepalive TCP
+# race) instead of reding the whole pipeline. A genuinely broken test still
+# fails after all 3 attempts, and nextest reports a retried-then-passed test as
+# "flaky" in its summary — so flakes stay visible for tracking instead of being
+# silently masked. Doctests are unaffected (nextest never runs them; the crates
+# have no runnable doctests — protocol is #![no_std], the other fences are
+# ```text/```sh).
+[profile.ci]
+retries = 2
