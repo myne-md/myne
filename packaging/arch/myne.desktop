@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=Myne
+GenericName=Notes
+Comment=A calm place for your notes
+Exec=myne
+Icon=md.myne.desktop
+Terminal=false
+Type=Application
+Categories=Office;Utility;TextEditor;
+StartupWMClass=Myne
+Keywords=notes;markdown;encrypted;wikilinks;knowledge;
