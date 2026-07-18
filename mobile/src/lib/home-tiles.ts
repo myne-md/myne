@@ -1,12 +1,14 @@
-// Home quick-action tile visibility (MYND-479). The three home tiles
-// (Templates / Open Today / Views) can each be hidden individually from
-// Settings → Appearance. This is a device-local layout preference, so it lives
-// in localStorage (not the synced vault prefs) — no prefs-format change — with a
-// tiny pub/sub so the home screen re-renders the instant a Settings toggle flips.
+// Home quick-action tile visibility (MYND-479). The home quick-action tiles
+// (New drawing / Templates / Open Today / Views) can each be hidden individually
+// from Settings → Appearance. This is a device-local layout preference, so it
+// lives in localStorage (not the synced vault prefs) — no prefs-format change —
+// with a tiny pub/sub so the home screen re-renders the instant a Settings toggle
+// flips. "new-drawing" joined the original three via MYND-538 (the drawing tile
+// landed after MYND-479, so it was initially outside the hide/show mechanism).
 
 import { useEffect, useState } from "react";
 
-export type HomeTileId = "templates" | "open-today" | "views";
+export type HomeTileId = "new-drawing" | "templates" | "open-today" | "views";
 
 const KEY = "myne.home-tiles-hidden";
 const listeners = new Set<() => void>();
