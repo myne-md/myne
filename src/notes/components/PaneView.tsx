@@ -428,18 +428,25 @@ export function PaneView({
   // `cancelled`.
   useEffect(() => {
     let cancelled = false;
-    const api = swapApiRef.current;
+    let api = swapApiRef.current;
     const cache = stateCacheRef.current;
     const scroller = outlineScrollerRef.current;
     const prevId = prevActiveIdRef.current;
 
     // Snapshot the outgoing markdown note (the view still holds it here) so a
-    // later return restores its undo history + scroll.
+    // later return restores its undo history + scroll. Best-effort: a stale /
+    // mid-update / destroyed view (common right after a pane split/move) must
+    // NEVER break the switch — on failure we drop the swap API and reload.
     if (api !== null && prevId !== null && prevId !== activeId) {
-      cache.set(prevId, {
-        state: api.captureState(),
-        scrollTop: scroller?.scrollTop ?? 0,
-      });
+      try {
+        cache.set(prevId, {
+          state: api.captureState(),
+          scrollTop: scroller?.scrollTop ?? 0,
+        });
+      } catch {
+        swapApiRef.current = null;
+        api = null;
+      }
     }
     prevActiveIdRef.current = activeId;
 
@@ -451,28 +458,41 @@ export function PaneView({
       };
     }
 
-    // Cached + swap API live → instant restore, no disk read, no loading gate.
+    // Cached + swap API live → try an instant restore (no disk read, no loading
+    // gate). ANY failure degrades to the disk-reload path below, which always
+    // clears `loading` — so a bad swap can never strand the pane in a loading
+    // state (the MYND-534 pane-op regression).
     const cached = api !== null ? cache.get(activeId) : undefined;
     if (api !== null && cached !== undefined) {
-      api.applyState(cached.state);
-      const doc = cached.state.doc.toString();
-      setContent(doc);
-      autosaveRef.current?.acceptReloadedBody(doc);
-      setLoading(false);
-      const top = cached.scrollTop;
-      // Restore scroll after the swapped-in content lays out.
-      requestAnimationFrame(() => {
-        if (!cancelled && scroller !== null) scroller.scrollTop = top;
-      });
-      return () => {
-        cancelled = true;
-      };
+      let swapped = false;
+      try {
+        api.applyState(cached.state);
+        swapped = true;
+      } catch {
+        swapApiRef.current = null; // view unusable → force a clean reload
+      }
+      if (swapped) {
+        const doc = cached.state.doc.toString();
+        setContent(doc);
+        autosaveRef.current?.acceptReloadedBody(doc);
+        setLoading(false);
+        const top = cached.scrollTop;
+        // Restore scroll after the swapped-in content lays out.
+        requestAnimationFrame(() => {
+          if (!cancelled && scroller !== null) scroller.scrollTop = top;
+        });
+        return () => {
+          cancelled = true;
+        };
+      }
+      // fall through to the disk reload on swap failure
     }
 
-    // First open (uncached) → read from disk. The loading gate rebuilds the view
-    // here (first-open re-init is unchanged; only re-VISITS get the persistent
-    // view + preserved undo/scroll — a fuller first-open overlay is a follow-up).
-    // No applyState: the remounted view picks up `content` via its value-mirror.
+    // First open (uncached) or degraded swap → read from disk. The loading gate
+    // rebuilds the view here (first-open re-init is unchanged; only re-VISITS get
+    // the persistent view + preserved undo/scroll). No applyState: the remounted
+    // view picks up `content` via its value-mirror. `finally` guarantees `loading`
+    // always clears (unless a newer switch cancelled us, which owns it instead).
     setLoading(true);
     void (async () => {
       try {
@@ -480,15 +500,13 @@ export function PaneView({
         if (cancelled) return;
         setContent(body);
         autosaveRef.current?.acceptReloadedBody(body);
-        setLoading(false);
         requestAnimationFrame(() => {
           if (!cancelled && scroller !== null) scroller.scrollTop = 0;
         });
       } catch {
-        if (!cancelled) {
-          setContent("");
-          setLoading(false);
-        }
+        if (!cancelled) setContent("");
+      } finally {
+        if (!cancelled) setLoading(false);
       }
     })();
     return () => {
