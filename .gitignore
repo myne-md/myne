@@ -43,6 +43,8 @@ coverage/
 /myne-ops/
 /myne-agents/
 /myne-clipper/
+/myne-themes/
+/myne-branding/
 /myne-status/
 
 # Vite dep-optimization cache (regenerated each build).
@@ -63,4 +65,3 @@ manual-fixes-needed.md
 .pnpm-store/
 # E2E failure artifacts (screenshots, page source, driver logs)
 e2e/artifacts/
-/myne-themes/

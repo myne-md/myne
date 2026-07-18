@@ -31,4 +31,6 @@ licensed (each carries its own `LICENSE`):
 | `myne-server`, `myne-web`, `myne-mobile`, `myne-clipper` | AGPL-3.0 |
 | `myne-test-vectors` | CC-BY-4.0 |
 | `myne-website` | MIT |
+| `myne-themes` | by subtree — CC-BY-4.0 (themes) / AGPL-3.0 (tooling) |
+| `myne-branding` | by subtree — reserved marks (trademark) / CC-BY-4.0 (token exports) / SIL OFL (fonts) |
 | `myne-agents`, `myne-ops` | Proprietary — All Rights Reserved (internal) |
