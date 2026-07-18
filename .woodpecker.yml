@@ -136,7 +136,7 @@ steps:
     when: *code-paths
     commands:
       - npm install -g pnpm@11.8.0
-      - pnpm install --frozen-lockfile
+      - pnpm install --frozen-lockfile --store-dir /cache/cargo/pnpm-store
       - pnpm build
       # i18n-catalog parity (hook-only otherwise): fails on empty English source
       # values or static t()/i18n.t() keys missing from locales/en/common.json.
@@ -157,7 +157,7 @@ steps:
     depends_on: [pnpm-build]
     commands:
       - npm install -g pnpm@11.8.0
-      - pnpm install --frozen-lockfile
+      - pnpm install --frozen-lockfile --store-dir /cache/cargo/pnpm-store
       - pnpm test
 
   # ─── Tauri compile-gate ──────────────────────────────────────
@@ -198,7 +198,7 @@ steps:
       - apt-get update && apt-get install -y --no-install-recommends curl ca-certificates xz-utils pkg-config libssl-dev libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev libasound2-dev mold
       - curl -fsSL https://nodejs.org/dist/v25.9.0/node-v25.9.0-linux-x64.tar.xz | tar -xJ -C /usr/local --strip-components=1
       - npm install -g pnpm@11.8.0
-      - pnpm install --frozen-lockfile
+      - pnpm install --frozen-lockfile --store-dir /cache/cargo/pnpm-store
       # Lint the shared `myne-core` crate here (not in the slim cargo-clippy
       # step): myne-core depends on `tauri` (default features), so it needs the
       # webkit/gtk -dev chains this step already installs. No frontend dist
@@ -248,7 +248,7 @@ steps:
       # tauri-compile) inside the unprivileged shell where the build actually runs.
       # RUSTFLAGS=mold (Q6) folded into the su env; `{ test -d dist || pnpm build; }`
       # reuses the dist/ from tauri-compile instead of rebuilding it (Q3).
-      - su ci -c 'export HOME=/home/ci CARGO_HOME=/cache/cargo/ci RUSTUP_HOME=/usr/local/rustup PATH=/usr/local/cargo/bin:/usr/local/bin:$PATH RUSTFLAGS="-C link-arg=-fuse-ld=mold" RUSTC_WRAPPER=/cache/bin/sccache SCCACHE_DIR=/cache/sccache/ci SCCACHE_CACHE_SIZE=20G CARGO_INCREMENTAL=0 ; ulimit -n $(ulimit -Hn) 2>/dev/null || true ; pnpm install --frozen-lockfile && { test -d dist || pnpm build; } && cargo test -p myne-desktop -p myne-core --no-fail-fast'
+      - su ci -c 'export HOME=/home/ci CARGO_HOME=/cache/cargo/ci RUSTUP_HOME=/usr/local/rustup PATH=/usr/local/cargo/bin:/usr/local/bin:$PATH RUSTFLAGS="-C link-arg=-fuse-ld=mold" RUSTC_WRAPPER=/cache/bin/sccache SCCACHE_DIR=/cache/sccache/ci SCCACHE_CACHE_SIZE=20G CARGO_INCREMENTAL=0 ; ulimit -n $(ulimit -Hn) 2>/dev/null || true ; pnpm install --frozen-lockfile --store-dir /cache/cargo/ci/pnpm-store && { test -d dist || pnpm build; } && cargo test -p myne-desktop -p myne-core --no-fail-fast'
 
   # ─── E2E suite (real binary via tauri-driver) ────────────────
   # MYND-129 (e2e-harness). Drives the production binary built by
@@ -286,7 +286,7 @@ steps:
       # silently inside the first seeding test's 180 s budget.
       # ulimit -n: raise the fd soft limit to the hard cap (EMFILE guard, see
       # tauri-compile) inside the unprivileged shell where the build runs.
-      - su ci -c 'export HOME=/home/ci CARGO_HOME=/cache/cargo/ci RUSTUP_HOME=/usr/local/rustup PATH=/usr/local/cargo/bin:/usr/local/bin:$PATH CI=true RUSTFLAGS="-C link-arg=-fuse-ld=mold" RUSTC_WRAPPER=/cache/bin/sccache SCCACHE_DIR=/cache/sccache/ci SCCACHE_CACHE_SIZE=20G CARGO_INCREMENTAL=0 ; ulimit -n $(ulimit -Hn) 2>/dev/null || true ; pnpm install --frozen-lockfile && cargo build --release -p e2e-fixture-gen && xvfb-run -a pnpm test:e2e'
+      - su ci -c 'export HOME=/home/ci CARGO_HOME=/cache/cargo/ci RUSTUP_HOME=/usr/local/rustup PATH=/usr/local/cargo/bin:/usr/local/bin:$PATH CI=true RUSTFLAGS="-C link-arg=-fuse-ld=mold" RUSTC_WRAPPER=/cache/bin/sccache SCCACHE_DIR=/cache/sccache/ci SCCACHE_CACHE_SIZE=20G CARGO_INCREMENTAL=0 ; ulimit -n $(ulimit -Hn) 2>/dev/null || true ; pnpm install --frozen-lockfile --store-dir /cache/cargo/ci/pnpm-store && cargo build --release -p e2e-fixture-gen && xvfb-run -a pnpm test:e2e'
 
   # ─── Sync simulation harness (multi-device, real myne-server) ─
   # Runs the Phase-1 sync harness `src-tauri/src/plugins/sync/sim.rs` against a
