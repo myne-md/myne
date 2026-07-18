@@ -14,8 +14,9 @@
 #     pipeline is separate from this verification CI.
 
 when:
-  - event: [push, pull_request, manual]
+  - event: [push, pull_request]
     branch: [develop, main]
+  - event: manual
 
 steps:
   # ── Rust style + lint + unit tests (mirrored vault/notes/prefs plugins) ───
