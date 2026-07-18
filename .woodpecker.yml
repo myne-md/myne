@@ -186,7 +186,7 @@ steps:
       # remove the agent volume line + these five vars.
       RUSTC_WRAPPER: /cache/bin/sccache
       SCCACHE_DIR: /cache/sccache
-      SCCACHE_CACHE_SIZE: "40G"
+      SCCACHE_CACHE_SIZE: "20G"
       CARGO_INCREMENTAL: "0"
       CARGO_HOME: /cache/cargo
     commands:
@@ -248,7 +248,7 @@ steps:
       # tauri-compile) inside the unprivileged shell where the build actually runs.
       # RUSTFLAGS=mold (Q6) folded into the su env; `{ test -d dist || pnpm build; }`
       # reuses the dist/ from tauri-compile instead of rebuilding it (Q3).
-      - su ci -c 'export HOME=/home/ci CARGO_HOME=/cache/cargo RUSTUP_HOME=/usr/local/rustup PATH=/usr/local/cargo/bin:/usr/local/bin:$PATH RUSTFLAGS="-C link-arg=-fuse-ld=mold" RUSTC_WRAPPER=/cache/bin/sccache SCCACHE_DIR=/cache/sccache SCCACHE_CACHE_SIZE=40G CARGO_INCREMENTAL=0 ; ulimit -n $(ulimit -Hn) 2>/dev/null || true ; pnpm install --frozen-lockfile && { test -d dist || pnpm build; } && cargo test -p myne-desktop -p myne-core --no-fail-fast'
+      - su ci -c 'export HOME=/home/ci CARGO_HOME=/cache/cargo/ci RUSTUP_HOME=/usr/local/rustup PATH=/usr/local/cargo/bin:/usr/local/bin:$PATH RUSTFLAGS="-C link-arg=-fuse-ld=mold" RUSTC_WRAPPER=/cache/bin/sccache SCCACHE_DIR=/cache/sccache/ci SCCACHE_CACHE_SIZE=20G CARGO_INCREMENTAL=0 ; ulimit -n $(ulimit -Hn) 2>/dev/null || true ; pnpm install --frozen-lockfile && { test -d dist || pnpm build; } && cargo test -p myne-desktop -p myne-core --no-fail-fast'
 
   # ─── E2E suite (real binary via tauri-driver) ────────────────
   # MYND-129 (e2e-harness). Drives the production binary built by
@@ -286,7 +286,7 @@ steps:
       # silently inside the first seeding test's 180 s budget.
       # ulimit -n: raise the fd soft limit to the hard cap (EMFILE guard, see
       # tauri-compile) inside the unprivileged shell where the build runs.
-      - su ci -c 'export HOME=/home/ci CARGO_HOME=/cache/cargo RUSTUP_HOME=/usr/local/rustup PATH=/usr/local/cargo/bin:/usr/local/bin:$PATH CI=true RUSTFLAGS="-C link-arg=-fuse-ld=mold" RUSTC_WRAPPER=/cache/bin/sccache SCCACHE_DIR=/cache/sccache SCCACHE_CACHE_SIZE=40G CARGO_INCREMENTAL=0 ; ulimit -n $(ulimit -Hn) 2>/dev/null || true ; pnpm install --frozen-lockfile && cargo build --release -p e2e-fixture-gen && xvfb-run -a pnpm test:e2e'
+      - su ci -c 'export HOME=/home/ci CARGO_HOME=/cache/cargo/ci RUSTUP_HOME=/usr/local/rustup PATH=/usr/local/cargo/bin:/usr/local/bin:$PATH CI=true RUSTFLAGS="-C link-arg=-fuse-ld=mold" RUSTC_WRAPPER=/cache/bin/sccache SCCACHE_DIR=/cache/sccache/ci SCCACHE_CACHE_SIZE=20G CARGO_INCREMENTAL=0 ; ulimit -n $(ulimit -Hn) 2>/dev/null || true ; pnpm install --frozen-lockfile && cargo build --release -p e2e-fixture-gen && xvfb-run -a pnpm test:e2e'
 
   # ─── Sync simulation harness (multi-device, real myne-server) ─
   # Runs the Phase-1 sync harness `src-tauri/src/plugins/sync/sim.rs` against a
@@ -326,7 +326,7 @@ steps:
       # Persistent compile cache (H1) — see tauri-compile's comment.
       RUSTC_WRAPPER: /cache/bin/sccache
       SCCACHE_DIR: /cache/sccache
-      SCCACHE_CACHE_SIZE: "40G"
+      SCCACHE_CACHE_SIZE: "20G"
       CARGO_INCREMENTAL: "0"
       CARGO_HOME: /cache/cargo
       # Forgejo PAT (read:repository on Myne/myne-server) for the private-
