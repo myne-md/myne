@@ -12,4 +12,4 @@ these platform renderings to match. Each client keeps the app-icon master its bu
 needs; `myne-branding` holds the canonical mark and the press exports.
 
 Brand marks are trademarks; their use is governed by the `myne-branding` repo's
-[`TRADEMARK.md`](https://github.com/myne-md/myne-branding/blob/main/TRADEMARK.md).
+[`TRADEMARK.md`](https://github.com/myne-md/myne-branding/blob/develop/TRADEMARK.md).
