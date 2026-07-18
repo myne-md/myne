@@ -17,9 +17,22 @@ export default defineConfig({
     include: ["e2e/**/*.e2e.ts"],
     environment: "node",
     globals: false,
-    // One tauri-driver/app pair at a time: the driver binds fixed ports
-    // and the scenarios assume exclusive ownership of the window.
-    fileParallelism: false,
+    // Per-worker setup: give each worker slot its own driver/native port band
+    // (keyed on VITEST_POOL_ID) so parallel workers never collide on the fixed
+    // 4444/4445 default. session.ts + multi-device.ts read those env vars, so
+    // this parallelises the harness with no change to either.
+    setupFiles: ["./e2e/support/worker-ports.ts"],
+    // Parallelise across worker PROCESSES: N = MYNE_E2E_SHARDS (default 2) file
+    // workers run concurrently, each driving its own tauri-driver + app on its
+    // own port pair. `forks` (not threads) so each worker has its own
+    // process.env for the port; within a worker `maxConcurrency: 1` keeps ONE
+    // app at a time (a file's scenarios stay sequential). The concurrent apps
+    // share the single CI Xvfb display — the pattern multi-device.ts already
+    // proves (two apps on one display; WebDriver routes input to each session's
+    // WebView, not the X-focused window).
+    pool: "forks",
+    fileParallelism: true,
+    maxWorkers: Number(process.env.MYNE_E2E_SHARDS ?? "2"),
     maxConcurrency: 1,
     // Production-KDF unlocks (m=256 MiB, t=3) and full create flows run
     // inside scenarios; budget generously, fail loudly.

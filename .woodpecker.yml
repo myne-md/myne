@@ -21,6 +21,15 @@ steps:
   # ─── Rust formatting ─────────────────────────────────────────
   cargo-fmt:
     image: rust:1.96.0-slim
+    # Docs-only path filter (Q2): a step is SKIPPED only when EVERY changed file
+    # matches an exclude glob — one code file changed ⇒ full pipeline (fail-open;
+    # path is also ignored for manual/cron so those always run). The anchor is
+    # defined here (first step) and aliased as `*code-paths` by every other
+    # compile/test step. hooks-parity deliberately keeps NO filter (its EOF/
+    # whitespace/SPDX checks apply to docs too), so it runs on every push.
+    when: &code-paths
+      - path:
+          exclude: ['docs/**', '*.md', '**/CLAUDE.md', '**/README.md']
     commands:
       - rustup component add rustfmt
       - cargo fmt --all -- --check
@@ -30,6 +39,18 @@ steps:
   # which the slim image lacks; tauri-compile step covers workspace compile gate.
   cargo-clippy:
     image: rust:1.96.0-slim
+    when: *code-paths
+    # Shared compile cache (H1) — root front-lane steps use the top-level cache
+    # dirs. cargo-clippy and cargo-test get the SAME config on purpose: they share
+    # the workspace target/, so a mismatched RUSTC_WRAPPER between them would churn
+    # cargo fingerprints. (sccache passes clippy-driver through, but the dep rustc
+    # compiles it caches are what cargo-test then reuses.)
+    environment:
+      RUSTC_WRAPPER: /cache/bin/sccache
+      SCCACHE_DIR: /cache/sccache
+      SCCACHE_CACHE_SIZE: "20G"
+      CARGO_INCREMENTAL: "0"
+      CARGO_HOME: /cache/cargo
     commands:
       - rustup component add clippy
       - cargo clippy -p protocol --all-targets -- -D warnings
@@ -38,8 +59,19 @@ steps:
   # Scoped to `protocol` crate (see cargo-clippy comment above).
   cargo-test:
     image: rust:1.96.0-slim
+    when: *code-paths
+    # Shared compile cache (H1) — the front-lane gate (~100s; ~cargo-deny went
+    # prebuilt so this now bounds when the heavy chain starts). Same cache config
+    # as cargo-clippy above (shared workspace target/). Argon2id KATs dominate the
+    # runtime and stay uncached; only the compile portion caches (~20-40s).
+    environment:
+      RUSTC_WRAPPER: /cache/bin/sccache
+      SCCACHE_DIR: /cache/sccache
+      SCCACHE_CACHE_SIZE: "20G"
+      CARGO_INCREMENTAL: "0"
+      CARGO_HOME: /cache/cargo
     commands:
-      - cargo test -p protocol --no-fail-fast
+      - /cache/bin/cargo-nextest nextest run --profile ci -p protocol --no-fail-fast
 
   # ─── Mobile cross-compile gate (MYND-457) ────────────────────
   # Proves the shared `myne-core` (which now carries the sync engine +
@@ -58,6 +90,7 @@ steps:
   #    enablement itself is MYND-465.
   mobile-crosscheck:
     image: rust:1.96.0-slim
+    when: *code-paths
     commands:
       - rustup target add aarch64-linux-android
       - |
@@ -74,9 +107,22 @@ steps:
   # `git` is required by cargo-deny to fetch the rustsec advisory-db.
   cargo-deny:
     image: rust:1.96.0-slim
+    when: *code-paths
     commands:
-      - apt-get update && apt-get install -y --no-install-recommends git
-      - cargo install --locked cargo-deny
+      # cargo-deny is installed from the official pinned prebuilt release
+      # (sha256-verified) instead of `cargo install` from source (~149s + runs
+      # the whole cargo-deny dependency tree's build scripts). It was the slowest
+      # front-lane step and gated when the heavy chain starts, so this both
+      # speeds CI and tightens the supply chain (Q5). Bump the version + sha
+      # together (asset: cargo-deny-<ver>-x86_64-unknown-linux-musl.tar.gz, tag
+      # has no `v` prefix; sha from the .sha256 sibling asset).
+      # `git` is still required by `cargo deny check` for the rustsec advisory-db.
+      - apt-get update && apt-get install -y --no-install-recommends git curl ca-certificates
+      - |
+        curl -fsSL "https://github.com/EmbarkStudios/cargo-deny/releases/download/0.20.2/cargo-deny-0.20.2-x86_64-unknown-linux-musl.tar.gz" -o /tmp/cargo-deny.tgz
+        echo "9f12ed4c49936e09b48bf862b595cde2fe64fcbd9d74dfacac6131ca824c8d5f  /tmp/cargo-deny.tgz" | sha256sum -c -
+        tar -xzf /tmp/cargo-deny.tgz -C /tmp --strip-components=1
+        install -m0755 /tmp/cargo-deny /usr/local/bin/cargo-deny
       - cargo deny check
 
   # ─── AI no-egress dependency gate ────────────────────────────
@@ -86,6 +132,7 @@ steps:
   # — just git for the Cargo.lock-singleton + wildcard checks. SYNC-2.
   ai-no-network:
     image: rust:1.96.0-slim
+    when: *code-paths
     commands:
       - apt-get update && apt-get install -y --no-install-recommends git
       - bash src-tauri/scripts/ai-no-network-check.sh
@@ -107,9 +154,10 @@ steps:
   # `node:25` does not ship corepack; install pnpm directly via npm.
   pnpm-build:
     image: node:25
+    when: *code-paths
     commands:
       - npm install -g pnpm@11.8.0
-      - pnpm install --frozen-lockfile
+      - pnpm install --frozen-lockfile --store-dir /cache/cargo/pnpm-store
       - pnpm build
       # i18n-catalog parity (hook-only otherwise): fails on empty English source
       # values or static t()/i18n.t() keys missing from locales/en/common.json.
@@ -122,6 +170,7 @@ steps:
   # does NOT type-check or run them — Vitest is their only CI gate.
   vitest:
     image: node:25
+    when: *code-paths
     # Serialized after pnpm-build: both run `pnpm install` into the shared
     # workspace node_modules; running them concurrently corrupts pnpm's temp
     # dirs (ERR_PNPM_ENOENT). The pnpm-install steps form one linear chain:
@@ -129,7 +178,7 @@ steps:
     depends_on: [pnpm-build]
     commands:
       - npm install -g pnpm@11.8.0
-      - pnpm install --frozen-lockfile
+      - pnpm install --frozen-lockfile --store-dir /cache/cargo/pnpm-store
       - pnpm test
 
   # ─── Tauri compile-gate ──────────────────────────────────────
@@ -137,6 +186,7 @@ steps:
   # Does NOT produce a signed bundle — release pipeline (Plan 1 §C-launch) handles cross-platform signed builds.
   tauri-compile:
     image: rust:1.96.0-slim
+    when: *code-paths
     # depends_on vitest (not pnpm-build) to keep the pnpm-install steps serial —
     # see the vitest step comment.
     depends_on: [cargo-clippy, vitest]
@@ -145,16 +195,31 @@ steps:
       # env-bound and only accepts true/false → normalize it, otherwise
       # `tauri build` aborts with "invalid value 'woodpecker' for '--ci'".
       CI: "true"
+      # mold linker for the candle+tauri release link (CI-only, Q6). Kept out of
+      # a committed .cargo/config.toml so macOS/local dev is unaffected; the
+      # signed release pipeline keeps its own linker.
+      RUSTFLAGS: "-C link-arg=-fuse-ld=mold"
+      # Persistent compile cache (H1): sccache + a shared cargo registry, provided
+      # by the agent's WOODPECKER_BACKEND_DOCKER_VOLUMES mounts (host /srv/wp-cache
+      # → /cache/*; see /root/cicd-myne/docker-compose.yml on the CI box). sccache
+      # is content-addressed + concurrency-safe (MAX_WORKFLOWS=2 stays); the signed
+      # release build is a SEPARATE pipeline and never uses this cache. To disable:
+      # remove the agent volume line + these five vars.
+      RUSTC_WRAPPER: /cache/bin/sccache
+      SCCACHE_DIR: /cache/sccache
+      SCCACHE_CACHE_SIZE: "20G"
+      CARGO_INCREMENTAL: "0"
+      CARGO_HOME: /cache/cargo
     commands:
       # Raise the open-file soft limit to the hard cap before the build: the
       # Tauri CLI + parallel cargo codegen open enough fds to hit the runner's
       # low default soft limit, which surfaces as a `tauri build` panic
       # (`Os code 24 / Too many open files`, EMFILE → core dump, exit 134).
       - ulimit -n $(ulimit -Hn) 2>/dev/null || true
-      - apt-get update && apt-get install -y --no-install-recommends curl ca-certificates xz-utils pkg-config libssl-dev libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev libasound2-dev
+      - apt-get update && apt-get install -y --no-install-recommends curl ca-certificates xz-utils pkg-config libssl-dev libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev libasound2-dev mold
       - curl -fsSL https://nodejs.org/dist/v25.9.0/node-v25.9.0-linux-x64.tar.xz | tar -xJ -C /usr/local --strip-components=1
       - npm install -g pnpm@11.8.0
-      - pnpm install --frozen-lockfile
+      - pnpm install --frozen-lockfile --store-dir /cache/cargo/pnpm-store
       # Lint the shared `myne-core` crate here (not in the slim cargo-clippy
       # step): myne-core depends on `tauri` (default features), so it needs the
       # webkit/gtk -dev chains this step already installs. No frontend dist
@@ -163,13 +228,18 @@ steps:
       - cargo clippy -p myne-core --all-targets -- -D warnings
       # Default build now compiles the on-device AI (local-inference is in
       # `default` as of decisions.md 2026-07-02) — no `--features` flag needed.
-      - pnpm tauri build --no-bundle
+      # `-c` overrides beforeBuildCommand to reuse the dist/ already built by the
+      # pnpm-build step (shared workspace) instead of rebuilding it here (Q3);
+      # `test -d dist || pnpm build` still rebuilds if dist/ is somehow absent.
+      - pnpm tauri build --no-bundle -c '{"build":{"beforeBuildCommand":"test -d dist || pnpm build"}}'
       # Guard the AI-free auditable variant: `--no-default-features` drops candle
       # entirely and exercises the `#[cfg(not(feature="local-inference"))]` no-op
       # hook arms (hooks.rs / auto_lock.rs) + the zero-ML-symbol reproducible path.
       # Now that AI is default-on this path would otherwise never compile in CI and
       # could bit-rot. Cheap `check` (no link) — the full build is the one above.
       - cargo check -p myne-desktop --no-default-features
+      # Cache hit-rate visibility (H1) — never fails the step.
+      - /cache/bin/sccache --show-stats || true
 
   # ─── Backend host tests (src-tauri / myne-desktop) ───────────
   # The protocol-scoped cargo-test above can't reach src-tauri: it needs the
@@ -182,11 +252,12 @@ steps:
   # the slim cargo-test step can't, since myne-core pulls Tauri default-features.
   cargo-test-tauri:
     image: rust:1.96.0-slim
+    when: *code-paths
     depends_on: [tauri-compile]
     environment:
       CI: "true"
     commands:
-      - apt-get update && apt-get install -y --no-install-recommends curl ca-certificates xz-utils pkg-config libssl-dev libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev libasound2-dev
+      - apt-get update && apt-get install -y --no-install-recommends curl ca-certificates xz-utils pkg-config libssl-dev libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev libasound2-dev mold
       - curl -fsSL https://nodejs.org/dist/v25.9.0/node-v25.9.0-linux-x64.tar.xz | tar -xJ -C /usr/local --strip-components=1
       - npm install -g pnpm@11.8.0
       # vault_delete / vault_unlock tests assert UNIX permission-denial and
@@ -196,7 +267,9 @@ steps:
       - useradd -m ci && chown -R ci:ci .
       # ulimit -n: raise the fd soft limit to the hard cap (EMFILE guard, see
       # tauri-compile) inside the unprivileged shell where the build actually runs.
-      - su ci -c 'export HOME=/home/ci CARGO_HOME=/home/ci/.cargo RUSTUP_HOME=/usr/local/rustup PATH=/usr/local/cargo/bin:/usr/local/bin:$PATH ; ulimit -n $(ulimit -Hn) 2>/dev/null || true ; pnpm install --frozen-lockfile && pnpm build && cargo test -p myne-desktop -p myne-core --no-fail-fast'
+      # RUSTFLAGS=mold (Q6) folded into the su env; `{ test -d dist || pnpm build; }`
+      # reuses the dist/ from tauri-compile instead of rebuilding it (Q3).
+      - su ci -c 'export HOME=/home/ci CARGO_HOME=/cache/cargo/ci RUSTUP_HOME=/usr/local/rustup PATH=/usr/local/cargo/bin:/usr/local/bin:$PATH RUSTFLAGS="-C link-arg=-fuse-ld=mold" RUSTC_WRAPPER=/cache/bin/sccache SCCACHE_DIR=/cache/sccache/ci SCCACHE_CACHE_SIZE=20G CARGO_INCREMENTAL=0 ; ulimit -n $(ulimit -Hn) 2>/dev/null || true ; pnpm install --frozen-lockfile --store-dir /cache/cargo/ci/pnpm-store && { test -d dist || pnpm build; } && /cache/bin/cargo-nextest nextest run --profile ci -p myne-desktop -p myne-core --no-fail-fast'
 
   # ─── E2E suite (real binary via tauri-driver) ────────────────
   # MYND-129 (e2e-harness). Drives the production binary built by
@@ -213,6 +286,7 @@ steps:
   # consumes the already-built binary.
   e2e:
     image: rust:1.96.0-slim
+    when: *code-paths
     depends_on: [cargo-test-tauri]
     environment:
       CI: "true"
@@ -221,7 +295,7 @@ steps:
       # GTK -dev header chains are unnecessary (webkit2gtk-driver drags
       # the runtime libs transitively); pkg-config/libssl-dev stay for
       # the tauri-driver cargo install.
-      - apt-get update && apt-get install -y --no-install-recommends curl ca-certificates xz-utils pkg-config libssl-dev webkit2gtk-driver xvfb xauth
+      - apt-get update && apt-get install -y --no-install-recommends curl ca-certificates xz-utils pkg-config libssl-dev webkit2gtk-driver xvfb xauth mold
       - curl -fsSL https://nodejs.org/dist/v25.9.0/node-v25.9.0-linux-x64.tar.xz | tar -xJ -C /usr/local --strip-components=1
       - npm install -g pnpm@11.8.0
       - cargo install tauri-driver --locked --version 2.0.6
@@ -233,7 +307,7 @@ steps:
       # silently inside the first seeding test's 180 s budget.
       # ulimit -n: raise the fd soft limit to the hard cap (EMFILE guard, see
       # tauri-compile) inside the unprivileged shell where the build runs.
-      - su ci -c 'export HOME=/home/ci CARGO_HOME=/home/ci/.cargo RUSTUP_HOME=/usr/local/rustup PATH=/usr/local/cargo/bin:/usr/local/bin:$PATH CI=true ; ulimit -n $(ulimit -Hn) 2>/dev/null || true ; pnpm install --frozen-lockfile && cargo build --release -p e2e-fixture-gen && xvfb-run -a pnpm test:e2e'
+      - su ci -c 'export HOME=/home/ci CARGO_HOME=/cache/cargo/ci RUSTUP_HOME=/usr/local/rustup PATH=/usr/local/cargo/bin:/usr/local/bin:$PATH CI=true MYNE_E2E_SHARDS=2 RUSTFLAGS="-C link-arg=-fuse-ld=mold" RUSTC_WRAPPER=/cache/bin/sccache SCCACHE_DIR=/cache/sccache/ci SCCACHE_CACHE_SIZE=20G CARGO_INCREMENTAL=0 ; ulimit -n $(ulimit -Hn) 2>/dev/null || true ; pnpm install --frozen-lockfile --store-dir /cache/cargo/ci/pnpm-store && cargo build --release -p e2e-fixture-gen && xvfb-run -a pnpm test:e2e'
 
   # ─── Sync simulation harness (multi-device, real myne-server) ─
   # Runs the Phase-1 sync harness `src-tauri/src/plugins/sync/sim.rs` against a
@@ -255,6 +329,7 @@ steps:
   # dormant until their fix lands and un-ignores them.
   sync-sim:
     image: rust:1.96.0-slim
+    when: *code-paths
     # `optional: true`: run AFTER e2e (keeps the heavy steps serial on the
     # shared host) but REGARDLESS of e2e's result. e2e is chronically flaky on
     # develop (a plain `depends_on: [e2e]` skips sync-sim whenever e2e is red),
@@ -267,6 +342,14 @@ steps:
         optional: true
     environment:
       CI: "true"
+      # mold linker for the myne-core sync test binary link (CI-only, Q6).
+      RUSTFLAGS: "-C link-arg=-fuse-ld=mold"
+      # Persistent compile cache (H1) — see tauri-compile's comment.
+      RUSTC_WRAPPER: /cache/bin/sccache
+      SCCACHE_DIR: /cache/sccache
+      SCCACHE_CACHE_SIZE: "20G"
+      CARGO_INCREMENTAL: "0"
+      CARGO_HOME: /cache/cargo
       # Forgejo PAT (read:repository on Myne/myne-server) for the private-
       # companion clone below. The secret `myne_server_token` is configured on
       # THIS repo (Woodpecker → repo → Settings → Secrets). The guard below
@@ -288,7 +371,7 @@ steps:
       # Sysdeps to compile/link myne-desktop's test binary (same set as
       # cargo-test-tauri) + git for the clone. node/pnpm NOT needed: dist/ is
       # already in the shared workspace from the pnpm-build step.
-      - apt-get update && apt-get install -y --no-install-recommends curl ca-certificates git xz-utils pkg-config libssl-dev libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev libasound2-dev
+      - apt-get update && apt-get install -y --no-install-recommends curl ca-certificates git xz-utils pkg-config libssl-dev libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev libasound2-dev mold
       # Go toolchain (matches myne-server go.mod 1.26.x) to build the server.
       - curl -fsSL https://go.dev/dl/go1.26.4.linux-amd64.tar.gz | tar -C /usr/local -xz
       # Clone the private companion via the Forgejo mirror (git.myne.md/Myne/
@@ -305,7 +388,7 @@ steps:
       # Quoted: the `:: ` (colon-colon-space) in the test-path filter is parsed
       # as a YAML key:value map otherwise, failing config-compile ("cannot
       # unmarshal map into string").
-      - "cargo test -p myne-core --lib plugins::sync::sim:: --no-fail-fast"
+      - "/cache/bin/cargo-nextest nextest run --profile ci -p myne-core -E 'test(plugins::sync::sim)' --no-fail-fast"
 
   # ─── Cross-impl vector verification (DISABLED) ───────────────
   # protocol/tests/vectors.rs reads ../myne-test-vectors fixtures and asserts
