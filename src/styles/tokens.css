@@ -19,8 +19,9 @@
      code, keyboard shortcuts). Has a true zero with a slash and disambiguates
      0/O, 1/lI/!, which matters for hand-typed Crockford-base32 identifiers.
 
-   The @font-face blocks are kept commented out until the WOFF2 binaries are
-   added under public/fonts/. The system stack below substitutes meanwhile.
+   The Inter + JetBrains Mono WOFF2 binaries are committed under public/fonts/
+   (self-hosted), so the @font-face blocks below are active. A dedicated
+   "Inter Display" display face is still pending brand-final.
    ------------------------------------------------------------------------ */
 
 @font-face {
