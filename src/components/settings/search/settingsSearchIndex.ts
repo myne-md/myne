@@ -1,0 +1,427 @@
+// Settings search-index registry (MYND-536). The single declarative source of
+// truth for what the Settings search can find. Matching runs against THIS static
+// array, never the rendered DOM — panels run IPC on mount (prefsRead / usePrefs),
+// so mounting all ten to scan their text is rejected as heavy + fragile.
+//
+// Each entry names an i18n key for its title (+ optional description + optional
+// translatable keyword/synonym string) and the `panelId` that owns it. The `id`
+// doubles as the `data-setting-anchor="<id>"` scroll target; where a setting
+// already exposes a stable `data-testid` the entry records it as `testid` and the
+// shell's scroll/flash resolver falls back to it — so most settings need no panel
+// edit. Titles/descriptions reference the SAME keys the panels already render, so
+// search text can't drift from the UI; a few settings whose live label is an
+// inline string (or lives outside the `settings.*` namespace) get dedicated
+// `settings.search.extra.*` / `sync.panel.*` keys.
+//
+// CONVENTION (see PRD + candidate decisions.md entry): a new user-facing setting
+// ships with its entry here in the same change. The drift test guards key
+// resolution + panel coverage, but cannot know about an entry that was never added.
+
+import type { PanelId } from "../../SettingsModal";
+
+export interface SettingsIndexEntry {
+  /** Unique, stable id. Also the `data-setting-anchor` value (Task 4). */
+  id: string;
+  /** Owning rail panel — the navigation target + results grouping key. */
+  panelId: PanelId;
+  /** Existing `data-testid` on this setting's control, used as the scroll/flash
+   *  fallback target when no `data-setting-anchor` is present (optional). */
+  testid?: string;
+  /** i18n key for the setting's display title (required). */
+  titleKey: string;
+  /** i18n key for the setting's description/helper (optional). */
+  descriptionKey?: string;
+  /** i18n key resolving to a space/comma-joined synonym string (optional,
+   *  translatable). Broadens matching beyond the literal label. */
+  keywordsKey?: string;
+}
+
+// Ordered by rail order (account → … → about → ai), and within a panel by the
+// order the settings appear in the panel. Keeping this aligned with the panels
+// makes the additive `data-setting-anchor` pass in Task 4 a straight read-down.
+export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
+  // ── Account ────────────────────────────────────────────────────────────────
+  {
+    id: "account.vault-label",
+    panelId: "account",
+    testid: "settings.label-input",
+    titleKey: "settings.account.vaultLabelEyebrow",
+    descriptionKey: "settings.account.vaultLabelHelper",
+    keywordsKey: "settings.search.keywords.vaultLabel",
+  },
+  {
+    id: "account.vault-icon",
+    panelId: "account",
+    testid: "settings.icon-picker",
+    titleKey: "settings.account.vaultIconLabel",
+    keywordsKey: "settings.search.keywords.vaultIcon",
+  },
+  {
+    id: "account.change-password",
+    panelId: "account",
+    testid: "settings.change-password-cta",
+    titleKey: "settings.account.changePasswordHeading",
+    descriptionKey: "settings.account.changePasswordHelper",
+    keywordsKey: "settings.search.keywords.changePassword",
+  },
+  {
+    id: "account.argon2id",
+    panelId: "account",
+    titleKey: "settings.account.argon2idHeading",
+    keywordsKey: "settings.search.keywords.argon2id",
+  },
+  {
+    id: "account.danger-zone",
+    panelId: "account",
+    testid: "settings.delete-vault-cta",
+    titleKey: "settings.account.dangerZoneHeading",
+    descriptionKey: "settings.account.dangerZoneHelper",
+    keywordsKey: "settings.search.keywords.dangerZone",
+  },
+
+  // ── Privacy ────────────────────────────────────────────────────────────────
+  {
+    id: "privacy.screen-capture",
+    panelId: "privacy",
+    titleKey: "settings.privacy.screenCaptureLabel",
+    descriptionKey: "settings.privacy.screenCaptureHelperOn",
+    keywordsKey: "settings.search.keywords.screenCapture",
+  },
+  {
+    id: "privacy.realtime-sync",
+    panelId: "privacy",
+    testid: "settings.realtime-sync-info",
+    titleKey: "settings.privacy.realtimeSyncLabel",
+    descriptionKey: "settings.privacy.realtimeSyncHelper",
+    keywordsKey: "settings.search.keywords.realtimeSync",
+  },
+  {
+    // The "Continue where you left off" toggle renders inline English (no
+    // `settings.*` key today); give search a dedicated translatable pair.
+    id: "privacy.last-active-note",
+    panelId: "privacy",
+    testid: "settings.last-active-note-toggle",
+    titleKey: "settings.search.extra.lastActiveNoteTitle",
+    descriptionKey: "settings.search.extra.lastActiveNoteDesc",
+    keywordsKey: "settings.search.keywords.lastActiveNote",
+  },
+  {
+    id: "privacy.auto-lock",
+    panelId: "privacy",
+    testid: "settings.auto-lock-select",
+    titleKey: "settings.privacy.autoLockLabel",
+    descriptionKey: "settings.privacy.autoLockHelper",
+    keywordsKey: "settings.search.keywords.autoLock",
+  },
+  {
+    id: "privacy.quick-unlock",
+    panelId: "privacy",
+    testid: "settings.quick-unlock",
+    titleKey: "settings.quickUnlock.title",
+    descriptionKey: "settings.quickUnlock.setupHelper",
+    keywordsKey: "settings.search.keywords.quickUnlock",
+  },
+
+  // ── Sync (keys live under `sync.panel.*`, not `settings.*`) ─────────────────
+  {
+    id: "sync.status",
+    panelId: "sync",
+    titleKey: "sync.panel.status.label",
+    descriptionKey: "sync.panel.status.helper",
+    keywordsKey: "settings.search.keywords.syncStatus",
+  },
+  {
+    id: "sync.devices",
+    panelId: "sync",
+    titleKey: "sync.panel.devices.label",
+    keywordsKey: "settings.search.keywords.syncDevices",
+  },
+  {
+    id: "sync.add-device",
+    panelId: "sync",
+    titleKey: "sync.panel.addDevice.label",
+    descriptionKey: "sync.panel.addDevice.helper",
+    keywordsKey: "settings.search.keywords.syncAddDevice",
+  },
+  {
+    id: "sync.conflicts",
+    panelId: "sync",
+    titleKey: "sync.panel.conflicts.label",
+    descriptionKey: "sync.panel.conflicts.helper",
+    keywordsKey: "settings.search.keywords.syncConflicts",
+  },
+  {
+    id: "sync.recovered",
+    panelId: "sync",
+    titleKey: "sync.panel.recovered.label",
+    descriptionKey: "sync.panel.recovered.helper",
+    keywordsKey: "settings.search.keywords.syncRecovered",
+  },
+  {
+    id: "sync.server",
+    panelId: "sync",
+    titleKey: "sync.panel.server.label",
+    keywordsKey: "settings.search.keywords.syncServer",
+  },
+
+  // ── Editor ─────────────────────────────────────────────────────────────────
+  {
+    id: "editor.text-size",
+    panelId: "editor",
+    titleKey: "settings.typography.textSizeLabel",
+    keywordsKey: "settings.search.keywords.textSize",
+  },
+  {
+    id: "editor.line-spacing",
+    panelId: "editor",
+    titleKey: "settings.typography.lineSpacingLabel",
+    keywordsKey: "settings.search.keywords.lineSpacing",
+  },
+  {
+    id: "editor.content-width",
+    panelId: "editor",
+    titleKey: "settings.typography.contentWidthLabel",
+    descriptionKey: "settings.typography.contentWidthHelper",
+    keywordsKey: "settings.search.keywords.contentWidth",
+  },
+  {
+    id: "editor.font",
+    panelId: "editor",
+    titleKey: "settings.typography.fontLabel",
+    keywordsKey: "settings.search.keywords.font",
+  },
+  {
+    id: "editor.line-numbers",
+    panelId: "editor",
+    testid: "settings.line-numbers",
+    titleKey: "settings.lineNumbers.label",
+    descriptionKey: "settings.lineNumbers.helper",
+    keywordsKey: "settings.search.keywords.lineNumbers",
+  },
+  {
+    id: "editor.toolbar",
+    panelId: "editor",
+    testid: "settings.toolbar-customize",
+    titleKey: "settings.toolbarCustomize.label",
+    descriptionKey: "settings.toolbarCustomize.helper",
+    keywordsKey: "settings.search.keywords.toolbar",
+  },
+  {
+    id: "editor.view-mode",
+    panelId: "editor",
+    titleKey: "settings.viewMode.label",
+    descriptionKey: "settings.viewMode.helper",
+    keywordsKey: "settings.search.keywords.viewMode",
+  },
+  {
+    id: "editor.focus-dim",
+    panelId: "editor",
+    testid: "settings.focus-dim",
+    titleKey: "settings.focusMode.dimLabel",
+    descriptionKey: "settings.focusMode.dimHelper",
+    keywordsKey: "settings.search.keywords.focusMode",
+  },
+  {
+    id: "editor.focus-typewriter",
+    panelId: "editor",
+    testid: "settings.focus-typewriter",
+    titleKey: "settings.focusMode.typewriterLabel",
+    descriptionKey: "settings.focusMode.typewriterHelper",
+    keywordsKey: "settings.search.keywords.focusMode",
+  },
+  {
+    id: "editor.spell-check",
+    panelId: "editor",
+    testid: "settings.spell-check",
+    titleKey: "settings.spell.label",
+    descriptionKey: "settings.spell.helper",
+    keywordsKey: "settings.search.keywords.spell",
+  },
+  {
+    id: "editor.spell-languages",
+    panelId: "editor",
+    titleKey: "settings.spell.languagesLabel",
+    descriptionKey: "settings.spell.languagesHelper",
+    keywordsKey: "settings.search.keywords.spellLanguages",
+  },
+  {
+    id: "editor.daily-notes-folder",
+    panelId: "editor",
+    titleKey: "settings.dailyNotes.folderLabel",
+    descriptionKey: "settings.dailyNotes.folderHelper",
+    keywordsKey: "settings.search.keywords.dailyNotes",
+  },
+  {
+    id: "editor.daily-notes-date-format",
+    panelId: "editor",
+    titleKey: "settings.dailyNotes.dateFormatLabel",
+    descriptionKey: "settings.dailyNotes.dateFormatHelper",
+    keywordsKey: "settings.search.keywords.dailyNotes",
+  },
+  {
+    id: "editor.daily-notes-template",
+    panelId: "editor",
+    titleKey: "settings.dailyNotes.templateLabel",
+    descriptionKey: "settings.dailyNotes.templateHelper",
+    keywordsKey: "settings.search.keywords.dailyNotes",
+  },
+  {
+    id: "editor.archive",
+    panelId: "editor",
+    testid: "settings.archive-disabled",
+    titleKey: "settings.archive.label",
+    descriptionKey: "settings.archive.helper",
+    keywordsKey: "settings.search.keywords.archive",
+  },
+
+  // ── Files ──────────────────────────────────────────────────────────────────
+  {
+    id: "files.startup-open",
+    panelId: "files",
+    testid: "settings.startup-open-select",
+    titleKey: "settings.files.startup.label",
+    descriptionKey: "settings.files.startup.helper",
+    keywordsKey: "settings.search.keywords.startupOpen",
+  },
+  {
+    id: "files.new-note-location",
+    panelId: "files",
+    testid: "settings.new-note-location-select",
+    titleKey: "settings.files.newNote.label",
+    descriptionKey: "settings.files.newNote.helper",
+    keywordsKey: "settings.search.keywords.newNoteLocation",
+  },
+
+  // ── Hotkeys (the panel has its own in-panel search; one entry routes to it) ──
+  {
+    id: "hotkeys.shortcuts",
+    panelId: "hotkeys",
+    titleKey: "settings.shell.panels.hotkeys",
+    descriptionKey: "settings.hotkeys.helper",
+    keywordsKey: "settings.search.keywords.hotkeys",
+  },
+
+  // ── Appearance ─────────────────────────────────────────────────────────────
+  {
+    id: "appearance.theme",
+    panelId: "appearance",
+    titleKey: "settings.appearance.themeLabel",
+    descriptionKey: "settings.appearance.themeHelper",
+    keywordsKey: "settings.search.keywords.theme",
+  },
+  {
+    id: "appearance.show-edit-times",
+    panelId: "appearance",
+    testid: "settings.note-timestamps-toggle",
+    titleKey: "settings.appearance.showEditTimesLabel",
+    descriptionKey: "settings.appearance.showEditTimesHelper",
+    keywordsKey: "settings.search.keywords.showEditTimes",
+  },
+  {
+    id: "appearance.custom-themes",
+    panelId: "appearance",
+    titleKey: "settings.customThemes.label",
+    keywordsKey: "settings.search.keywords.customThemes",
+  },
+  {
+    id: "appearance.language",
+    panelId: "appearance",
+    titleKey: "settings.language.label",
+    descriptionKey: "settings.language.helper",
+    keywordsKey: "settings.search.keywords.language",
+  },
+
+  // ── Storage ────────────────────────────────────────────────────────────────
+  {
+    id: "storage.backup",
+    panelId: "storage",
+    titleKey: "settings.storage.backupLabel",
+    descriptionKey: "settings.storage.backupHelper",
+    keywordsKey: "settings.search.keywords.backup",
+  },
+  {
+    id: "storage.export",
+    panelId: "storage",
+    titleKey: "settings.storage.exportLabel",
+    keywordsKey: "settings.search.keywords.export",
+  },
+  {
+    id: "storage.import",
+    panelId: "storage",
+    titleKey: "settings.storage.importLabel",
+    keywordsKey: "settings.search.keywords.import",
+  },
+  {
+    id: "storage.location",
+    panelId: "storage",
+    titleKey: "settings.storage.locationLabel",
+    keywordsKey: "settings.search.keywords.vaultLocation",
+  },
+  {
+    id: "storage.auto-backup",
+    panelId: "storage",
+    testid: "settings.auto-backup",
+    titleKey: "settings.autoBackup.title",
+    descriptionKey: "settings.autoBackup.helper",
+    keywordsKey: "settings.search.keywords.autoBackup",
+  },
+  {
+    id: "storage.clipper",
+    panelId: "storage",
+    testid: "settings.clipper-install",
+    titleKey: "settings.clipperInstall.label",
+    descriptionKey: "settings.clipperInstall.helper",
+    keywordsKey: "settings.search.keywords.clipper",
+  },
+
+  // ── About ──────────────────────────────────────────────────────────────────
+  {
+    id: "about.build-channel",
+    panelId: "about",
+    titleKey: "settings.about.buildChannelLabel",
+    keywordsKey: "settings.search.keywords.buildChannel",
+  },
+  {
+    id: "about.changelog",
+    panelId: "about",
+    titleKey: "settings.about.changelogLabel",
+    descriptionKey: "settings.about.changelogHelper",
+    keywordsKey: "settings.search.keywords.changelog",
+  },
+  {
+    id: "about.license",
+    panelId: "about",
+    titleKey: "settings.about.licenseLabel",
+    keywordsKey: "settings.search.keywords.license",
+  },
+  {
+    id: "about.threat-model",
+    panelId: "about",
+    titleKey: "settings.about.threatModelLabel",
+    descriptionKey: "settings.about.threatModelHelper",
+    keywordsKey: "settings.search.keywords.threatModel",
+  },
+
+  // ── AI (Labs) ──────────────────────────────────────────────────────────────
+  {
+    id: "ai.enable",
+    panelId: "ai",
+    titleKey: "settings.ai.enableLabel",
+    descriptionKey: "settings.ai.enableHelper",
+    keywordsKey: "settings.search.keywords.aiEnable",
+  },
+  {
+    id: "ai.models",
+    panelId: "ai",
+    titleKey: "settings.ai.modelsLabel",
+    descriptionKey: "settings.ai.modelsHelper",
+    keywordsKey: "settings.search.keywords.aiModels",
+  },
+  {
+    id: "ai.excluded-folders",
+    panelId: "ai",
+    titleKey: "settings.ai.excludedLabel",
+    descriptionKey: "settings.ai.excludedHelper",
+    keywordsKey: "settings.search.keywords.aiExcluded",
+  },
+];

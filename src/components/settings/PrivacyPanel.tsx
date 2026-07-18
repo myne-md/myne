@@ -69,6 +69,9 @@ interface ToggleRowProps {
   onToggle?: (next: boolean) => void;
   /** Optional `data-testid` forwarded to the Switch for E2E targeting. */
   testId?: string;
+  /** Optional settings-search anchor (MYND-536) on the block root, so a search
+   *  result can scroll this row into view and flash it. */
+  anchorId?: string;
 }
 
 function ToggleRow({
@@ -79,9 +82,10 @@ function ToggleRow({
   checked,
   onToggle,
   testId,
+  anchorId,
 }: ToggleRowProps) {
   return (
-    <div style={BLOCK_STYLE}>
+    <div style={BLOCK_STYLE} data-setting-anchor={anchorId}>
       <div style={TOGGLE_ROW_STYLE}>
         <span style={LABEL_STYLE}>{label}</span>
         <Switch
@@ -214,6 +218,7 @@ export function PrivacyPanel({ onShowToast }: PrivacyPanelProps = {}) {
         onToggle={(next) => {
           void toggleScreenCapture(next);
         }}
+        anchorId="privacy.screen-capture"
       />
       <RealtimeSyncInfoRow />
       <ToggleRow
