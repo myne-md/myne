@@ -18,7 +18,8 @@ import {
   type DragEvent as ReactDragEvent,
 } from "react";
 import { useTranslation } from "react-i18next";
-import { CMEditor, type ScrollAnchorRequest, type CMEditorProps } from "../../editor/CMEditor";
+import { CMEditor, type ScrollAnchorRequest, type CMEditorProps, type EditorSwapApi } from "../../editor/CMEditor";
+import type { EditorState } from "@codemirror/state";
 import { asViewMode, type ViewMode } from "../../editor/view-mode";
 import { headingSections } from "../../dialect";
 
@@ -294,6 +295,35 @@ export function PaneView({
   const [content, setContent] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
 
+  // Persistent-view swap (MYND-534). One long-lived CMEditor per pane; on a
+  // markdown→markdown note switch we cache the outgoing note's EditorState (undo +
+  // selection) + outer-scroller scrollTop and swap the incoming note's in via the
+  // CMEditor swap API, instead of tearing the view down. `swapApiRef` is handed up
+  // by the primary CMEditor's `onSwapReady` (null while unmounted — e.g. a drawing
+  // tab — in which case we fall back to the plain content-mirror path).
+  const swapApiRef = useRef<EditorSwapApi | null>(null);
+  const stateCacheRef = useRef<Map<NoteId, { state: EditorState; scrollTop: number }>>(
+    new Map(),
+  );
+  const prevActiveIdRef = useRef<NoteId | null>(null);
+
+  // MYND-534: evict cached EditorStates for notes no longer open in this pane (a
+  // closed tab), so the cache is bounded by the pane's open-tab count and a
+  // reopen starts fresh (grill Q3 — tab-switch-only lifetime).
+  const openNoteTabKey = leaf.tabs
+    .filter((t) => t.kind === "note")
+    .map((t) => t.id)
+    .join(" ");
+  useEffect(() => {
+    const open = new Set(
+      leaf.tabs.filter((t) => t.kind === "note").map((t) => t.id),
+    );
+    for (const key of [...stateCacheRef.current.keys()]) {
+      if (!open.has(key)) stateCacheRef.current.delete(key);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openNoteTabKey]);
+
   // --- Live outline scroll tracking (outline-scroll-tracking) ------------------
   // The focused pane publishes its topmost visible heading to the panel-level
   // Outline tab (a separate render subtree) through the `activeHeadingSignal`
@@ -388,10 +418,31 @@ export function PaneView({
     [recomputeActiveHeading],
   );
 
-  // Load the active note's body on change. Race-protected: a fetch that
-  // resolves after a newer activation is dropped via `cancelled`.
+  // Load / restore the active note's body on change (MYND-534). Persistent-view
+  // aware: capture the OUTGOING note's EditorState + scroll before swapping, then
+  // for the incoming note either restore its cached state instantly (no re-read,
+  // no loading) or read from disk (first open) and build a fresh state. When the
+  // swap API is unavailable (drawing tab, or before the view's onSwapReady fires),
+  // it degrades to the plain content-mirror path. `acceptReloadedBody` baselines
+  // autosave so a swap is never mistaken for a user edit. Race-protected via
+  // `cancelled`.
   useEffect(() => {
     let cancelled = false;
+    const api = swapApiRef.current;
+    const cache = stateCacheRef.current;
+    const scroller = outlineScrollerRef.current;
+    const prevId = prevActiveIdRef.current;
+
+    // Snapshot the outgoing markdown note (the view still holds it here) so a
+    // later return restores its undo history + scroll.
+    if (api !== null && prevId !== null && prevId !== activeId) {
+      cache.set(prevId, {
+        state: api.captureState(),
+        scrollTop: scroller?.scrollTop ?? 0,
+      });
+    }
+    prevActiveIdRef.current = activeId;
+
     if (activeId === null) {
       setContent("");
       setLoading(false);
@@ -399,14 +450,40 @@ export function PaneView({
         cancelled = true;
       };
     }
+
+    // Cached + swap API live → instant restore, no disk read, no loading gate.
+    const cached = api !== null ? cache.get(activeId) : undefined;
+    if (api !== null && cached !== undefined) {
+      api.applyState(cached.state);
+      const doc = cached.state.doc.toString();
+      setContent(doc);
+      autosaveRef.current?.acceptReloadedBody(doc);
+      setLoading(false);
+      const top = cached.scrollTop;
+      // Restore scroll after the swapped-in content lays out.
+      requestAnimationFrame(() => {
+        if (!cancelled && scroller !== null) scroller.scrollTop = top;
+      });
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    // First open (uncached) → read from disk. The loading gate rebuilds the view
+    // here (first-open re-init is unchanged; only re-VISITS get the persistent
+    // view + preserved undo/scroll — a fuller first-open overlay is a follow-up).
+    // No applyState: the remounted view picks up `content` via its value-mirror.
     setLoading(true);
     void (async () => {
       try {
         const body = await noteRead(activeId);
-        if (!cancelled) {
-          setContent(body);
-          setLoading(false);
-        }
+        if (cancelled) return;
+        setContent(body);
+        autosaveRef.current?.acceptReloadedBody(body);
+        setLoading(false);
+        requestAnimationFrame(() => {
+          if (!cancelled && scroller !== null) scroller.scrollTop = 0;
+        });
       } catch {
         if (!cancelled) {
           setContent("");
@@ -498,6 +575,12 @@ export function PaneView({
       reloadInit.current = false;
       return;
     }
+    // MYND-534: an out-of-band change (sync pull / external edit) may have
+    // rewritten ANY note, including ones cached in the background. Clear the
+    // whole per-note EditorState cache so the next swap-in rebuilds fresh from
+    // disk (content correctness over background-note undo — grill Q5). The active
+    // note's own re-read happens just below.
+    stateCacheRef.current.clear();
     if (activeId === null) return;
     // Never clobber unsaved local edits: a dirty buffer means the engine kept
     // OUR on-disk version (it skips a locally-dirty blob on pull), so reloading
@@ -784,6 +867,11 @@ export function PaneView({
             // outline-scroll-tracking: hand the live view to the pane so it can
             // watch the scroller and report the top heading to the Outline tab.
             onReady={handleEditorReady}
+            // persistent-view swap (MYND-534): the pane drives note switches on
+            // this one long-lived view via the swap API; null while unmounted.
+            onSwapReady={(api) => {
+              swapApiRef.current = api;
+            }}
             // writing-assistant task 6: surface the AI slash commands only in the
             // editable editor, gated on ai_enabled + the excluded-folder check
             // (SYNC-14). The reading-view instance below leaves it default-false.
