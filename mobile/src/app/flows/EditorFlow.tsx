@@ -1715,15 +1715,17 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
               </div>
 
               {/* Secondary create/browse tiles — New drawing / Template / Daily
-                  note / Views. New drawing (MYND-515) is a first-class create
-                  affordance so it always shows; Template/Daily/Views are each
-                  hideable from Settings → Appearance (MYND-479). */}
+                  note / Views. Each is hideable from Settings → Appearance: the
+                  original three via MYND-479, New drawing (MYND-515) folded into
+                  the same mechanism by MYND-538. */}
               {listView === "notes" && (
                 <div style={{ marginTop: 12, display: "flex", gap: 8 }}>
-                  <ActionPill onClick={newDrawing} label={t("notes.newTab.createDrawing")} testid="notes.new-drawing-tile">
-                    <path d="M12 20h9" stroke="currentColor" strokeWidth="1.7" fill="none" strokeLinecap="round" />
-                    <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" stroke="currentColor" strokeWidth="1.7" fill="none" strokeLinejoin="round" />
-                  </ActionPill>
+                  {!hiddenHomeTiles.has("new-drawing") && (
+                    <ActionPill onClick={newDrawing} label={t("notes.newTab.createDrawing")} testid="notes.new-drawing-tile">
+                      <path d="M12 20h9" stroke="currentColor" strokeWidth="1.7" fill="none" strokeLinecap="round" />
+                      <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" stroke="currentColor" strokeWidth="1.7" fill="none" strokeLinejoin="round" />
+                    </ActionPill>
+                  )}
                   {!hiddenHomeTiles.has("templates") && (
                     <ActionPill onClick={() => setTab("templates")} label={t("templates.manager.listLabel")}>
                       <rect x="8" y="4" width="11" height="14" rx="2" stroke="currentColor" strokeWidth="1.7" fill="none" />
