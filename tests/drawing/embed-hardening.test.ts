@@ -79,3 +79,35 @@ describe("excalidraw embed hardening", () => {
     },
   );
 });
+
+// Chrome curation guards (MYND-514, excalidraw-chrome-fit). These lock the
+// curated-menu posture in the SAME shared config so a future edit can't silently
+// re-surface the file-system / export affordances we dropped — nor regress the
+// egress fields the chrome work sits next to. The visual side (Library/Help gone,
+// welcome suppressed, token colours) is asserted in e2e/drawing-notes.e2e.ts; here
+// we lock the declarative config that drives it.
+describe("excalidraw chrome curation", () => {
+  it("keeps the egress config fields locked (libraryReturnUrl off, langCode en)", () => {
+    expect(HARDENED_EXCALIDRAW_PROPS.libraryReturnUrl).toBeUndefined();
+    expect(HARDENED_EXCALIDRAW_PROPS.langCode).toBe("en");
+  });
+
+  it("disables the file-system + export canvas actions (menu clutter can't return)", () => {
+    const ca = HARDENED_EXCALIDRAW_PROPS.UIOptions.canvasActions;
+    expect(ca.loadScene).toBe(false);
+    expect(ca.saveToActiveFile).toBe(false);
+    expect(ca.export).toBe(false);
+    expect(ca.saveAsImage).toBe(false);
+  });
+
+  it("keeps the three curated menu actions + the image tool enabled", () => {
+    const { canvasActions, tools } = HARDENED_EXCALIDRAW_PROPS.UIOptions;
+    // These three GATE the composed <MainMenu.DefaultItems> — each renders null if
+    // its canvasAction is off, so flipping any to false silently empties the menu.
+    expect(canvasActions.changeViewBackgroundColor).toBe(true);
+    expect(canvasActions.toggleTheme).toBe(true);
+    expect(canvasActions.clearCanvas).toBe(true);
+    // Image tool stays (local picker only; image-from-URL is CSP-blocked).
+    expect(tools.image).toBe(true);
+  });
+});
