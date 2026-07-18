@@ -178,6 +178,17 @@ steps:
       # a committed .cargo/config.toml so macOS/local dev is unaffected; the
       # signed release pipeline keeps its own linker.
       RUSTFLAGS: "-C link-arg=-fuse-ld=mold"
+      # Persistent compile cache (H1): sccache + a shared cargo registry, provided
+      # by the agent's WOODPECKER_BACKEND_DOCKER_VOLUMES mounts (host /srv/wp-cache
+      # → /cache/*; see /root/cicd-myne/docker-compose.yml on the CI box). sccache
+      # is content-addressed + concurrency-safe (MAX_WORKFLOWS=2 stays); the signed
+      # release build is a SEPARATE pipeline and never uses this cache. To disable:
+      # remove the agent volume line + these five vars.
+      RUSTC_WRAPPER: /cache/bin/sccache
+      SCCACHE_DIR: /cache/sccache
+      SCCACHE_CACHE_SIZE: "40G"
+      CARGO_INCREMENTAL: "0"
+      CARGO_HOME: /cache/cargo
     commands:
       # Raise the open-file soft limit to the hard cap before the build: the
       # Tauri CLI + parallel cargo codegen open enough fds to hit the runner's
@@ -206,6 +217,8 @@ steps:
       # Now that AI is default-on this path would otherwise never compile in CI and
       # could bit-rot. Cheap `check` (no link) — the full build is the one above.
       - cargo check -p myne-desktop --no-default-features
+      # Cache hit-rate visibility (H1) — never fails the step.
+      - /cache/bin/sccache --show-stats || true
 
   # ─── Backend host tests (src-tauri / myne-desktop) ───────────
   # The protocol-scoped cargo-test above can't reach src-tauri: it needs the
@@ -235,7 +248,7 @@ steps:
       # tauri-compile) inside the unprivileged shell where the build actually runs.
       # RUSTFLAGS=mold (Q6) folded into the su env; `{ test -d dist || pnpm build; }`
       # reuses the dist/ from tauri-compile instead of rebuilding it (Q3).
-      - su ci -c 'export HOME=/home/ci CARGO_HOME=/home/ci/.cargo RUSTUP_HOME=/usr/local/rustup PATH=/usr/local/cargo/bin:/usr/local/bin:$PATH RUSTFLAGS="-C link-arg=-fuse-ld=mold" ; ulimit -n $(ulimit -Hn) 2>/dev/null || true ; pnpm install --frozen-lockfile && { test -d dist || pnpm build; } && cargo test -p myne-desktop -p myne-core --no-fail-fast'
+      - su ci -c 'export HOME=/home/ci CARGO_HOME=/cache/cargo RUSTUP_HOME=/usr/local/rustup PATH=/usr/local/cargo/bin:/usr/local/bin:$PATH RUSTFLAGS="-C link-arg=-fuse-ld=mold" RUSTC_WRAPPER=/cache/bin/sccache SCCACHE_DIR=/cache/sccache SCCACHE_CACHE_SIZE=40G CARGO_INCREMENTAL=0 ; ulimit -n $(ulimit -Hn) 2>/dev/null || true ; pnpm install --frozen-lockfile && { test -d dist || pnpm build; } && cargo test -p myne-desktop -p myne-core --no-fail-fast'
 
   # ─── E2E suite (real binary via tauri-driver) ────────────────
   # MYND-129 (e2e-harness). Drives the production binary built by
@@ -273,7 +286,7 @@ steps:
       # silently inside the first seeding test's 180 s budget.
       # ulimit -n: raise the fd soft limit to the hard cap (EMFILE guard, see
       # tauri-compile) inside the unprivileged shell where the build runs.
-      - su ci -c 'export HOME=/home/ci CARGO_HOME=/home/ci/.cargo RUSTUP_HOME=/usr/local/rustup PATH=/usr/local/cargo/bin:/usr/local/bin:$PATH CI=true RUSTFLAGS="-C link-arg=-fuse-ld=mold" ; ulimit -n $(ulimit -Hn) 2>/dev/null || true ; pnpm install --frozen-lockfile && cargo build --release -p e2e-fixture-gen && xvfb-run -a pnpm test:e2e'
+      - su ci -c 'export HOME=/home/ci CARGO_HOME=/cache/cargo RUSTUP_HOME=/usr/local/rustup PATH=/usr/local/cargo/bin:/usr/local/bin:$PATH CI=true RUSTFLAGS="-C link-arg=-fuse-ld=mold" RUSTC_WRAPPER=/cache/bin/sccache SCCACHE_DIR=/cache/sccache SCCACHE_CACHE_SIZE=40G CARGO_INCREMENTAL=0 ; ulimit -n $(ulimit -Hn) 2>/dev/null || true ; pnpm install --frozen-lockfile && cargo build --release -p e2e-fixture-gen && xvfb-run -a pnpm test:e2e'
 
   # ─── Sync simulation harness (multi-device, real myne-server) ─
   # Runs the Phase-1 sync harness `src-tauri/src/plugins/sync/sim.rs` against a
@@ -310,6 +323,12 @@ steps:
       CI: "true"
       # mold linker for the myne-core sync test binary link (CI-only, Q6).
       RUSTFLAGS: "-C link-arg=-fuse-ld=mold"
+      # Persistent compile cache (H1) — see tauri-compile's comment.
+      RUSTC_WRAPPER: /cache/bin/sccache
+      SCCACHE_DIR: /cache/sccache
+      SCCACHE_CACHE_SIZE: "40G"
+      CARGO_INCREMENTAL: "0"
+      CARGO_HOME: /cache/cargo
       # Forgejo PAT (read:repository on Myne/myne-server) for the private-
       # companion clone below. The secret `myne_server_token` is configured on
       # THIS repo (Woodpecker → repo → Settings → Secrets). The guard below
