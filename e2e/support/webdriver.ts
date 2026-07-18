@@ -111,6 +111,15 @@ export class Element {
     );
   }
 
+  /** One raw click attempt — no interactability/stale retry. For callers that
+   *  re-locate the element themselves between attempts (typeIntoEditor's
+   *  note-open re-render race): a fresh handle clicks at once, and a handle that
+   *  staled mid-open throws immediately so the caller re-finds instead of burning
+   *  click()'s whole 10 s budget polling a dead node. */
+  async clickOnce(): Promise<void> {
+    await this.session.send("POST", this.path("/click"));
+  }
+
   /** Click via the W3C Actions API (pointer move to centre → button-0 down/up)
    *  in ONE sequence — the same transport as `rightClick`, with NO interactability
    *  pre-check. WebKit's `/click` endpoint refuses an element it deems

@@ -6,7 +6,7 @@
 // class (not credentials; see the notes suite header).
 
 import { expect } from "vitest";
-import { testIdSelector, type Session } from "./webdriver";
+import { testIdSelector, WebDriverError, type Session } from "./webdriver";
 
 /**
  * Fire one production IPC from the page seat and settle-poll its result
@@ -342,8 +342,34 @@ export async function reopenNoteAfterReload(session: Session): Promise<void> {
  *  Callers' asserts are `includes(...)`, so stray probe chars and a
  *  leftover truncated fragment are harmless. */
 export async function typeIntoEditor(session: Session, text: string): Promise<void> {
-  const content = await session.waitForElement(CM_CONTENT);
-  await content.click();
+  // Focus the editor. When a double-click CREATES+opens a note (folder index
+  // note, MYND-370), the editor re-renders asynchronously and REPLACES the
+  // .cm-content node — a handle located once then clicked goes genuinely stale
+  // mid-open, and click()'s retry then burns its whole budget polling the dead
+  // node (waitUntil only treats stale as transient when the predicate RE-QUERIES,
+  // see its header). Re-locate INSIDE the poll (raw clickOnce, no nested retry)
+  // so a replaced node is simply the next iteration's fresh handle.
+  const content = await session.waitUntil(
+    async () => {
+      const [el] = await session.findElements(CM_CONTENT);
+      if (!el) return null;
+      try {
+        await el.clickOnce();
+      } catch (e) {
+        if (
+          e instanceof WebDriverError &&
+          (e.code === "stale element reference" ||
+            e.code === "element not interactable" ||
+            e.code === "element click intercepted")
+        ) {
+          return null; // node replaced / not yet hit-testable — re-find next poll
+        }
+        throw e;
+      }
+      return el;
+    },
+    { label: "editor located + focused", timeoutMs: 10_000 },
+  );
   await session.waitUntil(
     async () => {
       await content.sendKeys("q");
