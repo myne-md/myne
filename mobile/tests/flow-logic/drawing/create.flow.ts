@@ -24,11 +24,25 @@ test.describe("mobile drawing-note create affordance", () => {
     await expect(page.getByTestId("drawing.pane")).toBeVisible();
   });
 
-  test("the New drawing tile is a first-class, always-present create affordance", async ({ page }) => {
+  test("the New drawing tile shows by default", async ({ page }) => {
     await installMockIpc(page, { syncStatus: { state: "idle" } });
     await page.goto("/");
     await expect(page.getByTestId("workspace.app-header")).toBeVisible();
-    // Unlike Template/Daily/Views (hideable), the drawing tile always shows.
+    // No hide pref set → the drawing tile is present out of the box.
     await expect(page.getByTestId("notes.new-drawing-tile")).toBeVisible();
+  });
+
+  test("the New drawing tile hides via the shared home-tile pref (MYND-538)", async ({ page }) => {
+    await installMockIpc(page, { syncStatus: { state: "idle" } });
+    // The drawing tile joined Templates/Daily/Views on the MYND-479 hide/show
+    // mechanism: a device-local `myne.home-tiles-hidden` list in localStorage,
+    // persisted across restarts. Seeding it with "new-drawing" (as a Settings →
+    // Appearance toggle would) must drop the tile while the list still renders.
+    await page.addInitScript(() =>
+      localStorage.setItem("myne.home-tiles-hidden", JSON.stringify(["new-drawing"])),
+    );
+    await page.goto("/");
+    await expect(page.getByTestId("workspace.app-header")).toBeVisible();
+    await expect(page.getByTestId("notes.new-drawing-tile")).toHaveCount(0);
   });
 });
