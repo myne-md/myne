@@ -20,7 +20,8 @@ pub enum SharedDiscipline {
     /// The whole array/map value is replaced by the newer side; one clock.
     WholeValueLww,
     /// Union of keys; a key edited on both sides resolves LWW on its own
-    /// `device_names/<key>` clock.
+    /// `<field>/<key>` clock (e.g. `device_names/<key>`,
+    /// `item_colors/<folderKey>`, `folder_icons/<folderKey>` — MYND-562).
     PerKeyMapMerge,
 }
 
@@ -99,13 +100,13 @@ pub const CLASSIFICATION: &[(&str, PrefClass)] = &[
     ("field_clocks", PrefClass::MergeMetadata),
     (
         "folder_icons",
-        PrefClass::Shared(SharedDiscipline::WholeValueLww),
+        PrefClass::Shared(SharedDiscipline::PerKeyMapMerge),
     ),
     ("hidden_bar_items", PrefClass::DeviceLocal),
     ("icon", PrefClass::Shared(SharedDiscipline::ScalarLww)),
     (
         "item_colors",
-        PrefClass::Shared(SharedDiscipline::WholeValueLww),
+        PrefClass::Shared(SharedDiscipline::PerKeyMapMerge),
     ),
     (
         "item_order",
@@ -319,6 +320,16 @@ mod tests {
         );
         assert_eq!(
             classify("device_names"),
+            Some(PrefClass::Shared(SharedDiscipline::PerKeyMapMerge))
+        );
+        // MYND-562: folder decorations moved from whole-value LWW to per-key
+        // map merge so concurrent edits to different folders no longer clobber.
+        assert_eq!(
+            classify("item_colors"),
+            Some(PrefClass::Shared(SharedDiscipline::PerKeyMapMerge))
+        );
+        assert_eq!(
+            classify("folder_icons"),
             Some(PrefClass::Shared(SharedDiscipline::PerKeyMapMerge))
         );
         // Privacy-load-bearing exclusion list syncs vault-wide.
