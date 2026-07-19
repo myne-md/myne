@@ -51,7 +51,7 @@ import {
   unarchiveNote,
   type NoteFlags,
 } from "../../lib/note-organize";
-import { folderChildren, notesDirectlyIn, notesInSubtree } from "../../lib/folders";
+import { folderChildren, itemOrderRank, notesDirectlyIn, notesInSubtree } from "../../lib/folders";
 import { resolveTodayNote, createNoteFromTemplate, createBlankNamedNote } from "../../lib/daily";
 import { normalizeFolderPath, ancestorPaths, foldSegment, folderKey } from "../../dialect/folderPath";
 import {
@@ -64,6 +64,7 @@ import {
 import { buildInitialPlaintext, readUpdatedFromFmBody } from "../../dialect/surgery";
 import { formatRelativeTime } from "../../lib/relative-time";
 import { runView, type RunViewContext, type ViewResult } from "@myne/editor/host/notes/queryEngine";
+import { foldDecorationKeys, rewriteFolderPrefix } from "@myne/editor/host/notes/decorationKeys";
 import { MobileViewRenderHost } from "./editor/views/MobileViewRenderHost";
 import type { SavedView } from "../../lib/prefs";
 import { ViewEditorSheet } from "./ViewEditorSheet";
@@ -128,35 +129,6 @@ import type { NoteEntry, OutlineItem, PaletteCommand } from "./editor/types";
  */
 
 type Editing = { id: string | null };
-
-/** A flattened row of the inline folder hierarchy — folders and their notes
- *  interleaved with a `depth` for indentation. Collapsed folders omit their
- *  subtree. This replaces the old drill-down/breadcrumb navigation. */
-type TreeRow =
-  | { kind: "folder"; path: string; name: string; depth: number; count: number; collapsed: boolean }
-  | { kind: "note"; id: string; depth: number };
-
-/** Walk the virtual folder tree from `current` (null = root) into a flat row
- *  list: child folders (each optionally expanding its subtree) then the notes
- *  sitting directly at this level. `sortNotes` orders the note ids per level. */
-function buildFolderTree(
-  folderOf: Map<string, string | null>,
-  collapsed: Set<string>,
-  sortNotes: (ids: string[]) => string[],
-  current: string | null = null,
-  depth = 0,
-): TreeRow[] {
-  const rows: TreeRow[] = [];
-  for (const f of folderChildren(folderOf, current)) {
-    const isCollapsed = collapsed.has(f.path);
-    rows.push({ kind: "folder", path: f.path, name: f.name, depth, count: f.count, collapsed: isCollapsed });
-    if (!isCollapsed) rows.push(...buildFolderTree(folderOf, collapsed, sortNotes, f.path, depth + 1));
-  }
-  for (const id of sortNotes(notesDirectlyIn(folderOf, current))) {
-    rows.push({ kind: "note", id, depth });
-  }
-  return rows;
-}
 
 /** Left-to-right tab position — drives the slide direction of the page
  *  transition: moving to a higher-indexed tab enters from the right, a
@@ -259,6 +231,22 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
   }, [view]);
 
   const { prefs } = usePrefs();
+
+  // Fold-on-load migration (MYND-562): mobile reads decorations by the folded
+  // folder identity, so a legacy display-cased entry (`Work/`) written by the
+  // old code must be re-keyed to `work/` or it goes invisible. Idempotent +
+  // self-healing (mirrors desktop's `useFolderManagement` effect); persists once
+  // when it actually re-keys. Covers the mobile-only user who has no desktop to
+  // migrate + sync folded keys.
+  useEffect(() => {
+    const { next, changed } = foldDecorationKeys(prefs.item_colors);
+    if (changed && HAS_TAURI) void setItemColors(next).then(bumpPrefsNonce).catch(bumpPrefsNonce);
+  }, [prefs.item_colors]);
+  useEffect(() => {
+    const { next, changed } = foldDecorationKeys(prefs.folder_icons);
+    if (changed && HAS_TAURI) void setFolderIcons(next).then(bumpPrefsNonce).catch(bumpPrefsNonce);
+  }, [prefs.folder_icons]);
+
   const [notes, setNotes] = useState<NoteEntry[]>([]);
   // Raw note bodies (id → text), kept so the Graph tab can compute the wikilink
   // graph without a second read — the list load already decrypts every note.
@@ -1197,11 +1185,12 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
   // ── Decoration: per-item color labels + per-folder icons (MYND-516) ───────
   // Whole-map prefs writes (the `set_item_colors` / `set_folder_icons` setters
   // take the full desired map). Assign = splice the one key; "None"/"Default" =
-  // delete it. Key discipline: item_colors is keyed by note UUID OR the folder's
-  // canonical trailing-slash path (`f.path`); folder_icons by that folder path
-  // only — byte-identical to the keys desktop writes, so a desktop-assigned
-  // decoration round-trips. bumpPrefsNonce after a successful write so `usePrefs`
-  // re-reads disk truth and the row re-renders — the favorites-writer chokepoint.
+  // delete it. Key discipline (MYND-562): item_colors is keyed by note UUID OR
+  // the folder's FOLDED identity (`folderKey`, applied at the decoration call
+  // sites); folder_icons by that folded key only — byte-identical to the keys
+  // desktop writes, so a desktop-assigned decoration round-trips across case-
+  // variants. bumpPrefsNonce after a successful write so `usePrefs` re-reads
+  // disk truth and the row re-renders — the favorites-writer chokepoint.
   function assignItemColor(key: string, slot: string | null) {
     const next = { ...prefs.item_colors };
     if (slot === null) delete next[key];
@@ -1240,6 +1229,13 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
       if (prefs.archived_folders.some((f) => f.startsWith(oldPath))) {
         await setArchivedFolders(reroot(prefs.archived_folders));
       }
+      // Decorations follow the folder (MYND-562): re-root item_colors +
+      // folder_icons by folded prefix, exactly as desktop does on rename —
+      // else the color/icon strands under the old folded key.
+      const colors = rewriteFolderPrefix(prefs.item_colors, oldPath, newPath);
+      if (colors.changed) await setItemColors(colors.next);
+      const icons = rewriteFolderPrefix(prefs.folder_icons, oldPath, newPath);
+      if (icons.changed) await setFolderIcons(icons.next);
       bumpPrefsNonce();
     }
     await refresh();
@@ -1524,13 +1520,24 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
         : folderOf;
     const titleOf = new Map(notes.map((n) => [n.id, n.title]));
     // Order note ids within one tree level: favourites first, then by sort mode.
+    // The default (non-A→Z) mode honors the user's manual `item_order` sequence
+    // (MYND-562 light parity with desktop), falling back to natural order for
+    // unlisted notes.
+    const noteRank = itemOrderRank(prefs.item_order);
     const sortIds = (ids: string[]): string[] => {
       const byTitle = (a: string, b: string) =>
         (titleOf.get(a) ?? "").localeCompare(titleOf.get(b) ?? "");
-      const base = sortMode === "az" ? [...ids].sort(byTitle) : sortMode === "za" ? [...ids].sort((a, b) => byTitle(b, a)) : ids;
+      const base =
+        sortMode === "az"
+          ? [...ids].sort(byTitle)
+          : sortMode === "za"
+            ? [...ids].sort((a, b) => byTitle(b, a))
+            : [...ids].sort((a, b) => noteRank(a) - noteRank(b));
       return [...base.filter((id) => favSet.has(id)), ...base.filter((id) => !favSet.has(id))];
     };
-    const treeRows = treeMode ? buildFolderTree(treeFolderOf, collapsedFolders, sortIds) : [];
+    // Tree emptiness (no notes in the tree map + no deliberate empty folder) is
+    // cheaper than materializing the whole flattened tree just to ask its length.
+    const treeEmpty = treeFolderOf.size === 0 && prefs.deliberate_folders.length === 0;
 
     const archiveDrillKey = archiveFolder !== null ? folderKey(archiveFolder) : "";
     const filtered =
@@ -1606,7 +1613,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
     // deep headers stuck in the wrong places.
     const renderTree = (current: string | null, depth: number): ReactNode[] => {
       const out: ReactNode[] = [];
-      for (const f of folderChildren(treeFolderOf, current)) {
+      for (const f of folderChildren(treeFolderOf, current, prefs.deliberate_folders, prefs.item_order)) {
         const isCollapsed = collapsedFolders.has(f.path);
         out.push(
           <div key={`f:${f.path}`}>
@@ -1617,8 +1624,10 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
                 count={f.count}
                 collapsed={isCollapsed}
                 indentPx={20 + depth * 18}
-                icon={prefs.folder_icons[f.path]}
-                color={prefs.item_colors[f.path]}
+                // Decorations key by the folded folder identity (MYND-562), not
+                // the display path — so they match desktop across case-variants.
+                icon={prefs.folder_icons[f.key]}
+                color={prefs.item_colors[f.key]}
                 onToggle={() => toggleFolder(f.path)}
                 onHold={() => setFolderActions({ path: f.path, name: f.name })}
               />
@@ -1848,7 +1857,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
               ) : (
                 <div style={{ flex: 1 }} />
               )
-            ) : (treeMode ? treeRows.length === 0 && !favStripVisible : orderedNotes.length === 0 && !archiveHasFolders && !inArchiveFolder) && !listError ? (
+            ) : (treeMode ? treeEmpty && !favStripVisible : orderedNotes.length === 0 && !archiveHasFolders && !inArchiveFolder) && !listError ? (
               <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "0 40px", textAlign: "center" }}>
                 <div style={{ fontSize: 18, fontWeight: 600, color: "var(--fg-1)" }}>
                   {listView === "trash" ? t("editor.list.trashEmpty") : listView === "archive" ? t("editor.list.archiveEmpty") : t("editor.list.noNotesYet")}
@@ -2229,28 +2238,31 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
           />
         )}
 
-        {/* Color-label + folder-icon picker (MYND-516). */}
-        {decoTarget && (
-          <DecorationSheet
-            color={
-              (decoTarget.kind === "note"
-                ? prefs.item_colors[decoTarget.id]
-                : prefs.item_colors[decoTarget.path]) ?? null
-            }
-            onSelectColor={(slot) =>
-              assignItemColor(decoTarget.kind === "note" ? decoTarget.id : decoTarget.path, slot)
-            }
-            icon={
-              decoTarget.kind === "folder"
-                ? {
-                    value: prefs.folder_icons[decoTarget.path] ?? null,
-                    onSelect: (name) => assignFolderIcon(decoTarget.path, name),
-                  }
-                : undefined
-            }
-            onClose={() => setDecoTarget(null)}
-          />
-        )}
+        {/* Color-label + folder-icon picker (MYND-516). The decoration key is the
+            folded folder identity (MYND-562) or the note UUID — resolved ONCE so a
+            consumer can't mis-key it. */}
+        {decoTarget &&
+          (() => {
+            const decoKey =
+              decoTarget.kind === "note"
+                ? decoTarget.id
+                : folderKey(decoTarget.path);
+            return (
+              <DecorationSheet
+                color={prefs.item_colors[decoKey] ?? null}
+                onSelectColor={(slot) => assignItemColor(decoKey, slot)}
+                icon={
+                  decoTarget.kind === "folder"
+                    ? {
+                        value: prefs.folder_icons[decoKey] ?? null,
+                        onSelect: (name) => assignFolderIcon(decoKey, name),
+                      }
+                    : undefined
+                }
+                onClose={() => setDecoTarget(null)}
+              />
+            );
+          })()}
 
         {/* New folder / New subfolder / Rename name prompt (MYND-473 / MYND-480). */}
         {folderPrompt && (

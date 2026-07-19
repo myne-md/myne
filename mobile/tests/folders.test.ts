@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { folderChildren, notesDirectlyIn, notesInSubtree } from "../src/lib/folders";
+import { folderChildren, itemOrderRank, notesDirectlyIn, notesInSubtree } from "../src/lib/folders";
 import { patchFolderField } from "../src/dialect/surgery";
 import { readNoteFolder } from "../src/lib/note-organize";
 
@@ -52,5 +52,58 @@ describe("folder tree", () => {
   it("subtree prefix match respects folder boundaries", () => {
     const fo = new Map<string, string | null>([["x", "A/"], ["y", "AB/"]]);
     expect(notesInSubtree(fo, "A/")).toEqual(["x"]); // "AB/" is not under "A/"
+  });
+});
+
+describe("folder tree — MYND-562 shared derivation", () => {
+  it("dedups case-variant folders to one canonical row with a folded key", () => {
+    // "personal" and "PERSONAL" are ONE folder identity — mobile must now agree
+    // with desktop (shared deriveFolderTree): a single row, lexicographic-min
+    // display, folded decoration key, both notes counted once.
+    const fo = new Map<string, string | null>([
+      ["1", "personal/"],
+      ["2", "PERSONAL/"],
+    ]);
+    const kids = folderChildren(fo, null);
+    expect(kids).toHaveLength(1);
+    expect(kids[0].path).toBe("PERSONAL/"); // lexicographic-min display
+    expect(kids[0].key).toBe("personal/"); // folded identity — the decoration key
+    expect(kids[0].count).toBe(2);
+  });
+
+  it("surfaces deliberate (empty) folders no note lives in", () => {
+    const fo = new Map<string, string | null>([["1", null]]); // only a root note
+    expect(folderChildren(fo, null)).toEqual([]); // invisible without the set…
+    const kids = folderChildren(fo, null, ["Ideas/"]); // …persists with it
+    expect(kids.map((k) => k.name)).toEqual(["Ideas"]);
+    expect(kids[0].key).toBe("ideas/");
+    expect(kids[0].count).toBe(0);
+  });
+});
+
+describe("item_order ranking — MYND-562 light parity", () => {
+  it("itemOrderRank folds folder entries and ranks notes by UUID", () => {
+    const rank = itemOrderRank(["PROJECTS/", "note-a"]); // display-cased folder entry
+    expect(rank("projects/")).toBe(0); // folded to identity
+    expect(rank("note-a")).toBe(1);
+    expect(rank("missing")).toBe(Number.MAX_SAFE_INTEGER); // unlisted → last
+  });
+
+  it("orders sibling folders by item_order; unlisted fall back to folded name", () => {
+    const fo = new Map<string, string | null>([
+      ["1", "Zebra/"],
+      ["2", "Apple/"],
+      ["3", "Mango/"],
+    ]);
+    // item_order (display-cased) lists Zebra then Apple; Mango is unlisted.
+    expect(
+      folderChildren(fo, null, [], ["Zebra/", "Apple/"]).map((k) => k.name),
+    ).toEqual(["Zebra", "Apple", "Mango"]);
+    // Without item_order: pure folded-name order.
+    expect(folderChildren(fo, null).map((k) => k.name)).toEqual([
+      "Apple",
+      "Mango",
+      "Zebra",
+    ]);
   });
 });
