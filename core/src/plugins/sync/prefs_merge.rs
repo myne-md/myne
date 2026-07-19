@@ -25,7 +25,7 @@ use std::collections::BTreeMap;
 use protocol::PrefsView;
 use serde::Serialize;
 
-use super::conflict::merge_set_union;
+use super::conflict::{merge_set_union, merge_set_union_folded};
 use super::prefs_classification::{PrefClass, SharedDiscipline, CLASSIFICATION};
 
 /// Read a field's LWW clock (absent = 0, §10.2).
@@ -107,24 +107,27 @@ fn tiebreak_key<T: Serialize>(value: &T) -> Vec<u8> {
     }
 }
 
-/// §10.2 per-key map merge for `device_names`: union of keys; a key present on
-/// both sides resolves LWW on its own `device_names/<key>` clock (equal clocks
-/// → byte-lexicographically greater name). Winning per-key clocks are recorded
-/// under their namespaced names.
-fn merge_device_names(
+/// §10.2 per-key map merge for a string→string map (`device_names`,
+/// `item_colors`, `folder_icons`): union of keys; a key present on both sides
+/// resolves LWW on its own `<field>/<key>` clock (equal clocks →
+/// byte-lexicographically greater value). Winning per-key clocks are recorded
+/// under their namespaced names. `local_map`/`remote_map` are passed explicitly
+/// (rather than re-read off the view) so the one helper serves every per-key
+/// field; `local`/`remote` are still needed to read the per-key clocks.
+fn merge_per_key_map(
+    field: &str,
     local: &PrefsView,
     remote: &PrefsView,
+    local_map: &BTreeMap<String, String>,
+    remote_map: &BTreeMap<String, String>,
     clocks: &mut BTreeMap<String, u64>,
 ) -> BTreeMap<String, String> {
     let mut out = BTreeMap::new();
-    let keys: std::collections::BTreeSet<&String> = local
-        .device_names
-        .keys()
-        .chain(remote.device_names.keys())
-        .collect();
+    let keys: std::collections::BTreeSet<&String> =
+        local_map.keys().chain(remote_map.keys()).collect();
     for key in keys {
-        let clock_key = format!("device_names/{key}");
-        match (local.device_names.get(key), remote.device_names.get(key)) {
+        let clock_key = format!("{field}/{key}");
+        match (local_map.get(key), remote_map.get(key)) {
             (Some(l), Some(r)) => {
                 let merged = lww_field(
                     &clock_key,
@@ -138,7 +141,7 @@ fn merge_device_names(
             }
             // Single-sided key: carried over verbatim with its clock (if any).
             (Some(v), None) | (None, Some(v)) => {
-                let side = if local.device_names.contains_key(key) {
+                let side = if local_map.contains_key(key) {
                     local
                 } else {
                     remote
@@ -236,8 +239,30 @@ pub fn merge_prefs(local: &PrefsView, remote: &PrefsView) -> PrefsView {
             )
         };
     }
+    // Sibling macro for per-key map fields — one `$field` drives both the clock
+    // namespace and the accessed map, so a name/map mismatch can't be typed
+    // (the `lww!` footgun-guard, extended to `device_names` + the MYND-562
+    // decoration maps).
+    macro_rules! per_key {
+        ($name:literal, $field:ident) => {
+            merge_per_key_map(
+                $name,
+                local,
+                remote,
+                &local.$field,
+                &remote.$field,
+                &mut clocks,
+            )
+        };
+    }
 
-    let device_names = merge_device_names(local, remote, &mut clocks);
+    // Folder decorations are per-key map merges too (MYND-562): concurrent edits
+    // to DIFFERENT folder keys both survive (whole-map LWW dropped one). Keys are
+    // the folded folder identity (`folderKey`) + note UUIDs; note colors gain the
+    // same per-key protection for free.
+    let device_names = per_key!("device_names", device_names);
+    let folder_icons = per_key!("folder_icons", folder_icons);
+    let item_colors = per_key!("item_colors", item_colors);
 
     // The struct literal lists EVERY PrefsView field with no `..` — the same
     // compile-time drift lock as the classification conformance test: a new
@@ -254,23 +279,26 @@ pub fn merge_prefs(local: &PrefsView, remote: &PrefsView) -> PrefsView {
         new_note_location: lww!("new_note_location", new_note_location),
         new_note_location_folder: lww!("new_note_location_folder", new_note_location_folder),
         // ---- shared: set-union (clockless; the shared conflict.rs primitive) --
-        ai_excluded_folders: merge_set_union(
+        // Folder-path sets fold case-insensitively so `personal/` ≡ `PERSONAL/`
+        // never coexist (MYND-562); `spell_languages` (language codes) stays
+        // case-sensitive on the plain union.
+        ai_excluded_folders: merge_set_union_folded(
             &local.ai_excluded_folders,
             &remote.ai_excluded_folders,
         ),
-        archived_folders: merge_set_union(&local.archived_folders, &remote.archived_folders),
-        deliberate_folders: merge_set_union(&local.deliberate_folders, &remote.deliberate_folders),
+        archived_folders: merge_set_union_folded(&local.archived_folders, &remote.archived_folders),
+        deliberate_folders: merge_set_union_folded(
+            &local.deliberate_folders,
+            &remote.deliberate_folders,
+        ),
         spell_languages: merge_set_union(&local.spell_languages, &remote.spell_languages),
         // ---- shared: sequence-LWW-on-whole -------------------------------
         favorites: lww!("favorites", favorites),
         item_order: lww!("item_order", item_order),
         view_order: lww!("view_order", view_order),
         // ---- shared: whole-value LWW -------------------------------------
-        // (folder_icons / item_colors are BTreeMaps, whose serde encoding IS
-        // the canonical sorted-key form; saved_views needs the codec's
-        // canonical encoder — serde would emit struct-declaration key order.)
-        folder_icons: lww!("folder_icons", folder_icons),
-        item_colors: lww!("item_colors", item_colors),
+        // (saved_views needs the codec's canonical encoder — serde would emit
+        // struct-declaration key order.)
         saved_views: lww_field_keyed(
             "saved_views",
             &local.saved_views,
@@ -280,8 +308,11 @@ pub fn merge_prefs(local: &PrefsView, remote: &PrefsView) -> PrefsView {
             &mut clocks,
             |v| protocol::canonical_encode_saved_views(v),
         ),
-        // ---- shared: per-key map merge ------------------------------------
+        // ---- shared: per-key map merge (MYND-478 device_names; MYND-562
+        // folder decorations) — computed above so each borrows `clocks` once.
         device_names,
+        folder_icons,
+        item_colors,
         // ---- device-local: local wins, always -----------------------------
         active_workspace: local.active_workspace.clone(),
         ai_enabled: local.ai_enabled,
@@ -458,6 +489,39 @@ mod tests {
     }
 
     #[test]
+    fn folder_path_sets_fold_case_variants() {
+        // MYND-562: a folder present as "personal/" on one device and
+        // "PERSONAL/" on the other collapses to one canonical entry through the
+        // merge (lexicographic-min survives).
+        let a = PrefsView {
+            deliberate_folders: vec!["personal/".into()],
+            ..PrefsView::default()
+        };
+        let b = PrefsView {
+            deliberate_folders: vec!["PERSONAL/".into()],
+            ..PrefsView::default()
+        };
+        assert_eq!(
+            merge_prefs(&a, &b).deliberate_folders,
+            vec!["PERSONAL/".to_string()]
+        );
+
+        // `spell_languages` is NOT a folder set — case is significant, both survive.
+        let a2 = PrefsView {
+            spell_languages: vec!["en".into()],
+            ..PrefsView::default()
+        };
+        let b2 = PrefsView {
+            spell_languages: vec!["EN".into()],
+            ..PrefsView::default()
+        };
+        assert_eq!(
+            merge_prefs(&a2, &b2).spell_languages,
+            vec!["EN".to_string(), "en".to_string()]
+        );
+    }
+
+    #[test]
     fn sequence_lww_replaces_whole_list() {
         let mut a = PrefsView {
             item_order: vec!["n1".into(), "n2".into()],
@@ -517,6 +581,42 @@ mod tests {
             assert_eq!(merged.device_names.get("bb22").unwrap(), "Phone");
             assert_eq!(merged.device_names.get("cc33").unwrap(), "New Name");
             assert_eq!(merged.field_clocks.get("device_names/cc33"), Some(&60));
+        }
+    }
+
+    #[test]
+    fn decoration_maps_merge_per_key() {
+        // MYND-562: `item_colors` / `folder_icons` are per-key map merges, not
+        // whole-map LWW. Concurrent edits to DIFFERENT folder keys must both
+        // survive (the lost-update the whole-map LWW dropped); the SAME key
+        // resolves LWW on its own `<field>/<key>` clock; note-UUID color keys
+        // ride the same path.
+        let mut a = PrefsView::default();
+        a.item_colors.insert("work/".into(), "#red".into());
+        a.item_colors.insert("uuid-note".into(), "#a1a1a1".into());
+        a.folder_icons.insert("work/".into(), "briefcase".into());
+        stamped(&mut a, "item_colors/work/", 100);
+        stamped(&mut a, "item_colors/uuid-note", 100);
+        stamped(&mut a, "folder_icons/work/", 100);
+
+        let mut b = PrefsView::default();
+        b.item_colors.insert("personal/".into(), "#blue".into()); // different folder
+        b.item_colors.insert("work/".into(), "#green".into()); // same folder, newer clock
+        b.folder_icons.insert("personal/".into(), "leaf".into());
+        stamped(&mut b, "item_colors/personal/", 200);
+        stamped(&mut b, "item_colors/work/", 300);
+        stamped(&mut b, "folder_icons/personal/", 200);
+
+        for merged in [merge_prefs(&a, &b), merge_prefs(&b, &a)] {
+            // Same key: newer clock (300 > 100) wins.
+            assert_eq!(merged.item_colors.get("work/").unwrap(), "#green");
+            // Different folders: BOTH survive (whole-map LWW would drop one).
+            assert_eq!(merged.item_colors.get("personal/").unwrap(), "#blue");
+            // Note-UUID color survives on its own key.
+            assert_eq!(merged.item_colors.get("uuid-note").unwrap(), "#a1a1a1");
+            assert_eq!(merged.folder_icons.get("work/").unwrap(), "briefcase");
+            assert_eq!(merged.folder_icons.get("personal/").unwrap(), "leaf");
+            assert_eq!(merged.field_clocks.get("item_colors/work/"), Some(&300));
         }
     }
 

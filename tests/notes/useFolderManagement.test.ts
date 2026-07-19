@@ -194,7 +194,9 @@ describe("prefs sync", () => {
     expect(result.current.itemOrder).toEqual(["n1", "Drafts/"]);
     expect(result.current.favorites).toEqual(["n1"]);
     expect(result.current.itemColors).toEqual({ n1: "rose" });
-    expect(result.current.folderIcons).toEqual({ "Drafts/": "star" });
+    // Fold-on-load (MYND-562): the display-cased folder key migrates to its
+    // folded identity; the note-UUID color key passes through unchanged.
+    expect(result.current.folderIcons).toEqual({ "drafts/": "star" });
   });
 });
 
@@ -355,16 +357,19 @@ describe("rename folder", () => {
       nextDeliberate: [],
       invalid: false,
     });
-    prefs.item_colors = { "Work/": "rose" };
-    prefs.folder_icons = { "Work/": "star" };
+    // Already-folded inputs (MYND-562) so hydrate does not itself persist —
+    // the only persist under test is the rename re-root.
+    prefs.item_colors = { "work/": "rose" };
+    prefs.folder_icons = { "work/": "star" };
     const { result } = mount([rec("n1", "Work/")]);
     const node = findNode(result.current.treeRef.current.roots, "work/")!;
     await act(async () => {
       await result.current.commitRenameFolder(node, "Workspace");
     });
-    // The folder's color + icon are re-keyed onto Workspace/ and persisted.
-    expect(setItemColors).toHaveBeenCalledWith({ "Workspace/": "rose" });
-    expect(setFolderIcons).toHaveBeenCalledWith({ "Workspace/": "star" });
+    // The folder's color + icon are re-keyed onto the folded workspace/ and
+    // persisted (decorations key by folded identity, never the display path).
+    expect(setItemColors).toHaveBeenCalledWith({ "workspace/": "rose" });
+    expect(setFolderIcons).toHaveBeenCalledWith({ "workspace/": "star" });
   });
 
   it("does NOT re-root decorations when the rename was invalid", async () => {
@@ -375,7 +380,9 @@ describe("rename folder", () => {
       nextDeliberate: [],
       invalid: true,
     });
-    prefs.item_colors = { "Work/": "rose" };
+    // Already-folded input so fold-on-load is a no-op — the assertion then
+    // cleanly proves the INVALID rename path never persists.
+    prefs.item_colors = { "work/": "rose" };
     const { result } = mount([rec("n1", "Work/")]);
     const node = findNode(result.current.treeRef.current.roots, "work/")!;
     await act(async () => {
