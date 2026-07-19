@@ -2087,8 +2087,11 @@ function PopulatedList({
           setDecoPopover({
             x: menuPos.x,
             y: menuPos.y,
-            key: node.path,
-            folderPath: node.path,
+            // Decorations key by the folded folder identity (MYND-562), not the
+            // volatile display path — so a color follows the folder across
+            // case-variant / display-flip and matches every client.
+            key: node.key,
+            folderPath: node.key,
           }),
       },
       // Archive the folder as a unit (folder-archive) — hidden when the archive
@@ -2350,8 +2353,8 @@ function PopulatedList({
                     }
                     onToggle={onToggleFolder}
                     onContextMenu={fm.openMenu}
-                    colorSlot={fm.itemColors[row.node.path]}
-                    iconName={fm.folderIcons[row.node.path]}
+                    colorSlot={fm.itemColors[row.node.key]}
+                    iconName={fm.folderIcons[row.node.key]}
                     onDragTarget={fm.setDropTargetKey}
                     onDropNote={(folderPath) =>
                       void fm.onFolderDropNote(folderPath)
