@@ -39,6 +39,9 @@ import {
   type CleanResult,
 } from "../../lib/attachments";
 import { attachmentUrl } from "../../notes/attachmentRef";
+import { startTranscription } from "../../lib/transcribe";
+import { usePrefs } from "../../hooks/usePrefs";
+import { showAttachmentToast } from "../../editor/attachments/toast";
 import { AttachmentSyncProgress } from "./AttachmentSyncProgress";
 import { referencingNotes } from "../../notes/attachmentRefs";
 import { useSelectedNote, type NoteId } from "../../notes/sidebarState";
@@ -236,6 +239,12 @@ const CLEAN_NOTICE_STYLE: CSSProperties = {
 export function AttachmentsLibrary({ onClose }: AttachmentsLibraryProps) {
   const { t } = useTranslation();
   const ctx = useSelectedNote();
+  // AI opt-in gate for the per-item Transcribe action (voice-to-text MYND-552,
+  // SYNC-V9). Gated on `ai_enabled` ALONE — a library attachment has no single
+  // folder, so the `ai_excluded_folders` gate does NOT apply (transcribing the
+  // media bytes is an explicit per-attachment user action, not ambient reading).
+  const { prefs } = usePrefs();
+  const aiEnabled = prefs.ai_enabled;
   // Resolve the option labels at render time (reactive to language switch).
   const typeFilterOptions: readonly SelectOption<TypeFilter>[] = useMemo(
     () => TYPE_FILTER_OPTION_KEYS.map((o) => ({ value: o.value, label: t(o.labelKey) })),
@@ -365,6 +374,31 @@ export function AttachmentsLibrary({ onClose }: AttachmentsLibraryProps) {
     void exportAttachment(entry.id, entry.filename);
   }, []);
 
+  // Transcribe (voice-to-text MYND-552, SYNC-V9) — routes through the SAME
+  // shared helper the in-note widget uses (no divergent call path). Fire-and-
+  // forget with transient feedback: the transcript lands in the searchable MYE1
+  // cache backend-side; the library has no editor to insert into. A no-model
+  // rejection points at the model picker (mirrors the widget's hint).
+  const handleTranscribe = useCallback(
+    (entry: CatalogEntry) => {
+      showAttachmentToast(t("attachments.library.transcribeStarted"));
+      const run = startTranscription(entry.id);
+      run.done
+        .then(() => showAttachmentToast(t("attachments.library.transcribeDone")))
+        .catch((err: unknown) => {
+          const notReady =
+            err !== null && typeof err === "object" && "kind" in err &&
+            (err as { kind: unknown }).kind === "not_ready";
+          showAttachmentToast(
+            notReady
+              ? t("attachments.library.transcribeNoModel")
+              : t("attachments.library.transcribeFailed"),
+          );
+        });
+    },
+    [t],
+  );
+
   const handleRenameCommit = useCallback(
     async (id: string, filename: string) => {
       const trimmed = filename.trim();
@@ -465,6 +499,10 @@ export function AttachmentsLibrary({ onClose }: AttachmentsLibraryProps) {
     onExport: () => handleExport(entry),
     onDelete: () => void openDeleteDialog(entry),
     onJump: handleJump,
+    // Transcribe is an audio-only, `ai_enabled`-gated action (SYNC-V9).
+    transcribable: kindOf(entry.content_type) === "audio",
+    aiEnabled,
+    onTranscribe: () => handleTranscribe(entry),
     // Only image/PDF open the shared lightbox preview. Audio plays inline in
     // its own tile (its own play button), and a generic ("other") file has no
     // inline preview — same fallback as the editor file-card; Preview hidden.
@@ -719,6 +757,12 @@ interface ItemActionProps {
   /** Whether this attachment can be previewed inline (image/PDF). A generic
    *  (octet-stream) file cannot — the ⋮ menu omits Preview for it (MYND-173). */
   previewable: boolean;
+  /** Whether this attachment is audio → the ⋮ menu shows Transcribe (MYND-552). */
+  transcribable: boolean;
+  /** Whether AI is enabled (SYNC-V9 gate for Transcribe — `ai_enabled` alone). */
+  aiEnabled: boolean;
+  /** Start transcribing this attachment (audio only). */
+  onTranscribe: () => void;
   /** Whether THIS row's ⋮ action menu is the one open (single-open). */
   actionMenuOpen: boolean;
   /** Toggle this row's ⋮ action menu (closing any other). */
@@ -882,6 +926,9 @@ interface ItemMenuEntry {
   id: string;
   label: string;
   destructive?: boolean;
+  /** Disabled-not-hidden (MYND-552 Transcribe when AI is off): the row shows its
+   *  real label, muted + non-activating. */
+  disabled?: boolean;
   onSelect: () => void;
 }
 
@@ -968,18 +1015,27 @@ function AttachmentActionMenu({
           key={item.id}
           type="button"
           role="menuitem"
+          disabled={item.disabled}
+          aria-disabled={item.disabled}
           data-testid={`attachments.action-${item.id}`}
           style={{
             ...MENU_ITEM_STYLE,
-            color: item.destructive ? "var(--danger)" : "var(--fg-1)",
+            color: item.disabled
+              ? "var(--fg-3)"
+              : item.destructive
+                ? "var(--danger)"
+                : "var(--fg-1)",
+            cursor: item.disabled ? "default" : "pointer",
+            opacity: item.disabled ? 0.6 : 1,
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.background = "var(--paper-2)";
+            if (!item.disabled) e.currentTarget.style.background = "var(--paper-2)";
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.background = "transparent";
           }}
           onClick={() => {
+            if (item.disabled) return;
             item.onSelect();
             onClose();
           }}
@@ -1022,6 +1078,9 @@ function ItemMenu({
   onExport,
   onStartRename,
   onDelete,
+  transcribable,
+  aiEnabled,
+  onTranscribe,
 }: {
   open: boolean;
   onToggle: () => void;
@@ -1031,6 +1090,9 @@ function ItemMenu({
   onExport: () => void;
   onStartRename: () => void;
   onDelete: () => void;
+  transcribable: boolean;
+  aiEnabled: boolean;
+  onTranscribe: () => void;
 }) {
   const { t } = useTranslation();
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -1041,6 +1103,18 @@ function ItemMenu({
             id: "preview",
             label: t("attachments.library.menuPreview"),
             onSelect: onPreview,
+          },
+        ]
+      : []),
+    // Transcribe — audio only (SYNC-V9), gated on `ai_enabled` ALONE
+    // (disabled-not-hidden when AI is off; no folder-exclusion gate).
+    ...(transcribable
+      ? [
+          {
+            id: "transcribe",
+            label: t("attachments.library.menuTranscribe"),
+            disabled: !aiEnabled,
+            onSelect: onTranscribe,
           },
         ]
       : []),
@@ -1212,6 +1286,9 @@ function AttachmentTile({
   onDelete,
   onJump,
   previewable,
+  transcribable,
+  aiEnabled,
+  onTranscribe,
   actionMenuOpen,
   onToggleActionMenu,
   onCloseActionMenu,
@@ -1263,6 +1340,9 @@ function AttachmentTile({
             onExport={onExport}
             onStartRename={onStartRename}
             onDelete={onDelete}
+            transcribable={transcribable}
+            aiEnabled={aiEnabled}
+            onTranscribe={onTranscribe}
           />
         </div>
       </div>
@@ -1323,6 +1403,9 @@ function AttachmentListRow({
   onDelete,
   onJump,
   previewable,
+  transcribable,
+  aiEnabled,
+  onTranscribe,
   actionMenuOpen,
   onToggleActionMenu,
   onCloseActionMenu,
@@ -1380,6 +1463,9 @@ function AttachmentListRow({
           onExport={onExport}
           onStartRename={onStartRename}
           onDelete={onDelete}
+          transcribable={transcribable}
+          aiEnabled={aiEnabled}
+          onTranscribe={onTranscribe}
         />
       </div>
     </div>

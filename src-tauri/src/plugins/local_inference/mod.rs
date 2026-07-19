@@ -17,6 +17,7 @@
 //! Logging: DENY-list clean (`src-tauri/CLAUDE.md`) — the engine seam never
 //! logs a prompt, note body, or embedding.
 
+pub mod audio;
 pub mod cancel;
 pub mod chunker;
 pub mod commands;
@@ -62,7 +63,7 @@ const LOCAL_INFERENCE_CAPABILITY: &str = r#"{
   "identifier": "local-inference",
   "description": "On-device AI inference + retrieval + grounded Q&A commands (infer/embed/semantic_search/ask) for the main window; no core/fs/dialog/clipboard/network.",
   "windows": ["main"],
-  "permissions": ["local-inference:allow-infer", "local-inference:allow-embed", "local-inference:allow-semantic-search", "local-inference:allow-ask", "local-inference:allow-chat-stream", "local-inference:allow-chat-stop", "local-inference:allow-set-model-path", "local-inference:allow-get-model-path"]
+  "permissions": ["local-inference:allow-infer", "local-inference:allow-embed", "local-inference:allow-semantic-search", "local-inference:allow-ask", "local-inference:allow-chat-stream", "local-inference:allow-chat-stop", "local-inference:allow-transcribe", "local-inference:allow-read-transcript", "local-inference:allow-set-model-path", "local-inference:allow-get-model-path"]
 }"#;
 
 /// Best-effort zeroize + reset of the in-RAM AI vector store on lock teardown
@@ -102,6 +103,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::ask,
             commands::chat_stream,
             commands::chat_stop,
+            commands::transcribe,
+            commands::read_transcript,
             commands::set_model_path,
             commands::get_model_path
         ])

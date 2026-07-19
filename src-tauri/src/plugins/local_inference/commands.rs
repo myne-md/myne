@@ -22,6 +22,7 @@
 //! discipline (TB9 Cargo.lock), mirroring `notes::…_with_dir`.
 
 use std::collections::HashMap;
+use std::path::Path;
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
@@ -29,6 +30,7 @@ use tauri::ipc::Channel;
 use tauri::{AppHandle, Runtime, State};
 use zeroize::Zeroizing;
 
+use myne_core::plugins::attachments::extract_types::{ExtractStatus, SourceFormat};
 use myne_core::plugins::notes::commands::note_read_with_dir;
 use myne_core::plugins::notes::note_id::NoteId;
 
@@ -40,6 +42,7 @@ use super::rag;
 use super::retrieval::{self, ScoredChunk};
 use super::state::LocalInferenceState;
 use super::vector_store::LocalInferenceVectorState;
+use crate::plugins::attachments::scheme_core::{decode_attachment_plaintext, ServeKeys};
 use crate::plugins::vault_unlock::state::VaultRuntimeState;
 
 /// DENY-list-safe static label for structured logging (mirrors
@@ -74,6 +77,216 @@ pub async fn embed(
     state: State<'_, LocalInferenceState>,
 ) -> Result<Vec<f32>, EngineError> {
     embed_with_engine(state.engine(), text).await
+}
+
+/// Transcribe an audio attachment to text (voice-to-text, MYND-550; SYNC-V3/V5/V6).
+///
+/// Decrypts the `MYA1` blob in RAM (the `attachment://` serve seam's
+/// [`decode_attachment_plaintext`]), decodes WAV → 16 kHz mono
+/// ([`super::audio::wav_to_mono_16k`]), then runs the ASR engine under
+/// `spawn_blocking`, streaming each newly-decoded segment over `on_segment` and
+/// returning the full transcript. Host-side `ai_enabled`-gated (a compromised
+/// WebView is not trusted to stop calling — mirror [`semantic_search`]).
+///
+/// DENY-list logging only: the decrypted WAV, the derived PCM, and the transcript
+/// are `Zeroizing`-wrapped and NEVER written to disk or logged. Cancellation
+/// (UI "Stop" or vault-lock teardown) flows through the shared [`CancelToken`]'s
+/// publish-guard, so no segment is emitted into a torn-down channel after a lock.
+#[tauri::command]
+pub async fn transcribe<R: Runtime>(
+    attachment_id: String,
+    on_segment: Channel<String>,
+    app: AppHandle<R>,
+    engine_state: State<'_, LocalInferenceState>,
+    vector_state: State<'_, LocalInferenceVectorState>,
+    vault_state: State<'_, VaultRuntimeState>,
+    cancel: State<'_, CancelToken>,
+) -> Result<String, EngineError> {
+    // Host-side `ai_enabled` gate — no engine call and no decrypt when AI is off.
+    if !vector_state.lock().is_enabled() {
+        return Err(EngineError::NotReady);
+    }
+    // Fresh cancel window (a prior Stop must not abort this run).
+    cancel.reset();
+
+    // Resolve the unlocked slot's key material + the active vault dir. This is
+    // the only place with `.await` access to the slot map (mirror the
+    // `attachment://` serve path).
+    let keys = match vault_state.peek_unlocked_attachment_material().await {
+        Some((items_key, items_key_id, root_key)) => ServeKeys {
+            items_key,
+            items_key_id,
+            root_key,
+        },
+        None => return Err(EngineError::NotReady),
+    };
+    let active_id = vault_state.active_vault_id().await;
+    let vault_dir = crate::paths::active_vault_root_io(&app, active_id)
+        .map_err(|_| EngineError::TranscriptionFailed)?;
+
+    let engine = engine_state.engine();
+    let cancel_token: CancelToken = (*cancel).clone();
+    // Kept for the out-of-band search refresh below (the closure consumes the id).
+    let attachment_id_hex = attachment_id.clone();
+    let app_for_cache = app.clone();
+
+    // Heavy work off the async thread: decrypt → decode → resample → engine →
+    // persist the transcript to the attachment's MYE1 cache.
+    let transcript = tokio::task::spawn_blocking(move || -> Result<String, EngineError> {
+        // Decrypt the MYA1 blob to WAV bytes in RAM (Zeroizing; wiped on drop).
+        let wav = decode_attachment_plaintext(&vault_dir, &keys, &attachment_id)
+            .map_err(|_| EngineError::TranscriptionFailed)?;
+        // Decode + resample to 16 kHz mono; wrap the derived PCM too.
+        let pcm = Zeroizing::new(
+            super::audio::wav_to_mono_16k(&wav).map_err(|_| EngineError::TranscriptionFailed)?,
+        );
+        drop(wav);
+        // Stream each decoded segment through the cancel publish-guard into the
+        // IPC channel; the transcript text is never logged.
+        let mut on = guarded_on_token(&cancel_token, |seg: &str| {
+            let _ = on_segment.send(seg.to_string());
+        });
+        let transcript = engine.transcribe_streaming(&pcm, &mut on)?;
+        // Task 2/3 (SYNC-V1/V6): seal the transcript into the attachment's MYE1
+        // cache so it is searchable + re-insertable without re-transcribing. The
+        // transcription model's SHA-256 (SYNC-V3) binds the cache-invalidation
+        // identity into the INNER payload (never the AAD, § 9.17.2 mirror).
+        // Best-effort — a cache-write miss must not discard the transcript the
+        // user already has; the transcript is never logged (DENY-list).
+        persist_transcript_cache(
+            &vault_dir,
+            &keys.root_key,
+            &attachment_id,
+            &transcript,
+            &app_for_cache,
+        );
+        Ok(transcript)
+    })
+    .await
+    .map_err(|_| EngineError::TranscriptionFailed)??;
+
+    // Task 4: the MYE1 write is out-of-band (the note's `content_nonce` is
+    // unchanged → the incremental reconcile would skip the note), so live-refresh
+    // the embedding notes' `att:` search docs now — the transcript is findable
+    // IN-SESSION, not only after a lock→unlock. Best-effort; never fails here.
+    crate::plugins::notes::search_sync::refresh_attachment_docs_for(
+        &app,
+        &vault_state,
+        &attachment_id_hex,
+    )
+    .await;
+
+    Ok(transcript)
+}
+
+/// Read `vault.meta`'s `account_number_hash` (the AAD binding for the
+/// attachment-text cache; § 9.3 offset 6). `None` on IO / parse failure. The
+/// bytes are a vault-stable correlation tag — used, never logged (DENY-list).
+fn read_account_number_hash(
+    vault_dir: &Path,
+) -> Option<[u8; protocol::VAULT_META_ACCOUNT_HASH_LEN]> {
+    let bytes = std::fs::read(vault_dir.join("vault.meta")).ok()?;
+    protocol::parse_vault_meta(&bytes)
+        .map(|m| m.account_number_hash)
+        .ok()
+}
+
+/// Seal a produced transcript into the attachment's `MYE1` cache (voice-to-text
+/// MYND-551, Task 2/3). Resolves the account-hash AAD binding, derives the
+/// `AttachmentTextKey` KEK from the unlocked-slot `root_key`, binds the current
+/// transcription model's SHA-256 into the inner payload (SYNC-V3), and writes via
+/// `myne_core` `text_cache::write_transcript`. Sync (runs inside
+/// `spawn_blocking`); best-effort — every miss (bad id, missing meta, IO) is
+/// swallowed. DENY-list: no transcript / hash / path is logged.
+fn persist_transcript_cache<R: Runtime>(
+    vault_dir: &Path,
+    root_key: &[u8; 32],
+    attachment_id_hex: &str,
+    transcript: &str,
+    app: &AppHandle<R>,
+) {
+    let Some(attachment_id) =
+        myne_core::plugins::attachments::commands::hex_decode_id(attachment_id_hex)
+    else {
+        return;
+    };
+    let Some(account_number_hash) = read_account_number_hash(vault_dir) else {
+        return;
+    };
+    let model_hash = super::model_store::transcription_model_hash_for(app);
+    let attachment_text_key =
+        protocol::derive_subkey(root_key, protocol::SubkeyRole::AttachmentTextKey);
+    let _ = myne_core::plugins::attachments::text_cache::write_transcript(
+        vault_dir,
+        &attachment_text_key,
+        &account_number_hash,
+        &attachment_id,
+        transcript,
+        model_hash,
+    );
+}
+
+/// Read an already-transcribed attachment's cached transcript from its `MYE1`
+/// cache (voice-to-text MYND-551, Task 5 — SYNC-V1) so the UI can show / re-insert
+/// it WITHOUT re-running the engine. `Slot::Unlocked`-gated; returns the
+/// transcript text, or `None` when no `Ok` audio transcript is cached (never
+/// transcribed / silence / decode miss). No engine call and no `ai_enabled`
+/// gate — this reads already-produced, already-searchable extracted text.
+///
+/// The backend NEVER writes the transcript into a note body; insertion is the
+/// frontend's explicit `note_save`/`MY01` action (SYNC-17). DENY-list: the
+/// transcript is plaintext (same class as a note body); returned to the WebView,
+/// never logged.
+#[tauri::command]
+pub async fn read_transcript<R: Runtime>(
+    attachment_id: String,
+    app: AppHandle<R>,
+    vault_state: State<'_, VaultRuntimeState>,
+) -> Result<Option<String>, EngineError> {
+    let Some(root_key) = vault_state.peek_unlocked_root_key_clone().await else {
+        return Err(EngineError::NotReady);
+    };
+    let active_id = vault_state.active_vault_id().await;
+    let vault_dir = crate::paths::active_vault_root_io(&app, active_id)
+        .map_err(|_| EngineError::TranscriptionFailed)?;
+    // Decrypt + decode the cache off the async thread (the KEK moves into the
+    // closure and drops on exit).
+    let transcript = tokio::task::spawn_blocking(move || -> Option<String> {
+        read_cached_transcript(&vault_dir, &root_key, &attachment_id)
+    })
+    .await
+    .map_err(|_| EngineError::TranscriptionFailed)?;
+    Ok(transcript)
+}
+
+/// Read + decode the cached `Ok` AUDIO transcript for `attachment_id_hex`, or
+/// `None` on any miss (bad id, missing meta, decode fail, or a non-audio /
+/// non-`Ok` cache entry). Sync (runs in `spawn_blocking`); the transcript is
+/// plaintext — never logged.
+fn read_cached_transcript(
+    vault_dir: &Path,
+    root_key: &[u8; 32],
+    attachment_id_hex: &str,
+) -> Option<String> {
+    let attachment_id =
+        myne_core::plugins::attachments::commands::hex_decode_id(attachment_id_hex)?;
+    let account_number_hash = read_account_number_hash(vault_dir)?;
+    let attachment_text_key =
+        protocol::derive_subkey(root_key, protocol::SubkeyRole::AttachmentTextKey);
+    let extracted = myne_core::plugins::attachments::text_cache::read_extracted(
+        vault_dir,
+        &attachment_text_key,
+        &account_number_hash,
+        &attachment_id,
+    )?;
+    if extracted.status == ExtractStatus::Ok
+        && extracted.source_format == SourceFormat::Audio
+        && !extracted.text.is_empty()
+    {
+        Some(extracted.text)
+    } else {
+        None
+    }
 }
 
 /// One ranked semantic-search hit crossing IPC (semantic-search-qa task 7). The
