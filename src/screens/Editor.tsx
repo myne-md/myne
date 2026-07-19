@@ -49,7 +49,6 @@ import { catalogDefaults } from "../commands/bindableCatalog";
 import { asViewMode, type ViewMode } from "../editor/view-mode";
 import { focusKindOf } from "../commands/scope";
 import { FailClosedError } from "../components/FailClosedError";
-import { SyncStatusIndicator } from "../components/sync/SyncStatusIndicator";
 import { SyncBanners } from "../components/sync/SyncBanners";
 import { Icon } from "../components/primitives/Icon";
 import { SettingsModal } from "../components/SettingsModal";
@@ -234,7 +233,6 @@ const COALESCED_FLUSH_POLL_MS = 30_000;
  * closed, non-secret UI vocabulary persisted in `vault.prefs.hidden_bar_items`.
  */
 const BAR_ITEMS: ReadonlyArray<{ id: string; labelKey: string }> = [
-  { id: "sync-status", labelKey: "editor.chrome.barItems.syncStatus" },
   { id: "save-status", labelKey: "editor.chrome.barItems.saveStatus" },
   { id: "view-mode", labelKey: "editor.chrome.barItems.viewMode" },
   { id: "workspace", labelKey: "editor.chrome.barItems.workspace" },
@@ -3742,7 +3740,6 @@ function BottomBar({
         padding: "0 12px",
       }}
     >
-      {!isHidden("sync-status") && <SyncStatusIndicator />}
       <div style={{ flex: 1 }} />
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
         {/* Preview-companion toggle is pinned (contextual, not a BAR_ITEMS id):
