@@ -465,17 +465,16 @@ export class AttachmentAudioWidget extends WidgetType {
       { label: i18n.t("editor.attachment.widget.menu.reveal"), testid: "attachment-audio.reveal", run: () => revealFileCard(view, this.id) },
     ];
     // "Transcribe" (SYNC-V7) — only when the host backs speech-to-text (desktop;
-    // mobile leaves the slot unset → row omitted). Disabled-not-hidden when AI is
-    // off or the note's folder is excluded (both folded into the AI facet by the
-    // host); enabled otherwise. When AI is on but no model is ready the run
-    // surfaces a "select a model" hint (handled inside the transcript section).
-    if (getHost().transcribe !== undefined) {
-      const aiEnabled = view.state.facet(aiSlashEnabledFacet);
+    // mobile leaves the slot unset → row omitted) AND local AI is on. When AI is
+    // off — or the note's folder is AI-excluded (both folded into the AI facet by
+    // the host) — the row is HIDDEN, not shown-disabled (MYND-270 product tweak:
+    // no dangling affordance when the whole subsystem is off). When AI is on but
+    // no model is ready the run surfaces a "select a model" hint (inside the
+    // transcript section).
+    if (getHost().transcribe !== undefined && view.state.facet(aiSlashEnabledFacet)) {
       actions.push({
         label: i18n.t("editor.attachment.widget.menu.transcribe"),
         testid: "attachment-audio.transcribe",
-        disabled: !aiEnabled,
-        disabledReason: i18n.t("editor.attachment.widget.transcribe.disabledReason"),
         run: () => transcript.start(),
       });
     }

@@ -2,8 +2,8 @@
 //
 // Attachments Library Transcribe entry (voice-to-text MYND-552 task 5, SYNC-V9).
 // Pins the library carve-out: the per-item ⋮ menu shows a Transcribe item for
-// AUDIO attachments only, gated on `ai_enabled` ALONE (disabled-not-hidden when
-// off — NO folder-exclusion gate), and selecting it (AI on) routes through the
+// AUDIO attachments only, gated on `ai_enabled` ALONE (HIDDEN when off — NO
+// folder-exclusion gate), and selecting it (AI on) routes through the
 // SAME shared `startTranscription` helper the in-note widget uses. `usePrefs`,
 // the catalog IPC, and the transcribe helper are mocked.
 
@@ -91,14 +91,14 @@ describe("Attachments Library Transcribe entry (SYNC-V9)", () => {
     expect((item as HTMLButtonElement).disabled).toBe(false);
   });
 
-  it("shows Transcribe DISABLED (not omitted) for an audio item when AI is off", async () => {
+  it("HIDES Transcribe for an audio item when AI is off", async () => {
     aiEnabled = false;
     mockedCatalog.mockResolvedValue([AUDIO]);
     renderLibrary();
     const menu = await openMenuFor("voice.wav");
-    const item = within(menu).getByTestId("attachments.action-transcribe") as HTMLButtonElement;
-    expect(item).toBeTruthy();
-    expect(item.disabled).toBe(true);
+    // Local AI off → the Transcribe entry is omitted entirely (MYND-270:
+    // hidden, not disabled).
+    expect(within(menu).queryByTestId("attachments.action-transcribe")).toBeNull();
   });
 
   it("does NOT show Transcribe for a non-audio item", async () => {
