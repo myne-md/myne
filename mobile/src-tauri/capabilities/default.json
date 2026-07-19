@@ -25,6 +25,7 @@
     "attachments:default",
     "export:default",
     "secret-export:default",
-    "sync:default"
+    "sync:default",
+    "qr-scan:default"
   ]
 }
