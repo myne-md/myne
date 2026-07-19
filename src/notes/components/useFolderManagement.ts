@@ -52,6 +52,7 @@ import { itemKey, noteItem } from "../workspaceState";
 import type { FolderNode, FolderTree } from "../folderTree";
 import { type NoteId, type UseSelectedNoteReturn } from "../sidebarState";
 import {
+  foldDecorationKeys,
   pruneFolderPrefix,
   pruneStaleNoteColors,
   rewriteFolderPrefix,
@@ -156,17 +157,25 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
 
   // Decoration maps (MYND-184 color labels / MYND-185 folder icons), synced
   // from the mount-time prefs read and mutated optimistically by the picker
-  // setters below. `itemColors` is keyed by note UUID OR canonical folder path
-  // (`/`-discriminated, like `item_order`); `folderIcons` by folder path.
+  // setters below. `itemColors` is keyed by note UUID OR the FOLDED folder
+  // identity (`/`-discriminated like `item_order`; folder entries fold per
+  // MYND-562); `folderIcons` by the folded folder identity.
   const [itemColors, setItemColorsState] = useState<Record<string, string>>({});
   const [folderIcons, setFolderIconsState] = useState<Record<string, string>>(
     {},
   );
+  // Fold-on-load migration (MYND-562): re-key any legacy display-cased folder
+  // entries to the folded identity so decorations follow the folder across
+  // clients. Idempotent + self-healing; persists once when it actually changed.
   useEffect(() => {
-    setItemColorsState(prefs.item_colors);
+    const { next, changed } = foldDecorationKeys(prefs.item_colors);
+    setItemColorsState(next);
+    if (changed) void persistItemColors(next);
   }, [prefs.item_colors]);
   useEffect(() => {
-    setFolderIconsState(prefs.folder_icons);
+    const { next, changed } = foldDecorationKeys(prefs.folder_icons);
+    setFolderIconsState(next);
+    if (changed) void persistFolderIcons(next);
   }, [prefs.folder_icons]);
 
   // ---- decorations: color labels + folder icons (MYND-184 / 185) ----------
