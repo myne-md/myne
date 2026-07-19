@@ -65,12 +65,6 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     keywordsKey: "settings.search.keywords.changePassword",
   },
   {
-    id: "account.argon2id",
-    panelId: "account",
-    titleKey: "settings.account.argon2idHeading",
-    keywordsKey: "settings.search.keywords.argon2id",
-  },
-  {
     id: "account.danger-zone",
     panelId: "account",
     testid: "settings.delete-vault-cta",
