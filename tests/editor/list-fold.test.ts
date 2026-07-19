@@ -16,19 +16,21 @@
 
 import { describe, expect, it } from "vitest";
 import { EditorState } from "@codemirror/state";
-import { foldable, syntaxTree } from "@codemirror/language";
+import { ensureSyntaxTree, foldable } from "@codemirror/language";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { listFoldRange, listFoldService } from "../../src/editor/list-fold";
 
 /** A markdown-parsed EditorState with the list-fold service mounted. The docs
- *  here are tiny, so the lezer parse completes synchronously; touching
- *  `syntaxTree` realizes the tree the foldService reads. */
+ *  here are tiny, but the lezer parse is lazy — `syntaxTree` alone only reads
+ *  whatever slice has already been realized, which under CI load/timing can be
+ *  the empty root. `ensureSyntaxTree` forces a full synchronous parse to the end
+ *  of the doc so the foldService reads a complete tree deterministically. */
 function parsed(doc: string): EditorState {
   const s = EditorState.create({
     doc,
     extensions: [markdown({ base: markdownLanguage }), listFoldService()],
   });
-  syntaxTree(s);
+  ensureSyntaxTree(s, s.doc.length, 5000);
   return s;
 }
 
