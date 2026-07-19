@@ -34,6 +34,10 @@ import { useFocusTrap } from "../hooks/useFocusTrap";
 import { SettingsSearch } from "./settings/search/SettingsSearch";
 import { SettingsSearchResults } from "./settings/search/SettingsSearchResults";
 import { searchSettings } from "./settings/search/searchSettings";
+import {
+  flattenGroups,
+  groupResultsByPanel,
+} from "./settings/search/resultsGrouping";
 import type { SettingsIndexEntry } from "./settings/search/settingsSearchIndex";
 import { AboutPanel } from "./settings/AboutPanel";
 import { AccountPanel } from "./settings/AccountPanel";
@@ -303,8 +307,17 @@ export function SettingsModal({
     null,
   );
   const searching = query.trim() !== "";
+  // Order the matches into the SAME panel-clustered sequence the results list
+  // renders (group-then-flatten). The scorer (fuzzyFilter, via searchSettings)
+  // orders by relevance, NOT by panel, so its raw output can interleave panels;
+  // the rendered list re-groups by panel. Aligning both here means keyboard ↑/↓
+  // over `results[activeIndex]` walks the rows in the exact on-screen order
+  // instead of jumping between panel groups. MYND-536.
   const results = useMemo(
-    () => (searching ? searchSettings(query, t) : []),
+    () =>
+      searching
+        ? flattenGroups(groupResultsByPanel(searchSettings(query, t)))
+        : [],
     [searching, query, t],
   );
   // Keyboard-highlighted result (arrow keys move it; Enter opens it). Reset to
