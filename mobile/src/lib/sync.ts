@@ -73,6 +73,42 @@ export function syncJoinAccount(
   });
 }
 
+// ── Device-join via QR (MYND-466) ────────────────────────────────────────────
+
+/** Mirrors Rust `JoinQrPinSource`. */
+export type JoinQrPinSource = "self_host_tofu" | "hosted" | "self_host_no_pin";
+
+/** Mirrors Rust `JoinQrView` — the decoded, validated device-join QR for the
+ *  confirm screen. Carries no secret (the account# is an identity; SYNC-47). */
+export interface JoinQrView {
+  endpoint_url: string;
+  /** Canonical 20-char account number (format for display with `formatAccountNumberInput`). */
+  account_number: string;
+  /** The QR's carried leaf-cert pin (hex), or null. */
+  cert_pin_hex: string | null;
+  pin_source: JoinQrPinSource;
+  /** False when the QR is past its ephemeral TTL (reject → re-scan). */
+  fresh: boolean;
+}
+
+/** Decode a scanned device-join QR string into its confirm-screen view. Rejects a
+ *  non-Myne / newer-version / malformed / bad-account payload (typed `kind`). */
+export function syncDecodeJoinQr(scanned: string): Promise<JoinQrView> {
+  return invoke<JoinQrView>("plugin:sync|sync_decode_join_qr", { scanned });
+}
+
+/** Mirrors Rust `tauri-plugin-qr-scan`'s `ScanResponse` — the decoded QR string,
+ *  or `null` when the user dismissed the scanner. */
+export interface QrScanResult {
+  value: string | null;
+}
+
+/** Open the iOS camera to scan a QR (device-join). Rejects with `{kind:"Unsupported"}`
+ *  off iOS (SYNC-46; Android is MYND-465). */
+export function scanQr(): Promise<QrScanResult> {
+  return invoke<QrScanResult>("plugin:qr-scan|scan");
+}
+
 // ── SAS eye-compare (SY-05, SYNC-40 / SYNC-17) ───────────────────────────────
 
 /** Request an immediate sync cycle — for a still-PENDING device this re-runs the
