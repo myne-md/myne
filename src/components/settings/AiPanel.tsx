@@ -89,6 +89,10 @@ const RECOMMENDED_MODEL: Record<ModelRole, { name: string; url: string }> = {
     name: "all-MiniLM-L6-v2",
     url: "https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2",
   },
+  transcription: {
+    name: "whisper-base (multilingual)",
+    url: "https://huggingface.co/openai/whisper-base",
+  },
 };
 
 /** Per-role side-load file filter for the OS picker (SYNC-1). */
@@ -98,6 +102,10 @@ const RECOMMENDED_MODEL: Record<ModelRole, { name: string; url: string }> = {
 const MODEL_FILTER: Record<ModelRole, { nameKey: string; extensions: string[] }> = {
   generation: { nameKey: "settings.ai.modelFilter.gguf", extensions: ["gguf"] },
   embedding: {
+    nameKey: "settings.ai.modelFilter.safetensors",
+    extensions: ["safetensors"],
+  },
+  transcription: {
     nameKey: "settings.ai.modelFilter.safetensors",
     extensions: ["safetensors"],
   },
@@ -186,6 +194,7 @@ export function AiPanel({ onShowToast }: AiPanelProps) {
   const [modelPaths, setModelPaths] = useState<Record<ModelRole, string | null>>({
     generation: null,
     embedding: null,
+    transcription: null,
   });
   // Local edit buffer for the excluded-folders textarea (one folder/line); the
   // backend NFC-sorts + dedups the set on encode, so the raw lines are fine.
@@ -200,7 +209,7 @@ export function AiPanel({ onShowToast }: AiPanelProps) {
   // persisted path — the panel stays usable.
   useEffect(() => {
     let alive = true;
-    (["generation", "embedding"] as const).forEach((role) => {
+    (["generation", "embedding", "transcription"] as const).forEach((role) => {
       loadModelPath(role)
         .then((p) => {
           if (alive) setModelPaths((prev) => ({ ...prev, [role]: p }));
@@ -343,6 +352,23 @@ export function AiPanel({ onShowToast }: AiPanelProps) {
           testIdRecommend="ai.model-recommend-embedding"
           testIdSelect="ai.model-select-embedding"
           testIdChoose="ai.model-choose-embedding"
+        />
+
+        {/* Speech-to-text (voice-to-text MYND-552, SYNC-V3): the ASR / Whisper
+            role — side-load only, disabled when AI is off, distinct testids. */}
+        <ModelRoleBlock
+          roleLabel={t("settings.ai.modelTranscriptionLabel")}
+          filesText={t("settings.ai.recommendedFilesTranscription")}
+          recommendName={RECOMMENDED_MODEL.transcription.name}
+          onOpenRecommend={() => openRecommend("transcription")}
+          path={modelPaths.transcription}
+          noneLabel={t("settings.ai.modelNone")}
+          chooseLabel={t("settings.ai.modelChoose")}
+          onChoose={() => void chooseModel("transcription")}
+          disabled={!aiEnabled}
+          testIdRecommend="ai.model-recommend-transcription"
+          testIdSelect="ai.model-select-transcription"
+          testIdChoose="ai.model-choose-transcription"
         />
       </div>
 

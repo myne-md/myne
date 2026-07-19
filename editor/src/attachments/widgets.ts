@@ -34,8 +34,10 @@ import {
   renameFileCard,
   revealFileCard,
 } from "./fileCardActions";
-import { buildOverflowMenu } from "./actionMenu";
+import { buildOverflowMenu, type OverflowAction } from "./actionMenu";
 import { decodePeaks } from "./waveform";
+import { createTranscriptSection } from "./transcript";
+import { aiSlashEnabledFacet } from "../slash/aiSlash";
 
 /** Width (CSS px) the inline image / PDF frame renders at. */
 const FRAME_WIDTH = 320;
@@ -452,15 +454,36 @@ export class AttachmentAudioWidget extends WidgetType {
     track.appendChild(wave);
     row.appendChild(track);
 
-    const menu = buildOverflowMenu(
-      [
-        { label: i18n.t("editor.attachment.widget.menu.export"), testid: "attachment-audio.export", run: () => void exportAttachment(this.id, this.filename) },
-        { label: i18n.t("editor.attachment.widget.menu.rename"), testid: "attachment-audio.rename", run: () => void renameFileCard(view, this.id, this.filename) },
-        { label: i18n.t("editor.attachment.widget.menu.remove"), testid: "attachment-audio.remove", run: () => removeFileCard(view, root, this.id) },
-        { label: i18n.t("editor.attachment.widget.menu.reveal"), testid: "attachment-audio.reveal", run: () => revealFileCard(view, this.id) },
-      ],
-      { buttonTestId: "attachment-audio.menu-button", menuTestId: "attachment-audio.menu" },
-    );
+    // Transcript section (voice-to-text MYND-552): progress + read-only expander
+    // + insert action, mounted under the time row. Calls only the host slot.
+    const transcript = createTranscriptSection({ view, id: this.id });
+
+    const actions: OverflowAction[] = [
+      { label: i18n.t("editor.attachment.widget.menu.export"), testid: "attachment-audio.export", run: () => void exportAttachment(this.id, this.filename) },
+      { label: i18n.t("editor.attachment.widget.menu.rename"), testid: "attachment-audio.rename", run: () => void renameFileCard(view, this.id, this.filename) },
+      { label: i18n.t("editor.attachment.widget.menu.remove"), testid: "attachment-audio.remove", run: () => removeFileCard(view, root, this.id) },
+      { label: i18n.t("editor.attachment.widget.menu.reveal"), testid: "attachment-audio.reveal", run: () => revealFileCard(view, this.id) },
+    ];
+    // "Transcribe" (SYNC-V7) — only when the host backs speech-to-text (desktop;
+    // mobile leaves the slot unset → row omitted). Disabled-not-hidden when AI is
+    // off or the note's folder is excluded (both folded into the AI facet by the
+    // host); enabled otherwise. When AI is on but no model is ready the run
+    // surfaces a "select a model" hint (handled inside the transcript section).
+    if (getHost().transcribe !== undefined) {
+      const aiEnabled = view.state.facet(aiSlashEnabledFacet);
+      actions.push({
+        label: i18n.t("editor.attachment.widget.menu.transcribe"),
+        testid: "attachment-audio.transcribe",
+        disabled: !aiEnabled,
+        disabledReason: i18n.t("editor.attachment.widget.transcribe.disabledReason"),
+        run: () => transcript.start(),
+      });
+    }
+
+    const menu = buildOverflowMenu(actions, {
+      buttonTestId: "attachment-audio.menu-button",
+      menuTestId: "attachment-audio.menu",
+    });
     row.appendChild(menu.wrap);
 
     root.appendChild(row);
@@ -471,6 +494,10 @@ export class AttachmentAudioWidget extends WidgetType {
     time.setAttribute("data-testid", "attachment-audio.time");
     time.textContent = "0:00 / 0:00";
     root.appendChild(time);
+
+    // Transcript surface sits below the time row (progress / expander render
+    // here on demand; a cached transcript re-renders synchronously).
+    root.appendChild(transcript.container);
 
     // --- playback wiring ---
     let duration = 0;
@@ -604,6 +631,7 @@ export class AttachmentAudioWidget extends WidgetType {
       observer?.disconnect();
       observer = null;
       menu.teardown();
+      transcript.teardown();
       audio.pause();
       audio.removeAttribute("src");
       audio.load(); // release the decoded buffer

@@ -202,6 +202,58 @@ pub(crate) async fn note_attachment_docs(
     .collect()
 }
 
+/// Live-refresh the `att:` search docs of every note embedding
+/// `attachment_id_hex`, after its transcript `MYE1` cache was written
+/// out-of-band (voice-to-text, MYND-551, Task 4). The transcribe command writes
+/// the transcript cache WITHOUT re-saving the note, so its `content_nonce` is
+/// unchanged and the incremental reconcile skips it — the transcript would not
+/// be findable until a lock→unlock cycle re-hydrated it. This resolves the
+/// embedding notes via the attachment reference graph
+/// ([`crate::plugins::attachments::AttachmentRefsState`]) and re-derives each
+/// note's attachment docs through the SAME [`note_attachment_docs`] →
+/// [`crate::search::SearchIndexState::set_note_attachments`] path a live save
+/// uses (so the just-written transcript is picked up), making it findable
+/// IN-SESSION and part of the next persisted snapshot.
+///
+/// Best-effort: a locked slot, missing graph/index state, or an unreadable note
+/// is skipped — a search-doc refresh must never fail a transcription the user
+/// already has. DENY-list: no note_id / title / body / transcript is logged.
+pub async fn refresh_attachment_docs_for<R: Runtime>(
+    app: &AppHandle<R>,
+    state: &VaultRuntimeState,
+    attachment_id_hex: &str,
+) {
+    let Some(refs) = app.try_state::<crate::plugins::attachments::AttachmentRefsState>() else {
+        return;
+    };
+    let note_ids = refs.referencing_notes(attachment_id_hex);
+    if note_ids.is_empty() {
+        return; // not embedded in any note → nothing to surface
+    }
+    let Some(search) = app.try_state::<SearchIndexState>() else {
+        return;
+    };
+    let active_id = state.active_vault_id().await;
+    let Some(vault_dir) = resolve_vault_dir(app, active_id) else {
+        return;
+    };
+    let Ok(notes_dir) = paths::notes_dir_under(&vault_dir) else {
+        return;
+    };
+    for note_id in note_ids {
+        // Read the embedding note to recover its title + body (the body names the
+        // embeds `note_attachment_docs` re-reads from the MYE1 caches).
+        let Ok(plaintext) = note_read_with_dir(notes_dir.clone(), state, note_id.clone()).await
+        else {
+            continue;
+        };
+        let title = resolve_note_title(plaintext.as_bytes()).unwrap_or_default();
+        let atts = note_attachment_docs(state, &vault_dir, &title, &plaintext).await;
+        search.set_note_attachments(&note_id, &atts);
+    }
+    tracing::info!(event = "transcript_search_docs_refreshed");
+}
+
 /// Testable core of [`hydrate_search_index`]. Loads `vault.search` (fast
 /// path) and reconciles it against the notes dir's current header nonces,
 /// then swaps the result into `search`. A note is decrypted ONLY when its

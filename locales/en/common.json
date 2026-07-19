@@ -45,8 +45,8 @@
     "library": {
       "actionsAriaLabel": "Attachment actions",
       "actionsTitle": "Actions",
-      "checking": "Checking…",
       "checkUnusedFailedNotice": "Couldn't check for unused attachments. Try again.",
+      "checking": "Checking…",
       "cleanUnused": "Clean unused",
       "cleanUnusedTitle": "Delete attachments not used in any note",
       "colCreated": "Created",
@@ -69,6 +69,7 @@
       "menuExport": "Export",
       "menuPreview": "Preview",
       "menuRename": "Rename",
+      "menuTranscribe": "Transcribe",
       "noMatch": "No attachments match your search.",
       "noUnusedNotice": "No unused attachments to clean.",
       "preview": "Preview",
@@ -84,6 +85,10 @@
       "sortAriaLabel": "Sort attachments",
       "supportedFilesFilter": "Supported files",
       "title": "Attachments",
+      "transcribeDone": "Transcription complete.",
+      "transcribeFailed": "Transcription failed. Please try again.",
+      "transcribeNoModel": "Select a transcription model in Settings → Labs → AI.",
+      "transcribeStarted": "Transcribing…",
       "typeFilter": {
         "all": "All types",
         "audio": "Audio",
@@ -675,7 +680,8 @@
           "export": "Export",
           "remove": "Remove",
           "rename": "Rename",
-          "reveal": "Reveal in library"
+          "reveal": "Reveal in library",
+          "transcribe": "Transcribe"
         },
         "pdfFallback": "PDF",
         "textPreview": {
@@ -686,6 +692,15 @@
           "brokenLabel": "broken",
           "deletedAria": "Deleted attachment: {{filename}}",
           "deletedLabel": "deleted"
+        },
+        "transcribe": {
+          "disabledReason": "Enable AI in Settings → Labs → AI to transcribe.",
+          "failed": "Transcription failed. Please try again.",
+          "heading": "Transcript",
+          "insert": "Insert transcript into note",
+          "noModelHint": "Select a transcription model in Settings → Labs → AI.",
+          "progress": "Transcribing…",
+          "stop": "Stop"
         },
         "urlImageFallback": "image"
       }
@@ -2169,10 +2184,12 @@
       "modelGenerationLabel": "Text model — chat, summaries, writing",
       "modelNone": "No file selected",
       "modelSaveFailed": "Couldn't save the model path (it must be outside your vault).",
+      "modelTranscriptionLabel": "Speech-to-text model (transcription)",
       "modelsHelper": "Myne never downloads models — that would mean sending data over the network. Open a link to get one in your browser, then pick the downloaded files here. Everything runs on your device.",
       "modelsLabel": "Models",
       "recommendedFilesEmbedding": "Needs model.safetensors + config.json + tokenizer.json in one folder.",
       "recommendedFilesGeneration": "Needs the .gguf file + tokenizer.json in the same folder.",
+      "recommendedFilesTranscription": "Recommended: whisper-base (Safetensors).",
       "title": "AI"
     },
     "prefs": {
