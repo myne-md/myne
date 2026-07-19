@@ -84,7 +84,11 @@ export const SettingsSearch = forwardRef<HTMLInputElement, SettingsSearchProps>(
             type="text"
             role="combobox"
             aria-expanded={query.trim() !== ""}
-            aria-controls="settings-search-results"
+            // Only reference the listbox while it is actually rendered (a
+            // non-empty query); an empty box has no results element to control.
+            aria-controls={
+              query.trim() !== "" ? "settings-search-results" : undefined
+            }
             aria-activedescendant={activeDescendantId}
             aria-label={t("settings.search.ariaLabel")}
             placeholder={t("settings.search.placeholder")}

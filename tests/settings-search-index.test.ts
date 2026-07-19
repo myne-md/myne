@@ -11,6 +11,9 @@
 // setting with no entry) is convention + PR review, out of a test's reach.
 
 import { describe, expect, it } from "vitest";
+import { readdirSync, readFileSync, statSync } from "node:fs";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import en from "../locales/en/common.json";
 import {
   SETTINGS_SEARCH_INDEX,
@@ -49,6 +52,25 @@ function lookup(key: string): string | undefined {
 /** A `t` for behavioural checks: real catalog string, or the key if missing. */
 const t = (key: string): string => lookup(key) ?? key;
 
+/**
+ * Concatenate every panel source under `dir`, EXCLUDING the search/ subtree.
+ * The registry lives under search/, so including it would let a stale testid
+ * match its own declaration and defeat the flash-target guard below.
+ */
+function readPanelSources(dir: string): string {
+  let blob = "";
+  for (const name of readdirSync(dir)) {
+    if (name === "search") continue;
+    const full = join(dir, name);
+    if (statSync(full).isDirectory()) {
+      blob += readPanelSources(full);
+    } else if (name.endsWith(".tsx") || name.endsWith(".ts")) {
+      blob += `\n${readFileSync(full, "utf8")}`;
+    }
+  }
+  return blob;
+}
+
 describe("settings search-index — integrity", () => {
   it("every entry targets a valid PanelId", () => {
     for (const e of SETTINGS_SEARCH_INDEX) {
@@ -77,6 +99,22 @@ describe("settings search-index — integrity", () => {
   it("every rail panel is represented by at least one entry (coverage)", () => {
     const covered = new Set(SETTINGS_SEARCH_INDEX.map((e) => e.panelId));
     for (const p of PANEL_IDS) expect(covered).toContain(p);
+  });
+
+  it("every registered testid still exists in a panel source (flash-target guard)", () => {
+    // The scroll/flash resolver falls back to a setting's `data-testid` when it
+    // has no `data-setting-anchor`. A registry `testid` that no longer exists in
+    // any panel would SILENTLY degrade the jump to a plain panel switch — the
+    // i18n-key checks above cannot catch that. Scan the panel sources, excluding
+    // the search/ subtree (it holds the registry itself, whose literals would
+    // otherwise let a stale testid match its own declaration).
+    const blob = readPanelSources(
+      fileURLToPath(new URL("../src/components/settings", import.meta.url)),
+    );
+    const missing = SETTINGS_SEARCH_INDEX.filter(
+      (e) => e.testid && !blob.includes(e.testid),
+    ).map((e) => `${e.id} → ${e.testid ?? ""}`);
+    expect(missing).toEqual([]);
   });
 });
 
