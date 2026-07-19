@@ -32,6 +32,7 @@ pub mod rag;
 pub mod retrieval;
 pub mod state;
 pub mod vector_store;
+pub mod whisper;
 
 // Sibling-facing API (AI capability features, tasks 3–7): the stable
 // `local_inference::{Engine, StubEngine, EngineError}` path — siblings reach

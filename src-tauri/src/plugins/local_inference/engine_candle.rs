@@ -34,11 +34,16 @@ use candle_nn::VarBuilder;
 use candle_transformers::generation::{LogitsProcessor, Sampling};
 use candle_transformers::models::bert::{BertModel, Config as BertConfig, DTYPE};
 use candle_transformers::models::quantized_qwen2::ModelWeights as Qwen2;
+use candle_transformers::models::whisper::{
+    quantized_model::{VarBuilder as WhisperVarBuilder, Whisper},
+    Config as WhisperConfig,
+};
 use tokenizers::Tokenizer;
 
 use super::engine::{ChatMessage, ChatRole, Engine};
 use super::error::EngineError;
 use super::model_store::{selected_model, ModelRole};
+use super::whisper::{self, WhisperTokens};
 
 /// Cap on generated tokens per `infer` — a bound so a runaway generation can't
 /// hang the blocking command.
@@ -71,6 +76,22 @@ struct LoadedEmbed {
     /// content is attacker-influenceable (a synced note could be a giant CJK /
     /// base64 blob), so this bound is load-bearing, not just a nicety.
     max_tokens: usize,
+}
+
+/// A loaded transcription (Whisper) model + its tokenizer, config, computed mel
+/// filterbank, and resolved control tokens. Mirrors [`LoadedGen`] — lazy-loaded
+/// once behind the `transcription` mutex; the `&mut` decode borrows the model.
+struct LoadedTranscription {
+    model: Whisper,
+    tokenizer: Tokenizer,
+    config: WhisperConfig,
+    /// `librosa`-slaney mel filterbank, computed for `config.num_mel_bins` — no
+    /// data blob shipped (see [`super::whisper::mel_filters`]).
+    mel_filters: Vec<f32>,
+    /// Resolved `<|startoftranscript|>` / `<|transcribe|>` / language / … tokens.
+    tokens: WhisperTokens,
+    /// The device the model + its inference tensors live on (Metal GPU or CPU).
+    device: Device,
 }
 
 /// Pick the compute device: the Apple GPU (Metal) on macOS when available, else
@@ -127,6 +148,7 @@ pub struct CandleEngine {
     compute: Mutex<()>,
     gen: Mutex<Option<LoadedGen>>,
     embed: Mutex<Option<LoadedEmbed>>,
+    transcription: Mutex<Option<LoadedTranscription>>,
 }
 
 impl CandleEngine {
@@ -139,6 +161,7 @@ impl CandleEngine {
             compute: Mutex::new(()),
             gen: Mutex::new(None),
             embed: Mutex::new(None),
+            transcription: Mutex::new(None),
         }
     }
 
@@ -260,6 +283,89 @@ impl CandleEngine {
             max_tokens: config.max_position_embeddings.max(1),
         })
     }
+
+    /// Lazy-load the side-loaded Whisper model (voice-to-text, MYND-550; task 3).
+    /// Layout mirrors the embedding model: the user picks a quantized `<model>.gguf`
+    /// with siblings `config.json` + `tokenizer.json`. `NotReady` when no model is
+    /// selected; the mel filterbank is computed from `config.num_mel_bins` (no
+    /// data blob). DENY-safe logging only — no path / audio / transcript.
+    fn load_transcription(&self) -> Result<LoadedTranscription, EngineError> {
+        let started = Instant::now();
+        let model_path = match selected_model(&self.base, ModelRole::Transcription) {
+            Ok(Some(p)) => p,
+            Ok(None) => {
+                tracing::warn!(
+                    target: "myne::ai",
+                    stage = "load_transcription",
+                    "no transcription (voice) model selected — pick a Whisper .gguf in Settings → AI"
+                );
+                return Err(EngineError::NotReady);
+            }
+            Err(e) => {
+                tracing::error!(
+                    target: "myne::ai",
+                    stage = "load_transcription.resolve",
+                    error_kind = e.kind(),
+                    "could not resolve the transcription model path"
+                );
+                return Err(EngineError::NotReady);
+            }
+        };
+        tracing::info!(
+            target: "myne::ai",
+            stage = "load_transcription",
+            "loading transcription model (first use)…"
+        );
+        let config_path = Self::sibling(&model_path, "config.json");
+        let tok_path = Self::sibling(&model_path, "tokenizer.json");
+        let config_json = std::fs::read_to_string(&config_path).map_err(|e| {
+            io_stage_fail("load_transcription.read_config", &e, EngineError::NotReady)
+        })?;
+        let config: WhisperConfig = serde_json::from_str(&config_json).map_err(|e| {
+            fmt_stage_fail(
+                "load_transcription.parse_config",
+                e,
+                EngineError::TranscriptionFailed,
+            )
+        })?;
+        let vb = WhisperVarBuilder::from_gguf(&model_path, &self.device).map_err(|e| {
+            fmt_stage_fail(
+                "load_transcription.from_gguf",
+                e,
+                EngineError::TranscriptionFailed,
+            )
+        })?;
+        let model = Whisper::load(&vb, config.clone()).map_err(|e| {
+            fmt_stage_fail(
+                "load_transcription.build_model",
+                e,
+                EngineError::TranscriptionFailed,
+            )
+        })?;
+        let tokenizer = Tokenizer::from_file(&tok_path).map_err(|e| {
+            fmt_stage_fail(
+                "load_transcription.tokenizer",
+                e,
+                EngineError::TranscriptionFailed,
+            )
+        })?;
+        let tokens = WhisperTokens::resolve(&tokenizer)?;
+        let mel_filters = whisper::mel_filters(config.num_mel_bins);
+        tracing::info!(
+            target: "myne::ai",
+            stage = "load_transcription",
+            elapsed_ms = started.elapsed().as_millis() as u64,
+            "transcription model loaded"
+        );
+        Ok(LoadedTranscription {
+            model,
+            tokenizer,
+            config,
+            mel_filters,
+            tokens,
+            device: self.device.clone(),
+        })
+    }
 }
 
 /// Log a FORMAT/parse-stage failure (candle / tokenizer / serde) and map to a
@@ -269,7 +375,7 @@ impl CandleEngine {
 /// carries only the bounded `stage` string; the fuller message — the load-bearing
 /// format diagnostic (e.g. a Qwen2.5-vs-Qwen2 tensor mismatch), which may include
 /// the path — is emitted at DEBUG, opt-in behind `RUST_LOG=myne::ai=debug`.
-fn fmt_stage_fail(
+pub(super) fn fmt_stage_fail(
     stage: &'static str,
     e: impl std::fmt::Display,
     kind: EngineError,
@@ -609,6 +715,29 @@ fn run_embed(loaded: &LoadedEmbed, text: &str) -> Result<Vec<f32>, EngineError> 
         .map_err(|_| EngineError::EmbeddingFailed)
 }
 
+/// Decode a loaded Whisper model over `pcm` (16 kHz mono), delegating the mel
+/// front end + segment loop to [`super::whisper::transcribe_pcm`]. `on_segment`
+/// streams each 30 s window's text and its `Break` stops early. Shared by the
+/// blocking [`Engine::transcribe`] and the streaming [`Engine::transcribe_streaming`]
+/// so the decode discipline lives in one place.
+fn run_transcribe(
+    loaded: &mut LoadedTranscription,
+    pcm: &[f32],
+    on_segment: &mut dyn FnMut(&str) -> ControlFlow<()>,
+) -> Result<String, EngineError> {
+    let device = loaded.device.clone();
+    whisper::transcribe_pcm(
+        &mut loaded.model,
+        &loaded.tokenizer,
+        &loaded.tokens,
+        &loaded.config,
+        &loaded.mel_filters,
+        &device,
+        pcm,
+        on_segment,
+    )
+}
+
 impl Engine for CandleEngine {
     fn infer(&self, prompt: &str) -> Result<String, EngineError> {
         // Serialize all GPU work (see `compute`): a concurrent embed on the same
@@ -711,13 +840,54 @@ impl Engine for CandleEngine {
         out
     }
 
+    fn transcribe(&self, pcm: &[f32]) -> Result<String, EngineError> {
+        // Blocking, no streaming — a no-op segment sink; the transcript is the
+        // return value. Serializes GPU work like infer/embed (Metal safety).
+        self.transcribe_streaming(pcm, &mut |_seg| ControlFlow::Continue(()))
+    }
+
+    fn transcribe_streaming(
+        &self,
+        pcm: &[f32],
+        on_segment: &mut dyn FnMut(&str) -> ControlFlow<()>,
+    ) -> Result<String, EngineError> {
+        // Serialize all GPU work (see `compute`): a concurrent infer/embed on the
+        // same Metal device crashes the AGX driver. Held for the whole decode.
+        let _compute = self.compute.lock().unwrap_or_else(|p| p.into_inner());
+        let mut guard = self.transcription.lock().unwrap_or_else(|p| p.into_inner());
+        if guard.is_none() {
+            *guard = Some(self.load_transcription()?);
+        }
+        let loaded = guard.as_mut().expect("just loaded");
+        let started = Instant::now();
+        let out = run_transcribe(loaded, pcm, on_segment);
+        match &out {
+            Ok(s) => tracing::info!(
+                target: "myne::ai",
+                op = "transcribe",
+                elapsed_ms = started.elapsed().as_millis() as u64,
+                out_chars = s.chars().count(),
+                "transcription complete"
+            ),
+            Err(e) => tracing::error!(
+                target: "myne::ai",
+                op = "transcribe",
+                error_kind = e.kind(),
+                "transcription failed"
+            ),
+        }
+        out
+    }
+
     fn invalidate_models(&self) {
-        // Drop both cached models under the compute lock so an in-flight
-        // infer/embed finishes first and the next call reloads the freshly
-        // selected weights (model-swap-without-restart correctness, §9.17.2).
+        // Drop every cached model under the compute lock so an in-flight
+        // infer/embed/transcribe finishes first and the next call reloads the
+        // freshly selected weights (model-swap-without-restart correctness,
+        // §9.17.2; the transcript MYE1 cache keys on the model hash, SYNC-V3).
         let _compute = self.compute.lock().unwrap_or_else(|p| p.into_inner());
         *self.gen.lock().unwrap_or_else(|p| p.into_inner()) = None;
         *self.embed.lock().unwrap_or_else(|p| p.into_inner()) = None;
+        *self.transcription.lock().unwrap_or_else(|p| p.into_inner()) = None;
     }
 
     fn embed(&self, text: &str) -> Result<Vec<f32>, EngineError> {
@@ -800,6 +970,29 @@ mod tests {
         let tmp = ScopedTempDir::new("candle-engine-noembed").expect("tempdir");
         let engine = CandleEngine::new(tmp.path().to_path_buf());
         assert_eq!(engine.embed("hello"), Err(EngineError::NotReady));
+    }
+
+    #[test]
+    fn transcribe_without_a_model_is_not_ready() {
+        // The real deferred-no-longer path (asr-engine task 3): with no Whisper
+        // model side-loaded, both the blocking and streaming entries return
+        // `NotReady` — never a panic, never a fabricated transcript. This is the
+        // production DEFAULT until the user picks a model.
+        let tmp = ScopedTempDir::new("candle-engine-notranscribe").expect("tempdir");
+        let engine = CandleEngine::new(tmp.path().to_path_buf());
+        let pcm = [0.0f32; 16_000]; // 1 s of silence
+        assert_eq!(engine.transcribe(&pcm), Err(EngineError::NotReady));
+
+        let mut called = false;
+        let out = engine.transcribe_streaming(&pcm, &mut |_seg| {
+            called = true;
+            ControlFlow::Continue(())
+        });
+        assert_eq!(out, Err(EngineError::NotReady));
+        assert!(
+            !called,
+            "no segment should be emitted without a loaded model"
+        );
     }
 
     #[test]
@@ -1121,6 +1314,62 @@ mod tests {
             sim_close > sim_far,
             "related text ({sim_close:.3}) should be more similar than unrelated ({sim_far:.3})"
         );
+    }
+
+    #[test]
+    #[ignore = "needs a side-loaded Whisper GGUF — set MYNE_TEST_TRANSCRIPTION_MODEL=<path>.gguf (siblings config.json + tokenizer.json) and MYNE_TEST_TRANSCRIPTION_AUDIO=<path>.wav (optional MYNE_TEST_TRANSCRIPTION_EXPECT=<substring>)"]
+    fn transcribe_with_a_real_model_streams_a_transcript() {
+        use crate::plugins::local_inference::audio::wav_to_mono_16k;
+
+        let Ok(model) = std::env::var("MYNE_TEST_TRANSCRIPTION_MODEL") else {
+            eprintln!("skip: set MYNE_TEST_TRANSCRIPTION_MODEL to a Whisper GGUF (siblings config.json + tokenizer.json)");
+            return;
+        };
+        let Ok(audio) = std::env::var("MYNE_TEST_TRANSCRIPTION_AUDIO") else {
+            eprintln!("skip: set MYNE_TEST_TRANSCRIPTION_AUDIO to a .wav clip with known speech");
+            return;
+        };
+        let tmp = ScopedTempDir::new("candle-real-transcribe").expect("tempdir");
+        set_selected_model(tmp.path(), ModelRole::Transcription, Path::new(&model))
+            .expect("record transcription model");
+        eprintln!("\n=== COMPUTE DEVICE: {:?} ===\n", select_device());
+        let engine = CandleEngine::new(tmp.path().to_path_buf());
+
+        let wav = std::fs::read(&audio).expect("read audio fixture");
+        let pcm = wav_to_mono_16k(&wav).expect("decode WAV → 16 kHz mono");
+
+        // Streaming: collect each segment; the concatenation must equal the
+        // returned full transcript, and at least one segment must arrive.
+        let mut pieces: Vec<String> = Vec::new();
+        let full = engine
+            .transcribe_streaming(&pcm, &mut |seg| {
+                pieces.push(seg.to_string());
+                ControlFlow::Continue(())
+            })
+            .expect("transcription should succeed with a real model");
+        eprintln!("\n=== REAL TRANSCRIPT ===\n{full}\n=======================\n");
+
+        assert!(!full.trim().is_empty(), "expected non-empty transcript");
+        assert!(!pieces.is_empty(), "expected at least one streamed segment");
+        assert_eq!(
+            pieces.concat(),
+            full,
+            "streamed segments reconstruct the full transcript"
+        );
+
+        // The blocking entry returns the same text as the streamed concatenation.
+        let blocking = engine.transcribe(&pcm).expect("blocking transcribe");
+        assert_eq!(
+            blocking, full,
+            "blocking and streaming transcripts must agree"
+        );
+
+        if let Ok(expect) = std::env::var("MYNE_TEST_TRANSCRIPTION_EXPECT") {
+            assert!(
+                full.to_lowercase().contains(&expect.to_lowercase()),
+                "transcript should contain {expect:?}, got: {full}"
+            );
+        }
     }
 
     // Retrieval-quality eval (conversational-ai-chat tuning): index a real folder
