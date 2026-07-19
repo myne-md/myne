@@ -151,6 +151,15 @@ fn parse_wav(bytes: &[u8]) -> Result<RawPcm, AudioError> {
     if channels == 0 {
         return Err(AudioError::BadLayout);
     }
+    // A zero `sample_rate` is a malformed `fmt ` chunk: it would drive the
+    // resampler's `to_rate / from_rate` ratio to +inf → `out_len = usize::MAX`
+    // → a `Vec::with_capacity` capacity-overflow panic. Reject it here (a
+    // crafted or corrupt WAV — including one synced from a compromised device,
+    // A6 — must not panic the transcribe worker) so decode collapses to a clean
+    // error and the caller re-extracts nothing.
+    if sample_rate == 0 {
+        return Err(AudioError::BadLayout);
+    }
 
     // i16 LE samples; a trailing odd byte (never expected for 16-bit) is dropped.
     let samples: Vec<i16> = data
@@ -310,6 +319,15 @@ mod tests {
         wav[20] = 3;
         wav[21] = 0;
         assert_eq!(wav_to_mono_16k(&wav), Err(AudioError::UnsupportedFormat));
+    }
+
+    #[test]
+    fn rejects_zero_sample_rate_without_panicking() {
+        // A malformed `fmt ` chunk declaring sample_rate=0 must be rejected at
+        // parse time — otherwise the resampler's `to_rate / 0` ratio overflows to
+        // usize::MAX and `Vec::with_capacity` panics the transcribe worker.
+        let wav = build_wav(1, 0, &[1i16, 2, 3, 4]);
+        assert_eq!(wav_to_mono_16k(&wav), Err(AudioError::BadLayout));
     }
 
     #[test]

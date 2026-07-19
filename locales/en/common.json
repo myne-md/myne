@@ -2189,7 +2189,7 @@
       "modelsLabel": "Models",
       "recommendedFilesEmbedding": "Needs model.safetensors + config.json + tokenizer.json in one folder.",
       "recommendedFilesGeneration": "Needs the .gguf file + tokenizer.json in the same folder.",
-      "recommendedFilesTranscription": "Recommended: whisper-base (Safetensors).",
+      "recommendedFilesTranscription": "Needs the Whisper .gguf file + config.json + tokenizer.json in the same folder.",
       "title": "AI"
     },
     "prefs": {
