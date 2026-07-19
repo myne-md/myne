@@ -14,13 +14,15 @@
 //                 the note body now contains the transcript (SYNC-V1/V17).
 //
 //   tr2 (UNGATED) — on the DEFAULT build (AI off), the Transcribe ⋮ row is
-//                   PRESENT but DISABLED (disabled-not-hidden; SYNC-V7) — no call
-//                   to an unregistered command. Mirrors `ai-labs-beta.e2e.ts`.
+//                   ABSENT (hidden-not-disabled; MYND-270 product tweak — no
+//                   dangling affordance when the whole AI subsystem is off, see
+//                   `editor/src/attachments/widgets.ts`). The other ⋮ rows still
+//                   render, so the menu opens; only Transcribe is gone.
 //
-// ⚠️ NEW SCENARIO — authored but NOT yet validated in the container. Per
-// `e2e/CLAUDE.md` definition of done it must go green 3× consecutive via
-// `./scripts/e2e-local.sh` before merge (it exercises the `local-inference|
-// transcribe` IPC path + the audio-widget transcript surface through the ACL).
+// Per `e2e/CLAUDE.md` definition of done a new/changed scenario must go green 3×
+// consecutive via `./scripts/e2e-local.sh` before merge (it exercises the
+// `local-inference|transcribe` IPC path + the audio-widget transcript surface
+// through the ACL).
 //
 // KDF: weak generator fixture (SYNC-9 — params are vault.meta-resident).
 
@@ -38,12 +40,21 @@ import {
   enableAi,
   pageSeatInvoke,
   reopenNoteAfterReload,
-  typeIntoEditor,
   unlockToEditor,
 } from "./support/flows";
 import { type Session, testIdSelector } from "./support/webdriver";
 
 const IPC_TIMEOUT = 15_000;
+
+/** The id of the note currently open in the editor (the selected sidebar row). */
+async function selectedNoteId(s: Session): Promise<string> {
+  const row = await s.waitForElement('[data-testid="notes.row"][aria-current="true"]');
+  const id = await row.attribute("data-note-id");
+  if (id === null || id === "") {
+    throw new Error("selected notes.row carried no data-note-id");
+  }
+  return id;
+}
 
 /** Only run the deterministic-inference slice against the `local-inference-stub`
  *  build (sets `MYNE_E2E_AI=1`) — the StubEngine transcribe is stable without a
@@ -68,11 +79,28 @@ async function recordFixtureAudio(s: Session): Promise<string> {
   return (imported as { id: string }).id;
 }
 
-/** Type the form-C audio embed into the current note, persist it, then reload so
- *  the editor's catalog cache re-reads and resolves the embed to the audio
- *  widget. */
+/** Embed the form-C audio reference into the current note, persist it, then reload
+ *  so the editor's catalog cache re-reads and resolves the embed to the audio
+ *  widget.
+ *
+ *  The body is written via production IPC (`note_read` + `note_update`), NOT
+ *  `typeIntoEditor`: an `![[att:…]]` embed renders as an ATOMIC audio widget, so
+ *  the typed characters are replaced by the widget in the live document and
+ *  `typeIntoEditor`'s read-back verification can never match — it times out,
+ *  re-sends, and doubles the text (the wikilink `[[` autocomplete compounds it).
+ *  Seeding the body + reloading is the same robust pattern `wikilink-deep-links`
+ *  uses for resolver-rendered content. */
 async function embedAudioAndReopen(s: Session, id: string): Promise<void> {
-  await typeIntoEditor(s, `![[att:${id}|Voice note tr.wav]]`);
+  const noteId = await selectedNoteId(s);
+  const cur = await pageSeatInvoke(s, "plugin:notes|note_read", { noteId }, IPC_TIMEOUT);
+  const base = typeof cur.ok === "string" ? cur.ok : "";
+  const up = await pageSeatInvoke(
+    s,
+    "plugin:notes|note_update",
+    { noteId, plaintext: `${base}\n![[att:${id}|Voice note tr.wav]]` },
+    IPC_TIMEOUT,
+  );
+  expect(up.err, "note_update should embed the audio attachment").toBeUndefined();
   await s.refresh();
   await reopenNoteAfterReload(s);
   // The inline audio player resolves once the catalog re-read completes.
@@ -126,13 +154,13 @@ aiDescribe("tr1 transcribe chain — progress → transcript → insert (transcr
   });
 });
 
-describeE2E("tr2 Transcribe row is present-but-disabled with AI off (transcription-ui)", () => {
+describeE2E("tr2 Transcribe row is absent (hidden) with AI off (transcription-ui)", () => {
   // Vault-count precondition: 1 (weak KDF). Runs on the DEFAULT build (no stub,
-  // no model) — AI is off by default, so the row must be disabled-not-hidden.
-  it("shows a disabled Transcribe ⋮ row when AI is off", async () => {
+  // no model) — AI is off by default, so the row must be hidden-not-disabled.
+  it("hides the Transcribe ⋮ row when AI is off", async () => {
     let seeded: SeededVault;
     await scenario(
-      "tr2-transcribe-disabled",
+      "tr2-transcribe-hidden",
       { seed: (dir) => void (seeded = seedVault(dir, {})) },
       async (app) => {
         const s = app.session;
@@ -144,10 +172,33 @@ describeE2E("tr2 Transcribe row is present-but-disabled with AI off (transcripti
         await embedAudioAndReopen(s, id);
 
         // AI stays OFF (default). Open the audio ⋮ menu and assert the Transcribe
-        // row is present AND disabled (no unregistered-command call possible).
-        await (await s.byTestId("attachment-audio.menu-button")).click();
-        const row = await s.waitForElement(testIdSelector("attachment-audio.transcribe"));
-        expect(await row.enabled(), "Transcribe row is disabled while AI is off").toBe(false);
+        // row is absent — hidden, not rendered-disabled, when the AI subsystem is
+        // off (MYND-270). The menu is body-portaled and self-closes on any
+        // scroll/resize reflow (`actionMenu.ts`), so a single click can race a
+        // layout shift on a cold app; re-open until an ALWAYS-present row
+        // (`reveal`) is visible, and — in that same open state — read Transcribe.
+        // `transcribe` is read BEFORE `reveal` each poll: `reveal` present AFTER
+        // the read proves the menu was open through both queries, so a count of 0
+        // means the row is genuinely hidden, not that the menu closed mid-check.
+        // The menu builds every row synchronously on open, so if Transcribe were
+        // offered it would be present alongside `reveal`.
+        // Returns a WRAPPER object (not the bare count): `waitUntil` only returns
+        // a truthy result, and the success count here is 0 (falsy) — a bare return
+        // would loop until timeout even on success.
+        const read = await s.waitUntil(
+          async () => {
+            const transcribe = (await s.byTestIdAll("attachment-audio.transcribe")).length;
+            const revealOpen = (await s.byTestIdAll("attachment-audio.reveal")).length > 0;
+            if (!revealOpen) {
+              // Menu not open (never opened, or a reflow closed it) — re-open.
+              await (await s.byTestId("attachment-audio.menu-button")).click();
+              return null;
+            }
+            return { transcribe };
+          },
+          { label: "audio ⋮ menu open, Transcribe row read", timeoutMs: 20_000 },
+        );
+        expect(read.transcribe, "Transcribe row is hidden while AI is off").toBe(0);
       },
     );
   });
