@@ -248,6 +248,14 @@ export function PaneView({
     (noteUuid: string, anchor: WikilinkAnchor | null) => {
       if (anchor !== null && hasAnchor(anchor)) {
         pendingAnchorTargetRef.current = noteUuid as NoteId;
+        // MYND-305 × MYND-534: an anchored open that switches to a DIFFERENT note
+        // must land at the anchor (or note-top if not found), NOT the target's
+        // restored cached scroll — flag it for the body-load effect. A same-note
+        // re-click keeps the flag clear (CMEditor's scroll effect handles it) so
+        // no stale flag leaks into a later plain tab-switch.
+        if (noteUuid !== activeIdRef.current) {
+          deepLinkOpenTargetRef.current = noteUuid as NoteId;
+        }
         setScrollAnchor({ anchor, nonce: Date.now() });
       }
       void ctx.open(noteUuid as NoteId);
@@ -306,6 +314,15 @@ export function PaneView({
     new Map(),
   );
   const prevActiveIdRef = useRef<NoteId | null>(null);
+
+  // MYND-305 × MYND-534: the target note-id of an in-flight deep-link OPEN (a
+  // wikilink chip carrying an anchor that switches to a DIFFERENT note). Set by
+  // `handleOpenWikilink`, consumed once by the body-load effect: when the load
+  // for that note runs, the anchor owns the scroll, so the note lands at the TOP
+  // (anchor `scrollIntoView` / §5.6 not-found fallback take over) instead of its
+  // restored cached scrollTop. Only set for cross-note opens so it never leaks a
+  // stale flag into a later plain tab-switch (which must restore cached scroll).
+  const deepLinkOpenTargetRef = useRef<NoteId | null>(null);
 
   // MYND-534: evict cached EditorStates for notes no longer open in this pane (a
   // closed tab), so the cache is bounded by the pane's open-tab count and a
@@ -458,6 +475,15 @@ export function PaneView({
       };
     }
 
+    // MYND-305 × MYND-534: is THIS open driven by a deep-link (a wikilink chip
+    // carrying an anchor that switched to this note)? If so the anchor owns the
+    // scroll — restoring the note's cached scrollTop would clobber both the
+    // anchor's `scrollIntoView` AND the §5.6 not-found fallback, which relies on
+    // the note opening at the TOP (a not-found anchor scrolls nowhere). Consumed
+    // once here so a later plain tab-switch restores the note's own cached scroll.
+    const anchorDrivenOpen = deepLinkOpenTargetRef.current === activeId;
+    if (anchorDrivenOpen) deepLinkOpenTargetRef.current = null;
+
     // Cached + swap API live → try an instant restore (no disk read, no loading
     // gate). ANY failure degrades to the disk-reload path below, which always
     // clears `loading` — so a bad swap can never strand the pane in a loading
@@ -476,7 +502,10 @@ export function PaneView({
         setContent(doc);
         autosaveRef.current?.acceptReloadedBody(doc);
         setLoading(false);
-        const top = cached.scrollTop;
+        // Anchor-driven open → land at the top and let the anchor effect take it
+        // to the heading (or hold at top if not found); otherwise restore the
+        // note's own cached scroll. Same 0-then-scrollIntoView shape as first open.
+        const top = anchorDrivenOpen ? 0 : cached.scrollTop;
         // Restore scroll after the swapped-in content lays out.
         requestAnimationFrame(() => {
           if (!cancelled && scroller !== null) scroller.scrollTop = top;
