@@ -2,14 +2,15 @@
 // Chromium + mock IPC — NOT end-to-end. Proves the two halves of the feature:
 //
 //   • Assignment — long-press a folder row → "Icon…" → pick a glyph invokes
-//     `set_folder_icons` with the folder's trailing-slash path as the key; and
-//     long-press a note row → "Color…" → pick a swatch invokes `set_item_colors`
-//     keyed by the note UUID. (Key discipline: item_colors is keyed by note id
-//     OR trailing-slash folder path; folder_icons by folder path only — the same
-//     keys desktop writes, so a decoration round-trips across clients.)
+//     `set_folder_icons` with the folder's FOLDED identity as the key (MYND-562);
+//     and long-press a note row → "Color…" → pick a swatch invokes
+//     `set_item_colors` keyed by the note UUID. (Key discipline: item_colors is
+//     keyed by note id OR the folded folder identity (`folderKey`); folder_icons
+//     by the folded folder identity only — the same keys desktop writes post-
+//     MYND-562, so a decoration round-trips across clients regardless of case.)
 //   • Display — a desktop-assigned `folder_icons` / `item_colors` (arriving via
-//     synced `vault.prefs`, seeded here) renders the glyph + color dots on the
-//     rows.
+//     synced `vault.prefs`, seeded here keyed by folded identity) renders the
+//     glyph + color dots on the rows.
 //
 // The long-press is dispatched synthetically: a bare `pointerdown` (no
 // pointermove/up) lets the row's 480ms hold timer fire `onHold` and open the
@@ -20,6 +21,9 @@ import { installMockIpc } from "../mock-ipc";
 
 const NOTE_ID = "note-decoration-1";
 const FOLDER_PATH = "Projects/";
+// The folded folder identity (`folderKey(FOLDER_PATH)`) — the key decorations
+// are stored under on every client post-MYND-562.
+const FOLDER_KEY = "projects/";
 // A note living in `Projects/` (canonical trailing-slash `folder:` frontmatter),
 // so the tree builds one folder row + one note row.
 const NOTE_BODY = `---\nfolder: ${FOLDER_PATH}\ntitle: Roadmap\n---\n\nDraft.\n`;
@@ -56,10 +60,10 @@ test.describe("folder icon + color decoration", () => {
     // Pick the "book" glyph.
     await page.locator('[data-testid="notes.decoration-icon"][data-icon-name="book"]').click();
 
-    // The whole-map setter fired with the folder's trailing-slash path as key.
+    // The whole-map setter fired with the folder's FOLDED identity as key.
     await expect
       .poll(() => page.evaluate(() => (window as unknown as { __folderIconWrites?: Array<Record<string, string>> }).__folderIconWrites ?? []))
-      .toContainEqual({ [FOLDER_PATH]: "book" });
+      .toContainEqual({ [FOLDER_KEY]: "book" });
   });
 
   test("assign a note color → set_item_colors keyed by the note id", async ({ page }) => {
@@ -87,7 +91,7 @@ test.describe("folder icon + color decoration", () => {
     await installMockIpc(page, {
       noteIds: [NOTE_ID],
       noteBodies: { [NOTE_ID]: NOTE_BODY },
-      prefs: { item_colors: { [FOLDER_PATH]: "moss" } },
+      prefs: { item_colors: { [FOLDER_KEY]: "moss" } },
     });
     await page.goto("/");
 
@@ -103,13 +107,30 @@ test.describe("folder icon + color decoration", () => {
       .toContainEqual({});
   });
 
+  test("fold-on-load migrates a legacy display-cased decoration to its folded key", async ({ page }) => {
+    // MYND-562: a mobile-only user's pre-change color was stored under a
+    // display-cased path (`Projects/`). On load, mobile now re-keys it to the
+    // folded identity (`projects/`) and persists once — else it goes invisible
+    // (the read looks up the folded key).
+    await installMockIpc(page, {
+      noteIds: [NOTE_ID],
+      noteBodies: { [NOTE_ID]: NOTE_BODY },
+      prefs: { item_colors: { [FOLDER_PATH]: "moss" } }, // legacy display-cased key
+    });
+    await page.goto("/");
+
+    await expect
+      .poll(() => page.evaluate(() => (window as unknown as { __itemColorWrites?: Array<Record<string, string>> }).__itemColorWrites ?? []))
+      .toContainEqual({ [FOLDER_KEY]: "moss" });
+  });
+
   test("display: a desktop-assigned icon + colors render on the rows", async ({ page }) => {
     await installMockIpc(page, {
       noteIds: [NOTE_ID],
       noteBodies: { [NOTE_ID]: NOTE_BODY },
       prefs: {
-        folder_icons: { [FOLDER_PATH]: "book" },
-        item_colors: { [FOLDER_PATH]: "clay", [NOTE_ID]: "moss" },
+        folder_icons: { [FOLDER_KEY]: "book" },
+        item_colors: { [FOLDER_KEY]: "clay", [NOTE_ID]: "moss" },
       },
     });
     await page.goto("/");
