@@ -43,7 +43,11 @@ export default defineConfig({
     globals: false,
     // Initialise the shared i18n instance so components calling
     // `useTranslation()` render with real source strings (see the file).
-    setupFiles: ["./tests/setup-i18n.ts", "./tests/setup-editor-host.ts"],
+    setupFiles: [
+      "./tests/setup-jsdom-cm6.ts",
+      "./tests/setup-i18n.ts",
+      "./tests/setup-editor-host.ts",
+    ],
     // Coverage targets the application code under `src/`; the `tests/`
     // unit suite is what drives the measurement. E2E + capture configs
     // live elsewhere and are not part of this report. `all: true` reports
