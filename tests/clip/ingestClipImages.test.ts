@@ -81,10 +81,17 @@ function fakePort(): ClipImageImporter & {
   const calls: { filename: string | null; bytes: number[] }[] = [];
   const stored = new Set<string>();
   const port: ClipImageImporter = async (img) => {
+    // Per-image cap — enforced Rust-side; here it surfaces as a typed reject.
+    // Check the raw Uint8Array length BEFORE materializing it into a plain
+    // number[]: `Array.from` on a 64 MiB+ buffer is ~500 MB and seconds of CPU,
+    // which times this test out under full-suite load (a load-dependent flake).
+    // The real host likewise rejects oversize bytes without a client-side copy.
+    if (img.bytes.length > PER_IMAGE_CAP) {
+      calls.push({ filename: img.filename, bytes: [] });
+      return { ok: false };
+    }
     const bytes = Array.from(img.bytes);
     calls.push({ filename: img.filename, bytes });
-    // Per-image cap — enforced Rust-side; here it surfaces as a typed reject.
-    if (bytes.length > PER_IMAGE_CAP) return { ok: false };
     // MIME re-sniff: a clip image whose first byte is 0 is a non-image
     // masquerading as one — the host's re-sniff rejects it (never trusts the
     // caller-claimed type).

@@ -1294,18 +1294,6 @@ runner(
         await s.byTestId("settings.modal", { timeoutMs: 8000 });
       });
 
-      // ---- Frame: account / Argon2id parameters ----
-      await frame(
-        s,
-        "settings-account-argon2id",
-        "settings-and-privacy/privacy-model",
-        "The Account settings panel showing the Argon2id key-derivation parameters.",
-        async () => {
-          await clickFirst(s, [testIdSelector("settings.tab-account")], 4000).catch(() => {});
-          await settle(s, 400);
-        },
-      );
-
       // ---- Frame: privacy (auto-lock + screen-capture) ----
       await frame(
         s,
@@ -1527,12 +1515,12 @@ runner(
         },
       );
 
-      // ---- Frame: account (label + icon + Argon2id + actions) ----
+      // ---- Frame: account (label + icon + actions) ----
       await frame(
         s,
         "account-panel",
         "settings-and-privacy/account",
-        "The Account settings panel showing the vault label and icon, the key-derivation parameters, and the change-password and delete-vault actions.",
+        "The Account settings panel showing the vault label and icon, and the change-password and delete-vault actions.",
         async () => {
           await (await s.byTestId("settings.tab-account")).click();
           await s.byTestId("settings.icon-picker", { timeoutMs: 6000 });
