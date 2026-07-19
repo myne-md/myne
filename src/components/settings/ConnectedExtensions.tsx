@@ -127,7 +127,10 @@ export function ConnectedExtensions() {
   const { t } = useTranslation();
   const [paired, setPaired] = useState<PairedExtension[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
-  const [installEnabled, setInstallEnabled] = useState(true);
+  // Default OFF (MYND-549): the clipper is disabled until the user opts in, so the
+  // optimistic pre-fetch value matches a fresh install (no flash of ON). The mount
+  // fetch below corrects it to the real flag (an explicitly-enabled user → ON).
+  const [installEnabled, setInstallEnabled] = useState(false);
   const [installBusy, setInstallBusy] = useState(false);
   const [installError, setInstallError] = useState<string | null>(null);
 
