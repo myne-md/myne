@@ -399,21 +399,13 @@ pub fn ensure_embedding_model_hash(base: &Path) -> Result<Option<[u8; 32]>, Mode
     ensure_model_hash(base, ModelRole::Embedding)
 }
 
-/// Return the transcription (Whisper) model hash, backfilling once if the
-/// pick-time marker is missing (voice-to-text, MYND-550; SYNC-V3). The transcript
-/// `MYE1` cache binds this into its model-identity so a model swap invalidates
-/// stale transcripts (§9.15-class, mirroring the `vault.embeddings` rule). `None`
-/// if no transcription model is selected.
-pub fn ensure_transcription_model_hash(base: &Path) -> Result<Option<[u8; 32]>, ModelStoreError> {
-    ensure_model_hash(base, ModelRole::Transcription)
-}
-
-/// Like [`ensure_transcription_model_hash`] but resolves the **effective**
-/// transcription model — the picker override if set, else the `bundled` default
-/// (voice-to-text, MYND-270) — so a transcript produced by the bundled model
-/// gets that model's identity hash bound into its `MYE1` cache (and swapping to
-/// an override correctly re-hashes → invalidates stale transcripts). `None` when
-/// neither an override nor a bundled model is present.
+/// The transcription (Whisper) model hash for the **effective** model — the
+/// picker override if set, else the `bundled` default (voice-to-text, MYND-270)
+/// — backfilled once if the marker is missing (like [`ensure_embedding_model_hash`]).
+/// A transcript produced by the bundled model gets that model's identity hash
+/// bound into its `MYE1` cache (and swapping to an override correctly re-hashes →
+/// invalidates stale transcripts). `None` when neither an override nor a bundled
+/// model is present.
 pub fn ensure_transcription_model_hash_with_bundled(
     base: &Path,
     bundled: Option<&Path>,

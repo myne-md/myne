@@ -5,66 +5,59 @@ desktop app, so transcription works out of the box once the user turns on AI
 (Settings → Labs → AI). It is **desktop-only** (mobile stays side-load). A user
 who picks their own model in the AI settings **overrides** whatever ships here.
 
+## What ships here
+
+| File | What | Tracking |
+|---|---|---|
+| `model.gguf` | quantized Whisper GGUF (candle format) — the default STT model | **Git LFS** (`.gitattributes` `*.gguf`) |
+| `config.json` | the Whisper config (`num_mel_bins`, `d_model`, …) | normal git |
+| `tokenizer.json` | the Whisper tokenizer | normal git |
+| `MODEL-LICENSE` | the Apache-2.0 license text for the weights | normal git |
+
 The engine (`src-tauri/src/plugins/local_inference/engine_candle.rs`,
-`load_transcription`) loads via candle's `WhisperVarBuilder::from_gguf`, so this
-directory MUST contain, with these exact names:
+`load_transcription`) loads `model.gguf` via candle's `WhisperVarBuilder::from_gguf`
+and reads the two siblings. If any file is absent (e.g. an `--no-default-features`
+AI-free build, or a checkout whose LFS blob was not fetched) resolution degrades
+cleanly to **side-load-only** (`NotReady`), so the build never breaks.
 
-| File | What |
-|---|---|
-| `model.gguf` | quantized Whisper GGUF (**candle format**, not whisper.cpp) — **Git LFS-tracked** |
-| `config.json` | the Whisper config (`num_mel_bins`, `max_position_embeddings`, …) |
-| `tokenizer.json` | the Whisper tokenizer |
+## Provenance (this model)
 
-Until these are present the wiring degrades cleanly to **side-load-only** (the
-engine returns `NotReady`, the UI shows "select a model"), so the build never
-breaks on a fresh checkout whose LFS blob was not fetched.
+- **Source:** [`openai/whisper-base`](https://huggingface.co/openai/whisper-base)
+  `model.safetensors` + `config.json` + `tokenizer.json`, revision
+  `e37978b90ca9030d5170a5c07aadb050351a65bb`. **License: Apache-2.0** (see
+  `MODEL-LICENSE`; attribution in the repo-root `LICENSING.md`).
+- **Quantization:** q8_0 (near-lossless), via candle `0.8.4` `tensor-tools`:
+  `tensor-tools quantize model.safetensors --out-file model.gguf --quantization q8_0`.
+- **`model.gguf` SHA-256:** `dd96b06f89f0ffe4a146a80835a846004688a5bc709768a47a0a13301f52b4a9`
+- **Verified end-to-end** with the `#[ignore]` real-model test
+  (`transcribe_with_a_real_model_streams_a_transcript`): a 16 kHz-mono WAV of
+  *"The quick brown fox jumps over the lazy dog. Myne keeps your notes encrypted
+  on your own device."* transcribed near-verbatim.
 
-## Producing `model.gguf` (candle-format q8_0 whisper-base)
+## Regenerating / updating the model
 
 candle's `from_gguf` needs a GGUF that candle's own `tensor-tools` produced — a
-whisper.cpp `ggml-base.bin` / whisper.cpp GGUF will **not** load (different
-tensor naming). The reference tiny models live at `lmz/candle-whisper`; a **base**
-GGUF is not published there, so generate one from the Apache-2.0 upstream weights:
+whisper.cpp `ggml-base.bin` / whisper.cpp GGUF will **not** load (different tensor
+naming). To refresh or swap the bundled model:
 
 ```sh
-# 1. Fetch the upstream safetensors weights + config + tokenizer (Apache-2.0):
-#    huggingface.co/openai/whisper-base  (model.safetensors, config.json, tokenizer.json)
-# 2. Quantize to q8_0 (near-lossless — "kaliteyi bozmadan") with candle tensor-tools:
-cargo run --release --example tensor-tools -- \
-    quantize --quantization q8_0 model.safetensors --out-file model.gguf
-# 3. Copy config.json + tokenizer.json next to model.gguf (same directory).
-# 4. Verify it actually loads + transcribes before committing (see below).
+# 1. Fetch openai/whisper-base weights + config + tokenizer (Apache-2.0).
+# 2. Quantize to a candle GGUF (q8_0 = near-lossless):
+cargo run --release --example ... tensor-tools -- \
+    quantize model.safetensors --out-file model.gguf --quantization q8_0
+# 3. Keep config.json + tokenizer.json next to model.gguf.
+# 4. Verify before committing (see below), then update the SHA-256 above.
 ```
 
-## Verify before committing
-
-Run the env-gated real-model test in `engine_candle.rs` (it is `#[ignore]` so it
-never runs in CI):
+Verify with the env-gated `#[ignore]` test (never runs in CI):
 
 ```sh
 MYNE_TEST_TRANSCRIPTION_MODEL=$(pwd)/model.gguf \
 MYNE_TEST_TRANSCRIPTION_AUDIO=/path/to/a/16k-mono.wav \
+MYNE_TEST_TRANSCRIPTION_EXPECT=fox \
 cargo test -p myne-desktop --features local-inference \
-    transcription -- --ignored --nocapture
+    transcribe_with_a_real_model_streams_a_transcript -- --ignored --nocapture
 ```
 
-## Commit via Git LFS
-
-`*.gguf` is Git LFS-tracked (repo-root `.gitattributes`). `config.json` /
-`tokenizer.json` are small and stay as normal git objects. Confirm the model is
-an LFS pointer, not a raw blob, before pushing:
-
-```sh
-git lfs track     # should list *.gguf
-git add model.gguf config.json tokenizer.json
-git lfs ls-files  # model.gguf must appear
-```
-
-## License
-
-The bundled weights derive from **OpenAI Whisper (`whisper-base`)**, licensed
-**Apache-2.0** — compatible with Myne's AGPL-3.0 and redistributable with
-attribution. Attribution is recorded in the repo-root
-[`LICENSING.md`](../../../../LICENSING.md) ("Bundled third-party assets"). When
-you commit the real model, add the upstream Apache-2.0 `LICENSE` text next to it
-as `MODEL-LICENSE` and reference the exact source revision.
+Commit via Git LFS (`git lfs ls-files` must list `model.gguf` as a pointer, not
+a raw blob).
