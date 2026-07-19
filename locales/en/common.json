@@ -731,7 +731,6 @@
         "moveRight": "Move right",
         "saveStatus": "Save status",
         "settings": "Settings",
-        "syncStatus": "Sync status",
         "tags": "Tags",
         "viewMode": "View mode",
         "views": "Views",
@@ -1884,7 +1883,6 @@
       "dev": "Dev"
     },
     "account": {
-      "argon2idHeading": "Argon2id parameters",
       "changePasswordButton": "Change password",
       "changePasswordError": {
         "invalidCredentialOrVault": "Wrong current password or vault file is corrupted.",
@@ -1898,9 +1896,6 @@
       "dangerZoneHeading": "Danger zone",
       "dangerZoneHelper": "Permanently delete this vault and all notes. Cannot be undone. Recovery phrase will not restore the vault.",
       "deleteVaultButton": "Delete vault…",
-      "memoryCost": "Memory cost",
-      "parallelism": "Parallelism",
-      "timeCost": "Time cost",
       "vaultLabelEyebrow": "VAULT LABEL",
       "vaultLabelHelper": "A name for this vault shown in the in-app switcher. Stored encrypted inside the vault; never leaves your device in plaintext.",
       "vaultLabelPlaceholder": "Add a label…",
