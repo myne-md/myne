@@ -147,15 +147,13 @@ describe("Transcribe ⋮-menu row gating (SYNC-V7)", () => {
     expect(row!.disabled).toBe(false);
   });
 
-  it("shows the Transcribe row DISABLED (not omitted) when the AI facet is false", () => {
+  it("HIDES the Transcribe row when the AI facet is false", () => {
     const { view } = installHost({ aiEnabled: false, withTranscribe: true });
     const dom = build(view);
     openMenu(dom);
-    const row = transcribeRow();
-    expect(row).not.toBeNull();
-    expect(row!.disabled).toBe(true);
-    // The real label is kept (disabled-not-hidden discipline).
-    expect(row!.textContent).toBe("Transcribe");
+    // Local AI off (or the note's folder AI-excluded) → the row is omitted
+    // entirely (MYND-270: hidden, not shown-disabled).
+    expect(transcribeRow()).toBeNull();
   });
 });
 

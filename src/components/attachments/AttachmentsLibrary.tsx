@@ -1106,14 +1106,14 @@ function ItemMenu({
           },
         ]
       : []),
-    // Transcribe — audio only (SYNC-V9), gated on `ai_enabled` ALONE
-    // (disabled-not-hidden when AI is off; no folder-exclusion gate).
-    ...(transcribable
+    // Transcribe — audio only (SYNC-V9), gated on `ai_enabled` ALONE (no
+    // folder-exclusion gate). HIDDEN when local AI is off (MYND-270 product
+    // tweak: no dangling affordance when the subsystem is off), not disabled.
+    ...(transcribable && aiEnabled
       ? [
           {
             id: "transcribe",
             label: t("attachments.library.menuTranscribe"),
-            disabled: !aiEnabled,
             onSelect: onTranscribe,
           },
         ]
