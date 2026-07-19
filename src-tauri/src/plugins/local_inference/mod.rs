@@ -126,7 +126,20 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             let engine: std::sync::Arc<dyn engine::Engine> = {
                 let base = crate::paths::app_data_dir(app)
                     .unwrap_or_else(|_| std::path::PathBuf::from("."));
-                std::sync::Arc::new(engine_candle::CandleEngine::new(base))
+                // The bundled default transcription model (voice-to-text,
+                // MYND-270), resolved from the Tauri resource dir — `None` when
+                // none ships (an AI-free `--no-default-features` build, or a
+                // checkout whose LFS model blob was not fetched), leaving STT
+                // side-load-only.
+                let bundled_transcription = app
+                    .path()
+                    .resource_dir()
+                    .ok()
+                    .and_then(|rd| model_store::bundled_transcription_model(&rd));
+                std::sync::Arc::new(
+                    engine_candle::CandleEngine::new(base)
+                        .with_bundled_transcription(bundled_transcription),
+                )
             };
             app.manage(state::LocalInferenceState::new(engine));
             app.manage(vector_store::LocalInferenceVectorState::default());

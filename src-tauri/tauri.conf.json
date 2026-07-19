@@ -96,7 +96,8 @@
       "resources/dictionaries/ru": "dictionaries/ru",
       "resources/dictionaries/sk": "dictionaries/sk",
       "resources/dictionaries/sl": "dictionaries/sl",
-      "resources/dictionaries/sv": "dictionaries/sv"
+      "resources/dictionaries/sv": "dictionaries/sv",
+      "resources/models/whisper": "models/whisper"
     }
   }
 }

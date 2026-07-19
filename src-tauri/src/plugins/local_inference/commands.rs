@@ -27,7 +27,7 @@ use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 use tauri::ipc::Channel;
-use tauri::{AppHandle, Runtime, State};
+use tauri::{AppHandle, Manager, Runtime, State};
 use zeroize::Zeroizing;
 
 use myne_core::plugins::attachments::extract_types::{ExtractStatus, SourceFormat};
@@ -679,7 +679,22 @@ pub async fn get_model_path<R: Runtime>(
     let base = crate::paths::app_data_dir(&app).map_err(|_| ModelStoreError::Io {
         kind: crate::io_failure_kind::IoFailureKind::Other,
     })?;
-    Ok(model_store::selected_model(&base, role)?.map(|p| p.to_string_lossy().into_owned()))
+    // Transcription resolves override-else-bundled (voice-to-text, MYND-270): the
+    // UI readiness signal (`useAiModelReady`) then reports "ready" — and shows the
+    // active model path — whenever the bundled default is present, not only after
+    // a user override. Other roles are override-only (no bundled default).
+    let resolved = match role {
+        ModelRole::Transcription => {
+            let bundled = app
+                .path()
+                .resource_dir()
+                .ok()
+                .and_then(|rd| model_store::bundled_transcription_model(&rd));
+            model_store::effective_transcription_model(&base, bundled.as_deref())?
+        }
+        _ => model_store::selected_model(&base, role)?,
+    };
+    Ok(resolved.map(|p| p.to_string_lossy().into_owned()))
 }
 
 /// Testable core of [`infer`]: `Zeroizing`-wrap → `spawn_blocking` → trait.
