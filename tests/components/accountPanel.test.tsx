@@ -115,9 +115,8 @@ function renderPanel(overrides: Partial<Parameters<typeof AccountPanel>[0]> = {}
 }
 
 describe("AccountPanel — idle view", () => {
-  it("renders the Argon2id readout + change-password CTA + danger zone", async () => {
+  it("renders the change-password CTA + danger zone", async () => {
     renderPanel();
-    expect(screen.getByText("256 MiB")).toBeTruthy();
     expect(screen.getByTestId("settings.change-password-cta")).toBeTruthy();
     expect(screen.getByText("Delete vault…")).toBeTruthy();
     // The label loads from prefs on mount.

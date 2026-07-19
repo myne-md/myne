@@ -52,6 +52,10 @@ describe("SpellSettings — enable toggle", () => {
     await waitFor(() =>
       expect(screen.getByTestId("settings.spell-check").textContent).toBe("On"),
     );
+    // Wait for `prefsRead` to resolve and seed `active` (the picker trigger shows
+    // the selected language label) before toggling — otherwise the click races
+    // the async load and fires with an empty language set.
+    await screen.findByText("English (US)");
     await act(async () => {
       fireEvent.click(screen.getByTestId("settings.spell-check"));
     });
@@ -97,7 +101,10 @@ describe("SpellSettings — enable toggle", () => {
 describe("SpellSettings — language selection", () => {
   it("adding a language persists the new set + live-updates the editor", async () => {
     render(<SpellSettings />);
-    await waitFor(() => expect(prefsRead).toHaveBeenCalled());
+    // Wait for `prefsRead` to resolve and seed `active` with ["en-US"] before
+    // adding "de" — otherwise the add races the async load and the resulting set
+    // is missing the seeded language.
+    await screen.findByText("English (US)");
 
     fireEvent.click(screen.getByTestId("settings.spell-language-select"));
     const de = (
