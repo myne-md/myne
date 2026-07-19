@@ -46,7 +46,7 @@ export type PairingError =
  * lowercase labels ("firefox" | "chrome" | "edge") whose manifest is present.
  */
 export interface ClipperInstallStatus {
-  /** Whether the host manifest is registered (the opt-in flag; absent ⇒ on). */
+  /** Whether the host manifest is registered (the opt-in flag; absent ⇒ off). */
   enabled: boolean;
   /** The absolute path of the running host binary the manifest points at. */
   hostPath: string | null;

@@ -1,8 +1,7 @@
 // Settings → Account panel. Three sub-views driven by local `view` state:
 //
-//   - "idle" — Argon2id parameters readout, Change password CTA, Danger
-//     zone with active Delete vault button (MYND-105 backend + MYND-108
-//     frontend both shipped).
+//   - "idle" — Change password CTA, Danger zone with active Delete vault
+//     button (MYND-105 backend + MYND-108 frontend both shipped).
 //   - "change-password" — `<PasswordChangeForm>` replaces the panel;
 //     Cancel returns to idle; Submit calls `vault_change_password` IPC.
 //   - "delete-vault" — `<DeleteVaultConfirmForm>` replaces the panel;
@@ -230,26 +229,6 @@ function iconPickerButtonStyle(
     opacity: disabled ? 0.6 : 1,
   };
 }
-
-const KV_ROW_STYLE: CSSProperties = {
-  display: "flex",
-  flexDirection: "row",
-  alignItems: "baseline",
-  gap: "var(--space-4)",
-};
-
-const KV_LABEL_STYLE: CSSProperties = {
-  fontSize: "var(--text-base)",
-  color: "var(--fg-2)",
-  width: 140,
-  flexShrink: 0,
-};
-
-const KV_VALUE_STYLE: CSSProperties = {
-  fontSize: "var(--text-base)",
-  color: "var(--fg-1)",
-  fontFamily: "var(--font-mono)",
-};
 
 const ROOT_STYLE: CSSProperties = {
   display: "flex",
@@ -603,24 +582,6 @@ export function AccountPanel({
 
   return (
     <div style={ROOT_STYLE}>
-      <section style={SECTION_STYLE}>
-        <h3 style={SECTION_HEADING_STYLE}>{t("settings.account.argon2idHeading")}</h3>
-        <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
-          <div style={KV_ROW_STYLE}>
-            <span style={KV_LABEL_STYLE}>{t("settings.account.memoryCost")}</span>
-            <span style={KV_VALUE_STYLE}>256 MiB</span>
-          </div>
-          <div style={KV_ROW_STYLE}>
-            <span style={KV_LABEL_STYLE}>{t("settings.account.timeCost")}</span>
-            <span style={KV_VALUE_STYLE}>3</span>
-          </div>
-          <div style={KV_ROW_STYLE}>
-            <span style={KV_LABEL_STYLE}>{t("settings.account.parallelism")}</span>
-            <span style={KV_VALUE_STYLE}>2</span>
-          </div>
-        </div>
-      </section>
-
       <section style={SECTION_STYLE}>
         <h3 style={SECTION_HEADING_STYLE}>{t("settings.account.changePasswordHeading")}</h3>
         <p style={HELPER_TEXT_STYLE}>{t("settings.account.changePasswordHelper")}</p>
