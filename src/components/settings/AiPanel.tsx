@@ -12,8 +12,9 @@
 // models" links open in the user's OWN browser via the opener plugin (an OS
 // handoff, not a Myne fetch — the same affordance the About panel uses for the
 // threat-model doc); the user downloads there and side-loads the files with the
-// pickers. Two roles: a Qwen2-family GGUF for generation (summaries / chat /
-// writing) and an all-MiniLM-L6-v2 embedding model for semantic search / Q&A.
+// pickers. Three roles: a Qwen2-family GGUF for generation (summaries / chat /
+// writing), an all-MiniLM-L6-v2 embedding model for semantic search / Q&A, and
+// a Whisper GGUF for speech-to-text transcription (MYND-270).
 //
 // Honesty discipline: the trust copy renders the `load-bearing-copy.ts`
 // constants VERBATIM (never i18n'd, E2E-pinned by literal equality); it makes
@@ -106,8 +107,11 @@ const MODEL_FILTER: Record<ModelRole, { nameKey: string; extensions: string[] }>
     extensions: ["safetensors"],
   },
   transcription: {
-    nameKey: "settings.ai.modelFilter.safetensors",
-    extensions: ["safetensors"],
+    // The Whisper engine loads via `WhisperVarBuilder::from_gguf`
+    // (`engine_candle.rs::load_transcription`), so the override picker must
+    // offer `.gguf` — a `.safetensors` pick fails `from_gguf` at load time.
+    nameKey: "settings.ai.modelFilter.gguf",
+    extensions: ["gguf"],
   },
 };
 
@@ -319,7 +323,8 @@ export function AiPanel({ onShowToast }: AiPanelProps) {
 
       {/* Models — side-load only, no in-app download (SYNC-1/2). Recommended
           links open in the user's browser; the pickers take the downloaded
-          files. Two roles: text (GGUF) + search/embedding (safetensors). */}
+          files. Three roles: text (GGUF) + search/embedding (safetensors) +
+          speech-to-text (Whisper GGUF). */}
       <div style={BLOCK_STYLE} data-testid="ai.models-section">
         <label style={LABEL_STYLE}>{t("settings.ai.modelsLabel")}</label>
         <p style={HELPER_STYLE}>{t("settings.ai.modelsHelper")}</p>
