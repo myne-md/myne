@@ -134,6 +134,12 @@ fn select_device() -> Device {
 /// live under; the models load lazily from the user's side-load paths.
 pub struct CandleEngine {
     base: PathBuf,
+    /// The bundled default transcription model shipped as a Tauri resource
+    /// (voice-to-text, MYND-270; desktop-only), resolved once at construction —
+    /// `None` when none ships (AI-free build / unfetched LFS blob). Used by
+    /// `load_transcription` when the user set no `transcription.path` override,
+    /// so speech-to-text works out of the box.
+    bundled_transcription: Option<PathBuf>,
     /// Compute device chosen once at construction (Metal GPU on macOS, else CPU).
     device: Device,
     /// Serializes ALL GPU/compute work across `infer` + `embed`. The `gen` and
@@ -153,16 +159,28 @@ pub struct CandleEngine {
 
 impl CandleEngine {
     /// Construct with the `model_store` base dir (`app_data_dir`). Nothing loads
-    /// until the first `infer`/`embed`; the compute device is picked now.
+    /// until the first `infer`/`embed`; the compute device is picked now. No
+    /// bundled transcription model by default (tests + the model-less baseline);
+    /// production wires one via [`with_bundled_transcription`].
     pub fn new(base: PathBuf) -> Self {
         Self {
             base,
+            bundled_transcription: None,
             device: select_device(),
             compute: Mutex::new(()),
             gen: Mutex::new(None),
             embed: Mutex::new(None),
             transcription: Mutex::new(None),
         }
+    }
+
+    /// Attach the bundled default transcription model (voice-to-text, MYND-270),
+    /// resolved from the Tauri `resource_dir` in `super::init`. `None` leaves the
+    /// engine side-load-only for STT. Builder-style so the ~13 test call sites of
+    /// [`new`] are untouched.
+    pub fn with_bundled_transcription(mut self, path: Option<PathBuf>) -> Self {
+        self.bundled_transcription = path;
+        self
     }
 
     fn sibling(model_path: &Path, name: &str) -> PathBuf {
@@ -284,23 +302,27 @@ impl CandleEngine {
         })
     }
 
-    /// Lazy-load the side-loaded Whisper model (voice-to-text, MYND-550; task 3).
-    /// Layout mirrors the embedding model: the user picks a quantized `<model>.gguf`
-    /// with siblings `config.json` + `tokenizer.json`. `NotReady` when no model is
-    /// selected; the mel filterbank is computed from `config.num_mel_bins` (no
-    /// data blob). DENY-safe logging only — no path / audio / transcript.
+    /// Lazy-load the Whisper transcription model (voice-to-text, MYND-550; task 3).
+    /// Resolution is override-else-bundled: the user's picked `transcription.path`
+    /// (a quantized `<model>.gguf` + sibling `config.json` + `tokenizer.json`) if
+    /// set, else the bundled default (MYND-270). `NotReady` only when neither is
+    /// present; the mel filterbank is computed from `config.num_mel_bins` (no data
+    /// blob). DENY-safe logging only — no path / audio / transcript.
     fn load_transcription(&self) -> Result<LoadedTranscription, EngineError> {
         let started = Instant::now();
         let model_path = match selected_model(&self.base, ModelRole::Transcription) {
             Ok(Some(p)) => p,
-            Ok(None) => {
-                tracing::warn!(
-                    target: "myne::ai",
-                    stage = "load_transcription",
-                    "no transcription (voice) model selected — pick a Whisper .gguf in Settings → AI"
-                );
-                return Err(EngineError::NotReady);
-            }
+            Ok(None) => match &self.bundled_transcription {
+                Some(p) => p.clone(),
+                None => {
+                    tracing::warn!(
+                        target: "myne::ai",
+                        stage = "load_transcription",
+                        "no transcription model — no override picked and no bundled default present"
+                    );
+                    return Err(EngineError::NotReady);
+                }
+            },
             Err(e) => {
                 tracing::error!(
                     target: "myne::ai",
