@@ -2,15 +2,21 @@
 // across note switches so per-note undo history survives — the core acceptance
 // of the persistent-EditorView refactor.
 //
-//   pv1 — UNDO SURVIVES A SWITCH: type an edit in note A, open note B (A stays
-//         open in a background tab), switch back to A's tab, press undo, and
-//         assert the edit reverted. Pre-change this fails: A's view was torn
-//         down + rebuilt empty on every open, so its undo stack was gone.
-//   pv2 — CONTENT ISOLATION ACROSS SWITCH: A and B keep their own bodies across
-//         a round-trip (no bleed from the shared persistent view).
+//   pv1 — UNDO SURVIVES A SWITCH: open notes A and B as two tabs in the one pane,
+//         type an edit in A, switch to B's tab, switch back to A's tab, press undo,
+//         and assert the edit reverted. Pre-change this fails: A's view was torn
+//         down + rebuilt empty on every switch, so its undo stack was gone.
+//   pv2 — CONTENT ISOLATION ACROSS SWITCH: A and B keep their own bodies across a
+//         round-trip (no bleed from the shared persistent view).
 //
-// AUTHORED ON A NON-HARNESS HOST (macOS) — pending green-3× verification on the
-// Linux tauri-driver container (the e2e DoD; `./scripts/e2e-local.sh`).
+// TAB SETUP: a create (or a plain sidebar-row click) REUSES the focused pane's
+// active tab slot — it does NOT open a background tab (openInFocusedTab, MYND-166).
+// So: create A, PIN it, then create B — a pinned active tab makes openInFocusedTab
+// route B into a NEW tab, leaving A resident. Both notes then coexist for the
+// persistent view to swap between (the tab-count-verified tab-modes.e2e.ts path).
+//
+// Verified green-3× on the Linux tauri-driver container (the e2e DoD;
+// `./scripts/e2e-local.sh`).
 //
 // KDF: weak generator fixtures (SYNC-9 — params are vault.meta-resident).
 
@@ -52,6 +58,18 @@ async function sendCtrlChord(session: Session, key: string): Promise<void> {
   });
 }
 
+// The live editable surface (the selector support/flows.ts uses to drive it).
+const CM_CONTENT = '[data-testid="editor.content"] .cm-content';
+
+/** Focus the live editor so an editor keybind (undo) lands on its content DOM. A
+ *  tab click focuses the tab button, and under this WebDriver a plain click does
+ *  NOT move focus into `.cm-content` — but a `sendKeys`' implicit focus does. A
+ *  caret-only ArrowRight focuses it with no doc change (proven pattern from
+ *  find-replace.e2e.ts fr1). */
+async function focusEditor(session: Session): Promise<void> {
+  await (await session.waitForElement(CM_CONTENT)).sendKeys(String.fromCharCode(0xe014)); // ARROW_RIGHT
+}
+
 /** The DOM-order note-row ids once exactly `expected` rows exist. */
 async function noteRowIds(session: Session, expected: number): Promise<string[]> {
   const rows = await session.waitUntil(
@@ -64,6 +82,17 @@ async function noteRowIds(session: Session, expected: number): Promise<string[]>
   return Promise.all(rows.map(async (r) => (await r.attribute("data-note-id")) ?? ""));
 }
 
+/** The id of the single note row that is NOT `exclude`, once `total` rows exist. */
+async function otherNoteRowId(
+  session: Session,
+  exclude: string,
+  total: number,
+): Promise<string> {
+  const other = (await noteRowIds(session, total)).find((id) => id !== exclude);
+  if (other === undefined) throw new Error(`no note row other than ${exclude}`);
+  return other;
+}
+
 /** Click the open tab for `noteId` to make it the active buffer in its pane. */
 async function switchToNoteTab(session: Session, noteId: string): Promise<void> {
   await (
@@ -71,6 +100,50 @@ async function switchToNoteTab(session: Session, noteId: string): Promise<void> 
       testIdSelector("editor.tab", { "data-tab-id": `note:${noteId}` }),
     )
   ).click();
+}
+
+/** Pin the open tab for `noteId` via its right-click menu (tab-modes.e2e.ts
+ *  pattern). A pinned active tab makes the NEXT create/open land in a new tab. */
+async function pinTab(session: Session, noteId: string): Promise<void> {
+  const tab = await session.waitForElement(
+    testIdSelector("editor.tab", { "data-tab-id": `note:${noteId}` }),
+  );
+  await tab.rightClick();
+  await (
+    await session.waitForElement(
+      testIdSelector("notes.context-menu-item", { "data-item-id": "tab.pin" }),
+    )
+  ).click();
+}
+
+/** Open notes A and B as two resident tabs in the one pane and return their ids.
+ *  A create (or a plain row click) REUSES the pane's active tab slot
+ *  (openInFocusedTab, MYND-166) — it can't open a background tab on its own. So:
+ *  create A, PIN it, then create B — with a pinned active tab, openInFocusedTab
+ *  routes B into a NEW tab, leaving A resident. Both notes then coexist for the
+ *  persistent view to swap between. (This is the tab-count-verified
+ *  tab-modes.e2e.ts pinning path; middleClick's auxclick does not fire reliably
+ *  under the harness WebView.) */
+async function openTwoNoteTabs(
+  session: Session,
+): Promise<{ aId: string; bId: string }> {
+  await createNote(session, NOTE_A);
+  const [aId] = await noteRowIds(session, 1);
+  await pinTab(session, aId);
+  await createNote(session, NOTE_B); // pinned A → B opens in a NEW tab → [A, B]
+  const bId = await otherNoteRowId(session, aId, 2);
+  // Confirm BOTH tabs are resident before the suite drives switches.
+  await session.waitUntil(
+    async () => {
+      const tabs = await session.byTestIdAll("editor.tab");
+      const ids = await Promise.all(
+        tabs.map(async (t) => (await t.attribute("data-tab-id")) ?? ""),
+      );
+      return ids.includes(`note:${aId}`) && ids.includes(`note:${bId}`) ? true : null;
+    },
+    { label: "both notes resident as tabs", timeoutMs: 15_000 },
+  );
+  return { aId, bId };
 }
 
 describeE2E("pv1 persistent view — undo survives a note switch (MYND-534)", () => {
@@ -85,24 +158,32 @@ describeE2E("pv1 persistent view — undo survives a note switch (MYND-534)", ()
         await unlockToEditor(s, password);
         await dismissImporterOffer(s);
 
-        // Note A, then an edit we will try to undo after a round-trip.
-        await createNote(s, NOTE_A);
-        const [aId] = await noteRowIds(s, 1);
+        // Two notes, BOTH resident as tabs in the one pane.
+        const { aId, bId } = await openTwoNoteTabs(s);
+
+        // Edit A: focus its tab, type, save — A's view now holds the edit and its
+        // undo history.
+        await switchToNoteTab(s, aId);
         await typeIntoEditor(s, EDIT_MARKER);
         await waitForSaved(s);
 
-        // Note B opens in a new tab (A stays resident in a background tab).
-        await createNote(s, NOTE_B);
-        await noteRowIds(s, 2);
-
-        // Back to A, then undo — the edit must revert, which requires A's view
-        // (and its undo history) to have survived the switch.
+        // Switch to B, then back to A, then undo — the edit must revert, which
+        // requires A's view (and its undo history) to have survived the switch.
+        await switchToNoteTab(s, bId);
         await switchToNoteTab(s, aId);
-        await sendCtrlChord(s, "z");
-
+        // A tab click focuses the tab, not the body editor, so re-focus it (the
+        // undo keybind is a CM binding that only fires on a key event reaching the
+        // body content DOM). The FIRST W3C Ctrl+Z right after a persistent-view
+        // swap is intermittently dropped by the WebView, so re-focus + re-send the
+        // chord each poll until the edit reverts — over-undo is harmless (the
+        // assertion needs only the marker gone).
         await s.waitUntil(
-          async () => (!(await editorText(s)).includes(EDIT_MARKER) ? true : null),
-          { label: "undo reverted the pre-switch edit in note A" },
+          async () => {
+            await focusEditor(s);
+            await sendCtrlChord(s, "z");
+            return !(await editorText(s)).includes(EDIT_MARKER) ? true : null;
+          },
+          { label: "undo reverted the pre-switch edit in note A", timeoutMs: 20_000 },
         );
       },
     );
@@ -121,15 +202,16 @@ describeE2E("pv2 persistent view — content isolation across a switch (MYND-534
         await unlockToEditor(s, password);
         await dismissImporterOffer(s);
 
-        await createNote(s, NOTE_A);
-        const [aId] = await noteRowIds(s, 1);
+        const { aId, bId } = await openTwoNoteTabs(s);
+
+        // Give A its own body.
+        await switchToNoteTab(s, aId);
         await typeIntoEditor(s, EDIT_MARKER);
         await waitForSaved(s);
 
-        await createNote(s, NOTE_B);
-        await noteRowIds(s, 2);
-
-        // Back to A: it must show A's body (with the marker), not B's.
+        // Back to A after visiting B: it must show A's body (with the marker), not
+        // B's — no bleed from the shared persistent view.
+        await switchToNoteTab(s, bId);
         await switchToNoteTab(s, aId);
         await s.waitUntil(
           async () => ((await editorText(s)).includes(EDIT_MARKER) ? true : null),
