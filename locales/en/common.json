@@ -2359,7 +2359,6 @@
         "aiExcluded": "excluded folders ignore ai privacy exclude",
         "aiModels": "models gguf download text embedding llm",
         "archive": "archive archiving hide restore notes",
-        "argon2id": "argon2id kdf key derivation parameters memory hardness security",
         "autoBackup": "automatic backups schedule frequency retention folder",
         "autoLock": "auto lock timeout idle lock timer inactivity session",
         "backup": "backup export .myne-backup restore save copy",
