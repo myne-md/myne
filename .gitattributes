@@ -1,0 +1,4 @@
+# On-device AI model weights are large binaries — track via Git LFS, never as
+# raw git blobs (repo-history bloat). The bundled default transcription model
+# (voice-to-text, MYND-270) is a quantized Whisper GGUF; user-side-loaded models
+# live outside the repo. See LICENSING.md for the weights' license (Apache-2.0).

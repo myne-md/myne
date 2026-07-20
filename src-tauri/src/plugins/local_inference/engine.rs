@@ -130,6 +130,45 @@ pub trait Engine: Send + Sync {
     /// model identity, silently poisoning retrieval (§9.17.2/§9.17.4). Default
     /// no-op — the stub holds no cache.
     fn invalidate_models(&self) {}
+
+    /// Transcribe already-decoded audio to text (voice-to-text, MYND-550;
+    /// SYNC-V5). `pcm` is **16 kHz mono f32** — the WAV decode + resample happen
+    /// at the command layer ([`super::audio`]) so the engine stays pure
+    /// model-compute; a Whisper impl feeds this straight into the log-mel front
+    /// end. Blocking (CPU-bound, like [`Engine::infer`]); the async /
+    /// `spawn_blocking` seam is the command's. Auto-detects the spoken language
+    /// and transcribes **in that language** — never translates (SYNC-V3).
+    ///
+    /// `pcm` is decrypted audio (AS1-class) — **never logged** (DENY-list); the
+    /// returned transcript is likewise content and is never logged.
+    ///
+    /// Default: [`EngineError::NotReady`] — an engine with no ASR model (a
+    /// generation/embedding-only build) has no transcription path. The real
+    /// Candle-Whisper impl and the [`StubEngine`] override this.
+    fn transcribe(&self, _pcm: &[f32]) -> Result<String, EngineError> {
+        Err(EngineError::NotReady)
+    }
+
+    /// Streaming transcription (SYNC-V5): emits each newly-decoded ~30 s
+    /// segment's text through `on_segment` as Whisper finishes it, and also
+    /// returns the full transcript so non-streaming callers keep working.
+    /// `on_segment` returning [`ControlFlow::Break`] stops decoding early — the
+    /// seam the UI "Stop" button and the vault-lock abort ([`super::cancel`])
+    /// drive — and the transcript produced so far is returned.
+    ///
+    /// The callback receives transcript text only; **no PCM or transcript span
+    /// is ever logged** (DENY-list). Default: a non-streaming fallback that
+    /// transcribes the whole clip and emits it once — correct for the stub and
+    /// any engine with no segment-incremental path.
+    fn transcribe_streaming(
+        &self,
+        pcm: &[f32],
+        on_segment: &mut dyn FnMut(&str) -> ControlFlow<()>,
+    ) -> Result<String, EngineError> {
+        let out = self.transcribe(pcm)?;
+        let _ = on_segment(&out);
+        Ok(out)
+    }
 }
 
 /// Trivial in-memory engine used before any model lands (the task-1 tracer).
@@ -166,6 +205,33 @@ impl Engine for StubEngine {
         for chunk in full.split_inclusive(' ') {
             emitted.push_str(chunk);
             if on_token(chunk).is_break() {
+                return Ok(emitted);
+            }
+        }
+        Ok(emitted)
+    }
+
+    fn transcribe(&self, pcm: &[f32]) -> Result<String, EngineError> {
+        // Deterministic, model-free: encode the sample count so a test can
+        // assert the value came through the trait against the stub (not a real
+        // decode), and the E2E flow can assert a transcript round-tripped
+        // without shipping a Whisper model into the repo.
+        Ok(format!("stub-transcript: {} samples", pcm.len()))
+    }
+
+    fn transcribe_streaming(
+        &self,
+        pcm: &[f32],
+        on_segment: &mut dyn FnMut(&str) -> ControlFlow<()>,
+    ) -> Result<String, EngineError> {
+        // Emit in whitespace-inclusive chunks like `infer_streaming`, so a test
+        // can assert incremental delivery AND that the concatenation equals the
+        // blocking `transcribe`. `Break` returns the partial emitted so far.
+        let full = format!("stub-transcript: {} samples", pcm.len());
+        let mut emitted = String::new();
+        for chunk in full.split_inclusive(' ') {
+            emitted.push_str(chunk);
+            if on_segment(chunk).is_break() {
                 return Ok(emitted);
             }
         }
@@ -269,5 +335,49 @@ mod tests {
         assert!(out.contains("hi"));
         assert!(out.contains("hello"));
         assert!(out.contains("again"));
+    }
+
+    #[test]
+    fn stub_transcribe_returns_through_trait() {
+        let engine: &dyn Engine = &StubEngine;
+        let pcm = vec![0.0f32; 16_000]; // 1 s of 16 kHz mono silence
+        let out = engine
+            .transcribe(&pcm)
+            .expect("stub transcribe never fails");
+        assert!(out.contains("stub-transcript"));
+        assert!(out.contains("16000"));
+    }
+
+    #[test]
+    fn stub_transcribe_streaming_concatenates_to_blocking() {
+        let engine: &dyn Engine = &StubEngine;
+        let pcm = vec![0.0f32; 32_000];
+        let mut segments: Vec<String> = Vec::new();
+        let full = engine
+            .transcribe_streaming(&pcm, &mut |s| {
+                segments.push(s.to_string());
+                ControlFlow::Continue(())
+            })
+            .expect("stub streaming transcribe never fails");
+        assert!(segments.len() > 1, "expected multiple segment emissions");
+        assert_eq!(segments.concat(), full);
+        assert_eq!(full, engine.transcribe(&pcm).unwrap());
+    }
+
+    #[test]
+    fn default_transcribe_is_not_ready() {
+        // An engine that overrides nothing (generation/embedding-only) has no
+        // ASR path: the trait default returns NotReady rather than panicking.
+        struct BareEngine;
+        impl Engine for BareEngine {
+            fn infer(&self, _p: &str) -> Result<String, EngineError> {
+                Ok(String::new())
+            }
+            fn embed(&self, _t: &str) -> Result<Vec<f32>, EngineError> {
+                Ok(Vec::new())
+            }
+        }
+        let engine: &dyn Engine = &BareEngine;
+        assert_eq!(engine.transcribe(&[0.0; 8]), Err(EngineError::NotReady));
     }
 }

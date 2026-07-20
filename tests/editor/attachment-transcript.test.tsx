@@ -1,0 +1,258 @@
+// @vitest-environment jsdom
+//
+// Transcript UI on the audio-attachment widget (voice-to-text MYND-552). Drives
+// AttachmentAudioWidget.toDOM directly (no full editor mount) and asserts the
+// SYNC-V7 seam contract: the ⋮ "Transcribe" row gating on the AI facet + host
+// slot, the in-flight progress affordance + Stop, the completed read-only
+// expander + verbatim honesty note (SYNC-V8), the explicit insert-into-note
+// action (SYNC-V1/V17), and the no-model hint (SYNC-V3). The host `transcribe`
+// slot is a controllable stub — no Tauri, no real engine.
+
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("../../src/editor/attachments/pdf-reader", () => ({
+  mountPdfScroller: () => () => {},
+}));
+vi.mock("../../src/editor/attachments/lightbox", () => ({
+  showAttachmentLightbox: vi.fn(),
+}));
+vi.mock("../../src/editor/attachments/waveform", () => ({
+  decodePeaks: vi.fn(async () => [] as number[]),
+}));
+
+import { AttachmentAudioWidget } from "../../src/editor/attachments/widgets";
+import { __clearTranscriptStore } from "../../src/editor/attachments/transcript";
+import { type EditorHost, getHost, setEditorHost } from "../../src/editor/host";
+import type { TranscribeHandle, TranscribeOptions } from "../../src/editor/host";
+import { AI_TRANSCRIPT_HONESTY_NOTE } from "../../src/lib/load-bearing-copy";
+
+const ID = "a".repeat(64);
+const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+const baseHost = getHost();
+
+/** A controllable stand-in for the desktop `transcribe` slot. */
+interface TranscribeStub {
+  spy: ReturnType<typeof vi.fn>;
+  stop: ReturnType<typeof vi.fn>;
+  resolve: (transcript: string) => void;
+  reject: (err: unknown) => void;
+  segment: (partial: string) => void;
+}
+
+function installHost(opts: {
+  aiEnabled: boolean;
+  withTranscribe: boolean;
+  honestyNote?: string;
+}): { view: EditorViewStub; stub: TranscribeStub } {
+  const stub: TranscribeStub = {
+    spy: vi.fn(),
+    stop: vi.fn(),
+    resolve: () => {},
+    reject: () => {},
+    segment: () => {},
+  };
+
+  const transcribe = ((_view, _id, o?: TranscribeOptions): TranscribeHandle => {
+    stub.segment = (partial: string) => o?.onSegment?.(partial);
+    const done = new Promise<string>((res, rej) => {
+      stub.resolve = res;
+      stub.reject = rej;
+    });
+    return { done, stop: stub.stop };
+  }) as EditorHost["transcribe"];
+  stub.spy = vi.fn(transcribe);
+
+  setEditorHost({
+    ...baseHost,
+    transcribe: opts.withTranscribe ? (stub.spy as EditorHost["transcribe"]) : undefined,
+    transcriptHonestyNote: opts.honestyNote,
+  });
+
+  const dispatched: { changes?: unknown; userEvent?: string }[] = [];
+  const view: EditorViewStub = {
+    state: {
+      facet: () => opts.aiEnabled,
+      doc: { length: 0 },
+      selection: { main: { head: 0 } },
+    },
+    dom: { isConnected: true },
+    dispatch: (tr: { changes?: unknown; userEvent?: string }) => dispatched.push(tr),
+    focus: () => {},
+    dispatched,
+  };
+  return { view, stub };
+}
+
+interface EditorViewStub {
+  state: {
+    facet: () => boolean;
+    doc: { length: number };
+    selection: { main: { head: number } };
+  };
+  dom: { isConnected: boolean };
+  dispatch: (tr: { changes?: unknown; userEvent?: string }) => void;
+  focus: () => void;
+  dispatched: { changes?: unknown; userEvent?: string }[];
+}
+
+/** Build the audio widget DOM against `view`, opening the ⋮ menu. */
+function build(view: EditorViewStub): HTMLElement {
+  const dom = new AttachmentAudioWidget(ID, "Voice note 1.wav").toDOM(view as never);
+  document.body.appendChild(dom);
+  return dom;
+}
+
+function openMenu(dom: HTMLElement): void {
+  (dom.querySelector('[data-testid="attachment-audio.menu-button"]') as HTMLButtonElement).click();
+}
+
+function transcribeRow(): HTMLButtonElement | null {
+  return document.body.querySelector('[data-testid="attachment-audio.transcribe"]');
+}
+
+beforeEach(() => {
+  __clearTranscriptStore();
+  vi.stubGlobal(
+    "IntersectionObserver",
+    class {
+      observe() {}
+      disconnect() {}
+      unobserve() {}
+    },
+  );
+});
+
+afterEach(() => {
+  setEditorHost(baseHost);
+  vi.clearAllMocks();
+  vi.unstubAllGlobals();
+  document.body.innerHTML = "";
+});
+
+describe("Transcribe ⋮-menu row gating (SYNC-V7)", () => {
+  it("omits the Transcribe row when the host provides no transcribe slot (mobile)", () => {
+    const { view } = installHost({ aiEnabled: true, withTranscribe: false });
+    const dom = build(view);
+    openMenu(dom);
+    expect(transcribeRow()).toBeNull();
+  });
+
+  it("shows the Transcribe row ENABLED when the slot exists and the AI facet is true", () => {
+    const { view } = installHost({ aiEnabled: true, withTranscribe: true });
+    const dom = build(view);
+    openMenu(dom);
+    const row = transcribeRow();
+    expect(row).not.toBeNull();
+    expect(row!.disabled).toBe(false);
+  });
+
+  it("HIDES the Transcribe row when the AI facet is false", () => {
+    const { view } = installHost({ aiEnabled: false, withTranscribe: true });
+    const dom = build(view);
+    openMenu(dom);
+    // Local AI off (or the note's folder AI-excluded) → the row is omitted
+    // entirely (MYND-270: hidden, not shown-disabled).
+    expect(transcribeRow()).toBeNull();
+  });
+});
+
+describe("Transcription run → progress → expander → insert", () => {
+  it("mounts the progress affordance with a Stop and streams partial segments", () => {
+    const { view, stub } = installHost({ aiEnabled: true, withTranscribe: true });
+    const dom = build(view);
+    openMenu(dom);
+    transcribeRow()!.click();
+
+    expect(stub.spy).toHaveBeenCalledTimes(1);
+    const progress = dom.querySelector('[data-testid="attachment-audio.transcript-progress"]');
+    expect(progress).not.toBeNull();
+    expect(dom.querySelector('[data-testid="attachment-audio.transcript-stop"]')).not.toBeNull();
+
+    // A streamed segment updates the live preview (textContent, TB2).
+    stub.segment("hello ");
+    stub.segment("world");
+    expect(dom.querySelector(".cm-attachment-audio-transcript-preview")?.textContent).toBe(
+      "hello world",
+    );
+  });
+
+  it("renders the read-only expander + verbatim honesty note on completion", async () => {
+    const { view, stub } = installHost({
+      aiEnabled: true,
+      withTranscribe: true,
+      honestyNote: AI_TRANSCRIPT_HONESTY_NOTE,
+    });
+    const dom = build(view);
+    openMenu(dom);
+    transcribeRow()!.click();
+    stub.resolve("the full transcript");
+    await flush();
+
+    const expander = dom.querySelector('[data-testid="attachment-audio.transcript"]');
+    expect(expander).not.toBeNull();
+    expect(expander!.textContent).toBe("the full transcript");
+    // Honesty note (SYNC-V8) rendered VERBATIM from the host constant.
+    expect(dom.querySelector(".cm-attachment-audio-transcript-note")?.textContent).toBe(
+      AI_TRANSCRIPT_HONESTY_NOTE,
+    );
+    // Progress is gone once complete.
+    expect(dom.querySelector('[data-testid="attachment-audio.transcript-progress"]')).toBeNull();
+  });
+
+  it("insert action writes the transcript into the note body via a normal dispatch (SYNC-17)", async () => {
+    const { view, stub } = installHost({ aiEnabled: true, withTranscribe: true });
+    const dom = build(view);
+    openMenu(dom);
+    transcribeRow()!.click();
+    stub.resolve("transcribed text");
+    await flush();
+
+    const insert = dom.querySelector(
+      '[data-testid="attachment-audio.transcript-edit"]',
+    ) as HTMLButtonElement;
+    expect(insert).not.toBeNull();
+    insert.click();
+
+    expect(view.dispatched).toHaveLength(1);
+    expect(view.dispatched[0].userEvent).toBe("input.transcript-insert");
+    expect(view.dispatched[0].changes).toMatchObject({ insert: "transcribed text" });
+  });
+});
+
+describe("no-model + Stop", () => {
+  it("surfaces the 'select a model' hint when the run rejects not_ready (SYNC-V3)", async () => {
+    const { view, stub } = installHost({ aiEnabled: true, withTranscribe: true });
+    const dom = build(view);
+    openMenu(dom);
+    transcribeRow()!.click();
+    stub.reject({ kind: "not_ready" });
+    await flush();
+
+    const hint = dom.querySelector('[data-testid="attachment-audio.transcript-hint"]');
+    expect(hint).not.toBeNull();
+    expect(hint!.textContent).not.toBe("");
+    // No expander, no lingering progress.
+    expect(dom.querySelector('[data-testid="attachment-audio.transcript"]')).toBeNull();
+    expect(dom.querySelector('[data-testid="attachment-audio.transcript-progress"]')).toBeNull();
+  });
+
+  it("Stop cancels the run, tears down the progress, and commits no transcript", async () => {
+    const { view, stub } = installHost({ aiEnabled: true, withTranscribe: true });
+    const dom = build(view);
+    openMenu(dom);
+    transcribeRow()!.click();
+    const stop = dom.querySelector(
+      '[data-testid="attachment-audio.transcript-stop"]',
+    ) as HTMLButtonElement;
+    stop.click();
+
+    expect(stub.stop).toHaveBeenCalledTimes(1);
+    expect(dom.querySelector('[data-testid="attachment-audio.transcript-progress"]')).toBeNull();
+    // A late resolution after a user Stop is ignored — no expander, no note write.
+    stub.resolve("late");
+    await flush();
+    expect(dom.querySelector('[data-testid="attachment-audio.transcript"]')).toBeNull();
+    expect(view.dispatched).toHaveLength(0);
+  });
+});
