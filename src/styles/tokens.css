@@ -843,3 +843,39 @@ a:focus-visible,
 ::-webkit-scrollbar-corner {
   background: transparent;
 }
+
+/* Settings search (MYND-536) — brief highlight of a setting after a result is
+   selected and the shell scrolls it into view. `data-setting-flash="true"` is
+   toggled imperatively for ~1.2s by SettingsModal, then removed. Token-driven.
+   The `box-shadow` spread pads the highlight ~8px beyond the element's own box
+   (which otherwise hugs the text edge-to-edge) WITHOUT shifting layout, and the
+   larger radius rounds it. */
+@keyframes settings-search-flash {
+  0% {
+    background-color: var(--accent-soft);
+    box-shadow: 0 0 0 8px var(--accent-soft);
+  }
+  100% {
+    background-color: transparent;
+    box-shadow: 0 0 0 8px transparent;
+  }
+}
+[data-setting-flash="true"] {
+  animation: settings-search-flash 1200ms var(--ease-standard);
+  border-radius: var(--radius-3, 10px);
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-setting-flash="true"] { animation: none; }
+}
+
+/* Settings search input (MYND-536) — suppress the WebView's native focus ring on
+   the inner <input>; focus is shown on the wrapper (accent border + soft ring).
+   `:focus-visible` can't be reached from the component's inline styles. */
+[data-testid="settings.search-input"],
+[data-testid="settings.search-input"]:focus,
+[data-testid="settings.search-input"]:focus-visible {
+  outline: none;
+  box-shadow: none;
+  -webkit-appearance: none;
+  appearance: none;
+}

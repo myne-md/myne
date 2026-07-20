@@ -40,9 +40,11 @@
 //! `{ "enabled": bool }`. It must be readable at BOOT — before any vault unlock —
 //! so it cannot live in the vault-scoped `vault.prefs`; it follows the
 //! `registry.json` / `backup-schedule.json` precedent (a small non-secret,
-//! non-vault JSON written with plain `std::fs`). **Absent ⇒ enabled** (the clipper
-//! works out of the box); the Settings toggle writes `{ "enabled": false }` to opt
-//! out (and the reconcile then removes the manifests).
+//! non-vault JSON written with plain `std::fs`). **Absent ⇒ disabled** (MYND-549:
+//! privacy-preserving default — no native-messaging host is registered until the
+//! user opts in); the Settings toggle writes `{ "enabled": true }` to opt in (the
+//! reconcile then installs the manifests) or `{ "enabled": false }` to opt back
+//! out (the reconcile removes them).
 //!
 //! ## Not a crypto site
 //!
@@ -373,14 +375,18 @@ fn flag_path(app_data_dir: &Path) -> PathBuf {
     app_data_dir.join(FLAG_FILE_NAME)
 }
 
-/// Read the opt-in flag. **Absent (or unreadable/malformed) ⇒ `true`** — the
-/// clipper is registered by default so it works out of the box.
+/// Read the opt-in flag. **Absent (or unreadable/malformed) ⇒ `false`** —
+/// MYND-549: the clipper ships DISABLED by default (privacy-preserving; no
+/// native-messaging host is registered until the user opts in). A flag file
+/// written by the Settings toggle is honored verbatim, so a user who explicitly
+/// enabled (`{ "enabled": true }`) stays enabled across upgrades. A malformed
+/// flag fails closed to disabled.
 pub fn read_enabled(app_data_dir: &Path) -> bool {
     match std::fs::read(flag_path(app_data_dir)) {
         Ok(bytes) => serde_json::from_slice::<InstallFlag>(&bytes)
             .map(|f| f.enabled)
-            .unwrap_or(true),
-        Err(_) => true,
+            .unwrap_or(false),
+        Err(_) => false,
     }
 }
 
@@ -397,7 +403,7 @@ fn write_enabled(app_data_dir: &Path, enabled: bool) -> std::io::Result<()> {
 /// Carries no secret (public host path + browser labels).
 #[derive(Debug, Clone, Serialize)]
 pub struct InstallStatus {
-    /// Whether the clipper host is registered (the opt-in flag; absent ⇒ true).
+    /// Whether the clipper host is registered (the opt-in flag; absent ⇒ false).
     pub enabled: bool,
     /// The absolute path the manifest points at (the running binary), if known.
     pub host_path: Option<String>,
@@ -428,7 +434,7 @@ pub fn set_enabled(app_data_dir: &Path, enabled: bool) -> std::io::Result<Instal
     Ok(status(app_data_dir))
 }
 
-/// Startup entry point: read the opt-in flag (default on) and reconcile the
+/// Startup entry point: read the opt-in flag (default off) and reconcile the
 /// on-disk manifests to it. Best-effort + non-fatal — the app starts regardless.
 pub fn reconcile_from_flag(app_data_dir: &Path) {
     reconcile(app_data_dir, read_enabled(app_data_dir));
@@ -542,9 +548,23 @@ mod tests {
     }
 
     #[test]
-    fn flag_absent_defaults_to_enabled() {
+    fn flag_absent_defaults_to_disabled() {
         let dir = ScopedTempDir::new("clipper-flag-absent").unwrap();
-        assert!(read_enabled(dir.path()), "no flag file ⇒ enabled");
+        assert!(
+            !read_enabled(dir.path()),
+            "no flag file ⇒ disabled (MYND-549 privacy-preserving default)"
+        );
+    }
+
+    #[test]
+    fn flag_malformed_defaults_to_disabled() {
+        let dir = ScopedTempDir::new("clipper-flag-malformed").unwrap();
+        std::fs::create_dir_all(dir.path()).unwrap();
+        std::fs::write(flag_path(dir.path()), b"not json").unwrap();
+        assert!(
+            !read_enabled(dir.path()),
+            "malformed flag ⇒ fails closed to disabled"
+        );
     }
 
     #[test]

@@ -4,10 +4,10 @@
 // gestures (drag-to-reorder + the right-click "move left / move right"
 // a11y fallback). Persisted via `setBarItemsOrder` (src/lib/prefs.ts).
 //
-// The order covers the RIGHT cluster only — `sync-status` is pinned to the far
-// left of the bar (before the spacer) and never participates. The
-// `preview-companion-toggle` is a contextual affordance, not a `BAR_ITEMS` id,
-// and is pinned outside this order entirely.
+// The order covers the RIGHT cluster only — the far-left of the bar (before the
+// spacer) holds no reorderable item. The `preview-companion-toggle` is a
+// contextual affordance, not a `BAR_ITEMS` id, and is pinned outside this order
+// entirely.
 
 /**
  * Canonical default display order of the right-cluster bottom-bar items —
