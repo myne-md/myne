@@ -33,6 +33,24 @@ export interface SpellWord {
   suggestions: string[];
 }
 
+/** Options for a transcription run (voice-to-text, SYNC-V5/V7). */
+export interface TranscribeOptions {
+  /** Called with each streamed per-segment partial transcript as it decodes
+   *  (SYNC-V5). Omit to consume only the final string. */
+  onSegment?: (segment: string) => void;
+}
+
+/** A running transcription (SYNC-V5). `done` resolves with the FULL transcript
+ *  when transcription completes and rejects on failure — the rejection carries a
+ *  `{ kind }`-tagged error where `kind === "not_ready"` signals AI-off / no
+ *  transcription model side-loaded (the widget surfaces a "select a model" hint
+ *  rather than a silent failure). `stop()` cancels the in-flight run (drives the
+ *  shared backend cancel; also fired on widget teardown). */
+export interface TranscribeHandle {
+  readonly done: Promise<string>;
+  stop: () => void;
+}
+
 /** The prefs fields the editor engine reads (a narrow projection the host maps
  *  its full PrefsView onto). */
 export interface EditorPrefs {
@@ -106,6 +124,28 @@ export interface EditorHost {
    *  recorder — mobile provides a WebView (`getUserMedia`) implementation. Omit
    *  on a platform with no recorder and `/record` falls back to the default. */
   voiceRecord?: (view: EditorView) => void;
+
+  /** OPTIONAL — on-device speech-to-text (voice-to-text, SYNC-V7). Transcribe
+   *  audio attachment `attachmentId` through the platform ASR engine. The shared
+   *  audio widget calls ONLY this slot — never Tauri directly — so `@myne/editor`
+   *  stays platform-agnostic; the desktop app bridges it to the `local-inference|
+   *  transcribe` command (streaming `Channel<String>` + shared cancel). Mobile
+   *  leaves it unset and the Transcribe affordance is omitted from the audio ⋮
+   *  menu. `view` is threaded so a run can be tied to its editor (unused today).
+   *  Returns a handle exposing the streaming segments + a stop + a final-string
+   *  resolution (SYNC-V5). */
+  transcribe?: (
+    view: EditorView,
+    attachmentId: string,
+    opts?: TranscribeOptions,
+  ) => TranscribeHandle;
+
+  /** OPTIONAL — the load-bearing transcript-fallibility honesty note (SYNC-V8),
+   *  rendered VERBATIM (never i18n'd) beneath the read-only transcript expander.
+   *  Injected by the app so the shared widget renders app-owned load-bearing copy
+   *  (`src/lib/load-bearing-copy.ts::AI_TRANSCRIPT_HONESTY_NOTE`) without
+   *  depending on the desktop `src/` tree. Omit and the note is skipped. */
+  transcriptHonestyNote?: string;
 }
 
 // ── Registry ─────────────────────────────────────────────────────────────────

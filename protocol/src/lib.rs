@@ -108,8 +108,9 @@ pub use attachment_blob::{
 pub use attachment_text_blob::{
     decode_attachment_text_blob, encode_attachment_text_blob, encode_attachment_text_blob_raw,
     AttachmentTextBlobError, ATTACHMENT_TEXT_BLOB_ACCOUNT_HASH_LEN,
-    ATTACHMENT_TEXT_BLOB_EXTRACTOR_V1, ATTACHMENT_TEXT_BLOB_HEADER_LEN, ATTACHMENT_TEXT_BLOB_MAGIC,
-    ATTACHMENT_TEXT_BLOB_PROTOCOL_VERSION, MAX_ATTACHMENT_TEXT_PLAINTEXT_LEN,
+    ATTACHMENT_TEXT_BLOB_EXTRACTOR_VERSION, ATTACHMENT_TEXT_BLOB_HEADER_LEN,
+    ATTACHMENT_TEXT_BLOB_MAGIC, ATTACHMENT_TEXT_BLOB_PROTOCOL_VERSION,
+    MAX_ATTACHMENT_TEXT_PLAINTEXT_LEN,
 };
 pub use attachments_catalog::{
     aad_attachments_catalog, decode_attachments_catalog, encode_attachments_catalog,

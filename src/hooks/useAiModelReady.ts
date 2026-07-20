@@ -10,14 +10,20 @@
 
 import { useEffect, useState } from "react";
 
-import { loadModelPath } from "../lib/ai-model-store";
+import { loadModelPath, type ModelRole } from "../lib/ai-model-store";
 
 /**
  * `null` while the (fast, device-local) path check is in flight, `true` once a
- * generation model path is recorded, `false` when none is set. Only probes when
- * `enabled` — a disabled toggle needs no check. Re-runs when `enabled` flips.
+ * model path for `role` is recorded, `false` when none is set. Only probes when
+ * `enabled` — a disabled toggle needs no check. Re-runs when `enabled`/`role`
+ * flips. `role` defaults to `"generation"` (the chat/writing surfaces); the
+ * voice-to-text surfaces pass `"transcription"` (MYND-552) so they can render a
+ * truthful "select a model" vs "ready" state without a false positive.
  */
-export function useAiModelReady(enabled: boolean): boolean | null {
+export function useAiModelReady(
+  enabled: boolean,
+  role: ModelRole = "generation",
+): boolean | null {
   const [ready, setReady] = useState<boolean | null>(null);
 
   useEffect(() => {
@@ -28,7 +34,7 @@ export function useAiModelReady(enabled: boolean): boolean | null {
     let cancelled = false;
     // A missing command (a `--no-default-features` AI-free build) or any error
     // degrades to "not ready" rather than throwing — the surface stays usable.
-    loadModelPath("generation")
+    loadModelPath(role)
       .then((path) => {
         if (!cancelled) setReady(path !== null);
       })
@@ -38,7 +44,7 @@ export function useAiModelReady(enabled: boolean): boolean | null {
     return () => {
       cancelled = true;
     };
-  }, [enabled]);
+  }, [enabled, role]);
 
   return ready;
 }
