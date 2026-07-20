@@ -21,6 +21,16 @@ import { frontmatterDecorations } from "../../src/editor/decorations/frontmatter
 
 type Mounted = { view: EditorView; host: HTMLElement };
 
+/** Flush CM6's measure/decoration pass SYNCHRONOUSLY. CM6 schedules it on
+ *  requestAnimationFrame; under full-suite load a synchronous test can query the
+ *  decoration DOM before that rAF fires — a cross-file, load-dependent flake
+ *  ("0 hr widgets" while the view is in fact correct). `measure()` is
+ *  CM6-internal (absent from the public d.ts) but stable across the 6.x line; it
+ *  is the synchronous body of the `requestMeasure()` that races here. */
+function flushMeasure(view: EditorView): void {
+  (view as unknown as { measure(flush?: boolean): void }).measure();
+}
+
 function mount(doc: string): Mounted {
   const host = document.createElement("div");
   document.body.appendChild(host);
@@ -60,7 +70,7 @@ describe("Horizontal-rule decoration vs. frontmatter suppression", () => {
     const doc = "first paragraph\n\n---\n\nsecond paragraph\n";
     mounted = mount(doc);
     // Force decoration build by ensuring the view is laid out.
-    mounted.view.requestMeasure();
+    flushMeasure(mounted.view);
     const hrs = mounted.host.querySelectorAll(".cm-hr");
     expect(hrs.length).toBeGreaterThanOrEqual(1);
   });
@@ -68,7 +78,7 @@ describe("Horizontal-rule decoration vs. frontmatter suppression", () => {
   it("frontmatter opening `---` is NOT rendered as an hr widget", () => {
     const doc = "---\nupdated: 2026-05-16T16:00:00.000Z\n---\nbody text\n";
     mounted = mount(doc);
-    mounted.view.requestMeasure();
+    flushMeasure(mounted.view);
     // The frontmatter decoration hides the `---` delimiters via
     // Decoration.replace (empty widget). The hr decoration must NOT fire
     // on those same lines — otherwise a `.cm-hr` widget would render in
@@ -82,7 +92,7 @@ describe("Horizontal-rule decoration vs. frontmatter suppression", () => {
     // delimiter) is suppressed.
     const doc = "---\nupdated: foo\n---\nbody\n\n---\n\nafter\n";
     mounted = mount(doc);
-    mounted.view.requestMeasure();
+    flushMeasure(mounted.view);
     // The standalone `---` AFTER body (outside frontmatter) should still
     // render an hr. The two frontmatter `---` lines should not.
     const hrs = mounted.host.querySelectorAll(".cm-hr");
