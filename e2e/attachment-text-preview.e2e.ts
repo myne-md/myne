@@ -95,7 +95,12 @@ async function typeRaw(session: Session, text: string): Promise<void> {
   await content.sendKeys(text);
 }
 
-describeE2E("tp1 inline txt attachment preview decrypts read-only (MYND-268)", () => {
+// QUARANTINED (flaky-test epic): the #1 cross-branch flake — the
+// `attachment-text-preview` widget mount timed out on a contended CI runner
+// across 6 unrelated branches (none touching attachments), i.e. host
+// resource starvation, not a preview bug. Runs in the non-blocking
+// `e2e-quarantine` step until the contention fix lands. See scenario.ts's gate note.
+describeE2E.flaky("tp1 inline txt attachment preview decrypts read-only (MYND-268)", () => {
   // Vault-count precondition: 1 (weak KDF).
   it("a form-C .txt embed renders the decrypted text inline, non-editable", async () => {
     let password = "";
