@@ -3,9 +3,9 @@
 // Deliberately a SEPARATE config from `vitest.config.ts`: `pnpm test`
 // (the unit/component suite, `tests/**`) must stay hermetic and fast,
 // while E2E specs (`e2e/**/*.e2e.ts`) drive the real production binary
-// through tauri-driver — Linux-only (SYNC-1), one app instance at a
-// time, with wall-clock budgets that include Argon2id at production
-// parameters (the VR-1 recovery-drill scenario, SYNC-9).
+// through tauri-driver — Linux-only (SYNC-1), up to MYNE_E2E_SHARDS apps
+// in parallel (default 2), with wall-clock budgets that include Argon2id
+// at production parameters (the VR-1 recovery-drill scenario, SYNC-9).
 //
 // Run via `pnpm test:e2e` (locally inside the container — see
 // docs/dev/e2e.md — or in the Woodpecker E2E step).
@@ -39,9 +39,9 @@ export default defineConfig({
     testTimeout: 180_000,
     hookTimeout: 120_000,
     // Retry a failed e2e test (up to 3 attempts total). The whole suite drives a
-    // real tauri-driver + production binary, ONE at a time, in a single worker
-    // process for all ~60 files — so running every file back-to-back puts the
-    // host under cumulative load that ISOLATED runs never see, and timing-
+    // real tauri-driver + production binary across MYNE_E2E_SHARDS parallel
+    // worker processes (default 2) for ~84 files — so running the full suite puts
+    // the host under cumulative load that ISOLATED runs never see, and timing-
     // sensitive steps (a post-reload editor re-mount, an autosave settle, a
     // cross-device tombstone propagation) occasionally exceed their wait budgets.
     // Each test owns a fresh vault + app instance (`scenario()` launches and
