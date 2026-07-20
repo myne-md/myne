@@ -415,8 +415,13 @@ export interface FindOptions {
 // land in <1 s alone routinely need several seconds under that load. Every
 // element-appearance/poll wait inherits this headroom, which (with the config's
 // retry: 2) is what closes the full-suite "different test flakes each run" tail.
-// A real never-appears bug still fails — just 20 s later instead of 10.
-const DEFAULT_TIMEOUT_MS = 20_000;
+// A real never-appears bug still fails — just 45 s later instead of 20.
+// Raised 20 s → 45 s: under a contended CI runner (MAX_WORKFLOWS in parallel)
+// even the lock-screen / attachment-preview first paint was observed slipping
+// past 30 s, flaking a *different* mount-bound scenario each full-suite run
+// (nav1 unlock, tp1 attachment-text-preview). The headroom trades slower
+// never-appears failures for a closed flake tail.
+const DEFAULT_TIMEOUT_MS = 45_000;
 const DEFAULT_INTERVAL_MS = 100;
 
 /** One WebDriver session against a running tauri-driver. */
