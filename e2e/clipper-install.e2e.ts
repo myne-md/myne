@@ -1,13 +1,14 @@
 // Browser-clipper host-install toggle suite (installer wiring, decisions.md
-// 2026-07-05). Drives Settings → Account → "Browser clipper" through the REAL
-// editor UI on the tauri-driver harness.
+// 2026-07-05; default flipped to OFF by MYND-549). Drives Settings → Account →
+// "Browser clipper" through the REAL editor UI on the tauri-driver harness.
 //
-//   ci1 — TOGGLE ROUND-TRIP: the toggle renders ON by default (absent flag ⇒
-//         enabled), flips to OFF, then back ON. The `data-enabled` attribute is
-//         driven by the command's RETURNED status (optimistic value rolls back
-//         on failure), so a clean true→false→true exercises the real
-//         `clipper_install_status` (mount read) + `clipper_install_set_enabled`
-//         (write flag + reconcile the on-disk manifests) commands end-to-end.
+//   ci1 — TOGGLE ROUND-TRIP: the toggle renders OFF by default (absent flag ⇒
+//         disabled, the privacy-preserving default), flips to ON, then back OFF.
+//         The `data-enabled` attribute is driven by the command's RETURNED status
+//         (optimistic value rolls back on failure), so a clean false→true→false
+//         exercises the real `clipper_install_status` (mount read) +
+//         `clipper_install_set_enabled` (write flag + reconcile the on-disk
+//         manifests) commands end-to-end.
 //
 // The manifest FILE writes land in the browser profile dirs (outside the vault),
 // which tauri-driver cannot assert directly; the Rust unit tests over a
@@ -44,7 +45,7 @@ async function waitEnabled(session: Session, expected: "true" | "false"): Promis
 
 describeE2E("ci1 browser-clipper host-install toggle (decisions.md 2026-07-05)", () => {
   // Vault-count precondition: 1 (weak KDF).
-  it("the Browser clipper toggle renders on by default and round-trips off→on", async () => {
+  it("the Browser clipper toggle renders off by default and round-trips on→off", async () => {
     let password = "";
     await scenario(
       "ci1-clipper-install-toggle",
@@ -62,16 +63,16 @@ describeE2E("ci1 browser-clipper host-install toggle (decisions.md 2026-07-05)",
         await openSettings(s, "account");
         await s.byTestId("settings.clipper-install");
 
-        // Default: absent flag ⇒ registered ⇒ toggle ON.
-        await waitEnabled(s, "true");
-
-        // Flip OFF — writes the flag + removes the manifests, returns enabled=false.
-        await (await s.byTestId("settings.clipper-install-toggle")).click();
+        // Default: absent flag ⇒ NOT registered ⇒ toggle OFF (MYND-549).
         await waitEnabled(s, "false");
 
-        // Flip back ON — re-registers, returns enabled=true.
+        // Flip ON — writes the flag + installs the manifests, returns enabled=true.
         await (await s.byTestId("settings.clipper-install-toggle")).click();
         await waitEnabled(s, "true");
+
+        // Flip back OFF — removes the manifests, returns enabled=false.
+        await (await s.byTestId("settings.clipper-install-toggle")).click();
+        await waitEnabled(s, "false");
 
         await closeSettings(s);
       },
