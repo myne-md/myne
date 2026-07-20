@@ -309,6 +309,32 @@ steps:
       # tauri-compile) inside the unprivileged shell where the build runs.
       - su ci -c 'export HOME=/home/ci CARGO_HOME=/cache/cargo/ci RUSTUP_HOME=/usr/local/rustup PATH=/usr/local/cargo/bin:/usr/local/bin:$PATH CI=true MYNE_E2E_SHARDS=2 RUSTFLAGS="-C link-arg=-fuse-ld=mold" RUSTC_WRAPPER=/cache/bin/sccache SCCACHE_DIR=/cache/sccache/ci SCCACHE_CACHE_SIZE=20G CARGO_INCREMENTAL=0 ; ulimit -n $(ulimit -Hn) 2>/dev/null || true ; pnpm install --frozen-lockfile --store-dir /cache/cargo/ci/pnpm-store && cargo build --release -p e2e-fixture-gen && xvfb-run -a pnpm test:e2e'
 
+  # ─── Quarantine lane (flaky-test epic) ──────────────────────
+  # Runs ONLY the `describeE2E.flaky` contention-victim scenarios (nav1, tp1),
+  # NON-BLOCKING (`failure: ignore`, the notify-failure pattern). The blocking
+  # `e2e` step SKIPS them, so an unrelated PR never goes red on a known
+  # cross-branch mount-boot flake; this lane keeps them VISIBLE (status still
+  # reported) until the contention fix retires the quarantine. depends_on e2e
+  # (optional): runs AFTER it — heavy app-driving steps stay serial on the shared
+  # host — and regardless of its result. Reuses the workspace binary e2e built.
+  e2e-quarantine:
+    image: rust:1.96.0-slim
+    when: *code-paths
+    depends_on:
+      - name: e2e
+        optional: true
+    environment:
+      CI: "true"
+    failure: ignore
+    commands:
+      - apt-get update && apt-get install -y --no-install-recommends curl ca-certificates xz-utils pkg-config libssl-dev webkit2gtk-driver xvfb xauth mold
+      - curl -fsSL https://nodejs.org/dist/v25.9.0/node-v25.9.0-linux-x64.tar.xz | tar -xJ -C /usr/local --strip-components=1
+      - npm install -g pnpm@11.8.0
+      - cargo install tauri-driver --locked --version 2.0.6
+      - useradd -m ci && chown -R ci:ci . /usr/local/cargo/registry
+      # MYNE_E2E_QUARANTINE=1 → scenario.ts's gate runs ONLY describeE2E.flaky specs.
+      - su ci -c 'export HOME=/home/ci CARGO_HOME=/cache/cargo/ci RUSTUP_HOME=/usr/local/rustup PATH=/usr/local/cargo/bin:/usr/local/bin:$PATH CI=true MYNE_E2E_QUARANTINE=1 RUSTFLAGS="-C link-arg=-fuse-ld=mold" RUSTC_WRAPPER=/cache/bin/sccache SCCACHE_DIR=/cache/sccache/ci SCCACHE_CACHE_SIZE=20G CARGO_INCREMENTAL=0 ; ulimit -n $(ulimit -Hn) 2>/dev/null || true ; pnpm install --frozen-lockfile --store-dir /cache/cargo/ci/pnpm-store && cargo build --release -p e2e-fixture-gen && xvfb-run -a pnpm test:e2e'
+
   # ─── Sync simulation harness (multi-device, real myne-server) ─
   # Runs the Phase-1 sync harness `src-tauri/src/plugins/sync/sim.rs` against a
   # REAL ephemeral myne-server (the engine behavior only surfaces across two
