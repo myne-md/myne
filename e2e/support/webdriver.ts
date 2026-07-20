@@ -401,15 +401,15 @@ export class Element {
 }
 
 export interface FindOptions {
-  /** Total wait budget for the element to appear. Default 10_000 ms. */
+  /** Total wait budget for the element to appear. Default `DEFAULT_TIMEOUT_MS` (45_000 ms). */
   timeoutMs?: number;
   /** Poll interval. Default 100 ms. */
   intervalMs?: number;
 }
 
-// Default wait budget. Held at 20 s (not a snappier 10) deliberately: the whole
-// e2e suite drives ~60 real tauri-driver + production-binary launches through a
-// SINGLE container + xvfb, sequentially, so back-to-back files run under
+// Default wait budget. Held generous deliberately: the whole e2e suite drives
+// ~84 real tauri-driver + production-binary launches through a SINGLE container
+// + xvfb, up to MYNE_E2E_SHARDS (=2) file-workers in parallel, so files run under
 // cumulative host pressure that an isolated spec never sees — element mounts,
 // editor re-mounts, and async engine work (spell tokenize, view re-query) that
 // land in <1 s alone routinely need several seconds under that load. Every
