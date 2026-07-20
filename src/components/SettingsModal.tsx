@@ -20,15 +20,25 @@ import {
   Fragment,
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type CSSProperties,
+  type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent,
   type ReactNode,
 } from "react";
 import { useTranslation } from "react-i18next";
 import { Icon } from "./primitives/Icon";
 import { useFocusTrap } from "../hooks/useFocusTrap";
+import { SettingsSearch } from "./settings/search/SettingsSearch";
+import { SettingsSearchResults } from "./settings/search/SettingsSearchResults";
+import { searchSettings } from "./settings/search/searchSettings";
+import {
+  flattenGroups,
+  groupResultsByPanel,
+} from "./settings/search/resultsGrouping";
+import type { SettingsIndexEntry } from "./settings/search/settingsSearchIndex";
 import { AboutPanel } from "./settings/AboutPanel";
 import { AccountPanel } from "./settings/AccountPanel";
 import { AiPanel } from "./settings/AiPanel";
@@ -48,7 +58,7 @@ import type { StageVaultStatus, SuspicionReason } from "../lib/stage";
  * 2026-05-08 5-panel lock; the Files panel (note-storage + startup behaviour,
  * MYND-462) was added by a further superseding `decisions.md` entry.
  */
-type PanelId =
+export type PanelId =
   | "account"
   | "privacy"
   | "sync"
@@ -202,15 +212,28 @@ const BODY_STYLE: CSSProperties = {
   flexDirection: "row",
 };
 
+// The rail is a column: the search box sits at the top (MYND-536), the panel
+// tab list below it.
 const RAIL_STYLE: CSSProperties = {
   width: 220,
   flex: "0 0 auto",
   background: "var(--paper-2)",
   borderRight: "1px solid var(--line-1)",
-  padding: "var(--space-3) 0",
+  display: "flex",
+  flexDirection: "column",
+  minHeight: 0,
+};
+
+// The tab list, beneath the search box. Scrolls independently if the panel set
+// ever outgrows the rail height.
+const RAIL_NAV_STYLE: CSSProperties = {
   display: "flex",
   flexDirection: "column",
   gap: 0,
+  padding: "var(--space-3) 0",
+  overflowY: "auto",
+  flex: 1,
+  minHeight: 0,
 };
 
 const RAIL_ITEM_BASE_STYLE: CSSProperties = {
@@ -272,6 +295,41 @@ export function SettingsModal({
   const { t } = useTranslation();
   const [selected, setSelected] = useState<PanelId>("account");
   const [childInFlight, setChildInFlight] = useState(false);
+  // Settings search (MYND-536). A non-empty query swaps the content pane from
+  // the active panel to a flat, panel-grouped results list built off the static
+  // search index — so filtering never mounts the other nine panels.
+  const [query, setQuery] = useState("");
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  // The setting to scroll to + flash once the target panel has mounted (a result
+  // was selected). Held across the panel switch; consumed by the effect below.
+  const [pendingScroll, setPendingScroll] = useState<SettingsIndexEntry | null>(
+    null,
+  );
+  const searching = query.trim() !== "";
+  // Order the matches into the SAME panel-clustered sequence the results list
+  // renders (group-then-flatten). The scorer (fuzzyFilter, via searchSettings)
+  // orders by relevance, NOT by panel, so its raw output can interleave panels;
+  // the rendered list re-groups by panel. Aligning both here means keyboard ↑/↓
+  // over `results[activeIndex]` walks the rows in the exact on-screen order
+  // instead of jumping between panel groups. MYND-536.
+  const results = useMemo(
+    () =>
+      searching
+        ? flattenGroups(groupResultsByPanel(searchSettings(query, t)))
+        : [],
+    [searching, query, t],
+  );
+  // Keyboard-highlighted result (arrow keys move it; Enter opens it). Reset to
+  // the top whenever the query changes so the highlight never points past the
+  // new result set.
+  const [activeResultIndex, setActiveResultIndex] = useState(0);
+  useEffect(() => {
+    setActiveResultIndex(0);
+  }, [query]);
+  const activeIndex =
+    results.length > 0 ? Math.min(activeResultIndex, results.length - 1) : 0;
+  const activeId = searching ? results[activeIndex]?.id : undefined;
   // Carve-out modal: trap focus directly (not via ModalShell, which would
   // strip the rail's arrow-key nav + in-flight dismiss gating). MYND-93.
   const modalRef = useRef<HTMLDivElement>(null);
@@ -294,25 +352,56 @@ export function SettingsModal({
   // change.
   const selectedRef = useRef(selected);
   const childInFlightRef = useRef(childInFlight);
+  const queryRef = useRef(query);
   useEffect(() => {
     selectedRef.current = selected;
   }, [selected]);
   useEffect(() => {
     childInFlightRef.current = childInFlight;
   }, [childInFlight]);
+  useEffect(() => {
+    queryRef.current = query;
+  }, [query]);
 
-  // Esc dismisses + ArrowUp/ArrowDown cycle the rail. Listener mounts
-  // once per `open` flip; reads selected/childInFlight from refs.
+  // Global modal keys (MYND-536 extends the original rail nav):
+  //   "/"          → focus the search box (unless already typing in a field)
+  //   Escape       → clear an active query first, else close (in-flight gated)
+  //   ↑/↓          → cycle the rail, BUT only when not searching / not in the
+  //                  search box (there, arrows drive the results list — handled
+  //                  on the input via `onSearchKeyDown`)
+  // Listener mounts once per `open` flip; reads live values from refs.
   useEffect(() => {
     if (!open) return;
     const onKeyDown = (e: KeyboardEvent) => {
+      const activeEl = document.activeElement;
+      const inSearchBox = activeEl === searchInputRef.current;
+      const inTextField =
+        activeEl instanceof HTMLElement &&
+        (activeEl.tagName === "INPUT" ||
+          activeEl.tagName === "TEXTAREA" ||
+          activeEl.isContentEditable);
+
+      if (e.key === "/" && !inTextField) {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+        return;
+      }
+
       if (e.key === "Escape") {
         e.preventDefault();
         if (childInFlightRef.current) return;
+        // Clear an active query first; only dismiss when nothing to clear.
+        if (queryRef.current.trim() !== "") {
+          setQuery("");
+          return;
+        }
         onClose();
         return;
       }
+
       if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+        // While searching or focused in the box, the results list owns arrows.
+        if (queryRef.current.trim() !== "" || inSearchBox) return;
         e.preventDefault();
         const idx = PANELS.findIndex((p) => p.id === selectedRef.current);
         const next =
@@ -335,6 +424,65 @@ export function SettingsModal({
     },
     [onClose, childInFlight],
   );
+
+  // Selecting a result jumps to the owning panel, clears the query (so the
+  // content pane returns to the panel view), and arms the scroll+flash of the
+  // target setting for after the panel mounts.
+  const handleSelectResult = useCallback((entry: SettingsIndexEntry) => {
+    setSelected(entry.panelId);
+    setPendingScroll(entry);
+    setQuery("");
+  }, []);
+
+  // Arrow/Enter navigation over the results, handled on the search input (which
+  // holds focus while the user types + navigates). Escape is left to the global
+  // handler above so its clear-then-close semantics stay in one place.
+  const onSearchKeyDown = (e: ReactKeyboardEvent<HTMLInputElement>) => {
+    if (!searching || results.length === 0) return;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setActiveResultIndex((i) => (i + 1) % results.length);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setActiveResultIndex((i) => (i - 1 + results.length) % results.length);
+    } else if (e.key === "Enter") {
+      const entry = results[activeIndex];
+      if (entry) {
+        e.preventDefault();
+        handleSelectResult(entry);
+      }
+    }
+  };
+
+  // Once the query is cleared and the target panel is rendered, scroll the
+  // setting into view and flash it. The target is located by
+  // `data-setting-anchor` (its registry id), falling back to a registered
+  // `data-testid`; a rAF lets the just-mounted panel lay out first. If the
+  // anchor is absent the jump degrades to a plain panel switch (already done).
+  useEffect(() => {
+    if (!pendingScroll || searching) return;
+    const target = pendingScroll;
+    const raf = requestAnimationFrame(() => {
+      const root = contentRef.current;
+      if (root) {
+        let el = root.querySelector<HTMLElement>(
+          `[data-setting-anchor="${target.id}"]`,
+        );
+        if (!el && target.testid) {
+          el = root.querySelector<HTMLElement>(
+            `[data-testid="${target.testid}"]`,
+          );
+        }
+        if (el) {
+          el.scrollIntoView({ block: "center" });
+          el.setAttribute("data-setting-flash", "true");
+          window.setTimeout(() => el?.removeAttribute("data-setting-flash"), 1200);
+        }
+      }
+      setPendingScroll(null);
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [pendingScroll, searching, selected]);
 
   if (!open) return null;
 
@@ -404,13 +552,23 @@ export function SettingsModal({
         </div>
 
         <div style={BODY_STYLE}>
-          <nav
-            aria-label={t("settings.shell.navLabel")}
-            role="tablist"
-            aria-orientation="vertical"
-            style={RAIL_STYLE}
-          >
-            {PANELS.map((panel, i) => {
+          <div style={RAIL_STYLE}>
+            <SettingsSearch
+              ref={searchInputRef}
+              query={query}
+              onQueryChange={setQuery}
+              onKeyDown={onSearchKeyDown}
+              activeDescendantId={
+                activeId ? `settings-search-result-${activeId}` : undefined
+              }
+            />
+            <nav
+              aria-label={t("settings.shell.navLabel")}
+              role="tablist"
+              aria-orientation="vertical"
+              style={RAIL_NAV_STYLE}
+            >
+              {PANELS.map((panel, i) => {
               const isSelected = panel.id === selected;
               // Insert the Labs divider once, at the core→labs boundary.
               const opensLabs =
@@ -438,6 +596,8 @@ export function SettingsModal({
                     aria-controls={`settings-panel-${panel.id}`}
                     tabIndex={isSelected ? 0 : -1}
                     onClick={() => {
+                      // Clicking a rail tab exits search back to the panel view.
+                      setQuery("");
                       if (panel.id !== selected) setSelected(panel.id);
                     }}
                     style={
@@ -449,16 +609,27 @@ export function SettingsModal({
                   </button>
                 </Fragment>
               );
-            })}
-          </nav>
+              })}
+            </nav>
+          </div>
 
           <div
+            ref={contentRef}
             role="tabpanel"
             id={`settings-panel-${selected}`}
             aria-labelledby={`settings-panel-${selected}-tab`}
             style={CONTENT_STYLE}
           >
-            {panelContent[selected]}
+            {searching ? (
+              <SettingsSearchResults
+                results={results}
+                query={query}
+                activeId={activeId}
+                onSelect={handleSelectResult}
+              />
+            ) : (
+              panelContent[selected]
+            )}
           </div>
         </div>
       </div>
