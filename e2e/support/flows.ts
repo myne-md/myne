@@ -60,7 +60,13 @@ export async function unlockToEditor(
   password: string,
   timeoutMs = 30_000,
 ): Promise<void> {
-  const input = await session.byTestId("unlock.password-input");
+  // Wait for the lock screen to mount with the SAME budget as the editor below.
+  // A bare byTestId falls back to DEFAULT_TIMEOUT_MS (20s), and under the
+  // full-suite's cumulative WebKitGTK load the unlock screen's first paint can
+  // slip past 20s — an intermittent lock-screen-never-mounts timeout that never
+  // reproduces in an isolated run (lockAndReunlock already passes 30s for the
+  // re-unlock leg; the initial unlock deserves the same tolerance).
+  const input = await session.byTestId("unlock.password-input", { timeoutMs });
   await input.sendKeys(password);
   // WebKit's driver can silently swallow the leading keystrokes sent during the
   // input's focus-settle (the same settle-drop the editor's q-probe guards
