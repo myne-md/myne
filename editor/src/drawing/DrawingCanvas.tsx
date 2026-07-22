@@ -11,8 +11,12 @@
 // `./DrawingCanvasLazy`. PaneView keys the mount by note id, so switching to a
 // different drawing remounts with the new scene (initialData is read once at
 // mount); a same-note out-of-band reload (sync-pull) still wants a live check.
-import { Excalidraw, serializeAsJSON } from "@excalidraw/excalidraw";
+import { Excalidraw, MainMenu, serializeAsJSON } from "@excalidraw/excalidraw";
 import "@excalidraw/excalidraw/index.css";
+// Chrome curation (MYND-514): scoped hides for the Library + Help buttons and the
+// welcome screen — the elements 0.18.1 can't remove via props. Also carries the
+// token-match aliases (task 4). Scoped under `.drawing-canvas-chrome`.
+import "./drawing-chrome.css";
 import { useRef, type ComponentProps, type CSSProperties } from "react";
 import { HARDENED_EXCALIDRAW_PROPS } from "./excalidrawConfig";
 import { withPersistedTheme } from "./sceneContent";
@@ -85,7 +89,11 @@ export default function DrawingCanvas({
   // live-tuning follow-up, per the review.)
   const primed = useRef(false);
   return (
-    <div style={WRAP_STYLE} data-testid="drawing.canvas">
+    <div
+      style={WRAP_STYLE}
+      className="drawing-canvas-chrome"
+      data-testid="drawing.canvas"
+    >
       <Excalidraw
         {...HARDENED_EXCALIDRAW_PROPS}
         initialData={parseInitialData(initialSceneJson)}
@@ -109,7 +117,20 @@ export default function DrawingCanvas({
               }
             : undefined
         }
-      />
+      >
+        {/* Curated main menu (MYND-514, excalidraw-chrome-fit): only the three
+            per-drawing items that have no other home. Composing our own menu
+            (vs CSS-hiding the default) guarantees no Excalidraw promo/social/
+            file items — and no Open / Save / Export image — can ever surface,
+            belt-and-suspenders on the egress posture. `canvasActions` in
+            HARDENED_EXCALIDRAW_PROPS keeps those actions off elsewhere too. */}
+        <MainMenu>
+          <MainMenu.DefaultItems.ToggleTheme />
+          <MainMenu.DefaultItems.ChangeCanvasBackground />
+          <MainMenu.Separator />
+          <MainMenu.DefaultItems.ClearCanvas />
+        </MainMenu>
+      </Excalidraw>
     </div>
   );
 }
