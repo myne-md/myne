@@ -147,9 +147,12 @@ export async function setupTwoSyncedDevices(
       await (await a.session.byTestId("settings.tab-sync")).click();
       await (await a.session.byTestId("sync.enroll.account-input")).sendKeys(account);
       if (opts.deviceNames) {
-        const nameField = await a.session.byTestId("sync.enroll.device-name-input");
-        await nameField.clear();
-        await nameField.sendKeys(opts.deviceNames.a);
+        // `replaceText`, not clear()+sendKeys: the field is PRE-FILLED with the
+        // platform suggestion, and W3C clear bypasses React's value tracker on the
+        // Input primitive, so the typed name would append to it.
+        await (
+          await a.session.byTestId("sync.enroll.device-name-input")
+        ).replaceText(opts.deviceNames.a);
       }
       await (await a.session.byTestId("sync.enroll.password-input")).sendKeys(password);
       await (await a.session.byTestId("sync.enroll.submit")).click();
@@ -173,9 +176,9 @@ export async function setupTwoSyncedDevices(
       await (await b.session.byTestId("join.server-input")).sendKeys(srv.url);
       await (await b.session.byTestId("join.account-input")).sendKeys(account);
       if (opts.deviceNames) {
-        const nameField = await b.session.byTestId("join.device-name-input");
-        await nameField.clear();
-        await nameField.sendKeys(opts.deviceNames.b);
+        await (
+          await b.session.byTestId("join.device-name-input")
+        ).replaceText(opts.deviceNames.b);
       }
       await (await b.session.byTestId("join.password-input")).sendKeys(password);
       await (await b.session.byTestId("join.submit")).click();

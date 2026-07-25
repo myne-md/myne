@@ -132,8 +132,9 @@ describeNames("device friendly names (two devices)", () => {
           );
           await trigger.click();
           const input = await a.session.byTestId("sync.device-name-input");
-          await input.clear();
-          await input.sendKeys(RENAMED_B);
+          // `replaceText`, not clear(): the rename input is seeded with the
+          // current name, and W3C clear bypasses React's value tracker.
+          await input.replaceText(RENAMED_B);
           // U+E007 is the WebDriver Enter key. Written as an ESCAPE, not as a
           // literal control character — an invisible key in a source line has
           // bitten this suite before.
@@ -190,6 +191,9 @@ describeNames("device friendly names (two devices)", () => {
           await (await a.session.byTestId("sync.enroll.submit")).click();
           await a.session.byTestId("sync.enroll.approved", { timeoutMs: 30_000 });
 
+          // The roster is polled, so the row appears a beat after the approval
+          // notice — wait for it rather than reading an empty list.
+          await a.session.byTestId("sync.device-row", { timeoutMs: 30_000 });
           const names = await rowNames(a.session);
           expect(names.length).toBeGreaterThan(0);
           for (const name of names) {
