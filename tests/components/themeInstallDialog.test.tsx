@@ -32,9 +32,11 @@ vi.mock("../../src/lib/themes", async () => {
     ...real,
     listCustomThemes: (...a: unknown[]) => listCustomThemes(...a),
     importCustomTheme: (...a: unknown[]) => importCustomTheme(...a),
-    activateCustomTheme: (...a: unknown[]) => activateCustomTheme(...a),
   };
 });
+vi.mock("../../src/lib/theme", () => ({
+  activateCustomTheme: (...a: unknown[]) => activateCustomTheme(...a),
+}));
 
 import { ThemeInstallDialog } from "../../src/components/ThemeInstallDialog";
 import { nextAvailableThemeName } from "../../src/lib/themes";
@@ -242,5 +244,87 @@ describe("deferral behind the first-run importer offer", () => {
     // Deferral must not DROP the request — it is still there to be confirmed.
     expect(await screen.findByTestId("theme-install.dialog")).toBeTruthy();
     expect(screen.getByTestId("theme-install.name").textContent).toBe("Warm Paper");
+  });
+});
+
+describe("preview safety (the pre-validation window)", () => {
+  // The dialog previews a palette that has NOT yet been through the host-side
+  // value-shape allowlist — that runs inside `themes_import`, on Apply. So for
+  // the moment the dialog is on screen, attacker-chosen strings would otherwise
+  // be painted straight into inline styles on a mere link click.
+  it("refuses to paint a value that is not a plain colour", async () => {
+    const hostile = {
+      ...PALETTE,
+      "--paper": "url(https://evil.example/pixel)",
+      "--accent": "expression(alert(1))",
+    };
+    render(<ThemeInstallDialog />);
+    await arrive(link({ payload: b64url(JSON.stringify(hostile)) }));
+
+    const strip = await screen.findByTestId("theme-install.preview");
+    const cells = Array.from(strip.children) as HTMLElement[];
+    expect(cells).toHaveLength(5);
+
+    const painted = cells.map((c) => c.style.background);
+    expect(painted.join(" ")).not.toContain("url(");
+    expect(painted.join(" ")).not.toContain("expression");
+    // The refused cells are marked, and the legitimate ones still paint.
+    expect(cells.filter((c) => c.dataset.unsafe === "true")).toHaveLength(2);
+    expect(painted.some((p) => p !== "")).toBe(true);
+  });
+
+  it("paints an ordinary palette untouched", async () => {
+    render(<ThemeInstallDialog />);
+    await arrive(link());
+    const strip = await screen.findByTestId("theme-install.preview");
+    const cells = Array.from(strip.children) as HTMLElement[];
+    expect(cells.filter((c) => c.dataset.unsafe === "true")).toHaveLength(0);
+  });
+});
+
+describe("collision detection must settle before anything is written", () => {
+  it("keeps Apply disabled until the installed-theme list comes back", async () => {
+    // `themes_import` is an UPSERT: applying before we know which names exist
+    // is precisely the silent clobber the confirm step exists to prevent.
+    let release: (v: unknown[]) => void = () => {};
+    listCustomThemes.mockReturnValue(new Promise((r) => (release = r)));
+
+    render(<ThemeInstallDialog />);
+    await arrive(link());
+
+    const apply = (await screen.findByTestId("theme-install.apply")) as HTMLButtonElement;
+    expect(apply.disabled).toBe(true);
+
+    await act(async () => release([]));
+    await waitFor(() => expect(apply.disabled).toBe(false));
+  });
+
+  it("fails CLOSED when the list cannot be read — no write, visible reason", async () => {
+    listCustomThemes.mockRejectedValue(new Error("vault unreadable"));
+    render(<ThemeInstallDialog />);
+    await arrive(link());
+
+    await screen.findByTestId("theme-install.list-failed");
+    const apply = screen.getByTestId("theme-install.apply") as HTMLButtonElement;
+    expect(apply.disabled).toBe(true);
+    apply.click();
+    expect(importCustomTheme).not.toHaveBeenCalled();
+  });
+});
+
+describe("post-write failure copy is honest", () => {
+  it("does not claim 'nothing was changed' once the theme is already installed", async () => {
+    // Import succeeds, activation fails: the theme IS in the vault, so the
+    // import-failure copy ("Nothing was changed") would be a lie here.
+    activateCustomTheme.mockRejectedValue(new Error("prefs write failed"));
+    render(<ThemeInstallDialog />);
+    await arrive(link());
+
+    (await screen.findByTestId("theme-install.apply")).click();
+
+    const err = await screen.findByTestId("theme-install.error");
+    expect(importCustomTheme).toHaveBeenCalledTimes(1);
+    expect(err.textContent).toContain("was installed");
+    expect(err.textContent).not.toContain("Nothing was changed");
   });
 });

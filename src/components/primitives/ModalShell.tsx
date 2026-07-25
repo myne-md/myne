@@ -37,6 +37,19 @@ interface ModalShellProps {
   height?: number;
   /** Accessible label for the close button (default "Close"). */
   closeLabel?: string;
+  /**
+   * Stacking level for the backdrop. Defaults to the shared modal level, which
+   * is correct for anything the user opened themselves — those are opened one
+   * at a time, by an owner that closes the previous one first.
+   *
+   * Raise it only for a surface that can appear UNSOLICITED over whatever is
+   * already open (MYND-567's deep-link install confirmation is the first).
+   * Such a surface at the shared level paints *under* the command palette
+   * (1500) and quick picker (1600) while the focus trap — which stacks by open
+   * order, not by z-index — still hands it focus: an invisible dialog holding
+   * the keyboard.
+   */
+  zIndex?: number;
   children: ReactNode;
 }
 
@@ -49,6 +62,10 @@ const BACKDROP_STYLE: CSSProperties = {
   justifyContent: "center",
   zIndex: 1000,
 };
+
+/** Above the command palette (1500) and quick picker (1600) — for a surface
+ *  that can appear without the user having opened it. */
+export const UNSOLICITED_MODAL_Z = 1700;
 
 const HEADER_STYLE: CSSProperties = {
   height: 56,
@@ -96,6 +113,7 @@ export function ModalShell({
   width = 480,
   height,
   closeLabel = "Close",
+  zIndex,
   children,
 }: ModalShellProps) {
   useEffect(() => {
@@ -144,7 +162,7 @@ export function ModalShell({
       role="dialog"
       aria-modal="true"
       aria-labelledby={labelId}
-      style={BACKDROP_STYLE}
+      style={zIndex === undefined ? BACKDROP_STYLE : { ...BACKDROP_STYLE, zIndex }}
       onClick={handleBackdropClick}
     >
       <div

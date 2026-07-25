@@ -127,7 +127,13 @@ function sanitizeDisplay(raw: string | null, maxChars: number): string | null {
   );
   const collapsed = stripped.replace(/\s+/g, " ").trim();
   if (collapsed === "") return null;
-  return collapsed.slice(0, maxChars);
+  // Slice by CODE POINTS. `String.slice` cuts UTF-16 units, so a name whose
+  // boundary falls inside a surrogate pair would yield a lone surrogate — which
+  // `JSON.stringify` happily emits and `serde_json` then rejects, turning a
+  // perfectly good link into a generic import failure. It also makes the cap
+  // mean what it says for emoji and astral-plane scripts.
+  const points = Array.from(collapsed);
+  return points.length <= maxChars ? collapsed : points.slice(0, maxChars).join("");
 }
 
 /**

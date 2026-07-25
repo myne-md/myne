@@ -12,6 +12,35 @@
 import type { CSSProperties } from "react";
 import type { ThemePreview } from "../../lib/themes";
 
+/**
+ * Display-safe colour shapes: `#hex`, the `rgb()/rgba()/hsl()/hsla()` functions
+ * over numeric arguments, and bare named colours.
+ *
+ * Deliberately NARROWER than `theme_validator`'s allowlist, and it is not a
+ * second copy of that grammar — this decides only what may be painted as a
+ * swatch, which is a much smaller question than what may be stored as a theme.
+ */
+const DISPLAY_SAFE_COLOR =
+  /^(#[0-9a-f]{3,8}|(?:rgb|rgba|hsl|hsla)\([0-9.,%/\s+-]*\)|[a-z]+)$/i;
+
+/**
+ * A swatch colour, or `null` when the value is not something we are willing to
+ * paint.
+ *
+ * Load-bearing for the deep-link install dialog (MYND-567): it previews a
+ * palette that has NOT yet been through the host-side value-shape allowlist, so
+ * without this an attacker-chosen `url(https://…)` would reach the DOM on a
+ * mere link click. React assigns inline styles through the CSSOM, which already
+ * refuses a second declaration (`red; position:fixed` is dropped wholesale) —
+ * but `url(...)` survives that, and leaving it to the CSP's `img-src` alone
+ * inverts the control ordering `threat-model.md` states, where the allowlist is
+ * the PRIMARY guard. Already-stored palettes are validated, so this never fires
+ * for them.
+ */
+function displaySafeColor(value: string): string | null {
+  return DISPLAY_SAFE_COLOR.test(value.trim()) ? value : null;
+}
+
 const CHIPLET_STYLE: CSSProperties = {
   display: "flex",
   width: 40,
@@ -39,9 +68,19 @@ export function ThemeChiplet({ preview, style, ...rest }: ThemeChipletProps) {
   ];
   return (
     <span style={{ ...CHIPLET_STYLE, ...style }} aria-hidden="true" {...rest}>
-      {swatches.map((color, i) => (
-        <span key={i} style={{ flex: 1, background: color }} />
-      ))}
+      {swatches.map((color, i) => {
+        // A value we will not paint renders as an empty cell rather than being
+        // dropped, so the swatch count stays stable and a hostile palette looks
+        // obviously wrong instead of silently plausible.
+        const safe = displaySafeColor(color);
+        return (
+          <span
+            key={i}
+            style={safe === null ? { flex: 1 } : { flex: 1, background: safe }}
+            data-unsafe={safe === null && color !== "" ? "true" : undefined}
+          />
+        );
+      })}
     </span>
   );
 }
