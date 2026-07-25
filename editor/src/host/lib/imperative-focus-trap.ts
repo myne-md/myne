@@ -17,6 +17,21 @@ export interface TrapFocusOptions {
 }
 
 /**
+ * Active traps, innermost last.
+ *
+ * Containment is enforced by a DOCUMENT-level `focusin` listener, so two live
+ * traps would each yank focus back into their own container and ping-pong. Only
+ * the innermost trap enforces; outer ones stay installed but inert until it is
+ * released. Releasing out of order is fine — a trap removes itself by identity.
+ *
+ * Every trap in the app used to be opened by the same owner closing the previous
+ * one first, so a stack was not needed. `ThemeInstallDialog` (MYND-567) breaks
+ * that: it opens from an OS deep link, which can arrive over any modal the user
+ * already had open.
+ */
+const activeTraps: object[] = [];
+
+/**
  * Trap keyboard focus inside `container`. Returns a release function that
  * removes the listeners and (by default) restores focus to whatever was
  * focused before the trap was installed.
@@ -29,10 +44,16 @@ export function trapFocus(
   const doc = container.ownerDocument;
   const previouslyFocused = doc.activeElement as HTMLElement | null;
 
+  // Identity for this trap's slot on the stack. Only the innermost trap
+  // enforces containment (see `activeTraps`).
+  const self = {};
+  activeTraps.push(self);
+  const isInnermost = () => activeTraps[activeTraps.length - 1] === self;
+
   (initialFocus ?? focusableWithin(container)[0] ?? container).focus();
 
   const onKeyDown = (e: KeyboardEvent) => {
-    if (e.key !== "Tab") return;
+    if (e.key !== "Tab" || !isInnermost()) return;
     const items = focusableWithin(container);
     if (items.length === 0) {
       e.preventDefault();
@@ -53,6 +74,7 @@ export function trapFocus(
   };
 
   const onFocusIn = (e: FocusEvent) => {
+    if (!isInnermost()) return;
     const target = e.target as Node | null;
     if (target && !container.contains(target)) {
       (focusableWithin(container)[0] ?? container).focus();
@@ -65,6 +87,11 @@ export function trapFocus(
   return () => {
     container.removeEventListener("keydown", onKeyDown);
     doc.removeEventListener("focusin", onFocusIn);
+    // Remove by identity, not `pop()`: traps can be released out of order.
+    // Whatever is left on top becomes the enforcing trap again, and the
+    // `restoreFocus` below is what puts focus back inside it.
+    const at = activeTraps.indexOf(self);
+    if (at !== -1) activeTraps.splice(at, 1);
     if (restoreFocus && previouslyFocused?.isConnected) {
       previouslyFocused.focus();
     }

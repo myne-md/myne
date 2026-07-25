@@ -19,51 +19,27 @@ import { act } from "react";
 
 const listCustomThemes = vi.fn();
 const importCustomTheme = vi.fn();
-const setCustomTheme = vi.fn();
-const applyCustomTheme = vi.fn();
+const activateCustomTheme = vi.fn();
 
-vi.mock("../../src/lib/themes", () => ({
-  listCustomThemes: (...a: unknown[]) => listCustomThemes(...a),
-  importCustomTheme: (...a: unknown[]) => importCustomTheme(...a),
-  themePreview: (palette: Record<string, string>) => ({
-    background: palette["--paper"] ?? "",
-    surface: palette["--paper-2"] ?? "",
-    foreground: palette["--ink-1"] ?? "",
-    accent: palette["--accent"] ?? "",
-    line: palette["--line-1"] ?? "",
-  }),
-}));
-vi.mock("../../src/lib/prefs", () => ({
-  setCustomTheme: (...a: unknown[]) => setCustomTheme(...a),
-}));
-vi.mock("../../src/lib/theme", () => ({
-  applyCustomTheme: (...a: unknown[]) => applyCustomTheme(...a),
-}));
+vi.mock("../../src/lib/themes", async () => {
+  // Pure helpers (`themePreview`, `nextAvailableThemeName`) come from the REAL
+  // module — mocking them would only test the mock. Only the IPC-boundary
+  // wrappers are stubbed.
+  const real = await vi.importActual<typeof import("../../src/lib/themes")>(
+    "../../src/lib/themes",
+  );
+  return {
+    ...real,
+    listCustomThemes: (...a: unknown[]) => listCustomThemes(...a),
+    importCustomTheme: (...a: unknown[]) => importCustomTheme(...a),
+    activateCustomTheme: (...a: unknown[]) => activateCustomTheme(...a),
+  };
+});
 
-import { ThemeInstallDialog, nextAvailableThemeName } from "../../src/components/ThemeInstallDialog";
-import {
-  clearPendingThemeInstall,
-  handleThemeDeepLinkUrl,
-} from "../../src/lib/themeDeepLink";
-
-const PALETTE = { "--paper": "#faf6ee", "--paper-2": "#f2ede1", "--ink-1": "#2b2720", "--accent": "#b3603c", "--line-1": "#e4ddcd" };
-
-function b64url(text: string): string {
-  const bytes = new TextEncoder().encode(text);
-  let binary = "";
-  for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-}
-
-function link(overrides: Record<string, string> = {}): string {
-  const params = new URLSearchParams({
-    v: "1",
-    name: "Warm Paper",
-    payload: b64url(JSON.stringify(PALETTE)),
-    ...overrides,
-  });
-  return `myne://theme/install?${params.toString()}`;
-}
+import { ThemeInstallDialog } from "../../src/components/ThemeInstallDialog";
+import { nextAvailableThemeName } from "../../src/lib/themes";
+import { clearPendingThemeInstall, handleThemeDeepLinkUrl } from "../../src/lib/themeDeepLink";
+import { PALETTE, b64url, link } from "../lib/_themeLink";
 
 /** Deliver a deep link the way the plugin does, then let the dialog react. */
 async function arrive(url: string) {
@@ -75,7 +51,7 @@ async function arrive(url: string) {
 beforeEach(() => {
   listCustomThemes.mockResolvedValue([]);
   importCustomTheme.mockResolvedValue(undefined);
-  setCustomTheme.mockResolvedValue(undefined);
+  activateCustomTheme.mockResolvedValue(undefined);
 });
 
 afterEach(() => {
@@ -114,8 +90,7 @@ describe("arrival", () => {
     await arrive(link());
     await screen.findByTestId("theme-install.dialog");
     expect(importCustomTheme).not.toHaveBeenCalled();
-    expect(setCustomTheme).not.toHaveBeenCalled();
-    expect(applyCustomTheme).not.toHaveBeenCalled();
+    expect(activateCustomTheme).not.toHaveBeenCalled();
   });
 });
 
@@ -129,8 +104,8 @@ describe("the accept path", () => {
     await waitFor(() => expect(importCustomTheme).toHaveBeenCalledTimes(1));
     expect(importCustomTheme).toHaveBeenCalledWith("Warm Paper", JSON.stringify(PALETTE));
     // Disk-first ordering: the selection is persisted before the live flip.
-    expect(setCustomTheme).toHaveBeenCalledWith("Warm Paper");
-    expect(applyCustomTheme).toHaveBeenCalledWith(PALETTE);
+    // Activation is one call now (disk-first ordering lives in `themes.ts`).
+    expect(activateCustomTheme).toHaveBeenCalledWith("Warm Paper", PALETTE);
     // The dialog closes on success.
     await waitFor(() => expect(screen.queryByTestId("theme-install.dialog")).toBeNull());
   });
@@ -156,8 +131,7 @@ describe("the cancel path", () => {
 
     await waitFor(() => expect(screen.queryByTestId("theme-install.dialog")).toBeNull());
     expect(importCustomTheme).not.toHaveBeenCalled();
-    expect(setCustomTheme).not.toHaveBeenCalled();
-    expect(applyCustomTheme).not.toHaveBeenCalled();
+    expect(activateCustomTheme).not.toHaveBeenCalled();
   });
 
   it("does not re-open for the same link after cancelling", async () => {
@@ -251,8 +225,7 @@ describe("failure surfaces", () => {
     expect(error.textContent).toContain("--accent");
     // Rejected before any write: no selection persisted, no palette painted,
     // and the dialog stays open so the user knows it did not happen.
-    expect(setCustomTheme).not.toHaveBeenCalled();
-    expect(applyCustomTheme).not.toHaveBeenCalled();
+    expect(activateCustomTheme).not.toHaveBeenCalled();
     expect(screen.getByTestId("theme-install.dialog")).toBeTruthy();
   });
 });
