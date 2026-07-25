@@ -67,13 +67,23 @@ export const IMPORT_DELTA_TAGS = [
 export const IMPORT_DELTA_ATTR = ["href", "src", "alt"] as const;
 
 /**
- * Permitted URL schemes: `http:`, `https:`, `mailto:`, or no scheme at all
- * (document-relative, which is how Notion emits internal links). Everything else —
- * `javascript:`, `data:`, `file:`, `vbscript:` — fails to match and DOMPurify drops
- * the attribute. The second alternative is a negative lookahead for "starts with a
- * scheme", which is what makes relative paths pass without enumerating them.
+ * Permitted URL shapes: `http://`, `https://`, `mailto:`, or a document-relative
+ * reference (how Notion emits internal links). Everything else — `javascript:`,
+ * `data:`, `file:`, `vbscript:` — fails to match, and DOMPurify drops the attribute.
+ *
+ * FAILS CLOSED, deliberately. An earlier version keyed the relative case on a
+ * negative lookahead for "looks like a scheme" (`(?![a-zA-Z][\w+.-]*:)`), which
+ * meant anything that *defeated* scheme detection was treated as relative and
+ * allowed — `jav\u{FFFD}ascript:alert(1)` (a NUL that HTML parsing turns into
+ * U+FFFD) passed straight through into note text. The relative arm now requires
+ * that the part before the first `/`, `?`, or `#` contain **no colon at all**, so
+ * an unrecognized scheme is rejected rather than mistaken for a path. Found by the
+ * adversarial payload battery during the MYND-580 allowlist review (grill R3).
+ *
+ * Protocol-relative (`//host/x`) still passes: it carries no scheme, and the
+ * importer's output is markdown text that is never fetched.
  */
-export const SAFE_URI_REGEXP = /^(?:https?:\/\/|mailto:)|^(?![a-zA-Z][a-zA-Z0-9+.-]*:)/;
+export const SAFE_URI_REGEXP = /^(?:https?:\/\/|mailto:)|^[^:]*(?:[/?#]|$)/;
 
 /** The composed import config. Built from the render config + the two deltas. */
 export const IMPORT_SANITIZE_CONFIG: Readonly<Record<string, unknown>> = {
