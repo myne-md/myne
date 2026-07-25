@@ -225,6 +225,24 @@ pub fn run() {
     #[cfg(desktop)]
     let builder = builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
         use tauri::Manager;
+        // MYND-567: on Windows + Linux the OS delivers a `myne://` deep link by
+        // spawning a SECOND process whose only argv is the URL — so the
+        // single-instance callback is the deep link's arrival path there. Hand
+        // the argv to the deep-link plugin BEFORE raising the window: it
+        // re-parses them, matches the scheme against the `tauri.conf.json`
+        // allowlist (`myne` only), and emits `deep-link://new-url` for the
+        // WebView latch to pick up. A no-op on macOS (the plugin routes
+        // `RunEvent::Opened` instead) and a no-op for an ordinary second
+        // launch with no URL argv.
+        //
+        // The URL is NOT trusted here — this only transports it. Parsing,
+        // caps, and the confirmation gate live WebView-side
+        // (`src/lib/themeDeepLink.ts`), and the palette still has to clear the
+        // `theme_validator` allowlist inside `themes_import` before any write.
+        {
+            use tauri_plugin_deep_link::DeepLinkExt;
+            app.deep_link().handle_cli_arguments(_args.iter());
+        }
         if let Some(window) = app.get_webview_window("main") {
             let _ = window.unminimize();
             // `show()` is load-bearing, not redundant with `unminimize()`:
@@ -238,6 +256,15 @@ pub fn run() {
     }));
 
     let builder = builder
+        // MYND-567: `myne://` custom-URL-scheme delivery. Registration is
+        // bundle-time from `tauri.conf.json` `plugins.deep-link.desktop.schemes`
+        // (macOS `CFBundleURLTypes`, Windows NSIS registry, Linux `.desktop`
+        // MimeType), so the scheme belongs to the INSTALLED app on all three
+        // platforms. The plugin grants no network capability — it only carries
+        // a URL the OS already resolved to us. Scheme grammar is shared with
+        // the mobile client (`myne://open` / `myne://capture`); desktop owns
+        // `myne://theme/install`.
+        .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_dialog::init())
@@ -353,6 +380,21 @@ pub fn run() {
                         "could not resolve app_data_dir for boot migration; skipping"
                     );
                 }
+            }
+            // MYND-567 COLD START (Windows + Linux): when a `myne://` link
+            // launches the app from closed, THIS process is the one the OS
+            // handed the URL to as argv — there is no second instance and so no
+            // single-instance callback to catch it. Seed the plugin from our own
+            // argv here so the WebView's boot-time `getCurrent()` sees the link.
+            // The plugin only accepts a lone argument that parses as a URL whose
+            // scheme is in the config allowlist, so ordinary launch flags (and
+            // the clipper's `--native-messaging-host`, which exits before this
+            // runs) are ignored. A no-op on macOS, where the OS delivers the URL
+            // as `RunEvent::Opened` instead of argv.
+            #[cfg(desktop)]
+            {
+                use tauri_plugin_deep_link::DeepLinkExt;
+                app.deep_link().handle_cli_arguments(std::env::args());
             }
             // Apply screen-capture protection before `window.show()` so
             // the first frame is protected on macOS + Windows 10 build
