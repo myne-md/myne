@@ -12,7 +12,13 @@ test.describe("sync join flow", () => {
   test("Welcome → Connect to my account → pending → editor", async ({ page }) => {
     await installMockIpc(page, {
       freshDevice: true,
-      joinResult: { vault_id: "flow-vault", pending: true, fingerprint: null },
+      joinResult: {
+        vault_id: "flow-vault",
+        pending: true,
+        fingerprint: null,
+        device_id_hex: "aa11bb22cc33dd44ee55ff6677889900",
+      },
+      devicePlatform: "ios",
       // sync_head_fingerprint returns a value → the pending poll advances to verify.
       headFingerprint: "TYRS-N318",
       syncStatus: { state: "pending" },
@@ -22,6 +28,12 @@ test.describe("sync join flow", () => {
     // Welcome offers the new entry; open the join flow.
     await page.getByRole("button", { name: "Connect to my account" }).click();
     await expect(page.getByTestId("sync.join")).toBeVisible();
+
+    // MYND-548: the join door carries the same pre-filled name field the Settings
+    // enrollment panel does — a device arriving through this one nameless would be
+    // a silent regression no other test would catch.
+    await expect(page.getByTestId("sync.join.device-name-input")).toHaveValue("iPhone");
+    await page.getByTestId("sync.join.device-name-input").fill("New phone");
 
     await page.getByTestId("sync.join.server-input").fill("https://sync.example.com");
     await page.getByTestId("sync.join.account-input").fill("MY-4K7P-9RH2-JR3T-8XW6-VZ0A");

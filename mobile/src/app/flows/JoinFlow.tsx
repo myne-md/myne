@@ -4,6 +4,8 @@ import type { TFunction } from "i18next";
 import type { CSSProperties, ReactNode } from "react";
 import { Screen, FlowHeader, Title, Lead, FooterBar, Button, Banner, BlockingOverlay, Icon } from "../../components";
 import { syncJoinAccount, syncNow, syncHeadFingerprint, syncResetLocal, errKind, syncDecodeJoinQr, scanQr, type JoinResult, type JoinQrView } from "../../lib/sync";
+import { DEVICE_NAME_MAX_LEN, useDeviceNameField } from "../../lib/device-name";
+import { setDeviceName } from "../../lib/prefs";
 import { formatAccountNumberInput } from "../../lib/account-number-format";
 import { HAS_TAURI } from "../../lib/app-window";
 import { ENROLL_NON_DISTINGUISHING_BANNER, ENROLL_PENDING_NOTICE } from "../../lib/load-bearing-copy";
@@ -218,6 +220,13 @@ export function JoinFlow({ onComplete, onCancel }: JoinFlowProps) {
   // Device-join via QR (MYND-466): the decoded QR held for the confirm step.
   const [scanned, setScanned] = useState<JoinQrView | null>(null);
 
+  // MYND-548: this device's own name — the same hook the Settings enrollment panel
+  // uses, so the two doors cannot drift.
+  const deviceNameField = useDeviceNameField();
+  // MYND-548: the id this join minted, kept so the poll below can name the device
+  // once its first pull lands (never before — see the enroll hook's note).
+  const joinedDeviceId = useRef<string | null>(null);
+
   // Secret-wipe artefact — mirrors the in-flight password so unmount can drop it.
   const pwRef = useRef("");
   const demoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -257,12 +266,18 @@ export function JoinFlow({ onComplete, onCancel }: JoinFlowProps) {
       // demoable without a backend (and flow-logic testable via the mock).
       demoTimer.current = setTimeout(() => {
         setBusy(false);
-        landOn({ vault_id: "demo-vault", pending: true, fingerprint: null });
+        landOn({
+          vault_id: "demo-vault",
+          pending: true,
+          fingerprint: null,
+          device_id_hex: "00".repeat(16),
+        });
       }, 700);
       return;
     }
     try {
       const result = await syncJoinAccount(serverUrl.trim(), accountNumber.trim(), password);
+      joinedDeviceId.current = result.device_id_hex;
       setBusy(false);
       landOn(result);
     } catch (e) {
@@ -352,6 +367,15 @@ export function JoinFlow({ onComplete, onCancel }: JoinFlowProps) {
         await syncNow(); // claim + sync if approved (no-op while still pending)
         const fp = await syncHeadFingerprint();
         if (!cancelled && fp) {
+          // A head was adopted ⇒ this device completed an authed cycle, so the
+          // §10.2.1 seed has had its turn and naming is now safe.
+          if (joinedDeviceId.current) {
+            try {
+              await setDeviceName(joinedDeviceId.current, deviceNameField.resolved);
+            } catch {
+              // The row keeps its id-derived label; rename fixes it.
+            }
+          }
           setFingerprint(fp);
           setStep("verify");
           return; // adopted the head — stop polling
@@ -545,6 +569,39 @@ export function JoinFlow({ onComplete, onCancel }: JoinFlowProps) {
               {t("join.accountHint")}
             </div>
           )}
+        </div>
+
+        {/* MYND-548: named at the one moment the user is provably holding this
+            device. Applied only once this device completes a pull — never at
+            join time, which would disable the §10.2.1 seed. */}
+        <div style={{ marginTop: 18 }}>
+          <FieldLabel>{t("sync.enroll.deviceNameLabel")}</FieldLabel>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              height: 52,
+              border: "1.5px solid var(--line-2)",
+              borderRadius: 6,
+              background: "var(--bg-1)",
+              padding: "0 14px",
+            }}
+          >
+            <input
+              value={deviceNameField.value}
+              onChange={(e) => deviceNameField.setValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") void onSubmit();
+              }}
+              maxLength={DEVICE_NAME_MAX_LEN}
+              placeholder={deviceNameField.suggestion}
+              autoComplete="off"
+              autoCorrect="off"
+              spellCheck={false}
+              data-testid="sync.join.device-name-input"
+              style={{ ...inputReset, fontSize: 16, color: "var(--fg-1)" }}
+            />
+          </div>
         </div>
 
         <div style={{ marginTop: 18 }}>

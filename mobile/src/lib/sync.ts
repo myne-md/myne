@@ -10,6 +10,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { setDeviceName } from "./prefs";
 import { listen } from "@tauri-apps/api/event";
 
 // ── Endpoint config (SY-02) ──────────────────────────────────────────────────
@@ -52,6 +53,10 @@ export interface JoinResult {
   pending: boolean;
   /** The server cert fingerprint (https) for eye-compare, or `null` (loopback). */
   fingerprint: string | null;
+  /** The device_id this join registered (MYND-548) — used to name THIS device in
+   *  its own local prefs; a pending device holds no token, so it cannot read the
+   *  roster to find its own row. */
+  device_id_hex: string;
 }
 
 /** **Add this device to an existing account.** On a fresh device, bootstrap the
@@ -142,6 +147,10 @@ export type EnrollCredentialKind = "password" | "recovery";
 /** Mirrors the Rust `EnrollResult`. */
 interface EnrollResult {
   approved: boolean;
+  /** The device_id this enrollment registered (MYND-548) — needed to name THIS
+   *  device, since a pending device holds no token and so cannot read the roster
+   *  to find its own row. */
+  device_id_hex: string;
 }
 
 /** A serialized `SyncDeviceError` from the plugin (`{ kind: "…" }`). */
@@ -167,10 +176,16 @@ export function errKind(e: unknown): string {
 export interface EnrollHook {
   busy: boolean;
   outcome: EnrollOutcome | null;
+  /** `deviceName` (MYND-548) is held in RAM and written only AFTER this device's
+   *  first authed sync cycle: writing it earlier would create `vault.prefs` before
+   *  the cycle and disable the §10.2.1 wholesale seed, and parking it on disk
+   *  would rest user-authored text outside the AEAD envelope (SYNC-3). A device
+   *  that stays PENDING is not named here. */
   enroll: (
     accountNumber: string,
     credential: string,
     credentialKind: EnrollCredentialKind,
+    deviceName: string,
   ) => Promise<void>;
   reset: () => void;
 }
@@ -184,6 +199,7 @@ export function useEnroll(): EnrollHook {
       accountNumber: string,
       credential: string,
       credentialKind: EnrollCredentialKind,
+      deviceName: string,
     ) => {
       setBusy(true);
       setOutcome(null);
@@ -193,6 +209,16 @@ export function useEnroll(): EnrollHook {
           credential,
           credentialKind,
         });
+        if (result.approved) {
+          // Approved ⇒ a cycle can run now; the seed (if any) happens inside it,
+          // so naming afterwards is safe.
+          try {
+            await invoke("plugin:sync|sync_now");
+            await setDeviceName(result.device_id_hex, deviceName);
+          } catch {
+            // Enrollment still succeeded; the row keeps its id-derived label.
+          }
+        }
         setOutcome(result.approved ? { state: "approved" } : { state: "pending" });
       } catch (e) {
         setOutcome({ state: "error", kind: errKind(e) });
