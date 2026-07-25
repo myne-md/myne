@@ -10,6 +10,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { setDeviceName } from "./prefs";
 import { listen } from "@tauri-apps/api/event";
 
 // ── Endpoint config (SY-02) ──────────────────────────────────────────────────
@@ -69,13 +70,11 @@ export function syncJoinAccount(
   serverUrl: string,
   accountNumber: string,
   password: string,
-  deviceName: string,
 ): Promise<JoinResult> {
   return invoke<JoinResult>("plugin:sync|sync_join_account", {
     serverUrl,
     accountNumber,
     password,
-    deviceName,
   });
 }
 
@@ -141,10 +140,11 @@ export function errKind(e: unknown): string {
 export interface EnrollHook {
   busy: boolean;
   outcome: EnrollOutcome | null;
-  /** `deviceName` (MYND-548) goes to the CORE, which parks it in device-local sync
-   *  state and applies it in a later prefs phase. It must not be written to
-   *  `vault.prefs` here: creating that blob before the first authed cycle
-   *  permanently disables the §10.2.1 enrollment wholesale seed. */
+  /** `deviceName` (MYND-548) is held in RAM and written only AFTER this device's
+   *  first authed sync cycle: writing it earlier would create `vault.prefs` before
+   *  the cycle and disable the §10.2.1 wholesale seed, and parking it on disk
+   *  would rest user-authored text outside the AEAD envelope (SYNC-3). A device
+   *  that stays PENDING is not named here. */
   enroll: (
     accountNumber: string,
     credential: string,
@@ -172,8 +172,17 @@ export function useEnroll(): EnrollHook {
           accountNumber,
           credential,
           credentialKind,
-          deviceName,
         });
+        if (result.approved) {
+          // Approved ⇒ a cycle can run now; the seed (if any) happens inside it,
+          // so naming afterwards is safe.
+          try {
+            await invoke("plugin:sync|sync_now");
+            await setDeviceName(result.device_id_hex, deviceName);
+          } catch {
+            // Enrollment still succeeded; the row keeps its id-derived label.
+          }
+        }
         setOutcome(result.approved ? { state: "approved" } : { state: "pending" });
       } catch (e) {
         setOutcome({ state: "error", kind: errKind(e) });
