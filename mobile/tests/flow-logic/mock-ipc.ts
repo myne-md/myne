@@ -32,6 +32,15 @@ export interface MockDevice {
 /** Per-test canned responses for the sync command surface. */
 export interface MockConfig {
   syncStatus?: MockSyncStatus;
+  /** Canned `GET /account/status` projection (MYND-570). Omit for `null` — the
+   *  no-route case. `0` ceilings mean unlimited, never a ceiling of zero. */
+  accountStatus?: {
+    stored_bytes: number;
+    device_count: number;
+    frozen: boolean;
+    quota_bytes: number;
+    max_devices: number;
+  } | null;
   /** Note ids `note_list` returns — seeds existing rows for tablet-layout tests
    *  (each renders a clickable `notes.row`; body is empty via `note_read`). */
   noteIds?: string[];
@@ -397,6 +406,9 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
       "plugin:sync|sync_set_endpoint": () =>
         config.setEndpoint ?? { fingerprint: null, pin_source: null },
       "plugin:sync|sync_list_devices": () => config.devices ?? [],
+      // `null` (the default) = no /account/status route — the usage section is
+      // omitted entirely, which is the self-hosted / older-server case.
+      "plugin:sync|sync_account_status": () => config.accountStatus ?? null,
       "plugin:sync|sync_approve_device": () => null,
       "plugin:sync|sync_remove_device": () => null,
       "plugin:sync|sync_reset_local": () => null,

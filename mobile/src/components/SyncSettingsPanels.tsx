@@ -19,12 +19,15 @@ import {
   syncGetEndpoint,
   syncSetEndpoint,
   syncHeadFingerprint,
+  syncAccountStatus,
   useEnroll,
   useDevices,
   type EnrollCredentialKind,
   type DeviceEntry,
   type PinSource,
+  type AccountStatusView,
 } from "../lib/sync";
+import { formatBytes } from "../lib/util";
 import { formatAccountNumberInput } from "../lib/account-number-format";
 import { normalizeBip39Phrase } from "../lib/bip39-normalize";
 import { usePrefs } from "../lib/use-prefs";
@@ -42,6 +45,12 @@ const HAS_TAURI = "__TAURI_INTERNALS__" in window;
 // ── Shared panel primitives (settings-card geometry) ─────────────────────────
 
 const rowLabel: CSSProperties = { fontSize: 16, color: "var(--fg-1)" };
+/** Right-aligned figure in a usage row (MYND-570) — mono, so the digits align. */
+const usageValue: CSSProperties = {
+  fontFamily: "var(--font-mono)",
+  fontSize: 14,
+  color: "var(--fg-2)",
+};
 
 function SectionLabel({ children, mt = 18 }: { children: ReactNode; mt?: number }) {
   return (
@@ -197,6 +206,8 @@ export interface SyncHubPanelProps {
 export function SyncHubPanel({ status, onSyncNow, syncing, onOpenEndpoint, onOpenEnroll, onOpenDevices }: SyncHubPanelProps) {
   const { t } = useTranslation();
   const [endpoint, setEndpoint] = useState<string | null>(null);
+  // Read-at-rest usage projection (MYND-570). `null` = unavailable → section omitted.
+  const [usage, setUsage] = useState<AccountStatusView | null>(null);
   const view = statusView(status, t);
   // "Sync now" is only meaningful with an authed session to sync — a cycle while
   // disabled / not-enrolled / pending returns NotReady, so hide it there rather
@@ -209,6 +220,9 @@ export function SyncHubPanel({ status, onSyncNow, syncing, onOpenEndpoint, onOpe
     void syncGetEndpoint()
       .then((c) => setEndpoint(c.endpoint_url))
       .catch(() => setEndpoint(null));
+    void syncAccountStatus()
+      .then((s) => setUsage(s ?? null))
+      .catch(() => setUsage(null));
   }, []);
 
   return (
@@ -252,6 +266,45 @@ export function SyncHubPanel({ status, onSyncNow, syncing, onOpenEndpoint, onOpe
           </Row>
         )}
       </Group>
+
+      {/* Usage (MYND-570). Absent when the server has no /account/status route
+          (self-hosted or older): the whole section is omitted rather than shown
+          as an error. `0` ceilings mean unlimited, so the value is the bare
+          figure with no limit and no upsell. */}
+      {usage !== null && (
+        <>
+          <SectionLabel>{t("sync.panel.usage.label")}</SectionLabel>
+          <Group>
+            <Row first testId="sync.usage-storage">
+              <span style={rowLabel}>{t("sync.usage.storage")}</span>
+              <span style={usageValue}>
+                {usage.quota_bytes === 0
+                  ? formatBytes(usage.stored_bytes)
+                  : t("sync.usage.ofTotal", {
+                      used: formatBytes(usage.stored_bytes),
+                      total: formatBytes(usage.quota_bytes),
+                    })}
+              </span>
+            </Row>
+            <Row testId="sync.usage-devices">
+              <span style={rowLabel}>{t("sync.usage.devices")}</span>
+              <span style={usageValue}>
+                {usage.max_devices === 0
+                  ? String(usage.device_count)
+                  : t("sync.usage.ofTotal", {
+                      used: String(usage.device_count),
+                      total: String(usage.max_devices),
+                    })}
+              </span>
+            </Row>
+            {usage.frozen && (
+              <Row testId="sync.usage-frozen">
+                <span style={{ ...rowLabel, fontSize: 14 }}>{t("sync.usage.frozen")}</span>
+              </Row>
+            )}
+          </Group>
+        </>
+      )}
 
       <SectionLabel>{t("sync.panel.devices.label")}</SectionLabel>
       <Group>
