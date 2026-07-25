@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import type { CSSProperties, ReactNode } from "react";
 import { Screen, FlowHeader, Title, Lead, FooterBar, Button, Banner, BlockingOverlay, Icon } from "../../components";
-import { syncJoinAccount, syncNow, syncHeadFingerprint, syncResetLocal, errKind, type JoinResult } from "../../lib/sync";
+import { syncJoinAccount, syncNow, syncHeadFingerprint, syncResetLocal, errKind, syncDecodeJoinQr, scanQr, type JoinResult, type JoinQrView } from "../../lib/sync";
 import { formatAccountNumberInput } from "../../lib/account-number-format";
 import { HAS_TAURI } from "../../lib/app-window";
 import { ENROLL_NON_DISTINGUISHING_BANNER, ENROLL_PENDING_NOTICE } from "../../lib/load-bearing-copy";
@@ -67,6 +67,37 @@ function FieldLabel({ children }: { children: ReactNode }) {
       }}
     >
       {children}
+    </div>
+  );
+}
+
+/** A read-only labelled value row on the QR confirm screen (MYND-466). */
+function ConfirmRow({
+  label,
+  value,
+  testId,
+  breakAll,
+}: {
+  label: string;
+  value: string;
+  testId: string;
+  breakAll?: boolean;
+}) {
+  return (
+    <div>
+      <FieldLabel>{label}</FieldLabel>
+      <div
+        style={{
+          marginTop: 6,
+          fontFamily: "var(--font-mono)",
+          fontSize: 14,
+          color: "var(--fg-1)",
+          wordBreak: breakAll ? "break-all" : undefined,
+        }}
+        data-testid={testId}
+      >
+        {value}
+      </div>
     </div>
   );
 }
@@ -180,10 +211,12 @@ export function JoinFlow({ onComplete, onCancel }: JoinFlowProps) {
   const [busy, setBusy] = useState(false);
   // "form" collects the credentials; "pending" waits for an existing device to
   // approve; "verify" shows the head-fingerprint SAS for the mandatory eye-compare.
-  const [step, setStep] = useState<"form" | "pending" | "verify">("form");
+  const [step, setStep] = useState<"form" | "confirm" | "pending" | "verify">("form");
   const [joinedVaultId, setJoinedVaultId] = useState<VaultId | undefined>(undefined);
   const [fingerprint, setFingerprint] = useState<string | null>(null);
   const [aborting, setAborting] = useState(false);
+  // Device-join via QR (MYND-466): the decoded QR held for the confirm step.
+  const [scanned, setScanned] = useState<JoinQrView | null>(null);
 
   // Secret-wipe artefact — mirrors the in-flight password so unmount can drop it.
   const pwRef = useRef("");
@@ -244,6 +277,65 @@ export function JoinFlow({ onComplete, onCancel }: JoinFlowProps) {
     onCancel();
   }
 
+  // ── Device-join via QR (MYND-466) ──────────────────────────────────────────
+  function qrErrorMessage(kind: string): string {
+    switch (kind) {
+      case "NotAQrJoinPayload":
+        return t("join.qr.invalid");
+      case "UnsupportedVersion":
+        return t("join.qr.newerVersion");
+      default:
+        return t("join.qr.scanFailed");
+    }
+  }
+
+  function qrPinLabel(source: JoinQrView["pin_source"]): string {
+    switch (source) {
+      case "self_host_tofu":
+        return t("join.qr.pinSelfHost");
+      case "hosted":
+        return t("join.qr.pinHosted");
+      default:
+        return t("join.qr.pinNone");
+    }
+  }
+
+  // Open the camera, decode the QR, and route to the confirm step. The QR fills the
+  // server + account number; the user still types only their password (SYNC-47).
+  async function onScan() {
+    setError(null);
+    if (!HAS_TAURI) return;
+    setBusy(true);
+    try {
+      const res = await scanQr();
+      if (!res.value) return; // scanner dismissed
+      const view = await syncDecodeJoinQr(res.value);
+      if (!view.fresh) {
+        setError(t("join.qr.expired"));
+        return;
+      }
+      setScanned(view);
+      setStep("confirm");
+    } catch (e) {
+      const kind = errKind(e);
+      setError(kind === "Unsupported" ? t("join.qr.scanUnavailable") : qrErrorMessage(kind));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // Confirm → prefill the form from the scanned QR; the user then enters only their
+  // password. Endpoint cert trust rests on the endpoint TOFU + the ZK backstop (the
+  // pin-source label surfaces which path); strict cert-pin-match at join is a
+  // documented follow-up (thread the expected pin through sync_join_account).
+  function onConfirmContinue() {
+    if (scanned) {
+      setServerUrl(scanned.endpoint_url);
+      setAccountNumber(formatAccountNumberInput(scanned.account_number));
+    }
+    setStep("form");
+  }
+
   // While PENDING, drive the claim + watch for the adopted-head fingerprint. The
   // foreground loop claims the token + pulls once an existing device approves; the
   // pulled head observation is surfaced as soon as it MAC-verifies (before note bodies
@@ -286,6 +378,39 @@ export function JoinFlow({ onComplete, onCancel }: JoinFlowProps) {
       /* best-effort */
     }
     onCancel();
+  }
+
+  // ── Confirm the scanned QR before the password (MYND-466, grill Q7) ──────────
+  if (step === "confirm" && scanned) {
+    return (
+      <Screen>
+        <FlowHeader label={t("join.qr.confirmTitle")} onBack={() => setStep("form")} />
+        <div style={{ flex: 1, padding: "18px 22px 0", overflowY: "auto" }} data-testid="sync.join.qr-confirm">
+          <Title>{t("join.qr.confirmTitle")}</Title>
+          <div style={{ marginTop: 22, display: "flex", flexDirection: "column", gap: 16 }}>
+            <ConfirmRow
+              label={t("join.qr.confirmServer")}
+              value={scanned.endpoint_url}
+              testId="sync.join.qr-confirm.server"
+              breakAll
+            />
+            <ConfirmRow
+              label={t("join.qr.confirmAccount")}
+              value={formatAccountNumberInput(scanned.account_number)}
+              testId="sync.join.qr-confirm.account"
+            />
+            <div style={{ fontSize: 13, color: "var(--fg-3)" }} data-testid="sync.join.qr-confirm.pin-source">
+              {qrPinLabel(scanned.pin_source)}
+            </div>
+          </div>
+        </div>
+        <FooterBar style={{ padding: "14px 20px calc(14px + env(safe-area-inset-bottom, 0px))", borderTop: "none" }}>
+          <Button onClick={onConfirmContinue} data-testid="sync.join.qr-confirm.continue">
+            {t("join.qr.continue")}
+          </Button>
+        </FooterBar>
+      </Screen>
+    );
   }
 
   // ── Pending-approval screen: auto-polls for approval, then advances to verify ──
@@ -367,6 +492,27 @@ export function JoinFlow({ onComplete, onCancel }: JoinFlowProps) {
       <div style={{ flex: 1, padding: "18px 22px 0", overflowY: "auto" }} data-testid="sync.join">
         <Title>{t("join.title")}</Title>
         <Lead>{t("join.lead")}</Lead>
+
+        <button
+          type="button"
+          onClick={() => void onScan()}
+          disabled={busy}
+          data-testid="sync.join.scan-qr"
+          style={{
+            marginTop: 16,
+            width: "100%",
+            padding: 12,
+            fontSize: 15,
+            fontWeight: 600,
+            background: "var(--bg-2)",
+            border: "1px solid var(--line-1)",
+            borderRadius: 10,
+            color: "var(--fg-1)",
+            cursor: busy ? "default" : "pointer",
+          }}
+        >
+          {t("join.qr.scan")}
+        </button>
 
         <div style={{ marginTop: 22 }}>
           <FieldLabel>{t("sync.join.serverLabel")}</FieldLabel>
