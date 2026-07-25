@@ -146,7 +146,10 @@ export function DeviceManagementPanel({ hook }: { hook: DevicesHook }) {
   // every other prefs consumer — `setDeviceName` bumps the prefs nonce, so a local
   // rename and a peer's merged rename both land here the same way.
   const { prefs } = usePrefs();
-  const names = prefs.device_names;
+  // `?? {}` is not defensive noise: a client can outrun its own backend (mobile
+  // ships ahead of core), and a payload without the key must degrade to the
+  // id-derived labels rather than take the panel down.
+  const names = prefs.device_names ?? {};
 
   // The row currently being renamed, plus its in-flight input value. `null` = no
   // row is in rename mode. One at a time: the Rename buttons disable while any
