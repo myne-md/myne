@@ -77,7 +77,11 @@ async function syncUntil(
   reader: Session,
   writers: Session[],
   predicate: (names: string[]) => boolean,
-  attempts = 12,
+  // Sized to the chain, not guessed: a name now travels approval → token claim →
+  // pull (which runs the §10.2.1 seed) → the writer naming itself → its push →
+  // the reader's pull. That is several cycles more than a plain note edit, and a
+  // 12-attempt budget was observably tight (~1 run in 4 missed the last hop).
+  attempts = 24,
 ): Promise<string[]> {
   let names: string[] = [];
   for (let i = 0; i < attempts; i++) {
