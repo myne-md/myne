@@ -343,7 +343,12 @@ pub(crate) async fn hydrate_search_index_with_dir(
                     &mut attachment_text_memo,
                     // The MYE1 producer is injected so the shared cache module
                     // (myne-core) stays free of the desktop-only extractor deps.
-                    crate::plugins::attachments::extract::extract,
+                    // MYND-441: OCR is DEFERRED here — this variant reports
+                    // image / scanned-PDF candidates as `Unsupported`, which the
+                    // backfill does not cache, leaving them for the background
+                    // worker. Keeping seconds-per-page work inside the rebuild
+                    // would stall the first search after unlock.
+                    crate::plugins::attachments::extract::extract_deferring_ocr,
                 );
                 // MYND-448a: each embedded attachment becomes its OWN doc; the
                 // note's body doc carries the UNFOLDED plaintext.

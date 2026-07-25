@@ -60,6 +60,7 @@ pub use myne_core::plugins::attachments::{
 // Desktop-only modules.
 pub mod extract;
 pub mod import_desktop;
+pub mod ocr_queue;
 pub mod read_text;
 pub mod scheme;
 pub mod voice;

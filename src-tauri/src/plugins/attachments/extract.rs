@@ -128,6 +128,38 @@ fn detect_format(content_type: &str, filename: &str) -> Option<SourceFormat> {
     }
 }
 
+/// The extractor the **on-unlock index rebuild** injects: everything the
+/// deterministic parsers can do, with OCR deferred to the background worker
+/// ([`super::ocr_queue`]).
+///
+/// OCR candidates come back `Unsupported`, which the backfill deliberately does
+/// **not** cache (a pre-existing rule, not one invented here). They therefore
+/// end the rebuild with no cache entry — which is precisely the worker's work
+/// list. The rebuild stays milliseconds-per-note, and the first search after
+/// unlock is not held hostage to reading every scanned document in the vault.
+///
+/// A PDF is only deferred once its text layer has been tried and produced
+/// nothing: a PDF that *has* selectable text is fully extracted here and never
+/// reaches the worker.
+pub fn extract_deferring_ocr(content_type: &str, filename: &str, bytes: &[u8]) -> ExtractedText {
+    if myne_core::plugins::attachments::ocr::is_ocr_image(content_type, filename) {
+        return ExtractedText::negative(ExtractStatus::Unsupported, SourceFormat::Image);
+    }
+    match detect_format(content_type, filename) {
+        Some(SourceFormat::Pdf) => {
+            let layer = guard(SourceFormat::Pdf, || extract_pdf_text_layer(bytes));
+            if layer.status == ExtractStatus::Empty {
+                // Possibly a scan — hand it to the worker rather than paying
+                // seconds-per-page inside the rebuild.
+                ExtractedText::negative(ExtractStatus::Unsupported, SourceFormat::Pdf)
+            } else {
+                layer
+            }
+        }
+        _ => extract(content_type, filename, bytes),
+    }
+}
+
 /// Maximum pages OCR'd for one scanned PDF.
 ///
 /// A time budget, not a size one: at roughly 0.4 s/page the queue is sequential,
@@ -138,16 +170,27 @@ fn detect_format(content_type: &str, filename: &str) -> Option<SourceFormat> {
 /// at any later `extractor_version`).
 const MAX_OCR_PDF_PAGES: usize = 50;
 
-fn extract_pdf(bytes: &[u8]) -> ExtractedText {
+/// The PDF text layer alone — no OCR fallback. Shared by [`extract_pdf`] and
+/// [`extract_deferring_ocr`], which needs to know whether a text layer exists
+/// without paying for the scan path.
+fn extract_pdf_text_layer(bytes: &[u8]) -> ExtractedText {
     let doc = match lopdf::Document::load_mem(bytes) {
         Ok(d) => d,
         Err(_) => return ExtractedText::negative(ExtractStatus::Failed, SourceFormat::Pdf),
     };
     let pages: Vec<u32> = doc.get_pages().keys().copied().collect();
-    let layer = match doc.extract_text(&pages) {
+    match doc.extract_text(&pages) {
         Ok(text) => finalize(text, SourceFormat::Pdf),
+        Err(_) => ExtractedText::negative(ExtractStatus::Failed, SourceFormat::Pdf),
+    }
+}
+
+fn extract_pdf(bytes: &[u8]) -> ExtractedText {
+    let doc = match lopdf::Document::load_mem(bytes) {
+        Ok(d) => d,
         Err(_) => return ExtractedText::negative(ExtractStatus::Failed, SourceFormat::Pdf),
     };
+    let layer = extract_pdf_text_layer(bytes);
     // A PDF that HAS selectable text keeps using it: faster, and exact. OCR is
     // only for the text-layer-less case (MYND-441).
     if layer.status != ExtractStatus::Empty {
@@ -981,6 +1024,70 @@ mod tests {
             mobile.to_blob_plaintext(),
             "desktop and mobile must serialize identically"
         );
+    }
+
+    // --- OCR deferral for the index rebuild (MYND-441) -------------------
+
+    /// The rebuild's extractor must NOT do OCR. An image comes back
+    /// `Unsupported`, which the backfill deliberately does not cache — leaving
+    /// no cache entry, which is exactly the background worker's work list.
+    #[test]
+    fn the_rebuild_extractor_defers_images() {
+        if !init_ocr_for_tests() {
+            return;
+        }
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("..")
+            .join("core")
+            .join("tests")
+            .join("fixtures")
+            .join("ocr-sample.png");
+        let bytes = std::fs::read(path).expect("fixture readable");
+
+        let deferred = extract_deferring_ocr("image/png", "sample.png", &bytes);
+        assert_eq!(
+            deferred.status,
+            ExtractStatus::Unsupported,
+            "the rebuild must defer, not extract"
+        );
+        assert!(deferred.text.is_empty());
+
+        // ...while the full extractor, which the worker uses, does read it.
+        let full = extract("image/png", "sample.png", &bytes);
+        assert_eq!(full.status, ExtractStatus::Ok);
+    }
+
+    /// A scanned PDF is deferred too — its text layer is tried (cheap) and comes
+    /// back empty, which is the signal that OCR is worth attempting later.
+    #[test]
+    fn the_rebuild_extractor_defers_a_scanned_pdf() {
+        if !init_ocr_for_tests() {
+            return;
+        }
+        let (jpeg, w, h) = fixture_jpeg();
+        let pdf = scanned_pdf(&jpeg, w as i64, h as i64, "DCTDecode");
+        let deferred = extract_deferring_ocr("application/pdf", "scan.pdf", &pdf);
+        assert_eq!(deferred.status, ExtractStatus::Unsupported);
+        assert_eq!(deferred.source_format, SourceFormat::Pdf);
+    }
+
+    /// A PDF that HAS a text layer is fully extracted in the rebuild and never
+    /// reaches the worker — deferring it would delay text that is already
+    /// available for free.
+    #[test]
+    fn the_rebuild_extractor_does_not_defer_a_text_layer_pdf() {
+        let pdf = build_text_pdf("Rebuild path keeps the text layer");
+        let r = extract_deferring_ocr("application/pdf", "doc.pdf", &pdf);
+        assert_eq!(r.status, ExtractStatus::Ok, "text layer extracted inline");
+        assert!(!r.text.is_empty());
+    }
+
+    /// Deterministic formats are unaffected by the deferral.
+    #[test]
+    fn the_rebuild_extractor_still_handles_text_inline() {
+        let r = extract_deferring_ocr("text/plain", "notes.txt", b"hello world");
+        assert_eq!(r.status, ExtractStatus::Ok);
+        assert_eq!(r.source_format, SourceFormat::Text);
     }
 
     // --- scanned-PDF OCR (MYND-441) -------------------------------------
