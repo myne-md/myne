@@ -30,8 +30,8 @@ pub use myne_core::plugins::attachments::extract_types::{
     ExtractStatus, ExtractedText, SourceFormat,
 };
 
-// The cap itself is no longer referenced here — `ExtractedText::finalize` in
-// core applies it — so it is imported only where the tests assert truncation.
+// Only the truncation tests reference the cap directly; `ExtractedText::finalize`
+// in core is what applies it at runtime.
 #[cfg(test)]
 use myne_core::plugins::attachments::extract_types::MAX_EXTRACTED_TEXT_LEN;
 
@@ -92,7 +92,7 @@ fn read_xml_part_capped(reader: impl std::io::Read) -> Option<String> {
     }
 }
 
-fn detect_format(content_type: &str, filename: &str) -> Option<SourceFormat> {
+pub(crate) fn detect_format(content_type: &str, filename: &str) -> Option<SourceFormat> {
     let ct = content_type
         .split(';')
         .next()
@@ -142,15 +142,26 @@ fn detect_format(content_type: &str, filename: &str) -> Option<SourceFormat> {
 /// nothing: a PDF that *has* selectable text is fully extracted here and never
 /// reaches the worker.
 pub fn extract_deferring_ocr(content_type: &str, filename: &str, bytes: &[u8]) -> ExtractedText {
-    if myne_core::plugins::attachments::ocr::is_ocr_image(content_type, filename) {
-        return ExtractedText::negative(ExtractStatus::Unsupported, SourceFormat::Image);
-    }
     match detect_format(content_type, filename) {
+        // Images defer unconditionally — the worker owns every model pass.
+        Some(SourceFormat::Image) => {
+            ExtractedText::negative(ExtractStatus::Unsupported, SourceFormat::Image)
+        }
         Some(SourceFormat::Pdf) => {
-            let layer = guard(SourceFormat::Pdf, || extract_pdf_text_layer(bytes));
+            // Try the (cheap) text layer. Only a PDF that yields nothing is a
+            // scan candidate worth handing to the worker; one with selectable
+            // text is fully extracted here and never queued.
+            //
+            // The `Document` is built INSIDE the guard: `&[u8]` is unwind-safe
+            // while `&lopdf::Document` is not, and this path must keep the same
+            // never-panics containment `extract` gives every other parser.
+            let layer = guard(SourceFormat::Pdf, || {
+                match lopdf::Document::load_mem(bytes) {
+                    Ok(doc) => extract_pdf_text_layer(&doc),
+                    Err(_) => ExtractedText::negative(ExtractStatus::Failed, SourceFormat::Pdf),
+                }
+            });
             if layer.status == ExtractStatus::Empty {
-                // Possibly a scan — hand it to the worker rather than paying
-                // seconds-per-page inside the rebuild.
                 ExtractedText::negative(ExtractStatus::Unsupported, SourceFormat::Pdf)
             } else {
                 layer
@@ -173,11 +184,7 @@ const MAX_OCR_PDF_PAGES: usize = 50;
 /// The PDF text layer alone — no OCR fallback. Shared by [`extract_pdf`] and
 /// [`extract_deferring_ocr`], which needs to know whether a text layer exists
 /// without paying for the scan path.
-fn extract_pdf_text_layer(bytes: &[u8]) -> ExtractedText {
-    let doc = match lopdf::Document::load_mem(bytes) {
-        Ok(d) => d,
-        Err(_) => return ExtractedText::negative(ExtractStatus::Failed, SourceFormat::Pdf),
-    };
+fn extract_pdf_text_layer(doc: &lopdf::Document) -> ExtractedText {
     let pages: Vec<u32> = doc.get_pages().keys().copied().collect();
     match doc.extract_text(&pages) {
         Ok(text) => finalize(text, SourceFormat::Pdf),
@@ -190,7 +197,7 @@ fn extract_pdf(bytes: &[u8]) -> ExtractedText {
         Ok(d) => d,
         Err(_) => return ExtractedText::negative(ExtractStatus::Failed, SourceFormat::Pdf),
     };
-    let layer = extract_pdf_text_layer(bytes);
+    let layer = extract_pdf_text_layer(&doc);
     // A PDF that HAS selectable text keeps using it: faster, and exact. OCR is
     // only for the text-layer-less case (MYND-441).
     if layer.status != ExtractStatus::Empty {
@@ -264,7 +271,7 @@ fn decode_pdf_image(
     );
     // Same icon-scale skip as direct image attachments: a small logo embedded in
     // an otherwise-blank page is not worth three model passes.
-    if w.min(h) < ocr_min_side() {
+    if w.min(h) < myne_core::plugins::attachments::ocr::MIN_OCR_IMAGE_SIDE {
         return None;
     }
 
@@ -300,10 +307,6 @@ fn decode_pdf_image(
     // CCITTFaxDecode, JBIG2Decode, JPXDecode, or a filter chain we do not
     // interpret. Deliberately unhandled — see `ocr_scanned_pdf`.
     None
-}
-
-fn ocr_min_side() -> u32 {
-    myne_core::plugins::attachments::ocr::MIN_OCR_IMAGE_SIDE
 }
 
 fn extract_docx(bytes: &[u8]) -> ExtractedText {

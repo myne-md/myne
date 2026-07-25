@@ -63,18 +63,6 @@ pub enum SourceFormat {
     Image,
 }
 
-impl SourceFormat {
-    /// Whether this format's text was produced by a **model**, as opposed to a
-    /// deterministic parser. Model-backed output is inherently approximate —
-    /// notably it may flatten diacritics the source document carries — which is
-    /// why OCR-derived documents are indexed under a diacritic-folded token
-    /// variant (MYND-441). Deterministic extractors reproduce the source exactly
-    /// and need no such widening.
-    pub fn is_model_derived(self) -> bool {
-        matches!(self, SourceFormat::Audio | SourceFormat::Image)
-    }
-}
-
 /// The extracted-text payload, serialized (postcard) into the `MYE1` blob
 /// plaintext (`extractor_version 0x02`, § 9.15.2).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -328,28 +316,7 @@ mod tests {
         let back = ExtractedText::from_blob_plaintext(&bytes).expect("decode");
         assert_eq!(r, back);
         assert_eq!(back.model_hash, None);
-        // ...and being model-independent in the payload does NOT make it
-        // deterministic: the index still needs the diacritic-folded widening.
-        assert!(SourceFormat::Image.is_model_derived());
         assert!(!back.is_model_stale(None), "no recorded hash → never stale");
-    }
-
-    #[test]
-    fn model_derived_formats_are_exactly_audio_and_image() {
-        // Guards the classification the index-side folding keys off: adding a
-        // future model-backed format without updating this set would silently
-        // leave its output unfolded.
-        for f in [SourceFormat::Audio, SourceFormat::Image] {
-            assert!(f.is_model_derived(), "{f:?} must be model-derived");
-        }
-        for f in [
-            SourceFormat::Pdf,
-            SourceFormat::Docx,
-            SourceFormat::Text,
-            SourceFormat::Other,
-        ] {
-            assert!(!f.is_model_derived(), "{f:?} must be deterministic");
-        }
     }
 
     #[test]

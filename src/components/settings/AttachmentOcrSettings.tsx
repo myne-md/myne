@@ -6,38 +6,26 @@
 // drain, and with no visible cause that reads as "the app broke". One switch
 // turns it off.
 //
-// Turning it off stops the background worker on its next drain; it never deletes
-// cached results, so switching back on resumes rather than restarts.
+// The switch gates BOTH paths — the background worker and the eager extraction
+// that runs at import — so turning it off really does stop all OCR, rather than
+// only the part that happens to be visible. It never deletes cached results, so
+// switching back on resumes rather than restarts.
 //
-// Shape mirrors `LineNumbersSettings` (role="switch" button, optimistic write
-// with rollback). Default here is ON, not off, so the initial state is `true`
-// until disk says otherwise — reading it as OFF first would flash the wrong
-// answer for the overwhelmingly common case.
+// Default state is ON, not off: starting from `false` and correcting after the
+// disk read would flash the wrong answer for effectively every vault.
 
 import { useEffect, useState, type CSSProperties } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { useTranslation } from "react-i18next";
 import { ControlBlock } from "./ControlBlock";
-import { prefsRead, setAttachmentOcrEnabled } from "../../lib/prefs";
-
-const TOGGLE_STYLE: CSSProperties = {
-  fontFamily: "var(--font-sans)",
-  fontSize: 13,
-  padding: "6px 12px",
-  borderRadius: "var(--radius-1)",
-  border: "1px solid var(--line-2)",
-  background: "var(--bg-1)",
-  color: "var(--fg-1)",
-  cursor: "pointer",
-  alignSelf: "flex-start",
-};
-
-const PROGRESS_STYLE: CSSProperties = {
-  marginTop: "var(--space-2)",
-  fontFamily: "var(--font-sans)",
-  fontSize: "var(--text-sm)",
-  color: "var(--fg-2)",
-};
+import { HELPER_STYLE } from "./panel-styles";
+import { Switch } from "../primitives/Switch";
+import {
+  OCR_BACKLOG_PROGRESS_EVENT,
+  prefsRead,
+  setAttachmentOcrEnabled,
+  type OcrBacklogProgress,
+} from "../../lib/prefs";
 
 const ERROR_STYLE: CSSProperties = {
   marginTop: "var(--space-2)",
@@ -73,9 +61,8 @@ export function AttachmentOcrSettings() {
   useEffect(() => {
     // The worker emits at start, after every attachment, and once at the end
     // with `remaining: 0`, so this needs no polling and no timer.
-    const stop = listen<{ remaining: number; done: number }>(
-      "ocr-backlog-progress",
-      (e) => setRemaining(e.payload.remaining),
+    const stop = listen<OcrBacklogProgress>(OCR_BACKLOG_PROGRESS_EVENT, (e) =>
+      setRemaining(e.payload.remaining),
     );
     return () => {
       void stop.then((unlisten) => unlisten());
@@ -100,21 +87,16 @@ export function AttachmentOcrSettings() {
         label={t("settings.attachmentOcr.label")}
         helper={t("settings.attachmentOcr.helper")}
         control={
-          <button
-            type="button"
-            role="switch"
-            aria-checked={enabled}
-            aria-label={t("settings.attachmentOcr.label")}
-            data-testid="settings.attachment-ocr"
-            onClick={() => void toggle(!enabled)}
-            style={TOGGLE_STYLE}
-          >
-            {enabled ? t("settings.attachmentOcr.on") : t("settings.attachmentOcr.off")}
-          </button>
+          <Switch
+            checked={enabled}
+            onChange={(next) => void toggle(next)}
+            ariaLabel={t("settings.attachmentOcr.label")}
+            testId="settings.attachment-ocr"
+          />
         }
       />
       {remaining > 0 && (
-        <p style={PROGRESS_STYLE} data-testid="settings.attachment-ocr-progress">
+        <p style={HELPER_STYLE} data-testid="settings.attachment-ocr-progress">
           {t("settings.attachmentOcr.processing", { count: remaining })}
         </p>
       )}

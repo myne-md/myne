@@ -558,6 +558,22 @@ export async function setAiEnabled(enabled: boolean): Promise<void> {
 }
 
 /**
+ * Progress event emitted by the background OCR worker (MYND-441). Paired with
+ * `OCR_BACKLOG_PROGRESS_EVENT` in
+ * `src-tauri/src/plugins/attachments/ocr_queue.rs` — the codebase convention is
+ * a named constant on both sides rather than a string literal at the listener.
+ */
+export const OCR_BACKLOG_PROGRESS_EVENT = "ocr-backlog-progress";
+
+/** Payload of {@link OCR_BACKLOG_PROGRESS_EVENT}: counts only, never filenames. */
+export interface OcrBacklogProgress {
+  /** Attachments still waiting, the in-flight one included. */
+  remaining: number;
+  /** Attachments extracted so far in this drain. */
+  done: number;
+}
+
+/**
  * Persist the `attachment_ocr_enabled` toggle (MYND-441) — whether attachment
  * text extraction may read images and scanned PDFs. A rejected promise means the
  * disk write failed and the caller's optimistic UI must revert.
