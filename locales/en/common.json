@@ -1986,11 +1986,13 @@
       "saveError": "Could not update the archiving setting."
     },
     "attachmentOcr": {
-      "label": "Search inside images and scanned documents",
+      "errorSaveSetting": "Could not save this setting.",
       "helper": "Reads text out of image attachments and scanned PDFs on this device, so search can find them by their contents. Nothing is uploaded. Turning this off stops the background extraction; text already extracted is kept.",
-      "on": "On",
+      "label": "Search inside images and scanned documents",
       "off": "Off",
-      "errorSaveSetting": "Could not save this setting."
+      "on": "On",
+      "processing_one": "Reading 1 attachment…",
+      "processing_other": "Reading {{count}} attachments…"
     },
     "autoBackup": {
       "backupFolder": "Backup folder",

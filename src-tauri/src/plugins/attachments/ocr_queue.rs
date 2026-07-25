@@ -39,9 +39,27 @@ use std::path::Path;
 use myne_core::plugins::attachments::text_cache;
 use myne_core::plugins::vault_unlock::state::VaultRuntimeState;
 use protocol::{derive_subkey, SubkeyRole};
-use tauri::{AppHandle, Manager, Runtime};
+use serde::Serialize;
+use tauri::{AppHandle, Emitter, Manager, Runtime};
 
 use super::commands::hex_decode_id;
+
+/// WebView event carrying the backlog's progress (MYND-441).
+///
+/// Emitted at start, after every completed attachment, and once at the end with
+/// `remaining = 0`. Counts only — DENY-list safe, nothing about *which* files.
+/// Its purpose is to explain a busy fan: a user opening a large vault on the OCR
+/// build sees sustained CPU with no visible cause, which reads as "the app
+/// broke". It doubles as the deterministic wait handle for the E2E scenario.
+pub const OCR_BACKLOG_PROGRESS_EVENT: &str = "ocr-backlog-progress";
+
+#[derive(Clone, Serialize)]
+pub struct OcrBacklogProgress {
+    /// Attachments still waiting, this one included.
+    pub remaining: usize,
+    /// Attachments extracted so far in this drain.
+    pub done: usize,
+}
 
 /// Whether an attachment could yield text under the OCR generation but has not
 /// been extracted yet. Images and PDFs only: everything else is either already
@@ -97,8 +115,9 @@ pub async fn drain_backlog<R: Runtime>(app: &AppHandle<R>, state: &VaultRuntimeS
         pending = candidates.len(),
         "extracting text from image and scanned-PDF attachments"
     );
-
+    let total = candidates.len();
     let mut done = 0usize;
+    emit_progress(app, total, done);
     for (id_hex, content_type, filename) in candidates {
         // Re-check the lock before every attachment: a lock must take effect
         // within one item, not at the end of the backlog.
@@ -106,6 +125,9 @@ pub async fn drain_backlog<R: Runtime>(app: &AppHandle<R>, state: &VaultRuntimeS
             state.peek_unlocked_attachment_material().await
         else {
             tracing::info!(event = "ocr_backlog_stopped", reason = "locked", done);
+            // Clear the indicator: a lock must not leave "N processing" on
+            // screen forever.
+            emit_progress(app, 0, done);
             return;
         };
         let Ok(account_number_hash) = read_account_hash(&vault_dir) else {
@@ -150,12 +172,23 @@ pub async fn drain_backlog<R: Runtime>(app: &AppHandle<R>, state: &VaultRuntimeS
         // the same path a live save uses, so a search run right now finds it.
         crate::plugins::notes::search_sync::refresh_attachment_docs_for(app, state, &id_hex).await;
         done += 1;
+        emit_progress(app, total.saturating_sub(done), done);
 
         // Yield between attachments so a burst of small images cannot starve
         // interactive work on the runtime.
         tokio::task::yield_now().await;
     }
     tracing::info!(event = "ocr_backlog_done", done);
+    emit_progress(app, 0, done);
+}
+
+/// Best-effort progress emit — a failed emit just means no UI update, never a
+/// failed extraction.
+fn emit_progress<R: Runtime>(app: &AppHandle<R>, remaining: usize, done: usize) {
+    let _ = app.emit(
+        OCR_BACKLOG_PROGRESS_EVENT,
+        OcrBacklogProgress { remaining, done },
+    );
 }
 
 /// Whether the user has left image OCR on for this vault. Absent / unreadable
