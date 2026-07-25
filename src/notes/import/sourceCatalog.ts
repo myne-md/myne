@@ -25,8 +25,13 @@ export interface ImportSourceSpec {
   readonly pick: PickMode;
   /** Native-dialog file filter, for single-file sources. */
   readonly filter?: { readonly name: string; readonly extensions: readonly string[] };
+  /** Icon name from the shared registry (`@myne/editor/host/lib/icons`). */
+  readonly icon: string;
   /** i18n keys — resolved at render time, never frozen at module load. */
   readonly labelKey: string;
+  /** One-line "what this is" for the picker card. The fuller keeps/loses detail
+   *  renders on the setup step, where there is room for it. */
+  readonly shortKey: string;
   readonly pickerTitleKey: string;
   readonly survivesKey: string;
   readonly losesKey: string;
@@ -39,8 +44,10 @@ export interface ImportSourceSpec {
 export const IMPORT_SOURCES: Readonly<Record<ImportSourceId, ImportSourceSpec>> = {
   obsidian: {
     id: "obsidian",
+    icon: "book-open",
     pick: "directory",
     labelKey: "notes.import.source.obsidian.label",
+    shortKey: "notes.import.source.obsidian.short",
     pickerTitleKey: "notes.import.source.obsidian.pickerTitle",
     survivesKey: "notes.import.source.obsidian.survives",
     losesKey: "notes.import.source.obsidian.loses",
@@ -48,8 +55,10 @@ export const IMPORT_SOURCES: Readonly<Record<ImportSourceId, ImportSourceSpec>> 
   },
   notion: {
     id: "notion",
+    icon: "layout-grid",
     pick: "directory",
     labelKey: "notes.import.source.notion.label",
+    shortKey: "notes.import.source.notion.short",
     pickerTitleKey: "notes.import.source.notion.pickerTitle",
     survivesKey: "notes.import.source.notion.survives",
     losesKey: "notes.import.source.notion.loses",
@@ -57,9 +66,11 @@ export const IMPORT_SOURCES: Readonly<Record<ImportSourceId, ImportSourceSpec>> 
   },
   evernote: {
     id: "evernote",
+    icon: "archive",
     pick: "file",
     filter: { name: "Evernote export", extensions: ["enex"] },
     labelKey: "notes.import.source.evernote.label",
+    shortKey: "notes.import.source.evernote.short",
     pickerTitleKey: "notes.import.source.evernote.pickerTitle",
     survivesKey: "notes.import.source.evernote.survives",
     losesKey: "notes.import.source.evernote.loses",
@@ -67,8 +78,10 @@ export const IMPORT_SOURCES: Readonly<Record<ImportSourceId, ImportSourceSpec>> 
   },
   html: {
     id: "html",
+    icon: "code",
     pick: "directory",
     labelKey: "notes.import.source.html.label",
+    shortKey: "notes.import.source.html.short",
     pickerTitleKey: "notes.import.source.html.pickerTitle",
     survivesKey: "notes.import.source.html.survives",
     losesKey: "notes.import.source.html.loses",
@@ -76,9 +89,11 @@ export const IMPORT_SOURCES: Readonly<Record<ImportSourceId, ImportSourceSpec>> 
   },
   csv: {
     id: "csv",
+    icon: "list",
     pick: "file",
     filter: { name: "CSV", extensions: ["csv"] },
     labelKey: "notes.import.source.csv.label",
+    shortKey: "notes.import.source.csv.short",
     pickerTitleKey: "notes.import.source.csv.pickerTitle",
     survivesKey: "notes.import.source.csv.survives",
     losesKey: "notes.import.source.csv.loses",

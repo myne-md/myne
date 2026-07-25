@@ -53,12 +53,9 @@ describeE2E("isp1 import source picker reaches every adapter (MYND-586)", () => 
           );
           expect(await row.text()).not.toBe("");
         }
-        expect(await s.byTestIdAll("import.source-survives")).toHaveLength(
-          SOURCES.length,
-        );
-        expect(await s.byTestIdAll("import.source-loses")).toHaveLength(
-          SOURCES.length,
-        );
+        // Cards carry a one-line identity; the full keeps/loses disclosure renders
+        // on the setup step (asserted below), still before anything is committed.
+        expect(await s.byTestIdAll("import.source-short")).toHaveLength(SOURCES.length);
 
         // Choosing a source advances to that source's setup step and records which
         // adapter the flow will run — the assertion that this is genuinely one
@@ -71,6 +68,24 @@ describeE2E("isp1 import source picker reaches every adapter (MYND-586)", () => 
         const setup = await s.waitForElement(testIdSelector("import.modal"));
         expect(await setup.attribute("data-phase")).toBe("setup");
         expect(await setup.attribute("data-source")).toBe("evernote");
+        expect(await (await s.byTestId("import.chosen-source")).text()).toBe("Evernote");
+
+        // PRE-import disclosure for the chosen source, before a path is even picked.
+        expect(await (await s.byTestId("import.source-survives")).text()).not.toBe("");
+        expect(await (await s.byTestId("import.source-loses")).text()).not.toBe("");
+
+        // And a way back, since this flow opened on the picker.
+        await (await s.byTestId("import.change-source")).click();
+        expect(
+          await (await s.waitForElement(testIdSelector("import.modal"))).attribute(
+            "data-phase",
+          ),
+        ).toBe("pick");
+        await (
+          await s.waitForElement(
+            testIdSelector("import.source-row", { "data-source": "csv" }),
+          )
+        ).click();
 
         // Nothing is armed until a path is picked, and the native dialog is the only
         // way to arm it — so this is where the driven part ends.
