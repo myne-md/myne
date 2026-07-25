@@ -29,16 +29,22 @@
 //! holding ciphertext and no key. The platforms permit background execution; the
 //! zero-knowledge design makes it useless.
 //!
-//! Each item re-checks the unlocked slot before doing any work, so a lock takes
-//! effect within one attachment rather than at the end of the backlog. Work is
-//! strictly sequential — one attachment at a time — because the point is to stay
-//! out of the user's way, not to finish fastest.
+//! Each item re-checks the unlocked slot before starting, so a lock stops the
+//! backlog within one attachment rather than at the end. To be precise about
+//! what that does NOT cover: a lock landing *mid-extraction* does not abort the
+//! in-flight item, which then still writes its `MYE1` blob under a KEK derived
+//! before the lock. Nothing escapes — the blob is AEAD-sealed and the index
+//! refresh that follows needs the unlocked slot, so it no-ops — but the window
+//! is one attachment wide, not instantaneous.
+//!
+//! Work is strictly sequential — one attachment at a time — because the point is
+//! to stay out of the user's way, not to finish fastest.
 
 use std::path::Path;
 
 use myne_core::plugins::attachments::scheme_core::{decode_attachment_plaintext, ServeKeys};
 use myne_core::plugins::attachments::text_cache;
-use myne_core::plugins::attachments::{ExtractedText, SourceFormat};
+use myne_core::plugins::attachments::{ExtractStatus, ExtractedText, SourceFormat};
 use myne_core::plugins::vault_unlock::state::VaultRuntimeState;
 use protocol::{derive_subkey, SubkeyRole};
 use serde::Serialize;
@@ -181,6 +187,15 @@ pub async fn drain_backlog<R: Runtime>(app: &AppHandle<R>, state: &VaultRuntimeS
         let Some(extracted) = extracted else {
             continue;
         };
+        // NEVER cache `Unsupported`. It is the "nothing was attempted" status —
+        // returned when the weights are unavailable (an unfetched Git-LFS blob,
+        // a resource-dir resolution failure), not when the image held no text.
+        // Persisting it would permanently skip that attachment at this
+        // `extractor_version`, recoverable only by another bump. Same rule the
+        // backfill and the import path already follow.
+        if extracted.status == ExtractStatus::Unsupported {
+            continue;
+        }
         let _ = text_cache::write_extracted(
             &vault_dir,
             &attachment_text_key,

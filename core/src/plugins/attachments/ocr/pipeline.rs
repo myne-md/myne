@@ -493,8 +493,11 @@ mod tests {
 
     #[test]
     fn ctc_collapses_repeats_and_drops_blanks() {
-        // a a <blank> a b  ->  "aab" is WRONG; CTC collapses the leading run to
-        // one 'a', the blank then re-arms, so the correct read is "aab".
+        // Sequence: a a <blank> a b. CTC collapses the leading `a a` run to a
+        // single 'a'; the blank then RE-ARMS, so the following 'a' is emitted
+        // again rather than collapsed into the first. Expected read: "aab".
+        // (Without the re-arm rule the answer would be "ab" — that is the whole
+        // point of the blank symbol.)
         let l = logits_from(&[1, 1, 0, 1, 2], 4);
         let line = ctc_decode(l.view(), &charset());
         assert_eq!(line.text, "aab");
