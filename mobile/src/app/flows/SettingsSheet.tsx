@@ -41,8 +41,11 @@ import {
   setScreenCaptureProtection,
   setAutoLockTimeout,
   setVaultLabel,
+  setEditorToolbarOrder,
+  setEditorToolbarHidden,
   type PrefsView,
 } from "../../lib/prefs";
+import { FORMAT_BAR_ITEMS, resolveFormatBarOrder } from "../../lib/formatBarItems";
 import type { VaultChangePasswordError } from "../../types/vault-change-password-error";
 import type { VaultId } from "../../lib/stage";
 
@@ -435,12 +438,158 @@ type Panel =
   | "delete-vault"
   | "rename"
   | "quick-unlock"
+  // MYND-555: editor format-bar customization (device-local layout).
+  | "format-bar"
   // Phase-2 sync (MYND-459): the sync settings panel + its sub-screens.
   | "sync"
   | "sync-endpoint"
   | "sync-enroll"
   | "sync-approve"
   | "sync-devices";
+
+/**
+ * Format-bar layout editor (MYND-555) — reorder + show/hide the editor's
+ * above-keyboard format actions.
+ *
+ * Reorder is move-up / move-down buttons, NOT drag-and-drop: the row already owns
+ * the horizontal-scroll gesture on the bar itself, and a long-press-drag inside a
+ * modal sheet on a phone fights the sheet's own dismiss gesture. Two explicit
+ * buttons are also the accessible affordance, and they are what desktop's panel
+ * offers (`settings.toolbarCustomize.moveUp` / `moveDown` already exist).
+ *
+ * Both writes send the WHOLE list — the setters are whole-value, and the resolver
+ * is total, so a partial write is never a valid intermediate state. `order` is
+ * always written as the fully-resolved 12-id list rather than a sparse diff, so a
+ * later vocabulary addition appends predictably instead of interleaving.
+ */
+function FormatBarPanel({
+  order,
+  hidden,
+  onOrder,
+  onHidden,
+}: {
+  order: string[];
+  hidden: string[];
+  onOrder: (next: string[]) => void;
+  onHidden: (next: string[]) => void;
+}) {
+  const { t } = useTranslation();
+  const resolved = resolveFormatBarOrder(order);
+  const hiddenSet = new Set(hidden);
+
+  const move = (i: number, delta: number) => {
+    const j = i + delta;
+    if (j < 0 || j >= resolved.length) return;
+    const next = [...resolved];
+    [next[i], next[j]] = [next[j]!, next[i]!];
+    onOrder(next);
+  };
+  const toggle = (id: string) => {
+    const next = hiddenSet.has(id) ? hidden.filter((x) => x !== id) : [...hidden, id];
+    // Sorted so the optimistic draft matches what the codec canonicalizes on
+    // disk — otherwise the panel would re-render in a different order than the
+    // next `prefs_read` returns.
+    onHidden([...next].sort());
+  };
+
+  const labelFor = (id: string): string => {
+    const item = FORMAT_BAR_ITEMS.find((x) => x.id === id);
+    return item ? t(item.labelKey) : id;
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 4 }}>
+      <Group>
+        {resolved.map((id, i) => {
+          const isHidden = hiddenSet.has(id);
+          return (
+            <Row key={id} first={i === 0} testId={`settings.format-bar-item-${id}`}>
+              <span
+                style={{
+                  ...rowLabel,
+                  minWidth: 0,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                  // A hidden action stays listed (that is how you bring it back)
+                  // but reads as inactive.
+                  color: isHidden ? "var(--fg-3)" : "var(--fg-1)",
+                }}
+              >
+                {labelFor(id)}
+              </span>
+              <span style={{ display: "flex", alignItems: "center", gap: 4, flex: "none" }}>
+                <IconBtn
+                  label={t("settings.toolbarCustomize.moveUp")}
+                  disabled={i === 0}
+                  testId={`settings.format-bar-up-${id}`}
+                  onClick={() => move(i, -1)}
+                >
+                  <path d="M3 8l5-5 5 5" />
+                </IconBtn>
+                <IconBtn
+                  label={t("settings.toolbarCustomize.moveDown")}
+                  disabled={i === resolved.length - 1}
+                  testId={`settings.format-bar-down-${id}`}
+                  onClick={() => move(i, 1)}
+                >
+                  <path d="M3 5l5 5 5-5" />
+                </IconBtn>
+                {/* `Switch` takes no testId, so the hook hangs on a wrapper —
+                    a click at its center lands on the switch itself. */}
+                <span data-testid={`settings.format-bar-toggle-${id}`} style={{ display: "flex", flex: "none" }}>
+                  <Switch on={!isHidden} onToggle={() => toggle(id)} />
+                </span>
+              </span>
+            </Row>
+          );
+        })}
+      </Group>
+    </div>
+  );
+}
+
+/** Small square icon button used by {@link FormatBarPanel}'s reorder controls. */
+function IconBtn({
+  label,
+  disabled,
+  onClick,
+  testId,
+  children,
+}: {
+  label: string;
+  disabled: boolean;
+  onClick: () => void;
+  testId: string;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      disabled={disabled}
+      data-testid={testId}
+      onClick={onClick}
+      style={{
+        width: 32,
+        height: 32,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        border: "1px solid var(--line-1)",
+        borderRadius: 8,
+        background: "transparent",
+        color: disabled ? "var(--line-2)" : "var(--fg-2)",
+        cursor: disabled ? "default" : "pointer",
+        flex: "none",
+      }}
+    >
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        {children}
+      </svg>
+    </button>
+  );
+}
 
 /** Parent panel for the header back button (one level up the stack). */
 const PANEL_PARENT: Record<Panel, Panel> = {
@@ -454,6 +603,7 @@ const PANEL_PARENT: Record<Panel, Panel> = {
   rename: "account",
   "change-password": "account",
   "quick-unlock": "privacy",
+  "format-bar": "editor",
   "delete-vault": "root",
   sync: "root",
   "sync-endpoint": "sync",
@@ -475,6 +625,7 @@ const PANEL_DEPTH: Record<Panel, number> = {
   rename: 2,
   "change-password": 2,
   "quick-unlock": 2,
+  "format-bar": 2,
   "delete-vault": 2,
   sync: 1,
   "sync-endpoint": 2,
@@ -496,6 +647,7 @@ const PANEL_TITLE: Record<Panel, string> = {
   rename: "settings.panelTitle.vaultName",
   "change-password": "settings.changePassword.title",
   "quick-unlock": "settings.quickUnlock.title",
+  "format-bar": "settings.toolbarCustomize.label",
   "delete-vault": "settings.deleteVault.heading",
   sync: "settings.shell.panels.sync",
   "sync-endpoint": "sync.join.serverLabel",
@@ -1173,7 +1325,24 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
                 }}
               />
             </Group>
+            {/* MYND-555: the format-bar layout editor is its own panel — it is a
+                12-row reorder/hide list, too tall to inline under the toggles. */}
+            <Group>
+              <Row first onClick={() => setPanel("format-bar")} testId="settings.format-bar-row">
+                <span style={rowLabel}>{t("settings.toolbarCustomize.label")}</span>
+                <RowChevron />
+              </Row>
+            </Group>
           </div>
+        )}
+
+        {panel === "format-bar" && (
+          <FormatBarPanel
+            order={eff.editor_toolbar_order}
+            hidden={eff.editor_toolbar_hidden}
+            onOrder={(next) => writePref("editor_toolbar_order", next, () => setEditorToolbarOrder(next))}
+            onHidden={(next) => writePref("editor_toolbar_hidden", next, () => setEditorToolbarHidden(next))}
+          />
         )}
 
         {panel === "privacy" && (

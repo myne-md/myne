@@ -53,6 +53,8 @@ export const DEFAULT_PREFS: PrefsView = {
   right_panel_active_tab: null,
   right_panel_hidden_tabs: [],
   right_panel_tab_order: [],
+  editor_toolbar_order: [],
+  editor_toolbar_hidden: [],
   item_colors: {},
   label: null,
   saved_views: [],
