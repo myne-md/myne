@@ -61,32 +61,30 @@ function selectWord(view: EditorView): void {
 }
 
 // The show path is rAF-deferred and re-tries across frames until `coordsAtPos`
-// resolves, so neither polarity can be asserted after a fixed tick count — that
-// reads as a flake. The two directions want DIFFERENT budgets, because only one
-// of them pays for its budget:
+// resolves, so neither polarity can be asserted after a fixed tick count. The two
+// directions need different treatment, because only one of them can be waited out:
 
-/** Positive-case ceiling. `waitForToolbar` returns the moment the node appears,
- *  so a generous deadline costs nothing in the passing case and only bounds a
- *  genuine failure. Kept roomy so a cold first run (module transform, JIT warm-up)
- *  cannot make a real pass look like a flake. */
-const APPEAR_TIMEOUT_MS = 600;
-
-/** Negative-case budget, burned IN FULL every run — so it is most of this file's
- *  wall-clock and worth keeping tight. 200ms is many multiples of the real
- *  ceiling: the plugin caps its coords retry at 4 attempts
- *  (`toolbar/plugin.ts` `coordsRetries`), one rAF apart, so a toolbar that is
- *  ever going to appear has appeared within ~4 frames. */
-const ABSENT_SETTLE_MS = 200;
-
-async function waitForToolbar(): Promise<Element | null> {
-  const deadline = Date.now() + APPEAR_TIMEOUT_MS;
-  while (Date.now() < deadline) {
-    const el = toolbarEl();
-    if (el !== null) return el;
-    await new Promise((r) => setTimeout(r, 16));
-  }
-  return null;
+/** Wait for the toolbar to appear. Deliberately NOT a hand-rolled `Date.now()`
+ *  deadline: a private wall-clock budget makes a real pass look like a flake the
+ *  moment the machine is busy (this file runs in the lefthook pre-push gate and in
+ *  CI alongside other steps, and a 600ms budget measurably failed ~1-in-3 under a
+ *  parallel vitest process). `expect.poll` retries until VITEST's own test timeout,
+ *  so a loaded box gets slower, not red — and a genuine regression still fails,
+ *  just later. This assertion guards the DEFAULT, which is the half desktop
+ *  depends on, so it must never cry wolf. */
+async function expectToolbarShown(): Promise<void> {
+  await expect.poll(() => toolbarEl() !== null, { interval: 16 }).toBe(true);
 }
+
+/** Negative-case budget. Absence cannot be polled for — there is no event to wait
+ *  on — so this burns a fixed budget and then asserts. It is safe to keep tight,
+ *  and safe against a slow machine, for a structural reason rather than a timing
+ *  one: with the flag off the plugin is never constructed (pinned by the
+ *  extension-count case below), so no amount of extra waiting could produce a
+ *  toolbar. The budget only has to outlast the plugin's own retry ceiling — 4
+ *  attempts one rAF apart (`toolbar/plugin.ts` `coordsRetries`) — which 200ms
+ *  clears many times over. */
+const ABSENT_SETTLE_MS = 200;
 
 async function settle(): Promise<void> {
   const deadline = Date.now() + ABSENT_SETTLE_MS;
@@ -109,13 +107,13 @@ describe("myneExtensions selectionToolbar flag", () => {
   it("defaults ON — a selection surfaces the floating toolbar (desktop)", async () => {
     mounted = mount();
     selectWord(mounted.view);
-    expect(await waitForToolbar()).not.toBeNull();
+    await expectToolbarShown();
   });
 
   it("explicit true behaves like the default", async () => {
     mounted = mount(true);
     selectWord(mounted.view);
-    expect(await waitForToolbar()).not.toBeNull();
+    await expectToolbarShown();
   });
 
   it("false mounts no toolbar at all — a selection surfaces nothing (mobile)", async () => {
@@ -126,8 +124,10 @@ describe("myneExtensions selectionToolbar flag", () => {
   });
 
   it("false drops exactly the toolbar — the rest of the stack is untouched", () => {
-    // Guards the flag against becoming a broader kill-switch: turning it off may
-    // remove ONE top-level entry (the toolbar ViewPlugin) and nothing else.
+    // Guards against the flag becoming a BROADER kill-switch — if it ever removed
+    // more than one entry, this fails. It deliberately does not claim more than
+    // that: it cannot tell WHICH entry went (the DOM cases above do) and it cannot
+    // see a reorder. Relative between two calls, so future extensions don't break it.
     expect(myneExtensions({ selectionToolbar: false })).toHaveLength(
       myneExtensions({ selectionToolbar: true }).length - 1,
     );
