@@ -13,6 +13,16 @@
 // `<canvas>`, so asserting drawn *content* (vs. its mount + persistence) needs the
 // canvas-interaction support layer — tracked as the depth follow-up; this suite
 // pins create → canvas-mounts → reload-survives, which is the load-bearing loop.
+//
+// Chrome-curation coverage (MYND-514, excalidraw-chrome-fit): the curated menu
+// {Theme, Canvas background, Reset} + dropped Open/Save/Export + hidden Library/Help
+// + suppressed welcome screen are Excalidraw-internal DOM — NOT Myne-owned, so they
+// carry no testid and (per this dir's byTestId-only / no-CSS-selector rule) are NOT
+// asserted here. The declarative posture that drives them (UIOptions.canvasActions,
+// egress fields) is locked by the Vitest guard `tests/drawing/embed-hardening.test.ts`
+// ("excalidraw chrome curation"); the CSS hides + token colours are a visual/manual
+// check. This suite's role for the feature is the no-regression proof: after the
+// chrome changes, the canvas still mounts and a drawing still persists across reload.
 
 import { expect, it } from "vitest";
 import { describeE2E, scenario } from "./support/scenario";

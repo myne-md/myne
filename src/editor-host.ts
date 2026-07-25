@@ -19,6 +19,8 @@ import {
 import { prefsRead } from "./lib/prefs";
 import { infer, buildCompletionPrompt, buildTitlePrompt } from "./lib/writing-assistant";
 import { spellCheck, addToPersonalDictionary, ignoreWordInVault } from "./lib/spell";
+import { startTranscription } from "./lib/transcribe";
+import { AI_TRANSCRIPT_HONESTY_NOTE } from "./lib/load-bearing-copy";
 
 const host: EditorHost = {
   t: (key, opts) => i18n.t(key, opts ?? {}),
@@ -41,6 +43,15 @@ const host: EditorHost = {
   },
   ai: { infer, buildCompletionPrompt, buildTitlePrompt },
   spell: { spellCheck, addToPersonalDictionary, ignoreWordInVault },
+  // Speech-to-text (voice-to-text MYND-552, SYNC-V7): bridge the shared audio
+  // widget's Transcribe affordance to the local-inference `transcribe` command
+  // via the shared helper (streaming Channel + shared cancel). `view` is unused
+  // desktop-side today; the seam threads it for parity/future use.
+  transcribe: (_view, attachmentId, opts) =>
+    startTranscription(attachmentId, opts?.onSegment),
+  // The load-bearing transcript-fallibility honesty note, rendered VERBATIM by
+  // the widget's read-only expander (SYNC-V8 — never i18n'd).
+  transcriptHonestyNote: AI_TRANSCRIPT_HONESTY_NOTE,
 };
 
 setEditorHost(host);

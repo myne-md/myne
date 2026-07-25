@@ -52,6 +52,12 @@ pub const MODELS_DIR_NAME: &str = "models";
 /// never re-hashes a hundreds-of-MiB safetensors file.
 const EMBEDDING_HASH_MARKER: &str = "embedding.hash";
 
+/// Marker file (under `models/`) recording the lowercase-hex SHA-256 of the
+/// selected **transcription** (Whisper) model's file bytes — the model-identity
+/// input the transcript `MYE1` cache binds so a model swap invalidates stale
+/// transcripts (voice-to-text, MYND-550; SYNC-V3, mirroring the embedding rule).
+const TRANSCRIPTION_HASH_MARKER: &str = "transcription.hash";
+
 /// Which model a stored path refers to. The generation model (Qwen2.5-1.5B,
 /// task 3) and the embedding model (all-MiniLM-L6-v2, task 4) are side-loaded
 /// independently, so each has its own marker.
@@ -61,6 +67,9 @@ pub enum ModelRole {
     Generation,
     /// Embedding model (`embed`).
     Embedding,
+    /// Speech-to-text model (`transcribe`) — Whisper, voice-to-text MYND-550
+    /// (SYNC-V3). Side-loaded + swappable independently of the other two.
+    Transcription,
 }
 
 impl ModelRole {
@@ -69,15 +78,29 @@ impl ModelRole {
         match self {
             ModelRole::Generation => "generation.path",
             ModelRole::Embedding => "embedding.path",
+            ModelRole::Transcription => "transcription.path",
         }
     }
 
-    /// Parse the IPC role string (`"generation"` / `"embedding"`) — the command
-    /// layer's only re-entry point for a UI-supplied role.
+    /// Which hash-marker file (if any) records this role's model SHA-256.
+    /// `Generation` has none (it does not key a persisted index); `Embedding`
+    /// keys `vault.embeddings`, `Transcription` keys the transcript `MYE1` cache.
+    fn hash_marker_file_name(self) -> Option<&'static str> {
+        match self {
+            ModelRole::Generation => None,
+            ModelRole::Embedding => Some(EMBEDDING_HASH_MARKER),
+            ModelRole::Transcription => Some(TRANSCRIPTION_HASH_MARKER),
+        }
+    }
+
+    /// Parse the IPC role string (`"generation"` / `"embedding"` /
+    /// `"transcription"`) — the command layer's only re-entry point for a
+    /// UI-supplied role.
     pub fn parse(s: &str) -> Option<ModelRole> {
         match s {
             "generation" => Some(ModelRole::Generation),
             "embedding" => Some(ModelRole::Embedding),
+            "transcription" => Some(ModelRole::Transcription),
             _ => None,
         }
     }
@@ -272,11 +295,14 @@ pub fn set_selected_model(
 ) -> Result<PathBuf, ModelStoreError> {
     let accepted = ensure_outside_vault_tree(base, model_path)?;
     let dir = ensure_models_dir(base)?;
-    if role == ModelRole::Embedding {
+    // Roles with a hash marker (Embedding / Transcription) record the file's
+    // SHA-256 at pick-time — computed BEFORE the path marker so a hash/IO
+    // failure records nothing (the swap fully lands or fully rolls back).
+    if let Some(marker) = role.hash_marker_file_name() {
         let stat = file_stat(&accepted)?;
         let hash = compute_file_sha256(&accepted)?;
         std::fs::write(
-            dir.join(EMBEDDING_HASH_MARKER),
+            dir.join(marker),
             embedding_hash_marker_body(&hash, stat).as_bytes(),
         )?;
     }
@@ -331,16 +357,93 @@ pub fn selected_model(base: &Path, role: ModelRole) -> Result<Option<PathBuf>, M
     }
 }
 
+/// Path components (under the Tauri `resource_dir`) of the **bundled default**
+/// transcription model shipped with the desktop app (voice-to-text, MYND-270):
+/// `<resource_dir>/models/whisper/model.gguf`, with sibling `config.json` +
+/// `tokenizer.json` (the `load_transcription` layout). Desktop-only — mobile
+/// stays side-load. A quantized `whisper-base` GGUF (Apache-2.0; `LICENSING.md`).
+pub const BUNDLED_TRANSCRIPTION_SUBPATH: [&str; 3] = ["models", "whisper", "model.gguf"];
+
+/// The bundled default transcription model path IFF it is actually present on
+/// disk. Returns `None` when no model ships (an `--no-default-features` AI-free
+/// build, or a checkout whose LFS model blob was not fetched) so resolution
+/// degrades cleanly to side-load-only — never a phantom path that fails to load.
+pub fn bundled_transcription_model(resource_dir: &Path) -> Option<PathBuf> {
+    let mut p = resource_dir.to_path_buf();
+    for c in BUNDLED_TRANSCRIPTION_SUBPATH {
+        p.push(c);
+    }
+    p.is_file().then_some(p)
+}
+
+/// The transcription model actually used: the user's picker **override**
+/// (`transcription.path`) if set, else the **bundled** default (MYND-270).
+/// `bundled` is `None` on a build with no bundled model, so the result is then
+/// override-only (the pre-MYND-270 behaviour). One source of truth shared by the
+/// engine loader, the `get_model_path` UI signal, and the model-hash resolver.
+pub fn effective_transcription_model(
+    base: &Path,
+    bundled: Option<&Path>,
+) -> Result<Option<PathBuf>, ModelStoreError> {
+    if let Some(p) = selected_model(base, ModelRole::Transcription)? {
+        return Ok(Some(p));
+    }
+    Ok(bundled.map(|p| p.to_path_buf()))
+}
+
 /// Return the embedding model hash, backfilling it (compute + persist) from the
 /// currently-selected embedding model if the pick-time marker is missing — e.g.
-/// a model selected before MYND-453 shipped. The hash cost is paid at most
-/// ONCE (then cached), never on every unlock. `None` if no embedding model is
-/// selected.
+/// a model selected before MYND-453 shipped. `None` if no embedding model is
+/// selected. Thin wrapper over [`ensure_model_hash`].
 pub fn ensure_embedding_model_hash(base: &Path) -> Result<Option<[u8; 32]>, ModelStoreError> {
-    let Some(path) = selected_model(base, ModelRole::Embedding)? else {
+    ensure_model_hash(base, ModelRole::Embedding)
+}
+
+/// The transcription (Whisper) model hash for the **effective** model — the
+/// picker override if set, else the `bundled` default (voice-to-text, MYND-270)
+/// — backfilled once if the marker is missing (like [`ensure_embedding_model_hash`]).
+/// A transcript produced by the bundled model gets that model's identity hash
+/// bound into its `MYE1` cache (and swapping to an override correctly re-hashes →
+/// invalidates stale transcripts). `None` when neither an override nor a bundled
+/// model is present.
+pub fn ensure_transcription_model_hash_with_bundled(
+    base: &Path,
+    bundled: Option<&Path>,
+) -> Result<Option<[u8; 32]>, ModelStoreError> {
+    let Some(marker_name) = ModelRole::Transcription.hash_marker_file_name() else {
         return Ok(None);
     };
-    let marker_path = models_dir_from_base(base).join(EMBEDDING_HASH_MARKER);
+    let Some(path) = effective_transcription_model(base, bundled)? else {
+        return Ok(None);
+    };
+    hash_model_at_path(base, marker_name, &path).map(Some)
+}
+
+/// Shared backfill for any role that has a hash marker ([`ModelRole::Embedding`]
+/// / [`ModelRole::Transcription`]). The hash cost is paid at most ONCE (then
+/// cached), never on every unlock. `None` if the role has no hash marker or no
+/// model is selected.
+fn ensure_model_hash(base: &Path, role: ModelRole) -> Result<Option<[u8; 32]>, ModelStoreError> {
+    let Some(marker_name) = role.hash_marker_file_name() else {
+        return Ok(None);
+    };
+    let Some(path) = selected_model(base, role)? else {
+        return Ok(None);
+    };
+    hash_model_at_path(base, marker_name, &path).map(Some)
+}
+
+/// Compute (or reuse the cached) SHA-256 of the model file at `path`, keyed by
+/// the `<models>/<marker_name>` marker's `(hash, len, mtime)`. Extracted from
+/// [`ensure_model_hash`] so the bundled-default transcription model
+/// ([`effective_transcription_model`]) hashes through the SAME cache path as a
+/// picked model. The hash cost is paid at most once per actual file change.
+fn hash_model_at_path(
+    base: &Path,
+    marker_name: &str,
+    path: &Path,
+) -> Result<[u8; 32], ModelStoreError> {
+    let marker_path = models_dir_from_base(base).join(marker_name);
     let marker = std::fs::read_to_string(&marker_path).ok();
     let cached_hash = marker.as_deref().and_then(hash_from_marker_body);
     let recorded_stat = marker.as_deref().and_then(parse_marker_stat);
@@ -348,25 +451,25 @@ pub fn ensure_embedding_model_hash(base: &Path) -> Result<Option<[u8; 32]>, Mode
     // Fast path: a cached hash whose recorded `(len, mtime)` still matches the
     // file on disk — no re-hash. Detects an IN-PLACE model replacement (same
     // path, new bytes) with a cheap `stat` and re-hashes only then, so the swap
-    // correctly invalidates the persisted index (§9.17.2) instead of poisoning
-    // it with vectors from the old weights under a stale hash.
-    let current_stat = file_stat(&path)?;
+    // correctly invalidates the persisted index instead of poisoning it with a
+    // stale hash (§9.17.2 for embeddings; the same rule for transcripts).
+    let current_stat = file_stat(path)?;
     if let (Some(hash), Some(stat)) = (cached_hash, recorded_stat) {
         if stat == current_stat {
-            return Ok(Some(hash));
+            return Ok(hash);
         }
     }
 
     // No hash, no recorded stat, or the file changed → (re)hash and rewrite the
     // marker (hash + fresh stat). Cost paid at most once per actual change.
-    let hash = compute_file_sha256(&path)?;
-    let stat = file_stat(&path)?;
+    let hash = compute_file_sha256(path)?;
+    let stat = file_stat(path)?;
     let dir = ensure_models_dir(base)?;
     std::fs::write(
-        dir.join(EMBEDDING_HASH_MARKER),
+        dir.join(marker_name),
         embedding_hash_marker_body(&hash, stat).as_bytes(),
     )?;
-    Ok(Some(hash))
+    Ok(hash)
 }
 
 /// Parse the hex hash (line 1) from a marker body into 32 bytes, or `None`.
@@ -389,6 +492,27 @@ fn hash_from_marker_body(body: &str) -> Option<[u8; 32]> {
 pub fn embedding_model_hash_for<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> Option<[u8; 32]> {
     let base = crate::paths::app_data_dir(app).ok()?;
     ensure_embedding_model_hash(&base).ok().flatten()
+}
+
+/// Runtime wrapper: resolve the app's `app_data_dir` base and return the
+/// transcription (Whisper) model hash (backfilling once if needed). Best-effort
+/// — `None` on any failure. The transcript-storage-search sibling reads this to
+/// bind the transcript `MYE1` cache's model-identity (SYNC-V3).
+pub fn transcription_model_hash_for<R: tauri::Runtime>(
+    app: &tauri::AppHandle<R>,
+) -> Option<[u8; 32]> {
+    use tauri::Manager;
+    let base = crate::paths::app_data_dir(app).ok()?;
+    // Hash the EFFECTIVE model (override else bundled default, MYND-270) so a
+    // bundled-model transcript binds that model's identity into its MYE1 cache.
+    let bundled = app
+        .path()
+        .resource_dir()
+        .ok()
+        .and_then(|rd| bundled_transcription_model(&rd));
+    ensure_transcription_model_hash_with_bundled(&base, bundled.as_deref())
+        .ok()
+        .flatten()
 }
 
 #[cfg(test)]

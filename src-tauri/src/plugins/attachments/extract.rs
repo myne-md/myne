@@ -495,6 +495,8 @@ fn finalize(raw: String, fmt: SourceFormat) -> ExtractedText {
             text,
             char_count,
             truncated,
+            // Deterministic extractors (PDF/DOCX/text) are model-independent.
+            model_hash: None,
         };
     }
     ExtractedText {
@@ -503,6 +505,7 @@ fn finalize(raw: String, fmt: SourceFormat) -> ExtractedText {
         text,
         char_count,
         truncated,
+        model_hash: None,
     }
 }
 

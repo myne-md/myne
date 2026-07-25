@@ -239,3 +239,16 @@ export const AI_TRUST_DISCLOSURE =
  *  exact wording by full-literal equality (SYNC-8 discipline). */
 export const AI_CHAT_HONESTY_NOTE =
   "Answers come from a small model running on your device and may be wrong — check the notes it cites.";
+
+/** Transcript-fallibility honesty note (voice-to-text MYND-552, SYNC-V8). A
+ *  load-bearing, threat-model-bounded framing shown beneath the read-only
+ *  transcript expander: the transcript comes from a SMALL on-device speech model
+ *  and MAY BE WRONG. It must NOT imply cloud-grade accuracy, and — per
+ *  `threat-model.md` §7 — must NOT claim model-runtime isolation ("sandbox"), the
+ *  same discipline as `AI_CHAT_HONESTY_NOTE`. The trust affordance itself reuses
+ *  `AI_TRUST_HEADLINE` / `AI_TRUST_DISCLOSURE` verbatim — this note is only the
+ *  accuracy counterweight. E2E/Vitest pin the exact wording by full-literal
+ *  equality (SYNC-8); changing it is a `decisions.md` event, not a copy edit.
+ *  Rendered verbatim in every locale (never i18n'd). */
+export const AI_TRANSCRIPT_HONESTY_NOTE =
+  "This transcript was made by a small model running on your device and may be wrong — check it against the audio.";
