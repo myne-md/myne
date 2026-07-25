@@ -25,6 +25,13 @@ vi.mock("@tauri-apps/api/core", () => ({
 import { useEnroll } from "../../src/hooks/useEnroll";
 
 const ENROLL_CMD = "plugin:sync|sync_enroll";
+// MYND-548: enrolling also names THIS device, so the hook now makes a SECOND
+// IPC call. Asserting on the enroll call by name (rather than on a total call
+// count) keeps these tests about credential forwarding.
+const SET_NAME_CMD = "plugin:prefs|set_device_name";
+const DEVICE_ID = "aa11bb22cc33dd44ee55ff6677889900";
+const enrollCalls = () => invokeMock.mock.calls.filter((c) => c[0] === ENROLL_CMD);
+const nameCalls = () => invokeMock.mock.calls.filter((c) => c[0] === SET_NAME_CMD);
 
 beforeEach(() => {
   invokeMock.mockReset();
@@ -58,7 +65,7 @@ describe("useEnroll — state machine transitions", () => {
 
     let pending!: Promise<void>;
     act(() => {
-      pending = result.current.enroll("ACCT", "secret-cred", "password");
+      pending = result.current.enroll("ACCT", "secret-cred", "password", "Test Device");
     });
 
     // Mid-flight: busy is true and the prior outcome was cleared.
@@ -75,11 +82,11 @@ describe("useEnroll — state machine transitions", () => {
   });
 
   it("idle → pending(busy) → pending outcome when held by the approval gate", async () => {
-    invokeMock.mockResolvedValueOnce({ approved: false });
+    invokeMock.mockResolvedValueOnce({ approved: false, device_id_hex: DEVICE_ID });
 
     const { result } = renderHook(() => useEnroll());
     await act(async () => {
-      await result.current.enroll("ACCT", "secret-cred", "password");
+      await result.current.enroll("ACCT", "secret-cred", "password", "Test Device");
     });
 
     expect(result.current.busy).toBe(false);
@@ -96,7 +103,7 @@ describe("useEnroll — state machine transitions", () => {
     // never throw, so there is no unhandled rejection escaping the hook.
     await act(async () => {
       await expect(
-        result.current.enroll("ACCT", "secret-cred", "password"),
+        result.current.enroll("ACCT", "secret-cred", "password", "Test Device"),
       ).resolves.toBeUndefined();
     });
 
@@ -109,7 +116,7 @@ describe("useEnroll — state machine transitions", () => {
 
     const { result } = renderHook(() => useEnroll());
     await act(async () => {
-      await result.current.enroll("ACCT", "secret-cred", "password");
+      await result.current.enroll("ACCT", "secret-cred", "password", "Test Device");
     });
 
     expect(result.current.outcome).toEqual({ state: "error", kind: "Internal" });
@@ -121,14 +128,14 @@ describe("useEnroll — state machine transitions", () => {
     // First attempt fails into the error state.
     invokeMock.mockRejectedValueOnce({ kind: "Unreachable" });
     await act(async () => {
-      await result.current.enroll("ACCT", "secret-cred", "password");
+      await result.current.enroll("ACCT", "secret-cred", "password", "Test Device");
     });
     expect(result.current.outcome).toEqual({ state: "error", kind: "Unreachable" });
 
     // Second attempt: setOutcome(null) runs before the new IPC resolves.
-    invokeMock.mockResolvedValueOnce({ approved: true });
+    invokeMock.mockResolvedValueOnce({ approved: true, device_id_hex: DEVICE_ID });
     await act(async () => {
-      await result.current.enroll("ACCT", "secret-cred", "password");
+      await result.current.enroll("ACCT", "secret-cred", "password", "Test Device");
     });
     expect(result.current.outcome).toEqual({ state: "approved" });
   });
@@ -136,15 +143,17 @@ describe("useEnroll — state machine transitions", () => {
 
 describe("useEnroll — credential forwarding to sync_enroll", () => {
   it("forwards the account number, credential and kind to the sync_enroll command", async () => {
-    invokeMock.mockResolvedValueOnce({ approved: true });
+    invokeMock.mockResolvedValueOnce({ approved: true, device_id_hex: DEVICE_ID });
 
     const { result } = renderHook(() => useEnroll());
     await act(async () => {
-      await result.current.enroll("MY-ACCT", "user-entered-phrase", "recovery");
+      await result.current.enroll("MY-ACCT", "user-entered-phrase", "recovery", "Test Device");
     });
 
-    // Single IPC call to the sync plugin's enroll command.
-    expect(invokeMock).toHaveBeenCalledTimes(1);
+    // Exactly one call to the sync plugin's enroll command. (The hook also
+    // writes this device's name afterwards — asserted separately below — so a
+    // bare total-call count would be testing the wrong thing.)
+    expect(enrollCalls()).toHaveLength(1);
     // Compare the payload object directly (no secret in any assertion message);
     // a failure surfaces via Vitest's structural diff, not our own copy.
     expect(invokeMock).toHaveBeenCalledWith(ENROLL_CMD, {
@@ -152,17 +161,23 @@ describe("useEnroll — credential forwarding to sync_enroll", () => {
       credential: "user-entered-phrase",
       credentialKind: "recovery",
     });
+
+    // MYND-548: the name write is a SEPARATE call that carries no credential and
+    // no account number. That separation is the point — a device name must never
+    // ride along with, or leak into, the enrollment payload.
+    expect(nameCalls()).toHaveLength(1);
+    expect(nameCalls()[0][1]).toEqual({ deviceIdHex: DEVICE_ID, name: "Test Device" });
   });
 
   it("carries the password credentialKind through unchanged", async () => {
-    invokeMock.mockResolvedValueOnce({ approved: false });
+    invokeMock.mockResolvedValueOnce({ approved: false, device_id_hex: DEVICE_ID });
 
     const { result } = renderHook(() => useEnroll());
     await act(async () => {
-      await result.current.enroll("MY-ACCT", "pw-cred", "password");
+      await result.current.enroll("MY-ACCT", "pw-cred", "password", "Test Device");
     });
 
-    const [cmd, payload] = invokeMock.mock.calls[0] as [
+    const [cmd, payload] = enrollCalls()[0] as [
       string,
       { accountNumber: string; credential: string; credentialKind: string },
     ];
@@ -175,11 +190,11 @@ describe("useEnroll — credential forwarding to sync_enroll", () => {
   });
 
   it("does not retain the credential anywhere on the returned hook surface", async () => {
-    invokeMock.mockResolvedValueOnce({ approved: true });
+    invokeMock.mockResolvedValueOnce({ approved: true, device_id_hex: DEVICE_ID });
 
     const { result } = renderHook(() => useEnroll());
     await act(async () => {
-      await result.current.enroll("MY-ACCT", "leaky-secret", "password");
+      await result.current.enroll("MY-ACCT", "leaky-secret", "password", "Test Device");
     });
 
     // The hook hands the secret straight to IPC; the post-call public surface
@@ -195,11 +210,11 @@ describe("useEnroll — credential forwarding to sync_enroll", () => {
 
 describe("useEnroll — reset()", () => {
   it("reset() clears the last outcome back to null", async () => {
-    invokeMock.mockResolvedValueOnce({ approved: true });
+    invokeMock.mockResolvedValueOnce({ approved: true, device_id_hex: DEVICE_ID });
 
     const { result } = renderHook(() => useEnroll());
     await act(async () => {
-      await result.current.enroll("ACCT", "secret-cred", "password");
+      await result.current.enroll("ACCT", "secret-cred", "password", "Test Device");
     });
     expect(result.current.outcome).toEqual({ state: "approved" });
 
