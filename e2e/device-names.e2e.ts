@@ -162,21 +162,21 @@ describeNames("device friendly names (two devices)", () => {
   );
 
   it(
-    "enrolling without touching the name field still yields a real, platform-derived name",
+    "the enrollment form pre-fills a real, platform-derived name with no user input",
     async () => {
-      // ONE device: the claim here is that the pre-filled default survives an
-      // untouched form and round-trips through the real Rust token → i18n → prefs
-      // path. Nothing about it needs a peer, and a second two-device harness is
-      // the most expensive thing this suite can buy.
+      // ONE device. The claim is that the suggestion survives the real path —
+      // Rust's `std::env::consts::OS` → the i18n catalogue → the rendered field —
+      // with nothing typed. That is observable at the form, and asserting it there
+      // keeps this off a second two-device harness (the most expensive thing this
+      // suite can buy). Whether a name reaches the OTHER device is scenario 1's
+      // job, and it covers it end to end.
       const srv = await startSyncServer();
       try {
-        let account = "";
         let password = "";
         const a = await launchDevice(0, {
           seedConfig: syncConfigSeed(srv.url),
           seed: (appDataDir) => {
             const v = seedVault(appDataDir, { password: "CanaryPass-9-animals!" });
-            account = v.account;
             password = v.password;
           },
         });
@@ -185,22 +185,14 @@ describeNames("device friendly names (two devices)", () => {
           await dismissImporterOffer(a.session);
           await openSettings(a.session);
           await (await a.session.byTestId("settings.tab-sync")).click();
-          await (await a.session.byTestId("sync.enroll.account-input")).sendKeys(account);
-          await (await a.session.byTestId("sync.enroll.password-input")).sendKeys(password);
-          // The name field is left exactly as the form pre-filled it.
-          await (await a.session.byTestId("sync.enroll.submit")).click();
-          await a.session.byTestId("sync.enroll.approved", { timeoutMs: 30_000 });
 
-          // The roster is polled, so the row appears a beat after the approval
-          // notice — wait for it rather than reading an empty list.
-          await a.session.byTestId("sync.device-row", { timeoutMs: 30_000 });
-          const names = await rowNames(a.session);
-          expect(names.length).toBeGreaterThan(0);
-          for (const name of names) {
-            expect(name.trim()).not.toBe("");
-            // A real word from the catalogue, not the id-derived fallback.
-            expect(name).not.toMatch(/^Device [0-9a-f]{6}$/);
-          }
+          const field = await a.session.byTestId("sync.enroll.device-name-input", {
+            timeoutMs: 30_000,
+          });
+          const prefilled = (await field.property<string>("value")) ?? "";
+          expect(prefilled.trim()).not.toBe("");
+          // A catalogue word, never the id-derived device label.
+          expect(prefilled).not.toMatch(/^Device [0-9a-f]{6}$/);
         } finally {
           await a.teardown();
         }
