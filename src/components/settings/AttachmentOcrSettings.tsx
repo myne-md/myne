@@ -15,6 +15,7 @@
 // answer for the overwhelmingly common case.
 
 import { useEffect, useState, type CSSProperties } from "react";
+import { listen } from "@tauri-apps/api/event";
 import { useTranslation } from "react-i18next";
 import { ControlBlock } from "./ControlBlock";
 import { prefsRead, setAttachmentOcrEnabled } from "../../lib/prefs";
@@ -31,6 +32,13 @@ const TOGGLE_STYLE: CSSProperties = {
   alignSelf: "flex-start",
 };
 
+const PROGRESS_STYLE: CSSProperties = {
+  marginTop: "var(--space-2)",
+  fontFamily: "var(--font-sans)",
+  fontSize: "var(--text-sm)",
+  color: "var(--fg-2)",
+};
+
 const ERROR_STYLE: CSSProperties = {
   marginTop: "var(--space-2)",
   fontFamily: "var(--font-sans)",
@@ -42,6 +50,10 @@ export function AttachmentOcrSettings() {
   const { t } = useTranslation();
   const [enabled, setEnabled] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Attachments still queued. `0` hides the line — the indicator exists to
+  // explain a busy fan, so it must disappear the moment there is nothing to
+  // explain.
+  const [remaining, setRemaining] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -55,6 +67,18 @@ export function AttachmentOcrSettings() {
       });
     return () => {
       cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    // The worker emits at start, after every attachment, and once at the end
+    // with `remaining: 0`, so this needs no polling and no timer.
+    const stop = listen<{ remaining: number; done: number }>(
+      "ocr-backlog-progress",
+      (e) => setRemaining(e.payload.remaining),
+    );
+    return () => {
+      void stop.then((unlisten) => unlisten());
     };
   }, []);
 
@@ -89,6 +113,11 @@ export function AttachmentOcrSettings() {
           </button>
         }
       />
+      {remaining > 0 && (
+        <p style={PROGRESS_STYLE} data-testid="settings.attachment-ocr-progress">
+          {t("settings.attachmentOcr.processing", { count: remaining })}
+        </p>
+      )}
       {error !== null && <p style={ERROR_STYLE}>{error}</p>}
     </>
   );
