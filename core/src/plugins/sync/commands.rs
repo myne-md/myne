@@ -1260,7 +1260,7 @@ pub async fn sync_enroll<R: Runtime>(
     // The SCRAM username is derived inside `enroll` as the account-hash hex —
     // the display-form account number never crosses the wire (AS9).
     let outcome =
-        tokio::task::spawn_blocking(move || -> Result<(bool, String), SyncDeviceError> {
+        tokio::task::spawn_blocking(move || -> Result<EnrollmentOutcome, SyncDeviceError> {
             let transport = super::http_transport::build_transport(&url, pins)
                 .map_err(|_| SyncDeviceError::Transport)?;
 
@@ -1538,7 +1538,7 @@ pub async fn sync_join_account<R: Runtime>(
         .await
         .ok_or(SyncDeviceError::Internal)?;
     let approved =
-        tokio::task::spawn_blocking(move || -> Result<(bool, String), SyncDeviceError> {
+        tokio::task::spawn_blocking(move || -> Result<EnrollmentOutcome, SyncDeviceError> {
             let transport = super::http_transport::build_transport(&url, pins)
                 .map_err(|_| SyncDeviceError::Transport)?;
             let secret = derive_subkey(&root_key, SubkeyRole::ServerAuth);
