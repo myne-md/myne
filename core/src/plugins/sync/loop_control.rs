@@ -72,6 +72,16 @@ pub enum FailureClass {
     Unauthenticated,
     /// Socket/TLS-level failure — offline or the server is unreachable.
     Transport,
+    /// 507 — the account is over its storage ceiling. Retrying cannot help until
+    /// the user frees space or the ceiling changes, so it parks like a 401.
+    QuotaExceeded,
+    /// 413 — one request exceeded the server's body cap. A property of THAT
+    /// request, not of the account: the next cycle may well succeed, so this
+    /// keeps the ordinary backoff rather than parking.
+    PayloadTooLarge,
+    /// 403 — the account is operator-frozen. Push + enroll are refused, pull is
+    /// never refused; only the operator can clear it, so it parks like a 401.
+    Frozen,
     /// Everything else (bad response, CAS races, protocol errors, local IO).
     Other,
 }
@@ -83,6 +93,11 @@ impl FailureClass {
         match self {
             FailureClass::Unauthenticated => "auth_failed",
             FailureClass::RateLimited => "rate_limited",
+            // Distinct tags so the UI never collapses these into "Sync failed"
+            // (MYND-570): each maps to its own banner copy.
+            FailureClass::QuotaExceeded => "quota_exceeded",
+            FailureClass::PayloadTooLarge => "payload_too_large",
+            FailureClass::Frozen => "frozen",
             FailureClass::Transport | FailureClass::Other => "sync_failed",
         }
     }
@@ -106,9 +121,13 @@ pub enum CycleResult {
 /// server-side, so decorrelation buys nothing here, unlike the SSE reconnect).
 fn retry_delay_ms(class: FailureClass, consecutive_failures: u32) -> u64 {
     let (start, cap) = match class {
-        FailureClass::Unauthenticated => return AUTH_PARK_MS,
+        // Nothing the client can retry its way out of — park until a user
+        // action (unlock / focus / manual sync) or a peer poke re-probes.
+        FailureClass::Unauthenticated | FailureClass::QuotaExceeded | FailureClass::Frozen => {
+            return AUTH_PARK_MS
+        }
         FailureClass::RateLimited => (RATE_LIMIT_RETRY_START_MS, RATE_LIMIT_RETRY_CAP_MS),
-        FailureClass::Transport | FailureClass::Other => {
+        FailureClass::Transport | FailureClass::Other | FailureClass::PayloadTooLarge => {
             (FAILURE_RETRY_START_MS, FAILURE_RETRY_CAP_MS)
         }
     };

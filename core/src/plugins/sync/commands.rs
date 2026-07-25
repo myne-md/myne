@@ -333,6 +333,12 @@ fn classify_cycle_error(
         | SyncCycleError::Push(PushError::RateLimited) => FailureClass::RateLimited,
         SyncCycleError::Pull(PullError::Unauthenticated)
         | SyncCycleError::Push(PushError::Unauthenticated) => FailureClass::Unauthenticated,
+        // Refusal classes that must reach the UI as themselves, never as the
+        // generic "sync failed" (MYND-570). Push-only by construction: a frozen
+        // or over-quota account still PULLS ("frozen is minimal").
+        SyncCycleError::Push(PushError::QuotaExceeded) => FailureClass::QuotaExceeded,
+        SyncCycleError::Push(PushError::PayloadTooLarge) => FailureClass::PayloadTooLarge,
+        SyncCycleError::Push(PushError::Frozen) => FailureClass::Frozen,
         SyncCycleError::Pull(PullError::Transport(_))
         | SyncCycleError::Push(PushError::Transport(_)) => FailureClass::Transport,
         _ => FailureClass::Other,
