@@ -58,3 +58,9 @@ pub mod vault_indices;
 pub mod vault_recover;
 pub mod vault_repair;
 pub mod vault_unlock;
+// MYND-561: MYW1 `vault.workspace` persistence — a NEW local plugin, not a
+// `myne-core` re-export. The desktop client's workspace plugin is bound to
+// desktop-crate internals and hoisting it into `myne-core` would mean migrating
+// desktop's live multi-tab restore in the same change; the container (codec +
+// subkey role) is what must match, and it does. See `workspace/commands.rs`.
+pub mod workspace;

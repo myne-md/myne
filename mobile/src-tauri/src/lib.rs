@@ -150,6 +150,14 @@ pub fn run() {
         // lockstep with build.rs + permissions/graph-layout/default.toml or
         // the ACL resolver fails closed.
         .plugin(plugins::graph_layout::init())
+        // Workspace state (MYW1, §9.7): read/write of the encrypted
+        // vault.workspace descriptor, which on mobile carries the sidebar
+        // folder-expand set (MYND-561). Mobile-LOCAL, not a `myne-core`
+        // re-export (see `plugins/workspace/commands.rs` for why), and only 2 of
+        // desktop's 3 commands — no `workspace_stage`. Commands must stay in
+        // lockstep with build.rs + permissions/workspace/default.toml or the ACL
+        // resolver fails closed.
+        .plugin(plugins::workspace::init())
         .plugin(plugins::search::init())
         .plugin(plugins::snapshots::init())
         .plugin(plugins::attachments::init())
