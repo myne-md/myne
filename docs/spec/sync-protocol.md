@@ -372,6 +372,7 @@ The table below is the **single normative classification**. The implementation m
 | `auto_lock_seconds`, `screen_capture_protection` | device-local | local wins (security posture is per-device) |
 | `theme`, `custom_theme`, `show_note_timestamps`, `editor_content_width`, `editor_default_view_mode`, `editor_focus_dim_inactive`, `editor_focus_typewriter`, `editor_font_family`, `editor_layout`, `editor_line_numbers`, `editor_line_spacing`, `editor_text_size` | device-local | local wins (presentation) |
 | `keymap` | device-local | local wins (input hardware) |
+| `attachment_ocr_enabled` | device-local | local wins (per-device compute budget) — image OCR (`protocol.md` §9.15, MYND-441) is CPU-heavy, and battery and thermal capacity differ per device, so turning it off on a phone must not turn it off on a desktop. Same reasoning as `ai_enabled`. **Defaults to `true`**, so it is emitted only when `false` and a blob predating the field decodes with the feature on |
 | `hidden_bar_items`, `bar_items_order`, `right_panel_active_tab`, `right_panel_hidden_tabs`, `right_panel_tab_order` | device-local | local wins (screen-size-dependent UI layout) |
 | `startup_open`, `startup_open_note`, `active_workspace` | device-local | local wins (session/startup behaviour; `active_workspace` points at the device-local `MYW1` artefact) |
 | `last_backup_at`, `paired_extensions`, `ai_enabled`, `spell_enabled` | device-local | local wins (device state / device capability) |

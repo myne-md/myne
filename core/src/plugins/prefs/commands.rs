@@ -2401,6 +2401,7 @@ mod tests {
                 &prefs_key,
                 &account_hash,
                 &PrefsView {
+                    attachment_ocr_enabled: true,
                     screen_capture_protection: false,
                     ai_enabled: false,
                     ai_excluded_folders: Vec::new(),
