@@ -422,7 +422,12 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
       "plugin:sync|sync_reset_local": () => null,
       "plugin:sync|sync_head_fingerprint": () => config.headFingerprint ?? "TYRS-N318",
       "plugin:sync|sync_pending_conflicts": () => config.pendingConflicts ?? [],
-      "plugin:sync|sync_enroll": () => {
+      "plugin:sync|sync_enroll": (args) => {
+        // Record the payload so a flow test can assert what the form forwarded.
+        // MYND-548: the device name goes to the CORE (which parks it and applies
+        // it in a later prefs phase), so "did the name reach the command" is the
+        // only half this mocked tier can honestly verify.
+        (window as unknown as { __enrollArgs?: unknown }).__enrollArgs = args;
         if (config.enrollError) throw config.enrollError;
         return { approved: false, device_id_hex: DEFAULT_DEVICE_ID, ...config.enrollResult };
       },

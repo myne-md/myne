@@ -71,10 +71,13 @@ test.describe("sync enroll flow", () => {
     await page.getByTestId("sync.enroll.password-input").fill("correct horse battery staple");
     await page.getByTestId("sync.enroll.submit").click();
 
-    // The name was written for the device_id the enrollment returned, so the
-    // device list now leads with it instead of the id-derived fallback.
-    await page.getByTestId("sync.settings.devices").click();
-    await expect(page.getByTestId("sync.device-name").first()).toHaveText("Work phone");
+    // The name is forwarded to the CORE, which parks it and applies it in a later
+    // prefs phase — so this tier asserts the hand-off, not the rendered row. That
+    // the name actually reaches the other device is the desktop E2E's job.
+    const forwarded = await page.evaluate(
+      () => (window as unknown as { __enrollArgs?: { deviceName?: string } }).__enrollArgs,
+    );
+    expect(forwarded?.deviceName).toBe("Work phone");
   });
 
   test("submitting with the name field cleared falls back to the suggestion", async ({ page }) => {
@@ -101,8 +104,10 @@ test.describe("sync enroll flow", () => {
     await page.getByTestId("sync.enroll.password-input").fill("correct horse battery staple");
     await page.getByTestId("sync.enroll.submit").click();
 
-    await page.getByTestId("sync.settings.devices").click();
-    await expect(page.getByTestId("sync.device-name").first()).toHaveText("Android phone");
+    const forwarded = await page.evaluate(
+      () => (window as unknown as { __enrollArgs?: { deviceName?: string } }).__enrollArgs,
+    );
+    expect(forwarded?.deviceName).toBe("Android phone");
   });
 
   test("wrong account → the single non-distinguishing banner", async ({ page }) => {

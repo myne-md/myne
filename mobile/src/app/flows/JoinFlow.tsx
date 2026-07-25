@@ -4,7 +4,6 @@ import type { TFunction } from "i18next";
 import type { CSSProperties, ReactNode } from "react";
 import { Screen, FlowHeader, Title, Lead, FooterBar, Button, Banner, BlockingOverlay, Icon } from "../../components";
 import { syncJoinAccount, syncNow, syncHeadFingerprint, syncResetLocal, errKind, type JoinResult } from "../../lib/sync";
-import { setDeviceName } from "../../lib/prefs";
 import { DEVICE_NAME_MAX_LEN, useDeviceNameField } from "../../lib/device-name";
 import { formatAccountNumberInput } from "../../lib/account-number-format";
 import { HAS_TAURI } from "../../lib/app-window";
@@ -240,17 +239,12 @@ export function JoinFlow({ onComplete, onCancel }: JoinFlowProps) {
       return;
     }
     try {
-      const result = await syncJoinAccount(serverUrl.trim(), accountNumber.trim(), password);
-      // Name THIS device before routing anywhere. The bootstrapped vault is
-      // unlocked by now, so the local prefs write needs no token and no approval;
-      // the §10.2 union merge carries the entry to peers on the first sync.
-      // Best-effort — a naming failure must not turn a successful join into an
-      // error (the row falls back to its id-derived label).
-      try {
-        await setDeviceName(result.device_id_hex, deviceNameField.resolved);
-      } catch {
-        // Prefs unwritable — carry on; the join itself succeeded.
-      }
+      const result = await syncJoinAccount(
+        serverUrl.trim(),
+        accountNumber.trim(),
+        password,
+        deviceNameField.resolved,
+      );
       setBusy(false);
       landOn(result);
     } catch (e) {
