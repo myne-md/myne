@@ -53,10 +53,21 @@ describe("import source catalog", () => {
     }
   });
 
+  it("gives every source its own brand icon", () => {
+    const icons = IMPORT_SOURCE_ORDER.map((id) => IMPORT_SOURCES[id].icon);
+    expect(new Set(icons).size).toBe(icons.length);
+  });
+
   it("stores i18n KEYS, never resolved strings (a resolved string would freeze the boot language)", () => {
     for (const id of IMPORT_SOURCE_ORDER) {
       const spec = IMPORT_SOURCES[id];
-      for (const key of [spec.labelKey, spec.survivesKey, spec.losesKey, spec.pickerTitleKey]) {
+      for (const key of [
+        spec.labelKey,
+        spec.shortKey,
+        spec.survivesKey,
+        spec.losesKey,
+        spec.pickerTitleKey,
+      ]) {
         expect(key).toMatch(/^notes\.import\.source\./);
       }
     }
@@ -75,16 +86,29 @@ describe("ImportSourcePicker", () => {
     ]);
   });
 
-  it("shows PRE-import fidelity disclosure on every row", () => {
-    // The pre-import half of "the fidelity bar per source, and how it is disclosed";
-    // the post-import half is the generated import-report note.
+  it("gives every card a one-line identity, not a wall of disclosure text", () => {
+    // The full keeps/loses disclosure lives on the SETUP step now — still before the
+    // user commits, but with room to read it. Putting it on the cards made the picker
+    // a scrolling wall of text before the five options were even visible.
     render(<ImportSourcePicker onPick={() => {}} onCancel={() => {}} />);
-    expect(screen.getAllByTestId("import.source-survives")).toHaveLength(
-      IMPORT_SOURCE_ORDER.length,
-    );
-    expect(screen.getAllByTestId("import.source-loses")).toHaveLength(
-      IMPORT_SOURCE_ORDER.length,
-    );
+    const shorts = screen.getAllByTestId("import.source-short");
+    expect(shorts).toHaveLength(IMPORT_SOURCE_ORDER.length);
+    for (const el of shorts) {
+      expect((el.textContent ?? "").length).toBeGreaterThan(0);
+      // One line, not a paragraph.
+      expect((el.textContent ?? "").length).toBeLessThan(60);
+    }
+    expect(screen.queryAllByTestId("import.source-survives")).toHaveLength(0);
+  });
+
+  it("renders a distinct brand mark per source", () => {
+    render(<ImportSourcePicker onPick={() => {}} onCancel={() => {}} />);
+    const svgs = screen
+      .getAllByTestId("import.source-row")
+      .map((r) => r.querySelector("svg")?.innerHTML ?? "");
+    expect(svgs.filter((h) => h.length > 0)).toHaveLength(IMPORT_SOURCE_ORDER.length);
+    // Distinct markup per source — a shared placeholder glyph would defeat the point.
+    expect(new Set(svgs).size).toBe(IMPORT_SOURCE_ORDER.length);
   });
 
   it("reports the chosen source", () => {

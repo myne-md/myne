@@ -37,7 +37,12 @@ import type { IllegalSegmentFlag, PreexistingFolder } from "./mapping";
 import type { ImportResult } from "./engine";
 import type { MediaByType } from "./media";
 import { runSourceImport } from "./ports";
-import { IMPORT_SOURCES, type ImportSourceId } from "./sourceCatalog";
+import {
+  IMPORT_SOURCES,
+  type ImportSourceId,
+  type ImportSourceSpec,
+} from "./sourceCatalog";
+import { BRAND_TINT, BrandMark } from "./brandMarks";
 import { ImportSourcePicker } from "./ImportSourcePicker";
 
 type Phase = "pick" | "setup" | "running" | "summary" | "error";
@@ -235,7 +240,9 @@ export function ObsidianImportModal({
       ? t("notes.import.modal.titleComplete")
       : phase === "error"
         ? t("notes.import.modal.titleFailed")
-        : t("notes.import.modal.titleSetup");
+        : phase === "pick"
+          ? t("notes.import.modal.titlePick")
+          : t("notes.import.modal.titleSetup");
 
   return (
     <div
@@ -304,6 +311,8 @@ export function ObsidianImportModal({
 
         {phase === "setup" && (
           <SetupBody
+            spec={spec}
+            onBack={initialSource === undefined ? () => setPhase("pick") : undefined}
             folder={folder}
             policy={policy}
             onChooseFolder={chooseFolder}
@@ -337,6 +346,8 @@ export function ObsidianImportModal({
 // ---- setup -------------------------------------------------------------------
 
 function SetupBody({
+  spec,
+  onBack,
   folder,
   policy,
   onChooseFolder,
@@ -344,6 +355,10 @@ function SetupBody({
   onStart,
   onCancel,
 }: {
+  spec: ImportSourceSpec;
+  /** Back to the picker. Absent when a caller named the source, since there is
+   *  nothing to go back to. */
+  onBack?: (() => void) | undefined;
   folder: string | null;
   policy: DuplicatePolicy;
   onChooseFolder: () => void;
@@ -355,9 +370,98 @@ function SetupBody({
   return (
     <>
       <div style={BODY_STYLE}>
+        {/* Chosen source, with the brand mark carried over from the picker so the
+            step reads as a continuation rather than a context switch. */}
+        <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
+          <span
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              width: 32,
+              height: 32,
+              borderRadius: "var(--radius-1)",
+              background: BRAND_TINT[spec.id].bg,
+              color: BRAND_TINT[spec.id].fg,
+              flex: "0 0 auto",
+            }}
+          >
+            <BrandMark source={spec.id} />
+          </span>
+          <span
+            style={{ fontSize: "var(--text-sm)", fontWeight: 500, color: "var(--fg-1)" }}
+            data-testid="import.chosen-source"
+          >
+            {t(spec.labelKey)}
+          </span>
+          {onBack !== undefined && (
+            <button
+              type="button"
+              onClick={onBack}
+              data-testid="import.change-source"
+              style={{
+                marginLeft: "auto",
+                background: "none",
+                border: 0,
+                padding: 0,
+                color: "var(--fg-3)",
+                fontFamily: "var(--font-sans)",
+                fontSize: "var(--text-xs)",
+                cursor: "pointer",
+                textDecoration: "underline",
+              }}
+            >
+              {t("notes.import.modal.changeSource")}
+            </button>
+          )}
+        </div>
+
         <p style={{ margin: 0, fontSize: "var(--text-sm)", color: "var(--fg-2)" }}>
           {t("notes.import.modal.setupIntro")}
         </p>
+
+        {/* PRE-import fidelity disclosure. Moved here from the picker card: stating
+            it before the user commits is the requirement, and this is still before
+            — with room to read it. */}
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: "var(--space-1)",
+            padding: "var(--space-3)",
+            borderRadius: "var(--radius-1)",
+            background: "var(--paper-2)",
+            border: "1px solid var(--line-1)",
+          }}
+        >
+          <span
+            style={{ fontSize: "var(--text-xs)", color: "var(--fg-1)", fontWeight: 500 }}
+          >
+            {t("notes.import.modal.keepsLabel")}
+          </span>
+          <span
+            style={{ fontSize: "var(--text-xs)", color: "var(--fg-2)", lineHeight: 1.5 }}
+            data-testid="import.source-survives"
+          >
+            {t(spec.survivesKey)}
+          </span>
+          <span
+            style={{
+              fontSize: "var(--text-xs)",
+              color: "var(--fg-1)",
+              fontWeight: 500,
+              marginTop: "var(--space-1)",
+            }}
+          >
+            {t("notes.import.modal.losesLabel")}
+          </span>
+          <span
+            style={{ fontSize: "var(--text-xs)", color: "var(--fg-2)", lineHeight: 1.5 }}
+            data-testid="import.source-loses"
+          >
+            {t(spec.losesKey)}
+          </span>
+        </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
           <span style={{ fontSize: "var(--text-sm)", fontWeight: 500, color: "var(--fg-1)" }}>

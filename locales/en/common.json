@@ -1458,7 +1458,7 @@
         "reasonPathTooLong": "the folder + title path is too long",
         "reasonSegmentTooLong": "name is longer than Myne allows",
         "scanning": "Scanning your vault…",
-        "setupIntro": "Point Myne at your existing Obsidian vault folder. Every Markdown note is imported and encrypted on the spot — nothing leaves this device, and your original files are left untouched.",
+        "setupIntro": "Myne imports and encrypts your notes on the spot — nothing leaves this device, and your original files are never changed.",
         "statCancelled": "Cancelled",
         "statCanvasSkipped": ".canvas files skipped",
         "statEmptyFoldersKept": "Empty folders kept",
@@ -1468,9 +1468,13 @@
         "suggestedNameAriaLabel": "Suggested name",
         "titleComplete": "Import complete",
         "titleFailed": "Import failed",
-        "titleSetup": "Import Obsidian vault",
+        "titleSetup": "Import notes",
         "vaultFolderLabel": "Vault folder",
-        "vaultRoot": "(vault root)"
+        "vaultRoot": "(vault root)",
+        "titlePick": "Import notes",
+        "keepsLabel": "What comes across",
+        "losesLabel": "What doesn't",
+        "changeSource": "Change source"
       },
       "offer": {
         "body": "Bring your existing notes into Myne. Each one is encrypted as it’s imported — nothing leaves this device, and your original files stay exactly where they are.",
@@ -1480,38 +1484,43 @@
         "title": "Import your Obsidian vault?"
       },
       "picker": {
-        "intro": "Choose where your notes are coming from. Myne imports and encrypts them on the spot — nothing leaves this device, and your original files are never changed."
+        "intro": "Where are your notes coming from?"
       },
       "source": {
         "obsidian": {
-          "label": "Obsidian vault",
+          "label": "Obsidian",
           "pickerTitle": "Choose your Obsidian vault folder",
           "survives": "Keeps: Markdown, frontmatter, [[wikilinks]], folder structure, attachments.",
-          "loses": "Leaves behind: canvas files, and anything that is not a Markdown note."
+          "loses": "Leaves behind: canvas files, and anything that is not a Markdown note.",
+          "short": "A vault folder of Markdown notes"
         },
         "notion": {
-          "label": "Notion export (unzipped)",
+          "label": "Notion",
           "pickerTitle": "Choose your unzipped Notion export folder",
           "survives": "Keeps: pages, folder structure, page properties as fields, and internal links as wikilinks. Each database also arrives as a table note linking to its rows.",
-          "loses": "Unzip the export first — Myne reads the folder, not the .zip. Toggles, callouts and coloured text have no equivalent and are listed in an import report."
+          "loses": "Unzip the export first — Myne reads the folder, not the .zip. Toggles, callouts and coloured text have no equivalent and are listed in an import report.",
+          "short": "An unzipped export folder"
         },
         "evernote": {
-          "label": "Evernote export (.enex)",
+          "label": "Evernote",
           "pickerTitle": "Choose your Evernote .enex file",
           "survives": "Keeps: every note in the file, formatting, and attachments. Encrypted blocks are preserved as text you can still decrypt in Evernote.",
-          "loses": "Leaves behind: reminders and note history. Very large exports are refused rather than risked — split the export if that happens."
+          "loses": "Leaves behind: reminders and note history. Very large exports are refused rather than risked — split the export if that happens.",
+          "short": "A single .enex export file"
         },
         "html": {
-          "label": "HTML files",
+          "label": "HTML",
           "pickerTitle": "Choose a folder of HTML files",
           "survives": "Keeps: headings, lists, tables, links, code and emphasis.",
-          "loses": "Leaves behind: styling, scripts and embeds. Remote images stay as links and are never downloaded."
+          "loses": "Leaves behind: styling, scripts and embeds. Remote images stay as links and are never downloaded.",
+          "short": "A folder of saved web pages"
         },
         "csv": {
-          "label": "CSV file",
+          "label": "CSV",
           "pickerTitle": "Choose your .csv file",
           "survives": "Becomes a single note holding the table.",
-          "loses": "It is one note, not one note per row — Myne is not a database. Very wide or very long files are trimmed, and the import report says by how much."
+          "loses": "It is one note, not one note per row — Myne is not a database. Very wide or very long files are trimmed, and the import report says by how much.",
+          "short": "One spreadsheet file"
         }
       }
     },
