@@ -2412,6 +2412,7 @@
         "spell": "spell check spelling dictionary autocorrect",
         "spellLanguages": "spell languages dictionaries locale words",
         "startupOpen": "startup open default file launch boot which note",
+        "attachmentOcr": "ocr image scan scanned pdf photo screenshot text recognition search inside attachments cpu battery",
         "syncAddDevice": "add device pair link phone laptop sync",
         "syncConflicts": "conflicts merge resolve versions sync",
         "syncDevices": "devices linked paired sync machines",

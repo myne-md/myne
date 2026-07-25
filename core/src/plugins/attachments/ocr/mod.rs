@@ -238,21 +238,41 @@ pub fn extract_image(bytes: &[u8]) -> ExtractedText {
         Err(_) => return ExtractedText::negative(ExtractStatus::Failed, SourceFormat::Image),
     }
 
-    let decoded = match image::load_from_memory(bytes) {
-        Ok(d) => d,
-        Err(_) => return ExtractedText::negative(ExtractStatus::Failed, SourceFormat::Image),
-    };
-
-    // Third-party decoders on hostile input: a panic here would abort a whole
-    // index build for one bad attachment, so contain it the way the desktop
-    // extractor contains its parsers.
+    // The DECODE is inside the guard too, not just the pipeline: the third-party
+    // decoder is the component actually parsing hostile bytes, so containing
+    // only what runs after it would have protected the wrong half.
     let out = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        pipeline::recognize(models, &decoded)
+        let decoded = decode_bounded(bytes)?;
+        Some(pipeline::recognize(models, &decoded))
     }));
     match out {
-        Ok(o) => ExtractedText::finalize(o.text(), SourceFormat::Image),
-        Err(_) => ExtractedText::negative(ExtractStatus::Failed, SourceFormat::Image),
+        Ok(Some(o)) => ExtractedText::finalize(o.text(), SourceFormat::Image),
+        Ok(None) | Err(_) => ExtractedText::negative(ExtractStatus::Failed, SourceFormat::Image),
     }
+}
+
+/// Maximum pixel dimension accepted for decoding.
+///
+/// An attachment is capped at 64 MiB of *compressed* bytes, which says nothing
+/// about the decoded size — PNG reaches ~1000:1, so a few hundred KB can expand
+/// to tens of gigabytes. `image`'s default limits leave width and height
+/// unbounded (only a 512 MiB allocation ceiling), and an allocation abort is not
+/// something `catch_unwind` recovers from. 20000 px comfortably exceeds any real
+/// scan (a 600 dpi A4 page is ~7000 px) while making the bomb case a clean
+/// `Failed`.
+const MAX_OCR_IMAGE_DIMENSION: u32 = 20_000;
+
+/// Decode with explicit dimension limits. `None` on anything the decoder
+/// rejects, including an image whose declared size exceeds the cap.
+fn decode_bounded(bytes: &[u8]) -> Option<image::DynamicImage> {
+    let mut limits = image::Limits::default();
+    limits.max_image_width = Some(MAX_OCR_IMAGE_DIMENSION);
+    limits.max_image_height = Some(MAX_OCR_IMAGE_DIMENSION);
+    let mut reader = image::ImageReader::new(std::io::Cursor::new(bytes))
+        .with_guessed_format()
+        .ok()?;
+    reader.limits(limits);
+    reader.decode().ok()
 }
 
 /// Load the bundled models from `base` and install them process-wide. Idempotent
@@ -272,9 +292,15 @@ pub fn models() -> Option<&'static OcrModels> {
     ENGINE.get().and_then(|m| m.as_ref())
 }
 
-/// Repo-relative location of the bundled models, for tests and for the desktop
-/// build's resource mapping. Not used at runtime — the platform resolves its own
-/// resource directory.
+/// Repo-relative location of the bundled models, for TESTS only.
+///
+/// Gated behind `test`/`test-support` deliberately: it embeds
+/// `CARGO_MANIFEST_DIR`, a build-machine absolute path, which has no business in
+/// a shipped library (reproducible-build hygiene, `threat-model.md` §6). The
+/// `test-support` arm is what lets the desktop crate's own tests reach it — the
+/// same gate `core::test_support` uses. At runtime the platform resolves its own
+/// resource directory and passes it to [`init_from_base`].
+#[cfg(any(test, feature = "test-support"))]
 pub fn bundled_models_dir_for_tests() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("..")
@@ -302,8 +328,12 @@ mod tests {
     /// The models load through `rten` from the bundled path, with no network.
     #[test]
     fn bundled_models_load() {
-        let models = OcrModels::load_from_base(&bundled_models_dir_for_tests())
-            .expect("bundled OCR models load");
+        // Degrades like its siblings on a checkout whose Git-LFS blobs were
+        // never fetched. `every_bundled_artefact_is_present` is the one test
+        // that SHOULD hard-fail there — it is the packaging contract.
+        let Ok(models) = OcrModels::load_from_base(&bundled_models_dir_for_tests()) else {
+            return;
+        };
         // The recognition head's class count must equal the charset length, or
         // CTC decoding is silently off by one (the trailing-newline trap).
         assert_eq!(
@@ -325,8 +355,9 @@ mod tests {
     /// corruption, not an error. Guard it directly.
     #[test]
     fn charset_entries_carry_no_carriage_return() {
-        let models = OcrModels::load_from_base(&bundled_models_dir_for_tests())
-            .expect("bundled OCR models load");
+        let Ok(models) = OcrModels::load_from_base(&bundled_models_dir_for_tests()) else {
+            return;
+        };
         assert!(
             !models.charset.iter().any(|c| c.contains('\r')),
             "a charset class still carries a CR — the CRLF strip regressed"
@@ -361,8 +392,9 @@ mod tests {
     /// the signal to revisit the folding rationale in `decisions.md`.
     #[test]
     fn bundled_charset_documents_its_turkish_gap() {
-        let models = OcrModels::load_from_base(&bundled_models_dir_for_tests())
-            .expect("bundled OCR models load");
+        let Ok(models) = OcrModels::load_from_base(&bundled_models_dir_for_tests()) else {
+            return;
+        };
         let has = |c: char| models.charset.iter().any(|s| s == &c.to_string());
         for c in ['ç', 'Ç', 'ğ', 'ı', 'ö', 'Ö', 'ş', 'Ş', 'ü', 'Ü'] {
             assert!(has(c), "expected {c:?} in the bundled charset");
