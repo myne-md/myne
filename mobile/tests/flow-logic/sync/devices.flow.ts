@@ -131,6 +131,32 @@ test.describe("device names", () => {
     expect(value.length).toBeLessThanOrEqual(40);
   });
 
+  test("a PENDING device never shows a name, even when one is stored for its id", async ({
+    page,
+  }) => {
+    // SYNC-40. This is the assertion that was missing: the pending row rendered
+    // the names map, so a stored name WOULD have surfaced beside an unverified
+    // device — a trust signal nothing verifies, which weakens the SAS
+    // eye-compare. Seeding a name for the pending id is the only way to tell the
+    // two implementations apart; without it the row falls back either way and the
+    // test passes for the wrong reason.
+    const PENDING = "cc33dd44ee55ff6677889900aa11bb22";
+    await installMockIpc(page, {
+      syncStatus: { state: "idle" },
+      devices: [
+        ...DEVICES,
+        { device_id_hex: PENDING, approved: false, retired: false, is_current: false },
+      ],
+      deviceNames: { [PENDING]: "Attacker Laptop" },
+    });
+    await openDevices(page);
+
+    const pendingRow = page.getByTestId("sync.pending-row");
+    await expect(pendingRow).toBeVisible();
+    await expect(pendingRow).not.toContainText("Attacker Laptop");
+    await expect(page.getByTestId("sync.pending-name")).toContainText(PENDING.slice(0, 6));
+  });
+
   test("removing a device names the target it is about to revoke", async ({ page }) => {
     await installMockIpc(page, {
       syncStatus: { state: "idle" },

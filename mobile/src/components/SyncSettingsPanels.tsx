@@ -656,7 +656,13 @@ export function SyncEnrollPanel({ onEnrolled }: SyncEnrollPanelProps) {
 /** The device's synced friendly name (SYNC-41), or a stable `device_id`-prefix
  *  fallback until it is explicitly named (no second default-name heuristic). */
 function deviceName(d: DeviceEntry, names: Record<string, string>, t: TFunction): string {
-  return names[d.device_id_hex] ?? t("sync.devices.shortName", { hex: d.device_id_hex.slice(0, 6) });
+  const stored = names[d.device_id_hex];
+  // A whitespace-only stored value counts as absent — the Rust setter refuses to
+  // write one, so this is belt-and-braces against a hand-edited or foreign-client
+  // blob. Desktop's `displayName` guards the same way.
+  return stored !== undefined && stored.trim() !== ""
+    ? stored
+    : t("sync.devices.shortName", { hex: d.device_id_hex.slice(0, 6) });
 }
 
 /** The device currently in the SY-05 approve-then-verify SAS step. */
@@ -927,7 +933,14 @@ export function SyncDevicesPanel() {
           <Group>
             {pending.map((d, i) => (
               <Row key={d.device_id_hex} first={i === 0} testId="sync.pending-row">
-                <span style={rowLabel}>{deviceName(d, names, t)}</span>
+                {/* The id-derived label, NEVER the names map (SYNC-40): a name
+                    beside an unverified device reads as a trust signal while
+                    nothing verifies it, which would weaken the SAS eye-compare
+                    that is the actual defense. Desktop enforces the same rule
+                    structurally in DeviceManagementPanel. */}
+                <span style={rowLabel} data-testid="sync.pending-name">
+                  {t("sync.devices.shortName", { hex: d.device_id_hex.slice(0, 6) })}
+                </span>
                 <button
                   type="button"
                   disabled={busy}

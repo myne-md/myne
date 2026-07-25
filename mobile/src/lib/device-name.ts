@@ -58,7 +58,10 @@ export function useDeviceNameField(): {
   resolved: string;
 } {
   const [value, setValue] = useState("");
-  const [suggestion, setSuggestion] = useState("");
+  // Seeded synchronously with the neutral label, NOT "": `resolved` must never be
+  // blank, or a submit landing before the platform IPC resolves would send an
+  // empty name and the device would arrive with the id-derived fallback.
+  const [suggestion, setSuggestion] = useState(() => i18n.t("sync.devices.platform.unknown"));
 
   useEffect(() => {
     let cancelled = false;
