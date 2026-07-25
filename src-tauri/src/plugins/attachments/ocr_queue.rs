@@ -36,13 +36,16 @@
 
 use std::path::Path;
 
+use myne_core::plugins::attachments::scheme_core::{decode_attachment_plaintext, ServeKeys};
 use myne_core::plugins::attachments::text_cache;
+use myne_core::plugins::attachments::{ExtractedText, SourceFormat};
 use myne_core::plugins::vault_unlock::state::VaultRuntimeState;
 use protocol::{derive_subkey, SubkeyRole};
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, Runtime};
 
-use super::commands::hex_decode_id;
+use super::commands::{hex_decode_id, read_account_number_hash};
+use super::extract::detect_format;
 
 /// WebView event carrying the backlog's progress (MYND-441).
 ///
@@ -61,28 +64,28 @@ pub struct OcrBacklogProgress {
     pub done: usize,
 }
 
+/// One attachment the backlog still owes work for. A named struct rather than a
+/// 3-tuple of `String`s, so the fields cannot be transposed at either end.
+struct Candidate {
+    id_hex: String,
+    content_type: String,
+    filename: String,
+}
+
 /// Whether an attachment could yield text under the OCR generation but has not
-/// been extracted yet. Images and PDFs only: everything else is either already
-/// handled deterministically at rebuild time or genuinely unsupported, and in
-/// both cases it carries a cache entry.
+/// been extracted yet.
+///
+/// Delegates to the extractor's own [`detect_format`] rather than re-deriving
+/// the content-type / extension dispatch: the backlog's "is a candidate" answer
+/// and the rebuild's "is deferred" answer must not be able to drift. A PDF
+/// reaches the worker only when its text layer produced nothing (the scanned
+/// case) — `extract_deferring_ocr` decides that; here we only need to know a PDF
+/// is worth re-examining.
 fn is_ocr_candidate(content_type: &str, filename: &str) -> bool {
-    if myne_core::plugins::attachments::ocr::is_ocr_image(content_type, filename) {
-        return true;
-    }
-    // A PDF reaches the worker only when its text layer produced nothing — the
-    // scanned case. `extract_deferring_ocr` is what decides that; here we only
-    // need to know a PDF is worth re-examining.
-    let ct = content_type
-        .split(';')
-        .next()
-        .unwrap_or("")
-        .trim()
-        .to_ascii_lowercase();
-    ct == "application/pdf"
-        || filename
-            .rsplit('.')
-            .next()
-            .is_some_and(|e| e.eq_ignore_ascii_case("pdf"))
+    matches!(
+        detect_format(content_type, filename),
+        Some(SourceFormat::Image) | Some(SourceFormat::Pdf)
+    )
 }
 
 /// Drain the OCR backlog for the active vault, one attachment at a time.
@@ -96,20 +99,32 @@ pub async fn drain_backlog<R: Runtime>(app: &AppHandle<R>, state: &VaultRuntimeS
         return;
     };
 
-    // MYND-441: the user's opt-out. Checked here rather than at spawn time so a
-    // toggle takes effect on the next unlock without any extra plumbing, and
-    // re-read per drain rather than cached. Turning it off stops the worker but
-    // never deletes cached results, so toggling costs the user nothing.
-    if !ocr_enabled(&vault_dir, state).await {
+    // MYND-441: the user's opt-out. Read per drain rather than cached, so a
+    // toggle takes effect on the next unlock with no extra plumbing. Reuses the
+    // shared prefs read (which carries its own decrypt-failure tracing) rather
+    // than open-coding the peek → derive → decode chain. An unreadable blob
+    // reads as ON: a prefs read failure must not silently disable a search
+    // feature.
+    let enabled = myne_core::plugins::prefs::commands::prefs_read_with_dir(&vault_dir, state)
+        .await
+        .map(|p| p.attachment_ocr_enabled)
+        .unwrap_or(true);
+    if !enabled {
         return;
     }
 
-    // Resolve the work list once, then re-check the slot per item. Holding key
-    // material across the whole backlog would keep it alive past a lock.
-    let candidates = match collect_candidates(&vault_dir, state).await {
-        Some(c) if !c.is_empty() => c,
-        _ => return,
+    // The account hash is a FILE CONSTANT — read once, not per attachment. Only
+    // the key material is re-peeked inside the loop, which is the part that must
+    // not outlive a lock.
+    let Ok(Ok(account_number_hash)) = read_account_number_hash(&vault_dir.join("vault.meta"))
+    else {
+        return;
     };
+
+    let candidates = collect_candidates(&vault_dir, state, &account_number_hash).await;
+    if candidates.is_empty() {
+        return;
+    }
     tracing::info!(
         event = "ocr_backlog_start",
         pending = candidates.len(),
@@ -118,7 +133,7 @@ pub async fn drain_backlog<R: Runtime>(app: &AppHandle<R>, state: &VaultRuntimeS
     let total = candidates.len();
     let mut done = 0usize;
     emit_progress(app, total, done);
-    for (id_hex, content_type, filename) in candidates {
+    for c in candidates {
         // Re-check the lock before every attachment: a lock must take effect
         // within one item, not at the end of the backlog.
         let Some((items_key, items_key_id, root_key)) =
@@ -130,12 +145,9 @@ pub async fn drain_backlog<R: Runtime>(app: &AppHandle<R>, state: &VaultRuntimeS
             emit_progress(app, 0, done);
             return;
         };
-        let Ok(account_number_hash) = read_account_hash(&vault_dir) else {
-            return;
-        };
         let attachment_text_key = derive_subkey(&root_key, SubkeyRole::AttachmentTextKey);
 
-        let Some(id) = hex_decode_id(&id_hex) else {
+        let Some(id) = hex_decode_id(&c.id_hex) else {
             continue;
         };
         // Someone may have extracted it since the work list was built (an eager
@@ -147,12 +159,20 @@ pub async fn drain_backlog<R: Runtime>(app: &AppHandle<R>, state: &VaultRuntimeS
         }
 
         let dir = vault_dir.clone();
-        let ct = content_type.clone();
-        let name = filename.clone();
-        let hex = id_hex.clone();
-        // OCR is CPU-bound for seconds; never on the async runtime's threads.
+        let keys = ServeKeys {
+            items_key,
+            items_key_id,
+            root_key,
+        };
+        let Candidate {
+            id_hex,
+            content_type,
+            filename,
+        } = c;
+        let hex = id_hex.clone(); // the original is needed after the join, below
+                                  // OCR is CPU-bound for seconds; never on the async runtime's threads.
         let extracted = tokio::task::spawn_blocking(move || {
-            extract_one(&dir, &hex, &ct, &name, &items_key, &items_key_id)
+            extract_one(&dir, &keys, &hex, &content_type, &filename)
         })
         .await
         .ok()
@@ -191,41 +211,24 @@ fn emit_progress<R: Runtime>(app: &AppHandle<R>, remaining: usize, done: usize) 
     );
 }
 
-/// Whether the user has left image OCR on for this vault. Absent / unreadable
-/// prefs read as ON — the default — because a prefs read failure must not
-/// silently disable a search feature.
-async fn ocr_enabled(vault_dir: &Path, state: &VaultRuntimeState) -> bool {
-    let Some((_, _, root_key)) = state.peek_unlocked_attachment_material().await else {
-        return false;
-    };
-    let Ok(account_number_hash) = read_account_hash(vault_dir) else {
-        return true;
-    };
-    let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
-    match std::fs::read(vault_dir.join("vault.prefs"))
-        .ok()
-        .and_then(|b| protocol::decode_prefs_blob(&prefs_key, &account_number_hash, &b).ok())
-    {
-        Some(p) => p.attachment_ocr_enabled,
-        None => true,
-    }
-}
-
 /// Attachments in the catalog that are OCR candidates and have no cache entry.
 async fn collect_candidates(
     vault_dir: &Path,
     state: &VaultRuntimeState,
-) -> Option<Vec<(String, String, String)>> {
-    let (_, _, root_key) = state.peek_unlocked_attachment_material().await?;
-    let account_number_hash = read_account_hash(vault_dir).ok()?;
+    account_number_hash: &[u8; 16],
+) -> Vec<Candidate> {
+    let Some((_, _, root_key)) = state.peek_unlocked_attachment_material().await else {
+        return Vec::new();
+    };
     let attachment_text_key = derive_subkey(&root_key, SubkeyRole::AttachmentTextKey);
     let catalog_key = derive_subkey(&root_key, SubkeyRole::AttachmentsCatalogKey);
-    let catalog = super::commands::read_catalog(
+    let Ok(catalog) = super::commands::read_catalog(
         &vault_dir.join("vault.attachments"),
         &catalog_key,
-        &account_number_hash,
-    )
-    .ok()?;
+        account_number_hash,
+    ) else {
+        return Vec::new();
+    };
 
     let mut out = Vec::new();
     for (id_hex, meta) in &catalog.entries {
@@ -235,47 +238,36 @@ async fn collect_candidates(
         let Some(id) = hex_decode_id(id_hex) else {
             continue;
         };
-        if text_cache::read_extracted(vault_dir, &attachment_text_key, &account_number_hash, &id)
+        if text_cache::read_extracted(vault_dir, &attachment_text_key, account_number_hash, &id)
             .is_some()
         {
             continue; // already extracted at this generation
         }
-        out.push((
-            id_hex.clone(),
-            meta.content_type.clone(),
-            meta.filename.clone(),
-        ));
+        out.push(Candidate {
+            id_hex: id_hex.clone(),
+            content_type: meta.content_type.clone(),
+            filename: meta.filename.clone(),
+        });
     }
-    Some(out)
+    out
 }
 
 /// Decrypt one `MYA1` blob and run the FULL extractor (OCR included) over it.
 /// Returns `None` when the blob is missing or will not decrypt.
+///
+/// Decryption goes through the shared `attachment://` serve core, so the
+/// plaintext arrives `Zeroizing`-wrapped and is wiped on drop — the same
+/// handling every other read of attachment plaintext gets. Open-coding the
+/// read+decode here would have dropped that guarantee.
 fn extract_one(
     vault_dir: &Path,
+    keys: &ServeKeys,
     id_hex: &str,
     content_type: &str,
     filename: &str,
-    items_key: &[u8; 32],
-    items_key_id: &[u8; 16],
-) -> Option<myne_core::plugins::attachments::ExtractedText> {
-    let id = hex_decode_id(id_hex)?;
-    let blob = std::fs::read(vault_dir.join("attachments").join(id_hex)).ok()?;
-    let plaintext = protocol::decode_attachment_blob(
-        &blob,
-        &id,
-        content_type.as_bytes(),
-        items_key,
-        items_key_id,
-    )
-    .ok()?;
+) -> Option<ExtractedText> {
+    let plaintext = decode_attachment_plaintext(vault_dir, keys, id_hex).ok()?;
     Some(super::extract::extract(content_type, filename, &plaintext))
-}
-
-fn read_account_hash(vault_dir: &Path) -> Result<[u8; 16], ()> {
-    let bytes = std::fs::read(vault_dir.join("vault.meta")).map_err(|_| ())?;
-    let meta = protocol::parse_vault_meta(&bytes).map_err(|_| ())?;
-    Ok(meta.account_number_hash)
 }
 
 /// Kick the backlog off the unlock hot path.

@@ -163,11 +163,12 @@ pub fn recognize(models: &OcrModels, image: &DynamicImage) -> OcrOutput {
         if ib.width() < 4 || ib.height() < 4 {
             continue;
         }
-        let crop = RgbImage::from(
-            DynamicImage::ImageRgb8(rgb.clone())
-                .crop_imm(ib.x0, ib.y0, ib.width(), ib.height())
-                .to_rgb8(),
-        );
+        // Borrow-and-crop. The obvious `DynamicImage::ImageRgb8(rgb.clone())`
+        // spelling copies the ENTIRE source image once per detected region —
+        // hundreds of times on a dense page — which on a phone scan is
+        // gigabytes of memcpy for nothing.
+        let crop =
+            image::imageops::crop_imm(&rgb, ib.x0, ib.y0, ib.width(), ib.height()).to_image();
         let crop = orient(models, crop);
         if let Some(line) = recognize_line(models, &crop) {
             if line.confidence >= MIN_WORD_CONFIDENCE && !line.text.trim().is_empty() {
@@ -225,13 +226,8 @@ fn run_detection(models: &OcrModels, input: NdTensor<f32, 4>, w: u32, h: u32) ->
         // silently mis-mapping coordinates.
         return None;
     }
-    let mut v = Vec::with_capacity(oh * ow);
-    for y in 0..oh {
-        for x in 0..ow {
-            v.push(t[[0, 0, y, x]]);
-        }
-    }
-    Some(v)
+    // One contiguous copy rather than ~1M strided indexed reads.
+    Some(t.to_contiguous().to_vec())
 }
 
 /// An axis-aligned box in detection-map coordinates.
@@ -434,7 +430,8 @@ fn ctc_decode(logits: NdTensorView<f32, 3>, charset: &[String]) -> OcrLine {
         let p = if (0.99..=1.01).contains(&sum) {
             best_v
         } else {
-            softmax_at(logits, t, best, classes)
+            // `best_v` IS the row max, so pass it rather than re-scanning.
+            softmax_at(logits, t, best, classes, best_v)
         };
 
         if best != 0 && best != prev {
@@ -457,12 +454,10 @@ fn ctc_decode(logits: NdTensorView<f32, 3>, charset: &[String]) -> OcrLine {
     }
 }
 
-/// Softmax probability of class `k` at timestep `t`, computed stably.
-fn softmax_at(logits: NdTensorView<f32, 3>, t: usize, k: usize, classes: usize) -> f32 {
-    let mut max = f32::MIN;
-    for c in 0..classes {
-        max = max.max(logits[[0, t, c]]);
-    }
+/// Softmax probability of class `k` at timestep `t`, computed stably. `max` must
+/// be the row maximum — the caller already computed it while finding the argmax,
+/// so re-deriving it here would walk the row a third time.
+fn softmax_at(logits: NdTensorView<f32, 3>, t: usize, k: usize, classes: usize, max: f32) -> f32 {
     let mut denom = 0.0f32;
     for c in 0..classes {
         denom += (logits[[0, t, c]] - max).exp();

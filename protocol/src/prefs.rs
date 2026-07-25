@@ -1996,13 +1996,8 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
     let (attachment_ocr_enabled, post_attachment_ocr) =
         match post_archived_folders.strip_prefix(attachment_ocr_marker) {
             Some(after) => {
-                let (val, after_val) = if let Some(r) = after.strip_prefix(b"false") {
-                    (false, r)
-                } else if let Some(r) = after.strip_prefix(b"true") {
-                    (true, r)
-                } else {
-                    return Err(PrefsBlobError::PlaintextParseFailed);
-                };
+                let (val, after_val) =
+                    parse_json_bool(after).ok_or(PrefsBlobError::PlaintextParseFailed)?;
                 let rest = after_val
                     .strip_prefix(b",")
                     .ok_or(PrefsBlobError::PlaintextParseFailed)?;
