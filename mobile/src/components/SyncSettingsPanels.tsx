@@ -28,6 +28,8 @@ import {
 import { formatAccountNumberInput } from "../lib/account-number-format";
 import { normalizeBip39Phrase } from "../lib/bip39-normalize";
 import { usePrefs } from "../lib/use-prefs";
+import { setDeviceName } from "../lib/prefs";
+import { suggestedDeviceName } from "../lib/device-name";
 import {
   ENROLL_APPROVED_NOTICE,
   ENROLL_NON_DISTINGUISHING_BANNER,
@@ -434,6 +436,24 @@ export function SyncEnrollPanel({ onEnrolled }: SyncEnrollPanelProps) {
   const baseId = useId();
   const { busy, outcome, enroll, reset } = useEnroll();
 
+  // MYND-548: this device's own name, pre-filled from the platform token Rust
+  // reports (refined phone/tablet by the size class). The functional update keeps
+  // a late-resolving suggestion from overwriting what the user typed.
+  const [deviceNameInput, setDeviceNameInput] = useState("");
+  const [suggestedName, setSuggestedName] = useState("");
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const suggestion = await suggestedDeviceName();
+      if (cancelled) return;
+      setSuggestedName(suggestion);
+      setDeviceNameInput((current) => (current === "" ? suggestion : current));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const [accountNumber, setAccountNumber] = useState("");
   const [mode, setMode] = useState<EnrollCredentialKind>("password");
   const [password, setPassword] = useState("");
@@ -475,7 +495,10 @@ export function SyncEnrollPanel({ onEnrolled }: SyncEnrollPanelProps) {
   const handleSubmit = () => {
     if (!canSubmit) return;
     const credential = mode === "password" ? password : normalizeBip39Phrase(cells.join(" "));
-    void enroll(accountNumber.trim(), credential, mode);
+    // A blank field falls back to the suggestion rather than enrolling nameless
+    // (the backend refuses a blank name outright).
+    const name = deviceNameInput.trim() !== "" ? deviceNameInput.trim() : suggestedName;
+    void enroll(accountNumber.trim(), credential, mode, name);
   };
 
   return (
@@ -495,6 +518,22 @@ export function SyncEnrollPanel({ onEnrolled }: SyncEnrollPanelProps) {
         style={{ ...INPUT_STYLE, fontFamily: "var(--font-mono)", fontSize: 15 }}
         data-testid="sync.enroll.account-input"
       />
+      {/* MYND-548: named here, at the one moment the user is provably holding
+          this device. Written to THIS vault's local prefs on success — it never
+          joins the enrollment request. */}
+      <FieldLabel mt={14}>{t("sync.enroll.deviceNameLabel")}</FieldLabel>
+      <input
+        value={deviceNameInput}
+        onChange={(e) => setDeviceNameInput(e.target.value)}
+        maxLength={DEVICE_NAME_MAX_LEN}
+        placeholder={suggestedName}
+        autoComplete="off"
+        spellCheck={false}
+        autoCorrect="off"
+        style={INPUT_STYLE}
+        data-testid="sync.enroll.device-name-input"
+      />
+      <p style={{ ...HELP, marginTop: 4 }}>{t("sync.enroll.deviceNameHelp")}</p>
       {!accountStructurallyPlausible(accountNumber) && (
         <p style={{ margin: "8px 2px 0", fontSize: 13, color: "var(--warning)" }} data-testid="sync.enroll.account-hint">
           {t("sync.settings.accountNumberHint")}
@@ -631,6 +670,11 @@ export function SyncEnrollPanel({ onEnrolled }: SyncEnrollPanelProps) {
 
 // ── SY-06 / SY-07 · Your devices + remove confirm ────────────────────────────
 
+/** The maximum device-name length the UI accepts (MYND-548) — a readability
+ *  bound, mirroring the desktop constant. There is no Rust-side cap; the prefs
+ *  blob's own size ceiling is the real backstop. */
+const DEVICE_NAME_MAX_LEN = 40;
+
 /** The device's synced friendly name (SYNC-41), or a stable `device_id`-prefix
  *  fallback until it is explicitly named (no second default-name heuristic). */
 function deviceName(d: DeviceEntry, names: Record<string, string>, t: TFunction): string {
@@ -651,9 +695,37 @@ interface SasState {
 export function SyncDevicesPanel() {
   const { t } = useTranslation();
   const { devices, pending, error, busy, approve, remove, resetLocal } = useDevices();
-  const { prefs } = usePrefs();
+  const { prefs, reload: reloadPrefs } = usePrefs();
   const names = prefs.device_names;
   const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
+
+  // MYND-548 inline rename. One row at a time — the Rename buttons disable while
+  // any row is open, so a stray tap cannot strand a half-typed edit.
+  const [renaming, setRenaming] = useState<{ id: string; value: string } | null>(null);
+  const [renameFailed, setRenameFailed] = useState(false);
+
+  // Enter and blur both land here. Closing the editor FIRST makes the two paths
+  // idempotent (blur fires right after Enter; the second call sees `null`). A
+  // blank value is a cancel — the backend refuses it too — so the previous name
+  // survives and only a genuine write failure surfaces. Deliberately NOT
+  // optimistic: the row renders off `prefs`, so a failed write simply never
+  // changed it, which IS the revert.
+  const commitRename = async () => {
+    const target = renaming;
+    if (target === null) return;
+    setRenaming(null);
+    const trimmed = target.value.trim();
+    if (trimmed === "") return;
+    try {
+      await setDeviceName(target.id, trimmed);
+      // `reload` is typed void (fire-and-forget); the hook's own setState is what
+      // re-renders this row.
+      reloadPrefs();
+      setRenameFailed(false);
+    } catch {
+      setRenameFailed(true);
+    }
+  };
   const [sas, setSas] = useState<SasState | null>(null);
 
   const approved = (devices ?? []).filter((d) => d.approved && !d.retired);
@@ -764,6 +836,20 @@ export function SyncDevicesPanel() {
         <h2 style={{ margin: "8px 4px 12px", fontSize: 20, fontWeight: 700, color: "var(--fg-1)" }}>
           {REMOVE_DEVICE_CONFIRM}
         </h2>
+        {/* MYND-548: which device is about to lose its token. Name + code, so the
+            user can verify the target — revocation is the one place a mis-read row
+            costs something. The disclosure copy below is load-bearing and stays
+            verbatim. */}
+        <p
+          style={{ margin: "0 4px 10px", fontSize: 15, color: "var(--fg-1)", fontWeight: 600 }}
+          data-testid="sync.remove-target"
+        >
+          {(() => {
+            const target = (devices ?? []).find((d) => d.device_id_hex === confirmRemove);
+            const label = target ? deviceName(target, names, t) : "";
+            return `${label} · ${confirmRemove.slice(0, 6)}`;
+          })()}
+        </p>
         <p style={{ margin: "0 4px", fontSize: 15, lineHeight: 1.6, color: "var(--fg-2)" }} data-testid="sync.remove-disclosure">
           {REMOVE_DEVICE_DISCLOSURE}
         </p>
@@ -894,6 +980,11 @@ export function SyncDevicesPanel() {
       )}
 
       <SectionLabel mt={12}>{t("sync.devices.yourDevices")}</SectionLabel>
+      {renameFailed && (
+        <p style={{ ...HELP, marginTop: 4, color: "var(--danger)" }} data-testid="sync.rename-error">
+          {t("sync.devices.renameFailed")}
+        </p>
+      )}
       {devices === null ? (
         error ? null : <p style={{ ...HELP, marginTop: 4 }}>{t("sync.devices.loading")}</p>
       ) : approved.length === 0 ? (
@@ -902,24 +993,91 @@ export function SyncDevicesPanel() {
         <Group>
           {approved.map((d, i) => (
             <Row key={d.device_id_hex} first={i === 0} testId="sync.device-row">
-              <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-                <span style={rowLabel}>{deviceName(d, names, t)}</span>
-                {d.is_current && (
-                  <span
-                    style={{
-                      padding: "1px 7px",
-                      fontSize: 11,
-                      fontWeight: 600,
-                      color: "var(--fg-2)",
-                      border: "1px solid var(--line-1)",
-                      borderRadius: 999,
+              <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
+                {renaming?.id === d.device_id_hex ? (
+                  <input
+                    autoFocus
+                    value={renaming.value}
+                    maxLength={DEVICE_NAME_MAX_LEN}
+                    aria-label={t("sync.devices.renameLabel")}
+                    onChange={(e) => setRenaming({ id: d.device_id_hex, value: e.target.value })}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        void commitRename();
+                      } else if (e.key === "Escape") {
+                        e.preventDefault();
+                        setRenaming(null);
+                      }
                     }}
-                    data-testid="sync.this-device"
-                  >
-                    {t("sync.devices.thisDevice")}
-                  </span>
+                    onBlur={() => void commitRename()}
+                    style={{
+                      font: "inherit",
+                      fontSize: 15,
+                      color: "var(--fg-1)",
+                      background: "var(--bg-1)",
+                      border: "1px solid var(--line-1)",
+                      borderRadius: 8,
+                      padding: "4px 8px",
+                      minWidth: 0,
+                      width: "100%",
+                    }}
+                    data-testid="sync.device-name-input"
+                  />
+                ) : (
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                    <span style={rowLabel} data-testid="sync.device-name">
+                      {deviceName(d, names, t)}
+                    </span>
+                    {d.is_current && (
+                      <span
+                        style={{
+                          padding: "1px 7px",
+                          fontSize: 11,
+                          fontWeight: 600,
+                          color: "var(--fg-2)",
+                          border: "1px solid var(--line-1)",
+                          borderRadius: 999,
+                        }}
+                        data-testid="sync.this-device"
+                      >
+                        {t("sync.devices.thisDevice")}
+                      </span>
+                    )}
+                  </div>
                 )}
+                {/* The demoted device code — a permanent line, not a hover
+                    affordance (mobile has no hover). It is what tells two
+                    same-named devices apart. */}
+                <span
+                  style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--fg-3)" }}
+                  data-testid="sync.device-code"
+                >
+                  {d.device_id_hex.slice(0, 6)}
+                </span>
               </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                {/* Rename is offered on EVERY approved row: devices enrolled
+                    before names existed are named from whatever device the user
+                    happens to be holding. */}
+                <button
+                  type="button"
+                  disabled={busy || renaming !== null}
+                  onClick={() => setRenaming({ id: d.device_id_hex, value: deviceName(d, names, t) })}
+                  style={{
+                    padding: "7px 12px",
+                    border: "1px solid var(--line-1)",
+                    borderRadius: 8,
+                    background: "var(--bg-1)",
+                    color: "var(--fg-1)",
+                    fontSize: 14,
+                    fontWeight: 600,
+                    cursor: busy ? "not-allowed" : "pointer",
+                  }}
+                  data-testid="sync.rename-device"
+                >
+                  {t("sync.devices.rename")}
+                </button>
               {d.is_current ? (
                 <span style={{ fontSize: 13, color: "var(--fg-3)" }}>{t("sync.settings.syncingHere")}</span>
               ) : (
@@ -942,6 +1100,7 @@ export function SyncDevicesPanel() {
                   {t("sync.devices.remove")}
                 </button>
               )}
+              </div>
             </Row>
           ))}
         </Group>

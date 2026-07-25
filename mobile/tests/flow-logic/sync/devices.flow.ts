@@ -1,0 +1,148 @@
+// Flow-logic: the device list's naming surface (MYND-548). Drives headless
+// Chromium against the dev server with mock IPC — NOT an end-to-end suite (no
+// device, no Rust, no real transport, no replication). This tier verifies the UI
+// contract: what the row renders, and what the rename interaction writes. Whether
+// a name actually replicates between two devices is the DESKTOP suite's job
+// (`e2e/device-names.e2e.ts`), which drives real IPC against a real server.
+
+import { test, expect } from "@playwright/test";
+import { installMockIpc } from "../mock-ipc";
+
+const NAMED = "aa11bb22cc33dd44ee55ff6677889900";
+const UNNAMED = "bb22cc33dd44ee55ff6677889900aa11";
+
+/** Two approved devices: one named, one not — so a single fixture covers both the
+ *  stored-name path and the id-derived fallback. */
+const DEVICES = [
+  { device_id_hex: NAMED, approved: true, retired: false, is_current: true },
+  { device_id_hex: UNNAMED, approved: true, retired: false, is_current: false },
+];
+
+async function openDevices(page: import("@playwright/test").Page) {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Settings" }).first().click();
+  await page.getByText("Sync", { exact: true }).click();
+  await page.getByTestId("sync.settings.devices").click();
+  await expect(page.getByTestId("sync.device-row").first()).toBeVisible();
+}
+
+test.describe("device names", () => {
+  test("a named device leads with its name; an unnamed one keeps the id-derived fallback", async ({
+    page,
+  }) => {
+    await installMockIpc(page, {
+      syncStatus: { state: "idle" },
+      devices: DEVICES,
+      deviceNames: { [NAMED]: "Work phone" },
+    });
+    await openDevices(page);
+
+    const names = page.getByTestId("sync.device-name");
+    await expect(names.nth(0)).toHaveText("Work phone");
+    // The fallback is the short-id label — the pre-feature rendering, unchanged.
+    await expect(names.nth(1)).toContainText(UNNAMED.slice(0, 6));
+  });
+
+  test("every row demotes the device code to a secondary line", async ({ page }) => {
+    // The code is what tells two same-named devices apart, so it is a permanent
+    // line rather than a hover affordance (mobile has no hover).
+    await installMockIpc(page, {
+      syncStatus: { state: "idle" },
+      devices: DEVICES,
+      deviceNames: { [NAMED]: "Work phone" },
+    });
+    await openDevices(page);
+
+    const codes = page.getByTestId("sync.device-code");
+    await expect(codes).toHaveCount(2);
+    await expect(codes.nth(0)).toHaveText(NAMED.slice(0, 6));
+    await expect(codes.nth(1)).toHaveText(UNNAMED.slice(0, 6));
+  });
+
+  test("renaming a row persists and re-renders from the stored map", async ({ page }) => {
+    await installMockIpc(page, {
+      syncStatus: { state: "idle" },
+      devices: DEVICES,
+      deviceNames: { [NAMED]: "Work phone" },
+    });
+    await openDevices(page);
+
+    await page.getByTestId("sync.rename-device").first().click();
+    const input = page.getByTestId("sync.device-name-input");
+    await expect(input).toHaveValue("Work phone");
+    await input.fill("Studio iPad");
+    await input.press("Enter");
+
+    await expect(page.getByTestId("sync.device-name").nth(0)).toHaveText("Studio iPad");
+  });
+
+  test("rename is offered on a device that is NOT this one", async ({ page }) => {
+    // Load-bearing: devices enrolled before names existed are named from whatever
+    // device the user happens to be holding. Restricting rename to "this device"
+    // would strand exactly that set.
+    await installMockIpc(page, {
+      syncStatus: { state: "idle" },
+      devices: DEVICES,
+    });
+    await openDevices(page);
+
+    await page.getByTestId("sync.rename-device").nth(1).click();
+    const input = page.getByTestId("sync.device-name-input");
+    await input.fill("Old laptop");
+    await input.press("Enter");
+
+    await expect(page.getByTestId("sync.device-name").nth(1)).toHaveText("Old laptop");
+  });
+
+  test("Escape cancels a rename and an empty submit keeps the previous name", async ({ page }) => {
+    // There is no clear path by design (§10.2 unions single-sided keys, so a
+    // deletion would not propagate), which is why a blank submit must read as
+    // "cancel" rather than as "erase".
+    await installMockIpc(page, {
+      syncStatus: { state: "idle" },
+      devices: DEVICES,
+      deviceNames: { [NAMED]: "Work phone" },
+    });
+    await openDevices(page);
+
+    await page.getByTestId("sync.rename-device").first().click();
+    await page.getByTestId("sync.device-name-input").fill("Discarded");
+    await page.getByTestId("sync.device-name-input").press("Escape");
+    await expect(page.getByTestId("sync.device-name").nth(0)).toHaveText("Work phone");
+
+    await page.getByTestId("sync.rename-device").first().click();
+    await page.getByTestId("sync.device-name-input").fill("   ");
+    await page.getByTestId("sync.device-name-input").press("Enter");
+    await expect(page.getByTestId("sync.device-name").nth(0)).toHaveText("Work phone");
+  });
+
+  test("the rename field caps its input length", async ({ page }) => {
+    await installMockIpc(page, {
+      syncStatus: { state: "idle" },
+      devices: DEVICES,
+      deviceNames: { [NAMED]: "Work phone" },
+    });
+    await openDevices(page);
+
+    await page.getByTestId("sync.rename-device").first().click();
+    const input = page.getByTestId("sync.device-name-input");
+    await input.fill("x".repeat(120));
+    const value = await input.inputValue();
+    expect(value.length).toBeLessThanOrEqual(40);
+  });
+
+  test("removing a device names the target it is about to revoke", async ({ page }) => {
+    await installMockIpc(page, {
+      syncStatus: { state: "idle" },
+      devices: DEVICES,
+      deviceNames: { [UNNAMED]: "Old laptop" },
+    });
+    await openDevices(page);
+
+    await page.getByTestId("sync.remove-device").click();
+    // Name AND code: revocation is the one place a mis-read row costs something.
+    const target = page.getByTestId("sync.remove-target");
+    await expect(target).toContainText("Old laptop");
+    await expect(target).toContainText(UNNAMED.slice(0, 6));
+  });
+});

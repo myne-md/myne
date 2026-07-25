@@ -9,6 +9,7 @@
 // straight to IPC and never parked in module or hook state.
 
 import { useCallback, useEffect, useState } from "react";
+import { setDeviceName } from "./prefs";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 
@@ -52,6 +53,10 @@ export interface JoinResult {
   pending: boolean;
   /** The server cert fingerprint (https) for eye-compare, or `null` (loopback). */
   fingerprint: string | null;
+  /** The device_id this join registered (MYND-548) — used to name THIS device in
+   *  its own local prefs; a pending device holds no token, so it cannot read the
+   *  roster to find its own row. */
+  device_id_hex: string;
 }
 
 /** **Add this device to an existing account.** On a fresh device, bootstrap the
@@ -106,6 +111,10 @@ export type EnrollCredentialKind = "password" | "recovery";
 /** Mirrors the Rust `EnrollResult`. */
 interface EnrollResult {
   approved: boolean;
+  /** The device_id this enrollment registered (MYND-548) — needed to name THIS
+   *  device, since a pending device holds no token and so cannot read the roster
+   *  to find its own row. */
+  device_id_hex: string;
 }
 
 /** A serialized `SyncDeviceError` from the plugin (`{ kind: "…" }`). */
@@ -131,10 +140,15 @@ export function errKind(e: unknown): string {
 export interface EnrollHook {
   busy: boolean;
   outcome: EnrollOutcome | null;
+  /** `deviceName` (MYND-548) is written to this vault's own `device_names` entry
+   *  once the handshake succeeds — locally, with no token and no approval, since
+   *  `vault.prefs` is an ordinary local file and the §10.2 union merge carries the
+   *  key to peers on the first sync after approval. */
   enroll: (
     accountNumber: string,
     credential: string,
     credentialKind: EnrollCredentialKind,
+    deviceName: string,
   ) => Promise<void>;
   reset: () => void;
 }
@@ -148,6 +162,7 @@ export function useEnroll(): EnrollHook {
       accountNumber: string,
       credential: string,
       credentialKind: EnrollCredentialKind,
+      deviceName: string,
     ) => {
       setBusy(true);
       setOutcome(null);
@@ -157,6 +172,14 @@ export function useEnroll(): EnrollHook {
           credential,
           credentialKind,
         });
+        // Best-effort, and deliberately AFTER the handshake: a naming failure must
+        // never turn a successful enrollment into a reported error. The row would
+        // fall back to its id-derived label, fixable with an inline rename.
+        try {
+          await setDeviceName(result.device_id_hex, deviceName);
+        } catch {
+          // Prefs unwritable (locked / IO) — enrollment still succeeded.
+        }
         setOutcome(result.approved ? { state: "approved" } : { state: "pending" });
       } catch (e) {
         setOutcome({ state: "error", kind: errKind(e) });

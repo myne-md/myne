@@ -748,6 +748,32 @@ export async function setFolderIcons(icons: Record<string, string>): Promise<voi
 }
 
 /**
+ * Name ONE device (MYND-548) — `device_names[deviceIdHex] = name`, the label the
+ * device list leads with. A single entry, not the whole map: entries are written
+ * by different devices and merged per key, so a whole-map write would let this
+ * client's stale view clobber a peer's rename.
+ *
+ * There is deliberately **no clear/delete counterpart**. `device_names` merges
+ * per key by UNION (`sync-protocol.md` §10.2), so removing a key does not
+ * propagate — it resurrects from the first peer that still holds it. The backend
+ * refuses a blank name, so an empty submit is a no-op the caller treats as
+ * "cancel".
+ */
+export async function setDeviceName(deviceIdHex: string, name: string): Promise<void> {
+  await invoke<void>("plugin:prefs|set_device_name", { deviceIdHex, name });
+}
+
+/**
+ * The running device's platform token (MYND-548) — `"ios"`, `"android"`, …,
+ * straight from Rust's `std::env::consts::OS`. Seeds the enrollment forms'
+ * suggested device name. **Do not sniff `navigator` instead** — one source keeps
+ * the two clients from drifting into two default-name heuristics.
+ */
+export async function devicePlatform(): Promise<string> {
+  return await invoke<string>("plugin:prefs|device_platform");
+}
+
+/**
  * Set (or clear) the active vault's human-readable label (MYND-205) — the name
  * the in-app vault switcher shows. Pass a string to set/rename it, or `null` to
  * clear it back to the neutral-fallback state. **Unlock-gated**: writing the

@@ -4,6 +4,11 @@ import type { TFunction } from "i18next";
 import type { CSSProperties, ReactNode } from "react";
 import { Screen, FlowHeader, Title, Lead, FooterBar, Button, Banner, BlockingOverlay, Icon } from "../../components";
 import { syncJoinAccount, syncNow, syncHeadFingerprint, syncResetLocal, errKind, type JoinResult } from "../../lib/sync";
+import { setDeviceName } from "../../lib/prefs";
+import { suggestedDeviceName } from "../../lib/device-name";
+
+/** Readability bound on the device-name field, mirroring the desktop constant. */
+const DEVICE_NAME_MAX_LEN = 40;
 import { formatAccountNumberInput } from "../../lib/account-number-format";
 import { HAS_TAURI } from "../../lib/app-window";
 import { ENROLL_NON_DISTINGUISHING_BANNER, ENROLL_PENDING_NOTICE } from "../../lib/load-bearing-copy";
@@ -185,6 +190,25 @@ export function JoinFlow({ onComplete, onCancel }: JoinFlowProps) {
   const [fingerprint, setFingerprint] = useState<string | null>(null);
   const [aborting, setAborting] = useState(false);
 
+  // MYND-548: this device's own name, pre-filled from the platform token Rust
+  // reports (phone/tablet refined by the size class). Same contract as the
+  // Settings enrollment panel — the two doors must not diverge, since a device
+  // arriving through this one nameless is a silent regression.
+  const [deviceNameInput, setDeviceNameInput] = useState("");
+  const [suggestedName, setSuggestedName] = useState("");
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const suggestion = await suggestedDeviceName();
+      if (cancelled) return;
+      setSuggestedName(suggestion);
+      setDeviceNameInput((current) => (current === "" ? suggestion : current));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   // Secret-wipe artefact — mirrors the in-flight password so unmount can drop it.
   const pwRef = useRef("");
   const demoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -224,12 +248,28 @@ export function JoinFlow({ onComplete, onCancel }: JoinFlowProps) {
       // demoable without a backend (and flow-logic testable via the mock).
       demoTimer.current = setTimeout(() => {
         setBusy(false);
-        landOn({ vault_id: "demo-vault", pending: true, fingerprint: null });
+        landOn({
+          vault_id: "demo-vault",
+          pending: true,
+          fingerprint: null,
+          device_id_hex: "00".repeat(16),
+        });
       }, 700);
       return;
     }
     try {
       const result = await syncJoinAccount(serverUrl.trim(), accountNumber.trim(), password);
+      // Name THIS device before routing anywhere. The bootstrapped vault is
+      // unlocked by now, so the local prefs write needs no token and no approval;
+      // the §10.2 union merge carries the entry to peers on the first sync.
+      // Best-effort — a naming failure must not turn a successful join into an
+      // error (the row falls back to its id-derived label).
+      try {
+        const name = deviceNameInput.trim() !== "" ? deviceNameInput.trim() : suggestedName;
+        if (name !== "") await setDeviceName(result.device_id_hex, name);
+      } catch {
+        // Prefs unwritable — carry on; the join itself succeeded.
+      }
       setBusy(false);
       landOn(result);
     } catch (e) {
@@ -399,6 +439,39 @@ export function JoinFlow({ onComplete, onCancel }: JoinFlowProps) {
               {t("join.accountHint")}
             </div>
           )}
+        </div>
+
+        {/* MYND-548: named at the one moment the user is provably holding this
+            device. Written to THIS vault's local prefs on success — it never
+            joins the join/enrollment request. */}
+        <div style={{ marginTop: 18 }}>
+          <FieldLabel>{t("sync.enroll.deviceNameLabel")}</FieldLabel>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              height: 52,
+              border: "1.5px solid var(--line-2)",
+              borderRadius: 6,
+              background: "var(--bg-1)",
+              padding: "0 14px",
+            }}
+          >
+            <input
+              value={deviceNameInput}
+              onChange={(e) => setDeviceNameInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") void onSubmit();
+              }}
+              maxLength={DEVICE_NAME_MAX_LEN}
+              placeholder={suggestedName}
+              autoComplete="off"
+              autoCorrect="off"
+              spellCheck={false}
+              data-testid="sync.join.device-name-input"
+              style={{ ...inputReset, fontSize: 16, color: "var(--fg-1)" }}
+            />
+          </div>
         </div>
 
         <div style={{ marginTop: 18 }}>
