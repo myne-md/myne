@@ -5,10 +5,7 @@ import type { CSSProperties, ReactNode } from "react";
 import { Screen, FlowHeader, Title, Lead, FooterBar, Button, Banner, BlockingOverlay, Icon } from "../../components";
 import { syncJoinAccount, syncNow, syncHeadFingerprint, syncResetLocal, errKind, type JoinResult } from "../../lib/sync";
 import { setDeviceName } from "../../lib/prefs";
-import { suggestedDeviceName } from "../../lib/device-name";
-
-/** Readability bound on the device-name field, mirroring the desktop constant. */
-const DEVICE_NAME_MAX_LEN = 40;
+import { DEVICE_NAME_MAX_LEN, useDeviceNameField } from "../../lib/device-name";
 import { formatAccountNumberInput } from "../../lib/account-number-format";
 import { HAS_TAURI } from "../../lib/app-window";
 import { ENROLL_NON_DISTINGUISHING_BANNER, ENROLL_PENDING_NOTICE } from "../../lib/load-bearing-copy";
@@ -190,24 +187,9 @@ export function JoinFlow({ onComplete, onCancel }: JoinFlowProps) {
   const [fingerprint, setFingerprint] = useState<string | null>(null);
   const [aborting, setAborting] = useState(false);
 
-  // MYND-548: this device's own name, pre-filled from the platform token Rust
-  // reports (phone/tablet refined by the size class). Same contract as the
-  // Settings enrollment panel — the two doors must not diverge, since a device
-  // arriving through this one nameless is a silent regression.
-  const [deviceNameInput, setDeviceNameInput] = useState("");
-  const [suggestedName, setSuggestedName] = useState("");
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      const suggestion = await suggestedDeviceName();
-      if (cancelled) return;
-      setSuggestedName(suggestion);
-      setDeviceNameInput((current) => (current === "" ? suggestion : current));
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  // MYND-548: this device's own name — the same hook the Settings enrollment panel
+  // uses, so the two doors cannot drift.
+  const deviceNameField = useDeviceNameField();
 
   // Secret-wipe artefact — mirrors the in-flight password so unmount can drop it.
   const pwRef = useRef("");
@@ -265,8 +247,7 @@ export function JoinFlow({ onComplete, onCancel }: JoinFlowProps) {
       // Best-effort — a naming failure must not turn a successful join into an
       // error (the row falls back to its id-derived label).
       try {
-        const name = deviceNameInput.trim() !== "" ? deviceNameInput.trim() : suggestedName;
-        if (name !== "") await setDeviceName(result.device_id_hex, name);
+        await setDeviceName(result.device_id_hex, deviceNameField.resolved);
       } catch {
         // Prefs unwritable — carry on; the join itself succeeded.
       }
@@ -458,13 +439,13 @@ export function JoinFlow({ onComplete, onCancel }: JoinFlowProps) {
             }}
           >
             <input
-              value={deviceNameInput}
-              onChange={(e) => setDeviceNameInput(e.target.value)}
+              value={deviceNameField.value}
+              onChange={(e) => deviceNameField.setValue(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter") void onSubmit();
               }}
               maxLength={DEVICE_NAME_MAX_LEN}
-              placeholder={suggestedName}
+              placeholder={deviceNameField.suggestion}
               autoComplete="off"
               autoCorrect="off"
               spellCheck={false}

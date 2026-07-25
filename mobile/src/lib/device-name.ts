@@ -9,26 +9,32 @@
 //
 // One mobile-only refinement: the OS constant reports `"ios"` for both iPhone and
 // iPad (and `"android"` for phone and tablet alike), so this picks the tablet
-// wording from the existing size class. That only chooses a better SUGGESTION for
-// an editable field — the stored value is whatever the user confirms — so it does
-// not reintroduce a second source of truth.
+// wording from the existing size class. That class models the WINDOW, not the
+// hardware, so it guesses wrong for an iPad in Slide Over — accepted, because this
+// only chooses a better starting SUGGESTION for an editable field. A real
+// form-factor signal would have to come from the same command as the token.
 
+import { useEffect, useState } from "react";
 import i18n from "@myne/i18n";
 import { devicePlatform } from "./prefs";
 import { computeSizeClass } from "../platform/SizeClassContext";
 
+/** The maximum device-name length the UI accepts (MYND-548) — a readability
+ *  bound, mirroring the desktop constant. There is no Rust-side cap; the prefs
+ *  blob's own size ceiling is the real backstop. */
+export const DEVICE_NAME_MAX_LEN = 40;
+
 /** The display word for a platform token, falling back to a neutral label for a
  *  target the catalogue does not know (or the browser dev shim, where the command
  *  is unavailable). */
-export function deviceNameForPlatform(token: string, tablet: boolean): string {
-  const key =
-    tablet && token === "ios"
-      ? "sync.devices.platform.ipad"
-      : tablet && token === "android"
-        ? "sync.devices.platform.androidTablet"
-        : `sync.devices.platform.${token}`;
-  const label = i18n.t(key, { defaultValue: "" });
-  return label !== "" ? label : i18n.t("sync.devices.platform.unknown");
+function deviceNameForPlatform(token: string, tablet: boolean): string {
+  const tabletKey =
+    token === "ios" ? "sync.devices.platform.ipad" : "sync.devices.platform.androidTablet";
+  return i18n.t([
+    ...(tablet ? [tabletKey] : []),
+    `sync.devices.platform.${token}`,
+    "sync.devices.platform.unknown",
+  ]);
 }
 
 /** Resolve this device's suggested name. Never throws — outside Tauri it degrades
@@ -40,4 +46,34 @@ export async function suggestedDeviceName(): Promise<string> {
   } catch {
     return i18n.t("sync.devices.platform.unknown");
   }
+}
+
+/** The "Name this device" field's state, shared by both mobile enrollment doors so
+ *  they cannot drift. `resolved` is what to submit — never blank, which matters
+ *  because the backend refuses a blank name outright. */
+export function useDeviceNameField(): {
+  value: string;
+  setValue: (next: string) => void;
+  suggestion: string;
+  resolved: string;
+} {
+  const [value, setValue] = useState("");
+  const [suggestion, setSuggestion] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const next = await suggestedDeviceName();
+      if (cancelled) return;
+      setSuggestion(next);
+      // Functional update: a late-resolving suggestion must never clobber what the
+      // user already typed.
+      setValue((current) => (current === "" ? next : current));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return { value, setValue, suggestion, resolved: value.trim() !== "" ? value.trim() : suggestion };
 }
