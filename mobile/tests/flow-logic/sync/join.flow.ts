@@ -65,4 +65,70 @@ test.describe("sync join flow", () => {
 
     await expect(page.getByTestId("sync.join.error")).toBeVisible();
   });
+
+  // ── Device-join via QR (MYND-466) ──────────────────────────────────────────
+  test("Scan QR → confirm → prefilled form → pending", async ({ page }) => {
+    await installMockIpc(page, {
+      freshDevice: true,
+      qrScan: { value: "MYQR1|https://sync.example.com|4K7P9RH2JR3T8XW6VZ0A|-|9999999999" },
+      qrDecode: {
+        endpoint_url: "https://sync.example.com",
+        account_number: "4K7P9RH2JR3T8XW6VZ0A",
+        cert_pin_hex: null,
+        pin_source: "self_host_no_pin",
+        fresh: true,
+      },
+      joinResult: { vault_id: "flow-vault", pending: true, fingerprint: null },
+      headFingerprint: "TYRS-N318",
+    });
+    await page.goto("/");
+    await page.getByRole("button", { name: "Connect to my account" }).click();
+
+    // Scan → confirm screen shows the decoded server + account#.
+    await page.getByTestId("sync.join.scan-qr").click();
+    await expect(page.getByTestId("sync.join.qr-confirm")).toBeVisible();
+    await expect(page.getByTestId("sync.join.qr-confirm.server")).toHaveText("https://sync.example.com");
+    await expect(page.getByTestId("sync.join.qr-confirm.account")).toHaveText("MY-4K7P-9RH2-JR3T-8XW6-VZ0A");
+
+    // Continue → back to the form, server + account prefilled; only the password left.
+    await page.getByTestId("sync.join.qr-confirm.continue").click();
+    await expect(page.getByTestId("sync.join.server-input")).toHaveValue("https://sync.example.com");
+    await expect(page.getByTestId("sync.join.account-input")).toHaveValue("MY-4K7P-9RH2-JR3T-8XW6-VZ0A");
+
+    await page.getByTestId("sync.join.password-input").fill("correct horse battery staple");
+    await page.getByTestId("sync.join.submit").click();
+    await expect(page.getByTestId("sync.join.verify")).toBeVisible();
+  });
+
+  test("expired QR → re-scan message, no confirm step", async ({ page }) => {
+    await installMockIpc(page, {
+      freshDevice: true,
+      qrScan: { value: "MYQR1|https://sync.example.com|4K7P9RH2JR3T8XW6VZ0A|-|1" },
+      qrDecode: {
+        endpoint_url: "https://sync.example.com",
+        account_number: "4K7P9RH2JR3T8XW6VZ0A",
+        cert_pin_hex: null,
+        pin_source: "self_host_no_pin",
+        fresh: false,
+      },
+    });
+    await page.goto("/");
+    await page.getByRole("button", { name: "Connect to my account" }).click();
+    await page.getByTestId("sync.join.scan-qr").click();
+    await expect(page.getByTestId("sync.join.error")).toBeVisible();
+    await expect(page.getByTestId("sync.join.qr-confirm")).toHaveCount(0);
+  });
+
+  test("non-Myne QR → error, stays on the form", async ({ page }) => {
+    await installMockIpc(page, {
+      freshDevice: true,
+      qrScan: { value: "https://evil.example" },
+      qrDecodeError: { kind: "NotAQrJoinPayload" },
+    });
+    await page.goto("/");
+    await page.getByRole("button", { name: "Connect to my account" }).click();
+    await page.getByTestId("sync.join.scan-qr").click();
+    await expect(page.getByTestId("sync.join.error")).toBeVisible();
+    await expect(page.getByTestId("sync.join.qr-confirm")).toHaveCount(0);
+  });
 });

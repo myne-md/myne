@@ -1,0 +1,10 @@
+"$schema" = "schemas/schema.json"
+
+# Deny-by-default (SYNC-15 / TB6): the only grant is the camera-backed `scan`
+# command, and ONLY to the main window. The camera itself is gated a second time
+# by the OS permission prompt (NSCameraUsageDescription). This grant is the one
+# new trust-surface expansion of MYND-466 — a camera-accessing native command —
+# deliberately isolated to one reviewable place.
+[default]
+description = "Allow the QR scanner's `scan` command (open the camera to read a device-join QR). Returns only the decoded string; no other native access."
+permissions = ["allow-scan"]
