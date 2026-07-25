@@ -1681,10 +1681,12 @@ cache blob** at `<vault-root>/attachments-text/<attachment-id-hex>` — one file
 attachment, named by the lowercase-hex `attachment_id` (§9.9), mirroring the
 `attachments/<attachment-id-hex>` layout of the `MYA1` blob it derives from (MYND-328).
 It holds the on-device text extracted from PDF / Word (`.docx`) / text-like (`.txt` /
-`.md` / `.csv`) attachments, fed into the search index (§9.6) so a note becomes findable
-by the text inside its embedded attachments. Image OCR and scanned (text-layer-less) PDFs
-are **out of scope for v0.1** and deferred to MYND-441, which reuses this blob unchanged
-(see "extractor_version" below). The blob is AEAD-encrypted under `attachment_text_key =
+`.md` / `.csv`) attachments, **plus the on-device transcript of an audio attachment
+(ASR / speech-to-text of an `audio/wav` `MYA1` blob — a recorded voice note or an imported
+clip, MYND-259/MYND-270)**, fed into the search index (§9.6) so a note becomes findable by
+the text inside its embedded attachments — and, for audio, by what was said in it. Image OCR
+and scanned (text-layer-less) PDFs are **out of scope for v0.1** and deferred to MYND-441,
+which reuses this blob unchanged (see "extractor_version" below). The blob is AEAD-encrypted under `attachment_text_key =
 DeriveSubkey(root_key, "attachment-text-key")` (§3.2 + §3.4).
 
 Extracted text is **AS3-Sensitive** derived plaintext of user content; storing it as
@@ -1708,12 +1710,15 @@ Offset  Size       Field                  Description
 4       1 byte     protocol_version       0x01 for this specification
 5       1 byte     extractor_version      0x01 = the v0.1 baseline extractor set
                                           (PDF text-layer, DOCX OOXML text, text-like
-                                          UTF-8; §9.15.2). Distinct from protocol_version:
-                                          a changed extractor set (better extraction, or
-                                          the future OCR layer §11/MYND-441) bumps THIS
-                                          byte so a lower stored value triggers re-extraction
-                                          + index rebuild (§9.6.4) rather than serving stale
-                                          text.
+                                          UTF-8; §9.15.2); 0x02 = that baseline set PLUS the
+                                          audio ASR (speech-to-text) extractor generation
+                                          (§9.15.2; MYND-270). Distinct from protocol_version:
+                                          a changed extractor set (better extraction, the
+                                          added audio ASR generation, or the future OCR layer
+                                          §11/MYND-441) bumps THIS byte so a lower stored value
+                                          triggers re-extraction + index rebuild (§9.6.4)
+                                          rather than serving stale text. This is an in-major
+                                          value change, NOT a protocol_version bump.
 6       24 bytes   text_nonce             192-bit random nonce (OS CSPRNG) for the inner
                                           AEAD under attachment_text_key.
 30      4 bytes    ciphertext_len         Length M = plaintext_len + 32 of the inner
@@ -1741,7 +1746,12 @@ A [postcard](https://docs.rs/postcard)-serialized struct:
 - `status` — one of `ok` (text extracted), `empty` (supported format but no extractable
   text, e.g. a scanned PDF with no text layer), `unsupported` (format not handled in this
   extractor generation), or `failed` (extraction errored — corrupt / password-protected).
-- `source_format` — the format the extractor dispatched on (`pdf` / `docx` / `text`).
+- `source_format` — the format the extractor dispatched on (`pdf` / `docx` / `text` /
+  `audio`). `audio` is the ASR / speech-to-text generation (`extractor_version 0x02`,
+  §9.15.1): the extractor decodes the `audio/wav` `MYA1` blob and writes the transcript to
+  `text`. An audio attachment that cannot be transcribed maps to the existing negative
+  `status` values (`unsupported` / `failed` / `empty`) — no new `status` is added, and the
+  `0x01 → 0x02` bump is precisely what re-processes previously-`unsupported` audio.
 - `text` — the extracted text, **NFC-normalized**, empty unless `status = ok`.
 - `char_count` — `u32` length of `text` before any truncation.
 - `truncated` — `bool`, set when extraction hit the `MAX_EXTRACTED_TEXT_LEN` cap (§9.15.4).
@@ -1752,6 +1762,14 @@ of §9.5.2) for the same reason as `vault.search` / `vault.dictionary`: the payl
 unbounded user-generated content and is never cross-validated field-by-field. All four
 `status` values (including the negative ones) are persisted so a rebuild does **not**
 retry extraction that already failed/was-unsupported — until `extractor_version` bumps.
+
+For the audio ASR generation (`extractor_version 0x02`), the selected transcription
+model's identity (its SHA-256) rides **inside** this client-opaque payload as part of the
+transcript cache-invalidation key — NOT in the cleartext header and NOT in the AAD —
+exactly as `vault.search` (§9.6.2) and `vault.embeddings` (§9.17.3) carry their
+model-identity in the inner payload. A model swap therefore invalidates a cached transcript
+through the inner payload while the §9.15 crypto framing stays payload-agnostic; the
+`extractor_version` byte marks the extractor *generation*, not the specific model.
 
 #### 9.15.3 AAD construction
 
@@ -1775,7 +1793,10 @@ epoch rotation, same rationale as prefs/search/dictionary). The `attachment_id` 
 is what makes one KEK safe across all attachment-text blobs: a blob sealed for attachment
 A fails AEAD verification if served as attachment B. Binding `extractor_version` in the
 AAD (as well as the header byte) prevents a tampered header byte from being silently
-accepted. The subkey role string `"attachment-text-key"` is DISTINCT from the AAD role
+accepted — this covers the `0x01 → 0x02` audio-ASR bump (MYND-270), a legal in-major value
+change (no `protocol_version` bump): a blob written at `0x02` binds that value into its tag,
+so flipping the stored byte back to `0x01` (to force acceptance of a stale generation) fails
+AEAD verification rather than being silently served. The subkey role string `"attachment-text-key"` is DISTINCT from the AAD role
 string `"attachment-text-blob"` — the same key/blob domain-separation as search.
 
 #### 9.15.4 Size cap, cache semantics, and threat class
@@ -2230,7 +2251,7 @@ Items deliberately not addressed by this specification. Each entry names where i
 | Anonymous credentials (KVAC, Privacy Pass) for sync entitlement | `appname-v005` |
 | Plugin sandboxing, capability-scoped plugin API | Possibly never; `../vision.md` §what-myne-is-not |
 | Single-shot attachment encryption (images/SVG/PDF, ≤64 MiB) | **Ships in v0.1** — `MYA1` blob (§9.9) + `MYC1` catalog (§9.10) |
-| Chunked/streamed attachment AEAD, Merkle manifests, large media (video/audio) | Phase 1.5 or later; future spec extension (new magic + migration, not a `MYA1` extension) |
+| Chunked/streamed attachment AEAD, Merkle manifests, **large (>64 MiB) media requiring chunking/streaming** (long video/audio) | Phase 1.5 or later; future spec extension (new magic + migration, not a `MYA1` extension). Single-shot audio ≤64 MiB already ships as a `MYA1` blob (row above), and on-device speech-to-text (§9.15, MYND-270) transcribes it; only media beyond the single-shot cap is deferred here. |
 | Encrypted search index format (FTS5 inside encrypted SQLite) | Phase 1.5 or later; client-internal, not in this spec |
 | Bidirectional links, graph view rendering | Out of scope for the cryptographic protocol; client UI concern |
 | Mobile / WASM Argon2id parameter profile | Phase 3; this spec ships desktop-only |

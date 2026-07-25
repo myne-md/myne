@@ -31,6 +31,11 @@ pub enum EngineError {
     /// `embed` failed inside the model runtime.
     #[error("local-inference embedding failed")]
     EmbeddingFailed,
+    /// `transcribe` failed inside the model runtime (voice-to-text, MYND-550).
+    /// Content-free like its siblings — the decoded transcript never appears in
+    /// an error value or its `Display`.
+    #[error("local-inference transcription failed")]
+    TranscriptionFailed,
 }
 
 impl EngineError {
@@ -42,6 +47,7 @@ impl EngineError {
             EngineError::NotReady => "not_ready",
             EngineError::InferenceFailed => "inference_failed",
             EngineError::EmbeddingFailed => "embedding_failed",
+            EngineError::TranscriptionFailed => "transcription_failed",
         }
     }
 }

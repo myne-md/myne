@@ -21,7 +21,7 @@
 //! `protocol::derive_subkey(root_key, SubkeyRole::AttachmentTextKey)` and passes
 //! it in, mirroring how `commands.rs` derives the catalog KEK at its call site.
 
-use super::extract_types::{ExtractStatus, ExtractedText};
+use super::extract_types::{ExtractStatus, ExtractedText, SourceFormat, MAX_EXTRACTED_TEXT_LEN};
 use protocol::{
     decode_attachment_blob, decode_attachment_text_blob, encode_attachment_text_blob,
     AttachmentsCatalog, AEAD_KEY_LEN, ATTACHMENT_ID_LEN, ATTACHMENT_TEXT_BLOB_ACCOUNT_HASH_LEN,
@@ -79,6 +79,71 @@ pub fn write_extracted(
     // `replace = true`: a cache blob may be overwritten (re-extraction), unlike
     // the write-once MYA1 source blob.
     crate::atomic_write::atomic_write(&cache_path(vault_dir, attachment_id), &blob, true)
+}
+
+/// Persist an on-device ASR transcript into the attachment's `MYE1` cache
+/// (voice-to-text, MYND-551; SYNC-V1/V6, Task 2). Builds the
+/// [`SourceFormat::Audio`] [`ExtractedText`] — `Ok` for a non-empty transcript,
+/// `Empty` for silence — binds the producing model's SHA-256 into the inner
+/// payload (`model_hash`, NOT the AAD — mirrors `vault.embeddings` § 9.17.2), and
+/// seals it via [`write_extracted`]. Over-cap text is truncated on a char
+/// boundary with `truncated = true` and `char_count` recording the full count
+/// (§ 9.15.2), mirroring the desktop extractor's `finalize`.
+///
+/// This owns ONLY the cache write. The command layer owns the single decrypt +
+/// transcribe path and passes the already-produced transcript + the
+/// caller-derived `attachment_text_key` KEK (SYNC-V6 — audio's own
+/// `Engine`-aware command, never widening the pure text-extractor seam). Returns
+/// the persisted [`ExtractedText`] so the caller can inspect the status /
+/// truncation without re-reading. The transcript is plaintext (AS3-Sensitive) —
+/// never logged (DENY-list; `src-tauri/CLAUDE.md`).
+pub fn write_transcript(
+    vault_dir: &Path,
+    attachment_text_key: &[u8; AEAD_KEY_LEN],
+    account_number_hash: &[u8; ATTACHMENT_TEXT_BLOB_ACCOUNT_HASH_LEN],
+    attachment_id: &[u8; ATTACHMENT_ID_LEN],
+    transcript: &str,
+    model_hash: Option<[u8; 32]>,
+) -> std::io::Result<ExtractedText> {
+    let char_count = transcript.chars().count() as u32;
+    let (text, truncated) = if transcript.len() > MAX_EXTRACTED_TEXT_LEN {
+        let mut end = MAX_EXTRACTED_TEXT_LEN;
+        while end > 0 && !transcript.is_char_boundary(end) {
+            end -= 1;
+        }
+        (transcript[..end].to_string(), true)
+    } else {
+        (transcript.to_string(), false)
+    };
+    let extracted = if text.trim().is_empty() {
+        // Silence / empty transcript: record a negative so a rebuild does not
+        // retry, but still bind the model so a model swap re-offers a transcribe.
+        ExtractedText {
+            status: ExtractStatus::Empty,
+            source_format: SourceFormat::Audio,
+            text: String::new(),
+            char_count: 0,
+            truncated: false,
+            model_hash,
+        }
+    } else {
+        ExtractedText {
+            status: ExtractStatus::Ok,
+            source_format: SourceFormat::Audio,
+            text,
+            char_count,
+            truncated,
+            model_hash,
+        }
+    };
+    write_extracted(
+        vault_dir,
+        attachment_text_key,
+        account_number_hash,
+        attachment_id,
+        &extracted,
+    )?;
+    Ok(extracted)
 }
 
 /// Load an attachment's cached [`ExtractedText`], or `None` on a cache miss —
@@ -260,6 +325,7 @@ mod tests {
             text,
             char_count,
             truncated: false,
+            model_hash: None,
         }
     }
 
@@ -275,6 +341,7 @@ mod tests {
             text: "cached extracted text".to_string(),
             char_count: 21,
             truncated: false,
+            model_hash: None,
         }
     }
 
@@ -316,6 +383,7 @@ mod tests {
             text: String::new(),
             char_count: 0,
             truncated: false,
+            model_hash: None,
         };
         write_extracted(tmp.path(), &KEY, &ACCOUNT_HASH, &ATT_ID, &e).expect("write");
         assert_eq!(
@@ -338,7 +406,7 @@ mod tests {
         write_extracted(tmp.path(), &KEY, &ACCOUNT_HASH, &ATT_ID, &sample()).expect("write");
         let path = cache_path(tmp.path(), &ATT_ID);
         let mut bytes = std::fs::read(&path).unwrap();
-        bytes[5] = 0x02; // a future extractor generation this client rejects
+        bytes[5] = 0x03; // a future extractor generation beyond the current 0x02
         std::fs::write(&path, &bytes).unwrap();
         assert!(read_extracted(tmp.path(), &KEY, &ACCOUNT_HASH, &ATT_ID).is_none());
     }
@@ -470,12 +538,97 @@ mod tests {
             text: String::new(),
             char_count: 0,
             truncated: false,
+            model_hash: None,
         };
         write_extracted(tmp.path(), &KEY, &ACCOUNT_HASH, &ATT_ID, &e).expect("write");
         let body = format!("body ![[att:{}|f]]", hex_encode(&ATT_ID));
         let mut memo = std::collections::HashMap::new();
         assert!(
             collect_attachment_texts(&body, tmp.path(), &KEY, &ACCOUNT_HASH, &mut memo).is_empty()
+        );
+    }
+
+    // ---- write_transcript (voice-to-text MYND-551, Task 2/3/4) ----------
+
+    #[test]
+    fn write_transcript_persists_audio_and_round_trips() {
+        // Task 2/5: a produced transcript is sealed as a SourceFormat::Audio Ok
+        // MYE1 blob and reads back verbatim — the retrievable-text seam the UI's
+        // "insert / re-insert without re-transcribing" affordance reads.
+        let tmp = ScopedTempDir::new("mye1-transcript").expect("tmp");
+        let model_hash = Some([0x5c; 32]);
+        let persisted = write_transcript(
+            tmp.path(),
+            &KEY,
+            &ACCOUNT_HASH,
+            &ATT_ID,
+            "the quick brown fox",
+            model_hash,
+        )
+        .expect("write transcript");
+        assert_eq!(persisted.status, ExtractStatus::Ok);
+        assert_eq!(persisted.source_format, SourceFormat::Audio);
+        assert_eq!(persisted.model_hash, model_hash);
+
+        let got = read_extracted(tmp.path(), &KEY, &ACCOUNT_HASH, &ATT_ID).expect("read");
+        assert_eq!(got.status, ExtractStatus::Ok);
+        assert_eq!(got.source_format, SourceFormat::Audio);
+        assert_eq!(got.text, "the quick brown fox");
+        assert_eq!(got.char_count, 19);
+        assert_eq!(got.model_hash, model_hash);
+        // Task 3: a swap to a different model reads the cached transcript stale.
+        assert!(got.is_model_stale(Some(&[0x99; 32])));
+        assert!(!got.is_model_stale(model_hash.as_ref()));
+    }
+
+    #[test]
+    fn write_transcript_silence_is_empty_negative() {
+        // A silent clip yields an Empty negative (cached so a rebuild does not
+        // retry), still model-bound so a model swap can re-offer a transcribe.
+        let tmp = ScopedTempDir::new("mye1-transcript-silence").expect("tmp");
+        let persisted = write_transcript(
+            tmp.path(),
+            &KEY,
+            &ACCOUNT_HASH,
+            &ATT_ID,
+            "   \n  ",
+            Some([0x01; 32]),
+        )
+        .expect("write transcript");
+        assert_eq!(persisted.status, ExtractStatus::Empty);
+        assert!(persisted.text.is_empty());
+        assert_eq!(persisted.model_hash, Some([0x01; 32]));
+        // An Empty transcript contributes no search doc.
+        let body = format!("note ![[att:{}]]", hex_encode(&ATT_ID));
+        let mut memo = std::collections::HashMap::new();
+        assert!(
+            collect_attachment_texts(&body, tmp.path(), &KEY, &ACCOUNT_HASH, &mut memo).is_empty()
+        );
+    }
+
+    #[test]
+    fn transcript_flows_through_collect_attachment_texts() {
+        // Task 4 data path: once the transcript MYE1 is written, the attachment's
+        // text flows through the SAME collect_attachment_texts → att-doc pipeline
+        // as PDF/DOCX text, so a note embedding it becomes findable.
+        let tmp = ScopedTempDir::new("mye1-transcript-collect").expect("tmp");
+        write_transcript(
+            tmp.path(),
+            &KEY,
+            &ACCOUNT_HASH,
+            &ATT_ID,
+            "meeting transcript needle",
+            Some([0x5c; 32]),
+        )
+        .expect("write transcript");
+        let id_hex = "5a".repeat(ATTACHMENT_ID_LEN);
+        let body = format!("intro ![[att:{id_hex}]]");
+        let mut memo = std::collections::HashMap::new();
+        let got = collect_attachment_texts(&body, tmp.path(), &KEY, &ACCOUNT_HASH, &mut memo);
+        assert_eq!(
+            got,
+            vec![(id_hex, "meeting transcript needle".to_string())],
+            "a cached audio transcript surfaces as its own att doc"
         );
     }
 }

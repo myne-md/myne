@@ -86,7 +86,7 @@ pub fn encode_snapshot(
     let plaintext = postcard::to_allocvec(&SnapshotRef {
         manifest,
         index,
-        extractor_version: protocol::ATTACHMENT_TEXT_BLOB_EXTRACTOR_V1,
+        extractor_version: protocol::ATTACHMENT_TEXT_BLOB_EXTRACTOR_VERSION,
         schema_version: SEARCH_SNAPSHOT_SCHEMA_SEPARATE_ATTACHMENT_DOCS,
     })
     .unwrap_or_default();
@@ -107,7 +107,7 @@ pub fn decode_snapshot(
     // stale (§ 9.6.4): reject → caller rebuilds so the current extractor's text
     // is re-extracted. A pre-MYND-328 snapshot lacks the field and already fails
     // the `from_bytes` above (postcard is non-self-describing) → same rebuild.
-    if snap.extractor_version != protocol::ATTACHMENT_TEXT_BLOB_EXTRACTOR_V1 {
+    if snap.extractor_version != protocol::ATTACHMENT_TEXT_BLOB_EXTRACTOR_VERSION {
         return None;
     }
     // MYND-448a: a snapshot from a different index doc-model is stale — a v1
@@ -266,7 +266,7 @@ mod tests {
         let plaintext = postcard::to_allocvec(&PreV2Snap {
             manifest: &manifest,
             index: &index,
-            extractor_version: protocol::ATTACHMENT_TEXT_BLOB_EXTRACTOR_V1,
+            extractor_version: protocol::ATTACHMENT_TEXT_BLOB_EXTRACTOR_VERSION,
         })
         .expect("encode pre-v2 snapshot");
         let blob = encode_search_index_blob(&KEY, &ACCOUNT_HASH, &plaintext).expect("seal");
@@ -274,6 +274,44 @@ mod tests {
             decode_snapshot(&KEY, &ACCOUNT_HASH, &blob).is_none(),
             "a folded-body (pre-448a) snapshot must force a rebuild"
         );
+    }
+
+    #[test]
+    fn snapshot_at_old_extractor_version_forces_rebuild() {
+        // MYND-551: the extractor generation bumped 0x01 → 0x02 (audio ASR
+        // transcripts + a model-hash payload field). A full, well-formed snapshot
+        // stamped at the OLD 0x01 generation — same 4-field shape, current
+        // schema_version — must fail the extractor_version gate → one-time global
+        // rebuild so the new extractor's text (transcripts) is re-collected. The
+        // old value is hardcoded (its symbol is now 0x02); the current value
+        // rides `protocol::ATTACHMENT_TEXT_BLOB_EXTRACTOR_VERSION`.
+        const OLD_EXTRACTOR_V1: u8 = 0x01;
+        #[derive(serde::Serialize)]
+        struct SnapAtVersion<'a> {
+            manifest: &'a NonceManifest,
+            index: &'a InvertedIndex,
+            extractor_version: u8,
+            schema_version: u8,
+        }
+        let mut manifest = NonceManifest::new();
+        manifest.insert("a".into(), nonce(1));
+        let index = InvertedIndex::default();
+        let plaintext = postcard::to_allocvec(&SnapAtVersion {
+            manifest: &manifest,
+            index: &index,
+            extractor_version: OLD_EXTRACTOR_V1,
+            schema_version: SEARCH_SNAPSHOT_SCHEMA_SEPARATE_ATTACHMENT_DOCS,
+        })
+        .expect("encode old-extractor snapshot");
+        let blob = encode_search_index_blob(&KEY, &ACCOUNT_HASH, &plaintext).expect("seal");
+        assert!(
+            decode_snapshot(&KEY, &ACCOUNT_HASH, &blob).is_none(),
+            "a snapshot at the old extractor_version must force a rebuild"
+        );
+        // Sanity: the CURRENT version round-trips (the gate is version-specific,
+        // not a blanket reject).
+        let ok = encode_snapshot(&KEY, &ACCOUNT_HASH, &manifest, &index).expect("encode current");
+        assert!(decode_snapshot(&KEY, &ACCOUNT_HASH, &ok).is_some());
     }
 
     // ---- reconcile == rebuild ----------------------------------------

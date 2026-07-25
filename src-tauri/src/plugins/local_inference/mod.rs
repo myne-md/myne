@@ -17,6 +17,7 @@
 //! Logging: DENY-list clean (`src-tauri/CLAUDE.md`) — the engine seam never
 //! logs a prompt, note body, or embedding.
 
+pub mod audio;
 pub mod cancel;
 pub mod chunker;
 pub mod commands;
@@ -31,6 +32,7 @@ pub mod rag;
 pub mod retrieval;
 pub mod state;
 pub mod vector_store;
+pub mod whisper;
 
 // Sibling-facing API (AI capability features, tasks 3–7): the stable
 // `local_inference::{Engine, StubEngine, EngineError}` path — siblings reach
@@ -62,7 +64,7 @@ const LOCAL_INFERENCE_CAPABILITY: &str = r#"{
   "identifier": "local-inference",
   "description": "On-device AI inference + retrieval + grounded Q&A commands (infer/embed/semantic_search/ask) for the main window; no core/fs/dialog/clipboard/network.",
   "windows": ["main"],
-  "permissions": ["local-inference:allow-infer", "local-inference:allow-embed", "local-inference:allow-semantic-search", "local-inference:allow-ask", "local-inference:allow-chat-stream", "local-inference:allow-chat-stop", "local-inference:allow-set-model-path", "local-inference:allow-get-model-path"]
+  "permissions": ["local-inference:allow-infer", "local-inference:allow-embed", "local-inference:allow-semantic-search", "local-inference:allow-ask", "local-inference:allow-chat-stream", "local-inference:allow-chat-stop", "local-inference:allow-transcribe", "local-inference:allow-read-transcript", "local-inference:allow-set-model-path", "local-inference:allow-get-model-path"]
 }"#;
 
 /// Best-effort zeroize + reset of the in-RAM AI vector store on lock teardown
@@ -102,6 +104,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::ask,
             commands::chat_stream,
             commands::chat_stop,
+            commands::transcribe,
+            commands::read_transcript,
             commands::set_model_path,
             commands::get_model_path
         ])
@@ -122,7 +126,20 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             let engine: std::sync::Arc<dyn engine::Engine> = {
                 let base = crate::paths::app_data_dir(app)
                     .unwrap_or_else(|_| std::path::PathBuf::from("."));
-                std::sync::Arc::new(engine_candle::CandleEngine::new(base))
+                // The bundled default transcription model (voice-to-text,
+                // MYND-270), resolved from the Tauri resource dir — `None` when
+                // none ships (an AI-free `--no-default-features` build, or a
+                // checkout whose LFS model blob was not fetched), leaving STT
+                // side-load-only.
+                let bundled_transcription = app
+                    .path()
+                    .resource_dir()
+                    .ok()
+                    .and_then(|rd| model_store::bundled_transcription_model(&rd));
+                std::sync::Arc::new(
+                    engine_candle::CandleEngine::new(base)
+                        .with_bundled_transcription(bundled_transcription),
+                )
             };
             app.manage(state::LocalInferenceState::new(engine));
             app.manage(vector_store::LocalInferenceVectorState::default());

@@ -39,16 +39,20 @@ pre-commit:
 
     whitespace:
       # Excludes vendored third-party dictionary data (wooorm/dictionaries
-      # Hunspell .aff/.dic + upstream license text): those carry upstream
-      # trailing whitespace / blank EOF lines / license `=======` dividers that
-      # read as conflict markers — not ours to reformat (hash-pinned, MYND-263).
-      run: git diff --cached --check -- ':(exclude)src-tauri/resources/dictionaries/**'
+      # Hunspell .aff/.dic + upstream license text) and the bundled AI model
+      # assets (upstream Whisper config/tokenizer + Apache-2.0 license, MYND-270):
+      # those carry upstream trailing whitespace / blank EOF lines / license
+      # `=======` dividers that read as conflict markers — not ours to reformat
+      # (hash-pinned upstream data).
+      run: git diff --cached --check -- ':(exclude)src-tauri/resources/dictionaries/**' ':(exclude)src-tauri/resources/models/**'
 
     eof-newline:
       # Skips tool-generated/exported assets: Lucide icons, Penpot brand
-      # exports, design preview specimens, Tauri/Android icon resources, and
-      # vendored Hunspell dictionaries (hash-pinned upstream data, MYND-263).
-      # Those round-trip through external tools that don't emit trailing \n.
+      # exports, design preview specimens, Tauri/Android icon resources,
+      # vendored Hunspell dictionaries, and the bundled AI model data (upstream
+      # Whisper config/tokenizer + Apache-2.0 license, MYND-270 — hash-pinned
+      # upstream data). Those round-trip through external tools that don't emit
+      # a trailing \n.
       run: |
         fail=0
         for f in {staged_files}; do
@@ -57,6 +61,7 @@ pre-commit:
             docs/design/icons/*|docs/design/assets/*|docs/design/preview/*) continue ;;
             src-tauri/icons/*|public/*.svg) continue ;;
             src-tauri/resources/dictionaries/*) continue ;;
+            src-tauri/resources/models/*) continue ;;
           esac
           if file --mime "$f" | grep -q 'charset=binary'; then continue; fi
           if [ -n "$(tail -c1 "$f")" ]; then
