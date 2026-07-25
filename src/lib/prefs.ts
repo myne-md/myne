@@ -231,6 +231,15 @@ export interface PrefsView {
    */
   ai_enabled: boolean;
   /**
+   * Whether attachment text extraction may read images and scanned PDFs
+   * (image OCR, MYND-441). **Defaults to `true`** — omitted from the encrypted
+   * blob when true, so a vault predating the field reads as enabled. Turning it
+   * off stops the background extraction worker but never deletes cached
+   * results. Device-local (`sync-protocol.md` §10.2): per-device compute
+   * budget. Non-load-bearing.
+   */
+  attachment_ocr_enabled: boolean;
+  /**
    * Folders excluded from every AI read/index (local-ai epic, ai-ux-surface
    * MYND-408, SYNC-14) — canonical trailing-slash form. Same encoding as
    * `deliberate_folders` (NFC-normalized, sorted, deduped set). Absent →
@@ -546,6 +555,15 @@ export async function setDeliberateFolders(folders: string[]): Promise<void> {
  */
 export async function setAiEnabled(enabled: boolean): Promise<void> {
   await invoke<void>("plugin:prefs|set_ai_enabled", { enabled });
+}
+
+/**
+ * Persist the `attachment_ocr_enabled` toggle (MYND-441) — whether attachment
+ * text extraction may read images and scanned PDFs. A rejected promise means the
+ * disk write failed and the caller's optimistic UI must revert.
+ */
+export async function setAttachmentOcrEnabled(enabled: boolean): Promise<void> {
+  await invoke<void>("plugin:prefs|set_attachment_ocr_enabled", { enabled });
 }
 
 /**

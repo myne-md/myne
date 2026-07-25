@@ -1930,6 +1930,31 @@
       "changePasswordFootnote": "This invalidates quick-unlock. Your recovery phrase is unchanged.",
       "changing": "Changing…"
     },
+    "ai": {
+      "betaBadge": "Beta",
+      "disclosureToggle": "How does this work?",
+      "enableHelper": "Runs a model you provide entirely on your device. Experimental, off by default.",
+      "enableLabel": "Enable local AI",
+      "excludedHelper": "Notes in these folders are never read or indexed by AI. One folder path per line.",
+      "excludedLabel": "Excluded folders",
+      "excludedPlaceholder": "Private/\nJournal/",
+      "modelChoose": "Choose file…",
+      "modelEmbeddingLabel": "Search model — semantic search & Q&A",
+      "modelFilter": {
+        "gguf": "GGUF model",
+        "safetensors": "Safetensors model"
+      },
+      "modelGenerationLabel": "Text model — chat, summaries, writing",
+      "modelNone": "No file selected",
+      "modelSaveFailed": "Couldn't save the model path (it must be outside your vault).",
+      "modelTranscriptionLabel": "Speech-to-text model (transcription)",
+      "modelsHelper": "Myne never downloads models — that would mean sending data over the network. Open a link to get one in your browser, then pick the downloaded files here. Everything runs on your device.",
+      "modelsLabel": "Models",
+      "recommendedFilesEmbedding": "Needs model.safetensors + config.json + tokenizer.json in one folder.",
+      "recommendedFilesGeneration": "Needs the .gguf file + tokenizer.json in the same folder.",
+      "recommendedFilesTranscription": "Needs the Whisper .gguf file + config.json + tokenizer.json in the same folder.",
+      "title": "AI"
+    },
     "appearance": {
       "homeQuickActions": "Home quick actions",
       "showEditTimesAria": "Show edit times in sidebar",
@@ -1959,6 +1984,13 @@
       "off": "Off",
       "on": "On",
       "saveError": "Could not update the archiving setting."
+    },
+    "attachmentOcr": {
+      "label": "Search inside images and scanned documents",
+      "helper": "Reads text out of image attachments and scanned PDFs on this device, so search can find them by their contents. Nothing is uploaded. Turning this off stops the background extraction; text already extracted is kept.",
+      "on": "On",
+      "off": "Off",
+      "errorSaveSetting": "Could not save this setting."
     },
     "autoBackup": {
       "backupFolder": "Backup folder",
@@ -1992,6 +2024,11 @@
       "title": "Change password",
       "tooShort": "Use at least {{n}} characters."
     },
+    "clipperInstall": {
+      "error": "Could not update the browser clipper setting.",
+      "helper": "Register the native-messaging host so the Myne browser extension can send clips to this app. On by default; turn off to remove it.",
+      "label": "Browser clipper"
+    },
     "connectedExtensions": {
       "browser": {
         "chromium": "Chrome / Edge",
@@ -2011,11 +2048,6 @@
         "minutesAgo_other": "Connected {{count}} min ago",
         "onDate": "Connected {{date}}"
       }
-    },
-    "clipperInstall": {
-      "error": "Could not update the browser clipper setting.",
-      "helper": "Register the native-messaging host so the Myne browser extension can send clips to this app. On by default; turn off to remove it.",
-      "label": "Browser clipper"
     },
     "customThemes": {
       "appliedBadge": "Applied",
@@ -2060,6 +2092,14 @@
       "templateSaveError": "Couldn't save the daily template. Please try again.",
       "untitledTemplate": "Untitled template"
     },
+    "data": {
+      "exported_one": "Exported {{count}} note → {{label}}",
+      "exported_other": "Exported {{count}} notes → {{label}}",
+      "exportNeedsApp": "Export needs the app (not the browser preview).",
+      "exportFailed": "Couldn't export the vault.",
+      "exportToMarkdown": "Export to Markdown",
+      "exportToMarkdownSubtitle": "Decrypt every note to a plain folder in Documents"
+    },
     "deleteVault": {
       "cancel": "Cancel",
       "caseSensitiveHint": "Case-sensitive. Type the word exactly to enable deletion.",
@@ -2080,6 +2120,13 @@
       "deleteError": "Couldn't fully delete the vault. Please try again.",
       "warning": "This permanently deletes this vault and all of its notes from this device. This cannot be undone.",
       "deleteButton": "Delete this vault"
+    },
+    "done": "Done",
+    "editor": {
+      "defaultView": "Default view",
+      "typewriter": "Typewriter scrolling",
+      "typewriterSubtitle": "Keep the caret vertically centered",
+      "enableArchiving": "Enable archiving"
     },
     "files": {
       "newNote": {
@@ -2117,6 +2164,7 @@
       "typewriterHelper": "In focus mode (⇧⌘F), keep the active line vertically centered as you type.",
       "typewriterLabel": "Focus mode · typewriter scroll"
     },
+    "footerTagline": "myne · encrypted on this device · open source",
     "hotkeys": {
       "addBindingAria": "Add a shortcut for {{command}}",
       "cancel": "Cancel",
@@ -2154,38 +2202,11 @@
       "off": "Off",
       "on": "On"
     },
-    "toolbarCustomize": {
-      "errorSave": "Could not save the toolbar layout.",
-      "helper": "Choose which formatting buttons appear on the selection toolbar, and their order.",
-      "label": "Toolbar buttons",
-      "moveDown": "Move down",
-      "moveUp": "Move up",
-      "pendingHint": "Coming soon"
-    },
-    "ai": {
-      "betaBadge": "Beta",
-      "disclosureToggle": "How does this work?",
-      "enableHelper": "Runs a model you provide entirely on your device. Experimental, off by default.",
-      "enableLabel": "Enable local AI",
-      "excludedHelper": "Notes in these folders are never read or indexed by AI. One folder path per line.",
-      "excludedLabel": "Excluded folders",
-      "excludedPlaceholder": "Private/\nJournal/",
-      "modelChoose": "Choose file…",
-      "modelEmbeddingLabel": "Search model — semantic search & Q&A",
-      "modelFilter": {
-        "gguf": "GGUF model",
-        "safetensors": "Safetensors model"
-      },
-      "modelGenerationLabel": "Text model — chat, summaries, writing",
-      "modelNone": "No file selected",
-      "modelSaveFailed": "Couldn't save the model path (it must be outside your vault).",
-      "modelTranscriptionLabel": "Speech-to-text model (transcription)",
-      "modelsHelper": "Myne never downloads models — that would mean sending data over the network. Open a link to get one in your browser, then pick the downloaded files here. Everything runs on your device.",
-      "modelsLabel": "Models",
-      "recommendedFilesEmbedding": "Needs model.safetensors + config.json + tokenizer.json in one folder.",
-      "recommendedFilesGeneration": "Needs the .gguf file + tokenizer.json in the same folder.",
-      "recommendedFilesTranscription": "Needs the Whisper .gguf file + config.json + tokenizer.json in the same folder.",
-      "title": "AI"
+    "panelTitle": {
+      "privacy": "Privacy & security",
+      "data": "Data",
+      "vaultName": "Vault name",
+      "approveDevice": "Approve device"
     },
     "prefs": {
       "saveError": "Couldn't save preference — try again"
@@ -2253,115 +2274,7 @@
       "reenterPin": "Re-enter PIN",
       "setupButton": "Set up quick unlock"
     },
-    "shell": {
-      "closeLabel": "Close settings",
-      "groups": {
-        "labs": "Labs"
-      },
-      "navLabel": "Settings panels",
-      "panels": {
-        "about": "About",
-        "account": "Account",
-        "ai": "AI",
-        "appearance": "Appearance",
-        "editor": "Editor",
-        "files": "Files",
-        "hotkeys": "Hotkeys",
-        "privacy": "Privacy",
-        "storage": "Storage",
-        "sync": "Sync"
-      },
-      "passwordUpdatedToast": "Password updated",
-      "title": "Settings"
-    },
-    "spell": {
-      "errorSaveLanguages": "Could not save the spell-check languages.",
-      "errorSaveSetting": "Could not save the spell-check setting.",
-      "helper": "Underline misspelled words as you type. Fully offline — your notes never leave the device.",
-      "label": "Spell check",
-      "languagesAriaLabel": "Spell-check languages",
-      "languagesHelper": "A word is correct if it’s valid in any selected language — handy for mixing English terms into other-language notes.",
-      "languagesLabel": "Languages",
-      "languagesPlaceholder": "Select languages…",
-      "languagesSearchEmpty": "No languages match.",
-      "languagesSearchPlaceholder": "Search languages…",
-      "off": "Off",
-      "on": "On"
-    },
-    "storage": {
-      "backupHelper": "Backups stay exactly as encrypted as your vault, in a single verified .myne-backup file. Restoring works with that vault's password or recovery phrase — exactly like unlock.",
-      "backupLabel": "Backup",
-      "backUpVault": "Back up vault…",
-      "exportAction": "Export…",
-      "exportBody": "Export vault as Markdown",
-      "exportHelper": "Plain markdown tree — not encrypted.",
-      "exportLabel": "Export",
-      "importHelper": "Bring an existing Obsidian vault into Myne. Every Markdown note is imported and encrypted on the spot; your original files are left untouched.",
-      "importLabel": "Import",
-      "importObsidian": "Import Obsidian vault…",
-      "locationHelper": "Each vault is a folder of encrypted files under this path. Prefer the Backup button below over manual copies — it verifies the written file.",
-      "locationLabel": "Vault location",
-      "openInFiles": "Open in Files",
-      "pathUnavailable": "Path unavailable",
-      "restoreBackup": "Restore from backup…"
-    },
-    "typography": {
-      "contentWidthHelper": "Maximum width of the editing column. Full lets text span the pane.",
-      "contentWidthLabel": "Content width",
-      "errorSave": "Couldn't save preference. Please try again.",
-      "fontHelper": "Monospace or proportional (sans-serif) text.",
-      "fontLabel": "Font",
-      "lineSpacingHelper": "Vertical space between lines.",
-      "lineSpacingLabel": "Line spacing",
-      "textSizeHelper": "Base size of the editor text. Headings scale with it.",
-      "textSizeLabel": "Text size"
-    },
-    "viewMode": {
-      "errorSave": "Could not save the default view mode.",
-      "helper": "How a note opens: Live preview (default), read-only Reading, or raw Source. Toggle a note with ⇧⌘E.",
-      "label": "Default view mode",
-      "optionLive": "Live preview",
-      "optionReading": "Reading",
-      "optionSource": "Source"
-    },
-    "strength": {
-      "weak": "Weak",
-      "fair": "Fair",
-      "good": "Good",
-      "strong": "Strong"
-    },
-    "sync": {
-      "summary": {
-        "notSetUp": "Not set up",
-        "offline": "Offline",
-        "conflicts_one": "{{count}} conflict",
-        "conflicts_other": "{{count}} conflicts"
-      }
-    },
-    "data": {
-      "exported_one": "Exported {{count}} note → {{label}}",
-      "exported_other": "Exported {{count}} notes → {{label}}",
-      "exportNeedsApp": "Export needs the app (not the browser preview).",
-      "exportFailed": "Couldn't export the vault.",
-      "exportToMarkdown": "Export to Markdown",
-      "exportToMarkdownSubtitle": "Decrypt every note to a plain folder in Documents"
-    },
     "saveSettingError": "Couldn't save that setting",
-    "panelTitle": {
-      "privacy": "Privacy & security",
-      "data": "Data",
-      "vaultName": "Vault name",
-      "approveDevice": "Approve device"
-    },
-    "done": "Done",
-    "sectionOptions": "Options",
-    "footerTagline": "myne · encrypted on this device · open source",
-    "editor": {
-      "defaultView": "Default view",
-      "typewriter": "Typewriter scrolling",
-      "typewriterSubtitle": "Keep the caret vertically centered",
-      "enableArchiving": "Enable archiving"
-    },
     "search": {
       "placeholder": "Search settings…",
       "ariaLabel": "Search settings",
@@ -2420,6 +2333,100 @@
         "vaultLocation": "vault location path folder on disk where stored",
         "viewMode": "default view mode live reading source preview"
       }
+    },
+    "sectionOptions": "Options",
+    "shell": {
+      "closeLabel": "Close settings",
+      "groups": {
+        "labs": "Labs"
+      },
+      "navLabel": "Settings panels",
+      "panels": {
+        "about": "About",
+        "account": "Account",
+        "ai": "AI",
+        "appearance": "Appearance",
+        "editor": "Editor",
+        "files": "Files",
+        "hotkeys": "Hotkeys",
+        "privacy": "Privacy",
+        "storage": "Storage",
+        "sync": "Sync"
+      },
+      "passwordUpdatedToast": "Password updated",
+      "title": "Settings"
+    },
+    "spell": {
+      "errorSaveLanguages": "Could not save the spell-check languages.",
+      "errorSaveSetting": "Could not save the spell-check setting.",
+      "helper": "Underline misspelled words as you type. Fully offline — your notes never leave the device.",
+      "label": "Spell check",
+      "languagesAriaLabel": "Spell-check languages",
+      "languagesHelper": "A word is correct if it’s valid in any selected language — handy for mixing English terms into other-language notes.",
+      "languagesLabel": "Languages",
+      "languagesPlaceholder": "Select languages…",
+      "languagesSearchEmpty": "No languages match.",
+      "languagesSearchPlaceholder": "Search languages…",
+      "off": "Off",
+      "on": "On"
+    },
+    "storage": {
+      "backupHelper": "Backups stay exactly as encrypted as your vault, in a single verified .myne-backup file. Restoring works with that vault's password or recovery phrase — exactly like unlock.",
+      "backupLabel": "Backup",
+      "backUpVault": "Back up vault…",
+      "exportAction": "Export…",
+      "exportBody": "Export vault as Markdown",
+      "exportHelper": "Plain markdown tree — not encrypted.",
+      "exportLabel": "Export",
+      "importHelper": "Bring an existing Obsidian vault into Myne. Every Markdown note is imported and encrypted on the spot; your original files are left untouched.",
+      "importLabel": "Import",
+      "importObsidian": "Import Obsidian vault…",
+      "locationHelper": "Each vault is a folder of encrypted files under this path. Prefer the Backup button below over manual copies — it verifies the written file.",
+      "locationLabel": "Vault location",
+      "openInFiles": "Open in Files",
+      "pathUnavailable": "Path unavailable",
+      "restoreBackup": "Restore from backup…"
+    },
+    "strength": {
+      "weak": "Weak",
+      "fair": "Fair",
+      "good": "Good",
+      "strong": "Strong"
+    },
+    "sync": {
+      "summary": {
+        "notSetUp": "Not set up",
+        "offline": "Offline",
+        "conflicts_one": "{{count}} conflict",
+        "conflicts_other": "{{count}} conflicts"
+      }
+    },
+    "toolbarCustomize": {
+      "errorSave": "Could not save the toolbar layout.",
+      "helper": "Choose which formatting buttons appear on the selection toolbar, and their order.",
+      "label": "Toolbar buttons",
+      "moveDown": "Move down",
+      "moveUp": "Move up",
+      "pendingHint": "Coming soon"
+    },
+    "typography": {
+      "contentWidthHelper": "Maximum width of the editing column. Full lets text span the pane.",
+      "contentWidthLabel": "Content width",
+      "errorSave": "Couldn't save preference. Please try again.",
+      "fontHelper": "Monospace or proportional (sans-serif) text.",
+      "fontLabel": "Font",
+      "lineSpacingHelper": "Vertical space between lines.",
+      "lineSpacingLabel": "Line spacing",
+      "textSizeHelper": "Base size of the editor text. Headings scale with it.",
+      "textSizeLabel": "Text size"
+    },
+    "viewMode": {
+      "errorSave": "Could not save the default view mode.",
+      "helper": "How a note opens: Live preview (default), read-only Reading, or raw Source. Toggle a note with ⇧⌘E.",
+      "label": "Default view mode",
+      "optionLive": "Live preview",
+      "optionReading": "Reading",
+      "optionSource": "Source"
     }
   },
   "sync": {
