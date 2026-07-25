@@ -36,9 +36,11 @@ import { DEFAULT_DUPLICATE_POLICY, type DuplicatePolicy } from "./conflict";
 import type { IllegalSegmentFlag, PreexistingFolder } from "./mapping";
 import type { ImportResult } from "./engine";
 import type { MediaByType } from "./media";
-import { runVaultImport } from "./ports";
+import { runSourceImport } from "./ports";
+import { IMPORT_SOURCES, type ImportSourceId } from "./sourceCatalog";
+import { ImportSourcePicker } from "./ImportSourcePicker";
 
-type Phase = "setup" | "running" | "summary" | "error";
+type Phase = "pick" | "setup" | "running" | "summary" | "error";
 
 interface ObsidianImportModalProps {
   open: boolean;
@@ -46,6 +48,12 @@ interface ObsidianImportModalProps {
   /** Fired once the import resolves (completed or cancelled) so the parent can
    *  refresh the sidebar + surface a toast. */
   onImported?: (result: ImportResult | null) => void;
+  /**
+   * Which adapter to run (MYND-586). Defaults to `"obsidian"`, so every call site
+   * that predates the source picker keeps its exact behaviour — the generalization
+   * is additive rather than a breaking signature change.
+   */
+  source?: ImportSourceId;
 }
 
 const BACKDROP_STYLE: CSSProperties = {
@@ -100,12 +108,24 @@ const MONO: CSSProperties = {
   fontFeatureSettings: '"ss02","zero","calt"',
 };
 
-export function ObsidianImportModal({ open, onClose, onImported }: ObsidianImportModalProps) {
+export function ObsidianImportModal({
+  open,
+  onClose,
+  onImported,
+  // Which adapter to run. Defaults to Obsidian so every existing call site keeps
+  // its behaviour unchanged across the MYND-586 generalization.
+  source: initialSource,
+}: ObsidianImportModalProps) {
+  // When a caller names a source, the flow starts at that source's setup step; when
+  // it does not, the flow opens on the picker. That is what lets all three
+  // entry-point surfaces share ONE flow (MYND-586).
+  const [source, setSource] = useState<ImportSourceId>(initialSource ?? "obsidian");
+  const spec = IMPORT_SOURCES[source];
   const { t } = useTranslation();
   const dialogRef = useRef<HTMLDivElement>(null);
   // Trap + restore focus while open (MYND-93).
   useFocusTrap(dialogRef, { enabled: open });
-  const [phase, setPhase] = useState<Phase>("setup");
+  const [phase, setPhase] = useState<Phase>(initialSource === undefined ? "pick" : "setup");
   const [folder, setFolder] = useState<string | null>(null);
   const [policy, setPolicy] = useState<DuplicatePolicy>(DEFAULT_DUPLICATE_POLICY);
   const [progress, setProgress] = useState<{ done: number; total: number }>({
@@ -122,7 +142,8 @@ export function ObsidianImportModal({ open, onClose, onImported }: ObsidianImpor
   // Reset to a clean setup state every time the modal opens.
   useEffect(() => {
     if (!open) return;
-    setPhase("setup");
+    setPhase(initialSource === undefined ? "pick" : "setup");
+    setSource(initialSource ?? "obsidian");
     setFolder(null);
     setPolicy(DEFAULT_DUPLICATE_POLICY);
     setProgress({ done: 0, total: 0 });
@@ -130,7 +151,7 @@ export function ObsidianImportModal({ open, onClose, onImported }: ObsidianImpor
     setErrorMsg(null);
     cancelRef.current = false;
     setCancelling(false);
-  }, [open]);
+  }, [open, initialSource]);
 
   // `dismissable` gates the header ✕ + the explicit-close handler (everything but
   // mid-import). `casualDismiss` gates backdrop-click + Esc, which fire ONLY in
@@ -138,7 +159,7 @@ export function ObsidianImportModal({ open, onClose, onImported }: ObsidianImpor
   // report must be closed deliberately via ✕ / Done / Close, never lost to a
   // stray backdrop click or keypress.
   const dismissable = phase !== "running";
-  const casualDismiss = phase === "setup";
+  const casualDismiss = phase === "setup" || phase === "pick";
 
   const handleClose = useCallback(() => {
     if (!dismissable) return;
@@ -169,15 +190,19 @@ export function ObsidianImportModal({ open, onClose, onImported }: ObsidianImpor
   const chooseFolder = useCallback(async () => {
     try {
       const picked = await openDialog({
-        directory: true,
+        // Evernote and CSV are SINGLE-FILE sources; the rest are directory trees.
+        directory: spec.pick === "directory",
         multiple: false,
-        title: t("notes.import.modal.folderPickerTitle"),
+        ...(spec.pick === "file" && spec.filter !== undefined
+          ? { filters: [{ name: spec.filter.name, extensions: [...spec.filter.extensions] }] }
+          : {}),
+        title: t(spec.pickerTitleKey),
       });
       if (typeof picked === "string") setFolder(picked);
     } catch {
       // Picker failure (cancel / unavailable) → leave the prior selection.
     }
-  }, []);
+  }, [spec]);
 
   const startImport = useCallback(() => {
     if (folder === null) return;
@@ -185,7 +210,7 @@ export function ObsidianImportModal({ open, onClose, onImported }: ObsidianImpor
     setCancelling(false);
     setProgress({ done: 0, total: 0 });
     setPhase("running");
-    void runVaultImport(folder, policy, {
+    void runSourceImport(source, folder, policy, {
       onProgress: (done, total) => setProgress({ done, total }),
       shouldCancel: () => cancelRef.current,
     })
@@ -237,9 +262,12 @@ export function ObsidianImportModal({ open, onClose, onImported }: ObsidianImpor
           overflow: "hidden",
         }}
         onClick={(e) => e.stopPropagation()}
+        data-testid="import.modal"
+        data-phase={phase}
+        data-source={source}
       >
         <div style={HEADER_STYLE}>
-          <h2 id="importer-modal-title" style={TITLE_STYLE}>
+          <h2 id="importer-modal-title" style={TITLE_STYLE} data-testid="import.title">
             {title}
           </h2>
           {dismissable && (
@@ -247,6 +275,7 @@ export function ObsidianImportModal({ open, onClose, onImported }: ObsidianImpor
               type="button"
               aria-label={t("notes.import.modal.closeAriaLabel")}
               onClick={handleClose}
+              data-testid="import.close"
               style={{
                 background: "none",
                 border: 0,
@@ -261,6 +290,17 @@ export function ObsidianImportModal({ open, onClose, onImported }: ObsidianImpor
             </button>
           )}
         </div>
+
+        {phase === "pick" && (
+          <ImportSourcePicker
+            onPick={(picked) => {
+              setSource(picked);
+              setFolder(null);
+              setPhase("setup");
+            }}
+            onCancel={onClose}
+          />
+        )}
 
         {phase === "setup" && (
           <SetupBody
@@ -341,7 +381,12 @@ function SetupBody({
             >
               {folder ?? t("notes.import.modal.noFolderChosen")}
             </code>
-            <Button variant="secondary" icon="folder" onClick={onChooseFolder}>
+            <Button
+              variant="secondary"
+              icon="folder"
+              onClick={onChooseFolder}
+              data-testid="import.choose-source"
+            >
               {t("notes.import.modal.chooseFolder")}
             </Button>
           </div>
@@ -366,10 +411,15 @@ function SetupBody({
         </div>
       </div>
       <div style={FOOTER_STYLE}>
-        <Button variant="ghost" onClick={onCancel}>
+        <Button variant="ghost" onClick={onCancel} data-testid="import.cancel">
           {t("notes.import.modal.cancel")}
         </Button>
-        <Button variant="primary" onClick={onStart} disabled={folder === null}>
+        <Button
+          variant="primary"
+          onClick={onStart}
+          disabled={folder === null}
+          data-testid="import.start"
+        >
           {t("notes.import.modal.import")}
         </Button>
       </div>
