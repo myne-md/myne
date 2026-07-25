@@ -17,12 +17,19 @@
 
 import { invoke } from "@tauri-apps/api/core";
 
+/**
+ * The credential kinds a quick-unlock blob can be sealed under — the TS mirror
+ * of the Rust `provider_kind`. Lives here, next to the IPC surface it comes
+ * from, so a third method added on the Rust side has exactly one place to land.
+ */
+export type QuickUnlockMethod = "pin" | "biometric";
+
 /** Mirror of the Rust `QuickUnlockStatus` (`commands.rs`). */
 export interface QuickUnlockStatus {
   /** A credential blob exists on disk. Settings uses this for "Configured via PIN". */
   configured: boolean;
-  /** `"pin"` | `"biometric"` when configured, else null. */
-  method: "pin" | "biometric" | null;
+  /** The configured method when `configured`, else null. */
+  method: QuickUnlockMethod | null;
   /**
    * Quick-unlock can be redeemed *right now* — `configured` AND a full
    * master-password unlock has happened this process session (the spring-loaded
