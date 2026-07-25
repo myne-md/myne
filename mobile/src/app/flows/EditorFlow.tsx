@@ -52,6 +52,8 @@ import {
   type NoteFlags,
 } from "../../lib/note-organize";
 import { folderChildren, itemOrderRank, notesDirectlyIn, notesInSubtree } from "../../lib/folders";
+import { toggleFolderExpanded, useExpandedFolders } from "../../lib/folder-expand-store";
+import { ensureWorkspaceHydrated, flushWorkspaceNow } from "../../lib/workspace-persist";
 import { resolveTodayNote, createNoteFromTemplate, createBlankNamedNote } from "../../lib/daily";
 import { normalizeFolderPath, ancestorPaths, foldSegment, folderKey } from "../../dialect/folderPath";
 import {
@@ -395,9 +397,14 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
   // Current folder for NEW-note placement (root by default; the tree no longer
   // drills, so this stays null unless a future "new note in folder" sets it).
   const [currentFolder, setCurrentFolder] = useState<string | null>(null);
-  // Collapsed folder paths in the inline hierarchy (empty = all expanded, so the
-  // whole tree is visible by default). The list is a tree, not a drill-down.
-  const [collapsedFolders, setCollapsedFolders] = useState<Set<string>>(new Set());
+  // OPEN folders in the inline hierarchy, keyed by folded folder identity
+  // (MYND-561). Owned by a module store — not `useState` — and persisted into the
+  // `vault.workspace` container so the set survives a restart; see
+  // `lib/folder-expand-store.ts` for why the store owns it and
+  // `lib/workspace-persist.ts` for the encoding + write cadence. Polarity is
+  // desktop's (present = expanded, empty = all collapsed), so a cold vault opens
+  // collapsed on both clients. The list is a tree, not a drill-down.
+  const expandedFolders = useExpandedFolders();
   // Filter sheet (the single home for Tags / Views / Archive / Trash).
   const [filterOpen, setFilterOpen] = useState(false);
   // Sort sheet — the sort-order picker (same modal treatment as Filter).
@@ -440,6 +447,37 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
   // pickers (the `vault_indices_property_keys` accessor). Loaded when the editor
   // sheet opens (fresh, so the pickers reflect the current index).
   const [viewPropertyKeys, setViewPropertyKeys] = useState<string[]>([]);
+
+  // ── Folder-expand persistence (MYND-561) ─────────────────────────────────────
+  // Restore the open-folder set from `vault.workspace` once per unlock session.
+  // The store is the single owner, so this is a plain replace with disk truth —
+  // no mount-order ref, and a toggle that beats it just gets overwritten (same
+  // outcome as a cold start).
+  useEffect(() => {
+    void ensureWorkspaceHydrated();
+  }, []);
+
+  // Write the set back at mobile's graceful-exit analogs. Per-toggle writes are
+  // deliberately NOT a seam: `vault.workspace`'s mtime is visible to an adversary
+  // with filesystem access even though its contents are sealed, and desktop keeps
+  // that mtime from becoming an activity log by writing on exit only (design grill
+  // 2026-06-01 Q1). Backgrounding is the mobile equivalent — an OS kill of a
+  // backgrounded app is the normal way a mobile app dies, so `visibilitychange`
+  // carries the common case and `pagehide` the terminal one. The other seam is
+  // `lockVault()`. Both no-op unless the set is dirty.
+  useEffect(() => {
+    const flush = () => void flushWorkspaceNow();
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") flush();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("pagehide", flush);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("pagehide", flush);
+    };
+  }, []);
+
   useEffect(() => {
     if (viewEditor === null) return;
     let cancelled = false;
@@ -1588,12 +1626,10 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
     const archiveHasFolders = archiveRoot && archivedFolders.length > 0;
     const inArchiveFolder = listView === "archive" && archiveFolder !== null;
     const folderLabel = (path: string) => (path.endsWith("/") ? path.slice(0, -1) : path);
-    const toggleFolder = (path: string) =>
-      setCollapsedFolders((prev) => {
-        const next = new Set(prev);
-        next.has(path) ? next.delete(path) : next.add(path);
-        return next;
-      });
+    // Keyed by FOLDED identity, not display path (MYND-561/562): the same key
+    // desktop's expand set and mobile's decorations use, so a case-variant of a
+    // folder name can't split one folder into two expand entries.
+    const toggleFolder = (key: string) => toggleFolderExpanded(key);
     // Row subtitle = last-edited relative time (desktop-parity), or "" when the
     // timestamp pref is off / no `updated:` stamp exists.
     const showTs = prefs.show_note_timestamps !== false;
@@ -1614,7 +1650,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
     const renderTree = (current: string | null, depth: number): ReactNode[] => {
       const out: ReactNode[] = [];
       for (const f of folderChildren(treeFolderOf, current, prefs.deliberate_folders, prefs.item_order)) {
-        const isCollapsed = collapsedFolders.has(f.path);
+        const isCollapsed = !expandedFolders.has(f.key);
         out.push(
           <div key={`f:${f.path}`}>
             <div style={{ position: "sticky", top: depth * 44, zIndex: 30 - depth, background: "var(--bg-1)" }}>
@@ -1628,7 +1664,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
                 // the display path — so they match desktop across case-variants.
                 icon={prefs.folder_icons[f.key]}
                 color={prefs.item_colors[f.key]}
-                onToggle={() => toggleFolder(f.path)}
+                onToggle={() => toggleFolder(f.key)}
                 onHold={() => setFolderActions({ path: f.path, name: f.name })}
               />
             </div>
@@ -2277,6 +2313,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
                       : t("notes.list.newFolder")}
                 </div>
                 <input
+                  data-testid="notes.folder-prompt-input"
                   value={folderPromptInput}
                   onChange={(e) => setFolderPromptInput(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter") void submitFolderPrompt(); }}
@@ -2293,6 +2330,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
                 />
                 <div style={{ marginTop: 16 }}>
                   <button
+                    data-testid="notes.folder-prompt-submit"
                     onClick={() => void submitFolderPrompt()}
                     style={{ width: "100%", height: 50, border: "none", borderRadius: 8, background: "var(--accent)", color: "var(--accent-on)", fontFamily: "var(--font-sans)", fontSize: 16, fontWeight: 600, cursor: "pointer" }}
                   >
@@ -2372,8 +2410,12 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
       ) : (
         // Shared live-preview editor (@myne/editor): raw-on-edit CodeMirror with
         // tables / KaTeX / syntax highlighting / frontmatter-as-properties, plus
-        // its own in-editor selection toolbar + slash menu + keymaps — so mobile
-        // no longer needs a separate FormatBar. Typography is applied via the
+        // its slash menu + keymaps. Its floating selection toolbar is DELIBERATELY
+        // OFF here (`selectionToolbar={false}`, MYND-559) and the above-keyboard
+        // FormatBar below is DELIBERATELY KEPT: both offer the same commands, and
+        // a thumb-reachable bar pinned over the keyboard beats a toolbar floating
+        // on top of the selection the user is trying to see. (Desktop keeps the
+        // floating one — the flag defaults true.) Typography is applied via the
         // canonical `typographyStyle(prefs)` CSS custom properties
         // (`--editor-text-size` / `--editor-font-family` / `--editor-line-spacing`)
         // that the shared CM theme reads (MYND-483) — direct `fontSize`/etc. on
@@ -2394,6 +2436,10 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
             value={editorText}
             onChange={setEditorText}
             onReady={setEditorView}
+            // MYND-559: the FormatBar (driven by the `onReady` view above) is
+            // mobile's single formatting surface — suppress the engine's floating
+            // selection toolbar so a word-select doesn't raise a second one.
+            selectionToolbar={false}
             viewMode={rawMode ? "source" : "live"}
             // Regular: the WS-01 prose measure — a 620px column (+ 56px gutters)
             // centered in the detail pane. Compact keeps the phone's 18/22.
