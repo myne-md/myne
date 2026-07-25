@@ -78,6 +78,14 @@ pub async fn drain_backlog<R: Runtime>(app: &AppHandle<R>, state: &VaultRuntimeS
         return;
     };
 
+    // MYND-441: the user's opt-out. Checked here rather than at spawn time so a
+    // toggle takes effect on the next unlock without any extra plumbing, and
+    // re-read per drain rather than cached. Turning it off stops the worker but
+    // never deletes cached results, so toggling costs the user nothing.
+    if !ocr_enabled(&vault_dir, state).await {
+        return;
+    }
+
     // Resolve the work list once, then re-check the slot per item. Holding key
     // material across the whole backlog would keep it alive past a lock.
     let candidates = match collect_candidates(&vault_dir, state).await {
@@ -148,6 +156,26 @@ pub async fn drain_backlog<R: Runtime>(app: &AppHandle<R>, state: &VaultRuntimeS
         tokio::task::yield_now().await;
     }
     tracing::info!(event = "ocr_backlog_done", done);
+}
+
+/// Whether the user has left image OCR on for this vault. Absent / unreadable
+/// prefs read as ON — the default — because a prefs read failure must not
+/// silently disable a search feature.
+async fn ocr_enabled(vault_dir: &Path, state: &VaultRuntimeState) -> bool {
+    let Some((_, _, root_key)) = state.peek_unlocked_attachment_material().await else {
+        return false;
+    };
+    let Ok(account_number_hash) = read_account_hash(vault_dir) else {
+        return true;
+    };
+    let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
+    match std::fs::read(vault_dir.join("vault.prefs"))
+        .ok()
+        .and_then(|b| protocol::decode_prefs_blob(&prefs_key, &account_number_hash, &b).ok())
+    {
+        Some(p) => p.attachment_ocr_enabled,
+        None => true,
+    }
 }
 
 /// Attachments in the catalog that are OCR candidates and have no cache entry.
