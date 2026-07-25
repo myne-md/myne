@@ -17,10 +17,17 @@
 import { describe, expect, it } from "vitest";
 import { harnessSupported } from "./support/session";
 import { startSyncServer, syncServerSupported } from "./support/sync-server";
-import { setupTwoSyncedDevices } from "./support/multi-device";
+import { launchDevice, setupTwoSyncedDevices, syncConfigSeed } from "./support/multi-device";
 import { type Session, testIdSelector } from "./support/webdriver";
 import { type AppSession } from "./support/session";
-import { closeSettings, ipcOk, openSettings } from "./support/flows";
+import {
+  closeSettings,
+  dismissImporterOffer,
+  ipcOk,
+  openSettings,
+  unlockToEditor,
+} from "./support/flows";
+import { seedVault } from "./support/fixtures";
 
 const driver = harnessSupported();
 const server = syncServerSupported();
@@ -48,13 +55,13 @@ async function openDeviceList(session: Session): Promise<void> {
 
 /** The visible primary labels of every approved row. */
 async function rowNames(session: Session): Promise<string[]> {
-  const els = await session.findElements(testIdSelector("sync.device-name"));
+  const els = await session.byTestIdAll("sync.device-name");
   return await Promise.all(els.map((e) => e.textContent()));
 }
 
 /** The demoted short codes of every approved row. */
 async function rowCodes(session: Session): Promise<string[]> {
-  const els = await session.findElements(testIdSelector("sync.device-code"));
+  const els = await session.byTestIdAll("sync.device-code");
   return await Promise.all(els.map((e) => e.textContent()));
 }
 
@@ -68,10 +75,8 @@ async function pullUntil(
   for (let i = 0; i < attempts; i++) {
     await ipcOk(session, "plugin:sync|sync_now", {});
     await new Promise((r) => setTimeout(r, 1500));
-    // Reopen the list so the panel re-reads prefs even if the live event was
-    // missed — the assertion is about the DATA replicating, not about the
-    // refresh timing (that is task 3's concern and is covered by the rename
-    // case below, which never reopens).
+    // Re-read the rendered rows: the assertion is about the DATA replicating.
+    // The panel refreshes itself off the prefs nonce, so no reopen is needed.
     names = await rowNames(session);
     if (predicate(names)) return names;
   }
@@ -86,7 +91,7 @@ describeNames("device friendly names (two devices)", () => {
       try {
         let pendingRowText = "";
         const { a, b, teardown } = await setupTwoSyncedDevices(srv, {
-          seedNote: false as boolean,
+          seedNote: false,
           deviceNames: { a: NAME_A, b: NAME_B },
           // The only window in which the pending row exists.
           whilePending: async ({ a: deviceA }: { a: AppSession; b: AppSession }) => {
@@ -118,24 +123,21 @@ describeNames("device friendly names (two devices)", () => {
           }
 
           // ── Rename B's row FROM A, and watch it land on B ───────────────────
-          const rows = await a.session.findElements(testIdSelector("sync.device-row"));
-          let renamedTarget = false;
-          for (const row of rows) {
-            const current = await row.attribute("data-current");
-            if (current === "true") continue; // rename the OTHER device
-            const trigger = await a.session.byTestId("sync.rename-device");
-            await trigger.click();
-            const input = await a.session.byTestId("sync.device-name-input");
-            await input.clear();
-            await input.sendKeys(RENAMED_B);
-            // U+E007 is the WebDriver Enter key. Written as an ESCAPE, not as a
-            // literal control character — an invisible key in a source line has
-            // bitten this suite before.
-            await input.sendKeys("\uE007");
-            renamedTarget = true;
-            break;
-          }
-          expect(renamedTarget).toBe(true);
+          // Scope the trigger to the row that is NOT this device — a bare
+          // `byTestId("sync.rename-device")` is a document-wide lookup and would
+          // silently rename A instead, passing for the wrong reason.
+          const trigger = await a.session.findElement(
+            `${testIdSelector("sync.device-row", { "data-current": "false" })} ` +
+              testIdSelector("sync.rename-device"),
+          );
+          await trigger.click();
+          const input = await a.session.byTestId("sync.device-name-input");
+          await input.clear();
+          await input.sendKeys(RENAMED_B);
+          // U+E007 is the WebDriver Enter key. Written as an ESCAPE, not as a
+          // literal control character — an invisible key in a source line has
+          // bitten this suite before.
+          await input.sendKeys("\uE007");
           await a.session.byTestId("sync.device-name", { timeoutMs: 10_000 });
           expect(await rowNames(a.session)).toContain(RENAMED_B);
 
@@ -159,26 +161,44 @@ describeNames("device friendly names (two devices)", () => {
   );
 
   it(
-    "a device nobody named keeps the id-derived fallback",
+    "enrolling without touching the name field still yields a real, platform-derived name",
     async () => {
+      // ONE device: the claim here is that the pre-filled default survives an
+      // untouched form and round-trips through the real Rust token → i18n → prefs
+      // path. Nothing about it needs a peer, and a second two-device harness is
+      // the most expensive thing this suite can buy.
       const srv = await startSyncServer();
       try {
-        // No `deviceNames` → both enrollment forms submit their PRE-FILLED
-        // platform default, so no row is ever nameless even without user input.
-        const { a, teardown } = await setupTwoSyncedDevices(srv, { seedNote: false as boolean });
+        let account = "";
+        let password = "";
+        const a = await launchDevice(0, {
+          seedConfig: syncConfigSeed(srv.url),
+          seed: (appDataDir) => {
+            const v = seedVault(appDataDir, { password: "CanaryPass-9-animals!" });
+            account = v.account;
+            password = v.password;
+          },
+        });
         try {
-          await openDeviceList(a.session);
+          await unlockToEditor(a.session, password);
+          await dismissImporterOffer(a.session);
+          await openSettings(a.session);
+          await (await a.session.byTestId("settings.tab-sync")).click();
+          await (await a.session.byTestId("sync.enroll.account-input")).sendKeys(account);
+          await (await a.session.byTestId("sync.enroll.password-input")).sendKeys(password);
+          // The name field is left exactly as the form pre-filled it.
+          await (await a.session.byTestId("sync.enroll.submit")).click();
+          await a.session.byTestId("sync.enroll.approved", { timeoutMs: 30_000 });
+
           const names = await rowNames(a.session);
           expect(names.length).toBeGreaterThan(0);
           for (const name of names) {
             expect(name.trim()).not.toBe("");
+            // A real word from the catalogue, not the id-derived fallback.
+            expect(name).not.toMatch(/^Device [0-9a-f]{6}$/);
           }
-          // Both devices took the same platform default, so the demoted code is
-          // what disambiguates them — the reason it is a permanent line.
-          const codes = await rowCodes(a.session);
-          expect(new Set(codes).size).toBe(codes.length);
         } finally {
-          await teardown();
+          await a.teardown();
         }
       } finally {
         await srv.teardown();

@@ -22,7 +22,9 @@ import { useTranslation } from "react-i18next";
 import { invoke } from "@tauri-apps/api/core";
 import i18n from "../../i18n";
 import { type DeviceEntry, type DevicesHook } from "../../hooks/useDevices";
-import { useDeviceNames, DEVICE_NAME_MAX_LEN } from "../../hooks/useDeviceNames";
+import { usePrefs } from "../../hooks/usePrefs";
+import { setDeviceName } from "../../lib/prefs";
+import { DEVICE_NAME_MAX_LEN } from "../../lib/device-name";
 
 const ROOT: CSSProperties = {
   display: "flex",
@@ -140,9 +142,11 @@ interface SasState {
 export function DeviceManagementPanel({ hook }: { hook: DevicesHook }) {
   const { t } = useTranslation();
   const { devices, pending, error, busy, approve, remove, resetLocal } = hook;
-  // The synced `device_names` map (MYND-548). Narrow hook rather than `usePrefs`
-  // — this panel is the only consumer of the field; see useDeviceNames.
-  const { names, rename } = useDeviceNames();
+  // The synced `device_names` map (MYND-548). Read off the shared prefs hook like
+  // every other prefs consumer — `setDeviceName` bumps the prefs nonce, so a local
+  // rename and a peer's merged rename both land here the same way.
+  const { prefs } = usePrefs();
+  const names = prefs.device_names;
 
   // The row currently being renamed, plus its in-flight input value. `null` = no
   // row is in rename mode. One at a time: the Rename buttons disable while any
@@ -153,13 +157,20 @@ export function DeviceManagementPanel({ hook }: { hook: DevicesHook }) {
   // Enter and blur both land here. Closing the editor FIRST makes the two paths
   // idempotent — blur fires right after Enter, and the second call sees `null`
   // and returns. A blank value is a cancel (the backend refuses it too), so the
-  // previous name survives; only a genuine write failure surfaces.
+  // previous name survives; only a genuine write failure surfaces. Deliberately
+  // NOT optimistic: the row renders straight off `names`, so a failed write simply
+  // never changed it — which IS the revert, with no rollback path to desync.
   const commitRename = async () => {
     const target = renaming;
     if (target === null) return;
     setRenaming(null);
-    const outcome = await rename(target.id, target.value);
-    setRenameFailed(outcome === "failed");
+    if (target.value.trim() === "") return;
+    try {
+      await setDeviceName(target.id, target.value.trim());
+      setRenameFailed(false);
+    } catch {
+      setRenameFailed(true);
+    }
   };
   const approved = (devices ?? []).filter((d) => d.approved && !d.retired);
   // This device, if the roster came back marking it retired — it was removed from

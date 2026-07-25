@@ -12,10 +12,9 @@ import { Input } from "../primitives/Input";
 import { PasswordInput } from "../PasswordInput";
 import { DestructiveBanner } from "../DestructiveBanner";
 import { formatAccountNumberInput } from "../../lib/account-number-format";
-import { suggestedDeviceName } from "../../lib/device-name";
+import { DEVICE_NAME_MAX_LEN, useDeviceNameField } from "../../lib/device-name";
 // Aliased: the component already has a `setDeviceName` React state setter.
 import { setDeviceName as persistDeviceName } from "../../lib/prefs";
-import { DEVICE_NAME_MAX_LEN } from "../../hooks/useDeviceNames";
 import { ENROLL_PENDING_NOTICE } from "../../lib/load-bearing-copy";
 
 interface JoinResult {
@@ -119,24 +118,9 @@ export function JoinDeviceModal({ onCancel, onJoined }: JoinDeviceModalProps) {
   const [headFingerprint, setHeadFingerprint] = useState<string | null>(null);
   const [aborting, setAborting] = useState(false);
 
-  // MYND-548: this device's own name, pre-filled from the platform token Rust
-  // reports. Same contract as the Settings enrollment form — the two doors must
-  // not diverge. The functional update keeps a late suggestion from overwriting
-  // what the user typed.
-  const [deviceName, setDeviceName] = useState("");
-  const [suggestedName, setSuggestedName] = useState("");
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      const suggestion = await suggestedDeviceName();
-      if (cancelled) return;
-      setSuggestedName(suggestion);
-      setDeviceName((current) => (current === "" ? suggestion : current));
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  // MYND-548: this device's own name — the same hook the Settings enrollment form
+  // uses, so the two doors cannot drift.
+  const deviceNameField = useDeviceNameField();
 
   const canSubmit =
     url.trim().length > 0 &&
@@ -160,8 +144,7 @@ export function JoinDeviceModal({ onCancel, onJoined }: JoinDeviceModalProps) {
         // to peers on the first sync. Best-effort: a naming failure must not turn
         // a successful join into an error.
         try {
-          const name = deviceName.trim() !== "" ? deviceName.trim() : suggestedName;
-          if (name !== "") await persistDeviceName(res.device_id_hex, name);
+          await persistDeviceName(res.device_id_hex, deviceNameField.resolved);
         } catch {
           // Prefs unwritable — the row falls back to its id-derived label.
         }
@@ -382,10 +365,10 @@ export function JoinDeviceModal({ onCancel, onJoined }: JoinDeviceModalProps) {
           </label>
           <Input
             id={`${baseId}-device-name`}
-            value={deviceName}
-            onChange={(e) => setDeviceName(e.target.value)}
+            value={deviceNameField.value}
+            onChange={(e) => deviceNameField.setValue(e.target.value)}
             maxLength={DEVICE_NAME_MAX_LEN}
-            placeholder={suggestedName}
+            placeholder={deviceNameField.suggestion}
             autoComplete="off"
             spellCheck={false}
             data-testid="join.device-name-input"
