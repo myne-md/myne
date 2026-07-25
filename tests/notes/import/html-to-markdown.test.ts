@@ -261,6 +261,69 @@ describe("regressions caught by the /simplify review", () => {
   });
 });
 
+describe("markdown-structure injection (adversarial battery, MYND-580 review)", () => {
+  // Untrusted HTML must not be able to inject markdown STRUCTURE into the note.
+  // The sanitizer stops script/handler vectors; these are the ones that survive
+  // sanitization as legitimate text and attack the markdown layer instead.
+
+  it("contains a code fence that carries its own backticks", async () => {
+    // A fixed ``` fence would let the content close it and inject real markdown —
+    // headings, links, even ![[att:<id>]] attachment refs.
+    const out = await md("<pre>```\n\n# INJECTED\n\n```</pre>");
+    const lines = out.split("\n");
+    const opener = lines[0]!;
+    expect(opener).toBe("````");
+    expect(lines.at(-1)).toBe("````");
+    // The heading is still PRESENT (nothing was destroyed) but stays enclosed:
+    // no interior line is a fence long enough to close the opener, so everything
+    // between the delimiters is code, not markdown structure.
+    expect(out).toContain("# INJECTED");
+    const interior = lines.slice(1, -1);
+    expect(interior.some((l) => /^`{4,}\s*$/.test(l))).toBe(false);
+  });
+
+  it("widens the fence past the longest internal backtick run", async () => {
+    const out = await md("<pre>a ```` b</pre>");
+    expect(out.startsWith("`````")).toBe(true);
+  });
+
+  it("escapes a leading ATX heading marker in paragraph text", async () => {
+    expect(await md("<p># not a heading</p>")).toBe("\\# not a heading");
+  });
+
+  it("preserves an inline tag, which is not a heading marker", async () => {
+    // `#tag` (no space) is the dialect's inline-tag form (§3.7) — must survive.
+    expect(await md("<p>#tag stays</p>")).toBe("#tag stays");
+  });
+
+  it.each([
+    ["- item", "\\- item"],
+    ["+ item", "\\+ item"],
+    ["1. item", "1\\. item"],
+    ["---", "\\---"],
+  ])("escapes a leading block marker %j", async (input, expected) => {
+    expect(await md(`<p>${input}</p>`)).toBe(expected);
+  });
+
+  it("escapes brackets so a link cannot be forged from text", async () => {
+    const out = await md('<a href="https://ok.test">te]xt(evil)</a>');
+    expect(out).toBe("[te\\]xt(evil)](https://ok.test)");
+  });
+
+  it("escapes a forged attachment wikilink in text", async () => {
+    const out = await md("<p>[[att:deadbeef|evil.png]]</p>");
+    expect(out).not.toContain("[[att:");
+  });
+
+  it("rejects a scheme obfuscated past scheme-detection (fails closed)", async () => {
+    // A NUL becomes U+FFFD during HTML parsing, which is not a control character —
+    // the earlier "no scheme → allow" default let this through into note text.
+    const out = await md('<a href="jav ascript:alert(1)">l</a>');
+    expect(out).toBe("l");
+    expect(out).not.toContain("ascript:");
+  });
+});
+
 describe("INVARIANT — nothing is attached to the live DOM", () => {
   const originalChildCount = document.body.childNodes.length;
 

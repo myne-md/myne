@@ -79,6 +79,41 @@ function escapeInline(text: string): string {
   return text.replace(/([\\`*_[\]<>])/g, "\\$1");
 }
 
+/**
+ * Escape a leading BLOCK marker so a paragraph's text cannot become a different
+ * block. `<p># not a heading</p>` would otherwise emit a real ATX heading, and a
+ * leading `-` / `+` / `1.` / `---` would inject a list or thematic break.
+ *
+ * `>` and `*` need no handling — {@link escapeInline} already escapes both. `#` is
+ * escaped ONLY when followed by whitespace, because `#tag` with no space is the
+ * dialect's inline-tag form (§3.7) and must survive verbatim.
+ */
+function escapeBlockStart(line: string): string {
+  return line
+    .replace(/^(#{1,6})(\s)/, "\\$1$2")
+    .replace(/^([-+])(\s)/, "\\$1$2")
+    .replace(/^(\d{1,9})([.)])(\s)/, "$1\\$2$3")
+    .replace(/^(-{3,}|_{3,})$/, "\\$1");
+}
+
+/**
+ * The fence for a code block, long enough that the content cannot close it.
+ *
+ * SECURITY-RELEVANT, not cosmetic. A fixed ``` fence lets untrusted `<pre>` content
+ * containing its own ``` **break out and inject arbitrary markdown structure** into
+ * the imported note — headings, links, even `![[att:<id>]]` attachment references.
+ * CommonMark's rule is that a fence is closed only by a run of at least as many
+ * backticks, so the opener must exceed the longest run inside. Found by the
+ * adversarial payload battery during the MYND-580 review (grill R3).
+ */
+function codeFenceFor(content: string): string {
+  let longest = 0;
+  for (const run of content.match(/`+/g) ?? []) {
+    longest = Math.max(longest, run.length);
+  }
+  return "`".repeat(Math.max(3, longest + 1));
+}
+
 class Walker {
   private readonly lossy = new Set<string>();
 
@@ -252,7 +287,7 @@ class Walker {
       }
       case "p": {
         const inner = this.inline(el).trim();
-        if (inner.length > 0) blocks.push(inner);
+        if (inner.length > 0) blocks.push(escapeBlockStart(inner));
         return;
       }
       case "ul":
@@ -279,7 +314,7 @@ class Walker {
         // outside the highlight enum, so there is no info string to recover.)
         const raw = el.textContent ?? "";
         if (raw.trim().length > 0) {
-          blocks.push(`\`\`\`\n${raw.replace(/\n+$/, "")}\n\`\`\``);
+          blocks.push(`${codeFenceFor(raw)}\n${raw.replace(/\n+$/, "")}\n${codeFenceFor(raw)}`);
         }
         return;
       }
@@ -320,7 +355,7 @@ class Walker {
     let run = "";
     const flush = (): void => {
       const text = run.trim();
-      if (text.length > 0) blocks.push(text);
+      if (text.length > 0) blocks.push(escapeBlockStart(text));
       run = "";
     };
     for (const child of Array.from(el.childNodes)) {
