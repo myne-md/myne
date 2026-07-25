@@ -36,6 +36,7 @@ import {
   type ImportResult,
 } from "./engine";
 import type { RefImporter } from "./media";
+import { joinPath } from "./source";
 import { attachmentImport } from "../../lib/attachments";
 
 /** Rust `ImportDirEntry` wire shape (snake_case `is_dir`). */
@@ -58,12 +59,8 @@ export async function importReadFile(root: string, path: string): Promise<string
   return await invoke<string>("plugin:importer|import_read_file", { root, path });
 }
 
-/** `root + "/" + rel` (mirrors the engine's path join; `rel===""` → `root`). */
-function joinPath(root: string, rel: string): string {
-  if (rel.length === 0) return root;
-  const base = root.endsWith("/") ? root.slice(0, -1) : root;
-  return `${base}/${rel}`;
-}
+// `joinPath` is imported from the seam, not redefined: the media index below is
+// keyed by the paths the WALK produced, so the two must agree byte-for-byte.
 
 /**
  * Union the importer's empty-dir folders with the vault's existing

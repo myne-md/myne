@@ -830,6 +830,24 @@ Used in: `threat-model.md` §1 (A11)
 
 The explicit, byte-change-visible command that turns an imported filename-only image reference (`![[image.png]]`, `![alt](path)`) into a real vault [attachment](#attachment): it resolves the source file (auto-resolve, picker fallback), imports it via [attachment_import](#attachment_import), mints the [attachment-id](#attachment-id), and rewrites the reference to the form-C embed `![[att:<id>|filename]]` — with a mandatory diff-preview before commit (parallel to the wikilink R2 conversion command, `spec/wikilink.md` §189). No silent name-match; without invoking it, imported references stay an unrendered chip (byte-preservation, `spec/markdown-dialect.md` C1). (MYND-164)
 
+### **import adapter** &nbsp; 📦 *Product*
+
+A per-source reader that turns one external note format into Myne-dialect markdown for the [import source](#import-source) seam, so the shared ingest path needs no knowledge of the format. v1 ships four beyond the original Obsidian reader — Evernote (`.enex`), generic HTML, Notion (unzipped export), and CSV (importer-breadth epic, MYND-312). Every adapter is **accepted-lossy** in the [base import](#base-import) sense: it converts the representable subset, names what it could not represent, and never silently drops content (the loss is surfaced through the [import report](#import-report)). Adapters add **no new host capability** — all four read through the existing within-root-validated importer file seam, which is why a Notion export must be unzipped by the user first rather than extracted in-app. Source names ("Notion", "Evernote", "Obsidian") are used **nominatively** only — what the adapter reads — and are never productized as Myne feature names. Apple Notes is deliberately **not** an adapter: it publishes no export artifact, and every mechanism to reach its data would need an exception to the single-external-read-path rule.
+
+Used in: `decisions.md` 2026-07-25
+
+### **import report** &nbsp; 📦 *Product*
+
+An ordinary generated note listing every note that imported successfully but **lost representable detail**, each as a [wikilink](#wikilink) plus its folder path and the names of the dropped constructs. It is the disclosure mechanism for **per-element** fidelity loss, which the pre-existing per-file drop tallies cannot express: an HTML→markdown conversion that loses a callout, a toggle, and coloured text still counts as one successfully imported note, so there is no honest integer to put in a summary row. Chosen over a persisted frontmatter marker specifically to avoid a [dialect](#dialect) commitment — it introduces no value-strict field, no round-trip clause, and no new spec surface, while still surviving the import session (a modal-only list is unrecoverable once dismissed on a large import) and remaining deletable in one action. (MYND-585)
+
+Used in: `decisions.md` 2026-07-25
+
+### **import source** &nbsp; 🏗️ *Construction*
+
+The two-stage seam every [import adapter](#import-adapter) implements: `plan()` enumerates item **descriptors** cheaply (never note content), and `load()` yields one item's markdown at a time. The split is load-bearing in both directions — `plan()` keeps the progress denominator determinate for every source (a bare streaming generator cannot know the total until it has finished, breaking "Importing X of N"), while `load()` preserves the serial-ingest discipline that keeps only one note's plaintext in memory at once. It is also what lets a **one-file-many-notes** source exist at all: Evernote's single `.enex` holds N notes, a shape the original directory walk could not represent. Because every source funnels through one shared ingest loop, per-note fidelity loss has exactly one collection point rather than one per adapter. (MYND-579)
+
+Used in: `decisions.md` 2026-07-25
+
 ### **isolated note** &nbsp; 📦 *Product*
 
 *(Alias: orphan note.)*
