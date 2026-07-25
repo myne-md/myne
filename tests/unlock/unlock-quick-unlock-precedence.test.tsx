@@ -159,6 +159,40 @@ describe("MYND-558 unlock screen shows one credential surface at a time", () => 
     expect(screen.queryByTestId("unlock.quick-unlock")).toBeNull();
   });
 
+  it("redeeming a PIN shows the same in-flight CTA the password path does", async () => {
+    // The PIN runs the vault's own Argon2id parameters — the same multi-second
+    // wait the password CTA covers with a spinner. Hold the redeem open and pin
+    // that the button reports the work instead of going quiet.
+    let releaseRedeem: () => void = () => {};
+    invokeMock.mockImplementation((cmd) => {
+      if (cmd === STATUS_CMD) {
+        return Promise.resolve({ configured: true, method: "pin", available: true });
+      }
+      if (cmd === "plugin:quick-unlock|quick_unlock_with_pin") {
+        return new Promise<undefined>((resolve) => {
+          releaseRedeem = () => resolve(undefined);
+        });
+      }
+      return Promise.resolve(undefined);
+    });
+    renderUnlock();
+
+    fireEvent.change(await screen.findByTestId("unlock.quick-pin-input"), {
+      target: { value: "135790" },
+    });
+    const submit = screen.getByTestId("unlock.quick-pin-submit");
+    fireEvent.click(submit);
+
+    await waitFor(() => expect(submit.textContent).toBe("Decrypting…"));
+    expect((submit as HTMLButtonElement).disabled).toBe(true);
+    // The field is locked too, so a second PIN cannot race the in-flight derive.
+    expect((screen.getByTestId("unlock.quick-pin-input") as HTMLInputElement).disabled).toBe(
+      true,
+    );
+
+    releaseRedeem();
+  });
+
   it("exhausting the PIN attempts surfaces the password form with no way back", async () => {
     invokeMock.mockImplementation((cmd) => {
       if (cmd === STATUS_CMD) {

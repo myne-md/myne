@@ -34,6 +34,8 @@ import {
   quickUnlockWithPin,
   type QuickUnlockMethod,
 } from "../lib/quick-unlock";
+import { ctaStyle } from "./primitives/CenteredCard";
+import { Spinner } from "./Spinner";
 import { isQuickUnlockError } from "../types/quick-unlock-error";
 
 interface QuickUnlockEntryProps {
@@ -72,18 +74,6 @@ const INPUT_STYLE: CSSProperties = {
   fontFamily: "var(--font-sans)",
   fontSize: "var(--text-base)",
   outline: "none",
-};
-
-const BTN_STYLE: CSSProperties = {
-  background: "var(--accent)",
-  color: "var(--accent-on)",
-  border: "none",
-  borderRadius: "var(--radius-2)",
-  padding: "var(--space-3) var(--space-5)",
-  fontFamily: "var(--font-sans)",
-  fontSize: "var(--text-base)",
-  fontWeight: "var(--weight-medium)" as CSSProperties["fontWeight"],
-  cursor: "pointer",
 };
 
 const HINT_STYLE: CSSProperties = {
@@ -175,10 +165,13 @@ export function QuickUnlockEntry({
           type="button"
           onClick={() => void attemptBiometric()}
           disabled={busy}
-          style={BTN_STYLE}
+          style={ctaStyle(busy)}
           data-testid="unlock.quick-touchid"
         >
-          {t("unlock.quickUnlock.unlockWithTouchId")}
+          {busy && <Spinner size={14} style={{ borderWidth: 2 }} />}
+          <span>
+            {busy ? t("unlock.decrypting") : t("unlock.quickUnlock.unlockWithTouchId")}
+          </span>
         </button>
       ) : (
         <form
@@ -204,10 +197,14 @@ export function QuickUnlockEntry({
           <button
             type="submit"
             disabled={busy || pin.length === 0}
-            style={BTN_STYLE}
+            style={ctaStyle(busy || pin.length === 0)}
             data-testid="unlock.quick-pin-submit"
           >
-            {t("unlock.quickUnlock.unlockWithPin")}
+            {/* The PIN runs the vault's own Argon2id parameters, so this is the
+                same multi-second wait the password CTA shows a spinner for — a
+                button that just goes quiet reads as a hung app. */}
+            {busy && <Spinner size={14} style={{ borderWidth: 2 }} />}
+            <span>{busy ? t("unlock.decrypting") : t("unlock.quickUnlock.unlockWithPin")}</span>
           </button>
         </form>
       )}
