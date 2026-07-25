@@ -1,0 +1,8 @@
+# Generated / machine-specific build artifacts — never committed (mirrors the
+# screen-guard / share-intent `.gitignore` discipline, adapted for the iOS plugin).
+# `.tauri/` is the generated Tauri-API surface; `ios/.build/` holds SwiftPM +
+# SourceKit index output (incl. binary `*.mdb`); `Package.resolved` re-resolves
+# from the local `../.tauri/tauri-api` path at each build.
+/.tauri
+/ios/.build
+/ios/Package.resolved
