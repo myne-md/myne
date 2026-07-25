@@ -515,6 +515,12 @@ The server authorization step that admits a newly-enrolled device onto an accoun
 
 Used in: `spec/server-protocol.md` §3.1, §4 (MYND-425)
 
+### **device-join QR** &nbsp; 📋 *Protocol*
+
+A QR the trusted desktop displays and a phone scans to add itself to an account (MYND-466), in place of manually typing the [account_number](#account_number). A scanner-only, versioned (`MYQR`) frame carrying only non-secret material — `{server_url, account#, cert_pin, generated_at}` — and **never** a password or recovery phrase (SYNC-47). Ephemeral (≈3-min TTL) to enforce live co-presence. For a self-host endpoint the scan is treated as the out-of-band channel that **replaces the cert-fingerprint eye-compare** ([TOFU bootstrap](#tofu-bootstrap) / SYNC-26); the [device-approval gate](#device-approval-gate) SAS still runs post-approval. The account number is supplied by a one-time user paste on the desktop (it is a bearer token — [AS9](#account_number) — never persisted at rest; `spec/account-number.md` §8). `MYQR` lives outside the `protocol` crate (no ciphertext → not a major-version event). iOS-only for v1 (Android: MYND-465).
+
+Used in: `decisions.md` 2026-07-19; `threat-model.md` §7
+
 ### **device key** &nbsp; 🗝️ *Key/identifier*
 
 Reserved term for `appname-v005` multi-device support: a per-device asymmetric key pair stored in hardware (Secure Enclave / TPM / Android Keystore) that participates in MLS group formation. **Not used in v0.1** — single-device protocol does not need device keys.

@@ -393,6 +393,7 @@ fn main() {
                 "sync_read_quarantine",
                 "sync_restore_quarantine",
                 "sync_delete_quarantine",
+                "sync_device_join_qr",
             ]),
         )
         .plugin(

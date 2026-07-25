@@ -2450,6 +2450,17 @@
       "untitled": "Untitled ({{hex}})",
       "useThisVersion": "Use this version"
     },
+    "deviceJoinQr": {
+      "accountLabel": "Account number",
+      "accountPlaceholder": "MY-XXXX-XXXX-XXXX-XXXX-XXXX",
+      "error": "Couldn’t make the QR. Please try again.",
+      "generate": "Make QR",
+      "hint": "Paste your account number to make a QR your phone can scan — it fills in the server and account number for you.",
+      "invalidAccount": "That doesn’t look like a valid account number.",
+      "notConfigured": "Configure a sync server first, then make a QR.",
+      "scanWithApp": "Scan with the iOS app",
+      "title": "Add a device with a QR"
+    },
     "devices": {
       "approve": "Approve",
       "awaitingApproval_one": "{{count}} device awaiting approval",
@@ -3082,7 +3093,23 @@
     "serverPlaceholder": "https://sync.example.com",
     "accountHint": "Double-check this number — it doesn't look right.",
     "approvalHint": "Your notes appear once you approve this device from a device that already has your account.",
-    "connectingSubtitle": "Fetching your account and unlocking your vault on this device."
+    "connectingSubtitle": "Fetching your account and unlocking your vault on this device.",
+    "qr": {
+      "cancel": "Cancel",
+      "confirmAccount": "Account",
+      "confirmServer": "Server",
+      "confirmTitle": "Add this device?",
+      "continue": "Continue",
+      "expired": "This QR has expired — show a fresh one on your other device and scan again.",
+      "invalid": "That's not a Myne device QR.",
+      "newerVersion": "This QR is from a newer version of Myne — update the app and try again.",
+      "pinHosted": "Myne-hosted server",
+      "pinNone": "Self-hosted server",
+      "pinSelfHost": "Cert pinned from your trusted device",
+      "scan": "Scan QR",
+      "scanFailed": "Couldn’t scan. Try again, or enter your details manually.",
+      "scanUnavailable": "Scanning isn’t available on this device — enter your details below."
+    }
   },
   "createVault": {
     "beginWeakPassword": "Choose a stronger password and try again.",
