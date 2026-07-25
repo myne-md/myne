@@ -104,25 +104,27 @@ export type TwoSyncedDevices = {
  *  `sync_now` still runs — an empty vault authors a genesis head on push
  *  (§6.1 genesis-on-empty), which B's join gate needs: `join.verify` surfaces
  *  only once `sync_head_fingerprint` observes a pulled head. */
+/** Options shared by every `setupTwoSyncedDevices` overload. */
+interface SetupOptions {
+  /** MYND-548: type these into the two enrollment forms' "Name this device"
+   *  fields instead of accepting the pre-filled platform default. */
+  deviceNames?: { a: string; b: string };
+  /** MYND-548: runs on A while B is still PENDING — the only window in which the
+   *  pending row is observable, since approval closes it. */
+  whilePending?: (devices: { a: AppSession; b: AppSession }) => Promise<void>;
+}
+
 export async function setupTwoSyncedDevices(
   srv: EphemeralServer,
-  opts?: { seedNote?: true },
+  opts?: SetupOptions & { seedNote?: true },
 ): Promise<TwoSyncedDevices & { noteId: string }>;
 export async function setupTwoSyncedDevices(
   srv: EphemeralServer,
-  opts: { seedNote: boolean },
+  opts: SetupOptions & { seedNote: boolean },
 ): Promise<TwoSyncedDevices>;
 export async function setupTwoSyncedDevices(
   srv: EphemeralServer,
-  opts: {
-    seedNote?: boolean;
-    /** MYND-548: type these into the two enrollment forms' "Name this device"
-     *  fields instead of accepting the pre-filled platform default. */
-    deviceNames?: { a: string; b: string };
-    /** MYND-548: runs on A while B is still PENDING — the only window in which
-     *  the pending row is observable, since approval closes it immediately. */
-    whilePending?: (devices: { a: AppSession; b: AppSession }) => Promise<void>;
-  } = {},
+  opts: SetupOptions & { seedNote?: boolean } = {},
 ): Promise<TwoSyncedDevices> {
   const seedNote = opts.seedNote ?? true;
   let account = "";
@@ -183,9 +185,13 @@ export async function setupTwoSyncedDevices(
       await openSettings(a.session);
       await (await a.session.byTestId("settings.tab-sync")).click();
       // Anything that must observe the PENDING row runs here — approving closes
-      // that window for good.
-      await a.session.byTestId("sync.pending-row", { timeoutMs: 30_000 });
-      if (opts.whilePending) await opts.whilePending({ a, b });
+      // that window for good. The row wait is scoped to that case: `approve-device`
+      // is a CHILD of `pending-row`, so waiting for both on the default path would
+      // just double the worst-case timeout for every suite that uses this setup.
+      if (opts.whilePending) {
+        await a.session.byTestId("sync.pending-row", { timeoutMs: 30_000 });
+        await opts.whilePending({ a, b });
+      }
       await (await a.session.byTestId("sync.approve-device", { timeoutMs: 30_000 })).click();
       await closeSettings(a.session);
 

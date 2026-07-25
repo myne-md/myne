@@ -854,6 +854,11 @@ export async function setFolderIcons(icons: Record<string, string>): Promise<voi
  */
 export async function setDeviceName(deviceIdHex: string, name: string): Promise<void> {
   await invoke<void>("plugin:prefs|set_device_name", { deviceIdHex, name });
+  // Bump AFTER the IPC resolves (the standard chokepoint): every mounted
+  // `usePrefs` consumer re-reads, so the device list refreshes without its own
+  // reload path — and so does a name written during enrollment, which has no
+  // list on screen to refresh manually.
+  bumpPrefsNonce();
 }
 
 /**

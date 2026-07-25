@@ -12,7 +12,6 @@
 // The pending outcome states plainly that the approval gate holds the device.
 
 import {
-  useEffect,
   useId,
   useState,
   type CSSProperties,
@@ -27,8 +26,7 @@ import { PasswordInput } from "../PasswordInput";
 import { DestructiveBanner } from "../DestructiveBanner";
 import { normalizeBip39Phrase } from "../../lib/bip39-normalize";
 import { formatAccountNumberInput } from "../../lib/account-number-format";
-import { suggestedDeviceName } from "../../lib/device-name";
-import { DEVICE_NAME_MAX_LEN } from "../../hooks/useDeviceNames";
+import { DEVICE_NAME_MAX_LEN, useDeviceNameField } from "../../lib/device-name";
 import { useEnroll, type EnrollCredentialKind } from "../../hooks/useEnroll";
 import {
   ENROLL_APPROVED_NOTICE,
@@ -168,23 +166,9 @@ export function EnrollDeviceForm() {
     Array.from({ length: PHRASE_CELL_COUNT }, () => ""),
   );
 
-  // MYND-548: the device's own name, pre-filled from the platform token the Rust
-  // side reports. The functional update below keeps a late-resolving suggestion
-  // from overwriting something the user already typed.
-  const [deviceName, setDeviceName] = useState("");
-  const [suggestedName, setSuggestedName] = useState("");
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      const suggestion = await suggestedDeviceName();
-      if (cancelled) return;
-      setSuggestedName(suggestion);
-      setDeviceName((current) => (current === "" ? suggestion : current));
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  // MYND-548: the device's own name. One hook for all four enrollment doors, so
+  // they cannot drift.
+  const deviceNameField = useDeviceNameField();
 
   // Any edit after a terminal outcome clears it so the user sees a fresh attempt.
   const clearOutcome = () => {
@@ -231,10 +215,7 @@ export function EnrollDeviceForm() {
       mode === "password"
         ? password
         : normalizeBip39Phrase(cells.join(" "));
-    // A blank field falls back to the suggestion rather than enrolling nameless
-    // (the backend refuses a blank name outright).
-    const name = deviceName.trim() !== "" ? deviceName.trim() : suggestedName;
-    void enroll(accountNumber.trim(), credential, mode, name);
+    void enroll(accountNumber.trim(), credential, mode, deviceNameField.resolved);
   };
 
   return (
@@ -267,10 +248,10 @@ export function EnrollDeviceForm() {
         </label>
         <Input
           id={`${baseId}-device-name`}
-          value={deviceName}
-          onChange={(e) => setDeviceName(e.target.value)}
+          value={deviceNameField.value}
+          onChange={(e) => deviceNameField.setValue(e.target.value)}
           maxLength={DEVICE_NAME_MAX_LEN}
-          placeholder={suggestedName}
+          placeholder={deviceNameField.suggestion}
           autoComplete="off"
           spellCheck={false}
           data-testid="sync.enroll.device-name-input"

@@ -1211,18 +1211,24 @@ pub enum EnrollCredential {
     Recovery,
 }
 
+/// What the blocking enrollment/join closure hands back: `(approved, device_id_hex)`.
+/// Named rather than written inline so the `spawn_blocking` signature stays under
+/// rustfmt's width — spelling the tuple out re-indents both closure bodies.
+type EnrollmentOutcome = (bool, String);
+
 /// Outcome of an enrollment attempt surfaced to the UI.
 #[derive(Debug, Clone, Serialize)]
 pub struct EnrollResult {
     /// True when the device was approved + a token issued (false = pending approval).
     pub approved: bool,
     /// The freshly generated `device_id` (hex) this enrollment registered
-    /// (MYND-548). Returned so the caller can write its own `device_names` entry
-    /// without a second round-trip: a PENDING device holds no token, so it cannot
-    /// read the roster to discover which row is itself. Not a secret — this is
-    /// the VV actor identifier, deliberately distinct from the revocable
-    /// per-device token (`sync-protocol.md` §4) — and the name it keys never
-    /// leaves the AEAD-sealed prefs blob.
+    /// (MYND-548) — the create returns the id it minted. The caller needs it to
+    /// write its own `device_names` entry, and has no other way to learn it: a
+    /// PENDING device holds no token, so it cannot read the roster to discover
+    /// which row is itself. Not a secret — this is the VV actor identifier,
+    /// deliberately distinct from the revocable per-device token
+    /// (`sync-protocol.md` §4) — and the name it keys never leaves the
+    /// AEAD-sealed prefs blob.
     pub device_id_hex: String,
 }
 
