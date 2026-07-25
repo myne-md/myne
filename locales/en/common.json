@@ -2654,7 +2654,9 @@
     },
     "error": {
       "importFailed": "Couldn't install that theme. Nothing was changed.",
+      "installedNotActivated": "“{{name}}” was installed, but couldn't be switched on. You can apply it from Settings → Appearance.",
       "invalidName": "That link doesn't name the theme it wants to install.",
+      "listUnavailable": "Couldn't read your existing themes, so this can't be installed safely right now. Close this and try the link again.",
       "malformedPayload": "That link's theme data is damaged or incomplete.",
       "nothingWritten": "Nothing was written to your vault.",
       "payloadTooLarge": "That link's theme data is too large to be a theme.",

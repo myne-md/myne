@@ -29,7 +29,7 @@ export interface TrapFocusOptions {
  * that: it opens from an OS deep link, which can arrive over any modal the user
  * already had open.
  */
-const activeTraps: object[] = [];
+const activeTraps: { container: HTMLElement }[] = [];
 
 /**
  * Trap keyboard focus inside `container`. Returns a release function that
@@ -46,9 +46,20 @@ export function trapFocus(
 
   // Identity for this trap's slot on the stack. Only the innermost trap
   // enforces containment (see `activeTraps`).
-  const self = {};
+  const self = { container };
   activeTraps.push(self);
-  const isInnermost = () => activeTraps[activeTraps.length - 1] === self;
+  // Skip entries whose container has left the document. Release is effect
+  // cleanup at every call site, so a stale entry should be unreachable — but if
+  // one ever survived, an inert trap sitting on top would silently disable
+  // containment for every LIVE trap, which is a worse failure than the
+  // ping-pong this stack exists to fix.
+  const isInnermost = () => {
+    for (let i = activeTraps.length - 1; i >= 0; i -= 1) {
+      const entry = activeTraps[i];
+      if (entry.container.isConnected) return entry === self;
+    }
+    return false;
+  };
 
   (initialFocus ?? focusableWithin(container)[0] ?? container).focus();
 

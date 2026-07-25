@@ -38,7 +38,7 @@
 
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
-import { ModalShell } from "./primitives/ModalShell";
+import { ModalShell, UNSOLICITED_MODAL_Z } from "./primitives/ModalShell";
 import { Button } from "./primitives/Button";
 import { ThemeChiplet } from "./primitives/ThemeChiplet";
 import {
@@ -49,12 +49,12 @@ import {
   type ThemeInstallRequest,
 } from "../lib/themeDeepLink";
 import {
-  activateCustomTheme,
   importCustomTheme,
   listCustomThemes,
   nextAvailableThemeName,
   themePreview,
 } from "../lib/themes";
+import { activateCustomTheme } from "../lib/theme";
 import { describeImportError } from "../lib/theme-errors";
 
 const BODY_STYLE: CSSProperties = {
@@ -173,15 +173,18 @@ function ConfirmInstall({
   onDone: () => void;
 }) {
   const { t } = useTranslation();
-  const [existingNames, setExistingNames] = useState<readonly string[]>([]);
+  // `null` = the vault's theme list has not come back yet. Apply stays disabled
+  // until it does: `themes_import` is an UPSERT, so applying against an unknown
+  // name set is exactly the silent clobber this dialog exists to prevent.
+  const [existingNames, setExistingNames] = useState<readonly string[] | null>(null);
+  const [listFailed, setListFailed] = useState(false);
   const [choice, setChoice] = useState<CollisionChoice>("keep-both");
   const [applying, setApplying] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
 
   // Read the installed names so a collision is surfaced BEFORE Apply — the user
   // chooses replace-vs-keep-both up front rather than discovering after the fact
-  // that something was overwritten. One decrypt; a read failure is not fatal, it
-  // just means no collision is offered and the import still succeeds.
+  // that something was overwritten. One decrypt.
   useEffect(() => {
     let cancelled = false;
     void listCustomThemes()
@@ -189,17 +192,21 @@ function ConfirmInstall({
         if (!cancelled) setExistingNames(entries.map((e) => e.name));
       })
       .catch(() => {
-        if (!cancelled) setExistingNames([]);
+        // Fail CLOSED. Treating an unreadable list as "no themes installed"
+        // would turn every read failure into a deterministic overwrite of
+        // whatever shares this name.
+        if (!cancelled) setListFailed(true);
       });
     return () => {
       cancelled = true;
     };
   }, []);
 
-  const collides = existingNames.includes(request.name);
+  const settled = existingNames !== null;
+  const collides = settled && existingNames.includes(request.name);
   const targetName =
     collides && choice === "keep-both"
-      ? nextAvailableThemeName(request.name, existingNames)
+      ? nextAvailableThemeName(request.name, existingNames ?? [])
       : request.name;
   const preview = themePreview(request.palette);
 
@@ -210,12 +217,22 @@ function ConfirmInstall({
       // The ordinary import path — the host re-validates the palette through
       // the value-shape allowlist and rejects before writing anything.
       await importCustomTheme(targetName, request.paletteJson);
-      await activateCustomTheme(targetName, request.palette);
-      onDone();
     } catch (caught) {
+      // Nothing was written: the host rejected before touching vault.themes.
       setFailure(describeImportError(caught, "themeInstall.error.importFailed"));
       setApplying(false);
+      return;
     }
+    try {
+      await activateCustomTheme(targetName, request.palette);
+    } catch {
+      // Separate arm, separate copy: the theme IS installed at this point, so
+      // saying "nothing was changed" here would be a lie. Only activation failed.
+      setFailure(t("themeInstall.error.installedNotActivated", { name: targetName }));
+      setApplying(false);
+      return;
+    }
+    onDone();
   }
 
   return (
@@ -269,6 +286,12 @@ function ConfirmInstall({
       <p style={QUESTION_STYLE}>{t("themeInstall.question")}</p>
       <p style={HELPER_STYLE}>{t("themeInstall.helper")}</p>
 
+      {listFailed && (
+        <p style={ERROR_STYLE} data-testid="theme-install.list-failed">
+          {t("themeInstall.error.listUnavailable")}
+        </p>
+      )}
+
       {failure !== null && (
         <p style={ERROR_STYLE} data-testid="theme-install.error">
           {failure}
@@ -287,7 +310,7 @@ function ConfirmInstall({
         <Button
           variant="primary"
           onClick={() => void apply()}
-          disabled={applying}
+          disabled={applying || !settled}
           data-testid="theme-install.apply"
         >
           {applying ? t("themeInstall.applying") : t("themeInstall.apply")}
@@ -339,6 +362,11 @@ export function ThemeInstallDialog({ deferred = false }: ThemeInstallDialogProps
       onClose={close}
       labelId="theme-install-title"
       closeLabel={t("themeInstall.close")}
+      // Unlike every other modal, this one is opened by an OS event rather than
+      // by the user, so it can land over an already-open surface. At the shared
+      // level it would paint UNDER the command palette while the focus trap
+      // still gave it the keyboard — a security gate you cannot see.
+      zIndex={UNSOLICITED_MODAL_Z}
     >
       {signal.ok ? (
         // Keyed by the payload: a second link replaces the surface outright

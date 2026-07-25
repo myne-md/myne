@@ -10,8 +10,6 @@
 // types in lockstep with the Rust `ThemesError` / `ThemeError` serde shapes.
 
 import { invoke } from "@tauri-apps/api/core";
-import { setCustomTheme } from "./prefs";
-import { applyCustomTheme } from "./theme";
 import { importReadFile } from "../notes/import/ports";
 import { splitExportPath } from "../notes/exportFlow";
 
@@ -121,16 +119,6 @@ export function nextAvailableThemeName(name: string, taken: readonly string[]): 
   let candidate = name;
   for (let n = 2; existing.has(candidate); n += 1) candidate = `${name} (${n})`;
   return candidate;
-}
-
-/**
- * Make `name` the active custom theme: persist the selection, THEN paint the
- * palette. Disk-first on purpose — a crash between the two leaves the vault
- * consistent and only the screen stale, never the reverse.
- */
-export async function activateCustomTheme(name: string, palette: ThemePalette): Promise<void> {
-  await setCustomTheme(name);
-  applyCustomTheme(palette);
 }
 
 /** Delete one custom theme by name. Idempotent (absent → success). */

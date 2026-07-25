@@ -223,7 +223,7 @@ pub fn run() {
     // `vault_meta_bytes_hash` CAS in MYND-22 is the defensive second
     // layer. See `decisions.md` 2026-05-06 entry.
     #[cfg(desktop)]
-    let builder = builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+    let builder = builder.plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
         use tauri::Manager;
         // MYND-567: on Windows + Linux the OS delivers a `myne://` deep link by
         // spawning a SECOND process whose only argv is the URL — so the
@@ -241,7 +241,7 @@ pub fn run() {
         // `theme_validator` allowlist inside `themes_import` before any write.
         {
             use tauri_plugin_deep_link::DeepLinkExt;
-            app.deep_link().handle_cli_arguments(_args.iter());
+            app.deep_link().handle_cli_arguments(args.iter());
         }
         if let Some(window) = app.get_webview_window("main") {
             let _ = window.unminimize();
@@ -256,8 +256,14 @@ pub fn run() {
     }));
 
     let builder = builder
-        // MYND-567: `myne://` custom-URL-scheme delivery. Registration is
-        // bundle-time from `tauri.conf.json` `plugins.deep-link.desktop.schemes`
+        // MYND-567: `myne://` custom-URL-scheme delivery. COLD START needs no
+        // wiring of ours — the plugin's own `init` already feeds `std::env::args()`
+        // to `handle_cli_arguments` on desktop, which is what makes the WebView's
+        // boot-time `getCurrent()` see a URL the OS launched us with. Do not add a
+        // second call in `setup`: it is redundant, and reading argv ourselves would
+        // put a `std::env::args()` panic-on-non-UTF-8 on the boot path. Registration
+        // itself is bundle-time
+        // from `tauri.conf.json` `plugins.deep-link.desktop.schemes`
         // (macOS `CFBundleURLTypes`, Windows NSIS registry, Linux `.desktop`
         // MimeType), so the scheme belongs to the INSTALLED app on all three
         // platforms. The plugin grants no network capability — it only carries
@@ -380,21 +386,6 @@ pub fn run() {
                         "could not resolve app_data_dir for boot migration; skipping"
                     );
                 }
-            }
-            // MYND-567 COLD START (Windows + Linux): when a `myne://` link
-            // launches the app from closed, THIS process is the one the OS
-            // handed the URL to as argv — there is no second instance and so no
-            // single-instance callback to catch it. Seed the plugin from our own
-            // argv here so the WebView's boot-time `getCurrent()` sees the link.
-            // The plugin only accepts a lone argument that parses as a URL whose
-            // scheme is in the config allowlist, so ordinary launch flags (and
-            // the clipper's `--native-messaging-host`, which exits before this
-            // runs) are ignored. A no-op on macOS, where the OS delivers the URL
-            // as `RunEvent::Opened` instead of argv.
-            #[cfg(desktop)]
-            {
-                use tauri_plugin_deep_link::DeepLinkExt;
-                app.deep_link().handle_cli_arguments(std::env::args());
             }
             // Apply screen-capture protection before `window.show()` so
             // the first frame is protected on macOS + Windows 10 build
