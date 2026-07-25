@@ -29,7 +29,7 @@ import { formatAccountNumberInput } from "../lib/account-number-format";
 import { normalizeBip39Phrase } from "../lib/bip39-normalize";
 import { usePrefs } from "../lib/use-prefs";
 import { setDeviceName } from "../lib/prefs";
-import { suggestedDeviceName } from "../lib/device-name";
+import { DEVICE_NAME_MAX_LEN, useDeviceNameField } from "../lib/device-name";
 import {
   ENROLL_APPROVED_NOTICE,
   ENROLL_NON_DISTINGUISHING_BANNER,
@@ -436,23 +436,9 @@ export function SyncEnrollPanel({ onEnrolled }: SyncEnrollPanelProps) {
   const baseId = useId();
   const { busy, outcome, enroll, reset } = useEnroll();
 
-  // MYND-548: this device's own name, pre-filled from the platform token Rust
-  // reports (refined phone/tablet by the size class). The functional update keeps
-  // a late-resolving suggestion from overwriting what the user typed.
-  const [deviceNameInput, setDeviceNameInput] = useState("");
-  const [suggestedName, setSuggestedName] = useState("");
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      const suggestion = await suggestedDeviceName();
-      if (cancelled) return;
-      setSuggestedName(suggestion);
-      setDeviceNameInput((current) => (current === "" ? suggestion : current));
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  // MYND-548: this device's own name. One hook for both mobile doors (and the
+  // desktop twin), so they cannot drift.
+  const deviceNameField = useDeviceNameField();
 
   const [accountNumber, setAccountNumber] = useState("");
   const [mode, setMode] = useState<EnrollCredentialKind>("password");
@@ -495,10 +481,7 @@ export function SyncEnrollPanel({ onEnrolled }: SyncEnrollPanelProps) {
   const handleSubmit = () => {
     if (!canSubmit) return;
     const credential = mode === "password" ? password : normalizeBip39Phrase(cells.join(" "));
-    // A blank field falls back to the suggestion rather than enrolling nameless
-    // (the backend refuses a blank name outright).
-    const name = deviceNameInput.trim() !== "" ? deviceNameInput.trim() : suggestedName;
-    void enroll(accountNumber.trim(), credential, mode, name);
+    void enroll(accountNumber.trim(), credential, mode, deviceNameField.resolved);
   };
 
   return (
@@ -523,10 +506,10 @@ export function SyncEnrollPanel({ onEnrolled }: SyncEnrollPanelProps) {
           joins the enrollment request. */}
       <FieldLabel mt={14}>{t("sync.enroll.deviceNameLabel")}</FieldLabel>
       <input
-        value={deviceNameInput}
-        onChange={(e) => setDeviceNameInput(e.target.value)}
+        value={deviceNameField.value}
+        onChange={(e) => deviceNameField.setValue(e.target.value)}
         maxLength={DEVICE_NAME_MAX_LEN}
-        placeholder={suggestedName}
+        placeholder={deviceNameField.suggestion}
         autoComplete="off"
         spellCheck={false}
         autoCorrect="off"
@@ -670,11 +653,6 @@ export function SyncEnrollPanel({ onEnrolled }: SyncEnrollPanelProps) {
 
 // ── SY-06 / SY-07 · Your devices + remove confirm ────────────────────────────
 
-/** The maximum device-name length the UI accepts (MYND-548) — a readability
- *  bound, mirroring the desktop constant. There is no Rust-side cap; the prefs
- *  blob's own size ceiling is the real backstop. */
-const DEVICE_NAME_MAX_LEN = 40;
-
 /** The device's synced friendly name (SYNC-41), or a stable `device_id`-prefix
  *  fallback until it is explicitly named (no second default-name heuristic). */
 function deviceName(d: DeviceEntry, names: Record<string, string>, t: TFunction): string {
@@ -695,7 +673,7 @@ interface SasState {
 export function SyncDevicesPanel() {
   const { t } = useTranslation();
   const { devices, pending, error, busy, approve, remove, resetLocal } = useDevices();
-  const { prefs, reload: reloadPrefs } = usePrefs();
+  const { prefs } = usePrefs();
   const names = prefs.device_names;
   const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
 
@@ -718,9 +696,6 @@ export function SyncDevicesPanel() {
     if (trimmed === "") return;
     try {
       await setDeviceName(target.id, trimmed);
-      // `reload` is typed void (fire-and-forget); the hook's own setState is what
-      // re-renders this row.
-      reloadPrefs();
       setRenameFailed(false);
     } catch {
       setRenameFailed(true);
@@ -831,6 +806,8 @@ export function SyncDevicesPanel() {
 
   // SY-07: full-screen-ish confirm sheet body (rendered in place of the list).
   if (confirmRemove) {
+    const target = (devices ?? []).find((d) => d.device_id_hex === confirmRemove);
+    const removeTargetLabel = `${target ? deviceName(target, names, t) : ""} · ${confirmRemove.slice(0, 6)}`;
     return (
       <div style={{ marginTop: 6 }} data-testid="sync.remove-confirm">
         <h2 style={{ margin: "8px 4px 12px", fontSize: 20, fontWeight: 700, color: "var(--fg-1)" }}>
@@ -844,11 +821,7 @@ export function SyncDevicesPanel() {
           style={{ margin: "0 4px 10px", fontSize: 15, color: "var(--fg-1)", fontWeight: 600 }}
           data-testid="sync.remove-target"
         >
-          {(() => {
-            const target = (devices ?? []).find((d) => d.device_id_hex === confirmRemove);
-            const label = target ? deviceName(target, names, t) : "";
-            return `${label} · ${confirmRemove.slice(0, 6)}`;
-          })()}
+          {removeTargetLabel}
         </p>
         <p style={{ margin: "0 4px", fontSize: 15, lineHeight: 1.6, color: "var(--fg-2)" }} data-testid="sync.remove-disclosure">
           {REMOVE_DEVICE_DISCLOSURE}
