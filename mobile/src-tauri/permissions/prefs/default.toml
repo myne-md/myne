@@ -56,6 +56,8 @@ permissions = [
   "allow-set-right-panel-active-tab",
   "allow-set-right-panel-hidden-tabs",
   "allow-set-right-panel-tab-order",
+  "allow-set-editor-toolbar-order",
+  "allow-set-editor-toolbar-hidden",
 ]
 
 [[permission]]
@@ -350,3 +352,13 @@ commands.allow = ["set_right_panel_hidden_tabs"]
 identifier = "allow-set-right-panel-tab-order"
 description = "Allow invoking prefs:set_right_panel_tab_order (Slot::Unlocked-gated setter for the right_panel_tab_order sequence — the right-sidebar tab display order; atomic-writes vault.prefs with no native side-effect, preserving element order verbatim; no codec GC of unknown ids)."
 commands.allow = ["set_right_panel_tab_order"]
+
+[[permission]]
+identifier = "allow-set-editor-toolbar-order"
+description = "Allow invoking prefs:set_editor_toolbar_order (Slot::Unlocked-gated setter for the editor_toolbar_order sequence — the editor format-bar action display order, MYND-555; atomic-writes vault.prefs with no native side-effect, preserving element order verbatim; no codec GC of unknown ids. DEVICE-LOCAL in the sync merge policy, so a phone layout never propagates to a desktop)."
+commands.allow = ["set_editor_toolbar_order"]
+
+[[permission]]
+identifier = "allow-set-editor-toolbar-hidden"
+description = "Allow invoking prefs:set_editor_toolbar_hidden (Slot::Unlocked-gated setter for the editor_toolbar_hidden set — the editor format-bar actions the user hid, MYND-555; atomic-writes vault.prefs with no native side-effect; codec canonicalizes sorted + deduped on encode; no codec GC of unknown ids. DEVICE-LOCAL, like its order twin)."
+commands.allow = ["set_editor_toolbar_hidden"]

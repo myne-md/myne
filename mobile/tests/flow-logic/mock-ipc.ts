@@ -169,6 +169,8 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
       right_panel_active_tab: null,
       right_panel_hidden_tabs: [],
       right_panel_tab_order: [],
+      editor_toolbar_order: [],
+      editor_toolbar_hidden: [],
       item_colors: {},
       label: null,
       saved_views: [],
@@ -186,6 +188,17 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
     const noteText = new Map(seededNotes.map((n) => [n.id, n.text]));
     let savedViews: SavedView[] = config.savedViews ? [...config.savedViews] : [];
     let viewOrder: string[] = savedViews.map((v) => v.id);
+
+    // STATEFUL format-bar layout (MYND-555). Both fields are whole-value setters
+    // and the panel writes optimistically, so a customize flow test is only
+    // meaningful if the write survives into the next `prefs_read` — otherwise the
+    // seeded value would keep winning and the live bar would never change.
+    let toolbarOrder: string[] = Array.isArray(config.prefs?.editor_toolbar_order)
+      ? [...(config.prefs.editor_toolbar_order as string[])]
+      : [];
+    let toolbarHidden: string[] = Array.isArray(config.prefs?.editor_toolbar_hidden)
+      ? [...(config.prefs.editor_toolbar_hidden as string[])]
+      : [];
 
     const handlers: Record<string, (args: Record<string, unknown>) => unknown> = {
       // ── Boot / editor mount ──
@@ -234,7 +247,29 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
         ...(config.prefs ?? {}),
         saved_views: savedViews,
         view_order: viewOrder,
+        // AFTER `config.prefs` — once a setter runs the stateful store owns these,
+        // else the seed would keep winning and a customize would appear to no-op.
+        editor_toolbar_order: toolbarOrder,
+        editor_toolbar_hidden: toolbarHidden,
       }),
+      // Format-bar layout setters (MYND-555): record the write AND mutate the
+      // store. `order` is a verbatim sequence; `hidden` is sorted+deduped by the
+      // real Rust codec, so mirror that here or the mock would let a test pass
+      // against an ordering the device would never return.
+      "plugin:prefs|set_editor_toolbar_order": (args) => {
+        const order = (args.order ?? []) as string[];
+        const w = window as unknown as { __toolbarOrderWrites?: string[][] };
+        (w.__toolbarOrderWrites ??= []).push([...order]);
+        toolbarOrder = [...order];
+        return null;
+      },
+      "plugin:prefs|set_editor_toolbar_hidden": (args) => {
+        const items = (args.items ?? []) as string[];
+        const w = window as unknown as { __toolbarHiddenWrites?: string[][] };
+        (w.__toolbarHiddenWrites ??= []).push([...items]);
+        toolbarHidden = [...new Set(items)].sort();
+        return null;
+      },
       // Record whole-map decoration writes (MYND-516) so a flow test asserts a
       // pick invoked the setter with the spliced key — the `__voiceImports` /
       // `__noteCreates` capture pattern. The payload keys mirror the Rust

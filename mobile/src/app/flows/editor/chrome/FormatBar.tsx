@@ -1,16 +1,23 @@
-import { type CSSProperties, useRef } from "react";
+import { type CSSProperties, type ReactNode, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { editorCommands } from "@myne/editor/toolbar/commands";
 import { undo, redo } from "@codemirror/commands";
 import type { EditorView } from "@codemirror/view";
 import { Spinner } from "../../../../components";
 import type { PressEvt } from "../types";
+import { FORMAT_BAR_ITEMS, visibleFormatBarIds } from "../../../../lib/formatBarItems";
 
 /** Markdown formatting bar that rides above the keyboard (mobile's answer to the
- *  desktop selection toolbar — mirrors Obsidian's accessory bar). Every action
- *  runs a SHARED `@myne/editor` command against the live CMEditor view, so the
- *  formatting logic is identical to desktop and lives in exactly one place.
- *  Horizontally scrollable action row + a pinned keyboard-dismiss button. */
+ *  desktop selection toolbar — mirrors Obsidian's accessory bar; since MYND-559
+ *  it is mobile's ONLY format surface, the engine's floating toolbar being off).
+ *  Every action runs a SHARED `@myne/editor` command against the live CMEditor
+ *  view, so the formatting logic is identical to desktop and lives in exactly one
+ *  place.
+ *
+ *  Layout (MYND-555): a horizontally scrollable region of USER-CONFIGURABLE
+ *  format actions, then the pinned insert chrome (attach / library / record), then
+ *  the pinned right rail (raw toggle + keyboard dismiss). Only the first region is
+ *  reorderable/hideable — see `lib/formatBarItems.ts` for why the chrome is not. */
 export function FormatBar({
   view,
   attaching,
@@ -19,6 +26,8 @@ export function FormatBar({
   onAttach,
   onLibrary,
   onRecord,
+  order = [],
+  hidden = [],
 }: {
   view: EditorView | null;
   attaching: boolean;
@@ -27,6 +36,10 @@ export function FormatBar({
   onAttach: () => void;
   onLibrary: () => void;
   onRecord: () => void;
+  /** Persisted `editor_toolbar_order` (device-local). Empty = canonical order. */
+  order?: readonly string[];
+  /** Persisted `editor_toolbar_hidden` (device-local). Empty = show everything. */
+  hidden?: readonly string[];
 }) {
   const { t } = useTranslation();
   // Fire on a genuine TAP only — never while the row is being scrolled. On
@@ -76,8 +89,73 @@ export function FormatBar({
     fontSize: 16,
   };
   const st = { stroke: "var(--fg-2)", strokeWidth: 1.7, fill: "none", strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
+
+  const labelOf = (id: string): string => {
+    const item = FORMAT_BAR_ITEMS.find((i) => i.id === id);
+    return item ? t(item.labelKey) : id;
+  };
+
+  /** One renderer per vocabulary id. Keyed by the SAME ids
+   *  `lib/formatBarItems.ts` freezes — a vocabulary entry with no entry here
+   *  renders nothing, which the unit test forbids. */
+  const RENDERERS: Record<string, (id: string) => ReactNode> = {
+    undo: (id) => (
+      <button key={id} {...run((v) => { undo(v); v.focus(); })} aria-label={labelOf(id)} data-format-item={id} style={fbtn}>
+        <svg width="20" height="20" viewBox="0 0 24 24"><path d="M7 7L3 11l4 4" {...st} /><path d="M3 11h11a6 6 0 0 1 0 12h-2" {...st} /></svg>
+      </button>
+    ),
+    redo: (id) => (
+      <button key={id} {...run((v) => { redo(v); v.focus(); })} aria-label={labelOf(id)} data-format-item={id} style={fbtn}>
+        <svg width="20" height="20" viewBox="0 0 24 24"><path d="M17 7l4 4-4 4" {...st} /><path d="M21 11H10a6 6 0 0 0 0 12h2" {...st} /></svg>
+      </button>
+    ),
+    heading1: (id) => (
+      <button key={id} {...run(editorCommands.heading1)} aria-label={labelOf(id)} data-format-item={id} style={{ ...fbtn, fontWeight: 700 }}>H1</button>
+    ),
+    heading2: (id) => (
+      <button key={id} {...run(editorCommands.heading2)} aria-label={labelOf(id)} data-format-item={id} style={{ ...fbtn, fontWeight: 700, fontSize: 14 }}>H2</button>
+    ),
+    bold: (id) => (
+      <button key={id} {...run(editorCommands.bold)} aria-label={labelOf(id)} data-format-item={id} style={{ ...fbtn, fontWeight: 800 }}>B</button>
+    ),
+    italic: (id) => (
+      <button key={id} {...run(editorCommands.italic)} aria-label={labelOf(id)} data-format-item={id} style={{ ...fbtn, fontStyle: "italic", fontWeight: 600 }}>I</button>
+    ),
+    bulletList: (id) => (
+      <button key={id} {...run(editorCommands.bulletList)} aria-label={labelOf(id)} data-format-item={id} style={fbtn}>
+        <svg width="20" height="20" viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11" {...st} /><circle cx="4.5" cy="6" r="1.3" fill="var(--fg-2)" /><circle cx="4.5" cy="12" r="1.3" fill="var(--fg-2)" /><circle cx="4.5" cy="18" r="1.3" fill="var(--fg-2)" /></svg>
+      </button>
+    ),
+    checklist: (id) => (
+      <button key={id} {...run(editorCommands.checklist)} aria-label={labelOf(id)} data-format-item={id} style={fbtn}>
+        <svg width="20" height="20" viewBox="0 0 24 24"><rect x="3" y="4" width="7" height="7" rx="1.5" {...st} /><path d="M4.6 7.5l1.5 1.5 2.3-2.6" {...st} /><path d="M13 7.5h8M13 16.5h8" {...st} /><rect x="3" y="13" width="7" height="7" rx="1.5" {...st} /></svg>
+      </button>
+    ),
+    quote: (id) => (
+      <button key={id} {...run(editorCommands.quote)} aria-label={labelOf(id)} data-format-item={id} style={fbtn}>
+        <svg width="20" height="20" viewBox="0 0 24 24"><path d="M5 5v14M9 8h11M9 12h11M9 16h7" {...st} /></svg>
+      </button>
+    ),
+    code: (id) => (
+      <button key={id} {...run(editorCommands.code)} aria-label={labelOf(id)} data-format-item={id} style={fbtn}>
+        <svg width="20" height="20" viewBox="0 0 24 24"><path d="M9 8l-4 4 4 4M15 8l4 4-4 4" {...st} /></svg>
+      </button>
+    ),
+    wikilink: (id) => (
+      <button key={id} {...run(editorCommands.wikilink)} aria-label={labelOf(id)} data-format-item={id} style={{ ...fbtn, fontWeight: 700, fontSize: 15 }}>[[</button>
+    ),
+    link: (id) => (
+      <button key={id} {...run(editorCommands.link)} aria-label={labelOf(id)} data-format-item={id} style={fbtn}>
+        <svg width="20" height="20" viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.6 0l3-3a4 4 0 0 0-5.6-5.6L11 7" {...st} /><path d="M14 10a4 4 0 0 0-5.6 0l-3 3a4 4 0 0 0 5.6 5.6L13 17" {...st} /></svg>
+      </button>
+    ),
+  };
+
+  const visible = visibleFormatBarIds(order, hidden);
+
   return (
     <div
+      data-testid="editor.format-bar"
       style={{
         flex: "none",
         display: "flex",
@@ -88,33 +166,13 @@ export function FormatBar({
       }}
     >
       <div style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 1, overflowX: "auto", padding: "6px 6px", scrollbarWidth: "none", touchAction: "pan-x" }}>
-        <button {...run((v) => { undo(v); v.focus(); })} aria-label={t("notes.list.undo")} style={fbtn}>
-          <svg width="20" height="20" viewBox="0 0 24 24"><path d="M7 7L3 11l4 4" {...st} /><path d="M3 11h11a6 6 0 0 1 0 12h-2" {...st} /></svg>
-        </button>
-        <button {...run((v) => { redo(v); v.focus(); })} aria-label={t("editor.formatBar.redo")} style={fbtn}>
-          <svg width="20" height="20" viewBox="0 0 24 24"><path d="M17 7l4 4-4 4" {...st} /><path d="M21 11H10a6 6 0 0 0 0 12h2" {...st} /></svg>
-        </button>
-        <div style={{ width: 1, height: 22, background: "var(--line-2)", margin: "0 5px", flex: "none" }} />
-        <button {...run(editorCommands.heading1)} aria-label={t("editor.slash.heading1")} style={{ ...fbtn, fontWeight: 700 }}>H1</button>
-        <button {...run(editorCommands.heading2)} aria-label={t("editor.slash.heading2")} style={{ ...fbtn, fontWeight: 700, fontSize: 14 }}>H2</button>
-        <button {...run(editorCommands.bold)} aria-label={t("editor.toolbar.customize.bold")} style={{ ...fbtn, fontWeight: 800 }}>B</button>
-        <button {...run(editorCommands.italic)} aria-label={t("editor.toolbar.customize.italic")} style={{ ...fbtn, fontStyle: "italic", fontWeight: 600 }}>I</button>
-        <button {...run(editorCommands.bulletList)} aria-label={t("editor.slash.bulletList")} style={fbtn}>
-          <svg width="20" height="20" viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11" {...st} /><circle cx="4.5" cy="6" r="1.3" fill="var(--fg-2)" /><circle cx="4.5" cy="12" r="1.3" fill="var(--fg-2)" /><circle cx="4.5" cy="18" r="1.3" fill="var(--fg-2)" /></svg>
-        </button>
-        <button {...run(editorCommands.checklist)} aria-label={t("editor.toolbar.customize.checklist")} style={fbtn}>
-          <svg width="20" height="20" viewBox="0 0 24 24"><rect x="3" y="4" width="7" height="7" rx="1.5" {...st} /><path d="M4.6 7.5l1.5 1.5 2.3-2.6" {...st} /><path d="M13 7.5h8M13 16.5h8" {...st} /><rect x="3" y="13" width="7" height="7" rx="1.5" {...st} /></svg>
-        </button>
-        <button {...run(editorCommands.quote)} aria-label={t("editor.slash.quote")} style={fbtn}>
-          <svg width="20" height="20" viewBox="0 0 24 24"><path d="M5 5v14M9 8h11M9 12h11M9 16h7" {...st} /></svg>
-        </button>
-        <button {...run(editorCommands.code)} aria-label={t("editor.toolbar.customize.code")} style={fbtn}>
-          <svg width="20" height="20" viewBox="0 0 24 24"><path d="M9 8l-4 4 4 4M15 8l4 4-4 4" {...st} /></svg>
-        </button>
-        <button {...run(editorCommands.wikilink)} aria-label={t("editor.slash.wikiLink")} style={{ ...fbtn, fontWeight: 700, fontSize: 15 }}>[[</button>
-        <button {...run(editorCommands.link)} aria-label={t("editor.slash.link")} style={fbtn}>
-          <svg width="20" height="20" viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.6 0l3-3a4 4 0 0 0-5.6-5.6L11 7" {...st} /><path d="M14 10a4 4 0 0 0-5.6 0l-3 3a4 4 0 0 0 5.6 5.6L13 17" {...st} /></svg>
-        </button>
+        {visible.map((id) => RENDERERS[id]?.(id) ?? null)}
+        {/* Separator between the configurable format region and the pinned insert
+            chrome — omitted when every format action is hidden, so an emptied bar
+            does not open with a stray rule. */}
+        {visible.length > 0 && (
+          <div style={{ width: 1, height: 22, background: "var(--line-2)", margin: "0 5px", flex: "none" }} />
+        )}
         <button {...tap(onAttach)} disabled={attaching} aria-label={t("editor.formatBar.attachFile")} style={{ ...fbtn, opacity: attaching ? 0.5 : 1 }}>
           {attaching ? <Spinner size={18} /> : (
             <svg width="20" height="20" viewBox="0 0 24 24"><path d="M21 12.5 12.5 21a5 5 0 0 1-7-7l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7L9.6 18.4a1.7 1.7 0 0 1-2.4-2.4l7.6-7.6" {...st} /></svg>
