@@ -39,6 +39,72 @@ test.describe("sync enroll flow", () => {
     await expect(page.getByTestId("sync.enroll.pending")).toBeVisible();
   });
 
+  test("the device-name field is pre-filled, editable, and lands on the new device", async ({
+    page,
+  }) => {
+    // MYND-548: naming happens at the one moment the user is provably holding
+    // this device. The suggestion comes from the Rust platform token — never from
+    // `navigator`, which would be a second default-name heuristic.
+    await installMockIpc(page, {
+      syncStatus: { state: "not_enrolled" },
+      enrollResult: { approved: true },
+      devicePlatform: "ios",
+      // The roster is mocked independently of enroll, so seed the row the
+      // enrollment registers (the mock hands back this device_id).
+      devices: [
+        {
+          device_id_hex: "aa11bb22cc33dd44ee55ff6677889900",
+          approved: true,
+          retired: false,
+          is_current: true,
+        },
+      ],
+    });
+    await openSyncSettings(page);
+    await page.getByTestId("sync.settings.add-device").click();
+
+    const nameField = page.getByTestId("sync.enroll.device-name-input");
+    await expect(nameField).toHaveValue("iPhone");
+
+    await nameField.fill("Work phone");
+    await page.getByTestId("sync.enroll.account-input").fill("MY-4K7P-9RH2-JR3T-8XW6-VZ0A");
+    await page.getByTestId("sync.enroll.password-input").fill("correct horse battery staple");
+    await page.getByTestId("sync.enroll.submit").click();
+
+    // The name was written for the device_id the enrollment returned, so the
+    // device list now leads with it instead of the id-derived fallback.
+    await page.getByTestId("sync.settings.devices").click();
+    await expect(page.getByTestId("sync.device-name").first()).toHaveText("Work phone");
+  });
+
+  test("submitting with the name field cleared falls back to the suggestion", async ({ page }) => {
+    // A device must never arrive nameless: the blank falls back to the platform
+    // suggestion (and the backend refuses a blank outright).
+    await installMockIpc(page, {
+      syncStatus: { state: "not_enrolled" },
+      enrollResult: { approved: true },
+      devicePlatform: "android",
+      devices: [
+        {
+          device_id_hex: "aa11bb22cc33dd44ee55ff6677889900",
+          approved: true,
+          retired: false,
+          is_current: true,
+        },
+      ],
+    });
+    await openSyncSettings(page);
+    await page.getByTestId("sync.settings.add-device").click();
+
+    await page.getByTestId("sync.enroll.device-name-input").fill("");
+    await page.getByTestId("sync.enroll.account-input").fill("MY-4K7P-9RH2-JR3T-8XW6-VZ0A");
+    await page.getByTestId("sync.enroll.password-input").fill("correct horse battery staple");
+    await page.getByTestId("sync.enroll.submit").click();
+
+    await page.getByTestId("sync.settings.devices").click();
+    await expect(page.getByTestId("sync.device-name").first()).toHaveText("Android phone");
+  });
+
   test("wrong account → the single non-distinguishing banner", async ({ page }) => {
     await installMockIpc(page, {
       syncStatus: { state: "not_enrolled" },
