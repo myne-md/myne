@@ -33,6 +33,7 @@
 pub mod commands;
 pub mod error;
 pub mod extract_types;
+pub mod ocr;
 pub mod reconcile;
 pub mod reconcile_commands;
 pub mod ref_scan;

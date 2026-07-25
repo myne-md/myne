@@ -406,7 +406,24 @@ mod tests {
         write_extracted(tmp.path(), &KEY, &ACCOUNT_HASH, &ATT_ID, &sample()).expect("write");
         let path = cache_path(tmp.path(), &ATT_ID);
         let mut bytes = std::fs::read(&path).unwrap();
-        bytes[5] = 0x03; // a future extractor generation beyond the current 0x02
+        bytes[5] = 0x04; // a generation beyond the current 0x03 (image OCR, MYND-441)
+        std::fs::write(&path, &bytes).unwrap();
+        assert!(read_extracted(tmp.path(), &KEY, &ACCOUNT_HASH, &ATT_ID).is_none());
+    }
+
+    #[test]
+    fn a_prior_generation_blob_is_also_a_cache_miss() {
+        // The other direction, and the one the OCR bump actually exercises: a
+        // blob written by an OLDER generation (0x02, the audio-ASR set) must
+        // also read as a miss so the caller re-extracts under 0x03. This is
+        // what makes the bump cost real — every cached extraction of every
+        // format is discarded, including audio transcripts the OCR generation
+        // does not improve (accepted deliberately; MYND-573 is the fix).
+        let tmp = ScopedTempDir::new("mye1-cache-prior-gen").expect("tmp");
+        write_extracted(tmp.path(), &KEY, &ACCOUNT_HASH, &ATT_ID, &sample()).expect("write");
+        let path = cache_path(tmp.path(), &ATT_ID);
+        let mut bytes = std::fs::read(&path).unwrap();
+        bytes[5] = 0x02;
         std::fs::write(&path, &bytes).unwrap();
         assert!(read_extracted(tmp.path(), &KEY, &ACCOUNT_HASH, &ATT_ID).is_none());
     }

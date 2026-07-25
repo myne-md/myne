@@ -12,14 +12,29 @@
 # NOT an HTTP client. (Measured 2026-07-02: the only denylist-family crates in
 # the shipped tree are those three; the AI delta adds zero networked crate.)
 #
-# Two checks run:
+# Three checks run:
 #   1. ABSOLUTE — scan the shipped (default, AI-on) closure; fail on any
 #      denylisted crate that is NOT in the SYNC_TLS_ALLOW allowlist. If sync
 #      ever swaps its TLS crate, this fails on purpose and forces a conscious
 #      TB9 review rather than silently widening the network surface.
 #   2. AI DELTA (belt-and-suspenders) — diff the shipped tree against the
-#      AI-free `--no-default-features` baseline; the crates the AI path adds
-#      must contain none of the denylist. Proves "enabling AI adds no egress".
+#      `--no-default-features` baseline; the crates the AI path adds must
+#      contain none of the denylist. Proves "enabling AI adds no egress".
+#   3. OCR UNGATED (MYND-441) — assert the OCR runtime is present in BOTH
+#      trees. OCR is search correctness, not an AI feature, so it deliberately
+#      ships in the `--no-default-features` build too. This check exists so a
+#      later refactor cannot quietly move it behind `local-inference` and
+#      change what the audit build actually does.
+#
+# NOTE on the `--no-default-features` build (MYND-441): it is no longer
+# "ML-free". It drops the generation model, the embedding model and ASR, and it
+# still has no network path — but it DOES contain the OCR neural network, by
+# design. `src-tauri/Cargo.toml`'s build-configuration comment carries the
+# corrected claim; do not reintroduce "zero ML symbols" language here.
+#
+# The OCR crates need no denylist entry of their own: they live in `myne-core`,
+# which is in the shipped tree, so check 1 already scans them. `rten` has no
+# network surface and the loader only ever reads the bundled resource dir.
 #
 # Also asserts the single-shared `Cargo.lock` (TB9 anchor) and no wildcard
 # version specs. `cargo tree` only RESOLVES the graph (no compile), so this is
@@ -136,6 +151,30 @@ for crate in $delta; do
   fi
 done
 [ "$delta_net" -eq 0 ] && echo "  ✓ the AI path adds zero networked crate"
+
+# ── Check 3: OCR UNGATED — the OCR runtime must be in BOTH trees (MYND-441).
+#    OCR is search correctness, not an AI feature: gating it would make the
+#    audit build search differently from the shipped product. ───────────────
+echo "== OCR is ungated (present in the --no-default-features tree too) =="
+OCR_CRATES="rten"
+for crate in $OCR_CRATES; do
+  in_on=0; in_off=0
+  printf '%s\n' "$on"  | grep -qx "$crate" && in_on=1
+  printf '%s\n' "$off" | grep -qx "$crate" && in_off=1
+  if [ "$in_on" -eq 1 ] && [ "$in_off" -eq 1 ]; then
+    echo "  ✓ $crate present in both trees (OCR ships ungated)"
+  elif [ "$in_on" -eq 1 ] && [ "$in_off" -eq 0 ]; then
+    echo "  ✗ $crate is in the default tree but NOT in --no-default-features:"
+    echo "    OCR has been feature-gated. That silently changes what the AI-free"
+    echo "    audit build does (search stops reaching inside images) and reverses"
+    echo "    a deliberate MYND-441 decision. Ungate it, or land a decisions.md"
+    echo "    entry that supersedes it."
+    violation=1
+  else
+    echo "  ✗ $crate missing from the shipped tree — OCR would not build"
+    violation=1
+  fi
+done
 
 echo "== Cargo.lock single-shared (TB9 anchor) =="
 tracked_locks="$(git -C "$REPO_ROOT" ls-files '*Cargo.lock' | grep -v '/fuzz/' || true)"

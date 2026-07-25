@@ -48,6 +48,35 @@ rust-stemmers = "1"
 # single-stems it while the query stays multi-stemmed. Moved here with the
 # search engine (was desktop-only); same pin as the shared lock.
 whatlang = "0.18"
+# On-device OCR for image + scanned-PDF attachments (MYND-441, `plugins::
+# attachments::ocr`). `rten` is a pure-Rust ML runtime — no C++ toolchain, no
+# prebuilt per-platform binary — which is what keeps the single workspace
+# `Cargo.lock` (TB9) and the mobile cross-builds intact; a rasterizer or an
+# onnxruntime binding would have cost both. It runs the bundled PP-OCRv5 mobile
+# weights (`src-tauri/resources/models/ocr/`, Apache-2.0, converted once from
+# ONNX and committed hash-pinned). Lives in core, not the desktop crate, because
+# mobile ships the same extractor (the import path already injects it).
+#
+# NOT gated behind `local-inference`: OCR is search correctness, not an AI
+# feature, so it compiles in every build including `--no-default-features`
+# (decisions.md entry owed with this feature; see `src-tauri/Cargo.toml`'s
+# build-configuration comment, corrected in the same change).
+#
+# Models are loaded ONLY from the bundled resource path. `rten` itself has no
+# network surface, and `src-tauri/scripts/ai-no-network-check.sh` scans for one.
+# `rten_format` ONLY — deliberately narrower than the crate's default, which
+# also pulls `onnx_format` (`rten-onnx`). We ship weights already converted to
+# `.rten` and never read ONNX at runtime, so the ONNX parser would be pure
+# untrusted-input surface for a path that is never taken.
+rten = { version = "0.24", default-features = false, features = ["rten_format"] }
+rten-tensor = "0.24"
+# Decoders for the image formats `sniff.rs` already accepts as attachments.
+# `default-features = false` + an explicit three-format list keeps the surface
+# to what OCR actually needs (PNG / JPEG / WebP) instead of the crate's full
+# codec matrix — adding a dependency is a security decision, and every extra
+# format decoder is extra untrusted-input parsing on an attachment path.
+# GIF (animation) and SVG (already text) are deliberately not decoded.
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp"] }
 # Phase 2 sync transport (extracted from the desktop crate with the sync engine,
 # decisions.md 2026-07-07). base64 = the SCRAM/enroll wire encoding; the
 # raw-rustls connection layer that SCRAM auth + sync push/pull share — one TLS
