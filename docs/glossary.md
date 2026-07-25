@@ -527,6 +527,12 @@ The permanent, client-generated 16-byte random identifier of a device as it appe
 
 Used in: `spec/sync-protocol.md` (vault head, version vector)
 
+### **device name** &nbsp; 📦 *Product*
+
+The human-readable label the device list shows for one enrolled device — "Studio Mac", "Travel Laptop" — as opposed to its opaque [device_id](#device_id-vv-actor). Lives **only** in the `device_names` map inside the AEAD-sealed [vault.prefs](#vaultprefs) (`spec/protocol.md` §9.5.2), keyed by the `device_id` hex: it is a [shared pref](#shared-pref) that merges **per key** by union, each entry racing on its own `device_names/<key>` clock (`spec/sync-protocol.md` §10.2). Set at enrollment from an editable field pre-filled with a platform word, and changeable afterwards from **any** device. Three properties are load-bearing and easy to get wrong: it is **never sent to the server** (no name field exists in the enrollment request or the device roster — TB5), a **pending** device's name is never shown to the approving device (a label beside an unverified device would read as a trust signal and weaken the [bootstrap-fingerprint](#bootstrap-fingerprint) compare), and there is **no delete** — union merge cannot propagate a removed key, so a name can only ever be replaced. Distinct from the vault `label` (which names a *vault*, not a device). Phase 2.
+
+Used in: `spec/protocol.md` §9.5.2; `spec/sync-protocol.md` §10.2; `decisions.md` 2026-07-25 (MYND-548)
+
 ### **device registry** &nbsp; 📦 *Product*
 
 The Phase 2 server's per-account table of enrolled devices, the server-side record that makes **revocation** possible (AS16 — device count per account is server-visible by necessity). Keyed by the client-generated [device_id](#device_id-vv-actor) (the VV-actor), **distinct from** the secret per-device token. Revocation in v0.1 = token iptal (an **availability** control — it stops a device syncing; it is not forward-secret, which is a v005/MLS feature, `threat-model.md` §7). The device-approval gate that admits a new enrollment is a server authz concern (the ceremony is MYND-425). Phase 2.

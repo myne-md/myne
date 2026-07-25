@@ -114,7 +114,15 @@ export async function setupTwoSyncedDevices(
 ): Promise<TwoSyncedDevices>;
 export async function setupTwoSyncedDevices(
   srv: EphemeralServer,
-  opts: { seedNote?: boolean } = {},
+  opts: {
+    seedNote?: boolean;
+    /** MYND-548: type these into the two enrollment forms' "Name this device"
+     *  fields instead of accepting the pre-filled platform default. */
+    deviceNames?: { a: string; b: string };
+    /** MYND-548: runs on A while B is still PENDING — the only window in which
+     *  the pending row is observable, since approval closes it immediately. */
+    whilePending?: (devices: { a: AppSession; b: AppSession }) => Promise<void>;
+  } = {},
 ): Promise<TwoSyncedDevices> {
   const seedNote = opts.seedNote ?? true;
   let account = "";
@@ -136,6 +144,11 @@ export async function setupTwoSyncedDevices(
       await openSettings(a.session);
       await (await a.session.byTestId("settings.tab-sync")).click();
       await (await a.session.byTestId("sync.enroll.account-input")).sendKeys(account);
+      if (opts.deviceNames) {
+        const nameField = await a.session.byTestId("sync.enroll.device-name-input");
+        await nameField.clear();
+        await nameField.sendKeys(opts.deviceNames.a);
+      }
       await (await a.session.byTestId("sync.enroll.password-input")).sendKeys(password);
       await (await a.session.byTestId("sync.enroll.submit")).click();
       await a.session.byTestId("sync.enroll.approved", { timeoutMs: 30_000 });
@@ -157,6 +170,11 @@ export async function setupTwoSyncedDevices(
       await b.session.byTestId("join.modal");
       await (await b.session.byTestId("join.server-input")).sendKeys(srv.url);
       await (await b.session.byTestId("join.account-input")).sendKeys(account);
+      if (opts.deviceNames) {
+        const nameField = await b.session.byTestId("join.device-name-input");
+        await nameField.clear();
+        await nameField.sendKeys(opts.deviceNames.b);
+      }
       await (await b.session.byTestId("join.password-input")).sendKeys(password);
       await (await b.session.byTestId("join.submit")).click();
       await b.session.byTestId("join.pending", { timeoutMs: 30_000 });
@@ -164,6 +182,10 @@ export async function setupTwoSyncedDevices(
       // A: approve B while it is pending.
       await openSettings(a.session);
       await (await a.session.byTestId("settings.tab-sync")).click();
+      // Anything that must observe the PENDING row runs here — approving closes
+      // that window for good.
+      await a.session.byTestId("sync.pending-row", { timeoutMs: 30_000 });
+      if (opts.whilePending) await opts.whilePending({ a, b });
       await (await a.session.byTestId("sync.approve-device", { timeoutMs: 30_000 })).click();
       await closeSettings(a.session);
 
