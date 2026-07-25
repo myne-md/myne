@@ -696,6 +696,95 @@ fn prefs_rename_replicates_and_device_local_stays_local() {
     assert_eq!(s0.pushed + s1.pushed, 0, "quiesced fleet stays silent");
 }
 
+/// MYND-562 regression canary — the original desktop↔mobile decoration scramble,
+/// reproduced at the plane it actually lives (the `vault.prefs` merge). Two
+/// devices concurrently decorate DIFFERENT folders and mark the SAME folder as a
+/// case-variant deliberate empty. After sync BOTH devices must converge to:
+///   • both folder colors + the icon preserved — the per-key LWW fix (whole-map
+///     LWW dropped the lower-clock side's *entire* map, losing the other folder's
+///     decoration); and
+///   • a SINGLE canonical `deliberate_folders` entry — the fold-aware set-union
+///     fix (case-sensitive union let "personal/" and "PERSONAL/" coexist).
+/// RED against the pre-MYND-562 merge (whole-map LWW + case-sensitive union),
+/// GREEN after Tasks 1 & 2.
+#[test]
+fn decoration_prefs_converge_per_key_across_case_variants() {
+    let (_guard, url) = server_or_skip!("decoration_prefs_562");
+    let acct = Account::new(0x5c);
+    let devices = enroll_devices(&acct, &url, 2);
+    let prefs_key = derive_subkey(&acct.root_key, SubkeyRole::PrefsKey);
+
+    let write_prefs = |d: &Device, view: &protocol::PrefsView| {
+        let bytes = protocol::encode_prefs_blob(&prefs_key, &acct.account_hash, view).unwrap();
+        std::fs::write(d.vault_dir.join("vault.prefs"), &bytes).unwrap();
+    };
+    let read_prefs = |d: &Device| -> protocol::PrefsView {
+        let bytes = std::fs::read(d.vault_dir.join("vault.prefs")).unwrap();
+        protocol::decode_prefs_blob(&prefs_key, &acct.account_hash, &bytes).unwrap()
+    };
+
+    // A decorates folder `work/` (color + icon) and marks `personal/` deliberate.
+    let mut a = protocol::PrefsView {
+        deliberate_folders: vec![String::from("personal/")],
+        ..protocol::PrefsView::default()
+    };
+    a.item_colors
+        .insert(String::from("work/"), String::from("clay"));
+    a.folder_icons
+        .insert(String::from("work/"), String::from("book"));
+    a.field_clocks
+        .insert(String::from("item_colors/work/"), 1_000);
+    a.field_clocks
+        .insert(String::from("folder_icons/work/"), 1_000);
+    write_prefs(&devices[0], &a);
+
+    // B concurrently decorates a DIFFERENT folder `ideas/` and marks the SAME
+    // folder as the case-variant `PERSONAL/`.
+    let mut b = protocol::PrefsView {
+        deliberate_folders: vec![String::from("PERSONAL/")],
+        ..protocol::PrefsView::default()
+    };
+    b.item_colors
+        .insert(String::from("ideas/"), String::from("moss"));
+    b.field_clocks
+        .insert(String::from("item_colors/ideas/"), 1_000);
+    write_prefs(&devices[1], &b);
+
+    quiesce(&devices, 8);
+
+    for d in &devices {
+        let v = read_prefs(d);
+        // Per-key LWW: BOTH folders' colors survive the merge (whole-map LWW
+        // would have dropped one side's entire map).
+        assert_eq!(
+            v.item_colors.get("work/").map(String::as_str),
+            Some("clay"),
+            "device {}: A's work/ color survived",
+            d.label
+        );
+        assert_eq!(
+            v.item_colors.get("ideas/").map(String::as_str),
+            Some("moss"),
+            "device {}: B's ideas/ color survived (no lost update)",
+            d.label
+        );
+        assert_eq!(
+            v.folder_icons.get("work/").map(String::as_str),
+            Some("book"),
+            "device {}: A's work/ icon survived",
+            d.label
+        );
+        // Fold-aware set-union: the case-variant deliberate folders collapse to a
+        // single lexicographic-min canonical entry.
+        assert_eq!(
+            v.deliberate_folders,
+            vec![String::from("PERSONAL/")],
+            "device {}: case-variant deliberate folders folded to one canonical",
+            d.label
+        );
+    }
+}
+
 /// The CORRECT deletion path (`deleteNoteRouted`) converges: both devices end
 /// with the `deleted:`-marked version. This is the control proving the harness
 /// distinguishes the good path from the buggy `empty_trash` one below.

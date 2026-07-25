@@ -58,9 +58,14 @@ export async function ipcOk(
 export async function unlockToEditor(
   session: Session,
   password: string,
-  timeoutMs = 30_000,
+  timeoutMs = 45_000,
 ): Promise<void> {
-  const input = await session.byTestId("unlock.password-input");
+  // Wait for the lock screen to mount with the SAME budget as the editor below.
+  // Under the full-suite's cumulative WebKitGTK load the unlock screen's first
+  // paint can slip well past the old ceilings — observed timing out even at 30s
+  // on a contended CI run (nav1) — so both waits use the raised default budget
+  // (aligned with DEFAULT_TIMEOUT_MS). Never reproduces in an isolated run.
+  const input = await session.byTestId("unlock.password-input", { timeoutMs });
   await input.sendKeys(password);
   // WebKit's driver can silently swallow the leading keystrokes sent during the
   // input's focus-settle (the same settle-drop the editor's q-probe guards
@@ -222,7 +227,7 @@ export async function dismissImporterOfferIfPresent(session: Session): Promise<v
  *  populated vault, so the second mount uses `dismissImporterOfferIfPresent`. */
 export async function lockAndReunlock(session: Session, password: string): Promise<void> {
   await (await session.byTestId("editor.lock-cta")).click();
-  await session.byTestId("unlock.password-input", { timeoutMs: 30_000 });
+  await session.byTestId("unlock.password-input", { timeoutMs: 45_000 });
   await unlockToEditor(session, password);
   await dismissImporterOfferIfPresent(session);
 }

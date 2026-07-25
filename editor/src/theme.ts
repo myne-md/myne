@@ -1600,6 +1600,118 @@ export const myneTheme = EditorView.theme({
     whiteSpace: "nowrap",
   },
 
+  // --- transcript section (voice-to-text MYND-552) --------------------------
+  ".cm-attachment-audio-transcript-section": {
+    display: "block",
+  },
+  // In-flight progress affordance (busy chrome + live partial + Stop).
+  ".cm-attachment-audio-transcript-progress": {
+    display: "flex",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: "8px",
+    marginTop: "2px",
+    padding: "6px 8px",
+    borderRadius: "var(--radius-1, 4px)",
+    backgroundColor: "var(--paper-2, #f3f1eb)",
+  },
+  ".cm-attachment-audio-transcript-progress-label": {
+    fontSize: "12px",
+    color: "var(--fg-2, #44423d)",
+  },
+  ".cm-attachment-audio-transcript-meter": {
+    display: "flex",
+    alignItems: "center",
+    gap: "2px",
+    height: "14px",
+  },
+  // Bar height/opacity is animated by the global keyframes in
+  // `attachments/styles.ts` (@keyframes is unsupported in the CM theme's
+  // StyleModule) — this rule only supplies the static box + accent colour.
+  ".cm-attachment-audio-transcript-bar": {
+    width: "3px",
+    height: "40%",
+    borderRadius: "999px",
+    backgroundColor: "var(--accent, #2c4a7a)",
+  },
+  ".cm-attachment-audio-transcript-preview": {
+    flex: "1 1 100%",
+    fontSize: "12px",
+    color: "var(--fg-3, #6b6a64)",
+    fontStyle: "italic",
+    maxHeight: "3.6em",
+    overflow: "hidden",
+  },
+  ".cm-attachment-audio-transcript-stop": {
+    appearance: "none",
+    border: "1px solid var(--line-2, #c8c7c1)",
+    background: "transparent",
+    fontFamily: "var(--font-sans)",
+    fontSize: "12px",
+    padding: "3px 10px",
+    borderRadius: "var(--radius-1, 4px)",
+    cursor: "pointer",
+    color: "var(--fg-1, #1a1a17)",
+  },
+  // Completed read-only expander.
+  ".cm-attachment-audio-transcript": {
+    display: "block",
+    marginTop: "4px",
+  },
+  ".cm-attachment-audio-transcript-toggle": {
+    appearance: "none",
+    border: "none",
+    background: "transparent",
+    padding: "2px 0",
+    fontFamily: "var(--font-sans)",
+    fontSize: "12px",
+    fontWeight: "600",
+    color: "var(--fg-2, #44423d)",
+    cursor: "pointer",
+  },
+  ".cm-attachment-audio-transcript-bodywrap": {
+    display: "block",
+  },
+  ".cm-attachment-audio-transcript-body": {
+    display: "block",
+    marginTop: "2px",
+    padding: "6px 8px",
+    borderRadius: "var(--radius-1, 4px)",
+    backgroundColor: "var(--paper-2, #f3f1eb)",
+    fontFamily: "var(--font-sans)",
+    fontSize: "13px",
+    lineHeight: "1.5",
+    color: "var(--fg-1, #1a1a17)",
+    whiteSpace: "pre-wrap",
+    maxHeight: "200px",
+    overflow: "auto",
+  },
+  ".cm-attachment-audio-transcript-note": {
+    display: "block",
+    marginTop: "4px",
+    fontSize: "11px",
+    color: "var(--fg-3, #6b6a64)",
+    lineHeight: "1.4",
+  },
+  ".cm-attachment-audio-transcript-insert": {
+    appearance: "none",
+    marginTop: "6px",
+    border: "1px solid var(--line-2, #c8c7c1)",
+    background: "var(--paper, #faf8f3)",
+    fontFamily: "var(--font-sans)",
+    fontSize: "12px",
+    padding: "4px 10px",
+    borderRadius: "var(--radius-1, 4px)",
+    cursor: "pointer",
+    color: "var(--fg-1, #1a1a17)",
+  },
+  ".cm-attachment-audio-transcript-hint": {
+    display: "block",
+    marginTop: "4px",
+    fontSize: "12px",
+    color: "var(--fg-3, #6b6a64)",
+  },
+
   // Autocomplete tooltip (emoji `:shortcode`, MYND-156). CM6 mounts the
   // completion tooltip inside the editor's tooltip layer, so its `.cm-tooltip*`
   // classes ARE reachable by this theme (unlike the body-mounted slash menu).

@@ -12,7 +12,14 @@ export { setToolbarLayout, setSelectionExportHandler } from "./toolbar/plugin";
 // command-palette action can run it on the active view.
 export { cycleHeading } from "./keymap";
 export { setEditorHost, getHost } from "./host";
-export type { EditorHost, EditorPrefs, TagTreeNode, SpellWord } from "./host";
+export type {
+  EditorHost,
+  EditorPrefs,
+  TagTreeNode,
+  SpellWord,
+  TranscribeHandle,
+  TranscribeOptions,
+} from "./host";
 export type { ResolverNote } from "./host/notes/resolveWikilink";
 // MYND-382: the enumerate-only imported-block-anchor scanner (the single dialect
 // source for `^block-id` markers) — reused by the vault-indices apply path to

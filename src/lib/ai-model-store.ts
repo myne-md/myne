@@ -8,7 +8,7 @@
 import { invoke } from "@tauri-apps/api/core";
 
 /** Which model a stored path refers to (mirrors the Rust `ModelRole`). */
-export type ModelRole = "generation" | "embedding";
+export type ModelRole = "generation" | "embedding" | "transcription";
 
 /**
  * Persist the user-picked model `path` for `role` device-locally. Returns the
