@@ -240,8 +240,9 @@ export function EnrollDeviceForm() {
       </div>
 
       {/* MYND-548: named here, at the one moment the user is provably standing in
-          front of this machine. Written to THIS vault's local prefs on success —
-          it never joins the enrollment request. */}
+          front of this machine. The name is held in RAM and written to this
+          vault's own prefs only AFTER the first authed sync cycle — never with
+          the enrollment request, and never before that cycle (see useEnroll). */}
       <div style={FIELD}>
         <label style={LABEL} htmlFor={`${baseId}-device-name`}>
           {t("sync.enroll.deviceNameLabel")}

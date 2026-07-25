@@ -819,53 +819,15 @@ fn sync_prefs_phase(
 
     let prefs_key = derive_subkey(root_key, SubkeyRole::PrefsKey);
     let path = vault_root.join("vault.prefs");
-    let mut local_bytes = std::fs::read(&path).ok();
-    let mut local_nonce = local_bytes.as_deref().and_then(read_prefs_nonce);
+    let local_bytes = std::fs::read(&path).ok();
+    let local_nonce = local_bytes.as_deref().and_then(read_prefs_nonce);
     // §9.5.5 read semantic: any local decode failure falls back to defaults.
-    let mut local_view = local_bytes
+    let local_view = local_bytes
         .as_deref()
         .and_then(|b| protocol::decode_prefs_blob(&prefs_key, account_number_hash, b).ok())
         .unwrap_or_default();
 
     let id_hex = hex(prefs_id);
-
-    // MYND-548: apply the device name chosen at enrollment, which `sync_enroll` /
-    // `sync_join_account` parked in device-local state rather than writing to
-    // `vault.prefs` directly. Writing it at enroll time would create the blob
-    // before this device's first authed cycle and so permanently disable the
-    // §10.2.1 wholesale seed below — which is gated on "no prefs file on disk".
-    //
-    // So it is applied only once that seed can no longer fire: either we have
-    // already reconciled prefs against the server (a baseline exists), or the
-    // account has no prefs blob to seed from at all. On a joining device that
-    // means the name lands one cycle after the seed instead of before it.
-    let seed_possible = !state.blobs.contains_key(&id_hex) && remote_record.is_some();
-    if !seed_possible {
-        if let (Some(name), Some(dev_hex)) = (
-            state.pending_device_name.clone(),
-            state.device_id_hex.clone(),
-        ) {
-            let mut named = local_view.clone();
-            named.device_names.insert(dev_hex, name);
-            let now_ms = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .map(|d| d.as_millis() as u64)
-                .unwrap_or(0);
-            crate::plugins::sync::prefs_merge::stamp_changed_shared_fields(
-                &local_view,
-                &mut named,
-                now_ms,
-            );
-            let named_bytes = protocol::encode_prefs_blob(&prefs_key, account_number_hash, &named)
-                .map_err(|_| SyncCycleError::Io)?;
-            crate::atomic_write::atomic_write(&path, &named_bytes, true)
-                .map_err(|_| SyncCycleError::Io)?;
-            local_nonce = read_prefs_nonce(&named_bytes);
-            local_bytes = Some(named_bytes);
-            local_view = named;
-            state.pending_device_name = None;
-        }
-    }
 
     // Enrollment wholesale seed (§10.2.1): a VIRGIN vault — no `vault.prefs`
     // on disk, the just-joined-device state (`sync_join_account` materializes
@@ -6055,86 +6017,6 @@ mod tests {
                 sync_prefs_phase(&t, "tok", &ROOT, &HASH, &dir, &mut st, &pid, Some(&rec)).unwrap();
             assert!(!phase2.applied_remote);
             assert!(!phase2.dirty);
-            std::fs::remove_dir_all(&dir).ok();
-        }
-
-        // MYND-548 regression: a device name chosen at enrollment must NOT
-        // defeat the wholesale seed. The name is parked in device-local state,
-        // so the joining device still has NO vault.prefs on its first authed
-        // cycle and still adopts the account's blob verbatim. Writing the name
-        // into vault.prefs at enroll time (the shape this pins against) would
-        // make `local_bytes.is_none()` permanently false and silently drop
-        // every device-local pref the account carries — and, worse, let an
-        // empty local `favorites`/`saved_views` win a clockless tie and push
-        // the wipe back to the fleet.
-        #[test]
-        fn a_pending_device_name_does_not_defeat_the_wholesale_seed() {
-            let dir = scratch("seedname");
-            let mut st = SyncState {
-                device_id_hex: Some("aa11bb22cc33dd44ee55ff6677889900".into()),
-                pending_device_name: Some("Travel Laptop".into()),
-                ..SyncState::default()
-            };
-            let pid = prefs_sync_id(&ROOT);
-            let t = FakeTransport::new();
-            let mut remote = PrefsView {
-                label: Some("Vault Identity".into()),
-                theme: Some(protocol::ThemeChoice::Dark), // device-local!
-                favorites: vec!["0190a000-0000-7000-8000-000000000002".into()],
-                ..PrefsView::default()
-            };
-            remote.field_clocks.insert("label".into(), 900);
-            let rec = serve_remote(&t, &pid, &remote);
-
-            // Cycle 1: seeds wholesale, exactly as if no name had been chosen.
-            let phase =
-                sync_prefs_phase(&t, "tok", &ROOT, &HASH, &dir, &mut st, &pid, Some(&rec)).unwrap();
-            assert!(phase.applied_remote);
-            assert_eq!(read_local(&dir), remote, "wholesale seed survived the name");
-            assert!(
-                st.pending_device_name.is_some(),
-                "the name waits for a cycle where the seed cannot fire"
-            );
-
-            // Cycle 2: the seed can no longer fire, so the name lands — on top
-            // of the seeded view, without dropping anything it brought.
-            let phase2 =
-                sync_prefs_phase(&t, "tok", &ROOT, &HASH, &dir, &mut st, &pid, Some(&rec)).unwrap();
-            let named = read_local(&dir);
-            assert_eq!(
-                named.device_names.get("aa11bb22cc33dd44ee55ff6677889900"),
-                Some(&"Travel Laptop".to_string())
-            );
-            assert_eq!(named.theme, remote.theme, "device-local seed value kept");
-            assert_eq!(named.favorites, remote.favorites, "shared seed value kept");
-            assert!(st.pending_device_name.is_none(), "applied exactly once");
-            assert!(phase2.dirty, "the new name is a shared edit worth pushing");
-            std::fs::remove_dir_all(&dir).ok();
-        }
-
-        // The other half: with NOTHING on the server there is no seed to
-        // protect, so the parked name applies on the very first cycle.
-        #[test]
-        fn a_pending_device_name_applies_immediately_when_there_is_no_seed() {
-            let dir = scratch("seednameempty");
-            let mut st = SyncState {
-                device_id_hex: Some("aa11bb22cc33dd44ee55ff6677889900".into()),
-                pending_device_name: Some("Studio Desktop".into()),
-                ..SyncState::default()
-            };
-            let pid = prefs_sync_id(&ROOT);
-            let t = FakeTransport::new();
-
-            let phase =
-                sync_prefs_phase(&t, "tok", &ROOT, &HASH, &dir, &mut st, &pid, None).unwrap();
-            assert!(phase.dirty);
-            assert_eq!(
-                read_local(&dir)
-                    .device_names
-                    .get("aa11bb22cc33dd44ee55ff6677889900"),
-                Some(&"Studio Desktop".to_string())
-            );
-            assert!(st.pending_device_name.is_none());
             std::fs::remove_dir_all(&dir).ok();
         }
 
