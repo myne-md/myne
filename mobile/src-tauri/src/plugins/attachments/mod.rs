@@ -47,10 +47,11 @@ pub use myne_core::plugins::attachments::{
 
 // Mobile Tauri glue for the `attachment://` URI scheme (delegates to the shared
 // `scheme_core::build_response`). Registered on the Builder in `lib.rs`.
+pub mod import_mobile;
 pub mod scheme;
 
 use tauri::plugin::{Builder, TauriPlugin};
-use tauri::Runtime;
+use tauri::{Manager, Runtime};
 
 /// Construct the mobile `attachments` plugin. The `VaultRuntimeState` it
 /// borrows is registered by the `vault-unlock` plugin; its own
@@ -59,8 +60,11 @@ use tauri::Runtime;
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::<R>::new("attachments")
         .invoke_handler(tauri::generate_handler![
-            // Extraction-free import (mobile has no text extractor).
-            commands::attachment_import,
+            // MYND-441: import with eager image OCR into the MYE1 cache, so a
+            // photo or screenshot taken on the phone is searchable by its
+            // contents exactly as on desktop. PDF/DOCX/text extraction stays
+            // desktop-only (lopdf/zip/quick-xml are desktop deps).
+            import_mobile::attachment_import,
             commands::catalog_list,
             commands::attachment_delete,
             commands::attachment_rename,
@@ -71,5 +75,26 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             reconcile_commands::attachment_refs_remove,
             reconcile_commands::attachment_refs_referencing,
         ])
+        .setup(|app, _api| {
+            // Load the bundled OCR weights once at startup from the platform
+            // resource dir (MYND-441), mirroring desktop. Failure is not an
+            // error: without weights, image attachments simply report
+            // `Unsupported` and the app starts normally.
+            let available = app
+                .path()
+                .resource_dir()
+                .ok()
+                .map(|rd| {
+                    myne_core::plugins::attachments::ocr::init_from_base(
+                        &rd.join("models")
+                            .join(myne_core::plugins::attachments::ocr::OCR_MODELS_DIR_NAME),
+                    )
+                })
+                .unwrap_or(false);
+            if !available {
+                tracing::info!("OCR weights unavailable; image attachments will not be indexed");
+            }
+            Ok(())
+        })
         .build()
 }
