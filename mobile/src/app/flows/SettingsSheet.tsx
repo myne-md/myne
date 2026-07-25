@@ -45,7 +45,7 @@ import {
   setEditorToolbarHidden,
   type PrefsView,
 } from "../../lib/prefs";
-import { FORMAT_BAR_ITEMS, resolveFormatBarOrder } from "../../lib/formatBarItems";
+import { formatBarLabelKey, resolveFormatBarOrder } from "../../lib/formatBarItems";
 import type { VaultChangePasswordError } from "../../types/vault-change-password-error";
 import type { VaultId } from "../../lib/stage";
 
@@ -493,8 +493,8 @@ function FormatBarPanel({
   };
 
   const labelFor = (id: string): string => {
-    const item = FORMAT_BAR_ITEMS.find((x) => x.id === id);
-    return item ? t(item.labelKey) : id;
+    const key = formatBarLabelKey(id);
+    return key ? t(key) : id;
   };
 
   return (
