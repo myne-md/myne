@@ -31,6 +31,16 @@ const NOTE_BODY = `---\nfolder: ${FOLDER_PATH}\ntitle: Roadmap\n---\n\nDraft.\n`
 /** Fire a long-press on the first element matching `selector`: a bubbling
  *  `pointerdown`, then wait past the 480ms hold threshold with no pointer
  *  move/up so the row's hold timer resolves and opens its action sheet. */
+/** Open a folder's subtree so its note rows render. Since MYND-561 the tree
+ *  starts fully COLLAPSED (desktop parity — the expand set is restored from
+ *  `vault.workspace`, and a fresh mock vault has none), so any assertion about an
+ *  in-folder row must expand its folder first. */
+async function expandFolder(page: Page, name: string): Promise<void> {
+  const row = page.locator(`[data-testid="notes.folder-row"][data-folder-path="${name}"]`);
+  await row.click();
+  await expect(row).toHaveAttribute("data-collapsed", "false");
+}
+
 async function longPress(page: Page, selector: string): Promise<void> {
   await page.evaluate((sel) => {
     const el = document.querySelector(sel) as HTMLElement | null;
@@ -71,6 +81,7 @@ test.describe("folder icon + color decoration", () => {
     await page.goto("/");
 
     // Long-press the note row → row action sheet → "Color…" → the picker.
+    await expandFolder(page, "Projects");
     await expect(page.getByTestId("notes.row")).toBeVisible();
     await longPress(page, '[data-testid="notes.row"]');
     await page.getByTestId("notes.note-color-action").click();
@@ -141,7 +152,8 @@ test.describe("folder icon + color decoration", () => {
     await expect(folderRow.getByTestId("notes.folder-glyph")).toHaveAttribute("data-icon-name", "book");
     await expect(folderRow.locator('[data-color-slot="clay"]')).toBeVisible();
 
-    // The note row shows a leading "moss" dot.
+    // The note row shows a leading "moss" dot (its folder must be open first).
+    await expandFolder(page, "Projects");
     await expect(page.getByTestId("notes.row").locator('[data-color-slot="moss"]')).toBeVisible();
   });
 });
