@@ -11,5 +11,9 @@ export function pushMap<V>(m: Map<string, V[]>, key: string, value: V): void {
 export function formatBytes(n: number): string {
   if (n < 1024) return `${n} B`;
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} KB`;
-  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+  if (n < 1024 * 1024 * 1024) return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+  // GB step (MYND-570): sync quotas are GB-scale, and stopping at MB rendered a
+  // 10 GiB ceiling as "10240.0 MB". Attachment/snapshot sizes are far below this
+  // threshold, so their display is unchanged.
+  return `${(n / (1024 * 1024 * 1024)).toFixed(1)} GB`;
 }

@@ -98,6 +98,28 @@ export function syncResetLocal(): Promise<void> {
   return invoke<void>("plugin:sync|sync_reset_local");
 }
 
+/** This account's own usage + effective ceilings (`GET /account/status`,
+ *  MYND-570). Shape mirrors the shared-core `AccountStatusView`, which in turn
+ *  mirrors the server struct — the mobile client parses nothing of its own.
+ *
+ *  **`0` means unlimited** for both ceilings, never a ceiling of zero: a
+ *  self-hosted server (or one with no quotas set) reports `0` and the UI must
+ *  show usage with no limit, no error and no upsell.
+ *
+ *  `null` when the projection is unavailable — sync unconfigured, this device
+ *  not enrolled, or a server without the route. */
+export interface AccountStatusView {
+  stored_bytes: number;
+  device_count: number;
+  frozen: boolean;
+  quota_bytes: number;
+  max_devices: number;
+}
+
+export function syncAccountStatus(): Promise<AccountStatusView | null> {
+  return invoke<AccountStatusView | null>("plugin:sync|sync_account_status");
+}
+
 // ── Enroll (SY-03 / SY-04) ───────────────────────────────────────────────────
 
 /** Which credential the enrolling device proves account ownership with. */

@@ -11,7 +11,7 @@
 //!
 //! ## Capability ACL (deny-by-default, SYNC-15)
 //!
-//! `sync:default` bundles all twenty-one commands into ONE narrow,
+//! `sync:default` bundles all twenty-two commands into ONE narrow,
 //! main-window-only grant — the nineteen-command desktop `sync:default` surface
 //! (including the recovered-notes quarantine quartet
 //! `sync_list_quarantine`/`sync_read_quarantine`/`sync_restore_quarantine`/
@@ -25,7 +25,7 @@
 //! push/pull/status/device commands are gated on an authenticated session inside
 //! the shared core. The `build.rs` `InlinedPlugin` command list, the
 //! `permissions/sync/default.toml` `commands.allow` entries, and the
-//! `generate_handler!` list below MUST match exactly (all twenty-one) — a
+//! `generate_handler!` list below MUST match exactly (all twenty-two) — a
 //! mismatch makes Tauri **fail closed** (the ACL resolver denies the invoke).
 //!
 //! ## R3 transport review-debt (registration ≠ verified crypto)
@@ -53,7 +53,7 @@ use tauri::plugin::{Builder, TauriPlugin};
 use tauri::Runtime;
 
 /// Construct the mobile `sync` plugin — registers the client command surface
-/// over the shared-core command bodies. All twenty-one commands, matching the
+/// over the shared-core command bodies. All twenty-two commands, matching the
 /// `build.rs` `InlinedPlugin` + `permissions/sync/default.toml` lists exactly.
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::<R>::new("sync")
@@ -63,6 +63,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::sync_status,
             commands::sync_now,
             commands::sync_list_devices,
+            commands::sync_account_status,
             commands::sync_approve_device,
             commands::sync_remove_device,
             commands::sync_pending_conflicts,
