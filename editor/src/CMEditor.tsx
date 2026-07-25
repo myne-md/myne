@@ -94,10 +94,13 @@ export type CMEditorProps = {
   style?: CSSProperties;
   /** Called once with the live `EditorView` after mount (and `null` on unmount).
    *  Lets a host render its own toolbar/accessory bar that drives the editor
-   *  through the shared `editorCommands` (the mobile above-keyboard bar). Desktop
-   *  leaves it unset — its formatting rides the in-editor selection toolbar. A
-   *  host that DOES set this generally also passes `selectionToolbar: false`, so
-   *  its own bar is the single formatting surface (MYND-559). */
+   *  through the shared `editorCommands` (the mobile above-keyboard bar).
+   *
+   *  Independent of `selectionToolbar`, NOT coupled to it: desktop sets this (for
+   *  outline scroll-tracking in `PaneView`) while keeping the floating toolbar.
+   *  The pairing worth knowing is the other direction — a host that sets this in
+   *  order to render its OWN formatting surface is the one that also wants
+   *  `selectionToolbar: false`, so it does not end up with two (mobile, MYND-559). */
   onReady?: (view: EditorView | null) => void;
 };
 
