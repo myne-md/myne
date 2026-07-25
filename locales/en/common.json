@@ -2558,6 +2558,10 @@
       "status": {
         "helper": "Myne syncs your encrypted notes across your devices. The server stores only ciphertext it cannot read.",
         "label": "Sync status"
+      },
+      "usage": {
+        "helper": "How much encrypted data this account stores on the server, and how many devices are signed in.",
+        "label": "Storage and devices"
       }
     },
     "reconcile": {
@@ -2579,6 +2583,12 @@
       "synced": "Synced",
       "syncing": "Syncing…",
       "syncNow": "Sync now"
+    },
+    "usage": {
+      "devices": "Devices",
+      "frozen": "This account is frozen. New changes can't be uploaded; your notes still download.",
+      "ofTotal": "{{used}} of {{total}}",
+      "storage": "Storage"
     },
     "settings": {
       "serverSection": "Server",
