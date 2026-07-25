@@ -580,6 +580,10 @@ The user-tunable presets for the editor's reading surface: **text size** (`sm`/`
 
 Used in: `spec/protocol.md` §9.5.2
 
+### **ex command** &nbsp; 📦 *Product*
+
+A `:`-prefixed command line in [vim mode](#vim-mode). In Myne it is a **closed dispatch table**, not an interpreter: `:w`/`:x`/`:wq` flush the pending autosave (Myne saves invisibly, so "write" means "persist now"), `:q` closes the note tab, and `:s`/`:%s` substitutes. Commands a vim user is likely to try but Myne deliberately does not implement — `:set`, `:map`/`:nmap`/`:imap`/`:vmap`, `:source`, `:!`, `:e` — are registered **only so they refuse with a message**, never silently. The governing boundary: **no ex command may persist a behaviour definition**, which is what keeps the `:` line from becoming the `.vimrc`-style config-script surface Myne rejects (`decisions.md` 2026-07-25) — the same anti-scripting posture as the [template engine](#template-engine)'s insert-never-evaluate rule. Substitution refuses vim-only regex syntax (`\v`, `\zs`, `\(…\)`, `\1` back-references) rather than translating it: a mistranslation would rewrite the user's note silently, so the failure mode is "not supported", never "we changed something else". Introduced MYND-313. See also [vim mode](#vim-mode), [vim register](#vim-register).
+
 ### **enc_item_key** &nbsp; 🗝️ *Key/identifier*
 
 The on-disk wrapped form of a per-note `item_key`. Layout per `spec/protocol.md` §9.2: 32 bytes of XChaCha20-Poly1305 ciphertext over the random `item_key`, followed by the 32-byte CTX commitment tag. Encrypted under the singleton `itemsKey` with `item_key_nonce`.
@@ -1915,6 +1919,14 @@ Used in: `spec/protocol.md` §9.5.2; Saved Views (MYND-273 / MYND-274)
 The render shape of a [saved view](#saved-view) (Saved Views epic, MYND-271). The closed v0.1 set is **table / cards / list** (Obsidian-Bases' `map` is dropped, SYNC-5); all three ship — cards (MYND-275), table (MYND-277), list (MYND-278) — behind one `viewRenderHost` dispatch. Every view type renders the **same** grouped query result read-only — no editable cells, no kanban drag-columns — so the choice is purely presentational (cards add a cover [`image:`](#attachment) + groupBy headers; table renders the view's property columns; list reuses the note-list row). The view type is one field of the view definition stored in `vault.prefs` / `MYP1`.
 
 Used in: Saved Views (MYND-271)
+
+### **vim mode** &nbsp; 📦 *Product*
+
+The editor's optional **modal editing** layer (`@replit/codemirror-vim`, MIT), off by default and toggled from Settings → Editor; persisted as the device-local `editor_vim_mode` field of [`vault.prefs`](#prefsview) (`spec/protocol.md` §9.5.2). Modal means keystrokes change meaning with the current **mode**: *normal* (keys are commands — motions, operators, counts), *insert* (keys are text), *visual* (keys extend a selection), plus *replace*. The active mode is surfaced on the editor root as `data-vim-mode` and rendered as a bottom-bar item; a block cursor marks normal mode. The engine is **dynamically imported only when the toggle is on**, so a user who never enables it never downloads it — the load-bearing mitigation for taking the dependency at all (`decisions.md` 2026-07-25). Vim lives **inside the editor**: where Myne's application chords collide with vim's `Ctrl-` grammar (Windows/Linux, where `Mod` is Ctrl), the vim binding is removed rather than Myne's, because the shortcut map is user data (`vault.prefs.keymap` + the Hotkeys panel). Escape resolves "one job at a time": an open overlay closes first, then insert/visual returns to normal, then a multi-selection collapses. With vim on, notes **default** to source [view mode](#view-mode) — live preview hides markdown characters that vim's motions still count. Introduced MYND-313. See also [ex command](#ex-command), [vim register](#vim-register), [view mode](#view-mode), [PrefsView](#prefsview).
+
+### **vim register** &nbsp; 📦 *Product*
+
+A named clipboard slot in [vim mode](#vim-mode) — where `yy` puts text and `p` takes it from — together with recorded macros (`q<letter>`). Registers live in the vim engine's **module-global** state, *not* on the editor view, so they survive the editor unmount that locking performs. Because that would let note text cross the vault boundary (yank in one vault → lock → open another → `p`), `lockVault()` clears them explicitly via `resetVimStateOnLock()`, immediately beside the [graph-layout](#graph-layout-cache) reset and for the same reason. This honours the existing lock guarantee rather than adding a new one; the system clipboard is unaffected (it is OS-owned and user-visible). Introduced MYND-313. See also [vim mode](#vim-mode), [zeroize](#zeroize).
 
 ### **voice note** &nbsp; 📦 *Product*
 

@@ -47,6 +47,8 @@ import { useConflictMaterializer } from "../hooks/useConflictMaterializer";
 import type { KeybindEntry } from "../commands/keybindEngine";
 import { catalogDefaults } from "../commands/bindableCatalog";
 import { asViewMode, type ViewMode } from "../editor/view-mode";
+import { VIM_MODE_EVENT, type VimModeEventDetail } from "../editor/vim";
+import { CLOSE_ACTIVE_TAB_EVENT } from "../notes/closeActiveTabSignal";
 import { focusKindOf } from "../commands/scope";
 import { FailClosedError } from "../components/FailClosedError";
 import { SyncBanners } from "../components/sync/SyncBanners";
@@ -232,6 +234,23 @@ const COALESCED_FLUSH_POLL_MS = 30_000;
  * `EditorChrome` maps over this list to build its checkable items. Ids are a
  * closed, non-secret UI vocabulary persisted in `vault.prefs.hidden_bar_items`.
  */
+/** vim-keyboard-mode (MYND-313): track the focused editor's vim mode for the
+ *  bottom-bar indicator. The editor announces transitions as a bubbling
+ *  `myne-vim-mode` event (and `null` when vim is switched off), so the indicator
+ *  stays decoupled from CodeMirror internals and from the pane tree. */
+function useVimMode(): string | null {
+  const [mode, setMode] = useState<string | null>(null);
+  useEffect(() => {
+    const onMode = (e: Event) => {
+      const { detail } = e as CustomEvent<VimModeEventDetail>;
+      setMode(detail?.mode ?? null);
+    };
+    window.addEventListener(VIM_MODE_EVENT, onMode);
+    return () => window.removeEventListener(VIM_MODE_EVENT, onMode);
+  }, []);
+  return mode;
+}
+
 const BAR_ITEMS: ReadonlyArray<{ id: string; labelKey: string }> = [
   { id: "save-status", labelKey: "editor.chrome.barItems.saveStatus" },
   { id: "view-mode", labelKey: "editor.chrome.barItems.viewMode" },
@@ -241,6 +260,7 @@ const BAR_ITEMS: ReadonlyArray<{ id: string; labelKey: string }> = [
   { id: "graph", labelKey: "editor.chrome.barItems.graph" },
   { id: "settings", labelKey: "editor.chrome.barItems.settings" },
   { id: "lock", labelKey: "editor.chrome.barItems.lock" },
+  { id: "vim-mode", labelKey: "editor.chrome.barItems.vimMode" },
   { id: "word-count", labelKey: "editor.chrome.barItems.wordCount" },
 ];
 
@@ -2884,6 +2904,20 @@ function WorkspaceHotkeys({
     activeModal: null,
   });
 
+  // vim `:q` / `:wq` / `:x` (MYND-313). The ex table lives in the editor package
+  // and cannot reach this context, so it emits a window signal; closing the tab
+  // reuses the exact same path as the `pane.close-tab` chord above.
+  useEffect(() => {
+    const onCloseTab = () => {
+      const active = ws.focusedLeaf.activeTab;
+      if (active !== null && active.kind === "note") {
+        ws.closeTabInPane(ws.focusedPaneId, active.id);
+      }
+    };
+    window.addEventListener(CLOSE_ACTIVE_TAB_EVENT, onCloseTab);
+    return () => window.removeEventListener(CLOSE_ACTIVE_TAB_EVENT, onCloseTab);
+  }, [ws]);
+
   // Ctrl+Tab / Ctrl+Shift+Tab — cycle tabs in the focused pane. Kept as a
   // literal-Ctrl inline handler OUTSIDE the rebindable keymap: Ctrl+Tab is a
   // cross-platform browser convention (literal Ctrl on every OS), but the
@@ -3493,6 +3527,10 @@ function BottomBar({
   onItemContextMenu,
 }: BottomBarProps) {
   const { t } = useTranslation();
+  // vim-keyboard-mode (MYND-313): the active mode arrives as a bubbled DOM event
+  // from the focused editor (`editor/src/vim.ts`), so the bar needs no prop
+  // threading through the pane tree. `null` ≡ vim off → the item renders nothing.
+  const vimMode = useVimMode();
   // Drag-to-reorder state (right cluster only). `draggedId` is the item being
   // dragged; `dropTarget` is the hovered insertion point (an item id + which
   // side the caret sits on). Both reset on drop / dragend.
@@ -3672,6 +3710,31 @@ function BottomBar({
         <span>{t("editor.chrome.bottomBar.lock")}</span>
       </button>
     ),
+    "vim-mode": () => {
+      // Renders only while vim is on (mode is null otherwise), so a user who
+      // never enables it sees a bottom bar identical to today's. `aria-live`
+      // makes the transition audible — modal state must not be a purely visual
+      // signal (story 12).
+      if (vimMode === null) return null;
+      return (
+        <span
+          data-testid="editor.vim-mode"
+          data-vim-mode={vimMode}
+          aria-live="polite"
+          title={t("editor.chrome.bottomBar.vimMode.title")}
+          style={{
+            ...STATUS_TEXT_STYLE,
+            fontFamily: "var(--font-mono)",
+            textTransform: "uppercase",
+            letterSpacing: "0.04em",
+          }}
+        >
+          {t(`editor.chrome.bottomBar.vimMode.${vimMode}`, {
+            defaultValue: vimMode,
+          })}
+        </span>
+      );
+    },
     "word-count": () => {
       // Combined statistics readout (MYND-339), reusing the `word-count`
       // bar-item id (one toggle). Shows the selection figures when a non-empty

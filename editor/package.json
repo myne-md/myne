@@ -33,6 +33,7 @@
     "@lezer/common": "1.5.2",
     "@lezer/highlight": "1.2.3",
     "@lezer/markdown": "1.6.4",
+    "@replit/codemirror-vim": "6.3.0",
     "dompurify": "3.4.10",
     "js-yaml": "4.2.0",
     "katex": "0.17.0",

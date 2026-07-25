@@ -119,6 +119,7 @@ describe("Command palette action registry", () => {
       "editor.toggle-line-numbers",
       "editor.toggle-spell-check",
       "editor.toggle-typewriter",
+      "editor.toggle-vim-mode",
       "editor.unfold-all",
       "folder.new",
       "graph.show",

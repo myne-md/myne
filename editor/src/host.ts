@@ -146,6 +146,18 @@ export interface EditorHost {
    *  (`src/lib/load-bearing-copy.ts::AI_TRANSCRIPT_HONESTY_NOTE`) without
    *  depending on the desktop `src/` tree. Omit and the note is skipped. */
   transcriptHonestyNote?: string;
+
+  /** Workspace reach for the vim `:` command line (vim-keyboard-mode, MYND-313).
+   *  OPTIONAL: a platform that does not back these simply gets an ex command that
+   *  does nothing rather than a crash — and the desktop is the only client that
+   *  exposes vim today. Kept behind the seam (rather than a direct Tauri call)
+   *  because this package is compiled by the mobile client too. */
+  workspace?: {
+    /** Persist any pending autosave immediately (`:w`). */
+    flushPendingSaves: () => Promise<void>;
+    /** Close the focused note tab (`:q`). */
+    closeActiveTab: () => void;
+  };
 }
 
 // ── Registry ─────────────────────────────────────────────────────────────────

@@ -46,6 +46,26 @@ export const myneTheme = EditorView.theme({
   "&.cm-focused .cm-cursor": {
     borderLeftColor: "var(--accent, #2c4a7a)",
   },
+  // vim-keyboard-mode (MYND-313): the vim engine draws its normal-mode BLOCK
+  // cursor as `.cm-fat-cursor` and hard-codes it to `#ff9696` — a colour that
+  // belongs to no Myne palette and reads as a foreign artefact in both themes.
+  // Re-point it at the same accent token the line cursor uses, so the two cursor
+  // shapes are visibly the same editor.
+  //
+  // Selector specificity is load-bearing here: the engine ships its rules at
+  // `Prec.highest`, so these must OUT-SPECIFY `.cm-fat-cursor` (0,1,0) and
+  // `&:not(.cm-focused) .cm-fat-cursor` (0,3,0) rather than merely come later in
+  // source order. Hence the `.cm-focused` qualifier and the explicit
+  // primary/secondary cursor classes.
+  "&.cm-focused .cm-fat-cursor": {
+    background: "var(--accent, #2c4a7a)",
+  },
+  "&:not(.cm-focused) .cm-fat-cursor.cm-cursor-primary": {
+    outline: "solid 1px var(--accent, #2c4a7a)",
+  },
+  "&:not(.cm-focused) .cm-fat-cursor.cm-cursor-secondary": {
+    outline: "solid 1px var(--accent, #2c4a7a)",
+  },
   // Text selection (double-click word, drag, Cmd/Ctrl+A). A neutral `--paper-3`
   // fill is invisible in dark mode, so tint with the accent (flips per theme, so
   // the wash stays visible in both light and dark). BOTH focus states are styled:

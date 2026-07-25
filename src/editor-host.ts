@@ -17,6 +17,8 @@ import {
   attachmentReadStructured,
 } from "./lib/attachments";
 import { prefsRead } from "./lib/prefs";
+import { renameFlushHooks } from "./notes/renameFlushHook";
+import { CLOSE_ACTIVE_TAB_EVENT } from "./notes/closeActiveTabSignal";
 import { infer, buildCompletionPrompt, buildTitlePrompt } from "./lib/writing-assistant";
 import { spellCheck, addToPersonalDictionary, ignoreWordInVault } from "./lib/spell";
 import { startTranscription } from "./lib/transcribe";
@@ -52,6 +54,17 @@ const host: EditorHost = {
   // The load-bearing transcript-fallibility honesty note, rendered VERBATIM by
   // the widget's read-only expander (SYNC-V8 — never i18n'd).
   transcriptHonestyNote: AI_TRANSCRIPT_HONESTY_NOTE,
+  // vim `:` command line (MYND-313). Both members bridge into React-owned state
+  // from module scope, so each goes through an existing cross-provider seam
+  // rather than reaching into a context it cannot see:
+  //   - `:w` reuses the workspace layer's already-registered flush-all hook (the
+  //     same one rename auto-update drives).
+  //   - `:q` emits a window event the editor shell listens for; the shell owns
+  //     the pane tree and is the only thing that can close a tab correctly.
+  workspace: {
+    flushPendingSaves: () => renameFlushHooks().flushOpenPanes(),
+    closeActiveTab: () => window.dispatchEvent(new CustomEvent(CLOSE_ACTIVE_TAB_EVENT)),
+  },
 };
 
 setEditorHost(host);

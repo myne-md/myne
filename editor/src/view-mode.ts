@@ -32,6 +32,26 @@ export function asViewMode(v: string | null | undefined): ViewMode {
   return v === "reading" || v === "source" ? v : "live";
 }
 
+/** The view mode a note tab opens in, given the stored `editor_default_view_mode`
+ *  pref and whether vim mode is on (vim-keyboard-mode, MYND-313).
+ *
+ *  Live preview hides markdown markers, but vim's motions still count them — so
+ *  `dw` operates over characters the user cannot see. Source view removes that
+ *  mismatch, and someone who wants vim is already someone who wants raw markdown,
+ *  so it is the better default while vim is on.
+ *
+ *  It is a DEFAULT, not an override: an explicit stored choice always wins, in
+ *  either direction. Turning vim on must never silently discard a preference the
+ *  user set on purpose (design session Q6). A per-tab choice is applied by the
+ *  caller and wins over both. */
+export function resolveDefaultViewMode(
+  storedPref: string | null | undefined,
+  vimEnabled: boolean,
+): ViewMode {
+  if (storedPref !== null && storedPref !== undefined) return asViewMode(storedPref);
+  return vimEnabled ? "source" : "live";
+}
+
 /** Compartment wrapping the live-preview hide/render decoration stack. Emptied
  *  in source mode, full otherwise. */
 export const viewModeDecorationsCompartment = new Compartment();

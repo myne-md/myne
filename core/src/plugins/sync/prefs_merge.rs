@@ -332,6 +332,9 @@ pub fn merge_prefs(local: &PrefsView, remote: &PrefsView) -> PrefsView {
         editor_text_size: local.editor_text_size.clone(),
         editor_toolbar_hidden: local.editor_toolbar_hidden.clone(),
         editor_toolbar_order: local.editor_toolbar_order.clone(),
+        // vim-keyboard-mode (MYND-313): device-local — the local value always
+        // survives the merge, like every other editor preference.
+        editor_vim_mode: local.editor_vim_mode,
         hidden_bar_items: local.hidden_bar_items.clone(),
         keymap: local.keymap.clone(),
         last_backup_at: local.last_backup_at,

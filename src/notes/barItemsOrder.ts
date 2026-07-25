@@ -25,6 +25,7 @@ export const RIGHT_CLUSTER_DEFAULT_ORDER: readonly string[] = [
   "graph",
   "settings",
   "lock",
+  "vim-mode",
   "word-count",
 ];
 
