@@ -1587,6 +1587,10 @@ The raw-markdown [view mode](#view-mode) of a note tab (MYND-299): the [decorati
 
 Used in: `spec/protocol.md` §9.5.2, §9.7; `decisions.md` 2026-06-17 (MYND-299)
 
+### **speech-to-text (ASR/STT)** &nbsp; 📦 *Product*
+
+On-device transcription of an audio attachment into text — Myne runs it entirely on the user's machine via a Whisper model (a **built-in default on desktop**, overridable with a user's own side-loaded file; `decisions.md` 2026-07-19 "Bundle a default transcription model on desktop") through the [Candle](#candle) stack ([local inference](#local-inference)); **no cloud, no provider call, no telemetry, nothing downloaded at runtime** (a standing anti-feature — decrypted audio never leaves the device, A1). Triggered on-demand per [voice note](#voice-note) (never auto-run on import); the machine [transcript](#transcript) is cached in the note's [`MYE1`](#mye1) extracted-text blob for search parity and can be inserted into the note body by an explicit user action. Gated on `ai_enabled` like the rest of the AI surface; the model is small and **fallible**, so copy treats a transcript as a machine guess, not a record, and — because the runtime is in-process, **not** sandboxed (SYNC-6) — never claims key-isolation. See `decisions.md` 2026-07-19; `threat-model.md` §7 "Local AI". (MYND-270)
+
 ### **startup open** &nbsp; 📦 *Product*
 
 The user preference, exposed in Settings → **Files**, controlling which file opens when the app launches. Two `vault.prefs` fields carry it (`spec/protocol.md` §9.5.2): **`startup_open`** — a mode of `last` (restore the last [workspace slot](#workspace-slot) layout, the default and pre-feature behaviour), `empty` (open a fresh empty editor), or `specific` — and **`startup_open_note`**, the target note UUID used only in `specific` mode. Crucially, choosing `empty`/`specific` does **not** destroy the saved [workspace-state blob](#workspace-state-blob): the session skips restoring it and suppresses workspace staging, so toggling back to `last` restores the prior layout intact. A deleted/unreadable `startup_open_note` falls back to the empty editor; the pref is never auto-cleared. Non-load-bearing. Note: semantically overlaps the (currently mock) Privacy "Continue where you left off" toggle — a flagged follow-up. See [decisions.md](decisions.md) 2026-06-27 (MYND-462).
@@ -1707,6 +1711,10 @@ Used in: `spec/sync-protocol.md` §11
 Adversary class A13: a server-side or network observer correlating sync timing, blob sizes, and account activity to infer behavior even without decrypting content. Myne v0.1 is Best-effort against A13 — sync timing, blob count, and blob size are visible to anyone observing the network or the server, and connection IPs are visible transiently (not logged). Padding, cover traffic, and timing randomization are deferred beyond v0.1.
 
 Used in: `threat-model.md` §1 (A13), §7
+
+### **transcript** &nbsp; 📦 *Product*
+
+The machine-produced text of an audio attachment — the output of on-device [speech-to-text](#speech-to-text-asrstt) (ASR). Unlike a lossless PDF text-layer, an ASR transcript is **lossy and model-dependent**: a different Whisper model (or a bump of the [extractor version](#extractor-version)) yields different text, so it is honestly a fallible machine guess, not a verbatim record. Cached per attachment in the [`MYE1`](#mye1) [extracted-text](#attachment-text-extraction) blob (device-local, rebuildable, never synced) for ambient search parity, and separately **insertable into a note body by an explicit user action** (SYNC-17) — that inserted copy is ordinary note text on the `MY01` `note_save` path, so it is synced, backed up, and editable (the hybrid representation, `decisions.md` 2026-07-19). (MYND-270)
 
 ### **Trash** &nbsp; 📦 *Product*
 

@@ -36,6 +36,7 @@ while IFS= read -r f; do
     docs/design/icons/*|docs/design/assets/*|docs/design/preview/*) continue ;;
     src-tauri/icons/*|public/*.svg) continue ;;
     src-tauri/resources/dictionaries/*) continue ;;
+    src-tauri/resources/models/*) continue ;;
   esac
   [ -f "$f" ] || continue
   if file --mime "$f" | grep -q 'charset=binary'; then continue; fi
@@ -55,7 +56,7 @@ echo "== trailing whitespace (diff-scoped, matches the pre-commit hook) =="
 base="${CI_PREV_COMMIT_SHA:-}"
 tip="${CI_COMMIT_SHA:-HEAD}"
 if [ -n "$base" ] && git rev-parse -q --verify "${base}^{commit}" >/dev/null 2>&1; then
-  if git diff --check "$base" "$tip" -- ':(exclude)src-tauri/resources/dictionaries/**'; then
+  if git diff --check "$base" "$tip" -- ':(exclude)src-tauri/resources/dictionaries/**' ':(exclude)src-tauri/resources/models/**'; then
     echo "  ok"
   else
     fail=1

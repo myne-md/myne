@@ -34,3 +34,25 @@ licensed (each carries its own `LICENSE`):
 | `myne-themes` | by subtree — CC-BY-4.0 (themes) / AGPL-3.0 (tooling) |
 | `myne-branding` | by subtree — reserved marks (trademark) / CC-BY-4.0 (token exports) / SIL OFL (fonts) |
 | `agent-tooling`, `operations` | Proprietary — All Rights Reserved (internal) |
+
+## Bundled third-party assets
+
+Some non-source assets are redistributed inside the desktop bundle. Each is
+under a license compatible with the application's AGPL-3.0 and is redistributed
+with attribution; none is Myne-authored.
+
+| Asset | Where | Upstream | License | AGPL-3.0 compatibility |
+|---|---|---|---|---|
+| Default speech-to-text model (voice-to-text, MYND-270) | `src-tauri/resources/models/whisper/model.gguf` (Git LFS; desktop-only) | [OpenAI Whisper `whisper-base`](https://huggingface.co/openai/whisper-base) weights, quantized to a candle GGUF | **Apache-2.0** | Compatible (Apache-2.0 → AGPL-3.0 is a one-way-compatible direction per the FSF license list). Redistribution requires only preserving the Apache-2.0 license + attribution — both satisfied here. |
+| Hunspell spell-check dictionaries | `src-tauri/resources/dictionaries/**` | per-language upstreams | mixed (LGPL / MPL / BSD / GPL-with-linking-exception, per dictionary) | Compatible; each dictionary keeps its upstream license. |
+
+**Whisper model provenance + obligations.** The bundled model is a quantized
+derivative of the Apache-2.0 `openai/whisper-base` weights (the OpenAI Whisper
+*code* is MIT; the *weights* are distributed under Apache-2.0 on Hugging Face —
+either way permissive and AGPL-3.0-compatible). Quantization is a format
+conversion of the same weights and does not change their license. Obligations
+under Apache-2.0 §4: (a) ship the Apache-2.0 license text (kept next to the model
+as `MODEL-LICENSE`), (b) retain attribution to OpenAI Whisper, and (c) note that
+the file is a quantized modification of the upstream weights — all recorded here
+and in `src-tauri/resources/models/whisper/README.md`. A user who overrides the
+model with their own file is responsible for that file's license.

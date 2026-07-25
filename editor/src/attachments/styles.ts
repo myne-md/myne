@@ -332,6 +332,17 @@ const CSS = `
 .cm-attachment-file-card-menuitem:hover {
   background-color: var(--paper-2, #f3f1eb);
 }
+/* Disabled-not-hidden row (MYND-552 Transcribe when AI is off / folder excluded):
+   the real label is kept but muted and non-activating. */
+.cm-attachment-file-card-menuitem-disabled,
+.cm-attachment-file-card-menuitem:disabled {
+  color: var(--fg-3, #6b6a64);
+  cursor: default;
+  opacity: 0.6;
+}
+.cm-attachment-file-card-menuitem-disabled:hover {
+  background-color: transparent;
+}
 
 /* Voice-note recording bar (MYND-259). Body-mounted floating surface (escapes
    the .cm-editor theme scope, like the toast/menu above). */
@@ -417,6 +428,20 @@ const CSS = `
 }
 .cm-voice-rec-cancel:hover {
   background-color: var(--paper-2, #f3f1eb);
+}
+
+/* Transcription busy meter (voice-to-text MYND-552). The @keyframes lives here
+   in the global sheet (the CM theme's StyleModule doesn't emit @keyframes); the
+   bar's static box + colour come from the scoped theme. */
+@keyframes cm-attachment-transcript-pulse {
+  0%, 100% { height: 30%; opacity: 0.4; }
+  50% { height: 100%; opacity: 1; }
+}
+.cm-attachment-audio-transcript-bar {
+  animation: cm-attachment-transcript-pulse 1s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .cm-attachment-audio-transcript-bar { animation: none; }
 }
 `;
 

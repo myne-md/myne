@@ -44,7 +44,13 @@ async function expectNavDisabled(
   );
 }
 
-describeE2E("nav1 back/forward steps through opened notes (MYND-260)", () => {
+// QUARANTINED (flaky-test epic): on a contended CI runner this scenario's
+// `unlockToEditor` has been observed timing out even at 45s — the app process
+// couldn't boot the unlock screen under host resource starvation (a mount-boot
+// timeout, not a nav logic bug; recurs across unrelated branches). Runs in the
+// non-blocking `e2e-quarantine` step until the contention fix lands. See
+// scenario.ts's gate note.
+describeE2E.flaky("nav1 back/forward steps through opened notes (MYND-260)", () => {
   // Vault-count precondition: 1 (weak KDF).
   it("steps back to earlier notes and forward again; ends greyed-out at edges", async () => {
     const M_ONE = "navigation marker bir";

@@ -445,6 +445,8 @@ fn main() {
                 "ask",
                 "chat_stream",
                 "chat_stop",
+                "transcribe",
+                "read_transcript",
                 "set_model_path",
                 "get_model_path",
             ]),

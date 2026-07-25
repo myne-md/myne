@@ -45,8 +45,8 @@
     "library": {
       "actionsAriaLabel": "Attachment actions",
       "actionsTitle": "Actions",
-      "checking": "Checking…",
       "checkUnusedFailedNotice": "Couldn't check for unused attachments. Try again.",
+      "checking": "Checking…",
       "cleanUnused": "Clean unused",
       "cleanUnusedTitle": "Delete attachments not used in any note",
       "colCreated": "Created",
@@ -69,6 +69,7 @@
       "menuExport": "Export",
       "menuPreview": "Preview",
       "menuRename": "Rename",
+      "menuTranscribe": "Transcribe",
       "noMatch": "No attachments match your search.",
       "noUnusedNotice": "No unused attachments to clean.",
       "preview": "Preview",
@@ -84,6 +85,10 @@
       "sortAriaLabel": "Sort attachments",
       "supportedFilesFilter": "Supported files",
       "title": "Attachments",
+      "transcribeDone": "Transcription complete.",
+      "transcribeFailed": "Transcription failed. Please try again.",
+      "transcribeNoModel": "Select a transcription model in Settings → Labs → AI.",
+      "transcribeStarted": "Transcribing…",
       "typeFilter": {
         "all": "All types",
         "audio": "Audio",
@@ -675,7 +680,8 @@
           "export": "Export",
           "remove": "Remove",
           "rename": "Rename",
-          "reveal": "Reveal in library"
+          "reveal": "Reveal in library",
+          "transcribe": "Transcribe"
         },
         "pdfFallback": "PDF",
         "textPreview": {
@@ -686,6 +692,15 @@
           "brokenLabel": "broken",
           "deletedAria": "Deleted attachment: {{filename}}",
           "deletedLabel": "deleted"
+        },
+        "transcribe": {
+          "disabledReason": "Enable AI in Settings → Labs → AI to transcribe.",
+          "failed": "Transcription failed. Please try again.",
+          "heading": "Transcript",
+          "insert": "Insert transcript into note",
+          "noModelHint": "Select a transcription model in Settings → Labs → AI.",
+          "progress": "Transcribing…",
+          "stop": "Stop"
         },
         "urlImageFallback": "image"
       }
@@ -2164,10 +2179,12 @@
       "modelGenerationLabel": "Text model — chat, summaries, writing",
       "modelNone": "No file selected",
       "modelSaveFailed": "Couldn't save the model path (it must be outside your vault).",
+      "modelTranscriptionLabel": "Speech-to-text model (transcription)",
       "modelsHelper": "Myne never downloads models — that would mean sending data over the network. Open a link to get one in your browser, then pick the downloaded files here. Everything runs on your device.",
       "modelsLabel": "Models",
       "recommendedFilesEmbedding": "Needs model.safetensors + config.json + tokenizer.json in one folder.",
       "recommendedFilesGeneration": "Needs the .gguf file + tokenizer.json in the same folder.",
+      "recommendedFilesTranscription": "Needs the Whisper .gguf file + config.json + tokenizer.json in the same folder.",
       "title": "AI"
     },
     "prefs": {
@@ -2344,6 +2361,65 @@
       "typewriter": "Typewriter scrolling",
       "typewriterSubtitle": "Keep the caret vertically centered",
       "enableArchiving": "Enable archiving"
+    },
+    "search": {
+      "placeholder": "Search settings…",
+      "ariaLabel": "Search settings",
+      "empty": "No settings match “{{query}}”.",
+      "resultsLabel": "Search results",
+      "extra": {
+        "lastActiveNoteTitle": "Continue where you left off",
+        "lastActiveNoteDesc": "Sync which note you had open so you can pick it up on another device."
+      },
+      "keywords": {
+        "aiEnable": "local ai on off enable disable machine learning",
+        "aiExcluded": "excluded folders ignore ai privacy exclude",
+        "aiModels": "models gguf download text embedding llm",
+        "archive": "archive archiving hide restore notes",
+        "autoBackup": "automatic backups schedule frequency retention folder",
+        "autoLock": "auto lock timeout idle lock timer inactivity session",
+        "backup": "backup export .myne-backup restore save copy",
+        "buildChannel": "build channel version release stable beta nightly",
+        "changePassword": "change password passphrase credentials update reset",
+        "changelog": "changelog release notes what is new history",
+        "clipper": "browser clipper extension web capture chrome firefox",
+        "contentWidth": "content width column reading measure line length",
+        "customThemes": "custom themes palette colors appearance import theme",
+        "dailyNotes": "daily notes journal date template folder diary",
+        "dangerZone": "danger zone delete vault destroy remove wipe",
+        "export": "export markdown decrypt plain files documents",
+        "focusMode": "focus mode typewriter dim inactive lines distraction free",
+        "font": "font typeface family sans serif mono typography",
+        "hotkeys": "hotkeys keyboard shortcuts keybindings keymap chords bindings",
+        "import": "import obsidian vault migrate bring in",
+        "language": "language locale interface translation ui",
+        "lastActiveNote": "continue where you left off last note resume sync open",
+        "license": "license agpl open source legal",
+        "lineNumbers": "line numbers gutter editor display",
+        "lineSpacing": "line spacing leading height typography readability",
+        "newNoteLocation": "new note location folder default where notes created",
+        "quickUnlock": "quick unlock pin touch id biometric face unlock",
+        "realtimeSync": "real time sync live connection presence polling",
+        "screenCapture": "screen capture protection screenshot recording block privacy",
+        "showEditTimes": "show edit times timestamps modified dates notes",
+        "spell": "spell check spelling dictionary autocorrect",
+        "spellLanguages": "spell languages dictionaries locale words",
+        "startupOpen": "startup open default file launch boot which note",
+        "syncAddDevice": "add device pair link phone laptop sync",
+        "syncConflicts": "conflicts merge resolve versions sync",
+        "syncDevices": "devices linked paired sync machines",
+        "syncRecovered": "recovered notes restore sync salvage",
+        "syncServer": "sync server host self hosted endpoint url",
+        "syncStatus": "sync status connection state up to date",
+        "textSize": "text size font size zoom scale readability",
+        "theme": "theme dark light mode appearance color scheme amoled system",
+        "threatModel": "threat model security adversaries assets trust",
+        "toolbar": "toolbar buttons formatting floating selection customize",
+        "vaultIcon": "vault icon avatar picture symbol",
+        "vaultLabel": "vault label name rename title",
+        "vaultLocation": "vault location path folder on disk where stored",
+        "viewMode": "default view mode live reading source preview"
+      }
     }
   },
   "sync": {

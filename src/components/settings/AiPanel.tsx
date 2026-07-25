@@ -12,8 +12,9 @@
 // models" links open in the user's OWN browser via the opener plugin (an OS
 // handoff, not a Myne fetch — the same affordance the About panel uses for the
 // threat-model doc); the user downloads there and side-loads the files with the
-// pickers. Two roles: a Qwen2-family GGUF for generation (summaries / chat /
-// writing) and an all-MiniLM-L6-v2 embedding model for semantic search / Q&A.
+// pickers. Three roles: a Qwen2-family GGUF for generation (summaries / chat /
+// writing), an all-MiniLM-L6-v2 embedding model for semantic search / Q&A, and
+// a Whisper GGUF for speech-to-text transcription (MYND-270).
 //
 // Honesty discipline: the trust copy renders the `load-bearing-copy.ts`
 // constants VERBATIM (never i18n'd, E2E-pinned by literal equality); it makes
@@ -89,6 +90,10 @@ const RECOMMENDED_MODEL: Record<ModelRole, { name: string; url: string }> = {
     name: "all-MiniLM-L6-v2",
     url: "https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2",
   },
+  transcription: {
+    name: "whisper-base (multilingual)",
+    url: "https://huggingface.co/openai/whisper-base",
+  },
 };
 
 /** Per-role side-load file filter for the OS picker (SYNC-1). */
@@ -100,6 +105,13 @@ const MODEL_FILTER: Record<ModelRole, { nameKey: string; extensions: string[] }>
   embedding: {
     nameKey: "settings.ai.modelFilter.safetensors",
     extensions: ["safetensors"],
+  },
+  transcription: {
+    // The Whisper engine loads via `WhisperVarBuilder::from_gguf`
+    // (`engine_candle.rs::load_transcription`), so the override picker must
+    // offer `.gguf` — a `.safetensors` pick fails `from_gguf` at load time.
+    nameKey: "settings.ai.modelFilter.gguf",
+    extensions: ["gguf"],
   },
 };
 
@@ -186,6 +198,7 @@ export function AiPanel({ onShowToast }: AiPanelProps) {
   const [modelPaths, setModelPaths] = useState<Record<ModelRole, string | null>>({
     generation: null,
     embedding: null,
+    transcription: null,
   });
   // Local edit buffer for the excluded-folders textarea (one folder/line); the
   // backend NFC-sorts + dedups the set on encode, so the raw lines are fine.
@@ -200,7 +213,7 @@ export function AiPanel({ onShowToast }: AiPanelProps) {
   // persisted path — the panel stays usable.
   useEffect(() => {
     let alive = true;
-    (["generation", "embedding"] as const).forEach((role) => {
+    (["generation", "embedding", "transcription"] as const).forEach((role) => {
       loadModelPath(role)
         .then((p) => {
           if (alive) setModelPaths((prev) => ({ ...prev, [role]: p }));
@@ -310,7 +323,8 @@ export function AiPanel({ onShowToast }: AiPanelProps) {
 
       {/* Models — side-load only, no in-app download (SYNC-1/2). Recommended
           links open in the user's browser; the pickers take the downloaded
-          files. Two roles: text (GGUF) + search/embedding (safetensors). */}
+          files. Three roles: text (GGUF) + search/embedding (safetensors) +
+          speech-to-text (Whisper GGUF). */}
       <div style={BLOCK_STYLE} data-testid="ai.models-section">
         <label style={LABEL_STYLE}>{t("settings.ai.modelsLabel")}</label>
         <p style={HELPER_STYLE}>{t("settings.ai.modelsHelper")}</p>
@@ -343,6 +357,23 @@ export function AiPanel({ onShowToast }: AiPanelProps) {
           testIdRecommend="ai.model-recommend-embedding"
           testIdSelect="ai.model-select-embedding"
           testIdChoose="ai.model-choose-embedding"
+        />
+
+        {/* Speech-to-text (voice-to-text MYND-552, SYNC-V3): the ASR / Whisper
+            role — side-load only, disabled when AI is off, distinct testids. */}
+        <ModelRoleBlock
+          roleLabel={t("settings.ai.modelTranscriptionLabel")}
+          filesText={t("settings.ai.recommendedFilesTranscription")}
+          recommendName={RECOMMENDED_MODEL.transcription.name}
+          onOpenRecommend={() => openRecommend("transcription")}
+          path={modelPaths.transcription}
+          noneLabel={t("settings.ai.modelNone")}
+          chooseLabel={t("settings.ai.modelChoose")}
+          onChoose={() => void chooseModel("transcription")}
+          disabled={!aiEnabled}
+          testIdRecommend="ai.model-recommend-transcription"
+          testIdSelect="ai.model-select-transcription"
+          testIdChoose="ai.model-choose-transcription"
         />
       </div>
 

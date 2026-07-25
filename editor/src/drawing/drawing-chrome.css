@@ -1,0 +1,73 @@
+/* Drawing chrome curation (MYND-514, excalidraw-chrome-fit).
+ *
+ * Scoped under `.drawing-canvas-chrome` (the wrapper div in DrawingCanvas.tsx)
+ * so nothing here leaks to CMEditor or any other `@myne/editor` surface — the
+ * Excalidraw layer UI (top-right library trigger, bottom-right help icon, the
+ * empty-canvas welcome screen) all render inside `.excalidraw`, which lives
+ * inside this wrapper.
+ *
+ * Only the elements the pinned 0.18.1 API can't remove via props live here.
+ * The menu curation (dropping Open/Save/Export and the Help/Library MENU items)
+ * is done via UIOptions + the composed <MainMenu> in DrawingCanvas.tsx / the
+ * shared HARDENED_EXCALIDRAW_PROPS — NOT here. Token/colour work is task 4.
+ */
+
+/* Library button — the default (right) sidebar trigger. 0.18.1 exposes no
+ * UIOptions toggle for it; the feature is already dead (SF1/MYND-498 stripped
+ * the libraries.excalidraw.com egress). */
+.drawing-canvas-chrome .default-sidebar-trigger {
+  display: none;
+}
+
+/* Help "?" button (bottom-right). Its shortcuts dialog is Excalidraw-branded
+ * and lists features Myne doesn't have (collaboration, library). */
+.drawing-canvas-chrome .help-icon {
+  display: none;
+}
+
+/* Welcome screen (empty-canvas logo + hint arrows). No UIOptions off-switch in
+ * 0.18.1 (it renders via internal tunnels gated on an empty canvas); its default
+ * hints point at the menu/help we've changed/removed, so suppress it for a clean
+ * empty canvas. */
+.drawing-canvas-chrome .welcome-screen-center,
+.drawing-canvas-chrome .welcome-screen-decor {
+  display: none;
+}
+
+/* ---------------------------------------------------------------------------
+ * Token match (MYND-514, task 4). Alias Excalidraw's UI CSS custom properties
+ * to the @myne/editor token contract so the CHROME (toolbar, panels, menus,
+ * popups) follows Myne's active theme — light / dark / amoled / custom — for
+ * free. The DRAWING CANVAS itself is untouched: its light/dark comes from the
+ * `theme` prop seeded in DrawingCanvas, and the `<canvas>` is painted by
+ * Excalidraw's renderer (viewBackgroundColor), not by these vars.
+ *
+ * Depth = MEDIUM (grill decision): surfaces + text + accent/active/selection.
+ * Deep per-button hover/border/input states are intentionally left at Excalidraw
+ * defaults — mapping `--color-primary*` already drives the active-tool highlight
+ * and selection, so we get "feels like ours" without the brittle full sweep.
+ *
+ * Specificity: Excalidraw's dark values live at `.excalidraw.theme--dark` (0,2,0).
+ * The doubled `.drawing-canvas-chrome.drawing-canvas-chrome .excalidraw` selector
+ * is (0,3,0), so a single block wins in BOTH themes (the aliased Myne vars are
+ * themselves theme-aware, so one declaration covers light and dark).
+ * --------------------------------------------------------------------------- */
+.drawing-canvas-chrome.drawing-canvas-chrome .excalidraw {
+  /* surfaces — panels / toolbar islands / popups / app base */
+  --island-bg-color: var(--bg-2);
+  --popup-bg-color: var(--bg-2);
+  --default-bg-color: var(--bg-1);
+
+  /* text */
+  --text-primary-color: var(--fg-1);
+
+  /* accent — active tool, selection, primary buttons/links */
+  --color-primary: var(--accent);
+  --color-primary-hover: var(--accent);
+  --color-primary-darker: var(--accent);
+  --color-primary-darkest: var(--accent);
+  --color-primary-light: var(--accent-soft);
+  --color-primary-light-darker: var(--accent-soft);
+  --color-on-primary: var(--accent-on);
+  --color-selection: var(--accent);
+}

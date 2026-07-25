@@ -20,6 +20,13 @@ export interface OverflowAction {
   /** `data-testid` for the menu item (E2E observability, SYNC-8). */
   readonly testid: string;
   readonly run: () => void;
+  /** OPTIONAL — render the row DISABLED (greyed, non-activating) but NOT omitted
+   *  (disabled-not-hidden discipline; MYND-552 Transcribe row when AI is off /
+   *  the folder is excluded). The real label is kept; `run` never fires. */
+  readonly disabled?: boolean;
+  /** OPTIONAL — why the row is disabled, surfaced as the row's `title` + aria so
+   *  the reason is discoverable (e.g. "Enable AI in Settings → Labs → AI"). */
+  readonly disabledReason?: string;
 }
 
 export interface OverflowMenuOptions {
@@ -82,12 +89,21 @@ export function buildOverflowMenu(
       item.setAttribute("role", "menuitem");
       item.setAttribute("data-testid", action.testid);
       item.textContent = action.label;
-      item.addEventListener("click", (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        closeMenu();
-        action.run();
-      });
+      if (action.disabled === true) {
+        // Disabled-not-hidden: keep the real label, block activation, and surface
+        // the reason (title + aria-disabled). No click handler is attached.
+        item.disabled = true;
+        item.setAttribute("aria-disabled", "true");
+        item.classList.add("cm-attachment-file-card-menuitem-disabled");
+        if (action.disabledReason !== undefined) item.title = action.disabledReason;
+      } else {
+        item.addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          closeMenu();
+          action.run();
+        });
+      }
       menu.appendChild(item);
     }
 
