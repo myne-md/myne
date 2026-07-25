@@ -502,8 +502,8 @@ export function SyncEnrollPanel({ onEnrolled }: SyncEnrollPanelProps) {
         data-testid="sync.enroll.account-input"
       />
       {/* MYND-548: named here, at the one moment the user is provably holding
-          this device. Written to THIS vault's local prefs on success — it never
-          joins the enrollment request. */}
+          this device. Held in RAM and written only AFTER the first authed sync
+          cycle — never with the request, and never before that cycle. */}
       <FieldLabel mt={14}>{t("sync.enroll.deviceNameLabel")}</FieldLabel>
       <input
         value={deviceNameField.value}
