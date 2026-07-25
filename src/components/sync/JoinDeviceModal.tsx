@@ -13,8 +13,6 @@ import { PasswordInput } from "../PasswordInput";
 import { DestructiveBanner } from "../DestructiveBanner";
 import { formatAccountNumberInput } from "../../lib/account-number-format";
 import { DEVICE_NAME_MAX_LEN, useDeviceNameField } from "../../lib/device-name";
-// Aliased: the component already has a `setDeviceName` React state setter.
-import { setDeviceName as persistDeviceName } from "../../lib/prefs";
 import { ENROLL_PENDING_NOTICE } from "../../lib/load-bearing-copy";
 
 interface JoinResult {
@@ -136,18 +134,9 @@ export function JoinDeviceModal({ onCancel, onJoined }: JoinDeviceModalProps) {
       serverUrl: url.trim(),
       accountNumber: account.trim(),
       password,
+      deviceName: deviceNameField.resolved,
     })
-      .then(async (res) => {
-        // Name THIS device before routing anywhere. The bootstrapped vault is
-        // unlocked by now, so the local prefs write succeeds without a token and
-        // without waiting for approval; the §10.2 union merge carries the entry
-        // to peers on the first sync. Best-effort: a naming failure must not turn
-        // a successful join into an error.
-        try {
-          await persistDeviceName(res.device_id_hex, deviceNameField.resolved);
-        } catch {
-          // Prefs unwritable — the row falls back to its id-derived label.
-        }
+      .then((res) => {
         if (!res.pending) {
           // Bootstrap/recovery self-approve (first device) — nothing to
           // eye-compare against, so route straight in.

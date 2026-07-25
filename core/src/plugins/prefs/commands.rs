@@ -2033,6 +2033,17 @@ pub(crate) async fn set_device_name_with_dir(
     device_id_hex: String,
     name: String,
 ) -> Result<(), PrefsWriteError> {
+    // The key is permanent (§10.2 union merge has no deletion) and replicates to
+    // every peer, so a malformed one is unrecoverable in-app. Reject anything that
+    // is not a 32-char lowercase-hex device_id before the read-modify-write.
+    if device_id_hex.len() != 32
+        || !device_id_hex
+            .bytes()
+            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+    {
+        return Ok(());
+    }
+
     let trimmed = name.trim();
     if trimmed.is_empty() {
         // Empty submit == cancel (see the doc comment). Nothing is written, so
@@ -2532,6 +2543,35 @@ mod tests {
                 view.device_names.get(DEV_HEX).map(String::as_str),
                 Some("Work Mac")
             );
+        });
+    }
+
+    #[test]
+    fn malformed_device_id_is_refused() {
+        // The key is permanent and replicates; a junk one could never be removed
+        // from the account afterwards.
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x48).await;
+            for bad in [
+                "",
+                "short",
+                "AA11BB22CC33DD44EE55FF6677889900",
+                "zz11bb22cc33dd44ee55ff6677889900",
+            ] {
+                set_device_name_with_dir(
+                    tmp.path(),
+                    &state,
+                    &noop_hooks(),
+                    bad.into(),
+                    "Nope".into(),
+                )
+                .await
+                .expect("refusal is Ok, not an error");
+            }
+            let view = prefs_read_with_dir(tmp.path(), &state)
+                .await
+                .expect("read prefs");
+            assert!(view.device_names.is_empty());
         });
     }
 
