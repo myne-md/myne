@@ -81,6 +81,7 @@ import {
   CARD_BODY_STYLE,
   CARD_TITLE_STYLE,
   CenteredCard,
+  ctaStyle,
 } from "../components/primitives/CenteredCard";
 import { Spinner } from "../components/Spinner";
 import { SuspicionBanner } from "../components/SuspicionBanner";
@@ -361,24 +362,6 @@ const RECOVER_LINK_STYLE: CSSProperties = {
   color: "var(--accent)",
   cursor: "pointer",
 };
-
-function ctaStyle(disabled: boolean): CSSProperties {
-  return {
-    background: disabled ? "var(--bg-3)" : "var(--accent)",
-    color: disabled ? "var(--fg-3)" : "var(--accent-on)",
-    border: disabled ? "1px solid var(--line-1)" : "none",
-    borderRadius: "var(--radius-2)",
-    padding: "var(--space-3) var(--space-5)",
-    fontFamily: "var(--font-sans)",
-    fontSize: "var(--text-base)",
-    fontWeight: "var(--weight-medium)" as CSSProperties["fontWeight"],
-    cursor: disabled ? "not-allowed" : "pointer",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: "var(--space-2)",
-  };
-}
 
 export function Unlock({
   initialStatus,
