@@ -14,6 +14,7 @@ import { toggleWrap } from "./wrap-toggle";
 import { toggleListPrefix } from "./toolbar/commands";
 import { cachedLocateFrontmatter } from "./frontmatter-cache";
 import { openWikilinkPicker } from "./wikilink/picker";
+import { vimWantsEscape } from "./vim";
 
 /** Escape collapses a multi-cursor / multi-range selection back to a single
  *  cursor at the primary range's head (multi-cursor story 6, MYND-306). Returns
@@ -21,6 +22,13 @@ import { openWikilinkPicker } from "./wikilink/picker";
  *  Escape handlers (close the search bar, dismiss a menu) — it never swallows a
  *  plain Escape. */
 const collapseMultiSelection: Command = (view) => {
+  // vim-keyboard-mode (MYND-313): while vim is in insert / visual / replace,
+  // Escape's first job is the mode transition — "one Escape, one job" (design
+  // session Q2). Declining here lets the key fall through to the vim engine,
+  // which captures at the DOM level AFTER every CodeMirror keymap; returning
+  // `true` here would silently steal the key and strand the user in insert mode.
+  // A second Escape, now in normal mode, collapses the multi-selection.
+  if (vimWantsEscape(view)) return false;
   if (view.state.selection.ranges.length <= 1) return false;
   view.dispatch({
     selection: EditorSelection.single(view.state.selection.main.head),

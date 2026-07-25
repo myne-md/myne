@@ -19,7 +19,7 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 import { CMEditor, type ScrollAnchorRequest, type CMEditorProps } from "../../editor/CMEditor";
-import { asViewMode, type ViewMode } from "../../editor/view-mode";
+import { resolveDefaultViewMode, type ViewMode } from "../../editor/view-mode";
 import { headingSections } from "../../dialect";
 
 /** Stable no-op onChange for the read-only preview companion (MYND-299) — a fresh
@@ -184,7 +184,13 @@ export function PaneView({
   // note tab — the tab's own per-tab mode if set, else the global
   // `editor_default_view_mode` pref, else `live`. Drives the CMEditor below
   // (re-mount-free reconfigure on change).
-  const defaultViewMode: ViewMode = asViewMode(prefs.editor_default_view_mode);
+  // vim-keyboard-mode (MYND-313): with vim on and no explicit stored choice,
+  // notes open in source view — live preview hides the markdown characters
+  // vim's motions still count. An explicit pref wins in either direction.
+  const defaultViewMode: ViewMode = resolveDefaultViewMode(
+    prefs.editor_default_view_mode,
+    prefs.editor_vim_mode === true,
+  );
   const effectiveViewMode: ViewMode =
     leaf.activeTab?.kind === "note" && leaf.activeTab.viewMode
       ? leaf.activeTab.viewMode
@@ -792,6 +798,14 @@ export function PaneView({
             // editor reconfigures its line-number compartment live when the pref
             // flips (no remount). `prefs` is already a useMemo dep below.
             lineNumbers={prefs.editor_line_numbers === true}
+            // vim-keyboard-mode (MYND-313): default OFF (modal editing is opt-in).
+            // The open editor reconfigures its vim compartment live when the pref
+            // flips (no remount), and the engine is only downloaded on the first
+            // enable — a user who never turns vim on never pays for it.
+            // Reading view is read-only and never holds a text cursor, so modal
+            // editing is meaningless there — and an indicator would be actively
+            // misleading. Vim is mounted only for the editable modes.
+            vimMode={prefs.editor_vim_mode === true && effectiveViewMode !== "reading"}
             // reading-source-modes (MYND-299): per-tab live/reading/source. The
             // editor reconfigures its view-mode compartments live (no remount).
             viewMode={effectiveViewMode}

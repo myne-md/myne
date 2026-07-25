@@ -5,6 +5,7 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { resetGraphLayoutOnLock } from "../notes/graphLayoutPersist";
+import { resetVimStateOnLock } from "../editor/vim";
 
 /** Read-only probe of the `UnlockedVault` slot. */
 export async function isVaultUnlocked(): Promise<boolean> {
@@ -17,6 +18,11 @@ export async function lockVault(): Promise<void> {
   // slot goes away, so a vault switch can't carry one vault's positions into
   // another's encrypted cache (see `resetGraphLayoutOnLock`).
   resetGraphLayoutOnLock();
+  // vim-keyboard-mode (MYND-313): yank registers and recorded macros live in the
+  // vim engine's MODULE-GLOBAL state, which survives the editor unmount that
+  // locking performs. Cleared here for the same reason as the graph layout above
+  // — so one vault's note text can never be pasted into another's.
+  resetVimStateOnLock();
   await invoke<void>("plugin:vault-unlock|lock");
 }
 

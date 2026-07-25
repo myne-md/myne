@@ -23,6 +23,7 @@ import type { VaultHeading } from "./wikilink/vault-headings";
 import { reconfigureVaultBlockAnchors } from "./wikilink/vault-block-anchors";
 import type { VaultBlockAnchor } from "./wikilink/vault-block-anchors";
 import { reconfigureLineNumbers } from "./line-numbers";
+import { reconfigureVim } from "./vim";
 import { reconfigureViewMode, type ViewMode } from "./view-mode";
 import { resolveAnchorRange, type WikilinkAnchor } from "./wikilink/anchor";
 import type { ResolverNote } from "@myne/editor/host/notes/resolveWikilink";
@@ -72,6 +73,12 @@ export type CMEditorProps = {
    *  so toggling the `editor_line_numbers` pref updates the open note live while
    *  preserving cursor / scroll / undo. Defaults OFF (prose-first). */
   lineNumbers?: boolean;
+  /** vim-keyboard-mode (MYND-313): make the editor modal (normal/insert/visual).
+   *  Pushed into the editor's vim compartment (re-mount-free) whenever it
+   *  changes, so toggling the `editor_vim_mode` pref updates the open note live
+   *  while preserving cursor / scroll / undo. The engine is dynamically imported
+   *  on first enable, so leaving this off costs nothing at all. Defaults OFF. */
+  vimMode?: boolean;
   /** reading-source-modes (MYND-299): the per-tab view mode. `live` (default) is
    *  today's live-preview; `reading` renders read-only; `source` shows raw
    *  markdown. Pushed into the view-mode compartments (re-mount-free) whenever it
@@ -92,7 +99,7 @@ export type CMEditorProps = {
 };
 
 export function CMEditor(props: CMEditorProps) {
-  const { value, onChange, onBlur, onSelectionChange, extensions, noteSet, vaultHeadings, vaultBlockAnchors, onOpenWikilink, scrollAnchor = null, lineNumbers = false, viewMode = "live", readOnly = false, aiEnabled = false, style, onReady } = props;
+  const { value, onChange, onBlur, onSelectionChange, extensions, noteSet, vaultHeadings, vaultBlockAnchors, onOpenWikilink, scrollAnchor = null, lineNumbers = false, vimMode = false, viewMode = "live", readOnly = false, aiEnabled = false, style, onReady } = props;
   const hostRef = useRef<HTMLDivElement | null>(null);
   const viewRef = useRef<EditorView | null>(null);
   const onChangeRef = useRef(onChange);
@@ -237,6 +244,18 @@ export function CMEditor(props: CMEditorProps) {
     if (view === null) return;
     view.dispatch({ effects: reconfigureViewMode(viewMode, readOnly) });
   }, [viewMode, readOnly]);
+
+  // vim-keyboard-mode (MYND-313): push the live `editor_vim_mode` pref into the
+  // vim compartment whenever it changes. Unlike the compartments above this is
+  // ASYNC — the engine is dynamically imported on first enable — so the helper
+  // owns its own last-call-wins guard rather than this effect trying to cancel.
+  // Errors are swallowed deliberately: a failed chunk load must leave the plain
+  // editor working, not break the note.
+  useEffect(() => {
+    const view = viewRef.current;
+    if (view === null) return;
+    void reconfigureVim(view, vimMode);
+  }, [vimMode]);
 
   // local-ai (SYNC-14): push the live `ai_enabled` (ANDed with the not-excluded
   // gate the host passes) into the AI compartment whenever it changes — so
