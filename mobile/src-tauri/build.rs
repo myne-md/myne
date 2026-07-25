@@ -233,6 +233,7 @@ fn main() {
                     "sync_delete_quarantine",
                     "sync_lifecycle_suspend",
                     "sync_lifecycle_resume",
+                    "sync_decode_join_qr",
                 ]),
             ),
     )

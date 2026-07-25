@@ -61,6 +61,17 @@ export interface MockConfig {
   /** `sync_join_account` outcome. */
   joinResult?: { vault_id: string; pending: boolean; fingerprint: string | null; device_id_hex?: string };
   joinError?: { kind: string };
+  /** `qr-scan|scan` outcome (MYND-466 device-join QR). */
+  qrScan?: { value: string | null };
+  /** `sync_decode_join_qr` outcome. */
+  qrDecode?: {
+    endpoint_url: string;
+    account_number: string;
+    cert_pin_hex: string | null;
+    pin_source: "self_host_tofu" | "hosted" | "self_host_no_pin";
+    fresh: boolean;
+  };
+  qrDecodeError?: { kind: string };
   /** Boot to the Unlock screen (one `Exists` vault, `Empty` slot) instead of
    *  straight to the editor — for the quick-unlock / password unlock flows. */
   lockedVault?: boolean;
@@ -439,6 +450,19 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
             pending: true,
             fingerprint: null,
             device_id_hex: DEFAULT_DEVICE_ID,
+          }
+        );
+      },
+      "plugin:qr-scan|scan": () => config.qrScan ?? { value: null },
+      "plugin:sync|sync_decode_join_qr": () => {
+        if (config.qrDecodeError) throw config.qrDecodeError;
+        return (
+          config.qrDecode ?? {
+            endpoint_url: "https://sync.example.com",
+            account_number: "4K7P9RH2JR3T8XW6VZ0A",
+            cert_pin_hex: null,
+            pin_source: "self_host_no_pin",
+            fresh: true,
           }
         );
       },

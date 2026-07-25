@@ -123,6 +123,12 @@ pub fn run() {
         // `plugin:share-import|seal_share`. On iOS/desktop this registers a no-op
         // (the iOS Share Extension is a separate app-extension target).
         .plugin(tauri_plugin_share_intent::init())
+        // MYND-466: iOS AVFoundation QR scanner for device-join via QR. The one
+        // WebView-facing command (`scan`) is under the deny-by-default
+        // `qr-scan:default` capability (camera-gated). On desktop/Android it
+        // registers the command surface but returns Unsupported (SYNC-46; Android
+        // decode is MYND-465).
+        .plugin(tauri_plugin_qr_scan::init())
         .plugin(plugins::vault_creation::init())
         .plugin(plugins::vault_unlock::init())
         .plugin(plugins::vault_recover::init())
