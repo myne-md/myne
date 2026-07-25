@@ -83,16 +83,26 @@ export type CMEditorProps = {
    *  `ai_enabled` pref (MYP1). Default false; read at mount (writing-assistant
    *  task 6). Never set on the reading-view instance (inert in Reading view). */
   aiEnabled?: boolean;
+  /** Mount the floating selection toolbar that appears over a text selection
+   *  (MYND-559). Default TRUE — desktop's formatting surface, unchanged. A host
+   *  that renders its own bar via {@link onReady} passes `false` so the two don't
+   *  stack: mobile's above-keyboard `FormatBar` offers the same commands, so the
+   *  floating toolbar was pure duplication there. Read at MOUNT (a host's choice
+   *  is a platform constant, not a live pref) — unlike `viewMode` / `aiEnabled`,
+   *  it has no reconfigure compartment. */
+  selectionToolbar?: boolean;
   style?: CSSProperties;
   /** Called once with the live `EditorView` after mount (and `null` on unmount).
    *  Lets a host render its own toolbar/accessory bar that drives the editor
    *  through the shared `editorCommands` (the mobile above-keyboard bar). Desktop
-   *  leaves it unset — its formatting rides the in-editor selection toolbar. */
+   *  leaves it unset — its formatting rides the in-editor selection toolbar. A
+   *  host that DOES set this generally also passes `selectionToolbar: false`, so
+   *  its own bar is the single formatting surface (MYND-559). */
   onReady?: (view: EditorView | null) => void;
 };
 
 export function CMEditor(props: CMEditorProps) {
-  const { value, onChange, onBlur, onSelectionChange, extensions, noteSet, vaultHeadings, vaultBlockAnchors, onOpenWikilink, scrollAnchor = null, lineNumbers = false, viewMode = "live", readOnly = false, aiEnabled = false, style, onReady } = props;
+  const { value, onChange, onBlur, onSelectionChange, extensions, noteSet, vaultHeadings, vaultBlockAnchors, onOpenWikilink, scrollAnchor = null, lineNumbers = false, viewMode = "live", readOnly = false, aiEnabled = false, selectionToolbar = true, style, onReady } = props;
   const hostRef = useRef<HTMLDivElement | null>(null);
   const viewRef = useRef<EditorView | null>(null);
   const onChangeRef = useRef(onChange);
@@ -129,7 +139,7 @@ export function CMEditor(props: CMEditorProps) {
       state: EditorState.create({
         doc: value,
         extensions: [
-          ...myneExtensions({ viewMode, readOnly, aiEnabled }),
+          ...myneExtensions({ viewMode, readOnly, aiEnabled, selectionToolbar }),
           ...(extensions ?? []),
           EditorView.updateListener.of((update) => {
             if (update.docChanged) {
