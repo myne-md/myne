@@ -19,9 +19,27 @@ import { expect, it } from "vitest";
 import { describeE2E, scenario } from "./support/scenario";
 import { seedVault } from "./support/fixtures";
 import { dismissImporterOffer, openSettings, unlockToEditor } from "./support/flows";
-import { testIdSelector } from "./support/webdriver";
+import { testIdSelector, type Session } from "./support/webdriver";
 
 const SOURCES = ["obsidian", "notion", "evernote", "html", "csv"] as const;
+
+/** Wait until the modal reports `phase`. The modal element persists across phases —
+ *  only `data-phase` changes — so `waitForElement` returns immediately and a single
+ *  `attribute()` read races React's state update. This is what made the first version
+ *  of this scenario pass only on retry. */
+async function waitForPhase(
+  s: Session,
+  phase: "pick" | "setup",
+): Promise<void> {
+  await s.waitUntil(
+    async () => {
+      const el = await s.byTestId("import.modal");
+      return (await el.attribute("data-phase")) === phase ? true : null;
+    },
+    { label: `import.modal[data-phase=${phase}]` },
+  );
+}
+
 
 describeE2E("isp1 import source picker reaches every adapter (MYND-586)", () => {
   // Vault-count precondition: 1 (weak KDF).
@@ -41,8 +59,7 @@ describeE2E("isp1 import source picker reaches every adapter (MYND-586)", () => 
         await (await s.byTestId("storage.import")).click();
 
         // The flow opens on the picker, not on an Obsidian-specific setup step.
-        const modal = await s.waitForElement(testIdSelector("import.modal"));
-        expect(await modal.attribute("data-phase")).toBe("pick");
+        await waitForPhase(s, "pick");
         await s.waitForElement(testIdSelector("import.source-picker"));
 
         // Every adapter is reachable, and each row carries its own honest
@@ -65,9 +82,10 @@ describeE2E("isp1 import source picker reaches every adapter (MYND-586)", () => 
             testIdSelector("import.source-row", { "data-source": "evernote" }),
           )
         ).click();
-        const setup = await s.waitForElement(testIdSelector("import.modal"));
-        expect(await setup.attribute("data-phase")).toBe("setup");
-        expect(await setup.attribute("data-source")).toBe("evernote");
+        await waitForPhase(s, "setup");
+        expect(
+          await (await s.byTestId("import.modal")).attribute("data-source"),
+        ).toBe("evernote");
         expect(await (await s.byTestId("import.chosen-source")).text()).toBe("Evernote");
 
         // PRE-import disclosure for the chosen source, before a path is even picked.
@@ -76,16 +94,13 @@ describeE2E("isp1 import source picker reaches every adapter (MYND-586)", () => 
 
         // And a way back, since this flow opened on the picker.
         await (await s.byTestId("import.change-source")).click();
-        expect(
-          await (await s.waitForElement(testIdSelector("import.modal"))).attribute(
-            "data-phase",
-          ),
-        ).toBe("pick");
+        await waitForPhase(s, "pick");
         await (
           await s.waitForElement(
             testIdSelector("import.source-row", { "data-source": "csv" }),
           )
         ).click();
+        await waitForPhase(s, "setup");
 
         // Nothing is armed until a path is picked, and the native dialog is the only
         // way to arm it — so this is where the driven part ends.
