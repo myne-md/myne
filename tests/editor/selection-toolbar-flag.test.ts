@@ -60,14 +60,26 @@ function selectWord(view: EditorView): void {
   view.dispatch({ selection: { anchor: from, head: from + "quick".length } });
 }
 
-/** The show path is rAF-deferred and re-tries across frames until `coordsAtPos`
- *  resolves, so neither polarity can be asserted after a fixed tick count — that
- *  reads as a flake. Poll to a deadline for the positive case; burn the whole
- *  budget for the negative one, so "absent" means absent-after-settling. */
-const SETTLE_MS = 600;
+// The show path is rAF-deferred and re-tries across frames until `coordsAtPos`
+// resolves, so neither polarity can be asserted after a fixed tick count — that
+// reads as a flake. The two directions want DIFFERENT budgets, because only one
+// of them pays for its budget:
+
+/** Positive-case ceiling. `waitForToolbar` returns the moment the node appears,
+ *  so a generous deadline costs nothing in the passing case and only bounds a
+ *  genuine failure. Kept roomy so a cold first run (module transform, JIT warm-up)
+ *  cannot make a real pass look like a flake. */
+const APPEAR_TIMEOUT_MS = 600;
+
+/** Negative-case budget, burned IN FULL every run — so it is most of this file's
+ *  wall-clock and worth keeping tight. 200ms is many multiples of the real
+ *  ceiling: the plugin caps its coords retry at 4 attempts
+ *  (`toolbar/plugin.ts` `coordsRetries`), one rAF apart, so a toolbar that is
+ *  ever going to appear has appeared within ~4 frames. */
+const ABSENT_SETTLE_MS = 200;
 
 async function waitForToolbar(): Promise<Element | null> {
-  const deadline = Date.now() + SETTLE_MS;
+  const deadline = Date.now() + APPEAR_TIMEOUT_MS;
   while (Date.now() < deadline) {
     const el = toolbarEl();
     if (el !== null) return el;
@@ -77,7 +89,7 @@ async function waitForToolbar(): Promise<Element | null> {
 }
 
 async function settle(): Promise<void> {
-  const deadline = Date.now() + SETTLE_MS;
+  const deadline = Date.now() + ABSENT_SETTLE_MS;
   while (Date.now() < deadline) await new Promise((r) => setTimeout(r, 16));
 }
 
