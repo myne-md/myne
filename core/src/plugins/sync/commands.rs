@@ -96,6 +96,73 @@ pub async fn sync_get_endpoint<R: Runtime>(
     })
 }
 
+/// Which trust path a scanned QR's cert pin takes (for the confirm-screen label).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum JoinQrPinSource {
+    /// Self-host: the QR's cert pin is adopted (TOFU-from-scan). The UI verifies
+    /// the connected cert matches this pin before proceeding (grill Q2 transfer).
+    SelfHostTofu,
+    /// Hosted default: the app's baked-in static pin governs; the QR pin is ignored.
+    Hosted,
+    /// Self-host with no pin carried: blind TOFU at first connect.
+    SelfHostNoPin,
+}
+
+/// The decoded, validated view of a scanned device-join QR — everything the mobile
+/// confirm screen needs before the user enters their password (MYND-466, Option 1).
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+pub struct JoinQrView {
+    /// Endpoint URL the QR carried (prefills the join form / endpoint set).
+    pub endpoint_url: String,
+    /// Canonical account number the QR carried (the UI formats it for display).
+    pub account_number: String,
+    /// The QR's carried leaf-cert pin (lowercase hex), or `None`. The UI matches
+    /// this against the connected cert (`sync_set_endpoint`'s returned fingerprint)
+    /// to verify the Q2 trusted-transfer before joining a self-host endpoint.
+    pub cert_pin_hex: Option<String>,
+    /// Which trust path the pin takes (hosted vs self-host).
+    pub pin_source: JoinQrPinSource,
+    /// Whether the QR is still fresh (within the ephemeral TTL). A stale QR is
+    /// rejected with a "re-scan a fresh one" message (grill Q8 liveness).
+    pub fresh: bool,
+}
+
+/// Pure decode → view mapping (host-testable; the command supplies `now_unix`).
+fn decode_join_qr_view(
+    scanned: &str,
+    now_unix: u64,
+) -> Result<JoinQrView, super::qr_join::QrJoinDecodeError> {
+    use super::qr_join::{select_pin_for_qr_join, QrJoinPayload, QrPinSelection, QR_JOIN_TTL_SECS};
+    let payload = QrJoinPayload::decode(scanned.trim())?;
+    let fresh = payload.is_fresh(now_unix, QR_JOIN_TTL_SECS);
+    let pin_source = match select_pin_for_qr_join(&payload) {
+        QrPinSelection::Hosted { .. } => JoinQrPinSource::Hosted,
+        QrPinSelection::SelfHostAdoptQr { .. } => JoinQrPinSource::SelfHostTofu,
+        QrPinSelection::SelfHostNoPin => JoinQrPinSource::SelfHostNoPin,
+    };
+    Ok(JoinQrView {
+        endpoint_url: payload.endpoint_url,
+        account_number: payload.account_number,
+        cert_pin_hex: payload.cert_pin_hex,
+        pin_source,
+        fresh,
+    })
+}
+
+/// Decode + validate a scanned device-join QR for the mobile confirm screen
+/// (MYND-466). Pure over the scanned string + the current clock; no vault access.
+#[tauri::command]
+pub async fn sync_decode_join_qr(
+    scanned: String,
+) -> Result<JoinQrView, super::qr_join::QrJoinDecodeError> {
+    let now_unix = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    decode_join_qr_view(&scanned, now_unix)
+}
+
 use super::to_hex as hex_lower;
 use super::token_store::TokenStore;
 
@@ -1563,6 +1630,52 @@ pub async fn sync_join_account<R: Runtime>(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn qr_account() -> String {
+        String::from_utf8(
+            protocol::generate_account_number()
+                .unwrap()
+                .canonical
+                .to_vec(),
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn decode_join_qr_view_maps_a_fresh_self_host_payload() {
+        use super::super::qr_join::QrJoinPayload;
+        let acct = qr_account();
+        let pin = "ab".repeat(32);
+        let encoded =
+            QrJoinPayload::new("https://sync.example.org", &acct, Some(pin.clone()), 1_000)
+                .unwrap()
+                .encode()
+                .unwrap();
+        let view = decode_join_qr_view(&encoded, 1_050).expect("decode");
+        assert_eq!(view.endpoint_url, "https://sync.example.org");
+        assert_eq!(view.account_number, acct);
+        assert_eq!(view.cert_pin_hex, Some(pin));
+        assert_eq!(view.pin_source, JoinQrPinSource::SelfHostTofu);
+        assert!(view.fresh);
+    }
+
+    #[test]
+    fn decode_join_qr_view_flags_a_stale_payload() {
+        use super::super::qr_join::{QrJoinPayload, QR_JOIN_TTL_SECS};
+        let acct = qr_account();
+        let encoded = QrJoinPayload::new("https://s.example", &acct, None, 1_000)
+            .unwrap()
+            .encode()
+            .unwrap();
+        let view = decode_join_qr_view(&encoded, 1_000 + QR_JOIN_TTL_SECS + 999).expect("decode");
+        assert!(!view.fresh);
+        assert_eq!(view.pin_source, JoinQrPinSource::SelfHostNoPin);
+    }
+
+    #[test]
+    fn decode_join_qr_view_rejects_non_myne_input() {
+        assert!(decode_join_qr_view("https://evil.example", 1).is_err());
+    }
 
     #[test]
     fn head_fingerprint_of_hex_matches_golden_vector() {
