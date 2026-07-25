@@ -65,19 +65,28 @@ async function rowCodes(session: Session): Promise<string[]> {
   return await Promise.all(els.map((e) => e.textContent()));
 }
 
-/** Pull until `predicate` holds on the device's rendered list, or give up. */
-async function pullUntil(
-  session: Session,
+/** Cycle both devices until `predicate` holds on `reader`'s rendered list.
+ *
+ *  BOTH sides must be driven. A name chosen at enrollment is parked in
+ *  device-local state and applied by a later prefs phase — on a joining device
+ *  that is the cycle AFTER its §10.2.1 seed — so the writer has to run its own
+ *  cycles before the reader has anything to pull. Driving only the reader made
+ *  this flaky: it depended on the writer's background 30 s poll landing inside
+ *  the reader's window. */
+async function syncUntil(
+  reader: Session,
+  writers: Session[],
   predicate: (names: string[]) => boolean,
   attempts = 12,
 ): Promise<string[]> {
   let names: string[] = [];
   for (let i = 0; i < attempts; i++) {
-    await ipcOk(session, "plugin:sync|sync_now", {});
+    for (const w of writers) await ipcOk(w, "plugin:sync|sync_now", {});
+    await ipcOk(reader, "plugin:sync|sync_now", {});
     await new Promise((r) => setTimeout(r, 1500));
     // Re-read the rendered rows: the assertion is about the DATA replicating.
     // The panel refreshes itself off the prefs nonce, so no reopen is needed.
-    names = await rowNames(session);
+    names = await rowNames(reader);
     if (predicate(names)) return names;
   }
   return names;
@@ -110,7 +119,7 @@ describeNames("device friendly names (two devices)", () => {
 
           // ── A sees its own name, and B's name once prefs replicate ──────────
           await openDeviceList(a.session);
-          const namesOnA = await pullUntil(a.session, (n) => n.includes(NAME_B));
+          const namesOnA = await syncUntil(a.session, [b.session], (n) => n.includes(NAME_B));
           expect(namesOnA).toContain(NAME_A);
           expect(namesOnA).toContain(NAME_B);
 
@@ -147,7 +156,7 @@ describeNames("device friendly names (two devices)", () => {
           await closeSettings(a.session);
 
           await openDeviceList(b.session);
-          const namesOnB = await pullUntil(b.session, (n) => n.includes(RENAMED_B));
+          const namesOnB = await syncUntil(b.session, [a.session], (n) => n.includes(RENAMED_B));
           expect(namesOnB).toContain(RENAMED_B);
           // A's own name replicated too — the map is shared, not per-device.
           expect(namesOnB).toContain(NAME_A);

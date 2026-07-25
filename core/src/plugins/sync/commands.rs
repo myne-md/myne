@@ -1223,12 +1223,11 @@ pub struct EnrollResult {
     pub approved: bool,
     /// The freshly generated `device_id` (hex) this enrollment registered
     /// (MYND-548) — the create returns the id it minted. The caller needs it to
-    /// write its own `device_names` entry, and has no other way to learn it: a
-    /// PENDING device holds no token, so it cannot read the roster to discover
-    /// which row is itself. Not a secret — this is the VV actor identifier,
-    /// deliberately distinct from the revocable per-device token
-    /// (`sync-protocol.md` §4) — and the name it keys never leaves the
-    /// AEAD-sealed prefs blob.
+    /// name THIS device once its first authed cycle has run, and has no other way
+    /// to learn it: a PENDING device holds no token, so it cannot read the roster
+    /// to discover which row is itself. Not a secret — this is the VV actor
+    /// identifier, deliberately distinct from the revocable per-device token
+    /// (`sync-protocol.md` §4).
     pub device_id_hex: String,
 }
 
@@ -1240,12 +1239,8 @@ pub async fn sync_enroll<R: Runtime>(
     account_number: String,
     credential: String,
     credential_kind: EnrollCredential,
-    device_name: String,
 ) -> Result<EnrollResult, SyncDeviceError> {
     let credential = Zeroizing::new(credential);
-    // MYND-548: parked, NOT written to vault.prefs here — an early prefs write
-    // would disable the §10.2.1 wholesale seed (see `prefs_phase`).
-    let device_name = device_name.trim().to_string();
 
     // Resolve the vault dir (token storage) + the endpoint transport.
     let dir = crate::paths::active_vault_root_io(&app, state.active_vault_id().await)
@@ -1394,9 +1389,6 @@ pub async fn sync_enroll<R: Runtime>(
                 dev_hex.push_str(&format!("{b:02x}"));
             }
             st.device_id_hex = Some(dev_hex.clone());
-            if !device_name.is_empty() {
-                st.pending_device_name = Some(device_name.clone());
-            }
             let _ = super::state::write_sync_state(&dir, &st);
 
             if out.approved && !out.token.is_empty() {
@@ -1467,11 +1459,8 @@ pub async fn sync_join_account<R: Runtime>(
     server_url: String,
     account_number: String,
     password: String,
-    device_name: String,
 ) -> Result<JoinResult, SyncDeviceError> {
     let password = Zeroizing::new(password);
-    // MYND-548: parked, NOT written to vault.prefs here (see `prefs_phase`).
-    let device_name = device_name.trim().to_string();
 
     // 1. Set + TOFU-pin the endpoint (https) before any transport use.
     let fingerprint = sync_set_endpoint(app.clone(), Some(server_url))
@@ -1579,9 +1568,6 @@ pub async fn sync_join_account<R: Runtime>(
                 dev_hex.push_str(&format!("{b:02x}"));
             }
             st.device_id_hex = Some(dev_hex.clone());
-            if !device_name.is_empty() {
-                st.pending_device_name = Some(device_name.clone());
-            }
             let _ = super::state::write_sync_state(&vault_dir, &st);
             if out.approved && !out.token.is_empty() {
                 super::token_store::default_store()

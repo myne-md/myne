@@ -13,6 +13,8 @@ import { PasswordInput } from "../PasswordInput";
 import { DestructiveBanner } from "../DestructiveBanner";
 import { formatAccountNumberInput } from "../../lib/account-number-format";
 import { DEVICE_NAME_MAX_LEN, useDeviceNameField } from "../../lib/device-name";
+// Aliased: the component already has a `setDeviceName` React state setter.
+import { setDeviceName as persistDeviceName } from "../../lib/prefs";
 import { ENROLL_PENDING_NOTICE } from "../../lib/load-bearing-copy";
 
 interface JoinResult {
@@ -115,6 +117,9 @@ export function JoinDeviceModal({ onCancel, onJoined }: JoinDeviceModalProps) {
   const [certFingerprint, setCertFingerprint] = useState<string | null>(null);
   const [headFingerprint, setHeadFingerprint] = useState<string | null>(null);
   const [aborting, setAborting] = useState(false);
+  // MYND-548: the id this join minted, kept so the pending path can name the
+  // device once its first pull lands.
+  const [joinedDeviceId, setJoinedDeviceId] = useState<string | null>(null);
 
   // MYND-548: this device's own name — the same hook the Settings enrollment form
   // uses, so the two doors cannot drift.
@@ -134,10 +139,18 @@ export function JoinDeviceModal({ onCancel, onJoined }: JoinDeviceModalProps) {
       serverUrl: url.trim(),
       accountNumber: account.trim(),
       password,
-      deviceName: deviceNameField.resolved,
     })
-      .then((res) => {
+      .then(async (res) => {
+        setJoinedDeviceId(res.device_id_hex);
         if (!res.pending) {
+          // Self-approved (first device / recovery bootstrap): a cycle can run
+          // now, so name after it — never before, or the §10.2.1 seed dies.
+          try {
+            await invoke("plugin:sync|sync_now");
+            await persistDeviceName(res.device_id_hex, deviceNameField.resolved);
+          } catch {
+            // The row keeps its id-derived label; rename fixes it.
+          }
           // Bootstrap/recovery self-approve (first device) — nothing to
           // eye-compare against, so route straight in.
           onJoined(res.vault_id);
@@ -175,6 +188,15 @@ export function JoinDeviceModal({ onCancel, onJoined }: JoinDeviceModalProps) {
         await invoke("plugin:sync|sync_now");
         const fp = await invoke<string | null>("plugin:sync|sync_head_fingerprint");
         if (!cancelled && fp) {
+          // A head was adopted ⇒ this device completed an authed cycle, so the
+          // §10.2.1 seed has already had its turn and naming is now safe.
+          if (joinedDeviceId) {
+            try {
+              await persistDeviceName(joinedDeviceId, deviceNameField.resolved);
+            } catch {
+              // The row keeps its id-derived label; rename fixes it.
+            }
+          }
           setHeadFingerprint(fp);
           setStep("verify");
           return; // adopted the head — stop polling
@@ -346,8 +368,9 @@ export function JoinDeviceModal({ onCancel, onJoined }: JoinDeviceModalProps) {
         </div>
 
         {/* MYND-548: the same "Name this device" field the Settings enrollment
-            form carries. The two doors must behave identically — a device that
-            arrives through this one and lands nameless is a silent regression. */}
+            form carries. The two doors must behave identically. The name is
+            applied only once this device completes a pull — never at join time,
+            which would disable the §10.2.1 seed. */}
         <div style={FIELD}>
           <label style={LABEL} htmlFor={`${baseId}-device-name`}>
             {t("sync.enroll.deviceNameLabel")}
