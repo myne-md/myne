@@ -53,6 +53,17 @@ describe("vocabulary", () => {
       expect(FORMAT_BAR_DEFAULT_ORDER).not.toContain(desktopOnly);
     }
   });
+
+  it("the pinned chrome is not in the vocabulary — it cannot become hideable", () => {
+    // "Pinned" is currently expressed by ABSENCE from this array, which is a
+    // property nothing else enforces: adding `hideKeyboard` here would compile,
+    // render, and quietly hand the user a way to remove the only exit from the
+    // keyboard (and `rawToggle`, the only exit from source mode). This test is the
+    // structural guard that absence alone does not provide.
+    for (const chrome of ["attach", "library", "record", "rawToggle", "hideKeyboard"]) {
+      expect(FORMAT_BAR_DEFAULT_ORDER).not.toContain(chrome);
+    }
+  });
 });
 
 describe("resolveFormatBarOrder", () => {

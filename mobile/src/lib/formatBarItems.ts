@@ -64,6 +64,20 @@ export const FORMAT_BAR_ITEMS: readonly FormatBarItem[] = [
 /** Canonical default order — every id in {@link FORMAT_BAR_ITEMS}, in bar order. */
 export const FORMAT_BAR_DEFAULT_ORDER: readonly string[] = FORMAT_BAR_ITEMS.map((i) => i.id);
 
+/** id → i18n label key, hoisted to module scope. Both consumers (the bar and the
+ *  Settings panel) label by id, and the bar re-renders on every keystroke, so a
+ *  linear scan of the vocabulary per button per render is pure waste. */
+const LABEL_KEY_BY_ID: ReadonlyMap<string, string> = new Map(
+  FORMAT_BAR_ITEMS.map((i) => [i.id, i.labelKey]),
+);
+
+/** The i18n key for `id`, or `null` when the id is not in the vocabulary (a
+ *  foreign id from a restored backup). Callers fall back to showing the raw id —
+ *  it is only reachable for something that should not be rendered anyway. */
+export function formatBarLabelKey(id: string): string | null {
+  return LABEL_KEY_BY_ID.get(id) ?? null;
+}
+
 /**
  * Resolve the persisted order against the canonical vocabulary.
  *

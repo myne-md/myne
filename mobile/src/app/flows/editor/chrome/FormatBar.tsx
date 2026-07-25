@@ -1,11 +1,11 @@
-import { type CSSProperties, type ReactNode, useRef } from "react";
+import { type CSSProperties, type ReactNode, useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { editorCommands } from "@myne/editor/toolbar/commands";
 import { undo, redo } from "@codemirror/commands";
 import type { EditorView } from "@codemirror/view";
 import { Spinner } from "../../../../components";
 import type { PressEvt } from "../types";
-import { FORMAT_BAR_ITEMS, visibleFormatBarIds } from "../../../../lib/formatBarItems";
+import { formatBarLabelKey, visibleFormatBarIds } from "../../../../lib/formatBarItems";
 
 /** Markdown formatting bar that rides above the keyboard (mobile's answer to the
  *  desktop selection toolbar — mirrors Obsidian's accessory bar; since MYND-559
@@ -91,67 +91,71 @@ export function FormatBar({
   const st = { stroke: "var(--fg-2)", strokeWidth: 1.7, fill: "none", strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
 
   const labelOf = (id: string): string => {
-    const item = FORMAT_BAR_ITEMS.find((i) => i.id === id);
-    return item ? t(item.labelKey) : id;
+    const key = formatBarLabelKey(id);
+    return key ? t(key) : id;
   };
 
   /** One renderer per vocabulary id. Keyed by the SAME ids
    *  `lib/formatBarItems.ts` freezes — a vocabulary entry with no entry here
    *  renders nothing, which the unit test forbids. */
-  const RENDERERS: Record<string, (id: string) => ReactNode> = {
-    undo: (id) => (
-      <button key={id} {...run((v) => { undo(v); v.focus(); })} aria-label={labelOf(id)} data-format-item={id} style={fbtn}>
+  const RENDERERS: Record<string, () => ReactNode> = {
+    undo: () => (
+      <button key="undo" {...run((v) => { undo(v); v.focus(); })} aria-label={labelOf("undo")} data-format-item="undo" style={fbtn}>
         <svg width="20" height="20" viewBox="0 0 24 24"><path d="M7 7L3 11l4 4" {...st} /><path d="M3 11h11a6 6 0 0 1 0 12h-2" {...st} /></svg>
       </button>
     ),
-    redo: (id) => (
-      <button key={id} {...run((v) => { redo(v); v.focus(); })} aria-label={labelOf(id)} data-format-item={id} style={fbtn}>
+    redo: () => (
+      <button key="redo" {...run((v) => { redo(v); v.focus(); })} aria-label={labelOf("redo")} data-format-item="redo" style={fbtn}>
         <svg width="20" height="20" viewBox="0 0 24 24"><path d="M17 7l4 4-4 4" {...st} /><path d="M21 11H10a6 6 0 0 0 0 12h2" {...st} /></svg>
       </button>
     ),
-    heading1: (id) => (
-      <button key={id} {...run(editorCommands.heading1)} aria-label={labelOf(id)} data-format-item={id} style={{ ...fbtn, fontWeight: 700 }}>H1</button>
+    heading1: () => (
+      <button key="heading1" {...run(editorCommands.heading1)} aria-label={labelOf("heading1")} data-format-item="heading1" style={{ ...fbtn, fontWeight: 700 }}>H1</button>
     ),
-    heading2: (id) => (
-      <button key={id} {...run(editorCommands.heading2)} aria-label={labelOf(id)} data-format-item={id} style={{ ...fbtn, fontWeight: 700, fontSize: 14 }}>H2</button>
+    heading2: () => (
+      <button key="heading2" {...run(editorCommands.heading2)} aria-label={labelOf("heading2")} data-format-item="heading2" style={{ ...fbtn, fontWeight: 700, fontSize: 14 }}>H2</button>
     ),
-    bold: (id) => (
-      <button key={id} {...run(editorCommands.bold)} aria-label={labelOf(id)} data-format-item={id} style={{ ...fbtn, fontWeight: 800 }}>B</button>
+    bold: () => (
+      <button key="bold" {...run(editorCommands.bold)} aria-label={labelOf("bold")} data-format-item="bold" style={{ ...fbtn, fontWeight: 800 }}>B</button>
     ),
-    italic: (id) => (
-      <button key={id} {...run(editorCommands.italic)} aria-label={labelOf(id)} data-format-item={id} style={{ ...fbtn, fontStyle: "italic", fontWeight: 600 }}>I</button>
+    italic: () => (
+      <button key="italic" {...run(editorCommands.italic)} aria-label={labelOf("italic")} data-format-item="italic" style={{ ...fbtn, fontStyle: "italic", fontWeight: 600 }}>I</button>
     ),
-    bulletList: (id) => (
-      <button key={id} {...run(editorCommands.bulletList)} aria-label={labelOf(id)} data-format-item={id} style={fbtn}>
+    bulletList: () => (
+      <button key="bulletList" {...run(editorCommands.bulletList)} aria-label={labelOf("bulletList")} data-format-item="bulletList" style={fbtn}>
         <svg width="20" height="20" viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11" {...st} /><circle cx="4.5" cy="6" r="1.3" fill="var(--fg-2)" /><circle cx="4.5" cy="12" r="1.3" fill="var(--fg-2)" /><circle cx="4.5" cy="18" r="1.3" fill="var(--fg-2)" /></svg>
       </button>
     ),
-    checklist: (id) => (
-      <button key={id} {...run(editorCommands.checklist)} aria-label={labelOf(id)} data-format-item={id} style={fbtn}>
+    checklist: () => (
+      <button key="checklist" {...run(editorCommands.checklist)} aria-label={labelOf("checklist")} data-format-item="checklist" style={fbtn}>
         <svg width="20" height="20" viewBox="0 0 24 24"><rect x="3" y="4" width="7" height="7" rx="1.5" {...st} /><path d="M4.6 7.5l1.5 1.5 2.3-2.6" {...st} /><path d="M13 7.5h8M13 16.5h8" {...st} /><rect x="3" y="13" width="7" height="7" rx="1.5" {...st} /></svg>
       </button>
     ),
-    quote: (id) => (
-      <button key={id} {...run(editorCommands.quote)} aria-label={labelOf(id)} data-format-item={id} style={fbtn}>
+    quote: () => (
+      <button key="quote" {...run(editorCommands.quote)} aria-label={labelOf("quote")} data-format-item="quote" style={fbtn}>
         <svg width="20" height="20" viewBox="0 0 24 24"><path d="M5 5v14M9 8h11M9 12h11M9 16h7" {...st} /></svg>
       </button>
     ),
-    code: (id) => (
-      <button key={id} {...run(editorCommands.code)} aria-label={labelOf(id)} data-format-item={id} style={fbtn}>
+    code: () => (
+      <button key="code" {...run(editorCommands.code)} aria-label={labelOf("code")} data-format-item="code" style={fbtn}>
         <svg width="20" height="20" viewBox="0 0 24 24"><path d="M9 8l-4 4 4 4M15 8l4 4-4 4" {...st} /></svg>
       </button>
     ),
-    wikilink: (id) => (
-      <button key={id} {...run(editorCommands.wikilink)} aria-label={labelOf(id)} data-format-item={id} style={{ ...fbtn, fontWeight: 700, fontSize: 15 }}>[[</button>
+    wikilink: () => (
+      <button key="wikilink" {...run(editorCommands.wikilink)} aria-label={labelOf("wikilink")} data-format-item="wikilink" style={{ ...fbtn, fontWeight: 700, fontSize: 15 }}>[[</button>
     ),
-    link: (id) => (
-      <button key={id} {...run(editorCommands.link)} aria-label={labelOf(id)} data-format-item={id} style={fbtn}>
+    link: () => (
+      <button key="link" {...run(editorCommands.link)} aria-label={labelOf("link")} data-format-item="link" style={fbtn}>
         <svg width="20" height="20" viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.6 0l3-3a4 4 0 0 0-5.6-5.6L11 7" {...st} /><path d="M14 10a4 4 0 0 0-5.6 0l-3 3a4 4 0 0 0 5.6 5.6L13 17" {...st} /></svg>
       </button>
     ),
   };
 
-  const visible = visibleFormatBarIds(order, hidden);
+  // `order` / `hidden` come from `usePrefs`, whose value changes only on a prefs
+  // nonce bump — but this component re-renders on every keystroke (EditorFlow
+  // owns the doc state), so without the memo the whole resolve+filter would run
+  // per character typed.
+  const visible = useMemo(() => visibleFormatBarIds(order, hidden), [order, hidden]);
 
   return (
     <div
@@ -166,7 +170,7 @@ export function FormatBar({
       }}
     >
       <div style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 1, overflowX: "auto", padding: "6px 6px", scrollbarWidth: "none", touchAction: "pan-x" }}>
-        {visible.map((id) => RENDERERS[id]?.(id) ?? null)}
+        {visible.map((id) => RENDERERS[id]?.() ?? null)}
         {/* Separator between the configurable format region and the pinned insert
             chrome — omitted when every format action is hidden, so an emptied bar
             does not open with a stray rule. */}
