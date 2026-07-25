@@ -53,6 +53,7 @@ import { SyncBanners } from "../components/sync/SyncBanners";
 import { Icon } from "../components/primitives/Icon";
 import { SettingsModal } from "../components/SettingsModal";
 import { TemplatesManager } from "../components/TemplatesManager";
+import { ThemeInstallDialog } from "../components/ThemeInstallDialog";
 import { Spinner } from "../components/Spinner";
 import { SnapshotsPanel } from "../notes/components/SnapshotsPanel";
 import { SnapshotFailedIndicator } from "../notes/components/SnapshotFailedIndicator";
@@ -1704,6 +1705,18 @@ function EditorChrome({
         onClose={() => setVaultExportOpen(false)}
         folders={vaultExportFolders}
       />
+      {/* MYND-567: the `myne://theme/install` confirmation gate. Self-driving —
+          it drains the deep-link latch on mount and listens for warm arrivals,
+          so it needs no state from Editor. Mounted HERE (and only here) because
+          Editor is the post-unlock stage: that is what holds a link arriving on
+          a locked vault until the vault is open.
+
+          `deferred` yields to the first-run importer offer. Both are focus-
+          trapping modals at the same z-index, so showing them together would
+          have the two traps fight over focus; the offer is the onboarding gate
+          and wins. Deferring only delays — the request stays latched and the
+          dialog opens as soon as the offer is dismissed. */}
+      <ThemeInstallDialog deferred={offerOpen} />
       <TemplatesManager
         open={templatesOpen}
         onClose={() => setTemplatesOpen(false)}

@@ -244,6 +244,58 @@ in the local-ai note).
 - **Not in `protocol/`:** the crypto crate's dependency surface is untouched; the closed RustCrypto primitive set (`decisions.md` 2026-04-28) is unchanged — this is transport-layer dependency surface (TB9), not protocol crypto.
 - **Hash-pinning:** exact pins in `core/Cargo.toml`, single workspace `Cargo.lock` updated (relocation, no new package); added to `core/` (and `base64` also stays in `src-tauri/` for `local_inference`), never `protocol/`.
 
+### `myne://` deep-link handling (MYND-567) — `src-tauri/Cargo.toml` + `package.json`
+
+One Tauri-org plugin so a website can hand the desktop app a theme via a `myne://theme/install?…`
+link (the one-click theme install; the website half is MYND-568). Not crypto, not telemetry,
+**not network** — it neither opens nor can open a connection; it only carries a URL the OS has
+already resolved to this app. Command-path only, never on the boot path beyond a single argv
+scan.
+
+| Dep | Version | Used for | Transitive footprint | License | Justified-by |
+|---|---|---|---|---|---|
+| `tauri-plugin-deep-link` | 2 | Register the `myne://` scheme at bundle time (macOS `CFBundleURLTypes`, Windows NSIS registry, Linux `.desktop` `MimeType`) and deliver an arriving URL to the app (macOS `RunEvent::Opened`; Windows/Linux a second process whose lone argv is the URL) | **+9 packages**, all leaf/platform-scoped — see the breakdown below | MIT/Apache-2.0 | `decisions.md` 2026-07-25 (device-independent theme install); MYND-567 |
+| `@tauri-apps/plugin-deep-link` | ^2.4.9 | The JS guest binding (`getCurrent` for cold launch, `onOpenUrl` for warm) consumed by `src/lib/themeDeepLink.ts` | **Zero** — peer-depends on the already-present `@tauri-apps/api` | MIT/Apache-2.0 | same |
+
+**Transitive breakdown (measured, `git diff Cargo.lock`).** The crate's own direct deps —
+`serde`, `serde_json`, `tauri`, `tauri-utils`, `thiserror`, `tracing`, `url` — are **already in
+the shared lock**, so they cost nothing. The 9 new lock entries are the crate itself plus two
+**target-conditional** registration backends and their trees:
+
+- `rust-ini` 0.21 (+ `ordered-multimap`, `dlv-list`, `const-random`, `const-random-macro`,
+  `tiny-keccak`, `hashbrown`) — **Linux only**, writes the `.desktop` entry's `MimeType` line.
+- `windows-registry` 0.5 — **Windows only**, writes the `HKCU\Software\Classes\myne` keys.
+  (`dunce` / `windows-result`, its siblings, were already in-tree.)
+
+A macOS build compiles **neither** backend (macOS registration is a build-time `Info.plist`
+edit via the crate's `plist` *build*-dependency, not a runtime dep). So the per-platform runtime
+cost is one crate on macOS, two on Windows, seven on Linux.
+
+**Why a dependency at all** (vs. hand-rolling per "The bar" Q1): scheme registration is three
+unrelated OS-integration chores — an `Info.plist` bundle key, NSIS registry writes, and a
+freedesktop `.desktop` `MimeType` + `update-desktop-database` call — none of which is logic we
+have any advantage writing, and each of which is silently broken-until-a-user-reports-it if
+wrong. The macOS arm additionally needs the `RunEvent::Opened` Apple-event path, which is inside
+Tauri's own event loop and not reachable from application code. The plugin is by the Tauri
+Programme (same org as the runtime already at the core of the app), and — decisively — the
+**`myne-mobile` companion already ships this exact crate and version** for the `myne://open` /
+`myne://capture` widget links (`decisions.md` 2026-07-13). Admitting it here means one deep-link
+implementation across the fleet rather than a desktop fork of a mobile-vetted one.
+
+**Why it does not widen the egress surface.** The plugin has no HTTP client, socket, or fetch in
+its tree, and its capability grant (`deep-link:default` = `allow-get-current`) is a **read of a
+URL already delivered**, not a request. The `no_egress` gate re-ran clean after admission
+(`cargo test -p myne-desktop --lib no_egress`, 12/12) — the crate is absent from
+`DENYLISTED_CRATES` on merit (nothing to originate a request), the CSP `connect-src` is
+byte-unchanged, and `deep-link:default` is not matched by `permission_is_network`. **The URL
+itself is untrusted input**: any website can serve a `myne://` link, so the payload is parsed
+under explicit size caps, is never fetched-from, must clear the existing `theme_validator`
+allowlist inside `themes_import`, and can never be applied without the user's confirmation.
+
+**Hash-pinning:** the single workspace `Cargo.lock` carries the 9 new entries; `pnpm-lock.yaml`
+carries the JS binding. No change to `protocol/` — the closed RustCrypto primitive set is
+untouched.
+
 ## Reference
 
 - `threat-model.md` §6 — compensating controls

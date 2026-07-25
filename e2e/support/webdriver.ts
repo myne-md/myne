@@ -569,6 +569,9 @@ export interface NewSessionOptions {
   baseUrl: string;
   /** Absolute path to the production app binary under test. */
   application: string;
+  /** Argv for the app binary — `tauri:options.args`. Used to model an OS
+   *  deep-link cold launch (the URL is the process's only argument). */
+  args?: readonly string[];
 }
 
 /** GET /status — used to poll driver readiness after spawn. */
@@ -582,6 +585,9 @@ export async function newSession(opts: NewSessionOptions): Promise<Session> {
       alwaysMatch: {
         "tauri:options": {
           application: opts.application,
+          // Omitted entirely when unset so every existing scenario sends the
+          // byte-identical capability payload it sent before.
+          ...(opts.args && opts.args.length > 0 ? { args: [...opts.args] } : {}),
         },
       },
     },
