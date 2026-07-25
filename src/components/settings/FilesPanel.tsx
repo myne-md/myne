@@ -7,6 +7,7 @@
 
 import { StartupOpenSettings } from "./StartupOpenSettings";
 import { NewNoteLocationSettings } from "./NewNoteLocationSettings";
+import { AttachmentOcrSettings } from "./AttachmentOcrSettings";
 import { PANEL_ROOT_STYLE } from "./panel-styles";
 
 export function FilesPanel() {
@@ -19,6 +20,11 @@ export function FilesPanel() {
       {/* Default location for new notes (MYND-462) — vault root / current note's
           folder / a specific folder. */}
       <NewNoteLocationSettings />
+
+      {/* Whether attachment text extraction reads images and scanned PDFs
+          (MYND-441). Lives here rather than under Labs because OCR is search
+          correctness, not an AI feature — it ships on by default. */}
+      <AttachmentOcrSettings />
     </div>
   );
 }

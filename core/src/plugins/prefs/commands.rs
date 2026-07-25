@@ -842,6 +842,46 @@ pub(crate) async fn set_ai_enabled_with_dir(
     Ok(())
 }
 
+/// Slot::Unlocked-gated setter for the `attachment_ocr_enabled` toggle
+/// (MYND-441) — whether attachment text extraction may read images and scanned
+/// PDFs. Read-modify-write under the per-plugin write mutex; **no native
+/// side-effect**, exactly like [`set_ai_enabled`].
+///
+/// Turning it off stops the background extraction worker on the next drain but
+/// never deletes cached results, so toggling costs the user nothing. Device-local
+/// (`sync-protocol.md` §10.2): per-device compute budget, so a phone can opt out
+/// without disabling OCR on the desktop.
+#[tauri::command]
+pub async fn set_attachment_ocr_enabled<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
+    enabled: bool,
+) -> Result<(), PrefsWriteError> {
+    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_attachment_ocr_enabled_with_dir(&dir, state.inner(), hooks.inner(), enabled).await
+}
+
+/// Testable core of [`set_attachment_ocr_enabled`].
+pub(crate) async fn set_attachment_ocr_enabled_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    enabled: bool,
+) -> Result<(), PrefsWriteError> {
+    update_prefs_with_dir(vault_dir, state, hooks, |prefs| {
+        prefs.attachment_ocr_enabled = enabled;
+    })
+    .await?;
+
+    tracing::info!(
+        event = "prefs_written",
+        field = "attachment_ocr_enabled",
+        enabled
+    );
+    Ok(())
+}
+
 /// Slot::Unlocked-gated setter for the `ai_excluded_folders` set (local-ai
 /// epic, ai-ux-surface MYND-408, SYNC-14) — folders the AI never reads/indexes.
 /// Same canonical set encoding as `deliberate_folders`; direct mirror of
