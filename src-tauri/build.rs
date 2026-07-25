@@ -124,6 +124,8 @@ fn main() {
                 "set_screen_capture_protection",
                 "set_deliberate_folders",
                 "set_archived_folders",
+                "set_device_name",
+                "device_platform",
                 "vault_set_label",
                 "vault_set_icon",
             ]),

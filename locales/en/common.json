@@ -2468,8 +2468,21 @@
       "loading": "Loading…",
       "noDevices": "No devices synced yet.",
       "notEnrolled": "This device isn’t connected yet. If you just added it, wait for approval from another device; otherwise add it with the “Add a device” form above.",
+      "platform": {
+        "android": "Android phone",
+        "androidTablet": "Android tablet",
+        "ios": "iPhone",
+        "ipad": "iPad",
+        "linux": "Linux PC",
+        "macos": "Mac",
+        "unknown": "This device",
+        "windows": "Windows PC"
+      },
       "remove": "Remove",
       "removedElsewhere": "This device was removed from your account on another device.",
+      "rename": "Rename",
+      "renameFailed": "Couldn’t save that name. Try again.",
+      "renameLabel": "Device name",
       "resetAndReAdd": "Reset and re-add this device",
       "resetSyncOnThisDevice": "Reset sync on this device",
       "shortName": "Device {{hex}}",
@@ -2501,6 +2514,8 @@
       "accountNumberPlaceholder": "MY-XXXX-XXXX-XXXX-XXXX-X",
       "connecting": "Connecting…",
       "credentialTypeAria": "Credential type",
+      "deviceNameHelp": "Shown in your device list. You can change it later.",
+      "deviceNameLabel": "Name this device",
       "error": {
         "notConfigured": "Set a sync server in settings before adding this device.",
         "transport": "Couldn’t reach the sync server. Check your connection and try again."
