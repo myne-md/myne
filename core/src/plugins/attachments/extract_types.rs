@@ -43,7 +43,8 @@ pub enum ExtractStatus {
 ///
 /// **Appended-only** — postcard serializes a fieldless enum by variant index, so
 /// new variants MUST be added at the end to keep the existing tags
-/// (Pdf=0/Docx=1/Text=2/Other=3) byte-stable for already-written `MYE1` blobs.
+/// (Pdf=0/Docx=1/Text=2/Other=3/Audio=4) byte-stable for already-written `MYE1`
+/// blobs. Inserting or reordering silently re-interprets every cached blob.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum SourceFormat {
     Pdf,
@@ -53,6 +54,25 @@ pub enum SourceFormat {
     /// Audio transcript from the on-device ASR engine (voice-to-text, MYND-551;
     /// `extractor_version 0x02`). Index tag `4`.
     Audio,
+    /// Recognized text from the on-device OCR engine for a **raster image**
+    /// attachment (MYND-441; `extractor_version 0x03`). Index tag `5`.
+    ///
+    /// A scanned, text-layer-less PDF keeps [`SourceFormat::Pdf`] — it *is* a
+    /// PDF, and `status` + `text` already distinguish an OCR result from a
+    /// text-layer one. Only the attachment's own format selects this variant.
+    Image,
+}
+
+impl SourceFormat {
+    /// Whether this format's text was produced by a **model**, as opposed to a
+    /// deterministic parser. Model-backed output is inherently approximate —
+    /// notably it may flatten diacritics the source document carries — which is
+    /// why OCR-derived documents are indexed under a diacritic-folded token
+    /// variant (MYND-441). Deterministic extractors reproduce the source exactly
+    /// and need no such widening.
+    pub fn is_model_derived(self) -> bool {
+        matches!(self, SourceFormat::Audio | SourceFormat::Image)
+    }
 }
 
 /// The extracted-text payload, serialized (postcard) into the `MYE1` blob
@@ -122,6 +142,55 @@ impl ExtractedText {
     /// payload (the caller treats it as a cache miss → re-extract).
     pub fn from_blob_plaintext(bytes: &[u8]) -> Option<ExtractedText> {
         postcard::from_bytes(bytes).ok()
+    }
+
+    /// NFC-normalize `raw`, apply the [`MAX_EXTRACTED_TEXT_LEN`] cap, and
+    /// classify the result as [`ExtractStatus::Ok`] or [`ExtractStatus::Empty`].
+    ///
+    /// The single place every extractor lands its text, so normalization, the
+    /// cap, the `char_count`-before-truncation rule and the whitespace-only →
+    /// `Empty` rule cannot drift between formats. Shared with mobile, which
+    /// runs the same extractors.
+    ///
+    /// `char_count` is deliberately the count **before** truncation (§9.15.2),
+    /// so a caller can tell how much was dropped. Truncation cuts on a char
+    /// boundary, never mid-codepoint.
+    pub fn finalize(raw: String, source_format: SourceFormat) -> ExtractedText {
+        use unicode_normalization::UnicodeNormalization;
+
+        let normalized: String = raw.nfc().collect();
+        let char_count = normalized.chars().count() as u32;
+
+        let (mut text, truncated) = if normalized.len() > MAX_EXTRACTED_TEXT_LEN {
+            let mut end = MAX_EXTRACTED_TEXT_LEN;
+            while end > 0 && !normalized.is_char_boundary(end) {
+                end -= 1;
+            }
+            (normalized[..end].to_string(), true)
+        } else {
+            (normalized, false)
+        };
+
+        let status = if text.trim().is_empty() {
+            text.clear();
+            ExtractStatus::Empty
+        } else {
+            ExtractStatus::Ok
+        };
+
+        ExtractedText {
+            status,
+            source_format,
+            text,
+            char_count,
+            truncated,
+            // Every extractor that lands here is either deterministic
+            // (PDF/DOCX/text) or model-backed with BUNDLED weights (OCR) — in
+            // both cases there is no per-vault model identity to record. The
+            // one caller that sets `model_hash` is the ASR path, whose model
+            // the user side-loads; it builds its payload directly.
+            model_hash: None,
+        }
     }
 }
 
@@ -234,6 +303,53 @@ mod tests {
             postcard::to_allocvec(&SourceFormat::Audio).unwrap(),
             vec![4u8]
         );
+        assert_eq!(
+            postcard::to_allocvec(&SourceFormat::Image).unwrap(),
+            vec![5u8]
+        );
+    }
+
+    #[test]
+    fn image_source_format_round_trips() {
+        // An OCR payload (SourceFormat::Image) round-trips equal through the
+        // postcard MYE1 inner-plaintext codec. `model_hash` stays None: the OCR
+        // weights are BUNDLED rather than user-chosen, so there is no per-vault
+        // model identity to record — `extractor_version` alone is the staleness
+        // signal, which is why changing the bundled weights must bump it.
+        let r = ExtractedText {
+            status: ExtractStatus::Ok,
+            source_format: SourceFormat::Image,
+            text: "recognized from pixels".to_string(),
+            char_count: 22,
+            truncated: false,
+            model_hash: None,
+        };
+        let bytes = r.to_blob_plaintext();
+        let back = ExtractedText::from_blob_plaintext(&bytes).expect("decode");
+        assert_eq!(r, back);
+        assert_eq!(back.model_hash, None);
+        // ...and being model-independent in the payload does NOT make it
+        // deterministic: the index still needs the diacritic-folded widening.
+        assert!(SourceFormat::Image.is_model_derived());
+        assert!(!back.is_model_stale(None), "no recorded hash → never stale");
+    }
+
+    #[test]
+    fn model_derived_formats_are_exactly_audio_and_image() {
+        // Guards the classification the index-side folding keys off: adding a
+        // future model-backed format without updating this set would silently
+        // leave its output unfolded.
+        for f in [SourceFormat::Audio, SourceFormat::Image] {
+            assert!(f.is_model_derived(), "{f:?} must be model-derived");
+        }
+        for f in [
+            SourceFormat::Pdf,
+            SourceFormat::Docx,
+            SourceFormat::Text,
+            SourceFormat::Other,
+        ] {
+            assert!(!f.is_model_derived(), "{f:?} must be deterministic");
+        }
     }
 
     #[test]

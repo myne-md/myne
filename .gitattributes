@@ -2,3 +2,8 @@
 # raw git blobs (repo-history bloat). The bundled default transcription model
 # (voice-to-text, MYND-270) is a quantized Whisper GGUF; user-side-loaded models
 # live outside the repo. See LICENSING.md for the weights' license (Apache-2.0).
+# The bundled OCR models (MYND-441) are `rten`-format weights converted once from
+# the PP-OCRv5 mobile ONNX exports. Unlike the transcription model these are NOT
+# side-loadable and ship on desktop AND mobile, so they are always present in a
+# checkout. See src-tauri/resources/models/ocr/README.md for provenance +
+# checksums, and LICENSING.md for the weights' license (Apache-2.0).

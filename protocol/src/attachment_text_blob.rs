@@ -13,7 +13,7 @@
 //!
 //! This codec is **payload-agnostic**, exactly like `search_blob.rs` /
 //! `dictionary_blob.rs`: the inner plaintext is an opaque byte string produced
-//! by the desktop layer (the `extractor_version 0x02` format is a
+//! by the desktop layer (the `extractor_version 0x03` format is a
 //! postcard-serialized `{status, source_format, text, char_count, truncated,
 //! model_hash}` struct — the extracted text is plaintext-derived AS3-Sensitive
 //! content and so MUST live INSIDE this AEAD envelope, never in the cleartext
@@ -27,10 +27,9 @@
 //! ------  ----  -------------------  ------------------------------------
 //! 0       4     magic                ASCII "MYE1"
 //! 4       1     protocol_version     0x01
-//! 5       1     extractor_version    0x02 (the extractor generation; a future
-//!                                     extractor — incl. the OCR layer MYND-441 —
-//!                                     bumps this so an old decoder rejects and
-//!                                     the caller re-extracts)
+//! 5       1     extractor_version    0x03 (the extractor generation; a future
+//!                                     extractor bumps this so an old decoder
+//!                                     rejects and the caller re-extracts)
 //! 6       24    nonce                XChaCha20-Poly1305 nonce
 //! 30      4     ciphertext_len       big-endian uint32, plaintext_len + 32
 //! 34      M     ciphertext           AEAD ciphertext + 32-byte CTX tag T'
@@ -48,8 +47,8 @@
 //! / unsupported-version) to a **cache miss** and re-extracts from the source
 //! `MYA1` attachment. A replayed/tampered/stale blob is non-load-bearing — the
 //! worst case is one re-extraction, never a weakened guarantee. The
-//! `extractor_version` byte is the forward hook: a future extractor (incl. OCR,
-//! MYND-441) writes a higher value, and an older-generation client returns
+//! `extractor_version` byte is the forward hook: a future extractor writes a
+//! higher value, and an older-generation client returns
 //! [`AttachmentTextBlobError::ExtractorVersionUnsupported`] → re-extract.
 
 use crate::aead::{
@@ -72,13 +71,27 @@ pub const ATTACHMENT_TEXT_BLOB_PROTOCOL_VERSION: u8 = 0x01;
 /// `extractor_version` byte at offset 5 — the extractor generation that
 /// produced the inner plaintext. Generations: `0x01` = the v0.1 baseline
 /// extractor set (PDF text-layer, DOCX OOXML text, text-like UTF-8); `0x02`
-/// (current) adds the on-device ASR audio transcript plus a `model_hash` field
-/// on the inner payload (voice-to-text, MYND-551). A future extractor set
-/// (better extraction, or the OCR layer MYND-441) bumps this again so an older
-/// decoder rejects cleanly and the caller re-extracts. Bound into the AAD as
-/// well as this header byte (§ 9.15.3), so a bump also invalidates every cached
-/// blob at a prior generation.
-pub const ATTACHMENT_TEXT_BLOB_EXTRACTOR_VERSION: u8 = 0x02;
+/// adds the on-device ASR audio transcript plus a `model_hash` field on the
+/// inner payload (voice-to-text, MYND-551); `0x03` (current) adds the on-device
+/// image OCR generation — image attachments and scanned, text-layer-less PDFs
+/// (MYND-441). A future extractor set bumps this again so an older decoder
+/// rejects cleanly and the caller re-extracts. Bound into the AAD as well as
+/// this header byte (§ 9.15.3), so a bump also invalidates every cached blob at
+/// a prior generation.
+///
+/// **The byte is global, not per-format.** A bump invalidates every cached
+/// extraction of every format, including ones the new generation does not
+/// improve — the `0x02 → 0x03` bump re-runs ASR over every audio attachment for
+/// no gain. That cost is accepted deliberately; per-format generation counters
+/// are tracked as MYND-573.
+///
+/// **Bundled-model rule (MYND-441).** The OCR payload leaves `model_hash` unset
+/// because its weights are bundled rather than user-chosen, so this byte is the
+/// only staleness signal that exists for them. **Changing the bundled OCR
+/// weights under `src-tauri/resources/models/ocr/` REQUIRES bumping this
+/// constant** — without it, every existing vault keeps serving text produced by
+/// the old weights and the improvement is invisible.
+pub const ATTACHMENT_TEXT_BLOB_EXTRACTOR_VERSION: u8 = 0x03;
 
 /// Length of the 16-byte `account_number_hash` bound into the AAD.
 pub const ATTACHMENT_TEXT_BLOB_ACCOUNT_HASH_LEN: usize = 16;
@@ -334,7 +347,7 @@ mod tests {
     #[test]
     fn unsupported_extractor_version_rejects_for_reextract() {
         let mut blob = encode(b"abc");
-        blob[5] = 0x03; // a future extractor generation beyond 0x02 (e.g. OCR, MYND-441)
+        blob[5] = 0x04; // a generation beyond the current 0x03 (OCR, MYND-441)
         assert_eq!(
             decode_attachment_text_blob(&KEY, &ACCOUNT_HASH, &ATT_ID, &blob),
             Err(AttachmentTextBlobError::ExtractorVersionUnsupported)
@@ -522,7 +535,7 @@ mod tests {
         let mut pf_version = blob_small.clone();
         pf_version[4] = 0x02;
         let mut pf_extractor = blob_small.clone();
-        pf_extractor[5] = 0x03;
+        pf_extractor[5] = 0x04;
         let pf_header_short = ATTACHMENT_TEXT_BLOB_MAGIC.to_vec();
         let mut pf_truncated = blob_small.clone();
         pf_truncated.truncate(pf_truncated.len() - 1);
@@ -540,7 +553,7 @@ mod tests {
         let mut d = alloc::string::String::new();
         d.push_str("{\n  \"schema\": \"attachment-text\",\n  \"protocol_version\": \"v0.1\",\n");
         d.push_str("  \"spec_section\": \"protocol.md §9.15 + §3.4 + §5.2 + §6.4\",\n");
-        d.push_str("  \"description\": \"Pins protocol::encode_attachment_text_blob_raw + decode_attachment_text_blob byte mapping for the MYE1 per-attachment extracted-text codec (MYND-328; §9.15). Inner plaintext is OPAQUE (the desktop's postcard ExtractedText). attachment_text_key = derive_subkey(root_key, SubkeyRole::AttachmentTextKey) (HKDF role 'attachment-text-key'); the AAD (role 'attachment-text-blob') additionally binds attachment_id + extractor_version (0x02 — the audio/STT extractor generation, MYND-270; 0x01 was the MYND-328 baseline). 13 cases: 3 encrypt + 1 decrypt_ok + 3 decrypt_aead_fail (tag-tamper + cross-vault + wrong-attachment-id, all non-distinguishing §6.4) + 6 parse_fail (incl. the load-bearing extractor_version_unsupported forward hook). Generated by `cargo test -p protocol --lib emit_attachment_text_vectors_for_paste -- --ignored`.\",\n");
+        d.push_str("  \"description\": \"Pins protocol::encode_attachment_text_blob_raw + decode_attachment_text_blob byte mapping for the MYE1 per-attachment extracted-text codec (MYND-328; §9.15). Inner plaintext is OPAQUE (the desktop's postcard ExtractedText). attachment_text_key = derive_subkey(root_key, SubkeyRole::AttachmentTextKey) (HKDF role 'attachment-text-key'); the AAD (role 'attachment-text-blob') additionally binds attachment_id + extractor_version (0x03 — the image-OCR extractor generation, MYND-441; 0x02 was the audio/STT generation, MYND-270; 0x01 the MYND-328 baseline). 13 cases: 3 encrypt + 1 decrypt_ok + 3 decrypt_aead_fail (tag-tamper + cross-vault + wrong-attachment-id, all non-distinguishing §6.4) + 6 parse_fail (incl. the load-bearing extractor_version_unsupported forward hook). Generated by `cargo test -p protocol --lib emit_attachment_text_vectors_for_paste -- --ignored`.\",\n");
         d.push_str("  \"cases\": [\n");
 
         let emit_encrypt = |d: &mut alloc::string::String,
@@ -694,7 +707,7 @@ mod tests {
             "protocol_version_mismatch",
             false,
         );
-        emit_parse_fail(&mut d, "parse-fail-extractor-version-unsupported", "extractor_version (offset 5) = 0x03 — a future extractor generation beyond the current 0x02 (incl. OCR, MYND-441) this client does not understand → rejected so the caller re-extracts. Load-bearing forward hook (§9.15).", &pf_extractor, "extractor_version_unsupported", false);
+        emit_parse_fail(&mut d, "parse-fail-extractor-version-unsupported", "extractor_version (offset 5) = 0x04 — a generation beyond the current 0x03 (image OCR, MYND-441) this client does not understand → rejected so the caller re-extracts. Load-bearing forward hook (§9.15).", &pf_extractor, "extractor_version_unsupported", false);
         emit_parse_fail(
             &mut d,
             "parse-fail-header-too-short",

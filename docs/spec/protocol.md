@@ -1712,13 +1712,34 @@ Offset  Size       Field                  Description
                                           (PDF text-layer, DOCX OOXML text, text-like
                                           UTF-8; §9.15.2); 0x02 = that baseline set PLUS the
                                           audio ASR (speech-to-text) extractor generation
-                                          (§9.15.2; MYND-270). Distinct from protocol_version:
-                                          a changed extractor set (better extraction, the
-                                          added audio ASR generation, or the future OCR layer
-                                          §11/MYND-441) bumps THIS byte so a lower stored value
-                                          triggers re-extraction + index rebuild (§9.6.4)
-                                          rather than serving stale text. This is an in-major
-                                          value change, NOT a protocol_version bump.
+                                          (§9.15.2; MYND-270); 0x03 = the above PLUS the
+                                          image OCR generation — image attachments and
+                                          scanned, text-layer-less PDFs (§9.15.2, MYND-441).
+                                          Distinct from protocol_version: a changed extractor
+                                          set (better extraction, the added audio ASR
+                                          generation, the added OCR generation) bumps THIS
+                                          byte so a lower stored value triggers re-extraction
+                                          + index rebuild (§9.6.4) rather than serving stale
+                                          text. This is an in-major value change, NOT a
+                                          protocol_version bump.
+
+                                          The byte is GLOBAL, not per-format: a bump
+                                          invalidates every cached extraction of EVERY
+                                          format, including ones the new generation does not
+                                          improve. The 0x02 -> 0x03 bump therefore re-runs
+                                          ASR over every audio attachment for no gain. That
+                                          cost is accepted deliberately, not overlooked;
+                                          per-format generation counters are tracked
+                                          separately as MYND-573.
+
+                                          For a MODEL-BACKED generation whose model is
+                                          BUNDLED rather than user-chosen, this byte is also
+                                          the only staleness signal that exists: the OCR
+                                          payload leaves model_hash unset (§9.15.2), so
+                                          CHANGING THE BUNDLED OCR WEIGHTS REQUIRES BUMPING
+                                          THIS BYTE. Without the bump, every existing vault
+                                          keeps serving text produced by the old weights and
+                                          the improvement is invisible.
 6       24 bytes   text_nonce             192-bit random nonce (OS CSPRNG) for the inner
                                           AEAD under attachment_text_key.
 30      4 bytes    ciphertext_len         Length M = plaintext_len + 32 of the inner
@@ -1739,7 +1760,7 @@ cryptographically without consuming header bytes, exactly as for `vault.search`.
 `protocol_version` + `extractor_version` MUST all be checked **before** any decryption
 (the magic-byte-before-decrypt discipline of §9.2 / §9.3 / §9.6.1).
 
-#### 9.15.2 Inner plaintext (`extractor_version 0x01`)
+#### 9.15.2 Inner plaintext
 
 A [postcard](https://docs.rs/postcard)-serialized struct:
 
@@ -1747,14 +1768,38 @@ A [postcard](https://docs.rs/postcard)-serialized struct:
   text, e.g. a scanned PDF with no text layer), `unsupported` (format not handled in this
   extractor generation), or `failed` (extraction errored — corrupt / password-protected).
 - `source_format` — the format the extractor dispatched on (`pdf` / `docx` / `text` /
-  `audio`). `audio` is the ASR / speech-to-text generation (`extractor_version 0x02`,
-  §9.15.1): the extractor decodes the `audio/wav` `MYA1` blob and writes the transcript to
-  `text`. An audio attachment that cannot be transcribed maps to the existing negative
-  `status` values (`unsupported` / `failed` / `empty`) — no new `status` is added, and the
-  `0x01 → 0x02` bump is precisely what re-processes previously-`unsupported` audio.
+  `audio` / `image`). `audio` is the ASR / speech-to-text generation
+  (`extractor_version 0x02`, §9.15.1): the extractor decodes the `audio/wav` `MYA1` blob
+  and writes the transcript to `text`. `image` is the OCR generation
+  (`extractor_version 0x03`, MYND-441): the extractor decodes a raster image attachment
+  and writes the recognized text. A scanned, text-layer-less PDF keeps `source_format =
+  pdf` — it *is* a PDF, and `status` plus `text` already distinguish an OCR result from a
+  text-layer one; only the attachment's own format selects the variant. An attachment that
+  cannot be transcribed or recognized maps to the existing negative `status` values
+  (`unsupported` / `failed` / `empty`) — no new `status` is added at either generation, and
+  each bump is precisely what re-processes what the previous generation marked
+  `unsupported`.
+
+  The variant set is **append-only**. The serialization tags variants by declaration
+  index (`pdf`=0, `docx`=1, `text`=2, `other`=3, `audio`=4, `image`=5), so inserting or
+  reordering would silently re-interpret every already-written blob. New formats are
+  appended, never inserted.
 - `text` — the extracted text, **NFC-normalized**, empty unless `status = ok`.
 - `char_count` — `u32` length of `text` before any truncation.
 - `truncated` — `bool`, set when extraction hit the `MAX_EXTRACTED_TEXT_LEN` cap (§9.15.4).
+- `model_hash` — optional `SHA-256` of the model that produced this payload, present only
+  for a model-backed generation whose model the **user chose**. It mirrors the
+  `vault.embeddings` model-identity rule (§9.17.2): the hash rides the inner payload, never
+  the AAD, so the crypto framing stays model-agnostic and a model swap invalidates cached
+  results through a payload-side comparison instead. It is `null` for a deterministic
+  extractor (PDF / DOCX / text — output is model-independent) and `set` for an ASR
+  transcript, whose Whisper model is side-loadable.
+
+  It is also **`null` for OCR**, and deliberately so: the OCR weights are *bundled*, not
+  user-chosen, so there is no per-vault model identity to record — every client at a given
+  `extractor_version` ran the same weights. The consequence is stated in §9.15.1 and is
+  normative: because no payload-side identity exists to catch it, **changing the bundled
+  OCR weights requires bumping `extractor_version`.**
 
 The whole struct rests INSIDE the AEAD envelope by necessity — the text is confidential
 vault content; none may appear in the cleartext header. Postcard (not the canonical JSON
