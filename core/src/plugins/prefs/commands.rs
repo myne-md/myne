@@ -1957,6 +1957,101 @@ pub(crate) async fn set_folder_icons_with_dir(
     Ok(())
 }
 
+/// The running device's platform token — [`std::env::consts::OS`] verbatim
+/// (`"macos"`, `"windows"`, `"linux"`, `"ios"`, `"android"`).
+///
+/// This is the product's SINGLE default-device-name heuristic (MYND-548): the
+/// enrollment forms seed their "Name this device" field from it, mapping the
+/// token to a display word through the i18n catalogue. Clients MUST NOT derive
+/// the platform from `navigator` instead — that would be a second heuristic
+/// diverging per client, which is exactly what the `PrefsView::device_names`
+/// doc comment ("the single home for device names so no client ships a second
+/// default-name heuristic") exists to prevent. A client MAY refine the token
+/// with information the core cannot see (mobile splits `"ios"` into phone vs
+/// tablet via its size class) — that only picks a better *suggestion* for an
+/// editable field; the stored value is whatever the user confirms.
+///
+/// Deliberately NOT `Slot::Unlocked`-gated and infallible: it reads a
+/// compile-time constant and touches no vault state, and the join flow needs it
+/// while bootstrapping a vault that is not unlocked yet.
+#[tauri::command]
+pub fn device_platform() -> String {
+    std::env::consts::OS.to_string()
+}
+
+/// Slot::Unlocked-gated setter for ONE entry of the `device_names` map
+/// (MYND-548 / SYNC-41) — the human-readable label the device list shows for a
+/// `device_id`, keyed by its hex. Read-modify-write under the per-plugin write
+/// mutex; **no native side-effect** (same disk-only shape as
+/// [`set_folder_icons`]).
+///
+/// Two deliberate deviations from the [`vault_set_label`] precedent this
+/// otherwise mirrors:
+///
+/// 1. **No clear path.** The parameter is a plain `String`, not
+///    `Option<String>`. `device_names` merges per-key by UNION
+///    (`sync-protocol.md` §10.2): a key present on one side and absent on the
+///    other is carried over verbatim, so removing an entry does not propagate —
+///    it resurrects from the first peer that still holds it. Rather than ship a
+///    delete that silently fails to stick (or mint an empty-string tombstone,
+///    which would need its own § 9.5.2 clause and would linger forever), the
+///    operation does not exist. A RENAME always works: it stamps a fresh
+///    `device_names/<hex>` clock and wins LWW.
+/// 2. **Empty is a no-op, not a write.** A blank or whitespace-only name is
+///    refused before the read-modify-write (returning `Ok`), so no row can ever
+///    render nameless. Both clients treat an empty submit as "cancel"; this is
+///    the fail-closed backstop for that contract, not a second code path.
+///
+/// The stored value is trimmed. NFC folding is the codec's job
+/// (`push_canonical_string_map` normalizes keys AND values on encode — the
+/// `spell_languages` precedent), so this setter does not re-normalize.
+/// **Non-load-bearing** (a tampered or replayed value can at worst mislabel a
+/// row) — no protective-envelope clamp. No per-name length cap here either: the
+/// clients cap the input for readability, and the `MAX_PREFS_PLAINTEXT_LEN`
+/// ceiling already fails the encode closed.
+///
+/// Logs the field name only — NEVER the name or the device id. The name is the
+/// user's own input (AS3-sensitive, like `label`); the device id is a
+/// correlation tag (like the `item_colors` keys).
+#[tauri::command]
+pub async fn set_device_name<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
+    device_id_hex: String,
+    name: String,
+) -> Result<(), PrefsWriteError> {
+    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_device_name_with_dir(&dir, state.inner(), hooks.inner(), device_id_hex, name).await
+}
+
+/// Testable core of [`set_device_name`].
+pub(crate) async fn set_device_name_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    device_id_hex: String,
+    name: String,
+) -> Result<(), PrefsWriteError> {
+    let trimmed = name.trim();
+    if trimmed.is_empty() {
+        // Empty submit == cancel (see the doc comment). Nothing is written, so
+        // the previous name — or the client's id-derived fallback — survives.
+        return Ok(());
+    }
+    let value = trimmed.to_string();
+
+    update_prefs_with_dir(vault_dir, state, hooks, |prefs| {
+        prefs.device_names.insert(device_id_hex, value);
+    })
+    .await?;
+
+    // Field name only — neither the label nor the device id reaches the log
+    // surface (see the doc comment).
+    tracing::info!(event = "prefs_written", field = "device_names");
+    Ok(())
+}
+
 /// Slot::Unlocked-gated setter for the per-vault `label` field (MYND-205) — the
 /// human-readable name the in-app vault switcher shows for this vault. `Some`
 /// sets/changes it; `None` clears it (back to the neutral-fallback state).
@@ -2251,6 +2346,204 @@ mod tests {
                 .expect("no-op re-set");
             assert_eq!(bumps.load(std::sync::atomic::Ordering::Relaxed), 1);
         });
+    }
+
+    // ── device_names (MYND-548 / SYNC-41) ────────────────────────────────────
+
+    /// A device id key shaped like the real thing (32 lowercase hex chars).
+    const DEV_HEX: &str = "3f9ac2d1aabbccdd00112233445566ff";
+
+    #[test]
+    fn device_name_round_trips_via_set_then_read() {
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x41).await;
+            set_device_name_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                DEV_HEX.into(),
+                "Studio Mac".into(),
+            )
+            .await
+            .expect("set device name");
+
+            let view = prefs_read_with_dir(tmp.path(), &state)
+                .await
+                .expect("read prefs");
+            assert_eq!(
+                view.device_names.get(DEV_HEX).map(String::as_str),
+                Some("Studio Mac")
+            );
+        });
+    }
+
+    #[test]
+    fn device_name_write_stamps_its_per_key_field_clock() {
+        // sync-protocol.md §10.2: device_names races per KEY, on a namespaced
+        // `device_names/<key>` clock — not one clock for the whole map.
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x42).await;
+            set_device_name_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                DEV_HEX.into(),
+                "Laptop".into(),
+            )
+            .await
+            .expect("set device name");
+
+            let view = prefs_read_with_dir(tmp.path(), &state)
+                .await
+                .expect("read prefs");
+            let clock = view
+                .field_clocks
+                .get(&format!("device_names/{DEV_HEX}"))
+                .copied();
+            assert!(
+                clock.is_some_and(|c| c > 0),
+                "expected a stamped per-key clock, got {clock:?}"
+            );
+            // The whole-field name must NOT be stamped — that would make one
+            // device's rename clobber every other device's name on merge.
+            assert!(!view.field_clocks.contains_key("device_names"));
+        });
+    }
+
+    #[test]
+    fn device_name_edit_bumps_the_sync_push_window_once() {
+        // MYND-517: device_names is SHARED, so a name change must open the
+        // coalesced push window; re-writing the SAME name must not.
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x43).await;
+            let (hooks, bumps) = counting_hooks();
+            set_device_name_with_dir(tmp.path(), &state, &hooks, DEV_HEX.into(), "Phone".into())
+                .await
+                .expect("first set");
+            assert_eq!(bumps.load(std::sync::atomic::Ordering::Relaxed), 1);
+
+            set_device_name_with_dir(tmp.path(), &state, &hooks, DEV_HEX.into(), "Phone".into())
+                .await
+                .expect("no-op re-set");
+            assert_eq!(bumps.load(std::sync::atomic::Ordering::Relaxed), 1);
+        });
+    }
+
+    #[test]
+    fn device_name_is_nfc_normalized_through_the_codec() {
+        // The setter does not normalize; push_canonical_string_map folds keys
+        // AND values to NFC on encode (the spell_languages precedent). Writing
+        // a decomposed "é" must read back precomposed, or two devices could
+        // encode byte-different blobs for the same visible name.
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x44).await;
+            set_device_name_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                DEV_HEX.into(),
+                "Cafe\u{0301} Mac".into(),
+            )
+            .await
+            .expect("set device name");
+
+            let view = prefs_read_with_dir(tmp.path(), &state)
+                .await
+                .expect("read prefs");
+            assert_eq!(
+                view.device_names.get(DEV_HEX).map(String::as_str),
+                Some("Caf\u{00e9} Mac")
+            );
+        });
+    }
+
+    #[test]
+    fn device_name_is_storable_for_an_unknown_device_id() {
+        // The map is keyed independently of the server roster: a name can be
+        // written for a device the roster has never reported (the enrolling
+        // device names ITSELF before approval, and a removed device keeps its
+        // entry — sync-protocol.md §4 never prunes).
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x45).await;
+            set_device_name_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                "ffffffffffffffffffffffffffffffff".into(),
+                "Retired phone".into(),
+            )
+            .await
+            .expect("set device name");
+
+            let view = prefs_read_with_dir(tmp.path(), &state)
+                .await
+                .expect("read prefs");
+            assert_eq!(view.device_names.len(), 1);
+        });
+    }
+
+    #[test]
+    fn empty_device_name_is_a_no_op_and_preserves_the_previous_name() {
+        // Empty submit == cancel. There is no clear path (the §10.2 union merge
+        // cannot propagate a deletion), so a blank must never reach the blob.
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x46).await;
+            let (hooks, bumps) = counting_hooks();
+            set_device_name_with_dir(tmp.path(), &state, &hooks, DEV_HEX.into(), "Desk".into())
+                .await
+                .expect("set device name");
+
+            for blank in ["", "   ", "\t\n"] {
+                set_device_name_with_dir(tmp.path(), &state, &hooks, DEV_HEX.into(), blank.into())
+                    .await
+                    .expect("blank is Ok, not an error");
+            }
+
+            let view = prefs_read_with_dir(tmp.path(), &state)
+                .await
+                .expect("read prefs");
+            assert_eq!(
+                view.device_names.get(DEV_HEX).map(String::as_str),
+                Some("Desk")
+            );
+            // A refused write must not open a push window either.
+            assert_eq!(bumps.load(std::sync::atomic::Ordering::Relaxed), 1);
+        });
+    }
+
+    #[test]
+    fn device_name_is_trimmed_before_storage() {
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x47).await;
+            set_device_name_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                DEV_HEX.into(),
+                "  Work Mac \n".into(),
+            )
+            .await
+            .expect("set device name");
+
+            let view = prefs_read_with_dir(tmp.path(), &state)
+                .await
+                .expect("read prefs");
+            assert_eq!(
+                view.device_names.get(DEV_HEX).map(String::as_str),
+                Some("Work Mac")
+            );
+        });
+    }
+
+    #[test]
+    fn device_platform_returns_the_target_token() {
+        // The single default-name heuristic: one token, from the core, shared
+        // by both clients. Asserting equality with the constant pins that the
+        // command is a passthrough and never grows a second mapping here (the
+        // token → display word mapping belongs in the i18n catalogue).
+        let token = device_platform();
+        assert!(!token.is_empty());
+        assert_eq!(token, std::env::consts::OS);
     }
 
     #[test]

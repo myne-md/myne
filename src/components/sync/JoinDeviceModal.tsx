@@ -12,9 +12,16 @@ import { Input } from "../primitives/Input";
 import { PasswordInput } from "../PasswordInput";
 import { DestructiveBanner } from "../DestructiveBanner";
 import { formatAccountNumberInput } from "../../lib/account-number-format";
+import { suggestedDeviceName } from "../../lib/device-name";
+// Aliased: the component already has a `setDeviceName` React state setter.
+import { setDeviceName as persistDeviceName } from "../../lib/prefs";
+import { DEVICE_NAME_MAX_LEN } from "../../hooks/useDeviceNames";
 import { ENROLL_PENDING_NOTICE } from "../../lib/load-bearing-copy";
 
 interface JoinResult {
+  /** The device_id this join registered (MYND-548) — used to name THIS device in
+   *  its own local prefs; a pending device cannot read the roster to find itself. */
+  device_id_hex: string;
   vault_id: string;
   pending: boolean;
   fingerprint: string | null;
@@ -112,6 +119,25 @@ export function JoinDeviceModal({ onCancel, onJoined }: JoinDeviceModalProps) {
   const [headFingerprint, setHeadFingerprint] = useState<string | null>(null);
   const [aborting, setAborting] = useState(false);
 
+  // MYND-548: this device's own name, pre-filled from the platform token Rust
+  // reports. Same contract as the Settings enrollment form — the two doors must
+  // not diverge. The functional update keeps a late suggestion from overwriting
+  // what the user typed.
+  const [deviceName, setDeviceName] = useState("");
+  const [suggestedName, setSuggestedName] = useState("");
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const suggestion = await suggestedDeviceName();
+      if (cancelled) return;
+      setSuggestedName(suggestion);
+      setDeviceName((current) => (current === "" ? suggestion : current));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const canSubmit =
     url.trim().length > 0 &&
     account.trim().length > 0 &&
@@ -127,7 +153,18 @@ export function JoinDeviceModal({ onCancel, onJoined }: JoinDeviceModalProps) {
       accountNumber: account.trim(),
       password,
     })
-      .then((res) => {
+      .then(async (res) => {
+        // Name THIS device before routing anywhere. The bootstrapped vault is
+        // unlocked by now, so the local prefs write succeeds without a token and
+        // without waiting for approval; the §10.2 union merge carries the entry
+        // to peers on the first sync. Best-effort: a naming failure must not turn
+        // a successful join into an error.
+        try {
+          const name = deviceName.trim() !== "" ? deviceName.trim() : suggestedName;
+          if (name !== "") await persistDeviceName(res.device_id_hex, name);
+        } catch {
+          // Prefs unwritable — the row falls back to its id-derived label.
+        }
         if (!res.pending) {
           // Bootstrap/recovery self-approve (first device) — nothing to
           // eye-compare against, so route straight in.
@@ -333,6 +370,25 @@ export function JoinDeviceModal({ onCancel, onJoined }: JoinDeviceModalProps) {
             spellCheck={false}
             autoCapitalize="characters"
             data-testid="join.account-input"
+          />
+        </div>
+
+        {/* MYND-548: the same "Name this device" field the Settings enrollment
+            form carries. The two doors must behave identically — a device that
+            arrives through this one and lands nameless is a silent regression. */}
+        <div style={FIELD}>
+          <label style={LABEL} htmlFor={`${baseId}-device-name`}>
+            {t("sync.enroll.deviceNameLabel")}
+          </label>
+          <Input
+            id={`${baseId}-device-name`}
+            value={deviceName}
+            onChange={(e) => setDeviceName(e.target.value)}
+            maxLength={DEVICE_NAME_MAX_LEN}
+            placeholder={suggestedName}
+            autoComplete="off"
+            spellCheck={false}
+            data-testid="join.device-name-input"
           />
         </div>
 

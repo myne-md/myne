@@ -2,9 +2,11 @@
 // names + removal) + the approval gate entry (pending devices with approve).
 // Penpot skipped per the owner directive; built against design tokens.
 //
-// Friendly names: v1 shows a default platform-agnostic short name derived from
-// the device_id prefix; editable names stored in synced prefs are the prefs-field
-// follow-up (MYND-425 spec-deltas).
+// Friendly names (MYND-548, closing the MYND-425 spec-delta follow-up): an
+// approved row leads with its synced `device_names` entry and demotes the short
+// device code to a secondary line; a device nobody has named keeps the old
+// id-derived label. Pending rows deliberately keep ONLY that id-derived label —
+// see the SAS note below.
 //
 // Approve-then-verify SAS (MYND-459 T14, SYNC-40): approving a pending device
 // surfaces THIS device's adopted-head fingerprint (`sync_head_fingerprint` →
@@ -20,6 +22,7 @@ import { useTranslation } from "react-i18next";
 import { invoke } from "@tauri-apps/api/core";
 import i18n from "../../i18n";
 import { type DeviceEntry, type DevicesHook } from "../../hooks/useDevices";
+import { useDeviceNames, DEVICE_NAME_MAX_LEN } from "../../hooks/useDeviceNames";
 
 const ROOT: CSSProperties = {
   display: "flex",
@@ -66,10 +69,62 @@ const BADGE: CSSProperties = {
   whiteSpace: "nowrap",
 };
 
-/** A short, stable display name from the device_id (until editable names land). */
+/** The short, id-derived label — the fallback for a device nobody has named, and
+ *  the ONLY label a pending device ever gets (SYNC-40: a name chosen by an
+ *  unverified newcomer would read as a trust signal next to the SAS). */
 function shortName(d: DeviceEntry): string {
   return i18n.t("sync.devices.shortName", { hex: d.device_id_hex.slice(0, 6) });
 }
+
+/** The label an APPROVED row leads with: the synced `device_names` entry when the
+ *  user has named this device, else {@link shortName}. A whitespace-only stored
+ *  value is treated as absent — the Rust setter refuses to write one, so this is
+ *  belt-and-braces against a hand-edited or foreign-client blob. */
+function displayName(d: DeviceEntry, names: Record<string, string>): string {
+  const stored = names[d.device_id_hex];
+  return stored !== undefined && stored.trim() !== "" ? stored : shortName(d);
+}
+
+/** The demoted device code. Kept as a permanent secondary line rather than a
+ *  hover affordance: mobile has no hover, and this is what disambiguates two
+ *  devices that share a default name ("Mac" / "Mac"). */
+const CODE_LINE: CSSProperties = {
+  fontFamily: "var(--font-mono)",
+  fontSize: "var(--text-xs)",
+  color: "var(--fg-3)",
+};
+
+const NAME_LINE: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  minWidth: 0,
+};
+
+const IDENTITY_COLUMN: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: 2,
+  minWidth: 0,
+};
+
+const ACTIONS: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: "var(--space-2)",
+  flexShrink: 0,
+};
+
+const RENAME_INPUT: CSSProperties = {
+  font: "inherit",
+  fontSize: "var(--text-sm)",
+  color: "var(--fg-1)",
+  background: "var(--bg-2)",
+  border: "1px solid var(--line-1)",
+  borderRadius: "var(--radius-1)",
+  padding: "2px var(--space-1)",
+  minWidth: 0,
+  width: "100%",
+};
 
 // Takes the `useDevices` hook result as a prop (lifted to `SyncPanel`) so the
 // roster poll runs once for both the device list AND the "Add a device" enroll
@@ -85,6 +140,27 @@ interface SasState {
 export function DeviceManagementPanel({ hook }: { hook: DevicesHook }) {
   const { t } = useTranslation();
   const { devices, pending, error, busy, approve, remove, resetLocal } = hook;
+  // The synced `device_names` map (MYND-548). Narrow hook rather than `usePrefs`
+  // — this panel is the only consumer of the field; see useDeviceNames.
+  const { names, rename } = useDeviceNames();
+
+  // The row currently being renamed, plus its in-flight input value. `null` = no
+  // row is in rename mode. One at a time: the Rename buttons disable while any
+  // row is open, so a stray click cannot strand a half-typed edit.
+  const [renaming, setRenaming] = useState<{ id: string; value: string } | null>(null);
+  const [renameFailed, setRenameFailed] = useState(false);
+
+  // Enter and blur both land here. Closing the editor FIRST makes the two paths
+  // idempotent — blur fires right after Enter, and the second call sees `null`
+  // and returns. A blank value is a cancel (the backend refuses it too), so the
+  // previous name survives; only a genuine write failure surfaces.
+  const commitRename = async () => {
+    const target = renaming;
+    if (target === null) return;
+    setRenaming(null);
+    const outcome = await rename(target.id, target.value);
+    setRenameFailed(outcome === "failed");
+  };
   const approved = (devices ?? []).filter((d) => d.approved && !d.retired);
   // This device, if the roster came back marking it retired — it was removed from
   // another device. It is filtered out of `approved`/`pending`, so without this it
@@ -246,6 +322,14 @@ export function DeviceManagementPanel({ hook }: { hook: DevicesHook }) {
 
       <div>
         <div style={SECTION_LABEL}>{t("sync.devices.yourDevices")}</div>
+        {renameFailed && (
+          <div
+            style={{ color: "var(--danger)", fontSize: "var(--text-sm)", paddingBottom: 4 }}
+            data-testid="sync.rename-error"
+          >
+            {t("sync.devices.renameFailed")}
+          </div>
+        )}
         {devices === null ? (
           // Only "Loading…" while genuinely loading. When the roster failed (e.g. this
           // device is not enrolled) `devices` stays null with an error set above — show
@@ -258,29 +342,74 @@ export function DeviceManagementPanel({ hook }: { hook: DevicesHook }) {
         ) : (
           approved.map((d) => (
             <div key={d.device_id_hex} style={ROW} data-testid="sync.device-row" data-device-id={d.device_id_hex} data-current={d.is_current ? "true" : "false"}>
-              <span>
-                {shortName(d)}
-                {d.is_current && (
-                  <span style={BADGE} data-testid="sync.this-device">
-                    {t("sync.devices.thisDevice")}
+              <span style={IDENTITY_COLUMN}>
+                {renaming?.id === d.device_id_hex ? (
+                  <input
+                    // Focused on mount: the field replaces the line the user just
+                    // activated, so focusing it IS the interaction.
+                    autoFocus
+                    value={renaming.value}
+                    maxLength={DEVICE_NAME_MAX_LEN}
+                    style={RENAME_INPUT}
+                    aria-label={t("sync.devices.renameLabel")}
+                    data-testid="sync.device-name-input"
+                    onChange={(e) => setRenaming({ id: d.device_id_hex, value: e.target.value })}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        void commitRename();
+                      } else if (e.key === "Escape") {
+                        e.preventDefault();
+                        setRenaming(null);
+                      }
+                    }}
+                    onBlur={() => void commitRename()}
+                  />
+                ) : (
+                  <span style={NAME_LINE}>
+                    <span data-testid="sync.device-name">{displayName(d, names)}</span>
+                    {d.is_current && (
+                      <span style={BADGE} data-testid="sync.this-device">
+                        {t("sync.devices.thisDevice")}
+                      </span>
+                    )}
                   </span>
                 )}
-              </span>
-              {d.is_current ? (
-                <span style={{ color: "var(--fg-3)", fontSize: "var(--text-xs)" }}>
-                  {t("sync.devices.syncedHere")}
+                <span style={CODE_LINE} data-testid="sync.device-code">
+                  {d.device_id_hex.slice(0, 6)}
                 </span>
-              ) : (
+              </span>
+              <span style={ACTIONS}>
+                {/* Rename is offered on EVERY approved row, not just this device:
+                    devices enrolled before names existed are named from whatever
+                    device the user happens to be holding. */}
                 <button
                   type="button"
                   style={BTN}
-                  disabled={busy}
-                  onClick={() => void remove(d.device_id_hex)}
-                  data-testid="sync.remove-device"
+                  disabled={busy || renaming !== null}
+                  onClick={() =>
+                    setRenaming({ id: d.device_id_hex, value: displayName(d, names) })
+                  }
+                  data-testid="sync.rename-device"
                 >
-                  {t("sync.devices.remove")}
+                  {t("sync.devices.rename")}
                 </button>
-              )}
+                {d.is_current ? (
+                  <span style={{ color: "var(--fg-3)", fontSize: "var(--text-xs)" }}>
+                    {t("sync.devices.syncedHere")}
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    style={BTN}
+                    disabled={busy}
+                    onClick={() => void remove(d.device_id_hex)}
+                    data-testid="sync.remove-device"
+                  >
+                    {t("sync.devices.remove")}
+                  </button>
+                )}
+              </span>
             </div>
           ))
         )}
