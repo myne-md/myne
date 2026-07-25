@@ -403,7 +403,7 @@
         "label": "Import .base view…"
       },
       "importObsidian": {
-        "label": "Import Obsidian vault…"
+        "label": "Import notes…"
       },
       "lockVault": {
         "label": "Lock vault"
@@ -1478,6 +1478,41 @@
         "laterHint": "You can always import later from Settings → Storage.",
         "notNow": "Not now",
         "title": "Import your Obsidian vault?"
+      },
+      "picker": {
+        "intro": "Choose where your notes are coming from. Myne imports and encrypts them on the spot — nothing leaves this device, and your original files are never changed."
+      },
+      "source": {
+        "obsidian": {
+          "label": "Obsidian vault",
+          "pickerTitle": "Choose your Obsidian vault folder",
+          "survives": "Keeps: Markdown, frontmatter, [[wikilinks]], folder structure, attachments.",
+          "loses": "Leaves behind: canvas files, and anything that is not a Markdown note."
+        },
+        "notion": {
+          "label": "Notion export (unzipped)",
+          "pickerTitle": "Choose your unzipped Notion export folder",
+          "survives": "Keeps: pages, folder structure, page properties as fields, and internal links as wikilinks. Each database also arrives as a table note linking to its rows.",
+          "loses": "Unzip the export first — Myne reads the folder, not the .zip. Toggles, callouts and coloured text have no equivalent and are listed in an import report."
+        },
+        "evernote": {
+          "label": "Evernote export (.enex)",
+          "pickerTitle": "Choose your Evernote .enex file",
+          "survives": "Keeps: every note in the file, formatting, and attachments. Encrypted blocks are preserved as text you can still decrypt in Evernote.",
+          "loses": "Leaves behind: reminders and note history. Very large exports are refused rather than risked — split the export if that happens."
+        },
+        "html": {
+          "label": "HTML files",
+          "pickerTitle": "Choose a folder of HTML files",
+          "survives": "Keeps: headings, lists, tables, links, code and emphasis.",
+          "loses": "Leaves behind: styling, scripts and embeds. Remote images stay as links and are never downloaded."
+        },
+        "csv": {
+          "label": "CSV file",
+          "pickerTitle": "Choose your .csv file",
+          "survives": "Becomes a single note holding the table.",
+          "loses": "It is one note, not one note per row — Myne is not a database. Very wide or very long files are trimmed, and the import report says by how much."
+        }
       }
     },
     "list": {
@@ -2296,9 +2331,9 @@
       "exportBody": "Export vault as Markdown",
       "exportHelper": "Plain markdown tree — not encrypted.",
       "exportLabel": "Export",
-      "importHelper": "Bring an existing Obsidian vault into Myne. Every Markdown note is imported and encrypted on the spot; your original files are left untouched.",
+      "importHelper": "Bring notes in from Obsidian, Notion, Evernote, HTML files or a CSV. Everything is imported and encrypted on the spot; your original files are left untouched.",
       "importLabel": "Import",
-      "importObsidian": "Import Obsidian vault…",
+      "importObsidian": "Import notes…",
       "locationHelper": "Each vault is a folder of encrypted files under this path. Prefer the Backup button below over manual copies — it verifies the written file.",
       "locationLabel": "Vault location",
       "openInFiles": "Open in Files",
@@ -2391,7 +2426,7 @@
         "focusMode": "focus mode typewriter dim inactive lines distraction free",
         "font": "font typeface family sans serif mono typography",
         "hotkeys": "hotkeys keyboard shortcuts keybindings keymap chords bindings",
-        "import": "import obsidian vault migrate bring in",
+        "import": "import notes obsidian notion evernote enex html csv migrate migration bring",
         "language": "language locale interface translation ui",
         "lastActiveNote": "continue where you left off last note resume sync open",
         "license": "license agpl open source legal",
