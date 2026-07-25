@@ -20,6 +20,7 @@
 
 import { test, expect, type Page } from "@playwright/test";
 import { installMockIpc } from "../mock-ipc";
+import { expandFolder, longPress } from "../helpers";
 
 const NOTE_ID = "note-empty-folders-1";
 /** A note in `Projects/` so the tree has one note-derived folder to sit beside. */
@@ -29,34 +30,11 @@ const folderRows = (page: Page) => page.getByTestId("notes.folder-row");
 const folderNamed = (page: Page, name: string) =>
   page.locator(`[data-testid="notes.folder-row"][data-folder-path="${name}"]`);
 
-/** Open a folder's subtree so its nested rows render. The tree starts fully
- *  COLLAPSED since MYND-561 (desktop parity), so any assertion about a nested
- *  folder must expand its parent chain first. */
-async function expandFolder(page: Page, name: string): Promise<void> {
-  const row = folderNamed(page, name);
-  await row.click();
-  await expect(row).toHaveAttribute("data-collapsed", "false");
-}
-
 /** Drive the New-folder prompt: open, type `name`, confirm. */
 async function createFolder(page: Page, name: string): Promise<void> {
   await page.getByTestId("notes.new-folder").click();
   await page.getByTestId("notes.folder-prompt-input").fill(name);
   await page.getByTestId("notes.folder-prompt-submit").click();
-}
-
-/** Fire a long-press (the 480ms hold with no move/up) to open a row's sheet —
- *  the recognizer the folder-decoration spec drives the same way. */
-async function longPress(page: Page, selector: string): Promise<void> {
-  await page.evaluate((sel) => {
-    const el = document.querySelector(sel) as HTMLElement | null;
-    if (!el) throw new Error(`longPress: no element for ${sel}`);
-    const r = el.getBoundingClientRect();
-    el.dispatchEvent(
-      new PointerEvent("pointerdown", { bubbles: true, cancelable: true, clientX: r.x + 8, clientY: r.y + 8 }),
-    );
-  }, selector);
-  await page.waitForTimeout(600);
 }
 
 test.describe("empty folders in the mobile folder tree", () => {

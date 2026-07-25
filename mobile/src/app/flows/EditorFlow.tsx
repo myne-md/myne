@@ -329,15 +329,24 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
     }
   };
   useEffect(() => {
-    const onHidden = () => {
-      if (document.visibilityState === "hidden") flushRef.current();
+    // ONE listener pair for the whole app-background moment. Everything that must
+    // reach disk before an OS kill hangs off it: the open note's body, and the
+    // sidebar folder-expand set (MYND-561 — `vault.workspace`'s only other write
+    // seam is `lockVault()`). Both are best-effort and independent; neither can
+    // block the other, and a second registration for the same event would just be
+    // two ways to get the same moment wrong.
+    const flushAll = () => {
+      flushRef.current();
+      void flushWorkspaceNow();
     };
-    const onHide = () => flushRef.current();
+    const onHidden = () => {
+      if (document.visibilityState === "hidden") flushAll();
+    };
     document.addEventListener("visibilitychange", onHidden);
-    window.addEventListener("pagehide", onHide);
+    window.addEventListener("pagehide", flushAll);
     return () => {
       document.removeEventListener("visibilitychange", onHidden);
-      window.removeEventListener("pagehide", onHide);
+      window.removeEventListener("pagehide", flushAll);
     };
   }, []);
 
@@ -453,29 +462,16 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
   // The store is the single owner, so this is a plain replace with disk truth —
   // no mount-order ref, and a toggle that beats it just gets overwritten (same
   // outcome as a cold start).
+  //
+  // The WRITE side rides the app-background listener above (and `lockVault()`).
+  // Per-toggle writes are deliberately NOT a seam: `vault.workspace`'s mtime is
+  // visible to an adversary with filesystem access even though its contents are
+  // sealed, and desktop keeps that mtime from becoming an activity log by writing
+  // on graceful exit only (design grill 2026-06-01 Q1). Backgrounding is the
+  // mobile equivalent — an OS kill of a backgrounded app is the normal way a
+  // mobile app dies.
   useEffect(() => {
     void ensureWorkspaceHydrated();
-  }, []);
-
-  // Write the set back at mobile's graceful-exit analogs. Per-toggle writes are
-  // deliberately NOT a seam: `vault.workspace`'s mtime is visible to an adversary
-  // with filesystem access even though its contents are sealed, and desktop keeps
-  // that mtime from becoming an activity log by writing on exit only (design grill
-  // 2026-06-01 Q1). Backgrounding is the mobile equivalent — an OS kill of a
-  // backgrounded app is the normal way a mobile app dies, so `visibilitychange`
-  // carries the common case and `pagehide` the terminal one. The other seam is
-  // `lockVault()`. Both no-op unless the set is dirty.
-  useEffect(() => {
-    const flush = () => void flushWorkspaceNow();
-    const onVisibility = () => {
-      if (document.visibilityState === "hidden") flush();
-    };
-    document.addEventListener("visibilitychange", onVisibility);
-    window.addEventListener("pagehide", flush);
-    return () => {
-      document.removeEventListener("visibilitychange", onVisibility);
-      window.removeEventListener("pagehide", flush);
-    };
   }, []);
 
   useEffect(() => {
