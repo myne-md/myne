@@ -585,9 +585,9 @@ export async function newSession(opts: NewSessionOptions): Promise<Session> {
       alwaysMatch: {
         "tauri:options": {
           application: opts.application,
-          // Omitted entirely when unset so every existing scenario sends the
-          // byte-identical capability payload it sent before.
-          ...(opts.args && opts.args.length > 0 ? { args: [...opts.args] } : {}),
+          // `undefined` is dropped by JSON.stringify, so a scenario that passes
+          // no args sends the byte-identical payload it sent before.
+          args: opts.args?.length ? [...opts.args] : undefined,
         },
       },
     },

@@ -18,6 +18,7 @@ import { useEffect, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import { open as openFileDialog } from "@tauri-apps/plugin-dialog";
 import { Button } from "../primitives/Button";
+import { ThemeChiplet } from "../primitives/ThemeChiplet";
 import { LABEL_STYLE, HELPER_STYLE, BLOCK_STYLE } from "./panel-styles";
 import {
   listCustomThemes,
@@ -28,14 +29,12 @@ import {
   readPickedThemeFile,
   themePreview,
   type ThemePreview,
-  type ThemeError,
-  type ThemesError,
 } from "../../lib/themes";
 import { prefsRead, setCustomTheme } from "../../lib/prefs";
 import { applyCustomTheme, applyTheme } from "../../lib/theme";
+import { describeImportError } from "../../lib/theme-errors";
 import { saveJsonAsFile } from "../../lib/secret-export";
 import { exportedBasename } from "../../notes/exportFlow";
-import i18n from "../../i18n";
 
 const ERROR_STYLE: CSSProperties = {
   marginTop: "var(--space-2)",
@@ -95,17 +94,6 @@ const BUTTON_ROW_STYLE: CSSProperties = {
   gap: "var(--space-2)",
 };
 
-const CHIPLET_STYLE: CSSProperties = {
-  display: "inline-flex",
-  flexDirection: "row",
-  width: 40,
-  height: 28,
-  borderRadius: "var(--radius-1)",
-  border: "1px solid var(--line-2)",
-  overflow: "hidden",
-  flexShrink: 0,
-};
-
 const EMPTY_STYLE: CSSProperties = {
   ...HELPER_STYLE,
   marginTop: "var(--space-3)",
@@ -117,64 +105,6 @@ const EMPTY_STYLE: CSSProperties = {
 interface ThemeRow {
   name: string;
   preview: ThemePreview;
-}
-
-/** Render a 5-swatch palette chiplet from a theme's preview colors. */
-function Chiplet({ preview }: { preview: ThemePreview }) {
-  const swatches = [
-    preview.background,
-    preview.surface,
-    preview.foreground,
-    preview.accent,
-    preview.line,
-  ];
-  return (
-    <span style={CHIPLET_STYLE} aria-hidden="true">
-      {swatches.map((color, i) => (
-        <span key={i} style={{ flex: 1, background: color }} />
-      ))}
-    </span>
-  );
-}
-
-/** Human-readable one-liner for a rich validation error (import failures). */
-function describeError(error: ThemeError): string {
-  switch (error.kind) {
-    case "MissingKey":
-      return i18n
-        .t("settings.customThemes.error.missingKey", { key: error.key ?? "" })
-        .trim();
-    case "InvalidValue": {
-      const key = error.key ?? i18n.t("settings.customThemes.error.aColorFallback");
-      return error.line != null
-        ? i18n.t("settings.customThemes.error.invalidValueWithLine", {
-            key,
-            line: error.line,
-          })
-        : i18n.t("settings.customThemes.error.invalidValue", { key });
-    }
-    case "ParseError":
-      return error.line != null
-        ? i18n.t("settings.customThemes.error.parseErrorWithLine", {
-            line: error.line,
-          })
-        : i18n.t("settings.customThemes.error.parseError");
-    case "InvalidName":
-      return i18n.t("settings.customThemes.error.invalidName");
-    default:
-      return i18n.t("settings.customThemes.error.invalidFile");
-  }
-}
-
-/** Map a caught `themes_import` failure to a message: a validation failure
- *  (`Invalid`) points at the offending token; anything else is the generic
- *  "not a valid theme" copy. */
-function describeImportError(caught: unknown): string {
-  const err = caught as ThemesError | null;
-  if (err && err.kind === "Invalid" && err.detail?.error) {
-    return describeError(err.detail.error);
-  }
-  return i18n.t("settings.customThemes.importError");
 }
 
 /** The imported theme's name: the picked file's base name minus a trailing
@@ -289,7 +219,7 @@ export function CustomThemesSection({
       await importCustomTheme(name, paletteJson);
       await refresh();
     } catch (e) {
-      setError(describeImportError(e));
+      setError(describeImportError(e, "settings.customThemes.importError"));
     }
   }
 
@@ -324,7 +254,7 @@ export function CustomThemesSection({
                 data-theme-name={row.name}
                 data-active={isActive ? "true" : "false"}
               >
-                <Chiplet preview={row.preview} />
+                <ThemeChiplet preview={row.preview} />
                 <span style={NAME_STYLE}>{row.name}</span>
 
                 {isActive && (

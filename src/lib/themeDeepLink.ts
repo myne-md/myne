@@ -45,6 +45,7 @@
 //   myne://theme/install?v=1&name=<name>&author=<author>&src=<url>&payload=<base64url>
 
 import { HAS_TAURI } from "./app-window";
+import type { ThemePalette } from "./themes";
 
 /** The URL action this module owns: `myne://theme/install`. */
 const INSTALL_HOST = "theme";
@@ -72,9 +73,6 @@ export const MAX_NAME_CHARS = 64;
 const MAX_AUTHOR_CHARS = 96;
 const MAX_SOURCE_CHARS = 256;
 
-/** A theme's flat `--token → value` palette (the same shape as `ThemePalette`). */
-export type DeepLinkPalette = Record<string, string>;
-
 /** A parsed, structurally-sound install request awaiting user confirmation. */
 export interface ThemeInstallRequest {
   /** The name the theme will be stored under. Sanitized, never empty. */
@@ -89,7 +87,7 @@ export interface ThemeInstallRequest {
    */
   paletteJson: string;
   /** The same palette parsed into a map, for rendering the confirm preview. */
-  palette: DeepLinkPalette;
+  palette: ThemePalette;
 }
 
 /**
@@ -167,7 +165,7 @@ function decodeBase64UrlUtf8(encoded: string): { text: string; byteLength: numbe
  * `themes_import`. Duplicating it here would create a second grammar to keep in
  * sync. All this buys is an honest early error and a renderable preview.
  */
-function parsePaletteShape(json: string): DeepLinkPalette | null {
+function parsePaletteShape(json: string): ThemePalette | null {
   let value: unknown;
   try {
     value = JSON.parse(json);
@@ -175,7 +173,7 @@ function parsePaletteShape(json: string): DeepLinkPalette | null {
     return null;
   }
   if (typeof value !== "object" || value === null || Array.isArray(value)) return null;
-  const palette: DeepLinkPalette = {};
+  const palette: ThemePalette = {};
   for (const [key, entry] of Object.entries(value as Record<string, unknown>)) {
     if (typeof entry !== "string") return null;
     palette[key] = entry;
@@ -258,13 +256,8 @@ export function parseThemeInstallUrl(raw: string): ThemeDeepLinkResult {
  */
 export const THEME_INSTALL_EVENT = "myne://theme-install-requested";
 
-/** What a listener/latch consumer receives: a request, or a reportable failure. */
-export type ThemeInstallSignal =
-  | { ok: true; request: ThemeInstallRequest }
-  | { ok: false; reason: Exclude<ThemeDeepLinkRejection, "not-a-theme-link"> };
-
 /**
- * A signal that arrived before anything could show it — a cold launch, or a
+ * A result that arrived before anything could show it — a cold launch, or a
  * link that landed on the locked vault. Held until the editor mounts
  * post-unlock, then consumed exactly once.
  *
@@ -272,7 +265,7 @@ export type ThemeInstallSignal =
  * a second click before the first is even confirmed means the user changed
  * their mind. The newest link wins.
  */
-let pendingSignal: ThemeInstallSignal | null = null;
+let pendingSignal: ThemeDeepLinkResult | null = null;
 
 /**
  * Take (and clear) a signal latched before the editor could present it.
@@ -281,13 +274,17 @@ let pendingSignal: ThemeInstallSignal | null = null;
  * unlocks" — the latch lives in page memory only, so quitting at the unlock
  * screen discards it with the process, and nothing is ever persisted to disk.
  */
-export function consumePendingThemeInstall(): ThemeInstallSignal | null {
+export function consumePendingThemeInstall(): ThemeDeepLinkResult | null {
   const signal = pendingSignal;
   pendingSignal = null;
   return signal;
 }
 
-/** Discard any latched signal without acting on it (used on lock/teardown). */
+/**
+ * Discard any latched result without acting on it. No production caller today —
+ * the latch is page memory, so a lock or quit drops it anyway; this exists so
+ * tests can reset the module between cases.
+ */
 export function clearPendingThemeInstall(): void {
   pendingSignal = null;
 }
@@ -307,8 +304,12 @@ export function clearPendingThemeInstall(): void {
 export function handleThemeDeepLinkUrl(raw: string): void {
   const result = parseThemeInstallUrl(raw);
   if (!result.ok && result.reason === "not-a-theme-link") return;
-  pendingSignal = result as ThemeInstallSignal;
-  window.dispatchEvent(new CustomEvent<ThemeInstallSignal>(THEME_INSTALL_EVENT, { detail: pendingSignal }));
+  pendingSignal = result;
+  // A bare notification, deliberately: the LATCH is the payload, and it is what
+  // enforces consume-exactly-once. An event carrying the signal too would let a
+  // future listener act on it while the latch still held it — two dialogs, one
+  // link.
+  window.dispatchEvent(new Event(THEME_INSTALL_EVENT));
 }
 
 /**

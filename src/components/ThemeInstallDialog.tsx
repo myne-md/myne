@@ -27,23 +27,35 @@
 // That is what implements the locked-vault rule: a link arriving while locked
 // stays in the `themeDeepLink` latch until this component mounts and drains it,
 // and is discarded with the process if the user never unlocks.
+//
+// ## Shape
+//
+// The outer component owns exactly one piece of state — the current signal —
+// and hands each request to a `key`-ed child. Per-request state (collision
+// choice, in-flight, failure) lives in that child, so React's remount is what
+// resets it; there is no hand-written reset to keep in sync across the
+// present / close / retry paths.
 
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import { ModalShell } from "./primitives/ModalShell";
 import { Button } from "./primitives/Button";
+import { ThemeChiplet } from "./primitives/ThemeChiplet";
 import {
   THEME_INSTALL_EVENT,
   consumePendingThemeInstall,
   type ThemeDeepLinkRejection,
+  type ThemeDeepLinkResult,
   type ThemeInstallRequest,
-  type ThemeInstallSignal,
 } from "../lib/themeDeepLink";
-import { importCustomTheme, listCustomThemes, themePreview } from "../lib/themes";
-import { setCustomTheme } from "../lib/prefs";
-import { applyCustomTheme } from "../lib/theme";
-import i18n from "../i18n";
-import type { ThemeError, ThemesError } from "../lib/themes";
+import {
+  activateCustomTheme,
+  importCustomTheme,
+  listCustomThemes,
+  nextAvailableThemeName,
+  themePreview,
+} from "../lib/themes";
+import { describeImportError } from "../lib/theme-errors";
 
 const BODY_STYLE: CSSProperties = {
   padding: "var(--space-5)",
@@ -76,12 +88,11 @@ const SOURCE_STYLE: CSSProperties = {
   color: "var(--fg-3)",
 };
 
+/** The chiplet, stretched into a full-width band for the confirm surface. */
 const SWATCHES_STYLE: CSSProperties = {
-  display: "flex",
+  width: "100%",
   height: 44,
   borderRadius: "var(--radius-2)",
-  overflow: "hidden",
-  border: "1px solid var(--line-2)",
 };
 
 const QUESTION_STYLE: CSSProperties = {
@@ -135,110 +146,43 @@ const CHOICE_ROW_STYLE: CSSProperties = {
 /** How a name that already exists in the vault gets resolved. */
 type CollisionChoice = "replace" | "keep-both";
 
-/**
- * First free `"<name> (n)"` for `n ≥ 2`. Used by the keep-both branch so an
- * install never silently clobbers a theme the user already has, and never
- * fails just because the obvious suffix is taken too.
- */
-export function nextAvailableThemeName(name: string, taken: readonly string[]): string {
-  const existing = new Set(taken);
-  if (!existing.has(name)) return name;
-  for (let n = 2; n < 1000; n += 1) {
-    const candidate = `${name} (${n})`;
-    if (!existing.has(candidate)) return candidate;
-  }
-  return `${name} (${Date.now()})`;
-}
-
-/** i18n key for a parse/rejection reason raised before the host ever saw it. */
-function rejectionKey(reason: Exclude<ThemeDeepLinkRejection, "not-a-theme-link">): string {
+/** i18n key for a link that never became a request. */
+function rejectionKey(reason: ThemeDeepLinkRejection): string {
   switch (reason) {
     case "unsupported-version":
       return "themeInstall.error.unsupportedVersion";
     case "invalid-name":
       return "themeInstall.error.invalidName";
+    case "payload-too-large":
+      return "themeInstall.error.payloadTooLarge";
+    // `not-a-theme-link` is filtered out before it can reach a dialog; it shares
+    // the damaged-data copy so this stays total without a throw.
+    case "not-a-theme-link":
     case "missing-payload":
     case "malformed-payload":
       return "themeInstall.error.malformedPayload";
-    case "payload-too-large":
-      return "themeInstall.error.payloadTooLarge";
   }
 }
 
-/**
- * Point at the offending token when the host validator rejected the palette.
- * Reuses the Settings picker's message catalog — a deep-linked theme and a
- * hand-imported one fail for the same reasons and should say the same thing.
- */
-function describeValidationError(error: ThemeError): string {
-  switch (error.kind) {
-    case "MissingKey":
-      return i18n.t("settings.customThemes.error.missingKey", { key: error.key ?? "" }).trim();
-    case "InvalidValue": {
-      const key = error.key ?? i18n.t("settings.customThemes.error.aColorFallback");
-      return error.line != null
-        ? i18n.t("settings.customThemes.error.invalidValueWithLine", { key, line: error.line })
-        : i18n.t("settings.customThemes.error.invalidValue", { key });
-    }
-    case "ParseError":
-      return error.line != null
-        ? i18n.t("settings.customThemes.error.parseErrorWithLine", { line: error.line })
-        : i18n.t("settings.customThemes.error.parseError");
-    case "InvalidName":
-      return i18n.t("settings.customThemes.error.invalidName");
-    default:
-      return i18n.t("settings.customThemes.error.invalidFile");
-  }
-}
-
-interface ThemeInstallDialogProps {
-  /**
-   * Hold the dialog closed while another focus-trapping modal owns the screen
-   * (today: the first-run importer onboarding offer). Purely a deferral — the
-   * request stays in state and renders the moment this goes false. Without it,
-   * two `useFocusTrap` modals at the same z-index fight over focus.
-   */
-  deferred?: boolean;
-}
-
-export function ThemeInstallDialog({ deferred = false }: ThemeInstallDialogProps) {
+/** The confirm surface for one parsed request. Remounted per link via `key`. */
+function ConfirmInstall({
+  request,
+  onDone,
+}: {
+  request: ThemeInstallRequest;
+  onDone: () => void;
+}) {
   const { t } = useTranslation();
-  const [signal, setSignal] = useState<ThemeInstallSignal | null>(null);
   const [existingNames, setExistingNames] = useState<readonly string[]>([]);
   const [choice, setChoice] = useState<CollisionChoice>("keep-both");
   const [applying, setApplying] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
 
-  const present = useCallback((next: ThemeInstallSignal) => {
-    setSignal(next);
-    setChoice("keep-both");
-    setApplying(false);
-    setFailure(null);
-  }, []);
-
-  // Two arrival paths, one dialog. The latch covers a link that landed before
-  // this component existed (cold launch, or while the vault was locked); the
-  // event covers a link that arrives with the editor already open. Draining the
-  // latch on mount is also what makes the warm path idempotent — the event
-  // handler re-reads it, so a single link cannot open two dialogs.
+  // Read the installed names so a collision is surfaced BEFORE Apply — the user
+  // chooses replace-vs-keep-both up front rather than discovering after the fact
+  // that something was overwritten. One decrypt; a read failure is not fatal, it
+  // just means no collision is offered and the import still succeeds.
   useEffect(() => {
-    const latched = consumePendingThemeInstall();
-    if (latched) present(latched);
-    const onEvent = () => {
-      const next = consumePendingThemeInstall();
-      if (next) present(next);
-    };
-    window.addEventListener(THEME_INSTALL_EVENT, onEvent);
-    return () => window.removeEventListener(THEME_INSTALL_EVENT, onEvent);
-  }, [present]);
-
-  // Read the installed names so a collision can be surfaced BEFORE Apply — the
-  // user chooses replace-vs-keep-both up front rather than discovering after
-  // the fact that something was overwritten. A read failure is not fatal: it
-  // just means no collision is offered, and the import still succeeds.
-  const request = signal?.ok ? signal.request : null;
-  useEffect(() => {
-    if (request === null) return;
     let cancelled = false;
     void listCustomThemes()
       .then((entries) => {
@@ -250,26 +194,157 @@ export function ThemeInstallDialog({ deferred = false }: ThemeInstallDialogProps
     return () => {
       cancelled = true;
     };
-  }, [request]);
-
-  const close = useCallback(() => {
-    setSignal(null);
-    setFailure(null);
-    setApplying(false);
   }, []);
+
+  const collides = existingNames.includes(request.name);
+  const targetName =
+    collides && choice === "keep-both"
+      ? nextAvailableThemeName(request.name, existingNames)
+      : request.name;
+  const preview = themePreview(request.palette);
+
+  async function apply() {
+    setApplying(true);
+    setFailure(null);
+    try {
+      // The ordinary import path — the host re-validates the palette through
+      // the value-shape allowlist and rejects before writing anything.
+      await importCustomTheme(targetName, request.paletteJson);
+      await activateCustomTheme(targetName, request.palette);
+      onDone();
+    } catch (caught) {
+      setFailure(describeImportError(caught, "themeInstall.error.importFailed"));
+      setApplying(false);
+    }
+  }
+
+  return (
+    <div style={BODY_STYLE} data-testid="theme-install.dialog">
+      <div>
+        <p style={NAME_STYLE} data-testid="theme-install.name">
+          {request.name}
+        </p>
+        {request.author !== null && (
+          <p style={META_STYLE} data-testid="theme-install.author">
+            {t("themeInstall.byAuthor", { author: request.author })}
+          </p>
+        )}
+        {request.source !== null && (
+          <p style={SOURCE_STYLE} data-testid="theme-install.source">
+            {request.source}
+          </p>
+        )}
+      </div>
+
+      <ThemeChiplet preview={preview} style={SWATCHES_STYLE} data-testid="theme-install.preview" />
+
+      {collides && (
+        <div style={COLLISION_STYLE} data-testid="theme-install.collision">
+          <p style={QUESTION_STYLE}>
+            {t("themeInstall.collision.question", { name: request.name })}
+          </p>
+          <label style={CHOICE_ROW_STYLE}>
+            <input
+              type="radio"
+              name="theme-install-collision"
+              checked={choice === "keep-both"}
+              onChange={() => setChoice("keep-both")}
+              data-testid="theme-install.keep-both"
+            />
+            {t("themeInstall.collision.keepBoth", { name: targetName })}
+          </label>
+          <label style={CHOICE_ROW_STYLE}>
+            <input
+              type="radio"
+              name="theme-install-collision"
+              checked={choice === "replace"}
+              onChange={() => setChoice("replace")}
+              data-testid="theme-install.replace"
+            />
+            {t("themeInstall.collision.replace", { name: request.name })}
+          </label>
+        </div>
+      )}
+
+      <p style={QUESTION_STYLE}>{t("themeInstall.question")}</p>
+      <p style={HELPER_STYLE}>{t("themeInstall.helper")}</p>
+
+      {failure !== null && (
+        <p style={ERROR_STYLE} data-testid="theme-install.error">
+          {failure}
+        </p>
+      )}
+
+      <div style={ACTIONS_STYLE}>
+        <Button
+          variant="secondary"
+          onClick={onDone}
+          disabled={applying}
+          data-testid="theme-install.cancel"
+        >
+          {t("themeInstall.cancel")}
+        </Button>
+        <Button
+          variant="primary"
+          onClick={() => void apply()}
+          disabled={applying}
+          data-testid="theme-install.apply"
+        >
+          {applying ? t("themeInstall.applying") : t("themeInstall.apply")}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+interface ThemeInstallDialogProps {
+  /**
+   * Hold the dialog closed while the first-run importer onboarding offer owns
+   * the screen. A PRODUCT call, not a technical one — a first-run user should
+   * finish onboarding before a theme install interrupts, and the request simply
+   * waits (it stays in state and renders the moment this goes false). The
+   * focus-trap primitive stacks correctly on its own (MYND-567 hardened
+   * `trapFocus` so only the innermost trap enforces containment), so this is
+   * NOT what keeps the two dialogs from fighting over focus.
+   */
+  deferred?: boolean;
+}
+
+export function ThemeInstallDialog({ deferred = false }: ThemeInstallDialogProps) {
+  const { t } = useTranslation();
+  const [signal, setSignal] = useState<ThemeDeepLinkResult | null>(null);
+
+  // Two arrival paths, one dialog. The latch covers a link that landed before
+  // this component existed (cold launch, or while the vault was locked); the
+  // event covers a link that arrives with the editor already open. Both drain
+  // the same latch, so a single link cannot open two dialogs.
+  useEffect(() => {
+    const drain = () => {
+      const next = consumePendingThemeInstall();
+      if (next) setSignal(next);
+    };
+    drain();
+    window.addEventListener(THEME_INSTALL_EVENT, drain);
+    return () => window.removeEventListener(THEME_INSTALL_EVENT, drain);
+  }, []);
+
+  const close = useCallback(() => setSignal(null), []);
 
   if (signal === null || deferred) return null;
 
-  // ---- Failure surface: a link that never became a request -----------------
-  if (!signal.ok) {
-    return (
-      <ModalShell
-        open
-        title={t("themeInstall.errorTitle")}
-        onClose={close}
-        labelId="theme-install-title"
-        closeLabel={t("themeInstall.close")}
-      >
+  return (
+    <ModalShell
+      open
+      title={signal.ok ? t("themeInstall.title") : t("themeInstall.errorTitle")}
+      onClose={close}
+      labelId="theme-install-title"
+      closeLabel={t("themeInstall.close")}
+    >
+      {signal.ok ? (
+        // Keyed by the payload: a second link replaces the surface outright
+        // rather than leaving the previous one's collision choice behind.
+        <ConfirmInstall key={signal.request.paletteJson} request={signal.request} onDone={close} />
+      ) : (
         <div style={BODY_STYLE} data-testid="theme-install.rejected">
           <p style={ERROR_STYLE} data-testid="theme-install.error">
             {t(rejectionKey(signal.reason))}
@@ -281,135 +356,7 @@ export function ThemeInstallDialog({ deferred = false }: ThemeInstallDialogProps
             </Button>
           </div>
         </div>
-      </ModalShell>
-    );
-  }
-
-  const req: ThemeInstallRequest = signal.request;
-  const collides = existingNames.includes(req.name);
-  const targetName =
-    collides && choice === "keep-both"
-      ? nextAvailableThemeName(req.name, existingNames)
-      : req.name;
-  const preview = themePreview(req.palette);
-
-  async function apply() {
-    setApplying(true);
-    setFailure(null);
-    try {
-      // The ordinary import path — the host re-validates the palette through
-      // the value-shape allowlist and rejects before writing anything.
-      await importCustomTheme(targetName, req.paletteJson);
-      // Disk-first, mirroring the Settings picker: persist the selection, then
-      // flip the live palette, so a crash between the two leaves the vault
-      // consistent rather than the screen.
-      await setCustomTheme(targetName);
-      applyCustomTheme(req.palette);
-      close();
-    } catch (caught) {
-      const err = caught as ThemesError | null;
-      setFailure(
-        err && err.kind === "Invalid" && err.detail?.error
-          ? describeValidationError(err.detail.error)
-          : t("themeInstall.error.importFailed"),
-      );
-      setApplying(false);
-    }
-  }
-
-  return (
-    <ModalShell
-      open
-      title={t("themeInstall.title")}
-      onClose={close}
-      labelId="theme-install-title"
-      closeLabel={t("themeInstall.close")}
-    >
-      <div style={BODY_STYLE} data-testid="theme-install.dialog">
-        <div>
-          <p style={NAME_STYLE} data-testid="theme-install.name">
-            {req.name}
-          </p>
-          {req.author !== null && (
-            <p style={META_STYLE} data-testid="theme-install.author">
-              {t("themeInstall.byAuthor", { author: req.author })}
-            </p>
-          )}
-          {req.source !== null && (
-            <p style={SOURCE_STYLE} data-testid="theme-install.source">
-              {req.source}
-            </p>
-          )}
-        </div>
-
-        <div style={SWATCHES_STYLE} aria-hidden="true" data-testid="theme-install.preview">
-          {[
-            preview.background,
-            preview.surface,
-            preview.foreground,
-            preview.accent,
-            preview.line,
-          ].map((color, i) => (
-            <span key={i} style={{ flex: 1, background: color }} />
-          ))}
-        </div>
-
-        {collides && (
-          <div style={COLLISION_STYLE} data-testid="theme-install.collision">
-            <p style={QUESTION_STYLE}>{t("themeInstall.collision.question", { name: req.name })}</p>
-            <label style={CHOICE_ROW_STYLE}>
-              <input
-                type="radio"
-                name="theme-install-collision"
-                checked={choice === "keep-both"}
-                onChange={() => setChoice("keep-both")}
-                data-testid="theme-install.keep-both"
-              />
-              {t("themeInstall.collision.keepBoth", { name: targetName })}
-            </label>
-            <label style={CHOICE_ROW_STYLE}>
-              <input
-                type="radio"
-                name="theme-install-collision"
-                checked={choice === "replace"}
-                onChange={() => setChoice("replace")}
-                data-testid="theme-install.replace"
-              />
-              {t("themeInstall.collision.replace", { name: req.name })}
-            </label>
-          </div>
-        )}
-
-        <p style={QUESTION_STYLE} data-testid="theme-install.question">
-          {t("themeInstall.question")}
-        </p>
-        <p style={HELPER_STYLE}>{t("themeInstall.helper")}</p>
-
-        {failure !== null && (
-          <p style={ERROR_STYLE} data-testid="theme-install.error">
-            {failure}
-          </p>
-        )}
-
-        <div style={ACTIONS_STYLE}>
-          <Button
-            variant="secondary"
-            onClick={close}
-            disabled={applying}
-            data-testid="theme-install.cancel"
-          >
-            {t("themeInstall.cancel")}
-          </Button>
-          <Button
-            variant="primary"
-            onClick={() => void apply()}
-            disabled={applying}
-            data-testid="theme-install.apply"
-          >
-            {applying ? t("themeInstall.applying") : t("themeInstall.apply")}
-          </Button>
-        </div>
-      </div>
+      )}
     </ModalShell>
   );
 }

@@ -10,6 +10,8 @@
 // types in lockstep with the Rust `ThemesError` / `ThemeError` serde shapes.
 
 import { invoke } from "@tauri-apps/api/core";
+import { setCustomTheme } from "./prefs";
+import { applyCustomTheme } from "./theme";
 import { importReadFile } from "../notes/import/ports";
 import { splitExportPath } from "../notes/exportFlow";
 
@@ -101,6 +103,34 @@ export async function exportCustomTheme(name: string): Promise<ThemePalette> {
  */
 export async function importCustomTheme(name: string, paletteJson: string): Promise<void> {
   await invoke<void>("plugin:themes|themes_import", { name, paletteJson });
+}
+
+/**
+ * The first free `"<name> (n)"` for `n >= 2`, given the names already in the
+ * vault. Returns `name` untouched when it is free.
+ *
+ * Lives beside {@link importCustomTheme} rather than in a caller because
+ * `themes_import` is an UPSERT: "don't silently clobber a theme the user
+ * already has" is a property of importing a theme, not of the surface that
+ * happens to be importing it. The deep-link dialog (MYND-567) is the first
+ * caller; the Settings file-import path still overwrites by filename and is a
+ * candidate for the same treatment.
+ */
+export function nextAvailableThemeName(name: string, taken: readonly string[]): string {
+  const existing = new Set(taken);
+  let candidate = name;
+  for (let n = 2; existing.has(candidate); n += 1) candidate = `${name} (${n})`;
+  return candidate;
+}
+
+/**
+ * Make `name` the active custom theme: persist the selection, THEN paint the
+ * palette. Disk-first on purpose — a crash between the two leaves the vault
+ * consistent and only the screen stale, never the reverse.
+ */
+export async function activateCustomTheme(name: string, palette: ThemePalette): Promise<void> {
+  await setCustomTheme(name);
+  applyCustomTheme(palette);
 }
 
 /** Delete one custom theme by name. Idempotent (absent → success). */
