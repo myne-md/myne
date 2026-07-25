@@ -58,12 +58,36 @@ export interface EphemeralServer {
  * Spawn an ephemeral myne-server on an OS-assigned port and wait until it has
  * surfaced its bound port (MYND-428 task 1) and answers `/healthz`.
  */
-export async function startSyncServer(): Promise<EphemeralServer> {
+export interface SyncServerOptions {
+  /**
+   * Per-account storage ceiling in bytes (`MYNE_QUOTA_CEILING_BYTES`).
+   * Omit (or `0`) for the server default: **unlimited** — the self-hosted /
+   * no-ceiling posture. A deliberately tiny value makes the next push exceed it,
+   * which is how the over-quota banner is exercised without needing a
+   * per-account `accounts.json` override (that store is fs-backend-only and
+   * keyed by an account hash the test does not know until after enrollment).
+   */
+  quotaCeilingBytes?: number;
+  /** Device cap (`MYNE_MAX_DEVICES_PER_ACCOUNT`); omit/`0` = unlimited. */
+  maxDevicesPerAccount?: number;
+}
+
+export async function startSyncServer(
+  opts: SyncServerOptions = {},
+): Promise<EphemeralServer> {
   const support = syncServerSupported();
   if (!support.ok) throw new Error(support.reason);
 
   const dir = mkdtempSync(join(tmpdir(), "myne-e2e-server-"));
   const portfile = join(dir, "port");
+
+  const policyEnv: Record<string, string> = {};
+  if (opts.quotaCeilingBytes !== undefined) {
+    policyEnv.MYNE_QUOTA_CEILING_BYTES = String(opts.quotaCeilingBytes);
+  }
+  if (opts.maxDevicesPerAccount !== undefined) {
+    policyEnv.MYNE_MAX_DEVICES_PER_ACCOUNT = String(opts.maxDevicesPerAccount);
+  }
 
   const proc: ChildProcess = spawn(syncServerBinary(), [], {
     stdio: ["ignore", "pipe", "pipe"],
@@ -71,6 +95,7 @@ export async function startSyncServer(): Promise<EphemeralServer> {
       ...process.env,
       MYNE_SERVER_ADDR: `${SERVER_HOST}:0`,
       MYNE_SERVER_PORTFILE: portfile,
+      ...policyEnv,
     },
   });
   let log = "";
