@@ -108,6 +108,14 @@ pub struct SyncState {
     /// re-entry (the unlocked `root_key` re-derives the SCRAM secret).
     #[serde(default)]
     pub account_hash_hex: Option<String>,
+    /// MYND-548: the device name chosen at enrollment, parked here until the
+    /// prefs phase can apply it. It is deliberately NOT written straight into
+    /// `vault.prefs` at enroll time: doing so creates the blob before the first
+    /// authed cycle, which permanently disables the §10.2.1 enrollment wholesale
+    /// seed (gated on "no prefs file on disk"). Device-local, non-secret, cleared
+    /// once applied.
+    #[serde(default)]
+    pub pending_device_name: Option<String>,
     /// F1 Faz B: SHA-256 (lowercase hex) of the `vault.meta` this device last saw
     /// as the agreed synced state. Lets the meta phase distinguish "the server's
     /// meta is unchanged since I synced" (only I changed → push) from "the server

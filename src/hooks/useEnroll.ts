@@ -9,7 +9,6 @@
 
 import { useCallback, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { setDeviceName } from "../lib/prefs";
 
 /** Which credential the enrolling device proves account ownership with. */
 export type EnrollCredentialKind = "password" | "recovery";
@@ -49,10 +48,10 @@ export interface EnrollHook {
   /** The last terminal outcome, or null before the first attempt. */
   outcome: EnrollOutcome | null;
   /** Run an enrollment attempt. The credential is passed straight to IPC.
-   *  `deviceName` (MYND-548) is written to this vault's own `device_names` entry
-   *  once the handshake succeeds — locally, with no token and no approval, since
-   *  `vault.prefs` is an ordinary local file and the §10.2 union merge carries
-   *  the key to peers on the first sync after approval. */
+   *  `deviceName` (MYND-548) goes to the CORE, which parks it in device-local
+   *  sync state and applies it in a later prefs phase. It must not be written to
+   *  `vault.prefs` here: creating that blob before the first authed cycle
+   *  permanently disables the §10.2.1 enrollment wholesale seed. */
   enroll: (
     accountNumber: string,
     credential: string,
@@ -81,16 +80,8 @@ export function useEnroll(): EnrollHook {
           accountNumber,
           credential,
           credentialKind,
+          deviceName,
         });
-        // Best-effort, and deliberately AFTER the handshake: a naming failure
-        // must never turn a successful enrollment into a reported error. The row
-        // would simply fall back to its id-derived label, which the user can fix
-        // with an inline rename.
-        try {
-          await setDeviceName(result.device_id_hex, deviceName);
-        } catch {
-          // Prefs unwritable (locked / IO) — enrollment still succeeded.
-        }
         setOutcome(result.approved ? { state: "approved" } : { state: "pending" });
       } catch (e) {
         setOutcome({ state: "error", kind: errKind(e) });

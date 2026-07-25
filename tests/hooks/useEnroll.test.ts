@@ -160,13 +160,15 @@ describe("useEnroll — credential forwarding to sync_enroll", () => {
       accountNumber: "MY-ACCT",
       credential: "user-entered-phrase",
       credentialKind: "recovery",
+      // MYND-548: the core parks this and applies it after the §10.2.1 seed —
+      // the client must not write it into vault.prefs itself.
+      deviceName: "Test Device",
     });
 
-    // MYND-548: the name write is a SEPARATE call that carries no credential and
-    // no account number. That separation is the point — a device name must never
-    // ride along with, or leak into, the enrollment payload.
-    expect(nameCalls()).toHaveLength(1);
-    expect(nameCalls()[0][1]).toEqual({ deviceIdHex: DEVICE_ID, name: "Test Device" });
+    // MYND-548: naming does NOT go through the prefs setter at enrollment time —
+    // writing vault.prefs before the first authed cycle would disable the §10.2.1
+    // wholesale seed. The core parks the name and applies it later.
+    expect(nameCalls()).toHaveLength(0);
   });
 
   it("carries the password credentialKind through unchanged", async () => {
