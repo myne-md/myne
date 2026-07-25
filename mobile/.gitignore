@@ -37,3 +37,12 @@ pnpm-debug.log*
 # Playwright flow-logic tier (MYND-462 T3) output
 test-results/
 playwright-report/
+
+# iOS/SwiftPM build output from Tauri mobile plugin builds. These regenerate on
+# every `tauri ios` build and carry no source: `.tauri/` is generated Swift API
+# scaffolding, `.build/` is the SwiftPM index database. Untracked and unignored,
+# they surfaced as ~14 phantom "new files" on whichever branch happened to be
+# checked out during a build.
+src-tauri/**/.tauri/
+src-tauri/**/.build/
+**/Package.resolved
