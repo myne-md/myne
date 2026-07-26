@@ -116,11 +116,24 @@ export type CMEditorProps = {
    *  `ai_enabled` pref (MYP1). Default false; read at mount (writing-assistant
    *  task 6). Never set on the reading-view instance (inert in Reading view). */
   aiEnabled?: boolean;
+  /** Mount the floating selection toolbar that appears over a text selection
+   *  (MYND-559). Default TRUE — desktop's formatting surface, unchanged. A host
+   *  that renders its own bar via {@link onReady} passes `false` so the two don't
+   *  stack: mobile's above-keyboard `FormatBar` offers the same commands, so the
+   *  floating toolbar was pure duplication there. Read at MOUNT (a host's choice
+   *  is a platform constant, not a live pref) — unlike `viewMode` / `aiEnabled`,
+   *  it has no reconfigure compartment. */
+  selectionToolbar?: boolean;
   style?: CSSProperties;
   /** Called once with the live `EditorView` after mount (and `null` on unmount).
    *  Lets a host render its own toolbar/accessory bar that drives the editor
-   *  through the shared `editorCommands` (the mobile above-keyboard bar). Desktop
-   *  leaves it unset — its formatting rides the in-editor selection toolbar. */
+   *  through the shared `editorCommands` (the mobile above-keyboard bar).
+   *
+   *  Independent of `selectionToolbar`, NOT coupled to it: desktop sets this (for
+   *  outline scroll-tracking in `PaneView`) while keeping the floating toolbar.
+   *  The pairing worth knowing is the other direction — a host that sets this in
+   *  order to render its OWN formatting surface is the one that also wants
+   *  `selectionToolbar: false`, so it does not end up with two (mobile, MYND-559). */
   onReady?: (view: EditorView | null) => void;
   /** MYND-534: hand a host the persistent-view swap API after mount (`null` on
    *  unmount). When set, the host drives note switches via `captureState` /
@@ -131,7 +144,7 @@ export type CMEditorProps = {
 };
 
 export function CMEditor(props: CMEditorProps) {
-  const { value, onChange, onBlur, onSelectionChange, extensions, noteSet, vaultHeadings, vaultBlockAnchors, onOpenWikilink, scrollAnchor = null, lineNumbers = false, viewMode = "live", readOnly = false, aiEnabled = false, style, onReady, onSwapReady } = props;
+  const { value, onChange, onBlur, onSelectionChange, extensions, noteSet, vaultHeadings, vaultBlockAnchors, onOpenWikilink, scrollAnchor = null, lineNumbers = false, viewMode = "live", readOnly = false, aiEnabled = false, selectionToolbar = true, style, onReady, onSwapReady } = props;
   const hostRef = useRef<HTMLDivElement | null>(null);
   const viewRef = useRef<EditorView | null>(null);
   const onChangeRef = useRef(onChange);
@@ -207,6 +220,10 @@ export function CMEditor(props: CMEditorProps) {
             viewMode: viewModeRef.current,
             readOnly: readOnlyRef.current,
             aiEnabled: aiEnabledRef.current,
+            // Mount-read, ref-free on purpose (MYND-559): a host's formatting
+            // surface is a platform constant, so every state this view ever
+            // builds — mount or post-swap — carries the SAME choice.
+            selectionToolbar,
           }),
           ...(extensionsRef.current ?? []),
           updateListener,
