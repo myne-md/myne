@@ -322,6 +322,38 @@ pub enum SubkeyRole {
 }
 
 impl SubkeyRole {
+    /// Every registered role, in declaration order — the machine-readable
+    /// mirror of the spec § 3.4 registry table.
+    ///
+    /// Exists so coverage guards enumerate the registry instead of restating
+    /// it. The `myne-test-vectors` `hkdf-sha256` runner iterates this to assert
+    /// every role has a companion-repo vector; before it existed, that runner
+    /// carried a hand-maintained string list that silently fell four roles
+    /// behind the enum (`vault-head-mac`, `server-auth`, `custom-themes-key`,
+    /// `themes-sync-id` derived without a single cross-implementation vector).
+    ///
+    /// **Adding a `SubkeyRole` variant means adding it here too** — the
+    /// `all_covers_every_registered_role` test fails compilation until you do.
+    pub const ALL: [SubkeyRole; 17] = [
+        SubkeyRole::ItemsKeyWrap,
+        SubkeyRole::PrefsKey,
+        SubkeyRole::SearchIndexKey,
+        SubkeyRole::AttachmentsCatalogKey,
+        SubkeyRole::AttachmentsIdHmac,
+        SubkeyRole::SessionStateKey,
+        SubkeyRole::PersonalDictKey,
+        SubkeyRole::VaultIndicesKey,
+        SubkeyRole::VaultHeadMac,
+        SubkeyRole::ServerAuth,
+        SubkeyRole::AttachmentTextKey,
+        SubkeyRole::AiEmbeddingsKey,
+        SubkeyRole::CatalogSyncId,
+        SubkeyRole::PrefsSyncId,
+        SubkeyRole::CustomThemesKey,
+        SubkeyRole::ThemesSyncId,
+        SubkeyRole::GraphLayoutKey,
+    ];
+
     /// Registered role string (the part appended after the
     /// `"myne.v0.1 "` prefix). Crate-internal so only
     /// [`derive_subkey`] / [`derive_with_context`] read it.
@@ -389,6 +421,57 @@ pub(crate) fn derive_with_context(root_key: &[u8; 32], info: &[u8]) -> Zeroizing
 mod tests {
     use super::*;
     use crate::test_vector_fmt::{hex_lower, json_escape};
+
+    #[test]
+    fn all_covers_every_registered_role() {
+        // The exhaustive match below is the compile-time half of the guard: a
+        // new SubkeyRole variant fails to compile here, forcing the author to
+        // land it in `SubkeyRole::ALL` (and thus in the companion-repo
+        // hkdf-sha256 coverage pin) in the same change. The index assertions
+        // are the runtime half — they catch a variant listed out of order or
+        // omitted from ALL entirely.
+        fn declaration_index(role: SubkeyRole) -> usize {
+            match role {
+                SubkeyRole::ItemsKeyWrap => 0,
+                SubkeyRole::PrefsKey => 1,
+                SubkeyRole::SearchIndexKey => 2,
+                SubkeyRole::AttachmentsCatalogKey => 3,
+                SubkeyRole::AttachmentsIdHmac => 4,
+                SubkeyRole::SessionStateKey => 5,
+                SubkeyRole::PersonalDictKey => 6,
+                SubkeyRole::VaultIndicesKey => 7,
+                SubkeyRole::VaultHeadMac => 8,
+                SubkeyRole::ServerAuth => 9,
+                SubkeyRole::AttachmentTextKey => 10,
+                SubkeyRole::AiEmbeddingsKey => 11,
+                SubkeyRole::CatalogSyncId => 12,
+                SubkeyRole::PrefsSyncId => 13,
+                SubkeyRole::CustomThemesKey => 14,
+                SubkeyRole::ThemesSyncId => 15,
+                SubkeyRole::GraphLayoutKey => 16,
+            }
+        }
+
+        for (i, role) in SubkeyRole::ALL.iter().enumerate() {
+            assert_eq!(
+                declaration_index(*role),
+                i,
+                "SubkeyRole::ALL[{i}] is {role:?} — ALL is out of order or missing a variant"
+            );
+        }
+
+        // Every role string is distinct: two roles sharing an info string
+        // would silently collapse two key lineages into one.
+        for (i, a) in SubkeyRole::ALL.iter().enumerate() {
+            for b in SubkeyRole::ALL.iter().skip(i + 1) {
+                assert_ne!(
+                    a.role_str(),
+                    b.role_str(),
+                    "{a:?} and {b:?} share a role string — domain separation lost"
+                );
+            }
+        }
+    }
 
     #[test]
     fn hkdf_prefix_is_exactly_myne_v0_1_with_trailing_space() {
@@ -877,7 +960,7 @@ mod tests {
         let gamma = pseudorandom_root(b"myne-test-vectors-seed-v0.1.gamma");
 
         type Case<'a> = (&'a str, &'a str, &'a [u8; 32], SubkeyRole, bool);
-        let cases: [Case<'_>; 32] = [
+        let cases: [Case<'_>; 40] = [
             (
                 "zero-root-items-key-wrap",
                 "All-zero root_key with the ItemsKeyWrap role. Promotes the in-crate golden at protocol/src/subkey.rs:222 — same input, same expected bytes; drift in either the unit test or this integration assertion indicates HKDF prefix or role-string corruption.",
@@ -1102,6 +1185,62 @@ mod tests {
                 SubkeyRole::GraphLayoutKey,
                 true,
             ),
+            (
+                "zero-root-vault-head-mac",
+                "All-zero root_key with the VaultHeadMac role (MYND-416/417, §3.4; sync-protocol.md §3). HMAC key for the Phase 2 sync vault head — keys HMAC-SHA-256(key, head_mac_input) for the fork-consistency head and re-verifies the device-local MYH1 vault.head-state baseline; role string 'vault-head-mac' (14 ASCII bytes). NOT a blob KEK. Pairs with the other zero-root vectors under the same trivial root — catches a role-confusion bug that would collapse the head-MAC lineage onto a blob KEK's info string.",
+                &zero_root,
+                SubkeyRole::VaultHeadMac,
+                false,
+            ),
+            (
+                "prn-alpha-vault-head-mac",
+                "Pseudorandom alpha root with the VaultHeadMac role. The informational_info_utf8_hex field carries the canonical 24-byte HKDF info bytes ('myne.v0.1 vault-head-mac') so independent implementers can verify this role's info assembly without re-parsing the spec. The vault-head / vault-head-state families consume this key transitively; this vector pins the derivation itself, so a port that drifts here fails at the derivation layer rather than deep inside a MAC comparison.",
+                &alpha,
+                SubkeyRole::VaultHeadMac,
+                true,
+            ),
+            (
+                "zero-root-server-auth",
+                "All-zero root_key with the ServerAuth role (MYND-420, §3.4 + §11.1). The Phase 2 server-authentication secret proven to the sync server via SCRAM-SHA-256-PLUS at device-enroll and NEVER transmitted (the server stores only a StoredKey/ServerKey verifier); role string 'server-auth' (11 ASCII bytes). NOT a blob KEK. Pairs with the other zero-root vectors under the same trivial root.",
+                &zero_root,
+                SubkeyRole::ServerAuth,
+                false,
+            ),
+            (
+                "prn-alpha-server-auth",
+                "Pseudorandom alpha root with the ServerAuth role. The informational_info_utf8_hex field carries the canonical 21-byte HKDF info bytes ('myne.v0.1 server-auth') so independent implementers can verify this role's info assembly without re-parsing the spec. The scram-auth family consumes this secret as its input_secret_hex; this vector pins where that secret comes from, closing the gap between the SCRAM vectors and the root_key.",
+                &alpha,
+                SubkeyRole::ServerAuth,
+                true,
+            ),
+            (
+                "zero-root-custom-themes-key",
+                "All-zero root_key with the CustomThemesKey role (MYND-486, §3.4; §9.21.3). KEK for the vault.themes custom-theme store (MYT1); role string 'custom-themes-key' (17 ASCII bytes). root_key-derived so it is itemsKey-independent and survives an items-key rotation. Pairs with the other zero-root vectors under the same trivial root — catches a role-confusion bug that would collapse the custom-themes lineage onto another blob KEK's info string.",
+                &zero_root,
+                SubkeyRole::CustomThemesKey,
+                false,
+            ),
+            (
+                "prn-alpha-custom-themes-key",
+                "Pseudorandom alpha root with the CustomThemesKey role. The informational_info_utf8_hex field carries the canonical 27-byte HKDF info bytes ('myne.v0.1 custom-themes-key') so independent implementers can verify this role's info assembly without re-parsing the spec. NOTE: the HKDF role string 'custom-themes-key' is DISTINCT from the AAD role string 'custom-themes-blob' (aad_custom_themes_blob, aad-construction vectors) and from the themes-sync-id identifier derivation — three different load-bearing strings in the same feature.",
+                &alpha,
+                SubkeyRole::CustomThemesKey,
+                true,
+            ),
+            (
+                "zero-root-themes-sync-id",
+                "All-zero root_key with the ThemesSyncId role (MYND-486, §3.4; sync-protocol.md §10.2.2). Derives the reserved sync-plane blob-id of vault.themes — the FIRST 16 BYTES of this 32-byte output are the id; role string 'themes-sync-id' (14 ASCII bytes). An identifier derivation like catalog-sync-id / prefs-sync-id, NOT a KEK — the themes KEK stays custom-themes-key. Pairs with the other zero-root vectors under the same trivial root.",
+                &zero_root,
+                SubkeyRole::ThemesSyncId,
+                false,
+            ),
+            (
+                "prn-alpha-themes-sync-id",
+                "Pseudorandom alpha root with the ThemesSyncId role. The informational_info_utf8_hex field carries the canonical 24-byte HKDF info bytes ('myne.v0.1 themes-sync-id') so independent implementers can verify this role's info assembly without re-parsing the spec. Domain-separation pair with the alpha custom-themes-key vector (same input_root_key_hex, byte-different outputs): the themes blob-id derivation and the themes KEK must never coincide — and with the alpha catalog-sync-id / prefs-sync-id vectors, the three singleton sync-id lineages must never coincide either.",
+                &alpha,
+                SubkeyRole::ThemesSyncId,
+                true,
+            ),
         ];
 
         let mut dump = alloc::string::String::new();
@@ -1109,7 +1248,7 @@ mod tests {
         dump.push_str("  \"schema\": \"hkdf-sha256\",\n");
         dump.push_str("  \"protocol_version\": \"v0.1\",\n");
         dump.push_str("  \"spec_section\": \"protocol.md §3.2 + §3.4\",\n");
-        dump.push_str("  \"description\": \"Pins protocol::derive_subkey byte mapping for cross-implementation conformance. Each case fixes a (root_key, role) input pair under HKDF-SHA-256 with salt=zero_32 and info='myne.v0.1 '||role, and the 32-byte subkey the helper must produce. Role registry mirrors the type-safe Rust SubkeyRole enum (spec §3.4); v0.1 registers itemsKey-wrap + prefs-key + search-index-key + attachments-catalog-key + attachments-id-hmac + session-state-key + personal-dictionary-key + vault-indices-key + attachment-text-key + ai-embeddings-key + catalog-sync-id + prefs-sync-id + graph-layout-key. Vectors generated by `cargo test -p protocol --lib emit_subkey_vectors_for_paste -- --ignored` (in protocol/src/subkey.rs).\",\n");
+        dump.push_str("  \"description\": \"Pins protocol::derive_subkey byte mapping for cross-implementation conformance. Each case fixes a (root_key, role) input pair under HKDF-SHA-256 with salt=zero_32 and info='myne.v0.1 '||role, and the 32-byte subkey the helper must produce. Role registry mirrors the type-safe Rust SubkeyRole enum (spec §3.4); v0.1 registers itemsKey-wrap + prefs-key + search-index-key + attachments-catalog-key + attachments-id-hmac + session-state-key + personal-dictionary-key + vault-indices-key + vault-head-mac + server-auth + attachment-text-key + ai-embeddings-key + catalog-sync-id + prefs-sync-id + custom-themes-key + themes-sync-id + graph-layout-key — every variant of the SubkeyRole enum, enforced by the SubkeyRole::ALL coverage pin in the companion runner. Vectors generated by `cargo test -p protocol --lib emit_subkey_vectors_for_paste -- --ignored` (in protocol/src/subkey.rs).\",\n");
         dump.push_str("  \"cases\": [\n");
 
         for (i, (slug, desc, root, role, include_info)) in cases.iter().enumerate() {
