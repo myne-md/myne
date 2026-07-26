@@ -150,4 +150,30 @@ Routes (JSON over the socket):
 
 Enforcement policy persists in a **sparse top-level `accounts.json`** (server-side plaintext, `schema_version`; not synced; captured by the built-in backup). A per-account quota override also gates the attachment transport (one AS17 total, no bypass).
 
-`GET /account/status` (on the normal **authed** HTTPS API, *not* the admin socket) returns the authenticated user's own `{stored bytes, device count, frozen, effective quota + device ceilings}`. The account is **resolved from the device token — never from the URL or query** (an identifier placed there is ignored, not a selector), so the account number never appears in a request line or log. API-only in v0.1 (no client UI yet). Enforcement fields carry no cryptographically load-bearing identifier; `accounts.json` is a new server-side plaintext format, forward-incompatible-by-design with v005.
+`GET /account/status` (on the normal **authed** HTTPS API, *not* the admin socket) returns the authenticated user's own `{stored bytes, device count, frozen, effective quota + device ceilings}`. The account is **resolved from the device token — never from the URL or query** (an identifier placed there is ignored, not a selector), so the account number never appears in a request line or log. Enforcement fields carry no cryptographically load-bearing identifier; `accounts.json` is a new server-side plaintext format, forward-incompatible-by-design with v005.
+
+### 7.1 `GET /account/status` response (normative; MYND-570)
+
+```json
+{ "stored_bytes": 0, "device_count": 0, "frozen": false, "quota_bytes": 0, "max_devices": 0 }
+```
+
+- **Ceilings are EFFECTIVE, never raw overrides.** `quota_bytes` and `max_devices` are the values enforcement would actually apply — the per-account override when set, else the global default (`decisions.md` 2026-07-13: `quota_override ?? plan ?? global default`). The server MUST resolve them through the **same** function the push/enroll enforcement guard calls, so a reported ceiling and a refusal cannot disagree. Exposing the raw override here would be wrong twice over: an account with no override would report `0`, and the number a client displays would not be the number it is judged against.
+- **`0` means UNLIMITED, for both ceilings** — never a ceiling of zero. This is the existing server convention (`MYNE_QUOTA_CEILING_BYTES`, `MYNE_MAX_DEVICES_PER_ACCOUNT`). A client MUST render usage **without** a limit, a meter, or any limit language when it sees `0`, and MUST NOT compute a ratio against it. This is the ordinary self-host posture (§6, TB5): a deployment that sets no ceilings answers successfully with `0`, so no error path and no hosted-only concept is ever forced onto a self-hoster.
+- **Absent route is a legitimate client state.** A server predating this section answers `404`; a client MUST treat that as "no usage to show" and degrade to a neutral state, never an error.
+- **No plan and no expiry.** `plan_id` and `paid_until_day` exist in the `accounts.json` schema but are **reserved to MYND-430** and MUST NOT be exposed here until billing ships; nothing writes them, so exposing them would publish a permanently-null field. The same applies to any billing-capability flag.
+- Still a live projection of already-persisted enforcement state only — no history, no wall-clocks, no per-account time series.
+
+### 7.2 Refusal bodies carry a machine-readable reason (normative; MYND-570)
+
+§3.1 already fixes the error body as `{"error_code": "<code>"}`. That shape is **normative for every refusal on the authed sync surface**, not only the auth wire, because a client must be able to tell refusals apart without parsing prose:
+
+| Status | `error_code` | Meaning |
+|---|---|---|
+| `403` | `frozen` | Operator freeze — push + enroll refused, **pull never refused** ("frozen is minimal") |
+| `413` | `too_large` | *This request* exceeded the body cap — a property of the request, not the account |
+| `507` | `quota` | The account is at its effective storage ceiling |
+| `429` | `rate` | Per-account token-bucket limit (§5.2) |
+| `409` | `blob_stale` / `head_stale` | CAS loss — the pre-existing use of this field |
+
+A client MUST NOT collapse these into one generic failure: each implies a different user action, and `413` in particular is **not** an account-level condition and can never be reported by `/account/status`. Carrying the reason on the refusal itself is also what keeps the client off a second request on the refusal path, where the §5.2 limiter could answer `429` and mask the very refusal being explained.
