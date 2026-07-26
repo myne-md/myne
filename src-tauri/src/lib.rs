@@ -223,8 +223,26 @@ pub fn run() {
     // `vault_meta_bytes_hash` CAS in MYND-22 is the defensive second
     // layer. See `decisions.md` 2026-05-06 entry.
     #[cfg(desktop)]
-    let builder = builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+    let builder = builder.plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
         use tauri::Manager;
+        // MYND-567: on Windows + Linux the OS delivers a `myne://` deep link by
+        // spawning a SECOND process whose only argv is the URL — so the
+        // single-instance callback is the deep link's arrival path there. Hand
+        // the argv to the deep-link plugin BEFORE raising the window: it
+        // re-parses them, matches the scheme against the `tauri.conf.json`
+        // allowlist (`myne` only), and emits `deep-link://new-url` for the
+        // WebView latch to pick up. A no-op on macOS (the plugin routes
+        // `RunEvent::Opened` instead) and a no-op for an ordinary second
+        // launch with no URL argv.
+        //
+        // The URL is NOT trusted here — this only transports it. Parsing,
+        // caps, and the confirmation gate live WebView-side
+        // (`src/lib/themeDeepLink.ts`), and the palette still has to clear the
+        // `theme_validator` allowlist inside `themes_import` before any write.
+        {
+            use tauri_plugin_deep_link::DeepLinkExt;
+            app.deep_link().handle_cli_arguments(args.iter());
+        }
         if let Some(window) = app.get_webview_window("main") {
             let _ = window.unminimize();
             // `show()` is load-bearing, not redundant with `unminimize()`:
@@ -238,6 +256,21 @@ pub fn run() {
     }));
 
     let builder = builder
+        // MYND-567: `myne://` custom-URL-scheme delivery. COLD START needs no
+        // wiring of ours — the plugin's own `init` already feeds `std::env::args()`
+        // to `handle_cli_arguments` on desktop, which is what makes the WebView's
+        // boot-time `getCurrent()` see a URL the OS launched us with. Do not add a
+        // second call in `setup`: it is redundant, and reading argv ourselves would
+        // put a `std::env::args()` panic-on-non-UTF-8 on the boot path. Registration
+        // itself is bundle-time
+        // from `tauri.conf.json` `plugins.deep-link.desktop.schemes`
+        // (macOS `CFBundleURLTypes`, Windows NSIS registry, Linux `.desktop`
+        // MimeType), so the scheme belongs to the INSTALLED app on all three
+        // platforms. The plugin grants no network capability — it only carries
+        // a URL the OS already resolved to us. Scheme grammar is shared with
+        // the mobile client (`myne://open` / `myne://capture`); desktop owns
+        // `myne://theme/install`.
+        .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_dialog::init())

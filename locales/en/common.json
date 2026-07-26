@@ -2494,6 +2494,17 @@
       "untitled": "Untitled ({{hex}})",
       "useThisVersion": "Use this version"
     },
+    "deviceJoinQr": {
+      "accountLabel": "Account number",
+      "accountPlaceholder": "MY-XXXX-XXXX-XXXX-XXXX-XXXX",
+      "error": "Couldn’t make the QR. Please try again.",
+      "generate": "Make QR",
+      "hint": "Paste your account number to make a QR your phone can scan — it fills in the server and account number for you.",
+      "invalidAccount": "That doesn’t look like a valid account number.",
+      "notConfigured": "Configure a sync server first, then make a QR.",
+      "scanWithApp": "Scan with the iOS app",
+      "title": "Add a device with a QR"
+    },
     "devices": {
       "approve": "Approve",
       "awaitingApproval_one": "{{count}} device awaiting approval",
@@ -2501,8 +2512,21 @@
       "loading": "Loading…",
       "noDevices": "No devices synced yet.",
       "notEnrolled": "This device isn’t connected yet. If you just added it, wait for approval from another device; otherwise add it with the “Add a device” form above.",
+      "platform": {
+        "android": "Android phone",
+        "androidTablet": "Android tablet",
+        "ios": "iPhone",
+        "ipad": "iPad",
+        "linux": "Linux PC",
+        "macos": "Mac",
+        "unknown": "This device",
+        "windows": "Windows PC"
+      },
       "remove": "Remove",
       "removedElsewhere": "This device was removed from your account on another device.",
+      "rename": "Rename",
+      "renameFailed": "Couldn’t save that name. Try again.",
+      "renameLabel": "Device name",
       "resetAndReAdd": "Reset and re-add this device",
       "resetSyncOnThisDevice": "Reset sync on this device",
       "shortName": "Device {{hex}}",
@@ -2534,6 +2558,8 @@
       "accountNumberPlaceholder": "MY-XXXX-XXXX-XXXX-XXXX-X",
       "connecting": "Connecting…",
       "credentialTypeAria": "Credential type",
+      "deviceNameHelp": "Shown in your device list. You can change it later.",
+      "deviceNameLabel": "Name this device",
       "error": {
         "notConfigured": "Set a sync server in settings before adding this device.",
         "transport": "Couldn’t reach the sync server. Check your connection and try again."
@@ -2685,6 +2711,32 @@
     "deleteConfirm": "Delete this template?",
     "convertToNote": "Convert to note"
   },
+  "themeInstall": {
+    "apply": "Apply theme",
+    "applying": "Applying…",
+    "byAuthor": "This link says it's by {{author}}",
+    "cancel": "Cancel",
+    "close": "Close",
+    "collision": {
+      "keepBoth": "Keep both — install as “{{name}}”",
+      "question": "You already have a theme called “{{name}}”.",
+      "replace": "Replace “{{name}}”"
+    },
+    "error": {
+      "importFailed": "Couldn't install that theme. Nothing was changed.",
+      "installedNotActivated": "“{{name}}” was installed, but couldn't be switched on. You can apply it from Settings → Appearance.",
+      "invalidName": "That link doesn't name the theme it wants to install.",
+      "listUnavailable": "Couldn't read your existing themes, so this can't be installed safely right now. Close this and try the link again.",
+      "malformedPayload": "That link's theme data is damaged or incomplete.",
+      "nothingWritten": "Nothing was written to your vault.",
+      "payloadTooLarge": "That link's theme data is too large to be a theme.",
+      "unsupportedVersion": "That link was made for a newer version of Myne. Update Myne, then try again."
+    },
+    "errorTitle": "Couldn't read that theme",
+    "helper": "Themes are a color palette, not code. Myne validates this one on this device before using it — nothing is uploaded.",
+    "question": "Do you want to use this theme?",
+    "title": "Install theme"
+  },
   "unlock": {
     "backToPicker": "Choose a different vault",
     "continue": "Continue",
@@ -2704,7 +2756,6 @@
       "pinPlaceholder": "PIN",
       "unlockWithPin": "Unlock with PIN",
       "unlockWithTouchId": "Unlock with Touch ID",
-      "usePasswordBelow": "or use your password below",
       "wrongCredential": "Incorrect. {{remaining}} attempt(s) left."
     },
     "recoveryInterruptedBanner": "Recovery flow was interrupted. Set a new password first.",
@@ -3111,7 +3162,23 @@
     "serverPlaceholder": "https://sync.example.com",
     "accountHint": "Double-check this number — it doesn't look right.",
     "approvalHint": "Your notes appear once you approve this device from a device that already has your account.",
-    "connectingSubtitle": "Fetching your account and unlocking your vault on this device."
+    "connectingSubtitle": "Fetching your account and unlocking your vault on this device.",
+    "qr": {
+      "cancel": "Cancel",
+      "confirmAccount": "Account",
+      "confirmServer": "Server",
+      "confirmTitle": "Add this device?",
+      "continue": "Continue",
+      "expired": "This QR has expired — show a fresh one on your other device and scan again.",
+      "invalid": "That's not a Myne device QR.",
+      "newerVersion": "This QR is from a newer version of Myne — update the app and try again.",
+      "pinHosted": "Myne-hosted server",
+      "pinNone": "Self-hosted server",
+      "pinSelfHost": "Cert pinned from your trusted device",
+      "scan": "Scan QR",
+      "scanFailed": "Couldn’t scan. Try again, or enter your details manually.",
+      "scanUnavailable": "Scanning isn’t available on this device — enter your details below."
+    }
   },
   "createVault": {
     "beginWeakPassword": "Choose a stronger password and try again.",
