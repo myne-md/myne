@@ -24,7 +24,7 @@
 //! - `vv_dominance` — the §5.3 three-case rollback test (extension / rollback /
 //!   incomparable) plus the §6 bootstrap-TOFU case (empty baseline);
 //! - the device-local `MYH1` `vault.head-state` baseline codec (`protocol.md`
-//!   §9.15): it stores the full wire-head TIP and re-verifies the head's own MAC
+//!   §9.16): it stores the full wire-head TIP and re-verifies the head's own MAC
 //!   under the same `vault-head-mac` key (no second context, no AEAD — the head
 //!   carries only server-visible metadata).
 //!
@@ -67,7 +67,7 @@ pub const HEAD_ID_LEN: usize = 32;
 pub const HEAD_MAC_LEN: usize = 32;
 
 /// Magic for the device-local `vault.head-state` baseline blob (`protocol.md`
-/// §9.15, §10.3).
+/// §9.16, §10.3).
 pub const VAULT_HEAD_STATE_MAGIC: [u8; 4] = *b"MYH1";
 
 /// One version-vector entry: a device and its authored-head counter (§4.1).
@@ -491,7 +491,7 @@ pub fn vv_dominance(baseline: &[VvEntry], candidate: &[VvEntry]) -> Dominance {
     }
 }
 
-// ---- MYH1 device-local baseline (`protocol.md` §9.15) ----------------------
+// ---- MYH1 device-local baseline (`protocol.md` §9.16) ----------------------
 
 /// Encode the device-local `MYH1` `vault.head-state` baseline: magic + protocol
 /// version + `head_format_version` + the full wire-head `record`
@@ -508,7 +508,7 @@ pub fn encode_head_state(sealed: &SealedHead, head_format_version: u8) -> Vec<u8
 }
 
 /// Decode + verify a device-local `MYH1` baseline: check the magic / version
-/// bytes, then re-verify the embedded head's own MAC under `root_key` (§9.15).
+/// bytes, then re-verify the embedded head's own MAC under `root_key` (§9.16).
 pub fn decode_head_state(root_key: &[u8; 32], blob: &[u8]) -> Result<VaultHead, VaultHeadError> {
     let header = 4 + 1 + 1;
     if blob.len() < header {
@@ -999,5 +999,363 @@ mod tests {
 
         std::fs::write("/tmp/myne_vault_head_vectors.json", out.as_bytes())
             .expect("write vault-head vectors dump");
+    }
+
+    /// Emits `myne-test-vectors/vectors/vault-head-state/v0.1/cases.json` to
+    /// `/tmp/myne_vault_head_state_vectors.json`, ready to copy verbatim.
+    ///
+    /// `#[ignore]` — regenerating vectors is a deliberate act. Run with:
+    /// `cargo test -p protocol --lib emit_head_state_vectors_for_paste -- --ignored`
+    ///
+    /// Pins the **`MYH1` device-local baseline envelope** (`protocol.md` §9.16),
+    /// which is a different surface from the sibling `vault-head` family: that
+    /// one pins the magic-less **sync-wire** head (`head_mac_input`, `head_mac`,
+    /// `head_id`, VV dominance, `sync-protocol.md` §3–§5), while this one pins
+    /// the 6-byte header a device wraps around that record before writing it to
+    /// disk. `MYH1` is the one §10.3 blob family that is **not AEAD-encrypted**
+    /// — integrity is the head's own MAC, re-verified on load — so there is no
+    /// `decrypt_aead_fail` shape here; the MAC surface gets its own `mac_fail`
+    /// case_kind instead.
+    ///
+    /// 9 cases: 3 `encode` (genesis / linear / merge — the same head shapes the
+    /// wire family pins, now wrapped in the baseline header) + 1 `decode_ok` +
+    /// 1 `mac_fail` (tampered `head_mac`) + 4 `parse_fail` (one per
+    /// distinguishable pre-MAC reject of `decode_head_state`:
+    /// `state_magic_mismatch`, `protocol_version_mismatch`, `format_unsupported`,
+    /// `record_too_short`).
+    #[test]
+    #[ignore]
+    fn emit_head_state_vectors_for_paste() {
+        extern crate std;
+        use alloc::string::String;
+
+        fn hex(bytes: &[u8]) -> String {
+            let mut s = String::with_capacity(bytes.len() * 2);
+            for b in bytes {
+                s.push_str(&alloc::format!("{:02x}", b));
+            }
+            s
+        }
+        fn vv_json(entries: &[VvEntry]) -> String {
+            let mut s = String::from("[");
+            for (i, e) in entries.iter().enumerate() {
+                if i > 0 {
+                    s.push_str(", ");
+                }
+                s.push_str(&alloc::format!(
+                    "{{ \"input_device_id_hex\": \"{}\", \"counter\": {} }}",
+                    hex(&e.device_id),
+                    e.counter
+                ));
+            }
+            s.push(']');
+            s
+        }
+        fn arr_hex(items: &[[u8; HEAD_ID_LEN]]) -> String {
+            let mut s = String::from("[");
+            for (i, it) in items.iter().enumerate() {
+                if i > 0 {
+                    s.push_str(", ");
+                }
+                s.push_str(&alloc::format!("\"{}\"", hex(it)));
+            }
+            s.push(']');
+            s
+        }
+
+        // Same fixture bytes as the wire `vault-head` family, so a reviewer can
+        // line the two files up field by field and see exactly what the MYH1
+        // header adds.
+        let root = [0x42u8; 32];
+        let account = [0x33u8; 16];
+        let dev_a = [0xA1u8; DEVICE_ID_LEN];
+        let dev_b = [0xB2u8; DEVICE_ID_LEN];
+        let parent1 = [0x11u8; HEAD_ID_LEN];
+        let parent2 = [0x22u8; HEAD_ID_LEN];
+
+        struct Enc {
+            slug: &'static str,
+            desc: &'static str,
+            manifest: [u8; 32],
+            seq: u64,
+            parents: Vec<[u8; HEAD_ID_LEN]>,
+            vv: Vec<VvEntry>,
+        }
+        let encs = vec![
+            Enc {
+                slug: "encode-genesis",
+                desc: "Genesis head wrapped as an MYH1 baseline: parent_count=0, VV={A:1}, seq=1. Pins the 6-byte header (MYH1 || 0x01 || 0x01) prepended to the sealed wire record — the smallest baseline a device can persist.",
+                manifest: [0x55u8; 32],
+                seq: 1,
+                parents: vec![],
+                vv: vec![VvEntry { device_id: dev_a, counter: 1 }],
+            },
+            Enc {
+                slug: "encode-linear",
+                desc: "Linear successor wrapped as an MYH1 baseline: one parent, VV={A:2,B:1}, seq=2. Pins that the baseline header is a pure prefix — the trailing bytes are the wire record verbatim, including the G1 device_id-sorted version vector.",
+                manifest: [0x66u8; 32],
+                seq: 2,
+                parents: vec![parent1],
+                vv: vec![
+                    VvEntry { device_id: dev_b, counter: 1 },
+                    VvEntry { device_id: dev_a, counter: 2 },
+                ],
+            },
+            Enc {
+                slug: "encode-merge",
+                desc: "Merge head wrapped as an MYH1 baseline: two parents supplied UNSORTED (parent2 before parent1), VV={A:3,B:2}, seq=3. Pins that the G2 lexicographic merge-parent sort still applies underneath the baseline header — the envelope never re-orders or re-canonicalizes the record it wraps.",
+                manifest: [0x77u8; 32],
+                seq: 3,
+                parents: vec![parent2, parent1],
+                vv: vec![
+                    VvEntry { device_id: dev_b, counter: 2 },
+                    VvEntry { device_id: dev_a, counter: 3 },
+                ],
+            },
+        ];
+
+        // The blob every decode-side case starts from (the genesis baseline).
+        let genesis_head = VaultHead {
+            head_format_version: VAULT_HEAD_FORMAT_V1,
+            account_number_hash: account,
+            manifest_hash: [0x55u8; 32],
+            seq: 1,
+            prev_head_hash: vec![],
+            version_vector: vec![VvEntry {
+                device_id: dev_a,
+                counter: 1,
+            }],
+        };
+        let genesis_sealed = genesis_head.seal(&root).expect("seal");
+        let genesis_blob = encode_head_state(&genesis_sealed, VAULT_HEAD_FORMAT_V1);
+
+        // Self-assert at mint: the fixtures below must actually produce the
+        // rejects they claim, so a broken generator cannot ship a vector that
+        // pins the wrong error.
+        let mut mac_tampered = genesis_blob.clone();
+        let last = mac_tampered.len() - 1;
+        mac_tampered[last] ^= 0x01;
+        assert_eq!(
+            decode_head_state(&root, &mac_tampered),
+            Err(VaultHeadError::MacMismatch)
+        );
+
+        let mut bad_magic = genesis_blob.clone();
+        bad_magic[0] ^= 0xFF;
+        assert_eq!(
+            decode_head_state(&root, &bad_magic),
+            Err(VaultHeadError::StateMagicMismatch)
+        );
+
+        let mut bad_version = genesis_blob.clone();
+        bad_version[4] = 0x02;
+        assert_eq!(
+            decode_head_state(&root, &bad_version),
+            Err(VaultHeadError::ProtocolVersionMismatch)
+        );
+
+        let mut bad_format = genesis_blob.clone();
+        bad_format[5] = 0x02;
+        assert_eq!(
+            decode_head_state(&root, &bad_format),
+            Err(VaultHeadError::FormatUnsupported)
+        );
+
+        // Five bytes: shorter than the 6-byte header, so the length guard fires
+        // before the magic comparison ever reads blob[0..4].
+        let too_short = genesis_blob[..5].to_vec();
+        assert_eq!(
+            decode_head_state(&root, &too_short),
+            Err(VaultHeadError::RecordTooShort)
+        );
+
+        struct Fail {
+            slug: &'static str,
+            desc: &'static str,
+            kind: &'static str,
+            blob: Vec<u8>,
+            expected_error: &'static str,
+        }
+        let fails = vec![
+            Fail {
+                slug: "mac-fail-tampered-head-mac",
+                desc: "Final byte of the trailing head_mac flipped. The baseline is NOT AEAD-encrypted, so the reject comes from the head's own HMAC-SHA-256 verification under DeriveSubkey(root_key, 'vault-head-mac') — a distinguishable MacMismatch, not a non-distinguishing AEAD failure. This is the load-bearing property of the MYH1 family: integrity without confidentiality, because the record is bytes the server already relays.",
+                kind: "mac_fail",
+                blob: mac_tampered.clone(),
+                expected_error: "mac_mismatch",
+            },
+            Fail {
+                slug: "parse-fail-state-magic-mismatch",
+                desc: "First magic byte flipped ('MYH1' -> 0xB2 'YH1'). Rejected before any MAC computation — the §10.3 magic-byte-before-verify discipline applied to the one non-AEAD family.",
+                kind: "parse_fail",
+                blob: bad_magic.clone(),
+                expected_error: "state_magic_mismatch",
+            },
+            Fail {
+                slug: "parse-fail-protocol-version-mismatch",
+                desc: "protocol_version byte at offset 4 set to 0x02. v0.1 and v005 are forward-incompatible by design: a decoder MUST reject rather than attempt a best-effort parse.",
+                kind: "parse_fail",
+                blob: bad_version.clone(),
+                expected_error: "protocol_version_mismatch",
+            },
+            Fail {
+                slug: "parse-fail-format-unsupported",
+                desc: "head_format_version byte at offset 5 set to 0x02. The load-bearing forward hook: a future head format bumps this so a v0.1-only client rejects cleanly and re-bootstraps its baseline from the server rather than mis-parsing a newer record.",
+                kind: "parse_fail",
+                blob: bad_format.clone(),
+                expected_error: "format_unsupported",
+            },
+            Fail {
+                slug: "parse-fail-record-too-short",
+                desc: "Five bytes — one short of the 6-byte header. The length guard MUST fire before the magic comparison, so a port that indexes blob[0..4] first panics here instead of returning an error.",
+                kind: "parse_fail",
+                blob: too_short.clone(),
+                expected_error: "record_too_short",
+            },
+        ];
+
+        let mut out = String::new();
+        out.push_str("{\n");
+        out.push_str("  \"schema\": \"vault-head-state\",\n");
+        out.push_str("  \"protocol_version\": \"v0.1\",\n");
+        out.push_str("  \"spec_section\": \"protocol.md §9.16 + §3.4 + sync-protocol.md §3\",\n");
+        out.push_str("  \"description\": \"Pins protocol::encode_head_state + protocol::decode_head_state — the MYH1 vault.head-state device-local sync baseline (§9.16). The envelope is magic (MYH1) || protocol_version (0x01) || head_format_version (0x01) || the sealed wire record (head_mac_input || head_mac) that the sibling vault-head family pins in isolation. UNIQUE among the §10.3 blob families: NOT AEAD-encrypted — the bytes are exactly the head the server already relays, and integrity is the head's own HMAC-SHA-256 under DeriveSubkey(root_key, SubkeyRole::VaultHeadMac), re-verified on load. So there is no decrypt_aead_fail shape: the MAC surface is its own distinguishable mac_fail case_kind, and the structural rejects stay under parse_fail. 9 cases: 3 encode (genesis / linear / merge) + 1 decode_ok + 1 mac_fail + 4 parse_fail. Cases generated by `cargo test -p protocol --lib emit_head_state_vectors_for_paste -- --ignored` (in protocol/src/vault_head.rs).\",\n");
+        out.push_str("  \"cases\": [\n");
+
+        let total = encs.len() + 1 + fails.len();
+        let mut n = 0usize;
+
+        for e in &encs {
+            let head = VaultHead {
+                head_format_version: VAULT_HEAD_FORMAT_V1,
+                account_number_hash: account,
+                manifest_hash: e.manifest,
+                seq: e.seq,
+                prev_head_hash: e.parents.clone(),
+                version_vector: e.vv.clone(),
+            };
+            let sealed = head.seal(&root).expect("seal");
+            let blob = encode_head_state(&sealed, VAULT_HEAD_FORMAT_V1);
+            let mac_key = derive_subkey(&root, SubkeyRole::VaultHeadMac);
+
+            out.push_str("    {\n");
+            out.push_str(&alloc::format!(
+                "      \"vector_id\": \"vault-head-state/v0.1/{}\",\n",
+                e.slug
+            ));
+            out.push_str(&alloc::format!("      \"description\": \"{}\",\n", e.desc));
+            out.push_str("      \"case_kind\": \"encode\",\n");
+            out.push_str(&alloc::format!(
+                "      \"input_root_key_hex\": \"{}\",\n",
+                hex(&root)
+            ));
+            out.push_str(&alloc::format!(
+                "      \"input_account_number_hash_hex\": \"{}\",\n",
+                hex(&account)
+            ));
+            out.push_str("      \"input_head_format_version\": 1,\n");
+            out.push_str(&alloc::format!(
+                "      \"input_manifest_hash_hex\": \"{}\",\n",
+                hex(&e.manifest)
+            ));
+            out.push_str(&alloc::format!("      \"input_seq\": {},\n", e.seq));
+            out.push_str(&alloc::format!(
+                "      \"input_parent_count\": {},\n",
+                e.parents.len()
+            ));
+            out.push_str(&alloc::format!(
+                "      \"input_prev_head_hash_hex\": {},\n",
+                arr_hex(&e.parents)
+            ));
+            out.push_str(&alloc::format!(
+                "      \"input_version_vector\": {},\n",
+                vv_json(&e.vv)
+            ));
+            out.push_str(&alloc::format!(
+                "      \"informational_head_mac_key_hex\": \"{}\",\n",
+                hex(&*mac_key)
+            ));
+            out.push_str(&alloc::format!(
+                "      \"informational_head_id_hex\": \"{}\",\n",
+                hex(&sealed.head_id)
+            ));
+            out.push_str(&alloc::format!(
+                "      \"expected_head_state_blob_hex\": \"{}\"\n",
+                hex(&blob)
+            ));
+            n += 1;
+            out.push_str(if n < total { "    },\n" } else { "    }\n" });
+        }
+
+        // decode_ok — the genesis baseline round-trips back to the same head.
+        out.push_str("    {\n");
+        out.push_str("      \"vector_id\": \"vault-head-state/v0.1/decode-ok-genesis\",\n");
+        out.push_str("      \"description\": \"Round-trip of the genesis baseline: strip the 6-byte header, re-verify the head_mac under DeriveSubkey(root_key, 'vault-head-mac'), and recover every field. A port that recovers the fields but skips MAC verification passes this case and fails mac-fail-tampered-head-mac — the pair is what makes verification non-optional.\",\n");
+        out.push_str("      \"case_kind\": \"decode_ok\",\n");
+        out.push_str(&alloc::format!(
+            "      \"input_blob_hex\": \"{}\",\n",
+            hex(&genesis_blob)
+        ));
+        out.push_str(&alloc::format!(
+            "      \"input_root_key_hex\": \"{}\",\n",
+            hex(&root)
+        ));
+        out.push_str("      \"expected_head_format_version\": 1,\n");
+        out.push_str(&alloc::format!(
+            "      \"expected_account_number_hash_hex\": \"{}\",\n",
+            hex(&account)
+        ));
+        out.push_str(&alloc::format!(
+            "      \"expected_manifest_hash_hex\": \"{}\",\n",
+            hex(&genesis_head.manifest_hash)
+        ));
+        out.push_str(&alloc::format!(
+            "      \"expected_seq\": {},\n",
+            genesis_head.seq
+        ));
+        out.push_str(&alloc::format!(
+            "      \"expected_prev_head_hash_hex\": {},\n",
+            arr_hex(&genesis_head.prev_head_hash)
+        ));
+        out.push_str(&alloc::format!(
+            "      \"expected_version_vector\": {},\n",
+            vv_json(&genesis_head.version_vector)
+        ));
+        out.push_str(&alloc::format!(
+            "      \"informational_head_id_hex\": \"{}\"\n",
+            hex(&genesis_sealed.head_id)
+        ));
+        n += 1;
+        out.push_str(if n < total { "    },\n" } else { "    }\n" });
+
+        for f in &fails {
+            out.push_str("    {\n");
+            out.push_str(&alloc::format!(
+                "      \"vector_id\": \"vault-head-state/v0.1/{}\",\n",
+                f.slug
+            ));
+            out.push_str(&alloc::format!("      \"description\": \"{}\",\n", f.desc));
+            out.push_str(&alloc::format!("      \"case_kind\": \"{}\",\n", f.kind));
+            out.push_str(&alloc::format!(
+                "      \"input_blob_hex\": \"{}\",\n",
+                hex(&f.blob)
+            ));
+            out.push_str(&alloc::format!(
+                "      \"input_root_key_hex\": \"{}\",\n",
+                hex(&root)
+            ));
+            out.push_str(&alloc::format!(
+                "      \"expected_error\": \"{}\"\n",
+                f.expected_error
+            ));
+            n += 1;
+            out.push_str(if n < total { "    },\n" } else { "    }\n" });
+        }
+
+        out.push_str("  ]\n");
+        out.push_str("}\n");
+
+        std::fs::write("/tmp/myne_vault_head_state_vectors.json", out.as_bytes())
+            .expect("write vault-head-state vectors dump");
     }
 }
