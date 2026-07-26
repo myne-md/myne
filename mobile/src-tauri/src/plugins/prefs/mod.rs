@@ -117,6 +117,13 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::set_right_panel_active_tab,
             commands::set_right_panel_hidden_tabs,
             commands::set_right_panel_tab_order,
+            // MYND-555: editor format-bar customization. Bodies are the SHARED
+            // `myne-core` prefs core desktop already uses — mobile only registers
+            // them. Device-local fields (`sync-protocol.md` §10.2.1), so a phone
+            // layout never propagates to a desktop. Must stay in lockstep with
+            // `permissions/prefs/default.toml` or the ACL resolver fails closed.
+            commands::set_editor_toolbar_order,
+            commands::set_editor_toolbar_hidden,
         ])
         .build()
 }
