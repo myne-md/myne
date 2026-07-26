@@ -47,6 +47,7 @@ permissions = [
     "allow-sync-delete-quarantine",
     "allow-sync-lifecycle-suspend",
     "allow-sync-lifecycle-resume",
+    "allow-sync-decode-join-qr",
 ]
 
 [[permission]]
@@ -158,3 +159,8 @@ commands.allow = ["sync_lifecycle_suspend"]
 identifier = "allow-sync-lifecycle-resume"
 description = "Allow invoking sync:sync_lifecycle_resume (WebView visibilitychange → visible: clear the suspend flag and arm the one-shot resume-immediate poll, SYNC-38). Flips an in-RAM scheduler flag only — no vault access, no IO, no server call."
 commands.allow = ["sync_lifecycle_resume"]
+
+[[permission]]
+identifier = "allow-sync-decode-join-qr"
+description = "Allow invoking sync:sync_decode_join_qr (MYND-466 — decode a scanned device-join QR string into {endpoint_url, account#, cert_pin, pin_source, fresh} for the confirm screen). Pure over the scanned string + the clock; no vault access, no IO, no server call, carries no secret."
+commands.allow = ["sync_decode_join_qr"]

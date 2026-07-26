@@ -80,6 +80,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::sync_delete_quarantine,
             commands::sync_lifecycle_suspend,
             commands::sync_lifecycle_resume,
+            commands::sync_decode_join_qr,
         ])
         .build()
 }

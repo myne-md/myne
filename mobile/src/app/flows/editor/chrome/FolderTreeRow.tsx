@@ -54,6 +54,10 @@ export function FolderTreeRow({
     <div
       data-testid="notes.folder-row"
       data-folder-path={name}
+      // Expose the fold state so a flow spec can assert a RESTORED expand set
+      // after a remount (MYND-561) — the chevron's rotation is a CSS transform,
+      // which Playwright can't read as state.
+      data-collapsed={collapsed ? "true" : "false"}
       onClick={() => {
         if (held.current) { held.current = false; return; } // consumed by the long-press
         onToggle();

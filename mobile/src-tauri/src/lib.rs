@@ -123,6 +123,12 @@ pub fn run() {
         // `plugin:share-import|seal_share`. On iOS/desktop this registers a no-op
         // (the iOS Share Extension is a separate app-extension target).
         .plugin(tauri_plugin_share_intent::init())
+        // MYND-466: iOS AVFoundation QR scanner for device-join via QR. The one
+        // WebView-facing command (`scan`) is under the deny-by-default
+        // `qr-scan:default` capability (camera-gated). On desktop/Android it
+        // registers the command surface but returns Unsupported (SYNC-46; Android
+        // decode is MYND-465).
+        .plugin(tauri_plugin_qr_scan::init())
         .plugin(plugins::vault_creation::init())
         .plugin(plugins::vault_unlock::init())
         .plugin(plugins::vault_recover::init())
@@ -150,6 +156,14 @@ pub fn run() {
         // lockstep with build.rs + permissions/graph-layout/default.toml or
         // the ACL resolver fails closed.
         .plugin(plugins::graph_layout::init())
+        // Workspace state (MYW1, §9.7): read/write of the encrypted
+        // vault.workspace descriptor, which on mobile carries the sidebar
+        // folder-expand set (MYND-561). Mobile-LOCAL, not a `myne-core`
+        // re-export (see `plugins/workspace/commands.rs` for why), and only 2 of
+        // desktop's 3 commands — no `workspace_stage`. Commands must stay in
+        // lockstep with build.rs + permissions/workspace/default.toml or the ACL
+        // resolver fails closed.
+        .plugin(plugins::workspace::init())
         .plugin(plugins::search::init())
         .plugin(plugins::snapshots::init())
         .plugin(plugins::attachments::init())
