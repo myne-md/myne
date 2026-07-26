@@ -1,0 +1,8 @@
+<p>Before.</p>
+<script>steal(document.cookie)</script>
+<iframe src="https://evil.test/frame"></iframe>
+<p onclick="steal()">Clickable text.</p>
+<a href="javascript:alert(1)">Bad link</a>
+<img src="data:text/html;base64,PHNjcmlwdD4=" alt="bad">
+<style>body { display: none }</style>
+<p>After.</p>

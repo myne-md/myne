@@ -1,51 +1,68 @@
-// Quick-unlock affordance on the Unlock screen (MYND-329).
+// Quick-unlock affordance on the Unlock screen (MYND-329, MYND-558).
 //
-// Rendered ABOVE the password form when quick-unlock is configured for the
-// vault. A PIN field or a Touch ID button lets the user re-enter after an
-// auto-lock without the full master password. The password form below is
-// always present as the escape hatch — this component never replaces it, so
-// the (security-critical) password path is untouched.
+// The PRIMARY unlock surface whenever quick-unlock is redeemable for the vault:
+// a PIN field or a Touch ID button lets the user re-enter after an auto-lock
+// without the full master password. Since MYND-558 the password form is no
+// longer rendered alongside it — the parent `Unlock` screen puts the password
+// behind an "Use password instead" reveal, so exactly one credential is asked
+// for at a time. The password path itself is untouched: it stays one click away
+// and is the only surface when quick-unlock is not redeemable.
+//
+// **Controlled, not self-probing.** `Unlock` owns the `quick_unlock_status`
+// probe and hands down the resolved `method`, because the parent's whole layout
+// hinges on the answer — a child that discovered it for itself would have to
+// report it back up, mirror it in local state, and lose it on every unmount.
+// This component therefore only redeems. Its one upward signal is
+// `onUnavailable`, a genuine event: "the credential I just tried is dead, stop
+// offering me."
 //
 // Spring-loaded gate: on a fresh process (app restart) quick-unlock is
 // suppressed until one full-password unlock has happened this session. The
-// status call reports `available: false` in that window, so this component
-// stays hidden on a cold start and the user simply types their password — the
-// PIN field returns after the first full unlock + an auto-lock in the same
-// session. The `RequiresFullPassword` / `AttemptsExhausted` / `NotConfigured`
-// error self-hide below is the redeem-time backstop for the same states.
+// status call reports `available: false` in that window, so the parent renders
+// only the password form on a cold start — the PIN field returns after the
+// first full unlock + an auto-lock in the same session. The
+// `RequiresFullPassword` / `AttemptsExhausted` / `NotConfigured` arm of
+// `handleError` is the redeem-time backstop for the same states, routed to the
+// parent through `onUnavailable`.
 //
 // ⚠️ Touch ID is HARDWARE-UNVERIFIED (see `core/.../quick_unlock/apple.rs`).
 
-import { useEffect, useState, type CSSProperties, type FormEvent } from "react";
+import { useState, type CSSProperties, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import {
-  quickUnlockStatus,
   quickUnlockWithBiometric,
   quickUnlockWithPin,
+  type QuickUnlockMethod,
 } from "../lib/quick-unlock";
+import { ctaStyle } from "./primitives/CenteredCard";
+import { Spinner } from "./Spinner";
 import { isQuickUnlockError } from "../types/quick-unlock-error";
 
 interface QuickUnlockEntryProps {
   /**
    * The vault this Unlock screen targets. Threaded into every quick-unlock IPC
    * call because no vault is unlocked here, so the backend can't infer the
-   * target from the active slot — without it, status/redeem mis-resolve to the
-   * wrong directory once more than one vault exists and the PIN field hides.
+   * target from the active slot — without it, redeem mis-resolves to the wrong
+   * directory once more than one vault exists.
    */
   vaultId?: string;
+  /** The redeemable method, resolved by the parent's status probe. */
+  method: QuickUnlockMethod;
   /** Called on a successful quick-unlock — same effect as a password unlock. */
   onUnlocked: () => void;
+  /**
+   * The credential just proved unusable (`RequiresFullPassword` /
+   * `AttemptsExhausted` / `NotConfigured`). The parent drops to the password
+   * form for the rest of the mount; this component is not re-offered.
+   */
+  onUnavailable: () => void;
 }
-
-type Method = "pin" | "biometric";
 
 const WRAP_STYLE: CSSProperties = {
   display: "flex",
   flexDirection: "column",
   gap: "var(--space-2)",
   marginTop: "var(--space-2)",
-  paddingBottom: "var(--space-3)",
-  borderBottom: "1px solid var(--line-1)",
 };
 
 const INPUT_STYLE: CSSProperties = {
@@ -59,65 +76,32 @@ const INPUT_STYLE: CSSProperties = {
   outline: "none",
 };
 
-const BTN_STYLE: CSSProperties = {
-  background: "var(--accent)",
-  color: "var(--accent-on)",
-  border: "none",
-  borderRadius: "var(--radius-2)",
-  padding: "var(--space-3) var(--space-5)",
-  fontFamily: "var(--font-sans)",
-  fontSize: "var(--text-base)",
-  fontWeight: "var(--weight-medium)" as CSSProperties["fontWeight"],
-  cursor: "pointer",
-};
-
 const HINT_STYLE: CSSProperties = {
   fontSize: "var(--text-sm)",
   color: "var(--fg-3)",
   textAlign: "center",
 };
 
-export function QuickUnlockEntry({ vaultId, onUnlocked }: QuickUnlockEntryProps) {
+export function QuickUnlockEntry({
+  vaultId,
+  method,
+  onUnlocked,
+  onUnavailable,
+}: QuickUnlockEntryProps) {
   const { t } = useTranslation();
-  const [method, setMethod] = useState<Method | null>(null);
   const [pin, setPin] = useState("");
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
-  const [hidden, setHidden] = useState(false);
-
-  useEffect(() => {
-    let alive = true;
-    quickUnlockStatus(vaultId)
-      .then((s) => {
-        if (!alive) return;
-        // `available` (not `configured`) gates the affordance: on a cold start
-        // the credential exists but the spring-loaded session gate is closed,
-        // so redeeming would fail `RequiresFullPassword`. Hiding here means a
-        // fresh launch shows only the password form — the PIN field returns
-        // after the first full unlock + an auto-lock in the same session.
-        if (s.available && (s.method === "pin" || s.method === "biometric")) {
-          setMethod(s.method);
-        } else {
-          setHidden(true);
-        }
-      })
-      .catch(() => {
-        if (alive) setHidden(true);
-      });
-    return () => {
-      alive = false;
-    };
-  }, [vaultId]);
 
   function handleError(e: unknown) {
     if (isQuickUnlockError(e)) {
       switch (e.kind) {
         // After a restart / a wipe, quick-unlock is unavailable — fold away and
-        // let the user type their password below.
+        // let the parent surface the password form in our place.
         case "RequiresFullPassword":
         case "AttemptsExhausted":
         case "NotConfigured":
-          setHidden(true);
+          onUnavailable();
           return;
         case "WrongCredential":
           setNote(
@@ -167,19 +151,27 @@ export function QuickUnlockEntry({ vaultId, onUnlocked }: QuickUnlockEntryProps)
     }
   }
 
-  if (hidden || method === null) return null;
-
   return (
-    <div style={WRAP_STYLE} data-testid="unlock.quick-unlock" data-method={method}>
+    <div
+      style={WRAP_STYLE}
+      data-testid="unlock.quick-unlock"
+      data-method={method}
+      // Mirrors `unlock.form`'s SYNC-8 idiom so the vault-addressed target stays
+      // observable on the PIN-primary surface, where no form is rendered.
+      data-vault-id={vaultId}
+    >
       {method === "biometric" ? (
         <button
           type="button"
           onClick={() => void attemptBiometric()}
           disabled={busy}
-          style={BTN_STYLE}
+          style={ctaStyle(busy)}
           data-testid="unlock.quick-touchid"
         >
-          {t("unlock.quickUnlock.unlockWithTouchId")}
+          {busy && <Spinner size={14} style={{ borderWidth: 2 }} />}
+          <span>
+            {busy ? t("unlock.decrypting") : t("unlock.quickUnlock.unlockWithTouchId")}
+          </span>
         </button>
       ) : (
         <form
@@ -193,6 +185,10 @@ export function QuickUnlockEntry({ vaultId, onUnlocked }: QuickUnlockEntryProps)
             value={pin}
             onChange={(e) => setPin(e.currentTarget.value)}
             disabled={busy}
+            // MYND-558: the PIN is now the primary (and only) field on screen
+            // when it is offered, so it takes the caret the password input used
+            // to hold.
+            autoFocus
             autoComplete="off"
             aria-label={t("unlock.quickUnlock.pinAriaLabel")}
             style={INPUT_STYLE}
@@ -201,10 +197,14 @@ export function QuickUnlockEntry({ vaultId, onUnlocked }: QuickUnlockEntryProps)
           <button
             type="submit"
             disabled={busy || pin.length === 0}
-            style={BTN_STYLE}
+            style={ctaStyle(busy || pin.length === 0)}
             data-testid="unlock.quick-pin-submit"
           >
-            {t("unlock.quickUnlock.unlockWithPin")}
+            {/* The PIN runs the vault's own Argon2id parameters, so this is the
+                same multi-second wait the password CTA shows a spinner for — a
+                button that just goes quiet reads as a hung app. */}
+            {busy && <Spinner size={14} style={{ borderWidth: 2 }} />}
+            <span>{busy ? t("unlock.decrypting") : t("unlock.quickUnlock.unlockWithPin")}</span>
           </button>
         </form>
       )}
@@ -213,7 +213,6 @@ export function QuickUnlockEntry({ vaultId, onUnlocked }: QuickUnlockEntryProps)
           {note}
         </p>
       )}
-      <p style={HINT_STYLE}>{t("unlock.quickUnlock.usePasswordBelow")}</p>
     </div>
   );
 }
