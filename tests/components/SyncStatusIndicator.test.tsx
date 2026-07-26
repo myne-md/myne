@@ -179,3 +179,37 @@ describe("SyncStatusIndicator — sync now affordance", () => {
     expect(screen.getByTestId("sync.status-label").textContent).toBe("Sync error");
   });
 });
+
+// --- Refusal classes (MYND-570) -------------------------------------------
+//
+// The Rust failure gate coarsens a cycle error to a FailureClass and emits its
+// `status_detail()` tag; the indicator maps each tag to its own copy. The point
+// of the feature is that these must NOT collapse into the generic "Sync error"
+// — each is separately actionable, and all three still PULL (only upload stops).
+describe("refusal classes render distinct copy", () => {
+  const cases: Array<[string, string]> = [
+    ["quota_exceeded", "Storage full — uploads paused"],
+    ["payload_too_large", "A file is too large to upload"],
+    ["frozen", "Account frozen — uploads paused"],
+  ];
+
+  for (const [detail, expected] of cases) {
+    it(`maps "${detail}" to its own label`, async () => {
+      statusFixture({ state: "error", detail } as SyncStatus);
+      render(<SyncStatusIndicator />);
+      await waitFor(() => {
+        expect(screen.getByText(expected)).toBeTruthy();
+      });
+      // The generic fallback must not be what the user sees.
+      expect(screen.queryByText("Sync error")).toBeNull();
+    });
+  }
+
+  it("still falls back to the generic label for an unknown detail", async () => {
+    statusFixture({ state: "error", detail: "sync_failed" } as SyncStatus);
+    render(<SyncStatusIndicator />);
+    await waitFor(() => {
+      expect(screen.getByText("Sync error")).toBeTruthy();
+    });
+  });
+});

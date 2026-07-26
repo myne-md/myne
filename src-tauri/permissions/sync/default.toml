@@ -22,6 +22,7 @@ permissions = [
     "allow-sync-status",
     "allow-sync-now",
     "allow-sync-list-devices",
+    "allow-sync-account-status",
     "allow-sync-approve-device",
     "allow-sync-remove-device",
     "allow-sync-pending-conflicts",
@@ -63,6 +64,11 @@ commands.allow = ["sync_now"]
 identifier = "allow-sync-list-devices"
 description = "Allow invoking sync:sync_list_devices (authed device roster from GET /auth/devices). No vault-blob access."
 commands.allow = ["sync_list_devices"]
+
+[[permission]]
+identifier = "allow-sync-account-status"
+description = "Allow invoking sync:sync_account_status (authed read-only projection from GET /account/status — this account's own stored bytes, device count, frozen flag and EFFECTIVE ceilings. Account is resolved from the device token, never a URL/query selector; no vault-blob access, no cross-account data)."
+commands.allow = ["sync_account_status"]
 
 [[permission]]
 identifier = "allow-sync-approve-device"

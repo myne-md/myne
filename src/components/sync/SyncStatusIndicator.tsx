@@ -75,6 +75,18 @@ function present(status: SyncStatus | null): Presentation {
       if (status.detail === "rate_limited") {
         return { dotColor: "var(--warning)", label: i18n.t("sync.status.errorRateLimited") };
       }
+      // Refusal classes (MYND-570). Each is a distinct, actionable state — a
+      // generic "Sync error" here would hide the one thing the user can act on.
+      // All three still PULL; only uploading is blocked.
+      if (status.detail === "quota_exceeded") {
+        return { dotColor: "var(--danger)", label: i18n.t("sync.status.errorQuota") };
+      }
+      if (status.detail === "payload_too_large") {
+        return { dotColor: "var(--danger)", label: i18n.t("sync.status.errorTooLarge") };
+      }
+      if (status.detail === "frozen") {
+        return { dotColor: "var(--danger)", label: i18n.t("sync.status.errorFrozen") };
+      }
       return { dotColor: "var(--danger)", label: i18n.t("sync.status.error") };
     case "conflicts":
       return {

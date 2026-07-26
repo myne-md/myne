@@ -15,6 +15,7 @@ import { EnrollDeviceForm } from "../sync/EnrollDeviceForm";
 import { DeviceManagementPanel } from "../sync/DeviceManagementPanel";
 import { DeviceJoinQr } from "../sync/DeviceJoinQr";
 import { BuildingIndexState } from "../sync/BuildingIndexState";
+import { SyncUsageBlock } from "../sync/SyncUsageBlock";
 import { RecoveredNotes } from "../sync/RecoveredNotes";
 import { ConflictsView } from "../../notes/components/ConflictsView";
 import {
@@ -33,6 +34,7 @@ import {
 import { Toast } from "../Toast";
 import { noteList } from "../../notes";
 import { useDevices } from "../../hooks/useDevices";
+import { useAccountStatus } from "../../hooks/useAccountStatus";
 import {
   PANEL_ROOT_STYLE,
   BLOCK_STYLE,
@@ -54,6 +56,11 @@ export function SyncPanel() {
   // Device roster, lifted here so its poll feeds BOTH the device list and the
   // "Add a device" enroll gate (single source of enrollment truth).
   const devicesHook = useDevices();
+
+  // Plan-free usage projection (MYND-570). Absent (`null`) on a server without
+  // the route — self-hosted or older — in which case the block is simply not
+  // rendered: no error, no hosted-only concept, no upsell.
+  const { status: accountStatus } = useAccountStatus();
   // "Add a device" enrolls THIS device into an account; once this device is an
   // approved member it can never be re-added, so the form is dead UI — hide it.
   // It stays visible while not-yet-a-member (never enrolled, pending approval,
@@ -201,6 +208,14 @@ export function SyncPanel() {
         <BuildingIndexState building={buildingIndex} />
         <p style={HELPER_STYLE}>{t("sync.panel.status.helper")}</p>
       </div>
+
+      {accountStatus !== null && (
+        <div style={BLOCK_STYLE}>
+          <span style={LABEL_STYLE}>{t("sync.panel.usage.label")}</span>
+          <SyncUsageBlock status={accountStatus} />
+          <p style={HELPER_STYLE}>{t("sync.panel.usage.helper")}</p>
+        </div>
+      )}
 
       {showEnroll && (
         <div style={BLOCK_STYLE}>
