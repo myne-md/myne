@@ -18,7 +18,8 @@ import {
   type DragEvent as ReactDragEvent,
 } from "react";
 import { useTranslation } from "react-i18next";
-import { CMEditor, type ScrollAnchorRequest, type CMEditorProps } from "../../editor/CMEditor";
+import { CMEditor, type ScrollAnchorRequest, type CMEditorProps, type EditorSwapApi } from "../../editor/CMEditor";
+import type { EditorState } from "@codemirror/state";
 import { resolveDefaultViewMode, type ViewMode } from "../../editor/view-mode";
 import { headingSections } from "../../dialect";
 
@@ -253,6 +254,14 @@ export function PaneView({
     (noteUuid: string, anchor: WikilinkAnchor | null) => {
       if (anchor !== null && hasAnchor(anchor)) {
         pendingAnchorTargetRef.current = noteUuid as NoteId;
+        // MYND-305 × MYND-534: an anchored open that switches to a DIFFERENT note
+        // must land at the anchor (or note-top if not found), NOT the target's
+        // restored cached scroll — flag it for the body-load effect. A same-note
+        // re-click keeps the flag clear (CMEditor's scroll effect handles it) so
+        // no stale flag leaks into a later plain tab-switch.
+        if (noteUuid !== activeIdRef.current) {
+          deepLinkOpenTargetRef.current = noteUuid as NoteId;
+        }
         setScrollAnchor({ anchor, nonce: Date.now() });
       }
       void ctx.open(noteUuid as NoteId);
@@ -299,6 +308,44 @@ export function PaneView({
 
   const [content, setContent] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
+
+  // Persistent-view swap (MYND-534). One long-lived CMEditor per pane; on a
+  // markdown→markdown note switch we cache the outgoing note's EditorState (undo +
+  // selection) + outer-scroller scrollTop and swap the incoming note's in via the
+  // CMEditor swap API, instead of tearing the view down. `swapApiRef` is handed up
+  // by the primary CMEditor's `onSwapReady` (null while unmounted — e.g. a drawing
+  // tab — in which case we fall back to the plain content-mirror path).
+  const swapApiRef = useRef<EditorSwapApi | null>(null);
+  const stateCacheRef = useRef<Map<NoteId, { state: EditorState; scrollTop: number }>>(
+    new Map(),
+  );
+  const prevActiveIdRef = useRef<NoteId | null>(null);
+
+  // MYND-305 × MYND-534: the target note-id of an in-flight deep-link OPEN (a
+  // wikilink chip carrying an anchor that switches to a DIFFERENT note). Set by
+  // `handleOpenWikilink`, consumed once by the body-load effect: when the load
+  // for that note runs, the anchor owns the scroll, so the note lands at the TOP
+  // (anchor `scrollIntoView` / §5.6 not-found fallback take over) instead of its
+  // restored cached scrollTop. Only set for cross-note opens so it never leaks a
+  // stale flag into a later plain tab-switch (which must restore cached scroll).
+  const deepLinkOpenTargetRef = useRef<NoteId | null>(null);
+
+  // MYND-534: evict cached EditorStates for notes no longer open in this pane (a
+  // closed tab), so the cache is bounded by the pane's open-tab count and a
+  // reopen starts fresh (grill Q3 — tab-switch-only lifetime).
+  const openNoteTabKey = leaf.tabs
+    .filter((t) => t.kind === "note")
+    .map((t) => t.id)
+    .join(" ");
+  useEffect(() => {
+    const open = new Set(
+      leaf.tabs.filter((t) => t.kind === "note").map((t) => t.id),
+    );
+    for (const key of [...stateCacheRef.current.keys()]) {
+      if (!open.has(key)) stateCacheRef.current.delete(key);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openNoteTabKey]);
 
   // --- Live outline scroll tracking (outline-scroll-tracking) ------------------
   // The focused pane publishes its topmost visible heading to the panel-level
@@ -394,10 +441,38 @@ export function PaneView({
     [recomputeActiveHeading],
   );
 
-  // Load the active note's body on change. Race-protected: a fetch that
-  // resolves after a newer activation is dropped via `cancelled`.
+  // Load / restore the active note's body on change (MYND-534). Persistent-view
+  // aware: capture the OUTGOING note's EditorState + scroll before swapping, then
+  // for the incoming note either restore its cached state instantly (no re-read,
+  // no loading) or read from disk (first open) and build a fresh state. When the
+  // swap API is unavailable (drawing tab, or before the view's onSwapReady fires),
+  // it degrades to the plain content-mirror path. `acceptReloadedBody` baselines
+  // autosave so a swap is never mistaken for a user edit. Race-protected via
+  // `cancelled`.
   useEffect(() => {
     let cancelled = false;
+    let api = swapApiRef.current;
+    const cache = stateCacheRef.current;
+    const scroller = outlineScrollerRef.current;
+    const prevId = prevActiveIdRef.current;
+
+    // Snapshot the outgoing markdown note (the view still holds it here) so a
+    // later return restores its undo history + scroll. Best-effort: a stale /
+    // mid-update / destroyed view (common right after a pane split/move) must
+    // NEVER break the switch — on failure we drop the swap API and reload.
+    if (api !== null && prevId !== null && prevId !== activeId) {
+      try {
+        cache.set(prevId, {
+          state: api.captureState(),
+          scrollTop: scroller?.scrollTop ?? 0,
+        });
+      } catch {
+        swapApiRef.current = null;
+        api = null;
+      }
+    }
+    prevActiveIdRef.current = activeId;
+
     if (activeId === null) {
       setContent("");
       setLoading(false);
@@ -405,19 +480,68 @@ export function PaneView({
         cancelled = true;
       };
     }
+
+    // MYND-305 × MYND-534: is THIS open driven by a deep-link (a wikilink chip
+    // carrying an anchor that switched to this note)? If so the anchor owns the
+    // scroll — restoring the note's cached scrollTop would clobber both the
+    // anchor's `scrollIntoView` AND the §5.6 not-found fallback, which relies on
+    // the note opening at the TOP (a not-found anchor scrolls nowhere). Consumed
+    // once here so a later plain tab-switch restores the note's own cached scroll.
+    const anchorDrivenOpen = deepLinkOpenTargetRef.current === activeId;
+    if (anchorDrivenOpen) deepLinkOpenTargetRef.current = null;
+
+    // Cached + swap API live → try an instant restore (no disk read, no loading
+    // gate). ANY failure degrades to the disk-reload path below, which always
+    // clears `loading` — so a bad swap can never strand the pane in a loading
+    // state (the MYND-534 pane-op regression).
+    const cached = api !== null ? cache.get(activeId) : undefined;
+    if (api !== null && cached !== undefined) {
+      let swapped = false;
+      try {
+        api.applyState(cached.state);
+        swapped = true;
+      } catch {
+        swapApiRef.current = null; // view unusable → force a clean reload
+      }
+      if (swapped) {
+        const doc = cached.state.doc.toString();
+        setContent(doc);
+        autosaveRef.current?.acceptReloadedBody(doc);
+        setLoading(false);
+        // Anchor-driven open → land at the top and let the anchor effect take it
+        // to the heading (or hold at top if not found); otherwise restore the
+        // note's own cached scroll. Same 0-then-scrollIntoView shape as first open.
+        const top = anchorDrivenOpen ? 0 : cached.scrollTop;
+        // Restore scroll after the swapped-in content lays out.
+        requestAnimationFrame(() => {
+          if (!cancelled && scroller !== null) scroller.scrollTop = top;
+        });
+        return () => {
+          cancelled = true;
+        };
+      }
+      // fall through to the disk reload on swap failure
+    }
+
+    // First open (uncached) or degraded swap → read from disk. The loading gate
+    // rebuilds the view here (first-open re-init is unchanged; only re-VISITS get
+    // the persistent view + preserved undo/scroll). No applyState: the remounted
+    // view picks up `content` via its value-mirror. `finally` guarantees `loading`
+    // always clears (unless a newer switch cancelled us, which owns it instead).
     setLoading(true);
     void (async () => {
       try {
         const body = await noteRead(activeId);
-        if (!cancelled) {
-          setContent(body);
-          setLoading(false);
-        }
+        if (cancelled) return;
+        setContent(body);
+        autosaveRef.current?.acceptReloadedBody(body);
+        requestAnimationFrame(() => {
+          if (!cancelled && scroller !== null) scroller.scrollTop = 0;
+        });
       } catch {
-        if (!cancelled) {
-          setContent("");
-          setLoading(false);
-        }
+        if (!cancelled) setContent("");
+      } finally {
+        if (!cancelled) setLoading(false);
       }
     })();
     return () => {
@@ -504,6 +628,12 @@ export function PaneView({
       reloadInit.current = false;
       return;
     }
+    // MYND-534: an out-of-band change (sync pull / external edit) may have
+    // rewritten ANY note, including ones cached in the background. Clear the
+    // whole per-note EditorState cache so the next swap-in rebuilds fresh from
+    // disk (content correctness over background-note undo — grill Q5). The active
+    // note's own re-read happens just below.
+    stateCacheRef.current.clear();
     if (activeId === null) return;
     // Never clobber unsaved local edits: a dirty buffer means the engine kept
     // OUR on-disk version (it skips a locally-dirty blob on pull), so reloading
@@ -790,6 +920,11 @@ export function PaneView({
             // outline-scroll-tracking: hand the live view to the pane so it can
             // watch the scroller and report the top heading to the Outline tab.
             onReady={handleEditorReady}
+            // persistent-view swap (MYND-534): the pane drives note switches on
+            // this one long-lived view via the swap API; null while unmounted.
+            onSwapReady={(api) => {
+              swapApiRef.current = api;
+            }}
             // writing-assistant task 6: surface the AI slash commands only in the
             // editable editor, gated on ai_enabled + the excluded-folder check
             // (SYNC-14). The reading-view instance below leaves it default-false.

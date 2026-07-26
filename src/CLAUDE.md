@@ -44,7 +44,7 @@ src/
 ├── screens/             ← top-level screens (one per stage)
 │   ├── CreateVault.tsx
 │   ├── Editor.tsx       ← B4.5 placeholder; full CodeMirror = Lane B #10 (B5). Hosts SettingsModal mount.
-│   ├── Unlock.tsx       ← password form + reducer (idle / decrypting / corrupted modes); renders SuspicionBanner when stage carries one
+│   ├── Unlock.tsx       ← quick-unlock OR password form (one at a time, MYND-558) + reducer (idle / decrypting / corrupted modes); renders SuspicionBanner when stage carries one
 │   ├── VaultRecover.tsx
 │   ├── Welcome.tsx
 │   ├── vault-creation/  ← multi-step flow (PasswordStep, PhraseStep, ConfirmStep, ...)

@@ -42,6 +42,7 @@ permissions = [
   "allow-set-editor-font-family",
   "allow-set-active-workspace",
   "allow-set-ai-enabled",
+  "allow-set-attachment-ocr-enabled",
   "allow-set-ai-excluded-folders",
   "allow-set-editor-default-view-mode",
   "allow-set-editor-focus-dim-inactive",
@@ -52,6 +53,10 @@ permissions = [
   "allow-set-editor-slash-hidden",
   "allow-set-item-colors",
   "allow-set-folder-icons",
+  # MYND-548 device naming: the per-key `device_names` setter + the platform
+  # token the enrollment forms seed their suggested name from.
+  "allow-set-device-name",
+  "allow-device-platform",
   "allow-vault-set-label",
   "allow-vault-set-icon",
   "allow-set-spell-enabled",
@@ -318,6 +323,26 @@ identifier = "allow-set-folder-icons"
 description = "Allow invoking prefs:set_folder_icons (Slot::Unlocked-gated setter for the folder_icons map — per-folder custom sidebar icons keyed by canonical folder path; atomic-writes vault.prefs with no native side-effect)."
 commands.allow = ["set_folder_icons"]
 
+# MYND-548 device naming: a write setter for ONE device_names entry, so it
+# inherits the same main-window-only invariant as the other allow-set-*
+# permissions — v0.2 multi-window MUST NOT grant this to any non-main window.
+# Unlock-gated by construction (the write needs prefs_key). There is no clear
+# path by design: device_names merges per-key by UNION (sync-protocol.md §10.2),
+# so a deletion would not propagate.
+[[permission]]
+identifier = "allow-set-device-name"
+description = "Allow invoking prefs:set_device_name (Slot::Unlocked-gated setter for one device_names entry — the human-readable label the device list shows for a device_id, keyed by its hex; a blank name is refused so no row renders nameless; atomic-writes vault.prefs with no native side-effect)."
+commands.allow = ["set_device_name"]
+
+# MYND-548: the read half — the platform token the enrollment forms seed their
+# suggested device name from. Deliberately NOT unlock-gated and vault-free: it
+# returns std::env::consts::OS, and the join flow needs it while bootstrapping a
+# vault that is not unlocked yet. Reads no vault state and writes nothing.
+[[permission]]
+identifier = "allow-device-platform"
+description = "Allow invoking prefs:device_platform (returns the compile-time std::env::consts::OS token — macos/windows/linux/ios/android — as the single default-device-name heuristic the enrollment forms seed from; touches no vault state and writes nothing)."
+commands.allow = ["device_platform"]
+
 # MYND-205 in-app vault switcher: a write setter for the per-vault label, so it
 # inherits the same main-window-only invariant as the other allow-set-*
 # permissions — v0.2 multi-window MUST NOT grant this to any non-main window.
@@ -422,6 +447,11 @@ commands.allow = ["set_right_panel_tab_order"]
 identifier = "allow-set-ai-enabled"
 description = "Allow invoking prefs:set_ai_enabled (Slot::Unlocked-gated setter for the ai_enabled AI opt-in toggle; atomic-writes vault.prefs with no native side-effect; the default-OFF policy is applied host-side at read time; emitted on disk only when true)."
 commands.allow = ["set_ai_enabled"]
+
+[[permission]]
+identifier = "allow-set-attachment-ocr-enabled"
+description = "Allow invoking prefs:set_attachment_ocr_enabled (Slot::Unlocked-gated setter for the attachment_ocr_enabled image-OCR toggle, MYND-441; atomic-writes vault.prefs with no native side-effect; device-local per sync-protocol.md §10.2; defaults to true, so it is emitted on disk only when false)."
+commands.allow = ["set_attachment_ocr_enabled"]
 
 [[permission]]
 identifier = "allow-set-ai-excluded-folders"

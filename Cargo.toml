@@ -23,6 +23,24 @@ opt-level = 3
 [profile.dev.package.half]
 opt-level = 3
 
+# Same reasoning for the OCR runtime (MYND-441): `rten` and its matmul/SIMD
+# kernels are unusable unoptimized — the fixture-image test alone takes seconds
+# in a plain debug build, and the background extraction queue would peg a core
+# for the whole of `pnpm tauri dev`. Unlike candle these are NOT feature-gated:
+# OCR ships in every build (it is search correctness, not an AI feature), so this
+# override always applies. `profile.dev` only — the reproducible RELEASE build is
+# unchanged.
+[profile.dev.package.rten]
+opt-level = 3
+[profile.dev.package.rten-gemm]
+opt-level = 3
+[profile.dev.package.rten-simd]
+opt-level = 3
+[profile.dev.package.rten-vecmath]
+opt-level = 3
+[profile.dev.package.rten-tensor]
+opt-level = 3
+
 # Same override for the `test` profile (it does NOT inherit `profile.dev`'s
 # per-package settings), so the `#[ignore]`d real-model smoke tests in
 # `engine_candle.rs` run with optimized candle instead of a ~50×-slower debug
@@ -36,4 +54,14 @@ opt-level = 3
 [profile.test.package.gemm]
 opt-level = 3
 [profile.test.package.half]
+opt-level = 3
+[profile.test.package.rten]
+opt-level = 3
+[profile.test.package.rten-gemm]
+opt-level = 3
+[profile.test.package.rten-simd]
+opt-level = 3
+[profile.test.package.rten-vecmath]
+opt-level = 3
+[profile.test.package.rten-tensor]
 opt-level = 3

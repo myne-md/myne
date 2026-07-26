@@ -231,6 +231,15 @@ export interface PrefsView {
    */
   ai_enabled: boolean;
   /**
+   * Whether attachment text extraction may read images and scanned PDFs
+   * (image OCR, MYND-441). **Defaults to `true`** — omitted from the encrypted
+   * blob when true, so a vault predating the field reads as enabled. Turning it
+   * off stops the background extraction worker but never deletes cached
+   * results. Device-local (`sync-protocol.md` §10.2): per-device compute
+   * budget. Non-load-bearing.
+   */
+  attachment_ocr_enabled: boolean;
+  /**
    * Folders excluded from every AI read/index (local-ai epic, ai-ux-surface
    * MYND-408, SYNC-14) — canonical trailing-slash form. Same encoding as
    * `deliberate_folders` (NFC-normalized, sorted, deduped set). Absent →
@@ -410,6 +419,18 @@ export interface PrefsView {
    */
   folder_icons: Record<string, string>;
   /**
+   * Friendly device names (MYND-548 / SYNC-41) — a map from a `device_id` (hex)
+   * to the user-chosen label the device list shows for it. The single home for
+   * device names across clients, so no client ships a second default-name
+   * heuristic. Absent in vaults where no device was ever named → the Rust
+   * decoder defaults it to `{}`, and the list falls back to its id-derived
+   * short label. Shared + synced, merged per key by UNION with a
+   * `device_names/<key>` LWW clock (`sync-protocol.md` §10.2) — which is why
+   * there is no "clear a name" path: a removed key resurrects from any peer
+   * that still holds it. Serialized from Rust `BTreeMap<String, String>`.
+   */
+  device_names: Record<string, string>;
+  /**
    * Hidden bottom-bar item ids (bottom-bar customization) — the set of
    * {@link BottomBar} element ids the user chose to hide via the bar's
    * right-click menu (e.g. `"graph"`, `"tags"`, `"word-count"`). The backend
@@ -556,6 +577,31 @@ export async function setDeliberateFolders(folders: string[]): Promise<void> {
  */
 export async function setAiEnabled(enabled: boolean): Promise<void> {
   await invoke<void>("plugin:prefs|set_ai_enabled", { enabled });
+}
+
+/**
+ * Progress event emitted by the background OCR worker (MYND-441). Paired with
+ * `OCR_BACKLOG_PROGRESS_EVENT` in
+ * `src-tauri/src/plugins/attachments/ocr_queue.rs` — the codebase convention is
+ * a named constant on both sides rather than a string literal at the listener.
+ */
+export const OCR_BACKLOG_PROGRESS_EVENT = "ocr-backlog-progress";
+
+/** Payload of {@link OCR_BACKLOG_PROGRESS_EVENT}: counts only, never filenames. */
+export interface OcrBacklogProgress {
+  /** Attachments still waiting, the in-flight one included. */
+  remaining: number;
+  /** Attachments extracted so far in this drain. */
+  done: number;
+}
+
+/**
+ * Persist the `attachment_ocr_enabled` toggle (MYND-441) — whether attachment
+ * text extraction may read images and scanned PDFs. A rejected promise means the
+ * disk write failed and the caller's optimistic UI must revert.
+ */
+export async function setAttachmentOcrEnabled(enabled: boolean): Promise<void> {
+  await invoke<void>("plugin:prefs|set_attachment_ocr_enabled", { enabled });
 }
 
 /**
@@ -835,6 +881,42 @@ export async function setItemColors(colors: Record<string, string>): Promise<voi
  */
 export async function setFolderIcons(icons: Record<string, string>): Promise<void> {
   await invoke<void>("plugin:prefs|set_folder_icons", { icons });
+}
+
+/**
+ * Name ONE device (MYND-548) — `device_names[deviceIdHex] = name`, the label the
+ * device list leads with. Unlike {@link setFolderIcons} this takes a single
+ * entry, not the whole map: entries are written by different devices and merged
+ * per key, so a whole-map write would let one client's stale view clobber a
+ * peer's rename.
+ *
+ * There is deliberately **no clear/delete counterpart**. `device_names` merges
+ * per key by UNION (`sync-protocol.md` §10.2), so removing a key does not
+ * propagate — it resurrects from the first peer that still holds it. Renaming
+ * always works (it stamps a fresh clock and wins LWW). The backend refuses a
+ * blank name, so an empty submit is a no-op the caller should treat as "cancel".
+ */
+export async function setDeviceName(deviceIdHex: string, name: string): Promise<void> {
+  await invoke<void>("plugin:prefs|set_device_name", { deviceIdHex, name });
+  // Bump AFTER the IPC resolves (the standard chokepoint): every mounted
+  // `usePrefs` consumer re-reads, so the device list refreshes without its own
+  // reload path — and so does a name written during enrollment, which has no
+  // list on screen to refresh manually.
+  bumpPrefsNonce();
+}
+
+/**
+ * The running device's platform token (MYND-548) — `"macos"`, `"windows"`,
+ * `"linux"`, `"ios"`, `"android"`, straight from Rust's `std::env::consts::OS`.
+ *
+ * The enrollment forms seed their "Name this device" field from it, mapping the
+ * token to a display word through the i18n catalogue. **Do not derive the
+ * platform from `navigator` instead** — that would be a second default-name
+ * heuristic diverging per client, which is exactly what keeping names in one
+ * synced map is meant to prevent.
+ */
+export async function devicePlatform(): Promise<string> {
+  return await invoke<string>("plugin:prefs|device_platform");
 }
 
 /**

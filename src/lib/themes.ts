@@ -103,6 +103,24 @@ export async function importCustomTheme(name: string, paletteJson: string): Prom
   await invoke<void>("plugin:themes|themes_import", { name, paletteJson });
 }
 
+/**
+ * The first free `"<name> (n)"` for `n >= 2`, given the names already in the
+ * vault. Returns `name` untouched when it is free.
+ *
+ * Lives beside {@link importCustomTheme} rather than in a caller because
+ * `themes_import` is an UPSERT: "don't silently clobber a theme the user
+ * already has" is a property of importing a theme, not of the surface that
+ * happens to be importing it. The deep-link dialog (MYND-567) is the first
+ * caller; the Settings file-import path still overwrites by filename and is a
+ * candidate for the same treatment.
+ */
+export function nextAvailableThemeName(name: string, taken: readonly string[]): string {
+  const existing = new Set(taken);
+  let candidate = name;
+  for (let n = 2; existing.has(candidate); n += 1) candidate = `${name} (${n})`;
+  return candidate;
+}
+
 /** Delete one custom theme by name. Idempotent (absent → success). */
 export async function deleteCustomTheme(name: string): Promise<void> {
   await invoke<void>("plugin:themes|themes_delete", { name });
