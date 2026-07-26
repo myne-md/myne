@@ -1,34 +1,48 @@
-// Obsidian importer — the engine (walk → assemble → serial ingest).
+// Importer — the engine (plan → serial ingest).
 //
 // Sub-feature 3 of the obsidian-importer epic (MYND-53), tasks 3 + 4 + 5.
+// Generalized to any source by the importer-breadth epic (MYND-579).
 //
-// A two-phase, serial, cancellable importer that ties together every sibling
+// A two-stage, serial, cancellable importer that ties together every sibling
 // sub-feature's pure logic:
-//   - Phase 1 walks directory ENTRIES only (no file content) via the Rust
-//     read-seam, classifying each entry with the SYNC-10 predicate
-//     (sub-feature 5): dot-prefixed entries are skipped (transparency count),
-//     non-dot directories are recursed, only `.md` files are queued for ingest,
-//     `.canvas` / other non-`.md` go to their skip buckets. It also records
-//     every directory for empty-dir detection (SYNC-4).
-//   - Phase 2 ingests the queued `.md` files SERIALLY (D3 — one file in RAM at a
-//     time; SYNC-1 no-plaintext-to-disk: only `note_create` writes, encrypted).
-//     For each file: `mapImportedFile` (sub-feature 1) produces the plaintext +
-//     read-time title + illegal-segment flags + any pre-existing-`folder:` note;
-//     `decideImport` (sub-feature 2) applies the SYNC-5 idempotent skip / copy
-//     toggle before `note_create`; cancellation (SYNC-6) stops the walk and
-//     keeps the partial import (no rollback).
+//   - Stage 1 asks the `ImportSource` for a PLAN — item descriptors (no note
+//     content), the directories seen for empty-dir detection (SYNC-4), and the
+//     SYNC-10 skip tallies. For Obsidian that is the old directory walk, now in
+//     `sources/obsidian.ts`. See `source.ts` for why this is a plan+load pair
+//     rather than one async generator (D3 vs a determinate `total`).
+//   - Stage 2 ingests the planned items SERIALLY (D3 — one item's markdown in RAM
+//     at a time; SYNC-1 no-plaintext-to-disk: only `note_create` writes,
+//     encrypted). For each item: `source.load()` yields the markdown;
+//     `mapImportedFile` (sub-feature 1) produces the plaintext + read-time title +
+//     illegal-segment flags + any pre-existing-`folder:` note; `decideImport`
+//     (sub-feature 2) applies the SYNC-5 idempotent skip / copy toggle before
+//     `note_create`; cancellation (SYNC-6) stops the run and keeps the partial
+//     import (no rollback).
 // At end-of-import, the empty source dirs are persisted with ONE
 // `set_deliberate_folders` write (SYNC-4).
 //
-// IO is injected as `ImportPorts` so the engine is unit-testable without Tauri;
-// the production factory wires the ports to the `importer:` read-seam, the
-// `notes:note_create` command, and the `prefs:set_deliberate_folders` command.
-// The engine itself never touches AEAD/magic/identifiers (delegated to
-// `note_create`) and never runs the dialect parser worker for ingest —
-// `mapImportedFile` reads frontmatter directly and the body is preserved
-// verbatim (C1), so a separate worker parse is not load-bearing here.
+// Reads come from an injected `ImportSource`, writes from an injected `ImportSink`,
+// so the engine is unit-testable without Tauri; the production factory wires the
+// Obsidian source to the `importer:` read-seam and the sink to `notes:note_create`
+// + `prefs:set_deliberate_folders`. The engine itself never touches
+// AEAD/magic/identifiers (delegated to `note_create`) and never runs the dialect
+// parser worker for ingest — `mapImportedFile` reads frontmatter directly and the
+// body is preserved verbatim (C1), so a separate worker parse is not load-bearing
+// here.
+//
+// ONE INGEST PATH IS LOAD-BEARING. Every source funnels through the single loop
+// below, which is why per-note lossy data has exactly one collection point
+// (`ImportResult.lossyNotes`, consumed by the import-report note, MYND-585) rather
+// than one per adapter.
 
-import { classifyEntry, emptyIgnoreCounts, type IgnoreCounts } from "./skipPredicate";
+import { type IgnoreCounts } from "./skipPredicate";
+import { createObsidianSource } from "./sources/obsidian";
+import type {
+  ImportPorts,
+  ImportSink,
+  ImportSource,
+  LossyNote,
+} from "./source";
 import {
   mapImportedFile,
   type IllegalSegmentFlag,
@@ -45,23 +59,10 @@ import {
   type RefImporter as MediaRefImporter,
 } from "./media";
 
-/** One external directory entry — mirrors the Rust `ImportDirEntry`. */
-export interface ImportDirEntry {
-  name: string;
-  isDir: boolean;
-}
-
-/** Injected IO ports (Tauri commands in production; fakes in tests). */
-export interface ImportPorts {
-  /** List a directory's entries (name + isDir, no content). */
-  readDir(absPath: string): Promise<ImportDirEntry[]>;
-  /** Read a file's UTF-8 source bytes. */
-  readFile(absPath: string): Promise<string>;
-  /** Encrypt + write one note; returns its id. */
-  createNote(plaintext: string): Promise<string>;
-  /** Persist the importer's empty-dir folders (the impl unions with existing prefs). */
-  setDeliberateFolders(folders: readonly string[]): Promise<void>;
-}
+// `ImportDirEntry` / `ImportPorts` now live on the seam (`source.ts`) so adapters
+// depend on the seam alone; re-exported here because every shipped caller and test
+// imports them from the engine.
+export type { ImportDirEntry, ImportPorts } from "./source";
 
 /** Tally for a `.base` saved-views import (Saved Views #6, MYND-276, SYNC-12).
  *  An OPTIONAL sub-field of {@link ImportResult} — the vault `.md` walk leaves it
@@ -100,6 +101,15 @@ export interface ImportResult {
   /** `.base` saved-views import tally — present only on a `.base` import flow
    *  (MYND-276); the `.md` vault walk leaves it `undefined`. */
   baseImport?: BaseImportTally;
+  /**
+   * Notes that imported successfully but lost representable detail (MYND-579).
+   * Always present; empty for a lossless source like Obsidian `.md`. This is the
+   * ONE collection point for per-note fidelity loss — the generated import-report
+   * note (MYND-585) is its only consumer. Deliberately NOT per-construct counters:
+   * HTML→markdown loss is pervasive inside notes that still count as imported, so
+   * there is no honest integer to tally.
+   */
+  lossyNotes: LossyNote[];
 }
 
 export interface ImportOptions {
@@ -118,72 +128,44 @@ function addByType(into: MediaByType, from: MediaByType): void {
   into.other += from.other;
 }
 
-function joinPath(root: string, rel: string): string {
-  return rel.length === 0 ? root : `${root}/${rel}`;
-}
-
 /**
- * Import an Obsidian vault rooted at `root` (the user-picked absolute path).
- * `existingIdentity` is the live-vault `(folder,title)` identity set
- * (`buildExistingIdentitySet`); `policy` is the global skip / import-as-copy
- * toggle. Pure orchestration over the injected `ports`.
+ * Import every note a source offers. `existingIdentity` is the live-vault
+ * `(folder,title)` identity set (`buildExistingIdentitySet`); `policy` is the
+ * global skip / import-as-copy toggle. Pure orchestration over the injected
+ * `source` (reads) and `sink` (writes).
  */
-export async function importVault(
-  root: string,
-  ports: ImportPorts,
+export async function importFromSource(
+  source: ImportSource,
+  sink: ImportSink,
   existingIdentity: ReadonlySet<string>,
   policy: DuplicatePolicy,
   options: ImportOptions = {},
 ): Promise<ImportResult> {
-  // ----- Phase 1: walk entries (no content) — classify + collect -----
-  const mdFiles: string[] = [];
-  const allDirs: string[] = [];
-  const ignore = emptyIgnoreCounts();
+  // ----- Stage 1: plan (descriptors only, never note content) -----
+  const plan = await source.plan();
+  const { items, dirs: allDirs, ignore } = plan;
 
-  const walk = async (relDir: string): Promise<void> => {
-    const entries = await ports.readDir(joinPath(root, relDir));
-    for (const entry of entries) {
-      const cls = classifyEntry(entry.name);
-      const rel = relDir.length === 0 ? entry.name : `${relDir}/${entry.name}`;
-      if (entry.isDir) {
-        if (cls === "hidden-ignored") {
-          ignore.hiddenIgnored++; // dot-dir (`.obsidian/`, `.git/`, …) — skipped
-          continue;
-        }
-        allDirs.push(rel); // non-dot dir → recurse (its classification is moot)
-        await walk(rel);
-      } else if (cls === "import-as-note") {
-        mdFiles.push(rel);
-      } else if (cls === "canvas-skipped") {
-        ignore.canvasSkipped++;
-      } else if (cls === "non-markdown-skipped") {
-        ignore.nonMarkdownSkipped++;
-      } else {
-        ignore.hiddenIgnored++; // dot-prefixed file (incl. the `.foo.md` edge)
-      }
-    }
-  };
-  await walk("");
-
-  // ----- Phase 2: serial ingest -----
-  const total = mdFiles.length;
+  // ----- Stage 2: serial ingest (D3 — one item's markdown live at a time) -----
+  const total = items.length;
   const seen = new Set(existingIdentity); // also dedups within this run
   const illegalFlags: IllegalSegmentFlag[] = [];
   const preexistingFolders: PreexistingFolder[] = [];
   const noteFolders: (string | null)[] = [];
   const media: MediaCounts = { ingested: emptyMediaByType(), omitted: emptyMediaByType() };
+  const lossyNotes: LossyNote[] = [];
   let imported = 0;
   let skippedExisting = 0;
   let cancelled: number | null = null;
 
-  for (let i = 0; i < mdFiles.length; i++) {
+  for (let i = 0; i < items.length; i++) {
     if (options.shouldCancel?.()) {
       cancelled = total - i; // keep the partial import — no rollback (SYNC-6)
       break;
     }
-    const rel = mdFiles[i]!;
-    const rawText = await ports.readFile(joinPath(root, rel));
-    const mapped = mapImportedFile(rel, rawText);
+    const ref = items[i]!;
+    const rel = ref.relPath;
+    const loaded = await source.load(ref);
+    const mapped = mapImportedFile(rel, loaded.markdown);
     illegalFlags.push(...mapped.illegalFlags);
     if (mapped.preexistingFolder !== null) {
       preexistingFolders.push(mapped.preexistingFolder);
@@ -210,10 +192,20 @@ export async function importVault(
         addByType(media.ingested, m.counts.ingested);
         addByType(media.omitted, m.counts.omitted);
       }
-      await ports.createNote(plaintext);
+      await sink.createNote(plaintext);
       imported++;
       noteFolders.push(folder); // empty-dir collection stays path-derived
       seen.add(noteIdentityKey(identityFolder, mapped.readTimeTitle));
+      // Record fidelity loss only for notes we actually created — a skipped
+      // duplicate has no note for the import report to link to.
+      if (loaded.lossy.length > 0) {
+        lossyNotes.push({
+          relPath: rel,
+          folder: identityFolder,
+          title: mapped.readTimeTitle,
+          dropped: loaded.lossy,
+        });
+      }
     }
     options.onProgress?.(i + 1, total);
   }
@@ -221,7 +213,7 @@ export async function importVault(
   // ----- SYNC-4: one deliberate-folders write for empty source dirs -----
   const deliberate = collectDeliberateImportFolders(allDirs, noteFolders);
   if (deliberate.length > 0) {
-    await ports.setDeliberateFolders(deliberate);
+    await sink.setDeliberateFolders(deliberate);
   }
 
   return {
@@ -234,5 +226,31 @@ export async function importVault(
     emptyFoldersPreserved: deliberate.length,
     cancelled,
     total,
+    lossyNotes,
   };
+}
+
+/**
+ * Import an Obsidian vault rooted at `root` (the user-picked absolute path).
+ *
+ * Thin wrapper over {@link importFromSource} with the Obsidian source — retained
+ * so every shipped caller and the pre-existing `tests/notes/import-*` suites keep
+ * working unchanged across the MYND-579 generalization (they are the regression
+ * gate for it). `ports` satisfies `ImportSink` structurally, so it doubles as the
+ * write half.
+ */
+export async function importVault(
+  root: string,
+  ports: ImportPorts,
+  existingIdentity: ReadonlySet<string>,
+  policy: DuplicatePolicy,
+  options: ImportOptions = {},
+): Promise<ImportResult> {
+  return importFromSource(
+    createObsidianSource(root, ports),
+    ports,
+    existingIdentity,
+    policy,
+    options,
+  );
 }
