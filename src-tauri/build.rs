@@ -379,6 +379,7 @@ fn main() {
                 "sync_status",
                 "sync_now",
                 "sync_list_devices",
+                "sync_account_status",
                 "sync_approve_device",
                 "sync_remove_device",
                 "sync_pending_conflicts",

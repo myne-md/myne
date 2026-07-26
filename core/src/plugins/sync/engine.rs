@@ -461,6 +461,11 @@ pub enum PushError {
     QuotaExceeded,
     /// 413 — the request body exceeded the server cap.
     PayloadTooLarge,
+    /// 403 `frozen` — the account is operator-frozen: push + enroll are refused,
+    /// pull is NEVER refused ("frozen is minimal", `decisions.md` 2026-07-13).
+    /// Distinct from `Unauthenticated` so the UI can say the account is frozen
+    /// and that reading still works, instead of "sign-in expired".
+    Frozen,
     /// A malformed / unparseable server response.
     BadResponse,
     /// Transport-level failure.
@@ -509,6 +514,7 @@ pub fn push(
     match resp.status {
         200 => {}
         401 => return Err(PushError::Unauthenticated),
+        403 => return Err(PushError::Frozen),
         429 => return Err(PushError::RateLimited),
         413 => return Err(PushError::PayloadTooLarge),
         507 => return Err(PushError::QuotaExceeded),

@@ -400,6 +400,12 @@ fn classify_cycle_error(
         | SyncCycleError::Push(PushError::RateLimited) => FailureClass::RateLimited,
         SyncCycleError::Pull(PullError::Unauthenticated)
         | SyncCycleError::Push(PushError::Unauthenticated) => FailureClass::Unauthenticated,
+        // Refusal classes that must reach the UI as themselves, never as the
+        // generic "sync failed" (MYND-570). Push-only by construction: a frozen
+        // or over-quota account still PULLS ("frozen is minimal").
+        SyncCycleError::Push(PushError::QuotaExceeded) => FailureClass::QuotaExceeded,
+        SyncCycleError::Push(PushError::PayloadTooLarge) => FailureClass::PayloadTooLarge,
+        SyncCycleError::Push(PushError::Frozen) => FailureClass::Frozen,
         SyncCycleError::Pull(PullError::Transport(_))
         | SyncCycleError::Push(PushError::Transport(_)) => FailureClass::Transport,
         _ => FailureClass::Other,
@@ -855,6 +861,68 @@ pub async fn sync_remove_device<R: Runtime>(
         .await
         .map_err(|_| SyncDeviceError::Internal)?
         .map_err(SyncDeviceError::from_mgmt)
+}
+
+/// The server's `GET /account/status` projection (MYND-506 server-side; MYND-570
+/// client surface). Mirrors `accountStatusView` in `myne-server`
+/// (`internal/httpapi/server.go`) field-for-field.
+///
+/// Both ceilings are the **effective** values — the server resolves
+/// `override ?? global default` through the same `EffectiveQuota` /
+/// `EffectiveMaxDevices` functions its enforcement guard uses, so a reported
+/// ceiling and a quota rejection cannot disagree. **`0` means unlimited**, never
+/// a ceiling of zero; a client must not render a meter against it.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct AccountStatusView {
+    /// Deduplicated ciphertext bytes stored for this account (the AS17 total).
+    pub stored_bytes: u64,
+    /// Enrolled, non-retired devices.
+    pub device_count: u64,
+    /// Operator freeze: push + enroll blocked, pull never blocked.
+    pub frozen: bool,
+    /// Effective storage ceiling in bytes; `0` = unlimited.
+    pub quota_bytes: u64,
+    /// Effective device cap; `0` = unlimited.
+    pub max_devices: u64,
+}
+
+/// Read this account's own usage + effective ceilings for Settings → Sync.
+///
+/// Returns `Ok(None)` — never an error — when the projection is simply not
+/// available: sync unconfigured, this device not enrolled, the server too old to
+/// serve the route (404), or the request failed. The panel omits its usage block
+/// in that case rather than showing an error, so a self-hosted or older server
+/// degrades to a neutral state with no hosted-only concept surfaced.
+///
+/// Read-at-rest only. A refused push does NOT come through here — the refusal
+/// carries its own `error_code` in the response body — so nothing adds a request
+/// on the rate-limited refusal path, where a 429 could mask the very 507 being
+/// explained.
+#[tauri::command]
+pub async fn sync_account_status<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+) -> Result<Option<AccountStatusView>, SyncConfigError> {
+    let Ok((token, transport)) = authed_transport(&app, state.inner()).await else {
+        return Ok(None);
+    };
+    let parsed = tokio::task::spawn_blocking(move || {
+        let resp = transport
+            .request(
+                super::transport::HttpMethod::Get,
+                "/account/status",
+                &[],
+                Some(&token),
+            )
+            .ok()?;
+        if resp.status != 200 {
+            return None;
+        }
+        serde_json::from_slice::<AccountStatusView>(&resp.body).ok()
+    })
+    .await
+    .unwrap_or(None);
+    Ok(parsed)
 }
 
 // --- Keep-both conflict materialization (MYND-427) ---

@@ -2628,6 +2628,10 @@
       "status": {
         "helper": "Myne syncs your encrypted notes across your devices. The server stores only ciphertext it cannot read.",
         "label": "Sync status"
+      },
+      "usage": {
+        "helper": "How much encrypted data this account stores on the server, and how many devices are signed in.",
+        "label": "Storage and devices"
       }
     },
     "reconcile": {
@@ -2642,13 +2646,22 @@
       "conflicts_other": "{{count}} conflicts to review",
       "error": "Sync error",
       "errorAuth": "Sync sign-in expired",
+      "errorFrozen": "Account frozen — uploads paused",
+      "errorQuota": "Storage full — uploads paused",
       "errorRateLimited": "Sync throttled — retrying",
+      "errorTooLarge": "A file is too large to upload",
       "loading": "Sync status…",
       "notEnrolled": "Not enrolled",
       "off": "Sync off",
       "synced": "Synced",
       "syncing": "Syncing…",
       "syncNow": "Sync now"
+    },
+    "usage": {
+      "devices": "Devices",
+      "frozen": "This account is frozen. New changes can't be uploaded; your notes still download.",
+      "ofTotal": "{{used}} of {{total}}",
+      "storage": "Storage"
     },
     "settings": {
       "serverSection": "Server",
