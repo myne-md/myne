@@ -23,7 +23,7 @@
 
 #![allow(dead_code)] // public surface is consumed by the Tauri search command (Task 5)
 
-use crate::text::{default_lower, split_nfc, turkish_lower};
+use crate::text::{default_lower, fold_diacritics, split_nfc, turkish_lower};
 use rust_stemmers::{Algorithm, Stemmer};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap, HashSet};
@@ -140,6 +140,18 @@ fn query_expansions(query: &str) -> Vec<Vec<String>> {
                 english.stem(&raw).into_owned(),
                 german.stem(&raw).into_owned(),
                 turkish.stem(&turkish_lower(token)).into_owned(),
+                // Diacritic-folded form (MYND-441). Attachment docs are indexed
+                // under this form as well, because on-device OCR flattens
+                // Turkish diacritics; without it, a correctly-typed `şirket`
+                // could never reach a scan that was recognized as `sirketin`.
+                //
+                // The reach of this form is EXACTLY the set of docs indexed with
+                // folded terms — i.e. attachment docs. It does not widen
+                // note-body matching, because a note's postings only ever carry
+                // the raw (and stemmed) forms, and `sirket` neither equals nor
+                // prefixes `şirketin`. Note search is unchanged; only extractor
+                // output becomes reachable through both spellings.
+                fold_diacritics(token),
             ];
             for c in candidates {
                 if !c.is_empty() && !forms.contains(&c) {
@@ -219,6 +231,7 @@ fn index_field(
     tokens: &[String],
     is_title: bool,
     stem_ctx: Option<(&Stemmer, Algorithm)>,
+    fold: bool,
 ) {
     for tok in tokens {
         let raw = default_lower(tok);
@@ -226,6 +239,17 @@ fn index_field(
             let stem = stem_in(stemmer, algo, tok);
             if !stem.is_empty() && stem != raw {
                 bump(freqs, stem, is_title);
+            }
+        }
+        // MYND-441: attachment docs are ALSO indexed under the diacritic-folded
+        // form, because their text came from an extractor (OCR) that flattens
+        // Turkish diacritics. Indexing both keeps an exact match exact while
+        // making the flattened spelling reachable. Note bodies are typed by the
+        // user and exact, so they are not folded.
+        if fold {
+            let folded = fold_diacritics(tok);
+            if !folded.is_empty() && folded != raw {
+                bump(freqs, folded, is_title);
             }
         }
         bump(freqs, raw, is_title);
@@ -457,11 +481,20 @@ impl SearchIndex for InvertedIndex {
         let stemmer = algo.map(Stemmer::create);
         let stem_ctx = stemmer.as_ref().zip(algo);
 
+        // MYND-441: an attachment doc's body is EXTRACTOR output, not typed
+        // text. The OCR generation flattens Turkish diacritics (measured: no
+        // available on-device model reproduces them reliably), so those docs are
+        // additionally indexed under the diacritic-folded form and the query
+        // carries a matching folded variant. `index_title` already identifies an
+        // attachment doc, so it doubles as the flag — a note doc is typed by the
+        // user, exact, and stays unfolded.
+        let fold = !index_title;
+
         let mut freqs: HashMap<String, FieldFreq> = HashMap::new();
         if index_title {
-            index_field(&mut freqs, &title_split, true, stem_ctx);
+            index_field(&mut freqs, &title_split, true, stem_ctx, false);
         }
-        index_field(&mut freqs, &body_split, false, stem_ctx);
+        index_field(&mut freqs, &body_split, false, stem_ctx, fold);
 
         let docid = self.next_doc;
         self.next_doc += 1;
@@ -1017,6 +1050,107 @@ mod tests {
         assert_eq!(lang_of(&idx, "a").as_deref(), Some("tr"));
         // "kitaplar" → Turkish stem "kitap"; exact "kitap" matches it.
         assert_eq!(ids(&idx.query("kitap aldım")), vec!["a"]);
+    }
+
+    // ---- diacritic folding for extractor-derived docs (MYND-441) --------
+
+    /// The core of the MYND-441 amendment: OCR flattens Turkish diacritics, so a
+    /// correctly-typed query must still reach the scan.
+    #[test]
+    fn a_diacritic_query_finds_an_attachment_doc_that_lost_them() {
+        let mut idx = InvertedIndex::default();
+        // The body is what OCR really produced for `şirketin yıllık raporu`.
+        idx.set_note_attachments(
+            "note1",
+            &[(
+                "aa".repeat(32),
+                "Scan".to_string(),
+                "sirketin yillik raporu".to_string(),
+            )],
+        );
+        assert_eq!(
+            idx.query("şirket").len(),
+            1,
+            "a correctly-spelled query must reach OCR text that lost its diacritics"
+        );
+    }
+
+    /// And the reverse: a user who types without diacritics reaches a document
+    /// that has them. Turkish users routinely do this.
+    #[test]
+    fn an_ascii_query_finds_an_attachment_doc_that_kept_its_diacritics() {
+        let mut idx = InvertedIndex::default();
+        idx.set_note_attachments(
+            "note1",
+            &[(
+                "bb".repeat(32),
+                "Scan".to_string(),
+                "şirketin yıllık raporu".to_string(),
+            )],
+        );
+        assert_eq!(idx.query("sirket").len(), 1);
+    }
+
+    /// Folding must not damage exact matching — the raw form is indexed too.
+    #[test]
+    fn folding_does_not_break_an_exact_attachment_match() {
+        let mut idx = InvertedIndex::default();
+        idx.set_note_attachments(
+            "note1",
+            &[(
+                "cc".repeat(32),
+                "Scan".to_string(),
+                "şirketin raporu".to_string(),
+            )],
+        );
+        assert_eq!(idx.query("şirketin").len(), 1, "exact form still matches");
+    }
+
+    /// Folding is an INDEX key only. The document's stored text is whatever the
+    /// extractor produced and must be handed back unchanged — the MYE1 cache and
+    /// any future display surface depend on it.
+    #[test]
+    fn folding_does_not_alter_the_stored_document_text() {
+        let mut idx = InvertedIndex::default();
+        let body = "şirketin yıllık raporu";
+        idx.set_note_attachments(
+            "note1",
+            &[("dd".repeat(32), "Scan".to_string(), body.to_string())],
+        );
+        let hit = idx.query("şirket");
+        assert_eq!(hit.len(), 1);
+        // The stored title/id round-trip untouched; the body is not folded in
+        // place anywhere (the index only derives extra keys from it).
+        let docid = idx.id_to_doc[hit[0].id.as_str()];
+        assert_eq!(idx.docs[&docid].title, "Scan");
+    }
+
+    /// Note bodies are typed by the user and stay unfolded on the index side,
+    /// and — the part worth pinning — the query's folded variant does NOT leak
+    /// into note matching. Its reach is exactly the docs that carry folded
+    /// postings, i.e. attachment docs. An early draft of this change claimed
+    /// note search would become "mildly diacritic-tolerant"; it does not, and
+    /// this test is what establishes that.
+    #[test]
+    fn folding_does_not_widen_note_body_matching() {
+        let mut idx = InvertedIndex::default();
+        idx.add(doc("n1", "Başlık", "şirketin yıllık raporu burada"));
+        assert!(
+            !idx.postings.contains_key("sirketin"),
+            "a note body must not add folded postings; found {:?}",
+            idx.postings.keys().take(20).collect::<Vec<_>>()
+        );
+        assert!(idx.postings.contains_key("şirketin"), "raw form is indexed");
+        assert!(
+            idx.query("sirket").is_empty(),
+            "an ASCII query must NOT reach an accented note body — only \
+             attachment docs carry folded postings"
+        );
+        assert_eq!(
+            idx.query("şirket").len(),
+            1,
+            "the accented query still works"
+        );
     }
 
     #[test]

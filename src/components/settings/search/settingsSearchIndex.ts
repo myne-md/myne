@@ -293,6 +293,14 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     descriptionKey: "settings.files.newNote.helper",
     keywordsKey: "settings.search.keywords.newNoteLocation",
   },
+  {
+    id: "files.attachment-ocr",
+    panelId: "files",
+    testid: "settings.attachment-ocr",
+    titleKey: "settings.attachmentOcr.label",
+    descriptionKey: "settings.attachmentOcr.helper",
+    keywordsKey: "settings.search.keywords.attachmentOcr",
+  },
 
   // ── Hotkeys (the panel has its own in-panel search; one entry routes to it) ──
   {

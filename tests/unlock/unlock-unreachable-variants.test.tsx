@@ -43,12 +43,20 @@ function renderUnlock(overrides?: { onResumeRecovery?: () => void }) {
       onStartRecovery={() => {}}
       onResumeRecovery={overrides?.onResumeRecovery ?? (() => {})}
       onDeleteVaultSuccess={() => {}}
+      onRestoreBackup={() => {}}
     />,
   );
 }
 
+/**
+ * The password form mounts only once `quick_unlock_status` settles (MYND-558 —
+ * the screen renders one credential surface at a time, and which one depends on
+ * that probe). `invoke` here resolves `undefined` for every non-unlock command,
+ * which the status probe treats as "no quick-unlock" → the password form. Hence
+ * `find`, not `get`: the first synchronous frame has no form yet.
+ */
 async function submitPassword(): Promise<void> {
-  fireEvent.change(screen.getByTestId("unlock.password-input"), {
+  fireEvent.change(await screen.findByTestId("unlock.password-input"), {
     target: { value: PASSWORD },
   });
   fireEvent.click(screen.getByTestId("unlock.submit"));

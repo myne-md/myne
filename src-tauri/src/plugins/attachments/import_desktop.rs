@@ -40,14 +40,23 @@ pub async fn attachment_import<R: Runtime>(
 ) -> Result<ImportedAttachment, AttachmentImportError> {
     let dir = crate::paths::active_vault_root_io(&app, state.active_vault_id().await)
         .map_err(AttachmentImportError::from)?;
-    let result = attachment_import_with_dir_ext(
-        &dir,
-        state.inner(),
-        source,
-        created_at,
-        crate::plugins::attachments::extract::extract,
-    )
-    .await;
+    // MYND-441: the image-OCR opt-out gates THIS path too, not only the
+    // background worker. Without it, a user who turned the switch off would
+    // still pay three model passes per imported image — and, for a scanned PDF,
+    // still block this IPC while they wait. An unreadable prefs blob reads as
+    // ON, matching the worker: a prefs read failure must not silently disable a
+    // search feature.
+    let ocr_enabled = myne_core::plugins::prefs::commands::prefs_read_with_dir(&dir, state.inner())
+        .await
+        .map(|p| p.attachment_ocr_enabled)
+        .unwrap_or(true);
+    let extractor = if ocr_enabled {
+        crate::plugins::attachments::extract::extract
+    } else {
+        crate::plugins::attachments::extract::extract_deferring_ocr
+    };
+    let result =
+        attachment_import_with_dir_ext(&dir, state.inner(), source, created_at, extractor).await;
     // MYND-468: a fresh import (not a dedup hit) is a local sync change — the
     // blob + catalog must push on the next coalesced cycle.
     if matches!(&result, Ok(imported) if !imported.deduplicated) {

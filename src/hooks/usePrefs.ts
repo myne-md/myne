@@ -51,6 +51,10 @@ const DEFAULT_PREFS: PrefsView = {
   show_note_timestamps: true,
   deliberate_folders: [],
   ai_enabled: false,
+  // MYND-441: matches the Rust default. OCR is on unless the user turns it off,
+  // so the optimistic pre-read value must be `true` — starting from `false`
+  // would flash the wrong answer for effectively every vault.
+  attachment_ocr_enabled: true,
   ai_excluded_folders: [],
   archived_folders: [],
   auto_lock_seconds: null,
@@ -74,6 +78,7 @@ const DEFAULT_PREFS: PrefsView = {
   archive_disabled: null,
   theme: null,
   folder_icons: {},
+  device_names: {},
   hidden_bar_items: [],
   bar_items_order: [],
   right_panel_active_tab: null,
@@ -194,7 +199,10 @@ export function usePrefs(onError?: (message: string) => void): UsePrefsResult {
     (async () => {
       try {
         const view = await prefsRead();
-        if (!cancelled) {
+        // Guard the shape, not just the error: a malformed/absent response must
+        // leave DEFAULT_PREFS in place. Storing a non-object here takes down
+        // every consumer that reads a field off it.
+        if (!cancelled && view) {
           setPrefs(view);
         }
       } catch {

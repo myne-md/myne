@@ -406,7 +406,7 @@
         "label": "Import .base view…"
       },
       "importObsidian": {
-        "label": "Import Obsidian vault…"
+        "label": "Import notes…"
       },
       "lockVault": {
         "label": "Lock vault"
@@ -1486,7 +1486,7 @@
         "reasonPathTooLong": "the folder + title path is too long",
         "reasonSegmentTooLong": "name is longer than Myne allows",
         "scanning": "Scanning your vault…",
-        "setupIntro": "Point Myne at your existing Obsidian vault folder. Every Markdown note is imported and encrypted on the spot — nothing leaves this device, and your original files are left untouched.",
+        "setupIntro": "Myne imports and encrypts your notes on the spot — nothing leaves this device, and your original files are never changed.",
         "statCancelled": "Cancelled",
         "statCanvasSkipped": ".canvas files skipped",
         "statEmptyFoldersKept": "Empty folders kept",
@@ -1496,9 +1496,13 @@
         "suggestedNameAriaLabel": "Suggested name",
         "titleComplete": "Import complete",
         "titleFailed": "Import failed",
-        "titleSetup": "Import Obsidian vault",
+        "titleSetup": "Import notes",
         "vaultFolderLabel": "Vault folder",
-        "vaultRoot": "(vault root)"
+        "vaultRoot": "(vault root)",
+        "titlePick": "Import notes",
+        "keepsLabel": "What comes across",
+        "losesLabel": "What doesn't",
+        "changeSource": "Change source"
       },
       "offer": {
         "body": "Bring your existing notes into Myne. Each one is encrypted as it’s imported — nothing leaves this device, and your original files stay exactly where they are.",
@@ -1506,6 +1510,46 @@
         "laterHint": "You can always import later from Settings → Storage.",
         "notNow": "Not now",
         "title": "Import your Obsidian vault?"
+      },
+      "picker": {
+        "intro": "Where are your notes coming from?"
+      },
+      "source": {
+        "obsidian": {
+          "label": "Obsidian",
+          "pickerTitle": "Choose your Obsidian vault folder",
+          "survives": "Keeps: Markdown, frontmatter, [[wikilinks]], folder structure, attachments.",
+          "loses": "Leaves behind: canvas files, and anything that is not a Markdown note.",
+          "short": "A vault folder of Markdown notes"
+        },
+        "notion": {
+          "label": "Notion",
+          "pickerTitle": "Choose your unzipped Notion export folder",
+          "survives": "Keeps: pages, folder structure, page properties as fields, and internal links as wikilinks. Each database also arrives as a table note linking to its rows.",
+          "loses": "Unzip the export first — Myne reads the folder, not the .zip. Toggles, callouts and coloured text have no equivalent and are listed in an import report.",
+          "short": "An unzipped export folder"
+        },
+        "evernote": {
+          "label": "Evernote",
+          "pickerTitle": "Choose your Evernote .enex file",
+          "survives": "Keeps: every note in the file, formatting, and attachments. Encrypted blocks are preserved as text you can still decrypt in Evernote.",
+          "loses": "Leaves behind: reminders and note history. Very large exports are refused rather than risked — split the export if that happens.",
+          "short": "A single .enex export file"
+        },
+        "html": {
+          "label": "HTML",
+          "pickerTitle": "Choose a folder of HTML files",
+          "survives": "Keeps: headings, lists, tables, links, code and emphasis.",
+          "loses": "Leaves behind: styling, scripts and embeds. Remote images stay as links and are never downloaded.",
+          "short": "A folder of saved web pages"
+        },
+        "csv": {
+          "label": "CSV",
+          "pickerTitle": "Choose your .csv file",
+          "survives": "Becomes a single note holding the table.",
+          "loses": "It is one note, not one note per row — Myne is not a database. Very wide or very long files are trimmed, and the import report says by how much.",
+          "short": "One spreadsheet file"
+        }
       }
     },
     "list": {
@@ -1988,6 +2032,13 @@
       "on": "On",
       "saveError": "Could not update the archiving setting."
     },
+    "attachmentOcr": {
+      "label": "Search inside images and scanned documents",
+      "helper": "Reads text out of image attachments and scanned PDFs on this device, so search can find them by their contents. Nothing is uploaded. Turning this off stops the background extraction; text already extracted is kept.",
+      "errorSaveSetting": "Could not save this setting.",
+      "processing_one": "Reading 1 attachment…",
+      "processing_other": "Reading {{count}} attachments…"
+    },
     "autoBackup": {
       "backupFolder": "Backup folder",
       "chooseFolder": "Choose folder…",
@@ -2332,9 +2383,9 @@
       "exportBody": "Export vault as Markdown",
       "exportHelper": "Plain markdown tree — not encrypted.",
       "exportLabel": "Export",
-      "importHelper": "Bring an existing Obsidian vault into Myne. Every Markdown note is imported and encrypted on the spot; your original files are left untouched.",
+      "importHelper": "Bring notes in from Obsidian, Notion, Evernote, HTML files or a CSV. Everything is imported and encrypted on the spot; your original files are left untouched.",
       "importLabel": "Import",
-      "importObsidian": "Import Obsidian vault…",
+      "importObsidian": "Import notes…",
       "locationHelper": "Each vault is a folder of encrypted files under this path. Prefer the Backup button below over manual copies — it verifies the written file.",
       "locationLabel": "Vault location",
       "openInFiles": "Open in Files",
@@ -2427,7 +2478,7 @@
         "focusMode": "focus mode typewriter dim inactive lines distraction free",
         "font": "font typeface family sans serif mono typography",
         "hotkeys": "hotkeys keyboard shortcuts keybindings keymap chords bindings",
-        "import": "import obsidian vault migrate bring in",
+        "import": "import notes obsidian notion evernote enex html csv migrate migration bring",
         "language": "language locale interface translation ui",
         "lastActiveNote": "continue where you left off last note resume sync open",
         "license": "license agpl open source legal",
@@ -2442,6 +2493,7 @@
         "spell": "spell check spelling dictionary autocorrect",
         "spellLanguages": "spell languages dictionaries locale words",
         "startupOpen": "startup open default file launch boot which note",
+        "attachmentOcr": "ocr image scan scanned pdf photo screenshot text recognition search inside attachments cpu battery",
         "syncAddDevice": "add device pair link phone laptop sync",
         "syncConflicts": "conflicts merge resolve versions sync",
         "syncDevices": "devices linked paired sync machines",
@@ -2487,6 +2539,17 @@
       "untitled": "Untitled ({{hex}})",
       "useThisVersion": "Use this version"
     },
+    "deviceJoinQr": {
+      "accountLabel": "Account number",
+      "accountPlaceholder": "MY-XXXX-XXXX-XXXX-XXXX-XXXX",
+      "error": "Couldn’t make the QR. Please try again.",
+      "generate": "Make QR",
+      "hint": "Paste your account number to make a QR your phone can scan — it fills in the server and account number for you.",
+      "invalidAccount": "That doesn’t look like a valid account number.",
+      "notConfigured": "Configure a sync server first, then make a QR.",
+      "scanWithApp": "Scan with the iOS app",
+      "title": "Add a device with a QR"
+    },
     "devices": {
       "approve": "Approve",
       "awaitingApproval_one": "{{count}} device awaiting approval",
@@ -2494,8 +2557,21 @@
       "loading": "Loading…",
       "noDevices": "No devices synced yet.",
       "notEnrolled": "This device isn’t connected yet. If you just added it, wait for approval from another device; otherwise add it with the “Add a device” form above.",
+      "platform": {
+        "android": "Android phone",
+        "androidTablet": "Android tablet",
+        "ios": "iPhone",
+        "ipad": "iPad",
+        "linux": "Linux PC",
+        "macos": "Mac",
+        "unknown": "This device",
+        "windows": "Windows PC"
+      },
       "remove": "Remove",
       "removedElsewhere": "This device was removed from your account on another device.",
+      "rename": "Rename",
+      "renameFailed": "Couldn’t save that name. Try again.",
+      "renameLabel": "Device name",
       "resetAndReAdd": "Reset and re-add this device",
       "resetSyncOnThisDevice": "Reset sync on this device",
       "shortName": "Device {{hex}}",
@@ -2527,6 +2603,8 @@
       "accountNumberPlaceholder": "MY-XXXX-XXXX-XXXX-XXXX-X",
       "connecting": "Connecting…",
       "credentialTypeAria": "Credential type",
+      "deviceNameHelp": "Shown in your device list. You can change it later.",
+      "deviceNameLabel": "Name this device",
       "error": {
         "notConfigured": "Set a sync server in settings before adding this device.",
         "transport": "Couldn’t reach the sync server. Check your connection and try again."
@@ -2595,6 +2673,10 @@
       "status": {
         "helper": "Myne syncs your encrypted notes across your devices. The server stores only ciphertext it cannot read.",
         "label": "Sync status"
+      },
+      "usage": {
+        "helper": "How much encrypted data this account stores on the server, and how many devices are signed in.",
+        "label": "Storage and devices"
       }
     },
     "reconcile": {
@@ -2609,13 +2691,22 @@
       "conflicts_other": "{{count}} conflicts to review",
       "error": "Sync error",
       "errorAuth": "Sync sign-in expired",
+      "errorFrozen": "Account frozen — uploads paused",
+      "errorQuota": "Storage full — uploads paused",
       "errorRateLimited": "Sync throttled — retrying",
+      "errorTooLarge": "A file is too large to upload",
       "loading": "Sync status…",
       "notEnrolled": "Not enrolled",
       "off": "Sync off",
       "synced": "Synced",
       "syncing": "Syncing…",
       "syncNow": "Sync now"
+    },
+    "usage": {
+      "devices": "Devices",
+      "frozen": "This account is frozen. New changes can't be uploaded; your notes still download.",
+      "ofTotal": "{{used}} of {{total}}",
+      "storage": "Storage"
     },
     "settings": {
       "serverSection": "Server",
@@ -2678,6 +2769,32 @@
     "deleteConfirm": "Delete this template?",
     "convertToNote": "Convert to note"
   },
+  "themeInstall": {
+    "apply": "Apply theme",
+    "applying": "Applying…",
+    "byAuthor": "This link says it's by {{author}}",
+    "cancel": "Cancel",
+    "close": "Close",
+    "collision": {
+      "keepBoth": "Keep both — install as “{{name}}”",
+      "question": "You already have a theme called “{{name}}”.",
+      "replace": "Replace “{{name}}”"
+    },
+    "error": {
+      "importFailed": "Couldn't install that theme. Nothing was changed.",
+      "installedNotActivated": "“{{name}}” was installed, but couldn't be switched on. You can apply it from Settings → Appearance.",
+      "invalidName": "That link doesn't name the theme it wants to install.",
+      "listUnavailable": "Couldn't read your existing themes, so this can't be installed safely right now. Close this and try the link again.",
+      "malformedPayload": "That link's theme data is damaged or incomplete.",
+      "nothingWritten": "Nothing was written to your vault.",
+      "payloadTooLarge": "That link's theme data is too large to be a theme.",
+      "unsupportedVersion": "That link was made for a newer version of Myne. Update Myne, then try again."
+    },
+    "errorTitle": "Couldn't read that theme",
+    "helper": "Themes are a color palette, not code. Myne validates this one on this device before using it — nothing is uploaded.",
+    "question": "Do you want to use this theme?",
+    "title": "Install theme"
+  },
   "unlock": {
     "backToPicker": "Choose a different vault",
     "continue": "Continue",
@@ -2697,7 +2814,6 @@
       "pinPlaceholder": "PIN",
       "unlockWithPin": "Unlock with PIN",
       "unlockWithTouchId": "Unlock with Touch ID",
-      "usePasswordBelow": "or use your password below",
       "wrongCredential": "Incorrect. {{remaining}} attempt(s) left."
     },
     "recoveryInterruptedBanner": "Recovery flow was interrupted. Set a new password first.",
@@ -3104,7 +3220,23 @@
     "serverPlaceholder": "https://sync.example.com",
     "accountHint": "Double-check this number — it doesn't look right.",
     "approvalHint": "Your notes appear once you approve this device from a device that already has your account.",
-    "connectingSubtitle": "Fetching your account and unlocking your vault on this device."
+    "connectingSubtitle": "Fetching your account and unlocking your vault on this device.",
+    "qr": {
+      "cancel": "Cancel",
+      "confirmAccount": "Account",
+      "confirmServer": "Server",
+      "confirmTitle": "Add this device?",
+      "continue": "Continue",
+      "expired": "This QR has expired — show a fresh one on your other device and scan again.",
+      "invalid": "That's not a Myne device QR.",
+      "newerVersion": "This QR is from a newer version of Myne — update the app and try again.",
+      "pinHosted": "Myne-hosted server",
+      "pinNone": "Self-hosted server",
+      "pinSelfHost": "Cert pinned from your trusted device",
+      "scan": "Scan QR",
+      "scanFailed": "Couldn’t scan. Try again, or enter your details manually.",
+      "scanUnavailable": "Scanning isn’t available on this device — enter your details below."
+    }
   },
   "createVault": {
     "beginWeakPassword": "Choose a stronger password and try again.",

@@ -112,6 +112,30 @@ Two pure-Rust deps so search can index the text inside attachments (PDF / Word /
 
 **Why not `pdf-extract` / `docx-rs` (the heavier obvious choices):** the MYND-328 dependency spike measured `pdf-extract` at **+61** transitive crates including a **duplicate `lopdf` 0.36** alongside the repo's 0.41 (a single-lockfile / minimal-surface violation), and `docx-rs` at **+44**. Reusing the in-tree `lopdf` for PDF + `zip`/`quick-xml` + ~50 LOC for DOCX gets the same extraction with a fraction of the surface. Trade-off accepted: `lopdf::extract_text` is weaker than `pdf-extract` on exotic-font PDFs, acceptable for search indexing (re-derivable, `extractor_version`-gated, §9.15) and revisitable without a format change.
 
+### Image OCR in search (MYND-441) — `core/Cargo.toml`
+
+The OCR layer MYND-328 deferred: pixels — image attachments and scanned, text-layer-less PDFs — become searchable. Two new direct deps, both pure-Rust, both leaf-use behind `core/src/plugins/attachments/ocr/`, neither crypto nor telemetry. They live in **`core/`**, not `src-tauri/`, because mobile ships the same extractor (the attachment-import path already takes the extractor as an injected parameter). Scanned PDFs add **zero** deps: the embedded page image is pulled out of the PDF XObject stream with the `lopdf` already in-tree.
+
+| Dep | Version | Used for | Transitive footprint | License | Justified-by |
+|---|---|---|---|---|---|
+| `rten` | 0.24 (`default-features = false`, feature `rten_format` only) | Run the bundled PP-OCRv5 mobile detection / recognition / angle-classifier weights | `rten-base`, `rten-gemm`, `rten-simd`, `rten-vecmath`, `rten-tensor`, `rten-model-file`, `rten-shape-inference`, `flatbuffers`, `rayon`, `rustc-hash`, `bitflags` — all pure-Rust, no C/C++ toolchain | MIT/Apache-2.0 | `decisions.md` (MYND-441); Task 2 |
+| `rten-tensor` | 0.24 | The tensor type the runtime's input/output surface takes | shared with `rten` above | MIT/Apache-2.0 | same |
+| `image` | 0.25 (`default-features = false`, features `png`/`jpeg`/`webp`) | Decode the image formats `sniff.rs` already accepts as attachments, before handing pixels to OCR. **Declared in both `core/` and `src-tauri/`** at the same pin and feature set — the desktop crate also decodes the page images pulled out of a scanned PDF (`extract::decode_pdf_image`), which is `lopdf`-bound and therefore desktop-only. Second declaring crate, not a second admission (the `base64` precedent). | `png` / `zune-jpeg` / `image-webp` + `flate2`/`miniz_oxide` (already in-tree via `zip`) | MIT/Apache-2.0 | same |
+
+**Feature surface narrowed below the crate default.** `rten`'s default enables both `rten_format` and `onnx_format`; we enable **only** `rten_format`. The weights ship already converted, so the ONNX parser (`rten-onnx`) would be pure untrusted-input parsing surface for a code path that is never taken at runtime.
+
+**Why `rten` over the obvious alternatives.** `onnxruntime` bindings (`ort`) and `pdfium-render` both mean a **prebuilt C++ binary per platform**, which breaks three commitments at once: the single shared `Cargo.lock` stops being a complete audit anchor, reproducible signed builds gain an opaque blob, and the mobile cross-builds (`aarch64-apple-ios`, `aarch64-linux-android`) gain a per-platform maintenance burden. `rten` is the same pure-Rust posture the `ring`-over-`aws-lc-rs` choice was made for. Measured cost: ~1.4× slower than onnxruntime on the same models (≈383 ms/page vs ≈250 ms on an aarch64 laptop) — accepted.
+
+**Why not the stock `ocrs` package** (which is `rten`'s sibling and would have supplied the pre/post-processing for free): it self-describes as an early preview and is Latin-only with an English-oriented charset. The MYND-441 spike measured both; see the Turkish note below.
+
+**Explicitly NOT behind `local-inference`.** OCR compiles in **every** build including `--no-default-features`. It is search correctness, not an AI feature: gating it would make the AI-free audit build search differently from the shipped product, which is exactly what that build exists to rule out. `ai-no-network-check.sh` check 3 asserts this and fails if someone later gates it. The consequence — that the `--no-default-features` build is no longer "ML-free" — is stated honestly in `src-tauri/Cargo.toml` rather than papered over.
+
+**Bundled weights are part of this admission.** `src-tauri/resources/models/ocr/` ships 21.05 MiB of PP-OCRv5 mobile weights (Apache-2.0, `MODEL-LICENSE` beside them, provenance + SHA-256 in that directory's `README.md`), tracked via Git LFS like the Whisper model. They are converted **once, offline** from the upstream ONNX with `rten-convert`; that Python tool is build-time-only and never enters the shipped graph. There is **no runtime download path** — `rten` has no network surface and the loader reads only the bundled directory.
+
+**Scanned PDFs add zero dependencies, on purpose.** The page image is pulled out of the PDF's XObject stream with the in-tree `lopdf` (`get_page_images`) rather than rendered. `DCTDecode` and `FlateDecode` cover modern scanner/phone output; `CCITTFaxDecode`, `JBIG2` and `JPX` are deliberately not decoded and those pages simply yield nothing. A rasterizer would have been the third prebuilt-C++-binary admission this section exists to avoid.
+
+**Turkish limitation, measured not assumed.** The spike found that `ppocrv5_dict.txt` lacks `Ğ` (U+011E) and `İ` (U+0130), and that in-dict characters (`ş`, `ç`, `ı`) are still emitted unreliably because the model's training distribution is Chinese+English dominant. No Turkish-specific PaddleOCR recognizer exists, and `latin_PP-OCRv3_rec` is worse (185-entry dict, no `ğ`/`Ğ`/`ş`/`Ş`/`İ`). Since every candidate engine shares the weakness, it is mitigated **index-side** — OCR-derived documents are indexed under a diacritic-folded token variant — rather than by swapping deps.
+
 ### Graph view (MYND-197) — `package.json`
 
 One JS dep for the Phase-1 minimal graph view's force-directed layout. Not crypto (consumes already-decrypted in-RAM index data); not telemetry; lazy-loaded (out of the initial bundle, off the crypto/IPC path). Chosen over Cytoscape.js because the Envelope-A scale target shrinks the need to "force-simulation only" and the render/interaction is hand-rolled (clears "The bar" Q1).
@@ -255,6 +279,58 @@ in the local-ai note).
 - **R3 review-debt (carried, not closed here):** the cert-pin verifier + tls-exporter wiring is **R3-gated** — a primitive-level security review + a live interop test are still owed before production trust. The banner travels with `rustls_transport.rs`; relocating it into the shared core does **not** promote it to reviewed. Nothing user-facing may present cert-trust as verified until R3 closes.
 - **Not in `protocol/`:** the crypto crate's dependency surface is untouched; the closed RustCrypto primitive set (`decisions.md` 2026-04-28) is unchanged — this is transport-layer dependency surface (TB9), not protocol crypto.
 - **Hash-pinning:** exact pins in `core/Cargo.toml`, single workspace `Cargo.lock` updated (relocation, no new package); added to `core/` (and `base64` also stays in `src-tauri/` for `local_inference`), never `protocol/`.
+
+### `myne://` deep-link handling (MYND-567) — `src-tauri/Cargo.toml` + `package.json`
+
+One Tauri-org plugin so a website can hand the desktop app a theme via a `myne://theme/install?…`
+link (the one-click theme install; the website half is MYND-568). Not crypto, not telemetry,
+**not network** — it neither opens nor can open a connection; it only carries a URL the OS has
+already resolved to this app. Command-path only, never on the boot path beyond a single argv
+scan.
+
+| Dep | Version | Used for | Transitive footprint | License | Justified-by |
+|---|---|---|---|---|---|
+| `tauri-plugin-deep-link` | 2 | Register the `myne://` scheme at bundle time (macOS `CFBundleURLTypes`, Windows NSIS registry, Linux `.desktop` `MimeType`) and deliver an arriving URL to the app (macOS `RunEvent::Opened`; Windows/Linux a second process whose lone argv is the URL) | **+9 packages**, all leaf/platform-scoped — see the breakdown below | MIT/Apache-2.0 | `decisions.md` 2026-07-25 (device-independent theme install); MYND-567 |
+| `@tauri-apps/plugin-deep-link` | ^2.4.9 | The JS guest binding (`getCurrent` for cold launch, `onOpenUrl` for warm) consumed by `src/lib/themeDeepLink.ts` | **Zero** — peer-depends on the already-present `@tauri-apps/api` | MIT/Apache-2.0 | same |
+
+**Transitive breakdown (measured, `git diff Cargo.lock`).** The crate's own direct deps —
+`serde`, `serde_json`, `tauri`, `tauri-utils`, `thiserror`, `tracing`, `url` — are **already in
+the shared lock**, so they cost nothing. The 9 new lock entries are the crate itself plus two
+**target-conditional** registration backends and their trees:
+
+- `rust-ini` 0.21 (+ `ordered-multimap`, `dlv-list`, `const-random`, `const-random-macro`,
+  `tiny-keccak`, `hashbrown`) — **Linux only**, writes the `.desktop` entry's `MimeType` line.
+- `windows-registry` 0.5 — **Windows only**, writes the `HKCU\Software\Classes\myne` keys.
+  (`dunce` / `windows-result`, its siblings, were already in-tree.)
+
+A macOS build compiles **neither** backend (macOS registration is a build-time `Info.plist`
+edit via the crate's `plist` *build*-dependency, not a runtime dep). So the per-platform runtime
+cost is one crate on macOS, two on Windows, seven on Linux.
+
+**Why a dependency at all** (vs. hand-rolling per "The bar" Q1): scheme registration is three
+unrelated OS-integration chores — an `Info.plist` bundle key, NSIS registry writes, and a
+freedesktop `.desktop` `MimeType` + `update-desktop-database` call — none of which is logic we
+have any advantage writing, and each of which is silently broken-until-a-user-reports-it if
+wrong. The macOS arm additionally needs the `RunEvent::Opened` Apple-event path, which is inside
+Tauri's own event loop and not reachable from application code. The plugin is by the Tauri
+Programme (same org as the runtime already at the core of the app), and — decisively — the
+**`myne-mobile` companion already ships this exact crate and version** for the `myne://open` /
+`myne://capture` widget links (`decisions.md` 2026-07-13). Admitting it here means one deep-link
+implementation across the fleet rather than a desktop fork of a mobile-vetted one.
+
+**Why it does not widen the egress surface.** The plugin has no HTTP client, socket, or fetch in
+its tree, and its capability grant (`deep-link:default` = `allow-get-current`) is a **read of a
+URL already delivered**, not a request. The `no_egress` gate re-ran clean after admission
+(`cargo test -p myne-desktop --lib no_egress`, 12/12) — the crate is absent from
+`DENYLISTED_CRATES` on merit (nothing to originate a request), the CSP `connect-src` is
+byte-unchanged, and `deep-link:default` is not matched by `permission_is_network`. **The URL
+itself is untrusted input**: any website can serve a `myne://` link, so the payload is parsed
+under explicit size caps, is never fetched-from, must clear the existing `theme_validator`
+allowlist inside `themes_import`, and can never be applied without the user's confirmation.
+
+**Hash-pinning:** the single workspace `Cargo.lock` carries the 9 new entries; `pnpm-lock.yaml`
+carries the JS binding. No change to `protocol/` — the closed RustCrypto primitive set is
+untouched.
 
 ## Reference
 

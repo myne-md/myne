@@ -111,6 +111,21 @@ export interface LaunchOptions {
   seedConfig?: (appConfigDir: string) => void | Promise<void>;
   /** Keep the temp data dir on teardown (debugging). */
   keepDataDir?: boolean;
+  /**
+   * Command-line arguments handed to the app binary at launch.
+   *
+   * The one production surface this models is an OS **deep link** (MYND-567):
+   * on Linux a `myne://…` click launches the app with the URL as its ONLY
+   * argument, which is exactly what the app's `setup` hook reads via
+   * `handle_cli_arguments`. So passing the URL here is not a test hook — it is
+   * the real cold-start delivery mechanism, driven from the real entry point.
+   *
+   * (The warm arrival — a second process relayed through
+   * `tauri-plugin-single-instance` — is NOT reachable in this container: the
+   * plugin's Linux transport is DBus and the image ships no session bus. That
+   * half is covered by the unit suite, not here.)
+   */
+  args?: readonly string[];
   /** Override the tauri-driver port (multi-device: one pair per instance,
    *  off the `MYNE_E2E_DRIVER_PORT` base). Defaults to env/4444. */
   driverPort?: number;
@@ -207,7 +222,11 @@ export async function launchApp(opts: LaunchOptions = {}): Promise<AppSession> {
 
   try {
     await waitForDriver(baseUrl, proc);
-    const session = await newSession({ baseUrl, application: defaultAppPath() });
+    const session = await newSession({
+      baseUrl,
+      application: defaultAppPath(),
+      args: opts.args,
+    });
 
     const teardown = async () => {
       try {
