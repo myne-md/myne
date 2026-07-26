@@ -449,6 +449,28 @@ export interface PrefsView {
    */
   right_panel_tab_order: string[];
   /**
+   * Editor format-bar display order (MYND-555 on mobile; MYND-336 on desktop) —
+   * the format-action ids in the order the user arranged them. A sequence: the
+   * backend preserves element order verbatim. Empty (the default — canonical
+   * order) is byte-identical to a pre-feature vault. Absent → `[]`.
+   *
+   * **Device-local** in the sync merge policy (`sync-protocol.md` §10.2.1, "local
+   * wins — screen-size-dependent UI layout"): a phone's above-keyboard bar and a
+   * desktop's floating toolbar are the same preference on incomparable form
+   * factors, so this never propagates between clients. Each client resolves the
+   * stored ids against its OWN vocabulary and drops the rest
+   * (`lib/formatBarItems.ts`), which is what makes a backup restore across
+   * clients harmless.
+   */
+  editor_toolbar_order: string[];
+  /**
+   * Editor format-action ids the user hid (MYND-555). The backend canonicalizes
+   * it (sorted + deduped); empty is the default (every action shown). Same
+   * device-local classification and same drop-unknown-ids discipline as
+   * {@link PrefsView.editor_toolbar_order}.
+   */
+  editor_toolbar_hidden: string[];
+  /**
    * Per-item color label (MYND-184) — a map from a sidebar item key (a note UUID
    * **or** a canonical trailing-slash folder path, discriminated by the trailing
    * `/`) to a color-slot name. Notes and folders both take a color (folders also
@@ -573,6 +595,33 @@ export async function setBarItemsOrder(order: string[]): Promise<void> {
  */
 export async function setHiddenBarItems(items: string[]): Promise<void> {
   await invoke<void>("plugin:prefs|set_hidden_bar_items", { items });
+}
+
+/**
+ * Persist the full editor format-bar display order (MYND-555) — the format-action
+ * ids in the order the user arranged them. The caller passes the entire desired
+ * order; the backend preserves element order verbatim (the sequence IS the
+ * payload, unlike the sorted+deduped `editor_toolbar_hidden`). No native
+ * side-effect; a rejected promise means the disk write failed and the caller's
+ * optimistic UI must revert. The IPC payload key (`order`) matches the Rust
+ * command's `order: Vec<String>` parameter.
+ *
+ * The command body is the SHARED `myne-core` prefs core desktop uses — mobile
+ * only registers it. Device-local field: see {@link PrefsView.editor_toolbar_order}.
+ */
+export async function setEditorToolbarOrder(order: string[]): Promise<void> {
+  await invoke<void>("plugin:prefs|set_editor_toolbar_order", { order });
+}
+
+/**
+ * Persist the full hidden-format-action set (MYND-555). The backend
+ * canonicalizes it (sorted + deduped); an empty array is the default (every
+ * action shown). No native side-effect; a rejected promise means the disk write
+ * failed and the caller's optimistic UI must revert. The IPC payload key
+ * (`items`) matches the Rust command's `items: Vec<String>` parameter.
+ */
+export async function setEditorToolbarHidden(items: string[]): Promise<void> {
+  await invoke<void>("plugin:prefs|set_editor_toolbar_hidden", { items });
 }
 
 /**
@@ -745,6 +794,37 @@ export async function setItemColors(colors: Record<string, string>): Promise<voi
  */
 export async function setFolderIcons(icons: Record<string, string>): Promise<void> {
   await invoke<void>("plugin:prefs|set_folder_icons", { icons });
+}
+
+/**
+ * Name ONE device (MYND-548) — `device_names[deviceIdHex] = name`, the label the
+ * device list leads with. A single entry, not the whole map: entries are written
+ * by different devices and merged per key, so a whole-map write would let this
+ * client's stale view clobber a peer's rename.
+ *
+ * There is deliberately **no clear/delete counterpart**. `device_names` merges
+ * per key by UNION (`sync-protocol.md` §10.2), so removing a key does not
+ * propagate — it resurrects from the first peer that still holds it. The backend
+ * refuses a blank name, so an empty submit is a no-op the caller treats as
+ * "cancel".
+ */
+export async function setDeviceName(deviceIdHex: string, name: string): Promise<void> {
+  await invoke<void>("plugin:prefs|set_device_name", { deviceIdHex, name });
+  // Bump AFTER the IPC resolves (the standard chokepoint): every mounted
+  // `usePrefs` consumer re-reads, so the device list refreshes without its own
+  // reload path — and so does a name written during enrollment, which has no
+  // list on screen to refresh manually.
+  bumpPrefsNonce();
+}
+
+/**
+ * The running device's platform token (MYND-548) — `"ios"`, `"android"`, …,
+ * straight from Rust's `std::env::consts::OS`. Seeds the enrollment forms'
+ * suggested device name. **Do not sniff `navigator` instead** — one source keeps
+ * the two clients from drifting into two default-name heuristics.
+ */
+export async function devicePlatform(): Promise<string> {
+  return await invoke<string>("plugin:prefs|device_platform");
 }
 
 /**

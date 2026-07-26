@@ -100,6 +100,12 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::set_editor_focus_typewriter,
             commands::set_item_colors,
             commands::set_folder_icons,
+            // MYND-548 device naming. Each needs a matching `allow-` entry in
+            // permissions/prefs/default.toml AND a name in build.rs's inlined
+            // command list — the desktop build.rs calls a mismatch here a
+            // security regression, and the same holds on this side.
+            commands::set_device_name,
+            commands::device_platform,
             commands::vault_set_label,
             commands::set_spell_enabled,
             commands::set_spell_languages,
@@ -111,6 +117,13 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::set_right_panel_active_tab,
             commands::set_right_panel_hidden_tabs,
             commands::set_right_panel_tab_order,
+            // MYND-555: editor format-bar customization. Bodies are the SHARED
+            // `myne-core` prefs core desktop already uses — mobile only registers
+            // them. Device-local fields (`sync-protocol.md` §10.2.1), so a phone
+            // layout never propagates to a desktop. Must stay in lockstep with
+            // `permissions/prefs/default.toml` or the ACL resolver fails closed.
+            commands::set_editor_toolbar_order,
+            commands::set_editor_toolbar_hidden,
         ])
         .build()
 }

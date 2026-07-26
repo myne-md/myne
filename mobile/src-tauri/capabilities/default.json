@@ -20,11 +20,13 @@
     "share-import:default",
     "vault-indices:default",
     "graph-layout:default",
+    "workspace:default",
     "search:default",
     "snapshots:default",
     "attachments:default",
     "export:default",
     "secret-export:default",
-    "sync:default"
+    "sync:default",
+    "qr-scan:default"
   ]
 }
