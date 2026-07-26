@@ -32,6 +32,39 @@ import type { ResolverNote } from "@myne/editor/host/notes/resolveWikilink";
  *  anchor re-fires. `null` = no pending scroll. */
 export type ScrollAnchorRequest = { anchor: WikilinkAnchor; nonce: number } | null;
 
+/**
+ * Persistent-view swap API (MYND-534). Handed to a host via `onSwapReady` so it
+ * can reuse ONE long-lived `EditorView` across note switches instead of
+ * remounting per note — preserving per-note undo history + selection. The host
+ * (desktop `PaneView`) owns the per-note `EditorState` cache and drives:
+ *
+ *   1. before leaving note A: `captureState()` → cache it (with A's scroll).
+ *   2. entering note B: `applyState(cached.state)` if cached (instant, no re-read),
+ *      else `applyState(buildState(bodyOfB))` for a first open.
+ *
+ * `applyState` does `view.setState(...)` (which resets ALL compartments to their
+ * seeded defaults) then re-applies the CURRENT compartment config (view-mode,
+ * line-numbers, note-set, vault-headings/anchors, AI) — so a config change made
+ * while a note was backgrounded is reflected on return. Scroll lives on the host's
+ * OUTER scroller (the CM view grows to fit), so scroll capture/restore is the
+ * host's job, not this API's.
+ *
+ * Opt-in: only wired when `onSwapReady` is set. Consumers that don't set it
+ * (mobile, the read-only reading companion) keep the plain controlled-`value`
+ * mirror unchanged.
+ */
+export type EditorSwapApi = {
+  /** Snapshot the current note's full state (doc + history + selection). */
+  captureState: () => EditorState;
+  /** Build a fresh `EditorState` for `doc` with the full myne extension set +
+   *  this instance's ref-routed listeners (so a swapped-in state never carries a
+   *  stale callback). Used for a first-open (uncached) note. */
+  buildState: (doc: string) => EditorState;
+  /** Swap `state` into the live view (`setState`) and re-apply current
+   *  compartment config. Does NOT touch the host's scroller. */
+  applyState: (state: EditorState) => void;
+};
+
 export type CMEditorProps = {
   value: string;
   onChange: (next: string) => void;
@@ -102,10 +135,16 @@ export type CMEditorProps = {
    *  order to render its OWN formatting surface is the one that also wants
    *  `selectionToolbar: false`, so it does not end up with two (mobile, MYND-559). */
   onReady?: (view: EditorView | null) => void;
+  /** MYND-534: hand a host the persistent-view swap API after mount (`null` on
+   *  unmount). When set, the host drives note switches via `captureState` /
+   *  `buildState` / `applyState` on ONE long-lived view instead of remounting per
+   *  note, preserving per-note undo + selection. Opt-in — leaving it unset keeps
+   *  the plain controlled-`value` behaviour (mobile, reading companion). */
+  onSwapReady?: (api: EditorSwapApi | null) => void;
 };
 
 export function CMEditor(props: CMEditorProps) {
-  const { value, onChange, onBlur, onSelectionChange, extensions, noteSet, vaultHeadings, vaultBlockAnchors, onOpenWikilink, scrollAnchor = null, lineNumbers = false, viewMode = "live", readOnly = false, aiEnabled = false, selectionToolbar = true, style, onReady } = props;
+  const { value, onChange, onBlur, onSelectionChange, extensions, noteSet, vaultHeadings, vaultBlockAnchors, onOpenWikilink, scrollAnchor = null, lineNumbers = false, viewMode = "live", readOnly = false, aiEnabled = false, selectionToolbar = true, style, onReady, onSwapReady } = props;
   const hostRef = useRef<HTMLDivElement | null>(null);
   const viewRef = useRef<EditorView | null>(null);
   const onChangeRef = useRef(onChange);
@@ -113,6 +152,24 @@ export function CMEditor(props: CMEditorProps) {
   const onSelectionChangeRef = useRef(onSelectionChange);
   const onOpenWikilinkRef = useRef(onOpenWikilink);
   const onReadyRef = useRef(onReady);
+  const onSwapReadyRef = useRef(onSwapReady);
+  // MYND-534: config refs so `buildState` / `applyState` (called imperatively by
+  // the host, outside React's render) read the CURRENT compartment config rather
+  // than a value frozen at mount. Kept live by the reconfigure effects below.
+  const extensionsRef = useRef(extensions);
+  const noteSetRef = useRef(noteSet);
+  const vaultHeadingsRef = useRef(vaultHeadings);
+  const vaultBlockAnchorsRef = useRef(vaultBlockAnchors);
+  const lineNumbersRef = useRef(lineNumbers);
+  const viewModeRef = useRef(viewMode);
+  const readOnlyRef = useRef(readOnly);
+  const aiEnabledRef = useRef(aiEnabled);
+  useEffect(() => {
+    onSwapReadyRef.current = onSwapReady;
+  }, [onSwapReady]);
+  useEffect(() => {
+    extensionsRef.current = extensions;
+  }, [extensions]);
   useEffect(() => {
     onOpenWikilinkRef.current = onOpenWikilink;
   }, [onOpenWikilink]);
@@ -138,32 +195,77 @@ export function CMEditor(props: CMEditorProps) {
     const host = hostRef.current;
     if (host === null) return;
 
-    const view = new EditorView({
-      state: EditorState.create({
-        doc: value,
-        extensions: [
-          ...myneExtensions({ viewMode, readOnly, aiEnabled, selectionToolbar }),
-          ...(extensions ?? []),
-          EditorView.updateListener.of((update) => {
-            if (update.docChanged) {
-              onChangeRef.current(update.state.doc.toString());
-            }
-            if (update.selectionSet || update.docChanged) {
-              onSelectionChangeRef.current?.(selectedRangesText(update.state));
-            }
-          }),
-          EditorView.domEventHandlers({
-            blur: () => {
-              onBlurRef.current?.();
-            },
-          }),
-        ],
-      }),
-      parent: host,
+    // Shared extension pieces + a single `makeState` closure, so the mount state
+    // AND every note state built later via the swap API (`buildState`) come from
+    // ONE source — no drift (MYND-534). Both listeners close over refs, so a
+    // cached state built earlier never carries a stale callback after a swap.
+    const updateListener = EditorView.updateListener.of((update) => {
+      if (update.docChanged) {
+        onChangeRef.current(update.state.doc.toString());
+      }
+      if (update.selectionSet || update.docChanged) {
+        onSelectionChangeRef.current?.(selectedRangesText(update.state));
+      }
     });
+    const blurHandler = EditorView.domEventHandlers({
+      blur: () => {
+        onBlurRef.current?.();
+      },
+    });
+    const makeState = (doc: string): EditorState =>
+      EditorState.create({
+        doc,
+        extensions: [
+          ...myneExtensions({
+            viewMode: viewModeRef.current,
+            readOnly: readOnlyRef.current,
+            aiEnabled: aiEnabledRef.current,
+            // Mount-read, ref-free on purpose (MYND-559): a host's formatting
+            // surface is a platform constant, so every state this view ever
+            // builds — mount or post-swap — carries the SAME choice.
+            selectionToolbar,
+          }),
+          ...(extensionsRef.current ?? []),
+          updateListener,
+          blurHandler,
+        ],
+      });
+
+    // Re-apply every compartment to its CURRENT prop value. `view.setState(...)`
+    // resets compartments to the myneExtensions seed, so after a swap we push the
+    // live config back in — a viewMode / line-numbers / note-set / AI change made
+    // while a note was backgrounded is reflected on return. Mirrors the per-prop
+    // reconfigure effects above (kept as separate dispatches for the same reason).
+    const reapplyCompartments = (v: EditorView): void => {
+      v.dispatch({ effects: reconfigureLineNumbers(lineNumbersRef.current) });
+      v.dispatch({ effects: reconfigureViewMode(viewModeRef.current, readOnlyRef.current) });
+      v.dispatch({ effects: reconfigureAi(aiEnabledRef.current) });
+      if (noteSetRef.current !== undefined) {
+        v.dispatch({ effects: reconfigureNoteSet(noteSetRef.current) });
+      }
+      if (vaultHeadingsRef.current !== undefined) {
+        v.dispatch({ effects: reconfigureVaultHeadings(vaultHeadingsRef.current) });
+      }
+      if (vaultBlockAnchorsRef.current !== undefined) {
+        v.dispatch({ effects: reconfigureVaultBlockAnchors(vaultBlockAnchorsRef.current) });
+      }
+    };
+
+    const view = new EditorView({ state: makeState(value), parent: host });
     viewRef.current = view;
     // Hand the live view to a host toolbar (mobile accessory bar); desktop no-op.
     onReadyRef.current?.(view);
+    // MYND-534: hand the host the persistent-view swap API (opt-in). The host
+    // (desktop PaneView) owns the per-note EditorState cache and drives switches
+    // through this instead of remounting the view.
+    onSwapReadyRef.current?.({
+      captureState: () => view.state,
+      buildState: (doc: string) => makeState(doc),
+      applyState: (state: EditorState) => {
+        view.setState(state);
+        reapplyCompartments(view);
+      },
+    });
 
     // The self-hosted web fonts (Inter / JetBrains Mono) finish loading AFTER
     // the editor's first paint; their metrics change line + block-widget heights,
@@ -179,6 +281,7 @@ export function CMEditor(props: CMEditorProps) {
 
     return () => {
       onReadyRef.current?.(null);
+      onSwapReadyRef.current?.(null);
       view.destroy();
       viewRef.current = null;
     };
@@ -209,6 +312,7 @@ export function CMEditor(props: CMEditorProps) {
   // the SYNC-5 nonce, so a note created/renamed/deleted elsewhere re-resolves
   // every wikilink chip live (WL-6) without a remount or a note-switch.
   useEffect(() => {
+    noteSetRef.current = noteSet;
     const view = viewRef.current;
     if (view === null || noteSet === undefined) return;
     view.dispatch({ effects: reconfigureNoteSet(noteSet) });
@@ -217,6 +321,7 @@ export function CMEditor(props: CMEditorProps) {
   // MYND-305: push the vault-wide heading set into the view's compartment (same
   // re-mount-free pattern as the note-set) so the `[[##` picker searches it.
   useEffect(() => {
+    vaultHeadingsRef.current = vaultHeadings;
     const view = viewRef.current;
     if (view === null || vaultHeadings === undefined) return;
     view.dispatch({ effects: reconfigureVaultHeadings(vaultHeadings) });
@@ -225,6 +330,7 @@ export function CMEditor(props: CMEditorProps) {
   // MYND-382: push the vault-wide imported-block-anchor set into the view's
   // compartment (same re-mount-free pattern) so the `[[^^` picker searches it.
   useEffect(() => {
+    vaultBlockAnchorsRef.current = vaultBlockAnchors;
     const view = viewRef.current;
     if (view === null || vaultBlockAnchors === undefined) return;
     view.dispatch({ effects: reconfigureVaultBlockAnchors(vaultBlockAnchors) });
@@ -236,6 +342,7 @@ export function CMEditor(props: CMEditorProps) {
   // compartment is seeded OFF at mount, so this runs once on mount to honor an
   // already-on pref, then on every subsequent toggle.
   useEffect(() => {
+    lineNumbersRef.current = lineNumbers;
     const view = viewRef.current;
     if (view === null) return;
     view.dispatch({ effects: reconfigureLineNumbers(lineNumbers) });
@@ -246,6 +353,8 @@ export function CMEditor(props: CMEditorProps) {
   // switching live/reading/source preserves cursor / scroll / undo and never
   // mutates the buffer. Seeded at mount, so this runs once then on every switch.
   useEffect(() => {
+    viewModeRef.current = viewMode;
+    readOnlyRef.current = readOnly;
     const view = viewRef.current;
     if (view === null) return;
     view.dispatch({ effects: reconfigureViewMode(viewMode, readOnly) });
@@ -257,6 +366,7 @@ export function CMEditor(props: CMEditorProps) {
   // down ghost-text + the AI slash commands instead of leaving them live-feeding
   // note content to the model. Seeded at mount, so this runs once then on toggle.
   useEffect(() => {
+    aiEnabledRef.current = aiEnabled;
     const view = viewRef.current;
     if (view === null) return;
     view.dispatch({ effects: reconfigureAi(aiEnabled) });

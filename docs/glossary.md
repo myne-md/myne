@@ -515,6 +515,12 @@ The server authorization step that admits a newly-enrolled device onto an accoun
 
 Used in: `spec/server-protocol.md` §3.1, §4 (MYND-425)
 
+### **device-join QR** &nbsp; 📋 *Protocol*
+
+A QR the trusted desktop displays and a phone scans to add itself to an account (MYND-466), in place of manually typing the [account_number](#account_number). A scanner-only, versioned (`MYQR`) frame carrying only non-secret material — `{server_url, account#, cert_pin, generated_at}` — and **never** a password or recovery phrase (SYNC-47). Ephemeral (≈3-min TTL) to enforce live co-presence. For a self-host endpoint the scan is treated as the out-of-band channel that **replaces the cert-fingerprint eye-compare** ([TOFU bootstrap](#tofu-bootstrap) / SYNC-26); the [device-approval gate](#device-approval-gate) SAS still runs post-approval. The account number is supplied by a one-time user paste on the desktop (it is a bearer token — [AS9](#account_number) — never persisted at rest; `spec/account-number.md` §8). `MYQR` lives outside the `protocol` crate (no ciphertext → not a major-version event). iOS-only for v1 (Android: MYND-465).
+
+Used in: `decisions.md` 2026-07-19; `threat-model.md` §7
+
 ### **device key** &nbsp; 🗝️ *Key/identifier*
 
 Reserved term for `appname-v005` multi-device support: a per-device asymmetric key pair stored in hardware (Secure Enclave / TPM / Android Keystore) that participates in MLS group formation. **Not used in v0.1** — single-device protocol does not need device keys.
@@ -526,6 +532,12 @@ Used in: `spec/protocol.md` §11 (out of scope for v0.1)
 The permanent, client-generated 16-byte random identifier of a device as it appears in a [vault head](#vault-head)'s [version vector](#version-vector-vv). Allocated once at enrollment, registered in the per-account device table (**AS16**), and **kept separate from** the device's secret per-device token/credential: the token is revocable/rotatable (an availability control), whereas `device_id` is permanent *history* — deriving the id from the token would let a revocation rewrite version-vector history and break [fork-consistency](#fork-consistency) continuity. Its legitimacy is **not** separately authenticated and need not be: single-user → all devices share `root_key` → the shared-key head MAC is the actor-set authority, and a malicious server (lacking `root_key`) cannot inject a phantom `device_id`. A reset/re-enrolled device generates a **new** `device_id` (the old one's VV component freezes — never pruned in v1). Phase 2.
 
 Used in: `spec/sync-protocol.md` (vault head, version vector)
+
+### **device name** &nbsp; 📦 *Product*
+
+The human-readable label the device list shows for one enrolled device — "Studio Mac", "Travel Laptop" — as opposed to its opaque [device_id](#device_id-vv-actor). Lives **only** in the `device_names` map inside the AEAD-sealed [vault.prefs](#vaultprefs) (`spec/protocol.md` §9.5.2), keyed by the `device_id` hex: it is a [shared pref](#shared-pref) that merges **per key** by union, each entry racing on its own `device_names/<key>` clock (`spec/sync-protocol.md` §10.2). Set at enrollment from an editable field pre-filled with a platform word, and changeable afterwards from **any** device. Three properties are load-bearing and easy to get wrong: it is **never sent to the server in plaintext** — no name field exists in the enrollment request or the device roster (TB5); it travels only inside the AEAD-sealed `MYP1` blob, a **pending** device's name is never shown to the approving device (a label beside an unverified device would read as a trust signal and weaken the [bootstrap-fingerprint](#bootstrap-fingerprint) compare), and there is **no delete** — union merge cannot propagate a removed key, so a name can only ever be replaced. Distinct from the vault `label` (which names a *vault*, not a device). Phase 2.
+
+Used in: `spec/protocol.md` §9.5.2; `spec/sync-protocol.md` §10.2; `decisions.md` 2026-07-25 (MYND-548)
 
 ### **device registry** &nbsp; 📦 *Product*
 
