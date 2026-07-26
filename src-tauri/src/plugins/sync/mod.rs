@@ -20,6 +20,10 @@
 // `hooks.rs`/`lib.rs` and the generated command handlers.
 pub use myne_core::plugins::sync::*;
 
+/// Desktop-only QR device-join generation (MYND-466) — mobile scans, never
+/// generates, so the `qrcode` dep + this command live here, not in the core.
+pub mod qr;
+
 use tauri::plugin::{Builder, TauriPlugin};
 use tauri::Runtime;
 
@@ -48,6 +52,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::sync_read_quarantine,
             commands::sync_restore_quarantine,
             commands::sync_delete_quarantine,
+            qr::sync_device_join_qr,
         ])
         .build()
 }

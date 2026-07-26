@@ -124,6 +124,8 @@ fn main() {
                 "set_screen_capture_protection",
                 "set_deliberate_folders",
                 "set_archived_folders",
+                "set_device_name",
+                "device_platform",
                 "vault_set_label",
                 "vault_set_icon",
             ]),
@@ -392,6 +394,7 @@ fn main() {
                 "sync_read_quarantine",
                 "sync_restore_quarantine",
                 "sync_delete_quarantine",
+                "sync_device_join_qr",
             ]),
         )
         .plugin(

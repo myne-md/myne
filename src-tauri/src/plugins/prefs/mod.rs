@@ -94,6 +94,11 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::set_editor_focus_typewriter,
             commands::set_item_colors,
             commands::set_folder_icons,
+            // MYND-548 device naming. Each needs a matching `allow-` entry in
+            // permissions/prefs/default.toml AND a name in build.rs's inlined
+            // command list — see the security-regression note in build.rs.
+            commands::set_device_name,
+            commands::device_platform,
             commands::vault_set_label,
             commands::vault_set_icon,
             commands::set_spell_enabled,

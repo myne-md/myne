@@ -37,6 +37,7 @@ permissions = [
     "allow-sync-read-quarantine",
     "allow-sync-restore-quarantine",
     "allow-sync-delete-quarantine",
+    "allow-sync-device-join-qr",
 ]
 
 [[permission]]
@@ -138,3 +139,8 @@ commands.allow = ["sync_restore_quarantine"]
 identifier = "allow-sync-delete-quarantine"
 description = "Allow invoking sync:sync_delete_quarantine (permanently remove ONE quarantined note blob; strict file-name validation, UI confirm-gated — the single path that destroys quarantine evidence). No decrypt, no vault-blob access beyond the quarantine dir."
 commands.allow = ["sync_delete_quarantine"]
+
+[[permission]]
+identifier = "allow-sync-device-join-qr"
+description = "Allow invoking sync:sync_device_join_qr (MYND-466 — render a device-join QR for the user-pasted account number + this device's own endpoint/cert-pin. Read-only affordance: reads the endpoint config, moves no vault bytes, carries no secret in the QR — SYNC-47. The account# is a paste argument, never read from storage)."
+commands.allow = ["sync_device_join_qr"]

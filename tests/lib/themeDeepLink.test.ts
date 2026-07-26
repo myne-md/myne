@@ -1,0 +1,265 @@
+// @vitest-environment jsdom
+//
+// `myne://theme/install` deep-link parsing + the pending-install latch
+// (MYND-567). The parser is the app's first contact with a URL ANY website can
+// mint, so the rejection matrix is the point of this suite: only a well-formed,
+// current-version, size-bounded link becomes a confirmable request, and every
+// other shape either fails loudly or (for another client's action) is ignored.
+//
+// What is NOT asserted here: which CSS values are safe. That allowlist lives in
+// the `theme_validator` crate and runs host-side inside `themes_import`; the
+// parser deliberately does not duplicate it (one grammar, one source of truth),
+// so a payload of syntactically-fine-but-disallowed values parses OK here and is
+// rejected at the real guard. `tests/lib/themeDeepLink.test.ts` covers transport;
+// `theme-validator`'s own Rust tests cover the grammar.
+
+import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  MAX_NAME_CHARS,
+  MAX_PAYLOAD_BYTES,
+  THEME_DEEP_LINK_VERSION,
+  THEME_INSTALL_EVENT,
+  clearPendingThemeInstall,
+  consumePendingThemeInstall,
+  handleThemeDeepLinkUrl,
+  parseThemeInstallUrl,
+  type ThemeDeepLinkResult,
+} from "../../src/lib/themeDeepLink";
+import { PALETTE, b64url, link } from "./_themeLink";
+
+afterEach(() => {
+  clearPendingThemeInstall();
+  vi.restoreAllMocks();
+});
+
+describe("parseThemeInstallUrl — the accept path", () => {
+  it("parses a well-formed link into a request", () => {
+    const result = parseThemeInstallUrl(
+      link({ author: "Myne", src: "https://myne.md/themes/" }),
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.request.name).toBe("Warm Paper");
+    expect(result.request.author).toBe("Myne");
+    expect(result.request.source).toBe("https://myne.md/themes/");
+    expect(result.request.palette).toEqual(PALETTE);
+    // The JSON handed to `themes_import` is the payload verbatim, not a re-
+    // serialization — the host must validate exactly what the link carried.
+    expect(JSON.parse(result.request.paletteJson)).toEqual(PALETTE);
+  });
+
+  it("treats optional metadata as optional", () => {
+    const result = parseThemeInstallUrl(link());
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.request.author).toBeNull();
+    expect(result.request.source).toBeNull();
+  });
+
+  it("accepts the action host case-insensitively and tolerates a trailing slash", () => {
+    const search = link().split("?")[1];
+    expect(parseThemeInstallUrl(`myne://THEME/Install/?${search}`).ok).toBe(true);
+  });
+
+  it("round-trips a full-size real gallery theme", () => {
+    // 21 required-core tokens — the shape every myne-themes entry actually has.
+    const full: Record<string, string> = {};
+    for (const key of [
+      "--paper", "--paper-2", "--paper-3", "--ink-0", "--ink-1", "--ink-2", "--ink-3",
+      "--line-1", "--line-2", "--line-3", "--accent", "--accent-hover", "--accent-press",
+      "--accent-soft", "--accent-on", "--danger", "--danger-soft", "--warning",
+      "--warning-soft", "--success", "--success-soft",
+    ]) {
+      full[key] = "#1e1e2e";
+    }
+    const result = parseThemeInstallUrl(link({ payload: b64url(JSON.stringify(full)) }));
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(Object.keys(result.request.palette)).toHaveLength(21);
+  });
+});
+
+describe("parseThemeInstallUrl — silently ignored (not ours)", () => {
+  it.each([
+    ["the mobile client's launcher action", "myne://open"],
+    ["the mobile client's capture action", "myne://capture?mode=voice"],
+    ["an unknown myne action", "myne://something/else"],
+    ["the right host but the wrong path", "myne://theme/uninstall?v=1"],
+    ["a foreign scheme", "https://myne.md/themes/"],
+    ["unparseable junk", "not a url at all"],
+  ])("ignores %s", (_label, url) => {
+    expect(parseThemeInstallUrl(url)).toEqual({ ok: false, reason: "not-a-theme-link" });
+  });
+
+  it("does not latch or announce an ignored URL", () => {
+    const listener = vi.fn();
+    window.addEventListener(THEME_INSTALL_EVENT, listener);
+    handleThemeDeepLinkUrl("myne://capture?mode=voice");
+    expect(listener).not.toHaveBeenCalled();
+    expect(consumePendingThemeInstall()).toBeNull();
+    window.removeEventListener(THEME_INSTALL_EVENT, listener);
+  });
+});
+
+describe("parseThemeInstallUrl — loud rejections", () => {
+  it("rejects a missing version", () => {
+    expect(parseThemeInstallUrl(link({ v: null }))).toEqual({
+      ok: false,
+      reason: "unsupported-version",
+    });
+  });
+
+  it("rejects a future version rather than guessing at it", () => {
+    expect(parseThemeInstallUrl(link({ v: "2" }))).toEqual({
+      ok: false,
+      reason: "unsupported-version",
+    });
+  });
+
+  it("rejects a missing or blank name", () => {
+    expect(parseThemeInstallUrl(link({ name: null }))).toEqual({
+      ok: false,
+      reason: "invalid-name",
+    });
+    expect(parseThemeInstallUrl(link({ name: "   " }))).toEqual({
+      ok: false,
+      reason: "invalid-name",
+    });
+  });
+
+  it("rejects a name that is nothing but control characters", () => {
+    // Escapes, not literals: a raw NUL makes git treat this file as binary,
+    // and raw bidi overrides are invisible in an editor.
+    const onlyControls = "\u0000\u202e\u2066";
+    expect(parseThemeInstallUrl(link({ name: onlyControls }))).toEqual({
+      ok: false,
+      reason: "invalid-name",
+    });
+  });
+
+  it("rejects a missing payload", () => {
+    expect(parseThemeInstallUrl(link({ payload: null }))).toEqual({
+      ok: false,
+      reason: "missing-payload",
+    });
+    expect(parseThemeInstallUrl(link({ payload: "" }))).toEqual({
+      ok: false,
+      reason: "missing-payload",
+    });
+  });
+
+  it("rejects a payload outside the base64url alphabet", () => {
+    expect(parseThemeInstallUrl(link({ payload: "not*base64url!" }))).toEqual({
+      ok: false,
+      reason: "malformed-payload",
+    });
+  });
+
+  it("rejects a payload that decodes to something other than a flat string map", () => {
+    for (const notATheme of ["[1,2,3]", '"a string"', "null", '{"--paper":42}', "{oops"]) {
+      expect(parseThemeInstallUrl(link({ payload: b64url(notATheme) }))).toEqual({
+        ok: false,
+        reason: "malformed-payload",
+      });
+    }
+  });
+
+  it("rejects invalid UTF-8 rather than decoding it lossily", () => {
+    // `_____w` is legal base64url that decodes to ff ff ff ff — four bytes that
+    // are not a legal UTF-8 sequence. A non-fatal decoder would silently hand
+    // the host a string of U+FFFD replacement characters instead of failing.
+    expect(parseThemeInstallUrl(link({ payload: "_____w" }))).toEqual({
+      ok: false,
+      reason: "malformed-payload",
+    });
+  });
+
+  it("rejects an oversized payload before it reaches the host", () => {
+    const huge = JSON.stringify({ "--paper": "#".repeat(MAX_PAYLOAD_BYTES + 64) });
+    expect(parseThemeInstallUrl(link({ payload: b64url(huge) }))).toEqual({
+      ok: false,
+      reason: "payload-too-large",
+    });
+  });
+});
+
+describe("parseThemeInstallUrl — hostile display strings", () => {
+  it("caps an absurdly long name instead of rejecting the install", () => {
+    const result = parseThemeInstallUrl(link({ name: "A".repeat(500) }));
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.request.name).toHaveLength(MAX_NAME_CHARS);
+  });
+
+  it("strips bidi overrides that would make the name render as something else", () => {
+    const result = parseThemeInstallUrl(link({ name: "Warm\u202ePaper" }));
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.request.name).toBe("WarmPaper");
+  });
+
+  it.each(["javascript:alert(1)", "data:text/html,<script>", "file:///etc/passwd", "nonsense"])(
+    "drops a non-web src rather than displaying it (%s)",
+    (src) => {
+      const result = parseThemeInstallUrl(link({ src }));
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.request.source).toBeNull();
+    },
+  );
+});
+
+describe("the pending-install latch", () => {
+  it("announces an arrival, and the latch yields it exactly once", () => {
+    // The event is a bare notification; the LATCH is the payload, and draining
+    // it is what enforces consume-exactly-once. So the listener consumes the
+    // way production does rather than reading anything off the event.
+    const seen: (ThemeDeepLinkResult | null)[] = [];
+    const listener = () => seen.push(consumePendingThemeInstall());
+    window.addEventListener(THEME_INSTALL_EVENT, listener);
+    try {
+      handleThemeDeepLinkUrl(link());
+
+      expect(seen).toHaveLength(1);
+      expect(seen[0]?.ok).toBe(true);
+      // Already drained by the listener — a remount must not re-open the same
+      // link's dialog.
+      expect(consumePendingThemeInstall()).toBeNull();
+    } finally {
+      // `finally`, not a trailing call: a failed assertion above would else
+      // leak a listener that silently drains the latch for every later test.
+      window.removeEventListener(THEME_INSTALL_EVENT, listener);
+    }
+  });
+
+  it("holds the arrival for a later consumer when nothing is listening yet", () => {
+    // The cold-launch / locked-vault path: no dialog is mounted to hear the
+    // event, so the latch is the only thing carrying the request.
+    handleThemeDeepLinkUrl(link({ name: "Latched" }));
+    const signal = consumePendingThemeInstall();
+    expect(signal?.ok).toBe(true);
+    if (!signal?.ok) return;
+    expect(signal.request.name).toBe("Latched");
+    expect(consumePendingThemeInstall()).toBeNull();
+  });
+
+  it("latches a loud rejection too, so a bad link never fails silently", () => {
+    handleThemeDeepLinkUrl(link({ v: "2" }));
+    expect(consumePendingThemeInstall()).toEqual({ ok: false, reason: "unsupported-version" });
+  });
+
+  it("keeps only the newest link when two arrive before either is shown", () => {
+    handleThemeDeepLinkUrl(link({ name: "First" }));
+    handleThemeDeepLinkUrl(link({ name: "Second" }));
+    const signal = consumePendingThemeInstall();
+    expect(signal?.ok).toBe(true);
+    if (!signal?.ok) return;
+    expect(signal.request.name).toBe("Second");
+  });
+
+  it("drops a latched request on clear — the never-unlocked path", () => {
+    handleThemeDeepLinkUrl(link());
+    clearPendingThemeInstall();
+    expect(consumePendingThemeInstall()).toBeNull();
+  });
+});

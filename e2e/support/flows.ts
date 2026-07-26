@@ -65,6 +65,21 @@ export async function unlockToEditor(
   // paint can slip well past the old ceilings — observed timing out even at 30s
   // on a contended CI run (nav1) — so both waits use the raised default budget
   // (aligned with DEFAULT_TIMEOUT_MS). Never reproduces in an isolated run.
+  //
+  // MYND-558: the screen shows ONE credential surface. With a redeemable
+  // quick-unlock the PIN owns it and the password form is behind a reveal, so
+  // wait for whichever mounted and take the password door. On a vault with no
+  // quick-unlock — every suite but `quick-unlock.e2e.ts` — the password input is
+  // what appears and the reveal branch never runs. Without this a suite that
+  // configures a PIN would hang the full budget on a field that is not there.
+  // Suites ASSERTING which surface won must drive the screen directly (qu2/qu3);
+  // this helper is for the ones where unlocking is a step, not the story.
+  await session.waitForElement(
+    `${testIdSelector("unlock.password-input")}, ${testIdSelector("unlock.use-password-link")}`,
+    { timeoutMs },
+  );
+  const reveal = await session.byTestIdAll("unlock.use-password-link");
+  if (reveal.length > 0) await reveal[0].click();
   const input = await session.byTestId("unlock.password-input", { timeoutMs });
   await input.sendKeys(password);
   // WebKit's driver can silently swallow the leading keystrokes sent during the
@@ -227,7 +242,9 @@ export async function dismissImporterOfferIfPresent(session: Session): Promise<v
  *  populated vault, so the second mount uses `dismissImporterOfferIfPresent`. */
 export async function lockAndReunlock(session: Session, password: string): Promise<void> {
   await (await session.byTestId("editor.lock-cta")).click();
-  await session.byTestId("unlock.password-input", { timeoutMs: 45_000 });
+  // No pre-wait for the password field here: `unlockToEditor` already waits for
+  // whichever credential surface mounted (MYND-558), and a hard wait for the
+  // password input would hang on a vault with a redeemable quick-unlock.
   await unlockToEditor(session, password);
   await dismissImporterOfferIfPresent(session);
 }
