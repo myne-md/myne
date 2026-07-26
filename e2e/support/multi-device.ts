@@ -104,17 +104,27 @@ export type TwoSyncedDevices = {
  *  `sync_now` still runs — an empty vault authors a genesis head on push
  *  (§6.1 genesis-on-empty), which B's join gate needs: `join.verify` surfaces
  *  only once `sync_head_fingerprint` observes a pulled head. */
+/** Options shared by every `setupTwoSyncedDevices` overload. */
+interface SetupOptions {
+  /** MYND-548: type these into the two enrollment forms' "Name this device"
+   *  fields instead of accepting the pre-filled platform default. */
+  deviceNames?: { a: string; b: string };
+  /** MYND-548: runs on A while B is still PENDING — the only window in which the
+   *  pending row is observable, since approval closes it. */
+  whilePending?: (devices: { a: AppSession; b: AppSession }) => Promise<void>;
+}
+
 export async function setupTwoSyncedDevices(
   srv: EphemeralServer,
-  opts?: { seedNote?: true },
+  opts?: SetupOptions & { seedNote?: true },
 ): Promise<TwoSyncedDevices & { noteId: string }>;
 export async function setupTwoSyncedDevices(
   srv: EphemeralServer,
-  opts: { seedNote: boolean },
+  opts: SetupOptions & { seedNote: boolean },
 ): Promise<TwoSyncedDevices>;
 export async function setupTwoSyncedDevices(
   srv: EphemeralServer,
-  opts: { seedNote?: boolean } = {},
+  opts: SetupOptions & { seedNote?: boolean } = {},
 ): Promise<TwoSyncedDevices> {
   const seedNote = opts.seedNote ?? true;
   let account = "";
@@ -136,6 +146,14 @@ export async function setupTwoSyncedDevices(
       await openSettings(a.session);
       await (await a.session.byTestId("settings.tab-sync")).click();
       await (await a.session.byTestId("sync.enroll.account-input")).sendKeys(account);
+      if (opts.deviceNames) {
+        // `replaceText`, not clear()+sendKeys: the field is PRE-FILLED with the
+        // platform suggestion, and W3C clear bypasses React's value tracker on the
+        // Input primitive, so the typed name would append to it.
+        await (
+          await a.session.byTestId("sync.enroll.device-name-input")
+        ).replaceText(opts.deviceNames.a);
+      }
       await (await a.session.byTestId("sync.enroll.password-input")).sendKeys(password);
       await (await a.session.byTestId("sync.enroll.submit")).click();
       await a.session.byTestId("sync.enroll.approved", { timeoutMs: 30_000 });
@@ -157,6 +175,11 @@ export async function setupTwoSyncedDevices(
       await b.session.byTestId("join.modal");
       await (await b.session.byTestId("join.server-input")).sendKeys(srv.url);
       await (await b.session.byTestId("join.account-input")).sendKeys(account);
+      if (opts.deviceNames) {
+        await (
+          await b.session.byTestId("join.device-name-input")
+        ).replaceText(opts.deviceNames.b);
+      }
       await (await b.session.byTestId("join.password-input")).sendKeys(password);
       await (await b.session.byTestId("join.submit")).click();
       await b.session.byTestId("join.pending", { timeoutMs: 30_000 });
@@ -164,6 +187,14 @@ export async function setupTwoSyncedDevices(
       // A: approve B while it is pending.
       await openSettings(a.session);
       await (await a.session.byTestId("settings.tab-sync")).click();
+      // Anything that must observe the PENDING row runs here — approving closes
+      // that window for good. The row wait is scoped to that case: `approve-device`
+      // is a CHILD of `pending-row`, so waiting for both on the default path would
+      // just double the worst-case timeout for every suite that uses this setup.
+      if (opts.whilePending) {
+        await a.session.byTestId("sync.pending-row", { timeoutMs: 30_000 });
+        await opts.whilePending({ a, b });
+      }
       await (await a.session.byTestId("sync.approve-device", { timeoutMs: 30_000 })).click();
       await closeSettings(a.session);
 
