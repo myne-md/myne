@@ -47,7 +47,11 @@ export interface MockConfig {
   setEndpoint?: { fingerprint: string | null; pin_source: "static" | "tofu" | null };
   devices?: MockDevice[];
   /** `sync_enroll` outcome — `{ approved }` on success, or a `{ kind }` error to reject. */
-  enrollResult?: { approved: boolean };
+  enrollResult?: { approved: boolean; device_id_hex?: string };
+  /** Seed `prefs.device_names` (MYND-548) — `device_id` hex → display name. */
+  deviceNames?: Record<string, string>;
+  /** What `prefs|device_platform` reports (MYND-548). Defaults to `"ios"`. */
+  devicePlatform?: string;
   enrollError?: { kind: string };
   headFingerprint?: string | null;
   pendingConflicts?: string[];
@@ -55,8 +59,19 @@ export interface MockConfig {
    *  the editor — for the fresh-device join flow. */
   freshDevice?: boolean;
   /** `sync_join_account` outcome. */
-  joinResult?: { vault_id: string; pending: boolean; fingerprint: string | null };
+  joinResult?: { vault_id: string; pending: boolean; fingerprint: string | null; device_id_hex?: string };
   joinError?: { kind: string };
+  /** `qr-scan|scan` outcome (MYND-466 device-join QR). */
+  qrScan?: { value: string | null };
+  /** `sync_decode_join_qr` outcome. */
+  qrDecode?: {
+    endpoint_url: string;
+    account_number: string;
+    cert_pin_hex: string | null;
+    pin_source: "self_host_tofu" | "hosted" | "self_host_no_pin";
+    fresh: boolean;
+  };
+  qrDecodeError?: { kind: string };
   /** Boot to the Unlock screen (one `Exists` vault, `Empty` slot) instead of
    *  straight to the editor — for the quick-unlock / password unlock flows. */
   lockedVault?: boolean;
@@ -169,7 +184,6 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
       archive_disabled: null,
       theme: null,
       folder_icons: {},
-      device_names: {},
       hidden_bar_items: [],
       bar_items_order: [],
       right_panel_active_tab: null,
@@ -192,6 +206,13 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
     const noteText = new Map(seededNotes.map((n) => [n.id, n.text]));
     let savedViews: SavedView[] = config.savedViews ? [...config.savedViews] : [];
     let viewOrder: string[] = savedViews.map((v) => v.id);
+    // MYND-548: device_names is STATEFUL for the same reason savedViews is — a
+    // rename made through the UI must be visible to the next `prefs_read`, which
+    // is what the real setter + nonce-bump round-trip does.
+    const deviceNames: Record<string, string> = { ...(config.deviceNames ?? {}) };
+    // Declared HERE, not at module scope: this callback is serialized into the
+    // browser, so a Node-side const would be a ReferenceError at call time.
+    const DEFAULT_DEVICE_ID = "aa11bb22cc33dd44ee55ff6677889900";
 
     // STATEFUL deliberate-folders store (MYND-560). An empty folder exists ONLY
     // as a `deliberate_folders` entry — no note carries its path — so a
@@ -259,6 +280,7 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
         // setter has run, otherwise the seed would keep winning and a folder
         // created through the UI would vanish on the next read.
         deliberate_folders: deliberateFolders,
+        device_names: { ...deviceNames },
       }),
       // Whole-set setter (MYND-560): record the write AND mutate the store, so
       // the created empty folder is present on the nonce-bumped re-read.
@@ -441,19 +463,53 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
         config.endpoint ?? { endpoint_url: null, cert_pin_hex: null, pin_source: null },
       "plugin:sync|sync_set_endpoint": () =>
         config.setEndpoint ?? { fingerprint: null, pin_source: null },
+      // MYND-548 device naming. The setter mirrors the real one's contract: a
+      // blank name is refused (no write), so an empty submit cannot blank a row.
+      "plugin:prefs|set_device_name": (args) => {
+        const id = args.deviceIdHex as string;
+        const name = (args.name as string).trim();
+        if (name !== "") deviceNames[id] = name;
+        return null;
+      },
+      "plugin:prefs|device_platform": () => config.devicePlatform ?? "ios",
       "plugin:sync|sync_list_devices": () => config.devices ?? [],
       "plugin:sync|sync_approve_device": () => null,
       "plugin:sync|sync_remove_device": () => null,
       "plugin:sync|sync_reset_local": () => null,
       "plugin:sync|sync_head_fingerprint": () => config.headFingerprint ?? "TYRS-N318",
       "plugin:sync|sync_pending_conflicts": () => config.pendingConflicts ?? [],
-      "plugin:sync|sync_enroll": () => {
+      "plugin:sync|sync_enroll": (args) => {
+        // Record the payload so a flow test can assert what the form forwarded.
+        // MYND-548: the device name goes to the CORE (which parks it and applies
+        // it in a later prefs phase), so "did the name reach the command" is the
+        // only half this mocked tier can honestly verify.
+        (window as unknown as { __enrollArgs?: unknown }).__enrollArgs = args;
         if (config.enrollError) throw config.enrollError;
-        return config.enrollResult ?? { approved: false };
+        return { approved: false, device_id_hex: DEFAULT_DEVICE_ID, ...config.enrollResult };
       },
       "plugin:sync|sync_join_account": () => {
         if (config.joinError) throw config.joinError;
-        return config.joinResult ?? { vault_id: "flow-vault", pending: true, fingerprint: null };
+        return (
+          config.joinResult ?? {
+            vault_id: "flow-vault",
+            pending: true,
+            fingerprint: null,
+            device_id_hex: DEFAULT_DEVICE_ID,
+          }
+        );
+      },
+      "plugin:qr-scan|scan": () => config.qrScan ?? { value: null },
+      "plugin:sync|sync_decode_join_qr": () => {
+        if (config.qrDecodeError) throw config.qrDecodeError;
+        return (
+          config.qrDecode ?? {
+            endpoint_url: "https://sync.example.com",
+            account_number: "4K7P9RH2JR3T8XW6VZ0A",
+            cert_pin_hex: null,
+            pin_source: "self_host_no_pin",
+            fresh: true,
+          }
+        );
       },
     };
 

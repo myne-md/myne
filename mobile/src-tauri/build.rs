@@ -52,6 +52,8 @@ fn main() {
                     "set_screen_capture_protection",
                     "set_deliberate_folders",
                     "set_archived_folders",
+                    "set_device_name",
+                    "device_platform",
                     "vault_set_label",
                 ]),
             )
@@ -241,6 +243,7 @@ fn main() {
                     "sync_delete_quarantine",
                     "sync_lifecycle_suspend",
                     "sync_lifecycle_resume",
+                    "sync_decode_join_qr",
                 ]),
             ),
     )
