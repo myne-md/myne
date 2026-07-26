@@ -18,6 +18,11 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-libra
 
 const invokeMock = vi.fn();
 
+// The panel reads `device_names` off `usePrefs`, so every mock below must answer
+// `prefs_read` with a prefs-shaped object — returning `undefined` (the old
+// catch-all) crashes the panel on `prefs.device_names`.
+const PREFS_STUB = { device_names: {} };
+
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: (...args: unknown[]) => invokeMock(...args),
 }));
@@ -42,6 +47,7 @@ function Harness() {
 function listRejects(kind: string) {
   invokeMock.mockImplementation(async (cmd: string) => {
     if (cmd === "plugin:sync|sync_list_devices") throw { kind };
+    if (cmd === "plugin:prefs|prefs_read") return PREFS_STUB;
     return undefined;
   });
 }
@@ -99,6 +105,7 @@ describe("DeviceManagementPanel — error-state branching", () => {
       if (cmd === "plugin:sync|sync_list_devices") {
         return [{ device_id_hex: "aa00", approved: true, retired: true, is_current: true }];
       }
+      if (cmd === "plugin:prefs|prefs_read") return PREFS_STUB;
       return undefined;
     });
     render(<Harness />);
@@ -121,6 +128,7 @@ describe("DeviceManagementPanel — reset recovery arc", () => {
     invokeMock.mockImplementation(async (cmd: string) => {
       if (cmd === "plugin:sync|sync_reset_local") return undefined;
       if (cmd === "plugin:sync|sync_list_devices") throw { kind: "NotEnrolled" };
+      if (cmd === "plugin:prefs|prefs_read") return PREFS_STUB;
       return undefined;
     });
 
@@ -144,6 +152,7 @@ describe("DeviceManagementPanel — loading", () => {
     // A never-settling list keeps devices===null with NO error → genuine loading.
     invokeMock.mockImplementation((cmd: string) => {
       if (cmd === "plugin:sync|sync_list_devices") return new Promise(() => {});
+      if (cmd === "plugin:prefs|prefs_read") return Promise.resolve(PREFS_STUB);
       return Promise.resolve(undefined);
     });
     render(<Harness />);

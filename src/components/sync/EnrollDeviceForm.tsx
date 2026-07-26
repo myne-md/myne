@@ -26,6 +26,7 @@ import { PasswordInput } from "../PasswordInput";
 import { DestructiveBanner } from "../DestructiveBanner";
 import { normalizeBip39Phrase } from "../../lib/bip39-normalize";
 import { formatAccountNumberInput } from "../../lib/account-number-format";
+import { DEVICE_NAME_MAX_LEN, useDeviceNameField } from "../../lib/device-name";
 import { useEnroll, type EnrollCredentialKind } from "../../hooks/useEnroll";
 import {
   ENROLL_APPROVED_NOTICE,
@@ -165,6 +166,10 @@ export function EnrollDeviceForm() {
     Array.from({ length: PHRASE_CELL_COUNT }, () => ""),
   );
 
+  // MYND-548: the device's own name. One hook for all four enrollment doors, so
+  // they cannot drift.
+  const deviceNameField = useDeviceNameField();
+
   // Any edit after a terminal outcome clears it so the user sees a fresh attempt.
   const clearOutcome = () => {
     if (outcome) reset();
@@ -210,7 +215,7 @@ export function EnrollDeviceForm() {
       mode === "password"
         ? password
         : normalizeBip39Phrase(cells.join(" "));
-    void enroll(accountNumber.trim(), credential, mode);
+    void enroll(accountNumber.trim(), credential, mode, deviceNameField.resolved);
   };
 
   return (
@@ -232,6 +237,29 @@ export function EnrollDeviceForm() {
           autoCapitalize="characters"
           data-testid="sync.enroll.account-input"
         />
+      </div>
+
+      {/* MYND-548: named here, at the one moment the user is provably standing in
+          front of this machine. The name is held in RAM and written to this
+          vault's own prefs only AFTER the first authed sync cycle — never with
+          the enrollment request, and never before that cycle (see useEnroll). */}
+      <div style={FIELD}>
+        <label style={LABEL} htmlFor={`${baseId}-device-name`}>
+          {t("sync.enroll.deviceNameLabel")}
+        </label>
+        <Input
+          id={`${baseId}-device-name`}
+          value={deviceNameField.value}
+          onChange={(e) => deviceNameField.setValue(e.target.value)}
+          maxLength={DEVICE_NAME_MAX_LEN}
+          placeholder={deviceNameField.suggestion}
+          autoComplete="off"
+          spellCheck={false}
+          data-testid="sync.enroll.device-name-input"
+        />
+        <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-3)" }}>
+          {t("sync.enroll.deviceNameHelp")}
+        </div>
       </div>
 
       <div style={FIELD}>

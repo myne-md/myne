@@ -11,7 +11,16 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
 import { RootErrorBoundary } from "./components/RootErrorBoundary";
+import { initThemeDeepLinks } from "./lib/themeDeepLink";
 import "./styles/tokens.css";
+
+// MYND-567: subscribe to `myne://` URLs at module scope — BEFORE React mounts,
+// so a cold launch from a theme-install link cannot race the subscription. The
+// URL lands in the module's latch; `ThemeInstallDialog` (mounted by `Editor`,
+// i.e. only past unlock) drains it. Deliberately here rather than in a
+// component effect: StrictMode double-invokes effects, and this must subscribe
+// exactly once.
+void initThemeDeepLinks();
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
