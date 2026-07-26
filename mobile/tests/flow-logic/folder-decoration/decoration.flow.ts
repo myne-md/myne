@@ -16,8 +16,9 @@
 // pointermove/up) lets the row's 480ms hold timer fire `onHold` and open the
 // action sheet — the same recognizer the swipe-back spec drives via TouchEvent.
 
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect } from "@playwright/test";
 import { installMockIpc } from "../mock-ipc";
+import { expandFolder, longPress } from "../helpers";
 
 const NOTE_ID = "note-decoration-1";
 const FOLDER_PATH = "Projects/";
@@ -31,18 +32,6 @@ const NOTE_BODY = `---\nfolder: ${FOLDER_PATH}\ntitle: Roadmap\n---\n\nDraft.\n`
 /** Fire a long-press on the first element matching `selector`: a bubbling
  *  `pointerdown`, then wait past the 480ms hold threshold with no pointer
  *  move/up so the row's hold timer resolves and opens its action sheet. */
-async function longPress(page: Page, selector: string): Promise<void> {
-  await page.evaluate((sel) => {
-    const el = document.querySelector(sel) as HTMLElement | null;
-    if (!el) throw new Error(`longPress: no element for ${sel}`);
-    const r = el.getBoundingClientRect();
-    el.dispatchEvent(
-      new PointerEvent("pointerdown", { bubbles: true, cancelable: true, clientX: r.x + 8, clientY: r.y + 8 }),
-    );
-  }, selector);
-  await page.waitForTimeout(600);
-}
-
 test.describe("folder icon + color decoration", () => {
   test("assign a folder icon → set_folder_icons keyed by the folder path", async ({ page }) => {
     await installMockIpc(page, { noteIds: [NOTE_ID], noteBodies: { [NOTE_ID]: NOTE_BODY } });
@@ -71,6 +60,7 @@ test.describe("folder icon + color decoration", () => {
     await page.goto("/");
 
     // Long-press the note row → row action sheet → "Color…" → the picker.
+    await expandFolder(page, "Projects");
     await expect(page.getByTestId("notes.row")).toBeVisible();
     await longPress(page, '[data-testid="notes.row"]');
     await page.getByTestId("notes.note-color-action").click();
@@ -141,7 +131,8 @@ test.describe("folder icon + color decoration", () => {
     await expect(folderRow.getByTestId("notes.folder-glyph")).toHaveAttribute("data-icon-name", "book");
     await expect(folderRow.locator('[data-color-slot="clay"]')).toBeVisible();
 
-    // The note row shows a leading "moss" dot.
+    // The note row shows a leading "moss" dot (its folder must be open first).
+    await expandFolder(page, "Projects");
     await expect(page.getByTestId("notes.row").locator('[data-color-slot="moss"]')).toBeVisible();
   });
 });

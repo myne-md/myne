@@ -1,0 +1,24 @@
+# In-repo Tauri mobile plugin: iOS AVFoundation QR scanner for device-join via QR
+# (MYND-466). Unlike screen-guard / share-intent (Rust-only Android bridges),
+# this plugin EXPOSES a WebView-facing command (`scan`) — so it carries a
+# permission set (`permissions/`) + `build.rs` command autogen, and its `ios/`
+# Swift package holds the AVFoundation capture. iOS-only (SYNC-46); Android decode
+# is MYND-465. Custom native, zero third-party scanner dep (grill Q4).
+[package]
+name = "tauri-plugin-qr-scan"
+version = "0.1.0"
+description = "Myne mobile — iOS AVFoundation QR scanner (device-join via QR, MYND-466)"
+authors = ["Myne"]
+edition = "2021"
+license = "AGPL-3.0"
+# Mandatory for tauri-plugin build scripts; must equal the crate name exactly.
+links = "tauri-plugin-qr-scan"
+
+[build-dependencies]
+# Already in the shared lock (pulled by tauri-plugin-deep-link) — no new crates.
+tauri-plugin = { version = "2", features = ["build"] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde = { version = "1", features = ["derive"] }
+thiserror = "2"

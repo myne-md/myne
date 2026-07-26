@@ -8,6 +8,7 @@ import {
   flushGraphLayoutNow,
   resetGraphLayoutOnLock,
 } from "./graph-layout-persist";
+import { flushWorkspaceNow, resetWorkspaceOnLock } from "./workspace-persist";
 
 /** Read-only probe of the `UnlockedVault` slot. */
 export async function isVaultUnlocked(): Promise<boolean> {
@@ -18,15 +19,23 @@ export async function isVaultUnlocked(): Promise<boolean> {
  * Drop the slot. Idempotent on already-locked.
  *
  * This is the mobile frontend's single lock choke point (Lock button, idle
- * auto-lock, vault switch all funnel here), so the graph-layout teardown
- * rides it: flush the freshest positions to `vault.graph` WHILE the slot is
- * still unlocked, then drop them from RAM (vault A's layout must never seed
- * vault B — §9.19.4 posture), then lock. Both graph steps are best-effort;
- * the lock itself always runs.
+ * auto-lock, vault switch all funnel here), so the per-vault session-state
+ * teardowns ride it: flush the freshest state WHILE the slot is still unlocked,
+ * then drop it from RAM (vault A's state must never seed vault B — the §9.19.4 /
+ * §9.7.4 posture), then lock.
+ *
+ *  - graph layout → `vault.graph` (MYG1)
+ *  - sidebar folder-expand set → `vault.workspace` (MYND-561, MYW1). This is one
+ *    of only two write seams for that blob (the other is app-background), which
+ *    is what keeps its mtime from becoming an activity log.
+ *
+ * Every flush/reset step is best-effort; the lock itself always runs.
  */
 export async function lockVault(): Promise<void> {
   await flushGraphLayoutNow();
   resetGraphLayoutOnLock();
+  await flushWorkspaceNow();
+  resetWorkspaceOnLock();
   await invoke<void>("plugin:vault-unlock|lock");
 }
 
