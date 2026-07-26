@@ -1603,6 +1603,7 @@ mod tests {
                 &prefs_key,
                 &parsed_meta.account_number_hash,
                 &protocol::PrefsView {
+                    attachment_ocr_enabled: true,
                     screen_capture_protection: false,
                     ai_enabled: false,
                     ai_excluded_folders: Vec::new(),
@@ -1746,6 +1747,7 @@ mod tests {
             &prefs_key,
             &account_hash,
             &protocol::PrefsView {
+                attachment_ocr_enabled: true,
                 screen_capture_protection: false,
                 ai_enabled: false,
                 ai_excluded_folders: Vec::new(),

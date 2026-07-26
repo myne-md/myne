@@ -60,6 +60,7 @@ pub use myne_core::plugins::attachments::{
 // Desktop-only modules.
 pub mod extract;
 pub mod import_desktop;
+pub mod ocr_queue;
 pub mod read_text;
 pub mod scheme;
 pub mod voice;
@@ -139,5 +140,32 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             voice::commands::voice_record_stop,
             voice::commands::voice_record_cancel,
         ])
+        .setup(|app, _api| {
+            // Load the bundled OCR weights once, at startup, from the Tauri
+            // resource dir (MYND-441). They are ~21 MiB and take real time to
+            // parse, so doing it per attachment would be absurd; the engine is
+            // process-wide and shared by every extraction.
+            //
+            // Failure is NOT an error: an `--no-default-features`-style checkout
+            // whose Git-LFS blobs were never fetched simply has no weights. OCR
+            // then reports image attachments as `Unsupported` and everything
+            // else keeps working. Search losing reach into images must never
+            // stop the app from starting.
+            let available = app
+                .path()
+                .resource_dir()
+                .ok()
+                .map(|rd| {
+                    myne_core::plugins::attachments::ocr::init_from_base(
+                        &rd.join("models")
+                            .join(myne_core::plugins::attachments::ocr::OCR_MODELS_DIR_NAME),
+                    )
+                })
+                .unwrap_or(false);
+            if !available {
+                tracing::info!("OCR weights unavailable; image attachments will not be indexed");
+            }
+            Ok(())
+        })
         .build()
 }

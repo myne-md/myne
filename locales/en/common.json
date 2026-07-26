@@ -2004,6 +2004,13 @@
       "on": "On",
       "saveError": "Could not update the archiving setting."
     },
+    "attachmentOcr": {
+      "label": "Search inside images and scanned documents",
+      "helper": "Reads text out of image attachments and scanned PDFs on this device, so search can find them by their contents. Nothing is uploaded. Turning this off stops the background extraction; text already extracted is kept.",
+      "errorSaveSetting": "Could not save this setting.",
+      "processing_one": "Reading 1 attachment…",
+      "processing_other": "Reading {{count}} attachments…"
+    },
     "autoBackup": {
       "backupFolder": "Backup folder",
       "chooseFolder": "Choose folder…",
@@ -2449,6 +2456,7 @@
         "spell": "spell check spelling dictionary autocorrect",
         "spellLanguages": "spell languages dictionaries locale words",
         "startupOpen": "startup open default file launch boot which note",
+        "attachmentOcr": "ocr image scan scanned pdf photo screenshot text recognition search inside attachments cpu battery",
         "syncAddDevice": "add device pair link phone laptop sync",
         "syncConflicts": "conflicts merge resolve versions sync",
         "syncDevices": "devices linked paired sync machines",

@@ -49,9 +49,101 @@ pub fn turkish_lower(s: &str) -> String {
     out
 }
 
+/// Fold a token to its diacritic-stripped, lowercased form: `şirket` → `sirket`,
+/// `İSTANBUL` → `istanbul`, `dağ` → `dag`.
+///
+/// **Why this exists (MYND-441).** On-device OCR does not reliably reproduce
+/// Turkish diacritics — the MYND-441 spike measured `ı`, `ş` and `ç` being
+/// dropped even though they are present in the recognition charset, because the
+/// model's training distribution is Chinese+English dominant. No engine
+/// available on-device does better: PaddleOCR ships no Turkish recognizer, its
+/// `latin` variant lacks `ğ`/`ş`/`İ` outright, and `ocrs` is English-only. Since
+/// the search tokenizer does Turkish-aware casefolding and stemming but **no**
+/// diacritic folding, an OCR imperfection would otherwise become a total miss: a
+/// document reading `şirketin`, recognized as `sirketin`, is unreachable by a
+/// user who types `şirket` correctly.
+///
+/// Folding both sides of that comparison is the standard remedy for noisy OCR
+/// text, and it is engine-independent — it keeps working whichever recognizer
+/// ships.
+///
+/// Implementation: NFD-decompose and drop combining marks, which covers every
+/// Turkish diacritic that decomposes (`ç`→`c`, `ğ`→`g`, `ö`→`o`, `ş`→`s`,
+/// `ü`→`u`, `İ`→`I`). The dotless `ı` is **not** a decomposable form — it is a
+/// distinct Latin letter — so it is mapped explicitly. Lowercasing runs last, so
+/// `İ` (→`I`→`i`) and `I` (→`i`) and `ı` (→`i`) all converge, which is exactly
+/// the confusion OCR produces.
+///
+/// This is deliberately lossy and must NEVER be used for storage or display —
+/// only as an additional index/query key.
+pub fn fold_diacritics(s: &str) -> String {
+    use unicode_normalization::char::is_combining_mark;
+
+    s.chars()
+        .map(|c| match c {
+            // Not decomposable: a distinct letter, not i-with-something.
+            'ı' => 'i',
+            'İ' => 'I',
+            other => other,
+        })
+        .nfd()
+        .filter(|c| !is_combining_mark(*c))
+        .flat_map(char::to_lowercase)
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn fold_diacritics_strips_turkish_marks() {
+        // Every Turkish diacritic folds to its base letter. These are exactly
+        // the characters MYND-441 measured OCR dropping.
+        assert_eq!(fold_diacritics("şirket"), "sirket");
+        assert_eq!(fold_diacritics("dağ"), "dag");
+        assert_eq!(fold_diacritics("çalışma"), "calisma");
+        assert_eq!(fold_diacritics("öğretmen"), "ogretmen");
+        assert_eq!(fold_diacritics("Ürgüp"), "urgup");
+    }
+
+    #[test]
+    fn fold_diacritics_converges_the_turkish_i_family() {
+        // `İ`, `I` and `ı` all fold to `i`. This is the whole point: OCR
+        // confuses exactly these, so the index and the query must agree on one
+        // form regardless of which the recognizer emitted.
+        assert_eq!(fold_diacritics("İSTANBUL"), "istanbul");
+        assert_eq!(fold_diacritics("ISTANBUL"), "istanbul");
+        assert_eq!(fold_diacritics("ıspanak"), "ispanak");
+        assert_eq!(fold_diacritics("İzmir"), fold_diacritics("Izmir"));
+    }
+
+    #[test]
+    fn fold_diacritics_leaves_plain_ascii_alone() {
+        assert_eq!(fold_diacritics("invoice"), "invoice");
+        assert_eq!(fold_diacritics("Report2024"), "report2024");
+        assert_eq!(fold_diacritics(""), "");
+    }
+
+    #[test]
+    fn fold_diacritics_is_idempotent() {
+        // It must be safe to apply to an already-folded token (the query path
+        // folds every term, including ones that were never accented).
+        for w in ["şirket", "dağ", "istanbul", "plain"] {
+            let once = fold_diacritics(w);
+            assert_eq!(fold_diacritics(&once), once, "not idempotent for {w:?}");
+        }
+    }
+
+    #[test]
+    fn fold_diacritics_covers_non_turkish_latin_too() {
+        // The mechanism is NFD + combining-mark removal, so it is not
+        // Turkish-specific — useful because OCR flattens other Latin scripts
+        // the same way.
+        assert_eq!(fold_diacritics("café"), "cafe");
+        assert_eq!(fold_diacritics("naïve"), "naive");
+        assert_eq!(fold_diacritics("Müller"), "muller");
+    }
 
     #[test]
     fn split_nfc_splits_on_punctuation_and_preserves_case() {

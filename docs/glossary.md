@@ -186,7 +186,7 @@ The **first 16 bytes** of a 32-byte [attachment-id](#attachment-id) — the key 
 
 ### **attachment text extraction** &nbsp; 📋 *Protocol*
 
-The on-device extraction of searchable text from an [attachment](#attachment)'s plaintext — PDF text-layer, Word (`.docx`) OOXML text, and text-like files (`.txt`/`.md`/`.csv`) in v0.1 — so a note becomes findable by the contents of the files embedded in it. Extraction runs entirely in the Rust core (no network, no cloud OCR — `vision.md` zero-knowledge), is cached per attachment in an [`MYE1`](#mye1) blob keyed by [attachment-id](#attachment-id), and is indexed into the [search index](#mys1) as a per-embedding-note [attachment search doc](#attachment-search-doc) (MYND-448a — separate docs superseded the original fold-into-note-body; the `MYS1` snapshot records the [extractor version](#extractor-version) and doc-model `schema_version` it was built under — a change in either forces a rebuild; the codec's `index_format_version` byte is unchanged, both ride the engine-opaque inner snapshot). Image OCR + scanned (text-layer-less) PDFs are out of scope for v0.1, deferred to MYND-441, which reuses the same cache by bumping the [extractor version](#extractor-version). (`spec/protocol.md` §9.15; MYND-328)
+The on-device extraction of searchable text from an [attachment](#attachment)'s plaintext — PDF text-layer, Word (`.docx`) OOXML text, and text-like files (`.txt`/`.md`/`.csv`) in v0.1 — so a note becomes findable by the contents of the files embedded in it. Extraction runs entirely in the Rust core (no network, no cloud OCR — `vision.md` zero-knowledge), is cached per attachment in an [`MYE1`](#mye1) blob keyed by [attachment-id](#attachment-id), and is indexed into the [search index](#mys1) as a per-embedding-note [attachment search doc](#attachment-search-doc) (MYND-448a — separate docs superseded the original fold-into-note-body; the `MYS1` snapshot records the [extractor version](#extractor-version) and doc-model `schema_version` it was built under — a change in either forces a rebuild; the codec's `index_format_version` byte is unchanged, both ride the engine-opaque inner snapshot). Image OCR and scanned (text-layer-less) PDFs joined this in MYND-441, at [extractor version](#extractor-version) `0x03`: an image attachment is recognized by the bundled on-device [image OCR](#image-ocr) engine, and a PDF whose text layer yields nothing has its embedded page image pulled out and recognized instead. Unlike the audio path, OCR is **not** behind the AI opt-in — it is search correctness, so it ships in every build. (`spec/protocol.md` §9.15; MYND-328)
 
 ### **attachment text preview** &nbsp; 📦 *Product*
 
@@ -633,7 +633,9 @@ A scoped, revocable, **append-only** credential (create-clip + is-unlocked-statu
 
 ### **extractor version** &nbsp; 📋 *Protocol*
 
-The 1-byte generation tag (`extractor_version`) on an [`MYE1`](#mye1) extracted-text blob (`spec/protocol.md` §9.15.1), distinct from `protocol_version`: it identifies which [attachment text extraction](#attachment-text-extraction) generation produced the cached text. Because an [attachment-id](#attachment-id) is content-addressed (the bytes are immutable), cached text never needs re-extraction at a fixed `extractor_version`; a **bump** — a better extractor, or the future OCR layer (MYND-441) — invalidates older blobs and forces lazy re-extraction plus a search-index [rebuild](#fall-to-rebuild) (the index records the version it was built under, §9.6.4). Bound into the blob AAD as well as the header byte so a tampered header cannot be silently accepted. (MYND-328)
+The 1-byte generation tag (`extractor_version`) on an [`MYE1`](#mye1) extracted-text blob (`spec/protocol.md` §9.15.1), distinct from `protocol_version`: it identifies which [attachment text extraction](#attachment-text-extraction) generation produced the cached text. Because an [attachment-id](#attachment-id) is content-addressed (the bytes are immutable), cached text never needs re-extraction at a fixed `extractor_version`; a **bump** — a better extractor, the audio-ASR generation (`0x02`), or the image-OCR generation (`0x03`, MYND-441) — invalidates older blobs and forces lazy re-extraction plus a search-index [rebuild](#fall-to-rebuild) (the index records the version it was built under, §9.6.4). Bound into the blob AAD as well as the header byte so a tampered header cannot be silently accepted.
+
+Two properties are worth stating because they cost real work. The byte is **global, not per-format**, so a bump discards every cached extraction of every format — the `0x02`→`0x03` OCR bump re-runs ASR over every audio attachment for no gain; that cost is accepted and the structural fix is tracked separately. And because the OCR weights are *bundled* rather than user-chosen, the payload records no `model_hash` for them, which makes this byte their only staleness signal: **changing the bundled OCR weights requires bumping it.** (MYND-328, MYND-441)
 
 ### **fall-to-rebuild** &nbsp; 📋 *Protocol*
 
@@ -813,6 +815,14 @@ Used in: `spec/markdown-dialect.md` §3.2, §5, §7, §8
 The convenience-paid tier in Myne's freemium model. Myne-operated zero-knowledge sync server (Phase 2+); identical protocol-level guarantees to a self-hosted instance. Status in v0.1: not yet shipped.
 
 Used in: `vision.md`, `decisions.md`
+
+### **image OCR** &nbsp; 🏗️ *Construction*
+
+The on-device optical-character-recognition generation of [attachment text extraction](#attachment-text-extraction) (MYND-441, [extractor version](#extractor-version) `0x03`): raster image attachments (PNG / JPEG / WebP) and scanned, text-layer-less PDFs become searchable by the words in their pixels. A three-model pipeline — text-region detection, 0°/180° line-orientation classification, then CTC recognition — runs on a pure-Rust ML runtime over weights **bundled with the app** (never side-loaded, never downloaded; the runtime has no network surface). A scanned PDF needs no rasterizer: the page image it already embeds is pulled out of the PDF object stream and recognized directly.
+
+Deliberately **not** an AI feature and **not** behind the AI opt-in — it is search correctness, and gating a background indexer behind a beta toggle would mean it effectively never ran. It therefore ships in every build, including the `--no-default-features` auditable one.
+
+Two limits are honest, measured properties rather than bugs. **Turkish diacritics do not survive reliably** — no available on-device model reproduces them, so the search index carries a diacritic-folded token variant for attachment documents to compensate; the *stored* text is whatever OCR produced. And recognition below a per-word confidence floor is discarded, so an image with no readable text is cached as empty rather than indexed with hallucinated words. (`spec/protocol.md` §9.15; MYND-441)
 
 ### **in-note find** &nbsp; 📦 *Product*
 
