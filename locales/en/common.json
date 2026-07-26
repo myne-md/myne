@@ -2686,7 +2686,6 @@
       "pinPlaceholder": "PIN",
       "unlockWithPin": "Unlock with PIN",
       "unlockWithTouchId": "Unlock with Touch ID",
-      "usePasswordBelow": "or use your password below",
       "wrongCredential": "Incorrect. {{remaining}} attempt(s) left."
     },
     "recoveryInterruptedBanner": "Recovery flow was interrupted. Set a new password first.",
