@@ -27,9 +27,13 @@
 // `crate::plugins::attachments::extract::{ExtractStatus, …}` paths keep
 // resolving. This module keeps ONLY the desktop extraction *producer* below.
 pub use myne_core::plugins::attachments::extract_types::{
-    ExtractStatus, ExtractedText, SourceFormat, MAX_EXTRACTED_TEXT_LEN,
+    ExtractStatus, ExtractedText, SourceFormat,
 };
-use unicode_normalization::UnicodeNormalization;
+
+// Only the truncation tests reference the cap directly; `ExtractedText::finalize`
+// in core is what applies it at runtime.
+#[cfg(test)]
+use myne_core::plugins::attachments::extract_types::MAX_EXTRACTED_TEXT_LEN;
 
 /// Extract searchable text from an attachment's decrypted `bytes`, dispatching
 /// on `content_type` first and the `filename` extension as a fallback (an
@@ -40,6 +44,12 @@ pub fn extract(content_type: &str, filename: &str, bytes: &[u8]) -> ExtractedTex
         Some(SourceFormat::Pdf) => guard(SourceFormat::Pdf, || extract_pdf(bytes)),
         Some(SourceFormat::Docx) => guard(SourceFormat::Docx, || extract_docx(bytes)),
         Some(SourceFormat::Text) => guard(SourceFormat::Text, || extract_text_like(bytes)),
+        // Image OCR (MYND-441) lives in `myne-core` so mobile runs the same
+        // extractor. It contains its own panic guard and never returns an
+        // error — an unavailable engine or an undersized image comes back as
+        // `Unsupported`, undecodable bytes as `Failed`, and a confident-word
+        // drought as `Empty`.
+        Some(SourceFormat::Image) => myne_core::plugins::attachments::ocr::extract_image(bytes),
         _ => ExtractedText::negative(ExtractStatus::Unsupported, SourceFormat::Other),
     }
 }
@@ -82,7 +92,7 @@ fn read_xml_part_capped(reader: impl std::io::Read) -> Option<String> {
     }
 }
 
-fn detect_format(content_type: &str, filename: &str) -> Option<SourceFormat> {
+pub(crate) fn detect_format(content_type: &str, filename: &str) -> Option<SourceFormat> {
     let ct = content_type
         .split(';')
         .next()
@@ -108,7 +118,77 @@ fn detect_format(content_type: &str, filename: &str) -> Option<SourceFormat> {
         "pdf" => Some(SourceFormat::Pdf),
         "docx" => Some(SourceFormat::Docx),
         "txt" | "text" | "md" | "markdown" | "csv" | "tsv" | "log" => Some(SourceFormat::Text),
+        // Raster formats the OCR generation handles (MYND-441). The predicate
+        // lives in `myne-core` because mobile dispatches on the SAME definition
+        // — the two platforms must not disagree about which files get read.
+        _ if myne_core::plugins::attachments::ocr::is_ocr_image(content_type, filename) => {
+            Some(SourceFormat::Image)
+        }
         _ => None,
+    }
+}
+
+/// The extractor the **on-unlock index rebuild** injects: everything the
+/// deterministic parsers can do, with OCR deferred to the background worker
+/// ([`super::ocr_queue`]).
+///
+/// OCR candidates come back `Unsupported`, which the backfill deliberately does
+/// **not** cache (a pre-existing rule, not one invented here). They therefore
+/// end the rebuild with no cache entry — which is precisely the worker's work
+/// list. The rebuild stays milliseconds-per-note, and the first search after
+/// unlock is not held hostage to reading every scanned document in the vault.
+///
+/// A PDF is only deferred once its text layer has been tried and produced
+/// nothing: a PDF that *has* selectable text is fully extracted here and never
+/// reaches the worker.
+pub fn extract_deferring_ocr(content_type: &str, filename: &str, bytes: &[u8]) -> ExtractedText {
+    match detect_format(content_type, filename) {
+        // Images defer unconditionally — the worker owns every model pass.
+        Some(SourceFormat::Image) => {
+            ExtractedText::negative(ExtractStatus::Unsupported, SourceFormat::Image)
+        }
+        Some(SourceFormat::Pdf) => {
+            // Try the (cheap) text layer. Only a PDF that yields nothing is a
+            // scan candidate worth handing to the worker; one with selectable
+            // text is fully extracted here and never queued.
+            //
+            // The `Document` is built INSIDE the guard: `&[u8]` is unwind-safe
+            // while `&lopdf::Document` is not, and this path must keep the same
+            // never-panics containment `extract` gives every other parser.
+            let layer = guard(SourceFormat::Pdf, || {
+                match lopdf::Document::load_mem(bytes) {
+                    Ok(doc) => extract_pdf_text_layer(&doc),
+                    Err(_) => ExtractedText::negative(ExtractStatus::Failed, SourceFormat::Pdf),
+                }
+            });
+            if layer.status == ExtractStatus::Empty {
+                ExtractedText::negative(ExtractStatus::Unsupported, SourceFormat::Pdf)
+            } else {
+                layer
+            }
+        }
+        _ => extract(content_type, filename, bytes),
+    }
+}
+
+/// Maximum pages OCR'd for one scanned PDF.
+///
+/// A time budget, not a size one: at roughly 0.4 s/page the queue is sequential,
+/// so a 500-page scan would monopolize it for minutes while every other
+/// attachment waits. 50 pages ≈ 20 s, which is a tolerable share of one
+/// attachment's turn. Pages beyond the cap are not read — a documented
+/// limitation, revisitable without a format change (the result is re-derivable
+/// at any later `extractor_version`).
+const MAX_OCR_PDF_PAGES: usize = 50;
+
+/// The PDF text layer alone — no OCR fallback. Shared by [`extract_pdf`] and
+/// [`extract_deferring_ocr`], which needs to know whether a text layer exists
+/// without paying for the scan path.
+fn extract_pdf_text_layer(doc: &lopdf::Document) -> ExtractedText {
+    let pages: Vec<u32> = doc.get_pages().keys().copied().collect();
+    match doc.extract_text(&pages) {
+        Ok(text) => finalize(text, SourceFormat::Pdf),
+        Err(_) => ExtractedText::negative(ExtractStatus::Failed, SourceFormat::Pdf),
     }
 }
 
@@ -117,11 +197,116 @@ fn extract_pdf(bytes: &[u8]) -> ExtractedText {
         Ok(d) => d,
         Err(_) => return ExtractedText::negative(ExtractStatus::Failed, SourceFormat::Pdf),
     };
-    let pages: Vec<u32> = doc.get_pages().keys().copied().collect();
-    match doc.extract_text(&pages) {
-        Ok(text) => finalize(text, SourceFormat::Pdf),
-        Err(_) => ExtractedText::negative(ExtractStatus::Failed, SourceFormat::Pdf),
+    let layer = extract_pdf_text_layer(&doc);
+    // A PDF that HAS selectable text keeps using it: faster, and exact. OCR is
+    // only for the text-layer-less case (MYND-441).
+    if layer.status != ExtractStatus::Empty {
+        return layer;
     }
+    ocr_scanned_pdf(&doc)
+}
+
+/// OCR a text-layer-less PDF by pulling the page images it already contains.
+///
+/// **No rasterizer.** A scanned PDF is, in practice, one embedded image per
+/// page — the shape every scanner and phone produces — so the pixels are already
+/// in the file and `lopdf` (in-tree since MYND-255) can hand them over. Adding a
+/// real renderer would mean a prebuilt C++ binary per platform, giving back the
+/// pure-Rust / single-`Cargo.lock` / mobile-portable properties the rest of this
+/// feature was built to protect.
+///
+/// Codec coverage is deliberately partial. `DCTDecode` (JPEG) and `FlateDecode`
+/// (raw deflated samples) are the overwhelming majority of modern output.
+/// `CCITTFaxDecode` (fax/legacy office scans), `JBIG2` (archive scans) and `JPX`
+/// (JPEG 2000) are **not** decoded: those pages contribute nothing and the
+/// attachment ends up `Empty`, cached, costing CPU exactly once and revisitable
+/// under a later generation with no data loss.
+///
+/// Known limitation: a page composed of several image tiles yields fragmentary
+/// text ordered by XObject iteration rather than true layout.
+fn ocr_scanned_pdf(doc: &lopdf::Document) -> ExtractedText {
+    use myne_core::plugins::attachments::ocr;
+
+    let Some(models) = ocr::models() else {
+        // No weights in this build/checkout: report honestly rather than
+        // caching a false "nothing here".
+        return ExtractedText::negative(ExtractStatus::Unsupported, SourceFormat::Pdf);
+    };
+
+    let mut out = String::new();
+    for (_, page_id) in doc.get_pages().into_iter().take(MAX_OCR_PDF_PAGES) {
+        let Ok(images) = doc.get_page_images(page_id) else {
+            continue;
+        };
+        for img in images {
+            let Some(decoded) = decode_pdf_image(doc, &img) else {
+                continue;
+            };
+            let text = ocr::recognize(models, &decoded).text();
+            if !text.trim().is_empty() {
+                if !out.is_empty() {
+                    out.push('\n');
+                }
+                out.push_str(&text);
+            }
+        }
+        // Stop early once the text cap is already exceeded — further pages
+        // would be truncated away anyway.
+        if out.len() > myne_core::plugins::attachments::extract_types::MAX_EXTRACTED_TEXT_LEN {
+            break;
+        }
+    }
+    finalize(out, SourceFormat::Pdf)
+}
+
+/// Turn one embedded PDF image into decoded pixels, or `None` for a codec this
+/// generation does not handle.
+fn decode_pdf_image(
+    doc: &lopdf::Document,
+    img: &lopdf::xobject::PdfImage<'_>,
+) -> Option<image::DynamicImage> {
+    let (w, h) = (
+        u32::try_from(img.width).ok()?,
+        u32::try_from(img.height).ok()?,
+    );
+    // Same icon-scale skip as direct image attachments: a small logo embedded in
+    // an otherwise-blank page is not worth three model passes.
+    if w.min(h) < myne_core::plugins::attachments::ocr::MIN_OCR_IMAGE_SIDE {
+        return None;
+    }
+
+    let filters = img.filters.clone().unwrap_or_default();
+    let has = |f: &str| filters.iter().any(|x| x == f);
+
+    if has("DCTDecode") {
+        // The stream content IS a JPEG file; hand it straight to the decoder.
+        return image::load_from_memory(img.content).ok();
+    }
+
+    if has("FlateDecode") && filters.len() == 1 {
+        // Raw samples behind zlib. Re-fetch the stream so lopdf inflates it for
+        // us (`PdfImage::content` is the still-filtered bytes).
+        let stream = doc.get_object(img.id).ok()?.as_stream().ok()?;
+        let raw = stream.decompressed_content().ok()?;
+        let bpc = img.bits_per_component.unwrap_or(8);
+        if bpc != 8 {
+            return None; // 1-bit/4-bit packed samples are a later improvement
+        }
+        return match img.color_space.as_deref() {
+            Some("DeviceRGB") => {
+                image::RgbImage::from_raw(w, h, raw).map(image::DynamicImage::ImageRgb8)
+            }
+            Some("DeviceGray") => {
+                image::GrayImage::from_raw(w, h, raw).map(image::DynamicImage::ImageLuma8)
+            }
+            // Indexed / CMYK / ICC-based need palette or profile handling.
+            _ => None,
+        };
+    }
+
+    // CCITTFaxDecode, JBIG2Decode, JPXDecode, or a filter chain we do not
+    // interpret. Deliberately unhandled — see `ocr_scanned_pdf`.
+    None
 }
 
 fn extract_docx(bytes: &[u8]) -> ExtractedText {
@@ -473,40 +658,12 @@ fn parse_docx_blocks(xml: &str, max_blocks: usize) -> Vec<DocxBlock> {
 }
 
 /// NFC-normalize, apply the size cap, and classify (`Ok` vs `Empty`).
+///
+/// Delegates to the shared core implementation so desktop and mobile cannot
+/// drift on normalization, the cap, the `char_count`-before-truncation rule, or
+/// the whitespace-only → `Empty` rule (MYND-441).
 fn finalize(raw: String, fmt: SourceFormat) -> ExtractedText {
-    let normalized: String = raw.nfc().collect();
-    let char_count = normalized.chars().count() as u32;
-
-    let (mut text, truncated) = if normalized.len() > MAX_EXTRACTED_TEXT_LEN {
-        let mut end = MAX_EXTRACTED_TEXT_LEN;
-        while end > 0 && !normalized.is_char_boundary(end) {
-            end -= 1;
-        }
-        (normalized[..end].to_string(), true)
-    } else {
-        (normalized, false)
-    };
-
-    if text.trim().is_empty() {
-        text.clear();
-        return ExtractedText {
-            status: ExtractStatus::Empty,
-            source_format: fmt,
-            text,
-            char_count,
-            truncated,
-            // Deterministic extractors (PDF/DOCX/text) are model-independent.
-            model_hash: None,
-        };
-    }
-    ExtractedText {
-        status: ExtractStatus::Ok,
-        source_format: fmt,
-        text,
-        char_count,
-        truncated,
-        model_hash: None,
-    }
+    ExtractedText::finalize(raw, fmt)
 }
 
 #[cfg(test)]
@@ -822,10 +979,374 @@ mod tests {
 
     #[test]
     fn unsupported_type_is_unsupported() {
-        let r = extract("image/png", "pic.png", b"\x89PNG\r\n");
+        // NB: this used to use `image/png` as the archetypal unsupported type.
+        // MYND-441 made PNG a first-class OCR format, so the example moved to a
+        // type nothing dispatches on.
+        let r = extract("application/zip", "bundle.zip", b"PK\x03\x04");
         assert_eq!(r.status, ExtractStatus::Unsupported);
         assert_eq!(r.source_format, SourceFormat::Other);
         assert!(r.text.is_empty());
+    }
+
+    /// Desktop and mobile must produce **byte-identical** cache payloads for the
+    /// same attachment, or the two clients disagree about what a file contains
+    /// and each re-extracts what the other already did.
+    ///
+    /// Both entry points are exercised here in one process: the desktop
+    /// dispatcher (`extract`) and the extractor mobile injects
+    /// (`ocr::extract_image_only`). The assertion is on the serialized MYE1
+    /// inner plaintext, not the text — so the format tag, char count and
+    /// truncation flag are all covered, not just the words.
+    #[test]
+    fn desktop_and_mobile_agree_byte_for_byte_on_an_image() {
+        if !init_ocr_for_tests() {
+            return; // no LFS blobs in this checkout
+        }
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("..")
+            .join("core")
+            .join("tests")
+            .join("fixtures")
+            .join("ocr-sample.png");
+        let bytes = std::fs::read(path).expect("fixture readable");
+
+        let desktop = extract("image/png", "sample.png", &bytes);
+        let mobile = myne_core::plugins::attachments::ocr::extract_image_only(
+            "image/png",
+            "sample.png",
+            &bytes,
+        );
+
+        assert_eq!(
+            desktop.status,
+            ExtractStatus::Ok,
+            "precondition: text was read"
+        );
+        assert_eq!(
+            desktop.to_blob_plaintext(),
+            mobile.to_blob_plaintext(),
+            "desktop and mobile must serialize identically"
+        );
+    }
+
+    // --- OCR deferral for the index rebuild (MYND-441) -------------------
+
+    /// The rebuild's extractor must NOT do OCR. An image comes back
+    /// `Unsupported`, which the backfill deliberately does not cache — leaving
+    /// no cache entry, which is exactly the background worker's work list.
+    #[test]
+    fn the_rebuild_extractor_defers_images() {
+        if !init_ocr_for_tests() {
+            return;
+        }
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("..")
+            .join("core")
+            .join("tests")
+            .join("fixtures")
+            .join("ocr-sample.png");
+        let bytes = std::fs::read(path).expect("fixture readable");
+
+        let deferred = extract_deferring_ocr("image/png", "sample.png", &bytes);
+        assert_eq!(
+            deferred.status,
+            ExtractStatus::Unsupported,
+            "the rebuild must defer, not extract"
+        );
+        assert!(deferred.text.is_empty());
+
+        // ...while the full extractor, which the worker uses, does read it.
+        let full = extract("image/png", "sample.png", &bytes);
+        assert_eq!(full.status, ExtractStatus::Ok);
+    }
+
+    /// A scanned PDF is deferred too — its text layer is tried (cheap) and comes
+    /// back empty, which is the signal that OCR is worth attempting later.
+    #[test]
+    fn the_rebuild_extractor_defers_a_scanned_pdf() {
+        if !init_ocr_for_tests() {
+            return;
+        }
+        let (jpeg, w, h) = fixture_jpeg();
+        let pdf = scanned_pdf(&jpeg, w as i64, h as i64, "DCTDecode");
+        let deferred = extract_deferring_ocr("application/pdf", "scan.pdf", &pdf);
+        assert_eq!(deferred.status, ExtractStatus::Unsupported);
+        assert_eq!(deferred.source_format, SourceFormat::Pdf);
+    }
+
+    /// A PDF that HAS a text layer is fully extracted in the rebuild and never
+    /// reaches the worker — deferring it would delay text that is already
+    /// available for free.
+    #[test]
+    fn the_rebuild_extractor_does_not_defer_a_text_layer_pdf() {
+        let pdf = build_text_pdf("Rebuild path keeps the text layer");
+        let r = extract_deferring_ocr("application/pdf", "doc.pdf", &pdf);
+        assert_eq!(r.status, ExtractStatus::Ok, "text layer extracted inline");
+        assert!(!r.text.is_empty());
+    }
+
+    /// Deterministic formats are unaffected by the deferral.
+    #[test]
+    fn the_rebuild_extractor_still_handles_text_inline() {
+        let r = extract_deferring_ocr("text/plain", "notes.txt", b"hello world");
+        assert_eq!(r.status, ExtractStatus::Ok);
+        assert_eq!(r.source_format, SourceFormat::Text);
+    }
+
+    // --- scanned-PDF OCR (MYND-441) -------------------------------------
+
+    /// Build a synthetic "scanned" PDF: one page whose only content is an
+    /// embedded image, exactly the shape a scanner or phone produces. Built in
+    /// memory with the `lopdf` already in-tree, so no binary fixture is
+    /// committed and the test states its own premise.
+    fn scanned_pdf(image_bytes: &[u8], w: i64, h: i64, filter: &str) -> Vec<u8> {
+        use lopdf::{dictionary, Dictionary, Document, Object, Stream};
+
+        let mut doc = Document::with_version("1.5");
+
+        let mut img_dict = Dictionary::new();
+        img_dict.set("Type", Object::Name(b"XObject".to_vec()));
+        img_dict.set("Subtype", Object::Name(b"Image".to_vec()));
+        img_dict.set("Width", Object::Integer(w));
+        img_dict.set("Height", Object::Integer(h));
+        img_dict.set("ColorSpace", Object::Name(b"DeviceRGB".to_vec()));
+        img_dict.set("BitsPerComponent", Object::Integer(8));
+        img_dict.set("Filter", Object::Name(filter.as_bytes().to_vec()));
+        // `Stream::new` does not compress; the content stays exactly the bytes
+        // the filter name advertises.
+        let img_id = doc.add_object(Stream::new(img_dict, image_bytes.to_vec()));
+
+        let content_id = doc.add_object(Stream::new(dictionary! {}, Vec::new()));
+        let pages_id = doc.new_object_id();
+        let page_id = doc.add_object(dictionary! {
+            "Type" => "Page",
+            "Parent" => pages_id,
+            "Contents" => content_id,
+            "MediaBox" => vec![0.into(), 0.into(), 612.into(), 792.into()],
+            "Resources" => dictionary! {
+                "XObject" => dictionary! { "Im0" => img_id },
+            },
+        });
+        doc.objects.insert(
+            pages_id,
+            Object::Dictionary(dictionary! {
+                "Type" => "Pages",
+                "Kids" => vec![page_id.into()],
+                "Count" => 1,
+            }),
+        );
+        let catalog_id = doc.add_object(dictionary! {
+            "Type" => "Catalog",
+            "Pages" => pages_id,
+        });
+        doc.trailer.set("Root", catalog_id);
+
+        let mut buf = Vec::new();
+        doc.save_to(&mut buf).expect("save pdf");
+        buf
+    }
+
+    fn fixture_jpeg() -> (Vec<u8>, u32, u32) {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("..")
+            .join("core")
+            .join("tests")
+            .join("fixtures")
+            .join("ocr-sample.png");
+        let img = image::open(path).expect("fixture decodes");
+        let (w, h) = (img.width(), img.height());
+        let mut buf = std::io::Cursor::new(Vec::new());
+        img.write_to(&mut buf, image::ImageFormat::Jpeg)
+            .expect("encode jpeg");
+        (buf.into_inner(), w, h)
+    }
+
+    /// The headline case: a PDF with no text layer, whose page is a single
+    /// embedded JPEG, becomes searchable — with no rasterizer anywhere.
+    #[test]
+    fn a_scanned_pdf_is_ocrd_through_its_embedded_page_image() {
+        if !init_ocr_for_tests() {
+            return; // no LFS blobs in this checkout
+        }
+        let (jpeg, w, h) = fixture_jpeg();
+        let pdf = scanned_pdf(&jpeg, w as i64, h as i64, "DCTDecode");
+        let r = extract("application/pdf", "scan.pdf", &pdf);
+        assert_eq!(
+            r.source_format,
+            SourceFormat::Pdf,
+            "still a PDF, not an image"
+        );
+        assert_eq!(
+            r.status,
+            ExtractStatus::Ok,
+            "expected recognized text, got {r:?}"
+        );
+        assert!(
+            r.text.to_lowercase().contains("invoice"),
+            "got {:?}",
+            r.text
+        );
+    }
+
+    /// A page image in a codec this generation does not decode contributes
+    /// nothing, and the attachment lands as `Empty` — cached, so it costs CPU
+    /// exactly once and can be revisited under a later generation.
+    #[test]
+    fn an_unsupported_page_codec_yields_empty_not_failed() {
+        if !init_ocr_for_tests() {
+            return;
+        }
+        let (jpeg, w, h) = fixture_jpeg();
+        // Same bytes, but the PDF advertises a fax codec we deliberately do not
+        // implement.
+        let pdf = scanned_pdf(&jpeg, w as i64, h as i64, "CCITTFaxDecode");
+        let r = extract("application/pdf", "fax.pdf", &pdf);
+        assert_eq!(r.source_format, SourceFormat::Pdf);
+        assert_eq!(
+            r.status,
+            ExtractStatus::Empty,
+            "an undecodable page codec must be Empty (cached), not Failed"
+        );
+    }
+
+    /// An icon-scale embedded image is skipped, so a mostly-blank PDF carrying a
+    /// small logo does not pay three model passes for nothing.
+    #[test]
+    fn a_tiny_embedded_image_is_skipped() {
+        if !init_ocr_for_tests() {
+            return;
+        }
+        let small = image::DynamicImage::ImageRgb8(image::RgbImage::from_pixel(
+            32,
+            32,
+            image::Rgb([10, 10, 10]),
+        ));
+        let mut buf = std::io::Cursor::new(Vec::new());
+        small.write_to(&mut buf, image::ImageFormat::Jpeg).unwrap();
+        let pdf = scanned_pdf(&buf.into_inner(), 32, 32, "DCTDecode");
+        let r = extract("application/pdf", "logo.pdf", &pdf);
+        assert_eq!(r.status, ExtractStatus::Empty);
+    }
+
+    // --- image OCR dispatch (MYND-441) ----------------------------------
+
+    /// The three raster formats OCR handles are dispatched by content type.
+    #[test]
+    fn raster_images_dispatch_to_the_ocr_format() {
+        for ct in ["image/png", "image/jpeg", "image/webp"] {
+            assert_eq!(
+                detect_format(ct, "whatever.bin"),
+                Some(SourceFormat::Image),
+                "{ct} should dispatch to OCR"
+            );
+        }
+    }
+
+    /// ...and by extension, for attachments stored as `application/octet-stream`
+    /// (the MYND-173 default for unsniffed types).
+    #[test]
+    fn raster_images_dispatch_by_extension_fallback() {
+        for name in ["scan.png", "photo.JPG", "shot.jpeg", "pic.webp"] {
+            assert_eq!(
+                detect_format("application/octet-stream", name),
+                Some(SourceFormat::Image),
+                "{name} should dispatch to OCR by extension"
+            );
+        }
+    }
+
+    /// GIF and SVG are accepted as attachments by `sniff.rs` but must NOT reach
+    /// OCR: GIF is animation, SVG is already text. Asserting on `detect_format`
+    /// proves the skip happens before any decode or model pass, not after.
+    #[test]
+    fn animated_and_vector_images_never_reach_ocr() {
+        for (ct, name) in [("image/gif", "loop.gif"), ("image/svg+xml", "logo.svg")] {
+            assert_eq!(
+                detect_format(ct, name),
+                None,
+                "{ct} must not dispatch to OCR"
+            );
+            let r = extract(ct, name, b"\x00\x01\x02");
+            assert_eq!(r.status, ExtractStatus::Unsupported);
+            assert_eq!(r.source_format, SourceFormat::Other);
+        }
+    }
+
+    /// Bytes that do not decode as an image are `Failed`, not `Empty` — the
+    /// distinction matters because both are cached, and `Failed` is the honest
+    /// record that we could not even look.
+    #[test]
+    fn undecodable_image_bytes_report_failed() {
+        init_ocr_for_tests();
+        let r = extract(
+            "image/png",
+            "broken.png",
+            b"\x89PNG\r\n\x1a\nnot really a png",
+        );
+        assert_eq!(r.source_format, SourceFormat::Image);
+        assert!(
+            matches!(r.status, ExtractStatus::Failed | ExtractStatus::Unsupported),
+            "undecodable bytes must not be reported as Ok/Empty, got {:?}",
+            r.status
+        );
+        assert!(r.text.is_empty());
+    }
+
+    /// An icon-scale image is skipped before decode: nothing readable lives
+    /// under the threshold, and a vault full of small images must cost the
+    /// queue nothing.
+    #[test]
+    fn undersized_images_are_skipped_without_running_ocr() {
+        init_ocr_for_tests();
+        let tiny = tiny_png(32, 32);
+        let r = extract("image/png", "icon.png", &tiny);
+        assert_eq!(r.source_format, SourceFormat::Image);
+        assert_eq!(
+            r.status,
+            ExtractStatus::Unsupported,
+            "an undersized image is skipped, not attempted"
+        );
+    }
+
+    /// End-to-end through the real dispatch: a fixture image comes back as
+    /// `Ok` with its text and the OCR source format.
+    #[test]
+    fn a_real_image_extracts_through_the_dispatch() {
+        if !init_ocr_for_tests() {
+            return; // no LFS blobs in this checkout
+        }
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("..")
+            .join("core")
+            .join("tests")
+            .join("fixtures")
+            .join("ocr-sample.png");
+        let bytes = std::fs::read(path).expect("fixture readable");
+        let r = extract("image/png", "sample.png", &bytes);
+        assert_eq!(r.source_format, SourceFormat::Image);
+        assert_eq!(r.status, ExtractStatus::Ok, "expected text, got {r:?}");
+        assert!(
+            r.text.to_lowercase().contains("invoice"),
+            "got {:?}",
+            r.text
+        );
+        assert!(r.char_count > 0);
+    }
+
+    fn init_ocr_for_tests() -> bool {
+        myne_core::plugins::attachments::ocr::init_from_base(
+            &myne_core::plugins::attachments::ocr::bundled_models_dir_for_tests(),
+        )
+    }
+
+    /// A valid but tiny PNG, encoded in-memory so the fixture stays out of git.
+    fn tiny_png(w: u32, h: u32) -> Vec<u8> {
+        let img = image::RgbImage::from_pixel(w, h, image::Rgb([255, 255, 255]));
+        let mut buf = std::io::Cursor::new(Vec::new());
+        image::DynamicImage::ImageRgb8(img)
+            .write_to(&mut buf, image::ImageFormat::Png)
+            .expect("encode");
+        buf.into_inner()
     }
 
     #[test]

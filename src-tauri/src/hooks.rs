@@ -26,9 +26,17 @@ impl<R: Runtime> DesktopHooks<R> {
 impl<R: Runtime> VaultLifecycleHooks for DesktopHooks<R> {
     // ---- Group 1: async ---------------------------------------------------
     fn hydrate_search_index<'a>(&'a self, state: &'a VaultRuntimeState) -> BoxFuture<'a> {
-        Box::pin(crate::plugins::notes::search_sync::hydrate_search_index(
-            &self.app, state,
-        ))
+        let app = self.app.clone();
+        Box::pin(async move {
+            crate::plugins::notes::search_sync::hydrate_search_index(&app, state).await;
+            // MYND-441: the rebuild above defers OCR (it injects
+            // `extract_deferring_ocr`), so image and scanned-PDF attachments
+            // finish it with no cache entry. Kick the background worker that
+            // drains them. DETACHED on purpose — waiting here would put
+            // seconds-per-page work back on the unlock path, which is the exact
+            // stall the deferral exists to remove.
+            crate::plugins::attachments::ocr_queue::spawn(app.clone());
+        })
     }
 
     fn hydrate_spell<'a>(&'a self, state: &'a VaultRuntimeState) -> BoxFuture<'a> {

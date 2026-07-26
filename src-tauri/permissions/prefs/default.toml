@@ -41,6 +41,7 @@ permissions = [
   "allow-set-editor-font-family",
   "allow-set-active-workspace",
   "allow-set-ai-enabled",
+  "allow-set-attachment-ocr-enabled",
   "allow-set-ai-excluded-folders",
   "allow-set-editor-default-view-mode",
   "allow-set-editor-focus-dim-inactive",
@@ -433,6 +434,11 @@ commands.allow = ["set_right_panel_tab_order"]
 identifier = "allow-set-ai-enabled"
 description = "Allow invoking prefs:set_ai_enabled (Slot::Unlocked-gated setter for the ai_enabled AI opt-in toggle; atomic-writes vault.prefs with no native side-effect; the default-OFF policy is applied host-side at read time; emitted on disk only when true)."
 commands.allow = ["set_ai_enabled"]
+
+[[permission]]
+identifier = "allow-set-attachment-ocr-enabled"
+description = "Allow invoking prefs:set_attachment_ocr_enabled (Slot::Unlocked-gated setter for the attachment_ocr_enabled image-OCR toggle, MYND-441; atomic-writes vault.prefs with no native side-effect; device-local per sync-protocol.md §10.2; defaults to true, so it is emitted on disk only when false)."
+commands.allow = ["set_attachment_ocr_enabled"]
 
 [[permission]]
 identifier = "allow-set-ai-excluded-folders"

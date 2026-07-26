@@ -26,12 +26,26 @@ tauri-build = { version = "2", features = [] }
 # `--features` flag (decisions.md 2026-07-02 "Ship local AI in the default build
 # behind a runtime beta opt-in", superseding the 2026-07-01 default-off posture).
 #
-# AI-FREE auditable build: `cargo build -p myne-desktop --no-default-features`
-# (or `pnpm tauri build --no-default-features`) still compiles zero ML symbols and
-# resolves the pre-AI `Cargo.lock` graph byte-for-byte — the reproducible-build /
-# TB9 escape hatch is preserved even though it is no longer the default. The
-# no-egress guarantee is an ABSOLUTE property of the single shipped tree, proved
-# by `scripts/ai-no-network-check.sh` (denylist scan), not a feature delta.
+# AUDITABLE build: `cargo build -p myne-desktop --no-default-features` (or
+# `pnpm tauri build --no-default-features`) drops the ENTIRE `local-inference`
+# stack — the generation model, the embedding model, the ASR/speech-to-text path
+# and every candle/tokenizers symbol — and carries no network path whatsoever.
+# The reproducible-build / TB9 escape hatch is preserved even though AI is no
+# longer opt-in at compile time. The no-egress guarantee is an ABSOLUTE property
+# of the single shipped tree, proved by `scripts/ai-no-network-check.sh`
+# (denylist scan), not a feature delta.
+#
+# It is NOT, however, a machine-learning-free build, and this comment used to
+# claim it was ("zero ML symbols"). Since MYND-441 the tree also contains an
+# on-device OCR extractor (`rten` + bundled PP-OCRv5 weights), and that ships in
+# EVERY build on purpose: OCR is search correctness, not an AI feature. Gating it
+# would make the audit build search differently from the shipped product, which
+# is precisely what this build exists to rule out. `ai-no-network-check.sh`
+# check 3 asserts the OCR runtime is present in both trees, so it cannot be
+# quietly moved behind the feature flag. What an auditor gets here is: no
+# generative model, no embeddings, no ASR, no network — plus a fixed,
+# model-invariant text recognizer whose weights are hash-pinned in
+# `resources/models/ocr/README.md`.
 default = ["local-inference"]
 local-inference = ["dep:candle-core", "dep:candle-nn", "dep:candle-transformers", "dep:tokenizers"]
 # E2E-only build variant: keeps `local-inference` but swaps the Candle engine for
@@ -178,6 +192,12 @@ base64 = "0.22"
 # conveniences) disabled: the stamper needs parse + content append + full
 # rewrite save only. MIT.
 lopdf = { version = "0.42.0", default-features = false }
+# Decodes the page images pulled out of a scanned (text-layer-less) PDF before
+# they go to OCR (MYND-441, `attachments::extract::decode_pdf_image`), and
+# synthesizes small PNGs in the dispatch tests. Same pin and same narrow feature
+# set as `myne-core`'s, so no package enters the graph that was not already
+# there — this is a second declaring crate, not a new admission.
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp"] }
 
 # Attachment text extraction for search (MYND-328). DOCX is an OOXML zip whose
 # text lives in `word/document.xml`; `zip` unpacks that one member and

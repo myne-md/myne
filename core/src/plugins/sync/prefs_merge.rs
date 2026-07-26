@@ -316,6 +316,10 @@ pub fn merge_prefs(local: &PrefsView, remote: &PrefsView) -> PrefsView {
         // ---- device-local: local wins, always -----------------------------
         active_workspace: local.active_workspace.clone(),
         ai_enabled: local.ai_enabled,
+        // MYND-441: device-local like `ai_enabled`, and for the same reason —
+        // battery and thermal capacity differ per device, so turning OCR off on
+        // a phone must not turn it off on the desktop.
+        attachment_ocr_enabled: local.attachment_ocr_enabled,
         auto_lock_seconds: local.auto_lock_seconds,
         bar_items_order: local.bar_items_order.clone(),
         custom_theme: local.custom_theme.clone(),
