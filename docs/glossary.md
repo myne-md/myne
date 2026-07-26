@@ -610,6 +610,12 @@ The two on-disk wrapped copies of `root_key` in `vault.meta`. Each is 32 bytes o
 
 Used in: `spec/protocol.md` §3.1, §9.3
 
+### **effective ceiling** &nbsp; 📋 *Protocol*
+
+The storage or device limit a server would actually enforce for one account: the per-account override from the [account policy store](#account-policy-store) when set, else the global default (`quota_override ?? plan ?? global default`; `decisions.md` 2026-07-13). Load-bearing rule: the [account status endpoint](#account-status-endpoint) and the push/enroll enforcement guard MUST resolve it through the **same** function, so a reported ceiling and a refusal cannot disagree. **`0` means unlimited**, never a ceiling of zero — the ordinary self-host posture, which clients render as usage with no limit, no meter and no upsell (`spec/server-protocol.md` §7.1; MYND-570).
+
+Used in: `spec/server-protocol.md` §7.1; `decisions.md` 2026-07-13, 2026-07-26
+
 ### **export** &nbsp; 📦 *Product*
 
 A one-shot, user-initiated operation that decrypts user content and writes it as ordinary **unencrypted** files to a destination the user explicitly chose via the OS file dialog — per-note markdown, the whole-vault markdown tree, attachment files, a rendered PDF, standalone HTML, or stripped plain text (HTML + plain text added by MYND-340). Export is the portability path ("you walk away with your files", `vision.md`): the markdown forms write the stored plaintext **verbatim** (frontmatter included; the only sanctioned mutation is the attachments-mode embed rewrite, `markdown-dialect.md` §6 — HTML's image-sidecar `src` rewrite is the same sanctioned-transform class). PDF/HTML/plain-text are **lossy projections**, not byte-stable round-trips of the source. Terminology wall: an export is never a [vault backup file](#vault-backup-file) (that stays exactly as encrypted as the vault) and never a snapshot (version history). Threat-model framing: a deliberate plaintext crossing of TB3 under user authority — the artifact is outside Myne's protection from the moment it is written (`threat-model.md` §3 TB3, §5). There is no plaintext *mode*: no watch, mirror, or export-on-save exists.
@@ -1206,7 +1212,7 @@ Used in: `decisions.md` 2026-07-15; `spec/server-protocol.md` §7
 
 ### **account status endpoint** &nbsp; 📋 *Protocol*
 
-`GET /account/status` (`decisions.md` 2026-07-15; MYND-506; `spec/server-protocol.md` §7): the authed, client-facing counterpart to the [operator console](#operator-console). Returns the caller's own `{stored bytes, device count, frozen, effective quota + device ceilings}`. The account is **resolved from the device token — never from the URL or query** (an identifier there is ignored), so the account number never appears in a request line or log. API-only in v0.1 (no client UI yet).
+`GET /account/status` (`decisions.md` 2026-07-15; MYND-506; `spec/server-protocol.md` §7 / §7.1): the authed, client-facing counterpart to the [operator console](#operator-console). Returns the caller's own `{stored_bytes, device_count, frozen, quota_bytes, max_devices}`. The account is **resolved from the device token — never from the URL or query** (an identifier there is ignored), so the account number never appears in a request line or log. Both ceilings are **effective** — resolved through the same function the enforcement guard uses, so a reported ceiling and a refusal cannot disagree — and **`0` means unlimited**, never a ceiling of zero (`decisions.md` 2026-07-26; MYND-570). Surfaced in Settings → Sync on desktop and mobile since MYND-570; `plan_id` / `paid_until_day` stay reserved to MYND-430 and are not exposed.
 
 Used in: `decisions.md` 2026-07-15; `spec/server-protocol.md` §7
 
