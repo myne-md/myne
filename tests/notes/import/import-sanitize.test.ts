@@ -104,13 +104,27 @@ describe("URL scheme narrowing", () => {
     "../parent.md",
     "Page%20Title%201a2b.md",
     "#anchor",
+    // Schemes are case-insensitive (RFC 3986 §3.1) and real-world exports do
+    // emit them uppercased; DOMPurify does not fold case before testing, so the
+    // pattern must. Without these the link would silently lose its `href`.
+    "HTTPS://example.test/x",
+    "HtTp://example.test/x",
+    "MAILTO:a@b.test",
   ];
   const rejected = [
     "javascript:alert(1)",
     "JaVaScRiPt:alert(1)",
+    "JAVASCRIPT:alert(1)",
     "data:text/html;base64,PHNjcmlwdD4=",
+    "DATA:text/html;base64,PHNjcmlwdD4=",
     "file:///etc/passwd",
+    "FILE:///etc/passwd",
     "vbscript:msgbox",
+    // Near-misses on the recognizing arm must fall through to the relative arm
+    // and be rejected there — the `i` flag widens neither.
+    "httpsx://evil.test",
+    "https:/evil.test",
+    "mailtox:a@b.test",
   ];
 
   it.each(allowed)("permits %s", (url) => {
