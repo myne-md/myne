@@ -26,6 +26,13 @@
       "csp": "default-src 'self'; img-src 'self' asset: attachment: http://attachment.localhost data: blob:; media-src 'self' attachment: http://attachment.localhost blob:; object-src 'none'; connect-src 'self' ipc: http://ipc.localhost attachment: http://attachment.localhost; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; frame-src 'self' attachment: http://attachment.localhost blob:; worker-src 'self' blob:"
     }
   },
+  "plugins": {
+    "deep-link": {
+      "desktop": {
+        "schemes": ["myne"]
+      }
+    }
+  },
   "bundle": {
     "active": true,
     "targets": "all",

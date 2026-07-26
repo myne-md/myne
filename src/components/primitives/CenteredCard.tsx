@@ -56,3 +56,27 @@ export const CARD_BODY_STYLE: CSSProperties = {
   color: "var(--fg-2)",
   margin: 0,
 };
+
+/**
+ * The card's primary call-to-action. Centered flex row with a `--space-2` gap so
+ * an in-flight `<Spinner>` sits beside the label rather than displacing it — the
+ * unlock surfaces all run multi-second Argon2id, and a CTA that just goes quiet
+ * reads as a hung app.
+ */
+export function ctaStyle(disabled: boolean): CSSProperties {
+  return {
+    background: disabled ? "var(--bg-3)" : "var(--accent)",
+    color: disabled ? "var(--fg-3)" : "var(--accent-on)",
+    border: disabled ? "1px solid var(--line-1)" : "none",
+    borderRadius: "var(--radius-2)",
+    padding: "var(--space-3) var(--space-5)",
+    fontFamily: "var(--font-sans)",
+    fontSize: "var(--text-base)",
+    fontWeight: "var(--weight-medium)" as CSSProperties["fontWeight"],
+    cursor: disabled ? "not-allowed" : "pointer",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "var(--space-2)",
+  };
+}

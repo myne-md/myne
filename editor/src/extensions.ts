@@ -98,9 +98,17 @@ export function myneExtensions(opts?: {
   viewMode?: ViewMode;
   readOnly?: boolean;
   aiEnabled?: boolean;
+  /** Mount the floating selection toolbar (MYND-559). Default TRUE — desktop's
+   *  formatting surface. Mobile passes `false`: it drives formatting from the
+   *  above-keyboard `FormatBar` (via `onReady`), so the floating toolbar would be
+   *  a second surface offering the same commands. A host that turns this off gets
+   *  no toolbar plugin at all — no listeners, no DOM node, no measure work —
+   *  rather than a CSS-hidden one that still mounts. */
+  selectionToolbar?: boolean;
 }): readonly Extension[] {
   const viewMode = opts?.viewMode ?? "live";
   const readOnly = opts?.readOnly ?? false;
+  const selectionToolbar = opts?.selectionToolbar ?? true;
   return [
     history(),
     closeBrackets(),
@@ -188,7 +196,9 @@ export function myneExtensions(opts?: {
     // `{{` token autocomplete — active only inside a `template: true` note
     // (MYND-189). Sits alongside the slash menu; both are floating menus.
     templateTokenMenuExtension(),
-    selectionToolbarExtension(),
+    // The floating selection toolbar — desktop's formatting surface, opt-OUT via
+    // `selectionToolbar: false` (MYND-559) for hosts that own their own bar.
+    ...(selectionToolbar ? [selectionToolbarExtension()] : []),
     // @codemirror/autocomplete — emoji `:` (inserts the glyph, MYND-156) + inline
     // `#tag` (suggests existing tags, MYND-45). Both override-sources in ONE
     // config (`completion.ts`) so they coexist.

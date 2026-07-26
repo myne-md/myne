@@ -56,6 +56,26 @@ local-inference-stub = ["local-inference"]
 
 [dependencies]
 tauri = { version = "2", features = [] }
+# `myne://` custom-URL-scheme handling (MYND-567): the OS hands the app a
+# `myne://theme/install?…` link so a website can offer a one-click theme
+# install. The plugin owns only the SCHEME REGISTRATION + URL DELIVERY —
+# bundle-time registration (macOS `CFBundleURLTypes`, Windows NSIS registry
+# keys, Linux `.desktop` MimeType) plus the platform-specific arrival paths
+# (macOS `RunEvent::Opened`; Windows/Linux a second process whose single argv
+# is the URL, forwarded through the already-registered
+# `tauri-plugin-single-instance` callback). It does NOT parse, validate, or
+# act on the URL — that is `src/lib/themeDeepLink.ts` + the existing
+# `theme_validator` allowlist, and the app re-validates every deep-linked
+# payload as untrusted, author-controlled input.
+#
+# Same crate + version already vetted and shipping in the `myne-mobile`
+# companion (which owns the `myne://open` / `myne://capture` half of the
+# scheme grammar) — one implementation across the fleet, no fork. Adds NO
+# network surface: no HTTP client in its tree (`serde`, `url`, `tauri-utils`,
+# and `windows-registry` on Windows only), and `deep-link:default` grants only
+# `allow-get-current`. Re-verified by the `no_egress` gate. A dependency is a
+# security decision — ledger row in `docs/dependency-policy.md`.
+tauri-plugin-deep-link = "2"
 tauri-plugin-opener = "2"
 tauri-plugin-clipboard-manager = "2"
 tauri-plugin-dialog = "2"
@@ -67,6 +87,10 @@ protocol = { path = "../protocol" }
 myne-core = { path = "../core" }
 uuid = { version = "1", features = ["v4", "v7"] }
 thiserror = "2"
+# QR generation for device-join (MYND-466), desktop-only — mobile scans, never
+# generates, so this dep stays off the mobile build. SVG renderer only (no `image`
+# bitmap backend) to keep the dependency surface minimal (reproducible-builds).
+qrcode = { version = "0.14", default-features = false, features = ["svg"] }
 getrandom = "0.2"
 zeroize = { version = "1.8", features = ["alloc", "derive"] }
 # Constant-time comparison for the clipper pairing-token bearer value

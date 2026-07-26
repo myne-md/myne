@@ -77,6 +77,7 @@ const DEFAULT_PREFS: PrefsView = {
   archive_disabled: null,
   theme: null,
   folder_icons: {},
+  device_names: {},
   hidden_bar_items: [],
   bar_items_order: [],
   right_panel_active_tab: null,
@@ -197,7 +198,10 @@ export function usePrefs(onError?: (message: string) => void): UsePrefsResult {
     (async () => {
       try {
         const view = await prefsRead();
-        if (!cancelled) {
+        // Guard the shape, not just the error: a malformed/absent response must
+        // leave DEFAULT_PREFS in place. Storing a non-object here takes down
+        // every consumer that reads a field off it.
+        if (!cancelled && view) {
           setPrefs(view);
         }
       } catch {
