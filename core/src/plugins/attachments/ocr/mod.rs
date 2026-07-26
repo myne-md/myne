@@ -26,7 +26,15 @@ pub mod pipeline;
 
 pub use pipeline::{recognize, OcrLine, OcrOutput, MIN_WORD_CONFIDENCE};
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
+// `PathBuf` is reachable ONLY from `bundled_models_dir_for_tests` below, which
+// carries this exact gate. Importing it unconditionally makes it an unused
+// import in every ordinary build of this crate (the desktop/mobile hosts depend
+// on `myne-core` without `test-support`), which `-D warnings` turns into a hard
+// compile error — green under `cargo clippy -p myne-core`, red under the host
+// build. Keep the gate on the import and the item in lockstep.
+#[cfg(any(test, feature = "test-support"))]
+use std::path::PathBuf;
 
 use rten::Model;
 
