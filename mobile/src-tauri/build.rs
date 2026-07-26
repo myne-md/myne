@@ -52,6 +52,8 @@ fn main() {
                     "set_screen_capture_protection",
                     "set_deliberate_folders",
                     "set_archived_folders",
+                    "set_device_name",
+                    "device_platform",
                     "vault_set_label",
                 ]),
             )
@@ -195,6 +197,16 @@ fn main() {
                     .commands(&["graph_layout_read", "graph_layout_write"]),
             )
             .plugin(
+                // Workspace state (MYW1, §9.7): mobile-LOCAL plugin carrying the
+                // sidebar folder-expand set (MYND-561). TWO commands — desktop's
+                // third (`workspace_stage`, its Cmd+Q RAM-staging) has no mobile
+                // analog and is deliberately not registered, so it must not
+                // appear here either. Adding a command here without a matching
+                // entry in `permissions/workspace/default.toml` is a security bug.
+                "workspace",
+                tauri_build::InlinedPlugin::new().commands(&["workspace_read", "workspace_write"]),
+            )
+            .plugin(
                 // MYND-458: the mobile `sync` shim over `myne_core::plugins::sync`
                 // — the SAME 19 commands the desktop registers, deny-by-default.
                 // (MYND-459 T12: `sync_head_fingerprint` added — the SY-05 SAS
@@ -215,6 +227,7 @@ fn main() {
                     "sync_status",
                     "sync_now",
                     "sync_list_devices",
+                    "sync_account_status",
                     "sync_approve_device",
                     "sync_remove_device",
                     "sync_pending_conflicts",
@@ -231,6 +244,7 @@ fn main() {
                     "sync_delete_quarantine",
                     "sync_lifecycle_suspend",
                     "sync_lifecycle_resume",
+                    "sync_decode_join_qr",
                 ]),
             ),
     )

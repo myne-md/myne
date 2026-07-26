@@ -10,6 +10,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { setDeviceName } from "./prefs";
 import { listen } from "@tauri-apps/api/event";
 
 // ── Endpoint config (SY-02) ──────────────────────────────────────────────────
@@ -52,6 +53,10 @@ export interface JoinResult {
   pending: boolean;
   /** The server cert fingerprint (https) for eye-compare, or `null` (loopback). */
   fingerprint: string | null;
+  /** The device_id this join registered (MYND-548) — used to name THIS device in
+   *  its own local prefs; a pending device holds no token, so it cannot read the
+   *  roster to find its own row. */
+  device_id_hex: string;
 }
 
 /** **Add this device to an existing account.** On a fresh device, bootstrap the
@@ -71,6 +76,42 @@ export function syncJoinAccount(
     accountNumber,
     password,
   });
+}
+
+// ── Device-join via QR (MYND-466) ────────────────────────────────────────────
+
+/** Mirrors Rust `JoinQrPinSource`. */
+export type JoinQrPinSource = "self_host_tofu" | "hosted" | "self_host_no_pin";
+
+/** Mirrors Rust `JoinQrView` — the decoded, validated device-join QR for the
+ *  confirm screen. Carries no secret (the account# is an identity; SYNC-47). */
+export interface JoinQrView {
+  endpoint_url: string;
+  /** Canonical 20-char account number (format for display with `formatAccountNumberInput`). */
+  account_number: string;
+  /** The QR's carried leaf-cert pin (hex), or null. */
+  cert_pin_hex: string | null;
+  pin_source: JoinQrPinSource;
+  /** False when the QR is past its ephemeral TTL (reject → re-scan). */
+  fresh: boolean;
+}
+
+/** Decode a scanned device-join QR string into its confirm-screen view. Rejects a
+ *  non-Myne / newer-version / malformed / bad-account payload (typed `kind`). */
+export function syncDecodeJoinQr(scanned: string): Promise<JoinQrView> {
+  return invoke<JoinQrView>("plugin:sync|sync_decode_join_qr", { scanned });
+}
+
+/** Mirrors Rust `tauri-plugin-qr-scan`'s `ScanResponse` — the decoded QR string,
+ *  or `null` when the user dismissed the scanner. */
+export interface QrScanResult {
+  value: string | null;
+}
+
+/** Open the iOS camera to scan a QR (device-join). Rejects with `{kind:"Unsupported"}`
+ *  off iOS (SYNC-46; Android is MYND-465). */
+export function scanQr(): Promise<QrScanResult> {
+  return invoke<QrScanResult>("plugin:qr-scan|scan");
 }
 
 // ── SAS eye-compare (SY-05, SYNC-40 / SYNC-17) ───────────────────────────────
@@ -98,6 +139,28 @@ export function syncResetLocal(): Promise<void> {
   return invoke<void>("plugin:sync|sync_reset_local");
 }
 
+/** This account's own usage + effective ceilings (`GET /account/status`,
+ *  MYND-570). Shape mirrors the shared-core `AccountStatusView`, which in turn
+ *  mirrors the server struct — the mobile client parses nothing of its own.
+ *
+ *  **`0` means unlimited** for both ceilings, never a ceiling of zero: a
+ *  self-hosted server (or one with no quotas set) reports `0` and the UI must
+ *  show usage with no limit, no error and no upsell.
+ *
+ *  `null` when the projection is unavailable — sync unconfigured, this device
+ *  not enrolled, or a server without the route. */
+export interface AccountStatusView {
+  stored_bytes: number;
+  device_count: number;
+  frozen: boolean;
+  quota_bytes: number;
+  max_devices: number;
+}
+
+export function syncAccountStatus(): Promise<AccountStatusView | null> {
+  return invoke<AccountStatusView | null>("plugin:sync|sync_account_status");
+}
+
 // ── Enroll (SY-03 / SY-04) ───────────────────────────────────────────────────
 
 /** Which credential the enrolling device proves account ownership with. */
@@ -106,6 +169,10 @@ export type EnrollCredentialKind = "password" | "recovery";
 /** Mirrors the Rust `EnrollResult`. */
 interface EnrollResult {
   approved: boolean;
+  /** The device_id this enrollment registered (MYND-548) — needed to name THIS
+   *  device, since a pending device holds no token and so cannot read the roster
+   *  to find its own row. */
+  device_id_hex: string;
 }
 
 /** A serialized `SyncDeviceError` from the plugin (`{ kind: "…" }`). */
@@ -131,10 +198,16 @@ export function errKind(e: unknown): string {
 export interface EnrollHook {
   busy: boolean;
   outcome: EnrollOutcome | null;
+  /** `deviceName` (MYND-548) is held in RAM and written only AFTER this device's
+   *  first authed sync cycle: writing it earlier would create `vault.prefs` before
+   *  the cycle and disable the §10.2.1 wholesale seed, and parking it on disk
+   *  would rest user-authored text outside the AEAD envelope (SYNC-3). A device
+   *  that stays PENDING is not named here. */
   enroll: (
     accountNumber: string,
     credential: string,
     credentialKind: EnrollCredentialKind,
+    deviceName: string,
   ) => Promise<void>;
   reset: () => void;
 }
@@ -148,6 +221,7 @@ export function useEnroll(): EnrollHook {
       accountNumber: string,
       credential: string,
       credentialKind: EnrollCredentialKind,
+      deviceName: string,
     ) => {
       setBusy(true);
       setOutcome(null);
@@ -157,6 +231,16 @@ export function useEnroll(): EnrollHook {
           credential,
           credentialKind,
         });
+        if (result.approved) {
+          // Approved ⇒ a cycle can run now; the seed (if any) happens inside it,
+          // so naming afterwards is safe.
+          try {
+            await invoke("plugin:sync|sync_now");
+            await setDeviceName(result.device_id_hex, deviceName);
+          } catch {
+            // Enrollment still succeeded; the row keeps its id-derived label.
+          }
+        }
         setOutcome(result.approved ? { state: "approved" } : { state: "pending" });
       } catch (e) {
         setOutcome({ state: "error", kind: errKind(e) });

@@ -30,6 +30,7 @@ permissions = [
     "allow-sync-status",
     "allow-sync-now",
     "allow-sync-list-devices",
+    "allow-sync-account-status",
     "allow-sync-approve-device",
     "allow-sync-remove-device",
     "allow-sync-pending-conflicts",
@@ -46,6 +47,7 @@ permissions = [
     "allow-sync-delete-quarantine",
     "allow-sync-lifecycle-suspend",
     "allow-sync-lifecycle-resume",
+    "allow-sync-decode-join-qr",
 ]
 
 [[permission]]
@@ -72,6 +74,11 @@ commands.allow = ["sync_now"]
 identifier = "allow-sync-list-devices"
 description = "Allow invoking sync:sync_list_devices (authed device roster from GET /auth/devices). No vault-blob access."
 commands.allow = ["sync_list_devices"]
+
+[[permission]]
+identifier = "allow-sync-account-status"
+description = "Allow invoking sync:sync_account_status (authed read-only projection from GET /account/status — this account's own stored bytes, device count, frozen flag and EFFECTIVE ceilings. Account is resolved from the device token, never a URL/query selector; no vault-blob access, no cross-account data)."
+commands.allow = ["sync_account_status"]
 
 [[permission]]
 identifier = "allow-sync-approve-device"
@@ -152,3 +159,8 @@ commands.allow = ["sync_lifecycle_suspend"]
 identifier = "allow-sync-lifecycle-resume"
 description = "Allow invoking sync:sync_lifecycle_resume (WebView visibilitychange → visible: clear the suspend flag and arm the one-shot resume-immediate poll, SYNC-38). Flips an in-RAM scheduler flag only — no vault access, no IO, no server call."
 commands.allow = ["sync_lifecycle_resume"]
+
+[[permission]]
+identifier = "allow-sync-decode-join-qr"
+description = "Allow invoking sync:sync_decode_join_qr (MYND-466 — decode a scanned device-join QR string into {endpoint_url, account#, cert_pin, pin_source, fresh} for the confirm screen). Pure over the scanned string + the clock; no vault access, no IO, no server call, carries no secret."
+commands.allow = ["sync_decode_join_qr"]

@@ -2484,6 +2484,7 @@ dependencies = [
  "tauri-build",
  "tauri-plugin-deep-link",
  "tauri-plugin-opener",
+ "tauri-plugin-qr-scan",
  "tauri-plugin-screen-guard",
  "tauri-plugin-share-intent",
  "tauri-utils",
@@ -4546,6 +4547,16 @@ dependencies = [
  "url",
  "windows",
  "zbus",
+]
+
+[[package]]
+name = "tauri-plugin-qr-scan"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "tauri",
+ "tauri-plugin",
+ "thiserror 2.0.18",
 ]
 
 [[package]]
