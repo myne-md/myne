@@ -203,6 +203,18 @@ One JS dep for the Phase-1 minimal graph view's force-directed layout. Not crypt
 - **CSP / safety:** no `eval` needed; renders to `<canvas>` (not `innerHTML`), so no DOMPurify pass here; embeddables rejected (`validateEmbeddable: () => false`, SYNC-5); collaboration / library-CDN / image-from-URL / font-CDN all foreclosed by CSP + the self-hosted `EXCALIDRAW_ASSET_PATH`. Fonts self-hosted under `public/excalidraw-assets/fonts` (SIL OFL 1.1, no CDN — reproducible-build-safe).
 - **License artifact:** the repo's first bundled `public/THIRD-PARTY-LICENSES.txt` (Excalidraw MIT + OFL fonts). The whole-npm-tree license CI gate is spun out to **MYND-504**.
 
+### Vim keyboard mode (MYND-313) — `editor/package.json`
+
+| Dep | Version | Used for | Transitive footprint | License | Justified-by |
+|---|---|---|---|---|---|
+| `@replit/codemirror-vim` | 6.3.0 (exact-pinned) | The opt-in modal (vim) editing layer for the shared editor engine — normal/insert/visual modes, the operator+motion grammar, and the `:` command line host (`editor/src/vim.ts`, `editor/src/vim-ex.ts`) | **Zero.** Declares no runtime `dependencies`; its five peers (`@codemirror/{commands,language,search,state,view}`) are all already direct deps of `@myne/editor`, so admitting it adds **one** package to the tree and nothing else. | MIT | `decisions.md` 2026-07-25 (optional vim keyboard mode); MYND-313 |
+
+- **"The bar" Q1 (hand-roll?):** no. A vim emulation is a large, subtle grammar (counts, operators, motions, text objects, registers, macros, undo granularity) where a partial hand-roll is worse than none — a half-implemented `d`-operator silently corrupts a user's note. This is the same class as katex/pdf.js: a well-specified external grammar we have no advantage reimplementing.
+- **"The bar" Q4 (transitive tree):** the best possible outcome — **+1 package, no new transitive**. Peers were already in-tree because the same CodeMirror 6 core powers the editor.
+- **Bundle size:** **dynamically imported only when the toggle is on** (`await import("@replit/codemirror-vim")` in `editor/src/vim.ts`), so vite code-splits it into a dedicated **≈ 120 KB** chunk. Verified against a production build: the chunk exists separately and the marker symbols are **absent from the `main` chunk** — a user who never enables vim never downloads it.
+- **Safety / trust surface:** no network, no `eval`, no filesystem. It is an in-editor keymap + state machine over the CodeMirror document. The one real exposure is that its registers/macros live in **engine process-global state** that outlives the editor unmount, so vault lock explicitly clears them (`editor/src/vim.ts`) — otherwise a yank in vault A could be pasted into vault B. Pinned by `tests/editor/vim-lock-reset.test.ts`.
+- **Not a config surface:** the `:` command line is a **closed table**, not an interpreter. `:set`/`:map`/`:source`/`:!`/`:e` are registered only to refuse, so no ex command can persist a behaviour definition (`editor/src/vim-ex.ts`; `tests/editor/vim-ex.test.ts`).
+
 ### PDF footer stamping (MYND-255 hotfix) — `src-tauri/Cargo.toml`
 
 | Dep | Version | Used for | Transitive footprint | License | Justified-by |

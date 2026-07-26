@@ -383,6 +383,16 @@ export interface PrefsView {
    */
   editor_line_numbers: boolean | null;
   /**
+   * Vim keyboard-mode toggle (vim-keyboard-mode, MYND-313). `null` ≡ unset →
+   * the host applies the default-OFF policy (modal editing is opt-in). `true`
+   * makes the editor modal (normal/insert/visual); `false` keeps the plain
+   * editor. Serialized from Rust `Option<bool>`; omitted from the encrypted blob
+   * when `null` (byte-identical to a pre-feature vault). **Device-local**: the
+   * vim choice never crosses devices in the Phase 2 prefs merge — a physical
+   * keyboard and a touch keyboard want different answers. Non-load-bearing.
+   */
+  editor_vim_mode: boolean | null;
+  /**
    * Archive-feature disable toggle (archive-disable, MYND-…). `null` ≡ unset →
    * the host applies the default-OFF policy (archiving enabled — the pre-feature
    * behaviour). `true` hides the archive entry points (sidebar button, context
@@ -1088,6 +1098,21 @@ export async function setEditorFontFamily(value: string | null): Promise<void> {
  */
 export async function setEditorLineNumbers(value: boolean): Promise<void> {
   await invoke<void>("plugin:prefs|set_editor_line_numbers", { enabled: value });
+  bumpPrefsNonce();
+}
+
+/**
+ * Set the vim keyboard-mode toggle (vim-keyboard-mode, MYND-313). Pass `true` to
+ * make the editor modal, `false` to return it to the plain editor (the default).
+ * Disk-first, no native side-effect; a rejected promise means the write failed
+ * and the caller's optimistic UI must revert. Bumps the prefs nonce on success so
+ * the open editor (which reads prefs through its OWN `usePrefs`, separate from
+ * the Settings modal's) re-reads disk truth and reconfigures its vim compartment
+ * live — same chokepoint discipline as {@link setEditorLineNumbers}.
+ * Non-load-bearing.
+ */
+export async function setEditorVimMode(value: boolean): Promise<void> {
+  await invoke<void>("plugin:prefs|set_editor_vim_mode", { enabled: value });
   bumpPrefsNonce();
 }
 
