@@ -30,12 +30,21 @@ import { loadNoteBatch, type TitleRecord } from "../loadNoteBatch";
 import { prefsRead, setDeliberateFolders } from "../../lib/prefs";
 import { buildExistingIdentitySet, type ExistingNote, type DuplicatePolicy } from "./conflict";
 import {
+  importFromSource,
   importVault,
   type ImportDirEntry,
   type ImportPorts,
   type ImportResult,
 } from "./engine";
+import { createObsidianSource } from "./sources/obsidian";
+import { createHtmlSource } from "./sources/html";
+import { createNotionSource } from "./sources/notion";
+import { createCsvSource } from "./sources/csv";
+import { createEnexSource } from "./sources/enex";
+import { buildImportReport, formatStamp } from "./report";
+import type { ImportSource, ImportSourceId } from "./source";
 import type { RefImporter } from "./media";
+import { joinPath } from "./source";
 import { attachmentImport } from "../../lib/attachments";
 
 /** Rust `ImportDirEntry` wire shape (snake_case `is_dir`). */
@@ -58,12 +67,8 @@ export async function importReadFile(root: string, path: string): Promise<string
   return await invoke<string>("plugin:importer|import_read_file", { root, path });
 }
 
-/** `root + "/" + rel` (mirrors the engine's path join; `rel===""` → `root`). */
-function joinPath(root: string, rel: string): string {
-  if (rel.length === 0) return root;
-  const base = root.endsWith("/") ? root.slice(0, -1) : root;
-  return `${base}/${rel}`;
-}
+// `joinPath` is imported from the seam, not redefined: the media index below is
+// keyed by the paths the WALK produced, so the two must agree byte-for-byte.
 
 /**
  * Union the importer's empty-dir folders with the vault's existing
@@ -244,4 +249,79 @@ export async function runVaultImport(
     shouldCancel: options.shouldCancel,
     importMedia,
   });
+}
+
+/**
+ * End-to-end import from ANY source (importer-breadth epic, MYND-579…586).
+ *
+ * The generalization of {@link runVaultImport}: pick the adapter for `source`, run it
+ * through the one shared ingest loop, then write the import-report note if anything
+ * arrived degraded. `root` is the picked directory for tree sources
+ * (Obsidian / HTML / Notion) or the picked FILE for single-file sources
+ * (Evernote / CSV).
+ *
+ * Media resolution stays tree-shaped: only the directory sources build a basename
+ * index, because a single-file source has no sibling media to resolve against
+ * (Evernote's resources are base64-inline and ingest through the bytes seam instead).
+ */
+export async function runSourceImport(
+  source: ImportSourceId,
+  root: string,
+  policy: DuplicatePolicy,
+  options: RunImportOptions = {},
+): Promise<ImportResult> {
+  const ports = createImportPorts(root);
+  const treeShaped = source === "obsidian" || source === "html" || source === "notion";
+
+  const [existingIdentity, mediaIndex] = await Promise.all([
+    loadExistingIdentity(),
+    treeShaped ? buildMediaIndex(root, ports) : Promise.resolve(new Map<string, string>()),
+  ]);
+
+  const adapter: ImportSource =
+    source === "obsidian"
+      ? createObsidianSource(root, ports)
+      : source === "html"
+        ? createHtmlSource(root, ports)
+        : source === "notion"
+          ? createNotionSource(root, ports)
+          : source === "csv"
+            ? createCsvSource(root, ports)
+            : createEnexSource(root, ports, {
+                // Evernote inlines every resource as base64, so ingestion needs the
+                // BYTES seam rather than the path-based media resolver.
+                ingestBytes: async (bytes, filename) => {
+                  try {
+                    const att = await attachmentImport({
+                      kind: "bytes",
+                      bytes: Array.from(bytes),
+                      filename,
+                    });
+                    return { id: att.id, filename: att.filename ?? filename };
+                  } catch {
+                    return null; // oversize / unsupported → placeholder + reported loss
+                  }
+                },
+              });
+
+  const result = await importFromSource(adapter, ports, existingIdentity, policy, {
+    onProgress: options.onProgress,
+    shouldCancel: options.shouldCancel,
+    importMedia: treeShaped ? createMediaRefImporter(root, mediaIndex) : undefined,
+  });
+
+  // The report is written LAST, after the ingest loop, so it can name every affected
+  // note — and it is created after `existingIdentity` was snapshotted, so it is never
+  // in the dedup set and cannot suppress itself on a re-import.
+  const report = buildImportReport(source, result, formatStamp(new Date()));
+  if (report !== null) {
+    try {
+      await ports.createNote(report);
+    } catch {
+      // A failed report must never fail an otherwise-successful import: the notes are
+      // already written, and the tallies on `result` still surface in the summary.
+    }
+  }
+
+  return result;
 }
