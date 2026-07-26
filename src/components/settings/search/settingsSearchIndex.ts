@@ -193,6 +193,14 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     keywordsKey: "settings.search.keywords.lineNumbers",
   },
   {
+    id: "editor.vim-mode",
+    panelId: "editor",
+    testid: "settings.vim-mode",
+    titleKey: "settings.vimMode.label",
+    descriptionKey: "settings.vimMode.helper",
+    keywordsKey: "settings.search.keywords.vimMode",
+  },
+  {
     id: "editor.toolbar",
     panelId: "editor",
     testid: "settings.toolbar-customize",

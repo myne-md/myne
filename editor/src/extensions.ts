@@ -90,6 +90,7 @@ import { findExtension } from "./find/find-extension";
 import { spellDecorations } from "./decorations/spell";
 import { spellCorrectionMenu } from "./spell/correction-menu";
 import { myneKeyBindings } from "./keymap";
+import { vimExtension } from "./vim";
 import { selectionCountObserver } from "./selection-count";
 import { focusModeExtension } from "./focus-mode";
 import { myneTheme } from "./theme";
@@ -244,6 +245,15 @@ export function myneExtensions(opts?: {
     // reconfigure it live on the `editor_line_numbers` pref change (SYNC-3
     // addendum) without a remount. Stock `lineNumbers()` numbers logical lines.
     lineNumbersExtension(),
+    // Optional modal (vim) editing layer (vim-keyboard-mode, MYND-313), seeded
+    // OFF. Lives in a CM6 Compartment so the host can reconfigure it live on the
+    // `editor_vim_mode` pref change without a remount — and so the engine itself
+    // is only dynamically imported when the user actually turns vim on (see
+    // `vim.ts`). Composed AFTER the keymap above deliberately: the vim engine
+    // captures keys at the DOM level rather than through the keymap facet, so its
+    // position in this array does not order it against Myne's chords — that
+    // layering is done explicitly in `vim.ts` instead.
+    vimExtension(),
     // Disable the WebView's native OS spellchecker on the editor content
     // (SYNC-5, MYND-264). Myne ships its own fully-offline spell-check; leaving
     // the native speller on would double-underline against the custom squiggle

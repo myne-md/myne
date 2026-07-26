@@ -68,6 +68,21 @@
   (keystrokes APPEND after a silent no-op clear).
 - Elements go STALE on step remount (e.g. Back navigation) — re-fetch handles
   after any sub-step transition.
+- **Never bound a NEGATIVE assertion with `waitForSaved`.** When the point is
+  that nothing changed, no save ever fires and the helper burns its full
+  timeout before failing (observed: 66 s + two retries on a "paste must add
+  nothing" step). CodeMirror applies edits synchronously while handling the
+  keystroke, so asserting straight after `sendKeys` is both correct and
+  instant. Follow it with a positive probe (send a key, assert it took effect)
+  so the absence cannot pass merely because input stopped arriving.
+- **The `myne-e2e-target` Docker volume is shared across git worktrees.** A run
+  can fail to BUILD against a stale crate compiled from another branch — the
+  giveaway is a compile error naming a field that exists in neither your source
+  nor `develop` (observed: `PrefsView has no field named editor_vim_mode`, with
+  the note listing `attachment_ocr_enabled`, a field belonging to a different
+  feature branch). Fix: `docker volume rm myne-e2e-target`, then a full rebuild
+  (`--skip-build` is not enough). Same class as the shared-`CARGO_TARGET_DIR`
+  collision, one layer down.
 - Post-exit assertions (disk state AFTER the app quit): launch with
   `keepDataDir: true`, capture `dataHome` in the SEED callback (the
   launch-failure path leaks the dir otherwise), gate on

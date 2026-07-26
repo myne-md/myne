@@ -439,6 +439,42 @@ pub(crate) async fn set_editor_line_numbers_with_dir(
     Ok(())
 }
 
+/// Slot::Unlocked-gated setter for the `editor_vim_mode` toggle
+/// (vim-keyboard-mode, MYND-313). Read-modify-write under the per-plugin write
+/// mutex; no native side-effect (like `set_editor_line_numbers`). Always persists
+/// an explicit `Some(enabled)` — the default-OFF policy (modal editing is opt-in)
+/// is a host read-time concern, not a stored value. Non-load-bearing → no clamp.
+#[tauri::command]
+pub async fn set_editor_vim_mode<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
+    enabled: bool,
+) -> Result<(), PrefsWriteError> {
+    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_editor_vim_mode_with_dir(&dir, state.inner(), hooks.inner(), enabled).await
+}
+
+/// Testable core of [`set_editor_vim_mode`].
+pub(crate) async fn set_editor_vim_mode_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    enabled: bool,
+) -> Result<(), PrefsWriteError> {
+    update_prefs_with_dir(vault_dir, state, hooks, |prefs| {
+        prefs.editor_vim_mode = Some(enabled);
+    })
+    .await?;
+
+    tracing::info!(
+        event = "prefs_written",
+        field = "editor_vim_mode",
+        value = enabled
+    );
+    Ok(())
+}
+
 /// Slot::Unlocked-gated setter for the `archive_disabled` toggle (archive-disable,
 /// MYND-…). Read-modify-write under the per-plugin write mutex; no native
 /// side-effect (like `set_editor_line_numbers`). Always persists an explicit
@@ -2812,6 +2848,7 @@ mod tests {
                     editor_font_family: None,
                     editor_line_spacing: None,
                     editor_text_size: None,
+                    editor_vim_mode: None,
                     label: None,
                     last_backup_at: None,
                     new_note_location: None,
@@ -4016,6 +4053,76 @@ mod tests {
                 .await
                 .expect("read after off");
             assert_eq!(view.editor_line_numbers, Some(false));
+        });
+    }
+
+    // ---- editor_vim_mode setter (vim-keyboard-mode, MYND-313) ---------
+
+    #[test]
+    fn set_editor_vim_mode_rejects_when_slot_empty() {
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("prefs-vim-mode-empty").expect("scoped tempdir");
+            let state = VaultRuntimeState::default();
+            let result =
+                set_editor_vim_mode_with_dir(tmp.path(), &state, &noop_hooks(), true).await;
+            assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
+        });
+    }
+
+    #[test]
+    fn editor_vim_mode_round_trips_via_set_then_read() {
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x4d).await;
+
+            // Default (no write yet) reads back as `None` — the host applies the
+            // default-OFF policy; modal editing is opt-in.
+            let view = prefs_read_with_dir(tmp.path(), &state)
+                .await
+                .expect("read default");
+            assert_eq!(view.editor_vim_mode, None);
+
+            // Turn ON persists (disk-first) + round-trips.
+            set_editor_vim_mode_with_dir(tmp.path(), &state, &noop_hooks(), true)
+                .await
+                .expect("write on");
+            let view = prefs_read_with_dir(tmp.path(), &state)
+                .await
+                .expect("read after on");
+            assert_eq!(view.editor_vim_mode, Some(true));
+            // Pre-existing screen_capture default untouched.
+            assert!(view.screen_capture_protection);
+
+            // Turn OFF overwrites (explicit Some(false), NOT back to None) — an
+            // explicit off stays distinguishable from never-set on disk.
+            set_editor_vim_mode_with_dir(tmp.path(), &state, &noop_hooks(), false)
+                .await
+                .expect("write off");
+            let view = prefs_read_with_dir(tmp.path(), &state)
+                .await
+                .expect("read after off");
+            assert_eq!(view.editor_vim_mode, Some(false));
+        });
+    }
+
+    #[test]
+    fn editor_vim_mode_write_leaves_neighbouring_prefs_untouched() {
+        // The vim toggle is a read-modify-write on a shared blob; a sibling
+        // editor pref written first must survive the write intact.
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x4e).await;
+
+            set_editor_line_numbers_with_dir(tmp.path(), &state, &noop_hooks(), true)
+                .await
+                .expect("write line numbers");
+            set_editor_vim_mode_with_dir(tmp.path(), &state, &noop_hooks(), true)
+                .await
+                .expect("write vim mode");
+
+            let view = prefs_read_with_dir(tmp.path(), &state)
+                .await
+                .expect("read after both");
+            assert_eq!(view.editor_line_numbers, Some(true));
+            assert_eq!(view.editor_vim_mode, Some(true));
         });
     }
 

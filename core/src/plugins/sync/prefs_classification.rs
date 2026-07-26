@@ -94,6 +94,11 @@ pub const CLASSIFICATION: &[(&str, PrefClass)] = &[
     ("editor_text_size", PrefClass::DeviceLocal),
     ("editor_toolbar_hidden", PrefClass::DeviceLocal),
     ("editor_toolbar_order", PrefClass::DeviceLocal),
+    // vim-keyboard-mode (MYND-313): device-local, like every other editor
+    // preference. Modal editing is a per-device input choice — a desktop with a
+    // physical keyboard and a phone with a touch keyboard want different answers —
+    // so the local value always survives the merge.
+    ("editor_vim_mode", PrefClass::DeviceLocal),
     (
         "favorites",
         PrefClass::Shared(SharedDiscipline::SequenceLww),
@@ -198,6 +203,7 @@ mod tests {
             editor_text_size: _,
             editor_toolbar_hidden: _,
             editor_toolbar_order: _,
+            editor_vim_mode: _,
             favorites: _,
             field_clocks: _,
             folder_icons: _,
@@ -256,6 +262,7 @@ mod tests {
             "editor_text_size",
             "editor_toolbar_hidden",
             "editor_toolbar_order",
+            "editor_vim_mode",
             "favorites",
             "field_clocks",
             "folder_icons",

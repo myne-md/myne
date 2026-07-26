@@ -216,6 +216,9 @@
       "toggleLineNumbers": {
         "label": "Toggle line numbers"
       },
+      "toggleVimMode": {
+        "label": "Toggle vim keyboard mode"
+      },
       "toggleSpellCheck": {
         "label": "Toggle spell check"
       },
@@ -749,6 +752,7 @@
         "tags": "Tags",
         "viewMode": "View mode",
         "views": "Views",
+        "vimMode": "Vim mode",
         "wordCount": "Word count",
         "workspace": "Workspace"
       },
@@ -780,6 +784,13 @@
           "title_one": "{{characters}} characters · {{words}} words · {{spaces}} spaces · {{count}} paragraph",
           "title_other": "{{characters}} characters · {{words}} words · {{spaces}} spaces · {{count}} paragraphs",
           "titleSelectionSuffix": " (selection)"
+        },
+        "vimMode": {
+          "insert": "Insert",
+          "normal": "Normal",
+          "replace": "Replace",
+          "title": "Vim mode — press Esc for normal mode",
+          "visual": "Visual"
         },
         "graphTitle": "Graph (⌘⇧G)",
         "lock": "Lock",
@@ -1010,6 +1021,23 @@
         "md": "Default",
         "sm": "Small",
         "xl": "Extra large"
+      }
+    },
+    "vim": {
+      "ex": {
+        "refused": {
+          "edit": "`:e` isn't supported — Myne opens notes, not files. Use the command palette or the sidebar.",
+          "map": "Custom key mappings aren't supported in Myne. Shortcuts are configured in Settings → Hotkeys.",
+          "set": "`:set` isn't supported — Myne has no vim options. Editor preferences live in Settings → Editor.",
+          "source": "`:source` isn't supported. Myne deliberately has no config-script surface.",
+          "unsupported": "That command isn't supported in Myne."
+        },
+        "substitute": {
+          "malformed": "Could not read that substitution. Expected :s/pattern/replacement/",
+          "refused": "That pattern uses vim-only syntax ({{what}}), which Myne's search doesn't support. Nothing was changed."
+        },
+        "writeFailed": "Could not save.",
+        "written": "Saved."
       }
     },
     "wikilink": {
@@ -2205,6 +2233,14 @@
       "off": "Off",
       "on": "On"
     },
+    "vimMode": {
+      "chordCaveat": "On Windows and Linux, Myne's own shortcuts take priority, so the vim chords that collide with them (Ctrl-a, Ctrl-b, Ctrl-d, Ctrl-e, Ctrl-f, Ctrl-i, Ctrl-p, Ctrl-t, Ctrl-v, Ctrl-w, Ctrl-x) are not available in the editor. Ctrl-[ still works as Escape, and visual-block moves to Alt-v.",
+      "errorSaveSetting": "Could not save the vim-mode setting.",
+      "helper": "Use vim keys in the editor: normal, insert and visual modes, with the usual motions and operators. Off by default. Notes open in source view while this is on.",
+      "label": "Vim keyboard mode",
+      "off": "Off",
+      "on": "On"
+    },
     "toolbarCustomize": {
       "errorSave": "Could not save the toolbar layout.",
       "helper": "Choose which formatting buttons appear on the selection toolbar, and their order.",
@@ -2447,6 +2483,7 @@
         "lastActiveNote": "continue where you left off last note resume sync open",
         "license": "license agpl open source legal",
         "lineNumbers": "line numbers gutter editor display",
+        "vimMode": "vim modal editing normal insert visual keyboard",
         "lineSpacing": "line spacing leading height typography readability",
         "newNoteLocation": "new note location folder default where notes created",
         "quickUnlock": "quick unlock pin touch id biometric face unlock",

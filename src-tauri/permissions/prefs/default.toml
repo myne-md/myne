@@ -35,6 +35,7 @@ permissions = [
   "allow-set-startup-open",
   "allow-set-editor-text-size",
   "allow-set-editor-line-numbers",
+  "allow-set-editor-vim-mode",
   "allow-set-archive-disabled",
   "allow-set-editor-line-spacing",
   "allow-set-editor-content-width",
@@ -230,6 +231,18 @@ commands.allow = ["set_editor_line_spacing"]
 identifier = "allow-set-editor-line-numbers"
 description = "Allow invoking prefs:set_editor_line_numbers (Slot::Unlocked-gated setter for the editor_line_numbers toggle — the optional editor line-number gutter; atomic-writes vault.prefs with no native side-effect; the default-OFF policy is applied host-side at read time)."
 commands.allow = ["set_editor_line_numbers"]
+
+# vim-keyboard-mode (MYND-313): a write setter for the editor_vim_mode toggle —
+# the optional modal (vim) editing layer. Inherits the same main-window-only
+# invariant as the other allow-set-* permissions — v0.2 multi-window MUST NOT
+# grant this to any non-main window. Atomic-writes vault.prefs with no native
+# side-effect; non-load-bearing (no clamp; default-OFF is host policy). Granting
+# it enables an editor input mode only — it reaches no key material and confers
+# no additional capability on the WebView.
+[[permission]]
+identifier = "allow-set-editor-vim-mode"
+description = "Allow invoking prefs:set_editor_vim_mode (Slot::Unlocked-gated setter for the editor_vim_mode toggle — the optional vim keyboard mode; atomic-writes vault.prefs with no native side-effect; the default-OFF policy is applied host-side at read time)."
+commands.allow = ["set_editor_vim_mode"]
 
 [[permission]]
 identifier = "allow-set-archive-disabled"

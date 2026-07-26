@@ -13,6 +13,7 @@
 
 import { TypographySettings } from "./TypographySettings";
 import { LineNumbersSettings } from "./LineNumbersSettings";
+import { VimModeSettings } from "./VimModeSettings";
 import { ToolbarCustomizeSettings } from "./ToolbarCustomizeSettings";
 import { DefaultViewModeSettings } from "./DefaultViewModeSettings";
 import { FocusModeSettings } from "./FocusModeSettings";
@@ -32,6 +33,12 @@ export function EditorPanel() {
       {/* Line-number gutter toggle (editor-line-numbers, MYND-314) — off by
           default; lives next to typography as an editor-display preference. */}
       <LineNumbersSettings />
+
+      {/* Vim keyboard mode (vim-keyboard-mode, MYND-313) — optional modal
+          editing; off by default. Sits next to the line-number toggle as the
+          other editor-input preference. The engine is only downloaded when this
+          is turned on. */}
+      <VimModeSettings />
 
       {/* Floating-toolbar customization (MYND-336) — reorder + show/hide the
           selection toolbar's buttons over the frozen command vocabulary. */}

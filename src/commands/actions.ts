@@ -23,6 +23,7 @@ import { appDataDir, join } from "@tauri-apps/api/path";
 import { openPath } from "@tauri-apps/plugin-opener";
 import {
   setEditorLineNumbers,
+  setEditorVimMode,
   setSpellEnabled,
   setAiEnabled,
   setScreenCaptureProtection,
@@ -68,6 +69,20 @@ const toggleLineNumbersAction: CommandAction = {
   visibility: editorOnly,
   run: (ctx) => {
     void setEditorLineNumbers(!(ctx.prefs.editor_line_numbers ?? false));
+  },
+};
+
+const toggleVimModeAction: CommandAction = {
+  id: "editor.toggle-vim-mode",
+  get label() {
+    return i18n.t("commands.actions.toggleVimMode.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.editor");
+  },
+  visibility: editorOnly,
+  run: (ctx) => {
+    void setEditorVimMode(!(ctx.prefs.editor_vim_mode ?? false));
   },
 };
 
@@ -1280,6 +1295,7 @@ export const COMMAND_ACTIONS: readonly CommandAction[] = Object.freeze([
   exportSelectionImageAction,
   // Wave 1 — prefs toggles/cycles + theme (palette-gap audit)
   toggleLineNumbersAction,
+  toggleVimModeAction,
   toggleSpellCheckAction,
   toggleTypewriterAction,
   toggleDimInactiveAction,

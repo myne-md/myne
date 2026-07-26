@@ -597,6 +597,19 @@ pub struct PrefsView {
     #[serde(default)]
     pub editor_text_size: Option<alloc::string::String>,
 
+    /// Vim keyboard-mode toggle (vim-keyboard-mode, MYND-313). `None` ≡ unset →
+    /// the host applies the default-OFF policy (modal editing is opt-in). Omitted
+    /// entirely from the canonical JSON when `None`, so a vault that never touched
+    /// the toggle is byte-identical to a pre-feature `vault.prefs` (existing golden
+    /// vectors unaffected — migration-less additive field on `MYP1`, the
+    /// `editor_line_numbers` precedent class). **Non-load-bearing** (a tampered /
+    /// replayed value can at worst turn modal editing on or off; it grants no
+    /// capability and reaches no key material) — no protective-envelope clamp.
+    /// Canonical key `editor_vim_mode` — sorts after `editor_toolbar_order`
+    /// (`editor_to` < `editor_v`), before `favorites` (`e` < `f`).
+    #[serde(default)]
+    pub editor_vim_mode: Option<bool>,
+
     /// User theme preference (MYND-110). `None` ≡ **system** (follow the OS
     /// `prefers-color-scheme`) and is the canonical encoding of "no explicit
     /// choice" — the field is omitted entirely from the canonical JSON when
@@ -982,6 +995,7 @@ impl Default for PrefsView {
             editor_font_family: None,
             editor_line_spacing: None,
             editor_text_size: None,
+            editor_vim_mode: None,
             label: None,
             last_backup_at: None,
             new_note_location: None,
@@ -1422,6 +1436,17 @@ fn canonical_json_encode(prefs: &PrefsView) -> Vec<u8> {
     if !prefs.editor_toolbar_order.is_empty() {
         out.extend_from_slice(b"\"editor_toolbar_order\":");
         push_ordered_string_array(&mut out, &prefs.editor_toolbar_order);
+        out.push(b',');
+    }
+
+    // editor_vim_mode (canonical key 'e', AFTER editor_toolbar_order
+    // [`editor_to` < `editor_v`] and BEFORE favorites [`e` < `f`]). A bool;
+    // omitted entirely when None so a vault that never touched the vim toggle is
+    // byte-identical to a pre-feature vault.prefs (preserves existing KAT
+    // vectors). vim-keyboard-mode, MYND-313.
+    if let Some(on) = prefs.editor_vim_mode {
+        out.extend_from_slice(b"\"editor_vim_mode\":");
+        out.extend_from_slice(if on { b"true" } else { b"false" });
         out.push(b',');
     }
 
@@ -2103,6 +2128,10 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
         parse_optional_array_field(rest, &mut cursor, b"\"editor_toolbar_hidden\":")?;
     let editor_toolbar_order =
         parse_optional_array_field(rest, &mut cursor, b"\"editor_toolbar_order\":")?;
+    // editor_vim_mode (key 'e') sits between editor_toolbar_order and favorites
+    // (`editor_to` < `editor_v` < `f`); a bool parsed from the same monotonic
+    // cursor so canonical key order holds. vim-keyboard-mode, MYND-313.
+    let editor_vim_mode = parse_optional_bool_field(rest, &mut cursor, b"\"editor_vim_mode\":")?;
     let favorites = parse_optional_array_field(rest, &mut cursor, b"\"favorites\":")?;
     // field_clocks (key 'fi') sits between favorites (fa) and folder_icons (fo)
     // in canonical order (MYND-478) — the per-field LWW clock map for the
@@ -2261,6 +2290,7 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
         archived_folders,
         editor_layout,
         editor_line_numbers,
+        editor_vim_mode,
         editor_content_width,
         editor_default_view_mode,
         editor_focus_dim_inactive,
@@ -3098,6 +3128,7 @@ mod tests {
             editor_font_family: None,
             editor_line_spacing: None,
             editor_text_size: None,
+            editor_vim_mode: None,
             label: None,
             last_backup_at: None,
             new_note_location: None,
@@ -3158,6 +3189,7 @@ mod tests {
             editor_font_family: None,
             editor_line_spacing: None,
             editor_text_size: None,
+            editor_vim_mode: None,
             label: None,
             last_backup_at: None,
             new_note_location: None,
@@ -3477,6 +3509,7 @@ mod tests {
                 editor_font_family: None,
                 editor_line_spacing: None,
                 editor_text_size: None,
+                editor_vim_mode: None,
                 label: None,
                 last_backup_at: None,
                 new_note_location: None,
@@ -3539,6 +3572,7 @@ mod tests {
                 editor_font_family: None,
                 editor_line_spacing: None,
                 editor_text_size: None,
+                editor_vim_mode: None,
                 label: None,
                 last_backup_at: None,
                 new_note_location: None,
@@ -3867,6 +3901,67 @@ mod tests {
             cw < ff && ff < el && el < ln && ln < ls && ls < ts,
             "canonical order: {s}"
         );
+    }
+
+    #[test]
+    fn encode_omits_vim_mode_when_none_byte_identical_to_pre_feature() {
+        // vim-keyboard-mode (MYND-313): a vault that never touched the vim toggle
+        // must encode byte-identically to the pre-feature form, so every existing
+        // golden vector stays valid (migration-less additive field on MYP1).
+        let encoded = canonical_json_encode(&PrefsView {
+            editor_vim_mode: None,
+            ..PrefsView::default()
+        });
+        assert_eq!(encoded.as_slice(), br#"{"screen_capture_protection":true}"#);
+    }
+
+    #[test]
+    fn encode_places_vim_mode_between_toolbar_order_and_favorites() {
+        // Canonical key order: editor_text_size < editor_toolbar_hidden <
+        // editor_toolbar_order < editor_vim_mode < favorites
+        // (`editor_te` < `editor_to` < `editor_v` < `f`). Getting this wrong
+        // breaks cross-implementation byte agreement, so it is pinned here.
+        let encoded = canonical_json_encode(&PrefsView {
+            editor_text_size: Some(alloc::string::String::from("lg")),
+            editor_toolbar_hidden: alloc::vec![alloc::string::String::from("bold")],
+            editor_toolbar_order: alloc::vec![alloc::string::String::from("italic")],
+            editor_vim_mode: Some(true),
+            favorites: alloc::vec![alloc::string::String::from(
+                "0192f1a0-0000-7000-8000-000000000000"
+            )],
+            ..PrefsView::default()
+        });
+        let s = core::str::from_utf8(&encoded).unwrap();
+        let ts = s.find("editor_text_size").unwrap();
+        let th = s.find("editor_toolbar_hidden").unwrap();
+        let to = s.find("editor_toolbar_order").unwrap();
+        let vm = s.find("editor_vim_mode").unwrap();
+        let fav = s.find("favorites").unwrap();
+        assert!(
+            ts < th && th < to && to < vm && vm < fav,
+            "canonical order: {s}"
+        );
+    }
+
+    #[test]
+    fn vim_mode_round_trips_through_decode_both_values() {
+        // Both explicit values must survive encode→decode. `Some(false)` is a
+        // real state (the user turned vim off explicitly) and must NOT collapse
+        // into `None` (never set) — the two are distinguishable on disk.
+        for value in [true, false] {
+            let original = PrefsView {
+                editor_vim_mode: Some(value),
+                ..PrefsView::default()
+            };
+            let encoded = canonical_json_encode(&original);
+            let decoded = canonical_json_decode(&encoded).expect("decode");
+            assert_eq!(decoded.editor_vim_mode, Some(value));
+            assert_eq!(decoded, original);
+        }
+        // And absent stays absent.
+        let decoded =
+            canonical_json_decode(&canonical_json_encode(&PrefsView::default())).expect("decode");
+        assert_eq!(decoded.editor_vim_mode, None);
     }
 
     #[test]
@@ -4668,6 +4763,7 @@ mod tests {
             editor_font_family: None,
             editor_line_spacing: None,
             editor_text_size: None,
+            editor_vim_mode: None,
             label: None,
             last_backup_at: None,
             new_note_location: None,
@@ -4963,6 +5059,7 @@ mod tests {
             editor_font_family: None,
             editor_line_spacing: None,
             editor_text_size: None,
+            editor_vim_mode: None,
             label: None,
             last_backup_at: None,
             new_note_location: None,
@@ -5030,6 +5127,7 @@ mod tests {
             editor_font_family: None,
             editor_line_spacing: None,
             editor_text_size: None,
+            editor_vim_mode: None,
             label: None,
             last_backup_at: None,
             new_note_location: None,
@@ -5095,6 +5193,7 @@ mod tests {
             editor_font_family: None,
             editor_line_spacing: None,
             editor_text_size: None,
+            editor_vim_mode: None,
             label: None,
             last_backup_at: None,
             new_note_location: None,
@@ -5159,6 +5258,7 @@ mod tests {
             editor_font_family: None,
             editor_line_spacing: None,
             editor_text_size: None,
+            editor_vim_mode: None,
             label: None,
             last_backup_at: None,
             new_note_location: None,
@@ -5286,6 +5386,7 @@ mod tests {
             editor_font_family: None,
             editor_line_spacing: None,
             editor_text_size: None,
+            editor_vim_mode: None,
             label: None,
             last_backup_at: None,
             new_note_location: None,
@@ -5378,6 +5479,7 @@ mod tests {
             editor_font_family: None,
             editor_line_spacing: None,
             editor_text_size: None,
+            editor_vim_mode: None,
             label: None,
             last_backup_at: None,
             new_note_location: None,
@@ -5449,6 +5551,7 @@ mod tests {
             editor_font_family: None,
             editor_line_spacing: None,
             editor_text_size: None,
+            editor_vim_mode: None,
             label: None,
             last_backup_at: None,
             new_note_location: None,
@@ -5555,6 +5658,7 @@ mod tests {
             editor_font_family: None,
             editor_line_spacing: None,
             editor_text_size: None,
+            editor_vim_mode: None,
             label: None,
             last_backup_at: None,
             new_note_location: None,
@@ -5637,6 +5741,7 @@ mod tests {
             editor_font_family: None,
             editor_line_spacing: None,
             editor_text_size: None,
+            editor_vim_mode: None,
             label: None,
             last_backup_at: None,
             new_note_location: None,
@@ -5820,6 +5925,7 @@ mod tests {
             editor_font_family: None,
             editor_line_spacing: None,
             editor_text_size: None,
+            editor_vim_mode: None,
             label: None,
             last_backup_at: None,
             new_note_location: None,
@@ -5884,6 +5990,7 @@ mod tests {
             editor_font_family: None,
             editor_line_spacing: None,
             editor_text_size: None,
+            editor_vim_mode: None,
             label: None,
             last_backup_at: None,
             new_note_location: None,
@@ -5950,6 +6057,7 @@ mod tests {
             editor_font_family: None,
             editor_line_spacing: None,
             editor_text_size: None,
+            editor_vim_mode: None,
             label: None,
             last_backup_at: None,
             new_note_location: None,
@@ -6084,6 +6192,7 @@ mod tests {
             editor_font_family: None,
             editor_line_spacing: None,
             editor_text_size: None,
+            editor_vim_mode: None,
             label: None,
             last_backup_at: None,
             new_note_location: None,
@@ -6192,6 +6301,7 @@ mod tests {
             editor_font_family: None,
             editor_line_spacing: None,
             editor_text_size: None,
+            editor_vim_mode: None,
             label: None,
             last_backup_at: None,
             new_note_location: None,
@@ -6490,6 +6600,7 @@ mod tests {
             editor_font_family: None,
             editor_line_spacing: None,
             editor_text_size: None,
+            editor_vim_mode: None,
             label: None,
             last_backup_at: None,
             new_note_location: None,
@@ -6558,6 +6669,7 @@ mod tests {
             editor_font_family: None,
             editor_line_spacing: None,
             editor_text_size: None,
+            editor_vim_mode: None,
             label: None,
             last_backup_at: None,
             new_note_location: None,
@@ -6887,6 +6999,7 @@ mod tests {
                 editor_font_family: None,
                 editor_line_spacing: None,
                 editor_text_size: None,
+                editor_vim_mode: None,
                 label: None,
                 last_backup_at: None,
                 new_note_location: None,
@@ -6948,6 +7061,7 @@ mod tests {
                 editor_font_family: None,
                 editor_line_spacing: None,
                 editor_text_size: None,
+                editor_vim_mode: None,
                 label: None,
                 last_backup_at: None,
                 new_note_location: None,
@@ -7028,6 +7142,7 @@ mod tests {
             editor_font_family: None,
             editor_line_spacing: None,
             editor_text_size: None,
+            editor_vim_mode: None,
             label: None,
             last_backup_at: None,
             new_note_location: None,
