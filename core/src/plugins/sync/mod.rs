@@ -42,6 +42,7 @@ pub mod orchestrator;
 pub mod poke_listener;
 pub mod prefs_classification;
 pub mod prefs_merge;
+pub mod qr_join;
 pub mod reconcile;
 pub mod reconcile_policy;
 pub mod rustls_transport;

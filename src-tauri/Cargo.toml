@@ -73,6 +73,10 @@ protocol = { path = "../protocol" }
 myne-core = { path = "../core" }
 uuid = { version = "1", features = ["v4", "v7"] }
 thiserror = "2"
+# QR generation for device-join (MYND-466), desktop-only — mobile scans, never
+# generates, so this dep stays off the mobile build. SVG renderer only (no `image`
+# bitmap backend) to keep the dependency surface minimal (reproducible-builds).
+qrcode = { version = "0.14", default-features = false, features = ["svg"] }
 getrandom = "0.2"
 zeroize = { version = "1.8", features = ["alloc", "derive"] }
 # Constant-time comparison for the clipper pairing-token bearer value

@@ -22,6 +22,27 @@
 // fail-closed surface as a boot-time corrupted vault — one-way, no
 // return to the form within the session.
 //
+// **One credential at a time (MYND-558).** Orthogonal to the reducer
+// above, `idle`/`decrypting` render exactly one credential surface,
+// picked by the derived `surface` union: `"pending"` while the
+// `quick_unlock_status` probe is in flight (NEITHER field is rendered —
+// the probe is a local IPC that settles in milliseconds, and showing the
+// password form first would flash exactly the double-prompt this fixes);
+// `"quick"` when quick-unlock is redeemable and the user has not opted
+// out, which gives the PIN / Touch ID surface the screen; `"password"`
+// otherwise, unchanged from before. `passwordRevealed` is the user's own
+// override — the "Use password instead" link swaps a redeemable
+// quick-unlock for the password form, and a matching "Unlock with PIN
+// instead" link swaps back, so neither side is a cul-de-sac.
+//
+// This screen owns the probe rather than `<QuickUnlockEntry>`, because
+// the answer decides the layout: a child that probed for itself would
+// have to report upward and would re-probe (rendering an empty card in
+// the gap) every time the user toggled back to it. The child's one
+// upward signal is `onUnavailable` — the credential just proved dead
+// mid-session (attempts exhausted), which drops to the password form
+// permanently, with no way back.
+//
 // **Cold-start recovery link.** In `idle` mode (Exists), a ghost-style
 // "Forgot your password? Unlock with recovery phrase" link below the
 // primary CTA dispatches `unlock.start-recovery` → App routes Stage
@@ -40,7 +61,14 @@
 // extended to accept Slot::Empty + vault.meta-exists".
 
 import { invoke } from "@tauri-apps/api/core";
-import { useEffect, useReducer, useRef, type CSSProperties, type FormEvent } from "react";
+import {
+  useEffect,
+  useReducer,
+  useRef,
+  useState,
+  type CSSProperties,
+  type FormEvent,
+} from "react";
 import { useTranslation } from "react-i18next";
 import { appDataDir, join } from "@tauri-apps/api/path";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -53,11 +81,13 @@ import {
   CARD_BODY_STYLE,
   CARD_TITLE_STYLE,
   CenteredCard,
+  ctaStyle,
 } from "../components/primitives/CenteredCard";
 import { Spinner } from "../components/Spinner";
 import { SuspicionBanner } from "../components/SuspicionBanner";
 import { closeApp } from "../lib/app-window";
 import { ioBanner } from "../lib/io-banner";
+import { quickUnlockStatus, type QuickUnlockMethod } from "../lib/quick-unlock";
 import { UNLOCK_NON_DISTINGUISHING_BANNER } from "../lib/load-bearing-copy";
 import type { StageVaultStatus, SuspicionReason, VaultId } from "../lib/stage";
 import {
@@ -333,24 +363,6 @@ const RECOVER_LINK_STYLE: CSSProperties = {
   cursor: "pointer",
 };
 
-function ctaStyle(disabled: boolean): CSSProperties {
-  return {
-    background: disabled ? "var(--bg-3)" : "var(--accent)",
-    color: disabled ? "var(--fg-3)" : "var(--accent-on)",
-    border: disabled ? "1px solid var(--line-1)" : "none",
-    borderRadius: "var(--radius-2)",
-    padding: "var(--space-3) var(--space-5)",
-    fontFamily: "var(--font-sans)",
-    fontSize: "var(--text-base)",
-    fontWeight: "var(--weight-medium)" as CSSProperties["fontWeight"],
-    cursor: disabled ? "not-allowed" : "pointer",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: "var(--space-2)",
-  };
-}
-
 export function Unlock({
   initialStatus,
   vaultId,
@@ -364,6 +376,16 @@ export function Unlock({
 }: UnlockProps) {
   const { t } = useTranslation();
   const [state, dispatch] = useReducer(reducer, INITIAL_STATE);
+  /**
+   * The redeemable quick-unlock method (MYND-558). `undefined` = the status
+   * probe below is still in flight; a method = quick-unlock owns the screen;
+   * `null` = it is offering nothing, so the password form does.
+   */
+  const [quickMethod, setQuickMethod] = useState<QuickUnlockMethod | null | undefined>(
+    undefined,
+  );
+  /** User traded a redeemable quick-unlock for the password form. */
+  const [passwordRevealed, setPasswordRevealed] = useState(false);
   const mountedRef = useRef(true);
   useEffect(() => {
     mountedRef.current = true;
@@ -371,6 +393,37 @@ export function Unlock({
       mountedRef.current = false;
     };
   }, []);
+
+  // MYND-558 — which credential surface owns the screen. `available` (not
+  // `configured`) is the gate: on a cold start the credential exists but the
+  // spring-loaded session gate is closed, so redeeming would fail
+  // `RequiresFullPassword`. Resolving to `null` there is what makes a fresh
+  // launch show only the password form; the PIN field returns after the first
+  // full unlock + an auto-lock in the same session.
+  //
+  // A rejected or garbled probe is a "no quick-unlock" answer, not a dead end —
+  // settling in BOTH arms is what keeps the card from sitting in `"pending"`
+  // with no credential field at all.
+  useEffect(() => {
+    let alive = true;
+    // Re-probing means the target vault changed, so the previous vault's answer
+    // is stale: drop back to `pending` rather than offering its surface for the
+    // length of the new probe. Unreachable today (`stage.ts` has no
+    // unlock → unlock transition, so a vault switch remounts this screen), and
+    // cheap insurance for whoever adds one.
+    setQuickMethod(undefined);
+    setPasswordRevealed(false);
+    quickUnlockStatus(vaultId)
+      .then((s) => {
+        if (alive) setQuickMethod(s.available && s.method != null ? s.method : null);
+      })
+      .catch(() => {
+        if (alive) setQuickMethod(null);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [vaultId]);
 
   // MYND-121 — re-show the window after an idle-lock hid it. Auto-lock on idle
   // calls `window.hide()` (renderer-independent visual cover) before the
@@ -517,6 +570,16 @@ export function Unlock({
   const error = state.kind === "idle" ? state.error : null;
   const submitDisabled = decrypting || password.length === 0;
 
+  // MYND-558 one-credential-at-a-time split. `"pending"` renders NEITHER field:
+  // for the few milliseconds the probe is in flight the card shows its heading
+  // alone rather than flashing a password form it is about to replace.
+  const surface: "pending" | "quick" | "password" =
+    quickMethod === undefined
+      ? "pending"
+      : quickMethod !== null && !passwordRevealed
+        ? "quick"
+        : "password";
+
   const onSubmit = (ev: FormEvent) => {
     ev.preventDefault();
     if (submitDisabled) return;
@@ -565,67 +628,106 @@ export function Unlock({
       {suspicionReason && <SuspicionBanner reason={suspicionReason} />}
       <h1 style={CARD_TITLE_STYLE}>{t("unlock.title")}</h1>
       <p style={CARD_BODY_STYLE}>{t("unlock.subtitle")}</p>
-      {/* Quick-unlock (PIN / Touch ID) affordance — rendered only when
-          configured + usable this session; self-hides otherwise. The password
-          form below stays the always-present escape hatch (MYND-329). */}
-      <QuickUnlockEntry vaultId={vaultId} onUnlocked={onUnlocked} />
+      {/* Quick-unlock (PIN / Touch ID) — the primary surface when the probe
+          above says it is redeemable and the user hasn't opted out (MYND-329,
+          MYND-558). The password escape hatch sits one click below it:
+          quick-unlock is a convenience gate, not a replacement, so a user who
+          has forgotten the PIN reaches the master password without restarting
+          the app. */}
+      {surface === "quick" && quickMethod != null && (
+        <>
+          <QuickUnlockEntry
+            vaultId={vaultId}
+            method={quickMethod}
+            onUnlocked={onUnlocked}
+            onUnavailable={() => setQuickMethod(null)}
+          />
+          <button
+            type="button"
+            onClick={() => setPasswordRevealed(true)}
+            style={RECOVER_LINK_STYLE}
+            data-testid="unlock.use-password-link"
+          >
+            {t("unlock.usePasswordInstead")}
+          </button>
+        </>
+      )}
       {/* `data-vault-id` mirrors the picker-row idiom (SYNC-8): the
           vault-addressed unlock target threaded from the Stage payload,
           observable to the E2E suite (MYND-127 story 2). Absent when the
           backend's sole-vault `None` path applies. */}
-      <form
-        style={FORM_STYLE}
-        onSubmit={onSubmit}
-        noValidate
-        data-testid="unlock.form"
-        data-vault-id={vaultId}
-      >
-        <input
-          type="password"
-          placeholder={t("unlock.passwordPlaceholder")}
-          value={password}
-          onChange={(e) => dispatch({ type: "set-password", value: e.currentTarget.value })}
-          disabled={decrypting}
-          autoFocus
-          autoComplete="current-password"
-          style={INPUT_STYLE}
-          aria-label={t("unlock.passwordLabel")}
-          aria-invalid={error != null ? true : undefined}
-          data-testid="unlock.password-input"
-        />
-        {error != null && (
-          <DestructiveBanner testId="unlock.error-banner">{error}</DestructiveBanner>
-        )}
-        <button
-          type="submit"
-          disabled={submitDisabled}
-          style={ctaStyle(submitDisabled)}
-          data-testid="unlock.submit"
+      {surface === "password" && (
+        <form
+          style={FORM_STYLE}
+          onSubmit={onSubmit}
+          noValidate
+          data-testid="unlock.form"
+          data-vault-id={vaultId}
         >
-          {decrypting && <Spinner size={14} style={{ borderWidth: 2 }} />}
-          <span>{decrypting ? t("unlock.decrypting") : t("unlock.submit")}</span>
-        </button>
-        {!decrypting && (
+          <input
+            type="password"
+            placeholder={t("unlock.passwordPlaceholder")}
+            value={password}
+            onChange={(e) => dispatch({ type: "set-password", value: e.currentTarget.value })}
+            disabled={decrypting}
+            autoFocus
+            autoComplete="current-password"
+            style={INPUT_STYLE}
+            aria-label={t("unlock.passwordLabel")}
+            aria-invalid={error != null ? true : undefined}
+            data-testid="unlock.password-input"
+          />
+          {error != null && (
+            <DestructiveBanner testId="unlock.error-banner">{error}</DestructiveBanner>
+          )}
           <button
-            type="button"
-            onClick={onStartRecovery}
-            style={RECOVER_LINK_STYLE}
-            data-testid="unlock.recovery-link"
+            type="submit"
+            disabled={submitDisabled}
+            style={ctaStyle(submitDisabled)}
+            data-testid="unlock.submit"
           >
-            {t("unlock.recoveryLink")}
+            {decrypting && <Spinner size={14} style={{ borderWidth: 2 }} />}
+            <span>{decrypting ? t("unlock.decrypting") : t("unlock.submit")}</span>
           </button>
-        )}
-        {!decrypting && (
-          <button
-            type="button"
-            onClick={() => dispatch({ type: "request-delete-vault" })}
-            style={DELETE_VAULT_LINK_STYLE}
-            data-testid="unlock.delete-link"
-          >
-            {t("unlock.deleteLink")}
-          </button>
-        )}
-      </form>
+          {/* Way back to the quick surface the user traded away — rendered only
+              when quick-unlock is still redeemable, so an exhausted or
+              unconfigured credential is never re-offered. */}
+          {quickMethod != null && !decrypting && (
+            <button
+              type="button"
+              onClick={() => setPasswordRevealed(false)}
+              style={RECOVER_LINK_STYLE}
+              data-testid="unlock.use-quick-unlock-link"
+            >
+              {quickMethod === "biometric"
+                ? t("unlock.useBiometricInstead", {
+                    biometric: t("settings.quickUnlock.methodTouchId"),
+                  })
+                : t("unlock.unlockWithPinInstead")}
+            </button>
+          )}
+          {!decrypting && (
+            <button
+              type="button"
+              onClick={onStartRecovery}
+              style={RECOVER_LINK_STYLE}
+              data-testid="unlock.recovery-link"
+            >
+              {t("unlock.recoveryLink")}
+            </button>
+          )}
+          {!decrypting && (
+            <button
+              type="button"
+              onClick={() => dispatch({ type: "request-delete-vault" })}
+              style={DELETE_VAULT_LINK_STYLE}
+              data-testid="unlock.delete-link"
+            >
+              {t("unlock.deleteLink")}
+            </button>
+          )}
+        </form>
+      )}
     </CenteredCard>
   );
 }
