@@ -13,6 +13,7 @@ import { SyncStatusIndicator } from "../sync/SyncStatusIndicator";
 import { EndpointConfig } from "../sync/EndpointConfig";
 import { EnrollDeviceForm } from "../sync/EnrollDeviceForm";
 import { DeviceManagementPanel } from "../sync/DeviceManagementPanel";
+import { DeviceJoinQr } from "../sync/DeviceJoinQr";
 import { BuildingIndexState } from "../sync/BuildingIndexState";
 import { RecoveredNotes } from "../sync/RecoveredNotes";
 import { ConflictsView } from "../../notes/components/ConflictsView";
@@ -215,6 +216,13 @@ export function SyncPanel() {
         <span style={SECTION_TITLE_STYLE}>{t("sync.panel.devices.label")}</span>
         <DeviceManagementPanel hook={devicesHook} />
       </div>
+
+      {/* An enrolled device can invite another by showing a QR (MYND-466). */}
+      {enrolledHere && (
+        <div style={BLOCK_STYLE}>
+          <DeviceJoinQr />
+        </div>
+      )}
 
       <div style={BLOCK_STYLE}>
         <span style={SECTION_TITLE_STYLE}>
