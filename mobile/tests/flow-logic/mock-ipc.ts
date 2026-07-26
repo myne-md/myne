@@ -140,6 +140,12 @@ export interface MockConfig {
    *  plaintext (`{"v":1,"pos":[[id,x,y],…]}`), or `null` for a cold vault.
    *  Writes are recorded on `window.__graphLayoutWrites` (payload strings). */
   graphLayoutPayload?: string | null;
+  /** Canned `workspace_read` descriptor — the `vault.workspace` (MYW1) opaque
+   *  JSON, or `null` for a vault that has never persisted one. The store is
+   *  STATEFUL: a `workspace_write` replaces it (and is logged on
+   *  `window.__workspaceWrites`), so a test can assert a restore-after-reopen
+   *  round-trip rather than just the write payload (MYND-561). */
+  workspaceDescriptor?: string | null;
 }
 
 /** Install the mock IPC as an init script so it runs before the app's first paint. */
@@ -208,6 +214,21 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
     // browser, so a Node-side const would be a ReferenceError at call time.
     const DEFAULT_DEVICE_ID = "aa11bb22cc33dd44ee55ff6677889900";
 
+    // STATEFUL deliberate-folders store (MYND-560). An empty folder exists ONLY
+    // as a `deliberate_folders` entry — no note carries its path — so a
+    // create-folder flow test is meaningless unless the write survives into the
+    // next `prefs_read`. Seeded from `prefs.deliberate_folders` so a test can
+    // also start with a pre-existing empty folder (the "arrives via sync" case).
+    let deliberateFolders: string[] = Array.isArray(config.prefs?.deliberate_folders)
+      ? [...(config.prefs.deliberate_folders as string[])]
+      : [];
+
+    // STATEFUL vault.workspace descriptor (MYND-561). The opaque JSON string the
+    // frontend seals into MYW1; `workspace_read` hands back whatever the last
+    // `workspace_write` staged, so a "reopen the app" assertion can re-read the
+    // persisted folder-expand set instead of trusting a write payload alone.
+    let workspaceDescriptor: string | null = config.workspaceDescriptor ?? null;
+
     const handlers: Record<string, (args: Record<string, unknown>) => unknown> = {
       // ── Boot / editor mount ──
       // freshDevice → boot to Welcome (no vaults, Empty slot); lockedVault →
@@ -255,8 +276,32 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
         ...(config.prefs ?? {}),
         saved_views: savedViews,
         view_order: viewOrder,
+        // Spread AFTER `config.prefs` — the stateful store owns this field once a
+        // setter has run, otherwise the seed would keep winning and a folder
+        // created through the UI would vanish on the next read.
+        deliberate_folders: deliberateFolders,
         device_names: { ...deviceNames },
       }),
+      // Whole-set setter (MYND-560): record the write AND mutate the store, so
+      // the created empty folder is present on the nonce-bumped re-read.
+      "plugin:prefs|set_deliberate_folders": (args) => {
+        const folders = (args.folders ?? []) as string[];
+        const w = window as unknown as { __deliberateFolderWrites?: string[][] };
+        (w.__deliberateFolderWrites ??= []).push([...folders]);
+        deliberateFolders = [...folders];
+        return null;
+      },
+      // ── Workspace-state persistence (vault.workspace MYW1 descriptor) ──
+      // MYND-561: mobile's folder-expand set rides this blob. Stateful + write
+      // log, mirroring the graph-layout pair above.
+      "plugin:workspace|workspace_read": () => workspaceDescriptor,
+      "plugin:workspace|workspace_write": (args) => {
+        const descriptor = String(args.descriptor ?? "");
+        const w = window as unknown as { __workspaceWrites?: string[] };
+        (w.__workspaceWrites ??= []).push(descriptor);
+        workspaceDescriptor = descriptor;
+        return null;
+      },
       // Record whole-map decoration writes (MYND-516) so a flow test asserts a
       // pick invoked the setter with the spliced key — the `__voiceImports` /
       // `__noteCreates` capture pattern. The payload keys mirror the Rust
