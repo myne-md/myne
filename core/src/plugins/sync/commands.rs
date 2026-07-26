@@ -96,6 +96,73 @@ pub async fn sync_get_endpoint<R: Runtime>(
     })
 }
 
+/// Which trust path a scanned QR's cert pin takes (for the confirm-screen label).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum JoinQrPinSource {
+    /// Self-host: the QR's cert pin is adopted (TOFU-from-scan). The UI verifies
+    /// the connected cert matches this pin before proceeding (grill Q2 transfer).
+    SelfHostTofu,
+    /// Hosted default: the app's baked-in static pin governs; the QR pin is ignored.
+    Hosted,
+    /// Self-host with no pin carried: blind TOFU at first connect.
+    SelfHostNoPin,
+}
+
+/// The decoded, validated view of a scanned device-join QR — everything the mobile
+/// confirm screen needs before the user enters their password (MYND-466, Option 1).
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+pub struct JoinQrView {
+    /// Endpoint URL the QR carried (prefills the join form / endpoint set).
+    pub endpoint_url: String,
+    /// Canonical account number the QR carried (the UI formats it for display).
+    pub account_number: String,
+    /// The QR's carried leaf-cert pin (lowercase hex), or `None`. The UI matches
+    /// this against the connected cert (`sync_set_endpoint`'s returned fingerprint)
+    /// to verify the Q2 trusted-transfer before joining a self-host endpoint.
+    pub cert_pin_hex: Option<String>,
+    /// Which trust path the pin takes (hosted vs self-host).
+    pub pin_source: JoinQrPinSource,
+    /// Whether the QR is still fresh (within the ephemeral TTL). A stale QR is
+    /// rejected with a "re-scan a fresh one" message (grill Q8 liveness).
+    pub fresh: bool,
+}
+
+/// Pure decode → view mapping (host-testable; the command supplies `now_unix`).
+fn decode_join_qr_view(
+    scanned: &str,
+    now_unix: u64,
+) -> Result<JoinQrView, super::qr_join::QrJoinDecodeError> {
+    use super::qr_join::{select_pin_for_qr_join, QrJoinPayload, QrPinSelection, QR_JOIN_TTL_SECS};
+    let payload = QrJoinPayload::decode(scanned.trim())?;
+    let fresh = payload.is_fresh(now_unix, QR_JOIN_TTL_SECS);
+    let pin_source = match select_pin_for_qr_join(&payload) {
+        QrPinSelection::Hosted { .. } => JoinQrPinSource::Hosted,
+        QrPinSelection::SelfHostAdoptQr { .. } => JoinQrPinSource::SelfHostTofu,
+        QrPinSelection::SelfHostNoPin => JoinQrPinSource::SelfHostNoPin,
+    };
+    Ok(JoinQrView {
+        endpoint_url: payload.endpoint_url,
+        account_number: payload.account_number,
+        cert_pin_hex: payload.cert_pin_hex,
+        pin_source,
+        fresh,
+    })
+}
+
+/// Decode + validate a scanned device-join QR for the mobile confirm screen
+/// (MYND-466). Pure over the scanned string + the current clock; no vault access.
+#[tauri::command]
+pub async fn sync_decode_join_qr(
+    scanned: String,
+) -> Result<JoinQrView, super::qr_join::QrJoinDecodeError> {
+    let now_unix = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    decode_join_qr_view(&scanned, now_unix)
+}
+
 use super::to_hex as hex_lower;
 use super::token_store::TokenStore;
 
@@ -1279,11 +1346,24 @@ pub enum EnrollCredential {
     Recovery,
 }
 
+/// What the blocking enrollment/join closure hands back: `(approved, device_id_hex)`.
+/// Named rather than written inline so the `spawn_blocking` signature stays under
+/// rustfmt's width — spelling the tuple out re-indents both closure bodies.
+type EnrollmentOutcome = (bool, String);
+
 /// Outcome of an enrollment attempt surfaced to the UI.
 #[derive(Debug, Clone, Serialize)]
 pub struct EnrollResult {
     /// True when the device was approved + a token issued (false = pending approval).
     pub approved: bool,
+    /// The freshly generated `device_id` (hex) this enrollment registered
+    /// (MYND-548) — the create returns the id it minted. The caller needs it to
+    /// name THIS device once its first authed cycle has run, and has no other way
+    /// to learn it: a PENDING device holds no token, so it cannot read the roster
+    /// to discover which row is itself. Not a secret — this is the VV actor
+    /// identifier, deliberately distinct from the revocable per-device token
+    /// (`sync-protocol.md` §4).
+    pub device_id_hex: String,
 }
 
 /// Enroll this device against the configured server using {account# + credential}.
@@ -1313,151 +1393,155 @@ pub async fn sync_enroll<R: Runtime>(
     };
     // The SCRAM username is derived inside `enroll` as the account-hash hex —
     // the display-form account number never crosses the wire (AS9).
-    let outcome = tokio::task::spawn_blocking(move || -> Result<bool, SyncDeviceError> {
-        let transport = super::http_transport::build_transport(&url, pins)
-            .map_err(|_| SyncDeviceError::Transport)?;
+    let outcome =
+        tokio::task::spawn_blocking(move || -> Result<EnrollmentOutcome, SyncDeviceError> {
+            let transport = super::http_transport::build_transport(&url, pins)
+                .map_err(|_| SyncDeviceError::Transport)?;
 
-        // 1. Obtain vault.meta. A returning device fetches it pre-auth from the
-        //    server; the FIRST device (the owner enabling sync) has no server
-        //    copy yet (404) and falls back to its local vault.meta — which it
-        //    seeds to the server after enrolling (step 6).
-        let acct_hex = {
-            let mut s = String::with_capacity(32);
-            for b in &account.hash {
-                s.push_str(&format!("{b:02x}"));
+            // 1. Obtain vault.meta. A returning device fetches it pre-auth from the
+            //    server; the FIRST device (the owner enabling sync) has no server
+            //    copy yet (404) and falls back to its local vault.meta — which it
+            //    seeds to the server after enrolling (step 6).
+            let acct_hex = {
+                let mut s = String::with_capacity(32);
+                for b in &account.hash {
+                    s.push_str(&format!("{b:02x}"));
+                }
+                s
+            };
+            let meta_resp = transport
+                .request(
+                    super::transport::HttpMethod::Get,
+                    &format!("/vault.meta?account={acct_hex}"),
+                    &[],
+                    None,
+                )
+                .map_err(|_| SyncDeviceError::Transport)?;
+            let meta_bytes: Vec<u8> = match meta_resp.status {
+                200 => meta_resp.body,
+                404 => {
+                    std::fs::read(dir.join("vault.meta")).map_err(|_| SyncDeviceError::Transport)?
+                }
+                _ => return Err(SyncDeviceError::Transport),
+            };
+            let meta = parse_vault_meta(&meta_bytes).map_err(|_| SyncDeviceError::Internal)?;
+            // The `vault.meta` came from the (untrusted, TB5) sync server, so its
+            // `kdf_params` are attacker-controlled. Validate the Argon2id memory/time
+            // floor+ceiling BEFORE deriving — otherwise a hostile server could pin an
+            // absurd `m_kib` (e.g. multi-TiB) and force a pre-auth OOM/DoS. Every
+            // other derive site (unlock / recover / change-password / quick-unlock)
+            // already gates on this; the sync enroll path was the one gap.
+            validate_kdf_params(&meta.kdf_params).map_err(|_| SyncDeviceError::BadRequest)?;
+
+            // 2. Derive root_key from the credential + the meta salts.
+            let root_key: Zeroizing<[u8; AEAD_KEY_LEN]> = match path {
+                EnrollPath::Password => {
+                    let wrap = derive_password_wrap_key(
+                        &credential,
+                        &meta.random_salt_password,
+                        &meta.account_number_hash,
+                        &meta.kdf_params,
+                    )
+                    .map_err(|_| SyncDeviceError::BadRequest)?;
+                    let opened = aead_open_ctx(
+                        &wrap,
+                        &meta.nonce_password_wrap,
+                        &meta.enc_root_key_password,
+                        &aad_password_wrap(&meta.kdf_params),
+                    )
+                    .map_err(|_| SyncDeviceError::BadRequest)?;
+                    let mut rk = Zeroizing::new([0u8; AEAD_KEY_LEN]);
+                    if opened.len() != AEAD_KEY_LEN {
+                        return Err(SyncDeviceError::Internal);
+                    }
+                    rk.copy_from_slice(&opened);
+                    rk
+                }
+                EnrollPath::Recovery => {
+                    let normalized = normalize_user_phrase(&credential);
+                    let wrap = derive_recovery_wrap_key_from_normalized(
+                        normalized.as_str(),
+                        &meta.random_salt_recovery,
+                        &meta.account_number_hash,
+                        &meta.kdf_params,
+                    )
+                    .map_err(|_| SyncDeviceError::BadRequest)?;
+                    let opened = aead_open_ctx(
+                        &wrap,
+                        &meta.nonce_recovery_wrap,
+                        &meta.enc_root_key_recovery,
+                        &aad_recovery_wrap(&meta.kdf_params),
+                    )
+                    .map_err(|_| SyncDeviceError::BadRequest)?;
+                    let mut rk = Zeroizing::new([0u8; AEAD_KEY_LEN]);
+                    if opened.len() != AEAD_KEY_LEN {
+                        return Err(SyncDeviceError::Internal);
+                    }
+                    rk.copy_from_slice(&opened);
+                    rk
+                }
+            };
+
+            // 3. ServerAuth secret.
+            let secret = derive_subkey(&root_key, SubkeyRole::ServerAuth);
+
+            // 4. Register the SCRAM verifier (idempotent — a 409 already_registered
+            //    is success; the first device's stored salt is what every later
+            //    handshake reuses). Keyed on the canonical `account.hash` (the same
+            //    value the server namespaces on), so register + enroll agree.
+            enroll::register_verifier(transport.as_ref(), &account.hash, secret.as_slice())
+                .map_err(|_| SyncDeviceError::Transport)?;
+
+            // 5. SCRAM enroll.
+            let device_id = enroll::generate_device_id();
+            let mut nonce_bytes = [0u8; 16];
+            getrandom::getrandom(&mut nonce_bytes).map_err(|_| SyncDeviceError::Internal)?;
+            let mut client_nonce = String::with_capacity(32);
+            for b in &nonce_bytes {
+                client_nonce.push_str(&format!("{b:02x}"));
             }
-            s
-        };
-        let meta_resp = transport
-            .request(
-                super::transport::HttpMethod::Get,
-                &format!("/vault.meta?account={acct_hex}"),
-                &[],
-                None,
+
+            let out = enroll::enroll(
+                transport.as_ref(),
+                &account.hash,
+                secret.as_slice(),
+                path,
+                &client_nonce,
+                device_id,
             )
-            .map_err(|_| SyncDeviceError::Transport)?;
-        let meta_bytes: Vec<u8> = match meta_resp.status {
-            200 => meta_resp.body,
-            404 => std::fs::read(dir.join("vault.meta")).map_err(|_| SyncDeviceError::Transport)?,
-            _ => return Err(SyncDeviceError::Transport),
-        };
-        let meta = parse_vault_meta(&meta_bytes).map_err(|_| SyncDeviceError::Internal)?;
-        // The `vault.meta` came from the (untrusted, TB5) sync server, so its
-        // `kdf_params` are attacker-controlled. Validate the Argon2id memory/time
-        // floor+ceiling BEFORE deriving — otherwise a hostile server could pin an
-        // absurd `m_kib` (e.g. multi-TiB) and force a pre-auth OOM/DoS. Every
-        // other derive site (unlock / recover / change-password / quick-unlock)
-        // already gates on this; the sync enroll path was the one gap.
-        validate_kdf_params(&meta.kdf_params).map_err(|_| SyncDeviceError::BadRequest)?;
+            .map_err(|_| SyncDeviceError::Unauthenticated)?;
 
-        // 2. Derive root_key from the credential + the meta salts.
-        let root_key: Zeroizing<[u8; AEAD_KEY_LEN]> = match path {
-            EnrollPath::Password => {
-                let wrap = derive_password_wrap_key(
-                    &credential,
-                    &meta.random_salt_password,
-                    &meta.account_number_hash,
-                    &meta.kdf_params,
-                )
-                .map_err(|_| SyncDeviceError::BadRequest)?;
-                let opened = aead_open_ctx(
-                    &wrap,
-                    &meta.nonce_password_wrap,
-                    &meta.enc_root_key_password,
-                    &aad_password_wrap(&meta.kdf_params),
-                )
-                .map_err(|_| SyncDeviceError::BadRequest)?;
-                let mut rk = Zeroizing::new([0u8; AEAD_KEY_LEN]);
-                if opened.len() != AEAD_KEY_LEN {
-                    return Err(SyncDeviceError::Internal);
+            // 6. On approval: store the token, seed vault.meta to the server (so the
+            //    next device can fetch it), and persist the account/device identity
+            //    sync_now needs to author heads.
+            // Persist the device identity ALWAYS (even when pending), so a pending
+            // device can later claim its token by re-running the handshake under the
+            // unlocked root_key once an existing device approves it.
+            let mut st = super::state::read_sync_state(&dir).unwrap_or_default();
+            st.account_hash_hex = Some(acct_hex.clone());
+            let mut dev_hex = String::with_capacity(32);
+            for b in &device_id {
+                dev_hex.push_str(&format!("{b:02x}"));
+            }
+            st.device_id_hex = Some(dev_hex.clone());
+            let _ = super::state::write_sync_state(&dir, &st);
+
+            if out.approved && !out.token.is_empty() {
+                super::token_store::default_store()
+                    .store(&dir, &out.token)
+                    .map_err(|_| SyncDeviceError::Internal)?;
+                let mut token_hex = String::with_capacity(out.token.len() * 2);
+                for b in &out.token {
+                    token_hex.push_str(&format!("{b:02x}"));
                 }
-                rk.copy_from_slice(&opened);
-                rk
+                // Best-effort seed (a returning device's meta already matches).
+                let _ = enroll::put_vault_meta(transport.as_ref(), &token_hex, &meta_bytes);
             }
-            EnrollPath::Recovery => {
-                let normalized = normalize_user_phrase(&credential);
-                let wrap = derive_recovery_wrap_key_from_normalized(
-                    normalized.as_str(),
-                    &meta.random_salt_recovery,
-                    &meta.account_number_hash,
-                    &meta.kdf_params,
-                )
-                .map_err(|_| SyncDeviceError::BadRequest)?;
-                let opened = aead_open_ctx(
-                    &wrap,
-                    &meta.nonce_recovery_wrap,
-                    &meta.enc_root_key_recovery,
-                    &aad_recovery_wrap(&meta.kdf_params),
-                )
-                .map_err(|_| SyncDeviceError::BadRequest)?;
-                let mut rk = Zeroizing::new([0u8; AEAD_KEY_LEN]);
-                if opened.len() != AEAD_KEY_LEN {
-                    return Err(SyncDeviceError::Internal);
-                }
-                rk.copy_from_slice(&opened);
-                rk
-            }
-        };
-
-        // 3. ServerAuth secret.
-        let secret = derive_subkey(&root_key, SubkeyRole::ServerAuth);
-
-        // 4. Register the SCRAM verifier (idempotent — a 409 already_registered
-        //    is success; the first device's stored salt is what every later
-        //    handshake reuses). Keyed on the canonical `account.hash` (the same
-        //    value the server namespaces on), so register + enroll agree.
-        enroll::register_verifier(transport.as_ref(), &account.hash, secret.as_slice())
-            .map_err(|_| SyncDeviceError::Transport)?;
-
-        // 5. SCRAM enroll.
-        let device_id = enroll::generate_device_id();
-        let mut nonce_bytes = [0u8; 16];
-        getrandom::getrandom(&mut nonce_bytes).map_err(|_| SyncDeviceError::Internal)?;
-        let mut client_nonce = String::with_capacity(32);
-        for b in &nonce_bytes {
-            client_nonce.push_str(&format!("{b:02x}"));
-        }
-
-        let out = enroll::enroll(
-            transport.as_ref(),
-            &account.hash,
-            secret.as_slice(),
-            path,
-            &client_nonce,
-            device_id,
-        )
-        .map_err(|_| SyncDeviceError::Unauthenticated)?;
-
-        // 6. On approval: store the token, seed vault.meta to the server (so the
-        //    next device can fetch it), and persist the account/device identity
-        //    sync_now needs to author heads.
-        // Persist the device identity ALWAYS (even when pending), so a pending
-        // device can later claim its token by re-running the handshake under the
-        // unlocked root_key once an existing device approves it.
-        let mut st = super::state::read_sync_state(&dir).unwrap_or_default();
-        st.account_hash_hex = Some(acct_hex.clone());
-        let mut dev_hex = String::with_capacity(32);
-        for b in &device_id {
-            dev_hex.push_str(&format!("{b:02x}"));
-        }
-        st.device_id_hex = Some(dev_hex);
-        let _ = super::state::write_sync_state(&dir, &st);
-
-        if out.approved && !out.token.is_empty() {
-            super::token_store::default_store()
-                .store(&dir, &out.token)
-                .map_err(|_| SyncDeviceError::Internal)?;
-            let mut token_hex = String::with_capacity(out.token.len() * 2);
-            for b in &out.token {
-                token_hex.push_str(&format!("{b:02x}"));
-            }
-            // Best-effort seed (a returning device's meta already matches).
-            let _ = enroll::put_vault_meta(transport.as_ref(), &token_hex, &meta_bytes);
-        }
-        Ok(out.approved)
-    })
-    .await
-    .map_err(|_| SyncDeviceError::Internal)??;
+            Ok((out.approved, dev_hex))
+        })
+        .await
+        .map_err(|_| SyncDeviceError::Internal)??;
+    let (outcome, device_id_hex) = outcome;
 
     // Bootstrap upload (MYND-424): an approved device that just enrolled with an
     // existing, populated vault must push it WITHOUT waiting for a note edit.
@@ -1474,7 +1558,10 @@ pub async fn sync_enroll<R: Runtime>(
         }
     }
 
-    Ok(EnrollResult { approved: outcome })
+    Ok(EnrollResult {
+        approved: outcome,
+        device_id_hex,
+    })
 }
 
 /// Outcome of joining an existing account on a fresh device.
@@ -1487,6 +1574,11 @@ pub struct JoinResult {
     pub pending: bool,
     /// The server cert fingerprint (https) for eye-compare, or `null` (loopback).
     pub fingerprint: Option<String>,
+    /// The freshly generated `device_id` (hex) this join registered (MYND-548) —
+    /// same contract as [`EnrollResult::device_id_hex`]: the joining device is
+    /// pending, so it cannot read the roster to learn which row is itself, and it
+    /// needs the id to name itself in its own `vault.prefs`.
+    pub device_id_hex: String,
 }
 
 /// **Add this device to an existing account.** On a fresh device, bootstrap the
@@ -1579,58 +1671,108 @@ pub async fn sync_join_account<R: Runtime>(
         .peek_unlocked_root_key_clone()
         .await
         .ok_or(SyncDeviceError::Internal)?;
-    let approved = tokio::task::spawn_blocking(move || -> Result<bool, SyncDeviceError> {
-        let transport = super::http_transport::build_transport(&url, pins)
-            .map_err(|_| SyncDeviceError::Transport)?;
-        let secret = derive_subkey(&root_key, SubkeyRole::ServerAuth);
-        enroll::register_verifier(transport.as_ref(), &account_hash, secret.as_slice())
-            .map_err(|_| SyncDeviceError::Transport)?;
-        let device_id = enroll::generate_device_id();
-        let mut nonce = [0u8; 16];
-        getrandom::getrandom(&mut nonce).map_err(|_| SyncDeviceError::Internal)?;
-        let mut client_nonce = String::with_capacity(32);
-        for b in &nonce {
-            client_nonce.push_str(&format!("{b:02x}"));
-        }
-        let out = enroll::enroll(
-            transport.as_ref(),
-            &account_hash,
-            secret.as_slice(),
-            EnrollPath::Password,
-            &client_nonce,
-            device_id,
-        )
-        .map_err(|_| SyncDeviceError::Unauthenticated)?;
+    let approved =
+        tokio::task::spawn_blocking(move || -> Result<EnrollmentOutcome, SyncDeviceError> {
+            let transport = super::http_transport::build_transport(&url, pins)
+                .map_err(|_| SyncDeviceError::Transport)?;
+            let secret = derive_subkey(&root_key, SubkeyRole::ServerAuth);
+            enroll::register_verifier(transport.as_ref(), &account_hash, secret.as_slice())
+                .map_err(|_| SyncDeviceError::Transport)?;
+            let device_id = enroll::generate_device_id();
+            let mut nonce = [0u8; 16];
+            getrandom::getrandom(&mut nonce).map_err(|_| SyncDeviceError::Internal)?;
+            let mut client_nonce = String::with_capacity(32);
+            for b in &nonce {
+                client_nonce.push_str(&format!("{b:02x}"));
+            }
+            let out = enroll::enroll(
+                transport.as_ref(),
+                &account_hash,
+                secret.as_slice(),
+                EnrollPath::Password,
+                &client_nonce,
+                device_id,
+            )
+            .map_err(|_| SyncDeviceError::Unauthenticated)?;
 
-        // Persist identity so the loop can claim the token after approval.
-        let mut st = super::state::read_sync_state(&vault_dir).unwrap_or_default();
-        st.account_hash_hex = Some(acct_hex);
-        let mut dev_hex = String::with_capacity(32);
-        for b in &device_id {
-            dev_hex.push_str(&format!("{b:02x}"));
-        }
-        st.device_id_hex = Some(dev_hex);
-        let _ = super::state::write_sync_state(&vault_dir, &st);
-        if out.approved && !out.token.is_empty() {
-            super::token_store::default_store()
-                .store(&vault_dir, &out.token)
-                .map_err(|_| SyncDeviceError::Internal)?;
-        }
-        Ok(out.approved)
-    })
-    .await
-    .map_err(|_| SyncDeviceError::Internal)??;
+            // Persist identity so the loop can claim the token after approval.
+            let mut st = super::state::read_sync_state(&vault_dir).unwrap_or_default();
+            st.account_hash_hex = Some(acct_hex);
+            let mut dev_hex = String::with_capacity(32);
+            for b in &device_id {
+                dev_hex.push_str(&format!("{b:02x}"));
+            }
+            st.device_id_hex = Some(dev_hex.clone());
+            let _ = super::state::write_sync_state(&vault_dir, &st);
+            if out.approved && !out.token.is_empty() {
+                super::token_store::default_store()
+                    .store(&vault_dir, &out.token)
+                    .map_err(|_| SyncDeviceError::Internal)?;
+            }
+            Ok((out.approved, dev_hex))
+        })
+        .await
+        .map_err(|_| SyncDeviceError::Internal)??;
+
+    let (approved, device_id_hex) = approved;
 
     Ok(JoinResult {
         vault_id: vault_id.to_string(),
         pending: !approved,
         fingerprint,
+        device_id_hex,
     })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn qr_account() -> String {
+        String::from_utf8(
+            protocol::generate_account_number()
+                .unwrap()
+                .canonical
+                .to_vec(),
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn decode_join_qr_view_maps_a_fresh_self_host_payload() {
+        use super::super::qr_join::QrJoinPayload;
+        let acct = qr_account();
+        let pin = "ab".repeat(32);
+        let encoded =
+            QrJoinPayload::new("https://sync.example.org", &acct, Some(pin.clone()), 1_000)
+                .unwrap()
+                .encode()
+                .unwrap();
+        let view = decode_join_qr_view(&encoded, 1_050).expect("decode");
+        assert_eq!(view.endpoint_url, "https://sync.example.org");
+        assert_eq!(view.account_number, acct);
+        assert_eq!(view.cert_pin_hex, Some(pin));
+        assert_eq!(view.pin_source, JoinQrPinSource::SelfHostTofu);
+        assert!(view.fresh);
+    }
+
+    #[test]
+    fn decode_join_qr_view_flags_a_stale_payload() {
+        use super::super::qr_join::{QrJoinPayload, QR_JOIN_TTL_SECS};
+        let acct = qr_account();
+        let encoded = QrJoinPayload::new("https://s.example", &acct, None, 1_000)
+            .unwrap()
+            .encode()
+            .unwrap();
+        let view = decode_join_qr_view(&encoded, 1_000 + QR_JOIN_TTL_SECS + 999).expect("decode");
+        assert!(!view.fresh);
+        assert_eq!(view.pin_source, JoinQrPinSource::SelfHostNoPin);
+    }
+
+    #[test]
+    fn decode_join_qr_view_rejects_non_myne_input() {
+        assert!(decode_join_qr_view("https://evil.example", 1).is_err());
+    }
 
     #[test]
     fn head_fingerprint_of_hex_matches_golden_vector() {

@@ -18,8 +18,9 @@
 // behavior, since the explicit choice lives in the encrypted vault.prefs and
 // is unknowable while locked).
 
-import type { ThemeChoice } from "./prefs";
+import { setCustomTheme, type ThemeChoice } from "./prefs";
 import { deriveSyntaxTokensForTheme } from "./syntaxTheme";
+import type { ThemePalette } from "./themes";
 
 // The CSS-custom-property keys most recently written by `applyCustomTheme`, so
 // `clearCustomTheme` removes EXACTLY those (and nothing else) on revert. A
@@ -84,4 +85,17 @@ export function clearCustomTheme(): void {
   const root = document.documentElement;
   for (const key of appliedCustomKeys) root.style.removeProperty(key);
   appliedCustomKeys = [];
+}
+
+/**
+ * Make `name` the active custom theme: persist the selection, THEN paint the
+ * palette. Disk-first on purpose — a crash between the two leaves the vault
+ * consistent and only the screen stale, never the reverse.
+ *
+ * Lives here rather than in `themes.ts` because it ends in a DOM mutation;
+ * `themes.ts` is the IPC-wrapper layer.
+ */
+export async function activateCustomTheme(name: string, palette: ThemePalette): Promise<void> {
+  await setCustomTheme(name);
+  applyCustomTheme(palette);
 }

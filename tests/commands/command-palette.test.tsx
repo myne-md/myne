@@ -93,7 +93,9 @@ describe("CommandPalette UI", () => {
     // surfaces inline once you type (see NOTES-section tests below).
     expect(screen.getByText("Lock vault")).toBeTruthy();
     expect(screen.getByText("Open settings…")).toBeTruthy();
-    expect(screen.getByText("Import Obsidian vault…")).toBeTruthy();
+    // Source-agnostic since MYND-586: one import flow serves Obsidian, Notion,
+    // Evernote, HTML and CSV, so the command can no longer name a single source.
+    expect(screen.getByText("Import notes…")).toBeTruthy();
     expect(screen.getByText("Convert imported wikilinks in this note…")).toBeTruthy();
     expect(screen.queryByText("Switch to note…")).toBeNull();
   });
