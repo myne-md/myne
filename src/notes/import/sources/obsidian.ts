@@ -1,0 +1,82 @@
+// Importer — the Obsidian source (importer-breadth epic, MYND-579).
+//
+// The shipped Obsidian walk, expressed as an `ImportSource`. This file is a
+// BEHAVIOUR-PRESERVING extraction of `engine.ts`'s old Phase 1: same
+// `classifyEntry` taxonomy, same recursion rule, same tallies, same ordering. The
+// ten pre-existing `tests/notes/import-*.test.ts` suites are the regression gate —
+// they exercise `importVault`, which now runs through this source.
+//
+// Obsidian is the lossless source: its files are already Myne-dialect markdown, so
+// `load()` returns the bytes verbatim with an empty `lossy` list. Every transform
+// that DOES apply (the `folder:` / `title:` injections) lives in the shared
+// `mapImportedFile` seam, which the engine applies after `load()` for every source.
+
+import { classifyEntry, emptyIgnoreCounts } from "../skipPredicate";
+import {
+  joinPath,
+  type ImportDirEntry,
+  type ImportItemRef,
+  type ImportPlan,
+  type ImportPorts,
+  type ImportSource,
+  type LoadedItem,
+} from "../source";
+
+/**
+ * An `ImportSource` over an Obsidian vault rooted at `root`, reading through the
+ * narrow within-root-validated `importer:` seam.
+ *
+ * `plan()` walks directory ENTRIES ONLY (no file content) so the enumeration stays
+ * cheap and `total` is known before the first note is read: dot-prefixed entries
+ * are skipped and counted (the SYNC-10 ignore set subsumes `.obsidian/`, `.git/`,
+ * `.trash/`, `.DS_Store`), non-dot directories are recursed and recorded for
+ * SYNC-4 empty-dir detection, `.md` files are queued, `.canvas` and other
+ * non-markdown files go to their own skip buckets.
+ */
+export function createObsidianSource(
+  root: string,
+  ports: ImportPorts,
+): ImportSource {
+  return {
+    id: "obsidian",
+
+    async plan(): Promise<ImportPlan> {
+      const items: ImportItemRef[] = [];
+      const dirs: string[] = [];
+      const ignore = emptyIgnoreCounts();
+
+      const walk = async (relDir: string): Promise<void> => {
+        const entries: ImportDirEntry[] = await ports.readDir(joinPath(root, relDir));
+        for (const entry of entries) {
+          const cls = classifyEntry(entry.name);
+          const rel = relDir.length === 0 ? entry.name : `${relDir}/${entry.name}`;
+          if (entry.isDir) {
+            if (cls === "hidden-ignored") {
+              ignore.hiddenIgnored++; // dot-dir — skipped
+              continue;
+            }
+            dirs.push(rel); // non-dot dir → recurse (its classification is moot)
+            await walk(rel);
+          } else if (cls === "import-as-note") {
+            items.push({ relPath: rel });
+          } else if (cls === "canvas-skipped") {
+            ignore.canvasSkipped++;
+          } else if (cls === "non-markdown-skipped") {
+            ignore.nonMarkdownSkipped++;
+          } else {
+            ignore.hiddenIgnored++; // dot-prefixed file (incl. the `.foo.md` edge)
+          }
+        }
+      };
+      await walk("");
+
+      return { items, dirs, ignore };
+    },
+
+    async load(ref: ImportItemRef): Promise<LoadedItem> {
+      const markdown = await ports.readFile(joinPath(root, ref.relPath));
+      // Lossless: the source bytes ARE Myne-dialect markdown.
+      return { markdown, lossy: [] };
+    },
+  };
+}
