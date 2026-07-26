@@ -1,4 +1,4 @@
-// Quick-unlock (PIN) end-to-end suite (MYND-329).
+// Quick-unlock (PIN) end-to-end suite (MYND-329, MYND-558).
 //
 // Pins the PIN quick-unlock flow through the production bundle: from an
 // unlocked editor, configure a PIN in Settings → Privacy, lock the vault, and
@@ -20,12 +20,21 @@
 //     gate). A genuine restart is a second process, so qu2 runs two launches
 //     that share the vault dir.
 //
+// Surface precedence (MYND-558), one story:
+//   qu3 pins that an offered PIN is the ONLY credential surface — the password
+//     form is not rendered beside it (the reported bug: both prompts at once
+//     after PIN setup, with no cue which one the app wanted) — and that the
+//     "Use password instead" link trades one for the other and still unlocks.
+//     The complementary no-PIN fallback is qu2 plus every other suite that
+//     boots straight into the password form.
+//
 // Precondition: exactly 1 vault (weak KDF — unlock reads params from vault.meta).
 //
 // Verified 3× green in the Linux tauri-driver container (`./scripts/e2e-local.sh`,
-// 2026-06-24). The PIN-setup completion wait (`configurePinInSettings`) is the
-// load-bearing de-flake: reading the always-present status text the instant the
-// element is found races the async Argon2id setup and failed ~1 in 3.
+// 2026-06-24; re-verified with qu3 on 2026-07-25). The PIN-setup completion wait
+// (`configurePinInSettings`) is the load-bearing de-flake: reading the
+// always-present status text the instant the element is found races the async
+// Argon2id setup and failed ~1 in 3.
 
 import { cpSync, rmSync } from "node:fs";
 import { it } from "vitest";
@@ -159,11 +168,11 @@ describeE2E("qu2 PIN quick-unlock hidden on a cold start (MYND-329)", () => {
         async (app) => {
           const s = app.session;
           // Single vault → boot lands straight on the Unlock screen. Waiting for
-          // the password field confirms the screen has settled; the Unlock
-          // screen (and QuickUnlockEntry's status probe) mounts during boot, so
-          // by the time this find returns the `quick_unlock_status` IPC has long
-          // resolved — a regression that mounts the PIN field would already be
-          // present and fail the waitForGone below.
+          // the password field confirms the screen has settled: since MYND-558
+          // the Unlock screen owns the `quick_unlock_status` probe and renders
+          // NO credential field until it resolves, so the password input can
+          // only be here because the probe already answered "not redeemable" —
+          // a regression that offered the PIN would fail the waitForGone below.
           await s.byTestId("unlock.password-input");
 
           // The bug: on a cold start the gate is closed, status reports
@@ -181,5 +190,46 @@ describeE2E("qu2 PIN quick-unlock hidden on a cold start (MYND-329)", () => {
       // Launch 1 kept its data dir; reap it now.
       if (warmDataHome) rmSync(warmDataHome, { recursive: true, force: true });
     }
+  });
+});
+
+describeE2E("qu3 PIN is the only surface, password is one click away (MYND-558)", () => {
+  // Precondition: exactly 1 vault (weak KDF). Same-session lock, so the
+  // spring-loaded gate is open and the PIN affordance is offered.
+  it("hides the password form behind a reveal, then unlocks with the password", async () => {
+    let password = "";
+    await scenario(
+      "qu3-pin-primary",
+      {
+        seed: (dir) => {
+          const v = seedVault(dir);
+          password = v.password;
+        },
+      },
+      async (app) => {
+        const s = app.session;
+        await unlockToEditor(s, password);
+        await dismissImporterOffer(s);
+        await configurePinInSettings(s);
+
+        // ---- Lock: the PIN owns the screen, the password form is absent -----
+        await (await s.byTestId("editor.lock-cta")).click();
+        // Finding the PIN field first means the screen has settled — the status
+        // probe that decides the surface has already resolved, so a regression
+        // that renders both would be on the page for the checks below.
+        await s.byTestId("unlock.quick-pin-input");
+        await s.waitForGone(testIdSelector("unlock.password-input"));
+        await s.waitForGone(testIdSelector("unlock.form"));
+
+        // ---- Reveal: the password replaces the PIN, it does not join it -----
+        await (await s.byTestId("unlock.use-password-link")).click();
+        await s.byTestId("unlock.password-input");
+        await s.waitForGone(testIdSelector("unlock.quick-pin-input"));
+        await s.waitForGone(testIdSelector("unlock.quick-unlock"));
+
+        // ---- The revealed password path still unlocks the vault -------------
+        await unlockToEditor(s, password);
+      },
+    );
   });
 });
