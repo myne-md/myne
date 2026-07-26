@@ -2462,6 +2462,11 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
           onAttach={() => attachInputRef.current?.click()}
           onLibrary={() => setManageAttachments(true)}
           onRecord={() => setRecordOpen(true)}
+          // MYND-555: the user's device-local bar layout. Both default to `[]`
+          // (canonical order, nothing hidden), and they ride the `usePrefs` nonce,
+          // so a change in Settings reorders the live bar without a remount.
+          order={prefs.editor_toolbar_order}
+          hidden={prefs.editor_toolbar_hidden}
         />
       )}
 

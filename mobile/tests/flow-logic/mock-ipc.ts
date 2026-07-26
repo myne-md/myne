@@ -189,6 +189,8 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
       right_panel_active_tab: null,
       right_panel_hidden_tabs: [],
       right_panel_tab_order: [],
+      editor_toolbar_order: [],
+      editor_toolbar_hidden: [],
       item_colors: {},
       label: null,
       saved_views: [],
@@ -228,6 +230,17 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
     // `workspace_write` staged, so a "reopen the app" assertion can re-read the
     // persisted folder-expand set instead of trusting a write payload alone.
     let workspaceDescriptor: string | null = config.workspaceDescriptor ?? null;
+
+    // STATEFUL format-bar layout (MYND-555). Both fields are whole-value setters
+    // and the panel writes optimistically, so a customize flow test is only
+    // meaningful if the write survives into the next `prefs_read` — otherwise the
+    // seeded value would keep winning and the live bar would never change.
+    let toolbarOrder: string[] = Array.isArray(config.prefs?.editor_toolbar_order)
+      ? [...(config.prefs.editor_toolbar_order as string[])]
+      : [];
+    let toolbarHidden: string[] = Array.isArray(config.prefs?.editor_toolbar_hidden)
+      ? [...(config.prefs.editor_toolbar_hidden as string[])]
+      : [];
 
     const handlers: Record<string, (args: Record<string, unknown>) => unknown> = {
       // ── Boot / editor mount ──
@@ -276,12 +289,32 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
         ...(config.prefs ?? {}),
         saved_views: savedViews,
         view_order: viewOrder,
-        // Spread AFTER `config.prefs` — the stateful store owns this field once a
-        // setter has run, otherwise the seed would keep winning and a folder
-        // created through the UI would vanish on the next read.
+        // Spread AFTER `config.prefs` — once a setter runs the stateful store
+        // owns these fields, else the seed would keep winning and a write made
+        // through the UI would appear to no-op on the next read.
         deliberate_folders: deliberateFolders,
         device_names: { ...deviceNames },
+        editor_toolbar_order: toolbarOrder,
+        editor_toolbar_hidden: toolbarHidden,
       }),
+      // Format-bar layout setters (MYND-555): record the write AND mutate the
+      // store. `order` is a verbatim sequence; `hidden` is sorted+deduped by the
+      // real Rust codec, so mirror that here or the mock would let a test pass
+      // against an ordering the device would never return.
+      "plugin:prefs|set_editor_toolbar_order": (args) => {
+        const order = (args.order ?? []) as string[];
+        const w = window as unknown as { __toolbarOrderWrites?: string[][] };
+        (w.__toolbarOrderWrites ??= []).push([...order]);
+        toolbarOrder = [...order];
+        return null;
+      },
+      "plugin:prefs|set_editor_toolbar_hidden": (args) => {
+        const items = (args.items ?? []) as string[];
+        const w = window as unknown as { __toolbarHiddenWrites?: string[][] };
+        (w.__toolbarHiddenWrites ??= []).push([...items]);
+        toolbarHidden = [...new Set(items)].sort();
+        return null;
+      },
       // Whole-set setter (MYND-560): record the write AND mutate the store, so
       // the created empty folder is present on the nonce-bumped re-read.
       "plugin:prefs|set_deliberate_folders": (args) => {
