@@ -82,8 +82,17 @@ export const IMPORT_DELTA_ATTR = ["href", "src", "alt"] as const;
  *
  * Protocol-relative (`//host/x`) still passes: it carries no scheme, and the
  * importer's output is markdown text that is never fetched.
+ *
+ * CASE-INSENSITIVE, and only the recognizing arm gains by it. URL schemes are
+ * case-insensitive per RFC 3986 §3.1 and real exports do emit `HTTPS://`, but
+ * DOMPurify tests this pattern against the raw attribute value without folding
+ * case — so without `i` an uppercase-scheme link silently lost its `href`. The
+ * flag cannot widen the reject set: the relative arm is `[^:]*`, which has no
+ * case-bearing literal, and a hostile scheme is rejected by the *absence* of a
+ * colon-free prefix, not by letter case (`JavaScript:` fails exactly as
+ * `javascript:` does — pinned in `tests/notes/import/import-sanitize.test.ts`).
  */
-export const SAFE_URI_REGEXP = /^(?:https?:\/\/|mailto:)|^[^:]*(?:[/?#]|$)/;
+export const SAFE_URI_REGEXP = /^(?:https?:\/\/|mailto:)|^[^:]*(?:[/?#]|$)/i;
 
 /** The composed import config. Built from the render config + the two deltas. */
 export const IMPORT_SANITIZE_CONFIG: Readonly<Record<string, unknown>> = {
