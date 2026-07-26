@@ -5,7 +5,7 @@
 # single-lock discipline). The share-intent plugin (MYND-511) is a member for
 # the same reason.
 [workspace]
-members = ["tauri-plugin-screen-guard", "tauri-plugin-share-intent"]
+members = ["tauri-plugin-screen-guard", "tauri-plugin-share-intent", "tauri-plugin-qr-scan"]
 
 [package]
 name = "myne-mobile"
@@ -82,6 +82,10 @@ tauri-plugin-screen-guard = { path = "tauri-plugin-screen-guard" }
 # surface — no WebView commands, no capability entry; it delivers each shared
 # file to the WebView as a global `share-intent` event. Zero external crates.
 tauri-plugin-share-intent = { path = "tauri-plugin-share-intent" }
+# MYND-466: in-repo iOS AVFoundation QR scanner for device-join via QR. WebView
+# command `scan` (deny-by-default `qr-scan:default` capability, camera-gated,
+# NSCameraUsageDescription). iOS-only (SYNC-46); Android decode is MYND-465.
+tauri-plugin-qr-scan = { path = "tauri-plugin-qr-scan" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 uuid = { version = "1", features = ["v4", "v7"] }
