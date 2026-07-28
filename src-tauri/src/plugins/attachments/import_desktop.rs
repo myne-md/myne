@@ -46,17 +46,29 @@ pub async fn attachment_import<R: Runtime>(
     // still block this IPC while they wait. An unreadable prefs blob reads as
     // ON, matching the worker: a prefs read failure must not silently disable a
     // search feature.
-    let ocr_enabled = myne_core::plugins::prefs::commands::prefs_read_with_dir(&dir, state.inner())
-        .await
-        .map(|p| p.attachment_ocr_enabled)
-        .unwrap_or(true);
+    let ocr_enabled = myne_core::plugins::prefs::commands::prefs_read_with_dir(
+        &dir,
+        state.inner(),
+        &myne_core::vault_io::StdVaultIo,
+    )
+    .await
+    .map(|p| p.attachment_ocr_enabled)
+    .unwrap_or(true);
     let extractor = if ocr_enabled {
         crate::plugins::attachments::extract::extract
     } else {
         crate::plugins::attachments::extract::extract_deferring_ocr
     };
-    let result =
-        attachment_import_with_dir_ext(&dir, state.inner(), source, created_at, extractor).await;
+    let result = attachment_import_with_dir_ext(
+        &myne_core::vault_io::StdVaultIo,
+        &myne_core::host::tauri_host::TauriHost::new(app.clone()),
+        &dir,
+        state.inner(),
+        source,
+        created_at,
+        extractor,
+    )
+    .await;
     // MYND-468: a fresh import (not a dedup hit) is a local sync change — the
     // blob + catalog must push on the next coalesced cycle.
     if matches!(&result, Ok(imported) if !imported.deduplicated) {
@@ -136,7 +148,16 @@ mod tests {
         myne_core::plugins::attachments::commands::ImportedAttachment,
         myne_core::plugins::attachments::error::AttachmentImportError,
     > {
-        attachment_import_with_dir_ext(vault_dir, state, source, None, extract::extract).await
+        attachment_import_with_dir_ext(
+            &myne_core::vault_io::StdVaultIo,
+            &myne_core::host::test_host::TestHost::new("/nonexistent-import-desktop-test-host"),
+            vault_dir,
+            state,
+            source,
+            None,
+            extract::extract,
+        )
+        .await
     }
 
     #[test]
@@ -213,10 +234,15 @@ mod tests {
             // No note references it, so clean_unused deletes it. The MYE1 cache
             // MUST go too — otherwise the "permanently deleted" attachment's
             // searchable plaintext stays decryptable (§9.15.4 crypto-erase parity).
-            let result =
-                attachment_clean_unused_with_dir(tmp.path(), &state, vec![imported.id.clone()])
-                    .await
-                    .expect("clean_unused succeeds");
+            let result = attachment_clean_unused_with_dir(
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::test_host::TestHost::new("/nonexistent-import-desktop-test-host"),
+                tmp.path(),
+                &state,
+                vec![imported.id.clone()],
+            )
+            .await
+            .expect("clean_unused succeeds");
             assert_eq!(result.deleted, 1);
             assert!(
                 !text_cache::cache_path(tmp.path(), &id).exists(),
@@ -251,9 +277,15 @@ mod tests {
                 "import eager-cached the text"
             );
 
-            attachment_delete_with_dir(tmp.path(), &state, imported.id.clone())
-                .await
-                .expect("delete succeeds");
+            attachment_delete_with_dir(
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::test_host::TestHost::new("/nonexistent-import-desktop-test-host"),
+                tmp.path(),
+                &state,
+                imported.id.clone(),
+            )
+            .await
+            .expect("delete succeeds");
 
             // ...and gone after delete.
             assert!(

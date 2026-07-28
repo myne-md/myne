@@ -55,7 +55,6 @@ use protocol::AEAD_KEY_LEN;
 use serde::Serialize;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
-use std::time::Instant;
 use tokio::sync::{RwLock, Semaphore};
 use zeroize::Zeroizing;
 
@@ -75,7 +74,9 @@ pub const AUTH_PERMITS: usize = 1;
 /// when a user-initiated auth op preempts it (MYND-351). Interval × attempts
 /// caps how long the user waits before the op rejects (when the permit is held
 /// by a non-cancellable auth op rather than the cancellable backup). ~2s ceiling.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 const BACKUP_YIELD_POLL_INTERVAL: std::time::Duration = std::time::Duration::from_millis(25);
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 const BACKUP_YIELD_POLL_ATTEMPTS: u32 = 80;
 
 /// Tauri-managed runtime state for the vault auth domain.
@@ -104,12 +105,27 @@ pub struct VaultRuntimeState {
     /// silently linearize multi-click DoS into N×Argon2id).
     auth_permits: Semaphore,
 
-    /// Monotonic process-start baseline for the auto-lock activity clock
-    /// (MYND-121). Immutable after construction; read by
-    /// [`Self::monotonic_millis`]. `Instant` (monotonic), not `SystemTime`
-    /// — a security timer must be immune to wall-clock / NTP / DST steps
-    /// (`decisions.md` 2026-05-30 "Auto-lock on idle").
-    start_instant: Instant,
+    /// Monotonic origin for the auto-lock activity clock (MYND-121), in
+    /// milliseconds, set on first use rather than at construction.
+    ///
+    /// **Was an `Instant` captured in `Default::default()`, and that panicked on
+    /// wasm32** (phase3-web-client task 12): `Instant::now()` resolves to std's
+    /// `unsupported` backend there, so merely *constructing* the state aborted
+    /// the wasm instance — before any vault work, with a bare
+    /// `RuntimeError: unreachable` and no other signal. Found from a Worker
+    /// stack trace, not by reading.
+    ///
+    /// Lazy + `AtomicU64` rather than a constructor parameter because
+    /// [`Default`] has nowhere to take a host from, and every alternative
+    /// (`Option<Instant>`, a cfg-split field, a second constructor) either kept
+    /// the panic or pushed a host into ~40 construction sites. The value is
+    /// whatever the first caller's monotonic reading was; `0` means "not yet
+    /// set", which is why [`Self::activity_origin`] takes the reading as a
+    /// parameter instead of fetching one.
+    ///
+    /// Still monotonic, never wall-clock — a security timer must be immune to
+    /// NTP / DST steps (`decisions.md` 2026-05-30 "Auto-lock on idle").
+    activity_origin_millis: AtomicU64,
 
     /// Last user-activity timestamp, in millis since [`Self::start_instant`],
     /// updated by the lock-free `report_user_activity` heartbeat. A plain
@@ -177,7 +193,7 @@ impl Default for VaultRuntimeState {
         Self {
             slots: RwLock::new(HashMap::new()),
             auth_permits: Semaphore::new(AUTH_PERMITS),
-            start_instant: Instant::now(),
+            activity_origin_millis: AtomicU64::new(0),
             last_activity_millis: AtomicU64::new(0),
             auto_lock_timeout_secs: AtomicU32::new(crate::DEFAULT_AUTO_LOCK_SECS),
             label_cache: RwLock::new(HashMap::new()),
@@ -194,6 +210,12 @@ impl VaultRuntimeState {
         &self.auth_permits
     }
 
+    // Backup is desktop-only — the web capability set excludes backup
+    // export/restore by decision (`decisions.md` 2026-07-26), and the only
+    // production caller is `src-tauri`'s backup plugin. Gated rather than
+    // routed through `crate::task`: a wasm `sleep` here would be dead code,
+    // and a dead timer arm is a thing that looks tested and is not.
+    #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
     /// "User always wins" preemption of an in-flight scheduled backup before a
     /// user-initiated auth op acquires the shared auth permit (MYND-351, design
     /// session 2026-06-17 Q6 / Direction 2).
@@ -312,9 +334,9 @@ impl VaultRuntimeState {
     /// cannot serialise against note-save / unlock / lock ops
     /// (`decisions.md` 2026-05-30). Safe in any slot state; the value is
     /// only consulted while `Slot::Unlocked` (see [`Self::idle_millis`]).
-    pub fn report_activity(&self) {
+    pub fn report_activity(&self, now_millis: u64) {
         self.last_activity_millis
-            .store(self.monotonic_millis(), Ordering::Relaxed);
+            .store(self.relative_millis(now_millis), Ordering::Relaxed);
     }
 
     /// Milliseconds elapsed since the last recorded activity. Lock-free
@@ -323,18 +345,36 @@ impl VaultRuntimeState {
     /// write-lock before the irreversible zeroize (TOCTOU close). The
     /// value is meaningful only while `Slot::Unlocked`; the timer checks
     /// the slot kind first.
-    pub fn idle_millis(&self) -> u64 {
-        self.monotonic_millis()
+    pub fn idle_millis(&self, now_millis: u64) -> u64 {
+        self.relative_millis(now_millis)
             .saturating_sub(self.last_activity_millis.load(Ordering::Relaxed))
     }
 
-    /// Monotonic milliseconds since the process-start baseline. Monotonic
-    /// (`Instant`-derived) — never wall-clock — so the auto-lock timer is
-    /// immune to NTP steps / DST changes (`decisions.md` 2026-05-30).
-    fn monotonic_millis(&self) -> u64 {
-        // u128 -> u64 truncation is irrelevant in practice: u64 millis
-        // spans ~584 million years of process uptime.
-        self.start_instant.elapsed().as_millis() as u64
+    /// A host monotonic reading, rebased onto this state's own origin.
+    ///
+    /// The origin is claimed by whoever reads first. Two properties matter and
+    /// both are deliberate: the result is **0 on that first call**, so a fresh
+    /// state reports no idle time rather than the host's uptime; and rebasing
+    /// keeps `last_activity_millis` small regardless of what origin the host
+    /// picked (`performance.now()` counts from page load, the desktop's from
+    /// first use).
+    ///
+    /// `saturating_sub` is load-bearing, not defensive: a host clock that went
+    /// backwards would otherwise underflow to a colossal idle time and lock the
+    /// vault instantly. Saturating to 0 means a backwards step delays the
+    /// auto-lock rather than triggering it — the direction that does not throw
+    /// away a user's unsaved work on a clock glitch.
+    fn relative_millis(&self, now_millis: u64) -> u64 {
+        // `now_millis` can legitimately be 0 (a `NoopHost`, or the very first
+        // millisecond). Storing 0 leaves the origin "unset" and the next call
+        // claims it — harmless, because the rebased result is 0 either way.
+        let origin = self.activity_origin_millis.load(Ordering::Relaxed);
+        if origin == 0 {
+            self.activity_origin_millis
+                .store(now_millis, Ordering::Relaxed);
+            return 0;
+        }
+        now_millis.saturating_sub(origin)
     }
 
     /// Set the cached effective auto-lock timeout (seconds). Lock-free.
@@ -489,15 +529,23 @@ impl VaultRuntimeState {
     /// ABSOLUTE from `recovered_at` (a transient-state deadline, not an
     /// activity-reset idle): a user cannot hold the freshly-recovered
     /// `root_key` live indefinitely by moving the mouse. `age_of` is a closure
-    /// (the real caller passes `|r| r.elapsed()`) so the age is read while the
-    /// write-lock is held and so tests can inject a deterministic age.
+    /// (the real caller subtracts against [`crate::host::HostCtx::monotonic_millis`])
+    /// so the age is read while the write-lock is held and so tests can inject a
+    /// deterministic age.
+    ///
+    /// Takes a monotonic MILLISECOND reading rather than an `Instant`
+    /// (phase3-web-client task 12): `Instant::now()` panics on
+    /// `wasm32-unknown-unknown`. This is a genuine elapsed-time consumer — the
+    /// one `Slot` timestamp that is actually read — so it must be monotonic and
+    /// must not become a wall clock, or a backwards clock step would extend a
+    /// recovery session indefinitely.
     pub async fn take_recovering_if_expired<F>(
         &self,
         ttl: core::time::Duration,
         age_of: F,
     ) -> Option<Slot>
     where
-        F: FnOnce(Instant) -> core::time::Duration,
+        F: FnOnce(u64) -> core::time::Duration,
     {
         // TRANSITIONAL (sub-feature 6 — multi-vault auto-lock): operate on the
         // single active `Recovering` entry (SYNC-1 one-at-a-time).
@@ -688,8 +736,13 @@ impl VaultRuntimeState {
         // `last_activity_millis` cannot shorten the first idle window
         // (auto-lock on idle, MYND-121). The activity clock stays a SINGLETON
         // (SYNC-1: one vault unlocked at a time → one clock).
+        //
+        // `unlocked_at` is the caller's host reading, taken moments ago on the
+        // same monotonic clock — so it is reused here rather than requiring a
+        // host parameter on this method.
+        let now_millis = vault.unlocked_at;
         self.last_activity_millis
-            .store(self.monotonic_millis(), Ordering::Relaxed);
+            .store(self.relative_millis(now_millis), Ordering::Relaxed);
         // Insert under `id`; the prior entry (or `Slot::Empty` if absent) is
         // returned for diagnostics.
         self.slots
@@ -729,8 +782,9 @@ impl VaultRuntimeState {
         // Fresh activity baseline for the new session (mirrors `set_unlocked`)
         // so a stale pre-unlock `last_activity_millis` cannot shorten the first
         // idle window. The activity clock stays a SINGLETON (SYNC-1).
+        let now_millis = vault.unlocked_at;
         self.last_activity_millis
-            .store(self.monotonic_millis(), Ordering::Relaxed);
+            .store(self.relative_millis(now_millis), Ordering::Relaxed);
 
         let mut slots = self.slots.write().await;
         // Resolve the currently-`Unlocked` vault (if any) under the held write
@@ -1012,7 +1066,7 @@ impl VaultRuntimeState {
         // Run the rewrite in spawn_blocking; the write lock is held
         // across the .await, blocking any concurrent `vault_lock`
         // until atomic_write completes.
-        let new_hash = match tokio::task::spawn_blocking(rewrite).await {
+        let new_hash = match crate::task::run_blocking(rewrite).await {
             Ok(Ok(h)) => h,
             Ok(Err(e)) => return Err(CommitRewriteError::Rewrite(e)),
             Err(_) => return Err(CommitRewriteError::Join),
@@ -1099,10 +1153,70 @@ impl VaultRuntimeState {
         drop(dropped);
         // Lock still held across the spawn_blocking await; any concurrent
         // slot-touching op queues on the RwLock.
-        match tokio::task::spawn_blocking(unlink).await {
+        match crate::task::run_blocking(unlink).await {
             Ok(Ok(())) => Ok(()),
             Ok(Err(e)) => Err(TakeAndRunError::Closure(e)),
             Err(_) => Err(TakeAndRunError::Join),
+        }
+    }
+
+    /// The **async** sibling of [`Self::take_and_run_blocking_for_id`]
+    /// (`phase3-web-client` task 72): same slot discipline, but the erase is a
+    /// future rather than a blocking closure.
+    ///
+    /// # Why a sibling and not a rewrite
+    ///
+    /// The blocking variant's `F: FnOnce() -> Result<(), E> + Send + 'static`
+    /// bound is not incidental — it is what lets the desktop erase run on
+    /// tokio's blocking pool while this slot's write lock is held. Widening it in
+    /// place would drag every existing caller onto an async signature for a
+    /// target they do not build for. So the two coexist and the *invariants*, not
+    /// the code, are what has to match — which is what
+    /// `the_two_takers_agree_on_the_empty_slot_rejection` pins.
+    ///
+    /// # The invariants it preserves, in the same order
+    ///
+    /// 1. `Empty`/absent slot → [`TakeAndRunError::SlotEmpty`], future NOT
+    ///    polled, storage untouched.
+    /// 2. `remove` + explicit `drop` fire the moved-out variant's `Drop` — so
+    ///    `root_key` / `items_key` are zeroized **before the first `.await` of
+    ///    the erase**, exactly as on the blocking arm. This is the ordering the
+    ///    cryptographic-erase claim rests on (`decisions.md` 2026-05-26
+    ///    "vault_delete partial-fail posture"), and on the web arm it matters
+    ///    more rather than less: OPFS removal is genuinely asynchronous, so
+    ///    without this the keys would live in memory for the whole walk.
+    /// 3. The write guard is held across the await. A `tokio::sync::RwLock`
+    ///    guard can be, which is why only the `spawn_blocking` had to go.
+    ///
+    /// [`TakeAndRunError::Join`] is unreachable here — nothing is spawned, so
+    /// there is no join to fail. The variant stays in the shared enum because
+    /// the blocking arm still produces it, and a second enum differing by one
+    /// unreachable variant would be a worse trade than an arm the caller can
+    /// route to the same place.
+    ///
+    /// The returned future is `Send` exactly when `fut` is, by auto-trait
+    /// leakage — no bound is written, so the wasm arm's `!Send` OPFS futures are
+    /// accepted here and the native callers keep their `Send` future.
+    pub async fn take_and_run_async_for_id<Fut, E>(
+        &self,
+        id: VaultId,
+        erase: impl FnOnce() -> Fut,
+    ) -> Result<(), TakeAndRunError<E>>
+    where
+        Fut: core::future::Future<Output = Result<(), E>>,
+    {
+        let mut slots = self.slots.write().await;
+        match slots.get(&id) {
+            Some(Slot::Unlocked(_)) | Some(Slot::Recovering { .. }) => {}
+            _ => return Err(TakeAndRunError::SlotEmpty),
+        }
+        let dropped = slots.remove(&id);
+        // Explicit drop fires zeroize NOW — before the erase future is even
+        // constructed, let alone polled.
+        drop(dropped);
+        match erase().await {
+            Ok(()) => Ok(()),
+            Err(e) => Err(TakeAndRunError::Closure(e)),
         }
     }
 }
@@ -1166,7 +1280,7 @@ pub enum Slot {
         root_key: Zeroizing<[u8; AEAD_KEY_LEN]>,
         items_key: Zeroizing<[u8; AEAD_KEY_LEN]>,
         items_key_id: [u8; 16],
-        recovered_at: Instant,
+        recovered_at: u64,
     },
     /// Vault is fully unlocked and ready for editor access. Reached
     /// directly via `vault_unlock` (password path) or via the
@@ -1216,7 +1330,7 @@ pub struct RecoveringMaterial {
     pub root_key: Zeroizing<[u8; AEAD_KEY_LEN]>,
     pub items_key: Zeroizing<[u8; AEAD_KEY_LEN]>,
     pub items_key_id: [u8; 16],
-    pub recovered_at: Instant,
+    pub recovered_at: u64,
 }
 
 /// Discriminator for the [`Slot`] enum, exposed across IPC by the
@@ -1239,10 +1353,19 @@ pub enum SlotKind {
 /// `items_key_id` is the UUIDv7 of the singleton v0.1 `itemsKey`
 /// (spec §3.3 / §9.3 offset 241); not secret-bearing and held bare.
 ///
-/// `unlocked_at` records the wall-clock instant of successful unlock
-/// for diagnostics. Phase 2+ auto-lock will add a `last_activity` field
-/// updated by activity-tracking commands; not added here because there
-/// is no Phase 1 writer for it.
+/// `unlocked_at` records the host's MONOTONIC millisecond reading at the moment
+/// of successful unlock, for diagnostics and for the Phase 2+ auto-lock idle
+/// timer. Monotonic, not wall-clock, because its only use is measuring elapsed
+/// time: an idle timer driven by a wall clock unlocks itself when the clock
+/// steps backwards. Supplied by [`crate::host::HostCtx::monotonic_millis`]
+/// rather than read as an `Instant`, because `Instant::now()` PANICS on
+/// `wasm32-unknown-unknown` (std has no wasm arm and falls to its `unsupported`
+/// time backend) — phase3-web-client task 12. The origin is unspecified; only
+/// differences are meaningful.
+///
+/// Phase 2+ auto-lock will add a `last_activity` field updated by
+/// activity-tracking commands; not added here because there is no Phase 1
+/// writer for it.
 ///
 /// `vault_meta_bytes_hash` is `SHA-256(vault.meta bytes)` captured at
 /// populate time (unlock-time read for the password path; post-rewrite
@@ -1262,7 +1385,7 @@ pub struct UnlockedVault {
     pub root_key: Zeroizing<[u8; AEAD_KEY_LEN]>,
     pub items_key: Zeroizing<[u8; AEAD_KEY_LEN]>,
     pub items_key_id: [u8; 16],
-    pub unlocked_at: Instant,
+    pub unlocked_at: u64,
     pub vault_meta_bytes_hash: [u8; 32],
 }
 
@@ -1341,7 +1464,7 @@ pub fn fixture_unlocked_with_keys(
         root_key: Zeroizing::new([root_byte; AEAD_KEY_LEN]),
         items_key: Zeroizing::new([items_byte; AEAD_KEY_LEN]),
         items_key_id: [items_id_byte; 16],
-        unlocked_at: Instant::now(),
+        unlocked_at: 0,
         vault_meta_bytes_hash: [0xFF; 32],
     }
 }
@@ -1359,7 +1482,7 @@ pub fn fixture_recovering_with_keys(
         root_key: Zeroizing::new([root_byte; AEAD_KEY_LEN]),
         items_key: Zeroizing::new([items_byte; AEAD_KEY_LEN]),
         items_key_id: [items_id_byte; 16],
-        recovered_at: Instant::now(),
+        recovered_at: 0,
     }
 }
 
@@ -1502,6 +1625,135 @@ mod tests {
         });
     }
 
+    // ── the async taker (phase3-web-client task 72) ─────────────────────────
+    //
+    // Its whole reason to exist is that OPFS removal is asynchronous, so the
+    // erase cannot be a blocking closure. What must NOT change with it is the
+    // slot discipline, and these four pin the parts that would otherwise be
+    // easy to lose in translation: the empty-slot rejection, the "future never
+    // polled" half of it, the targeting, and the zeroize-before-erase ordering.
+
+    #[test]
+    fn the_two_takers_agree_on_the_empty_slot_rejection() {
+        rt().block_on(async {
+            let state = VaultRuntimeState::default();
+            let blocking = state
+                .take_and_run_blocking_for_id(test_vault_id(), || {
+                    Ok::<(), std::convert::Infallible>(())
+                })
+                .await;
+            let asynchronous = state
+                .take_and_run_async_for_id(test_vault_id(), || async {
+                    Ok::<(), std::convert::Infallible>(())
+                })
+                .await;
+            assert!(matches!(blocking, Err(TakeAndRunError::SlotEmpty)));
+            assert!(matches!(asynchronous, Err(TakeAndRunError::SlotEmpty)));
+        });
+    }
+
+    /// The rejection is not merely reported — the erase must not START. On the
+    /// web arm the future IS the OPFS removal, so a polled-then-rejected call
+    /// would delete a vault the caller was told it had not touched.
+    #[test]
+    fn an_empty_slot_leaves_the_erase_future_unpolled() {
+        rt().block_on(async {
+            let state = VaultRuntimeState::default();
+            let mut ran = false;
+            let r = state
+                .take_and_run_async_for_id(test_vault_id(), || {
+                    ran = true;
+                    async { Ok::<(), std::convert::Infallible>(()) }
+                })
+                .await;
+            assert!(matches!(r, Err(TakeAndRunError::SlotEmpty)));
+            assert!(!ran, "the erase closure must not be called at all");
+        });
+    }
+
+    /// SYNC-6 targeting: taking `a` leaves `b`'s keys live in its own slot.
+    #[test]
+    fn the_async_taker_takes_only_the_named_vault() {
+        rt().block_on(async {
+            let state = VaultRuntimeState::default();
+            state
+                .set_unlocked(test_vault_id(), fixture_unlocked())
+                .await;
+            state
+                .set_unlocked(test_vault_id_b(), fixture_unlocked_with_keys(3, 4, 2))
+                .await;
+            let r: Result<(), TakeAndRunError<std::convert::Infallible>> = state
+                .take_and_run_async_for_id(test_vault_id(), || async { Ok(()) })
+                .await;
+            assert!(r.is_ok());
+            assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Empty);
+            assert_eq!(state.slot_kind(test_vault_id_b()).await, SlotKind::Unlocked);
+        });
+    }
+
+    /// The write guard is held ACROSS the erase: a concurrent slot-touching op
+    /// queues behind it and only sees the taken slot afterwards.
+    ///
+    /// **On the zeroize ordering, which this test does not check.** The first
+    /// version of it was named for that ordering and asserted this same pair of
+    /// facts — and inverting `drop(dropped)` and `erase()` in the function left
+    /// it green, because a `slot_kind` observer cannot acquire the lock while
+    /// the guard is held and therefore cannot see the difference. The ordering
+    /// is enforced by construction (the `drop` precedes the `erase()` CALL in
+    /// source, so the future is not even built until the keys are gone) and by
+    /// review against the blocking arm, not by this assertion. Naming it
+    /// honestly is the point: a test whose name claims an invariant it does not
+    /// exercise is worse than no test, because it stops anyone writing the real
+    /// one.
+    #[test]
+    fn a_queued_op_waits_for_the_erase_to_finish() {
+        rt().block_on(async {
+            let state = std::sync::Arc::new(VaultRuntimeState::default());
+            state
+                .set_unlocked(test_vault_id(), fixture_unlocked())
+                .await;
+            // A slot-touching op that queues behind the write guard. The flag it
+            // sets is read FROM INSIDE the erase — asserting on it afterwards
+            // proves nothing, because the op completes either way once the
+            // taker returns. (That is how the first draft of this test passed a
+            // probe that released the guard early.)
+            let done = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+            let queued = {
+                let state = state.clone();
+                let done = done.clone();
+                tokio::spawn(async move {
+                    let kind = state.slot_kind(test_vault_id()).await;
+                    done.store(true, std::sync::atomic::Ordering::SeqCst);
+                    kind
+                })
+            };
+            let r: Result<(), TakeAndRunError<std::convert::Infallible>> = state
+                .take_and_run_async_for_id(test_vault_id(), || {
+                    let done = done.clone();
+                    async move {
+                        // Give the queued op every chance to run. If the guard
+                        // were released before the erase, it would acquire the
+                        // read lock during these yields and set the flag.
+                        for _ in 0..8 {
+                            tokio::task::yield_now().await;
+                        }
+                        assert!(
+                            !done.load(std::sync::atomic::Ordering::SeqCst),
+                            "a slot-touching op ran DURING the erase — the write guard was not held across it",
+                        );
+                        Ok(())
+                    }
+                })
+                .await;
+            assert!(r.is_ok());
+            assert_eq!(
+                queued.await.expect("queued op joins"),
+                SlotKind::Empty,
+                "once it does run, it must see the taken slot, not the old one",
+            );
+        });
+    }
+
     #[test]
     fn slot_kind_returns_empty_on_fresh_state() {
         rt().block_on(async {
@@ -1555,28 +1807,39 @@ mod tests {
 
     // ---- auto-lock activity clock (MYND-121) ---------------------------
 
+    // The clock is now INJECTED (phase3-web-client task 12), so these assert
+    // exact values instead of "under a second". The old bounds could not
+    // distinguish a working idle timer from one that always returned 0.
+
     #[test]
-    fn fresh_state_has_near_zero_idle() {
-        // last_activity init = 0 and the monotonic baseline was just
-        // captured, so idle is ~0 (well under the generous bound).
+    fn fresh_state_has_zero_idle_regardless_of_the_hosts_origin() {
+        // The host's monotonic origin is arbitrary — `performance.now()` counts
+        // from page load, the desktop's from first use — so a state that did
+        // not rebase would report the host's uptime as idle time and lock the
+        // vault the instant it opened.
         let state = VaultRuntimeState::default();
-        assert!(state.idle_millis() < 1_000);
+        assert_eq!(state.idle_millis(9_999_999), 0);
     }
 
     #[test]
-    fn report_activity_yields_near_zero_idle() {
+    fn idle_grows_with_the_hosts_clock_and_resets_on_activity() {
         let state = VaultRuntimeState::default();
-        state.report_activity();
-        assert!(state.idle_millis() < 1_000);
+        state.report_activity(1_000); // claims the origin
+        assert_eq!(state.idle_millis(1_000), 0);
+        assert_eq!(state.idle_millis(4_500), 3_500);
+        state.report_activity(4_500);
+        assert_eq!(state.idle_millis(4_500), 0);
+        assert_eq!(state.idle_millis(5_000), 500);
     }
 
     #[test]
-    fn idle_millis_never_underflows() {
-        // `saturating_sub` guarantees a valid u64 (no panic / underflow)
-        // however the clock and last-activity stamp relate.
+    fn a_backwards_clock_step_delays_the_lock_rather_than_triggering_it() {
+        // The direction matters: underflowing to a colossal idle time would
+        // zeroize the keys — and throw away unsaved work — on a clock glitch.
         let state = VaultRuntimeState::default();
-        state.report_activity();
-        let _ = state.idle_millis();
+        state.report_activity(10_000);
+        assert_eq!(state.idle_millis(9_000), 0, "must saturate, not wrap");
+        assert_eq!(state.idle_millis(1), 0);
     }
 
     #[test]
@@ -1588,8 +1851,8 @@ mod tests {
         rt().block_on(async {
             let state = VaultRuntimeState::default();
             let _write_guard = state.slots.write().await;
-            state.report_activity();
-            let _ = state.idle_millis();
+            state.report_activity(0);
+            let _ = state.idle_millis(0);
             // Reaching here without deadlock proves no slot-lock acquisition.
         });
     }
@@ -1602,7 +1865,7 @@ mod tests {
             state
                 .set_unlocked(test_vault_id(), fixture_unlocked())
                 .await;
-            assert!(state.idle_millis() < 1_000);
+            assert_eq!(state.idle_millis(0), 0);
         });
     }
 
@@ -2380,7 +2643,7 @@ mod tests {
                 root_key: recovering.root_key,
                 items_key: recovering.items_key,
                 items_key_id: recovering.items_key_id,
-                unlocked_at: Instant::now(),
+                unlocked_at: 0,
                 vault_meta_bytes_hash: [0xAA; 32],
             };
             state.set_unlocked(test_vault_id(), promoted).await;

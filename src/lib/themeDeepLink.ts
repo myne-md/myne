@@ -44,6 +44,7 @@
 //
 //   myne://theme/install?v=1&name=<name>&author=<author>&src=<url>&payload=<base64url>
 
+import { loadDeepLink } from "../platform/deepLink";
 import { HAS_TAURI } from "./app-window";
 import type { ThemePalette } from "./themes";
 
@@ -333,7 +334,7 @@ export function handleThemeDeepLinkUrl(raw: string): void {
 export async function initThemeDeepLinks(): Promise<void> {
   if (!HAS_TAURI) return;
   try {
-    const { onOpenUrl, getCurrent } = await import("@tauri-apps/plugin-deep-link");
+    const { onOpenUrl, getCurrent } = await loadDeepLink();
     const current = await getCurrent().catch(() => null);
     current?.forEach(handleThemeDeepLinkUrl);
     await onOpenUrl((urls: string[]) => urls.forEach(handleThemeDeepLinkUrl));

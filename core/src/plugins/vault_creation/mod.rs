@@ -18,11 +18,20 @@ pub mod commands;
 pub mod error;
 pub mod state;
 
+// Used only by the TTL evictor the gated `init()` spawns.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 use std::time::Duration;
+// `init()` below IS a Tauri plugin builder — `Builder`, `generate_handler!`,
+// `app.manage`, the TTL evictor's `async_runtime::spawn`. There is nothing to
+// split out of it, so the whole module's Tauri surface is gated together
+// (task 79, Option B). The web client builds its own registration.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 use tauri::plugin::{Builder, TauriPlugin};
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 use tauri::{Manager, Runtime};
 
 /// Background TTL evictor tick interval — every 60 seconds.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 const EVICTOR_TICK_SECS: u64 = 60;
 
 /// Construct the `vault-creation` plugin.
@@ -34,6 +43,7 @@ const EVICTOR_TICK_SECS: u64 = 60;
 /// [`EVICTOR_TICK_SECS`] seconds. Permission gates (declared in
 /// `src-tauri/permissions/vault-creation/default.toml`) restrict
 /// IPC access to the three commands.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::<R>::new("vault-creation")
         .invoke_handler(tauri::generate_handler![

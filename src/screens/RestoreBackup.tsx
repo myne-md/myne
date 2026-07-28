@@ -21,7 +21,7 @@
 
 import { useEffect, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
-import { open as openFileDialog } from "@tauri-apps/plugin-dialog";
+import { open as openFileDialog } from "../platform/dialog";
 import { Button } from "../components/primitives/Button";
 import { CenteredCard } from "../components/primitives/CenteredCard";
 import { restoreErrorMessage } from "../lib/backup-errors";

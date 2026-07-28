@@ -89,6 +89,12 @@ export type NoteRowProps = {
    *  tiebreak (its id is in `FolderNode.indexConflictIds`, MYND-370). Surfaces a
    *  muted "folder already has an index" indicator so the user can resolve it. */
   indexConflict?: boolean;
+  /** Whether this note's current bytes are **not yet on the server**
+   *  (phase3-web-client task 23). Distinct from the save status in the bottom
+   *  bar, which is about the local disk — a note can be saved and still be the
+   *  only copy in existence. Only ever true when sync is configured; a client
+   *  that was never asked to sync marks nothing. */
+  unsynced?: boolean;
 };
 
 // ─── Token-bound style constants ──────────────────────────────────
@@ -260,6 +266,34 @@ const indexConflictStyle: CSSProperties = {
   verticalAlign: "middle",
 };
 
+/** Unsynced-edit marker (phase3-web-client task 23) — a small hollow ring at the
+ *  row's trailing edge on a note the server has not acknowledged. Row-level, not
+ *  title-level: inline-rename swaps the title node out, and the marker must
+ *  survive that.
+ *
+ *  **Hollow, and that is the whole design.** The filled shapes on this row are
+ *  already spoken for (the colour dot leads, the index-conflict dot trails), and
+ *  a third filled dot would read as a fourth kind of status nobody can rank. A
+ *  ring reads as "open / outstanding" against them without competing, and it
+ *  stays legible at 6px in both themes because it is a border, not a fill.
+ *
+ *  `--fg-3` rather than `--warning`: an unsynced edit is the normal state of a
+ *  note you just typed, and painting it as a warning would make the ordinary
+ *  case look broken — the alarm belongs to eviction and tab-close (tasks 22/93),
+ *  not to the second between a save and a push. */
+const unsyncedMarkerStyle: CSSProperties = {
+  display: "inline-block",
+  boxSizing: "border-box",
+  width: 6,
+  height: 6,
+  borderRadius: "50%",
+  border: "1px solid var(--fg-3)",
+  background: "transparent",
+  marginLeft: 6,
+  verticalAlign: "middle",
+  flexShrink: 0,
+};
+
 const renameInputStyle: CSSProperties = {
   display: "block",
   width: "100%",
@@ -301,6 +335,7 @@ export function NoteRow(props: NoteRowProps) {
     multiSelected = false,
     isIndexNote = false,
     indexConflict = false,
+    unsynced = false,
   } = props;
 
   const [hovering, setHovering] = useState(false);
@@ -431,6 +466,19 @@ export function NoteRow(props: NoteRowProps) {
           </div>
         )}
       </div>
+      {/* Unsynced-edit marker (phase3-web-client task 23) — a ROW-level node,
+          deliberately outside the title/rename swap above. Its first draft sat
+          inside `TitleLine`, so entering inline-rename mode removed it: a note
+          does not become safe because the user is retitling it, and that is
+          exactly the moment the sidebar is being looked at. */}
+      {unsynced && (
+        <span
+          style={unsyncedMarkerStyle}
+          data-testid="notes.row-unsynced"
+          title={t("notes.row.unsyncedTitle")}
+          aria-label={t("notes.row.unsyncedLabel")}
+        />
+      )}
       {showStar &&
         (onToggleFavorite !== undefined ? (
           <button

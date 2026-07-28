@@ -15,7 +15,7 @@
 // reads fall back to an empty list on decode failure (§ 9.10.4), so
 // `catalogList` only rejects on the slot gate / a vault.meta read error.
 
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../platform/core";
 import type { IoFailureKind } from "../types/vault-unlock-error";
 
 /** One catalog row — TS mirror of the Rust `CatalogEntry`. */
@@ -115,6 +115,9 @@ export type AttachmentUnusedListError =
   | { kind: "Io"; detail: { io_error_kind: IoFailureKind } }
   | { kind: "InvalidVaultMeta" }
   | { kind: "NoteScanFailed" }
+  /** This device has not finished syncing, so the unused set would be computed
+   *  over a fraction of the corpus (phase3-web-client task 89). */
+  | { kind: "CorpusIncomplete" }
   | { kind: "JoinFailure" };
 
 /** Error surface of {@link attachmentCleanUnused} — mirror of `AttachmentCleanUnusedError`. */
@@ -124,6 +127,9 @@ export type AttachmentCleanUnusedError =
   | { kind: "Io"; detail: { io_error_kind: IoFailureKind } }
   | { kind: "InvalidVaultMeta" }
   | { kind: "NoteScanFailed" }
+  /** See {@link AttachmentUnusedListError}. Re-checked at the destructive step,
+   *  because the list is advisory and storage can shrink between the two. */
+  | { kind: "CorpusIncomplete" }
   | { kind: "EncodeFailed" }
   | { kind: "JoinFailure" };
 
@@ -203,7 +209,7 @@ export async function attachmentRename(
 /**
  * Export one attachment's **decrypted** bytes to a user-chosen `destination`
  * (Slot::Unlocked-gated). The caller opens the native Save dialog (TS-side,
- * via `@tauri-apps/plugin-dialog`) and passes the chosen path plus the
+ * via the platform seam's dialog module) and passes the chosen path plus the
  * `overwrite` consent. The plaintext is decrypted in Rust RAM and written to
  * the destination; it never crosses back into the WebView. Type-agnostic —
  * the generic file-card Export action and the image/PDF Save-As affordance

@@ -16,17 +16,27 @@
 // `dialog:allow-open` is already granted in `src-tauri/capabilities/default.json`.
 
 import { EditorView } from "@codemirror/view";
-import { open } from "@tauri-apps/plugin-dialog";
+import { getHost, type PickedFile } from "../host";
 import i18n from "@myne/editor/i18n";
 import { type ImportSource, importMany, summarizeBatch } from "./insert";
 import { insertEmbedsForOutcomes } from "./paste-drop";
 import { showAttachmentToast } from "./toast";
 
-/** The dialog `open` call, isolated so tests can override it without Tauri. */
-type OpenFn = () => Promise<string[] | null>;
+/** The picker call, isolated so tests can override it without a host.
+ *
+ * Yields opaque {@link PickedFile} handles rather than path strings
+ * (phase3-web-client task 76) — a browser picker produces a `File`, and a
+ * path-shaped seam compiles on web and fails at runtime. */
+type OpenFn = () => Promise<PickedFile[] | null>;
 
-let openFn: OpenFn = () =>
-  open({ multiple: true, directory: false }) as Promise<string[] | null>;
+let openFn: OpenFn = async () => {
+  const pick = getHost().attachments.pickFiles;
+  // A host with no picker at all: treat as "cancelled" rather than throwing.
+  // The `/attach` command is gated on the same absence upstream; this is the
+  // belt for a stale keybinding reaching a host that cannot pick.
+  if (pick === undefined) return null;
+  return pick({ multiple: true });
+};
 
 /** Override the picker (tests only). Returns a restore fn. */
 export function setPickerFn(fn: OpenFn): () => void {
@@ -38,12 +48,12 @@ export function setPickerFn(fn: OpenFn): () => void {
 }
 
 /**
- * Open the picker, import every chosen file by path, and insert form-C embeds
- * at `insertAt` (defaults to the current cursor). Cancelling the picker is a
+ * Open the picker, import every chosen file, and insert form-C embeds at
+ * `insertAt` (defaults to the current cursor). Cancelling the picker is a
  * silent no-op. Surfaces the partial-success toast for multi-file imports.
  */
 export async function pickAndInsert(view: EditorView, insertAt?: number): Promise<void> {
-  let selected: string[] | null;
+  let selected: PickedFile[] | null;
   try {
     selected = await openFn();
   } catch {
@@ -53,7 +63,7 @@ export async function pickAndInsert(view: EditorView, insertAt?: number): Promis
   if (selected === null || selected.length === 0) return; // cancelled
 
   const at = insertAt ?? view.state.selection.main.head;
-  const sources: ImportSource[] = selected.map((path) => ({ kind: "path", path }));
+  const sources: ImportSource[] = selected.map((file) => ({ kind: "picked", file }));
   const outcomes = await importMany(sources);
 
   insertEmbedsForOutcomes(view, outcomes, at);

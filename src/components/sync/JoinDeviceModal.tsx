@@ -7,7 +7,7 @@
 
 import { useEffect, useId, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../../platform/core";
 import { Input } from "../primitives/Input";
 import { PasswordInput } from "../PasswordInput";
 import { DestructiveBanner } from "../DestructiveBanner";

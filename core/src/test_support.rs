@@ -111,3 +111,190 @@ pub fn seed_real_vault_meta(dir: &Path, seed_byte: u8) {
     )
     .expect("seed vault.meta");
 }
+
+/// Drive an async body to completion on a throwaway current-thread runtime.
+///
+/// # Why a test helper needs to exist at all
+///
+/// phase3-web-client task 86 made the sync engine `async` — `run_sync_cycle`
+/// and every sidecar reader now go through the storage seam, and the seam is
+/// async because OPFS handle acquisition is. The engine's test suites are
+/// deliberately **synchronous**: the two-device scenarios and the simulation
+/// harness drive a deterministic timeline step by step, and rewriting them as
+/// async would have buried a behavioural diff in mechanical noise.
+///
+/// So each step is driven on a runtime, and the construction lives here rather
+/// than at ~30 call sites, for a reason beyond tidiness:
+/// `scripts/check-core-task-seam.mjs` bans `tokio::runtime::` throughout
+/// `core/` — correctly, since wasm32 has no runtime to build. This module
+/// compiles only under `test` / `test-support`, so it is the one honest place
+/// for the exception, and the guard grants exactly one entry rather than one per
+/// harness.
+///
+/// A **current-thread** runtime specifically: the callers are synchronous test
+/// bodies that own their thread, and a multi-thread runtime would add worker
+/// threads whose scheduling the deterministic scenarios do not want.
+pub fn block_on<F: std::future::Future>(f: F) -> F::Output {
+    tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .expect("current-thread runtime build")
+        .block_on(f)
+}
+
+/// A [`crate::vault_io::VaultIo`] that routes container-mode paths through
+/// [`crate::double_buffer`], exactly as the browser's OPFS arm does.
+///
+/// # Why this exists
+///
+/// The container's own crash tests drive `write_next_faulting` directly against
+/// a raw store, which proves the ALGORITHM. What they cannot show is the thing
+/// task 86's criterion actually asks for — that a sidecar's own reader
+/// (`read_sync_state`, `read_config`, …) sees "the previous copy" after a torn
+/// write rather than a default or an error — because those readers call
+/// `io.read(path)` and a raw store hands them the plain path.
+///
+/// This is the missing middle: the same routing decision `OpfsVaultIo` makes
+/// (`is_container` → container; otherwise → the file), over a real temp
+/// directory, so the sidecar readers can be driven end to end on the host.
+///
+/// It is NOT a fake. Every byte goes through `crate::double_buffer` and lands on
+/// disk through [`crate::vault_io::StdVaultIo`]; only the *choice* of layout is
+/// reproduced here rather than imported from the wasm crate, which `myne-core`
+/// cannot depend on.
+#[derive(Debug, Default, Clone, Copy)]
+pub struct ContainerVaultIo;
+
+#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
+#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
+impl crate::vault_io::VaultIo for ContainerVaultIo {
+    async fn read(&self, path: &Path) -> crate::vault_io::IoResult<Vec<u8>> {
+        let name = path.to_string_lossy();
+        if crate::double_buffer::is_container(&name) {
+            let mut found =
+                crate::double_buffer::candidates(&crate::vault_io::StdVaultIo, path).await?;
+            return if found.is_empty() {
+                Err(crate::io_failure_kind::IoFailureKind::NotFound)
+            } else {
+                Ok(found.remove(0))
+            };
+        }
+        crate::vault_io::StdVaultIo.read(path).await
+    }
+
+    async fn read_candidates(&self, path: &Path) -> crate::vault_io::IoResult<Vec<Vec<u8>>> {
+        let name = path.to_string_lossy();
+        if crate::double_buffer::is_container(&name) {
+            return crate::double_buffer::candidates(&crate::vault_io::StdVaultIo, path).await;
+        }
+        match self.read(path).await {
+            Ok(bytes) => Ok(vec![bytes]),
+            Err(crate::io_failure_kind::IoFailureKind::NotFound) => Ok(Vec::new()),
+            Err(e) => Err(e),
+        }
+    }
+
+    async fn read_prefix(&self, path: &Path, len: usize) -> crate::vault_io::IoResult<Vec<u8>> {
+        // Container-aware, matching the OPFS arm — and this helper carried the
+        // SAME wrong assumption the production code did, which is why no test
+        // in `core` ever saw the bug: a raw prefix read of `notes/<uuid>.myn`
+        // finds nothing, because the bytes live at `<path>.a` behind an 8-byte
+        // generation frame. `note_nonce`'s scan `continue`s past any note whose
+        // header will not read, so the unsynced set came back empty forever and
+        // a browser pushed nothing it wrote.
+        //
+        // The recursion the old comment feared does not happen: `slot_generations`
+        // calls this with the SLOT path (`<base>.a`), and a slot path is not a
+        // container (`mode_for` matches on the `.myn` suffix, which `.myn.a`
+        // does not have), so it takes the raw arm below and terminates.
+        let name = path.to_string_lossy();
+        if crate::double_buffer::is_container(&name) {
+            let found =
+                crate::double_buffer::candidates(&crate::vault_io::StdVaultIo, path).await?;
+            let Some(first) = found.into_iter().next() else {
+                return Err(crate::io_failure_kind::IoFailureKind::NotFound);
+            };
+            return Ok(first.into_iter().take(len).collect());
+        }
+        crate::vault_io::StdVaultIo.read_prefix(path, len).await
+    }
+
+    async fn write(
+        &self,
+        path: &Path,
+        bytes: &[u8],
+        opts: crate::vault_io::WriteOpts,
+    ) -> crate::vault_io::IoResult<()> {
+        let name = path.to_string_lossy();
+        match crate::double_buffer::mode_for(&name) {
+            crate::double_buffer::Mode::Doubled => {
+                crate::double_buffer::write_next(&crate::vault_io::StdVaultIo, path, bytes).await
+            }
+            crate::double_buffer::Mode::SingleLive => {
+                crate::double_buffer::write_single_live(&crate::vault_io::StdVaultIo, path, bytes)
+                    .await
+            }
+            crate::double_buffer::Mode::Plain => {
+                crate::vault_io::StdVaultIo.write(path, bytes, opts).await
+            }
+        }
+    }
+
+    async fn remove_file(&self, path: &Path) -> crate::vault_io::IoResult<()> {
+        let name = path.to_string_lossy();
+        if crate::double_buffer::is_container(&name) {
+            return crate::double_buffer::remove_all(&crate::vault_io::StdVaultIo, path).await;
+        }
+        crate::vault_io::StdVaultIo.remove_file(path).await
+    }
+
+    async fn remove_dir_all(&self, path: &Path) -> crate::vault_io::IoResult<()> {
+        crate::vault_io::StdVaultIo.remove_dir_all(path).await
+    }
+
+    async fn create_dir_all(&self, path: &Path) -> crate::vault_io::IoResult<()> {
+        crate::vault_io::StdVaultIo.create_dir_all(path).await
+    }
+
+    async fn read_dir(
+        &self,
+        path: &Path,
+    ) -> crate::vault_io::IoResult<Vec<crate::vault_io::DirEntry>> {
+        // Slot suffixes mapped back and de-duplicated, as the OPFS arm does —
+        // without this a `notes/` listing invents a note whose id ends `.myn.a`.
+        let raw = crate::vault_io::StdVaultIo.read_dir(path).await?;
+        let mut out: Vec<crate::vault_io::DirEntry> = Vec::with_capacity(raw.len());
+        for e in raw {
+            let name = crate::double_buffer::strip_slot_suffix(&e.name)
+                .map(|b| b.to_string())
+                .unwrap_or(e.name);
+            if !out.iter().any(|x| x.name == name) {
+                out.push(crate::vault_io::DirEntry {
+                    name,
+                    is_dir: e.is_dir,
+                });
+            }
+        }
+        Ok(out)
+    }
+
+    async fn exists(&self, path: &Path) -> crate::vault_io::IoResult<bool> {
+        let name = path.to_string_lossy();
+        if crate::double_buffer::is_container(&name) {
+            return Ok(
+                !crate::double_buffer::candidates(&crate::vault_io::StdVaultIo, path)
+                    .await?
+                    .is_empty(),
+            );
+        }
+        crate::vault_io::StdVaultIo.exists(path).await
+    }
+
+    async fn is_dir(&self, path: &Path) -> crate::vault_io::IoResult<bool> {
+        crate::vault_io::StdVaultIo.is_dir(path).await
+    }
+
+    async fn rename(&self, from: &Path, to: &Path) -> crate::vault_io::IoResult<()> {
+        crate::vault_io::StdVaultIo.rename(from, to).await
+    }
+}

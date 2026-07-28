@@ -26,8 +26,13 @@
 //!   the winner's password-side and a **valid recovery-side**, so a password
 //!   change on one device can never strand the recovery path (story 4).
 
+use super::devices::SyncDeviceError;
 use crate::plugins::themes::commands::{ThemeEntry, ThemesMap};
+use crate::plugins::vault_unlock::state::VaultRuntimeState;
 use protocol::{AttachmentMeta, AttachmentsCatalog, VaultMeta};
+use serde::Serialize;
+use std::path::{Path, PathBuf};
+use zeroize::Zeroizing;
 
 /// Managed-frontmatter key marking a note a conflict copy (value-strict
 /// canonical `true`, mirroring `template:`). New dialect field (§3.6.1) — staged
@@ -983,5 +988,607 @@ mod tests {
             merge_vault_meta(&local, &remote, MetaWinner::Remote),
             Err(ConflictError::InvariantDivergence)
         );
+    }
+}
+
+// ── the quarantine surface, lifted out of the host-gated `commands.rs` ──────
+//
+// phase3-web-client task 87. `quarantine/` is where `sync-protocol.md` §11.3's
+// "moved aside, never destroyed" rule lands on disk, and these four are the only
+// way a user gets a note back out of it — so a browser that could not reach them
+// would drop notes into a directory with no door.
+//
+// Nothing here was host-shaped; it merely lived behind an `AppHandle`. The one
+// real addition the port needed was `VaultIo::stat`: the listing shows each
+// entry's size and age, which `std::fs::DirEntry::metadata` gave for free and
+// the seam's `DirEntry` deliberately does not carry (a listing is cheap on both
+// arms, a stat is not — OPFS needs a handle acquisition per entry).
+
+/// One quarantined note blob, as listed to the "Recovered notes" UI.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct QuarantineEntry {
+    /// Exact file name under `quarantine/` — the read/restore/delete key.
+    /// Duplicates of a re-created id carry a `-<n>` suffix (`quarantine_note`).
+    pub file_name: String,
+    /// The suffix-stripped base note uuid (36-char lowercase hyphenated) —
+    /// display only; a `-<n>` duplicate shares its base id.
+    pub note_id_hex: String,
+    /// Encrypted blob size in bytes.
+    pub size: u64,
+    /// Device-local mtime (ms since epoch) — display only, never synced
+    /// (AS6 untouched). `None` when the filesystem yields no mtime.
+    pub modified_epoch_ms: Option<u64>,
+}
+
+/// Validate + parse a UI-supplied quarantine file name. Accepts ONLY the
+/// exact shape `quarantine_note` writes — `<uuid>[-<n>].myn`, where `<uuid>`
+/// is the 36-char lowercase hyphenated form and `<n>` a decimal duplicate
+/// suffix. Anything else (path separators, `..`, absolute paths, other
+/// extensions, uppercase) is rejected: this is the path-traversal guard for
+/// the read/restore/delete commands. Returns the SUFFIX-STRIPPED base uuid's
+/// 16 bytes — the decode AAD (`protocol.md` §9.1: the `.myn` filename is the
+/// canonical uuid, so a `-<n>` duplicate still decodes under its base id).
+pub(crate) fn parse_quarantine_file_name(name: &str) -> Option<[u8; 16]> {
+    let stem = name.strip_suffix(".myn")?;
+    let base = stem.get(..36)?;
+    let rest = stem.get(36..)?;
+    if !rest.is_empty() {
+        let digits = rest.strip_prefix('-')?;
+        if digits.is_empty() || !digits.bytes().all(|b| b.is_ascii_digit()) {
+            return None;
+        }
+    }
+    let mut hex = String::with_capacity(32);
+    for (i, b) in base.bytes().enumerate() {
+        match i {
+            8 | 13 | 18 | 23 => {
+                if b != b'-' {
+                    return None;
+                }
+            }
+            _ => {
+                if !matches!(b, b'0'..=b'9' | b'a'..=b'f') {
+                    return None;
+                }
+                hex.push(b as char);
+            }
+        }
+    }
+    super::devices::hex16(&hex)
+}
+
+/// Enumerate `<vault>/quarantine/`, sorted by file name (deterministic
+/// across calls and platforms). Non-conforming names are skipped — the dir
+/// is engine-written, so anything else is stray (e.g. `.DS_Store`).
+pub async fn list_quarantine_entries(
+    io: &dyn crate::vault_io::VaultIo,
+    vault_root: &Path,
+) -> Vec<QuarantineEntry> {
+    let mut out = Vec::new();
+    let dir = super::orchestrator::quarantine_dir(vault_root);
+    if let Ok(entries) = io.read_dir(&dir).await {
+        for e in entries {
+            let name = e.name;
+            if parse_quarantine_file_name(&name).is_none() {
+                continue;
+            }
+            // One `stat` per surviving entry, and only after the name filter —
+            // so a directory full of strays costs nothing extra. Size and age
+            // are what let the user tell two recovered copies of the same note
+            // apart; `None` degrades the row, never the listing (task 87).
+            let meta = io.stat(&dir.join(&name)).await.ok().flatten();
+            let size = meta.map(|m| m.size).unwrap_or(0);
+            let modified_epoch_ms = meta.and_then(|m| m.modified_epoch_ms);
+            out.push(QuarantineEntry {
+                note_id_hex: name[..36].to_string(),
+                file_name: name,
+                size,
+                modified_epoch_ms,
+            });
+        }
+    }
+    out.sort_by(|a, b| a.file_name.cmp(&b.file_name));
+    out
+}
+
+/// Read + decrypt one quarantined blob to its plaintext body. The decode AAD
+/// is the suffix-stripped base uuid (see [`parse_quarantine_file_name`]).
+/// The body is the user's note plaintext (same secret class as `note_read`)
+/// — never logged. See the repo `src-tauri/CLAUDE.md` "Secret-handling
+/// logging discipline".
+pub async fn read_quarantine_with_dir(
+    io: &dyn crate::vault_io::VaultIo,
+    vault_root: &Path,
+    state: &VaultRuntimeState,
+    file_name: &str,
+) -> Result<String, SyncDeviceError> {
+    let id = parse_quarantine_file_name(file_name).ok_or(SyncDeviceError::BadRequest)?;
+    let blob = io
+        .read(&super::orchestrator::quarantine_dir(vault_root).join(file_name))
+        .await
+        .map_err(|_| SyncDeviceError::BadRequest)?;
+    let (items_key, items_key_id, _root) = state
+        .peek_unlocked_attachment_material()
+        .await
+        .ok_or(SyncDeviceError::Internal)?;
+    // `crate::task::run_blocking`, not `spawn_blocking` (task 87). This call
+    // moved out of the host-gated `commands.rs`, where the task-seam guard
+    // exempted it automatically; the guard caught it the moment it landed
+    // somewhere a browser compiles — which is the exemption-by-inheritance the
+    // guard's own comment warns about, happening for real. Left as it was, an
+    // AEAD decrypt on a quarantined note would have killed the Worker.
+    crate::task::run_blocking(move || {
+        let decrypted = protocol::decode_note(&blob, &id, &items_key, &items_key_id)
+            .map_err(|_| SyncDeviceError::Internal)?;
+        let body = String::from_utf8(decrypted.plaintext().to_vec())
+            .map_err(|_| SyncDeviceError::Internal)?;
+        drop(decrypted);
+        Ok::<String, SyncDeviceError>(body)
+    })
+    .await
+    .map_err(|_| SyncDeviceError::Internal)?
+}
+
+/// Restore core: decode the quarantined blob, create a NEW note from its
+/// body via the shared `note_create_with_dir` pipeline (fresh backend-minted
+/// UUIDv7; slot guard → AEAD → create-only atomic_write), then remove the
+/// quarantine source. The source is removed ONLY after the create succeeded
+/// — a failed create leaves the evidence intact. Returns the new note's
+/// 36-char id plus the body (the Tauri wrapper feeds it to the note-create
+/// hooks). No frontmatter marker is added — this is the user's deliberate
+/// recovery, not a conflict copy.
+pub async fn restore_quarantine_with_dirs(
+    io: &dyn crate::vault_io::VaultIo,
+    vault_root: &Path,
+    notes_dir: PathBuf,
+    state: &VaultRuntimeState,
+    file_name: &str,
+    // Threaded in with MYND-574 task 13: `note_create_with_dir` takes the host
+    // for its duration metric. A `NoopHost` here would compile and silently log
+    // every quarantine restore as 0 ms — the production caller has an
+    // `AppHandle`, so it passes the real one.
+    host: &dyn crate::host::HostCtx,
+) -> Result<(String, Zeroizing<String>), SyncDeviceError> {
+    let body = Zeroizing::new(read_quarantine_with_dir(io, vault_root, state, file_name).await?);
+    let new_id = crate::plugins::notes::commands::note_create_with_dir(
+        notes_dir,
+        state,
+        (*body).clone(),
+        io,
+        host,
+    )
+    .await
+    .map_err(|_| SyncDeviceError::Internal)?;
+    io.remove_file(&super::orchestrator::quarantine_dir(vault_root).join(file_name))
+        .await
+        .map_err(|_| SyncDeviceError::Internal)?;
+    Ok((new_id, body))
+}
+
+/// Validate the name, then remove one quarantined blob. See the section
+/// comment: this command is the only destroyer of `quarantine/` content.
+pub async fn delete_quarantine_in(
+    io: &dyn crate::vault_io::VaultIo,
+    vault_root: &Path,
+    file_name: &str,
+) -> Result<(), SyncDeviceError> {
+    parse_quarantine_file_name(file_name).ok_or(SyncDeviceError::BadRequest)?;
+    io.remove_file(&super::orchestrator::quarantine_dir(vault_root).join(file_name))
+        .await
+        .map_err(|_| SyncDeviceError::Internal)
+}
+
+// ── the keep-both staging surface, lifted out of `commands.rs` (task 87) ────
+//
+// `conflicts/<id>.myn` is where §10.1's keep-both puts the REMOTE revision when
+// two devices edited one note: the local edit is never touched, and these four
+// are how the notes layer finishes the resolution. A browser without them would
+// stage conflicts it could not resolve — the same shape of dead end quarantine
+// had before the pass above.
+
+/// Note ids (36-char uuid strings) with a staged remote revision awaiting
+/// resolution.
+pub async fn pending_conflicts(
+    io: &dyn crate::vault_io::VaultIo,
+    vault_root: &Path,
+) -> Vec<String> {
+    super::orchestrator::list_pending_conflicts(io, vault_root).await
+}
+
+/// Decrypt a staged conflicting remote revision to its plaintext body, so the
+/// notes layer can materialize it as a keep-both copy.
+///
+/// The body is the user's note plaintext (same secret class as `note_read`) —
+/// never logged. See `src-tauri/CLAUDE.md` "Secret-handling logging discipline".
+pub async fn take_conflict(
+    io: &dyn crate::vault_io::VaultIo,
+    vault_root: &Path,
+    state: &VaultRuntimeState,
+    original_id_hex: &str,
+) -> Result<String, SyncDeviceError> {
+    let id = super::devices::hex16(original_id_hex).ok_or(SyncDeviceError::BadRequest)?;
+    let blob = super::orchestrator::read_staged_conflict_blob(io, vault_root, original_id_hex)
+        .await
+        .ok_or(SyncDeviceError::BadRequest)?;
+    let (items_key, items_key_id, _root) = state
+        .peek_unlocked_attachment_material()
+        .await
+        .ok_or(SyncDeviceError::Internal)?;
+    // `crate::task::run_blocking`, not `spawn_blocking` — the same correction the
+    // quarantine read needed when it left the host-gated module. An AEAD decrypt
+    // on the blocking pool is right natively and fatal in a Worker.
+    crate::task::run_blocking(move || {
+        let decrypted = protocol::decode_note(&blob, &id, &items_key, &items_key_id)
+            .map_err(|_| SyncDeviceError::Internal)?;
+        let body = String::from_utf8(decrypted.plaintext().to_vec())
+            .map_err(|_| SyncDeviceError::Internal)?;
+        drop(decrypted);
+        Ok::<String, SyncDeviceError>(body)
+    })
+    .await
+    .map_err(|_| SyncDeviceError::Internal)?
+}
+
+/// Finish a keep-both resolution: adopt the staged remote revision as the synced
+/// baseline (the untouched local edit then pushes as a linear advance) + clear
+/// the staging. Idempotent.
+pub async fn resolve_conflict(
+    io: &dyn crate::vault_io::VaultIo,
+    vault_root: &Path,
+    original_id_hex: &str,
+) -> Result<(), SyncDeviceError> {
+    super::orchestrator::resolve_conflict(io, vault_root, original_id_hex)
+        .await
+        .map_err(|_| SyncDeviceError::Internal)
+}
+
+/// Queue a deletion so the next push sets its server-side tombstone flag
+/// (horizon-GC).
+///
+/// The id is validated FIRST, before the vault root is resolved: a malformed id
+/// is a caller bug and must read as `BadRequest` rather than as whatever the
+/// path layer happens to say. No vault-blob access — only the device-local
+/// pending-tombstone queue is touched.
+pub async fn mark_tombstone(
+    io: &dyn crate::vault_io::VaultIo,
+    vault_root: &Path,
+    note_id_hex: &str,
+) -> Result<(), SyncDeviceError> {
+    let _ = super::devices::hex16(note_id_hex).ok_or(SyncDeviceError::BadRequest)?;
+    super::orchestrator::add_pending_tombstone(io, vault_root, note_id_hex)
+        .await
+        .map_err(|_| SyncDeviceError::Internal)
+}
+
+// ── quarantine file-name validation (phase3-web-client task 87) ─────────────
+//
+// `parse_quarantine_file_name` is the PATH-TRAVERSAL GUARD for the quarantine
+// read / restore / delete commands: they take a file name from the UI, and this
+// is the only thing between that string and a `vault_root.join(...)`. It had no
+// test.
+//
+// The threat is concrete rather than theoretical on this client. The commands
+// are reachable from the page, so a name is one `invoke` from a devtools console
+// away — and the seam's `read` will happily open whatever path it is handed.
+#[cfg(test)]
+mod quarantine_name_tests {
+    use super::parse_quarantine_file_name as parse;
+
+    const OK: &str = "0193e8d3-1234-7890-abcd-ef0123456789.myn";
+
+    #[test]
+    fn accepts_exactly_what_quarantine_note_writes() {
+        assert!(parse(OK).is_some());
+        // …and the duplicate suffix, which decodes under its BASE uuid because
+        // `protocol.md` §9.1 makes the filename the canonical id.
+        let with_suffix = parse("0193e8d3-1234-7890-abcd-ef0123456789-2.myn");
+        assert_eq!(with_suffix, parse(OK), "a -<n> duplicate keeps the base id");
+    }
+
+    #[test]
+    fn rejects_every_traversal_shape() {
+        for name in [
+            "../vault.meta",
+            "../../etc/passwd",
+            "..%2fvault.meta",
+            "/absolute/path.myn",
+            "sub/dir/0193e8d3-1234-7890-abcd-ef0123456789.myn",
+            "sub\\dir\\0193e8d3-1234-7890-abcd-ef0123456789.myn",
+            "0193e8d3-1234-7890-abcd-ef0123456789/../../vault.meta.myn",
+        ] {
+            assert!(parse(name).is_none(), "{name} must be rejected");
+        }
+    }
+
+    #[test]
+    fn rejects_a_name_that_is_a_valid_uuid_wearing_the_wrong_extension() {
+        // The extension is not decoration: a `.myn` is a note blob, and the
+        // read/restore paths decode what they open under the uuid as AAD.
+        for name in [
+            "0193e8d3-1234-7890-abcd-ef0123456789",
+            "0193e8d3-1234-7890-abcd-ef0123456789.MYN",
+            "0193e8d3-1234-7890-abcd-ef0123456789.myn.bak",
+            "0193e8d3-1234-7890-abcd-ef0123456789.json",
+        ] {
+            assert!(parse(name).is_none(), "{name} must be rejected");
+        }
+    }
+
+    #[test]
+    fn rejects_uppercase_and_non_hex() {
+        // Uppercase is rejected rather than normalised: two names that differ
+        // only in case would otherwise map to one id, and on a case-insensitive
+        // filesystem that is two files claiming one identity.
+        assert!(parse("0193E8D3-1234-7890-ABCD-EF0123456789.myn").is_none());
+        assert!(parse("0193e8g3-1234-7890-abcd-ef0123456789.myn").is_none());
+    }
+
+    #[test]
+    fn rejects_a_malformed_duplicate_suffix() {
+        for name in [
+            "0193e8d3-1234-7890-abcd-ef0123456789-.myn",  // empty
+            "0193e8d3-1234-7890-abcd-ef0123456789-a.myn", // not digits
+            "0193e8d3-1234-7890-abcd-ef0123456789_2.myn", // wrong separator
+            "0193e8d3-1234-7890-abcd-ef01234567892.myn",  // no separator at all
+        ] {
+            assert!(parse(name).is_none(), "{name} must be rejected");
+        }
+    }
+
+    #[test]
+    fn rejects_the_empty_and_the_short() {
+        // `get(..36)` returns `None` rather than panicking on a short name — and
+        // a slice index would have panicked, which on this client means a wasm
+        // trap that kills the Worker. Asserted so a future rewrite keeps it.
+        for name in ["", ".myn", "a.myn", "0193e8d3.myn"] {
+            assert!(
+                parse(name).is_none(),
+                "{name:?} must be rejected, not panic"
+            );
+        }
+    }
+
+    #[test]
+    fn rejects_a_multibyte_boundary_without_panicking() {
+        // `get(..36)` on a string whose 36th byte is mid-character returns
+        // `None`; `&s[..36]` would panic. The distinction matters here more than
+        // usual: a panic in wasm aborts the instance permanently.
+        let name = format!("{}é-1234-7890-abcd-ef0123456789.myn", "0193e8d3".repeat(4));
+        assert!(parse(&name).is_none());
+    }
+}
+
+// ── quarantine restore: the id it must NOT reuse (task 87) ──────────────────
+
+#[cfg(test)]
+mod quarantine_restore_tests {
+    use super::*;
+    use crate::plugins::vault_creation::commands::{build_and_serialize_vault_meta, build_session};
+    use crate::plugins::vault_unlock::commands::unlock_with_path;
+    use crate::test_support::{ScratchVault, FAST_TEST_KDF};
+    use crate::vault_io::VaultIo as _;
+
+    const IO: crate::vault_io::StdVaultIo = crate::vault_io::StdVaultIo;
+
+    fn rt() -> tokio::runtime::Runtime {
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+    }
+
+    /// An unlocked vault with a `notes/` directory, ready to mint notes.
+    async fn unlocked() -> (VaultRuntimeState, ScratchVault) {
+        let scratch = ScratchVault::new("quarantine-restore");
+        let session = build_session(
+            crate::vault_id::VaultId::mint(),
+            "pw-restore-1",
+            FAST_TEST_KDF,
+        )
+        .expect("build_session");
+        scratch.write_meta(&build_and_serialize_vault_meta(&session).expect("serialize"));
+        let state = VaultRuntimeState::default();
+        unlock_with_path(
+            "pw-restore-1".to_string(),
+            None,
+            scratch.path(),
+            &state,
+            &IO,
+            &crate::host::NoopHost,
+        )
+        .await
+        .expect("unlock");
+        std::fs::create_dir_all(scratch.path().parent().unwrap().join("notes")).ok();
+        (state, scratch)
+    }
+
+    /// Write a real encrypted note under `id`, then move it into `quarantine/`
+    /// exactly as the reconcile path does. Returns the quarantine file name.
+    async fn quarantined_note(
+        state: &VaultRuntimeState,
+        vault_root: &Path,
+        body: &str,
+    ) -> (String, uuid::Uuid) {
+        let notes_dir = vault_root.join("notes");
+        let id_str = crate::plugins::notes::commands::note_create_with_dir(
+            notes_dir.clone(),
+            state,
+            body.to_string(),
+            &IO,
+            &crate::host::NoopHost,
+        )
+        .await
+        .expect("mint the note that will be quarantined");
+        let id = uuid::Uuid::parse_str(&id_str).expect("canonical uuid");
+
+        // The reconcile path's write-then-remove, reproduced rather than called
+        // (`quarantine_note` is private to `orchestrator`). The property under
+        // test is what RESTORE does with the file, not how it got there.
+        let qdir = super::super::orchestrator::quarantine_dir(vault_root);
+        IO.create_dir_all(&qdir).await.expect("quarantine dir");
+        let src = notes_dir.join(format!("{id}.myn"));
+        let bytes = IO.read(&src).await.expect("read the minted blob");
+        let name = format!("{id}.myn");
+        IO.write(
+            &qdir.join(&name),
+            &bytes,
+            crate::vault_io::WriteOpts::default(),
+        )
+        .await
+        .expect("stage into quarantine");
+        IO.remove_file(&src).await.expect("drop the original");
+        (name, id)
+    }
+
+    /// The criterion, and the reason it is one.
+    ///
+    /// A quarantined note is one this device could not reconcile — the server
+    /// holds a blob under that id which this client failed to apply. If restore
+    /// re-used the id, the vault would hold a note whose local bytes differ from
+    /// the server's under the SAME id, and the next push would send it: this
+    /// device would overwrite the server's copy with content derived from a blob
+    /// it could not even decrypt, using an id it does not own the history of.
+    ///
+    /// Minting a fresh id makes the restored note an ordinary new note — pushed
+    /// as an addition, colliding with nothing.
+    #[test]
+    fn restore_mints_a_fresh_id_and_leaves_the_original_unclaimed() {
+        rt().block_on(async {
+            let (state, scratch) = unlocked().await;
+            let vault_root = scratch.path().parent().unwrap().to_path_buf();
+            let notes_dir = vault_root.join("notes");
+            let (file_name, original_id) =
+                quarantined_note(&state, &vault_root, "the quarantined body").await;
+
+            let (new_id, body) = restore_quarantine_with_dirs(
+                &IO,
+                &vault_root,
+                notes_dir.clone(),
+                &state,
+                &file_name,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("restore");
+
+            assert_ne!(
+                new_id,
+                original_id.to_string(),
+                "restore MUST mint a fresh id — reusing the quarantined one would \
+                 push local bytes over the server's copy under an id this device \
+                 could not reconcile"
+            );
+            assert_eq!(&*body, "the quarantined body", "the plaintext round-trips");
+
+            // The fresh note exists on disk…
+            assert!(
+                notes_dir.join(format!("{new_id}.myn")).exists(),
+                "the restored note must be an ordinary note in notes/"
+            );
+            // …and NOTHING claims the original id. This is the half that makes
+            // "never re-pushed" true rather than merely intended: the push loop
+            // scans `notes/`, so an absent file is an id it cannot send.
+            assert!(
+                !notes_dir.join(format!("{original_id}.myn")).exists(),
+                "the original id must have no local note to push"
+            );
+        });
+    }
+
+    /// The source is dropped, so a second restore cannot mint a second copy.
+    ///
+    /// Without this, a user who clicked twice would get two notes from one
+    /// quarantined blob and no way to tell which was which — and the staging
+    /// area would still show the entry, inviting a third.
+    #[test]
+    fn restore_drops_the_source_so_it_cannot_be_restored_twice() {
+        rt().block_on(async {
+            let (state, scratch) = unlocked().await;
+            let vault_root = scratch.path().parent().unwrap().to_path_buf();
+            let notes_dir = vault_root.join("notes");
+            let (file_name, _) = quarantined_note(&state, &vault_root, "restore me once").await;
+
+            restore_quarantine_with_dirs(
+                &IO,
+                &vault_root,
+                notes_dir.clone(),
+                &state,
+                &file_name,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("first restore");
+
+            assert!(
+                !super::super::orchestrator::quarantine_dir(&vault_root)
+                    .join(&file_name)
+                    .exists(),
+                "the quarantined blob must be gone after a successful restore"
+            );
+            assert!(
+                restore_quarantine_with_dirs(
+                    &IO,
+                    &vault_root,
+                    notes_dir,
+                    &state,
+                    &file_name,
+                    &crate::host::NoopHost,
+                )
+                .await
+                .is_err(),
+                "a second restore of the same name must fail rather than mint a duplicate"
+            );
+        });
+    }
+
+    /// Two quarantined copies of one id — the `-<n>` duplicate shape — restore
+    /// to two DISTINCT fresh ids. They decode under the same base uuid, so a
+    /// restore that derived the new id from the AAD id rather than minting one
+    /// would collapse them into a single note and silently lose a revision.
+    #[test]
+    fn duplicate_quarantine_entries_restore_to_distinct_notes() {
+        rt().block_on(async {
+            let (state, scratch) = unlocked().await;
+            let vault_root = scratch.path().parent().unwrap().to_path_buf();
+            let notes_dir = vault_root.join("notes");
+            let qdir = super::super::orchestrator::quarantine_dir(&vault_root);
+
+            let (first_name, id) = quarantined_note(&state, &vault_root, "revision one").await;
+            // The `-1` sibling the writer produces when the target is occupied.
+            let dup_name = format!("{id}-1.myn");
+            let bytes = IO.read(&qdir.join(&first_name)).await.expect("read staged");
+            IO.write(
+                &qdir.join(&dup_name),
+                &bytes,
+                crate::vault_io::WriteOpts::default(),
+            )
+            .await
+            .expect("stage the duplicate");
+
+            let (a, _) = restore_quarantine_with_dirs(
+                &IO,
+                &vault_root,
+                notes_dir.clone(),
+                &state,
+                &first_name,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("restore base");
+            let (b, _) = restore_quarantine_with_dirs(
+                &IO,
+                &vault_root,
+                notes_dir,
+                &state,
+                &dup_name,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("restore duplicate");
+
+            assert_ne!(a, b, "two staged copies must become two notes");
+            assert_ne!(a, id.to_string());
+            assert_ne!(b, id.to_string());
+        });
     }
 }

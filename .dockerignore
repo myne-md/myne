@@ -1,0 +1,13 @@
+# The image builds the bundle from source; the host's node_modules is a macOS
+# install that Linux cannot use, and copying it makes `pnpm install` try to
+# remove it — which it refuses to do without a TTY
+# (ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY). Excluding it is both correct and
+# far faster.
+node_modules
+**/node_modules
+target
+dist
+web/dist
+.git
+e2e/artifacts
+myne-*/

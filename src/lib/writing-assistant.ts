@@ -10,7 +10,7 @@
 // - Every entry point is gated on `ai_enabled` (MYP1) + `ai_excluded_folders`
 //   (SYNC-14) via `aiEntryAllowed` before any model call.
 
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../platform/core";
 import type { EditorState } from "@codemirror/state";
 
 import { isNoteAiExcluded } from "./aiExcludedFolders";

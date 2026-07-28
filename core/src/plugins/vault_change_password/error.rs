@@ -73,6 +73,22 @@ pub enum VaultChangePasswordError {
     #[error("invalid vault.meta")]
     InvalidVaultMeta,
 
+    /// The local rewrite SUCCEEDED but the server did not acknowledge the new
+    /// `vault.meta` (phase3-web-client tasks 41 + 88).
+    ///
+    /// **Not a failure of the change, and the wording must not say it is.** The
+    /// new password works on this device right now. What has not happened is the
+    /// push — so any other device, and any future re-materialisation of this one,
+    /// still holds the old wrap.
+    ///
+    /// Its own variant because the remedy is unlike every other variant here:
+    /// nothing is retyped and nothing is restored, the client simply has to reach
+    /// the server. On a client whose local copy is an evictable cache this is the
+    /// difference between an inconvenience and a lockout — task 88's whole
+    /// argument — which is why the web arm reports it instead of returning `Ok`.
+    #[error("the password changed locally but the server has not acknowledged it")]
+    ServerAckPending,
+
     /// Compare-and-swap mismatch between the `Slot::Unlocked.vault_meta_bytes_hash`
     /// captured at unlock time and the SHA-256 of the on-disk
     /// `vault.meta` re-read just before the rewrite. Indicates an
@@ -289,6 +305,7 @@ mod tests {
             match e {
                 VaultChangePasswordError::InvalidCredentialOrVault => {}
                 VaultChangePasswordError::InvalidVaultMeta => {}
+                VaultChangePasswordError::ServerAckPending => {}
                 VaultChangePasswordError::VaultMetaChangedExternally => {}
                 VaultChangePasswordError::VaultLockedDuringChange => {}
                 VaultChangePasswordError::ChangePasswordInProgress => {}

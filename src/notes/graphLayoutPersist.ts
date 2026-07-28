@@ -7,7 +7,7 @@
 // degrades to "empty store → recompute the layout", never an error to the user.
 // Mirrors the frontend-driven shape of `src/lib/workspace-persist.ts`.
 
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../platform/core";
 import {
   clearGraphLayout,
   hasGraphLayout,

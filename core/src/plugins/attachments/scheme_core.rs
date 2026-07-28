@@ -15,7 +15,7 @@
 //! served `&'static str` MIME label + a coarse status crosses a tracing boundary.
 
 use super::commands::hex_decode_id;
-use super::sniff::{sniff_content_type, ALLOWLISTED_CONTENT_TYPES};
+use super::sniff::served_content_type;
 use protocol::{decode_attachment_blob, AttachmentsCatalog, VAULT_META_ACCOUNT_HASH_LEN};
 use std::path::Path;
 use tauri::http;
@@ -106,16 +106,10 @@ pub fn build_response(vault_dir: &Path, keys: &ServeKeys, id_hex: &str) -> http:
         }
     };
 
-    // RE-SNIFF the decrypted bytes — the served content-type is derived
-    // from the bytes, allowlist-fenced, NEVER the catalog hint and NEVER
-    // text/html. An unrecognized sniff falls back to a non-scriptable
-    // octet-stream so a tampered-but-decryptable blob can't become XSS.
-    let served_type = sniff_content_type(&plaintext).unwrap_or("application/octet-stream");
-    debug_assert!(
-        served_type == "application/octet-stream"
-            || ALLOWLISTED_CONTENT_TYPES.contains(&served_type),
-        "served type must be allowlisted or the octet-stream fallback"
-    );
+    // RE-SNIFF the decrypted bytes. The rule and its rationale live in
+    // `sniff::served_content_type`, which the browser's object-URL mint (task
+    // 44) calls too — the one place this security decision is written down.
+    let served_type = served_content_type(&plaintext);
 
     // Build the body (clones the plaintext out of the Zeroizing buffer).
     // The clone is the non-Zeroized intermediate that the WebView will

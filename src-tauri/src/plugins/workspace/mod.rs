@@ -1,12 +1,13 @@
 //! `workspace` Tauri plugin (MYND-166).
 //!
-//! Owns `workspace_read` + `workspace_write` — the persistence side of the
-//! editor multi-tab/split-pane workspace. Both Slot::Unlocked-gated; both
-//! borrow the existing `VaultRuntimeState` singleton (registered by
-//! `vault_unlock::init`) via `tauri::State<...>`. The descriptor is the
-//! frontend's serialized pane-tree (open tabs + layout + cursors), sealed
-//! opaque under `session_state_key = DeriveSubkey(root_key,
-//! SessionStateKey)` into `vault.workspace` (`MYW1`, `protocol.md` § 9.7).
+//! Owns `workspace_read` + `workspace_write` + `workspace_stage` — the
+//! persistence side of the editor multi-tab/split-pane workspace. All
+//! Slot::Unlocked-gated except the RAM-only stage; all borrow the existing
+//! `VaultRuntimeState` singleton (registered by `vault_unlock::init`) via
+//! `tauri::State<...>`. The descriptor is the frontend's serialized pane-tree
+//! (open tabs + layout + cursors), sealed opaque under `session_state_key =
+//! DeriveSubkey(root_key, SessionStateKey)` into `vault.workspace` (`MYW1`,
+//! `protocol.md` § 9.7).
 //!
 //! Write cadence is graceful-exit-only (lock / auto-lock grace / quit) —
 //! never per tab-switch — so the blob mtime never becomes an editor-activity
@@ -16,12 +17,17 @@
 //! ## Capability ACL
 //!
 //! `workspace:default` bundles `allow-workspace-read` +
-//! `allow-workspace-write`, main-window-only.
+//! `allow-workspace-write` + `allow-workspace-stage`, main-window-only.
 //!
 //! See: ../../CLAUDE.md "Secret-handling logging discipline".
 
-pub mod commands;
-pub mod error;
+// The `workspace` command core and its `error` enums moved to `myne-core`
+// (phase3-web-client task 65 — the web client had no pane layout at all while
+// they lived here; the `graph_layout`/`snapshots` extraction precedent).
+// Re-exported so existing `crate::plugins::workspace::…` paths keep resolving.
+// The `init()` wiring stays desktop-side.
+#[allow(unused_imports)]
+pub use myne_core::plugins::workspace::{commands, error};
 
 use tauri::plugin::{Builder, TauriPlugin};
 use tauri::Runtime;

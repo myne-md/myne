@@ -18,8 +18,12 @@
 // primitive-level review of the fingerprint substrate is recorded, not passed.
 
 import { useState, type CSSProperties } from "react";
+import {
+  REMOVE_DEVICE_CONFIRM,
+  REMOVE_DEVICE_DISCLOSURE,
+} from "../../lib/load-bearing-copy";
 import { useTranslation } from "react-i18next";
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../../platform/core";
 import i18n from "../../i18n";
 import { type DeviceEntry, type DevicesHook } from "../../hooks/useDevices";
 import { usePrefs } from "../../hooks/usePrefs";
@@ -30,6 +34,19 @@ const ROOT: CSSProperties = {
   display: "flex",
   flexDirection: "column",
   gap: "var(--space-3)",
+};
+
+const CONFIRM_BOX: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: "var(--space-2)",
+  flexBasis: "100%",
+  marginTop: "var(--space-2)",
+  padding: "var(--space-3)",
+  border: "1px solid var(--line-1)",
+  borderRadius: "var(--radius-2, 6px)",
+  background: "var(--bg-2)",
+  fontSize: "var(--text-sm)",
 };
 
 const ROW: CSSProperties = {
@@ -182,6 +199,10 @@ export function DeviceManagementPanel({ hook }: { hook: DevicesHook }) {
   const retiredSelf = (devices ?? []).find((d) => d.is_current && d.retired);
 
   const [sas, setSas] = useState<SasState | null>(null);
+  // The device id whose removal is awaiting confirmation, or `null`. One at a
+  // time: a second Remove click replaces the open disclosure rather than
+  // stacking two.
+  const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
 
   // Approve-then-verify (SYNC-40): approve FIRST, then fetch this device's
   // adopted-head fingerprint for the out-of-band eye-compare against the newcomer.
@@ -417,13 +438,60 @@ export function DeviceManagementPanel({ hook }: { hook: DevicesHook }) {
                     type="button"
                     style={BTN}
                     disabled={busy}
-                    onClick={() => void remove(d.device_id_hex)}
+                    onClick={() => setConfirmRemove(d.device_id_hex)}
                     data-testid="sync.remove-device"
                   >
                     {t("sync.devices.remove")}
                   </button>
                 )}
               </span>
+              {confirmRemove === d.device_id_hex && (
+                // The honest-disclosure step (MYND-574 task 69). `@myne/copy`
+                // has carried `REMOVE_DEVICE_CONFIRM` +
+                // `REMOVE_DEVICE_DISCLOSURE` since MYND-425 and **nothing
+                // rendered them** — the literals were single-sourced, pinned by
+                // a test, and dead. So removal was one unconfirmed click that
+                // said nothing about what it does.
+                //
+                // Both sentences are shown together, never collapsed: the
+                // effect (sync stops) is the part a user wants, and the limit
+                // (a device that already has the vault and the password keeps
+                // it — this is not a remote wipe) is the part they must not be
+                // allowed to assume. `decisions.md` 2026-06-27 makes the wording
+                // itself a decision, not copy.
+                //
+                // Rendered by the SHARED component, which is what makes
+                // "identical to desktop" true by construction rather than by
+                // review — there is one implementation and both clients mount it.
+                <div style={CONFIRM_BOX} data-testid="sync.remove-confirm">
+                  <span style={{ fontWeight: 600 }}>{REMOVE_DEVICE_CONFIRM}</span>
+                  <span style={{ color: "var(--fg-2)" }} data-testid="sync.remove-disclosure">
+                    {REMOVE_DEVICE_DISCLOSURE}
+                  </span>
+                  <span style={{ display: "flex", gap: "var(--space-2)" }}>
+                    <button
+                      type="button"
+                      style={{ ...BTN, color: "var(--danger)" }}
+                      disabled={busy}
+                      onClick={() => {
+                        setConfirmRemove(null);
+                        void remove(d.device_id_hex);
+                      }}
+                      data-testid="sync.remove-confirm-yes"
+                    >
+                      {t("sync.devices.remove")}
+                    </button>
+                    <button
+                      type="button"
+                      style={BTN}
+                      onClick={() => setConfirmRemove(null)}
+                      data-testid="sync.remove-confirm-cancel"
+                    >
+                      {t("common.cancel")}
+                    </button>
+                  </span>
+                </div>
+              )}
             </div>
           ))
         )}

@@ -3,8 +3,8 @@
 // `src-tauri/src/plugins/backup/{commands,restore}.rs` — no codegen canary
 // yet (see src/CLAUDE.md "Tauri command bindings").
 
-import { invoke } from "@tauri-apps/api/core";
-import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { invoke } from "../platform/core";
+import { listen, type UnlistenFn } from "../platform/event";
 import {
   BACKUP_PROGRESS_EVENT,
   type BackupProgress,

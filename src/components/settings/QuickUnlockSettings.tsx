@@ -11,6 +11,7 @@
 // copy says so; do not present it as a trusted gate until verified.
 
 import { useEffect, useState } from "react";
+import * as capabilities from "../../platform/capabilities";
 import { useTranslation } from "react-i18next";
 import i18n from "../../i18n";
 import {
@@ -206,14 +207,22 @@ export function QuickUnlockSettings() {
             >
               {t("settings.quickUnlock.setPin")}
             </Button>
-            <Button
-              variant="secondary"
-              disabled={busy}
-              onClick={() => void onSetupBiometric()}
-              data-testid="settings.quick-unlock-setup-biometric"
-            >
-              {t("settings.quickUnlock.useTouchId")}
-            </Button>
+            {/* Biometric quick-unlock is absent on web (MYND-574 task 27):
+                the credential is a Keychain/Keystore item with no browser
+                counterpart. The PIN button above STAYS — that path is
+                "genuinely portable: Argon2id + three files under one vault
+                root, no OS secret involved" (`core-wasm-assessment.md`), which
+                is why the two are separate capabilities rather than one. */}
+            {capabilities.has("biometricQuickUnlock") && (
+              <Button
+                variant="secondary"
+                disabled={busy}
+                onClick={() => void onSetupBiometric()}
+                data-testid="settings.quick-unlock-setup-biometric"
+              >
+                {t("settings.quickUnlock.useTouchId")}
+              </Button>
+            )}
           </div>
           <p style={HELPER_STYLE}>
             {t("settings.quickUnlock.setupHelper")}

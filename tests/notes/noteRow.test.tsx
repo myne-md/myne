@@ -315,3 +315,46 @@ describe("NoteRow — inline rename mode", () => {
     expect(onCommitRename).toHaveBeenCalledWith("note-1", "Renamed");
   });
 });
+
+// ─── The unsynced-edit marker (phase3-web-client task 23) ────────────────────
+//
+// Story 29: an edit not yet on the server is the only thing between the user and
+// real loss if storage is evicted or the tab closes, so it must be visible
+// without being asked for. In the sidebar that means a marker on the row itself
+// — not a hover reveal, not a panel, not a summary count somewhere else.
+
+describe("NoteRow — unsynced-edit marker", () => {
+  it("renders no marker by default", () => {
+    renderRow();
+    expect(screen.queryByTestId("notes.row-unsynced")).toBeNull();
+  });
+
+  it("renders the marker when the note is not yet on the server", () => {
+    renderRow({ unsynced: true });
+    expect(screen.getByTestId("notes.row-unsynced")).toBeTruthy();
+  });
+
+  it("marks the row without hover, selection or any other interaction", () => {
+    // The whole point of the criterion. A marker that only appears on hover is
+    // a marker the user has to go looking for, which is the state this feature
+    // exists to prevent.
+    renderRow({ unsynced: true, selected: false });
+    expect(screen.getByTestId("notes.row-unsynced")).toBeTruthy();
+  });
+
+  it("still marks a note that is being renamed inline", () => {
+    // Rename mode swaps the title node for an input, and an earlier draft lost
+    // the marker with it — an edit does not become safe because the user is
+    // retitling it. The marker moves out of the swapped node.
+    renderRow({ unsynced: true, renaming: true });
+    expect(screen.getByTestId("notes.rename-input")).toBeTruthy();
+    expect(screen.getByTestId("notes.row-unsynced")).toBeTruthy();
+  });
+
+  it("carries an accessible label, not colour alone", () => {
+    renderRow({ unsynced: true });
+    const mark = screen.getByTestId("notes.row-unsynced");
+    expect(mark.getAttribute("aria-label")).toBeTruthy();
+    expect(mark.getAttribute("title")).toBeTruthy();
+  });
+});

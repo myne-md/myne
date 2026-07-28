@@ -22,8 +22,8 @@
 
 import { useEffect, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
-import { open as openFileDialog } from "@tauri-apps/plugin-dialog";
-import { openUrl } from "@tauri-apps/plugin-opener";
+import { open as openFileDialog } from "../../platform/dialog";
+import { openUrl } from "../../platform/opener";
 
 import type { ModelRole } from "../../lib/ai-model-store";
 import { usePrefs } from "../../hooks/usePrefs";

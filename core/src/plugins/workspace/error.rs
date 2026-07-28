@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0
 //! `workspace` plugin IPC error enums (MYND-166).
 //!
 //! Two closed taxonomies — read + write — both DENY-list clean per
@@ -57,6 +58,24 @@ pub enum WorkspaceWriteError {
     /// descriptor exceeded the 1 MiB cap).
     #[error("workspace blob encode failed")]
     WorkspaceEncodeFailed,
+}
+
+/// The storage seam's closed error, straight through (phase3-web-client task 65).
+///
+/// Both reads go through [`crate::vault_io::VaultIo`] now, which already reduces
+/// `std::io::Error` at its own boundary — so this is an identity wrap, not a
+/// second reduction. The `From<std::io::Error>` impl below stays for the
+/// host-only path resolution, which still yields a real `io::Error`.
+impl From<IoFailureKind> for WorkspaceReadError {
+    fn from(io_error_kind: IoFailureKind) -> Self {
+        WorkspaceReadError::Io { io_error_kind }
+    }
+}
+
+impl From<IoFailureKind> for WorkspaceWriteError {
+    fn from(io_error_kind: IoFailureKind) -> Self {
+        WorkspaceWriteError::Io { io_error_kind }
+    }
 }
 
 impl From<std::io::Error> for WorkspaceReadError {

@@ -8,6 +8,21 @@
 #
 # Deliberately NOT covered here:
 #   - i18n-catalog  -> checked in the `pnpm-build` CI step (needs node).
+#   - platform-seam -> checked in the `pnpm-build` CI step (needs node), same
+#                      reason as i18n-catalog. It IS remotely gated; it is just
+#                      gated there rather than here.
+#   - core-task-seam -> same: `pnpm-build` CI step, needs node.
+#   - web-command-coverage -> same: `pnpm-build` CI step, needs node.
+#   - core-io-seam  -> same: `pnpm-build` CI step, needs node.
+#   - web-capabilities -> same: `pnpm-build` CI step, needs node.
+#   - clippy-wasm   -> a pre-PUSH hook, and it already has a remote gate: the
+#                      same `cargo clippy -p myne-core -p protocol --target
+#                      wasm32-unknown-unknown -- -D warnings` runs in the
+#                      `wasm-protocol` CI step (phase3-web-client task 77). Listed
+#                      here anyway, because "not in this script" and "not gated
+#                      remotely" are different facts and only one of them is a
+#                      hole — the point of this list is that a reader can tell
+#                      which.
 #   - damm32 table  -> VALUE drift is already caught by `cargo test -p protocol`
 #                      (damm32_table_matches_runtime_construction, a normal
 #                      #[test]); only the hook's TEXTUAL sentinel-block sync is

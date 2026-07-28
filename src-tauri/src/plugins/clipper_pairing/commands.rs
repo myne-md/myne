@@ -57,6 +57,8 @@ async fn persist_registry<R: Runtime>(
         vault_state,
         hooks,
         records,
+        &myne_core::vault_io::StdVaultIo,
+        &myne_core::host::tauri_host::TauriHost::new(app.clone()),
     )
     .await
     .map_err(|_| PairingError::PersistFailed)

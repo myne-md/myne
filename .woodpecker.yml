@@ -6,6 +6,15 @@
 # Notes:
 # - Each step runs in its own container; installed packages do NOT inherit between steps.
 # - Linux runner only; macOS + Windows checked manually before release (revisit at v1.0).
+# - TWO lanes, one pipeline (MYND-574). The desktop lane is one serial chain
+#   (pnpm-build -> vitest -> tauri-compile -> cargo-test-tauri -> e2e) because
+#   every one of those steps runs `pnpm install` into the shared workspace
+#   node_modules and concurrent installs corrupt it. The WEB lane hangs off the
+#   end of that chain (`web-build`, alongside `sync-sim`) so it adds nothing to
+#   the desktop lane's wall-clock, plus the two Rust wasm gates that run early
+#   and independently (`wasm-protocol`). Every web step carries the same
+#   `code-paths` filter as the compile steps, so a docs-only commit runs none of
+#   them, and every step that can go red is listed in `notify-failure`.
 # - Future: cache cargo + pnpm artifacts; pre-build a custom image with rust + node + Tauri sysdeps.
 
 when:
@@ -137,6 +146,100 @@ steps:
       - apt-get update && apt-get install -y --no-install-recommends git
       - bash src-tauri/scripts/ai-no-network-check.sh
 
+  # ─── wasm32 target gate for `protocol` (phase3-web-client task 9) ──
+  # The crypto core is SHARED with the web client rather than reimplemented, so
+  # `wasm32-unknown-unknown` is a supported target and must not rot between web
+  # tasks. Front-lane and dependency-free (no `depends_on`), so it runs in
+  # parallel with the other cheap Rust steps and adds nothing to the desktop
+  # chain's duration.
+  #
+  # The script does more than build: it asserts the CSPRNG hook is UNRESOLVED
+  # and that wasm-bindgen has not crept into the graph. A plain
+  # `cargo build --target wasm32-unknown-unknown` passes with no entropy source
+  # at all (an rlib never resolves the embedder hook), so "wasm32 builds green"
+  # on its own would be evidence of nothing. Logic lives in the committed script
+  # — same reason as ai-no-network and hooks-parity: Woodpecker's env
+  # substitution must never see shell dollar-brace expansions.
+  wasm-protocol:
+    image: rust:1.96.0-slim
+    when: *code-paths
+    environment:
+      RUSTC_WRAPPER: /cache/bin/sccache
+      SCCACHE_DIR: /cache/sccache
+      SCCACHE_CACHE_SIZE: "20G"
+      CARGO_INCREMENTAL: "0"
+      CARGO_HOME: /cache/cargo
+    commands:
+      # No `rustup target add` here on purpose: `rust-toolchain.toml` pins
+      # `targets = ["wasm32-unknown-unknown"]`, so the target is present from the
+      # toolchain install. A gate that installs its own target is a gate that
+      # silently does not run wherever the line was forgotten.
+      # llvm-nm — the script reads the getrandom rlib's symbol table.
+      - rustup component add llvm-tools
+      - bash scripts/wasm-csprng-check.sh
+      # myne-core's wasm graph must keep resolving (phase3-web-client task 78).
+      # Until task 79 removes core's Tauri references this still fails INSIDE
+      # core, so the gate is on the dependency resolution specifically: reaching
+      # core's own code is the pass condition.
+      - bash scripts/wasm-core-graph-check.sh
+      # The wasm ENTRY crate (phase3-web-client task 11). Gated here because
+      # nothing else reaches it: `cargo clippy --workspace --all-targets` and
+      # `cargo test --workspace` run for the HOST triple, where this crate's
+      # `#[wasm_bindgen]` exports and its CSPRNG registration do not compile at
+      # all — so a broken `cfg`, a clippy error, or a plain compile break in the
+      # wasm-only half would pass every other gate in this pipeline.
+      #
+      # `cargo build`, not `wasm-bindgen`: generating the JS glue needs a pinned
+      # `wasm-bindgen-cli` (see `scripts/build-wasm.sh`), which belongs to the
+      # bundle build rather than to a compile gate. What this catches is the Rust.
+      #
+      # The build ALSO proves the CSPRNG registration resolves: with no
+      # `register_custom_getrandom!` the link fails with
+      # `undefined symbol: __getrandom_custom` (task 81, verified by probe).
+      - cargo clippy -p myne-web-wasm --target wasm32-unknown-unknown -- -D warnings
+      # The SHARED crates' wasm-only arms (phase3-web-client task 77). The step
+      # above lints the entry crate; these two are where most of the
+      # `#[cfg(target_arch = "wasm32")]` code actually lives — the browser
+      # transport factory, `task::run_blocking_future`'s wasm arm, the session
+      # token store's selection, the TOFU-pin refusal — and NOTHING reached them
+      # before: `cargo clippy --workspace --all-targets` in the `lint` step
+      # builds for the host triple, where those arms do not compile at all.
+      - cargo clippy -p myne-core -p protocol --target wasm32-unknown-unknown -- -D warnings
+      # The wasm entry crate's HOST-triple unit tests (phase3-web-client task 77).
+      #
+      # Not a wasm-target run and it does not need one: these are source-level
+      # and pure-logic guards that compile for the host — the dispatch roster
+      # cross-check, the `WebHooks`-not-`NoopHooks` installation assertion, the
+      # OPFS kind-mapping mirror. Nothing else in this pipeline reaches them:
+      # `cargo-test` runs `-p protocol`, `cargo-test-tauri` runs
+      # `-p myne-desktop -p myne-core`, and neither names this crate.
+      #
+      # The hole was not theoretical. Two dispatch arms added on 2026-07-28
+      # shipped without their `capability::DISPATCHED` entries, which makes
+      # `classify` report a DISPATCHED command as unported — the roster test
+      # caught it locally, and would have caught nothing here.
+      - cargo test -p myne-web-wasm
+      # Reproducible wasm artefact (MYND-574 task 16). Two cold builds into
+      # separate target directories must produce the same digest.
+      #
+      # This runs in CI as well as locally on purpose: CI is a DIFFERENT machine
+      # — different user, different checkout path, a Linux container rather than
+      # macOS — so a path remap that only works on the author's box fails here.
+      # That cross-machine difference is most of the value; a same-machine check
+      # can only prove independence from the target directory.
+      #
+      # `threat-model.md` §6 makes reproducible builds the substitute for the
+      # missing third-party audit, and A15/TB11 makes the published bundle hash
+      # the web client's only defence against hostile code delivery. A hash
+      # nobody can reproduce is a number the publisher asserts about itself.
+      #
+      # All logic in a COMMITTED script, never inline — the same rule
+      # `ai-no-network-check.sh` and `hooks-parity-check.sh` follow, because
+      # Woodpecker's config-compile runs env substitution over this file and a
+      # shell expansion in a step (or even in a comment) can error the whole
+      # pipeline config.
+      - bash scripts/wasm-repro-check.sh
+
   # ─── Hook-parity backstop ────────────────────────────────────
   # SPDX headers, EOF newline, trailing whitespace live ONLY in the lefthook
   # pre-commit set (bypassable via --no-verify) and had no remote gate. This
@@ -152,12 +255,45 @@ steps:
 
   # ─── TypeScript typecheck + Vite build ───────────────────────
   # `node:25` does not ship corepack; install pnpm directly via npm.
+  # ─── The bundle-hash record is append-only (MYND-574 task 56) ────────────────
+  # No `code-paths` filter, deliberately: the record IS a doc, so a docs-only
+  # commit is exactly when it changes and exactly when this must run.
+  #
+  # Rows are added, never edited or removed. A withdrawn build is published as a
+  # NEW row for its replacement — deleting the bad entry is the rewrite the
+  # record exists to make impossible to do quietly.
+  bundle-record:
+    image: node:25
+    commands:
+      - git fetch origin develop --depth=50 || true
+      - node scripts/check-bundle-record.mjs --append-only origin/develop
+
   pnpm-build:
     image: node:25
     when: *code-paths
     commands:
       - npm install -g pnpm@11.8.0
       - pnpm install --frozen-lockfile --store-dir /cache/cargo/pnpm-store
+      # platform-seam backstop (phase3-web-client tasks 2 + 76): the same guard the
+      # pre-commit hook runs, so `--no-verify` cannot land a direct
+      # `@tauri-apps/*` import outside `src/platform/`. Sub-second and
+      # node-builtins only, so it runs BEFORE the build to fail fast.
+      - node scripts/check-platform-seam.mjs
+      # Async-execution seam guard (MYND-574 task 80). Same fail-fast placement
+      # and the same reason as the platform-seam guard above: sub-second, and a
+      # violation is invisible to every compiler and lint on both targets.
+      - node scripts/check-core-task-seam.mjs
+      # Filesystem-seam ratchet (MYND-574 task 17). Same class as the two guards
+      # above: `std::fs` compiles for wasm32 and fails at runtime, so a new call
+      # site is invisible to every compiler on both targets.
+      - node scripts/check-core-io-seam.mjs
+      # Web command-coverage guard (MYND-574 task 11): every IPC command name in
+      # the shared tree is classified in `web/wasm/src/capability.rs`. Spans TS
+      # and Rust, so no compiler on either side sees both halves.
+      - node scripts/check-web-command-coverage.mjs
+      # Capability-descriptor drift gate (MYND-574 task 27): the UI's omission
+      # set and the dispatcher's refusal set must agree, in both directions.
+      - node scripts/check-web-capabilities.mjs
       - pnpm build
       # i18n-catalog parity (hook-only otherwise): fails on empty English source
       # values or static t()/i18n.t() keys missing from locales/en/common.json.
@@ -180,6 +316,16 @@ steps:
       - npm install -g pnpm@11.8.0
       - pnpm install --frozen-lockfile --store-dir /cache/cargo/pnpm-store
       - pnpm test
+      # The platform-seam CONTRACT against the implementation this lane owns
+      # (phase3-web-client task 62). `pnpm test` above already ran it — this line
+      # re-runs the desktop subject alone so a FAILING seam names its lane and its
+      # implementation in the step title, instead of being one red file inside a
+      # 436-file run. Seconds of runtime for an attribution nobody has to dig for.
+      #
+      # No duplication in the sense the task means: there is ONE contract
+      # (`tests/platform/seam-contract.ts`), parameterised over a transport. The
+      # two subject files supply the transports; neither restates an assertion.
+      - pnpm test:seam:desktop
 
   # ─── Tauri compile-gate ──────────────────────────────────────
   # Verifies the Tauri Rust+TS compile path on Linux.
@@ -353,6 +499,192 @@ steps:
   # reuses the warm workspace `dist/` (generate_context! embeds it at compile
   # time). Only `sync::sim::` runs; the `#[ignore]`d RED bug-repro tests stay
   # dormant until their fix lands and un-ignores them.
+  # ─── Web-target lane (phase3-web-client task 8) ──────────────
+  # Builds the `web/` target: typecheck of the web tree against the shared
+  # `src/` tree, then the production bundle with the platform seam substituted
+  # for its web implementation.
+  #
+  # Placement is deliberate and is the whole point of this being a separate
+  # step. The desktop lane is one SERIAL chain — pnpm-build → vitest →
+  # tauri-compile → cargo-test-tauri → e2e — and it is serial because every one
+  # of those steps runs `pnpm install` into the shared workspace node_modules,
+  # which concurrent installs corrupt (see the vitest step's comment). So there
+  # are exactly two options: insert this into the chain, which lengthens the
+  # desktop pipeline by this step's duration, or hang it off the end, which does
+  # not. The task's constraint is that the desktop lane's steps and timings stay
+  # untouched, so: off the end, alongside sync-sim.
+  #
+  # `optional: true` on e2e for the same reason sync-sim uses it — e2e is
+  # chronically flaky on develop, and a web build break is independent of the
+  # desktop UI suite. This step is NOT `failure: ignore`: a broken web build is
+  # a real break and must go red.
+  web-build:
+    image: node:25
+    when: *code-paths
+    depends_on:
+      - name: e2e
+        optional: true
+    commands:
+      - npm install -g pnpm@11.8.0
+      - pnpm install --frozen-lockfile --store-dir /cache/cargo/pnpm-store
+      - pnpm web:build
+      # Zero-third-party-origin drift gate (MYND-574 tasks 55 + 60). The CSP is
+      # the runtime guarantee; this pins the SURFACE — which external origins
+      # appear in the shipped JS at all — and fails when a new one shows up, so
+      # it gets read by a person instead of shipping silently. Same shape as
+      # `ai-no-network-check.sh` on the Rust side.
+      # The same platform-seam contract, against the WEB implementation
+      # (phase3-web-client task 62). This is what makes seam divergence a
+      # build failure by construction rather than something a missing E2E
+      # scenario would have to notice: the web lane cannot go green while the
+      # web seam answers differently from the contract every client shares.
+      #
+      # Runs BEFORE the artefact greps on purpose — a seam that does not satisfy
+      # its contract makes questions about the bundle premature.
+      - pnpm test:seam:web
+      - node scripts/check-web-third-party.mjs
+      # The recovery phrase must be ABSENT from the served bundle, not hidden
+      # (MYND-574 task 32). Same shape as the third-party gate above and for the
+      # same reason: it is a question about the ARTEFACT, which no test can ask.
+      # `decisions.md` 2026-07-26 makes the absence normative and `protocol.md`
+      # §7 sets the stakes — the phrase survives every password change and there
+      # is no rotation command, so one exposure is permanent.
+      - node scripts/check-web-no-phrase.mjs
+      # No production test hook in the served bundle (MYND-574 task 105). Same
+      # artefact-grep shape, and the stakes are the same kind: a hook the bundle
+      # ships is an API any script that gets execution on the page can call, and
+      # on this client that is the whole threat model (TB11).
+      - node scripts/check-web-no-test-hooks.mjs
+      # Command-surface completeness + capability agreement, run in the WEB lane
+      # too (MYND-574 task 28: "runs in both lanes").
+      #
+      # Both already run in the desktop lane's `pnpm-build` step. Repeating them
+      # here is not redundancy for its own sake: this lane is the one that fails
+      # when the web client is broken, and these two properties are the ones that
+      # break it silently — a command with no classification, or a UI descriptor
+      # disagreeing with the dispatcher. A web-lane failure points at the web
+      # client; the same failure in the desktop lane reads as a desktop problem.
+      - node scripts/check-web-command-coverage.mjs
+      - node scripts/check-web-capabilities.mjs
+      # First-load budget ratchet (MYND-574 task 68). Reads the built
+      # `web/dist/index.html`, sums the entry's static graph, and fails when the
+      # gzip transfer size grows past the recorded baseline by more than its
+      # margin — so a bundle increase is a decision someone records (re-baseline
+      # with `--update`, which shows up as a diff) rather than a drift nobody
+      # sees. Also fails if the wasm core lands on the first-load path at all:
+      # it is needed at unlock, not at first paint.
+      #
+      # Here rather than in the desktop lane because it needs `web/dist`, which
+      # only this step builds.
+      - node scripts/check-web-bundle-budget.mjs
+      # Every screen has a web verdict, and the excluded ones are really gone
+      # (MYND-574 task 70). Two halves: a roster that fails when a file under
+      # `src/screens/` has no verdict (a new screen otherwise ships to the
+      # browser by default), and a marker grep over `web/dist` that fails if an
+      # "excluded" screen is in the artefact after all — the same
+      # absence-not-unreachability bar as `check-web-no-phrase.mjs`.
+      - node scripts/check-web-screens.mjs
+      # The same two questions for the SERVICE layer — settings panels, `src/lib`,
+      # `src/hooks` (MYND-574 task 96). Different directory, same failure: a
+      # module with no verdict ships by default, and nothing ROUTES to a hook, so
+      # no screen audit finds it. `--emit` regenerates the checked-in assessment
+      # from this roster; CI runs the gate without it.
+      - node scripts/check-web-surfaces.mjs
+      # The E2E observability contract for the web-only screens (MYND-574 task
+      # 100). `src/CLAUDE.md` states the rule and 489 testids in `src/` are held
+      # to it by review alone — which works only where a screen has an owner who
+      # reviews it. The web screens' builders never mention `data-*`, and the
+      # tasks that CONSUME the testids land later, so the gap would be found by
+      # a scenario that cannot select anything. Also enforces the SYNC-7 leak
+      # budget: no `data-*` on a pre-unlock screen may carry a runtime value,
+      # because the account number is typed on one of them.
+      - node scripts/check-web-testids.mjs
+      # The vitest specs that assert the same two properties (tests/web/,
+      # tests/platform/) — so the web lane covers them as tests, not only as
+      # scripts, and the seam contract runs against BOTH implementations here.
+      - pnpm test
+
+  # ─── Hosted web-client deploy (MYND-574 task 112) ────────────────────────────
+  # The repo's first deployable artefact. Same shape every sibling repo already
+  # uses (`myne-server`, `myne-website`): a `docker:28-cli` step that builds on
+  # the HOST daemon through the mounted socket, then a second step that brings
+  # up the committed stack in its deploy directory.
+  #
+  # `depends_on: [web-build]` and nothing else — deliberately. The desktop `e2e`
+  # step is roughly half the pipeline's runtime, and a web deploy must not wait
+  # on the desktop UI suite to decide whether a static bundle can ship.
+  #
+  # `manual` stays in the `when` block because a Forgejo pull-mirror sync does
+  # not reliably fire the push webhook, and a deploy that only fires on an event
+  # the mirror sometimes swallows is a deploy nobody can trigger.
+  web-docker-build:
+    image: docker:28-cli
+    when: &web-deploy
+      - event: [push, manual]
+        branch: develop
+    depends_on: [web-build]
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    commands:
+      # `.git` is excluded from the build context, so the commit identity is
+      # passed in — `version.json` is what makes the deploy observable, and it
+      # would otherwise read `unknown` and the smoke gate could not tell a fresh
+      # deploy from a stale one.
+      - >
+        docker build -f web/container/Dockerfile
+        --build-arg MYNE_BUILD_COMMIT=$CI_COMMIT_SHA
+        --build-arg MYNE_BUILD_TIMESTAMP=$CI_COMMIT_TIMESTAMP
+        -t myne-web:$CI_COMMIT_SHA -t myne-web:prod .
+      # Gate the image BEFORE it is deployed. This is the check that would have
+      # caught a container serving no CSP, no COOP and no COEP with a valid
+      # config, and a `/healthz` answering 200 with the whole SPA — both shipped
+      # once, both invisible to every unit test, because the only thing that can
+      # see them is a request to a running container.
+      - apk add --no-cache bash curl nodejs
+      - MYNE_WEB_IMAGE=myne-web:prod bash scripts/check-web-container-headers.sh --no-build
+      # The published-hash gate (MYND-574 task 56). The record is a
+      # PRECONDITION, not a log: a record written after the deploy detects
+      # nothing, because whoever substituted the bundle also writes the record
+      # and the two agree. Gating on it inverts that — a bundle whose hash was
+      # not published first cannot reach the origin.
+      #
+      # Usable only because the build is reproducible (task 16): the hash for a
+      # commit is knowable before the deploy, by anyone, which is what lets it
+      # be written down first.
+      - >
+        docker run --rm --entrypoint cat myne-web:prod /srv/web/version.json > /tmp/version.json
+      - >
+        node scripts/check-bundle-record.mjs --has
+        "$(node -e 'console.log(JSON.parse(require("fs").readFileSync("/tmp/version.json","utf8")).bundle_hash)')"
+
+  web-docker-deploy:
+    image: docker:28-cli
+    when: *web-deploy
+    depends_on: [web-docker-build]
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /opt/myne-web:/opt/myne-web
+    commands:
+      # The committed stack (`myne-ops/deploy/web/docker-compose.yml`, copied to
+      # this directory), never an ad-hoc `docker run`: the port binding, the
+      # restart policy and the sync-origin variable are deployment decisions
+      # that belong in a file someone reviewed.
+      - cd /opt/myne-web/prod
+      - docker compose up -d
+      - docker image prune -f
+
+  # Post-deploy smoke, from OUTSIDE the container over the public origin. Every
+  # failure it exists to catch lives between the container and the browser — a
+  # proxy that drops a header, a certificate that did not renew, a stack that
+  # came up on the previous image — and none of those are visible from inside.
+  web-smoke:
+    image: alpine:3.21
+    when: *web-deploy
+    depends_on: [web-docker-deploy]
+    commands:
+      - apk add --no-cache curl bash
+      - bash scripts/web-smoke.sh https://app.myne.md https://sync.myne.md $CI_COMMIT_SHA
+
   sync-sim:
     image: rust:1.96.0-slim
     when: *code-paths
@@ -416,28 +748,59 @@ steps:
       # unmarshal map into string").
       - "/cache/bin/cargo-nextest nextest run --profile ci -p myne-core -E 'test(plugins::sync::sim)' --no-fail-fast"
 
-  # ─── Cross-impl vector verification (DISABLED) ───────────────
+  # ─── Cross-impl vector verification, both lanes (BLOCKED, not disabled) ─────
   # protocol/tests/vectors.rs reads ../myne-test-vectors fixtures and asserts
-  # byte-equality of the public API; without the companion checked out those 13
-  # runners (argon2id, ctx-aead, hkdf-sha256, account-number, phrase_normalize,
-  # myn-blob, vault-meta(+rewrite), vault-prefs, vault-search, password-policy,
-  # bip39-recovery, aad-construction) just skip. See protocol/CLAUDE.md.
+  # byte-equality of the public API across all 34 runners (argon2id, ctx-aead,
+  # hkdf-sha256, account-number, phrase_normalize, myn-blob, vault-meta(+rewrite)
+  # and every §10.3 blob family). Without the companion checked out they all just
+  # skip. See protocol/CLAUDE.md.
   #
-  # DISABLED while myne-test-vectors is private: an unauthenticated `git clone`
-  # in CI fails (exit 128, "could not read Username"). Re-enable when the repo
-  # goes public — or, to keep it private, clone via a Woodpecker secret token:
-  #   environment:
-  #     VECTORS_TOKEN: { from_secret: vectors_token }
-  #   commands:
-  #     - git clone --depth 1 https://oauth2:$VECTORS_TOKEN@git.myne.md/Myne/myne-test-vectors.git myne-test-vectors
+  # Since MYND-574 task 15 the SAME runners also execute inside a real browser —
+  # `scripts/browser-vectors.sh`, wasm32 + headless Chrome. That is not a nicety:
+  # the web client's execution target is a browser's wasm engine, and a suite that
+  # only ever ran on aarch64/x86_64 is evidence about a different machine. Both
+  # lanes belong in this step; the browser one is what task 15 owes.
   #
-  # vector-verification:
-  #   image: rust:1.96.0-slim
-  #   depends_on: [cargo-test]
-  #   commands:
-  #     - apt-get update && apt-get install -y --no-install-recommends git ca-certificates
-  #     - git clone --depth 1 https://github.com/myne-md/myne-test-vectors.git myne-test-vectors
-  #     - cargo test -p protocol --test vectors
+  # ENABLED 2026-07-28. `myne-test-vectors` is a PRIVATE repo, so the clone needs
+  # a token; `vectors_token` is now provisioned in this repo's Woodpecker
+  # secrets (a Forgejo PAT with read:repository on Myne/myne-test-vectors).
+  #
+  # **The ordering that made this a comment for so long is worth keeping in
+  # mind if it is ever removed again**: referencing a secret this repo cannot see
+  # errors the WHOLE pipeline at config-compile — no step runs at all — so a
+  # `from_secret:` written BEFORE the secret exists takes down every other gate.
+  # Same caution as sync-sim above, which learned it the hard way, and the same
+  # failure that was erroring `myne-server`'s PR checks at the time this landed.
+  #
+  # The step still self-skips on an absent token rather than failing, so a fork
+  # PR (which gets no secrets) is not blocked by a companion it cannot clone.
+  #
+  vector-verification:
+    image: rust:1.96.0-slim
+    when: *code-paths
+    depends_on: [cargo-test]
+    environment:
+      VECTORS_TOKEN:
+        from_secret: vectors_token
+    commands:
+      - |
+        if [ -z "$VECTORS_TOKEN" ]; then
+          echo "vectors_token not provided -> skipping cross-impl vectors";
+          exit 0;
+        fi
+      # chromium + its driver are what make the browser lane possible; the
+      # driver's major version must match the browser's, which is why they are
+      # installed as a pair from the same distro archive rather than pinned
+      # separately. (Learned locally the same week: chromedriver 151 refuses a
+      # Chrome 150 session outright.)
+      - apt-get update && apt-get install -y --no-install-recommends git ca-certificates curl chromium chromium-driver
+      - git clone --depth 1 "https://oauth2:$VECTORS_TOKEN@git.myne.md/Myne/myne-test-vectors.git" myne-test-vectors
+      # Native lane: the desktop/mobile execution target.
+      - cargo test -p protocol --test vectors
+      # Browser lane: the web client's. Same runners, same fixtures, different
+      # wasm engine. The script fails rather than skips when either the
+      # fixtures or a driver are missing.
+      - CHROMEDRIVER=/usr/bin/chromedriver bash scripts/browser-vectors.sh
 
   # Failure notification via Pushover. The token + group come ONLY from CI
   # secrets, never committed (public repo). A missing secret (e.g. a fork PR)
@@ -463,6 +826,13 @@ steps:
         optional: true
       - name: hooks-parity
         optional: true
+      - name: wasm-protocol
+        optional: true
+      # Enabled with the `vectors_token` secret (task 15). Listed here because
+      # this is the only thing that pushes a failure to the maintainer, and a
+      # gate nobody is told about is a gate that goes red unnoticed.
+      - name: vector-verification
+        optional: true
       - name: pnpm-build
         optional: true
       - name: vitest
@@ -473,7 +843,30 @@ steps:
         optional: true
       - name: e2e
         optional: true
+      - name: bundle-record
+        optional: true
+      - name: web-build
+        optional: true
+      # The deploy chain (task 112). A deploy that fails silently is worse than
+      # one that fails loudly: the previous container keeps serving and nobody
+      # learns the new build never shipped.
+      - name: web-docker-build
+        optional: true
+      - name: web-docker-deploy
+        optional: true
+      - name: web-smoke
+        optional: true
       - name: sync-sim
+        optional: true
+      # MYND-574 task 116. `mobile-crosscheck` can go red on its own (it has no
+      # failure:ignore), so leaving it out meant a red pipeline with no push.
+      # `e2e-quarantine` is listed for a different reason: it CANNOT fail the
+      # pipeline (failure:ignore), but notify must still wait for its terminal
+      # status rather than racing it — the same reason every other entry is here
+      # with optional:true.
+      - name: mobile-crosscheck
+        optional: true
+      - name: e2e-quarantine
         optional: true
     environment:
       PUSHOVER_TOKEN:

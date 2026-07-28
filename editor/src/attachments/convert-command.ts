@@ -14,7 +14,7 @@
 // agent adds (the deferred-palette TODO).
 
 import { EditorView } from "@codemirror/view";
-import { open } from "@tauri-apps/plugin-dialog";
+import { getHost, type PickedFile } from "../host";
 import i18n from "@myne/editor/i18n";
 import {
   type ImportSource,
@@ -26,23 +26,20 @@ import { type RefImporter, convertImportedRefs, importSkipNote } from "./convert
 
 const PICKER_EXTENSIONS = ["png", "jpg", "jpeg", "gif", "webp", "svg", "pdf"];
 
-/** Single-file picker seam (tests override). Returns the chosen path or null. */
-type PickOneFn = (ref: ImportedImageRef) => Promise<string | null>;
+/** Single-file picker seam (tests override). Returns the chosen file or null. */
+type PickOneFn = (ref: ImportedImageRef) => Promise<PickedFile | null>;
 
 let pickOneFn: PickOneFn = async () => {
+  const pick = getHost().attachments.pickFiles;
+  if (pick === undefined) return null;
   // Resolve the filter label at usage time so a mid-session language switch is
-  // reflected in the native picker (never frozen at module load).
-  const picked = await open({
+  // reflected in the picker (never frozen at module load).
+  const picked = await pick({
     multiple: false,
-    directory: false,
-    filters: [
-      {
-        name: i18n.t("editor.attachment.convertCommand.pickerSourceFilter"),
-        extensions: PICKER_EXTENSIONS,
-      },
-    ],
+    extensions: PICKER_EXTENSIONS,
+    filterLabel: i18n.t("editor.attachment.convertCommand.pickerSourceFilter"),
   });
-  return typeof picked === "string" ? picked : null;
+  return picked !== null && picked.length > 0 ? picked[0] : null;
 };
 
 /** Override the single-file-picker seam (tests only). Returns a restore fn. */
@@ -54,11 +51,11 @@ export function setPickOneFn(fn: PickOneFn): () => void {
   };
 }
 
-/** Import a path source, narrowing the outcome to the convert shape. */
-async function importPath(
-  path: string,
+/** Import a picked file, narrowing the outcome to the convert shape. */
+async function importPicked(
+  file: PickedFile,
 ): Promise<{ ok: true; attachment: ImportedAttachment } | { ok: false; reason: string }> {
-  const source: ImportSource = { kind: "path", path };
+  const source: ImportSource = { kind: "picked", file };
   const outcome = await importOne(source);
   if (outcome.ok) return { ok: true, attachment: outcome.attachment };
   return { ok: false, reason: outcome.reason };
@@ -72,20 +69,28 @@ async function importPath(
  * file was found, it's just not importable).
  */
 export const pickerBackedImporter: RefImporter = async (ref: ImportedImageRef) => {
-  const first = await importPath(ref.source);
-  if (first.ok) return first;
+  // Auto-resolve the literal reference the note names — host-specific, and a
+  // host that cannot reach an arbitrary source (a browser) answers `null`, which
+  // simply routes straight to the picker below. That is the same user-visible
+  // outcome as a literal path that did not read, so the fallback needed no new
+  // branch (phase3-web-client task 76).
+  const literal = getHost().attachments.resolveLiteralSource?.(ref.source) ?? null;
+  if (literal !== null) {
+    const first = await importPicked(literal);
+    if (first.ok) return first;
 
-  // An `error`/`io` reason means the literal path didn't read → offer the
-  // picker. A `too-large`/`unsupported` reason means the file WAS read but is
-  // not importable → don't re-prompt; report it.
-  if (first.reason !== "error" && first.reason !== "locked") {
-    return { ok: false, note: importSkipNote(first.reason) };
+    // An `error`/`io` reason means the literal source didn't read → offer the
+    // picker. A `too-large`/`unsupported` reason means the file WAS read but is
+    // not importable → don't re-prompt; report it.
+    if (first.reason !== "error" && first.reason !== "locked") {
+      return { ok: false, note: importSkipNote(first.reason) };
+    }
   }
 
   const picked = await pickOneFn(ref);
   if (picked === null) return { ok: false, note: importSkipNote("not-found") };
 
-  const second = await importPath(picked);
+  const second = await importPicked(picked);
   if (second.ok) return second;
   return { ok: false, note: importSkipNote(second.reason) };
 };

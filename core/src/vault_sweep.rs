@@ -116,6 +116,118 @@ pub fn sweep(dir: &Path, disposal: RootDisposal) -> SweepOutcome {
     aggregate(&results)
 }
 
+/// The same sweep, through the storage seam (phase3-web-client task 72).
+///
+/// # Why a sibling rather than an edit in place
+///
+/// [`sweep`] is synchronous and reaches `std::fs` directly, which is correct for
+/// every caller it has today — and impossible on `wasm32`, where `std::fs`
+/// compiles and then fails at runtime. The web client needs the same erase for
+/// "sign out and erase this browser's copy" (owner decision, 2026-07-27), so it
+/// needs a [`VaultIo`] version.
+///
+/// Editing `sweep` in place would drag every other caller onto an async,
+/// io-injected signature for a change none of them asked for. So this is a
+/// sibling, and the invariants are held in one place instead: the post-order
+/// order, the no-short-circuit posture, the per-entry result vector and the
+/// aggregation are all the same, and `sweep_outcome_to_delete_result` maps both.
+///
+/// # What is deliberately NOT here
+///
+/// * **No directory `fsync`.** [`sweep`]'s `try_dir_sync` commits the parent's
+///   journal entry on Unix. OPFS exposes no such primitive — `flush()` is per
+///   file handle — and there is nothing to call. Stating it rather than silently
+///   omitting it: the durability posture of a web erase is the browser's, and
+///   this is where a reader finds that out.
+/// * **No symlink handling.** The seam's `DirEntry` has `is_dir` and nothing
+///   else, because OPFS has files and directories and no third thing. On the
+///   native arm a symlink lands in the `else` branch and is unlinked as a file,
+///   which is exactly `sweep`'s `symlink_metadata` behaviour.
+pub async fn sweep_via_io(
+    io: &dyn crate::vault_io::VaultIo,
+    dir: &Path,
+    disposal: RootDisposal,
+) -> SweepOutcome {
+    let mut results: Vec<(PathBuf, Result<(), IoFailureKind>)> = Vec::new();
+    match disposal {
+        RootDisposal::Remove => walk_and_remove_via_io(io, dir, &mut results).await,
+        RootDisposal::KeepRoot => match io.read_dir(dir).await {
+            Ok(entries) => {
+                for e in entries {
+                    walk_and_remove_via_io(io, &dir.join(&e.name), &mut results).await;
+                }
+            }
+            Err(kind) => results.push((dir.to_path_buf(), Err(kind))),
+        },
+    }
+    emit_per_unlink_failure_trace_kinds(&results);
+    aggregate_kinds(&results)
+}
+
+/// Post-order walker over the seam. Boxed because it recurses in an `async fn`,
+/// which otherwise needs an infinitely-sized future.
+fn walk_and_remove_via_io<'a>(
+    io: &'a dyn crate::vault_io::VaultIo,
+    path: &'a Path,
+    results: &'a mut Vec<(PathBuf, Result<(), IoFailureKind>)>,
+) -> std::pin::Pin<Box<dyn std::future::Future<Output = ()> + 'a>> {
+    Box::pin(async move {
+        // `is_dir` is the seam's whole type vocabulary. A missing path answers
+        // its own error here, which is what `symlink_metadata` did in `sweep`.
+        match io.is_dir(path).await {
+            Ok(true) => {
+                match io.read_dir(path).await {
+                    Ok(entries) => {
+                        for e in entries {
+                            walk_and_remove_via_io(io, &path.join(&e.name), results).await;
+                        }
+                        // Children first, so the directory is empty by now —
+                        // the post-order property `sweep` also relies on.
+                        let r = io.remove_dir_all(path).await;
+                        results.push((path.to_path_buf(), r));
+                    }
+                    Err(kind) => results.push((path.to_path_buf(), Err(kind))),
+                }
+            }
+            Ok(false) => {
+                let r = io.remove_file(path).await;
+                results.push((path.to_path_buf(), r));
+            }
+            Err(kind) => results.push((path.to_path_buf(), Err(kind))),
+        }
+    })
+}
+
+/// [`emit_per_unlink_failure_trace`] over seam-shaped results. The path is
+/// never emitted here either (DENY-list discipline).
+pub(crate) fn emit_per_unlink_failure_trace_kinds(
+    results: &[(PathBuf, Result<(), IoFailureKind>)],
+) {
+    for (_path, r) in results {
+        if let Err(kind) = r {
+            tracing::warn!(
+                stage = "unlink_blob",
+                io_failure_kind = ?kind,
+                "vault sweep: entry unlink failed"
+            );
+        }
+    }
+}
+
+/// [`aggregate`] over seam-shaped results — same counting, same neutral
+/// `SweepOutcome`, so both sweeps feed the identical error mapping.
+pub(crate) fn aggregate_kinds(results: &[(PathBuf, Result<(), IoFailureKind>)]) -> SweepOutcome {
+    let mut removed = 0usize;
+    let mut failures = Vec::new();
+    for (_path, r) in results {
+        match r {
+            Ok(()) => removed += 1,
+            Err(kind) => failures.push(UnlinkFailure { kind: *kind }),
+        }
+    }
+    SweepOutcome { removed, failures }
+}
+
 /// Count every entry (file + directory) under `dir`, recursively, **not**
 /// counting `dir` itself. Read-only — the read-side mirror of a
 /// [`RootDisposal::KeepRoot`] sweep's removal scope, so a scan count equals
@@ -285,6 +397,116 @@ fn aggregate(results: &[(PathBuf, std::io::Result<()>)]) -> SweepOutcome {
 mod tests {
     use super::*;
     use crate::test_support::ScopedTempDir;
+
+    // ---- the seam-backed sibling (phase3-web-client task 72) -------------
+    //
+    // Driven against the REAL native arm (`StdVaultIo`), not a double: the
+    // claim is that one erase serves both targets, and a fake would only prove
+    // the signature compiles. What these pin is that the sibling AGREES with
+    // `sweep` — same removals, same post-order, same no-short-circuit posture —
+    // because two erases that disagree is worse than one erase that is slow.
+
+    fn rt() -> tokio::runtime::Runtime {
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("current-thread runtime")
+    }
+
+    const IO: crate::vault_io::StdVaultIo = crate::vault_io::StdVaultIo;
+
+    /// A vault-shaped tree: a file at the root, a subdirectory with two files,
+    /// and an empty subdirectory.
+    fn seed(root: &Path) {
+        std::fs::write(root.join("vault.meta"), b"meta").unwrap();
+        std::fs::create_dir_all(root.join("notes")).unwrap();
+        std::fs::write(root.join("notes").join("a.myn"), b"a").unwrap();
+        std::fs::write(root.join("notes").join("b.myn"), b"b").unwrap();
+        std::fs::create_dir_all(root.join("attachments")).unwrap();
+    }
+
+    #[test]
+    fn via_io_removes_the_whole_tree_including_the_root() {
+        let tmp = ScopedTempDir::new("sweep-io-remove").expect("tempdir");
+        let root = tmp.path().join("vaults").join("v1");
+        std::fs::create_dir_all(&root).unwrap();
+        seed(&root);
+
+        let outcome = rt().block_on(sweep_via_io(&IO, &root, RootDisposal::Remove));
+
+        assert!(
+            outcome.failures.is_empty(),
+            "failures: {:?}",
+            outcome.failures
+        );
+        // 3 files + 2 dirs + the root itself.
+        assert_eq!(outcome.removed, 6);
+        assert!(!root.exists());
+    }
+
+    #[test]
+    fn via_io_keeps_the_root_when_asked() {
+        let tmp = ScopedTempDir::new("sweep-io-keep").expect("tempdir");
+        let root = tmp.path().join("v2");
+        std::fs::create_dir_all(&root).unwrap();
+        seed(&root);
+
+        let outcome = rt().block_on(sweep_via_io(&IO, &root, RootDisposal::KeepRoot));
+
+        assert!(outcome.failures.is_empty());
+        assert_eq!(outcome.removed, 5); // everything under the root, not the root
+        assert!(root.is_dir());
+        assert_eq!(std::fs::read_dir(&root).unwrap().count(), 0);
+    }
+
+    #[test]
+    fn via_io_agrees_with_the_sync_sweep_on_the_same_tree() {
+        // The property that makes a sibling safe: two identical trees, one
+        // swept each way, must report the same counts. A divergence here is a
+        // web client erasing a different set of bytes than a desktop one.
+        let tmp = ScopedTempDir::new("sweep-io-agree").expect("tempdir");
+        let a = tmp.path().join("a");
+        let b = tmp.path().join("b");
+        std::fs::create_dir_all(&a).unwrap();
+        std::fs::create_dir_all(&b).unwrap();
+        seed(&a);
+        seed(&b);
+
+        let sync_outcome = sweep(&a, RootDisposal::Remove);
+        let io_outcome = rt().block_on(sweep_via_io(&IO, &b, RootDisposal::Remove));
+
+        assert_eq!(io_outcome.removed, sync_outcome.removed);
+        assert_eq!(io_outcome.failures.len(), sync_outcome.failures.len());
+        assert!(!a.exists() && !b.exists());
+    }
+
+    #[test]
+    fn via_io_reports_a_missing_root_as_one_failure_and_does_not_panic() {
+        // `sweep`'s `symlink_metadata` error path. The erase must degrade to a
+        // reported failure, never a trap — on wasm32 a panic aborts the whole
+        // instance, so "returns an outcome" is the load-bearing half.
+        let tmp = ScopedTempDir::new("sweep-io-missing").expect("tempdir");
+        let missing = tmp.path().join("nope");
+
+        let outcome = rt().block_on(sweep_via_io(&IO, &missing, RootDisposal::Remove));
+
+        assert_eq!(outcome.removed, 0);
+        assert_eq!(outcome.failures.len(), 1);
+        assert_eq!(outcome.failures[0].kind, IoFailureKind::NotFound);
+    }
+
+    #[test]
+    fn aggregate_kinds_counts_the_same_way_aggregate_does() {
+        let results = vec![
+            (PathBuf::from("x"), Ok(())),
+            (PathBuf::from("y"), Err(IoFailureKind::PermissionDenied)),
+            (PathBuf::from("z"), Ok(())),
+        ];
+        let o = aggregate_kinds(&results);
+        assert_eq!(o.removed, 2);
+        assert_eq!(o.failures.len(), 1);
+        assert_eq!(o.failures[0].kind, IoFailureKind::PermissionDenied);
+    }
 
     // ---- synthetic-input helpers ----------------------------------------
 

@@ -1,4 +1,30 @@
 {
+  "accountBootstrap": {
+    "accountMismatch": "This browser already holds a different account's vault. Open that one, or sign out and erase this browser's copy first.",
+    "changeAccount": "Use a different account number",
+    "continue": "Continue",
+    "failed": "Couldn't open that account. Check the account number and password, then try again.",
+    "hint": "Enter the master password for this account. Myne will fetch your vault and set this browser up as a device on it.",
+    "noEndpoint": "This copy of Myne has no sync server configured, so it can't reach your vault. Contact whoever runs it.",
+    "passwordLabel": "Master password",
+    "approversIntro": "These devices can approve this one:",
+    "noApprovers": "No other device on this account can approve it right now. Open Myne on a device that already has access, then come back here.",
+    "pendingTitle": "Waiting for approval",
+    "sasMatch": "They match — continue",
+    "sasMismatch": "They don't match",
+    "verifyBody": "Check that this code is the same on both devices before you continue. If it isn't, stop — something is wrong with the connection, not with your password.",
+    "verifyTitle": "Compare this code",
+    "title": "Sign in to your vault",
+    "working": "Setting up…"
+  },
+  "accountEntry": {
+    "checkFailed": "Could not check that account number. Try again.",
+    "checking": "Checking…",
+    "continue": "Continue",
+    "hint": "It looks like MY-XXXX-XXXX-XXXX-XXXX-XXXX. Checked here on your device — nothing is sent yet.",
+    "invalid": "That account number is not valid. Check it and try again.",
+    "title": "Enter your account number"
+  },
   "attachments": {
     "cleanUnused": {
       "cancel": "Cancel",
@@ -8,6 +34,7 @@
       "deleteCta": "Delete {{count}} unused",
       "deleteCta_one": "Delete {{count}} unused",
       "deleteCta_other": "Delete {{count}} unused",
+      "corpusIncomplete": "Finish syncing first — this device doesn't have all your notes yet. Nothing was deleted.",
       "error": "Couldn't clean up. Some notes may be unreadable — nothing was deleted.",
       "intro_one": "These attachment is not used in any note. Deleting it is permanent and can't be undone.",
       "intro_other": "These {{count}} attachments are not used in any note. Deleting them is permanent and can't be undone.",
@@ -46,6 +73,7 @@
       "actionsAriaLabel": "Attachment actions",
       "actionsTitle": "Actions",
       "checkUnusedFailedNotice": "Couldn't check for unused attachments. Try again.",
+      "corpusIncompleteNotice": "Finish syncing first — this device doesn't have all your notes yet, so it can't tell which attachments are unused.",
       "checking": "Checking…",
       "cleanUnused": "Clean unused",
       "cleanUnusedTitle": "Delete attachments not used in any note",
@@ -520,6 +548,7 @@
     }
   },
   "common": {
+    "cancel": "Cancel",
     "dismiss": "Dismiss",
     "prompt": {
       "cancel": "Cancel",
@@ -530,6 +559,10 @@
     },
     "back": "Back",
     "continue": "Continue"
+  },
+  "deviceRevoked": {
+    "cta": "Start over",
+    "title": "This browser was removed from your account"
   },
   "editor": {
     "attachment": {
@@ -1230,6 +1263,11 @@
         "title": "Export as Markdown"
       }
     },
+    "egress": {
+      "cancel": "Cancel",
+      "confirm": "Download",
+      "title": "Download this file"
+    },
     "pdf": {
       "cancel": "Cancel",
       "continue": "Continue…",
@@ -1296,6 +1334,10 @@
     }
   },
   "failClosed": {
+    "exit": {
+      "quit": "Close app",
+      "reload": "Reload"
+    },
     "corrupted": {
       "body": "If you have a backup, you can restore it — your current files are not touched; the backup is restored as a separate vault first.",
       "cta": "Close app",
@@ -1316,6 +1358,8 @@
       "cta": "Close app",
       "title": "No permission to access the vault file."
     },
+    "copyDiagnostics": "Copy diagnostics",
+    "diagnosticsCopied": "Copied",
     "restoreFromBackup": "Restore from backup…"
   },
   "notes": {
@@ -1674,6 +1718,8 @@
       "loadError": "Couldn't load this note",
       "removeFromFavorites": "Remove from favorites",
       "renameAriaLabel": "Rename note",
+      "unsyncedLabel": "Not yet on the server",
+      "unsyncedTitle": "This note's latest changes are only on this device",
       "untitled": "Untitled"
     },
     "savedView": {
@@ -1691,6 +1737,8 @@
       "savedRelative": "Saved {{rel}}",
       "saveFailed": "Save failed",
       "saveFailedTitle": "Save failed — click Retry",
+      "storageFull": "Storage full",
+      "storageFullTitle": "There's no room left to save this note. Free up space (or remove some attachments), then retry. Until it saves, this edit is only in this window — it is not on the server either.",
       "saving": "Saving",
       "savingEllipsis": "Saving…"
     },
@@ -1956,6 +2004,7 @@
   "settings": {
     "about": {
       "buildChannelDevelopment": "Development build",
+      "buildLabel": "Build",
       "buildChannelLabel": "Build channel",
       "buildChannelStable": "Stable",
       "changelogButton": "View changelog…",
@@ -1976,12 +2025,16 @@
         "ioError": "Disk error, please try again.",
         "joinFailure": "Something went wrong, please try again.",
         "samePasswordRejected": "New password matches the current one.",
+          "serverAckPending": "Your new password works on this device, but Myne couldn't reach the server to save it. Until it does, your other devices still expect the old password — and if this browser's copy is cleared before then, the change is lost. It will retry automatically.",
         "weakNewPassword": "New password must be at least 12 characters."
       },
       "changePasswordHeading": "Change password",
       "changePasswordHelper": "Rotate your master password while keeping the same vault. Recovery phrase stays the same.",
       "dangerZoneHeading": "Danger zone",
       "dangerZoneHelper": "Permanently delete this vault and all notes. Cannot be undone. Recovery phrase will not restore the vault.",
+      "localEraseHeading": "This browser",
+      "localEraseHelper": "Erase Myne's copy of your vault from this browser. Your account and everything already synced stay on the server.",
+      "localEraseButton": "Sign out and erase this browser's copy…",
       "deleteVaultButton": "Delete vault…",
       "vaultLabelEyebrow": "VAULT LABEL",
       "vaultLabelHelper": "A name for this vault shown in the in-app switcher. Stored encrypted inside the vault; never leaves your device in plaintext.",
@@ -2149,6 +2202,10 @@
       "heading": "Delete vault",
       "ioFailBody": "Could not access vault files for deletion. Vault keys are already zeroized from memory; any vault data that remains on disk is unrecoverable Argon2id-wrapped junk.",
       "ioFailTitle": "Disk error during delete",
+      "localEraseHeading": "Sign out and erase this browser's copy",
+      "localEraseEyebrow": "THIS BROWSER ONLY",
+      "localEraseSubmit": "Erase this browser's copy",
+      "localEraseSubmitInFlight": "Erasing…",
       "partialFailBody_one": "{{count}} file could not be deleted from disk. Vault keys are already zeroized from memory, so any orphan ciphertext that remains is unrecoverable Argon2id-wrapped junk.",
       "partialFailBody_other": "{{count}} files could not be deleted from disk. Vault keys are already zeroized from memory, so any orphan ciphertext that remains is unrecoverable Argon2id-wrapped junk.",
       "partialFailTitle": "Vault deletion partially failed",
@@ -2214,6 +2271,32 @@
       "helper": "View and change keyboard shortcuts. Editor formatting and the tab-cycle shortcut are fixed.",
       "notSet": "Not set",
       "removeBindingAria": "Remove {{chord}}",
+      "reserved": {
+        "bookmarkPage": "bookmarks the page",
+        "closeTab": "closes the tab",
+        "closeWindow": "closes the window",
+        "cycleTabs": "moves between tabs",
+        "focusAddressBar": "focuses the address bar",
+        "hideApplication": "hides the browser",
+        "inspectElement": "opens the element inspector",
+        "minimiseWindow": "minimises the window",
+        "newPrivateWindow": "opens a private window",
+        "newTab": "opens a new tab",
+        "newWindow": "opens a new window",
+        "openBookmarks": "opens bookmarks",
+        "openDevTools": "opens developer tools",
+        "openExtensions": "opens extensions",
+        "openFile": "opens a file",
+        "openHistory": "opens history",
+        "quit": "quits the browser",
+        "reopenTab": "reopens the last closed tab",
+        "switchTab": "switches tabs",
+        "toggleFullscreen": "toggles full screen"
+      },
+      "reservedBadge": "Unavailable here",
+      "reservedBadgeTitle": "Your browser {{action}} with {{chord}}, so it never reaches Myne. The shortcut still works on the desktop app.",
+      "reservedRefused": "{{chord}} belongs to your browser — it {{action}}. Pick a different shortcut; your desktop shortcuts are unchanged.",
+      "reservedUnreliable": "{{chord}} may not reach Myne — in some browsers it {{action}}. Added anyway.",
       "resetAll": "Reset all hotkeys…",
       "resetAllConfirm": "Reset every custom shortcut to its default?",
       "resetAllYes": "Reset all",
@@ -2389,6 +2472,8 @@
       "locationHelper": "Each vault is a folder of encrypted files under this path. Prefer the Backup button below over manual copies — it verifies the written file.",
       "locationLabel": "Vault location",
       "openInFiles": "Open in Files",
+      "webLocationHelper": "Your notes live in this browser's storage for this site, managed by the browser — there is no folder to open. Clearing this site's data removes the local copy; because this client syncs, signing in again downloads it back.",
+      "webLocationLabel": "Where your notes are stored",
       "pathUnavailable": "Path unavailable",
       "restoreBackup": "Restore from backup…"
     },
@@ -2511,7 +2596,29 @@
       }
     }
   },
+  "storageLost": {
+    "allSynced": "Nothing was lost — every note here had already reached the server.",
+    "evicted": {
+      "body": "Your browser cleared this site's storage to free up space. Nothing is damaged and nothing was deleted on the server — everything that had synced is still there.",
+      "title": "Your browser cleared this vault's local copy"
+    },
+    "lockCta": "Lock and try again",
+    "reDownloadCta": "Set this browser up again",
+    "reEnrolNotice": "Setting up again registers this browser as a new device, so it will wait for approval from one of your other devices before it can sync.",
+    "unopenable": {
+      "body": "The local copy of this vault can no longer be read. Nothing on the server is affected — the copy here is a cache, and it can be replaced.",
+      "title": "This vault's local copy can't be read"
+    },
+    "unsyncedIntro": "{{count}} note hadn't reached the server yet. It's gone — this was the only copy:",
+    "unsyncedIntro_one": "{{count}} note hadn't reached the server yet. It's gone — this was the only copy:",
+    "unsyncedIntro_other": "{{count}} notes hadn't reached the server yet. They're gone — this was the only copy:",
+    "unsyncedOverflow": "…and {{count}} more.",
+    "unsyncedOverflow_one": "…and {{count}} more.",
+    "unsyncedOverflow_other": "…and {{count}} more."
+  },
   "sync": {
+    "materialising": "Downloading your notes — {{done}} of {{total}}. You can start working; the rest will appear as they arrive.",
+    "credentialAmbiguous": "Your password may have changed on this device and on another, and Myne can't tell which is newer — so it hasn't changed anything. Sign in on a device that already has access to sort it out.",
     "attachments": {
       "aria": {
         "downloading": "Downloading {{name}}",
@@ -2565,6 +2672,7 @@
         "linux": "Linux PC",
         "macos": "Mac",
         "unknown": "This device",
+        "web": "Browser",
         "windows": "Windows PC"
       },
       "remove": "Remove",
@@ -2591,10 +2699,14 @@
       "connect": "Connect",
       "connectedLocal": "Connected (local, no TLS).",
       "connectedTls": "Connected. Check that this fingerprint matches on your other device.",
+      "connectedPlatformTrust": "Connected over TLS. Your browser verified this server\u2019s certificate.",
       "connecting": "Connecting…",
       "fingerprintLabel": "Server certificate fingerprint:",
       "pinStatic": "Verified against Myne’s built-in certificate.",
       "pinTofu": "Pinned on first connect. Compare this fingerprint across your devices.",
+      "fixedOrigin": "This client syncs with one server, set when it was deployed. It cannot be changed from here — the page is only allowed to talk to this one address.",
+      "fixedOriginNone": "No sync server is configured for this deployment.",
+      "pinPlatformTrust": "Verified by your browser\u2019s certificate store. This client cannot pin a certificate itself.",
       "placeholder": "https://your-server.example   ·   http://127.0.0.1:8080",
       "unreachable": "Couldn’t reach that server — check the URL and that it’s running."
     },
@@ -2692,6 +2804,8 @@
       "error": "Sync error",
       "errorAuth": "Sync sign-in expired",
       "errorFrozen": "Account frozen — uploads paused",
+      "errorDeviceRevoked": "This device was removed from your account",
+        "errorStorageFull": "Storage full — syncing paused",
       "errorQuota": "Storage full — uploads paused",
       "errorRateLimited": "Sync throttled — retrying",
       "errorTooLarge": "A file is too large to upload",
@@ -2803,6 +2917,7 @@
     "errors": {
       "alreadyUnlocked": "Vault is already unlocked.",
       "inProgress": "Operation in progress.",
+      "kdfMemoryExceedsHost": "This vault needs {{required}} MiB of memory to open — more than this browser can give it ({{available}} MiB). The vault is fine; open it in the Myne desktop app.",
       "unexpected": "Unexpected error. Please try again.",
       "vaultNotFound": "Vault file not found. Please restart the app."
     },
@@ -3274,5 +3389,44 @@
     "personalLabel": "Personal",
     "openVault": "Open vault",
     "backUpNow": "Back up now"
+  },
+  "web": {
+    "reload": {
+      "body": "Reloading this page asks for your password again — there is no quicker way in, by design. Your vault stays encrypted on this device while the page is closed, and the key is rebuilt from your password each time.",
+      "title": "A reload means your password again"
+    },
+    "wall": {
+      "getNative": "Get Myne for desktop or mobile",
+      "noAccount": {
+        "body": "Accounts are created in the Myne desktop or mobile app, not here.",
+        "reason": "Creating an account generates your 24-word recovery phrase and shows it to you once. A web page should never be the thing that shows you that phrase — if it leaked there, nothing in Myne could take it back.",
+        "title": "You need an account first"
+      },
+      "noSync": {
+        "body": "This browser has no sync server configured, so there is nothing for it to open.",
+        "reason": "Unlike the desktop app, the browser keeps no vault of its own to fall back on — sync is where its notes come from. Set it up in the desktop or mobile app, then come back here.",
+        "title": "Sync is not set up yet"
+      }
+    },
+    "unavailableHere": {
+      "backup": "Encrypted backups are made and restored in the Myne desktop app, which can write the backup file where you choose. Your notes here come from the server, so this browser restores itself by syncing.",
+      "creation": "New accounts are created in the Myne desktop app. It shows you your recovery phrase — and a recovery phrase should never be shown by a web page.",
+      "multiVault": "This browser holds one account. To use another, open it in the Myne desktop app or in a different browser profile.",
+      "phraseRecovery": "Recovery by phrase happens in the Myne desktop app. Your recovery phrase should never be typed into a web page.",
+      "title": "Not available in the browser"
+    },
+    "unsupported": {
+      "title": "Myne can’t run in this browser",
+      "handoff": "Myne's desktop app (macOS, Windows, Linux) and mobile app (iOS, Android) have no such limit â and they verify their own signature before running, which a web page cannot.",
+      "reason": {
+        "webassembly": "This browser does not support WebAssembly, which the encryption core runs on.",
+        "wasm-memory-headroom": "This browser cannot reserve the ~336 MB of memory the vault's key derivation needs. Phone and tablet browsers generally cannot; that limit is set by the vault itself and cannot be lowered for one device without making the vault unreadable everywhere else.",
+        "worker": "This browser does not support Web Workers, which the vault's storage and encryption run inside.",
+        "opfs": "This browser does not provide private local storage for web apps, so there is nowhere to keep your vault between page loads.",
+        "opfs-sync-access-handle": "This browser's private local storage is missing the synchronous file access the vault needs to write safely.",
+        "web-locks": "This browser does not support the lock that keeps two tabs from writing to one vault at the same time.",
+        "crypto-getrandomvalues": "This browser does not provide a cryptographic random-number source."
+      }
+    }
   }
 }

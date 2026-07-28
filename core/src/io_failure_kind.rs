@@ -37,6 +37,27 @@ pub enum IoFailureKind {
     Other,
 }
 
+/// Bare variant name. Safe under the DENY-list discipline **by construction**:
+/// this is a unit-only enum, so there is no payload that could carry a path or
+/// an OS message — unlike `std::io::Error`'s `Display`, which is the exact thing
+/// this type exists to keep off the wire.
+///
+/// Added with the `VaultIo` seam (phase3-web-client task 17), which returns this
+/// type as its error directly; `Display` + [`std::error::Error`] are what let a
+/// call site use `?` into a plugin error type.
+impl core::fmt::Display for IoFailureKind {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.write_str(match self {
+            IoFailureKind::PermissionDenied => "PermissionDenied",
+            IoFailureKind::NotFound => "NotFound",
+            IoFailureKind::NoSpace => "NoSpace",
+            IoFailureKind::Other => "Other",
+        })
+    }
+}
+
+impl std::error::Error for IoFailureKind {}
+
 /// Map a `std::io::ErrorKind` to the closed [`IoFailureKind`] enum.
 ///
 /// `WriteZero` and `StorageFull` collapse into `NoSpace` because both

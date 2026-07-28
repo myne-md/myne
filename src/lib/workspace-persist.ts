@@ -7,7 +7,7 @@
 // activity log (design grill 2026-06-01 Q1). The Rust side seals it opaque
 // under `session_state_key` (`MYW1`, protocol.md § 9.7).
 
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../platform/core";
 import {
   collectLeaves,
   findLeaf,

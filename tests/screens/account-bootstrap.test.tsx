@@ -1,0 +1,344 @@
+// @vitest-environment jsdom
+//
+// The web client's first-run flow (phase3-web-client task 85): account number →
+// password → a vault.
+//
+// The tests here are about the two things this screen must NOT do, because both
+// are properties that a reasonable-looking implementation gets wrong:
+//
+//   * It must not offer a server-URL field. Task 50 fixes the sync origin when
+//     the container starts and generates a `connect-src` naming exactly it, so
+//     any other address is CSP-blocked before a request leaves the page. A field
+//     would be a lie of capability whose failure mode is an unexplained network
+//     error — and the origin the join actually uses must come from the config,
+//     not from anything the user typed.
+//   * It must not distinguish "no such account" from "wrong password".
+//     `account-number.md` §5 requires the non-distinguishing answer, and a
+//     two-message version turns the pair into a two-step account enumeration for
+//     anyone holding a guessed number.
+//
+// Plus the pending gate, which on this client is the NORMAL outcome rather than
+// an edge case: task 92 leaves a browser only the password enrolment path, and
+// per `server-protocol.md` §3.1 that path lands pending until an existing device
+// approves.
+
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+
+const invokeMock = vi.fn<(cmd: string, args?: Record<string, unknown>) => Promise<unknown>>();
+vi.mock("@tauri-apps/api/core", () => ({
+  invoke: (cmd: string, args?: Record<string, unknown>) => invokeMock(cmd, args),
+}));
+
+import { AccountBootstrap } from "../../src/screens/AccountBootstrap";
+import {
+  ENROLL_NON_DISTINGUISHING_BANNER,
+  ENROLL_NON_DISTINGUISHING_BANNER_NO_PHRASE,
+} from "../../src/lib/load-bearing-copy";
+
+const DISPLAY_FORM = "MY-4K7P-9QRS-2TVW-XYZ0-1234";
+const ENDPOINT = "https://sync.example.test";
+
+/** Default wiring: the account number checks out and an endpoint is configured. */
+function wire(over: Partial<Record<string, unknown>> = {}): void {
+  invokeMock.mockImplementation(async (cmd) => {
+    if (cmd === "plugin:vault-unlock|account_number_check") return true;
+    if (cmd === "plugin:sync|sync_get_endpoint") {
+      return "endpoint" in over ? over.endpoint : { endpoint_url: ENDPOINT };
+    }
+    if (cmd === "plugin:sync|sync_join_account") {
+      if (over.joinThrows === true) throw new Error("refused");
+      return (
+        over.join ?? {
+          device_id_hex: "aa".repeat(16),
+          vault_id: "00000000-0000-7000-8000-ebebebebebeb",
+          pending: false,
+          fingerprint: null,
+        }
+      );
+    }
+    throw new Error(`unexpected command ${cmd}`);
+  });
+}
+
+/** Get past the identity step and onto the password step. */
+async function reachPasswordStep(): Promise<void> {
+  fireEvent.change(screen.getByTestId("account-entry.input"), {
+    target: { value: DISPLAY_FORM },
+  });
+  fireEvent.click(screen.getByTestId("account-entry.submit"));
+  await screen.findByTestId("account-bootstrap.password");
+}
+
+async function submitPassword(value = "CanaryPass-9-animals!"): Promise<void> {
+  fireEvent.change(screen.getByTestId("account-bootstrap.password"), {
+    target: { value },
+  });
+  fireEvent.click(screen.getByTestId("account-bootstrap.submit"));
+}
+
+beforeEach(() => {
+  invokeMock.mockReset();
+});
+
+afterEach(cleanup);
+
+describe("web first-run bootstrap", () => {
+  it("starts at the identity step and advances to a password only after it validates", async () => {
+    wire();
+    render(<AccountBootstrap onBootstrapped={() => {}} />);
+    expect(screen.getByTestId("account-entry.input")).toBeTruthy();
+    expect(screen.queryByTestId("account-bootstrap.password")).toBeNull();
+    await reachPasswordStep();
+    // The number is echoed rather than re-asked — the user has already read it
+    // off another device once.
+    expect(screen.getByTestId("account-bootstrap.account").textContent).toBe(DISPLAY_FORM);
+  });
+
+  it("offers NO server-URL field, and joins against the configured origin", async () => {
+    wire();
+    render(<AccountBootstrap onBootstrapped={() => {}} />);
+    await reachPasswordStep();
+    // Nothing on this screen invites a server address. Asserted as an absence of
+    // ANY text input beside the password, because a URL field could be added
+    // under any name and the property is "the deployment chose the origin".
+    const inputs = Array.from(document.querySelectorAll("input")).filter(
+      (i) => i.type !== "password" && i.getAttribute("data-testid") !== "account-bootstrap.password",
+    );
+    expect(inputs).toHaveLength(0);
+
+    await submitPassword();
+    await waitFor(() =>
+      expect(invokeMock).toHaveBeenCalledWith(
+        "plugin:sync|sync_join_account",
+        expect.objectContaining({ serverUrl: ENDPOINT, accountNumber: DISPLAY_FORM }),
+      ),
+    );
+  });
+
+  it("reports a missing endpoint as a deployment fault, not a bad credential", async () => {
+    // Telling someone their password is wrong when the client has no server
+    // configured sends them to change a credential that is fine — and they can
+    // change it as many times as they like without ever fixing it.
+    wire({ endpoint: { endpoint_url: null } });
+    render(<AccountBootstrap onBootstrapped={() => {}} />);
+    await reachPasswordStep();
+    await submitPassword();
+    const banner = await screen.findByTestId("account-bootstrap.error");
+    expect(banner.textContent).toMatch(/sync server/i);
+    // And it never reached the wire.
+    expect(invokeMock).not.toHaveBeenCalledWith(
+      "plugin:sync|sync_join_account",
+      expect.anything(),
+    );
+  });
+
+  it("gives one non-distinguishing message for every join failure, from the load-bearing constant", async () => {
+    wire({ joinThrows: true });
+    render(<AccountBootstrap onBootstrapped={() => {}} />);
+    await reachPasswordStep();
+    await submitPassword();
+    const banner = await screen.findByTestId("account-bootstrap.error");
+    // Full-literal equality, not a substring: the exact wording IS the privacy
+    // property, so a paraphrase must fail here rather than pass on a keyword.
+    // The default capability set has `phraseRecovery`, so this asserts the
+    // ORIGINAL literal — the web substitution is asserted below.
+    expect(banner.textContent).toBe(ENROLL_NON_DISTINGUISHING_BANNER);
+    const text = banner.textContent ?? "";
+    // And the words that would turn this into an enumeration oracle are absent
+    // from the literal itself, which is what makes reusing it safe.
+    expect(text).not.toMatch(/no such account|account not found|does not exist/i);
+    expect(text).not.toMatch(/wrong password|incorrect password/i);
+  });
+
+  it("names no recovery phrase on a client that cannot accept one", async () => {
+    // The sibling constant (`decisions.md` 2026-07-28). The original lists the
+    // phrase as a possible cause; on this client the phrase paths are ABSENT
+    // from the bundle, so naming it sends the user looking for a field that
+    // cannot be made to exist. The non-distinguishing collapse is unchanged —
+    // that is the difference between removing a cause the client cannot have and
+    // removing one it can.
+    vi.resetModules();
+    vi.doMock("../../src/platform/capabilities", () => ({
+      has: (cap: string) => cap !== "phraseRecovery",
+    }));
+    const { AccountBootstrap: WebBootstrap } = await import(
+      "../../src/screens/AccountBootstrap"
+    );
+    wire({ joinThrows: true });
+    render(<WebBootstrap onBootstrapped={() => {}} />);
+    await reachPasswordStep();
+    await submitPassword();
+    const banner = await screen.findByTestId("account-bootstrap.error");
+    expect(banner.textContent).toBe(ENROLL_NON_DISTINGUISHING_BANNER_NO_PHRASE);
+    expect(banner.textContent?.toLowerCase()).not.toContain("phrase");
+    vi.doUnmock("../../src/platform/capabilities");
+  });
+
+  it("names the different-account case separately, because nothing retyped fixes it", async () => {
+    // The one exception to the non-distinguishing rule above, and it leaks
+    // nothing: it is a fact about THIS browser's own storage, visible to whoever
+    // is sitting in front of it. Folding it into the generic banner would send
+    // the user round a password-retry loop with no exit — the container has to
+    // be erased first (task 72).
+    invokeMock.mockImplementation(async (cmd) => {
+      if (cmd === "plugin:vault-unlock|account_number_check") return true;
+      if (cmd === "plugin:sync|sync_get_endpoint") return { endpoint_url: ENDPOINT };
+      throw { kind: "AccountMismatch" };
+    });
+    render(<AccountBootstrap onBootstrapped={() => {}} />);
+    await reachPasswordStep();
+    await submitPassword();
+    const banner = await screen.findByTestId("account-bootstrap.error");
+    expect(banner.textContent).toMatch(/different account/i);
+  });
+
+  it("an approved join hands straight back to the boot probe", async () => {
+    const onBootstrapped = vi.fn();
+    wire();
+    render(<AccountBootstrap onBootstrapped={onBootstrapped} />);
+    await reachPasswordStep();
+    await submitPassword();
+    await waitFor(() => expect(onBootstrapped).toHaveBeenCalledTimes(1));
+    expect(screen.queryByTestId("account-bootstrap.pending-notice")).toBeNull();
+  });
+
+  it("a pending join explains the wait, names who can approve, and offers no manual continue", async () => {
+    const onBootstrapped = vi.fn();
+    invokeMock.mockImplementation(async (cmd) => {
+      if (cmd === "plugin:vault-unlock|account_number_check") return true;
+      if (cmd === "plugin:sync|sync_get_endpoint") return { endpoint_url: ENDPOINT };
+      if (cmd === "plugin:sync|sync_join_account") {
+        return {
+          device_id_hex: "bb".repeat(16),
+          vault_id: "00000000-0000-7000-8000-ebebebebebeb",
+          pending: true,
+          fingerprint: null,
+        };
+      }
+      if (cmd === "plugin:sync|sync_list_devices") {
+        return [
+          { device_id_hex: "cc".repeat(16), name: "Ömer's laptop", approved: true },
+          { device_id_hex: "dd".repeat(16), name: "Old tablet", approved: false },
+        ];
+      }
+      if (cmd === "plugin:sync|sync_now") return null;
+      if (cmd === "plugin:sync|sync_head_fingerprint") return null;
+      throw new Error(`unexpected ${cmd}`);
+    });
+    render(<AccountBootstrap onBootstrapped={onBootstrapped} />);
+    await reachPasswordStep();
+    await submitPassword();
+    await screen.findByTestId("account-bootstrap.pending-notice");
+
+    // Criterion 4: it continues automatically. A manual "Continue" would let a
+    // user walk past the gate into a client that syncs nothing and cannot say
+    // why.
+    expect(screen.queryByTestId("account-bootstrap.pending-continue")).toBeNull();
+    expect(onBootstrapped).not.toHaveBeenCalled();
+
+    // And it says WHICH devices can approve, up front. A browser is typically
+    // opened precisely when the user's other devices are not with them, so a
+    // bare spinner is the worst version of this screen.
+    const list = await screen.findByTestId("account-bootstrap.approvers");
+    expect(list.textContent).toContain("Ömer's laptop");
+    // Only APPROVED devices can approve — a pending sibling cannot.
+    expect(list.textContent).not.toContain("Old tablet");
+  });
+
+  it("says plainly when nothing on the account can approve it", async () => {
+    // The case a spinner waits out forever without explaining.
+    invokeMock.mockImplementation(async (cmd) => {
+      if (cmd === "plugin:vault-unlock|account_number_check") return true;
+      if (cmd === "plugin:sync|sync_get_endpoint") return { endpoint_url: ENDPOINT };
+      if (cmd === "plugin:sync|sync_join_account") {
+        return {
+          device_id_hex: "bb".repeat(16),
+          vault_id: "v",
+          pending: true,
+          fingerprint: null,
+        };
+      }
+      if (cmd === "plugin:sync|sync_list_devices") return [];
+      return null;
+    });
+    render(<AccountBootstrap onBootstrapped={() => {}} />);
+    await reachPasswordStep();
+    await submitPassword();
+    await screen.findByTestId("account-bootstrap.no-approvers");
+  });
+
+  it("treats an unreadable roster as UNKNOWN, never as 'nobody can approve you'", async () => {
+    // A still-pending device often cannot read the roster at all. Saying
+    // "nobody can approve this" on the strength of a failed call would send the
+    // user to give up on a gate that is working.
+    invokeMock.mockImplementation(async (cmd) => {
+      if (cmd === "plugin:vault-unlock|account_number_check") return true;
+      if (cmd === "plugin:sync|sync_get_endpoint") return { endpoint_url: ENDPOINT };
+      if (cmd === "plugin:sync|sync_join_account") {
+        return {
+          device_id_hex: "bb".repeat(16),
+          vault_id: "v",
+          pending: true,
+          fingerprint: null,
+        };
+      }
+      if (cmd === "plugin:sync|sync_list_devices") throw new Error("401");
+      return null;
+    });
+    render(<AccountBootstrap onBootstrapped={() => {}} />);
+    await reachPasswordStep();
+    await submitPassword();
+    await screen.findByTestId("account-bootstrap.pending-notice");
+    expect(screen.queryByTestId("account-bootstrap.no-approvers")).toBeNull();
+    expect(screen.queryByTestId("account-bootstrap.approvers")).toBeNull();
+  });
+
+  it("surfaces the code-match screen once an approval lets a head be adopted", async () => {
+    // The existing enrolment-approval step, not a parallel mechanism: the head
+    // fingerprint IS the code both sides compare, and it only becomes available
+    // once an authed cycle has adopted a head — which only happens after
+    // approval.
+    let fingerprint: string | null = null;
+    invokeMock.mockImplementation(async (cmd) => {
+      if (cmd === "plugin:vault-unlock|account_number_check") return true;
+      if (cmd === "plugin:sync|sync_get_endpoint") return { endpoint_url: ENDPOINT };
+      if (cmd === "plugin:sync|sync_join_account") {
+        return {
+          device_id_hex: "bb".repeat(16),
+          vault_id: "v",
+          pending: true,
+          fingerprint: null,
+        };
+      }
+      if (cmd === "plugin:sync|sync_list_devices") return [];
+      if (cmd === "plugin:sync|sync_now") {
+        fingerprint = "MYNE 4K7P 9QRS"; // approval landed
+        return null;
+      }
+      if (cmd === "plugin:sync|sync_head_fingerprint") return fingerprint;
+      return null;
+    });
+    const onBootstrapped = vi.fn();
+    render(<AccountBootstrap onBootstrapped={onBootstrapped} />);
+    await reachPasswordStep();
+    await submitPassword();
+    const sas = await screen.findByTestId("account-bootstrap.sas", {}, { timeout: 4000 });
+    expect(sas.textContent).toBe("MYNE 4K7P 9QRS");
+    // Both outcomes are offered, and the mismatch is not a cosmetic dismissal:
+    // it un-enrols, because a mismatch means the data this device adopted may
+    // be forked.
+    expect(screen.getByTestId("account-bootstrap.sas-mismatch")).toBeTruthy();
+    fireEvent.click(screen.getByTestId("account-bootstrap.sas-match"));
+    expect(onBootstrapped).toHaveBeenCalledTimes(1);
+  });
+
+  it("lets the user go back and correct the account number", async () => {
+    wire();
+    render(<AccountBootstrap onBootstrapped={() => {}} />);
+    await reachPasswordStep();
+    fireEvent.click(screen.getByTestId("account-bootstrap.change-account"));
+    expect(screen.getByTestId("account-entry.input")).toBeTruthy();
+    expect(screen.queryByTestId("account-bootstrap.password")).toBeNull();
+  });
+});

@@ -11,6 +11,7 @@
 // stage), it's just not yet built.
 
 import type { CommandAction } from "./registry";
+import * as capabilities from "../platform/capabilities";
 import { runWikilinkConvert } from "../editor/wikilink/convert-command";
 import { foldAll, unfoldAll } from "@codemirror/language";
 import { getActiveEditorView } from "../editor/active-view";
@@ -19,8 +20,8 @@ import { showAttachmentToast } from "../editor/attachments/toast";
 import { openInNoteFind } from "../editor/find/find-session";
 import { cycleHeading } from "@myne/editor";
 import { sidebarCommands } from "../notes/sidebarCommands";
-import { appDataDir, join } from "@tauri-apps/api/path";
-import { openPath } from "@tauri-apps/plugin-opener";
+import { appDataDir, join } from "../platform/path";
+import { openPath } from "../platform/opener";
 import {
   setEditorLineNumbers,
   setEditorVimMode,
@@ -1259,7 +1260,68 @@ const deleteWorkspaceAction: CommandAction = {
   },
 };
 
-export const COMMAND_ACTIONS: readonly CommandAction[] = Object.freeze([
+/**
+ * Which capability each gated action needs. Absent from this map = ungated.
+ *
+ * Capability gating happens HERE, at the registry, rather than at each render
+ * site (MYND-574 task 27). The command palette, the keyboard-shortcut resolver
+ * and the settings-search index all read `COMMAND_ACTIONS`, so filtering once
+ * is what makes "unreachable by menu, still reachable by shortcut" impossible
+ * rather than merely unlikely — that gap is the specific failure the task names.
+ */
+const ACTION_CAPABILITY: Readonly<Record<string, capabilities.Capability>> = Object.freeze({
+  "ai.toggle-enabled": "localAi",
+  "ai.open-chat": "localAi",
+  "ai.summarize-note": "localAi",
+  "ai.suggest-tags": "localAi",
+  "ai.rewrite-selection": "localAi",
+  "app.toggle-screen-capture": "screenCaptureProtection",
+  "vault.backup": "backup",
+  "vault.restore": "backup",
+  "vault.export-markdown": "vaultExport",
+  // Task 48. The one export whose obstacle is the OUTPUT rather than the
+  // destination: it drives a hidden Tauri WebView, prints it and collects the
+  // result. `note.export-markdown` and `note.export-html` are deliberately NOT
+  // here — their obstacle was where the file goes, and the browser download flow
+  // answers that (`src/platform/download.ts`), so they stay reachable.
+  "note.export-pdf": "pdfExport",
+  // `note.export-selection-image` is NOT gated: it renders to a canvas and
+  // hands the bytes to a download, which a browser does natively. It is task
+  // 48's shape, not `nativeSaveAs`.
+  //
+  // Task 97 verdicts for the three formats task 48 left unnamed, recorded here
+  // because "ungated" is the claim that has to be TRUE rather than merely
+  // unwritten. All three are ungated, and all three now have a download arm
+  // that makes that honest:
+  //
+  //   - `note.export-html` — SHIPS, as a standalone single file. The sidecar
+  //     image variant does NOT ship on the download path: it needs a multi-file
+  //     delivery mechanism task 48 settled only for single-file exports, and
+  //     inventing a second one is what task 97's criterion forbids. The
+  //     download arm therefore emits the document alone, which is the same
+  //     inert degrade the flow already documents for a render with no modal
+  //     mount (images stay in-app-only `attachment://` refs).
+  //   - `note.export-txt` — SHIPS. One file, never a sidecar; nothing owed.
+  //   - `note.export-selection-image` — SHIPS. Steps 1–3 of its pipeline are
+  //     WebView work on every platform and the bytes are a finished PNG before
+  //     any delivery decision.
+  //
+  // Until those arms existed the claim was false in a specific, invisible way:
+  // each flow called the save dialog unconditionally, and a browser's typed
+  // refusal landed in a `.catch(() => null)` that reads as "the user
+  // dismissed it". The commands were offered, did nothing, and said nothing.
+  //
+  // Theme-JSON export SHIPS too, and it is not a palette action at all — it
+  // lives on a row in Settings → Appearance, so it has no entry here. Its
+  // verdict is recorded on `saveJsonAsFile`, which is where the download arm
+  // is. It was the only one of the four whose absence would have had to reach
+  // a settings section as well as the palette; shipping it makes that question
+  // moot, and shipping is the right answer because it is a single file — the
+  // exact case task 48 settled — and because a palette is colour values the
+  // user authored, not vault content.
+});
+
+const ALL_COMMAND_ACTIONS: readonly CommandAction[] = Object.freeze([
   lockVaultAction,
   openSettingsAction,
   toggleLeftSidebarAction,
@@ -1351,3 +1413,17 @@ export const COMMAND_ACTIONS: readonly CommandAction[] = Object.freeze([
   aiSuggestTagsAction,
   aiRewriteSelectionAction,
 ]);
+
+/**
+ * The actions this platform actually offers.
+ *
+ * Filtered, not flagged: an action left in the list with a `disabled` marker
+ * would still be found by palette search and still bound by the shortcut
+ * resolver — visible-and-broken, which `decisions.md` 2026-07-26 rules out.
+ */
+export const COMMAND_ACTIONS: readonly CommandAction[] = Object.freeze(
+  ALL_COMMAND_ACTIONS.filter((a) => {
+    const needed = ACTION_CAPABILITY[a.id];
+    return needed === undefined || capabilities.has(needed);
+  }),
+);

@@ -51,6 +51,25 @@ export const SYNC_INTEGRITY_ALERT =
 export const ENROLL_NON_DISTINGUISHING_BANNER =
   "Account number, password, or recovery phrase is incorrect. Please try again.";
 
+/** The same message on a client that cannot accept a recovery phrase
+ *  (phase3-web-client task 98; `decisions.md` 2026-07-28).
+ *
+ *  A **sibling, not a paraphrase**: the non-distinguishing property is
+ *  identical — a wrong account number and a wrong password fail at the same
+ *  AEAD-open step and collapse to one message — and the only difference is that
+ *  it does not name a credential the client structurally cannot take. On the web
+ *  client the phrase paths are ABSENT from the bundle (tasks 32 and 92), so
+ *  offering "or recovery phrase" as a possible cause sends the user looking for
+ *  a field that does not exist and cannot be made to exist.
+ *
+ *  Selected by the `phraseRecovery` capability rather than by a platform name,
+ *  so a future client with the same shape inherits the right one. Changing
+ *  either literal is a `docs/decisions.md` event, never a copy edit — and
+ *  changing one without the other is how the two drift into disagreeing about
+ *  what failed. */
+export const ENROLL_NON_DISTINGUISHING_BANNER_NO_PHRASE =
+  "Account number or password is incorrect. Please try again.";
+
 /** Honest enroll-pending notice — the device is held by the approval gate. */
 export const ENROLL_PENDING_NOTICE =
   "This device is waiting for approval. Approve it from a device that already has access to start syncing.";
@@ -58,3 +77,39 @@ export const ENROLL_PENDING_NOTICE =
 /** Enroll success — the device was approved and a sync token issued. */
 export const ENROLL_APPROVED_NOTICE =
   "This device is now connected and syncing.";
+
+// Local-erase honesty (MYND-574 task 72, owner decision 2026-07-27). On a client
+// whose storage is a cache of a sync-held vault — the web client, where sync is
+// required by `decisions.md` 2026-07-26 — `vault_delete` erases THIS client's
+// copy and nothing else. The desktop copy for the same command says the deletion
+// is permanent and that the recovery phrase will not bring the data back; said
+// here that would be false in the dangerous direction, because a user trying to
+// destroy their notes would believe they had while every synced note remained on
+// the server. Same class of claim as REMOVE_DEVICE_DISCLOSURE above, and the
+// same rule: state the effect, state the limit, never imply a remote wipe, and
+// name the one thing that IS irreversibly lost.
+
+/** The honest scope of a local erase on a sync-backed client. Four plain
+ *  sentences — effect, what survives, what this is NOT, and the real loss — and
+ *  the last of them is why the typed-DELETE gate stays: unsynced edits die here
+ *  and nothing brings them back. */
+/** What a device REVOCATION means to the browser it was revoked from
+ *  (phase3-web-client task 94).
+ *
+ *  The sibling of `REMOVE_DEVICE_DISCLOSURE`, written from the other end. That
+ *  one tells the person doing the removing that it is not a remote wipe; this
+ *  one tells the person it happened TO what actually occurred here — and the two
+ *  must not contradict each other, because a user reading both would otherwise
+ *  conclude one of them is lying.
+ *
+ *  So: this browser's copy is deleted, and that is a LOCAL deletion this client
+ *  performed on itself because it can no longer sync — not the server reaching
+ *  in. The account is untouched. And the sentence that keeps it honest is the
+ *  last one: anything not yet synced from this browser is gone, which is exactly
+ *  what `REMOVE_DEVICE_DISCLOSURE`'s "not a remote wipe" implies and no copy
+ *  should let the user discover by surprise. */
+export const DEVICE_REVOKED_DISCLOSURE =
+  "This browser was removed from your account, so it can no longer sync. Myne has deleted its local copy of your vault from this browser — a local deletion, not something the server reached in and did. Your account and everything already synced are safe on the server. Anything this browser had not synced yet is gone.";
+
+export const LOCAL_ERASE_DISCLOSURE =
+  "This erases Myne's copy of your vault from this browser only. Your account and everything already synced stay on the server, and signing in here again brings them back. It is not an account deletion and not a remote wipe. Anything this browser has not synced yet is lost for good.";

@@ -22,19 +22,13 @@ protocol = { path = "../protocol" }
 # `vault.themes` blob — no reimplementation of the security-load-bearing
 # injection guard (threat-model §149).
 theme-validator = { path = "../theme-validator" }
-tauri = { version = "2", features = [] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "2"
-tokio = { version = "1", features = ["rt", "rt-multi-thread", "time", "sync"] }
 zeroize = { version = "1.8", features = ["alloc", "derive"] }
 tracing = "0.1"
-uuid = { version = "1", features = ["v4", "v7"] }
 sha2 = { version = "0.10", default-features = false }
 unicode-normalization = { version = "0.1.25", default-features = false }
-# Vault-id / wrap-key CSPRNG bytes in the vault-creation core. Same version the
-# desktop crate already pins (resolved from the shared workspace lock).
-getrandom = "0.2"
 # Compact binary serialization for the vault-indices (MYI1) snapshot payload
 # (`plugins::vault_indices::persist`). Same pin the desktop crate uses for the
 # search-index blob (varint, no field names); pure-Rust, `no_std`+`alloc`.
@@ -89,8 +83,124 @@ image = { version = "0.25", default-features = false, features = ["png", "jpeg",
 # primitive-level security review + live interop test are still owed before
 # production trust. Recorded in `docs/dependency-policy.md`. Apache-2.0/ISC/MIT.
 base64 = "0.22"
+# `#[async_trait]` for the `VaultIo` filesystem seam (phase3-web-client task 17).
+# The seam MUST be `dyn`-compatible — core holds `&dyn VaultIo` exactly as it
+# holds `&dyn HostCtx` — and Rust 1.96's native async-fn-in-trait is not. It must
+# also be async at all, which is forced rather than chosen: OPFS handle
+# acquisition is asynchronous and a Worker cannot block its event loop on a
+# promise, so there is no synchronous implementation to write.
+#
+# A PROC-MACRO, so it contributes no runtime code to any target, and already in
+# the shared `Cargo.lock` (reached via `zbus` -> tauri-plugin-opener /
+# -single-instance) — a transitive->direct promotion adding zero lock entries,
+# same shape as task 11's wasm-bindgen family. Unconditional rather than
+# target-split because proc-macros are compiled for the HOST regardless of the
+# build target.
+async-trait = "0.1"
+
+# ── Target split for the Phase 3 web client (phase3-web-client task 78) ──────
+#
+# `cargo check -p myne-core --target wasm32-unknown-unknown` on the pre-change
+# tree stopped in the DEPENDENCY GRAPH, before a single line of core code was
+# compiled, behind four separate walls. This block is those four walls removed.
+# It is deliberately only the graph: the API-level Tauri decoupling (445
+# `AppHandle`/`State<`/`Runtime`/`Emitter` sites across 69 files) is task 79,
+# and until it lands a wasm check still fails — but it fails *inside core*,
+# which is the point. A graph that does not resolve makes every later question
+# unanswerable.
+#
+# `tauri` is host-only and has no wasm arm to gate TO — `cargo tree` resolves it
+# through `tauri-runtime-wry → tao/wry`, none of which exist in a browser. It is
+# gated here so the wasm graph is clean; removing the *references* is task 79.
+#
+# `rustls` + `rustls-pki-types` back the raw-TLS sync transport. `rustls 0.23`
+# with the `ring` provider has no wasm32 backend, and a browser has no raw TCP
+# socket to put TLS on regardless: the web client's transport is `fetch` +
+# `EventSource` (task 84). The `SyncTransport` trait
+# (`plugins/sync/transport.rs`) is already the seam, so only the rustls
+# implementation needs gating — the trait, the engine, and every caller stay
+# target-independent.
+#
+# The desktop/mobile side of this block is byte-identical to what was
+# unconditional before, so the native dependency graph is unchanged.
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+# Optional behind the default-on `tauri-ipc` feature (phase3-web-client task 79,
+# Option B). The thin `#[tauri::command]` wrappers stay in this crate, gated on
+# that feature, so both native hosts keep their `generate_handler!` lines
+# unchanged and the mobile client needs no companion PR. Turning the feature
+# off is the release valve for a future consumer (a CLI, a server) that wants
+# core without Tauri — and it is a configuration change rather than a refactor
+# precisely because the host-taking inners exist underneath.
+tauri = { version = "2", features = [], optional = true }
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
 rustls-pki-types = "1"
+# `rt-multi-thread` is the wall on wasm: tokio emits a `compile_error!` there
+# ("Only features sync,macros,io-util,rt,time are supported"). A browser has one
+# thread per worker and no thread pool to spawn onto, so the wasm arm below
+# drops it rather than pretending.
+tokio = { version = "1", features = ["rt", "rt-multi-thread", "time", "sync"] }
+# `v4` (random) + `v7` (time-ordered) draw from the OS CSPRNG, which uuid
+# reaches through its own default backend on native targets.
+uuid = { version = "1", features = ["v4", "v7"] }
+# Vault-id / wrap-key CSPRNG bytes in the vault-creation core. Same version the
+# desktop crate already pins (resolved from the shared workspace lock).
+getrandom = "0.2"
+
+# ── wasm32 arm ───────────────────────────────────────────────────────────────
+# Same crates, different capabilities. Nothing new enters the dependency graph
+# that is not already in the shared lock.
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+# No `rt-multi-thread` (see above). `rt` + `time` + `sync` are the subset tokio
+# itself declares supported on wasm; the async-execution seam that replaces the
+# remaining runtime assumptions is task 80.
+tokio = { version = "1", features = ["rt", "time", "sync"] }
+# uuid needs TWO things on wasm32, and they are separate — conflating them cost
+# a browser stack trace (MYND-574 task 13):
+#
+#   RANDOMNESS  -> `rng-getrandom`. uuid draws through getrandom, which the
+#                  embedder registers, keeping the entropy source one explicit
+#                  auditable registration at the Worker boundary. Same call
+#                  `protocol/Cargo.toml` makes, for the same reason.
+#   TIMESTAMP   -> `js`. UUIDv7 is time-ordered, so minting one reads a clock —
+#                  and uuid's default path is `SystemTime`, which PANICS on
+#                  wasm32. `note_create` mints a v7 id, so every browser note
+#                  creation aborted the instance with a bare
+#                  `RuntimeError: unreachable` from `uuid::timestamp::now`.
+#
+# An earlier revision of this comment dismissed `js` as buying nothing over
+# `rng-getrandom`. That was true of randomness and FALSE of the timestamp; both
+# features are needed and they do different jobs. Corrected here rather than
+# left as a plausible-sounding reason for a broken build.
+#
+# `js` pulls wasm-bindgen — which is already in this crate's wasm graph via
+# `getrandom_v04`'s `wasm_js` backend, so it adds no new dependency family. The
+# `protocol` crate remains wasm-bindgen-free; that boundary is unchanged and
+# still asserted by `scripts/wasm-csprng-check.sh`.
+uuid = { version = "1", features = ["v4", "v7", "rng-getrandom", "js"] }
+# uuid's `rng-getrandom` reaches getrandom **0.4**, not the 0.2 above — a
+# different major with a different wasm story: 0.3+ dropped the embedder hook in
+# favour of a `wasm_js` backend built on wasm-bindgen. It is named here as an
+# explicit dependency purely to turn that feature on; without it the build stops
+# at getrandom's own "not supported by default" compile_error.
+#
+# So the wasm arm has TWO entropy paths, and that is stated rather than hidden:
+# core's own CSPRNG bytes come through the 0.2 `custom` hook the Worker host
+# registers, and uuid's v4/v7 randomness comes through 0.4's `wasm_js` backend.
+# The alternative — uuid's own `js` feature — pulls the same wasm-bindgen and
+# adds a second unrelated glue layer, so it buys nothing.
+#
+# This is where wasm-bindgen enters the graph, and it enters `myne-core` ONLY.
+# The `protocol` crate stays wasm-bindgen-free (its gate,
+# `scripts/wasm-csprng-check.sh`, asserts exactly that): the primitive crate
+# keeps one auditable entropy decision, while the host-integration crate has JS
+# glue by nature. Task 81 owns the registration itself; task 77 owes both a
+# dependency-policy verdict.
+getrandom_v04 = { package = "getrandom", version = "0.4", features = ["wasm_js"] }
+# `custom` (not `js`) — the embedder registers the backend
+# (`crypto.getRandomValues` in the Worker host, task 81). Matches `protocol`;
+# `scripts/wasm-csprng-check.sh` is the gate that the hook stays unresolved
+# rather than silently defaulting to no entropy.
+getrandom = { version = "0.2", default-features = false, features = ["custom"] }
 
 # Windows durability primitive: `MoveFileExW(MOVEFILE_WRITE_THROUGH)` backs the
 # Windows arm of `atomic_write::finalize_atomic` (moved here from the desktop
@@ -115,6 +225,12 @@ security-framework = "3"
 security-framework-sys = "2"
 
 [features]
+# Default-on. Compiles the `#[tauri::command]` wrappers and the `TauriHost`
+# adapter. A wasm build never enables it (the `tauri` dep is target-gated out
+# anyway); a native consumer that wants no Tauri turns it off.
+default = ["tauri-ipc"]
+tauri-ipc = ["dep:tauri"]
+
 # Gates the cross-plugin test fixtures (`test_support`) so the desktop/mobile
 # clients can pull them in as a dev-dependency (`features = ["test-support"]`)
 # while production builds never compile them. The crate's own unit tests reach
@@ -123,3 +239,24 @@ test-support = []
 
 [dev-dependencies]
 tracing-test = "0.2"
+
+# The web build compiles every `tracing::` event BELOW `warn` out of existence
+# (phase3-web-client task 82). Two reasons, and the second is the load-bearing
+# one:
+#
+# * **Cost.** `myne-core` emits ~357 events. On a client with no subscriber they
+#   all still pay for their format strings, which task 68's first-load ratchet
+#   measures — bytes shipped to every user for output nobody reads.
+# * **Sink.** The only place a browser CAN write is the console: readable by
+#   devtools, by any extension with devtools access, and by whoever the user
+#   screenshots a bug report to. That is a materially different sink from an
+#   operator's stdout, and it sits INSIDE the served-code trust boundary
+#   (TB11). `debug`/`trace` events are the ones that name stages, counts and
+#   ids; compiling them out is the only guarantee that survives a future call
+#   site added without reading the DENY list.
+#
+# `max_level_*` is a compile-time ceiling, not a runtime filter: the events are
+# not in the binary at all, so there is nothing to enable by accident.
+[target.'cfg(target_arch = "wasm32")'.dependencies.tracing]
+version = "0.1"
+features = ["max_level_warn", "release_max_level_warn"]

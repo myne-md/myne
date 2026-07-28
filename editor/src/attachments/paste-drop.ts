@@ -24,6 +24,7 @@ import {
   importMany,
   summarizeBatch,
 } from "./insert";
+import { getHost } from "../host";
 import { showAttachmentToast } from "./toast";
 import { addCatalogRows } from "./catalog";
 import {
@@ -34,9 +35,35 @@ import {
 
 /** A file pulled off a clipboard or datatransfer, ready to import. */
 interface PendingFile {
-  readonly bytes: number[];
+  readonly source: ImportSource;
   readonly filename: string | null;
-  readonly mime: string;
+}
+
+/**
+ * Turn one `File` into an import source, preferring the host's handle path.
+ *
+ * Two shapes, and which one is used is the host's answer rather than a platform
+ * test here (phase3-web-client task 67):
+ *
+ *  - `pickedFromDropped` present → the host moves the file itself. On web that
+ *    means the `File` handle crosses to the Worker and the CONTENT is read
+ *    there, so a 64 MiB drop never becomes a 64-million-element array on the
+ *    page — which is what `readFileBytes` below would do, and what made this
+ *    path an out-of-memory risk in a browser rather than merely a slow one.
+ *  - absent → the byte path, unchanged. Desktop takes this branch, so its
+ *    behaviour is not merely preserved, it is the same code it always ran.
+ */
+async function pendingFrom(file: File, autoName: string | null): Promise<PendingFile> {
+  const filename = file.name && file.name.trim() !== "" ? file.name : autoName;
+  const mint = getHost().attachments.pickedFromDropped;
+  if (mint !== undefined) {
+    const picked = mint(file, filename ?? undefined);
+    if (picked !== null) return { source: { kind: "picked", file: picked }, filename };
+  }
+  return {
+    source: { kind: "bytes", bytes: await readFileBytes(file), filename },
+    filename,
+  };
 }
 
 // Since MYND-173 the host accepts ANY file bytes (a non-allowlisted type is
@@ -70,11 +97,8 @@ async function collectFromClipboard(
     .filter((f): f is File => f !== null);
   const out: PendingFile[] = [];
   for (const file of files) {
-    const bytes = await readFileBytes(file);
     // A pasted screenshot has an empty `name`; auto-generate per decision 1.
-    const filename =
-      file.name && file.name.trim() !== "" ? file.name : autoPasteName(file.type, now);
-    out.push({ bytes, filename, mime: file.type });
+    out.push(await pendingFrom(file, autoPasteName(file.type, now)));
   }
   return out;
 }
@@ -83,11 +107,7 @@ async function collectFromClipboard(
 async function collectFromDrop(data: DataTransfer): Promise<PendingFile[]> {
   const out: PendingFile[] = [];
   for (const file of Array.from(data.files)) {
-    const bytes = await readFileBytes(file);
-    const filename = file.name && file.name.trim() !== ""
-      ? file.name
-      : autoPasteName(file.type);
-    out.push({ bytes, filename, mime: file.type });
+    out.push(await pendingFrom(file, autoPasteName(file.type)));
   }
   return out;
 }
@@ -100,11 +120,7 @@ export async function importAndInsert(
   pending: readonly PendingFile[],
   insertAt: number,
 ): Promise<readonly ImportOutcome[]> {
-  const sources: ImportSource[] = pending.map((p) => ({
-    kind: "bytes",
-    bytes: p.bytes,
-    filename: p.filename,
-  }));
+  const sources: ImportSource[] = pending.map((p) => p.source);
 
   // Optimistic in-editor feedback: a clean "Importing…" progress chip at the
   // cursor while the bytes are read + encrypted + stored. Decoration-only — the

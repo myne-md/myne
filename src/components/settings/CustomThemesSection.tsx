@@ -16,7 +16,7 @@
 
 import { useEffect, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
-import { open as openFileDialog } from "@tauri-apps/plugin-dialog";
+import { open as openFileDialog } from "../../platform/dialog";
 import { Button } from "../primitives/Button";
 import { ThemeChiplet } from "../primitives/ThemeChiplet";
 import { LABEL_STYLE, HELPER_STYLE, BLOCK_STYLE } from "./panel-styles";

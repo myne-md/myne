@@ -67,6 +67,18 @@ export type VaultChangePasswordError =
    */
   | { kind: "InvalidVaultMeta" }
   /**
+   * The local rewrite SUCCEEDED but the server has not acknowledged the new
+   * `vault.meta` (phase3-web-client tasks 41 + 88). **Web only** — the desktop
+   * arm defers the push and reports plain success, which it can afford because
+   * its `vault.meta-dirty` marker lives in durable storage.
+   *
+   * **Not a failure of the change**, and the copy must not say it is: the new
+   * password works on this device right now. What has not happened is the push,
+   * so every other device — and any future re-materialisation of this one —
+   * still holds the old wrap.
+   */
+  | { kind: "ServerAckPending" }
+  /**
    * Compare-and-swap mismatch between the slot-held
    * `vault_meta_bytes_hash` (captured at unlock time) and the SHA-256
    * of the on-disk `vault.meta` re-read just before the rewrite.

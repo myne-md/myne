@@ -51,6 +51,13 @@ import { VIM_MODE_EVENT, type VimModeEventDetail } from "../editor/vim";
 import { CLOSE_ACTIVE_TAB_EVENT } from "../notes/closeActiveTabSignal";
 import { focusKindOf } from "../commands/scope";
 import { FailClosedError } from "../components/FailClosedError";
+import { StorageLost } from "./StorageLost";
+import { DeviceRevoked } from "./DeviceRevoked";
+import { useSyncStatus } from "../hooks/useSyncStatus";
+import { has } from "../platform/capabilities";
+import { deleteVault } from "../lib/vault-delete";
+import { useUnsyncedEdits } from "../hooks/useUnsyncedEdits";
+import { useStorageHealth } from "../hooks/useStorageHealth";
 import { SyncBanners } from "../components/sync/SyncBanners";
 import { Icon } from "../components/primitives/Icon";
 import { SettingsModal } from "../components/SettingsModal";
@@ -65,7 +72,7 @@ import { Toast, type ToastAction } from "../components/Toast";
 import { NoteExportModal } from "../components/export/NoteExportModal";
 import { ObsidianImportModal } from "../notes/import/ObsidianImportModal";
 import { ImporterOnboardingOffer } from "../notes/import/ImporterOnboardingOffer";
-import { open as openDialog } from "@tauri-apps/plugin-dialog";
+import { open as openDialog } from "../platform/dialog";
 import {
   importBaseFilePath,
   BaseImportPersistError,
@@ -76,6 +83,8 @@ import { VaultExportModal } from "../components/export/VaultExportModal";
 import { collectFolderOptions } from "../components/export/vaultExportFlow";
 import type { ImportResult } from "../notes/import/engine";
 import { isVaultUnlocked, lockVault } from "../lib/vault-unlock";
+import { onExitIntent, setUnsavedGuard } from "../platform/exit-signals";
+import { takeDeepLinkNoteId, useNoteRoute } from "../lib/routing";
 import type { StageVaultStatus, SuspicionReason, VaultId } from "../lib/stage";
 import {
   noteList,
@@ -105,6 +114,7 @@ import {
   type NoteExportUiHooks,
 } from "../notes/exportFlow";
 import { NotePdfExportNotice } from "../components/export/NotePdfExportNotice";
+import { ExportEgressNotice } from "../components/export/ExportEgressNotice";
 import type { ExcludedAttachment } from "../dialect/html/emitNoteHtml";
 import { NoteList as NotesSidebarList } from "../notes/components/NoteList";
 import { dragEdgeX, insertionLineStyleX } from "../notes/components/reorderDnd";
@@ -151,8 +161,8 @@ import {
 } from "../notes/sidebarState";
 import { sidebarCommands } from "../notes/sidebarCommands";
 import type { SaveStatus as SaveStatusValue } from "../notes/useAutosave";
-import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
-import { listen } from "@tauri-apps/api/event";
+import { getCurrentWebviewWindow } from "../platform/webviewWindow";
+import { listen } from "../platform/event";
 import { useActivityHeartbeat } from "../hooks/useActivityHeartbeat";
 import { useBackupScheduler } from "../hooks/useBackupScheduler";
 import { BACKUP_SCHEDULE_FAILED_TOAST } from "../lib/load-bearing-copy";
@@ -160,11 +170,17 @@ import { ResizeHandle } from "../components/primitives/ResizeHandle";
 import { VaultSwitcher } from "../components/VaultSwitcher";
 import { useEditorLayout } from "./editorLayout";
 import { usePrefs } from "../hooks/usePrefs";
+import { useIdleAutoLock } from "../hooks/useIdleAutoLock";
+import { runFlushChain } from "../lib/flush-chain";
 import {
   ContextMenu,
   type ContextMenuItem,
 } from "../notes/components/ContextMenu";
-import { IS_MAC, TRAFFIC_LIGHT_GAP } from "./titlebar";
+import {
+  HAS_OVERLAY_WINDOW_CONTROLS,
+  TRAFFIC_LIGHT_GAP,
+  dragRegionProps,
+} from "./titlebar";
 import { useIsFullscreen } from "../hooks/useIsFullscreen";
 import { LEFT_BOUNDS, RIGHT_BOUNDS } from "./layoutClamp";
 import { useResponsiveCollapse } from "./responsiveCollapse";
@@ -414,6 +430,41 @@ export function Editor({
     })();
   }, []);
 
+  // Device revocation, treated as TERMINAL on a client whose local copy is a
+  // cache of a server-held vault (task 94). On desktop the same server code
+  // keeps parking at re-enrol: erasing a user's own machine on a server signal
+  // would be a new and unasked-for destructive power, so the gate is the
+  // capability, not a platform name.
+  const { status: syncStatusForRevocation } = useSyncStatus();
+  const revokedTerminal =
+    !has("localOnlyVault") &&
+    syncStatusForRevocation?.state === "error" &&
+    syncStatusForRevocation.detail === "device_revoked";
+
+  // Mid-session storage health (task 22). Held as a one-way latch alongside the
+  // unsynced set AT THE MOMENT OF LOSS: an evicted store cannot be read to find
+  // out afterwards what had not been pushed, so the running session's own last
+  // answer is the only place that knowledge still exists.
+  const { lost: storageIsLost, health: storageHealthState } = useStorageHealth();
+  const storageLost: "evicted" | "unopenable" | null = storageIsLost
+    ? storageHealthState?.state === "unopenable"
+      ? "unopenable"
+      : "evicted"
+    : null;
+  // The unsynced set as of the loss. `useUnsyncedEdits` is polled here rather
+  // than reached for from `EditorChrome` because THIS component is the one that
+  // survives the loss — the editor body unmounts, and with it any memory of what
+  // had not been pushed.
+  const { unsyncedIds: unsyncedNoteIds } = useUnsyncedEdits();
+  const lostUnsyncedRef = useRef<string[] | null>(null);
+  if (storageIsLost && lostUnsyncedRef.current === null) {
+    // Latched at the transition, not recomputed: the set is derived from storage
+    // that no longer exists, so a later poll would legitimately return empty and
+    // silently erase the report the user is standing in front of.
+    lostUnsyncedRef.current = [...unsyncedNoteIds];
+  }
+  const lostUnsyncedTitles = lostUnsyncedRef.current ?? [];
+
   // Cmd+, (macOS) / Ctrl+, (Win/Linux) toggles the Settings modal —
   // toggle so the same shortcut closes the modal when it's open.
   // Listener mounts only when the editor body renders (after the
@@ -436,6 +487,54 @@ export function Editor({
     // null avoids any flash of the editor body before the guard
     // result arrives.
     return null;
+  }
+
+  // The local store went away underneath this live session (task 22). Checked
+  // AFTER the slot guard and BEFORE the editor body: the slot guard answers "is
+  // this session real", this answers "is the storage it reads from still there",
+  // and rendering the editor between the two would put a user in a document they
+  // cannot save.
+  if (revokedTerminal) {
+    return (
+      <DeviceRevoked
+        onEraseLocalCopy={async () => {
+          // Lock first, then erase — the desktop ordering, and for the same
+          // reason: keys must be gone before the bytes they could still read
+          // are, so a failure part-way never leaves an unlocked session over a
+          // half-erased container.
+          await lockVault().catch(() => {});
+          // ONE erase (task 72), not a second implementation.
+          await deleteVault().catch(() => {});
+        }}
+        onDismiss={() => onResetRequested?.()}
+      />
+    );
+  }
+
+  if (storageLost !== null) {
+    return (
+      <StorageLost
+        kind={storageLost}
+        unsyncedTitles={lostUnsyncedTitles}
+        onReDownload={() => {
+          void (async () => {
+            // Reuse the ONE erase (task 72) rather than writing a second: the
+            // remaining container is unusable either way, and a second erase
+            // path is a second thing to keep correct. A failure here is not
+            // fatal — the boot probe re-routes regardless, and a browser that
+            // could not erase an already-broken store has lost nothing more.
+            await deleteVault().catch(() => {});
+            onResetRequested?.();
+          })();
+        }}
+        onLock={() => {
+          void (async () => {
+            await lockVault().catch(() => {});
+            onResetRequested?.();
+          })();
+        }}
+      />
+    );
   }
 
   if (slotPopulated === false) {
@@ -583,6 +682,21 @@ function EditorChrome({
       }),
     [],
   );
+  // Egress disclosure for the DOWNLOAD delivery path (phase3-web-client task
+  // 98) — same promise-backed pattern again. Reached only where `nativeSaveAs`
+  // is absent: on desktop the save dialog's title carries the sentence and the
+  // flows never call this.
+  const [egressPreflight, setEgressPreflight] = useState<{
+    sentence: string;
+    resolve: (proceed: boolean) => void;
+  } | null>(null);
+  const confirmEgress = useCallback(
+    (sentence: string) =>
+      new Promise<boolean>((resolve) => {
+        setEgressPreflight({ sentence, resolve });
+      }),
+    [],
+  );
   // If the Editor unmounts mid-question (lock / force-relock), resolve
   // any pending pre-flight with its cancel value so the awaiting flow
   // (and, on the PDF path, its held body string) isn't stranded forever.
@@ -590,10 +704,16 @@ function EditorChrome({
   exportPreflightRef.current = exportPreflight;
   const pdfPreflightRef = useRef(pdfPreflight);
   pdfPreflightRef.current = pdfPreflight;
+  const egressPreflightRef = useRef(egressPreflight);
+  egressPreflightRef.current = egressPreflight;
   useEffect(
     () => () => {
       exportPreflightRef.current?.resolve(null);
       pdfPreflightRef.current?.resolve(false);
+      // Unmounting mid-question resolves to REFUSE, not proceed: a lock or a
+      // force-relock is the one moment where silently delivering plaintext the
+      // user never confirmed would be worst.
+      egressPreflightRef.current?.resolve(false);
     },
     [],
   );
@@ -602,8 +722,9 @@ function EditorChrome({
       showToast: showExportToast,
       confirmAttachments,
       confirmPdfExclusions,
+      confirmEgress,
     }),
-    [showExportToast, confirmAttachments, confirmPdfExclusions],
+    [showExportToast, confirmAttachments, confirmPdfExclusions, confirmEgress],
   );
   const [paletteOpen, setPaletteOpen] = useState<boolean>(false);
   const [templatesOpen, setTemplatesOpen] = useState<boolean>(false);
@@ -777,7 +898,8 @@ function EditorChrome({
   // the sidebar toggle past them. In fullscreen the traffic lights are hidden —
   // drop that gap so the toggle sits flush-left (matching the non-mac layout).
   const isFullscreen = useIsFullscreen();
-  const leftToggleX = IS_MAC && !isFullscreen ? TRAFFIC_LIGHT_GAP + 16 : 12;
+  const leftToggleX =
+    HAS_OVERLAY_WINDOW_CONTROLS && !isFullscreen ? TRAFFIC_LIGHT_GAP + 16 : 12;
   const leftClearance = leftToggleX + LEFT_CONTROLS_WIDTH + 8;
 
   // Reveal the Saved Views surface (MYND-274) — the "Views" section lives in the
@@ -990,6 +1112,13 @@ function EditorChrome({
   // view-kind active tab (MYND-274) clears the note selection.
   const focusedActiveNoteId =
     focusedActive?.kind === "note" ? focusedActive.id : null;
+  // Per-note "not yet on the server" (phase3-web-client task 23). The sidebar
+  // row carries the same marker; this repeats it in the bottom bar so the state
+  // is still visible with the sidebar collapsed — which is the layout a user
+  // writing at length is most likely to be in.
+  const { unsyncedIds: unsyncedNoteIds, credentialPending } = useUnsyncedEdits();
+  const focusedNoteUnsynced =
+    focusedActiveNoteId !== null && unsyncedNoteIds.has(focusedActiveNoteId);
   const select = ctx.select;
   useEffect(() => {
     select(focusedActiveNoteId);
@@ -1263,6 +1392,65 @@ function EditorChrome({
     };
   }, [flushAll, persistWorkspace, persistVaultIndices]);
 
+  // Web graceful exit (MYND-574 task 93). The Tauri close-intercept above is a
+  // no-op in a browser — its own catch says so — which meant every tab close
+  // silently dropped the newest edit, the workspace descriptor, the vault
+  // indices and the graph layout. On the one client where an unsynced edit is
+  // all that stands between the user and real loss.
+  //
+  // Additive rather than a rewrite of the effect above: that path has E2E
+  // coverage this task must not disturb, and on desktop this seam is a no-op, so
+  // the two cannot both fire.
+  //
+  // The `kind` split is load-bearing. `pagehide` is a real exit — flush
+  // everything. `hidden` is a tab switch that MAY become a discard, so content
+  // is flushed (integrity) and `vault.workspace` deliberately is not: writing it
+  // per visibility flip would turn its mtime into an editor-activity log, which
+  // is exactly what `protocol.md` §9.7.4's graceful-exit-only rule forecloses
+  // and what task 65 kept the web client to.
+  useEffect(() => {
+    return onExitIntent(async (kind) => {
+      setUnsavedGuard("flushing", true);
+      try {
+        // Same chain, same ordering, one call — `kind` carries the ONE
+        // difference (a hidden tab must not write `vault.workspace`, whose mtime
+        // is a lock/quit signal), so the divergence is a named parameter rather
+        // than two sequences that happen to differ by a line.
+        await runFlushChain(
+          {
+            flushAll,
+            persistWorkspace,
+            persistVaultIndices,
+            flushGraphLayout: flushGraphLayoutNow,
+          },
+          kind,
+        );
+      } finally {
+        setUnsavedGuard("flushing", false);
+      }
+    });
+  }, [flushAll, persistWorkspace, persistVaultIndices]);
+
+  // Task 88 — the second, much longer-lived holder of the same guard.
+  //
+  // A password change is reported as complete only once the server acknowledges
+  // the new `vault.meta`. Until then this browser expects the new password and
+  // every other device still expects the old one, and clearing this browser's
+  // copy loses the change: on web there is no recovery phrase, so the only other
+  // remedy is a native client with the old password — which the user has just
+  // been told is no longer their password.
+  //
+  // So closing the tab while it is pending is the one exit worth interrupting.
+  // The signal is `credentialPending`, which is recomputed from disk on every
+  // poll rather than remembered, so it is still armed after a reload.
+  //
+  // No-op on desktop: the seam is a no-op there, and desktop's own path does not
+  // need it.
+  useEffect(() => {
+    setUnsavedGuard("credential-push-pending", credentialPending);
+    return () => setUnsavedGuard("credential-push-pending", false);
+  }, [credentialPending]);
+
   // MYND-121 — flush every pane on idle-lock imminent. The backend idle
   // timer emits `vault-lock-imminent` before its grace window; flush any
   // unsaved edit so the autosave deltas persist before the keys zeroize.
@@ -1303,15 +1491,39 @@ function EditorChrome({
   // Lock button flush-then-lock — `decisions.md` 2026-05-07 canonical
   // flush-on-lock, now across all panes; persist the workspace before lock.
   const handleLockFlushed = useCallback(async () => {
-    await flushAll();
-    await persistWorkspace();
-    await persistVaultIndices();
-    await flushGraphLayoutNow();
+    // The chain is best-effort and CANNOT skip the lock (task 93). It used to be
+    // a bare `await` sequence ending in `lockVault()`, so a rejection from any
+    // writer skipped every step after it — including the lock. A transient write
+    // failure did not merely lose a cache: it cancelled the auto-lock, leaving
+    // the keys live in the Worker and the plaintext mounted, past the idle
+    // deadline, with nothing said.
+    await runFlushChain(
+      {
+        flushAll,
+        persistWorkspace,
+        persistVaultIndices,
+        flushGraphLayout: flushGraphLayoutNow,
+      },
+      "lock",
+    );
     await lockVault().catch(() => {
       /* lock is best-effort, parent callback still fires */
     });
     onLock?.();
   }, [flushAll, persistWorkspace, persistVaultIndices, onLock]);
+
+  // Idle auto-lock where the platform has no OS-level idle detection — the web
+  // client (phase3-web-client task 43). Desktop keeps `src-tauri/src/auto_lock.rs`
+  // and this is inert there, so the two never race to lock the same vault.
+  //
+  // It reuses the Lock button's own handler rather than calling `lockVault`
+  // directly: locking has to flush first, and a second lock path that skipped
+  // the flush would lose the last edits of exactly the session the user walked
+  // away from.
+  useIdleAutoLock({
+    timeoutSecs: barPrefs.auto_lock_seconds ?? 0,
+    onIdle: () => void handleLockFlushed(),
+  });
 
   // named-workspaces (MYND-308) — palette command handlers. The BottomBar
   // dropdown is the primary discoverable surface for switch + save-as; the
@@ -1458,7 +1670,7 @@ function EditorChrome({
                   and macOS traffic lights sit over this; the vault switcher
                   and Notes list start below it. Draggable (title-bar row). */}
               <div
-                data-tauri-drag-region
+                {...dragRegionProps()}
                 style={{
                   height: STRIP_HEIGHT,
                   flexShrink: 0,
@@ -1494,7 +1706,7 @@ function EditorChrome({
             }}
           >
             <div
-              data-tauri-drag-region
+              {...dragRegionProps()}
               style={{
                 height: STRIP_HEIGHT,
                 flexShrink: 0,
@@ -1589,6 +1801,7 @@ function EditorChrome({
         saveStatus={readout.status}
         onRetry={readout.retry}
         hideSaveStatus={ws.focusedLeaf.activeTab === null}
+        saveStatusUnsynced={focusedNoteUnsynced}
         stats={readout.stats}
         selectionStats={readout.selectionStats}
         viewMode={focusedTabViewMode}
@@ -1993,6 +2206,18 @@ function EditorChrome({
         onConfirm={() => {
           pdfPreflight?.resolve(true);
           setPdfPreflight(null);
+        }}
+      />
+      <ExportEgressNotice
+        open={egressPreflight !== null}
+        sentence={egressPreflight?.sentence ?? ""}
+        onCancel={() => {
+          egressPreflight?.resolve(false);
+          setEgressPreflight(null);
+        }}
+        onConfirm={() => {
+          egressPreflight?.resolve(true);
+          setEgressPreflight(null);
         }}
       />
       <Toast
@@ -2776,6 +3001,15 @@ function CommandPaletteHost({
 function SidebarBootstrap() {
   const ctx = useSelectedNote();
   const booted = useRef(false);
+  // MYND-574 task 64 — the deep link resolves HERE, and only here, because this
+  // is the one place that has the authoritative note list. A URL is untrusted
+  // input and a bookmark outlives the note it points at, so the id is checked
+  // against `note_list` before it is opened; an id that is not there is dropped
+  // and the user lands in an empty editor, never on an error. `routeReady`
+  // gates the URL binding below: nothing may rewrite the address bar until this
+  // settles, or a reload (which always lands locked on web — the keys are RAM)
+  // would throw away the note it was asked to restore.
+  const [routeReady, setRouteReady] = useState(false);
   useEffect(() => {
     if (booted.current) return; // StrictMode double-invoke guard
     booted.current = true;
@@ -2783,14 +3017,22 @@ function SidebarBootstrap() {
       try {
         const ids = await noteList();
         await ctx.refreshAll(ids);
+        const target = takeDeepLinkNoteId();
+        if (target !== null && ids.includes(target)) ctx.select(target);
       } catch (e) {
         if (import.meta.env.DEV) {
           // eslint-disable-next-line no-console
           console.warn("[Editor] sidebar boot refresh failed:", e);
         }
+      } finally {
+        // Also on the failure path: a boot that could not read the list must
+        // not leave the address bar frozen for the rest of the session.
+        setRouteReady(true);
       }
     })();
   }, [ctx]);
+
+  useNoteRoute({ active: routeReady, selectedId: ctx.selectedId, select: ctx.select });
 
   // Global Cmd+N / Ctrl+N → create new note (T25).
   useEffect(() => {
@@ -3459,6 +3701,9 @@ interface BottomBarProps {
    *  (the indicator would otherwise read "Saved" / a stale relative-
    *  time from the previous note and confuse the user). */
   hideSaveStatus?: boolean;
+  /** Whether the focused note's latest bytes are not yet on the server
+   *  (phase3-web-client task 23) — trails the save readout. */
+  saveStatusUnsynced?: boolean;
   /** Whole-note statistics of the active note (frontmatter + markdown syntax
    *  excluded). `null` hides the readout entirely — same rationale as
    *  `hideSaveStatus`: with no note selected the values would be meaningless. */
@@ -3521,6 +3766,7 @@ function BottomBar({
   saveStatus,
   onRetry,
   hideSaveStatus = false,
+  saveStatusUnsynced = false,
   stats = null,
   selectionStats = null,
   viewMode = null,
@@ -3566,7 +3812,11 @@ function BottomBar({
   const renderers: Record<string, () => ReactNode> = {
     "save-status": () =>
       hideSaveStatus ? null : (
-        <SaveStatusBadge status={saveStatus} onRetry={onRetry} />
+        <SaveStatusBadge
+          status={saveStatus}
+          onRetry={onRetry}
+          unsynced={saveStatusUnsynced}
+        />
       ),
     workspace: () =>
       onSwitchWorkspace !== undefined && activeWorkspaceId !== undefined ? (

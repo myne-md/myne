@@ -7,8 +7,7 @@
 // recorded audio is encrypted Rust-side; only the attachment metadata crosses
 // IPC back here (no raw PCM in the WebView).
 
-import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
+import { getHost } from "../host";
 import type { EditorView } from "@codemirror/view";
 import i18n from "@myne/editor/i18n";
 import { emitAttachmentEmbed } from "@myne/editor/host/notes/attachmentRef";
@@ -17,8 +16,10 @@ import { fileNameTimestamp } from "./insert";
 import { showAttachmentToast } from "./toast";
 import { mountRecordingBar, type RecordingBarHandle } from "./recordingBar";
 
-const LEVEL_EVENT = "voice-record:level";
-const CLIP_EVENT = "voice-record:clip";
+// The two backend→UI event names moved to the host with phase3-web-client task
+// 76, alongside the three `invoke` calls — `EditorHost.voice` now exposes
+// `onLevel` / `onClip` subscriptions instead of this file naming a transport it
+// cannot have on every client.
 
 /** The subset of the Rust `ImportedAttachment` the insert path needs. */
 interface ImportedAttachment {
@@ -71,8 +72,17 @@ export async function startVoiceRecording(view: EditorView): Promise<void> {
   if (recording) return;
   recording = true;
 
+  const voice = getHost().voice;
+  if (voice === undefined) {
+    // No capture backend on this host. `/record` is gated on the same absence
+    // upstream; this is the belt for a stale keybinding.
+    recording = false;
+    showAttachmentToast(startErrorMessage(undefined));
+    return;
+  }
+
   try {
-    await invoke("plugin:attachments|voice_record_start");
+    await voice.start();
   } catch (err) {
     recording = false;
     showAttachmentToast(startErrorMessage(err));
@@ -85,13 +95,11 @@ export async function startVoiceRecording(view: EditorView): Promise<void> {
   });
 
   try {
-    const unlistenLevel = await listen<number>(LEVEL_EVENT, (e) => bar.setLevel(e.payload));
+    const unlistenLevel = await voice.onLevel((level) => bar.setLevel(level));
     bar.onTeardown(unlistenLevel);
     // Continuation clips (long recordings past the per-clip cap) arrive here
     // mid-recording and insert their embed in order, live.
-    const unlistenClip = await listen<ImportedAttachment>(CLIP_EVENT, (e) =>
-      insertVoiceEmbed(view, e.payload),
-    );
+    const unlistenClip = await voice.onClip((clip) => insertVoiceEmbed(view, clip));
     bar.onTeardown(unlistenClip);
   } catch {
     // No event stream → the meter stays flat / no live continuation inserts;
@@ -104,10 +112,7 @@ async function finishRecording(view: EditorView, bar: RecordingBarHandle): Promi
   try {
     // `null` when all audio already went out as continuation clips (each
     // inserted live via CLIP_EVENT); otherwise the final sub-cap clip.
-    const imported = await invoke<ImportedAttachment | null>(
-      "plugin:attachments|voice_record_stop",
-      { filename: voiceNoteFilename(new Date()) },
-    );
+    const imported = await getHost().voice!.stop();
     if (imported !== null) insertVoiceEmbed(view, imported);
     view.focus();
   } catch (err) {
@@ -120,7 +125,7 @@ async function finishRecording(view: EditorView, bar: RecordingBarHandle): Promi
 
 async function cancelRecording(bar: RecordingBarHandle): Promise<void> {
   try {
-    await invoke("plugin:attachments|voice_record_cancel");
+    await getHost().voice?.cancel();
   } catch {
     // Best-effort — tear the bar down regardless.
   }

@@ -36,11 +36,11 @@
 // A8f success. No defensive cleanup, no `beforeunload` listener.
 
 import { useEffect, useReducer, useRef } from "react";
-import { appDataDir, join } from "@tauri-apps/api/path";
+import { appDataDir, join } from "../platform/path";
 import i18n from "../i18n";
 import { DeleteVaultConfirmForm } from "../components/DeleteVaultConfirmForm";
 import { FailClosedError } from "../components/FailClosedError";
-import { closeApp } from "../lib/app-window";
+import { failClosedExit, FAIL_CLOSED_EXIT_LABEL_KEY } from "../platform/app-exit";
 import { ioBanner } from "../lib/io-banner";
 import type { RecoverSubStep } from "../lib/stage";
 import { listVaults } from "../lib/vault-list";
@@ -259,7 +259,8 @@ export function VaultRecover({
     return (
       <FailClosedError
         reason={{ kind: state.failClosed }}
-        onCtaClick={() => void closeApp()}
+        onCtaClick={() => void failClosedExit()}
+        ctaLabelKey={FAIL_CLOSED_EXIT_LABEL_KEY}
       />
     );
   }

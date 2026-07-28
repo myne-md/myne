@@ -31,10 +31,41 @@
 //! Secret-handling: callers pass ALREADY-ENCODED (encrypted) ciphertext blobs;
 //! this module never sees plaintext and logs nothing (no paths, no ids).
 
-use std::io::Write;
 use std::path::{Path, PathBuf};
 
-use crate::atomic_write::{finalize_atomic, tmp_path};
+use crate::atomic_write::tmp_path;
+use crate::io_failure_kind::IoFailureKind;
+use crate::vault_io::{VaultIo, WriteOpts};
+
+/// Publish a staged blob: copy the temp's bytes to the destination, then drop
+/// the temp.
+///
+/// **Replaces `finalize_atomic`'s rename** (phase3-web-client task 86). Rename
+/// is the one filesystem operation this product cannot rely on — the Phase 0
+/// spike measured Safari implementing no `FileSystemFileHandle.move()` at all —
+/// and this was the last one in the note-write path.
+///
+/// The observable state machine is unchanged, which is what lets the
+/// `myne-test-vectors` §8.3 conformance fixture pass unmodified: before the
+/// call the destination holds the OLD bytes and the temp holds the new; after
+/// it, the destination holds the new bytes and the temp is gone. Only the
+/// mechanism between those two states differs.
+///
+/// The crash window shifts and the new shape is the safe one **because the
+/// marker already covers it**: a crash mid-publish leaves both the temp and a
+/// destination that is either old or new, and the marker says roll FORWARD — so
+/// recovery re-publishes from the temp, which is idempotent. A failed rename had
+/// the same recovery; what it did not have was a browser it worked on.
+///
+/// On the web store the destination is a `SingleLive` container, so the write
+/// itself lands in the slot that is not live and retires the old one — the
+/// per-blob crash property comes for free on top of the journal's.
+async fn publish_staged(io: &dyn VaultIo, tmp: &Path, dst: &Path) -> Result<(), IoFailureKind> {
+    let bytes = io.read(tmp).await?;
+    io.write(dst, &bytes, WriteOpts::default()).await?;
+    let _ = io.remove_file(tmp).await;
+    Ok(())
+}
 
 /// The empty roll-forward marker, written in the notes directory between the
 /// stage and commit phases. Content-free — its mere existence is the signal.
@@ -76,13 +107,22 @@ enum TxnFault {
 /// Write all blobs in one all-or-nothing transaction (§8.3). Stages every blob,
 /// then commits the renames; roll-forward-recoverable via the marker. Returns an
 /// error (vault untouched) if any stage fails.
-pub fn write_batch_transactional(notes_dir: &Path, blobs: &[TxnBlob]) -> std::io::Result<()> {
-    write_batch_inner(notes_dir, blobs, TxnFault::None)
+pub async fn write_batch_transactional(
+    io: &dyn VaultIo,
+    notes_dir: &Path,
+    blobs: &[TxnBlob],
+) -> Result<(), IoFailureKind> {
+    write_batch_inner(io, notes_dir, blobs, TxnFault::None).await
 }
 
 // `idx` in the commit loop is read only under the `#[cfg(test)]` crash hook.
 #[cfg_attr(not(test), allow(unused_variables))]
-fn write_batch_inner(notes_dir: &Path, blobs: &[TxnBlob], fault: TxnFault) -> std::io::Result<()> {
+async fn write_batch_inner(
+    io: &dyn VaultIo,
+    notes_dir: &Path,
+    blobs: &[TxnBlob],
+    fault: TxnFault,
+) -> Result<(), IoFailureKind> {
     if blobs.is_empty() {
         return Ok(());
     }
@@ -92,11 +132,11 @@ fn write_batch_inner(notes_dir: &Path, blobs: &[TxnBlob], fault: TxnFault) -> st
     let mut staged: Vec<(PathBuf, PathBuf)> = Vec::with_capacity(blobs.len()); // (tmp, dst)
     for (i, b) in blobs.iter().enumerate() {
         let tmp = tmp_path(&b.path);
-        let stage_result = stage_write(&tmp, &b.bytes, fault, i);
+        let stage_result = stage_write(io, &tmp, &b.bytes, fault, i).await;
         if let Err(e) = stage_result {
-            let _ = std::fs::remove_file(&tmp);
+            let _ = io.remove_file(&tmp).await;
             for (t, _) in &staged {
-                let _ = std::fs::remove_file(t);
+                let _ = io.remove_file(t).await;
             }
             return Err(e);
         }
@@ -106,72 +146,71 @@ fn write_batch_inner(notes_dir: &Path, blobs: &[TxnBlob], fault: TxnFault) -> st
     #[cfg(test)]
     if let TxnFault::StopAfterStage = fault {
         // Crash after staging, before the marker. Leaves `.tmp` + NO marker.
-        return Err(std::io::ErrorKind::Interrupted.into());
+        return Err(IoFailureKind::Other);
     }
 
     // Phase 2 — write the empty commit marker (durable).
     let marker = notes_dir.join(RENAME_JOURNAL);
-    write_marker(&marker)?;
+    write_marker(io, &marker).await?;
 
     #[cfg(test)]
     if let TxnFault::StopAfterMarker = fault {
-        // Crash after the marker, before any rename. Marker + all `.tmp` present.
-        return Err(std::io::ErrorKind::Interrupted.into());
+        // Crash after the marker, before any publish. Marker + all `.tmp` present.
+        return Err(IoFailureKind::Other);
     }
 
-    // Phase 3 — commit every rename atomically.
+    // Phase 3 — publish every staged blob.
     for (idx, (tmp, dst)) in staged.iter().enumerate() {
-        finalize_atomic(tmp, dst, /* replace = */ true)?;
+        publish_staged(io, tmp, dst).await?;
         #[cfg(test)]
         if let TxnFault::StopMidCommit = fault {
             if idx == 0 {
-                // One renamed, the rest still `.tmp`, marker present.
-                return Err(std::io::ErrorKind::Interrupted.into());
+                // One published, the rest still `.tmp`, marker present.
+                return Err(IoFailureKind::Other);
             }
         }
     }
 
     // Phase 4 — clear the marker (the transaction is fully committed).
-    let _ = std::fs::remove_file(&marker);
-    if let Some(parent) = marker.parent() {
-        let _ = std::fs::File::open(parent).and_then(|f| f.sync_all());
-    }
+    let _ = io.remove_file(&marker).await;
     Ok(())
 }
 
 /// Stage one blob: write `<uuid>.myn.tmp` + `sync_all` so it is durable before
 /// the commit phase. `fault`/`index` are read only under `#[cfg(test)]`.
 #[cfg_attr(not(test), allow(unused_variables))]
-fn stage_write(tmp: &Path, bytes: &[u8], fault: TxnFault, index: usize) -> std::io::Result<()> {
+async fn stage_write(
+    io: &dyn VaultIo,
+    tmp: &Path,
+    bytes: &[u8],
+    fault: TxnFault,
+    index: usize,
+) -> Result<(), IoFailureKind> {
     #[cfg(test)]
     if let TxnFault::FailStage(fail_at) = fault {
         if fail_at == index {
-            return Err(std::io::ErrorKind::Other.into());
+            return Err(IoFailureKind::Other);
         }
     }
-    let mut f = std::fs::OpenOptions::new()
-        .write(true)
-        .create(true)
-        .truncate(true)
-        .open(tmp)?;
-    f.write_all(bytes)?;
-    f.sync_all()
+    // A `<uuid>.myn.tmp` is `Mode::Plain` on the container store — it does not
+    // end in `.myn`, so it is not mistaken for a per-note blob and gets no slot
+    // suffix. That is what keeps `recover_pending_rename`'s `*.myn.tmp` scan
+    // finding exactly what it found before.
+    io.write(tmp, bytes, WriteOpts::default()).await
 }
 
-/// Write the empty marker durably (file fsync + parent-dir fsync) so its
-/// existence survives a power loss into the recovery pass.
-fn write_marker(marker: &Path) -> std::io::Result<()> {
-    let f = std::fs::OpenOptions::new()
-        .write(true)
-        .create(true)
-        .truncate(true)
-        .open(marker)?;
-    f.sync_all()?;
-    drop(f);
-    if let Some(parent) = marker.parent() {
-        std::fs::File::open(parent)?.sync_all()?;
-    }
-    Ok(())
+/// Write the empty marker so its existence survives into the recovery pass.
+///
+/// The fsync + parent-dir fsync it used to do explicitly are now the seam's
+/// native arm's job (`atomic_write`'s durability contract: temp → fsync →
+/// rename → parent sync). The wasm arm cannot make that promise at all, which
+/// is why the marker is a **presence** signal over a content-free file: the
+/// weakest thing a store can get wrong, and the only failure it has is "the
+/// marker is not there", which recovery already treats as roll-BACK — the
+/// conservative direction, since every live `.myn` is still the pre-transaction
+/// one at that point.
+async fn write_marker(io: &dyn VaultIo, marker: &Path) -> Result<(), IoFailureKind> {
+    io.write(marker, &[], WriteOpts::default()).await
 }
 
 /// Recover a pending rename transaction on vault-open (call BEFORE the index
@@ -179,44 +218,42 @@ fn write_marker(marker: &Path) -> std::io::Result<()> {
 /// the unlock path via
 /// `plugins::vault_unlock::commands::recover_pending_rename_on_unlock`
 /// (MYND-85 task 3c).
-pub fn recover_pending_rename(notes_dir: &Path) -> std::io::Result<()> {
+pub async fn recover_pending_rename(
+    io: &dyn VaultIo,
+    notes_dir: &Path,
+) -> Result<(), IoFailureKind> {
     let marker = notes_dir.join(RENAME_JOURNAL);
-    let roll_forward = marker.exists();
+    let roll_forward = io.exists(&marker).await.unwrap_or(false);
 
-    let entries = match std::fs::read_dir(notes_dir) {
+    let entries = match io.read_dir(notes_dir).await {
         Ok(e) => e,
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(()),
-        Err(e) => return Err(e),
+        Err(IoFailureKind::NotFound) => return Ok(()),
+        Err(kind) => return Err(kind),
     };
-    let mut tmp_files: Vec<PathBuf> = Vec::new();
-    for entry in entries {
-        let path = entry?.path();
-        if is_myn_tmp(&path) {
-            tmp_files.push(path);
-        }
-    }
+    // The seam yields NAMES — OPFS has no path API — so the parent is
+    // reassembled from the directory the caller already passed in. The
+    // `.myn.tmp` predicate is the same one, over the same strings.
+    let tmp_files: Vec<PathBuf> = entries
+        .into_iter()
+        .filter(|e| is_myn_tmp(&e.name))
+        .map(|e| notes_dir.join(e.name))
+        .collect();
 
     for tmp in &tmp_files {
         if roll_forward {
-            finalize_atomic(tmp, &myn_from_tmp(tmp), /* replace = */ true)?;
+            publish_staged(io, tmp, &myn_from_tmp(tmp)).await?;
         } else {
-            let _ = std::fs::remove_file(tmp);
+            let _ = io.remove_file(tmp).await;
         }
     }
     if roll_forward {
-        let _ = std::fs::remove_file(&marker);
-        if let Some(parent) = marker.parent() {
-            let _ = std::fs::File::open(parent).and_then(|f| f.sync_all());
-        }
+        let _ = io.remove_file(&marker).await;
     }
     Ok(())
 }
 
-fn is_myn_tmp(path: &Path) -> bool {
-    path.file_name()
-        .and_then(|n| n.to_str())
-        .map(|n| n.ends_with(".myn.tmp"))
-        .unwrap_or(false)
+fn is_myn_tmp(name: &str) -> bool {
+    name.ends_with(".myn.tmp")
 }
 
 /// `<uuid>.myn.tmp` → `<uuid>.myn` (strip exactly one trailing `.tmp`).
@@ -230,6 +267,36 @@ fn myn_from_tmp(tmp: &Path) -> PathBuf {
 mod tests {
     use super::*;
     use crate::test_support::ScopedTempDir;
+
+    // ── the seam, filled in ─────────────────────────────────────────────────
+    //
+    // Task 86 gave the transaction `io: &dyn VaultIo` and made it async (the
+    // seam is, because OPFS handle acquisition is). These shims shadow the two
+    // entry points with their old synchronous signatures so every scenario below
+    // reads unchanged — and each still drives the REAL transaction against a
+    // real temp directory, which is what these tests are for: they pin the
+    // observable state machine the `myne-test-vectors` §8.3 fixture also pins.
+    const IO: crate::vault_io::StdVaultIo = crate::vault_io::StdVaultIo;
+
+    fn rt<F: std::future::Future>(f: F) -> F::Output {
+        crate::test_support::block_on(f)
+    }
+
+    fn write_batch_transactional(notes_dir: &Path, blobs: &[TxnBlob]) -> Result<(), IoFailureKind> {
+        rt(super::write_batch_transactional(&IO, notes_dir, blobs))
+    }
+
+    fn write_batch_inner(
+        notes_dir: &Path,
+        blobs: &[TxnBlob],
+        fault: TxnFault,
+    ) -> Result<(), IoFailureKind> {
+        rt(super::write_batch_inner(&IO, notes_dir, blobs, fault))
+    }
+
+    fn recover_pending_rename(notes_dir: &Path) -> Result<(), IoFailureKind> {
+        rt(super::recover_pending_rename(&IO, notes_dir))
+    }
 
     fn blob(dir: &Path, uuid: &str, body: &[u8]) -> TxnBlob {
         TxnBlob {
@@ -246,7 +313,7 @@ mod tests {
         std::fs::read_dir(dir)
             .unwrap()
             .filter_map(|e| e.ok())
-            .filter(|e| is_myn_tmp(&e.path()))
+            .filter(|e| is_myn_tmp(&e.file_name().to_string_lossy()))
             .count()
     }
 
@@ -280,7 +347,7 @@ mod tests {
         let blobs = vec![blob(dir, "a", b"NEW-A"), blob(dir, "b", b"NEW-B")];
         // Fail staging the 2nd blob.
         let err = write_batch_inner(dir, &blobs, TxnFault::FailStage(1)).unwrap_err();
-        assert_eq!(err.kind(), std::io::ErrorKind::Other);
+        assert_eq!(err, IoFailureKind::Other);
         assert_eq!(
             read(&dir.join("a.myn")).as_deref(),
             Some(&b"OLD-A"[..]),

@@ -9,7 +9,7 @@
 // Callers without that consent pass `overwrite=false` and surface the
 // distinct `TargetAlreadyExists` rejection instead of clobbering.
 
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../platform/core";
 
 /**
  * Decrypt a note and write its full plaintext verbatim to `targetPath`,

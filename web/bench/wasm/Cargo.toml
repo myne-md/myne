@@ -1,0 +1,27 @@
+# The web benchmark's wasm half (phase3-web-client task 63).
+#
+# A SEPARATE crate from `web/wasm`, deliberately. The production entry surface
+# must not grow a benchmark export: it would ship in the served bundle, where
+# `scripts/check-web-no-test-hooks.mjs` is right to refuse anything of that
+# shape, and where a CPU-burning export is a gift to any script that gets
+# execution on the page.
+#
+# A workspace member so the tree keeps its single `Cargo.lock` (the TB9 audit
+# anchor). It builds only when the benchmark is run — nothing in the app or the
+# CI lanes depends on it.
+[package]
+name = "myne-web-bench"
+version = "0.1.0"
+edition = "2021"
+license = "AGPL-3.0"
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+protocol = { path = "../../../protocol" }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen = "0.2"
+js-sys = "0.3"

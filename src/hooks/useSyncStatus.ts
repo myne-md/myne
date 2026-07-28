@@ -10,8 +10,8 @@
 // responsiveness, then reflects whatever the command returns.
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
+import { invoke } from "../platform/core";
+import { subscribeToEvents } from "../lib/subscribe";
 
 /** The runtime sync status (mirrors the Rust `SyncRuntimeStatus`). */
 export type SyncStatus =
@@ -65,17 +65,14 @@ export function useSyncStatus(): SyncStatusHook {
     // nudge (MYND-461: the loop/sync_now emit `sync://status-changed` when they
     // publish Syncing/Error/clear), so the dot updates without waiting a whole
     // poll interval.
-    const unlisteners: Array<() => void> = [];
-    for (const ev of ["sync://enrollment-changed", "sync://status-changed"]) {
-      void listen(ev, tick).then((fn) => {
-        if (mounted.current) unlisteners.push(fn);
-        else fn();
-      });
-    }
+    const unsubscribe = subscribeToEvents(
+      ["sync://enrollment-changed", "sync://status-changed"],
+      tick,
+    );
     return () => {
       mounted.current = false;
       if (timer) clearInterval(timer);
-      for (const fn of unlisteners) fn();
+      unsubscribe();
     };
   }, []);
 

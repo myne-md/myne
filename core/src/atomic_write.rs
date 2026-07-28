@@ -113,9 +113,42 @@ pub fn atomic_write(path: &Path, bytes: &[u8], replace: bool) -> std::io::Result
 /// non-Unix the mode is a no-op — the OS keychain is the production target and
 /// the fallback file rides the user-profile ACL (documented as weaker).
 pub fn atomic_write_private(path: &Path, bytes: &[u8], replace: bool) -> std::io::Result<()> {
-    atomic_write_inner(path, bytes, replace, Fault::None, Some(0o600))
+    atomic_write_inner(path, bytes, replace, Fault::None, Some(0o600))?;
+    normalize_private_mode(path)
 }
 
+/// Final `0600` normalization for [`atomic_write_private`] (Unix only).
+///
+/// Redundant against a too-PERMISSIVE result — the temp is created `0600` and
+/// umask can only clear bits, so what lands is already ⊆ `0600`. What this
+/// guards is the OPPOSITE case: an exotic umask leaving, say, `0400`, which
+/// would make the next write to the same path fail. Cheap, and it makes
+/// `_private` mean exactly `0600` rather than "at most `0600`".
+///
+/// Moved here from `sync::token_store` with phase3-web-client task 86. It is a
+/// permission mechanic of the native write, so it belongs beside the write
+/// rather than at one caller — and putting it here let `token_store` leave the
+/// IO-seam ratchet, which a `#[cfg(unix)]` `std::fs` call in that file would
+/// have blocked even though wasm32 is not unix and could never reach it.
+#[cfg(unix)]
+fn normalize_private_mode(path: &Path) -> std::io::Result<()> {
+    use std::os::unix::fs::PermissionsExt;
+    std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600))
+}
+
+/// Non-Unix: nothing to normalize. Windows relies on the user-profile ACL, and
+/// OPFS (which never reaches this module at all) is origin-scoped.
+#[cfg(not(unix))]
+fn normalize_private_mode(_path: &Path) -> std::io::Result<()> {
+    Ok(())
+}
+
+// wasm32's `std::fs::File` is a stub that implements no `Drop`, so clippy calls
+// these `drop`s pointless there. They are not: on every target that has a real
+// filesystem the handle must be released before the rename (a hard Windows
+// requirement) and before the failure-path `remove_file`. Allowed on the wasm
+// arm only, so the lint keeps working everywhere it means something.
+#[cfg_attr(target_arch = "wasm32", allow(clippy::drop_non_drop))]
 /// Export-destination-safe variant of [`atomic_write`] (115-F1): same
 /// `replace` semantics and durability story, but the temp sibling gets
 /// a randomized `<path>.<pid>-<counter>.tmp` name opened with
@@ -339,6 +372,27 @@ pub fn finalize_atomic(src: &Path, dst: &Path, _replace: bool) -> std::io::Resul
     std::fs::File::open(parent)?.sync_all()
 }
 
+/// wasm32 arm: **there is no rename**, and that is not a gap to fill later.
+///
+/// OPFS offers `flush()` and no crash-atomicity guarantee, and the Phase 0
+/// spike measured that **Safari does not implement `move()` at all**
+/// (`TypeError`, reproduced at 400 and 3,000 files). So a rename-based
+/// finalize has no correct implementation on a browser this client ships to.
+/// The replacement is the double-buffered singleton write
+/// (`decisions.md` 2026-07-26; phase3-web-client tasks 18 and 86), which needs
+/// no atomic rename — only "never write both copies at once".
+///
+/// Refusing loudly rather than silently doing a non-atomic copy: a caller that
+/// reaches here on wasm has bypassed the double-buffer, and a torn write to
+/// `vault.meta` is the one failure this whole construction exists to prevent.
+#[cfg(all(target_arch = "wasm32", not(unix), not(windows)))]
+pub fn finalize_atomic(_src: &Path, _dst: &Path, _replace: bool) -> std::io::Result<()> {
+    Err(std::io::Error::new(
+        std::io::ErrorKind::Unsupported,
+        "atomic rename is unavailable in a browser; use the double-buffered write path",
+    ))
+}
+
 #[cfg(windows)]
 pub fn finalize_atomic(src: &Path, dst: &Path, replace: bool) -> std::io::Result<()> {
     use std::os::windows::ffi::OsStrExt;
@@ -375,6 +429,12 @@ pub fn finalize_atomic(src: &Path, dst: &Path, replace: bool) -> std::io::Result
     Ok(())
 }
 
+// wasm32's `std::fs::File` is a stub that implements no `Drop`, so clippy calls
+// these `drop`s pointless there. They are not: on every target that has a real
+// filesystem the handle must be released before the rename (a hard Windows
+// requirement) and before the failure-path `remove_file`. Allowed on the wasm
+// arm only, so the lint keeps working everywhere it means something.
+#[cfg_attr(target_arch = "wasm32", allow(clippy::drop_non_drop))]
 pub fn tmp_path(path: &Path) -> std::path::PathBuf {
     let mut p = path.to_path_buf();
     let name = p.file_name().map(|n| n.to_os_string()).unwrap_or_default();

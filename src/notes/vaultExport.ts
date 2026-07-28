@@ -17,7 +17,7 @@
 // Progress arrives as counts-only `export://progress` events (see
 // `VAULT_EXPORT_PROGRESS_EVENT` in `src/types/vault-export-error.ts`).
 
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../platform/core";
 import type { VaultExportSummary } from "../types/vault-export-error";
 
 /**

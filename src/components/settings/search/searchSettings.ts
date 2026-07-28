@@ -5,7 +5,7 @@
 // consistent with the rest of the Settings shell.
 
 import {
-  SETTINGS_SEARCH_INDEX,
+  visibleSettingsIndex,
   type SettingsIndexEntry,
 } from "./settingsSearchIndex";
 import { matchHaystacks } from "./matchSettings";
@@ -24,7 +24,7 @@ export function panelLabelKey(panelId: SettingsIndexEntry["panelId"]): string {
  * of that panel's settings. An empty query returns every entry (index order).
  */
 export function searchSettings(query: string, t: Translate): SettingsIndexEntry[] {
-  const candidates = SETTINGS_SEARCH_INDEX.map((entry) => ({
+  const candidates = visibleSettingsIndex().map((entry) => ({
     item: entry,
     haystacks: [
       t(entry.titleKey),

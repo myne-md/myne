@@ -35,6 +35,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::sync_get_endpoint,
             commands::sync_set_endpoint,
             commands::sync_status,
+            commands::sync_unsynced_edits,
+            commands::sync_materialisation_progress,
             commands::sync_now,
             commands::sync_list_devices,
             commands::sync_account_status,

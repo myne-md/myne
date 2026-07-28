@@ -3,8 +3,8 @@
 // Implements design session 2026-04-28-vault-creation-frontend.md Q9:
 //   - No eyebrow (endpoint, not a numbered step).
 //   - Success indicator: circle-check icon, var(--success).
-//   - "Show vault folder" → @tauri-apps/plugin-opener opens OS file
-//     manager at app_data_dir/vault/ (built via @tauri-apps/api/path
+//   - "Show vault folder" → the platform seam's opener module opens the OS
+//     file manager at app_data_dir/vault/ (built via the seam's path module
 //     `appDataDir()` + `join("vault")`).
 //   - "Done" → calls the `onDone` callback prop. The orchestrator
 //     (<CreateVault>) wires it through to App.tsx, which transitions
@@ -22,9 +22,9 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "../../components/primitives/Button";
 import { Icon } from "../../components/primitives/Icon";
-import { appDataDir, join } from "@tauri-apps/api/path";
-import { openPath } from "@tauri-apps/plugin-opener";
-import { save as saveFileDialog } from "@tauri-apps/plugin-dialog";
+import { appDataDir, join } from "../../platform/path";
+import { openPath } from "../../platform/opener";
+import { save as saveFileDialog } from "../../platform/dialog";
 import { logErrorKind } from "../../lib/vault-creation-logging";
 import { backupDefaultFilename, exportBackup } from "../../lib/vault-backup";
 import { StepHeading, StepLayout } from "./step-shell";

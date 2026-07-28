@@ -7,7 +7,33 @@
 
 import { useEffect, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../../platform/core";
+
+/**
+ * Mirrors `myne_core::plugins::sync::config::PinSource` (`snake_case` on the
+ * wire), plus `null` for "there is no TLS here / nothing pinned".
+ *
+ * `platform_trust_store` is the browser's answer and is deliberately NOT `null`:
+ * a page cannot see a leaf certificate, so it has no fingerprint to show, but
+ * the connection IS verified — by the browser's own trust store. Collapsing the
+ * two is what made this screen tell a browser user they had connected to a
+ * local server.
+ */
+type PinSource = "static" | "tofu" | "platform_trust_store" | null;
+
+/**
+ * The i18n key each source's explanatory line uses.
+ *
+ * Exported for `tests/sync/pin-source-copy.test.ts`: these are DYNAMIC keys
+ * (`t(PIN_SOURCE_COPY[src])`), so `scripts/check-i18n.mjs` — which only sees
+ * static `t("…")` literals — cannot tell whether they resolve. That test is
+ * the guard instead.
+ */
+export const PIN_SOURCE_COPY: Record<NonNullable<PinSource>, string> = {
+  static: "sync.endpoint.pinStatic",
+  tofu: "sync.endpoint.pinTofu",
+  platform_trust_store: "sync.endpoint.pinPlatformTrust",
+};
 
 const ROW: CSSProperties = {
   display: "flex",
@@ -61,13 +87,20 @@ export function EndpointConfig() {
   // Where the pin came from (SYNC-43): `static` (pre-vetted hosted cert) vs
   // `tofu` (self-host first-connect pin — the one the user eye-compares). Kept
   // distinct so a hosted endpoint is never shown as a bare TOFU pin.
-  const [pinSource, setPinSource] = useState<"static" | "tofu" | null>(null);
+  //
+  // `platform_trust_store` is the third answer (phase3-web-client task 84): this
+  // client cannot pin and the browser's certificate store did the verifying. It
+  // is NOT the same as `null`, which means "there is no TLS here" — see the
+  // message selection below, which used to read a missing fingerprint as
+  // "connected to a local server" and would have said that about a real
+  // `https://` server in a browser.
+  const [pinSource, setPinSource] = useState<PinSource>(null);
 
   useEffect(() => {
     void invoke<{
       endpoint_url: string | null;
       cert_pin_hex: string | null;
-      pin_source: "static" | "tofu" | null;
+      pin_source: PinSource;
     }>("plugin:sync|sync_get_endpoint")
       .then((c) => {
         if (c.endpoint_url) setUrl(c.endpoint_url);
@@ -88,18 +121,26 @@ export function EndpointConfig() {
     setPinSource(null);
     void invoke<{
       fingerprint: string | null;
-      pin_source: "static" | "tofu" | null;
+      pin_source: PinSource;
     }>("plugin:sync|sync_set_endpoint", {
       endpointUrl: trimmed,
     })
       .then((r) => {
         setPinSource(r.pin_source);
-        if (r.fingerprint) {
-          setFingerprint(r.fingerprint);
-          setMsg(t("sync.endpoint.connectedTls"));
-        } else {
-          setMsg(t("sync.endpoint.connectedLocal"));
-        }
+        if (r.fingerprint) setFingerprint(r.fingerprint);
+        // Branch on the PIN SOURCE, not on whether a fingerprint came back.
+        // A browser reaches a real `https://` server and gets no fingerprint —
+        // it cannot see the leaf cert — so the old "no fingerprint means local"
+        // reading told the user they had connected to a local server.
+        setMsg(
+          t(
+            r.pin_source === "platform_trust_store"
+              ? "sync.endpoint.connectedPlatformTrust"
+              : r.fingerprint
+                ? "sync.endpoint.connectedTls"
+                : "sync.endpoint.connectedLocal",
+          ),
+        );
       })
       .catch(() => setMsg(t("sync.endpoint.unreachable")))
       .finally(() => setBusy(false));
@@ -136,22 +177,26 @@ export function EndpointConfig() {
           {msg}
         </p>
       )}
-      {fingerprint && (
+      {/* The pin note renders whenever a SOURCE is known — it used to be
+          nested inside the fingerprint block, which meant the browser's
+          "verified by your certificate store" line could never appear, because
+          that case has no fingerprint to show. */}
+      {(fingerprint || pinSource) && (
         <p style={HELP}>
-          {t("sync.endpoint.fingerprintLabel")}
-          <br />
-          <span style={FP} data-testid="sync.cert-fingerprint">
-            {fingerprint}
-          </span>
+          {fingerprint && (
+            <>
+              {t("sync.endpoint.fingerprintLabel")}
+              <br />
+              <span style={FP} data-testid="sync.cert-fingerprint">
+                {fingerprint}
+              </span>
+            </>
+          )}
           {pinSource && (
             <>
-              <br />
+              {fingerprint && <br />}
               <span data-testid="sync.pin-source" data-pin-source={pinSource}>
-                {t(
-                  pinSource === "static"
-                    ? "sync.endpoint.pinStatic"
-                    : "sync.endpoint.pinTofu",
-                )}
+                {t(PIN_SOURCE_COPY[pinSource])}
               </span>
             </>
           )}

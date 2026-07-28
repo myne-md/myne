@@ -28,26 +28,53 @@ pub const DEFAULT_AUTO_LOCK_SECS: u32 = 300;
 
 pub mod atomic_write;
 pub mod attachment_nonce;
+/// The double-buffered container the web client stores singletons in
+/// (phase3-web-client task 18) — framing, slot selection, and the write/open
+/// algorithm over the [`vault_io`] seam, with the fault-injection points task 19
+/// drives. Native builds never reach it: `atomic_write` is their durability
+/// contract, and this is what replaces it where no atomic rename exists.
+pub mod double_buffer;
+/// Named crash states of a double-buffered singleton, as bytes for the web E2E
+/// lane's OPFS seeder. Test-support only: the fixtures exist to be written into
+/// a browser before an app boots, never by production code.
+#[cfg(any(test, feature = "test-support"))]
+pub mod double_buffer_fixtures;
 pub mod export_naming;
+// The process-host seam (phase3-web-client task 79) — what a command core needs
+// from its host that is not already an ordinary Rust value. Sibling of `hooks`,
+// which is the same idea one axis over (lifecycle side effects).
 pub mod hooks;
+pub mod host;
+// The async-execution seam (phase3-web-client task 80). `spawn_blocking`
+// COMPILES for wasm32 and panics at runtime — the same shape as the clock in
+// `host`. Both live here so neither can be reached by accident.
 pub mod io_failure_kind;
 pub mod note_nonce;
 pub mod note_txn;
 pub mod paths;
 pub mod plugins;
 pub mod protocol_error_kind;
+pub mod task;
 // The full-text search engine (MYS1) + its encrypted persistence/reconcile core.
 // Top-level (not under `plugins/`) mirroring the desktop `mod search;` it
 // replaces. The desktop crate re-exports it via `pub use myne_core::search;`;
 // mobile does not wire it (the search-index feed hangs off the desktop-only
 // `search_upsert`/`hydrate` hooks, absent in mobile's `NoopHooks`).
 pub mod search;
+/// Opening a singleton vault file with crash recovery (phase3-web-client task
+/// 18) — the one place that implements "newest copy that verifies wins", so the
+/// ~10 singleton readers do not each carry a fallback loop.
+pub mod singleton;
 pub mod snapshot_policy;
 pub mod snapshot_store;
 #[cfg(any(test, feature = "test-support"))]
 pub mod test_support;
 pub mod text;
 pub mod vault_id;
+/// The filesystem seam (phase3-web-client task 17) — the third and last of the
+/// three that make this crate host-independent, alongside [`host`] (paths, events,
+/// clock) and [`task`] (blocking execution, timers).
+pub mod vault_io;
 pub mod vault_meta_hash;
 pub mod vault_registry;
 pub mod vault_sweep;

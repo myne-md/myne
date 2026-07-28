@@ -15,7 +15,7 @@
 // device + a primitive review (see `core/.../quick_unlock/apple.rs`).
 // The UI must not present it as a trusted gate until that verification passes.
 
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../platform/core";
 
 /**
  * The credential kinds a quick-unlock blob can be sealed under — the TS mirror

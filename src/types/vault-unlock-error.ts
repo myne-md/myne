@@ -135,7 +135,34 @@ export type VaultUnlockError =
    * (panic in the blocking task, runtime shutdown). User-facing
    * CTA is "try again" — recoverable banner, not a credential error.
    */
-  | { kind: "JoinFailure" };
+  | { kind: "JoinFailure" }
+  /**
+   * The vault's declared Argon2id memory cost is more than **this client
+   * build** can service, so the unlock was refused before any derivation
+   * was attempted (phase3-web-client task 31).
+   *
+   * **Web-only in practice.** `HostCtx::max_kdf_memory_kib` is `None` on
+   * desktop and mobile — their ceiling is the machine's, which the
+   * allocator reports honestly — so this variant is unreachable there. The
+   * web client declares 1 GiB, because on `wasm32` an over-large Argon2id
+   * block is not a catchable allocation failure but an abort: the Worker
+   * dies and the user gets no cause at all.
+   *
+   * **Not a protocol judgement and not a corrupt vault.** The parameters
+   * are legal — `validate_kdf_params` accepts up to 4 GiB — and the vault
+   * opens normally on desktop. That is why this is its own variant rather
+   * than `InvalidVaultMeta`, whose CTA ("restore from a backup") would be
+   * actively wrong advice here: nothing is damaged.
+   *
+   * Both figures are MiB and both are public — `required_mib` is read from
+   * the unencrypted `vault.meta` KDF block (`protocol.md` §4.2 makes it
+   * deliberately inspectable), `available_mib` is a property of the client
+   * build — so the banner can name real numbers.
+   */
+  | {
+      kind: "KdfMemoryExceedsHostCapability";
+      detail: { required_mib: number; available_mib: number };
+    };
 
 /**
  * Type-narrowing helper. Use to access `e.detail.io_error_kind`

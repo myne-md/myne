@@ -58,6 +58,7 @@ pub use myne_core::plugins::attachments::{
 };
 
 // Desktop-only modules.
+pub mod blocking_reads;
 pub mod extract;
 pub mod import_desktop;
 pub mod ocr_queue;

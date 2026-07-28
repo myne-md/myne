@@ -8,7 +8,7 @@
 
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import { Trans, useTranslation } from "react-i18next";
-import { listen } from "@tauri-apps/api/event";
+import { listen } from "../../platform/event";
 import { SyncStatusIndicator } from "../sync/SyncStatusIndicator";
 import { EndpointConfig } from "../sync/EndpointConfig";
 import { EnrollDeviceForm } from "../sync/EnrollDeviceForm";

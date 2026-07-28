@@ -142,6 +142,45 @@ pub(crate) fn read_response_head<R: BufRead>(
 ) -> Result<ResponseHead, HttpReadError> {
     let mut head_budget = MAX_HEAD_BYTES;
 
+    // Peek before reading, and the reason is a real bug rather than caution.
+    //
+    // A stale keep-alive connection does not always announce itself as a clean
+    // EOF. When the peer has already closed and our request lands on the dead
+    // socket, the kernel answers with **RST**, and the first read then fails
+    // with `ConnectionReset` rather than returning zero bytes. That was mapped to
+    // `Failed` — "bytes started flowing, not retry-safe" — so
+    // `keepalive_roundtrip` returned `Network` instead of retrying on a fresh
+    // connection, and a sync cycle failed for a condition the retry path exists
+    // to absorb. It reproduced as an intermittent unit-test failure under load
+    // (~1 run in 3 of the full suite) before it was understood as production
+    // behaviour.
+    //
+    // `fill_buf` is the right instrument because it **consumes nothing**: if it
+    // reports a teardown, no response byte has been delivered to anyone, which
+    // is precisely the property `EofBeforeResponse` asserts and precisely what
+    // makes one retry safe.
+    //
+    // Narrow on purpose — only peer-teardown kinds. A read TIMEOUT is NOT
+    // included: the server may have received and processed the request and
+    // simply be slow, and retrying a non-idempotent push on that basis would
+    // risk applying it twice.
+    match reader.fill_buf() {
+        Ok([]) => return Err(HttpReadError::EofBeforeResponse),
+        Ok(_) => {}
+        Err(e)
+            if matches!(
+                e.kind(),
+                std::io::ErrorKind::ConnectionReset
+                    | std::io::ErrorKind::ConnectionAborted
+                    | std::io::ErrorKind::BrokenPipe
+                    | std::io::ErrorKind::NotConnected
+            ) =>
+        {
+            return Err(HttpReadError::EofBeforeResponse)
+        }
+        Err(_) => return Err(HttpReadError::Failed),
+    }
+
     // Status line. EOF *here* — before any byte — is the stale-connection case.
     let status_line = match read_line_limited(reader, &mut head_budget)? {
         Some(l) => l,
@@ -512,6 +551,72 @@ mod tests {
         let mut partial = std::io::Cursor::new(&b"HTTP/1.1 200 OK\r\nContent-"[..]);
         assert_eq!(
             read_http_response(&mut partial, false).unwrap_err(),
+            HttpReadError::Failed
+        );
+    }
+
+    /// A reader whose first `fill_buf` reports `kind`, then behaves as EOF.
+    /// Models a socket the peer reset: the read fails without ever handing a
+    /// byte to the caller.
+    struct ResettingReader {
+        kind: std::io::ErrorKind,
+        fired: bool,
+    }
+    impl std::io::Read for ResettingReader {
+        fn read(&mut self, _buf: &mut [u8]) -> std::io::Result<usize> {
+            Ok(0)
+        }
+    }
+    impl BufRead for ResettingReader {
+        fn fill_buf(&mut self) -> std::io::Result<&[u8]> {
+            if !self.fired {
+                self.fired = true;
+                return Err(std::io::Error::new(self.kind, "peer went away"));
+            }
+            Ok(&[])
+        }
+        fn consume(&mut self, _amt: usize) {}
+    }
+
+    /// A stale keep-alive that RESETS is the same situation as one that closes
+    /// cleanly, and must be retryable for the same reason.
+    ///
+    /// This was a real bug, and it surfaced as an intermittent unit-test failure
+    /// (~1 run in 3 of the full suite under parallel load) before it was
+    /// understood as production behaviour: a request landing on a socket the peer
+    /// had already closed gets RST, the first read failed with `ConnectionReset`,
+    /// that was classified `Failed` — "bytes started flowing, not retry-safe" —
+    /// and `keepalive_roundtrip` returned `Network` instead of retrying on a
+    /// fresh connection. A sync cycle failed for exactly the condition the retry
+    /// path exists to absorb.
+    #[test]
+    fn a_peer_teardown_before_any_byte_is_retry_safe() {
+        for kind in [
+            std::io::ErrorKind::ConnectionReset,
+            std::io::ErrorKind::ConnectionAborted,
+            std::io::ErrorKind::BrokenPipe,
+            std::io::ErrorKind::NotConnected,
+        ] {
+            let mut r = ResettingReader { kind, fired: false };
+            assert_eq!(
+                read_http_response(&mut r, false).unwrap_err(),
+                HttpReadError::EofBeforeResponse,
+                "{kind:?} before any response byte must be retry-safe"
+            );
+        }
+    }
+
+    /// The narrowness is the point. A read TIMEOUT is NOT a teardown: the server
+    /// may have received and processed the request and simply be slow, so
+    /// retrying a non-idempotent push on that basis could apply it twice.
+    #[test]
+    fn a_timeout_is_not_treated_as_a_stale_connection() {
+        let mut r = ResettingReader {
+            kind: std::io::ErrorKind::WouldBlock,
+            fired: false,
+        };
+        assert_eq!(
+            read_http_response(&mut r, false).unwrap_err(),
             HttpReadError::Failed
         );
     }

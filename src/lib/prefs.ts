@@ -9,7 +9,7 @@
 //   Disk-then-native ordering is load-bearing for UI / disk
 //   consistency per MYND-160 grill Q5.2.
 
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../platform/core";
 import { bumpPrefsNonce } from "../notes/prefsNonce";
 
 /**

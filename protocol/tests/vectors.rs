@@ -5,15 +5,327 @@
 // Each runner reads a category's `cases.json`, drives the matching public
 // API, and asserts byte-equality. When the companion repo is not checked
 // out the runners skip with an explanatory message rather than fail.
+//
+// # Two execution targets, one set of runners (phase3-web-client task 15)
+//
+// The same 34 runners execute natively and **inside a browser**. Cross-
+// implementation agreement is a property of compiled code on its execution
+// target, and the web client's target is a browser's wasm engine — so a suite
+// that only ever ran on aarch64/x86_64 was evidence about a different machine
+// than the one those users run.
+//
+//   cargo test -p protocol --test vectors                 # native
+//   scripts/browser-vectors.sh                            # headless Chrome
+//
+// Only two things differ between them, and both live here rather than sprinkled
+// through the runners: where `cases.json` comes from ([`cases_json`]) and which
+// attribute registers a test (the `cfg_attr` pair on each `fn`). Everything that
+// asserts anything is shared source, which is the point — a browser lane running
+// a *copy* of these assertions would drift from them silently.
 
+#[cfg(not(target_arch = "wasm32"))]
 use std::fs;
+#[cfg(not(target_arch = "wasm32"))]
 use std::path::PathBuf;
 
+#[cfg(target_arch = "wasm32")]
+use wasm_bindgen_test::{wasm_bindgen_test, wasm_bindgen_test_configure};
+
+// **In the browser, not in node.** Without this, `wasm-bindgen-test` runs the
+// module under node, which is a different wasm engine than any user has.
+#[cfg(target_arch = "wasm32")]
+wasm_bindgen_test_configure!(run_in_browser);
+
+// `protocol` selects getrandom's `custom` backend on wasm32 and deliberately
+// leaves the hook unregistered (see `protocol/Cargo.toml`), so a wasm test
+// binary has to supply one: a test binary is a root artifact, and an
+// unregistered hook is a link error rather than a fallback.
+//
+// It refuses. That is not a shortcut — **a vector run is deterministic by
+// definition**: every nonce, salt and key comes from the fixture. A runner that
+// reaches for entropy is testing something other than the vector, and the
+// loudest available answer is the right one. Natively that property holds
+// implicitly; here it is enforced.
+#[cfg(target_arch = "wasm32")]
+fn vectors_need_no_entropy(_dest: &mut [u8]) -> Result<(), getrandom::Error> {
+    Err(getrandom::Error::UNSUPPORTED)
+}
+#[cfg(target_arch = "wasm32")]
+getrandom::register_custom_getrandom!(vectors_need_no_entropy);
+
+#[cfg(not(target_arch = "wasm32"))]
 fn companion_vectors_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("..")
         .join("myne-test-vectors")
         .join("vectors")
+}
+
+/// The raw `cases.json` for one category's `v0.1` fixtures, or `None` when this
+/// build has none — in which case the caller returns without asserting, exactly
+/// as the per-runner `path.exists()` check used to.
+///
+/// The two arms differ in *when* the bytes are read, and that difference is
+/// forced rather than chosen:
+///
+/// * **native** — read from `../myne-test-vectors/vectors/<category>/v0.1/cases.json`
+///   at run time. A missing companion prints `[skip]` and returns `None`, which
+///   is the long-standing contract (`protocol/CLAUDE.md`): the companion is
+///   optional for a contributor and required for the gate.
+/// * **wasm32** — a browser has no filesystem to read at run time, so the
+///   fixtures are baked in at COMPILE time behind the `browser-vectors` feature.
+///   Without that feature the browser build still compiles and every runner
+///   skips.
+///
+/// A category the embedded table does not carry **panics** instead of skipping.
+/// Natively a missing file means "no companion checked out"; in the browser lane
+/// it can only mean the table fell behind the runners, and a lane that silently
+/// skips the family somebody just added is worse than no lane at all.
+fn cases_json(category: &str) -> Option<String> {
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        let path = companion_vectors_root()
+            .join(category)
+            .join("v0.1")
+            .join("cases.json");
+        if !path.exists() {
+            eprintln!(
+                "[skip] {category}: companion repo fixture not present at {}",
+                path.display()
+            );
+            return None;
+        }
+        Some(fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display())))
+    }
+
+    #[cfg(all(target_arch = "wasm32", feature = "browser-vectors"))]
+    {
+        Some(
+            embedded::CASES
+                .iter()
+                .find(|(name, _)| *name == category)
+                .map(|(_, body)| (*body).to_owned())
+                .unwrap_or_else(|| {
+                    panic!(
+                        "[{category}] no embedded fixture. The browser lane's table in \
+                         `mod embedded` has fallen behind the runners — add the category \
+                         there rather than letting it skip."
+                    )
+                }),
+        )
+    }
+
+    #[cfg(all(target_arch = "wasm32", not(feature = "browser-vectors")))]
+    {
+        let _ = category;
+        None
+    }
+}
+
+/// The fixtures, baked in (phase3-web-client task 15).
+///
+/// A browser cannot read `../myne-test-vectors/` at run time, so the bytes have
+/// to be in the module. `include_str!` resolves relative to THIS file, so these
+/// paths are the same ones [`companion_vectors_root`] builds — the native and
+/// browser lanes read the identical files, never a copy checked in beside the
+/// runners.
+///
+/// The whole module is gated on `browser-vectors` because `include_str!` of an
+/// absent file is a compile error: without the gate, every contributor who has
+/// not cloned the companion would lose the ability to build this crate's tests.
+///
+/// Keeping this list complete is enforced rather than remembered —
+/// [`cases_json`] panics on a category that is missing here, and
+/// `the_browser_lane_carries_every_category` asserts the table and the runners
+/// name the same set.
+#[cfg(all(target_arch = "wasm32", feature = "browser-vectors"))]
+mod embedded {
+    pub const CASES: &[(&str, &str)] = &[
+        (
+            "aad-construction",
+            include_str!("../../myne-test-vectors/vectors/aad-construction/v0.1/cases.json"),
+        ),
+        (
+            "account-number",
+            include_str!("../../myne-test-vectors/vectors/account-number/v0.1/cases.json"),
+        ),
+        (
+            "argon2id",
+            include_str!("../../myne-test-vectors/vectors/argon2id/v0.1/cases.json"),
+        ),
+        (
+            "attachment-blob",
+            include_str!("../../myne-test-vectors/vectors/attachment-blob/v0.1/cases.json"),
+        ),
+        (
+            "attachment-text",
+            include_str!("../../myne-test-vectors/vectors/attachment-text/v0.1/cases.json"),
+        ),
+        (
+            "attachments-catalog",
+            include_str!("../../myne-test-vectors/vectors/attachments-catalog/v0.1/cases.json"),
+        ),
+        (
+            "bip39-recovery",
+            include_str!("../../myne-test-vectors/vectors/bip39-recovery/v0.1/cases.json"),
+        ),
+        (
+            "ctx-aead",
+            include_str!("../../myne-test-vectors/vectors/ctx-aead/v0.1/cases.json"),
+        ),
+        (
+            "damm32-table",
+            include_str!("../../myne-test-vectors/vectors/damm32-table/v0.1/cases.json"),
+        ),
+        (
+            "embeddings",
+            include_str!("../../myne-test-vectors/vectors/embeddings/v0.1/cases.json"),
+        ),
+        (
+            "graph-layout",
+            include_str!("../../myne-test-vectors/vectors/graph-layout/v0.1/cases.json"),
+        ),
+        (
+            "head-fingerprint",
+            include_str!("../../myne-test-vectors/vectors/head-fingerprint/v0.1/cases.json"),
+        ),
+        (
+            "hkdf-sha256",
+            include_str!("../../myne-test-vectors/vectors/hkdf-sha256/v0.1/cases.json"),
+        ),
+        (
+            "manifest",
+            include_str!("../../myne-test-vectors/vectors/manifest/v0.1/cases.json"),
+        ),
+        (
+            "myn-blob",
+            include_str!("../../myne-test-vectors/vectors/myn-blob/v0.1/cases.json"),
+        ),
+        (
+            "note-template",
+            include_str!("../../myne-test-vectors/vectors/note-template/v0.1/cases.json"),
+        ),
+        (
+            "paired-extension",
+            include_str!("../../myne-test-vectors/vectors/paired-extension/v0.1/cases.json"),
+        ),
+        (
+            "password-policy",
+            include_str!("../../myne-test-vectors/vectors/password-policy/v0.1/cases.json"),
+        ),
+        (
+            "pending-capture",
+            include_str!("../../myne-test-vectors/vectors/pending-capture/v0.1/cases.json"),
+        ),
+        (
+            "phrase_normalize",
+            include_str!("../../myne-test-vectors/vectors/phrase_normalize/v0.1/cases.json"),
+        ),
+        (
+            "saved-view",
+            include_str!("../../myne-test-vectors/vectors/saved-view/v0.1/cases.json"),
+        ),
+        (
+            "scram-auth",
+            include_str!("../../myne-test-vectors/vectors/scram-auth/v0.1/cases.json"),
+        ),
+        (
+            "share-import",
+            include_str!("../../myne-test-vectors/vectors/share-import/v0.1/cases.json"),
+        ),
+        (
+            "vault-dictionary",
+            include_str!("../../myne-test-vectors/vectors/vault-dictionary/v0.1/cases.json"),
+        ),
+        (
+            "vault-head",
+            include_str!("../../myne-test-vectors/vectors/vault-head/v0.1/cases.json"),
+        ),
+        (
+            "vault-head-state",
+            include_str!("../../myne-test-vectors/vectors/vault-head-state/v0.1/cases.json"),
+        ),
+        (
+            "vault-indices",
+            include_str!("../../myne-test-vectors/vectors/vault-indices/v0.1/cases.json"),
+        ),
+        (
+            "vault-meta",
+            include_str!("../../myne-test-vectors/vectors/vault-meta/v0.1/cases.json"),
+        ),
+        (
+            "vault-prefs",
+            include_str!("../../myne-test-vectors/vectors/vault-prefs/v0.1/cases.json"),
+        ),
+        (
+            "vault-quickunlock",
+            include_str!("../../myne-test-vectors/vectors/vault-quickunlock/v0.1/cases.json"),
+        ),
+        (
+            "vault-search",
+            include_str!("../../myne-test-vectors/vectors/vault-search/v0.1/cases.json"),
+        ),
+        (
+            "vault-themes",
+            include_str!("../../myne-test-vectors/vectors/vault-themes/v0.1/cases.json"),
+        ),
+        (
+            "vault-workspace",
+            include_str!("../../myne-test-vectors/vectors/vault-workspace/v0.1/cases.json"),
+        ),
+        (
+            "vault_meta_rewrite",
+            include_str!("../../myne-test-vectors/vectors/vault_meta_rewrite/v0.1/cases.json"),
+        ),
+    ];
+}
+
+/// The browser lane is really running the vectors, not skipping all 34.
+///
+/// Every runner returns quietly when its fixtures are unavailable — correct for
+/// a contributor without the companion, and catastrophic for a CI lane that
+/// forgot `--features browser-vectors`: the lane would report 34 passing tests
+/// having asserted nothing at all. This is the assertion that distinguishes the
+/// two, and it is why the browser script passes the feature explicitly rather
+/// than relying on a default.
+#[cfg(target_arch = "wasm32")]
+#[wasm_bindgen_test]
+fn the_browser_lane_actually_has_fixtures() {
+    assert!(
+        cfg!(feature = "browser-vectors"),
+        "browser vector run without `--features browser-vectors`: every runner \
+         would skip and the lane would pass having verified nothing"
+    );
+}
+
+/// The embedded table and the runners name the same categories.
+///
+/// One direction is already covered — [`cases_json`] panics on a category the
+/// table lacks. This covers the other: an entry left behind after a runner was
+/// renamed or removed, which otherwise sits there looking like coverage.
+#[cfg(all(target_arch = "wasm32", feature = "browser-vectors"))]
+#[wasm_bindgen_test]
+fn the_browser_lane_carries_every_category() {
+    assert_eq!(
+        embedded::CASES.len(),
+        34,
+        "the embedded table has drifted from the 34 runners in this file"
+    );
+    let mut names: Vec<&str> = embedded::CASES.iter().map(|(n, _)| *n).collect();
+    names.sort_unstable();
+    names.dedup();
+    assert_eq!(
+        names.len(),
+        embedded::CASES.len(),
+        "duplicate category in the embedded table"
+    );
+    for (name, body) in embedded::CASES {
+        assert!(
+            !body.trim().is_empty(),
+            "[{name}] embedded fixture is empty — `include_str!` found a file, \
+             but not one with vectors in it"
+        );
+    }
 }
 
 fn hex_decode(s: &str) -> Vec<u8> {
@@ -92,24 +404,14 @@ fn parse_kdf_params(case: &serde_json::Value, id: &str) -> protocol::KdfParams {
     }
 }
 
-#[test]
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
 fn phrase_normalize_vectors() {
-    let path = companion_vectors_root()
-        .join("phrase_normalize")
-        .join("v0.1")
-        .join("cases.json");
-
-    if !path.exists() {
-        eprintln!(
-            "[skip] phrase_normalize: companion repo fixture not present at {}",
-            path.display()
-        );
+    let Some(raw) = cases_json("phrase_normalize") else {
         return;
-    }
-
-    let raw = fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
-    let doc: serde_json::Value =
-        serde_json::from_str(&raw).unwrap_or_else(|e| panic!("parse {}: {e}", path.display()));
+    };
+    let doc: serde_json::Value = serde_json::from_str(&raw)
+        .unwrap_or_else(|e| panic!("[phrase_normalize] parse cases.json: {e}"));
 
     assert_eq!(doc["schema"], "phrase_normalize");
     assert_eq!(doc["protocol_version"], "v0.1");
@@ -149,7 +451,8 @@ fn phrase_normalize_vectors() {
     }
 }
 
-#[test]
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
 fn vault_prefs_vectors() {
     use protocol::{
         aad_prefs_blob, aead_seal_ctx, decode_prefs_blob, derive_subkey, encode_prefs_blob_raw,
@@ -181,22 +484,11 @@ fn vault_prefs_vectors() {
         blob
     }
 
-    let path = companion_vectors_root()
-        .join("vault-prefs")
-        .join("v0.1")
-        .join("cases.json");
-
-    if !path.exists() {
-        eprintln!(
-            "[skip] vault-prefs: companion repo fixture not present at {}",
-            path.display()
-        );
+    let Some(raw) = cases_json("vault-prefs") else {
         return;
-    }
-
-    let raw = fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
-    let doc: serde_json::Value =
-        serde_json::from_str(&raw).unwrap_or_else(|e| panic!("parse {}: {e}", path.display()));
+    };
+    let doc: serde_json::Value = serde_json::from_str(&raw)
+        .unwrap_or_else(|e| panic!("[vault-prefs] parse cases.json: {e}"));
 
     assert_eq!(doc["schema"], "vault-prefs");
     assert_eq!(doc["protocol_version"], "v0.1");
@@ -482,26 +774,16 @@ fn vault_prefs_vectors() {
     );
 }
 
-#[test]
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
 fn vault_meta_rewrite_vectors() {
     use protocol::{parse_vault_meta, rewrite_vault_meta_password_side};
 
-    let path = companion_vectors_root()
-        .join("vault_meta_rewrite")
-        .join("v0.1")
-        .join("cases.json");
-
-    if !path.exists() {
-        eprintln!(
-            "[skip] vault_meta_rewrite: companion repo fixture not present at {}",
-            path.display()
-        );
+    let Some(raw) = cases_json("vault_meta_rewrite") else {
         return;
-    }
-
-    let raw = fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
-    let doc: serde_json::Value =
-        serde_json::from_str(&raw).unwrap_or_else(|e| panic!("parse {}: {e}", path.display()));
+    };
+    let doc: serde_json::Value = serde_json::from_str(&raw)
+        .unwrap_or_else(|e| panic!("[vault_meta_rewrite] parse cases.json: {e}"));
 
     assert_eq!(doc["schema"], "vault_meta_rewrite");
     assert_eq!(doc["protocol_version"], "v0.1");
@@ -573,26 +855,16 @@ fn vault_meta_rewrite_vectors() {
     }
 }
 
-#[test]
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
 fn hkdf_sha256_vectors() {
     use protocol::{derive_subkey, SubkeyRole};
 
-    let path = companion_vectors_root()
-        .join("hkdf-sha256")
-        .join("v0.1")
-        .join("cases.json");
-
-    if !path.exists() {
-        eprintln!(
-            "[skip] hkdf-sha256: companion repo fixture not present at {}",
-            path.display()
-        );
+    let Some(raw) = cases_json("hkdf-sha256") else {
         return;
-    }
-
-    let raw = fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
-    let doc: serde_json::Value =
-        serde_json::from_str(&raw).unwrap_or_else(|e| panic!("parse {}: {e}", path.display()));
+    };
+    let doc: serde_json::Value = serde_json::from_str(&raw)
+        .unwrap_or_else(|e| panic!("[hkdf-sha256] parse cases.json: {e}"));
 
     assert_eq!(doc["schema"], "hkdf-sha256");
     assert_eq!(doc["protocol_version"], "v0.1");
@@ -699,29 +971,19 @@ fn hkdf_sha256_vectors() {
     }
 }
 
-#[test]
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
 fn vault_meta_vectors() {
     use protocol::{
         parse_kdf_params, parse_vault_meta, serialize_vault_meta, KdfParams, ProtocolError,
         VaultMeta,
     };
 
-    let path = companion_vectors_root()
-        .join("vault-meta")
-        .join("v0.1")
-        .join("cases.json");
-
-    if !path.exists() {
-        eprintln!(
-            "[skip] vault-meta: companion repo fixture not present at {}",
-            path.display()
-        );
+    let Some(raw) = cases_json("vault-meta") else {
         return;
-    }
-
-    let raw = fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
+    };
     let doc: serde_json::Value =
-        serde_json::from_str(&raw).unwrap_or_else(|e| panic!("parse {}: {e}", path.display()));
+        serde_json::from_str(&raw).unwrap_or_else(|e| panic!("[vault-meta] parse cases.json: {e}"));
 
     assert_eq!(doc["schema"], "vault-meta");
     assert_eq!(doc["protocol_version"], "v0.1");
@@ -904,26 +1166,16 @@ fn vault_meta_vectors() {
     );
 }
 
-#[test]
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
 fn account_number_vectors() {
     use protocol::{parse_account_number, ProtocolError};
 
-    let path = companion_vectors_root()
-        .join("account-number")
-        .join("v0.1")
-        .join("cases.json");
-
-    if !path.exists() {
-        eprintln!(
-            "[skip] account-number: companion repo fixture not present at {}",
-            path.display()
-        );
+    let Some(raw) = cases_json("account-number") else {
         return;
-    }
-
-    let raw = fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
-    let doc: serde_json::Value =
-        serde_json::from_str(&raw).unwrap_or_else(|e| panic!("parse {}: {e}", path.display()));
+    };
+    let doc: serde_json::Value = serde_json::from_str(&raw)
+        .unwrap_or_else(|e| panic!("[account-number] parse cases.json: {e}"));
 
     assert_eq!(doc["schema"], "account-number");
     assert_eq!(doc["protocol_version"], "v0.1");
@@ -1013,26 +1265,16 @@ fn account_number_vectors() {
     }
 }
 
-#[test]
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
 fn myn_blob_vectors() {
     use protocol::{decode_note, encode_new_note_blob_raw, encode_update_blob_raw, DecryptError};
 
-    let path = companion_vectors_root()
-        .join("myn-blob")
-        .join("v0.1")
-        .join("cases.json");
-
-    if !path.exists() {
-        eprintln!(
-            "[skip] myn-blob: companion repo fixture not present at {}",
-            path.display()
-        );
+    let Some(raw) = cases_json("myn-blob") else {
         return;
-    }
-
-    let raw = fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
+    };
     let doc: serde_json::Value =
-        serde_json::from_str(&raw).unwrap_or_else(|e| panic!("parse {}: {e}", path.display()));
+        serde_json::from_str(&raw).unwrap_or_else(|e| panic!("[myn-blob] parse cases.json: {e}"));
 
     assert_eq!(doc["schema"], "myn-blob");
     assert_eq!(doc["protocol_version"], "v0.1");
@@ -1314,26 +1556,16 @@ fn myn_blob_vectors() {
     }
 }
 
-#[test]
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
 fn password_policy_vectors() {
     use protocol::{validate_min_length, ProtocolError};
 
-    let path = companion_vectors_root()
-        .join("password-policy")
-        .join("v0.1")
-        .join("cases.json");
-
-    if !path.exists() {
-        eprintln!(
-            "[skip] password-policy: companion repo fixture not present at {}",
-            path.display()
-        );
+    let Some(raw) = cases_json("password-policy") else {
         return;
-    }
-
-    let raw = fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
-    let doc: serde_json::Value =
-        serde_json::from_str(&raw).unwrap_or_else(|e| panic!("parse {}: {e}", path.display()));
+    };
+    let doc: serde_json::Value = serde_json::from_str(&raw)
+        .unwrap_or_else(|e| panic!("[password-policy] parse cases.json: {e}"));
 
     assert_eq!(doc["schema"], "password-policy");
     assert_eq!(doc["protocol_version"], "v0.1");
@@ -1392,7 +1624,8 @@ fn password_policy_vectors() {
     }
 }
 
-#[test]
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
 fn ctx_aead_vectors() {
     use protocol::{
         aad_ai_embeddings_blob, aad_graph_layout_blob, aad_note_content_encrypt,
@@ -1402,22 +1635,11 @@ fn ctx_aead_vectors() {
         ProtocolError,
     };
 
-    let path = companion_vectors_root()
-        .join("ctx-aead")
-        .join("v0.1")
-        .join("cases.json");
-
-    if !path.exists() {
-        eprintln!(
-            "[skip] ctx-aead: companion repo fixture not present at {}",
-            path.display()
-        );
+    let Some(raw) = cases_json("ctx-aead") else {
         return;
-    }
-
-    let raw = fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
+    };
     let doc: serde_json::Value =
-        serde_json::from_str(&raw).unwrap_or_else(|e| panic!("parse {}: {e}", path.display()));
+        serde_json::from_str(&raw).unwrap_or_else(|e| panic!("[ctx-aead] parse cases.json: {e}"));
 
     assert_eq!(doc["schema"], "ctx-aead");
     assert_eq!(doc["protocol_version"], "v0.1");
@@ -1753,26 +1975,16 @@ fn ctx_aead_vectors() {
     }
 }
 
-#[test]
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
 fn argon2id_wrap_vectors() {
     use protocol::{derive_password_wrap_key, derive_recovery_wrap_key_from_normalized};
 
-    let path = companion_vectors_root()
-        .join("argon2id")
-        .join("v0.1")
-        .join("cases.json");
-
-    if !path.exists() {
-        eprintln!(
-            "[skip] argon2id: companion repo fixture not present at {}",
-            path.display()
-        );
+    let Some(raw) = cases_json("argon2id") else {
         return;
-    }
-
-    let raw = fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
+    };
     let doc: serde_json::Value =
-        serde_json::from_str(&raw).unwrap_or_else(|e| panic!("parse {}: {e}", path.display()));
+        serde_json::from_str(&raw).unwrap_or_else(|e| panic!("[argon2id] parse cases.json: {e}"));
 
     assert_eq!(doc["schema"], "argon2id");
     assert_eq!(doc["protocol_version"], "v0.1");
@@ -1871,26 +2083,16 @@ fn argon2id_wrap_vectors() {
     }
 }
 
-#[test]
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
 fn bip39_recovery_vectors() {
     use protocol::{derive_recovery_wrap_key_from_normalized, normalize_user_phrase};
 
-    let path = companion_vectors_root()
-        .join("bip39-recovery")
-        .join("v0.1")
-        .join("cases.json");
-
-    if !path.exists() {
-        eprintln!(
-            "[skip] bip39-recovery: companion repo fixture not present at {}",
-            path.display()
-        );
+    let Some(raw) = cases_json("bip39-recovery") else {
         return;
-    }
-
-    let raw = fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
-    let doc: serde_json::Value =
-        serde_json::from_str(&raw).unwrap_or_else(|e| panic!("parse {}: {e}", path.display()));
+    };
+    let doc: serde_json::Value = serde_json::from_str(&raw)
+        .unwrap_or_else(|e| panic!("[bip39-recovery] parse cases.json: {e}"));
 
     assert_eq!(doc["schema"], "bip39-recovery");
     assert_eq!(doc["protocol_version"], "v0.1");
@@ -1966,7 +2168,8 @@ fn bip39_recovery_vectors() {
     }
 }
 
-#[test]
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
 fn aad_construction_vectors() {
     use protocol::{
         aad_ai_embeddings_blob, aad_attachment_text_blob, aad_custom_themes_blob,
@@ -1976,22 +2179,11 @@ fn aad_construction_vectors() {
         aad_workspace_blob,
     };
 
-    let path = companion_vectors_root()
-        .join("aad-construction")
-        .join("v0.1")
-        .join("cases.json");
-
-    if !path.exists() {
-        eprintln!(
-            "[skip] aad-construction: companion repo fixture not present at {}",
-            path.display()
-        );
+    let Some(raw) = cases_json("aad-construction") else {
         return;
-    }
-
-    let raw = fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
-    let doc: serde_json::Value =
-        serde_json::from_str(&raw).unwrap_or_else(|e| panic!("parse {}: {e}", path.display()));
+    };
+    let doc: serde_json::Value = serde_json::from_str(&raw)
+        .unwrap_or_else(|e| panic!("[aad-construction] parse cases.json: {e}"));
 
     assert_eq!(doc["schema"], "aad-construction");
     assert_eq!(doc["protocol_version"], "v0.1");
@@ -2167,29 +2359,19 @@ fn aad_construction_vectors() {
     }
 }
 
-#[test]
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
 fn vault_search_vectors() {
     use protocol::{
         decode_search_index_blob, derive_subkey, encode_search_index_blob_raw, SearchBlobError,
         SubkeyRole,
     };
 
-    let path = companion_vectors_root()
-        .join("vault-search")
-        .join("v0.1")
-        .join("cases.json");
-
-    if !path.exists() {
-        eprintln!(
-            "[skip] vault-search: companion repo fixture not present at {}",
-            path.display()
-        );
+    let Some(raw) = cases_json("vault-search") else {
         return;
-    }
-
-    let raw = fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
-    let doc: serde_json::Value =
-        serde_json::from_str(&raw).unwrap_or_else(|e| panic!("parse {}: {e}", path.display()));
+    };
+    let doc: serde_json::Value = serde_json::from_str(&raw)
+        .unwrap_or_else(|e| panic!("[vault-search] parse cases.json: {e}"));
 
     assert_eq!(doc["schema"], "vault-search");
     assert_eq!(doc["protocol_version"], "v0.1");
@@ -2409,29 +2591,19 @@ fn vault_search_vectors() {
     }
 }
 
-#[test]
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
 fn vault_workspace_vectors() {
     use protocol::{
         decode_workspace_blob, derive_subkey, encode_workspace_blob_raw, SubkeyRole,
         WorkspaceBlobError,
     };
 
-    let path = companion_vectors_root()
-        .join("vault-workspace")
-        .join("v0.1")
-        .join("cases.json");
-
-    if !path.exists() {
-        eprintln!(
-            "[skip] vault-workspace: companion repo fixture not present at {}",
-            path.display()
-        );
+    let Some(raw) = cases_json("vault-workspace") else {
         return;
-    }
-
-    let raw = fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
-    let doc: serde_json::Value =
-        serde_json::from_str(&raw).unwrap_or_else(|e| panic!("parse {}: {e}", path.display()));
+    };
+    let doc: serde_json::Value = serde_json::from_str(&raw)
+        .unwrap_or_else(|e| panic!("[vault-workspace] parse cases.json: {e}"));
 
     assert_eq!(doc["schema"], "vault-workspace");
     assert_eq!(doc["protocol_version"], "v0.1");
@@ -2650,29 +2822,19 @@ fn vault_workspace_vectors() {
     }
 }
 
-#[test]
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
 fn graph_layout_vectors() {
     use protocol::{
         decode_graph_layout_blob, derive_subkey, encode_graph_layout_blob_raw,
         GraphLayoutBlobError, SubkeyRole,
     };
 
-    let path = companion_vectors_root()
-        .join("graph-layout")
-        .join("v0.1")
-        .join("cases.json");
-
-    if !path.exists() {
-        eprintln!(
-            "[skip] graph-layout: companion repo fixture not present at {}",
-            path.display()
-        );
+    let Some(raw) = cases_json("graph-layout") else {
         return;
-    }
-
-    let raw = fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
-    let doc: serde_json::Value =
-        serde_json::from_str(&raw).unwrap_or_else(|e| panic!("parse {}: {e}", path.display()));
+    };
+    let doc: serde_json::Value = serde_json::from_str(&raw)
+        .unwrap_or_else(|e| panic!("[graph-layout] parse cases.json: {e}"));
 
     assert_eq!(doc["schema"], "graph-layout");
     assert_eq!(doc["protocol_version"], "v0.1");
@@ -2883,29 +3045,19 @@ fn graph_layout_vectors() {
     }
 }
 
-#[test]
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
 fn vault_indices_vectors() {
     use protocol::{
         decode_vault_indices_blob, derive_subkey, encode_vault_indices_blob_raw, SubkeyRole,
         VaultIndicesBlobError,
     };
 
-    let path = companion_vectors_root()
-        .join("vault-indices")
-        .join("v0.1")
-        .join("cases.json");
-
-    if !path.exists() {
-        eprintln!(
-            "[skip] vault-indices: companion repo fixture not present at {}",
-            path.display()
-        );
+    let Some(raw) = cases_json("vault-indices") else {
         return;
-    }
-
-    let raw = fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
-    let doc: serde_json::Value =
-        serde_json::from_str(&raw).unwrap_or_else(|e| panic!("parse {}: {e}", path.display()));
+    };
+    let doc: serde_json::Value = serde_json::from_str(&raw)
+        .unwrap_or_else(|e| panic!("[vault-indices] parse cases.json: {e}"));
 
     assert_eq!(doc["schema"], "vault-indices");
     assert_eq!(doc["protocol_version"], "v0.1");
@@ -3120,29 +3272,19 @@ fn vault_indices_vectors() {
     }
 }
 
-#[test]
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
 fn vault_dictionary_vectors() {
     use protocol::{
         decode_dictionary_blob, derive_subkey, encode_dictionary_blob_raw, DictionaryBlobError,
         SubkeyRole,
     };
 
-    let path = companion_vectors_root()
-        .join("vault-dictionary")
-        .join("v0.1")
-        .join("cases.json");
-
-    if !path.exists() {
-        eprintln!(
-            "[skip] vault-dictionary: companion repo fixture not present at {}",
-            path.display()
-        );
+    let Some(raw) = cases_json("vault-dictionary") else {
         return;
-    }
-
-    let raw = fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
-    let doc: serde_json::Value =
-        serde_json::from_str(&raw).unwrap_or_else(|e| panic!("parse {}: {e}", path.display()));
+    };
+    let doc: serde_json::Value = serde_json::from_str(&raw)
+        .unwrap_or_else(|e| panic!("[vault-dictionary] parse cases.json: {e}"));
 
     assert_eq!(doc["schema"], "vault-dictionary");
     assert_eq!(doc["protocol_version"], "v0.1");
@@ -3361,29 +3503,19 @@ fn vault_dictionary_vectors() {
     }
 }
 
-#[test]
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
 fn attachment_text_vectors() {
     use protocol::{
         decode_attachment_text_blob, derive_subkey, encode_attachment_text_blob_raw,
         AttachmentTextBlobError, SubkeyRole,
     };
 
-    let path = companion_vectors_root()
-        .join("attachment-text")
-        .join("v0.1")
-        .join("cases.json");
-
-    if !path.exists() {
-        eprintln!(
-            "[skip] attachment-text: companion repo fixture not present at {}",
-            path.display()
-        );
+    let Some(raw) = cases_json("attachment-text") else {
         return;
-    }
-
-    let raw = fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
-    let doc: serde_json::Value =
-        serde_json::from_str(&raw).unwrap_or_else(|e| panic!("parse {}: {e}", path.display()));
+    };
+    let doc: serde_json::Value = serde_json::from_str(&raw)
+        .unwrap_or_else(|e| panic!("[attachment-text] parse cases.json: {e}"));
 
     assert_eq!(doc["schema"], "attachment-text");
     assert_eq!(doc["protocol_version"], "v0.1");
@@ -3617,7 +3749,8 @@ fn attachment_text_vectors() {
     }
 }
 
-#[test]
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
 fn vault_quickunlock_vectors() {
     // quick_unlock_blob is NOT re-exported at the crate root (it is a `pub mod`
     // with no flattened `pub use`), so the codec items are imported via the
@@ -3626,22 +3759,11 @@ fn vault_quickunlock_vectors() {
         decode_quick_unlock_blob, encode_quick_unlock_blob_raw, QuickUnlockBlobError,
     };
 
-    let path = companion_vectors_root()
-        .join("vault-quickunlock")
-        .join("v0.1")
-        .join("cases.json");
-
-    if !path.exists() {
-        eprintln!(
-            "[skip] vault-quickunlock: companion repo fixture not present at {}",
-            path.display()
-        );
+    let Some(raw) = cases_json("vault-quickunlock") else {
         return;
-    }
-
-    let raw = fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
-    let doc: serde_json::Value =
-        serde_json::from_str(&raw).unwrap_or_else(|e| panic!("parse {}: {e}", path.display()));
+    };
+    let doc: serde_json::Value = serde_json::from_str(&raw)
+        .unwrap_or_else(|e| panic!("[vault-quickunlock] parse cases.json: {e}"));
 
     assert_eq!(doc["schema"], "vault-quickunlock");
     assert_eq!(doc["protocol_version"], "v0.1");
@@ -3847,29 +3969,19 @@ fn vault_quickunlock_vectors() {
     }
 }
 
-#[test]
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
 fn pending_capture_vectors() {
     // capture_blob is NOT re-exported at the crate root (it is a `pub mod` with
     // no flattened `pub use`), so the codec items are imported via the full
     // module path.
     use protocol::capture_blob::{decode_capture_blob, encode_capture_blob_raw, CaptureBlobError};
 
-    let path = companion_vectors_root()
-        .join("pending-capture")
-        .join("v0.1")
-        .join("cases.json");
-
-    if !path.exists() {
-        eprintln!(
-            "[skip] pending-capture: companion repo fixture not present at {}",
-            path.display()
-        );
+    let Some(raw) = cases_json("pending-capture") else {
         return;
-    }
-
-    let raw = fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
-    let doc: serde_json::Value =
-        serde_json::from_str(&raw).unwrap_or_else(|e| panic!("parse {}: {e}", path.display()));
+    };
+    let doc: serde_json::Value = serde_json::from_str(&raw)
+        .unwrap_or_else(|e| panic!("[pending-capture] parse cases.json: {e}"));
 
     assert_eq!(doc["schema"], "pending-capture");
     assert_eq!(doc["protocol_version"], "v0.1");
@@ -4044,7 +4156,8 @@ fn pending_capture_vectors() {
     }
 }
 
-#[test]
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
 fn share_import_vectors() {
     // share_import_blob is NOT re-exported at the crate root (it is a `pub mod`
     // with no flattened `pub use`), so the codec items are imported via the full
@@ -4053,22 +4166,11 @@ fn share_import_vectors() {
         decode_share_import_blob, encode_share_import_blob_raw, ShareImportBlobError,
     };
 
-    let path = companion_vectors_root()
-        .join("share-import")
-        .join("v0.1")
-        .join("cases.json");
-
-    if !path.exists() {
-        eprintln!(
-            "[skip] share-import: companion repo fixture not present at {}",
-            path.display()
-        );
+    let Some(raw) = cases_json("share-import") else {
         return;
-    }
-
-    let raw = fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
-    let doc: serde_json::Value =
-        serde_json::from_str(&raw).unwrap_or_else(|e| panic!("parse {}: {e}", path.display()));
+    };
+    let doc: serde_json::Value = serde_json::from_str(&raw)
+        .unwrap_or_else(|e| panic!("[share-import] parse cases.json: {e}"));
 
     assert_eq!(doc["schema"], "share-import");
     assert_eq!(doc["protocol_version"], "v0.1");
@@ -4243,29 +4345,19 @@ fn share_import_vectors() {
     }
 }
 
-#[test]
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
 fn attachment_blob_vectors() {
     use protocol::{
         aad_encrypt_attachment, aad_wrap_attachment_key, compute_attachment_id,
         decode_attachment_blob, encode_attachment_blob_raw, AttachmentBlobError,
     };
 
-    let path = companion_vectors_root()
-        .join("attachment-blob")
-        .join("v0.1")
-        .join("cases.json");
-
-    if !path.exists() {
-        eprintln!(
-            "[skip] attachment-blob: companion repo fixture not present at {}",
-            path.display()
-        );
+    let Some(raw) = cases_json("attachment-blob") else {
         return;
-    }
-
-    let raw = fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
-    let doc: serde_json::Value =
-        serde_json::from_str(&raw).unwrap_or_else(|e| panic!("parse {}: {e}", path.display()));
+    };
+    let doc: serde_json::Value = serde_json::from_str(&raw)
+        .unwrap_or_else(|e| panic!("[attachment-blob] parse cases.json: {e}"));
 
     assert_eq!(doc["schema"], "attachment-blob");
     assert_eq!(doc["protocol_version"], "v0.1");
@@ -4456,29 +4548,19 @@ fn attachment_blob_vectors() {
     }
 }
 
-#[test]
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
 fn attachments_catalog_vectors() {
     use protocol::{
         aad_attachments_catalog, decode_attachments_catalog, derive_subkey,
         encode_attachments_catalog_raw, CatalogBlobError, SubkeyRole,
     };
 
-    let path = companion_vectors_root()
-        .join("attachments-catalog")
-        .join("v0.1")
-        .join("cases.json");
-
-    if !path.exists() {
-        eprintln!(
-            "[skip] attachments-catalog: companion repo fixture not present at {}",
-            path.display()
-        );
+    let Some(raw) = cases_json("attachments-catalog") else {
         return;
-    }
-
-    let raw = fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
-    let doc: serde_json::Value =
-        serde_json::from_str(&raw).unwrap_or_else(|e| panic!("parse {}: {e}", path.display()));
+    };
+    let doc: serde_json::Value = serde_json::from_str(&raw)
+        .unwrap_or_else(|e| panic!("[attachments-catalog] parse cases.json: {e}"));
 
     assert_eq!(doc["schema"], "attachments-catalog");
     assert_eq!(doc["protocol_version"], "v0.1");
@@ -4720,26 +4802,16 @@ fn field<'a>(case: &'a serde_json::Value, id: &str, key: &str) -> &'a str {
         .unwrap_or_else(|| panic!("[{id}] missing {key}"))
 }
 
-#[test]
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
 fn damm32_table_vectors() {
     use protocol::damm32_table;
 
-    let path = companion_vectors_root()
-        .join("damm32-table")
-        .join("v0.1")
-        .join("cases.json");
-
-    if !path.exists() {
-        eprintln!(
-            "[skip] damm32-table: companion repo fixture not present at {}",
-            path.display()
-        );
+    let Some(raw) = cases_json("damm32-table") else {
         return;
-    }
-
-    let raw = fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
-    let doc: serde_json::Value =
-        serde_json::from_str(&raw).unwrap_or_else(|e| panic!("parse {}: {e}", path.display()));
+    };
+    let doc: serde_json::Value = serde_json::from_str(&raw)
+        .unwrap_or_else(|e| panic!("[damm32-table] parse cases.json: {e}"));
 
     assert_eq!(doc["schema"], "damm32-table");
     assert_eq!(doc["protocol_version"], "v0.1");
@@ -4829,26 +4901,16 @@ fn damm32_table_vectors() {
     );
 }
 
-#[test]
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
 fn note_template_vectors() {
     use protocol::{render, supported_tokens, RenderContext};
 
-    let path = companion_vectors_root()
-        .join("note-template")
-        .join("v0.1")
-        .join("cases.json");
-
-    if !path.exists() {
-        eprintln!(
-            "[skip] note-template: companion repo fixture not present at {}",
-            path.display()
-        );
+    let Some(raw) = cases_json("note-template") else {
         return;
-    }
-
-    let raw = fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
-    let doc: serde_json::Value =
-        serde_json::from_str(&raw).unwrap_or_else(|e| panic!("parse {}: {e}", path.display()));
+    };
+    let doc: serde_json::Value = serde_json::from_str(&raw)
+        .unwrap_or_else(|e| panic!("[note-template] parse cases.json: {e}"));
 
     assert_eq!(doc["schema"], "note-template");
     assert_eq!(doc["protocol_version"], "v0.1");
@@ -4973,7 +5035,8 @@ fn note_template_vectors() {
     );
 }
 
-#[test]
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
 fn vault_head_vectors() {
     use protocol::{
         compute_head_id, compute_vault_head_mac, derive_subkey, vv_dominance, Dominance,
@@ -4981,22 +5044,11 @@ fn vault_head_vectors() {
         VAULT_HEAD_FORMAT_V1,
     };
 
-    let path = companion_vectors_root()
-        .join("vault-head")
-        .join("v0.1")
-        .join("cases.json");
-
-    if !path.exists() {
-        eprintln!(
-            "[skip] vault-head: companion repo fixture not present at {}",
-            path.display()
-        );
+    let Some(raw) = cases_json("vault-head") else {
         return;
-    }
-
-    let raw = fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
+    };
     let doc: serde_json::Value =
-        serde_json::from_str(&raw).unwrap_or_else(|e| panic!("parse {}: {e}", path.display()));
+        serde_json::from_str(&raw).unwrap_or_else(|e| panic!("[vault-head] parse cases.json: {e}"));
 
     assert_eq!(doc["schema"], "vault-head");
     assert_eq!(doc["protocol_version"], "v0.1");
@@ -5175,29 +5227,19 @@ fn vault_head_vectors() {
 /// encoding (`uuid → content_nonce`) + its `manifest_hash`, and the structural
 /// decode rejects. Validates `protocol::manifest` bit-for-bit against the
 /// committed golden vectors (`sync-protocol.md` §4.2).
-#[test]
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
 fn manifest_vectors() {
     use protocol::{
         compute_manifest_hash, decode_manifest, encode_manifest, ManifestEntry, ManifestError,
         MANIFEST_ID_LEN,
     };
 
-    let path = companion_vectors_root()
-        .join("manifest")
-        .join("v0.1")
-        .join("cases.json");
-
-    if !path.exists() {
-        eprintln!(
-            "[skip] manifest: companion repo fixture not present at {}",
-            path.display()
-        );
+    let Some(raw) = cases_json("manifest") else {
         return;
-    }
-
-    let raw = fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
+    };
     let doc: serde_json::Value =
-        serde_json::from_str(&raw).unwrap_or_else(|e| panic!("parse {}: {e}", path.display()));
+        serde_json::from_str(&raw).unwrap_or_else(|e| panic!("[manifest] parse cases.json: {e}"));
 
     assert_eq!(doc["schema"], "manifest");
     assert_eq!(doc["protocol_version"], "v0.1");
@@ -5315,26 +5357,16 @@ fn manifest_vectors() {
 /// (`protocol::head_fingerprint`) both devices eye-compare at enrollment
 /// (MYND-425) + fork-audit (MYND-427). Validates byte-for-byte against the
 /// committed golden vectors (`sync-protocol.md` §6.3).
-#[test]
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
 fn head_fingerprint_vectors() {
     use protocol::head_fingerprint;
 
-    let path = companion_vectors_root()
-        .join("head-fingerprint")
-        .join("v0.1")
-        .join("cases.json");
-
-    if !path.exists() {
-        eprintln!(
-            "[skip] head-fingerprint: companion repo fixture not present at {}",
-            path.display()
-        );
+    let Some(raw) = cases_json("head-fingerprint") else {
         return;
-    }
-
-    let raw = fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
-    let doc: serde_json::Value =
-        serde_json::from_str(&raw).unwrap_or_else(|e| panic!("parse {}: {e}", path.display()));
+    };
+    let doc: serde_json::Value = serde_json::from_str(&raw)
+        .unwrap_or_else(|e| panic!("[head-fingerprint] parse cases.json: {e}"));
 
     assert_eq!(doc["schema"], "head-fingerprint");
     assert_eq!(doc["protocol_version"], "v0.1");
@@ -5371,26 +5403,16 @@ fn head_fingerprint_vectors() {
 /// signature. Validates `protocol::scram_client_proof` byte-for-byte against the
 /// shared golden vectors — the cross-impl bar with the Go server's
 /// `internal/auth/scram` (`server-protocol.md` auth; RFC 5802/7677/9266).
-#[test]
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
 fn scram_auth_vectors() {
     use protocol::scram_client_proof;
 
-    let path = companion_vectors_root()
-        .join("scram-auth")
-        .join("v0.1")
-        .join("cases.json");
-
-    if !path.exists() {
-        eprintln!(
-            "[skip] scram-auth: companion repo fixture not present at {}",
-            path.display()
-        );
+    let Some(raw) = cases_json("scram-auth") else {
         return;
-    }
-
-    let raw = fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
+    };
     let doc: serde_json::Value =
-        serde_json::from_str(&raw).unwrap_or_else(|e| panic!("parse {}: {e}", path.display()));
+        serde_json::from_str(&raw).unwrap_or_else(|e| panic!("[scram-auth] parse cases.json: {e}"));
 
     assert_eq!(doc["schema"], "scram-auth");
     assert_eq!(doc["protocol_version"], "v0.1");
@@ -5471,25 +5493,16 @@ fn scram_auth_vectors() {
     }
 }
 
-#[test]
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
 fn saved_view_vectors() {
     use protocol::{canonical_encode_saved_views, parse_saved_views_array, SavedViewParseError};
 
-    let path = companion_vectors_root()
-        .join("saved-view")
-        .join("v0.1")
-        .join("cases.json");
-    if !path.exists() {
-        eprintln!(
-            "[skip] saved-view: companion repo fixture not present at {}",
-            path.display()
-        );
+    let Some(raw) = cases_json("saved-view") else {
         return;
-    }
-
-    let raw = fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
+    };
     let doc: serde_json::Value =
-        serde_json::from_str(&raw).unwrap_or_else(|e| panic!("parse {}: {e}", path.display()));
+        serde_json::from_str(&raw).unwrap_or_else(|e| panic!("[saved-view] parse cases.json: {e}"));
     assert_eq!(doc["schema"], "saved-view");
     assert_eq!(doc["protocol_version"], "v0.1");
 
@@ -5556,28 +5569,19 @@ fn saved_view_vectors() {
     }
 }
 
-#[test]
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
 fn paired_extension_vectors() {
     use protocol::{
         canonical_encode_paired_extensions, parse_paired_extensions_array,
         PairedExtensionParseError,
     };
 
-    let path = companion_vectors_root()
-        .join("paired-extension")
-        .join("v0.1")
-        .join("cases.json");
-    if !path.exists() {
-        eprintln!(
-            "[skip] paired-extension: companion repo fixture not present at {}",
-            path.display()
-        );
+    let Some(raw) = cases_json("paired-extension") else {
         return;
-    }
-
-    let raw = fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
-    let doc: serde_json::Value =
-        serde_json::from_str(&raw).unwrap_or_else(|e| panic!("parse {}: {e}", path.display()));
+    };
+    let doc: serde_json::Value = serde_json::from_str(&raw)
+        .unwrap_or_else(|e| panic!("[paired-extension] parse cases.json: {e}"));
     assert_eq!(doc["schema"], "paired-extension");
     assert_eq!(doc["protocol_version"], "v0.1");
 
@@ -5645,28 +5649,18 @@ fn paired_extension_vectors() {
     }
 }
 
-#[test]
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
 fn vault_themes_vectors() {
     use protocol::{
         decode_themes_blob, derive_subkey, encode_themes_blob_raw, SubkeyRole, ThemesBlobError,
     };
 
-    let path = companion_vectors_root()
-        .join("vault-themes")
-        .join("v0.1")
-        .join("cases.json");
-
-    if !path.exists() {
-        eprintln!(
-            "[skip] vault-themes: companion repo fixture not present at {}",
-            path.display()
-        );
+    let Some(raw) = cases_json("vault-themes") else {
         return;
-    }
-
-    let raw = fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
-    let doc: serde_json::Value =
-        serde_json::from_str(&raw).unwrap_or_else(|e| panic!("parse {}: {e}", path.display()));
+    };
+    let doc: serde_json::Value = serde_json::from_str(&raw)
+        .unwrap_or_else(|e| panic!("[vault-themes] parse cases.json: {e}"));
 
     assert_eq!(doc["schema"], "vault-themes");
     assert_eq!(doc["protocol_version"], "v0.1");
@@ -5878,29 +5872,19 @@ fn vault_themes_vectors() {
     }
 }
 
-#[test]
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
 fn vault_head_state_vectors() {
     use protocol::{
         decode_head_state, derive_subkey, encode_head_state, SubkeyRole, VaultHead, VaultHeadError,
         VvEntry, DEVICE_ID_LEN, HEAD_ID_LEN,
     };
 
-    let path = companion_vectors_root()
-        .join("vault-head-state")
-        .join("v0.1")
-        .join("cases.json");
-
-    if !path.exists() {
-        eprintln!(
-            "[skip] vault-head-state: companion repo fixture not present at {}",
-            path.display()
-        );
+    let Some(raw) = cases_json("vault-head-state") else {
         return;
-    }
-
-    let raw = fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
-    let doc: serde_json::Value =
-        serde_json::from_str(&raw).unwrap_or_else(|e| panic!("parse {}: {e}", path.display()));
+    };
+    let doc: serde_json::Value = serde_json::from_str(&raw)
+        .unwrap_or_else(|e| panic!("[vault-head-state] parse cases.json: {e}"));
 
     assert_eq!(doc["schema"], "vault-head-state");
     assert_eq!(doc["protocol_version"], "v0.1");
@@ -6195,29 +6179,19 @@ fn vault_head_state_vectors() {
     }
 }
 
-#[test]
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
 fn embeddings_vectors() {
     use protocol::{
         decode_embeddings_blob, derive_subkey, encode_embeddings_blob_raw, EmbeddingsBlobError,
         SubkeyRole,
     };
 
-    let path = companion_vectors_root()
-        .join("embeddings")
-        .join("v0.1")
-        .join("cases.json");
-
-    if !path.exists() {
-        eprintln!(
-            "[skip] embeddings: companion repo fixture not present at {}",
-            path.display()
-        );
+    let Some(raw) = cases_json("embeddings") else {
         return;
-    }
-
-    let raw = fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
+    };
     let doc: serde_json::Value =
-        serde_json::from_str(&raw).unwrap_or_else(|e| panic!("parse {}: {e}", path.display()));
+        serde_json::from_str(&raw).unwrap_or_else(|e| panic!("[embeddings] parse cases.json: {e}"));
 
     assert_eq!(doc["schema"], "embeddings");
     assert_eq!(doc["protocol_version"], "v0.1");

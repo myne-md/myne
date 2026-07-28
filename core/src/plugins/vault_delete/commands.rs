@@ -68,9 +68,14 @@
 //! See: ../../CLAUDE.md "Secret-handling logging discipline".
 
 use super::error::VaultDeleteError;
+use crate::host::HostCtx;
 use crate::plugins::vault_unlock::state::{SlotKind, TakeAndRunError, VaultRuntimeState};
 use crate::vault_id::VaultId;
 use std::path::PathBuf;
+// Tauri types serve only the cfg-gated IPC wrappers (task 79, Option B).
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+use crate::host::tauri_host::TauriHost;
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 use tauri::{AppHandle, Runtime, State};
 
 /// One-shot vault destruction.
@@ -127,11 +132,10 @@ use tauri::{AppHandle, Runtime, State};
 /// - `docs/threat-model.md` A5 (lost or stolen device — locked,
 ///   Strong) — the load-bearing at-rest guarantee that the
 ///   "geri getirilemez" UX claim reaffirms post-unlink
-#[tauri::command]
-pub async fn vault_delete<R: Runtime>(
-    state: State<'_, VaultRuntimeState>,
-    hooks: State<'_, crate::hooks::Hooks>,
-    app: AppHandle<R>,
+pub async fn vault_delete_from_host(
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    host: &dyn HostCtx,
     vault_id: Option<String>,
 ) -> Result<(), VaultDeleteError> {
     // SYNC-6 explicit-id targeting (mirrors `unlock` / `recover`): the IPC layer
@@ -146,11 +150,12 @@ pub async fn vault_delete<R: Runtime>(
     // Non-creating resolver (MYND-253): delete destroys an EXISTING vault;
     // a stale/forged id must resolve to a path the scan below turns into
     // VaultNotFound — never materialize an empty `vaults/<bogus-id>/`.
-    let vault_dir = crate::paths::vault_root_for_id_optional(&app, target).map_err(|_| {
-        VaultDeleteError::Io {
-            io_error_kind: crate::io_failure_kind::IoFailureKind::Other,
-        }
-    })?;
+    let vault_dir =
+        crate::paths::vault_root_for_id_optional_from_host(host, target).map_err(|_| {
+            VaultDeleteError::Io {
+                io_error_kind: crate::io_failure_kind::IoFailureKind::Other,
+            }
+        })?;
     // Name the slot-map key: the explicit `target` when present, else the
     // sole-vault id derived from the resolved root (same derivation as
     // `unlock` / `recover` when no explicit id was threaded).
@@ -159,20 +164,54 @@ pub async fn vault_delete<R: Runtime>(
     // MYND-351 Direction 2: a user-initiated delete preempts an in-flight
     // scheduled backup (which holds the shared auth permit) so the `try_acquire`
     // inside `vault_delete_with_dir` is not rejected by the invisible job.
-    hooks.preempt_inflight_backup(state.inner()).await;
+    hooks.preempt_inflight_backup(state).await;
 
-    let result = vault_delete_with_dir(vault_dir, vault_id, state.inner()).await;
+    let result = vault_delete_with_dir(vault_dir, vault_id, state).await;
+    run_post_delete_teardown(hooks, &result);
+    result
+}
 
-    // MYND-29 Task 8: the slot was dropped iff the delete actually proceeded
-    // (full `Ok` or a `PartialDelete`) — wipe the plaintext-derived search
-    // index on that same path so it does not outlive the deleted vault. A
-    // rejected delete (`BusyAuth` / `VaultNotFound`) left the slot untouched,
-    // so any live index belongs to a still-unlocked session and MUST NOT be
-    // wiped.
-    if matches!(
-        &result,
-        Ok(()) | Err(VaultDeleteError::PartialDelete { .. })
-    ) {
+/// The wasm/`VaultIo` twin of [`vault_delete_from_host`]
+/// (`phase3-web-client` task 72).
+///
+/// Same resolution, same backup preemption, same post-delete teardown — the one
+/// difference is which erase it drives ([`vault_delete_via_io`]). Sharing the
+/// teardown through [`run_post_delete_teardown`] rather than copying it is the
+/// point of the split: that list is what stops plaintext derived from the
+/// deleted vault (the search index, the staged workspace descriptor, the
+/// indices, the attachment graph) from outliving it, and two copies of it would
+/// diverge silently on the client with the smaller test surface.
+pub async fn vault_delete_via_io_from_host(
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    host: &dyn HostCtx,
+    io: &dyn crate::vault_io::VaultIo,
+    vault_id: Option<String>,
+) -> Result<(), VaultDeleteError> {
+    let target = VaultId::parse_optional(vault_id.as_deref());
+    let vault_dir =
+        crate::paths::vault_root_for_id_optional_from_host(host, target).map_err(|_| {
+            VaultDeleteError::Io {
+                io_error_kind: crate::io_failure_kind::IoFailureKind::Other,
+            }
+        })?;
+    let vault_id = target.unwrap_or_else(|| crate::paths::vault_id_from_root(&vault_dir));
+
+    hooks.preempt_inflight_backup(state).await;
+
+    let result = vault_delete_via_io(io, vault_dir, vault_id, state).await;
+    run_post_delete_teardown(hooks, &result);
+    result
+}
+
+/// Wipe every plaintext-derived artefact that must not outlive the vault.
+///
+/// Runs iff the delete actually PROCEEDED (full `Ok` or a `PartialDelete`) —
+/// the slot was dropped on exactly those paths. A rejected delete
+/// (`VaultBusyAuth` / `VaultNotFound`) left the slot untouched, so any live
+/// index belongs to a still-unlocked session and MUST NOT be wiped.
+fn run_post_delete_teardown(hooks: &crate::hooks::Hooks, result: &Result<(), VaultDeleteError>) {
+    if matches!(result, Ok(()) | Err(VaultDeleteError::PartialDelete { .. })) {
         hooks.zeroize_search_index();
         // MYND-166: wipe the staged editor-workspace descriptor too.
         hooks.clear_staged_descriptor();
@@ -192,7 +231,19 @@ pub async fn vault_delete<R: Runtime>(
         // PCM buffer do not outlive the deleted vault.
         hooks.abort_active_recording();
     }
-    result
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn vault_delete<R: Runtime>(
+    state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
+    app: AppHandle<R>,
+    vault_id: Option<String>,
+) -> Result<(), VaultDeleteError> {
+    vault_delete_from_host(state.inner(), hooks.inner(), &TauriHost::new(app), vault_id).await
 }
 
 /// Testable core of [`vault_delete`]. The Tauri-command wrapper
@@ -405,7 +456,7 @@ pub(crate) async fn delete_vault_files_no_zeroize(
         "vault_delete proceeding: slot empty, vault.meta present (MYND-108-bis no-keys lost-credentials path)"
     );
     let vault_dir_for_blocking = vault_dir.clone();
-    let join_result = tokio::task::spawn_blocking(move || -> Result<(), VaultDeleteError> {
+    let join_result = crate::task::run_blocking(move || -> Result<(), VaultDeleteError> {
         let outcome = crate::vault_sweep::sweep(
             &vault_dir_for_blocking,
             crate::vault_sweep::RootDisposal::Remove,
@@ -445,6 +496,186 @@ pub(crate) async fn delete_vault_files_no_zeroize(
                 io_error_kind: crate::io_failure_kind::IoFailureKind::Other,
             })
         }
+    }
+}
+
+// ── the storage-seam sibling (phase3-web-client task 72) ─────────────────────
+//
+// # What this is, and what it deliberately is not
+//
+// `vault_delete_with_dir` above reaches the filesystem through `std::fs`, twice
+// removed: `vault_sweep::sweep` inside `crate::task::run_blocking`. On
+// `wasm32-unknown-unknown` both halves are traps — `std::fs` fails at runtime
+// and `run_blocking`'s wasm arm cannot host a future — so a browser needed a
+// path that goes through [`crate::vault_io::VaultIo`] and awaits.
+//
+// It is a **sibling**, not a rewrite, for the same reason `sweep_via_io` is:
+// converting the existing function would drag desktop's erase off tokio's
+// blocking pool and onto the async executor, which is a real behaviour change to
+// a destructive command, made for a target that is not the one being served.
+//
+// # What it means on this client, which is not what it means on desktop
+//
+// The web client's OPFS container is a CACHE of a sync-held vault
+// (`decisions.md` 2026-07-26: sync is not optional here, it is the storage), so
+// erasing it is a sign-out that takes this browser's copy with it — the account
+// and everything already synced survive on the server. The command is the same
+// command and the bytes it removes are the same bytes; what differs is what the
+// user is told, and that lives in the UI (`localOnlyVault` in the capability
+// descriptor, and the load-bearing disclosure it selects). Nothing here claims
+// otherwise, and nothing here talks to the server: **no remote wipe, no
+// account deletion, no device revocation.** A user who wants the account gone
+// removes devices and deletes it from a client that can.
+//
+// # The two absences carried over from `sweep_via_io`
+//
+// No directory `fsync` (OPFS has no such primitive) and no symlink branch (the
+// seam's `DirEntry` distinguishes only files from directories, because OPFS
+// has nothing else to distinguish). Both are stated on `sweep_via_io` itself.
+
+/// [`vault_delete_with_dir`]'s storage-seam sibling: same slot precondition
+/// matrix, same partial-fail posture, same tracing taxonomy — awaiting
+/// [`crate::vault_sweep::sweep_via_io`] instead of offloading
+/// [`crate::vault_sweep::sweep`].
+///
+/// The zeroize-before-erase ordering is preserved by
+/// [`VaultRuntimeState::take_and_run_async_for_id`], which drops the slot before
+/// the erase future is constructed. That ordering is what the
+/// cryptographic-erase claim rests on and it matters MORE here: an OPFS walk is
+/// genuinely asynchronous, so keys left in the slot would outlive every await in
+/// it.
+pub async fn vault_delete_via_io(
+    io: &dyn crate::vault_io::VaultIo,
+    vault_dir: PathBuf,
+    vault_id: VaultId,
+    state: &VaultRuntimeState,
+) -> Result<(), VaultDeleteError> {
+    let _permit = match state.auth_permits().try_acquire() {
+        Ok(p) => p,
+        Err(_) => {
+            tracing::debug!(
+                stage = "auth_permits",
+                error_kind = "VaultBusyAuth",
+                "vault_delete rejected: another auth-pipeline op in flight"
+            );
+            return Err(VaultDeleteError::VaultBusyAuth);
+        }
+    };
+
+    match state.slot_kind(vault_id).await {
+        SlotKind::Empty => dispatch_empty_arm_via_io(io, vault_dir).await,
+        SlotKind::Recovering | SlotKind::Unlocked => {
+            let dir = vault_dir.clone();
+            let taken = state
+                .take_and_run_async_for_id(vault_id, || async {
+                    let outcome = crate::vault_sweep::sweep_via_io(
+                        io,
+                        &dir,
+                        crate::vault_sweep::RootDisposal::Remove,
+                    )
+                    .await;
+                    sweep_outcome_to_delete_result(outcome)
+                })
+                .await;
+            match taken {
+                Ok(()) => {
+                    tracing::info!(event = "vault_deleted", stage = "complete");
+                    Ok(())
+                }
+                Err(TakeAndRunError::SlotEmpty) => {
+                    // Same race, same answer as the native arm: a concurrent
+                    // `lock` took the slot (and zeroized it) between our peek
+                    // and the write-lock acquire, so the user's delete intent
+                    // is completed through the no-keys path rather than
+                    // rejected.
+                    tracing::debug!(
+                        stage = "slot_race",
+                        "vault_delete: slot raced to Empty during write-lock acquire; falling through to dispatch_empty_arm"
+                    );
+                    dispatch_empty_arm_via_io(io, vault_dir).await
+                }
+                Err(TakeAndRunError::Closure(vd_err)) => {
+                    report_delete_failure(&vd_err);
+                    Err(vd_err)
+                }
+                Err(TakeAndRunError::Join) => {
+                    // Unreachable on this arm — nothing is spawned. Routed
+                    // rather than `unreachable!()`d: a panic in a Worker kills
+                    // the instance, and the enum is shared with the arm that
+                    // can produce it.
+                    Err(VaultDeleteError::Io {
+                        io_error_kind: crate::io_failure_kind::IoFailureKind::Other,
+                    })
+                }
+            }
+        }
+    }
+}
+
+/// [`dispatch_empty_arm`]'s storage-seam sibling.
+///
+/// The `vault.meta` probe is `io.exists`, and an IO failure asking the question
+/// is treated as **absent** — the same verdict a desktop `is_file()` gives for
+/// an unreadable path, so the two arms agree on the lost-credentials gate rather
+/// than diverging on a rare error.
+pub(crate) async fn dispatch_empty_arm_via_io(
+    io: &dyn crate::vault_io::VaultIo,
+    vault_dir: PathBuf,
+) -> Result<(), VaultDeleteError> {
+    if io
+        .exists(&vault_dir.join("vault.meta"))
+        .await
+        .unwrap_or(false)
+    {
+        tracing::debug!(
+            stage = "slot_check",
+            slot_arm = "empty_meta_exists",
+            "vault_delete proceeding: slot empty, vault.meta present (no-keys path)"
+        );
+        let outcome = crate::vault_sweep::sweep_via_io(
+            io,
+            &vault_dir,
+            crate::vault_sweep::RootDisposal::Remove,
+        )
+        .await;
+        match sweep_outcome_to_delete_result(outcome) {
+            Ok(()) => {
+                tracing::info!(event = "vault_deleted", stage = "complete");
+                Ok(())
+            }
+            Err(vd_err) => {
+                report_delete_failure(&vd_err);
+                Err(vd_err)
+            }
+        }
+    } else {
+        tracing::debug!(
+            stage = "slot_check",
+            error_kind = "VaultNotFound",
+            "vault_delete rejected: slot empty and vault.meta absent"
+        );
+        Err(VaultDeleteError::VaultNotFound)
+    }
+}
+
+/// The partial-fail / unexpected-error tracing both `via_io` arms emit.
+///
+/// Extracted rather than duplicated a third and fourth time: the payload is
+/// DENY-list-clean by construction (a count and a variant name, never a path),
+/// and having one writer of it is what keeps that true as arms are added.
+fn report_delete_failure(vd_err: &VaultDeleteError) {
+    if let VaultDeleteError::PartialDelete { remaining_count } = vd_err {
+        tracing::warn!(
+            event = "vault_delete_partial",
+            remaining_count = *remaining_count,
+            "vault_delete completed with partial-fail"
+        );
+    } else {
+        tracing::warn!(
+            stage = "unlink_pipeline",
+            error_kind = vault_delete_error_kind(vd_err),
+            "vault_delete unlink pipeline returned non-PartialDelete error"
+        );
     }
 }
 
@@ -1106,6 +1337,228 @@ mod tests {
             assert!(
                 !tmp.path().exists(),
                 "vault_dir must be removed recursively (vault.meta + vault.meta.tmp + notes/*.myn + notes/ dir + vault_dir itself)"
+            );
+        });
+    }
+
+    // ---- the storage-seam sibling (phase3-web-client task 72) -------------
+    //
+    // Driven against the REAL native `VaultIo` rather than a double, for the
+    // same reason `vault_sweep`'s via_io tests are: a double would agree with
+    // whatever this arm does, and the property under test is that the two arms
+    // agree with EACH OTHER. The web arm's `VaultIo` is a different
+    // implementation of the same trait, so what these pin is the plugin logic
+    // above the seam — the slot matrix, the empty-arm dispatch, the partial-fail
+    // mapping — which is all of it that is not the seam's own job.
+
+    const IO: crate::vault_io::StdVaultIo = crate::vault_io::StdVaultIo;
+
+    /// Build a realistic vault directory: metadata, a note, and the mid-write
+    /// `.tmp` orphan a crash leaves behind.
+    fn seed_vault(dir: &std::path::Path) {
+        std::fs::create_dir_all(dir.join("notes")).unwrap();
+        std::fs::write(dir.join("vault.meta"), b"meta bytes").unwrap();
+        std::fs::write(dir.join("vault.meta.tmp"), b"mid-write crash artefact").unwrap();
+        std::fs::write(
+            dir.join("notes")
+                .join("0193e8d3-1234-7890-abcd-ef0123456789.myn"),
+            b"note",
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn via_io_removes_the_dir_and_zeroizes_the_slot() {
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("vd-via-io-happy").unwrap();
+            seed_vault(tmp.path());
+            let state = VaultRuntimeState::default();
+            state
+                .set_unlocked(
+                    test_vault_id(),
+                    crate::plugins::vault_unlock::state::fixture_unlocked_with_keys(7, 9, 1),
+                )
+                .await;
+
+            let result =
+                vault_delete_via_io(&IO, tmp.path().to_path_buf(), test_vault_id(), &state).await;
+
+            assert!(result.is_ok(), "happy path must succeed; got {result:?}");
+            assert_eq!(
+                state.slot_kind(test_vault_id()).await,
+                crate::plugins::vault_unlock::state::SlotKind::Empty,
+                "the slot must be Empty — the zeroize fired before the erase"
+            );
+            assert!(!tmp.path().exists(), "the vault directory must be gone");
+        });
+    }
+
+    /// phase3-web-client task 37: the erase clears this browser's **device
+    /// identity**, not only its content.
+    ///
+    /// Task 37 splits two lifetimes deliberately — the bearer token never
+    /// touches storage (`SessionTokenStore`), while `device_id` persists in
+    /// `sync-state.json` so a reload does not mint a new pending device. That
+    /// second half is a durable identifier on a machine that may not be the
+    /// user's, and the thing that makes it acceptable is that "sign out and
+    /// erase this browser's copy" (task 72) removes it. So the erase owes an
+    /// assertion, not an inference from "the sweep is recursive".
+    ///
+    /// Seeded with the whole device-local sync bookkeeping set — both
+    /// double-buffer copies of `sync-state.json` (task 18 writes `.a`/`.b`, and a
+    /// sweep that removed only a bare `sync-state.json` would leave the identity
+    /// sitting in a buffer file), the config, and the token file a NATIVE session
+    /// leaves behind. That last one matters for a reason worth stating: the
+    /// browser never writes `sync-token`, but a vault directory can be a desktop
+    /// one, and an erase that spared it would be leaving a credential behind on
+    /// the path whose whole promise is that it does not.
+    #[test]
+    fn via_io_erase_clears_the_device_identity_and_the_sync_bookkeeping() {
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("vd-via-io-device-id").unwrap();
+            seed_vault(tmp.path());
+            // `device_id_hex` is the identifier task 37 decided to persist.
+            for suffix in ["", ".a", ".b"] {
+                std::fs::write(
+                    tmp.path().join(format!("sync-state.json{suffix}")),
+                    br#"{"device_id_hex":"0123456789abcdef0123456789abcdef"}"#,
+                )
+                .unwrap();
+            }
+            std::fs::write(tmp.path().join("sync-config.json"), b"{}").unwrap();
+            std::fs::write(tmp.path().join("sync-token"), b"a native session's token").unwrap();
+
+            let state = VaultRuntimeState::default();
+            state
+                .set_unlocked(
+                    test_vault_id(),
+                    crate::plugins::vault_unlock::state::fixture_unlocked_with_keys(7, 9, 1),
+                )
+                .await;
+
+            let result =
+                vault_delete_via_io(&IO, tmp.path().to_path_buf(), test_vault_id(), &state).await;
+
+            assert!(result.is_ok(), "erase must succeed; got {result:?}");
+            // Named individually rather than resting on `!tmp.path().exists()`:
+            // the failure this guards against is a future artefact allow-list,
+            // and an allow-list failure shows up as a surviving FILE, which a
+            // directory-level assertion reports as "the directory is still
+            // there" without saying what is in it.
+            for leftover in [
+                "sync-state.json",
+                "sync-state.json.a",
+                "sync-state.json.b",
+                "sync-config.json",
+                "sync-token",
+            ] {
+                assert!(
+                    !tmp.path().join(leftover).exists(),
+                    "{leftover} must not survive the erase — task 37's device_id is only \
+                     acceptable as a persisted identifier because this removes it"
+                );
+            }
+            assert!(!tmp.path().exists(), "the vault directory must be gone");
+        });
+    }
+
+    /// The MYND-108-bis lost-credentials arm, through the seam: no keys to
+    /// zeroize, `vault.meta` on disk, so the erase proceeds.
+    #[test]
+    fn via_io_accepts_an_empty_slot_when_vault_meta_exists() {
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("vd-via-io-empty-meta").unwrap();
+            seed_vault(tmp.path());
+            let state = VaultRuntimeState::default();
+
+            let result =
+                vault_delete_via_io(&IO, tmp.path().to_path_buf(), test_vault_id(), &state).await;
+
+            assert!(
+                result.is_ok(),
+                "empty + meta-exists must accept; got {result:?}"
+            );
+            assert!(!tmp.path().exists());
+        });
+    }
+
+    /// …and rejects when there is nothing on disk, rather than reporting a
+    /// silent no-op success. On web this is the reachable case: a browser that
+    /// was evicted has no container, and telling the user "erased" would be a
+    /// lie about state they cannot see.
+    #[test]
+    fn via_io_rejects_an_empty_slot_with_nothing_on_disk() {
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("vd-via-io-nothing").unwrap();
+            std::fs::create_dir_all(tmp.path().join("notes")).unwrap();
+            let state = VaultRuntimeState::default();
+
+            let result =
+                vault_delete_via_io(&IO, tmp.path().to_path_buf(), test_vault_id(), &state).await;
+
+            assert!(matches!(result, Err(VaultDeleteError::VaultNotFound)));
+            assert!(
+                tmp.path().exists(),
+                "a rejected delete must leave storage untouched"
+            );
+        });
+    }
+
+    #[test]
+    fn via_io_rejects_when_another_auth_op_holds_the_permit() {
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("vd-via-io-busy").unwrap();
+            seed_vault(tmp.path());
+            let state = VaultRuntimeState::default();
+            let _held = state.auth_permits().try_acquire().expect("permit is free");
+
+            let result =
+                vault_delete_via_io(&IO, tmp.path().to_path_buf(), test_vault_id(), &state).await;
+
+            assert!(matches!(result, Err(VaultDeleteError::VaultBusyAuth)));
+            assert!(tmp.path().exists(), "a rejected delete touches nothing");
+        });
+    }
+
+    /// The agreement test. Two identical vault trees, one deleted each way,
+    /// must reach the same end state — which is the claim that lets the web
+    /// client reuse this plugin instead of growing its own.
+    #[test]
+    fn via_io_agrees_with_the_blocking_arm_on_the_same_tree() {
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("vd-via-io-agree").unwrap();
+            let a = tmp.path().join("a");
+            let b = tmp.path().join("b");
+            seed_vault(&a);
+            seed_vault(&b);
+
+            let state_a = VaultRuntimeState::default();
+            state_a
+                .set_unlocked(
+                    test_vault_id(),
+                    crate::plugins::vault_unlock::state::fixture_unlocked_with_keys(7, 9, 1),
+                )
+                .await;
+            let state_b = VaultRuntimeState::default();
+            state_b
+                .set_unlocked(
+                    test_vault_id(),
+                    crate::plugins::vault_unlock::state::fixture_unlocked_with_keys(7, 9, 1),
+                )
+                .await;
+
+            let blocking = vault_delete_with_dir(a.clone(), test_vault_id(), &state_a).await;
+            let via_io = vault_delete_via_io(&IO, b.clone(), test_vault_id(), &state_b).await;
+
+            assert_eq!(
+                format!("{blocking:?}"),
+                format!("{via_io:?}"),
+                "the two arms must return the same verdict on the same tree"
+            );
+            assert!(!a.exists() && !b.exists(), "both trees must be gone");
+            assert_eq!(
+                state_a.slot_kind(test_vault_id()).await,
+                state_b.slot_kind(test_vault_id()).await,
             );
         });
     }

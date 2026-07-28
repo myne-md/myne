@@ -12,7 +12,7 @@
 // via `Zeroizing<String>` (`src-tauri/CLAUDE.md` "Plaintext IPC across
 // the WebView boundary").
 
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../platform/core";
 import { buildInitialPlaintext } from "../dialect";
 import { normalizeFolderPath } from "../dialect/folderPath";
 

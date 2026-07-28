@@ -26,6 +26,7 @@
 //! trivially survives lock/unlock (a fresh unlock just reloads from disk).
 
 use super::config::SyncConfigError;
+use crate::io_failure_kind::IoFailureKind;
 use protocol::{decode_head_state, SealedHead, VaultHead, VvEntry, DEVICE_ID_LEN, HEAD_ID_LEN};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
@@ -108,6 +109,22 @@ pub struct SyncState {
     /// re-entry (the unlocked `root_key` re-derives the SCRAM secret).
     #[serde(default)]
     pub account_hash_hex: Option<String>,
+    /// Whether the last completed cycle PROVED this device holds every content
+    /// blob the server's head commits to (phase3-web-client task 89).
+    ///
+    /// Set by comparing the local manifest hash against the MAC-verified vault
+    /// head's `manifest_hash` — an exact statement of "I hold everything",
+    /// verified rather than inferred, over data the cycle already assembled.
+    /// Cleared whenever that comparison does not hold, so it can never go stale
+    /// in the dangerous direction.
+    ///
+    /// It gates ONE thing: a whole-corpus destructive sweep
+    /// (`attachment_clean_unused`), whose "unused" set is computed by scanning
+    /// the local notes directory and is therefore wrong by exactly the notes a
+    /// mid-materialisation device does not have yet. See
+    /// `super::corpus` for why an approximation would not do.
+    #[serde(default)]
+    pub corpus_complete: bool,
     /// F1 Faz B: SHA-256 (lowercase hex) of the `vault.meta` this device last saw
     /// as the agreed synced state. Lets the meta phase distinguish "the server's
     /// meta is unchanged since I synced" (only I changed → push) from "the server
@@ -145,12 +162,50 @@ impl SyncState {
 use super::to_hex as hex;
 
 /// Read `<dir>/sync-state.json`. Absent → default (no cursor, empty log).
-pub fn read_sync_state(dir: &Path) -> Result<SyncState, SyncConfigError> {
+///
+/// # Absent and unreadable are different answers, and callers must keep them so
+///
+/// `Ok(SyncState::default())` means **this device has never enrolled** — cursor
+/// 0, no baselines, no `device_id`. `Err` means the file is there and could not
+/// be read or parsed, which is a different situation entirely and is NOT safe to
+/// treat as the first one.
+///
+/// The dangerous shape is a read-modify-WRITE that collapses them: defaulting on
+/// a failed read and then persisting destroys the pull cursor, the VV
+/// observation log, the per-blob CAS baselines and `meta_baseline_hex` in one
+/// step. The consequences compound — the device re-enrols as brand new, AND the
+/// meta phase gets a false "only the server changed" verdict from the absent
+/// `meta_baseline_hex`, which overwrites a locally-newer `vault.meta`.
+///
+/// `unwrap_or_default()` on this function is therefore a bug wherever a write
+/// follows, and was one at two call sites until phase3-web-client task 86.
+pub async fn read_sync_state(
+    io: &dyn crate::vault_io::VaultIo,
+    dir: &Path,
+) -> Result<SyncState, SyncConfigError> {
     let path = dir.join(SYNC_STATE_FILE);
-    match std::fs::read(&path) {
-        Ok(bytes) => serde_json::from_slice(&bytes).map_err(|_| SyncConfigError::Parse),
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(SyncState::default()),
-        Err(e) => Err(e.into()),
+    // `open_newest`, not a plain read (task 86). On the web store this file is
+    // two alternating copies, and `VaultIo::read` there returns the newest
+    // STRUCTURALLY INTACT one — the newest whose generation frame parses. That
+    // is not the same question: a write torn a few bytes in leaves a valid frame
+    // wrapping half a JSON document, so a plain read hands back the torn copy
+    // and the parse fails, even though the previous complete copy is sitting
+    // right beside it. The verifier for a plaintext sidecar is `serde_json`, so
+    // it has to be the thing that chooses.
+    //
+    // Native is unchanged by construction: `read_candidates` yields one element
+    // there, so this is the same read followed by the same parse.
+    match crate::singleton::open_newest(io, &path, |bytes| {
+        serde_json::from_slice::<SyncState>(bytes)
+    })
+    .await
+    {
+        Ok(state) => Ok(state),
+        // Absent is the legitimate pre-enrolment answer, and stays distinct from
+        // "present and unreadable" — see the doc above.
+        Err(crate::singleton::OpenOutcome::Absent) => Ok(SyncState::default()),
+        Err(crate::singleton::OpenOutcome::Undecodable(_)) => Err(SyncConfigError::Parse),
+        Err(crate::singleton::OpenOutcome::Io(kind)) => Err(kind.into()),
     }
 }
 
@@ -159,12 +214,15 @@ pub fn read_sync_state(dir: &Path) -> Result<SyncState, SyncConfigError> {
 /// are fine). NEVER touches `notes/`, attachments, or `vault.meta`: it only drops the
 /// device-local sync bookkeeping so the vault returns to a clean unsynced state and the
 /// next sync re-bootstraps the baseline (BootstrapTofu) from the server.
-pub fn clear_device_local_sync(dir: &Path) -> Result<(), SyncConfigError> {
+pub async fn clear_device_local_sync(
+    io: &dyn crate::vault_io::VaultIo,
+    dir: &Path,
+) -> Result<(), SyncConfigError> {
     for f in DEVICE_LOCAL_SYNC_FILES {
-        match std::fs::remove_file(dir.join(f)) {
+        match io.remove_file(&dir.join(f)).await {
             Ok(()) => {}
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
-            Err(e) => return Err(e.into()),
+            Err(IoFailureKind::NotFound) => {}
+            Err(kind) => return Err(kind.into()),
         }
     }
     // Also drop the orchestrator-owned device-local sync artifacts so a reset is a
@@ -172,22 +230,25 @@ pub fn clear_device_local_sync(dir: &Path) -> Result<(), SyncConfigError> {
     // (keyed to the OLD enrollment's baseline) survive into the next sync cycle after
     // re-enroll. Names mirror orchestrator.rs (`pending-tombstones` file + `conflicts/`
     // staging dir); neither holds note plaintext.
-    match std::fs::remove_file(dir.join("pending-tombstones")) {
+    match io.remove_file(&dir.join("pending-tombstones")).await {
         Ok(()) => {}
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
-        Err(e) => return Err(e.into()),
+        Err(IoFailureKind::NotFound) => {}
+        Err(kind) => return Err(kind.into()),
     }
     // The attachment-deletion queue (MYND-468) is likewise stale deletion
     // intent keyed to the old enrollment.
-    match std::fs::remove_file(dir.join("pending-attachment-tombstones")) {
+    match io
+        .remove_file(&dir.join("pending-attachment-tombstones"))
+        .await
+    {
         Ok(()) => {}
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
-        Err(e) => return Err(e.into()),
+        Err(IoFailureKind::NotFound) => {}
+        Err(kind) => return Err(kind.into()),
     }
-    match std::fs::remove_dir_all(dir.join("conflicts")) {
+    match io.remove_dir_all(&dir.join("conflicts")).await {
         Ok(()) => {}
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
-        Err(e) => return Err(e.into()),
+        Err(IoFailureKind::NotFound) => {}
+        Err(kind) => return Err(kind.into()),
     }
     // Deliberately NOT removed: `quarantine/` (reconcile drop-leg, §11.3). Unlike
     // every artifact above it holds USER DATA — the ciphertext of notes that were
@@ -195,7 +256,7 @@ pub fn clear_device_local_sync(dir: &Path) -> Result<(), SyncConfigError> {
     // never destroy it.
     // The vault.meta-dirty marker is keyed to the old enrollment's server state;
     // a fresh enrollment re-seeds meta, so drop it on reset.
-    clear_vault_meta_dirty(dir)?;
+    clear_vault_meta_dirty(io, dir).await?;
     Ok(())
 }
 
@@ -203,58 +264,89 @@ pub fn clear_device_local_sync(dir: &Path) -> Result<(), SyncConfigError> {
 /// after a credential change so the sync loop's meta phase knows to push the
 /// local wrap even if the immediate best-effort push failed (offline). Empty
 /// file; idempotent.
-pub fn mark_vault_meta_dirty(dir: &Path) -> Result<(), SyncConfigError> {
-    crate::atomic_write::atomic_write(&dir.join(VAULT_META_DIRTY_FILE), &[], true)?;
+pub async fn mark_vault_meta_dirty(
+    io: &dyn crate::vault_io::VaultIo,
+    dir: &Path,
+) -> Result<(), SyncConfigError> {
+    io.write(
+        &dir.join(VAULT_META_DIRTY_FILE),
+        &[],
+        crate::vault_io::WriteOpts::default(),
+    )
+    .await?;
     Ok(())
 }
 
 /// Clear the `vault.meta-dirty` marker (after a successful server push, or on
 /// reset). Idempotent — an absent marker is fine.
-pub fn clear_vault_meta_dirty(dir: &Path) -> Result<(), SyncConfigError> {
-    match std::fs::remove_file(dir.join(VAULT_META_DIRTY_FILE)) {
+pub async fn clear_vault_meta_dirty(
+    io: &dyn crate::vault_io::VaultIo,
+    dir: &Path,
+) -> Result<(), SyncConfigError> {
+    match io.remove_file(&dir.join(VAULT_META_DIRTY_FILE)).await {
         Ok(()) => Ok(()),
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
-        Err(e) => Err(e.into()),
+        Err(IoFailureKind::NotFound) => Ok(()),
+        Err(kind) => Err(kind.into()),
     }
 }
 
 /// Whether the local `vault.meta` is marked dirty (a pending credential change
 /// this device should push).
-pub fn vault_meta_is_dirty(dir: &Path) -> bool {
-    dir.join(VAULT_META_DIRTY_FILE).exists()
+pub async fn vault_meta_is_dirty(io: &dyn crate::vault_io::VaultIo, dir: &Path) -> bool {
+    // A failure to CONSULT the store reads as "not dirty", which is the same
+    // answer an absent marker gives. That is the conservative direction: a false
+    // "dirty" would push a local `vault.meta` the meta phase has no reason to
+    // believe is newer, whereas a false "clean" only defers the push to the next
+    // cycle (the marker is still on disk and the next read sees it).
+    io.exists(&dir.join(VAULT_META_DIRTY_FILE))
+        .await
+        .unwrap_or(false)
 }
 
 /// Persist the sync state to `<dir>/sync-state.json` (atomic replace).
-pub fn write_sync_state(dir: &Path, state: &SyncState) -> Result<(), SyncConfigError> {
+pub async fn write_sync_state(
+    io: &dyn crate::vault_io::VaultIo,
+    dir: &Path,
+    state: &SyncState,
+) -> Result<(), SyncConfigError> {
     let path = dir.join(SYNC_STATE_FILE);
     let bytes = serde_json::to_vec_pretty(state).map_err(|_| SyncConfigError::Parse)?;
-    crate::atomic_write::atomic_write(&path, &bytes, true)?;
+    io.write(&path, &bytes, crate::vault_io::WriteOpts::default())
+        .await?;
     Ok(())
 }
 
 /// Persist the last-seen head baseline to `<dir>/vault.head-state` as `MYH1`
 /// (atomic replace). The caller seals the head (`VaultHead::seal`) first.
-pub fn write_head_baseline(dir: &Path, sealed: &SealedHead) -> Result<(), SyncConfigError> {
+pub async fn write_head_baseline(
+    io: &dyn crate::vault_io::VaultIo,
+    dir: &Path,
+    sealed: &SealedHead,
+) -> Result<(), SyncConfigError> {
     let path = dir.join(HEAD_STATE_FILE);
     let blob = protocol::encode_head_state(sealed, protocol::VAULT_HEAD_FORMAT_V1);
-    crate::atomic_write::atomic_write(&path, &blob, true)?;
+    io.write(&path, &blob, crate::vault_io::WriteOpts::default())
+        .await?;
     Ok(())
 }
 
 /// Read + verify the device-local head baseline. Absent → `Ok(None)`. A present
 /// blob is MAC-re-verified under `root_key`; a tamper / wrong-key blob is an
 /// error (the server cannot have written a valid one).
-pub fn read_head_baseline(
+pub async fn read_head_baseline(
+    io: &dyn crate::vault_io::VaultIo,
     root_key: &[u8; 32],
     dir: &Path,
 ) -> Result<Option<VaultHead>, HeadBaselineError> {
     let path = dir.join(HEAD_STATE_FILE);
-    match std::fs::read(&path) {
-        Ok(blob) => decode_head_state(root_key, &blob)
-            .map(Some)
-            .map_err(|_| HeadBaselineError::Invalid),
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
-        Err(_) => Err(HeadBaselineError::Io),
+    // Same reasoning as `read_sync_state`: the verifier here is the head's own
+    // HMAC (§9.16 re-verifies it under `root_key` on every load), so it is what
+    // must choose between the two copies rather than the generation frame.
+    match crate::singleton::open_newest(io, &path, |blob| decode_head_state(root_key, blob)).await {
+        Ok(head) => Ok(Some(head)),
+        Err(crate::singleton::OpenOutcome::Absent) => Ok(None),
+        Err(crate::singleton::OpenOutcome::Undecodable(_)) => Err(HeadBaselineError::Invalid),
+        Err(crate::singleton::OpenOutcome::Io(_)) => Err(HeadBaselineError::Io),
     }
 }
 
@@ -278,10 +370,217 @@ mod tests {
     use super::*;
     use protocol::VAULT_HEAD_FORMAT_V1;
 
+    // ── the seam, filled in for this module's tests ─────────────────────────
+    //
+    // Task 86 gave every reader and writer here `io: &dyn VaultIo`. The shims
+    // below shadow them with the OLD signatures and supply the real
+    // `StdVaultIo`, so the ~120 call sites in this module read unchanged and the
+    // behavioural diff is not buried in mechanical noise. They are shims, not
+    // fakes: every one drives the production function against a real temp dir.
+
+    const IO: crate::vault_io::StdVaultIo = crate::vault_io::StdVaultIo;
+
+    fn rt<F: std::future::Future>(f: F) -> F::Output {
+        crate::test_support::block_on(f)
+    }
+
+    fn read_sync_state(dir: &Path) -> Result<SyncState, SyncConfigError> {
+        rt(super::read_sync_state(&IO, dir))
+    }
+    fn write_sync_state(dir: &Path, state: &SyncState) -> Result<(), SyncConfigError> {
+        rt(super::write_sync_state(&IO, dir, state))
+    }
+    fn read_head_baseline(
+        root_key: &[u8; 32],
+        dir: &Path,
+    ) -> Result<Option<VaultHead>, HeadBaselineError> {
+        rt(super::read_head_baseline(&IO, root_key, dir))
+    }
+    fn write_head_baseline(dir: &Path, sealed: &SealedHead) -> Result<(), SyncConfigError> {
+        rt(super::write_head_baseline(&IO, dir, sealed))
+    }
+    #[allow(dead_code)]
+    fn clear_device_local_sync(dir: &Path) -> Result<(), SyncConfigError> {
+        rt(super::clear_device_local_sync(&IO, dir))
+    }
+    #[allow(dead_code)]
+    fn mark_vault_meta_dirty(dir: &Path) -> Result<(), SyncConfigError> {
+        rt(super::mark_vault_meta_dirty(&IO, dir))
+    }
+    #[allow(dead_code)]
+    fn clear_vault_meta_dirty(dir: &Path) -> Result<(), SyncConfigError> {
+        rt(super::clear_vault_meta_dirty(&IO, dir))
+    }
+    #[allow(dead_code)]
+    fn vault_meta_is_dirty(dir: &Path) -> bool {
+        rt(super::vault_meta_is_dirty(&IO, dir))
+    }
+
     fn tmpdir(tag: &str) -> std::path::PathBuf {
         let d = std::env::temp_dir().join(format!("myne-syncstate-{}-{}", tag, std::process::id()));
         std::fs::create_dir_all(&d).unwrap();
         d
+    }
+
+    // ── absent vs unreadable (phase3-web-client task 86) ────────────────────
+    //
+    // These two answers had four callers between them and two of those callers
+    // erased the difference with `unwrap_or_default()`. The reader always kept
+    // it; what these pin is that it stays keepable, because the consequence of
+    // collapsing them is not a degraded read — it is a WRITE that destroys the
+    // cursor, the VV log, the CAS baselines and `meta_baseline_hex` at once.
+
+    // ── the sidecar over the OPFS container (task 86) ───────────────────────
+    //
+    // The container's own crash tests prove the algorithm. What these prove is
+    // the criterion: that a sidecar's OWN READER sees "the previous copy or the
+    // new one, never a default or a mixed one" after a torn write. They run over
+    // `ContainerVaultIo`, which makes the same routing decision the browser's
+    // OPFS arm makes, so the reader is driven exactly as a browser drives it.
+
+    #[test]
+    fn a_torn_sidecar_write_leaves_the_previous_copy_readable() {
+        rt(async {
+            let io = crate::test_support::ContainerVaultIo;
+            let dir = tmpdir("torn-container");
+            let base = dir.join(SYNC_STATE_FILE);
+            for slot in 0..2 {
+                let _ = std::fs::remove_file(crate::double_buffer::slot_path(
+                    &base.to_string_lossy(),
+                    slot,
+                ));
+            }
+
+            // Generation 1: a real, enrolled device.
+            let enrolled = SyncState {
+                cursor: 4_242,
+                device_id_hex: Some("aa".repeat(16)),
+                account_hash_hex: Some("bb".repeat(16)),
+                meta_baseline_hex: Some("cc".repeat(32)),
+                ..SyncState::default()
+            };
+            super::write_sync_state(&io, &dir, &enrolled).await.unwrap();
+
+            // Generation 2, TORN mid-write — the shape a crash leaves on a store
+            // with no atomicity, which is the entire reason task 18 exists.
+            let mut next = enrolled.clone();
+            next.cursor = 9_999;
+            let bytes = serde_json::to_vec_pretty(&next).unwrap();
+            crate::double_buffer::write_next_faulting(
+                &crate::vault_io::StdVaultIo,
+                &base,
+                &bytes,
+                crate::double_buffer::Fault::StopMidWrite(12),
+            )
+            .await
+            .ok();
+
+            // PREVIOUS-or-new, and here it is previous: the torn slot has a
+            // broken frame, so `candidates` skips it. Crucially NOT the default
+            // — a defaulted read here is what turns an enrolled device into a
+            // brand-new one and overwrites a locally-newer `vault.meta`.
+            let read = super::read_sync_state(&io, &dir).await.unwrap();
+            assert_eq!(read, enrolled, "the torn write must not be observable");
+            assert_ne!(read, SyncState::default());
+
+            for slot in 0..2 {
+                let _ = std::fs::remove_file(crate::double_buffer::slot_path(
+                    &base.to_string_lossy(),
+                    slot,
+                ));
+            }
+        });
+    }
+
+    #[test]
+    fn a_completed_sidecar_write_is_the_new_copy() {
+        // The other half of previous-or-new: without this, a reader that always
+        // returned the older copy would pass the test above.
+        rt(async {
+            let io = crate::test_support::ContainerVaultIo;
+            let dir = tmpdir("container-advance");
+            let base = dir.join(SYNC_STATE_FILE);
+            for slot in 0..2 {
+                let _ = std::fs::remove_file(crate::double_buffer::slot_path(
+                    &base.to_string_lossy(),
+                    slot,
+                ));
+            }
+            let mut st = SyncState {
+                cursor: 1,
+                ..SyncState::default()
+            };
+            super::write_sync_state(&io, &dir, &st).await.unwrap();
+            st.cursor = 2;
+            super::write_sync_state(&io, &dir, &st).await.unwrap();
+            assert_eq!(super::read_sync_state(&io, &dir).await.unwrap().cursor, 2);
+            for slot in 0..2 {
+                let _ = std::fs::remove_file(crate::double_buffer::slot_path(
+                    &base.to_string_lossy(),
+                    slot,
+                ));
+            }
+        });
+    }
+
+    #[test]
+    fn an_absent_state_is_the_default_not_an_error() {
+        // The legitimate pre-enrolment answer: cursor 0, no baselines, no
+        // device_id. A caller may default on this one.
+        let dir = tmpdir("absent");
+        let _ = std::fs::remove_file(dir.join(SYNC_STATE_FILE));
+        assert_eq!(read_sync_state(&dir).unwrap(), SyncState::default());
+    }
+
+    #[test]
+    fn a_present_but_unparseable_state_is_an_error_not_the_default() {
+        let dir = tmpdir("torn");
+        // A TRUNCATED file, which is the shape a torn write actually leaves —
+        // not arbitrary garbage. On a store with no crash-atomicity (OPFS, the
+        // whole reason task 18 exists) this is the realistic corruption.
+        std::fs::write(
+            dir.join(SYNC_STATE_FILE),
+            br#"{"cursor":42,"vv_log":[],"bl"#,
+        )
+        .unwrap();
+        assert!(matches!(read_sync_state(&dir), Err(SyncConfigError::Parse)));
+        let _ = std::fs::remove_file(dir.join(SYNC_STATE_FILE));
+    }
+
+    #[test]
+    fn an_empty_state_file_is_an_error_too() {
+        // Zero bytes is the other torn shape: the file was created and nothing
+        // landed. It must not read as "never enrolled".
+        let dir = tmpdir("empty");
+        std::fs::write(dir.join(SYNC_STATE_FILE), b"").unwrap();
+        assert!(read_sync_state(&dir).is_err());
+        let _ = std::fs::remove_file(dir.join(SYNC_STATE_FILE));
+    }
+
+    #[test]
+    fn defaulting_over_an_unreadable_state_would_lose_exactly_these_fields() {
+        // The blast radius, written down as a test rather than as a comment, so
+        // that a future change which reintroduces `unwrap_or_default()` on a
+        // write path has something concrete to fail.
+        let enrolled = SyncState {
+            cursor: 9_001,
+            vv_log: Vec::new(),
+            blobs: std::collections::BTreeMap::new(),
+            device_id_hex: Some("aa".repeat(16)),
+            account_hash_hex: Some("bb".repeat(16)),
+            meta_baseline_hex: Some("cc".repeat(32)),
+            corpus_complete: true,
+        };
+        let defaulted = SyncState::default();
+
+        // Re-enrols as a brand-new device…
+        assert_ne!(enrolled.device_id_hex, defaulted.device_id_hex);
+        // …loses the pull high-water mark, so the next cycle re-pulls from 0…
+        assert_ne!(enrolled.cursor, defaulted.cursor);
+        // …and hands the meta phase a false "only the server changed" verdict,
+        // which is what overwrites a locally-newer `vault.meta`.
+        assert!(enrolled.meta_baseline_hex.is_some());
+        assert!(defaulted.meta_baseline_hex.is_none());
     }
 
     fn sample_head(root_key: &[u8; 32], counter: u64) -> SealedHead {

@@ -28,6 +28,7 @@ import { makeProgressChip } from "./progress";
 import { showAttachmentLightbox } from "./lightbox";
 import { fileTypeLabel } from "./fileKind";
 import { formatBytes, formatClock } from "@myne/editor/host/components/attachments/format";
+import { canExportAttachment } from "@myne/editor/host/lib/attachments";
 import {
   exportAttachment,
   removeFileCard,
@@ -342,7 +343,18 @@ export class AttachmentFileCardWidget extends WidgetType {
 
     const menu = buildOverflowMenu(
       [
-        { label: i18n.t("editor.attachment.widget.menu.export"), testid: "attachment-card.export", run: () => void exportAttachment(this.id, this.filename) },
+        // Absent, not disabled: a platform with no export destination
+        // (the web client — no API grants a page a write path) omits the
+        // item entirely rather than offering one that cannot work.
+        ...(canExportAttachment()
+          ? [
+              {
+                label: i18n.t("editor.attachment.widget.menu.export"),
+                testid: "attachment-card.export",
+                run: () => void exportAttachment(this.id, this.filename),
+              },
+            ]
+          : []),
         { label: i18n.t("editor.attachment.widget.menu.rename"), testid: "attachment-card.rename", run: () => void renameFileCard(view, this.id, this.filename) },
         { label: i18n.t("editor.attachment.widget.menu.remove"), testid: "attachment-card.remove", run: () => removeFileCard(view, card, this.id) },
         { label: i18n.t("editor.attachment.widget.menu.reveal"), testid: "attachment-card.reveal", run: () => revealFileCard(view, this.id) },
@@ -459,7 +471,18 @@ export class AttachmentAudioWidget extends WidgetType {
     const transcript = createTranscriptSection({ view, id: this.id });
 
     const actions: OverflowAction[] = [
-      { label: i18n.t("editor.attachment.widget.menu.export"), testid: "attachment-audio.export", run: () => void exportAttachment(this.id, this.filename) },
+      // Absent, not disabled: a platform with no export destination
+      // (the web client — no API grants a page a write path) omits the
+      // item entirely rather than offering one that cannot work.
+      ...(canExportAttachment()
+        ? [
+            {
+              label: i18n.t("editor.attachment.widget.menu.export"),
+              testid: "attachment-audio.export",
+              run: () => void exportAttachment(this.id, this.filename),
+            },
+          ]
+        : []),
       { label: i18n.t("editor.attachment.widget.menu.rename"), testid: "attachment-audio.rename", run: () => void renameFileCard(view, this.id, this.filename) },
       { label: i18n.t("editor.attachment.widget.menu.remove"), testid: "attachment-audio.remove", run: () => removeFileCard(view, root, this.id) },
       { label: i18n.t("editor.attachment.widget.menu.reveal"), testid: "attachment-audio.reveal", run: () => revealFileCard(view, this.id) },
@@ -886,7 +909,18 @@ export class AttachmentTextPreviewWidget extends WidgetType {
 
     const menu = buildOverflowMenu(
       [
-        { label: i18n.t("editor.attachment.widget.menu.export"), testid: "attachment-text-preview.export", run: () => void exportAttachment(this.id, this.filename) },
+        // Absent, not disabled: a platform with no export destination
+        // (the web client — no API grants a page a write path) omits the
+        // item entirely rather than offering one that cannot work.
+        ...(canExportAttachment()
+          ? [
+              {
+                label: i18n.t("editor.attachment.widget.menu.export"),
+                testid: "attachment-text-preview.export",
+                run: () => void exportAttachment(this.id, this.filename),
+              },
+            ]
+          : []),
         { label: i18n.t("editor.attachment.widget.menu.rename"), testid: "attachment-text-preview.rename", run: () => void renameFileCard(view, this.id, this.filename) },
         { label: i18n.t("editor.attachment.widget.menu.remove"), testid: "attachment-text-preview.remove", run: () => removeFileCard(view, card, this.id) },
         { label: i18n.t("editor.attachment.widget.menu.reveal"), testid: "attachment-text-preview.reveal", run: () => revealFileCard(view, this.id) },

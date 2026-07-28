@@ -50,7 +50,8 @@ use protocol::{derive_subkey, SubkeyRole};
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, Runtime};
 
-use super::commands::{hex_decode_id, read_account_number_hash};
+use super::blocking_reads::{read_account_number_hash, read_catalog};
+use super::commands::hex_decode_id;
 use super::extract::detect_format;
 
 /// WebView event carrying the backlog's progress (MYND-441).
@@ -111,10 +112,14 @@ pub async fn drain_backlog<R: Runtime>(app: &AppHandle<R>, state: &VaultRuntimeS
     // than open-coding the peek → derive → decode chain. An unreadable blob
     // reads as ON: a prefs read failure must not silently disable a search
     // feature.
-    let enabled = myne_core::plugins::prefs::commands::prefs_read_with_dir(&vault_dir, state)
-        .await
-        .map(|p| p.attachment_ocr_enabled)
-        .unwrap_or(true);
+    let enabled = myne_core::plugins::prefs::commands::prefs_read_with_dir(
+        &vault_dir,
+        state,
+        &myne_core::vault_io::StdVaultIo,
+    )
+    .await
+    .map(|p| p.attachment_ocr_enabled)
+    .unwrap_or(true);
     if !enabled {
         return;
     }
@@ -122,7 +127,7 @@ pub async fn drain_backlog<R: Runtime>(app: &AppHandle<R>, state: &VaultRuntimeS
     // The account hash is a FILE CONSTANT — read once, not per attachment. Only
     // the key material is re-peeked inside the loop, which is the part that must
     // not outlive a lock.
-    let Ok(Ok(account_number_hash)) = read_account_number_hash(&vault_dir.join("vault.meta"))
+    let Ok(Some(account_number_hash)) = read_account_number_hash(&vault_dir.join("vault.meta"))
     else {
         return;
     };
@@ -237,7 +242,7 @@ async fn collect_candidates(
     };
     let attachment_text_key = derive_subkey(&root_key, SubkeyRole::AttachmentTextKey);
     let catalog_key = derive_subkey(&root_key, SubkeyRole::AttachmentsCatalogKey);
-    let Ok(catalog) = super::commands::read_catalog(
+    let Ok(catalog) = read_catalog(
         &vault_dir.join("vault.attachments"),
         &catalog_key,
         account_number_hash,

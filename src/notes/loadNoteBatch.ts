@@ -23,7 +23,7 @@
 // is the read-side analogue — direct `plugin:notes|note_titles_batch`
 // callers outside this file are a contract violation.
 
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../platform/core";
 import { load as parseYaml } from "js-yaml";
 import {
   readArchivedFromFmBody,

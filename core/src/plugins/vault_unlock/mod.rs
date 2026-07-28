@@ -15,3 +15,8 @@
 pub mod commands;
 pub mod error;
 pub mod state;
+// Mid-session storage health (phase3-web-client task 22). A sibling of the boot
+// probe in `commands`, not an extension of it: the same three on-disk states mean
+// different things once a session is unlocked, and "eviction detected, not
+// misreported as corruption" is a distinction that only exists here.
+pub mod storage_health;

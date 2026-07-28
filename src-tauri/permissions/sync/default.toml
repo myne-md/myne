@@ -20,6 +20,8 @@ permissions = [
     "allow-sync-get-endpoint",
     "allow-sync-set-endpoint",
     "allow-sync-status",
+    "allow-sync-unsynced-edits",
+    "allow-sync-materialisation-progress",
     "allow-sync-now",
     "allow-sync-list-devices",
     "allow-sync-account-status",
@@ -54,6 +56,16 @@ commands.allow = ["sync_set_endpoint"]
 identifier = "allow-sync-status"
 description = "Allow invoking sync:sync_status (read-only current sync status for the status indicator: disabled / idle / syncing / error / conflicts). No vault access."
 commands.allow = ["sync_status"]
+
+[[permission]]
+identifier = "allow-sync-unsynced-edits"
+description = "Allow invoking sync:sync_unsynced_edits (read-only list of note ids whose local bytes the server has not acknowledged, for the unsynced-edit marker). Derived from each note's MY01 header nonce and the sync-state.json baselines — no decrypt, no key material, no network."
+commands.allow = ["sync_unsynced_edits"]
+
+[[permission]]
+identifier = "allow-sync-materialisation-progress"
+description = "Allow invoking sync:sync_materialisation_progress (read-only {done, total, generation} counts for the first-sync progress readout). Three atomic loads; no vault access, no IO, no network, no identifiers."
+commands.allow = ["sync_materialisation_progress"]
 
 [[permission]]
 identifier = "allow-sync-now"

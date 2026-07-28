@@ -12,7 +12,7 @@
 
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
-import { save as saveFileDialog } from "@tauri-apps/plugin-dialog";
+import { save as saveFileDialog } from "../../platform/dialog";
 import { Button } from "../primitives/Button";
 import { ModalShell } from "../primitives/ModalShell";
 import { Spinner } from "../Spinner";

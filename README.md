@@ -27,22 +27,26 @@ The threat model is normative: marketing copy and code may not exceed its guaran
 - **Desktop core ([`src-tauri/`](src-tauri/))** — Tauri 2 host with atomic writes, auto-lock, snapshot/backup, vault registry and migration, on-device search and spell-check, screen-capture protection, and the browser-clipper native-messaging host. Capability ACLs live under [`src-tauri/capabilities/`](src-tauri/capabilities).
 - **UI ([`src/`](src/))** — React 19 vault onboarding/unlock/recovery flows, a CodeMirror 6 markdown editor (reading/source modes, folding, find-and-replace, multi-cursor, wikilinks, tags), graph view, attachments, saved views, and export (TXT/HTML/PDF).
 - **Specs ([`docs/`](docs/))** — complete v0.1 protocol, threat model, account-number spec, ~115-entry glossary, and an append-only decisions log.
+- **Web client ([`web/`](web/))** — the Phase 3 desktop-**browser** target. Not a second UI: it compiles the same [`src/`](src/) tree and the same [`protocol/`](protocol/) crate (to `wasm32-unknown-unknown`), substituting one internal boundary — the platform seam at [`src/platform/`](src/platform/) — at build time. Deliberately narrower than the native clients: no account or vault creation, no recovery-phrase unlock, and it requires sync. Its delivery channel is weaker than a signed desktop build; see [`docs/threat-model.md`](docs/threat-model.md) A15 / TB11 for exactly what that costs.
 - **E2E suite ([`e2e/`](e2e/))** — 50+ scenarios driving the production binary via tauri-driver. A new user-facing flow ships with its E2E coverage.
 
-Planned and not yet in this repo: a tagged release, signed reproducible builds, and the server-backed sync described in [`docs/vision.md`](docs/vision.md). Sync, the server, and the other clients live in their own companion repos (below).
+Planned and not yet in this repo: a tagged release, signed reproducible builds, and the published bundle-hash record the web client's verifiability story depends on. The sync **server** and the **mobile** client live in their own companion repos (below); the web client does not — it is the in-repo `web/` target above.
 
 ## Repository layout
 
 ```
 myne/
 ├── docs/                ← specs, threat model, glossary, decisions log
-├── src/                 ← React UI (Tauri WebView)
-│   └── clip/            ← clip assembly + dispatch (clipper-paired)
+├── src/                 ← React UI — shared by BOTH clients
+│   ├── clip/            ← clip assembly + dispatch (clipper-paired)
+│   └── platform/        ← platform seam: the only place allowed to import @tauri-apps/*
 ├── src-tauri/           ← Tauri 2 + Rust desktop core
 │   ├── capabilities/    ← Tauri capability ACLs (security-load-bearing)
 │   └── src/clipper/     ← browser-clipper native-messaging host
 ├── protocol/            ← Rust cryptographic protocol crate (no_std + alloc)
-├── e2e/                 ← tauri-driver end-to-end scenarios + fixture-gen
+├── web/                 ← Phase 3 desktop-browser client (same src/ tree, seam substituted)
+├── e2e/                 ← tauri-driver end-to-end scenarios + fixture-gen (desktop lane)
+├── e2e-web/             ← browser-driven web E2E lane (web-specific behaviour only)
 ├── tests/              ← Vitest unit/integration specs
 ├── public/              ← static assets bundled into the WebView
 ├── workspace/           ← multi-repo helper scripts + manifest
@@ -52,7 +56,7 @@ myne/
 └── package.json         ← pnpm + Vite + React + TS toolchain
 ```
 
-The desktop client lives at the repo root, not under `apps/`, because mobile, web, server, and website each live in a dedicated companion repo — a one-child `apps/desktop/` would be needless nesting. `src-tauri/`, `protocol/`, and `e2e/fixture-gen/` are members of one Cargo workspace sharing a single root `Cargo.lock` so there is exactly one auditable lockfile.
+The desktop client lives at the repo root, not under `apps/`, because mobile, server, and website each live in a dedicated companion repo — a one-child `apps/desktop/` would be needless nesting. The **web** client is the exception, and deliberately so: it lives in-repo at `web/` because it compiles the same `src/` tree, and a cross-repo split would mean publishing that tree as a versioned package — reintroducing exactly the drift the shared tree exists to prevent ([`docs/decisions.md`](docs/decisions.md), 2026-07-26). `src-tauri/`, `protocol/`, and `e2e/fixture-gen/` are members of one Cargo workspace sharing a single root `Cargo.lock` so there is exactly one auditable lockfile.
 
 ## Development
 
@@ -63,6 +67,9 @@ pnpm install            # install JS toolchain
 pnpm tauri dev          # full Tauri dev (Vite on :1420 + Rust core)
 pnpm dev                # Vite only (strictPort — fails if 1420 is taken)
 pnpm tauri build        # production desktop bundle
+
+pnpm web:dev            # web client dev server on :1421 (runs alongside the desktop one)
+pnpm web:build          # typecheck web/ against the shared src/ tree + production web bundle
 
 pnpm test               # Vitest unit/integration suite
 pnpm test:e2e           # tauri-driver end-to-end scenarios
@@ -81,7 +88,6 @@ The full project spans several repos under the [`myne-md`](https://github.com/my
 | Repo | What it is |
 |---|---|
 | [`myne-server`](https://github.com/myne-md/myne-server) | Zero-knowledge sync server — the TB5 trust boundary, identical hosted and self-hosted |
-| [`myne-web`](https://github.com/myne-md/myne-web) | Web client |
 | [`myne-mobile`](https://github.com/myne-md/myne-mobile) | iOS + Android client |
 | [`myne-clipper`](https://github.com/myne-md/myne-clipper) | Browser-extension clipper — the paired channel that talks to this repo's native host |
 | [`myne-website`](https://github.com/myne-md/myne-website) | Marketing site (myne.md) |

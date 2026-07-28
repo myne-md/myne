@@ -1,0 +1,101 @@
+# Static server for the self-hosted web client (phase3-web-client task 49).
+#
+# Caddy rather than "here is a directory of files": a self-hoster serving the
+# bundle with a default static server silently loses cross-origin isolation and
+# the zero-third-party guarantee, and nothing in the app can detect a missing
+# response header. Handing out static files and calling that self-hostable would
+# push operators into an insecure default.
+#
+# The header block is GENERATED at container start from MYNE_SYNC_ORIGIN
+# (`generate-headers.mjs`) and imported here, so the CSP names exactly the
+# operator's own sync server and the policy stays as tight for them as for the
+# hosted instance.
+
+{
+	admin off
+	auto_https off
+}
+
+:{$PORT:8080} {
+	root * /srv/web
+	encode gzip zstd
+
+	# --- no client-IP access logging (phase3-web-client task 110) -------------
+	# "No persistent server-side IP logging" is a hard architectural commitment
+	# and AS14 is normative. This origin is where it is easiest to lose
+	# silently: Caddy's default access log emits the client IP, and **a page
+	# load here is a vault opening** — so a default log would be an access-time
+	# record of when each user opens their notes. Exactly the record the whole
+	# design refuses to keep.
+	#
+	# The field-delete filter below is the same one `myne-ops/bundle/Caddyfile`
+	# uses at the sync edge, verbatim, so the two edges cannot drift.
+	log {
+		output stdout
+		format filter {
+			wrap console
+			fields {
+				request>remote_ip delete
+				request>remote_port delete
+				request>client_ip delete
+				request>headers>X-Forwarded-For delete
+				request>headers>X-Real-Ip delete
+				request>headers>Forwarded delete
+			}
+		}
+	}
+	# The health route is polled continuously; logging it would be noise even if
+	# it carried nothing (task 111).
+	log_skip /healthz
+
+	header {
+		import /etc/caddy/security-headers.caddy
+		# Never cache the entry document: it is how a client picks up a new
+		# bundle, and a cached one would pin the user to an old build in a way
+		# the signed-update policy does not control.
+		?Cache-Control "no-cache"
+	}
+
+	# Hashed asset filenames are immutable by construction.
+	@assets path /assets/*
+	header @assets Cache-Control "public, max-age=31536000, immutable"
+
+	# `version.json` must describe the SERVED build, so it is never cached and
+	# is excluded from the service worker's pinned cache (task 54). It is what
+	# lets anyone compare a running instance against the published hash record
+	# without downloading and hashing the bundle by hand.
+	@version path /version.json
+	header @version Cache-Control "no-store"
+
+	# `config.json` is this deployment's runtime configuration (task 50) —
+	# written by the entrypoint from `MYNE_SYNC_ORIGIN`, read by the client on
+	# first sign-in. Never cached: an operator who re-points their container at
+	# a different sync server must not have the old address survive in a
+	# browser cache, talking to a server the CSP no longer permits.
+	@config path /config.json
+	header @config Cache-Control "no-store"
+
+	# Operational endpoints (task 111). Deliberately static and content-free
+	# about users: they report that the server is up and which build it is
+	# serving, and nothing else. No counter, nothing account-specific — anything
+	# of that shape would be telemetry by another name.
+	#
+	# `handle` blocks, NOT a bare `respond` beside `try_files`. Written the
+	# obvious way, this route never fired: `try_files` REWRITES an unmatched
+	# path to `/index.html` before the `respond` matcher is evaluated, so
+	# `/healthz` arrived at it already renamed and the health endpoint answered
+	# with the whole SPA — a 200 with the right status and entirely the wrong
+	# body, which every naive health check passes. `handle` blocks are mutually
+	# exclusive, so the rewrite cannot reach across into this one.
+	handle /healthz {
+		respond "ok" 200
+	}
+
+	# SPA: unknown paths serve the entry document, so a deep link works. Routes
+	# are path segments (`/editor/<uuid>`), so without this every bookmark and
+	# every reload-in-the-editor is a 404.
+	handle {
+		try_files {path} /index.html
+		file_server
+	}
+}

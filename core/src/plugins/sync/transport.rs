@@ -120,6 +120,22 @@ pub trait SyncTransport: Send + Sync {
     /// stream, 401 → [`SseOpenError::Unauthorized`]). `read_timeout` is the
     /// dead-connection detector — set above the server's heartbeat cadence.
     /// Default: unsupported (the [`FakeTransport`] / any test double).
+    ///
+    /// **The browser inherits this default permanently** (phase3-web-client task
+    /// 84), and that is a decision rather than an unfinished port. [`SseStream`]
+    /// is a *blocking byte reader over a socket* plus a socket handle to shut it
+    /// down from another thread; a page has neither, and the browser's own
+    /// primitive for this — `EventSource` — is push-based, so wrapping it behind
+    /// a blocking signature would mean buffering an unbounded stream across a
+    /// `SharedArrayBuffer` and a second Worker to feed it. That machinery would
+    /// exist only to make a callback look like a socket.
+    ///
+    /// So the browser's poke channel is not a transport method at all: JS holds
+    /// the `EventSource` and calls
+    /// [`super::loop_control::SyncScheduler::on_poke`] — the same entry point
+    /// `poke_listener` reaches on desktop through its signal cell, which is why
+    /// the two clients still share one scheduler and one set of poke semantics
+    /// (`sync-protocol.md` §8.3). Wiring and reconnect are task 38's.
     fn open_sse(
         &self,
         path: &str,
@@ -468,5 +484,103 @@ mod tests {
             t.request(HttpMethod::Get, "/v1/pull", b"", None),
             Err(TransportError::NotConfigured)
         );
+    }
+}
+
+#[cfg(test)]
+mod default_binding_tests {
+    use super::*;
+
+    /// A transport that overrides nothing — the shape every non-TLS
+    /// implementation has, including the browser's (`web/wasm/src/sync_transport.rs`).
+    struct Bare(std::sync::Mutex<Vec<u8>>);
+
+    impl SyncTransport for Bare {
+        fn request(
+            &self,
+            _method: HttpMethod,
+            _path: &str,
+            body: &[u8],
+            _token: Option<&str>,
+        ) -> Result<TransportResponse, TransportError> {
+            *self.0.lock().expect("probe mutex") = body.to_vec();
+            Ok(TransportResponse {
+                status: 200,
+                body: Vec::new(),
+            })
+        }
+    }
+
+    /// The default channel binding is EMPTY, and a transport that overrides
+    /// nothing gets it.
+    ///
+    /// This is the client half of the rule task 36 states server-side, and the
+    /// property phase3-web-client task 84 asks to hold **structurally**: a
+    /// browser cannot read TLS exporter material, so the only correct binding
+    /// there is the empty one. It is correct because the sole override lives in
+    /// `rustls_transport`, which does not compile for `wasm32` — not because
+    /// somebody wrote `Ok(Vec::new())` in the browser arm, which a later change
+    /// could "fix" into something wrong.
+    #[test]
+    fn a_transport_that_overrides_nothing_binds_to_an_empty_exporter() {
+        let t = Bare(std::sync::Mutex::new(Vec::new()));
+        let seen: std::sync::Mutex<Option<Vec<u8>>> = std::sync::Mutex::new(None);
+        let build = |exporter: &[u8]| -> Vec<u8> {
+            *seen.lock().expect("probe mutex") = Some(exporter.to_vec());
+            b"client-final".to_vec()
+        };
+
+        t.request_bound_to_exporter(
+            HttpMethod::Post,
+            "/auth/scram/final",
+            None,
+            b"label",
+            32,
+            &build,
+        )
+        .expect("bare transport answers");
+
+        assert_eq!(
+            seen.lock().expect("probe mutex").as_deref(),
+            Some(&[][..]),
+            "the default must hand the body builder an EMPTY exporter"
+        );
+        assert_eq!(
+            &*t.0.lock().expect("probe mutex"),
+            b"client-final",
+            "and must still send the body the builder produced"
+        );
+    }
+
+    /// A transport that overrides nothing **cannot stream**, and says so.
+    ///
+    /// The browser's is exactly that transport. Task 84's acceptance criterion
+    /// names `open_sse`, and this is the answer: it is permanently absent there,
+    /// because [`SseStream`] is a blocking socket reader and a page has no
+    /// socket. The property that matters is that the absence is LOUD — a
+    /// `SyncTransport` that could not stream but returned an empty stream, or
+    /// reported [`SseOpenError::Transport`], would make the poke listener
+    /// reconnect forever against a transport that will never support it.
+    /// [`SseOpenError::Unsupported`] is the one variant a caller can react to by
+    /// falling back to polling, which is precisely what the scheduler does (the
+    /// module doc's "polling is the fallback cadence").
+    ///
+    /// Pinned here rather than in the browser crate for the same reason the
+    /// binding test is: `wasm32` has no test runner in this repo, and asserting
+    /// the DEFAULT covers every implementation that inherits it — including one
+    /// that does not exist yet.
+    #[test]
+    fn a_transport_that_overrides_nothing_reports_sse_unsupported() {
+        let t = Bare(std::sync::Mutex::new(Vec::new()));
+        match t.open_sse("/sync/poke", "tok", std::time::Duration::from_secs(30)) {
+            Err(SseOpenError::Unsupported) => {}
+            Err(other) => panic!(
+                "the default must be Unsupported — a caller distinguishes it from \
+                 a retryable failure; got {other:?}"
+            ),
+            Ok(_) => {
+                panic!("a transport with no streaming implementation must not return a stream")
+            }
+        }
     }
 }

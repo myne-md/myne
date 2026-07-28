@@ -56,6 +56,7 @@ import {
   runNoteTxtExportFlow,
   type NoteExportUiHooks,
 } from "../exportFlow";
+import { has as hasCapability } from "../../platform/capabilities";
 import { DecorationPopover } from "./DecorationPopover";
 import { Toast } from "../../components/Toast";
 import { FolderRow } from "./FolderRow";
@@ -101,6 +102,7 @@ import {
 import { Icon } from "../../components/primitives/Icon";
 import { useCenterView } from "../../screens/centerView";
 import { useFocusTrap } from "../../hooks/useFocusTrap";
+import { useUnsyncedEdits } from "../../hooks/useUnsyncedEdits";
 
 /**
  * Compute the adjacent note to select after deleting `victimId` from
@@ -1510,6 +1512,11 @@ function PopulatedList({
   // menu (avoids a per-row `favorites.includes` array scan).
   const favSet = useMemo(() => new Set(fm.favorites), [fm.favorites]);
 
+  // Per-note "not yet on the server" (phase3-web-client task 23). Read here
+  // rather than inside `<NoteRow>` so one poll serves the whole list — a hook
+  // per row would issue one IPC call per visible note on every tick.
+  const { unsyncedIds } = useUnsyncedEdits();
+
   // Shared <NoteRow> renderer — the Favorites section and the tree render an
   // identical NoteRow (only the `favorited` flag + the surrounding drag wrapper
   // differ). Keeping the prop wiring in one place stops the two sites drifting.
@@ -1535,6 +1542,7 @@ function PopulatedList({
           showTimestamps={showTimestamps}
           isIndexNote={role === "index"}
           indexConflict={role === "conflict"}
+          unsynced={unsyncedIds.has(id)}
         />
       );
     },
@@ -1547,6 +1555,7 @@ function PopulatedList({
       fm.itemColors,
       showTimestamps,
       folderIndexRoles,
+      unsyncedIds,
     ],
   );
 
@@ -1939,6 +1948,13 @@ function PopulatedList({
             ),
           ),
       },
+      // The PDF item is OMITTED where `pdfExport` is absent (task 48), matching
+      // the palette, which drops the same action through `ACTION_CAPABILITY`.
+      // Two render sites, one answer — a menu that offered it while the palette
+      // did not would be the "unreachable by menu, still reachable elsewhere"
+      // gap task 27 exists to close, pointing the other way.
+      ...(hasCapability("pdfExport")
+        ? [
       {
         // Sibling PDF egress (MYND-255) — same export group, same shared-
         // flow discipline (runNotePdfExportFlow is the palette's flow too).
@@ -1954,6 +1970,8 @@ function PopulatedList({
             ),
           ),
       },
+          ]
+        : []),
       {
         // Sibling HTML egress (MYND-340) — same export group, same shared-
         // flow discipline (runNoteHtmlExportFlow is the palette's flow too).

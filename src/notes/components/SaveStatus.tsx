@@ -12,6 +12,7 @@ import { useEffect, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import { formatRelativeTime, useTick } from "./relativeTime";
 import type { SaveStatus as SaveStatusValue } from "../useAutosave";
+import { isStorageFull } from "../../lib/storage-pressure";
 
 const ROOT_STYLE: CSSProperties = {
   display: "inline-flex",
@@ -68,12 +69,58 @@ const SEP_STYLE: CSSProperties = {
   margin: "0 4px",
 };
 
+/** Unsynced-edit marker (phase3-web-client task 23) — the hollow ring the
+ *  sidebar row uses, repeated here so the state is visible while the sidebar is
+ *  collapsed. Same shape and same ink deliberately: two glyphs for one fact
+ *  would read as two facts. */
+const UNSYNCED_MARK_STYLE: CSSProperties = {
+  display: "inline-block",
+  boxSizing: "border-box",
+  width: 6,
+  height: 6,
+  borderRadius: "50%",
+  border: "1px solid var(--fg-3)",
+  background: "transparent",
+  flexShrink: 0,
+};
+
 export type SaveStatusProps = {
   status: SaveStatusValue;
   onRetry: () => void;
+  /**
+   * Whether the note this readout describes is **not yet on the server**
+   * (phase3-web-client task 23).
+   *
+   * Rendered as a trailing marker rather than as a sixth `status` value, because
+   * it is an orthogonal fact and folding it in would make the two mutually
+   * exclusive: "Saved" and "not on the server" are simultaneously true for every
+   * note in the seconds after a save, and that combination is exactly the one
+   * the user needs to be able to see.
+   */
+  unsynced?: boolean;
 };
 
-export function SaveStatus({ status, onRetry }: SaveStatusProps) {
+export function SaveStatus({ status, onRetry, unsynced = false }: SaveStatusProps) {
+  const { t } = useTranslation();
+  // Sits OUTSIDE the readout rather than inside one of its six branches: the
+  // save state and the sync state are independent, and every branch would
+  // otherwise need the same trailing node.
+  return (
+    <>
+      <SaveStatusReadout status={status} onRetry={onRetry} />
+      {unsynced && (
+        <span
+          style={UNSYNCED_MARK_STYLE}
+          data-testid="editor.unsynced-marker"
+          title={t("notes.row.unsyncedTitle")}
+          aria-label={t("notes.row.unsyncedLabel")}
+        />
+      )}
+    </>
+  );
+}
+
+function SaveStatusReadout({ status, onRetry }: { status: SaveStatusValue; onRetry: () => void }) {
   const { t } = useTranslation();
   // Subscribe to the shared 30s tick so "Saved · N min ago" auto-updates.
   useTick();
@@ -139,19 +186,29 @@ export function SaveStatus({ status, onRetry }: SaveStatusProps) {
       );
     }
 
-    case "error":
+    case "error": {
+      // Storage exhaustion gets its own words (phase3-web-client task 91).
+      // "Save failed — click Retry" is advice that cannot work while the disk or
+      // the origin's quota is full: the user would retry forever. And the
+      // sentence that matters most is the one a generic failure never says —
+      // an edit that could not be written locally is **also not on the server**,
+      // so there is no second copy waiting to be recovered.
+      const full = isStorageFull(status.error);
       return (
         <span
           data-testid="editor.save-status"
+          data-storage-full={full ? "true" : undefined}
           style={{ ...ROOT_STYLE, color: "var(--warning)" }}
-          aria-label={t("notes.saveStatus.saveFailed")}
-          title={t("notes.saveStatus.saveFailedTitle")}
+          aria-label={t(full ? "notes.saveStatus.storageFull" : "notes.saveStatus.saveFailed")}
+          title={t(
+            full ? "notes.saveStatus.storageFullTitle" : "notes.saveStatus.saveFailedTitle",
+          )}
         >
           <span style={DOT_ERROR_STYLE} aria-hidden="true">
             ✕
           </span>
           <span style={{ color: "var(--fg-1)" }}>
-            {t("notes.saveStatus.saveFailed")}
+            {t(full ? "notes.saveStatus.storageFull" : "notes.saveStatus.saveFailed")}
           </span>
           <span style={SEP_STYLE}>·</span>
           <button type="button" style={RETRY_BUTTON_STYLE} onClick={onRetry}>
@@ -159,6 +216,7 @@ export function SaveStatus({ status, onRetry }: SaveStatusProps) {
           </button>
         </span>
       );
+    }
 
     // §11.3 keep-both in flight: the save lost to a sync pull; the buffer is
     // being preserved as a conflict copy and the pane re-based. Transient —

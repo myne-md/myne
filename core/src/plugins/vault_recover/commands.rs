@@ -16,12 +16,18 @@ use super::super::vault_unlock::state::{
     RecoveringMaterial, SlotKind, UnlockedVault, VaultRuntimeState,
 };
 use super::error::VaultRecoveryError;
+use crate::host::HostCtx;
 use crate::io_failure_kind::{from_io_error_kind, IoFailureKind};
 use crate::protocol_error_kind::protocol_error_kind;
 use protocol::{VaultMeta, AEAD_KEY_LEN, AEAD_NONCE_LEN, ARGON2_SALT_LEN};
 use std::path::{Path, PathBuf};
-use std::time::Instant;
-use tauri::{AppHandle, Manager, Runtime, State};
+// Tauri types serve only the cfg-gated IPC wrappers (task 79, Option B). The
+// `Manager` import went with them: its only use here was `app.path()`, which
+// `HostCtx::app_data_dir` now provides.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+use crate::host::tauri_host::TauriHost;
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+use tauri::{AppHandle, Runtime, State};
 use zeroize::Zeroizing;
 
 /// Bundle returned by the spawn_blocking pipeline closure: both
@@ -43,12 +49,11 @@ struct DerivedKeys {
 ///   the picker (sub-feature 3) passes (SYNC-6 targeting).
 /// - `None` → the sole-vault fallback (`current_vault_root_from_base`), which
 ///   preserves the current single-vault recovery flow.
-fn vault_meta_path<R: Runtime>(
-    app: &AppHandle<R>,
+fn vault_meta_path(
+    host: &dyn HostCtx,
     vault_id: Option<crate::vault_id::VaultId>,
 ) -> Result<PathBuf, VaultRecoveryError> {
-    let base = app
-        .path()
+    let base = host
         .app_data_dir()
         .map_err(|_| VaultRecoveryError::IoError {
             io_error_kind: IoFailureKind::Other,
@@ -80,6 +85,23 @@ fn vault_meta_path<R: Runtime>(
 /// discipline parallel: AEAD-tag failure on `recovery_wrap_key` →
 /// `InvalidCredentialOrVault` (non-distinguishing); items_key wrap
 /// failure → `InvalidVaultMeta` (recovery wrap-key already verified).
+pub async fn recover_with_phrase_from_host(
+    vault_id: Option<String>,
+    phrase: String,
+    state: &VaultRuntimeState,
+    host: &dyn HostCtx,
+) -> Result<(), VaultRecoveryError> {
+    // SYNC-6 targeting: `Some(id)` recovers exactly `vaults/<id>/`; `None`/
+    // malformed → the sole-vault fallback. The parsed id keys BOTH the path
+    // resolution and the slot map so they cannot diverge.
+    let target = crate::vault_id::VaultId::parse_optional(vault_id.as_deref());
+    let vault_path = vault_meta_path(host, target)?;
+    recover_with_phrase_with_path(phrase, target, &vault_path, state, host).await
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn recover_with_phrase<R: Runtime>(
     vault_id: Option<String>,
@@ -87,12 +109,7 @@ pub async fn recover_with_phrase<R: Runtime>(
     state: State<'_, VaultRuntimeState>,
     app: AppHandle<R>,
 ) -> Result<(), VaultRecoveryError> {
-    // SYNC-6 targeting: `Some(id)` recovers exactly `vaults/<id>/`; `None`/
-    // malformed → the sole-vault fallback. The parsed id keys BOTH the path
-    // resolution and the slot map so they cannot diverge.
-    let target = crate::vault_id::VaultId::parse_optional(vault_id.as_deref());
-    let vault_path = vault_meta_path(&app, target)?;
-    recover_with_phrase_with_path(phrase, target, &vault_path, state.inner()).await
+    recover_with_phrase_from_host(vault_id, phrase, state.inner(), &TauriHost::new(app)).await
 }
 
 /// Testable core of [`recover_with_phrase`]. The Tauri-command wrapper
@@ -105,6 +122,9 @@ pub(crate) async fn recover_with_phrase_with_path(
     vault_id: Option<crate::vault_id::VaultId>,
     vault_path: &Path,
     state: &VaultRuntimeState,
+    // See the sibling `complete_recovery_with_path`: the duration log was
+    // `Instant`-based, and `Instant::now()` panics on wasm32 (task 12).
+    host: &dyn HostCtx,
 ) -> Result<(), VaultRecoveryError> {
     // Wrap immediately so any early-return path (VaultAlreadyUnlocked,
     // RecoveryAlreadyInProgress, RecoveryInProgress, IO failure, parse
@@ -112,7 +132,7 @@ pub(crate) async fn recover_with_phrase_with_path(
     // would drop without zeroize.
     let phrase = Zeroizing::new(phrase);
 
-    let started = Instant::now();
+    let started_ms = host.monotonic_millis();
 
     // Slot-map key resolution (sub-feature 2 task 4 — explicit vault_id
     // targeting): `Some(id)` is the EXPLICIT target the IPC layer threaded.
@@ -174,7 +194,7 @@ pub(crate) async fn recover_with_phrase_with_path(
     let vault_path = vault_path.to_path_buf();
 
     let join_outcome =
-        tokio::task::spawn_blocking(move || -> Result<DerivedKeys, VaultRecoveryError> {
+        crate::task::run_blocking(move || -> Result<DerivedKeys, VaultRecoveryError> {
             // IO + parse + NFKD + KDF + AEAD all run inside the
             // blocking task: this frees the runtime worker across
             // the whole pipeline (Windows / cold-disk / antivirus
@@ -243,7 +263,7 @@ pub(crate) async fn recover_with_phrase_with_path(
         }
     };
 
-    let now = Instant::now();
+    let now_ms = host.monotonic_millis();
     state
         .set_recovering(
             vault_id,
@@ -251,7 +271,7 @@ pub(crate) async fn recover_with_phrase_with_path(
                 root_key,
                 items_key,
                 items_key_id,
-                recovered_at: now,
+                recovered_at: now_ms,
             },
         )
         .await;
@@ -263,7 +283,7 @@ pub(crate) async fn recover_with_phrase_with_path(
     // `decisions.md` 2026-05-06 "Tracing event-name pattern" entry.
     tracing::info!(
         event = "vault_recovered_with_phrase",
-        duration_ms = (now.duration_since(started).as_millis() / 10 * 10) as u64,
+        duration_ms = (now_ms.saturating_sub(started_ms) / 10) * 10,
         "vault recovered successfully (Slot::Recovering populated, awaiting password commit)"
     );
 
@@ -298,13 +318,12 @@ pub(crate) async fn recover_with_phrase_with_path(
 /// `vault_status` round-trip would be paranoia (`decisions.md`
 /// 2026-05-02 — IPC contract pins `Slot::Unlocked` as success).
 /// `vault_status` is for boot + post-WebView-reload routing only.
-#[tauri::command]
-pub async fn complete_recovery<R: Runtime>(
+pub async fn complete_recovery_from_host(
     vault_id: Option<String>,
     new_password: String,
-    state: State<'_, VaultRuntimeState>,
-    hooks: State<'_, crate::hooks::Hooks>,
-    app: AppHandle<R>,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    host: &dyn HostCtx,
 ) -> Result<(), VaultRecoveryError> {
     // SYNC-6 targeting: `Some(id)` commits against exactly `vaults/<id>/`;
     // `None`/malformed → resolution below. The resolved id keys BOTH the
@@ -323,8 +342,8 @@ pub async fn complete_recovery<R: Runtime>(
         Some(id) => Some(id),
         None => state.recovering_vault_id().await,
     };
-    let vault_path = vault_meta_path(&app, target)?;
-    complete_recovery_with_path(new_password, target, &vault_path, state.inner()).await?;
+    let vault_path = vault_meta_path(host, target)?;
+    complete_recovery_with_path(new_password, target, &vault_path, state, host).await?;
 
     // MYND-160 fix: post-recovery slot transition to Unlocked must
     // re-apply persisted prefs (user story 11). Same pattern as
@@ -332,9 +351,10 @@ pub async fn complete_recovery<R: Runtime>(
     // hook; failure does not propagate (vault_complete_recovery's
     // Ok(()) is already committed by this point).
     crate::plugins::vault_unlock::commands::apply_persisted_prefs(
-        &app,
-        state.inner(),
-        hooks.inner(),
+        host,
+        state,
+        hooks,
+        &crate::vault_io::StdVaultIo,
     )
     .await;
 
@@ -342,16 +362,44 @@ pub async fn complete_recovery<R: Runtime>(
     // the search index too (same best-effort, inline post-pipeline hook as
     // `vault_unlock::commands::unlock`). A recovered user's vault opens with
     // a working search index — full-rebuild if no blob exists yet.
-    hooks.hydrate_search_index(state.inner()).await;
+    hooks.hydrate_search_index(state).await;
 
     // F1: recovery reset just rewrote the password-side wrap of `vault.meta`
     // (root_key preserved). Best-effort push it so a second device derives
     // root_key against the NEW password wrap, not the stale server copy — same
     // rationale and non-blocking posture as the change-password path. Offline
     // leaves the `vault.meta-dirty` marker for the sync loop's meta phase.
-    let _ = crate::plugins::sync::commands::push_vault_meta_now(&app).await;
+    // Host-only: the post-change `vault.meta` push rides the raw-TLS sync
+    // transport, which does not exist on wasm — the browser's transport is
+    // `fetch` + `EventSource` (phase3-web-client task 84). Deliberately NOT
+    // no-opped on the wasm arm: task 88 requires `change_password` on web to
+    // be gated behind a **server-acknowledged** push, so silently skipping it
+    // here would build exactly the failure that task exists to prevent.
+    #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+    let _ = crate::plugins::sync::commands::push_vault_meta_now_from_host(host, state).await;
 
     Ok(())
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn complete_recovery<R: Runtime>(
+    vault_id: Option<String>,
+    new_password: String,
+    state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
+    app: AppHandle<R>,
+) -> Result<(), VaultRecoveryError> {
+    complete_recovery_from_host(
+        vault_id,
+        new_password,
+        state.inner(),
+        hooks.inner(),
+        &TauriHost::new(app),
+    )
+    .await
 }
 
 /// Testable core of [`complete_recovery`]. The Tauri-command wrapper
@@ -364,11 +412,16 @@ pub(crate) async fn complete_recovery_with_path(
     vault_id: Option<crate::vault_id::VaultId>,
     vault_path: &Path,
     state: &VaultRuntimeState,
+    // Supplies `UnlockedVault::unlocked_at` and the duration log, both of which
+    // were `Instant`-based until phase3-web-client task 12 — `Instant::now()`
+    // panics on wasm32. This path is decided absent on web, but it shares the
+    // `UnlockedVault` type with the password path that is not.
+    host: &dyn HostCtx,
 ) -> Result<(), VaultRecoveryError> {
     // Wrap immediately so any early-return path drops the wrapper and
     // zeroes the bytes.
     let new_password = Zeroizing::new(new_password);
-    let started = Instant::now();
+    let started_ms = host.monotonic_millis();
 
     // (0) Backend min-length floor — structural belt+suspenders against
     //     frontend bypass per `decisions.md` 2026-05-06 "Auth-pipeline
@@ -465,7 +518,7 @@ pub(crate) async fn complete_recovery_with_path(
     //     Returns the freshly-built vault.meta bytes WITHOUT writing
     //     them to disk — disk write is conditional on the post-Argon2id
     //     slot peek (step 5).
-    let derive_outcome = tokio::task::spawn_blocking(
+    let derive_outcome = crate::task::run_blocking(
         move || -> Result<[u8; protocol::VAULT_META_LEN], VaultRecoveryError> {
             // (a) Fresh CSPRNG salt + nonce.
             let mut fresh_salt = [0u8; ARGON2_SALT_LEN];
@@ -600,7 +653,7 @@ pub(crate) async fn complete_recovery_with_path(
     //     keys. The slot is currently Empty (we just took); the user
     //     must restart from A8d.
     let write_outcome =
-        tokio::task::spawn_blocking(move || -> Result<[u8; 32], VaultRecoveryError> {
+        crate::task::run_blocking(move || -> Result<[u8; 32], VaultRecoveryError> {
             // (e) Atomic write — tempfile + fsync + rename per §4.2.
             //     A failure here leaves vault.meta on disk with the
             //     original password still in effect; the user can
@@ -641,7 +694,10 @@ pub(crate) async fn complete_recovery_with_path(
     };
 
     // (7) Promote Slot::Recovering material → Slot::Unlocked.
-    let now = Instant::now();
+    // Host clock (phase3-web-client task 12): `unlocked_at` is a monotonic
+    // millisecond reading, because `Instant::now()` panics on wasm32. This path
+    // is decided absent on web, but it shares the `UnlockedVault` type.
+    let now_ms = host.monotonic_millis();
     state
         .set_unlocked(
             vault_id,
@@ -649,7 +705,7 @@ pub(crate) async fn complete_recovery_with_path(
                 root_key: recovering.root_key,
                 items_key: recovering.items_key,
                 items_key_id: recovering.items_key_id,
-                unlocked_at: now,
+                unlocked_at: now_ms,
                 vault_meta_bytes_hash,
             },
         )
@@ -665,7 +721,7 @@ pub(crate) async fn complete_recovery_with_path(
     // future `vault_password_changed` (MYND-22 plugin tasks).
     tracing::info!(
         event = "vault_recovery_completed",
-        duration_ms = (now.duration_since(started).as_millis() / 10 * 10) as u64,
+        duration_ms = (now_ms.saturating_sub(started_ms) / 10) * 10,
         "post-recovery password commit succeeded; slot is Unlocked"
     );
 
@@ -694,13 +750,11 @@ pub(crate) async fn complete_recovery_with_path(
 /// (`src-tauri/CLAUDE.md`). This command emits NONE of them — nor the parsed
 /// account-number, nor any per-vault hash, nor the resolved `VaultId`, nor a
 /// path — via `tracing`/IPC/format. It returns a bare `Option<String>`.
-#[tauri::command]
-pub async fn resolve_vault_by_account_number<R: Runtime>(
+pub async fn resolve_vault_by_account_number_from_host(
     account_number: String,
-    app: AppHandle<R>,
+    host: &dyn HostCtx,
 ) -> Result<Option<String>, VaultRecoveryError> {
-    let base = app
-        .path()
+    let base = host
         .app_data_dir()
         .map_err(|_| VaultRecoveryError::IoError {
             io_error_kind: IoFailureKind::Other,
@@ -709,6 +763,17 @@ pub async fn resolve_vault_by_account_number<R: Runtime>(
         super::account_number_select::resolve_vault_by_account_number(&base, &account_number)
             .map(|id| id.to_string()),
     )
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn resolve_vault_by_account_number<R: Runtime>(
+    account_number: String,
+    app: AppHandle<R>,
+) -> Result<Option<String>, VaultRecoveryError> {
+    resolve_vault_by_account_number_from_host(account_number, &TauriHost::new(app)).await
 }
 
 /// Step (a)+(b) of the spawn_blocking pipeline: NFKD-normalize the
@@ -891,9 +956,15 @@ mod tests {
             scratch.write_meta(&meta_bytes);
 
             let state = VaultRuntimeState::default();
-            recover_with_phrase_with_path(phrase, None, scratch.path(), &state)
-                .await
-                .expect("recover with correct phrase");
+            recover_with_phrase_with_path(
+                phrase,
+                None,
+                scratch.path(),
+                &state,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("recover with correct phrase");
 
             // Slot is now Recovering; both keys derived eagerly.
             let taken = state.take(test_vault_id()).await;
@@ -926,9 +997,15 @@ mod tests {
             assert_ne!(explicit, test_vault_id(), "explicit id must be non-legacy");
 
             let state = VaultRuntimeState::default();
-            recover_with_phrase_with_path(phrase, Some(explicit), scratch.path(), &state)
-                .await
-                .expect("recover with explicit vault_id");
+            recover_with_phrase_with_path(
+                phrase,
+                Some(explicit),
+                scratch.path(),
+                &state,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("recover with explicit vault_id");
 
             // The Recovering entry is keyed under the EXPLICIT id.
             assert_eq!(state.slot_kind(explicit).await, SlotKind::Recovering);
@@ -974,9 +1051,15 @@ mod tests {
 
             let state = VaultRuntimeState::default();
             // Recover with B's phrase against B's id + B's path.
-            recover_with_phrase_with_path(phrase_b, Some(id_b), scratch_b.path(), &state)
-                .await
-                .expect("B's phrase recovers B's vault.meta");
+            recover_with_phrase_with_path(
+                phrase_b,
+                Some(id_b),
+                scratch_b.path(),
+                &state,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("B's phrase recovers B's vault.meta");
 
             // B's slot holds B's root_key; A's slot is untouched.
             assert_eq!(state.slot_kind(id_b).await, SlotKind::Recovering);
@@ -1010,7 +1093,7 @@ mod tests {
             let state = VaultRuntimeState::default();
 
             let result =
-                recover_with_phrase_with_path(phrase_a, Some(id_b), scratch_b.path(), &state).await;
+                recover_with_phrase_with_path(phrase_a, Some(id_b), scratch_b.path(), &state, &crate::host::NoopHost).await;
             assert!(
                 matches!(result, Err(VaultRecoveryError::InvalidCredentialOrVault)),
                 "wrong-vault phrase must map to the same non-distinguishing variant as a typo; got {result:?}"
@@ -1036,9 +1119,15 @@ mod tests {
 
             let state = VaultRuntimeState::default();
             // `None` = sole-vault fallback — no VaultId selection was made.
-            recover_with_phrase_with_path(phrase, None, scratch.path(), &state)
-                .await
-                .expect("single-vault recovery via sole-vault fallback");
+            recover_with_phrase_with_path(
+                phrase,
+                None,
+                scratch.path(),
+                &state,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("single-vault recovery via sole-vault fallback");
 
             assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Recovering);
             match state.take(test_vault_id()).await {
@@ -1070,6 +1159,7 @@ mod tests {
                 None,
                 scratch.path(),
                 &state,
+                &crate::host::NoopHost,
             )
             .await;
             assert!(matches!(
@@ -1100,9 +1190,15 @@ mod tests {
             assert_ne!(mutated, phrase, "must actually contain U+00A0 now");
 
             let state = VaultRuntimeState::default();
-            recover_with_phrase_with_path(mutated, None, scratch.path(), &state)
-                .await
-                .expect("NFKD-normalized phrase must recover successfully");
+            recover_with_phrase_with_path(
+                mutated,
+                None,
+                scratch.path(),
+                &state,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("NFKD-normalized phrase must recover successfully");
 
             let taken = state.take(test_vault_id()).await;
             match taken {
@@ -1127,6 +1223,7 @@ mod tests {
                 None,
                 scratch.path(),
                 &state,
+                &crate::host::NoopHost,
             )
             .await;
             assert!(matches!(result, Err(VaultRecoveryError::VaultNotFound)));
@@ -1149,7 +1246,14 @@ mod tests {
             scratch.write_meta(&meta_bytes);
 
             let state = VaultRuntimeState::default();
-            let result = recover_with_phrase_with_path(phrase, None, scratch.path(), &state).await;
+            let result = recover_with_phrase_with_path(
+                phrase,
+                None,
+                scratch.path(),
+                &state,
+                &crate::host::NoopHost,
+            )
+            .await;
             match result {
                 Err(VaultRecoveryError::InvalidVaultMeta) => {}
                 Err(VaultRecoveryError::InvalidCredentialOrVault) => {
@@ -1173,7 +1277,14 @@ mod tests {
             scratch.write_meta(&bytes);
 
             let state = VaultRuntimeState::default();
-            let result = recover_with_phrase_with_path(phrase, None, scratch.path(), &state).await;
+            let result = recover_with_phrase_with_path(
+                phrase,
+                None,
+                scratch.path(),
+                &state,
+                &crate::host::NoopHost,
+            )
+            .await;
             assert!(matches!(result, Err(VaultRecoveryError::InvalidVaultMeta)));
             assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Empty);
         });
@@ -1188,7 +1299,14 @@ mod tests {
             scratch.write_meta(&bytes[..protocol::VAULT_META_LEN - 1]);
 
             let state = VaultRuntimeState::default();
-            let result = recover_with_phrase_with_path(phrase, None, scratch.path(), &state).await;
+            let result = recover_with_phrase_with_path(
+                phrase,
+                None,
+                scratch.path(),
+                &state,
+                &crate::host::NoopHost,
+            )
+            .await;
             assert!(matches!(result, Err(VaultRecoveryError::InvalidVaultMeta)));
             assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Empty);
         });
@@ -1212,7 +1330,14 @@ mod tests {
                 )
                 .await;
 
-            let result = recover_with_phrase_with_path(phrase, None, scratch.path(), &state).await;
+            let result = recover_with_phrase_with_path(
+                phrase,
+                None,
+                scratch.path(),
+                &state,
+                &crate::host::NoopHost,
+            )
+            .await;
             assert!(matches!(
                 result,
                 Err(VaultRecoveryError::VaultAlreadyUnlocked)
@@ -1247,7 +1372,14 @@ mod tests {
                 )
                 .await;
 
-            let result = recover_with_phrase_with_path(phrase, None, scratch.path(), &state).await;
+            let result = recover_with_phrase_with_path(
+                phrase,
+                None,
+                scratch.path(),
+                &state,
+                &crate::host::NoopHost,
+            )
+            .await;
             assert!(matches!(
                 result,
                 Err(VaultRecoveryError::RecoveryAlreadyInProgress)
@@ -1276,8 +1408,14 @@ mod tests {
                 .expect("first acquire on fresh state");
             assert_eq!(state.auth_permits().available_permits(), 0);
 
-            let result =
-                recover_with_phrase_with_path(phrase.clone(), None, scratch.path(), &state).await;
+            let result = recover_with_phrase_with_path(
+                phrase.clone(),
+                None,
+                scratch.path(),
+                &state,
+                &crate::host::NoopHost,
+            )
+            .await;
             assert!(matches!(
                 result,
                 Err(VaultRecoveryError::RecoveryInProgress)
@@ -1287,9 +1425,15 @@ mod tests {
             drop(held_permit);
             assert_eq!(state.auth_permits().available_permits(), 1);
 
-            recover_with_phrase_with_path(phrase, None, scratch.path(), &state)
-                .await
-                .expect("retry after permit released succeeds");
+            recover_with_phrase_with_path(
+                phrase,
+                None,
+                scratch.path(),
+                &state,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("retry after permit released succeeds");
             assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Recovering);
             assert_eq!(state.auth_permits().available_permits(), 1);
         });
@@ -1319,7 +1463,14 @@ mod tests {
                 .expect("first acquire on fresh state");
             assert_eq!(state.auth_permits().available_permits(), 0);
 
-            let result = recover_with_phrase_with_path(phrase, None, scratch.path(), &state).await;
+            let result = recover_with_phrase_with_path(
+                phrase,
+                None,
+                scratch.path(),
+                &state,
+                &crate::host::NoopHost,
+            )
+            .await;
             // Peek catches it before try_acquire runs.
             assert!(matches!(
                 result,
@@ -1354,6 +1505,7 @@ mod tests {
                 None,
                 scratch.path(),
                 &state,
+                &crate::host::NoopHost,
             )
             .await;
             assert!(matches!(
@@ -1367,9 +1519,15 @@ mod tests {
             );
 
             // Retry with correct phrase — must succeed.
-            recover_with_phrase_with_path(correct_phrase, None, scratch.path(), &state)
-                .await
-                .expect("retry after wrong-phrase failure works");
+            recover_with_phrase_with_path(
+                correct_phrase,
+                None,
+                scratch.path(),
+                &state,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("retry after wrong-phrase failure works");
             assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Recovering);
             assert_eq!(state.auth_permits().available_permits(), 1);
         });
@@ -1405,9 +1563,15 @@ mod tests {
         scratch.write_meta(&meta_bytes);
 
         let state = VaultRuntimeState::default();
-        recover_with_phrase_with_path(phrase.clone(), None, scratch.path(), &state)
-            .await
-            .expect("seed: A8d must succeed against the seeded vault");
+        recover_with_phrase_with_path(
+            phrase.clone(),
+            None,
+            scratch.path(),
+            &state,
+            &crate::host::NoopHost,
+        )
+        .await
+        .expect("seed: A8d must succeed against the seeded vault");
         assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Recovering);
 
         (state, scratch, password.to_string(), phrase, meta_bytes)
@@ -1427,7 +1591,14 @@ mod tests {
             // 11 chars — below MIN_PASSWORD_LEN of 12.
             let weak_pw = "a".repeat(11);
             let started = std::time::Instant::now();
-            let result = complete_recovery_with_path(weak_pw, None, scratch.path(), &state).await;
+            let result = complete_recovery_with_path(
+                weak_pw,
+                None,
+                scratch.path(),
+                &state,
+                &crate::host::NoopHost,
+            )
+            .await;
             let elapsed = started.elapsed();
 
             assert!(
@@ -1472,6 +1643,7 @@ mod tests {
                 None,
                 scratch.path(),
                 &state,
+                &crate::host::NoopHost,
             )
             .await
             .expect("A8f must succeed when slot is Recovering");
@@ -1500,6 +1672,7 @@ mod tests {
                 None,
                 scratch.path(),
                 &state,
+                &crate::host::NoopHost,
             )
             .await
             .expect("A8f");
@@ -1537,6 +1710,7 @@ mod tests {
                 None,
                 scratch.path(),
                 &state,
+                &crate::host::NoopHost,
             )
             .await
             .expect("A8f");
@@ -1590,6 +1764,7 @@ mod tests {
                 None,
                 scratch.path(),
                 &state,
+                &crate::host::NoopHost,
             )
             .await
             .expect("A8f");
@@ -1601,7 +1776,15 @@ mod tests {
             assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Empty);
 
             // Try the original password — must fail.
-            let result = unlock_with_path(orig_pw, None, scratch.path(), &state).await;
+            let result = unlock_with_path(
+                orig_pw,
+                None,
+                scratch.path(),
+                &state,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await;
             assert!(
                 matches!(result, Err(VaultUnlockError::InvalidCredentialOrVault)),
                 "original password must no longer unlock after A8f; got {result:?}"
@@ -1624,14 +1807,22 @@ mod tests {
                 None,
                 scratch.path(),
                 &state,
+                &crate::host::NoopHost,
             )
             .await
             .expect("A8f");
 
             let _ = state.take(test_vault_id()).await;
-            unlock_with_path("new-password-12".to_string(), None, scratch.path(), &state)
-                .await
-                .expect("new password must unlock the rewritten vault.meta");
+            unlock_with_path(
+                "new-password-12".to_string(),
+                None,
+                scratch.path(),
+                &state,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("new password must unlock the rewritten vault.meta");
             assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Unlocked);
         });
     }
@@ -1651,6 +1842,7 @@ mod tests {
                 None,
                 scratch.path(),
                 &state,
+                &crate::host::NoopHost,
             )
             .await
             .expect("A8f");
@@ -1658,9 +1850,15 @@ mod tests {
             // Lock to clear Slot::Unlocked, then re-recover with the
             // original phrase.
             let _ = state.take(test_vault_id()).await;
-            recover_with_phrase_with_path(phrase, None, scratch.path(), &state)
-                .await
-                .expect("phrase must still recover after A8f");
+            recover_with_phrase_with_path(
+                phrase,
+                None,
+                scratch.path(),
+                &state,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("phrase must still recover after A8f");
             assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Recovering);
         });
     }
@@ -1680,6 +1878,7 @@ mod tests {
                 None,
                 scratch.path(),
                 &state,
+                &crate::host::NoopHost,
             )
             .await;
             assert!(matches!(
@@ -1717,6 +1916,7 @@ mod tests {
                 None,
                 scratch.path(),
                 &state,
+                &crate::host::NoopHost,
             )
             .await;
             assert!(matches!(
@@ -1751,6 +1951,7 @@ mod tests {
                 None,
                 scratch.path(),
                 &state,
+                &crate::host::NoopHost,
             )
             .await;
             assert!(matches!(
@@ -1793,7 +1994,7 @@ mod tests {
             std::fs::remove_dir_all(&scratch.dir).expect("remove parent dir");
 
             let result =
-                complete_recovery_with_path("new-password-12".to_string(), None, scratch.path(), &state).await;
+                complete_recovery_with_path("new-password-12".to_string(), None, scratch.path(), &state, &crate::host::NoopHost).await;
             // Either IoError (read_meta / atomic_write failed) or
             // VaultNotFound (vault.meta was removed alongside the dir).
             assert!(

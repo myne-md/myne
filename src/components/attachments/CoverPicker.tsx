@@ -23,7 +23,7 @@ import {
   type DragEvent,
 } from "react";
 import { useTranslation } from "react-i18next";
-import { open as openFileDialog } from "@tauri-apps/plugin-dialog";
+import { pickFiles } from "../../platform/filePicker";
 import { ModalShell } from "../primitives/ModalShell";
 import { Button } from "../primitives/Button";
 import { AttachmentThumbnail } from "./AttachmentThumbnail";
@@ -140,13 +140,12 @@ export function CoverPicker({
   const handleUpload = useCallback(async () => {
     setBusy(true);
     try {
-      const selected = (await openFileDialog({
-        multiple: false,
-        directory: false,
-      })) as string | string[] | null;
-      if (selected === null) return; // cancelled
-      const paths = Array.isArray(selected) ? selected : [selected];
-      const sources: ImportSource[] = paths.map((path) => ({ kind: "path", path }));
+      // Through the picker seam, not `dialog.open` (phase3-web-client task 76):
+      // the result is an opaque handle rather than a path, so this compiles for
+      // a browser instead of handing a filename to something expecting a path.
+      const selected = await pickFiles({ multiple: false });
+      if (selected === null || selected.length === 0) return; // cancelled
+      const sources: ImportSource[] = selected.map((file) => ({ kind: "picked", file }));
       const choice = firstOk(await importMany(sources));
       if (choice !== null) onPick(choice);
     } catch {

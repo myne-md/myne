@@ -29,9 +29,9 @@ import {
   type CSSProperties,
 } from "react";
 import { useTranslation } from "react-i18next";
-import { open as openDialog } from "@tauri-apps/plugin-dialog";
-import { listen } from "@tauri-apps/api/event";
-import { revealItemInDir } from "@tauri-apps/plugin-opener";
+import { open as openDialog } from "../../platform/dialog";
+import { listen } from "../../platform/event";
+import { revealItemInDir } from "../../platform/opener";
 import { Button } from "../primitives/Button";
 // One modal skin (NoteExportModal exports it for its siblings) — only the
 // card width differs (480 vs 420) and the sub-panel doubles as the

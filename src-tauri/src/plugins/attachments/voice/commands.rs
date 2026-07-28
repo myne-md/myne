@@ -203,6 +203,8 @@ async fn encode_and_import_clip<R: Runtime>(
     let dir = crate::paths::active_vault_root_io(app, vault.active_vault_id().await)
         .map_err(|_| VoiceRecordError::Internal)?;
     attachment_import_with_dir(
+        &myne_core::vault_io::StdVaultIo,
+        &myne_core::host::tauri_host::TauriHost::new(app.clone()),
         &dir,
         vault.inner(),
         ImportSource::Bytes {

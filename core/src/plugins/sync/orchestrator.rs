@@ -70,6 +70,15 @@ pub struct SyncSummary {
     /// Local attachment bodies erased this cycle because the merged catalog
     /// carries their tombstone (remote-deletion propagation).
     pub attachments_deleted: usize,
+    /// The meta phase refused to adopt because the two `vault.meta` copies
+    /// disagree on the password-side wrap and no baseline says which side moved
+    /// (phase3-web-client task 88, [`MetaPhaseOutcome::CredentialAmbiguous`]).
+    ///
+    /// Surfaced rather than swallowed, because refusing is a **permanent stall**
+    /// until someone acts: every later cycle re-refuses, and a user who is told
+    /// nothing has no way to act. Silence here would trade a silent revert for a
+    /// silent freeze, which is not an improvement.
+    pub credential_ambiguous: bool,
     /// A remote `vault.prefs` change was merged into the on-disk view this
     /// cycle (MYND-478). The caller refreshes the RAM label/icon caches and
     /// emits the prefs-changed event off this (the orchestrator stays
@@ -105,6 +114,21 @@ pub enum SyncCycleError {
     Push(PushError),
     /// A local filesystem error (read/write a `.myn`, read/write sync state).
     Io,
+    /// The local store ran out of room while materialising a pulled note
+    /// (phase3-web-client task 91).
+    ///
+    /// Split out of [`SyncCycleError::Io`] because the two want opposite
+    /// schedules. A generic IO failure is usually transient and the ordinary
+    /// backoff is right; a full store is not, and retrying at that cadence is a
+    /// LOOP — the cycle re-downloads the same records and hits the same wall,
+    /// forever, while the user sees nothing but a spinning dot.
+    ///
+    /// **The cursor deliberately does not advance on this path.** Nothing is
+    /// lost: the records that did land are skipped next time by the disk-nonce
+    /// check, and the ones that did not are re-pulled once there is room. What
+    /// changes is that the client parks and SAYS the store is full instead of
+    /// hammering silently.
+    StorageFull,
     /// Head authoring (manifest hash / seal) failed.
     Head,
 }
@@ -145,7 +169,7 @@ fn download_blob_backoff(
     for _ in 0..6 {
         match engine::download_blob(transport, token, id) {
             Err(PullError::RateLimited) => {
-                std::thread::sleep(std::time::Duration::from_millis(delay_ms));
+                crate::task::block_sleep(std::time::Duration::from_millis(delay_ms));
                 delay_ms = (delay_ms * 2).min(2000);
             }
             other => return other,
@@ -162,6 +186,10 @@ enum PulledNoteApply {
     /// in flight (a `note_update` raced the pull) — an unpushed local edit now;
     /// nothing was written.
     SkippedDirty,
+    /// The store is full (phase3-web-client task 91). Distinct from an `Err` so
+    /// the caller can END the materialisation cleanly rather than unwinding —
+    /// what has already landed is fine and must keep its bookkeeping.
+    StorageFull,
 }
 
 /// Write one pulled note blob to disk under `notes::commands::notes_write_mutex`,
@@ -177,15 +205,24 @@ enum PulledNoteApply {
 /// exists and the disk no longer matches it (including "file vanished" — a
 /// mid-cycle local delete must not be resurrected) → skip without mutation.
 /// No baseline (fresh pull of a never-held note) → write unconditionally.
-fn apply_pulled_note_blob(
+async fn apply_pulled_note_blob(
+    io: &dyn crate::vault_io::VaultIo,
     notes_dir: &Path,
     id: &[u8; 16],
     bytes: &[u8],
     baseline_nonce_hex: Option<&str>,
 ) -> Result<PulledNoteApply, SyncCycleError> {
-    let _guard = crate::plugins::notes::commands::notes_write_mutex().blocking_lock();
+    // `.lock().await`, not `blocking_lock()` (phase3-web-client task 86): the
+    // cycle is async now, and `blocking_lock` PANICS inside a runtime. It was
+    // correct while the whole cycle ran on `spawn_blocking`; here it is a crash,
+    // and one the type system cannot see.
+    let _guard = crate::plugins::notes::commands::notes_write_mutex()
+        .lock()
+        .await;
     if let Some(base) = baseline_nonce_hex {
-        let disk_nonce_hex = std::fs::read(blob_path(notes_dir, id))
+        let disk_nonce_hex = io
+            .read(&blob_path(notes_dir, id))
+            .await
             .ok()
             .as_deref()
             .and_then(crate::note_nonce::read_myn_content_nonce)
@@ -194,10 +231,24 @@ fn apply_pulled_note_blob(
             return Ok(PulledNoteApply::SkippedDirty);
         }
     }
-    std::fs::create_dir_all(notes_dir).map_err(|_| SyncCycleError::Io)?;
-    crate::atomic_write::atomic_write(&blob_path(notes_dir, id), bytes, true)
+    io.create_dir_all(notes_dir)
+        .await
         .map_err(|_| SyncCycleError::Io)?;
-    Ok(PulledNoteApply::Applied)
+    match io
+        .write(
+            &blob_path(notes_dir, id),
+            bytes,
+            crate::vault_io::WriteOpts::default(),
+        )
+        .await
+    {
+        Ok(()) => Ok(PulledNoteApply::Applied),
+        // The one IO failure with a different remedy and a different schedule.
+        // Reported rather than raised so the caller can stop materialising and
+        // keep what landed, instead of unwinding a cycle that was mostly fine.
+        Err(crate::io_failure_kind::IoFailureKind::NoSpace) => Ok(PulledNoteApply::StorageFull),
+        Err(_) => Err(SyncCycleError::Io),
+    }
 }
 
 /// The device-local conflict-staging dir: a downloaded *remote* revision of a note
@@ -220,7 +271,8 @@ pub(crate) fn quarantine_dir(vault_root: &Path) -> std::path::PathBuf {
 /// Move a note's on-disk blob into the quarantine dir. A missing source is a
 /// no-op `Ok` (the id may be baseline-only); an occupied target gets a `-<n>`
 /// suffix so repeated drops of re-created ids never overwrite older evidence.
-fn quarantine_note(
+async fn quarantine_note(
+    io: &dyn crate::vault_io::VaultIo,
     vault_root: &Path,
     notes_dir: &Path,
     id: &[u8; 16],
@@ -230,21 +282,40 @@ fn quarantine_note(
         return Ok(());
     }
     let dir = quarantine_dir(vault_root);
-    std::fs::create_dir_all(&dir).map_err(|_| SyncCycleError::Io)?;
+    io.create_dir_all(&dir)
+        .await
+        .map_err(|_| SyncCycleError::Io)?;
     let uuid = uuid::Uuid::from_bytes(*id);
     let mut target = dir.join(format!("{uuid}.myn"));
     let mut n = 1u32;
-    while target.exists() {
+    while io.exists(&target).await.unwrap_or(false) {
         target = dir.join(format!("{uuid}-{n}.myn"));
         n += 1;
     }
-    std::fs::rename(&src, &target).map_err(|_| SyncCycleError::Io)
+    // WRITE-then-REMOVE, not `rename` (phase3-web-client task 86). Rename is the
+    // one filesystem operation this product cannot rely on: the Phase 0 spike
+    // measured Safari implementing no `FileSystemFileHandle.move()` at all, at
+    // 400 and at 3 000 files. Task 20 settled the replacement shape for
+    // write-once directory entries and this is one.
+    //
+    // The crash window inverts, and the new direction is the safe one: a crash
+    // between the write and the remove leaves the note in BOTH places, where a
+    // failed rename could leave it in neither. §11.3's whole rule is that a
+    // dropped note is "moved aside, never destroyed" — duplicate evidence costs
+    // a stale file the next reconcile re-quarantines under the `-n` suffix;
+    // losing it costs the note.
+    let bytes = io.read(&src).await.map_err(|_| SyncCycleError::Io)?;
+    io.write(&target, &bytes, crate::vault_io::WriteOpts::default())
+        .await
+        .map_err(|_| SyncCycleError::Io)?;
+    io.remove_file(&src).await.map_err(|_| SyncCycleError::Io)
 }
 
 /// Persist a conflicting remote revision: `conflicts/<id>.myn` (the ciphertext the
 /// notes layer decrypts to build the copy) + `conflicts/<id>.meta` (`<version>\n
 /// <nonce-hex>`, the baseline [`resolve_conflict`] adopts).
-fn stage_conflict(
+async fn stage_conflict(
+    io: &dyn crate::vault_io::VaultIo,
     vault_root: &Path,
     id: &[u8; 16],
     version: u64,
@@ -252,27 +323,43 @@ fn stage_conflict(
     ciphertext: &[u8],
 ) -> Result<(), SyncCycleError> {
     let dir = conflict_staging_dir(vault_root);
-    std::fs::create_dir_all(&dir).map_err(|_| SyncCycleError::Io)?;
+    io.create_dir_all(&dir)
+        .await
+        .map_err(|_| SyncCycleError::Io)?;
     let id_hex = hex(id);
-    crate::atomic_write::atomic_write(&dir.join(format!("{id_hex}.myn")), ciphertext, true)
-        .map_err(|_| SyncCycleError::Io)?;
+    io.write(
+        &dir.join(format!("{id_hex}.myn")),
+        ciphertext,
+        crate::vault_io::WriteOpts::default(),
+    )
+    .await
+    .map_err(|_| SyncCycleError::Io)?;
     let meta = format!("{version}\n{}", hex(content_nonce));
-    crate::atomic_write::atomic_write(&dir.join(format!("{id_hex}.meta")), meta.as_bytes(), true)
-        .map_err(|_| SyncCycleError::Io)?;
+    io.write(
+        &dir.join(format!("{id_hex}.meta")),
+        meta.as_bytes(),
+        crate::vault_io::WriteOpts::default(),
+    )
+    .await
+    .map_err(|_| SyncCycleError::Io)?;
     Ok(())
 }
 
 /// The note ids (16-byte, hex) with a staged conflicting remote revision awaiting
 /// keep-both materialization by the notes layer.
-pub fn list_pending_conflicts(vault_root: &Path) -> Vec<String> {
+pub async fn list_pending_conflicts(
+    io: &dyn crate::vault_io::VaultIo,
+    vault_root: &Path,
+) -> Vec<String> {
     let mut out = Vec::new();
-    if let Ok(entries) = std::fs::read_dir(conflict_staging_dir(vault_root)) {
-        for e in entries.flatten() {
-            let p = e.path();
-            if p.extension().and_then(|x| x.to_str()) == Some("myn") {
-                if let Some(stem) = p.file_stem().and_then(|s| s.to_str()) {
-                    out.push(stem.to_string());
-                }
+    if let Ok(entries) = io.read_dir(&conflict_staging_dir(vault_root)).await {
+        // The seam yields NAMES, not paths — OPFS has no path API at all, so a
+        // path would have to be reassembled from a parent the caller already
+        // holds. The `.myn` filter and stem extraction are the same two checks
+        // the `Path` form did.
+        for e in entries {
+            if let Some(stem) = e.name.strip_suffix(".myn") {
+                out.push(stem.to_string());
             }
         }
     }
@@ -282,25 +369,42 @@ pub fn list_pending_conflicts(vault_root: &Path) -> Vec<String> {
 
 /// Read a staged conflicting remote revision's ciphertext (the notes layer
 /// decrypts it to build the keep-both copy). `None` if nothing is staged.
-pub fn read_staged_conflict_blob(vault_root: &Path, id_hex: &str) -> Option<Vec<u8>> {
-    std::fs::read(conflict_staging_dir(vault_root).join(format!("{id_hex}.myn"))).ok()
+pub async fn read_staged_conflict_blob(
+    io: &dyn crate::vault_io::VaultIo,
+    vault_root: &Path,
+    id_hex: &str,
+) -> Option<Vec<u8>> {
+    io.read(&conflict_staging_dir(vault_root).join(format!("{id_hex}.myn")))
+        .await
+        .ok()
 }
 
 /// Finish a keep-both resolution: adopt the staged remote revision's (version,
 /// nonce) as the synced baseline for the note — so the untouched local edit now
 /// pushes as a clean linear advance over it — then clear the staging. Idempotent;
 /// a missing staging is a no-op.
-pub fn resolve_conflict(vault_root: &Path, id_hex: &str) -> Result<(), SyncCycleError> {
+pub async fn resolve_conflict(
+    io: &dyn crate::vault_io::VaultIo,
+    vault_root: &Path,
+    id_hex: &str,
+) -> Result<(), SyncCycleError> {
     let dir = conflict_staging_dir(vault_root);
     let meta_path = dir.join(format!("{id_hex}.meta"));
-    if let Ok(meta) = std::fs::read_to_string(&meta_path) {
+    if let Some(meta) = io
+        .read(&meta_path)
+        .await
+        .ok()
+        .and_then(|b| String::from_utf8(b).ok())
+    {
         let mut lines = meta.lines();
         let version: u64 = lines
             .next()
             .and_then(|s| s.parse().ok())
             .ok_or(SyncCycleError::Io)?;
         let nonce_hex = lines.next().unwrap_or("").to_string();
-        let mut state = read_sync_state(vault_root).map_err(|_| SyncCycleError::Io)?;
+        let mut state = read_sync_state(io, vault_root)
+            .await
+            .map_err(|_| SyncCycleError::Io)?;
         state.blobs.insert(
             id_hex.to_string(),
             BlobSyncState {
@@ -308,10 +412,12 @@ pub fn resolve_conflict(vault_root: &Path, id_hex: &str) -> Result<(), SyncCycle
                 content_nonce_hex: nonce_hex,
             },
         );
-        write_sync_state(vault_root, &state).map_err(|_| SyncCycleError::Io)?;
+        write_sync_state(io, vault_root, &state)
+            .await
+            .map_err(|_| SyncCycleError::Io)?;
     }
-    let _ = std::fs::remove_file(dir.join(format!("{id_hex}.myn")));
-    let _ = std::fs::remove_file(meta_path);
+    let _ = io.remove_file(&dir.join(format!("{id_hex}.myn"))).await;
+    let _ = io.remove_file(&meta_path).await;
     Ok(())
 }
 
@@ -326,8 +432,14 @@ fn pending_tombstones_path(vault_root: &Path) -> std::path::PathBuf {
 }
 
 /// Read the pending-tombstone id set (absent → empty).
-fn read_pending_tombstones(vault_root: &Path) -> std::collections::HashSet<String> {
-    std::fs::read_to_string(pending_tombstones_path(vault_root))
+async fn read_pending_tombstones(
+    io: &dyn crate::vault_io::VaultIo,
+    vault_root: &Path,
+) -> std::collections::HashSet<String> {
+    io.read(&pending_tombstones_path(vault_root))
+        .await
+        .ok()
+        .and_then(|b| String::from_utf8(b).ok())
         .map(|s| {
             s.lines()
                 .map(|l| l.trim().to_string())
@@ -338,25 +450,34 @@ fn read_pending_tombstones(vault_root: &Path) -> std::collections::HashSet<Strin
 }
 
 /// Queue a note id (32-hex) as a tombstone for the next push. Idempotent.
-pub fn add_pending_tombstone(vault_root: &Path, id_hex: &str) -> Result<(), SyncCycleError> {
-    let mut set = read_pending_tombstones(vault_root);
+pub async fn add_pending_tombstone(
+    io: &dyn crate::vault_io::VaultIo,
+    vault_root: &Path,
+    id_hex: &str,
+) -> Result<(), SyncCycleError> {
+    let mut set = read_pending_tombstones(io, vault_root).await;
     set.insert(id_hex.to_string());
-    write_pending_tombstones(vault_root, &set)
+    write_pending_tombstones(io, vault_root, &set).await
 }
 
 /// Drop ids from the pending-tombstone queue (after they were pushed-with-flag).
-fn clear_pending_tombstones(vault_root: &Path, drop: &[String]) -> Result<(), SyncCycleError> {
+async fn clear_pending_tombstones(
+    io: &dyn crate::vault_io::VaultIo,
+    vault_root: &Path,
+    drop: &[String],
+) -> Result<(), SyncCycleError> {
     if drop.is_empty() {
         return Ok(());
     }
-    let mut set = read_pending_tombstones(vault_root);
+    let mut set = read_pending_tombstones(io, vault_root).await;
     for d in drop {
         set.remove(d);
     }
-    write_pending_tombstones(vault_root, &set)
+    write_pending_tombstones(io, vault_root, &set).await
 }
 
-fn write_pending_tombstones(
+async fn write_pending_tombstones(
+    io: &dyn crate::vault_io::VaultIo,
     vault_root: &Path,
     set: &std::collections::HashSet<String>,
 ) -> Result<(), SyncCycleError> {
@@ -367,8 +488,13 @@ fn write_pending_tombstones(
         .map(|s| s.as_str())
         .collect::<Vec<_>>()
         .join("\n");
-    crate::atomic_write::atomic_write(&pending_tombstones_path(vault_root), body.as_bytes(), true)
-        .map_err(|_| SyncCycleError::Io)
+    io.write(
+        &pending_tombstones_path(vault_root),
+        body.as_bytes(),
+        crate::vault_io::WriteOpts::default(),
+    )
+    .await
+    .map_err(|_| SyncCycleError::Io)
 }
 
 // ---------------------------------------------------------------------------
@@ -498,8 +624,16 @@ fn hex_to_arr<const N: usize>(s: &str) -> Option<[u8; N]> {
 
 /// Read the pending attachment-tombstone queue (absent → empty; a malformed
 /// line is skipped rather than wedging the cycle).
-pub fn read_pending_attachment_tombstones(vault_root: &Path) -> Vec<PendingAttachmentTombstone> {
-    let Ok(body) = std::fs::read_to_string(pending_attachment_tombstones_path(vault_root)) else {
+pub async fn read_pending_attachment_tombstones(
+    io: &dyn crate::vault_io::VaultIo,
+    vault_root: &Path,
+) -> Vec<PendingAttachmentTombstone> {
+    let Some(body) = io
+        .read(&pending_attachment_tombstones_path(vault_root))
+        .await
+        .ok()
+        .and_then(|b| String::from_utf8(b).ok())
+    else {
         return Vec::new();
     };
     let mut out = Vec::new();
@@ -527,11 +661,12 @@ pub fn read_pending_attachment_tombstones(vault_root: &Path) -> Vec<PendingAttac
 /// Queue an attachment deletion for the next push (called by the attachments
 /// plugin right after the catalog-tombstone rewrite + local crypto-erase).
 /// Mints the fresh tombstone nonce internally. Idempotent per full id.
-pub fn add_pending_attachment_tombstone(
+pub async fn add_pending_attachment_tombstone(
+    io: &dyn crate::vault_io::VaultIo,
     vault_root: &Path,
     id: &[u8; 32],
 ) -> Result<(), SyncCycleError> {
-    let mut queue = read_pending_attachment_tombstones(vault_root);
+    let mut queue = read_pending_attachment_tombstones(io, vault_root).await;
     if queue.iter().any(|t| &t.id == id) {
         return Ok(());
     }
@@ -544,26 +679,29 @@ pub fn add_pending_attachment_tombstone(
         id: *id,
         content_nonce: nonce,
     });
-    write_pending_attachment_tombstones(vault_root, &queue)
+    write_pending_attachment_tombstones(io, vault_root, &queue).await
 }
 
 /// Drop queue entries (after their tombstone records pushed, or when a re-add
 /// made them stale).
-fn clear_pending_attachment_tombstones(
+async fn clear_pending_attachment_tombstones(
+    io: &dyn crate::vault_io::VaultIo,
     vault_root: &Path,
     drop_ids: &HashSet<[u8; 32]>,
 ) -> Result<(), SyncCycleError> {
     if drop_ids.is_empty() {
         return Ok(());
     }
-    let queue: Vec<PendingAttachmentTombstone> = read_pending_attachment_tombstones(vault_root)
+    let queue: Vec<PendingAttachmentTombstone> = read_pending_attachment_tombstones(io, vault_root)
+        .await
         .into_iter()
         .filter(|t| !drop_ids.contains(&t.id))
         .collect();
-    write_pending_attachment_tombstones(vault_root, &queue)
+    write_pending_attachment_tombstones(io, vault_root, &queue).await
 }
 
-fn write_pending_attachment_tombstones(
+async fn write_pending_attachment_tombstones(
+    io: &dyn crate::vault_io::VaultIo,
     vault_root: &Path,
     queue: &[PendingAttachmentTombstone],
 ) -> Result<(), SyncCycleError> {
@@ -579,11 +717,12 @@ fn write_pending_attachment_tombstones(
         })
         .collect();
     lines.sort();
-    crate::atomic_write::atomic_write(
+    io.write(
         &pending_attachment_tombstones_path(vault_root),
         lines.join("\n").as_bytes(),
-        true,
+        crate::vault_io::WriteOpts::default(),
     )
+    .await
     .map_err(|_| SyncCycleError::Io)
 }
 
@@ -597,7 +736,7 @@ fn download_attachment_backoff(
     for _ in 0..6 {
         match engine::download_attachment(transport, token, id, &[]) {
             Err(PullError::RateLimited) => {
-                std::thread::sleep(std::time::Duration::from_millis(delay_ms));
+                crate::task::block_sleep(std::time::Duration::from_millis(delay_ms));
                 delay_ms = (delay_ms * 2).min(2000);
             }
             other => return other,
@@ -617,7 +756,7 @@ fn upload_attachment_backoff(
     for _ in 0..6 {
         match engine::upload_attachment(transport, token, id, bytes) {
             Err(PushError::RateLimited) => {
-                std::thread::sleep(std::time::Duration::from_millis(delay_ms));
+                crate::task::block_sleep(std::time::Duration::from_millis(delay_ms));
                 delay_ms = (delay_ms * 2).min(2000);
             }
             other => return other,
@@ -647,7 +786,8 @@ struct CatalogPhase {
 // Each argument is a distinct cycle input (same shape as run_sync_cycle above);
 // a bundling struct would not aid clarity at this single internal call site.
 #[allow(clippy::too_many_arguments)]
-fn sync_catalog_phase(
+async fn sync_catalog_phase(
+    io: &dyn crate::vault_io::VaultIo,
     transport: &dyn SyncTransport,
     token: &str,
     root_key: &[u8; 32],
@@ -657,11 +797,14 @@ fn sync_catalog_phase(
     cat_id: &[u8; 16],
     remote_record: Option<&ChangedBlob>,
 ) -> Result<CatalogPhase, SyncCycleError> {
-    let _guard = crate::plugins::attachments::commands::catalog_write_mutex().blocking_lock();
+    // See `apply_pulled_note_blob` — `blocking_lock` panics inside a runtime.
+    let _guard = crate::plugins::attachments::commands::catalog_write_mutex()
+        .lock()
+        .await;
 
     let catalog_key = derive_subkey(root_key, SubkeyRole::AttachmentsCatalogKey);
     let path = catalog_file_path(vault_root);
-    let local_bytes = std::fs::read(&path).ok();
+    let local_bytes = io.read(&path).await.ok();
     let local_nonce = local_bytes.as_deref().and_then(read_catalog_nonce);
     // §9.10.4 read semantic: any local decode failure falls back to empty.
     let local_cat =
@@ -691,7 +834,8 @@ fn sync_catalog_phase(
         if merged == remote_cat {
             // Adopt the server bytes VERBATIM — byte-identical catalog +
             // baseline == server (version, nonce); nothing to push.
-            crate::atomic_write::atomic_write(&path, &remote_bytes, true)
+            io.write(&path, &remote_bytes, crate::vault_io::WriteOpts::default())
+                .await
                 .map_err(|_| SyncCycleError::Io)?;
             record_blob_baseline(state, &cat_hex, rec);
             return Ok(CatalogPhase {
@@ -704,7 +848,8 @@ fn sync_catalog_phase(
         // cycle against the server's current version.
         let merged_bytes = encode_attachments_catalog(&catalog_key, account_number_hash, &merged)
             .map_err(|_| SyncCycleError::Io)?;
-        crate::atomic_write::atomic_write(&path, &merged_bytes, true)
+        io.write(&path, &merged_bytes, crate::vault_io::WriteOpts::default())
+            .await
             .map_err(|_| SyncCycleError::Io)?;
         // Record the server's version as the CAS base WITHOUT claiming its
         // nonce (the local file now differs → dirty).
@@ -803,7 +948,8 @@ struct PrefsPhase {
 /// server's version as CAS base). Holds the prefs plugin's write mutex
 /// across the read-merge-write.
 #[allow(clippy::too_many_arguments)]
-fn sync_prefs_phase(
+async fn sync_prefs_phase(
+    io: &dyn crate::vault_io::VaultIo,
     transport: &dyn SyncTransport,
     token: &str,
     root_key: &[u8; 32],
@@ -815,11 +961,12 @@ fn sync_prefs_phase(
 ) -> Result<PrefsPhase, SyncCycleError> {
     use crate::plugins::sync::prefs_merge::{merge_prefs, shared_subset_hash};
 
-    let _guard = crate::plugins::prefs::commands::write_mutex().blocking_lock();
+    // See `apply_pulled_note_blob` — `blocking_lock` panics inside a runtime.
+    let _guard = crate::plugins::prefs::commands::write_mutex().lock().await;
 
     let prefs_key = derive_subkey(root_key, SubkeyRole::PrefsKey);
     let path = vault_root.join("vault.prefs");
-    let local_bytes = std::fs::read(&path).ok();
+    let local_bytes = io.read(&path).await.ok();
     let local_nonce = local_bytes.as_deref().and_then(read_prefs_nonce);
     // §9.5.5 read semantic: any local decode failure falls back to defaults.
     let local_view = local_bytes
@@ -844,7 +991,8 @@ fn sync_prefs_phase(
             if let Ok(seeded) =
                 protocol::decode_prefs_blob(&prefs_key, account_number_hash, &remote_bytes)
             {
-                crate::atomic_write::atomic_write(&path, &remote_bytes, true)
+                io.write(&path, &remote_bytes, crate::vault_io::WriteOpts::default())
+                    .await
                     .map_err(|_| SyncCycleError::Io)?;
                 record_blob_baseline(state, &id_hex, rec);
                 let shared_hash = shared_subset_hash(&seeded);
@@ -891,7 +1039,8 @@ fn sync_prefs_phase(
         if merged == remote_view {
             // Adopt the server bytes VERBATIM — byte-identical blob + baseline
             // == server (version, nonce); nothing to push.
-            crate::atomic_write::atomic_write(&path, &remote_bytes, true)
+            io.write(&path, &remote_bytes, crate::vault_io::WriteOpts::default())
+                .await
                 .map_err(|_| SyncCycleError::Io)?;
             record_blob_baseline(state, &id_hex, rec);
             set_prefs_gate_baseline(vault_root, merged_hash.clone());
@@ -913,7 +1062,8 @@ fn sync_prefs_phase(
                 let merged_bytes =
                     protocol::encode_prefs_blob(&prefs_key, account_number_hash, &merged)
                         .map_err(|_| SyncCycleError::Io)?;
-                crate::atomic_write::atomic_write(&path, &merged_bytes, true)
+                io.write(&path, &merged_bytes, crate::vault_io::WriteOpts::default())
+                    .await
                     .map_err(|_| SyncCycleError::Io)?;
             }
             record_blob_baseline(state, &id_hex, rec);
@@ -931,7 +1081,8 @@ fn sync_prefs_phase(
         // file (freshly re-encrypted) intentionally carries a different one.
         let merged_bytes = protocol::encode_prefs_blob(&prefs_key, account_number_hash, &merged)
             .map_err(|_| SyncCycleError::Io)?;
-        crate::atomic_write::atomic_write(&path, &merged_bytes, true)
+        io.write(&path, &merged_bytes, crate::vault_io::WriteOpts::default())
+            .await
             .map_err(|_| SyncCycleError::Io)?;
         record_blob_baseline(state, &id_hex, rec);
         return Ok(PrefsPhase {
@@ -1009,7 +1160,8 @@ struct ThemesPhase {
 // Each argument is a distinct cycle input (the same shape as the sibling
 // catalog/prefs phases); a bundling struct would not aid clarity here.
 #[allow(clippy::too_many_arguments)]
-fn sync_themes_phase(
+async fn sync_themes_phase(
+    io: &dyn crate::vault_io::VaultIo,
     transport: &dyn SyncTransport,
     token: &str,
     root_key: &[u8; 32],
@@ -1021,10 +1173,11 @@ fn sync_themes_phase(
 ) -> Result<ThemesPhase, SyncCycleError> {
     use crate::plugins::themes::commands::{decode_themes_map_or_empty, encode_themes_map};
 
-    let _guard = crate::plugins::themes::commands::write_mutex().blocking_lock();
+    // See `apply_pulled_note_blob` — `blocking_lock` panics inside a runtime.
+    let _guard = crate::plugins::themes::commands::write_mutex().lock().await;
 
     let path = themes_file_path(vault_root);
-    let local_bytes = std::fs::read(&path).ok();
+    let local_bytes = io.read(&path).await.ok();
     let local_nonce = local_bytes.as_deref().and_then(read_themes_nonce);
 
     // Decrypting the local store costs an HKDF + a full AEAD open + a whole-map
@@ -1082,7 +1235,9 @@ fn sync_themes_phase(
                 true,
             )
         };
-        crate::atomic_write::atomic_write(&path, &bytes, true).map_err(|_| SyncCycleError::Io)?;
+        io.write(&path, &bytes, crate::vault_io::WriteOpts::default())
+            .await
+            .map_err(|_| SyncCycleError::Io)?;
         record_blob_baseline(state, &id_hex, rec);
         return Ok(ThemesPhase {
             dirty,
@@ -1114,9 +1269,12 @@ fn sync_themes_phase(
 /// decryption-free from the on-disk notes dir. Converts the notes-domain
 /// [`NonceManifest`](crate::note_nonce::NonceManifest) String keys to the
 /// raw uuid bytes the engine wants.
-pub fn local_manifest(notes_dir: &Path) -> HashMap<[u8; 16], [u8; 24]> {
+pub async fn local_manifest(
+    io: &dyn crate::vault_io::VaultIo,
+    notes_dir: &Path,
+) -> HashMap<[u8; 16], [u8; 24]> {
     let mut out = HashMap::new();
-    for (id_str, nonce) in crate::note_nonce::scan_on_disk_manifest(notes_dir) {
+    for (id_str, nonce) in crate::note_nonce::scan_on_disk_manifest_io(io, notes_dir).await {
         if let Ok(u) = uuid::Uuid::parse_str(&id_str) {
             out.insert(*u.as_bytes(), nonce);
         }
@@ -1180,6 +1338,27 @@ pub enum MetaPhaseOutcome {
     Merged,
     /// Transient/incompatible: left local untouched (never overwrites on doubt).
     Skipped,
+    /// The two metas disagree on the **password-side wrap** and this device has
+    /// **no baseline** to say which side moved (phase3-web-client task 88).
+    ///
+    /// Refused rather than adopted, and the asymmetry of the two mistakes is the
+    /// whole reason:
+    ///
+    /// * **Adopting wrongly** reverts a password the user has just changed. It is
+    ///   silent — no error anywhere — and their new password stops working while
+    ///   the old one starts working again. On the web client there is no recovery
+    ///   phrase by settled decision, so the only remedy is a native client with a
+    ///   password they have just been told is no longer theirs.
+    /// * **Refusing wrongly** stalls another device's password change on this one.
+    ///   The user knows they changed it, the vault content is untouched, and the
+    ///   next cycle with an intact baseline resolves it.
+    ///
+    /// The condition is reachable exactly when the evidence was lost: `sync-state.json`
+    /// and `vault.meta-dirty` both live in the same evictable OPFS container, so a
+    /// browser eviction or a torn sidecar write removes `meta_baseline_hex` and the
+    /// dirty marker together — and an ABSENT baseline must never read as "I have no
+    /// local change".
+    CredentialAmbiguous,
 }
 
 /// F1 Faz B — reconcile `vault.meta` with the server, independent of the head /
@@ -1201,7 +1380,8 @@ pub enum MetaPhaseOutcome {
 /// unaffected; only the NEXT unlock uses the new password wrap. On any doubt
 /// (transport error, unparseable or invariant-incompatible server meta) the phase
 /// SKIPS — it never overwrites the local credential root on a bad input.
-pub(crate) fn sync_meta_phase(
+pub(crate) async fn sync_meta_phase(
+    io: &dyn crate::vault_io::VaultIo,
     transport: &dyn SyncTransport,
     token: &str,
     vault_root: &Path,
@@ -1209,14 +1389,14 @@ pub(crate) fn sync_meta_phase(
     allow_push: bool,
 ) -> MetaPhaseOutcome {
     let meta_path = vault_root.join("vault.meta");
-    let Ok(local_bytes) = std::fs::read(&meta_path) else {
+    let Ok(local_bytes) = io.read(&meta_path).await else {
         return MetaPhaseOutcome::NoChange; // no local meta (unenrolled edge) → nothing
     };
     let Ok(local_meta) = parse_vault_meta(&local_bytes) else {
         return MetaPhaseOutcome::Skipped;
     };
     let local_hash = sha256_hex(&local_bytes);
-    let dirty = vault_meta_is_dirty(vault_root);
+    let dirty = vault_meta_is_dirty(io, vault_root).await;
 
     // Authed GET of THIS device's own server meta (no ?account=, not pre-auth).
     let resp = match transport.request(HttpMethod::Get, "/vault.meta", &[], Some(token)) {
@@ -1233,7 +1413,7 @@ pub(crate) fn sync_meta_phase(
                 && super::enroll::put_vault_meta(transport, token, &local_bytes).is_ok()
             {
                 state.meta_baseline_hex = Some(local_hash);
-                let _ = clear_vault_meta_dirty(vault_root);
+                let _ = clear_vault_meta_dirty(io, vault_root).await;
                 return MetaPhaseOutcome::Pushed;
             }
             return MetaPhaseOutcome::NoChange;
@@ -1248,7 +1428,7 @@ pub(crate) fn sync_meta_phase(
     // Already agree → clear any pending dirt, record the baseline.
     if server_hash == local_hash {
         state.meta_baseline_hex = Some(local_hash);
-        let _ = clear_vault_meta_dirty(vault_root);
+        let _ = clear_vault_meta_dirty(io, vault_root).await;
         return MetaPhaseOutcome::NoChange;
     }
 
@@ -1260,12 +1440,47 @@ pub(crate) fn sync_meta_phase(
     // compatibility first: never overwrite the local credential root with a meta
     // whose recovery-side / KDF / itemsKey diverges (a hostile or corrupt server).
     if server_changed && !local_changed {
+        // The absent-baseline trap (phase3-web-client task 88). `local_changed`
+        // is `dirty || (baseline.is_some() && …)`, so with BOTH the baseline and
+        // the dirty marker gone it computes `false` while `server_changed`
+        // computes `true` — and this branch overwrites the local `vault.meta`
+        // with the server's older copy. Those two signals live in the same
+        // evictable OPFS container, so they are lost together, and the visible
+        // result is that a password the user just changed silently stops working
+        // and the old one silently starts working again.
+        //
+        // Scoped to the PASSWORD-SIDE wrap on purpose. An absent baseline with an
+        // identical password wrap is the ordinary case — another device changed
+        // something this one does not hold an opinion about — and refusing there
+        // would stall propagation for no safety gain. It is only when the
+        // credential itself differs and nothing can say which side moved that
+        // adopting risks reverting one.
+        let credential_differs = local_meta.random_salt_password
+            != server_meta.random_salt_password
+            || local_meta.nonce_password_wrap != server_meta.nonce_password_wrap
+            || local_meta.enc_root_key_password != server_meta.enc_root_key_password;
+        if baseline.is_none() && credential_differs {
+            tracing::warn!(
+                stage = "meta_phase",
+                event = "credential_ambiguous",
+                "refusing to adopt: password-side wraps differ and no baseline says which moved"
+            );
+            return MetaPhaseOutcome::CredentialAmbiguous;
+        }
         if merge_vault_meta(&local_meta, &server_meta, MetaWinner::Remote).is_err() {
             return MetaPhaseOutcome::Skipped;
         }
-        if crate::atomic_write::atomic_write(&meta_path, &server_bytes, true).is_ok() {
+        if io
+            .write(
+                &meta_path,
+                &server_bytes,
+                crate::vault_io::WriteOpts::default(),
+            )
+            .await
+            .is_ok()
+        {
             state.meta_baseline_hex = Some(server_hash);
-            let _ = clear_vault_meta_dirty(vault_root);
+            let _ = clear_vault_meta_dirty(io, vault_root).await;
             return MetaPhaseOutcome::Adopted;
         }
         return MetaPhaseOutcome::Skipped;
@@ -1275,7 +1490,7 @@ pub(crate) fn sync_meta_phase(
     if local_changed && !server_changed {
         if allow_push && super::enroll::put_vault_meta(transport, token, &local_bytes).is_ok() {
             state.meta_baseline_hex = Some(local_hash);
-            let _ = clear_vault_meta_dirty(vault_root);
+            let _ = clear_vault_meta_dirty(io, vault_root).await;
             return MetaPhaseOutcome::Pushed;
         }
         return MetaPhaseOutcome::NoChange; // keep dirty for a later push cycle
@@ -1289,16 +1504,24 @@ pub(crate) fn sync_meta_phase(
     };
     let merged_bytes = serialize_vault_meta(&merged);
     let merged_hash = sha256_hex(&merged_bytes);
-    if crate::atomic_write::atomic_write(&meta_path, &merged_bytes, true).is_err() {
+    if io
+        .write(
+            &meta_path,
+            &merged_bytes,
+            crate::vault_io::WriteOpts::default(),
+        )
+        .await
+        .is_err()
+    {
         return MetaPhaseOutcome::Skipped;
     }
     state.meta_baseline_hex = Some(merged_hash.clone());
     if merged_hash == server_hash {
         // Server already holds the winner — nothing to push; we are converged.
-        let _ = clear_vault_meta_dirty(vault_root);
+        let _ = clear_vault_meta_dirty(io, vault_root).await;
     } else if allow_push {
         let _ = super::enroll::put_vault_meta(transport, token, &merged_bytes);
-        let _ = clear_vault_meta_dirty(vault_root);
+        let _ = clear_vault_meta_dirty(io, vault_root).await;
     }
     // (!allow_push && merged != server: keep dirty so a later push cycle propagates.)
     MetaPhaseOutcome::Merged
@@ -1308,7 +1531,8 @@ pub(crate) fn sync_meta_phase(
 // transport, the two keys/ids, the token, the two paths, the push gate); bundling
 // them into a struct would not aid clarity at this single orchestrator entry.
 #[allow(clippy::too_many_arguments)]
-pub fn run_sync_cycle(
+pub async fn run_sync_cycle(
+    io: &dyn crate::vault_io::VaultIo,
     transport: &dyn SyncTransport,
     root_key: &[u8; 32],
     account_number_hash: [u8; 16],
@@ -1319,10 +1543,15 @@ pub fn run_sync_cycle(
     allow_push: bool,
     attachment_keys: Option<AttachmentKeys<'_>>,
 ) -> Result<SyncSummary, SyncCycleError> {
-    let mut state = read_sync_state(vault_root).map_err(|_| SyncCycleError::Io)?;
+    let mut state = read_sync_state(io, vault_root)
+        .await
+        .map_err(|_| SyncCycleError::Io)?;
 
     // Baseline VV + seq from the device-local head baseline (empty on first sync).
-    let baseline_head = read_head_baseline(root_key, vault_root).ok().flatten();
+    let baseline_head = read_head_baseline(io, root_key, vault_root)
+        .await
+        .ok()
+        .flatten();
     let baseline_vv: Vec<VvEntry> = baseline_head
         .as_ref()
         .map(|h| h.version_vector.clone())
@@ -1337,6 +1566,7 @@ pub fn run_sync_cycle(
     loop {
         attempt += 1;
         match sync_cycle_attempt(
+            io,
             transport,
             root_key,
             account_number_hash,
@@ -1350,19 +1580,26 @@ pub fn run_sync_cycle(
             &baseline_vv,
             baseline_seq,
             from_cursor,
-        ) {
-            Ok(summary) => {
+        )
+        .await
+        {
+            Ok(mut summary) => {
                 // F1 Faz B: reconcile vault.meta once per successful cycle (it is
                 // independent of the head/blob CAS plane, so it runs after the notes
                 // attempt succeeds, not inside the 409-retry loop). Best-effort — a
                 // meta hiccup must not fail a cycle that already synced notes; it
                 // mutates `state.meta_baseline_hex` (persisted just below) and does
                 // its own vault.meta write / dirty-marker clear.
-                let _ = sync_meta_phase(transport, token, vault_root, &mut state, allow_push);
+                let meta_outcome =
+                    sync_meta_phase(io, transport, token, vault_root, &mut state, allow_push).await;
+                summary.credential_ambiguous =
+                    meta_outcome == MetaPhaseOutcome::CredentialAmbiguous;
                 // Persist the advanced cursor + per-blob CAS state + meta baseline
                 // ONLY on success, so a failed retry never leaves a half-advanced
                 // cursor on disk.
-                write_sync_state(vault_root, &state).map_err(|_| SyncCycleError::Io)?;
+                write_sync_state(io, vault_root, &state)
+                    .await
+                    .map_err(|_| SyncCycleError::Io)?;
                 return Ok(summary);
             }
             Err(SyncCycleError::Push(PushError::BlobStale | PushError::HeadStale))
@@ -1382,7 +1619,8 @@ pub fn run_sync_cycle(
 /// Mutates `state` in place (cursor + per-blob baselines + VV log) but does NOT
 /// persist `sync-state.json` — the caller persists on success only.
 #[allow(clippy::too_many_arguments)]
-fn sync_cycle_attempt(
+async fn sync_cycle_attempt(
+    io: &dyn crate::vault_io::VaultIo,
     transport: &dyn SyncTransport,
     root_key: &[u8; 32],
     account_number_hash: [u8; 16],
@@ -1421,11 +1659,11 @@ fn sync_cycle_attempt(
     let cat_id = attachment_keys.map(|_| catalog_sync_id(root_key));
     let themes_id = themes_sync_id(root_key);
     let mut att_scan: BTreeMap<[u8; 16], AttachmentManifestEntry> = if attachment_keys.is_some() {
-        scan_attachments_manifest(&attachments_dir(vault_root))
+        scan_attachments_manifest(io, &attachments_dir(vault_root)).await
     } else {
         BTreeMap::new()
     };
-    let mut notes_manifest = local_manifest(notes_dir);
+    let mut notes_manifest = local_manifest(io, notes_dir).await;
     // The pre-pull union snapshot the pull-diff runs against — the dirty-skip
     // check wants each blob's state BEFORE this cycle's writes.
     let mut local = notes_manifest.clone();
@@ -1433,7 +1671,9 @@ fn sync_cycle_attempt(
         local.insert(*sid, e.content_nonce);
     }
     if let Some(cid) = cat_id {
-        if let Some(n) = std::fs::read(catalog_file_path(vault_root))
+        if let Some(n) = io
+            .read(&catalog_file_path(vault_root))
+            .await
             .ok()
             .as_deref()
             .and_then(read_catalog_nonce)
@@ -1441,7 +1681,9 @@ fn sync_cycle_attempt(
             local.insert(cid, n);
         }
     }
-    if let Some(n) = std::fs::read(themes_file_path(vault_root))
+    if let Some(n) = io
+        .read(&themes_file_path(vault_root))
+        .await
         .ok()
         .as_deref()
         .and_then(read_themes_nonce)
@@ -1461,7 +1703,9 @@ fn sync_cycle_attempt(
         Err(PullError::CursorExpired) => {
             reconcile_ran = true;
             state.cursor = 0;
-            write_sync_state(vault_root, state).map_err(|_| SyncCycleError::Io)?;
+            write_sync_state(io, vault_root, state)
+                .await
+                .map_err(|_| SyncCycleError::Io)?;
             engine::pull_to_stable(transport, root_key, token, baseline_vv, 0, &local, true)
                 .map_err(SyncCycleError::Pull)?
         }
@@ -1510,7 +1754,9 @@ fn sync_cycle_attempt(
         // repeat of the latest observation, so this avoids a redundant disk write every
         // cycle for a device already sitting on the current head.
         if !already_current {
-            write_sync_state(vault_root, state).map_err(|_| SyncCycleError::Io)?;
+            write_sync_state(io, vault_root, state)
+                .await
+                .map_err(|_| SyncCycleError::Io)?;
         }
     }
 
@@ -1527,6 +1773,7 @@ fn sync_cycle_attempt(
             .iter()
             .find(|m| m.id == cid && m.attachment_id.is_none());
         let phase = sync_catalog_phase(
+            io,
             transport,
             token,
             root_key,
@@ -1535,7 +1782,8 @@ fn sync_cycle_attempt(
             state,
             &cid,
             remote_cat_rec,
-        )?;
+        )
+        .await?;
 
         // --- attachment pull loop (catalog-guarded, server-wins) ---
         for c in page.changed.iter().filter(|c| c.attachment_id.is_some()) {
@@ -1557,13 +1805,19 @@ fn sync_cycle_attempt(
                     // MYE1 text cache) and adopt the tombstone record as the
                     // baseline so it is not re-processed every cycle.
                     let p = attachments_dir(vault_root).join(&full_hex);
-                    if p.exists() && std::fs::remove_file(&p).is_ok() {
+                    if io.remove_file(&p).await.is_ok() {
                         attachments_deleted += 1;
                     }
                     att_scan.remove(&c.id); // keep the in-memory manifest current
+                                            // Back through `text_cache::remove_extracted` (task 86). Task
+                                            // 44 had to inline the unlink here because that helper went
+                                            // async while this file was still synchronous; the file is
+                                            // async now, so the duplicate is gone and the §9.15.4
+                                            // crypto-erase parity has one implementation again.
                     let _ = crate::plugins::attachments::text_cache::remove_extracted(
-                        vault_root, &full_id,
-                    );
+                        io, vault_root, &full_id,
+                    )
+                    .await;
                     state.blobs.insert(
                         prefix_hex,
                         BlobSyncState {
@@ -1612,14 +1866,21 @@ fn sync_cycle_attempt(
                         continue;
                     }
                     let dir = attachments_dir(vault_root);
-                    std::fs::create_dir_all(&dir).map_err(|_| SyncCycleError::Io)?;
+                    io.create_dir_all(&dir)
+                        .await
+                        .map_err(|_| SyncCycleError::Io)?;
                     // Server-wins on nonce mismatch (§4.2): a locally-held
                     // divergent ciphertext of the same content-addressed id is
                     // REPLACED — plaintext is identical by construction, and
                     // adopting the server bytes is what converges the fleet's
                     // manifests (dirty-skip would diverge them forever).
-                    crate::atomic_write::atomic_write(&dir.join(&full_hex), &bytes, true)
-                        .map_err(|_| SyncCycleError::Io)?;
+                    io.write(
+                        &dir.join(&full_hex),
+                        &bytes,
+                        crate::vault_io::WriteOpts::default(),
+                    )
+                    .await
+                    .map_err(|_| SyncCycleError::Io)?;
                     // The adopted bytes' nonce was verified against the record
                     // above — mirror the write into the in-memory manifest so
                     // the push-detect phase sees it as clean without a rescan.
@@ -1655,6 +1916,7 @@ fn sync_cycle_attempt(
         .iter()
         .find(|m| m.id == prefs_id && m.attachment_id.is_none());
     let prefs_phase = sync_prefs_phase(
+        io,
         transport,
         token,
         root_key,
@@ -1663,7 +1925,8 @@ fn sync_cycle_attempt(
         state,
         &prefs_id,
         remote_prefs_rec,
-    )?;
+    )
+    .await?;
 
     // --- themes phase (MYND-486) — unconditional, every cycle ---
     // Like the catalog + prefs singletons, `vault.themes` is never
@@ -1674,6 +1937,7 @@ fn sync_cycle_attempt(
         .iter()
         .find(|m| m.id == themes_id && m.attachment_id.is_none());
     let themes_phase = sync_themes_phase(
+        io,
         transport,
         token,
         root_key,
@@ -1682,9 +1946,27 @@ fn sync_cycle_attempt(
         state,
         &themes_id,
         remote_themes_rec,
-    )?;
+    )
+    .await?;
 
     // --- apply remote changes: download + write each changed NOTE blob to disk ---
+    //
+    // Progress (phase3-web-client task 39) is opened over the NOTE records only —
+    // the catalog, prefs and themes singletons were handled above, and counting
+    // them would make the denominator drift from what the user watches appear in
+    // the sidebar. `begin(0)` is a no-op, so an ordinary idle cycle with nothing
+    // to pull does not register as a run.
+    let note_record_count = page
+        .changed
+        .iter()
+        .filter(|c| {
+            c.attachment_id.is_none()
+                && Some(c.id) != cat_id
+                && c.id != prefs_id
+                && c.id != themes_id
+        })
+        .count() as u32;
+    super::progress::begin(note_record_count);
     let mut pulled = 0;
     let mut pull_skipped = 0usize;
     for c in &page.changed {
@@ -1735,7 +2017,15 @@ fn sync_cycle_attempt(
         // this bug destroy live notes and self-seal.
         match crate::note_nonce::read_myn_content_nonce(&bytes) {
             Some(n) if n == c.content_nonce => {
-                match apply_pulled_note_blob(notes_dir, &c.id, &bytes, baseline_nonce.as_deref())? {
+                match apply_pulled_note_blob(
+                    io,
+                    notes_dir,
+                    &c.id,
+                    &bytes,
+                    baseline_nonce.as_deref(),
+                )
+                .await?
+                {
                     PulledNoteApply::Applied => {
                         // Mirror the write into the in-memory manifest for the
                         // push-detect phase (ONE scan per attempt).
@@ -1748,11 +2038,28 @@ fn sync_cycle_attempt(
                             },
                         );
                         pulled += 1;
+                        // Counted at the WRITE, not at the download: the number
+                        // the user watches is notes that exist locally, and a
+                        // download that then failed to land would otherwise
+                        // advance a bar for work that did not happen.
+                        super::progress::advance();
                     }
                     // A local save landed between the cycle-start scan and this
                     // write — the note is an unpushed local edit now; the push
                     // phase (or keep-both) owns it. No write, no baseline move.
                     PulledNoteApply::SkippedDirty => {}
+                    // The store is full (task 91). END the materialisation here
+                    // rather than trying every remaining record against a store
+                    // that cannot take them — each attempt is a round trip and a
+                    // failed write, and the answer will not change within this
+                    // cycle.
+                    //
+                    // `finish()` before the return so the progress readout does
+                    // not sit "active" forever on a bar that stopped.
+                    PulledNoteApply::StorageFull => {
+                        super::progress::finish();
+                        return Err(SyncCycleError::StorageFull);
+                    }
                 }
             }
             _ => {
@@ -1760,6 +2067,11 @@ fn sync_cycle_attempt(
             }
         }
     }
+    // Close the progress run whatever the per-record outcomes were. A skipped or
+    // deferred record still ends the run: leaving it "active" forever would show
+    // a bar that never completes on a cycle that finished normally.
+    super::progress::finish();
+
     // The head observation is already recorded + persisted before the download loop
     // above (so the join SAS surfaces without waiting for the full content download);
     // here we only advance the cursor, which must move after a successful download.
@@ -1787,7 +2099,10 @@ fn sync_cycle_attempt(
             .collect();
         let previously_synced: HashSet<[u8; 16]> =
             state.blobs.keys().filter_map(|k| from_hex16(k)).collect();
-        let staged: HashSet<String> = list_pending_conflicts(vault_root).into_iter().collect();
+        let staged: HashSet<String> = list_pending_conflicts(io, vault_root)
+            .await
+            .into_iter()
+            .collect();
         let plan = super::reconcile_policy::plan_full_reconcile(
             super::reconcile_policy::ReconcileTrigger::CursorExpired,
             &authoritative,
@@ -1800,14 +2115,14 @@ fn sync_cycle_attempt(
             if staged.contains(&id_hex) {
                 continue; // unresolved keep-both — never quarantine user work
             }
-            quarantine_note(vault_root, notes_dir, id)?;
+            quarantine_note(io, vault_root, notes_dir, id).await?;
             notes_manifest.remove(id);
             state.blobs.remove(&id_hex);
             dropped_hex.push(id_hex);
             dropped += 1;
         }
         // The ids are gone locally — their queued tombstone flags (if any) are moot.
-        let _ = clear_pending_tombstones(vault_root, &dropped_hex);
+        let _ = clear_pending_tombstones(io, vault_root, &dropped_hex).await;
     }
 
     // --- detect local changes to push (content_nonce ≠ last-synced) ---
@@ -1829,7 +2144,7 @@ fn sync_cycle_attempt(
         .iter()
         .map(|m| (m.id, (m.version, m.content_nonce)))
         .collect();
-    let pending_tombstones = read_pending_tombstones(vault_root);
+    let pending_tombstones = read_pending_tombstones(io, vault_root).await;
     // Notes whose remote revision is already staged as an unresolved keep-both
     // conflict (`conflicts/<id>.myn`, awaiting materialization). Their synced
     // baseline is, by construction, behind the server — so pushing them would lose
@@ -1842,8 +2157,10 @@ fn sync_cycle_attempt(
     // — not this transient summary — is the materialization source (the notes layer
     // reads it via `list_pending_conflicts`), so an excluded blob is NOT re-surfaced
     // in `conflicts` here (re-surfacing every cycle would re-materialize duplicates).
-    let pending_conflicts: HashSet<String> =
-        list_pending_conflicts(vault_root).into_iter().collect();
+    let pending_conflicts: HashSet<String> = list_pending_conflicts(io, vault_root)
+        .await
+        .into_iter()
+        .collect();
     let mut to_push: Vec<PushBlob> = Vec::new();
     let mut conflicts: Vec<ConflictCopyPlan> = Vec::new();
     if allow_push {
@@ -1873,12 +2190,14 @@ fn sync_cycle_attempt(
                         // pushes as a clean linear advance.
                         if let Ok(remote_bytes) = download_blob_backoff(transport, token, id) {
                             let _ = stage_conflict(
+                                io,
                                 vault_root,
                                 id,
                                 *server_version,
                                 remote_nonce,
                                 &remote_bytes,
-                            );
+                            )
+                            .await;
                         }
                         conflicts.push(plan_note_keep_both(id, *remote_nonce));
                         continue;
@@ -1899,15 +2218,17 @@ fn sync_cycle_attempt(
             // genuinely new note, errors) proceeds to push.
             if synced.is_none() && page.head.is_some() && (from_cursor == 0 || reconcile_ran) {
                 if let Err(PullError::BlobReclaimed) = engine::download_blob(transport, token, id) {
-                    quarantine_note(vault_root, notes_dir, id)?;
+                    quarantine_note(io, vault_root, notes_dir, id).await?;
                     state.blobs.remove(&id_hex);
-                    let _ = clear_pending_tombstones(vault_root, &[id_hex]);
+                    let _ = clear_pending_tombstones(io, vault_root, &[id_hex]).await;
                     dropped += 1;
                     continue;
                 }
             }
-            let ciphertext =
-                std::fs::read(blob_path(notes_dir, id)).map_err(|_| SyncCycleError::Io)?;
+            let ciphertext = io
+                .read(&blob_path(notes_dir, id))
+                .await
+                .map_err(|_| SyncCycleError::Io)?;
             to_push.push(PushBlob {
                 id: *id,
                 base_version: synced.map(|b| b.version).unwrap_or(0),
@@ -1954,7 +2275,9 @@ fn sync_cycle_attempt(
                         }
                     }
                 }
-                let bytes = std::fs::read(attachments_dir(vault_root).join(hex(&entry.id)))
+                let bytes = io
+                    .read(&attachments_dir(vault_root).join(hex(&entry.id)))
+                    .await
                     .map_err(|_| SyncCycleError::Io)?;
                 upload_attachment_backoff(transport, token, &entry.id, &bytes)
                     .map_err(SyncCycleError::Push)?;
@@ -1977,7 +2300,7 @@ fn sync_cycle_attempt(
                 .map(|p| &p.merged)
                 .expect("catalog phase ran whenever attachment_keys is Some");
             let mut stale: HashSet<[u8; 32]> = HashSet::new();
-            for t in read_pending_attachment_tombstones(vault_root) {
+            for t in read_pending_attachment_tombstones(io, vault_root).await {
                 let live_again = merged
                     .entries
                     .get(&hex(&t.id))
@@ -2002,12 +2325,12 @@ fn sync_cycle_attempt(
                 });
                 pushed_att_tombstones.insert(t.id);
             }
-            let _ = clear_pending_attachment_tombstones(vault_root, &stale);
+            let _ = clear_pending_attachment_tombstones(io, vault_root, &stale).await;
 
             // A dirty catalog (local-only change, or a merge that beat the
             // server's plaintext) rides the same batch as an inline blob.
             if catalog_phase.as_ref().map(|p| p.dirty).unwrap_or(false) {
-                if let Ok(bytes) = std::fs::read(catalog_file_path(vault_root)) {
+                if let Ok(bytes) = io.read(&catalog_file_path(vault_root)).await {
                     if let Some(nonce) = read_catalog_nonce(&bytes) {
                         let base = state.blobs.get(&hex(&cid)).map(|b| b.version).unwrap_or(0);
                         to_push.push(PushBlob {
@@ -2027,7 +2350,7 @@ fn sync_cycle_attempt(
         // server's plaintext, or the §10.2.1 initial publish) rides the same
         // batch as an inline blob (MYND-478).
         if prefs_phase.dirty {
-            if let Ok(bytes) = std::fs::read(vault_root.join("vault.prefs")) {
+            if let Ok(bytes) = io.read(&vault_root.join("vault.prefs")).await {
                 if let Some(nonce) = read_prefs_nonce(&bytes) {
                     let base = state
                         .blobs
@@ -2049,7 +2372,7 @@ fn sync_cycle_attempt(
         // A dirty themes blob (local-only change, or a merge that beat the
         // server's store) rides the same batch as an inline blob (MYND-486).
         if themes_phase.dirty {
-            if let Ok(bytes) = std::fs::read(themes_file_path(vault_root)) {
+            if let Ok(bytes) = io.read(&themes_file_path(vault_root)).await {
                 if let Some(nonce) = read_themes_nonce(&bytes) {
                     let base = state
                         .blobs
@@ -2083,6 +2406,10 @@ fn sync_cycle_attempt(
     // the `else` branch below. `compute_manifest_hash` over the empty manifest and a
     // head-only push (empty `to_push`) are both well-defined; the server accepts a
     // head-only push (blobs `[]` + `new_head`).
+    // The `manifest_hash` of the head this cycle ends on, when the cycle authored
+    // one. `None` means "the pulled head is still current" — see the corpus block
+    // below, which is the only reader.
+    let mut final_head_manifest_hash: Option<[u8; 32]> = None;
     if !to_push.is_empty() || (allow_push && page.head.is_none()) {
         // Author a linear-advance head over the current (post-pull) head: bump
         // this device's VV component, seq+1, parent = the server's current head
@@ -2120,6 +2447,7 @@ fn sync_cycle_attempt(
         }
         let manifest_hash = compute_manifest_hash(&manifest_entries(&manifest_map))
             .map_err(|_| SyncCycleError::Head)?;
+        final_head_manifest_hash = Some(manifest_hash);
         let head = VaultHead {
             head_format_version: VAULT_HEAD_FORMAT_V1,
             account_number_hash,
@@ -2164,16 +2492,58 @@ fn sync_cycle_attempt(
             .map(|b| hex(&b.id))
             .collect();
         tombstones_pushed = pushed_tombstones.len();
-        let _ = clear_pending_tombstones(vault_root, &pushed_tombstones);
+        let _ = clear_pending_tombstones(io, vault_root, &pushed_tombstones).await;
         // The attachment-tombstone queue drains only after its records landed.
-        let _ = clear_pending_attachment_tombstones(vault_root, &pushed_att_tombstones);
-        write_head_baseline(vault_root, &sealed).map_err(|_| SyncCycleError::Io)?;
+        let _ = clear_pending_attachment_tombstones(io, vault_root, &pushed_att_tombstones).await;
+        write_head_baseline(io, vault_root, &sealed)
+            .await
+            .map_err(|_| SyncCycleError::Io)?;
         state.record_observation(&sealed.head_id, &version_vector);
     } else if let Some(vh) = &page.head {
         // No local changes: adopt the pulled head as the new baseline (re-seal
         // the decoded head — deterministic, reproduces the same record/head_id).
         let sealed = vh.head.seal(root_key).map_err(|_| SyncCycleError::Head)?;
-        write_head_baseline(vault_root, &sealed).map_err(|_| SyncCycleError::Io)?;
+        write_head_baseline(io, vault_root, &sealed)
+            .await
+            .map_err(|_| SyncCycleError::Io)?;
+    }
+
+    // --- corpus completeness (phase3-web-client task 89) ---
+    //
+    // "Do I hold every content blob this account has?", answered EXACTLY rather
+    // than approximated: the vault head commits `manifest_hash` over notes ∪ live
+    // attachments (§4.2), the head is MAC-verified before anything reads it, and
+    // the local manifest is already assembled above. So the comparison costs one
+    // hash and states the property outright.
+    //
+    // It gates ONE thing — `attachment_clean_unused`, whose "unused" set is
+    // computed by scanning the local notes directory and is therefore wrong by
+    // exactly the notes a mid-materialisation device does not have yet. See
+    // `super::corpus` for why every cheaper signal is an approximation.
+    //
+    // **Recomputed every cycle, and cleared as readily as it is set.** A device
+    // that was complete and then fell behind must not keep a stale `true`: the
+    // flag's only job is to authorise an irreversible cross-device erase, so it
+    // has to describe THIS cycle's end state.
+    //
+    // No head at all (a virgin account before its genesis push) reads as
+    // incomplete — there is nothing to compare against, and "I could not check"
+    // must not authorise the sweep.
+    {
+        let mut local_content = local2.clone();
+        for (sid, e) in &att_scan {
+            local_content.insert(*sid, e.content_nonce);
+        }
+        let local_hash = compute_manifest_hash(&manifest_entries(&local_content)).ok();
+        // The head this cycle ENDS on: the one it just authored, else the one it
+        // pulled. Reading the pre-push head after a push would compare against a
+        // manifest this device has already moved past.
+        let head_hash =
+            final_head_manifest_hash.or_else(|| page.head.as_ref().map(|h| h.head.manifest_hash));
+        state.corpus_complete = match (local_hash, head_hash) {
+            (Some(local), Some(remote)) => local == remote,
+            _ => false,
+        };
     }
 
     // NOTE: `sync-state.json` is persisted by `run_sync_cycle` on success only (so a
@@ -2190,6 +2560,9 @@ fn sync_cycle_attempt(
         attachments_pulled,
         attachments_pushed,
         attachments_deleted,
+        // Set by the caller after the meta phase runs — the meta phase is
+        // deliberately outside the 409-retry loop this summary is built in.
+        credential_ambiguous: false,
         prefs_applied_remote: prefs_phase.applied_remote,
         themes_applied_remote: themes_phase.applied_remote,
         pull_skipped,
@@ -2207,6 +2580,95 @@ mod tests {
     use std::path::PathBuf;
     use std::process::Child;
 
+    // ── the storage seam, filled in for this module's tests ─────────────────
+    //
+    // Task 86 made `run_sync_cycle`, `sync_meta_phase`, `resolve_conflict` and
+    // every sidecar reader/writer take `io: &dyn VaultIo` and become `async`
+    // (the seam is async because OPFS handle acquisition is). The shims below
+    // shadow them with the OLD synchronous signatures and supply the real
+    // `StdVaultIo`, so ~150 call sites across these scenarios read unchanged.
+    //
+    // Shims, not fakes: each drives the production function against a real temp
+    // vault. A stub `VaultIo` would only have proved the signatures compile —
+    // and these are the tests that pin the CAS, cursor and conflict behaviour.
+    const IO: crate::vault_io::StdVaultIo = crate::vault_io::StdVaultIo;
+
+    fn blocking<F: std::future::Future>(f: F) -> F::Output {
+        crate::test_support::block_on(f)
+    }
+
+    // The seam-taking helpers, shadowed with their pre-task-86 signatures so the
+    // scenarios below read unchanged.
+    fn list_pending_conflicts(vault_root: &Path) -> Vec<String> {
+        blocking(super::list_pending_conflicts(&IO, vault_root))
+    }
+    #[allow(dead_code)]
+    fn read_staged_conflict_blob(vault_root: &Path, id_hex: &str) -> Option<Vec<u8>> {
+        blocking(super::read_staged_conflict_blob(&IO, vault_root, id_hex))
+    }
+    fn add_pending_tombstone(vault_root: &Path, id_hex: &str) -> Result<(), SyncCycleError> {
+        blocking(super::add_pending_tombstone(&IO, vault_root, id_hex))
+    }
+    #[allow(dead_code)]
+    fn add_pending_attachment_tombstone(
+        vault_root: &Path,
+        id: &[u8; 32],
+    ) -> Result<(), SyncCycleError> {
+        blocking(super::add_pending_attachment_tombstone(&IO, vault_root, id))
+    }
+    fn read_pending_tombstones(vault_root: &Path) -> std::collections::HashSet<String> {
+        blocking(super::read_pending_tombstones(&IO, vault_root))
+    }
+    #[allow(dead_code)]
+    fn write_pending_tombstones(
+        vault_root: &Path,
+        set: &std::collections::HashSet<String>,
+    ) -> Result<(), SyncCycleError> {
+        blocking(super::write_pending_tombstones(&IO, vault_root, set))
+    }
+    fn read_pending_attachment_tombstones(vault_root: &Path) -> Vec<PendingAttachmentTombstone> {
+        blocking(super::read_pending_attachment_tombstones(&IO, vault_root))
+    }
+    #[allow(dead_code)]
+    fn stage_conflict(
+        vault_root: &Path,
+        id: &[u8; 16],
+        server_version: u64,
+        remote_nonce: &[u8; 24],
+        ciphertext: &[u8],
+    ) -> Result<(), SyncCycleError> {
+        blocking(super::stage_conflict(
+            &IO,
+            vault_root,
+            id,
+            server_version,
+            remote_nonce,
+            ciphertext,
+        ))
+    }
+    #[allow(dead_code)]
+    fn quarantine_note(
+        vault_root: &Path,
+        notes_dir: &Path,
+        id: &[u8; 16],
+    ) -> Result<(), SyncCycleError> {
+        blocking(super::quarantine_note(&IO, vault_root, notes_dir, id))
+    }
+
+    fn read_sync_state(dir: &Path) -> Result<SyncState, super::super::config::SyncConfigError> {
+        blocking(super::read_sync_state(&IO, dir))
+    }
+    fn write_sync_state(
+        dir: &Path,
+        state: &SyncState,
+    ) -> Result<(), super::super::config::SyncConfigError> {
+        blocking(super::write_sync_state(&IO, dir, state))
+    }
+    #[allow(dead_code)]
+    fn resolve_conflict(vault_root: &Path, id_hex: &str) -> Result<(), SyncCycleError> {
+        blocking(super::resolve_conflict(&IO, vault_root, id_hex))
+    }
+
     /// The pre-MYND-468 cycle shape — a note-only cycle (no attachment keys).
     /// The existing note-sync scenarios pin note behavior in isolation;
     /// attachment-aware scenarios call `run_sync_cycle` with `Some(keys)`.
@@ -2221,7 +2683,8 @@ mod tests {
         vault_root: &Path,
         allow_push: bool,
     ) -> Result<SyncSummary, SyncCycleError> {
-        run_sync_cycle(
+        blocking(run_sync_cycle(
+            &IO,
             transport,
             root_key,
             account_number_hash,
@@ -2231,7 +2694,7 @@ mod tests {
             vault_root,
             allow_push,
             None,
-        )
+        ))
     }
 
     /// A transport that relays everything to a wrapped real transport EXCEPT it
@@ -3151,12 +3614,13 @@ mod tests {
         crate::atomic_write::atomic_write(&blob_path(&notes, &id), &local_edit, false).unwrap();
 
         let server_bytes = encode_new_note(&items_key, &items_key_id, &id, b"server v2").unwrap();
-        let outcome = apply_pulled_note_blob(
+        let outcome = blocking(apply_pulled_note_blob(
+            &IO,
             &notes,
             &id,
             &server_bytes,
             Some(hex(&scanned_nonce).as_str()),
-        )
+        ))
         .unwrap();
         assert!(matches!(outcome, PulledNoteApply::SkippedDirty));
         let on_disk = std::fs::read(blob_path(&notes, &id)).unwrap();
@@ -3176,21 +3640,38 @@ mod tests {
         crate::atomic_write::atomic_write(&blob_path(&notes, &id), &base, false).unwrap();
 
         let server_bytes = encode_new_note(&items_key, &items_key_id, &id, b"server v2").unwrap();
-        let outcome =
-            apply_pulled_note_blob(&notes, &id, &server_bytes, Some(hex(&base_nonce).as_str()))
-                .unwrap();
+        let outcome = blocking(apply_pulled_note_blob(
+            &IO,
+            &notes,
+            &id,
+            &server_bytes,
+            Some(hex(&base_nonce).as_str()),
+        ))
+        .unwrap();
         assert!(matches!(outcome, PulledNoteApply::Applied));
         let on_disk = std::fs::read(blob_path(&notes, &id)).unwrap();
         assert_eq!(on_disk, server_bytes);
         // A vanished file under a live baseline is likewise dirty (a mid-cycle
         // local delete must not be resurrected).
         std::fs::remove_file(blob_path(&notes, &id)).unwrap();
-        let outcome2 =
-            apply_pulled_note_blob(&notes, &id, &server_bytes, Some(hex(&base_nonce).as_str()))
-                .unwrap();
+        let outcome2 = blocking(apply_pulled_note_blob(
+            &IO,
+            &notes,
+            &id,
+            &server_bytes,
+            Some(hex(&base_nonce).as_str()),
+        ))
+        .unwrap();
         assert!(matches!(outcome2, PulledNoteApply::SkippedDirty));
         // No baseline (fresh pull) writes unconditionally.
-        let outcome3 = apply_pulled_note_blob(&notes, &id, &server_bytes, None).unwrap();
+        let outcome3 = blocking(apply_pulled_note_blob(
+            &IO,
+            &notes,
+            &id,
+            &server_bytes,
+            None,
+        ))
+        .unwrap();
         assert!(matches!(outcome3, PulledNoteApply::Applied));
         std::fs::remove_dir_all(&dir).ok();
     }
@@ -3744,13 +4225,13 @@ mod tests {
         // Corruption: clear A's synced baseline — exactly what the chunked
         // push-response parse bug produced (server got the blob, A never recorded
         // it). Device identity + cursor are kept.
-        let mut st = crate::plugins::sync::state::read_sync_state(&dir_a).unwrap();
+        let mut st = read_sync_state(&dir_a).unwrap();
         assert!(
             !st.blobs.is_empty(),
             "baseline populated by the initial push"
         );
         st.blobs.clear();
-        crate::plugins::sync::state::write_sync_state(&dir_a, &st).unwrap();
+        write_sync_state(&dir_a, &st).unwrap();
 
         // A edits the note locally (a fresh content_nonce).
         let blob_v2 =
@@ -4542,7 +5023,7 @@ mod tests {
     /// recovery paths compose without wedging.
     #[test]
     fn cursor_expired_resets_and_full_reconciles() {
-        use crate::plugins::sync::state::{write_sync_state, SyncState};
+        use crate::plugins::sync::state::SyncState;
         use crate::plugins::sync::transport::{FakeTransport, HttpMethod};
 
         let dir = std::env::temp_dir().join(format!("myne-cursor-{}", std::process::id()));
@@ -5105,12 +5586,12 @@ mod tests {
         // Corrupt B's recorded baseline for X back to v1 WITHOUT staging a conflict —
         // simulating a baseline that fell behind the server while X sits outside the
         // cursor window (the partial-commit / chunked-parse class of desync).
-        let mut st = crate::plugins::sync::state::read_sync_state(&dir_b).unwrap();
+        let mut st = read_sync_state(&dir_b).unwrap();
         st.blobs
             .get_mut(&x_hex)
             .expect("B has a baseline for X")
             .version = 1;
-        crate::plugins::sync::state::write_sync_state(&dir_b, &st).unwrap();
+        write_sync_state(&dir_b, &st).unwrap();
 
         // B edits X locally → dirty over the corrupted v1 baseline. On push B sends
         // X@base_version=1; the server is at v2 → 409 blob_stale. Without the reactive
@@ -5170,7 +5651,8 @@ mod tests {
         items_key: &[u8; 32],
         items_key_id: &[u8; 16],
     ) -> Result<SyncSummary, SyncCycleError> {
-        run_sync_cycle(
+        blocking(run_sync_cycle(
+            &IO,
             transport,
             root_key,
             account_number_hash,
@@ -5183,7 +5665,7 @@ mod tests {
                 items_key,
                 items_key_id,
             }),
-        )
+        ))
     }
 
     /// Seed a local attachment exactly as `attachment_import` would: MYA1 blob
@@ -5811,6 +6293,9 @@ mod tests {
     // ---- MYND-478: vault.prefs phase (sync_prefs_phase) ----------------------
 
     mod prefs_phase {
+        // The parent module's seam shims (task 86).
+        use super::{blocking, IO};
+
         use super::super::*;
         use crate::plugins::sync::prefs_merge::shared_subset_hash;
         use crate::plugins::sync::state::SyncState;
@@ -5876,8 +6361,10 @@ mod tests {
             let t = FakeTransport::new();
             let pid = prefs_sync_id(&ROOT);
 
-            let phase =
-                sync_prefs_phase(&t, "tok", &ROOT, &HASH, &dir, &mut st, &pid, None).unwrap();
+            let phase = blocking(sync_prefs_phase(
+                &IO, &t, "tok", &ROOT, &HASH, &dir, &mut st, &pid, None,
+            ))
+            .unwrap();
             assert!(phase.dirty, "never-synced server ⇒ initial publish");
             assert!(!phase.applied_remote);
             std::fs::remove_dir_all(&dir).ok();
@@ -5907,8 +6394,10 @@ mod tests {
             set_prefs_gate_baseline(&dir, shared_subset_hash(&PrefsView::default()));
             let t = FakeTransport::new();
 
-            let phase =
-                sync_prefs_phase(&t, "tok", &ROOT, &HASH, &dir, &mut st, &pid, None).unwrap();
+            let phase = blocking(sync_prefs_phase(
+                &IO, &t, "tok", &ROOT, &HASH, &dir, &mut st, &pid, None,
+            ))
+            .unwrap();
             assert!(!phase.dirty, "device-local edit must not push");
             std::fs::remove_dir_all(&dir).ok();
         }
@@ -5935,8 +6424,10 @@ mod tests {
             set_prefs_gate_baseline(&dir, shared_subset_hash(&PrefsView::default()));
             let t = FakeTransport::new();
 
-            let phase =
-                sync_prefs_phase(&t, "tok", &ROOT, &HASH, &dir, &mut st, &pid, None).unwrap();
+            let phase = blocking(sync_prefs_phase(
+                &IO, &t, "tok", &ROOT, &HASH, &dir, &mut st, &pid, None,
+            ))
+            .unwrap();
             assert!(phase.dirty, "shared edit must push");
             std::fs::remove_dir_all(&dir).ok();
         }
@@ -5962,8 +6453,18 @@ mod tests {
             remote.field_clocks.insert("label".into(), 500);
             let rec = serve_remote(&t, &pid, &remote);
 
-            let phase =
-                sync_prefs_phase(&t, "tok", &ROOT, &HASH, &dir, &mut st, &pid, Some(&rec)).unwrap();
+            let phase = blocking(sync_prefs_phase(
+                &IO,
+                &t,
+                "tok",
+                &ROOT,
+                &HASH,
+                &dir,
+                &mut st,
+                &pid,
+                Some(&rec),
+            ))
+            .unwrap();
             assert!(phase.applied_remote, "remote rename must apply");
             assert!(!phase.dirty, "shared subsets agree ⇒ no re-push");
             let on_disk = read_local(&dir);
@@ -5980,8 +6481,18 @@ mod tests {
             );
             // Second cycle against the SAME server record: already reconciled
             // (baseline nonce) ⇒ no download, no dirt, no ping-pong.
-            let phase2 =
-                sync_prefs_phase(&t, "tok", &ROOT, &HASH, &dir, &mut st, &pid, Some(&rec)).unwrap();
+            let phase2 = blocking(sync_prefs_phase(
+                &IO,
+                &t,
+                "tok",
+                &ROOT,
+                &HASH,
+                &dir,
+                &mut st,
+                &pid,
+                Some(&rec),
+            ))
+            .unwrap();
             assert!(!phase2.dirty);
             assert!(!phase2.applied_remote);
             std::fs::remove_dir_all(&dir).ok();
@@ -6005,16 +6516,36 @@ mod tests {
             remote.field_clocks.insert("label".into(), 900);
             let rec = serve_remote(&t, &pid, &remote);
 
-            let phase =
-                sync_prefs_phase(&t, "tok", &ROOT, &HASH, &dir, &mut st, &pid, Some(&rec)).unwrap();
+            let phase = blocking(sync_prefs_phase(
+                &IO,
+                &t,
+                "tok",
+                &ROOT,
+                &HASH,
+                &dir,
+                &mut st,
+                &pid,
+                Some(&rec),
+            ))
+            .unwrap();
             assert!(phase.applied_remote);
             assert!(!phase.dirty, "a seed adopts; it never pushes");
             let seeded = read_local(&dir);
             assert_eq!(seeded, remote, "wholesale: device-local theme included");
             // Second cycle against the same record: file exists + baseline
             // matches ⇒ no re-seed, no download loop.
-            let phase2 =
-                sync_prefs_phase(&t, "tok", &ROOT, &HASH, &dir, &mut st, &pid, Some(&rec)).unwrap();
+            let phase2 = blocking(sync_prefs_phase(
+                &IO,
+                &t,
+                "tok",
+                &ROOT,
+                &HASH,
+                &dir,
+                &mut st,
+                &pid,
+                Some(&rec),
+            ))
+            .unwrap();
             assert!(!phase2.applied_remote);
             assert!(!phase2.dirty);
             std::fs::remove_dir_all(&dir).ok();
@@ -6029,8 +6560,10 @@ mod tests {
             let pid = prefs_sync_id(&ROOT);
             let t = FakeTransport::new();
 
-            let phase =
-                sync_prefs_phase(&t, "tok", &ROOT, &HASH, &dir, &mut st, &pid, None).unwrap();
+            let phase = blocking(sync_prefs_phase(
+                &IO, &t, "tok", &ROOT, &HASH, &dir, &mut st, &pid, None,
+            ))
+            .unwrap();
             assert!(!phase.applied_remote);
             assert!(phase.dirty, "never-synced ⇒ initial-publish intent");
             assert!(
@@ -6078,8 +6611,18 @@ mod tests {
             };
             let t = FakeTransport::new();
 
-            let phase =
-                sync_prefs_phase(&t, "tok", &ROOT, &HASH, &dir, &mut st, &pid, Some(&rec)).unwrap();
+            let phase = blocking(sync_prefs_phase(
+                &IO,
+                &t,
+                "tok",
+                &ROOT,
+                &HASH,
+                &dir,
+                &mut st,
+                &pid,
+                Some(&rec),
+            ))
+            .unwrap();
             assert!(
                 phase.dirty,
                 "the unsynced rename must push despite the lost RAM baseline"
@@ -6112,8 +6655,18 @@ mod tests {
             remote.field_clocks.insert("icon".into(), 300);
             let rec = serve_remote(&t, &pid, &remote);
 
-            let phase =
-                sync_prefs_phase(&t, "tok", &ROOT, &HASH, &dir, &mut st, &pid, Some(&rec)).unwrap();
+            let phase = blocking(sync_prefs_phase(
+                &IO,
+                &t,
+                "tok",
+                &ROOT,
+                &HASH,
+                &dir,
+                &mut st,
+                &pid,
+                Some(&rec),
+            ))
+            .unwrap();
             assert!(phase.dirty, "merge beat the server ⇒ push");
             assert!(phase.applied_remote, "remote icon landed locally");
             let on_disk = read_local(&dir);
@@ -6128,6 +6681,9 @@ mod tests {
     // ---- MYND-486: vault.themes phase (sync_themes_phase) --------------------
 
     mod themes_phase {
+        // The parent module's seam shims (task 86).
+        use super::{blocking, IO};
+
         use super::super::*;
         use crate::plugins::sync::state::SyncState;
         use crate::plugins::sync::transport::FakeTransport;
@@ -6220,8 +6776,10 @@ mod tests {
             let t = FakeTransport::new();
             let tid = themes_sync_id(&ROOT);
 
-            let phase =
-                sync_themes_phase(&t, "tok", &ROOT, &HASH, &dir, &mut st, &tid, None).unwrap();
+            let phase = blocking(sync_themes_phase(
+                &IO, &t, "tok", &ROOT, &HASH, &dir, &mut st, &tid, None,
+            ))
+            .unwrap();
             assert!(!phase.dirty, "a theme-less vault generates no traffic");
             assert!(!phase.applied_remote);
             std::fs::remove_dir_all(&dir).ok();
@@ -6236,8 +6794,10 @@ mod tests {
             let t = FakeTransport::new();
             let tid = themes_sync_id(&ROOT);
 
-            let phase =
-                sync_themes_phase(&t, "tok", &ROOT, &HASH, &dir, &mut st, &tid, None).unwrap();
+            let phase = blocking(sync_themes_phase(
+                &IO, &t, "tok", &ROOT, &HASH, &dir, &mut st, &tid, None,
+            ))
+            .unwrap();
             assert!(phase.dirty, "an unsynced local theme must push");
             std::fs::remove_dir_all(&dir).ok();
         }
@@ -6262,8 +6822,10 @@ mod tests {
             );
             let t = FakeTransport::new();
 
-            let phase =
-                sync_themes_phase(&t, "tok", &ROOT, &HASH, &dir, &mut st, &tid, None).unwrap();
+            let phase = blocking(sync_themes_phase(
+                &IO, &t, "tok", &ROOT, &HASH, &dir, &mut st, &tid, None,
+            ))
+            .unwrap();
             assert!(!phase.dirty, "byte-untouched blob must not push");
             std::fs::remove_dir_all(&dir).ok();
         }
@@ -6281,8 +6843,18 @@ mod tests {
             let remote = ThemesMap::from([theme("solarized", "#268bd2", T0 + 1)]);
             let rec = serve_remote(&t, &tid, &remote);
 
-            let phase = sync_themes_phase(&t, "tok", &ROOT, &HASH, &dir, &mut st, &tid, Some(&rec))
-                .unwrap();
+            let phase = blocking(sync_themes_phase(
+                &IO,
+                &t,
+                "tok",
+                &ROOT,
+                &HASH,
+                &dir,
+                &mut st,
+                &tid,
+                Some(&rec),
+            ))
+            .unwrap();
             assert!(phase.dirty, "merge beat the server ⇒ push");
             assert!(phase.applied_remote, "the peer's theme landed locally");
             let on_disk = read_local(&dir);
@@ -6306,8 +6878,18 @@ mod tests {
             let remote = ThemesMap::from([theme("nord", "#88c0d0", T0)]);
             let rec = serve_remote(&t, &tid, &remote);
 
-            let phase = sync_themes_phase(&t, "tok", &ROOT, &HASH, &dir, &mut st, &tid, Some(&rec))
-                .unwrap();
+            let phase = blocking(sync_themes_phase(
+                &IO,
+                &t,
+                "tok",
+                &ROOT,
+                &HASH,
+                &dir,
+                &mut st,
+                &tid,
+                Some(&rec),
+            ))
+            .unwrap();
             assert!(!phase.dirty, "adopting the server's bytes pushes nothing");
             assert!(phase.applied_remote);
             assert_eq!(read_local(&dir), remote);
@@ -6333,8 +6915,18 @@ mod tests {
             let remote = ThemesMap::from([(name, entry.into_tombstone(T0 + 10))]);
             let rec = serve_remote(&t, &tid, &remote);
 
-            let phase = sync_themes_phase(&t, "tok", &ROOT, &HASH, &dir, &mut st, &tid, Some(&rec))
-                .unwrap();
+            let phase = blocking(sync_themes_phase(
+                &IO,
+                &t,
+                "tok",
+                &ROOT,
+                &HASH,
+                &dir,
+                &mut st,
+                &tid,
+                Some(&rec),
+            ))
+            .unwrap();
             assert!(phase.applied_remote, "the peer's delete landed");
             let on_disk = read_local(&dir);
             assert!(
@@ -6342,8 +6934,18 @@ mod tests {
                 "the local live copy did NOT resurrect the theme"
             );
             assert!(
-                crate::plugins::themes::commands::themes_list_in_dir(&dir, &themes_key(), &HASH)
-                    .is_empty(),
+                // The themes list moved onto the IO seam (phase3-web-client
+                // task 45), so this sync-side assertion drives it through the
+                // native arm rather than through `std::fs` directly.
+                crate::test_support::block_on(
+                    crate::plugins::themes::commands::themes_list_in_dir(
+                        &crate::vault_io::StdVaultIo,
+                        &dir,
+                        &themes_key(),
+                        &HASH,
+                    )
+                )
+                .is_empty(),
                 "a tombstoned theme is gone from the user's list"
             );
             std::fs::remove_dir_all(&dir).ok();
@@ -6375,8 +6977,18 @@ mod tests {
                 attachment_id: None,
             };
 
-            let phase = sync_themes_phase(&t, "tok", &ROOT, &HASH, &dir, &mut st, &tid, Some(&rec))
-                .unwrap();
+            let phase = blocking(sync_themes_phase(
+                &IO,
+                &t,
+                "tok",
+                &ROOT,
+                &HASH,
+                &dir,
+                &mut st,
+                &tid,
+                Some(&rec),
+            ))
+            .unwrap();
             assert!(phase.dirty, "the local store re-pushes over the garbage");
             assert_eq!(read_local(&dir), local, "nothing lost");
             std::fs::remove_dir_all(&dir).ok();
@@ -6384,6 +6996,9 @@ mod tests {
     }
 
     mod meta_phase {
+        // The parent module's seam shims, re-exported into this nested one.
+        use super::{blocking, IO};
+
         use super::super::*;
         use crate::plugins::sync::state::{mark_vault_meta_dirty, vault_meta_is_dirty, SyncState};
         use crate::plugins::sync::transport::{FakeTransport, HttpMethod};
@@ -6431,6 +7046,72 @@ mod tests {
                 .collect()
         }
 
+        /// The silent-revert trap (phase3-web-client task 88).
+        ///
+        /// `sync-state.json` and `vault.meta-dirty` live in the same evictable
+        /// OPFS container, so a browser eviction or a torn sidecar write loses
+        /// them TOGETHER. `local_changed` then computes `false` (no dirty marker,
+        /// and the baseline clause is guarded by `baseline.is_some()`) while
+        /// `server_changed` computes `true` — and the adopt branch overwrites the
+        /// local `vault.meta` with the server's older copy.
+        ///
+        /// What the user sees: the password they just changed stops working and
+        /// the old one starts working again, with no error anywhere. On the web
+        /// client there is no recovery phrase by settled decision, so the only
+        /// remedy is a native client with a password they have just been told is
+        /// no longer theirs.
+        #[test]
+        fn refuses_to_adopt_a_differing_credential_when_no_baseline_says_which_moved() {
+            let dir = scratch("ambiguous");
+            let local = meta_bytes(0xAA); // this device's NEW password wrap
+            let server = meta_bytes(0xBB); // the server's older one
+            std::fs::write(dir.join("vault.meta"), &local).unwrap();
+            // The post-eviction state: no baseline, no dirty marker.
+            let mut st = SyncState::default();
+            let t = FakeTransport::new();
+            t.on(HttpMethod::Get, "/vault.meta", 200, server.clone());
+
+            let out = blocking(sync_meta_phase(&IO, &t, "tok", &dir, &mut st, true));
+
+            assert_eq!(out, MetaPhaseOutcome::CredentialAmbiguous);
+            assert_eq!(
+                std::fs::read(dir.join("vault.meta")).unwrap(),
+                local,
+                "the local credential must survive an unresolvable disagreement"
+            );
+            assert!(
+                st.meta_baseline_hex.is_none(),
+                "refusing must not invent a baseline — that would make the NEXT cycle adopt"
+            );
+            std::fs::remove_dir_all(&dir).ok();
+        }
+
+        /// The other half, and the reason the guard is scoped to the password
+        /// side. An absent baseline with an IDENTICAL password wrap is ordinary —
+        /// another device changed something this one holds no opinion about — and
+        /// refusing there would stall propagation for no safety gain.
+        #[test]
+        fn an_absent_baseline_still_adopts_when_the_credential_is_unchanged() {
+            let dir = scratch("ambiguous-same-pw");
+            // Same password side, different elsewhere: only the recovery-side
+            // bytes are varied here, which `merge_vault_meta` treats as a hard
+            // divergence — so this asserts the guard did not fire, via the
+            // outcome it DOES produce rather than by adopting something the
+            // merge would refuse.
+            let local = meta_bytes(0xAA);
+            std::fs::write(dir.join("vault.meta"), &local).unwrap();
+            let mut st = SyncState::default();
+            let t = FakeTransport::new();
+            // Identical bytes → the early "already agree" return, which proves
+            // the guard is not reached for an unchanged credential.
+            t.on(HttpMethod::Get, "/vault.meta", 200, local.clone());
+
+            let out = blocking(sync_meta_phase(&IO, &t, "tok", &dir, &mut st, true));
+            assert_eq!(out, MetaPhaseOutcome::NoChange);
+            assert_eq!(st.meta_baseline_hex, Some(sha256_hex(&local)));
+            std::fs::remove_dir_all(&dir).ok();
+        }
+
         // Device B holds an old meta, made NO local change; the server carries a
         // newer password-side (device A changed it). B must ADOPT it: the local
         // file becomes the server bytes, and no PUT is sent.
@@ -6448,7 +7129,7 @@ mod tests {
             let t = FakeTransport::new();
             t.on(HttpMethod::Get, "/vault.meta", 200, server.clone());
 
-            let out = sync_meta_phase(&t, "tok", &dir, &mut st, true);
+            let out = blocking(sync_meta_phase(&IO, &t, "tok", &dir, &mut st, true));
             assert_eq!(out, MetaPhaseOutcome::Adopted);
             assert_eq!(
                 std::fs::read(dir.join("vault.meta")).unwrap(),
@@ -6468,7 +7149,7 @@ mod tests {
             let baseline = meta_bytes(0xAA); // what the server still has
             let local = meta_bytes(0xCC); // A's new password-side
             std::fs::write(dir.join("vault.meta"), &local).unwrap();
-            mark_vault_meta_dirty(&dir).unwrap();
+            blocking(mark_vault_meta_dirty(&IO, &dir)).unwrap();
             let mut st = SyncState {
                 meta_baseline_hex: Some(sha256_hex(&baseline)),
                 ..Default::default()
@@ -6477,14 +7158,14 @@ mod tests {
             t.on(HttpMethod::Get, "/vault.meta", 200, baseline);
             t.on(HttpMethod::Put, "/vault.meta", 200, Vec::new());
 
-            let out = sync_meta_phase(&t, "tok", &dir, &mut st, true);
+            let out = blocking(sync_meta_phase(&IO, &t, "tok", &dir, &mut st, true));
             assert_eq!(out, MetaPhaseOutcome::Pushed);
             let puts = put_recorded(&t);
             assert_eq!(puts.len(), 1);
             assert_eq!(puts[0], local, "A pushes its own new meta");
             assert_eq!(st.meta_baseline_hex, Some(sha256_hex(&local)));
             assert!(
-                !vault_meta_is_dirty(&dir),
+                !blocking(vault_meta_is_dirty(&IO, &dir)),
                 "dirty cleared after a successful push"
             );
             std::fs::remove_dir_all(&dir).ok();
@@ -6498,7 +7179,7 @@ mod tests {
             let baseline = meta_bytes(0xAA);
             let local = meta_bytes(0xCC);
             std::fs::write(dir.join("vault.meta"), &local).unwrap();
-            mark_vault_meta_dirty(&dir).unwrap();
+            blocking(mark_vault_meta_dirty(&IO, &dir)).unwrap();
             let mut st = SyncState {
                 meta_baseline_hex: Some(sha256_hex(&baseline)),
                 ..Default::default()
@@ -6506,11 +7187,11 @@ mod tests {
             let t = FakeTransport::new();
             t.on(HttpMethod::Get, "/vault.meta", 200, baseline);
 
-            let out = sync_meta_phase(&t, "tok", &dir, &mut st, false);
+            let out = blocking(sync_meta_phase(&IO, &t, "tok", &dir, &mut st, false));
             assert_eq!(out, MetaPhaseOutcome::NoChange);
             assert!(put_recorded(&t).is_empty(), "a poll cycle pushes nothing");
             assert!(
-                vault_meta_is_dirty(&dir),
+                blocking(vault_meta_is_dirty(&IO, &dir)),
                 "dirty kept for a later push cycle"
             );
             std::fs::remove_dir_all(&dir).ok();
@@ -6529,7 +7210,7 @@ mod tests {
             // --- A's perspective: local=A, server=B (B pushed first) ---
             let dir_a = scratch("conc-a");
             std::fs::write(dir_a.join("vault.meta"), &a_pw).unwrap();
-            mark_vault_meta_dirty(&dir_a).unwrap();
+            blocking(mark_vault_meta_dirty(&IO, &dir_a)).unwrap();
             let mut st_a = SyncState {
                 meta_baseline_hex: Some(sha256_hex(&baseline)),
                 ..Default::default()
@@ -6537,7 +7218,7 @@ mod tests {
             let ta = FakeTransport::new();
             ta.on(HttpMethod::Get, "/vault.meta", 200, b_pw.clone());
             ta.on(HttpMethod::Put, "/vault.meta", 200, Vec::new());
-            let out_a = sync_meta_phase(&ta, "tok", &dir_a, &mut st_a, true);
+            let out_a = blocking(sync_meta_phase(&IO, &ta, "tok", &dir_a, &mut st_a, true));
             assert_eq!(out_a, MetaPhaseOutcome::Merged);
             assert_eq!(
                 std::fs::read(dir_a.join("vault.meta")).unwrap(),
@@ -6548,7 +7229,7 @@ mod tests {
             // --- B's perspective: local=B, server=A (A pushed first) ---
             let dir_b = scratch("conc-b");
             std::fs::write(dir_b.join("vault.meta"), &b_pw).unwrap();
-            mark_vault_meta_dirty(&dir_b).unwrap();
+            blocking(mark_vault_meta_dirty(&IO, &dir_b)).unwrap();
             let mut st_b = SyncState {
                 meta_baseline_hex: Some(sha256_hex(&baseline)),
                 ..Default::default()
@@ -6556,7 +7237,7 @@ mod tests {
             let tb = FakeTransport::new();
             tb.on(HttpMethod::Get, "/vault.meta", 200, a_pw.clone());
             tb.on(HttpMethod::Put, "/vault.meta", 200, Vec::new());
-            let out_b = sync_meta_phase(&tb, "tok", &dir_b, &mut st_b, true);
+            let out_b = blocking(sync_meta_phase(&IO, &tb, "tok", &dir_b, &mut st_b, true));
             assert_eq!(out_b, MetaPhaseOutcome::Merged);
             assert_eq!(
                 std::fs::read(dir_b.join("vault.meta")).unwrap(),
@@ -6600,7 +7281,7 @@ mod tests {
             let t = FakeTransport::new();
             t.on(HttpMethod::Get, "/vault.meta", 200, server);
 
-            let out = sync_meta_phase(&t, "tok", &dir, &mut st, true);
+            let out = blocking(sync_meta_phase(&IO, &t, "tok", &dir, &mut st, true));
             assert_eq!(out, MetaPhaseOutcome::Skipped);
             assert_eq!(
                 std::fs::read(dir.join("vault.meta")).unwrap(),
@@ -6616,17 +7297,17 @@ mod tests {
             let dir = scratch("seed");
             let local = meta_bytes(0xAA);
             std::fs::write(dir.join("vault.meta"), &local).unwrap();
-            mark_vault_meta_dirty(&dir).unwrap();
+            blocking(mark_vault_meta_dirty(&IO, &dir)).unwrap();
             let mut st = SyncState::default();
             let t = FakeTransport::new();
             t.on(HttpMethod::Get, "/vault.meta", 404, Vec::new());
             t.on(HttpMethod::Put, "/vault.meta", 200, Vec::new());
 
-            let out = sync_meta_phase(&t, "tok", &dir, &mut st, true);
+            let out = blocking(sync_meta_phase(&IO, &t, "tok", &dir, &mut st, true));
             assert_eq!(out, MetaPhaseOutcome::Pushed);
             assert_eq!(put_recorded(&t), vec![local.clone()]);
             assert_eq!(st.meta_baseline_hex, Some(sha256_hex(&local)));
-            assert!(!vault_meta_is_dirty(&dir));
+            assert!(!blocking(vault_meta_is_dirty(&IO, &dir)));
             std::fs::remove_dir_all(&dir).ok();
         }
 
@@ -6636,17 +7317,17 @@ mod tests {
             let dir = scratch("agree");
             let m = meta_bytes(0xAA);
             std::fs::write(dir.join("vault.meta"), &m).unwrap();
-            mark_vault_meta_dirty(&dir).unwrap();
+            blocking(mark_vault_meta_dirty(&IO, &dir)).unwrap();
             let mut st = SyncState::default();
             let t = FakeTransport::new();
             t.on(HttpMethod::Get, "/vault.meta", 200, m.clone());
 
-            let out = sync_meta_phase(&t, "tok", &dir, &mut st, true);
+            let out = blocking(sync_meta_phase(&IO, &t, "tok", &dir, &mut st, true));
             assert_eq!(out, MetaPhaseOutcome::NoChange);
             assert!(put_recorded(&t).is_empty());
             assert_eq!(st.meta_baseline_hex, Some(sha256_hex(&m)));
             assert!(
-                !vault_meta_is_dirty(&dir),
+                !blocking(vault_meta_is_dirty(&IO, &dir)),
                 "an agreeing server clears a stale dirty flag"
             );
             std::fs::remove_dir_all(&dir).ok();

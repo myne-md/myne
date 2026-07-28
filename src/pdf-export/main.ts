@@ -24,7 +24,7 @@
 // permission set `pdf-export:page`) grants exactly the two commands
 // invoked here and nothing else.
 
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../platform/core";
 import { composePrintStylesheet } from "../dialect/html/page-geometry";
 import { FONT_FACE_CSS } from "../dialect/html/font-face";
 

@@ -37,6 +37,13 @@ pub mod ocr;
 pub mod reconcile;
 pub mod reconcile_commands;
 pub mod ref_scan;
+// The custom-protocol serve path returns a `tauri::http::Response`, i.e. it is
+// typed on the host's HTTP surface rather than merely using it for paths — so
+// unlike the command modules there is nothing to split out. Gated whole. The
+// browser gets its own attachment render path (phase3-web-client task 44),
+// which is a different mechanism (an object URL from the Worker), not a port of
+// this one.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 pub mod scheme_core;
 pub mod sniff;
 pub mod text_cache;

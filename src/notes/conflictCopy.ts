@@ -6,7 +6,7 @@
 // (useConflictMaterializer, the Conflicts view) are unchanged. Behaviour —
 // including the MYND-452 take-theirs + Undo — is identical to before the lift.
 
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../platform/core";
 import {
   buildConflictCopyContent,
   clearConflictMarkers,

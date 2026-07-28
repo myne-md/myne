@@ -6,9 +6,11 @@ import {
   writeText as clipboardWriteText,
   readText as clipboardReadText,
   clear as clipboardClear,
-} from "@tauri-apps/plugin-clipboard-manager";
-import { save as dialogSave } from "@tauri-apps/plugin-dialog";
-import { invoke } from "@tauri-apps/api/core";
+} from "../platform/clipboardManager";
+import { save as dialogSave } from "../platform/dialog";
+import { invoke } from "../platform/core";
+import { has } from "../platform/capabilities";
+import { deliverFile } from "../platform/download";
 import { logErrorKind } from "./vault-creation-logging";
 
 const CLIPBOARD_AUTO_CLEAR_MS = 30_000;
@@ -84,6 +86,35 @@ export async function saveJsonAsFile(
   contents: string,
   filterName: string,
 ): Promise<void> {
+  // The download arm (phase3-web-client task 97). This is the LAST of the four
+  // formats that task left without a verdict, and its verdict is "ships" rather
+  // than "absent" — a single file, which is exactly the case task 48 settled.
+  //
+  // **No egress disclosure here, and the distinction is the point.** Every other
+  // download path in the client carries one because it delivers vault
+  // plaintext. A palette is a set of colour values the user authored in
+  // Settings: it is not note content, not a credential, and not derived from
+  // either. Attaching an egress sentence to it would train the user to click
+  // through the sentence on the paths where it means something — which is the
+  // failure the say-it-once rule exists to prevent, arrived at from the other
+  // direction.
+  //
+  // The name says `secret` because the sibling in this file writes recovery
+  // material through the same narrow Rust seam; the palette rides it only so
+  // there is one fs-write path, not because it is secret. On web there is no fs
+  // write to narrow — the browser owns the destination — so the seam question
+  // does not arise.
+  if (!has("nativeSaveAs")) {
+    try {
+      await deliverFile(defaultPath, new TextEncoder().encode(contents), "application/json");
+    } catch (e) {
+      // REJECTS, like the dialog arm's write failure: the caller surfaces it.
+      logErrorKind(e, "download-failed");
+      throw e;
+    }
+    return;
+  }
+
   let path: string | null;
   try {
     path = await dialogSave({

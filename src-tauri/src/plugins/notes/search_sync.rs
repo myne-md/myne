@@ -35,7 +35,6 @@
 
 use crate::paths;
 use crate::plugins::vault_unlock::state::{SlotKind, VaultRuntimeState};
-use crate::search::persist::{decode_snapshot, encode_snapshot, reconcile};
 use crate::search::SearchIndexState;
 use protocol::{derive_subkey, parse_vault_meta, SubkeyRole, VAULT_META_ACCOUNT_HASH_LEN};
 use std::collections::HashMap;
@@ -43,12 +42,12 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 use tauri::{AppHandle, Manager, Runtime};
 
-// The decryption-free on-disk nonce scan moved to `myne-core`
-// (`myne_core::note_nonce::scan_on_disk_manifest`, shared with the vault-indices
-// plugin). Re-exported so existing
-// `crate::plugins::notes::search_sync::scan_on_disk_manifest` paths (the sync
-// orchestrator, this module's own hydrate/persist) keep resolving.
-pub(crate) use myne_core::note_nonce::scan_on_disk_manifest;
+// The blocking manifest twin that used to live here is GONE. It existed because
+// the desktop path walked the notes directory synchronously while the seam's
+// version was async; now both clients call the same
+// `search_sync_core::hydrate_search_index_core`, which walks through the seam,
+// so a second implementation would only be a way for the two to disagree about
+// what a `.myn` header means.
 
 use super::commands::note_read_with_dir;
 use super::title_extract::resolve_note_title;
@@ -71,39 +70,15 @@ const _: () = assert!(VAULT_META_ACCOUNT_HASH_LEN == protocol::SEARCH_BLOB_ACCOU
 /// code, mirroring the `auto_lock` placeholder-constant discipline.
 const FLUSH_INTERVAL: Duration = Duration::from_secs(120);
 
-/// Bounded failure surface for the search-index IO lifecycle. Every variant
-/// is swallowed (logged, then ignored) at the call site — the `Result`
-/// exists only so the `_with_dir` cores are unit-testable. Variant names are
-/// DENY-list-safe (no payload).
-#[derive(Debug)]
-pub enum SearchSyncError {
-    /// The slot was not `Unlocked` when hydrate / persist ran (peek of
-    /// `root_key` failed). Hydrate: nothing to load into. Persist: no key.
-    SlotNotUnlocked,
-    /// `vault.meta` was missing or unreadable (needed for the
-    /// `account_number_hash` AAD binding).
-    InvalidVaultMeta,
-    /// A filesystem failure reading `vault.meta` / scanning headers /
-    /// writing `vault.search`.
-    Io,
-    /// `encode_search_index_blob` failed (structurally unreachable under
-    /// v0.1 fixed AEAD params; mapped defensively).
-    Encode,
-    /// The `spawn_blocking` encode task panicked / the runtime shut down.
-    Join,
-}
+/// Re-exported from `myne-core`: the two `_with_dir` cores moved there
+/// (phase3-web-client tasks 14 + 83) and their error type moved with them, so
+/// there is one definition rather than a desktop copy that can drift.
+pub use myne_core::plugins::notes::search_sync_core::SearchSyncError;
 
-/// Static-string label for [`SearchSyncError`] — tracing-safe, drift-
-/// detecting (a new variant compile-fails the match). Mirrors the
-/// `*_error_kind` discipline across the plugins.
+/// Static-string label for [`SearchSyncError`] — delegates to the shared one so
+/// a new variant is labelled in exactly one place.
 fn sync_error_kind(e: &SearchSyncError) -> &'static str {
-    match e {
-        SearchSyncError::SlotNotUnlocked => "slot_not_unlocked",
-        SearchSyncError::InvalidVaultMeta => "invalid_vault_meta",
-        SearchSyncError::Io => "io_error",
-        SearchSyncError::Encode => "encode_failed",
-        SearchSyncError::Join => "join_failure",
-    }
+    myne_core::plugins::notes::search_sync_core::search_sync_error_kind(e)
 }
 
 /// Resolve the ACTIVE vault root for the running app. Local mirror of the
@@ -243,7 +218,14 @@ pub async fn refresh_attachment_docs_for<R: Runtime>(
     for note_id in note_ids {
         // Read the embedding note to recover its title + body (the body names the
         // embeds `note_attachment_docs` re-reads from the MYE1 caches).
-        let Ok(plaintext) = note_read_with_dir(notes_dir.clone(), state, note_id.clone()).await
+        let Ok(plaintext) = note_read_with_dir(
+            notes_dir.clone(),
+            state,
+            note_id.clone(),
+            &myne_core::vault_io::StdVaultIo,
+            &myne_core::host::tauri_host::TauriHost::new(app.clone()),
+        )
+        .await
         else {
             continue;
         };
@@ -254,203 +236,135 @@ pub async fn refresh_attachment_docs_for<R: Runtime>(
     tracing::info!(event = "transcript_search_docs_refreshed");
 }
 
-/// Testable core of [`hydrate_search_index`]. Loads `vault.search` (fast
-/// path) and reconciles it against the notes dir's current header nonces,
-/// then swaps the result into `search`. A note is decrypted ONLY when its
-/// nonce changed / first appeared; unchanged notes are never decrypted
-/// (acceptance criterion 2). Absent / AEAD-fail / malformed blob → empty
-/// `(manifest, index)` → reconcile becomes a full rebuild against every
-/// on-disk note (criterion 4).
+/// Desktop's `hydrate_search_index_with_dir`: the shared core plus THIS
+/// platform's attachment-document layer.
+///
+/// The whole body moved to `myne_core::plugins::notes::search_sync_core`
+/// (phase3-web-client tasks 14 + 83) — loading `vault.search`, the
+/// decryption-free staleness scan, the reconcile and the swap are the same
+/// operations on every client. What stayed here is [`DesktopAttachmentDocs`],
+/// because the `MYE1` extracted-text cache it reads has no `wasm32` producers by
+/// construction and the extractors behind it are bound to desktop-only crates.
 pub(crate) async fn hydrate_search_index_with_dir(
     vault_dir: &Path,
     state: &VaultRuntimeState,
     search: &SearchIndexState,
+    // `note_read_with_dir` takes the host for its duration metric; a `NoopHost`
+    // here would compile and silently log every desktop note-read as 0 ms.
+    host: &dyn myne_core::host::HostCtx,
 ) -> Result<(), SearchSyncError> {
-    // MYND-328: also need items_key + items_key_id to decrypt MYA1 sources for
-    // the lazy backfill of attachments imported before the eager cache.
-    let (items_key, items_key_id, root_key) = state
-        .peek_unlocked_attachment_material()
-        .await
-        .ok_or(SearchSyncError::SlotNotUnlocked)?;
-    let account_number_hash = read_account_number_hash(&vault_dir.join("vault.meta"))?;
-    let search_index_key = derive_subkey(&root_key, SubkeyRole::SearchIndexKey);
-    // MYND-328: KEK for the per-attachment extracted-text cache, folded into the
-    // indexed note bodies below. `memo` dedups cache reads across notes within
-    // this rebuild (an attachment embedded in N notes is read once — § 9.6.4).
-    let attachment_text_key = derive_subkey(&root_key, SubkeyRole::AttachmentTextKey);
-    let mut attachment_text_memo: std::collections::HashMap<[u8; 32], Option<String>> =
-        std::collections::HashMap::new();
-    // Catalog (content_type + filename per attachment) drives the backfill's
-    // MYA1 decrypt + extraction dispatch. Best-effort: empty on any read error.
-    let catalog_key = derive_subkey(&root_key, SubkeyRole::AttachmentsCatalogKey);
-    let attachment_catalog = crate::plugins::attachments::commands::read_catalog(
-        &vault_dir.join("vault.attachments"),
-        &catalog_key,
-        &account_number_hash,
+    let mut attachments = DesktopAttachmentDocs::new(vault_dir, state).await?;
+    myne_core::plugins::notes::search_sync_core::hydrate_search_index_core(
+        &myne_core::vault_io::StdVaultIo,
+        host,
+        vault_dir,
+        state,
+        search,
+        &mut attachments,
     )
-    .unwrap_or_else(|_| protocol::AttachmentsCatalog::empty());
-    let notes_dir = paths::notes_dir_under(vault_dir).map_err(|_| SearchSyncError::Io)?;
-
-    // Decryption-free staleness scan of the current notes dir.
-    let on_disk = scan_on_disk_manifest(&notes_dir);
-
-    // Fast path: decode the persisted snapshot. Absent / AEAD-fail /
-    // malformed / stale schema → empty `(manifest, index)` so the reconcile
-    // below is a full rebuild against `on_disk`. MYND-448a: a v1 (folded-body)
-    // blob is rejected by the schema-version gate → rebuild into the v2
-    // separate-attachment-doc model.
-    let (mut manifest, mut index) = std::fs::read(vault_dir.join("vault.search"))
-        .ok()
-        .and_then(|blob| decode_snapshot(&search_index_key, &account_number_hash, &blob))
-        .unwrap_or_default();
-
-    // MYND-448a: notes that vanished from disk — reconcile drops their BODY doc;
-    // their separate attachment docs (`att:*:<note_id>`) are dropped below.
-    let deleted_note_ids: Vec<String> = manifest
-        .keys()
-        .filter(|id| !on_disk.contains_key(*id))
-        .cloned()
-        .collect();
-
-    // Decrypt ONLY the changed / new notes (nonce differs from, or is absent
-    // in, the loaded manifest). Unchanged notes are skipped here — and never
-    // reached by `reconcile`'s fetch either, since their nonce matches; their
-    // body doc AND attachment docs stay as loaded from the blob.
-    let mut fetched: HashMap<String, (String, String)> = HashMap::new();
-    // MYND-448a: for every changed/new note, its attachment docs
-    // `(attachment_id_hex, title, text)`. An entry is inserted even when EMPTY,
-    // so `set_note_attachments` below clears attachment docs the note no longer
-    // embeds (e.g. an attachment removed from an edited note).
-    let mut note_attachments: HashMap<String, Vec<(String, String, String)>> = HashMap::new();
-    for (id, nonce) in &on_disk {
-        if manifest.get(id) == Some(nonce) {
-            continue; // unchanged — no decrypt
-        }
-        match note_read_with_dir(notes_dir.clone(), state, id.clone()).await {
-            Ok(plaintext) => {
-                let title = resolve_note_title(plaintext.as_bytes()).unwrap_or_default();
-                // MYND-328: backfill any uncached embedded attachment from its
-                // MYA1 source (pre-eager-cache attachments) so `collect` below
-                // sees its extracted text.
-                crate::plugins::attachments::text_cache::backfill_note_attachment_text(
-                    &plaintext,
-                    vault_dir,
-                    &attachment_text_key,
-                    &account_number_hash,
-                    &items_key,
-                    &items_key_id,
-                    &attachment_catalog,
-                    &mut attachment_text_memo,
-                    // The MYE1 producer is injected so the shared cache module
-                    // (myne-core) stays free of the desktop-only extractor deps.
-                    // MYND-441: OCR is DEFERRED here — this variant reports
-                    // image / scanned-PDF candidates as `Unsupported`, which the
-                    // backfill does not cache, leaving them for the background
-                    // worker. Keeping seconds-per-page work inside the rebuild
-                    // would stall the first search after unlock.
-                    crate::plugins::attachments::extract::extract_deferring_ocr,
-                );
-                // MYND-448a: each embedded attachment becomes its OWN doc; the
-                // note's body doc carries the UNFOLDED plaintext.
-                // SF5 (MYND-502): a `kind: drawing` note has no markdown embeds —
-                // rebuild its body doc from projected scene text, never the raw
-                // ```excalidraw JSON (SYNC-4 body-only), and skip attachment docs,
-                // so the projection survives lock→unlock and never repollutes the
-                // index (parity with the incremental path).
-                if myne_core::plugins::notes::drawing_text::is_drawing(plaintext.as_bytes()) {
-                    let body = myne_core::plugins::notes::drawing_text::project_drawing_text(
-                        plaintext.as_bytes(),
-                    )
-                    .unwrap_or_default();
-                    fetched.insert(id.clone(), (title, body));
-                } else {
-                    let atts: Vec<(String, String, String)> =
-                        crate::plugins::attachments::text_cache::collect_attachment_texts(
-                            &plaintext,
-                            vault_dir,
-                            &attachment_text_key,
-                            &account_number_hash,
-                            &mut attachment_text_memo,
-                        )
-                        .into_iter()
-                        .map(|(att_id_hex, text)| (att_id_hex, title.clone(), text))
-                        .collect();
-                    note_attachments.insert(id.clone(), atts);
-                    fetched.insert(id.clone(), (title, plaintext));
-                }
-            }
-            Err(_) => {
-                // Unreadable note (locked mid-hydrate / corrupt / non-UTF-8):
-                // leave it for the next reconcile pass. No id / cause logged
-                // (DENY-list); reconcile leaves the prior index entry intact.
-            }
-        }
-    }
-    let reindexed = fetched.len();
-
-    // reconcile handles NOTE body docs only (unfolded); it is the untouched
-    // shared core. MYND-448a layers the separate attachment docs on top.
-    reconcile(&mut index, &mut manifest, &on_disk, |id| fetched.remove(id));
-    for id in &deleted_note_ids {
-        index.remove_note_attachments(id);
-    }
-    for (note_id, atts) in &note_attachments {
-        index.set_note_attachments(note_id, atts);
-    }
-    search.replace(index);
-
-    tracing::info!(
-        event = "search_index_hydrated",
-        reindexed,
-        total = on_disk.len(),
-    );
-    Ok(())
+    .await
 }
 
-/// Testable core of [`persist_search_index`]. Snapshots the live index,
-/// pairs it with a freshly-scanned nonce manifest (so the persisted snapshot
-/// matches disk exactly → the next unlock skips everything), encrypts to the
-/// `vault.search` blob, and atomically writes it. The CPU-bound serialize +
-/// AEAD runs in `spawn_blocking`. MUST be called while the slot is still
-/// `Unlocked` (it peeks `root_key`).
+/// The attachment-document layer for a client that can extract attachment text.
+///
+/// Holds the two KEKs, the catalog and the cross-note memo for one rebuild pass.
+/// The memo is what keeps §9.6.4's promise that an attachment embedded in N
+/// notes is decoded once, and it is per-pass rather than global on purpose: a
+/// cache entry rewritten between rebuilds must be re-read.
+struct DesktopAttachmentDocs {
+    vault_dir: PathBuf,
+    account_number_hash: [u8; VAULT_META_ACCOUNT_HASH_LEN],
+    attachment_text_key: zeroize::Zeroizing<[u8; 32]>,
+    items_key: zeroize::Zeroizing<[u8; 32]>,
+    items_key_id: [u8; 16],
+    catalog: protocol::AttachmentsCatalog,
+    memo: HashMap<[u8; 32], Option<String>>,
+}
+
+impl DesktopAttachmentDocs {
+    async fn new(vault_dir: &Path, state: &VaultRuntimeState) -> Result<Self, SearchSyncError> {
+        // items_key + items_key_id decrypt MYA1 sources for the lazy backfill of
+        // attachments imported before the eager cache existed (MYND-328).
+        let (items_key, items_key_id, root_key) = state
+            .peek_unlocked_attachment_material()
+            .await
+            .ok_or(SearchSyncError::SlotNotUnlocked)?;
+        let account_number_hash = read_account_number_hash(&vault_dir.join("vault.meta"))?;
+        let catalog_key = derive_subkey(&root_key, SubkeyRole::AttachmentsCatalogKey);
+        // Best-effort: an unreadable catalog yields an empty one, which makes the
+        // backfill a no-op rather than failing the whole rebuild.
+        let catalog = crate::plugins::attachments::blocking_reads::read_catalog(
+            &vault_dir.join("vault.attachments"),
+            &catalog_key,
+            &account_number_hash,
+        )
+        .unwrap_or_else(|_| protocol::AttachmentsCatalog::empty());
+        Ok(Self {
+            vault_dir: vault_dir.to_path_buf(),
+            account_number_hash,
+            attachment_text_key: derive_subkey(&root_key, SubkeyRole::AttachmentTextKey),
+            items_key,
+            items_key_id,
+            catalog,
+            memo: HashMap::new(),
+        })
+    }
+}
+
+impl myne_core::plugins::notes::search_sync_core::AttachmentDocs for DesktopAttachmentDocs {
+    fn for_note(
+        &mut self,
+        _note_id: &str,
+        title: &str,
+        plaintext: &str,
+    ) -> Vec<(String, String, String)> {
+        // Backfill any uncached embedded attachment from its MYA1 source, so the
+        // collect below sees its extracted text. OCR is DEFERRED here — this
+        // extractor reports image / scanned-PDF candidates as `Unsupported`,
+        // which the backfill does not cache, leaving them for the background
+        // worker. Seconds-per-page work inside the rebuild would stall the first
+        // search after unlock.
+        crate::plugins::attachments::text_cache::backfill_note_attachment_text(
+            plaintext,
+            &self.vault_dir,
+            &self.attachment_text_key,
+            &self.account_number_hash,
+            &self.items_key,
+            &self.items_key_id,
+            &self.catalog,
+            &mut self.memo,
+            crate::plugins::attachments::extract::extract_deferring_ocr,
+        );
+        crate::plugins::attachments::text_cache::collect_attachment_texts(
+            plaintext,
+            &self.vault_dir,
+            &self.attachment_text_key,
+            &self.account_number_hash,
+            &mut self.memo,
+        )
+        .into_iter()
+        .map(|(att_id_hex, text)| (att_id_hex, title.to_string(), text))
+        .collect()
+    }
+}
+
+/// Desktop's `persist_search_index_with_dir` — a straight delegate.
+///
+/// Nothing about snapshotting the index, re-deriving the manifest, encrypting
+/// and writing is platform-specific, so unlike hydrate this one has no layer to
+/// inject: the whole body is `search_sync_core::persist_search_index_core`.
 pub(crate) async fn persist_search_index_with_dir(
     vault_dir: &Path,
     state: &VaultRuntimeState,
     search: &SearchIndexState,
 ) -> Result<(), SearchSyncError> {
-    // SYNC-6 writer-guard (MYND-32): guard bound across the atomic_write
-    // below — see `state::hold_unlocked_root_key_and_hash`.
-    let (_slots_guard, root_key, _vmh) = state
-        .hold_unlocked_root_key_and_hash()
-        .await
-        .ok_or(SearchSyncError::SlotNotUnlocked)?;
-    let account_number_hash = read_account_number_hash(&vault_dir.join("vault.meta"))?;
-    let search_index_key = derive_subkey(&root_key, SubkeyRole::SearchIndexKey);
-    let notes_dir = paths::notes_dir_under(vault_dir).map_err(|_| SearchSyncError::Io)?;
-
-    // Re-derive the manifest from disk so the persisted snapshot is exactly
-    // consistent with the current `.myn` nonces (the in-RAM index already
-    // reflects the session's incremental upserts/removes).
-    let on_disk = scan_on_disk_manifest(&notes_dir);
-    let total = on_disk.len();
-    let index = search.snapshot();
-    let search_path = vault_dir.join("vault.search");
-
-    // Serialize + AEAD-encrypt off the runtime worker (the index can be
-    // large at 10k notes). `search_index_key` (Zeroizing) moves into the
-    // closure and wipes on its exit.
-    let blob = tokio::task::spawn_blocking(move || {
-        encode_snapshot(&search_index_key, &account_number_hash, &on_disk, &index)
-    })
+    myne_core::plugins::notes::search_sync_core::persist_search_index_core(
+        &myne_core::vault_io::StdVaultIo,
+        vault_dir,
+        state,
+        search,
+    )
     .await
-    .map_err(|_| SearchSyncError::Join)?
-    .map_err(|_| SearchSyncError::Encode)?;
-
-    crate::atomic_write::atomic_write(&search_path, &blob, /* replace = */ true)
-        .map_err(|_| SearchSyncError::Io)?;
-
-    tracing::info!(event = "search_index_persisted", total);
-    Ok(())
 }
 
 /// Best-effort hydrate on unlock / post-recovery. Resolves the vault dir +
@@ -473,7 +387,14 @@ pub async fn hydrate_search_index<R: Runtime>(app: &AppHandle<R>, state: &VaultR
     else {
         return;
     };
-    if let Err(e) = hydrate_search_index_with_dir(&vault_dir, state, search.inner()).await {
+    if let Err(e) = hydrate_search_index_with_dir(
+        &vault_dir,
+        state,
+        search.inner(),
+        &myne_core::host::tauri_host::TauriHost::new(app.clone()),
+    )
+    .await
+    {
         tracing::warn!(
             event = "search_index_hydrate_skipped",
             reason = sync_error_kind(&e),
@@ -620,6 +541,8 @@ mod tests {
                 notes_dir.clone(),
                 &state,
                 "# Alpha\nrust async runtime".into(),
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
             )
             .await
             .expect("create A");
@@ -627,6 +550,8 @@ mod tests {
                 notes_dir.clone(),
                 &state,
                 "# Beta\npython data science".into(),
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
             )
             .await
             .expect("create B");
@@ -634,7 +559,7 @@ mod tests {
             // First hydrate (no blob) → full rebuild → both searchable
             // (criterion 4: full rebuild on absent blob).
             let s1 = SearchIndexState::default();
-            hydrate_search_index_with_dir(vault.path(), &state, &s1)
+            hydrate_search_index_with_dir(vault.path(), &state, &s1, &myne_core::host::NoopHost)
                 .await
                 .expect("hydrate full-rebuild");
             assert_eq!(query_ids(&s1, "rust"), vec![id_a.clone()]);
@@ -652,7 +577,7 @@ mod tests {
             // Fresh state → warm hydrate from the blob → identical results
             // (criterion 2: warm unlock loads the blob).
             let s2 = SearchIndexState::default();
-            hydrate_search_index_with_dir(vault.path(), &state, &s2)
+            hydrate_search_index_with_dir(vault.path(), &state, &s2, &myne_core::host::NoopHost)
                 .await
                 .expect("hydrate warm");
             assert_eq!(query_ids(&s2, "rust"), vec![id_a]);
@@ -668,18 +593,28 @@ mod tests {
             let state = unlocked_state().await;
             let notes_dir = paths::notes_dir_under(vault.path()).unwrap();
 
-            let id_a =
-                note_create_with_dir(notes_dir.clone(), &state, "# Alpha\nrust async".into())
-                    .await
-                    .expect("create A");
-            let id_b =
-                note_create_with_dir(notes_dir.clone(), &state, "# Beta\npython data".into())
-                    .await
-                    .expect("create B");
+            let id_a = note_create_with_dir(
+                notes_dir.clone(),
+                &state,
+                "# Alpha\nrust async".into(),
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
+            )
+            .await
+            .expect("create A");
+            let id_b = note_create_with_dir(
+                notes_dir.clone(),
+                &state,
+                "# Beta\npython data".into(),
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
+            )
+            .await
+            .expect("create B");
 
             // Build + persist the baseline.
             let s1 = SearchIndexState::default();
-            hydrate_search_index_with_dir(vault.path(), &state, &s1)
+            hydrate_search_index_with_dir(vault.path(), &state, &s1, &myne_core::host::NoopHost)
                 .await
                 .expect("baseline hydrate");
             persist_search_index_with_dir(vault.path(), &state, &s1)
@@ -695,6 +630,8 @@ mod tests {
                 id_a.clone(),
                 "# Alpha\nrust tokio reactor".into(),
                 None,
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
             )
             .await
             .expect("edit A");
@@ -702,7 +639,7 @@ mod tests {
             // Warm hydrate: A re-indexed (new term present, stale term gone),
             // B untouched (kept from the blob — criterion 3).
             let s2 = SearchIndexState::default();
-            hydrate_search_index_with_dir(vault.path(), &state, &s2)
+            hydrate_search_index_with_dir(vault.path(), &state, &s2, &myne_core::host::NoopHost)
                 .await
                 .expect("reconcile hydrate");
             assert_eq!(
@@ -730,17 +667,27 @@ mod tests {
             let state = unlocked_state().await;
             let notes_dir = paths::notes_dir_under(vault.path()).unwrap();
 
-            let id_a =
-                note_create_with_dir(notes_dir.clone(), &state, "# Alpha\nrust async".into())
-                    .await
-                    .expect("create A");
-            let id_b =
-                note_create_with_dir(notes_dir.clone(), &state, "# Beta\npython data".into())
-                    .await
-                    .expect("create B");
+            let id_a = note_create_with_dir(
+                notes_dir.clone(),
+                &state,
+                "# Alpha\nrust async".into(),
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
+            )
+            .await
+            .expect("create A");
+            let id_b = note_create_with_dir(
+                notes_dir.clone(),
+                &state,
+                "# Beta\npython data".into(),
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
+            )
+            .await
+            .expect("create B");
 
             let s1 = SearchIndexState::default();
-            hydrate_search_index_with_dir(vault.path(), &state, &s1)
+            hydrate_search_index_with_dir(vault.path(), &state, &s1, &myne_core::host::NoopHost)
                 .await
                 .expect("baseline hydrate");
             persist_search_index_with_dir(vault.path(), &state, &s1)
@@ -753,7 +700,7 @@ mod tests {
             std::fs::remove_file(notes_dir.join(format!("{note_uuid}.myn"))).expect("delete B");
 
             let s2 = SearchIndexState::default();
-            hydrate_search_index_with_dir(vault.path(), &state, &s2)
+            hydrate_search_index_with_dir(vault.path(), &state, &s2, &myne_core::host::NoopHost)
                 .await
                 .expect("reconcile hydrate");
             assert_eq!(
@@ -777,7 +724,13 @@ mod tests {
             let search = SearchIndexState::default();
 
             assert!(matches!(
-                hydrate_search_index_with_dir(vault.path(), &state, &search).await,
+                hydrate_search_index_with_dir(
+                    vault.path(),
+                    &state,
+                    &search,
+                    &myne_core::host::NoopHost
+                )
+                .await,
                 Err(SearchSyncError::SlotNotUnlocked)
             ));
             assert!(matches!(

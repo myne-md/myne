@@ -10,6 +10,66 @@
 // epic) — a substring match would silently pass a future collapse.
 //
 // Changing either string is a decisions.md event, not a copy edit.
+//
+// ── Which file does a new user-facing string belong in? ─────────────────────
+//
+// The rule, written here because this is the file an implementer opens when
+// they suspect the answer is "this one" (phase3-web-client task 98):
+//
+//   A string belongs in THIS file (or `@myne/copy`, for the cross-client set)
+//   when its EXACT WORDING is a privacy or security property — that is, when a
+//   reasonable paraphrase would change what an observer can infer. Everything
+//   else gets an i18n key.
+//
+// The test is not "is this string important" or "does it mention security". It
+// is: **would rewording it leak something, or claim something untrue?** Three
+// shapes qualify:
+//
+//   1. **Non-distinguishing collapses.** Two failure causes deliberately share
+//      one message so the message cannot tell them apart. Splitting the legs is
+//      the leak; the shared wording is the control.
+//   2. **Egress and irreversibility statements.** A sentence that is the ONLY
+//      place a consequence is stated — plaintext leaving the vault, a loss with
+//      no remedy. Softening it is the failure.
+//   3. **Guarantee boundaries.** Copy that says what a client can and cannot
+//      promise (`threat-model.md` qualifications). Overstating is the failure.
+//
+// A load-bearing literal is **rendered verbatim in every locale**, never through
+// `t()`, and E2E-pins it by full-string equality. `scripts/check-i18n.mjs` fails
+// if one appears as a value in ANY locale file — because the failure mode is not
+// a bad translation, it is a GOOD one: the key ships, 24 locales fill it
+// faithfully, the English still matches, every test passes, and the byte
+// identity is gone.
+//
+// ── The web client's new strings, classified ────────────────────────────────
+//
+// Load-bearing (here or in `@myne/copy`):
+//   * `ENROLL_NON_DISTINGUISHING_BANNER_NO_PHRASE` — shape 1. The web entry
+//     flow checks account number and password against a server-fetched
+//     `vault.meta`; both wrong inputs fail at the same AEAD-open step and must
+//     collapse to one message. The `_NO_PHRASE` sibling exists because the
+//     original names the recovery phrase as a possible cause and web has no
+//     phrase — naming a credential the client cannot accept sends the user
+//     looking for a field that does not exist. Selected by the `phraseRecovery`
+//     CAPABILITY, never by a platform name.
+//   * The four export egress sentences — shape 2, and on web they are the only
+//     disclosure, since a download has no dialog title to carry one.
+//
+// i18n keys (`web.unsupported.*`, `storageLost.*`, `deviceRevoked.*`,
+// `accountBootstrap.*` except the banner):
+//   * The unsupported-browser refusal — it NAMES which capability is missing,
+//     so it is deliberately distinguishing; there is nothing to collapse. Its
+//     English rides `defaultValue` from `environment-gate.ts` so an untranslated
+//     locale renders a sentence rather than a raw key.
+//   * The KDF-ceiling and quota refusals — facts about this device's own limits.
+//   * The storage-eviction and device-revocation copy — facts about this
+//     browser's own state, which leak nothing to anyone who does not already
+//     have the browser. Their honesty matters and is reviewed, but a translator
+//     rewording them cannot leak anything.
+//   * `accountBootstrap.accountMismatch` — the one deliberate departure, and it
+//     is recorded next to the rule it departs from: it is a fact about this
+//     browser's own storage, so distinguishing it from a credential failure
+//     tells an attacker nothing they could not learn by opening the browser.
 
 /** Unlock A8b `InvalidCredentialOrVault` banner — §7.3 compound form. */
 export const UNLOCK_NON_DISTINGUISHING_BANNER =
@@ -126,8 +186,22 @@ export {
   REMOVE_DEVICE_DISCLOSURE,
   SYNC_INTEGRITY_ALERT,
   ENROLL_NON_DISTINGUISHING_BANNER,
+  // Its sibling for a client with no phrase credential (task 98). Same
+  // non-distinguishing collapse, one fewer cause named — because naming a
+  // credential the client cannot accept is a lie of capability, and this
+  // constant's whole value is exactness.
+  ENROLL_NON_DISTINGUISHING_BANNER_NO_PHRASE,
   ENROLL_PENDING_NOTICE,
   ENROLL_APPROVED_NOTICE,
+  // Rendered only where `localOnlyVault` is absent (the web client), but it
+  // lives in the shared package for the same reason the rest do: it is a claim
+  // about what a command does, and a second client that ever ships a cached
+  // vault must reach for this literal rather than write its own.
+  LOCAL_ERASE_DISCLOSURE,
+  // The other end of `REMOVE_DEVICE_DISCLOSURE`: what a revocation means to the
+  // browser it happened TO (task 94). Kept beside it so the two claims stay
+  // consistent — a user who reads both must not conclude one is lying.
+  DEVICE_REVOKED_DISCLOSURE,
 } from "@myne/copy";
 // Browser-extension clip success notice (desktop-ingest task 7, MYND-442). A
 // clip lands at the vault ROOT (SYNC-15) and the user keeps working — the

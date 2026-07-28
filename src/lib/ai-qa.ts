@@ -9,7 +9,7 @@
 // note-local byte-ranges) — never logged here, dropped on lock by the render
 // store's teardown (`clearAiOutput`) like the summarize output.
 
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../platform/core";
 
 /** One retrieved source chunk backing an answer, for citation. Mirrors the Rust
  *  `SearchHit` (snake_case serde fields). */

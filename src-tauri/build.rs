@@ -29,8 +29,18 @@ fn main() {
                 "unlock",
                 "lock",
                 "vault_status",
+                "vault_storage_health",
                 "vault_is_unlocked",
                 "vault_slot_kind",
+                // phase3-web-client task 30 adds `account_number_check` — a
+                // LOCAL, network-free well-formedness check of an account
+                // number (Crockford alphabet + length + the frozen Damm-32
+                // check character). Registered on desktop too, even though the
+                // screen that calls it is the web client's first-run identity
+                // step: a command name that reaches an unregistered handler
+                // fails at the ACL, and a shared `src/` tree can call it from
+                // either client.
+                "account_number_check",
             ]),
         )
         .plugin(
@@ -377,6 +387,8 @@ fn main() {
                 "sync_get_endpoint",
                 "sync_set_endpoint",
                 "sync_status",
+                "sync_unsynced_edits",
+                "sync_materialisation_progress",
                 "sync_now",
                 "sync_list_devices",
                 "sync_account_status",

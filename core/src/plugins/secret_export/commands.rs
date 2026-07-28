@@ -12,7 +12,12 @@
 //! first non-doc statement and never logged.
 
 use super::error::SecretExportError;
+use crate::host::HostCtx;
 use std::path::Path;
+// Tauri types serve only the cfg-gated IPC wrapper (task 79, Option B).
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+use crate::host::tauri_host::TauriHost;
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 use tauri::{AppHandle, Runtime};
 use zeroize::Zeroizing;
 
@@ -42,9 +47,8 @@ fn validate_secret_destination(dest: &Path, app_data: &Path) -> Result<(), Secre
 
 /// Write the secret `contents` to the user-chosen `path` returned by the save
 /// dialog. Rejects any destination inside the app-data / vault tree.
-#[tauri::command]
-pub async fn save_secret_text<R: Runtime>(
-    app: AppHandle<R>,
+pub async fn save_secret_text_from_host(
+    host: &dyn HostCtx,
     path: String,
     contents: String,
 ) -> Result<(), SecretExportError> {
@@ -52,7 +56,7 @@ pub async fn save_secret_text<R: Runtime>(
     let contents = Zeroizing::new(contents);
     let dest = std::path::PathBuf::from(&path);
 
-    let app_data = crate::paths::app_data_dir(&app).map_err(|_| SecretExportError::Io {
+    let app_data = host.app_data_dir().map_err(|_| SecretExportError::Io {
         io_error_kind: crate::io_failure_kind::IoFailureKind::Other,
     })?;
     validate_secret_destination(&dest, &app_data)?;
@@ -60,7 +64,7 @@ pub async fn save_secret_text<R: Runtime>(
     // User destination → `atomic_write_unclobbered` (randomized temp name; never
     // truncates a pre-existing `<target>.tmp`). `replace = true`: the OS save
     // dialog already confirmed any overwrite of the chosen file.
-    tokio::task::spawn_blocking(move || {
+    crate::task::run_blocking(move || {
         crate::atomic_write::atomic_write_unclobbered(&dest, contents.as_bytes(), true)
     })
     .await
@@ -70,6 +74,18 @@ pub async fn save_secret_text<R: Runtime>(
     .map_err(|e| SecretExportError::Io {
         io_error_kind: crate::io_failure_kind::from_io_error_kind(e.kind()),
     })
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn save_secret_text<R: Runtime>(
+    app: AppHandle<R>,
+    path: String,
+    contents: String,
+) -> Result<(), SecretExportError> {
+    save_secret_text_from_host(&TauriHost::new(app), path, contents).await
 }
 
 #[cfg(test)]

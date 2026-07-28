@@ -16,7 +16,7 @@
 // (a model swap invalidates the model-identity tuple → fall-to-rebuild.)
 
 import { useEffect, useState } from "react";
-import { listen } from "@tauri-apps/api/event";
+import { listen } from "../../platform/event";
 
 /** Backend event name — mirror of `AI_VECTORS_HYDRATED_EVENT` (Rust,
  *  `src-tauri/src/plugins/local_inference/hydrate.rs`). */

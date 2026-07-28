@@ -3,9 +3,10 @@
 // (CreateVault auto-unlock, Unlock screen submit) so password lifetime
 // is visible at the boundary.
 
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../platform/core";
 import { resetGraphLayoutOnLock } from "../notes/graphLayoutPersist";
 import { resetVimStateOnLock } from "../editor/vim";
+import { releaseAttachmentUrls } from "../platform/attachments";
 
 /** Read-only probe of the `UnlockedVault` slot. */
 export async function isVaultUnlocked(): Promise<boolean> {
@@ -23,6 +24,12 @@ export async function lockVault(): Promise<void> {
   // locking performs. Cleared here for the same reason as the graph layout above
   // — so one vault's note text can never be pasted into another's.
   resetVimStateOnLock();
+  // Render-side attachment resources (phase3-web-client task 44). A no-op on
+  // desktop, where `attachment://<id>` caches nothing; on web it drops the
+  // `blob:` URL strings whose objects the Worker is about to revoke, so a render
+  // after a re-unlock cannot paint a revoked URL. Same category as the two calls
+  // above: platform state that outlives the slot.
+  releaseAttachmentUrls();
   await invoke<void>("plugin:vault-unlock|lock");
 }
 

@@ -14,6 +14,12 @@
 # Task 3 of `vault-registry-and-disk-layout` (multi-vault, MYND-202) adds
 # `allow-vault-list` (read-only multi-vault enumeration: one VaultSummary per
 # discovered `vaults/<id>/`, the SYNC-4 generalization of `vault_status`).
+# Task 30 of `phase3-web-client` adds `allow-account-number-check`: a pure,
+# network-free predicate over a user-typed account number (no IO, no state, no
+# vault access, and a single non-distinguishing boolean out — `account-number.md`
+# §5). It is listed here rather than left out because the ACL is fail-closed:
+# an unlisted command is refused, and the web-side screen shares the `src/` tree
+# with desktop.
 
 "$schema" = "../../gen/schemas/desktop-schema.json"
 
@@ -23,10 +29,12 @@ permissions = [
     "allow-unlock",
     "allow-lock",
     "allow-vault-status",
+    "allow-vault-storage-health",
     "allow-vault-list",
     "allow-vault-is-unlocked",
     "allow-vault-slot-kind",
     "allow-report-user-activity",
+    "allow-account-number-check",
 ]
 
 [[permission]]
@@ -43,6 +51,11 @@ commands.allow = ["lock"]
 identifier = "allow-vault-status"
 description = "Allow invoking vault_unlock:vault_status (read-only probe of vault.meta — Exists | Missing | Corrupted)."
 commands.allow = ["vault_status"]
+
+[[permission]]
+identifier = "allow-vault-storage-health"
+description = "Allow invoking vault_unlock:vault_storage_health (read-only mid-session probe: Healthy | NotUnlocked | Evicted | Unopenable | Unknown). A slot peek plus a vault.meta read; no key material, no write, no network. Distinct from vault_status, which is the boot probe — this one exists to tell an eviction from a corruption, which the boot vocabulary cannot express."
+commands.allow = ["vault_storage_health"]
 
 [[permission]]
 identifier = "allow-vault-list"

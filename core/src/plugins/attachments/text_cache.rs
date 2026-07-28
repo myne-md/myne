@@ -20,21 +20,65 @@
 //! The caller derives the KEK once per session via
 //! `protocol::derive_subkey(root_key, SubkeyRole::AttachmentTextKey)` and passes
 //! it in, mirroring how `commands.rs` derives the catalog KEK at its call site.
+//!
+//! # Why the producers stop at wasm32 (phase3-web-client task 90)
+//!
+//! Attachment-CONTENT search is absent on the web client this release
+//! (`decisions.md` 2026-07-28; capability `attachmentTextSearch`), and the
+//! producers here are `#[cfg(not(target_arch = "wasm32"))]` so that is a
+//! **compile-time** property rather than a claim about which code path happens
+//! to run. Three facts make the absence a decision rather than an oversight: the
+//! extractors live in `src-tauri/`, so they do not arrive in a browser; `MYE1` is
+//! device-local and never synced (§ 9.15), so a browser cannot inherit a
+//! desktop's extractions either; and [`read_extracted`]'s miss contract is "the
+//! caller re-extracts", which on an extractor-less client is an unwinnable retry
+//! on every import.
+//!
+//! What that buys, stated as properties a later change must keep:
+//!
+//! * **No `att:` search document can originate in a browser.**
+//!   [`collect_attachment_texts`] is their only source and it does not compile
+//!   for wasm32, so task 14's web search-index port cannot fold attachment text
+//!   in by copying the desktop rebuild — it stops at the compiler.
+//! * **No `extractor_version` thrash.** Nothing on wasm32 reads a cache blob, so
+//!   nothing can decide a desktop's blob is stale and rewrite it.
+//! * **A desktop session's `attachments-text/` files are never touched by a web
+//!   session except to be crypto-erased with their attachment.**
+//!   [`remove_extracted`] stays compiled on wasm32 deliberately — it is the
+//!   § 9.15.4 crypto-erase parity, keyed to an attachment the user deleted, and
+//!   skipping it would leave a "permanently deleted" attachment's searchable
+//!   plaintext recoverable under a still-live `root_key` subkey. The unlock-time
+//!   stray scan (`commands::reclaim_stray_blobs_in_dir`) enumerates
+//!   `attachments/` only and never this directory.
+//!
+//! `MYE1`'s magic, its `"attachment-text-key"` subkey role and its
+//! `"attachment-text-blob"` AAD role are untouched by any of this — the codec in
+//! `protocol::attachment_text_blob` is shared, and the web build simply has no
+//! caller for it.
 
+// Split by target, not for tidiness: everything below the `cfg` is reachable
+// only from the producers, and the producers do not exist on wasm32. Leaving the
+// imports ungated would make `-D warnings` fail the web lint lane.
+#[cfg(not(target_arch = "wasm32"))]
 use super::extract_types::{ExtractStatus, ExtractedText, SourceFormat, MAX_EXTRACTED_TEXT_LEN};
+use protocol::ATTACHMENT_ID_LEN;
+#[cfg(not(target_arch = "wasm32"))]
 use protocol::{
     decode_attachment_blob, decode_attachment_text_blob, encode_attachment_text_blob,
-    AttachmentsCatalog, AEAD_KEY_LEN, ATTACHMENT_ID_LEN, ATTACHMENT_TEXT_BLOB_ACCOUNT_HASH_LEN,
+    AttachmentsCatalog, AEAD_KEY_LEN, ATTACHMENT_TEXT_BLOB_ACCOUNT_HASH_LEN,
 };
+#[cfg(not(target_arch = "wasm32"))]
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 /// Length of the vault `items_key_id` (the MYA1 wrap-key selector).
+#[cfg(not(target_arch = "wasm32"))]
 const ITEMS_KEY_ID_LEN: usize = 16;
 
 /// The Ok-status searchable text of a cache entry (moved out, not cloned —
 /// the extracted text can be up to 1 MiB), or `None` for any negative/empty
 /// result.
+#[cfg(not(target_arch = "wasm32"))]
 fn ok_text(extracted: ExtractedText) -> Option<String> {
     if extracted.status == ExtractStatus::Ok && !extracted.text.is_empty() {
         Some(extracted.text)
@@ -58,6 +102,9 @@ pub fn cache_path(vault_dir: &Path, attachment_id: &[u8; ATTACHMENT_ID_LEN]) -> 
 /// Seal `extracted` into the attachment's `MYE1` cache blob and write it
 /// atomically (overwriting any prior entry — the cache is idempotent and a
 /// re-extraction at a new `extractor_version` replaces the stale blob).
+///
+/// Native-only (see the module-level "Why the producers stop at wasm32" note).
+#[cfg(not(target_arch = "wasm32"))]
 pub fn write_extracted(
     vault_dir: &Path,
     attachment_text_key: &[u8; AEAD_KEY_LEN],
@@ -97,6 +144,9 @@ pub fn write_extracted(
 /// the persisted [`ExtractedText`] so the caller can inspect the status /
 /// truncation without re-reading. The transcript is plaintext (AS3-Sensitive) —
 /// never logged (DENY-list; `src-tauri/CLAUDE.md`).
+///
+/// Native-only (see the module-level "Why the producers stop at wasm32" note).
+#[cfg(not(target_arch = "wasm32"))]
 pub fn write_transcript(
     vault_dir: &Path,
     attachment_text_key: &[u8; AEAD_KEY_LEN],
@@ -149,6 +199,13 @@ pub fn write_transcript(
 /// Load an attachment's cached [`ExtractedText`], or `None` on a cache miss —
 /// absent file, decode/AEAD failure, a stale/unsupported `extractor_version`,
 /// or a malformed payload. A `None` tells the caller to re-extract.
+///
+/// Native-only (see the module-level "Why the producers stop at wasm32" note) —
+/// and this one is the reason the note exists. Its miss contract is "the caller
+/// re-extracts"; on a client with no extractor that is an unwinnable retry on
+/// every import, so the honest arm is not to compile it rather than to let it
+/// return `None` forever.
+#[cfg(not(target_arch = "wasm32"))]
 pub fn read_extracted(
     vault_dir: &Path,
     attachment_text_key: &[u8; AEAD_KEY_LEN],
@@ -177,6 +234,12 @@ pub fn read_extracted(
 /// within a single rebuild — an attachment embedded in N notes is read +
 /// decoded once (the in-RAM memo of § 9.6.4); only Ok results carry text, but
 /// negative results are still "resolved" in the memo.
+///
+/// Native-only (see the module-level "Why the producers stop at wasm32" note).
+/// This is the only source of `att:` search documents, so its absence on wasm32
+/// is what makes "no dangling `att:` docs in the web index" a compile-time
+/// property rather than an argument about which code happens to run.
+#[cfg(not(target_arch = "wasm32"))]
 pub fn collect_attachment_texts(
     note_body: &str,
     vault_dir: &Path,
@@ -218,6 +281,9 @@ pub fn collect_attachment_texts(
 /// passes its `lopdf`/`zip`/`quick-xml` extractor; this pure cache module never
 /// depends on those crates so it compiles on mobile (which simply never calls
 /// this — mobile has no extraction step).
+///
+/// Native-only (see the module-level "Why the producers stop at wasm32" note).
+#[cfg(not(target_arch = "wasm32"))]
 #[allow(clippy::too_many_arguments)]
 pub fn backfill_note_attachment_text<F>(
     note_body: &str,
@@ -287,14 +353,32 @@ pub fn backfill_note_attachment_text<F>(
 
 /// Delete an attachment's cache blob if present (lifecycle cleanup, Task 8).
 /// Absent file is success (idempotent).
-pub fn remove_extracted(
+///
+/// **The one function in this module that goes through the storage seam**
+/// (phase3-web-client task 44), because it is the one a browser reaches: both
+/// `attachment_delete` and `attachment_clean_unused` call it, and § 9.15.4's
+/// crypto-erase parity means skipping it would leave a deleted attachment's
+/// searchable plaintext recoverable under a still-live `root_key` subkey.
+///
+/// The rest of the module — [`write_extracted`], [`read_extracted`],
+/// [`collect_attachment_texts`], [`backfill_note_attachment_text`] — stays on
+/// `std::fs` deliberately, and **task 90 owns moving it**: those are the
+/// producers, and their callers are the desktop OCR queue, the on-device ASR
+/// path and the search-index rebuild, all synchronous. Porting them for task 44
+/// would push the seam through three `src-tauri` subsystems in service of a blob
+/// family whose web disposition (does `MYE1` exist in a browser at all?) is
+/// exactly what task 90 decides. The import path can reach `write_extracted`
+/// only with a real extractor injected, and the web build injects
+/// `no_op_extract`, so nothing wasm32 runs today ends up there.
+pub async fn remove_extracted(
+    io: &dyn crate::vault_io::VaultIo,
     vault_dir: &Path,
     attachment_id: &[u8; ATTACHMENT_ID_LEN],
-) -> std::io::Result<()> {
-    match std::fs::remove_file(cache_path(vault_dir, attachment_id)) {
+) -> Result<(), crate::io_failure_kind::IoFailureKind> {
+    match io.remove_file(&cache_path(vault_dir, attachment_id)).await {
         Ok(()) => Ok(()),
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
-        Err(e) => Err(e),
+        Err(crate::io_failure_kind::IoFailureKind::NotFound) => Ok(()),
+        Err(kind) => Err(kind),
     }
 }
 
@@ -453,11 +537,22 @@ mod tests {
 
     #[test]
     fn remove_is_idempotent() {
-        let tmp = ScopedTempDir::new("mye1-cache-rm").expect("tmp");
-        write_extracted(tmp.path(), &KEY, &ACCOUNT_HASH, &ATT_ID, &sample()).expect("write");
-        remove_extracted(tmp.path(), &ATT_ID).expect("remove existing");
-        assert!(read_extracted(tmp.path(), &KEY, &ACCOUNT_HASH, &ATT_ID).is_none());
-        remove_extracted(tmp.path(), &ATT_ID).expect("remove absent is ok");
+        // `remove_extracted` went through the storage seam with task 44 (it is
+        // the one function here a browser reaches), so the test drives it on a
+        // runtime against the real `StdVaultIo` — the producers around it are
+        // still synchronous and stay that way until task 90.
+        crate::test_support::block_on(async {
+            let io = crate::vault_io::StdVaultIo;
+            let tmp = ScopedTempDir::new("mye1-cache-rm").expect("tmp");
+            write_extracted(tmp.path(), &KEY, &ACCOUNT_HASH, &ATT_ID, &sample()).expect("write");
+            remove_extracted(&io, tmp.path(), &ATT_ID)
+                .await
+                .expect("remove existing");
+            assert!(read_extracted(tmp.path(), &KEY, &ACCOUNT_HASH, &ATT_ID).is_none());
+            remove_extracted(&io, tmp.path(), &ATT_ID)
+                .await
+                .expect("remove absent is ok");
+        });
     }
 
     #[test]

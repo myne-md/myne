@@ -22,7 +22,7 @@
 // hiccup must never affect a note save (it self-heals on the next
 // rebuild-on-unlock sweep), exactly like the VaultIndices reindex calls.
 
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../platform/core";
 import { extractAttachmentIds } from "./attachmentRef";
 
 /**

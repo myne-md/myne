@@ -7,7 +7,7 @@
 //
 // Rejects with a `NoteListError` (see `src/types/note-list-error.ts`).
 
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../platform/core";
 
 /** Enumerate all note IDs in the vault. Metadata-only; no decryption. */
 export async function noteList(): Promise<string[]> {

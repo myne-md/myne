@@ -11,7 +11,7 @@
 // command. The decrypted PCM + transcript never leave Rust except as this final
 // string / the streamed segments — AS1-class content, never logged here.
 
-import { Channel, invoke } from "@tauri-apps/api/core";
+import { Channel, invoke } from "../platform/core";
 
 /** A normalized transcription failure. `kind: "not_ready"` = AI off / no
  *  transcription model side-loaded (SYNC-V3 — surface a "select a model" hint);

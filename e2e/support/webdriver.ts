@@ -535,6 +535,17 @@ export class Session {
     return this.send("POST", "/refresh");
   }
 
+  /** Navigate to `url` (plain W3C `POST /url`).
+   *
+   *  Unused by the desktop lane and that is not an oversight: there, the app IS
+   *  the page and tauri-driver opens it — there is no URL to go to, and a
+   *  scenario that navigated would be leaving the application under test. The
+   *  web lane (MYND-574 task 105) needs it for the opposite reason: the bundle
+   *  is served over HTTP and every scenario starts by going there. */
+  navigate(url: string): Promise<void> {
+    return this.send("POST", "/url", { url });
+  }
+
   /** Base64 PNG of the current viewport. */
   screenshot(): Promise<string> {
     return this.send("GET", "/screenshot");

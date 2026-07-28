@@ -231,10 +231,17 @@ mod desktop_tests {
 
             // A huge value is stored RAW on disk (replay-resistance lives in
             // the read-time clamp, not the write)...
-            set_auto_lock_timeout_with_dir(tmp.path(), &state, &clamp_hooks(), u32::MAX)
-                .await
-                .expect("write must succeed");
-            let view = prefs_read_with_dir(tmp.path(), &state)
+            set_auto_lock_timeout_with_dir(
+                tmp.path(),
+                &state,
+                &clamp_hooks(),
+                u32::MAX,
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
+            )
+            .await
+            .expect("write must succeed");
+            let view = prefs_read_with_dir(tmp.path(), &state, &myne_core::vault_io::StdVaultIo)
                 .await
                 .expect("read must succeed");
             assert_eq!(view.auto_lock_seconds, Some(u32::MAX));
@@ -265,11 +272,15 @@ mod desktop_tests {
                 &state,
                 &clamp_hooks(),
                 reg.to_paired_extensions(),
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
             )
             .await
             .expect("persist issued");
 
-            let view = prefs_read_with_dir(tmp.path(), &state).await.expect("read");
+            let view = prefs_read_with_dir(tmp.path(), &state, &myne_core::vault_io::StdVaultIo)
+                .await
+                .expect("read");
             assert_eq!(view.paired_extensions.len(), 1);
             let restored = TokenRegistry::from_paired_extensions(&view.paired_extensions);
             assert_eq!(
@@ -283,10 +294,14 @@ mod desktop_tests {
                 &state,
                 &clamp_hooks(),
                 reg.to_paired_extensions(),
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
             )
             .await
             .expect("persist revoked");
-            let view = prefs_read_with_dir(tmp.path(), &state).await.expect("read");
+            let view = prefs_read_with_dir(tmp.path(), &state, &myne_core::vault_io::StdVaultIo)
+                .await
+                .expect("read");
             let restored = TokenRegistry::from_paired_extensions(&view.paired_extensions);
             let gate = RegistryGate::new(&restored, EXT, token.value());
             assert_eq!(gate.validation(), TokenValidation::Revoked);
@@ -311,6 +326,8 @@ mod desktop_tests {
                 &state,
                 &clamp_hooks(),
                 reg.to_paired_extensions(),
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
             )
             .await;
             assert!(matches!(

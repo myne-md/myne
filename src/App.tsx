@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { AccountBootstrap } from "./screens/AccountBootstrap";
 import { Welcome } from "./screens/Welcome";
 import { RestoreBackup } from "./screens/RestoreBackup";
 import { CreateVault } from "./screens/CreateVault";
@@ -23,6 +24,8 @@ import { switchVault } from "./lib/vault-switch";
 import { openInNoteFind } from "./editor/find/find-session";
 import { prefsRead } from "./lib/prefs";
 import { applyTheme, applyCustomTheme } from "./lib/theme";
+import { useStageRoute } from "./lib/routing";
+import { HAS_NATIVE_TITLE_BAR, dragRegionProps } from "./screens/titlebar";
 import { readCustomTheme } from "./lib/themes";
 
 // Synthetic key for the single-entry boot `SlotMap` (MYND-204 SYNC-4).
@@ -109,10 +112,13 @@ function App() {
   // "reset to whatever vault_status now says" is a recovery path that
   // doesn't fit a (prev, action) → next mapping. Resets the `probed`
   // ref so the boot-probe useEffect re-runs.
-  const reprobe = () => {
+  // Stable identity: `useStageRoute` re-subscribes to the back button whenever
+  // this changes, and a per-render function would re-arm the listener on every
+  // render for no reason.
+  const reprobe = useCallback(() => {
     probed.current = false;
     setStage(null);
-  };
+  }, []);
 
   // Out-of-band stage set with a fully-known target — sibling to
   // `reprobe()`. Used by post-event handlers (today: change-password
@@ -210,6 +216,14 @@ function App() {
     };
   }, [stageName]);
 
+  // Stage ↔ address bar (MYND-574 task 64). On desktop every call inside is a
+  // seam no-op — a window has no back button and opens where the boot probe
+  // says, never where a URL says. On web this is what makes back/forward stay
+  // inside the app and a note view survive a reload. `src/lib/routing.ts` holds
+  // the rules (what pushes, what only replaces, and why a back press is never
+  // allowed to un-unlock a vault).
+  useStageRoute(stage?.name ?? null, reprobe);
+
   if (stage === null) {
     // Loading shim — vault_status probe in flight (~ms on warm disk).
     // Returning null avoids a flash-of-welcome before existing-vault
@@ -232,6 +246,20 @@ function App() {
 
   const screen = (() => {
     switch (stage.name) {
+      case "account-entry":
+        // The web client's first-run identity step (tasks 30 + 85). Desktop
+        // never reaches this stage — `initialStageFromProbe` only produces it
+        // where vault CREATION is absent, i.e. where an empty container means
+        // "this browser has not been told which account to pull" rather than
+        // "make a new vault".
+        //
+        // Exit is `reprobe()` rather than a stage action: once the bootstrap
+        // has written a container, the flow comes back through the boot probe,
+        // which is the same door every other out-of-band completion uses
+        // (restore-backup, back-from-create). The probe then finds a `vault.meta`
+        // and routes to unlock — so this screen never has to know what comes
+        // next, and boot routing stays the one place that decides.
+        return <AccountBootstrap onBootstrapped={() => void reprobe()} />;
       case "welcome":
         return (
           <Welcome
@@ -366,9 +394,9 @@ function App() {
           Drag uses Tauri's `data-tauri-drag-region` attribute, NOT the
           Chromium-only `-webkit-app-region: drag` (unsupported in WKWebView /
           WebKitGTK); the data attribute is intercepted on all platforms. */}
-      {stage.name !== "editor" && (
+      {stage.name !== "editor" && HAS_NATIVE_TITLE_BAR && (
         <div
-          data-tauri-drag-region
+          {...dragRegionProps()}
           style={{
             height: 38,
             flexShrink: 0,

@@ -19,6 +19,7 @@ import i18n from "@myne/editor/i18n";
 import { openModal } from "@myne/editor/host/lib/imperative-modal";
 import { ensureAttachmentInsertStyles, hasDom } from "./styles";
 import { mountPdfScroller } from "./pdf-reader";
+import { canExportAttachment } from "@myne/editor/host/lib/attachments";
 import { exportAttachment } from "./fileCardActions";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
@@ -137,10 +138,15 @@ export function showAttachmentLightbox(opts: LightboxOptions): void {
   }
 
   // Vault-wide Export (Save As) affordance (MYND-173): present whenever the
-  // caller supplies the attachment-id. Pinned next to the close button. Clicking
-  // opens the native save dialog (host-side decrypt + write); the lightbox stays
-  // open behind it.
-  if (opts.id !== undefined) {
+  // caller supplies the attachment-id AND the platform can pick a destination.
+  // Pinned next to the close button. Clicking opens the native save dialog
+  // (host-side decrypt + write); the lightbox stays open behind it.
+  //
+  // The second condition is phase3-web-client task 26: a browser grants a page
+  // no arbitrary write path, so the button is **omitted** there rather than
+  // rendered and failing on click (`decisions.md` 2026-07-26, absent-not-
+  // disabled). Task 48's download flow is a different affordance, not this one.
+  if (opts.id !== undefined && canExportAttachment()) {
     const exportBtn = document.createElement("button");
     exportBtn.type = "button";
     exportBtn.className = "cm-attach-lightbox-export";

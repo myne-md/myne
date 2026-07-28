@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "license": "AGPL-3.0",
-  "//": "Shared CodeMirror editor ENGINE — the frontend `core` to `@myne/dialect`'s `protocol`. Most desktop/mobile coupling (i18n, tag index, prefs, attachment export/rename, open-URL, AI, spell) is injected through the `EditorHost` in ./src/host.ts. NOT yet through the seam (Phase A): attachment insert/catalog/picker/voice-record + convert-command still call Tauri `invoke`/`plugin-dialog`/`event` directly, and host/notes/attachmentRef reads `convertFileSrc` at call time (declared as peerDependencies below) — both clients happen to be Tauri, so this works; routing them through the host is deferred to Phase B. Consumed as SOURCE by both clients (Vite compiles it); the desktop keeps re-export shims in `src/editor/*` so its importers stay unchanged.",
+  "//": "Shared CodeMirror editor ENGINE — the frontend `core` to `@myne/dialect`'s `protocol`. ALL platform coupling (i18n, tag index, prefs, attachment import/catalog/picker/export/rename/ref-resolution, voice capture, open-URL, AI, spell) is injected through the `EditorHost` in ./src/host.ts. Phase B closed with phase3-web-client task 76: the six files that still imported `@tauri-apps/*` at module scope now call `getHost()`, and the two `@tauri-apps/*` peerDependencies are gone — this package has NO host dependency of any kind, which is what lets a third, non-Tauri client (the browser) compile it. `scripts/check-platform-seam.mjs` enforces that in pre-commit and in CI. Consumed as SOURCE by every client (Vite compiles it); the desktop keeps re-export shims in `src/editor/*` so its importers stay unchanged.",
   "exports": {
     ".": "./src/index.ts",
     "./CMEditor": "./src/CMEditor.tsx",
@@ -41,8 +41,6 @@
   },
   "peerDependencies": {
     "react": "^19",
-    "react-dom": "^19",
-    "@tauri-apps/api": "^2.11.0",
-    "@tauri-apps/plugin-dialog": "^2.7.1"
+    "react-dom": "^19"
   }
 }

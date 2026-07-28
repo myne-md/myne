@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
@@ -7,6 +8,24 @@ import packageJson from "./package.json";
 const host = process.env.TAURI_DEV_HOST;
 
 // https://vite.dev/config/
+/**
+ * The short commit this build came from, or `"unknown"`.
+ *
+ * Never throws: a source tarball, a shallow CI checkout or a machine without
+ * git must still be able to build. An unavailable commit is a missing readout,
+ * not a broken build.
+ */
+function buildCommit(): string {
+  try {
+    return execFileSync("git", ["rev-parse", "--short=9", "HEAD"], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+  } catch {
+    return "unknown";
+  }
+}
+
 export default defineConfig(async () => ({
   plugins: [react()],
 
@@ -18,6 +37,15 @@ export default defineConfig(async () => ({
   // fields into the WebView. Type declaration: `src/vite-env.d.ts`.
   define: {
     __APP_VERSION__: JSON.stringify(packageJson.version),
+    // The commit this build came from (phase3-web-client task 114). An INPUT to
+    // the build, so it can be a define — unlike the bundle hash, which is an
+    // output and therefore cannot be (a bundle cannot contain its own hash;
+    // `scripts/emit-web-version.mjs` computes it afterwards).
+    //
+    // Resolved at config time with a fallback, because a source tarball or a
+    // CI checkout without git history must still build — an unavailable commit
+    // is "unknown", never a failed build.
+    __BUILD_COMMIT__: JSON.stringify(buildCommit()),
   },
 
   // Multi-page build: `pdf-export.html` is the hidden PDF-export render

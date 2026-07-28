@@ -30,7 +30,22 @@ use std::sync::Arc;
 use crate::plugins::vault_unlock::state::VaultRuntimeState;
 
 /// Boxed-future alias for the hand-rolled async-in-`dyn`-trait methods.
+///
+/// **`Send` on native, `?Send` on `wasm32`** — the same split
+/// `#[async_trait]` / `#[async_trait(?Send)]` already draws across this crate,
+/// and drawn here for the same reason. A hook that touches storage awaits a
+/// `VaultIo` future, and on `wasm32` those are `?Send` because the browser
+/// arm's OPFS handles are bound to their Worker thread and cannot be moved off
+/// it. Requiring `Send` there would make every storage-touching hook
+/// unimplementable, which is what a `WebHooks` that reads `vault.search`
+/// discovered.
+///
+/// Native behaviour is byte-identical: on every non-`wasm32` target this is the
+/// bound it always was, so desktop and mobile see no change at all.
+#[cfg(not(target_arch = "wasm32"))]
 pub type BoxFuture<'a, T = ()> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
+#[cfg(target_arch = "wasm32")]
+pub type BoxFuture<'a, T = ()> = Pin<Box<dyn Future<Output = T> + 'a>>;
 
 /// The managed-state handle the command cores take as `State<'_, Hooks>`.
 pub type Hooks = Arc<dyn VaultLifecycleHooks>;

@@ -27,7 +27,7 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 import { createPortal } from "react-dom";
-import { open as openFileDialog } from "@tauri-apps/plugin-dialog";
+import { open as openFileDialog } from "../../platform/dialog";
 import {
   attachmentCleanUnused,
   attachmentDelete,
@@ -446,8 +446,19 @@ export function AttachmentsLibrary({ onClose }: AttachmentsLibraryProps) {
       } else {
         setCleanupTarget(unused);
       }
-    } catch {
-      setCleanNotice(t("attachments.library.checkUnusedFailedNotice"));
+    } catch (e) {
+      // `CorpusIncomplete` gets its own sentence (phase3-web-client task 89).
+      // It is not a failure — the scan refused because it would have been
+      // computed over a fraction of the corpus — and the remedy is to wait,
+      // which "couldn't check" does not communicate. Collapsing it into the
+      // generic notice would leave the user re-clicking a button that will keep
+      // refusing for exactly as long as the sync takes.
+      const kind = (e as { kind?: string } | null)?.kind;
+      setCleanNotice(
+        kind === "CorpusIncomplete"
+          ? t("attachments.library.corpusIncompleteNotice")
+          : t("attachments.library.checkUnusedFailedNotice"),
+      );
     } finally {
       setCheckingUnused(false);
     }

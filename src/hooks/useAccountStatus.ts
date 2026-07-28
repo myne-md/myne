@@ -11,7 +11,7 @@
 // without the route simply has no usage block (server-protocol.md §7).
 
 import { useEffect, useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../platform/core";
 
 /**
  * The server's live projection of its own enforcement state for the calling

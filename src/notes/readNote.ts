@@ -6,7 +6,7 @@
 // `tracing::debug!` host-side; the WebView never sees it. UI:
 // "Bu not okunamadı" with a single category.
 
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../platform/core";
 
 /**
  * Read + AEAD-decrypt an existing `.myn` note by `NoteId`. Returns the

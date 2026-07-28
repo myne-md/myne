@@ -17,6 +17,11 @@ vi.mock("@myne/editor/host/lib/attachments", () => ({
   attachmentExport: (...a: unknown[]) => attachmentExport(...a),
   attachmentRename: (...a: unknown[]) => attachmentRename(...a),
   pickExportDestination: (...a: unknown[]) => pickExportDestination(...a),
+  // The platform predicate the widgets consult before rendering an Export item
+  // (phase3-web-client task 26). `true` here because these cases are about the
+  // export ACTION; whether the affordance is offered at all is asserted in
+  // `tests/platform/editor-host-capabilities.test.ts`.
+  canExportAttachment: () => true,
 }));
 
 const promptForName = vi.fn();

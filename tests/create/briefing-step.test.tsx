@@ -18,7 +18,6 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn(() => Promise.resolve()) }));
 vi.mock("../../src/lib/app-window", () => ({
   HAS_TAURI: false,
-  closeApp: () => Promise.resolve(),
 }));
 vi.mock("@tauri-apps/api/window", () => ({
   getCurrentWindow: () => ({ onCloseRequested: async () => () => {} }),

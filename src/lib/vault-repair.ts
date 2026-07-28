@@ -16,7 +16,7 @@
 // Capability ACL `vault-repair:default` is in
 // `src-tauri/capabilities/default.json`.
 
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../platform/core";
 
 export type { VaultRepairError } from "../types/vault-repair-error";
 export { isVaultRepairPartial } from "../types/vault-repair-error";

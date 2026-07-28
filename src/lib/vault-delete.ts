@@ -35,7 +35,7 @@
 // `backend-vault-delete`). No ACL change required for MYND-108 or
 // MYND-108-bis.
 
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../platform/core";
 import type { VaultDeleteError } from "../types/vault-delete-error";
 
 export type {
@@ -58,7 +58,12 @@ export {
  *   (AV scanner / Spotlight / OneDrive sync lock). Vault directory
  *   path comes from UI-side resolution (`appDataDir() + "vault"`),
  *   not from the backend response (backend DENY-list discipline
- *   forbids path-in-tracing).
+ *   forbids path-in-tracing). **`null` where the client has no path
+ *   to show** (phase3-web-client task 72): `path.appDataDir` is a typed
+ *   refusal in the browser seam, and an OPFS container is not a place a
+ *   user can open a file manager on, so the manual-cleanup pointer has
+ *   nothing to point at. `null` rather than `""` so the form's absence
+ *   branch is a check the compiler enforces.
  * - `io` — backend `VaultDeleteError::Io { io_error_kind }`. Generic
  *   disk-error scenario; UI shows a banner with a generic copy and
  *   the resolved vault path. The `io_error_kind` discriminant is not
@@ -68,11 +73,11 @@ export type DeleteVaultPartialFailContext =
   | {
       kind: "partial-delete";
       remainingCount: number;
-      vaultDirPath: string;
+      vaultDirPath: string | null;
     }
   | {
       kind: "io";
-      vaultDirPath: string;
+      vaultDirPath: string | null;
     };
 
 /**
@@ -128,7 +133,7 @@ function assertNeverDeleteVaultError(x: never): never {
  */
 export function mapDeleteVaultError(
   e: VaultDeleteError,
-  vaultDirPath: string,
+  vaultDirPath: string | null,
 ): DeleteVaultErrorMapping {
   switch (e.kind) {
     case "VaultBusyAuth":

@@ -81,6 +81,55 @@ All request/response bodies are JSON. Every pre-auth request body is capped (`Ma
 
 **Channel binding (R3 — not yet channel-bound).** The mechanism is **SCRAM-SHA-256-PLUS** with channel binding = the **TLS exporter** (`tls-server-end-point`-class exporter keying material). Over the loopback-http test harness there is **no** TLS exporter, so the server's expected channel-binding data is **empty** and the client matches it; over real TLS both ends feed the exporter. Wiring the live exporter on both the Go server (`serverCbind`) and the client rustls transport is the **R3-pending** step. **Until R3 lands, no channel-binding / "-PLUS"-verified claim may be made** — the handshake authenticates the account and mints a token, but it is not yet bound to the TLS channel (documented so a reader does not over-read the `-PLUS` suffix). See the epic sync-ledger R3.
 
+**Non-channel-bound sessions are accepted; a bound client cannot be downgraded (MYND-574).** A browser obtains neither TLS-exporter keying material nor a certificate pin — no browser exposes either to page JavaScript — so the Phase 3 web client can **never** be channel-bound (`decisions.md` 2026-07-26; `threat-model.md` A4 splits per client on exactly this). The server therefore accepts a client that authenticates with the RFC 5802 unbound gs2 form (`n,,`, no channel-binding data), under these normative rules:
+
+- **The unbound form is accepted only where the server advertised no channel binding.** If the init response advertised `cbind: "tls-exporter"` — i.e. the application itself terminated TLS 1.3 and a real exporter exists — a client-final carrying `n,,` MUST be **refused**. Accepting it there would mean an attacker who strips the advertisement can talk a bindable client out of binding.
+- **Accepting `n,,` does not weaken a bound client.** The gs2 header is part of the `c=` attribute, `c=` is part of the AuthMessage, and the AuthMessage is what the client proof MACs. Rewriting `p=tls-exporter,,` to `n,,` on the wire therefore invalidates the proof. A client that always binds cannot be downgraded; accepting the unbound form affects only clients that genuinely send it.
+- **Empty channel-binding data MUST NOT be a silent fallback over terminated TLS.** Where the server terminates TLS but cannot produce an exporter — TLS below 1.3, or an exporter call that fails — it MUST refuse the handshake rather than bind to empty data. Binding a real-TLS session to nothing while the client believes it is bound is strictly worse than refusing. The empty-`serverCbind` path remains legitimate **only** where the application does not terminate TLS at all (a terminating reverse proxy, or the loopback test harness), because there the absence of a binding is the honest state and is advertised as such.
+- **The refusal is indistinguishable from any other auth failure** (the same `401`), so no deployment detail leaks.
+- **A per-account "bound sessions only" opt-out is reserved, not built** (MYND-577). The verification path reports which form the client used, so an account-level predicate can refuse an unbound session without a schema change or a wire change. No field is added for it here.
+
+**`device_revoked` — a revoked device is not an expired token (MYND-574 task 94).** Every authed route answers a bad credential with `401`, and until now it answered every kind of bad credential with the same `{"error_code": "unauthenticated"}`. Three different situations arrive that way: a token that expired, a token the server has never heard of, and a token whose **device row was revoked or retired** by `/auth/devices/revoke`. The first two are fixed by re-authenticating and say nothing about anyone's intent; the third is a **deliberate act by the account owner from another client**, and a client that cannot tell it apart cannot honour it.
+
+The server MUST therefore answer a request whose bearer token maps to a revoked or retired device row with:
+
+```
+401 {"error_code": "device_revoked"}
+```
+
+Normative points:
+
+- **The status stays `401`.** It is an authentication outcome, and a new status would break every existing client's error handling for no gain. What is new is the code inside the body, which is the vocabulary §3.1 already establishes (`unauthenticated`, `cursor_expired`, `blob_stale`, `head_stale`, `frozen`, `blob_reclaimed`).
+- **It applies only to a token that resolves to a KNOWN, revoked device row.** A token the server cannot resolve at all stays `unauthenticated` — the server genuinely does not know whether it was revoked, expired, or never existed, and claiming otherwise would let a client act on a guess. This is also what keeps the code from becoming a device-enumeration oracle: it is emitted only to the holder of a token the server itself issued.
+- **It carries no information about WHICH device or WHEN.** No `device_id`, no timestamp, no actor. The revoked device already knows its own identity, and everything else is the account roster's business, reachable through `GET /auth/devices` by a device that still has a session.
+- **A client MUST NOT treat this code as a retry class.** Retrying cannot help: only re-enrolment can, and only if the account owner allows it.
+- **What the client does with it is client policy, not server policy, and the two ship differently on purpose.** Desktop and mobile park and prompt to re-enrol, exactly as they already do on `unauthenticated` — the machine is the user's own, its vault directory is theirs, and erasing it on a server signal would be a destructive power nobody asked the server to have. The **web** client's storage is a cache of a sync-held vault (`decisions.md` 2026-07-26 makes sync required there), so it treats the code as terminal: lock, erase this browser's copy, and explain. The server emits one code; it does not know or care which policy is on the other end.
+- **This is not a remote wipe and not a cryptographic lockout, and no copy anywhere may imply that it is.** A device that already decrypted content cannot un-decrypt it, and an attacker holding the vault file plus the password is entirely unaffected — revocation is an **availability** control (§4). `REMOVE_DEVICE_DISCLOSURE` states exactly this and remains normative.
+
+### 3.1b Cross-origin access for the web client (CORS; MYND-574)
+
+The Phase 3 web client runs on **its own origin** (`decisions.md` 2026-07-26 — OPFS is origin-scoped, so the app may not share an origin with anything else), which makes every call it issues to the sync origin cross-origin. Until this section the server assumed a native caller and answered no preflight, so a browser could not complete even the first step of the handshake.
+
+The server MUST therefore answer CORS, and MUST do so under the following normative constraints.
+
+**Configured allowlist, never a wildcard.** Allowed origins are an operator-configured, exact-match list (`MYNE_ALLOWED_ORIGINS`, comma-separated in the reference implementation). `*` MUST NOT be honoured: it cannot be combined with credentialed requests, and a wildcard turns a configuration typo into an edge any page on the internet may address. An **empty list disables CORS entirely**, which is the correct state for a deployment with no browser client and preserves the pre-web behaviour exactly. Matching is exact — no scheme-insensitivity, no trailing-slash tolerance, no subdomain wildcards: an origin is a precise string in the browser's model, and a normalising comparison is how an allowlist ends up matching something the operator did not intend.
+
+**Both deployment modes, by configuration.** The hosted app origin is not privileged: a self-hoster configures their own. This is TB5 applied to the browser edge — the same protocol and the same security model, a different operator.
+
+**Every route the browser reaches, including the pre-auth ones.** The policy MUST cover the session-less routes of §3.1 (`POST /auth/register`, `POST /auth/scram/init`, `POST /auth/scram/final`, `GET /vault.meta`) as well as the authed surface (`/auth/devices`, `/auth/devices/approve`, `/auth/devices/revoke`, `/sync/push`, `/sync/pull`, `/sync/blob`, `/sync/poke`, `/account/status`, and `HEAD|GET|PUT /attachments/{id}` of §3.2). `POST /auth/scram/init` carries a JSON body and is therefore **not** a CORS-simple request: it is preflighted. A policy scoped to "authed routes" would leave the browser's **first** call unanswered, and authentication would fail before any token existed.
+
+**Preflight is answered by the policy, not by a route handler.** An `OPTIONS` request carrying `Access-Control-Request-Method` MUST be answered directly with the allowed methods, allowed request headers and a max-age, and MUST NOT reach a route handler — several routes implement no `OPTIONS` at all, and a `404`/`405` reads to the browser as an unexplained denial. A preflight from a **disallowed** origin MUST be refused with no CORS headers at all.
+
+**`Access-Control-Allow-Headers` MUST include `Authorization`, `Content-Type` and `Range`** — the per-device bearer token, the JSON bodies, and the resumable attachment reads of §3.2.
+
+**`Access-Control-Expose-Headers` MUST include `X-Uploaded-Length`, `X-Complete`, `Content-Range` and `Accept-Ranges`.** None of these is CORS-safelisted, so without the header a cross-origin reader sees them as *absent* rather than as an error: the §3.2 resumable-upload probe would read a half-transferred attachment as zero bytes uploaded and restart from the beginning, and a Range `GET` would be indistinguishable from an unranged one. This is a correctness requirement, not a convenience.
+
+**A response carrying a reflected origin MUST `Vary: Origin`**, or a shared cache may serve one origin's response to another.
+
+**Non-browser clients are unaffected.** A request with no `Origin` header — every native client — MUST proceed exactly as before. Enforcement for browsers happens in the browser: a disallowed origin simply receives no `Access-Control-Allow-Origin` and the page is denied the response. Refusing such requests server-side would break every native caller instead.
+
+**Placement.** The policy is outermost middleware, directly inside the no-IP layer (§5.2 / AS14) and outside everything else. It MUST NOT be positioned outside the no-IP layer: CORS reflects a client-supplied header and must never sit where it could observe a source IP.
+
 ### 3.2 Attachment byte-transport (`/attachments/{id}`; MYND-423/468)
 
 Attachment ciphertext does not travel inline in `push` (a 64 MiB blob in a one-shot base64-JSON body has no resume story). It moves over three dedicated, **session-bound** routes keyed by the full lowercase-hex 32-byte `attachment-id` (`protocol.md` §9.9). The server stores the bytes as an opaque unit in the vault namespace (§2.1); it never parses them.

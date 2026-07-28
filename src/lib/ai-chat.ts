@@ -9,7 +9,7 @@
 // (`clearChat`). The Rust side runs the model locally: no provider call, no
 // network (the no-egress gate is the structural guarantee).
 
-import { Channel, invoke } from "@tauri-apps/api/core";
+import { Channel, invoke } from "../platform/core";
 
 import {
   appendChatToken,

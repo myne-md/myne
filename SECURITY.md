@@ -28,14 +28,19 @@ We may also work with you to coordinate disclosure timing with downstream packag
 ## Scope
 
 In scope for security reports:
-- The `myne-md/myne` repository (this one) — desktop client, `protocol/` Rust crypto crate, build configuration
-- Companion repositories under `myne-md/`: `myne-server`, `myne-web`, `myne-mobile`, `myne-website`, `myne-ops`, `myne-test-vectors`
+- The `myne-md/myne` repository (this one) — desktop client, the in-repo **web client** (`web/`), `protocol/` Rust crypto crate, build configuration
+- Companion repositories under `myne-md/`: `myne-server`, `myne-mobile`, `myne-website`, `myne-ops`, `myne-test-vectors`
+- **The served web bundle and its integrity chain** — the reproducible build of `web/`, the published per-release bundle hashes and their append-only record, and any way to make a served bundle differ from the source it claims to be built from without that being detectable
+- **The service-worker update path** — its signing key, its rotation and revocation story, and any way to get code past the pin that the documented update policy is supposed to prevent
+- **The security-header and CSP configuration shipped in the self-host container** — a way to weaken or bypass the strict CSP, the zero-third-party-origin rule, or cross-origin isolation counts, whether via the container's own configuration surface or the runtime sync-origin knob
+- **The hosted `app.myne.md` origin**, as a maintainer-run instance
 - The published v0.1 cryptographic protocol (`docs/spec/protocol.md`) and account-number scheme (`docs/spec/account-number.md`) — including formal modeling concerns or attack analyses
 - Reproducible-build chain and signing infrastructure (when Phase 1 §C-launch lands)
 - Any hosted instance run by the Myne maintainers (when Phase 2 ships)
 
 Out of scope:
 - Self-hosted instances run by third parties — report to the operator
+- **Bundles served by third parties.** An operator serving a modified web bundle to their own users is a policy matter between them and those users, not a vulnerability in this project — the same boundary the self-hosted-instance carve-out draws. What *is* in scope: any way for someone who is **not** the operator to alter what a bundle origin serves, and any weakness in the mechanisms that make a substituted bundle detectable (the reproducible build, the published hashes, the service-worker pin).
 - The `myne-agents/` repository (private, internal tooling)
 - Third-party dependencies — report upstream first; we'll track via `cargo audit` / `pnpm audit`
 - Social-engineering attacks against maintainers
@@ -59,7 +64,7 @@ Per the project's privacy commitment (`docs/vision.md`, `docs/threat-model.md`),
 
 ## Reference
 
-- `docs/threat-model.md` — adversaries (A1–A13), assets (AS1–AS17), trust boundaries (TB1–TB9)
+- `docs/threat-model.md` — adversaries (A1–A15), assets (AS1–AS19), trust boundaries (TB1–TB11)
 - `docs/spec/protocol.md` — v0.1 cryptographic protocol
-- `public/.well-known/security.txt` — RFC 9116 machine-readable contact file
+- `public/.well-known/security.txt` — RFC 9116 machine-readable contact file. It is served from **every** origin this project runs, including the hosted web-app origin (`app.myne.md`): a researcher who finds a problem in the served bundle is, by definition, looking at that origin and not at this repository, so the contact has to be reachable from there.
 - `docs/decisions.md` — design decisions log (append-only)

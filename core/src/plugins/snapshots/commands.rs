@@ -12,6 +12,7 @@
 //! `snapshot_preview`'s returned plaintext).
 
 use super::error::{snapshot_error_kind, SnapshotError};
+use crate::host::HostCtx;
 use crate::io_failure_kind::from_io_error_kind;
 use crate::paths;
 use crate::plugins::notes::commands::note_update_with_dir;
@@ -22,6 +23,10 @@ use crate::plugins::vault_unlock::state::{Slot, VaultRuntimeState};
 use protocol::{decode_note, DecryptError};
 use serde::Serialize;
 use std::path::PathBuf;
+// Tauri types serve only the cfg-gated IPC wrappers (task 79, Option B).
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+use crate::host::tauri_host::TauriHost;
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 use tauri::{AppHandle, Runtime, State};
 use zeroize::Zeroizing;
 
@@ -80,7 +85,7 @@ pub(crate) async fn snapshot_list_in(
     }
 
     let note_uuid = note_id.as_uuid().to_string();
-    let files = tokio::task::spawn_blocking(move || {
+    let files = crate::task::run_blocking(move || {
         crate::snapshot_store::list_note_snapshots(&snapshots_dir, &note_uuid)
     })
     .await
@@ -101,14 +106,13 @@ pub(crate) async fn snapshot_list_in(
 }
 
 /// List a note's encrypted snapshots, newest-first, decrypt-free.
-#[tauri::command]
-pub async fn snapshot_list<R: Runtime>(
-    app: AppHandle<R>,
-    state: State<'_, VaultRuntimeState>,
+pub async fn snapshot_list_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
     note_id: String,
 ) -> Result<Vec<SnapshotMeta>, SnapshotError> {
-    let snapshots_dir = resolve_snapshots_dir(&app, state.active_vault_id().await)?;
-    snapshot_list_in(snapshots_dir, state.inner(), note_id)
+    let snapshots_dir = resolve_snapshots_dir(host, state.active_vault_id().await)?;
+    snapshot_list_in(snapshots_dir, state, note_id)
         .await
         .inspect_err(|e| {
             tracing::debug!(
@@ -117,6 +121,18 @@ pub async fn snapshot_list<R: Runtime>(
                 "snapshot command failed"
             )
         })
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn snapshot_list<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    note_id: String,
+) -> Result<Vec<SnapshotMeta>, SnapshotError> {
+    snapshot_list_from_host(&TauriHost::new(app), state.inner(), note_id).await
 }
 
 // ---- snapshot_preview ---------------------------------------------------
@@ -146,7 +162,7 @@ pub(crate) async fn snapshot_preview_in(
         &snapshot_uuid,
     ));
 
-    let plaintext = tokio::task::spawn_blocking(move || -> Result<String, SnapshotError> {
+    let plaintext = crate::task::run_blocking(move || -> Result<String, SnapshotError> {
         let blob = match std::fs::read(&path) {
             Ok(b) => b,
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
@@ -173,15 +189,14 @@ pub(crate) async fn snapshot_preview_in(
 }
 
 /// Decrypt a selected snapshot in memory and return its plaintext.
-#[tauri::command]
-pub async fn snapshot_preview<R: Runtime>(
-    app: AppHandle<R>,
-    state: State<'_, VaultRuntimeState>,
+pub async fn snapshot_preview_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
     note_id: String,
     snapshot_uuid: String,
 ) -> Result<String, SnapshotError> {
-    let snapshots_dir = resolve_snapshots_dir(&app, state.active_vault_id().await)?;
-    snapshot_preview_in(snapshots_dir, state.inner(), note_id, snapshot_uuid)
+    let snapshots_dir = resolve_snapshots_dir(host, state.active_vault_id().await)?;
+    snapshot_preview_in(snapshots_dir, state, note_id, snapshot_uuid)
         .await
         .inspect_err(|e| {
             tracing::debug!(
@@ -190,6 +205,19 @@ pub async fn snapshot_preview<R: Runtime>(
                 "snapshot command failed"
             )
         })
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn snapshot_preview<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    note_id: String,
+    snapshot_uuid: String,
+) -> Result<String, SnapshotError> {
+    snapshot_preview_from_host(&TauriHost::new(app), state.inner(), note_id, snapshot_uuid).await
 }
 
 // ---- snapshot_restore ---------------------------------------------------
@@ -211,6 +239,12 @@ pub(crate) async fn snapshot_restore_in(
     hooks: &crate::hooks::Hooks,
     note_id: String,
     snapshot_uuid: String,
+    // Threaded in with MYND-574 task 13: `note_update_with_dir` now takes both
+    // seams. Snapshots themselves are not ported to web yet (task 31) — this
+    // parameter exists so the shared call site compiles, and the desktop caller
+    // passes its real host so the metric it feeds stays honest.
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
 ) -> Result<(), SnapshotError> {
     let note_id_parsed = NoteId::parse(&note_id).map_err(|_| SnapshotError::InvalidNoteId)?;
     if !valid_v7(&snapshot_uuid) {
@@ -233,7 +267,7 @@ pub(crate) async fn snapshot_restore_in(
             &note_id_parsed.as_uuid().to_string(),
             &snapshot_uuid,
         ));
-        let pt = tokio::task::spawn_blocking(move || -> Result<String, SnapshotError> {
+        let pt = crate::task::run_blocking(move || -> Result<String, SnapshotError> {
             let blob = match std::fs::read(&path) {
                 Ok(b) => b,
                 Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
@@ -271,7 +305,7 @@ pub(crate) async fn snapshot_restore_in(
         let note_uuid_str = note_id_parsed.as_uuid().to_string();
         let live_path = notes_dir.join(format!("{note_uuid_str}.myn"));
         let hooks_owned: crate::hooks::Hooks = hooks.clone();
-        let undo_failed = tokio::task::spawn_blocking(move || match std::fs::read(&live_path) {
+        let undo_failed = crate::task::run_blocking(move || match std::fs::read(&live_path) {
             Ok(old_blob) => {
                 let now_ms = crate::snapshot_store::now_unix_ms();
                 hooks_owned.capture_snapshot(
@@ -304,6 +338,8 @@ pub(crate) async fn snapshot_restore_in(
         (*plaintext).clone(),
         // Restore is an explicit user overwrite — never base-guarded.
         None,
+        io,
+        host,
     )
     .await
     .map_err(map_note_update_err)?;
@@ -343,6 +379,33 @@ pub(crate) async fn snapshot_restore_in(
 
 /// Restore a selected snapshot, atomically capturing the current state as the
 /// undo point first.
+pub async fn snapshot_restore_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    note_id: String,
+    snapshot_uuid: String,
+    // Takes the seam rather than naming `StdVaultIo` internally: this function
+    // is NOT gated off wasm32, and `StdVaultIo` is — so hardcoding the native
+    // arm here broke the wasm build of a crate that otherwise compiles fine.
+    // Threading it keeps the choice at the edge, where the host already is.
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), SnapshotError> {
+    let notes_dir = resolve_notes_dir(host, state.active_vault_id().await)?;
+    snapshot_restore_in(notes_dir, state, hooks, note_id, snapshot_uuid, io, host)
+        .await
+        .inspect_err(|e| {
+            tracing::debug!(
+                stage = "snapshot_restore",
+                error_kind = snapshot_error_kind(e),
+                "snapshot command failed"
+            )
+        })
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn snapshot_restore<R: Runtime>(
     app: AppHandle<R>,
@@ -351,22 +414,15 @@ pub async fn snapshot_restore<R: Runtime>(
     note_id: String,
     snapshot_uuid: String,
 ) -> Result<(), SnapshotError> {
-    let notes_dir = resolve_notes_dir(&app, state.active_vault_id().await)?;
-    snapshot_restore_in(
-        notes_dir,
+    snapshot_restore_from_host(
+        &TauriHost::new(app),
         state.inner(),
         hooks.inner(),
         note_id,
         snapshot_uuid,
+        &crate::vault_io::StdVaultIo,
     )
     .await
-    .inspect_err(|e| {
-        tracing::debug!(
-            stage = "snapshot_restore",
-            error_kind = snapshot_error_kind(e),
-            "snapshot command failed"
-        )
-    })
 }
 
 // ---- snapshot_prune -----------------------------------------------------
@@ -389,7 +445,7 @@ pub(crate) async fn snapshot_prune_in(
 
     let note_uuid = note_id.as_uuid().to_string();
     let now_ms = crate::snapshot_store::now_unix_ms();
-    let removed = tokio::task::spawn_blocking(move || {
+    let removed = crate::task::run_blocking(move || {
         crate::snapshot_store::prune_note_snapshots(
             &snapshots_dir,
             &note_uuid,
@@ -409,14 +465,13 @@ pub(crate) async fn snapshot_prune_in(
 
 /// Apply the retention policy to a note's snapshots now (manual "clear old
 /// history"; the eager write-path prune already runs on every create).
-#[tauri::command]
-pub async fn snapshot_prune<R: Runtime>(
-    app: AppHandle<R>,
-    state: State<'_, VaultRuntimeState>,
+pub async fn snapshot_prune_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
     note_id: String,
 ) -> Result<u32, SnapshotError> {
-    let snapshots_dir = resolve_snapshots_dir(&app, state.active_vault_id().await)?;
-    snapshot_prune_in(snapshots_dir, state.inner(), note_id)
+    let snapshots_dir = resolve_snapshots_dir(host, state.active_vault_id().await)?;
+    snapshot_prune_in(snapshots_dir, state, note_id)
         .await
         .inspect_err(|e| {
             tracing::debug!(
@@ -427,13 +482,25 @@ pub async fn snapshot_prune<R: Runtime>(
         })
 }
 
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn snapshot_prune<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    note_id: String,
+) -> Result<u32, SnapshotError> {
+    snapshot_prune_from_host(&TauriHost::new(app), state.inner(), note_id).await
+}
+
 // ---- path resolution ----------------------------------------------------
 
-fn resolve_snapshots_dir<R: Runtime>(
-    app: &AppHandle<R>,
+fn resolve_snapshots_dir(
+    host: &dyn HostCtx,
     active_id: Option<crate::vault_id::VaultId>,
 ) -> Result<PathBuf, SnapshotError> {
-    paths::snapshots_dir_for(app, active_id).map_err(|e| match e.kind() {
+    paths::snapshots_dir_for_host(host, active_id).map_err(|e| match e.kind() {
         std::io::ErrorKind::NotADirectory | std::io::ErrorKind::AlreadyExists => {
             SnapshotError::NotesDirNotADirectory
         }
@@ -443,11 +510,11 @@ fn resolve_snapshots_dir<R: Runtime>(
     })
 }
 
-fn resolve_notes_dir<R: Runtime>(
-    app: &AppHandle<R>,
+fn resolve_notes_dir(
+    host: &dyn HostCtx,
     active_id: Option<crate::vault_id::VaultId>,
 ) -> Result<PathBuf, SnapshotError> {
-    paths::notes_dir_for(app, active_id).map_err(|e| match e.kind() {
+    paths::notes_dir_for_host(host, active_id).map_err(|e| match e.kind() {
         std::io::ErrorKind::NotADirectory | std::io::ErrorKind::AlreadyExists => {
             SnapshotError::NotesDirNotADirectory
         }
@@ -626,9 +693,15 @@ mod tests {
             let sdir = snapshots_dir_under(scratch.path()).unwrap();
             let state = unlocked().await;
 
-            let id = note_create_with_dir(notes_dir.clone(), &state, "v1".to_string())
-                .await
-                .unwrap();
+            let id = note_create_with_dir(
+                notes_dir.clone(),
+                &state,
+                "v1".to_string(),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .unwrap();
             // No snapshot yet (create doesn't snapshot).
             assert!(snapshot_list_in(sdir.clone(), &state, id.clone())
                 .await
@@ -642,6 +715,8 @@ mod tests {
                 id.clone(),
                 "v2".to_string(),
                 None,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
             )
             .await
             .unwrap();
@@ -675,9 +750,15 @@ mod tests {
             let state = unlocked().await;
 
             let v1 = "# v1\noriginal";
-            let id = note_create_with_dir(notes_dir.clone(), &state, v1.to_string())
-                .await
-                .unwrap();
+            let id = note_create_with_dir(
+                notes_dir.clone(),
+                &state,
+                v1.to_string(),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .unwrap();
             note_update_with_dir(
                 notes_dir.clone(),
                 &state,
@@ -685,6 +766,8 @@ mod tests {
                 id.clone(),
                 "# v2".to_string(),
                 None,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
             )
             .await
             .unwrap();
@@ -711,9 +794,15 @@ mod tests {
             let notes_dir = notes_dir_under(scratch.path()).unwrap();
             let sdir = snapshots_dir_under(scratch.path()).unwrap();
             let state = unlocked().await;
-            let id = note_create_with_dir(notes_dir, &state, "v1".to_string())
-                .await
-                .unwrap();
+            let id = note_create_with_dir(
+                notes_dir,
+                &state,
+                "v1".to_string(),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .unwrap();
             // A syntactically-valid but absent snapshot id.
             let absent = "01970e83-4f2f-7000-8000-000000000000".to_string();
             assert_eq!(
@@ -730,9 +819,15 @@ mod tests {
             let notes_dir = notes_dir_under(scratch.path()).unwrap();
             let sdir = snapshots_dir_under(scratch.path()).unwrap();
             let state = unlocked().await;
-            let id = note_create_with_dir(notes_dir, &state, "v1".to_string())
-                .await
-                .unwrap();
+            let id = note_create_with_dir(
+                notes_dir,
+                &state,
+                "v1".to_string(),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .unwrap();
             assert_eq!(
                 snapshot_preview_in(sdir, &state, id, "not-a-uuid".to_string()).await,
                 Err(SnapshotError::InvalidSnapshotId)
@@ -749,9 +844,15 @@ mod tests {
             let state = unlocked().await;
 
             let v1 = "# v1\noriginal body";
-            let id = note_create_with_dir(notes_dir.clone(), &state, v1.to_string())
-                .await
-                .unwrap();
+            let id = note_create_with_dir(
+                notes_dir.clone(),
+                &state,
+                v1.to_string(),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .unwrap();
             note_update_with_dir(
                 notes_dir.clone(),
                 &state,
@@ -759,6 +860,8 @@ mod tests {
                 id.clone(),
                 "# v2\nedited".to_string(),
                 None,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
             )
             .await
             .unwrap();
@@ -771,9 +874,17 @@ mod tests {
                 .clone();
 
             // Restore S1 (v1).
-            snapshot_restore_in(notes_dir.clone(), &state, &noop_hooks(), id.clone(), s1)
-                .await
-                .unwrap();
+            snapshot_restore_in(
+                notes_dir.clone(),
+                &state,
+                &noop_hooks(),
+                id.clone(),
+                s1,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .unwrap();
 
             // Live note is now v1 again.
             let note_id = NoteId::parse(&id).unwrap();
@@ -806,9 +917,15 @@ mod tests {
             let notes_dir = notes_dir_under(scratch.path()).unwrap();
             let sdir = snapshots_dir_under(scratch.path()).unwrap();
             let state = unlocked().await;
-            let id = note_create_with_dir(notes_dir.clone(), &state, "v1".to_string())
-                .await
-                .unwrap();
+            let id = note_create_with_dir(
+                notes_dir.clone(),
+                &state,
+                "v1".to_string(),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .unwrap();
             note_update_with_dir(
                 notes_dir,
                 &state,
@@ -816,6 +933,8 @@ mod tests {
                 id.clone(),
                 "v2".to_string(),
                 None,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
             )
             .await
             .unwrap();

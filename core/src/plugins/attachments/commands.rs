@@ -23,11 +23,15 @@
 
 use super::error::{
     AttachmentCleanUnusedError, AttachmentDeleteError, AttachmentExportError,
-    AttachmentImportError, AttachmentRenameError, AttachmentUnusedListError, CatalogListError,
+    AttachmentImportError, AttachmentRenameError, AttachmentServeError, AttachmentUnusedListError,
+    CatalogListError,
 };
 use super::extract_types::ExtractedText;
 use super::sniff::sniff_content_type;
+use crate::host::HostCtx;
+use crate::io_failure_kind::IoFailureKind;
 use crate::plugins::vault_unlock::state::VaultRuntimeState;
+use crate::vault_io::{VaultIo, WriteOpts};
 use protocol::{
     compute_attachment_id, decode_attachment_blob, decode_attachments_catalog, derive_subkey,
     encode_attachment_blob, encode_attachments_catalog, parse_vault_meta, read_or_empty,
@@ -37,7 +41,10 @@ use protocol::{
 use serde::Serialize;
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
-use std::time::{SystemTime, UNIX_EPOCH};
+// Tauri types serve only the cfg-gated IPC wrappers (task 79, Option B).
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+use crate::host::tauri_host::TauriHost;
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 use tauri::{AppHandle, Runtime, State};
 use tokio::sync::Mutex;
 use zeroize::Zeroizing;
@@ -57,17 +64,20 @@ pub(crate) fn catalog_write_mutex() -> &'static Mutex<()> {
     M.get_or_init(|| Mutex::new(()))
 }
 
-/// Resolve the ACTIVE vault root for the current Tauri app. `active_id` is read
-/// from the runtime state by the calling command (`state.active_vault_id().await`)
-/// — the only place with `.await` access to the slot map. SYNC-6: attachment
-/// import/list/delete/rename all operate on the unlocked vault, so resolving via
-/// the active id (not the transitional sole-vault disk heuristic) keeps the blob
-/// + catalog targeting the correct vault once two or more exist.
-fn vault_dir<R: Runtime>(
-    app: &AppHandle<R>,
+/// Resolve the ACTIVE vault root. `active_id` is read from the runtime state by
+/// the calling command (`state.active_vault_id().await`) — the only place with
+/// `.await` access to the slot map. SYNC-6: attachment import/list/delete/rename
+/// all operate on the unlocked vault, so resolving via the active id (not the
+/// transitional sole-vault disk heuristic) keeps the blob and catalog targeting
+/// the correct vault once two or more exist.
+///
+/// One line over the pure resolver in `crate::paths`; the Tauri-shaped twin is
+/// gone once every wrapper delegates (task 79).
+fn vault_dir_from_host(
+    host: &dyn HostCtx,
     active_id: Option<crate::vault_id::VaultId>,
 ) -> std::io::Result<PathBuf> {
-    crate::paths::active_vault_root_io(app, active_id)
+    crate::paths::active_vault_root_io_from_host(host, active_id)
 }
 
 /// The `source` argument to [`attachment_import`].
@@ -172,28 +182,33 @@ fn hex_val(b: u8) -> Option<u8> {
 /// Generic over the caller's error type via the two `From` impls.
 /// `pub(crate)`: also consumed by the notes plugin's
 /// `note_export_attachments` (MYND-115 task 4).
-pub fn read_account_number_hash(
+pub async fn read_account_number_hash(
+    io: &dyn VaultIo,
     vault_meta_path: &Path,
-) -> std::io::Result<Result<[u8; VAULT_META_ACCOUNT_HASH_LEN], MetaParseFailed>> {
-    let bytes = std::fs::read(vault_meta_path)?;
-    Ok(parse_vault_meta(&bytes)
-        .map(|m| m.account_number_hash)
-        .map_err(|_| MetaParseFailed))
+) -> Result<Result<[u8; VAULT_META_ACCOUNT_HASH_LEN], MetaParseFailed>, IoFailureKind> {
+    // `vault.meta` is a double-buffered singleton on the web store (task 18), so
+    // "read it" means "the newest copy that PARSES" — and `parse_vault_meta` is
+    // exactly the verifier `open_newest` wants. Desktop and mobile are unchanged
+    // by construction: `read_candidates` defaults to a one-element list there,
+    // so this is the same read followed by the same parse.
+    match crate::singleton::open_newest(io, vault_meta_path, |candidate| {
+        parse_vault_meta(candidate).map(|m| m.account_number_hash)
+    })
+    .await
+    {
+        Ok(hash) => Ok(Ok(hash)),
+        // Absence stays an IO answer rather than a parse failure — that is what
+        // `std::fs::read` reported here before, and the callers' `Io`/
+        // `InvalidVaultMeta` split is built on the distinction.
+        Err(crate::singleton::OpenOutcome::Absent) => Err(IoFailureKind::NotFound),
+        Err(crate::singleton::OpenOutcome::Io(kind)) => Err(kind),
+        Err(crate::singleton::OpenOutcome::Undecodable(_)) => Ok(Err(MetaParseFailed)),
+    }
 }
 
 /// Zero-sized marker for a `vault.meta` parse failure, mapped to each
 /// command's `InvalidVaultMeta` variant at the call site.
 pub struct MetaParseFailed;
-
-/// Current UNIX time in whole seconds, saturating at 0 if the clock is
-/// before the epoch (cannot happen in practice). Used for the catalog
-/// entry's `created_at`.
-fn now_unix_secs() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or(0)
-}
 
 /// Grace window (7 days) during which a freshly-added but never-referenced
 /// attachment is withheld from the "unused" list (share-import ledger SYNC-10):
@@ -241,6 +256,27 @@ fn auto_filename(content_type: &str) -> String {
 /// `app_data_dir` then delegates to [`attachment_import_with_dir`] so
 /// tests exercise the core against a `ScopedTempDir` without a Tauri
 /// runtime.
+pub async fn attachment_import_from_host(
+    host: &dyn HostCtx,
+    io: &dyn VaultIo,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    source: ImportSource,
+) -> Result<ImportedAttachment, AttachmentImportError> {
+    let dir = vault_dir_from_host(host, state.active_vault_id().await)
+        .map_err(AttachmentImportError::from)?;
+    let result = attachment_import_with_dir(io, host, &dir, state, source).await;
+    // MYND-468: a fresh import (not a dedup hit) is a local sync change — the
+    // blob + catalog must push on the next coalesced cycle.
+    if matches!(&result, Ok(imported) if !imported.deduplicated) {
+        hooks.bump_local_change();
+    }
+    result
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn attachment_import<R: Runtime>(
     app: AppHandle<R>,
@@ -248,15 +284,14 @@ pub async fn attachment_import<R: Runtime>(
     hooks: State<'_, crate::hooks::Hooks>,
     source: ImportSource,
 ) -> Result<ImportedAttachment, AttachmentImportError> {
-    let dir =
-        vault_dir(&app, state.active_vault_id().await).map_err(AttachmentImportError::from)?;
-    let result = attachment_import_with_dir(&dir, state.inner(), source).await;
-    // MYND-468: a fresh import (not a dedup hit) is a local sync change — the
-    // blob + catalog must push on the next coalesced cycle.
-    if matches!(&result, Ok(imported) if !imported.deduplicated) {
-        hooks.bump_local_change();
-    }
-    result
+    attachment_import_from_host(
+        &TauriHost::new(app),
+        &crate::vault_io::StdVaultIo,
+        state.inner(),
+        hooks.inner(),
+        source,
+    )
+    .await
 }
 
 /// Testable core of [`attachment_import`] — the **extraction-free** import
@@ -272,11 +307,13 @@ pub async fn attachment_import<R: Runtime>(
 /// the computed id, else encode + `atomic_write` the `MYA1` blob and
 /// upsert + `atomic_write` the `MYC1` catalog. Returns the id + metadata.
 pub async fn attachment_import_with_dir(
+    io: &dyn VaultIo,
+    host: &dyn HostCtx,
     vault_dir: &Path,
     state: &VaultRuntimeState,
     source: ImportSource,
 ) -> Result<ImportedAttachment, AttachmentImportError> {
-    attachment_import_with_dir_ext(vault_dir, state, source, None, no_op_extract).await
+    attachment_import_with_dir_ext(io, host, vault_dir, state, source, None, no_op_extract).await
 }
 
 /// No-op text extractor: reports every input as `Unsupported`, so the eager
@@ -296,6 +333,8 @@ fn no_op_extract(_content_type: &str, _filename: &str, _bytes: &[u8]) -> Extract
 /// extractor (eager `MYE1` cache — search parity); mobile / the core command
 /// pass [`no_op_extract`] (no extraction step).
 pub async fn attachment_import_with_dir_ext<F>(
+    io: &dyn VaultIo,
+    host: &dyn HostCtx,
     vault_dir: &Path,
     state: &VaultRuntimeState,
     source: ImportSource,
@@ -321,21 +360,27 @@ where
         ImportSource::Bytes { bytes, filename } => (Zeroizing::new(bytes), filename),
         ImportSource::Path { path } => {
             let p = PathBuf::from(path);
-            // Reject an over-cap file BEFORE reading it into RAM: `std::fs::read`
-            // on a huge picked / drag-dropped file (e.g. a multi-GB video) would
-            // allocate the whole file and OOM the host before the `len()` cap
-            // check below could fire. The Bytes arm is already materialized by the
-            // WebView, so only the Path arm (host reads the file) needs this.
-            if std::fs::metadata(&p)
-                .map_err(AttachmentImportError::from)?
-                .len()
-                > MAX_ATTACHMENT_IMPORT_LEN as u64
-            {
+            // Bound the allocation BEFORE reading the whole file: a huge picked /
+            // drag-dropped file (e.g. a multi-GB video) would otherwise be pulled
+            // into RAM in full and OOM the host before the `len()` cap check
+            // below could fire. The Bytes arm is already materialized by the
+            // WebView, so only the Path arm (the host reads the file) needs this.
+            //
+            // A **prefix read of cap+1** rather than a `metadata()` size probe
+            // (task 44): it needs no seam method beyond the two the storage seam
+            // already has, it costs one syscall instead of two, and it closes a
+            // TOCTOU the size probe left open — a file that grows between the
+            // `stat` and the read used to be read in full anyway. `cap+1` bytes
+            // arriving means "at least cap+1", which is over.
+            let bytes = io
+                .read_prefix(&p, MAX_ATTACHMENT_IMPORT_LEN + 1)
+                .await
+                .map_err(AttachmentImportError::from)?;
+            if bytes.len() > MAX_ATTACHMENT_IMPORT_LEN {
                 return Err(AttachmentImportError::Oversize {
                     cap_bytes: MAX_ATTACHMENT_IMPORT_LEN,
                 });
             }
-            let bytes = std::fs::read(&p).map_err(AttachmentImportError::from)?;
             // Derive the display name from the final path component; the
             // raw path itself is DENY-listed and never logged.
             let name = p
@@ -385,10 +430,11 @@ where
     tracing::debug!(stage = "slot_check", outcome = "vault_unlocked");
 
     // (5) Read vault.meta → account_number_hash (catalog AAD identity).
-    let account_number_hash = match read_account_number_hash(&vault_dir.join("vault.meta"))? {
-        Ok(h) => h,
-        Err(MetaParseFailed) => return Err(AttachmentImportError::InvalidVaultMeta),
-    };
+    let account_number_hash =
+        match read_account_number_hash(io, &vault_dir.join("vault.meta")).await? {
+            Ok(h) => h,
+            Err(MetaParseFailed) => return Err(AttachmentImportError::InvalidVaultMeta),
+        };
 
     // (6) Content-addressed id (keyed under root_key; stable within the
     //     vault, no cross-vault equality oracle).
@@ -403,7 +449,7 @@ where
     //     EXISTING entry verbatim (no re-store, no timestamp churn).
     let catalog_key = derive_subkey(&root_key, SubkeyRole::AttachmentsCatalogKey);
     let catalog_path = vault_dir.join("vault.attachments");
-    let mut catalog = read_catalog(&catalog_path, &catalog_key, &account_number_hash)?;
+    let mut catalog = read_catalog(io, &catalog_path, &catalog_key, &account_number_hash).await?;
 
     // A TOMBSTONED entry (deleted, awaiting sync propagation — MYND-468) is
     // treated as absent: re-importing the same file is the deliberate re-add
@@ -427,7 +473,7 @@ where
         .filter(|f| !f.trim().is_empty())
         .unwrap_or_else(|| auto_filename(content_type));
     let size = file_bytes.len() as u64;
-    let created_at = created_at_override.unwrap_or_else(now_unix_secs);
+    let created_at = created_at_override.unwrap_or_else(|| host.now_unix_secs());
 
     // (10) Encode the MYA1 blob on a blocking thread (random key + nonces
     //      from getrandom; AEAD seal under items_key → attachment_key).
@@ -438,72 +484,126 @@ where
     let content_type_owned = content_type.to_string();
     // MYND-328: eager text extraction → MYE1 cache, done on the same blocking
     // thread (extraction is CPU work) right after the source blob lands. Derive
-    // the attachment-text KEK + clone the inputs the closure needs.
+    // the attachment-text KEK + clone the inputs the closure needs. The KEK has
+    // exactly one consumer — the cache write below — which task 90 compiled out
+    // of wasm32, so on that target deriving it would be work with no reader.
+    #[cfg(not(target_arch = "wasm32"))]
     let attachment_text_key = derive_subkey(&root_key, SubkeyRole::AttachmentTextKey);
     let filename_for_extract = filename.clone();
-    let vault_dir_for_cache = vault_dir.to_path_buf();
-    let join = tokio::task::spawn_blocking(move || -> Result<(), AttachmentImportError> {
-        let blob = encode_attachment_blob(
-            &items_key,
-            &items_key_id,
-            &attachment_id,
-            content_type_owned.as_bytes(),
-            &file_bytes,
-        )
-        .map_err(|_| AttachmentImportError::EncodeFailed)?;
-        // Ensure the attachments/ directory exists, then create-only
-        // write (the id is content-addressed; a pre-existing blob would
-        // mean the catalog dedup missed — treat AlreadyExists as a
-        // benign already-stored, not an error).
-        std::fs::create_dir_all(&attachments_dir)?;
-        match crate::atomic_write::atomic_write(&blob_path, &blob, /* replace = */ false) {
-            Ok(()) => {}
-            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {}
-            Err(e) => return Err(AttachmentImportError::from(e)),
-        }
-
-        // MYND-328: extract text from the (still-in-scope) plaintext and cache
-        // it under MYE1. Best-effort + non-fatal — a failed extraction or cache
-        // write must never fail the import; the lazy backfill (search rebuild)
-        // retries. Unsupported formats (e.g. images) are NOT cached — their
-        // O(1) dispatch is cheap to repeat and a cache blob per image is waste.
-        let extracted = extract(&content_type_owned, &filename_for_extract, &file_bytes);
-        if extracted.status != super::extract_types::ExtractStatus::Unsupported
-            && super::text_cache::write_extracted(
-                &vault_dir_for_cache,
-                &attachment_text_key,
-                &account_number_hash,
+    // Only the CPU work stays inside `run_blocking` (task 44): the AEAD seal and
+    // the text extraction. Every byte that reaches storage now goes through the
+    // seam below, whose native arm dispatches its own blocking — so a browser,
+    // where `run_blocking` runs its closure inline, no longer has `std::fs`
+    // inside it.
+    let join = crate::task::run_blocking(
+        move || -> Result<(Vec<u8>, Option<ExtractedText>), AttachmentImportError> {
+            let blob = encode_attachment_blob(
+                &items_key,
+                &items_key_id,
                 &attachment_id,
-                &extracted,
+                content_type_owned.as_bytes(),
+                &file_bytes,
             )
-            .is_err()
+            .map_err(|_| AttachmentImportError::EncodeFailed)?;
+
+            // MYND-328: extract text from the (still-in-scope) plaintext for the
+            // MYE1 cache. Unsupported formats (e.g. images) are NOT cached —
+            // their O(1) dispatch is cheap to repeat and a cache blob per image
+            // is waste — so an unsupported result is dropped here rather than
+            // carried out to a write that would skip it anyway.
+            let extracted = extract(&content_type_owned, &filename_for_extract, &file_bytes);
+            let cacheable = (extracted.status != super::extract_types::ExtractStatus::Unsupported)
+                .then_some(extracted);
+            Ok((blob, cacheable))
+        },
+    )
+    .await;
+    let (blob, cacheable) = match join {
+        Err(_join) => {
+            tracing::error!(
+                stage = "spawn_blocking_join",
+                error_kind = "JoinFailure",
+                "attachment_import encode worker panicked or runtime shutdown"
+            );
+            return Err(AttachmentImportError::JoinFailure);
+        }
+        Ok(Err(e)) => {
+            tracing::error!(
+                stage = "blob_encode",
+                error_kind = attachment_import_error_kind(&e),
+                "attachment_import blob encode failed"
+            );
+            return Err(e);
+        }
+        Ok(Ok(pair)) => pair,
+    };
+
+    // Ensure `attachments/` exists, then create-only write. The id is
+    // content-addressed, so a pre-existing blob means the catalog dedup missed
+    // and the bytes on disk are the SAME bytes — benign already-stored, not an
+    // error.
+    //
+    // "Already exists" is recovered by ASKING rather than by widening the seam's
+    // closed `IoFailureKind` (the `note_create` discipline): the enum crosses
+    // the IPC boundary and is matched exhaustively in TypeScript, so a fifth
+    // variant would be a two-language change to express one cheaply-observable
+    // condition. The catalog write mutex is held across this, so the
+    // check-after-failure is not a same-process TOCTOU; a lost cross-process
+    // race fails loudly rather than replacing a blob, which is the safe
+    // direction for a create-only write.
+    if let Err(io_error_kind) = io.create_dir_all(&attachments_dir).await {
+        tracing::error!(
+            stage = "attachments_dir",
+            error_kind = "Io",
+            io_failure_kind = ?io_error_kind,
+            "attachment_import could not create the attachments directory"
+        );
+        return Err(AttachmentImportError::Io { io_error_kind });
+    }
+    if let Err(io_error_kind) = io.write(&blob_path, &blob, WriteOpts::create_new()).await {
+        if !io.exists(&blob_path).await.unwrap_or(false) {
+            tracing::error!(
+                stage = "blob_write",
+                error_kind = "Io",
+                io_failure_kind = ?io_error_kind,
+                "attachment_import blob write failed"
+            );
+            return Err(AttachmentImportError::Io { io_error_kind });
+        }
+    }
+
+    // Best-effort + non-fatal MYE1 cache write — a failed cache write must never
+    // fail the import; the lazy backfill (search rebuild) retries.
+    //
+    // Native-only, and the `cfg` is the point (task 90): attachment-content
+    // search is absent on web, so `text_cache`'s producers do not compile for
+    // wasm32 at all. Dropping `cacheable` here rather than gating the extractor
+    // call keeps the closure above target-independent — the web build passes
+    // `no_op_extract`, so `cacheable` is already `None` and the drop is a no-op
+    // in practice; the `cfg` is what stops a future caller from making it one in
+    // theory and a written `MYE1` blob in fact.
+    #[cfg(target_arch = "wasm32")]
+    drop(cacheable);
+    #[cfg(not(target_arch = "wasm32"))]
+    if let Some(extracted) = cacheable {
+        // NOT through the seam, and that is the boundary this task drew: the
+        // MYE1 producers stay on `std::fs`, which is sound because they are now
+        // compiled out of the one target that has no `std::fs` (see the
+        // "Why the producers stop at wasm32" note in `text_cache.rs`).
+        if super::text_cache::write_extracted(
+            vault_dir,
+            &attachment_text_key,
+            &account_number_hash,
+            &attachment_id,
+            &extracted,
+        )
+        .is_err()
         {
             tracing::debug!(
                 stage = "text_cache_write",
                 "MYE1 cache write failed (non-fatal; lazy backfill retries)"
             );
         }
-        Ok(())
-    })
-    .await;
-    match join {
-        Err(_join) => {
-            tracing::error!(
-                stage = "spawn_blocking_join",
-                error_kind = "JoinFailure",
-                "attachment_import encode/write worker panicked or runtime shutdown"
-            );
-            return Err(AttachmentImportError::JoinFailure);
-        }
-        Ok(Err(e)) => {
-            tracing::error!(
-                stage = "blob_write",
-                error_kind = attachment_import_error_kind(&e),
-                "attachment_import blob encode/write failed"
-            );
-            return Err(e);
-        }
-        Ok(Ok(())) => {}
     }
 
     // (11) Upsert the catalog entry + atomic-write the catalog. The blob
@@ -517,8 +617,9 @@ where
     );
     let catalog_bytes = encode_attachments_catalog(&catalog_key, &account_number_hash, &catalog)
         .map_err(|_| AttachmentImportError::EncodeFailed)?;
-    crate::atomic_write::atomic_write(&catalog_path, &catalog_bytes, /* replace = */ true)
-        .map_err(AttachmentImportError::from)?;
+    io.write(&catalog_path, &catalog_bytes, WriteOpts::default())
+        .await
+        .map_err(|io_error_kind| AttachmentImportError::Io { io_error_kind })?;
 
     tracing::info!(stage = "success", event = "attachment_imported");
     Ok(ImportedAttachment {
@@ -571,17 +672,35 @@ pub struct CatalogEntry {
 /// (§ 9.10.4) — only the slot gate + the `vault.meta` read surface as
 /// errors. Returns the rows sorted by id (the catalog's `BTreeMap`
 /// iteration order).
+pub async fn catalog_list_from_host(
+    host: &dyn HostCtx,
+    io: &dyn VaultIo,
+    state: &VaultRuntimeState,
+) -> Result<Vec<CatalogEntry>, CatalogListError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(CatalogListError::from)?;
+    catalog_list_with_dir(io, &dir, state).await
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn catalog_list<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
 ) -> Result<Vec<CatalogEntry>, CatalogListError> {
-    let dir = vault_dir(&app, state.active_vault_id().await).map_err(CatalogListError::from)?;
-    catalog_list_with_dir(&dir, state.inner()).await
+    catalog_list_from_host(
+        &TauriHost::new(app),
+        &crate::vault_io::StdVaultIo,
+        state.inner(),
+    )
+    .await
 }
 
 /// Testable core of [`catalog_list`].
 pub(crate) async fn catalog_list_with_dir(
+    io: &dyn VaultIo,
     vault_dir: &Path,
     state: &VaultRuntimeState,
 ) -> Result<Vec<CatalogEntry>, CatalogListError> {
@@ -590,14 +709,16 @@ pub(crate) async fn catalog_list_with_dir(
         .await
         .ok_or(CatalogListError::Locked)?;
 
-    let account_number_hash = match read_account_number_hash(&vault_dir.join("vault.meta"))? {
-        Ok(h) => h,
-        Err(MetaParseFailed) => return Err(CatalogListError::InvalidVaultMeta),
-    };
+    let account_number_hash =
+        match read_account_number_hash(io, &vault_dir.join("vault.meta")).await? {
+            Ok(h) => h,
+            Err(MetaParseFailed) => return Err(CatalogListError::InvalidVaultMeta),
+        };
 
     let catalog_key = derive_subkey(&root_key, SubkeyRole::AttachmentsCatalogKey);
     let catalog_path = vault_dir.join("vault.attachments");
-    let catalog = read_catalog_or_empty(&catalog_path, &catalog_key, &account_number_hash);
+    let catalog =
+        read_catalog_or_empty(io, &catalog_path, &catalog_key, &account_number_hash).await;
 
     let rows: Vec<CatalogEntry> = catalog
         .entries
@@ -642,14 +763,30 @@ pub(crate) async fn catalog_list_with_dir(
 /// to under-report references. Returns the unused rows in catalog id order
 /// (the `BTreeMap` iteration order), each a [`CatalogEntry`] the dialog
 /// renders (thumbnail / filename / size).
+pub async fn attachment_unused_list_from_host(
+    host: &dyn HostCtx,
+    io: &dyn VaultIo,
+    state: &VaultRuntimeState,
+) -> Result<Vec<CatalogEntry>, AttachmentUnusedListError> {
+    let dir = vault_dir_from_host(host, state.active_vault_id().await)
+        .map_err(AttachmentUnusedListError::from)?;
+    attachment_unused_list_with_dir(io, &dir, state, host.now_unix_secs()).await
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn attachment_unused_list<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
 ) -> Result<Vec<CatalogEntry>, AttachmentUnusedListError> {
-    let dir =
-        vault_dir(&app, state.active_vault_id().await).map_err(AttachmentUnusedListError::from)?;
-    attachment_unused_list_with_dir(&dir, state.inner(), now_unix_secs()).await
+    attachment_unused_list_from_host(
+        &TauriHost::new(app),
+        &crate::vault_io::StdVaultIo,
+        state.inner(),
+    )
+    .await
 }
 
 /// Testable core of [`attachment_unused_list`]. `now` is the current UNIX time
@@ -657,10 +794,31 @@ pub async fn attachment_unused_list<R: Runtime>(
 /// [`UNUSED_CLEANUP_GRACE_SECS`] of it are withheld (SYNC-10). Pass
 /// `u64::MAX` to disable the grace window (unbounded "now" ⇒ nothing is recent).
 pub(crate) async fn attachment_unused_list_with_dir(
+    io: &dyn VaultIo,
     vault_dir: &Path,
     state: &VaultRuntimeState,
     now: u64,
 ) -> Result<Vec<CatalogEntry>, AttachmentUnusedListError> {
+    // Corpus-completeness gate (phase3-web-client task 89). BEFORE the scan, not
+    // after: computing an unused set the caller must not act on is work whose
+    // only possible use is to be ignored, and an implementation that computed it
+    // first would invite a later "just show it, greyed out" change that hands the
+    // user a wrong list.
+    //
+    // In `core/`, not the UI, so no caller can bypass it — and so a DESKTOP that
+    // enrolled and has never finished its first sync gets the same protection.
+    if !crate::plugins::sync::corpus::corpus_state(io, vault_dir)
+        .await
+        .permits_whole_corpus_sweep()
+    {
+        tracing::info!(
+            stage = "corpus_gate",
+            event = "unused_list_refused",
+            "attachment_unused_list refused: corpus not proven complete"
+        );
+        return Err(AttachmentUnusedListError::CorpusIncomplete);
+    }
+
     // Hold the slot guard across the whole compute (catalog read + note
     // scan) — the import/delete writer-guard pattern. Clone the material
     // once: root_key derives the catalog KEK; items_key + items_key_id
@@ -670,35 +828,39 @@ pub(crate) async fn attachment_unused_list_with_dir(
         .await
         .ok_or(AttachmentUnusedListError::Locked)?;
 
-    let account_number_hash = match read_account_number_hash(&vault_dir.join("vault.meta"))? {
-        Ok(h) => h,
-        Err(MetaParseFailed) => return Err(AttachmentUnusedListError::InvalidVaultMeta),
-    };
+    let account_number_hash =
+        match read_account_number_hash(io, &vault_dir.join("vault.meta")).await? {
+            Ok(h) => h,
+            Err(MetaParseFailed) => return Err(AttachmentUnusedListError::InvalidVaultMeta),
+        };
 
     // Hard-IO surfaces (`read_catalog`, not `read_catalog_or_empty`): a
     // masked-empty catalog would report a populated vault as "nothing to
     // clean". Absent catalog → empty → empty unused list (correct).
     let catalog_key = derive_subkey(&root_key, SubkeyRole::AttachmentsCatalogKey);
     let catalog = read_catalog(
+        io,
         &vault_dir.join("vault.attachments"),
         &catalog_key,
         &account_number_hash,
     )
+    .await
     .map_err(AttachmentUnusedListError::from)?;
 
     // Authoritative reference scan over ALL notes, fail-closed. Decrypts
     // every note → CPU/IO-bound → spawn_blocking. `items_key` +
     // `items_key_id` move into the closure (Zeroizing wipes on exit).
     let notes_dir = vault_dir.join("notes");
-    let referenced = tokio::task::spawn_blocking(move || {
-        crate::plugins::attachments::ref_scan::collect_referenced_attachment_ids(
-            &notes_dir,
-            &items_key,
-            &items_key_id,
-        )
-    })
-    .await
-    .map_err(|_join| AttachmentUnusedListError::JoinFailure)??;
+    // `run_blocking` is gone from this path rather than moved (task 44): the
+    // scan's reads dispatch their own blocking through the seam, and its decodes
+    // stay inline for the reason recorded on `collect_referenced_attachment_ids`.
+    let referenced = crate::plugins::attachments::ref_scan::collect_referenced_attachment_ids(
+        io,
+        &notes_dir,
+        &items_key,
+        &items_key_id,
+    )
+    .await?;
 
     let rows: Vec<CatalogEntry> = catalog
         .entries
@@ -758,7 +920,9 @@ pub struct CleanResult {
 /// by the unlock-time scan — rather than dangling catalog entries that would
 /// fail to open. `pub(crate)` so the crash-ordering test can stop here and
 /// assert "catalog updated, blob still present".
-pub(crate) fn rewrite_catalog_dropping_unused(
+pub(crate) async fn rewrite_catalog_dropping_unused(
+    io: &dyn VaultIo,
+    host: &dyn HostCtx,
     vault_dir: &Path,
     catalog_key: &[u8; 32],
     account_number_hash: &[u8; CATALOG_BLOB_ACCOUNT_HASH_LEN],
@@ -766,7 +930,8 @@ pub(crate) fn rewrite_catalog_dropping_unused(
     referenced: &std::collections::HashSet<String>,
 ) -> Result<(Vec<(String, u64)>, usize), AttachmentCleanUnusedError> {
     let catalog_path = vault_dir.join("vault.attachments");
-    let mut catalog = read_catalog(&catalog_path, catalog_key, account_number_hash)
+    let mut catalog = read_catalog(io, &catalog_path, catalog_key, account_number_hash)
+        .await
         .map_err(AttachmentCleanUnusedError::from)?;
 
     let mut survivors: Vec<(String, u64)> = Vec::new();
@@ -787,7 +952,7 @@ pub(crate) fn rewrite_catalog_dropping_unused(
         // MYND-468 (`sync-protocol.md` §11.4): swept entries become catalog
         // TOMBSTONES (not removals) so the deletion propagates to the fleet
         // and a stale catalog cannot resurrect them.
-        let deleted_at = now_unix_secs();
+        let deleted_at = host.now_unix_secs();
         for (id, _) in &survivors {
             if let Some(meta) = catalog.entries.get(id).cloned() {
                 catalog
@@ -797,7 +962,8 @@ pub(crate) fn rewrite_catalog_dropping_unused(
         }
         let catalog_bytes = encode_attachments_catalog(catalog_key, account_number_hash, &catalog)
             .map_err(|_| AttachmentCleanUnusedError::EncodeFailed)?;
-        crate::atomic_write::atomic_write(&catalog_path, &catalog_bytes, /* replace = */ true)
+        io.write(&catalog_path, &catalog_bytes, WriteOpts::default())
+            .await
             .map_err(AttachmentCleanUnusedError::from)?;
     }
 
@@ -816,16 +982,16 @@ pub(crate) fn rewrite_catalog_dropping_unused(
 /// erased. A note that cannot be read/decrypted during the re-verify aborts
 /// the whole sweep (`NoteScanFailed`) with nothing deleted — fail-closed,
 /// the same safety posture as `attachment_unused_list`.
-#[tauri::command]
-pub async fn attachment_clean_unused<R: Runtime>(
-    app: AppHandle<R>,
-    state: State<'_, VaultRuntimeState>,
-    hooks: State<'_, crate::hooks::Hooks>,
+pub async fn attachment_clean_unused_from_host(
+    host: &dyn HostCtx,
+    io: &dyn VaultIo,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
     ids: Vec<String>,
 ) -> Result<CleanResult, AttachmentCleanUnusedError> {
-    let dir =
-        vault_dir(&app, state.active_vault_id().await).map_err(AttachmentCleanUnusedError::from)?;
-    let result = attachment_clean_unused_with_dir(&dir, state.inner(), ids).await;
+    let dir = vault_dir_from_host(host, state.active_vault_id().await)
+        .map_err(AttachmentCleanUnusedError::from)?;
+    let result = attachment_clean_unused_with_dir(io, host, &dir, state, ids).await;
     // MYND-468: swept tombstones (catalog + queued records) must push.
     if matches!(&result, Ok(r) if r.deleted > 0) {
         hooks.bump_local_change();
@@ -833,8 +999,30 @@ pub async fn attachment_clean_unused<R: Runtime>(
     result
 }
 
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn attachment_clean_unused<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
+    ids: Vec<String>,
+) -> Result<CleanResult, AttachmentCleanUnusedError> {
+    attachment_clean_unused_from_host(
+        &TauriHost::new(app),
+        &crate::vault_io::StdVaultIo,
+        state.inner(),
+        hooks.inner(),
+        ids,
+    )
+    .await
+}
+
 /// Testable core of [`attachment_clean_unused`].
 pub async fn attachment_clean_unused_with_dir(
+    io: &dyn VaultIo,
+    host: &dyn HostCtx,
     vault_dir: &Path,
     state: &VaultRuntimeState,
     ids: Vec<String>,
@@ -848,15 +1036,35 @@ pub async fn attachment_clean_unused_with_dir(
         requested.push(hex_encode(&bytes)); // canonical lowercase
     }
 
+    // The same gate as `attachment_unused_list`, repeated here rather than
+    // trusted from there (phase3-web-client task 89). The list is advisory and
+    // this is the irreversible half: a browser tab that fetched the list while
+    // complete, then lost storage, then confirmed, would erase against a corpus
+    // that shrank underneath it. Re-checking at the destructive step is the same
+    // reason this command re-runs the whole reference scan instead of trusting
+    // the ids it was handed.
+    if !crate::plugins::sync::corpus::corpus_state(io, vault_dir)
+        .await
+        .permits_whole_corpus_sweep()
+    {
+        tracing::warn!(
+            stage = "corpus_gate",
+            event = "clean_unused_refused",
+            "attachment_clean_unused refused: corpus not proven complete"
+        );
+        return Err(AttachmentCleanUnusedError::CorpusIncomplete);
+    }
+
     let (_slots_guard, items_key, items_key_id, root_key) = state
         .hold_unlocked_attachment_material()
         .await
         .ok_or(AttachmentCleanUnusedError::Locked)?;
 
-    let account_number_hash = match read_account_number_hash(&vault_dir.join("vault.meta"))? {
-        Ok(h) => h,
-        Err(MetaParseFailed) => return Err(AttachmentCleanUnusedError::InvalidVaultMeta),
-    };
+    let account_number_hash =
+        match read_account_number_hash(io, &vault_dir.join("vault.meta")).await? {
+            Ok(h) => h,
+            Err(MetaParseFailed) => return Err(AttachmentCleanUnusedError::InvalidVaultMeta),
+        };
     let catalog_key = derive_subkey(&root_key, SubkeyRole::AttachmentsCatalogKey);
 
     // Authoritative re-verify scan over ALL notes (fail-closed). Decrypts
@@ -866,27 +1074,28 @@ pub async fn attachment_clean_unused_with_dir(
     // window between this scan and the catalog write below is not covered —
     // there is no vault-wide write lock in v0.1; Phase 2 sync revisit.)
     let notes_dir = vault_dir.join("notes");
-    let referenced = tokio::task::spawn_blocking(move || {
-        crate::plugins::attachments::ref_scan::collect_referenced_attachment_ids(
-            &notes_dir,
-            &items_key,
-            &items_key_id,
-        )
-    })
-    .await
-    .map_err(|_join| AttachmentCleanUnusedError::JoinFailure)??;
+    let referenced = crate::plugins::attachments::ref_scan::collect_referenced_attachment_ids(
+        io,
+        &notes_dir,
+        &items_key,
+        &items_key_id,
+    )
+    .await?;
 
     // Serialize the catalog RMW + unlinks against concurrent import/delete.
     let _write_guard = catalog_write_mutex().lock().await;
 
     // Catalog-first: drop survivors + rewrite the catalog, THEN unlink.
     let (survivors, skipped) = rewrite_catalog_dropping_unused(
+        io,
+        host,
         vault_dir,
         &catalog_key,
         &account_number_hash,
         &requested,
         &referenced,
-    )?;
+    )
+    .await?;
 
     // Queue each swept id's §11.4 blob-plane tombstone record (idempotent).
     // Best-effort per id — a failed queue write leaves the catalog tombstone
@@ -894,8 +1103,11 @@ pub async fn attachment_clean_unused_with_dir(
     // reclaim then waits for a later re-delete or the horizon.
     for (id, _) in &survivors {
         if let Some(idb) = hex_decode_id(id) {
-            if crate::plugins::sync::orchestrator::add_pending_attachment_tombstone(vault_dir, &idb)
-                .is_err()
+            if crate::plugins::sync::orchestrator::add_pending_attachment_tombstone(
+                io, vault_dir, &idb,
+            )
+            .await
+            .is_err()
             {
                 tracing::warn!(
                     stage = "tombstone_queue",
@@ -914,27 +1126,29 @@ pub async fn attachment_clean_unused_with_dir(
         // MYA1 blob would leave a "permanently deleted" attachment's searchable
         // plaintext recoverable. Best-effort-remove the MYE1 cache too.
         if let Some(idb) = hex_decode_id(id) {
-            if let Err(e) = super::text_cache::remove_extracted(vault_dir, &idb) {
+            if let Err(io_failure_kind) =
+                super::text_cache::remove_extracted(io, vault_dir, &idb).await
+            {
                 tracing::warn!(
                     stage = "text_cache_unlink",
-                    io_failure_kind = ?crate::io_failure_kind::from_io_error_kind(e.kind()),
+                    io_failure_kind = ?io_failure_kind,
                     "attachment_clean_unused MYE1 cache unlink failed; left as a stray"
                 );
             }
         }
-        match std::fs::remove_file(attachments_dir.join(id)) {
+        match io.remove_file(&attachments_dir.join(id)).await {
             Ok(()) => bytes_reclaimed += *size,
             // Already gone: the catalog entry is dropped regardless (still
             // "deleted"); no bytes to count (reclaimed earlier).
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+            Err(IoFailureKind::NotFound) => {}
             // Unlink failed AFTER the catalog commit: the attachment is
             // logically deleted (catalog entry gone); the blob is now a
             // catalog-less stray file the unlock-time scan reclaims. Don't
             // fail the sweep over a cleanup remnant — log + carry on.
-            Err(e) => {
+            Err(io_failure_kind) => {
                 tracing::warn!(
                     stage = "blob_unlink",
-                    io_failure_kind = ?crate::io_failure_kind::from_io_error_kind(e.kind()),
+                    io_failure_kind = ?io_failure_kind,
                     "attachment_clean_unused blob unlink failed post-catalog-commit; \
                      left as a stray file for the unlock-time scan"
                 );
@@ -968,7 +1182,7 @@ pub(crate) enum StrayReclaimOutcome {
     /// make every blob look "stray" and trigger a mass deletion on unlock.
     SkipUndecodableCatalog,
     /// Filesystem error reading the catalog or scanning the dir.
-    Io(std::io::ErrorKind),
+    Io(IoFailureKind),
 }
 
 /// Remove catalog-less attachment blobs from `attachments_dir` — the pure
@@ -977,24 +1191,24 @@ pub(crate) enum StrayReclaimOutcome {
 /// A cataloged id (incl. a zero-reference orphan the user has not swept) is
 /// NEVER removed; a non-hex name (`.tmp`, `.DS_Store`, an interrupted-import
 /// temp) is left untouched. Returns the count removed.
-pub(crate) fn reclaim_stray_blobs_in_dir(
+pub(crate) async fn reclaim_stray_blobs_in_dir(
+    io: &dyn VaultIo,
     attachments_dir: &Path,
     valid_ids: &std::collections::HashSet<String>,
-) -> std::io::Result<usize> {
-    let entries = match std::fs::read_dir(attachments_dir) {
+) -> Result<usize, IoFailureKind> {
+    let entries = match io.read_dir(attachments_dir).await {
         Ok(e) => e,
         // No attachments dir yet → nothing to reclaim.
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(0),
-        Err(e) => return Err(e),
+        Err(IoFailureKind::NotFound) => return Ok(0),
+        Err(kind) => return Err(kind),
     };
     let mut removed = 0usize;
     for entry in entries {
-        let entry = entry?;
-        let file_name = entry.file_name();
-        let Some(name) = file_name.to_str() else {
-            // Non-UTF-8 filename — leave it (never a canonical blob name).
-            continue;
-        };
+        // Non-UTF-8 names cannot reach here — the seam's `DirEntry::name` is a
+        // `String`, lossy-converted at the boundary — and a lossy-mangled name
+        // simply fails the canonical-hex check below, which is what the old
+        // `to_str()` arm did too.
+        let name = entry.name.as_str();
         // Touch ONLY canonical 64-char lowercase-hex final blob names.
         // `hex_decode_id` enforces exactly that (rejects uppercase, wrong
         // length, non-hex, and any suffix like `.tmp`).
@@ -1007,10 +1221,10 @@ pub(crate) fn reclaim_stray_blobs_in_dir(
         if valid_ids.contains(name) {
             continue;
         }
-        match std::fs::remove_file(entry.path()) {
+        match io.remove_file(&attachments_dir.join(name)).await {
             Ok(()) => removed += 1,
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
-            Err(e) => return Err(e),
+            Err(IoFailureKind::NotFound) => {}
+            Err(kind) => return Err(kind),
         }
     }
     Ok(removed)
@@ -1024,34 +1238,42 @@ pub(crate) fn reclaim_stray_blobs_in_dir(
 /// otherwise a transiently-corrupt catalog would mark every blob stray and
 /// delete the whole attachment store on unlock. A genuinely absent catalog
 /// (`NotFound`) is the empty set: any hex blob is then a true orphan.
-pub(crate) fn reclaim_stray_blobs(
+pub(crate) async fn reclaim_stray_blobs(
+    io: &dyn VaultIo,
     vault_dir: &Path,
     catalog_key: &[u8; 32],
     account_number_hash: &[u8; CATALOG_BLOB_ACCOUNT_HASH_LEN],
 ) -> StrayReclaimOutcome {
+    // Through `open_newest` (task 18/44): on the web store the catalog is two
+    // alternating copies, and the fail-closed branch below is only sound if
+    // "undecodable" means EVERY copy failed rather than "the newest file did".
+    // Getting that wrong here is the expensive direction — it would mark every
+    // blob stray and mass-delete the attachment store on unlock.
     let valid_ids: std::collections::HashSet<String> =
-        match std::fs::read(vault_dir.join("vault.attachments")) {
-            Ok(bytes) => {
-                match decode_attachments_catalog(catalog_key, account_number_hash, &bytes) {
-                    // Only LIVE entries protect a blob (MYND-468): a blob whose
-                    // entry is a tombstone is a crypto-erased leftover (e.g. a
-                    // crash between the catalog tombstone write and the unlink)
-                    // and is reclaimed like any stray.
-                    Ok(catalog) => catalog
-                        .entries
-                        .into_iter()
-                        .filter(|(_, meta)| !meta.is_tombstone())
-                        .map(|(id, _)| id)
-                        .collect(),
-                    Err(_) => return StrayReclaimOutcome::SkipUndecodableCatalog,
-                }
+        match crate::singleton::open_newest(io, &vault_dir.join("vault.attachments"), |bytes| {
+            decode_attachments_catalog(catalog_key, account_number_hash, bytes)
+        })
+        .await
+        {
+            // Only LIVE entries protect a blob (MYND-468): a blob whose entry is a
+            // tombstone is a crypto-erased leftover (e.g. a crash between the
+            // catalog tombstone write and the unlink) and is reclaimed like any
+            // stray.
+            Ok(catalog) => catalog
+                .entries
+                .into_iter()
+                .filter(|(_, meta)| !meta.is_tombstone())
+                .map(|(id, _)| id)
+                .collect(),
+            Err(crate::singleton::OpenOutcome::Absent) => std::collections::HashSet::new(),
+            Err(crate::singleton::OpenOutcome::Undecodable(_)) => {
+                return StrayReclaimOutcome::SkipUndecodableCatalog
             }
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => std::collections::HashSet::new(),
-            Err(e) => return StrayReclaimOutcome::Io(e.kind()),
+            Err(crate::singleton::OpenOutcome::Io(kind)) => return StrayReclaimOutcome::Io(kind),
         };
-    match reclaim_stray_blobs_in_dir(&vault_dir.join("attachments"), &valid_ids) {
+    match reclaim_stray_blobs_in_dir(io, &vault_dir.join("attachments"), &valid_ids).await {
         Ok(n) => StrayReclaimOutcome::Removed(n),
-        Err(e) => StrayReclaimOutcome::Io(e.kind()),
+        Err(kind) => StrayReclaimOutcome::Io(kind),
     }
 }
 
@@ -1061,11 +1283,13 @@ pub(crate) fn reclaim_stray_blobs(
 /// the catalog write mutex across the read+scan so it cannot race a
 /// concurrent import/delete catalog RMW (none can occur at unlock time in
 /// Phase 1's single window, but the guard keeps the invariant explicit).
-pub async fn reclaim_stray_attachment_blobs<R: Runtime>(
-    app: &AppHandle<R>,
+pub async fn reclaim_stray_attachment_blobs(
+    host: &dyn HostCtx,
+    io: &dyn VaultIo,
     state: &VaultRuntimeState,
 ) {
-    let Ok(vault_dir) = crate::paths::active_vault_root_io(app, state.active_vault_id().await)
+    let Ok(vault_dir) =
+        crate::paths::active_vault_root_io_from_host(host, state.active_vault_id().await)
     else {
         tracing::warn!(
             event = "stray_scan_skipped",
@@ -1078,46 +1302,39 @@ pub async fn reclaim_stray_attachment_blobs<R: Runtime>(
         tracing::warn!(event = "stray_scan_skipped", reason = "slot_not_unlocked");
         return;
     };
-    let account_number_hash = match read_account_number_hash(&vault_dir.join("vault.meta")) {
-        Ok(Ok(h)) => h,
-        Ok(Err(MetaParseFailed)) => {
-            tracing::warn!(event = "stray_scan_skipped", reason = "invalid_vault_meta");
-            return;
-        }
-        Err(e) => {
-            tracing::warn!(
-                event = "stray_scan_skipped",
-                reason = "meta_io",
-                io_failure_kind = ?crate::io_failure_kind::from_io_error_kind(e.kind()),
-            );
-            return;
-        }
-    };
+    let account_number_hash =
+        match read_account_number_hash(io, &vault_dir.join("vault.meta")).await {
+            Ok(Ok(h)) => h,
+            Ok(Err(MetaParseFailed)) => {
+                tracing::warn!(event = "stray_scan_skipped", reason = "invalid_vault_meta");
+                return;
+            }
+            Err(io_failure_kind) => {
+                tracing::warn!(
+                    event = "stray_scan_skipped",
+                    reason = "meta_io",
+                    io_failure_kind = ?io_failure_kind,
+                );
+                return;
+            }
+        };
     let catalog_key = derive_subkey(&root_key, SubkeyRole::AttachmentsCatalogKey);
 
     let _write_guard = catalog_write_mutex().lock().await;
-    let vault_dir_owned = vault_dir.clone();
-    let outcome = tokio::task::spawn_blocking(move || {
-        reclaim_stray_blobs(&vault_dir_owned, &catalog_key, &account_number_hash)
-    })
-    .await;
-
-    match outcome {
-        Ok(StrayReclaimOutcome::Removed(n)) if n > 0 => {
+    // No `run_blocking` wrapper any more: what this does is a catalog read, a
+    // directory walk and N unlinks — all IO, all dispatching their own blocking
+    // on the native arm. The one piece of CPU work, the catalog AEAD decode, is
+    // a single small blob.
+    match reclaim_stray_blobs(io, &vault_dir, &catalog_key, &account_number_hash).await {
+        StrayReclaimOutcome::Removed(n) if n > 0 => {
             tracing::info!(event = "stray_blobs_reclaimed", count = n);
         }
-        Ok(StrayReclaimOutcome::Removed(_)) => {}
-        Ok(StrayReclaimOutcome::SkipUndecodableCatalog) => {
+        StrayReclaimOutcome::Removed(_) => {}
+        StrayReclaimOutcome::SkipUndecodableCatalog => {
             tracing::warn!(event = "stray_scan_skipped", reason = "catalog_undecodable");
         }
-        Ok(StrayReclaimOutcome::Io(kind)) => {
-            tracing::warn!(
-                event = "stray_scan_io",
-                io_failure_kind = ?crate::io_failure_kind::from_io_error_kind(kind),
-            );
-        }
-        Err(_join) => {
-            tracing::warn!(event = "stray_scan_skipped", reason = "join_failure");
+        StrayReclaimOutcome::Io(io_failure_kind) => {
+            tracing::warn!(event = "stray_scan_io", io_failure_kind = ?io_failure_kind);
         }
     }
 }
@@ -1128,16 +1345,16 @@ pub async fn reclaim_stray_attachment_blobs<R: Runtime>(
 /// blob file and the catalog entry. NO auto-GC — the reference graph is
 /// the UI's concern; this is a deliberate user action. Deleting an
 /// absent id is idempotent `Ok(())`.
-#[tauri::command]
-pub async fn attachment_delete<R: Runtime>(
-    app: AppHandle<R>,
-    state: State<'_, VaultRuntimeState>,
-    hooks: State<'_, crate::hooks::Hooks>,
+pub async fn attachment_delete_from_host(
+    host: &dyn HostCtx,
+    io: &dyn VaultIo,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
     id: String,
 ) -> Result<(), AttachmentDeleteError> {
-    let dir =
-        vault_dir(&app, state.active_vault_id().await).map_err(AttachmentDeleteError::from)?;
-    let result = attachment_delete_with_dir(&dir, state.inner(), id).await;
+    let dir = vault_dir_from_host(host, state.active_vault_id().await)
+        .map_err(AttachmentDeleteError::from)?;
+    let result = attachment_delete_with_dir(io, host, &dir, state, id).await;
     // MYND-468: the catalog tombstone + queued blob-plane tombstone must push.
     if result.is_ok() {
         hooks.bump_local_change();
@@ -1145,8 +1362,30 @@ pub async fn attachment_delete<R: Runtime>(
     result
 }
 
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn attachment_delete<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
+    id: String,
+) -> Result<(), AttachmentDeleteError> {
+    attachment_delete_from_host(
+        &TauriHost::new(app),
+        &crate::vault_io::StdVaultIo,
+        state.inner(),
+        hooks.inner(),
+        id,
+    )
+    .await
+}
+
 /// Testable core of [`attachment_delete`].
 pub async fn attachment_delete_with_dir(
+    io: &dyn VaultIo,
+    host: &dyn HostCtx,
     vault_dir: &Path,
     state: &VaultRuntimeState,
     id: String,
@@ -1166,18 +1405,18 @@ pub async fn attachment_delete_with_dir(
         .await
         .ok_or(AttachmentDeleteError::Locked)?;
 
-    let account_number_hash = match read_account_number_hash(&vault_dir.join("vault.meta"))
-        .map_err(AttachmentDeleteError::from)?
-    {
-        Ok(h) => h,
-        Err(MetaParseFailed) => return Err(AttachmentDeleteError::InvalidVaultMeta),
-    };
+    let account_number_hash =
+        match read_account_number_hash(io, &vault_dir.join("vault.meta")).await? {
+            Ok(h) => h,
+            Err(MetaParseFailed) => return Err(AttachmentDeleteError::InvalidVaultMeta),
+        };
 
     let _write_guard = catalog_write_mutex().lock().await;
 
     let catalog_key = derive_subkey(&root_key, SubkeyRole::AttachmentsCatalogKey);
     let catalog_path = vault_dir.join("vault.attachments");
-    let mut catalog = read_catalog(&catalog_path, &catalog_key, &account_number_hash)
+    let mut catalog = read_catalog(io, &catalog_path, &catalog_key, &account_number_hash)
+        .await
         .map_err(AttachmentDeleteError::from)?;
 
     // Deletion under sync (MYND-468, `sync-protocol.md` §11.4): the entry is
@@ -1188,17 +1427,14 @@ pub async fn attachment_delete_with_dir(
     // them is retry-recoverable (a re-delete of a tombstoned id re-queues).
     let (was_present, needs_queue) = match catalog.entries.get(&id_hex) {
         Some(e) if !e.is_tombstone() => {
-            let tomb = e.clone().into_tombstone(now_unix_secs());
+            let tomb = e.clone().into_tombstone(host.now_unix_secs());
             catalog.entries.insert(id_hex.clone(), tomb);
             let catalog_bytes =
                 encode_attachments_catalog(&catalog_key, &account_number_hash, &catalog)
                     .map_err(|_| AttachmentDeleteError::EncodeFailed)?;
-            crate::atomic_write::atomic_write(
-                &catalog_path,
-                &catalog_bytes,
-                /* replace = */ true,
-            )
-            .map_err(AttachmentDeleteError::from)?;
+            io.write(&catalog_path, &catalog_bytes, WriteOpts::default())
+                .await
+                .map_err(AttachmentDeleteError::from)?;
             (true, true)
         }
         // Already tombstoned — an interrupted earlier delete; re-queue + re-erase.
@@ -1211,9 +1447,11 @@ pub async fn attachment_delete_with_dir(
     // server would never reclaim the body.
     if needs_queue {
         crate::plugins::sync::orchestrator::add_pending_attachment_tombstone(
+            io,
             vault_dir,
             &attachment_id,
         )
+        .await
         .map_err(|_| {
             AttachmentDeleteError::from(std::io::Error::other(
                 "attachment tombstone queue write failed",
@@ -1223,17 +1461,17 @@ pub async fn attachment_delete_with_dir(
 
     // Remove the blob file (idempotent on NotFound).
     let blob_path = vault_dir.join("attachments").join(&id_hex);
-    match std::fs::remove_file(&blob_path) {
+    match io.remove_file(&blob_path).await {
         Ok(()) => {}
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
-        Err(e) => {
+        Err(IoFailureKind::NotFound) => {}
+        Err(io_error_kind) => {
             tracing::error!(
                 stage = "blob_unlink",
                 error_kind = "Io",
-                io_failure_kind = ?crate::io_failure_kind::from_io_error_kind(e.kind()),
+                io_failure_kind = ?io_error_kind,
                 "attachment_delete blob unlink failed"
             );
-            return Err(AttachmentDeleteError::from(e));
+            return Err(AttachmentDeleteError::Io { io_error_kind });
         }
     }
 
@@ -1241,14 +1479,16 @@ pub async fn attachment_delete_with_dir(
     // derived text under a `root_key` subkey (NOT the erased per-attachment
     // key), so leaving it behind is decryptable residue of a deleted file —
     // delete it for cryptographic-erase parity with the MYA1 source (§9.15.4).
-    if let Err(e) = super::text_cache::remove_extracted(vault_dir, &attachment_id) {
+    if let Err(io_error_kind) =
+        super::text_cache::remove_extracted(io, vault_dir, &attachment_id).await
+    {
         tracing::error!(
             stage = "text_cache_unlink",
             error_kind = "Io",
-            io_failure_kind = ?crate::io_failure_kind::from_io_error_kind(e.kind()),
+            io_failure_kind = ?io_error_kind,
             "attachment_delete extracted-text cache unlink failed"
         );
-        return Err(AttachmentDeleteError::from(e));
+        return Err(AttachmentDeleteError::Io { io_error_kind });
     }
 
     tracing::info!(
@@ -1268,6 +1508,27 @@ pub async fn attachment_delete_with_dir(
 /// `filename` field changes; the blob, the id, and the on-disk filename
 /// (the id hex) are untouched. Renaming an absent id is `AttachmentNotFound`
 /// (a bug-canary — the UI only hands back catalog ids).
+pub async fn attachment_rename_from_host(
+    host: &dyn HostCtx,
+    io: &dyn VaultIo,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    id: String,
+    filename: String,
+) -> Result<(), AttachmentRenameError> {
+    let dir = vault_dir_from_host(host, state.active_vault_id().await)
+        .map_err(AttachmentRenameError::from)?;
+    let result = attachment_rename_with_dir(io, host, &dir, state, id, filename).await;
+    // MYND-468: the catalog's filename-LWW change must push.
+    if result.is_ok() {
+        hooks.bump_local_change();
+    }
+    result
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn attachment_rename<R: Runtime>(
     app: AppHandle<R>,
@@ -1276,18 +1537,21 @@ pub async fn attachment_rename<R: Runtime>(
     id: String,
     filename: String,
 ) -> Result<(), AttachmentRenameError> {
-    let dir =
-        vault_dir(&app, state.active_vault_id().await).map_err(AttachmentRenameError::from)?;
-    let result = attachment_rename_with_dir(&dir, state.inner(), id, filename).await;
-    // MYND-468: the catalog's filename-LWW change must push.
-    if result.is_ok() {
-        hooks.bump_local_change();
-    }
-    result
+    attachment_rename_from_host(
+        &TauriHost::new(app),
+        &crate::vault_io::StdVaultIo,
+        state.inner(),
+        hooks.inner(),
+        id,
+        filename,
+    )
+    .await
 }
 
 /// Testable core of [`attachment_rename`].
 pub(crate) async fn attachment_rename_with_dir(
+    io: &dyn VaultIo,
+    host: &dyn HostCtx,
     vault_dir: &Path,
     state: &VaultRuntimeState,
     id: String,
@@ -1316,18 +1580,18 @@ pub(crate) async fn attachment_rename_with_dir(
         .await
         .ok_or(AttachmentRenameError::Locked)?;
 
-    let account_number_hash = match read_account_number_hash(&vault_dir.join("vault.meta"))
-        .map_err(AttachmentRenameError::from)?
-    {
-        Ok(h) => h,
-        Err(MetaParseFailed) => return Err(AttachmentRenameError::InvalidVaultMeta),
-    };
+    let account_number_hash =
+        match read_account_number_hash(io, &vault_dir.join("vault.meta")).await? {
+            Ok(h) => h,
+            Err(MetaParseFailed) => return Err(AttachmentRenameError::InvalidVaultMeta),
+        };
 
     let _write_guard = catalog_write_mutex().lock().await;
 
     let catalog_key = derive_subkey(&root_key, SubkeyRole::AttachmentsCatalogKey);
     let catalog_path = vault_dir.join("vault.attachments");
-    let mut catalog = read_catalog(&catalog_path, &catalog_key, &account_number_hash)
+    let mut catalog = read_catalog(io, &catalog_path, &catalog_key, &account_number_hash)
+        .await
         .map_err(AttachmentRenameError::from)?;
 
     // A tombstoned entry is deleted — renaming it is NotFound (bug-canary;
@@ -1341,15 +1605,147 @@ pub(crate) async fn attachment_rename_with_dir(
     };
     entry.filename = filename;
     // The filename-LWW discriminator for the sync merge (§11.4 rule 4).
-    entry.updated_at = Some(now_unix_secs());
+    entry.updated_at = Some(host.now_unix_secs());
 
     let catalog_bytes = encode_attachments_catalog(&catalog_key, &account_number_hash, &catalog)
         .map_err(|_| AttachmentRenameError::EncodeFailed)?;
-    crate::atomic_write::atomic_write(&catalog_path, &catalog_bytes, /* replace = */ true)
+    io.write(&catalog_path, &catalog_bytes, WriteOpts::default())
+        .await
         .map_err(AttachmentRenameError::from)?;
 
     tracing::info!(stage = "success", event = "attachment_renamed");
     Ok(())
+}
+
+// ---- attachment_serve (phase3-web-client task 44) ------------------------
+
+/// One attachment's decrypted bytes plus the type they may be SERVED as.
+///
+/// The desktop equivalent is an `http::Response`; a browser has no HTTP layer
+/// between the vault and the `<img>`, so the same two fields cross as a value
+/// and the caller mints an object URL from them.
+#[derive(Debug)]
+pub struct ServedAttachment {
+    /// The RE-SNIFFED, allowlist-fenced type — never the catalog hint, never
+    /// `text/html`. Comes from [`super::sniff::served_content_type`], the one
+    /// place that decision is written down.
+    pub content_type: &'static str,
+    /// The decrypted bytes.
+    ///
+    /// **Not `Zeroizing`, and that is the honest shape rather than a slip.**
+    /// These are going straight into a `Blob` the browser owns and this process
+    /// cannot wipe; wrapping the Rust-side copy would zero one of two copies and
+    /// read as a guarantee that does not hold. Same reasoning the desktop serve
+    /// path already applies to its response body, under the V8-leak-dominance
+    /// argument in `src-tauri/CLAUDE.md`.
+    pub bytes: Vec<u8>,
+}
+
+/// Decrypt one attachment and return its bytes with a safe served type.
+///
+/// The browser half of `protocol.md` §9.9's serve path. Same decode as the
+/// desktop `attachment://` handler — id parse → catalog `content_type` (the
+/// inner AAD, so decode needs the SAME bytes) → blob read → AEAD open — and the
+/// same re-sniff afterwards, through the shared
+/// [`served_content_type`](super::sniff::served_content_type).
+///
+/// Every failure that could distinguish a tampered blob from a wrong-key one
+/// collapses to [`AttachmentServeError::Denied`] (§6.4).
+pub async fn attachment_serve_with_dir(
+    io: &dyn VaultIo,
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    id: &str,
+) -> Result<ServedAttachment, AttachmentServeError> {
+    // Strict id parse first — a bug canary; the UI only serves ids it rendered.
+    let attachment_id = hex_decode_id(id).ok_or(AttachmentServeError::Denied)?;
+    let id_hex = hex_encode(&attachment_id);
+
+    let Some((items_key, items_key_id, root_key)) = state.peek_unlocked_attachment_material().await
+    else {
+        return Err(AttachmentServeError::Locked);
+    };
+
+    let account_number_hash =
+        match read_account_number_hash(io, &vault_dir.join("vault.meta")).await? {
+            Ok(h) => h,
+            Err(MetaParseFailed) => return Err(AttachmentServeError::InvalidVaultMeta),
+        };
+
+    // The catalog carries the `content_type` bound into the blob's inner AAD at
+    // encode time, so a missing entry means the blob cannot be decoded at all —
+    // reported as not-found rather than denied, matching the desktop handler.
+    let catalog_key = derive_subkey(&root_key, SubkeyRole::AttachmentsCatalogKey);
+    let catalog = read_catalog(
+        io,
+        &vault_dir.join("vault.attachments"),
+        &catalog_key,
+        &account_number_hash,
+    )
+    .await?;
+    let content_type_hint = catalog
+        .entries
+        .get(&id_hex)
+        .filter(|meta| !meta.is_tombstone())
+        .map(|meta| meta.content_type.clone())
+        .ok_or(AttachmentServeError::NotFound)?;
+
+    let blob = match io.read(&vault_dir.join("attachments").join(&id_hex)).await {
+        Ok(b) => b,
+        Err(IoFailureKind::NotFound) => return Err(AttachmentServeError::NotFound),
+        Err(io_error_kind) => return Err(AttachmentServeError::Io { io_error_kind }),
+    };
+
+    // AEAD open is the CPU work and stays on the pool where there is one.
+    let join = crate::task::run_blocking(move || {
+        decode_attachment_blob(
+            &blob,
+            &attachment_id,
+            content_type_hint.as_bytes(),
+            &items_key,
+            &items_key_id,
+        )
+        .map_err(|_| AttachmentServeError::Denied)
+    })
+    .await;
+    let plaintext = match join {
+        Ok(Ok(p)) => p,
+        Ok(Err(e)) => {
+            // Non-distinguishing per §6.4 — tampered / cross-vault / wrong-key
+            // all arrive here as one outcome and leave as one.
+            tracing::debug!(stage = "serve_decode", outcome = "denied");
+            return Err(e);
+        }
+        Err(_join) => {
+            tracing::error!(stage = "spawn_blocking_join", error_kind = "JoinFailure");
+            return Err(AttachmentServeError::Denied);
+        }
+    };
+
+    let content_type = super::sniff::served_content_type(&plaintext);
+    let bytes = plaintext.to_vec();
+    drop(plaintext); // explicit wipe of the Zeroizing source
+
+    tracing::debug!(stage = "serve", outcome = "ok", content_type = content_type);
+    Ok(ServedAttachment {
+        content_type,
+        bytes,
+    })
+}
+
+/// Host-resolving wrapper for [`attachment_serve_with_dir`].
+pub async fn attachment_serve_from_host(
+    host: &dyn HostCtx,
+    io: &dyn VaultIo,
+    state: &VaultRuntimeState,
+    id: &str,
+) -> Result<ServedAttachment, AttachmentServeError> {
+    let dir = vault_dir_from_host(host, state.active_vault_id().await).map_err(|e| {
+        AttachmentServeError::Io {
+            io_error_kind: crate::io_failure_kind::from_io_error_kind(e.kind()),
+        }
+    })?;
+    attachment_serve_with_dir(io, &dir, state, id).await
 }
 
 // ---- shared catalog read helpers ----------------------------------------
@@ -1365,20 +1761,33 @@ pub(crate) async fn attachment_rename_with_dir(
 /// `note_export_attachments` (MYND-115 task 4) — there a masked-empty
 /// catalog would mis-report every referenced attachment as missing, so
 /// the hard-IO-error surface is the right one for it too.
-pub fn read_catalog(
+pub async fn read_catalog(
+    io: &dyn VaultIo,
     catalog_path: &Path,
     catalog_key: &[u8; 32],
     account_number_hash: &[u8; CATALOG_BLOB_ACCOUNT_HASH_LEN],
-) -> std::io::Result<AttachmentsCatalog> {
-    match std::fs::read(catalog_path) {
-        Ok(bytes) => Ok(read_or_empty(
-            catalog_key,
-            account_number_hash,
-            Some(&bytes),
-        )),
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(AttachmentsCatalog::empty()),
-        Err(e) => Err(e),
+) -> Result<AttachmentsCatalog, IoFailureKind> {
+    // `read_candidates`, not `read`, and the difference is only visible on the
+    // web store: a corrupt NEWEST copy of a double-buffered catalog must fall
+    // back to the older intact one rather than collapsing to the empty catalog
+    // that `read_or_empty` would produce — because the very next thing several
+    // callers do is write the catalog back, which would make an empty read
+    // permanent. Native is unchanged: the default `read_candidates` yields one
+    // element there, so this is the same read followed by the same decode.
+    let candidates = io.read_candidates(catalog_path).await?;
+    for bytes in &candidates {
+        if let Ok(catalog) = decode_attachments_catalog(catalog_key, account_number_hash, bytes) {
+            return Ok(catalog);
+        }
     }
+    // Absent, or present and undecodable: § 9.10.4's fall-back-to-empty. The
+    // `read_or_empty` call is kept for the present-but-undecodable arm so this
+    // stays the protocol crate's decision rather than a second copy of it.
+    Ok(read_or_empty(
+        catalog_key,
+        account_number_hash,
+        candidates.first().map(|b| b.as_slice()),
+    ))
 }
 
 /// Closed failure surface of [`load_catalog_for_export`] — the two
@@ -1390,10 +1799,10 @@ pub enum CatalogLoadError {
     /// identity cannot be derived.
     InvalidVaultMeta,
     /// IO failure reading `vault.meta`.
-    MetaIo(std::io::ErrorKind),
+    MetaIo(IoFailureKind),
     /// Hard IO failure reading `vault.attachments` (absence is NOT an
     /// error — it decodes to the empty catalog per [`read_catalog`]).
-    CatalogIo(std::io::ErrorKind),
+    CatalogIo(IoFailureKind),
 }
 
 /// The full catalog-for-export ritual, owned by the attachments
@@ -1404,22 +1813,26 @@ pub enum CatalogLoadError {
 /// (`plugins::export`) — both read-only consumers where a
 /// masked-empty catalog would mis-report referenced attachments as
 /// missing, so the hard-IO-error surface is the right one.
-pub fn load_catalog_for_export(
+pub async fn load_catalog_for_export(
+    io: &dyn VaultIo,
     vault_root: &Path,
     root_key: &[u8; 32],
 ) -> Result<AttachmentsCatalog, CatalogLoadError> {
-    let account_number_hash = match read_account_number_hash(&vault_root.join("vault.meta")) {
-        Ok(Ok(h)) => h,
-        Ok(Err(MetaParseFailed)) => return Err(CatalogLoadError::InvalidVaultMeta),
-        Err(e) => return Err(CatalogLoadError::MetaIo(e.kind())),
-    };
+    let account_number_hash =
+        match read_account_number_hash(io, &vault_root.join("vault.meta")).await {
+            Ok(Ok(h)) => h,
+            Ok(Err(MetaParseFailed)) => return Err(CatalogLoadError::InvalidVaultMeta),
+            Err(kind) => return Err(CatalogLoadError::MetaIo(kind)),
+        };
     let catalog_key = derive_subkey(root_key, SubkeyRole::AttachmentsCatalogKey);
     read_catalog(
+        io,
         &vault_root.join("vault.attachments"),
         &catalog_key,
         &account_number_hash,
     )
-    .map_err(|e| CatalogLoadError::CatalogIo(e.kind()))
+    .await
+    .map_err(CatalogLoadError::CatalogIo)
 }
 
 // ---- attachment_export --------------------------------------------------
@@ -1432,6 +1845,22 @@ pub fn load_catalog_for_export(
 /// RAM and written via `atomic_write_unclobbered`; it never crosses back
 /// into the WebView. This is the TB3 user-initiated-egress exception: the
 /// destination is plaintext by the user's own intent.
+pub async fn attachment_export_from_host(
+    host: &dyn HostCtx,
+    io: &dyn VaultIo,
+    state: &VaultRuntimeState,
+    id: String,
+    destination: String,
+    overwrite: bool,
+) -> Result<(), AttachmentExportError> {
+    let dir = vault_dir_from_host(host, state.active_vault_id().await)
+        .map_err(AttachmentExportError::from)?;
+    attachment_export_with_dir(io, &dir, state, &id, PathBuf::from(destination), overwrite).await
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn attachment_export<R: Runtime>(
     app: AppHandle<R>,
@@ -1440,13 +1869,12 @@ pub async fn attachment_export<R: Runtime>(
     destination: String,
     overwrite: bool,
 ) -> Result<(), AttachmentExportError> {
-    let dir =
-        vault_dir(&app, state.active_vault_id().await).map_err(AttachmentExportError::from)?;
-    attachment_export_with_dir(
-        &dir,
+    attachment_export_from_host(
+        &TauriHost::new(app),
+        &crate::vault_io::StdVaultIo,
         state.inner(),
-        &id,
-        PathBuf::from(destination),
+        id,
+        destination,
         overwrite,
     )
     .await
@@ -1456,6 +1884,7 @@ pub async fn attachment_export<R: Runtime>(
 /// attachment (image / PDF / opaque generic) — the chip's Export action
 /// and the image/PDF Save-As affordance both call it.
 pub(crate) async fn attachment_export_with_dir(
+    io: &dyn VaultIo,
     vault_dir: &Path,
     state: &VaultRuntimeState,
     id: &str,
@@ -1486,12 +1915,15 @@ pub(crate) async fn attachment_export_with_dir(
     };
 
     // (3) Catalog lookup → the content_type (AAD) + existence check.
-    let catalog = load_catalog_for_export(vault_dir, &root_key).map_err(|e| match e {
-        CatalogLoadError::InvalidVaultMeta => AttachmentExportError::InvalidVaultMeta,
-        CatalogLoadError::MetaIo(k) | CatalogLoadError::CatalogIo(k) => AttachmentExportError::Io {
-            io_error_kind: crate::io_failure_kind::from_io_error_kind(k),
-        },
-    })?;
+    let catalog = load_catalog_for_export(io, vault_dir, &root_key)
+        .await
+        .map_err(|e| match e {
+            CatalogLoadError::InvalidVaultMeta => AttachmentExportError::InvalidVaultMeta,
+            CatalogLoadError::MetaIo(io_error_kind)
+            | CatalogLoadError::CatalogIo(io_error_kind) => {
+                AttachmentExportError::Io { io_error_kind }
+            }
+        })?;
     let Some(meta) = catalog.entries.get(id) else {
         tracing::debug!(stage = "catalog_lookup", outcome = "not_found");
         return Err(AttachmentExportError::NotFound);
@@ -1505,14 +1937,18 @@ pub(crate) async fn attachment_export_with_dir(
     //     a pre-existing user file shaped like its own temp sibling safe
     //     (115-F1); `overwrite=false` rejects an existing target untouched.
     let blob_path = vault_dir.join("attachments").join(id);
-    let join = tokio::task::spawn_blocking(move || -> Result<(), AttachmentExportError> {
-        let blob = match std::fs::read(&blob_path) {
-            Ok(b) => b,
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-                return Err(AttachmentExportError::NotFound);
-            }
-            Err(e) => return Err(AttachmentExportError::from(e)),
-        };
+    // The blob read moved OUT of `run_blocking` and onto the IO seam (task 44);
+    // the AEAD decode and the destination write stay inside it. That split is
+    // what the export path needs anyway: the DESTINATION is a user-chosen path
+    // outside the vault, and `atomic_write_unclobbered`'s temp-file dance is a
+    // host filesystem affordance with no OPFS analogue — which is exactly why
+    // task 48 decides web's export shape separately rather than porting this.
+    let blob = match io.read(&blob_path).await {
+        Ok(b) => b,
+        Err(IoFailureKind::NotFound) => return Err(AttachmentExportError::NotFound),
+        Err(io_error_kind) => return Err(AttachmentExportError::Io { io_error_kind }),
+    };
+    let join = crate::task::run_blocking(move || -> Result<(), AttachmentExportError> {
         let bytes = decode_attachment_blob(
             &blob,
             &id_bytes,
@@ -1570,15 +2006,15 @@ fn attachment_export_error_kind(e: &AttachmentExportError) -> &'static str {
 /// the empty catalog — the read-only `catalog_list` path, where a
 /// transient IO error showing an empty library is acceptable (the next
 /// list retries) and where no destructive write follows.
-fn read_catalog_or_empty(
+async fn read_catalog_or_empty(
+    io: &dyn VaultIo,
     catalog_path: &Path,
     catalog_key: &[u8; 32],
     account_number_hash: &[u8; CATALOG_BLOB_ACCOUNT_HASH_LEN],
 ) -> AttachmentsCatalog {
-    match std::fs::read(catalog_path) {
-        Ok(bytes) => read_or_empty(catalog_key, account_number_hash, Some(&bytes)),
-        Err(_) => AttachmentsCatalog::empty(),
-    }
+    read_catalog(io, catalog_path, catalog_key, account_number_hash)
+        .await
+        .unwrap_or_else(|_| AttachmentsCatalog::empty())
 }
 
 #[cfg(test)]
@@ -1646,6 +2082,169 @@ mod tests {
         seed_vault_meta(tmp.path(), SEED_ACCOUNT_HASH);
         let state = unlocked_state().await;
         (tmp, state)
+    }
+
+    // ── the two seams, filled in for the ~180 call sites below ──────────────
+    //
+    // Task 44 gave every core here `io: &dyn VaultIo` and (where it needs a
+    // clock) `host: &dyn HostCtx`. Rewriting each call site to thread both would
+    // have buried the behavioural diff in mechanical noise, so the shims below
+    // shadow the now-wider cores with the OLD signatures and supply the real
+    // `StdVaultIo` — the same move task 45 made for `themes`.
+    //
+    // They are shims, not fakes: every one drives the production function
+    // against a real temp directory. A stub `VaultIo` would only have proved the
+    // signatures compile.
+
+    fn io() -> &'static crate::vault_io::StdVaultIo {
+        &crate::vault_io::StdVaultIo
+    }
+
+    /// A host whose clock is the REAL wall clock.
+    ///
+    /// [`TestHost`]'s default is a fixed synthetic epoch, which is the right
+    /// default for a test that asserts on time — but these tests assert
+    /// `created_at` / `deleted_at` against `SystemTime::now()`-shaped
+    /// expectations, exactly as the production `now_unix_secs()` they replaced
+    /// produced. Pinning the clock here would have changed what the suite tests
+    /// rather than what the code does.
+    fn host() -> crate::host::test_host::TestHost {
+        let h = crate::host::test_host::TestHost::new("/nonexistent-attachments-test-host");
+        h.set_now(
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_secs())
+                .unwrap_or(0),
+        );
+        h
+    }
+
+    async fn attachment_import_with_dir(
+        vault_dir: &Path,
+        state: &VaultRuntimeState,
+        source: ImportSource,
+    ) -> Result<ImportedAttachment, AttachmentImportError> {
+        super::attachment_import_with_dir(io(), &host(), vault_dir, state, source).await
+    }
+
+    // Unused by this module's own tests (the desktop crate's `import_desktop`
+    // tests are the ones that inject a real extractor), kept so the shim set
+    // covers the full core surface rather than only what today's tests happen
+    // to reach.
+    #[allow(dead_code)]
+    async fn attachment_import_with_dir_ext<F>(
+        vault_dir: &Path,
+        state: &VaultRuntimeState,
+        source: ImportSource,
+        created_at_override: Option<u64>,
+        extract: F,
+    ) -> Result<ImportedAttachment, AttachmentImportError>
+    where
+        F: Fn(&str, &str, &[u8]) -> ExtractedText + Send + 'static,
+    {
+        super::attachment_import_with_dir_ext(
+            io(),
+            &host(),
+            vault_dir,
+            state,
+            source,
+            created_at_override,
+            extract,
+        )
+        .await
+    }
+
+    async fn catalog_list_with_dir(
+        vault_dir: &Path,
+        state: &VaultRuntimeState,
+    ) -> Result<Vec<CatalogEntry>, CatalogListError> {
+        super::catalog_list_with_dir(io(), vault_dir, state).await
+    }
+
+    async fn attachment_unused_list_with_dir(
+        vault_dir: &Path,
+        state: &VaultRuntimeState,
+        now: u64,
+    ) -> Result<Vec<CatalogEntry>, AttachmentUnusedListError> {
+        super::attachment_unused_list_with_dir(io(), vault_dir, state, now).await
+    }
+
+    async fn attachment_clean_unused_with_dir(
+        vault_dir: &Path,
+        state: &VaultRuntimeState,
+        ids: Vec<String>,
+    ) -> Result<CleanResult, AttachmentCleanUnusedError> {
+        super::attachment_clean_unused_with_dir(io(), &host(), vault_dir, state, ids).await
+    }
+
+    async fn attachment_delete_with_dir(
+        vault_dir: &Path,
+        state: &VaultRuntimeState,
+        id: String,
+    ) -> Result<(), AttachmentDeleteError> {
+        super::attachment_delete_with_dir(io(), &host(), vault_dir, state, id).await
+    }
+
+    async fn attachment_rename_with_dir(
+        vault_dir: &Path,
+        state: &VaultRuntimeState,
+        id: String,
+        filename: String,
+    ) -> Result<(), AttachmentRenameError> {
+        super::attachment_rename_with_dir(io(), &host(), vault_dir, state, id, filename).await
+    }
+
+    async fn attachment_export_with_dir(
+        vault_dir: &Path,
+        state: &VaultRuntimeState,
+        id: &str,
+        destination: PathBuf,
+        overwrite: bool,
+    ) -> Result<(), AttachmentExportError> {
+        super::attachment_export_with_dir(io(), vault_dir, state, id, destination, overwrite).await
+    }
+
+    async fn rewrite_catalog_dropping_unused(
+        vault_dir: &Path,
+        catalog_key: &[u8; 32],
+        account_number_hash: &[u8; CATALOG_BLOB_ACCOUNT_HASH_LEN],
+        requested: &[String],
+        referenced: &std::collections::HashSet<String>,
+    ) -> Result<(Vec<(String, u64)>, usize), AttachmentCleanUnusedError> {
+        super::rewrite_catalog_dropping_unused(
+            io(),
+            &host(),
+            vault_dir,
+            catalog_key,
+            account_number_hash,
+            requested,
+            referenced,
+        )
+        .await
+    }
+
+    async fn reclaim_stray_blobs(
+        vault_dir: &Path,
+        catalog_key: &[u8; 32],
+        account_number_hash: &[u8; CATALOG_BLOB_ACCOUNT_HASH_LEN],
+    ) -> StrayReclaimOutcome {
+        super::reclaim_stray_blobs(io(), vault_dir, catalog_key, account_number_hash).await
+    }
+
+    async fn reclaim_stray_blobs_in_dir(
+        attachments_dir: &Path,
+        valid_ids: &std::collections::HashSet<String>,
+    ) -> Result<usize, IoFailureKind> {
+        super::reclaim_stray_blobs_in_dir(io(), attachments_dir, valid_ids).await
+    }
+
+    #[allow(dead_code)]
+    async fn read_catalog(
+        catalog_path: &Path,
+        catalog_key: &[u8; 32],
+        account_number_hash: &[u8; CATALOG_BLOB_ACCOUNT_HASH_LEN],
+    ) -> Result<AttachmentsCatalog, IoFailureKind> {
+        super::read_catalog(io(), catalog_path, catalog_key, account_number_hash).await
     }
 
     // Eager-text-extraction → MYE1-cache tests (MYND-328) moved to the desktop
@@ -2405,6 +3004,8 @@ mod tests {
             notes_dir.to_path_buf(),
             state,
             body.to_string(),
+            &crate::vault_io::StdVaultIo,
+            &crate::host::NoopHost,
         )
         .await
         .expect("note_create")
@@ -2480,7 +3081,7 @@ mod tests {
     fn unused_list_withholds_recently_added_within_grace() {
         rt().block_on(async {
             let (tmp, state) = temp_vault().await;
-            let t0 = now_unix_secs();
+            let t0 = host().now_unix_secs();
             // A never-referenced import — "unused", but freshly added (e.g. a
             // just-shared, not-yet-filed file). SYNC-10: it must not appear in
             // the Clean-Unused review until the grace window elapses.
@@ -2700,6 +3301,7 @@ mod tests {
                 std::slice::from_ref(&a),
                 &referenced,
             )
+            .await
             .expect("catalog rewrite");
 
             assert_eq!(skipped, 0);
@@ -2716,35 +3318,40 @@ mod tests {
 
     #[test]
     fn reclaim_stray_blobs_in_dir_removes_only_catalog_less_hex() {
-        let tmp = ScopedTempDir::new("attach-stray-dir").unwrap();
-        let dir = tmp.path().join("attachments");
-        std::fs::create_dir_all(&dir).unwrap();
-        let stray = "a".repeat(64); // 64-hex, NOT cataloged → removed
-        let cataloged = "b".repeat(64); // 64-hex, cataloged → kept
-        std::fs::write(dir.join(&stray), b"x").unwrap();
-        std::fs::write(dir.join(&cataloged), b"x").unwrap();
-        std::fs::write(dir.join("notes.txt"), b"x").unwrap(); // non-hex → kept
-        std::fs::write(dir.join("c".repeat(63)), b"x").unwrap(); // wrong length → kept
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("attach-stray-dir").unwrap();
+            let dir = tmp.path().join("attachments");
+            std::fs::create_dir_all(&dir).unwrap();
+            let stray = "a".repeat(64); // 64-hex, NOT cataloged → removed
+            let cataloged = "b".repeat(64); // 64-hex, cataloged → kept
+            std::fs::write(dir.join(&stray), b"x").unwrap();
+            std::fs::write(dir.join(&cataloged), b"x").unwrap();
+            std::fs::write(dir.join("notes.txt"), b"x").unwrap(); // non-hex → kept
+            std::fs::write(dir.join("c".repeat(63)), b"x").unwrap(); // wrong length → kept
 
-        let valid: std::collections::HashSet<String> = std::iter::once(cataloged.clone()).collect();
-        let removed = reclaim_stray_blobs_in_dir(&dir, &valid).unwrap();
+            let valid: std::collections::HashSet<String> =
+                std::iter::once(cataloged.clone()).collect();
+            let removed = reclaim_stray_blobs_in_dir(&dir, &valid).await.unwrap();
 
-        assert_eq!(removed, 1);
-        assert!(!dir.join(&stray).exists(), "catalog-less hex blob removed");
-        assert!(dir.join(&cataloged).exists(), "cataloged id preserved");
-        assert!(dir.join("notes.txt").exists(), "non-hex left untouched");
-        assert!(
-            dir.join("c".repeat(63)).exists(),
-            "wrong-length left untouched"
-        );
+            assert_eq!(removed, 1);
+            assert!(!dir.join(&stray).exists(), "catalog-less hex blob removed");
+            assert!(dir.join(&cataloged).exists(), "cataloged id preserved");
+            assert!(dir.join("notes.txt").exists(), "non-hex left untouched");
+            assert!(
+                dir.join("c".repeat(63)).exists(),
+                "wrong-length left untouched"
+            );
+        });
     }
 
     #[test]
     fn reclaim_stray_blobs_in_dir_empty_when_absent() {
-        let tmp = ScopedTempDir::new("attach-stray-absent").unwrap();
-        let dir = tmp.path().join("attachments"); // never created
-        let valid = std::collections::HashSet::new();
-        assert_eq!(reclaim_stray_blobs_in_dir(&dir, &valid).unwrap(), 0);
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("attach-stray-absent").unwrap();
+            let dir = tmp.path().join("attachments"); // never created
+            let valid = std::collections::HashSet::new();
+            assert_eq!(reclaim_stray_blobs_in_dir(&dir, &valid).await.unwrap(), 0);
+        });
     }
 
     #[test]
@@ -2757,7 +3364,7 @@ mod tests {
 
             let catalog_key = derive_subkey(&[SEED_ROOT; 32], SubkeyRole::AttachmentsCatalogKey);
             let account_number_hash = [SEED_ACCOUNT_HASH; CATALOG_BLOB_ACCOUNT_HASH_LEN];
-            let outcome = reclaim_stray_blobs(tmp.path(), &catalog_key, &account_number_hash);
+            let outcome = reclaim_stray_blobs(tmp.path(), &catalog_key, &account_number_hash).await;
 
             match outcome {
                 StrayReclaimOutcome::Removed(n) => assert_eq!(n, 1),
@@ -2785,7 +3392,7 @@ mod tests {
 
             let catalog_key = derive_subkey(&[SEED_ROOT; 32], SubkeyRole::AttachmentsCatalogKey);
             let account_number_hash = [SEED_ACCOUNT_HASH; CATALOG_BLOB_ACCOUNT_HASH_LEN];
-            let outcome = reclaim_stray_blobs(tmp.path(), &catalog_key, &account_number_hash);
+            let outcome = reclaim_stray_blobs(tmp.path(), &catalog_key, &account_number_hash).await;
 
             assert!(matches!(
                 outcome,
@@ -2794,6 +3401,166 @@ mod tests {
             // Nothing removed — both the cataloged blob AND the stray survive.
             assert!(blob_exists(&tmp, &a));
             assert!(tmp.path().join("attachments").join(&stray).exists());
+        });
+    }
+
+    // ---- the corpus-completeness gate (phase3-web-client task 89) ----------
+    //
+    // The gated operation is a cryptographic erase whose tombstone PROPAGATES:
+    // the desktop pulls it and erases its own copy, and the server drops the body
+    // at horizon-GC. So the tests below are all about the two ways this can be
+    // wrong — refusing when it should not (breaking a working desktop feature)
+    // and permitting when it should not (destroying attachments across every
+    // device the account has).
+
+    /// Seed an enrolled-but-incomplete `sync-state.json`.
+    async fn seed_sync_state(dir: &std::path::Path, complete: bool) {
+        use crate::plugins::sync::state::SyncState;
+        let s = SyncState {
+            device_id_hex: Some("aa".repeat(16)),
+            corpus_complete: complete,
+            ..Default::default()
+        };
+        std::fs::write(dir.join("sync-state.json"), serde_json::to_vec(&s).unwrap()).unwrap();
+    }
+
+    #[test]
+    fn unused_list_refuses_while_the_corpus_is_incomplete() {
+        rt().block_on(async {
+            let (tmp, state) = temp_vault().await;
+            let _a = import_tagged(&tmp, &state, 1).await;
+            seed_sync_state(tmp.path(), false).await;
+
+            let result = attachment_unused_list_with_dir(tmp.path(), &state, u64::MAX).await;
+
+            // Typed refusal, NOT an empty list. An empty list reads as "nothing
+            // to clean", which is the second-worst answer — it is wrong AND it
+            // looks like the good outcome.
+            assert!(
+                matches!(result, Err(AttachmentUnusedListError::CorpusIncomplete)),
+                "expected CorpusIncomplete; got {result:?}"
+            );
+        });
+    }
+
+    #[test]
+    fn clean_unused_refuses_while_the_corpus_is_incomplete_and_touches_nothing() {
+        rt().block_on(async {
+            let (tmp, state) = temp_vault().await;
+            let a = import_tagged(&tmp, &state, 1).await;
+            let catalog_before = std::fs::read(tmp.path().join("vault.attachments")).unwrap();
+            seed_sync_state(tmp.path(), false).await;
+
+            let result =
+                attachment_clean_unused_with_dir(tmp.path(), &state, vec![a.clone()]).await;
+
+            assert!(
+                matches!(result, Err(AttachmentCleanUnusedError::CorpusIncomplete)),
+                "expected CorpusIncomplete; got {result:?}"
+            );
+            // The whole point: a refused sweep leaves the catalog, the manifest
+            // and every blob exactly as they were. Asserted on BYTES — a
+            // re-serialised catalog with the same entries would be a rewrite
+            // this command has no business performing.
+            assert!(
+                blob_exists(&tmp, &a),
+                "the blob must survive a refused sweep"
+            );
+            assert_eq!(
+                std::fs::read(tmp.path().join("vault.attachments")).unwrap(),
+                catalog_before,
+                "the catalog must be byte-unchanged by a refused sweep"
+            );
+        });
+    }
+
+    /// The regression that would break desktop. A vault that never enrolled has
+    /// nothing missing — its local copy IS the corpus — so gating it would
+    /// disable a working feature to protect against a state it cannot enter.
+    #[test]
+    fn a_vault_that_never_enrolled_is_not_gated() {
+        rt().block_on(async {
+            let (tmp, state) = temp_vault().await;
+            let _a = import_tagged(&tmp, &state, 1).await;
+            // No sync-state.json at all.
+            let result = attachment_unused_list_with_dir(tmp.path(), &state, u64::MAX).await;
+            assert!(
+                result.is_ok(),
+                "an unsynced vault must not be gated; got {result:?}"
+            );
+        });
+    }
+
+    #[test]
+    fn a_device_that_proved_completeness_is_not_gated() {
+        rt().block_on(async {
+            let (tmp, state) = temp_vault().await;
+            let _a = import_tagged(&tmp, &state, 1).await;
+            seed_sync_state(tmp.path(), true).await;
+            let result = attachment_unused_list_with_dir(tmp.path(), &state, u64::MAX).await;
+            assert!(
+                result.is_ok(),
+                "a complete corpus must not be gated; got {result:?}"
+            );
+        });
+    }
+
+    /// phase3-web-client task 90: a web session must never reclaim a desktop
+    /// session's `MYE1` extracted-text cache.
+    ///
+    /// The unlock-time stray scan is the only thing in the vault that deletes
+    /// files nobody asked it to delete, so it is the one that could do this — and
+    /// `attachments-text/<id-hex>` is *shaped exactly like* what it hunts: a
+    /// canonical 64-char lowercase-hex filename with no catalog entry of its own.
+    /// The only reason it survives is that the scan is handed `attachments/` and
+    /// never walks a sibling. That is a one-argument invariant, which is why it
+    /// gets a test rather than a comment: "scan the whole vault root for stray
+    /// hex blobs" is a plausible future simplification, and it would silently
+    /// erase the search cache of every attachment on the machine.
+    ///
+    /// Driven through the same entry point the unlock pipeline uses, with a
+    /// deliberately catalog-less MYE1 file — the worst case, since a cataloged
+    /// one would be protected by the valid-id set for the wrong reason.
+    #[test]
+    fn reclaim_stray_blobs_never_touches_the_mye1_text_cache() {
+        rt().block_on(async {
+            let (tmp, state) = temp_vault().await;
+            let a = import_tagged(&tmp, &state, 1).await; // cataloged attachment
+            let stray = "f".repeat(64);
+            std::fs::write(tmp.path().join("attachments").join(&stray), b"x").unwrap();
+
+            // A desktop session's MYE1 caches: one for the cataloged attachment,
+            // one whose attachment is gone from the catalog entirely.
+            let text_dir = tmp.path().join("attachments-text");
+            std::fs::create_dir_all(&text_dir).unwrap();
+            std::fs::write(text_dir.join(&a), b"MYE1 cached text for a live one").unwrap();
+            std::fs::write(text_dir.join(&stray), b"MYE1 cached text, no catalog").unwrap();
+
+            let catalog_key = derive_subkey(&[SEED_ROOT; 32], SubkeyRole::AttachmentsCatalogKey);
+            let account_number_hash = [SEED_ACCOUNT_HASH; CATALOG_BLOB_ACCOUNT_HASH_LEN];
+            let outcome = reclaim_stray_blobs(tmp.path(), &catalog_key, &account_number_hash).await;
+
+            // The scan did its job on `attachments/` …
+            match outcome {
+                StrayReclaimOutcome::Removed(n) => assert_eq!(n, 1),
+                _ => panic!("expected Removed(1)"),
+            }
+            assert!(!tmp.path().join("attachments").join(&stray).exists());
+
+            // … and left `attachments-text/` entirely alone, including the entry
+            // whose attachment it just reclaimed. Deleting THAT one would even
+            // look defensible; it is still not this scan's call, because the
+            // deletion paths that own MYE1 erasure (`attachment_delete`,
+            // `attachment_clean_unused`, the sync tombstone) all go through
+            // `text_cache::remove_extracted` and are keyed to a user action.
+            assert!(
+                text_dir.join(&a).exists(),
+                "MYE1 cache of a cataloged attachment must survive the stray scan"
+            );
+            assert!(
+                text_dir.join(&stray).exists(),
+                "MYE1 cache is not a stray blob — the scan must not walk this directory"
+            );
         });
     }
 }
