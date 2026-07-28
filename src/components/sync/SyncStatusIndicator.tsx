@@ -87,6 +87,22 @@ function present(status: SyncStatus | null): Presentation {
       if (status.detail === "frozen") {
         return { dotColor: "var(--danger)", label: i18n.t("sync.status.errorFrozen") };
       }
+      // Task 94. NOT folded into `auth_failed`: that copy says the sign-in
+      // expired and points at re-enrolling, which is the wrong instruction for a
+      // device the account owner deliberately removed from another client. The
+      // copy names the act and nothing more — it must never imply that anything
+      // was wiped remotely or that a device holding the vault and the password
+      // has been locked out, because neither is true (`REMOVE_DEVICE_DISCLOSURE`).
+      if (status.detail === "storage_full") {
+        // The LOCAL store, not the account's server-side ceiling (task 91).
+        // Distinct copy because only one of the two is fixable on this device,
+        // and "you're over your storage limit" would send a user to an account
+        // page while their disk is what filled up.
+        return { dotColor: "var(--warning)", label: i18n.t("sync.status.errorStorageFull") };
+      }
+      if (status.detail === "device_revoked") {
+        return { dotColor: "var(--danger)", label: i18n.t("sync.status.errorDeviceRevoked") };
+      }
       return { dotColor: "var(--danger)", label: i18n.t("sync.status.error") };
     case "conflicts":
       return {

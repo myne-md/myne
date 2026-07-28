@@ -11,11 +11,19 @@
 //  - IntegrityAlertBanner: lit when the engine's head-verify rejects a rollback
 //    / non-extending head (a possible-tamper alert). `run_active_cycle` emits
 //    `sync://integrity-alert` when that happens (MYND-461); this subscribes to it.
+//  - CredentialAmbiguousBanner: the meta phase refused to adopt the server's
+//    `vault.meta` because the password-side wraps differ and no baseline says
+//    which side moved (phase3-web-client task 88). NOT dismissable, unlike the
+//    other two: refusing is a permanent stall — every later cycle re-refuses —
+//    so dismissing it would restore exactly the silence the refusal exists to
+//    break.
 
 import { useEffect, useState, type CSSProperties } from "react";
-import { listen } from "@tauri-apps/api/event";
+import { useTranslation } from "react-i18next";
+import { listen } from "../../platform/event";
 import { ReconcileBanner } from "./ReconcileBanner";
 import { IntegrityAlertBanner } from "./IntegrityAlertBanner";
+import { useMaterialisationProgress } from "../../hooks/useMaterialisationProgress";
 
 const STACK_STYLE: CSSProperties = {
   display: "flex",
@@ -25,9 +33,15 @@ const STACK_STYLE: CSSProperties = {
 };
 
 export function SyncBanners() {
+  const { t } = useTranslation();
   const [reconcileActive, setReconcileActive] = useState(false);
   const [reconcileDismissed, setReconcileDismissed] = useState(false);
   const [integrity, setIntegrity] = useState(false);
+  const [credentialAmbiguous, setCredentialAmbiguous] = useState(false);
+  // First-sync materialisation (task 39). Counts, never a percentage or an ETA:
+  // the measured cost spans 6× across engines at the same note count, so an ETA
+  // would be wrong by that factor on whichever browser the user is running.
+  const materialising = useMaterialisationProgress();
 
   // Event-driven producers (MYND-461). A reconcile occurred → show the reassuring
   // banner, re-armed, until the user dismisses it. A head-verify rejection → the
@@ -53,6 +67,7 @@ export function SyncBanners() {
     void sub("sync://reconcile-started", armReconcile);
     void sub("sync://reconcile-finished", armReconcile);
     void sub("sync://integrity-alert", () => setIntegrity(true));
+    void sub("sync://credential-ambiguous", () => setCredentialAmbiguous(true));
     return () => {
       cancelled = true;
       for (const fn of unlisteners) fn();
@@ -60,7 +75,8 @@ export function SyncBanners() {
   }, []);
 
   const showReconcile = reconcileActive && !reconcileDismissed;
-  if (!showReconcile && !integrity) return null;
+  const showMaterialising = materialising !== null && materialising.active;
+  if (!showReconcile && !integrity && !credentialAmbiguous && !showMaterialising) return null;
 
   return (
     <div style={STACK_STYLE}>
@@ -72,6 +88,57 @@ export function SyncBanners() {
         present={integrity}
         onDismiss={() => setIntegrity(false)}
       />
+      {showMaterialising && materialising !== null && (
+        // `role="status"`, not `alert`: this is progress, not a problem, and an
+        // assertive live region would interrupt a screen reader every 250 ms.
+        <div
+          role="status"
+          data-testid="sync.materialising"
+          data-done={materialising.done}
+          data-total={materialising.total}
+          style={{
+            display: "flex",
+            gap: "var(--space-2)",
+            padding: "var(--space-3) var(--space-4)",
+            borderRadius: "var(--radius-2)",
+            border: "1px solid var(--line-1)",
+            background: "var(--bg-2)",
+            color: "var(--fg-2)",
+            fontFamily: "var(--font-sans)",
+            fontSize: "var(--text-sm)",
+          }}
+        >
+          <span>
+            {t("sync.materialising", {
+              done: materialising.done,
+              total: materialising.total,
+            })}
+          </span>
+        </div>
+      )}
+      {credentialAmbiguous && (
+        // No `onDismiss`, deliberately. The condition does not resolve on its
+        // own and every later cycle re-refuses, so a dismiss button would let
+        // the user restore the silence this banner exists to break — on the one
+        // client (web) where the recovery phrase is not a backstop.
+        <div
+          role="alert"
+          data-testid="sync.credential-ambiguous"
+          style={{
+            display: "flex",
+            gap: "var(--space-2)",
+            padding: "var(--space-3) var(--space-4)",
+            borderRadius: "var(--radius-2)",
+            border: "1px solid var(--warning)",
+            background: "var(--bg-2)",
+            color: "var(--fg-1)",
+            fontFamily: "var(--font-sans)",
+            fontSize: "var(--text-sm)",
+          }}
+        >
+          <span>{t("sync.credentialAmbiguous")}</span>
+        </div>
+      )}
     </div>
   );
 }

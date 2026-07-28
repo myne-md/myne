@@ -1,0 +1,109 @@
+# SPDX-License-Identifier: AGPL-3.0
+[package]
+name = "myne-web-wasm"
+version = "0.1.0"
+description = "Myne — the web client's wasm entry surface: the Worker-hosted command dispatcher over myne-core"
+edition = "2021"
+license = "AGPL-3.0"
+repository = "https://github.com/myne-md/myne"
+publish = false
+
+# `cdylib` is what `wasm-bindgen` post-processes into the ES module the Worker
+# imports. No `rlib`: nothing in the workspace depends on this crate, and adding
+# one would invite a native consumer to link an entry surface whose entire
+# contract is "a browser called us". `cargo test -p myne-web-wasm` still works —
+# cargo builds the lib source into its own test harness regardless of
+# `crate-type`.
+[lib]
+crate-type = ["cdylib"]
+
+# ── Why this crate is a workspace member ─────────────────────────────────────
+#
+# It joins the root workspace deliberately (task 78's reasoning): a second
+# tracked `Cargo.lock` fails three separate guards — lefthook's
+# `cargo-lock-singleton`, `scripts/hooks-parity-check.sh`, and
+# `src-tauri/scripts/ai-no-network-check.sh` — and the single lockfile at the
+# root IS the TB9 audit anchor.
+#
+# `cargo clippy --workspace --all-targets` and `cargo test --workspace` run in
+# `pre-push` for **everyone**, including contributors who never touch web, so a
+# member that only compiles under `cfg(target_arch = "wasm32")` would break
+# pre-push for them. The split below is what avoids that AND avoids the opposite
+# failure of an untested crate:
+#
+#   `[dependencies]`  — the pure logic: the capability table, the outcome
+#                       envelope, the router. Compiles and is UNIT-TESTED on the
+#                       host, so `cargo test --workspace` genuinely covers it.
+#   wasm32-only       — the JS boundary and the CSPRNG registration, which have
+#                       no host meaning at all.
+#
+# Deliberately not the other way round. Gating everything on wasm32 (the first
+# draft of this file) would have made the host build an empty compile — tidy, and
+# it would have left the capability classification, the three-way outcome split
+# and the router with no gate reachable by `pre-push`. The part of this crate
+# most likely to be wrong is the part that is now testable.
+[dependencies]
+# `default-features = false` turns OFF `tauri-ipc`, so the `#[tauri::command]`
+# wrappers and the `TauriHost` adapter are not compiled. The host-taking inners
+# underneath them are what this crate calls (task 79, Option B).
+#
+# NOTE on the host build: cargo unifies features across workspace members, so a
+# `cargo build --workspace` gives `myne-core` its `tauri-ipc` feature anyway
+# (`src-tauri` asks for it). That is harmless — this crate never names a Tauri
+# type. A `cargo build -p myne-web-wasm --target wasm32-unknown-unknown` resolves
+# in isolation and gets the feature off, which is the build that matters.
+myne-core = { path = "../../core", default-features = false }
+# `ThemeChoice` and friends: prefs field types are protocol types, so a command
+# that takes one names it from the crate that defines it rather than through a
+# re-export. Already in the graph via `myne-core`.
+protocol = { path = "../../protocol" }
+serde = { version = "1", features = ["derive"] }
+# Implementing `myne_core::vault_io::VaultIo` (the OPFS arm, task 17) requires
+# the same macro the trait is declared with — an `#[async_trait]` trait can only
+# be implemented by an `#[async_trait]` impl, because the macro is what rewrites
+# `async fn` into the boxed-future signature both sides must agree on.
+# Unconditional: proc-macros compile for the HOST regardless of build target.
+async-trait = "0.1"
+# The wasm↔JS boundary carries **JSON strings**, not `JsValue` graphs, so
+# `serde_json` (already a direct dependency of `myne-core`) is the whole
+# serialization layer and `serde-wasm-bindgen` is deliberately NOT admitted.
+# Two reasons, and the second is the load-bearing one:
+#   1. One fewer dependency on the path that handles decrypted note bodies.
+#   2. Tauri's own IPC payload is JSON. Crossing this seam as JSON keeps the
+#      argument and return shapes **identical** to what the desktop already
+#      sends, which is the one property `src/platform/core.ts` exists to hold.
+#      A different serializer would be a second wire format to keep in step.
+serde_json = "1"
+
+# ── wasm32-only: the JS boundary ─────────────────────────────────────────────
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+# The JS↔wasm codegen. Mandatory and unsubstitutable for Rust-in-a-browser;
+# there is no second implementation to choose between. Already in the shared
+# `Cargo.lock` (pulled transitively), so this is a transitive→direct promotion
+# rather than a new admission — the `unicode-normalization` precedent in
+# `docs/dependency-policy.md`.
+wasm-bindgen = "0.2"
+# `js_sys::Uint8Array` + the `crypto` global for the CSPRNG bridge (task 81).
+# Same family, same pin source, same transitive→direct promotion. Used ONLY
+# there: the rest of the boundary is strings and needs nothing from it.
+js-sys = "0.3"
+# Required by `#[wasm_bindgen]` on an `async fn` — the macro expands to a
+# `wasm_bindgen_futures` path, so this is not optional even though no line of
+# this crate names the crate itself. It is what turns the exported
+# `async fn invoke` into a JS `Promise`; without it the export would need a
+# hand-rolled callback protocol across the boundary, i.e. more code on the path
+# that carries plaintext for no gain.
+wasm-bindgen-futures = "0.4"
+# The `custom` backend registration lives HERE and nowhere else (task 81):
+# getrandom's own documentation requires it in the root cdylib crate, which this
+# is. `protocol/` and `myne-core` both declare the `custom` feature and leave the
+# hook UNRESOLVED on purpose — `scripts/wasm-csprng-check.sh` asserts exactly
+# that, so a build with no registration fails at link rather than falling back to
+# a weak stream.
+#
+# Target-gated rather than unconditional for a reason that is not cosmetic:
+# `register_custom_getrandom!` REPLACES the OS entropy source for the whole
+# linked graph. On a native build that would substitute a browser bridge for
+# `getrandom`'s real OS source — catastrophic, and silent. It can only ever be
+# compiled where there is no OS source to displace.
+getrandom = { version = "0.2", default-features = false, features = ["custom"] }

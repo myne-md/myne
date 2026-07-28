@@ -7,7 +7,7 @@
 //
 // All reject with a `SnapshotError` (see `src/types/snapshot-error.ts`).
 
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../platform/core";
 import type { SnapshotMeta } from "../types/snapshot-error";
 
 /**

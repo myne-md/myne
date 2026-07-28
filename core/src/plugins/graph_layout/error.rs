@@ -60,6 +60,24 @@ pub enum GraphLayoutWriteError {
     GraphLayoutEncodeFailed,
 }
 
+/// The storage seam's closed error, straight through (phase3-web-client task 46).
+///
+/// Both reads go through [`crate::vault_io::VaultIo`] now, which already reduces
+/// `std::io::Error` at its own boundary — so this is an identity wrap, not a
+/// second reduction. The `From<std::io::Error>` impl below stays for the
+/// host-only path resolution, which still yields a real `io::Error`.
+impl From<IoFailureKind> for GraphLayoutReadError {
+    fn from(io_error_kind: IoFailureKind) -> Self {
+        GraphLayoutReadError::Io { io_error_kind }
+    }
+}
+
+impl From<IoFailureKind> for GraphLayoutWriteError {
+    fn from(io_error_kind: IoFailureKind) -> Self {
+        GraphLayoutWriteError::Io { io_error_kind }
+    }
+}
+
 impl From<std::io::Error> for GraphLayoutReadError {
     fn from(e: std::io::Error) -> Self {
         GraphLayoutReadError::Io {

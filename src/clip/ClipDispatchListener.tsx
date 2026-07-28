@@ -39,8 +39,8 @@
 // mirrors `Editor.tsx`'s `vault-lock-imminent` listen/unlisten idiom.
 
 import { useEffect, useRef, useState } from "react";
-import { listen } from "@tauri-apps/api/event";
-import { invoke } from "@tauri-apps/api/core";
+import { listen } from "../platform/event";
+import { invoke } from "../platform/core";
 
 import { Toast } from "../components/Toast";
 import {

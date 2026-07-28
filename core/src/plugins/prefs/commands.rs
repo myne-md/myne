@@ -12,6 +12,7 @@
 //! See: ../../CLAUDE.md "Secret-handling logging discipline".
 
 use super::error::{PrefsReadError, PrefsWriteError};
+use crate::host::HostCtx;
 use crate::plugins::vault_unlock::state::VaultRuntimeState;
 use protocol::{
     decode_prefs_blob, derive_subkey, encode_prefs_blob, parse_vault_meta, EditorLayout,
@@ -19,6 +20,10 @@ use protocol::{
 };
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
+// Tauri types serve only the cfg-gated IPC wrappers (task 79, Option B).
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+use crate::host::tauri_host::TauriHost;
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 use tauri::{AppHandle, Runtime, State};
 use tokio::sync::Mutex;
 
@@ -42,11 +47,14 @@ pub fn write_mutex() -> &'static Mutex<()> {
 /// operate on the unlocked vault, so resolving via the active id (not the
 /// transitional sole-vault disk heuristic) is what keeps `vault.prefs` reads +
 /// the label write targeting the correct vault once two or more exist.
-fn vault_dir<R: Runtime>(
-    app: &AppHandle<R>,
+/// Resolve the active vault's root. One line over the pure resolver in
+/// `crate::paths`, so the host arm and the (now removed) Tauri arm cannot
+/// compute different paths.
+fn vault_dir_from_host(
+    host: &dyn HostCtx,
     active_id: Option<crate::vault_id::VaultId>,
 ) -> std::io::Result<PathBuf> {
-    crate::paths::active_vault_root_io(app, active_id)
+    crate::paths::active_vault_root_io_from_host(host, active_id)
 }
 
 /// Read `vault.prefs` from disk and decode under `prefs_key` + AAD
@@ -58,32 +66,76 @@ fn vault_dir<R: Runtime>(
 /// `pub(crate)` so the future Task 10 (vault_unlock pipeline
 /// integration) can share the same read-or-default discipline at the
 /// unlock-time step 5 call site.
-pub fn read_or_default(
+pub async fn read_or_default(
+    io: &dyn crate::vault_io::VaultIo,
     prefs_path: &Path,
     prefs_key: &[u8; 32],
     account_number_hash: &[u8; VAULT_META_ACCOUNT_HASH_LEN],
 ) -> PrefsView {
-    let bytes = match std::fs::read(prefs_path) {
-        Ok(b) => b,
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+    // The newest copy that DECODES (phase3-web-client task 18), not the newest
+    // copy. On the web client a singleton is two alternating files, and here the
+    // difference is user-visible in a way it is nowhere else: § 9.5.5 says an
+    // undecodable `vault.prefs` degrades to defaults, so a torn newest copy
+    // would silently reset the user's settings — with their real prefs intact in
+    // the other buffer. Falling back first is what keeps the degrade-to-defaults
+    // rule a last resort instead of a routine outcome after a crash.
+    //
+    // Native is unchanged: `read_candidates` yields one copy there, so this is
+    // the same read, the same decode, the same fallback.
+    match crate::singleton::open_newest(io, prefs_path, |candidate| {
+        decode_prefs_blob(prefs_key, account_number_hash, candidate)
+    })
+    .await
+    {
+        Ok(view) => view,
+        Err(crate::singleton::OpenOutcome::Absent) => {
             // Absent file is the standard case for pre-MYND-160 vaults
             // and for the first read after vault_create (until Task 12
             // lands eager-write). Not a warn — this is the documented
             // happy path of spec § 9.5.5.
-            return PrefsView::default();
+            PrefsView::default()
         }
-        Err(e) => {
+        Err(crate::singleton::OpenOutcome::Io(e)) => {
             tracing::warn!(
                 event = "prefs_io_failed",
                 stage = "read",
-                io_kind = ?crate::io_failure_kind::from_io_error_kind(e.kind()),
+                io_kind = ?e,
                 "vault.prefs read failed; falling back to defaults"
             );
-            return PrefsView::default();
+            PrefsView::default()
         }
-    };
+        Err(crate::singleton::OpenOutcome::Undecodable(cause)) => {
+            // Every stored copy failed — on desktop the only one, on web both.
+            // The warn keeps the same shape and reason code it had when this was
+            // a single decode, because for an operator the situation is the
+            // same: prefs are gone and defaults are in use.
+            tracing::warn!(
+                event = "prefs_decrypt_failed",
+                reason = prefs_blob_error_kind(&cause),
+                "vault.prefs decode failed; falling back to defaults"
+            );
+            PrefsView::default()
+        }
+    }
+}
 
-    match decode_prefs_blob(prefs_key, account_number_hash, &bytes) {
+/// The decode-and-fall-back half of [`read_or_default`], over bytes already read.
+///
+/// Split out (phase3-web-client task 14) because the seam's read is **async**
+/// and one caller cannot await: `export`'s `stage_export_tree_inner` is a
+/// synchronous function, and `export` is host-only (gated out of the wasm build
+/// entirely), so it reads with `std::fs` and decodes here.
+///
+/// Sharing this function rather than letting that caller reimplement the
+/// fallback is the point: § 9.5.5's "absent / undecodable prefs degrade to
+/// defaults, never fail" is a spec rule, and two copies of it would be two
+/// places for it to drift.
+pub fn decode_or_default(
+    bytes: &[u8],
+    prefs_key: &[u8; 32],
+    account_number_hash: &[u8; VAULT_META_ACCOUNT_HASH_LEN],
+) -> PrefsView {
+    match decode_prefs_blob(prefs_key, account_number_hash, bytes) {
         Ok(view) => view,
         Err(cause) => {
             tracing::warn!(
@@ -126,10 +178,14 @@ fn prefs_blob_error_kind(e: &PrefsBlobError) -> &'static str {
 /// (Slot stays crypto-state-only per grill Q5.1), so each prefs IPC
 /// re-reads. Cost is a single ~345-byte file read + parse; acceptable
 /// for the lazy/rare prefs cadence.
-fn read_account_number_hash(
+async fn read_account_number_hash(
+    io: &dyn crate::vault_io::VaultIo,
     vault_meta_path: &Path,
 ) -> Result<[u8; VAULT_META_ACCOUNT_HASH_LEN], PrefsReadError> {
-    let bytes = std::fs::read(vault_meta_path)?;
+    let bytes = io
+        .read(vault_meta_path)
+        .await
+        .map_err(|k| PrefsReadError::Io { io_error_kind: k })?;
     let meta = parse_vault_meta(&bytes).map_err(|_| PrefsReadError::InvalidVaultMeta)?;
     Ok(meta.account_number_hash)
 }
@@ -138,10 +194,14 @@ fn read_account_number_hash(
 /// write-error type. Trivial wrapper — kept separate so the error
 /// surface stays asymmetric (read fails differently than write) per
 /// MYND-160 grill Q3.4 + Q6.3.
-fn read_account_number_hash_for_write(
+async fn read_account_number_hash_for_write(
+    io: &dyn crate::vault_io::VaultIo,
     vault_meta_path: &Path,
 ) -> Result<[u8; VAULT_META_ACCOUNT_HASH_LEN], PrefsWriteError> {
-    let bytes = std::fs::read(vault_meta_path)?;
+    let bytes = io
+        .read(vault_meta_path)
+        .await
+        .map_err(|k| PrefsWriteError::Io { io_error_kind: k })?;
     let meta = parse_vault_meta(&bytes).map_err(|_| PrefsWriteError::InvalidVaultMeta)?;
     Ok(meta.account_number_hash)
 }
@@ -162,6 +222,8 @@ async fn update_prefs_with_dir(
     state: &VaultRuntimeState,
     hooks: &crate::hooks::Hooks,
     mutate: impl FnOnce(&mut PrefsView),
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
 ) -> Result<(), PrefsWriteError> {
     use crate::plugins::sync::prefs_merge::shared_subset_hash;
 
@@ -173,11 +235,12 @@ async fn update_prefs_with_dir(
         .await
         .ok_or(PrefsWriteError::SlotNotUnlocked)?;
 
-    let account_number_hash = read_account_number_hash_for_write(&vault_dir.join("vault.meta"))?;
+    let account_number_hash =
+        read_account_number_hash_for_write(io, &vault_dir.join("vault.meta")).await?;
     let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
     let prefs_path = vault_dir.join("vault.prefs");
 
-    let mut prefs = read_or_default(&prefs_path, &prefs_key, &account_number_hash);
+    let mut prefs = read_or_default(io, &prefs_path, &prefs_key, &account_number_hash).await;
     let before = prefs.clone();
     mutate(&mut prefs);
 
@@ -186,10 +249,17 @@ async fn update_prefs_with_dir(
     // Device-local and set-union fields are never stamped; a wall-clock
     // failure degrades to clock 0 (the legacy value) rather than blocking the
     // write.
-    let now_ms = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_millis() as u64)
-        .unwrap_or(0);
+    // Host clock (task 14 — the TODO this replaces was recorded in task 12).
+    // `SystemTime::now()` panics on wasm32 and this is a WRITE path, so the
+    // whole `set_*` surface would have aborted the instance the first time a
+    // user changed a setting in a browser.
+    //
+    // WALL clock, in MILLISECONDS: these are §10.2 last-write-wins field clocks
+    // compared across devices, so a monotonic reading would be meaningless and a
+    // second-granularity one would make two edits inside the same second
+    // unorderable. Exactly why `HostCtx` carries both clocks at millisecond
+    // resolution.
+    let now_ms = host.now_unix_millis();
     crate::plugins::sync::prefs_merge::stamp_changed_shared_fields(&before, &mut prefs, now_ms);
 
     // MYND-517: did this write change the SHARED subset? Compared via
@@ -203,8 +273,13 @@ async fn update_prefs_with_dir(
     let blob_bytes = encode_prefs_blob(&prefs_key, &account_number_hash, &prefs)
         .map_err(|_| PrefsWriteError::PrefsEncodeFailed)?;
 
-    crate::atomic_write::atomic_write(&prefs_path, &blob_bytes, true)
-        .map_err(PrefsWriteError::from)?;
+    io.write(
+        &prefs_path,
+        &blob_bytes,
+        crate::vault_io::WriteOpts::default(),
+    )
+    .await
+    .map_err(|io_error_kind| PrefsWriteError::Io { io_error_kind })?;
 
     // MYND-517: a shared-pref edit opens the same coalesced push window a note
     // edit does — without this, a prefs-only change (vault rename, favorites,
@@ -238,19 +313,37 @@ pub const PREFS_CHANGED_EVENT: &str = "myne://prefs-changed";
 /// The Tauri-command wrapper resolves `app_data_dir` then delegates
 /// to [`prefs_read_with_dir`] so tests can exercise the core logic
 /// against a `ScopedTempDir` without spinning up a Tauri runtime.
+pub async fn prefs_read_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<PrefsView, PrefsReadError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsReadError::from)?;
+    prefs_read_with_dir(&dir, state, io).await
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn prefs_read<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
 ) -> Result<PrefsView, PrefsReadError> {
-    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsReadError::from)?;
-    prefs_read_with_dir(&dir, state.inner()).await
+    prefs_read_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
 }
 
 /// Testable core of [`prefs_read`].
 pub async fn prefs_read_with_dir(
     vault_dir: &Path,
     state: &VaultRuntimeState,
+    io: &dyn crate::vault_io::VaultIo,
 ) -> Result<PrefsView, PrefsReadError> {
     // Peek root_key from the Unlocked slot (ignore the
     // vault_meta_bytes_hash — prefs has no CAS anchor against it).
@@ -259,15 +352,11 @@ pub async fn prefs_read_with_dir(
         .await
         .ok_or(PrefsReadError::SlotNotUnlocked)?;
 
-    let account_number_hash = read_account_number_hash(&vault_dir.join("vault.meta"))?;
+    let account_number_hash = read_account_number_hash(io, &vault_dir.join("vault.meta")).await?;
     let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
     let prefs_path = vault_dir.join("vault.prefs");
 
-    Ok(read_or_default(
-        &prefs_path,
-        &prefs_key,
-        &account_number_hash,
-    ))
+    Ok(read_or_default(io, &prefs_path, &prefs_key, &account_number_hash).await)
 }
 
 /// Internal (non-IPC) setter: record the last successful backup export
@@ -280,10 +369,19 @@ pub async fn record_last_backup_at_with_dir(
     state: &VaultRuntimeState,
     hooks: &crate::hooks::Hooks,
     epoch_seconds: u64,
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
 ) -> Result<(), PrefsWriteError> {
-    update_prefs_with_dir(vault_dir, state, hooks, |prefs| {
-        prefs.last_backup_at = Some(epoch_seconds);
-    })
+    update_prefs_with_dir(
+        vault_dir,
+        state,
+        hooks,
+        |prefs| {
+            prefs.last_backup_at = Some(epoch_seconds);
+        },
+        io,
+        host,
+    )
     .await?;
 
     tracing::info!(event = "prefs_written", field = "last_backup_at");
@@ -307,11 +405,20 @@ pub async fn persist_paired_extensions_with_dir(
     state: &VaultRuntimeState,
     hooks: &crate::hooks::Hooks,
     records: Vec<protocol::PairedExtension>,
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
 ) -> Result<(), PrefsWriteError> {
     let count = records.len();
-    update_prefs_with_dir(vault_dir, state, hooks, |prefs| {
-        prefs.paired_extensions = records;
-    })
+    update_prefs_with_dir(
+        vault_dir,
+        state,
+        hooks,
+        |prefs| {
+            prefs.paired_extensions = records;
+        },
+        io,
+        host,
+    )
     .await?;
 
     // COUNT only — never a token value / extension id (AS-low correlation tags).
@@ -326,6 +433,26 @@ pub async fn persist_paired_extensions_with_dir(
 /// side-effect. **Disk-then-native ordering is load-bearing**: if
 /// the disk write fails, the native state is unchanged so UI / disk
 /// never silently diverge (MYND-160 grill Q5.2 — story 16).
+pub async fn set_screen_capture_protection_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    enabled: bool,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    // Disk-side commit FIRST, under the mutex.
+    set_screen_capture_protection_with_dir(&dir, state, hooks, enabled, io, host).await?;
+    // Native side-effect SECOND, only on disk-side success (desktop-only;
+    // mobile no-op through the hook).
+    hooks.apply_screen_capture(enabled, "runtime_apply");
+    Ok(())
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_screen_capture_protection<R: Runtime>(
     app: AppHandle<R>,
@@ -333,13 +460,14 @@ pub async fn set_screen_capture_protection<R: Runtime>(
     hooks: State<'_, crate::hooks::Hooks>,
     enabled: bool,
 ) -> Result<(), PrefsWriteError> {
-    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    // Disk-side commit FIRST, under the mutex.
-    set_screen_capture_protection_with_dir(&dir, state.inner(), hooks.inner(), enabled).await?;
-    // Native side-effect SECOND, only on disk-side success (desktop-only;
-    // mobile no-op through the hook).
-    hooks.apply_screen_capture(enabled, "runtime_apply");
-    Ok(())
+    set_screen_capture_protection_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        enabled,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
 }
 
 /// Testable core of [`set_screen_capture_protection`]. Performs the
@@ -353,10 +481,19 @@ pub(crate) async fn set_screen_capture_protection_with_dir(
     state: &VaultRuntimeState,
     hooks: &crate::hooks::Hooks,
     enabled: bool,
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
 ) -> Result<(), PrefsWriteError> {
-    update_prefs_with_dir(vault_dir, state, hooks, |prefs| {
-        prefs.screen_capture_protection = enabled;
-    })
+    update_prefs_with_dir(
+        vault_dir,
+        state,
+        hooks,
+        |prefs| {
+            prefs.screen_capture_protection = enabled;
+        },
+        io,
+        host,
+    )
     .await?;
 
     tracing::info!(
@@ -372,6 +509,21 @@ pub(crate) async fn set_screen_capture_protection_with_dir(
 /// native side-effect (like `set_deliberate_folders`). Always persists an
 /// explicit `Some(enabled)` — the default-ON policy (SYNC-15) is a host
 /// read-time concern, not a stored value. Non-load-bearing → no clamp.
+pub async fn set_spell_enabled_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    enabled: bool,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_spell_enabled_with_dir(&dir, state, hooks, enabled, io, host).await
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_spell_enabled<R: Runtime>(
     app: AppHandle<R>,
@@ -379,8 +531,14 @@ pub async fn set_spell_enabled<R: Runtime>(
     hooks: State<'_, crate::hooks::Hooks>,
     enabled: bool,
 ) -> Result<(), PrefsWriteError> {
-    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    set_spell_enabled_with_dir(&dir, state.inner(), hooks.inner(), enabled).await
+    set_spell_enabled_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        enabled,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
 }
 
 /// Testable core of [`set_spell_enabled`].
@@ -389,10 +547,19 @@ pub(crate) async fn set_spell_enabled_with_dir(
     state: &VaultRuntimeState,
     hooks: &crate::hooks::Hooks,
     enabled: bool,
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
 ) -> Result<(), PrefsWriteError> {
-    update_prefs_with_dir(vault_dir, state, hooks, |prefs| {
-        prefs.spell_enabled = Some(enabled);
-    })
+    update_prefs_with_dir(
+        vault_dir,
+        state,
+        hooks,
+        |prefs| {
+            prefs.spell_enabled = Some(enabled);
+        },
+        io,
+        host,
+    )
     .await?;
 
     tracing::info!(
@@ -408,6 +575,21 @@ pub(crate) async fn set_spell_enabled_with_dir(
 /// mutex; no native side-effect (like `set_spell_enabled`). Always persists an
 /// explicit `Some(enabled)` — the default-OFF policy (prose-first) is a host
 /// read-time concern, not a stored value. Non-load-bearing → no clamp.
+pub async fn set_editor_line_numbers_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    enabled: bool,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_editor_line_numbers_with_dir(&dir, state, hooks, enabled, io, host).await
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_editor_line_numbers<R: Runtime>(
     app: AppHandle<R>,
@@ -415,8 +597,14 @@ pub async fn set_editor_line_numbers<R: Runtime>(
     hooks: State<'_, crate::hooks::Hooks>,
     enabled: bool,
 ) -> Result<(), PrefsWriteError> {
-    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    set_editor_line_numbers_with_dir(&dir, state.inner(), hooks.inner(), enabled).await
+    set_editor_line_numbers_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        enabled,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
 }
 
 /// Testable core of [`set_editor_line_numbers`].
@@ -425,10 +613,19 @@ pub(crate) async fn set_editor_line_numbers_with_dir(
     state: &VaultRuntimeState,
     hooks: &crate::hooks::Hooks,
     enabled: bool,
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
 ) -> Result<(), PrefsWriteError> {
-    update_prefs_with_dir(vault_dir, state, hooks, |prefs| {
-        prefs.editor_line_numbers = Some(enabled);
-    })
+    update_prefs_with_dir(
+        vault_dir,
+        state,
+        hooks,
+        |prefs| {
+            prefs.editor_line_numbers = Some(enabled);
+        },
+        io,
+        host,
+    )
     .await?;
 
     tracing::info!(
@@ -444,6 +641,21 @@ pub(crate) async fn set_editor_line_numbers_with_dir(
 /// mutex; no native side-effect (like `set_editor_line_numbers`). Always persists
 /// an explicit `Some(enabled)` — the default-OFF policy (modal editing is opt-in)
 /// is a host read-time concern, not a stored value. Non-load-bearing → no clamp.
+pub async fn set_editor_vim_mode_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    enabled: bool,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_editor_vim_mode_with_dir(&dir, state, hooks, enabled, io, host).await
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_editor_vim_mode<R: Runtime>(
     app: AppHandle<R>,
@@ -451,8 +663,14 @@ pub async fn set_editor_vim_mode<R: Runtime>(
     hooks: State<'_, crate::hooks::Hooks>,
     enabled: bool,
 ) -> Result<(), PrefsWriteError> {
-    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    set_editor_vim_mode_with_dir(&dir, state.inner(), hooks.inner(), enabled).await
+    set_editor_vim_mode_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        enabled,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
 }
 
 /// Testable core of [`set_editor_vim_mode`].
@@ -461,10 +679,19 @@ pub(crate) async fn set_editor_vim_mode_with_dir(
     state: &VaultRuntimeState,
     hooks: &crate::hooks::Hooks,
     enabled: bool,
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
 ) -> Result<(), PrefsWriteError> {
-    update_prefs_with_dir(vault_dir, state, hooks, |prefs| {
-        prefs.editor_vim_mode = Some(enabled);
-    })
+    update_prefs_with_dir(
+        vault_dir,
+        state,
+        hooks,
+        |prefs| {
+            prefs.editor_vim_mode = Some(enabled);
+        },
+        io,
+        host,
+    )
     .await?;
 
     tracing::info!(
@@ -483,6 +710,21 @@ pub(crate) async fn set_editor_vim_mode_with_dir(
 /// auto-unarchive of existing archived notes when the toggle flips ON is a
 /// WebView-side orchestration concern (runs before this setter); this command
 /// only persists the flag.
+pub async fn set_archive_disabled_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    enabled: bool,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_archive_disabled_with_dir(&dir, state, hooks, enabled, io, host).await
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_archive_disabled<R: Runtime>(
     app: AppHandle<R>,
@@ -490,8 +732,14 @@ pub async fn set_archive_disabled<R: Runtime>(
     hooks: State<'_, crate::hooks::Hooks>,
     enabled: bool,
 ) -> Result<(), PrefsWriteError> {
-    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    set_archive_disabled_with_dir(&dir, state.inner(), hooks.inner(), enabled).await
+    set_archive_disabled_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        enabled,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
 }
 
 /// Testable core of [`set_archive_disabled`].
@@ -500,10 +748,19 @@ pub(crate) async fn set_archive_disabled_with_dir(
     state: &VaultRuntimeState,
     hooks: &crate::hooks::Hooks,
     enabled: bool,
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
 ) -> Result<(), PrefsWriteError> {
-    update_prefs_with_dir(vault_dir, state, hooks, |prefs| {
-        prefs.archive_disabled = Some(enabled);
-    })
+    update_prefs_with_dir(
+        vault_dir,
+        state,
+        hooks,
+        |prefs| {
+            prefs.archive_disabled = Some(enabled);
+        },
+        io,
+        host,
+    )
     .await?;
 
     tracing::info!(
@@ -519,6 +776,32 @@ pub(crate) async fn set_archive_disabled_with_dir(
 /// the host default. Read-modify-write under the per-plugin write mutex; no
 /// native side-effect. A free `Option<String>` stored verbatim (the
 /// `set_custom_theme` precedent class); non-load-bearing → no clamp.
+pub async fn set_active_workspace_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    value: Option<String>,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_typography_field_with_dir(
+        &dir,
+        state,
+        hooks,
+        "active_workspace",
+        |p| {
+            p.active_workspace = value;
+        },
+        io,
+        host,
+    )
+    .await
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_active_workspace<R: Runtime>(
     app: AppHandle<R>,
@@ -526,15 +809,12 @@ pub async fn set_active_workspace<R: Runtime>(
     hooks: State<'_, crate::hooks::Hooks>,
     value: Option<String>,
 ) -> Result<(), PrefsWriteError> {
-    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    set_typography_field_with_dir(
-        &dir,
+    set_active_workspace_from_host(
+        &TauriHost::new(app),
         state.inner(),
         hooks.inner(),
-        "active_workspace",
-        |p| {
-            p.active_workspace = value;
-        },
+        value,
+        &crate::vault_io::StdVaultIo,
     )
     .await
 }
@@ -544,6 +824,32 @@ pub async fn set_active_workspace<R: Runtime>(
 /// default. Read-modify-write under the write mutex; no native side-effect. A
 /// free `Option<String>` (the `set_editor_content_width` precedent class); the
 /// enum interpretation + unknown→default fallback live on the client.
+pub async fn set_editor_default_view_mode_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    value: Option<String>,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_typography_field_with_dir(
+        &dir,
+        state,
+        hooks,
+        "editor_default_view_mode",
+        |p| {
+            p.editor_default_view_mode = value;
+        },
+        io,
+        host,
+    )
+    .await
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_editor_default_view_mode<R: Runtime>(
     app: AppHandle<R>,
@@ -551,15 +857,12 @@ pub async fn set_editor_default_view_mode<R: Runtime>(
     hooks: State<'_, crate::hooks::Hooks>,
     value: Option<String>,
 ) -> Result<(), PrefsWriteError> {
-    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    set_typography_field_with_dir(
-        &dir,
+    set_editor_default_view_mode_from_host(
+        &TauriHost::new(app),
         state.inner(),
         hooks.inner(),
-        "editor_default_view_mode",
-        |p| {
-            p.editor_default_view_mode = value;
-        },
+        value,
+        &crate::vault_io::StdVaultIo,
     )
     .await
 }
@@ -569,6 +872,21 @@ pub async fn set_editor_default_view_mode<R: Runtime>(
 /// side-effect (like `set_editor_line_numbers`). Always persists an explicit
 /// `Some(enabled)` — the host applies the default focus-mode policy at read time.
 /// Non-load-bearing → no clamp.
+pub async fn set_editor_focus_dim_inactive_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    enabled: bool,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_editor_focus_dim_inactive_with_dir(&dir, state, hooks, enabled, io, host).await
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_editor_focus_dim_inactive<R: Runtime>(
     app: AppHandle<R>,
@@ -576,8 +894,14 @@ pub async fn set_editor_focus_dim_inactive<R: Runtime>(
     hooks: State<'_, crate::hooks::Hooks>,
     enabled: bool,
 ) -> Result<(), PrefsWriteError> {
-    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    set_editor_focus_dim_inactive_with_dir(&dir, state.inner(), hooks.inner(), enabled).await
+    set_editor_focus_dim_inactive_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        enabled,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
 }
 
 /// Testable core of [`set_editor_focus_dim_inactive`].
@@ -586,10 +910,19 @@ pub(crate) async fn set_editor_focus_dim_inactive_with_dir(
     state: &VaultRuntimeState,
     hooks: &crate::hooks::Hooks,
     enabled: bool,
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
 ) -> Result<(), PrefsWriteError> {
-    update_prefs_with_dir(vault_dir, state, hooks, |prefs| {
-        prefs.editor_focus_dim_inactive = Some(enabled);
-    })
+    update_prefs_with_dir(
+        vault_dir,
+        state,
+        hooks,
+        |prefs| {
+            prefs.editor_focus_dim_inactive = Some(enabled);
+        },
+        io,
+        host,
+    )
     .await?;
 
     tracing::info!(
@@ -605,6 +938,21 @@ pub(crate) async fn set_editor_focus_dim_inactive_with_dir(
 /// side-effect (like `set_editor_line_numbers`). Always persists an explicit
 /// `Some(enabled)` — the host applies the default focus-mode policy at read time.
 /// Non-load-bearing → no clamp.
+pub async fn set_editor_focus_typewriter_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    enabled: bool,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_editor_focus_typewriter_with_dir(&dir, state, hooks, enabled, io, host).await
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_editor_focus_typewriter<R: Runtime>(
     app: AppHandle<R>,
@@ -612,8 +960,14 @@ pub async fn set_editor_focus_typewriter<R: Runtime>(
     hooks: State<'_, crate::hooks::Hooks>,
     enabled: bool,
 ) -> Result<(), PrefsWriteError> {
-    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    set_editor_focus_typewriter_with_dir(&dir, state.inner(), hooks.inner(), enabled).await
+    set_editor_focus_typewriter_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        enabled,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
 }
 
 /// Testable core of [`set_editor_focus_typewriter`].
@@ -622,10 +976,19 @@ pub(crate) async fn set_editor_focus_typewriter_with_dir(
     state: &VaultRuntimeState,
     hooks: &crate::hooks::Hooks,
     enabled: bool,
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
 ) -> Result<(), PrefsWriteError> {
-    update_prefs_with_dir(vault_dir, state, hooks, |prefs| {
-        prefs.editor_focus_typewriter = Some(enabled);
-    })
+    update_prefs_with_dir(
+        vault_dir,
+        state,
+        hooks,
+        |prefs| {
+            prefs.editor_focus_typewriter = Some(enabled);
+        },
+        io,
+        host,
+    )
     .await?;
 
     tracing::info!(
@@ -642,6 +1005,21 @@ pub(crate) async fn set_editor_focus_typewriter_with_dir(
 /// plain `bool` (default `true`), so this stores the value directly (no `Some`
 /// wrap); the codec omits it on disk when `true`, so toggling back ON re-encodes
 /// byte-identical to a pre-feature vault.prefs. Non-load-bearing → no clamp.
+pub async fn set_show_note_timestamps_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    enabled: bool,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_show_note_timestamps_with_dir(&dir, state, hooks, enabled, io, host).await
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_show_note_timestamps<R: Runtime>(
     app: AppHandle<R>,
@@ -649,8 +1027,14 @@ pub async fn set_show_note_timestamps<R: Runtime>(
     hooks: State<'_, crate::hooks::Hooks>,
     enabled: bool,
 ) -> Result<(), PrefsWriteError> {
-    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    set_show_note_timestamps_with_dir(&dir, state.inner(), hooks.inner(), enabled).await
+    set_show_note_timestamps_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        enabled,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
 }
 
 /// Testable core of [`set_show_note_timestamps`].
@@ -659,10 +1043,19 @@ pub(crate) async fn set_show_note_timestamps_with_dir(
     state: &VaultRuntimeState,
     hooks: &crate::hooks::Hooks,
     enabled: bool,
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
 ) -> Result<(), PrefsWriteError> {
-    update_prefs_with_dir(vault_dir, state, hooks, |prefs| {
-        prefs.show_note_timestamps = enabled;
-    })
+    update_prefs_with_dir(
+        vault_dir,
+        state,
+        hooks,
+        |prefs| {
+            prefs.show_note_timestamps = enabled;
+        },
+        io,
+        host,
+    )
     .await?;
 
     tracing::info!(
@@ -680,6 +1073,21 @@ pub(crate) async fn set_show_note_timestamps_with_dir(
 /// (folded-identity dedup is the caller's job). Non-load-bearing → no clamp.
 /// Logs the COUNT only — the specific language tags are mildly fingerprintable,
 /// so they stay off the log surface (mirrors `set_deliberate_folders`).
+pub async fn set_spell_languages_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    languages: Vec<String>,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_spell_languages_with_dir(&dir, state, hooks, languages, io, host).await
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_spell_languages<R: Runtime>(
     app: AppHandle<R>,
@@ -687,8 +1095,14 @@ pub async fn set_spell_languages<R: Runtime>(
     hooks: State<'_, crate::hooks::Hooks>,
     languages: Vec<String>,
 ) -> Result<(), PrefsWriteError> {
-    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    set_spell_languages_with_dir(&dir, state.inner(), hooks.inner(), languages).await
+    set_spell_languages_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        languages,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
 }
 
 /// Testable core of [`set_spell_languages`].
@@ -697,11 +1111,20 @@ pub(crate) async fn set_spell_languages_with_dir(
     state: &VaultRuntimeState,
     hooks: &crate::hooks::Hooks,
     languages: Vec<String>,
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
 ) -> Result<(), PrefsWriteError> {
     let count = languages.len();
-    update_prefs_with_dir(vault_dir, state, hooks, |prefs| {
-        prefs.spell_languages = languages;
-    })
+    update_prefs_with_dir(
+        vault_dir,
+        state,
+        hooks,
+        |prefs| {
+            prefs.spell_languages = languages;
+        },
+        io,
+        host,
+    )
     .await?;
 
     tracing::info!(event = "prefs_written", field = "spell_languages", count);
@@ -723,6 +1146,22 @@ pub(crate) async fn set_spell_languages_with_dir(
 /// chord strings (a user's specific binding is mildly fingerprintable, like
 /// `spell_languages`). Inherits the main-window-only invariant of the other
 /// `set_*` setters.
+pub async fn set_keymap_binding_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    command_id: String,
+    chords: Option<Vec<String>>,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_keymap_binding_with_dir(&dir, state, hooks, command_id, chords, io, host).await
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_keymap_binding<R: Runtime>(
     app: AppHandle<R>,
@@ -731,8 +1170,15 @@ pub async fn set_keymap_binding<R: Runtime>(
     command_id: String,
     chords: Option<Vec<String>>,
 ) -> Result<(), PrefsWriteError> {
-    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    set_keymap_binding_with_dir(&dir, state.inner(), hooks.inner(), command_id, chords).await
+    set_keymap_binding_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        command_id,
+        chords,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
 }
 
 /// Testable core of [`set_keymap_binding`].
@@ -742,17 +1188,26 @@ pub(crate) async fn set_keymap_binding_with_dir(
     hooks: &crate::hooks::Hooks,
     command_id: String,
     chords: Option<Vec<String>>,
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
 ) -> Result<(), PrefsWriteError> {
     let removed = chords.is_none();
     let count = chords.as_ref().map(Vec::len).unwrap_or(0);
-    update_prefs_with_dir(vault_dir, state, hooks, |prefs| match chords {
-        Some(c) => {
-            prefs.keymap.insert(command_id, c);
-        }
-        None => {
-            prefs.keymap.remove(&command_id);
-        }
-    })
+    update_prefs_with_dir(
+        vault_dir,
+        state,
+        hooks,
+        |prefs| match chords {
+            Some(c) => {
+                prefs.keymap.insert(command_id, c);
+            }
+            None => {
+                prefs.keymap.remove(&command_id);
+            }
+        },
+        io,
+        host,
+    )
     .await?;
 
     tracing::info!(event = "prefs_written", field = "keymap", removed, count);
@@ -769,6 +1224,21 @@ pub(crate) async fn set_keymap_binding_with_dir(
 /// (union + add-wins is a Phase 2 sync-merge concern, not a v0.1
 /// write-API concern). Folded-identity dedup is the caller's job; the
 /// codec only sorts + exact-dedups for canonical byte-stability.
+pub async fn set_deliberate_folders_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    folders: Vec<String>,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_deliberate_folders_with_dir(&dir, state, hooks, folders, io, host).await
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_deliberate_folders<R: Runtime>(
     app: AppHandle<R>,
@@ -776,8 +1246,14 @@ pub async fn set_deliberate_folders<R: Runtime>(
     hooks: State<'_, crate::hooks::Hooks>,
     folders: Vec<String>,
 ) -> Result<(), PrefsWriteError> {
-    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    set_deliberate_folders_with_dir(&dir, state.inner(), hooks.inner(), folders).await
+    set_deliberate_folders_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        folders,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
 }
 
 /// Testable core of [`set_deliberate_folders`].
@@ -786,11 +1262,20 @@ pub async fn set_deliberate_folders_with_dir(
     state: &VaultRuntimeState,
     hooks: &crate::hooks::Hooks,
     folders: Vec<String>,
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
 ) -> Result<(), PrefsWriteError> {
     let count = folders.len();
-    update_prefs_with_dir(vault_dir, state, hooks, |prefs| {
-        prefs.deliberate_folders = folders;
-    })
+    update_prefs_with_dir(
+        vault_dir,
+        state,
+        hooks,
+        |prefs| {
+            prefs.deliberate_folders = folders;
+        },
+        io,
+        host,
+    )
     .await?;
 
     // Folder COUNT only — never the paths (folder structure is AS3
@@ -808,6 +1293,21 @@ pub async fn set_deliberate_folders_with_dir(
 /// single-device writes it verbatim (union + add-wins is a Phase 2 sync-merge
 /// concern). Folded-identity dedup is the caller's job; the codec only sorts +
 /// exact-dedups for canonical byte-stability.
+pub async fn set_archived_folders_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    folders: Vec<String>,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_archived_folders_with_dir(&dir, state, hooks, folders, io, host).await
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_archived_folders<R: Runtime>(
     app: AppHandle<R>,
@@ -815,8 +1315,14 @@ pub async fn set_archived_folders<R: Runtime>(
     hooks: State<'_, crate::hooks::Hooks>,
     folders: Vec<String>,
 ) -> Result<(), PrefsWriteError> {
-    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    set_archived_folders_with_dir(&dir, state.inner(), hooks.inner(), folders).await
+    set_archived_folders_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        folders,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
 }
 
 /// Testable core of [`set_archived_folders`].
@@ -825,11 +1331,20 @@ pub async fn set_archived_folders_with_dir(
     state: &VaultRuntimeState,
     hooks: &crate::hooks::Hooks,
     folders: Vec<String>,
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
 ) -> Result<(), PrefsWriteError> {
     let count = folders.len();
-    update_prefs_with_dir(vault_dir, state, hooks, |prefs| {
-        prefs.archived_folders = folders;
-    })
+    update_prefs_with_dir(
+        vault_dir,
+        state,
+        hooks,
+        |prefs| {
+            prefs.archived_folders = folders;
+        },
+        io,
+        host,
+    )
     .await?;
 
     // Folder COUNT only — never the paths (folder structure is AS3
@@ -843,6 +1358,29 @@ pub async fn set_archived_folders_with_dir(
 /// per-plugin write mutex; **no native side-effect** (same shape as
 /// `set_deliberate_folders`). Per-vault + encrypted in `vault.prefs` (the
 /// at-rest "uses AI" fingerprint never leaks).
+pub async fn set_ai_enabled_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    enabled: bool,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    // Disk-side commit FIRST, under the mutex.
+    set_ai_enabled_with_dir(&dir, state, hooks, enabled, io, host).await?;
+    // Reflect the new policy into the AI runtime SECOND (desktop-only; mobile
+    // no-op). Read back the authoritative post-write policy so both the opt-in
+    // and the current exclusion set are consistent (SYNC-14).
+    if let Ok(view) = prefs_read_with_dir(&dir, state, io).await {
+        hooks.ai_policy_changed(view.ai_enabled, &view.ai_excluded_folders);
+    }
+    Ok(())
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_ai_enabled<R: Runtime>(
     app: AppHandle<R>,
@@ -850,16 +1388,14 @@ pub async fn set_ai_enabled<R: Runtime>(
     hooks: State<'_, crate::hooks::Hooks>,
     enabled: bool,
 ) -> Result<(), PrefsWriteError> {
-    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    // Disk-side commit FIRST, under the mutex.
-    set_ai_enabled_with_dir(&dir, state.inner(), hooks.inner(), enabled).await?;
-    // Reflect the new policy into the AI runtime SECOND (desktop-only; mobile
-    // no-op). Read back the authoritative post-write policy so both the opt-in
-    // and the current exclusion set are consistent (SYNC-14).
-    if let Ok(view) = prefs_read_with_dir(&dir, state.inner()).await {
-        hooks.ai_policy_changed(view.ai_enabled, &view.ai_excluded_folders);
-    }
-    Ok(())
+    set_ai_enabled_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        enabled,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
 }
 
 /// Testable core of [`set_ai_enabled`].
@@ -868,10 +1404,19 @@ pub(crate) async fn set_ai_enabled_with_dir(
     state: &VaultRuntimeState,
     hooks: &crate::hooks::Hooks,
     enabled: bool,
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
 ) -> Result<(), PrefsWriteError> {
-    update_prefs_with_dir(vault_dir, state, hooks, |prefs| {
-        prefs.ai_enabled = enabled;
-    })
+    update_prefs_with_dir(
+        vault_dir,
+        state,
+        hooks,
+        |prefs| {
+            prefs.ai_enabled = enabled;
+        },
+        io,
+        host,
+    )
     .await?;
 
     tracing::info!(event = "prefs_written", field = "ai_enabled", enabled);
@@ -887,6 +1432,21 @@ pub(crate) async fn set_ai_enabled_with_dir(
 /// never deletes cached results, so toggling costs the user nothing. Device-local
 /// (`sync-protocol.md` §10.2): per-device compute budget, so a phone can opt out
 /// without disabling OCR on the desktop.
+pub async fn set_attachment_ocr_enabled_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    enabled: bool,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_attachment_ocr_enabled_with_dir(&dir, state, hooks, enabled, io, host).await
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_attachment_ocr_enabled<R: Runtime>(
     app: AppHandle<R>,
@@ -894,8 +1454,14 @@ pub async fn set_attachment_ocr_enabled<R: Runtime>(
     hooks: State<'_, crate::hooks::Hooks>,
     enabled: bool,
 ) -> Result<(), PrefsWriteError> {
-    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    set_attachment_ocr_enabled_with_dir(&dir, state.inner(), hooks.inner(), enabled).await
+    set_attachment_ocr_enabled_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        enabled,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
 }
 
 /// Testable core of [`set_attachment_ocr_enabled`].
@@ -904,10 +1470,19 @@ pub(crate) async fn set_attachment_ocr_enabled_with_dir(
     state: &VaultRuntimeState,
     hooks: &crate::hooks::Hooks,
     enabled: bool,
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
 ) -> Result<(), PrefsWriteError> {
-    update_prefs_with_dir(vault_dir, state, hooks, |prefs| {
-        prefs.attachment_ocr_enabled = enabled;
-    })
+    update_prefs_with_dir(
+        vault_dir,
+        state,
+        hooks,
+        |prefs| {
+            prefs.attachment_ocr_enabled = enabled;
+        },
+        io,
+        host,
+    )
     .await?;
 
     tracing::info!(
@@ -922,6 +1497,29 @@ pub(crate) async fn set_attachment_ocr_enabled_with_dir(
 /// epic, ai-ux-surface MYND-408, SYNC-14) — folders the AI never reads/indexes.
 /// Same canonical set encoding as `deliberate_folders`; direct mirror of
 /// [`set_deliberate_folders`] (read-modify-write, no native side-effect).
+pub async fn set_ai_excluded_folders_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    folders: Vec<String>,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    // Disk-side commit FIRST, under the mutex.
+    set_ai_excluded_folders_with_dir(&dir, state, hooks, folders, io, host).await?;
+    // Reflect the new exclusion set into the AI runtime SECOND: purge any
+    // now-excluded note from the resident store + persisted blob (SYNC-14).
+    // Read back the authoritative policy (opt-in may be off).
+    if let Ok(view) = prefs_read_with_dir(&dir, state, io).await {
+        hooks.ai_policy_changed(view.ai_enabled, &view.ai_excluded_folders);
+    }
+    Ok(())
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_ai_excluded_folders<R: Runtime>(
     app: AppHandle<R>,
@@ -929,16 +1527,14 @@ pub async fn set_ai_excluded_folders<R: Runtime>(
     hooks: State<'_, crate::hooks::Hooks>,
     folders: Vec<String>,
 ) -> Result<(), PrefsWriteError> {
-    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    // Disk-side commit FIRST, under the mutex.
-    set_ai_excluded_folders_with_dir(&dir, state.inner(), hooks.inner(), folders).await?;
-    // Reflect the new exclusion set into the AI runtime SECOND: purge any
-    // now-excluded note from the resident store + persisted blob (SYNC-14).
-    // Read back the authoritative policy (opt-in may be off).
-    if let Ok(view) = prefs_read_with_dir(&dir, state.inner()).await {
-        hooks.ai_policy_changed(view.ai_enabled, &view.ai_excluded_folders);
-    }
-    Ok(())
+    set_ai_excluded_folders_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        folders,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
 }
 
 /// Testable core of [`set_ai_excluded_folders`].
@@ -947,11 +1543,20 @@ pub(crate) async fn set_ai_excluded_folders_with_dir(
     state: &VaultRuntimeState,
     hooks: &crate::hooks::Hooks,
     folders: Vec<String>,
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
 ) -> Result<(), PrefsWriteError> {
     let count = folders.len();
-    update_prefs_with_dir(vault_dir, state, hooks, |prefs| {
-        prefs.ai_excluded_folders = folders;
-    })
+    update_prefs_with_dir(
+        vault_dir,
+        state,
+        hooks,
+        |prefs| {
+            prefs.ai_excluded_folders = folders;
+        },
+        io,
+        host,
+    )
     .await?;
 
     // Folder COUNT only — never the paths (AS3 Sensitive; see the
@@ -973,6 +1578,21 @@ pub(crate) async fn set_ai_excluded_folders_with_dir(
 /// single-device writes it verbatim. Unlike `deliberate_folders`, the codec
 /// preserves element order — the sequence IS the payload
 /// (`protocol::PrefsView::item_order`).
+pub async fn set_item_order_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    order: Vec<String>,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_item_order_with_dir(&dir, state, hooks, order, io, host).await
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_item_order<R: Runtime>(
     app: AppHandle<R>,
@@ -980,8 +1600,14 @@ pub async fn set_item_order<R: Runtime>(
     hooks: State<'_, crate::hooks::Hooks>,
     order: Vec<String>,
 ) -> Result<(), PrefsWriteError> {
-    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    set_item_order_with_dir(&dir, state.inner(), hooks.inner(), order).await
+    set_item_order_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        order,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
 }
 
 /// Testable core of [`set_item_order`].
@@ -990,11 +1616,20 @@ pub(crate) async fn set_item_order_with_dir(
     state: &VaultRuntimeState,
     hooks: &crate::hooks::Hooks,
     order: Vec<String>,
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
 ) -> Result<(), PrefsWriteError> {
     let count = order.len();
-    update_prefs_with_dir(vault_dir, state, hooks, |prefs| {
-        prefs.item_order = order;
-    })
+    update_prefs_with_dir(
+        vault_dir,
+        state,
+        hooks,
+        |prefs| {
+            prefs.item_order = order;
+        },
+        io,
+        host,
+    )
     .await?;
 
     // COUNT only — never the item IDs/paths (note_id is a per-note vault-stable
@@ -1011,6 +1646,21 @@ pub(crate) async fn set_item_order_with_dir(
 /// full desired set; the codec canonicalizes it (sorted + exact-deduped) on
 /// encode (`protocol::PrefsView::hidden_bar_items`). An empty set is the default
 /// (bar fully visible) and encodes to byte-identical-to-pre-feature.
+pub async fn set_hidden_bar_items_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    items: Vec<String>,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_hidden_bar_items_with_dir(&dir, state, hooks, items, io, host).await
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_hidden_bar_items<R: Runtime>(
     app: AppHandle<R>,
@@ -1018,8 +1668,14 @@ pub async fn set_hidden_bar_items<R: Runtime>(
     hooks: State<'_, crate::hooks::Hooks>,
     items: Vec<String>,
 ) -> Result<(), PrefsWriteError> {
-    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    set_hidden_bar_items_with_dir(&dir, state.inner(), hooks.inner(), items).await
+    set_hidden_bar_items_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        items,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
 }
 
 /// Testable core of [`set_hidden_bar_items`].
@@ -1028,11 +1684,20 @@ pub(crate) async fn set_hidden_bar_items_with_dir(
     state: &VaultRuntimeState,
     hooks: &crate::hooks::Hooks,
     items: Vec<String>,
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
 ) -> Result<(), PrefsWriteError> {
     let count = items.len();
-    update_prefs_with_dir(vault_dir, state, hooks, |prefs| {
-        prefs.hidden_bar_items = items;
-    })
+    update_prefs_with_dir(
+        vault_dir,
+        state,
+        hooks,
+        |prefs| {
+            prefs.hidden_bar_items = items;
+        },
+        io,
+        host,
+    )
     .await?;
 
     // COUNT only — the ids are a non-secret closed UI vocabulary, but stay
@@ -1051,6 +1716,21 @@ pub(crate) async fn set_hidden_bar_items_with_dir(
 /// untouched (story 13). Logs the view COUNT only — a view's name / filter /
 /// referenced property is AS3-Sensitive and never reaches the log surface (see
 /// ../../CLAUDE.md "Secret-handling logging discipline").
+pub async fn upsert_saved_view_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    view: SavedView,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    upsert_saved_view_with_dir(&dir, state, hooks, view, io, host).await
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn upsert_saved_view<R: Runtime>(
     app: AppHandle<R>,
@@ -1058,8 +1738,14 @@ pub async fn upsert_saved_view<R: Runtime>(
     hooks: State<'_, crate::hooks::Hooks>,
     view: SavedView,
 ) -> Result<(), PrefsWriteError> {
-    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    upsert_saved_view_with_dir(&dir, state.inner(), hooks.inner(), view).await
+    upsert_saved_view_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        view,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
 }
 
 /// Testable core of [`upsert_saved_view`].
@@ -1068,16 +1754,25 @@ pub(crate) async fn upsert_saved_view_with_dir(
     state: &VaultRuntimeState,
     hooks: &crate::hooks::Hooks,
     view: SavedView,
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
 ) -> Result<(), PrefsWriteError> {
     let mut count = 0usize;
-    update_prefs_with_dir(vault_dir, state, hooks, |prefs| {
-        // Upsert by id: replace in place, else append. No duplicate ids.
-        match prefs.saved_views.iter_mut().find(|v| v.id == view.id) {
-            Some(existing) => *existing = view,
-            None => prefs.saved_views.push(view),
-        }
-        count = prefs.saved_views.len();
-    })
+    update_prefs_with_dir(
+        vault_dir,
+        state,
+        hooks,
+        |prefs| {
+            // Upsert by id: replace in place, else append. No duplicate ids.
+            match prefs.saved_views.iter_mut().find(|v| v.id == view.id) {
+                Some(existing) => *existing = view,
+                None => prefs.saved_views.push(view),
+            }
+            count = prefs.saved_views.len();
+        },
+        io,
+        host,
+    )
     .await?;
 
     // COUNT only — never a view name / filter / property (AS3-Sensitive).
@@ -1090,6 +1785,21 @@ pub(crate) async fn upsert_saved_view_with_dir(
 /// view leaves no dangling display-order entry). Read-modify-write under the
 /// per-plugin write mutex; no native side-effect. Deleting an absent id is a
 /// no-op success (idempotent). Logs the post-delete view COUNT only.
+pub async fn delete_saved_view_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    id: String,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    delete_saved_view_with_dir(&dir, state, hooks, id, io, host).await
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn delete_saved_view<R: Runtime>(
     app: AppHandle<R>,
@@ -1097,8 +1807,14 @@ pub async fn delete_saved_view<R: Runtime>(
     hooks: State<'_, crate::hooks::Hooks>,
     id: String,
 ) -> Result<(), PrefsWriteError> {
-    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    delete_saved_view_with_dir(&dir, state.inner(), hooks.inner(), id).await
+    delete_saved_view_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        id,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
 }
 
 /// Testable core of [`delete_saved_view`].
@@ -1107,14 +1823,23 @@ pub(crate) async fn delete_saved_view_with_dir(
     state: &VaultRuntimeState,
     hooks: &crate::hooks::Hooks,
     id: String,
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
 ) -> Result<(), PrefsWriteError> {
     let mut count = 0usize;
-    update_prefs_with_dir(vault_dir, state, hooks, |prefs| {
-        prefs.saved_views.retain(|v| v.id != id);
-        // Prune the id from the display order too (no dangling entry).
-        prefs.view_order.retain(|vid| *vid != id);
-        count = prefs.saved_views.len();
-    })
+    update_prefs_with_dir(
+        vault_dir,
+        state,
+        hooks,
+        |prefs| {
+            prefs.saved_views.retain(|v| v.id != id);
+            // Prune the id from the display order too (no dangling entry).
+            prefs.view_order.retain(|vid| *vid != id);
+            count = prefs.saved_views.len();
+        },
+        io,
+        host,
+    )
     .await?;
 
     // COUNT only — never the view id (AS3-Sensitive correlation surface).
@@ -1129,6 +1854,21 @@ pub(crate) async fn delete_saved_view_with_dir(
 /// payload — same discipline as `set_item_order`). Stale-id pruning is the
 /// caller's job; the codec performs no GC (mirroring `favorites`). Logs the
 /// COUNT only.
+pub async fn set_view_order_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    order: Vec<String>,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_view_order_with_dir(&dir, state, hooks, order, io, host).await
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_view_order<R: Runtime>(
     app: AppHandle<R>,
@@ -1136,8 +1876,14 @@ pub async fn set_view_order<R: Runtime>(
     hooks: State<'_, crate::hooks::Hooks>,
     order: Vec<String>,
 ) -> Result<(), PrefsWriteError> {
-    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    set_view_order_with_dir(&dir, state.inner(), hooks.inner(), order).await
+    set_view_order_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        order,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
 }
 
 /// Testable core of [`set_view_order`].
@@ -1146,11 +1892,20 @@ pub(crate) async fn set_view_order_with_dir(
     state: &VaultRuntimeState,
     hooks: &crate::hooks::Hooks,
     order: Vec<String>,
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
 ) -> Result<(), PrefsWriteError> {
     let count = order.len();
-    update_prefs_with_dir(vault_dir, state, hooks, |prefs| {
-        prefs.view_order = order;
-    })
+    update_prefs_with_dir(
+        vault_dir,
+        state,
+        hooks,
+        |prefs| {
+            prefs.view_order = order;
+        },
+        io,
+        host,
+    )
     .await?;
 
     // COUNT only — never the view ids (AS3-Sensitive correlation surface).
@@ -1165,6 +1920,21 @@ pub(crate) async fn set_view_order_with_dir(
 /// right-cluster bar element ids; the codec preserves element order VERBATIM
 /// (the sequence is the payload). Unknown-id pruning is the caller's job; the
 /// codec performs no GC. Logs the COUNT only.
+pub async fn set_bar_items_order_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    order: Vec<String>,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_bar_items_order_with_dir(&dir, state, hooks, order, io, host).await
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_bar_items_order<R: Runtime>(
     app: AppHandle<R>,
@@ -1172,8 +1942,14 @@ pub async fn set_bar_items_order<R: Runtime>(
     hooks: State<'_, crate::hooks::Hooks>,
     order: Vec<String>,
 ) -> Result<(), PrefsWriteError> {
-    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    set_bar_items_order_with_dir(&dir, state.inner(), hooks.inner(), order).await
+    set_bar_items_order_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        order,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
 }
 
 /// Testable core of [`set_bar_items_order`].
@@ -1182,11 +1958,20 @@ pub(crate) async fn set_bar_items_order_with_dir(
     state: &VaultRuntimeState,
     hooks: &crate::hooks::Hooks,
     order: Vec<String>,
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
 ) -> Result<(), PrefsWriteError> {
     let count = order.len();
-    update_prefs_with_dir(vault_dir, state, hooks, |prefs| {
-        prefs.bar_items_order = order;
-    })
+    update_prefs_with_dir(
+        vault_dir,
+        state,
+        hooks,
+        |prefs| {
+            prefs.bar_items_order = order;
+        },
+        io,
+        host,
+    )
     .await?;
 
     // COUNT only — the bar element ids are fixed UI affordance names, but keep
@@ -1200,6 +1985,32 @@ pub(crate) async fn set_bar_items_order_with_dir(
 /// clear back to the host default. Read-modify-write under the per-plugin write
 /// mutex; no native side-effect. A free `Option<String>` stored verbatim (the
 /// `set_active_workspace` precedent class); non-load-bearing → no clamp.
+pub async fn set_right_panel_active_tab_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    value: Option<String>,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_typography_field_with_dir(
+        &dir,
+        state,
+        hooks,
+        "right_panel_active_tab",
+        |p| {
+            p.right_panel_active_tab = value;
+        },
+        io,
+        host,
+    )
+    .await
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_right_panel_active_tab<R: Runtime>(
     app: AppHandle<R>,
@@ -1207,15 +2018,12 @@ pub async fn set_right_panel_active_tab<R: Runtime>(
     hooks: State<'_, crate::hooks::Hooks>,
     value: Option<String>,
 ) -> Result<(), PrefsWriteError> {
-    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    set_typography_field_with_dir(
-        &dir,
+    set_right_panel_active_tab_from_host(
+        &TauriHost::new(app),
         state.inner(),
         hooks.inner(),
-        "right_panel_active_tab",
-        |p| {
-            p.right_panel_active_tab = value;
-        },
+        value,
+        &crate::vault_io::StdVaultIo,
     )
     .await
 }
@@ -1226,6 +2034,21 @@ pub async fn set_right_panel_active_tab<R: Runtime>(
 /// full desired set; the codec canonicalizes it (sorted + exact-deduped) on
 /// encode. An empty set is the default (every tab visible) and encodes to
 /// byte-identical-to-pre-feature.
+pub async fn set_right_panel_hidden_tabs_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    items: Vec<String>,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_right_panel_hidden_tabs_with_dir(&dir, state, hooks, items, io, host).await
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_right_panel_hidden_tabs<R: Runtime>(
     app: AppHandle<R>,
@@ -1233,8 +2056,14 @@ pub async fn set_right_panel_hidden_tabs<R: Runtime>(
     hooks: State<'_, crate::hooks::Hooks>,
     items: Vec<String>,
 ) -> Result<(), PrefsWriteError> {
-    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    set_right_panel_hidden_tabs_with_dir(&dir, state.inner(), hooks.inner(), items).await
+    set_right_panel_hidden_tabs_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        items,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
 }
 
 /// Testable core of [`set_right_panel_hidden_tabs`].
@@ -1243,11 +2072,20 @@ pub(crate) async fn set_right_panel_hidden_tabs_with_dir(
     state: &VaultRuntimeState,
     hooks: &crate::hooks::Hooks,
     items: Vec<String>,
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
 ) -> Result<(), PrefsWriteError> {
     let count = items.len();
-    update_prefs_with_dir(vault_dir, state, hooks, |prefs| {
-        prefs.right_panel_hidden_tabs = items;
-    })
+    update_prefs_with_dir(
+        vault_dir,
+        state,
+        hooks,
+        |prefs| {
+            prefs.right_panel_hidden_tabs = items;
+        },
+        io,
+        host,
+    )
     .await?;
 
     // COUNT only — the tab ids are a non-secret closed UI vocabulary, but stay
@@ -1266,6 +2104,21 @@ pub(crate) async fn set_right_panel_hidden_tabs_with_dir(
 /// `set_bar_items_order`). The caller passes the full desired sequence of tab
 /// ids; the codec preserves element order VERBATIM. Unknown-id pruning is the
 /// caller's job; the codec performs no GC. Logs the COUNT only.
+pub async fn set_right_panel_tab_order_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    order: Vec<String>,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_right_panel_tab_order_with_dir(&dir, state, hooks, order, io, host).await
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_right_panel_tab_order<R: Runtime>(
     app: AppHandle<R>,
@@ -1273,8 +2126,14 @@ pub async fn set_right_panel_tab_order<R: Runtime>(
     hooks: State<'_, crate::hooks::Hooks>,
     order: Vec<String>,
 ) -> Result<(), PrefsWriteError> {
-    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    set_right_panel_tab_order_with_dir(&dir, state.inner(), hooks.inner(), order).await
+    set_right_panel_tab_order_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        order,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
 }
 
 /// Testable core of [`set_right_panel_tab_order`].
@@ -1283,11 +2142,20 @@ pub(crate) async fn set_right_panel_tab_order_with_dir(
     state: &VaultRuntimeState,
     hooks: &crate::hooks::Hooks,
     order: Vec<String>,
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
 ) -> Result<(), PrefsWriteError> {
     let count = order.len();
-    update_prefs_with_dir(vault_dir, state, hooks, |prefs| {
-        prefs.right_panel_tab_order = order;
-    })
+    update_prefs_with_dir(
+        vault_dir,
+        state,
+        hooks,
+        |prefs| {
+            prefs.right_panel_tab_order = order;
+        },
+        io,
+        host,
+    )
     .await?;
 
     // COUNT only — the tab ids are fixed UI affordance names, but keep the
@@ -1305,6 +2173,21 @@ pub(crate) async fn set_right_panel_tab_order_with_dir(
 // verbatim sequence, *_hidden is a set the codec canonicalizes on encode.
 
 /// Slot::Unlocked-gated setter for `editor_toolbar_order` (verbatim sequence).
+pub async fn set_editor_toolbar_order_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    order: Vec<String>,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_editor_toolbar_order_with_dir(&dir, state, hooks, order, io, host).await
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_editor_toolbar_order<R: Runtime>(
     app: AppHandle<R>,
@@ -1312,8 +2195,14 @@ pub async fn set_editor_toolbar_order<R: Runtime>(
     hooks: State<'_, crate::hooks::Hooks>,
     order: Vec<String>,
 ) -> Result<(), PrefsWriteError> {
-    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    set_editor_toolbar_order_with_dir(&dir, state.inner(), hooks.inner(), order).await
+    set_editor_toolbar_order_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        order,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
 }
 
 /// Testable core of [`set_editor_toolbar_order`].
@@ -1322,11 +2211,20 @@ pub(crate) async fn set_editor_toolbar_order_with_dir(
     state: &VaultRuntimeState,
     hooks: &crate::hooks::Hooks,
     order: Vec<String>,
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
 ) -> Result<(), PrefsWriteError> {
     let count = order.len();
-    update_prefs_with_dir(vault_dir, state, hooks, |prefs| {
-        prefs.editor_toolbar_order = order;
-    })
+    update_prefs_with_dir(
+        vault_dir,
+        state,
+        hooks,
+        |prefs| {
+            prefs.editor_toolbar_order = order;
+        },
+        io,
+        host,
+    )
     .await?;
     tracing::info!(
         event = "prefs_written",
@@ -1337,6 +2235,21 @@ pub(crate) async fn set_editor_toolbar_order_with_dir(
 }
 
 /// Slot::Unlocked-gated setter for `editor_toolbar_hidden` (sorted+deduped set).
+pub async fn set_editor_toolbar_hidden_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    items: Vec<String>,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_editor_toolbar_hidden_with_dir(&dir, state, hooks, items, io, host).await
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_editor_toolbar_hidden<R: Runtime>(
     app: AppHandle<R>,
@@ -1344,8 +2257,14 @@ pub async fn set_editor_toolbar_hidden<R: Runtime>(
     hooks: State<'_, crate::hooks::Hooks>,
     items: Vec<String>,
 ) -> Result<(), PrefsWriteError> {
-    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    set_editor_toolbar_hidden_with_dir(&dir, state.inner(), hooks.inner(), items).await
+    set_editor_toolbar_hidden_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        items,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
 }
 
 /// Testable core of [`set_editor_toolbar_hidden`].
@@ -1354,11 +2273,20 @@ pub(crate) async fn set_editor_toolbar_hidden_with_dir(
     state: &VaultRuntimeState,
     hooks: &crate::hooks::Hooks,
     items: Vec<String>,
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
 ) -> Result<(), PrefsWriteError> {
     let count = items.len();
-    update_prefs_with_dir(vault_dir, state, hooks, |prefs| {
-        prefs.editor_toolbar_hidden = items;
-    })
+    update_prefs_with_dir(
+        vault_dir,
+        state,
+        hooks,
+        |prefs| {
+            prefs.editor_toolbar_hidden = items;
+        },
+        io,
+        host,
+    )
     .await?;
     tracing::info!(
         event = "prefs_written",
@@ -1369,6 +2297,21 @@ pub(crate) async fn set_editor_toolbar_hidden_with_dir(
 }
 
 /// Slot::Unlocked-gated setter for `editor_slash_order` (verbatim sequence).
+pub async fn set_editor_slash_order_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    order: Vec<String>,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_editor_slash_order_with_dir(&dir, state, hooks, order, io, host).await
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_editor_slash_order<R: Runtime>(
     app: AppHandle<R>,
@@ -1376,8 +2319,14 @@ pub async fn set_editor_slash_order<R: Runtime>(
     hooks: State<'_, crate::hooks::Hooks>,
     order: Vec<String>,
 ) -> Result<(), PrefsWriteError> {
-    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    set_editor_slash_order_with_dir(&dir, state.inner(), hooks.inner(), order).await
+    set_editor_slash_order_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        order,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
 }
 
 /// Testable core of [`set_editor_slash_order`].
@@ -1386,17 +2335,41 @@ pub(crate) async fn set_editor_slash_order_with_dir(
     state: &VaultRuntimeState,
     hooks: &crate::hooks::Hooks,
     order: Vec<String>,
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
 ) -> Result<(), PrefsWriteError> {
     let count = order.len();
-    update_prefs_with_dir(vault_dir, state, hooks, |prefs| {
-        prefs.editor_slash_order = order;
-    })
+    update_prefs_with_dir(
+        vault_dir,
+        state,
+        hooks,
+        |prefs| {
+            prefs.editor_slash_order = order;
+        },
+        io,
+        host,
+    )
     .await?;
     tracing::info!(event = "prefs_written", field = "editor_slash_order", count);
     Ok(())
 }
 
 /// Slot::Unlocked-gated setter for `editor_slash_hidden` (sorted+deduped set).
+pub async fn set_editor_slash_hidden_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    items: Vec<String>,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_editor_slash_hidden_with_dir(&dir, state, hooks, items, io, host).await
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_editor_slash_hidden<R: Runtime>(
     app: AppHandle<R>,
@@ -1404,8 +2377,14 @@ pub async fn set_editor_slash_hidden<R: Runtime>(
     hooks: State<'_, crate::hooks::Hooks>,
     items: Vec<String>,
 ) -> Result<(), PrefsWriteError> {
-    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    set_editor_slash_hidden_with_dir(&dir, state.inner(), hooks.inner(), items).await
+    set_editor_slash_hidden_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        items,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
 }
 
 /// Testable core of [`set_editor_slash_hidden`].
@@ -1414,11 +2393,20 @@ pub(crate) async fn set_editor_slash_hidden_with_dir(
     state: &VaultRuntimeState,
     hooks: &crate::hooks::Hooks,
     items: Vec<String>,
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
 ) -> Result<(), PrefsWriteError> {
     let count = items.len();
-    update_prefs_with_dir(vault_dir, state, hooks, |prefs| {
-        prefs.editor_slash_hidden = items;
-    })
+    update_prefs_with_dir(
+        vault_dir,
+        state,
+        hooks,
+        |prefs| {
+            prefs.editor_slash_hidden = items;
+        },
+        io,
+        host,
+    )
     .await?;
     tracing::info!(
         event = "prefs_written",
@@ -1432,6 +2420,21 @@ pub(crate) async fn set_editor_slash_hidden_with_dir(
 /// the daily-notes date-format string (e.g. `YYYY-MM-DD`). Read-modify-write
 /// under the per-plugin write mutex; no native side-effect. Disk-first. The
 /// field is non-load-bearing (cold/derivable); no protective-envelope clamp.
+pub async fn set_daily_date_format_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    format: String,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_daily_date_format_with_dir(&dir, state, hooks, format, io, host).await
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_daily_date_format<R: Runtime>(
     app: AppHandle<R>,
@@ -1439,8 +2442,14 @@ pub async fn set_daily_date_format<R: Runtime>(
     hooks: State<'_, crate::hooks::Hooks>,
     format: String,
 ) -> Result<(), PrefsWriteError> {
-    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    set_daily_date_format_with_dir(&dir, state.inner(), hooks.inner(), format).await
+    set_daily_date_format_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        format,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
 }
 
 /// Testable core of [`set_daily_date_format`].
@@ -1449,10 +2458,19 @@ pub(crate) async fn set_daily_date_format_with_dir(
     state: &VaultRuntimeState,
     hooks: &crate::hooks::Hooks,
     format: String,
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
 ) -> Result<(), PrefsWriteError> {
-    update_prefs_with_dir(vault_dir, state, hooks, |prefs| {
-        prefs.daily_date_format = Some(format);
-    })
+    update_prefs_with_dir(
+        vault_dir,
+        state,
+        hooks,
+        |prefs| {
+            prefs.daily_date_format = Some(format);
+        },
+        io,
+        host,
+    )
     .await?;
 
     tracing::info!(event = "prefs_written", field = "daily_date_format");
@@ -1464,6 +2482,21 @@ pub(crate) async fn set_daily_date_format_with_dir(
 /// folder ALSO registers it as a deliberate folder (union, exact-dedup) so the
 /// folder survives empty (the virtual-folder model, MYND-144). Read-modify-write
 /// under the write mutex; no native side-effect; disk-first. Non-load-bearing.
+pub async fn set_daily_folder_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    folder: String,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_daily_folder_with_dir(&dir, state, hooks, folder, io, host).await
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_daily_folder<R: Runtime>(
     app: AppHandle<R>,
@@ -1471,8 +2504,14 @@ pub async fn set_daily_folder<R: Runtime>(
     hooks: State<'_, crate::hooks::Hooks>,
     folder: String,
 ) -> Result<(), PrefsWriteError> {
-    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    set_daily_folder_with_dir(&dir, state.inner(), hooks.inner(), folder).await
+    set_daily_folder_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        folder,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
 }
 
 /// Testable core of [`set_daily_folder`].
@@ -1481,15 +2520,24 @@ pub(crate) async fn set_daily_folder_with_dir(
     state: &VaultRuntimeState,
     hooks: &crate::hooks::Hooks,
     folder: String,
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
 ) -> Result<(), PrefsWriteError> {
-    update_prefs_with_dir(vault_dir, state, hooks, |prefs| {
-        prefs.daily_folder = Some(folder.clone());
-        // Register as a deliberate folder so the daily folder survives empty
-        // (MYND-144). Exact-dedup here; the codec sorts + exact-dedups on encode.
-        if !prefs.deliberate_folders.contains(&folder) {
-            prefs.deliberate_folders.push(folder);
-        }
-    })
+    update_prefs_with_dir(
+        vault_dir,
+        state,
+        hooks,
+        |prefs| {
+            prefs.daily_folder = Some(folder.clone());
+            // Register as a deliberate folder so the daily folder survives empty
+            // (MYND-144). Exact-dedup here; the codec sorts + exact-dedups on encode.
+            if !prefs.deliberate_folders.contains(&folder) {
+                prefs.deliberate_folders.push(folder);
+            }
+        },
+        io,
+        host,
+    )
     .await?;
 
     // Field name only — never the path (folder structure is AS3 Sensitive; see
@@ -1502,6 +2550,21 @@ pub(crate) async fn set_daily_folder_with_dir(
 /// UUIDv7 of the template to instantiate today's note from. `Some(id)` sets it;
 /// `None` clears it (the canonical "blank daily note" state). Read-modify-write
 /// under the write mutex; no native side-effect; disk-first. Non-load-bearing.
+pub async fn set_daily_template_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    template_id: Option<String>,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_daily_template_with_dir(&dir, state, hooks, template_id, io, host).await
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_daily_template<R: Runtime>(
     app: AppHandle<R>,
@@ -1509,8 +2572,14 @@ pub async fn set_daily_template<R: Runtime>(
     hooks: State<'_, crate::hooks::Hooks>,
     template_id: Option<String>,
 ) -> Result<(), PrefsWriteError> {
-    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    set_daily_template_with_dir(&dir, state.inner(), hooks.inner(), template_id).await
+    set_daily_template_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        template_id,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
 }
 
 /// Testable core of [`set_daily_template`].
@@ -1519,11 +2588,20 @@ pub(crate) async fn set_daily_template_with_dir(
     state: &VaultRuntimeState,
     hooks: &crate::hooks::Hooks,
     template_id: Option<String>,
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
 ) -> Result<(), PrefsWriteError> {
     let cleared = template_id.is_none();
-    update_prefs_with_dir(vault_dir, state, hooks, |prefs| {
-        prefs.daily_template = template_id;
-    })
+    update_prefs_with_dir(
+        vault_dir,
+        state,
+        hooks,
+        |prefs| {
+            prefs.daily_template = template_id;
+        },
+        io,
+        host,
+    )
     .await?;
 
     // Field name + set/cleared only — never the UUID (note_id is a vault-stable
@@ -1533,14 +2611,30 @@ pub(crate) async fn set_daily_template_with_dir(
 }
 
 /// Slot::Unlocked-gated setter for the new-note default-location pair (MYND-462,
-/// "Files" settings panel) — `new_note_location` (the mode: root/current/specific)
-/// + `new_note_location_folder` (the target folder when mode == "specific"). Set
+/// "Files" settings panel) — `new_note_location` (the mode: root/current/specific) +
+/// `new_note_location_folder` (the target folder when mode == "specific"). Set
 /// atomically in one disk write so the mode and target never desync. When a
 /// folder is supplied it is ALSO registered as a deliberate folder (union,
 /// exact-dedup) so the target survives empty (the `set_daily_folder` discipline,
 /// MYND-144). The caller passes `folder = None` whenever `location != "specific"`.
 /// Read-modify-write under the write mutex; no native side-effect; disk-first;
 /// non-load-bearing.
+pub async fn set_new_note_location_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    location: Option<String>,
+    folder: Option<String>,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_new_note_location_with_dir(&dir, state, hooks, location, folder, io, host).await
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_new_note_location<R: Runtime>(
     app: AppHandle<R>,
@@ -1549,8 +2643,15 @@ pub async fn set_new_note_location<R: Runtime>(
     location: Option<String>,
     folder: Option<String>,
 ) -> Result<(), PrefsWriteError> {
-    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    set_new_note_location_with_dir(&dir, state.inner(), hooks.inner(), location, folder).await
+    set_new_note_location_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        location,
+        folder,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
 }
 
 /// Testable core of [`set_new_note_location`].
@@ -1560,18 +2661,27 @@ pub(crate) async fn set_new_note_location_with_dir(
     hooks: &crate::hooks::Hooks,
     location: Option<String>,
     folder: Option<String>,
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
 ) -> Result<(), PrefsWriteError> {
-    update_prefs_with_dir(vault_dir, state, hooks, |prefs| {
-        prefs.new_note_location = location;
-        prefs.new_note_location_folder = folder.clone();
-        // When a specific target folder is named, register it as a deliberate folder
-        // so it survives empty (MYND-144) — exactly like set_daily_folder.
-        if let Some(folder) = folder {
-            if !prefs.deliberate_folders.contains(&folder) {
-                prefs.deliberate_folders.push(folder);
+    update_prefs_with_dir(
+        vault_dir,
+        state,
+        hooks,
+        |prefs| {
+            prefs.new_note_location = location;
+            prefs.new_note_location_folder = folder.clone();
+            // When a specific target folder is named, register it as a deliberate folder
+            // so it survives empty (MYND-144) — exactly like set_daily_folder.
+            if let Some(folder) = folder {
+                if !prefs.deliberate_folders.contains(&folder) {
+                    prefs.deliberate_folders.push(folder);
+                }
             }
-        }
-    })
+        },
+        io,
+        host,
+    )
     .await?;
 
     // Field name only — never the path (folder structure is AS3 Sensitive; see
@@ -1594,8 +2704,10 @@ async fn set_typography_field_with_dir(
     hooks: &crate::hooks::Hooks,
     field_label: &'static str,
     mutate: impl FnOnce(&mut PrefsView),
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
 ) -> Result<(), PrefsWriteError> {
-    update_prefs_with_dir(vault_dir, state, hooks, mutate).await?;
+    update_prefs_with_dir(vault_dir, state, hooks, mutate, io, host).await?;
 
     // Field name only — never the value (a typography preset is not secret, but
     // the field-name-only discipline is uniform across prefs setters).
@@ -1606,6 +2718,32 @@ async fn set_typography_field_with_dir(
 /// Slot::Unlocked-gated setter for the `editor_text_size` preset
 /// (editor-typography) — `sm`/`md`/`lg`/`xl`, or `None` to clear to the `md`
 /// default. Read-modify-write under the write mutex; no native side-effect.
+pub async fn set_editor_text_size_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    value: Option<String>,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_typography_field_with_dir(
+        &dir,
+        state,
+        hooks,
+        "editor_text_size",
+        |p| {
+            p.editor_text_size = value;
+        },
+        io,
+        host,
+    )
+    .await
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_editor_text_size<R: Runtime>(
     app: AppHandle<R>,
@@ -1613,21 +2751,44 @@ pub async fn set_editor_text_size<R: Runtime>(
     hooks: State<'_, crate::hooks::Hooks>,
     value: Option<String>,
 ) -> Result<(), PrefsWriteError> {
-    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    set_typography_field_with_dir(
-        &dir,
+    set_editor_text_size_from_host(
+        &TauriHost::new(app),
         state.inner(),
         hooks.inner(),
-        "editor_text_size",
-        |p| {
-            p.editor_text_size = value;
-        },
+        value,
+        &crate::vault_io::StdVaultIo,
     )
     .await
 }
 
 /// Slot::Unlocked-gated setter for the `editor_line_spacing` preset
 /// (editor-typography) — `tight`/`normal`/`relaxed`, or `None` to clear.
+pub async fn set_editor_line_spacing_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    value: Option<String>,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_typography_field_with_dir(
+        &dir,
+        state,
+        hooks,
+        "editor_line_spacing",
+        |p| {
+            p.editor_line_spacing = value;
+        },
+        io,
+        host,
+    )
+    .await
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_editor_line_spacing<R: Runtime>(
     app: AppHandle<R>,
@@ -1635,21 +2796,44 @@ pub async fn set_editor_line_spacing<R: Runtime>(
     hooks: State<'_, crate::hooks::Hooks>,
     value: Option<String>,
 ) -> Result<(), PrefsWriteError> {
-    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    set_typography_field_with_dir(
-        &dir,
+    set_editor_line_spacing_from_host(
+        &TauriHost::new(app),
         state.inner(),
         hooks.inner(),
-        "editor_line_spacing",
-        |p| {
-            p.editor_line_spacing = value;
-        },
+        value,
+        &crate::vault_io::StdVaultIo,
     )
     .await
 }
 
 /// Slot::Unlocked-gated setter for the `editor_content_width` preset
 /// (editor-typography) — `narrow`/`normal`/`wide`/`full`, or `None` to clear.
+pub async fn set_editor_content_width_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    value: Option<String>,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_typography_field_with_dir(
+        &dir,
+        state,
+        hooks,
+        "editor_content_width",
+        |p| {
+            p.editor_content_width = value;
+        },
+        io,
+        host,
+    )
+    .await
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_editor_content_width<R: Runtime>(
     app: AppHandle<R>,
@@ -1657,21 +2841,44 @@ pub async fn set_editor_content_width<R: Runtime>(
     hooks: State<'_, crate::hooks::Hooks>,
     value: Option<String>,
 ) -> Result<(), PrefsWriteError> {
-    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    set_typography_field_with_dir(
-        &dir,
+    set_editor_content_width_from_host(
+        &TauriHost::new(app),
         state.inner(),
         hooks.inner(),
-        "editor_content_width",
-        |p| {
-            p.editor_content_width = value;
-        },
+        value,
+        &crate::vault_io::StdVaultIo,
     )
     .await
 }
 
 /// Slot::Unlocked-gated setter for the `editor_font_family` preset
 /// (editor-typography) — `mono`/`sans`, or `None` to clear to the `mono` default.
+pub async fn set_editor_font_family_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    value: Option<String>,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_typography_field_with_dir(
+        &dir,
+        state,
+        hooks,
+        "editor_font_family",
+        |p| {
+            p.editor_font_family = value;
+        },
+        io,
+        host,
+    )
+    .await
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_editor_font_family<R: Runtime>(
     app: AppHandle<R>,
@@ -1679,15 +2886,12 @@ pub async fn set_editor_font_family<R: Runtime>(
     hooks: State<'_, crate::hooks::Hooks>,
     value: Option<String>,
 ) -> Result<(), PrefsWriteError> {
-    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    set_typography_field_with_dir(
-        &dir,
+    set_editor_font_family_from_host(
+        &TauriHost::new(app),
         state.inner(),
         hooks.inner(),
-        "editor_font_family",
-        |p| {
-            p.editor_font_family = value;
-        },
+        value,
+        &crate::vault_io::StdVaultIo,
     )
     .await
 }
@@ -1699,6 +2903,22 @@ pub async fn set_editor_font_family<R: Runtime>(
 /// target never desync. No deliberate-folder side-effect (a note pointer, not a
 /// folder). The caller passes `note = None` whenever `mode != "specific"`.
 /// Disk-first; non-load-bearing.
+pub async fn set_startup_open_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    mode: Option<String>,
+    note: Option<String>,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_startup_open_with_dir(&dir, state, hooks, mode, note, io, host).await
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_startup_open<R: Runtime>(
     app: AppHandle<R>,
@@ -1707,8 +2927,15 @@ pub async fn set_startup_open<R: Runtime>(
     mode: Option<String>,
     note: Option<String>,
 ) -> Result<(), PrefsWriteError> {
-    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    set_startup_open_with_dir(&dir, state.inner(), hooks.inner(), mode, note).await
+    set_startup_open_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        mode,
+        note,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
 }
 
 /// Testable core of [`set_startup_open`]. Writes the `startup_open` mode +
@@ -1719,11 +2946,21 @@ pub(crate) async fn set_startup_open_with_dir(
     hooks: &crate::hooks::Hooks,
     mode: Option<String>,
     note: Option<String>,
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
 ) -> Result<(), PrefsWriteError> {
-    set_typography_field_with_dir(vault_dir, state, hooks, "startup_open", |p| {
-        p.startup_open = mode;
-        p.startup_open_note = note;
-    })
+    set_typography_field_with_dir(
+        vault_dir,
+        state,
+        hooks,
+        "startup_open",
+        |p| {
+            p.startup_open = mode;
+            p.startup_open_note = note;
+        },
+        io,
+        host,
+    )
     .await
 }
 
@@ -1732,6 +2969,21 @@ pub(crate) async fn set_startup_open_with_dir(
 /// Favorites section, MYND-183). Identical read-modify-write + order-
 /// preserving + no-native-side-effect shape as [`set_item_order`], applied to
 /// the favorites field.
+pub async fn set_favorites_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    order: Vec<String>,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_favorites_with_dir(&dir, state, hooks, order, io, host).await
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_favorites<R: Runtime>(
     app: AppHandle<R>,
@@ -1739,8 +2991,14 @@ pub async fn set_favorites<R: Runtime>(
     hooks: State<'_, crate::hooks::Hooks>,
     order: Vec<String>,
 ) -> Result<(), PrefsWriteError> {
-    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    set_favorites_with_dir(&dir, state.inner(), hooks.inner(), order).await
+    set_favorites_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        order,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
 }
 
 /// Testable core of [`set_favorites`].
@@ -1749,11 +3007,20 @@ pub(crate) async fn set_favorites_with_dir(
     state: &VaultRuntimeState,
     hooks: &crate::hooks::Hooks,
     order: Vec<String>,
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
 ) -> Result<(), PrefsWriteError> {
     let count = order.len();
-    update_prefs_with_dir(vault_dir, state, hooks, |prefs| {
-        prefs.favorites = order;
-    })
+    update_prefs_with_dir(
+        vault_dir,
+        state,
+        hooks,
+        |prefs| {
+            prefs.favorites = order;
+        },
+        io,
+        host,
+    )
     .await?;
 
     // COUNT only — never the note IDs (note_id is a per-note vault-stable
@@ -1765,6 +3032,21 @@ pub(crate) async fn set_favorites_with_dir(
 /// Slot::Unlocked-gated setter for the `auto_lock_seconds` field (MYND-121).
 /// Read-modify-write under the per-plugin write mutex. Getter is the existing
 /// [`prefs_read`] (the returned `PrefsView` already carries `auto_lock_seconds`).
+pub async fn set_auto_lock_timeout_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    seconds: u32,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_auto_lock_timeout_with_dir(&dir, state, hooks, seconds, io, host).await
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_auto_lock_timeout<R: Runtime>(
     app: AppHandle<R>,
@@ -1772,8 +3054,14 @@ pub async fn set_auto_lock_timeout<R: Runtime>(
     hooks: State<'_, crate::hooks::Hooks>,
     seconds: u32,
 ) -> Result<(), PrefsWriteError> {
-    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    set_auto_lock_timeout_with_dir(&dir, state.inner(), hooks.inner(), seconds).await
+    set_auto_lock_timeout_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        seconds,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
 }
 
 /// Testable core of [`set_auto_lock_timeout`]. Persists `auto_lock_seconds`
@@ -1792,10 +3080,19 @@ pub async fn set_auto_lock_timeout_with_dir(
     state: &VaultRuntimeState,
     hooks: &crate::hooks::Hooks,
     seconds: u32,
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
 ) -> Result<(), PrefsWriteError> {
-    update_prefs_with_dir(vault_dir, state, hooks, |prefs| {
-        prefs.auto_lock_seconds = Some(seconds);
-    })
+    update_prefs_with_dir(
+        vault_dir,
+        state,
+        hooks,
+        |prefs| {
+            prefs.auto_lock_seconds = Some(seconds);
+        },
+        io,
+        host,
+    )
     .await?;
 
     // Effect SECOND (only on disk success): refresh the cached effective
@@ -1820,6 +3117,21 @@ pub async fn set_auto_lock_timeout_with_dir(
 /// the min/max clamp + collapse policy live in the UI layer (a replayed /
 /// tampered `vault.prefs` is re-clamped on the client at read time), so this
 /// command only persists the choice.
+pub async fn set_editor_layout_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    layout: EditorLayout,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_editor_layout_with_dir(&dir, state, hooks, layout, io, host).await
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_editor_layout<R: Runtime>(
     app: AppHandle<R>,
@@ -1827,8 +3139,14 @@ pub async fn set_editor_layout<R: Runtime>(
     hooks: State<'_, crate::hooks::Hooks>,
     layout: EditorLayout,
 ) -> Result<(), PrefsWriteError> {
-    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    set_editor_layout_with_dir(&dir, state.inner(), hooks.inner(), layout).await
+    set_editor_layout_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        layout,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
 }
 
 /// Testable core of [`set_editor_layout`].
@@ -1837,11 +3155,20 @@ pub(crate) async fn set_editor_layout_with_dir(
     state: &VaultRuntimeState,
     hooks: &crate::hooks::Hooks,
     layout: EditorLayout,
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
 ) -> Result<(), PrefsWriteError> {
     let (left_collapsed, right_collapsed) = (layout.left_collapsed, layout.right_collapsed);
-    update_prefs_with_dir(vault_dir, state, hooks, |prefs| {
-        prefs.editor_layout = Some(layout);
-    })
+    update_prefs_with_dir(
+        vault_dir,
+        state,
+        hooks,
+        |prefs| {
+            prefs.editor_layout = Some(layout);
+        },
+        io,
+        host,
+    )
     .await?;
 
     // Collapsed flags only — window-layout metadata (AS3-low), never note
@@ -1881,6 +3208,21 @@ fn theme_label(theme: Option<ThemeChoice>) -> &'static str {
 /// color). The getter is the existing [`prefs_read`] — the returned
 /// `PrefsView` already carries `theme`. Disk-first ordering is trivial
 /// here (nothing is sequenced after the write).
+pub async fn set_theme_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    theme: Option<ThemeChoice>,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_theme_with_dir(&dir, state, hooks, theme, io, host).await
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_theme<R: Runtime>(
     app: AppHandle<R>,
@@ -1888,8 +3230,14 @@ pub async fn set_theme<R: Runtime>(
     hooks: State<'_, crate::hooks::Hooks>,
     theme: Option<ThemeChoice>,
 ) -> Result<(), PrefsWriteError> {
-    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    set_theme_with_dir(&dir, state.inner(), hooks.inner(), theme).await
+    set_theme_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        theme,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
 }
 
 /// Testable core of [`set_theme`].
@@ -1898,10 +3246,19 @@ pub(crate) async fn set_theme_with_dir(
     state: &VaultRuntimeState,
     hooks: &crate::hooks::Hooks,
     theme: Option<ThemeChoice>,
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
 ) -> Result<(), PrefsWriteError> {
-    update_prefs_with_dir(vault_dir, state, hooks, |prefs| {
-        prefs.theme = theme;
-    })
+    update_prefs_with_dir(
+        vault_dir,
+        state,
+        hooks,
+        |prefs| {
+            prefs.theme = theme;
+        },
+        io,
+        host,
+    )
     .await?;
 
     // Theme is a non-secret cosmetic preference (AS3-low) — the resolved
@@ -1926,6 +3283,21 @@ pub(crate) async fn set_theme_with_dir(
 /// to a built-in theme on any failure). The name is `is_valid_theme_name`-
 /// constrained at the themes-plugin file boundary (MYND-297 read/delete); this
 /// setter stores the string verbatim.
+pub async fn set_custom_theme_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    custom_theme: Option<String>,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_custom_theme_with_dir(&dir, state, hooks, custom_theme, io, host).await
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_custom_theme<R: Runtime>(
     app: AppHandle<R>,
@@ -1933,8 +3305,14 @@ pub async fn set_custom_theme<R: Runtime>(
     hooks: State<'_, crate::hooks::Hooks>,
     custom_theme: Option<String>,
 ) -> Result<(), PrefsWriteError> {
-    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    set_custom_theme_with_dir(&dir, state.inner(), hooks.inner(), custom_theme).await
+    set_custom_theme_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        custom_theme,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
 }
 
 /// Testable core of [`set_custom_theme`].
@@ -1943,11 +3321,20 @@ pub(crate) async fn set_custom_theme_with_dir(
     state: &VaultRuntimeState,
     hooks: &crate::hooks::Hooks,
     custom_theme: Option<String>,
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
 ) -> Result<(), PrefsWriteError> {
     let is_set = custom_theme.is_some();
-    update_prefs_with_dir(vault_dir, state, hooks, |prefs| {
-        prefs.custom_theme = custom_theme;
-    })
+    update_prefs_with_dir(
+        vault_dir,
+        state,
+        hooks,
+        |prefs| {
+            prefs.custom_theme = custom_theme;
+        },
+        io,
+        host,
+    )
     .await?;
 
     // The custom-theme NAME is user-authored cosmetic data; emit only whether a
@@ -1968,6 +3355,21 @@ pub(crate) async fn set_custom_theme_with_dir(
 /// single-device writes it verbatim. Clearing a color = omit its key from the
 /// map (an empty map omits the whole field on disk). Stale-key pruning
 /// (deleted note/folder) is the caller's job — the codec performs no GC.
+pub async fn set_item_colors_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    colors: std::collections::BTreeMap<String, String>,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_item_colors_with_dir(&dir, state, hooks, colors, io, host).await
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_item_colors<R: Runtime>(
     app: AppHandle<R>,
@@ -1975,8 +3377,14 @@ pub async fn set_item_colors<R: Runtime>(
     hooks: State<'_, crate::hooks::Hooks>,
     colors: std::collections::BTreeMap<String, String>,
 ) -> Result<(), PrefsWriteError> {
-    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    set_item_colors_with_dir(&dir, state.inner(), hooks.inner(), colors).await
+    set_item_colors_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        colors,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
 }
 
 /// Testable core of [`set_item_colors`].
@@ -1985,11 +3393,20 @@ pub(crate) async fn set_item_colors_with_dir(
     state: &VaultRuntimeState,
     hooks: &crate::hooks::Hooks,
     colors: std::collections::BTreeMap<String, String>,
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
 ) -> Result<(), PrefsWriteError> {
     let count = colors.len();
-    update_prefs_with_dir(vault_dir, state, hooks, |prefs| {
-        prefs.item_colors = colors;
-    })
+    update_prefs_with_dir(
+        vault_dir,
+        state,
+        hooks,
+        |prefs| {
+            prefs.item_colors = colors;
+        },
+        io,
+        host,
+    )
     .await?;
 
     // Entry COUNT only — never the keys (note IDs / folder paths are AS3
@@ -2004,6 +3421,21 @@ pub(crate) async fn set_item_colors_with_dir(
 /// [`set_item_colors`]. The caller passes the full desired map; resetting a
 /// folder to its default glyph = omit its key (an empty map omits the field on
 /// disk). Stale-key pruning (deleted/renamed folder) is the caller's job.
+pub async fn set_folder_icons_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    icons: std::collections::BTreeMap<String, String>,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_folder_icons_with_dir(&dir, state, hooks, icons, io, host).await
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_folder_icons<R: Runtime>(
     app: AppHandle<R>,
@@ -2011,8 +3443,14 @@ pub async fn set_folder_icons<R: Runtime>(
     hooks: State<'_, crate::hooks::Hooks>,
     icons: std::collections::BTreeMap<String, String>,
 ) -> Result<(), PrefsWriteError> {
-    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    set_folder_icons_with_dir(&dir, state.inner(), hooks.inner(), icons).await
+    set_folder_icons_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        icons,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
 }
 
 /// Testable core of [`set_folder_icons`].
@@ -2021,11 +3459,20 @@ pub(crate) async fn set_folder_icons_with_dir(
     state: &VaultRuntimeState,
     hooks: &crate::hooks::Hooks,
     icons: std::collections::BTreeMap<String, String>,
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
 ) -> Result<(), PrefsWriteError> {
     let count = icons.len();
-    update_prefs_with_dir(vault_dir, state, hooks, |prefs| {
-        prefs.folder_icons = icons;
-    })
+    update_prefs_with_dir(
+        vault_dir,
+        state,
+        hooks,
+        |prefs| {
+            prefs.folder_icons = icons;
+        },
+        io,
+        host,
+    )
     .await?;
 
     // Entry COUNT only — never the keys (folder paths are AS3 correlation tags).
@@ -2050,9 +3497,33 @@ pub(crate) async fn set_folder_icons_with_dir(
 /// Deliberately NOT `Slot::Unlocked`-gated and infallible: it reads a
 /// compile-time constant and touches no vault state, and the join flow needs it
 /// while bootstrapping a vault that is not unlocked yet.
+pub fn device_platform_value() -> String {
+    // **`std::env::consts::OS` is the EMPTY STRING on `wasm32-unknown-unknown`**
+    // — measured in a browser, not assumed (phase3-web-client). It is not
+    // `"unknown"`, which is what the name suggests and what an earlier note in
+    // this feature's progress log wrongly claimed. An empty platform token is
+    // worse than a wrong one: every `platform === "…"` branch silently takes its
+    // else, and nothing reports a problem.
+    //
+    // "web" rather than the browser or the OS underneath it: the value names the
+    // CLIENT, which is what a caller branches on, and a page cannot honestly
+    // report the operating system anyway.
+    #[cfg(target_arch = "wasm32")]
+    {
+        "web".to_string()
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        std::env::consts::OS.to_string()
+    }
+}
+
+/// IPC wrapper. The only host-specific thing about this command is the
+/// attribute — it takes no Tauri types at all.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub fn device_platform() -> String {
-    std::env::consts::OS.to_string()
+    device_platform_value()
 }
 
 /// Slot::Unlocked-gated setter for ONE entry of the `device_names` map
@@ -2089,6 +3560,22 @@ pub fn device_platform() -> String {
 /// Logs the field name only — NEVER the name or the device id. The name is the
 /// user's own input (AS3-sensitive, like `label`); the device id is a
 /// correlation tag (like the `item_colors` keys).
+pub async fn set_device_name_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    device_id_hex: String,
+    name: String,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_device_name_with_dir(&dir, state, hooks, device_id_hex, name, io, host).await
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn set_device_name<R: Runtime>(
     app: AppHandle<R>,
@@ -2097,8 +3584,15 @@ pub async fn set_device_name<R: Runtime>(
     device_id_hex: String,
     name: String,
 ) -> Result<(), PrefsWriteError> {
-    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    set_device_name_with_dir(&dir, state.inner(), hooks.inner(), device_id_hex, name).await
+    set_device_name_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        device_id_hex,
+        name,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
 }
 
 /// Testable core of [`set_device_name`].
@@ -2108,6 +3602,8 @@ pub(crate) async fn set_device_name_with_dir(
     hooks: &crate::hooks::Hooks,
     device_id_hex: String,
     name: String,
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
 ) -> Result<(), PrefsWriteError> {
     // The key is permanent (§10.2 union merge has no deletion) and replicates to
     // every peer, so a malformed one is unrecoverable in-app. Reject anything that
@@ -2128,9 +3624,16 @@ pub(crate) async fn set_device_name_with_dir(
     }
     let value = trimmed.to_string();
 
-    update_prefs_with_dir(vault_dir, state, hooks, |prefs| {
-        prefs.device_names.insert(device_id_hex, value);
-    })
+    update_prefs_with_dir(
+        vault_dir,
+        state,
+        hooks,
+        |prefs| {
+            prefs.device_names.insert(device_id_hex, value);
+        },
+        io,
+        host,
+    )
     .await?;
 
     // Field name only — neither the label nor the device id reaches the log
@@ -2154,6 +3657,21 @@ pub(crate) async fn set_device_name_with_dir(
 /// lives ONLY inside the AEAD-sealed `vault.prefs` at rest and in that RAM
 /// cache at runtime; it is never logged (DENY-list discipline — the value is
 /// the user's own input, treated as AS3-sensitive).
+pub async fn vault_set_label_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    label: Option<String>,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    vault_set_label_with_dir(&dir, state, hooks, label, io, host).await
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn vault_set_label<R: Runtime>(
     app: AppHandle<R>,
@@ -2161,8 +3679,14 @@ pub async fn vault_set_label<R: Runtime>(
     hooks: State<'_, crate::hooks::Hooks>,
     label: Option<String>,
 ) -> Result<(), PrefsWriteError> {
-    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    vault_set_label_with_dir(&dir, state.inner(), hooks.inner(), label).await
+    vault_set_label_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        label,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
 }
 
 /// Testable core of [`vault_set_label`]. Performs the disk-side commit
@@ -2177,11 +3701,20 @@ pub(crate) async fn vault_set_label_with_dir(
     state: &VaultRuntimeState,
     hooks: &crate::hooks::Hooks,
     label: Option<String>,
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
 ) -> Result<(), PrefsWriteError> {
     let cleared = label.is_none();
-    update_prefs_with_dir(vault_dir, state, hooks, |prefs| {
-        prefs.label = label.clone();
-    })
+    update_prefs_with_dir(
+        vault_dir,
+        state,
+        hooks,
+        |prefs| {
+            prefs.label = label.clone();
+        },
+        io,
+        host,
+    )
     .await?;
 
     // Effect SECOND (only on disk success): refresh the active vault's entry in
@@ -2214,6 +3747,21 @@ pub(crate) async fn vault_set_label_with_dir(
 /// decrypted icon is refreshed in the per-session RAM cache so the switcher
 /// (`vault_list`) reflects the change immediately. The glyph name lives ONLY
 /// inside the AEAD-sealed `vault.prefs` at rest and in that RAM cache at runtime.
+pub async fn vault_set_icon_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    icon: Option<String>,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    vault_set_icon_with_dir(&dir, state, hooks, icon, io, host).await
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn vault_set_icon<R: Runtime>(
     app: AppHandle<R>,
@@ -2221,8 +3769,14 @@ pub async fn vault_set_icon<R: Runtime>(
     hooks: State<'_, crate::hooks::Hooks>,
     icon: Option<String>,
 ) -> Result<(), PrefsWriteError> {
-    let dir = vault_dir(&app, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    vault_set_icon_with_dir(&dir, state.inner(), hooks.inner(), icon).await
+    vault_set_icon_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        icon,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
 }
 
 /// Testable core of [`vault_set_icon`]. Performs the disk-side commit
@@ -2235,11 +3789,20 @@ pub(crate) async fn vault_set_icon_with_dir(
     state: &VaultRuntimeState,
     hooks: &crate::hooks::Hooks,
     icon: Option<String>,
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
 ) -> Result<(), PrefsWriteError> {
     let cleared = icon.is_none();
-    update_prefs_with_dir(vault_dir, state, hooks, |prefs| {
-        prefs.icon = icon.clone();
-    })
+    update_prefs_with_dir(
+        vault_dir,
+        state,
+        hooks,
+        |prefs| {
+            prefs.icon = icon.clone();
+        },
+        io,
+        host,
+    )
     .await?;
 
     // Effect SECOND (only on disk success): refresh the active vault's entry in
@@ -2375,9 +3938,16 @@ mod tests {
         rt().block_on(async {
             let (tmp, state) = make_temp_vault_with_unlocked_state(0x33).await;
             let (hooks, bumps) = counting_hooks();
-            vault_set_label_with_dir(tmp.path(), &state, &hooks, Some("Renamed".into()))
-                .await
-                .expect("set label");
+            vault_set_label_with_dir(
+                tmp.path(),
+                &state,
+                &hooks,
+                Some("Renamed".into()),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("set label");
             assert_eq!(bumps.load(std::sync::atomic::Ordering::Relaxed), 1);
         });
     }
@@ -2390,9 +3960,16 @@ mod tests {
         rt().block_on(async {
             let (tmp, state) = make_temp_vault_with_unlocked_state(0x33).await;
             let (hooks, bumps) = counting_hooks();
-            set_spell_languages_with_dir(tmp.path(), &state, &hooks, vec!["en".into()])
-                .await
-                .expect("set spell languages");
+            set_spell_languages_with_dir(
+                tmp.path(),
+                &state,
+                &hooks,
+                vec!["en".into()],
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("set spell languages");
             assert_eq!(bumps.load(std::sync::atomic::Ordering::Relaxed), 1);
         });
     }
@@ -2411,6 +3988,8 @@ mod tests {
                 &state,
                 &hooks,
                 Some(protocol::ThemeChoice::Dark),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
             )
             .await
             .expect("set theme");
@@ -2425,12 +4004,26 @@ mod tests {
         rt().block_on(async {
             let (tmp, state) = make_temp_vault_with_unlocked_state(0x33).await;
             let (hooks, bumps) = counting_hooks();
-            vault_set_label_with_dir(tmp.path(), &state, &hooks, Some("Same".into()))
-                .await
-                .expect("first set");
-            vault_set_label_with_dir(tmp.path(), &state, &hooks, Some("Same".into()))
-                .await
-                .expect("no-op re-set");
+            vault_set_label_with_dir(
+                tmp.path(),
+                &state,
+                &hooks,
+                Some("Same".into()),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("first set");
+            vault_set_label_with_dir(
+                tmp.path(),
+                &state,
+                &hooks,
+                Some("Same".into()),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("no-op re-set");
             assert_eq!(bumps.load(std::sync::atomic::Ordering::Relaxed), 1);
         });
     }
@@ -2450,11 +4043,13 @@ mod tests {
                 &noop_hooks(),
                 DEV_HEX.into(),
                 "Studio Mac".into(),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
             )
             .await
             .expect("set device name");
 
-            let view = prefs_read_with_dir(tmp.path(), &state)
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
                 .await
                 .expect("read prefs");
             assert_eq!(
@@ -2476,11 +4071,13 @@ mod tests {
                 &noop_hooks(),
                 DEV_HEX.into(),
                 "Laptop".into(),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::test_host::TestHost::new(tmp.path()),
             )
             .await
             .expect("set device name");
 
-            let view = prefs_read_with_dir(tmp.path(), &state)
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
                 .await
                 .expect("read prefs");
             let clock = view
@@ -2504,14 +4101,30 @@ mod tests {
         rt().block_on(async {
             let (tmp, state) = make_temp_vault_with_unlocked_state(0x43).await;
             let (hooks, bumps) = counting_hooks();
-            set_device_name_with_dir(tmp.path(), &state, &hooks, DEV_HEX.into(), "Phone".into())
-                .await
-                .expect("first set");
+            set_device_name_with_dir(
+                tmp.path(),
+                &state,
+                &hooks,
+                DEV_HEX.into(),
+                "Phone".into(),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("first set");
             assert_eq!(bumps.load(std::sync::atomic::Ordering::Relaxed), 1);
 
-            set_device_name_with_dir(tmp.path(), &state, &hooks, DEV_HEX.into(), "Phone".into())
-                .await
-                .expect("no-op re-set");
+            set_device_name_with_dir(
+                tmp.path(),
+                &state,
+                &hooks,
+                DEV_HEX.into(),
+                "Phone".into(),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("no-op re-set");
             assert_eq!(bumps.load(std::sync::atomic::Ordering::Relaxed), 1);
         });
     }
@@ -2530,11 +4143,13 @@ mod tests {
                 &noop_hooks(),
                 DEV_HEX.into(),
                 "Cafe\u{0301} Mac".into(),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
             )
             .await
             .expect("set device name");
 
-            let view = prefs_read_with_dir(tmp.path(), &state)
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
                 .await
                 .expect("read prefs");
             assert_eq!(
@@ -2558,11 +4173,13 @@ mod tests {
                 &noop_hooks(),
                 "ffffffffffffffffffffffffffffffff".into(),
                 "Retired phone".into(),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
             )
             .await
             .expect("set device name");
 
-            let view = prefs_read_with_dir(tmp.path(), &state)
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
                 .await
                 .expect("read prefs");
             assert_eq!(view.device_names.len(), 1);
@@ -2576,17 +4193,33 @@ mod tests {
         rt().block_on(async {
             let (tmp, state) = make_temp_vault_with_unlocked_state(0x46).await;
             let (hooks, bumps) = counting_hooks();
-            set_device_name_with_dir(tmp.path(), &state, &hooks, DEV_HEX.into(), "Desk".into())
-                .await
-                .expect("set device name");
+            set_device_name_with_dir(
+                tmp.path(),
+                &state,
+                &hooks,
+                DEV_HEX.into(),
+                "Desk".into(),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("set device name");
 
             for blank in ["", "   ", "\t\n"] {
-                set_device_name_with_dir(tmp.path(), &state, &hooks, DEV_HEX.into(), blank.into())
-                    .await
-                    .expect("blank is Ok, not an error");
+                set_device_name_with_dir(
+                    tmp.path(),
+                    &state,
+                    &hooks,
+                    DEV_HEX.into(),
+                    blank.into(),
+                    &crate::vault_io::StdVaultIo,
+                    &crate::host::NoopHost,
+                )
+                .await
+                .expect("blank is Ok, not an error");
             }
 
-            let view = prefs_read_with_dir(tmp.path(), &state)
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
                 .await
                 .expect("read prefs");
             assert_eq!(
@@ -2608,11 +4241,13 @@ mod tests {
                 &noop_hooks(),
                 DEV_HEX.into(),
                 "  Work Mac \n".into(),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
             )
             .await
             .expect("set device name");
 
-            let view = prefs_read_with_dir(tmp.path(), &state)
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
                 .await
                 .expect("read prefs");
             assert_eq!(
@@ -2640,11 +4275,13 @@ mod tests {
                     &noop_hooks(),
                     bad.into(),
                     "Nope".into(),
+                    &crate::vault_io::StdVaultIo,
+                    &crate::host::NoopHost,
                 )
                 .await
                 .expect("refusal is Ok, not an error");
             }
-            let view = prefs_read_with_dir(tmp.path(), &state)
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
                 .await
                 .expect("read prefs");
             assert!(view.device_names.is_empty());
@@ -2669,10 +4306,19 @@ mod tests {
         // nothing (sync-protocol.md §10.2).
         rt().block_on(async {
             let (tmp, state) = make_temp_vault_with_unlocked_state(0x33).await;
-            vault_set_label_with_dir(tmp.path(), &state, &noop_hooks(), Some("Work".into()))
+            vault_set_label_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                Some("Work".into()),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::test_host::TestHost::new(tmp.path()),
+            )
+            .await
+            .expect("set label");
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
                 .await
-                .expect("set label");
-            let view = prefs_read_with_dir(tmp.path(), &state).await.expect("read");
+                .expect("read");
             let label_clock = *view.field_clocks.get("label").expect("label stamped");
             assert!(label_clock > 0, "epoch-ms clock must be non-zero");
 
@@ -2682,10 +4328,14 @@ mod tests {
                 &state,
                 &noop_hooks(),
                 Some(protocol::ThemeChoice::Dark),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::test_host::TestHost::new(tmp.path()),
             )
             .await
             .expect("set theme");
-            let view = prefs_read_with_dir(tmp.path(), &state).await.expect("read");
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
+                .await
+                .expect("read");
             assert!(!view.field_clocks.contains_key("theme"));
             assert_eq!(view.field_clocks.get("label"), Some(&label_clock));
         });
@@ -2697,10 +4347,19 @@ mod tests {
         // §9.5.2 `last_backup_at` field via the standard setter discipline.
         rt().block_on(async {
             let (tmp, state) = make_temp_vault_with_unlocked_state(0x33).await;
-            record_last_backup_at_with_dir(tmp.path(), &state, &noop_hooks(), 1765432100)
+            record_last_backup_at_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                1765432100,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("record");
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
                 .await
-                .expect("record");
-            let view = prefs_read_with_dir(tmp.path(), &state).await.expect("read");
+                .expect("read");
             assert_eq!(view.last_backup_at, Some(1765432100));
         });
     }
@@ -2764,7 +4423,8 @@ mod tests {
         rt().block_on(async {
             let tmp = ScopedTempDir::new("prefs-empty").expect("scoped tempdir");
             let state = VaultRuntimeState::default();
-            let result = prefs_read_with_dir(tmp.path(), &state).await;
+            let result =
+                prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo).await;
             assert!(matches!(result, Err(PrefsReadError::SlotNotUnlocked)));
         });
     }
@@ -2774,9 +4434,15 @@ mod tests {
         rt().block_on(async {
             let tmp = ScopedTempDir::new("prefs-write-empty").expect("scoped tempdir");
             let state = VaultRuntimeState::default();
-            let result =
-                set_screen_capture_protection_with_dir(tmp.path(), &state, &noop_hooks(), false)
-                    .await;
+            let result = set_screen_capture_protection_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                false,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await;
             assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
         });
     }
@@ -2788,7 +4454,7 @@ mod tests {
         rt().block_on(async {
             let (tmp, state) = make_temp_vault_with_unlocked_state(0x33).await;
             // vault.meta is seeded, vault.prefs is absent.
-            let view = prefs_read_with_dir(tmp.path(), &state)
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
                 .await
                 .expect("absent vault.prefs collapses to defaults");
             assert_eq!(view, PrefsView::default());
@@ -2870,7 +4536,7 @@ mod tests {
             blob[40] ^= 0xFF;
             std::fs::write(tmp.path().join("vault.prefs"), &blob).expect("seed tampered prefs");
 
-            let view = prefs_read_with_dir(tmp.path(), &state)
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
                 .await
                 .expect("tampered vault.prefs collapses to defaults");
             assert_eq!(view, PrefsView::default());
@@ -2885,9 +4551,16 @@ mod tests {
             let (tmp, state) = make_temp_vault_with_unlocked_state(0x33).await;
 
             // Toggle off via the plugin.
-            set_screen_capture_protection_with_dir(tmp.path(), &state, &noop_hooks(), false)
-                .await
-                .expect("write must succeed");
+            set_screen_capture_protection_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                false,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("write must succeed");
 
             // Disk file now exists.
             assert!(
@@ -2896,7 +4569,7 @@ mod tests {
             );
 
             // Read back via the plugin.
-            let view = prefs_read_with_dir(tmp.path(), &state)
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
                 .await
                 .expect("read must succeed after write");
             assert!(
@@ -2905,10 +4578,17 @@ mod tests {
             );
 
             // Toggle back on.
-            set_screen_capture_protection_with_dir(tmp.path(), &state, &noop_hooks(), true)
-                .await
-                .expect("second write must succeed");
-            let view = prefs_read_with_dir(tmp.path(), &state)
+            set_screen_capture_protection_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                true,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("second write must succeed");
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
                 .await
                 .expect("read must succeed after second write");
             assert!(
@@ -2935,6 +4615,8 @@ mod tests {
                     left_collapsed: false,
                     right_collapsed: false,
                 },
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
             )
             .await;
             assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
@@ -2952,16 +4634,23 @@ mod tests {
                 left_collapsed: false,
                 right_collapsed: true,
             };
-            set_editor_layout_with_dir(tmp.path(), &state, &noop_hooks(), layout)
-                .await
-                .expect("write must succeed");
+            set_editor_layout_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                layout,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("write must succeed");
 
             assert!(
                 tmp.path().join("vault.prefs").exists(),
                 "set_editor_layout must create vault.prefs"
             );
 
-            let view = prefs_read_with_dir(tmp.path(), &state)
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
                 .await
                 .expect("read must succeed after write");
             assert_eq!(
@@ -2977,10 +4666,17 @@ mod tests {
                 left_collapsed: true,
                 right_collapsed: false,
             };
-            set_editor_layout_with_dir(tmp.path(), &state, &noop_hooks(), layout2)
-                .await
-                .expect("second write must succeed");
-            let view = prefs_read_with_dir(tmp.path(), &state)
+            set_editor_layout_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                layout2,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("second write must succeed");
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
                 .await
                 .expect("read must succeed after second write");
             assert_eq!(view.editor_layout, Some(layout2));
@@ -2999,6 +4695,8 @@ mod tests {
                 &state,
                 &noop_hooks(),
                 alloc_vec(["Projects/"]),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
             )
             .await;
             assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
@@ -3012,8 +4710,15 @@ mod tests {
         rt().block_on(async {
             let tmp = ScopedTempDir::new("prefs-autolock-empty").expect("scoped tempdir");
             let state = VaultRuntimeState::default();
-            let result =
-                set_auto_lock_timeout_with_dir(tmp.path(), &state, &noop_hooks(), 300).await;
+            let result = set_auto_lock_timeout_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                300,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await;
             assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
         });
     }
@@ -3023,12 +4728,19 @@ mod tests {
         rt().block_on(async {
             let (tmp, state) = make_temp_vault_with_unlocked_state(0x33).await;
 
-            set_auto_lock_timeout_with_dir(tmp.path(), &state, &noop_hooks(), 900)
-                .await
-                .expect("write must succeed");
+            set_auto_lock_timeout_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                900,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("write must succeed");
 
             // Disk: prefs_read returns the raw stored value.
-            let view = prefs_read_with_dir(tmp.path(), &state)
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
                 .await
                 .expect("read must succeed after write");
             assert_eq!(view.auto_lock_seconds, Some(900));
@@ -3055,11 +4767,13 @@ mod tests {
                 &state,
                 &noop_hooks(),
                 alloc_vec(["Projects/Myne/", "Archive/2025/"]),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
             )
             .await
             .expect("write must succeed");
 
-            let view = prefs_read_with_dir(tmp.path(), &state)
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
                 .await
                 .expect("read must succeed after write");
             // Canonical sort applies at encode → read-back is sorted.
@@ -3071,10 +4785,17 @@ mod tests {
             assert!(view.screen_capture_protection);
 
             // Empty set round-trips (and re-encodes byte-identical to v0.1.0).
-            set_deliberate_folders_with_dir(tmp.path(), &state, &noop_hooks(), Vec::new())
-                .await
-                .expect("clear must succeed");
-            let cleared = prefs_read_with_dir(tmp.path(), &state)
+            set_deliberate_folders_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                Vec::new(),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("clear must succeed");
+            let cleared = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
                 .await
                 .expect("read after clear");
             assert!(cleared.deliberate_folders.is_empty());
@@ -3093,6 +4814,8 @@ mod tests {
                 &state,
                 &noop_hooks(),
                 alloc_vec(["Projects/"]),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
             )
             .await;
             assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
@@ -3109,11 +4832,13 @@ mod tests {
                 &state,
                 &noop_hooks(),
                 alloc_vec(["Projects/Myne/", "Archive/2025/"]),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
             )
             .await
             .expect("write must succeed");
 
-            let view = prefs_read_with_dir(tmp.path(), &state)
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
                 .await
                 .expect("read must succeed after write");
             // Canonical sort applies at encode → read-back is sorted.
@@ -3125,10 +4850,17 @@ mod tests {
             assert!(view.deliberate_folders.is_empty());
 
             // Empty set round-trips (and re-encodes byte-identical to pre-feature).
-            set_archived_folders_with_dir(tmp.path(), &state, &noop_hooks(), Vec::new())
-                .await
-                .expect("clear must succeed");
-            let cleared = prefs_read_with_dir(tmp.path(), &state)
+            set_archived_folders_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                Vec::new(),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("clear must succeed");
+            let cleared = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
                 .await
                 .expect("read after clear");
             assert!(cleared.archived_folders.is_empty());
@@ -3143,24 +4875,35 @@ mod tests {
             let (tmp, state) = make_temp_vault_with_unlocked_state(0x51).await;
 
             // Defaults: AI off, no exclusions.
-            let base = prefs_read_with_dir(tmp.path(), &state).await.expect("read");
+            let base = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
+                .await
+                .expect("read");
             assert!(!base.ai_enabled);
             assert!(base.ai_excluded_folders.is_empty());
 
             // Enable + set exclusions (unsorted input).
-            set_ai_enabled_with_dir(tmp.path(), &state, &noop_hooks(), true)
-                .await
-                .expect("enable must succeed");
+            set_ai_enabled_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                true,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("enable must succeed");
             set_ai_excluded_folders_with_dir(
                 tmp.path(),
                 &state,
                 &noop_hooks(),
                 alloc_vec(["Private/", "Archive/2025/"]),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
             )
             .await
             .expect("set exclusions must succeed");
 
-            let view = prefs_read_with_dir(tmp.path(), &state)
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
                 .await
                 .expect("read after write");
             assert!(view.ai_enabled);
@@ -3173,13 +4916,27 @@ mod tests {
             assert!(view.screen_capture_protection);
 
             // Disable + clear → back to defaults (byte-identical to pre-field).
-            set_ai_enabled_with_dir(tmp.path(), &state, &noop_hooks(), false)
-                .await
-                .expect("disable must succeed");
-            set_ai_excluded_folders_with_dir(tmp.path(), &state, &noop_hooks(), Vec::new())
-                .await
-                .expect("clear must succeed");
-            let cleared = prefs_read_with_dir(tmp.path(), &state)
+            set_ai_enabled_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                false,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("disable must succeed");
+            set_ai_excluded_folders_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                Vec::new(),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("clear must succeed");
+            let cleared = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
                 .await
                 .expect("read after clear");
             assert!(!cleared.ai_enabled);
@@ -3200,6 +4957,8 @@ mod tests {
                 &noop_hooks(),
                 Some("root".to_string()),
                 None,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
             )
             .await;
             assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
@@ -3217,6 +4976,8 @@ mod tests {
                 &noop_hooks(),
                 Some("last".to_string()),
                 None,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
             )
             .await;
             assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
@@ -3236,11 +4997,13 @@ mod tests {
                 &noop_hooks(),
                 Some("specific".to_string()),
                 Some("Inbox/".to_string()),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
             )
             .await
             .expect("write must succeed");
 
-            let view = prefs_read_with_dir(tmp.path(), &state)
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
                 .await
                 .expect("read must succeed after write");
             assert_eq!(view.new_note_location.as_deref(), Some("specific"));
@@ -3254,10 +5017,12 @@ mod tests {
                 &noop_hooks(),
                 Some("root".to_string()),
                 None,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
             )
             .await
             .expect("second write must succeed");
-            let view = prefs_read_with_dir(tmp.path(), &state)
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
                 .await
                 .expect("read after second write");
             assert_eq!(view.new_note_location.as_deref(), Some("root"));
@@ -3279,11 +5044,13 @@ mod tests {
                 &noop_hooks(),
                 Some("specific".to_string()),
                 Some("0192f1a0-0000-7000-8000-000000000000".to_string()),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
             )
             .await
             .expect("write must succeed");
 
-            let view = prefs_read_with_dir(tmp.path(), &state)
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
                 .await
                 .expect("read must succeed after write");
             assert_eq!(view.startup_open.as_deref(), Some("specific"));
@@ -3299,10 +5066,12 @@ mod tests {
                 &noop_hooks(),
                 Some("empty".to_string()),
                 None,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
             )
             .await
             .expect("second write must succeed");
-            let view = prefs_read_with_dir(tmp.path(), &state)
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
                 .await
                 .expect("read after second write");
             assert_eq!(view.startup_open.as_deref(), Some("empty"));
@@ -3324,11 +5093,18 @@ mod tests {
                 ),
                 (String::from("Projects/Myne/"), String::from("slate")),
             ]);
-            set_item_colors_with_dir(tmp.path(), &state, &noop_hooks(), colors.clone())
-                .await
-                .expect("write must succeed");
+            set_item_colors_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                colors.clone(),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("write must succeed");
 
-            let view = prefs_read_with_dir(tmp.path(), &state)
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
                 .await
                 .expect("read after write");
             assert_eq!(view.item_colors, colors);
@@ -3341,10 +5117,12 @@ mod tests {
                 &state,
                 &noop_hooks(),
                 std::collections::BTreeMap::new(),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
             )
             .await
             .expect("clear must succeed");
-            let cleared = prefs_read_with_dir(tmp.path(), &state)
+            let cleared = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
                 .await
                 .expect("read after clear");
             assert!(cleared.item_colors.is_empty());
@@ -3360,11 +5138,18 @@ mod tests {
                 (String::from("Archive/2025/"), String::from("archive")),
                 (String::from("Projects/Myne/"), String::from("book")),
             ]);
-            set_folder_icons_with_dir(tmp.path(), &state, &noop_hooks(), icons.clone())
-                .await
-                .expect("write must succeed");
+            set_folder_icons_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                icons.clone(),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("write must succeed");
 
-            let view = prefs_read_with_dir(tmp.path(), &state)
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
                 .await
                 .expect("read after write");
             assert_eq!(view.folder_icons, icons);
@@ -3374,10 +5159,12 @@ mod tests {
                 &state,
                 &noop_hooks(),
                 std::collections::BTreeMap::new(),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
             )
             .await
             .expect("clear must succeed");
-            let cleared = prefs_read_with_dir(tmp.path(), &state)
+            let cleared = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
                 .await
                 .expect("read after clear");
             assert!(cleared.folder_icons.is_empty());
@@ -3391,9 +5178,15 @@ mod tests {
         rt().block_on(async {
             let tmp = ScopedTempDir::new("prefs-item-order-empty").expect("scoped tempdir");
             let state = VaultRuntimeState::default();
-            let result =
-                set_item_order_with_dir(tmp.path(), &state, &noop_hooks(), alloc_vec(["a", "b"]))
-                    .await;
+            let result = set_item_order_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                alloc_vec(["a", "b"]),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await;
             assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
         });
     }
@@ -3412,6 +5205,8 @@ mod tests {
                 &state,
                 &noop_hooks(),
                 alloc_vec(["n-zzz", "Zebra/", "n-aaa"]),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
             )
             .await
             .expect("write item_order");
@@ -3420,11 +5215,13 @@ mod tests {
                 &state,
                 &noop_hooks(),
                 alloc_vec(["n-zzz", "n-aaa"]),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
             )
             .await
             .expect("write favorites");
 
-            let view = prefs_read_with_dir(tmp.path(), &state)
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
                 .await
                 .expect("read after order writes");
             assert_eq!(view.item_order, alloc_vec(["n-zzz", "Zebra/", "n-aaa"]));
@@ -3434,10 +5231,17 @@ mod tests {
 
             // Clearing item_order round-trips back to empty; favorites is
             // an independent field and stays set.
-            set_item_order_with_dir(tmp.path(), &state, &noop_hooks(), Vec::new())
-                .await
-                .expect("clear item_order");
-            let cleared = prefs_read_with_dir(tmp.path(), &state)
+            set_item_order_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                Vec::new(),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("clear item_order");
+            let cleared = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
                 .await
                 .expect("read after clear");
             assert!(cleared.item_order.is_empty());
@@ -3461,6 +5265,8 @@ mod tests {
                 &state,
                 &noop_hooks(),
                 alloc_vec(["graph"]),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
             )
             .await;
             assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
@@ -3479,21 +5285,30 @@ mod tests {
                 &state,
                 &noop_hooks(),
                 alloc_vec(["word-count", "graph", "graph"]),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
             )
             .await
             .expect("write hidden_bar_items");
 
-            let view = prefs_read_with_dir(tmp.path(), &state)
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
                 .await
                 .expect("read after hidden_bar_items write");
             assert_eq!(view.hidden_bar_items, alloc_vec(["graph", "word-count"]));
             assert!(view.screen_capture_protection);
 
             // Clearing round-trips back to empty (bar fully visible default).
-            set_hidden_bar_items_with_dir(tmp.path(), &state, &noop_hooks(), Vec::new())
-                .await
-                .expect("clear hidden_bar_items");
-            let cleared = prefs_read_with_dir(tmp.path(), &state)
+            set_hidden_bar_items_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                Vec::new(),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("clear hidden_bar_items");
+            let cleared = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
                 .await
                 .expect("read after clear");
             assert!(cleared.hidden_bar_items.is_empty());
@@ -3525,9 +5340,15 @@ mod tests {
         rt().block_on(async {
             let tmp = ScopedTempDir::new("prefs-sv-empty").expect("scoped tempdir");
             let state = VaultRuntimeState::default();
-            let result =
-                upsert_saved_view_with_dir(tmp.path(), &state, &noop_hooks(), test_view("v1", "A"))
-                    .await;
+            let result = upsert_saved_view_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                test_view("v1", "A"),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await;
             assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
         });
     }
@@ -3538,10 +5359,19 @@ mod tests {
             let (tmp, state) = make_temp_vault_with_unlocked_state(0x44).await;
 
             // Save v1 → read returns it.
-            upsert_saved_view_with_dir(tmp.path(), &state, &noop_hooks(), test_view("v1", "Books"))
+            upsert_saved_view_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                test_view("v1", "Books"),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("save v1");
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
                 .await
-                .expect("save v1");
-            let view = prefs_read_with_dir(tmp.path(), &state).await.expect("read");
+                .expect("read");
             assert_eq!(view.saved_views.len(), 1);
             assert_eq!(view.saved_views[0].name, "Books");
 
@@ -3551,18 +5381,31 @@ mod tests {
                 &state,
                 &noop_hooks(),
                 test_view("v1", "Reading"),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
             )
             .await
             .expect("edit v1");
-            let view = prefs_read_with_dir(tmp.path(), &state).await.expect("read");
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
+                .await
+                .expect("read");
             assert_eq!(view.saved_views.len(), 1);
             assert_eq!(view.saved_views[0].name, "Reading");
 
             // Save a second view → two distinct entries.
-            upsert_saved_view_with_dir(tmp.path(), &state, &noop_hooks(), test_view("v2", "Films"))
+            upsert_saved_view_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                test_view("v2", "Films"),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("save v2");
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
                 .await
-                .expect("save v2");
-            let view = prefs_read_with_dir(tmp.path(), &state).await.expect("read");
+                .expect("read");
             assert_eq!(view.saved_views.len(), 2);
             // The pre-existing screen_capture default is untouched.
             assert!(view.screen_capture_protection);
@@ -3584,18 +5427,35 @@ mod tests {
         // view set is untouched.
         rt().block_on(async {
             let (tmp, state) = make_temp_vault_with_unlocked_state(0x45).await;
-            upsert_saved_view_with_dir(tmp.path(), &state, &noop_hooks(), test_view("v1", "Small"))
-                .await
-                .expect("save small");
+            upsert_saved_view_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                test_view("v1", "Small"),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("save small");
 
             // A view with a >64 KiB name blows the cap on encode.
             let mut huge = test_view("v2", "");
             huge.name = "x".repeat(70 * 1024);
-            let result = upsert_saved_view_with_dir(tmp.path(), &state, &noop_hooks(), huge).await;
+            let result = upsert_saved_view_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                huge,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await;
             assert!(matches!(result, Err(PrefsWriteError::PrefsEncodeFailed)));
 
             // Prior prefs intact: still exactly the one small view.
-            let view = prefs_read_with_dir(tmp.path(), &state).await.expect("read");
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
+                .await
+                .expect("read");
             assert_eq!(view.saved_views.len(), 1);
             assert_eq!(view.saved_views[0].id, "v1");
         });
@@ -3607,12 +5467,27 @@ mod tests {
             let tmp = ScopedTempDir::new("prefs-sv-del-empty").expect("scoped tempdir");
             let state = VaultRuntimeState::default();
             assert!(matches!(
-                delete_saved_view_with_dir(tmp.path(), &state, &noop_hooks(), String::from("v1"))
-                    .await,
+                delete_saved_view_with_dir(
+                    tmp.path(),
+                    &state,
+                    &noop_hooks(),
+                    String::from("v1"),
+                    &crate::vault_io::StdVaultIo,
+                    &crate::host::NoopHost
+                )
+                .await,
                 Err(PrefsWriteError::SlotNotUnlocked)
             ));
             assert!(matches!(
-                set_view_order_with_dir(tmp.path(), &state, &noop_hooks(), alloc_vec(["v1"])).await,
+                set_view_order_with_dir(
+                    tmp.path(),
+                    &state,
+                    &noop_hooks(),
+                    alloc_vec(["v1"]),
+                    &crate::vault_io::StdVaultIo,
+                    &crate::host::NoopHost
+                )
+                .await,
                 Err(PrefsWriteError::SlotNotUnlocked)
             ));
         });
@@ -3622,30 +5497,69 @@ mod tests {
     fn delete_saved_view_removes_and_prunes_view_order() {
         rt().block_on(async {
             let (tmp, state) = make_temp_vault_with_unlocked_state(0x46).await;
-            upsert_saved_view_with_dir(tmp.path(), &state, &noop_hooks(), test_view("v1", "A"))
-                .await
-                .expect("save v1");
-            upsert_saved_view_with_dir(tmp.path(), &state, &noop_hooks(), test_view("v2", "B"))
-                .await
-                .expect("save v2");
-            set_view_order_with_dir(tmp.path(), &state, &noop_hooks(), alloc_vec(["v2", "v1"]))
-                .await
-                .expect("order");
+            upsert_saved_view_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                test_view("v1", "A"),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("save v1");
+            upsert_saved_view_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                test_view("v2", "B"),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("save v2");
+            set_view_order_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                alloc_vec(["v2", "v1"]),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("order");
 
             // Delete v1 → gone from saved_views AND pruned from view_order.
-            delete_saved_view_with_dir(tmp.path(), &state, &noop_hooks(), String::from("v1"))
+            delete_saved_view_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                String::from("v1"),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("delete v1");
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
                 .await
-                .expect("delete v1");
-            let view = prefs_read_with_dir(tmp.path(), &state).await.expect("read");
+                .expect("read");
             assert_eq!(view.saved_views.len(), 1);
             assert_eq!(view.saved_views[0].id, "v2");
             assert_eq!(view.view_order, alloc_vec(["v2"]));
 
             // Deleting an absent id is an idempotent no-op success.
-            delete_saved_view_with_dir(tmp.path(), &state, &noop_hooks(), String::from("ghost"))
+            delete_saved_view_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                String::from("ghost"),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("delete absent is ok");
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
                 .await
-                .expect("delete absent is ok");
-            let view = prefs_read_with_dir(tmp.path(), &state).await.expect("read");
+                .expect("read");
             assert_eq!(view.saved_views.len(), 1);
         });
     }
@@ -3660,10 +5574,14 @@ mod tests {
                 &state,
                 &noop_hooks(),
                 alloc_vec(["v3", "v1", "v3"]),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
             )
             .await
             .expect("set order");
-            let view = prefs_read_with_dir(tmp.path(), &state).await.expect("read");
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
+                .await
+                .expect("read");
             assert_eq!(view.view_order, alloc_vec(["v3", "v1", "v3"]));
         });
     }
@@ -3680,6 +5598,8 @@ mod tests {
                 &state,
                 &noop_hooks(),
                 alloc_vec(["graph"]),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
             )
             .await;
             assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
@@ -3697,20 +5617,33 @@ mod tests {
                 &state,
                 &noop_hooks(),
                 alloc_vec(["word-count", "graph", "tags", "view-mode"]),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
             )
             .await
             .expect("set order");
-            let view = prefs_read_with_dir(tmp.path(), &state).await.expect("read");
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
+                .await
+                .expect("read");
             assert_eq!(
                 view.bar_items_order,
                 alloc_vec(["word-count", "graph", "tags", "view-mode"])
             );
 
             // Clearing round-trips back to empty.
-            set_bar_items_order_with_dir(tmp.path(), &state, &noop_hooks(), Vec::new())
+            set_bar_items_order_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                Vec::new(),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("clear order");
+            let cleared = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
                 .await
-                .expect("clear order");
-            let cleared = prefs_read_with_dir(tmp.path(), &state).await.expect("read");
+                .expect("read");
             assert!(cleared.bar_items_order.is_empty());
         });
     }
@@ -3722,9 +5655,15 @@ mod tests {
         rt().block_on(async {
             let tmp = ScopedTempDir::new("prefs-theme-empty").expect("scoped tempdir");
             let state = VaultRuntimeState::default();
-            let result =
-                set_theme_with_dir(tmp.path(), &state, &noop_hooks(), Some(ThemeChoice::Dark))
-                    .await;
+            let result = set_theme_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                Some(ThemeChoice::Dark),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await;
             assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
         });
     }
@@ -3735,14 +5674,21 @@ mod tests {
             let (tmp, state) = make_temp_vault_with_unlocked_state(0x33).await;
 
             // Explicit Dark persists (disk-first) + round-trips.
-            set_theme_with_dir(tmp.path(), &state, &noop_hooks(), Some(ThemeChoice::Dark))
-                .await
-                .expect("write theme");
+            set_theme_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                Some(ThemeChoice::Dark),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("write theme");
             assert!(
                 tmp.path().join("vault.prefs").exists(),
                 "set_theme must create vault.prefs"
             );
-            let view = prefs_read_with_dir(tmp.path(), &state)
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
                 .await
                 .expect("read after theme write");
             assert_eq!(view.theme, Some(ThemeChoice::Dark));
@@ -3750,19 +5696,33 @@ mod tests {
             assert!(view.screen_capture_protection);
 
             // Switching to Light overwrites.
-            set_theme_with_dir(tmp.path(), &state, &noop_hooks(), Some(ThemeChoice::Light))
-                .await
-                .expect("write light");
-            let view = prefs_read_with_dir(tmp.path(), &state)
+            set_theme_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                Some(ThemeChoice::Light),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("write light");
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
                 .await
                 .expect("read after light");
             assert_eq!(view.theme, Some(ThemeChoice::Light));
 
             // System (None) clears the field back to "no explicit choice".
-            set_theme_with_dir(tmp.path(), &state, &noop_hooks(), None)
-                .await
-                .expect("write system");
-            let view = prefs_read_with_dir(tmp.path(), &state)
+            set_theme_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                None,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("write system");
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
                 .await
                 .expect("read after system");
             assert_eq!(view.theme, None);
@@ -3779,6 +5739,8 @@ mod tests {
                 &state,
                 &noop_hooks(),
                 Some(String::from("solarized")),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
             )
             .await;
             assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
@@ -3796,30 +5758,46 @@ mod tests {
                 &state,
                 &noop_hooks(),
                 Some(String::from("solarized-dark")),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
             )
             .await
             .expect("write custom_theme");
-            let view = prefs_read_with_dir(tmp.path(), &state)
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
                 .await
                 .expect("read after custom_theme write");
             assert_eq!(view.custom_theme.as_deref(), Some("solarized-dark"));
 
             // A built-in theme can be set alongside it; both persist (precedence
             // — custom_theme winning — is resolved client-side).
-            set_theme_with_dir(tmp.path(), &state, &noop_hooks(), Some(ThemeChoice::Dark))
-                .await
-                .expect("write theme");
-            let view = prefs_read_with_dir(tmp.path(), &state)
+            set_theme_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                Some(ThemeChoice::Dark),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("write theme");
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
                 .await
                 .expect("read after theme write");
             assert_eq!(view.custom_theme.as_deref(), Some("solarized-dark"));
             assert_eq!(view.theme, Some(ThemeChoice::Dark));
 
             // Clearing custom_theme (None) drops the field back to "no custom".
-            set_custom_theme_with_dir(tmp.path(), &state, &noop_hooks(), None)
-                .await
-                .expect("clear custom_theme");
-            let view = prefs_read_with_dir(tmp.path(), &state)
+            set_custom_theme_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                None,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("clear custom_theme");
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
                 .await
                 .expect("read after clear");
             assert_eq!(view.custom_theme, None);
@@ -3842,6 +5820,8 @@ mod tests {
                 |p| {
                     p.editor_text_size = Some(String::from("lg"));
                 },
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
             )
             .await;
             assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
@@ -3861,6 +5841,8 @@ mod tests {
                 |p| {
                     p.editor_text_size = Some(String::from("lg"));
                 },
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
             )
             .await
             .expect("write text size");
@@ -3872,12 +5854,14 @@ mod tests {
                 |p| {
                     p.editor_font_family = Some(String::from("sans"));
                 },
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
             )
             .await
             .expect("write font family");
             assert!(tmp.path().join("vault.prefs").exists());
 
-            let view = prefs_read_with_dir(tmp.path(), &state)
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
                 .await
                 .expect("read after typography write");
             assert_eq!(view.editor_text_size.as_deref(), Some("lg"));
@@ -3894,10 +5878,12 @@ mod tests {
                 |p| {
                     p.editor_text_size = None;
                 },
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
             )
             .await
             .expect("clear text size");
-            let view = prefs_read_with_dir(tmp.path(), &state)
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
                 .await
                 .expect("read after clear");
             assert_eq!(view.editor_text_size, None);
@@ -3912,7 +5898,15 @@ mod tests {
         rt().block_on(async {
             let tmp = ScopedTempDir::new("prefs-spell-empty").expect("scoped tempdir");
             let state = VaultRuntimeState::default();
-            let result = set_spell_enabled_with_dir(tmp.path(), &state, &noop_hooks(), true).await;
+            let result = set_spell_enabled_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                true,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await;
             assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
         });
     }
@@ -3923,10 +5917,17 @@ mod tests {
             let (tmp, state) = make_temp_vault_with_unlocked_state(0x44).await;
 
             // Enable persists (disk-first) + round-trips.
-            set_spell_enabled_with_dir(tmp.path(), &state, &noop_hooks(), true)
-                .await
-                .expect("write spell_enabled");
-            let view = prefs_read_with_dir(tmp.path(), &state)
+            set_spell_enabled_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                true,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("write spell_enabled");
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
                 .await
                 .expect("read after enable");
             assert_eq!(view.spell_enabled, Some(true));
@@ -3940,10 +5941,12 @@ mod tests {
                 &state,
                 &noop_hooks(),
                 vec!["tr".to_string(), "en-US".to_string(), "tr".to_string()],
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
             )
             .await
             .expect("write spell_languages");
-            let view = prefs_read_with_dir(tmp.path(), &state)
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
                 .await
                 .expect("read after languages");
             assert_eq!(
@@ -3954,10 +5957,17 @@ mod tests {
             assert_eq!(view.spell_enabled, Some(true));
 
             // Disable overwrites.
-            set_spell_enabled_with_dir(tmp.path(), &state, &noop_hooks(), false)
-                .await
-                .expect("write disable");
-            let view = prefs_read_with_dir(tmp.path(), &state)
+            set_spell_enabled_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                false,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("write disable");
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
                 .await
                 .expect("read after disable");
             assert_eq!(view.spell_enabled, Some(false));
@@ -3971,8 +5981,15 @@ mod tests {
         rt().block_on(async {
             let tmp = ScopedTempDir::new("prefs-timestamps-empty").expect("scoped tempdir");
             let state = VaultRuntimeState::default();
-            let result =
-                set_show_note_timestamps_with_dir(tmp.path(), &state, &noop_hooks(), false).await;
+            let result = set_show_note_timestamps_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                false,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await;
             assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
         });
     }
@@ -3983,16 +6000,23 @@ mod tests {
             let (tmp, state) = make_temp_vault_with_unlocked_state(0x45).await;
 
             // Default (no write yet) reads back as `true` (visible).
-            let view = prefs_read_with_dir(tmp.path(), &state)
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
                 .await
                 .expect("read default");
             assert!(view.show_note_timestamps);
 
             // Turn OFF persists (disk-first) + round-trips.
-            set_show_note_timestamps_with_dir(tmp.path(), &state, &noop_hooks(), false)
-                .await
-                .expect("write off");
-            let view = prefs_read_with_dir(tmp.path(), &state)
+            set_show_note_timestamps_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                false,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("write off");
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
                 .await
                 .expect("read after off");
             assert!(!view.show_note_timestamps);
@@ -4000,10 +6024,17 @@ mod tests {
             assert!(view.screen_capture_protection);
 
             // Turn back ON overwrites (re-encodes byte-identical to pre-feature).
-            set_show_note_timestamps_with_dir(tmp.path(), &state, &noop_hooks(), true)
-                .await
-                .expect("write on");
-            let view = prefs_read_with_dir(tmp.path(), &state)
+            set_show_note_timestamps_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                true,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("write on");
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
                 .await
                 .expect("read after on");
             assert!(view.show_note_timestamps);
@@ -4017,8 +6048,15 @@ mod tests {
         rt().block_on(async {
             let tmp = ScopedTempDir::new("prefs-line-numbers-empty").expect("scoped tempdir");
             let state = VaultRuntimeState::default();
-            let result =
-                set_editor_line_numbers_with_dir(tmp.path(), &state, &noop_hooks(), true).await;
+            let result = set_editor_line_numbers_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                true,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await;
             assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
         });
     }
@@ -4029,16 +6067,23 @@ mod tests {
             let (tmp, state) = make_temp_vault_with_unlocked_state(0x46).await;
 
             // Default (no write yet) reads back as `None` (host default-OFF).
-            let view = prefs_read_with_dir(tmp.path(), &state)
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
                 .await
                 .expect("read default");
             assert_eq!(view.editor_line_numbers, None);
 
             // Turn ON persists (disk-first) + round-trips.
-            set_editor_line_numbers_with_dir(tmp.path(), &state, &noop_hooks(), true)
-                .await
-                .expect("write on");
-            let view = prefs_read_with_dir(tmp.path(), &state)
+            set_editor_line_numbers_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                true,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("write on");
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
                 .await
                 .expect("read after on");
             assert_eq!(view.editor_line_numbers, Some(true));
@@ -4046,10 +6091,17 @@ mod tests {
             assert!(view.screen_capture_protection);
 
             // Turn OFF overwrites (explicit Some(false), not back to None).
-            set_editor_line_numbers_with_dir(tmp.path(), &state, &noop_hooks(), false)
-                .await
-                .expect("write off");
-            let view = prefs_read_with_dir(tmp.path(), &state)
+            set_editor_line_numbers_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                false,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("write off");
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
                 .await
                 .expect("read after off");
             assert_eq!(view.editor_line_numbers, Some(false));
@@ -4063,8 +6115,15 @@ mod tests {
         rt().block_on(async {
             let tmp = ScopedTempDir::new("prefs-vim-mode-empty").expect("scoped tempdir");
             let state = VaultRuntimeState::default();
-            let result =
-                set_editor_vim_mode_with_dir(tmp.path(), &state, &noop_hooks(), true).await;
+            let result = set_editor_vim_mode_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                true,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await;
             assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
         });
     }
@@ -4076,16 +6135,23 @@ mod tests {
 
             // Default (no write yet) reads back as `None` — the host applies the
             // default-OFF policy; modal editing is opt-in.
-            let view = prefs_read_with_dir(tmp.path(), &state)
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
                 .await
                 .expect("read default");
             assert_eq!(view.editor_vim_mode, None);
 
             // Turn ON persists (disk-first) + round-trips.
-            set_editor_vim_mode_with_dir(tmp.path(), &state, &noop_hooks(), true)
-                .await
-                .expect("write on");
-            let view = prefs_read_with_dir(tmp.path(), &state)
+            set_editor_vim_mode_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                true,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("write on");
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
                 .await
                 .expect("read after on");
             assert_eq!(view.editor_vim_mode, Some(true));
@@ -4094,10 +6160,17 @@ mod tests {
 
             // Turn OFF overwrites (explicit Some(false), NOT back to None) — an
             // explicit off stays distinguishable from never-set on disk.
-            set_editor_vim_mode_with_dir(tmp.path(), &state, &noop_hooks(), false)
-                .await
-                .expect("write off");
-            let view = prefs_read_with_dir(tmp.path(), &state)
+            set_editor_vim_mode_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                false,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("write off");
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
                 .await
                 .expect("read after off");
             assert_eq!(view.editor_vim_mode, Some(false));
@@ -4111,14 +6184,28 @@ mod tests {
         rt().block_on(async {
             let (tmp, state) = make_temp_vault_with_unlocked_state(0x4e).await;
 
-            set_editor_line_numbers_with_dir(tmp.path(), &state, &noop_hooks(), true)
-                .await
-                .expect("write line numbers");
-            set_editor_vim_mode_with_dir(tmp.path(), &state, &noop_hooks(), true)
-                .await
-                .expect("write vim mode");
+            set_editor_line_numbers_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                true,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("write line numbers");
+            set_editor_vim_mode_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                true,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("write vim mode");
 
-            let view = prefs_read_with_dir(tmp.path(), &state)
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
                 .await
                 .expect("read after both");
             assert_eq!(view.editor_line_numbers, Some(true));
@@ -4133,8 +6220,15 @@ mod tests {
         rt().block_on(async {
             let tmp = ScopedTempDir::new("prefs-archive-disabled-empty").expect("scoped tempdir");
             let state = VaultRuntimeState::default();
-            let result =
-                set_archive_disabled_with_dir(tmp.path(), &state, &noop_hooks(), true).await;
+            let result = set_archive_disabled_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                true,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await;
             assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
         });
     }
@@ -4146,16 +6240,23 @@ mod tests {
 
             // Default (no write yet) reads back as `None` (host default-OFF —
             // archiving enabled).
-            let view = prefs_read_with_dir(tmp.path(), &state)
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
                 .await
                 .expect("read default");
             assert_eq!(view.archive_disabled, None);
 
             // Turn ON persists (disk-first) + round-trips.
-            set_archive_disabled_with_dir(tmp.path(), &state, &noop_hooks(), true)
-                .await
-                .expect("write on");
-            let view = prefs_read_with_dir(tmp.path(), &state)
+            set_archive_disabled_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                true,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("write on");
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
                 .await
                 .expect("read after on");
             assert_eq!(view.archive_disabled, Some(true));
@@ -4163,10 +6264,17 @@ mod tests {
             assert!(view.screen_capture_protection);
 
             // Turn OFF overwrites (explicit Some(false), not back to None).
-            set_archive_disabled_with_dir(tmp.path(), &state, &noop_hooks(), false)
-                .await
-                .expect("write off");
-            let view = prefs_read_with_dir(tmp.path(), &state)
+            set_archive_disabled_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                false,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("write off");
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
                 .await
                 .expect("read after off");
             assert_eq!(view.archive_disabled, Some(false));
@@ -4180,9 +6288,15 @@ mod tests {
         rt().block_on(async {
             let tmp = ScopedTempDir::new("prefs-focus-dim-empty").expect("scoped tempdir");
             let state = VaultRuntimeState::default();
-            let result =
-                set_editor_focus_dim_inactive_with_dir(tmp.path(), &state, &noop_hooks(), true)
-                    .await;
+            let result = set_editor_focus_dim_inactive_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                true,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await;
             assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
         });
     }
@@ -4192,8 +6306,15 @@ mod tests {
         rt().block_on(async {
             let tmp = ScopedTempDir::new("prefs-focus-tw-empty").expect("scoped tempdir");
             let state = VaultRuntimeState::default();
-            let result =
-                set_editor_focus_typewriter_with_dir(tmp.path(), &state, &noop_hooks(), true).await;
+            let result = set_editor_focus_typewriter_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                true,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await;
             assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
         });
     }
@@ -4204,20 +6325,34 @@ mod tests {
             let (tmp, state) = make_temp_vault_with_unlocked_state(0x47).await;
 
             // Default (no write yet) reads back as `None`.
-            let view = prefs_read_with_dir(tmp.path(), &state)
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
                 .await
                 .expect("read default");
             assert_eq!(view.editor_focus_dim_inactive, None);
             assert_eq!(view.editor_focus_typewriter, None);
 
             // Enable both persists (disk-first) + round-trips.
-            set_editor_focus_dim_inactive_with_dir(tmp.path(), &state, &noop_hooks(), true)
-                .await
-                .expect("write dim on");
-            set_editor_focus_typewriter_with_dir(tmp.path(), &state, &noop_hooks(), false)
-                .await
-                .expect("write typewriter off");
-            let view = prefs_read_with_dir(tmp.path(), &state)
+            set_editor_focus_dim_inactive_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                true,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("write dim on");
+            set_editor_focus_typewriter_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                false,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("write typewriter off");
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
                 .await
                 .expect("read after writes");
             assert_eq!(view.editor_focus_dim_inactive, Some(true));
@@ -4242,6 +6377,8 @@ mod tests {
                 |p| {
                     p.active_workspace = Some(String::from("ws-7"));
                 },
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
             )
             .await
             .expect("write active_workspace");
@@ -4253,11 +6390,13 @@ mod tests {
                 |p| {
                     p.editor_default_view_mode = Some(String::from("reading"));
                 },
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
             )
             .await
             .expect("write default view mode");
 
-            let view = prefs_read_with_dir(tmp.path(), &state)
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
                 .await
                 .expect("read after writes");
             assert_eq!(view.active_workspace.as_deref(), Some("ws-7"));
@@ -4273,10 +6412,12 @@ mod tests {
                 |p| {
                     p.active_workspace = None;
                 },
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
             )
             .await
             .expect("clear active_workspace");
-            let view = prefs_read_with_dir(tmp.path(), &state)
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
                 .await
                 .expect("read after clear");
             assert_eq!(view.active_workspace, None);
@@ -4297,6 +6438,8 @@ mod tests {
                 &noop_hooks(),
                 "graph.show".to_string(),
                 Some(vec!["Mod-Shift-g".to_string()]),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
             )
             .await;
             assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
@@ -4309,7 +6452,7 @@ mod tests {
             let (tmp, state) = make_temp_vault_with_unlocked_state(0x4B).await;
 
             // Default (no write yet) reads back as an empty keymap.
-            let view = prefs_read_with_dir(tmp.path(), &state)
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
                 .await
                 .expect("read default");
             assert!(view.keymap.is_empty());
@@ -4326,10 +6469,12 @@ mod tests {
                     "Mod-k".to_string(),
                     "Mod-p".to_string(),
                 ]),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
             )
             .await
             .expect("write override");
-            let view = prefs_read_with_dir(tmp.path(), &state)
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
                 .await
                 .expect("read after override");
             assert_eq!(
@@ -4346,10 +6491,12 @@ mod tests {
                 &noop_hooks(),
                 "vault.lock".to_string(),
                 Some(Vec::new()),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
             )
             .await
             .expect("write unbind");
-            let view = prefs_read_with_dir(tmp.path(), &state)
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
                 .await
                 .expect("read after unbind");
             assert_eq!(view.keymap.get("vault.lock"), Some(&Vec::<String>::new()));
@@ -4366,10 +6513,12 @@ mod tests {
                 &noop_hooks(),
                 "app.command-palette".to_string(),
                 None,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
             )
             .await
             .expect("write remove");
-            let view = prefs_read_with_dir(tmp.path(), &state)
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
                 .await
                 .expect("read after remove");
             assert!(!view.keymap.contains_key("app.command-palette"));
@@ -4394,6 +6543,8 @@ mod tests {
                 &state,
                 &noop_hooks(),
                 Some(String::from("Work")),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
             )
             .await;
             assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
@@ -4418,6 +6569,8 @@ mod tests {
                 &state,
                 &noop_hooks(),
                 Some(String::from("Work")),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
             )
             .await
             .expect("write label");
@@ -4425,7 +6578,7 @@ mod tests {
                 tmp.path().join("vault.prefs").exists(),
                 "vault_set_label must create vault.prefs"
             );
-            let view = prefs_read_with_dir(tmp.path(), &state)
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
                 .await
                 .expect("read after label write");
             assert_eq!(view.label, Some(String::from("Work")));
@@ -4443,10 +6596,12 @@ mod tests {
                 &state,
                 &noop_hooks(),
                 Some(String::from("Personal")),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
             )
             .await
             .expect("rename label");
-            let view = prefs_read_with_dir(tmp.path(), &state)
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
                 .await
                 .expect("read after rename");
             assert_eq!(view.label, Some(String::from("Personal")));
@@ -4456,10 +6611,17 @@ mod tests {
             );
 
             // Clearing (None) removes the label on disk AND evicts the cache.
-            vault_set_label_with_dir(tmp.path(), &state, &noop_hooks(), None)
-                .await
-                .expect("clear label");
-            let view = prefs_read_with_dir(tmp.path(), &state)
+            vault_set_label_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                None,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("clear label");
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
                 .await
                 .expect("read after clear");
             assert_eq!(view.label, None);
@@ -4482,6 +6644,8 @@ mod tests {
                 &state,
                 &noop_hooks(),
                 Some(String::from("book")),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
             )
             .await;
             assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
@@ -4506,6 +6670,8 @@ mod tests {
                 &state,
                 &noop_hooks(),
                 Some(String::from("book")),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
             )
             .await
             .expect("write icon");
@@ -4513,7 +6679,7 @@ mod tests {
                 tmp.path().join("vault.prefs").exists(),
                 "vault_set_icon must create vault.prefs"
             );
-            let view = prefs_read_with_dir(tmp.path(), &state)
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
                 .await
                 .expect("read after icon write");
             assert_eq!(view.icon, Some(String::from("book")));
@@ -4531,10 +6697,12 @@ mod tests {
                 &state,
                 &noop_hooks(),
                 Some(String::from("code")),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
             )
             .await
             .expect("change icon");
-            let view = prefs_read_with_dir(tmp.path(), &state)
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
                 .await
                 .expect("read after change");
             assert_eq!(view.icon, Some(String::from("code")));
@@ -4544,10 +6712,17 @@ mod tests {
             );
 
             // Clearing (None) removes the icon on disk AND evicts the cache.
-            vault_set_icon_with_dir(tmp.path(), &state, &noop_hooks(), None)
-                .await
-                .expect("clear icon");
-            let view = prefs_read_with_dir(tmp.path(), &state)
+            vault_set_icon_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                None,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("clear icon");
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
                 .await
                 .expect("read after clear");
             assert_eq!(view.icon, None);
@@ -4569,6 +6744,8 @@ mod tests {
                 &state,
                 &noop_hooks(),
                 Some(String::from(secret_label)),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
             )
             .await
             .expect("write label");
@@ -4594,7 +6771,8 @@ mod tests {
             state
                 .set_unlocked(test_vault_id(), fixture_unlocked_with_keys(0x42, 0x99, 1))
                 .await;
-            let result = prefs_read_with_dir(tmp.path(), &state).await;
+            let result =
+                prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo).await;
             // vault.meta absent → Io error (NOT collapsed to defaults
             // like vault.prefs absent — vault.meta is structural).
             assert!(matches!(result, Err(PrefsReadError::Io { .. })));

@@ -96,6 +96,19 @@ pub enum AttachmentImportError {
     JoinFailure,
 }
 
+/// The storage seam's closed error, straight through (phase3-web-client task 44).
+///
+/// Every read and write in this plugin now goes through [`crate::vault_io::VaultIo`],
+/// which already reduces `std::io::Error` to [`IoFailureKind`] at its own boundary —
+/// so this is an identity wrap rather than a second reduction. The
+/// `From<std::io::Error>` impl above stays for the host-only paths that still hold a
+/// real `io::Error`.
+impl From<IoFailureKind> for AttachmentImportError {
+    fn from(io_error_kind: IoFailureKind) -> Self {
+        AttachmentImportError::Io { io_error_kind }
+    }
+}
+
 impl From<std::io::Error> for AttachmentImportError {
     fn from(e: std::io::Error) -> Self {
         AttachmentImportError::Io {
@@ -176,6 +189,19 @@ pub enum AttachmentExportError {
     JoinFailure,
 }
 
+/// The storage seam's closed error, straight through (phase3-web-client task 44).
+///
+/// Every read and write in this plugin now goes through [`crate::vault_io::VaultIo`],
+/// which already reduces `std::io::Error` to [`IoFailureKind`] at its own boundary —
+/// so this is an identity wrap rather than a second reduction. The
+/// `From<std::io::Error>` impl above stays for the host-only paths that still hold a
+/// real `io::Error`.
+impl From<IoFailureKind> for AttachmentExportError {
+    fn from(io_error_kind: IoFailureKind) -> Self {
+        AttachmentExportError::Io { io_error_kind }
+    }
+}
+
 impl From<std::io::Error> for AttachmentExportError {
     fn from(e: std::io::Error) -> Self {
         AttachmentExportError::Io {
@@ -214,6 +240,70 @@ pub enum CatalogListError {
     /// `vault.meta` parse failed.
     #[error("vault.meta parse failed")]
     InvalidVaultMeta,
+}
+
+/// Failure surface for the attachment SERVE path (phase3-web-client task 44) —
+/// the browser's equivalent of the desktop `attachment://` handler's status
+/// codes.
+///
+/// **Non-distinguishing, deliberately.** The desktop handler collapses a
+/// malformed id, a tampered blob, a cross-vault blob and a wrong-key blob into
+/// one `403` (`protocol.md` §6.4), because telling them apart tells an attacker
+/// which of those they achieved. This enum keeps that collapse: `Denied` is the
+/// single answer for all four, and `NotFound` is reserved for "no catalog entry
+/// or no blob file", which a caller already knows from the catalog it rendered.
+///
+/// | Variant                | JSON                                                           |
+/// |------------------------|----------------------------------------------------------------|
+/// | `Locked`               | `{"kind":"Locked"}`                                            |
+/// | `NotFound`             | `{"kind":"NotFound"}`                                          |
+/// | `Denied`               | `{"kind":"Denied"}`                                            |
+/// | `Io { io_error_kind }` | `{"kind":"Io","detail":{"io_error_kind":"PermissionDenied"}}` |
+/// | `InvalidVaultMeta`     | `{"kind":"InvalidVaultMeta"}`                                  |
+#[derive(Debug, Error, Serialize)]
+#[serde(tag = "kind", content = "detail")]
+pub enum AttachmentServeError {
+    /// Slot was not `Slot::Unlocked` — no keys to decrypt with.
+    #[error("vault is not unlocked")]
+    Locked,
+
+    /// No catalog entry for this id, or no blob file behind it.
+    #[error("attachment not found")]
+    NotFound,
+
+    /// Malformed id, or the blob did not decode. One answer for four causes.
+    #[error("attachment refused")]
+    Denied,
+
+    /// Filesystem error reading `vault.meta`, the catalog or the blob.
+    #[error("filesystem error serving attachment")]
+    Io {
+        /// Closed-enum mapping of the storage seam's failure.
+        io_error_kind: IoFailureKind,
+    },
+
+    /// `vault.meta` parse failed — the catalog AAD identity is underivable.
+    #[error("vault.meta parse failed")]
+    InvalidVaultMeta,
+}
+
+impl From<IoFailureKind> for AttachmentServeError {
+    fn from(io_error_kind: IoFailureKind) -> Self {
+        AttachmentServeError::Io { io_error_kind }
+    }
+}
+
+/// The storage seam's closed error, straight through (phase3-web-client task 44).
+///
+/// Every read and write in this plugin now goes through [`crate::vault_io::VaultIo`],
+/// which already reduces `std::io::Error` to [`IoFailureKind`] at its own boundary —
+/// so this is an identity wrap rather than a second reduction. The
+/// `From<std::io::Error>` impl above stays for the host-only paths that still hold a
+/// real `io::Error`.
+impl From<IoFailureKind> for CatalogListError {
+    fn from(io_error_kind: IoFailureKind) -> Self {
+        CatalogListError::Io { io_error_kind }
+    }
 }
 
 impl From<std::io::Error> for CatalogListError {
@@ -266,6 +356,19 @@ pub enum AttachmentDeleteError {
     /// catalog rewrite — practically unreachable in v0.1.
     #[error("catalog encode failed")]
     EncodeFailed,
+}
+
+/// The storage seam's closed error, straight through (phase3-web-client task 44).
+///
+/// Every read and write in this plugin now goes through [`crate::vault_io::VaultIo`],
+/// which already reduces `std::io::Error` to [`IoFailureKind`] at its own boundary —
+/// so this is an identity wrap rather than a second reduction. The
+/// `From<std::io::Error>` impl above stays for the host-only paths that still hold a
+/// real `io::Error`.
+impl From<IoFailureKind> for AttachmentDeleteError {
+    fn from(io_error_kind: IoFailureKind) -> Self {
+        AttachmentDeleteError::Io { io_error_kind }
+    }
 }
 
 impl From<std::io::Error> for AttachmentDeleteError {
@@ -330,6 +433,19 @@ pub enum AttachmentRenameError {
     /// catalog rewrite — practically unreachable in v0.1.
     #[error("catalog encode failed")]
     EncodeFailed,
+}
+
+/// The storage seam's closed error, straight through (phase3-web-client task 44).
+///
+/// Every read and write in this plugin now goes through [`crate::vault_io::VaultIo`],
+/// which already reduces `std::io::Error` to [`IoFailureKind`] at its own boundary —
+/// so this is an identity wrap rather than a second reduction. The
+/// `From<std::io::Error>` impl above stays for the host-only paths that still hold a
+/// real `io::Error`.
+impl From<IoFailureKind> for AttachmentRenameError {
+    fn from(io_error_kind: IoFailureKind) -> Self {
+        AttachmentRenameError::Io { io_error_kind }
+    }
 }
 
 impl From<std::io::Error> for AttachmentRenameError {
@@ -410,9 +526,40 @@ pub enum AttachmentUnusedListError {
     #[error("a note could not be scanned for attachment references")]
     NoteScanFailed,
 
+    /// This device cannot prove it holds the whole vault (phase3-web-client
+    /// task 89).
+    ///
+    /// The unused set is computed by scanning the LOCAL notes directory, so it
+    /// is wrong by exactly the notes a mid-materialisation device has not pulled
+    /// yet — and every attachment embedded only in one of those is offered as
+    /// unused. Confirming performs the §11.4 client action, whose tombstone the
+    /// OTHER devices then pull and honour: the desktop erases its copy and the
+    /// server drops the body at horizon-GC. The bytes exist nowhere else.
+    ///
+    /// A device that never enrolled is NOT gated — its local copy is the whole
+    /// vault. Only "enrolled and not proven complete" refuses.
+    ///
+    /// UI: "finish syncing before cleaning up" — never an empty unused list,
+    /// which reads as "nothing to clean" and is the second-worst answer.
+    #[error("this device has not finished syncing; the unused set would be incomplete")]
+    CorpusIncomplete,
+
     /// `spawn_blocking` panic / runtime shutdown during the note scan.
     #[error("attachment unused-set worker failed")]
     JoinFailure,
+}
+
+/// The storage seam's closed error, straight through (phase3-web-client task 44).
+///
+/// Every read and write in this plugin now goes through [`crate::vault_io::VaultIo`],
+/// which already reduces `std::io::Error` to [`IoFailureKind`] at its own boundary —
+/// so this is an identity wrap rather than a second reduction. The
+/// `From<std::io::Error>` impl above stays for the host-only paths that still hold a
+/// real `io::Error`.
+impl From<IoFailureKind> for AttachmentUnusedListError {
+    fn from(io_error_kind: IoFailureKind) -> Self {
+        AttachmentUnusedListError::Io { io_error_kind }
+    }
 }
 
 impl From<std::io::Error> for AttachmentUnusedListError {
@@ -429,9 +576,7 @@ impl From<crate::plugins::attachments::ref_scan::ReferencedScanError>
     fn from(e: crate::plugins::attachments::ref_scan::ReferencedScanError) -> Self {
         use crate::plugins::attachments::ref_scan::ReferencedScanError as Scan;
         match e {
-            Scan::Io(kind) => AttachmentUnusedListError::Io {
-                io_error_kind: from_io_error_kind(kind),
-            },
+            Scan::Io(io_error_kind) => AttachmentUnusedListError::Io { io_error_kind },
             Scan::CannotDecrypt | Scan::InvalidPlaintextEncoding => {
                 AttachmentUnusedListError::NoteScanFailed
             }
@@ -489,6 +634,24 @@ pub enum AttachmentCleanUnusedError {
     #[error("a note could not be scanned for attachment references")]
     NoteScanFailed,
 
+    /// This device cannot prove it holds the whole vault (phase3-web-client
+    /// task 89).
+    ///
+    /// The unused set is computed by scanning the LOCAL notes directory, so it
+    /// is wrong by exactly the notes a mid-materialisation device has not pulled
+    /// yet — and every attachment embedded only in one of those is offered as
+    /// unused. Confirming performs the §11.4 client action, whose tombstone the
+    /// OTHER devices then pull and honour: the desktop erases its copy and the
+    /// server drops the body at horizon-GC. The bytes exist nowhere else.
+    ///
+    /// A device that never enrolled is NOT gated — its local copy is the whole
+    /// vault. Only "enrolled and not proven complete" refuses.
+    ///
+    /// UI: "finish syncing before cleaning up" — never an empty unused list,
+    /// which reads as "nothing to clean" and is the second-worst answer.
+    #[error("this device has not finished syncing; the unused set would be incomplete")]
+    CorpusIncomplete,
+
     /// `protocol::encode_attachments_catalog` failed on the catalog
     /// rewrite — practically unreachable in v0.1.
     #[error("catalog encode failed")]
@@ -497,6 +660,19 @@ pub enum AttachmentCleanUnusedError {
     /// `spawn_blocking` panic / runtime shutdown during the re-verify scan.
     #[error("attachment cleanup worker failed")]
     JoinFailure,
+}
+
+/// The storage seam's closed error, straight through (phase3-web-client task 44).
+///
+/// Every read and write in this plugin now goes through [`crate::vault_io::VaultIo`],
+/// which already reduces `std::io::Error` to [`IoFailureKind`] at its own boundary —
+/// so this is an identity wrap rather than a second reduction. The
+/// `From<std::io::Error>` impl above stays for the host-only paths that still hold a
+/// real `io::Error`.
+impl From<IoFailureKind> for AttachmentCleanUnusedError {
+    fn from(io_error_kind: IoFailureKind) -> Self {
+        AttachmentCleanUnusedError::Io { io_error_kind }
+    }
 }
 
 impl From<std::io::Error> for AttachmentCleanUnusedError {
@@ -513,9 +689,7 @@ impl From<crate::plugins::attachments::ref_scan::ReferencedScanError>
     fn from(e: crate::plugins::attachments::ref_scan::ReferencedScanError) -> Self {
         use crate::plugins::attachments::ref_scan::ReferencedScanError as Scan;
         match e {
-            Scan::Io(kind) => AttachmentCleanUnusedError::Io {
-                io_error_kind: from_io_error_kind(kind),
-            },
+            Scan::Io(io_error_kind) => AttachmentCleanUnusedError::Io { io_error_kind },
             Scan::CannotDecrypt | Scan::InvalidPlaintextEncoding => {
                 AttachmentCleanUnusedError::NoteScanFailed
             }

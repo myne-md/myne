@@ -8,8 +8,8 @@
 // edit is ever silently lost. Runs on mount + on every `sync://changed` event.
 
 import { useCallback, useEffect } from "react";
-import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
+import { invoke } from "../platform/core";
+import { listen } from "../platform/event";
 import { createConflictCopy } from "../notes/conflictCopy";
 
 /** 32-char hex note id → the canonical dashed UUID the `conflict_of:` field (and

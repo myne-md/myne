@@ -1,5 +1,12 @@
 [workspace]
-members = ["src-tauri", "protocol", "core", "e2e/fixture-gen", "theme-validator"]
+# `web/wasm` is the Phase 3 web client's wasm entry surface (task 11). It joins
+# THIS workspace rather than forming its own so the tree keeps a single
+# `Cargo.lock` — the TB9 audit anchor, and a constraint enforced three separate
+# ways (lefthook `cargo-lock-singleton`, `scripts/hooks-parity-check.sh`,
+# `src-tauri/scripts/ai-no-network-check.sh`). Its host build compiles the pure
+# router/classification logic and its unit tests; the JS boundary and the CSPRNG
+# registration are `cfg(target_arch = "wasm32")`. See `web/wasm/Cargo.toml`.
+members = ["src-tauri", "protocol", "core", "e2e/fixture-gen", "theme-validator", "web/wasm", "web/bench/wasm"]
 resolver = "2"
 
 # Optimize the on-device AI math crates even in DEV builds. Candle + its `gemm`

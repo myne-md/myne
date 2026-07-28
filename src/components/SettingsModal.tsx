@@ -41,6 +41,7 @@ import {
 import type { SettingsIndexEntry } from "./settings/search/settingsSearchIndex";
 import { AboutPanel } from "./settings/AboutPanel";
 import { AccountPanel } from "./settings/AccountPanel";
+import * as capabilities from "../platform/capabilities";
 import { AiPanel } from "./settings/AiPanel";
 import { BetaBadge } from "./settings/BetaBadge";
 import { AppearancePanel } from "./settings/AppearancePanel";
@@ -91,7 +92,19 @@ interface PanelMeta {
 // runtime beta opt-in (decisions.md 2026-07-02). Keeping PANELS a single flat
 // array preserves the ArrowUp/ArrowDown cycle + `itemRefs` logic unchanged — the
 // Labs divider is a non-focusable presentation row inserted at the group edge.
-const PANELS: readonly PanelMeta[] = [
+//
+// **Capability gating (MYND-574 task 27).** `ai` is absent on web — the on-device
+// LLM needs multi-GiB weights and a CPU thread pool, neither of which a Worker
+// has. It is filtered OUT of the rail rather than rendered disabled: a greyed
+// panel is an offer the platform cannot honour, and `decisions.md` 2026-07-26
+// makes omission normative rather than a UX preference.
+//
+// Filtering the ARRAY (rather than hiding a row at render time) is what keeps
+// the ArrowUp/ArrowDown cycle and `itemRefs` correct: a hidden-but-present entry
+// would still be a keyboard stop, which is exactly the "unreachable by menu,
+// reachable by shortcut" gap this task exists to close.
+const PANELS: readonly PanelMeta[] = (
+  [
   { id: "account", labelKey: "settings.shell.panels.account" },
   { id: "privacy", labelKey: "settings.shell.panels.privacy" },
   { id: "sync", labelKey: "settings.shell.panels.sync" },
@@ -102,7 +115,8 @@ const PANELS: readonly PanelMeta[] = [
   { id: "storage", labelKey: "settings.shell.panels.storage" },
   { id: "about", labelKey: "settings.shell.panels.about" },
   { id: "ai", labelKey: "settings.shell.panels.ai", group: "labs", beta: true },
-];
+  ] as const satisfies readonly PanelMeta[]
+).filter((p) => p.id !== "ai" || capabilities.has("localAi"));
 
 interface SettingsModalProps {
   open: boolean;

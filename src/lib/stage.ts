@@ -217,6 +217,19 @@ export type Stage =
     }
   | { name: "recover"; subStep: RecoverSubStep }
   | { name: "picker" }
+  /**
+   * The web client's first-run identity step (phase3-web-client tasks 30 + 85).
+   *
+   * Desktop never reaches it: the vault is on disk, so unlock is password-only
+   * and `initialStageFromProbe` keeps routing an empty disk to `welcome`. A
+   * browser starting from an empty origin knows nothing — and `decisions.md`
+   * 2026-07-26 makes sync a requirement rather than an option there — so the
+   * first thing it must learn is which account to pull.
+   *
+   * It is a stage rather than a mode inside `unlock` because it precedes any
+   * vault: there is no `initialStatus` to carry and no password to ask for yet.
+   */
+  | { name: "account-entry" }
   | {
       /**
        * Restore-from-backup flow (MYND-56 / MYND-218). A pre-unlock-class
@@ -593,6 +606,14 @@ export function transition(prev: Stage, action: Action): Stage {
       // (MYND-219 / SYNC-16), so every (restore-backup × action) pair is
       // illegal by design.
       return rejectIllegal(prev, action);
+    case "account-entry":
+      // Same posture, and for the same kind of reason: a validated account
+      // number is not a stage change, it is the input to the unlock that
+      // follows (task 32's flow), which re-enters through `reprobe()` once the
+      // vault container exists. Modelling an `account-entry.success` action
+      // would put the same fact in two places — the reducer and the screen —
+      // and they would drift.
+      return rejectIllegal(prev, action);
     default:
       return assertNever(prev);
   }
@@ -684,7 +705,12 @@ export function initialStageFromProbe(vaultList: VaultListResult, slotMap: SlotM
 
   const vaults = vaultList.ok;
   if (vaults.length === 0) {
-    return { name: "welcome" };
+    // `welcome` offers vault CREATION, which a client without that capability
+    // cannot honour — and on the web client the empty state is not "no vault
+    // yet, make one", it is "this browser has not been told which account to
+    // pull" (phase3-web-client task 85: the `Missing → welcome` mapping is
+    // wrong there, and it is wrong in the direction that dead-ends the user).
+    return has("vaultCreation") ? { name: "welcome" } : { name: "account-entry" };
   }
   if (vaults.length === 1) {
     // Exactly one vault — unlock it directly (SYNC-7a: no picker for the
@@ -702,7 +728,17 @@ export function initialStageFromProbe(vaultList: VaultListResult, slotMap: SlotM
       case "Exists":
         return { name: "unlock", initialStatus: { kind: "Exists" }, vaultId };
       case "Corrupted":
-        return { name: "unlock", initialStatus: { kind: "Corrupted" }, vaultId };
+        // On a client whose vault came from a server, a corrupt local container
+        // is **not data loss** — `decisions.md` 2026-07-26 ("TOFU re-bootstrap
+        // is routine") is explicit that eviction and its cousins are a
+        // re-bootstrap, because every byte is on the server. Routing there to
+        // the fail-closed "restore from a backup" surface would offer a remedy
+        // that does not exist on web (backup is an absent capability) while the
+        // real one — re-enter the account number and re-sync — sits one screen
+        // away. Task 22 makes that path incremental; this is its entry point.
+        return has("backup")
+          ? { name: "unlock", initialStatus: { kind: "Corrupted" }, vaultId }
+          : { name: "account-entry" };
       default:
         return assertNever(status);
     }
@@ -725,6 +761,7 @@ function assertNever(x: never): never {
   throw new Error(`[stage] Unhandled stage variant: ${JSON.stringify(x)}`);
 }
 
+import { has } from "../platform/capabilities";
 import type { SlotKind } from "../types/slot-kind";
 import type { VaultListResult, VaultSummary } from "../types/vault-summary";
 
@@ -774,6 +811,11 @@ const LEGAL: Record<string, Stage["name"]> = {
 
 const ALL_STAGES_FOR_VERIFICATION: Stage[] = [
   { name: "welcome" },
+  // The web first-run identity step. It has no outgoing transitions in the
+  // table yet — the account number is carried into unlock by the screen itself
+  // (task 32's flow), not by a stage action — so this entry asserts the
+  // stage does not accidentally accept one.
+  { name: "account-entry" },
   { name: "create-vault" },
   // Coverage entry for the optional `briefing` payload field (MYND-114).
   // Payload, not the `name` discriminator — `transition` ignores it on
@@ -948,10 +990,16 @@ function verifyInitialStageFromProbe(): void {
   const cases: Array<Case> = [
     // ---- All slots Empty: list-based routing (cold boot path) ----
     {
+      // Capability-DERIVED rather than hardcoded (phase3-web-client task 85):
+      // an empty container means "make a vault" only where vault creation
+      // exists. Writing `"welcome"` here would be a second statement of the
+      // routing rule, and it is the copy that would drift — this harness runs
+      // at module load, so a client whose routing legitimately differs would
+      // fail to boot rather than fail a test.
       label: "AllEmpty + 0 vaults",
       vaultList: okList(),
       slotMap: allEmpty,
-      expectedName: "welcome",
+      expectedName: has("vaultCreation") ? "welcome" : "account-entry",
     },
     {
       label: "AllEmpty + 1 vault Exists",
@@ -962,10 +1010,12 @@ function verifyInitialStageFromProbe(): void {
       expectedVaultId: VID_A,
     },
     {
+      // Same reasoning: the fail-closed surface's remedy is "restore from a
+      // backup", so it is the right destination only where backup exists.
       label: "AllEmpty + 1 vault Corrupted",
       vaultList: okList(corruptVault(VID_A)),
       slotMap: allEmpty,
-      expectedName: "unlock",
+      expectedName: has("backup") ? "unlock" : "account-entry",
       expectedInitialStatus: { kind: "Corrupted" },
       expectedVaultId: VID_A,
     },

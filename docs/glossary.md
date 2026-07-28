@@ -420,6 +420,18 @@ Per NIST SP 800-88 Rev. 1: securely deleting data by destroying the key under wh
 
 Used in: `spec/protocol.md` §3.3 (implicit)
 
+### **cross-origin isolation** &nbsp; 📦 *Product*
+
+The browser state a page enters when it serves `Cross-Origin-Opener-Policy: same-origin` **and** `Cross-Origin-Embedder-Policy: require-corp`, gating `SharedArrayBuffer`, high-resolution timers, and wasm threading. The Phase 3 web client needs it, and the price it charges — **no third-party origins at all** — is a cost the security posture already committed to, so it is free here rather than a trade. Confirmed in the Phase 0 spike: all three browsers reported `crossOriginIsolated: true` with `SharedArrayBuffer` available. Threads are therefore *possible* and *not needed* — single-threaded Argon2id at `p=2` already derives in under 700 ms.
+
+Used in: `decisions.md` 2026-07-26 (dedicated app origin); `threat-model.md` §1 A15
+
+### **capability descriptor** &nbsp; 📦 *Product*
+
+The single value the UI consults to decide whether a platform provides a given affordance, so gating is one decision rather than a condition re-derived at each call site. Its rule is **omission, not disablement**: a capability the running platform lacks is **absent from the interface**, never shown greyed out — a disabled control is a promise the platform cannot keep. It is asserted in tests, so adding a desktop-only command without gating it fails CI rather than shipping a broken web affordance. Distinct from the **web capability set**, which is the *normative* statement of what web may do; the descriptor is the runtime projection of it.
+
+Used in: `decisions.md` 2026-07-26 (web capability set)
+
 ### **CTX commitment** &nbsp; 🏗️ *Construction* (deep entry)
 
 The key-committing AEAD construction defined by Chan & Rogaway (ESORICS 2022) that wraps a non-committing AEAD to provide commitment to the key. Myne instantiates CTX with XChaCha20-Poly1305 as the inner AEAD and SHA-256 as the outer hash. The Poly1305 tag T (16 bytes) is replaced on disk by the 32-byte commitment tag T' = SHA-256(canonical_encode(K, N, AD, T)), where `canonical_encode` uses a length-prefixed encoding of AD to eliminate concatenation ambiguity per Chan & Rogaway §3. This defends against partitioning-oracle attacks (Len–Grubbs–Ristenpart, USENIX 2021): without CTX, an attacker with a partial-decrypt oracle could construct a ciphertext that decrypts under multiple keys, enabling binary-search brute-force against weak passwords. The cost is ~30 lines of code, ~0.001% performance, and ~16 extra bytes per AEAD operation on disk.
@@ -562,6 +574,12 @@ Used in: `sync-protocol.md` §10.2; `decisions.md` 2026-07-13
 The cryptographic principle that contexts which should not produce equal outputs from equal inputs MUST mix in a context-distinguishing string. Myne applies it pervasively: HKDF context strings (§3.2), AAD prefixes (§5.2), KDF-parameter binding (§4.3), and protocol-version magic bytes (§9, §10). Failure to domain-separate is the root cause of many published protocol vulnerabilities.
 
 Used in: `spec/protocol.md` §3.2, §5.2
+
+### **double-buffered blob** &nbsp; 📋 *Protocol* (*Myne-divergent*)
+
+The web client's on-disk representation of a **singleton** vault blob (`vault.meta`, `vault.prefs`, `vault.search`, `vault.indices`, `vault.themes`, …): two alternating files, `.a` and `.b`, each carrying a sequence number, of which the newest copy that passes AEAD verification is the live one. It replaces the desktop's temp-file-plus-atomic-rename durability construction, which has **no correct implementation on OPFS** — the format offers no crash-atomicity guarantee, and Safari does not implement `move()` at all (measured in the Phase 0 spike). Double buffering needs only "never write both copies at once"; the blob's existing AEAD tag already rejects a torn file, so no checksum or format change is added. The **blob bytes are unchanged** — this is the container around them, not the format. Per-note blobs are not double-buffered; they use write-new-then-remove-old.
+
+Used in: `decisions.md` 2026-07-26 (OPFS container layout)
 
 ### **downgrade attack** &nbsp; ⚠️ *Threat*
 
@@ -761,7 +779,7 @@ Used in: `vision.md` Phase 1 Scope
 
 ### **hash-pinned dependencies** &nbsp; 🛠️ *Tooling*
 
-Lockfiles checked into the repository that record the exact SHA hash of every direct and transitive dependency. Myne covers Cargo (Rust), npm (Phase 3 web UI), Go modules (server), and any WASM artifacts. Updates require explicit review.
+Lockfiles checked into the repository that record the exact SHA hash of every direct and transitive dependency. Myne covers Cargo (Rust), **pnpm** (the desktop and web clients share one `pnpm-lock.yaml`; pnpm is canonical, never npm or yarn), Go modules (server), and the wasm build's pinned toolchain + crate graph. Updates require explicit review.
 
 Used in: `threat-model.md` §6, §7
 
@@ -1020,15 +1038,15 @@ Used in: `spec/protocol.md` §9.5.2; `decisions.md` 2026-06-10
 
 ### **libsodium** &nbsp; 🛠️ *Tooling*
 
-The canonical cryptographic library across Myne's stack. Used via Rust bindings (`libsodium-sys-stable` or `sodiumoxide`) in the desktop client, Go via `golang.org/x/crypto` (parts of which mirror libsodium primitives) on the server, and `libsodium-js` in the Phase 3 web client. RustCrypto crates are an acceptable fallback for primitives where libsodium bindings prove inadequate, but libsodium remains canonical for audit consistency.
+The reference cryptographic library the v0.1 primitive choices are stated against, and the byte-level interoperability target for independent implementations — **not** the library Myne's own clients use. Superseded on the Rust side by the **RustCrypto stack** (`decisions.md` 2026-04-28), which the desktop, mobile and — compiled to `wasm32-unknown-unknown` — **web** clients all run; the Go server uses `golang.org/x/crypto`. Byte-level agreement with libsodium is preserved and machine-checked by `myne-test-vectors/`, which is what keeps the reference role meaningful. No Myne client links libsodium, and none links `libsodium-js`.
 
 Used in: `spec/protocol.md` §2.2
 
 ### **libsodium-js** &nbsp; 🛠️ *Tooling*
 
-WebAssembly-compiled JavaScript port of libsodium. Used in the Phase 3 web client (bundler choice deferred to Phase 3 start; framework is React) and in the Phase 3 React Native mobile clients (via `react-native-libsodium`). Provides Argon2id, XChaCha20-Poly1305, HKDF, and the other primitives the protocol requires.
+The WebAssembly/asm.js build of libsodium for JavaScript environments. **Myne's web client does not use it.** The Phase 3 browser client compiles this repository's RustCrypto-based `protocol/` crate to `wasm32-unknown-unknown` and calls the same code the desktop client calls (`decisions.md` 2026-07-26; `spec/protocol.md` §2), so no JavaScript primitive provider exists in the stack at all. The entry is kept because `spec/protocol.md` §5.1.4 still names libsodium-js as guidance for an *independent* JavaScript implementation — `docs/` is CC-BY-4.0 precisely so such an implementation is possible.
 
-Used in: `spec/protocol.md` §5.1.4
+Used in: `spec/protocol.md` §5.1.4 (third-party guidance only)
 
 ### **libsodium-sys-stable / sodiumoxide** &nbsp; 🛠️ *Tooling*
 
@@ -1205,6 +1223,12 @@ Myne Note: the binary encrypted blob holding a single note. File extension `.myn
 
 Used in: `spec/protocol.md` §9.1, §9.2
 
+### **OPFS (origin private file system)** &nbsp; 📦 *Product* (*Myne-divergent*)
+
+The browser's private, origin-scoped filesystem — the Phase 3 web client's local vault storage, and the analogue of the desktop vault directory. Three properties make it *not* a drop-in replacement, and each drives a design decision: it offers **no crash-atomicity guarantee** and Safari implements no `move()` at all, so singleton blobs are written as a [double-buffered blob](#double-buffered-blob) rather than by atomic rename; its synchronous access handles are **dedicated-worker-only** in every browser, which is why the wasm core and all vault IO live in a Worker; and it is **evictable** and scoped to the origin *and* the browsing profile, which makes storage loss an ordinary event the client treats as re-sync rather than as data loss. The blob *format* stored in it is byte-identical to the desktop's; only the container layout diverges.
+
+Used in: `decisions.md` 2026-07-26 (OPFS container layout); `spec/sync-protocol.md` §4.1, §6.2, §9
+
 ### **OPAQUE** &nbsp; 🏗️ *Construction*
 
 The aPAKE protocol standardized as RFC 9807 (March 2025). Server stores no offline-brute-forceable password verifier. Myne's `appname-v005` roadmap canonicalizes OPAQUE for sync-server authentication. Phase 2 will choose between OPAQUE and a simple-verifier alternative; the choice is documented in `spec/protocol.md` §11.1 with criteria for resolution.
@@ -1276,13 +1300,19 @@ Used in: `spec/protocol.md` §9.13; MYND-266.
 
 ### **Phase 1, Phase 2, Phase 3, Phase 4** &nbsp; 📦 *Product*
 
-Myne's product phasing. See `vision.md` Phase 1 Scope and `decisions.md` for definitions and timelines. Roughly: P1 = single-user desktop local-only; P2 = sync server + optional web client; P3 = mobile clients + full web client; P4 = sharing + real-time collaboration + plugin API.
+Myne's product phasing. See `vision.md` Phase 1 Scope and `decisions.md` for definitions and timelines. Roughly: **P1** = single-user desktop, plus the self-hostable sync server (which moved into Phase 1 — `vision.md`, 2026-07-18); **P2** = the *managed hosted* account and paid tier on top of that server; **P3** = mobile clients and the desktop-**browser** client; **P4** = sharing, real-time collaboration, plugin API. The older "P2 = sync server + optional web client" reading is superseded on both halves: the server shipped in P1, and the web client is a P3 desktop-browser client with a deliberately narrower capability set, not an "optional" variant of the desktop one.
 
 Used in: `vision.md`, `decisions.md`
 
 ### **pending capture** &nbsp; 📦 *Product*
 
 A short piece of dictated note text captured on the native-SwiftUI Apple Watch companion and relayed to the paired phone over WatchConnectivity, held in a **device-local encrypted queue** (`MYK1`, `spec/protocol.md` §9.18 — one file per capture at `captures/<capture-id>`) until the vault is next unlocked on the phone, at which point it is drained into that vault as an ordinary new note. Sealed under a device-local keychain `wrap_key` (non-biometric, `afterFirstUnlockThisDeviceOnly`; **not** `root_key`-derived, since the queue must be writable while the vault is locked), it is **vault-agnostic** — it binds the per-entry `capture_id` rather than a vault identity, and drains into whichever vault unlocks first. The watch holds no vault keys and runs no crypto (the same outside-the-trust-boundary posture as the home-screen widget); the queue is never synced or backed up. V1 is voice quick-capture only — no reading, editing, or Siri intent. (`decisions.md` 2026-07-12)
+
+### **platform seam** &nbsp; 📦 *Product*
+
+The single internal boundary through which the shared React UI reaches its host platform — `src/platform/`, one module per host capability (`core`, `event`, `dialog`, `opener`, `path`, `window`, `webviewWindow`, `clipboardManager`, `deepLink`). Desktop's implementation re-exports Tauri; the web client's routes the same calls into a wasm Worker. No file under `src/` outside the seam may import `@tauri-apps/*`, and a `pre-commit` hook plus a CI step enforce it. The seam's whole purpose is that the two clients are the **same tree with one substitution**, which is also why a single **contract-test** suite runs against every implementation rather than each being tested on its own terms.
+
+Used in: `decisions.md` 2026-07-26 (web E2E policy); `src/platform/`
 
 ### **plausibly-deniable encryption** &nbsp; ⚠️ *Threat*
 
@@ -1388,7 +1418,7 @@ Used in: `spec/protocol.md` §1.3, §10
 
 ### **React** &nbsp; 🛠️ *Tooling*
 
-The UI library used for the Phase 1 desktop client UI inside the Tauri WebView, and the planned UI library for the Phase 3 web and mobile clients (the latter via React Native). React 19 with TypeScript per the scaffold. Chosen for the maturity of its CodeMirror 6 (`@uiw/react-codemirror`) integration — the largest UI dependency in the Phase 1 scope. (The graph view uses [d3-force](#d3-force) for layout with a hand-rolled canvas renderer rather than a React graph wrapper, so it adds no React-specific UI dependency — superseding the earlier `react-cytoscapejs` plan, `decisions.md` 2026-06-08.) Shared React components are anticipated to live in a future `packages/ui/` workspace member when Phase 3 web work begins, decoupling the desktop UI bundler from the web bundler.
+The UI library used for the Phase 1 desktop client UI inside the Tauri WebView, and the planned UI library for the Phase 3 web and mobile clients (the latter via React Native). React 19 with TypeScript per the scaffold. Chosen for the maturity of its CodeMirror 6 (`@uiw/react-codemirror`) integration — the largest UI dependency in the Phase 1 scope. (The graph view uses [d3-force](#d3-force) for layout with a hand-rolled canvas renderer rather than a React graph wrapper, so it adds no React-specific UI dependency — superseding the earlier `react-cytoscapejs` plan, `decisions.md` 2026-06-08.) The Phase 3 web client shares this UI by **compiling the same `src/` tree** rather than through an extracted package: the `packages/ui/` workspace member once anticipated here was not built and is not planned, because the only boundary that actually differs between the two clients is the platform seam (`src/platform/`), which the web build substitutes at build time (`decisions.md` 2026-07-26).
 
 Used in: `decisions.md`; `threat-model.md` §7
 Reference: https://react.dev
@@ -1500,6 +1530,12 @@ The 32-byte AEAD KEK encrypting `vault.search`. Derived deterministically from `
 
 Used in: `spec/protocol.md` §3.4, §5.2, §9.6
 
+### **service worker** &nbsp; 📦 *Product*
+
+A script the browser installs for an origin and consults for that origin's network requests. In the Phase 3 web client it is the **code-pinning** mechanism: after the first load it serves the bundle it already holds, so a bundle substituted *later* cannot reach a session that has already started. It is a partial answer to [served-code delivery](#served-code-delivery), not a complete one — it does nothing about *targeted first delivery*, where the very first bundle a user receives is the malicious one. Its update policy is in direct tension with shipping security fixes, which is why the policy is written before any pinning ships rather than after.
+
+Used in: `threat-model.md` §1 A15, §3 TB11
+
 ### **session-state-key** &nbsp; 🗝️ *Key/identifier*
 
 The 32-byte AEAD KEK encrypting `vault.workspace` (the [workspace-state blob](#workspace-state-blob)). Derived deterministically from `root_key` via the canonical `DeriveSubkey(root_key, "session-state-key")` helper (`spec/protocol.md` §3.4 registry entry `"myne.v0.1 session-state-key"`). Never persisted; re-derived on each unlock (to restore the workspace) and on each graceful-exit persist. Independent from the `itemsKey` lineage by design — like `prefs_key` / `search-index-key` it derives straight from `root_key`, so it survives the v005 epoch-rotation `itemsKey` evolution. The AAD `AAD_workspace_blob` (role `"workspace-blob"`, `spec/protocol.md` §9.7.3) binds the blob to its vault via `account_number_hash`.
@@ -1533,6 +1569,12 @@ Used in: `agent-tooling/features/editor-mvp-baseline/prd.md`, `agent-tooling/ses
 User-operated deployment of the Myne sync server. First-class in the product plan: same protocol, same security properties as hosted sync. The protocol treats hosted and self-hosted servers as identical trust boundaries (TB5) — the operator does not see plaintext in either case.
 
 Used in: `vision.md`, `threat-model.md` §3
+
+### **served-code delivery** &nbsp; ⚠️ *Threat*
+
+The property that distinguishes the web client's code channel from every other one Myne uses: the client program is re-sent from an origin on **every page load**, the browser verifies no signature over it, and the user keeps no artifact afterwards to hash or compare. This makes the origin operator able to serve one identified account modified code and everyone else the honest code, undetectably at the time and in the same page the master password is typed into. It is a **separate boundary (TB11) and a separate adversary (A15)**, not a variant of the signed, hash-published, reproducible distribution channel TB7 describes — a served bundle satisfies none of TB7's three crossing conditions. Compensating controls are detection-oriented (reproducible builds, published bundle hashes in a public append-only record, a service worker that pins the code after first load) and close *later substitution*, not *targeted first delivery*.
+
+Used in: `threat-model.md` §1 A15, §3 TB11, §5
 
 ### **server-auth subkey** &nbsp; 🗝️ *Key/identifier*
 
@@ -1582,6 +1624,12 @@ Reference: FIPS 180-4.
 The 512-bit Secure Hash Algorithm 2. **Not used by Myne** — referenced only when explaining the standard BIP-39 derivation (PBKDF2-HMAC-SHA512) that Myne explicitly avoids.
 
 Used in: `spec/protocol.md` §7.1
+
+### **signed bundle update** &nbsp; 📦 *Product*
+
+The verification story the web client is **laid out for but does not yet have**: a released bundle whose hashes are published to a public append-only record, reproducible from source so a third party can rebuild and compare, and structured so it can later enrol in an external code-transparency scheme without restructuring. It is deliberately *detection*, not prevention — it makes a silent later substitution discoverable after the fact, and closes nothing about targeted first delivery. Contrast the native clients' `TB7` channel, where a signature is verified **before any code runs** and a failed check refuses the update outright.
+
+Used in: `threat-model.md` §1 A15, §3 TB11, §4
 
 ### **slash command** &nbsp; 📦 *Product*
 
@@ -2014,6 +2062,12 @@ Used in: `spec/markdown-dialect.md` §3.2
 The self-hosted web translation platform at `translate.myne.md` (Komodo stack on the apps VPS; closed registration, admin-invite only) that owns Myne's non-English **locale catalogs**. English source strings are authored in code and committed; Weblate reads the source, lets translators fill `tr`/`de`/`fr`, and flows translations back as commits to a dedicated push branch (merged via PR). File mask `locales/*/common.json`, format *i18next JSON v4*, monolingual base `locales/en/common.json`.
 
 Used in: `docs/dev/i18n.md`; `decisions.md` 2026-06-25.
+
+### **web capability set** &nbsp; 📦 *Product* (*Myne-divergent*)
+
+The normatively-defined set of things the web client can and cannot do — not a UX scope decision that a later release quietly widens. Its two load-bearing rules: **the 24-word recovery phrase never crosses into served code** (which removes account creation, vault creation, and phrase-based recovery from the browser in one rule, because the phrase is unrotatable — no rotation command exists, so a phrase exposure is permanent), and **web requires sync** (the browser is a window onto a synced vault; conflict resolution is sync-based, so a vault arriving any other way is an orphan fork). `change_password` stays available, because the password is already typed into the page at unlock. Everything the operating system provides and a browser does not — clipper host, local AI, share-sheet import, watch captures, keychain/biometric quick-unlock, OS idle auto-lock, screen-capture protection, backup export/restore, vault migration, native file dialogs — is **absent from the interface**, not shown disabled.
+
+Used in: `decisions.md` 2026-07-26 (web capability set); `vision.md`
 
 ### **wikilink** &nbsp; 📦 *Product* (deep entry, *Myne-divergent*)
 

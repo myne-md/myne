@@ -1,0 +1,8 @@
+{
+  "note": "Measured from a complete build. Regenerate deliberately with `node scripts/check-web-bundle-budget.mjs --update`, and say why in the commit.",
+  "marginPct": 10,
+  "initial": {
+    "rawBytes": 4941789,
+    "gzipBytes": 1433145
+  }
+}

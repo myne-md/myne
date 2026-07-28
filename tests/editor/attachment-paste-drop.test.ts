@@ -130,8 +130,11 @@ describe("importAndInsert", () => {
     const outcomes = await importAndInsert(
       view,
       [
-        { bytes: [1], filename: "good.png", mime: "image/png" },
-        { bytes: [2], filename: "bad.png", mime: "image/png" },
+        // `PendingFile` carries the import SOURCE since task 67 — the byte
+        // shape is one of two, and the host decides which (a browser hands its
+        // Worker the `File` instead of reading it on the page).
+        { source: { kind: "bytes", bytes: [1], filename: "good.png" }, filename: "good.png" },
+        { source: { kind: "bytes", bytes: [2], filename: "bad.png" }, filename: "bad.png" },
       ],
       0,
     );
@@ -145,7 +148,11 @@ describe("importAndInsert", () => {
   it("stays silent (no toast) for a single clean success — the embed is the feedback", async () => {
     restores.push(setImportFn(async () => imported(ID_A, "one.png")));
     const view = mount("");
-    await importAndInsert(view, [{ bytes: [1], filename: "one.png", mime: "image/png" }], 0);
+    await importAndInsert(
+      view,
+      [{ source: { kind: "bytes", bytes: [1], filename: "one.png" }, filename: "one.png" }],
+      0,
+    );
     expect(showAttachmentToast).not.toHaveBeenCalled();
     view.destroy();
   });

@@ -447,6 +447,8 @@ pub async fn ask<R: Runtime>(
             notes_dir.clone(),
             vault_state.inner(),
             h.key.note_id.to_string(),
+            &myne_core::vault_io::StdVaultIo,
+            &myne_core::host::tauri_host::TauriHost::new(app.clone()),
         )
         .await
         {
@@ -583,6 +585,8 @@ pub async fn chat_stream<R: Runtime>(
             notes_dir.clone(),
             vault_state.inner(),
             h.key.note_id.to_string(),
+            &myne_core::vault_io::StdVaultIo,
+            &myne_core::host::tauri_host::TauriHost::new(app.clone()),
         )
         .await
         {

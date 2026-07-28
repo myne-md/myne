@@ -25,6 +25,7 @@ pub mod drawing_text;
 pub mod error;
 pub mod export_mtime;
 pub mod note_id;
+pub mod search_sync_core;
 pub mod title_extract;
 
 pub use commands::SNAPSHOT_WRITE_FAILED_EVENT;

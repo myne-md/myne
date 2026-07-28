@@ -95,15 +95,17 @@ fn fingerprint_of(s: &ConnSnapshot) -> u64 {
 /// `run_active_cycle` — but NEVER claims a pending token (that is the cycle's
 /// job; the listener only ever uses an already-stored token).
 async fn gather_snapshot<R: Runtime>(app: &AppHandle<R>) -> Option<ConnSnapshot> {
-    let cfg = super::commands::config_path(app)
-        .ok()
-        .and_then(|p| super::config::read_config(&p).ok())?;
+    let cfg_path = super::commands::config_path(app).await.ok()?;
+    let cfg = super::config::read_config(&crate::vault_io::StdVaultIo, &cfg_path)
+        .await
+        .ok()?;
     let url = cfg.endpoint_url.clone()?;
     let pins = super::commands::config_pins(&cfg);
     let state = app.try_state::<crate::plugins::vault_unlock::state::VaultRuntimeState>()?;
     let dir = crate::paths::active_vault_root_io(app, state.active_vault_id().await).ok()?;
     let token = super::token_store::default_store()
-        .read(&dir)
+        .read(&crate::vault_io::StdVaultIo, &dir)
+        .await
         .ok()
         .flatten()?;
     let mut token_hex = String::with_capacity(token.len() * 2);

@@ -20,7 +20,7 @@
 // a real WebView and the plaintext already lives there; the hidden
 // window only renders, see `src/pdf-export/main.ts`.)
 
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../platform/core";
 
 /**
  * Render an emitted note-HTML projection to a PDF at `targetPath` via

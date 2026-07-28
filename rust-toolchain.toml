@@ -2,3 +2,9 @@
 channel = "1.96.0"
 components = ["rustfmt", "clippy"]
 profile = "minimal"
+# The web client compiles `protocol` (and, once task 79 lands, `myne-core`) to
+# wasm, so wasm32 is a SUPPORTED target of this workspace, not an opt-in. Pinned
+# here rather than left to an ad-hoc `rustup target add` in each CI step and each
+# clone: a blocking gate that has to install its own target is a gate that
+# silently does not run wherever someone forgot the line.
+targets = ["wasm32-unknown-unknown"]

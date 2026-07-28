@@ -1,26 +1,57 @@
 // @vitest-environment jsdom
 //
-// Voice-note recording controller (MYND-259): the start / stop / cancel flow
-// over the three Rust commands, the single-recording-at-a-time guard, the
-// continuation-clip live insert, and the start/stop error→toast mapping. The
-// Tauri `invoke` / `listen`, the recording-bar UI, and the toast are mocked at
-// module scope; embeds insert into a real EditorView so the form-C output and
-// catalog seeding are asserted for real.
+// Voice-note recording controller (MYND-259): the start / stop / cancel flow,
+// the single-recording-at-a-time guard, the continuation-clip live insert, and
+// the start/stop error→toast mapping. Embeds insert into a real EditorView so
+// the form-C output and catalog seeding are asserted for real.
+//
+// **Driven through `EditorHost.voice`, not through Tauri** (phase3-web-client
+// task 76). The controller used to `invoke` the three commands and `listen` for
+// the two events itself, which put `@tauri-apps/api` into any bundle reaching
+// this file — including a browser's. The platform half now lives in the host
+// (`src/lib/voice-record.ts` on desktop), so what this file mocks is the seam,
+// which is also what a second client has to satisfy. The IPC strings and event
+// names did not change; they simply moved.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { setEditorHost, getHost, type EditorHost } from "@myne/editor/host";
 
-const invoke = vi.fn();
-vi.mock("@tauri-apps/api/core", () => ({ invoke: (...a: unknown[]) => invoke(...a) }));
+// The two backend→UI subscriptions, captured so tests can drive the level and
+// continuation-clip streams synchronously.
+type LevelCb = (level: number) => void;
+type ClipCb = (clip: { id: string; content_type: string; filename: string; size: number }) => void;
+let levelCb: LevelCb | null = null;
+let clipCb: ClipCb | null = null;
 
-// `listen` returns an unlisten fn; capture the registered callbacks so tests can
-// drive the level / continuation-clip event streams synchronously.
-const listeners = new Map<string, (e: { payload: unknown }) => void>();
 const unlisten = vi.fn();
-const listen = vi.fn(async (event: string, cb: (e: { payload: unknown }) => void) => {
-  listeners.set(event, cb);
+const voiceStart = vi.fn(async () => {});
+const voiceStop = vi.fn(async () => null as unknown);
+const voiceCancel = vi.fn(async () => {});
+const onLevel = vi.fn(async (cb: LevelCb) => {
+  levelCb = cb;
   return unlisten;
 });
-vi.mock("@tauri-apps/api/event", () => ({ listen: (...a: unknown[]) => (listen as Function)(...a) }));
+const onClip = vi.fn(async (cb: ClipCb) => {
+  clipCb = cb;
+  return unlisten;
+});
+
+/** Install the voice backend on the globally-installed test host. */
+function installVoiceHost(): () => void {
+  const host = getHost();
+  const patched: EditorHost = {
+    ...host,
+    voice: {
+      start: voiceStart,
+      stop: voiceStop as () => Promise<never>,
+      cancel: voiceCancel,
+      onLevel,
+      onClip,
+    } as EditorHost["voice"],
+  };
+  setEditorHost(patched);
+  return () => setEditorHost(host);
+}
 
 // A controllable recording-bar handle stand-in.
 const barHandle = {
@@ -70,46 +101,53 @@ function mount(doc = ""): EditorView {
   });
 }
 
+let restoreHost: (() => void) | null = null;
+
 beforeEach(() => {
-  listeners.clear();
+  levelCb = null;
+  clipCb = null;
   lastBarOpts = null;
-  invoke.mockReset();
+  voiceStart.mockReset().mockResolvedValue(undefined);
+  voiceStop.mockReset().mockResolvedValue(null);
+  voiceCancel.mockReset().mockResolvedValue(undefined);
+  onLevel.mockClear();
+  onClip.mockClear();
   showAttachmentToast.mockReset();
   Object.values(barHandle).forEach((fn) => fn.mockReset());
+  restoreHost = installVoiceHost();
 });
 
 afterEach(() => {
+  restoreHost?.();
+  restoreHost = null;
   document.body.innerHTML = "";
   vi.clearAllMocks();
 });
 
 describe("startVoiceRecording", () => {
   it("starts the backend, mounts the bar, and registers level + clip listeners", async () => {
-    invoke.mockResolvedValue(undefined);
     const view = mount();
     await startVoiceRecording(view);
-    // microtask flush so the awaited listen() calls have registered.
+    // microtask flush so the awaited subscriptions have registered.
     await Promise.resolve();
-    expect(invoke).toHaveBeenCalledWith("plugin:attachments|voice_record_start");
+    expect(voiceStart).toHaveBeenCalledOnce();
     expect(mountRecordingBar).toHaveBeenCalledOnce();
     expect(isRecording()).toBe(true);
-    expect(listeners.has("voice-record:level")).toBe(true);
-    expect(listeners.has("voice-record:clip")).toBe(true);
-    // Both unlisten fns were registered for teardown.
+    expect(levelCb).not.toBeNull();
+    expect(clipCb).not.toBeNull();
+    // Both unsubscribe fns were registered for teardown.
     expect(barHandle.onTeardown).toHaveBeenCalledTimes(2);
     // Clean up via the cancel path so the module-level `recording` flag resets.
-    invoke.mockResolvedValue(undefined);
     lastBarOpts!.onCancel();
     await Promise.resolve();
     view.destroy();
   });
 
   it("feeds the level event into the bar meter", async () => {
-    invoke.mockResolvedValue(undefined);
     const view = mount();
     await startVoiceRecording(view);
     await Promise.resolve();
-    listeners.get("voice-record:level")!({ payload: 0.7 });
+    levelCb!(0.7);
     expect(barHandle.setLevel).toHaveBeenCalledWith(0.7);
     lastBarOpts!.onCancel();
     await Promise.resolve();
@@ -117,11 +155,10 @@ describe("startVoiceRecording", () => {
   });
 
   it("inserts a continuation-clip embed live and seeds the catalog", async () => {
-    invoke.mockResolvedValue(undefined);
     const view = mount("");
     await startVoiceRecording(view);
     await Promise.resolve();
-    listeners.get("voice-record:clip")!({ payload: imported(ID, "clip1.wav") });
+    clipCb!(imported(ID, "clip1.wav"));
     expect(view.state.doc.toString()).toBe(`![[att:${ID}|clip1.wav]]`);
     // The catalog cache is seeded so the embed resolves to its player immediately.
     expect(view.state.field(catalogField)!.get(ID)!.contentType).toBe("audio/wav");
@@ -131,7 +168,7 @@ describe("startVoiceRecording", () => {
   });
 
   it("toasts a mapped start error and does NOT mount the bar nor stay recording", async () => {
-    invoke.mockRejectedValueOnce({ kind: "noInputDevice" });
+    voiceStart.mockRejectedValueOnce({ kind: "noInputDevice" });
     const view = mount();
     await startVoiceRecording(view);
     expect(mountRecordingBar).not.toHaveBeenCalled();
@@ -153,9 +190,8 @@ describe("startVoiceRecording", () => {
       [{ kind: "weird" }, "Couldn't start recording."],
     ];
     for (const [err, msg] of cases) {
-      invoke.mockReset();
       showAttachmentToast.mockReset();
-      invoke.mockRejectedValueOnce(err);
+      voiceStart.mockRejectedValueOnce(err);
       const view = mount();
       await startVoiceRecording(view);
       expect(showAttachmentToast).toHaveBeenCalledWith(msg);
@@ -164,15 +200,14 @@ describe("startVoiceRecording", () => {
   });
 
   it("is a no-op while a recording is already in progress (single-recording guard)", async () => {
-    invoke.mockResolvedValue(undefined);
     const view = mount();
     await startVoiceRecording(view);
     await Promise.resolve();
     expect(isRecording()).toBe(true);
-    invoke.mockClear();
-    // A second start while recording must not re-invoke the backend.
+    voiceStart.mockClear();
+    // A second start while recording must not re-enter the backend.
     await startVoiceRecording(view);
-    expect(invoke).not.toHaveBeenCalled();
+    expect(voiceStart).not.toHaveBeenCalled();
     lastBarOpts!.onCancel();
     await Promise.resolve();
     view.destroy();
@@ -181,19 +216,18 @@ describe("startVoiceRecording", () => {
 
 describe("finishRecording (Stop)", () => {
   it("stops, inserts the final clip embed, flips busy, and clears the recording flag", async () => {
-    invoke.mockResolvedValueOnce(undefined); // start
     const view = mount("");
     vi.spyOn(view, "focus").mockImplementation(() => {});
     await startVoiceRecording(view);
     await Promise.resolve();
 
-    invoke.mockResolvedValueOnce(imported(ID, "final.wav")); // stop returns the clip
+    voiceStop.mockResolvedValueOnce(imported(ID, "final.wav")); // stop returns the clip
     await lastBarOpts!.onStop();
     expect(barHandle.setBusy).toHaveBeenCalledOnce();
-    expect(invoke).toHaveBeenCalledWith(
-      "plugin:attachments|voice_record_stop",
-      expect.objectContaining({ filename: expect.stringMatching(/^Voice note .*\.wav$/) }),
-    );
+    // The display filename is stamped by the HOST now (`src/lib/voice-record.ts`
+    // calls the package's own `voiceNoteFilename`), so what this asserts is that
+    // stop was reached — the naming convention has its own test.
+    expect(voiceStop).toHaveBeenCalledOnce();
     expect(view.state.doc.toString()).toBe(`![[att:${ID}|final.wav]]`);
     expect(barHandle.teardown).toHaveBeenCalled();
     expect(isRecording()).toBe(false);
@@ -201,12 +235,11 @@ describe("finishRecording (Stop)", () => {
   });
 
   it("inserts nothing when stop returns null (all audio already went out as clips)", async () => {
-    invoke.mockResolvedValueOnce(undefined); // start
     const view = mount("base");
     vi.spyOn(view, "focus").mockImplementation(() => {});
     await startVoiceRecording(view);
     await Promise.resolve();
-    invoke.mockResolvedValueOnce(null); // stop → null
+    voiceStop.mockResolvedValueOnce(null); // stop → null
     await lastBarOpts!.onStop();
     expect(view.state.doc.toString()).toBe("base");
     expect(isRecording()).toBe(false);
@@ -214,11 +247,10 @@ describe("finishRecording (Stop)", () => {
   });
 
   it("toasts a mapped stop error and still tears the bar down + clears the flag", async () => {
-    invoke.mockResolvedValueOnce(undefined); // start
     const view = mount("");
     await startVoiceRecording(view);
     await Promise.resolve();
-    invoke.mockRejectedValueOnce({ kind: "silentRecording" }); // stop fails
+    voiceStop.mockRejectedValueOnce({ kind: "silentRecording" }); // stop fails
     await lastBarOpts!.onStop();
     expect(showAttachmentToast).toHaveBeenCalledWith(
       "Recording was silent and discarded — check your microphone.",
@@ -231,14 +263,12 @@ describe("finishRecording (Stop)", () => {
 
 describe("cancelRecording (Cancel)", () => {
   it("calls the cancel command, tears the bar down, and clears the flag", async () => {
-    invoke.mockResolvedValueOnce(undefined); // start
     const view = mount("keep");
     await startVoiceRecording(view);
     await Promise.resolve();
-    invoke.mockClear();
-    invoke.mockResolvedValueOnce(undefined); // cancel
+    voiceCancel.mockClear();
     await lastBarOpts!.onCancel();
-    expect(invoke).toHaveBeenCalledWith("plugin:attachments|voice_record_cancel");
+    expect(voiceCancel).toHaveBeenCalledOnce();
     expect(barHandle.teardown).toHaveBeenCalled();
     expect(isRecording()).toBe(false);
     // Nothing inserted on cancel.
@@ -247,11 +277,10 @@ describe("cancelRecording (Cancel)", () => {
   });
 
   it("tears the bar down even when the cancel command rejects (best-effort)", async () => {
-    invoke.mockResolvedValueOnce(undefined); // start
     const view = mount();
     await startVoiceRecording(view);
     await Promise.resolve();
-    invoke.mockRejectedValueOnce(new Error("ipc down")); // cancel fails
+    voiceCancel.mockRejectedValueOnce(new Error("ipc down")); // cancel fails
     await lastBarOpts!.onCancel();
     expect(barHandle.teardown).toHaveBeenCalled();
     expect(isRecording()).toBe(false);

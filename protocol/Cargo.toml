@@ -29,13 +29,71 @@ thiserror = { version = "2", default-features = false }
 serde = { version = "1", default-features = false, features = ["derive", "alloc"] }
 tracing = { version = "0.1", default-features = false }
 
+# wasm32 (Phase 3 web client). getrandom 0.2 refuses to build for
+# `wasm*-unknown-unknown` unless a backend is chosen, and the two choices are
+# not equivalent:
+#
+#   - `js`     pulls in wasm-bindgen and its JS glue, adding a build-tool
+#              dependency and a code-generation step to a crate that is
+#              `#![no_std]` and deliberately has neither.
+#   - `custom` declares an `extern "Rust"` hook the EMBEDDER registers
+#              (`register_custom_getrandom!`), which for the web client is one
+#              call to `crypto.getRandomValues` in the Worker host (task 81).
+#
+# `custom` is chosen deliberately, not by default: it keeps the primitive crate
+# free of wasm-bindgen and leaves the entropy source an explicit, auditable
+# decision at the boundary that actually has one. The Phase 0 spike proved this
+# path derives a byte-identical key in all three browsers.
+#
+# The failure mode this MUST NOT have is silent: an unregistered hook links
+# nothing in an rlib, so `cargo build --target wasm32-unknown-unknown` passes
+# with no entropy source at all. `scripts/wasm-csprng-check.sh` is the gate for
+# that — it asserts a real cdylib link FAILS while no backend is registered.
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+getrandom = { version = "0.2", default-features = false, features = ["custom"] }
+
+[features]
+# Bake the `myne-test-vectors` fixtures into the `vectors` test binary so it can
+# run where there is no filesystem — i.e. in a browser (phase3-web-client task
+# 15). OFF by default and it must stay off: the arm it enables is a table of
+# `include_str!`s pointing into the companion repo, and `include_str!` of an
+# absent file is a **compile error**, not a skip. A contributor without the
+# companion checked out has to be able to build this crate's tests.
+#
+# Native runs never need it — they read the same files at run time and skip when
+# they are missing.
+browser-vectors = []
+
 [dev-dependencies]
 serde_json = { version = "1", default-features = false, features = ["alloc"] }
+
+# Native-only dev-dependencies.
+#
+# `proptest` is gated off wasm32 rather than left unconditional because cargo
+# builds every dev-dependency in the graph when it builds ANY test target — so an
+# unconditional `proptest` would have to compile for `wasm32-unknown-unknown`
+# before `--test vectors` could run there, and its default features reach for
+# process and timeout APIs that target does not have. The property tests are
+# native by nature; nothing is lost.
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
 # Property-based testing (dev-only; never enters the shipped dependency
 # graph). Used by tests/crypto_properties.rs to assert universal laws
 # (roundtrip, determinism, forgery-rejection) over thousands of generated
 # inputs, complementing the example-based attack suite + mutation testing.
 proptest = "1"
+
+# The browser test harness (phase3-web-client task 15). Dev-only, wasm-only, and
+# **never** in the shipped graph: `myne-web-wasm` is the crate that ships, and it
+# does not depend on this.
+#
+# Same family as the `wasm-bindgen` already pinned in the shared `Cargo.lock`,
+# and the same transitive→direct promotion precedent as `js-sys` in
+# `web/wasm/Cargo.toml`. What it buys is the one thing this task is about:
+# `wasm_bindgen_test_configure!(run_in_browser)` runs the vectors inside a real
+# browser's wasm engine, driven over WebDriver — not in node, and not in a
+# standalone runtime that happens to execute wasm.
+[target.'cfg(target_arch = "wasm32")'.dev-dependencies]
+wasm-bindgen-test = "0.3"
 
 [lints.rust]
 # `cargo-llvm-cov` sets these cfgs when instrumenting; `coverage_nightly`

@@ -8,7 +8,7 @@
 // All reject with a `SyncDeviceError`-shaped `{ kind: ... }` payload (the
 // sync plugin's shared error enum).
 
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../platform/core";
 
 /** One quarantined note blob, as returned by `sync_list_quarantine`. */
 export interface QuarantineEntry {

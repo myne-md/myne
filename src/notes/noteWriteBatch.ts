@@ -10,7 +10,7 @@
 // them through the two-phase `.rename-journal` transaction: any per-note
 // failure aborts the WHOLE batch with the vault left pre-rename.
 
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../platform/core";
 
 /** One note in a transactional batch rewrite: id + the full new body. Mirrors
  *  the Rust `NoteBatchUpdate { note_id, plaintext }` (camelCase over the wire). */

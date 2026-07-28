@@ -7,6 +7,7 @@ import {
   ENROLL_NON_DISTINGUISHING_BANNER,
   ENROLL_PENDING_NOTICE,
   ENROLL_APPROVED_NOTICE,
+  LOCAL_ERASE_DISCLOSURE,
 } from "../src/lib/load-bearing-copy";
 
 // SYNC-42 structural anti-drift: the desktop load-bearing copy is a verbatim
@@ -23,6 +24,7 @@ describe("shared load-bearing copy (SYNC-42)", () => {
     expect(ENROLL_NON_DISTINGUISHING_BANNER).toBe(shared.ENROLL_NON_DISTINGUISHING_BANNER);
     expect(ENROLL_PENDING_NOTICE).toBe(shared.ENROLL_PENDING_NOTICE);
     expect(ENROLL_APPROVED_NOTICE).toBe(shared.ENROLL_APPROVED_NOTICE);
+    expect(LOCAL_ERASE_DISCLOSURE).toBe(shared.LOCAL_ERASE_DISCLOSURE);
   });
 
   it("pins the exact E2E-literal values (a byte change is a decisions.md event)", () => {
@@ -40,5 +42,12 @@ describe("shared load-bearing copy (SYNC-42)", () => {
       "This device is waiting for approval. Approve it from a device that already has access to start syncing.",
     );
     expect(shared.ENROLL_APPROVED_NOTICE).toBe("This device is now connected and syncing.");
+    // Four sentences, in this order and none dropped: effect, what survives,
+    // what this is NOT, and the one thing genuinely lost. The third is the
+    // REMOVE_DEVICE_DISCLOSURE rule applied to erasure ("not a remote wipe");
+    // the fourth is why the typed-DELETE gate stays.
+    expect(shared.LOCAL_ERASE_DISCLOSURE).toBe(
+      "This erases Myne's copy of your vault from this browser only. Your account and everything already synced stay on the server, and signing in here again brings them back. It is not an account deletion and not a remote wipe. Anything this browser has not synced yet is lost for good.",
+    );
   });
 });

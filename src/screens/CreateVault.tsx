@@ -22,9 +22,9 @@
 //   - vault-creation:cancel  — wired here (cleanup + PhraseStep Back).
 
 import { useEffect, useReducer, useRef, useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
-import { getCurrentWindow } from "@tauri-apps/api/window";
-import { confirm as dialogConfirm } from "@tauri-apps/plugin-dialog";
+import { invoke } from "../platform/core";
+import { getCurrentWindow } from "../platform/window";
+import { confirm as dialogConfirm } from "../platform/dialog";
 import i18n from "../i18n";
 import { HAS_TAURI } from "../lib/app-window";
 import {

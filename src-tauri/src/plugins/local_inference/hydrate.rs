@@ -149,8 +149,12 @@ pub(crate) async fn hydrate_ai_vectors<R: Runtime>(app: &AppHandle<R>, state: &V
     let Ok(vault_dir) = myne_core::paths::active_vault_root_io(app, Some(active_id)) else {
         return;
     };
-    let Ok(prefs) =
-        myne_core::plugins::prefs::commands::prefs_read_with_dir(&vault_dir, state).await
+    let Ok(prefs) = myne_core::plugins::prefs::commands::prefs_read_with_dir(
+        &vault_dir,
+        state,
+        &myne_core::vault_io::StdVaultIo,
+    )
+    .await
     else {
         return;
     };
@@ -268,7 +272,15 @@ pub(crate) async fn hydrate_ai_vectors<R: Runtime>(app: &AppHandle<R>, state: &V
         let mut notes: Vec<NoteForIndex> = Vec::new();
         for id in &plan.to_embed {
             let id_str = id.as_uuid().to_string();
-            let Ok(body) = note_read_with_dir(notes_dir.clone(), &vault_state, id_str).await else {
+            let Ok(body) = note_read_with_dir(
+                notes_dir.clone(),
+                &vault_state,
+                id_str,
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::tauri_host::TauriHost::new(app.clone()),
+            )
+            .await
+            else {
                 continue;
             };
             let folder = folder_of(&body);
@@ -410,8 +422,12 @@ pub(crate) fn reembed_one_note<R: Runtime>(app: &AppHandle<R>, note_id: &str, bo
             return;
         };
         // Gate on the opt-in + fetch the exclusion set.
-        let Ok(prefs) =
-            myne_core::plugins::prefs::commands::prefs_read_with_dir(&vault_dir, &state).await
+        let Ok(prefs) = myne_core::plugins::prefs::commands::prefs_read_with_dir(
+            &vault_dir,
+            &state,
+            &myne_core::vault_io::StdVaultIo,
+        )
+        .await
         else {
             return;
         };

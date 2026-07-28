@@ -23,8 +23,10 @@
 // dismissed → silent no-op: backing out is free, nothing written,
 // nothing shown.
 
-import { save as saveFileDialog } from "@tauri-apps/plugin-dialog";
-import { revealItemInDir } from "@tauri-apps/plugin-opener";
+import { save as saveFileDialog } from "../platform/dialog";
+import { revealItemInDir } from "../platform/opener";
+import { deliverFile } from "../platform/download";
+import { has } from "../platform/capabilities";
 import i18n from "../i18n";
 import {
   EXPORT_PDF_PLAIN_SENTENCE,
@@ -130,6 +132,64 @@ export interface NoteExportUiHooks {
   confirmPdfExclusions: (
     excluded: readonly ExcludedAttachment[],
   ) => Promise<boolean>;
+  /** Say the plaintext-egress sentence and collect consent on the DOWNLOAD
+   *  path, where there is no save dialog to carry it (phase3-web-client task
+   *  98). Renders the sentence **verbatim** — it is load-bearing copy, not a
+   *  message to paraphrase. Resolves `true` to proceed, `false` to cancel. */
+  confirmEgress: (sentence: string) => Promise<boolean>;
+}
+
+/** What {@link deliverWithDisclosure} did. Three outcomes, not a boolean,
+ *  because "the user said no" and "there was nowhere to ask" need different
+ *  copy — one is a free exit and the other is a wiring fault. */
+type EgressDelivery = "delivered" | "declined" | "undisclosed";
+
+/**
+ * Deliver bytes on the download path, **saying the egress sentence first**.
+ *
+ * # Why the order is the whole point
+ *
+ * Myne states its plaintext egress plainly, exactly once, at the decision
+ * point. On desktop that "once" is the OS save dialog's title: the sentence is
+ * on screen while the user is still choosing whether and where, and dismissing
+ * the dialog costs nothing. A browser download has no title and no dismissable
+ * step — `deliverFile` resolves with the file already handed to the browser.
+ *
+ * So a disclosure delivered *after* `deliverFile` is not a disclosure. It is a
+ * notification that plaintext has already left, which is the exact property
+ * TB3 makes export the deliberate exception FOR: user-initiated, and the user
+ * gets to decide with the consequence in front of them.
+ *
+ * # Why an absent hook refuses rather than proceeding
+ *
+ * `confirmEgress` is optional on the flow options, like the other modal hooks,
+ * because a flow can be driven from an isolated render with no modal mount. For
+ * `confirmAttachments` the documented degrade is "export note-only" — a smaller
+ * export, still correct. There is no smaller-but-correct version of skipping
+ * the disclosure: proceeding would ship the plaintext with nothing said, and
+ * that is worse than not exporting. So an absent hook is `"undisclosed"` and no
+ * bytes move.
+ *
+ * `alreadyShown` covers the path where a pre-flight modal has *already*
+ * rendered the same sentence — saying it twice in one flow reads as a warning
+ * escalating, which trains the user to click through both.
+ */
+async function deliverWithDisclosure(
+  sentence: string,
+  alreadyShown: boolean,
+  confirmEgress: ((sentence: string) => Promise<boolean>) | undefined,
+  filename: string,
+  bytes: Uint8Array,
+  mimeType: string,
+): Promise<EgressDelivery> {
+  if (!alreadyShown) {
+    if (confirmEgress === undefined) return "undisclosed";
+    // A hook that throws is a hook that did not obtain consent.
+    const proceed = await confirmEgress(sentence).catch(() => false);
+    if (!proceed) return "declined";
+  }
+  await deliverFile(filename, bytes, mimeType);
+  return "delivered";
 }
 
 export interface NoteExportFlowOptions {
@@ -145,6 +205,10 @@ export interface NoteExportFlowOptions {
    * degrade for isolated renders without the Editor's modal mount.
    */
   confirmAttachments?: (count: number) => Promise<AttachmentPreflightChoice | null>;
+  /** Egress-disclosure hook, used only on the download path. Absent → the
+   *  download REFUSES rather than shipping plaintext with nothing said; see
+   *  {@link deliverWithDisclosure}. */
+  confirmEgress?: (sentence: string) => Promise<boolean>;
   /** Note-body provider for the attachment scan (default: the `note_read`
    *  IPC — the context-menu path has no body loaded). Read failure
    *  degrades to a note-only export; the export IPC surfaces the real
@@ -174,6 +238,7 @@ export function noteExportOptions(
     showToast: hooks?.showToast ?? (() => {}),
     confirmAttachments: hooks?.confirmAttachments,
     confirmPdfExclusions: hooks?.confirmPdfExclusions,
+    confirmEgress: hooks?.confirmEgress,
   };
 }
 
@@ -187,6 +252,7 @@ export async function runNoteExportFlow({
   noteTitle,
   showToast,
   confirmAttachments,
+  confirmEgress,
   getBody = noteRead,
 }: NoteExportFlowOptions): Promise<void> {
   // Pre-flight: only when a modal hook exists AND the body references
@@ -204,6 +270,62 @@ export async function runNoteExportFlow({
       if (choice === null) return; // cancelled — free exit, nothing invoked
       includeAttachments = choice.includeAttachments;
     }
+  }
+
+  // ── the two delivery mechanisms (phase3-web-client task 48) ──────────────
+  //
+  // Where `nativeSaveAs` exists the flow is unchanged: a native dialog names a
+  // real path, the OS owns the overwrite prompt, and Rust writes the bytes — so
+  // the plaintext never round-trips through the WebView.
+  //
+  // Where it does not (a browser: no API grants a page an arbitrary write path)
+  // the DOWNLOAD flow replaces it. TB3's two properties survive the swap: the
+  // user still initiates it, and the browser's own download UI is the second
+  // confirmation that owns the destination. What changes is that the body must
+  // cross into the page to be delivered — which is the same plaintext the editor
+  // is already holding for this note, so it opens no new window.
+  if (!has("nativeSaveAs")) {
+    // The egress sentence still gets said exactly once, and — the part that
+    // matters — BEFORE the bytes move. Without a dialog title to carry it, a
+    // confirmation does; a toast after `deliverFile` would be a notification
+    // that plaintext has already left, not a decision point (task 98).
+    const body = await getBody(noteId).catch(() => null);
+    if (body === null) {
+      showToast({ message: exportFallbackMessage() });
+      return;
+    }
+    const filename = defaultExportFilename(noteTitle);
+    let outcome: EgressDelivery;
+    try {
+      outcome = await deliverWithDisclosure(
+        EXPORT_PLAIN_MARKDOWN_SENTENCE,
+        egressSentenceShown,
+        confirmEgress,
+        filename,
+        new TextEncoder().encode(body),
+        "text/markdown",
+      );
+    } catch {
+      showToast({ message: exportFallbackMessage() });
+      return;
+    }
+    if (outcome === "declined") return; // free exit — nothing was written
+    if (outcome === "undisclosed") {
+      showToast({ message: exportFallbackMessage() });
+      return;
+    }
+    showToast({
+      message: i18n.t("export.note.flow.exportedTo", { filename }),
+      // No `revealPath`: the browser owns where it landed, and this client has
+      // no way to reveal it. Omitting the key omits the action.
+    });
+    // Attachments are deliberately NOT bundled here. Doing it would mean a zip,
+    // which means a zip writer, which is a dependency decision (root CLAUDE.md:
+    // "Adding a dependency is a security decision") — recorded on task 48 rather
+    // than made silently inside an export flow. The markdown keeps its
+    // `![[att:…]]` embeds, which is the inert degrade this flow already
+    // documents for the no-attachments path.
+    return;
   }
 
   const destination = await saveFileDialog({
@@ -387,6 +509,8 @@ export interface NoteHtmlExportFlowOptions {
    * isolated renders without the Editor's modal mount.
    */
   confirmAttachments?: (count: number) => Promise<AttachmentPreflightChoice | null>;
+  /** Egress-disclosure hook, used only on the download path. */
+  confirmEgress?: (sentence: string) => Promise<boolean>;
   /** Note-body provider (default: the `note_read` IPC). The body is the
    *  HTML projection input, so a read failure ends the flow with an error
    *  toast (no degrade — mirrors the PDF flow). */
@@ -417,6 +541,7 @@ export async function runNoteHtmlExportFlow({
   noteTitle,
   showToast,
   confirmAttachments,
+  confirmEgress,
   getBody = noteRead,
 }: NoteHtmlExportFlowOptions): Promise<void> {
   let body: string;
@@ -424,6 +549,59 @@ export async function runNoteHtmlExportFlow({
     body = await getBody(noteId);
   } catch {
     showToast({ message: i18n.t("export.note.flow.couldNotRead") });
+    return;
+  }
+
+  // ── the download arm (phase3-web-client tasks 48 + 97) ───────────────────
+  //
+  // Answered BEFORE the attachment pre-flight, because on this platform the
+  // question the pre-flight asks has no answer yet. Sidecar images need a
+  // multi-file delivery mechanism that task 48 settled only for single-file
+  // exports; inventing a second one here is what task 97's criterion forbids.
+  //
+  // So the download arm ships the standalone document ALONE. That is the same
+  // inert degrade this flow already documents for a render with no modal mount
+  // — images stay in-app-only `attachment://` refs — rather than a new
+  // behaviour, and it is why asking "include N images?" first would be worse
+  // than not asking: the user would answer a question this arm cannot honour.
+  //
+  // Until this arm was written, `saveFileDialog` was called unconditionally and
+  // a browser's typed refusal fell into the `.catch(() => null)` below, which
+  // reads as "dismissed" — so HTML export was a palette command that did
+  // nothing, silently, with the action still offered.
+  if (!has("nativeSaveAs")) {
+    let document: string;
+    try {
+      const { emitStandaloneHtml } = await import("../dialect/html/htmlDocument");
+      const composed = await emitStandaloneHtml(body, {
+        locale: typeof navigator !== "undefined" ? navigator.language : "en-US",
+      });
+      document = composed.document;
+    } catch {
+      showToast({ message: exportFallbackMessage() });
+      return;
+    }
+    const filename = defaultExportFilename(noteTitle, "html");
+    let outcome: EgressDelivery;
+    try {
+      outcome = await deliverWithDisclosure(
+        EXPORT_PLAIN_HTML_SENTENCE,
+        false,
+        confirmEgress,
+        filename,
+        new TextEncoder().encode(document),
+        "text/html",
+      );
+    } catch {
+      showToast({ message: exportFallbackMessage() });
+      return;
+    }
+    if (outcome === "declined") return;
+    if (outcome === "undisclosed") {
+      showToast({ message: exportFallbackMessage() });
+      return;
+    }
+    showToast({ message: i18n.t("export.note.flow.exportedTo", { filename }) });
     return;
   }
 
@@ -518,6 +696,8 @@ export interface NoteTxtExportFlowOptions {
   noteTitle: string | null;
   /** Toast sink — both success and mapped-error copy go through it. */
   showToast: (toast: ExportToast) => void;
+  /** Egress-disclosure hook, used only on the download path. */
+  confirmEgress?: (sentence: string) => Promise<boolean>;
   /** Note-body provider (default: the `note_read` IPC). The body is the
    *  text projection input, so a read failure ends the flow with an error
    *  toast. */
@@ -541,6 +721,7 @@ export async function runNoteTxtExportFlow({
   noteId,
   noteTitle,
   showToast,
+  confirmEgress,
   getBody = noteRead,
 }: NoteTxtExportFlowOptions): Promise<void> {
   let body: string;
@@ -548,6 +729,45 @@ export async function runNoteTxtExportFlow({
     body = await getBody(noteId);
   } catch {
     showToast({ message: i18n.t("export.note.flow.couldNotRead") });
+    return;
+  }
+
+  // The download arm (tasks 48 + 97). TXT is the simplest case in the suite —
+  // one file, never any sidecars — so nothing here is owed to task 48's
+  // multi-file question. The projection is identical to the dialog arm's; only
+  // the delivery differs.
+  if (!has("nativeSaveAs")) {
+    let text: string;
+    try {
+      const { emitNoteText } = await import("../dialect/text/emitNoteText");
+      text = `${emitNoteText(body)}\n`;
+    } catch {
+      showToast({ message: exportFallbackMessage() });
+      return;
+    }
+    const filename = defaultExportFilename(noteTitle, "txt");
+    let outcome: EgressDelivery;
+    try {
+      outcome = await deliverWithDisclosure(
+        EXPORT_PLAIN_TEXT_SENTENCE,
+        // TXT has no pre-flight modal (no attachments), so the confirmation is
+        // always the single decision point — never a second telling.
+        false,
+        confirmEgress,
+        filename,
+        new TextEncoder().encode(text),
+        "text/plain",
+      );
+    } catch {
+      showToast({ message: exportFallbackMessage() });
+      return;
+    }
+    if (outcome === "declined") return;
+    if (outcome === "undisclosed") {
+      showToast({ message: exportFallbackMessage() });
+      return;
+    }
+    showToast({ message: i18n.t("export.note.flow.exportedTo", { filename }) });
     return;
   }
 

@@ -5,7 +5,7 @@
 // callers wrap in try/catch so the feature-OFF build (command absent) degrades
 // to local-only state rather than throwing.
 
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../platform/core";
 
 /** Which model a stored path refers to (mirrors the Rust `ModelRole`). */
 export type ModelRole = "generation" | "embedding" | "transcription";

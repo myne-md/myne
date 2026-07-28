@@ -7,6 +7,7 @@
 // filename placeholder line. Non-image embeds join `excludedAttachments`.
 
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { setEditorHost, getHost } from "@myne/editor/host";
 import { emitNoteHtml } from "../../../src/dialect/html/emitNoteHtml";
 import { scanExcludedAttachments } from "../../../src/dialect/html/attachment-classification";
 
@@ -16,6 +17,10 @@ const ID_B = "b".repeat(64);
 function embed(id: string, filename: string): string {
   return `![[att:${id}|${filename}]]`;
 }
+
+/** The globally-installed test host, captured so a per-test override restores
+ *  cleanly (the host registry is module-global). */
+const baseHost = getHost();
 
 describe("image attachment embeds", () => {
   it("renders an <img> over the attachment protocol at position", async () => {
@@ -47,23 +52,43 @@ describe("image attachment embeds", () => {
   });
 });
 
-describe("attachment src form (MYND-519)", () => {
+describe("attachment src form (MYND-519 / phase3-web-client task 76)", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+    setEditorHost(baseHost);
   });
 
-  it("the default builder is platform-aware: delegates to convertFileSrc inside Tauri", async () => {
+  it("the default builder asks the HOST, so each client emits its own servable form", async () => {
     // Display surfaces (reading mode, the PDF hidden print window) call
-    // emitNoteHtml without an attachmentUrl override — inside Tauri the
-    // emitted src must be the per-platform servable form.
-    vi.stubGlobal("window", {
-      __TAURI_INTERNALS__: {
-        convertFileSrc: (path: string, protocol: string) =>
-          `http://${protocol}.localhost/${path}`,
+    // emitNoteHtml without an attachmentUrl override, so the default builder is
+    // what decides the src. It used to feature-detect `window.__TAURI_INTERNALS__`
+    // and call `convertFileSrc` itself; task 76 moved that to the host, because
+    // this package is compiled by a client that is not Tauri and a module-scope
+    // `@tauri-apps/*` import lands in the bundle whether or not the call fires.
+    //
+    // Asserted with the form a WebView that cannot intercept a custom scheme
+    // needs (Android, Windows WebView2) — the exact case MYND-519 existed for.
+    setEditorHost({
+      ...baseHost,
+      attachments: {
+        ...baseHost.attachments,
+        resolveRef: (id: string) => `http://attachment.localhost/${id}`,
       },
     });
     const { html } = await emitNoteHtml(`${embed(ID_A, "pic.png")}\n`);
     expect(html).toContain(`src="http://attachment.localhost/${ID_A}"`);
+  });
+
+  it("emits a browser object URL just as readily — no scheme is baked in here", async () => {
+    setEditorHost({
+      ...baseHost,
+      attachments: {
+        ...baseHost.attachments,
+        resolveRef: () => "blob:http://localhost:1421/9f2c",
+      },
+    });
+    const { html } = await emitNoteHtml(`${embed(ID_A, "pic.png")}\n`);
+    expect(html).toContain('src="blob:http://localhost:1421/9f2c"');
   });
 
   it("an explicit attachmentUrl option overrides the default builder", async () => {

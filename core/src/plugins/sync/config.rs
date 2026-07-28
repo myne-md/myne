@@ -50,6 +50,20 @@ pub enum PinSource {
     Static,
     /// A TOFU pin captured at first connect (self-host / operator-owned cert).
     Tofu,
+    /// **This client cannot pin, and the platform's trust store is doing the
+    /// verifying** (phase3-web-client tasks 84/85).
+    ///
+    /// The browser's case, and it is a third ANSWER rather than the absence of
+    /// one. `None` already means "there is no TLS here" (a loopback `http`
+    /// endpoint) or "nothing was pinned", and reporting either for a browser on
+    /// `https` would be actively wrong in the direction that misleads: the UI
+    /// reads a missing fingerprint as "connected to a local server". A page
+    /// cannot see a leaf certificate — `decisions.md` 2026-07-26 records that as
+    /// permanent, and the threat model qualifies A4 per client — so the honest
+    /// statement is "verified, by someone else", not "unverified".
+    ///
+    /// Derived at read like the other two; nothing new is persisted.
+    PlatformTrustStore,
 }
 
 /// The build-time static pin for the Myne-operated hosted endpoint (SYNC-43).
@@ -68,11 +82,40 @@ pub fn hosted_static_pin(_url: &str) -> Option<[u8; 32]> {
 /// or unpinned). Surfaced to the UI so a hosted endpoint is never shown as a bare
 /// first-connect TOFU pin — which is exactly the "silently normalize
 /// TOFU-for-hosted" regression SYNC-43 guards against.
+///
+/// The pinning client's answer. A client that cannot pin calls
+/// [`pin_source_for_client`] with `can_pin: false`.
 pub fn pin_source_for(url: &str, cfg: &SyncEndpointConfig) -> Option<PinSource> {
+    pin_source_for_client(url, cfg, true)
+}
+
+/// [`pin_source_for`] with the client's pinning ability made an INPUT rather
+/// than a compile target (phase3-web-client task 84).
+///
+/// `can_pin` is false in a browser. It is a parameter and not a `cfg!` for two
+/// reasons: the answer is a property of the client, not of the instruction set —
+/// a future embedding could be the same shape — and a `cfg!` would make the
+/// browser's branch unreachable from `cargo test --workspace`, which is where
+/// every other answer in this file is covered.
+///
+/// Order matters and is deliberate: a hosted static pin still wins if one
+/// exists (nothing about a browser makes a build-time pin less true), and a
+/// recorded TOFU pin still wins over the platform answer, so a config written by
+/// a desktop that DID pin keeps reporting `Tofu` when the browser reads it.
+/// Only when neither exists does the client's own ability decide.
+pub fn pin_source_for_client(
+    url: &str,
+    cfg: &SyncEndpointConfig,
+    can_pin: bool,
+) -> Option<PinSource> {
     if hosted_static_pin(url).is_some() {
         Some(PinSource::Static)
     } else if cfg.cert_pin_hex.is_some() {
         Some(PinSource::Tofu)
+    } else if !can_pin && url.starts_with("https://") {
+        // Only for TLS. A loopback `http` endpoint has no certificate for
+        // anyone to verify, so the honest answer there stays `None`.
+        Some(PinSource::PlatformTrustStore)
     } else {
         None
     }
@@ -98,6 +141,18 @@ pub enum SyncConfigError {
     /// The on-disk config file failed to parse as JSON.
     #[error("sync-config.json parse failed")]
     Parse,
+}
+
+/// The storage seam's closed error, straight through (phase3-web-client task 86).
+///
+/// Both config IO paths go through [`crate::vault_io::VaultIo`] now, which
+/// already reduces `std::io::Error` at its own boundary — an identity wrap, not
+/// a second reduction. The `From<std::io::Error>` impl below stays for the
+/// host-only path resolution that still yields a real `io::Error`.
+impl From<IoFailureKind> for SyncConfigError {
+    fn from(io_error_kind: IoFailureKind) -> Self {
+        SyncConfigError::Io { io_error_kind }
+    }
 }
 
 impl From<std::io::Error> for SyncConfigError {
@@ -140,6 +195,151 @@ fn is_loopback_host(host: &str) -> bool {
     matches!(host, "127.0.0.1" | "localhost" | "::1")
 }
 
+/// `<app_config_dir>/sync-config.json`.
+///
+/// **Moved here from the host-gated `commands.rs`** (phase3-web-client task 84)
+/// and given the IO seam, so the browser can resolve the same path through the
+/// same code. It was the last thing standing between the endpoint commands and a
+/// web dispatch, and it stood there because of one `std::fs::create_dir_all`.
+///
+/// This is the **only** consumer of `HostCtx::app_config_dir` in the crate, and
+/// the reason that method exists at all: the config directory is device-scoped
+/// and vault-independent, so it is not derivable from the vault root the rest of
+/// the seam resolves (`core-hostctx-design.md`).
+pub async fn config_path_from_host(
+    host: &dyn crate::host::HostCtx,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<std::path::PathBuf, SyncConfigError> {
+    let dir = host.app_config_dir().map_err(|_| SyncConfigError::Io {
+        io_error_kind: IoFailureKind::Other,
+    })?;
+    io.create_dir_all(&dir).await?;
+    Ok(dir.join("sync-config.json"))
+}
+
+/// The endpoint config plus the DERIVED pin source (SYNC-43) — not persisted;
+/// computed at read so the UI distinguishes a hosted static pin from a self-host
+/// TOFU pin (and, on a client that cannot pin at all, the platform trust store)
+/// without changing the on-disk config schema.
+#[derive(Debug, Clone, Serialize)]
+pub struct SyncEndpointView {
+    /// The sync server base URL, or `None` when unconfigured.
+    pub endpoint_url: Option<String>,
+    /// The pinned leaf-cert fingerprint (lowercase SHA-256 hex), or `None`.
+    pub cert_pin_hex: Option<String>,
+    /// Where the pin came from, or who did the verifying instead.
+    pub pin_source: Option<PinSource>,
+}
+
+/// Read the device-local endpoint config into its UI view.
+///
+/// `can_pin` is the calling client's ability, threaded rather than derived —
+/// see [`pin_source_for_client`].
+pub async fn get_endpoint_view(
+    host: &dyn crate::host::HostCtx,
+    io: &dyn crate::vault_io::VaultIo,
+    can_pin: bool,
+) -> Result<SyncEndpointView, SyncConfigError> {
+    let path = config_path_from_host(host, io).await?;
+    let cfg = read_config(io, &path).await?;
+    let pin_source = cfg
+        .endpoint_url
+        .as_deref()
+        .and_then(|u| pin_source_for_client(u, &cfg, can_pin));
+    Ok(SyncEndpointView {
+        endpoint_url: cfg.endpoint_url,
+        cert_pin_hex: cfg.cert_pin_hex,
+        pin_source,
+    })
+}
+
+/// The endpoint-set result: the pinned fingerprint + its source (SYNC-43), so
+/// the UI can render a self-host first-connect TOFU pin ("compare across
+/// devices") distinctly from a pre-vetted hosted static pin — and, on a client
+/// that cannot pin, from the platform's own verification. Never silently
+/// normalizing one as another is the whole point.
+#[derive(Debug, Clone, Serialize)]
+pub struct EndpointPinInfo {
+    /// The pinned leaf-cert fingerprint (lowercase SHA-256 hex) for eye-compare,
+    /// or `None` for a loopback `http` endpoint, a cleared config, or a client
+    /// that cannot see a certificate.
+    pub fingerprint: Option<String>,
+    /// Where the pin came from, or who did the verifying instead.
+    pub pin_source: Option<PinSource>,
+}
+
+/// Set (or clear, with `None`) the sync endpoint: validate against the A4/TB5
+/// policy, persist, and report the pin situation.
+///
+/// **`cert_pin_hex` is an INPUT, not something this computes** (phase3-web-client
+/// task 84), and that is where the platform split lives. Acquiring a TOFU pin
+/// means completing a TLS handshake yourself and reading the leaf certificate —
+/// desktop does that over `rustls_transport`, which has no `wasm32` build and no
+/// browser equivalent, because a page never sees the certificate at all. So the
+/// caller acquires the pin (or does not) and this owns everything that follows:
+/// the URL policy, the write, and the derived source. Splitting it here rather
+/// than at the whole command keeps one implementation of the part that is a
+/// *rule* and lets the part that is a *capability* differ.
+///
+/// A cleared endpoint drops the pin with it — a pin without an endpoint is a
+/// fact about a server nobody is talking to.
+pub async fn set_endpoint(
+    host: &dyn crate::host::HostCtx,
+    io: &dyn crate::vault_io::VaultIo,
+    endpoint_url: Option<String>,
+    cert_pin_hex: Option<String>,
+    can_pin: bool,
+) -> Result<EndpointPinInfo, SyncConfigError> {
+    let path = config_path_from_host(host, io).await?;
+    let Some(url) = endpoint_url else {
+        write_config(io, &path, &SyncEndpointConfig::default()).await?;
+        return Ok(EndpointPinInfo {
+            fingerprint: None,
+            pin_source: None,
+        });
+    };
+    validate_endpoint_url(&url)?;
+    let cfg = SyncEndpointConfig {
+        endpoint_url: Some(url.clone()),
+        cert_pin_hex: cert_pin_hex.clone(),
+    };
+    write_config(io, &path, &cfg).await?;
+    Ok(EndpointPinInfo {
+        fingerprint: cert_pin_hex,
+        pin_source: pin_source_for_client(&url, &cfg, can_pin),
+    })
+}
+
+/// Parse a 64-char lowercase-hex cert pin into raw SHA-256 bytes.
+fn parse_pin_hex(s: &str) -> Option<[u8; 32]> {
+    if s.len() != 64 || !s.bytes().all(|b| b.is_ascii_hexdigit()) {
+        return None;
+    }
+    let mut out = [0u8; 32];
+    for (i, byte) in out.iter_mut().enumerate() {
+        *byte = u8::from_str_radix(&s[i * 2..i * 2 + 2], 16).ok()?;
+    }
+    Some(out)
+}
+
+/// The cert pins to verify an `https` connection against: the **static-hosted-pin
+/// slot ∪ the TOFU pin** (SYNC-43). The static slot is deferred (`None`) until
+/// hosted launch, so today this is just the captured TOFU pin; when hosted ships,
+/// a hosted endpoint additionally verifies against its pre-vetted static pin.
+/// Empty for a loopback `http` endpoint or an unpinned config.
+pub fn config_pins(cfg: &SyncEndpointConfig) -> Vec<[u8; 32]> {
+    let mut pins = Vec::new();
+    if let Some(url) = cfg.endpoint_url.as_deref() {
+        if let Some(sp) = hosted_static_pin(url) {
+            pins.push(sp);
+        }
+    }
+    if let Some(tofu) = cfg.cert_pin_hex.as_deref().and_then(parse_pin_hex) {
+        pins.push(tofu);
+    }
+    pins
+}
+
 /// Validate an endpoint URL per the A4/TB5 policy. `https` is always allowed;
 /// `http` is allowed only for a loopback host (local E2E / dev server).
 pub fn validate_endpoint_url(url: &str) -> Result<(), SyncConfigError> {
@@ -155,19 +355,43 @@ pub fn validate_endpoint_url(url: &str) -> Result<(), SyncConfigError> {
 /// Read the device-local config from `path`. An absent file is NOT an error —
 /// it means "sync unconfigured" and returns the default. A present-but-corrupt
 /// file is a `Parse` error (the operator must fix or clear it).
-pub fn read_config(path: &Path) -> Result<SyncEndpointConfig, SyncConfigError> {
-    match std::fs::read(path) {
-        Ok(bytes) => serde_json::from_slice(&bytes).map_err(|_| SyncConfigError::Parse),
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(SyncEndpointConfig::default()),
-        Err(e) => Err(e.into()),
+///
+/// **Absent and unreadable stay different answers** (task 86), the same
+/// discipline `state::read_sync_state` documents: absent is "sync unconfigured",
+/// present-but-unparseable is an operator-visible fault. Defaulting on the
+/// second and then writing would silently erase a configured endpoint — this
+/// file has a write path a few lines below, so the distinction is load-bearing
+/// rather than decorative.
+pub async fn read_config(
+    io: &dyn crate::vault_io::VaultIo,
+    path: &Path,
+) -> Result<SyncEndpointConfig, SyncConfigError> {
+    // `open_newest` for the same reason `state::read_sync_state` uses it: on the
+    // web store this is two alternating copies, and the verifier for a plaintext
+    // JSON sidecar is `serde_json` — not the generation frame, which a torn
+    // write leaves perfectly valid around half a document.
+    match crate::singleton::open_newest(io, path, |bytes| {
+        serde_json::from_slice::<SyncEndpointConfig>(bytes)
+    })
+    .await
+    {
+        Ok(cfg) => Ok(cfg),
+        Err(crate::singleton::OpenOutcome::Absent) => Ok(SyncEndpointConfig::default()),
+        Err(crate::singleton::OpenOutcome::Undecodable(_)) => Err(SyncConfigError::Parse),
+        Err(crate::singleton::OpenOutcome::Io(kind)) => Err(kind.into()),
     }
 }
 
 /// Persist the config to `path` (atomic replace). The caller validates the URL
 /// via [`validate_endpoint_url`] before constructing the config.
-pub fn write_config(path: &Path, cfg: &SyncEndpointConfig) -> Result<(), SyncConfigError> {
+pub async fn write_config(
+    io: &dyn crate::vault_io::VaultIo,
+    path: &Path,
+    cfg: &SyncEndpointConfig,
+) -> Result<(), SyncConfigError> {
     let bytes = serde_json::to_vec_pretty(cfg).map_err(|_| SyncConfigError::Parse)?;
-    crate::atomic_write::atomic_write(path, &bytes, true)?;
+    io.write(path, &bytes, crate::vault_io::WriteOpts::default())
+        .await?;
     Ok(())
 }
 
@@ -193,6 +417,52 @@ mod tests {
         assert_eq!(pin_source_for(url, &cfg), Some(PinSource::Tofu));
         // SYNC-43-pending: no hosted static pin exists yet.
         assert_eq!(hosted_static_pin(url), None);
+    }
+
+    /// A client that cannot pin reports the platform trust store on TLS — and
+    /// still reports nothing on loopback `http`.
+    ///
+    /// The distinction is the whole point. `None` means "there is no TLS here";
+    /// a browser on `https` is verified, just not by us, and collapsing the two
+    /// makes the UI tell the user they connected to a local server when they
+    /// connected to a real one.
+    #[test]
+    fn a_client_that_cannot_pin_reports_the_platform_trust_store_on_tls_only() {
+        let tls = "https://s.example";
+        let cfg = SyncEndpointConfig {
+            endpoint_url: Some(tls.into()),
+            cert_pin_hex: None,
+        };
+        assert_eq!(
+            pin_source_for_client(tls, &cfg, false),
+            Some(PinSource::PlatformTrustStore)
+        );
+        assert_eq!(pin_source_for_client(tls, &cfg, true), None);
+
+        let loopback = "http://127.0.0.1:8453";
+        let cfg = SyncEndpointConfig {
+            endpoint_url: Some(loopback.into()),
+            cert_pin_hex: None,
+        };
+        assert_eq!(pin_source_for_client(loopback, &cfg, false), None);
+    }
+
+    /// A recorded pin still wins for a client that cannot make one.
+    ///
+    /// The config is device-local today, but the field is the same shape a
+    /// desktop writes, and reading someone else's recorded TOFU pin as "the
+    /// browser's trust store" would erase a fact rather than report one.
+    #[test]
+    fn a_recorded_pin_outranks_the_platform_answer() {
+        let url = "https://s.example";
+        let cfg = SyncEndpointConfig {
+            endpoint_url: Some(url.into()),
+            cert_pin_hex: Some("ab".repeat(32)),
+        };
+        assert_eq!(
+            pin_source_for_client(url, &cfg, false),
+            Some(PinSource::Tofu)
+        );
     }
 
     #[test]
@@ -246,24 +516,39 @@ mod tests {
 
     #[test]
     fn read_write_roundtrip() {
-        let dir = std::env::temp_dir().join(format!("myne-sync-cfg-{}", std::process::id()));
-        std::fs::create_dir_all(&dir).unwrap();
-        let path = dir.join("sync-config.json");
+        // Driven on a runtime against the real `StdVaultIo` since task 86 moved
+        // both IO paths onto the storage seam — a stub would only have proved
+        // the signatures compile.
+        crate::test_support::block_on(async {
+            let io = crate::vault_io::StdVaultIo;
+            let dir = std::env::temp_dir().join(format!("myne-sync-cfg-{}", std::process::id()));
+            std::fs::create_dir_all(&dir).unwrap();
+            let path = dir.join("sync-config.json");
 
-        // Absent → default.
-        assert_eq!(read_config(&path).unwrap(), SyncEndpointConfig::default());
+            // Absent → default. The legitimate "sync unconfigured" answer.
+            assert_eq!(
+                read_config(&io, &path).await.unwrap(),
+                SyncEndpointConfig::default()
+            );
 
-        let cfg = SyncEndpointConfig {
-            endpoint_url: Some("https://sync.myne.md".into()),
-            cert_pin_hex: Some("ab".repeat(32)),
-        };
-        write_config(&path, &cfg).unwrap();
-        assert_eq!(read_config(&path).unwrap(), cfg);
+            let cfg = SyncEndpointConfig {
+                endpoint_url: Some("https://sync.myne.md".into()),
+                cert_pin_hex: Some("ab".repeat(32)),
+            };
+            write_config(&io, &path, &cfg).await.unwrap();
+            assert_eq!(read_config(&io, &path).await.unwrap(), cfg);
 
-        // Corrupt → Parse error.
-        std::fs::write(&path, b"{not json").unwrap();
-        assert_eq!(read_config(&path), Err(SyncConfigError::Parse));
+            // Present-but-corrupt → `Parse`, NOT the default. This file has a
+            // write path, so collapsing the two would let a transient fault
+            // erase a configured endpoint (the `state.rs` discipline).
+            std::fs::write(&path, b"{not json").unwrap();
+            assert_eq!(read_config(&io, &path).await, Err(SyncConfigError::Parse));
 
-        std::fs::remove_dir_all(&dir).ok();
+            // A truncated file is the shape a torn write actually leaves.
+            std::fs::write(&path, br#"{"endpoint_url":"https://s"#).unwrap();
+            assert_eq!(read_config(&io, &path).await, Err(SyncConfigError::Parse));
+
+            std::fs::remove_dir_all(&dir).ok();
+        });
     }
 }

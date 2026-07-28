@@ -1,5 +1,9 @@
-import { describe, expect, it } from "vitest";
-import { buildSelectionCardSvg, svgToDataUri } from "../../src/lib/noteImageCard";
+// @vitest-environment jsdom
+//
+// jsdom for `URL.createObjectURL` / `Blob`, which the object-url helper needs
+// (phase3-web-client task 97).
+import { describe, expect, it, vi } from "vitest";
+import { buildSelectionCardSvg, svgToObjectUrl } from "../../src/lib/noteImageCard";
 
 // MYND-361 note→image — the pure SVG share-card builder (the DOM→canvas raster
 // step is the runtime piece, not covered here).
@@ -30,10 +34,33 @@ describe("buildSelectionCardSvg", () => {
   });
 });
 
-describe("svgToDataUri", () => {
-  it("produces an inspectable, decodable data URI", () => {
-    const uri = svgToDataUri("<svg/>");
-    expect(uri.startsWith("data:image/svg+xml;charset=utf-8,")).toBe(true);
-    expect(decodeURIComponent(uri.slice("data:image/svg+xml;charset=utf-8,".length))).toBe("<svg/>");
+describe("svgToObjectUrl", () => {
+  // Was `svgToDataUri` until phase3-web-client task 97. The change is not a
+  // refactor: that one call shape was the only reason the web client's CSP
+  // carried `img-src … data:`, which contradicted task 44's criterion that the
+  // policy admit object URLs *without* admitting `data:` content.
+  it("mints an object URL carrying the SVG's own type", () => {
+    const seen: Blob[] = [];
+    const created = vi
+      .spyOn(URL, "createObjectURL")
+      .mockImplementation((b: Blob | MediaSource) => {
+        seen.push(b as Blob);
+        return "blob:test/1";
+      });
+    try {
+      expect(svgToObjectUrl("<svg/>")).toBe("blob:test/1");
+      expect(created).toHaveBeenCalledTimes(1);
+      expect(seen[0]!.type).toBe("image/svg+xml");
+    } finally {
+      created.mockRestore();
+    }
+  });
+
+  it("produces a NEW url per call, so one revoke cannot kill another's image", () => {
+    // The property that makes caller-owned revocation safe. With a shared or
+    // cached url, the QR panel unmounting would blank a rasterisation in flight.
+    const urls = new Set([svgToObjectUrl("<svg/>"), svgToObjectUrl("<svg/>")]);
+    expect(urls.size).toBe(2);
+    for (const u of urls) URL.revokeObjectURL(u);
   });
 });

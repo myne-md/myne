@@ -9,7 +9,7 @@
 // level failure still rejects the invoke promise, so callers that care guard
 // with try/catch.
 
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../platform/core";
 import type { NoteSearchResult } from "../types/note-search-result";
 
 /**

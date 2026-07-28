@@ -8,7 +8,7 @@
 // caller owns; this hook takes it per-call and hands it straight to IPC.
 
 import { useCallback, useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../platform/core";
 import { setDeviceName } from "../lib/prefs";
 
 /** Which credential the enrolling device proves account ownership with. */

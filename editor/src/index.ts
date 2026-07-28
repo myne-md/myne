@@ -19,6 +19,15 @@ export type {
   SpellWord,
   TranscribeHandle,
   TranscribeOptions,
+  // phase3-web-client task 76 — the seam grew a picked-file handle, the import
+  // and catalog shapes, and the voice-capture backend, so every host implements
+  // the same contract without importing `@tauri-apps/*` into this package.
+  PickedFile,
+  PickFilesOptions,
+  ImportSource,
+  ImportedAttachment,
+  CatalogRow,
+  VoiceRecorder,
 } from "./host";
 export type { ResolverNote } from "./host/notes/resolveWikilink";
 // MYND-382: the enumerate-only imported-block-anchor scanner (the single dialect

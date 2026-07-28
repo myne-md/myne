@@ -70,6 +70,18 @@ pub enum FailureClass {
     RateLimited,
     /// 401 — the stored token is dead; only re-auth helps.
     Unauthenticated,
+    /// 401 `device_revoked` — this device's registry row was revoked from
+    /// another client (task 94, `server-protocol.md` §3.1).
+    ///
+    /// **Parks exactly like `Unauthenticated`, and that is the whole of its
+    /// behaviour here.** On desktop and mobile the machine is the user's own and
+    /// re-enrolling is the fix, so today's park-and-prompt is already right —
+    /// erasing someone's own machine on a server signal would be a new and
+    /// unasked-for destructive power. What the separate class buys is that the
+    /// UI can SAY which of the two happened, and that the web client (whose
+    /// storage is a cache of a sync-held vault) can treat it as terminal instead
+    /// of retryable. The scheduler is not where that difference lives.
+    DeviceRevoked,
     /// Socket/TLS-level failure — offline or the server is unreachable.
     Transport,
     /// 507 — the account is over its storage ceiling. Retrying cannot help until
@@ -82,6 +94,13 @@ pub enum FailureClass {
     /// 403 — the account is operator-frozen. Push + enroll are refused, pull is
     /// never refused; only the operator can clear it, so it parks like a 401.
     Frozen,
+    /// The LOCAL store ran out of room while materialising (phase3-web-client
+    /// task 91). Distinct from [`FailureClass::QuotaExceeded`], which is the
+    /// SERVER's 507: that one is about the account's ceiling and this one is
+    /// about this device's disk or this origin's OPFS allowance. Both park —
+    /// retrying cannot help until someone frees something — but they are
+    /// different sentences to the user, and only one of them is fixable here.
+    StorageFull,
     /// Everything else (bad response, CAS races, protocol errors, local IO).
     Other,
 }
@@ -92,10 +111,16 @@ impl FailureClass {
     pub fn status_detail(self) -> &'static str {
         match self {
             FailureClass::Unauthenticated => "auth_failed",
+            // Its own tag, for the same reason `frozen` has one: collapsing it
+            // into "auth_failed" would show "sign-in expired" to a user whose
+            // device was deliberately removed, and send them to re-enrol a
+            // device the account owner just cut off.
+            FailureClass::DeviceRevoked => "device_revoked",
             FailureClass::RateLimited => "rate_limited",
             // Distinct tags so the UI never collapses these into "Sync failed"
             // (MYND-570): each maps to its own banner copy.
             FailureClass::QuotaExceeded => "quota_exceeded",
+            FailureClass::StorageFull => "storage_full",
             FailureClass::PayloadTooLarge => "payload_too_large",
             FailureClass::Frozen => "frozen",
             FailureClass::Transport | FailureClass::Other => "sync_failed",
@@ -123,9 +148,11 @@ fn retry_delay_ms(class: FailureClass, consecutive_failures: u32) -> u64 {
     let (start, cap) = match class {
         // Nothing the client can retry its way out of — park until a user
         // action (unlock / focus / manual sync) or a peer poke re-probes.
-        FailureClass::Unauthenticated | FailureClass::QuotaExceeded | FailureClass::Frozen => {
-            return AUTH_PARK_MS
-        }
+        FailureClass::Unauthenticated
+        | FailureClass::DeviceRevoked
+        | FailureClass::QuotaExceeded
+        | FailureClass::StorageFull
+        | FailureClass::Frozen => return AUTH_PARK_MS,
         FailureClass::RateLimited => (RATE_LIMIT_RETRY_START_MS, RATE_LIMIT_RETRY_CAP_MS),
         FailureClass::Transport | FailureClass::Other | FailureClass::PayloadTooLarge => {
             (FAILURE_RETRY_START_MS, FAILURE_RETRY_CAP_MS)
@@ -329,17 +356,37 @@ impl SyncScheduler {
 // Runtime glue (task 9): the tokio task that drives the scheduler. The decision
 // logic above is pure + unit-tested; this is the thin "spawn / timer / Slot read
 // / transport call" layer the module doc promised, mirroring `auto_lock`.
+//
+// **Everything below this line is host-gated; everything above it is not**
+// (phase3-web-client task 84). The split is the whole point: the decision logic
+// is the privacy-load-bearing part — poll cadence, focus rate-limiting, push
+// coalescing, the extend-only retry ladder — and a browser that re-derived it
+// would be a second answer to questions `sync-protocol.md` §8.3 and the A13
+// timing posture have exactly one. What genuinely differs is only how a tick
+// ARRIVES (a `tokio::time::interval` here, a Worker timer there) and where the
+// per-tick inputs are read from (`Manager::try_state` singletons here, Worker
+// state there), so those are the only things gated.
+//
+// The wasm arm's driver is not written yet and is deliberately absent rather
+// than stubbed: it needs the sync data plane dispatched into the Worker (tasks
+// 22/23/33), and a driver with nothing to drive would be a shape guess frozen
+// into the tree. What this ungating buys today is that when it arrives, it
+// binds to THIS `SyncScheduler` — there is no second one to write.
 // ---------------------------------------------------------------------------
 
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 use tauri::{AppHandle, Emitter, Manager, Runtime};
 
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 /// Device-local "a note changed" signal: the note-save path bumps it, the sync
 /// loop reads it to mark the scheduler dirty (the coalesced-push trigger). A
 /// monotone counter — the loop only cares whether it advanced since last tick.
 #[derive(Default)]
 pub struct SyncLocalChange(AtomicU64);
 
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 impl SyncLocalChange {
     /// Note-save calls this after a successful write (soft dependency via
     /// `app.try_state` — a no-op when the sync plugin isn't registered).
@@ -351,6 +398,7 @@ impl SyncLocalChange {
     }
 }
 
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 /// Device-local mobile-lifecycle signal (SYNC-38): the platform event source
 /// (mobile `WindowEvent::Suspended`/`Resumed`, task 2) sets it, the sync loop
 /// reads it each tick to drive `SyncScheduler::on_suspend`/`on_resume`. Desktop
@@ -362,6 +410,7 @@ pub struct SyncLifecycleSignal {
     resume_poll_requested: AtomicBool,
 }
 
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 impl SyncLifecycleSignal {
     /// App backgrounded — the loop hard-idles the scheduler.
     pub fn suspend(&self) {
@@ -381,6 +430,7 @@ impl SyncLifecycleSignal {
     }
 }
 
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 /// Desktop window-focus signal: the host's `WindowEvent::Focused(true)` handler
 /// bumps it, the loop reads it each tick to drive the rate-limited
 /// [`SyncScheduler::on_focus`] immediate poll. Mobile never registers it
@@ -389,6 +439,7 @@ impl SyncLifecycleSignal {
 #[derive(Default)]
 pub struct SyncFocusSignal(AtomicU64);
 
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 impl SyncFocusSignal {
     /// The host window regained focus.
     pub fn bump(&self) {
@@ -399,10 +450,12 @@ impl SyncFocusSignal {
     }
 }
 
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 /// Base loop cadence — a fine tick so the scheduler's logical clock advances; the
 /// scheduler itself enforces the poll interval + the coalescing window.
 const LOOP_TICK_MS: u64 = 1_000;
 
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 /// Spawn the background sync loop (wired in `lib.rs` setup, exactly like
 /// `auto_lock::spawn_idle_lock_timer`). Unlock-gated. Polling-default +
 /// coalesced-push per the MYND-424 grill (decision B); the SSE-opt-in
@@ -791,6 +844,34 @@ mod tests {
         assert_eq!(s.tick(30_000), SyncAction::Pull);
     }
 
+    /// A full LOCAL store parks, and it parks distinctly from a full ACCOUNT
+    /// (phase3-web-client task 91).
+    ///
+    /// Both are "no room", both are unfixable by retrying, and they park on the
+    /// same ladder — but they are different sentences to the user and only one of
+    /// them is fixable on this device. A client that reported a full disk as
+    /// "you are over your storage limit" would send someone to an account page
+    /// while their own drive was what filled up.
+    #[test]
+    fn a_full_local_store_parks_and_says_which_store() {
+        assert_eq!(
+            retry_delay_ms(FailureClass::StorageFull, 1),
+            retry_delay_ms(FailureClass::QuotaExceeded, 1),
+            "both park — retrying cannot help until someone frees something"
+        );
+        assert_eq!(
+            retry_delay_ms(FailureClass::StorageFull, 9),
+            retry_delay_ms(FailureClass::StorageFull, 1),
+            "parking is flat, not exponential — there is nothing to back off from"
+        );
+        assert_ne!(
+            FailureClass::StorageFull.status_detail(),
+            FailureClass::QuotaExceeded.status_detail(),
+            "the two must not collapse into one message"
+        );
+        assert_eq!(FailureClass::StorageFull.status_detail(), "storage_full");
+    }
+
     #[test]
     fn failed_pull_does_not_rearm_dirty() {
         let mut s = sched();
@@ -860,6 +941,54 @@ mod tests {
         );
         assert_eq!(s.tick(500_000), SyncAction::Idle); // parked
         assert_eq!(s.tick(930_000), SyncAction::Pull); // AUTH_PARK_MS elapsed
+    }
+
+    /// Task 94's "desktop and mobile behaviour on the same code unchanged"
+    /// criterion, at the layer that decides it: a revoked device parks on the
+    /// SAME ladder as an expired token. The class exists to be SAID, not to
+    /// change the schedule — and nothing in this file may ever make it
+    /// destructive, because a server signal must not erase a user's own machine.
+    #[test]
+    fn device_revoked_parks_exactly_like_unauthenticated() {
+        let mut a = sched();
+        let mut b = sched();
+        a.set_unlocked(true);
+        b.set_unlocked(true);
+        assert_eq!(a.tick(30_000), SyncAction::Pull);
+        assert_eq!(b.tick(30_000), SyncAction::Pull);
+        a.on_cycle_outcome(
+            SyncAction::Pull,
+            CycleResult::Failed(FailureClass::Unauthenticated),
+            30_000,
+        );
+        b.on_cycle_outcome(
+            SyncAction::Pull,
+            CycleResult::Failed(FailureClass::DeviceRevoked),
+            30_000,
+        );
+        for t in [500_000, 930_000, 1_000_000] {
+            assert_eq!(
+                a.tick(t),
+                b.tick(t),
+                "the two must park identically at {t}ms"
+            );
+        }
+    }
+
+    /// …and yet is DISTINGUISHABLE where it matters: the status detail the UI
+    /// reads. Collapsing it into `auth_failed` would tell a user whose device was
+    /// deliberately removed that their sign-in expired, and send them to re-enrol
+    /// a device the account owner just cut off.
+    #[test]
+    fn device_revoked_carries_its_own_status_detail() {
+        assert_eq!(
+            FailureClass::DeviceRevoked.status_detail(),
+            "device_revoked"
+        );
+        assert_ne!(
+            FailureClass::DeviceRevoked.status_detail(),
+            FailureClass::Unauthenticated.status_detail()
+        );
     }
 
     #[test]

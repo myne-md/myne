@@ -13,7 +13,7 @@
 // Signature parity (no codegen — see src/CLAUDE.md "Tauri command bindings"):
 // keep these in step with `plugins::clipper_pairing::commands`.
 
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../platform/core";
 
 /** Mirrors `plugins::clipper_pairing::commands::PendingPairingView`. */
 export interface PendingPairing {

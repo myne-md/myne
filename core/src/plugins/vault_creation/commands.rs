@@ -6,6 +6,7 @@
 
 use super::error::AppError;
 use super::state::{SessionLookup, VaultCreationSession, VaultCreationState};
+use crate::host::HostCtx;
 use crate::plugins::vault_unlock::state::VaultRuntimeState;
 use crate::vault_id::VaultId;
 use protocol::{
@@ -15,6 +16,10 @@ use protocol::{
 use serde::Serialize;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
+// Tauri types serve only the cfg-gated IPC wrappers (task 79, Option B).
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+use crate::host::tauri_host::TauriHost;
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 use tauri::{Runtime, State};
 use uuid::Uuid;
 use zeroize::Zeroizing;
@@ -66,11 +71,10 @@ pub struct BeginResult {
 /// `vault/` directory for a newly-created vault. The `AppHandle` is needed
 /// only to resolve `<app_data_dir>` for the collision scan; minting is cheap
 /// and runs before the slot reservation + Argon2id work.
-#[tauri::command]
-pub async fn begin<R: Runtime>(
+pub async fn begin_from_host(
     password: String,
-    state: State<'_, VaultCreationState>,
-    app: tauri::AppHandle<R>,
+    state: &VaultCreationState,
+    host: &dyn HostCtx,
 ) -> Result<BeginResult, AppError> {
     // Wrap immediately so any early-return path (slot-cap rejection,
     // spawn_blocking join failure, build_session error) drops the
@@ -107,7 +111,9 @@ pub async fn begin<R: Runtime>(
     // write destination to `vaults/<minted-id>/` from the session by default
     // (SYNC-6). An `app_data_dir` lookup failure fails fast without
     // consuming a session slot.
-    let base = crate::paths::app_data_dir(&app)?;
+    let base = host.app_data_dir().map_err(|_| AppError::Io {
+        kind: crate::plugins::vault_creation::error::IoErrorKind::Other,
+    })?;
     let vault_id = crate::vault_registry::mint_unique_vault_id(&base);
 
     // Reserve a slot atomically before kicking off ~2 seconds of
@@ -122,7 +128,7 @@ pub async fn begin<R: Runtime>(
     // (releasing the slot via SlotReservation::drop) and the closure-
     // captured wrapper drops in spawn_blocking's task pool. The minted
     // `vault_id` (Copy) moves into the closure and is stored on the session.
-    let session = tokio::task::spawn_blocking(move || {
+    let session = crate::task::run_blocking(move || {
         build_session(vault_id, &password, DEFAULT_V0_1_KDF_PARAMS)
     })
     .await
@@ -147,6 +153,18 @@ pub async fn begin<R: Runtime>(
         account_number,
         session_token: token.to_string(),
     })
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn begin<R: Runtime>(
+    password: String,
+    state: State<'_, VaultCreationState>,
+    app: tauri::AppHandle<R>,
+) -> Result<BeginResult, AppError> {
+    begin_from_host(password, state.inner(), &TauriHost::new(app)).await
 }
 
 /// Pure-function helper — no Tauri runtime, no async — that builds a
@@ -235,13 +253,19 @@ pub fn build_session(
 /// chained `vault_unlock` so the auto-unlock targets the just-created vault
 /// rather than the ambiguous sole-vault fallback — which, once a second vault
 /// exists, resolves to a non-existent legacy path (`VaultNotFound`).
-#[tauri::command]
-pub async fn commit<R: Runtime>(
+// The doc above uses an `a.` / `b.` sub-outline under numbered step 3. Markdown
+// recognises only digit-led ordered lists, so it reads those lines as
+// continuations of step 3 and calls their indentation wrong. The prose has been
+// correct and readable since it was written; what changed is only that moving it
+// off a `#[tauri::command]` item made it visible to these lints for the first
+// time (task 79). Scoped to this item, not the crate.
+#[allow(clippy::doc_overindented_list_items, clippy::doc_lazy_continuation)]
+pub async fn commit_from_host(
     vault_id: Option<String>,
     session_token: String,
-    state: State<'_, VaultCreationState>,
-    runtime_state: State<'_, VaultRuntimeState>,
-    app: tauri::AppHandle<R>,
+    state: &VaultCreationState,
+    runtime_state: &VaultRuntimeState,
+    host: &dyn HostCtx,
 ) -> Result<Option<String>, AppError> {
     let token = Uuid::parse_str(&session_token).map_err(|_| AppError::SessionNotFound)?;
     // SYNC-6 create targeting. Resolution precedence for the write
@@ -265,18 +289,33 @@ pub async fn commit<R: Runtime>(
     // lookup or create_dir_all on the vault subfolder fails, there's
     // nothing to restore yet (the session is still in the live map for
     // a future retry once the underlying condition is fixed).
-    let vault_dir = crate::paths::vault_dir_for_id(&app, target)?;
+    let vault_dir = crate::paths::vault_dir_for_id_from_host(host, target)?;
     let vault_path = vault_dir.join("vault.meta");
-    commit_with_permit(
-        token,
-        vault_path,
-        state.inner(),
-        runtime_state.auth_permits(),
-    )
-    .await?;
+    commit_with_permit(token, vault_path, state, runtime_state.auth_permits()).await?;
     // Surface the written-to vault id so the frontend's chained auto-unlock can
     // target it explicitly (`target` is `Copy`, untouched by the path resolve).
     Ok(target.map(|id| id.to_string()))
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn commit<R: Runtime>(
+    vault_id: Option<String>,
+    session_token: String,
+    state: State<'_, VaultCreationState>,
+    runtime_state: State<'_, VaultRuntimeState>,
+    app: tauri::AppHandle<R>,
+) -> Result<Option<String>, AppError> {
+    commit_from_host(
+        vault_id,
+        session_token,
+        state.inner(),
+        runtime_state.inner(),
+        &TauriHost::new(app),
+    )
+    .await
 }
 
 /// `auth_permits`-gated wrapper around [`commit_with_vault_path`].
@@ -530,7 +569,7 @@ pub(crate) async fn commit_with_vault_path(
     // clippy::result_large_err (new in Rust 1.96) otherwise flags the ~824-byte
     // payload moving on the stack; the box is on the rare error path only.
     let outcome: Result<(), Box<(AppError, VaultCreationSession)>> =
-        tokio::task::spawn_blocking(move || match build_and_serialize_vault_meta(&session) {
+        crate::task::run_blocking(move || match build_and_serialize_vault_meta(&session) {
             Err(e) => Err(Box::new((e, session))),
             Ok(bytes) => match crate::atomic_write::atomic_write(&vault_path, &bytes, false) {
                 Err(e) => Err(Box::new((AppError::from(e), session))),
@@ -662,13 +701,22 @@ pub(crate) async fn commit_with_vault_path(
 ///
 /// Sync (no `async`) because no work is dispatched: just a single
 /// hashmap remove + a token-parse attempt.
-#[tauri::command]
-pub fn cancel(session_token: String, state: State<'_, VaultCreationState>) -> Result<(), AppError> {
+pub fn cancel_from_state(
+    session_token: String,
+    state: &VaultCreationState,
+) -> Result<(), AppError> {
     if let Ok(token) = Uuid::parse_str(&session_token) {
         // Drop runs on the removed session; Zeroizing fields wipe.
         let _ = state.take_ignore_status(token);
     }
     Ok(())
+}
+
+/// IPC wrapper. Needs no host — it only drops a creation session.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub fn cancel(session_token: String, state: State<'_, VaultCreationState>) -> Result<(), AppError> {
+    cancel_from_state(session_token, state.inner())
 }
 
 /// Pure helper: from a [`VaultCreationSession`] (which carries its own

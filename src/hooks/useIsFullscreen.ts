@@ -4,7 +4,7 @@
 // API so it degrades to `false` outside a Tauri context (plain web / tests).
 
 import { useEffect, useState } from "react";
-import { getCurrentWindow } from "@tauri-apps/api/window";
+import { getCurrentWindow } from "../platform/window";
 
 export function useIsFullscreen(): boolean {
   const [fullscreen, setFullscreen] = useState(false);

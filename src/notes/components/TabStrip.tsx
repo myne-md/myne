@@ -16,6 +16,7 @@
 // (`overflow-x: auto`) AND the `…` menu lists every open tab for direct
 // switching when the strip is too narrow to show them all.
 
+import { dragRegionProps } from "../../screens/titlebar";
 import {
   useState,
   type ButtonHTMLAttributes,
@@ -240,7 +241,7 @@ export function TabStrip({
 
       {/* The empty trailing expanse doubles as the window-drag handle (the
           strip sits on the OS title-bar row for a top pane), Obsidian-style. */}
-      <div data-tauri-drag-region style={{ flex: "1 1 auto", minWidth: 16 }} />
+      <div {...dragRegionProps()} style={{ flex: "1 1 auto", minWidth: 16 }} />
 
       {tabs.length > 0 && (
         <StripButton

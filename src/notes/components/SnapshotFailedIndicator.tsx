@@ -8,7 +8,7 @@
 
 import { useEffect, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
-import { listen } from "@tauri-apps/api/event";
+import { subscribeToEvents } from "../../lib/subscribe";
 
 /** Backend event name — mirror of `SNAPSHOT_WRITE_FAILED_EVENT` (Rust). */
 const SNAPSHOT_WRITE_FAILED_EVENT = "snapshot://write-failed";
@@ -54,17 +54,14 @@ export function SnapshotFailedIndicator() {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
-    let unlisten: (() => void) | undefined;
     let timer: ReturnType<typeof setTimeout> | undefined;
-    void listen(SNAPSHOT_WRITE_FAILED_EVENT, () => {
+    const unsubscribe = subscribeToEvents([SNAPSHOT_WRITE_FAILED_EVENT], () => {
       setVisible(true);
       if (timer !== undefined) clearTimeout(timer);
       timer = setTimeout(() => setVisible(false), AUTO_DISMISS_MS);
-    }).then((u) => {
-      unlisten = u;
     });
     return () => {
-      unlisten?.();
+      unsubscribe();
       if (timer !== undefined) clearTimeout(timer);
     };
   }, []);

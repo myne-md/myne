@@ -62,6 +62,31 @@ pub enum VaultUnlockError {
     #[error("io error")]
     IoError { io_error_kind: IoFailureKind },
 
+    /// The vault's Argon2id memory cost is **legal but unaffordable on this
+    /// host** (phase3-web-client task 31).
+    ///
+    /// Distinct from [`Self::InvalidVaultMeta`] on purpose, and the distinction
+    /// is the whole point: `InvalidVaultMeta` means "this file is unreadable,
+    /// restore from a backup", which is **wrong advice here**. The vault is
+    /// fine; this client cannot open it. The user's action is to open it on a
+    /// desktop client, and a variant that said "corrupted" would send them to
+    /// restore a backup they do not need.
+    ///
+    /// Raised **before** the allocation, so it is a refusal rather than a caught
+    /// OOM — on `wasm32` an over-large allocation aborts the instance, which
+    /// cannot be caught at all and presents as a dead Worker with no cause.
+    ///
+    /// Both figures are in MiB and both are **public**: `required` comes from
+    /// the unencrypted `vault.meta` KDF block, which `protocol.md` §4.2 makes
+    /// deliberately inspectable, and `available` is a property of the client
+    /// build. Neither is credential-adjacent, so carrying them is safe and lets
+    /// the UI say something concrete instead of "this vault will not open".
+    #[error("kdf memory cost exceeds host capability")]
+    KdfMemoryExceedsHostCapability {
+        required_mib: u32,
+        available_mib: u32,
+    },
+
     /// Another unlock attempt is already in progress — the unlock
     /// permit (`Semaphore` capacity 1) is held. Returned by
     /// `Semaphore::try_acquire()` rather than queued (see grilling
@@ -228,9 +253,30 @@ mod tests {
                 VaultUnlockError::VaultAlreadyUnlocked => {}
                 VaultUnlockError::VaultRecoveryInProgress => {}
                 VaultUnlockError::JoinFailure => {}
+                VaultUnlockError::KdfMemoryExceedsHostCapability {
+                    required_mib: _,
+                    available_mib: _,
+                } => {}
             }
         }
         assert_closed(&VaultUnlockError::VaultNotFound);
+    }
+
+    /// The wire shape the TS mirror in `src/types/vault-unlock-error.ts`
+    /// hand-mirrors (phase3-web-client task 31). Both figures are MiB and both
+    /// are public — `required` is read from the unencrypted `vault.meta` KDF
+    /// block, `available` is a property of the client build — so carrying them
+    /// across the boundary lets the UI say which vault, on which client,
+    /// instead of "this vault will not open".
+    #[test]
+    fn kdf_memory_exceeds_host_capability_serializes_with_both_figures() {
+        assert_eq!(
+            serialize(&VaultUnlockError::KdfMemoryExceedsHostCapability {
+                required_mib: 2048,
+                available_mib: 1024,
+            }),
+            r#"{"kind":"KdfMemoryExceedsHostCapability","detail":{"required_mib":2048,"available_mib":1024}}"#
+        );
     }
 
     #[test]

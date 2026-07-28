@@ -2,7 +2,7 @@
 // Mirrors `sync::qr::sync_device_join_qr` (src-tauri/src/plugins/sync/qr.rs).
 // No mock layer — real Tauri command (see src/CLAUDE.md "Tauri command bindings").
 
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../platform/core";
 import i18n from "../i18n";
 
 /** Mirror of Rust `sync::qr::DeviceJoinQr`. */

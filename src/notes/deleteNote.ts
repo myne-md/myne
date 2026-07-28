@@ -12,7 +12,7 @@
 // `<DeleteConfirmModal>` (Task 22 of `notes-sidebar-autosave`) for the
 // canonical UX envelope.
 
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../platform/core";
 import { patchDeletedField } from "../dialect";
 import { noteRead } from "./readNote";
 import { noteUpdate } from "./updateNote";

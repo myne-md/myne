@@ -18,6 +18,7 @@
 // resolution + panel coverage, but cannot know about an entry that was never added.
 
 import type { PanelId } from "../../SettingsModal";
+import { has, type Capability } from "../../../platform/capabilities";
 
 export interface SettingsIndexEntry {
   /** Unique, stable id. Also the `data-setting-anchor` value (Task 4). */
@@ -34,6 +35,22 @@ export interface SettingsIndexEntry {
   /** i18n key resolving to a space/comma-joined synonym string (optional,
    *  translatable). Broadens matching beyond the literal label. */
   keywordsKey?: string;
+  /**
+   * The capability this setting's control needs (phase3-web-client task 96).
+   *
+   * Matching runs against THIS static array rather than the rendered DOM —
+   * panels are not mounted, which is the whole reason the registry exists. That
+   * makes an ungated index actively harmful on a client with absent
+   * capabilities: the search happily finds a setting, navigates to its panel and
+   * scrolls to a `data-setting-anchor` that was never rendered, leaving the user
+   * at a panel with no explanation and no setting.
+   *
+   * Absent ⇒ the setting is unconditional. Present ⇒ the entry is filtered out
+   * where `platform/capabilities.has()` says no, which is the same rule the rail
+   * and the panels already use — one descriptor, three consumers, no third
+   * source of truth.
+   */
+  capability?: Capability;
 }
 
 // Ordered by rail order (account → … → about → ai), and within a panel by the
@@ -76,6 +93,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   // ── Privacy ────────────────────────────────────────────────────────────────
   {
     id: "privacy.screen-capture",
+    capability: "screenCaptureProtection",
     panelId: "privacy",
     titleKey: "settings.privacy.screenCaptureLabel",
     descriptionKey: "settings.privacy.screenCaptureHelperOn",
@@ -109,6 +127,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   },
   {
     id: "privacy.quick-unlock",
+    capability: "biometricQuickUnlock",
     panelId: "privacy",
     testid: "settings.quick-unlock",
     titleKey: "settings.quickUnlock.title",
@@ -233,6 +252,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   },
   {
     id: "editor.spell-check",
+    capability: "spellCheck",
     panelId: "editor",
     testid: "settings.spell-check",
     titleKey: "settings.spell.label",
@@ -241,6 +261,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   },
   {
     id: "editor.spell-languages",
+    capability: "spellCheck",
     panelId: "editor",
     titleKey: "settings.spell.languagesLabel",
     descriptionKey: "settings.spell.languagesHelper",
@@ -344,6 +365,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   // ── Storage ────────────────────────────────────────────────────────────────
   {
     id: "storage.backup",
+    capability: "backup",
     panelId: "storage",
     titleKey: "settings.storage.backupLabel",
     descriptionKey: "settings.storage.backupHelper",
@@ -351,6 +373,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   },
   {
     id: "storage.export",
+    capability: "vaultExport",
     panelId: "storage",
     titleKey: "settings.storage.exportLabel",
     keywordsKey: "settings.search.keywords.export",
@@ -363,12 +386,14 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   },
   {
     id: "storage.location",
+    capability: "nativeSaveAs",
     panelId: "storage",
     titleKey: "settings.storage.locationLabel",
     keywordsKey: "settings.search.keywords.vaultLocation",
   },
   {
     id: "storage.auto-backup",
+    capability: "backup",
     panelId: "storage",
     testid: "settings.auto-backup",
     titleKey: "settings.autoBackup.title",
@@ -377,6 +402,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   },
   {
     id: "storage.clipper",
+    capability: "clipper",
     panelId: "storage",
     testid: "settings.clipper-install",
     titleKey: "settings.clipperInstall.label",
@@ -415,6 +441,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   // ── AI (Labs) ──────────────────────────────────────────────────────────────
   {
     id: "ai.enable",
+    capability: "localAi",
     panelId: "ai",
     titleKey: "settings.ai.enableLabel",
     descriptionKey: "settings.ai.enableHelper",
@@ -422,6 +449,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   },
   {
     id: "ai.models",
+    capability: "localAi",
     panelId: "ai",
     titleKey: "settings.ai.modelsLabel",
     descriptionKey: "settings.ai.modelsHelper",
@@ -429,9 +457,22 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   },
   {
     id: "ai.excluded-folders",
+    capability: "localAi",
     panelId: "ai",
     titleKey: "settings.ai.excludedLabel",
     descriptionKey: "settings.ai.excludedHelper",
     keywordsKey: "settings.search.keywords.aiExcluded",
   },
 ];
+
+/**
+ * The entries this client can actually navigate to.
+ *
+ * Every search path goes through here rather than through
+ * {@link SETTINGS_SEARCH_INDEX} directly — the raw array stays exported because
+ * the drift test needs to see ALL of it, including the entries this platform
+ * hides.
+ */
+export function visibleSettingsIndex(): readonly SettingsIndexEntry[] {
+  return SETTINGS_SEARCH_INDEX.filter((e) => e.capability === undefined || has(e.capability));
+}

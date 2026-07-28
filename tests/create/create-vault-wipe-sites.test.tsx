@@ -33,7 +33,6 @@ vi.mock("@tauri-apps/api/core", () => ({
 }));
 vi.mock("../../src/lib/app-window", () => ({
   HAS_TAURI: true,
-  closeApp: () => Promise.resolve(),
 }));
 vi.mock("@tauri-apps/api/window", () => ({
   getCurrentWindow: () => ({

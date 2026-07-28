@@ -9,7 +9,7 @@
 // No mock layer (per `src/CLAUDE.md`): these call the real IPC commands. Keep the
 // types in lockstep with the Rust `ThemesError` / `ThemeError` serde shapes.
 
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../platform/core";
 import { importReadFile } from "../notes/import/ports";
 import { splitExportPath } from "../notes/exportFlow";
 

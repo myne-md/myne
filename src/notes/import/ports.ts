@@ -23,7 +23,7 @@
 // Resolution is a documented v0.1 heuristic: an ambiguous basename resolves to
 // the first match found in the walk.
 
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../../platform/core";
 import { noteCreate } from "../createNote";
 import { noteList } from "../listNotes";
 import { loadNoteBatch, type TitleRecord } from "../loadNoteBatch";
@@ -46,6 +46,12 @@ import type { ImportSource, ImportSourceId } from "./source";
 import type { RefImporter } from "./media";
 import { joinPath } from "./source";
 import { attachmentImport } from "../../lib/attachments";
+import {
+  importPicked,
+  readPickedText,
+  type PickedTree,
+} from "../../platform/filePicker";
+import type { PickedFile } from "@myne/editor";
 
 /** Rust `ImportDirEntry` wire shape (snake_case `is_dir`). */
 interface RustDirEntry {
@@ -105,6 +111,142 @@ export async function loadExistingIdentity(): Promise<Set<string>> {
   const ids = await noteList();
   const records = await loadNoteBatch(ids);
   return buildExistingIdentitySet(titleRecordsToExistingNotes(records));
+}
+
+// ── the tree-backed arm (phase3-web-client task 71) ──────────────────────────
+//
+// # Why the port is this small
+//
+// The engine was already injected-IO over `ImportPorts`, and the string algebra
+// it uses — `joinPath(root, rel)` — is platform-free. So a client whose picker
+// hands back the WALK instead of a path does not need a different engine, a
+// different adapter, a different media index or a different `mediaCandidatePaths`.
+// It needs the same two functions reading from a Map. Everything above this line
+// is unchanged, and that is the result of the seam, not a coincidence.
+//
+// What does NOT port is the Rust `importer` plugin, and that is the part worth
+// stating: `import_read_dir` / `import_read_file` are a least-privilege READ
+// SEAM (canonicalise + within-root check) that exists because the WebView is
+// denied `fs:allow-read-dir`. A browser has no absolute path, no `canonicalize`
+// and no host to confine to — moving it would relocate a security mechanism to a
+// platform where it protects nothing.
+
+/**
+ * Index a picked tree's entries by the ABSOLUTE-shaped key the walk produces.
+ *
+ * `joinPath(root, rel)` is the same key `readDir`/`readFile` are called with, so
+ * indexing by it is what lets the tree ports answer the engine's existing calls
+ * with no translation layer. Exported for its own test: a key that disagrees with
+ * the walk by one separator makes every read miss and the import silently empty.
+ */
+export function indexTree(tree: PickedTree): Map<string, PickedFile> {
+  const map = new Map<string, PickedFile>();
+  for (const entry of tree.entries ?? []) {
+    map.set(joinPath(tree.root, entry.path), entry.file);
+  }
+  return map;
+}
+
+/**
+ * List one directory's immediate children out of a flat file index.
+ *
+ * A browser hands back FILES only — directories exist in the listing purely as
+ * path prefixes — so this reconstructs them. Names are de-duplicated (many files
+ * share one parent) and a directory shadows a file of the same name, which
+ * cannot happen in a real tree and would otherwise depend on iteration order.
+ */
+export function readDirFromIndex(
+  index: ReadonlyMap<string, PickedFile>,
+  absPath: string,
+): ImportDirEntry[] {
+  const prefix = absPath.endsWith("/") ? absPath : `${absPath}/`;
+  const seen = new Map<string, boolean>();
+  for (const key of index.keys()) {
+    if (!key.startsWith(prefix)) continue;
+    const rest = key.slice(prefix.length);
+    if (rest.length === 0) continue;
+    const cut = rest.indexOf("/");
+    const name = cut === -1 ? rest : rest.slice(0, cut);
+    const isDir = cut !== -1;
+    if (isDir || !seen.has(name)) seen.set(name, isDir || (seen.get(name) ?? false));
+  }
+  return [...seen].map(([name, isDir]) => ({ name, isDir }));
+}
+
+/**
+ * Ports backed by a picked tree the platform already walked.
+ *
+ * `createNote` / `setDeliberateFolders` are shared verbatim with the host-backed
+ * arm — the write half of the importer is identical on every client, and only
+ * the READ half differs. A missing key is a `NotFound`-shaped throw rather than
+ * an empty string, so a walk bug surfaces as a failure instead of as a note that
+ * imported with no content.
+ */
+export function createTreePorts(tree: PickedTree): ImportPorts {
+  const index = indexTree(tree);
+  const host = createImportPorts(tree.root);
+  return {
+    readDir: async (absPath) => readDirFromIndex(index, absPath),
+    readFile: async (absPath) => {
+      const file = index.get(absPath);
+      if (file === undefined) throw new Error("import: no such file in the picked tree");
+      return await readPickedText(file);
+    },
+    createNote: host.createNote,
+    setDeliberateFolders: host.setDeliberateFolders,
+  };
+}
+
+/**
+ * The tree-backed {@link RefImporter}: resolve a media ref inside the picked
+ * tree, then ingest it through the platform's own import route.
+ *
+ * Candidate resolution is `mediaCandidatePaths` UNCHANGED — the same
+ * absolute-and-traversal refusals, the same basename index. That matters for
+ * more than tidiness: those refusals are the TB6 guard against a crafted ref in
+ * untrusted imported content reaching outside the picked root, and a second copy
+ * of them would be a second place to get them wrong. Here a candidate that
+ * escapes simply is not a key in the map, so the guard is belt-and-braces.
+ */
+export function createTreeMediaRefImporter(
+  tree: PickedTree,
+  mediaIndex: ReadonlyMap<string, string>,
+): RefImporter {
+  const index = indexTree(tree);
+  return async (ref) => {
+    for (const path of mediaCandidatePaths(tree.root, mediaIndex, ref.source)) {
+      const file = index.get(path);
+      if (file === undefined) continue;
+      try {
+        const attachment = await importPicked(file);
+        return { ok: true, attachment };
+      } catch {
+        // Oversize / unsupported / refused → try the next candidate; exhausting
+        // them falls through to the omitted tally, exactly as on the host arm.
+      }
+    }
+    return { ok: false };
+  };
+}
+
+/**
+ * The ports for a picked tree, whichever shape the platform produced.
+ *
+ * ONE entry point so a caller never branches on `entries` itself — the branch
+ * exists once, here, and a new caller cannot forget it.
+ */
+export function portsForTree(tree: PickedTree): ImportPorts {
+  return tree.entries === null ? createImportPorts(tree.root) : createTreePorts(tree);
+}
+
+/** The media importer for a picked tree, same one-branch discipline. */
+export function mediaImporterForTree(
+  tree: PickedTree,
+  mediaIndex: ReadonlyMap<string, string>,
+): RefImporter {
+  return tree.entries === null
+    ? createMediaRefImporter(tree.root, mediaIndex)
+    : createTreeMediaRefImporter(tree, mediaIndex);
 }
 
 /** Real ports bound to the picked vault `root`. */
@@ -231,11 +373,12 @@ export interface RunImportOptions {
  * encrypted `.myn` blobs (via `note_create`) + attachment blobs are written.
  */
 export async function runVaultImport(
-  root: string,
+  tree: PickedTree,
   policy: DuplicatePolicy,
   options: RunImportOptions = {},
 ): Promise<ImportResult> {
-  const ports = createImportPorts(root);
+  const root = tree.root;
+  const ports = portsForTree(tree);
   // The two prep steps are independent (one decrypts the destination vault's
   // titles, the other walks the source tree) — overlap them so the "Scanning…"
   // latency is the slower of the two, not their sum.
@@ -243,7 +386,7 @@ export async function runVaultImport(
     loadExistingIdentity(),
     buildMediaIndex(root, ports),
   ]);
-  const importMedia = createMediaRefImporter(root, mediaIndex);
+  const importMedia = mediaImporterForTree(tree, mediaIndex);
   return importVault(root, ports, existingIdentity, policy, {
     onProgress: options.onProgress,
     shouldCancel: options.shouldCancel,
@@ -266,11 +409,12 @@ export async function runVaultImport(
  */
 export async function runSourceImport(
   source: ImportSourceId,
-  root: string,
+  tree: PickedTree,
   policy: DuplicatePolicy,
   options: RunImportOptions = {},
 ): Promise<ImportResult> {
-  const ports = createImportPorts(root);
+  const root = tree.root;
+  const ports = portsForTree(tree);
   const treeShaped = source === "obsidian" || source === "html" || source === "notion";
 
   const [existingIdentity, mediaIndex] = await Promise.all([
@@ -307,7 +451,7 @@ export async function runSourceImport(
   const result = await importFromSource(adapter, ports, existingIdentity, policy, {
     onProgress: options.onProgress,
     shouldCancel: options.shouldCancel,
-    importMedia: treeShaped ? createMediaRefImporter(root, mediaIndex) : undefined,
+    importMedia: treeShaped ? mediaImporterForTree(tree, mediaIndex) : undefined,
   });
 
   // The report is written LAST, after the ingest loop, so it can name every affected

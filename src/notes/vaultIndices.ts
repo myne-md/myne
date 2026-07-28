@@ -7,7 +7,7 @@
 // resolve via the SINGLE resolver (`resolveWikilink.ts`, §5.3) — no
 // second resolver, so chip-vs-panel resolution can never diverge.
 
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../platform/core";
 import { extractBlockAnchors } from "@myne/editor";
 import { foldSegment, normalizeFolderPath } from "../dialect/folderPath";
 import { parse } from "../dialect/parse";

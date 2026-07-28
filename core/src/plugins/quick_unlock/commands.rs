@@ -29,14 +29,18 @@
 //! `items_key`, `wrap_key`, and the PIN are never logged.
 
 use std::path::{Path, PathBuf};
-use std::time::Instant;
 
+use crate::host::HostCtx;
 use protocol::quick_unlock_blob::{
     decode_quick_unlock_blob, encode_quick_unlock_blob, parse_quick_unlock_header,
     PROVIDER_KIND_BIOMETRIC, PROVIDER_KIND_PIN,
 };
 use protocol::{derive_items_key, parse_vault_meta, VaultMeta};
 use serde::Serialize;
+// Tauri types serve only the cfg-gated IPC wrappers (task 79, Option B).
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+use crate::host::tauri_host::TauriHost;
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 use tauri::{AppHandle, Runtime, State};
 use zeroize::Zeroizing;
 
@@ -180,7 +184,7 @@ pub async fn setup_with_dir<P: QuickUnlockProvider + Send + 'static>(
     // offload it to a blocking thread so a heavy KDF never parks an async
     // runtime worker (the `vault_unlock` spawn_blocking discipline).
     let kind = provider.kind();
-    let secret = tokio::task::spawn_blocking(move || provider.create())
+    let secret = crate::task::run_blocking(move || provider.create())
         .await
         .map_err(|_| QuickUnlockError::Backend)??;
 
@@ -247,6 +251,12 @@ pub async fn quick_unlock_with_dir<P: QuickUnlockProvider + Send + 'static>(
     vault_id: VaultId,
     state: &VaultRuntimeState,
     provider: P,
+    // Supplies `UnlockedVault::unlocked_at`. Threaded in with
+    // phase3-web-client task 12, which changed that field from an `Instant` to
+    // a host-supplied monotonic reading — `Instant::now()` panics on
+    // `wasm32-unknown-unknown`. Both production callers already hold a host, so
+    // this costs them nothing.
+    host: &dyn crate::host::HostCtx,
 ) -> Result<(), QuickUnlockError> {
     // Spring-loaded gate (task 9): quick-unlock is permitted only after a full
     // master-password unlock has happened THIS session. A fresh process (app
@@ -291,7 +301,7 @@ pub async fn quick_unlock_with_dir<P: QuickUnlockProvider + Send + 'static>(
     // parks an async runtime worker; the provider is handed back so the
     // failure path below can still call `delete()`.
     let pin_salt = header.pin_salt;
-    let (provider, retrieve_result) = tokio::task::spawn_blocking(move || {
+    let (provider, retrieve_result) = crate::task::run_blocking(move || {
         let r = provider.retrieve(&pin_salt);
         (provider, r)
     })
@@ -313,7 +323,7 @@ pub async fn quick_unlock_with_dir<P: QuickUnlockProvider + Send + 'static>(
                         root_key,
                         items_key,
                         items_key_id: meta.items_key_id,
-                        unlocked_at: Instant::now(),
+                        unlocked_at: host.monotonic_millis(),
                         vault_meta_bytes_hash,
                     },
                 )
@@ -354,11 +364,11 @@ fn map_pin_validation(e: PinValidationError) -> QuickUnlockError {
     }
 }
 
-pub async fn active_dir<R: Runtime>(
-    app: &AppHandle<R>,
+pub async fn active_dir(
+    host: &dyn HostCtx,
     state: &VaultRuntimeState,
 ) -> Result<PathBuf, QuickUnlockError> {
-    crate::paths::active_vault_root_io(app, state.active_vault_id().await)
+    crate::paths::active_vault_root_io_from_host(host, state.active_vault_id().await)
         .map_err(|_| QuickUnlockError::InvalidVaultMeta)
 }
 
@@ -374,35 +384,62 @@ pub async fn active_dir<R: Runtime>(
 /// targets, so it threads that id here and we resolve `<app_data_dir>/vaults/<id>/`
 /// directly (non-creating). When no id is named (the Settings panel, where a
 /// vault IS unlocked) we keep the active-vault path.
-pub async fn target_dir<R: Runtime>(
-    app: &AppHandle<R>,
+pub async fn target_dir(
+    host: &dyn HostCtx,
     state: &VaultRuntimeState,
     vault_id: Option<&str>,
 ) -> Result<PathBuf, QuickUnlockError> {
     match VaultId::parse_optional(vault_id) {
-        Some(id) => {
-            crate::paths::vault_root_for_id(app, id).map_err(|_| QuickUnlockError::InvalidVaultMeta)
-        }
-        None => active_dir(app, state).await,
+        Some(id) => crate::paths::vault_root_for_id_from_host(host, id)
+            .map_err(|_| QuickUnlockError::InvalidVaultMeta),
+        None => active_dir(host, state).await,
     }
 }
 
 /// Configure PIN quick-unlock for the active (Unlocked) vault.
+pub async fn quick_unlock_setup_pin_from_host(
+    pin: String,
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+) -> Result<(), QuickUnlockError> {
+    let pin = Zeroizing::new(pin);
+    validate_pin(&pin).map_err(map_pin_validation)?;
+    let dir = active_dir(host, state).await?;
+    let (_, meta) = read_meta(&dir)?;
+    let provider = PinProvider::new(pin, meta.account_number_hash, meta.kdf_params);
+    setup_with_dir(&dir, state, provider, &meta.account_number_hash).await
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn quick_unlock_setup_pin<R: Runtime>(
     pin: String,
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
 ) -> Result<(), QuickUnlockError> {
-    let pin = Zeroizing::new(pin);
-    validate_pin(&pin).map_err(map_pin_validation)?;
-    let dir = active_dir(&app, &state).await?;
-    let (_, meta) = read_meta(&dir)?;
-    let provider = PinProvider::new(pin, meta.account_number_hash, meta.kdf_params);
-    setup_with_dir(&dir, &state, provider, &meta.account_number_hash).await
+    quick_unlock_setup_pin_from_host(pin, &TauriHost::new(app), state.inner()).await
 }
 
 /// Attempt a PIN quick-unlock of the active vault.
+pub async fn quick_unlock_with_pin_from_host(
+    pin: String,
+    vault_id: Option<String>,
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+) -> Result<(), QuickUnlockError> {
+    let pin = Zeroizing::new(pin);
+    let dir = target_dir(host, state, vault_id.as_deref()).await?;
+    let (_, meta) = read_meta(&dir)?;
+    let id = crate::paths::vault_id_from_root(&dir);
+    let provider = PinProvider::new(pin, meta.account_number_hash, meta.kdf_params);
+    quick_unlock_with_dir(&dir, id, state, provider, host).await
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn quick_unlock_with_pin<R: Runtime>(
     pin: String,
@@ -410,12 +447,7 @@ pub async fn quick_unlock_with_pin<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
 ) -> Result<(), QuickUnlockError> {
-    let pin = Zeroizing::new(pin);
-    let dir = target_dir(&app, &state, vault_id.as_deref()).await?;
-    let (_, meta) = read_meta(&dir)?;
-    let id = crate::paths::vault_id_from_root(&dir);
-    let provider = PinProvider::new(pin, meta.account_number_hash, meta.kdf_params);
-    quick_unlock_with_dir(&dir, id, &state, provider).await
+    quick_unlock_with_pin_from_host(pin, vault_id, &TauriHost::new(app), state.inner()).await
 }
 
 /// Configure Apple biometric quick-unlock (macOS Touch ID / iOS Face ID or
@@ -424,56 +456,76 @@ pub async fn quick_unlock_with_pin<R: Runtime>(
 /// ⚠️ The Apple provider's biometric gating is UNVERIFIED pending biometric
 /// hardware + a primitive review (see `apple.rs`). Returns
 /// `HardwareUnavailable` off Apple targets.
+pub async fn quick_unlock_setup_biometric_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+) -> Result<(), QuickUnlockError> {
+    #[cfg(any(target_os = "macos", target_os = "ios"))]
+    {
+        let dir = active_dir(host, state).await?;
+        let (_, meta) = read_meta(&dir)?;
+        let provider = super::apple::AppleBiometricProvider::new(meta.account_number_hash);
+        setup_with_dir(&dir, state, provider, &meta.account_number_hash).await
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "ios")))]
+    {
+        let _ = (host, &state);
+        Err(QuickUnlockError::HardwareUnavailable)
+    }
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn quick_unlock_setup_biometric<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
 ) -> Result<(), QuickUnlockError> {
-    #[cfg(any(target_os = "macos", target_os = "ios"))]
-    {
-        let dir = active_dir(&app, &state).await?;
-        let (_, meta) = read_meta(&dir)?;
-        let provider = super::apple::AppleBiometricProvider::new(meta.account_number_hash);
-        setup_with_dir(&dir, &state, provider, &meta.account_number_hash).await
-    }
-    #[cfg(not(any(target_os = "macos", target_os = "ios")))]
-    {
-        let _ = (&app, &state);
-        Err(QuickUnlockError::HardwareUnavailable)
-    }
+    quick_unlock_setup_biometric_from_host(&TauriHost::new(app), state.inner()).await
 }
 
 /// Attempt an Apple biometric quick-unlock of the active vault. (See the setup
 /// command's verification caveat.)
+pub async fn quick_unlock_with_biometric_from_host(
+    vault_id: Option<String>,
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+) -> Result<(), QuickUnlockError> {
+    #[cfg(any(target_os = "macos", target_os = "ios"))]
+    {
+        let dir = target_dir(host, state, vault_id.as_deref()).await?;
+        let (_, meta) = read_meta(&dir)?;
+        let id = crate::paths::vault_id_from_root(&dir);
+        let provider = super::apple::AppleBiometricProvider::new(meta.account_number_hash);
+        quick_unlock_with_dir(&dir, id, state, provider, host).await
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "ios")))]
+    {
+        let _ = (host, &state, &vault_id);
+        Err(QuickUnlockError::HardwareUnavailable)
+    }
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn quick_unlock_with_biometric<R: Runtime>(
     vault_id: Option<String>,
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
 ) -> Result<(), QuickUnlockError> {
-    #[cfg(any(target_os = "macos", target_os = "ios"))]
-    {
-        let dir = target_dir(&app, &state, vault_id.as_deref()).await?;
-        let (_, meta) = read_meta(&dir)?;
-        let id = crate::paths::vault_id_from_root(&dir);
-        let provider = super::apple::AppleBiometricProvider::new(meta.account_number_hash);
-        quick_unlock_with_dir(&dir, id, &state, provider).await
-    }
-    #[cfg(not(any(target_os = "macos", target_os = "ios")))]
-    {
-        let _ = (&app, &state, &vault_id);
-        Err(QuickUnlockError::HardwareUnavailable)
-    }
+    quick_unlock_with_biometric_from_host(vault_id, &TauriHost::new(app), state.inner()).await
 }
 
 /// Report quick-unlock status for the active vault.
-#[tauri::command]
-pub async fn quick_unlock_status<R: Runtime>(
+pub async fn quick_unlock_status_from_host(
     vault_id: Option<String>,
-    app: AppHandle<R>,
-    state: State<'_, VaultRuntimeState>,
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
 ) -> Result<QuickUnlockStatus, QuickUnlockError> {
-    let dir = target_dir(&app, &state, vault_id.as_deref()).await?;
+    let dir = target_dir(host, state, vault_id.as_deref()).await?;
     let mut status = status_with_dir(&dir);
     // Layer the spring-loaded session gate on: a cold start (no full unlock yet)
     // reports `available: false` so the Unlock screen hides the PIN field rather
@@ -483,16 +535,38 @@ pub async fn quick_unlock_status<R: Runtime>(
     Ok(status)
 }
 
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn quick_unlock_status<R: Runtime>(
+    vault_id: Option<String>,
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+) -> Result<QuickUnlockStatus, QuickUnlockError> {
+    quick_unlock_status_from_host(vault_id, &TauriHost::new(app), state.inner()).await
+}
+
 /// Disable quick-unlock for the active vault (device-local files + the
 /// Apple-Keychain item, if any).
+pub async fn quick_unlock_disable_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+) -> Result<(), QuickUnlockError> {
+    let dir = active_dir(host, state).await?;
+    cleanup_os_credential(&dir);
+    disable_with_dir(&dir)
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn quick_unlock_disable<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
 ) -> Result<(), QuickUnlockError> {
-    let dir = active_dir(&app, &state).await?;
-    cleanup_os_credential(&dir);
-    disable_with_dir(&dir)
+    quick_unlock_disable_from_host(&TauriHost::new(app), state.inner()).await
 }
 
 #[cfg(test)]
@@ -550,6 +624,8 @@ mod tests {
     }
 
     async fn seed_unlocked(state: &VaultRuntimeState, dir: &Path) {
+        // Test fixture: the origin is unspecified by contract, so a literal is
+        // as valid as a reading — and no test asserts on it.
         let vault_id = crate::paths::vault_id_from_root(dir);
         state
             .set_unlocked(
@@ -558,7 +634,7 @@ mod tests {
                     root_key: Zeroizing::new(ROOT_KEY),
                     items_key: Zeroizing::new(ITEMS_KEY),
                     items_key_id: [0x07u8; 16],
-                    unlocked_at: Instant::now(),
+                    unlocked_at: 0,
                     vault_meta_bytes_hash: [0u8; 32],
                 },
             )
@@ -588,9 +664,15 @@ mod tests {
         let fresh = unlocked_state();
         fresh.mark_full_unlock_done();
         let vault_id = crate::paths::vault_id_from_root(dir);
-        quick_unlock_with_dir(dir, vault_id, &fresh, provider.clone())
-            .await
-            .expect("quick unlock");
+        quick_unlock_with_dir(
+            dir,
+            vault_id,
+            &fresh,
+            provider.clone(),
+            &crate::host::NoopHost,
+        )
+        .await
+        .expect("quick unlock");
         // The slot is now Unlocked and carries the round-tripped items_key.
         let material = fresh
             .peek_unlocked_root_key_clone()
@@ -621,9 +703,10 @@ mod tests {
         fresh.mark_full_unlock_done();
         let vault_id = crate::paths::vault_id_from_root(dir);
         for expected_remaining in [4, 3, 2, 1] {
-            let err = quick_unlock_with_dir(dir, vault_id, &fresh, bad.clone())
-                .await
-                .unwrap_err();
+            let err =
+                quick_unlock_with_dir(dir, vault_id, &fresh, bad.clone(), &crate::host::NoopHost)
+                    .await
+                    .unwrap_err();
             assert_eq!(
                 err,
                 QuickUnlockError::WrongCredential {
@@ -632,7 +715,7 @@ mod tests {
             );
         }
         // 5th failure wipes the credential.
-        let err = quick_unlock_with_dir(dir, vault_id, &fresh, bad.clone())
+        let err = quick_unlock_with_dir(dir, vault_id, &fresh, bad.clone(), &crate::host::NoopHost)
             .await
             .unwrap_err();
         assert_eq!(err, QuickUnlockError::AttemptsExhausted);
@@ -666,9 +749,15 @@ mod tests {
         let vault_id = crate::paths::vault_id_from_root(dir);
         // Cancel many times — never wipes, never counts.
         for _ in 0..10 {
-            let err = quick_unlock_with_dir(dir, vault_id, &fresh, cancelling.clone())
-                .await
-                .unwrap_err();
+            let err = quick_unlock_with_dir(
+                dir,
+                vault_id,
+                &fresh,
+                cancelling.clone(),
+                &crate::host::NoopHost,
+            )
+            .await
+            .unwrap_err();
             assert_eq!(err, QuickUnlockError::Cancelled);
         }
         assert!(blob_path(dir).exists());
@@ -687,9 +776,15 @@ mod tests {
         let vault_id = crate::paths::vault_id_from_root(dir);
         let provider = MockProvider::new(PROVIDER_KIND_PIN, 0x11);
         assert_eq!(
-            quick_unlock_with_dir(dir, vault_id, &fresh, provider.clone())
-                .await
-                .unwrap_err(),
+            quick_unlock_with_dir(
+                dir,
+                vault_id,
+                &fresh,
+                provider.clone(),
+                &crate::host::NoopHost
+            )
+            .await
+            .unwrap_err(),
             QuickUnlockError::NotConfigured
         );
         assert!(!status_with_dir(dir).configured);
@@ -753,9 +848,15 @@ mod tests {
         let restarted = unlocked_state();
         let vault_id = crate::paths::vault_id_from_root(dir);
         assert_eq!(
-            quick_unlock_with_dir(dir, vault_id, &restarted, provider.clone())
-                .await
-                .unwrap_err(),
+            quick_unlock_with_dir(
+                dir,
+                vault_id,
+                &restarted,
+                provider.clone(),
+                &crate::host::NoopHost
+            )
+            .await
+            .unwrap_err(),
             QuickUnlockError::RequiresFullPassword
         );
         // The credential is NOT wiped by the gate (a restart must not destroy it).
@@ -763,9 +864,15 @@ mod tests {
 
         // After one full-password unlock this session, quick-unlock works.
         restarted.mark_full_unlock_done();
-        quick_unlock_with_dir(dir, vault_id, &restarted, provider.clone())
-            .await
-            .expect("quick unlock after full unlock");
+        quick_unlock_with_dir(
+            dir,
+            vault_id,
+            &restarted,
+            provider.clone(),
+            &crate::host::NoopHost,
+        )
+        .await
+        .expect("quick unlock after full unlock");
     }
 
     #[test]

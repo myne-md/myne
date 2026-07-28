@@ -13,8 +13,20 @@
 //      `foo_other` / … exists). Catches a `t()` added without running
 //      `pnpm i18n:extract`.
 //
-// Load-bearing copy is intentionally NOT in the catalog (it renders from
-// constants), so it is out of scope here.
+//   3. NO LOAD-BEARING LITERAL appears as a value in ANY locale file
+//      (phase3-web-client task 98). These strings render from constants, in
+//      every locale, because their exact wording IS a privacy or security
+//      property — a non-distinguishing failure message that gains a second
+//      variant leaks which half of a credential pair was wrong; an egress
+//      sentence that gets softened stops being a disclosure.
+//
+//      The failure this catches is not a bad translation, it is a *good* one:
+//      an implementer told to "add i18n keys for the pending-approval wait"
+//      does exactly that, the key ships, 24 locales fill it, and the byte
+//      identity `@myne/copy` exists to guarantee is gone — silently, with the
+//      English still matching, and nothing else in the repo noticing. So the
+//      check is on the VALUES, and it runs over every locale rather than just
+//      English, because the drift starts in the translated ones.
 //
 // Exits non-zero with actionable guidance on any failure.
 
@@ -100,8 +112,72 @@ if (missing.length) {
   );
 }
 
+// --- 3. load-bearing literals must not enter any catalog ---------------------
+//
+// Sourced from `copy/src/index.ts` and `src/lib/load-bearing-copy.ts` by reading
+// their exported string literals, rather than from a hand-kept list here: a list
+// would be one more thing to update, and the one time it was not updated is
+// exactly when a new literal quietly became translatable.
+function exportedLiterals(file) {
+  const txt = readFileSync(file, "utf8");
+  const out = [];
+  // `export const NAME =` followed by one or more adjacent string literals
+  // (prettier wraps long copy across lines as `"…" +\n  "…"`).
+  const re = /export const ([A-Z0-9_]+)\s*=\s*((?:\s*"(?:[^"\\]|\\.)*"\s*\+?)+);/g;
+  let m;
+  while ((m = re.exec(txt)) !== null) {
+    const joined = [...m[2].matchAll(/"((?:[^"\\]|\\.)*)"/g)]
+      .map((s) => s[1])
+      .join("");
+    // Short constants are keys or labels, not prose; requiring some length
+    // keeps the check from flagging an ordinary word that coincides.
+    if (joined.length >= 24) out.push({ name: m[1], value: joined });
+  }
+  return out;
+}
+
+const literals = [
+  ...exportedLiterals(join(REPO, "copy/src/index.ts")),
+  ...exportedLiterals(join(REPO, "src/lib/load-bearing-copy.ts")),
+];
+
+function everyValue(node, acc = []) {
+  if (typeof node === "string") acc.push(node);
+  else if (node && typeof node === "object") for (const v of Object.values(node)) everyValue(v, acc);
+  return acc;
+}
+
+const localesDir = join(REPO, "locales");
+const leaked = [];
+for (const lang of readdirSync(localesDir)) {
+  const catalog = join(localesDir, lang, "common.json");
+  let parsed;
+  try {
+    parsed = JSON.parse(readFileSync(catalog, "utf8"));
+  } catch {
+    continue; // not a catalog dir, or a locale mid-edit — the other checks own that
+  }
+  const values = new Set(everyValue(parsed).map((v) => v.replace(/\s+/g, " ").trim()));
+  for (const lit of literals) {
+    if (values.has(lit.value.replace(/\s+/g, " ").trim())) {
+      leaked.push(`${lang}: ${lit.name}`);
+    }
+  }
+}
+if (leaked.length) {
+  problems.push(
+    `  ${leaked.length} LOAD-BEARING literal(s) present as a catalog value:\n` +
+      leaked.slice(0, 40).map((k) => `    ✗ ${k}`).join("\n") +
+      `\n  → these render from their constant in EVERY locale. Their exact wording is` +
+      `\n    the property (a non-distinguishing message that gains a second variant` +
+      `\n    leaks; an egress sentence that gets softened stops disclosing). Delete the` +
+      `\n    key and render the constant instead.`,
+  );
+}
+
 if (problems.length) fail(problems.join("\n\n"));
 
 console.log(
-  `✓ i18n: ${used.size} keys used, none missing; no empty English values.`,
+  `✓ i18n: ${used.size} keys used, none missing; no empty English values; ` +
+    `${literals.length} load-bearing literal(s) absent from all catalogs.`,
 );

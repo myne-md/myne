@@ -22,17 +22,16 @@ import {
   StateField,
 } from "@codemirror/state";
 import { EditorView, ViewPlugin } from "@codemirror/view";
-import { invoke } from "@tauri-apps/api/core";
+import { getHost } from "../host";
+import { extractAttachmentIds } from "../host/notes/attachmentRef";
 
-/** One catalog row — the subset the editor render path needs. Mirrors the Rust
- *  `CatalogEntry` (`src-tauri/src/plugins/attachments/commands.rs`); hand-kept
- *  in lockstep per the no-codegen note in `src/CLAUDE.md`. */
-export interface CatalogRow {
-  readonly id: string;
-  readonly contentType: string;
-  readonly filename: string;
-  readonly size: number;
-}
+/** One catalog row — the subset the editor render path needs.
+ *
+ * Moved to the host seam with phase3-web-client task 76: the host now shapes
+ * the rows, so the type belongs to the contract rather than to this consumer.
+ * Re-exported unchanged so every existing importer of `./catalog` still works. */
+export type { CatalogRow } from "../host";
+import type { CatalogRow } from "../host";
 
 /** The catalog as resolved into editor state: `null` until the IPC load
  *  resolves (loading), then a `Map<id, row>` (possibly empty). */
@@ -76,15 +75,6 @@ export function addCatalogRows(
   view.dispatch({ effects: setCatalog.of(next) });
 }
 
-/** The raw IPC shape from `plugin:attachments|catalog_list`. */
-interface RawCatalogEntry {
-  id: string;
-  content_type: string;
-  created_at: number;
-  filename: string;
-  size: number;
-}
-
 /**
  * Fetch the catalog over IPC and shape it into an id→row map. Swallows any IPC
  * failure into an empty map (the read is `Slot::Unlocked`-gated host-side and
@@ -96,16 +86,9 @@ type CatalogLoader = () => Promise<ReadonlyMap<string, CatalogRow>>;
 
 let loadCatalog: CatalogLoader = async () => {
   try {
-    const rows = await invoke<RawCatalogEntry[]>("plugin:attachments|catalog_list");
+    const rows = await getHost().attachments.catalogList();
     const map = new Map<string, CatalogRow>();
-    for (const r of rows) {
-      map.set(r.id, {
-        id: r.id,
-        contentType: r.content_type,
-        filename: r.filename,
-        size: r.size,
-      });
-    }
+    for (const r of rows) map.set(r.id, r);
     return map;
   } catch {
     return new Map();
@@ -136,7 +119,39 @@ const catalogLoaderPlugin = ViewPlugin.fromClass(
         if (this.destroyed) return;
         view.dispatch({ effects: setCatalog.of(map) });
       });
+      // Ask the host to make this DOCUMENT's attachment refs resolvable
+      // (phase3-web-client task 44). Desktop omits `warmRefs` and this is a
+      // no-op; a browser decrypts those attachments and mints their object URLs,
+      // because its `resolveRef` cannot do IO inside a render.
+      //
+      // Scoped to the ids the open note actually embeds, NOT the whole catalog:
+      // warming the catalog would decrypt every attachment in the vault on every
+      // note open, which for an attachment-heavy vault is gigabytes to answer a
+      // question about one note.
+      void this.warm(view);
     }
+
+    /** Warm the doc's refs, then repaint so the resolved URLs are picked up. */
+    private async warm(view: EditorView): Promise<void> {
+      const warmRefs = getHost().attachments.warmRefs;
+      if (warmRefs === undefined) return;
+      const ids = extractAttachmentIds(view.state.doc.toString());
+      if (ids.length === 0) return;
+      try {
+        await warmRefs(ids);
+      } catch {
+        // Best-effort: a host that cannot warm leaves the refs unresolved, which
+        // its `resolveRef` already has an answer for.
+        return;
+      }
+      if (this.destroyed) return;
+      // The decorations were built against the pre-warm answers, so they have to
+      // be rebuilt — dispatching the catalog we already hold is the cheapest
+      // repaint that invalidates them without touching the document.
+      const current = view.state.field(catalogField, false);
+      if (current != null) view.dispatch({ effects: setCatalog.of(current) });
+    }
+
     destroy() {
       this.destroyed = true;
     }

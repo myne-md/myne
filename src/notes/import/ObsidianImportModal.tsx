@@ -28,7 +28,11 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
-import { open as openDialog } from "@tauri-apps/plugin-dialog";
+import {
+  pickDirectory,
+  pickFileAsTree,
+  type PickedTree,
+} from "../../platform/filePicker";
 import { useFocusTrap } from "../../hooks/useFocusTrap";
 import { Button } from "../../components/primitives/Button";
 import { Icon } from "../../components/primitives/Icon";
@@ -131,7 +135,12 @@ export function ObsidianImportModal({
   // Trap + restore focus while open (MYND-93).
   useFocusTrap(dialogRef, { enabled: open });
   const [phase, setPhase] = useState<Phase>(initialSource === undefined ? "pick" : "setup");
-  const [folder, setFolder] = useState<string | null>(null);
+  // The picked source, as the ONE type both pick shapes and both platforms
+  // produce (phase3-web-client task 71). It used to be the path string
+  // `dialog.open` returns — which a browser never gives, so the flow was
+  // structurally desktop-only. `PickedTree` carries the root for display plus,
+  // where the platform walked it, the entries themselves.
+  const [folder, setFolder] = useState<PickedTree | null>(null);
   const [policy, setPolicy] = useState<DuplicatePolicy>(DEFAULT_DUPLICATE_POLICY);
   const [progress, setProgress] = useState<{ done: number; total: number }>({
     done: 0,
@@ -194,16 +203,19 @@ export function ObsidianImportModal({
 
   const chooseFolder = useCallback(async () => {
     try {
-      const picked = await openDialog({
-        // Evernote and CSV are SINGLE-FILE sources; the rest are directory trees.
-        directory: spec.pick === "directory",
-        multiple: false,
-        ...(spec.pick === "file" && spec.filter !== undefined
-          ? { filters: [{ name: spec.filter.name, extensions: [...spec.filter.extensions] }] }
-          : {}),
-        title: t(spec.pickerTitleKey),
-      });
-      if (typeof picked === "string") setFolder(picked);
+      // Evernote and CSV are SINGLE-FILE sources; the rest are directory trees.
+      const picked =
+        spec.pick === "directory"
+          ? await pickDirectory()
+          : await pickFileAsTree(
+              spec.filter !== undefined
+                ? {
+                    extensions: [...spec.filter.extensions],
+                    filterLabel: spec.filter.name,
+                  }
+                : undefined,
+            );
+      if (picked !== null) setFolder(picked);
     } catch {
       // Picker failure (cancel / unavailable) → leave the prior selection.
     }
@@ -359,7 +371,9 @@ function SetupBody({
   /** Back to the picker. Absent when a caller named the source, since there is
    *  nothing to go back to. */
   onBack?: (() => void) | undefined;
-  folder: string | null;
+  /** The picked source tree, or `null` before a pick. Only `root` is rendered —
+   *  the entries, where the platform supplies them, are the importer's business. */
+  folder: PickedTree | null;
   policy: DuplicatePolicy;
   onChooseFolder: () => void;
   onPolicyChange: (p: DuplicatePolicy) => void;
@@ -483,7 +497,7 @@ function SetupBody({
                 textOverflow: "ellipsis",
               }}
             >
-              {folder ?? t("notes.import.modal.noFolderChosen")}
+              {folder?.root ?? t("notes.import.modal.noFolderChosen")}
             </code>
             <Button
               variant="secondary"

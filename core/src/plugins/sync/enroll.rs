@@ -30,9 +30,17 @@
 //! `FakeTransport` in tests). cbind is empty over loopback http; the live
 //! `-PLUS` exporter feed is the R3-pending wiring (mirrors the SCRAM client).
 
+use super::devices::SyncDeviceError;
+use super::token_store::TokenStore as _;
 use super::transport::{HttpMethod, SyncTransport, TransportError};
+use protocol::{
+    aad_password_wrap, aad_recovery_wrap, aead_open_ctx, derive_password_wrap_key,
+    derive_recovery_wrap_key_from_normalized, derive_subkey, normalize_user_phrase,
+    parse_account_number, parse_vault_meta, validate_kdf_params, SubkeyRole, AEAD_KEY_LEN,
+};
 use protocol::{scram_client_final_message, scram_client_proof, SCRAM_CBIND_NAME};
 use serde::{Deserialize, Serialize};
+use zeroize::Zeroizing;
 
 /// RFC 9266 TLS keying-material exporter label — FROZEN, must match the Go server's
 /// `scram.ExporterLabel` byte-for-byte, or the channel binding diverges and every
@@ -328,6 +336,168 @@ pub fn enroll(
 }
 
 #[cfg(test)]
+mod bootstrap_meta_tests {
+    //! The idempotence half of task 85, tested without a server.
+    //!
+    //! `join_account_from_host` is a network fetch, then this, then an unlock
+    //! and a SCRAM handshake. Everything ELSE needs a live server; this does
+    //! not — and this is where the three acceptance criteria about re-running
+    //! actually live, so it is where they get asserted rather than argued.
+
+    use super::write_bootstrap_meta;
+    use crate::plugins::sync::devices::SyncDeviceError;
+    use crate::plugins::vault_creation::commands::{build_and_serialize_vault_meta, build_session};
+    use crate::test_support::{ScopedTempDir, FAST_TEST_KDF};
+    use crate::vault_io::{StdVaultIo, VaultIo};
+    use protocol::parse_vault_meta;
+
+    const IO: StdVaultIo = StdVaultIo;
+
+    fn rt() -> tokio::runtime::Runtime {
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+    }
+
+    /// A real `vault.meta` and the `account_number_hash` it binds.
+    fn a_meta(password: &str) -> (Vec<u8>, [u8; 16]) {
+        let session = build_session(crate::vault_id::VaultId::mint(), password, FAST_TEST_KDF)
+            .expect("build_session");
+        let bytes = build_and_serialize_vault_meta(&session).expect("serialize vault.meta");
+        let hash = parse_vault_meta(&bytes).expect("parse").account_number_hash;
+        (bytes.to_vec(), hash)
+    }
+
+    #[test]
+    fn a_first_run_writes_the_fetched_meta_byte_for_byte() {
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("join-first-run").unwrap();
+            let path = tmp.path().join("vault.meta");
+            let (bytes, hash) = a_meta("CanaryPass-9-animals!");
+
+            write_bootstrap_meta(&IO, &path, &bytes, &hash)
+                .await
+                .expect("first run writes");
+
+            // Byte-identical to what the server sent — the criterion says
+            // byte-identical, so this compares BYTES rather than re-parsing and
+            // comparing fields, which would pass on a re-serialisation.
+            assert_eq!(IO.read(&path).await.unwrap(), bytes);
+            // And the KDF parameters are readable from it, which is what makes
+            // "never hardcoded" checkable at all.
+            let parsed = parse_vault_meta(&bytes).unwrap();
+            assert_eq!(parsed.kdf_params, FAST_TEST_KDF);
+        });
+    }
+
+    #[test]
+    fn a_re_run_for_the_same_account_succeeds_and_leaves_the_local_meta_untouched() {
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("join-rerun").unwrap();
+            let path = tmp.path().join("vault.meta");
+            let (bytes, hash) = a_meta("CanaryPass-9-animals!");
+            write_bootstrap_meta(&IO, &path, &bytes, &hash)
+                .await
+                .unwrap();
+
+            // The server's copy has moved on — a password change on another
+            // device rewrites `vault.meta`, so this is an ordinary situation and
+            // NOT a signal to overwrite. The local copy may be the newer of the
+            // two; the sync meta phase reconciles them.
+            let (newer_server_bytes, _) = a_meta("AnotherPass-9-animals!");
+            let mut server_bytes = newer_server_bytes;
+            server_bytes[6..22].copy_from_slice(&hash); // same account, new wraps
+
+            write_bootstrap_meta(&IO, &path, &server_bytes, &hash)
+                .await
+                .expect("a second run must re-authenticate, not fail");
+
+            assert_eq!(
+                IO.read(&path).await.unwrap(),
+                bytes,
+                "the local meta must survive a re-run untouched"
+            );
+        });
+    }
+
+    #[test]
+    fn a_container_holding_a_different_account_is_refused_with_its_own_error() {
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("join-mismatch").unwrap();
+            let path = tmp.path().join("vault.meta");
+            let (mine, my_hash) = a_meta("CanaryPass-9-animals!");
+            write_bootstrap_meta(&IO, &path, &mine, &my_hash)
+                .await
+                .unwrap();
+
+            // Someone else's account, fetched into the same browser container.
+            let (theirs, _) = a_meta("TheirPass-9-animals!");
+            let their_hash = [0x5au8; 16];
+
+            let err = write_bootstrap_meta(&IO, &path, &theirs, &their_hash)
+                .await
+                .expect_err("a different account must be refused");
+            // Its OWN variant, not `BadRequest`: nothing the user retypes fixes
+            // this, so copy that says "check your password" would send them
+            // round a loop with no exit.
+            assert_eq!(err, SyncDeviceError::AccountMismatch);
+            assert_eq!(
+                IO.read(&path).await.unwrap(),
+                mine,
+                "a refused join must not have touched the resident vault"
+            );
+        });
+    }
+
+    /// The loop this arm exists to break. Boot routing sends a web `Corrupted`
+    /// straight back here (`initialStageFromProbe`, task 85), because on a client
+    /// whose vault lives on the server a corrupt local container is a
+    /// re-bootstrap rather than data loss. A bootstrap that refused to replace
+    /// unparseable rubble would return the user to the screen that sent them,
+    /// forever — which is exactly the dead end task 22's fourth criterion names.
+    #[test]
+    fn an_unparseable_local_meta_is_replaced_rather_than_refused() {
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("join-rubble").unwrap();
+            let path = tmp.path().join("vault.meta");
+            IO.write(&path, b"neither buffer verified", Default::default())
+                .await
+                .unwrap();
+            let (server_bytes, hash) = a_meta("CanaryPass-9-animals!");
+
+            write_bootstrap_meta(&IO, &path, &server_bytes, &hash)
+                .await
+                .expect("rubble must not dead-end the bootstrap");
+
+            assert_eq!(
+                IO.read(&path).await.unwrap(),
+                server_bytes,
+                "the server's meta must have replaced the unparseable local one"
+            );
+        });
+    }
+
+    #[test]
+    fn a_genuine_write_failure_is_not_mistaken_for_an_existing_container() {
+        rt().block_on(async {
+            // No parent directory: the write fails and NOTHING is there, which
+            // is the case the `exists` probe exists to separate from "already
+            // bootstrapped". Reporting `AccountMismatch` here would tell the
+            // user to erase a container that does not exist.
+            let tmp = ScopedTempDir::new("join-io-fail").unwrap();
+            let path = tmp.path().join("missing-dir").join("vault.meta");
+            let (bytes, hash) = a_meta("CanaryPass-9-animals!");
+
+            let err = write_bootstrap_meta(&IO, &path, &bytes, &hash)
+                .await
+                .expect_err("an unwritable path must fail");
+            assert_eq!(err, SyncDeviceError::Internal);
+        });
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use crate::plugins::sync::transport::FakeTransport;
@@ -512,4 +682,720 @@ mod tests {
             "init username must be the account-hash hex: {body}"
         );
     }
+}
+
+/// Which credential the enrolling device proves account ownership with.
+#[derive(Debug, Clone, Copy, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum EnrollCredential {
+    Password,
+    Recovery,
+}
+
+/// What the blocking enrollment/join closure hands back: `(approved, device_id_hex)`.
+/// Named rather than written inline so the `spawn_blocking` signature stays under
+/// rustfmt's width — spelling the tuple out re-indents both closure bodies.
+/// `(approved, device_id_hex, token_to_store, vault_dir)`.
+///
+/// The last two exist because the token WRITE left the blocking closure with
+/// phase3-web-client task 86: `TokenStore` is async now (a browser-backed store
+/// has no synchronous implementation), so the closure hands the token out and the
+/// async caller persists it. The network work — the handshake and the `vault.meta`
+/// seed, both of which need the moved-in `transport` — stays on the pool.
+pub(crate) type EnrollmentOutcome = (bool, String, Option<Vec<u8>>, std::path::PathBuf);
+
+/// Outcome of an enrollment attempt surfaced to the UI.
+#[derive(Debug, Clone, Serialize)]
+pub struct EnrollResult {
+    /// True when the device was approved + a token issued (false = pending approval).
+    pub approved: bool,
+    /// The freshly generated `device_id` (hex) this enrollment registered
+    /// (MYND-548) — the create returns the id it minted. The caller needs it to
+    /// name THIS device once its first authed cycle has run, and has no other way
+    /// to learn it: a PENDING device holds no token, so it cannot read the roster
+    /// to discover which row is itself. Not a secret — this is the VV actor
+    /// identifier, deliberately distinct from the revocable per-device token
+    /// (`sync-protocol.md` §4).
+    pub device_id_hex: String,
+}
+
+// ── the enrolment FLOW, lifted out of the host-gated `commands.rs` ──────────
+//
+// phase3-web-client task 84. Everything above is the SCRAM wire — pure over a
+// transport, and already target-independent. What was not was the flow around
+// it: resolving the vault dir, reading the endpoint config, deriving
+// `root_key` from the credential, and persisting the identity + token
+// afterwards. None of that was host-shaped either; it merely lived behind an
+// `AppHandle`.
+
+/// Enroll this device against the configured server using {account# + credential}.
+///
+/// **The first extracted core that carries key material across the seam**
+/// (phase3-web-client task 84), and the discipline is unchanged rather than
+/// re-derived: `credential` is wrapped in `Zeroizing` on the first non-doc
+/// statement, moves into the blocking closure, and dies with it; `root_key` and
+/// the derived `ServerAuth` secret never leave that closure at all. What comes
+/// back out is `(approved, device_id_hex, token, dir)` — an identity and a
+/// revocable token, never a key.
+///
+/// Returns `approved` so the CALLER can fire its own "local change" signal: the
+/// desktop bumps a `Manager::try_state` counter, the browser calls its
+/// scheduler. That side effect is the one host-shaped thing left, and it stayed
+/// outside.
+pub async fn enroll_device_from_host(
+    host: &dyn crate::host::HostCtx,
+    io: &dyn crate::vault_io::VaultIo,
+    state: &crate::plugins::vault_unlock::state::VaultRuntimeState,
+    account_number: String,
+    credential: String,
+    credential_kind: EnrollCredential,
+) -> Result<EnrollResult, SyncDeviceError> {
+    let credential = Zeroizing::new(credential);
+
+    // Resolve the vault dir (token storage) + the endpoint transport.
+    let dir = crate::paths::active_vault_root_io_from_host(host, state.active_vault_id().await)
+        .map_err(|_| SyncDeviceError::Internal)?;
+    let cfg_path = super::config::config_path_from_host(host, io)
+        .await
+        .map_err(|_| SyncDeviceError::Internal)?;
+    let cfg = super::config::read_config(io, &cfg_path)
+        .await
+        .map_err(|_| SyncDeviceError::NotConfigured)?;
+    let pins = super::config::config_pins(&cfg);
+    let url = cfg.endpoint_url.ok_or(SyncDeviceError::NotConfigured)?;
+
+    let account =
+        parse_account_number(account_number.trim()).map_err(|_| SyncDeviceError::BadRequest)?;
+    let path = match credential_kind {
+        EnrollCredential::Password => EnrollPath::Password,
+        EnrollCredential::Recovery => EnrollPath::Recovery,
+    };
+    // The FIRST device's fallback `vault.meta`, read here rather than inside the
+    // closure (task 84). It used to be a `std::fs::read` on the blocking pool —
+    // which compiles for wasm32 and fails at runtime, and would have failed on
+    // exactly the path a first device takes. `None` is fine: it only matters when
+    // the server answers 404, and a device with no local meta and no server copy
+    // has nothing to enrol against either way.
+    let local_meta: Option<Vec<u8>> = io.read(&dir.join("vault.meta")).await.ok();
+
+    // The SCRAM username is derived inside `enroll` as the account-hash hex —
+    // the display-form account number never crosses the wire (AS9).
+    let outcome =
+        crate::task::run_blocking(move || -> Result<EnrollmentOutcome, SyncDeviceError> {
+            let transport = super::http_transport::build_transport(&url, pins)
+                .map_err(|_| SyncDeviceError::Transport)?;
+
+            // 1. Obtain vault.meta. A returning device fetches it pre-auth from the
+            //    server; the FIRST device (the owner enabling sync) has no server
+            //    copy yet (404) and falls back to its local vault.meta — which it
+            //    seeds to the server after enrolling (step 6).
+            let acct_hex = {
+                let mut s = String::with_capacity(32);
+                for b in &account.hash {
+                    s.push_str(&format!("{b:02x}"));
+                }
+                s
+            };
+            let meta_resp = transport
+                .request(
+                    super::transport::HttpMethod::Get,
+                    &format!("/vault.meta?account={acct_hex}"),
+                    &[],
+                    None,
+                )
+                .map_err(|_| SyncDeviceError::Transport)?;
+            let meta_bytes: Vec<u8> = match meta_resp.status {
+                200 => meta_resp.body,
+                404 => local_meta.ok_or(SyncDeviceError::Transport)?,
+                _ => return Err(SyncDeviceError::Transport),
+            };
+            let meta = parse_vault_meta(&meta_bytes).map_err(|_| SyncDeviceError::Internal)?;
+            // The `vault.meta` came from the (untrusted, TB5) sync server, so its
+            // `kdf_params` are attacker-controlled. Validate the Argon2id memory/time
+            // floor+ceiling BEFORE deriving — otherwise a hostile server could pin an
+            // absurd `m_kib` (e.g. multi-TiB) and force a pre-auth OOM/DoS. Every
+            // other derive site (unlock / recover / change-password / quick-unlock)
+            // already gates on this; the sync enroll path was the one gap.
+            validate_kdf_params(&meta.kdf_params).map_err(|_| SyncDeviceError::BadRequest)?;
+
+            // 2. Derive root_key from the credential + the meta salts.
+            let root_key: Zeroizing<[u8; AEAD_KEY_LEN]> = match path {
+                EnrollPath::Password => {
+                    let wrap = derive_password_wrap_key(
+                        &credential,
+                        &meta.random_salt_password,
+                        &meta.account_number_hash,
+                        &meta.kdf_params,
+                    )
+                    .map_err(|_| SyncDeviceError::BadRequest)?;
+                    let opened = aead_open_ctx(
+                        &wrap,
+                        &meta.nonce_password_wrap,
+                        &meta.enc_root_key_password,
+                        &aad_password_wrap(&meta.kdf_params),
+                    )
+                    .map_err(|_| SyncDeviceError::BadRequest)?;
+                    let mut rk = Zeroizing::new([0u8; AEAD_KEY_LEN]);
+                    if opened.len() != AEAD_KEY_LEN {
+                        return Err(SyncDeviceError::Internal);
+                    }
+                    rk.copy_from_slice(&opened);
+                    rk
+                }
+                EnrollPath::Recovery => {
+                    let normalized = normalize_user_phrase(&credential);
+                    let wrap = derive_recovery_wrap_key_from_normalized(
+                        normalized.as_str(),
+                        &meta.random_salt_recovery,
+                        &meta.account_number_hash,
+                        &meta.kdf_params,
+                    )
+                    .map_err(|_| SyncDeviceError::BadRequest)?;
+                    let opened = aead_open_ctx(
+                        &wrap,
+                        &meta.nonce_recovery_wrap,
+                        &meta.enc_root_key_recovery,
+                        &aad_recovery_wrap(&meta.kdf_params),
+                    )
+                    .map_err(|_| SyncDeviceError::BadRequest)?;
+                    let mut rk = Zeroizing::new([0u8; AEAD_KEY_LEN]);
+                    if opened.len() != AEAD_KEY_LEN {
+                        return Err(SyncDeviceError::Internal);
+                    }
+                    rk.copy_from_slice(&opened);
+                    rk
+                }
+            };
+
+            // 3. ServerAuth secret.
+            let secret = derive_subkey(&root_key, SubkeyRole::ServerAuth);
+
+            // 4. Register the SCRAM verifier (idempotent — a 409 already_registered
+            //    is success; the first device's stored salt is what every later
+            //    handshake reuses). Keyed on the canonical `account.hash` (the same
+            //    value the server namespaces on), so register + enroll agree.
+            register_verifier(transport.as_ref(), &account.hash, secret.as_slice())
+                .map_err(|_| SyncDeviceError::Transport)?;
+
+            // 5. SCRAM enroll.
+            let device_id = generate_device_id();
+            let mut nonce_bytes = [0u8; 16];
+            getrandom::getrandom(&mut nonce_bytes).map_err(|_| SyncDeviceError::Internal)?;
+            let mut client_nonce = String::with_capacity(32);
+            for b in &nonce_bytes {
+                client_nonce.push_str(&format!("{b:02x}"));
+            }
+
+            let out = enroll(
+                transport.as_ref(),
+                &account.hash,
+                secret.as_slice(),
+                path,
+                &client_nonce,
+                device_id,
+            )
+            .map_err(|_| SyncDeviceError::Unauthenticated)?;
+
+            // 6. On approval: store the token, seed vault.meta to the server (so the
+            //    next device can fetch it), and persist the account/device identity
+            //    sync_now needs to author heads.
+            // Persist the device identity ALWAYS (even when pending), so a pending
+            // device can later claim its token by re-running the handshake under the
+            // unlocked root_key once an existing device approves it.
+            // The sync-state read-modify-write is deferred to the async caller
+            // (phase3-web-client task 86), for the same reason as the token
+            // write below: `state.rs` is on the storage seam now and the seam is
+            // async, while this closure runs on the blocking pool. Only the
+            // `dev_hex` derivation — pure formatting — stays here, because the
+            // network work below needs it.
+            let mut dev_hex = String::with_capacity(32);
+            for b in &device_id {
+                dev_hex.push_str(&format!("{b:02x}"));
+            }
+
+            // The token WRITE is deferred to the caller (phase3-web-client task
+            // 86): `TokenStore` is async now, because a browser-backed store has
+            // no synchronous implementation to write, and this closure is on the
+            // blocking pool. What stays here is the NETWORK work — the meta seed
+            // needs `transport`, which was moved in.
+            //
+            // Deferring reorders the two: the meta is seeded before the token is
+            // stored, where it used to be after. Both orders are crash-safe and
+            // recoverable by re-running the handshake — a crash now leaves a
+            // seeded meta and no token (re-enrol claims one), where before it
+            // left a token and an unseeded meta (the next cycle seeds it).
+            let stored_token = if out.approved && !out.token.is_empty() {
+                let mut token_hex = String::with_capacity(out.token.len() * 2);
+                for b in &out.token {
+                    token_hex.push_str(&format!("{b:02x}"));
+                }
+                // Best-effort seed (a returning device's meta already matches).
+                let _ = put_vault_meta(transport.as_ref(), &token_hex, &meta_bytes);
+                Some(out.token)
+            } else {
+                None
+            };
+            Ok((out.approved, dev_hex, stored_token, dir))
+        })
+        .await
+        .map_err(|_| SyncDeviceError::Internal)??;
+    let (outcome, device_id_hex, stored_token, token_dir) = outcome;
+
+    // The deferred sync-state read-modify-write (task 86). Persist the device
+    // identity ALWAYS — even when pending — so a pending device can later claim
+    // its token by re-running the handshake under the unlocked `root_key` once
+    // an existing device approves it.
+    //
+    // NOT `unwrap_or_default()`. This is a read-modify-WRITE, so defaulting on a
+    // failed read would persist a blank state over a real one: cursor, VV log,
+    // per-blob CAS baselines and `meta_baseline_hex` gone in a single step — the
+    // device re-enrols as brand new AND the meta phase reads the absent baseline
+    // as "only the server changed" and overwrites a locally-newer `vault.meta`.
+    // An ABSENT file still defaults (that is `read_sync_state`'s own `Ok`); what
+    // must not be swallowed is a file that exists and did not parse.
+    let mut st = super::state::read_sync_state(io, &token_dir)
+        .await
+        .map_err(|_| {
+            tracing::error!(
+                stage = "read_sync_state",
+                error_kind = "Internal",
+                "sync-state.json unreadable; refusing to overwrite it with a fresh identity"
+            );
+            SyncDeviceError::Internal
+        })?;
+    st.account_hash_hex = Some({
+        // Pure formatting over `account.hash`, re-derived here rather than
+        // threaded out of the closure: it is four lines and no state.
+        let mut h = String::with_capacity(32);
+        for b in &account.hash {
+            h.push_str(&format!("{b:02x}"));
+        }
+        h
+    });
+    st.device_id_hex = Some(device_id_hex.clone());
+    let _ = super::state::write_sync_state(io, &token_dir, &st).await;
+
+    // The deferred token write (task 86) — see the closure for why it moved.
+    if let Some(token) = stored_token {
+        super::token_store::default_store()
+            .store(io, &token_dir, &token)
+            .await
+            .map_err(|_| SyncDeviceError::Internal)?;
+    }
+
+    // Bootstrap upload (MYND-424): an approved device that just enrolled with an
+    // existing, populated vault must push it WITHOUT waiting for a note edit.
+    // `sync_enroll` itself does not author a head; the background loop only pushes
+    // once a local change is signalled. Reuse that same coalesced-push trigger
+    // (the SyncLocalChange counter note_create / note_update bump) so the loop's
+    // next tick opens the coalescing window and runs an allow_push cycle. Safe re:
+    // the resolution-blur side-channel — a one-shot bootstrap, not edit timing. A
+    // pending (not-yet-approved) device is skipped: it cannot push and, as a
+    // joining device, has no local vault to upload.
+    // (The bootstrap-push signal itself is the caller's — see the doc.)
+
+    Ok(EnrollResult {
+        approved: outcome,
+        device_id_hex,
+    })
+}
+
+/// Acquire a TOFU pin for an `https` endpoint by reaching the server once.
+///
+/// Host-only by nature: it completes a TLS handshake over the raw-TLS transport
+/// and reads the leaf certificate. A page never sees one, which is why the
+/// browser arm passes `can_pin: false` and gets `None` here without calling it.
+#[cfg(not(target_arch = "wasm32"))]
+async fn acquire_tofu_pin(url: &str) -> Result<Option<String>, SyncDeviceError> {
+    super::config::validate_endpoint_url(url).map_err(|_| SyncDeviceError::NotConfigured)?;
+    let Some((scheme, host, port)) = super::http_transport::parse_endpoint(url) else {
+        return Err(SyncDeviceError::NotConfigured);
+    };
+    if scheme != "https" {
+        return Ok(None); // loopback http: no TLS, nothing to pin
+    }
+    let pin =
+        crate::task::run_blocking(move || super::rustls_transport::tofu_fetch_pin(&host, port))
+            .await
+            .map_err(|_| SyncDeviceError::Internal)?
+            .map_err(|_| SyncDeviceError::Transport)?;
+    Ok(Some(super::to_hex(&pin)))
+}
+
+/// The `wasm32` arm exists only so the `can_pin: true` branch has a body to
+/// compile against; it is unreachable, because the browser always passes
+/// `can_pin: false`. It refuses rather than returning `None` so a future caller
+/// that flipped the flag would fail loudly instead of silently unpinned.
+#[cfg(target_arch = "wasm32")]
+async fn acquire_tofu_pin(_url: &str) -> Result<Option<String>, SyncDeviceError> {
+    Err(SyncDeviceError::Transport)
+}
+
+/// The two answers a CLIENT brings to the bootstrap — grouped rather than passed
+/// loose, because they are one idea ("what kind of client is doing this") and
+/// because they are the only two things that differ between the desktop and the
+/// browser on this whole flow.
+#[derive(Debug, Clone, Copy)]
+pub struct JoinClient {
+    /// The container to bootstrap into. Desktop MINTS one (a disk scan for
+    /// collision-freedom, because it holds many vaults); the browser passes the
+    /// constant `paths::web_single_vault_id()`, which is the registry collapse
+    /// made explicit and what makes a re-run idempotent by construction.
+    pub vault_id: crate::vault_id::VaultId,
+    /// Whether this client can TOFU-pin the server's certificate. False in a
+    /// browser: a page never sees the leaf cert, so the result reports
+    /// `PinSource::PlatformTrustStore` instead of an empty pin.
+    pub can_pin: bool,
+}
+
+/// Outcome of joining an existing account on a fresh device.
+#[derive(Debug, Clone, Serialize)]
+pub struct JoinResult {
+    /// The new local vault's id — the frontend routes to its unlocked editor.
+    pub vault_id: String,
+    /// True when the device is pending approval by an existing device (the
+    /// common password-path case); false if it was approved immediately.
+    pub pending: bool,
+    /// The server cert fingerprint (https) for eye-compare, or `null` (loopback).
+    pub fingerprint: Option<String>,
+    /// The freshly generated `device_id` (hex) this join registered (MYND-548) —
+    /// same contract as [`EnrollResult::device_id_hex`]: the joining device is
+    /// pending, so it cannot read the roster to learn which row is itself, and it
+    /// needs the id to name itself in its own `vault.prefs`.
+    pub device_id_hex: String,
+}
+
+/// **Add this device to an existing account.** On a fresh device, bootstrap the
+/// whole local vault from the server: TOFU-pin the endpoint, fetch the account's
+/// `vault.meta` pre-auth, derive `root_key` from `{account# + password}`, write
+/// the meta to a NEW local vault + unlock it, then SCRAM-enroll (password →
+/// **pending** until an existing device approves). No 24-word recovery. After
+/// approval the background loop claims the token + pulls the account's notes.
+///
+/// `vault_id` is supplied by the CALLER, and that is where the two clients
+/// genuinely differ (phase3-web-client task 85).
+///
+/// Desktop mints a fresh one through `vault_registry::mint_unique_vault_id`,
+/// which is a disk scan for collision-freedom because a desktop holds many
+/// vaults. A browser holds exactly one per origin, so it passes the constant
+/// `paths::web_single_vault_id()` — the registry collapse made explicit rather
+/// than letting that scan run over OPFS, where it would be both slower and
+/// meaningless. Making it a parameter keeps this flow free of a capability flag:
+/// the RULE (fetch, write, unlock, enrol) is shared; the choice of container is
+/// the client's.
+///
+/// Because the browser's id is a constant, re-running this is idempotent by
+/// construction — "never mints a second container" holds without a check.
+/// Write the fetched `vault.meta` into a first-run container, or decide what an
+/// existing one means (phase3-web-client task 85).
+///
+/// Split out of [`join_account_from_host`] because it is the whole of the
+/// idempotence criterion and it is the only part of the join that can be tested
+/// without a server: everything above it is a network fetch and everything below
+/// is an unlock plus a SCRAM handshake.
+///
+/// # The three outcomes
+///
+/// * **Nothing there** → write it. The ordinary first run.
+/// * **A meta for the SAME account** → leave it alone and return `Ok`, so the
+///   caller falls through to unlock + enrol. On the browser's constant vault id
+///   this is the ordinary SECOND run — a reload, a re-auth after the token
+///   expired, a user re-entering their number — and failing it would make
+///   signing in again impossible. Note the local copy is deliberately preferred
+///   even when it differs byte-wise from the server's: a password change on
+///   another device rewrites `vault.meta`, so the local one may legitimately be
+///   the newer, and the sync meta phase is what reconciles them. A bootstrap
+///   must not adjudicate that by overwriting.
+/// * **A meta for a DIFFERENT account** → [`SyncDeviceError::AccountMismatch`].
+///   Proceeding would unlock (or fail to unlock) someone else's vault while the
+///   user believes they signed into theirs, and the remedy is not a retype: the
+///   container has to be erased first.
+///
+/// The create-only write is what makes the first two safe — the decision below
+/// is reached only after the write has already declined to clobber anything.
+/// "Already there" is separated from a genuine IO failure by asking (`exists`)
+/// rather than by widening the closed `IoFailureKind` enum, the same shape
+/// `note_create` uses for its create-new refusal.
+async fn write_bootstrap_meta(
+    io: &dyn crate::vault_io::VaultIo,
+    meta_path: &std::path::Path,
+    meta_bytes: &[u8],
+    account_hash: &[u8; 16],
+) -> Result<(), SyncDeviceError> {
+    let Err(kind) = io
+        .write(
+            meta_path,
+            meta_bytes,
+            crate::vault_io::WriteOpts {
+                replace: false,
+                ..Default::default()
+            },
+        )
+        .await
+    else {
+        return Ok(());
+    };
+    if !io.exists(meta_path).await.unwrap_or(false) {
+        tracing::error!(
+            stage = "meta_write",
+            io_failure_kind = ?kind,
+            "join_account: vault.meta write failed"
+        );
+        return Err(SyncDeviceError::Internal);
+    }
+    let local = io
+        .read(meta_path)
+        .await
+        .map_err(|_| SyncDeviceError::Internal)?;
+    let Ok(local_meta) = parse_vault_meta(&local) else {
+        // Rubble, not "a newer local meta". On a double-buffered store the seam
+        // has already fallen back to the older copy, so reaching here means BOTH
+        // are unusable — and there is nothing in that worth preserving.
+        //
+        // This arm is what stops a loop, and the loop is reachable: boot routing
+        // sends a web `Corrupted` here (`initialStageFromProbe`, task 85),
+        // because a corrupt local container on a client whose vault lives on the
+        // server is a re-bootstrap rather than data loss. Refusing would send
+        // the user back to the same screen that sent them, forever.
+        //
+        // Native clients never take this arm — a desktop join mints a fresh
+        // vault id and so never meets an existing meta at all. It exists for the
+        // one client that pins a container to a constant id.
+        tracing::warn!(
+            stage = "meta_write",
+            event = "replacing_unparseable_meta",
+            "join_account: the local vault.meta does not parse; replacing it with the server's"
+        );
+        io.write(
+            meta_path,
+            meta_bytes,
+            crate::vault_io::WriteOpts::default(), // replace: true
+        )
+        .await
+        .map_err(|_| SyncDeviceError::Internal)?;
+        return Ok(());
+    };
+    if &local_meta.account_number_hash != account_hash {
+        tracing::warn!(
+            stage = "meta_write",
+            event = "account_mismatch",
+            "join_account refused: this container already holds a different account"
+        );
+        return Err(SyncDeviceError::AccountMismatch);
+    }
+    tracing::info!(
+        stage = "meta_write",
+        event = "already_bootstrapped",
+        "join_account: container exists for this account; re-authenticating"
+    );
+    Ok(())
+}
+
+pub async fn join_account_from_host(
+    host: &dyn crate::host::HostCtx,
+    io: &'static dyn crate::vault_io::VaultIo,
+    state: &crate::plugins::vault_unlock::state::VaultRuntimeState,
+    client: JoinClient,
+    server_url: String,
+    account_number: String,
+    password: String,
+) -> Result<JoinResult, SyncDeviceError> {
+    let JoinClient { vault_id, can_pin } = client;
+    let password = Zeroizing::new(password);
+
+    // 1. Set + TOFU-pin the endpoint (https) before any transport use.
+    //
+    // The pin itself is the caller's to acquire — it needs a TLS handshake and
+    // the leaf certificate, which a browser cannot see. `can_pin` decides what
+    // the RESULT reports, so a browser's `fingerprint` is `None` with
+    // `PinSource::PlatformTrustStore` rather than an empty pin that reads as
+    // unverified. Task 85's criterion asks for exactly that typed answer.
+    let cert_pin_hex = if can_pin {
+        acquire_tofu_pin(&server_url).await?
+    } else {
+        None
+    };
+    let fingerprint =
+        super::config::set_endpoint(host, io, Some(server_url), cert_pin_hex, can_pin)
+            .await
+            .map_err(|_| SyncDeviceError::NotConfigured)?
+            .fingerprint;
+    let cfg = super::config::read_config(
+        io,
+        &super::config::config_path_from_host(host, io)
+            .await
+            .map_err(|_| SyncDeviceError::Internal)?,
+    )
+    .await
+    .map_err(|_| SyncDeviceError::NotConfigured)?;
+    let pins = super::config::config_pins(&cfg);
+    let url = cfg.endpoint_url.ok_or(SyncDeviceError::NotConfigured)?;
+
+    let account =
+        parse_account_number(account_number.trim()).map_err(|_| SyncDeviceError::BadRequest)?;
+    let account_hash = account.hash;
+    let acct_hex = {
+        let mut s = String::with_capacity(32);
+        for b in &account_hash {
+            s.push_str(&format!("{b:02x}"));
+        }
+        s
+    };
+
+    // 2. Fetch the account's vault.meta pre-auth (AEAD-protected — useless
+    //    without the credential, the accepted A4-equivalent exposure).
+    let url_fetch = url.clone();
+    let pins_fetch = pins.clone();
+    let acct_q = acct_hex.clone();
+    let meta_bytes: Vec<u8> =
+        crate::task::run_blocking(move || -> Result<Vec<u8>, SyncDeviceError> {
+            let transport = super::http_transport::build_transport(&url_fetch, pins_fetch)
+                .map_err(|_| SyncDeviceError::Transport)?;
+            let resp = transport
+                .request(
+                    super::transport::HttpMethod::Get,
+                    &format!("/vault.meta?account={acct_q}"),
+                    &[],
+                    None,
+                )
+                .map_err(|_| SyncDeviceError::Transport)?;
+            if resp.status != 200 {
+                return Err(SyncDeviceError::DeviceNotFound); // no such account seeded
+            }
+            Ok(resp.body)
+        })
+        .await
+        .map_err(|_| SyncDeviceError::Internal)??;
+    parse_vault_meta(&meta_bytes).map_err(|_| SyncDeviceError::Internal)?; // must be real meta
+
+    // 3. Mint a fresh local vault, write the fetched meta, and UNLOCK it (the
+    //    normal password-unlock path derives root_key + items_key).
+    let vault_dir = crate::paths::vault_dir_for_id_from_host_io(host, io, Some(vault_id))
+        .await
+        .map_err(|_| SyncDeviceError::Internal)?;
+    let meta_path = vault_dir.join("vault.meta");
+    // Through the SEAM, which on a browser means through the double-buffered
+    // container — `vault.meta` is in `DOUBLE_BUFFERED`, so task 85's "written
+    // through the double-buffered path, byte-identical to the server copy"
+    // criterion is satisfied by routing rather than by a second write path.
+    //
+    // `replace: false` keeps the create-only guard: a bootstrap that finds a
+    // meta already there must not overwrite it. On the browser's constant vault
+    // id that is what makes a re-run idempotent — a second run cannot clobber
+    // the container the first one made, and cannot mint a second one either
+    // (there is only one id).
+    //
+    // What a create-only refusal means, and why it is not an error: on the
+    // browser's constant id, "a meta is already here" is the ORDINARY second
+    // run — a reload, a re-auth after the token expired, a user re-entering
+    // their number. Task 85 asks for a re-run that "re-authenticates, never
+    // mints a second container or overwrites a newer local meta", so the refusal
+    // has to fall through to the unlock + enrol below rather than fail the join.
+    //
+    // The one case that must NOT fall through is a DIFFERENT account. The local
+    // meta binds `account_number_hash`; if it is not the account just typed,
+    // this browser is holding someone else's vault, and proceeding would unlock
+    // (or fail to unlock) the wrong one while the user believes they signed into
+    // theirs. That gets its own refusal, because the remedy is different: erase
+    // this browser's copy first (task 72), not "try your password again".
+    //
+    // A meta for the SAME account that differs byte-wise is fine and is left
+    // alone — a password change on another device rewrites `vault.meta`, and the
+    // local copy may legitimately be the newer of the two. The sync meta phase
+    // reconciles them; a bootstrap must not adjudicate it by overwriting.
+    write_bootstrap_meta(io, &meta_path, &meta_bytes, &account_hash).await?;
+    crate::plugins::vault_unlock::commands::unlock_with_path(
+        (*password).clone(),
+        Some(vault_id),
+        &meta_path,
+        state,
+        io,
+        host,
+    )
+    .await
+    .map_err(|_| SyncDeviceError::BadRequest)?; // wrong account# / password
+
+    // 4. Register the verifier + SCRAM enroll (password → pending). The SCRAM
+    //    secret is re-derived from the now-unlocked root_key (no credential reuse).
+    let root_key = state
+        .peek_unlocked_root_key_clone()
+        .await
+        .ok_or(SyncDeviceError::Internal)?;
+    let approved =
+        crate::task::run_blocking(move || -> Result<EnrollmentOutcome, SyncDeviceError> {
+            let transport = super::http_transport::build_transport(&url, pins)
+                .map_err(|_| SyncDeviceError::Transport)?;
+            let secret = derive_subkey(&root_key, SubkeyRole::ServerAuth);
+            register_verifier(transport.as_ref(), &account_hash, secret.as_slice())
+                .map_err(|_| SyncDeviceError::Transport)?;
+            let device_id = generate_device_id();
+            let mut nonce = [0u8; 16];
+            getrandom::getrandom(&mut nonce).map_err(|_| SyncDeviceError::Internal)?;
+            let mut client_nonce = String::with_capacity(32);
+            for b in &nonce {
+                client_nonce.push_str(&format!("{b:02x}"));
+            }
+            let out = enroll(
+                transport.as_ref(),
+                &account_hash,
+                secret.as_slice(),
+                EnrollPath::Password,
+                &client_nonce,
+                device_id,
+            )
+            .map_err(|_| SyncDeviceError::Unauthenticated)?;
+
+            // Identity persistence is deferred to the async caller (task 86) —
+            // `state.rs` is on the storage seam and the seam is async, while
+            // this closure runs on the blocking pool. Only the `dev_hex`
+            // formatting stays.
+            let mut dev_hex = String::with_capacity(32);
+            for b in &device_id {
+                dev_hex.push_str(&format!("{b:02x}"));
+            }
+            // Token write deferred too (task 86) — see `EnrollmentOutcome`.
+            let stored_token = if out.approved && !out.token.is_empty() {
+                Some(out.token)
+            } else {
+                None
+            };
+            Ok((out.approved, dev_hex, stored_token, vault_dir))
+        })
+        .await
+        .map_err(|_| SyncDeviceError::Internal)??;
+
+    let (approved, device_id_hex, stored_token, token_dir) = approved;
+
+    // The deferred identity persistence. Written ALWAYS — even when pending —
+    // so the loop can claim the token once an existing device approves.
+    // Same rule as the enrolment path: a read-modify-write must not default over
+    // an unreadable file, or it erases the cursor, the CAS baselines and
+    // `meta_baseline_hex` in one step (task 86).
+    let mut st = super::state::read_sync_state(io, &token_dir)
+        .await
+        .map_err(|_| {
+            tracing::error!(
+                stage = "read_sync_state",
+                error_kind = "Internal",
+                "sync-state.json unreadable; refusing to overwrite it with a fresh identity"
+            );
+            SyncDeviceError::Internal
+        })?;
+    st.account_hash_hex = Some(acct_hex);
+    st.device_id_hex = Some(device_id_hex.clone());
+    let _ = super::state::write_sync_state(io, &token_dir, &st).await;
+
+    if let Some(token) = stored_token {
+        super::token_store::default_store()
+            .store(io, &token_dir, &token)
+            .await
+            .map_err(|_| SyncDeviceError::Internal)?;
+    }
+
+    Ok(JoinResult {
+        vault_id: vault_id.to_string(),
+        pending: !approved,
+        fingerprint,
+        device_id_hex,
+    })
 }

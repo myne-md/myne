@@ -15,7 +15,8 @@
 // surface the result (task 5 wires the StoragePanel status + toast).
 
 import { useEffect, useRef } from "react";
-import { join } from "@tauri-apps/api/path";
+import { has } from "../platform/capabilities";
+import { join } from "../platform/path";
 import { backupDefaultFilename, exportBackup } from "../lib/vault-backup";
 import { resolveActiveVaultId } from "../lib/vault-list";
 import {
@@ -50,6 +51,19 @@ const LIVE_DEPS: ScheduleEngineDeps = {
  * non-repeating failure toast (task 5).
  */
 export function useBackupScheduler(onTick?: (tick: ScheduleTick) => void): void {
+  // Gated on the capability, at the TOP of the hook (phase3-web-client task 96).
+  //
+  // The Editor mounts this unconditionally, so on a client where `backup` is
+  // absent it became a five-minute timer running for the whole unlocked session,
+  // calling `vault_list` and `plugin:backup|backup_schedule_read` forever. Every
+  // one of those is answered `Unsupported`, and every failure is swallowed by
+  // the engine's own catch — so the loop was invisible, permanent, and
+  // pointless: an IPC heartbeat for a feature the platform does not have.
+  //
+  // Gated here rather than at the Editor's call site so the guarantee holds for
+  // every caller, including a future one. The effect below still runs its
+  // cleanup path unchanged; it simply never arms.
+  const enabled = has("backup");
   // Keep the latest callback without re-arming the interval each render.
   const onTickRef = useRef(onTick);
   onTickRef.current = onTick;
@@ -57,6 +71,7 @@ export function useBackupScheduler(onTick?: (tick: ScheduleTick) => void): void 
   const prevOutcomeRef = useRef<ScheduleRunOutcome | null>(null);
 
   useEffect(() => {
+    if (!enabled) return;
     let cancelled = false;
     // The active vault is stable for the Editor's lifetime (SYNC-1; a switch
     // relocks + remounts the Editor, re-running this effect), so resolve it
@@ -87,5 +102,7 @@ export function useBackupScheduler(onTick?: (tick: ScheduleTick) => void): void 
       cancelled = true;
       clearInterval(timer);
     };
-  }, []);
+    // `enabled` is a build-time constant per client, so this dependency never
+    // actually changes — it is listed because it is read.
+  }, [enabled]);
 }

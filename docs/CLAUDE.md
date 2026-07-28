@@ -77,6 +77,12 @@ Split operator-facing docs by **nature**, which maps to the license boundary (MY
 
 Cross-reference is **one-way**: a runbook (AGPL) points to the policy doc (CC-BY-4.0) for the *why/guarantee*; the CC-BY-4.0 doc embeds **no** bundle-specific command (so it stays bundle-agnostic and reusable). Never reference an AGPL runbook from a CC-BY-4.0 doc.
 
+**Ruling for the web client's self-host documentation** (MYND-574 tasks 49–51). The split applies unchanged, and the cut runs through the *middle* of the web self-host story rather than around it:
+
+- The **obligations** a self-hoster takes on by serving the bundle — that they become the code-delivery operator for their users (`threat-model.md` A15/TB11), that the strict CSP and cross-origin isolation are part of the security posture and not decoration, that the sync-origin knob must be a runtime value so the published bundle hash stays comparable, and that no client IP is logged at the bundle origin either — are **normative** and live in `docs/` (CC-BY-4.0), alongside `self-host-policy.md`.
+- The **mechanics** — the container image, its compose file, env-var syntax, reverse-proxy config, TLS setup — live in **`operations`** (AGPL), like every other runbook.
+- **`web/README.md` is a third thing and stays small**: a contributor-facing map of the target (what `web/` is, which commands build it, where the seam substitution happens). It is neither the normative contract nor the operator runbook, and it must not grow into either.
+
 ## Gotchas
 
 - `glossary.md` references are case-sensitive matches in some downstream tools — keep entry titles stable.

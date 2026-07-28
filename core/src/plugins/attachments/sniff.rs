@@ -76,6 +76,47 @@ pub const ALLOWLISTED_CONTENT_TYPES: &[&str] = &[
 ///
 /// The match is content-only — the filename / extension is never
 /// consulted (a `.png` extension on `MZ`-prefixed PE bytes must reject).
+/// The content type an attachment's decrypted bytes are SERVED as.
+///
+/// # This function is the XSS defence, and it is why it is not two functions
+///
+/// The rule is: the served type is derived from the BYTES, allowlist-fenced, and
+/// is never the catalog's `content_type` hint and never `text/html`. An
+/// unrecognized sniff falls back to `application/octet-stream`, which no browser
+/// executes — so a blob that was tampered with but still decrypts (an attacker
+/// who can write the vault already holds the keys) cannot become script.
+///
+/// It exists as a named function, rather than as
+/// `sniff_content_type(b).unwrap_or("application/octet-stream")` written at each
+/// serve site, because there are now **two** serve sites and they run on
+/// different targets: the desktop `attachment://` protocol handler
+/// (`scheme_core::build_response`, which is `tauri::http`-typed and synchronous)
+/// and the browser's object-URL mint (phase3-web-client task 44, which is
+/// async and has no HTTP layer at all). Two copies of a three-line security
+/// decision is exactly the shape that drifts, and the one that drifts is the one
+/// nobody is watching.
+///
+/// The `debug_assert` is a canary rather than a check: it fires in tests if a
+/// future sniffer ever returns something outside the allowlist, which would mean
+/// the fence had been widened somewhere other than
+/// [`ALLOWLISTED_CONTENT_TYPES`].
+pub fn served_content_type(plaintext: &[u8]) -> &'static str {
+    let served = sniff_content_type(plaintext).unwrap_or(OCTET_STREAM);
+    debug_assert!(
+        served == OCTET_STREAM || ALLOWLISTED_CONTENT_TYPES.contains(&served),
+        "served type must be allowlisted or the octet-stream fallback"
+    );
+    served
+}
+
+/// The non-scriptable fallback for bytes the sniffer does not recognize.
+///
+/// Deliberately NOT a member of [`ALLOWLISTED_CONTENT_TYPES`]: an
+/// octet-stream attachment is never rendered inline anywhere — it surfaces as an
+/// export-only file card — so a `.png`-named binary cannot become a served,
+/// scriptable resource.
+pub const OCTET_STREAM: &str = "application/octet-stream";
+
 pub fn sniff_content_type(bytes: &[u8]) -> Option<&'static str> {
     // PNG: 89 50 4E 47 0D 0A 1A 0A
     if bytes.starts_with(&[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]) {

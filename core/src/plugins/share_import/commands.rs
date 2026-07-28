@@ -285,7 +285,17 @@ pub async fn drain_pending_shares<R: Runtime>(
             bytes: share.bytes.to_vec(),
             filename: Some(share.filename.clone()),
         };
-        match attachment_import_with_dir(&dir, state.inner(), source).await {
+        // `share_import` is host-only (cfg `tauri-ipc` + not wasm32), so the
+        // two seams it hands the import are always the native ones.
+        match attachment_import_with_dir(
+            &crate::vault_io::StdVaultIo,
+            &crate::host::tauri_host::TauriHost::new(app.clone()),
+            &dir,
+            state.inner(),
+            source,
+        )
+        .await
+        {
             Ok(att) => {
                 // A fresh (non-dedup) import is a local sync change.
                 if !att.deduplicated {

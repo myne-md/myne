@@ -1,5 +1,19 @@
 # e2e/ — real-IPC E2E suites (tauri-driver harness)
 
+> **Scope: the NATIVE desktop client only.** Everything below — the production
+> Tauri bundle, real IPC, tauri-driver, the Linux-only constraint, the
+> page-seat dialog interception — is specific to this harness. The Phase 3 web
+> client has a **second, separate lane** at `e2e-web/`, browser-driven, with its
+> own driver and its own constraints, and it is deliberately thin: it covers
+> only what is web-*specific* (capability gating, OPFS persistence across
+> reload, the single-tab lock, sync-required entry, incremental first-sync
+> materialisation, crash recovery of the double-buffered blobs). Shared UI
+> behaviour is covered **once**, here, because it is the same `src/` tree —
+> a premise the platform-seam contract tests (`tests/platform/seam-contract.ts`)
+> verify rather than assume. Do not mirror a scenario across both lanes.
+> (`design-notes.md` 2026-07-26 "Web E2E policy"; procedure for both:
+> `docs/dev/e2e.md`.)
+
 > Subdirectory CLAUDE.md. Loaded when Claude works in this directory. Operating
 > manual (platform constraints, local container loop, env knobs, version pins):
 > `docs/dev/e2e.md`. Policy provenance: `design-notes.md` 2026-06-10 "E2E

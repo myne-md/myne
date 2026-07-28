@@ -19,6 +19,7 @@
 //! See: ../../CLAUDE.md "Secret-handling logging discipline".
 
 use super::error::ThemesError;
+use crate::host::HostCtx;
 use crate::plugins::vault_unlock::state::VaultRuntimeState;
 use protocol::{
     decode_themes_blob, derive_subkey, encode_themes_blob, parse_vault_meta, SubkeyRole,
@@ -27,7 +28,12 @@ use protocol::{
 use std::collections::BTreeMap;
 use std::path::Path;
 use std::sync::OnceLock;
-use std::time::{SystemTime, UNIX_EPOCH};
+// Tauri types are needed only by the cfg-gated wrappers below, so the import is
+// gated the same way — otherwise a `--no-default-features` build fails on an
+// unused import of a dependency that is not there.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+use crate::host::tauri_host::TauriHost;
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 use tauri::{AppHandle, Runtime, State};
 use theme_validator::validate_theme;
 use tokio::sync::Mutex;
@@ -170,25 +176,26 @@ pub fn write_mutex() -> &'static Mutex<()> {
     M.get_or_init(|| Mutex::new(()))
 }
 
-/// Current UNIX time in whole seconds, saturating at 0 if the clock is before
-/// the epoch (cannot happen in practice). The clock source for the entry
-/// `created_at`/`updated_at`/`deleted_at` fields — the same wall-clock the
-/// attachments catalog stamps its entries with, and it inherits the same
-/// `sync-protocol.md` §11.4 clock-honesty caveat (device skew can decide a
-/// race; deterministic convergence is the contract, not clock truth).
-fn now_unix_secs() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or(0)
-}
+// The entry `created_at` / `updated_at` / `deleted_at` stamps come from
+// `HostCtx::now_unix_secs()`, NOT from `SystemTime::now()` (phase3-web-client
+// task 45). That call compiles for wasm32 and then PANICS — std has no wasm arm
+// — and these are the §10.2 LWW field clocks the theme merge reconciles on, so a
+// client that could not read a clock could not write a theme at all.
+//
+// The `sync-protocol.md` §11.4 clock-honesty caveat rides along unchanged:
+// these are client wall-clocks from different devices, skew can decide a race,
+// and deterministic convergence is the contract rather than clock truth.
 
 /// Read `vault.meta` and return its `account_number_hash` (offset 6, 16 bytes),
 /// used to build the themes-blob AAD per § 9.21.3.
-fn read_account_number_hash(
+async fn read_account_number_hash(
+    io: &dyn crate::vault_io::VaultIo,
     vault_meta_path: &Path,
 ) -> Result<[u8; VAULT_META_ACCOUNT_HASH_LEN], ThemesError> {
-    let bytes = std::fs::read(vault_meta_path)?;
+    let bytes = io
+        .read(vault_meta_path)
+        .await
+        .map_err(|io_error_kind| ThemesError::Io { io_error_kind })?;
     let meta = parse_vault_meta(&bytes).map_err(|_| ThemesError::InvalidVaultMeta)?;
     Ok(meta.account_number_hash)
 }
@@ -242,19 +249,24 @@ pub fn decode_themes_map_or_empty(
 /// PURE CORE — read + decrypt `vault.themes` under `vault_dir` into the
 /// `{name → palette}` map. Absent file / AEAD-fail / malformed payload → empty
 /// map (the fall-back-to-empty semantic, § 9.21.4).
-pub fn read_themes_map_in_dir(
+pub async fn read_themes_map_in_dir(
+    io: &dyn crate::vault_io::VaultIo,
     vault_dir: &Path,
     themes_key: &[u8; AEAD_KEY_LEN],
     account_number_hash: &[u8; VAULT_META_ACCOUNT_HASH_LEN],
 ) -> ThemesMap {
-    let blob = std::fs::read(vault_dir.join(THEMES_FILE)).ok();
+    // Absent is not an error here — §9.21.4's fall-back-to-empty covers absent,
+    // truncated, AEAD-failed and malformed alike, so every IO failure collapses
+    // the same way the decode failures do.
+    let blob = io.read(&vault_dir.join(THEMES_FILE)).await.ok();
     decode_themes_map_or_empty(themes_key, account_number_hash, blob.as_deref())
 }
 
 /// PURE CORE — encrypt `map` to the `vault.themes` blob and atomically write it
 /// under `vault_dir`. When `map` is empty, the file is removed (best-effort) so
 /// an empty store leaves no file (fall-back-to-empty on read; byte-clean vault).
-pub fn write_themes_map_in_dir(
+pub async fn write_themes_map_in_dir(
+    io: &dyn crate::vault_io::VaultIo,
     vault_dir: &Path,
     themes_key: &[u8; AEAD_KEY_LEN],
     account_number_hash: &[u8; VAULT_META_ACCOUNT_HASH_LEN],
@@ -263,11 +275,13 @@ pub fn write_themes_map_in_dir(
     let path = vault_dir.join(THEMES_FILE);
     if map.is_empty() {
         // Best-effort remove; absent == empty on read.
-        let _ = std::fs::remove_file(&path);
+        let _ = io.remove_file(&path).await;
         return Ok(());
     }
     let blob = encode_themes_map(themes_key, account_number_hash, map)?;
-    crate::atomic_write::atomic_write(&path, &blob, /* replace = */ true)?;
+    io.write(&path, &blob, crate::vault_io::WriteOpts::default())
+        .await
+        .map_err(|io_error_kind| ThemesError::Io { io_error_kind })?;
     Ok(())
 }
 
@@ -305,16 +319,13 @@ fn live_palette(map: &ThemesMap, name: &str) -> Result<ThemePalette, ThemesError
 
 /// PURE CORE — the name-sorted list of **live** custom themes in the store,
 /// each carrying the palette this read already decoded (see [`ThemeListEntry`]).
-pub fn themes_list_in_dir(
+pub async fn themes_list_in_dir(
+    io: &dyn crate::vault_io::VaultIo,
     vault_dir: &Path,
     themes_key: &[u8; AEAD_KEY_LEN],
     account_number_hash: &[u8; VAULT_META_ACCOUNT_HASH_LEN],
 ) -> Vec<ThemeListEntry> {
-    live_entries(&read_themes_map_in_dir(
-        vault_dir,
-        themes_key,
-        account_number_hash,
-    ))
+    live_entries(&read_themes_map_in_dir(io, vault_dir, themes_key, account_number_hash).await)
 }
 
 /// PURE CORE — one **live** theme's palette by name, or
@@ -325,14 +336,15 @@ pub fn themes_list_in_dir(
 /// boundary ([`themes_export_with_dir`] + its `allow-themes-export` ACL), which
 /// is where the TB3 egress door is actually guarded — a duplicate pure-core
 /// alias would add a second name without adding a second check.
-pub fn themes_read_in_dir(
+pub async fn themes_read_in_dir(
+    io: &dyn crate::vault_io::VaultIo,
     vault_dir: &Path,
     themes_key: &[u8; AEAD_KEY_LEN],
     account_number_hash: &[u8; VAULT_META_ACCOUNT_HASH_LEN],
     name: &str,
 ) -> Result<ThemePalette, ThemesError> {
     live_palette(
-        &read_themes_map_in_dir(vault_dir, themes_key, account_number_hash),
+        &read_themes_map_in_dir(io, vault_dir, themes_key, account_number_hash).await,
         name,
     )
 }
@@ -385,7 +397,8 @@ fn apply_delete(map: &mut ThemesMap, name: &str, now: u64) {
 /// — the deliberate re-add), and re-seal the blob. An invalid palette rejects
 /// with [`ThemesError::Invalid`] BEFORE any write, so the on-disk store is
 /// untouched. `now` is UNIX seconds, injected so the core stays pure.
-pub fn themes_import_in_dir(
+pub async fn themes_import_in_dir(
+    io: &dyn crate::vault_io::VaultIo,
     vault_dir: &Path,
     themes_key: &[u8; AEAD_KEY_LEN],
     account_number_hash: &[u8; VAULT_META_ACCOUNT_HASH_LEN],
@@ -396,24 +409,25 @@ pub fn themes_import_in_dir(
     // Security-load-bearing injection guard (threat-model §149): a value that
     // reaches the DOM executes under the WebView's `style-src 'unsafe-inline'`.
     let parsed = validate_theme(palette_json).map_err(|error| ThemesError::Invalid { error })?;
-    let mut map = read_themes_map_in_dir(vault_dir, themes_key, account_number_hash);
+    let mut map = read_themes_map_in_dir(io, vault_dir, themes_key, account_number_hash).await;
     apply_import(&mut map, name, parsed.vars, now);
-    write_themes_map_in_dir(vault_dir, themes_key, account_number_hash, &map)
+    write_themes_map_in_dir(io, vault_dir, themes_key, account_number_hash, &map).await
 }
 
 /// PURE CORE — **tombstone** `name` in the store and re-seal the blob. Deleting
 /// an absent name is a no-op success (idempotent). `now` is UNIX seconds,
 /// injected so the core stays pure.
-pub fn themes_delete_in_dir(
+pub async fn themes_delete_in_dir(
+    io: &dyn crate::vault_io::VaultIo,
     vault_dir: &Path,
     themes_key: &[u8; AEAD_KEY_LEN],
     account_number_hash: &[u8; VAULT_META_ACCOUNT_HASH_LEN],
     name: &str,
     now: u64,
 ) -> Result<(), ThemesError> {
-    let mut map = read_themes_map_in_dir(vault_dir, themes_key, account_number_hash);
+    let mut map = read_themes_map_in_dir(io, vault_dir, themes_key, account_number_hash).await;
     apply_delete(&mut map, name, now);
-    write_themes_map_in_dir(vault_dir, themes_key, account_number_hash, &map)
+    write_themes_map_in_dir(io, vault_dir, themes_key, account_number_hash, &map).await
 }
 
 // ---- `*_with_dir` wrappers (fetch material from the unlocked slot) ---------
@@ -421,6 +435,7 @@ pub fn themes_delete_in_dir(
 /// Read the `{name → palette}` map for the currently-unlocked vault. MUST be
 /// called while `Slot::Unlocked`.
 async fn read_themes_map_with_dir(
+    io: &dyn crate::vault_io::VaultIo,
     vault_dir: &Path,
     state: &VaultRuntimeState,
 ) -> Result<ThemesMap, ThemesError> {
@@ -428,19 +443,16 @@ async fn read_themes_map_with_dir(
         .peek_unlocked_root_key_and_hash_clone()
         .await
         .ok_or(ThemesError::SlotNotUnlocked)?;
-    let account_number_hash = read_account_number_hash(&vault_dir.join("vault.meta"))?;
+    let account_number_hash = read_account_number_hash(io, &vault_dir.join("vault.meta")).await?;
     let themes_key = derive_subkey(&root_key, SubkeyRole::CustomThemesKey);
-    Ok(read_themes_map_in_dir(
-        vault_dir,
-        &themes_key,
-        &account_number_hash,
-    ))
+    Ok(read_themes_map_in_dir(io, vault_dir, &themes_key, &account_number_hash).await)
 }
 
 /// Shared read-modify-write core for the write commands (SYNC-6): take the
 /// per-plugin write mutex → hold the SYNC-6 root-key guard across the disk write
 /// → derive the KEK → read the current map → apply `mutate` → re-seal + persist.
 async fn mutate_themes_with_dir(
+    io: &dyn crate::vault_io::VaultIo,
     vault_dir: &Path,
     state: &VaultRuntimeState,
     mutate: impl FnOnce(&mut ThemesMap),
@@ -454,45 +466,50 @@ async fn mutate_themes_with_dir(
         .hold_unlocked_root_key_and_hash()
         .await
         .ok_or(ThemesError::SlotNotUnlocked)?;
-    let account_number_hash = read_account_number_hash(&vault_dir.join("vault.meta"))?;
+    let account_number_hash = read_account_number_hash(io, &vault_dir.join("vault.meta")).await?;
     let themes_key = derive_subkey(&root_key, SubkeyRole::CustomThemesKey);
 
-    let mut map = read_themes_map_in_dir(vault_dir, &themes_key, &account_number_hash);
+    let mut map = read_themes_map_in_dir(io, vault_dir, &themes_key, &account_number_hash).await;
     mutate(&mut map);
-    write_themes_map_in_dir(vault_dir, &themes_key, &account_number_hash, &map)
+    write_themes_map_in_dir(io, vault_dir, &themes_key, &account_number_hash, &map).await
 }
 
 /// Testable core of [`themes_list`]. Tombstoned names are skipped.
 pub async fn themes_list_with_dir(
+    io: &dyn crate::vault_io::VaultIo,
     vault_dir: &Path,
     state: &VaultRuntimeState,
 ) -> Result<Vec<ThemeListEntry>, ThemesError> {
     Ok(live_entries(
-        &read_themes_map_with_dir(vault_dir, state).await?,
+        &read_themes_map_with_dir(io, vault_dir, state).await?,
     ))
 }
 
 /// Testable core of [`themes_read`]. A tombstoned name reads as absent.
 pub async fn themes_read_with_dir(
+    io: &dyn crate::vault_io::VaultIo,
     vault_dir: &Path,
     state: &VaultRuntimeState,
     name: &str,
 ) -> Result<ThemePalette, ThemesError> {
-    live_palette(&read_themes_map_with_dir(vault_dir, state).await?, name)
+    live_palette(&read_themes_map_with_dir(io, vault_dir, state).await?, name)
 }
 
 /// Testable core of [`themes_export`] (byte-identical to the read core).
 pub async fn themes_export_with_dir(
+    io: &dyn crate::vault_io::VaultIo,
     vault_dir: &Path,
     state: &VaultRuntimeState,
     name: &str,
 ) -> Result<ThemePalette, ThemesError> {
-    themes_read_with_dir(vault_dir, state, name).await
+    themes_read_with_dir(io, vault_dir, state, name).await
 }
 
 /// Testable core of [`themes_import`]. Validation runs BEFORE the SYNC-6 write
 /// guard is taken, so an invalid palette never enters the read-modify-write.
 pub async fn themes_import_with_dir(
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
     vault_dir: &Path,
     state: &VaultRuntimeState,
     name: &str,
@@ -500,8 +517,8 @@ pub async fn themes_import_with_dir(
 ) -> Result<(), ThemesError> {
     let parsed = validate_theme(palette_json).map_err(|error| ThemesError::Invalid { error })?;
     let vars = parsed.vars;
-    let now = now_unix_secs();
-    mutate_themes_with_dir(vault_dir, state, |map| {
+    let now = host.now_unix_secs();
+    mutate_themes_with_dir(io, vault_dir, state, |map| {
         apply_import(map, name, vars, now);
     })
     .await?;
@@ -513,12 +530,14 @@ pub async fn themes_import_with_dir(
 /// a dropped name would be resurrected by a peer's live copy on the next sync
 /// merge). Idempotent (deleting an absent name is a no-op success).
 pub async fn themes_delete_with_dir(
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
     vault_dir: &Path,
     state: &VaultRuntimeState,
     name: &str,
 ) -> Result<(), ThemesError> {
-    let now = now_unix_secs();
-    mutate_themes_with_dir(vault_dir, state, |map| {
+    let now = host.now_unix_secs();
+    mutate_themes_with_dir(io, vault_dir, state, |map| {
         apply_delete(map, name, now);
     })
     .await?;
@@ -526,45 +545,124 @@ pub async fn themes_delete_with_dir(
     Ok(())
 }
 
-// ---- `#[tauri::command]` wrappers (resolve the active vault dir) -----------
+// ---- host-taking inners + the Tauri wrappers over them ---------------------
+//
+// phase3-web-client task 79, keystone. Each command is now two functions:
+//
+//   `*_from_host`  — takes `&dyn HostCtx`, compiles on EVERY target, and is
+//                    the whole of the command. It differs from the old wrapper
+//                    by exactly one line: the path resolution.
+//   `*` (wrapper)  — `#[tauri::command]`, cfg-gated off on wasm and behind the
+//                    default-on `tauri-ipc` feature, and reduced to a single
+//                    delegation. The IPC name and payload shape are byte-
+//                    identical **because it is literally the same function**
+//                    the frontend already calls (Option B, `decisions.md`
+//                    2026-07-26 / `core-hostctx-design.md`).
+//
+// `state.inner()` is the only asymmetry: the wrapper unwraps Tauri's
+// `State<'_, T>` so the inner takes a plain `&VaultRuntimeState`. That is the
+// shape the `*_with_dir` layer below already uses, which is why the inners are
+// three lines each rather than a rewrite.
 
 /// IPC: list every live custom theme in the unlocked vault's store — name +
 /// palette per entry, so a picker renders its previews off THIS decrypt instead
 /// of buying each palette back with a `themes_read` round-trip.
+/// Host-taking inner. Compiles on every target.
+pub async fn themes_list_from_host(
+    host: &dyn HostCtx,
+    io: &dyn crate::vault_io::VaultIo,
+    state: &VaultRuntimeState,
+) -> Result<Vec<ThemeListEntry>, ThemesError> {
+    let dir = crate::paths::active_vault_root_io_from_host(host, state.active_vault_id().await)?;
+    themes_list_with_dir(io, &dir, state).await
+}
+
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn themes_list<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
 ) -> Result<Vec<ThemeListEntry>, ThemesError> {
-    let dir = crate::paths::active_vault_root_io(&app, state.active_vault_id().await)?;
-    themes_list_with_dir(&dir, state.inner()).await
+    themes_list_from_host(
+        &TauriHost::new(app),
+        &crate::vault_io::StdVaultIo,
+        state.inner(),
+    )
+    .await
 }
 
 /// IPC: read one custom theme's palette by name (consumed by the apply layer).
+/// Host-taking inner. Compiles on every target.
+pub async fn themes_read_from_host(
+    host: &dyn HostCtx,
+    io: &dyn crate::vault_io::VaultIo,
+    state: &VaultRuntimeState,
+    name: String,
+) -> Result<ThemePalette, ThemesError> {
+    let dir = crate::paths::active_vault_root_io_from_host(host, state.active_vault_id().await)?;
+    themes_read_with_dir(io, &dir, state, &name).await
+}
+
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn themes_read<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
     name: String,
 ) -> Result<ThemePalette, ThemesError> {
-    let dir = crate::paths::active_vault_root_io(&app, state.active_vault_id().await)?;
-    themes_read_with_dir(&dir, state.inner(), &name).await
+    themes_read_from_host(
+        &TauriHost::new(app),
+        &crate::vault_io::StdVaultIo,
+        state.inner(),
+        name,
+    )
+    .await
 }
 
 /// IPC: read one custom theme's palette for a plaintext `.json` export.
+/// Host-taking inner. Compiles on every target.
+pub async fn themes_export_from_host(
+    host: &dyn HostCtx,
+    io: &dyn crate::vault_io::VaultIo,
+    state: &VaultRuntimeState,
+    name: String,
+) -> Result<ThemePalette, ThemesError> {
+    let dir = crate::paths::active_vault_root_io_from_host(host, state.active_vault_id().await)?;
+    themes_export_with_dir(io, &dir, state, &name).await
+}
+
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn themes_export<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
     name: String,
 ) -> Result<ThemePalette, ThemesError> {
-    let dir = crate::paths::active_vault_root_io(&app, state.active_vault_id().await)?;
-    themes_export_with_dir(&dir, state.inner(), &name).await
+    themes_export_from_host(
+        &TauriHost::new(app),
+        &crate::vault_io::StdVaultIo,
+        state.inner(),
+        name,
+    )
+    .await
 }
 
 /// IPC: import (upsert) a validated custom theme under `name`. `palette_json` is
 /// the raw contents of a user-picked `.json` theme file; it is validated through
 /// the shared allowlist before being sealed into `vault.themes`.
+/// Host-taking inner. Compiles on every target.
+pub async fn themes_import_from_host(
+    host: &dyn HostCtx,
+    io: &dyn crate::vault_io::VaultIo,
+    state: &VaultRuntimeState,
+    name: String,
+    palette_json: String,
+) -> Result<(), ThemesError> {
+    let dir = crate::paths::active_vault_root_io_from_host(host, state.active_vault_id().await)?;
+    themes_import_with_dir(io, host, &dir, state, &name, &palette_json).await
+}
+
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn themes_import<R: Runtime>(
     app: AppHandle<R>,
@@ -572,19 +670,42 @@ pub async fn themes_import<R: Runtime>(
     name: String,
     palette_json: String,
 ) -> Result<(), ThemesError> {
-    let dir = crate::paths::active_vault_root_io(&app, state.active_vault_id().await)?;
-    themes_import_with_dir(&dir, state.inner(), &name, &palette_json).await
+    themes_import_from_host(
+        &TauriHost::new(app),
+        &crate::vault_io::StdVaultIo,
+        state.inner(),
+        name,
+        palette_json,
+    )
+    .await
 }
 
 /// IPC: delete one custom theme by name (idempotent).
+/// Host-taking inner. Compiles on every target.
+pub async fn themes_delete_from_host(
+    host: &dyn HostCtx,
+    io: &dyn crate::vault_io::VaultIo,
+    state: &VaultRuntimeState,
+    name: String,
+) -> Result<(), ThemesError> {
+    let dir = crate::paths::active_vault_root_io_from_host(host, state.active_vault_id().await)?;
+    themes_delete_with_dir(io, host, &dir, state, &name).await
+}
+
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn themes_delete<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
     name: String,
 ) -> Result<(), ThemesError> {
-    let dir = crate::paths::active_vault_root_io(&app, state.active_vault_id().await)?;
-    themes_delete_with_dir(&dir, state.inner(), &name).await
+    themes_delete_from_host(
+        &TauriHost::new(app),
+        &crate::vault_io::StdVaultIo,
+        state.inner(),
+        name,
+    )
+    .await
 }
 
 #[cfg(test)]
@@ -610,6 +731,118 @@ mod tests {
 
     /// Wall-clock stand-in for the injected `now` (UNIX seconds).
     const T0: u64 = 1_700_000_000;
+
+    // ── the seam, driven synchronously (phase3-web-client task 45) ──────────
+    //
+    // The `*_in_dir` cores became async when they moved onto `VaultIo`. These
+    // shims shadow them inside the test module so the ~50 existing call sites
+    // read exactly as they did — the assertions are about themes, not about
+    // await points, and rewriting them all would have buried the behavioural
+    // diff in mechanical noise.
+    //
+    // They drive the REAL native arm (`StdVaultIo`), not a double: the whole
+    // claim of the port is that one code path serves both targets, and a fake
+    // here would only prove the signature compiles.
+    const IO: crate::vault_io::StdVaultIo = crate::vault_io::StdVaultIo;
+
+    fn rt() -> tokio::runtime::Runtime {
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("current-thread runtime build")
+    }
+
+    fn read_themes_map_in_dir(
+        vault_dir: &Path,
+        themes_key: &[u8; AEAD_KEY_LEN],
+        account_number_hash: &[u8; VAULT_META_ACCOUNT_HASH_LEN],
+    ) -> ThemesMap {
+        rt().block_on(super::read_themes_map_in_dir(
+            &IO,
+            vault_dir,
+            themes_key,
+            account_number_hash,
+        ))
+    }
+
+    fn write_themes_map_in_dir(
+        vault_dir: &Path,
+        themes_key: &[u8; AEAD_KEY_LEN],
+        account_number_hash: &[u8; VAULT_META_ACCOUNT_HASH_LEN],
+        map: &ThemesMap,
+    ) -> Result<(), ThemesError> {
+        rt().block_on(super::write_themes_map_in_dir(
+            &IO,
+            vault_dir,
+            themes_key,
+            account_number_hash,
+            map,
+        ))
+    }
+
+    fn themes_list_in_dir(
+        vault_dir: &Path,
+        themes_key: &[u8; AEAD_KEY_LEN],
+        account_number_hash: &[u8; VAULT_META_ACCOUNT_HASH_LEN],
+    ) -> Vec<ThemeListEntry> {
+        rt().block_on(super::themes_list_in_dir(
+            &IO,
+            vault_dir,
+            themes_key,
+            account_number_hash,
+        ))
+    }
+
+    fn themes_read_in_dir(
+        vault_dir: &Path,
+        themes_key: &[u8; AEAD_KEY_LEN],
+        account_number_hash: &[u8; VAULT_META_ACCOUNT_HASH_LEN],
+        name: &str,
+    ) -> Result<ThemePalette, ThemesError> {
+        rt().block_on(super::themes_read_in_dir(
+            &IO,
+            vault_dir,
+            themes_key,
+            account_number_hash,
+            name,
+        ))
+    }
+
+    fn themes_import_in_dir(
+        vault_dir: &Path,
+        themes_key: &[u8; AEAD_KEY_LEN],
+        account_number_hash: &[u8; VAULT_META_ACCOUNT_HASH_LEN],
+        name: &str,
+        palette_json: &str,
+        now: u64,
+    ) -> Result<(), ThemesError> {
+        rt().block_on(super::themes_import_in_dir(
+            &IO,
+            vault_dir,
+            themes_key,
+            account_number_hash,
+            name,
+            palette_json,
+            now,
+        ))
+    }
+
+    fn themes_delete_in_dir(
+        vault_dir: &Path,
+        themes_key: &[u8; AEAD_KEY_LEN],
+        account_number_hash: &[u8; VAULT_META_ACCOUNT_HASH_LEN],
+        name: &str,
+        now: u64,
+    ) -> Result<(), ThemesError> {
+        rt().block_on(super::themes_delete_in_dir(
+            &IO,
+            vault_dir,
+            themes_key,
+            account_number_hash,
+            name,
+            now,
+        ))
+    }
 
     /// The live theme NAMES [`themes_list_in_dir`] reports, under the fixed
     /// `KEY`/`HASH`. The list surface hands out `{name, palette}` entries, but
@@ -875,7 +1108,16 @@ mod tests {
     #[test]
     fn corrupt_blob_reads_empty() {
         let tmp = ScopedTempDir::new("themes-corrupt").expect("tmp");
-        std::fs::write(tmp.path().join(THEMES_FILE), b"not a MYT1 blob").expect("write");
+        // Through the seam like everything else — the bytes are deliberately
+        // garbage, but the WRITE is not special, and reaching for `std::fs` here
+        // would put this file back on the io-seam ratchet it just left.
+        rt().block_on(crate::vault_io::VaultIo::write(
+            &IO,
+            &tmp.path().join(THEMES_FILE),
+            b"not a MYT1 blob",
+            crate::vault_io::WriteOpts::default(),
+        ))
+        .expect("write");
         assert!(read_themes_map_in_dir(tmp.path(), &KEY, &HASH).is_empty());
     }
 

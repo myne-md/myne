@@ -323,7 +323,11 @@ impl Device {
     /// from the local set), so the deletion never propagates.
     fn empty_trash_buggy(&self, id: &NoteId) {
         let _ = std::fs::remove_file(self.blob_path(id));
-        let _ = add_pending_tombstone(&self.vault_dir, &Self::id_hex(id));
+        let _ = crate::test_support::block_on(add_pending_tombstone(
+            &crate::vault_io::StdVaultIo,
+            &self.vault_dir,
+            &Self::id_hex(id),
+        ));
     }
 
     /// Move a note to the trash — a soft, recoverable state set by a `trashed:`
@@ -350,7 +354,11 @@ impl Device {
         if let Some(mut pt) = self.read_note(id) {
             pt.extend_from_slice(b"\ndeleted: 2026-06-21T00:00:00Z");
             self.write_blob(id, &pt, true);
-            let _ = add_pending_tombstone(&self.vault_dir, &Self::id_hex(id));
+            let _ = crate::test_support::block_on(add_pending_tombstone(
+                &crate::vault_io::StdVaultIo,
+                &self.vault_dir,
+                &Self::id_hex(id),
+            ));
         }
     }
 
@@ -364,7 +372,12 @@ impl Device {
     /// [`Device::sync`] without the panic-on-error — the fault-injection
     /// scenarios assert on the error shape instead.
     fn try_sync(&self) -> Result<SyncSummary, super::orchestrator::SyncCycleError> {
-        run_sync_cycle(
+        // `run_sync_cycle` became `async` with task 86; the sim's scenarios are
+        // synchronous by design (they drive a deterministic two-device timeline
+        // step by step), so each cycle is driven on a runtime. The engine under
+        // test is unchanged.
+        crate::test_support::block_on(run_sync_cycle(
+            &crate::vault_io::StdVaultIo,
             self.transport.as_ref(),
             &self.acct.root_key,
             self.acct.account_hash,
@@ -377,7 +390,7 @@ impl Device {
                 items_key: &self.acct.items_key,
                 items_key_id: &self.acct.items_key_id,
             }),
-        )
+        ))
     }
 
     fn read_note(&self, id: &NoteId) -> Option<Vec<u8>> {
@@ -410,7 +423,10 @@ impl Device {
     }
 
     fn pending_conflicts(&self) -> Vec<String> {
-        list_pending_conflicts(&self.vault_dir)
+        crate::test_support::block_on(list_pending_conflicts(
+            &crate::vault_io::StdVaultIo,
+            &self.vault_dir,
+        ))
     }
 
     /// Resolve EVERY staged conflict the way the frontend does: for each, keep
@@ -423,7 +439,11 @@ impl Device {
         for id_hex in self.pending_conflicts() {
             if let (Some(idb), Some(blob)) = (
                 id_hex_to_bytes(&id_hex),
-                read_staged_conflict_blob(&self.vault_dir, &id_hex),
+                crate::test_support::block_on(read_staged_conflict_blob(
+                    &crate::vault_io::StdVaultIo,
+                    &self.vault_dir,
+                    &id_hex,
+                )),
             ) {
                 if let Ok(dec) =
                     decode_note(&blob, &idb, &self.acct.items_key, &self.acct.items_key_id)
@@ -431,7 +451,11 @@ impl Device {
                     copies.push(self.create_note(dec.plaintext()));
                 }
             }
-            let _ = resolve_conflict(&self.vault_dir, &id_hex);
+            let _ = crate::test_support::block_on(resolve_conflict(
+                &crate::vault_io::StdVaultIo,
+                &self.vault_dir,
+                &id_hex,
+            ));
         }
         copies
     }
@@ -466,14 +490,22 @@ impl Device {
     /// baseline + clear the staging, so the untouched local edit pushes next as
     /// a clean linear advance.
     fn resolve_conflict(&self, id: &NoteId) {
-        let _ = resolve_conflict(&self.vault_dir, &Self::id_hex(id));
+        let _ = crate::test_support::block_on(resolve_conflict(
+            &crate::vault_io::StdVaultIo,
+            &self.vault_dir,
+            &Self::id_hex(id),
+        ));
     }
 
     /// Decrypt the remote revision staged as a keep-both conflict for `id`
     /// (the bytes the notes layer would turn into a "conflict copy"). `None` if
     /// nothing is staged for that note.
     fn read_staged_conflict(&self, id: &NoteId) -> Option<Vec<u8>> {
-        let blob = read_staged_conflict_blob(&self.vault_dir, &Self::id_hex(id))?;
+        let blob = crate::test_support::block_on(read_staged_conflict_blob(
+            &crate::vault_io::StdVaultIo,
+            &self.vault_dir,
+            &Self::id_hex(id),
+        ))?;
         let nb = *id.as_uuid().as_bytes();
         Some(
             decode_note(&blob, &nb, &self.acct.items_key, &self.acct.items_key_id)

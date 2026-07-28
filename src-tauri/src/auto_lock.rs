@@ -266,9 +266,19 @@ async fn idle_lock_tick<R: Runtime>(app: &AppHandle<R>) {
 /// screen). Fail-closed + grace-flush + TOCTOU re-read.
 async fn lock_unlocked_if_idle<R: Runtime>(app: &AppHandle<R>, state: &VaultRuntimeState) {
     let timeout = Duration::from_secs(u64::from(state.auto_lock_timeout_secs()));
+    // The monotonic clock comes from the host seam now (MYND-574 task 12):
+    // `VaultRuntimeState` no longer owns an `Instant` baseline, because
+    // capturing one in `Default::default()` panicked on wasm32. Behaviour on
+    // desktop is unchanged — `TauriHost::monotonic_millis` is `Instant`-backed.
+    // `HostCtx` in scope so `monotonic_millis` resolves on the concrete adapter.
+    use myne_core::host::HostCtx as _;
+    let host = myne_core::host::tauri_host::TauriHost::new(app.clone());
 
     // Lock-free pre-check: has the effective idle crossed the timeout?
-    if effective_idle(Duration::from_millis(state.idle_millis())) < timeout {
+    if effective_idle(Duration::from_millis(
+        state.idle_millis(host.monotonic_millis()),
+    )) < timeout
+    {
         return;
     }
 
@@ -283,7 +293,9 @@ async fn lock_unlocked_if_idle<R: Runtime>(app: &AppHandle<R>, state: &VaultRunt
     // vault_lock — not a parallel zeroize path.
     let locked = state
         .take_unlocked_if_idle(timeout, || {
-            effective_idle(Duration::from_millis(state.idle_millis()))
+            effective_idle(Duration::from_millis(
+                state.idle_millis(host.monotonic_millis()),
+            ))
         })
         .await;
 
@@ -336,8 +348,18 @@ async fn lock_unlocked_if_idle<R: Runtime>(app: &AppHandle<R>, state: &VaultRunt
 /// `vault_complete_recovery` (bail without disk write); the frontend resumes
 /// via its existing needs-active-session path on the next commit attempt.
 async fn bail_recovering_if_expired<R: Runtime>(app: &AppHandle<R>, state: &VaultRuntimeState) {
+    // `recovered_at` is a host monotonic reading in millis rather than an
+    // `Instant` (MYND-574 task 12); the age is the difference against a fresh
+    // reading from the same clock. `saturating_sub` so a backwards clock step
+    // reports age 0 — which DELAYS the bail rather than firing it early, the
+    // safe direction for a guard that zeroizes key material.
+    let now_ms = myne_core::host::HostCtx::monotonic_millis(
+        &myne_core::host::tauri_host::TauriHost::new(app.clone()),
+    );
     let bailed = state
-        .take_recovering_if_expired(RECOVERING_TTL, |recovered_at| recovered_at.elapsed())
+        .take_recovering_if_expired(RECOVERING_TTL, |recovered_at| {
+            Duration::from_millis(now_ms.saturating_sub(recovered_at))
+        })
         .await;
 
     if let Some(prior) = bailed {

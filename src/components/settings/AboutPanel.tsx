@@ -8,9 +8,10 @@
 // Penpot canon: `🔴 screen------settings--about` (frame id
 // `9fb59646-2811-8082-8007-fd4c5a602b46`).
 
-import type { CSSProperties, ReactNode } from "react";
+import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { openUrl } from "@tauri-apps/plugin-opener";
+import { servedBuildInfo, type BuildInfo } from "../../platform/build-info";
+import { openUrl } from "../../platform/opener";
 import { Button } from "../primitives/Button";
 import {
   BLOCK_STYLE,
@@ -77,6 +78,29 @@ function handleThreatModelClick() {
 
 export function AboutPanel() {
   const { t } = useTranslation();
+  // The SERVED bundle's identity, where there is one (phase3-web-client task
+  // 114). `null` on desktop by construction — a desktop user's build identity is
+  // the signed installer they ran, which the version string above already names.
+  //
+  // On web this is the readout that makes the rest of the integrity chain
+  // usable: the bundle is re-delivered on every load, meant to be pinned by a
+  // service worker and checkable against a published hash record, and none of
+  // that helps if the running client will not say which bundle it is.
+  //
+  // Presented exactly as the version string is, with no security claim attached
+  // — the disclosure of the weakened trust posture is a separate, deliberate
+  // decision and is out of this task's scope.
+  const [served, setServed] = useState<BuildInfo | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    void servedBuildInfo().then((info) => {
+      if (!cancelled) setServed(info);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const buildChannelLabel =
     import.meta.env.MODE === "development"
       ? t("settings.about.buildChannelDevelopment")
@@ -92,6 +116,21 @@ export function AboutPanel() {
       <Block>
         <span style={LABEL_STYLE}>{t("settings.about.buildChannelLabel")}</span>
         <p style={VALUE_STYLE}>{buildChannelLabel}</p>
+      </Block>
+
+      <Block>
+        <span style={LABEL_STYLE}>{t("settings.about.buildLabel")}</span>
+        <p style={VALUE_STYLE} data-testid="about.build-commit">
+          {__BUILD_COMMIT__}
+        </p>
+        {served !== null && (
+          <p
+            style={{ ...VALUE_STYLE, fontFamily: "var(--font-mono)", overflowWrap: "anywhere" }}
+            data-testid="about.bundle-hash"
+          >
+            {served.bundleHash}
+          </p>
+        )}
       </Block>
 
       <Block>

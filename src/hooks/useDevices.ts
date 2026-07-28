@@ -3,8 +3,8 @@
 // /auth/devices* surface over the configured transport).
 
 import { useCallback, useEffect, useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
+import { invoke } from "../platform/core";
+import { subscribeToEvents } from "../lib/subscribe";
 
 /** One device in the roster (mirrors the Rust `DeviceEntry`). */
 export interface DeviceEntry {
@@ -83,16 +83,10 @@ export function useDevices(): DevicesHook {
     const id = setInterval(() => void load(true), 2000);
     // Re-read immediately on a local enrollment change (e.g. reset) so the roster
     // does not lag its 4s poll behind the status indicator.
-    let unlisten: (() => void) | undefined;
-    let cancelled = false;
-    void listen("sync://enrollment-changed", () => void load(false)).then((fn) => {
-      if (cancelled) fn();
-      else unlisten = fn;
-    });
+    const unsubscribe = subscribeToEvents(["sync://enrollment-changed"], () => void load(false));
     return () => {
-      cancelled = true;
       clearInterval(id);
-      unlisten?.();
+      unsubscribe();
     };
   }, [load]);
 

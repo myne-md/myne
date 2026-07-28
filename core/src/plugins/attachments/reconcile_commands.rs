@@ -29,6 +29,8 @@
 use super::error::AttachmentRefsError;
 use super::reconcile::AttachmentRefsState;
 use crate::plugins::vault_unlock::state::{SlotKind, VaultRuntimeState};
+// Tauri types serve only the cfg-gated IPC wrappers (task 79, Option B).
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 use tauri::State;
 
 /// Replace the set of attachment-ids a note references (replace-on-apply).
@@ -39,6 +41,22 @@ use tauri::State;
 /// Re-applying a note id fully overwrites its prior id set, so an edit
 /// that removes an embed drops the stale reference. Rejected with
 /// [`AttachmentRefsError::SlotNotUnlocked`] when no vault is unlocked.
+pub async fn attachment_refs_apply_from_host(
+    note_id: String,
+    attachment_ids: Vec<String>,
+    runtime: &VaultRuntimeState,
+    refs: &AttachmentRefsState,
+) -> Result<(), AttachmentRefsError> {
+    if runtime.slot_kind_active().await != SlotKind::Unlocked {
+        return Err(AttachmentRefsError::SlotNotUnlocked);
+    }
+    refs.apply(&note_id, attachment_ids);
+    Ok(())
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn attachment_refs_apply(
     note_id: String,
@@ -46,11 +64,7 @@ pub async fn attachment_refs_apply(
     runtime: State<'_, VaultRuntimeState>,
     refs: State<'_, AttachmentRefsState>,
 ) -> Result<(), AttachmentRefsError> {
-    if runtime.slot_kind_active().await != SlotKind::Unlocked {
-        return Err(AttachmentRefsError::SlotNotUnlocked);
-    }
-    refs.apply(&note_id, attachment_ids);
-    Ok(())
+    attachment_refs_apply_from_host(note_id, attachment_ids, runtime.inner(), refs.inner()).await
 }
 
 /// Remove a hard-deleted note from the reference graph (no-op if absent).
@@ -60,17 +74,28 @@ pub async fn attachment_refs_apply(
 /// `vault_indices` trash posture. Only hard-delete / empty-trash removes.
 /// Rejected with [`AttachmentRefsError::SlotNotUnlocked`] when no vault is
 /// unlocked.
-#[tauri::command]
-pub async fn attachment_refs_remove(
+pub async fn attachment_refs_remove_from_host(
     note_id: String,
-    runtime: State<'_, VaultRuntimeState>,
-    refs: State<'_, AttachmentRefsState>,
+    runtime: &VaultRuntimeState,
+    refs: &AttachmentRefsState,
 ) -> Result<(), AttachmentRefsError> {
     if runtime.slot_kind_active().await != SlotKind::Unlocked {
         return Err(AttachmentRefsError::SlotNotUnlocked);
     }
     refs.remove(&note_id);
     Ok(())
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn attachment_refs_remove(
+    note_id: String,
+    runtime: State<'_, VaultRuntimeState>,
+    refs: State<'_, AttachmentRefsState>,
+) -> Result<(), AttachmentRefsError> {
+    attachment_refs_remove_from_host(note_id, runtime.inner(), refs.inner()).await
 }
 
 /// The note-ids referencing `attachment_id`, sorted for determinism.
@@ -80,14 +105,25 @@ pub async fn attachment_refs_remove(
 /// (SYNC-6 amended — exposes ids, not just a count). Empty when the
 /// attachment is unreferenced. Rejected with
 /// [`AttachmentRefsError::SlotNotUnlocked`] when no vault is unlocked.
+pub async fn attachment_refs_referencing_from_host(
+    attachment_id: String,
+    runtime: &VaultRuntimeState,
+    refs: &AttachmentRefsState,
+) -> Result<Vec<String>, AttachmentRefsError> {
+    if runtime.slot_kind_active().await != SlotKind::Unlocked {
+        return Err(AttachmentRefsError::SlotNotUnlocked);
+    }
+    Ok(refs.referencing_notes(&attachment_id))
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn attachment_refs_referencing(
     attachment_id: String,
     runtime: State<'_, VaultRuntimeState>,
     refs: State<'_, AttachmentRefsState>,
 ) -> Result<Vec<String>, AttachmentRefsError> {
-    if runtime.slot_kind_active().await != SlotKind::Unlocked {
-        return Err(AttachmentRefsError::SlotNotUnlocked);
-    }
-    Ok(refs.referencing_notes(&attachment_id))
+    attachment_refs_referencing_from_host(attachment_id, runtime.inner(), refs.inner()).await
 }

@@ -12,7 +12,7 @@
 // canonical IPC; γ1+γ2 hybrid coalescing lives in `./saveNote.ts` +
 // `./useAutosave.ts` (Tasks 12 + 26 of the `notes-sidebar-autosave` PRD).
 
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../platform/core";
 
 /**
  * Re-encrypt an existing `.myn` note in place. Stateless idempotent

@@ -33,7 +33,7 @@
 
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
-import { appDataDir, join } from "@tauri-apps/api/path";
+import { appDataDir, join } from "../../platform/path";
 import { Button } from "../primitives/Button";
 import { PasswordChangeForm } from "../PasswordChangeForm";
 import { DeleteVaultConfirmForm } from "../DeleteVaultConfirmForm";
@@ -42,6 +42,7 @@ import { prefsRead, setVaultLabel, setVaultIcon } from "../../lib/prefs";
 import { listVaults, orderByLastUnlock } from "../../lib/vault-list";
 import { FolderGlyph } from "../../notes/components/FolderGlyph";
 import { FOLDER_ICON_NAMES } from "../../notes/folderIcons";
+import * as capabilities from "../../platform/capabilities";
 import { ConnectedExtensions } from "./ConnectedExtensions";
 import {
   deleteVault,
@@ -274,6 +275,14 @@ function mapChangePasswordError(
       return i18n.t("settings.account.changePasswordError.ioError");
     case "JoinFailure":
       return i18n.t("settings.account.changePasswordError.joinFailure");
+    case "ServerAckPending":
+      // NOT a failure of the change, and the copy says so first (tasks 41 + 88).
+      // The new password works on this device right now; what has not happened
+      // is the push, so every other device still holds the old wrap. Saying
+      // "couldn't change your password" here would send the user to change it
+      // again — and the second change would rewrap the wrap the first one
+      // produced, leaving them further from the server, not closer.
+      return i18n.t("settings.account.changePasswordError.serverAckPending");
     case "InvalidVaultMeta":
     case "VaultMetaChangedExternally":
     case "VaultLockedDuringChange":
@@ -491,8 +500,17 @@ export function AccountPanel({
           // Resolve the vault path lazily on reject — the success
           // path doesn't need it. UI-side resolution mirrors the
           // backend's `paths::vault_dir` derivation.
-          const base = await appDataDir();
-          const vaultDirPath = await join(base, "vault");
+          //
+          // `null` where the platform has no such path (phase3-web-client task
+          // 72). `path.appDataDir` is a typed refusal in the browser seam, and
+          // an unguarded call here would throw INSIDE this catch block —
+          // swallowing the mapping and leaving the user with a failed delete and
+          // no banner at all. The capability is the same one that selects the
+          // copy: a client whose vault is not the only copy has no directory to
+          // send anyone to either.
+          const vaultDirPath = capabilities.has("localOnlyVault")
+            ? await join(await appDataDir(), "vault")
+            : null;
           if (!mountedRef.current) return;
           const mapping = mapDeleteVaultError(e, vaultDirPath);
           if (mapping.kind === "partial-fail") {
@@ -674,15 +692,36 @@ export function AccountPanel({
         </div>
       </section>
 
-      <section style={SECTION_STYLE}>
-        <ConnectedExtensions />
-      </section>
+      {/* Browser clipper: absent on web (MYND-574 task 27). A page cannot be a
+          native-messaging host, so the extension talks to the desktop app or to
+          nothing — there is no degraded mode to offer. Omitted rather than
+          disabled: `decisions.md` 2026-07-26 makes that normative. */}
+      {capabilities.has("clipper") && (
+        <section style={SECTION_STYLE}>
+          <ConnectedExtensions />
+        </section>
+      )}
 
       <hr style={DIVIDER_STYLE} aria-hidden="true" />
 
+      {/* The danger zone, and what "danger" means here (MYND-574 task 72).
+          Where the local vault may be the only copy it is a destruction; where
+          it is a cache of a sync-held vault it is a sign-out that takes this
+          browser's copy with it. Same CTA, same testid, same command — different
+          promise, because the desktop promise would be false on the other
+          client in the direction that loses a user's trust rather than their
+          data. */}
       <section style={SECTION_STYLE}>
-        <h3 style={DANGER_HEADING_STYLE}>{t("settings.account.dangerZoneHeading")}</h3>
-        <p style={HELPER_TEXT_MUTED_STYLE}>{t("settings.account.dangerZoneHelper")}</p>
+        <h3 style={DANGER_HEADING_STYLE}>
+          {capabilities.has("localOnlyVault")
+            ? t("settings.account.dangerZoneHeading")
+            : t("settings.account.localEraseHeading")}
+        </h3>
+        <p style={HELPER_TEXT_MUTED_STYLE}>
+          {capabilities.has("localOnlyVault")
+            ? t("settings.account.dangerZoneHelper")
+            : t("settings.account.localEraseHelper")}
+        </p>
         <div>
           <Button
             variant="danger"
@@ -692,7 +731,9 @@ export function AccountPanel({
               setView("delete-vault");
             }}
           >
-            {t("settings.account.deleteVaultButton")}
+            {capabilities.has("localOnlyVault")
+              ? t("settings.account.deleteVaultButton")
+              : t("settings.account.localEraseButton")}
           </Button>
         </div>
       </section>

@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/myne-mark.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Myne</title>
+  </head>
+
+  <body>
+    <!-- Boot shell (phase3-web-client task 68).
+
+         Inline, styled by nothing, and removed by the first React render. It
+         exists because the shared `App` returns `null` while its boot probe is
+         in flight — correct on desktop, where the probe is a millisecond of
+         local IO, and a WHITE PAGE on web, where it waits for a Worker to
+         start, a multi-megabyte wasm module to compile, and OPFS to answer.
+
+         Deliberately not a spinner and deliberately not the unlock screen: a
+         spinner that outlives its cause is the most common lie in a loading
+         state, and painting a fake unlock form would invite a password into a
+         field nothing is listening to yet. It is the window the app is about to
+         fill, in the app's own colours, so the first paint says "this is
+         loading" instead of "this is broken".
+
+         The colours are literals rather than tokens because this markup is
+         parsed before any stylesheet: `prefers-color-scheme` is the only theme
+         signal available at this instant, which is also exactly what the app
+         itself falls back to before a vault is unlocked. -->
+    <div id="boot-shell" aria-hidden="true">
+      <style>
+        #boot-shell {
+          position: fixed;
+          inset: 0;
+          background: #fbfbfa;
+        }
+        @media (prefers-color-scheme: dark) {
+          #boot-shell {
+            background: #16161a;
+          }
+        }
+      </style>
+    </div>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

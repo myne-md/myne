@@ -29,7 +29,7 @@ use crate::export_naming::{
 };
 use crate::io_failure_kind::from_io_error_kind;
 use crate::paths;
-use crate::search::{MatchedIn, SearchIndexState};
+use crate::search::SearchIndexState;
 use protocol::{decode_note, DecryptError};
 use std::path::PathBuf;
 use std::time::Instant;
@@ -37,7 +37,7 @@ use tauri::{AppHandle, Emitter, Runtime, State};
 use zeroize::Zeroizing;
 
 use super::SNAPSHOT_WRITE_FAILED_EVENT;
-use crate::plugins::vault_unlock::state::{Slot, SlotKind, VaultRuntimeState};
+use crate::plugins::vault_unlock::state::{Slot, VaultRuntimeState};
 use myne_core::atomic_write;
 // `enumerate_notes_dir` is now consumed only by this module's tests (the
 // non-test caller, `collect_referenced_attachment_ids`, moved to
@@ -630,9 +630,8 @@ pub(crate) async fn note_export_attachments_with_root(
             //     catalog read on that path).
             let mut pending: Vec<PendingAttachment> = Vec::with_capacity(unique_ids.len());
             if !unique_ids.is_empty() {
-                use crate::plugins::attachments::commands::{
-                    hex_decode_id, load_catalog_for_export, CatalogLoadError,
-                };
+                use crate::plugins::attachments::blocking_reads::load_catalog_for_export;
+                use crate::plugins::attachments::commands::{hex_decode_id, CatalogLoadError};
                 let catalog =
                     load_catalog_for_export(&vault_root, &root_key).map_err(|e| match e {
                         CatalogLoadError::InvalidVaultMeta => {
@@ -643,8 +642,7 @@ pub(crate) async fn note_export_attachments_with_root(
                             );
                             NoteExportAttachmentsError::InvalidVaultMeta
                         }
-                        CatalogLoadError::MetaIo(kind) => {
-                            let io_kind = from_io_error_kind(kind);
+                        CatalogLoadError::MetaIo(io_kind) => {
                             tracing::error!(
                                 stage = "read_meta",
                                 error_kind = "Io",
@@ -655,8 +653,7 @@ pub(crate) async fn note_export_attachments_with_root(
                                 io_error_kind: io_kind,
                             }
                         }
-                        CatalogLoadError::CatalogIo(kind) => {
-                            let io_kind = from_io_error_kind(kind);
+                        CatalogLoadError::CatalogIo(io_kind) => {
                             tracing::error!(
                                 stage = "read_catalog",
                                 error_kind = "Io",
@@ -1035,9 +1032,8 @@ pub(crate) async fn note_export_html_attachments_with_root(
             //     nothing). Skipped when the HTML references none.
             let mut pending: Vec<PendingAttachment> = Vec::with_capacity(unique_ids.len());
             if !unique_ids.is_empty() {
-                use crate::plugins::attachments::commands::{
-                    hex_decode_id, load_catalog_for_export, CatalogLoadError,
-                };
+                use crate::plugins::attachments::blocking_reads::load_catalog_for_export;
+                use crate::plugins::attachments::commands::{hex_decode_id, CatalogLoadError};
                 let catalog =
                     load_catalog_for_export(&vault_root, &root_key).map_err(|e| match e {
                         CatalogLoadError::InvalidVaultMeta => {
@@ -1048,8 +1044,7 @@ pub(crate) async fn note_export_html_attachments_with_root(
                             );
                             NoteExportAttachmentsError::InvalidVaultMeta
                         }
-                        CatalogLoadError::MetaIo(kind) => {
-                            let io_kind = from_io_error_kind(kind);
+                        CatalogLoadError::MetaIo(io_kind) => {
                             tracing::error!(
                                 stage = "read_meta",
                                 error_kind = "Io",
@@ -1060,8 +1055,7 @@ pub(crate) async fn note_export_html_attachments_with_root(
                                 io_error_kind: io_kind,
                             }
                         }
-                        CatalogLoadError::CatalogIo(kind) => {
-                            let io_kind = from_io_error_kind(kind);
+                        CatalogLoadError::CatalogIo(io_kind) => {
                             tracing::error!(
                                 stage = "read_catalog",
                                 error_kind = "Io",
@@ -1382,93 +1376,31 @@ pub async fn note_snapshot_flush<R: Runtime>(
 // consume it (shared desktop↔mobile). It depends only on `protocol::decode_note`,
 // the core note enumerator, and the shared embed tokenizer.
 
-/// A ranked search result for the WebView (MYND-29 Task 5; `matched_in` +
-/// cap added in MYND-40): the matching note's id + display title + BM25 score,
-/// best score first, plus which field(s) the query matched in. `matched_in`
-/// drives the palette's "matched in body" badge — a body-only hit is a note
-/// whose title does not contain the query. Match-context SNIPPET rendering is
-/// deferred to Phase 2 (the index stores postings + titles, not the full body,
-/// and decrypting per hit to build a snippet is rejected on threat-model
-/// grounds); v0.1 ranks over the body but renders title + the body-match badge.
-#[derive(Debug, Clone, serde::Serialize)]
-pub struct SearchResult {
-    pub note_id: String,
-    pub title: String,
-    pub score: f32,
-    pub matched_in: MatchedIn,
-    /// MYND-448a: `None` for a note-body hit; `Some(attachment_id_hex)` when the
-    /// hit is an EMBEDDED attachment's extracted text (its own index doc,
-    /// `att:<attachment_id>:<note_id>`). `note_id` above is the embedding note in
-    /// both cases, so the palette opens the same note; a `Some` value badges the
-    /// row as an attachment-content match and lets it scroll to the embed.
-    pub attachment_id: Option<String>,
-}
-
-/// Upper bound on results returned to the WebView per query (MYND-40). The
-/// index returns the full BM25-ranked match set; a broad type-ahead prefix on
-/// a large vault can match thousands of notes, so the command caps to the
-/// top-N highest-scored — the palette renders ~10-20 rows, and an unbounded
-/// result set is wasted IPC + render. Result-shaping only: the index
-/// data-model and the `MYS1` blob are untouched.
-pub const NOTE_SEARCH_RESULT_CAP: usize = 50;
-
 /// `note_search` — `Slot::Unlocked`-gated full-text search over the live
-/// in-RAM index (MYND-29 Task 5). Returns BM25-ranked results, or an EMPTY
-/// vec when the vault is not unlocked (no error, no leak). The index is
-/// populated/updated while unlocked (Tasks 4/7) and cleared on lock (Task 8).
+/// in-RAM index. The IPC wrapper only; the ranking core is shared.
 #[tauri::command]
 pub async fn note_search(
-    state: State<'_, VaultRuntimeState>,
-    search: State<'_, SearchIndexState>,
+    state: tauri::State<'_, VaultRuntimeState>,
+    search: tauri::State<'_, SearchIndexState>,
     query: String,
 ) -> Result<Vec<SearchResult>, ()> {
     // Infallible in practice (the gate yields an empty vec, not an error, when
     // not unlocked; `query` is infallible). The `Result` is only here because
-    // Tauri requires reference-taking async commands to return a `Result`; the
-    // `Err(())` arm is never produced.
+    // Tauri requires reference-taking async commands to return one; the `Err`
+    // arm is never produced.
     Ok(note_search_core(state.inner(), search.inner(), &query).await)
 }
 
-/// Testable core of [`note_search`]: gate on `Slot::Unlocked`, then map the
-/// index's ranked hits to the WebView result shape. Takes plain refs so tests
-/// exercise the slot gate without a Tauri runtime (mirrors the `_with_dir`
-/// testability pattern). No secret material is logged.
-pub async fn note_search_core(
-    state: &VaultRuntimeState,
-    search: &SearchIndexState,
-    query: &str,
-) -> Vec<SearchResult> {
-    // Gate: search only while Unlocked. Recovering / Empty → empty result, so a
-    // stale-but-not-yet-cleared index (pre-Task-8) cannot leak when locked.
-    if !matches!(state.slot_kind_active().await, SlotKind::Unlocked) {
-        return Vec::new();
-    }
-    search
-        .query(query)
-        .into_iter()
-        .take(NOTE_SEARCH_RESULT_CAP)
-        .map(|hit| {
-            // MYND-448a: an attachment doc's id carries its provenance
-            // (`att:<attachment>:<note>`); decode it so the WebView opens the
-            // embedding note and badges an attachment-content match.
-            let (note_id, attachment_id) = match crate::search::doc_id::parse_search_doc_id(&hit.id)
-            {
-                crate::search::doc_id::SearchDocId::Attachment {
-                    attachment_id,
-                    note_id,
-                } => (note_id.to_string(), Some(attachment_id.to_string())),
-                crate::search::doc_id::SearchDocId::Note { note_id } => (note_id.to_string(), None),
-            };
-            SearchResult {
-                note_id,
-                title: hit.title,
-                score: hit.score,
-                matched_in: hit.matched_in,
-                attachment_id,
-            }
-        })
-        .collect()
-}
+// The search result shape, the cap and the ranking core moved to
+// `myne_core::plugins::notes::search_sync_core` with the index lifecycle
+// (phase3-web-client tasks 14 + 83) — none of it is desktop-specific, and a web
+// client with a populated index and no way to query it would have been the
+// obvious half of the port to leave behind. Re-exported so the `#[tauri::command]`
+// wrapper below and every existing consumer keep their paths.
+pub use myne_core::plugins::notes::search_sync_core::{note_search_core, SearchResult};
+// Read only by the cap test below; the production cap lives in the core.
+#[cfg(test)]
+use myne_core::plugins::notes::search_sync_core::NOTE_SEARCH_RESULT_CAP;
 
 #[cfg(test)]
 mod tests {
@@ -1630,10 +1562,15 @@ mod tests {
                 .await;
 
             let plaintext = "# happy path\nnote body";
-            let note_id_str =
-                note_create_with_dir(notes_dir.clone(), &state, plaintext.to_string())
-                    .await
-                    .expect("happy path must succeed");
+            let note_id_str = note_create_with_dir(
+                notes_dir.clone(),
+                &state,
+                plaintext.to_string(),
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
+            )
+            .await
+            .expect("happy path must succeed");
 
             let note_id = NoteId::parse(&note_id_str).expect("returned id must be canonical");
             let on_disk = notes_dir.join(format!("{}.myn", note_id.as_uuid()));
@@ -1674,9 +1611,15 @@ mod tests {
                 .await;
 
             let v1 = "# v1\noriginal body";
-            let id = note_create_with_dir(notes_dir.clone(), &state, v1.to_string())
-                .await
-                .unwrap();
+            let id = note_create_with_dir(
+                notes_dir.clone(),
+                &state,
+                v1.to_string(),
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
+            )
+            .await
+            .unwrap();
             let v2 = "# v2\nedited body";
             let outcome = note_update_with_dir(
                 notes_dir.clone(),
@@ -1685,6 +1628,8 @@ mod tests {
                 id.clone(),
                 v2.to_string(),
                 None,
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
             )
             .await
             .unwrap();
@@ -1747,9 +1692,15 @@ mod tests {
                 )
                 .await;
 
-            let id = note_create_with_dir(notes_dir.clone(), &state, "v1".to_string())
-                .await
-                .unwrap();
+            let id = note_create_with_dir(
+                notes_dir.clone(),
+                &state,
+                "v1".to_string(),
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
+            )
+            .await
+            .unwrap();
             note_update_with_dir(
                 notes_dir.clone(),
                 &state,
@@ -1757,6 +1708,8 @@ mod tests {
                 id.clone(),
                 "v2".to_string(),
                 None,
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
             )
             .await
             .unwrap();
@@ -1768,6 +1721,8 @@ mod tests {
                 id.clone(),
                 "v3".to_string(),
                 None,
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
             )
             .await
             .unwrap();
@@ -1822,18 +1777,30 @@ mod tests {
                 .await;
 
             // Three existing notes (the renamed note + two inbound).
-            let id_a =
-                note_create_with_dir(notes_dir.clone(), &state, "# Old Title\nbody A".into())
-                    .await
-                    .unwrap();
-            let id_b =
-                note_create_with_dir(notes_dir.clone(), &state, "see [[Old Title]] here".into())
-                    .await
-                    .unwrap();
+            let id_a = note_create_with_dir(
+                notes_dir.clone(),
+                &state,
+                "# Old Title\nbody A".into(),
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
+            )
+            .await
+            .unwrap();
+            let id_b = note_create_with_dir(
+                notes_dir.clone(),
+                &state,
+                "see [[Old Title]] here".into(),
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
+            )
+            .await
+            .unwrap();
             let id_c = note_create_with_dir(
                 notes_dir.clone(),
                 &state,
                 "and [[Old Title|alias]] too".into(),
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
             )
             .await
             .unwrap();
@@ -1851,9 +1818,14 @@ mod tests {
                     Zeroizing::new("and [[New Title|alias]] too".into()),
                 ),
             ];
-            note_write_batch_with_dir(notes_dir.clone(), &state, &items)
-                .await
-                .expect("transactional batch must commit");
+            note_write_batch_with_dir(
+                &myne_core::vault_io::StdVaultIo,
+                notes_dir.clone(),
+                &state,
+                &items,
+            )
+            .await
+            .expect("transactional batch must commit");
 
             assert_on_disk_body(&notes_dir, &id_a, "# New Title\nbody A");
             assert_on_disk_body(&notes_dir, &id_b, "see [[New Title]] here");
@@ -1890,9 +1862,15 @@ mod tests {
                 )
                 .await;
 
-            let id_a = note_create_with_dir(notes_dir.clone(), &state, "real A v1".into())
-                .await
-                .unwrap();
+            let id_a = note_create_with_dir(
+                notes_dir.clone(),
+                &state,
+                "real A v1".into(),
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
+            )
+            .await
+            .unwrap();
             // A canonical-but-nonexistent id (never created on disk).
             let phantom = NoteId::new_v7().as_uuid().to_string();
 
@@ -1900,9 +1878,14 @@ mod tests {
                 (id_a.clone(), Zeroizing::new("real A v2".into())),
                 (phantom, Zeroizing::new("ghost".into())),
             ];
-            let err = note_write_batch_with_dir(notes_dir.clone(), &state, &items)
-                .await
-                .expect_err("a missing note must abort the whole batch");
+            let err = note_write_batch_with_dir(
+                &myne_core::vault_io::StdVaultIo,
+                notes_dir.clone(),
+                &state,
+                &items,
+            )
+            .await
+            .expect_err("a missing note must abort the whole batch");
             assert!(
                 matches!(err, NoteBatchError::NoteNotFound),
                 "expected NoteNotFound, got {err:?}"
@@ -1939,7 +1922,7 @@ mod tests {
                     ),
                 )
                 .await;
-            note_write_batch_with_dir(notes_dir, &state, &[])
+            note_write_batch_with_dir(&myne_core::vault_io::StdVaultIo, notes_dir, &state, &[])
                 .await
                 .expect("empty batch is a no-op success");
         });
@@ -1956,9 +1939,14 @@ mod tests {
                 NoteId::new_v7().as_uuid().to_string(),
                 Zeroizing::new("x".into()),
             )];
-            let err = note_write_batch_with_dir(notes_dir, &state, &items)
-                .await
-                .expect_err("a locked slot must reject the batch");
+            let err = note_write_batch_with_dir(
+                &myne_core::vault_io::StdVaultIo,
+                notes_dir,
+                &state,
+                &items,
+            )
+            .await
+            .expect_err("a locked slot must reject the batch");
             assert!(
                 matches!(err, NoteBatchError::VaultNotUnlocked),
                 "expected VaultNotUnlocked, got {err:?}"
@@ -1986,9 +1974,15 @@ mod tests {
                 )
                 .await;
 
-            let id = note_create_with_dir(notes_dir.clone(), &state, "v1".to_string())
-                .await
-                .unwrap();
+            let id = note_create_with_dir(
+                notes_dir.clone(),
+                &state,
+                "v1".to_string(),
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
+            )
+            .await
+            .unwrap();
             let outcome = note_update_with_dir(
                 notes_dir.clone(),
                 &state,
@@ -1996,6 +1990,8 @@ mod tests {
                 id.clone(),
                 "v2".to_string(),
                 None,
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
             )
             .await
             .expect("update must succeed despite a failing snapshot");
@@ -2038,9 +2034,15 @@ mod tests {
                 )
                 .await;
 
-            let id = note_create_with_dir(notes_dir.clone(), &state, "v1".to_string())
-                .await
-                .unwrap();
+            let id = note_create_with_dir(
+                notes_dir.clone(),
+                &state,
+                "v1".to_string(),
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
+            )
+            .await
+            .unwrap();
             // First update captures one snapshot (of v1); we're now inside the window.
             note_update_with_dir(
                 notes_dir.clone(),
@@ -2049,6 +2051,8 @@ mod tests {
                 id.clone(),
                 "v2".to_string(),
                 None,
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
             )
             .await
             .unwrap();
@@ -2124,9 +2128,15 @@ mod tests {
                 )
                 .await;
 
-            let id = note_create_with_dir(notes_dir.clone(), &state, "v1".to_string())
-                .await
-                .unwrap();
+            let id = note_create_with_dir(
+                notes_dir.clone(),
+                &state,
+                "v1".to_string(),
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
+            )
+            .await
+            .unwrap();
             note_update_with_dir(
                 notes_dir.clone(),
                 &state,
@@ -2134,6 +2144,8 @@ mod tests {
                 id.clone(),
                 "v2".to_string(),
                 None,
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
             )
             .await
             .unwrap();
@@ -2150,9 +2162,16 @@ mod tests {
             );
 
             // Permanent delete must purge the note's snapshots (cryptographic erase).
-            note_delete_with_dir(notes_dir.clone(), &state, &noop_hooks(), id.clone())
-                .await
-                .unwrap();
+            note_delete_with_dir(
+                notes_dir.clone(),
+                &state,
+                &noop_hooks(),
+                id.clone(),
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
+            )
+            .await
+            .unwrap();
 
             assert!(
                 !notes_dir.join(format!("{uuid}.myn")).exists(),
@@ -2176,7 +2195,14 @@ mod tests {
             let notes_dir = notes_dir_under(scratch.path()).unwrap();
             let state = VaultRuntimeState::default(); // Slot::Empty by default
 
-            let result = note_create_with_dir(notes_dir, &state, "x".to_string()).await;
+            let result = note_create_with_dir(
+                notes_dir,
+                &state,
+                "x".to_string(),
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
+            )
+            .await;
             assert!(matches!(result, Err(NoteCreateError::VaultNotUnlocked)));
         });
     }
@@ -2194,7 +2220,14 @@ mod tests {
                 )
                 .await;
 
-            let result = note_create_with_dir(notes_dir, &state, "x".to_string()).await;
+            let result = note_create_with_dir(
+                notes_dir,
+                &state,
+                "x".to_string(),
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
+            )
+            .await;
             assert!(matches!(result, Err(NoteCreateError::VaultNotUnlocked)));
         });
     }
@@ -2219,7 +2252,14 @@ mod tests {
                 .await;
 
             let plaintext = String::from_utf8(vec![b'a'; protocol::MAX_PLAINTEXT_LEN]).unwrap();
-            let result = note_create_with_dir(notes_dir, &state, plaintext).await;
+            let result = note_create_with_dir(
+                notes_dir,
+                &state,
+                plaintext,
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
+            )
+            .await;
             assert!(
                 result.is_ok(),
                 "MAX_PLAINTEXT_LEN must succeed; got {result:?}"
@@ -2245,7 +2285,14 @@ mod tests {
                 .await;
 
             let plaintext = String::from_utf8(vec![b'a'; protocol::MAX_PLAINTEXT_LEN + 1]).unwrap();
-            let result = note_create_with_dir(notes_dir, &state, plaintext).await;
+            let result = note_create_with_dir(
+                notes_dir,
+                &state,
+                plaintext,
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
+            )
+            .await;
             assert!(matches!(result, Err(NoteCreateError::PlaintextTooLarge)));
         });
     }
@@ -2329,7 +2376,14 @@ mod tests {
             let create_state = Arc::clone(&state);
             let create_dir = notes_dir.clone();
             let create = tokio::spawn(async move {
-                note_create_with_dir(create_dir, &create_state, "concurrent".to_string()).await
+                note_create_with_dir(
+                    create_dir,
+                    &create_state,
+                    "concurrent".to_string(),
+                    &myne_core::vault_io::StdVaultIo,
+                    &myne_core::host::NoopHost,
+                )
+                .await
             });
 
             tokio::task::yield_now().await;
@@ -2466,14 +2520,25 @@ mod tests {
                 .await;
 
             let plaintext = "# round trip\nbody bytes";
-            let note_id_str =
-                note_create_with_dir(notes_dir.clone(), &state, plaintext.to_string())
-                    .await
-                    .unwrap();
+            let note_id_str = note_create_with_dir(
+                notes_dir.clone(),
+                &state,
+                plaintext.to_string(),
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
+            )
+            .await
+            .unwrap();
 
-            let recovered = note_read_with_dir(notes_dir, &state, note_id_str)
-                .await
-                .expect("read of freshly created note must succeed");
+            let recovered = note_read_with_dir(
+                notes_dir,
+                &state,
+                note_id_str,
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
+            )
+            .await
+            .expect("read of freshly created note must succeed");
             assert_eq!(recovered, plaintext);
         });
     }
@@ -2491,6 +2556,8 @@ mod tests {
                 notes_dir,
                 &state,
                 "01970e83-4f2f-7000-8000-000000000000".to_string(),
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
             )
             .await;
             assert!(matches!(result, Err(NoteReadError::VaultNotUnlocked)));
@@ -2514,6 +2581,8 @@ mod tests {
                 notes_dir,
                 &state,
                 "01970e83-4f2f-7000-8000-000000000000".to_string(),
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
             )
             .await;
             assert!(matches!(result, Err(NoteReadError::VaultNotUnlocked)));
@@ -2539,7 +2608,14 @@ mod tests {
                 )
                 .await;
 
-            let result = note_read_with_dir(notes_dir, &state, "too-short".to_string()).await;
+            let result = note_read_with_dir(
+                notes_dir,
+                &state,
+                "too-short".to_string(),
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
+            )
+            .await;
             assert!(matches!(result, Err(NoteReadError::InvalidNoteId)));
         });
     }
@@ -2568,6 +2644,8 @@ mod tests {
                 notes_dir,
                 &state,
                 "01970E83-4F2F-7000-8000-000000000000".to_string(),
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
             )
             .await;
             assert!(matches!(result, Err(NoteReadError::InvalidNoteId)));
@@ -2597,6 +2675,8 @@ mod tests {
                 notes_dir,
                 &state,
                 "550e8400-e29b-41d4-a716-446655440000".to_string(),
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
             )
             .await;
             assert!(matches!(result, Err(NoteReadError::InvalidNoteId)));
@@ -2624,7 +2704,14 @@ mod tests {
 
             // Mint a fresh v7 UUID; no corresponding file on disk.
             let phantom = NoteId::new_v7();
-            let result = note_read_with_dir(notes_dir, &state, phantom.to_string()).await;
+            let result = note_read_with_dir(
+                notes_dir,
+                &state,
+                phantom.to_string(),
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
+            )
+            .await;
             assert!(matches!(result, Err(NoteReadError::NoteNotFound)));
         });
     }
@@ -2651,10 +2738,15 @@ mod tests {
             // Create a real note, then tamper one byte of the on-disk
             // blob's content_nonce region (offset > 47, post-prefix) so
             // §6.4 inner-AEAD verification fails.
-            let note_id_str =
-                note_create_with_dir(notes_dir.clone(), &state, "untampered original".to_string())
-                    .await
-                    .unwrap();
+            let note_id_str = note_create_with_dir(
+                notes_dir.clone(),
+                &state,
+                "untampered original".to_string(),
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
+            )
+            .await
+            .unwrap();
             let path = notes_dir.join(format!(
                 "{}.myn",
                 NoteId::parse(&note_id_str).unwrap().as_uuid()
@@ -2666,7 +2758,14 @@ mod tests {
             blob[last] ^= 0xFF;
             std::fs::write(&path, &blob).unwrap();
 
-            let result = note_read_with_dir(notes_dir, &state, note_id_str).await;
+            let result = note_read_with_dir(
+                notes_dir,
+                &state,
+                note_id_str,
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
+            )
+            .await;
             assert!(matches!(result, Err(NoteReadError::CannotDecrypt)));
         });
     }
@@ -2706,7 +2805,14 @@ mod tests {
                 bad_plaintext,
             );
 
-            let result = note_read_with_dir(notes_dir, &state, note_id.to_string()).await;
+            let result = note_read_with_dir(
+                notes_dir,
+                &state,
+                note_id.to_string(),
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
+            )
+            .await;
             assert!(matches!(
                 result,
                 Err(NoteReadError::InvalidPlaintextEncoding)
@@ -2801,9 +2907,15 @@ mod tests {
                 .await;
 
             let original = "# original\nfirst body";
-            let note_id_str = note_create_with_dir(notes_dir.clone(), &state, original.to_string())
-                .await
-                .unwrap();
+            let note_id_str = note_create_with_dir(
+                notes_dir.clone(),
+                &state,
+                original.to_string(),
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
+            )
+            .await
+            .unwrap();
 
             // Capture the original blob's prefix for the byte-identical pin
             // below. `protocol.md` §6.3: bytes 0..=47+N (where N = 64 in
@@ -2823,6 +2935,8 @@ mod tests {
                 note_id_str.clone(),
                 updated.to_string(),
                 None,
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
             )
             .await
             .expect("update must succeed on a fresh note");
@@ -2844,9 +2958,15 @@ mod tests {
             );
 
             // Round-trip: post-update read returns the new plaintext.
-            let recovered = note_read_with_dir(notes_dir, &state, note_id_str)
-                .await
-                .expect("read after update must succeed");
+            let recovered = note_read_with_dir(
+                notes_dir,
+                &state,
+                note_id_str,
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
+            )
+            .await
+            .expect("read after update must succeed");
             assert_eq!(recovered, updated);
         });
     }
@@ -2869,6 +2989,8 @@ mod tests {
                 "01970e83-4f2f-7000-8000-000000000000".to_string(),
                 "x".to_string(),
                 None,
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
             )
             .await;
             assert!(matches!(result, Err(NoteUpdateError::VaultNotUnlocked)));
@@ -2895,6 +3017,8 @@ mod tests {
                 "01970e83-4f2f-7000-8000-000000000000".to_string(),
                 "x".to_string(),
                 None,
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
             )
             .await;
             assert!(matches!(result, Err(NoteUpdateError::VaultNotUnlocked)));
@@ -2931,6 +3055,8 @@ mod tests {
                 "too-short".to_string(),
                 "x".to_string(),
                 None,
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
             )
             .await;
             assert!(matches!(result, Err(NoteUpdateError::InvalidNoteId)));
@@ -2968,6 +3094,8 @@ mod tests {
                 phantom.to_string(),
                 "x".to_string(),
                 None,
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
             )
             .await;
             assert!(matches!(result, Err(NoteUpdateError::NoteNotFound)));
@@ -2996,10 +3124,15 @@ mod tests {
             // Create a real note, then tamper one byte of the on-disk
             // blob's inner ciphertext + CTX tag region so §6.4 inner-AEAD
             // verification fails on decode_note.
-            let note_id_str =
-                note_create_with_dir(notes_dir.clone(), &state, "untampered original".to_string())
-                    .await
-                    .unwrap();
+            let note_id_str = note_create_with_dir(
+                notes_dir.clone(),
+                &state,
+                "untampered original".to_string(),
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
+            )
+            .await
+            .unwrap();
             let path = notes_dir.join(format!(
                 "{}.myn",
                 NoteId::parse(&note_id_str).unwrap().as_uuid()
@@ -3016,6 +3149,8 @@ mod tests {
                 note_id_str,
                 "rewrite".to_string(),
                 None,
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
             )
             .await;
             assert!(matches!(result, Err(NoteUpdateError::CannotDecrypt)));
@@ -3075,9 +3210,15 @@ mod tests {
                 .await;
 
             let plaintext = format!("# leak check\n{PLAINTEXT_CANARY} body");
-            note_create_with_dir(notes_dir.clone(), &state, plaintext)
-                .await
-                .expect("create must succeed");
+            note_create_with_dir(
+                notes_dir.clone(),
+                &state,
+                plaintext,
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
+            )
+            .await
+            .expect("create must succeed");
 
             // Every file persisted under notes/ (the .myn blob plus any
             // leftover temp) must be ciphertext — the plaintext canary may
@@ -3104,10 +3245,15 @@ mod tests {
                 )
                 .await;
 
-            let note_id_str =
-                note_create_with_dir(notes_dir.clone(), &state, "# v1\nfirst body".to_string())
-                    .await
-                    .unwrap();
+            let note_id_str = note_create_with_dir(
+                notes_dir.clone(),
+                &state,
+                "# v1\nfirst body".to_string(),
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
+            )
+            .await
+            .unwrap();
             let updated = format!("# v2\n{PLAINTEXT_CANARY} rewritten");
             note_update_with_dir(
                 notes_dir.clone(),
@@ -3116,6 +3262,8 @@ mod tests {
                 note_id_str,
                 updated,
                 None,
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
             )
             .await
             .expect("update must succeed");
@@ -3149,9 +3297,15 @@ mod tests {
                 .await;
 
             let original = "# original\ndurable body";
-            let note_id_str = note_create_with_dir(notes_dir.clone(), &state, original.to_string())
-                .await
-                .unwrap();
+            let note_id_str = note_create_with_dir(
+                notes_dir.clone(),
+                &state,
+                original.to_string(),
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
+            )
+            .await
+            .unwrap();
 
             // r-x only: creating the atomic_write temp inside now fails
             // with PermissionDenied. Read perms remain, so the pre-write
@@ -3164,6 +3318,8 @@ mod tests {
                 note_id_str.clone(),
                 "rewrite that cannot land".to_string(),
                 None,
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
             )
             .await;
             // Restore write perms BEFORE asserting so a failing assert can
@@ -3182,9 +3338,15 @@ mod tests {
 
             // The committed note is byte-for-byte the original — a failed
             // update never corrupts or partially overwrites it.
-            let recovered = note_read_with_dir(notes_dir, &state, note_id_str)
-                .await
-                .expect("note must still be readable after a failed update");
+            let recovered = note_read_with_dir(
+                notes_dir,
+                &state,
+                note_id_str,
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
+            )
+            .await
+            .expect("note must still be readable after a failed update");
             assert_eq!(recovered, original);
         });
     }
@@ -3211,8 +3373,14 @@ mod tests {
                 .await;
 
             std::fs::set_permissions(&notes_dir, std::fs::Permissions::from_mode(0o500)).unwrap();
-            let result =
-                note_create_with_dir(notes_dir.clone(), &state, "# never lands".to_string()).await;
+            let result = note_create_with_dir(
+                notes_dir.clone(),
+                &state,
+                "# never lands".to_string(),
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
+            )
+            .await;
             // Snapshot the dir contents while still read-only, then restore.
             let entries: Vec<_> = std::fs::read_dir(&notes_dir)
                 .unwrap()
@@ -3251,14 +3419,28 @@ mod tests {
                 )
                 .await;
 
-            let note_id_str = note_create_with_dir(notes_dir.clone(), &state, "small".to_string())
-                .await
-                .unwrap();
+            let note_id_str = note_create_with_dir(
+                notes_dir.clone(),
+                &state,
+                "small".to_string(),
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
+            )
+            .await
+            .unwrap();
 
             let big = String::from_utf8(vec![b'a'; protocol::MAX_PLAINTEXT_LEN]).unwrap();
-            let result =
-                note_update_with_dir(notes_dir, &state, &noop_hooks(), note_id_str, big, None)
-                    .await;
+            let result = note_update_with_dir(
+                notes_dir,
+                &state,
+                &noop_hooks(),
+                note_id_str,
+                big,
+                None,
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
+            )
+            .await;
             assert!(
                 result.is_ok(),
                 "MAX_PLAINTEXT_LEN must succeed; got {result:?}"
@@ -3283,14 +3465,28 @@ mod tests {
                 )
                 .await;
 
-            let note_id_str = note_create_with_dir(notes_dir.clone(), &state, "small".to_string())
-                .await
-                .unwrap();
+            let note_id_str = note_create_with_dir(
+                notes_dir.clone(),
+                &state,
+                "small".to_string(),
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
+            )
+            .await
+            .unwrap();
 
             let too_big = String::from_utf8(vec![b'a'; protocol::MAX_PLAINTEXT_LEN + 1]).unwrap();
-            let result =
-                note_update_with_dir(notes_dir, &state, &noop_hooks(), note_id_str, too_big, None)
-                    .await;
+            let result = note_update_with_dir(
+                notes_dir,
+                &state,
+                &noop_hooks(),
+                note_id_str,
+                too_big,
+                None,
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
+            )
+            .await;
             assert!(matches!(result, Err(NoteUpdateError::PlaintextTooLarge)));
         });
     }
@@ -3323,10 +3519,15 @@ mod tests {
                 )
                 .await;
 
-            let note_id_str =
-                note_create_with_dir(notes_dir.clone(), &state, "initial body".to_string())
-                    .await
-                    .unwrap();
+            let note_id_str = note_create_with_dir(
+                notes_dir.clone(),
+                &state,
+                "initial body".to_string(),
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
+            )
+            .await
+            .unwrap();
 
             let update_state = Arc::clone(&state);
             let update_dir = notes_dir.clone();
@@ -3339,6 +3540,8 @@ mod tests {
                     update_id,
                     "rewrite".to_string(),
                     None,
+                    &myne_core::vault_io::StdVaultIo,
+                    &myne_core::host::NoopHost,
                 )
                 .await
             });
@@ -3440,10 +3643,15 @@ mod tests {
                 )
                 .await;
 
-            let note_id_str =
-                note_create_with_dir(notes_dir.clone(), &state, "to be deleted".to_string())
-                    .await
-                    .unwrap();
+            let note_id_str = note_create_with_dir(
+                notes_dir.clone(),
+                &state,
+                "to be deleted".to_string(),
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
+            )
+            .await
+            .unwrap();
 
             // Confirm file exists pre-delete.
             let path = notes_dir.join(format!(
@@ -3457,6 +3665,8 @@ mod tests {
                 &state,
                 &noop_hooks(),
                 note_id_str.clone(),
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
             )
             .await
             .expect("delete must succeed on a fresh note");
@@ -3468,7 +3678,14 @@ mod tests {
 
             // Subsequent read returns NoteNotFound — the ledger / editor
             // route's natural affordance for a deleted note.
-            let read_result = note_read_with_dir(notes_dir, &state, note_id_str).await;
+            let read_result = note_read_with_dir(
+                notes_dir,
+                &state,
+                note_id_str,
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
+            )
+            .await;
             assert!(matches!(read_result, Err(NoteReadError::NoteNotFound)));
         });
     }
@@ -3495,21 +3712,36 @@ mod tests {
                 )
                 .await;
 
-            let note_id_str =
-                note_create_with_dir(notes_dir.clone(), &state, "transient".to_string())
-                    .await
-                    .unwrap();
+            let note_id_str = note_create_with_dir(
+                notes_dir.clone(),
+                &state,
+                "transient".to_string(),
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
+            )
+            .await
+            .unwrap();
 
             note_delete_with_dir(
                 notes_dir.clone(),
                 &state,
                 &noop_hooks(),
                 note_id_str.clone(),
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
             )
             .await
             .expect("first delete must succeed");
 
-            let second = note_delete_with_dir(notes_dir, &state, &noop_hooks(), note_id_str).await;
+            let second = note_delete_with_dir(
+                notes_dir,
+                &state,
+                &noop_hooks(),
+                note_id_str,
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
+            )
+            .await;
             assert!(matches!(second, Err(NoteDeleteError::NoteNotFound)));
         });
     }
@@ -3537,8 +3769,15 @@ mod tests {
                 .await;
 
             let phantom = NoteId::new_v7();
-            let result =
-                note_delete_with_dir(notes_dir, &state, &noop_hooks(), phantom.to_string()).await;
+            let result = note_delete_with_dir(
+                notes_dir,
+                &state,
+                &noop_hooks(),
+                phantom.to_string(),
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
+            )
+            .await;
             assert!(matches!(result, Err(NoteDeleteError::NoteNotFound)));
         });
     }
@@ -3557,6 +3796,8 @@ mod tests {
                 &state,
                 &noop_hooks(),
                 "01970e83-4f2f-7000-8000-000000000000".to_string(),
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
             )
             .await;
             assert!(matches!(result, Err(NoteDeleteError::VaultNotUnlocked)));
@@ -3581,6 +3822,8 @@ mod tests {
                 &state,
                 &noop_hooks(),
                 "01970e83-4f2f-7000-8000-000000000000".to_string(),
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
             )
             .await;
             assert!(matches!(result, Err(NoteDeleteError::VaultNotUnlocked)));
@@ -3606,9 +3849,15 @@ mod tests {
                 )
                 .await;
 
-            let result =
-                note_delete_with_dir(notes_dir, &state, &noop_hooks(), "too-short".to_string())
-                    .await;
+            let result = note_delete_with_dir(
+                notes_dir,
+                &state,
+                &noop_hooks(),
+                "too-short".to_string(),
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
+            )
+            .await;
             assert!(matches!(result, Err(NoteDeleteError::InvalidNoteId)));
         });
     }
@@ -3640,9 +3889,15 @@ mod tests {
                 .await;
 
             let phantom = NoteId::new_v7();
-            let result =
-                note_delete_with_dir(bogus_notes_dir, &state, &noop_hooks(), phantom.to_string())
-                    .await;
+            let result = note_delete_with_dir(
+                bogus_notes_dir,
+                &state,
+                &noop_hooks(),
+                phantom.to_string(),
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
+            )
+            .await;
             assert!(matches!(
                 result,
                 Err(NoteDeleteError::NotesDirNotADirectory)
@@ -3675,16 +3930,29 @@ mod tests {
                 )
                 .await;
 
-            let note_id_str =
-                note_create_with_dir(notes_dir.clone(), &state, "to be deleted".to_string())
-                    .await
-                    .unwrap();
+            let note_id_str = note_create_with_dir(
+                notes_dir.clone(),
+                &state,
+                "to be deleted".to_string(),
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
+            )
+            .await
+            .unwrap();
 
             let delete_state = Arc::clone(&state);
             let delete_dir = notes_dir.clone();
             let delete_id = note_id_str.clone();
             let delete_task = tokio::spawn(async move {
-                note_delete_with_dir(delete_dir, &delete_state, &noop_hooks(), delete_id).await
+                note_delete_with_dir(
+                    delete_dir,
+                    &delete_state,
+                    &noop_hooks(),
+                    delete_id,
+                    &myne_core::vault_io::StdVaultIo,
+                    &myne_core::host::NoopHost,
+                )
+                .await
             });
 
             tokio::task::yield_now().await;
@@ -3892,7 +4160,13 @@ mod tests {
                 )
                 .await;
 
-            let result = note_list_with_dir(notes_dir, &state).await;
+            let result = note_list_with_dir(
+                notes_dir,
+                &state,
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
+            )
+            .await;
             assert!(matches!(result, Ok(ref v) if v.is_empty()));
         });
     }
@@ -3923,7 +4197,14 @@ mod tests {
                 std::fs::write(notes_dir.join(format!("{stem}.myn")), b"\0").unwrap();
             }
 
-            let ids = note_list_with_dir(notes_dir, &state).await.unwrap();
+            let ids = note_list_with_dir(
+                notes_dir,
+                &state,
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
+            )
+            .await
+            .unwrap();
             let id_strs: Vec<String> = ids.iter().map(|id| format!("{id}")).collect();
             assert_eq!(
                 id_strs,
@@ -3943,7 +4224,13 @@ mod tests {
             let notes_dir = notes_dir_under(scratch.path()).unwrap();
             let state = VaultRuntimeState::default(); // Slot::Empty by default
 
-            let result = note_list_with_dir(notes_dir, &state).await;
+            let result = note_list_with_dir(
+                notes_dir,
+                &state,
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
+            )
+            .await;
             assert!(matches!(result, Err(NoteListError::VaultNotUnlocked)));
         });
     }
@@ -3961,7 +4248,13 @@ mod tests {
                 )
                 .await;
 
-            let result = note_list_with_dir(notes_dir, &state).await;
+            let result = note_list_with_dir(
+                notes_dir,
+                &state,
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
+            )
+            .await;
             assert!(matches!(result, Err(NoteListError::VaultNotUnlocked)));
         });
     }
@@ -3990,7 +4283,13 @@ mod tests {
                 )
                 .await;
 
-            let result = note_list_with_dir(conflict, &state).await;
+            let result = note_list_with_dir(
+                conflict,
+                &state,
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
+            )
+            .await;
             assert!(matches!(result, Err(NoteListError::NotesDirNotADirectory)));
         });
     }
@@ -4033,8 +4332,15 @@ mod tests {
 
             let list_state = std::sync::Arc::clone(&state);
             let list_dir = notes_dir.clone();
-            let list_task =
-                tokio::spawn(async move { note_list_with_dir(list_dir, &list_state).await });
+            let list_task = tokio::spawn(async move {
+                note_list_with_dir(
+                    list_dir,
+                    &list_state,
+                    &myne_core::vault_io::StdVaultIo,
+                    &myne_core::host::NoopHost,
+                )
+                .await
+            });
 
             tokio::task::yield_now().await;
 
@@ -4115,9 +4421,15 @@ mod tests {
         state: &VaultRuntimeState,
         plaintext: &str,
     ) -> String {
-        note_create_with_dir(notes_dir.to_path_buf(), state, plaintext.to_string())
-            .await
-            .expect("note_create must succeed in test setup")
+        note_create_with_dir(
+            notes_dir.to_path_buf(),
+            state,
+            plaintext.to_string(),
+            &myne_core::vault_io::StdVaultIo,
+            &myne_core::host::NoopHost,
+        )
+        .await
+        .expect("note_create must succeed in test setup")
     }
 
     // ---- happy path: mixed FM / H1 / both / neither --------------------
@@ -4145,9 +4457,15 @@ mod tests {
 
             // Input order: B, D, A, C — verifies output ordering matches.
             let ids = vec![id_b.clone(), id_d.clone(), id_a.clone(), id_c.clone()];
-            let results = note_titles_batch_with_dir(notes_dir, &state, ids.clone())
-                .await
-                .expect("batch must succeed at outer level");
+            let results = note_titles_batch_with_dir(
+                notes_dir,
+                &state,
+                ids.clone(),
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
+            )
+            .await
+            .expect("batch must succeed at outer level");
 
             assert_eq!(results.len(), 4);
             // Position 0 — id_b (FM with title).
@@ -4187,7 +4505,14 @@ mod tests {
             let ids: Vec<String> = (0..101)
                 .map(|_| "00000000-0000-7000-8000-000000000000".to_string())
                 .collect();
-            let result = note_titles_batch_with_dir(notes_dir, &state, ids).await;
+            let result = note_titles_batch_with_dir(
+                notes_dir,
+                &state,
+                ids,
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
+            )
+            .await;
             match result {
                 Err(NoteTitleBatchError::BatchTooLarge { cap }) => {
                     assert_eq!(cap, NOTE_TITLES_BATCH_CAP);
@@ -4211,9 +4536,15 @@ mod tests {
             }
             assert_eq!(ids.len(), NOTE_TITLES_BATCH_CAP);
 
-            let results = note_titles_batch_with_dir(notes_dir, &state, ids)
-                .await
-                .expect("at-cap batch must succeed at outer level");
+            let results = note_titles_batch_with_dir(
+                notes_dir,
+                &state,
+                ids,
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
+            )
+            .await
+            .expect("at-cap batch must succeed at outer level");
             assert_eq!(results.len(), NOTE_TITLES_BATCH_CAP);
             assert!(results[0].is_ok(), "real ID at position 0 must succeed");
             for (i, r) in results.iter().enumerate().skip(1) {
@@ -4233,7 +4564,14 @@ mod tests {
             let scratch = ScopedTempDir::new("nt-batch-slot-empty").unwrap();
             let notes_dir = notes_dir_under(scratch.path()).unwrap();
             let state = VaultRuntimeState::default(); // Slot::Empty by default
-            let result = note_titles_batch_with_dir(notes_dir, &state, vec![]).await;
+            let result = note_titles_batch_with_dir(
+                notes_dir,
+                &state,
+                vec![],
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
+            )
+            .await;
             assert!(matches!(result, Err(NoteTitleBatchError::VaultNotUnlocked)));
         });
     }
@@ -4250,7 +4588,14 @@ mod tests {
                     fixture_recovering_with_keys(0xAA, 0xBB, 0xCC),
                 )
                 .await;
-            let result = note_titles_batch_with_dir(notes_dir, &state, vec![]).await;
+            let result = note_titles_batch_with_dir(
+                notes_dir,
+                &state,
+                vec![],
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
+            )
+            .await;
             assert!(matches!(result, Err(NoteTitleBatchError::VaultNotUnlocked)));
         });
     }
@@ -4269,9 +4614,15 @@ mod tests {
             let note_id = NoteId::parse(&id).unwrap();
             std::fs::remove_file(notes_dir.join(format!("{}.myn", note_id.as_uuid()))).unwrap();
 
-            let results = note_titles_batch_with_dir(notes_dir, &state, vec![id.clone()])
-                .await
-                .expect("outer must succeed");
+            let results = note_titles_batch_with_dir(
+                notes_dir,
+                &state,
+                vec![id.clone()],
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
+            )
+            .await
+            .expect("outer must succeed");
             assert_eq!(results.len(), 1);
             assert!(matches!(results[0], Err(NoteTitleError::NoteNotFound)));
         });
@@ -4282,10 +4633,15 @@ mod tests {
         rt().block_on(async {
             let (_scratch, notes_dir, state) =
                 make_unlocked_state_and_dir("nt-batch-malformed-id").await;
-            let results =
-                note_titles_batch_with_dir(notes_dir, &state, vec!["not-a-valid-uuid".to_string()])
-                    .await
-                    .expect("outer must succeed");
+            let results = note_titles_batch_with_dir(
+                notes_dir,
+                &state,
+                vec!["not-a-valid-uuid".to_string()],
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
+            )
+            .await
+            .expect("outer must succeed");
             assert_eq!(results.len(), 1);
             assert!(matches!(results[0], Err(NoteTitleError::NoteNotFound)));
         });
@@ -4295,9 +4651,15 @@ mod tests {
     fn batch_empty_input_returns_empty_results() {
         rt().block_on(async {
             let (_scratch, notes_dir, state) = make_unlocked_state_and_dir("nt-batch-empty").await;
-            let results = note_titles_batch_with_dir(notes_dir, &state, vec![])
-                .await
-                .expect("empty batch must succeed");
+            let results = note_titles_batch_with_dir(
+                notes_dir,
+                &state,
+                vec![],
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
+            )
+            .await
+            .expect("empty batch must succeed");
             assert!(results.is_empty());
         });
     }
@@ -4501,16 +4863,28 @@ mod tests {
                 .await;
 
             let plaintext = "# active vault\nresolved with no vault_id param";
-            let id = note_create_with_dir(notes_dir.clone(), &state, plaintext.to_string())
-                .await
-                .expect("note_create must operate on the sole Unlocked vault");
+            let id = note_create_with_dir(
+                notes_dir.clone(),
+                &state,
+                plaintext.to_string(),
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
+            )
+            .await
+            .expect("note_create must operate on the sole Unlocked vault");
 
             // Round-trip read (also no vault_id param) returns the same body —
             // confirming both the create and read seams resolved the active
             // vault and used its `items_key`.
-            let read_back = note_read_with_dir(notes_dir, &state, id)
-                .await
-                .expect("note_read must operate on the sole Unlocked vault");
+            let read_back = note_read_with_dir(
+                notes_dir,
+                &state,
+                id,
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
+            )
+            .await
+            .expect("note_read must operate on the sole Unlocked vault");
             assert_eq!(read_back, plaintext);
         });
     }
@@ -4526,7 +4900,14 @@ mod tests {
             // clean guard branch (`VaultNotUnlocked`) — never panic / unwrap.
             let state = VaultRuntimeState::default();
 
-            let result = note_create_with_dir(notes_dir, &state, "x".to_string()).await;
+            let result = note_create_with_dir(
+                notes_dir,
+                &state,
+                "x".to_string(),
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
+            )
+            .await;
             assert!(
                 matches!(result, Err(NoteCreateError::VaultNotUnlocked)),
                 "no unlocked vault must yield the clean guard error, got {result:?}"
@@ -4565,6 +4946,8 @@ mod tests {
             notes_dir.clone(),
             &state,
             EXPORT_FIXTURE_PLAINTEXT.to_string(),
+            &myne_core::vault_io::StdVaultIo,
+            &myne_core::host::NoopHost,
         )
         .await
         .expect("fixture note create must succeed");
@@ -4992,6 +5375,8 @@ mod tests {
                 notes_dir.clone(),
                 &state,
                 "# no frontmatter\nbody".to_string(),
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
             )
             .await
             .unwrap();
@@ -5029,6 +5414,8 @@ mod tests {
                 notes_dir.clone(),
                 &state,
                 "---\nupdated: yesterday-ish\n---\n\nbody".to_string(),
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
             )
             .await
             .unwrap();
@@ -5167,6 +5554,8 @@ mod tests {
         filename: &str,
     ) -> String {
         attachment_import_with_dir(
+            &myne_core::vault_io::StdVaultIo,
+            &myne_core::host::test_host::TestHost::new("/nonexistent-desktop-cmds-test-host"),
             vault_root,
             state,
             ImportSource::Bytes {
@@ -5208,7 +5597,7 @@ mod tests {
                 vault_root.join("notes"),
                 &state,
                 plaintext.clone(),
-            )
+            &myne_core::vault_io::StdVaultIo, &myne_core::host::NoopHost,)
             .await
             .unwrap();
 
@@ -5282,9 +5671,15 @@ mod tests {
             std::fs::write(out.join("photo.png"), b"sentinel: pre-existing").unwrap();
 
             let plaintext = format!("a ![[att:{id_a}|photo.png]] b ![[att:{id_b}|photo.png]] c");
-            let note_id = note_create_with_dir(vault_root.join("notes"), &state, plaintext.clone())
-                .await
-                .unwrap();
+            let note_id = note_create_with_dir(
+                vault_root.join("notes"),
+                &state,
+                plaintext.clone(),
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
+            )
+            .await
+            .unwrap();
 
             let count = note_export_attachments_with_root(
                 vault_root.clone(),
@@ -5330,9 +5725,15 @@ mod tests {
 
             let plaintext =
                 format!("a ![[att:{id_tmpish}|x.png.tmp]] b ![[att:{id_plain}|x.png]] c");
-            let note_id = note_create_with_dir(vault_root.join("notes"), &state, plaintext)
-                .await
-                .unwrap();
+            let note_id = note_create_with_dir(
+                vault_root.join("notes"),
+                &state,
+                plaintext,
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
+            )
+            .await
+            .unwrap();
 
             let count = note_export_attachments_with_root(
                 vault_root.clone(),
@@ -5367,9 +5768,15 @@ mod tests {
             let id = import_att(&vault_root, &state, ATT_PNG_A, "photo.png").await;
 
             let plaintext = format!("x ![[att:{id}|alias-one.png]] y ![[att:{id}]] z");
-            let note_id = note_create_with_dir(vault_root.join("notes"), &state, plaintext)
-                .await
-                .unwrap();
+            let note_id = note_create_with_dir(
+                vault_root.join("notes"),
+                &state,
+                plaintext,
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
+            )
+            .await
+            .unwrap();
 
             let count = note_export_attachments_with_root(
                 vault_root.clone(),
@@ -5407,7 +5814,7 @@ mod tests {
                 vault_root.join("notes"),
                 &state,
                 plaintext.to_string(),
-            )
+            &myne_core::vault_io::StdVaultIo, &myne_core::host::NoopHost,)
             .await
             .unwrap();
 
@@ -5446,9 +5853,15 @@ mod tests {
             let id_ghost = "f".repeat(64);
 
             let plaintext = format!("![[att:{id_real}|photo.png]] ![[att:{id_ghost}|ghost.png]]");
-            let note_id = note_create_with_dir(vault_root.join("notes"), &state, plaintext)
-                .await
-                .unwrap();
+            let note_id = note_create_with_dir(
+                vault_root.join("notes"),
+                &state,
+                plaintext,
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
+            )
+            .await
+            .unwrap();
 
             let result = note_export_attachments_with_root(
                 vault_root.clone(),
@@ -5482,9 +5895,15 @@ mod tests {
             std::fs::write(&blob_path, &blob).unwrap();
 
             let plaintext = format!("![[att:{id}|photo.png]]");
-            let note_id = note_create_with_dir(vault_root.join("notes"), &state, plaintext)
-                .await
-                .unwrap();
+            let note_id = note_create_with_dir(
+                vault_root.join("notes"),
+                &state,
+                plaintext,
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
+            )
+            .await
+            .unwrap();
 
             let result = note_export_attachments_with_root(
                 vault_root.clone(),
@@ -5514,9 +5933,15 @@ mod tests {
             std::fs::remove_file(vault_root.join("attachments").join(&id)).unwrap();
 
             let plaintext = format!("![[att:{id}|photo.png]]");
-            let note_id = note_create_with_dir(vault_root.join("notes"), &state, plaintext)
-                .await
-                .unwrap();
+            let note_id = note_create_with_dir(
+                vault_root.join("notes"),
+                &state,
+                plaintext,
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
+            )
+            .await
+            .unwrap();
 
             let result = note_export_attachments_with_root(
                 vault_root.clone(),
@@ -5547,9 +5972,15 @@ mod tests {
             std::fs::write(out.join("note.md"), b"sentinel: pre-existing note").unwrap();
 
             let plaintext = format!("![[att:{id}|photo.png]]");
-            let note_id = note_create_with_dir(vault_root.join("notes"), &state, plaintext)
-                .await
-                .unwrap();
+            let note_id = note_create_with_dir(
+                vault_root.join("notes"),
+                &state,
+                plaintext,
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
+            )
+            .await
+            .unwrap();
 
             let result = note_export_attachments_with_root(
                 vault_root.clone(),
@@ -5584,9 +6015,15 @@ mod tests {
             std::fs::write(out.join("note.md"), b"sentinel: pre-existing note").unwrap();
 
             let plaintext = format!("![[att:{id}|photo.png]]");
-            let note_id = note_create_with_dir(vault_root.join("notes"), &state, plaintext)
-                .await
-                .unwrap();
+            let note_id = note_create_with_dir(
+                vault_root.join("notes"),
+                &state,
+                plaintext,
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
+            )
+            .await
+            .unwrap();
 
             let count = note_export_attachments_with_root(
                 vault_root.clone(),
@@ -5621,9 +6058,15 @@ mod tests {
             let id = import_att(&vault_root, &state, ATT_PNG_A, "../escape.png").await;
 
             let plaintext = format!("![[att:{id}|x]]");
-            let note_id = note_create_with_dir(vault_root.join("notes"), &state, plaintext)
-                .await
-                .unwrap();
+            let note_id = note_create_with_dir(
+                vault_root.join("notes"),
+                &state,
+                plaintext,
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
+            )
+            .await
+            .unwrap();
 
             note_export_attachments_with_root(
                 vault_root.clone(),
@@ -5722,10 +6165,15 @@ mod tests {
         rt().block_on(async {
             let (scratch, state) = export_att_fixture().await;
             let plaintext = "body";
-            let note_id =
-                note_create_with_dir(scratch.path().join("notes"), &state, plaintext.to_string())
-                    .await
-                    .unwrap();
+            let note_id = note_create_with_dir(
+                scratch.path().join("notes"),
+                &state,
+                plaintext.to_string(),
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
+            )
+            .await
+            .unwrap();
             let result = note_export_attachments_with_root(
                 scratch.path().to_path_buf(),
                 &state,
@@ -5901,10 +6349,15 @@ mod tests {
             let id_b = import_att(&vault_root, &state, ATT_PNG_B, "photo.png").await;
             // A valid note id is required (bug-canary parse) even though
             // the HTML — not the note — carries the refs.
-            let note_id =
-                note_create_with_dir(vault_root.join("notes"), &state, "body".to_string())
-                    .await
-                    .unwrap();
+            let note_id = note_create_with_dir(
+                vault_root.join("notes"),
+                &state,
+                "body".to_string(),
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
+            )
+            .await
+            .unwrap();
 
             let doc = format!(
                 "<!DOCTYPE html>\n<html><body>\
@@ -5949,10 +6402,15 @@ mod tests {
             let (scratch, state) = export_att_fixture().await;
             let vault_root = scratch.path().to_path_buf();
             let out = vault_root.join("out");
-            let note_id =
-                note_create_with_dir(vault_root.join("notes"), &state, "body".to_string())
-                    .await
-                    .unwrap();
+            let note_id = note_create_with_dir(
+                vault_root.join("notes"),
+                &state,
+                "body".to_string(),
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
+            )
+            .await
+            .unwrap();
             let doc = "<!DOCTYPE html>\n<html><body><p>no images</p></body></html>\n";
 
             let count = note_export_html_attachments_with_root(
@@ -5983,10 +6441,15 @@ mod tests {
         rt().block_on(async {
             let (scratch, state) = export_att_fixture().await;
             let vault_root = scratch.path().to_path_buf();
-            let note_id =
-                note_create_with_dir(vault_root.join("notes"), &state, "body".to_string())
-                    .await
-                    .unwrap();
+            let note_id = note_create_with_dir(
+                vault_root.join("notes"),
+                &state,
+                "body".to_string(),
+                &myne_core::vault_io::StdVaultIo,
+                &myne_core::host::NoopHost,
+            )
+            .await
+            .unwrap();
             let res = note_export_html_attachments_with_root(
                 vault_root.clone(),
                 &state,

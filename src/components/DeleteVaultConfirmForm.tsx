@@ -21,11 +21,29 @@
 // **No "Re-display recovery phrase" affordance anywhere** — Story 17 +
 // `docs/spec/recovery-flow.md` §2.4 explicit prohibition.
 
+// A third render axis, orthogonal to the two above (phase3-web-client task 72):
+// **what the command means on this client.** Where `localOnlyVault` is absent —
+// the web client, whose OPFS container is a cache of a sync-held vault — this
+// same command erases THIS browser's copy and leaves the account and everything
+// already synced on the server. The desktop wording ("permanently deletes… the
+// action cannot be undone… your recovery phrase will not restore the data") is
+// false there in the dangerous direction: someone trying to destroy their notes
+// would believe they had. So the idle-mode copy is selected by the capability
+// and its body is a load-bearing constant, not an i18n string — same rule as
+// `REMOVE_DEVICE_DISCLOSURE` (`src/CLAUDE.md`, "Do NOT i18n load-bearing copy").
+//
+// The typed-DELETE gate does NOT relax on that path. Unsynced edits die with the
+// local copy and nothing brings them back, which is the one genuinely
+// irreversible thing the web erase does — and the last sentence of the
+// disclosure is exactly that sentence.
+
 import { useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "./primitives/Button";
 import { Input } from "./primitives/Input";
 import { DestructiveBanner } from "./DestructiveBanner";
+import { has } from "../platform/capabilities";
+import { LOCAL_ERASE_DISCLOSURE } from "../lib/load-bearing-copy";
 
 const CONFIRM_PHRASE = "DELETE";
 
@@ -152,6 +170,10 @@ export function DeleteVaultConfirmForm({
   const { t } = useTranslation();
   const [typed, setTyped] = useState("");
   const submitReady = typed === CONFIRM_PHRASE && !inFlight;
+  // Read once per render, not memoised: the seam is a synchronous constant
+  // lookup by construction (`src/platform/capabilities.ts`), so caching it would
+  // add a dependency array to protect nothing.
+  const onlyCopy = has("localOnlyVault");
 
   const handleSubmit = () => {
     if (!submitReady) return;
@@ -169,18 +191,41 @@ export function DeleteVaultConfirmForm({
       }}
     >
       <div style={HEADING_ROW_STYLE}>
-        <h3 style={HEADING_STYLE}>{t("settings.deleteVault.heading")}</h3>
+        <h3 style={HEADING_STYLE}>
+          {onlyCopy
+            ? t("settings.deleteVault.heading")
+            : t("settings.deleteVault.localEraseHeading")}
+        </h3>
       </div>
 
       {partialFailContext === null ? (
         <>
-          <div style={EYEBROW_STYLE}>{t("settings.deleteVault.eyebrow")}</div>
-          <p style={COPY_PRIMARY_STYLE}>
-            {t("settings.deleteVault.copyPrimary")}
-          </p>
-          <p style={COPY_SECONDARY_STYLE}>
-            {t("settings.deleteVault.copySecondary")}
-          </p>
+          <div style={EYEBROW_STYLE} data-testid="delete-vault.eyebrow">
+            {onlyCopy
+              ? t("settings.deleteVault.eyebrow")
+              : t("settings.deleteVault.localEraseEyebrow")}
+          </div>
+          {onlyCopy ? (
+            <>
+              <p style={COPY_PRIMARY_STYLE}>
+                {t("settings.deleteVault.copyPrimary")}
+              </p>
+              <p style={COPY_SECONDARY_STYLE}>
+                {t("settings.deleteVault.copySecondary")}
+              </p>
+            </>
+          ) : (
+            <>
+              {/* Verbatim in every locale — the literal IS the guarantee, and
+                  E2E asserts it by full equality. */}
+              <p style={COPY_PRIMARY_STYLE} data-testid="delete-vault.local-erase-disclosure">
+                {LOCAL_ERASE_DISCLOSURE}
+              </p>
+              <p style={COPY_SECONDARY_STYLE}>
+                {t("settings.deleteVault.copySecondary")}
+              </p>
+            </>
+          )}
 
           <div
             style={{
@@ -228,9 +273,13 @@ export function DeleteVaultConfirmForm({
               disabled={!submitReady}
               data-testid="delete-vault.submit"
             >
-              {inFlight
-                ? t("settings.deleteVault.submitInFlight")
-                : t("settings.deleteVault.submit")}
+              {onlyCopy
+                ? inFlight
+                  ? t("settings.deleteVault.submitInFlight")
+                  : t("settings.deleteVault.submit")
+                : inFlight
+                  ? t("settings.deleteVault.localEraseSubmitInFlight")
+                  : t("settings.deleteVault.localEraseSubmit")}
             </Button>
           </div>
         </>
@@ -254,11 +303,17 @@ export function DeleteVaultConfirmForm({
                   })
                 : t("settings.deleteVault.ioFailBody")}
             </div>
-            <code style={VAULT_PATH_STYLE}>
-              {t("settings.deleteVault.vaultPath", {
-                path: partialFailContext.vaultDirPath,
-              })}
-            </code>
+            {/* No path on a client that has none. `appDataDir()` is a typed
+                refusal in the browser seam, so the web consumer passes `null`
+                rather than a fabricated string — and a "Vault path:" line with
+                nothing after it would be worse than its absence. */}
+            {partialFailContext.vaultDirPath !== null && (
+              <code style={VAULT_PATH_STYLE}>
+                {t("settings.deleteVault.vaultPath", {
+                  path: partialFailContext.vaultDirPath,
+                })}
+              </code>
+            )}
           </DestructiveBanner>
 
           <div style={BUTTON_ROW_STYLE}>

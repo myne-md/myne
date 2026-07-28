@@ -12,7 +12,6 @@
 import {
   useCallback,
   useEffect,
-  useMemo,
   useRef,
   useState,
   type CSSProperties,
@@ -23,7 +22,7 @@ import {
   generateDeviceJoinQr,
   deviceJoinQrErrorMessage,
 } from "../../lib/deviceJoinQr";
-import { svgToDataUri } from "../../lib/noteImageCard";
+import { svgToObjectUrl } from "../../lib/noteImageCard";
 
 const ROOT: CSSProperties = {
   display: "flex",
@@ -140,8 +139,21 @@ export function DeviceJoinQr() {
   };
 
   const canGenerate = account.trim().length > 0 && !busy;
-  // Percent-encode the (multi-KB) SVG only when it actually changes, not per render.
-  const imgSrc = useMemo(() => (svg ? svgToDataUri(svg) : undefined), [svg]);
+  // An object URL rather than a `data:` URI (phase3-web-client task 97): this was
+  // the second of the two call sites keeping `data:` in the web client's CSP.
+  // Minted only when the SVG actually changes — and REVOKED when it changes
+  // again or the panel unmounts, because an object URL is a GC root for its Blob
+  // and a QR panel the user opens repeatedly would otherwise accumulate them.
+  const [imgSrc, setImgSrc] = useState<string | undefined>(undefined);
+  useEffect(() => {
+    if (!svg) {
+      setImgSrc(undefined);
+      return;
+    }
+    const url = svgToObjectUrl(svg);
+    setImgSrc(url);
+    return () => URL.revokeObjectURL(url);
+  }, [svg]);
 
   return (
     <div style={ROOT} data-testid="sync.device-join-qr">

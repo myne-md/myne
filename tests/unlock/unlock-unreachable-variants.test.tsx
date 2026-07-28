@@ -101,6 +101,40 @@ describe("unreachable unlock error variants (component-level, mocked reject)", (
     expect(banner.textContent).toBe("Operation in progress.");
   });
 
+  // phase3-web-client task 31. Unreachable from the desktop E2E suite for a
+  // structural reason rather than a fixture one: `HostCtx::max_kdf_memory_kib`
+  // is `None` on desktop, so the Rust side cannot produce this variant there at
+  // all. The browser can, and what the user is told is the entire deliverable —
+  // the refusal exists so that an unopenable vault says why instead of killing
+  // the Worker.
+  it("KdfMemoryExceedsHostCapability → a banner naming desktop and both real figures", async () => {
+    rejectUnlockWith({
+      kind: "KdfMemoryExceedsHostCapability",
+      detail: { required_mib: 2048, available_mib: 1024 },
+    });
+    renderUnlock();
+    await submitPassword();
+
+    const banner = await screen.findByTestId("unlock.error-banner");
+    // The figures are interpolated, not dropped: "this vault will not open" is
+    // exactly the message this variant exists to avoid.
+    expect(banner.textContent).toContain("2048 MiB");
+    expect(banner.textContent).toContain("1024 MiB");
+    // The one actionable thing the user can do.
+    expect(banner.textContent).toContain("desktop");
+
+    // NOT the fail-closed surface. `InvalidVaultMeta` switches the screen to
+    // <FailClosedError> whose CTA is "restore from a backup" — wrong and
+    // destructive advice for a vault that is intact and opens on another
+    // client.
+    expect(screen.queryByTestId("fail-closed.root")).toBeNull();
+    // And the form stays usable, since retrying is harmless (it just refuses
+    // again) and the user may want to switch vaults instead.
+    expect((screen.getByTestId("unlock.password-input") as HTMLInputElement).disabled).toBe(
+      false,
+    );
+  });
+
   it("VaultRecoveryInProgress → recovery-in-progress mode: form suppressed, Continue resumes", async () => {
     rejectUnlockWith({ kind: "VaultRecoveryInProgress" });
     const onResumeRecovery = vi.fn();

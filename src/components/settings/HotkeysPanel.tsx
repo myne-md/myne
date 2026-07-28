@@ -27,6 +27,7 @@ import {
   type BindGroup,
 } from "../../commands/bindableCatalog";
 import { PANEL_ROOT_STYLE, HELPER_STYLE } from "./panel-styles";
+import { reservedChord } from "../../platform/keyboard";
 
 const DEFAULTS = catalogDefaults();
 // Conflict descriptors: all rebindable commands (CM-fixed rows are not in the
@@ -177,6 +178,29 @@ export function HotkeysPanel() {
       if (result.reason) setWarning(result.reason);
       return;
     }
+    // Host-reserved chords (MYND-574 task 66). `null` on desktop, so this whole
+    // branch is dead there. On web a `hard` reservation is REFUSED rather than
+    // bound: the browser acts on the chord and the page cannot stop it, so
+    // binding it would produce a shortcut that is visibly configured and does
+    // nothing — the failure this task exists to end. The `unreliable` tier is
+    // warned about and allowed, matching the panel's existing warn-only conflict
+    // policy: it does reach Myne in some browsers, and refusing it would take
+    // away a shortcut that works on the machine the user is sitting at.
+    //
+    // Either way the STORED keymap is untouched on refusal. The keymap syncs
+    // (`vault.prefs`), so a web session that "cleaned up" a reserved binding
+    // would reach across and break the user's desktop.
+    const reserved = reservedChord(result.chord);
+    if (reserved?.tier === "hard") {
+      setWarning(
+        t("settings.hotkeys.reservedRefused", {
+          chord: formatChord(result.chord),
+          action: t(`settings.hotkeys.reserved.${reserved.actionKey}`),
+        }),
+      );
+      setCapturingId(null);
+      return;
+    }
     const others = conflictsFor(result.chord, cmd.id, DESCRIPTORS, {
       ...effectiveKeymap,
       [cmd.id]: [...effectiveChords(cmd.id, DEFAULTS, overrides), result.chord],
@@ -186,6 +210,13 @@ export function HotkeysPanel() {
         .map((id) => BINDABLE_COMMANDS.find((c) => c.id === id)?.label ?? id)
         .join(", ");
       setWarning(t("settings.hotkeys.warnAlreadyUsed", { commands: otherLabels }));
+    } else if (reserved) {
+      setWarning(
+        t("settings.hotkeys.reservedUnreliable", {
+          chord: formatChord(result.chord),
+          action: t(`settings.hotkeys.reserved.${reserved.actionKey}`),
+        }),
+      );
     } else {
       setWarning(null);
     }
@@ -282,9 +313,34 @@ export function HotkeysPanel() {
                         {t("settings.hotkeys.notSet")}
                       </span>
                     )}
-                    {effective.map((chord) => (
-                      <kbd key={chord} style={CHIP_STYLE}>
+                    {effective.map((chord) => {
+                      // An existing binding the host takes for itself. It is
+                      // NOT removed and NOT rewritten — the keymap syncs, and
+                      // this same binding works on the user's desktop. It is
+                      // marked, so a shortcut that does nothing here is visibly
+                      // accounted for rather than looking broken.
+                      const taken = reservedChord(chord);
+                      return (
+                      <kbd
+                        key={chord}
+                        style={CHIP_STYLE}
+                        data-testid={taken ? "hotkeys.binding-reserved" : undefined}
+                        data-reserved-tier={taken?.tier}
+                        title={
+                          taken
+                            ? t("settings.hotkeys.reservedBadgeTitle", {
+                                chord: formatChord(chord),
+                                action: t(`settings.hotkeys.reserved.${taken.actionKey}`),
+                              })
+                            : undefined
+                        }
+                      >
                         {formatChord(chord)}
+                        {taken && (
+                          <span style={{ ...WARN_STYLE, marginLeft: "var(--space-1)" }}>
+                            {t("settings.hotkeys.reservedBadge")}
+                          </span>
+                        )}
                         {cmd.rebindable && (
                           <button
                             style={ICON_BTN_STYLE}
@@ -298,7 +354,8 @@ export function HotkeysPanel() {
                           </button>
                         )}
                       </kbd>
-                    ))}
+                      );
+                    })}
                     {!cmd.rebindable && (
                       <span style={FIXED_TAG_STYLE}>{t("settings.hotkeys.fixed")}</span>
                     )}

@@ -19,7 +19,6 @@
 use protocol::attachment_blob::{ATTACHMENT_ID_LEN, OFFSET_CONTENT_NONCE};
 use protocol::AEAD_NONCE_LEN;
 use std::collections::BTreeMap;
-use std::io::Read;
 use std::path::Path;
 
 /// `MYA1` magic — sourced from `protocol::attachment_blob` so a header-format
@@ -82,37 +81,46 @@ fn hex_nibble_lower(b: u8) -> Option<u8> {
     }
 }
 
-/// Read a single `MYA1` file's `content_nonce` from its header WITHOUT
-/// decrypting — only the first [`MYA1_HEADER_PREFIX_FOR_NONCE`] bytes are
-/// read. `None` on any IO failure / short file / bad magic.
-fn read_header_nonce(path: &Path) -> Option<[u8; AEAD_NONCE_LEN]> {
-    let mut file = std::fs::File::open(path).ok()?;
-    let mut header = [0u8; MYA1_HEADER_PREFIX_FOR_NONCE];
-    file.read_exact(&mut header).ok()?;
-    read_mya1_content_nonce(&header)
-}
-
-/// Scan `attachments_dir` for canonical `MYA1` blobs and build the
-/// sync-plane manifest, keyed by sync-id so the caller consumes it in the
-/// same shape as [`crate::note_nonce::scan_on_disk_manifest`]. Non-canonical
-/// names (temp files, partials — anything not 64 lowercase hex) and
-/// unreadable/bad-magic files are skipped, mirroring the stray-reconcile
-/// discipline. An absent/unreadable dir yields an empty manifest (a vault
-/// with no attachments has no `attachments/` dir until the first import).
-pub fn scan_attachments_manifest(
+/// Scan `attachments_dir` for canonical `MYA1` blobs and build the sync-plane
+/// manifest, keyed by sync-id so the caller consumes it in the same shape as
+/// [`crate::note_nonce::scan_on_disk_manifest_io`]. Non-canonical names (temp
+/// files, partials — anything not 64 lowercase hex) and unreadable/bad-magic
+/// files are skipped, mirroring the stray-reconcile discipline. An
+/// absent/unreadable dir yields an empty manifest (a vault with no attachments
+/// has no `attachments/` dir until the first import).
+///
+/// Over the IO seam (phase3-web-client task 84). Its caller — the sync cycle's
+/// once-per-attempt disk scan — went async two passes ago, and this was the leaf
+/// it still reached `std::fs` through: a hole that compiles on `wasm32` and
+/// fails at first attachment sync.
+///
+/// [`crate::vault_io::VaultIo::read_prefix`] rather than whole-file reads, for
+/// the reason that method exists: an attachment can be 64 MiB and this wants 40
+/// bytes of it, once per blob, every cycle.
+pub async fn scan_attachments_manifest(
+    io: &dyn crate::vault_io::VaultIo,
     attachments_dir: &Path,
 ) -> BTreeMap<[u8; ATTACHMENT_SYNC_ID_LEN], AttachmentManifestEntry> {
     let mut manifest = BTreeMap::new();
-    let Ok(entries) = std::fs::read_dir(attachments_dir) else {
+    let Ok(entries) = io.read_dir(attachments_dir).await else {
         return manifest;
     };
-    for entry in entries.flatten() {
-        let name = entry.file_name();
-        let Some(name) = name.to_str() else { continue };
-        let Some(id) = parse_canonical_id(name) else {
+    for entry in entries {
+        // Names, not paths: the seam's `DirEntry` carries a name because OPFS
+        // has no path API at all. The canonical-name check is unchanged.
+        let Some(id) = parse_canonical_id(&entry.name) else {
             continue;
         };
-        let Some(content_nonce) = read_header_nonce(&entry.path()) else {
+        let Ok(header) = io
+            .read_prefix(
+                &attachments_dir.join(&entry.name),
+                MYA1_HEADER_PREFIX_FOR_NONCE,
+            )
+            .await
+        else {
+            continue;
+        };
+        let Some(content_nonce) = read_mya1_content_nonce(&header) else {
             continue;
         };
         let mut sync_id = [0u8; ATTACHMENT_SYNC_ID_LEN];
@@ -162,30 +170,77 @@ mod tests {
         assert!(parse_canonical_id(&format!("{}.partial", "ab".repeat(32))).is_none());
     }
 
+    /// The fixture writes through the SEAM, not `std::fs`.
+    ///
+    /// The rule this follows: a test that stages its files with `std::fs` while
+    /// production reads them through `VaultIo` is testing a path production does
+    /// not take, and the port it is supposed to prove goes unproven. Here it also
+    /// keeps this file OFF the io-seam ratchet, which a `std::fs` fixture alone
+    /// would have held it on.
+    fn io() -> crate::vault_io::StdVaultIo {
+        crate::vault_io::StdVaultIo
+    }
+
+    async fn put(io: &dyn crate::vault_io::VaultIo, path: &Path, bytes: &[u8]) {
+        io.write(path, bytes, crate::vault_io::WriteOpts::default())
+            .await
+            .expect("stage fixture through the seam");
+    }
+
     #[test]
     fn scan_skips_non_canonical_and_bad_magic_files() {
         let tmp = crate::test_support::ScopedTempDir::new("attachment-nonce-scan").unwrap();
         let dir = tmp.path();
 
-        // Canonical blob with valid header.
-        let id_hex = "11".repeat(32);
-        std::fs::write(dir.join(&id_hex), header_with(&MYA1_MAGIC, 0xCD)).unwrap();
-        // Canonical name, wrong magic → skipped.
-        std::fs::write(dir.join("22".repeat(32)), header_with(b"NOPE", 0x01)).unwrap();
-        // Non-canonical name → skipped.
-        std::fs::write(dir.join("readme.txt"), b"x").unwrap();
+        crate::test_support::block_on(async {
+            let io = io();
+            // Canonical blob with valid header.
+            let id_hex = "11".repeat(32);
+            put(&io, &dir.join(&id_hex), &header_with(&MYA1_MAGIC, 0xCD)).await;
+            // Canonical name, wrong magic → skipped.
+            put(&io, &dir.join("22".repeat(32)), &header_with(b"NOPE", 0x01)).await;
+            // Non-canonical name → skipped.
+            put(&io, &dir.join("readme.txt"), b"x").await;
 
-        let manifest = scan_attachments_manifest(dir);
-        assert_eq!(manifest.len(), 1);
-        let entry = manifest.values().next().unwrap();
-        assert_eq!(entry.id, [0x11; 32]);
-        assert_eq!(entry.sync_id, [0x11; 16]);
-        assert_eq!(entry.content_nonce, [0xCD; AEAD_NONCE_LEN]);
+            let manifest = scan_attachments_manifest(&io, dir).await;
+            assert_eq!(manifest.len(), 1);
+            let entry = manifest.values().next().unwrap();
+            assert_eq!(entry.id, [0x11; 32]);
+            assert_eq!(entry.sync_id, [0x11; 16]);
+            assert_eq!(entry.content_nonce, [0xCD; AEAD_NONCE_LEN]);
+        });
+    }
+
+    /// A blob SHORTER than the header prefix is skipped, not misread.
+    ///
+    /// New with the seam port and worth its own case: `File::read_exact` failed
+    /// outright on a short file, while `read_prefix` is specified to return
+    /// fewer bytes than asked for at EOF — "shorter than expected is a normal
+    /// answer". So the length check moved from the IO call into
+    /// `read_mya1_content_nonce`, and this pins that it is still made. Without
+    /// it a truncated blob would read a nonce out of whatever followed.
+    #[test]
+    fn scan_skips_a_truncated_blob() {
+        let tmp = crate::test_support::ScopedTempDir::new("attachment-nonce-short").unwrap();
+        let dir = tmp.path();
+        crate::test_support::block_on(async {
+            let io = io();
+            let mut short = header_with(&MYA1_MAGIC, 0xCD);
+            short.truncate(MYA1_HEADER_PREFIX_FOR_NONCE - 1);
+            put(&io, &dir.join("11".repeat(32)), &short).await;
+            assert!(scan_attachments_manifest(&io, dir).await.is_empty());
+        });
     }
 
     #[test]
     fn scan_of_absent_dir_is_empty() {
         let tmp = crate::test_support::ScopedTempDir::new("attachment-nonce-absent").unwrap();
-        assert!(scan_attachments_manifest(&tmp.path().join("missing")).is_empty());
+        crate::test_support::block_on(async {
+            assert!(
+                scan_attachments_manifest(&io(), &tmp.path().join("missing"))
+                    .await
+                    .is_empty()
+            );
+        });
     }
 }

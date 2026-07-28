@@ -7,22 +7,46 @@
 //! codec (`http_codec`), no TLS. It refuses any non-loopback host (a
 //! non-loopback plaintext sync would be an A4 downgrade), so production https
 //! always routes to the pinned rustls layer.
+//!
+//! # What compiles for `wasm32`, and what does not (task 84)
+//!
+//! [`HttpTransport`] itself is **excluded** from the browser build rather than
+//! stubbed. It is a raw `TcpStream` with a keep-alive slot; on
+//! `wasm32-unknown-unknown` `std::net` compiles and then fails at runtime, which
+//! is the same silent-panic class as the clocks — a transport that constructs
+//! successfully and dies on first use is strictly worse than one that cannot be
+//! constructed.
+//!
+//! What stays compiled is the DISPATCH: [`parse_endpoint`], [`is_loopback`] and
+//! [`build_transport`]. That is deliberate and is the reason this file is not
+//! simply `#[cfg(not(wasm32))]` wholesale — the endpoint policy (https anywhere,
+//! http on loopback only, non-loopback plaintext refused as an A4 downgrade) is
+//! a security rule, and both clients must be answering the same one. Only the
+//! transports it selects differ.
 
+#[cfg(not(target_arch = "wasm32"))]
 use super::http_codec::{build_http_request_ext, keepalive_roundtrip, read_response_head};
+#[cfg(not(target_arch = "wasm32"))]
 use super::transport::{
-    HttpMethod, SseOpenError, SseStream, SyncTransport, TransportError, TransportResponse,
-    TransportResponseExt,
+    HttpMethod, SseOpenError, SseStream, TransportResponse, TransportResponseExt,
 };
+use super::transport::{SyncTransport, TransportError};
+#[cfg(not(target_arch = "wasm32"))]
 use std::io::BufReader;
+#[cfg(not(target_arch = "wasm32"))]
 use std::net::TcpStream;
+#[cfg(not(target_arch = "wasm32"))]
 use std::sync::Mutex;
+#[cfg(not(target_arch = "wasm32"))]
 use std::time::Duration;
 
+#[cfg(not(target_arch = "wasm32"))]
 /// Socket read/write deadline: a hung or half-dead server must fail the request
 /// instead of wedging a sync cycle forever; keep-alive reuse also needs death
 /// detection. Comfortably exceeds any legitimate response (incl. a 64 MiB blob).
 pub(crate) const SOCKET_TIMEOUT: Duration = Duration::from_secs(60);
 
+#[cfg(not(target_arch = "wasm32"))]
 /// Plain-HTTP transport, loopback-only. Holds one keep-alive connection —
 /// within a sync cycle every request rides the same TCP session (the codec's
 /// framed reader decides reusability per response).
@@ -32,6 +56,7 @@ pub struct HttpTransport {
     conn: Mutex<Option<BufReader<TcpStream>>>,
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 impl HttpTransport {
     /// Construct for `host:port`. The factory guarantees `host` is loopback.
     pub fn new(host: impl Into<String>, port: u16) -> Self {
@@ -51,6 +76,7 @@ impl HttpTransport {
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 impl SyncTransport for HttpTransport {
     fn request(
         &self,
@@ -163,21 +189,106 @@ fn is_loopback(host: &str) -> bool {
     matches!(host, "127.0.0.1" | "localhost" | "::1")
 }
 
+// ── the browser's transport, installed rather than built (task 35) ───────────
+//
+// On wasm32 there is no rustls arm and no TCP socket, so the `https` case cannot
+// be constructed here — but it must still be *reachable* from the same
+// `build_transport` every sync call site already uses, or the web client would
+// need its own copy of that dispatch.
+//
+// So the entry crate installs a factory at startup and this module calls it. The
+// direction matters: core does not learn what a browser is, it learns that
+// something else may answer for `https`. The factory is a plain `fn` pointer —
+// no captured state, nothing to keep alive, and the `OnceLock` makes a second
+// installation a no-op rather than a race.
+
+/// Which of the two endpoint shapes the browser is being asked to speak.
+///
+/// A closed enum rather than a `&str` scheme, and it carries its precondition in
+/// its own name: [`BrowserScheme::LoopbackHttp`] is constructible only inside
+/// [`build_transport`]'s `is_loopback`-guarded arm, so "a browser transport
+/// cannot be built for plaintext off loopback" stays a property of the type
+/// rather than a rule someone has to remember. A `scheme: &str` parameter would
+/// have made the A4 guard a convention.
+#[cfg(target_arch = "wasm32")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BrowserScheme {
+    /// Ordinary `https` — the production shape, any host.
+    Https,
+    /// Plain `http` to a loopback host: the dev server and the web E2E harness,
+    /// the same endpoints the desktop's [`HttpTransport`] serves. Permitted
+    /// because the policy already permits them and because `127.0.0.1` /
+    /// `localhost` are "potentially trustworthy" origins, so a browser will
+    /// reach them from a secure page instead of blocking them as mixed content.
+    LoopbackHttp,
+}
+
+#[cfg(target_arch = "wasm32")]
+pub type BrowserTransportFactory =
+    fn(scheme: BrowserScheme, host: &str, port: u16) -> Box<dyn SyncTransport>;
+
+#[cfg(target_arch = "wasm32")]
+static BROWSER_TRANSPORT: std::sync::OnceLock<BrowserTransportFactory> = std::sync::OnceLock::new();
+
+/// Install the browser's `https` transport. Called once, from the Worker entry
+/// point, before any sync command runs.
+#[cfg(target_arch = "wasm32")]
+pub fn set_browser_transport(factory: BrowserTransportFactory) {
+    let _ = BROWSER_TRANSPORT.set(factory);
+}
+
 /// Build the right transport for an endpoint URL: pinned rustls for `https`,
 /// plain http for a **loopback** `http` endpoint. `pins` are the cert pins for
 /// the rustls path (ignored for loopback http). Errors on a non-loopback http
 /// endpoint (no plaintext sync off loopback — A4) or an unparseable URL.
 pub fn build_transport(
     endpoint_url: &str,
-    pins: Vec<[u8; 32]>,
+    // Consumed only by the rustls arm below, which does not exist on wasm.
+    #[cfg_attr(target_arch = "wasm32", allow(unused_variables))] pins: Vec<[u8; 32]>,
 ) -> Result<Box<dyn SyncTransport>, TransportError> {
     let (scheme, host, port) = parse_endpoint(endpoint_url).ok_or(TransportError::BadRequest)?;
     match scheme.as_str() {
+        // wasm32 has no rustls arm (see `mod.rs`); the browser transport is
+        // installed by the Worker host, not built here.
+        #[cfg(not(target_arch = "wasm32"))]
         "https" => Ok(Box::new(super::rustls_transport::RustlsTransport::new(
             host, port, pins,
         ))),
+        // The browser answers for `https` through the factory it installed. TLS,
+        // certificate verification and the trust store are the browser's, which
+        // is also why `pins` is unused here: a page cannot pin a certificate,
+        // and `decisions.md` 2026-07-26 records that as permanent rather than
+        // deferred (A4 is ⚠️ Best-effort on web by decision, not by omission).
+        #[cfg(target_arch = "wasm32")]
+        "https" => browser_transport(BrowserScheme::Https, &host, port),
+        #[cfg(not(target_arch = "wasm32"))]
         "http" if is_loopback(&host) => Ok(Box::new(HttpTransport::new(host, port))),
+        // Same endpoints, different transport. The browser cannot open the raw
+        // socket `HttpTransport` is, but it can fetch a loopback origin — so the
+        // loopback-dev/harness case is served by the browser transport rather
+        // than refused, which is what keeps the web E2E lane able to talk to the
+        // same local `myne-server` the desktop lane does. The A4 rule is
+        // untouched: `is_loopback` gates this arm exactly as it gates the native
+        // one, and it is the guard, not the transport, that enforces it.
+        #[cfg(target_arch = "wasm32")]
+        "http" if is_loopback(&host) => browser_transport(BrowserScheme::LoopbackHttp, &host, port),
         _ => Err(TransportError::BadRequest), // non-loopback http = A4 downgrade
+    }
+}
+
+/// Resolve the installed browser factory, or report a startup failure.
+#[cfg(target_arch = "wasm32")]
+fn browser_transport(
+    scheme: BrowserScheme,
+    host: &str,
+    port: u16,
+) -> Result<Box<dyn SyncTransport>, TransportError> {
+    match BROWSER_TRANSPORT.get() {
+        Some(factory) => Ok(factory(scheme, host, port)),
+        // Not a network failure — a startup one. The Worker entry point is
+        // supposed to install this before any sync command can run, so reaching
+        // here means the boot order changed.
+        None => Err(TransportError::BadRequest),
     }
 }
 
@@ -338,7 +449,22 @@ mod tests {
                 if read_request(&mut sock).is_some() {
                     write_keepalive_response(&mut sock);
                 }
-                drop(sock); // close after one exchange → the cached conn goes stale
+                // Half-close (FIN), not a bare `drop`, and this is a fix for a
+                // real flake rather than tidiness. Dropping a socket whose peer
+                // may still have unread bytes in flight can make the kernel send
+                // RST instead of FIN — which discards the response the client has
+                // not finished reading, so the FIRST exchange fails and the test
+                // reports a stale-connection bug that is not there. Under
+                // parallel `cargo test --workspace` load that window is wide
+                // enough to hit.
+                //
+                // `shutdown(Write)` delivers the pending response and THEN closes,
+                // which is exactly the condition under test: a server that
+                // finished one exchange and went away. The client's next write
+                // still lands on a dead socket — the stale signature the retry
+                // path exists for — so nothing about the property is weakened.
+                let _ = sock.shutdown(std::net::Shutdown::Write);
+                drop(sock);
             }
             accepts
         });

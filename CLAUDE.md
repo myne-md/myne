@@ -23,7 +23,7 @@ Three files at the repo root carry the visual + strategic system. Read in this o
 
 ## Project status
 
-**Pre-alpha.** Shipped: v0.1 specs (`docs/`), Tauri 2 + Vite + React + TS scaffold (`src/`, `src-tauri/`), Rust crypto crate (`protocol/`, RustCrypto, `#![no_std]` + `alloc`), Cargo workspace (one shared `Cargo.lock`), workspace scripts, pinned toolchain. The desktop scaffold lives at the **repo root** deliberately — there is one in-repo client; mobile/web/server/website/ops/test-vectors are companion repos. See `design-notes.md` "Desktop scaffold lives at repository root".
+**Pre-alpha.** Shipped: v0.1 specs (`docs/`), Tauri 2 + Vite + React + TS scaffold (`src/`, `src-tauri/`), Rust crypto crate (`protocol/`, RustCrypto, `#![no_std]` + `alloc`), Cargo workspace (one shared `Cargo.lock`), workspace scripts, pinned toolchain. The desktop scaffold lives at the **repo root** deliberately. It is no longer the only in-repo client: the Phase 3 desktop-**browser** client lives at `web/` and compiles the same `src/` tree (`design-notes.md` **2026-07-26** "The web client lives in-repo at `web/`", which supersedes the one-in-repo-client clause of the 2026-04-26 "Desktop scaffold lives at repository root" entry while leaving its placement decision intact). Mobile/server/website/ops/test-vectors remain companion repos; `myne-web` is redundant and archived.
 
 ## Common commands
 
@@ -32,15 +32,19 @@ pnpm tauri dev          # full Tauri dev (spawns Vite on :1420 + Rust core)
 pnpm dev                # Vite only — port fixed via strictPort, fails if 1420 is taken
 pnpm tauri build        # production desktop bundle
 
+pnpm web:dev            # web client dev server on :1421 (runs alongside the desktop one)
+pnpm web:build          # typecheck web/ against the shared src/ tree + production web bundle
+pnpm web:preview        # serve the built web bundle
+
 cargo test -p protocol <name>     # one test in protocol crate
 cargo clippy --workspace --all-targets -- -D warnings
 
 brew install lefthook && lefthook install   # one-time per clone; activates git hooks
 ```
 
-Git hooks are managed by **lefthook** (`lefthook.yml`). `pre-commit` runs the fast lint set (rustfmt-check, `tsc --noEmit`, whitespace, EOF newline, secret pattern guard, single-Cargo.lock check); `pre-push` runs the full battery (`cargo clippy --workspace -- -D warnings`, `cargo test --workspace`, `pnpm build`). CI is self-hosted Woodpecker via the Forgejo mirror (`.woodpecker.yml`, Linux runner; `design-notes.md` 2026-05-01) — the hooks are the local pre-push net, CI is the remote gate, and the `e2e` step drives the production binary via tauri-driver (`docs/dev/e2e.md`). Bypass with `git commit --no-verify` only when you understand why.
+Git hooks are managed by **lefthook** (`lefthook.yml`). `pre-commit` runs the fast lint set (rustfmt-check, `tsc --noEmit`, whitespace, EOF newline, secret pattern guard, single-Cargo.lock check); `pre-push` runs the full battery (`cargo clippy --workspace -- -D warnings`, `cargo test --workspace`, `pnpm build`). CI is self-hosted Woodpecker via the Forgejo mirror (`.woodpecker.yml`, Linux runner; `design-notes.md` 2026-05-01) — the hooks are the local pre-push net, CI is the remote gate, and the `e2e` step drives the production binary via tauri-driver (`docs/dev/e2e.md`). **Two lanes, one pipeline** (MYND-574): the desktop lane is one serial chain (`pnpm-build` → `vitest` → `tauri-compile` → `cargo-test-tauri` → `e2e`) because each of those runs `pnpm install` into the shared workspace `node_modules`; the **web lane** hangs off the end of it (`web-build` — the web bundle plus the artefact greps, the seam contract against the web implementation, the bundle budget and the screen/surface/testid rosters) so it adds nothing to the desktop lane's wall-clock, alongside the early Rust wasm gates (`wasm-protocol`). Every step that can go red is listed in `notify-failure` (the only thing that pushes a failure to the maintainer), and every step carries the `code-paths` filter, so a docs-only commit runs none of them. Bypass with `git commit --no-verify` only when you understand why.
 
-**A new user-facing flow ships WITH its E2E coverage**: the same change carries the `data-testid` pass (`src/CLAUDE.md` "Test observability") and an `e2e/` scenario on the harness (`e2e/CLAUDE.md`, procedure `docs/dev/e2e.md`). A PR that adds a flow without its E2E scenario gets rejected in review.
+**A new user-facing flow ships WITH its E2E coverage**: the same change carries the `data-testid` pass (`src/CLAUDE.md` "Test observability") and a scenario on the right harness (`e2e/CLAUDE.md`, procedure `docs/dev/e2e.md`). A PR that adds a flow without its E2E scenario gets rejected in review. **Which harness** — there are two lanes and they do not mirror each other: a flow in the **shared** `src/` tree owes ONE scenario to the tauri-driver suite in `e2e/` and nothing to the web lane, because it is literally the same code; a **web-specific** behaviour (capability gating, OPFS persistence, the single-tab lock, sync-required entry, crash recovery of the double-buffered blobs) owes a scenario to `e2e-web/`. Do **not** dual-drive the desktop suite against a browser: the premise that lets one suite cover both clients is "same tree, only the seam differs", and that premise is verified by the **seam contract tests** (`tests/platform/seam-contract.ts`, run against every implementation in both CI lanes), not by re-running 92 tauri-driver scenario files. `design-notes.md` 2026-07-26 "Web E2E policy".
 
 `pnpm` is the canonical package manager (Tauri's `beforeDevCommand`/`beforeBuildCommand` invoke it). Pinned versions: Node `.nvmrc`, Rust `rust-toolchain.toml`. **Do not bypass the pinning** — CI and reproducible-build rely on it.
 
@@ -51,7 +55,10 @@ JS tests run on **Vitest** (`pnpm test` → `vitest run`; config `vite.config.ts
 ```
 myne/
 ├── docs/                ← specs, threat model, glossary, decisions log (CC-BY-4.0)
-├── src/                 ← React UI (Tauri WebView); src/dialect + src/editor are re-export shims into the shared pkgs below
+├── src/                 ← React UI, shared by BOTH clients; src/dialect + src/editor are re-export shims into the shared pkgs below
+│   └── platform/        ← the platform seam: the ONLY place under src/ allowed to import @tauri-apps/*
+├── web/                 ← Phase 3 desktop-browser client: same src/ tree, seam substituted at build time (pnpm web:dev / web:build)
+├── e2e-web/             ← browser-driven web E2E lane (deliberately thin: web-specific behaviour only) — lands with MYND-574 task 105
 ├── src-tauri/           ← Tauri 2 + Rust desktop core
 │   └── capabilities/    ← Tauri capability ACLs (security-load-bearing)
 ├── dialect/             ← @myne/dialect: shared markdown-parser source pkg (source-consumed, no build), desktop+mobile WebView
@@ -68,7 +75,7 @@ myne/
 └── vite.config.ts       ← Tauri-aware Vite config
 ```
 
-**Companion repos** (clone via `./workspace/setup.sh` reading `workspace/manifest.txt`): `myne-test-vectors/`, `myne-server/`, `myne-web/`, `myne-mobile/`, `myne-website/`, `operations/`, `agent-tooling/`. Each is a separate GitHub repo under [`myne-md`](https://github.com/myne-md) — **never commit changes to them through this repo**. Each carries its own CLAUDE.md (lazy-load when you `cd` into it).
+**Companion repos** (clone via `./workspace/setup.sh` reading `workspace/manifest.txt`): `myne-test-vectors/`, `myne-server/`, `myne-mobile/`, `myne-website/`, `operations/`, `agent-tooling/`. (`myne-web` is **not** in this list: the web client is the in-repo `web/` target, and the empty companion repo is archived — `decisions.md` 2026-07-26.) Each is a separate GitHub repo under [`myne-md`](https://github.com/myne-md) — **never commit changes to them through this repo**. Each carries its own CLAUDE.md (lazy-load when you `cd` into it).
 
 ## The spec is the source of truth
 
@@ -88,6 +95,8 @@ See `docs/CLAUDE.md` for spec-authoring discipline in depth.
 Active Phase 1 work is tracked in Plane: **plane.myne.md** (self-hosted). Lane IDs (`A`, `B`, `C`, `D`, `S`) are retired — Plane native work-item identifiers (e.g., `MYN-…`) are the new anchor for cross-references in `design-notes.md`, feature directories, commit subjects, and PR titles. Historical lane-ID references in `design-notes.md` and git history are preserved (append-only spec discipline).
 
 ## Cryptographically load-bearing identifiers
+
+**The Phase 3 web client adds nothing to this table and removes nothing from it** — it runs the same `protocol/` crate compiled to wasm, reads and writes byte-identical blobs, and introduces no magic, AAD prefix, HKDF context or subkey role of its own. Its only on-disk divergence is the *container layout* around those blobs in OPFS (`decisions.md` 2026-07-26), which is not an identifier.
 
 Identifiers and constants whose change is a major-version event. Most are bound into AEAD tags or magic-byte checks; some (e.g. the account-number display prefix, the Damm-32 table) are load-bearing through account identity or presentation rather than an AEAD/magic boundary — the mechanism is noted per row:
 
@@ -159,6 +168,10 @@ Full primitive details, audit anchors, and subkey derivation discipline rule (wh
 
 ## Gotchas
 
+- **`@tauri-apps/*` may only be imported from `src/platform/`.** The platform seam is what lets one `src/` tree compile for both the desktop and the web client; a direct import anywhere else breaks the web build rather than degrading it. Enforced by `scripts/check-platform-seam.mjs` in `pre-commit` **and** in CI (so `--no-verify` does not slip one through), and extended to `editor/`, `dialect/` and `copy/` by MYND-574 task 76. If an export you need is missing, add it to the seam module — do not reach around it.
+- **A new `web/wasm/src/dispatch.rs` arm needs its `capability::DISPATCHED` entry in the same change, and only `cargo test -p myne-web-wasm` tells you.** Without it, `classify` reports a command the router *does* answer as unported — the exact wrong answer the capability system exists to prevent. `cargo clippy --target wasm32-unknown-unknown` is green either way, and so is every `scripts/check-web-*.mjs` guard. The crate is a workspace member (so `cargo test --workspace` in `pre-push` covers it), but CI's Rust steps name `-p protocol` and `-p myne-desktop -p myne-core`; the wasm lane now runs the crate's tests too (MYND-574 task 77).
+- **A `[target.'cfg(…)'.dependencies.…]` table must go at the END of a `Cargo.toml`, never beside the crate it overrides.** Inserted next to `tracing = "0.1"` inside `[dependencies]`, it TERMINATES that section, and every crate declared after that line silently becomes part of the target table — `sha2`, `unicode_normalization` and friends disappear from both builds with `unresolved import` errors that name the wrong file. TOML sections have no closing brace, so nothing about the edit looks wrong.
+- **`web/wasm/pkg/` is a derived artefact and goes stale.** Adding a `#[wasm_bindgen]` export needs `./scripts/build-wasm.sh` before `pnpm web:build`, or the bundler fails with `MISSING_EXPORT` on the new name.
 - **`Cargo.lock` is single-shared at workspace root** (TB9 audit anchor). Do not split into per-crate locks.
 - **Vite `strictPort: 1420`** — `pnpm dev` fails fast if port taken; this is intentional (Tauri expects exact port).
 - **Vite `clearScreen: false`** — keep it; otherwise Rust errors get hidden during `pnpm tauri dev`.

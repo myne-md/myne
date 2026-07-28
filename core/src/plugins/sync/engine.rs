@@ -134,6 +134,23 @@ pub struct PullPage {
 pub enum PullError {
     /// 401 — token rejected / no authed session.
     Unauthenticated,
+    /// 401 `device_revoked` — this DEVICE's registry row was revoked or retired
+    /// from another client (`server-protocol.md` §3.1). Distinct from
+    /// [`PullError::Unauthenticated`] on purpose: the two arrive on the same
+    /// status and mean opposite things to a client.
+    ///
+    /// `Unauthenticated` covers an expired token, a restarted server, a token
+    /// the server has simply never heard of — every one of which is fixed by
+    /// re-authenticating, and none of which says anything about the user's
+    /// intent. A revoked device row is a **deliberate act by the account owner
+    /// from another client**, and on a client whose storage is a cache of a
+    /// sync-held vault it is terminal rather than a retry class (task 94).
+    ///
+    /// It is emphatically NOT a remote wipe or a cryptographic lockout: a device
+    /// that already decrypted content cannot un-decrypt it, and anyone holding
+    /// the vault file plus the password is unaffected. `REMOVE_DEVICE_DISCLOSURE`
+    /// says exactly that and must keep saying it.
+    DeviceRevoked,
     /// 429 — per-account rate limit.
     RateLimited,
     /// 410 cursor_expired — the caller MUST trigger a full-reconcile (task 8).
@@ -161,6 +178,23 @@ impl From<TransportError> for PullError {
     fn from(e: TransportError) -> Self {
         PullError::Transport(e)
     }
+}
+
+/// Classify a 401 body into `device_revoked` vs plain `unauthenticated`.
+///
+/// **One reader, on purpose.** The server sends both on status 401, so every
+/// 401 site has to look inside the body or it silently collapses a terminal
+/// condition into a retryable one. Five sites do; a copy at each is five places
+/// for the string to drift from `server-protocol.md` §3.1.
+///
+/// An unparseable or absent body means `false` — plain `Unauthenticated`, the
+/// SAFE default in the direction that matters. Guessing "revoked" from a missing
+/// body would let a malformed response from any server erase a web client's
+/// local copy, which is the one outcome here that cannot be undone by retrying.
+fn is_device_revoked(body: &[u8]) -> bool {
+    serde_json::from_slice::<ErrBodyWire>(body)
+        .map(|e| e.error_code == "device_revoked")
+        .unwrap_or(false)
 }
 
 fn hex_to_array<const N: usize>(s: &str) -> Option<[u8; N]> {
@@ -199,7 +233,13 @@ pub fn pull_page(
 
     match resp.status {
         200 => {}
-        401 => return Err(PullError::Unauthenticated),
+        401 => {
+            return Err(if is_device_revoked(&resp.body) {
+                PullError::DeviceRevoked
+            } else {
+                PullError::Unauthenticated
+            })
+        }
         410 => return Err(PullError::CursorExpired),
         429 => return Err(PullError::RateLimited),
         _ => {
@@ -210,6 +250,9 @@ pub fn pull_page(
                 }
                 if eb.error_code == "unauthenticated" {
                     return Err(PullError::Unauthenticated);
+                }
+                if eb.error_code == "device_revoked" {
+                    return Err(PullError::DeviceRevoked);
                 }
             }
             return Err(PullError::BadResponse);
@@ -451,6 +494,9 @@ pub struct PushOutcome {
 pub enum PushError {
     /// 401 — token rejected.
     Unauthenticated,
+    /// 401 `device_revoked` — see [`PullError::DeviceRevoked`] for why this is a
+    /// separate variant rather than a flavour of `Unauthenticated`.
+    DeviceRevoked,
     /// 429 — per-account rate limit.
     RateLimited,
     /// 409 `blob_stale` — a blob's `base_version` lost the CAS; pull + re-push.
@@ -513,7 +559,13 @@ pub fn push(
 
     match resp.status {
         200 => {}
-        401 => return Err(PushError::Unauthenticated),
+        401 => {
+            return Err(if is_device_revoked(&resp.body) {
+                PushError::DeviceRevoked
+            } else {
+                PushError::Unauthenticated
+            })
+        }
         403 => return Err(PushError::Frozen),
         429 => return Err(PushError::RateLimited),
         413 => return Err(PushError::PayloadTooLarge),
@@ -595,7 +647,11 @@ pub fn probe_attachment(
             Ok(Some(AttachmentProbe { uploaded, complete }))
         }
         404 => Ok(None),
-        401 => Err(PushError::Unauthenticated),
+        401 => Err(if is_device_revoked(&resp.body) {
+            PushError::DeviceRevoked
+        } else {
+            PushError::Unauthenticated
+        }),
         429 => Err(PushError::RateLimited),
         _ => Err(PushError::BadResponse),
     }
@@ -659,7 +715,13 @@ pub fn upload_attachment(
                     None => offset = 0,
                 }
             }
-            401 => return Err(PushError::Unauthenticated),
+            401 => {
+                return Err(if is_device_revoked(&resp.body) {
+                    PushError::DeviceRevoked
+                } else {
+                    PushError::Unauthenticated
+                })
+            }
             429 => return Err(PushError::RateLimited),
             413 => return Err(PushError::PayloadTooLarge),
             507 => return Err(PushError::QuotaExceeded),
@@ -688,6 +750,11 @@ pub fn download_attachment(
     let probe = match probe_attachment(transport, token, id) {
         Ok(p) => p,
         Err(PushError::Unauthenticated) => return Err(PullError::Unauthenticated),
+        // Carried across the push→pull translation rather than flattened into
+        // `BadResponse`: an attachment probe is the first request many cycles
+        // make, so losing the distinction here would make revocation look like a
+        // protocol error on exactly the path most likely to see it first.
+        Err(PushError::DeviceRevoked) => return Err(PullError::DeviceRevoked),
         Err(PushError::RateLimited) => return Err(PullError::RateLimited),
         Err(PushError::Transport(t)) => return Err(PullError::Transport(t)),
         Err(_) => return Err(PullError::BadResponse),
@@ -950,6 +1017,88 @@ mod tests {
             "/sync/pull?cursor=0",
             401,
             b"{\"error_code\":\"unauthenticated\"}".to_vec(),
+        );
+        assert_eq!(
+            pull_page(&t, &ROOT, "tok", &[], 0, &HashMap::new(), false).unwrap_err(),
+            PullError::Unauthenticated
+        );
+    }
+
+    // ── device_revoked (task 94) ────────────────────────────────────────────
+    //
+    // The whole value of the code is the DISTINCTION, so every test here is a
+    // pair: the same status, two bodies, two verdicts. A test that only asserted
+    // the new variant would pass just as happily against a parser that returned
+    // it for every 401 — which would erase a web client's local copy on an
+    // ordinary expired token.
+
+    #[test]
+    fn a_revoked_device_is_not_reported_as_unauthenticated() {
+        let t = FakeTransport::new();
+        t.on(
+            HttpMethod::Get,
+            "/sync/pull?cursor=0",
+            401,
+            b"{\"error_code\":\"device_revoked\"}".to_vec(),
+        );
+        assert_eq!(
+            pull_page(&t, &ROOT, "tok", &[], 0, &HashMap::new(), false).unwrap_err(),
+            PullError::DeviceRevoked
+        );
+    }
+
+    /// The safe default, and the direction it has to be safe in: an unparseable
+    /// or bodyless 401 is `Unauthenticated`. Guessing "revoked" from a missing
+    /// body would let any malformed response erase a browser's local copy.
+    #[test]
+    fn a_401_with_no_usable_body_stays_unauthenticated() {
+        for body in [b"".to_vec(), b"not json".to_vec(), b"{}".to_vec()] {
+            let t = FakeTransport::new();
+            t.on(HttpMethod::Get, "/sync/pull?cursor=0", 401, body);
+            assert_eq!(
+                pull_page(&t, &ROOT, "tok", &[], 0, &HashMap::new(), false).unwrap_err(),
+                PullError::Unauthenticated
+            );
+        }
+    }
+
+    #[test]
+    fn the_push_path_distinguishes_it_too() {
+        let t = FakeTransport::new();
+        t.on(
+            HttpMethod::Post,
+            "/sync/push",
+            401,
+            b"{\"error_code\":\"device_revoked\"}".to_vec(),
+        );
+        assert_eq!(
+            push(&t, "tok", &[], None).unwrap_err(),
+            PushError::DeviceRevoked
+        );
+        let t2 = FakeTransport::new();
+        t2.on(
+            HttpMethod::Post,
+            "/sync/push",
+            401,
+            b"{\"error_code\":\"unauthenticated\"}".to_vec(),
+        );
+        assert_eq!(
+            push(&t2, "tok", &[], None).unwrap_err(),
+            PushError::Unauthenticated
+        );
+    }
+
+    /// A close cousin that must NOT match: the code is compared whole, not by
+    /// prefix or substring, so a server that grows `device_revoked_pending`
+    /// later does not silently trigger an erase.
+    #[test]
+    fn only_the_exact_code_counts() {
+        let t = FakeTransport::new();
+        t.on(
+            HttpMethod::Get,
+            "/sync/pull?cursor=0",
+            401,
+            b"{\"error_code\":\"device_revoked_soon\"}".to_vec(),
         );
         assert_eq!(
             pull_page(&t, &ROOT, "tok", &[], 0, &HashMap::new(), false).unwrap_err(),

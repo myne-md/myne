@@ -22,7 +22,7 @@
 // dependency. The attachment-id is a 32-byte value rendered as 64
 // lowercase hex chars (`spec/protocol.md` §9.9).
 
-import { convertFileSrc } from "@tauri-apps/api/core";
+import { getHost } from "../../host";
 
 /** The scheme prefix that marks a wikilink target as an attachment ref. */
 export const ATT_SCHEME = "att:";
@@ -109,24 +109,31 @@ export function canonicalAttachmentUrl(id: string): string {
 }
 
 /**
- * The custom-protocol URL that the editor/library use as an `<img src>` (or
- * pdf.js source) to fetch the decrypted bytes of an attachment. The Rust
- * `attachment://` handler decrypts in memory, re-sniffs the content-type,
- * and streams an allowlisted type — no plaintext ever touches disk
- * (`spec/protocol.md` §9.9, sync-ledger SYNC-4).
+ * The URL a display surface uses as an `<img src>` (or pdf.js source) to fetch
+ * an attachment's decrypted bytes.
  *
- * Platform-aware (MYND-519): Android WebView and Windows WebView2 cannot
- * intercept custom schemes — Tauri serves registered protocols there as
- * `http://attachment.localhost/<id>`, so a literal `attachment://<id>`
- * dies in the WebView before ever reaching the Rust handler. Inside Tauri
- * this delegates to `convertFileSrc`, which emits the per-platform form
- * (`attachment://localhost/<id>` on macOS/Linux/iOS); `extract_id`
- * (scheme_core.rs) accepts every form. Outside Tauri (vitest/jsdom,
- * plain-browser dev) it falls back to the canonical literal.
+ * **Delegates to the host** (phase3-web-client task 76). It used to call
+ * `convertFileSrc(id, "attachment")` directly, which is a `@tauri-apps/*` import
+ * at module scope — so it landed in any bundle reaching this file, Tauri or not.
+ * Each host now answers in its own terms:
+ *
+ * - **Desktop / mobile** return the platform form of the `attachment://` custom
+ *   protocol. The Rust handler decrypts in memory, RE-SNIFFS the content type
+ *   from the decrypted bytes and serves only an allowlisted one — never
+ *   `text/html` (`spec/protocol.md` §9.9, sync-ledger SYNC-4). MYND-519's
+ *   per-platform form (`http://attachment.localhost/<id>` where a WebView cannot
+ *   intercept a custom scheme) is the host's business now, not this file's.
+ * - **A browser** has no custom protocol and mints an object URL from bytes the
+ *   Worker decrypted (task 44).
+ *
+ * Outside any host — vitest/jsdom, a plain-browser dev boot before
+ * `setEditorHost` — it falls back to the canonical literal rather than throwing,
+ * because a missing image is a better failure here than a crashed render.
  */
 export function attachmentUrl(id: string): string {
-  if (typeof window !== "undefined" && "__TAURI_INTERNALS__" in window) {
-    return convertFileSrc(id, "attachment");
+  try {
+    return getHost().attachments.resolveRef(id);
+  } catch {
+    return canonicalAttachmentUrl(id);
   }
-  return canonicalAttachmentUrl(id);
 }

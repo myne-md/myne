@@ -57,10 +57,27 @@ export function buildSelectionCardSvg(contentXhtml: string, opts: ShareCardOptio
 }
 
 /**
- * Encode an SVG string as a `data:image/svg+xml` URI for an `<img>` src (the
- * canvas-draw source). Uses `encodeURIComponent` (not base64) so it stays
- * inspectable and needs no `btoa`/Buffer.
+ * Wrap an SVG string as a same-origin object URL for an `<img>` src (the
+ * canvas-draw source, and the QR image).
+ *
+ * # Why not a `data:` URI (phase3-web-client task 97)
+ *
+ * It was one, and that single call site was the only reason the web client's
+ * CSP carried `img-src … data:`. Task 44's acceptance criterion for attachment
+ * rendering is that the policy admit object URLs **without** admitting remote or
+ * `data:` content, and the difference is not stylistic: a `blob:` URL is an
+ * opaque handle to an object this origin already holds — unforgeable from a
+ * string, and dead once revoked — while `data:` carries its payload inline, so
+ * admitting it admits any bytes any script can construct.
+ *
+ * Nothing else changes. A Blob-URL SVG in an `<img>` does not execute script and
+ * does not taint the canvas, so `rasterizeCardToPng`'s tainted-canvas fallback
+ * keeps meaning what it meant.
+ *
+ * **The caller owns the URL.** An object URL is a GC root for its Blob, so a
+ * caller that forgets `URL.revokeObjectURL` leaks the SVG for the life of the
+ * page — the same discipline the attachment cache already follows.
  */
-export function svgToDataUri(svg: string): string {
-  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+export function svgToObjectUrl(svg: string): string {
+  return URL.createObjectURL(new Blob([svg], { type: "image/svg+xml" }));
 }

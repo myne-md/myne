@@ -215,6 +215,46 @@ One JS dep for the Phase-1 minimal graph view's force-directed layout. Not crypt
 - **Safety / trust surface:** no network, no `eval`, no filesystem. It is an in-editor keymap + state machine over the CodeMirror document. The one real exposure is that its registers/macros live in **engine process-global state** that outlives the editor unmount, so vault lock explicitly clears them (`editor/src/vim.ts`) — otherwise a yank in vault A could be pasted into vault B. Pinned by `tests/editor/vim-lock-reset.test.ts`.
 - **Not a config surface:** the `:` command line is a **closed table**, not an interpreter. `:set`/`:map`/`:source`/`:!`/`:e` are registered only to refuse, so no ex command can persist a behaviour definition (`editor/src/vim-ex.ts`; `tests/editor/vim-ex.test.ts`).
 
+### Web client wasm entry surface (MYND-574 task 11) — `web/wasm/Cargo.toml`
+
+| Dep | Version | Used for | Transitive footprint | License | Justified-by |
+|---|---|---|---|---|---|
+| `wasm-bindgen` | 0.2 (wasm32 arm only) | The JS↔wasm boundary: the three `#[wasm_bindgen]` exports the Worker calls (`invoke`, `build_info`, `csprng_self_check`) and the `crypto.getRandomValues` import behind the CSPRNG backend | **Zero new `Cargo.lock` entries** — already locked at 0.2.125, reached transitively by `getrandom`, `iana-time-zone`, `cpal` and `reqwest`. Transitive→direct promotion (the `unicode-normalization` precedent above). | MIT/Apache-2.0 | `decisions.md` 2026-07-26 (Phase 3 web client); MYND-574 tasks 11 + 81 |
+| `js-sys` | 0.3 (wasm32 arm only) | `Uint8Array` for the CSPRNG fill (`web/wasm/src/csprng.rs`) — and nothing else | **Zero new entries** — already locked at 0.3.102, same four existing consumers. | MIT/Apache-2.0 | same |
+| `wasm-bindgen-futures` | 0.4 (wasm32 arm only) | Required by `#[wasm_bindgen]` on an `async fn`; the macro expands to a `wasm_bindgen_futures` path, so it is not optional even though no line of the crate names it. Turns the exported `async fn invoke` into a JS `Promise`. | **Zero new entries** — already locked at 0.4.75. | MIT/Apache-2.0 | same |
+
+- **Measured, not asserted:** `git diff Cargo.lock` for the whole of task 11 adds **two** package names — `myne-web-wasm` (the new crate itself) and `uuid-rng-internal` (pulled by the `uuid` `rng-getrandom` feature that task 78 had already declared on the wasm arm, and which only now resolves because the wasm graph builds). None of the three crates above is new to the tree.
+- **"The bar" Q1 (hand-roll?):** not applicable in the usual sense — there is no second implementation to choose between. `wasm-bindgen` *is* the Rust→browser toolchain; a hand-rolled ABI would mean writing the JS glue, the string marshalling and the `Promise` bridge by hand, on the path that carries decrypted note bodies.
+- **Scope is narrower than it looks.** These are on the **`cfg(target_arch = "wasm32")` arm of the entry crate only**. `protocol/` stays wasm-bindgen-free by design — task 9 chose getrandom's `custom` backend over its `js` feature precisely to keep codegen out of the crypto crate, and `scripts/wasm-csprng-check.sh` asserts that as a gate, not a convention. The desktop and mobile builds resolve none of these.
+- **`serde-wasm-bindgen` was considered and refused.** The boundary carries **JSON strings** via `serde_json`, which `myne-core` already depends on. Two reasons, and the second is load-bearing: one fewer dependency on the path handling plaintext, and Tauri's own IPC payload is JSON — so crossing this seam as JSON keeps the argument and return shapes byte-identical to what the desktop sends, which is the single property `src/platform/core.ts` exists to hold. A different serializer would be a second wire format to keep in step.
+- **`console_error_panic_hook` was considered and refused.** It forwards the **formatted** panic payload to the console, and a panic message can carry a path, a note id, or a fragment of plaintext. Task 82's hook captures a bounded static label plus `file:line` instead (`src-tauri/CLAUDE.md`, secret-handling logging discipline).
+- **`web-sys` was considered and refused.** It would be a whole additional crate to reach one method (`crypto.getRandomValues`). The import is hand-declared in `csprng.rs` instead, which also puts the exact JS expression in the file a reviewer of a nonce source reads.
+- **Network surface (task 77's egress question, answered for these three):** none. `wasm-bindgen` and `js-sys` emit and describe bindings — they originate no request of their own; every call is one this codebase writes. `wasm-bindgen-futures` is a `Future`↔`Promise` adapter. The web bundle's actual third-party-origin surface is pinned separately and independently by `scripts/check-web-third-party.mjs`.
+- **Toolchain pin:** `wasm-bindgen-cli` must match the locked library version **exactly** — it refuses a mismatched pair, and it is right to, since the glue it emits encodes the ABI the library compiled against. `scripts/build-wasm.sh` reads the required version out of `Cargo.lock` rather than hardcoding it, so a `cargo update` cannot leave the pin stale.
+
+### In-browser vector execution (MYND-574 task 15) — `protocol/Cargo.toml`
+
+| Dep | Version | Used for | Transitive footprint | License | Justified-by |
+|---|---|---|---|---|---|
+| `wasm-bindgen-test` | 0.3 (**dev-dependency**, wasm32 arm only) | Running `protocol/tests/vectors.rs` — the 34 cross-implementation vector runners — inside a real browser. `wasm_bindgen_test_configure!(run_in_browser)` is the whole reason it is here: it is what puts the module in a browser's wasm engine rather than in node. | **+6 `Cargo.lock` entries measured** (`cargo tree -i … --target all`): `wasm-bindgen-test`, `wasm-bindgen-test-macro`, `wasm-bindgen-test-shared`, plus its own `minicov`, `cast`, `oorandom`. All reached ONLY through this dev-dependency. | MIT/Apache-2.0 | `decisions.md` 2026-07-26 (Phase 3 web client); MYND-574 task 15 |
+
+- **It cannot reach a shipped artefact, and that is checked rather than asserted.** Resolver v2 keeps dev-dependency features out of non-test builds, so the six entries appear in no `cargo build`. Verified on the graph that matters: `cargo tree -p myne-web-wasm --target wasm32-unknown-unknown -e normal` shows no `wasm-bindgen-test`, and `scripts/wasm-csprng-check.sh` still passes all four of its assertions — including "no wasm-bindgen in protocol's shipped wasm graph", which is the property task 9 chose getrandom's `custom` backend to preserve.
+- **The `js-sys` + `wasm-bindgen` edges the lockfile grows under `getrandom` belong to getrandom 0.4, not to `protocol`'s 0.2.** They are the `wasm_js` backend `wasm-bindgen-test` asks for, in a different major version that is a different package. `wasm-csprng-check.sh`'s "getrandom 0.3+ … without an explicit backend" assertion covers exactly this confusion and reports `ok — 0.2 only`.
+- **`proptest` moved to the native arm in the same change.** Cargo builds every dev-dependency in the graph when it builds any test target, so an unconditional `proptest` would have to compile for `wasm32-unknown-unknown` before `--test vectors` could run there; its default features reach for process and timeout APIs that target lacks. The property tests are native by nature, so nothing is lost.
+- **"The bar" Q1 (hand-roll?):** the alternative is a hand-written harness page plus a WebDriver script, i.e. reimplementing what this crate does — and a second copy of the 34 runners to go with it, which is the drift the whole design avoids.
+- **Network surface:** none at runtime. The **toolchain** side does fetch: `scripts/browser-vectors.sh` downloads the version-matched `wasm-bindgen-test-runner` from the wasm-bindgen GitHub release when it is not already installed, exactly as `build-wasm.sh` requires a version-matched `wasm-bindgen-cli`. That is a test harness, not a shipped artefact.
+
+### Filesystem seam for the web client (MYND-574 task 17) — `core/Cargo.toml`, `web/wasm/Cargo.toml`
+
+| Dep | Version | Used for | Transitive footprint | License | Justified-by |
+|---|---|---|---|---|---|
+| `async-trait` | 0.1 | The `VaultIo` filesystem seam (`core/src/vault_io.rs`) and its OPFS implementation (`web/wasm/src/opfs.rs`) | **Zero new `Cargo.lock` entries** — already locked at 0.1.89, reached via `zbus` → `tauri-plugin-opener` / `tauri-plugin-single-instance`. A **proc-macro**: it contributes no runtime code to any target. Transitive→direct promotion, same shape as the wasm-bindgen family above. | MIT/Apache-2.0 | `decisions.md` 2026-07-26 (Phase 3 web client); `core-io-seam-design.md` §2a |
+
+- **Why a macro at all — the trait cannot be written without one.** It must be `dyn`-compatible (core holds `&dyn VaultIo` exactly as it holds `&dyn HostCtx`) and Rust 1.96's native async-fn-in-trait is not. The only alternative is hand-writing `Pin<Box<dyn Future<Output = …> + '_>>` returns for eight methods on the trait and on every implementation — the exact code the macro generates, with more surface to get wrong and no security gain, since the macro is absent from the runtime graph.
+- **Why the trait must be async at all — forced, not chosen.** OPFS handle acquisition (`getDirectory`, `getDirectoryHandle`, `getFileHandle`, `createSyncAccessHandle`) is asynchronous and a Worker cannot block its event loop on a promise, so there is no synchronous implementation to write. The in-memory-VFS alternative is excluded by `decisions.md` 2026-07-26's double-buffered `.a`/`.b` scheme, which is about what is durably on disk after a crash.
+- **`Send` differs per target**, applied conditionally: native futures cross tokio's threads and must be `Send`; wasm futures hold `JsValue` and cannot be.
+- **Network surface:** none. It is a compile-time code generator.
+
 ### PDF footer stamping (MYND-255 hotfix) — `src-tauri/Cargo.toml`
 
 | Dep | Version | Used for | Transitive footprint | License | Justified-by |
@@ -332,6 +372,21 @@ allowlist inside `themes_import`, and can never be applied without the user's co
 carries the JS binding. No change to `protocol/` — the closed RustCrypto primitive set is
 untouched.
 
+### Web browser automation (MYND-574 task 105) — **REJECTED: Playwright; the hand-rolled W3C client is extended instead**
+
+| Dep considered | Version | Would be used for | Transitive footprint | License | Verdict |
+|---|---|---|---|---|---|
+| `@playwright/test` | (n/a) | Driving the web client's E2E lane against Chromium / Firefox / WebKit | one direct dep, a large transitive tree, **plus downloaded browser binaries** — a class of surface no other dep in this ledger carries | Apache-2.0 | **rejected** |
+
+- **"The bar" Q1 (hand-roll?) — and this is the whole decision.** `e2e/support/webdriver.ts` is already a zero-dependency W3C WebDriver client, written for exactly this reason: `docs/dev/e2e.md` records that the `webdriver` **npm package was rejected** against this policy. Extending it to speak to `chromedriver` / `geckodriver` is the same work the desktop lane already proved, with no new npm dependency and no downloaded browser binary in a blocking step.
+- **The argument FOR Playwright does not survive inspection.** It is the WebKit seat: the Phase 0 spike's storage findings — `FileSystemFileHandle.move()` absent, `createWritable` absent — are **Safari** findings, and they are precisely what the double-buffered OPFS design exists to accommodate, so a Chromium-only lane cannot prove that design. But **Playwright's WebKit is a build of WebKit, not Safari**, and it does not carry Safari's storage restrictions faithfully. Buying the dependency would therefore buy a seat that *implies* Safari coverage while not providing it — worse than no seat, because a green lane would read as a verified claim.
+- **Neither option gives a CI Safari seat, and that is a property of the runner.** The Woodpecker runner is Linux-only; Safari does not run there under any driver. Safari verification is a **documented manual gate on macOS**, in both worlds. Stating that is strictly better than paying for a dependency that hides it.
+- **Q4 (transitive tree):** RED FLAG by the policy's own ≥50-transitive heuristic, before counting the browser binaries — which are not in any lockfile's hash-pinning story the way an npm tarball is.
+- **Artifact leakage cuts the same way.** A Playwright trace records DOM **plus network** by default, which is strictly leakier than the desktop harness's artifact set and sits against `e2e/CLAUDE.md`'s credentials-never-in-output rule. Honouring that rule would mean configuring the tracer *down*, i.e. paying for a feature and then disabling it.
+- **What is given up, stated rather than glossed:** Playwright's auto-waiting, its selector ergonomics and its trace viewer. The desktop lane has lived without all three for 92 scenario files; the cost is real and it is known.
+- **Revisit trigger.** If a CI runner with real Safari ever exists (a macOS runner), the WebKit question reopens — but it reopens as "add a macOS runner", not as "add Playwright", because even then Playwright's WebKit would not be the thing under test.
+
+
 ## Reference
 
 - `threat-model.md` §6 — compensating controls
@@ -339,3 +394,63 @@ untouched.
 - `decisions.md` 2026-04-28 — "Rust-side primitives: RustCrypto stack as primary"
 - `decisions.md` 2026-05-31 — "Encrypted search index" (the four search deps + the postcard-over-serde_json rationale)
 - `deny.toml` (this repo) — machine-readable enforcement
+
+## Web/wasm closure (MYND-574 task 77)
+
+The Phase 3 web client promotes four crates from transitive to **direct**, and
+turns on one feature of a fifth. The checklist below is the record `CLAUDE.md`
+requires — a dependency is a security decision — plus a column the standard
+checklist does not have and this closure needs.
+
+**Every one of these is a transitive→direct PROMOTION, not a new admission.** All
+five were already in the shared `Cargo.lock` before this feature; what changed is
+that a manifest now names them, because a crate that calls a macro or an API must
+declare the crate that provides it. This is the `unicode-normalization` precedent
+recorded above. The relevance is concrete: no new code enters the audit surface,
+and the hash-pinning story is unchanged because the lock entries are the same
+ones.
+
+### The extra column: can it originate a network request?
+
+Task 60 asserts at RUNTIME that a full session touches only the app origin and
+the configured sync server. A runtime assertion over one observed session is
+weaker than a static answer, so each dependency also carries one here, and the
+two together are the claim.
+
+| Crate | Version | Role | Unique transitives | Licence | Can originate a request? |
+|---|---|---|---|---|---|
+| `wasm-bindgen` | 0.2.125 | The JS↔wasm codegen. Mandatory and unsubstitutable for Rust in a browser — there is no second implementation to choose between | 11 (`bumpalo`, `cfg-if`, `once_cell`, and the proc-macro four) | MIT OR Apache-2.0 | **No.** It emits glue for calls the Rust side makes; it names no network API |
+| `js-sys` | 0.3.102 | `Uint8Array` + the `crypto` global for the CSPRNG bridge (task 81). Used at that one site | 17 | MIT OR Apache-2.0 | **No.** Bindings to ECMAScript built-ins only — `fetch`, `XMLHttpRequest` and `EventSource` are Web APIs and live in `web-sys` |
+| `web-sys` | 0.3.102 | Bindings to the Web APIs the Worker uses | 18 | MIT OR Apache-2.0 | **Yes, by construction — and that is the point.** This is the crate the browser transport is built on (task 84). Its capability is not a surprise to be minimised but the feature being bought, and it is bounded elsewhere: the CSP's `connect-src` names exactly the app origin and the configured sync origin, so the browser refuses anything else regardless of what any Rust line asks for |
+| `wasm-bindgen-futures` | 0.4.75 | Required by `#[wasm_bindgen]` on an `async fn` — the macro expands to a path in it. Not optional even though no line names it | 18 | MIT OR Apache-2.0 | **No.** It turns a Rust future into a JS `Promise` |
+| `getrandom` (0.4, `wasm_js` feature) | 0.4.2 | Not a new dependency — `uuid`'s `rng-getrandom` already pulled it. The FEATURE is what is new, and it is what makes the crate compile for `wasm32` at all | (already in the graph) | MIT OR Apache-2.0 | **No.** `crypto.getRandomValues` is local entropy |
+
+**Advisories, licences and bans:** `cargo deny check advisories licenses bans` →
+`advisories ok, bans ok, licenses ok`. Every version above carries a `checksum`
+line in the shared lock, so the hash-pinning rule holds with no exception.
+
+**Maintainer/bus-factor:** the four `wasm-bindgen`-family crates are one project
+under the rustwasm organisation, released together and versioned in lockstep.
+That is a *concentration* rather than a bus-factor risk in the usual sense — the
+alternative is not another maintainer, it is not compiling Rust for a browser.
+Recorded so the concentration is a known fact rather than a later discovery.
+
+**`web-sys`'s network capability is the one thing on this table that would be a
+red flag anywhere else**, so it is worth saying plainly why it is not one here.
+The web client's whole transport is the browser's own HTTP stack; a client that
+could not originate a request could not sync, and sync is required on this client
+by decision. What bounds the capability is not the dependency graph but the
+Content-Security-Policy, which is a runtime refusal by the browser rather than a
+promise by the code — `default-src 'none'` with `connect-src 'self' <sync-origin>`
+means every other origin is blocked before a request leaves the page, whatever
+any crate in the graph asks for.
+
+**What was REFUSED, and why it belongs in this record.** `serde-wasm-bindgen` was
+not admitted: the wasm↔JS boundary carries JSON strings, `serde_json` is already
+a direct dependency of `myne-core`, and a second serializer would be one more
+dependency on the path that handles decrypted note bodies *and* a second wire
+format to keep in step with Tauri's own IPC payload. `getrandom`'s `js` feature
+was refused in `protocol/` for the same class of reason — it would drag
+`wasm-bindgen` into the `#![no_std]` primitive crate, which
+`scripts/wasm-csprng-check.sh` asserts stays out. Playwright was refused for the
+browser-automation slot (`decisions.md` 2026-07-27).

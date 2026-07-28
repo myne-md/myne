@@ -32,7 +32,23 @@ const isMediaTarget = (target: string): boolean => {
 setEditorHost({
   t: (key, opts) => i18n.t(key, opts ?? {}),
   notes: { tagTree: async () => [], isMediaTarget },
-  attachments: { attachmentExport: async () => {}, attachmentRename: async () => {}, pickExportDestination: async () => null },
+  attachments: {
+    attachmentExport: async () => {},
+    attachmentRename: async () => {},
+    pickExportDestination: async () => null,
+    // phase3-web-client task 76 moved these off direct `@tauri-apps/*` imports
+    // inside the package, so they are part of the contract now and a host must
+    // answer them. Inert defaults; the tests that exercise a flow install their
+    // own host over this one.
+    import: async () => {
+      throw new Error("test host: attachments.import not installed");
+    },
+    catalogList: async () => [],
+    // The default `attachment://<id>` literal — what the package itself used to
+    // fall back to outside Tauri, kept identical so every render-path test that
+    // merely needs A url is unaffected by the move.
+    resolveRef: (id: string) => `attachment://${id}`,
+  },
   prefsRead: async () => ({
     editor_content_width: null,
     editor_font_family: null,

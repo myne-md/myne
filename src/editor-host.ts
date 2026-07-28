@@ -1,12 +1,40 @@
-// Desktop implementation of the shared editor's `EditorHost` seam. Installs the
-// Tauri-backed IPC surface (tag index, spell, on-device AI, attachment IO,
-// prefs, open-URL) + i18n into `@myne/editor` before any editor mounts. The
-// pure engine + all pure helpers live in the package; only these platform-
-// coupled operations are injected here. Imported for its side effect by
-// `main.tsx` (after `./i18n`, before `<App>` renders).
+// The shared editor's `EditorHost` seam. Installs the IPC surface (tag index,
+// spell, on-device AI, attachment IO, prefs, open-URL) + i18n into
+// `@myne/editor` before any editor mounts. The pure engine + all pure helpers
+// live in the package; only these platform-coupled operations are injected here.
+// Imported for its side effect by `main.tsx` (after `./i18n`, before `<App>`).
+//
+// # One host, two clients (phase3-web-client task 26)
+//
+// This file compiles UNCHANGED for the web client — every import below either
+// goes through `src/platform/` (substituted at build time) or through `invoke`,
+// which the web seam routes into the wasm Worker. What differs is not the code
+// but the **capability answers**, so the optional members are gated on
+// `platform/capabilities` rather than duplicated into a second host file. A
+// second file would be two places for one contract to drift, and the drift would
+// present as an affordance that throws.
+//
+// Each member's web answer, so "every member has one" is checkable by reading:
+//
+// | member | web |
+// |---|---|
+// | `t`, `notes`, `prefsRead`, `openExternal`, `workspace` | same code, ported backends |
+// | `attachments.attachmentExport` / `Rename` / `readText` / `readStructured` | same code; the attachment port is task 44, and until it lands these reject as `NotPortedToWeb` rather than lying |
+// | `attachments.pickExportDestination` | **omitted** — no API grants a page a write path (`nativeSaveAs` absent); task 48's download flow is a different affordance |
+// | `ai`, `transcribe`, `transcriptHonestyNote` | **omitted** — `localAi` is absent by decision (multi-GiB weights, one Worker thread) |
+// | `spell` | **omitted** — task 47 decided spell-check is absent on web this release, and the reason is bundle size rather than portability (dictionaries are bundled binary resources). `spellCheck` is in the web descriptor's ABSENT set and the dispatcher answers `Unsupported`. The `MYD1` personal dictionary is untouched: it is vault content (`sync-protocol.md` §9 Class 1, set-union merge), so it keeps syncing and a desktop session keeps using it — what is absent is the CHECKER, not the word list. |
 
-import { openUrl } from "@tauri-apps/plugin-opener";
-import { save } from "@tauri-apps/plugin-dialog";
+import { openUrl } from "./platform/opener";
+import { save } from "./platform/dialog";
+import { convertFileSrc } from "./platform/core";
+import {
+  pickFiles,
+  resolveLiteralSource,
+  importPicked,
+  pickedFromDropped,
+} from "./platform/filePicker";
+import { warmAttachmentUrls } from "./platform/attachments";
+import { has } from "./platform/capabilities";
 import { setEditorHost, type EditorHost, type EditorPrefs } from "@myne/editor";
 import i18n from "./i18n";
 import { tagTree, isMediaTarget } from "./notes/vaultIndices";
@@ -15,7 +43,16 @@ import {
   attachmentRename,
   attachmentReadText,
   attachmentReadStructured,
+  attachmentImport,
+  catalogList,
 } from "./lib/attachments";
+import {
+  voiceRecordStart,
+  voiceRecordStop,
+  voiceRecordCancel,
+  onVoiceLevel,
+  onVoiceClip,
+} from "./lib/voice-record";
 import { prefsRead } from "./lib/prefs";
 import { renameFlushHooks } from "./notes/renameFlushHook";
 import { CLOSE_ACTIVE_TAB_EVENT } from "./notes/closeActiveTabSignal";
@@ -28,10 +65,58 @@ const host: EditorHost = {
   t: (key, opts) => i18n.t(key, opts ?? {}),
   notes: { tagTree, isMediaTarget },
   attachments: {
+    // The members task 76 moved off `@myne/editor`'s direct Tauri imports. The
+    // IPC strings and payloads are byte-unchanged — only the caller moved.
+    //
+    // A picked source is imported BY THE SEAM (task 67), because the two
+    // platforms differ in who reads the bytes: desktop hands Rust a path and
+    // Rust opens it inside its root-confined seam, while a browser has no path
+    // and moves the `File` handle to the Worker so the page never allocates the
+    // content. The unwrap used to live in `src/lib/picked-file.ts` and THREW for
+    // any handle it had not minted — i.e. for every web pick.
+    import: (source) =>
+      source.kind === "picked" ? importPicked(source.file) : attachmentImport(source),
+    // The host shapes the rows, so the editor's render path holds no knowledge
+    // of the IPC field names.
+    catalogList: async () =>
+      (await catalogList()).map((r) => ({
+        id: r.id,
+        contentType: r.content_type,
+        filename: r.filename,
+        size: r.size,
+      })),
+    // Both go through `platform/filePicker`, which is where the path-vs-`File`
+    // difference is absorbed: desktop wraps the native dialog's absolute paths,
+    // web wraps `File`s, and neither ever reaches this file or the editor.
+    pickFiles,
+    resolveLiteralSource,
+    // Task 67: a `File` from an HTML5 drop or paste, wrapped so the HOST moves
+    // it. Installed unconditionally rather than capability-gated — the desktop
+    // arm answers `null` ("no handle for a DataTransfer file"), which is the
+    // modelled answer the editor already falls back from, and gating it would
+    // put a platform test here for a call whose desktop cost is one return.
+    pickedFromDropped,
+    // The `attachment://` custom protocol in this platform's form. MYND-519:
+    // Android WebView and Windows WebView2 cannot intercept a custom scheme, so
+    // Tauri serves it as `http://attachment.localhost/<id>` there;
+    // `convertFileSrc` emits whichever form the platform needs and
+    // `scheme_core::extract_id` accepts them all. The web seam answers with the
+    // canonical literal until task 44 mints object URLs.
+    resolveRef: (id: string) => convertFileSrc(id, "attachment"),
+    // Unconditional, not capability-gated: the desktop arm is an immediate
+    // resolve because `attachment://<id>` needs no IO, and the web arm decrypts
+    // the ids a note references so its synchronous `resolveRef` can answer.
+    // Gating would put a platform test here for a call whose desktop cost is
+    // zero.
+    warmRefs: warmAttachmentUrls,
     attachmentExport,
     attachmentRename,
-    // Desktop: native Save-As dialog (the OS confirms any overwrite).
-    pickExportDestination: (filename) => save({ defaultPath: filename }),
+    // Desktop: native Save-As dialog (the OS confirms any overwrite). Omitted
+    // where `nativeSaveAs` is absent — the editor then renders no Export
+    // affordance at all, rather than one that fails on click.
+    ...(has("nativeSaveAs")
+      ? { pickExportDestination: (filename: string) => save({ defaultPath: filename }) }
+      : {}),
     // MYND-268 Tier-1: decrypt-to-text for the inline read-only preview.
     readText: attachmentReadText,
     // MYND-268 Tier-2: decrypt + Rust-parse docx/xlsx into a structured model.
@@ -43,17 +128,45 @@ const host: EditorHost = {
       if (import.meta.env.DEV) console.warn("openExternal: openUrl rejected", err);
     });
   },
-  ai: { infer, buildCompletionPrompt, buildTitlePrompt },
-  spell: { spellCheck, addToPersonalDictionary, ignoreWordInVault },
+  // On-device AI: omitted where `localAi` is absent, which takes the ghost-text
+  // and the AI slash commands with it — the seam's own contract for `ai`.
+  ...(has("localAi") ? { ai: { infer, buildCompletionPrompt, buildTitlePrompt } } : {}),
+  // Omitted where `spellCheck` is absent (task 47) — the seam's own contract for
+  // `spell` is that omission disables the feature, so the editor renders no
+  // squiggles and no dictionary affordances rather than ones that reject.
+  ...(has("spellCheck")
+    ? { spell: { spellCheck, addToPersonalDictionary, ignoreWordInVault } }
+    : {}),
+  // Native mic capture (MYND-259). Present on both clients as CODE — the calls
+  // route through the seam like everything else — but the web `invoke` refuses
+  // `plugin:attachments|voice_record_*` loudly (`attachments` is still
+  // `Class::Pending`), so `/record` surfaces a failure rather than silence. That
+  // is the interim task 44 fixes; a capability flag would be the wrong tool
+  // because the browser CAN capture audio (`getUserMedia`) — the decision owed
+  // here is which backend, not whether.
+  voice: {
+    start: voiceRecordStart,
+    stop: voiceRecordStop,
+    cancel: voiceRecordCancel,
+    onLevel: onVoiceLevel,
+    onClip: onVoiceClip,
+  },
   // Speech-to-text (voice-to-text MYND-552, SYNC-V7): bridge the shared audio
   // widget's Transcribe affordance to the local-inference `transcribe` command
   // via the shared helper (streaming Channel + shared cancel). `view` is unused
   // desktop-side today; the seam threads it for parity/future use.
-  transcribe: (_view, attachmentId, opts) =>
-    startTranscription(attachmentId, opts?.onSegment),
-  // The load-bearing transcript-fallibility honesty note, rendered VERBATIM by
-  // the widget's read-only expander (SYNC-V8 — never i18n'd).
-  transcriptHonestyNote: AI_TRANSCRIPT_HONESTY_NOTE,
+  // Both ride `localAi`: transcription IS the on-device engine, and the honesty
+  // note exists to caveat a transcript. Shipping the note without the feature
+  // would caveat something that cannot happen.
+  ...(has("localAi")
+    ? {
+        transcribe: (_view: unknown, attachmentId: string, opts?: { onSegment?: (s: string) => void }) =>
+          startTranscription(attachmentId, opts?.onSegment),
+        // The load-bearing transcript-fallibility honesty note, rendered
+        // VERBATIM by the widget's read-only expander (SYNC-V8 — never i18n'd).
+        transcriptHonestyNote: AI_TRANSCRIPT_HONESTY_NOTE,
+      }
+    : {}),
   // vim `:` command line (MYND-313). Both members bridge into React-owned state
   // from module scope, so each goes through an existing cross-provider seam
   // rather than reaching into a context it cannot see:

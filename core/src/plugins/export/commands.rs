@@ -43,10 +43,7 @@ use crate::export_naming::{
     rewrite_embeds_to_final_names, sanitize_export_component, suffixed_filename, DEDUP_RETRY_CAP,
 };
 use crate::io_failure_kind::IoFailureKind;
-use crate::plugins::attachments::commands::{
-    hex_decode_id, load_catalog_for_export, read_account_number_hash, CatalogLoadError,
-    MetaParseFailed,
-};
+use crate::plugins::attachments::commands::hex_decode_id;
 use crate::plugins::attachments::reconcile::extract_att_embed_spans;
 use crate::plugins::notes::commands::enumerate_notes_dir;
 use crate::plugins::notes::export_mtime::{apply_updated_mtime_from, fm_rfc3339_field_in};
@@ -404,6 +401,28 @@ fn stage_export_tree(params: StageParams) -> Result<StagedExport, VaultExportErr
     result
 }
 
+/// `vault.meta`'s `account_number_hash`, read synchronously.
+///
+/// The attachments plugin's shared version moved onto the storage seam and
+/// became `async` with phase3-web-client task 44. This module cannot follow it:
+/// `export` is host-only (gated out of the wasm build entirely) and this call
+/// sits inside a synchronous staging pass, so there is nothing to await from.
+/// Same shape and same justification as the `vault.prefs` read a few lines
+/// below — the `std::fs` half is local, the DECODE stays the protocol crate's,
+/// so the parse rule cannot drift.
+///
+/// `Ok(None)` is "present but does not parse" (the caller's `InvalidVaultMeta`);
+/// absence and every other failure stay `Err`, matching what the shared helper
+/// reported here before.
+fn read_account_number_hash_blocking(
+    vault_dir: &Path,
+) -> std::io::Result<Option<[u8; protocol::VAULT_META_ACCOUNT_HASH_LEN]>> {
+    let bytes = std::fs::read(vault_dir.join("vault.meta"))?;
+    Ok(protocol::parse_vault_meta(&bytes)
+        .map(|m| m.account_number_hash)
+        .ok())
+}
+
 fn stage_export_tree_inner(
     params: &StageParams,
     staging: &Path,
@@ -424,9 +443,9 @@ fn stage_export_tree_inner(
     // AAD identity for prefs + catalog (vault.meta presence was probed
     // above; an unlocked vault implies it parsed once already — a parse
     // failure here is honest corruption).
-    let account_number_hash = match read_account_number_hash(&vault_dir.join("vault.meta")) {
-        Ok(Ok(h)) => h,
-        Ok(Err(MetaParseFailed)) => {
+    let account_number_hash = match read_account_number_hash_blocking(vault_dir) {
+        Ok(Some(h)) => h,
+        Ok(None) => {
             tracing::error!(
                 stage = "read_meta",
                 error_kind = "InvalidVaultMeta",
@@ -441,11 +460,19 @@ fn stage_export_tree_inner(
     // the prefs read discipline (absent / undecodable prefs degrade to
     // "no deliberate folders", never fail the export).
     let prefs_key = derive_subkey(&params.root_key, SubkeyRole::PrefsKey);
-    let prefs = crate::plugins::prefs::commands::read_or_default(
-        &vault_dir.join("vault.prefs"),
-        &prefs_key,
-        &account_number_hash,
-    );
+    // `export` is host-only (gated out of the wasm build entirely) AND this
+    // function is synchronous, so it cannot await the seam's read. It reads with
+    // `std::fs` and shares the decode-and-fall-back half — § 9.5.5's "absent /
+    // undecodable prefs degrade to defaults" is a spec rule, and a second copy
+    // here would be a second place for it to drift.
+    let prefs = match std::fs::read(vault_dir.join("vault.prefs")) {
+        Ok(bytes) => crate::plugins::prefs::commands::decode_or_default(
+            &bytes,
+            &prefs_key,
+            &account_number_hash,
+        ),
+        Err(_) => Default::default(),
+    };
 
     // Tree-build state: per-directory assigned-name sets (the dedup
     // oracle — staging starts empty, so collisions only arise within
@@ -573,22 +600,23 @@ fn stage_export_tree_inner(
                 // KEK → read). The meta arms are unreachable in
                 // practice — vault.meta already parsed above in this
                 // same quiescent pass — but map honestly anyway.
-                let loaded =
-                    load_catalog_for_export(vault_dir, &params.root_key).map_err(|e| match e {
-                        CatalogLoadError::InvalidVaultMeta => {
-                            tracing::error!(
-                                stage = "read_meta",
-                                error_kind = "InvalidVaultMeta",
-                                "vault_export vault.meta parse failed"
-                            );
-                            VaultExportError::InvalidVaultMeta
-                        }
-                        CatalogLoadError::MetaIo(kind) | CatalogLoadError::CatalogIo(kind) => {
-                            VaultExportError::Io {
-                                io_error_kind: crate::io_failure_kind::from_io_error_kind(kind),
-                            }
-                        }
-                    })?;
+                let Some(meta_hash) = read_account_number_hash_blocking(vault_dir)? else {
+                    tracing::error!(
+                        stage = "read_meta",
+                        error_kind = "InvalidVaultMeta",
+                        "vault_export vault.meta parse failed"
+                    );
+                    return Err(VaultExportError::InvalidVaultMeta);
+                };
+                let catalog_key =
+                    derive_subkey(&params.root_key, SubkeyRole::AttachmentsCatalogKey);
+                let loaded = match std::fs::read(vault_dir.join("vault.attachments")) {
+                    Ok(bytes) => protocol::read_or_empty(&catalog_key, &meta_hash, Some(&bytes)),
+                    Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                        protocol::AttachmentsCatalog::empty()
+                    }
+                    Err(e) => return Err(e.into()),
+                };
                 catalog = Some(loaded);
             }
             let Some(meta) = catalog.as_ref().and_then(|c| c.entries.get(span.id)) else {
@@ -993,9 +1021,15 @@ mod tests {
     }
 
     async fn add_note(vault_dir: &Path, state: &VaultRuntimeState, plaintext: &str) -> String {
-        note_create_with_dir(vault_dir.join("notes"), state, plaintext.to_string())
-            .await
-            .expect("fixture note create must succeed")
+        note_create_with_dir(
+            vault_dir.join("notes"),
+            state,
+            plaintext.to_string(),
+            &crate::vault_io::StdVaultIo,
+            &crate::host::NoopHost,
+        )
+        .await
+        .expect("fixture note create must succeed")
     }
 
     async fn import_att(
@@ -1005,6 +1039,8 @@ mod tests {
         filename: &str,
     ) -> String {
         attachment_import_with_dir(
+            &crate::vault_io::StdVaultIo,
+            &crate::host::test_host::TestHost::new("/nonexistent-export-test-host"),
             vault_dir,
             state,
             ImportSource::Bytes {
@@ -1120,7 +1156,7 @@ mod tests {
                 &state,
                 &(std::sync::Arc::new(crate::hooks::NoopHooks) as crate::hooks::Hooks),
                 vec!["Empty/Nested/".to_string(), "Projects/".to_string()],
-            )
+            &crate::vault_io::StdVaultIo, &crate::host::NoopHost,)
             .await
             .expect("deliberate folders write");
 
@@ -1597,7 +1633,7 @@ mod tests {
                 &state,
                 &(std::sync::Arc::new(crate::hooks::NoopHooks) as crate::hooks::Hooks),
                 vec!["A/Empty/".to_string(), "C/Empty/".to_string()],
-            )
+            &crate::vault_io::StdVaultIo, &crate::host::NoopHost,)
             .await
             .expect("deliberate folders write");
 

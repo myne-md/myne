@@ -30,9 +30,14 @@
 //! on-disk vault). Sub-feature 2 introduces the per-`VaultId` resolver where
 //! its first caller lands.
 
+// Only the (host-gated) Tauri-taking resolvers return this error type.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 use crate::plugins::vault_creation::error::AppError;
 use crate::vault_id::VaultId;
 use std::path::{Path, PathBuf};
+// The Tauri-taking resolvers below are host-only; their `*_from_host` and
+// `*_from_base` siblings are what every target shares (task 79).
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 use tauri::{AppHandle, Manager, Runtime};
 
 /// Top-level directory holding every `<VaultId>/` vault root.
@@ -71,6 +76,30 @@ pub const LEGACY_VAULT_DIR_NAME: &str = "vault";
 /// [`current_vault_id_from_base`]).
 const LEGACY_VAULT_ID_STR: &str = "00000000-0000-7000-8000-777777777777";
 
+/// The **single-vault sentinel** for a client that hosts exactly one vault
+/// (phase3-web-client task 85).
+///
+/// A browser holds one account's vault per origin — `decisions.md` 2026-07-26,
+/// and task 85's own out-of-scope line ("web is one account to one vault") — so
+/// there is nothing to enumerate and nothing to choose between. This constant is
+/// the **registry collapse made explicit**, which is the point: the alternative
+/// was letting `mint_unique_vault_id`'s disk scan run over OPFS, where it would
+/// have been both slower and meaningless.
+///
+/// Being a CONSTANT is what makes re-running the first-run bootstrap idempotent
+/// — the criterion "never mints a second container" holds by construction rather
+/// than by a check — and what makes the `VaultId` on the unlock stage payload
+/// stable across reloads. It is non-secret by the same reasoning the legacy
+/// sentinel is: it carries no account number, no hash bytes and no path. The
+/// all-`eb` node bits read as "EB" ≈ web in a debugger, the same trick the
+/// legacy sentinel plays with all-`7`.
+const WEB_VAULT_ID_STR: &str = "00000000-0000-7000-8000-ebebebebebeb";
+
+/// The fixed single-vault [`VaultId`] (see [`WEB_VAULT_ID_STR`]).
+pub fn web_single_vault_id() -> VaultId {
+    VaultId::parse(WEB_VAULT_ID_STR).expect("WEB_VAULT_ID_STR is a valid UUIDv7")
+}
+
 /// The fixed legacy-vault sentinel [`VaultId`] (see [`LEGACY_VAULT_ID_STR`]).
 /// Used as a deterministic fallback key when no real `VaultId` is in play —
 /// e.g. the active-vault read helpers when no vault is unlocked (the keyed
@@ -79,6 +108,7 @@ pub fn legacy_vault_id() -> VaultId {
     VaultId::parse(LEGACY_VAULT_ID_STR).expect("LEGACY_VAULT_ID_STR is a valid UUIDv7")
 }
 
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 /// Resolve `<app_data_dir>` for the running app, mapping a failure to
 /// the `vault_creation` plugin's [`AppError`] shape.
 ///
@@ -135,6 +165,176 @@ pub fn current_vault_root_from_base(base: &Path) -> PathBuf {
     base.join(LEGACY_VAULT_DIR_NAME)
 }
 
+// ── host-taking siblings (phase3-web-client task 79, step 0) ─────────────────
+//
+// One-line wrappers over the SAME pure `*_from_base` / `*_under` helpers the
+// Tauri-taking resolvers above use. The split is the point: the path
+// *arithmetic* — which is all of the interesting logic, including the
+// sole-vault disk heuristic and the `create_dir_all` in `notes_dir_under` —
+// has exactly one implementation, shared by every host. Only the *base lookup*
+// varies, and that is the single method these take.
+//
+// Nothing calls these yet. They land with the seam so the first plugin move is
+// a one-line substitution rather than a resolver rewrite, and so a reviewer can
+// see that the host arm and the Tauri arm compute the same path from the same
+// helper.
+//
+// `HostPathError` collapses to the same opaque failures the Tauri arms already
+// produce (`AppError::Io { Other }`, `io::Error::other(..)`), so a ported
+// command's error behaviour is unchanged. That equivalence is asserted in the
+// tests at the bottom of this file rather than assumed.
+
+use crate::host::{HostCtx, HostPathError};
+
+/// [`current_vault_root`] over a host. Same heuristic, same result.
+pub fn current_vault_root_from_host(host: &dyn HostCtx) -> Result<PathBuf, HostPathError> {
+    Ok(current_vault_root_from_base(&host.app_data_dir()?))
+}
+
+/// [`active_vault_root`] over a host.
+pub fn active_vault_root_from_host(
+    host: &dyn HostCtx,
+    active_id: Option<VaultId>,
+) -> Result<PathBuf, HostPathError> {
+    Ok(active_vault_root_from_base(
+        &host.app_data_dir()?,
+        active_id,
+    ))
+}
+
+/// [`active_vault_root_io`] over a host — the `std::io` universe the
+/// `notes` / `prefs` / `search` / `attachments` plugins match on.
+pub fn active_vault_root_io_from_host(
+    host: &dyn HostCtx,
+    active_id: Option<VaultId>,
+) -> std::io::Result<PathBuf> {
+    active_vault_root_from_host(host, active_id)
+        .map_err(|_| std::io::Error::other("vault root resolution failed"))
+}
+
+/// [`notes_dir_for`] over a host. Ensures the directory exists, like its twin.
+pub fn notes_dir_for_host(
+    host: &dyn HostCtx,
+    active_id: Option<VaultId>,
+) -> std::io::Result<PathBuf> {
+    notes_dir_under(&active_vault_root_io_from_host(host, active_id)?)
+}
+
+/// [`notes_dir_for_host`] over the IO seam — the wasm-capable sibling
+/// (phase3-web-client task 13).
+///
+/// Same two steps as [`notes_dir_under`], through [`crate::vault_io::VaultIo`]
+/// instead of `std::fs`: confirm the vault root exists, then ensure
+/// `<root>/notes/` does. The path arithmetic itself is pure and shared —
+/// [`active_vault_root_io_from_host`] touches no filesystem — so the two arms
+/// cannot resolve to different directories, which is the property that lets a
+/// browser and a desktop client agree about where a note lives.
+///
+/// The root check is deliberately kept: `notes_dir_under` refuses to create a
+/// `notes/` directory under a path that is not a vault root, and dropping that
+/// on the web arm would let a mis-resolved root silently materialise an empty
+/// vault instead of failing.
+pub async fn notes_dir_for_host_io(
+    host: &dyn HostCtx,
+    io: &dyn crate::vault_io::VaultIo,
+    active_id: Option<VaultId>,
+) -> std::io::Result<PathBuf> {
+    let root = active_vault_root_io_from_host(host, active_id)?;
+    if !io
+        .exists(&root)
+        .await
+        .map_err(|_| std::io::Error::other("vault root probe failed"))?
+    {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            "vault root does not exist",
+        ));
+    }
+    let dir = root.join("notes");
+    io.create_dir_all(&dir)
+        .await
+        .map_err(|_| std::io::Error::other("notes dir creation failed"))?;
+    Ok(dir)
+}
+
+/// [`snapshots_dir_for`] over a host. Ensures the directory exists.
+pub fn snapshots_dir_for_host(
+    host: &dyn HostCtx,
+    active_id: Option<VaultId>,
+) -> std::io::Result<PathBuf> {
+    snapshots_dir_under(&active_vault_root_io_from_host(host, active_id)?)
+}
+
+/// [`vault_root_for_id`] over a host.
+pub fn vault_root_for_id_from_host(
+    host: &dyn HostCtx,
+    id: VaultId,
+) -> Result<PathBuf, HostPathError> {
+    Ok(vault_root_for_id_from_base(&host.app_data_dir()?, id))
+}
+
+/// [`vault_dir_for_id`] over a host. Creates the directory for an explicit id,
+/// exactly as the Tauri arm does; the `None` arm resolves a path only.
+pub fn vault_dir_for_id_from_host(
+    host: &dyn HostCtx,
+    vault_id: Option<VaultId>,
+) -> std::io::Result<PathBuf> {
+    match vault_id {
+        Some(id) => {
+            let dir = vault_root_for_id_from_host(host, id)
+                .map_err(|_| std::io::Error::other("vault root resolution failed"))?;
+            std::fs::create_dir_all(&dir)?;
+            Ok(dir)
+        }
+        None => current_vault_root_from_host(host)
+            .map_err(|_| std::io::Error::other("vault root resolution failed")),
+    }
+}
+
+/// [`vault_dir_for_id_from_host`] over the IO seam — the wasm-capable sibling
+/// (phase3-web-client task 85).
+///
+/// Same resolution, same "ensure the directory exists" contract; only the
+/// `create_dir_all` moves onto the seam, which is what a browser needs (OPFS
+/// creates directories through handle acquisition, not a path call).
+pub async fn vault_dir_for_id_from_host_io(
+    host: &dyn HostCtx,
+    io: &dyn crate::vault_io::VaultIo,
+    vault_id: Option<VaultId>,
+) -> std::io::Result<PathBuf> {
+    match vault_id {
+        Some(id) => {
+            let dir = vault_root_for_id_from_host(host, id)
+                .map_err(|_| std::io::Error::other("vault root resolution failed"))?;
+            io.create_dir_all(&dir)
+                .await
+                .map_err(|_| std::io::Error::other("create_dir_all failed"))?;
+            Ok(dir)
+        }
+        None => current_vault_root_from_host(host)
+            .map_err(|_| std::io::Error::other("vault root resolution failed")),
+    }
+}
+
+/// [`vault_root_for_id_optional`] over a host — `Some(id)` targets that vault,
+/// `None` falls back to the transitional sole-vault resolution, exactly as the
+/// Tauri arm does.
+pub fn vault_root_for_id_optional_from_host(
+    host: &dyn HostCtx,
+    vault_id: Option<VaultId>,
+) -> Result<PathBuf, HostPathError> {
+    match vault_id {
+        Some(id) => vault_root_for_id_from_host(host, id),
+        None => current_vault_root_from_host(host),
+    }
+}
+
+/// [`current_vault_id`] over a host.
+pub fn current_vault_id_from_host(host: &dyn HostCtx) -> Result<VaultId, HostPathError> {
+    Ok(current_vault_id_from_base(&host.app_data_dir()?))
+}
+
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 /// TRANSITIONAL (multi-vault sub-feature 2 — SYNC-6): replace with
 /// active-VaultId resolution.
 ///
@@ -160,6 +360,7 @@ pub fn current_vault_root<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, App
     Ok(current_vault_root_from_base(&app_data_dir(app)?))
 }
 
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 /// Tauri-aware companion to [`active_vault_root_from_base`]: resolve the active
 /// (sole-`Unlocked`) vault's root. `active_id` is read from the runtime state
 /// (`VaultRuntimeState::active_vault_id().await`) by the calling command, which
@@ -174,6 +375,7 @@ pub fn active_vault_root<R: Runtime>(
     Ok(active_vault_root_from_base(&app_data_dir(app)?, active_id))
 }
 
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 /// [`active_vault_root`] re-mapped into the [`std::io::Result`] universe the
 /// `notes` / `prefs` / `search` / `attachments` plugins match on (mirrors
 /// [`current_vault_root_io`]).
@@ -185,6 +387,7 @@ pub fn active_vault_root_io<R: Runtime>(
         .map_err(|_| std::io::Error::other("vault root resolution failed"))
 }
 
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 /// Active-vault companion to [`notes_dir`]: resolve `<active-vault-root>/notes/`
 /// and ensure it exists. Drop-in for the note commands, which read the active
 /// id from the runtime state and thread it here.
@@ -195,6 +398,7 @@ pub fn notes_dir_for<R: Runtime>(
     notes_dir_under(&active_vault_root_io(app, active_id)?)
 }
 
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 /// Active-vault companion to [`snapshots_dir`]: resolve
 /// `<active-vault-root>/snapshots/` and ensure it exists.
 pub fn snapshots_dir_for<R: Runtime>(
@@ -279,6 +483,7 @@ pub fn active_vault_root_from_base(base: &Path, active_id: Option<VaultId>) -> P
     }
 }
 
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 /// Tauri-aware companion to [`vault_root_for_id_from_base`]: resolve
 /// `<app_data_dir>/vaults/<id>/` for an explicit [`VaultId`]. Returns the path
 /// only; never `create_dir_all`s (the write-path resolvers own creation).
@@ -291,6 +496,7 @@ pub fn vault_root_for_id<R: Runtime>(app: &AppHandle<R>, id: VaultId) -> Result<
     Ok(vault_root_for_id_from_base(&app_data_dir(app)?, id))
 }
 
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 /// TRANSITIONAL (multi-vault sub-feature 2, MYND-203 task 4): the Tauri-aware
 /// companion to [`current_vault_id_from_base`]. Resolves `<app_data_dir>` then
 /// derives the sole vault's [`VaultId`] (a real parsed id for a `vaults/<id>/`
@@ -305,6 +511,7 @@ pub fn current_vault_id<R: Runtime>(app: &AppHandle<R>) -> Result<VaultId, AppEr
     Ok(current_vault_id_from_base(&app_data_dir(app)?))
 }
 
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 /// Resolve the vault directory for an OPTIONAL explicit [`VaultId`] and ensure
 /// it exists — the CREATE-flow targeting resolver (sub-feature 2 task 4,
 /// SYNC-6 create targeting). `vault_creation::commit` is its ONLY intended
@@ -336,6 +543,7 @@ pub fn vault_dir_for_id<R: Runtime>(
     }
 }
 
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 /// Resolve the vault directory for an OPTIONAL explicit [`VaultId`] **without
 /// creating anything** — the targeting resolver for every command that reads
 /// or destroys an EXISTING vault (`vault_delete`, `vault_export_backup`).
@@ -356,6 +564,7 @@ pub fn vault_root_for_id_optional<R: Runtime>(
     }
 }
 
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 /// Resolve the vault directory path **without creating it**.
 ///
 /// Used by read-only probes — `vault_repair`'s residue scan (MYND-159) —
@@ -368,6 +577,7 @@ pub fn vault_dir_path<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, AppErro
     current_vault_root(app)
 }
 
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 /// Resolve `<vault-root>/notes/` and ensure it exists. The returned
 /// `PathBuf` points at `<current-vault-root>/notes/` and the directory is
 /// `create_dir_all`'d before return.
@@ -412,6 +622,7 @@ pub fn notes_dir_under(parent: &Path) -> std::io::Result<PathBuf> {
     Ok(dir)
 }
 
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 /// Resolve `<vault-root>/snapshots/` and ensure it exists (MYND-96 encrypted
 /// per-note version history; `spec/protocol.md` §9.1). Mirrors [`notes_dir`] —
 /// the flat snapshots directory is a sibling of `notes/`, never nested inside
@@ -457,6 +668,7 @@ fn require_vault_root(parent: &Path) -> std::io::Result<()> {
     }
 }
 
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 /// [`current_vault_root`] re-mapped into the `std::io::Result` universe the
 /// notes / snapshots resolvers use. The `AppError::Io` → `io::Error` bridge
 /// drops kind detail (it is only `Other` here, an `app_data_dir` lookup
@@ -474,6 +686,36 @@ fn current_vault_root_io<R: Runtime>(app: &AppHandle<R>) -> std::io::Result<Path
 
 #[cfg(test)]
 mod tests {
+    /// The web's single-vault id is a CONSTANT, distinct from the legacy
+    /// sentinel, and a valid `VaultId`.
+    ///
+    /// All three properties are load-bearing (task 85). Constant is what makes
+    /// re-running the first-run bootstrap idempotent — "never mints a second
+    /// container" holds by construction rather than by a check — and what keeps
+    /// the `VaultId` on the unlock stage payload stable across reloads.
+    /// DISTINCT from the legacy sentinel because that one means "a migrated
+    /// pre-multi-vault install"; colliding them would make a fresh browser
+    /// bootstrap look like a migration to any code that branches on it.
+    #[test]
+    fn the_web_single_vault_id_is_a_stable_distinct_constant() {
+        let a = super::web_single_vault_id();
+        let b = super::web_single_vault_id();
+        assert_eq!(
+            a, b,
+            "must be stable across calls — it is the container key"
+        );
+        assert_ne!(
+            a,
+            super::legacy_vault_id(),
+            "must not collide with the legacy-migration sentinel"
+        );
+        // Round-trips through the string form the path layer uses.
+        assert_eq!(
+            crate::vault_id::VaultId::parse(&a.to_string()).expect("valid VaultId"),
+            a
+        );
+    }
+
     use super::*;
     use crate::test_support::ScopedTempDir;
 
@@ -732,5 +974,91 @@ mod tests {
         // Deterministic + re-parses; two calls agree.
         assert_eq!(legacy_vault_id(), legacy_vault_id());
         assert_eq!(legacy_vault_id().as_uuid().get_version_num(), 7);
+    }
+
+    // ── the host arm computes the same paths as the Tauri arm ────────────────
+    //
+    // "Pure move, zero behaviour change" is the whole claim of task 79, and
+    // these are what make it checkable rather than asserted. Each pins that a
+    // `*_from_host` resolver equals the pure `*_from_base` helper the Tauri
+    // resolver is a one-line wrapper over — so the two arms cannot drift
+    // without a test going red.
+
+    use crate::host::test_host::TestHost;
+    use crate::host::{HostCtx, NoopHost};
+
+    #[test]
+    fn host_and_base_arms_agree_on_the_current_vault_root() {
+        let tmp = ScopedTempDir::new("host-current-root").unwrap();
+        let host = TestHost::with_dirs(tmp.path(), tmp.path().join("config"));
+        let base = host.app_data_dir().unwrap();
+        assert_eq!(
+            current_vault_root_from_host(&host).unwrap(),
+            current_vault_root_from_base(&base)
+        );
+    }
+
+    #[test]
+    fn host_and_base_arms_agree_on_the_active_vault_root_with_and_without_an_id() {
+        let tmp = ScopedTempDir::new("host-active-root").unwrap();
+        let host = TestHost::with_dirs(tmp.path(), tmp.path().join("config"));
+        let base = host.app_data_dir().unwrap();
+        let id = VaultId::mint();
+
+        assert_eq!(
+            active_vault_root_from_host(&host, Some(id)).unwrap(),
+            active_vault_root_from_base(&base, Some(id))
+        );
+        assert_eq!(
+            active_vault_root_from_host(&host, None).unwrap(),
+            active_vault_root_from_base(&base, None)
+        );
+    }
+
+    #[test]
+    fn host_and_base_arms_agree_on_vault_root_for_id_and_current_vault_id() {
+        let tmp = ScopedTempDir::new("host-id-resolvers").unwrap();
+        let host = TestHost::with_dirs(tmp.path(), tmp.path().join("config"));
+        let base = host.app_data_dir().unwrap();
+        let id = VaultId::mint();
+
+        assert_eq!(
+            vault_root_for_id_from_host(&host, id).unwrap(),
+            vault_root_for_id_from_base(&base, id)
+        );
+        assert_eq!(
+            current_vault_id_from_host(&host).unwrap(),
+            current_vault_id_from_base(&base)
+        );
+    }
+
+    #[test]
+    fn host_dir_resolvers_create_the_directory_like_their_tauri_twins() {
+        // `notes_dir_under` / `snapshots_dir_under` `create_dir_all`. The host
+        // arm must inherit that, not just the path arithmetic — a resolver that
+        // returned the right path without ensuring it would fail on first write.
+        let tmp = ScopedTempDir::new("host-dir-create").unwrap();
+        let host = TestHost::with_dirs(tmp.path(), tmp.path().join("config"));
+        let id = VaultId::mint();
+        // The vault root must exist for `require_vault_root` to accept it.
+        let root = active_vault_root_from_host(&host, Some(id)).unwrap();
+        std::fs::create_dir_all(&root).unwrap();
+
+        let notes = notes_dir_for_host(&host, Some(id)).unwrap();
+        assert!(notes.is_dir(), "notes dir should have been created");
+        let snaps = snapshots_dir_for_host(&host, Some(id)).unwrap();
+        assert!(snaps.is_dir(), "snapshots dir should have been created");
+    }
+
+    #[test]
+    fn a_host_that_cannot_resolve_fails_the_same_shape_the_tauri_arm_does() {
+        // The Tauri arms collapse an `app_data_dir()` failure to one opaque
+        // variant; the host arms must do the same, or a ported command's error
+        // behaviour changes.
+        let host = NoopHost;
+        assert!(current_vault_root_from_host(&host).is_err());
+        assert!(active_vault_root_from_host(&host, None).is_err());
+        let io_err = active_vault_root_io_from_host(&host, None).unwrap_err();
+        assert_eq!(io_err.to_string(), "vault root resolution failed");
     }
 }

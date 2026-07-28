@@ -24,17 +24,21 @@ import { Input } from "../primitives/Input";
 import { Segmented } from "../primitives/Segmented";
 import { PasswordInput } from "../PasswordInput";
 import { DestructiveBanner } from "../DestructiveBanner";
-import { normalizeBip39Phrase } from "../../lib/bip39-normalize";
+// The phrase credential lives in its own module because the WEB BUILD REPLACES
+// IT (task 92) — see that file's header. Importing `normalizeBip39Phrase`
+// directly here is what used to leave served code one import edge away from the
+// BIP-39 wordlist.
+import { buildPhraseCredential, PHRASE_CELL_COUNT } from "./phrase-credential";
 import { formatAccountNumberInput } from "../../lib/account-number-format";
 import { DEVICE_NAME_MAX_LEN, useDeviceNameField } from "../../lib/device-name";
 import { useEnroll, type EnrollCredentialKind } from "../../hooks/useEnroll";
+import { has } from "../../platform/capabilities";
+import { EnrollPhraseCredential } from "./EnrollPhraseCredential";
 import {
   ENROLL_APPROVED_NOTICE,
   ENROLL_NON_DISTINGUISHING_BANNER,
   ENROLL_PENDING_NOTICE,
 } from "../../lib/load-bearing-copy";
-
-const PHRASE_CELL_COUNT = 24;
 
 const ROOT: CSSProperties = {
   display: "flex",
@@ -56,57 +60,10 @@ const FIELD: CSSProperties = {
   gap: 6,
 };
 
-const HINT: CSSProperties = {
-  fontSize: "var(--text-sm)",
-  color: "var(--fg-3)",
-  margin: 0,
-};
 
-const GRID: CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(4, 1fr)",
-  gap: 6,
-};
 
-const CELL_WRAP: CSSProperties = {
-  position: "relative",
-  display: "flex",
-  alignItems: "center",
-  background: "var(--paper-1)",
-  border: "1px solid var(--line-1)",
-  borderRadius: 2,
-  paddingLeft: 28,
-  paddingRight: 8,
-  height: 32,
-  cursor: "text",
-};
 
-const CELL_NUMBER: CSSProperties = {
-  position: "absolute",
-  left: 8,
-  top: "50%",
-  transform: "translateY(-50%)",
-  fontFamily: "var(--font-mono)",
-  fontSize: "var(--text-sm)",
-  color: "var(--fg-3)",
-  pointerEvents: "none",
-  userSelect: "none",
-};
 
-const CELL_INPUT: CSSProperties = {
-  width: "100%",
-  height: "100%",
-  background: "transparent",
-  border: 0,
-  outline: "none",
-  appearance: "none",
-  WebkitAppearance: "none",
-  fontFamily: "var(--font-mono)",
-  fontSize: "var(--text-base)",
-  color: "var(--fg-1)",
-  padding: 0,
-  margin: 0,
-};
 
 const NOTICE: CSSProperties = {
   fontSize: "var(--text-sm)",
@@ -150,7 +107,19 @@ export function EnrollDeviceForm() {
   const baseId = useId();
   const { busy, outcome, enroll, reset } = useEnroll();
 
-  const modeOptions = MODE_VALUES.map((value) => ({
+  // The recovery-phrase credential is a **decided absence** on the web client
+  // (phase3-web-client task 32): `decisions.md` 2026-07-26 forbids the phrase
+  // from being typed into served code as firmly as it forbids generating it
+  // there, and enrolment is the third path to it after creation and recovery —
+  // the one that is easy to miss, because the screen is about adding a device
+  // rather than about the phrase. `protocol.md` §7 sets the bar: the phrase
+  // survives every password change and no rotation command exists, so one
+  // exposure is permanent.
+  const phraseCredentialAvailable = has("phraseRecovery");
+  const availableModes = MODE_VALUES.filter(
+    (value) => value !== "recovery" || phraseCredentialAvailable,
+  );
+  const modeOptions = availableModes.map((value) => ({
     value,
     label:
       value === "password"
@@ -214,7 +183,7 @@ export function EnrollDeviceForm() {
     const credential =
       mode === "password"
         ? password
-        : normalizeBip39Phrase(cells.join(" "));
+        : buildPhraseCredential(cells);
     void enroll(accountNumber.trim(), credential, mode, deviceNameField.resolved);
   };
 
@@ -262,6 +231,12 @@ export function EnrollDeviceForm() {
         </div>
       </div>
 
+      {/* One credential kind means no choice to offer: ABSENT, not hidden.
+          `hidden` still puts the control in the DOM, where a devtools attribute
+          edit or an accessibility tree walk finds a "recovery phrase" segment
+          the web client must not have — and task 92 sets the same bar task 32
+          set for the screens: absent, not hidden. */}
+      {modeOptions.length >= 2 && (
       <div style={FIELD}>
         <span style={LABEL}>{t("sync.enroll.signInWith")}</span>
         <Segmented
@@ -275,8 +250,9 @@ export function EnrollDeviceForm() {
           testId="sync.enroll.mode"
         />
       </div>
+      )}
 
-      {mode === "password" ? (
+      {mode === "password" || !phraseCredentialAvailable ? (
         <PasswordInput
           label={t("sync.enroll.passwordLabel")}
           value={password}
@@ -289,36 +265,12 @@ export function EnrollDeviceForm() {
           testId="sync.enroll.password-input"
         />
       ) : (
-        <div style={FIELD}>
-          <span style={LABEL}>{t("sync.enroll.recoveryPhraseLabel")}</span>
-          <p style={HINT}>{t("sync.enroll.recoveryPhraseHint")}</p>
-          <div style={GRID} data-testid="sync.enroll.phrase-grid">
-            {Array.from({ length: PHRASE_CELL_COUNT }, (_, i) => {
-              const inputId = `${baseId}-cell-${i}`;
-              return (
-                <label key={i} htmlFor={inputId} style={CELL_WRAP}>
-                  <span style={CELL_NUMBER}>{i + 1}</span>
-                  <input
-                    id={inputId}
-                    type="text"
-                    value={cells[i] ?? ""}
-                    onChange={handleCellChange(i)}
-                    onPaste={handlePaste(i)}
-                    autoComplete="off"
-                    spellCheck={false}
-                    autoCapitalize="off"
-                    autoCorrect="off"
-                    inputMode="text"
-                    style={CELL_INPUT}
-                    aria-label={t("sync.enroll.wordAria", { number: i + 1 })}
-                    data-testid="sync.enroll.phrase-cell"
-                    data-index={i + 1}
-                  />
-                </label>
-              );
-            })}
-          </div>
-        </div>
+        <EnrollPhraseCredential
+          baseId={baseId}
+          cells={cells}
+          onCellChange={handleCellChange}
+          onCellPaste={handlePaste}
+        />
       )}
 
       {outcome?.state === "error" && (

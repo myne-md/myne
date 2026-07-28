@@ -112,9 +112,19 @@ export function CleanUnusedAttachmentsDialog({
         setResult(r);
         setBusy(false);
       })
-      .catch(() => {
+      .catch((e: unknown) => {
         setBusy(false);
-        setError(t("attachments.cleanUnused.error"));
+        // The corpus can go incomplete BETWEEN the list and the confirm — a
+        // browser tab that lost storage, a desktop that fell behind. The core
+        // re-checks at the destructive step (task 89), and the message has to
+        // match: "couldn't clean up" would send the user to retry something that
+        // is refusing on purpose.
+        const kind = (e as { kind?: string } | null)?.kind;
+        setError(
+          kind === "CorpusIncomplete"
+            ? t("attachments.cleanUnused.corpusIncomplete")
+            : t("attachments.cleanUnused.error"),
+        );
       });
   };
 

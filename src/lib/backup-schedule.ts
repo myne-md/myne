@@ -15,7 +15,7 @@
 // a fixed wall-clock timer. The per-device clock (`lastScheduledSuccessAt`) is
 // deliberately separate from the encrypted `vault.prefs.last_backup_at`.
 
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../platform/core";
 
 /** Cadence presets. Mirrors Rust `BackupInterval` (serde string form). */
 export type BackupInterval = "every-unlock" | "daily" | "weekly";

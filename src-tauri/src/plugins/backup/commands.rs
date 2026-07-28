@@ -108,6 +108,7 @@ pub async fn vault_export_backup<R: Runtime>(
         lifecycle_hooks.inner(),
         destination,
         hooks,
+        &myne_core::host::tauri_host::TauriHost::new(app.clone()),
     )
     .await;
 
@@ -139,6 +140,12 @@ pub(crate) async fn export_backup_core(
     lifecycle_hooks: &myne_core::hooks::Hooks,
     destination: PathBuf,
     hooks: ContainerHooks,
+    // Threaded in with MYND-574 task 14: the prefs write path takes the host for
+    // its §10.2 LWW field clocks. A `NoopHost` here would compile and stamp
+    // `last_backup_at` with clock 0 — which the sync merge would then treat as
+    // the oldest possible write and always lose. Not a metric this time: a
+    // wrong value in a merge is data loss that looks like a sync bug.
+    host: &dyn myne_core::host::HostCtx,
 ) -> Result<ExportSummary, BackupExportError> {
     // (1) Lifecycle permit, both lock states, reject-never-queue. Bound to
     // `_permit` so it is held until this function returns.
@@ -195,6 +202,8 @@ pub(crate) async fn export_backup_core(
             state,
             lifecycle_hooks,
             epoch_seconds,
+            &myne_core::vault_io::StdVaultIo,
+            host,
         )
         .await
         {
@@ -590,7 +599,8 @@ mod tests {
                     &state,
                     &noop_lifecycle_hooks(),
                     dest.clone(),
-                    ContainerHooks::default()
+                    ContainerHooks::default(),
+                    &myne_core::host::NoopHost,
                 )
                 .await,
                 Err(BackupExportError::AuthOperationInProgress)
@@ -604,6 +614,7 @@ mod tests {
                 &noop_lifecycle_hooks(),
                 dest,
                 ContainerHooks::default(),
+                &myne_core::host::NoopHost,
             )
             .await
             .expect("export");
@@ -640,6 +651,7 @@ mod tests {
                 &lifecycle_hooks,
                 dest.clone(),
                 ContainerHooks::default(),
+                &myne_core::host::NoopHost,
             );
             tokio::pin!(export);
             assert!(
@@ -675,9 +687,16 @@ mod tests {
                 progress: Some(tx),
                 cancelled: None,
             };
-            let summary = export_backup_core(vault, &state, &noop_lifecycle_hooks(), dest, hooks)
-                .await
-                .expect("export");
+            let summary = export_backup_core(
+                vault,
+                &state,
+                &noop_lifecycle_hooks(),
+                dest,
+                hooks,
+                &myne_core::host::NoopHost,
+            )
+            .await
+            .expect("export");
 
             let mut events: Vec<(u32, u32, &'static str)> = Vec::new();
             while let Ok(ev) = rx.try_recv() {
@@ -719,8 +738,15 @@ mod tests {
                 cancelled: Some(flag),
             };
             assert!(matches!(
-                export_backup_core(vault, &state, &noop_lifecycle_hooks(), dest.clone(), hooks)
-                    .await,
+                export_backup_core(
+                    vault,
+                    &state,
+                    &noop_lifecycle_hooks(),
+                    dest.clone(),
+                    hooks,
+                    &myne_core::host::NoopHost
+                )
+                .await,
                 Err(BackupExportError::Cancelled)
             ));
             assert!(!dest.exists(), "cancel must discard partial output");

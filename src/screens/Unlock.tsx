@@ -60,7 +60,7 @@
 // See `decisions.md` 2026-05-26 entry "MYND-108-bis vault_delete
 // extended to accept Slot::Empty + vault.meta-exists".
 
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../platform/core";
 import {
   useEffect,
   useReducer,
@@ -70,8 +70,8 @@ import {
   type FormEvent,
 } from "react";
 import { useTranslation } from "react-i18next";
-import { appDataDir, join } from "@tauri-apps/api/path";
-import { getCurrentWindow } from "@tauri-apps/api/window";
+import { appDataDir, join } from "../platform/path";
+import { getCurrentWindow } from "../platform/window";
 import i18n from "../i18n";
 import { DestructiveBanner } from "../components/DestructiveBanner";
 import { DeleteVaultConfirmForm } from "../components/DeleteVaultConfirmForm";
@@ -85,7 +85,7 @@ import {
 } from "../components/primitives/CenteredCard";
 import { Spinner } from "../components/Spinner";
 import { SuspicionBanner } from "../components/SuspicionBanner";
-import { closeApp } from "../lib/app-window";
+import { failClosedExit, FAIL_CLOSED_EXIT_LABEL_KEY } from "../platform/app-exit";
 import { ioBanner } from "../lib/io-banner";
 import { quickUnlockStatus, type QuickUnlockMethod } from "../lib/quick-unlock";
 import { UNLOCK_NON_DISTINGUISHING_BANNER } from "../lib/load-bearing-copy";
@@ -277,6 +277,19 @@ function unlockErrorOutcome(e: VaultUnlockError): BannerOutcome {
       return {
         kind: "banner",
         text: i18n.t("unlock.errors.unexpected"),
+      };
+    case "KdfMemoryExceedsHostCapability":
+      // A plain banner, deliberately NOT the `corrupted` mode. The vault is
+      // intact and opens on desktop — routing to "restore from a backup" would
+      // send the user to destroy a working vault over a client limitation.
+      // The copy names desktop as the way in, which is the only action that
+      // resolves this (phase3-web-client task 31).
+      return {
+        kind: "banner",
+        text: i18n.t("unlock.errors.kdfMemoryExceedsHost", {
+          required: e.detail.required_mib,
+          available: e.detail.available_mib,
+        }),
       };
   }
 }
@@ -512,7 +525,8 @@ export function Unlock({
     return (
       <FailClosedError
         reason={{ kind: "corrupted-vault" }}
-        onCtaClick={() => void closeApp()}
+        onCtaClick={() => void failClosedExit()}
+        ctaLabelKey={FAIL_CLOSED_EXIT_LABEL_KEY}
         onRestoreBackup={onRestoreBackup}
       />
     );
@@ -521,7 +535,8 @@ export function Unlock({
     return (
       <FailClosedError
         reason={{ kind: "io-error", ioKind: initialStatus.ioKind }}
-        onCtaClick={() => void closeApp()}
+        onCtaClick={() => void failClosedExit()}
+        ctaLabelKey={FAIL_CLOSED_EXIT_LABEL_KEY}
       />
     );
   }
@@ -532,7 +547,8 @@ export function Unlock({
     return (
       <FailClosedError
         reason={{ kind: "corrupted-vault" }}
-        onCtaClick={() => void closeApp()}
+        onCtaClick={() => void failClosedExit()}
+        ctaLabelKey={FAIL_CLOSED_EXIT_LABEL_KEY}
         onRestoreBackup={onRestoreBackup}
       />
     );

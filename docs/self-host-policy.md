@@ -104,9 +104,17 @@ The mechanical commands are in the `operations` reproducible-build runbook.
 
 ## 6. Certificate trust
 
-Your client must trust the server's TLS certificate, and the SCRAM channel binding ties the authenticated
-session to that exact certificate (so a man-in-the-middle presenting a different certificate fails to
-authenticate).
+Your client must trust the server's TLS certificate. On a **native client** (desktop, mobile) the SCRAM
+channel binding additionally ties the authenticated session to that exact certificate, so a
+man-in-the-middle presenting a different certificate fails to authenticate.
+
+**This does not hold for the web client, and will not.** A browser exposes neither TLS-exporter keying
+material nor a certificate-pinning API to page JavaScript, so a browser session rests on the browser's own
+trust store and nothing more — permanently, not pending some later release (`decisions.md` 2026-07-26).
+What is unchanged either way: a man-in-the-middle on the sync connection sees only ciphertext. What a web
+client additionally depends on is the origin that serves it the client code, which is a separate boundary
+with a separate adversary (`threat-model.md` TB11 / A15) — and if you self-host the web client too, that
+origin is yours.
 
 - **Hosted:** the client ships with a pinned certificate for the hosted endpoint (settled).
 - **Self-host:** how your client trusts *your* operator-chosen certificate/domain is being finalised with

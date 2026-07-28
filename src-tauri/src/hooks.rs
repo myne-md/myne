@@ -44,9 +44,23 @@ impl<R: Runtime> VaultLifecycleHooks for DesktopHooks<R> {
     }
 
     fn reclaim_stray_attachment_blobs<'a>(&'a self, state: &'a VaultRuntimeState) -> BoxFuture<'a> {
-        Box::pin(
-            crate::plugins::attachments::commands::reclaim_stray_attachment_blobs(&self.app, state),
-        )
+        // The core helper now takes `&dyn HostCtx` rather than an `AppHandle`
+        // (phase3-web-client task 79). This is the ONE host-crate edit the whole
+        // port needed, and it is instructive: Option B keeps every
+        // `#[tauri::command]` wrapper — and therefore every `generate_handler!`
+        // line — untouched, but this is not a command. It is a hooks
+        // implementation calling a plain helper, so a signature change reaches
+        // the host directly. Mobile is unaffected: its `NoopHooks`-style impl
+        // ignores this method entirely.
+        let host = myne_core::host::tauri_host::TauriHost::new(self.app.clone());
+        Box::pin(async move {
+            crate::plugins::attachments::commands::reclaim_stray_attachment_blobs(
+                &host,
+                &myne_core::vault_io::StdVaultIo,
+                state,
+            )
+            .await
+        })
     }
 
     fn persist_search_index<'a>(&'a self, state: &'a VaultRuntimeState) -> BoxFuture<'a> {

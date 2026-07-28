@@ -15,13 +15,20 @@
 
 use super::error::{VaultStatusError, VaultUnlockError};
 use super::state::{Slot, SlotKind, UnlockedVault, VaultRuntimeState};
+use crate::host::HostCtx;
 use crate::io_failure_kind::{from_io_error_kind, IoFailureKind};
 use crate::protocol_error_kind::protocol_error_kind;
+use crate::vault_io::VaultIo;
 use protocol::{VaultMeta, AEAD_KEY_LEN, AEAD_NONCE_LEN};
 use serde::Serialize;
 use std::path::{Path, PathBuf};
-use std::time::Instant;
-use tauri::{AppHandle, Manager, Runtime, State};
+// Tauri types serve only the cfg-gated IPC wrappers (task 79, Option B). The
+// `Manager` import went with them: its only use here was `app.path()`, which
+// `HostCtx::app_data_dir` now provides.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+use crate::host::tauri_host::TauriHost;
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+use tauri::{AppHandle, Runtime, State};
 use zeroize::Zeroizing;
 
 /// Bundle returned by the spawn_blocking pipeline closure: both
@@ -57,16 +64,13 @@ struct DerivedKeys {
 /// - `None` → the sole-vault fallback (`current_vault_root_from_base`), which
 ///   preserves the current single-vault boot (callers that have no chosen id
 ///   yet pass `None`).
-fn vault_meta_path<R: Runtime>(
-    app: &AppHandle<R>,
+fn vault_meta_path(
+    host: &dyn HostCtx,
     vault_id: Option<crate::vault_id::VaultId>,
 ) -> Result<PathBuf, VaultUnlockError> {
-    let base = app
-        .path()
-        .app_data_dir()
-        .map_err(|_| VaultUnlockError::IoError {
-            io_error_kind: IoFailureKind::Other,
-        })?;
+    let base = host.app_data_dir().map_err(|_| VaultUnlockError::IoError {
+        io_error_kind: IoFailureKind::Other,
+    })?;
     let root = match vault_id {
         Some(id) => crate::paths::vault_root_for_id_from_base(&base, id),
         // sole-vault fallback until picker (sub-feature 3): the transitional
@@ -135,20 +139,20 @@ fn is_vault_switch(
 /// 6. Populate [`super::state::VaultRuntimeState`]'s slot with the
 ///    fully-verified [`UnlockedVault`]. Permit is still held; drops
 ///    when the function returns.
-#[tauri::command]
-pub async fn unlock<R: Runtime>(
+pub async fn unlock_from_host(
     vault_id: Option<String>,
     password: String,
-    state: State<'_, VaultRuntimeState>,
-    hooks: State<'_, crate::hooks::Hooks>,
-    app: AppHandle<R>,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    host: &dyn HostCtx,
+    io: &dyn VaultIo,
 ) -> Result<(), VaultUnlockError> {
     // SYNC-6 targeting: `Some(id)` → unlock exactly `vaults/<id>/` (the picker
     // of sub-feature 3 passes the chosen id); `None`/malformed → the sole-vault
     // fallback. The parsed id keys BOTH the path resolution and the slot map so
     // they cannot diverge.
     let target = crate::vault_id::VaultId::parse_optional(vault_id.as_deref());
-    let vault_path = vault_meta_path(&app, target)?;
+    let vault_path = vault_meta_path(host, target)?;
 
     // Lock-then-unlock teardown (sub-feature 2 task 2): capture the currently-
     // active vault BEFORE the unlock so we can tell whether this unlock is a
@@ -163,7 +167,7 @@ pub async fn unlock<R: Runtime>(
         crate::paths::vault_id_from_root(vault_path.parent().unwrap_or(&vault_path))
     });
 
-    unlock_with_path(password, target, &vault_path, state.inner()).await?;
+    unlock_with_path(password, target, &vault_path, state, io, host).await?;
 
     // A SWITCH occurred when a DIFFERENT vault was unlocked beforehand.
     // `set_unlocked_locking_others` (inside `unlock_with_path`) already dropped
@@ -208,12 +212,12 @@ pub async fn unlock<R: Runtime>(
     // stays `None` and those surfaces fall back to a creation-order tie-break.
     // Best-effort: a failed `app_data_dir` lookup or persist degrades to stale
     // ordering, never blocks the unlock. `target_id` is the vault just opened.
-    if let Ok(base) = app.path().app_data_dir() {
-        let now_ms = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_millis() as u64)
-            .unwrap_or(0);
-        crate::vault_registry::record_unlock(&base, &target_id, now_ms);
+    if let Ok(base) = host.app_data_dir() {
+        // Host clock, not `SystemTime::now()` — the latter panics on wasm32
+        // (phase3-web-client task 12). This one is genuinely WALL-clock: the
+        // picker orders by it and the value is compared across sessions, so a
+        // monotonic reading would be meaningless here.
+        crate::vault_registry::record_unlock(&base, &target_id, host.now_unix_millis());
     }
 
     // ---- MYND-85: roll-forward-recover a crashed transactional rename ----
@@ -228,7 +232,7 @@ pub async fn unlock<R: Runtime>(
     // link bodies, never a half-renamed vault. Idempotent + best-effort:
     // a failure leaves the residue for the next unlock to retry (the
     // marker is the durable WAL), so it never blocks unlock.
-    recover_pending_rename_on_unlock(&app, state.inner()).await;
+    recover_pending_rename_on_unlock(host, io, state).await;
 
     // ---- MYND-171: reclaim catalog-less stray attachment blobs ----------
     //
@@ -240,7 +244,7 @@ pub async fn unlock<R: Runtime>(
     // here (post-unlock, slot Unlocked → catalog KEK derivable) and is
     // fail-closed on an undecodable catalog (never mass-deletes on
     // corruption). Best-effort: any failure is logged and never blocks unlock.
-    hooks.reclaim_stray_attachment_blobs(state.inner()).await;
+    hooks.reclaim_stray_attachment_blobs(state).await;
 
     // ---- MYND-160 pipeline steps 4-6 (post-`set_unlocked` orchestration) ----
     //
@@ -261,7 +265,7 @@ pub async fn unlock<R: Runtime>(
     // logged via `tracing::warn!` inside `prefs::read_or_default`
     // and `screen_capture::apply`. **vault_unlock's `VaultUnlockError`
     // surface is unchanged** — the user's unlock succeeds regardless.
-    apply_persisted_prefs(&app, state.inner(), hooks.inner()).await;
+    apply_persisted_prefs(host, state, hooks, io).await;
 
     // ---- MYND-29 Task 7: hydrate the search index ----------------------
     //
@@ -274,11 +278,11 @@ pub async fn unlock<R: Runtime>(
     // `vault_lock` into repopulating a just-cleared index. A cold first
     // unlock (no blob) is a full rebuild — a known latency cost the Task 9
     // benchmark will quantify.
-    hooks.hydrate_search_index(state.inner()).await;
+    hooks.hydrate_search_index(state).await;
 
     // MYND-262/266: load the bundled dictionaries (en-US, SYNC-12) + hydrate the
     // personal/ignore sets from vault.dictionary. Best-effort, like search.
-    hooks.hydrate_spell(state.inner()).await;
+    hooks.hydrate_spell(state).await;
 
     // MYND-412 (semantic-search-qa task 3): embed-on-unlock trigger for the
     // local-AI semantic index. Unlike the search/spell hydrates this is NOT
@@ -287,9 +291,31 @@ pub async fn unlock<R: Runtime>(
     // embed walk detached so it never blocks unlock. Mobile + the default
     // (feature-off) desktop build install a no-op. Best-effort: it can never
     // block or fail the unlock the user just completed.
-    hooks.hydrate_ai_vectors(state.inner()).await;
+    hooks.hydrate_ai_vectors(state).await;
 
     Ok(())
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn unlock<R: Runtime>(
+    vault_id: Option<String>,
+    password: String,
+    state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
+    app: AppHandle<R>,
+) -> Result<(), VaultUnlockError> {
+    unlock_from_host(
+        vault_id,
+        password,
+        state.inner(),
+        hooks.inner(),
+        &TauriHost::new(app),
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
 }
 
 /// MYND-160 pipeline steps 4-6: derive `prefs_key` from the just-
@@ -311,10 +337,11 @@ pub async fn unlock<R: Runtime>(
 /// `decisions.md` 2026-05-27 already applied `screen_capture::apply(true)`
 /// inside `vault_lock`, so the additional `apply(true)` here is a
 /// harmless no-op idempotent.
-pub(crate) async fn apply_persisted_prefs<R: Runtime>(
-    app: &AppHandle<R>,
+pub(crate) async fn apply_persisted_prefs(
+    host: &dyn HostCtx,
     state: &VaultRuntimeState,
     hooks: &crate::hooks::Hooks,
+    io: &dyn VaultIo,
 ) {
     // SYNC-6: resolve the ACTIVE vault root via the just-unlocked slot's id
     // (`unlock_with_path` set the slot to `Unlocked` before this runs, so
@@ -322,7 +349,8 @@ pub(crate) async fn apply_persisted_prefs<R: Runtime>(
     // two or more vaults exist, where the old sole-vault disk heuristic
     // mis-resolved). `None` (a concurrent lock raced — Phase 2 only) falls back
     // to the sole-vault path, harmless since prefs_read then fails the slot gate.
-    let Ok(vault_dir) = crate::paths::active_vault_root_io(app, state.active_vault_id().await)
+    let Ok(vault_dir) =
+        crate::paths::active_vault_root_io_from_host(host, state.active_vault_id().await)
     else {
         // app_data_dir lookup failure is structurally rare; if it
         // happens, fall back to the safer state (protection ON).
@@ -334,26 +362,26 @@ pub(crate) async fn apply_persisted_prefs<R: Runtime>(
         return;
     };
 
-    let prefs = match crate::plugins::prefs::commands::prefs_read_with_dir(&vault_dir, state).await
-    {
-        Ok(view) => view,
-        Err(e) => {
-            // MYND-160 fix: log PrefsReadError before collapsing to
-            // defaults so support flows can distinguish "user has no
-            // persisted preference" (handled silently by read_or_default
-            // inside prefs_read_with_dir) from "vault.meta read or parse
-            // failed" (this branch) — both produce default-ON natively
-            // but the latter is a structural problem worth a trace
-            // entry. The vault_dir-resolution-failed branch above warns
-            // similarly; this restores observability symmetry.
-            tracing::warn!(
-                event = "prefs_post_unlock_skipped",
-                reason = "prefs_read_failed",
-                error_kind = prefs_read_error_kind(&e),
-            );
-            crate::plugins::prefs::PrefsView::default()
-        }
-    };
+    let prefs =
+        match crate::plugins::prefs::commands::prefs_read_with_dir(&vault_dir, state, io).await {
+            Ok(view) => view,
+            Err(e) => {
+                // MYND-160 fix: log PrefsReadError before collapsing to
+                // defaults so support flows can distinguish "user has no
+                // persisted preference" (handled silently by read_or_default
+                // inside prefs_read_with_dir) from "vault.meta read or parse
+                // failed" (this branch) — both produce default-ON natively
+                // but the latter is a structural problem worth a trace
+                // entry. The vault_dir-resolution-failed branch above warns
+                // similarly; this restores observability symmetry.
+                tracing::warn!(
+                    event = "prefs_post_unlock_skipped",
+                    reason = "prefs_read_failed",
+                    error_kind = prefs_read_error_kind(&e),
+                );
+                crate::plugins::prefs::PrefsView::default()
+            }
+        };
 
     hooks.apply_screen_capture(prefs.screen_capture_protection, "runtime_apply");
 
@@ -415,11 +443,12 @@ fn prefs_read_error_kind(e: &crate::plugins::prefs::PrefsReadError) -> &'static 
 /// io-failure kind and skipped (no path / id ever logged) — the
 /// `.rename-journal` marker is the durable WAL, so a missed recovery is
 /// retried idempotently on the next unlock and never blocks this one.
-pub(crate) async fn recover_pending_rename_on_unlock<R: Runtime>(
-    app: &AppHandle<R>,
+pub(crate) async fn recover_pending_rename_on_unlock(
+    host: &dyn HostCtx,
+    io: &dyn crate::vault_io::VaultIo,
     state: &VaultRuntimeState,
 ) {
-    let notes_dir = match crate::paths::notes_dir_for(app, state.active_vault_id().await) {
+    let notes_dir = match crate::paths::notes_dir_for_host(host, state.active_vault_id().await) {
         Ok(d) => d,
         Err(e) => {
             tracing::warn!(
@@ -430,30 +459,28 @@ pub(crate) async fn recover_pending_rename_on_unlock<R: Runtime>(
             return;
         }
     };
-    recover_pending_rename_in_dir(notes_dir).await;
+    recover_pending_rename_in_dir(io, notes_dir).await;
 }
 
 /// Testable core of [`recover_pending_rename_on_unlock`]: run
-/// `note_txn::recover_pending_rename` on a resolved `notes/` dir from a
-/// blocking thread (fsync + rename I/O must not stall the async runtime).
+/// `note_txn::recover_pending_rename` on a resolved `notes/` dir.
 /// Best-effort — every failure is logged (bounded kind, no path) and
 /// swallowed so the next unlock retries the idempotent recovery.
-pub(crate) async fn recover_pending_rename_in_dir(notes_dir: PathBuf) {
-    match tokio::task::spawn_blocking(move || crate::note_txn::recover_pending_rename(&notes_dir))
-        .await
-    {
-        Ok(Ok(())) => {}
-        Ok(Err(e)) => {
+pub(crate) async fn recover_pending_rename_in_dir(
+    io: &dyn crate::vault_io::VaultIo,
+    notes_dir: PathBuf,
+) {
+    // `run_blocking` is gone rather than moved (task 86): what this does is a
+    // directory read plus N publishes, all of which dispatch their own blocking
+    // on the native arm. There is no CPU work left to keep off the runtime — the
+    // fsync mechanics the old comment cited are the seam's now.
+    match crate::note_txn::recover_pending_rename(io, &notes_dir).await {
+        Ok(()) => {}
+        Err(io_failure_kind) => {
             tracing::warn!(
                 event = "rename_recovery_failed",
-                io_failure_kind = ?from_io_error_kind(e.kind()),
+                io_failure_kind = ?io_failure_kind,
                 "pending rename recovery failed; left for next-unlock retry",
-            );
-        }
-        Err(_join) => {
-            tracing::warn!(
-                event = "rename_recovery_join_failed",
-                "pending rename recovery task panicked or runtime shutdown",
             );
         }
     }
@@ -469,13 +496,19 @@ pub async fn unlock_with_path(
     vault_id: Option<crate::vault_id::VaultId>,
     vault_path: &Path,
     state: &VaultRuntimeState,
+    io: &dyn VaultIo,
+    host: &dyn HostCtx,
 ) -> Result<(), VaultUnlockError> {
     // Wrap immediately so any early-return path (VaultAlreadyUnlocked,
     // UnlockInProgress, IO failure, parse failure) drops the wrapper
     // and zeroes the bytes. Plain `String` would drop without zeroize.
     let password = Zeroizing::new(password);
 
-    let started = Instant::now();
+    // Host clock, not `Instant::now()`: the latter PANICS on
+    // `wasm32-unknown-unknown` (std falls to its `unsupported` time backend).
+    // Monotonic rather than wall-clock because this measures an elapsed
+    // duration — a wall clock that steps backwards would log a negative unlock.
+    let started_ms = host.monotonic_millis();
 
     // Slot-map key resolution (sub-feature 2 task 4 — explicit vault_id
     // targeting): `Some(id)` is the EXPLICIT target the IPC layer threaded (it
@@ -534,38 +567,110 @@ pub async fn unlock_with_path(
         }
     };
 
-    // Own the path so it can move into spawn_blocking (the closure
-    // captures by-value). Cheap one-allocation clone.
-    let vault_path = vault_path.to_path_buf();
+    // The `vault.meta` read now goes through the IO seam and is awaited HERE,
+    // outside the blocking closure (phase3-web-client task 17/12). Two reasons:
+    // the seam's native arm already dispatches its own `std::fs` call through
+    // `crate::task::run_blocking`, so nesting would be a blocking dispatch
+    // inside a blocking dispatch; and the wasm arm's read is genuinely async
+    // (OPFS handle acquisition), which a closure cannot await.
+    //
+    // What stays inside the closure is exactly the CPU-bound part — parse,
+    // SHA-256, Argon2id, AEAD — which is what the blocking pool is for. The
+    // original comment claimed "IO + parse + KDF + AEAD all run inside the
+    // blocking task"; that is now half true, and the half that changed is the
+    // half that was never CPU work.
+    // Read and parse are ONE step (task 18), because on the web client they have
+    // to be: a singleton there is two alternating copies, and choosing between
+    // them is exactly "the newest one that parses". `open_newest` runs that loop
+    // once, in `core/src/singleton.rs`, rather than at each of the ~10 singleton
+    // readers.
+    //
+    // **Desktop and mobile behaviour is unchanged, by construction.**
+    // `VaultIo::read_candidates` defaults to a one-element list there —
+    // `atomic_write` already makes a torn file impossible — so this is the same
+    // read followed by the same parse, mapping onto the same three errors.
+    let (meta_preview, bytes) = crate::singleton::open_newest(io, vault_path, |candidate| {
+        // The bytes travel with the parse result: the blocking closure below
+        // needs them for the SHA-256 CAS anchor and for `derive_root_key`, and
+        // on a double-buffered store "the bytes" means *this* copy's, not
+        // whatever a second read would return.
+        protocol::parse_vault_meta(candidate).map(|meta| (meta, candidate.to_vec()))
+    })
+    .await
+    .map_err(|outcome| match outcome {
+        crate::singleton::OpenOutcome::Absent => {
+            tracing::error!(
+                stage = "read_meta",
+                error_kind = "VaultNotFound",
+                "vault.meta does not exist (first-run UX routes to creation flow)"
+            );
+            VaultUnlockError::VaultNotFound
+        }
+        crate::singleton::OpenOutcome::Io(io_kind) => {
+            tracing::error!(
+                stage = "read_meta",
+                error_kind = "IoError",
+                io_failure_kind = ?io_kind,
+                "vault.meta read failed"
+            );
+            VaultUnlockError::IoError {
+                io_error_kind: io_kind,
+            }
+        }
+        // Every stored copy failed to parse — on desktop that is the only copy,
+        // on web it is both. Same conclusion either way, and the reported cause
+        // is the newest copy's.
+        crate::singleton::OpenOutcome::Undecodable(e) => {
+            tracing::error!(
+                stage = "parse_meta",
+                error_kind = "InvalidVaultMeta",
+                protocol_error_kind = protocol_error_kind(&e),
+                "vault.meta parse rejected"
+            );
+            VaultUnlockError::InvalidVaultMeta
+        }
+    })?;
+
+    // ── browser-capability ceiling (task 31) ────────────────────────────────
+    //
+    // Parsed here, OUTSIDE the blocking closure, purely so the host's memory
+    // ceiling can be checked BEFORE `derive_root_key` allocates. The parse is
+    // cheap (345 bytes) and its result moves into the closure, so nothing is
+    // done twice.
+    //
+    // Ordering is the entire contract: on `wasm32` an over-large Argon2id block
+    // is not a catchable allocation failure, it is an abort — the instance dies
+    // and the user sees a dead Worker with no cause. A refusal has to happen
+    // before the allocation, not around it.
+    //
+    // This does NOT relax protocol validation, and must not: `validate_kdf_params`
+    // still runs inside `derive_root_key`, `MAX_KDF_M_KIB` (4 GiB) is unchanged,
+    // and the v0.1 256 MiB baseline is unchanged. Parameters are AAD-bound and
+    // read from `vault.meta` (`protocol.md` §4.2) — they can be neither lowered
+    // nor renegotiated per client. This is strictly an "and can this host
+    // actually service it" question layered on top.
+    if let Some(ceiling_kib) = host.max_kdf_memory_kib() {
+        let required_kib = meta_preview.kdf_params.m_kib;
+        if required_kib > ceiling_kib {
+            // Public figures only (both come from the unencrypted KDF block or
+            // the client build), so this log carries no credential-adjacent
+            // value — see the variant's doc comment.
+            tracing::error!(
+                stage = "kdf_capability",
+                error_kind = "KdfMemoryExceedsHostCapability",
+                required_kib,
+                ceiling_kib,
+                "vault KDF memory cost exceeds what this host can service"
+            );
+            return Err(VaultUnlockError::KdfMemoryExceedsHostCapability {
+                required_mib: required_kib / 1024,
+                available_mib: ceiling_kib / 1024,
+            });
+        }
+    }
 
     let join_outcome =
-        tokio::task::spawn_blocking(move || -> Result<DerivedKeys, VaultUnlockError> {
-            // IO + parse + KDF + AEAD all run inside the blocking
-            // task: this frees the runtime worker across the whole
-            // pipeline (Windows / cold-disk / antivirus latency
-            // doesn't stall the async runtime).
-            let bytes = std::fs::read(&vault_path).map_err(|e| {
-                if e.kind() == std::io::ErrorKind::NotFound {
-                    tracing::error!(
-                        stage = "read_meta",
-                        error_kind = "VaultNotFound",
-                        "vault.meta does not exist (first-run UX routes to creation flow)"
-                    );
-                    VaultUnlockError::VaultNotFound
-                } else {
-                    let io_kind = from_io_error_kind(e.kind());
-                    tracing::error!(
-                        stage = "read_meta",
-                        error_kind = "IoError",
-                        io_failure_kind = ?io_kind,
-                        "vault.meta read failed"
-                    );
-                    VaultUnlockError::IoError {
-                        io_error_kind: io_kind,
-                    }
-                }
-            })?;
-
+        crate::task::run_blocking(move || -> Result<DerivedKeys, VaultUnlockError> {
             let meta = protocol::parse_vault_meta(&bytes).map_err(|e| {
                 tracing::error!(
                     stage = "parse_meta",
@@ -616,7 +721,7 @@ pub async fn unlock_with_path(
         }
     };
 
-    let now = Instant::now();
+    let now_ms = host.monotonic_millis();
     // Lock-then-unlock seam (sub-feature 2 task 2): enforce the ≤1-`Unlocked`
     // invariant. If a DIFFERENT vault is already unlocked,
     // `set_unlocked_locking_others` locks it first (drops + zeroizes its keys)
@@ -633,7 +738,7 @@ pub async fn unlock_with_path(
                 root_key,
                 items_key,
                 items_key_id,
-                unlocked_at: now,
+                unlocked_at: now_ms,
                 vault_meta_bytes_hash,
             },
         )
@@ -665,7 +770,7 @@ pub async fn unlock_with_path(
     // out of scope, but the discipline costs ~zero today).
     tracing::info!(
         event = "vault_unlocked",
-        duration_ms = (now.duration_since(started).as_millis() / 10 * 10) as u64,
+        duration_ms = (now_ms.saturating_sub(started_ms) / 10) * 10,
         "vault unlocked successfully"
     );
 
@@ -827,10 +932,9 @@ fn open_32_byte_secret(
 /// mitigates this UI-side (Lock affordance hidden during
 /// `decrypting`); a Rust-side "lock requested" signal that the
 /// pipelines check before populating the slot is a Phase 2+ fix.
-#[tauri::command]
-pub async fn lock(
-    state: State<'_, VaultRuntimeState>,
-    hooks: State<'_, crate::hooks::Hooks>,
+pub async fn lock_from_host(
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
 ) -> Result<(), VaultUnlockError> {
     // ---- MYND-29 Task 7: graceful-lock flush ----------------------------
     //
@@ -846,9 +950,9 @@ pub async fn lock(
     // Task 8's job. Until then the index lingers post-lock, but `note_search`
     // gates on `Slot::Unlocked` (returns empty when locked), so there is no
     // IPC leak — only raw RAM retention that Task 8 zeroizes.
-    hooks.persist_search_index(state.inner()).await;
+    hooks.persist_search_index(state).await;
 
-    lock_with_state(state.inner()).await?;
+    lock_with_state(state).await?;
 
     // ---- MYND-29 Task 8: wipe the plaintext-derived search index --------
     //
@@ -911,6 +1015,17 @@ pub async fn lock(
     Ok(())
 }
 
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn lock(
+    state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
+) -> Result<(), VaultUnlockError> {
+    lock_from_host(state.inner(), hooks.inner()).await
+}
+
 /// Report the current [`Slot`] variant via the [`SlotKind`]
 /// discriminator. Used by frontend boot-time and post-WebView-reload
 /// routing — Tauri's Rust state can outlive the WebView's JS state
@@ -947,16 +1062,26 @@ pub async fn lock(
 /// A malformed (non-parseable) `vault_id` string is treated as `None` (fall
 /// back to the active-vault probe) rather than surfacing a hard error — the
 /// boot/routing probe must always yield a usable [`SlotKind`].
+pub async fn vault_slot_kind_from_host(
+    vault_id: Option<String>,
+    state: &VaultRuntimeState,
+) -> Result<SlotKind, VaultUnlockError> {
+    vault_slot_kind_inner(
+        crate::vault_id::VaultId::parse_optional(vault_id.as_deref()),
+        state,
+    )
+    .await
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn vault_slot_kind(
     vault_id: Option<String>,
     state: State<'_, VaultRuntimeState>,
 ) -> Result<SlotKind, VaultUnlockError> {
-    vault_slot_kind_inner(
-        crate::vault_id::VaultId::parse_optional(vault_id.as_deref()),
-        state.inner(),
-    )
-    .await
+    vault_slot_kind_from_host(vault_id, state.inner()).await
 }
 
 /// Testable core of [`vault_slot_kind`]. The Tauri-command wrapper
@@ -1088,17 +1213,95 @@ pub enum VaultStatus {
 ///      bounded [`IoFailureKind`].
 ///    - `parse_vault_meta` Ok → `Ok(VaultStatus::Exists)`.
 ///    - `parse_vault_meta` Err → `Ok(VaultStatus::Corrupted)`.
-/// 3. `JoinFailure` from the spawn_blocking handle → fold into
-///    `IoError { Other }` (no separate variant — the boundary contract
-///    only surfaces IO-class failures).
-#[tauri::command]
-pub async fn vault_status<R: Runtime>(app: AppHandle<R>) -> Result<VaultStatus, VaultStatusError> {
+/// 3. Any other seam failure → `IoError { <bounded kind> }` (no separate
+///    variant — the boundary contract only surfaces IO-class failures). The
+///    old `JoinFailure` bullet went with the explicit `run_blocking` this
+///    function no longer has: `VaultIo`'s native arm owns that dispatch and
+///    already collapses a dropped blocking task into `IoFailureKind::Other`.
+pub async fn vault_status_from_host(
+    host: &dyn HostCtx,
+    io: &dyn VaultIo,
+) -> Result<VaultStatus, VaultStatusError> {
     // sole-vault fallback until picker (sub-feature 3): `vault_status` is the
     // boot-time probe of the sole on-disk vault — no explicit id to target.
-    let vault_path = vault_meta_path(&app, None).map_err(|_| VaultStatusError::IoError {
+    let vault_path = vault_meta_path(host, None).map_err(|_| VaultStatusError::IoError {
         io_error_kind: IoFailureKind::Other,
     })?;
-    vault_status_with_path(&vault_path).await
+    vault_status_with_path(io, &vault_path).await
+}
+
+// ── account-number check (phase3-web-client task 30) ─────────────────────────
+
+/// Whether `input` is a well-formed account number — **locally**, with no
+/// network call of any kind.
+///
+/// # Why this exists when `parse_account_number` already does
+///
+/// It does not add validation; it adds a *reachable* one. Every existing caller
+/// of `protocol::parse_account_number` in this crate sits inside `sync`'s
+/// device-enrolment path, which is a server round-trip — so the web client's
+/// first-run identity step (task 30) had no way to reject a typo without asking
+/// a server, which is exactly what its third criterion forbids.
+///
+/// # Why it returns one bit
+///
+/// `account-number.md` §5: the result is non-distinguishing. A caller learns
+/// "this is not a valid account number", never *which* character failed, and
+/// never whether the failure was the alphabet, the length or the Damm-32 check
+/// character. Reporting the position of a bad character would tell an attacker
+/// holding a partially-known number which half to work on.
+///
+/// The parse is `protocol`'s — the frozen Damm-32 quasigroup table
+/// (`account-number.md` §4.2) is consulted exactly once in this codebase, and a
+/// second implementation in TypeScript would be a second table to keep frozen.
+/// It already strips whitespace, the `MY-` display prefix and every dash, so the
+/// grouped display form and the bare canonical body validate identically.
+///
+/// **Nothing leaves the client.** The input is not logged (it is an account
+/// identifier, and `src-tauri/CLAUDE.md`'s DENY list covers it), not stored, and
+/// not returned — only the verdict is.
+pub fn account_number_is_valid(input: &str) -> bool {
+    protocol::parse_account_number(input.trim()).is_ok()
+}
+
+/// IPC wrapper. Local and synchronous — there is no IO to await.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub fn account_number_check(account_number: String) -> bool {
+    account_number_is_valid(&account_number)
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn vault_status<R: Runtime>(app: AppHandle<R>) -> Result<VaultStatus, VaultStatusError> {
+    vault_status_from_host(&TauriHost::new(app), &crate::vault_io::StdVaultIo).await
+}
+
+/// Mid-session storage health (phase3-web-client task 22).
+///
+/// Distinct from [`vault_status`], which is the BOOT probe: the same three
+/// on-disk states mean different things once a session is unlocked, and the one
+/// this exists for — the container vanishing underneath a live session — has no
+/// representation in the boot vocabulary at all. See
+/// [`super::storage_health`] for the full argument.
+///
+/// Read-only, cheap and infallible-by-shape: a slot peek, an `exists` and a
+/// 345-byte read. Safe to poll, which is how a browser notices an eviction while
+/// the user is mid-sentence rather than at the next reload.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn vault_storage_health<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+) -> Result<super::storage_health::StorageHealth, VaultStatusError> {
+    Ok(super::storage_health::probe_storage_health(
+        &TauriHost::new(app),
+        &crate::vault_io::StdVaultIo,
+        state.inner(),
+    )
+    .await)
 }
 
 /// Testable core of [`vault_status`]. The Tauri-command wrapper
@@ -1106,60 +1309,53 @@ pub async fn vault_status<R: Runtime>(app: AppHandle<R>) -> Result<VaultStatus, 
 /// so tests do not need an [`AppHandle`].
 ///
 /// All decisions documented on [`vault_status`] apply identically.
+/// **First command migrated onto the [`VaultIo`] seam** (phase3-web-client task
+/// 17). Chosen as the first because it is the smallest real one: read-only, no
+/// keys, no derivation, no unlock precondition — and it is what the shared UI
+/// calls at boot (`src/lib/vault-status.ts`), so a browser reaching `Exists`
+/// after a reload is a genuine end-to-end persistence proof rather than a
+/// synthetic one.
+///
+/// The explicit [`crate::task::run_blocking`] that used to wrap this body is
+/// **gone, not moved**: the seam's native arm already routes its `std::fs` call
+/// through it ([`crate::vault_io::StdVaultIo`]), so keeping one here would have
+/// nested a blocking dispatch inside a blocking dispatch. The `JoinFailure` arm
+/// went with it — the seam collapses that case into `IoFailureKind::Other`
+/// itself, which is where it belongs now that the seam owns the dispatch.
 pub(crate) async fn vault_status_with_path(
+    io: &dyn VaultIo,
     vault_path: &Path,
 ) -> Result<VaultStatus, VaultStatusError> {
-    let vault_path = vault_path.to_path_buf();
-
-    let join_outcome =
-        tokio::task::spawn_blocking(move || -> Result<VaultStatus, VaultStatusError> {
-            let bytes = match std::fs::read(&vault_path) {
-                Ok(b) => b,
-                Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-                    // Canonical no-vault case — frontend routes to
-                    // welcome (create flow). Not an IO error; do not
-                    // log (this is the expected first-run path).
-                    return Ok(VaultStatus::Missing);
-                }
-                Err(e) => {
-                    let io_kind = from_io_error_kind(e.kind());
-                    tracing::error!(
-                        stage = "status_check",
-                        error_kind = "IoError",
-                        io_failure_kind = ?io_kind,
-                        "vault.meta probe read failed"
-                    );
-                    return Err(VaultStatusError::IoError {
-                        io_error_kind: io_kind,
-                    });
-                }
-            };
-            match protocol::parse_vault_meta(&bytes) {
-                Ok(_) => Ok(VaultStatus::Exists),
-                Err(e) => {
-                    tracing::error!(
-                        stage = "status_check",
-                        result = "Corrupted",
-                        protocol_error_kind = protocol_error_kind(&e),
-                        "vault.meta probe rejected by parse_vault_meta"
-                    );
-                    Ok(VaultStatus::Corrupted)
-                }
-            }
-        })
-        .await;
-
-    match join_outcome {
-        Ok(inner) => inner,
-        Err(_) => {
+    let bytes = match io.read(vault_path).await {
+        Ok(b) => b,
+        Err(IoFailureKind::NotFound) => {
+            // Canonical no-vault case — frontend routes to welcome (create
+            // flow). Not an IO error; do not log (this is the expected
+            // first-run path).
+            return Ok(VaultStatus::Missing);
+        }
+        Err(io_kind) => {
             tracing::error!(
                 stage = "status_check",
-                error_kind = "JoinFailure",
-                "blocking task join failed during vault_status"
+                error_kind = "IoError",
+                io_failure_kind = ?io_kind,
+                "vault.meta probe read failed"
             );
-            Err(VaultStatusError::IoError {
-                io_error_kind: IoFailureKind::Other,
-            })
+            return Err(VaultStatusError::IoError {
+                io_error_kind: io_kind,
+            });
+        }
+    };
+    match protocol::parse_vault_meta(&bytes) {
+        Ok(_) => Ok(VaultStatus::Exists),
+        Err(e) => {
+            tracing::error!(
+                stage = "status_check",
+                result = "Corrupted",
+                protocol_error_kind = protocol_error_kind(&e),
+                "vault.meta probe rejected by parse_vault_meta"
+            );
+            Ok(VaultStatus::Corrupted)
         }
     }
 }
@@ -1180,11 +1376,20 @@ pub(crate) async fn vault_status_with_path(
 /// [`tokio::sync::RwLock`] read is infallible). The `Result` shape is
 /// retained so the Tauri IPC contract for the two probe commands is
 /// uniform on the frontend side.
+pub async fn vault_is_unlocked_from_host(
+    state: &VaultRuntimeState,
+) -> Result<bool, VaultStatusError> {
+    vault_is_unlocked_with_state(state).await
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn vault_is_unlocked(
     state: State<'_, VaultRuntimeState>,
 ) -> Result<bool, VaultStatusError> {
-    vault_is_unlocked_with_state(state.inner()).await
+    vault_is_unlocked_from_host(state.inner()).await
 }
 
 /// Testable core of [`vault_is_unlocked`]. The Tauri-command wrapper
@@ -1293,12 +1498,11 @@ pub struct VaultSummary {
 /// is best-effort and self-rebuilding), but returns `Result` for IPC-contract
 /// uniformity with the other probe commands and to surface the lone
 /// `app_data_dir`-resolution failure.
-#[tauri::command]
-pub async fn vault_list<R: Runtime>(
-    app: AppHandle<R>,
-    state: State<'_, VaultRuntimeState>,
+pub async fn vault_list_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
 ) -> Result<Vec<VaultSummary>, VaultStatusError> {
-    let base = app.path().app_data_dir().map_err(|_| {
+    let base = host.app_data_dir().map_err(|_| {
         tracing::error!(
             stage = "vault_list",
             error_kind = "IoError",
@@ -1309,7 +1513,18 @@ pub async fn vault_list<R: Runtime>(
             io_error_kind: IoFailureKind::Other,
         }
     })?;
-    Ok(vault_list_from_base(&base, state.inner()).await)
+    Ok(vault_list_from_base(&base, state).await)
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn vault_list<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+) -> Result<Vec<VaultSummary>, VaultStatusError> {
+    vault_list_from_host(&TauriHost::new(app), state.inner()).await
 }
 
 /// Testable core of [`vault_list`]. The Tauri-command wrapper resolves
@@ -1362,6 +1577,65 @@ pub(crate) async fn vault_list_from_base(
     summaries
 }
 
+/// [`vault_list_from_base`] for a client that hosts exactly ONE vault
+/// (phase3-web-client task 85).
+///
+/// A browser holds one vault per origin, at the constant
+/// [`crate::paths::web_single_vault_id`], so there is nothing to enumerate — and
+/// running `discover_vaults`' disk scan over OPFS would be both slower and
+/// meaningless. This is the registry collapse for the READ side, the same way
+/// the constant id is for the write side.
+///
+/// **`last_unlock` is always `None`, and that is a decision.** It comes from
+/// `registry.json`, a non-authoritative cache the multi-vault scan rebuilds; on
+/// a single-vault client it can only ever describe the one vault the user is
+/// already looking at, so keeping the file would buy a "last opened" timestamp
+/// nobody can compare against anything. The `VaultSummary` field stays in the
+/// shape (the type is shared) and the ordering helper already treats `None` as
+/// "never unlocked", which sorts a single entry identically.
+///
+/// The three states are the ones the multi-vault scan reports, derived the same
+/// way: a readable `vault.meta` is `Exists`, a container without one is
+/// `Corrupted` (surfaced, never dropped — `initialStageFromProbe` routes it to
+/// the re-bootstrap path), and nothing at all is an empty list.
+pub async fn vault_list_single_from_host(
+    host: &dyn HostCtx,
+    io: &dyn crate::vault_io::VaultIo,
+    state: &VaultRuntimeState,
+    id: crate::vault_id::VaultId,
+) -> Vec<VaultSummary> {
+    let Ok(root) = crate::paths::vault_root_for_id_from_host(host, id) else {
+        return Vec::new();
+    };
+    let meta_present = io.exists(&root.join("vault.meta")).await.unwrap_or(false);
+    if !meta_present {
+        // No meta. Either nothing has been bootstrapped (empty list — the
+        // first-run state) or a container exists without one, which is the
+        // `Corrupted` the picker must still see.
+        let container_present = io.exists(&root).await.unwrap_or(false);
+        if !container_present {
+            return Vec::new();
+        }
+        return vec![VaultSummary {
+            id: id.to_string(),
+            status: VaultSummaryStatus::Corrupted,
+            label: state.cached_label(id).await,
+            icon: state.cached_icon(id).await,
+            last_unlock: None,
+        }];
+    }
+    vec![VaultSummary {
+        id: id.to_string(),
+        status: VaultSummaryStatus::Exists,
+        // Projected from the session cache exactly as the multi-vault arm does:
+        // `Some` only for a vault unlocked THIS session, because the label and
+        // icon live inside `vault.prefs` and are not readable while locked.
+        label: state.cached_label(id).await,
+        icon: state.cached_icon(id).await,
+        last_unlock: None,
+    }]
+}
+
 /// Record user activity for the auto-lock-on-idle timer (MYND-121).
 ///
 /// The frontend's debounced activity heartbeat (mousemove / keydown /
@@ -1371,9 +1645,19 @@ pub(crate) async fn vault_list_from_base(
 /// ops even at heartbeat frequency (`decisions.md` 2026-05-30). Sync +
 /// infallible by construction — there is no failure mode to surface, and
 /// no secret material is read or logged.
+///
+/// Takes the monotonic reading from the host rather than reading a clock itself
+/// (phase3-web-client task 12) — `Instant::now()` panics on wasm32, and this is
+/// the heartbeat, so it would panic on every mousemove.
+pub fn report_user_activity_from_state(state: &VaultRuntimeState, host: &dyn HostCtx) {
+    state.report_activity(host.monotonic_millis());
+}
+
+/// IPC wrapper.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
-pub fn report_user_activity(state: State<'_, VaultRuntimeState>) {
-    state.report_activity();
+pub fn report_user_activity<R: Runtime>(state: State<'_, VaultRuntimeState>, app: AppHandle<R>) {
+    report_user_activity_from_state(state.inner(), &TauriHost::new(app))
 }
 
 #[cfg(test)]
@@ -1435,7 +1719,7 @@ mod tests {
             std::fs::write(notes_dir.join("note-a.myn.tmp"), b"NEW").unwrap();
             std::fs::write(notes_dir.join(".rename-journal"), b"").unwrap();
 
-            recover_pending_rename_in_dir(notes_dir.clone()).await;
+            recover_pending_rename_in_dir(&crate::vault_io::StdVaultIo, notes_dir.clone()).await;
 
             assert_eq!(
                 std::fs::read(notes_dir.join("note-a.myn")).unwrap(),
@@ -1463,7 +1747,7 @@ mod tests {
             std::fs::write(notes_dir.join("note-a.myn"), b"OLD").unwrap();
             std::fs::write(notes_dir.join("note-a.myn.tmp"), b"NEW").unwrap();
 
-            recover_pending_rename_in_dir(notes_dir.clone()).await;
+            recover_pending_rename_in_dir(&crate::vault_io::StdVaultIo, notes_dir.clone()).await;
 
             assert_eq!(
                 std::fs::read(notes_dir.join("note-a.myn")).unwrap(),
@@ -1504,7 +1788,15 @@ mod tests {
 
             const MARKER: &str = "ZZ_LEAK_MARKER_PW_DO_NOT_LOG_42";
             let state = VaultRuntimeState::default();
-            let result = unlock_with_path(MARKER.to_string(), None, scratch.path(), &state).await;
+            let result = unlock_with_path(
+                MARKER.to_string(),
+                None,
+                scratch.path(),
+                &state,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await;
             assert!(result.is_err(), "wrong password must fail to unlock");
             assert!(
                 !logs_contain(MARKER),
@@ -1526,12 +1818,168 @@ mod tests {
             scratch.write_meta(&meta_bytes);
 
             let state = VaultRuntimeState::default();
-            let result = unlock_with_path(MARKER.to_string(), None, scratch.path(), &state).await;
+            let result = unlock_with_path(
+                MARKER.to_string(),
+                None,
+                scratch.path(),
+                &state,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await;
             assert!(result.is_ok(), "correct password must unlock");
             assert!(
                 !logs_contain(MARKER),
                 "SECRET LEAK: password appeared in tracing output on success path"
             );
+        });
+    }
+
+    // ── browser-capability KDF ceiling (phase3-web-client task 31) ──────────
+    //
+    // The property under test is an ORDERING one, and the three tests below are
+    // written so that the ordering — not merely the outcome — is what fails.
+
+    /// Argon2id parameters above the test floor but far below anything
+    /// production uses: a vault whose declared cost is **legal**
+    /// (`validate_kdf_params` accepts 64 MiB happily) and above what a
+    /// constrained host declares. `t = 1`, `p = 1` keeps the one real derivation
+    /// these tests perform — the one that *builds* the fixture — in the tens of
+    /// milliseconds.
+    const CEILING_TEST_KDF: protocol::KdfParams = protocol::KdfParams {
+        m_kib: 64 * 1024,
+        t: 1,
+        p: 1,
+        argon2_version: 0x13,
+    };
+
+    /// [`seed_vault_meta`] with the KDF parameters chosen by the caller.
+    fn seed_vault_meta_with_kdf(
+        password: &str,
+        kdf: protocol::KdfParams,
+    ) -> [u8; protocol::VAULT_META_LEN] {
+        let session =
+            build_session(crate::vault_id::VaultId::mint(), password, kdf).expect("build_session");
+        build_and_serialize_vault_meta(&session).expect("serialize vault.meta")
+    }
+
+    /// A vault declaring more Argon2id memory than the host can service is
+    /// refused **before** derivation, not as a caught allocation failure.
+    ///
+    /// The password is deliberately WRONG. That is the whole design of the test:
+    /// if the refusal were layered around the derivation rather than ahead of
+    /// it, the KDF would run, the AEAD tag would fail, and this would come back
+    /// `InvalidCredentialOrVault`. Getting the capability error instead is the
+    /// only observable proof — from outside — that nothing allocated.
+    ///
+    /// Why that ordering is load-bearing rather than tidy: on `wasm32` an
+    /// over-large Argon2id block is not a `Result`, it is an abort. The instance
+    /// dies and the user is left with a dead Worker and no cause. There is no
+    /// "catch the OOM" arm available to write.
+    #[test]
+    fn kdf_ceiling_refuses_before_any_derivation() {
+        rt().block_on(async {
+            let scratch = scratch_vault();
+            scratch.write_meta(&seed_vault_meta_with_kdf(
+                "the genuine vault password",
+                CEILING_TEST_KDF,
+            ));
+
+            let host = crate::host::test_host::TestHost::new(scratch.path())
+                .with_kdf_ceiling_kib(32 * 1024);
+            let state = VaultRuntimeState::default();
+            let err = unlock_with_path(
+                "not the vault password".to_string(),
+                None,
+                scratch.path(),
+                &state,
+                &crate::vault_io::StdVaultIo,
+                &host,
+            )
+            .await
+            .expect_err("a vault above the host ceiling must not unlock");
+
+            match err {
+                VaultUnlockError::KdfMemoryExceedsHostCapability {
+                    required_mib,
+                    available_mib,
+                } => {
+                    // Both figures reach the UI, so both are asserted: the
+                    // message is only useful if it names the real numbers.
+                    assert_eq!(required_mib, 64, "required cost, in MiB");
+                    assert_eq!(available_mib, 32, "host ceiling, in MiB");
+                }
+                VaultUnlockError::InvalidCredentialOrVault => panic!(
+                    "derivation RAN before the ceiling check — the wrong password \
+                     reached the AEAD tag. On wasm32 that allocation is an abort, \
+                     not an error: the refusal must precede it."
+                ),
+                other => panic!("expected the capability refusal, got {other:?}"),
+            }
+
+            // Nothing half-opened: a refusal is not a failed unlock attempt that
+            // left a slot occupied.
+            assert!(
+                state.active_vault_id().await.is_none(),
+                "a refused unlock must leave no vault active"
+            );
+        });
+    }
+
+    /// A ceiling **equal** to the declared cost still unlocks.
+    ///
+    /// The comparison is `>`, not `>=`, and that is not a detail: a host
+    /// declaring exactly what a vault asks for can service it. An off-by-one
+    /// here would refuse every vault sitting on a round number, which — since
+    /// the parameters people pick are round numbers — is nearly all of them,
+    /// including the v0.1 baseline against a 256 MiB host.
+    #[test]
+    fn a_ceiling_equal_to_the_declared_cost_still_unlocks() {
+        rt().block_on(async {
+            let scratch = scratch_vault();
+            scratch.write_meta(&seed_vault_meta_with_kdf("pw", CEILING_TEST_KDF));
+
+            let host = crate::host::test_host::TestHost::new(scratch.path())
+                .with_kdf_ceiling_kib(CEILING_TEST_KDF.m_kib);
+            let state = VaultRuntimeState::default();
+            unlock_with_path(
+                "pw".to_string(),
+                None,
+                scratch.path(),
+                &state,
+                &crate::vault_io::StdVaultIo,
+                &host,
+            )
+            .await
+            .expect("a vault at exactly the host ceiling must unlock");
+        });
+    }
+
+    /// A host that declares **no** ceiling is unaffected — the check is not
+    /// merely passed, it is not performed.
+    ///
+    /// This is the desktop and mobile path: [`HostCtx::max_kdf_memory_kib`]
+    /// defaults to `None` there, because their ceiling is the machine's and the
+    /// allocator already reports it honestly. The regression this guards is a
+    /// future default of `Some(_)` on the seam, which would silently impose a
+    /// browser's limit on every client.
+    #[test]
+    fn a_host_with_no_ceiling_does_not_refuse() {
+        rt().block_on(async {
+            let scratch = scratch_vault();
+            scratch.write_meta(&seed_vault_meta_with_kdf("pw", CEILING_TEST_KDF));
+
+            let state = VaultRuntimeState::default();
+            unlock_with_path(
+                "pw".to_string(),
+                None,
+                scratch.path(),
+                &state,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("a host with no declared ceiling must not refuse anything");
         });
     }
 
@@ -1553,6 +2001,8 @@ mod tests {
                 None,
                 scratch.path(),
                 &state,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
             )
             .await
             .expect("unlock with correct password");
@@ -1667,6 +2117,8 @@ mod tests {
                 None,
                 scratch.path(),
                 &state,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
             )
             .await
             .expect("unlock with correct password");
@@ -1674,10 +2126,13 @@ mod tests {
             // Slot is now Unlocked; prefs_read_with_dir uses the same
             // slot-peek + AAD-bind path the Tauri-wrapper
             // `apply_persisted_prefs` takes.
-            let prefs_view =
-                crate::plugins::prefs::commands::prefs_read_with_dir(&scratch.dir, &state)
-                    .await
-                    .expect("prefs_read after unlock");
+            let prefs_view = crate::plugins::prefs::commands::prefs_read_with_dir(
+                &scratch.dir,
+                &state,
+                &crate::vault_io::StdVaultIo,
+            )
+            .await
+            .expect("prefs_read after unlock");
             assert!(
                 !prefs_view.screen_capture_protection,
                 "persisted toggle (false) must round-trip through unlock → prefs_read"
@@ -1706,14 +2161,19 @@ mod tests {
                 None,
                 scratch.path(),
                 &state,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
             )
             .await
             .expect("unlock must succeed even without vault.prefs");
 
-            let prefs_view =
-                crate::plugins::prefs::commands::prefs_read_with_dir(&scratch.dir, &state)
-                    .await
-                    .expect("prefs_read after unlock-without-prefs");
+            let prefs_view = crate::plugins::prefs::commands::prefs_read_with_dir(
+                &scratch.dir,
+                &state,
+                &crate::vault_io::StdVaultIo,
+            )
+            .await
+            .expect("prefs_read after unlock-without-prefs");
             assert!(
                 prefs_view.screen_capture_protection,
                 "absent vault.prefs falls back to defaults (protection ON) per spec § 9.5.5"
@@ -1831,6 +2291,8 @@ mod tests {
                 None,
                 scratch.path(),
                 &state,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
             )
             .await
             .expect("unlock with correct password");
@@ -1858,9 +2320,16 @@ mod tests {
             assert_ne!(explicit, test_vault_id(), "explicit id must be non-legacy");
 
             let state = VaultRuntimeState::default();
-            unlock_with_path("pw".to_string(), Some(explicit), scratch.path(), &state)
-                .await
-                .expect("unlock with explicit vault_id");
+            unlock_with_path(
+                "pw".to_string(),
+                Some(explicit),
+                scratch.path(),
+                &state,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("unlock with explicit vault_id");
 
             // The slot is keyed under the EXPLICIT id.
             assert_eq!(state.slot_kind(explicit).await, SlotKind::Unlocked);
@@ -1890,6 +2359,8 @@ mod tests {
                 None,
                 scratch.path(),
                 &state,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
             )
             .await;
 
@@ -1910,8 +2381,15 @@ mod tests {
             assert!(!scratch.path().exists());
 
             let state = VaultRuntimeState::default();
-            let result =
-                unlock_with_path("anything".to_string(), None, scratch.path(), &state).await;
+            let result = unlock_with_path(
+                "anything".to_string(),
+                None,
+                scratch.path(),
+                &state,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await;
 
             assert!(matches!(result, Err(VaultUnlockError::VaultNotFound)));
             assert!(state.slot_kind(test_vault_id()).await == SlotKind::Empty);
@@ -1949,9 +2427,16 @@ mod tests {
             .expect("independent items_key unwrap");
 
             let state = VaultRuntimeState::default();
-            unlock_with_path("pw".to_string(), None, scratch.path(), &state)
-                .await
-                .expect("unlock");
+            unlock_with_path(
+                "pw".to_string(),
+                None,
+                scratch.path(),
+                &state,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("unlock");
 
             let unlocked = state.take(test_vault_id()).await.unwrap_unlocked();
             assert_eq!(unlocked.items_key_id, parsed.items_key_id);
@@ -1981,7 +2466,15 @@ mod tests {
             scratch.write_meta(&meta_bytes);
 
             let state = VaultRuntimeState::default();
-            let result = unlock_with_path("pw".to_string(), None, scratch.path(), &state).await;
+            let result = unlock_with_path(
+                "pw".to_string(),
+                None,
+                scratch.path(),
+                &state,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await;
 
             match result {
                 Err(VaultUnlockError::InvalidVaultMeta) => {} // expected
@@ -2023,7 +2516,15 @@ mod tests {
         scratch.write_meta(tampered_bytes);
 
         let state = VaultRuntimeState::default();
-        let result = unlock_with_path("pw".to_string(), None, scratch.path(), &state).await;
+        let result = unlock_with_path(
+            "pw".to_string(),
+            None,
+            scratch.path(),
+            &state,
+            &crate::vault_io::StdVaultIo,
+            &crate::host::NoopHost,
+        )
+        .await;
 
         match result {
             Err(VaultUnlockError::InvalidVaultMeta) => {} // expected
@@ -2146,7 +2647,15 @@ mod tests {
             std::fs::set_permissions(scratch.path(), perms).expect("chmod 000");
 
             let state = VaultRuntimeState::default();
-            let result = unlock_with_path("pw".to_string(), None, scratch.path(), &state).await;
+            let result = unlock_with_path(
+                "pw".to_string(),
+                None,
+                scratch.path(),
+                &state,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await;
 
             // Restore readability for cleanup BEFORE asserting (so a
             // panicking assert still leaves the dir cleanable).
@@ -2206,7 +2715,15 @@ mod tests {
                 )
                 .await;
 
-            let result = unlock_with_path("pw".to_string(), None, scratch.path(), &state).await;
+            let result = unlock_with_path(
+                "pw".to_string(),
+                None,
+                scratch.path(),
+                &state,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await;
 
             assert!(matches!(
                 result,
@@ -2252,7 +2769,15 @@ mod tests {
                 .expect("first acquire on fresh state");
             assert_eq!(state.auth_permits().available_permits(), 0);
 
-            let result = unlock_with_path("pw".to_string(), None, scratch.path(), &state).await;
+            let result = unlock_with_path(
+                "pw".to_string(),
+                None,
+                scratch.path(),
+                &state,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await;
 
             // Peek catches it before try_acquire runs.
             assert!(matches!(
@@ -2292,7 +2817,15 @@ mod tests {
                 )
                 .await;
 
-            let result = unlock_with_path("pw".to_string(), None, scratch.path(), &state).await;
+            let result = unlock_with_path(
+                "pw".to_string(),
+                None,
+                scratch.path(),
+                &state,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await;
 
             assert!(matches!(
                 result,
@@ -2332,7 +2865,15 @@ mod tests {
                 .expect("first acquire on fresh state");
             assert_eq!(state.auth_permits().available_permits(), 0);
 
-            let result = unlock_with_path("pw".to_string(), None, scratch.path(), &state).await;
+            let result = unlock_with_path(
+                "pw".to_string(),
+                None,
+                scratch.path(),
+                &state,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await;
 
             // Peek catches it before try_acquire runs.
             assert!(matches!(
@@ -2367,7 +2908,15 @@ mod tests {
             assert_eq!(state.auth_permits().available_permits(), 0);
 
             // While held, a fresh unlock attempt rejects cleanly.
-            let result = unlock_with_path("pw".to_string(), None, scratch.path(), &state).await;
+            let result = unlock_with_path(
+                "pw".to_string(),
+                None,
+                scratch.path(),
+                &state,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await;
             assert!(matches!(result, Err(VaultUnlockError::UnlockInProgress)));
             // The slot stayed empty — no half-state.
             assert!(state.slot_kind(test_vault_id()).await == SlotKind::Empty);
@@ -2378,9 +2927,16 @@ mod tests {
             drop(held_permit);
             assert_eq!(state.auth_permits().available_permits(), 1);
 
-            unlock_with_path("pw".to_string(), None, scratch.path(), &state)
-                .await
-                .expect("retry after permit released succeeds");
+            unlock_with_path(
+                "pw".to_string(),
+                None,
+                scratch.path(),
+                &state,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("retry after permit released succeeds");
 
             // Permit released after successful unlock too.
             assert_eq!(state.auth_permits().available_permits(), 1);
@@ -2426,7 +2982,7 @@ mod tests {
             // guard — proving the permit is global, not per-vault. Argon2id is
             // never reached (try_acquire fails before spawn_blocking).
             let result =
-                unlock_with_path("pw".to_string(), Some(id_b), scratch_b.path(), &state).await;
+                unlock_with_path("pw".to_string(), Some(id_b), scratch_b.path(), &state, &crate::vault_io::StdVaultIo, &crate::host::NoopHost).await;
             assert!(
                 matches!(result, Err(VaultUnlockError::UnlockInProgress)),
                 "distinct-vault unlock must reject with UnlockInProgress while the single global permit is held, got {result:?}"
@@ -2438,7 +2994,7 @@ mod tests {
             // structural — global permit availability, not per-vault state).
             drop(held_for_a);
             assert_eq!(state.auth_permits().available_permits(), 1);
-            unlock_with_path("pw".to_string(), Some(id_b), scratch_b.path(), &state)
+            unlock_with_path("pw".to_string(), Some(id_b), scratch_b.path(), &state, &crate::vault_io::StdVaultIo, &crate::host::NoopHost)
                 .await
                 .expect("B unlocks once the single global permit is free");
             assert_eq!(state.slot_kind(id_b).await, SlotKind::Unlocked);
@@ -2463,7 +3019,15 @@ mod tests {
             // succeeds) → Argon2id runs → AEAD-open fails →
             // InvalidCredentialOrVault → permit released by RAII
             // drop on function return.
-            let r1 = unlock_with_path("wrong pw".to_string(), None, scratch.path(), &state).await;
+            let r1 = unlock_with_path(
+                "wrong pw".to_string(),
+                None,
+                scratch.path(),
+                &state,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await;
             assert!(matches!(
                 r1,
                 Err(VaultUnlockError::InvalidCredentialOrVault)
@@ -2476,9 +3040,16 @@ mod tests {
 
             // Retry with the right password — must succeed (would
             // hit UnlockInProgress if the permit had leaked).
-            unlock_with_path("right pw".to_string(), None, scratch.path(), &state)
-                .await
-                .expect("retry after wrong-password failure works");
+            unlock_with_path(
+                "right pw".to_string(),
+                None,
+                scratch.path(),
+                &state,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("retry after wrong-password failure works");
 
             // Permit released after successful unlock too.
             assert_eq!(state.auth_permits().available_permits(), 1);
@@ -2582,9 +3153,16 @@ mod tests {
             scratch.write_meta(&meta_bytes);
 
             let state = VaultRuntimeState::default();
-            unlock_with_path("pw".to_string(), None, scratch.path(), &state)
-                .await
-                .expect("unlock seeded vault");
+            unlock_with_path(
+                "pw".to_string(),
+                None,
+                scratch.path(),
+                &state,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("unlock seeded vault");
 
             assert_eq!(
                 unwrap_slot_kind(vault_slot_kind_inner(None, &state).await),
@@ -2863,9 +3441,16 @@ mod tests {
 
             // Real unlock from the seeded vault.meta. Pays the
             // full Argon2id (FAST_TEST_KDF) + AEAD-open pipeline.
-            unlock_with_path("pw".to_string(), None, scratch.path(), &state)
-                .await
-                .expect("unlock after lock succeeds");
+            unlock_with_path(
+                "pw".to_string(),
+                None,
+                scratch.path(),
+                &state,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("unlock after lock succeeds");
 
             // The slot now carries the FRESH root_key from
             // vault.meta, NOT the prior fixture's 0x11 bytes.
@@ -2893,7 +3478,7 @@ mod tests {
             let scratch = ScratchVault::new("vault_status_missing");
             assert!(!scratch.path().exists());
 
-            let result = vault_status_with_path(scratch.path()).await;
+            let result = vault_status_with_path(&crate::vault_io::StdVaultIo, scratch.path()).await;
             assert_eq!(result, Ok(VaultStatus::Missing));
         });
     }
@@ -2908,7 +3493,7 @@ mod tests {
             let (bytes, _) = seed_vault_meta("pw");
             scratch.write_meta(&bytes);
 
-            let result = vault_status_with_path(scratch.path()).await;
+            let result = vault_status_with_path(&crate::vault_io::StdVaultIo, scratch.path()).await;
             assert_eq!(result, Ok(VaultStatus::Exists));
         });
     }
@@ -2922,7 +3507,7 @@ mod tests {
         let scratch = ScratchVault::new("vault_status_corrupted");
         scratch.write_meta(tampered_bytes);
 
-        let result = vault_status_with_path(scratch.path()).await;
+        let result = vault_status_with_path(&crate::vault_io::StdVaultIo, scratch.path()).await;
         assert_eq!(
             result,
             Ok(VaultStatus::Corrupted),
@@ -3019,7 +3604,7 @@ mod tests {
             perms.set_mode(0o000);
             std::fs::set_permissions(scratch.path(), perms).expect("chmod 000");
 
-            let result = vault_status_with_path(scratch.path()).await;
+            let result = vault_status_with_path(&crate::vault_io::StdVaultIo, scratch.path()).await;
 
             // Restore readability for cleanup BEFORE asserting (so a
             // panicking assert still leaves the dir cleanable).

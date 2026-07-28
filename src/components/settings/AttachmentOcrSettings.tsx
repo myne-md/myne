@@ -15,7 +15,7 @@
 // disk read would flash the wrong answer for effectively every vault.
 
 import { useEffect, useState, type CSSProperties } from "react";
-import { listen } from "@tauri-apps/api/event";
+import { listen } from "../../platform/event";
 import { useTranslation } from "react-i18next";
 import { ControlBlock } from "./ControlBlock";
 import { HELPER_STYLE } from "./panel-styles";

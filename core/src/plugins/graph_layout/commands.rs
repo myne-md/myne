@@ -14,13 +14,21 @@
 //! "Secret-handling logging discipline", Plaintext-IPC pattern) applies.
 
 use super::error::{GraphLayoutReadError, GraphLayoutWriteError};
+use crate::host::HostCtx;
 use crate::plugins::vault_unlock::state::VaultRuntimeState;
+use crate::vault_io::VaultIo;
 use protocol::{
     decode_graph_layout_blob, derive_subkey, encode_graph_layout_blob, parse_vault_meta,
     GraphLayoutBlobError, SubkeyRole, VAULT_META_ACCOUNT_HASH_LEN,
 };
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
+// Tauri types serve only the cfg-gated wrappers (phase3-web-client task 79,
+// Option B); gated alongside them so a `--no-default-features` build does not
+// trip on an import of a dependency that is not there.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+use crate::host::tauri_host::TauriHost;
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 use tauri::{AppHandle, Runtime, State};
 use tokio::sync::Mutex;
 use zeroize::Zeroizing;
@@ -34,26 +42,51 @@ fn write_mutex() -> &'static Mutex<()> {
 /// Resolve the ACTIVE (sole-`Unlocked`) vault's root `vaults/<id>/`. Mirrors
 /// `workspace`/`prefs`/`search`: the graph blob always belongs to the unlocked
 /// vault, so it resolves via the active id.
-fn vault_dir<R: Runtime>(
-    app: &AppHandle<R>,
+/// Resolve the active vault's root. One line over the pure resolver in
+/// `crate::paths`.
+///
+/// The Tauri-shaped `vault_dir<R: Runtime>(&AppHandle<R>, ..)` this replaced is
+/// **gone**, not gated: once both wrappers delegate to the host inners, nothing
+/// calls it. Clippy caught that, which is a small piece of evidence that the
+/// port actually moved the resolution rather than duplicating it.
+fn vault_dir_from_host(
+    host: &dyn HostCtx,
     active_id: Option<crate::vault_id::VaultId>,
 ) -> std::io::Result<PathBuf> {
-    crate::paths::active_vault_root_io(app, active_id)
+    crate::paths::active_vault_root_io_from_host(host, active_id)
 }
 
 /// Read `vault.meta` and return its `account_number_hash` (offset 6). The
 /// caller passes the parse-error constructor so read/write land on their own
 /// error surface; an IO failure flows through `E: From<io::Error>`.
-fn read_account_number_hash<E>(
+async fn read_account_number_hash<E>(
+    io: &dyn VaultIo,
     meta_path: &Path,
     on_parse_err: impl FnOnce() -> E,
 ) -> Result<[u8; VAULT_META_ACCOUNT_HASH_LEN], E>
 where
-    E: From<std::io::Error>,
+    E: From<crate::io_failure_kind::IoFailureKind>,
 {
-    let bytes = std::fs::read(meta_path)?;
-    let meta = parse_vault_meta(&bytes).map_err(|_| on_parse_err())?;
-    Ok(meta.account_number_hash)
+    // `vault.meta` is a double-buffered singleton on the web store (task 18), so
+    // "read it" means "the newest copy that PARSES" — and `parse_vault_meta` is
+    // the verifier `open_newest` wants. Native is unchanged by construction:
+    // `read_candidates` yields one element there, so this is the same read
+    // followed by the same parse.
+    match crate::singleton::open_newest(io, meta_path, |candidate| {
+        parse_vault_meta(candidate).map(|m| m.account_number_hash)
+    })
+    .await
+    {
+        Ok(hash) => Ok(hash),
+        // Absence stays an IO answer rather than a parse failure, which is what
+        // `std::fs::read` reported here before and what the callers'
+        // `Io`/`InvalidVaultMeta` split is built on.
+        Err(crate::singleton::OpenOutcome::Absent) => {
+            Err(crate::io_failure_kind::IoFailureKind::NotFound.into())
+        }
+        Err(crate::singleton::OpenOutcome::Io(kind)) => Err(kind.into()),
+        Err(crate::singleton::OpenOutcome::Undecodable(_)) => Err(on_parse_err()),
+    }
 }
 
 /// Closed-enum mapping from `GraphLayoutBlobError` to a static log tag.
@@ -75,19 +108,20 @@ fn graph_layout_blob_error_kind(e: &GraphLayoutBlobError) -> &'static str {
 /// Read `vault.graph` and decode under `graph_layout_key` + AAD. Returns `None`
 /// on any failure (absent / AEAD-fail / unsupported / non-UTF-8) per spec
 /// § 9.19.4 — the caller recomputes the layout.
-fn read_or_none(
+async fn read_or_none(
+    io: &dyn VaultIo,
     graph_path: &Path,
     graph_layout_key: &[u8; 32],
     account_number_hash: &[u8; VAULT_META_ACCOUNT_HASH_LEN],
 ) -> Option<String> {
-    let bytes = match std::fs::read(graph_path) {
+    let bytes = match io.read(graph_path).await {
         Ok(b) => b,
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return None,
-        Err(e) => {
+        Err(crate::io_failure_kind::IoFailureKind::NotFound) => return None,
+        Err(io_kind) => {
             tracing::warn!(
                 event = "graph_layout_io_failed",
                 stage = "read",
-                io_kind = ?crate::io_failure_kind::from_io_error_kind(e.kind()),
+                io_kind = ?io_kind,
                 "vault.graph read failed; recomputing layout"
             );
             return None;
@@ -118,17 +152,35 @@ fn read_or_none(
 
 /// Read the persisted graph layout payload. `Ok(None)` means "no restorable
 /// layout" → the frontend recomputes the force layout.
+/// Host-taking inner. Compiles on every target; differs from the wrapper by the
+/// path-resolution line alone.
+pub async fn graph_layout_read_from_host(
+    host: &dyn HostCtx,
+    io: &dyn VaultIo,
+    state: &VaultRuntimeState,
+) -> Result<Option<String>, GraphLayoutReadError> {
+    let dir = vault_dir_from_host(host, state.active_vault_id().await)
+        .map_err(GraphLayoutReadError::from)?;
+    graph_layout_read_with_dir(io, &dir, state).await
+}
+
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn graph_layout_read<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
 ) -> Result<Option<String>, GraphLayoutReadError> {
-    let dir = vault_dir(&app, state.active_vault_id().await).map_err(GraphLayoutReadError::from)?;
-    graph_layout_read_with_dir(&dir, state.inner()).await
+    graph_layout_read_from_host(
+        &TauriHost::new(app),
+        &crate::vault_io::StdVaultIo,
+        state.inner(),
+    )
+    .await
 }
 
 /// Testable core of [`graph_layout_read`].
 pub async fn graph_layout_read_with_dir(
+    io: &dyn VaultIo,
     vault_dir: &Path,
     state: &VaultRuntimeState,
 ) -> Result<Option<String>, GraphLayoutReadError> {
@@ -137,36 +189,60 @@ pub async fn graph_layout_read_with_dir(
         .await
         .ok_or(GraphLayoutReadError::SlotNotUnlocked)?;
 
-    let account_number_hash = read_account_number_hash(&vault_dir.join("vault.meta"), || {
+    let account_number_hash = read_account_number_hash(io, &vault_dir.join("vault.meta"), || {
         GraphLayoutReadError::InvalidVaultMeta
-    })?;
+    })
+    .await?;
     let graph_layout_key = derive_subkey(&root_key, SubkeyRole::GraphLayoutKey);
 
     Ok(read_or_none(
+        io,
         &vault_dir.join("vault.graph"),
         &graph_layout_key,
         &account_number_hash,
-    ))
+    )
+    .await)
 }
 
 /// Persist the graph layout payload (opaque JSON string from the frontend).
 /// Called after a fresh layout computation / a node drag.
+/// Host-taking inner.
+///
+/// The `Zeroizing` wrap stays the FIRST non-doc statement, exactly as in the
+/// wrapper it replaces: the payload is a position map derived from note
+/// structure, and every early-return path must wipe it. Moving that line would
+/// be a behaviour change hiding inside a "pure move".
+pub async fn graph_layout_write_from_host(
+    host: &dyn HostCtx,
+    io: &dyn VaultIo,
+    state: &VaultRuntimeState,
+    payload: String,
+) -> Result<(), GraphLayoutWriteError> {
+    let payload = Zeroizing::new(payload);
+    let dir = vault_dir_from_host(host, state.active_vault_id().await)
+        .map_err(GraphLayoutWriteError::from)?;
+    graph_layout_write_with_dir(io, &dir, state, &payload).await
+}
+
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn graph_layout_write<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
     payload: String,
 ) -> Result<(), GraphLayoutWriteError> {
-    // First non-doc statement: bound the payload (position map derived from
-    // note structure) to a Zeroizing wrapper so every early-return path wipes it.
-    let payload = Zeroizing::new(payload);
-    let dir =
-        vault_dir(&app, state.active_vault_id().await).map_err(GraphLayoutWriteError::from)?;
-    graph_layout_write_with_dir(&dir, state.inner(), &payload).await
+    graph_layout_write_from_host(
+        &TauriHost::new(app),
+        &crate::vault_io::StdVaultIo,
+        state.inner(),
+        payload,
+    )
+    .await
 }
 
 /// Testable core of [`graph_layout_write`].
 pub async fn graph_layout_write_with_dir(
+    io: &dyn VaultIo,
     vault_dir: &Path,
     state: &VaultRuntimeState,
     payload: &str,
@@ -178,17 +254,23 @@ pub async fn graph_layout_write_with_dir(
         .await
         .ok_or(GraphLayoutWriteError::SlotNotUnlocked)?;
 
-    let account_number_hash = read_account_number_hash(&vault_dir.join("vault.meta"), || {
+    let account_number_hash = read_account_number_hash(io, &vault_dir.join("vault.meta"), || {
         GraphLayoutWriteError::InvalidVaultMeta
-    })?;
+    })
+    .await?;
     let graph_layout_key = derive_subkey(&root_key, SubkeyRole::GraphLayoutKey);
 
     let blob_bytes =
         encode_graph_layout_blob(&graph_layout_key, &account_number_hash, payload.as_bytes())
             .map_err(|_| GraphLayoutWriteError::GraphLayoutEncodeFailed)?;
 
-    crate::atomic_write::atomic_write(&vault_dir.join("vault.graph"), &blob_bytes, true)
-        .map_err(GraphLayoutWriteError::from)?;
+    io.write(
+        &vault_dir.join("vault.graph"),
+        &blob_bytes,
+        crate::vault_io::WriteOpts::default(),
+    )
+    .await
+    .map_err(GraphLayoutWriteError::from)?;
 
     tracing::info!(event = "graph_layout_written");
     Ok(())

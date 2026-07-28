@@ -17,26 +17,19 @@
 // `src-tauri/src/plugins/attachments/{commands,error}.rs`; the shapes below are
 // hand-mirrored per the no-codegen note in `src/CLAUDE.md`.
 
-import { invoke } from "@tauri-apps/api/core";
+import { getHost } from "../host";
 import i18n from "@myne/editor/i18n";
 import { emitAttachmentEmbed } from "@myne/editor/host/notes/attachmentRef";
 
 /** The success payload of `attachment_import` (mirrors Rust
  *  `ImportedAttachment`). Only the fields the insert path needs. */
-export interface ImportedAttachment {
-  readonly id: string;
-  readonly content_type: string;
-  readonly filename: string;
-  readonly size: number;
-  readonly created_at: number;
-  readonly deduplicated: boolean;
-}
-
-/** The `source` argument to `attachment_import` (mirrors Rust `ImportSource`,
- *  internally tagged on `kind`). */
-export type ImportSource =
-  | { readonly kind: "bytes"; readonly bytes: number[]; readonly filename: string | null }
-  | { readonly kind: "path"; readonly path: string };
+// `ImportedAttachment` and `ImportSource` moved to the host seam (`../host`)
+// with phase3-web-client task 76: they are now part of the contract a host
+// implements, and defining them here while the host consumed them would have
+// made this module a dependency of the seam rather than a consumer of it.
+// Re-exported so every existing importer of `./insert` is unchanged.
+export type { ImportedAttachment, ImportSource, PickedFile } from "../host";
+import type { ImportSource, ImportedAttachment } from "../host";
 
 /** Mirror of the Rust `AttachmentImportError` closed taxonomy (tag = "kind",
  *  content = "detail"). Hand-kept in lockstep with
@@ -134,8 +127,7 @@ export function autoPasteName(mime: string, now: Date = new Date()): string {
 /** The IPC call, isolated so tests can override it without a Tauri runtime. */
 type ImportFn = (source: ImportSource) => Promise<ImportedAttachment>;
 
-let importFn: ImportFn = (source) =>
-  invoke<ImportedAttachment>("plugin:attachments|attachment_import", { source });
+let importFn: ImportFn = (source) => getHost().attachments.import(source);
 
 /** Override the import IPC (tests only). Returns a restore fn. */
 export function setImportFn(fn: ImportFn): () => void {

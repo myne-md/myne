@@ -12,12 +12,19 @@
 
 use super::super::vault_unlock::state::VaultRuntimeState;
 use super::error::VaultChangePasswordError;
+use crate::host::HostCtx;
 use crate::io_failure_kind::{from_io_error_kind, IoFailureKind};
 use crate::protocol_error_kind::protocol_error_kind;
 use protocol::{AEAD_NONCE_LEN, ARGON2_SALT_LEN};
 use std::path::{Path, PathBuf};
 use std::time::Instant;
-use tauri::{AppHandle, Manager, Runtime, State};
+// Tauri types serve only the cfg-gated IPC wrappers (task 79, Option B). The
+// `Manager` import went with them: its only use here was `app.path()`, which
+// `HostCtx::app_data_dir` now provides.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+use crate::host::tauri_host::TauriHost;
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+use tauri::{AppHandle, Runtime, State};
 use zeroize::Zeroizing;
 
 /// Resolve `<active-vault-root>/vault.meta`. Local rather than imported from
@@ -28,12 +35,11 @@ use zeroize::Zeroizing;
 /// wrap, so resolving via the active id (not the transitional sole-vault disk
 /// heuristic) keeps the rewrite targeting the correct `vault.meta` once two or
 /// more exist.
-fn vault_meta_path<R: Runtime>(
-    app: &AppHandle<R>,
+fn vault_meta_path(
+    host: &dyn HostCtx,
     active_id: Option<crate::vault_id::VaultId>,
 ) -> Result<PathBuf, VaultChangePasswordError> {
-    let base = app
-        .path()
+    let base = host
         .app_data_dir()
         .map_err(|_| VaultChangePasswordError::IoError {
             io_error_kind: IoFailureKind::Other,
@@ -46,29 +52,22 @@ fn vault_meta_path<R: Runtime>(
 /// `vault_creation::commands::commit`. Both macros generate a hidden
 /// `__cmd__<fn-name>` symbol in the global namespace; identical
 /// short names across plugins collide at link-time.
-#[tauri::command]
-pub async fn change_password<R: Runtime>(
+pub async fn change_password_from_host(
     current_password: String,
     new_password: String,
-    state: State<'_, VaultRuntimeState>,
-    hooks: State<'_, crate::hooks::Hooks>,
-    app: AppHandle<R>,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    host: &dyn HostCtx,
 ) -> Result<(), VaultChangePasswordError> {
-    let vault_path = vault_meta_path(&app, state.active_vault_id().await)?;
+    let vault_path = vault_meta_path(host, state.active_vault_id().await)?;
 
     // MYND-351 Direction 2: a user-initiated change-password preempts an
     // in-flight scheduled backup (which holds the shared auth permit) so the
     // pipeline's `try_acquire` below is not rejected by the invisible job.
-    hooks.preempt_inflight_backup(state.inner()).await;
+    hooks.preempt_inflight_backup(state).await;
 
-    let result = change_password_with_path(
-        current_password,
-        new_password,
-        &vault_path,
-        state.inner(),
-        hooks.inner(),
-    )
-    .await;
+    let result =
+        change_password_with_path(current_password, new_password, &vault_path, state, hooks).await;
 
     // MYND-29: wipe the plaintext-derived search index on the force-relock
     // outcomes — they drop `Slot::Unlocked` to `Empty` and zeroize the keys
@@ -105,9 +104,37 @@ pub async fn change_password<R: Runtime>(
     // sync loop's meta phase. Only on Ok — the force-relock / IO error paths must
     // not push a possibly-inconsistent meta. Shared core → covers desktop + mobile.
     if result.is_ok() {
-        let _ = crate::plugins::sync::commands::push_vault_meta_now(&app).await;
+        // Host-only: the post-change `vault.meta` push rides the raw-TLS sync
+        // transport, which does not exist on wasm — the browser's transport is
+        // `fetch` + `EventSource` (phase3-web-client task 84). Deliberately NOT
+        // no-opped on the wasm arm: task 88 requires `change_password` on web to
+        // be gated behind a **server-acknowledged** push, so silently skipping it
+        // here would build exactly the failure that task exists to prevent.
+        #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+        let _ = crate::plugins::sync::commands::push_vault_meta_now_from_host(host, state).await;
     }
     result
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn change_password<R: Runtime>(
+    current_password: String,
+    new_password: String,
+    state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
+    app: AppHandle<R>,
+) -> Result<(), VaultChangePasswordError> {
+    change_password_from_host(
+        current_password,
+        new_password,
+        state.inner(),
+        hooks.inner(),
+        &TauriHost::new(app),
+    )
+    .await
 }
 
 /// Testable core of [`change_password`]. The Tauri-command wrapper
@@ -210,7 +237,7 @@ pub(crate) async fn change_password_with_path(
     //     This split mirrors vault_recover's Task 4 restructure: if
     //     `vault_lock` fires during the Argon2id window, we bail
     //     WITHOUT touching `vault.meta`.
-    let derive_outcome = tokio::task::spawn_blocking(
+    let derive_outcome = crate::task::run_blocking(
         move || -> Result<[u8; protocol::VAULT_META_LEN], VaultChangePasswordError> {
             // (a) Read existing vault.meta.
             let bytes = std::fs::read(&vault_path_for_pipeline).map_err(|e| {
@@ -606,9 +633,16 @@ mod tests {
         scratch.write_meta(&meta_bytes);
 
         let state = VaultRuntimeState::default();
-        unlock_with_path(password.to_string(), None, scratch.path(), &state)
-            .await
-            .expect("seed: vault_unlock must succeed against the seeded vault");
+        unlock_with_path(
+            password.to_string(),
+            None,
+            scratch.path(),
+            &state,
+            &crate::vault_io::StdVaultIo,
+            &crate::host::NoopHost,
+        )
+        .await
+        .expect("seed: vault_unlock must succeed against the seeded vault");
         assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Unlocked);
 
         (
@@ -680,7 +714,7 @@ mod tests {
                 None,
                 scratch.path(),
                 &state,
-            )
+            &crate::vault_io::StdVaultIo, &crate::host::NoopHost,)
             .await;
             assert!(
                 matches!(
@@ -691,7 +725,7 @@ mod tests {
             );
 
             // New password unlocks.
-            unlock_with_path("new-password-12".to_string(), None, scratch.path(), &state)
+            unlock_with_path("new-password-12".to_string(), None, scratch.path(), &state, &crate::vault_io::StdVaultIo, &crate::host::NoopHost)
                 .await
                 .expect("new password must unlock the rewritten vault");
         });
@@ -718,9 +752,15 @@ mod tests {
 
             // Lock and recover via phrase.
             let _ = state.take(test_vault_id()).await;
-            recover_with_phrase_with_path(phrase, None, scratch.path(), &state)
-                .await
-                .expect("recovery phrase must still work after change_password");
+            recover_with_phrase_with_path(
+                phrase,
+                None,
+                scratch.path(),
+                &state,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("recovery phrase must still work after change_password");
             assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Recovering);
         });
     }
@@ -775,11 +815,67 @@ mod tests {
                 "items_key_id + items_key_nonce + enc_items_key @ 241..345 must byte-equal original"
             );
 
+            // The two identity/parameter fields task 88 adds to this invariant.
+            // They are not "recovery-side", which is why they were not covered
+            // above — and they are exactly the fields whose silent drift would
+            // be worst:
+            //
+            //   * `account_number_hash` is bound into the password-wrap AAD, so
+            //     rewriting it would make the vault un-openable by the very
+            //     password the user just set, with no error until next unlock.
+            //   * `kdf_params` govern how expensive that unlock is. A rewrite
+            //     that "helpfully" normalised them to the current default would
+            //     silently re-parameterise an existing vault — a cross-version
+            //     change wearing a password change's clothes.
+            //
+            // Both must survive a rotation byte-for-byte.
+            assert_eq!(
+                &new_bytes[6..22],
+                &orig_bytes[6..22],
+                "account_number_hash @ 6..22 must byte-equal original"
+            );
+            assert_eq!(
+                &new_bytes[22..33],
+                &orig_bytes[22..33],
+                "kdf_params_canonical @ 22..33 must byte-equal original"
+            );
+            // And the bytes that are not struct fields at all: magic, protocol
+            // version, reserved. A rotation is not a format event.
+            assert_eq!(
+                &new_bytes[0..6],
+                &orig_bytes[0..6],
+                "magic + protocol_version + reserved @ 0..6 must byte-equal original"
+            );
+
             // Password-side fields MUST differ (fresh CSPRNG).
             assert_ne!(
                 &new_bytes[33..49],
                 &orig_bytes[33..49],
                 "random_salt_password @ 33..49 must change"
+            );
+            assert_ne!(
+                &new_bytes[65..89],
+                &orig_bytes[65..89],
+                "nonce_password_wrap @ 65..89 must change"
+            );
+            assert_ne!(
+                &new_bytes[89..153],
+                &orig_bytes[89..153],
+                "enc_root_key_password @ 89..153 must change"
+            );
+
+            // Stated as a partition rather than a list of ranges, so a future
+            // field added anywhere in the 345 bytes lands in one side or the
+            // other rather than in neither. The preserved set is everything
+            // except the password-side window [33..49) ∪ [65..153).
+            let preserved_differs: Vec<usize> = (0..protocol::VAULT_META_LEN)
+                .filter(|&i| !((33..49).contains(&i) || (65..153).contains(&i)))
+                .filter(|&i| new_bytes[i] != orig_bytes[i])
+                .collect();
+            assert!(
+                preserved_differs.is_empty(),
+                "a password rotation touched bytes outside the password-side \
+                 window: {preserved_differs:?}"
             );
         });
     }
@@ -1198,6 +1294,8 @@ mod tests {
                 None,
                 scratch.path(),
                 &state,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
             )
             .await
             .expect("final password must unlock the post-B→C rewritten vault");

@@ -17,11 +17,13 @@
 // Chromium; if a platform taints the canvas, `toBlob` yields null and the
 // export surfaces a coarse "error" outcome rather than a broken file.
 
-import { save } from "@tauri-apps/plugin-dialog";
-import { invoke } from "@tauri-apps/api/core";
+import { save } from "../platform/dialog";
+import { invoke } from "../platform/core";
+import { has } from "../platform/capabilities";
+import { deliverFile } from "../platform/download";
 import {
   buildSelectionCardSvg,
-  svgToDataUri,
+  svgToObjectUrl,
   type ShareCardOptions,
 } from "./noteImageCard";
 import { getActiveEditorView } from "../editor/active-view";
@@ -126,11 +128,18 @@ export async function rasterizeCardToPng(
   const img = new Image();
   img.width = cardWidth;
   img.height = cardHeight;
-  await new Promise<void>((resolve, reject) => {
-    img.onload = () => resolve();
-    img.onerror = () => reject(new Error("card image failed to decode"));
-    img.src = svgToDataUri(svg);
-  });
+  // Revoked in `finally`, not after `onload`: the decode can also FAIL, and an
+  // object URL that outlives its use pins the SVG for the life of the page.
+  const src = svgToObjectUrl(svg);
+  try {
+    await new Promise<void>((resolve, reject) => {
+      img.onload = () => resolve();
+      img.onerror = () => reject(new Error("card image failed to decode"));
+      img.src = src;
+    });
+  } finally {
+    URL.revokeObjectURL(src);
+  }
   const canvas = document.createElement("canvas");
   canvas.width = Math.round(cardWidth * scale);
   canvas.height = Math.round(cardHeight * scale);
@@ -182,6 +191,29 @@ export async function exportSelectionAsImage(): Promise<ImageExportOutcome> {
     );
   } catch {
     return "error";
+  }
+
+  // The download arm (phase3-web-client tasks 48 + 97). Nothing about the
+  // pipeline above changes: steps 1–3 are WebView work on both platforms and the
+  // bytes are already a finished PNG. Only the last step differs — a platform
+  // with no `nativeSaveAs` hands them to the browser's download instead of to
+  // Rust with a path.
+  //
+  // No egress-disclosure step here, and that is a deliberate match to desktop
+  // rather than an omission: this flow has no sanctioned sentence on either
+  // platform. The reason it does not need one is that the action names its own
+  // output — the user selected specific content and chose "export selection as
+  // image", so what leaves is exactly what they pointed at, not a whole note or
+  // a whole vault whose contents they may not have in mind. If that judgement is
+  // ever revised it is a `design-notes.md` event and applies to BOTH clients;
+  // it must not become a web-only sentence invented inside an export flow.
+  if (!has("nativeSaveAs")) {
+    try {
+      await deliverFile("myne-selection.png", bytes, "image/png");
+      return "ok";
+    } catch {
+      return "error";
+    }
   }
 
   let targetPath: string | null;

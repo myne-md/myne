@@ -27,15 +27,20 @@
 //!
 //! See: ../../CLAUDE.md "Secret-handling logging discipline".
 
-use crate::atomic_write;
-use crate::io_failure_kind::from_io_error_kind;
+use crate::host::HostCtx;
+use crate::io_failure_kind::{from_io_error_kind, IoFailureKind};
 use crate::paths;
 use crate::plugins::vault_unlock::state::{Slot, VaultRuntimeState};
+use crate::vault_io::{VaultIo, WriteOpts};
 use protocol::{decode_note, encode_new_note, encode_update, DecryptError, ProtocolError};
 use serde::Deserialize;
 use std::path::PathBuf;
 use std::sync::OnceLock;
 use std::time::Instant;
+// Tauri types serve only the cfg-gated IPC wrappers (task 79, Option B).
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+use crate::host::tauri_host::TauriHost;
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 use tauri::{AppHandle, Runtime, State};
 use tokio::sync::Mutex;
 use zeroize::Zeroizing;
@@ -55,12 +60,12 @@ use super::title_extract::{extract_title_slices, resolve_note_title};
 /// on success — the UI never produces a `NoteId`, only consumes one
 /// returned by this command (see `decisions.md` 2026-05-07
 /// "Note UUIDv7 backend-gen; UI never names the destination").
-#[tauri::command]
-pub async fn note_create<R: Runtime>(
-    app: AppHandle<R>,
-    state: State<'_, VaultRuntimeState>,
-    hooks: State<'_, crate::hooks::Hooks>,
+pub async fn note_create_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
     plaintext: String,
+    io: &dyn VaultIo,
 ) -> Result<String, NoteCreateError> {
     // First-line Plaintext-IPC wrap (`src-tauri/CLAUDE.md`): the index needs
     // the body AFTER the core consumes its own copy, so bound this retained
@@ -73,36 +78,38 @@ pub async fn note_create<R: Runtime>(
     // `NotADirectory` and `AlreadyExists` to the structural defensive
     // variant per the accept-list pinned in `paths::notes_dir_under`'s
     // tests.
-    let notes_dir = paths::notes_dir_for(&app, state.active_vault_id().await).map_err(|e| {
-        let kind = e.kind();
-        match kind {
-            std::io::ErrorKind::NotADirectory | std::io::ErrorKind::AlreadyExists => {
-                tracing::error!(
-                    stage = "notes_dir",
-                    error_kind = "NotesDirNotADirectory",
-                    "note_create notes_dir resolution conflicted with a non-dir entry"
-                );
-                NoteCreateError::NotesDirNotADirectory
-            }
-            other => {
-                let io_kind = from_io_error_kind(other);
-                tracing::error!(
-                    stage = "notes_dir",
-                    error_kind = "Io",
-                    io_failure_kind = ?io_kind,
-                    "note_create notes_dir resolution failed"
-                );
-                NoteCreateError::Io {
-                    io_error_kind: io_kind,
+    let notes_dir = paths::notes_dir_for_host_io(host, io, state.active_vault_id().await)
+        .await
+        .map_err(|e| {
+            let kind = e.kind();
+            match kind {
+                std::io::ErrorKind::NotADirectory | std::io::ErrorKind::AlreadyExists => {
+                    tracing::error!(
+                        stage = "notes_dir",
+                        error_kind = "NotesDirNotADirectory",
+                        "note_create notes_dir resolution conflicted with a non-dir entry"
+                    );
+                    NoteCreateError::NotesDirNotADirectory
+                }
+                other => {
+                    let io_kind = from_io_error_kind(other);
+                    tracing::error!(
+                        stage = "notes_dir",
+                        error_kind = "Io",
+                        io_failure_kind = ?io_kind,
+                        "note_create notes_dir resolution failed"
+                    );
+                    NoteCreateError::Io {
+                        io_error_kind: io_kind,
+                    }
                 }
             }
-        }
-    })?;
+        })?;
     // MYND-29 Task 4: incremental in-RAM index update — index after a
     // successful write so the new note is searchable in-session without a
     // rebuild. Title is best-effort H1; body is the full plaintext. (The
     // index is plaintext-derived RAM; the lock path clears it — Task 8.)
-    let result = note_create_with_dir(notes_dir, state.inner(), (*plaintext).clone()).await;
+    let result = note_create_with_dir(notes_dir, state, (*plaintext).clone(), io, host).await;
     if let Ok(id) = &result {
         let title = resolve_note_title(plaintext.as_bytes()).unwrap_or_default();
         // MYND-448a: the note body is indexed UNFOLDED; each embedded attachment
@@ -119,7 +126,7 @@ pub async fn note_create<R: Runtime>(
         } else {
             hooks.search_upsert(id, &title, &plaintext);
             hooks
-                .index_note_attachments(state.inner(), id, &title, &plaintext)
+                .index_note_attachments(state, id, &title, &plaintext)
                 .await;
         }
         // MYND-453: eager per-note AI re-embed over the note prose (attachments
@@ -130,6 +137,26 @@ pub async fn note_create<R: Runtime>(
         hooks.bump_local_change();
     }
     result
+}
+
+/// IPC wrapper. Delegates; the name and payload the frontend sends are
+/// unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn note_create<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
+    plaintext: String,
+) -> Result<String, NoteCreateError> {
+    note_create_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        plaintext,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
 }
 
 /// Inner — pure-and-testable helper. Tauri-aware path resolution is
@@ -143,6 +170,8 @@ pub async fn note_create_with_dir(
     notes_dir: PathBuf,
     state: &VaultRuntimeState,
     plaintext: String,
+    io: &dyn VaultIo,
+    host: &dyn HostCtx,
 ) -> Result<String, NoteCreateError> {
     // First non-doc statement: bound the lifetime of plaintext bytes
     // to a `Zeroizing<String>` wrapper. Every early-return path drops
@@ -180,8 +209,8 @@ pub async fn note_create_with_dir(
     // their bytes on closure exit. The slot read guard remains in the
     // outer task across this `.await` — its lifetime is bounded by
     // `state`, not the closure.
-    let started = Instant::now();
-    let blob_result = tokio::task::spawn_blocking(move || {
+    let started_ms = host.monotonic_millis();
+    let blob_result = crate::task::run_blocking(move || {
         encode_new_note(
             &items_key,
             &items_key_id,
@@ -190,7 +219,7 @@ pub async fn note_create_with_dir(
         )
     })
     .await;
-    let duration_ms = started.elapsed().as_millis() as u64;
+    let duration_ms = host.monotonic_millis().saturating_sub(started_ms);
 
     let blob = match blob_result {
         Err(_join_err) => {
@@ -236,14 +265,30 @@ pub async fn note_create_with_dir(
     // UUIDv7 collision is astronomically improbable so the canary
     // never fires in normal flow.
     let dest = notes_dir.join(format!("{}.myn", note_id.as_uuid()));
-    if let Err(e) = atomic_write::atomic_write(&dest, &blob, /* replace = */ false) {
-        let kind = e.kind();
-        let mapped = match kind {
-            std::io::ErrorKind::AlreadyExists => NoteCreateError::NoteAlreadyExists,
-            std::io::ErrorKind::NotADirectory => NoteCreateError::NotesDirNotADirectory,
-            other => NoteCreateError::Io {
-                io_error_kind: from_io_error_kind(other),
-            },
+    // Create-only through the IO seam. `WriteOpts::create_new()` carries the
+    // `replace = false` semantic the old `atomic_write` call had.
+    //
+    // **The `AlreadyExists` / `NotADirectory` distinctions are recovered by
+    // ASKING, not by widening the seam's error vocabulary.** `IoFailureKind` is
+    // a closed four-variant enum that crosses the IPC boundary and is matched
+    // exhaustively in TypeScript (`src/lib/stage.ts`), so a fifth variant would
+    // be a two-language change to every consumer — to express two conditions
+    // that are cheaply *observable* on an already-failing path. One `exists`
+    // call answers both:
+    //
+    //   dest exists            -> the UUIDv7-collision canary (`NoteAlreadyExists`)
+    //   parent does not exist  -> the notes dir is missing or not a directory
+    //
+    // Same shape as `note_list`'s `NotesDirNotADirectory` recovery. The cost is
+    // one extra call, only when the write already failed; the alternative cost
+    // was a serialized-enum change reaching `src/types/`.
+    if let Err(io_error_kind) = io.write(&dest, &blob, WriteOpts::create_new()).await {
+        let mapped = if io.exists(&dest).await.unwrap_or(false) {
+            NoteCreateError::NoteAlreadyExists
+        } else if !io.is_dir(&notes_dir).await.unwrap_or(true) {
+            NoteCreateError::NotesDirNotADirectory
+        } else {
+            NoteCreateError::Io { io_error_kind }
         };
         tracing::error!(
             stage = "atomic_write",
@@ -302,38 +347,58 @@ pub fn note_create_error_kind(e: &NoteCreateError) -> &'static str {
 ///   valid UTF-8 (structural-corruption / foreign-writer suspicion;
 ///   distinct from `CannotDecrypt`).
 /// - `JoinFailure` — `spawn_blocking` panic / runtime shutdown.
+pub async fn note_read_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    note_id: String,
+    io: &dyn VaultIo,
+) -> Result<String, NoteReadError> {
+    let notes_dir = paths::notes_dir_for_host_io(host, io, state.active_vault_id().await)
+        .await
+        .map_err(|e| {
+            let kind = e.kind();
+            match kind {
+                std::io::ErrorKind::NotADirectory | std::io::ErrorKind::AlreadyExists => {
+                    tracing::error!(
+                        stage = "notes_dir",
+                        error_kind = "NotesDirNotADirectory",
+                        "note_read notes_dir resolution conflicted with a non-dir entry"
+                    );
+                    NoteReadError::NotesDirNotADirectory
+                }
+                other => {
+                    let io_kind = from_io_error_kind(other);
+                    tracing::error!(
+                        stage = "notes_dir",
+                        error_kind = "Io",
+                        io_failure_kind = ?io_kind,
+                        "note_read notes_dir resolution failed"
+                    );
+                    NoteReadError::Io {
+                        io_error_kind: io_kind,
+                    }
+                }
+            }
+        })?;
+    note_read_with_dir(notes_dir, state, note_id, io, host).await
+}
+
+/// IPC wrapper. Delegates; the name and payload the frontend sends are
+/// unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn note_read<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
     note_id: String,
 ) -> Result<String, NoteReadError> {
-    let notes_dir = paths::notes_dir_for(&app, state.active_vault_id().await).map_err(|e| {
-        let kind = e.kind();
-        match kind {
-            std::io::ErrorKind::NotADirectory | std::io::ErrorKind::AlreadyExists => {
-                tracing::error!(
-                    stage = "notes_dir",
-                    error_kind = "NotesDirNotADirectory",
-                    "note_read notes_dir resolution conflicted with a non-dir entry"
-                );
-                NoteReadError::NotesDirNotADirectory
-            }
-            other => {
-                let io_kind = from_io_error_kind(other);
-                tracing::error!(
-                    stage = "notes_dir",
-                    error_kind = "Io",
-                    io_failure_kind = ?io_kind,
-                    "note_read notes_dir resolution failed"
-                );
-                NoteReadError::Io {
-                    io_error_kind: io_kind,
-                }
-            }
-        }
-    })?;
-    note_read_with_dir(notes_dir, state.inner(), note_id).await
+    note_read_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        note_id,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
 }
 
 /// Inner — pure-and-testable helper. Mirror of [`note_create_with_dir`].
@@ -341,6 +406,8 @@ pub async fn note_read_with_dir(
     notes_dir: PathBuf,
     state: &VaultRuntimeState,
     note_id: String,
+    io: &dyn VaultIo,
+    host: &dyn HostCtx,
 ) -> Result<String, NoteReadError> {
     // Strict-parse FIRST — before any path concatenation. Sub-cause
     // emits to `tracing::debug!(stage = ?cause)` for ops debugging;
@@ -379,27 +446,35 @@ pub async fn note_read_with_dir(
     // decode keeps both blocking ops on the worker thread; the slot
     // read guard remains in the outer task and the fair-queue
     // semantics for `vault_lock` are preserved.
-    let started = Instant::now();
+    let started_ms = host.monotonic_millis();
+    // The blob read moved OUT of `run_blocking` and onto the IO seam (task 13).
+    // The comment above still holds for the half that stayed: the AEAD decode is
+    // CPU-bound and belongs on the blocking pool. The read does not — the seam's
+    // native arm dispatches its own, and the wasm arm's read is genuinely async.
+    //
+    // The slot read guard is still held across both, so `vault_lock`'s queued
+    // write-lock request continues to wait for an in-flight decrypt.
+    let blob = match io.read(&path).await {
+        Ok(bytes) => bytes,
+        Err(IoFailureKind::NotFound) => {
+            tracing::error!(
+                stage = "read_blob",
+                error_kind = "NoteNotFound",
+                "note_read blob read failed"
+            );
+            return Err(NoteReadError::NoteNotFound);
+        }
+        Err(io_error_kind) => {
+            tracing::error!(
+                stage = "read_blob",
+                error_kind = "Io",
+                "note_read blob read failed"
+            );
+            return Err(NoteReadError::Io { io_error_kind });
+        }
+    };
     let join_result =
-        tokio::task::spawn_blocking(move || -> Result<protocol::DecryptedNote, NoteReadError> {
-            let blob = match std::fs::read(&path) {
-                Ok(bytes) => bytes,
-                Err(e) => {
-                    let io_kind_raw = e.kind();
-                    let mapped = match io_kind_raw {
-                        std::io::ErrorKind::NotFound => NoteReadError::NoteNotFound,
-                        _ => NoteReadError::Io {
-                            io_error_kind: from_io_error_kind(io_kind_raw),
-                        },
-                    };
-                    tracing::error!(
-                        stage = "read_blob",
-                        error_kind = note_read_error_kind(&mapped),
-                        "note_read blob read failed"
-                    );
-                    return Err(mapped);
-                }
-            };
+        crate::task::run_blocking(move || -> Result<protocol::DecryptedNote, NoteReadError> {
             // `decode_note` parameter order is
             // (blob, note_uuid, items_key, items_key_id) — note_uuid is
             // the SECOND argument (different from `encode_new_note`'s).
@@ -421,7 +496,7 @@ pub async fn note_read_with_dir(
             )
         })
         .await;
-    let duration_ms = started.elapsed().as_millis() as u64;
+    let duration_ms = host.monotonic_millis().saturating_sub(started_ms);
 
     let decrypted = match join_result {
         Err(_join_err) => {
@@ -520,9 +595,9 @@ fn parse_base_hash_hex(s: &str) -> Option<[u8; 32]> {
 /// 2. Strict [`NoteId::parse`] — UI bug-canary; sub-cause via tracing.
 /// 3. Slot read guard + `Slot::Unlocked(uv)` match (clone `items_key`
 ///    + `items_key_id` into Zeroizing wrappers; reject `Empty` /
-///    `Recovering` as `VaultNotUnlocked`). Guard held across
-///    `spawn_blocking + atomic_write` so `vault_lock` fair-queues per
-///    `decisions.md` 2026-05-07 "Note AEAD ops".
+///      `Recovering` as `VaultNotUnlocked`). Guard held across
+///      `spawn_blocking + atomic_write` so `vault_lock` fair-queues per
+///      `decisions.md` 2026-05-07 "Note AEAD ops".
 /// 4. `spawn_blocking { std::fs::read → decode_note → encode_update }`
 ///    — `encode_update` consumes the [`protocol::DecryptedNote`] handle
 ///    (typestate "one decode, one update"); fresh `content_nonce` is
@@ -551,45 +626,47 @@ fn parse_base_hash_hex(s: &str) -> Option<[u8; 32]> {
 /// - `JoinFailure` — `spawn_blocking` panic / runtime shutdown,
 ///   absorbing v0.1-unreachable `ProtocolError::Csprng` /
 ///   `ProtocolError::AeadFailure` paths defensively.
-#[tauri::command]
-pub async fn note_update<R: Runtime>(
-    app: AppHandle<R>,
-    state: State<'_, VaultRuntimeState>,
-    hooks: State<'_, crate::hooks::Hooks>,
+pub async fn note_update_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
     note_id: String,
     plaintext: String,
     expected_base_hash_hex: Option<String>,
+    io: &dyn VaultIo,
 ) -> Result<(), NoteUpdateError> {
     // First-line Plaintext-IPC wrap (`src-tauri/CLAUDE.md`): bound the
     // index-feeding copy to `Zeroizing` so it wipes on every early-return and
     // at function exit rather than lingering as a plain `String` across the
     // `.await`. The core takes a fresh plain clone and re-wraps it first-line.
     let plaintext = Zeroizing::new(plaintext);
-    let notes_dir = paths::notes_dir_for(&app, state.active_vault_id().await).map_err(|e| {
-        let kind = e.kind();
-        match kind {
-            std::io::ErrorKind::NotADirectory | std::io::ErrorKind::AlreadyExists => {
-                tracing::error!(
-                    stage = "notes_dir",
-                    error_kind = "NotesDirNotADirectory",
-                    "note_update notes_dir resolution conflicted with a non-dir entry"
-                );
-                NoteUpdateError::NotesDirNotADirectory
-            }
-            other => {
-                let io_kind = from_io_error_kind(other);
-                tracing::error!(
-                    stage = "notes_dir",
-                    error_kind = "Io",
-                    io_failure_kind = ?io_kind,
-                    "note_update notes_dir resolution failed"
-                );
-                NoteUpdateError::Io {
-                    io_error_kind: io_kind,
+    let notes_dir = paths::notes_dir_for_host_io(host, io, state.active_vault_id().await)
+        .await
+        .map_err(|e| {
+            let kind = e.kind();
+            match kind {
+                std::io::ErrorKind::NotADirectory | std::io::ErrorKind::AlreadyExists => {
+                    tracing::error!(
+                        stage = "notes_dir",
+                        error_kind = "NotesDirNotADirectory",
+                        "note_update notes_dir resolution conflicted with a non-dir entry"
+                    );
+                    NoteUpdateError::NotesDirNotADirectory
+                }
+                other => {
+                    let io_kind = from_io_error_kind(other);
+                    tracing::error!(
+                        stage = "notes_dir",
+                        error_kind = "Io",
+                        io_failure_kind = ?io_kind,
+                        "note_update notes_dir resolution failed"
+                    );
+                    NoteUpdateError::Io {
+                        io_error_kind: io_kind,
+                    }
                 }
             }
-        }
-    })?;
+        })?;
     // Expected-base guard input (§11.3 ms-race closure): strict-parse or skip.
     // A malformed value is a frontend bug — canary-trace + fail-open to the
     // legacy overwrite (never manufacture a spurious BaseMismatch from a bug).
@@ -611,11 +688,13 @@ pub async fn note_update<R: Runtime>(
     // stale terms and add the new ones) after a successful write.
     let result = note_update_with_dir(
         notes_dir,
-        state.inner(),
-        hooks.inner(),
+        state,
+        hooks,
         note_id.clone(),
         (*plaintext).clone(),
         expected_base_hash,
+        io,
+        host,
     )
     .await;
     match result {
@@ -635,7 +714,7 @@ pub async fn note_update<R: Runtime>(
             } else {
                 hooks.search_upsert(&note_id, &title, &plaintext);
                 hooks
-                    .index_note_attachments(state.inner(), &note_id, &title, &plaintext)
+                    .index_note_attachments(state, &note_id, &title, &plaintext)
                     .await;
                 // MYND-453: eager per-note AI re-embed over note prose (feature/ai-gated).
                 hooks.ai_note_changed(&note_id, &plaintext);
@@ -653,6 +732,30 @@ pub async fn note_update<R: Runtime>(
         }
         Err(e) => Err(e),
     }
+}
+
+/// IPC wrapper. Delegates; the name and payload the frontend sends are
+/// unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn note_update<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
+    note_id: String,
+    plaintext: String,
+    expected_base_hash_hex: Option<String>,
+) -> Result<(), NoteUpdateError> {
+    note_update_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        note_id,
+        plaintext,
+        expected_base_hash_hex,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
 }
 
 /// Tauri event emitted (non-blocking) when a note saved successfully but its
@@ -680,6 +783,24 @@ pub struct NoteUpdateOutcome {
 /// no index touch** — a sync pull-apply advanced the note underneath the
 /// editor and the caller resolves via local keep-both. `None` = legacy
 /// last-write-wins (every non-autosave caller, snapshots restore, mobile).
+// Clippy's arity limit (8/7), and it is pointing at something real rather than
+// being noise: `io` and `host` now travel TOGETHER through every ported
+// signature in this crate, which means they are one concept wearing two
+// parameters.
+//
+// The right fix is a `Platform<'a> { io: &'a dyn VaultIo, host: &'a dyn HostCtx }`
+// passed as a single argument — it would shorten every signature the port has
+// touched, and it would make the pairing explicit instead of conventional.
+// Deliberately NOT done inside this port: it is a wide mechanical change across
+// work that is currently green and uncommitted, and bundling a refactor into a
+// migration is how both become unreviewable.
+//
+// Recorded as debt with the fix named, so this `allow` is a decision rather
+// than a silenced lint.
+#[allow(
+    clippy::too_many_arguments,
+    reason = "seam pair; see the Platform struct note above"
+)]
 pub async fn note_update_with_dir(
     notes_dir: PathBuf,
     state: &VaultRuntimeState,
@@ -687,6 +808,8 @@ pub async fn note_update_with_dir(
     note_id: String,
     plaintext: String,
     expected_base_hash: Option<[u8; 32]>,
+    io: &dyn VaultIo,
+    host: &dyn HostCtx,
 ) -> Result<NoteUpdateOutcome, NoteUpdateError> {
     // First non-doc statement: bound the lifetime of plaintext bytes
     // to a `Zeroizing<String>` wrapper. Same Plaintext-IPC discipline
@@ -744,10 +867,13 @@ pub async fn note_update_with_dir(
     // unset clock yields 0, treated conservatively as "within window"). Computed
     // here in core rather than via the desktop-only `snapshot_store` so the
     // snapshot machinery stays fully behind the hooks seam.
-    let now_ms = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_millis() as u64)
-        .unwrap_or(0);
+    //
+    // Through the host seam (task 13): `SystemTime::now()` panics on wasm32.
+    // This was already hoisted out of the blocking closure, so the port is one
+    // line — and it is a WALL clock on purpose, not the monotonic one: the
+    // coalescing gate compares against a timestamp persisted in a previous
+    // session, which a per-process monotonic reading cannot be compared to.
+    let now_ms = host.now_unix_millis();
     // The snapshot-capture side-effect rides the hooks seam (desktop wires the
     // real snapshot store; mobile is a no-op). Clone the `Arc` so it moves into
     // the blocking closure alongside the other captured inputs.
@@ -757,27 +883,32 @@ pub async fn note_update_with_dir(
     // `encode_update` consumes the `DecryptedNote` handle (typestate
     // "one decode, one update"); fresh `content_nonce` generated
     // internally; bytes 0..47+N byte-identical per §6.3.
-    let started = Instant::now();
+    let started_ms = host.monotonic_millis();
+    // The blob read moved onto the IO seam, out of the closure — same split as
+    // `note_read`: the decode + re-encode stay on the blocking pool, the read
+    // does not.
+    let blob_bytes = match io.read(&path_for_read).await {
+        Ok(bytes) => bytes,
+        Err(IoFailureKind::NotFound) => {
+            tracing::error!(
+                stage = "read_blob",
+                error_kind = "NoteNotFound",
+                "note_update blob read failed"
+            );
+            return Err(NoteUpdateError::NoteNotFound);
+        }
+        Err(io_error_kind) => {
+            tracing::error!(
+                stage = "read_blob",
+                error_kind = "Io",
+                "note_update blob read failed"
+            );
+            return Err(NoteUpdateError::Io { io_error_kind });
+        }
+    };
     let join_result =
-        tokio::task::spawn_blocking(move || -> Result<(Vec<u8>, bool), NoteUpdateError> {
-            let blob = match std::fs::read(&path_for_read) {
-                Ok(bytes) => bytes,
-                Err(e) => {
-                    let io_kind_raw = e.kind();
-                    let mapped = match io_kind_raw {
-                        std::io::ErrorKind::NotFound => NoteUpdateError::NoteNotFound,
-                        _ => NoteUpdateError::Io {
-                            io_error_kind: from_io_error_kind(io_kind_raw),
-                        },
-                    };
-                    tracing::error!(
-                        stage = "fs_read",
-                        error_kind = note_update_error_kind(&mapped),
-                        "note_update blob read failed"
-                    );
-                    return Err(mapped);
-                }
-            };
+        crate::task::run_blocking(move || -> Result<(Vec<u8>, bool), NoteUpdateError> {
+            let blob = blob_bytes;
             // `decode_note` parameter order matches `note_read_with_dir`:
             // (blob, note_uuid, items_key, items_key_id). The codec
             // emits its sub-cause via `tracing::debug!(stage = ?cause)`
@@ -860,7 +991,7 @@ pub async fn note_update_with_dir(
             }
         })
         .await;
-    let duration_ms = started.elapsed().as_millis() as u64;
+    let duration_ms = host.monotonic_millis().saturating_sub(started_ms);
 
     let (new_blob, snapshot_warning) = match join_result {
         Err(_join_err) => {
@@ -884,13 +1015,19 @@ pub async fn note_update_with_dir(
     // byte-identical to the previous blob; `atomic_write` durably
     // commits the rename per `decisions.md` 2026-05-07 atomic_write
     // entry.
-    if let Err(e) = atomic_write::atomic_write(&path, &new_blob, /* replace = */ true) {
-        let kind = e.kind();
-        let mapped = match kind {
-            std::io::ErrorKind::NotADirectory => NoteUpdateError::NotesDirNotADirectory,
-            other => NoteUpdateError::Io {
-                io_error_kind: from_io_error_kind(other),
-            },
+    // Through the IO seam (task 13). `WriteOpts::default()` carries the
+    // `replace = true` semantic, and on the native arm the seam delegates to the
+    // very same `atomic_write` — so desktop durability is unchanged by reading,
+    // not only by testing.
+    //
+    // `NotesDirNotADirectory` recovered by asking, as in `note_create`: the
+    // seam's closed vocabulary has no `NotADirectory`, but `is_dir` answers the
+    // question directly, and only on an already-failing path.
+    if let Err(io_error_kind) = io.write(&path, &new_blob, WriteOpts::default()).await {
+        let mapped = if !io.is_dir(&notes_dir).await.unwrap_or(true) {
+            NoteUpdateError::NotesDirNotADirectory
+        } else {
+            NoteUpdateError::Io { io_error_kind }
         };
         tracing::error!(
             stage = "atomic_write",
@@ -976,11 +1113,11 @@ pub struct NoteBatchUpdate {
 /// transaction to the best-effort snapshot subsystem would add a
 /// failure-ambiguity surface for no integrity gain (§8.3 is about
 /// crash-atomicity, not undo history).
-#[tauri::command]
-pub async fn note_write_batch_transactional<R: Runtime>(
-    app: AppHandle<R>,
-    state: State<'_, VaultRuntimeState>,
-    hooks: State<'_, crate::hooks::Hooks>,
+pub async fn note_write_batch_transactional_from_host(
+    host: &dyn HostCtx,
+    io: &dyn VaultIo,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
     notes: Vec<NoteBatchUpdate>,
 ) -> Result<(), NoteBatchError> {
     // First-line Plaintext-IPC discipline: bound every body to a
@@ -1003,30 +1140,32 @@ pub async fn note_write_batch_transactional<R: Runtime>(
     }
 
     let notes_dir =
-        paths::notes_dir_for(&app, state.active_vault_id().await).map_err(|e| match e.kind() {
-            std::io::ErrorKind::NotADirectory | std::io::ErrorKind::AlreadyExists => {
-                tracing::error!(
-                    stage = "notes_dir",
-                    error_kind = "NotesDirNotADirectory",
-                    "note_write_batch notes_dir resolution conflicted with a non-dir entry"
-                );
-                NoteBatchError::NotesDirNotADirectory
-            }
-            other => {
-                let io_kind = from_io_error_kind(other);
-                tracing::error!(
-                    stage = "notes_dir",
-                    error_kind = "Io",
-                    io_failure_kind = ?io_kind,
-                    "note_write_batch notes_dir resolution failed"
-                );
-                NoteBatchError::Io {
-                    io_error_kind: io_kind,
+        paths::notes_dir_for_host(host, state.active_vault_id().await).map_err(|e| {
+            match e.kind() {
+                std::io::ErrorKind::NotADirectory | std::io::ErrorKind::AlreadyExists => {
+                    tracing::error!(
+                        stage = "notes_dir",
+                        error_kind = "NotesDirNotADirectory",
+                        "note_write_batch notes_dir resolution conflicted with a non-dir entry"
+                    );
+                    NoteBatchError::NotesDirNotADirectory
+                }
+                other => {
+                    let io_kind = from_io_error_kind(other);
+                    tracing::error!(
+                        stage = "notes_dir",
+                        error_kind = "Io",
+                        io_failure_kind = ?io_kind,
+                        "note_write_batch notes_dir resolution failed"
+                    );
+                    NoteBatchError::Io {
+                        io_error_kind: io_kind,
+                    }
                 }
             }
         })?;
 
-    note_write_batch_with_dir(notes_dir, state.inner(), &items).await?;
+    note_write_batch_with_dir(io, notes_dir, state, &items).await?;
 
     // MYND-29 parity with `note_update`: re-index every rewritten note so
     // full-text search reflects the new bodies (esp. the renamed note's
@@ -1045,7 +1184,7 @@ pub async fn note_write_batch_transactional<R: Runtime>(
         } else {
             hooks.search_upsert(note_id, &title, plaintext);
             hooks
-                .index_note_attachments(state.inner(), note_id, &title, plaintext)
+                .index_note_attachments(state, note_id, &title, plaintext)
                 .await;
             // MYND-453: eager per-note AI re-embed over note prose (feature/ai-gated).
             hooks.ai_note_changed(note_id, plaintext);
@@ -1059,12 +1198,33 @@ pub async fn note_write_batch_transactional<R: Runtime>(
     Ok(())
 }
 
+/// IPC wrapper. Delegates; the name and payload the frontend sends are
+/// unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn note_write_batch_transactional<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
+    notes: Vec<NoteBatchUpdate>,
+) -> Result<(), NoteBatchError> {
+    note_write_batch_transactional_from_host(
+        &TauriHost::new(app),
+        &crate::vault_io::StdVaultIo,
+        state.inner(),
+        hooks.inner(),
+        notes,
+    )
+    .await
+}
+
 /// Testable core of [`note_write_batch_transactional`]: takes a resolved
 /// `notes_dir` + borrowed `(id, body)` slice so tests exercise the full
 /// parse → slot-guard → AEAD → transactional-commit pipeline under a
 /// `ScopedTempDir` without a Tauri runtime. Mirror of
 /// [`note_update_with_dir`], generalized to N notes under one transaction.
 pub async fn note_write_batch_with_dir(
+    io: &dyn VaultIo,
     notes_dir: PathBuf,
     state: &VaultRuntimeState,
     items: &[(String, Zeroizing<String>)],
@@ -1072,6 +1232,9 @@ pub async fn note_write_batch_with_dir(
     if items.is_empty() {
         return Ok(());
     }
+    // Kept for the commit, which happens after the blocking closure consumes
+    // its own copy (task 86).
+    let notes_dir_for_commit = notes_dir.clone();
 
     // Strict-parse EVERY note_id before any filesystem touch (a malformed
     // id never reaches a path). Re-wrap each body in a fresh `Zeroizing`
@@ -1109,7 +1272,8 @@ pub async fn note_write_batch_with_dir(
     // BEFORE `write_batch_transactional` stages anything, so a failure
     // leaves the vault untouched.
     let started = Instant::now();
-    let join_result = tokio::task::spawn_blocking(move || -> Result<(), NoteBatchError> {
+    let join_result =
+        crate::task::run_blocking(move || -> Result<Vec<crate::note_txn::TxnBlob>, NoteBatchError> {
         let mut blobs: Vec<crate::note_txn::TxnBlob> = Vec::with_capacity(parsed.len());
         for (note_id, plaintext) in &parsed {
             let uuid = note_id.as_uuid();
@@ -1168,18 +1332,13 @@ pub async fn note_write_batch_with_dir(
             });
         }
 
-        // All N encoded — commit atomically (§8.3 / WL-7).
-        crate::note_txn::write_batch_transactional(&notes_dir, &blobs).map_err(|e| {
-            let mapped = NoteBatchError::Io {
-                io_error_kind: from_io_error_kind(e.kind()),
-            };
-            tracing::error!(
-                stage = "write_batch_transactional",
-                error_kind = note_batch_error_kind(&mapped),
-                "note_write_batch transactional commit failed"
-            );
-            mapped
-        })
+        // All N encoded. The COMMIT is handed to the async caller
+        // (phase3-web-client task 86): `write_batch_transactional` went onto the
+        // storage seam and is async, while this closure is on the blocking pool.
+        // The CPU work — N decodes and N re-encodes — is what belongs here, and
+        // it all still happens before anything is staged, so the "every fallible
+        // step aborts before the transaction begins" property is unchanged.
+        Ok(blobs)
     })
     .await;
     let duration_ms = started.elapsed().as_millis() as u64;
@@ -1194,7 +1353,22 @@ pub async fn note_write_batch_with_dir(
             return Err(NoteBatchError::JoinFailure);
         }
         Ok(Err(e)) => return Err(e),
-        Ok(Ok(())) => {}
+        Ok(Ok(blobs)) => {
+            // The deferred commit (task 86). All-or-nothing is unaffected by the
+            // move: nothing has been staged until this line, so every failure
+            // above still leaves the vault in its pre-rename state.
+            crate::note_txn::write_batch_transactional(io, &notes_dir_for_commit, &blobs)
+                .await
+                .map_err(|io_error_kind| {
+                    let mapped = NoteBatchError::Io { io_error_kind };
+                    tracing::error!(
+                        stage = "write_batch_transactional",
+                        error_kind = note_batch_error_kind(&mapped),
+                        "note_write_batch transactional commit failed"
+                    );
+                    mapped
+                })?;
+        }
     }
     tracing::debug!(
         stage = "encode_commit",
@@ -1271,42 +1445,43 @@ pub fn note_batch_error_kind(e: &NoteBatchError) -> &'static str {
 /// - `Io` — residual filesystem failure on `remove_file` or parent-
 ///   dir `sync_all`.
 /// - `JoinFailure` — `spawn_blocking` panic / runtime shutdown.
-#[tauri::command]
-pub async fn note_delete<R: Runtime>(
-    app: AppHandle<R>,
-    state: State<'_, VaultRuntimeState>,
-    hooks: State<'_, crate::hooks::Hooks>,
+pub async fn note_delete_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
     note_id: String,
+    io: &dyn VaultIo,
 ) -> Result<(), NoteDeleteError> {
-    let notes_dir = paths::notes_dir_for(&app, state.active_vault_id().await).map_err(|e| {
-        let kind = e.kind();
-        match kind {
-            std::io::ErrorKind::NotADirectory | std::io::ErrorKind::AlreadyExists => {
-                tracing::error!(
-                    stage = "notes_dir",
-                    error_kind = "NotesDirNotADirectory",
-                    "note_delete notes_dir resolution conflicted with a non-dir entry"
-                );
-                NoteDeleteError::NotesDirNotADirectory
-            }
-            other => {
-                let io_kind = from_io_error_kind(other);
-                tracing::error!(
-                    stage = "notes_dir",
-                    error_kind = "Io",
-                    io_failure_kind = ?io_kind,
-                    "note_delete notes_dir resolution failed"
-                );
-                NoteDeleteError::Io {
-                    io_error_kind: io_kind,
+    let notes_dir = paths::notes_dir_for_host_io(host, io, state.active_vault_id().await)
+        .await
+        .map_err(|e| {
+            let kind = e.kind();
+            match kind {
+                std::io::ErrorKind::NotADirectory | std::io::ErrorKind::AlreadyExists => {
+                    tracing::error!(
+                        stage = "notes_dir",
+                        error_kind = "NotesDirNotADirectory",
+                        "note_delete notes_dir resolution conflicted with a non-dir entry"
+                    );
+                    NoteDeleteError::NotesDirNotADirectory
+                }
+                other => {
+                    let io_kind = from_io_error_kind(other);
+                    tracing::error!(
+                        stage = "notes_dir",
+                        error_kind = "Io",
+                        io_failure_kind = ?io_kind,
+                        "note_delete notes_dir resolution failed"
+                    );
+                    NoteDeleteError::Io {
+                        io_error_kind: io_kind,
+                    }
                 }
             }
-        }
-    })?;
+        })?;
     // MYND-29 Task 4: drop the deleted note from the live index after a
     // successful delete.
-    let result =
-        note_delete_with_dir(notes_dir, state.inner(), hooks.inner(), note_id.clone()).await;
+    let result = note_delete_with_dir(notes_dir, state, hooks, note_id.clone(), io, host).await;
     if result.is_ok() {
         hooks.search_remove(&note_id);
         // MYND-453: drop the deleted note's vectors from the RAM store
@@ -1314,6 +1489,26 @@ pub async fn note_delete<R: Runtime>(
         hooks.ai_note_deleted(&note_id);
     }
     result
+}
+
+/// IPC wrapper. Delegates; the name and payload the frontend sends are
+/// unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn note_delete<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
+    note_id: String,
+) -> Result<(), NoteDeleteError> {
+    note_delete_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        note_id,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
 }
 
 /// Inner — pure-and-testable helper. Mirror of
@@ -1324,6 +1519,8 @@ pub async fn note_delete_with_dir(
     state: &VaultRuntimeState,
     hooks: &crate::hooks::Hooks,
     note_id: String,
+    io: &dyn VaultIo,
+    host: &dyn HostCtx,
 ) -> Result<(), NoteDeleteError> {
     // Strict NoteId parse FIRST — before any path concatenation.
     let note_id = NoteId::parse(&note_id).map_err(|cause| {
@@ -1359,20 +1556,50 @@ pub async fn note_delete_with_dir(
     // blocking closure.
     let hooks = hooks.clone();
 
-    let started = Instant::now();
-    let join_result = tokio::task::spawn_blocking(move || -> Result<(), NoteDeleteError> {
-        // Defensive bug-canary: `<vault>/notes` may have been replaced
-        // by a regular file via dev-tools manipulation, disk corruption,
-        // or cross-process race. Parallel to
-        // `NoteCreateError::NotesDirNotADirectory`.
-        if !notes_dir.is_dir() {
-            tracing::error!(
-                stage = "exists_check",
-                error_kind = "NotesDirNotADirectory",
-                "note_delete notes_dir is not a directory"
+    let started_ms = host.monotonic_millis();
+    // Defensive bug-canary, and it runs BEFORE the unlink — as it did when it
+    // lived at the top of the blocking closure. Hoisting the unlink above it
+    // (my first attempt) made a hostile `<vault>/notes` regular file report
+    // `NoteNotFound` instead, because the unlink fails first and its error is
+    // more specific-looking. A desktop test caught the reordering; the ordering
+    // is the contract, not an accident of where the code sat.
+    //
+    // `is_dir`, not `exists`: `exists()` answers `true` for that hostile file,
+    // which would disarm the canary entirely (`vault_io.rs`, `is_dir` doc).
+    if !io.is_dir(&notes_dir).await.unwrap_or(false) {
+        tracing::error!(
+            stage = "exists_check",
+            error_kind = "NotesDirNotADirectory",
+            "note_delete notes_dir is not a directory"
+        );
+        return Err(NoteDeleteError::NotesDirNotADirectory);
+    }
+
+    // The unlink moved onto the IO seam and out of `run_blocking` (task 13).
+    // What stays in the closure is the snapshot purge (a hooks call) and the
+    // Unix parent-directory fsync — both genuinely blocking, neither expressible
+    // through the seam.
+    match io.remove_file(&path).await {
+        Ok(()) => {}
+        Err(IoFailureKind::NotFound) => {
+            tracing::debug!(
+                stage = "remove_file",
+                error_kind = "NoteNotFound",
+                "note_delete file already gone"
             );
-            return Err(NoteDeleteError::NotesDirNotADirectory);
+            return Err(NoteDeleteError::NoteNotFound);
         }
+        Err(io_error_kind) => {
+            let mapped = NoteDeleteError::Io { io_error_kind };
+            tracing::error!(
+                stage = "remove_file",
+                error_kind = note_delete_error_kind(&mapped),
+                "note_delete remove_file failed"
+            );
+            return Err(mapped);
+        }
+    }
+    let join_result = crate::task::run_blocking(move || -> Result<(), NoteDeleteError> {
         // MYND-96 SYNC-1: purge this note's snapshots BEFORE removing the live
         // `.myn`, so cryptographic erase holds. A snapshot is a verbatim `.myn`
         // copy carrying its own wrapped `enc_item_key`, so it stays decryptable
@@ -1398,28 +1625,6 @@ pub async fn note_delete_with_dir(
                         "snapshot purge on delete failed (best-effort)"
                     );
                 }
-            }
-        }
-        match std::fs::remove_file(&path) {
-            Ok(()) => {}
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-                tracing::debug!(
-                    stage = "remove_file",
-                    error_kind = "NoteNotFound",
-                    "note_delete file already gone"
-                );
-                return Err(NoteDeleteError::NoteNotFound);
-            }
-            Err(e) => {
-                let mapped = NoteDeleteError::Io {
-                    io_error_kind: from_io_error_kind(e.kind()),
-                };
-                tracing::error!(
-                    stage = "remove_file",
-                    error_kind = note_delete_error_kind(&mapped),
-                    "note_delete remove_file failed"
-                );
-                return Err(mapped);
             }
         }
         // Unix-only durability: flush the directory entry's removal to
@@ -1455,7 +1660,7 @@ pub async fn note_delete_with_dir(
         Ok(())
     })
     .await;
-    let duration_ms = started.elapsed().as_millis() as u64;
+    let duration_ms = host.monotonic_millis().saturating_sub(started_ms);
 
     match join_result {
         Err(_join_err) => {
@@ -1505,18 +1710,44 @@ pub async fn note_delete_with_dir(
 ///   logged (DENY-list compliance per `src-tauri/CLAUDE.md`
 ///   "Secret-handling logging discipline").
 pub fn enumerate_notes_dir(notes_dir: &std::path::Path) -> std::io::Result<Vec<NoteId>> {
+    let entries: Vec<crate::vault_io::DirEntry> = std::fs::read_dir(notes_dir)?
+        .map(|e| {
+            let e = e?;
+            Ok(crate::vault_io::DirEntry {
+                name: e.file_name().to_string_lossy().into_owned(),
+                is_dir: e.file_type()?.is_dir(),
+            })
+        })
+        .collect::<std::io::Result<Vec<_>>>()?;
+    Ok(note_ids_from_entries(&entries))
+}
+
+/// The `.myn` filter and UUID-parse half of [`enumerate_notes_dir`], over
+/// entries already read.
+///
+/// Split out for the wasm port (phase3-web-client task 13): the directory read
+/// now goes through [`crate::vault_io::VaultIo::read_dir`], which is async and
+/// yields names rather than `std::fs::DirEntry`. Everything below the read is
+/// pure classification and is shared verbatim by both arms — so the skip/warn
+/// behaviour cannot drift between desktop and web, which it would if the web
+/// port had reimplemented the loop.
+///
+/// Non-UTF-8 names cannot reach here (the seam's `DirEntry::name` is a `String`,
+/// lossy-converted at the boundary); a lossy-mangled name simply fails the
+/// `.myn`/UUID checks below and is skipped, which is what the old `to_str()`
+/// arm did too.
+pub fn note_ids_from_entries(entries: &[crate::vault_io::DirEntry]) -> Vec<NoteId> {
     let mut ids: Vec<NoteId> = Vec::new();
-    for entry in std::fs::read_dir(notes_dir)? {
-        let entry = entry?;
-        let name = entry.file_name();
-        let Some(name_str) = name.to_str() else {
+    for entry in entries {
+        let name_str = entry.name.as_str();
+        {
             // Non-UTF-8 filename (Linux can hold arbitrary bytes; APFS /
             // NTFS normalize but accept many invalid sequences). Benign
             // OS-level housekeeping noise — the offending bytes never
             // appear in tracing per `src-tauri/CLAUDE.md` DENY list.
-            tracing::debug!(stage = "skip_orphan");
-            continue;
-        };
+            // Non-UTF-8 filenames are handled at the seam boundary now; this
+            // block is retained so the control flow below reads unchanged.
+        }
         let Some(stem) = name_str.strip_suffix(".myn") else {
             // Non-`.myn` orphan: `.DS_Store`, `.tmp`, accidental drops.
             // Filename string is **not** logged — DENY-list compliance.
@@ -1536,7 +1767,7 @@ pub fn enumerate_notes_dir(notes_dir: &std::path::Path) -> std::io::Result<Vec<N
         }
     }
     ids.sort();
-    Ok(ids)
+    ids
 }
 
 /// Static-string label for [`NoteDeleteError`] variants — same
@@ -1572,37 +1803,55 @@ pub fn note_delete_error_kind(e: &NoteDeleteError) -> &'static str {
 /// - `Io` — read_dir / per-entry IO failure (`PermissionDenied` /
 ///   `NoSpace` / other).
 /// - `JoinFailure` — `spawn_blocking` panic / runtime shutdown.
+pub async fn note_list_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    io: &dyn VaultIo,
+) -> Result<Vec<NoteId>, NoteListError> {
+    let notes_dir = paths::notes_dir_for_host_io(host, io, state.active_vault_id().await)
+        .await
+        .map_err(|e| {
+            let kind = e.kind();
+            match kind {
+                std::io::ErrorKind::NotADirectory | std::io::ErrorKind::AlreadyExists => {
+                    tracing::error!(
+                        stage = "notes_dir",
+                        error_kind = "NotesDirNotADirectory",
+                        "note_list notes_dir resolution conflicted with a non-dir entry"
+                    );
+                    NoteListError::NotesDirNotADirectory
+                }
+                other => {
+                    let io_kind = from_io_error_kind(other);
+                    tracing::error!(
+                        stage = "notes_dir",
+                        error_kind = "Io",
+                        io_failure_kind = ?io_kind,
+                        "note_list notes_dir resolution failed"
+                    );
+                    NoteListError::Io {
+                        io_error_kind: io_kind,
+                    }
+                }
+            }
+        })?;
+    note_list_with_dir(notes_dir, state, io, host).await
+}
+
+/// IPC wrapper. Delegates; the name and payload the frontend sends are
+/// unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn note_list<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
 ) -> Result<Vec<NoteId>, NoteListError> {
-    let notes_dir = paths::notes_dir_for(&app, state.active_vault_id().await).map_err(|e| {
-        let kind = e.kind();
-        match kind {
-            std::io::ErrorKind::NotADirectory | std::io::ErrorKind::AlreadyExists => {
-                tracing::error!(
-                    stage = "notes_dir",
-                    error_kind = "NotesDirNotADirectory",
-                    "note_list notes_dir resolution conflicted with a non-dir entry"
-                );
-                NoteListError::NotesDirNotADirectory
-            }
-            other => {
-                let io_kind = from_io_error_kind(other);
-                tracing::error!(
-                    stage = "notes_dir",
-                    error_kind = "Io",
-                    io_failure_kind = ?io_kind,
-                    "note_list notes_dir resolution failed"
-                );
-                NoteListError::Io {
-                    io_error_kind: io_kind,
-                }
-            }
-        }
-    })?;
-    note_list_with_dir(notes_dir, state.inner()).await
+    note_list_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
 }
 
 /// Inner — pure-and-testable helper. Mirror of [`note_create_with_dir`]
@@ -1622,6 +1871,8 @@ pub async fn note_list<R: Runtime>(
 pub async fn note_list_with_dir(
     notes_dir: PathBuf,
     state: &VaultRuntimeState,
+    io: &dyn VaultIo,
+    host: &dyn HostCtx,
 ) -> Result<Vec<NoteId>, NoteListError> {
     let slot = state.slot_read_active().await;
     match &*slot {
@@ -1637,28 +1888,33 @@ pub async fn note_list_with_dir(
     }
     tracing::debug!(stage = "slot_check", outcome = "vault_unlocked");
 
-    let started = Instant::now();
-    let result = tokio::task::spawn_blocking(move || enumerate_notes_dir(&notes_dir)).await;
-    let duration_ms = started.elapsed().as_millis() as u64;
-
-    let ids = match result {
-        Err(_join_err) => {
-            tracing::error!(
-                stage = "spawn_blocking_join",
-                error_kind = "JoinFailure",
-                "note_list enumerate panicked or runtime shutdown"
-            );
-            return Err(NoteListError::JoinFailure);
-        }
-        Ok(Err(e)) => {
-            let kind = e.kind();
-            let mapped = match kind {
-                std::io::ErrorKind::NotADirectory | std::io::ErrorKind::AlreadyExists => {
-                    NoteListError::NotesDirNotADirectory
+    let started_ms = host.monotonic_millis();
+    // Directory read through the IO seam (task 13); the `.myn` filter + UUID
+    // parse stay in the shared pure helper so the skip/warn behaviour cannot
+    // drift between the two arms.
+    //
+    // `run_blocking` is gone from this path rather than moved: enumerating a
+    // directory is IO, and the seam's native arm already dispatches its own —
+    // nesting would be a blocking dispatch inside a blocking dispatch. There is
+    // no CPU work left here to keep on the pool.
+    let ids = match io.read_dir(&notes_dir).await {
+        Ok(entries) => note_ids_from_entries(&entries),
+        Err(io_kind) => {
+            // `NotesDirNotADirectory` used to come from `ErrorKind::NotADirectory`
+            // / `AlreadyExists`, which the seam's closed 4-variant vocabulary
+            // does not carry — both now arrive as `Other`. The distinction is
+            // preserved by ASKING: a notes dir that exists but is not a
+            // directory is exactly the case, and `read_dir` failing while
+            // `exists` is true is what identifies it. One extra call, only on an
+            // already-failing path.
+            let mapped = if io_kind == IoFailureKind::Other
+                && !io.is_dir(&notes_dir).await.unwrap_or(true)
+            {
+                NoteListError::NotesDirNotADirectory
+            } else {
+                NoteListError::Io {
+                    io_error_kind: io_kind,
                 }
-                other => NoteListError::Io {
-                    io_error_kind: from_io_error_kind(other),
-                },
             };
             tracing::error!(
                 stage = "enumerate",
@@ -1667,8 +1923,8 @@ pub async fn note_list_with_dir(
             );
             return Err(mapped);
         }
-        Ok(Ok(ids)) => ids,
     };
+    let duration_ms = host.monotonic_millis().saturating_sub(started_ms);
 
     drop(slot);
 
@@ -1751,11 +2007,11 @@ pub struct TitleSlice {
 ///   sequential-await; ordering preserved by await order).
 /// - `decisions.md` 2026-05-07 "Note AEAD ops: clone-out items_key +
 ///   always spawn_blocking" — same pattern reused per-item.
-#[tauri::command]
-pub async fn note_titles_batch<R: Runtime>(
-    app: AppHandle<R>,
-    state: State<'_, VaultRuntimeState>,
+pub async fn note_titles_batch_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
     ids: Vec<String>,
+    io: &dyn VaultIo,
 ) -> Result<Vec<Result<TitleSlice, NoteTitleError>>, NoteTitleBatchError> {
     // Cap check BEFORE notes_dir resolution — defensive cheap precondition
     // (no I/O if caller bypasses the chunking convention).
@@ -1773,32 +2029,52 @@ pub async fn note_titles_batch<R: Runtime>(
         return Err(err);
     }
 
-    let notes_dir = paths::notes_dir_for(&app, state.active_vault_id().await).map_err(|e| {
-        let kind = e.kind();
-        match kind {
-            std::io::ErrorKind::NotADirectory | std::io::ErrorKind::AlreadyExists => {
-                tracing::error!(
-                    stage = "notes_dir",
-                    error_kind = "NotesDirNotADirectory",
-                    "note_titles_batch notes_dir resolution conflicted with a non-dir entry"
-                );
-                NoteTitleBatchError::NotesDirNotADirectory
-            }
-            other => {
-                let io_kind = from_io_error_kind(other);
-                tracing::error!(
-                    stage = "notes_dir",
-                    error_kind = "Io",
-                    io_failure_kind = ?io_kind,
-                    "note_titles_batch notes_dir resolution failed"
-                );
-                NoteTitleBatchError::Io {
-                    io_error_kind: io_kind,
+    let notes_dir = paths::notes_dir_for_host_io(host, io, state.active_vault_id().await)
+        .await
+        .map_err(|e| {
+            let kind = e.kind();
+            match kind {
+                std::io::ErrorKind::NotADirectory | std::io::ErrorKind::AlreadyExists => {
+                    tracing::error!(
+                        stage = "notes_dir",
+                        error_kind = "NotesDirNotADirectory",
+                        "note_titles_batch notes_dir resolution conflicted with a non-dir entry"
+                    );
+                    NoteTitleBatchError::NotesDirNotADirectory
+                }
+                other => {
+                    let io_kind = from_io_error_kind(other);
+                    tracing::error!(
+                        stage = "notes_dir",
+                        error_kind = "Io",
+                        io_failure_kind = ?io_kind,
+                        "note_titles_batch notes_dir resolution failed"
+                    );
+                    NoteTitleBatchError::Io {
+                        io_error_kind: io_kind,
+                    }
                 }
             }
-        }
-    })?;
-    note_titles_batch_with_dir(notes_dir, state.inner(), ids).await
+        })?;
+    note_titles_batch_with_dir(notes_dir, state, ids, io, host).await
+}
+
+/// IPC wrapper. Delegates; the name and payload the frontend sends are
+/// unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn note_titles_batch<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    ids: Vec<String>,
+) -> Result<Vec<Result<TitleSlice, NoteTitleError>>, NoteTitleBatchError> {
+    note_titles_batch_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        ids,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
 }
 
 /// Inner — pure-and-testable helper. Mirror of the other notes-command
@@ -1807,6 +2083,8 @@ pub async fn note_titles_batch_with_dir(
     notes_dir: PathBuf,
     state: &VaultRuntimeState,
     ids: Vec<String>,
+    io: &dyn VaultIo,
+    host: &dyn HostCtx,
 ) -> Result<Vec<Result<TitleSlice, NoteTitleError>>, NoteTitleBatchError> {
     // Cap re-check at the inner layer — direct test callers must
     // honor the same invariant as the IPC boundary.
@@ -1834,40 +2112,35 @@ pub async fn note_titles_batch_with_dir(
         count = ids.len()
     );
 
-    let started = Instant::now();
+    let started_ms = host.monotonic_millis();
 
     // Spawn all per-item tasks up front; each lands on the blocking pool
     // immediately. Awaiting sequentially below preserves input order
     // without sacrificing wall-clock parallelism — tokio executes the
     // spawned tasks concurrently regardless of await order.
-    let mut handles = Vec::with_capacity(ids.len());
+    // Read through the IO seam, decode on the blocking pool, one item at a time.
+    //
+    // **This loop is sequential, and it already was.** The previous shape pushed
+    // `crate::task::run_blocking(...)` calls into a `Vec` and awaited them
+    // afterwards, under a comment claiming "each lands on the blocking pool
+    // immediately … tokio executes the spawned tasks concurrently regardless of
+    // await order". That was true of the ORIGINAL `tokio::task::spawn_blocking`,
+    // which returns an already-scheduled `JoinHandle` — but task 80 replaced it
+    // with `crate::task::run_blocking`, an `async fn`. An async fn's future does
+    // nothing until polled, so collecting them and awaiting in order has been a
+    // sequential loop ever since, with a comment asserting otherwise.
+    //
+    // Written honestly here rather than preserved as a fiction. Restoring real
+    // concurrency needs a `spawn`-shaped addition to the task seam that has a
+    // wasm answer (a Worker has one thread), which is its own decision — noted
+    // in `progress.md` rather than smuggled into a port.
+    //
+    // Sequential reads suit OPFS regardless: a sync access handle is an
+    // exclusive per-file lock, so concurrent reads buy nothing there.
+    let mut results: Vec<Result<TitleSlice, NoteTitleError>> = Vec::with_capacity(ids.len());
     for id_str in ids {
-        let items_key_clone = items_key.clone();
-        let items_key_id_local = items_key_id;
-        let notes_dir_clone = notes_dir.clone();
-        handles.push(tokio::task::spawn_blocking(move || {
-            extract_one_title_slice(
-                &notes_dir_clone,
-                id_str,
-                &items_key_clone,
-                &items_key_id_local,
-            )
-        }));
-    }
-
-    let mut results: Vec<Result<TitleSlice, NoteTitleError>> = Vec::with_capacity(handles.len());
-    for handle in handles {
-        let per_item = match handle.await {
-            Ok(per_item) => per_item,
-            Err(_join_err) => {
-                tracing::error!(
-                    stage = "spawn_blocking_join",
-                    error_kind = "JoinFailure",
-                    "note_titles_batch per-item task panicked or runtime shutdown"
-                );
-                Err(NoteTitleError::JoinFailure)
-            }
-        };
+        let per_item =
+            read_and_decode_title(&notes_dir, &id_str, &items_key, &items_key_id, io).await;
         if let Err(ref e) = per_item {
             tracing::warn!(
                 stage = "title_extract",
@@ -1880,7 +2153,7 @@ pub async fn note_titles_batch_with_dir(
 
     drop(slot);
 
-    let duration_ms = started.elapsed().as_millis() as u64;
+    let duration_ms = host.monotonic_millis().saturating_sub(started_ms);
     let ok_count = results.iter().filter(|r| r.is_ok()).count();
     let err_count = results.len() - ok_count;
     tracing::info!(
@@ -1902,27 +2175,7 @@ pub fn extract_one_title_slice(
     items_key: &Zeroizing<[u8; 32]>,
     items_key_id: &[u8; 16],
 ) -> Result<TitleSlice, NoteTitleError> {
-    // Strict-parse `note_id`. A malformed ID is treated as `NoteNotFound`
-    // since the canonical ID set comes from `note_list` — anything else
-    // is a UI bug or a manual invocation; the file doesn't exist on
-    // disk either way, and surfacing `NoteNotFound` keeps the user
-    // experience honest (the row drops out of the sidebar).
-    let note_id = match NoteId::parse(&id_str) {
-        Ok(id) => id,
-        Err(cause) => {
-            tracing::debug!(
-                stage = "note_id_parse",
-                outcome = "invalid",
-                cause = ?cause,
-                "note_titles_batch per-item note_id strict-parse failed; mapping to NoteNotFound"
-            );
-            return Err(NoteTitleError::NoteNotFound);
-        }
-    };
-
-    let path = notes_dir.join(format!("{}.myn", note_id.as_uuid()));
-    let note_uuid_bytes = *note_id.as_uuid().as_bytes();
-
+    let (note_id, path) = parse_title_target(notes_dir, &id_str)?;
     let blob = match std::fs::read(&path) {
         Ok(bytes) => bytes,
         Err(e) => {
@@ -1935,7 +2188,88 @@ pub fn extract_one_title_slice(
             });
         }
     };
+    decode_one_title_slice(&note_id, &blob, items_key, items_key_id)
+}
 
+/// One batch item, end to end: parse the id, read its blob through the seam,
+/// decode on the blocking pool.
+///
+/// Exists so the batch loop reads as one statement per item; the three halves
+/// are separately callable because the read between them is async.
+async fn read_and_decode_title(
+    notes_dir: &std::path::Path,
+    id_str: &str,
+    items_key: &Zeroizing<[u8; 32]>,
+    items_key_id: &[u8; 16],
+    io: &dyn VaultIo,
+) -> Result<TitleSlice, NoteTitleError> {
+    let (note_id, path) = parse_title_target(notes_dir, id_str)?;
+    let blob = match io.read(&path).await {
+        Ok(bytes) => bytes,
+        Err(IoFailureKind::NotFound) => return Err(NoteTitleError::NoteNotFound),
+        Err(io_error_kind) => return Err(NoteTitleError::Io { io_error_kind }),
+    };
+    let items_key = items_key.clone();
+    let items_key_id = *items_key_id;
+    match crate::task::run_blocking(move || {
+        decode_one_title_slice(&note_id, &blob, &items_key, &items_key_id)
+    })
+    .await
+    {
+        Ok(res) => res,
+        Err(_join_err) => {
+            tracing::error!(
+                stage = "spawn_blocking_join",
+                error_kind = "JoinFailure",
+                "note_titles_batch per-item task panicked or runtime shutdown"
+            );
+            Err(NoteTitleError::JoinFailure)
+        }
+    }
+}
+
+/// Strict-parse an id and resolve its blob path.
+///
+/// Split out of [`extract_one_title_slice`] for the wasm port (task 13): the
+/// read between these two halves is now async, so the pure parse and the pure
+/// decode had to become separately callable. A malformed id is `NoteNotFound`
+/// because the canonical id set comes from `note_list` — anything else is a UI
+/// bug or a manual invocation, the file does not exist either way, and
+/// `NoteNotFound` keeps the user experience honest (the row drops out).
+pub fn parse_title_target(
+    notes_dir: &std::path::Path,
+    id_str: &str,
+) -> Result<(NoteId, PathBuf), NoteTitleError> {
+    let note_id = match NoteId::parse(id_str) {
+        Ok(id) => id,
+        Err(cause) => {
+            tracing::debug!(
+                stage = "note_id_parse",
+                outcome = "invalid",
+                cause = ?cause,
+                "note_titles_batch per-item note_id strict-parse failed; mapping to NoteNotFound"
+            );
+            return Err(NoteTitleError::NoteNotFound);
+        }
+    };
+    let path = notes_dir.join(format!("{}.myn", note_id.as_uuid()));
+    Ok((note_id, path))
+}
+
+/// AEAD-decrypt one already-read blob and extract its title slices.
+///
+/// The CPU half of [`extract_one_title_slice`], callable on its own so the
+/// wasm path can read through the seam and still run the decode on the blocking
+/// pool. Shared by both arms verbatim, so the title-extraction behaviour cannot
+/// drift between clients.
+pub fn decode_one_title_slice(
+    note_id: &NoteId,
+    blob: &[u8],
+    items_key: &Zeroizing<[u8; 32]>,
+    items_key_id: &[u8; 16],
+) -> Result<TitleSlice, NoteTitleError> {
+    let note_uuid_bytes = *note_id.as_uuid().as_bytes();
+    let blob = blob.to_vec();
     let decrypted = match decode_note(&blob, &note_uuid_bytes, items_key, items_key_id) {
         Ok(d) => d,
         Err(_dec_err) => {
@@ -1969,7 +2303,11 @@ pub fn extract_one_title_slice(
     drop(decrypted);
 
     Ok(TitleSlice {
-        note_uuid: id_str,
+        // Rendered from the parsed id rather than echoing the caller's string:
+        // they are equal by construction (a `NoteId` only exists if the string
+        // parsed), and taking it from the parsed value means this helper needs
+        // no second parameter carrying the same information.
+        note_uuid: note_id.as_uuid().to_string(),
         frontmatter_bytes,
         first_h1_line,
     })
@@ -2029,9 +2367,15 @@ mod tests {
             let tmp = ScopedTempDir::new("base-guard-mismatch").unwrap();
             let notes_dir = notes_dir_under(tmp.path()).unwrap();
             let state = unlocked().await;
-            let id = note_create_with_dir(notes_dir.clone(), &state, "base body".to_string())
-                .await
-                .unwrap();
+            let id = note_create_with_dir(
+                notes_dir.clone(),
+                &state,
+                "base body".to_string(),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .unwrap();
             // Another writer (the sync pull-apply shape) advances the note…
             note_update_with_dir(
                 notes_dir.clone(),
@@ -2040,6 +2384,8 @@ mod tests {
                 id.clone(),
                 "moved on".to_string(),
                 None,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
             )
             .await
             .unwrap();
@@ -2051,11 +2397,21 @@ mod tests {
                 id.clone(),
                 "my racing edit".to_string(),
                 Some(hash_of("base body")),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
             )
             .await
             .unwrap_err();
             assert!(matches!(err, super::NoteUpdateError::BaseMismatch));
-            let on_disk = note_read_with_dir(notes_dir, &state, id).await.unwrap();
+            let on_disk = note_read_with_dir(
+                notes_dir,
+                &state,
+                id,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .unwrap();
             assert_eq!(on_disk, "moved on", "a rejected save must not touch disk");
         })
     }
@@ -2066,9 +2422,15 @@ mod tests {
             let tmp = ScopedTempDir::new("base-guard-match").unwrap();
             let notes_dir = notes_dir_under(tmp.path()).unwrap();
             let state = unlocked().await;
-            let id = note_create_with_dir(notes_dir.clone(), &state, "base body".to_string())
-                .await
-                .unwrap();
+            let id = note_create_with_dir(
+                notes_dir.clone(),
+                &state,
+                "base body".to_string(),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .unwrap();
             note_update_with_dir(
                 notes_dir.clone(),
                 &state,
@@ -2076,10 +2438,20 @@ mod tests {
                 id.clone(),
                 "edited".to_string(),
                 Some(hash_of("base body")),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
             )
             .await
             .unwrap();
-            let on_disk = note_read_with_dir(notes_dir, &state, id).await.unwrap();
+            let on_disk = note_read_with_dir(
+                notes_dir,
+                &state,
+                id,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .unwrap();
             assert_eq!(on_disk, "edited");
         })
     }
@@ -2090,9 +2462,15 @@ mod tests {
             let tmp = ScopedTempDir::new("base-guard-none").unwrap();
             let notes_dir = notes_dir_under(tmp.path()).unwrap();
             let state = unlocked().await;
-            let id = note_create_with_dir(notes_dir.clone(), &state, "base body".to_string())
-                .await
-                .unwrap();
+            let id = note_create_with_dir(
+                notes_dir.clone(),
+                &state,
+                "base body".to_string(),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .unwrap();
             // Disk moves on; a guardless caller (mobile / trash / templates /
             // snapshots restore) still overwrites — the pinned legacy semantic.
             note_update_with_dir(
@@ -2102,6 +2480,8 @@ mod tests {
                 id.clone(),
                 "moved on".to_string(),
                 None,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
             )
             .await
             .unwrap();
@@ -2112,10 +2492,20 @@ mod tests {
                 id.clone(),
                 "guardless overwrite".to_string(),
                 None,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
             )
             .await
             .unwrap();
-            let on_disk = note_read_with_dir(notes_dir, &state, id).await.unwrap();
+            let on_disk = note_read_with_dir(
+                notes_dir,
+                &state,
+                id,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .unwrap();
             assert_eq!(on_disk, "guardless overwrite");
         })
     }

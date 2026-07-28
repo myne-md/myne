@@ -64,7 +64,7 @@ import { isNoteAiExcluded } from "../../lib/aiExcludedFolders";
 import { CoverPicker, type CoverChoice } from "../../components/attachments/CoverPicker";
 import { ContextMenu, type ContextMenuItem } from "./ContextMenu";
 import { buildCardMenuItems } from "../views/cardMenu";
-import { writeText as clipboardWriteText } from "@tauri-apps/plugin-clipboard-manager";
+import { writeText as clipboardWriteText } from "../../platform/clipboardManager";
 import {
   DrawingCanvasLazy,
   extractSceneJson,

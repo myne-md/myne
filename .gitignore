@@ -65,3 +65,17 @@ manual-fixes-needed.md
 .pnpm-store/
 # E2E failure artifacts (screenshots, page source, driver logs)
 e2e/artifacts/
+# The web lane's own, same rule. A browser artifact is MORE sensitive than the
+# desktop lane's: a page-source dump carries the rendered DOM, which on an
+# unlocked vault is note plaintext. `e2e-web/support/artifacts.ts` redacts the
+# known secrets before writing; this is the belt for everything it does not know
+# about (phase3-web-client task 105).
+e2e-web/artifacts/
+
+# phase3-web-client task 11: the wasm-bindgen output for `web/wasm`. Pure build
+# artefact — derived from `web/wasm/src/` plus the pinned toolchain by
+# `scripts/build-wasm.sh`. Committing it would put a 128 KiB binary in every diff
+# and make the reproducible-bundle-hash story (A15) depend on whoever last ran
+# the script rather than on the source.
+web/wasm/pkg/
+web/bench/pkg/

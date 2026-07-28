@@ -16,7 +16,7 @@
 // excluded (SYNC-12 + size/compat). Adding a bundled language is a one-site
 // change on each side (and a hash-pin in dict_manifest.rs).
 
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../platform/core";
 
 /** Per-word spell verdict (mirrors the Rust `SpellWord`). */
 export type SpellWord = {
