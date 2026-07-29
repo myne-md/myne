@@ -12,7 +12,7 @@
 // exists to make loud.
 
 import { describe, expect, it } from "vitest";
-import { capabilitiesFor } from "../../e2e-web/support/session";
+import { capabilitiesFor, EMULATED_MOBILE_DEVICE } from "../../e2e-web/support/session";
 
 const PROFILE = "/tmp/myne-web-e2e-profile-abc";
 
@@ -65,6 +65,33 @@ describe("browser capabilities", () => {
     // A payload that pretended otherwise would make the Safari seat look like
     // the others in code while behaving nothing like them.
     expect(capabilitiesFor("safari", PROFILE, true)).toEqual({ browserName: "safari" });
+  });
+
+  // The device-class refusal (`environment-gate.ts`) is the only scenario that
+  // wants a phone, and the flag is the whole reason its assertion means
+  // anything: without it the session drives a desktop browser and the scenario
+  // reports a product bug instead of a harness one.
+  it("asks Chrome for mobile emulation only when the scenario opted in", () => {
+    const plain = capabilitiesFor("chrome", PROFILE, true);
+    expect(plain["goog:chromeOptions"]).not.toHaveProperty("mobileEmulation");
+
+    const mobile = capabilitiesFor("chrome", PROFILE, true, { emulateMobile: true });
+    expect((mobile["goog:chromeOptions"] as { mobileEmulation: { deviceName: string } }).mobileEmulation)
+      .toEqual({ deviceName: EMULATED_MOBILE_DEVICE });
+    // Emulation must not cost the isolation every session depends on.
+    expect((mobile["goog:chromeOptions"] as { args: string[] }).args).toContain(
+      `--user-data-dir=${PROFILE}`,
+    );
+  });
+
+  it("refuses mobile emulation on a driver that cannot do it, rather than dropping it", () => {
+    // geckodriver and safaridriver take no such capability. Ignoring the flag
+    // would leave the scenario asserting a phone refusal against a desktop
+    // browser — a red suite blaming the wrong side.
+    expect(() => capabilitiesFor("firefox", PROFILE, true, { emulateMobile: true })).toThrow(
+      /chromedriver capability/,
+    );
+    expect(() => capabilitiesFor("safari", PROFILE, true, { emulateMobile: true })).toThrow();
   });
 
   it("names a distinct browser in every payload", () => {

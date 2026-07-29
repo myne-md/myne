@@ -3420,8 +3420,10 @@
     },
     "unsupported": {
       "title": "Myne can’t run in this browser",
-      "handoff": "Myne's desktop app (macOS, Windows, Linux) and mobile app (iOS, Android) have no such limit â and they verify their own signature before running, which a web page cannot.",
+      "mobileTitle": "Open Myne's app on this device",
+      "handoff": "Myne's desktop app (macOS, Windows, Linux) and mobile app (iOS, Android) have no such limit — and they verify their own signature before running, which a web page cannot.",
       "reason": {
+        "desktop-form-factor": "Myne in the browser is built for a desktop computer — it needs the memory and the input a phone or tablet browser cannot give it. On this device the Myne app is the better client anyway: it is faster, it works offline, and it keeps your notes when the browser clears its storage.",
         "webassembly": "This browser does not support WebAssembly, which the encryption core runs on.",
         "wasm-memory-headroom": "This browser cannot reserve the ~336 MB of memory the vault's key derivation needs. Phone and tablet browsers generally cannot; that limit is set by the vault itself and cannot be lowered for one device without making the vault unreadable everywhere else.",
         "worker": "This browser does not support Web Workers, which the vault's storage and encryption run inside.",
