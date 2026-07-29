@@ -38,7 +38,38 @@ class TaskCheckboxWidget extends WidgetType {
       : "cm-task-checkbox";
     span.setAttribute("role", "checkbox");
     span.setAttribute("aria-checked", String(this.checked));
+    // MYND-614 task 10 — inherited debt, fixed here rather than deferred. The
+    // checkbox carried a role and a checked state but NO accessible name and NO
+    // focus stop, which made it mouse-only. Shipping fully accessible chips
+    // beside a mouse-only checkbox would have been an inconsistency the user
+    // feels immediately: same line, two affordances, one reachable.
+    span.setAttribute("tabindex", "0");
+    span.setAttribute(
+      "aria-label",
+      this.checked ? "Task, completed" : "Task, not completed",
+    );
     span.style.cursor = "pointer";
+
+    const toggle = (): void => {
+      const from = view.posAtDOM(span);
+      const current = view.state.doc.sliceString(from, from + 3);
+      if (current !== "[ ]" && current !== "[x]" && current !== "[X]") return;
+      const next = current === "[ ]" ? "[x]" : "[ ]";
+      view.dispatch({
+        changes: { from, to: from + 3, insert: next },
+        userEvent: "task.toggle",
+      });
+    };
+
+    span.addEventListener("keydown", (e) => {
+      // Space is the checkbox convention; Enter is accepted too so the two
+      // affordances on a task line behave the same way under the keyboard.
+      if (e.key !== " " && e.key !== "Enter") return;
+      e.preventDefault();
+      e.stopPropagation();
+      toggle();
+    });
+
     span.addEventListener("mousedown", (e) => {
       e.preventDefault();
       // Resolve the marker position live from the DOM rather than trusting the

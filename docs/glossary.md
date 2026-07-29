@@ -111,7 +111,7 @@ Used in: `spec/markdown-dialect.md` §3.6.1
 
 ### **archived field** &nbsp; 📋 *Protocol*
 
-The seventh Myne-managed canonical frontmatter field, `archived:` — a **value-strict** RFC 3339 UTC timestamp marking when a note was archived (the exact twin of `trashed:`; any non-timestamp value leaves the note live). Written only by the archive/unarchive actions (`src/notes/archiveNote.ts`) via `patchArchivedField` over the existing `note_update` IPC; neither transition bumps `updated:`. Mutually exclusive with `trashed:` at the action layer. Rides the existing `.myn` AEAD envelope — no `protocol.md` magic-byte / AAD / version change (MYND-331). See [archive](#archive).
+The eighth Myne-managed canonical frontmatter field, `archived:` — a **value-strict** RFC 3339 UTC timestamp marking when a note was archived (the exact twin of `trashed:`; any non-timestamp value leaves the note live). Written only by the archive/unarchive actions (`src/notes/archiveNote.ts`) via `patchArchivedField` over the existing `note_update` IPC; neither transition bumps `updated:`. Mutually exclusive with `trashed:` at the action layer. Rides the existing `.myn` AEAD envelope — no `protocol.md` magic-byte / AAD / version change (MYND-331). See [archive](#archive).
 
 ### **archived folder** &nbsp; 📦 *Product*
 
@@ -447,9 +447,9 @@ Reference: Chan & Rogaway, "On Committing Authenticated Encryption", ESORICS 202
 
 ### **cursor-aware reveal** &nbsp; 📦 *Product*
 
-The Phase 1 editor pattern where decorations on the line containing the cursor lift to expose the underlying markdown source for editing, then reapply when the cursor leaves the line. There is no separate "rendered view" / "source view" mode-switch — cursor location *is* the reveal. Headings show their leading `#`s on the active line and hide them off-line; bold and italic delimiters reveal on entry; inline link URLs become editable when the cursor enters their parent line. Wikilink chips are an exception per `spec/wikilink.md` §5.4 (chips stay atomic regardless of cursor position).
+The Phase 1 editor pattern where decorations on the line containing the cursor lift to expose the underlying markdown source for editing, then reapply when the cursor leaves the line. There is no separate "rendered view" / "source view" mode-switch — cursor location *is* the reveal. Headings show their leading `#`s on the active line and hide them off-line; bold and italic delimiters reveal on entry; inline link URLs become editable when the cursor enters their parent line. Wikilink chips are an exception per `spec/wikilink.md` §5.4 (chips stay atomic regardless of cursor position). **Task-field chips are a second exception** (MYND-614): they never open on caret entry — a date is a structured value, not prose, and a line carrying three chips would reflow every time the caret travelled it — but they *do* open while the find panel is open, because a search that lands on a match inside hidden text and highlights nothing is worse than not finding it. Reading mode never reveals, under either exception.
 
-Used in: `spec/markdown-dialect.md`, `agent-tooling/features/editor-mvp/rfc.md`
+Used in: `spec/markdown-dialect.md`, `agent-tooling/features/editor-mvp/rfc.md`; `decisions.md` 2026-07-28
 
 ### **custom folder icon** &nbsp; 📦 *Product*
 
@@ -591,6 +591,16 @@ The cryptographic principle that contexts which should not produce equal outputs
 
 Used in: `spec/protocol.md` §3.2, §5.2
 
+### **done field** &nbsp; 📋 *Protocol*
+
+The Myne-managed canonical frontmatter field `done:` — a **value-strict** RFC 3339 UTC timestamp recording when a [note-task](#note-task) was completed (the exact twin of the `trashed:` / `archived:` / `deleted:` trio; any non-timestamp value leaves the note incomplete). The twelfth managed field (`spec/markdown-dialect.md` §3.6.1).
+
+**Quoting does not demote it.** The scalar is unquoted before the date check, matching the §3.6.4 asymmetry in which quoting demotes checkbox and number values but never dates — so the strict reader and the derived property index agree on `done: "2026-…Z"`. A divergence would mean a note reading complete on one surface and incomplete on another.
+
+Written only by the complete / un-complete orchestrators (`src/notes/completeNote.ts`) via `patchDoneField` over the existing `note_update` IPC — never by body autosave, and neither transition bumps `updated:` (flipping a managed flag is not a content edit). Un-completion **deletes** the field; a note never carries `done: false`. **Orthogonal to the location markers**: a task may be done and archived, or done and trashed — unlike archive ⊥ trash, which are two positions on one location axis. Rides the existing `.myn` AEAD envelope — no magic-byte / AAD / version change (MYND-613).
+
+Used in: `spec/markdown-dialect.md` §3.6.1; `decisions.md` 2026-07-28
+
 ### **double-buffered blob** &nbsp; 📋 *Protocol* (*Myne-divergent*)
 
 The web client's on-disk representation of a **singleton** vault blob (`vault.meta`, `vault.prefs`, `vault.search`, `vault.indices`, `vault.themes`, …): two alternating files, `.a` and `.b`, each carrying a sequence number, of which the newest copy that passes AEAD verification is the live one. It replaces the desktop's temp-file-plus-atomic-rename durability construction, which has **no correct implementation on OPFS** — the format offers no crash-atomicity guarantee, and Safari does not implement `move()` at all (measured in the Phase 0 spike). Double buffering needs only "never write both copies at once"; the blob's existing AEAD tag already rejects a torn file, so no checksum or format change is added. The **blob bytes are unchanged** — this is the container around them, not the format. Per-note blobs are not double-buffered; they use write-new-then-remove-old.
@@ -609,9 +619,19 @@ Myne's pattern for unlocking the vault under either of two independent credentia
 
 Used in: `spec/protocol.md` §3.1, §9.3
 
+### **due-date chip** &nbsp; 📦 *Product*
+
+The inline rendering of a task line's `due` field as a compact pill (MYND-614). One of three task-field chips, with the [recurrence chip](#recurrence-chip) and the priority chip; all three share one token module so the editor's chips and the task panel's rows cannot drift.
+
+**It never opens on caret entry** — the [cursor-aware reveal](#cursor-aware-reveal) exception it shares with wikilink chips — so the chip's own editor is the only way to change the value in live mode, which is why that editor is fully keyboard-operable. It **does** open while the find panel is open. A value that does not parse renders as raw source text with a subtle hint instead of a chip: never a blank chip, never a silently corrected date.
+
+Editing any field on the line rewrites **every** task field on it into Myne's form, in one transaction, so a single undo restores the prior state.
+
+Used in: `spec/markdown-dialect.md` §3.8; `decisions.md` 2026-07-28
+
 ### **drawing note** &nbsp; 📦 *Product*
 
-A note whose editing surface is an **Excalidraw canvas** instead of the CodeMirror markdown editor. Stored as an ordinary `.myn` note carrying a value-strict `kind: drawing` frontmatter marker (the 11th Myne-managed canonical field, [`spec/markdown-dialect.md`](spec/markdown-dialect.md) §3.6.1) with the Excalidraw scene serialized into a ` ```excalidraw ` fenced body — so it rides the existing `MY01` envelope with **no protocol change**, syncs/exports like any note, and its text elements are searchable (projected to plain text). Embedded raster images are externalized to attachments (`MYA1`), referenced by a superset `![[att:<id>]]` block so the fail-closed GC never erases a live image. Powered by the vendored, egress-hardened Excalidraw engine (`decisions.md` 2026-07-14). Epic MYND-497.
+A note whose editing surface is an **Excalidraw canvas** instead of the CodeMirror markdown editor. Stored as an ordinary `.myn` note carrying a value-strict `kind: drawing` frontmatter marker (the 7th Myne-managed canonical field, [`spec/markdown-dialect.md`](spec/markdown-dialect.md) §3.6.1) with the Excalidraw scene serialized into a ` ```excalidraw ` fenced body — so it rides the existing `MY01` envelope with **no protocol change**, syncs/exports like any note, and its text elements are searchable (projected to plain text). Embedded raster images are externalized to attachments (`MYA1`), referenced by a superset `![[att:<id>]]` block so the fail-closed GC never erases a live image. Powered by the vendored, egress-hardened Excalidraw engine (`decisions.md` 2026-07-14). Epic MYND-497.
 
 ### **Ed25519** &nbsp; 🔐 *Primitive*
 
@@ -779,7 +799,7 @@ Used in: `decisions.md` 2026-07-13
 
 ### **frontmatter** &nbsp; 📦 *Product*
 
-The optional YAML metadata block delimited by `---` lines at the top of a note's decrypted markdown (`spec/markdown-dialect.md` §3.6). Carries the five Myne-managed canonical fields (`updated:` / `title:` / `folder:` / `trashed:` / `template:`, §3.6.1) plus arbitrary user-authored keys, all preserved byte-for-byte on write (unknown-field-preservation + §6 C1). The editor's recognizer only *delimits* the block; a separate read-only [property](#property) parse (Saved Views / MYND-271) reads the YAML *body* to type each key for the [property index](#property). Not to be confused with the inline `#tag` / frontmatter `tags:` distinction (§3.7).
+The optional YAML metadata block delimited by `---` lines at the top of a note's decrypted markdown (`spec/markdown-dialect.md` §3.6). Carries the twelve Myne-managed canonical fields (§3.6.1) plus arbitrary user-authored keys, all preserved byte-for-byte on write (unknown-field-preservation + §6 C1). The editor's recognizer only *delimits* the block; a separate read-only [property](#property) parse (Saved Views / MYND-271) reads the YAML *body* to type each key for the [property index](#property). Not to be confused with the inline `#tag` / frontmatter `tags:` distinction (§3.7).
 
 Used in: `spec/markdown-dialect.md` §3.6
 
@@ -981,6 +1001,14 @@ The desktop UI localization layer: `react-i18next` over bundled flat-per-namespa
 
 Used in: `docs/dev/i18n.md`; `decisions.md` 2026-06-25; `src/i18n/`.
 
+### **interval rule** &nbsp; 📦 *Product*
+
+One of the two [recurrence rule](#recurrence-rule) families: a rule that **counts from the previous date** — plain intervals (`every 3 days`, `every month`) and weekday sets (`every monday and friday`).
+
+***Myne-divergent* in a way worth stating: an interval rule may drift, and that is the design, not a bug.** Where the previous date has no counterpart in the target month, the occurrence **clamps** to the last valid day and the *next* step counts from the clamped date — 31 January + one month = 28 February, then 28 March. Clamping-and-drifting is the stateless option: nothing has to remember an original anchor day the file does not carry. It is acceptable precisely because the [ordinal rule](#ordinal-rule) family exists, so a user who wants "keep it on the 31st" says so directly. Compare `spec/markdown-dialect.md` §3.8.7's family table.
+
+Used in: `spec/markdown-dialect.md` §3.8.7; `decisions.md` 2026-07-28
+
 ### **locale catalog** &nbsp; 🛠️ *Tooling*
 
 A single language's translation file in the i18n layer: `locales/<lang>/<namespace>.json` (only namespace today: `common`). The English catalog (`locales/en/common.json`) is hand-maintained and is the runtime per-key fallback; every other catalog is **Weblate**-managed and must not be hand-edited in the repo (that races Weblate). New keys are added by `pnpm i18n:extract` (`i18next-cli`).
@@ -1082,6 +1110,22 @@ A [focus-mode](#focus-mode) reading aid (MYND-348): every editor line except the
 
 Used in: `spec/protocol.md` §9.5.2; `decisions.md` 2026-06-17 (MYND-348)
 
+### **line-task** &nbsp; 📦 *Product*
+
+A task-list item (`- [ ]` / `- [x]`, `spec/markdown-dialect.md` §3.3) that carries task metadata as [task inline fields](#task-inline-field) on the same line. The unit the task index, the task panel and the query block all operate on. "Line-" is the load-bearing half of the name: a line-task lives entirely within one markdown line — no sidecar, no database row, no identity beyond its position in the note — which is what keeps the commitment that a task is plain markdown and nothing else.
+
+The recognizer does **not** enforce line-task-ness: it recognizes fields on any line, exactly as the inline-tag tokenizer does, so applying the restriction is the consuming layer's obligation (`spec/markdown-dialect.md` §3.8.6).
+
+Used in: `spec/markdown-dialect.md` §3.8; `decisions.md` 2026-07-28
+
+### **line-task projection** &nbsp; 📦 *Product*
+
+The per-note record set the structured index (`vault.indices` / `MYI1`, `spec/protocol.md` §9.8) holds for each [line-task](#line-task): a locator (`line_index`, `raw_line`) plus the five [task inline field](#task-inline-field) values, **every one an opaque verbatim source substring**. Rust stores and returns them and interprets nothing — no date parsing, no comparison, no sorting — because the type authority is `markdown-dialect.md` §3.6.4 and it lives client-side.
+
+The projection is derived, never authoritative: the note files remain the source of truth, deleting the index loses only time, and a blob whose `index_format_version` this client does not understand is rejected before decryption and rebuilt.
+
+Used in: `spec/protocol.md` §9.8.2; `decisions.md` 2026-07-28
+
 ### **link reference definition** &nbsp; 📦 *Product*
 
 A `[label]: url` line (CommonMark "link reference definition") that supplies the destination for a [reference link](#reference-link) (`[text][label]`) or a reference-style image (`![alt][label]`) elsewhere in the same note. Labels match by CommonMark rules — case-folded with internal whitespace collapsed — and the first definition of a given label wins. In the Myne editor a shared collector scans all such definition lines into a `label → { target, range }` map; a definition referenced by a resolved reference link is hidden off-cursor (it reads as body noise otherwise) and revealed when the cursor enters its line. The definition bytes are preserved (§6 C1) and the form is never emitted by an authoring affordance. See also [reference link](#reference-link).
@@ -1157,6 +1201,16 @@ Used in: `spec/protocol.md` §5.3
 
 The small Rust stdio host in the Tauri core that receives a keyless clip handoff from the [browser clipper](#browser-clipper) and pipes it into the existing `note_create` / `attachment_import` pipeline. Allowlists the exact extension ID and treats every handed-off byte as hostile input (size caps, UTF-8 validation, no path traversal, re-sniffed MIME, rate limits). Defines trust boundary TB10.
 
+### **note-task** &nbsp; 📦 *Product*
+
+A whole note the user has declared a unit of work, marked by the value-strict `kind: task` frontmatter field (`spec/markdown-dialect.md` §3.6.1). Distinct from a [line-task](#line-task), which is a single `- [ ]` line inside any note: a note-task is the note itself.
+
+The declaration is deliberate and explicit — a note carrying a due date is **not** a task, because otherwise every meeting note with a date would silently become one. Completion is recorded by [`done:`](#done), and the complete action is **gated on the marker**: completing a note that is not a task would produce state no surface lists.
+
+Unlike the sibling `kind: drawing`, the marker does **not** change the render surface — a note-task's body is ordinary markdown — so it needs no Rust mirror. It surfaces as a muted marker in the sidebar row and the tab, hideable via the `show_task_marker` preference.
+
+Used in: `spec/markdown-dialect.md` §3.6.1; `decisions.md` 2026-07-28
+
 ### **note template** &nbsp; 📦 *Product*
 
 A reusable note skeleton the user picks at note-creation time. Stored as an ordinary AEAD-sealed [`.myn`](#myn-file) note carrying the value-strict Myne-managed `template:` flag (`spec/markdown-dialect.md` §3.6.1) — **not** a `vault.prefs` field, so it inherits the 16 MiB/note ceiling, per-note fault isolation, and a free [UUIDv7](#note_uuid) identity (rename-safe; the template's name is its `title:` field, its content is the note body). A note template is the inverse-visibility twin of [Trash](#trash): excluded from the sidebar file-tree, folder-tree, and search, surfaced **only** in the template picker and the management UI. Location-agnostic (no target-folder baked in) and minimal: no declared-variables field — the [template variable](#template-variable) engine infers `{{...}}` tokens from the body at fill time. Myne ships **none** — a fresh vault has zero templates (start-empty). See [markdown-dialect.md](spec/markdown-dialect.md) §3.6.1 (`template:` row), [decisions.md](decisions.md) 2026-06-07 (MYND-186).
@@ -1187,7 +1241,7 @@ Used in: `decisions.md` 2026-07-13
 
 ### **Myne-managed canonical frontmatter field** &nbsp; 📋 *Protocol*
 
-A YAML frontmatter field whose value is written by the Myne dialect surgery module (`src/dialect/surgery.ts`) rather than left purely user-authored. v0.1 defines two such fields: `updated` (RFC 3339 string, UTC, **autosave-driven** — overwritten on every `note_update` via `patchUpdatedField` to record the user's last-edit timestamp on the device) and `title` (YAML string scalar, **rename-driven** — overwritten only when the user renames a note from the sidebar AND the read-precedence chain resolves to the frontmatter slot, via `patchTitleField`; the `<NoteRow>` sidebar reads from the same field per the mirror-existing source-of-truth decision tree). Both fields are **unprefixed** (no `myne_` namespace) to align with Obsidian / Logseq / Bear convention and the `PRODUCT.md` plain-markdown-portability commitment. Other frontmatter fields (`tags:`, user-defined keys) are user-authored and preserved per `markdown-dialect.md` §3.6 "Unknown frontmatter fields are preserved on write." The set of Myne-managed canonical fields is forward-incompatible-by-design with v005.
+A YAML frontmatter field whose value is written by the Myne dialect surgery module (`src/dialect/surgery.ts`) rather than left purely user-authored. v0.1 defines **twelve** such fields, enumerated in `markdown-dialect.md` §3.6.1 and exported as the single `MANAGED_FRONTMATTER_FIELDS` constant (`dialect/src/managedFields.ts`) that the importers' reject list consumes: `updated` / `title` / `folder` / `trashed` / `template` / `folder_index` / `kind` / `done` / `archived` / `deleted` / `conflict` / `conflict_of`. The first two are the original pair — `updated` (RFC 3339 string, UTC, **autosave-driven** — overwritten on every `note_update` via `patchUpdatedField` to record the user's last-edit timestamp on the device) and `title` (YAML string scalar, **rename-driven** — overwritten only when the user renames a note from the sidebar AND the read-precedence chain resolves to the frontmatter slot, via `patchTitleField`; the `<NoteRow>` sidebar reads from the same field per the mirror-existing source-of-truth decision tree). All are **unprefixed** (no `myne_` namespace) to align with Obsidian / Logseq / Bear convention and the `PRODUCT.md` plain-markdown-portability commitment. Other frontmatter fields (`tags:`, user-defined keys) are user-authored and preserved per `markdown-dialect.md` §3.6 "Unknown frontmatter fields are preserved on write." The set of Myne-managed canonical fields is forward-incompatible-by-design with v005.
 
 Used in: `spec/markdown-dialect.md` §3.6.1; `decisions.md` 2026-05-07 "User-meaningful timestamp storage path"; `decisions.md` 2026-05-15 "Note title write target"
 
@@ -1281,6 +1335,16 @@ Used in: `decisions.md` 2026-07-15; `spec/server-protocol.md` §7
 The UI pattern where a state change (sidebar row appended, removed, title overwritten) is applied to the local React cache **before** the underlying Tauri IPC call resolves, giving the user instant feedback. On IPC rejection (disk full, vault locked mid-save, structural error) the change is reverted from the cache and the user is informed via a non-blocking error toast. Myne uses optimistic UI rollback in three sidebar paths per `decisions.md` 2026-05-15 "Save-handler discipline": `createNote` (row appended optimistically), `deleteNote` (row removed optimistically), `renameNote` (title overwritten optimistically). `saveNote` (autosave) is **not** optimistic — body autosave doesn't typically alter the sidebar's title row, and the BottomBar save-status indicator (`SaveStatus` component, `Saving…` → `Saved · 2s ago` / `Save failed · Retry`) provides feedback without preempting the IPC. The pattern requires a paired rollback discipline at every optimistic call site; an IPC-rejected optimistic action that doesn't rollback is a UX-state-corruption bug.
 
 Used in: `decisions.md` 2026-05-15; MYND-82
+
+### **ordinal rule** &nbsp; 📦 *Product*
+
+One of the two [recurrence rule](#recurrence-rule) families — the **calendar-anchored** one: `first monday of every month`, `last friday of every month`, `day 31 of every month`, `last day of every month`. Also called the calendar family.
+
+**It does not drift.** Where the nominal position does not exist in a month, that occurrence clamps and the *next* one returns to the nominal position: `day 31` gives 28 February and then **31 March**, where the [interval rule](#interval-rule) family would have given 28 March. That contrast is the whole reason both families exist. An ordinal position a month cannot hold (`fourth monday` in a month with only four Mondays already used) clamps **back** a week rather than spilling into the next month.
+
+The family a rule belongs to is fixed by the rule's shape, so the user chooses the behaviour by choosing the rule — there is no setting, and Myne never infers.
+
+Used in: `spec/markdown-dialect.md` §3.8.7; `decisions.md` 2026-07-28
 
 ### **orphan vault artefact** &nbsp; 📋 *Protocol*
 
@@ -1475,11 +1539,45 @@ The 32-byte key derived from the recovery phrase via Argon2id with `salt_recover
 
 Used in: `spec/protocol.md` §3.1, §7
 
+### **recurrence chip** &nbsp; 📦 *Product*
+
+The inline rendering of a task line's `repeat` field as a compact pill (MYND-614), the sibling of the [due-date chip](#due-date-chip). Its label is the [recurrence rule](#recurrence-rule) **localized for display** while the file keeps the canonical English form — the chip carries the display label and the source bytes as separate values, so a localized label can never travel back into a write.
+
+**A rule outside the closed vocabulary is not chipped at all** (MYND-615): it renders as raw source text with the same subtle failure hint a malformed date gets, plus a note of the consequence — this task will not repeat. Until the vocabulary existed the chip flagged nothing, because flagging every rule would have been worse than flagging none; now that it exists, an unreadable rule must *look* unread. The field is also registered in the spell-check skip set, or a rule made of ordinary dictionary words (`every 3 days`) would be underlined as a spelling error.
+
+Used in: `spec/markdown-dialect.md` §3.8, §3.8.7; `decisions.md` 2026-07-28
+
+### **recurrence rule** &nbsp; 📦 *Product*
+
+The expression a [line-task](#line-task)'s `repeat` [task inline field](#task-inline-field) carries, drawn from a **closed** three-tier vocabulary frozen normatively in `spec/markdown-dialect.md` §3.8.7: plain intervals (`every 3 days`), weekday sets (`every monday and friday`), and calendar positions in a month (`last friday of every month`, `day 31 of every month`).
+
+**Closed on purpose.** A general implementation of a recurrence standard is an *evaluator*, and admitting one would put a second execution surface into a dialect that refuses `onCompletion` for exactly that reason. The user never types a rule — they choose it from a control — which is what makes a closed vocabulary honest rather than restrictive.
+
+Rules are **stored in canonical English and displayed localized**: a file carrying two languages would become unreadable to its own owner on a differently-configured device. An expression outside the vocabulary is preserved verbatim and surfaced as unrecognized, never approximated and **never defaulted** — see [unrecognized rule](#unrecognized-rule). Rules divide into the [interval rule](#interval-rule) and [ordinal rule](#ordinal-rule) families, which differ in whether they drift.
+
+Used in: `spec/markdown-dialect.md` §3.8.3, §3.8.7; `decisions.md` 2026-07-28
+
 ### **reference link** &nbsp; 📦 *Product*
 
 A CommonMark link that names a [link reference definition](#link-reference-definition) instead of carrying its URL inline: full `[text][label]`, collapsed `[text][]` (label = the text), or shortcut `[label]`. Myne v0.1 recognizes and **renders** reference links — a usage whose label resolves against a definition shows its visible text as a link and its definition line hides off-cursor — while a dangling reference (no matching definition) stays plain text. Rendering is cursor-aware and byte-preserving (§6 C1); the canonical emit form for new links is the inline `[text](url)`, so reference links are recognized and rendered but **never emitted**. Distinguished from an inline link by the parse tree (a reference link has a `LinkLabel` child or no `URL`); resolution uses the shared collector, since the parser alone emits a node even for a broken full reference. See also [link reference definition](#link-reference-definition), [decoration layer](#decoration-layer).
 
 Used in: `spec/markdown-dialect.md` §3.2, §5; `decisions.md` 2026-05-30
+
+### **remind** &nbsp; 📦 *Product*
+
+The [task inline field](#task-inline-field) naming a [reminder instant](#reminder-instant) — the moment the user wants to be nudged about a [line-task](#line-task). One of the five fields Myne writes.
+
+**Absolute, not an offset from the due date.** An offset would survive recurrence more gracefully, but it cannot express a reminder on a task that has no due date at all — "remind me Tuesday to call my mother" — and that case is real. The cost is paid in recurrence instead: the anchor is `due` if present, else `remind`; the anchor advances by the rule and the other field shifts by the *same interval*, so the gap between them is carried rather than recomputed.
+
+Used in: `spec/markdown-dialect.md` §3.8.2; `decisions.md` 2026-07-28
+
+### **reminder instant** &nbsp; 📦 *Product*
+
+The value a [`remind`](#remind) field carries: a date, optionally with a wall-clock time of day.
+
+***Myne-divergent*** in one respect a reader must know: it carries **no UTC offset and no IANA zone identifier**. "09:00" means 09:00 wherever the user is — which is what a personal reminder means, and which keeps a coarse geolocation datum out of a file that gets exported as plaintext. A value carrying an offset does not type at all: it is preserved verbatim and surfaced as unparsed rather than being silently shifted into local time.
+
+Used in: `spec/markdown-dialect.md` §3.8.3; `decisions.md` 2026-07-28
 
 ### **rename journal** &nbsp; 📋 *Protocol*
 
@@ -1687,6 +1785,22 @@ The mobile client's layout axis — the discriminator that decides which pane co
 
 Used in: `decisions.md` 2026-07-12 "Mobile tablet strategy"; `myne-mobile/src/platform/SizeClassContext.tsx`
 
+### **skip (a recurring task)** &nbsp; 📦 *Product*
+
+Advancing a recurring [line-task](#line-task) to its next occurrence **without recording a completion** — "this occurrence did not happen and will not". Same date arithmetic as completing it, with two differences: no `done` field is written, and the existing line is updated **in place** rather than a second line being added, so the line count does not grow.
+
+**A skip leaves no trace at all** — not a ticked marker (which would be a lie), and not a record of the skip (which would be per-occurrence history, rejected outright for the task epic: a task lives in its line and nowhere else). The only evidence a skip happened is that the date moved. In completion-anchored mode a skip counts from today, since there is no completion to anchor on.
+
+Used in: `spec/markdown-dialect.md` §3.8.7; `decisions.md` 2026-07-28
+
+### **unrecognized rule** &nbsp; 📦 *Product*
+
+A `repeat` value outside the closed [recurrence rule](#recurrence-rule) vocabulary — an RFC-5545 expression pasted in, a phrase from another app, a half-typed rule.
+
+Its bytes are **preserved verbatim** and its state is **shown**: the editor renders it as raw source text with a subtle failure hint naming the consequence — this task will not repeat — rather than as a [recurrence chip](#recurrence-chip). What is forbidden is the silent path: falling back to a default rule (which repeats a task the user never asked to repeat) or quietly treating the task as non-recurring (a data-loss-shaped surprise in which the user believes it repeats, completes it, and finds out months later that nothing was scheduled). A rule Myne cannot read must *look* unread.
+
+Used in: `spec/markdown-dialect.md` §3.8.7; `decisions.md` 2026-07-28
+
 ### **Slot** &nbsp; 📦 *Product*
 
 The three-state enum that holds a vault's auth state inside `VaultRuntimeState`'s `RwLock<HashMap<VaultId, Slot>>` — one entry per vault, keyed by [VaultId](#vaultid) (an absent key IS the `Empty` case; no `Empty` entries are stored). Variants: `Slot::Empty` (no vault open), `Slot::Recovering { ... }` (post-recovery / pre-password-commit), `Slot::Unlocked(UnlockedVault)` (full editor access). Editor commands match only `Slot::Unlocked(uv) => ...`; the `Slot::Recovering` and `Slot::Empty` variants are structurally rejected at compile time (per entry). The shape is the type-system realization of `recovery-flow.md` §4.1 + §4.3's "no soft-unlocked session" guarantee — security lives in the type, not in UI discipline. Multi-vault made the storage a `HashMap<VaultId, Slot>` (the singleton→map type-swap landed 2026-06-09) under the **≤1-`Unlocked` invariant**: at most one entry is ever `Unlocked` — the **active vault** is that sole `Unlocked` entry (no separate pointer), and unlocking a second vault first locks the current one. `auth_permits` stays a single global capacity-1 semaphore (one Argon2id auth op in flight client-wide, never per-vault). The per-entry lifecycle reasoning carries forward unchanged.
@@ -1797,6 +1911,140 @@ Used in: `spec/protocol.md` §9.13; MYND-261…267.
 A candidate correct spelling the [spell checker](#spell-check) offers for a misspelled word, produced by the `spellbook` speller and surfaced (capped at 5, SYNC-14) in the right-click correction menu. Choosing one applies a surgical, byte-stable range edit that replaces exactly the flagged word; it is a presentation affordance only — never an auto-correct, never mutating the buffer until the user picks one. Distinct from the **Personal dictionary** / **Ignore list** actions in the same menu (which change verdicts, not text).
 
 Used in: MYND-265; `src/editor/spell/correction-menu.ts`.
+
+### **task-query block** &nbsp; 📦 *Product*
+
+A fenced code block with the info string `tasks`, rendered as a **live list** of the tasks matching its query (`spec/markdown-dialect.md` §3.9). The note reads as a document rather than as code, and the list is never stale — it re-runs when the index changes.
+
+Its query is a **closed clause roster**, frozen normatively, with one rule doing all the work: ***a field name may never appear where a value goes.*** `in 3 days` is a parameterized constant and is accepted; `due + 3d` reads a field and operates on it, and is not — once that is representable, so is comparing two fields, and the grammar would need an evaluator. All three of the upstream grammar's function-valued forms are excluded.
+
+Two behaviours are load-bearing rather than incidental. An unreadable clause is **dropped and reported inside the block, permanently** — never a toast, which would nag on every note open or go silent after the first. And a query whose clauses were **all** dropped **refuses** rather than matching everything: see [widen guard](#widen-guard). Rendering is purely visual and never modifies the block's bytes, and a block cannot match itself, because inline parsing never descends into a code node.
+
+Used in: `spec/markdown-dialect.md` §3.9; `decisions.md` 2026-07-28; MYND-617
+
+### **widen guard** &nbsp; 📦 *Product*
+
+The rule that a [task-query block](#task-query-block) whose clauses were **all** unreadable **refuses** rather than collapsing to "match everything".
+
+The failure it prevents is specific and nasty: a misunderstood query that renders the entire vault does not look like an error, it looks like a **correct enormous result**, so the user does not go looking for the mistake. A query with no clauses at all is a different case and is legitimately unfiltered — both produce zero clauses, and an implementation that conflates the two renders the whole vault for a query it misread. Inherited verbatim from the Obsidian importer, which implements the same distinction for the same reason.
+
+Used in: `spec/markdown-dialect.md` §3.9.3; `decisions.md` 2026-07-28
+
+### **query block builder** &nbsp; 📦 *Product*
+
+The slash-command surface that writes a [task-query block](#task-query-block) from choices instead of from memory, showing a live preview of the canonical text it produces.
+
+**It is the reason the roster can be English-only.** Translating the roster would mean one contract and one vector set per shipped language, and a vault that stops being portable between a user's own devices — a query written under one app language would be unreadable under another. The builder removes the need to memorize any keyword; what remains is reading them, which the preview also teaches. Operable by keyboard alone from its first version, since it is the comfortable route to the feature.
+
+Used in: `spec/markdown-dialect.md` §3.9.4; `decisions.md` 2026-07-28; MYND-617
+
+### **task reminder** &nbsp; 📦 *Product*
+
+A nudge at a chosen moment for a [line-task](#line-task) carrying a [`remind`](#remind) field (MYND-618). Delivered in **two layers**: an in-app layer while Myne is open, and — on platforms that hold such registrations — an OS **pre-registration** layer so one can fire while Myne is closed.
+
+**Locking does not cancel the registered set**, which is an explicit departure from the rule that every plaintext surface is torn down on every lock path, recorded in `decisions.md` 2026-07-28. The rule protects vault *content*; what the platform holds here is a timestamp and a content-free string. It is also barely a choice: the default auto-lock is five minutes with no off switch, so cancelling on lock would end reminders five minutes after the user stops typing.
+
+Not the same as a due date: a due date is when work is *expected*, a reminder is when the user asked to be *interrupted*. Treating one as the other would notify a user who never asked.
+
+Used in: `threat-model.md` §7; `decisions.md` 2026-07-28; MYND-618
+
+### **registration horizon** &nbsp; 📦 *Product*
+
+How far ahead a device hands pending [task reminders](#task-reminder) to its operating system. Device-local and user-adjustable; Myne's default is seven days.
+
+***A privacy bound before a resource one.*** Pending reminder **times** leave the AEAD envelope and sit in OS-owned plaintext (`threat-model.md` §7), so a shorter horizon exposes less. Its consequence is **stated rather than discovered**: reminders stop if Myne is not opened within the horizon, because registration can only happen inside an unlocked session — so the UI shows the date through which reminders are currently registered.
+
+Used in: `spec/protocol.md` §9.5.2; `threat-model.md` §7; `decisions.md` 2026-07-28
+
+### **reminder registration** &nbsp; 📦 *Product*
+
+One [task reminder](#task-reminder) as the operating system holds it: an **opaque identifier** and a [reminder instant](#reminder-instant), plus a [content-free notification body](#content-free-notification-body) the client owns. Nothing else — no task text, no note identifier, no title (MYND-619).
+
+***The identifier is opaque on purpose, and that is a Myne-divergent choice.*** The client's own key for a reminder names where the task lives, which is the right key for reconciling a set and the wrong thing to hand a platform: a registration is written into the operating system's own persistence — and on Android into a pending intent — where a note identifier would be correlatable metadata outside the AEAD envelope. So what crosses is random bytes minted per registration, and the mapping back to a task is held **in memory only**. The cost is accepted rather than hidden: a new session cannot name the previous one's registrations, so it clears and re-registers them.
+
+**Who holds the set differs by platform.** iOS keeps it entirely in OS-owned storage. Android exposes no way to enumerate an app's alarms, so the client also keeps a device-local `{identifier → instant}` record — same content as the OS would hold, different holder, and it is what makes a registration survive the reboot that drops every alarm.
+
+Used in: `threat-model.md` §7; `decisions.md` 2026-07-29; MYND-619
+
+### **content-free notification body** &nbsp; 📦 *Product*
+
+The default form of a [task reminder](#task-reminder)'s notification: it carries **no task text and no resolvable note identifier** — only that a reminder is due.
+
+The registration lives in OS-owned plaintext storage and can surface on a locked screen, so putting the task's words in it would hand content to a shoulder-surfer for a convenience nobody asked for. Real text is a **separate, default-off opt-in** with its own disclosure sentence, shown at the moment the user decides, because turning it on changes what leaves the vault. The disclosure deliberately does **not** claim Myne controls what a lock screen previews — those settings are the platform's and the user's.
+
+Used in: `threat-model.md` §7; `decisions.md` 2026-07-28; MYND-618
+
+### **task panel** &nbsp; 📦 *Product*
+
+The collective name for Myne's task-list surfaces (MYND-616): the vault-wide [task tab](#task-tab), the note-scoped right-panel tab, and — later — the query block. All three are **one component with a [scope selector](#scope-selector) parameter**; they differ in the list handed to them and in whether they show a task's source note.
+
+A task panel is the one place a *view* may write to a note, and only one bit of it: a completion marker, through the single task-mutation writer. That exception is recorded and scoped in `decisions.md` 2026-07-28, which narrows the saved-views read-only rule rather than quietly ignoring it. Nothing else is editable from a panel — no text, no fields, no cells.
+
+Used in: `decisions.md` 2026-07-28; MYND-616
+
+### **task tab** &nbsp; 📦 *Product*
+
+The vault-wide [task panel](#task-panel), opened as a first-class workspace tab — the pattern the knowledge-graph view established. A **singleton**: one per workspace, with a fixed sentinel id, so "open tasks" reveals the existing tab rather than making a second one.
+
+Its selected filter and [scope](#scope-selector) persist **with the tab** in the workspace descriptor, not as a preference: preferences are for stated choices like theme and auto-lock, while "which filter am I looking at" is where the user is. Both are omit-when-default, so an untouched task tab serializes byte-identical to a descriptor written before the feature existed, and the descriptor is opaque to the storage codec — so none of this is a format change.
+
+Used in: `decisions.md` 2026-07-28; MYND-616
+
+### **task destination** &nbsp; 📦 *Product*
+
+The mobile placement of the vault-wide [task panel](#task-panel) (MYND-620): a top-level entry in the phone's bottom navigation bar, and a tab in the expanded-layout sidebar — the same shape the knowledge-graph view established.
+
+**Not a second surface, and deliberately not a second name.** It is the [task tab](#task-tab)'s content in the placement each mobile layout offers; the filters, the sort, the empty states and the write path are the desktop's code, consumed rather than mirrored. What differs is layout and navigation.
+
+Putting it in the bottom bar is an information-architecture statement — tasks sit alongside notes in Myne's mobile identity — and is **hard to reverse**: top-level navigation is something users learn, so removing a destination later is breaking in a way that removing a menu item is not. On a phone "what is due today" is asked more often than almost anything else, and two taps away would have confined the feature to the desktop in practice.
+
+Used in: `decisions.md` 2026-07-28; MYND-620
+
+### **task sheet** &nbsp; 📦 *Product*
+
+The mobile placement of the **note-scoped** [task panel](#task-panel) (MYND-620): a sheet opened from the editor, listing only the open note's tasks.
+
+It is the phone's answer to the desktop's permanently-visible side panel — there is no room beside an editor on a phone, so the same information arrives on request, through the sheet mechanism attachments, snapshots, templates, settings and the view editor already use. In the expanded layout the same list is a sidebar tab instead, because a larger screen can show tasks *beside* a note rather than instead of it.
+
+Used in: `decisions.md` 2026-07-28; MYND-620
+
+### **two-line task row** &nbsp; 📦 *Product*
+
+The narrow-width form of the shared task row (MYND-620): the task's text on the first line, its [reminder instant](#reminder-instant) or due date and its source note as quiet metadata on the second — which is also where the overdue treatment sits.
+
+***Nothing is dropped and nothing is truncated***, and that is the whole argument. The single-line alternatives each remove something load-bearing: truncating the text removes the one thing on the row that matters, and dropping the source note removes half the context in a vault-wide list, where the tasks come from different notes. One component serves every surface, so the row has to work for the harder case.
+
+The state rules are unchanged by the layout: neutral surface, state carried by icon and coloured text, and **never a green check**.
+
+Used in: `decisions.md` 2026-07-28; MYND-620
+
+### **scope selector** &nbsp; 📦 *Product*
+
+The narrowing control on a [task panel](#task-panel): **one folder** (single-select, subtree-inclusive) **AND any of several tags** (multi-select, OR'd).
+
+***Myne-divergent* in the half people expect to be an AND**: several selected tags are OR'd, not AND'd. Most notes carry one of a user's top-level tags rather than several, so AND'ing two selections returns empty for most real choices — and a selector that usually yields nothing reads as broken rather than precise. Folder and tags are then AND'd with each other.
+
+It adds **no expressiveness to the query surface**: every scope it can express is one of the closed `FilterNode` leaves the saved-views work already froze (`inFolder` / `hasTag` / `and` / `or` / `all`), which is checkable rather than merely asserted.
+
+Used in: `decisions.md` 2026-07-28; MYND-616
+
+### **task marker** &nbsp; 📦 *Product*
+
+The muted glyph shown on a [note-task](#note-task) in the sidebar row and on its tab, so the user's declaration is visible without opening the note. Rides the same trailing-marker treatment as the folder-index badge (`--fg-3`, 12px, inline after the title).
+
+It marks the note as a task and says **nothing about completion** — deliberately not a check, and above all not a green check, which the design canon prohibits. Hideable via the `show_task_marker` preference, which is classified **Shared** rather than device-local: a marker's visibility is taste, not device capability, so it should not have to be re-chosen on every new device.
+
+Used in: `spec/protocol.md` §9.5.2; `decisions.md` 2026-07-28
+
+### **task inline field** &nbsp; 📦 *Product*
+
+The metadata a [line-task](#line-task) carries in its own line — when it is due, whether it repeats, when it was completed, how urgent it is, when to be reminded. Myne **reads three dialects and writes one**: it recognizes Obsidian's emoji form (`📅 2026-08-01`) and Obsidian's Dataview-style bracketed form (`[due:: 2026-08-01]`), and emits only the bracketed form with Myne's own key names.
+
+Five fields are written — `due`, `repeat`, `done`, `priority`, [`remind`](#remind). Everything else Obsidian Tasks supports is read and **preserved but never emitted**, so round-tripping through Myne cannot destroy data Myne did not understand. Obsidian's `onCompletion` is preserved as bytes and given no meaning at all: it is a miniature action language, and interpreting it would cross the no-code-eval line the dialect defends elsewhere.
+
+Reading three dialects is what makes the Obsidian importer honest — without it, an import "succeeds" and the user's tasks are silently invisible. Writing one is the accepted asymmetry: a task Myne edits drops out of that user's Obsidian Tasks view, because editing any field converts the whole line.
+
+Used in: `spec/markdown-dialect.md` §3.8; `decisions.md` 2026-07-28
 
 ### **Tauri** &nbsp; 🛠️ *Tooling*
 

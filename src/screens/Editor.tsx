@@ -49,6 +49,14 @@ import { catalogDefaults } from "../commands/bindableCatalog";
 import { asViewMode, type ViewMode } from "../editor/view-mode";
 import { VIM_MODE_EVENT, type VimModeEventDetail } from "../editor/vim";
 import { CLOSE_ACTIVE_TAB_EVENT } from "../notes/closeActiveTabSignal";
+import { EditorView } from "@codemirror/view";
+import {
+  applyTaskFieldEdit,
+  beginTaskFieldEdit,
+  TASK_CHIP_EVENT,
+  type TaskChipEventDetail,
+} from "@myne/editor/decorations/task-chip";
+import { openTaskFieldEditor } from "@myne/editor/task-field-editor";
 import { focusKindOf } from "../commands/scope";
 import { FailClosedError } from "../components/FailClosedError";
 import { StorageLost } from "./StorageLost";
@@ -130,6 +138,8 @@ import { requestRevealViews } from "../notes/views/revealViewsSignal";
 import { useResolverNotes } from "../notes/resolverNotes";
 import { UnlinkedMentionsSection } from "../notes/components/UnlinkedMentionsSection";
 import { AiChatTab } from "../notes/components/AiChatTab";
+import { NoteTasksPanel } from "../notes/components/TasksPane";
+import { TASK_WRITE_EVENT } from "../notes/toggleTask";
 import { clearAiOutput } from "../notes/ai/aiOutputStore";
 import { clearTagSuggest } from "../notes/ai/tagSuggestStore";
 import { clearChat, stopChatTurn } from "../notes/ai/chatStore";
@@ -829,6 +839,58 @@ function EditorChrome({
     };
     window.addEventListener("myne-open-tag", onOpenTag);
     return () => window.removeEventListener("myne-open-tag", onOpenTag);
+  }, []);
+  // A task written from a LIST surface (MYND-616 task 8) changes a note's bytes
+  // out-of-band of any pane's own autosave, so every open pane must re-read.
+  // `reloadOpenNote` is the existing blanket bump used after a sync pull — each
+  // pane applies its own dirty guard, so it never clobbers in-flight typing.
+  useEffect(() => {
+    const onWritten = (): void => ctx.reloadOpenNote();
+    window.addEventListener(TASK_WRITE_EVENT, onWritten);
+    return () => window.removeEventListener(TASK_WRITE_EVENT, onWritten);
+  }, [ctx]);
+  // Editor task-field chip activation (MYND-614 tasks 6 + 7): the chip
+  // decoration dispatches a bubbling `myne-open-task-chip` event; open the
+  // field editor anchored to that chip and write the result back through the
+  // single writer seam. Same Editor-level-listener shape as the `#tag` chip
+  // above, and for the same reason — no per-pane prop threading.
+  //
+  // Because the chips never open on caret entry, this listener is the ONLY way
+  // to edit these values in live mode. It is therefore load-bearing rather than
+  // convenience wiring: without it the chips render and do nothing.
+  useEffect(() => {
+    const onOpenChip = (e: Event) => {
+      const detail = (e as CustomEvent<TaskChipEventDetail>).detail;
+      const target = e.target as HTMLElement | null;
+      const anchor = target?.closest?.("[data-task-chip]") as HTMLElement | null;
+      if (detail === undefined || anchor === null || anchor === undefined) return;
+      // The view is recovered from the DOM rather than threaded down, so a
+      // chip in any pane resolves against its own editor.
+      const view = EditorView.findFromDOM(anchor);
+      if (view === null) return;
+
+      // Track the span across document changes for as long as the popover is
+      // open. The document stays live underneath it — a background autosave
+      // rewrites the frontmatter stamp about a second after any edit — and
+      // writing at the offsets captured on click would land the new value in
+      // whatever text has since moved into them.
+      const edit = beginTaskFieldEdit(view, detail);
+      openTaskFieldEditor({
+        anchor,
+        kind: detail.kind,
+        value: detail.value,
+        onCommit: (next) => {
+          const span = edit.current();
+          edit.end();
+          // Null means the field was deleted while the popover was open;
+          // declining is the only correct answer.
+          if (span !== null) applyTaskFieldEdit(view, span, next);
+        },
+        onCancel: () => edit.end(),
+      });
+    };
+    window.addEventListener(TASK_CHIP_EVENT, onOpenChip);
+    return () => window.removeEventListener(TASK_CHIP_EVENT, onOpenChip);
   }, []);
   const [newFromTemplateOpen, setNewFromTemplateOpen] = useState<boolean>(false);
   // Bottom-bar readout (save status + word count) — reported up by
@@ -2096,6 +2158,10 @@ function EditorChrome({
           setPaletteOpen(false);
           ws.openGraph();
         }}
+        onShowTasks={() => {
+          setPaletteOpen(false);
+          ws.openTasks();
+        }}
         onShowTags={() => {
           setPaletteOpen(false);
           setTagsSeed(null);
@@ -2440,6 +2506,7 @@ type CommandPaletteHostProps = {
   onShowTags: () => void;
   onShowViews: () => void;
   onImportObsidian: () => void;
+  onShowTasks: () => void;
   onImportBaseView: () => void;
   onBackupVault: () => void;
   onRestoreBackup: () => void;
@@ -2475,6 +2542,7 @@ function CommandPaletteHost({
   onShowTags,
   onShowViews,
   onImportObsidian,
+  onShowTasks,
   onImportBaseView,
   onBackupVault,
   onExportVaultMarkdown,
@@ -2852,6 +2920,7 @@ function CommandPaletteHost({
       onShowTags,
       onShowViews,
       onImportObsidian,
+      onShowTasks,
       onImportBaseView,
       onBackupVault,
       onExportVaultMarkdown,
@@ -2900,6 +2969,7 @@ function CommandPaletteHost({
       onShowTags,
       onShowViews,
       onImportObsidian,
+      onShowTasks,
       onImportBaseView,
       onBackupVault,
       onExportVaultMarkdown,
@@ -3434,6 +3504,8 @@ function RightSidebar() {
           />
         ) : active === "outline" ? (
           <OutlineTab />
+        ) : active === "tasks" ? (
+          <NoteTasksPanel />
         ) : active === "ai-chat" ? (
           <AiChatTab
             onInsert={(text) => {

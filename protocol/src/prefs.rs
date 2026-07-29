@@ -225,6 +225,50 @@ pub struct PrefsView {
     #[serde(default = "default_true")]
     pub show_note_timestamps: bool,
 
+    /// Whether the note-task marker is shown in the sidebar row and the tab
+    /// (MYND-613). `true` (default) shows it. **Shared, not device-local**:
+    /// device-local settings exist because devices genuinely differ in
+    /// capability, and a marker's visibility is taste — a device-local value
+    /// would mean re-choosing it on every new device. **Non-load-bearing** (a
+    /// tampered value can at worst show or hide a glyph) — no protective-envelope
+    /// clamp. Same inverted default polarity as `show_note_timestamps`: a plain
+    /// `bool` defaulting `true`, so the serde-derive path needs
+    /// Whether THIS DEVICE shows task reminders (MYND-618). Default `true`.
+    ///
+    /// **Device-local**, and for the real reason rather than the assumed one:
+    /// the discriminator is not "is it per-device" but "must it be readable
+    /// while locked, or does it name a device-specific path". Neither applies,
+    /// so it lives in the encrypted preferences rather than the plaintext
+    /// device-local store — but it does not SYNC, because whether a given
+    /// machine should be interrupted is a property of that machine.
+    /// **Non-load-bearing** (a tampered value can at worst silence or enable a
+    /// notification) — no protective-envelope clamp. Inverted default polarity
+    /// like `show_note_timestamps`, so the serde-derive path needs
+    /// `default = "default_true"`. Canonical key `reminders_enabled` — sorts
+    /// after `reminder_horizon_days` (`_` 0x5F < `s` 0x73), before
+    /// `right_panel_active_tab` (`re` < `ri`).
+    #[serde(default = "default_true")]
+    pub reminders_enabled: bool,
+
+    /// How many days ahead this device registers reminders with the operating
+    /// system (MYND-618). `None` means the client's built-in horizon.
+    ///
+    /// **Device-local** for the same reason as `reminders_enabled`. The horizon
+    /// is a **privacy** bound before it is a resource one: pending reminder
+    /// times leave the AEAD envelope and sit in OS-owned plaintext
+    /// (`threat-model.md` §7), so a shorter horizon exposes less. Optional and
+    /// omitted when unset, exactly like `auto_lock_seconds`, so a vault that
+    /// never touched it stays byte-identical to a pre-MYND-618 `vault.prefs`.
+    /// Canonical key `reminder_horizon_days` — sorts after `paired_extensions`
+    /// (`p` < `r`), before `reminders_enabled`.
+    pub reminder_horizon_days: Option<u32>,
+
+    /// `default = "default_true"`. Canonical key `show_task_marker` — sorts after
+    /// `show_note_timestamps` (`show_n` < `show_t`), before `spell_enabled`
+    /// (`sho` < `spe`).
+    #[serde(default = "default_true")]
+    pub show_task_marker: bool,
+
     /// Deliberately-created folder paths (canonical trailing-slash display
     /// form) that persist independently of whether any note carries them —
     /// the carrier for empty folders in the virtual-folder model (MYND-144 /
@@ -964,6 +1008,9 @@ impl Default for PrefsView {
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
             show_note_timestamps: true,
+            reminders_enabled: true,
+            reminder_horizon_days: None,
+            show_task_marker: true,
             folder_icons: Default::default(),
             hidden_bar_items: Vec::new(),
             icon: None,
@@ -1603,6 +1650,25 @@ fn canonical_json_encode(prefs: &PrefsView) -> Vec<u8> {
         out.push(b',');
     }
 
+    // reminder_horizon_days (canonical key 'reminder_h' — after
+    // paired_extensions ['p' < 'r'], before reminders_enabled ['_' 0x5F <
+    // 's' 0x73], MYND-618). Omitted entirely when None so a vault that never
+    // set a horizon is byte-identical to a pre-MYND-618 vault.prefs (preserves
+    // existing KAT vectors).
+    if let Some(days) = prefs.reminder_horizon_days {
+        out.extend_from_slice(b"\"reminder_horizon_days\":");
+        push_json_uint(&mut out, days);
+        out.push(b',');
+    }
+
+    // reminders_enabled (canonical key 'reminders_e' — after
+    // reminder_horizon_days, before right_panel_active_tab ['re' < 'ri'],
+    // MYND-618). Default `true`, so only a `false` is written — an untouched
+    // vault stays byte-identical.
+    if !prefs.reminders_enabled {
+        out.extend_from_slice(b"\"reminders_enabled\":false,");
+    }
+
     // right_panel_active_tab (canonical key 'right_panel_a…' — after
     // paired_extensions ['p' < 'r'], before right_panel_hidden_tabs). A free
     // enum string; omitted entirely when None so a vault that never switched the
@@ -1671,6 +1737,16 @@ fn canonical_json_encode(prefs: &PrefsView) -> Vec<u8> {
     // to a pre-feature vault.prefs (preserves existing KAT vectors).
     if !prefs.show_note_timestamps {
         out.extend_from_slice(b",\"show_note_timestamps\":false");
+    }
+
+    // show_task_marker (canonical key 'show_t…' — after show_note_timestamps
+    // [show_n < show_t], before spell_enabled [sho < spe]). OMIT-WHEN-DEFAULT
+    // with the same inverted polarity: the default is `true`, so ONLY the
+    // non-default `false` is emitted. A vault that never touched the toggle
+    // stays byte-identical to a pre-MYND-613 vault.prefs (preserves existing
+    // KAT vectors).
+    if !prefs.show_task_marker {
+        out.extend_from_slice(b",\"show_task_marker\":false");
     }
 
     // spell_enabled (canonical key 'spell_e…' — after screen_capture_protection
@@ -2188,6 +2264,17 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
     // a token value or extension id that literally contains a later marker text.
     let paired_extensions =
         parse_optional_paired_extensions_field(rest, &mut cursor, b"\"paired_extensions\":")?;
+    // reminder_horizon_days + reminders_enabled (keys 'reminder' — after
+    // paired_extensions ['p' < 'r'], before right_panel_* ['re' < 'ri'],
+    // MYND-618). Parsed from the same monotonic cursor and in canonical order,
+    // so neither can be matched inside a prior field's string content.
+    let reminder_horizon_days =
+        parse_optional_uint64_field(rest, &mut cursor, b"\"reminder_horizon_days\":")?
+            .map(|v| u32::try_from(v).unwrap_or(u32::MAX));
+    // Absent means the default `true`, mirroring the encoder's
+    // omit-when-default rule, so a pre-MYND-618 blob parses unchanged.
+    let reminders_enabled =
+        parse_optional_bool_field(rest, &mut cursor, b"\"reminders_enabled\":")?.unwrap_or(true);
     // right_panel_* (keys 'r' — after paired_extensions ['p' < 'r'], before
     // saved_views ['r' < 'sav']). Parsed from the same monotonic cursor in
     // canonical order (active < hidden < tab_order) so the following saved_views /
@@ -2250,6 +2337,12 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
     // `false` on disk flips it.
     let show_note_timestamps =
         parse_optional_bool_marker(after_key, b"\"show_note_timestamps\":").unwrap_or(true);
+
+    // show_task_marker (key 'show_t…' — between show_note_timestamps and
+    // spell_enabled). Absent means the default `true`, mirroring the encoder's
+    // omit-when-default rule, so a pre-MYND-613 blob parses unchanged.
+    let show_task_marker =
+        parse_optional_bool_marker(after_key, b"\"show_task_marker\":").unwrap_or(true);
     // view_order (key 'v' — LAST, after theme [t < v], MYND-273). A sequence
     // array located by marker in the post-screen_capture_protection region, like
     // theme/spell. Absent → empty; present-but-malformed → PlaintextParseFailed.
@@ -2267,6 +2360,7 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
         attachment_ocr_enabled,
         screen_capture_protection,
         show_note_timestamps,
+        show_task_marker,
         folder_icons,
         hidden_bar_items,
         bar_items_order,
@@ -2310,6 +2404,8 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
         startup_open,
         startup_open_note,
         paired_extensions,
+        reminder_horizon_days,
+        reminders_enabled,
         right_panel_active_tab,
         right_panel_hidden_tabs,
         right_panel_tab_order,
@@ -3098,6 +3194,9 @@ mod tests {
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
             show_note_timestamps: true,
+            reminders_enabled: true,
+            reminder_horizon_days: None,
+            show_task_marker: true,
             folder_icons: Default::default(),
             device_names: Default::default(),
             hidden_bar_items: Vec::new(),
@@ -3159,6 +3258,9 @@ mod tests {
             screen_capture_protection: false,
             bar_items_order: Vec::new(),
             show_note_timestamps: true,
+            reminders_enabled: true,
+            reminder_horizon_days: None,
+            show_task_marker: true,
             folder_icons: Default::default(),
             device_names: Default::default(),
             hidden_bar_items: Vec::new(),
@@ -3483,6 +3585,9 @@ mod tests {
                 ai_excluded_folders: Vec::new(),
                 archived_folders: Vec::new(),
                 show_note_timestamps: true,
+                reminders_enabled: true,
+                reminder_horizon_days: None,
+                show_task_marker: true,
                 folder_icons: Default::default(),
                 device_names: Default::default(),
                 hidden_bar_items: Vec::new(),
@@ -3546,6 +3651,9 @@ mod tests {
                 ai_excluded_folders: Vec::new(),
                 archived_folders: Vec::new(),
                 show_note_timestamps: true,
+                reminders_enabled: true,
+                reminder_horizon_days: None,
+                show_task_marker: true,
                 folder_icons: Default::default(),
                 device_names: Default::default(),
                 hidden_bar_items: Vec::new(),
@@ -4706,6 +4814,9 @@ mod tests {
             screen_capture_protection: false,
             bar_items_order: Vec::new(),
             show_note_timestamps: true,
+            reminders_enabled: true,
+            reminder_horizon_days: None,
+            show_task_marker: true,
             folder_icons: Default::default(),
             device_names: Default::default(),
             hidden_bar_items: Vec::new(),
@@ -4729,6 +4840,9 @@ mod tests {
             bar_items_order: Vec::new(),
             archived_folders: Vec::new(),
             show_note_timestamps: true,
+            reminders_enabled: true,
+            reminder_horizon_days: None,
+            show_task_marker: true,
             folder_icons: Default::default(),
             device_names: Default::default(),
             hidden_bar_items: Vec::new(),
@@ -4979,6 +5093,9 @@ mod tests {
         // screen_capture_protection value (scr < sho < spe).
         let prefs = PrefsView {
             show_note_timestamps: false,
+            reminders_enabled: true,
+            reminder_horizon_days: None,
+            show_task_marker: true,
             ..PrefsView::default()
         };
         let encoded = canonical_json_encode(&prefs);
@@ -4992,11 +5109,151 @@ mod tests {
     fn show_note_timestamps_false_round_trips() {
         let original = PrefsView {
             show_note_timestamps: false,
+            reminders_enabled: true,
+            reminder_horizon_days: None,
+            show_task_marker: true,
             ..PrefsView::default()
         };
         let encoded = canonical_json_encode(&original);
         let decoded = canonical_json_decode(&encoded).expect("decode");
         assert!(!decoded.show_note_timestamps);
+    }
+
+    // ---- show_task_marker (MYND-613) ----------------------------------
+
+    #[test]
+    fn encode_omits_show_task_marker_when_default() {
+        // The default `true` is NOT emitted, so a vault that never touched the
+        // toggle stays byte-identical to a pre-MYND-613 vault.prefs — which is
+        // what keeps the existing KAT vectors valid.
+        let prefs = PrefsView::default();
+        let encoded = canonical_json_encode(&prefs);
+        assert!(!String::from_utf8_lossy(&encoded).contains("show_task_marker"));
+    }
+
+    #[test]
+    fn encode_emits_show_task_marker_false_in_canonical_order() {
+        // Lexicographic position: after show_note_timestamps (show_n < show_t),
+        // before spell_enabled (sho < spe).
+        let prefs = PrefsView {
+            show_note_timestamps: false,
+            reminders_enabled: true,
+            reminder_horizon_days: None,
+            show_task_marker: false,
+            ..PrefsView::default()
+        };
+        let encoded = canonical_json_encode(&prefs);
+        assert_eq!(
+            encoded.as_slice(),
+            br#"{"screen_capture_protection":true,"show_note_timestamps":false,"show_task_marker":false}"#
+        );
+    }
+
+    #[test]
+    fn show_task_marker_false_round_trips() {
+        let original = PrefsView {
+            reminders_enabled: true,
+            reminder_horizon_days: None,
+            show_task_marker: false,
+            ..PrefsView::default()
+        };
+        let decoded = canonical_json_decode(&canonical_json_encode(&original)).expect("decode");
+        assert!(!decoded.show_task_marker);
+    }
+
+    #[test]
+    fn show_task_marker_absent_decodes_to_true() {
+        // A pre-MYND-613 blob carries no such key; it must read as shown, not
+        // hidden — the omit-when-default rule read backwards.
+        let decoded =
+            canonical_json_decode(br#"{"screen_capture_protection":true}"#).expect("decode");
+        assert!(decoded.show_task_marker);
+    }
+
+    #[test]
+    fn reminders_enabled_false_round_trips() {
+        let original = PrefsView {
+            reminders_enabled: false,
+            ..PrefsView::default()
+        };
+        let encoded = canonical_json_encode(&original);
+        assert_eq!(
+            encoded.as_slice(),
+            br#"{"reminders_enabled":false,"screen_capture_protection":true}"#
+        );
+        let decoded = canonical_json_decode(&encoded).expect("decode");
+        assert!(!decoded.reminders_enabled);
+    }
+
+    #[test]
+    fn reminders_enabled_absent_decodes_to_true() {
+        // A pre-MYND-618 blob carries no such key; it must read as ENABLED, not
+        // silenced — the omit-when-default rule read backwards. Silently
+        // disabling reminders on every existing vault would be the worst
+        // available reading of an absent key.
+        let decoded =
+            canonical_json_decode(br#"{"screen_capture_protection":true}"#).expect("decode");
+        assert!(decoded.reminders_enabled);
+    }
+
+    #[test]
+    fn reminder_horizon_days_round_trips() {
+        let original = PrefsView {
+            reminder_horizon_days: Some(3),
+            ..PrefsView::default()
+        };
+        let encoded = canonical_json_encode(&original);
+        assert_eq!(
+            encoded.as_slice(),
+            br#"{"reminder_horizon_days":3,"screen_capture_protection":true}"#
+        );
+        assert_eq!(
+            canonical_json_decode(&encoded)
+                .expect("decode")
+                .reminder_horizon_days,
+            Some(3)
+        );
+    }
+
+    #[test]
+    fn reminder_horizon_days_absent_decodes_to_none() {
+        // `None` means "use the client's built-in horizon", which is what a
+        // vault that never touched the setting must get.
+        let decoded =
+            canonical_json_decode(br#"{"screen_capture_protection":true}"#).expect("decode");
+        assert_eq!(decoded.reminder_horizon_days, None);
+    }
+
+    #[test]
+    fn both_reminder_fields_sort_between_paired_extensions_and_right_panel() {
+        // The canonical ordering claim, asserted rather than argued: the parser
+        // is a sequential prefix matcher, so a field in the wrong position does
+        // not merely look untidy — it fails to parse.
+        let original = PrefsView {
+            reminders_enabled: false,
+            reminder_horizon_days: Some(14),
+            right_panel_active_tab: Some(String::from("backlinks")),
+            ..PrefsView::default()
+        };
+        let encoded = canonical_json_encode(&original);
+        assert_eq!(
+            encoded.as_slice(),
+            br#"{"reminder_horizon_days":14,"reminders_enabled":false,"right_panel_active_tab":"backlinks","screen_capture_protection":true}"#
+        );
+        let decoded = canonical_json_decode(&encoded).expect("decode");
+        assert_eq!(decoded.reminder_horizon_days, Some(14));
+        assert!(!decoded.reminders_enabled);
+        assert_eq!(decoded.right_panel_active_tab.as_deref(), Some("backlinks"));
+    }
+
+    #[test]
+    fn defaults_are_omitted_so_an_untouched_vault_is_byte_identical() {
+        // The property the existing KAT vectors depend on: adding two fields
+        // must not change one byte of a blob that never set them.
+        let encoded = canonical_json_encode(&PrefsView::default());
+        assert!(!encoded
+            .windows(b"reminder".len())
+            .any(|w| w == b"reminder"));
     }
 
     #[test]
@@ -5026,6 +5283,9 @@ mod tests {
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
             show_note_timestamps: true,
+            reminders_enabled: true,
+            reminder_horizon_days: None,
+            show_task_marker: true,
             folder_icons: Default::default(),
             device_names: Default::default(),
             hidden_bar_items: Vec::new(),
@@ -5093,6 +5353,9 @@ mod tests {
             screen_capture_protection: false,
             bar_items_order: Vec::new(),
             show_note_timestamps: true,
+            reminders_enabled: true,
+            reminder_horizon_days: None,
+            show_task_marker: true,
             folder_icons: Default::default(),
             device_names: Default::default(),
             hidden_bar_items: Vec::new(),
@@ -5163,6 +5426,9 @@ mod tests {
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
             show_note_timestamps: true,
+            reminders_enabled: true,
+            reminder_horizon_days: None,
+            show_task_marker: true,
             folder_icons: Default::default(),
             device_names: Default::default(),
             hidden_bar_items: Vec::new(),
@@ -5228,6 +5494,9 @@ mod tests {
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
             show_note_timestamps: true,
+            reminders_enabled: true,
+            reminder_horizon_days: None,
+            show_task_marker: true,
             folder_icons: Default::default(),
             device_names: Default::default(),
             hidden_bar_items: Vec::new(),
@@ -5353,6 +5622,9 @@ mod tests {
             screen_capture_protection: false,
             bar_items_order: Vec::new(),
             show_note_timestamps: true,
+            reminders_enabled: true,
+            reminder_horizon_days: None,
+            show_task_marker: true,
             folder_icons: Default::default(),
             device_names: Default::default(),
             hidden_bar_items: Vec::new(),
@@ -5443,6 +5715,9 @@ mod tests {
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
             show_note_timestamps: true,
+            reminders_enabled: true,
+            reminder_horizon_days: None,
+            show_task_marker: true,
             folder_icons: Default::default(),
             device_names: Default::default(),
             hidden_bar_items: Vec::new(),
@@ -5516,6 +5791,9 @@ mod tests {
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
             show_note_timestamps: true,
+            reminders_enabled: true,
+            reminder_horizon_days: None,
+            show_task_marker: true,
             folder_icons: Default::default(),
             device_names: Default::default(),
             hidden_bar_items: Vec::new(),
@@ -5620,6 +5898,9 @@ mod tests {
             screen_capture_protection: false,
             bar_items_order: Vec::new(),
             show_note_timestamps: true,
+            reminders_enabled: true,
+            reminder_horizon_days: None,
+            show_task_marker: true,
             folder_icons: Default::default(),
             device_names: Default::default(),
             hidden_bar_items: alloc::vec![
@@ -5707,6 +5988,9 @@ mod tests {
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
             show_note_timestamps: true,
+            reminders_enabled: true,
+            reminder_horizon_days: None,
+            show_task_marker: true,
             folder_icons: map_of(&[("Projects/", "book")]),
             device_names: Default::default(),
             hidden_bar_items: alloc::vec![
@@ -5895,6 +6179,9 @@ mod tests {
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
             show_note_timestamps: true,
+            reminders_enabled: true,
+            reminder_horizon_days: None,
+            show_task_marker: true,
             folder_icons: Default::default(),
             device_names: Default::default(),
             hidden_bar_items: Vec::new(),
@@ -5960,6 +6247,9 @@ mod tests {
             screen_capture_protection: false,
             bar_items_order: Vec::new(),
             show_note_timestamps: true,
+            reminders_enabled: true,
+            reminder_horizon_days: None,
+            show_task_marker: true,
             folder_icons: Default::default(),
             device_names: Default::default(),
             hidden_bar_items: Vec::new(),
@@ -6027,6 +6317,9 @@ mod tests {
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
             show_note_timestamps: true,
+            reminders_enabled: true,
+            reminder_horizon_days: None,
+            show_task_marker: true,
             folder_icons: Default::default(),
             device_names: Default::default(),
             hidden_bar_items: Vec::new(),
@@ -6162,6 +6455,9 @@ mod tests {
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
             show_note_timestamps: true,
+            reminders_enabled: true,
+            reminder_horizon_days: None,
+            show_task_marker: true,
             folder_icons: Default::default(),
             device_names: Default::default(),
             hidden_bar_items: Vec::new(),
@@ -6272,6 +6568,9 @@ mod tests {
             bar_items_order: Vec::new(),
             archived_folders: Vec::new(),
             show_note_timestamps: true,
+            reminders_enabled: true,
+            reminder_horizon_days: None,
+            show_task_marker: true,
             folder_icons: Default::default(),
             device_names: Default::default(),
             hidden_bar_items: Vec::new(),
@@ -6570,6 +6869,9 @@ mod tests {
             screen_capture_protection: false,
             bar_items_order: Vec::new(),
             show_note_timestamps: true,
+            reminders_enabled: true,
+            reminder_horizon_days: None,
+            show_task_marker: true,
             folder_icons: Default::default(),
             device_names: Default::default(),
             hidden_bar_items: Vec::new(),
@@ -6639,6 +6941,9 @@ mod tests {
             screen_capture_protection: false,
             bar_items_order: Vec::new(),
             show_note_timestamps: true,
+            reminders_enabled: true,
+            reminder_horizon_days: None,
+            show_task_marker: true,
             folder_icons: Default::default(),
             device_names: Default::default(),
             hidden_bar_items: Vec::new(),
@@ -6973,6 +7278,9 @@ mod tests {
                 ai_excluded_folders: Vec::new(),
                 archived_folders: Vec::new(),
                 show_note_timestamps: true,
+                reminders_enabled: true,
+                reminder_horizon_days: None,
+                show_task_marker: true,
                 folder_icons: Default::default(),
                 device_names: Default::default(),
                 hidden_bar_items: Vec::new(),
@@ -7035,6 +7343,9 @@ mod tests {
                 ai_excluded_folders: Vec::new(),
                 archived_folders: Vec::new(),
                 show_note_timestamps: true,
+                reminders_enabled: true,
+                reminder_horizon_days: None,
+                show_task_marker: true,
                 folder_icons: Default::default(),
                 device_names: Default::default(),
                 hidden_bar_items: Vec::new(),
@@ -7099,6 +7410,9 @@ mod tests {
             ai_excluded_folders: Vec::new(),
             archived_folders: Vec::new(),
             show_note_timestamps: true,
+            reminders_enabled: true,
+            reminder_horizon_days: None,
+            show_task_marker: true,
             folder_icons: Default::default(),
             device_names: Default::default(),
             hidden_bar_items: Vec::new(),

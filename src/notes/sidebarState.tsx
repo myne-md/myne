@@ -149,6 +149,7 @@ export function applyOptimisticCreate(
     conflictOf: null,
     hasSource: false,
     kind: null,
+    done: null,
   });
 }
 

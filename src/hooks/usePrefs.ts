@@ -49,6 +49,9 @@ import { subscribePrefsNonce } from "../notes/prefsNonce";
 const DEFAULT_PREFS: PrefsView = {
   screen_capture_protection: true,
   show_note_timestamps: true,
+  reminders_enabled: true,
+  reminder_horizon_days: null,
+  show_task_marker: true,
   deliberate_folders: [],
   ai_enabled: false,
   // MYND-441: matches the Rust default. OCR is on unless the user turns it off,

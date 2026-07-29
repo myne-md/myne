@@ -469,6 +469,9 @@
       "showGraph": {
         "label": "Show graph view…"
       },
+      "showTasks": {
+        "label": "Show tasks"
+      },
       "showTags": {
         "label": "Browse tags…"
       },
@@ -522,6 +525,7 @@
         "saveWorkspaceAs": "Save workspace as",
         "selectAllScoped": "Select all (scoped)",
         "showGraphView": "Show graph view",
+        "showTasks": "Show tasks",
         "splitPaneDown": "Split pane (down)",
         "splitPaneRight": "Split pane (right)",
         "switchWorkspace": "Switch workspace",
@@ -888,6 +892,7 @@
           "aiChat": "AI Chat",
           "backlinks": "Backlinks",
           "outline": "Outline",
+          "tasks": "Tasks",
           "unlinked": "Unlinked mentions"
         }
       },
@@ -976,6 +981,7 @@
       "numberedList": "Numbered list",
       "quote": "Quote",
       "table": "Table",
+      "taskQuery": "Task list",
       "time": "Time",
       "todoList": "To-do list",
       "voiceNote": "Voice note",
@@ -997,6 +1003,11 @@
       "deleteRow": "Delete row",
       "reorderColumn": "Reorder column",
       "reorderRow": "Reorder row"
+    },
+    "taskField": {
+      "invalidDue": "Myne can't read this date, so it isn't shown as a due date.",
+      "invalidPriority": "Myne can't read this priority. Use highest, high, medium, low or lowest.",
+      "invalidRepeat": "Myne doesn't recognise this repeat rule, so this task won't repeat."
     },
     "toolbar": {
       "apply": "Apply",
@@ -1697,6 +1708,7 @@
     },
     "pane": {
       "graphTab": "Graph",
+      "tasksTab": "Tasks",
       "loading": "Loading…",
       "untitledView": "Untitled view"
     },
@@ -1718,6 +1730,8 @@
       "loadError": "Couldn't load this note",
       "removeFromFavorites": "Remove from favorites",
       "renameAriaLabel": "Rename note",
+      "taskBadgeLabel": "This note is a task",
+      "taskBadgeTitle": "Task note",
       "unsyncedLabel": "Not yet on the server",
       "unsyncedTitle": "This note's latest changes are only on this device",
       "untitled": "Untitled"
@@ -1962,6 +1976,43 @@
     "passwordHelper": "Never stored, never transmitted. It encrypts your keys on this device.",
     "encryptingSubtitle": "Wrapping your vault keys with your new password."
   },
+  "recurrence": {
+    "every": {
+      "day": "every day",
+      "week": "every week",
+      "month": "every month",
+      "year": "every year"
+    },
+    "everyN": {
+      "day": "every {{count}} days",
+      "week": "every {{count}} weeks",
+      "month": "every {{count}} months",
+      "year": "every {{count}} years"
+    },
+    "everyWeekday": "every {{days}}",
+    "everyWeekdays": "every {{days}}",
+    "ordinal": {
+      "first": "first",
+      "second": "second",
+      "third": "third",
+      "fourth": "fourth",
+      "last": "last"
+    },
+    "ordinalOfMonth": "{{ordinal}} {{weekday}} of every month",
+    "dayOfMonth": "day {{day}} of every month",
+    "lastDayOfMonth": "last day of every month",
+    "weekday": {
+      "monday": "Monday",
+      "tuesday": "Tuesday",
+      "wednesday": "Wednesday",
+      "thursday": "Thursday",
+      "friday": "Friday",
+      "saturday": "Saturday",
+      "sunday": "Sunday"
+    },
+    "weekdaySeparator": ", ",
+    "whenDone": "{{rule}}, when done"
+  },
   "restore": {
     "backLabel": "Back",
     "cancelLabel": "Cancel",
@@ -2060,6 +2111,10 @@
       "showEditTimesAria": "Show edit times in sidebar",
       "showEditTimesHelper": "Display each note's last-edited time beneath its title in the sidebar.",
       "showEditTimesLabel": "Show edit times",
+      "taskMarkerAria": "Show the task marker on task notes",
+      "taskMarkerHelper": "Marks notes you have declared as tasks in the sidebar and on their tab.",
+      "taskMarkerLabel": "Show task marker",
+      "taskMarkerSaveError": "Could not save that setting. Try again.",
       "theme": {
         "amoled": "AMOLED",
         "dark": "Dark",
@@ -2359,6 +2414,17 @@
     },
     "prefs": {
       "saveError": "Couldn't save preference — try again"
+    },
+    "reminders": {
+      "aria": "Show task reminders on this device",
+      "exactAllow": "Allow",
+      "exactLabel": "Exact timing",
+      "exactOn": "On",
+      "horizon": "Reminders are registered through {{date}}. Open Myne before then to keep them coming.",
+      "label": "Task reminders",
+      "saveError": "Could not save that setting. Try again.",
+      "showTextAria": "Show task text in the notification",
+      "showTextLabel": "Show task text"
     },
     "privacy": {
       "autoLockHelper": "Lock the vault after this much inactivity.",
@@ -2862,6 +2928,57 @@
       "catchingUp": "Catching up on sync — your notes are safe.",
       "verifyDevices": "Verify devices"
     }
+  },
+  "tasks": {
+    "builder": {
+      "any": "Any",
+      "due": "Due",
+      "folder": "Folder",
+      "insert": "Insert",
+      "noDueDate": "No due date",
+      "priority": "Priority",
+      "sort": "Sort by",
+      "sortDue": "Due date",
+      "sortPath": "Note",
+      "sortPriority": "Priority",
+      "status": "Status",
+      "statusDone": "Completed",
+      "statusTodo": "Not done",
+      "tag": "Tag"
+    },
+    "empty": {
+      "filter": "Nothing here right now. Try another filter.",
+      "rebuilding": "Reading your notes…",
+      "scope": "No tasks in this folder or tag. Try widening the scope.",
+      "vault": "No tasks yet. Write “- [ ]” on a line in any note to make one."
+    },
+    "filter": {
+      "all": "All",
+      "overdue": "Overdue",
+      "today": "Today",
+      "upcoming": "Upcoming"
+    },
+    "noteTitle": "Tasks in this note",
+    "query": {
+      "dropped_one": "{{count}} clause Myne could not read",
+      "dropped_other": "{{count}} clauses Myne could not read",
+      "empty": "No tasks match this query.",
+      "loading": "Reading your notes…",
+      "refused": "Myne could not read any of this query, so it is showing nothing rather than everything.",
+      "remainder_one": "{{count}} more task matched",
+      "remainder_other": "{{count}} more tasks matched"
+    },
+    "row": {
+      "completed": "Task, completed",
+      "notCompleted": "Task, not completed",
+      "tooLongToWrite": "This task's line is too long to edit from here. Open its note instead.",
+      "untitled": "Untitled task"
+    },
+    "scope": {
+      "allFolders": "All folders",
+      "label": "Narrow by"
+    },
+    "title": "Tasks"
   },
   "templates": {
     "manager": {

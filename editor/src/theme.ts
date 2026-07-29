@@ -9,6 +9,7 @@
 
 import { EditorView } from "@codemirror/view";
 import { tagChipCmTheme } from "@myne/editor/host/notes/tagPillToken";
+import { taskChipCmTheme } from "@myne/editor/host/notes/taskChipToken";
 
 export const myneTheme = EditorView.theme({
   "&": {
@@ -310,6 +311,96 @@ export const myneTheme = EditorView.theme({
     cursor: "pointer",
   },
   ".cm-math-inline": { cursor: "pointer" },
+
+  // Malformed task-field value (MYND-614 task 8) — raw source text carrying a
+  // subtle failure hint, the math-error treatment. Never a blank chip, never a
+  // silently corrected value; the characters stay in place so the user can fix
+  // them, and the span stays clickable.
+  ".cm-task-field-invalid": {
+    textDecoration: "underline dotted var(--fg-3, #6b6a64)",
+    textDecorationSkipInk: "none",
+    cursor: "pointer",
+  },
+
+  // Task-query block (MYND-617) — a live list where a code card would be. The
+  // fill is neutral and the completed state is a filled box plus struck text:
+  // the canon's no-green-check and no-state-as-fill rules apply here exactly as
+  // they do in the panel, because it is the same list in a different frame.
+  ".cm-task-query": {
+    display: "block",
+    padding: "8px 10px",
+    margin: "6px 0",
+    border: "1px solid var(--line-1, #d8d5cc)",
+    borderRadius: "var(--radius-2, 6px)",
+    background: "var(--paper-1)",
+    fontFamily: "var(--font-sans)",
+    fontSize: "13px",
+    lineHeight: "1.5",
+  },
+  ".cm-task-query-row": {
+    display: "flex",
+    alignItems: "flex-start",
+    gap: "8px",
+    padding: "3px 0",
+  },
+  ".cm-task-query-box": {
+    flex: "0 0 auto",
+    width: "13px",
+    height: "13px",
+    marginTop: "3px",
+    borderRadius: "3px",
+    border: "1px solid var(--line-2, #d8d5cc)",
+    cursor: "pointer",
+  },
+  ".cm-task-query-box-done": {
+    background: "var(--fg-3, #6b6a64)",
+    borderColor: "var(--fg-3, #6b6a64)",
+  },
+  ".cm-task-query-box:focus-visible": {
+    outline: "2px solid var(--accent)",
+    outlineOffset: "1px",
+  },
+  ".cm-task-query-text": { flex: "1 1 auto", minWidth: "0", overflowWrap: "anywhere" },
+  ".cm-task-query-text-done": {
+    textDecoration: "line-through",
+    color: "var(--fg-3, #6b6a64)",
+  },
+  ".cm-task-query-note": {
+    flex: "0 0 auto",
+    background: "none",
+    border: "none",
+    padding: "0",
+    color: "var(--fg-3, #6b6a64)",
+    fontFamily: "inherit",
+    fontSize: "12px",
+    cursor: "pointer",
+    maxWidth: "160px",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+  },
+  ".cm-task-query-empty, .cm-task-query-more": {
+    color: "var(--fg-3, #6b6a64)",
+    fontSize: "12px",
+    padding: "2px 0",
+  },
+  // The refusal reads differently from an empty result on purpose: an empty
+  // list that was actually a misread query sends the user hunting for tasks
+  // that are really there.
+  ".cm-task-query-refused": {
+    color: "var(--fg-2, #4a4943)",
+    fontSize: "12px",
+    padding: "2px 0",
+    borderLeft: "2px solid var(--line-2, #d8d5cc)",
+    paddingLeft: "8px",
+  },
+  ".cm-task-query-dropped": {
+    marginTop: "6px",
+    color: "var(--fg-3, #6b6a64)",
+    fontSize: "12px",
+  },
+  ".cm-task-query-dropped summary": { cursor: "pointer" },
+  ".cm-task-query-dropped ul": { margin: "4px 0 0", paddingLeft: "18px" },
 
   // Spell-check squiggle (MYND-264, SYNC-9) — a wavy red underline driven by
   // the `--danger` design token (no hex), tracking the glyphs via
@@ -924,6 +1015,18 @@ export const myneTheme = EditorView.theme({
     textDecorationColor: "var(--line-3, #a3a29c)",
     color: "var(--fg-3)",
   },
+  // Carve-out (MYND-614 task 9) — MANDATORY, not cosmetic. The completed-task
+  // strike runs to the end of the line, so without this it draws straight
+  // through every chip on that line and the values become unreadable. The chip
+  // keeps its own muted treatment; the strike belongs to the prose.
+  ".cm-task-done-label .cm-task-chip": {
+    textDecoration: "none",
+  },
+  // The same carve-out for a malformed field's hint underline: two overlapping
+  // decorations on one span render as a muddle.
+  ".cm-task-done-label .cm-task-field-invalid": {
+    textDecoration: "underline dotted var(--fg-3, #6b6a64)",
+  },
 
   // Wikilink chip widget from wikilink/chip-widget.ts.
   ".cm-wikilink-chip": {
@@ -969,6 +1072,7 @@ export const myneTheme = EditorView.theme({
   // browser's pill rows never drift. Pill shape distinguishes a tag from a
   // wikilink chip.
   ...tagChipCmTheme(),
+  ...taskChipCmTheme(),
   // Generic tooltip surface (Myne design system). CM6's default `.cm-tooltip`
   // is a light box that clashes with the dark editor; bring it onto the paper
   // surface. The autocomplete tooltip's 2-class rule (`.cm-tooltip-autocomplete`)

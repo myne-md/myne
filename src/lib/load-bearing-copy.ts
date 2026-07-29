@@ -117,6 +117,34 @@ export const EXPORT_PLAIN_MARKDOWN_SENTENCE =
 export const VAULT_EXPORT_PLAIN_TREE_SENTENCE =
   "The exported files are plain Markdown — they are not encrypted.";
 
+/** Task reminders (MYND-618): the one plain sentence stating what leaves the
+ *  encrypted vault when a reminder is scheduled with the operating system.
+ *
+ *  **Load-bearing copy, not a translated string.** Its exact wording is a
+ *  privacy statement, so it renders verbatim in every locale and is pinned by
+ *  full-literal assertion — the same discipline as the export sentences above.
+ *
+ *  Three things it deliberately does NOT say. It does not claim Myne controls
+ *  what a lock screen previews — the platform's own preview settings are the
+ *  user's, not ours, and implying otherwise would be a promise we cannot keep.
+ *  It does not soften "leaves the vault" into something vaguer. And it does not
+ *  alarm: it states the fact and stops. */
+export const REMINDER_OS_DISCLOSURE_SENTENCE =
+  "To remind you while Myne is closed, your device stores the reminder times — not your task text — outside the encrypted vault.";
+
+/** The opt-in for putting real task text in the notification body. Default OFF
+ *  (MYND-618). Its own sentence, because turning it on changes what leaves the
+ *  vault, and the user should read that at the moment they decide. */
+export const REMINDER_SHOW_TEXT_SENTENCE =
+  "Turning this on puts your task's text in the notification, where your device — and anyone who can see its screen — can read it.";
+
+/** Linux: the in-app layer is the whole feature there, said plainly rather than
+ *  left to be discovered (MYND-618 task 7). Classified as a usability
+ *  limitation, matching the threat-model entry: a platform that holds no
+ *  registration leaks nothing, so this gap is the safer side of the trade. */
+export const REMINDER_LINUX_LIMITATION_SENTENCE =
+  "On Linux, reminders appear only while Myne is open.";
+
 /** Muted sub-label under the "Include N attachments" toggle. */
 export const EXPORT_ATTACHMENTS_PLACEMENT_SUBLABEL =
   "Files are placed in the same folder as the note.";

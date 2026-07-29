@@ -65,6 +65,9 @@ export const BINDABLE_COMMANDS: readonly BindableCommand[] = [
 
   // View
   { id: "graph.show", get label() { return i18n.t("commands.hotkeys.command.showGraphView"); }, group: "View", defaultBindings: ["Mod-Shift-g"], rebindable: true },
+  // MYND-616. `Mod-Shift-t` was free: Mod-t is new-tab, and Shift-t is unused in
+  // both the app catalog and the editor keymap (checked, not assumed).
+  { id: "tasks.show", get label() { return i18n.t("commands.hotkeys.command.showTasks"); }, group: "View", defaultBindings: ["Mod-Shift-t"], rebindable: true },
   // reading-source-modes (MYND-299): Edit⇄Reading default Mod-Shift-e (inline-code
   // keeps Mod-e); the secondary live↔source toggle ships with NO default chord.
   { id: "view.toggle-reading", get label() { return i18n.t("commands.hotkeys.command.toggleReadingView"); }, group: "View", defaultBindings: ["Mod-Shift-e"], rebindable: true },
