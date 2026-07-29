@@ -1554,7 +1554,8 @@
         "titlePick": "Import notes",
         "keepsLabel": "What comes across",
         "losesLabel": "What doesn't",
-        "changeSource": "Change source"
+        "changeSource": "Change source",
+        "statExcalidrawSkipped": "Excalidraw drawings skipped"
       },
       "offer": {
         "body": "Bring your existing notes into Myne. Each one is encrypted as it’s imported — nothing leaves this device, and your original files stay exactly where they are.",
