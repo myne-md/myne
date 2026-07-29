@@ -986,6 +986,15 @@ export const myneTheme = EditorView.theme({
     backgroundColor: "var(--paper-3, #ece9e2)",
     fontStyle: "italic",
   },
+  // MYND-634: a drawing embed is visually its own thing, not a link to prose.
+  // The full inline canvas (a locked thumbnail that unlocks into an editable
+  // surface) renders through this same class once it lands; until then the chip
+  // at least stops claiming to be a text note.
+  ".cm-wikilink-chip-drawing": {
+    fontStyle: "normal",
+    borderStyle: "dashed",
+    borderColor: "var(--line-2, #cfccc4)",
+  },
   // §5.3 broken-link styling (MYND-37/83): a wikilink whose target matches no
   // note — faded foreground, italic, no underline. Same chip surface as the
   // default (background/border/radius unchanged) so only the text reads "dead".
