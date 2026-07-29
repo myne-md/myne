@@ -71,7 +71,7 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 import { appDataDir, join } from "../platform/path";
-import { getCurrentWindow } from "../platform/window";
+import { useRevealAfterIdleLock } from "../hooks/useRevealAfterIdleLock";
 import i18n from "../i18n";
 import { DestructiveBanner } from "../components/DestructiveBanner";
 import { DeleteVaultConfirmForm } from "../components/DeleteVaultConfirmForm";
@@ -438,23 +438,11 @@ export function Unlock({
     };
   }, [vaultId]);
 
-  // MYND-121 — re-show the window after an idle-lock hid it. Auto-lock on idle
-  // calls `window.hide()` (renderer-independent visual cover) before the
-  // zeroize + WebView reload; the reloaded app boots straight here (slot Empty
-  // → unlock). Re-reveal now that the safe unlock screen is mounted — gating
-  // the show on REACHING this screen means a hung renderer (which never
-  // reloads to here) never re-exposes plaintext. Idempotent on a normal boot
-  // (the window is already shown by `screen_capture::init`). No-op outside
-  // Tauri (browser dev shim).
-  useEffect(() => {
-    void (async () => {
-      try {
-        await getCurrentWindow().show();
-      } catch {
-        // Not inside Tauri, or no main window to reveal.
-      }
-    })();
-  }, []);
+  // MYND-121 — re-show the window after an idle-lock hid it. Gating the show on
+  // REACHING this screen is the safety property: a hung renderer never reloads
+  // to here, so it never re-exposes plaintext. Shared with `VaultPicker`, the
+  // other locked boot surface (MYND-628) — see the hook for why both need it.
+  useRevealAfterIdleLock();
 
   // MYND-108-bis delete-vault sub-view. Mounts when the user clicks
   // the tertiary "Lost both password and recovery phrase? Delete vault
