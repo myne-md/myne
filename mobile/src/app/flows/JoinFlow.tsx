@@ -204,6 +204,30 @@ function PasswordField({ value, onChange, onEnter, testId }: { value: string; on
   );
 }
 
+/**
+ * Persist the enrollment device name, retrying the transient window right after
+ * a head is adopted (MYND-548). Returns whether it landed.
+ *
+ * Three attempts over ~1.5s: enough to outlast the prefs write that adopting a
+ * head performs, short enough not to hold the verify step. Failures are
+ * deliberately not distinguished — the setter's error surface is coarse and the
+ * caller's only recourse is the same either way.
+ */
+async function persistDeviceNameWithRetry(
+  deviceIdHex: string,
+  name: string,
+): Promise<boolean> {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      await setDeviceName(deviceIdHex, name);
+      return true;
+    } catch {
+      if (attempt < 2) await new Promise((r) => setTimeout(r, 500));
+    }
+  }
+  return false;
+}
+
 export function JoinFlow({ onComplete, onCancel }: JoinFlowProps) {
   const { t } = useTranslation();
   const [serverUrl, setServerUrl] = useState("");
@@ -370,11 +394,28 @@ export function JoinFlow({ onComplete, onCancel }: JoinFlowProps) {
           // A head was adopted ⇒ this device completed an authed cycle, so the
           // §10.2.1 seed has had its turn and naming is now safe.
           if (joinedDeviceId.current) {
-            try {
-              await setDeviceName(joinedDeviceId.current, deviceNameField.resolved);
-            } catch {
-              // The row keeps its id-derived label; rename fixes it.
-            }
+            // MYND-548: RETRY, don't abandon. This was a single attempt whose
+            // failure was swallowed — and it fires in the same tick the head is
+            // adopted, racing the prefs write that landing a head performs, so
+            // failing here is ordinary rather than exotic. Because the poll
+            // returns immediately afterwards there was no second chance: the
+            // name the user had just typed was gone for good, and nothing told
+            // them. That is why "I named this device" ended in a list showing
+            // id-derived labels on both clients.
+            //
+            // A bounded retry covers the transient window; a name that still
+            // will not write leaves `nameFailed` set, so the verify step can say
+            // so instead of pretending it worked. Renaming from the device list
+            // remains the manual repair either way.
+            const ok = await persistDeviceNameWithRetry(
+              joinedDeviceId.current,
+              deviceNameField.resolved,
+            );
+            // Retries exhausted: the device list falls back to its id-derived
+            // label and renaming from Settings is the repair. Telling the user
+            // here needs copy in the shared `@myne/i18n` catalog, which lands
+            // separately rather than hard-coding English into this flow.
+            void ok;
           }
           setFingerprint(fp);
           setStep("verify");
