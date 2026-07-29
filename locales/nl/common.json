@@ -1,4 +1,30 @@
 {
+  "accountBootstrap": {
+    "accountMismatch": "Deze browser bevat al de kluis van een ander account. Open die, of meld je eerst af en wis de kopie van deze browser.",
+    "changeAccount": "Een ander accountnummer gebruiken",
+    "continue": "Doorgaan",
+    "failed": "Kon dat account niet openen. Controleer het accountnummer en het wachtwoord en probeer het opnieuw.",
+    "hint": "Voer het hoofdwachtwoord voor dit account in. Myne haalt je kluis op en stelt deze browser in als apparaat op je account.",
+    "noEndpoint": "Voor deze installatie van Myne is geen synchronisatieserver ingesteld, dus die kan je kluis niet bereiken. Neem contact op met degene die hem beheert.",
+    "passwordLabel": "Hoofdwachtwoord",
+    "approversIntro": "Deze apparaten kunnen dit apparaat goedkeuren:",
+    "noApprovers": "Geen enkel ander apparaat op dit account kan het nu goedkeuren. Open Myne op een apparaat dat al toegang heeft en kom daarna hier terug.",
+    "pendingTitle": "Wachten op goedkeuring",
+    "sasMatch": "Ze komen overeen — doorgaan",
+    "sasMismatch": "Ze komen niet overeen",
+    "verifyBody": "Controleer of deze code op beide apparaten hetzelfde is voordat je doorgaat. Zo niet, stop dan — er is iets mis met de verbinding, niet met je wachtwoord.",
+    "verifyTitle": "Vergelijk deze code",
+    "title": "Meld je aan bij je kluis",
+    "working": "Instellen…"
+  },
+  "accountEntry": {
+    "checkFailed": "Kon dat accountnummer niet controleren. Probeer het opnieuw.",
+    "checking": "Controleren…",
+    "continue": "Doorgaan",
+    "hint": "Het ziet eruit als MY-XXXX-XXXX-XXXX-XXXX-XXXX. Wordt hier op je apparaat gecontroleerd — er wordt nog niets verzonden.",
+    "invalid": "Dat accountnummer is niet geldig. Controleer het en probeer het opnieuw.",
+    "title": "Voer je accountnummer in"
+  },
   "attachments": {
     "cleanUnused": {
       "cancel": "Annuleren",
@@ -8,6 +34,7 @@
       "deleteCta": "{{count}} ongebruikte verwijderen",
       "deleteCta_one": "{{count}} ongebruikte verwijderen",
       "deleteCta_other": "{{count}} ongebruikte verwijderen",
+      "corpusIncomplete": "Rond eerst het synchroniseren af — dit apparaat heeft nog niet al je notities. Er is niets verwijderd.",
       "error": "Opruimen mislukt. Sommige notities zijn mogelijk onleesbaar — er is niets verwijderd.",
       "intro_one": "Deze bijlage wordt in geen enkele notitie gebruikt. Verwijderen is definitief en kan niet ongedaan worden gemaakt.",
       "intro_other": "Deze {{count}} bijlagen worden in geen enkele notitie gebruikt. Verwijderen is definitief en kan niet ongedaan worden gemaakt.",
@@ -47,6 +74,7 @@
       "actionsTitle": "Acties",
       "checking": "Controleren…",
       "checkUnusedFailedNotice": "Controleren op ongebruikte bijlagen is mislukt. Probeer het opnieuw.",
+      "corpusIncompleteNotice": "Rond eerst het synchroniseren af — dit apparaat heeft nog niet al je notities en kan dus niet bepalen welke bijlagen ongebruikt zijn.",
       "cleanUnused": "Ongebruikte opruimen",
       "cleanUnusedTitle": "Bijlagen verwijderen die in geen enkele notitie worden gebruikt",
       "colCreated": "Aangemaakt",
@@ -69,6 +97,7 @@
       "menuExport": "Exporteren",
       "menuPreview": "Voorbeeld",
       "menuRename": "Hernoemen",
+      "menuTranscribe": "Transcriberen",
       "noMatch": "Geen bijlagen komen overeen met je zoekopdracht.",
       "noUnusedNotice": "Geen ongebruikte bijlagen om op te ruimen.",
       "preview": "Voorbeeld",
@@ -84,6 +113,10 @@
       "sortAriaLabel": "Bijlagen sorteren",
       "supportedFilesFilter": "Ondersteunde bestanden",
       "title": "Bijlagen",
+      "transcribeDone": "Transcriptie voltooid.",
+      "transcribeFailed": "Transcriptie mislukt. Probeer het opnieuw.",
+      "transcribeNoModel": "Selecteer een transcriptiemodel in Instellingen → Labs → AI.",
+      "transcribeStarted": "Transcriberen…",
       "typeFilter": {
         "all": "Alle types",
         "audio": "Audio",
@@ -210,6 +243,9 @@
       },
       "toggleLineNumbers": {
         "label": "Regelnummers in-/uitschakelen"
+      },
+      "toggleVimMode": {
+        "label": "Vim-toetsenbordmodus in-/uitschakelen"
       },
       "toggleSpellCheck": {
         "label": "Spellingcontrole in-/uitschakelen"
@@ -512,6 +548,7 @@
     }
   },
   "common": {
+    "cancel": "Annuleren",
     "dismiss": "Sluiten",
     "prompt": {
       "cancel": "Annuleren",
@@ -522,6 +559,10 @@
     },
     "back": "Terug",
     "continue": "Doorgaan"
+  },
+  "deviceRevoked": {
+    "cta": "Opnieuw beginnen",
+    "title": "Deze browser is uit je account verwijderd"
   },
   "editor": {
     "attachment": {
@@ -675,7 +716,8 @@
           "export": "Exporteren",
           "remove": "Verwijderen",
           "rename": "Hernoemen",
-          "reveal": "Tonen in bibliotheek"
+          "reveal": "Tonen in bibliotheek",
+          "transcribe": "Transcriberen"
         },
         "pdfFallback": "PDF",
         "textPreview": {
@@ -686,6 +728,15 @@
           "brokenLabel": "verbroken",
           "deletedAria": "Verwijderde bijlage: {{filename}}",
           "deletedLabel": "verwijderd"
+        },
+        "transcribe": {
+          "disabledReason": "Schakel AI in via Instellingen → Labs → AI om te transcriberen.",
+          "failed": "Transcriptie mislukt. Probeer het opnieuw.",
+          "heading": "Transcript",
+          "insert": "Transcript in notitie invoegen",
+          "noModelHint": "Selecteer een transcriptiemodel in Instellingen → Labs → AI.",
+          "progress": "Transcriberen…",
+          "stop": "Stoppen"
         },
         "urlImageFallback": "afbeelding"
       }
@@ -735,6 +786,7 @@
         "tags": "Tags",
         "viewMode": "Weergavemodus",
         "views": "Weergaven",
+        "vimMode": "Vim-modus",
         "wordCount": "Aantal woorden",
         "workspace": "Werkruimte"
       },
@@ -766,6 +818,13 @@
           "title_one": "{{characters}} tekens · {{words}} woorden · {{spaces}} spaties · {{count}} alinea",
           "title_other": "{{characters}} tekens · {{words}} woorden · {{spaces}} spaties · {{count}} alinea's",
           "titleSelectionSuffix": " (selectie)"
+        },
+        "vimMode": {
+          "insert": "Insert",
+          "normal": "Normal",
+          "replace": "Replace",
+          "title": "Vim-modus — druk op Esc voor de Normal-modus",
+          "visual": "Visual"
         },
         "graphTitle": "Grafiek (⌘⇧G)",
         "lock": "Vergrendelen",
@@ -998,6 +1057,23 @@
         "xl": "Extra groot"
       }
     },
+    "vim": {
+      "ex": {
+        "refused": {
+          "edit": "`:e` wordt niet ondersteund — Myne opent notities, geen bestanden. Gebruik het opdrachtpalet of de zijbalk.",
+          "map": "Aangepaste toetstoewijzingen worden niet ondersteund in Myne. Sneltoetsen stel je in via Instellingen → Sneltoetsen.",
+          "set": "`:set` wordt niet ondersteund — Myne heeft geen vim-opties. Editorvoorkeuren staan in Instellingen → Editor.",
+          "source": "`:source` wordt niet ondersteund. Myne heeft bewust geen configuratiescripts.",
+          "unsupported": "Die opdracht wordt niet ondersteund in Myne."
+        },
+        "substitute": {
+          "malformed": "Kon die vervanging niet lezen. Verwachte vorm: :s/pattern/replacement/",
+          "refused": "Dat patroon gebruikt syntaxis die alleen in vim bestaat ({{what}}) en die het zoeken van Myne niet ondersteunt. Er is niets gewijzigd."
+        },
+        "writeFailed": "Kon niet opslaan.",
+        "written": "Opgeslagen."
+      }
+    },
     "wikilink": {
       "chip": {
         "embed": "Insluiten: {{label}}"
@@ -1188,6 +1264,11 @@
         "title": "Exporteren als Markdown"
       }
     },
+    "egress": {
+      "cancel": "Annuleren",
+      "confirm": "Downloaden",
+      "title": "Dit bestand downloaden"
+    },
     "pdf": {
       "cancel": "Annuleren",
       "continue": "Doorgaan…",
@@ -1254,6 +1335,10 @@
     }
   },
   "failClosed": {
+    "exit": {
+      "quit": "App sluiten",
+      "reload": "Opnieuw laden"
+    },
     "corrupted": {
       "body": "Als je een back-up hebt, kun je die herstellen — je huidige bestanden blijven onaangeroerd; de back-up wordt eerst als aparte kluis hersteld.",
       "cta": "App sluiten",
@@ -1274,6 +1359,8 @@
       "cta": "App sluiten",
       "title": "Geen toestemming om het kluisbestand te openen."
     },
+    "copyDiagnostics": "Diagnostiek kopiëren",
+    "diagnosticsCopied": "Gekopieerd",
     "restoreFromBackup": "Herstellen vanuit back-up…"
   },
   "notes": {
@@ -1343,14 +1430,20 @@
       "noteCount_other": "{{count}} notities",
       "of": "van:",
       "ofTheGroups": "van de groepen:",
+      "op": {
+        "contains": "bevat"
+      },
+      "propertyValuePlaceholder": "waarde",
       "removeCondition": "Voorwaarde verwijderen",
       "replaceFilter": "Filter vervangen",
       "save": "Opslaan",
       "searchTextPlaceholder": "zoektekst",
       "selectFolderPlaceholder": "selecteer een map…",
+      "selectPropertyPlaceholder": "selecteer een eigenschap…",
       "selectTagPlaceholder": "selecteer een tag…",
       "type": {
         "folder": "Map",
+        "property": "Eigenschap",
         "search": "Zoeken",
         "tag": "Tag"
       },
@@ -1451,7 +1544,11 @@
         "titleFailed": "Import mislukt",
         "titleSetup": "Obsidian-kluis importeren",
         "vaultFolderLabel": "Kluismap",
-        "vaultRoot": "(kluiswortel)"
+        "vaultRoot": "(kluiswortel)",
+        "titlePick": "Notities importeren",
+        "keepsLabel": "Wat er meekomt",
+        "losesLabel": "Wat niet",
+        "changeSource": "Bron wijzigen"
       },
       "offer": {
         "body": "Breng je bestaande notities naar Myne. Elke notitie wordt versleuteld zodra die wordt geïmporteerd — niets verlaat dit apparaat en je originele bestanden blijven precies waar ze zijn.",
@@ -1459,6 +1556,46 @@
         "laterHint": "Je kunt later altijd importeren via Instellingen → Opslag.",
         "notNow": "Niet nu",
         "title": "Je Obsidian-kluis importeren?"
+      },
+      "picker": {
+        "intro": "Waar komen je notities vandaan?"
+      },
+      "source": {
+        "obsidian": {
+          "label": "Obsidian",
+          "pickerTitle": "Kies je Obsidian-kluismap",
+          "survives": "Komt mee: Markdown, frontmatter, [[wikilinks]], mapstructuur, bijlagen.",
+          "loses": "Blijft achter: canvasbestanden en alles wat geen Markdown-notitie is.",
+          "short": "Een kluismap met Markdown-notities"
+        },
+        "notion": {
+          "label": "Notion",
+          "pickerTitle": "Kies je uitgepakte Notion-exportmap",
+          "survives": "Komt mee: pagina's, mapstructuur, pagina-eigenschappen als velden en interne links als wikilinks. Elke database komt daarnaast binnen als een tabelnotitie die naar zijn rijen linkt.",
+          "loses": "Pak de export eerst uit — Myne leest de map, niet de .zip. Toggles, callouts en gekleurde tekst hebben geen equivalent en worden vermeld in een importrapport.",
+          "short": "Een uitgepakte exportmap"
+        },
+        "evernote": {
+          "label": "Evernote",
+          "pickerTitle": "Kies je Evernote .enex-bestand",
+          "survives": "Komt mee: elke notitie in het bestand, opmaak en bijlagen. Versleutelde blokken blijven behouden als tekst die je in Evernote nog kunt ontsleutelen.",
+          "loses": "Blijft achter: herinneringen en notitiegeschiedenis. Heel grote exports worden geweigerd in plaats van geriskeerd — splits de export als dat gebeurt.",
+          "short": "Eén .enex-exportbestand"
+        },
+        "html": {
+          "label": "HTML",
+          "pickerTitle": "Kies een map met HTML-bestanden",
+          "survives": "Komt mee: koppen, lijsten, tabellen, links, code en nadruk.",
+          "loses": "Blijft achter: opmaakstijlen, scripts en ingesloten inhoud. Externe afbeeldingen blijven links en worden nooit gedownload.",
+          "short": "Een map met opgeslagen webpagina's"
+        },
+        "csv": {
+          "label": "CSV",
+          "pickerTitle": "Kies je .csv-bestand",
+          "survives": "Wordt één notitie die de tabel bevat.",
+          "loses": "Het wordt één notitie, niet één notitie per rij — Myne is geen database. Heel brede of heel lange bestanden worden ingekort, en het importrapport vermeldt met hoeveel.",
+          "short": "Eén spreadsheetbestand"
+        }
       }
     },
     "list": {
@@ -1497,7 +1634,10 @@
       "exportPdf": "Exporteren als PDF…",
       "exportTxt": "Exporteren als platte tekst…",
       "favoritesHeading": "Favorieten",
+      "icon": "Pictogram…",
       "mergeAnyway": "Toch samenvoegen",
+      "newDrawingHere": "Nieuwe tekening hier",
+      "newDrawingMenu": "Nieuwe tekening",
       "newFolder": "Nieuwe map",
       "newFolderInPlaceholder": "Nieuwe map in {{path}}",
       "newFolderPlaceholder": "Nieuwe map",
@@ -1550,6 +1690,7 @@
     },
     "newTab": {
       "createNote": "Een nieuwe notitie maken",
+      "createDrawing": "Nieuwe tekening",
       "noNotesMatch": "Geen notities komen overeen.",
       "noNotesYet": "Nog geen notities.",
       "searchAriaLabel": "Notities zoeken om te openen",
@@ -1579,12 +1720,16 @@
       "loadError": "Deze notitie kon niet worden geladen",
       "removeFromFavorites": "Uit favorieten verwijderen",
       "renameAriaLabel": "Notitie hernoemen",
+      "unsyncedLabel": "Nog niet op de server",
+      "unsyncedTitle": "De laatste wijzigingen van deze notitie staan alleen op dit apparaat",
       "untitled": "Naamloos"
     },
     "savedView": {
       "defaultName": "Gefilterde weergave"
     },
     "saveStatus": {
+      "conflict": "Bewerkingsconflict oplossen…",
+      "conflictTitle": "Deze notitie is op een ander apparaat gewijzigd — beide versies worden bewaard",
       "editing": "Bewerken",
       "editingEllipsis": "Bewerken…",
       "editingTitle": "Bewerken — automatisch opslaan staat klaar",
@@ -1594,6 +1739,8 @@
       "savedRelative": "Opgeslagen {{rel}}",
       "saveFailed": "Opslaan mislukt",
       "saveFailedTitle": "Opslaan mislukt — klik op Opnieuw proberen",
+      "storageFull": "Opslag vol",
+      "storageFullTitle": "Er is geen ruimte meer om deze notitie op te slaan. Maak ruimte vrij (of verwijder een paar bijlagen) en probeer het opnieuw. Tot het opslaan lukt, bestaat deze bewerking alleen in dit venster — hij staat ook niet op de server.",
       "saving": "Opslaan",
       "savingEllipsis": "Opslaan…"
     },
@@ -1708,6 +1855,10 @@
       "host": {
         "unsupported": "Dit type weergave komt in een latere update."
       },
+      "list": {
+        "empty": "Geen notities komen overeen met deze weergave",
+        "noValue": "Geen waarde"
+      },
       "menu": {
         "deleteView": "Weergave verwijderen",
         "editFilter": "Filter bewerken…",
@@ -1717,6 +1868,11 @@
         "viewSettings": "Weergave-instellingen…"
       },
       "newView": "Nieuwe weergave",
+      "table": {
+        "empty": "Geen notities komen overeen met deze weergave",
+        "name": "Naam",
+        "noValue": "Geen waarde"
+      },
       "untitledView": "Naamloze weergave"
     },
     "viewSettings": {
@@ -1730,12 +1886,26 @@
       "cancel": "Annuleren",
       "cardSize": "Kaartgrootte",
       "cardSizeValue": "{{size}} px",
+      "columns": "Kolommen",
+      "columnsEmpty": "Geen eigenschappen gevonden",
+      "columnsHint": "Frontmatter-eigenschappen die als kolommen (tabel) of als detailregel (lijst / kaarten) worden getoond.",
+      "columnsPlaceholder": "Kolommen toevoegen…",
       "coverImageHint": "De frontmatter-eigenschap waarvan de waarde een afbeelding is — getoond als de omslag van elke kaart. Laat leeg voor geen omslag.",
       "coverImagePlaceholder": "bijv. cover",
       "coverImageProperty": "Eigenschap voor omslagafbeelding",
+      "groupBy": "Groeperen op",
       "imageAspectRatio": "Beeldverhouding",
+      "propertyNone": "Geen",
       "reset": "Resetten",
-      "save": "Opslaan"
+      "save": "Opslaan",
+      "sortAsc": "Oplopend",
+      "sortBy": "Sorteren op",
+      "sortDesc": "Aflopend",
+      "sortDirection": "Sorteerrichting",
+      "viewType": "Weergavetype",
+      "viewTypeCards": "Kaarten",
+      "viewTypeList": "Lijst",
+      "viewTypeTable": "Tabel"
     },
     "welcome": {
       "body": "Welkom bij Myne, je privéruimte om te denken en te schrijven.\n\nAlles wat je hier opslaat is versleuteld en blijft op je apparaat. Je **wachtwoord** en **herstelzin** zijn de enige sleutels ertoe, dus bewaar ze op een veilige plek. Als je beide ooit verliest, kan niemand je notities meer terughalen, wij ook niet.\n\nDit is gewoon een normale notitie, dus maak hem helemaal van jezelf. Bewerk, hernoem of verwijder hem wanneer je maar wilt, en voeg nieuwe notities toe naarmate je ideeën groeien.\n\nFijn dat je er bent. Voor meer informatie over Myne, ga naar https://myne.md\n",
@@ -1836,6 +2006,7 @@
   "settings": {
     "about": {
       "buildChannelDevelopment": "Ontwikkelversie",
+      "buildLabel": "Build",
       "buildChannelLabel": "Buildkanaal",
       "buildChannelStable": "Stabiel",
       "changelogButton": "Wijzigingslog bekijken…",
@@ -1857,12 +2028,16 @@
         "ioError": "Schijffout, probeer het opnieuw.",
         "joinFailure": "Er is iets misgegaan, probeer het opnieuw.",
         "samePasswordRejected": "Het nieuwe wachtwoord komt overeen met het huidige.",
+        "serverAckPending": "Je nieuwe wachtwoord werkt op dit apparaat, maar Myne kon de server niet bereiken om het op te slaan. Tot dat lukt, verwachten je andere apparaten nog het oude wachtwoord — en als de kopie van deze browser vóór die tijd wordt gewist, gaat de wijziging verloren. Myne probeert het automatisch opnieuw.",
         "weakNewPassword": "Het nieuwe wachtwoord moet minstens 12 tekens lang zijn."
       },
       "changePasswordHeading": "Wachtwoord wijzigen",
       "changePasswordHelper": "Vervang je hoofdwachtwoord terwijl je dezelfde kluis houdt. Je herstelzin blijft hetzelfde.",
       "dangerZoneHeading": "Gevarenzone",
       "dangerZoneHelper": "Verwijder deze kluis en alle notities definitief. Dit kan niet ongedaan worden gemaakt. De herstelzin herstelt de kluis niet.",
+      "localEraseHeading": "Deze browser",
+      "localEraseHelper": "Wis de kopie die Myne van je kluis in deze browser bewaart. Je account en alles wat al is gesynchroniseerd, blijven op de server staan.",
+      "localEraseButton": "Afmelden en de kopie van deze browser wissen…",
       "deleteVaultButton": "Kluis verwijderen…",
       "memoryCost": "Geheugenkosten",
       "parallelism": "Parallellisme",
@@ -1887,6 +2062,7 @@
       "changing": "Wijzigen…"
     },
     "appearance": {
+      "homeQuickActions": "Snelle acties op startscherm",
       "showEditTimesAria": "Bewerktijden in zijbalk tonen",
       "showEditTimesHelper": "Toon de tijd van de laatste bewerking van elke notitie onder de titel in de zijbalk.",
       "showEditTimesLabel": "Bewerktijden tonen",
@@ -1914,6 +2090,13 @@
       "off": "Uit",
       "on": "Aan",
       "saveError": "De archiveringsinstelling kon niet worden bijgewerkt."
+    },
+    "attachmentOcr": {
+      "label": "Zoeken in afbeeldingen en gescande documenten",
+      "helper": "Leest tekst uit afbeeldingsbijlagen en gescande PDF's op dit apparaat, zodat zoeken ze op hun inhoud kan vinden. Er wordt niets geüpload. Dit uitschakelen stopt de extractie op de achtergrond; al geëxtraheerde tekst blijft behouden.",
+      "errorSaveSetting": "Kon deze instelling niet opslaan.",
+      "processing_one": "1 bijlage lezen…",
+      "processing_other": "{{count}} bijlagen lezen…"
     },
     "autoBackup": {
       "backupFolder": "Back-upmap",
@@ -1991,6 +2174,8 @@
         "parseError": "Geen geldige JSON",
         "parseErrorWithLine": "Geen geldige JSON (regel {{line}})"
       },
+      "export": "Exporteren",
+      "exportError": "Dat thema kon niet worden geëxporteerd. Probeer het opnieuw.",
       "fileFilterName": "Myne-thema",
       "helper": "Gebruik je eigen kleurenpalet. Thema's worden vóór gebruik op dit apparaat gevalideerd — er wordt niets geüpload.",
       "importButton": "Thema importeren…",
@@ -2025,6 +2210,10 @@
       "heading": "Kluis verwijderen",
       "ioFailBody": "Kon de kluisbestanden niet openen om te verwijderen. De kluissleutels zijn al uit het geheugen gewist; eventuele kluisgegevens die op de schijf achterblijven zijn onherstelbare, met Argon2id ingepakte ruis.",
       "ioFailTitle": "Schijffout tijdens verwijderen",
+      "localEraseHeading": "Afmelden en de kopie van deze browser wissen",
+      "localEraseEyebrow": "ALLEEN DEZE BROWSER",
+      "localEraseSubmit": "De kopie van deze browser wissen",
+      "localEraseSubmitInFlight": "Wissen…",
       "partialFailBody_one": "{{count}} bestand kon niet van de schijf worden verwijderd. De kluissleutels zijn al uit het geheugen gewist, dus eventuele achtergebleven ciphertext is onherstelbare, met Argon2id ingepakte ruis.",
       "partialFailBody_other": "{{count}} bestanden konden niet van de schijf worden verwijderd. De kluissleutels zijn al uit het geheugen gewist, dus eventuele achtergebleven ciphertext is onherstelbare, met Argon2id ingepakte ruis.",
       "partialFailTitle": "Kluis verwijderen gedeeltelijk mislukt",
@@ -2090,6 +2279,32 @@
       "helper": "Bekijk en wijzig sneltoetsen. De editoropmaak en de sneltoets voor het doorlopen van tabbladen liggen vast.",
       "notSet": "Niet ingesteld",
       "removeBindingAria": "{{chord}} verwijderen",
+      "reserved": {
+        "bookmarkPage": "maakt een bladwijzer van de pagina",
+        "closeTab": "sluit het tabblad",
+        "closeWindow": "sluit het venster",
+        "cycleTabs": "wisselt tussen tabbladen",
+        "focusAddressBar": "zet de focus op de adresbalk",
+        "hideApplication": "verbergt zichzelf",
+        "inspectElement": "opent de elementinspector",
+        "minimiseWindow": "minimaliseert het venster",
+        "newPrivateWindow": "opent een privévenster",
+        "newTab": "opent een nieuw tabblad",
+        "newWindow": "opent een nieuw venster",
+        "openBookmarks": "opent de bladwijzers",
+        "openDevTools": "opent de ontwikkelaarstools",
+        "openExtensions": "opent de extensies",
+        "openFile": "opent een bestand",
+        "openHistory": "opent de geschiedenis",
+        "quit": "sluit zichzelf af",
+        "reopenTab": "heropent het laatst gesloten tabblad",
+        "switchTab": "wisselt van tabblad",
+        "toggleFullscreen": "schakelt het volledige scherm in of uit"
+      },
+      "reservedBadge": "Hier niet beschikbaar",
+      "reservedBadgeTitle": "Je browser {{action}} met {{chord}}, dus die bereikt Myne nooit. De sneltoets werkt nog wel in de desktopapp.",
+      "reservedRefused": "{{chord}} hoort bij je browser — die {{action}}. Kies een andere sneltoets; je sneltoetsen op de desktop blijven ongewijzigd.",
+      "reservedUnreliable": "{{chord}} bereikt Myne mogelijk niet — in sommige browsers is dit een sneltoets van de browser zelf: hij {{action}}. Toch toegevoegd.",
       "resetAll": "Alle sneltoetsen resetten…",
       "resetAllConfirm": "Elke aangepaste sneltoets terugzetten naar de standaard?",
       "resetAllYes": "Alles resetten",
@@ -2106,6 +2321,14 @@
       "errorSaveSetting": "De regelnummerinstelling kon niet worden opgeslagen.",
       "helper": "Toon een regelnummerkantlijn in de editor. Eén nummer per regel; standaard uit.",
       "label": "Regelnummers",
+      "off": "Uit",
+      "on": "Aan"
+    },
+    "vimMode": {
+      "chordCaveat": "Op Windows en Linux hebben de eigen sneltoetsen van Myne voorrang, dus de vim-combinaties die daarmee botsen (Ctrl-a, Ctrl-b, Ctrl-d, Ctrl-e, Ctrl-f, Ctrl-i, Ctrl-p, Ctrl-t, Ctrl-v, Ctrl-w, Ctrl-x) zijn niet beschikbaar in de editor. Ctrl-[ werkt nog steeds als Escape, en visual-block verhuist naar Alt-v.",
+      "errorSaveSetting": "De instelling voor de vim-modus kon niet worden opgeslagen.",
+      "helper": "Gebruik vim-toetsen in de editor: de modi normal, insert en visual, met de gebruikelijke bewegingen en operatoren. Standaard uit. Zolang dit aanstaat, openen notities in de bronmodus.",
+      "label": "Vim-toetsenbordmodus",
       "off": "Uit",
       "on": "Aan"
     },
@@ -2134,10 +2357,12 @@
       "modelGenerationLabel": "Tekstmodel — chat, samenvattingen, schrijven",
       "modelNone": "Geen bestand geselecteerd",
       "modelSaveFailed": "Kon het modelpad niet opslaan (het moet buiten je kluis liggen).",
+      "modelTranscriptionLabel": "Spraak-naar-tekstmodel (transcriptie)",
       "modelsHelper": "Myne downloadt nooit modellen — dat zou betekenen dat er gegevens over het netwerk worden verzonden. Open een link om er een in je browser op te halen en kies vervolgens de gedownloade bestanden hier. Alles draait op je apparaat.",
       "modelsLabel": "Modellen",
       "recommendedFilesEmbedding": "Vereist model.safetensors + config.json + tokenizer.json in één map.",
       "recommendedFilesGeneration": "Vereist het .gguf-bestand + tokenizer.json in dezelfde map.",
+      "recommendedFilesTranscription": "Vereist het .gguf-bestand van Whisper + config.json + tokenizer.json in dezelfde map.",
       "title": "AI"
     },
     "prefs": {
@@ -2154,6 +2379,7 @@
       "screenCaptureHelperOn": "Actief op macOS en Windows 10 (mei 2020-update of later). Linux-ondersteuning volgt in een toekomstige release.",
       "screenCaptureLabel": "Bescherming tegen schermopname",
       "screenCaptureSubtitle": "Schermafbeeldingen en schermopname blokkeren",
+      "screenshotBlocked": "Bescherming tegen schermopname staat aan — schermafbeeldingen van Myne worden leeg.",
       "autoLockAfter": "Automatisch vergrendelen na",
       "autoLock1m": "1 min",
       "autoLock5m": "5 min",
@@ -2254,6 +2480,8 @@
       "locationHelper": "Elke kluis is een map met versleutelde bestanden onder dit pad. Gebruik liever de knop Back-up hieronder dan handmatige kopieën — die verifieert het geschreven bestand.",
       "locationLabel": "Kluislocatie",
       "openInFiles": "Openen in Bestanden",
+      "webLocationHelper": "Je notities staan in de opslag die deze browser voor deze site bijhoudt en die de browser zelf beheert — er is geen map om te openen. Als je de gegevens van deze site wist, verdwijnt de lokale kopie; omdat deze client synchroniseert, wordt die bij opnieuw aanmelden weer gedownload.",
+      "webLocationLabel": "Waar je notities worden opgeslagen",
       "pathUnavailable": "Pad niet beschikbaar",
       "restoreBackup": "Herstellen vanuit back-up…"
     },
@@ -2313,9 +2541,92 @@
       "typewriter": "Typemachine-scrollen",
       "typewriterSubtitle": "Houd de cursor verticaal gecentreerd",
       "enableArchiving": "Archiveren inschakelen"
+    },
+    "search": {
+      "placeholder": "Instellingen zoeken…",
+      "ariaLabel": "Instellingen zoeken",
+      "empty": "Geen instellingen komen overeen met “{{query}}”.",
+      "resultsLabel": "Zoekresultaten",
+      "extra": {
+        "lastActiveNoteTitle": "Doorgaan waar je gebleven was",
+        "lastActiveNoteDesc": "Synchroniseer welke notitie je open had staan, zodat je op een ander apparaat verder kunt."
+      },
+      "keywords": {
+        "aiEnable": "lokale ai aan uit inschakelen uitschakelen local ai machine learning kunstmatige intelligentie",
+        "aiExcluded": "uitgesloten mappen negeren uitsluiten ai privacy excluded folders",
+        "aiModels": "modellen model gguf downloaden tekst embedding llm models ai",
+        "archive": "archief archiveren verbergen herstellen notities archive",
+        "autoBackup": "automatische back-ups backup schema frequentie bewaren map planning",
+        "autoLock": "automatisch vergrendelen slot time-out inactiviteit timer sessie auto lock",
+        "backup": "back-up backup myne-backup exporteren herstellen opslaan kopie",
+        "buildChannel": "buildkanaal build kanaal versie release stabiel bèta nightly",
+        "changePassword": "wachtwoord wijzigen veranderen wachtwoordzin aanmeldgegevens bijwerken resetten password",
+        "changelog": "wijzigingslog changelog releaseopmerkingen wat is nieuw geschiedenis versies",
+        "clipper": "browserclipper clipper extensie web knippen vastleggen chrome firefox",
+        "contentWidth": "inhoudsbreedte breedte kolom lezen regellengte content width",
+        "customThemes": "aangepaste thema themas palet kleuren weergave vormgeving importeren custom themes",
+        "dailyNotes": "dagelijkse notities dagboek journaal datum sjabloon map daily notes",
+        "dangerZone": "gevarenzone kluis verwijderen wissen vernietigen danger zone",
+        "export": "exporteren export markdown ontsleutelen platte bestanden documenten",
+        "focusMode": "focusmodus focus typemachine dimmen inactieve regels afleidingsvrij typewriter",
+        "font": "lettertype font schreefloos sans serif mono typografie",
+        "hotkeys": "sneltoetsen toetsenbord toetscombinaties toewijzingen hotkeys keybindings keymap",
+        "import": "importeren import notities obsidian notion evernote enex html csv migreren migratie overzetten",
+        "language": "taal talen weergavetaal locale interface vertaling ui",
+        "lastActiveNote": "doorgaan waar je gebleven was laatste notitie hervatten synchroniseren openen last note resume sync",
+        "license": "licentie agpl opensource open source juridisch license",
+        "lineNumbers": "regelnummers regels kantlijn editor weergeven line numbers",
+        "vimMode": "vim vi modaal bewerken normal insert visual toetsenbord",
+        "lineSpacing": "regelafstand regels hoogte typografie leesbaarheid line spacing",
+        "newNoteLocation": "nieuwe notitie locatie map standaard waar notities aangemaakt new note folder default",
+        "quickUnlock": "snel ontgrendelen pin touch id biometrisch gezicht face unlock",
+        "realtimeSync": "realtime synchronisatie live verbinding aanwezigheid polling sync",
+        "screenCapture": "schermopname bescherming schermafbeelding screenshot opname blokkeren privacy",
+        "showEditTimes": "bewerktijden tijdstempels gewijzigd datums notities tonen timestamps",
+        "spell": "spellingcontrole spelling woordenboek autocorrectie spellcheck spell check dictionary",
+        "spellLanguages": "spelling talen taal woordenboeken locale woorden spell languages dictionary",
+        "startupOpen": "opstarten openen standaard bestand starten welke notitie startup",
+        "attachmentOcr": "ocr afbeelding scan gescand pdf foto schermafbeelding tekstherkenning zoeken bijlagen cpu batterij",
+        "syncAddDevice": "apparaat toevoegen koppelen verbinden telefoon laptop synchronisatie sync",
+        "syncConflicts": "conflicten samenvoegen oplossen versies synchronisatie sync",
+        "syncDevices": "apparaten gekoppeld verbonden machines synchronisatie sync",
+        "syncRecovered": "herstelde notities herstellen terughalen synchronisatie sync",
+        "syncServer": "synchronisatieserver server host zelf-gehost endpoint url sync",
+        "syncStatus": "synchronisatiestatus status verbinding bijgewerkt synchroniseren sync status up to date",
+        "textSize": "tekstgrootte lettergrootte zoom schaal leesbaarheid text size",
+        "theme": "thema theme donker licht modus weergave vormgeving kleurenschema amoled systeem dark light",
+        "threatModel": "dreigingsmodel beveiliging tegenstanders middelen vertrouwen threat model",
+        "toolbar": "werkbalk knoppen opmaak zwevende selectie aanpassen toolbar",
+        "vaultIcon": "kluis pictogram icoon avatar afbeelding symbool vault icon",
+        "vaultLabel": "kluis label naam hernoemen titel vault name rename",
+        "vaultLocation": "kluis locatie pad map schijf waar opgeslagen vault location path",
+        "viewMode": "standaardweergavemodus weergave modus live lezen bron voorbeeld view mode source reading preview"
+      }
     }
   },
+  "storageLost": {
+    "allSynced": "Er is niets verloren gegaan — elke notitie hier had de server al bereikt.",
+    "evicted": {
+      "body": "Je browser heeft de opslag van deze site gewist om ruimte vrij te maken. Er is niets beschadigd en er is niets op de server verwijderd — alles wat was gesynchroniseerd, staat er nog.",
+      "title": "Je browser heeft de lokale kopie van deze kluis gewist"
+    },
+    "lockCta": "Vergrendelen en opnieuw proberen",
+    "reDownloadCta": "Deze browser opnieuw instellen",
+    "reEnrolNotice": "Opnieuw instellen registreert deze browser als een nieuw apparaat, dus die wacht op goedkeuring van een van je andere apparaten voordat hij kan synchroniseren.",
+    "unopenable": {
+      "body": "De lokale kopie van deze kluis kan niet meer worden gelezen. Er is niets op de server aangetast — de kopie hier is een cache en kan worden vervangen.",
+      "title": "De lokale kopie van deze kluis kan niet worden gelezen"
+    },
+    "unsyncedIntro": "{{count}} notities hadden de server nog niet bereikt. Die zijn weg — dit was de enige kopie:",
+    "unsyncedIntro_one": "{{count}} notitie had de server nog niet bereikt. Die is weg — dit was de enige kopie:",
+    "unsyncedIntro_other": "{{count}} notities hadden de server nog niet bereikt. Die zijn weg — dit was de enige kopie:",
+    "unsyncedOverflow": "…en nog {{count}}.",
+    "unsyncedOverflow_one": "…en nog {{count}}.",
+    "unsyncedOverflow_other": "…en nog {{count}}."
+  },
   "sync": {
+    "materialising": "Je notities worden gedownload — {{done}} van {{total}}. Je kunt al beginnen; de rest verschijnt zodra die binnenkomt.",
+    "credentialAmbiguous": "Je wachtwoord is mogelijk zowel op dit apparaat als op een ander gewijzigd, en Myne kan niet bepalen welke wijziging nieuwer is — er is daarom niets gewijzigd. Meld je aan op een apparaat dat al toegang heeft om dit op te lossen.",
     "attachments": {
       "aria": {
         "downloading": "{{name}} downloaden",
@@ -2343,6 +2654,17 @@
       "untitled": "Naamloos ({{hex}})",
       "useThisVersion": "Deze versie gebruiken"
     },
+    "deviceJoinQr": {
+      "accountLabel": "Accountnummer",
+      "accountPlaceholder": "MY-XXXX-XXXX-XXXX-XXXX-XXXX",
+      "error": "Kon de QR niet maken. Probeer het opnieuw.",
+      "generate": "QR maken",
+      "hint": "Plak je accountnummer om een QR te maken die je telefoon kan scannen — die vult de server en het accountnummer voor je in.",
+      "invalidAccount": "Dat lijkt geen geldig accountnummer.",
+      "notConfigured": "Stel eerst een synchronisatieserver in en maak daarna een QR.",
+      "scanWithApp": "Scannen met de iOS-app",
+      "title": "Een apparaat toevoegen met een QR"
+    },
     "devices": {
       "approve": "Goedkeuren",
       "awaitingApproval_one": "{{count}} apparaat wacht op goedkeuring",
@@ -2350,8 +2672,22 @@
       "loading": "Laden…",
       "noDevices": "Nog geen apparaten gesynchroniseerd.",
       "notEnrolled": "Dit apparaat is nog niet verbonden. Als je het zojuist hebt toegevoegd, wacht dan op goedkeuring vanaf een ander apparaat; voeg het anders toe via het formulier “Een apparaat toevoegen” hierboven.",
+      "platform": {
+        "android": "Android-telefoon",
+        "androidTablet": "Android-tablet",
+        "ios": "iPhone",
+        "ipad": "iPad",
+        "linux": "Linux-pc",
+        "macos": "Mac",
+        "unknown": "Dit apparaat",
+        "web": "Browser",
+        "windows": "Windows-pc"
+      },
       "remove": "Verwijderen",
       "removedElsewhere": "Dit apparaat is op een ander apparaat uit je account verwijderd.",
+      "rename": "Hernoemen",
+      "renameFailed": "Kon die naam niet opslaan. Probeer het opnieuw.",
+      "renameLabel": "Apparaatnaam",
       "resetAndReAdd": "Dit apparaat opnieuw instellen en opnieuw toevoegen",
       "resetSyncOnThisDevice": "Synchronisatie op dit apparaat opnieuw instellen",
       "shortName": "Apparaat {{hex}}",
@@ -2371,10 +2707,14 @@
       "connect": "Verbinden",
       "connectedLocal": "Verbonden (lokaal, geen TLS).",
       "connectedTls": "Verbonden. Controleer of deze vingerafdruk overeenkomt met die op je andere apparaat.",
+      "connectedPlatformTrust": "Verbonden via TLS. Je browser heeft het certificaat van deze server geverifieerd.",
       "connecting": "Verbinden…",
       "fingerprintLabel": "Vingerafdruk van servercertificaat:",
       "pinStatic": "Geverifieerd aan de hand van het ingebouwde certificaat van Myne.",
       "pinTofu": "Vastgezet bij de eerste verbinding. Vergelijk deze vingerafdruk op al je apparaten.",
+      "fixedOrigin": "Deze client synchroniseert met één server, vastgelegd bij het uitrollen. Die kun je hier niet wijzigen — de pagina mag alleen met dit ene adres praten.",
+      "fixedOriginNone": "Voor deze installatie is geen synchronisatieserver ingesteld.",
+      "pinPlatformTrust": "Geverifieerd aan de hand van de certificaatopslag van je browser. Deze client kan zelf geen certificaat vastzetten.",
       "placeholder": "https://your-server.example   ·   http://127.0.0.1:8080",
       "unreachable": "Die server was niet bereikbaar — controleer de URL en of de server draait."
     },
@@ -2383,6 +2723,8 @@
       "accountNumberPlaceholder": "MY-XXXX-XXXX-XXXX-XXXX-X",
       "connecting": "Verbinden…",
       "credentialTypeAria": "Type aanmeldgegeven",
+      "deviceNameHelp": "Wordt getoond in je apparatenlijst. Je kunt hem later wijzigen.",
+      "deviceNameLabel": "Geef dit apparaat een naam",
       "error": {
         "notConfigured": "Stel een synchronisatieserver in via de instellingen voordat je dit apparaat toevoegt.",
         "transport": "De synchronisatieserver was niet bereikbaar. Controleer je verbinding en probeer het opnieuw."
@@ -2424,12 +2766,28 @@
         "helper": "Meld je op een nieuw apparaat aan met je accountnummer en wachtwoord of herstelzin. Een apparaat blijft in afwachting totdat een bestaand apparaat het goedkeurt.",
         "label": "Een apparaat toevoegen"
       },
+      "awaitingApproval": {
+        "label": "Wacht op goedkeuring"
+      },
       "conflicts": {
         "helper": "Wanneer dezelfde notitie tegelijk op twee apparaten wordt bewerkt, bewaart Myne beide kopieën zodat er niets verloren gaat. Los ze hier op.",
         "label": "Conflicten"
       },
       "devices": {
         "label": "Apparaten"
+      },
+      "recovered": {
+        "close": "Sluiten",
+        "decrypting": "Ontsleutelen…",
+        "deleteConfirmTitle": "Deze herstelde notitie verwijderen?",
+        "deleteConfirmWarning": "Hiermee verwijder je definitief de enige kopie die op dit apparaat wordt bewaard. Dit kan niet ongedaan worden gemaakt.",
+        "deleteCta": "Verwijderen",
+        "errorGeneric": "Er is iets misgegaan. Probeer het opnieuw.",
+        "helper": "Wanneer een notitie die op een ander apparaat is verwijderd hier ook verdwijnt, blijft de versleutelde kopie op dit apparaat bewaard. Herstel er een als nieuwe notitie, of verwijder hem definitief.",
+        "label": "Herstelde notities",
+        "previewCta": "Voorbeeld",
+        "previewTitle": "Herstelde notitie",
+        "restoreCta": "Herstellen"
       },
       "server": {
         "helper": "Voer op elk apparaat dezelfde server-URL in. Gebruik voor een zelf-gehoste server het <1>https://</1>-adres ervan; controleer of de vingerafdruk van het certificaat op al je apparaten overeenkomt.",
@@ -2438,22 +2796,42 @@
       "status": {
         "helper": "Myne synchroniseert je versleutelde notities tussen je apparaten. De server bewaart alleen ciphertext die hij niet kan lezen.",
         "label": "Synchronisatiestatus"
+      },
+      "usage": {
+        "helper": "Hoeveel versleutelde gegevens dit account op de server bewaart en hoeveel apparaten zijn aangemeld.",
+        "label": "Opslag en apparaten"
       }
     },
     "reconcile": {
       "message": "Dit apparaat is een tijd offline geweest — de synchronisatie wordt bijgewerkt. Je notities zijn veilig."
+    },
+    "recovered": {
+      "restoredToast": "Hersteld als nieuwe notitie."
     },
     "status": {
       "awaitingApproval": "Wacht op goedkeuring",
       "conflicts_one": "{{count}} conflict te beoordelen",
       "conflicts_other": "{{count}} conflicten te beoordelen",
       "error": "Synchronisatiefout",
+      "errorAuth": "Aanmelding voor synchronisatie verlopen",
+      "errorFrozen": "Account bevroren — uploads gepauzeerd",
+      "errorDeviceRevoked": "Dit apparaat is uit je account verwijderd",
+      "errorStorageFull": "Opslag vol — synchronisatie gepauzeerd",
+      "errorQuota": "Opslag vol — uploads gepauzeerd",
+      "errorRateLimited": "Synchronisatie afgeremd — nieuwe poging volgt",
+      "errorTooLarge": "Een bestand is te groot om te uploaden",
       "loading": "Synchronisatiestatus…",
       "notEnrolled": "Niet aangemeld",
       "off": "Synchronisatie uit",
       "synced": "Gesynchroniseerd",
       "syncing": "Synchroniseren…",
       "syncNow": "Nu synchroniseren"
+    },
+    "usage": {
+      "devices": "Apparaten",
+      "frozen": "Dit account is bevroren. Nieuwe wijzigingen kunnen niet worden geüpload; je notities worden nog wel gedownload.",
+      "ofTotal": "{{used}} van {{total}}",
+      "storage": "Opslag"
     },
     "settings": {
       "serverSection": "Server",
@@ -2516,6 +2894,32 @@
     "deleteConfirm": "Dit sjabloon verwijderen?",
     "convertToNote": "Omzetten naar notitie"
   },
+  "themeInstall": {
+    "apply": "Thema toepassen",
+    "applying": "Toepassen…",
+    "byAuthor": "Volgens deze link is dit van {{author}}",
+    "cancel": "Annuleren",
+    "close": "Sluiten",
+    "collision": {
+      "keepBoth": "Beide houden — installeren als “{{name}}”",
+      "question": "Je hebt al een thema met de naam “{{name}}”.",
+      "replace": "“{{name}}” vervangen"
+    },
+    "error": {
+      "importFailed": "Dat thema kon niet worden geïnstalleerd. Er is niets gewijzigd.",
+      "installedNotActivated": "“{{name}}” is geïnstalleerd, maar kon niet worden ingeschakeld. Je kunt het toepassen via Instellingen → Weergave.",
+      "invalidName": "Die link noemt niet welk thema hij wil installeren.",
+      "listUnavailable": "Je bestaande thema's konden niet worden gelezen, dus dit kan nu niet veilig worden geïnstalleerd. Sluit dit en probeer de link opnieuw.",
+      "malformedPayload": "De themagegevens in die link zijn beschadigd of onvolledig.",
+      "nothingWritten": "Er is niets naar je kluis geschreven.",
+      "payloadTooLarge": "De themagegevens in die link zijn te groot om een thema te zijn.",
+      "unsupportedVersion": "Die link is gemaakt voor een nieuwere versie van Myne. Werk Myne bij en probeer het opnieuw."
+    },
+    "errorTitle": "Kon dat thema niet lezen",
+    "helper": "Thema's zijn een kleurenpalet, geen code. Myne valideert dit thema op dit apparaat voordat het wordt gebruikt — er wordt niets geüpload.",
+    "question": "Wil je dit thema gebruiken?",
+    "title": "Thema installeren"
+  },
   "unlock": {
     "backToPicker": "Kies een andere kluis",
     "continue": "Doorgaan",
@@ -2524,6 +2928,7 @@
     "errors": {
       "alreadyUnlocked": "De kluis is al ontgrendeld.",
       "inProgress": "Er is een bewerking bezig.",
+      "kdfMemoryExceedsHost": "Deze kluis heeft {{required}} MiB geheugen nodig om te openen — meer dan deze browser kan geven ({{available}} MiB). Er is niets mis met de kluis; open hem in de Myne-desktopapp.",
       "unexpected": "Onverwachte fout. Probeer het opnieuw.",
       "vaultNotFound": "Kluisbestand niet gevonden. Start de app opnieuw op."
     },
@@ -2879,6 +3284,7 @@
     "containsPlaceholder": "bevat…",
     "tagPlaceholder": "tag",
     "folderPlaceholder": "Map/",
+    "propertyKeyPlaceholder": "eigenschapsnaam",
     "addCondition": "+ Voorwaarde toevoegen",
     "createView": "Weergave maken"
   },
@@ -2941,7 +3347,23 @@
     "serverPlaceholder": "https://sync.example.com",
     "accountHint": "Controleer dit nummer nog eens — het lijkt niet te kloppen.",
     "approvalHint": "Je notities verschijnen zodra je dit apparaat goedkeurt vanaf een apparaat dat je account al heeft.",
-    "connectingSubtitle": "Je account wordt opgehaald en je kluis wordt ontgrendeld op dit apparaat."
+    "connectingSubtitle": "Je account wordt opgehaald en je kluis wordt ontgrendeld op dit apparaat.",
+    "qr": {
+      "cancel": "Annuleren",
+      "confirmAccount": "Account",
+      "confirmServer": "Server",
+      "confirmTitle": "Dit apparaat toevoegen?",
+      "continue": "Doorgaan",
+      "expired": "Deze QR is verlopen — toon een nieuwe op je andere apparaat en scan opnieuw.",
+      "invalid": "Dat is geen QR van een Myne-apparaat.",
+      "newerVersion": "Deze QR komt van een nieuwere versie van Myne — werk de app bij en probeer het opnieuw.",
+      "pinHosted": "Door Myne gehoste server",
+      "pinNone": "Zelf-gehoste server",
+      "pinSelfHost": "Certificaat vastgezet vanaf je vertrouwde apparaat",
+      "scan": "QR scannen",
+      "scanFailed": "Kon niet scannen. Probeer het opnieuw of voer je gegevens handmatig in.",
+      "scanUnavailable": "Scannen is niet beschikbaar op dit apparaat — voer je gegevens hieronder in."
+    }
   },
   "createVault": {
     "beginWeakPassword": "Kies een sterker wachtwoord en probeer het opnieuw.",
@@ -2979,5 +3401,46 @@
     "personalLabel": "Persoonlijk",
     "openVault": "Kluis openen",
     "backUpNow": "Nu een back-up maken"
+  },
+  "web": {
+    "reload": {
+      "body": "Als je deze pagina opnieuw laadt, wordt opnieuw om je wachtwoord gevraagd — er is bewust geen snellere weg naar binnen. Je kluis blijft versleuteld op dit apparaat terwijl de pagina gesloten is, en de sleutel wordt elke keer opnieuw uit je wachtwoord opgebouwd.",
+      "title": "Opnieuw laden betekent opnieuw je wachtwoord"
+    },
+    "wall": {
+      "getNative": "Myne voor desktop of mobiel downloaden",
+      "noAccount": {
+        "body": "Accounts maak je aan in de Myne-desktopapp of de mobiele app, niet hier.",
+        "reason": "Bij het aanmaken van een account wordt je herstelzin van 24 woorden gegenereerd en één keer aan je getoond. Een webpagina hoort nooit degene te zijn die je die zin toont — als hij daar zou uitlekken, kan niets in Myne dat terugdraaien.",
+        "title": "Je hebt eerst een account nodig"
+      },
+      "noSync": {
+        "body": "Voor deze browser is geen synchronisatieserver ingesteld, dus er is niets om te openen.",
+        "reason": "Anders dan de desktopapp houdt de browser geen eigen kluis achter de hand — synchronisatie is waar zijn notities vandaan komen. Stel die in via de desktopapp of de mobiele app en kom daarna hier terug.",
+        "title": "Synchronisatie is nog niet ingesteld"
+      }
+    },
+    "unavailableHere": {
+      "backup": "Versleutelde back-ups maak en herstel je in de Myne-desktopapp, die het back-upbestand kan wegschrijven waar jij wilt. Je notities hier komen van de server, dus deze browser herstelt zichzelf door te synchroniseren.",
+      "creation": "Nieuwe accounts maak je aan in de Myne-desktopapp. Die laat je herstelzin zien — en een herstelzin hoort nooit door een webpagina te worden getoond.",
+      "multiVault": "Deze browser bevat één account. Wil je een ander gebruiken, open dat dan in de Myne-desktopapp of in een ander browserprofiel.",
+      "phraseRecovery": "Herstel met je herstelzin gebeurt in de Myne-desktopapp. Je herstelzin hoort nooit in een webpagina te worden getypt.",
+      "title": "Niet beschikbaar in de browser"
+    },
+    "unsupported": {
+      "title": "Myne kan niet draaien in deze browser",
+      "mobileTitle": "Open de Myne-app op dit apparaat",
+      "handoff": "De desktopapp van Myne (macOS, Windows, Linux) en de mobiele app (iOS, Android) kennen die beperking niet — en ze verifiëren hun eigen handtekening voordat ze starten, iets wat een webpagina niet kan.",
+      "reason": {
+        "desktop-form-factor": "Myne in de browser is gemaakt voor een desktopcomputer — het heeft het geheugen en de invoer nodig die een browser op een telefoon of tablet niet kan bieden. Op dit apparaat is de Myne-app sowieso de betere client: hij is sneller, hij werkt offline en hij behoudt je notities wanneer de browser zijn opslag wist.",
+        "webassembly": "Deze browser ondersteunt geen WebAssembly, waarop de versleutelingskern draait.",
+        "wasm-memory-headroom": "Deze browser kan de ~336 MB geheugen die de sleutelafleiding van de kluis nodig heeft niet reserveren. Browsers op telefoons en tablets kunnen dat doorgaans niet; die grens wordt door de kluis zelf bepaald en kan niet voor één apparaat worden verlaagd zonder de kluis overal elders onleesbaar te maken.",
+        "worker": "Deze browser ondersteunt geen Web Workers, waarin de opslag en de versleuteling van de kluis draaien.",
+        "opfs": "Deze browser biedt geen afgeschermde lokale opslag voor webapps, dus er is nergens plek om je kluis te bewaren wanneer de pagina opnieuw wordt geladen.",
+        "opfs-sync-access-handle": "In de afgeschermde lokale opslag van deze browser ontbreekt de synchrone bestandstoegang die de kluis nodig heeft om veilig te schrijven.",
+        "web-locks": "Deze browser ondersteunt de vergrendeling niet die voorkomt dat twee tabbladen tegelijk naar één kluis schrijven.",
+        "crypto-getrandomvalues": "Deze browser biedt geen cryptografische bron van willekeurige getallen."
+      }
+    }
   }
 }

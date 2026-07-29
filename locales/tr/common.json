@@ -1,4 +1,30 @@
 {
+  "accountBootstrap": {
+    "accountMismatch": "Bu tarayıcı zaten başka bir hesabın kasasını tutuyor. Önce onu açın ya da oturumu kapatıp bu tarayıcıdaki kopyayı silin.",
+    "changeAccount": "Farklı bir hesap numarası kullan",
+    "continue": "Devam et",
+    "failed": "Bu hesap açılamadı. Hesap numarasını ve parolayı kontrol edip tekrar deneyin.",
+    "hint": "Bu hesabın ana parolasını girin. Myne kasanızı getirecek ve bu tarayıcıyı hesabınızda bir cihaz olarak kuracak.",
+    "noEndpoint": "Myne’in bu kopyasında yapılandırılmış bir eşitleme sunucusu yok, bu yüzden kasanıza ulaşamıyor. Sunucuyu işleten kişiyle iletişime geçin.",
+    "passwordLabel": "Ana parola",
+    "approversIntro": "Bu cihazı şu cihazlar onaylayabilir:",
+    "noApprovers": "Bu hesapta şu anda onay verebilecek başka bir cihaz yok. Erişimi zaten olan bir cihazda Myne’i açın, sonra buraya dönün.",
+    "pendingTitle": "Onay bekleniyor",
+    "sasMatch": "Eşleşiyor — devam et",
+    "sasMismatch": "Eşleşmiyor",
+    "verifyBody": "Devam etmeden önce bu kodun her iki cihazda da aynı olduğunu doğrulayın. Aynı değilse durun — sorun parolanızda değil, bağlantıdadır.",
+    "verifyTitle": "Bu kodu karşılaştırın",
+    "title": "Kasanıza giriş yapın",
+    "working": "Kuruluyor…"
+  },
+  "accountEntry": {
+    "checkFailed": "Bu hesap numarası denetlenemedi. Tekrar deneyin.",
+    "checking": "Denetleniyor…",
+    "continue": "Devam et",
+    "hint": "MY-XXXX-XXXX-XXXX-XXXX-XXXX gibi görünür. Burada, cihazınızda denetlenir — henüz hiçbir şey gönderilmez.",
+    "invalid": "Bu hesap numarası geçerli değil. Kontrol edip tekrar deneyin.",
+    "title": "Hesap numaranızı girin"
+  },
   "attachments": {
     "cleanUnused": {
       "cancel": "İptal",
@@ -8,6 +34,7 @@
       "deleteCta": "{{count}} kullanılmayanı sil",
       "deleteCta_one": "{{count}} kullanılmayanı sil",
       "deleteCta_other": "{{count}} kullanılmayanı sil",
+      "corpusIncomplete": "Önce eşitlemeyi tamamlayın — bu cihazda henüz tüm notlarınız yok. Hiçbir şey silinmedi.",
       "error": "Temizlenemedi. Bazı notlar okunamıyor olabilir — hiçbir şey silinmedi.",
       "intro_one": "Bu ek hiçbir notta kullanılmıyor. Silmek kalıcıdır ve geri alınamaz.",
       "intro_other": "Bu {{count}} ek hiçbir notta kullanılmıyor. Silmek kalıcıdır ve geri alınamaz.",
@@ -47,6 +74,7 @@
       "actionsTitle": "İşlemler",
       "checking": "Denetleniyor…",
       "checkUnusedFailedNotice": "Kullanılmayan ekler denetlenemedi. Tekrar deneyin.",
+      "corpusIncompleteNotice": "Önce eşitlemeyi tamamlayın — bu cihazda henüz tüm notlarınız yok, bu yüzden hangi eklerin kullanılmadığı belirlenemiyor.",
       "cleanUnused": "Kullanılmayanları temizle",
       "cleanUnusedTitle": "Hiçbir notta kullanılmayan ekleri sil",
       "colCreated": "Oluşturulma",
@@ -69,6 +97,7 @@
       "menuExport": "Dışa aktar",
       "menuPreview": "Önizle",
       "menuRename": "Yeniden adlandır",
+      "menuTranscribe": "Yazıya dök",
       "noMatch": "Aramanızla eşleşen ek yok.",
       "noUnusedNotice": "Temizlenecek kullanılmayan ek yok.",
       "preview": "Önizle",
@@ -84,6 +113,10 @@
       "sortAriaLabel": "Ekleri sırala",
       "supportedFilesFilter": "Desteklenen dosyalar",
       "title": "Ekler",
+      "transcribeDone": "Yazıya dökme tamamlandı.",
+      "transcribeFailed": "Yazıya dökme başarısız oldu. Lütfen tekrar deneyin.",
+      "transcribeNoModel": "Ayarlar → Labs → Yapay Zeka bölümünden bir yazıya dökme modeli seçin.",
+      "transcribeStarted": "Yazıya dökülüyor…",
       "typeFilter": {
         "all": "Tüm türler",
         "audio": "Ses",
@@ -210,6 +243,9 @@
       },
       "toggleLineNumbers": {
         "label": "Satır numaralarını aç/kapat"
+      },
+      "toggleVimMode": {
+        "label": "Vim klavye modunu aç/kapat"
       },
       "toggleSpellCheck": {
         "label": "Yazım denetimini aç/kapat"
@@ -512,6 +548,7 @@
     }
   },
   "common": {
+    "cancel": "İptal",
     "dismiss": "Kapat",
     "prompt": {
       "cancel": "İptal",
@@ -522,6 +559,10 @@
     },
     "back": "Geri",
     "continue": "Devam et"
+  },
+  "deviceRevoked": {
+    "cta": "Baştan başla",
+    "title": "Bu tarayıcı hesabınızdan kaldırıldı"
   },
   "editor": {
     "attachment": {
@@ -675,7 +716,8 @@
           "export": "Dışa aktar",
           "remove": "Kaldır",
           "rename": "Yeniden adlandır",
-          "reveal": "Kitaplıkta göster"
+          "reveal": "Kitaplıkta göster",
+          "transcribe": "Yazıya dök"
         },
         "pdfFallback": "PDF",
         "textPreview": {
@@ -686,6 +728,15 @@
           "brokenLabel": "bozuk",
           "deletedAria": "Silinmiş ek: {{filename}}",
           "deletedLabel": "silindi"
+        },
+        "transcribe": {
+          "disabledReason": "Yazıya dökmek için Ayarlar → Labs → Yapay Zeka bölümünden yapay zekayı açın.",
+          "failed": "Yazıya dökme başarısız oldu. Lütfen tekrar deneyin.",
+          "heading": "Metin dökümü",
+          "insert": "Metin dökümünü nota ekle",
+          "noModelHint": "Ayarlar → Labs → Yapay Zeka bölümünden bir yazıya dökme modeli seçin.",
+          "progress": "Yazıya dökülüyor…",
+          "stop": "Durdur"
         },
         "urlImageFallback": "görsel"
       }
@@ -735,6 +786,7 @@
         "tags": "Etiketler",
         "viewMode": "Görünüm modu",
         "views": "Görünümler",
+        "vimMode": "Vim modu",
         "wordCount": "Sözcük sayısı",
         "workspace": "Çalışma alanı"
       },
@@ -766,6 +818,13 @@
           "title_one": "{{characters}} karakter · {{words}} sözcük · {{spaces}} boşluk · {{count}} paragraf",
           "title_other": "{{characters}} karakter · {{words}} sözcük · {{spaces}} boşluk · {{count}} paragraf",
           "titleSelectionSuffix": " (seçim)"
+        },
+        "vimMode": {
+          "insert": "Insert",
+          "normal": "Normal",
+          "replace": "Replace",
+          "title": "Vim modu — normal mod için Esc’e basın",
+          "visual": "Visual"
         },
         "graphTitle": "Grafik (⌘⇧G)",
         "lock": "Kilitle",
@@ -998,6 +1057,23 @@
         "xl": "Çok büyük"
       }
     },
+    "vim": {
+      "ex": {
+        "refused": {
+          "edit": "`:e` desteklenmiyor — Myne dosyaları değil, notları açar. Komut paletini veya kenar çubuğunu kullanın.",
+          "map": "Myne’de özel tuş eşlemeleri desteklenmiyor. Kısayollar Ayarlar → Kısayollar bölümünden yapılandırılır.",
+          "set": "`:set` desteklenmiyor — Myne’de vim seçenekleri yok. Düzenleyici tercihleri Ayarlar → Düzenleyici bölümündedir.",
+          "source": "`:source` desteklenmiyor. Myne’de bilinçli olarak yapılandırma betiği yüzeyi yoktur.",
+          "unsupported": "Bu komut Myne’de desteklenmiyor."
+        },
+        "substitute": {
+          "malformed": "Bu değiştirme okunamadı. Beklenen biçim :s/pattern/replacement/",
+          "refused": "Bu desen yalnızca vim’e özgü sözdizimi ({{what}}) kullanıyor; Myne’in araması bunu desteklemiyor. Hiçbir şey değişmedi."
+        },
+        "writeFailed": "Kaydedilemedi.",
+        "written": "Kaydedildi."
+      }
+    },
     "wikilink": {
       "chip": {
         "embed": "Göm: {{label}}"
@@ -1188,6 +1264,11 @@
         "title": "Markdown olarak dışa aktar"
       }
     },
+    "egress": {
+      "cancel": "İptal",
+      "confirm": "İndir",
+      "title": "Bu dosyayı indir"
+    },
     "pdf": {
       "cancel": "İptal",
       "continue": "Devam et…",
@@ -1254,6 +1335,10 @@
     }
   },
   "failClosed": {
+    "exit": {
+      "quit": "Uygulamayı kapat",
+      "reload": "Yeniden yükle"
+    },
     "corrupted": {
       "body": "Bir yedeklemeniz varsa geri yükleyebilirsiniz — mevcut dosyalarınıza dokunulmaz; yedekleme önce ayrı bir kasa olarak geri yüklenir.",
       "cta": "Uygulamayı kapat",
@@ -1274,6 +1359,8 @@
       "cta": "Uygulamayı kapat",
       "title": "Kasa dosyasına erişim izni yok."
     },
+    "copyDiagnostics": "Tanılamayı kopyala",
+    "diagnosticsCopied": "Kopyalandı",
     "restoreFromBackup": "Yedeklemeden geri yükle…"
   },
   "notes": {
@@ -1343,14 +1430,20 @@
       "noteCount_other": "{{count}} not",
       "of": "şununla:",
       "ofTheGroups": "şu grupların:",
+      "op": {
+        "contains": "içerir"
+      },
+      "propertyValuePlaceholder": "değer",
       "removeCondition": "Koşulu kaldır",
       "replaceFilter": "Filtreyi değiştir",
       "save": "Kaydet",
       "searchTextPlaceholder": "arama metni",
       "selectFolderPlaceholder": "bir klasör seçin…",
+      "selectPropertyPlaceholder": "bir özellik seçin…",
       "selectTagPlaceholder": "bir etiket seçin…",
       "type": {
         "folder": "Klasör",
+        "property": "Özellik",
         "search": "Arama",
         "tag": "Etiket"
       },
@@ -1451,7 +1544,11 @@
         "titleFailed": "İçe aktarma başarısız oldu",
         "titleSetup": "Obsidian kasasını içe aktar",
         "vaultFolderLabel": "Kasa klasörü",
-        "vaultRoot": "(kasa kökü)"
+        "vaultRoot": "(kasa kökü)",
+        "titlePick": "Notları içe aktar",
+        "keepsLabel": "Neler aktarılır",
+        "losesLabel": "Neler aktarılmaz",
+        "changeSource": "Kaynağı değiştir"
       },
       "offer": {
         "body": "Mevcut notlarınızı Myne’e getirin. Her biri içe aktarılırken şifrelenir — hiçbir şey bu cihazdan ayrılmaz ve özgün dosyalarınız tam olduğu yerde kalır.",
@@ -1459,6 +1556,46 @@
         "laterHint": "Daha sonra istediğiniz zaman Ayarlar → Depolama’dan içe aktarabilirsiniz.",
         "notNow": "Şimdi değil",
         "title": "Obsidian kasanız içe aktarılsın mı?"
+      },
+      "picker": {
+        "intro": "Notlarınız nereden geliyor?"
+      },
+      "source": {
+        "obsidian": {
+          "label": "Obsidian",
+          "pickerTitle": "Obsidian kasa klasörünüzü seçin",
+          "survives": "Korunanlar: Markdown, ön bilgi, [[wikilinks]], klasör yapısı, ekler.",
+          "loses": "Geride kalanlar: canvas dosyaları ve Markdown notu olmayan her şey.",
+          "short": "Markdown notlarından oluşan bir kasa klasörü"
+        },
+        "notion": {
+          "label": "Notion",
+          "pickerTitle": "Sıkıştırması açılmış Notion dışa aktarma klasörünüzü seçin",
+          "survives": "Korunanlar: sayfalar, klasör yapısı, alan olarak sayfa özellikleri ve wikilink olarak iç bağlantılar. Her veritabanı ayrıca satırlarına bağlanan bir tablo notu olarak gelir.",
+          "loses": "Önce dışa aktarmanın sıkıştırmasını açın — Myne .zip dosyasını değil, klasörü okur. Açılır blokların, vurgu kutularının ve renkli metnin karşılığı yoktur; bunlar bir içe aktarma raporunda listelenir.",
+          "short": "Sıkıştırması açılmış bir dışa aktarma klasörü"
+        },
+        "evernote": {
+          "label": "Evernote",
+          "pickerTitle": "Evernote .enex dosyanızı seçin",
+          "survives": "Korunanlar: dosyadaki her not, biçimlendirme ve ekler. Şifreli bloklar, Evernote’ta hâlâ çözebileceğiniz metin olarak korunur.",
+          "loses": "Geride kalanlar: hatırlatıcılar ve not geçmişi. Çok büyük dışa aktarmalar riske atılmak yerine reddedilir — böyle bir durumda dışa aktarmayı bölün.",
+          "short": "Tek bir .enex dışa aktarma dosyası"
+        },
+        "html": {
+          "label": "HTML",
+          "pickerTitle": "HTML dosyalarından oluşan bir klasör seçin",
+          "survives": "Korunanlar: başlıklar, listeler, tablolar, bağlantılar, kod ve vurgular.",
+          "loses": "Geride kalanlar: stiller, betikler ve gömülü içerikler. Uzak görseller bağlantı olarak kalır ve asla indirilmez.",
+          "short": "Kaydedilmiş web sayfalarından oluşan bir klasör"
+        },
+        "csv": {
+          "label": "CSV",
+          "pickerTitle": ".csv dosyanızı seçin",
+          "survives": "Tabloyu tutan tek bir nota dönüşür.",
+          "loses": "Bu tek bir nottur, satır başına bir not değil — Myne bir veritabanı değildir. Çok geniş veya çok uzun dosyalar kırpılır ve içe aktarma raporu ne kadar kırpıldığını söyler.",
+          "short": "Tek bir hesap tablosu dosyası"
+        }
       }
     },
     "list": {
@@ -1497,7 +1634,10 @@
       "exportPdf": "PDF olarak dışa aktar…",
       "exportTxt": "Düz Metin olarak dışa aktar…",
       "favoritesHeading": "Favoriler",
+      "icon": "Simge…",
       "mergeAnyway": "Yine de birleştir",
+      "newDrawingHere": "Burada yeni çizim",
+      "newDrawingMenu": "Yeni çizim",
       "newFolder": "Yeni klasör",
       "newFolderInPlaceholder": "{{path}} içinde yeni klasör",
       "newFolderPlaceholder": "Yeni klasör",
@@ -1550,6 +1690,7 @@
     },
     "newTab": {
       "createNote": "Yeni bir not oluştur",
+      "createDrawing": "Yeni çizim",
       "noNotesMatch": "Eşleşen not yok.",
       "noNotesYet": "Henüz not yok.",
       "searchAriaLabel": "Açılacak notları ara",
@@ -1579,12 +1720,16 @@
       "loadError": "Bu not yüklenemedi",
       "removeFromFavorites": "Favorilerden çıkar",
       "renameAriaLabel": "Notu yeniden adlandır",
+      "unsyncedLabel": "Henüz sunucuda değil",
+      "unsyncedTitle": "Bu notun son değişiklikleri yalnızca bu cihazda",
       "untitled": "Başlıksız"
     },
     "savedView": {
       "defaultName": "Filtrelenmiş görünüm"
     },
     "saveStatus": {
+      "conflict": "Düzenleme çakışması çözülüyor…",
+      "conflictTitle": "Bu not başka bir cihazda değişti — iki sürüm de saklanıyor",
       "editing": "Düzenleniyor",
       "editingEllipsis": "Düzenleniyor…",
       "editingTitle": "Düzenleniyor — otomatik kaydetme etkin",
@@ -1594,6 +1739,8 @@
       "savedRelative": "{{rel}} kaydedildi",
       "saveFailed": "Kayıt başarısız",
       "saveFailedTitle": "Kayıt başarısız — Yeniden dene’ye tıklayın",
+      "storageFull": "Depolama dolu",
+      "storageFullTitle": "Bu notu kaydetmek için yer kalmadı. Yer açın (ya da bazı ekleri kaldırın), sonra yeniden deneyin. Kaydedilene kadar bu düzenleme yalnızca bu pencerededir — sunucuda da yoktur.",
       "saving": "Kaydediliyor",
       "savingEllipsis": "Kaydediliyor…"
     },
@@ -1708,6 +1855,10 @@
       "host": {
         "unsupported": "Bu görünüm türü ileriki bir güncellemede geliyor."
       },
+      "list": {
+        "empty": "Bu görünümle eşleşen not yok",
+        "noValue": "Değer yok"
+      },
       "menu": {
         "deleteView": "Görünümü sil",
         "editFilter": "Filtreyi düzenle…",
@@ -1717,6 +1868,11 @@
         "viewSettings": "Görünüm ayarları…"
       },
       "newView": "Yeni görünüm",
+      "table": {
+        "empty": "Bu görünümle eşleşen not yok",
+        "name": "Ad",
+        "noValue": "Değer yok"
+      },
       "untitledView": "Başlıksız görünüm"
     },
     "viewSettings": {
@@ -1730,12 +1886,26 @@
       "cancel": "İptal",
       "cardSize": "Kart boyutu",
       "cardSizeValue": "{{size}} px",
+      "columns": "Sütunlar",
+      "columnsEmpty": "Özellik bulunamadı",
+      "columnsHint": "Sütun (tablo) ya da ayrıntı satırı (liste / kartlar) olarak gösterilen ön bilgi özellikleri.",
+      "columnsPlaceholder": "Sütun ekle…",
       "coverImageHint": "Değeri bir görsel olan ön bilgi özelliği — her kartın kapağı olarak gösterilir. Kapak istemiyorsanız boş bırakın.",
       "coverImagePlaceholder": "örneğin cover",
       "coverImageProperty": "Kapak görseli özelliği",
+      "groupBy": "Gruplama ölçütü",
       "imageAspectRatio": "Görsel en boy oranı",
+      "propertyNone": "Yok",
       "reset": "Sıfırla",
-      "save": "Kaydet"
+      "save": "Kaydet",
+      "sortAsc": "Artan",
+      "sortBy": "Sıralama ölçütü",
+      "sortDesc": "Azalan",
+      "sortDirection": "Sıralama yönü",
+      "viewType": "Görünüm türü",
+      "viewTypeCards": "Kartlar",
+      "viewTypeList": "Liste",
+      "viewTypeTable": "Tablo"
     },
     "welcome": {
       "body": "Myne’e hoş geldiniz; düşünmek ve yazmak için özel alanınız.\n\nBurada kaydettiğiniz her şey şifrelenir ve cihazınızda kalır. **Parolanız** ve **kurtarma ifadeniz** bunun tek anahtarıdır, bu yüzden onları güvenli bir yerde saklayın. İkisi de kaybolursa kimse notlarınızı geri getiremez, biz bile.\n\nBu sadece sıradan bir not, o yüzden onu kendinize göre düzenleyin. Dilediğiniz zaman düzenleyin, yeniden adlandırın veya silin; fikirleriniz büyüdükçe yeni notlar ekleyin.\n\nBurada olmanıza sevindik. Myne hakkında daha fazla bilgi için https://myne.md adresini ziyaret edin\n",
@@ -1836,6 +2006,7 @@
   "settings": {
     "about": {
       "buildChannelDevelopment": "Geliştirme yapısı",
+      "buildLabel": "Yapı",
       "buildChannelLabel": "Yapı kanalı",
       "buildChannelStable": "Kararlı",
       "changelogButton": "Değişiklik günlüğünü görüntüle…",
@@ -1857,12 +2028,16 @@
         "ioError": "Disk hatası, lütfen tekrar deneyin.",
         "joinFailure": "Bir şeyler ters gitti, lütfen tekrar deneyin.",
         "samePasswordRejected": "Yeni parola, mevcut olanla aynı.",
+        "serverAckPending": "Yeni parolanız bu cihazda çalışıyor, ancak Myne onu kaydetmek için sunucuya ulaşamadı. Ulaşana kadar diğer cihazlarınız hâlâ eski parolayı bekler — ve bu tarayıcıdaki kopya o zamandan önce temizlenirse değişiklik kaybolur. Otomatik olarak yeniden denenecek.",
         "weakNewPassword": "Yeni parola en az 12 karakter olmalı."
       },
       "changePasswordHeading": "Parola değiştir",
       "changePasswordHelper": "Aynı kasayı koruyarak ana parolanızı değiştirin. Kurtarma ifadesi aynı kalır.",
       "dangerZoneHeading": "Tehlikeli bölge",
       "dangerZoneHelper": "Bu kasayı ve tüm notları kalıcı olarak silin. Geri alınamaz. Kurtarma ifadesi kasayı geri getirmez.",
+      "localEraseHeading": "Bu tarayıcı",
+      "localEraseHelper": "Myne’in kasanıza ait kopyasını bu tarayıcıdan silin. Hesabınız ve eşitlenmiş olan her şey sunucuda kalır.",
+      "localEraseButton": "Oturumu kapat ve bu tarayıcıdaki kopyayı sil…",
       "deleteVaultButton": "Kasayı sil…",
       "memoryCost": "Bellek maliyeti",
       "parallelism": "Paralellik",
@@ -1887,6 +2062,7 @@
       "changing": "Değiştiriliyor…"
     },
     "appearance": {
+      "homeQuickActions": "Ana ekran hızlı işlemleri",
       "showEditTimesAria": "Kenar çubuğunda düzenleme zamanlarını göster",
       "showEditTimesHelper": "Her notun son düzenlenme zamanını kenar çubuğunda başlığının altında göster.",
       "showEditTimesLabel": "Düzenleme zamanlarını göster",
@@ -1914,6 +2090,13 @@
       "off": "Kapalı",
       "on": "Açık",
       "saveError": "Arşivleme ayarı güncellenemedi."
+    },
+    "attachmentOcr": {
+      "label": "Görsellerin ve taranmış belgelerin içinde ara",
+      "helper": "Görsel eklerden ve taranmış PDF’lerden bu cihazda metin okur, böylece arama onları içeriklerine göre bulabilir. Hiçbir şey yüklenmez. Bunu kapatmak arka plandaki metin çıkarma işlemini durdurur; hâlihazırda çıkarılmış metin korunur.",
+      "errorSaveSetting": "Bu ayar kaydedilemedi.",
+      "processing_one": "1 ek okunuyor…",
+      "processing_other": "{{count}} ek okunuyor…"
     },
     "autoBackup": {
       "backupFolder": "Yedekleme klasörü",
@@ -1991,6 +2174,8 @@
         "parseError": "Geçerli JSON değil",
         "parseErrorWithLine": "Geçerli JSON değil ({{line}}. satır)"
       },
+      "export": "Dışa aktar",
+      "exportError": "Bu tema dışa aktarılamadı. Lütfen tekrar deneyin.",
       "fileFilterName": "Myne teması",
       "helper": "Kendi renk paletinizi kullanın. Temalar kullanılmadan önce bu cihazda doğrulanır — hiçbir şey yüklenmez.",
       "importButton": "Tema içe aktar…",
@@ -2025,6 +2210,10 @@
       "heading": "Kasayı sil",
       "ioFailBody": "Silme için kasa dosyalarına erişilemedi. Kasa anahtarları bellekten zaten sıfırlandı; diskte kalan kasa verileri kurtarılamayan Argon2id ile sarmalanmış çöptür.",
       "ioFailTitle": "Silme sırasında disk hatası",
+      "localEraseHeading": "Oturumu kapat ve bu tarayıcıdaki kopyayı sil",
+      "localEraseEyebrow": "YALNIZCA BU TARAYICI",
+      "localEraseSubmit": "Bu tarayıcıdaki kopyayı sil",
+      "localEraseSubmitInFlight": "Siliniyor…",
       "partialFailBody_one": "{{count}} dosya diskten silinemedi. Kasa anahtarları bellekten zaten sıfırlandı, bu yüzden kalan yetim şifreli metin kurtarılamayan Argon2id ile sarmalanmış çöptür.",
       "partialFailBody_other": "{{count}} dosya diskten silinemedi. Kasa anahtarları bellekten zaten sıfırlandı, bu yüzden kalan yetim şifreli metin kurtarılamayan Argon2id ile sarmalanmış çöptür.",
       "partialFailTitle": "Kasa silme işlemi kısmen başarısız oldu",
@@ -2090,6 +2279,32 @@
       "helper": "Klavye kısayollarını görüntüleyin ve değiştirin. Düzenleyici biçimlendirme ve sekmeler arası geçiş kısayolu sabittir.",
       "notSet": "Ayarlanmadı",
       "removeBindingAria": "{{chord}} kısayolunu kaldır",
+      "reserved": {
+        "bookmarkPage": "sayfayı yer imlerine ekler",
+        "closeTab": "sekmeyi kapatır",
+        "closeWindow": "pencereyi kapatır",
+        "cycleTabs": "sekmeler arasında geçiş yapar",
+        "focusAddressBar": "adres çubuğuna odaklanır",
+        "hideApplication": "gizlenir",
+        "inspectElement": "öğe denetleyicisini açar",
+        "minimiseWindow": "pencereyi simge durumuna küçültür",
+        "newPrivateWindow": "gizli bir pencere açar",
+        "newTab": "yeni bir sekme açar",
+        "newWindow": "yeni bir pencere açar",
+        "openBookmarks": "yer imlerini açar",
+        "openDevTools": "geliştirici araçlarını açar",
+        "openExtensions": "uzantıları açar",
+        "openFile": "bir dosya açar",
+        "openHistory": "geçmişi açar",
+        "quit": "kapanır",
+        "reopenTab": "son kapatılan sekmeyi yeniden açar",
+        "switchTab": "sekme değiştirir",
+        "toggleFullscreen": "tam ekranı açıp kapatır"
+      },
+      "reservedBadge": "Burada kullanılamaz",
+      "reservedBadgeTitle": "Tarayıcınız {{chord}} ile {{action}}, bu yüzden bu kısayol Myne’e hiç ulaşmaz. Kısayol masaüstü uygulamasında yine de çalışır.",
+      "reservedRefused": "{{chord}} tarayıcınıza aittir — tarayıcı {{action}}. Farklı bir kısayol seçin; masaüstü kısayollarınız değişmedi.",
+      "reservedUnreliable": "{{chord}} Myne’e ulaşmayabilir — bazı tarayıcılar bununla {{action}}. Yine de eklendi.",
       "resetAll": "Tüm kısayolları sıfırla…",
       "resetAllConfirm": "Her özel kısayol varsayılanına sıfırlansın mı?",
       "resetAllYes": "Tümünü sıfırla",
@@ -2106,6 +2321,14 @@
       "errorSaveSetting": "Satır numarası ayarı kaydedilemedi.",
       "helper": "Düzenleyicide satır numarası sütununu göster. Her satır için bir numara; varsayılan olarak kapalı.",
       "label": "Satır numaraları",
+      "off": "Kapalı",
+      "on": "Açık"
+    },
+    "vimMode": {
+      "chordCaveat": "Windows ve Linux’ta Myne’in kendi kısayolları önceliklidir; bu yüzden onlarla çakışan vim kısayolları (Ctrl-a, Ctrl-b, Ctrl-d, Ctrl-e, Ctrl-f, Ctrl-i, Ctrl-p, Ctrl-t, Ctrl-v, Ctrl-w, Ctrl-x) düzenleyicide kullanılamaz. Ctrl-[ yine Escape olarak çalışır ve visual-block Alt-v tuşuna taşınır.",
+      "errorSaveSetting": "Vim modu ayarı kaydedilemedi.",
+      "helper": "Düzenleyicide vim tuşlarını kullanın: alışılmış hareketler ve işleçlerle birlikte normal, insert ve visual modlar. Varsayılan olarak kapalıdır. Bu açıkken notlar kaynak görünümünde açılır.",
+      "label": "Vim klavye modu",
       "off": "Kapalı",
       "on": "Açık"
     },
@@ -2134,10 +2357,12 @@
       "modelGenerationLabel": "Metin modeli — sohbet, özetler, yazma",
       "modelNone": "Dosya seçilmedi",
       "modelSaveFailed": "Model yolu kaydedilemedi (kasanızın dışında olmalı).",
+      "modelTranscriptionLabel": "Konuşmadan metne modeli (yazıya dökme)",
       "modelsHelper": "Myne modelleri asla indirmez — bu, ağ üzerinden veri göndermek anlamına gelir. Bir tane edinmek için tarayıcınızda bir bağlantı açın, ardından indirilen dosyaları buradan seçin. Her şey cihazınızda çalışır.",
       "modelsLabel": "Modeller",
       "recommendedFilesEmbedding": "Tek bir klasörde model.safetensors + config.json + tokenizer.json gerektirir.",
       "recommendedFilesGeneration": "Aynı klasörde .gguf dosyası + tokenizer.json gerektirir.",
+      "recommendedFilesTranscription": "Aynı klasörde Whisper .gguf dosyası + config.json + tokenizer.json gerektirir.",
       "title": "Yapay Zeka"
     },
     "prefs": {
@@ -2154,6 +2379,7 @@
       "screenCaptureHelperOn": "macOS ve Windows 10’da (Mayıs 2020 Güncellemesi veya sonrası) etkindir. Linux desteği ileriki bir sürümde gelecek.",
       "screenCaptureLabel": "Ekran görüntüsü koruması",
       "screenCaptureSubtitle": "Ekran görüntülerini ve ekran kaydını engelle",
+      "screenshotBlocked": "Ekran koruması açık — Myne’in ekran görüntüleri boş çıkar.",
       "autoLockAfter": "Otomatik kilit süresi",
       "autoLock1m": "1 dk",
       "autoLock5m": "5 dk",
@@ -2254,6 +2480,8 @@
       "locationHelper": "Her kasa, bu yol altında şifreli dosyalardan oluşan bir klasördür. Elle kopyalamak yerine aşağıdaki Yedekle düğmesini tercih edin — yazılan dosyayı doğrular.",
       "locationLabel": "Kasa konumu",
       "openInFiles": "Dosyalar’da aç",
+      "webLocationHelper": "Notlarınız, bu site için bu tarayıcının deposunda durur; bu depoyu tarayıcı yönetir — açılacak bir klasör yoktur. Bu sitenin verilerini temizlemek yerel kopyayı kaldırır; bu istemci eşitleme yaptığı için yeniden giriş yapmak onu geri indirir.",
+      "webLocationLabel": "Notlarınızın saklandığı yer",
       "pathUnavailable": "Yol kullanılamıyor",
       "restoreBackup": "Yedeklemeden geri yükle…"
     },
@@ -2313,9 +2541,92 @@
       "typewriter": "Daktilo kaydırması",
       "typewriterSubtitle": "İmleci dikey olarak ortalanmış tutar",
       "enableArchiving": "Arşivlemeyi etkinleştir"
+    },
+    "search": {
+      "placeholder": "Ayarlarda ara…",
+      "ariaLabel": "Ayarlarda ara",
+      "empty": "“{{query}}” ile eşleşen ayar yok.",
+      "resultsLabel": "Arama sonuçları",
+      "extra": {
+        "lastActiveNoteTitle": "Kaldığınız yerden devam edin",
+        "lastActiveNoteDesc": "Hangi notun açık olduğunu eşitleyin, böylece başka bir cihazda kaldığınız yerden devam edebilirsiniz."
+      },
+      "keywords": {
+        "aiEnable": "yapay zeka yerel ai açık kapalı etkinleştir kapat makine öğrenmesi llm",
+        "aiExcluded": "hariç tutulan klasörler yoksay dışla ai yapay zeka gizlilik",
+        "aiModels": "model modeller gguf indir metin gömme embedding llm ai",
+        "archive": "arşiv arşivleme gizle geri yükle notlar archive",
+        "autoBackup": "otomatik yedekleme yedeklemeler zamanlama sıklık saklama klasör backup",
+        "autoLock": "otomatik kilit zaman aşımı boşta hareketsizlik süre oturum lock",
+        "backup": "yedek yedekleme dışa aktar geri yükle kaydet kopya backup restore",
+        "buildChannel": "yapı kanal sürüm dağıtım kararlı beta nightly build",
+        "changePassword": "parola değiştir şifre kimlik bilgileri güncelle sıfırla password",
+        "changelog": "değişiklik günlüğü sürüm notları yenilikler geçmiş changelog",
+        "clipper": "tarayıcı kırpıcı uzantı web yakalama chrome firefox clipper",
+        "contentWidth": "içerik genişliği sütun okuma satır uzunluğu ölçü width",
+        "customThemes": "özel tema temalar palet renkler görünüm içe aktar theme",
+        "dailyNotes": "günlük not notlar tarih şablon klasör günce journal daily",
+        "dangerZone": "tehlikeli bölge kasa sil yok et kaldır temizle delete",
+        "export": "dışa aktar markdown şifre çöz düz dosyalar belgeler export",
+        "focusMode": "odak modu daktilo soluklaştır etkin olmayan satırlar dikkat dağınıklığı focus",
+        "font": "yazı tipi font aile sans serif mono tipografi",
+        "hotkeys": "kısayol kısayollar klavye tuş atamaları tuş haritası bağlama hotkeys shortcut keymap",
+        "import": "içe aktar notlar obsidian notion evernote enex html csv taşı göç import",
+        "language": "dil yerel ayar arayüz çeviri ui language",
+        "lastActiveNote": "kaldığın yerden devam son not sürdür eşitle aç last note resume",
+        "license": "lisans agpl açık kaynak yasal license",
+        "lineNumbers": "satır numaraları numara kenar sütunu düzenleyici görünüm line numbers gutter",
+        "vimMode": "vim modal düzenleme normal insert visual klavye kip",
+        "lineSpacing": "satır aralığı satır yüksekliği tipografi okunabilirlik leading line height",
+        "newNoteLocation": "yeni not konumu klasör varsayılan nerede oluşturulur new note location default",
+        "quickUnlock": "hızlı kilit açma pin touch id biyometrik yüz parmak izi face id unlock",
+        "realtimeSync": "gerçek zamanlı eşitleme canlı bağlantı yoklama sync realtime live",
+        "screenCapture": "ekran yakalama koruma ekran görüntüsü kayıt engelle gizlilik screenshot capture",
+        "showEditTimes": "düzenleme zamanları zaman damgaları değiştirilme tarih notlar timestamps modified",
+        "spell": "yazım denetimi imla sözlük otomatik düzeltme spell",
+        "spellLanguages": "yazım dilleri sözlükler yerel ayar sözcükler spell dictionary",
+        "startupOpen": "başlangıç aç varsayılan dosya açılış hangi not startup",
+        "attachmentOcr": "ocr görsel tarama taranmış pdf fotoğraf ekran görüntüsü metin tanıma ek içinde ara işlemci pil scan text",
+        "syncAddDevice": "cihaz ekle eşle bağla telefon dizüstü eşitleme sync device pair qr",
+        "syncConflicts": "çakışma çakışmalar birleştir çöz sürümler eşitleme conflict merge sync",
+        "syncDevices": "cihazlar bağlı eşleşmiş eşitleme makineler device sync",
+        "syncRecovered": "kurtarılan notlar geri yükle eşitleme kurtar sync recovered restore",
+        "syncServer": "eşitleme sunucu kendi barındırma uç nokta url host",
+        "syncStatus": "eşitleme durumu bağlantı güncel sync",
+        "textSize": "metin boyutu yazı boyutu yakınlaştırma ölçek okunabilirlik text size zoom",
+        "theme": "tema koyu açık mod görünüm renk şeması amoled sistem dark light",
+        "threatModel": "tehdit modeli güvenlik saldırgan varlıklar güven threat model security",
+        "toolbar": "araç çubuğu düğmeler biçimlendirme kayan seçim özelleştir toolbar format",
+        "vaultIcon": "kasa simge avatar resim sembol icon",
+        "vaultLabel": "kasa etiket ad yeniden adlandır başlık vault name rename",
+        "vaultLocation": "kasa konum yol klasör diskte nerede saklanır vault path folder",
+        "viewMode": "varsayılan görünüm modu canlı okuma kaynak önizleme view mode preview source"
+      }
     }
   },
+  "storageLost": {
+    "allSynced": "Hiçbir şey kaybolmadı — buradaki her not sunucuya çoktan ulaşmıştı.",
+    "evicted": {
+      "body": "Tarayıcınız yer açmak için bu sitenin deposunu temizledi. Hiçbir şey zarar görmedi ve sunucuda hiçbir şey silinmedi — eşitlenmiş olan her şey hâlâ orada.",
+      "title": "Tarayıcınız bu kasanın yerel kopyasını temizledi"
+    },
+    "lockCta": "Kilitle ve tekrar dene",
+    "reDownloadCta": "Bu tarayıcıyı yeniden kur",
+    "reEnrolNotice": "Yeniden kurmak bu tarayıcıyı yeni bir cihaz olarak kaydeder; bu yüzden eşitleyebilmesi için önce diğer cihazlarınızdan birinin onayını bekler.",
+    "unopenable": {
+      "body": "Bu kasanın yerel kopyası artık okunamıyor. Sunucudaki hiçbir şey etkilenmedi — buradaki kopya bir önbellektir ve yerine yenisi konabilir.",
+      "title": "Bu kasanın yerel kopyası okunamıyor"
+    },
+    "unsyncedIntro": "{{count}} not sunucuya henüz ulaşmamıştı. Artık yok — tek kopya buydu:",
+    "unsyncedIntro_one": "{{count}} not sunucuya henüz ulaşmamıştı. Artık yok — tek kopya buydu:",
+    "unsyncedIntro_other": "{{count}} not sunucuya henüz ulaşmamıştı. Artık yok — tek kopya buydu:",
+    "unsyncedOverflow": "…ve {{count}} tane daha.",
+    "unsyncedOverflow_one": "…ve {{count}} tane daha.",
+    "unsyncedOverflow_other": "…ve {{count}} tane daha."
+  },
   "sync": {
+    "materialising": "Notlarınız indiriliyor — {{done}} / {{total}}. Çalışmaya başlayabilirsiniz; kalanlar geldikçe görünecek.",
+    "credentialAmbiguous": "Parolanız hem bu cihazda hem de başka bir cihazda değişmiş olabilir ve Myne hangisinin daha yeni olduğunu ayırt edemiyor — bu yüzden hiçbir şeyi değiştirmedi. Bunu çözmek için erişimi zaten olan bir cihazdan giriş yapın.",
     "attachments": {
       "aria": {
         "downloading": "{{name}} indiriliyor",
@@ -2343,6 +2654,17 @@
       "untitled": "Başlıksız ({{hex}})",
       "useThisVersion": "Bu sürümü kullan"
     },
+    "deviceJoinQr": {
+      "accountLabel": "Hesap numarası",
+      "accountPlaceholder": "MY-XXXX-XXXX-XXXX-XXXX-XXXX",
+      "error": "QR oluşturulamadı. Lütfen tekrar deneyin.",
+      "generate": "QR oluştur",
+      "hint": "Telefonunuzun tarayabileceği bir QR oluşturmak için hesap numaranızı yapıştırın — sunucuyu ve hesap numarasını sizin için doldurur.",
+      "invalidAccount": "Bu, geçerli bir hesap numarasına benzemiyor.",
+      "notConfigured": "Önce bir eşitleme sunucusu yapılandırın, sonra QR oluşturun.",
+      "scanWithApp": "iOS uygulamasıyla tarayın",
+      "title": "QR ile cihaz ekle"
+    },
     "devices": {
       "approve": "Onayla",
       "awaitingApproval_one": "{{count}} cihaz onay bekliyor",
@@ -2350,8 +2672,22 @@
       "loading": "Yükleniyor…",
       "noDevices": "Henüz eşitlenmiş cihaz yok.",
       "notEnrolled": "Bu cihaz henüz bağlı değil. Az önce eklediyseniz başka bir cihazdan onaylanmasını bekleyin; aksi hâlde yukarıdaki “Cihaz ekle” formuyla ekleyin.",
+      "platform": {
+        "android": "Android telefon",
+        "androidTablet": "Android tablet",
+        "ios": "iPhone",
+        "ipad": "iPad",
+        "linux": "Linux bilgisayar",
+        "macos": "Mac",
+        "unknown": "Bu cihaz",
+        "web": "Tarayıcı",
+        "windows": "Windows bilgisayar"
+      },
       "remove": "Kaldır",
       "removedElsewhere": "Bu cihaz, başka bir cihazdan hesabınızdan kaldırıldı.",
+      "rename": "Yeniden adlandır",
+      "renameFailed": "Bu ad kaydedilemedi. Tekrar deneyin.",
+      "renameLabel": "Cihaz adı",
       "resetAndReAdd": "Bu cihazı sıfırla ve yeniden ekle",
       "resetSyncOnThisDevice": "Bu cihazda eşitlemeyi sıfırla",
       "shortName": "Cihaz {{hex}}",
@@ -2371,10 +2707,14 @@
       "connect": "Bağlan",
       "connectedLocal": "Bağlandı (yerel, TLS yok).",
       "connectedTls": "Bağlandı. Bu parmak izinin diğer cihazınızdakiyle eşleştiğini doğrulayın.",
+      "connectedPlatformTrust": "TLS üzerinden bağlanıldı. Tarayıcınız bu sunucunun sertifikasını doğruladı.",
       "connecting": "Bağlanıyor…",
       "fingerprintLabel": "Sunucu sertifikası parmak izi:",
       "pinStatic": "Myne'nin yerleşik sertifikasına karşı doğrulandı.",
       "pinTofu": "İlk bağlantıda sabitlendi. Bu parmak izini cihazlarınız arasında karşılaştırın.",
+      "fixedOrigin": "Bu istemci, dağıtımı sırasında belirlenen tek bir sunucuyla eşitlenir. Buradan değiştirilemez — sayfanın yalnızca bu tek adresle konuşmasına izin verilir.",
+      "fixedOriginNone": "Bu dağıtım için yapılandırılmış bir eşitleme sunucusu yok.",
+      "pinPlatformTrust": "Tarayıcınızın sertifika deposu tarafından doğrulandı. Bu istemci sertifikayı kendisi sabitleyemez.",
       "placeholder": "https://your-server.example   ·   http://127.0.0.1:8080",
       "unreachable": "O sunucuya ulaşılamadı — URL’yi ve sunucunun çalıştığını kontrol edin."
     },
@@ -2383,6 +2723,8 @@
       "accountNumberPlaceholder": "MY-XXXX-XXXX-XXXX-XXXX-X",
       "connecting": "Bağlanıyor…",
       "credentialTypeAria": "Kimlik bilgisi türü",
+      "deviceNameHelp": "Cihaz listenizde gösterilir. Daha sonra değiştirebilirsiniz.",
+      "deviceNameLabel": "Bu cihaza ad verin",
       "error": {
         "notConfigured": "Bu cihazı eklemeden önce ayarlardan bir eşitleme sunucusu belirleyin.",
         "transport": "Eşitleme sunucusuna ulaşılamadı. Bağlantınızı kontrol edip tekrar deneyin."
@@ -2424,12 +2766,28 @@
         "helper": "Yeni bir cihazda hesap numaranız ve parolanız ya da kurtarma ifadenizle giriş yapın. Mevcut bir cihaz onaylayana kadar cihaz beklemede kalır.",
         "label": "Cihaz ekle"
       },
+      "awaitingApproval": {
+        "label": "Onay bekleniyor"
+      },
       "conflicts": {
         "helper": "Aynı not iki cihazda aynı anda düzenlendiğinde, Myne hiçbir şey kaybolmasın diye her iki kopyayı da saklar. Bunları buradan çözün.",
         "label": "Çakışmalar"
       },
       "devices": {
         "label": "Cihazlar"
+      },
+      "recovered": {
+        "close": "Kapat",
+        "decrypting": "Şifre çözülüyor…",
+        "deleteConfirmTitle": "Bu kurtarılan not silinsin mi?",
+        "deleteConfirmWarning": "Bu, bu cihazda tutulan tek kopyayı kalıcı olarak siler. Bu işlem geri alınamaz.",
+        "deleteCta": "Sil",
+        "errorGeneric": "Bir şeyler ters gitti. Tekrar deneyin.",
+        "helper": "Başka bir cihazda silinen bir not burada da kaldırıldığında, şifreli kopyası bu cihazda saklanır. Birini yeni bir not olarak geri yükleyin ya da kalıcı olarak silin.",
+        "label": "Kurtarılan notlar",
+        "previewCta": "Önizle",
+        "previewTitle": "Kurtarılan not",
+        "restoreCta": "Geri yükle"
       },
       "server": {
         "helper": "Her cihaza aynı sunucu URL’sini girin. Kendi barındırdığınız bir sunucu için onun <1>https://</1> adresini kullanın; sertifika parmak izinin tüm cihazlarınızda eşleştiğini doğrulayın.",
@@ -2438,22 +2796,42 @@
       "status": {
         "helper": "Myne, şifreli notlarınızı cihazlarınız arasında eşitler. Sunucu yalnızca okuyamadığı şifreli metni saklar.",
         "label": "Eşitleme durumu"
+      },
+      "usage": {
+        "helper": "Bu hesabın sunucuda ne kadar şifreli veri sakladığı ve kaç cihazın giriş yapmış olduğu.",
+        "label": "Depolama ve cihazlar"
       }
     },
     "reconcile": {
       "message": "Bu cihaz bir süre çevrimdışıydı — eşitlemede gecikme kapatılıyor. Notlarınız güvende."
+    },
+    "recovered": {
+      "restoredToast": "Yeni bir not olarak geri yüklendi."
     },
     "status": {
       "awaitingApproval": "Onay bekleniyor",
       "conflicts_one": "Gözden geçirilecek {{count}} çakışma",
       "conflicts_other": "Gözden geçirilecek {{count}} çakışma",
       "error": "Eşitleme hatası",
+      "errorAuth": "Eşitleme oturumu sona erdi",
+      "errorFrozen": "Hesap donduruldu — yüklemeler duraklatıldı",
+      "errorDeviceRevoked": "Bu cihaz hesabınızdan kaldırıldı",
+      "errorStorageFull": "Depolama dolu — eşitleme duraklatıldı",
+      "errorQuota": "Depolama dolu — yüklemeler duraklatıldı",
+      "errorRateLimited": "Eşitleme kısıtlandı — yeniden deneniyor",
+      "errorTooLarge": "Bir dosya yüklenemeyecek kadar büyük",
       "loading": "Eşitleme durumu…",
       "notEnrolled": "Kaydedilmedi",
       "off": "Eşitleme kapalı",
       "synced": "Eşitlendi",
       "syncing": "Eşitleniyor…",
       "syncNow": "Şimdi eşitle"
+    },
+    "usage": {
+      "devices": "Cihazlar",
+      "frozen": "Bu hesap donduruldu. Yeni değişiklikler yüklenemez; notlarınız yine de indirilir.",
+      "ofTotal": "{{used}} / {{total}}",
+      "storage": "Depolama"
     },
     "settings": {
       "serverSection": "Sunucu",
@@ -2516,6 +2894,32 @@
     "deleteConfirm": "Bu şablon silinsin mi?",
     "convertToNote": "Nota dönüştür"
   },
+  "themeInstall": {
+    "apply": "Temayı uygula",
+    "applying": "Uygulanıyor…",
+    "byAuthor": "Bu bağlantı, temanın {{author}} tarafından yapıldığını söylüyor",
+    "cancel": "İptal",
+    "close": "Kapat",
+    "collision": {
+      "keepBoth": "İkisini de tut — “{{name}}” olarak kur",
+      "question": "Zaten “{{name}}” adında bir temanız var.",
+      "replace": "“{{name}}” temasının yerine koy"
+    },
+    "error": {
+      "importFailed": "Bu tema kurulamadı. Hiçbir şey değişmedi.",
+      "installedNotActivated": "“{{name}}” kuruldu, ancak açılamadı. Ayarlar → Görünüm bölümünden uygulayabilirsiniz.",
+      "invalidName": "Bu bağlantı, kurmak istediği temanın adını belirtmiyor.",
+      "listUnavailable": "Mevcut temalarınız okunamadı, bu yüzden bu tema şu anda güvenle kurulamaz. Bunu kapatıp bağlantıyı tekrar deneyin.",
+      "malformedPayload": "Bu bağlantının tema verisi hasarlı veya eksik.",
+      "nothingWritten": "Kasanıza hiçbir şey yazılmadı.",
+      "payloadTooLarge": "Bu bağlantının tema verisi bir tema olamayacak kadar büyük.",
+      "unsupportedVersion": "Bu bağlantı, Myne’in daha yeni bir sürümü için yapılmış. Myne’i güncelleyip tekrar deneyin."
+    },
+    "errorTitle": "Bu tema okunamadı",
+    "helper": "Temalar bir renk paletidir, kod değil. Myne bunu kullanmadan önce bu cihazda doğrular — hiçbir şey yüklenmez.",
+    "question": "Bu temayı kullanmak istiyor musunuz?",
+    "title": "Tema kur"
+  },
   "unlock": {
     "backToPicker": "Farklı bir kasa seçin",
     "continue": "Devam et",
@@ -2524,6 +2928,7 @@
     "errors": {
       "alreadyUnlocked": "Kasa zaten açık.",
       "inProgress": "İşlem sürüyor.",
+      "kdfMemoryExceedsHost": "Bu kasanın açılması için {{required}} MiB bellek gerekir — bu tarayıcının verebileceğinden ({{available}} MiB) fazlası. Kasada bir sorun yok; onu Myne masaüstü uygulamasında açın.",
       "unexpected": "Beklenmeyen bir hata oluştu. Lütfen tekrar deneyin.",
       "vaultNotFound": "Kasa dosyası bulunamadı. Lütfen uygulamayı yeniden başlatın."
     },
@@ -2879,6 +3284,7 @@
     "containsPlaceholder": "içerir…",
     "tagPlaceholder": "etiket",
     "folderPlaceholder": "Klasör/",
+    "propertyKeyPlaceholder": "özellik anahtarı",
     "addCondition": "+ Koşul ekle",
     "createView": "Görünüm oluştur"
   },
@@ -2941,7 +3347,23 @@
     "serverPlaceholder": "https://sync.example.com",
     "accountHint": "Bu numarayı bir daha kontrol edin — doğru görünmüyor.",
     "approvalHint": "Notlarınız, hesabınızın zaten bulunduğu bir cihazdan bu cihazı onayladığınızda görünür.",
-    "connectingSubtitle": "Hesabınız getiriliyor ve kasanızın kilidi bu cihazda açılıyor."
+    "connectingSubtitle": "Hesabınız getiriliyor ve kasanızın kilidi bu cihazda açılıyor.",
+    "qr": {
+      "cancel": "İptal",
+      "confirmAccount": "Hesap",
+      "confirmServer": "Sunucu",
+      "confirmTitle": "Bu cihaz eklensin mi?",
+      "continue": "Devam et",
+      "expired": "Bu QR’ın süresi doldu — diğer cihazınızda yeni bir tane gösterip yeniden tarayın.",
+      "invalid": "Bu bir Myne cihaz QR’ı değil.",
+      "newerVersion": "Bu QR, Myne’in daha yeni bir sürümünden — uygulamayı güncelleyip tekrar deneyin.",
+      "pinHosted": "Myne tarafından barındırılan sunucu",
+      "pinNone": "Kendi barındırdığınız sunucu",
+      "pinSelfHost": "Sertifika, güvendiğiniz cihazdan sabitlendi",
+      "scan": "QR tara",
+      "scanFailed": "Taranamadı. Tekrar deneyin ya da bilgilerinizi elle girin.",
+      "scanUnavailable": "Bu cihazda tarama kullanılamıyor — bilgilerinizi aşağıya girin."
+    }
   },
   "createVault": {
     "beginWeakPassword": "Daha güçlü bir parola seçip tekrar deneyin.",
@@ -2979,5 +3401,46 @@
     "personalLabel": "Kişisel",
     "openVault": "Kasayı aç",
     "backUpNow": "Şimdi yedekle"
+  },
+  "web": {
+    "reload": {
+      "body": "Bu sayfayı yenilemek parolanızı yeniden sorar — tasarım gereği daha hızlı bir giriş yolu yoktur. Sayfa kapalıyken kasanız bu cihazda şifreli kalır ve anahtar her seferinde parolanızdan yeniden oluşturulur.",
+      "title": "Sayfayı yenilemek parolanızı yeniden ister"
+    },
+    "wall": {
+      "getNative": "Masaüstü veya mobil için Myne’i edin",
+      "noAccount": {
+        "body": "Hesaplar burada değil, Myne masaüstü veya mobil uygulamasında oluşturulur.",
+        "reason": "Hesap oluşturmak 24 sözcüklük kurtarma ifadenizi üretir ve size bir kez gösterir. Bu ifadeyi size gösteren şey asla bir web sayfası olmamalı — orada sızarsa, Myne’de bunu geri alabilecek hiçbir şey yoktur.",
+        "title": "Önce bir hesabınız olmalı"
+      },
+      "noSync": {
+        "body": "Bu tarayıcıda yapılandırılmış bir eşitleme sunucusu yok, bu yüzden açacağı bir şey de yok.",
+        "reason": "Masaüstü uygulamasının aksine tarayıcı, geri dönebileceği kendi kasasını tutmaz — notları eşitlemeden gelir. Masaüstü veya mobil uygulamada kurun, sonra buraya dönün.",
+        "title": "Eşitleme henüz kurulmadı"
+      }
+    },
+    "unavailableHere": {
+      "backup": "Şifreli yedeklemeler, yedekleme dosyasını seçtiğiniz yere yazabilen Myne masaüstü uygulamasında alınır ve geri yüklenir. Buradaki notlarınız sunucudan gelir, bu yüzden bu tarayıcı kendini eşitleyerek geri yükler.",
+      "creation": "Yeni hesaplar Myne masaüstü uygulamasında oluşturulur. Kurtarma ifadenizi size o gösterir — ve bir kurtarma ifadesi asla bir web sayfası tarafından gösterilmemelidir.",
+      "multiVault": "Bu tarayıcı tek bir hesap tutar. Başka bir hesabı kullanmak için onu Myne masaüstü uygulamasında ya da farklı bir tarayıcı profilinde açın.",
+      "phraseRecovery": "Kurtarma ifadesiyle kurtarma, Myne masaüstü uygulamasında yapılır. Kurtarma ifadeniz asla bir web sayfasına yazılmamalıdır.",
+      "title": "Tarayıcıda kullanılamaz"
+    },
+    "unsupported": {
+      "title": "Myne bu tarayıcıda çalışamaz",
+      "mobileTitle": "Bu cihazda Myne uygulamasını açın",
+      "handoff": "Myne’in masaüstü uygulamasında (macOS, Windows, Linux) ve mobil uygulamasında (iOS, Android) böyle bir sınır yoktur — ayrıca çalışmadan önce kendi imzalarını doğrularlar; bir web sayfası bunu yapamaz.",
+      "reason": {
+        "desktop-form-factor": "Tarayıcıdaki Myne bir masaüstü bilgisayar için tasarlandı — telefon veya tablet tarayıcısının veremeyeceği belleğe ve girdiye ihtiyaç duyar. Bu cihazda zaten Myne uygulaması daha iyi bir istemci: daha hızlıdır, çevrimdışı çalışır ve tarayıcı deposunu temizlediğinde notlarınızı korur.",
+        "webassembly": "Bu tarayıcı, şifreleme çekirdeğinin üzerinde çalıştığı WebAssembly’yi desteklemiyor.",
+        "wasm-memory-headroom": "Bu tarayıcı, kasanın anahtar türetmesi için gereken ~336 MB belleği ayıramıyor. Telefon ve tablet tarayıcıları genellikle ayıramaz; bu sınırı kasanın kendisi belirler ve kasayı diğer her yerde okunamaz hâle getirmeden tek bir cihaz için düşürülemez.",
+        "worker": "Bu tarayıcı, kasanın deposunun ve şifrelemesinin içinde çalıştığı Web Workers’ı desteklemiyor.",
+        "opfs": "Bu tarayıcı, web uygulamaları için özel yerel depolama sağlamıyor; bu yüzden kasanızı sayfa yüklemeleri arasında tutacak bir yer yok.",
+        "opfs-sync-access-handle": "Bu tarayıcının özel yerel deposunda, kasanın güvenle yazması için gereken eşzamanlı dosya erişimi yok.",
+        "web-locks": "Bu tarayıcı, iki sekmenin aynı anda tek bir kasaya yazmasını engelleyen kilidi desteklemiyor.",
+        "crypto-getrandomvalues": "Bu tarayıcı kriptografik bir rastgele sayı kaynağı sağlamıyor."
+      }
+    }
   }
 }

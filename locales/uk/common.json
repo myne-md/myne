@@ -1,4 +1,30 @@
 {
+  "accountBootstrap": {
+    "accountMismatch": "Цей браузер уже містить сейф іншого облікового запису. Відкрийте той обліковий запис або спершу вийдіть і зітріть копію з цього браузера.",
+    "changeAccount": "Використати інший номер облікового запису",
+    "continue": "Продовжити",
+    "failed": "Не вдалося відкрити цей обліковий запис. Перевірте номер облікового запису та пароль, а потім спробуйте ще раз.",
+    "hint": "Введіть головний пароль цього облікового запису. Myne отримає ваш сейф і зареєструє цей браузер як пристрій у ньому.",
+    "noEndpoint": "У цій копії Myne не налаштовано сервер синхронізації, тож вона не може дістатися до вашого сейфа. Зверніться до того, хто нею керує.",
+    "passwordLabel": "Головний пароль",
+    "approversIntro": "Схвалити цей пристрій можуть:",
+    "noApprovers": "Зараз жоден інший пристрій у цьому обліковому записі не може його схвалити. Відкрийте Myne на пристрої, який уже має доступ, а потім поверніться сюди.",
+    "pendingTitle": "Очікування схвалення",
+    "sasMatch": "Збігаються — продовжити",
+    "sasMismatch": "Не збігаються",
+    "verifyBody": "Перед тим як продовжити, перевірте, що цей код однаковий на обох пристроях. Якщо ні — зупиніться: щось не так зі з’єднанням, а не з вашим паролем.",
+    "verifyTitle": "Порівняйте цей код",
+    "title": "Увійдіть до свого сейфа",
+    "working": "Налаштування…"
+  },
+  "accountEntry": {
+    "checkFailed": "Не вдалося перевірити цей номер облікового запису. Спробуйте ще раз.",
+    "checking": "Перевірка…",
+    "continue": "Продовжити",
+    "hint": "Він має вигляд MY-XXXX-XXXX-XXXX-XXXX-XXXX. Перевіряється тут, на вашому пристрої — поки що нічого не надсилається.",
+    "invalid": "Цей номер облікового запису недійсний. Перевірте його та спробуйте ще раз.",
+    "title": "Введіть свій номер облікового запису"
+  },
   "attachments": {
     "cleanUnused": {
       "cancel": "Скасувати",
@@ -7,16 +33,25 @@
       "completeTitle": "Очищення завершено",
       "deleteCta": "Видалити {{count}} невикористаний файл",
       "deleteCta_one": "Видалити {{count}} невикористане",
+      "deleteCta_few": "Видалити {{count}} невикористані файли",
+      "deleteCta_many": "Видалити {{count}} невикористаних файлів",
       "deleteCta_other": "Видалити {{count}} невикористаних файлів",
+      "corpusIncomplete": "Спершу завершіть синхронізацію — цей пристрій ще не має всіх ваших нотаток. Нічого не видалено.",
       "error": "Не вдалося виконати очищення. Деякі нотатки можуть бути нечитабельними — нічого не видалено.",
       "intro_one": "Це вкладення не використовується в жодній нотатці. Його видалення є остаточним і його не можна скасувати.",
+      "intro_few": "Ці {{count}} вкладення не використовуються в жодній нотатці. Їх видалення є остаточним і не може бути скасоване.",
+      "intro_many": "Ці {{count}} вкладень не використовуються в жодній нотатці. Їх видалення є остаточним і не може бути скасоване.",
       "intro_other": "Ці {{count}} вкладень не використовуються в жодній нотатці. Їх видалення є остаточним і не може бути скасоване.",
       "summaryFreed": " · звільнено {{size}}",
       "summaryPeriod": ".",
       "summaryRemoved_one": "Видалено {{count}} вкладення",
+      "summaryRemoved_few": "Видалено {{count}} вкладення",
+      "summaryRemoved_many": "Видалено {{count}} вкладень",
       "summaryRemoved_other": "Видалено {{count}} вкладень",
       "summarySkipped": " · {{count}} пропущено (зараз використовується)",
       "summarySkipped_one": " · {{count}} пропущено (тепер використовується)",
+      "summarySkipped_few": " · {{count}} пропущено (зараз використовуються)",
+      "summarySkipped_many": " · {{count}} пропущено (зараз використовуються)",
       "summarySkipped_other": " · {{count}} пропущено (зараз використовуються)",
       "title": "Очистити невикористані вкладення",
       "willBeReclaimed": "Буде звільнено {{size}}."
@@ -38,6 +73,8 @@
       "error": "Не вдалося видалити вкладення. Спробуйте ще раз.",
       "notUsed": "Не використовується в жодній нотатці.",
       "stillUsed_one": "Воно й досі використовується в {{count}} нотатці. Його видалення залишить позначку там, де воно було вбудоване:",
+      "stillUsed_few": "Воно досі використовується в {{count}} нотатках. Його видалення залишить заглушку там, де воно було вбудоване:",
+      "stillUsed_many": "Воно досі використовується в {{count}} нотатках. Його видалення залишить заглушку там, де воно було вбудоване:",
       "stillUsed_other": "Воно досі використовується в {{count}} нотатках. Його видалення залишить заглушку там, де воно було вбудоване:",
       "title": "Видалити вкладення",
       "untitled": "Без назви"
@@ -47,6 +84,7 @@
       "actionsTitle": "Дії",
       "checking": "Перевірка…",
       "checkUnusedFailedNotice": "Не вдалося перевірити невикористані вкладення. Спробуйте ще раз.",
+      "corpusIncompleteNotice": "Спершу завершіть синхронізацію — цей пристрій ще не має всіх ваших нотаток, тож не може визначити, які вкладення не використовуються.",
       "cleanUnused": "Очистити невикористані",
       "cleanUnusedTitle": "Видалити вкладення, що не використовуються в жодній нотатці",
       "colCreated": "Створено",
@@ -69,6 +107,7 @@
       "menuExport": "Експортувати",
       "menuPreview": "Переглянути",
       "menuRename": "Перейменувати",
+      "menuTranscribe": "Транскрибувати",
       "noMatch": "Немає вкладень, що відповідають вашому запиту.",
       "noUnusedNotice": "Немає невикористаних вкладень для очищення.",
       "preview": "Перегляд",
@@ -84,6 +123,10 @@
       "sortAriaLabel": "Сортувати вкладення",
       "supportedFilesFilter": "Підтримувані файли",
       "title": "Вкладення",
+      "transcribeDone": "Транскрибування завершено.",
+      "transcribeFailed": "Не вдалося транскрибувати. Спробуйте ще раз.",
+      "transcribeNoModel": "Виберіть модель транскрибування в Налаштування → Лабораторія → ШІ.",
+      "transcribeStarted": "Транскрибування…",
       "typeFilter": {
         "all": "Усі типи",
         "audio": "Аудіо",
@@ -92,6 +135,8 @@
         "pdf": "PDF"
       },
       "usedInCount_one": "Використовується в {{count}} нотатці",
+      "usedInCount_few": "Використовується в {{count}} нотатках",
+      "usedInCount_many": "Використовується в {{count}} нотатках",
       "usedInCount_other": "Використовується в {{count}} нотатках",
       "usedInLoading": "…"
     },
@@ -111,6 +156,8 @@
     "noUnused": "Немає невикористаних вкладень — на кожен файл є посилання.",
     "scanError": "Не вдалося перевірити наявність невикористаних вкладень.",
     "erasedToast_one": "Стерто {{count}} невикористаний файл.",
+    "erasedToast_few": "Стерто {{count}} невикористані файли.",
+    "erasedToast_many": "Стерто {{count}} невикористаних файлів.",
     "erasedToast_other": "Стерто {{count}} невикористаних файлів.",
     "eraseError": "Не вдалося стерти невикористані вкладення.",
     "readError": "Не вдалося прочитати вкладення.",
@@ -121,8 +168,12 @@
     "deleteError": "Не вдалося видалити це вкладення.",
     "renameError": "Не вдалося перейменувати це вкладення.",
     "unusedSummary_one": "На {{count}} вкладення не посилається жодна нотатка ({{size}}). Стирання — це остаточне криптографічне видалення, кошика немає.",
+    "unusedSummary_few": "На {{count}} вкладення не посилається жодна нотатка ({{size}}). Стирання — це остаточне криптографічне видалення, кошика немає.",
+    "unusedSummary_many": "На {{count}} вкладень не посилається жодна нотатка ({{size}}). Стирання — це остаточне криптографічне видалення, кошика немає.",
     "unusedSummary_other": "На {{count}} вкладень не посилається жодна нотатка ({{size}}). Стирання — це остаточне криптографічне видалення, кошика немає.",
     "eraseCta_one": "Стерти {{count}} невикористаний файл",
+    "eraseCta_few": "Стерти {{count}} невикористані файли",
+    "eraseCta_many": "Стерти {{count}} невикористаних файлів",
     "eraseCta_other": "Стерти {{count}} невикористаних файлів",
     "emptyState": "Ще немає вкладень. Торкніться «Завантажити», щоб додати зображення або PDF.",
     "insert": "Вставити",
@@ -210,6 +261,9 @@
       },
       "toggleLineNumbers": {
         "label": "Перемкнути нумерацію рядків"
+      },
+      "toggleVimMode": {
+        "label": "Перемкнути режим клавіатури vim"
       },
       "toggleSpellCheck": {
         "label": "Перемкнути перевірку правопису"
@@ -512,6 +566,7 @@
     }
   },
   "common": {
+    "cancel": "Скасувати",
     "dismiss": "Закрити",
     "prompt": {
       "cancel": "Скасувати",
@@ -522,6 +577,10 @@
     },
     "back": "Назад",
     "continue": "Продовжити"
+  },
+  "deviceRevoked": {
+    "cta": "Почати спочатку",
+    "title": "Цей браузер було вилучено з вашого облікового запису"
   },
   "editor": {
     "attachment": {
@@ -537,6 +596,8 @@
         "confirm": "Перетворити",
         "skipped": "пропущено — {{note}}",
         "subtitle_one": "Буде перезаписано 1 посилання. Перегляньте перед застосуванням.",
+        "subtitle_few": "{{count}} посилання буде переписано. Перегляньте перед підтвердженням.",
+        "subtitle_many": "{{count}} посилань буде переписано. Перегляньте перед підтвердженням.",
         "subtitle_other": "{{count}} посилань буде переписано. Перегляньте перед підтвердженням.",
         "subtitleEmpty": "Немає що перетворювати — жодного вихідного файлу не знайдено.",
         "title": "Перетворити імпортовані вкладення"
@@ -547,6 +608,8 @@
       "convertCore": {
         "converted": "{{count}} перетворено",
         "converted_one": "{{count}} перетворено",
+        "converted_few": "{{count}} перетворено",
+        "converted_many": "{{count}} перетворено",
         "converted_other": "{{count}} перетворено",
         "noneToConvert": "У цій нотатці немає імпортованих вкладень для перетворення.",
         "skipNote": {
@@ -558,6 +621,8 @@
         },
         "skippedSuffix": " · {{count}} пропущено",
         "skippedSuffix_one": " · {{count}} пропущено",
+        "skippedSuffix_few": " · {{count}} пропущено",
+        "skippedSuffix_many": " · {{count}} пропущено",
         "skippedSuffix_other": " · {{count}} пропущено"
       },
       "fileKind": {
@@ -639,6 +704,8 @@
       "summary": {
         "added": "{{count}} додано",
         "added_one": "{{count}} додано",
+        "added_few": "{{count}} додано",
+        "added_many": "{{count}} додано",
         "added_other": "{{count}} додано",
         "reason": {
           "failed": "помилка",
@@ -648,6 +715,8 @@
         },
         "skipped": "{{count}} пропущено: {{noun}}",
         "skipped_one": "{{count}} пропущено: {{noun}}",
+        "skipped_few": "{{count}} пропущено: {{noun}}",
+        "skipped_many": "{{count}} пропущено: {{noun}}",
         "skipped_other": "{{count}} пропущено: {{noun}}"
       },
       "voice": {
@@ -675,7 +744,8 @@
           "export": "Експортувати",
           "remove": "Вилучити",
           "rename": "Перейменувати",
-          "reveal": "Показати в бібліотеці"
+          "reveal": "Показати в бібліотеці",
+          "transcribe": "Транскрибувати"
         },
         "pdfFallback": "PDF",
         "textPreview": {
@@ -686,6 +756,15 @@
           "brokenLabel": "зламано",
           "deletedAria": "Видалене вкладення: {{filename}}",
           "deletedLabel": "видалено"
+        },
+        "transcribe": {
+          "disabledReason": "Щоб транскрибувати, увімкніть ШІ в Налаштування → Лабораторія → ШІ.",
+          "failed": "Не вдалося транскрибувати. Спробуйте ще раз.",
+          "heading": "Транскрипт",
+          "insert": "Вставити транскрипт у нотатку",
+          "noModelHint": "Виберіть модель транскрибування в Налаштування → Лабораторія → ШІ.",
+          "progress": "Транскрибування…",
+          "stop": "Зупинити"
         },
         "urlImageFallback": "зображення"
       }
@@ -720,6 +799,8 @@
         "empty": "Поки немає зворотних посилань.",
         "linkedFrom": "Вхідних посилань: {{count}}",
         "linkedFrom_one": "Згадується в {{count}}",
+        "linkedFrom_few": "Вхідних посилань: {{count}}",
+        "linkedFrom_many": "Вхідних посилань: {{count}}",
         "linkedFrom_other": "Вхідних посилань: {{count}}",
         "untitled": "Без назви"
       },
@@ -735,24 +816,33 @@
         "tags": "Теги",
         "viewMode": "Режим перегляду",
         "views": "Подання",
+        "vimMode": "Режим vim",
         "wordCount": "Кількість слів",
         "workspace": "Робоча область"
       },
       "baseImport": {
         "droppedFiltersSuffix": " · {{count}} фільтр відкинуто",
         "droppedFiltersSuffix_one": " · {{count}} фільтр відкинуто",
+        "droppedFiltersSuffix_few": " · {{count}} фільтри відкинуто",
+        "droppedFiltersSuffix_many": " · {{count}} фільтрів відкинуто",
         "droppedFiltersSuffix_other": " · {{count}} фільтрів відкинуто",
         "failed": "Імпорт не вдався.",
         "fileFilterName": "Obsidian Base",
         "imported": "Імпортовано {{count}} подання",
         "imported_one": "Імпортовано {{count}} подання",
+        "imported_few": "Імпортовано {{count}} подання",
+        "imported_many": "Імпортовано {{count}} подань",
         "imported_other": "Імпортовано {{count}} подань",
         "notValid": "Недійсний файл .base.",
         "skippedSuffix": " · {{count}} пропущено",
         "skippedSuffix_one": " · {{count}} пропущено",
+        "skippedSuffix_few": " · {{count}} пропущено",
+        "skippedSuffix_many": " · {{count}} пропущено",
         "skippedSuffix_other": " · {{count}} пропущено",
         "stoppedAfter": "Імпорт зупинено після {{count}} подання.",
         "stoppedAfter_one": "Імпорт зупинено після {{count}} подання.",
+        "stoppedAfter_few": "Імпорт зупинено після {{count}} подань.",
+        "stoppedAfter_many": "Імпорт зупинено після {{count}} подань.",
         "stoppedAfter_other": "Імпорт зупинено після {{count}} подань."
       },
       "bottomBar": {
@@ -761,11 +851,22 @@
         "cycleViewMode": "Перемкнути режим перегляду",
         "docStats": {
           "summary_one": "{{count}} слово · {{characters}} симв.",
+          "summary_few": "{{count}} слова · {{characters}} символів",
+          "summary_many": "{{count}} слів · {{characters}} символів",
           "summary_other": "{{count}} слів · {{characters}} символів",
           "summarySelectionSuffix": " (виділення)",
           "title_one": "{{characters}} символів · {{words}} слів · {{spaces}} пробілів · {{count}} абзац",
+          "title_few": "{{characters}} символів · {{words}} слів · {{spaces}} пробілів · {{count}} абзаци",
+          "title_many": "{{characters}} символів · {{words}} слів · {{spaces}} пробілів · {{count}} абзаців",
           "title_other": "{{characters}} символів · {{words}} слів · {{spaces}} пробілів · {{count}} абзаців",
           "titleSelectionSuffix": " (виділення)"
+        },
+        "vimMode": {
+          "insert": "Вставка",
+          "normal": "Звичайний",
+          "replace": "Заміна",
+          "title": "Режим vim — натисніть Esc для звичайного режиму",
+          "visual": "Візуальний"
         },
         "graphTitle": "Граф (⌘⇧G)",
         "lock": "Заблокувати",
@@ -781,9 +882,13 @@
       },
       "import": {
         "imported_one": "Імпортовано {{count}} нотатку{{skipped}}",
+        "imported_few": "Імпортовано {{count}} нотатки{{skipped}}",
+        "imported_many": "Імпортовано {{count}} нотаток{{skipped}}",
         "imported_other": "Імпортовано {{count}} нотаток{{skipped}}",
         "skippedSuffix": " · {{count}} пропущено",
         "skippedSuffix_one": " · {{count}} пропущено",
+        "skippedSuffix_few": " · {{count}} пропущено",
+        "skippedSuffix_many": " · {{count}} пропущено",
         "skippedSuffix_other": " · {{count}} пропущено"
       },
       "nav": {
@@ -998,6 +1103,23 @@
         "xl": "Дуже великий"
       }
     },
+    "vim": {
+      "ex": {
+        "refused": {
+          "edit": "`:e` не підтримується — Myne відкриває нотатки, а не файли. Скористайтеся палітрою команд або бічною панеллю.",
+          "map": "Власні призначення клавіш у Myne не підтримуються. Комбінації налаштовуються в Налаштування → Комбінації клавіш.",
+          "set": "`:set` не підтримується — у Myne немає параметрів vim. Параметри редактора налаштовуються в Налаштування → Редактор.",
+          "source": "`:source` не підтримується. Myne навмисно не має механізму конфігураційних сценаріїв.",
+          "unsupported": "Ця команда не підтримується в Myne."
+        },
+        "substitute": {
+          "malformed": "Не вдалося прочитати цю заміну. Очікувалося :s/pattern/replacement/",
+          "refused": "Цей шаблон використовує синтаксис, властивий лише vim ({{what}}), який пошук Myne не підтримує. Нічого не змінено."
+        },
+        "writeFailed": "Не вдалося зберегти.",
+        "written": "Збережено."
+      }
+    },
     "wikilink": {
       "chip": {
         "embed": "Вставка: {{label}}"
@@ -1005,14 +1127,20 @@
       "convert": {
         "cancel": "Скасувати",
         "choiceClause_one": " · {{count}} потребує вибору.",
+        "choiceClause_few": " · {{count}} потребують вибору.",
+        "choiceClause_many": " · {{count}} потребують вибору.",
         "choiceClause_other": " · {{count}} потребують вибору.",
         "chooseTarget": "Виберіть ціль…",
         "convert": "Перетворити",
         "convertedToast_one": "{{count}} вікі-посилання перетворено",
+        "convertedToast_few": "{{count}} вікі-посилання перетворено",
+        "convertedToast_many": "{{count}} вікі-посилань перетворено",
         "convertedToast_other": "{{count}} вікі-посилань перетворено",
         "noneToConvert": "У цій нотатці немає імпортованих вікі-посилань для перетворення.",
         "nothingToConvert": "Немає що перетворювати — жодне імпортоване вікі-посилання не розв’язується.",
         "rewriteCount_one": "Буде перезаписано {{count}} посилання",
+        "rewriteCount_few": "{{count}} посилання буде переписано",
+        "rewriteCount_many": "{{count}} посилань буде переписано",
         "rewriteCount_other": "{{count}} посилань буде переписано",
         "skipped": "пропущено — {{reason}}",
         "title": "Перетворити імпортовані вікі-посилання в цій нотатці"
@@ -1044,6 +1172,8 @@
       "searchPlaceholder": "Пошук нотаток",
       "clearSearch": "Очистити пошук",
       "viewNoteCount_one": "{{count}} нотатка в «{{name}}»",
+      "viewNoteCount_few": "{{count}} нотатки в «{{name}}»",
+      "viewNoteCount_many": "{{count}} нотаток у «{{name}}»",
       "viewNoteCount_other": "{{count}} нотаток у «{{name}}»",
       "edit": "Редагувати",
       "trashEmpty": "Кошик порожній",
@@ -1067,6 +1197,8 @@
     "noteMenu": {
       "emptyNote": "Порожня нотатка",
       "wordCount_one": "{{count}} слово · {{minutes}} хв читання",
+      "wordCount_few": "{{count}} слова · {{minutes}} хв читання",
+      "wordCount_many": "{{count}} слів · {{minutes}} хв читання",
       "wordCount_other": "{{count}} слів · {{minutes}} хв читання",
       "moveToFolder": "Перемістити в теку…",
       "moveToTrash": "Перемістити в кошик",
@@ -1096,8 +1228,12 @@
     },
     "graphTab": {
       "linkedNotes_one": "{{count}} пов’язана нотатка",
+      "linkedNotes_few": "{{count}} пов’язані нотатки",
+      "linkedNotes_many": "{{count}} пов’язаних нотаток",
       "linkedNotes_other": "{{count}} пов’язаних нотаток",
       "links_one": "{{count}} посилання",
+      "links_few": "{{count}} посилання",
+      "links_many": "{{count}} посилань",
       "links_other": "{{count}} посилань"
     },
     "formatBar": {
@@ -1117,6 +1253,8 @@
     "noteContext": {
       "collapsePanel": "Згорнути панель",
       "unlinkedCount_one": "Непов’язана згадка {{count}}",
+      "unlinkedCount_few": "Непов’язані згадки {{count}}",
+      "unlinkedCount_many": "Непов’язані згадки {{count}}",
       "unlinkedCount_other": "Непов’язані згадки {{count}}"
     },
     "viewsSheet": {
@@ -1134,6 +1272,8 @@
     "tagBrowser": {
       "noTagsMatch": "Немає відповідних тегів.",
       "notesCount_one": "Нотатки · {{count}}",
+      "notesCount_few": "Нотатки · {{count}}",
+      "notesCount_many": "Нотатки · {{count}}",
       "notesCount_other": "Нотатки · {{count}}"
     },
     "untitledNote": "Нотатка без назви",
@@ -1171,8 +1311,12 @@
         "couldNotRead": "Не вдалося прочитати цю нотатку.",
         "exportedTo": "Експортовано до {{filename}}",
         "exportedToWithAttachments_one": "Експортовано до {{filename}} + {{count}} вкладення",
+        "exportedToWithAttachments_few": "Експортовано до {{filename}} + {{count}} вкладення",
+        "exportedToWithAttachments_many": "Експортовано до {{filename}} + {{count}} вкладень",
         "exportedToWithAttachments_other": "Експортовано до {{filename}} + {{count}} вкладень",
         "exportedToWithImages_one": "Експортовано до {{filename}} + {{count}} зображення",
+        "exportedToWithImages_few": "Експортовано до {{filename}} + {{count}} зображення",
+        "exportedToWithImages_many": "Експортовано до {{filename}} + {{count}} зображень",
         "exportedToWithImages_other": "Експортовано до {{filename}} + {{count}} зображень",
         "filterHtml": "HTML",
         "filterMarkdown": "Markdown",
@@ -1184,9 +1328,16 @@
         "cancel": "Скасувати",
         "export": "Експортувати…",
         "includeAttachments_one": "Включити {{count}} вкладення",
+        "includeAttachments_few": "Включити {{count}} вкладення",
+        "includeAttachments_many": "Включити {{count}} вкладень",
         "includeAttachments_other": "Включити {{count}} вкладень",
         "title": "Експортувати як Markdown"
       }
+    },
+    "egress": {
+      "cancel": "Скасувати",
+      "confirm": "Завантажити",
+      "title": "Завантажити цей файл"
     },
     "pdf": {
       "cancel": "Скасувати",
@@ -1212,15 +1363,25 @@
       },
       "flow": {
         "countAttachments_one": "{{count}} вкладення",
+        "countAttachments_few": "{{count}} вкладення",
+        "countAttachments_many": "{{count}} вкладень",
         "countAttachments_other": "{{count}} вкладень",
         "countFolders_one": "{{count}} папка",
+        "countFolders_few": "{{count}} теки",
+        "countFolders_many": "{{count}} тек",
         "countFolders_other": "{{count}} тек",
         "countNotes_one": "{{count}} нотатка",
+        "countNotes_few": "{{count}} нотатки",
+        "countNotes_many": "{{count}} нотаток",
         "countNotes_other": "{{count}} нотаток",
         "exclusionsHistory": "Історію версій не включено.",
         "exclusionsTrashed_one": "{{count}} нотатку в кошику не включено.",
+        "exclusionsTrashed_few": "{{count}} нотатки з кошика не включено.",
+        "exclusionsTrashed_many": "{{count}} нотаток із кошика не включено.",
         "exclusionsTrashed_other": "{{count}} нотаток із кошика не включено.",
         "exclusionsTrashedAndHistory_one": "{{count}} нотатку в кошику та історію версій не включено.",
+        "exclusionsTrashedAndHistory_few": "{{count}} нотатки з кошика та історію версій не включено.",
+        "exclusionsTrashedAndHistory_many": "{{count}} нотаток із кошика та історію версій не включено.",
         "exclusionsTrashedAndHistory_other": "{{count}} нотаток із кошика та історію версій не включено.",
         "phaseAttachments": "вкладення",
         "phaseNotes": "нотатки",
@@ -1254,6 +1415,10 @@
     }
   },
   "failClosed": {
+    "exit": {
+      "quit": "Закрити програму",
+      "reload": "Перезавантажити"
+    },
     "corrupted": {
       "body": "Якщо у вас є резервна копія, ви можете відновити її — поточні файли залишаються недоторканими; резервну копію спочатку відновлюють як окремий сейф.",
       "cta": "Закрити програму",
@@ -1274,6 +1439,8 @@
       "cta": "Закрити програму",
       "title": "Немає дозволу на доступ до файлу сейфа."
     },
+    "copyDiagnostics": "Копіювати діагностику",
+    "diagnosticsCopied": "Скопійовано",
     "restoreFromBackup": "Відновити з резервної копії…"
   },
   "notes": {
@@ -1281,12 +1448,16 @@
       "cancel": "Скасувати",
       "close": "Закрити",
       "count_one": "{{count}} нотатка",
+      "count_few": "{{count}} нотатки",
+      "count_many": "{{count}} нотаток",
       "count_other": "{{count}} нотаток",
       "countEmpty": "Порожньо",
       "delete": "Видалити",
       "deleteError": "Не вдалося видалити цю нотатку. Спробуйте ще раз.",
       "emptyState": "Архів порожній.",
       "folderDeleteConfirm_one": "Перемістити {{count}} нотатку в кошик?",
+      "folderDeleteConfirm_few": "Перемістити {{count}} нотатки в кошик?",
+      "folderDeleteConfirm_many": "Перемістити {{count}} нотаток у кошик?",
       "folderDeleteConfirm_other": "Перемістити {{count}} нотаток у кошик?",
       "folderDeleteConfirmCta": "Перемістити в кошик",
       "folderDeleteError": "Не вдалося перемістити нотатки цієї теки в кошик. Спробуйте ще раз.",
@@ -1340,17 +1511,25 @@
       },
       "noConditions": "Поки немає умов — це подання показує всі сторінки.",
       "noteCount_one": "{{count}} нотатка",
+      "noteCount_few": "{{count}} нотатки",
+      "noteCount_many": "{{count}} нотаток",
       "noteCount_other": "{{count}} нотаток",
       "of": "з:",
       "ofTheGroups": "з груп:",
+      "op": {
+        "contains": "містить"
+      },
+      "propertyValuePlaceholder": "значення",
       "removeCondition": "Видалити умову",
       "replaceFilter": "Замінити фільтр",
       "save": "Зберегти",
       "searchTextPlaceholder": "текст пошуку",
       "selectFolderPlaceholder": "виберіть папку…",
+      "selectPropertyPlaceholder": "виберіть властивість…",
       "selectTagPlaceholder": "виберіть тег…",
       "type": {
         "folder": "Папка",
+        "property": "Властивість",
         "search": "Пошук",
         "tag": "Тег"
       },
@@ -1394,6 +1573,8 @@
         "cancel": "Скасувати",
         "cancelledNotImported": "{{count}} не імпортовано",
         "cancelledNotImported_one": "{{count}} не імпортовано",
+        "cancelledNotImported_few": "{{count}} не імпортовано",
+        "cancelledNotImported_many": "{{count}} не імпортовано",
         "cancelledNotImported_other": "{{count}} не імпортовано",
         "cancelling": "Скасування…",
         "chooseFolder": "Виберіть папку…",
@@ -1408,6 +1589,8 @@
         "flagKindTitle": "Назва",
         "folderPickerTitle": "Виберіть папку сейфа Obsidian",
         "hiddenIgnoredPrefix_one": "{{count}} конфігураційний / прихований елемент проігноровано (напр. ",
+        "hiddenIgnoredPrefix_few": "{{count}} конфігураційні / приховані елементи проігноровано (напр., ",
+        "hiddenIgnoredPrefix_many": "{{count}} конфігураційних / прихованих елементів проігноровано (напр., ",
         "hiddenIgnoredPrefix_other": "{{count}} конфігураційних / прихованих елементів проігноровано (напр., ",
         "hiddenIgnoredSuffix": ", приховані файли).",
         "ifNoteExistsLabel": "Якщо нотатка вже існує",
@@ -1418,14 +1601,20 @@
         "markedDone": "Позначено готовим",
         "mediaImported": "{{count}} імпортовано",
         "mediaImported_one": "{{count}} імпортовано",
+        "mediaImported_few": "{{count}} імпортовано",
+        "mediaImported_many": "{{count}} імпортовано",
         "mediaImported_other": "{{count}} імпортовано",
         "mediaOmittedSuffix": " · {{count}} опущено",
         "mediaOmittedSuffix_one": " · {{count}} пропущено",
+        "mediaOmittedSuffix_few": " · {{count}} опущено",
+        "mediaOmittedSuffix_many": " · {{count}} опущено",
         "mediaOmittedSuffix_other": " · {{count}} опущено",
         "needsAttention": "Потребує уваги",
         "needsAttentionHelp": "Ці нотатки імпортовано без змін. Запропоновані виправлення — це лише відправні точки; скопіюйте одне, а потім перейменуйте нотатку, коли відкриєте її.",
         "noFolderChosen": "Папку не вибрано",
         "notesImported_one": "нотатку імпортовано",
+        "notesImported_few": "нотатки імпортовано",
+        "notesImported_many": "нотаток імпортовано",
         "notesImported_other": "нотаток імпортовано",
         "policyCopyHint": "Додати її поруч з наявною нотаткою.",
         "policyCopyLabel": "Імпортувати як копію",
@@ -1451,7 +1640,11 @@
         "titleFailed": "Імпорт не вдався",
         "titleSetup": "Імпорт сейфа Obsidian",
         "vaultFolderLabel": "Папка сейфа",
-        "vaultRoot": "(корінь сейфа)"
+        "vaultRoot": "(корінь сейфа)",
+        "titlePick": "Імпорт нотаток",
+        "keepsLabel": "Що переноситься",
+        "losesLabel": "Що не переноситься",
+        "changeSource": "Змінити джерело"
       },
       "offer": {
         "body": "Перенесіть наявні нотатки до Myne. Кожну буде зашифровано під час імпорту — ніщо не залишає цей пристрій, а ваші оригінальні файли залишаються там, де вони є.",
@@ -1459,6 +1652,46 @@
         "laterHint": "Ви завжди можете імпортувати пізніше в розділі «Налаштування → Сховище».",
         "notNow": "Не зараз",
         "title": "Імпортувати ваш сейф Obsidian?"
+      },
+      "picker": {
+        "intro": "Звідки надходять ваші нотатки?"
+      },
+      "source": {
+        "obsidian": {
+          "label": "Obsidian",
+          "pickerTitle": "Виберіть папку свого сейфа Obsidian",
+          "survives": "Переноситься: Markdown, frontmatter, [[wikilinks]], структура папок, вкладення.",
+          "loses": "Не переноситься: файли canvas і все, що не є нотаткою Markdown.",
+          "short": "Папка сейфа з нотатками Markdown"
+        },
+        "notion": {
+          "label": "Notion",
+          "pickerTitle": "Виберіть розпаковану папку експорту Notion",
+          "survives": "Переноситься: сторінки, структура папок, властивості сторінок як поля та внутрішні посилання як вікі-посилання. Кожна база даних також надходить як нотатка-таблиця з посиланнями на її рядки.",
+          "loses": "Спершу розпакуйте експорт — Myne читає папку, а не .zip. Перемикачі, виноски та кольоровий текст не мають відповідників і перелічуються у звіті про імпорт.",
+          "short": "Розпакована папка експорту"
+        },
+        "evernote": {
+          "label": "Evernote",
+          "pickerTitle": "Виберіть свій файл .enex з Evernote",
+          "survives": "Переноситься: кожна нотатка у файлі, форматування та вкладення. Зашифровані блоки зберігаються як текст, який ви й далі можете розшифрувати в Evernote.",
+          "loses": "Не переноситься: нагадування та історія нотаток. Дуже великі експорти відхиляються, а не обробляються з ризиком — якщо так станеться, розділіть експорт.",
+          "short": "Один файл експорту .enex"
+        },
+        "html": {
+          "label": "HTML",
+          "pickerTitle": "Виберіть папку з файлами HTML",
+          "survives": "Переноситься: заголовки, списки, таблиці, посилання, код і виділення.",
+          "loses": "Не переноситься: стилі, сценарії та вбудовані елементи. Віддалені зображення залишаються посиланнями й ніколи не завантажуються.",
+          "short": "Папка зі збереженими вебсторінками"
+        },
+        "csv": {
+          "label": "CSV",
+          "pickerTitle": "Виберіть свій файл .csv",
+          "survives": "Стає однією нотаткою, що містить таблицю.",
+          "loses": "Це одна нотатка, а не одна нотатка на рядок — Myne не є базою даних. Дуже широкі або дуже довгі файли обрізаються, і звіт про імпорт зазначає, наскільки.",
+          "short": "Один файл електронної таблиці"
+        }
       }
     },
     "list": {
@@ -1471,12 +1704,18 @@
       "attachments": "Вкладення",
       "bulkArchive": "Архівувати {{count}} нотатку",
       "bulkArchive_one": "Архівувати {{count}} нотатку",
+      "bulkArchive_few": "Архівувати {{count}} нотатки",
+      "bulkArchive_many": "Архівувати {{count}} нотаток",
       "bulkArchive_other": "Архівувати {{count}} нотаток",
       "bulkDelete": "Видалити {{count}} нотатку",
       "bulkDelete_one": "Видалити {{count}} нотатку",
+      "bulkDelete_few": "Видалити {{count}} нотатки",
+      "bulkDelete_many": "Видалити {{count}} нотаток",
       "bulkDelete_other": "Видалити {{count}} нотаток",
       "bulkMove": "Перемістити {{count}} нотатку в…",
       "bulkMove_one": "Перемістити {{count}} нотатку до…",
+      "bulkMove_few": "Перемістити {{count}} нотатки в…",
+      "bulkMove_many": "Перемістити {{count}} нотаток у…",
       "bulkMove_other": "Перемістити {{count}} нотаток у…",
       "caseMergeBody": "Папка з назвою «{{name}}» уже існує. Їх буде об’єднано — перейменувати одну, щоб тримати їх окремо?",
       "color": "Колір…",
@@ -1485,6 +1724,8 @@
       "customize": "Налаштувати…",
       "delete": "Видалити",
       "deleteFolderBody_one": "«{{name}}» та її {{count}} нотатку",
+      "deleteFolderBody_few": "«{{name}}» та її {{count}} нотатки",
+      "deleteFolderBody_many": "«{{name}}» та її {{count}} нотаток",
       "deleteFolderBody_other": "«{{name}}» та її {{count}} нотаток",
       "deleteFolderConfirm": "Видалити папку",
       "deleteFolderTitle": "Видалити цю папку?",
@@ -1497,7 +1738,10 @@
       "exportPdf": "Експортувати як PDF…",
       "exportTxt": "Експортувати як простий текст…",
       "favoritesHeading": "Обране",
+      "icon": "Піктограма…",
       "mergeAnyway": "Усе одно об’єднати",
+      "newDrawingHere": "Новий малюнок тут",
+      "newDrawingMenu": "Новий малюнок",
       "newFolder": "Нова папка",
       "newFolderInPlaceholder": "Нова папка в {{path}}",
       "newFolderPlaceholder": "Нова папка",
@@ -1511,6 +1755,8 @@
       "noteMovedToTrash": "Нотатку переміщено до кошика",
       "notesHeading": "Нотатки",
       "notesMovedToTrash_one": "{{count}} нотатку переміщено до кошика",
+      "notesMovedToTrash_few": "{{count}} нотатки переміщено в кошик",
+      "notesMovedToTrash_many": "{{count}} нотаток переміщено в кошик",
       "notesMovedToTrash_other": "{{count}} нотаток переміщено в кошик",
       "openArchive": "Відкрити архів",
       "openAttachments": "Відкрити вкладення",
@@ -1525,6 +1771,8 @@
       "trash": "Кошик",
       "trashBulkError": "Не вдалося перемістити нотатки до кошика.",
       "trashConfirmBulkBody_one": "{{count}} нотатку буде переміщено в кошик.",
+      "trashConfirmBulkBody_few": "{{count}} нотатки буде переміщено в кошик.",
+      "trashConfirmBulkBody_many": "{{count}} нотаток буде переміщено в кошик.",
       "trashConfirmBulkBody_other": "{{count}} нотаток буде переміщено в кошик.",
       "trashConfirmBulkWarning": "Ви зможете відновити їх із кошика пізніше.",
       "trashConfirmConfirm": "Перемістити в кошик",
@@ -1550,6 +1798,7 @@
     },
     "newTab": {
       "createNote": "Створити нову нотатку",
+      "createDrawing": "Новий малюнок",
       "noNotesMatch": "Немає нотаток, що відповідають запиту.",
       "noNotesYet": "Поки немає нотаток.",
       "searchAriaLabel": "Пошук нотаток для відкриття",
@@ -1579,12 +1828,16 @@
       "loadError": "Не вдалося завантажити цю нотатку",
       "removeFromFavorites": "Видалити з обраного",
       "renameAriaLabel": "Перейменувати нотатку",
+      "unsyncedLabel": "Ще не на сервері",
+      "unsyncedTitle": "Останні зміни цієї нотатки є лише на цьому пристрої",
       "untitled": "Без назви"
     },
     "savedView": {
       "defaultName": "Відфільтроване подання"
     },
     "saveStatus": {
+      "conflict": "Розв’язання конфлікту редагувань…",
+      "conflictTitle": "Ця нотатка змінилася на іншому пристрої — зберігаємо обидві версії",
       "editing": "Редагування",
       "editingEllipsis": "Редагування…",
       "editingTitle": "Редагування — автозбереження ввімкнено",
@@ -1594,6 +1847,8 @@
       "savedRelative": "Збережено {{rel}}",
       "saveFailed": "Не вдалося зберегти",
       "saveFailedTitle": "Не вдалося зберегти — натисніть «Повторити»",
+      "storageFull": "Сховище заповнене",
+      "storageFullTitle": "Немає місця, щоб зберегти цю нотатку. Звільніть місце (або вилучіть кілька вкладень), а потім повторіть. Доки вона не збережеться, ця правка існує лише в цьому вікні — на сервері її також немає.",
       "saving": "Збереження",
       "savingEllipsis": "Збереження…"
     },
@@ -1604,6 +1859,8 @@
     "snapshots": {
       "cancel": "Скасувати",
       "changeCount_one": "{{count}} зміна з часу цього знімка",
+      "changeCount_few": "{{count}} зміни від цього знімка",
+      "changeCount_many": "{{count}} змін від цього знімка",
       "changeCount_other": "{{count}} змін від цього знімка",
       "close": "Закрити",
       "confirmBody": "Вашу поточну нотатку спершу буде збережено як знімок, тож ви зможете скасувати цю дію.",
@@ -1649,6 +1906,8 @@
       "noTagsMatch": "Немає тегів, що відповідають «{{query}}».",
       "noTagsYet": "Поки немає тегів.",
       "noteCount_one": "{{count}} нотатка",
+      "noteCount_few": "{{count}} нотатки",
+      "noteCount_many": "{{count}} нотаток",
       "noteCount_other": "{{count}} нотаток",
       "notes": "Нотатки",
       "pickTag": "Виберіть тег для фільтрування.",
@@ -1662,16 +1921,22 @@
     "trash": {
       "close": "Закрити",
       "count_one": "{{count}} нотатка",
+      "count_few": "{{count}} нотатки",
+      "count_many": "{{count}} нотаток",
       "count_other": "{{count}} нотаток",
       "countEmpty": "Порожньо",
       "delete": "Видалити",
       "deleteError": "Не вдалося видалити цю нотатку. Спробуйте ще раз.",
       "empty": "Очистити кошик",
       "emptyConfirmBody_one": "{{count}} нотатку буде остаточно видалено.",
+      "emptyConfirmBody_few": "{{count}} нотатки буде остаточно видалено.",
+      "emptyConfirmBody_many": "{{count}} нотаток буде остаточно видалено.",
       "emptyConfirmBody_other": "{{count}} нотаток буде остаточно видалено.",
       "emptyConfirmCta": "Очистити кошик",
       "emptyConfirmTitle": "Очистити кошик?",
       "emptyPartialFailure_one": "{{count}} нотатку не вдалося видалити, і вона залишається в кошику.",
+      "emptyPartialFailure_few": "{{count}} нотатки не вдалося видалити, і вони залишаються в кошику.",
+      "emptyPartialFailure_many": "{{count}} нотаток не вдалося видалити, і вони залишаються в кошику.",
       "emptyPartialFailure_other": "{{count}} нотаток не вдалося видалити, і вони залишаються в кошику.",
       "emptyState": "Кошик порожній.",
       "purgeConfirmCta": "Видалити назавжди",
@@ -1708,6 +1973,10 @@
       "host": {
         "unsupported": "Цей тип подання з’явиться в одному з наступних оновлень."
       },
+      "list": {
+        "empty": "Немає нотаток, що відповідають цьому поданню",
+        "noValue": "Немає значення"
+      },
       "menu": {
         "deleteView": "Видалити подання",
         "editFilter": "Редагувати фільтр…",
@@ -1717,6 +1986,11 @@
         "viewSettings": "Налаштування подання…"
       },
       "newView": "Нове подання",
+      "table": {
+        "empty": "Немає нотаток, що відповідають цьому поданню",
+        "name": "Назва",
+        "noValue": "Немає значення"
+      },
       "untitledView": "Подання без назви"
     },
     "viewSettings": {
@@ -1730,12 +2004,26 @@
       "cancel": "Скасувати",
       "cardSize": "Розмір картки",
       "cardSizeValue": "{{size}} пкс",
+      "columns": "Стовпці",
+      "columnsEmpty": "Властивостей не знайдено",
+      "columnsHint": "Властивості frontmatter, які показуються як стовпці (таблиця) або як рядок деталей (список / картки).",
+      "columnsPlaceholder": "Додати стовпці…",
       "coverImageHint": "Властивість frontmatter, значення якої є зображенням — показується як обкладинка кожної картки. Залиште порожнім, щоб не показувати обкладинку.",
       "coverImagePlaceholder": "напр. cover",
       "coverImageProperty": "Властивість зображення обкладинки",
+      "groupBy": "Групувати за",
       "imageAspectRatio": "Співвідношення сторін зображення",
+      "propertyNone": "Немає",
       "reset": "Скинути",
-      "save": "Зберегти"
+      "save": "Зберегти",
+      "sortAsc": "За зростанням",
+      "sortBy": "Сортувати за",
+      "sortDesc": "За спаданням",
+      "sortDirection": "Напрямок сортування",
+      "viewType": "Тип подання",
+      "viewTypeCards": "Картки",
+      "viewTypeList": "Список",
+      "viewTypeTable": "Таблиця"
     },
     "welcome": {
       "body": "Ласкаво просимо до Myne — вашого приватного простору для думок і письма.\n\nУсе, що ви зберігаєте тут, зашифровано й залишається на вашому пристрої. Ваш **пароль** і **фраза відновлення** — єдині ключі до нього, тож тримайте їх у безпечному місці. Якщо ви втратите обидва, ніхто не зможе повернути ваші нотатки, навіть ми.\n\nЦе звичайна нотатка, тож зробіть її своєю. Редагуйте, перейменовуйте чи видаляйте її, коли захочете, і додавайте нові нотатки в міру того, як ростуть ваші ідеї.\n\nМи раді, що ви тут. Щоб дізнатися більше про Myne, відвідайте https://myne.md\n",
@@ -1821,6 +2109,8 @@
       "notes": "Нотаток: {{n}}",
       "openVaultList": "Відкрити список сейфів",
       "partialHeader_one": "Відновлено частково — {{count}} елемент не вдалося прочитати.",
+      "partialHeader_few": "Відновлено частково — {{count}} елементи не вдалося прочитати.",
+      "partialHeader_many": "Відновлено частково — {{count}} елементів не вдалося прочитати.",
       "partialHeader_other": "Відновлено частково — {{count}} елементів не вдалося прочитати.",
       "restored": "Сейф відновлено.",
       "versionHistory": "Записів історії версій: {{n}}"
@@ -1836,6 +2126,7 @@
   "settings": {
     "about": {
       "buildChannelDevelopment": "Складання для розробки",
+      "buildLabel": "Складання",
       "buildChannelLabel": "Канал складання",
       "buildChannelStable": "Стабільний",
       "changelogButton": "Переглянути журнал змін…",
@@ -1857,12 +2148,16 @@
         "ioError": "Помилка диска, спробуйте ще раз.",
         "joinFailure": "Щось пішло не так, спробуйте ще раз.",
         "samePasswordRejected": "Новий пароль збігається з поточним.",
+        "serverAckPending": "Ваш новий пароль працює на цьому пристрої, але Myne не зміг зв’язатися із сервером, щоб зберегти його. Доки це не станеться, інші ваші пристрої й далі очікують старий пароль — а якщо копію в цьому браузері буде очищено до того часу, зміну буде втрачено. Спробу буде повторено автоматично.",
         "weakNewPassword": "Новий пароль має містити щонайменше 12 символів."
       },
       "changePasswordHeading": "Змінити пароль",
       "changePasswordHelper": "Змініть головний пароль, зберігши той самий сейф. Фраза відновлення залишається незмінною.",
       "dangerZoneHeading": "Небезпечна зона",
       "dangerZoneHelper": "Остаточно видалити цей сейф і всі нотатки. Дію не можна скасувати. Фраза відновлення не відновить сейф.",
+      "localEraseHeading": "Цей браузер",
+      "localEraseHelper": "Стерти копію вашого сейфа, яку Myne зберігає в цьому браузері. Ваш обліковий запис і все, що вже синхронізовано, залишаються на сервері.",
+      "localEraseButton": "Вийти та стерти копію з цього браузера…",
       "deleteVaultButton": "Видалити сейф…",
       "memoryCost": "Витрати пам’яті",
       "parallelism": "Паралелізм",
@@ -1887,6 +2182,7 @@
       "changing": "Змінюємо…"
     },
     "appearance": {
+      "homeQuickActions": "Швидкі дії на головному екрані",
       "showEditTimesAria": "Показувати час редагування на бічній панелі",
       "showEditTimesHelper": "Показувати час останнього редагування кожної нотатки під її назвою на бічній панелі.",
       "showEditTimesLabel": "Показувати час редагування",
@@ -1914,6 +2210,15 @@
       "off": "Вимкнено",
       "on": "Увімкнено",
       "saveError": "Не вдалося оновити налаштування архівування."
+    },
+    "attachmentOcr": {
+      "label": "Шукати всередині зображень і сканованих документів",
+      "helper": "Зчитує текст із вкладених зображень і сканованих PDF на цьому пристрої, щоб пошук міг знаходити їх за вмістом. Нічого не завантажується. Вимкнення зупиняє фонове зчитування; уже видобутий текст зберігається.",
+      "errorSaveSetting": "Не вдалося зберегти це налаштування.",
+      "processing_one": "Читання 1 вкладення…",
+      "processing_few": "Читання {{count}} вкладень…",
+      "processing_many": "Читання {{count}} вкладень…",
+      "processing_other": "Читання {{count}} вкладень…"
     },
     "autoBackup": {
       "backupFolder": "Папка резервних копій",
@@ -1956,13 +2261,19 @@
       "when": {
         "bare": "Під’єднано",
         "daysAgo_one": "Під’єднано {{count}} день тому",
+        "daysAgo_few": "Підключено {{count}} дні тому",
+        "daysAgo_many": "Підключено {{count}} днів тому",
         "daysAgo_other": "Підключено {{count}} днів тому",
         "hoursAgo": "Підключено {{count}} год тому",
         "hoursAgo_one": "Під’єднано {{count}} год тому",
+        "hoursAgo_few": "Підключено {{count}} год тому",
+        "hoursAgo_many": "Підключено {{count}} год тому",
         "hoursAgo_other": "Підключено {{count}} год тому",
         "justNow": "Під’єднано щойно",
         "minutesAgo": "Підключено {{count}} хв тому",
         "minutesAgo_one": "Під’єднано {{count}} хв тому",
+        "minutesAgo_few": "Підключено {{count}} хв тому",
+        "minutesAgo_many": "Підключено {{count}} хв тому",
         "minutesAgo_other": "Підключено {{count}} хв тому",
         "onDate": "Під’єднано {{date}}"
       }
@@ -1991,6 +2302,8 @@
         "parseError": "Недійсний JSON",
         "parseErrorWithLine": "Недійсний JSON (рядок {{line}})"
       },
+      "export": "Експортувати",
+      "exportError": "Не вдалося експортувати цю тему. Спробуйте ще раз.",
       "fileFilterName": "Тема Myne",
       "helper": "Використовуйте власну палітру кольорів. Теми перевіряються на цьому пристрої перед використанням — нічого не завантажується.",
       "importButton": "Імпортувати тему…",
@@ -2025,7 +2338,13 @@
       "heading": "Видалити сейф",
       "ioFailBody": "Не вдалося отримати доступ до файлів сейфа для видалення. Ключі сейфа вже стерто з пам’яті; будь-які дані сейфа, що лишаються на диску, є невідновлюваним сміттям, обгорнутим Argon2id.",
       "ioFailTitle": "Помилка диска під час видалення",
+      "localEraseHeading": "Вийти та стерти копію з цього браузера",
+      "localEraseEyebrow": "ЛИШЕ ЦЕЙ БРАУЗЕР",
+      "localEraseSubmit": "Стерти копію з цього браузера",
+      "localEraseSubmitInFlight": "Стирання…",
       "partialFailBody_one": "{{count}} файл не вдалося видалити з диска. Ключі сейфа вже стерто з пам’яті, тож будь-який залишковий шифротекст є невідновлюваним сміттям, обгорнутим Argon2id.",
+      "partialFailBody_few": "{{count}} файли не вдалося видалити з диска. Ключі сховища вже обнулено в пам’яті, тож будь-який залишковий шифротекст — це невідновлюване сміття, обгорнуте Argon2id.",
+      "partialFailBody_many": "{{count}} файлів не вдалося видалити з диска. Ключі сховища вже обнулено в пам’яті, тож будь-який залишковий шифротекст — це невідновлюване сміття, обгорнуте Argon2id.",
       "partialFailBody_other": "{{count}} файлів не вдалося видалити з диска. Ключі сховища вже обнулено в пам’яті, тож будь-який залишковий шифротекст — це невідновлюване сміття, обгорнуте Argon2id.",
       "partialFailTitle": "Видалення сейфа частково не вдалося",
       "submit": "Видалити сейф",
@@ -2090,6 +2409,32 @@
       "helper": "Перегляд і зміна сполучень клавіш. Форматування редактора та комбінація перемикання вкладок є фіксованими.",
       "notSet": "Не задано",
       "removeBindingAria": "Видалити {{chord}}",
+      "reserved": {
+        "bookmarkPage": "додає сторінку до закладок",
+        "closeTab": "закриває вкладку",
+        "closeWindow": "закриває вікно",
+        "cycleTabs": "перемикається між вкладками",
+        "focusAddressBar": "переводить фокус на адресний рядок",
+        "hideApplication": "ховає браузер",
+        "inspectElement": "відкриває інспектор елементів",
+        "minimiseWindow": "згортає вікно",
+        "newPrivateWindow": "відкриває приватне вікно",
+        "newTab": "відкриває нову вкладку",
+        "newWindow": "відкриває нове вікно",
+        "openBookmarks": "відкриває закладки",
+        "openDevTools": "відкриває інструменти розробника",
+        "openExtensions": "відкриває розширення",
+        "openFile": "відкриває файл",
+        "openHistory": "відкриває історію",
+        "quit": "завершує роботу браузера",
+        "reopenTab": "знову відкриває останню закриту вкладку",
+        "switchTab": "перемикає вкладки",
+        "toggleFullscreen": "перемикає повноекранний режим"
+      },
+      "reservedBadge": "Недоступно тут",
+      "reservedBadgeTitle": "У вашому браузері {{chord}} {{action}}, тож ця комбінація ніколи не досягає Myne. У застосунку для комп’ютера вона й далі працює.",
+      "reservedRefused": "{{chord}} належить вашому браузеру — він {{action}}. Виберіть іншу комбінацію; ваші комбінації в застосунку для комп’ютера не змінюються.",
+      "reservedUnreliable": "{{chord}} може не досягти Myne — у деяких браузерах ця комбінація {{action}}. Усе одно додано.",
       "resetAll": "Скинути всі комбінації…",
       "resetAllConfirm": "Скинути кожну власну комбінацію до значення за замовчуванням?",
       "resetAllYes": "Скинути всі",
@@ -2106,6 +2451,14 @@
       "errorSaveSetting": "Не вдалося зберегти налаштування нумерації рядків.",
       "helper": "Показувати поле з номерами рядків у редакторі. Один номер на рядок; вимкнено за замовчуванням.",
       "label": "Номери рядків",
+      "off": "Вимкнено",
+      "on": "Увімкнено"
+    },
+    "vimMode": {
+      "chordCaveat": "У Windows і Linux власні комбінації Myne мають пріоритет, тож комбінації vim, які з ними конфліктують (Ctrl-a, Ctrl-b, Ctrl-d, Ctrl-e, Ctrl-f, Ctrl-i, Ctrl-p, Ctrl-t, Ctrl-v, Ctrl-w, Ctrl-x), недоступні в редакторі. Ctrl-[ і далі працює як Escape, а візуальний блок переходить на Alt-v.",
+      "errorSaveSetting": "Не вдалося зберегти налаштування режиму vim.",
+      "helper": "Використовуйте клавіші vim у редакторі: звичайний режим, режим вставки та візуальний режим зі звичними рухами й операторами. Вимкнено за замовчуванням. Поки це ввімкнено, нотатки відкриваються в режимі коду.",
+      "label": "Режим клавіатури vim",
       "off": "Вимкнено",
       "on": "Увімкнено"
     },
@@ -2134,10 +2487,12 @@
       "modelGenerationLabel": "Текстова модель — чат, підсумки, письмо",
       "modelNone": "Файл не вибрано",
       "modelSaveFailed": "Не вдалося зберегти шлях до моделі (він має бути поза вашим сховищем).",
+      "modelTranscriptionLabel": "Модель перетворення мовлення на текст (транскрибування)",
       "modelsHelper": "Myne ніколи не завантажує моделі — це означало б надсилання даних через мережу. Відкрийте посилання, щоб отримати модель у браузері, а потім виберіть завантажені файли тут. Усе працює на вашому пристрої.",
       "modelsLabel": "Моделі",
       "recommendedFilesEmbedding": "Потрібні model.safetensors + config.json + tokenizer.json в одній теці.",
       "recommendedFilesGeneration": "Потрібні файл .gguf + tokenizer.json в одній теці.",
+      "recommendedFilesTranscription": "Потрібні файл Whisper .gguf + config.json + tokenizer.json в одній теці.",
       "title": "ШІ"
     },
     "prefs": {
@@ -2154,6 +2509,7 @@
       "screenCaptureHelperOn": "Активний на macOS і Windows 10 (оновлення за травень 2020 чи новіше). Підтримка Linux з’явиться в одному з наступних випусків.",
       "screenCaptureLabel": "Захист від знімків екрана",
       "screenCaptureSubtitle": "Блокувати знімки екрана та запис екрана",
+      "screenshotBlocked": "Захист від знімків екрана ввімкнено — знімки Myne виходять порожніми.",
       "autoLockAfter": "Автоблокування після",
       "autoLock1m": "1 хв",
       "autoLock5m": "5 хв",
@@ -2171,6 +2527,8 @@
       "errorPinNotDigits": "PIN-код має містити лише цифри.",
       "errorPinTooShort": "PIN має містити щонайменше {{count}} цифру.",
       "errorPinTooShort_one": "PIN-код має містити щонайменше {{count}} цифру.",
+      "errorPinTooShort_few": "PIN має містити щонайменше {{count}} цифри.",
+      "errorPinTooShort_many": "PIN має містити щонайменше {{count}} цифр.",
       "errorPinTooShort_other": "PIN має містити щонайменше {{count}} цифр.",
       "helperConfigured": "Налаштовано через {{method}}. Повторне введення після автоблокування не потребує головного пароля. Головний пароль усе одно потрібен після перезапуску.",
       "helperNotConfigured": "Повторно вводьте після автоблокування PIN-код або Touch ID замість повного головного пароля. Це зручність поверх зашифрованого сейфа — головний пароль усе одно потрібен після перезапуску.",
@@ -2179,6 +2537,8 @@
       "pinAriaLabel": "PIN-код швидкого розблокування",
       "pinPlaceholder": "PIN (щонайменше {{count}} цифра)",
       "pinPlaceholder_one": "PIN-код (щонайменше {{count}} цифру)",
+      "pinPlaceholder_few": "PIN (щонайменше {{count}} цифри)",
+      "pinPlaceholder_many": "PIN (щонайменше {{count}} цифр)",
       "pinPlaceholder_other": "PIN (щонайменше {{count}} цифр)",
       "setPin": "Установити PIN-код",
       "setupHelper": "Touch ID доступний лише на macOS і наразі є експериментальним (очікує апаратної перевірки). PIN-код працює всюди.",
@@ -2254,6 +2614,8 @@
       "locationHelper": "Кожен сейф — це папка зашифрованих файлів за цим шляхом. Краще користуйтеся кнопкою «Резервна копія» нижче, ніж ручним копіюванням — вона перевіряє записаний файл.",
       "locationLabel": "Розташування сейфа",
       "openInFiles": "Відкрити у Файлах",
+      "webLocationHelper": "Ваші нотатки зберігаються у сховищі цього браузера для цього сайту, яким керує сам браузер — жодної папки, яку можна відкрити, немає. Очищення даних цього сайту вилучає локальну копію; оскільки цей клієнт синхронізується, повторний вхід завантажує її назад.",
+      "webLocationLabel": "Де зберігаються ваші нотатки",
       "pathUnavailable": "Шлях недоступний",
       "restoreBackup": "Відновити з резервної копії…"
     },
@@ -2287,11 +2649,15 @@
         "notSetUp": "Не налаштовано",
         "offline": "Офлайн",
         "conflicts_one": "{{count}} конфлікт",
+        "conflicts_few": "{{count}} конфлікти",
+        "conflicts_many": "{{count}} конфліктів",
         "conflicts_other": "{{count}} конфліктів"
       }
     },
     "data": {
       "exported_one": "Експортовано {{count}} нотатку → {{label}}",
+      "exported_few": "Експортовано {{count}} нотатки → {{label}}",
+      "exported_many": "Експортовано {{count}} нотаток → {{label}}",
       "exported_other": "Експортовано {{count}} нотаток → {{label}}",
       "exportNeedsApp": "Експорт потребує застосунку (а не браузерного перегляду).",
       "exportFailed": "Не вдалося експортувати сховище.",
@@ -2313,9 +2679,96 @@
       "typewriter": "Друкарське прокручування",
       "typewriterSubtitle": "Тримати курсор вертикально по центру",
       "enableArchiving": "Увімкнути архівування"
+    },
+    "search": {
+      "placeholder": "Пошук налаштувань…",
+      "ariaLabel": "Пошук налаштувань",
+      "empty": "Немає налаштувань, що відповідають «{{query}}».",
+      "resultsLabel": "Результати пошуку",
+      "extra": {
+        "lastActiveNoteTitle": "Продовжити з місця, де ви зупинилися",
+        "lastActiveNoteDesc": "Синхронізувати, яка нотатка була відкрита, щоб продовжити на іншому пристрої."
+      },
+      "keywords": {
+        "aiEnable": "локальний ші штучний інтелект ai увімкнути вимкнути машинне навчання llm",
+        "aiExcluded": "виключені теки папки ігнорувати ші ai приватність виключення excluded",
+        "aiModels": "моделі модель gguf завантажити текстова вбудовування embedding llm ші ai",
+        "archive": "архів архівування сховати відновити нотатки archive",
+        "autoBackup": "автоматичні резервні копії розклад частота зберігання папка backup",
+        "autoLock": "автоблокування таймаут бездіяльність блокування таймер сеанс auto lock",
+        "backup": "резервна копія копії експорт myne-backup відновити зберегти backup",
+        "buildChannel": "канал складання версія випуск стабільний бета нічний build channel",
+        "changePassword": "змінити пароль головний пароль облікові дані оновити скинути password",
+        "changelog": "журнал змін нотатки до випуску що нового історія changelog",
+        "clipper": "браузерний кліпер розширення веб захоплення chrome firefox clipper",
+        "contentWidth": "ширина вмісту стовпець читання довжина рядка width",
+        "customThemes": "власні теми палітра кольори вигляд імпорт тема theme",
+        "dailyNotes": "щоденні нотатки журнал дата шаблон папка щоденник daily",
+        "dangerZone": "небезпечна зона видалити сейф знищити стерти вилучити delete",
+        "export": "експорт markdown розшифрувати звичайні файли документи export",
+        "focusMode": "режим фокусування друкарське прокручування притлумлення неактивних рядків без відволікань focus",
+        "font": "шрифт гарнітура сімейство без засічок моноширинний типографіка font mono",
+        "hotkeys": "комбінації клавіш гарячі клавіші скорочення призначення розкладка hotkeys shortcuts",
+        "import": "імпорт нотаток obsidian notion evernote enex html csv міграція перенести import",
+        "language": "мова локаль інтерфейс переклад ui language",
+        "lastActiveNote": "продовжити з місця де зупинилися остання нотатка відновити синхронізувати відкрити last note sync resume",
+        "license": "ліцензія agpl відкритий код правова інформація legal",
+        "lineNumbers": "номери рядків поле редактор відображення line numbers",
+        "vimMode": "vim модальне редагування звичайний вставка візуальний клавіатура режим",
+        "lineSpacing": "міжрядковий інтервал висота рядка типографіка читабельність spacing",
+        "newNoteLocation": "розташування нових нотаток тека папка за замовчуванням де створюються new note folder default",
+        "quickUnlock": "швидке розблокування pin touch id біометрія обличчя unlock",
+        "realtimeSync": "синхронізація в реальному часі наживо з’єднання присутність опитування realtime sync live",
+        "screenCapture": "захист від захоплення екрана знімок екрана запис блокування приватність screenshot",
+        "showEditTimes": "показувати час редагування позначки часу змінено дати нотатки timestamps modified dates",
+        "spell": "перевірка правопису орфографія словник автовиправлення spell",
+        "spellLanguages": "мови перевірки правопису словники локаль слова spell languages",
+        "startupOpen": "запуск відкрити типовий файл старт яка нотатка startup",
+        "attachmentOcr": "ocr зображення скан сканований pdf фото знімок екрана розпізнавання тексту пошук усередині вкладень процесор батарея",
+        "syncAddDevice": "додати пристрій сполучення телефон ноутбук синхронізація sync pair",
+        "syncConflicts": "конфлікти злиття розв’язати версії синхронізація conflicts",
+        "syncDevices": "пристрої підключені сполучені синхронізація машини devices",
+        "syncRecovered": "відновлені нотатки відновлення синхронізація порятунок recovered",
+        "syncServer": "сервер синхронізації хост самостійно розміщений адреса url server",
+        "syncStatus": "стан синхронізації підключення актуально sync status",
+        "textSize": "розмір тексту розмір шрифту масштаб читабельність zoom",
+        "theme": "тема темна світла режим вигляд кольорова схема системна theme dark light amoled",
+        "threatModel": "модель загроз безпека супротивники активи довіра threat model",
+        "toolbar": "панель інструментів кнопки форматування плаваюча виділення налаштувати toolbar",
+        "vaultIcon": "значок сейфа піктограма аватар зображення символ icon",
+        "vaultLabel": "мітка сейфа назва перейменувати заголовок label",
+        "vaultLocation": "розташування сейфа шлях папка на диску де зберігається location",
+        "viewMode": "типовий режим перегляду наживо читання код попередній перегляд view"
+      }
     }
   },
+  "storageLost": {
+    "allSynced": "Нічого не втрачено — кожна нотатка тут уже потрапила на сервер.",
+    "evicted": {
+      "body": "Ваш браузер очистив сховище цього сайту, щоб звільнити місце. Нічого не пошкоджено й нічого не видалено на сервері — усе, що синхронізувалося, лишається там.",
+      "title": "Ваш браузер очистив локальну копію цього сейфа"
+    },
+    "lockCta": "Заблокувати та спробувати ще раз",
+    "reDownloadCta": "Налаштувати цей браузер знову",
+    "reEnrolNotice": "Повторне налаштування реєструє цей браузер як новий пристрій, тож перед синхронізацією він чекатиме на схвалення від одного з ваших інших пристроїв.",
+    "unopenable": {
+      "body": "Локальну копію цього сейфа більше неможливо прочитати. На сервері це ні на що не впливає: копія тут — це кеш, і її можна замінити.",
+      "title": "Локальну копію цього сейфа неможливо прочитати"
+    },
+    "unsyncedIntro": "{{count}} нотаток ще не потрапили на сервер. Їх втрачено — це була єдина копія:",
+    "unsyncedIntro_one": "{{count}} нотатка ще не потрапила на сервер. Її втрачено — це була єдина копія:",
+    "unsyncedIntro_few": "{{count}} нотатки ще не потрапили на сервер. Їх втрачено — це була єдина копія:",
+    "unsyncedIntro_many": "{{count}} нотаток ще не потрапили на сервер. Їх втрачено — це була єдина копія:",
+    "unsyncedIntro_other": "{{count}} нотаток ще не потрапили на сервер. Їх втрачено — це була єдина копія:",
+    "unsyncedOverflow": "…і ще {{count}}.",
+    "unsyncedOverflow_one": "…і ще {{count}}.",
+    "unsyncedOverflow_few": "…і ще {{count}}.",
+    "unsyncedOverflow_many": "…і ще {{count}}.",
+    "unsyncedOverflow_other": "…і ще {{count}}."
+  },
   "sync": {
+    "materialising": "Завантаження ваших нотаток — {{done}} з {{total}}. Ви можете починати працювати; решта з’являтиметься в міру надходження.",
+    "credentialAmbiguous": "Можливо, ваш пароль змінився і на цьому пристрої, і на іншому, а Myne не може визначити, який із них новіший — тож він нічого не змінив. Щоб владнати це, увійдіть на пристрої, який уже має доступ.",
     "attachments": {
       "aria": {
         "downloading": "Завантаження {{name}}",
@@ -2336,6 +2789,8 @@
       "discard": "Відхилити",
       "empty": "Конфліктів немає — ваші пристрої синхронізовано.",
       "groupTitle_one": "{{count}} конфліктна копія {{original}}",
+      "groupTitle_few": "{{count}} конфліктні копії «{{original}}»",
+      "groupTitle_many": "{{count}} конфліктних копій «{{original}}»",
       "groupTitle_other": "{{count}} конфліктних копій «{{original}}»",
       "keepAsSeparate": "Зберегти окремо",
       "tookTheirsToast": "Локальну версію переміщено в кошик.",
@@ -2343,15 +2798,42 @@
       "untitled": "Без назви ({{hex}})",
       "useThisVersion": "Використати цю версію"
     },
+    "deviceJoinQr": {
+      "accountLabel": "Номер облікового запису",
+      "accountPlaceholder": "MY-XXXX-XXXX-XXXX-XXXX-XXXX",
+      "error": "Не вдалося створити QR. Спробуйте ще раз.",
+      "generate": "Створити QR",
+      "hint": "Вставте свій номер облікового запису, щоб створити QR, який зможе відсканувати ваш телефон — він заповнить сервер і номер облікового запису за вас.",
+      "invalidAccount": "Це не схоже на дійсний номер облікового запису.",
+      "notConfigured": "Спершу налаштуйте сервер синхронізації, а потім створіть QR.",
+      "scanWithApp": "Відскануйте застосунком для iOS",
+      "title": "Додати пристрій за допомогою QR"
+    },
     "devices": {
       "approve": "Схвалити",
       "awaitingApproval_one": "{{count}} пристрій очікує схвалення",
+      "awaitingApproval_few": "{{count}} пристрої очікують схвалення",
+      "awaitingApproval_many": "{{count}} пристроїв очікують схвалення",
       "awaitingApproval_other": "{{count}} пристроїв очікують схвалення",
       "loading": "Завантаження…",
       "noDevices": "Жодного пристрою ще не синхронізовано.",
       "notEnrolled": "Цей пристрій ще не під’єднано. Якщо ви щойно додали його, дочекайтеся схвалення з іншого пристрою; інакше додайте його за допомогою форми «Додати пристрій» вище.",
+      "platform": {
+        "android": "Телефон Android",
+        "androidTablet": "Планшет Android",
+        "ios": "iPhone",
+        "ipad": "iPad",
+        "linux": "ПК з Linux",
+        "macos": "Mac",
+        "unknown": "Цей пристрій",
+        "web": "Браузер",
+        "windows": "ПК з Windows"
+      },
       "remove": "Вилучити",
       "removedElsewhere": "Цей пристрій було вилучено з вашого облікового запису на іншому пристрої.",
+      "rename": "Перейменувати",
+      "renameFailed": "Не вдалося зберегти цю назву. Спробуйте ще раз.",
+      "renameLabel": "Назва пристрою",
       "resetAndReAdd": "Скинути й додати цей пристрій знову",
       "resetSyncOnThisDevice": "Скинути синхронізацію на цьому пристрої",
       "shortName": "Пристрій {{hex}}",
@@ -2371,10 +2853,14 @@
       "connect": "Під’єднати",
       "connectedLocal": "Під’єднано (локально, без TLS).",
       "connectedTls": "Під’єднано. Переконайтеся, що цей відбиток збігається на вашому іншому пристрої.",
+      "connectedPlatformTrust": "Під’єднано через TLS. Ваш браузер перевірив сертифікат цього сервера.",
       "connecting": "З’єднання…",
       "fingerprintLabel": "Відбиток сертифіката сервера:",
       "pinStatic": "Перевірено за вбудованим сертифікатом Myne.",
       "pinTofu": "Закріплено під час першого підключення. Порівняйте цей відбиток на всіх ваших пристроях.",
+      "fixedOrigin": "Цей клієнт синхронізується з одним сервером, заданим під час розгортання. Змінити його звідси неможливо — сторінці дозволено звертатися лише до цієї однієї адреси.",
+      "fixedOriginNone": "Для цього розгортання не налаштовано сервера синхронізації.",
+      "pinPlatformTrust": "Перевірено сховищем сертифікатів вашого браузера. Цей клієнт не може закріпити сертифікат самостійно.",
       "placeholder": "https://your-server.example   ·   http://127.0.0.1:8080",
       "unreachable": "Не вдалося зв’язатися з цим сервером — перевірте URL-адресу та чи він запущений."
     },
@@ -2383,6 +2869,8 @@
       "accountNumberPlaceholder": "MY-XXXX-XXXX-XXXX-XXXX-X",
       "connecting": "З’єднання…",
       "credentialTypeAria": "Тип облікових даних",
+      "deviceNameHelp": "Показується у вашому списку пристроїв. Ви можете змінити її пізніше.",
+      "deviceNameLabel": "Назвіть цей пристрій",
       "error": {
         "notConfigured": "Перш ніж додавати цей пристрій, укажіть сервер синхронізації в налаштуваннях.",
         "transport": "Не вдалося зв’язатися із сервером синхронізації. Перевірте з’єднання та спробуйте ще раз."
@@ -2424,12 +2912,28 @@
         "helper": "Увійдіть на новому пристрої за допомогою номера облікового запису та пароля або фрази відновлення. Пристрій залишається в очікуванні, доки його не схвалить наявний пристрій.",
         "label": "Додати пристрій"
       },
+      "awaitingApproval": {
+        "label": "Очікування схвалення"
+      },
       "conflicts": {
         "helper": "Коли ту саму нотатку редагують одночасно на двох пристроях, Myne зберігає обидві копії, щоб нічого не втратилося. Розв’яжіть їх тут.",
         "label": "Конфлікти"
       },
       "devices": {
         "label": "Пристрої"
+      },
+      "recovered": {
+        "close": "Закрити",
+        "decrypting": "Розшифрування…",
+        "deleteConfirmTitle": "Видалити цю відновлену нотатку?",
+        "deleteConfirmWarning": "Це остаточно видаляє єдину копію, що зберігається на цьому пристрої. Дію не можна скасувати.",
+        "deleteCta": "Видалити",
+        "errorGeneric": "Щось пішло не так. Спробуйте ще раз.",
+        "helper": "Коли нотатку, видалену на іншому пристрої, вилучають тут, її зашифрована копія залишається на цьому пристрої. Відновіть її як нову нотатку або видаліть остаточно.",
+        "label": "Відновлені нотатки",
+        "previewCta": "Переглянути",
+        "previewTitle": "Відновлена нотатка",
+        "restoreCta": "Відновити"
       },
       "server": {
         "helper": "Уведіть однакову URL-адресу сервера на кожному пристрої. Для самостійно розміщеного сервера використовуйте його <1>https://</1> адресу; переконайтеся, що відбиток сертифіката збігається на всіх ваших пристроях.",
@@ -2438,22 +2942,44 @@
       "status": {
         "helper": "Myne синхронізує ваші зашифровані нотатки між пристроями. Сервер зберігає лише шифротекст, який не може прочитати.",
         "label": "Стан синхронізації"
+      },
+      "usage": {
+        "helper": "Скільки зашифрованих даних цей обліковий запис зберігає на сервері та скільки пристроїв до нього ввійшло.",
+        "label": "Сховище та пристрої"
       }
     },
     "reconcile": {
       "message": "Цей пристрій певний час був офлайн — наздоганяємо синхронізацію. Ваші нотатки в безпеці."
     },
+    "recovered": {
+      "restoredToast": "Відновлено як нову нотатку."
+    },
     "status": {
       "awaitingApproval": "Очікування схвалення",
       "conflicts_one": "{{count}} конфлікт на розгляд",
+      "conflicts_few": "{{count}} конфлікти для перегляду",
+      "conflicts_many": "{{count}} конфліктів для перегляду",
       "conflicts_other": "{{count}} конфліктів для перегляду",
       "error": "Помилка синхронізації",
+      "errorAuth": "Термін дії входу для синхронізації минув",
+      "errorFrozen": "Обліковий запис заморожено — вивантаження призупинено",
+      "errorDeviceRevoked": "Цей пристрій було вилучено з вашого облікового запису",
+      "errorStorageFull": "Сховище заповнене — синхронізацію призупинено",
+      "errorQuota": "Сховище заповнене — вивантаження призупинено",
+      "errorRateLimited": "Синхронізацію обмежено — повторюємо спробу",
+      "errorTooLarge": "Файл завеликий для вивантаження",
       "loading": "Стан синхронізації…",
       "notEnrolled": "Не під’єднано",
       "off": "Синхронізацію вимкнено",
       "synced": "Синхронізовано",
       "syncing": "Синхронізація…",
       "syncNow": "Синхронізувати зараз"
+    },
+    "usage": {
+      "devices": "Пристрої",
+      "frozen": "Цей обліковий запис заморожено. Нові зміни не можна вивантажити; ваші нотатки й далі завантажуються.",
+      "ofTotal": "{{used}} з {{total}}",
+      "storage": "Сховище"
     },
     "settings": {
       "serverSection": "Сервер",
@@ -2488,6 +3014,8 @@
     },
     "banner": {
       "conflictsNeedReview_one": "{{count}} конфлікт потребує перегляду",
+      "conflictsNeedReview_few": "{{count}} конфлікти потребують перегляду",
+      "conflictsNeedReview_many": "{{count}} конфліктів потребують перегляду",
       "conflictsNeedReview_other": "{{count}} конфліктів потребують перегляду",
       "catchingUp": "Наздоганяємо синхронізацію — ваші нотатки в безпеці.",
       "verifyDevices": "Підтвердити пристрої"
@@ -2516,6 +3044,32 @@
     "deleteConfirm": "Видалити цей шаблон?",
     "convertToNote": "Перетворити на нотатку"
   },
+  "themeInstall": {
+    "apply": "Застосувати тему",
+    "applying": "Застосування…",
+    "byAuthor": "Це посилання стверджує, що її автор — {{author}}",
+    "cancel": "Скасувати",
+    "close": "Закрити",
+    "collision": {
+      "keepBoth": "Залишити обидві — установити як «{{name}}»",
+      "question": "У вас уже є тема з назвою «{{name}}».",
+      "replace": "Замінити «{{name}}»"
+    },
+    "error": {
+      "importFailed": "Не вдалося встановити цю тему. Нічого не змінено.",
+      "installedNotActivated": "«{{name}}» встановлено, але не вдалося ввімкнути. Ви можете застосувати її в Налаштування → Вигляд.",
+      "invalidName": "У цьому посиланні не вказано назву теми, яку воно хоче встановити.",
+      "listUnavailable": "Не вдалося прочитати ваші наявні теми, тож зараз цю неможливо встановити безпечно. Закрийте це вікно й спробуйте посилання ще раз.",
+      "malformedPayload": "Дані теми в цьому посиланні пошкоджені або неповні.",
+      "nothingWritten": "До вашого сейфа нічого не записано.",
+      "payloadTooLarge": "Дані теми в цьому посиланні завеликі, щоб бути темою.",
+      "unsupportedVersion": "Це посилання створено для новішої версії Myne. Оновіть Myne, а потім спробуйте ще раз."
+    },
+    "errorTitle": "Не вдалося прочитати цю тему",
+    "helper": "Теми — це палітра кольорів, а не код. Myne перевіряє цю тему на цьому пристрої перед використанням — нічого не завантажується.",
+    "question": "Хочете використати цю тему?",
+    "title": "Установити тему"
+  },
   "unlock": {
     "backToPicker": "Вибрати інший сейф",
     "continue": "Продовжити",
@@ -2524,6 +3078,7 @@
     "errors": {
       "alreadyUnlocked": "Сейф уже розблоковано.",
       "inProgress": "Операція триває.",
+      "kdfMemoryExceedsHost": "Щоб відкрити цей сейф, потрібно {{required}} МіБ пам’яті — більше, ніж може надати цей браузер ({{available}} МіБ). Із сейфом усе гаразд; відкрийте його в застосунку Myne для комп’ютера.",
       "unexpected": "Неочікувана помилка. Спробуйте ще раз.",
       "vaultNotFound": "Файл сейфа не знайдено. Перезапустіть програму."
     },
@@ -2553,6 +3108,8 @@
     "unlockFailedGeneric": "Не вдалося розблокувати. Спробуйте ще раз.",
     "biometricTooManyAttempts": "Забагато спроб {{biometric}}. Скористайтеся паролем.",
     "pinIncorrect_one": "Неправильний PIN. Залишилася {{count}} спроба.",
+    "pinIncorrect_few": "Неправильний PIN. Залишилися {{count}} спроби.",
+    "pinIncorrect_many": "Неправильний PIN. Залишилося {{count}} спроб.",
     "pinIncorrect_other": "Неправильний PIN. Залишилося {{count}} спроб.",
     "pinTooManyAttempts": "Забагато спроб PIN. Скористайтеся паролем.",
     "pinFailedGeneric": "Не вдалося розблокувати за PIN. Скористайтеся паролем.",
@@ -2826,23 +3383,33 @@
       "cleaningUp": "Очищення…",
       "cleanUp": "Очистити",
       "confirmBody_one": "{{count}} файл буде видалено. Він уже нечитабельний; нічого, що можна відновити, не втрачено.",
+      "confirmBody_few": "{{count}} файли буде вилучено. Їх уже неможливо прочитати; нічого відновлюваного не втрачається.",
+      "confirmBody_many": "{{count}} файлів буде вилучено. Їх уже неможливо прочитати; нічого відновлюваного не втрачається.",
       "confirmBody_other": "{{count}} файлів буде вилучено. Їх уже неможливо прочитати; нічого відновлюваного не втрачається.",
       "confirmTitle": "Очистити залишкові файли?",
       "doneBody_one": "Видалено {{count}} залишковий файл. Тепер ви можете створити новий сейф.",
+      "doneBody_few": "Вилучено {{count}} залишкові файли. Тепер ви можете створити нове сховище.",
+      "doneBody_many": "Вилучено {{count}} залишкових файлів. Тепер ви можете створити нове сховище.",
       "doneBody_other": "Вилучено {{count}} залишкових файлів. Тепер ви можете створити нове сховище.",
       "doneTitle": "Очищено",
       "errorBody": "Щось пішло не так. Закрийте програму та спробуйте ще раз.",
       "errorTitle": "Очищення не вдалося",
       "foundBody_one": "{{count}} залишковий файл від попереднього видалення, яке не завершилося. Він уже нечитабельний — ви не втратите нічого, що можна відновити.",
+      "foundBody_few": "{{count}} залишкові файли від попереднього видалення, яке не завершилося. Їх уже неможливо прочитати — ви не втратите нічого відновлюваного.",
+      "foundBody_many": "{{count}} залишкових файлів від попереднього видалення, яке не завершилося. Їх уже неможливо прочитати — ви не втратите нічого відновлюваного.",
       "foundBody_other": "{{count}} залишкових файлів від попереднього видалення, яке не завершилося. Їх уже неможливо прочитати — ви не втратите нічого відновлюваного.",
       "foundTitle": "Залишкові файли від незавершеного видалення",
       "partialBody_one": "{{count}} файл може бути заблокований іншою програмою (антивірусом, синхронізацією файлів чи індексуванням пошуку). Закрийте програму та спробуйте за мить ще раз або видаліть папку сейфа вручну.",
+      "partialBody_few": "{{count}} файли можуть бути заблоковані іншим застосунком (антивірус, синхронізація файлів або індексування пошуку). Закрийте застосунок і спробуйте ще раз за мить або вилучіть теку сховища вручну.",
+      "partialBody_many": "{{count}} файлів можуть бути заблоковані іншим застосунком (антивірус, синхронізація файлів або індексування пошуку). Закрийте застосунок і спробуйте ще раз за мить або вилучіть теку сховища вручну.",
       "partialBody_other": "{{count}} файлів можуть бути заблоковані іншим застосунком (антивірус, синхронізація файлів або індексування пошуку). Закрийте застосунок і спробуйте ще раз за мить або вилучіть теку сховища вручну.",
       "partialTitle": "Деякі файли не вдалося видалити"
     },
     "restoreCta": "Відновити з резервної копії",
     "subtitle": "Ваші нотатки шифруються на цьому пристрої, перш ніж залишити його. Сервер зберігає лише шифротекст.",
     "repairCleanedUp_one": "Очищено {{count}} залишковий файл.",
+    "repairCleanedUp_few": "Очищено {{count}} залишкові файли.",
+    "repairCleanedUp_many": "Очищено {{count}} залишкових файлів.",
     "repairCleanedUp_other": "Очищено {{count}} залишкових файлів.",
     "repairFailed": "Не вдалося завершити очищення. Спробуйте ще раз.",
     "heroLine1": "Нотатки, що",
@@ -2866,6 +3433,8 @@
   "conflicts": {
     "empty": "Немає конфліктів для перегляду — ваші нотатки синхронізовані.",
     "groupTitle_one": "{{count}} конфліктна копія",
+    "groupTitle_few": "{{count}} конфліктні копії",
+    "groupTitle_many": "{{count}} конфліктних копій",
     "groupTitle_other": "{{count}} конфліктних копій",
     "groupTitleOfNote": " нотатки {{hex}}"
   },
@@ -2879,6 +3448,7 @@
     "containsPlaceholder": "містить…",
     "tagPlaceholder": "тег",
     "folderPlaceholder": "Тека/",
+    "propertyKeyPlaceholder": "ключ властивості",
     "addCondition": "+ Додати умову",
     "createView": "Створити подання"
   },
@@ -2911,21 +3481,33 @@
     "openedJustNow": "відкрито щойно",
     "openedMinuteAgo": "відкрито хвилину тому",
     "openedMinutesAgo_one": "відкрито {{count}} хвилину тому",
+    "openedMinutesAgo_few": "відкрито {{count}} хвилини тому",
+    "openedMinutesAgo_many": "відкрито {{count}} хвилин тому",
     "openedMinutesAgo_other": "відкрито {{count}} хвилин тому",
     "openedHourAgo": "відкрито годину тому",
     "openedHoursAgo_one": "відкрито {{count}} годину тому",
+    "openedHoursAgo_few": "відкрито {{count}} години тому",
+    "openedHoursAgo_many": "відкрито {{count}} годин тому",
     "openedHoursAgo_other": "відкрито {{count}} годин тому",
     "openedYesterday": "відкрито вчора",
     "openedDaysAgo_one": "відкрито {{count}} день тому",
+    "openedDaysAgo_few": "відкрито {{count}} дні тому",
+    "openedDaysAgo_many": "відкрито {{count}} днів тому",
     "openedDaysAgo_other": "відкрито {{count}} днів тому",
     "openedLastWeek": "відкрито минулого тижня",
     "openedWeeksAgo_one": "відкрито {{count}} тиждень тому",
+    "openedWeeksAgo_few": "відкрито {{count}} тижні тому",
+    "openedWeeksAgo_many": "відкрито {{count}} тижнів тому",
     "openedWeeksAgo_other": "відкрито {{count}} тижнів тому",
     "openedLastMonth": "відкрито минулого місяця",
     "openedMonthsAgo_one": "відкрито {{count}} місяць тому",
+    "openedMonthsAgo_few": "відкрито {{count}} місяці тому",
+    "openedMonthsAgo_many": "відкрито {{count}} місяців тому",
     "openedMonthsAgo_other": "відкрито {{count}} місяців тому",
     "openedLastYear": "відкрито минулого року",
     "openedYearsAgo_one": "відкрито {{count}} рік тому",
+    "openedYearsAgo_few": "відкрито {{count}} роки тому",
+    "openedYearsAgo_many": "відкрито {{count}} років тому",
     "openedYearsAgo_other": "відкрито {{count}} років тому",
     "corruptedBadge": "Пошкоджено"
   },
@@ -2941,7 +3523,23 @@
     "serverPlaceholder": "https://sync.example.com",
     "accountHint": "Ще раз перевірте цей номер — він виглядає неправильним.",
     "approvalHint": "Ваші нотатки з’являться, коли ви схвалите цей пристрій з пристрою, який уже має ваш акаунт.",
-    "connectingSubtitle": "Отримуємо ваш акаунт і розблоковуємо ваше сховище на цьому пристрої."
+    "connectingSubtitle": "Отримуємо ваш акаунт і розблоковуємо ваше сховище на цьому пристрої.",
+    "qr": {
+      "cancel": "Скасувати",
+      "confirmAccount": "Обліковий запис",
+      "confirmServer": "Сервер",
+      "confirmTitle": "Додати цей пристрій?",
+      "continue": "Продовжити",
+      "expired": "Термін дії цього QR минув — покажіть новий на іншому пристрої та відскануйте ще раз.",
+      "invalid": "Це не QR пристрою Myne.",
+      "newerVersion": "Цей QR створено новішою версією Myne — оновіть застосунок і спробуйте ще раз.",
+      "pinHosted": "Сервер, розміщений Myne",
+      "pinNone": "Самостійно розміщений сервер",
+      "pinSelfHost": "Сертифікат закріплено з вашого довіреного пристрою",
+      "scan": "Сканувати QR",
+      "scanFailed": "Не вдалося відсканувати. Спробуйте ще раз або введіть свої дані вручну.",
+      "scanUnavailable": "Сканування недоступне на цьому пристрої — введіть свої дані нижче."
+    }
   },
   "createVault": {
     "beginWeakPassword": "Виберіть надійніший пароль і спробуйте ще раз.",
@@ -2979,5 +3577,46 @@
     "personalLabel": "Особисте",
     "openVault": "Відкрити сховище",
     "backUpNow": "Створити резервну копію зараз"
+  },
+  "web": {
+    "reload": {
+      "body": "Перезавантаження цієї сторінки знову запитає ваш пароль — швидшого входу немає, і так задумано. Поки сторінку закрито, ваш сейф залишається зашифрованим на цьому пристрої, а ключ щоразу відтворюється з вашого пароля.",
+      "title": "Перезавантаження означає повторне введення пароля"
+    },
+    "wall": {
+      "getNative": "Отримати Myne для комп’ютера або мобільного пристрою",
+      "noAccount": {
+        "body": "Облікові записи створюються в застосунку Myne для комп’ютера або мобільного пристрою, а не тут.",
+        "reason": "Створення облікового запису генерує вашу фразу відновлення з 24 слів і показує її вам один раз. Цю фразу ніколи не повинна показувати вебсторінка — якби вона там витекла, ніщо в Myne не змогло б цього відкликати.",
+        "title": "Спершу потрібен обліковий запис"
+      },
+      "noSync": {
+        "body": "У цьому браузері не налаштовано сервер синхронізації, тож йому нічого відкривати.",
+        "reason": "На відміну від застосунку для комп’ютера, браузер не зберігає власного сейфа, на який можна було б спертися — його нотатки надходять із синхронізації. Налаштуйте її в застосунку для комп’ютера чи мобільного пристрою, а потім поверніться сюди.",
+        "title": "Синхронізацію ще не налаштовано"
+      }
+    },
+    "unavailableHere": {
+      "backup": "Зашифровані резервні копії створюються та відновлюються в застосунку Myne для комп’ютера, який може записати файл резервної копії туди, куди ви вкажете. Ваші нотатки тут надходять із сервера, тож цей браузер відновлює себе через синхронізацію.",
+      "creation": "Нові облікові записи створюються в застосунку Myne для комп’ютера. Він показує вам вашу фразу відновлення — а фразу відновлення ніколи не повинна показувати вебсторінка.",
+      "multiVault": "Цей браузер містить один обліковий запис. Щоб скористатися іншим, відкрийте його в застосунку Myne для комп’ютера або в іншому профілі браузера.",
+      "phraseRecovery": "Відновлення за фразою відбувається в застосунку Myne для комп’ютера. Вашу фразу відновлення ніколи не слід уводити на вебсторінці.",
+      "title": "Недоступно в браузері"
+    },
+    "unsupported": {
+      "title": "Myne не може працювати в цьому браузері",
+      "mobileTitle": "Відкрийте застосунок Myne на цьому пристрої",
+      "handoff": "Застосунок Myne для комп’ютера (macOS, Windows, Linux) і мобільний застосунок (iOS, Android) не мають такого обмеження — і вони перевіряють власний підпис перед запуском, чого вебсторінка зробити не може.",
+      "reason": {
+        "desktop-form-factor": "Myne у браузері створено для настільного комп’ютера — йому потрібні пам’ять і способи введення, яких не може дати браузер на телефоні чи планшеті. На цьому пристрої застосунок Myne усе одно кращий клієнт: він швидший, працює офлайн і зберігає ваші нотатки, коли браузер очищає своє сховище.",
+        "webassembly": "Цей браузер не підтримує WebAssembly, на якому працює ядро шифрування.",
+        "wasm-memory-headroom": "Цей браузер не може зарезервувати ~336 МБ пам’яті, потрібної для виведення ключа сейфа. Браузери телефонів і планшетів здебільшого не можуть; це обмеження задає сам сейф, і його не можна знизити для одного пристрою, не зробивши сейф нечитабельним на всіх інших.",
+        "worker": "Цей браузер не підтримує Web Workers, усередині яких працюють сховище та шифрування сейфа.",
+        "opfs": "Цей браузер не надає приватного локального сховища для вебзастосунків, тож немає де тримати ваш сейф між завантаженнями сторінки.",
+        "opfs-sync-access-handle": "У приватному локальному сховищі цього браузера бракує синхронного доступу до файлів, потрібного сейфу для безпечного запису.",
+        "web-locks": "Цей браузер не підтримує блокування, яке не дає двом вкладкам одночасно писати в один сейф.",
+        "crypto-getrandomvalues": "Цей браузер не надає криптографічного джерела випадкових чисел."
+      }
+    }
   }
 }

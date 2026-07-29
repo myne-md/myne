@@ -1,4 +1,30 @@
 {
+  "accountBootstrap": {
+    "accountMismatch": "Den här webbläsaren innehåller redan ett annat kontos valv. Öppna det, eller logga ut och radera den här webbläsarens kopia först.",
+    "changeAccount": "Använd ett annat kontonummer",
+    "continue": "Fortsätt",
+    "failed": "Det gick inte att öppna det kontot. Kontrollera kontonumret och lösenordet och försök sedan igen.",
+    "hint": "Ange huvudlösenordet för det här kontot. Myne hämtar ditt valv och registrerar den här webbläsaren som en enhet på kontot.",
+    "noEndpoint": "Den här kopian av Myne har ingen synkserver konfigurerad och kan därför inte nå ditt valv. Kontakta den som driver den här kopian.",
+    "passwordLabel": "Huvudlösenord",
+    "approversIntro": "De här enheterna kan godkänna den här enheten:",
+    "noApprovers": "Ingen annan enhet på det här kontot kan godkänna den här enheten just nu. Öppna Myne på en enhet som redan har åtkomst och kom sedan tillbaka hit.",
+    "pendingTitle": "Väntar på godkännande",
+    "sasMatch": "De stämmer överens — fortsätt",
+    "sasMismatch": "De stämmer inte överens",
+    "verifyBody": "Kontrollera att den här koden är densamma på båda enheterna innan du fortsätter. Om den inte är det, avbryt — något är fel med anslutningen, inte med ditt lösenord.",
+    "verifyTitle": "Jämför den här koden",
+    "title": "Logga in på ditt valv",
+    "working": "Konfigurerar…"
+  },
+  "accountEntry": {
+    "checkFailed": "Det gick inte att kontrollera det kontonumret. Försök igen.",
+    "checking": "Kontrollerar…",
+    "continue": "Fortsätt",
+    "hint": "Det ser ut som MY-XXXX-XXXX-XXXX-XXXX-XXXX. Kontrolleras här på din enhet — ingenting skickas ännu.",
+    "invalid": "Det kontonumret är inte giltigt. Kontrollera det och försök igen.",
+    "title": "Ange ditt kontonummer"
+  },
   "attachments": {
     "cleanUnused": {
       "cancel": "Avbryt",
@@ -8,6 +34,7 @@
       "deleteCta": "Ta bort {{count}} oanvänd",
       "deleteCta_one": "Ta bort {{count}} oanvänd",
       "deleteCta_other": "Ta bort {{count}} oanvända",
+      "corpusIncomplete": "Slutför synkroniseringen först — den här enheten har inte alla dina anteckningar ännu. Ingenting togs bort.",
       "error": "Kunde inte rensa. Vissa anteckningar kan vara oläsbara — ingenting togs bort.",
       "intro_one": "Den här bilagan används inte i någon anteckning. Att ta bort den är permanent och kan inte ångras.",
       "intro_other": "De här {{count}} bilagorna används inte i någon anteckning. Att ta bort dem är permanent och kan inte ångras.",
@@ -47,6 +74,7 @@
       "actionsTitle": "Åtgärder",
       "checking": "Kontrollerar…",
       "checkUnusedFailedNotice": "Kunde inte kontrollera oanvända bilagor. Försök igen.",
+      "corpusIncompleteNotice": "Slutför synkroniseringen först — den här enheten har inte alla dina anteckningar ännu och kan därför inte avgöra vilka bilagor som är oanvända.",
       "cleanUnused": "Rensa oanvända",
       "cleanUnusedTitle": "Ta bort bilagor som inte används i någon anteckning",
       "colCreated": "Skapad",
@@ -69,6 +97,7 @@
       "menuExport": "Exportera",
       "menuPreview": "Förhandsgranska",
       "menuRename": "Byt namn",
+      "menuTranscribe": "Transkribera",
       "noMatch": "Inga bilagor matchar din sökning.",
       "noUnusedNotice": "Inga oanvända bilagor att rensa.",
       "preview": "Förhandsgranska",
@@ -84,6 +113,10 @@
       "sortAriaLabel": "Sortera bilagor",
       "supportedFilesFilter": "Filer som stöds",
       "title": "Bilagor",
+      "transcribeDone": "Transkriberingen är klar.",
+      "transcribeFailed": "Transkriberingen misslyckades. Försök igen.",
+      "transcribeNoModel": "Välj en transkriberingsmodell i Inställningar → Labb → AI.",
+      "transcribeStarted": "Transkriberar…",
       "typeFilter": {
         "all": "Alla typer",
         "audio": "Ljud",
@@ -210,6 +243,9 @@
       },
       "toggleLineNumbers": {
         "label": "Växla radnummer"
+      },
+      "toggleVimMode": {
+        "label": "Växla vim-tangentbordsläge"
       },
       "toggleSpellCheck": {
         "label": "Växla stavningskontroll"
@@ -512,6 +548,7 @@
     }
   },
   "common": {
+    "cancel": "Avbryt",
     "dismiss": "Avfärda",
     "prompt": {
       "cancel": "Avbryt",
@@ -522,6 +559,10 @@
     },
     "back": "Tillbaka",
     "continue": "Fortsätt"
+  },
+  "deviceRevoked": {
+    "cta": "Börja om",
+    "title": "Den här webbläsaren togs bort från ditt konto"
   },
   "editor": {
     "attachment": {
@@ -675,7 +716,8 @@
           "export": "Exportera",
           "remove": "Ta bort",
           "rename": "Byt namn",
-          "reveal": "Visa i biblioteket"
+          "reveal": "Visa i biblioteket",
+          "transcribe": "Transkribera"
         },
         "pdfFallback": "PDF",
         "textPreview": {
@@ -686,6 +728,15 @@
           "brokenLabel": "trasig",
           "deletedAria": "Borttagen bilaga: {{filename}}",
           "deletedLabel": "borttagen"
+        },
+        "transcribe": {
+          "disabledReason": "Aktivera AI i Inställningar → Labb → AI för att transkribera.",
+          "failed": "Transkriberingen misslyckades. Försök igen.",
+          "heading": "Transkription",
+          "insert": "Infoga transkriptionen i anteckningen",
+          "noModelHint": "Välj en transkriberingsmodell i Inställningar → Labb → AI.",
+          "progress": "Transkriberar…",
+          "stop": "Stoppa"
         },
         "urlImageFallback": "bild"
       }
@@ -735,6 +786,7 @@
         "tags": "Taggar",
         "viewMode": "Visningsläge",
         "views": "Vyer",
+        "vimMode": "Vim-läge",
         "wordCount": "Antal ord",
         "workspace": "Arbetsyta"
       },
@@ -766,6 +818,13 @@
           "title_one": "{{characters}} tecken · {{words}} ord · {{spaces}} mellanslag · {{count}} stycke",
           "title_other": "{{characters}} tecken · {{words}} ord · {{spaces}} mellanslag · {{count}} stycken",
           "titleSelectionSuffix": " (markering)"
+        },
+        "vimMode": {
+          "insert": "Insert",
+          "normal": "Normal",
+          "replace": "Replace",
+          "title": "Vim-läge — tryck på Esc för normalläge",
+          "visual": "Visual"
         },
         "graphTitle": "Graf (⌘⇧G)",
         "lock": "Lås",
@@ -998,6 +1057,23 @@
         "xl": "Extra stor"
       }
     },
+    "vim": {
+      "ex": {
+        "refused": {
+          "edit": "`:e` stöds inte — Myne öppnar anteckningar, inte filer. Använd kommandopaletten eller sidofältet.",
+          "map": "Egna tangentmappningar stöds inte i Myne. Genvägar konfigureras i Inställningar → Kortkommandon.",
+          "set": "`:set` stöds inte — Myne har inga vim-alternativ. Redigerarinställningar finns i Inställningar → Redigerare.",
+          "source": "`:source` stöds inte. Myne har medvetet ingen yta för konfigurationsskript.",
+          "unsupported": "Det kommandot stöds inte i Myne."
+        },
+        "substitute": {
+          "malformed": "Kunde inte läsa den ersättningen. Formatet ska vara :s/pattern/replacement/",
+          "refused": "Det mönstret använder syntax som bara finns i vim ({{what}}), och som Mynes sökning inte stöder. Ingenting ändrades."
+        },
+        "writeFailed": "Kunde inte spara.",
+        "written": "Sparad."
+      }
+    },
     "wikilink": {
       "chip": {
         "embed": "Inbäddad: {{label}}"
@@ -1188,6 +1264,11 @@
         "title": "Exportera som Markdown"
       }
     },
+    "egress": {
+      "cancel": "Avbryt",
+      "confirm": "Ladda ner",
+      "title": "Ladda ner den här filen"
+    },
     "pdf": {
       "cancel": "Avbryt",
       "continue": "Fortsätt…",
@@ -1254,6 +1335,10 @@
     }
   },
   "failClosed": {
+    "exit": {
+      "quit": "Stäng appen",
+      "reload": "Ladda om"
+    },
     "corrupted": {
       "body": "Om du har en säkerhetskopia kan du återställa den — dina nuvarande filer rörs inte; säkerhetskopian återställs som ett separat valv först.",
       "cta": "Stäng appen",
@@ -1274,6 +1359,8 @@
       "cta": "Stäng appen",
       "title": "Saknar behörighet att komma åt valvfilen."
     },
+    "copyDiagnostics": "Kopiera diagnostik",
+    "diagnosticsCopied": "Kopierad",
     "restoreFromBackup": "Återställ från säkerhetskopia…"
   },
   "notes": {
@@ -1343,14 +1430,20 @@
       "noteCount_other": "{{count}} anteckningar",
       "of": "av:",
       "ofTheGroups": "av grupperna:",
+      "op": {
+        "contains": "innehåller"
+      },
+      "propertyValuePlaceholder": "värde",
       "removeCondition": "Ta bort villkor",
       "replaceFilter": "Ersätt filter",
       "save": "Spara",
       "searchTextPlaceholder": "söktext",
       "selectFolderPlaceholder": "välj en mapp…",
+      "selectPropertyPlaceholder": "välj en egenskap…",
       "selectTagPlaceholder": "välj en tagg…",
       "type": {
         "folder": "Mapp",
+        "property": "Egenskap",
         "search": "Sök",
         "tag": "Tagg"
       },
@@ -1451,7 +1544,11 @@
         "titleFailed": "Importen misslyckades",
         "titleSetup": "Importera Obsidian-valv",
         "vaultFolderLabel": "Valvmapp",
-        "vaultRoot": "(valvrot)"
+        "vaultRoot": "(valvrot)",
+        "titlePick": "Importera anteckningar",
+        "keepsLabel": "Vad som följer med",
+        "losesLabel": "Vad som inte gör det",
+        "changeSource": "Byt källa"
       },
       "offer": {
         "body": "Ta med dina befintliga anteckningar till Myne. Varje anteckning krypteras när den importeras — ingenting lämnar den här enheten, och dina originalfiler stannar exakt där de är.",
@@ -1459,6 +1556,46 @@
         "laterHint": "Du kan alltid importera senare från Inställningar → Lagring.",
         "notNow": "Inte nu",
         "title": "Importera ditt Obsidian-valv?"
+      },
+      "picker": {
+        "intro": "Var kommer dina anteckningar ifrån?"
+      },
+      "source": {
+        "obsidian": {
+          "label": "Obsidian",
+          "pickerTitle": "Välj din Obsidian-valvmapp",
+          "survives": "Behåller: Markdown, frontmatter, [[wikilinks]], mappstruktur, bilagor.",
+          "loses": "Lämnar kvar: canvas-filer och allt som inte är en Markdown-anteckning.",
+          "short": "En valvmapp med Markdown-anteckningar"
+        },
+        "notion": {
+          "label": "Notion",
+          "pickerTitle": "Välj din uppackade Notion-exportmapp",
+          "survives": "Behåller: sidor, mappstruktur, sidegenskaper som fält och interna länkar som wikilänkar. Varje databas kommer dessutom in som en tabellanteckning som länkar till sina rader.",
+          "loses": "Packa upp exporten först — Myne läser mappen, inte .zip-filen. Hopfällbara listor, notrutor och färgad text har ingen motsvarighet och listas i en importrapport.",
+          "short": "En uppackad exportmapp"
+        },
+        "evernote": {
+          "label": "Evernote",
+          "pickerTitle": "Välj din .enex-fil från Evernote",
+          "survives": "Behåller: varje anteckning i filen, formatering och bilagor. Krypterade block bevaras som text som du fortfarande kan dekryptera i Evernote.",
+          "loses": "Lämnar kvar: påminnelser och anteckningshistorik. Mycket stora exporter avvisas hellre än att riskeras — dela upp exporten om det händer.",
+          "short": "En enda .enex-exportfil"
+        },
+        "html": {
+          "label": "HTML",
+          "pickerTitle": "Välj en mapp med HTML-filer",
+          "survives": "Behåller: rubriker, listor, tabeller, länkar, kod och betoning.",
+          "loses": "Lämnar kvar: stilar, skript och inbäddningar. Fjärrbilder förblir länkar och laddas aldrig ner.",
+          "short": "En mapp med sparade webbsidor"
+        },
+        "csv": {
+          "label": "CSV",
+          "pickerTitle": "Välj din .csv-fil",
+          "survives": "Blir en enda anteckning som innehåller tabellen.",
+          "loses": "Det blir en anteckning, inte en anteckning per rad — Myne är ingen databas. Mycket breda eller mycket långa filer beskärs, och importrapporten anger hur mycket.",
+          "short": "En kalkylarksfil"
+        }
       }
     },
     "list": {
@@ -1497,7 +1634,10 @@
       "exportPdf": "Exportera som PDF…",
       "exportTxt": "Exportera som oformaterad text…",
       "favoritesHeading": "Favoriter",
+      "icon": "Ikon…",
       "mergeAnyway": "Slå samman ändå",
+      "newDrawingHere": "Ny teckning här",
+      "newDrawingMenu": "Ny teckning",
       "newFolder": "Ny mapp",
       "newFolderInPlaceholder": "Ny mapp i {{path}}",
       "newFolderPlaceholder": "Ny mapp",
@@ -1550,6 +1690,7 @@
     },
     "newTab": {
       "createNote": "Skapa en ny anteckning",
+      "createDrawing": "Ny teckning",
       "noNotesMatch": "Inga anteckningar matchar.",
       "noNotesYet": "Inga anteckningar ännu.",
       "searchAriaLabel": "Sök anteckningar att öppna",
@@ -1579,12 +1720,16 @@
       "loadError": "Kunde inte läsa in den här anteckningen",
       "removeFromFavorites": "Ta bort från favoriter",
       "renameAriaLabel": "Byt namn på anteckning",
+      "unsyncedLabel": "Inte på servern ännu",
+      "unsyncedTitle": "Den här anteckningens senaste ändringar finns bara på den här enheten",
       "untitled": "Namnlös"
     },
     "savedView": {
       "defaultName": "Filtrerad vy"
     },
     "saveStatus": {
+      "conflict": "Löser redigeringskonflikt…",
+      "conflictTitle": "Den här anteckningen ändrades på en annan enhet — båda versionerna behålls",
       "editing": "Redigerar",
       "editingEllipsis": "Redigerar…",
       "editingTitle": "Redigerar — autospar är aktiverat",
@@ -1594,6 +1739,8 @@
       "savedRelative": "Sparad {{rel}}",
       "saveFailed": "Sparningen misslyckades",
       "saveFailedTitle": "Sparningen misslyckades — klicka på Försök igen",
+      "storageFull": "Lagringen är full",
+      "storageFullTitle": "Det finns inget utrymme kvar för att spara den här anteckningen. Frigör utrymme (eller ta bort några bilagor) och försök igen. Tills den sparas finns den här ändringen bara i det här fönstret — den är inte på servern heller.",
       "saving": "Sparar",
       "savingEllipsis": "Sparar…"
     },
@@ -1708,6 +1855,10 @@
       "host": {
         "unsupported": "Den här vytypen kommer i en senare uppdatering."
       },
+      "list": {
+        "empty": "Inga anteckningar matchar den här vyn",
+        "noValue": "Inget värde"
+      },
       "menu": {
         "deleteView": "Ta bort vy",
         "editFilter": "Redigera filter…",
@@ -1717,6 +1868,11 @@
         "viewSettings": "Vyinställningar…"
       },
       "newView": "Ny vy",
+      "table": {
+        "empty": "Inga anteckningar matchar den här vyn",
+        "name": "Namn",
+        "noValue": "Inget värde"
+      },
       "untitledView": "Namnlös vy"
     },
     "viewSettings": {
@@ -1730,12 +1886,26 @@
       "cancel": "Avbryt",
       "cardSize": "Kortstorlek",
       "cardSizeValue": "{{size}} px",
+      "columns": "Kolumner",
+      "columnsEmpty": "Inga egenskaper hittades",
+      "columnsHint": "Frontmatter-egenskaper som visas som kolumner (tabell) eller som en detaljrad (lista / kort).",
+      "columnsPlaceholder": "Lägg till kolumner…",
       "coverImageHint": "Den frontmatter-egenskap vars värde är en bild — visas som varje korts omslag. Lämna tomt för inget omslag.",
       "coverImagePlaceholder": "t.ex. cover",
       "coverImageProperty": "Omslagsbildsegenskap",
+      "groupBy": "Gruppera efter",
       "imageAspectRatio": "Bildens bildförhållande",
+      "propertyNone": "Ingen",
       "reset": "Återställ",
-      "save": "Spara"
+      "save": "Spara",
+      "sortAsc": "Stigande",
+      "sortBy": "Sortera efter",
+      "sortDesc": "Fallande",
+      "sortDirection": "Sorteringsriktning",
+      "viewType": "Vytyp",
+      "viewTypeCards": "Kort",
+      "viewTypeList": "Lista",
+      "viewTypeTable": "Tabell"
     },
     "welcome": {
       "body": "Välkommen till Myne, ditt privata utrymme för att tänka och skriva.\n\nAllt du sparar här är krypterat och stannar på din enhet. Ditt **lösenord** och din **återställningsfras** är de enda nycklarna till det, så förvara dem på ett säkert ställe. Om båda någonsin går förlorade kan ingen återskapa dina anteckningar, inte ens vi.\n\nDet här är bara en vanlig anteckning, så gör den till din egen. Redigera den, byt namn på den eller ta bort den när du vill, och lägg till nya anteckningar i takt med att dina idéer växer.\n\nVi är glada att du är här. För att lära dig mer om Myne, besök https://myne.md\n",
@@ -1836,6 +2006,7 @@
   "settings": {
     "about": {
       "buildChannelDevelopment": "Utvecklingsbygge",
+      "buildLabel": "Bygge",
       "buildChannelLabel": "Byggkanal",
       "buildChannelStable": "Stabil",
       "changelogButton": "Visa ändringslogg…",
@@ -1857,12 +2028,16 @@
         "ioError": "Diskfel, försök igen.",
         "joinFailure": "Något gick fel, försök igen.",
         "samePasswordRejected": "Det nya lösenordet är samma som det nuvarande.",
+        "serverAckPending": "Ditt nya lösenord fungerar på den här enheten, men Myne kunde inte nå servern för att spara det. Tills det sker förväntar sig dina andra enheter fortfarande det gamla lösenordet — och om den här webbläsarens kopia rensas innan dess går ändringen förlorad. Myne försöker igen automatiskt.",
         "weakNewPassword": "Det nya lösenordet måste vara minst 12 tecken."
       },
       "changePasswordHeading": "Ändra lösenord",
       "changePasswordHelper": "Byt ut ditt huvudlösenord men behåll samma valv. Återställningsfrasen förblir densamma.",
       "dangerZoneHeading": "Riskzon",
       "dangerZoneHelper": "Ta bort det här valvet och alla anteckningar permanent. Kan inte ångras. Återställningsfrasen kommer inte att återställa valvet.",
+      "localEraseHeading": "Den här webbläsaren",
+      "localEraseHelper": "Radera Mynes kopia av ditt valv från den här webbläsaren. Ditt konto och allt som redan synkroniserats ligger kvar på servern.",
+      "localEraseButton": "Logga ut och radera den här webbläsarens kopia…",
       "deleteVaultButton": "Ta bort valv…",
       "memoryCost": "Minneskostnad",
       "parallelism": "Parallellitet",
@@ -1887,6 +2062,7 @@
       "changing": "Ändrar…"
     },
     "appearance": {
+      "homeQuickActions": "Snabbåtgärder på startskärmen",
       "showEditTimesAria": "Visa redigeringstider i sidofältet",
       "showEditTimesHelper": "Visa varje antecknings senast redigerade tid under titeln i sidofältet.",
       "showEditTimesLabel": "Visa redigeringstider",
@@ -1914,6 +2090,13 @@
       "off": "Av",
       "on": "På",
       "saveError": "Kunde inte uppdatera arkiveringsinställningen."
+    },
+    "attachmentOcr": {
+      "label": "Sök inuti bilder och skannade dokument",
+      "helper": "Läser ut text ur bildbilagor och skannade PDF:er på den här enheten, så att sökningen kan hitta dem via innehållet. Ingenting laddas upp. Att stänga av detta stoppar bakgrundsextraheringen; text som redan extraherats behålls.",
+      "errorSaveSetting": "Kunde inte spara den här inställningen.",
+      "processing_one": "Läser 1 bilaga…",
+      "processing_other": "Läser {{count}} bilagor…"
     },
     "autoBackup": {
       "backupFolder": "Säkerhetskopieringsmapp",
@@ -1991,6 +2174,8 @@
         "parseError": "Inte giltig JSON",
         "parseErrorWithLine": "Inte giltig JSON (rad {{line}})"
       },
+      "export": "Exportera",
+      "exportError": "Kunde inte exportera det temat. Försök igen.",
       "fileFilterName": "Myne-tema",
       "helper": "Använd din egen färgpalett. Teman valideras på den här enheten innan de används — ingenting laddas upp.",
       "importButton": "Importera tema…",
@@ -2025,6 +2210,10 @@
       "heading": "Ta bort valv",
       "ioFailBody": "Kunde inte komma åt valvfilerna för borttagning. Valvnycklarna är redan nollställda ur minnet; eventuell valvdata som blir kvar på disken är oåterställbart Argon2id-inslaget skräp.",
       "ioFailTitle": "Diskfel under borttagning",
+      "localEraseHeading": "Logga ut och radera den här webbläsarens kopia",
+      "localEraseEyebrow": "ENDAST DEN HÄR WEBBLÄSAREN",
+      "localEraseSubmit": "Radera den här webbläsarens kopia",
+      "localEraseSubmitInFlight": "Raderar…",
       "partialFailBody_one": "{{count}} fil kunde inte tas bort från disken. Valvnycklarna är redan nollställda ur minnet, så eventuell föräldralös chiffertext som blir kvar är oåterställbart Argon2id-inslaget skräp.",
       "partialFailBody_other": "{{count}} filer kunde inte tas bort från disken. Valvnycklarna är redan nollställda ur minnet, så eventuell föräldralös chiffertext som blir kvar är oåterställbart Argon2id-inslaget skräp.",
       "partialFailTitle": "Borttagningen av valvet misslyckades delvis",
@@ -2090,6 +2279,32 @@
       "helper": "Visa och ändra kortkommandon. Redigerarformatering och genvägen för flikväxling är fasta.",
       "notSet": "Inte angiven",
       "removeBindingAria": "Ta bort {{chord}}",
+      "reserved": {
+        "bookmarkPage": "sparar sidan som bokmärke",
+        "closeTab": "stänger fliken",
+        "closeWindow": "stänger fönstret",
+        "cycleTabs": "växlar mellan flikar",
+        "focusAddressBar": "fokuserar adressfältet",
+        "hideApplication": "döljs",
+        "inspectElement": "öppnar elementinspektören",
+        "minimiseWindow": "minimerar fönstret",
+        "newPrivateWindow": "öppnar ett privat fönster",
+        "newTab": "öppnar en ny flik",
+        "newWindow": "öppnar ett nytt fönster",
+        "openBookmarks": "öppnar bokmärkena",
+        "openDevTools": "öppnar utvecklarverktygen",
+        "openExtensions": "öppnar tilläggen",
+        "openFile": "öppnar en fil",
+        "openHistory": "öppnar historiken",
+        "quit": "avslutas",
+        "reopenTab": "återöppnar den senast stängda fliken",
+        "switchTab": "byter flik",
+        "toggleFullscreen": "växlar helskärm"
+      },
+      "reservedBadge": "Inte tillgänglig här",
+      "reservedBadgeTitle": "Din webbläsare {{action}} med {{chord}}, så det når aldrig Myne. Genvägen fungerar fortfarande i skrivbordsappen.",
+      "reservedRefused": "{{chord}} tillhör din webbläsare — den {{action}}. Välj en annan genväg; dina genvägar i skrivbordsappen är oförändrade.",
+      "reservedUnreliable": "{{chord}} når kanske inte Myne — i vissa webbläsare är det webbläsaren som {{action}}. Tillagd ändå.",
       "resetAll": "Återställ alla kortkommandon…",
       "resetAllConfirm": "Återställ alla egna genvägar till sina standardvärden?",
       "resetAllYes": "Återställ alla",
@@ -2106,6 +2321,14 @@
       "errorSaveSetting": "Kunde inte spara radnummerinställningen.",
       "helper": "Visa en radnummerkant i redigeraren. Ett nummer per rad; av som standard.",
       "label": "Radnummer",
+      "off": "Av",
+      "on": "På"
+    },
+    "vimMode": {
+      "chordCaveat": "På Windows och Linux har Mynes egna genvägar företräde, så de vim-kombinationer som krockar med dem (Ctrl-a, Ctrl-b, Ctrl-d, Ctrl-e, Ctrl-f, Ctrl-i, Ctrl-p, Ctrl-t, Ctrl-v, Ctrl-w, Ctrl-x) är inte tillgängliga i redigeraren. Ctrl-[ fungerar fortfarande som Escape, och visual-block flyttas till Alt-v.",
+      "errorSaveSetting": "Kunde inte spara inställningen för vim-läge.",
+      "helper": "Använd vim-tangenter i redigeraren: normal-, insert- och visual-läge, med de vanliga förflyttningarna och operatorerna. Av som standard. Anteckningar öppnas i läget Källa medan detta är på.",
+      "label": "Vim-tangentbordsläge",
       "off": "Av",
       "on": "På"
     },
@@ -2134,10 +2357,12 @@
       "modelGenerationLabel": "Textmodell – chatt, sammanfattningar, skrivande",
       "modelNone": "Ingen fil vald",
       "modelSaveFailed": "Det gick inte att spara modellsökvägen (den måste ligga utanför ditt valv).",
+      "modelTranscriptionLabel": "Tal-till-text-modell (transkription)",
       "modelsHelper": "Myne laddar aldrig ner modeller – det skulle innebära att data skickas över nätverket. Öppna en länk för att hämta en i din webbläsare och välj sedan de nedladdade filerna här. Allt körs på din enhet.",
       "modelsLabel": "Modeller",
       "recommendedFilesEmbedding": "Behöver model.safetensors + config.json + tokenizer.json i en och samma mapp.",
       "recommendedFilesGeneration": "Behöver .gguf-filen + tokenizer.json i samma mapp.",
+      "recommendedFilesTranscription": "Behöver .gguf-filen för Whisper + config.json + tokenizer.json i samma mapp.",
       "title": "AI"
     },
     "prefs": {
@@ -2154,6 +2379,7 @@
       "screenCaptureHelperOn": "Aktivt på macOS och Windows 10 (May 2020 Update eller senare). Stöd för Linux kommer i en framtida version.",
       "screenCaptureLabel": "Skydd mot skärminspelning",
       "screenCaptureSubtitle": "Blockera skärmdumpar och skärminspelning",
+      "screenshotBlocked": "Skärmskyddet är på — skärmdumpar av Myne blir tomma.",
       "autoLockAfter": "Lås automatiskt efter",
       "autoLock1m": "1 min",
       "autoLock5m": "5 min",
@@ -2254,6 +2480,8 @@
       "locationHelper": "Varje valv är en mapp med krypterade filer under den här sökvägen. Använd hellre knappen Säkerhetskopiera nedan än manuella kopior — den verifierar den skrivna filen.",
       "locationLabel": "Valvplats",
       "openInFiles": "Öppna i Filer",
+      "webLocationHelper": "Dina anteckningar ligger i den här webbläsarens lagring för den här webbplatsen, som webbläsaren sköter — det finns ingen mapp att öppna. Att rensa webbplatsens data tar bort den lokala kopian; eftersom den här klienten synkroniserar hämtas den tillbaka när du loggar in igen.",
+      "webLocationLabel": "Var dina anteckningar lagras",
       "pathUnavailable": "Sökväg otillgänglig",
       "restoreBackup": "Återställ från säkerhetskopia…"
     },
@@ -2313,9 +2541,92 @@
       "typewriter": "Skrivmaskinsrullning",
       "typewriterSubtitle": "Håll markören vertikalt centrerad",
       "enableArchiving": "Aktivera arkivering"
+    },
+    "search": {
+      "placeholder": "Sök inställningar…",
+      "ariaLabel": "Sök inställningar",
+      "empty": "Inga inställningar matchar ”{{query}}”.",
+      "resultsLabel": "Sökresultat",
+      "extra": {
+        "lastActiveNoteTitle": "Fortsätt där du slutade",
+        "lastActiveNoteDesc": "Synkronisera vilken anteckning du hade öppen så att du kan fortsätta på en annan enhet."
+      },
+      "keywords": {
+        "aiEnable": "lokal ai på av aktivera inaktivera stäng av maskininlärning local machine learning",
+        "aiExcluded": "undantagna mappar ignorera uteslut exkludera ai sekretess integritet excluded folders",
+        "aiModels": "modeller modell gguf ladda ner text inbäddning llm models embedding",
+        "archive": "arkiv arkivera arkivering dölj återställ anteckningar archive",
+        "autoBackup": "automatiska säkerhetskopior säkerhetskopiering schema frekvens behåll mapp backup",
+        "autoLock": "autolås automatisk låsning tidsgräns inaktivitet lås timer session auto lock",
+        "backup": "säkerhetskopia säkerhetskopiering exportera myne-backup återställ spara kopia backup",
+        "buildChannel": "bygge byggkanal version utgåva stabil beta nightly build channel",
+        "changePassword": "ändra lösenord byta lösenord lösenfras uppgifter uppdatera återställ change password",
+        "changelog": "ändringslogg nyheter versionsinformation vad är nytt historik changelog",
+        "clipper": "webbläsarklippare klippare tillägg webb fånga spara chrome firefox clipper",
+        "contentWidth": "innehållsbredd bredd kolumn läsning radlängd marginal content width",
+        "customThemes": "egna teman tema palett färger utseende importera custom themes",
+        "dailyNotes": "dagsanteckningar dagbok journal datum mall mapp daily notes",
+        "dangerZone": "riskzon ta bort radera valv förstöra rensa danger zone delete",
+        "export": "exportera export markdown dekryptera klartext okrypterad oformaterad filer dokument",
+        "focusMode": "fokusläge fokus skrivmaskinsrullning dämpa inaktiva rader distraktionsfri focus mode",
+        "font": "teckensnitt typsnitt font sans serif mono typografi",
+        "hotkeys": "kortkommandon genvägar tangentbord tangentbordsgenvägar bindningar hotkeys shortcuts keymap",
+        "import": "importera import anteckningar obsidian notion evernote enex html csv migrera migrering",
+        "language": "språk språkinställning gränssnitt översättning locale ui language",
+        "lastActiveNote": "fortsätt där du slutade senaste anteckning återuppta synkronisera öppna last note",
+        "license": "licens agpl öppen källkod juridik license",
+        "lineNumbers": "radnummer rader marginal redigerare visa line numbers",
+        "vimMode": "vim modal modalt redigering normal insert visual tangentbord vim-läge",
+        "lineSpacing": "radavstånd radhöjd typografi läsbarhet line spacing",
+        "newNoteLocation": "ny anteckning plats mapp standard var skapas nya anteckningar location",
+        "quickUnlock": "snabbupplåsning snabb upplåsning pin touch id biometrisk ansikte lås upp quick unlock",
+        "realtimeSync": "realtidssynkronisering realtid direkt synkronisering anslutning live polling sync realtime",
+        "screenCapture": "skärmdump skärminspelning skydd blockera sekretess integritet screenshot capture",
+        "showEditTimes": "visa redigeringstider tidsstämplar ändrad datum anteckningar timestamps",
+        "spell": "stavningskontroll stavning ordlista rättstavning autokorrigering spell check",
+        "spellLanguages": "stavningsspråk språk ordlistor ord stavning spell languages",
+        "startupOpen": "start uppstart öppna standardfil starta vilken anteckning startup",
+        "attachmentOcr": "ocr bild skanna skannad pdf foto skärmdump textigenkänning sök i bilagor batteri cpu",
+        "syncAddDevice": "lägg till enhet parkoppla länka telefon dator synkronisering add device",
+        "syncConflicts": "konflikter sammanfoga lösa versioner synkronisering conflicts",
+        "syncDevices": "enheter länkade parkopplade synkronisering datorer devices",
+        "syncRecovered": "återfunna anteckningar återställ synkronisering bärga recovered",
+        "syncServer": "synkserver server värd egenhostad slutpunkt url sync server",
+        "syncStatus": "synkstatus status anslutning tillstånd uppdaterad synkronisering sync",
+        "textSize": "textstorlek teckenstorlek zoom skala läsbarhet text size",
+        "theme": "tema mörkt ljust läge utseende färgschema amoled system dark light",
+        "threatModel": "hotmodell säkerhet angripare tillgångar förtroende threat model",
+        "toolbar": "verktygsfält knappar formatering flytande markering anpassa toolbar",
+        "vaultIcon": "valvikon ikon avatar bild symbol vault icon",
+        "vaultLabel": "valvetikett etikett namn byt namn titel vault label",
+        "vaultLocation": "valvplats sökväg mapp disk var lagras vault location",
+        "viewMode": "standardvisningsläge visningsläge direkt läsning källa förhandsgranskning view mode"
+      }
     }
   },
+  "storageLost": {
+    "allSynced": "Ingenting gick förlorat — varje anteckning här hade redan nått servern.",
+    "evicted": {
+      "body": "Din webbläsare rensade den här webbplatsens lagring för att frigöra utrymme. Ingenting är skadat och ingenting togs bort på servern — allt som hade synkroniserats finns kvar.",
+      "title": "Din webbläsare rensade det här valvets lokala kopia"
+    },
+    "lockCta": "Lås och försök igen",
+    "reDownloadCta": "Konfigurera den här webbläsaren igen",
+    "reEnrolNotice": "Att konfigurera igen registrerar den här webbläsaren som en ny enhet, så den väntar på godkännande från någon av dina andra enheter innan den kan synkronisera.",
+    "unopenable": {
+      "body": "Den lokala kopian av det här valvet går inte längre att läsa. Ingenting på servern påverkas — kopian här är en cache och kan ersättas.",
+      "title": "Det här valvets lokala kopia går inte att läsa"
+    },
+    "unsyncedIntro": "{{count}} anteckningar hade inte nått servern ännu. De är borta — det här var de enda kopiorna:",
+    "unsyncedIntro_one": "{{count}} anteckning hade inte nått servern ännu. Den är borta — det här var den enda kopian:",
+    "unsyncedIntro_other": "{{count}} anteckningar hade inte nått servern ännu. De är borta — det här var de enda kopiorna:",
+    "unsyncedOverflow": "…och {{count}} till.",
+    "unsyncedOverflow_one": "…och {{count}} till.",
+    "unsyncedOverflow_other": "…och {{count}} till."
+  },
   "sync": {
+    "materialising": "Hämtar dina anteckningar — {{done}} av {{total}}. Du kan börja arbeta; resten dyker upp allteftersom de kommer in.",
+    "credentialAmbiguous": "Ditt lösenord kan ha ändrats både på den här enheten och på en annan, och Myne kan inte avgöra vilket som är nyare — så ingenting har ändrats. Logga in på en enhet som redan har åtkomst för att reda ut det.",
     "attachments": {
       "aria": {
         "downloading": "Laddar ner {{name}}",
@@ -2343,6 +2654,17 @@
       "untitled": "Namnlös ({{hex}})",
       "useThisVersion": "Använd den här versionen"
     },
+    "deviceJoinQr": {
+      "accountLabel": "Kontonummer",
+      "accountPlaceholder": "MY-XXXX-XXXX-XXXX-XXXX-XXXX",
+      "error": "Det gick inte att skapa QR-koden. Försök igen.",
+      "generate": "Skapa QR-kod",
+      "hint": "Klistra in ditt kontonummer för att skapa en QR-kod som din telefon kan skanna — den fyller i servern och kontonumret åt dig.",
+      "invalidAccount": "Det ser inte ut som ett giltigt kontonummer.",
+      "notConfigured": "Konfigurera en synkserver först och skapa sedan en QR-kod.",
+      "scanWithApp": "Skanna med iOS-appen",
+      "title": "Lägg till en enhet med en QR-kod"
+    },
     "devices": {
       "approve": "Godkänn",
       "awaitingApproval_one": "{{count}} enhet väntar på godkännande",
@@ -2350,8 +2672,22 @@
       "loading": "Läser in…",
       "noDevices": "Inga enheter synkroniserade ännu.",
       "notEnrolled": "Den här enheten är inte ansluten ännu. Om du precis lade till den, vänta på godkännande från en annan enhet. Annars lägger du till den med formuläret ”Lägg till en enhet” ovan.",
+      "platform": {
+        "android": "Android-telefon",
+        "androidTablet": "Android-surfplatta",
+        "ios": "iPhone",
+        "ipad": "iPad",
+        "linux": "Linux-dator",
+        "macos": "Mac",
+        "unknown": "Den här enheten",
+        "web": "Webbläsare",
+        "windows": "Windows-dator"
+      },
       "remove": "Ta bort",
       "removedElsewhere": "Den här enheten togs bort från ditt konto på en annan enhet.",
+      "rename": "Byt namn",
+      "renameFailed": "Det gick inte att spara det namnet. Försök igen.",
+      "renameLabel": "Enhetsnamn",
       "resetAndReAdd": "Återställ och lägg till den här enheten igen",
       "resetSyncOnThisDevice": "Återställ synkronisering på den här enheten",
       "shortName": "Enhet {{hex}}",
@@ -2371,10 +2707,14 @@
       "connect": "Anslut",
       "connectedLocal": "Ansluten (lokalt, ingen TLS).",
       "connectedTls": "Ansluten. Kontrollera att det här fingeravtrycket matchar på din andra enhet.",
+      "connectedPlatformTrust": "Ansluten via TLS. Din webbläsare verifierade den här serverns certifikat.",
       "connecting": "Ansluter…",
       "fingerprintLabel": "Serverns certifikatfingeravtryck:",
       "pinStatic": "Verifierat mot Mynes inbyggda certifikat.",
       "pinTofu": "Fäst vid första anslutningen. Jämför det här fingeravtrycket mellan dina enheter.",
+      "fixedOrigin": "Den här klienten synkroniserar med en enda server, som angavs när den driftsattes. Den kan inte ändras härifrån — sidan får bara kommunicera med just den adressen.",
+      "fixedOriginNone": "Ingen synkserver är konfigurerad för den här driftsättningen.",
+      "pinPlatformTrust": "Verifierat mot din webbläsares certifikatlager. Den här klienten kan inte fästa ett certifikat själv.",
       "placeholder": "https://your-server.example   ·   http://127.0.0.1:8080",
       "unreachable": "Kunde inte nå den servern — kontrollera adressen och att den är igång."
     },
@@ -2383,6 +2723,8 @@
       "accountNumberPlaceholder": "MY-XXXX-XXXX-XXXX-XXXX-X",
       "connecting": "Ansluter…",
       "credentialTypeAria": "Typ av inloggningsuppgift",
+      "deviceNameHelp": "Visas i din enhetslista. Du kan ändra det senare.",
+      "deviceNameLabel": "Namnge den här enheten",
       "error": {
         "notConfigured": "Ange en synkserver i inställningarna innan du lägger till den här enheten.",
         "transport": "Kunde inte nå synkservern. Kontrollera din anslutning och försök igen."
@@ -2424,12 +2766,28 @@
         "helper": "Logga in på en ny enhet med ditt kontonummer och lösenord eller din återställningsfras. En enhet förblir väntande tills en befintlig enhet godkänner den.",
         "label": "Lägg till en enhet"
       },
+      "awaitingApproval": {
+        "label": "Väntar på godkännande"
+      },
       "conflicts": {
         "helper": "När samma anteckning redigeras på två enheter samtidigt behåller Myne båda kopiorna så att inget går förlorat. Lös dem här.",
         "label": "Konflikter"
       },
       "devices": {
         "label": "Enheter"
+      },
+      "recovered": {
+        "close": "Stäng",
+        "decrypting": "Dekrypterar…",
+        "deleteConfirmTitle": "Ta bort den här återfunna anteckningen?",
+        "deleteConfirmWarning": "Detta tar permanent bort den enda kopia som finns kvar på den här enheten. Detta kan inte ångras.",
+        "deleteCta": "Ta bort",
+        "errorGeneric": "Något gick fel. Försök igen.",
+        "helper": "När en anteckning som tagits bort på en annan enhet även tas bort här, behålls dess krypterade kopia på den här enheten. Återställ en som en ny anteckning, eller ta bort den permanent.",
+        "label": "Återfunna anteckningar",
+        "previewCta": "Förhandsgranska",
+        "previewTitle": "Återfunnen anteckning",
+        "restoreCta": "Återställ"
       },
       "server": {
         "helper": "Ange samma serveradress på varje enhet. För en egenhostad server använder du dess <1>https://</1>-adress; kontrollera att certifikatfingeravtrycket matchar mellan dina enheter.",
@@ -2438,22 +2796,42 @@
       "status": {
         "helper": "Myne synkroniserar dina krypterade anteckningar mellan dina enheter. Servern lagrar bara chiffertext som den inte kan läsa.",
         "label": "Synkstatus"
+      },
+      "usage": {
+        "helper": "Hur mycket krypterad data det här kontot lagrar på servern, och hur många enheter som är inloggade.",
+        "label": "Lagring och enheter"
       }
     },
     "reconcile": {
       "message": "Den här enheten var offline ett tag — hämtar ikapp synkroniseringen. Dina anteckningar är trygga."
+    },
+    "recovered": {
+      "restoredToast": "Återställd som en ny anteckning."
     },
     "status": {
       "awaitingApproval": "Väntar på godkännande",
       "conflicts_one": "{{count}} konflikt att granska",
       "conflicts_other": "{{count}} konflikter att granska",
       "error": "Synkfel",
+      "errorAuth": "Synkinloggningen har gått ut",
+      "errorFrozen": "Kontot är fryst — uppladdningar pausade",
+      "errorDeviceRevoked": "Den här enheten togs bort från ditt konto",
+      "errorStorageFull": "Lagringen är full — synkroniseringen pausad",
+      "errorQuota": "Lagringen är full — uppladdningar pausade",
+      "errorRateLimited": "Synkroniseringen begränsad — försöker igen",
+      "errorTooLarge": "En fil är för stor för att laddas upp",
       "loading": "Synkstatus…",
       "notEnrolled": "Inte registrerad",
       "off": "Synk av",
       "synced": "Synkroniserad",
       "syncing": "Synkroniserar…",
       "syncNow": "Synkronisera nu"
+    },
+    "usage": {
+      "devices": "Enheter",
+      "frozen": "Det här kontot är fryst. Nya ändringar kan inte laddas upp; dina anteckningar hämtas fortfarande.",
+      "ofTotal": "{{used}} av {{total}}",
+      "storage": "Lagring"
     },
     "settings": {
       "serverSection": "Server",
@@ -2516,6 +2894,32 @@
     "deleteConfirm": "Ta bort den här mallen?",
     "convertToNote": "Konvertera till anteckning"
   },
+  "themeInstall": {
+    "apply": "Tillämpa tema",
+    "applying": "Tillämpar…",
+    "byAuthor": "Länken uppger att temat är gjort av {{author}}",
+    "cancel": "Avbryt",
+    "close": "Stäng",
+    "collision": {
+      "keepBoth": "Behåll båda — installera som ”{{name}}”",
+      "question": "Du har redan ett tema som heter ”{{name}}”.",
+      "replace": "Ersätt ”{{name}}”"
+    },
+    "error": {
+      "importFailed": "Det gick inte att installera det temat. Ingenting ändrades.",
+      "installedNotActivated": "”{{name}}” installerades, men kunde inte slås på. Du kan tillämpa det från Inställningar → Utseende.",
+      "invalidName": "Länken anger inte namnet på temat den vill installera.",
+      "listUnavailable": "Kunde inte läsa dina befintliga teman, så det här kan inte installeras säkert just nu. Stäng detta och prova länken igen.",
+      "malformedPayload": "Länkens temadata är skadad eller ofullständig.",
+      "nothingWritten": "Ingenting skrevs till ditt valv.",
+      "payloadTooLarge": "Länkens temadata är för stor för att vara ett tema.",
+      "unsupportedVersion": "Länken skapades för en nyare version av Myne. Uppdatera Myne och försök igen."
+    },
+    "errorTitle": "Kunde inte läsa det temat",
+    "helper": "Ett tema är en färgpalett, inte kod. Myne validerar det här temat på den här enheten innan det används — ingenting laddas upp.",
+    "question": "Vill du använda det här temat?",
+    "title": "Installera tema"
+  },
   "unlock": {
     "backToPicker": "Välj ett annat valv",
     "continue": "Fortsätt",
@@ -2524,6 +2928,7 @@
     "errors": {
       "alreadyUnlocked": "Valvet är redan upplåst.",
       "inProgress": "Åtgärd pågår.",
+      "kdfMemoryExceedsHost": "Det här valvet behöver {{required}} MiB minne för att öppnas — mer än den här webbläsaren kan ge det ({{available}} MiB). Valvet är oskadat; öppna det i Mynes skrivbordsapp.",
       "unexpected": "Oväntat fel. Försök igen.",
       "vaultNotFound": "Valvfilen hittades inte. Starta om appen."
     },
@@ -2879,6 +3284,7 @@
     "containsPlaceholder": "innehåller…",
     "tagPlaceholder": "tagg",
     "folderPlaceholder": "Mapp/",
+    "propertyKeyPlaceholder": "egenskapsnyckel",
     "addCondition": "+ Lägg till villkor",
     "createView": "Skapa vy"
   },
@@ -2941,7 +3347,23 @@
     "serverPlaceholder": "https://sync.example.com",
     "accountHint": "Dubbelkolla numret – det ser inte rätt ut.",
     "approvalHint": "Dina anteckningar visas när du godkänner den här enheten från en enhet som redan har ditt konto.",
-    "connectingSubtitle": "Hämtar ditt konto och låser upp ditt valv på den här enheten."
+    "connectingSubtitle": "Hämtar ditt konto och låser upp ditt valv på den här enheten.",
+    "qr": {
+      "cancel": "Avbryt",
+      "confirmAccount": "Konto",
+      "confirmServer": "Server",
+      "confirmTitle": "Lägg till den här enheten?",
+      "continue": "Fortsätt",
+      "expired": "Den här QR-koden har gått ut — visa en ny på din andra enhet och skanna igen.",
+      "invalid": "Det är inte en QR-kod för en Myne-enhet.",
+      "newerVersion": "Den här QR-koden kommer från en nyare version av Myne — uppdatera appen och försök igen.",
+      "pinHosted": "Server som drivs av Myne",
+      "pinNone": "Egenhostad server",
+      "pinSelfHost": "Certifikat fäst från din betrodda enhet",
+      "scan": "Skanna QR-kod",
+      "scanFailed": "Det gick inte att skanna. Försök igen, eller ange dina uppgifter manuellt.",
+      "scanUnavailable": "Skanning är inte tillgänglig på den här enheten — ange dina uppgifter nedan."
+    }
   },
   "createVault": {
     "beginWeakPassword": "Välj ett starkare lösenord och försök igen.",
@@ -2979,5 +3401,46 @@
     "personalLabel": "Personligt",
     "openVault": "Öppna valv",
     "backUpNow": "Säkerhetskopiera nu"
+  },
+  "web": {
+    "reload": {
+      "body": "Att ladda om den här sidan innebär att ditt lösenord efterfrågas igen — det finns medvetet ingen snabbare väg in. Ditt valv förblir krypterat på den här enheten medan sidan är stängd, och nyckeln byggs upp på nytt från ditt lösenord varje gång.",
+      "title": "En omladdning kräver ditt lösenord igen"
+    },
+    "wall": {
+      "getNative": "Hämta Myne för dator eller mobil",
+      "noAccount": {
+        "body": "Konton skapas i Mynes skrivbords- eller mobilapp, inte här.",
+        "reason": "När ett konto skapas genereras din återställningsfras med 24 ord och visas för dig en gång. En webbsida ska aldrig vara det som visar dig den frasen — om den läckte där kunde ingenting i Myne ta tillbaka den.",
+        "title": "Du behöver ett konto först"
+      },
+      "noSync": {
+        "body": "Den här webbläsaren har ingen synkserver konfigurerad, så det finns ingenting för den att öppna.",
+        "reason": "Till skillnad från skrivbordsappen har webbläsaren inget eget valv att falla tillbaka på — dess anteckningar kommer från synkroniseringen. Konfigurera den i skrivbords- eller mobilappen och kom sedan tillbaka hit.",
+        "title": "Synkroniseringen är inte konfigurerad ännu"
+      }
+    },
+    "unavailableHere": {
+      "backup": "Krypterade säkerhetskopior skapas och återställs i Mynes skrivbordsapp, som kan skriva säkerhetskopian dit du väljer. Dina anteckningar här kommer från servern, så den här webbläsaren återställer sig själv genom att synkronisera.",
+      "creation": "Nya konton skapas i Mynes skrivbordsapp. Den visar dig din återställningsfras — och en återställningsfras ska aldrig visas av en webbsida.",
+      "multiVault": "Den här webbläsaren rymmer ett konto. För att använda ett annat, öppna det i Mynes skrivbordsapp eller i en annan webbläsarprofil.",
+      "phraseRecovery": "Återställning med fras sker i Mynes skrivbordsapp. Din återställningsfras ska aldrig skrivas in på en webbsida.",
+      "title": "Inte tillgängligt i webbläsaren"
+    },
+    "unsupported": {
+      "title": "Myne kan inte köras i den här webbläsaren",
+      "mobileTitle": "Öppna Myne-appen på den här enheten",
+      "handoff": "Mynes skrivbordsapp (macOS, Windows, Linux) och mobilapp (iOS, Android) har ingen sådan begränsning — och de verifierar sin egen signatur innan de körs, vilket en webbsida inte kan.",
+      "reason": {
+        "desktop-form-factor": "Myne i webbläsaren är byggt för en dator — det behöver det minne och den inmatning som en webbläsare på telefon eller surfplatta inte kan ge. På den här enheten är Myne-appen ändå den bättre klienten: den är snabbare, den fungerar offline och den behåller dina anteckningar när webbläsaren rensar sin lagring.",
+        "webassembly": "Den här webbläsaren stöder inte WebAssembly, som krypteringskärnan körs på.",
+        "wasm-memory-headroom": "Den här webbläsaren kan inte reservera de ~336 MB minne som valvets nyckelhärledning behöver. Webbläsare på telefon och surfplatta kan i regel inte det; gränsen sätts av valvet självt och kan inte sänkas för en enskild enhet utan att valvet blir oläsbart överallt annars.",
+        "worker": "Den här webbläsaren stöder inte Web Workers, som valvets lagring och kryptering körs inuti.",
+        "opfs": "Den här webbläsaren erbjuder ingen privat lokal lagring för webbappar, så det finns ingenstans att förvara ditt valv mellan sidladdningar.",
+        "opfs-sync-access-handle": "Den här webbläsarens privata lokala lagring saknar den synkrona filåtkomst som valvet behöver för att kunna skriva säkert.",
+        "web-locks": "Den här webbläsaren stöder inte det lås som hindrar två flikar från att skriva till samma valv samtidigt.",
+        "crypto-getrandomvalues": "Den här webbläsaren erbjuder ingen kryptografisk slumptalskälla."
+      }
+    }
   }
 }

@@ -1,4 +1,30 @@
 {
+  "accountBootstrap": {
+    "accountMismatch": "このブラウザにはすでに別のアカウントの保管庫があります。そちらを開くか、先にサインアウトしてこのブラウザ内のコピーを消去してください。",
+    "changeAccount": "別のアカウント番号を使用",
+    "continue": "続ける",
+    "failed": "そのアカウントを開けませんでした。アカウント番号とパスワードを確認して、もう一度お試しください。",
+    "hint": "このアカウントのマスターパスワードを入力してください。Myneが保管庫を取得し、このブラウザをこのアカウントのデバイスとして設定します。",
+    "noEndpoint": "このMyneには同期サーバーが設定されていないため、保管庫に接続できません。運用している方にお問い合わせください。",
+    "passwordLabel": "マスターパスワード",
+    "approversIntro": "このデバイスを承認できるデバイス：",
+    "noApprovers": "現在、このアカウントでこのデバイスを承認できる他のデバイスはありません。すでにアクセス権のあるデバイスでMyneを開いてから、ここに戻ってください。",
+    "pendingTitle": "承認待ち",
+    "sasMatch": "一致します — 続ける",
+    "sasMismatch": "一致しません",
+    "verifyBody": "続ける前に、このコードが両方のデバイスで同じであることを確認してください。異なる場合は中止してください — 問題があるのは接続であって、あなたのパスワードではありません。",
+    "verifyTitle": "このコードを照合",
+    "title": "保管庫にサインイン",
+    "working": "設定中…"
+  },
+  "accountEntry": {
+    "checkFailed": "そのアカウント番号を確認できませんでした。もう一度お試しください。",
+    "checking": "確認中…",
+    "continue": "続ける",
+    "hint": "MY-XXXX-XXXX-XXXX-XXXX-XXXX のような形式です。確認はこのデバイス上で行われます — まだ何も送信されません。",
+    "invalid": "そのアカウント番号は有効ではありません。確認してもう一度お試しください。",
+    "title": "アカウント番号を入力"
+  },
   "attachments": {
     "cleanUnused": {
       "cancel": "キャンセル",
@@ -8,6 +34,7 @@
       "deleteCta": "未使用の{{count}}件を削除",
       "deleteCta_one": "未使用の{{count}}件を削除",
       "deleteCta_other": "未使用の{{count}}件を削除",
+      "corpusIncomplete": "先に同期を完了してください — このデバイスにはまだすべてのノートがありません。何も削除されていません。",
       "error": "クリーンアップできませんでした。一部のノートが読み取れない可能性があります — 何も削除されていません。",
       "intro_one": "この添付ファイルはどのノートでも使用されていません。削除は永久的で、元に戻せません。",
       "intro_other": "これら{{count}}件の添付ファイルはどのノートでも使用されていません。削除すると元に戻せません。",
@@ -47,6 +74,7 @@
       "actionsTitle": "操作",
       "checking": "確認中…",
       "checkUnusedFailedNotice": "未使用の添付ファイルを確認できませんでした。もう一度お試しください。",
+      "corpusIncompleteNotice": "先に同期を完了してください — このデバイスにはまだすべてのノートがないため、どの添付ファイルが未使用かを判断できません。",
       "cleanUnused": "未使用を整理",
       "cleanUnusedTitle": "どのノートでも使用されていない添付ファイルを削除",
       "colCreated": "作成日",
@@ -69,6 +97,7 @@
       "menuExport": "エクスポート",
       "menuPreview": "プレビュー",
       "menuRename": "名前を変更",
+      "menuTranscribe": "文字起こし",
       "noMatch": "検索に一致する添付ファイルはありません。",
       "noUnusedNotice": "整理する未使用の添付ファイルはありません。",
       "preview": "プレビュー",
@@ -84,6 +113,10 @@
       "sortAriaLabel": "添付ファイルを並べ替え",
       "supportedFilesFilter": "対応ファイル",
       "title": "添付ファイル",
+      "transcribeDone": "文字起こしが完了しました。",
+      "transcribeFailed": "文字起こしに失敗しました。もう一度お試しください。",
+      "transcribeNoModel": "設定 → Labs → AI で文字起こしモデルを選択してください。",
+      "transcribeStarted": "文字起こし中…",
       "typeFilter": {
         "all": "すべての種類",
         "audio": "オーディオ",
@@ -210,6 +243,9 @@
       },
       "toggleLineNumbers": {
         "label": "行番号の表示を切り替え"
+      },
+      "toggleVimMode": {
+        "label": "Vimキーボードモードを切り替え"
       },
       "toggleSpellCheck": {
         "label": "スペルチェックを切り替え"
@@ -512,6 +548,7 @@
     }
   },
   "common": {
+    "cancel": "キャンセル",
     "dismiss": "閉じる",
     "prompt": {
       "cancel": "キャンセル",
@@ -522,6 +559,10 @@
     },
     "back": "戻る",
     "continue": "続ける"
+  },
+  "deviceRevoked": {
+    "cta": "最初からやり直す",
+    "title": "このブラウザはアカウントから削除されました"
   },
   "editor": {
     "attachment": {
@@ -675,7 +716,8 @@
           "export": "エクスポート",
           "remove": "削除",
           "rename": "名前を変更",
-          "reveal": "ライブラリで表示"
+          "reveal": "ライブラリで表示",
+          "transcribe": "文字起こし"
         },
         "pdfFallback": "PDF",
         "textPreview": {
@@ -686,6 +728,15 @@
           "brokenLabel": "破損",
           "deletedAria": "削除された添付ファイル：{{filename}}",
           "deletedLabel": "削除済み"
+        },
+        "transcribe": {
+          "disabledReason": "文字起こしするには 設定 → Labs → AI でAIを有効にしてください。",
+          "failed": "文字起こしに失敗しました。もう一度お試しください。",
+          "heading": "文字起こし",
+          "insert": "文字起こしをノートに挿入",
+          "noModelHint": "設定 → Labs → AI で文字起こしモデルを選択してください。",
+          "progress": "文字起こし中…",
+          "stop": "停止"
         },
         "urlImageFallback": "画像"
       }
@@ -735,6 +786,7 @@
         "tags": "タグ",
         "viewMode": "表示モード",
         "views": "ビュー",
+        "vimMode": "Vimモード",
         "wordCount": "文字数",
         "workspace": "ワークスペース"
       },
@@ -766,6 +818,13 @@
           "title_one": "{{characters}}文字 · {{words}}語 · {{spaces}}スペース · {{count}}段落",
           "title_other": "{{characters}}文字 · {{words}}語 · {{spaces}}スペース · {{count}}段落",
           "titleSelectionSuffix": "（選択範囲）"
+        },
+        "vimMode": {
+          "insert": "挿入",
+          "normal": "ノーマル",
+          "replace": "置換",
+          "title": "Vimモード — Escでノーマルモードに戻ります",
+          "visual": "ビジュアル"
         },
         "graphTitle": "グラフ（⌘⇧G）",
         "lock": "ロック",
@@ -998,6 +1057,23 @@
         "xl": "特大"
       }
     },
+    "vim": {
+      "ex": {
+        "refused": {
+          "edit": "`:e` は使用できません — Myneが開くのはノートであってファイルではありません。コマンドパレットかサイドバーを使用してください。",
+          "map": "Myneではカスタムキーマッピングは使用できません。ショートカットは 設定 → ホットキー で設定します。",
+          "set": "`:set` は使用できません — Myneにvimのオプションはありません。エディタの設定は 設定 → エディタ にあります。",
+          "source": "`:source` は使用できません。Myneには設定スクリプトの仕組みが意図的にありません。",
+          "unsupported": "そのコマンドはMyneでは使用できません。"
+        },
+        "substitute": {
+          "malformed": "その置換を読み取れませんでした。正しい形式は :s/pattern/replacement/ です",
+          "refused": "そのパターンはvim独自の構文（{{what}}）を使用しており、Myneの検索では対応していません。何も変更されていません。"
+        },
+        "writeFailed": "保存できませんでした。",
+        "written": "保存しました。"
+      }
+    },
     "wikilink": {
       "chip": {
         "embed": "埋め込み：{{label}}"
@@ -1188,6 +1264,11 @@
         "title": "Markdownとしてエクスポート"
       }
     },
+    "egress": {
+      "cancel": "キャンセル",
+      "confirm": "ダウンロード",
+      "title": "このファイルをダウンロード"
+    },
     "pdf": {
       "cancel": "キャンセル",
       "continue": "続行…",
@@ -1254,6 +1335,10 @@
     }
   },
   "failClosed": {
+    "exit": {
+      "quit": "アプリを閉じる",
+      "reload": "再読み込み"
+    },
     "corrupted": {
       "body": "バックアップがあれば復元できます — 現在のファイルには手を加えず、バックアップはまず別の保管庫として復元されます。",
       "cta": "アプリを閉じる",
@@ -1274,6 +1359,8 @@
       "cta": "アプリを閉じる",
       "title": "保管庫ファイルにアクセスする権限がありません。"
     },
+    "copyDiagnostics": "診断情報をコピー",
+    "diagnosticsCopied": "コピーしました",
     "restoreFromBackup": "バックアップから復元…"
   },
   "notes": {
@@ -1343,14 +1430,20 @@
       "noteCount_other": "{{count}}件のノート",
       "of": "の条件：",
       "ofTheGroups": "次のグループの条件：",
+      "op": {
+        "contains": "を含む"
+      },
+      "propertyValuePlaceholder": "値",
       "removeCondition": "条件を削除",
       "replaceFilter": "フィルタを置き換え",
       "save": "保存",
       "searchTextPlaceholder": "検索テキスト",
       "selectFolderPlaceholder": "フォルダを選択…",
+      "selectPropertyPlaceholder": "プロパティを選択…",
       "selectTagPlaceholder": "タグを選択…",
       "type": {
         "folder": "フォルダ",
+        "property": "プロパティ",
         "search": "検索",
         "tag": "タグ"
       },
@@ -1451,7 +1544,11 @@
         "titleFailed": "インポート失敗",
         "titleSetup": "Obsidian保管庫をインポート",
         "vaultFolderLabel": "保管庫フォルダ",
-        "vaultRoot": "（保管庫のルート）"
+        "vaultRoot": "（保管庫のルート）",
+        "titlePick": "ノートをインポート",
+        "keepsLabel": "引き継がれるもの",
+        "losesLabel": "引き継がれないもの",
+        "changeSource": "インポート元を変更"
       },
       "offer": {
         "body": "既存のノートをMyneに取り込みましょう。インポート時にそれぞれが暗号化されます — このデバイスから何も送信されず、元のファイルはそのままの場所に残ります。",
@@ -1459,6 +1556,46 @@
         "laterHint": "後からいつでも、設定 → ストレージからインポートできます。",
         "notNow": "今はしない",
         "title": "Obsidian保管庫をインポートしますか？"
+      },
+      "picker": {
+        "intro": "ノートのインポート元はどこですか？"
+      },
+      "source": {
+        "obsidian": {
+          "label": "Obsidian",
+          "pickerTitle": "Obsidian保管庫フォルダを選択",
+          "survives": "引き継がれるもの：Markdown、フロントマター、[[wikilinks]]、フォルダ構成、添付ファイル。",
+          "loses": "引き継がれないもの：canvasファイル、およびMarkdownノート以外のもの。",
+          "short": "Markdownノートが入った保管庫フォルダ"
+        },
+        "notion": {
+          "label": "Notion",
+          "pickerTitle": "展開済みのNotionエクスポートフォルダを選択",
+          "survives": "引き継がれるもの：ページ、フォルダ構成、フィールドとしてのページプロパティ、Wikiリンクとしての内部リンク。各データベースも、その行にリンクする表のノートとして取り込まれます。",
+          "loses": "先にエクスポートを展開してください — Myneが読み取るのはフォルダであって.zipではありません。トグル、コールアウト、色付きテキストには対応するものがないため、インポートレポートに一覧表示されます。",
+          "short": "展開済みのエクスポートフォルダ"
+        },
+        "evernote": {
+          "label": "Evernote",
+          "pickerTitle": "Evernoteの.enexファイルを選択",
+          "survives": "引き継がれるもの：ファイル内のすべてのノート、書式、添付ファイル。暗号化されたブロックは、Evernoteで復号できるテキストのまま保持されます。",
+          "loses": "引き継がれないもの：リマインダーとノート履歴。非常に大きなエクスポートは、危険を冒すのではなく拒否されます — その場合はエクスポートを分割してください。",
+          "short": "1つの.enexエクスポートファイル"
+        },
+        "html": {
+          "label": "HTML",
+          "pickerTitle": "HTMLファイルが入ったフォルダを選択",
+          "survives": "引き継がれるもの：見出し、リスト、表、リンク、コード、強調。",
+          "loses": "引き継がれないもの：スタイル、スクリプト、埋め込み。リモート画像はリンクのまま残り、ダウンロードされることはありません。",
+          "short": "保存したWebページが入ったフォルダ"
+        },
+        "csv": {
+          "label": "CSV",
+          "pickerTitle": ".csvファイルを選択",
+          "survives": "表を収めた1つのノートになります。",
+          "loses": "1行につき1ノートではなく、全体で1つのノートになります — Myneはデータベースではありません。非常に横長または縦長のファイルは切り詰められ、その量はインポートレポートに表示されます。",
+          "short": "1つのスプレッドシートファイル"
+        }
       }
     },
     "list": {
@@ -1497,7 +1634,10 @@
       "exportPdf": "PDFとしてエクスポート…",
       "exportTxt": "プレーンテキストとしてエクスポート…",
       "favoritesHeading": "お気に入り",
+      "icon": "アイコン…",
       "mergeAnyway": "そのまま統合",
+      "newDrawingHere": "ここに新規ドローイング",
+      "newDrawingMenu": "新規ドローイング",
       "newFolder": "新規フォルダ",
       "newFolderInPlaceholder": "{{path}}内に新規フォルダ",
       "newFolderPlaceholder": "新規フォルダ",
@@ -1550,6 +1690,7 @@
     },
     "newTab": {
       "createNote": "新規ノートを作成",
+      "createDrawing": "新規ドローイング",
       "noNotesMatch": "一致するノートはありません。",
       "noNotesYet": "ノートはまだありません。",
       "searchAriaLabel": "開くノートを検索",
@@ -1579,12 +1720,16 @@
       "loadError": "このノートを読み込めませんでした",
       "removeFromFavorites": "お気に入りから削除",
       "renameAriaLabel": "ノートの名前を変更",
+      "unsyncedLabel": "サーバー未同期",
+      "unsyncedTitle": "このノートの最新の変更はこのデバイスにのみあります",
       "untitled": "無題"
     },
     "savedView": {
       "defaultName": "絞り込みビュー"
     },
     "saveStatus": {
+      "conflict": "編集の競合を解消中…",
+      "conflictTitle": "このノートは別のデバイスで変更されました — 両方のバージョンを保持します",
       "editing": "編集中",
       "editingEllipsis": "編集中…",
       "editingTitle": "編集中 — 自動保存が有効です",
@@ -1594,6 +1739,8 @@
       "savedRelative": "{{rel}}に保存",
       "saveFailed": "保存に失敗しました",
       "saveFailedTitle": "保存に失敗しました — 「再試行」をクリック",
+      "storageFull": "ストレージがいっぱい",
+      "storageFullTitle": "このノートを保存する空き容量がありません。空き容量を確保（または添付ファイルをいくつか削除）してから、再試行してください。保存されるまで、この編集はこのウィンドウ内にしかありません — サーバーにもありません。",
       "saving": "保存中",
       "savingEllipsis": "保存中…"
     },
@@ -1708,6 +1855,10 @@
       "host": {
         "unsupported": "このビュータイプは今後のアップデートで対応予定です。"
       },
+      "list": {
+        "empty": "このビューに一致するノートはありません",
+        "noValue": "値なし"
+      },
       "menu": {
         "deleteView": "ビューを削除",
         "editFilter": "フィルタを編集…",
@@ -1717,6 +1868,11 @@
         "viewSettings": "ビュー設定…"
       },
       "newView": "新規ビュー",
+      "table": {
+        "empty": "このビューに一致するノートはありません",
+        "name": "名前",
+        "noValue": "値なし"
+      },
       "untitledView": "無題のビュー"
     },
     "viewSettings": {
@@ -1730,12 +1886,26 @@
       "cancel": "キャンセル",
       "cardSize": "カードサイズ",
       "cardSizeValue": "{{size}} px",
+      "columns": "列",
+      "columnsEmpty": "プロパティが見つかりません",
+      "columnsHint": "列（表）または詳細行（リスト / カード）として表示されるフロントマターのプロパティ。",
+      "columnsPlaceholder": "列を追加…",
       "coverImageHint": "値が画像であるフロントマターのプロパティ — 各カードのカバーとして表示されます。カバーを表示しない場合は空のままにしてください。",
       "coverImagePlaceholder": "例：cover",
       "coverImageProperty": "カバー画像のプロパティ",
+      "groupBy": "グループ化",
       "imageAspectRatio": "画像のアスペクト比",
+      "propertyNone": "なし",
       "reset": "リセット",
-      "save": "保存"
+      "save": "保存",
+      "sortAsc": "昇順",
+      "sortBy": "並べ替え",
+      "sortDesc": "降順",
+      "sortDirection": "並べ替えの向き",
+      "viewType": "ビューの種類",
+      "viewTypeCards": "カード",
+      "viewTypeList": "リスト",
+      "viewTypeTable": "表"
     },
     "welcome": {
       "body": "Myneへようこそ。ここはあなたが考え、書くためのプライベートな空間です。\n\nここに保存したものはすべて暗号化され、あなたのデバイスにとどまります。**パスワード**と**復元フレーズ**だけがその鍵なので、安全な場所に保管してください。両方とも失ってしまうと、私たちを含め誰もあなたのノートを取り戻すことはできません。\n\nこれはごく普通のノートなので、自由に使ってください。いつでも編集、名前変更、削除でき、アイデアが広がるたびに新しいノートを追加できます。\n\nお越しいただきありがとうございます。Myneについて詳しくは https://myne.md をご覧ください。\n",
@@ -1836,6 +2006,7 @@
   "settings": {
     "about": {
       "buildChannelDevelopment": "開発ビルド",
+      "buildLabel": "ビルド",
       "buildChannelLabel": "ビルドチャネル",
       "buildChannelStable": "安定版",
       "changelogButton": "変更履歴を表示…",
@@ -1857,12 +2028,16 @@
         "ioError": "ディスクエラーが発生しました。もう一度お試しください。",
         "joinFailure": "問題が発生しました。もう一度お試しください。",
         "samePasswordRejected": "新しいパスワードが現在のパスワードと同じです。",
+        "serverAckPending": "新しいパスワードはこのデバイスでは有効ですが、Myneはそれを保存するためにサーバーへ接続できませんでした。接続できるまで、他のデバイスは引き続き以前のパスワードを要求します — そして、それまでにこのブラウザ内のコピーが消去されると、この変更は失われます。自動的に再試行されます。",
         "weakNewPassword": "新しいパスワードは12文字以上にしてください。"
       },
       "changePasswordHeading": "パスワードを変更",
       "changePasswordHelper": "同じ保管庫を保ったまま、マスターパスワードを変更します。復元フレーズは変わりません。",
       "dangerZoneHeading": "危険な操作",
       "dangerZoneHelper": "この保管庫とすべてのノートを完全に削除します。元に戻せません。復元フレーズでも保管庫を復元できません。",
+      "localEraseHeading": "このブラウザ",
+      "localEraseHelper": "このブラウザにあるMyneの保管庫コピーを消去します。アカウントと、すでに同期済みのものはサーバーに残ります。",
+      "localEraseButton": "サインアウトしてこのブラウザ内のコピーを消去…",
       "deleteVaultButton": "保管庫を削除…",
       "memoryCost": "メモリコスト",
       "parallelism": "並列度",
@@ -1887,6 +2062,7 @@
       "changing": "変更中…"
     },
     "appearance": {
+      "homeQuickActions": "ホームのクイック操作",
       "showEditTimesAria": "サイドバーに編集時刻を表示",
       "showEditTimesHelper": "各ノートの最終編集時刻を、サイドバーのタイトルの下に表示します。",
       "showEditTimesLabel": "編集時刻を表示",
@@ -1914,6 +2090,13 @@
       "off": "オフ",
       "on": "オン",
       "saveError": "アーカイブ設定を更新できませんでした。"
+    },
+    "attachmentOcr": {
+      "label": "画像やスキャンした文書の中を検索",
+      "helper": "画像の添付ファイルやスキャンしたPDFからテキストをこのデバイス上で読み取り、内容で検索できるようにします。何もアップロードされません。オフにするとバックグラウンドの抽出は停止しますが、すでに抽出されたテキストは保持されます。",
+      "errorSaveSetting": "この設定を保存できませんでした。",
+      "processing_one": "添付ファイル1件を読み取り中…",
+      "processing_other": "添付ファイル{{count}}件を読み取り中…"
     },
     "autoBackup": {
       "backupFolder": "バックアップフォルダ",
@@ -1991,6 +2174,8 @@
         "parseError": "有効なJSONではありません",
         "parseErrorWithLine": "有効なJSONではありません（{{line}}行目）"
       },
+      "export": "エクスポート",
+      "exportError": "そのテーマをエクスポートできませんでした。もう一度お試しください。",
       "fileFilterName": "Myneテーマ",
       "helper": "独自のカラーパレットを使用できます。テーマは使用前にこのデバイス上で検証されます — 何もアップロードされません。",
       "importButton": "テーマをインポート…",
@@ -2025,6 +2210,10 @@
       "heading": "保管庫を削除",
       "ioFailBody": "削除のために保管庫ファイルにアクセスできませんでした。保管庫の鍵はすでにメモリからゼロ消去されています。ディスク上に残った保管庫データは、復元不可能なArgon2idでラップされた無意味なデータです。",
       "ioFailTitle": "削除中にディスクエラーが発生しました",
+      "localEraseHeading": "サインアウトしてこのブラウザ内のコピーを消去",
+      "localEraseEyebrow": "このブラウザのみ",
+      "localEraseSubmit": "このブラウザ内のコピーを消去",
+      "localEraseSubmitInFlight": "消去中…",
       "partialFailBody_one": "{{count}}件のファイルをディスクから削除できませんでした。ボールトの鍵はすでにメモリからゼロ化されているため、残った孤立した暗号文は復元不可能なArgon2idでラップされたゴミです。",
       "partialFailBody_other": "{{count}}件のファイルをディスクから削除できませんでした。保管庫の鍵はすでにメモリからゼロ消去されているため、残った孤立した暗号文は復元不可能なArgon2idでラップされた無意味なデータです。",
       "partialFailTitle": "保管庫の削除が一部失敗しました",
@@ -2090,6 +2279,32 @@
       "helper": "キーボードショートカットの表示と変更ができます。エディタの書式設定とタブ循環のショートカットは固定です。",
       "notSet": "未設定",
       "removeBindingAria": "{{chord}}を削除",
+      "reserved": {
+        "bookmarkPage": "ページをブックマークする",
+        "closeTab": "タブを閉じる",
+        "closeWindow": "ウィンドウを閉じる",
+        "cycleTabs": "タブ間を移動する",
+        "focusAddressBar": "アドレスバーにフォーカスする",
+        "hideApplication": "ブラウザを隠す",
+        "inspectElement": "要素インスペクタを開く",
+        "minimiseWindow": "ウィンドウを最小化する",
+        "newPrivateWindow": "プライベートウィンドウを開く",
+        "newTab": "新しいタブを開く",
+        "newWindow": "新しいウィンドウを開く",
+        "openBookmarks": "ブックマークを開く",
+        "openDevTools": "開発者ツールを開く",
+        "openExtensions": "拡張機能を開く",
+        "openFile": "ファイルを開く",
+        "openHistory": "履歴を開く",
+        "quit": "ブラウザを終了する",
+        "reopenTab": "最後に閉じたタブを再度開く",
+        "switchTab": "タブを切り替える",
+        "toggleFullscreen": "全画面表示を切り替える"
+      },
+      "reservedBadge": "ここでは使用不可",
+      "reservedBadgeTitle": "お使いのブラウザは{{chord}}で{{action}}ため、Myneに届くことはありません。このショートカットはデスクトップアプリでは引き続き使えます。",
+      "reservedRefused": "{{chord}}はブラウザのものです — {{action}}動作に割り当てられています。別のショートカットを選んでください。デスクトップのショートカットは変更されません。",
+      "reservedUnreliable": "{{chord}}はMyneに届かない可能性があります — 一部のブラウザでは{{action}}動作になります。そのまま追加しました。",
       "resetAll": "すべてのホットキーをリセット…",
       "resetAllConfirm": "すべてのカスタムショートカットをデフォルトにリセットしますか？",
       "resetAllYes": "すべてリセット",
@@ -2106,6 +2321,14 @@
       "errorSaveSetting": "行番号の設定を保存できませんでした。",
       "helper": "エディタに行番号の余白を表示します。1行につき1つの番号で、デフォルトではオフです。",
       "label": "行番号",
+      "off": "オフ",
+      "on": "オン"
+    },
+    "vimMode": {
+      "chordCaveat": "WindowsとLinuxではMyne自身のショートカットが優先されるため、それらと競合するvimのキー（Ctrl-a、Ctrl-b、Ctrl-d、Ctrl-e、Ctrl-f、Ctrl-i、Ctrl-p、Ctrl-t、Ctrl-v、Ctrl-w、Ctrl-x）はエディタでは使用できません。Ctrl-[ は引き続きEscapeとして機能し、ビジュアルブロックはAlt-vに移ります。",
+      "errorSaveSetting": "Vimモードの設定を保存できませんでした。",
+      "helper": "エディタでVimのキー操作を使用します。ノーマル、挿入、ビジュアルの各モードに対応し、通常のモーションとオペレータが使えます。デフォルトはオフです。オンの間、ノートはソースビューで開きます。",
+      "label": "Vimキーボードモード",
       "off": "オフ",
       "on": "オン"
     },
@@ -2134,10 +2357,12 @@
       "modelGenerationLabel": "テキストモデル — チャット、要約、執筆",
       "modelNone": "ファイルが選択されていません",
       "modelSaveFailed": "モデルのパスを保存できませんでした（ボールトの外にある必要があります）。",
+      "modelTranscriptionLabel": "音声認識モデル（文字起こし）",
       "modelsHelper": "Myneはモデルをダウンロードしません — それはネットワーク経由でデータを送信することを意味するからです。ブラウザでリンクを開いて入手し、ダウンロードしたファイルをここで選択してください。すべてがデバイス上で実行されます。",
       "modelsLabel": "モデル",
       "recommendedFilesEmbedding": "model.safetensors + config.json + tokenizer.json が1つのフォルダに必要です。",
       "recommendedFilesGeneration": ".gguf ファイル + tokenizer.json が同じフォルダに必要です。",
+      "recommendedFilesTranscription": "Whisperの .gguf ファイル + config.json + tokenizer.json が同じフォルダに必要です。",
       "title": "AI"
     },
     "prefs": {
@@ -2154,6 +2379,7 @@
       "screenCaptureHelperOn": "macOSおよびWindows 10（2020年5月更新以降）で有効です。Linuxは今後のリリースで対応予定です。",
       "screenCaptureLabel": "画面キャプチャ保護",
       "screenCaptureSubtitle": "スクリーンショットと画面録画をブロック",
+      "screenshotBlocked": "画面キャプチャ保護がオンです — Myneのスクリーンショットは空白になります。",
       "autoLockAfter": "自動ロックまでの時間",
       "autoLock1m": "1分",
       "autoLock5m": "5分",
@@ -2254,6 +2480,8 @@
       "locationHelper": "各保管庫は、このパス配下にある暗号化ファイルのフォルダです。手動コピーよりも下記のバックアップボタンを優先してください — 書き込んだファイルを検証します。",
       "locationLabel": "保管庫の場所",
       "openInFiles": "ファイルで開く",
+      "webLocationHelper": "ノートはこのサイト用のブラウザストレージに保存され、ブラウザが管理します — 開けるフォルダはありません。このサイトのデータを消去するとローカルのコピーは削除されますが、このクライアントは同期するため、再度サインインすればダウンロードし直されます。",
+      "webLocationLabel": "ノートの保存場所",
       "pathUnavailable": "パスを取得できません",
       "restoreBackup": "バックアップから復元…"
     },
@@ -2313,9 +2541,92 @@
       "typewriter": "タイプライタースクロール",
       "typewriterSubtitle": "キャレットを垂直方向の中央に保つ",
       "enableArchiving": "アーカイブを有効化"
+    },
+    "search": {
+      "placeholder": "設定を検索…",
+      "ariaLabel": "設定を検索",
+      "empty": "「{{query}}」に一致する設定はありません。",
+      "resultsLabel": "検索結果",
+      "extra": {
+        "lastActiveNoteTitle": "続きから再開",
+        "lastActiveNoteDesc": "開いていたノートを同期して、別のデバイスで続きから作業できるようにします。"
+      },
+      "keywords": {
+        "aiEnable": "ai ローカルai 有効 無効 オン オフ 機械学習 local ai enable disable machine learning",
+        "aiExcluded": "除外 除外フォルダ フォルダ 無視 プライバシー ai excluded folders ignore exclude privacy",
+        "aiModels": "モデル gguf ダウンロード テキスト 埋め込み ai llm models download embedding",
+        "archive": "アーカイブ 保管 非表示 復元 ノート archive archiving hide restore notes",
+        "autoBackup": "自動バックアップ バックアップ 自動 スケジュール 頻度 保持 フォルダ automatic backups schedule frequency retention",
+        "autoLock": "自動ロック ロック タイムアウト 無操作 放置 タイマー セッション auto lock timeout idle inactivity session",
+        "backup": "バックアップ 復元 保存 コピー エクスポート myne-backup backup restore export save copy",
+        "buildChannel": "ビルド チャネル バージョン リリース 安定版 ベータ build channel version release stable beta nightly",
+        "changePassword": "パスワード変更 パスワード 変更 パスフレーズ 認証情報 更新 リセット change password passphrase credentials update reset",
+        "changelog": "変更履歴 更新履歴 リリースノート 新機能 履歴 changelog release notes what is new history",
+        "clipper": "クリッパー ブラウザ 拡張機能 ウェブクリップ 取り込み browser clipper extension web capture chrome firefox",
+        "contentWidth": "コンテンツ幅 幅 段組み 読みやすさ 行長 content width column reading measure line length",
+        "customThemes": "カスタムテーマ テーマ パレット 配色 色 外観 インポート custom themes palette colors appearance import",
+        "dailyNotes": "デイリーノート 日誌 日記 日付 テンプレート フォルダ daily notes journal date template diary",
+        "dangerZone": "危険な操作 保管庫削除 削除 消去 破棄 danger zone delete vault destroy remove wipe",
+        "export": "エクスポート 書き出し 復号 平文 ファイル 文書 export markdown decrypt plain files documents",
+        "focusMode": "フォーカスモード 集中 タイプライター 減光 非アクティブ行 focus mode typewriter dim inactive lines distraction free",
+        "font": "フォント 書体 等幅 サンセリフ 明朝 タイポグラフィ font typeface family sans serif mono typography",
+        "hotkeys": "ホットキー ショートカット キーボード キー割り当て キーバインド hotkeys keyboard shortcuts keybindings keymap chords bindings",
+        "import": "インポート 取り込み 移行 ノート obsidian notion evernote enex html csv import migrate migration bring",
+        "language": "言語 表示言語 ロケール 翻訳 インターフェース language locale interface translation ui",
+        "lastActiveNote": "続きから 最後のノート 再開 同期 開く continue where you left off last note resume sync open",
+        "license": "ライセンス オープンソース 法務 agpl license open source legal",
+        "lineNumbers": "行番号 番号 余白 エディタ 表示 line numbers gutter editor display",
+        "vimMode": "vim ノーマル 挿入 ビジュアル 置換 モーダル編集 キーボード modal editing normal insert visual keyboard",
+        "lineSpacing": "行間 行送り 行の高さ タイポグラフィ 読みやすさ line spacing leading height typography readability",
+        "newNoteLocation": "新規ノート 保存先 場所 フォルダ デフォルト new note location folder default where created",
+        "quickUnlock": "クイックロック解除 ロック解除 pin 生体認証 指紋 顔認証 touch id quick unlock biometric face",
+        "realtimeSync": "リアルタイム同期 同期 リアルタイム 接続 ライブ real time sync live connection presence polling",
+        "screenCapture": "画面キャプチャ スクリーンショット 画面録画 保護 ブロック プライバシー screen capture protection screenshot recording block",
+        "showEditTimes": "編集時刻 タイムスタンプ 更新日時 日付 表示 show edit times timestamps modified dates notes",
+        "spell": "スペルチェック つづり 辞書 自動修正 spell check spelling dictionary autocorrect",
+        "spellLanguages": "スペルチェック 言語 辞書 ロケール 単語 spell languages dictionaries locale words",
+        "startupOpen": "起動 起動時 開く デフォルト ファイル ノート startup open default file launch boot which note",
+        "attachmentOcr": "ocr 画像 スキャン pdf 写真 スクリーンショット 文字認識 テキスト抽出 添付ファイル 検索 cpu バッテリー image scan scanned photo screenshot text recognition attachments battery",
+        "syncAddDevice": "デバイス追加 追加 ペアリング 連携 スマホ 同期 add device pair link phone laptop sync",
+        "syncConflicts": "競合 解消 マージ バージョン 同期 conflicts merge resolve versions sync",
+        "syncDevices": "デバイス 端末 連携 ペアリング 同期 devices linked paired sync machines",
+        "syncRecovered": "復元されたノート 復元 サルベージ 回復 同期 recovered notes restore sync salvage",
+        "syncServer": "同期サーバー サーバー ホスト セルフホスト エンドポイント url sync server self hosted endpoint",
+        "syncStatus": "同期ステータス 状態 接続 最新 同期 sync status connection state up to date",
+        "textSize": "文字サイズ フォントサイズ 拡大 ズーム 読みやすさ text size font zoom scale readability",
+        "theme": "テーマ ダーク ライト 外観 配色 amoled システム theme dark light mode appearance color scheme system",
+        "threatModel": "脅威モデル セキュリティ 攻撃者 資産 信頼 threat model security adversaries assets trust",
+        "toolbar": "ツールバー ボタン 書式 選択 カスタマイズ toolbar buttons formatting floating selection customize",
+        "vaultIcon": "保管庫アイコン アイコン 画像 シンボル アバター vault icon avatar picture symbol",
+        "vaultLabel": "保管庫ラベル ラベル 名前 名前変更 タイトル vault label name rename title",
+        "vaultLocation": "保管庫の場所 場所 パス フォルダ ディスク 保存先 vault location path folder on disk where stored",
+        "viewMode": "表示モード デフォルト ライブ 読み取り ソース プレビュー default view mode live reading source preview"
+      }
     }
   },
+  "storageLost": {
+    "allSynced": "失われたものはありません — ここにあったすべてのノートは、すでにサーバーに届いていました。",
+    "evicted": {
+      "body": "空き容量を確保するため、ブラウザがこのサイトのストレージを消去しました。何も破損しておらず、サーバー上では何も削除されていません — 同期済みのものはすべて残っています。",
+      "title": "ブラウザがこの保管庫のローカルコピーを消去しました"
+    },
+    "lockCta": "ロックしてもう一度試す",
+    "reDownloadCta": "このブラウザを再設定",
+    "reEnrolNotice": "再設定すると、このブラウザは新しいデバイスとして登録されるため、同期を始める前に他のデバイスからの承認を待つことになります。",
+    "unopenable": {
+      "body": "この保管庫のローカルコピーはもう読み取れません。サーバー上のものには影響ありません — ここにあるコピーはキャッシュであり、置き換えられます。",
+      "title": "この保管庫のローカルコピーを読み取れません"
+    },
+    "unsyncedIntro": "{{count}}件のノートがまだサーバーに届いていませんでした。それらのノートは失われました — これが唯一のコピーでした：",
+    "unsyncedIntro_one": "{{count}}件のノートがまだサーバーに届いていませんでした。そのノートは失われました — これが唯一のコピーでした：",
+    "unsyncedIntro_other": "{{count}}件のノートがまだサーバーに届いていませんでした。それらのノートは失われました — これが唯一のコピーでした：",
+    "unsyncedOverflow": "…他{{count}}件。",
+    "unsyncedOverflow_one": "…他{{count}}件。",
+    "unsyncedOverflow_other": "…他{{count}}件。"
+  },
   "sync": {
+    "materialising": "ノートをダウンロード中 — {{total}}件中{{done}}件。作業を始められます。残りは届き次第表示されます。",
+    "credentialAmbiguous": "このデバイスと別のデバイスの両方でパスワードが変更された可能性があり、Myneはどちらが新しいか判断できません — そのため何も変更していません。すでにアクセス権のあるデバイスでサインインして解消してください。",
     "attachments": {
       "aria": {
         "downloading": "{{name}}をダウンロード中",
@@ -2343,6 +2654,17 @@
       "untitled": "無題（{{hex}}）",
       "useThisVersion": "このバージョンを使用"
     },
+    "deviceJoinQr": {
+      "accountLabel": "アカウント番号",
+      "accountPlaceholder": "MY-XXXX-XXXX-XXXX-XXXX-XXXX",
+      "error": "QRを作成できませんでした。もう一度お試しください。",
+      "generate": "QRを作成",
+      "hint": "アカウント番号を貼り付けると、スマートフォンで読み取れるQRを作成できます — サーバーとアカウント番号が自動で入力されます。",
+      "invalidAccount": "有効なアカウント番号ではないようです。",
+      "notConfigured": "先に同期サーバーを設定してから、QRを作成してください。",
+      "scanWithApp": "iOSアプリで読み取る",
+      "title": "QRでデバイスを追加"
+    },
     "devices": {
       "approve": "承認",
       "awaitingApproval_one": "承認待ちのデバイス{{count}}台",
@@ -2350,8 +2672,22 @@
       "loading": "読み込み中…",
       "noDevices": "同期されているデバイスはまだありません。",
       "notEnrolled": "このデバイスはまだ接続されていません。追加したばかりの場合は、別のデバイスからの承認をお待ちください。そうでない場合は、上の「デバイスを追加」フォームから追加してください。",
+      "platform": {
+        "android": "Androidスマートフォン",
+        "androidTablet": "Androidタブレット",
+        "ios": "iPhone",
+        "ipad": "iPad",
+        "linux": "Linux PC",
+        "macos": "Mac",
+        "unknown": "このデバイス",
+        "web": "ブラウザ",
+        "windows": "Windows PC"
+      },
       "remove": "削除",
       "removedElsewhere": "このデバイスは別のデバイスからアカウントの登録を解除されました。",
+      "rename": "名前を変更",
+      "renameFailed": "その名前を保存できませんでした。もう一度お試しください。",
+      "renameLabel": "デバイス名",
       "resetAndReAdd": "このデバイスをリセットして再追加",
       "resetSyncOnThisDevice": "このデバイスの同期をリセット",
       "shortName": "デバイス{{hex}}",
@@ -2371,10 +2707,14 @@
       "connect": "接続",
       "connectedLocal": "接続済み（ローカル、TLSなし）。",
       "connectedTls": "接続しました。このフィンガープリントが他のデバイスと一致することを確認してください。",
+      "connectedPlatformTrust": "TLS経由で接続しました。このサーバーの証明書はお使いのブラウザが検証しました。",
       "connecting": "接続中…",
       "fingerprintLabel": "サーバー証明書のフィンガープリント：",
       "pinStatic": "Myneの組み込み証明書に対して検証済み。",
       "pinTofu": "初回接続時にピン留めされました。このフィンガープリントをあなたのデバイス間で比較してください。",
+      "fixedOrigin": "このクライアントは、デプロイ時に設定された1つのサーバーと同期します。ここから変更することはできません — このページはこの1つのアドレスとしか通信できません。",
+      "fixedOriginNone": "このデプロイには同期サーバーが設定されていません。",
+      "pinPlatformTrust": "お使いのブラウザの証明書ストアによって検証されました。このクライアント自身で証明書をピン留めすることはできません。",
       "placeholder": "https://your-server.example   ·   http://127.0.0.1:8080",
       "unreachable": "そのサーバーに接続できませんでした — URLと、サーバーが稼働しているかを確認してください。"
     },
@@ -2383,6 +2723,8 @@
       "accountNumberPlaceholder": "MY-XXXX-XXXX-XXXX-XXXX-X",
       "connecting": "接続中…",
       "credentialTypeAria": "認証情報の種類",
+      "deviceNameHelp": "デバイス一覧に表示されます。後から変更できます。",
+      "deviceNameLabel": "このデバイスに名前を付ける",
       "error": {
         "notConfigured": "このデバイスを追加する前に、設定で同期サーバーを指定してください。",
         "transport": "同期サーバーに接続できませんでした。接続を確認してもう一度お試しください。"
@@ -2424,12 +2766,28 @@
         "helper": "新しいデバイスで、アカウント番号とパスワード、または復元フレーズを使ってサインインします。デバイスは、既存のデバイスが承認するまで保留状態になります。",
         "label": "デバイスを追加"
       },
+      "awaitingApproval": {
+        "label": "承認待ち"
+      },
       "conflicts": {
         "helper": "同じノートが2台のデバイスで同時に編集されると、Myneは何も失われないよう両方のコピーを保持します。ここで解消してください。",
         "label": "競合"
       },
       "devices": {
         "label": "デバイス"
+      },
+      "recovered": {
+        "close": "閉じる",
+        "decrypting": "復号中…",
+        "deleteConfirmTitle": "この復元されたノートを削除しますか？",
+        "deleteConfirmWarning": "このデバイスに保持されている唯一のコピーを完全に削除します。元に戻せません。",
+        "deleteCta": "削除",
+        "errorGeneric": "問題が発生しました。もう一度お試しください。",
+        "helper": "別のデバイスで削除されたノートがここでも削除されるとき、その暗号化されたコピーはこのデバイスに保持されます。新しいノートとして復元するか、完全に削除してください。",
+        "label": "復元されたノート",
+        "previewCta": "プレビュー",
+        "previewTitle": "復元されたノート",
+        "restoreCta": "復元"
       },
       "server": {
         "helper": "すべてのデバイスで同じサーバーURLを入力してください。セルフホストのサーバーの場合は<1>https://</1>のアドレスを使い、証明書のフィンガープリントがデバイス間で一致することを確認してください。",
@@ -2438,22 +2796,42 @@
       "status": {
         "helper": "Myneは暗号化されたノートをデバイス間で同期します。サーバーには、読み取ることのできない暗号文だけが保存されます。",
         "label": "同期ステータス"
+      },
+      "usage": {
+        "helper": "このアカウントがサーバーに保存している暗号化データの量と、サインインしているデバイスの数です。",
+        "label": "ストレージとデバイス"
       }
     },
     "reconcile": {
       "message": "このデバイスはしばらくオフラインでした — 同期に追いついています。ノートは安全です。"
+    },
+    "recovered": {
+      "restoredToast": "新しいノートとして復元しました。"
     },
     "status": {
       "awaitingApproval": "承認待ち",
       "conflicts_one": "確認する競合{{count}}件",
       "conflicts_other": "確認が必要な競合{{count}}件",
       "error": "同期エラー",
+      "errorAuth": "同期のサインインの有効期限が切れました",
+      "errorFrozen": "アカウントが凍結されています — アップロードを一時停止中",
+      "errorDeviceRevoked": "このデバイスはアカウントから削除されました",
+      "errorStorageFull": "ストレージがいっぱいです — 同期を一時停止中",
+      "errorQuota": "ストレージがいっぱいです — アップロードを一時停止中",
+      "errorRateLimited": "同期が制限されています — 再試行中",
+      "errorTooLarge": "アップロードするにはファイルが大きすぎます",
       "loading": "同期ステータスを確認中…",
       "notEnrolled": "未登録",
       "off": "同期オフ",
       "synced": "同期済み",
       "syncing": "同期中…",
       "syncNow": "今すぐ同期"
+    },
+    "usage": {
+      "devices": "デバイス",
+      "frozen": "このアカウントは凍結されています。新しい変更はアップロードできませんが、ノートのダウンロードは続きます。",
+      "ofTotal": "{{used}} / {{total}}",
+      "storage": "ストレージ"
     },
     "settings": {
       "serverSection": "サーバー",
@@ -2516,6 +2894,32 @@
     "deleteConfirm": "このテンプレートを削除しますか？",
     "convertToNote": "ノートに変換"
   },
+  "themeInstall": {
+    "apply": "テーマを適用",
+    "applying": "適用中…",
+    "byAuthor": "このリンクは作者を{{author}}と称しています",
+    "cancel": "キャンセル",
+    "close": "閉じる",
+    "collision": {
+      "keepBoth": "両方を保持 — 「{{name}}」としてインストール",
+      "question": "「{{name}}」という名前のテーマがすでにあります。",
+      "replace": "「{{name}}」を置き換える"
+    },
+    "error": {
+      "importFailed": "そのテーマをインストールできませんでした。何も変更されていません。",
+      "installedNotActivated": "「{{name}}」はインストールされましたが、有効にできませんでした。設定 → 外観 から適用できます。",
+      "invalidName": "そのリンクには、インストールしようとしているテーマの名前がありません。",
+      "listUnavailable": "既存のテーマを読み取れなかったため、現時点では安全にインストールできません。これを閉じて、もう一度リンクを試してください。",
+      "malformedPayload": "そのリンクのテーマデータは破損しているか、不完全です。",
+      "nothingWritten": "保管庫には何も書き込まれていません。",
+      "payloadTooLarge": "そのリンクのテーマデータは、テーマにしては大きすぎます。",
+      "unsupportedVersion": "そのリンクは、より新しいバージョンのMyne向けに作られています。Myneを更新してから、もう一度お試しください。"
+    },
+    "errorTitle": "そのテーマを読み取れませんでした",
+    "helper": "テーマはカラーパレットであり、コードではありません。Myneは使用する前に、このテーマをこのデバイス上で検証します — 何もアップロードされません。",
+    "question": "このテーマを使用しますか？",
+    "title": "テーマをインストール"
+  },
   "unlock": {
     "backToPicker": "別の保管庫を選択",
     "continue": "続行",
@@ -2524,6 +2928,7 @@
     "errors": {
       "alreadyUnlocked": "保管庫はすでにロック解除されています。",
       "inProgress": "操作が進行中です。",
+      "kdfMemoryExceedsHost": "この保管庫を開くには{{required}} MiBのメモリが必要ですが、このブラウザが確保できる量（{{available}} MiB）を超えています。保管庫に問題はありません。Myneのデスクトップアプリで開いてください。",
       "unexpected": "予期しないエラーが発生しました。もう一度お試しください。",
       "vaultNotFound": "保管庫ファイルが見つかりません。アプリを再起動してください。"
     },
@@ -2879,6 +3284,7 @@
     "containsPlaceholder": "含む…",
     "tagPlaceholder": "タグ",
     "folderPlaceholder": "フォルダ/",
+    "propertyKeyPlaceholder": "プロパティキー",
     "addCondition": "+ 条件を追加",
     "createView": "ビューを作成"
   },
@@ -2941,7 +3347,23 @@
     "serverPlaceholder": "https://sync.example.com",
     "accountHint": "この番号をもう一度確認してください — 正しくないようです。",
     "approvalHint": "すでにアカウントを持っているデバイスからこのデバイスを承認すると、ノートが表示されます。",
-    "connectingSubtitle": "アカウントを取得し、このデバイスでボールトのロックを解除しています。"
+    "connectingSubtitle": "アカウントを取得し、このデバイスでボールトのロックを解除しています。",
+    "qr": {
+      "cancel": "キャンセル",
+      "confirmAccount": "アカウント",
+      "confirmServer": "サーバー",
+      "confirmTitle": "このデバイスを追加しますか？",
+      "continue": "続ける",
+      "expired": "このQRは有効期限が切れています — 他のデバイスで新しいQRを表示して、もう一度読み取ってください。",
+      "invalid": "これはMyneのデバイスQRではありません。",
+      "newerVersion": "このQRは、より新しいバージョンのMyneのものです — アプリを更新してからもう一度お試しください。",
+      "pinHosted": "Myneがホストするサーバー",
+      "pinNone": "セルフホストのサーバー",
+      "pinSelfHost": "信頼済みデバイスから証明書をピン留め済み",
+      "scan": "QRを読み取る",
+      "scanFailed": "読み取れませんでした。もう一度試すか、手動で入力してください。",
+      "scanUnavailable": "このデバイスでは読み取りを利用できません — 以下に入力してください。"
+    }
   },
   "createVault": {
     "beginWeakPassword": "より強力なパスワードを選んで、もう一度お試しください。",
@@ -2979,5 +3401,46 @@
     "personalLabel": "個人",
     "openVault": "ボールトを開く",
     "backUpNow": "今すぐバックアップ"
+  },
+  "web": {
+    "reload": {
+      "body": "このページを再読み込みすると、再びパスワードの入力を求められます — 設計上、これより早く入る方法はありません。ページが閉じている間、保管庫はこのデバイス上で暗号化されたまま保たれ、鍵は毎回あなたのパスワードから再構築されます。",
+      "title": "再読み込みには再度パスワードが必要です"
+    },
+    "wall": {
+      "getNative": "デスクトップ版またはモバイル版のMyneを入手",
+      "noAccount": {
+        "body": "アカウントはMyneのデスクトップアプリまたはモバイルアプリで作成します。ここでは作成できません。",
+        "reason": "アカウントを作成すると24語の復元フレーズが生成され、一度だけ表示されます。そのフレーズを表示するのがWebページであってはなりません — そこで漏れてしまえば、Myneのどの仕組みでも取り消すことはできません。",
+        "title": "まずアカウントが必要です"
+      },
+      "noSync": {
+        "body": "このブラウザには同期サーバーが設定されていないため、開けるものがありません。",
+        "reason": "デスクトップアプリとは異なり、ブラウザは頼りにできる自前の保管庫を持ちません — ノートの出どころは同期です。デスクトップアプリまたはモバイルアプリで設定してから、ここに戻ってください。",
+        "title": "同期がまだ設定されていません"
+      }
+    },
+    "unavailableHere": {
+      "backup": "暗号化バックアップの作成と復元は、任意の場所にバックアップファイルを書き込めるMyneのデスクトップアプリで行います。ここでのノートはサーバーから取得されるため、このブラウザは同期によって自身を復元します。",
+      "creation": "新しいアカウントはMyneのデスクトップアプリで作成します。そこで復元フレーズが表示されます — そして復元フレーズは、決してWebページが表示すべきものではありません。",
+      "multiVault": "このブラウザが保持できるアカウントは1つです。別のアカウントを使うには、Myneのデスクトップアプリか別のブラウザプロファイルで開いてください。",
+      "phraseRecovery": "フレーズによる復元はMyneのデスクトップアプリで行います。復元フレーズは、決してWebページに入力すべきではありません。",
+      "title": "ブラウザでは利用できません"
+    },
+    "unsupported": {
+      "title": "Myneはこのブラウザでは動作しません",
+      "mobileTitle": "このデバイスではMyneのアプリを開いてください",
+      "handoff": "Myneのデスクトップアプリ（macOS、Windows、Linux）とモバイルアプリ（iOS、Android）にこうした制限はありません — さらに、実行前に自身の署名を検証します。Webページにはできないことです。",
+      "reason": {
+        "desktop-form-factor": "ブラウザ版のMyneはデスクトップコンピュータ向けに作られています — スマートフォンやタブレットのブラウザでは用意できないメモリと入力手段を必要とします。いずれにせよ、このデバイスではMyneのアプリのほうが適したクライアントです。より高速で、オフラインでも動作し、ブラウザがストレージを消去してもノートを保持します。",
+        "webassembly": "このブラウザは、暗号化コアの動作基盤であるWebAssemblyに対応していません。",
+        "wasm-memory-headroom": "このブラウザは、保管庫の鍵導出に必要な約336 MBのメモリを確保できません。スマートフォンやタブレットのブラウザでは一般に確保できません。この要件は保管庫自体が定めるもので、1台のデバイスのために下げれば、他のすべての場所で保管庫が読み取れなくなります。",
+        "worker": "このブラウザは、保管庫のストレージと暗号化処理が動作するWeb Workersに対応していません。",
+        "opfs": "このブラウザはWebアプリ向けのプライベートなローカルストレージを提供しないため、ページの読み込みをまたいで保管庫を保持する場所がありません。",
+        "opfs-sync-access-handle": "このブラウザのプライベートなローカルストレージには、保管庫が安全に書き込むために必要な同期的ファイルアクセスがありません。",
+        "web-locks": "このブラウザは、2つのタブが同時に1つの保管庫へ書き込むのを防ぐロックに対応していません。",
+        "crypto-getrandomvalues": "このブラウザは暗号学的な乱数源を提供しません。"
+      }
+    }
   }
 }
