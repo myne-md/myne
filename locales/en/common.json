@@ -1672,7 +1672,11 @@
       "trashSingleError": "Couldn't move the note to Trash.",
       "undo": "Undo",
       "vaultRoot": "Vault root",
-      "viewSettingsTitle": "View settings"
+      "viewSettingsTitle": "View settings",
+      "imported_one": "Imported 1 note into this folder",
+      "imported_other": "Imported {{count}} notes into this folder",
+      "importedWithSkips": "Imported {{count}} — {{skipped}} skipped",
+      "importNoMarkdown": "No markdown files in that drop"
     },
     "newFromTemplate": {
       "back": "Back",
