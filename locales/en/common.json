@@ -2487,6 +2487,8 @@
       "lineSpacingHelper": "Vertical space between lines.",
       "lineSpacingLabel": "Line spacing",
       "textSizeHelper": "Base size of the editor text. Headings scale with it.",
+      "previewLabel": "Preview",
+      "previewBody": "The quick brown fox jumps over the lazy dog. Typography settings change how every note reads, so this sample updates as you choose.",
       "textSizeLabel": "Text size"
     },
     "viewMode": {
@@ -2530,6 +2532,12 @@
     "sectionOptions": "Options",
     "footerTagline": "myne · encrypted on this device · open source",
     "editor": {
+      "sections": {
+        "text": "Text & display",
+        "editing": "Editing",
+        "writing": "Writing",
+        "features": "Features"
+      },
       "defaultView": "Default view",
       "typewriter": "Typewriter scrolling",
       "typewriterSubtitle": "Keep the caret vertically centered",

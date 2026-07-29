@@ -28,10 +28,43 @@ import {
   lineSpacingKey,
   textSizeKey,
   toWire,
+  typographyStyleFromKeys,
   type TypographyOption,
 } from "../../editor/typography";
 import { Segmented } from "../primitives/Segmented";
 import { ControlBlock } from "./ControlBlock";
+
+const PREVIEW_WRAP_STYLE: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: "var(--space-2)",
+};
+
+const PREVIEW_CAPTION_STYLE: CSSProperties = {
+  fontFamily: "var(--font-sans)",
+  fontSize: "var(--text-xs)",
+  letterSpacing: "0.06em",
+  textTransform: "uppercase",
+  color: "var(--fg-3)",
+};
+
+// Mirrors the editor's own paper + rule so the specimen reads as a slice of the
+// note surface rather than a settings widget.
+const PREVIEW_FRAME_STYLE: CSSProperties = {
+  background: "var(--paper-1, var(--bg-1))",
+  border: "1px solid var(--line-1)",
+  borderRadius: "var(--radius-2)",
+  padding: "var(--space-4)",
+  overflow: "hidden",
+};
+
+const PREVIEW_TEXT_STYLE: CSSProperties = {
+  margin: 0,
+  color: "var(--fg-1)",
+  fontSize: "var(--editor-text-size)",
+  lineHeight: "var(--editor-line-spacing)",
+  fontFamily: "var(--editor-font-family)",
+};
 
 const ERROR_STYLE: CSSProperties = {
   marginTop: "var(--space-2)",
@@ -164,6 +197,20 @@ export function TypographySettings() {
           </Fragment>
         );
       })}
+      {/* MYND-624: a live specimen of the four presets above. Typography is the
+          setting whose effect is hardest to hold in your head -- "relaxed" line
+          spacing and "wide" content width mean nothing until you see them, and
+          the editor is behind a modal while you are choosing. Resolved through
+          the SAME `typographyStyleFromKeys` the editor uses, so the preview
+          cannot claim something the note will not do. */}
+      <div style={PREVIEW_WRAP_STYLE} data-testid="settings.typography-preview">
+        <span style={PREVIEW_CAPTION_STYLE}>{t("settings.typography.previewLabel")}</span>
+        <div style={PREVIEW_FRAME_STYLE}>
+          <p style={{ ...typographyStyleFromKeys(sel), ...PREVIEW_TEXT_STYLE }}>
+            {t("settings.typography.previewBody")}
+          </p>
+        </div>
+      </div>
       {error !== null && <p style={ERROR_STYLE}>{error}</p>}
     </>
   );
