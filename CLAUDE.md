@@ -4,9 +4,12 @@ Guidance to Claude Code (claude.ai/code) when working in this repository.
 
 Subdirectory CLAUDE.md files cover their own domain in depth — they lazy-load when Claude reads files there:
 - `src-tauri/CLAUDE.md` — Tauri 2 host, capability ACL, plugin pattern, Windows lib-name quirk
+- `core/CLAUDE.md` — `myne-core`, the shared backend crate: the host/IO/task seams, the lifecycle-hooks seam, plugin-core layout, three-layer command shape
 - `protocol/CLAUDE.md` — RustCrypto primitives, subkey derivation discipline, vector-verification
 - `src/CLAUDE.md` — React UI patterns, design tokens, mock-layer status
 - `docs/CLAUDE.md` — spec authoring rules (decisions.md append-only, glossary discipline)
+- `e2e/CLAUDE.md` — tauri-driver desktop harness, scenario authoring rules, the green-3×-consecutive gate
+- `e2e-web/CLAUDE.md` — browser web-E2E lane: what belongs in it and what does not
 - `myne-agents/CLAUDE.md` — agent + skill + feature/session/plan layout
 
 ## Design context (pointer)
@@ -23,7 +26,7 @@ Three files at the repo root carry the visual + strategic system. Read in this o
 
 ## Project status
 
-**Pre-alpha.** Shipped: v0.1 specs (`docs/`), Tauri 2 + Vite + React + TS scaffold (`src/`, `src-tauri/`), Rust crypto crate (`protocol/`, RustCrypto, `#![no_std]` + `alloc`), Cargo workspace (one shared `Cargo.lock`), workspace scripts, pinned toolchain. The desktop scaffold lives at the **repo root** deliberately. It is no longer the only in-repo client: the Phase 3 desktop-**browser** client lives at `web/` and compiles the same `src/` tree (`docs/decisions.md` **2026-07-26** "The web client lives in-repo at `web/`", which supersedes the one-in-repo-client clause of the 2026-04-26 "Desktop scaffold lives at repository root" entry while leaving its placement decision intact). Mobile/server/website/ops/test-vectors remain companion repos; `myne-web` is redundant and archived.
+**Pre-alpha.** Shipped: v0.1 specs (`docs/`), Tauri 2 + Vite + React + TS scaffold (`src/`, `src-tauri/`), Rust crypto crate (`protocol/`, RustCrypto, `#![no_std]` + `alloc`), Cargo workspace (one shared `Cargo.lock`), workspace scripts, pinned toolchain. The desktop scaffold lives at the **repo root** deliberately. It is no longer the only in-repo client: the Phase 3 desktop-**browser** client lives at `web/` and compiles the same `src/` tree (`docs/decisions.md` **2026-07-26** "The web client lives in-repo at `web/`", which supersedes the one-in-repo-client clause of the 2026-04-26 "Desktop scaffold lives at repository root" entry while leaving its placement decision intact). Mobile, server, website, ops, test-vectors, clipper, themes and branding remain companion repos (`workspace/manifest.txt` is the list); `myne-web` is redundant and archived.
 
 ## Common commands
 
@@ -42,57 +45,94 @@ cargo clippy --workspace --all-targets -- -D warnings
 brew install lefthook && lefthook install   # one-time per clone; activates git hooks
 ```
 
-Git hooks are managed by **lefthook** (`lefthook.yml`). `pre-commit` runs the fast lint set (rustfmt-check, `tsc --noEmit`, whitespace, EOF newline, secret pattern guard, single-Cargo.lock check); `pre-push` runs the full battery (`cargo clippy --workspace -- -D warnings`, `cargo test --workspace`, `pnpm build`). CI is self-hosted Woodpecker via the Forgejo mirror (`.woodpecker.yml`, Linux runner; `docs/decisions.md` 2026-05-01) — the hooks are the local pre-push net, CI is the remote gate, and the `e2e` step drives the production binary via tauri-driver (`docs/dev/e2e.md`). **Two lanes, one pipeline** (MYND-574): the desktop lane is one serial chain (`pnpm-build` → `vitest` → `tauri-compile` → `cargo-test-tauri` → `e2e`) because each of those runs `pnpm install` into the shared workspace `node_modules`; the **web lane** hangs off the end of it (`web-build` — the web bundle plus the artefact greps, the seam contract against the web implementation, the bundle budget and the screen/surface/testid rosters) so it adds nothing to the desktop lane's wall-clock, alongside the early Rust wasm gates (`wasm-protocol`). Every step that can go red is listed in `notify-failure` (the only thing that pushes a failure to the maintainer), and every step carries the `code-paths` filter, so a docs-only commit runs none of them. Bypass with `git commit --no-verify` only when you understand why.
+Git hooks are managed by **lefthook** (`lefthook.yml`, which is the authoritative list). `pre-commit` runs the fast lint set (rustfmt-check, SPDX headers on `protocol/`, `tsc --noEmit`, the seam/coverage guards + the i18n catalog check under `scripts/` (see "Repo guards" below), whitespace, EOF newline, single-`Cargo.lock` check, secret pattern guard); `pre-push` runs the full battery (Damm-32 table drift, `cargo clippy --workspace --all-targets -- -D warnings`, the same clippy for `wasm32-unknown-unknown` over `myne-core` + `protocol`, `cargo test -p myne-web-wasm`, `cargo test --workspace`, `pnpm build`, `pnpm test`); `commit-msg` rejects AI co-author/attribution trailers. CI is self-hosted Woodpecker via the Forgejo mirror (`.woodpecker.yml`, Linux runner; `docs/decisions.md` 2026-05-01) — the hooks are the local pre-push net, CI is the remote gate, and the `e2e` step drives the production binary via tauri-driver (`docs/dev/e2e.md`). **Two lanes, one pipeline** (MYND-574): the desktop lane is one serial chain (`pnpm-build` → `vitest` → `tauri-compile` → `cargo-test-tauri` → `e2e`) because each of those runs `pnpm install` into the shared workspace `node_modules`; the **web lane** hangs off the end of it (`web-build` — the web bundle plus the artefact greps, the seam contract against the web implementation, the bundle budget and the screen/surface/testid rosters) so it adds nothing to the desktop lane's wall-clock, alongside the early Rust wasm gates (`wasm-protocol`). Every step that can go red is listed in `notify-failure` (the only thing that pushes a failure to the maintainer), and every compile/test step carries the `code-paths` filter, so a docs-only commit skips them. **Two steps deliberately carry no filter and must keep it that way**: `hooks-parity` (its EOF/whitespace/SPDX checks apply to docs too) and `bundle-record` (the append-only hash record *is* a doc, so a docs-only commit is exactly when it must run) — both say so in their own `.woodpecker.yml` comments; adding `when: *code-paths` to either is a regression, not a cleanup. The web deploy chain (`web-docker-build` → `web-docker-deploy` → `web-smoke`) gates on a different anchor again — `&web-deploy`, i.e. push-to-`develop` — because it publishes `app.myne.md`. Bypass with `git commit --no-verify` only when you understand why.
 
-**A new user-facing flow ships WITH its E2E coverage**: the same change carries the `data-testid` pass (`src/CLAUDE.md` "Test observability") and a scenario on the right harness (`e2e/CLAUDE.md`, procedure `docs/dev/e2e.md`). A PR that adds a flow without its E2E scenario gets rejected in review. **Which harness** — there are two lanes and they do not mirror each other: a flow in the **shared** `src/` tree owes ONE scenario to the tauri-driver suite in `e2e/` and nothing to the web lane, because it is literally the same code; a **web-specific** behaviour (capability gating, OPFS persistence, the single-tab lock, sync-required entry, crash recovery of the double-buffered blobs) owes a scenario to `e2e-web/`. Do **not** dual-drive the desktop suite against a browser: the premise that lets one suite cover both clients is "same tree, only the seam differs", and that premise is verified by the **seam contract tests** (`tests/platform/seam-contract.ts`, run against every implementation in both CI lanes), not by re-running 92 tauri-driver scenario files. `docs/decisions.md` 2026-07-26 "Web E2E policy".
+**A new user-facing flow ships WITH its E2E coverage**: the same change carries the `data-testid` pass (`src/CLAUDE.md` "Test observability") and a scenario on the right harness (`e2e/CLAUDE.md`, procedure `docs/dev/e2e.md`). A PR that adds a flow without its E2E scenario gets rejected in review. **Which harness** — there are two lanes and they do not mirror each other: a flow in the **shared** `src/` tree owes ONE scenario to the tauri-driver suite in `e2e/` and nothing to the web lane, because it is literally the same code; a **web-specific** behaviour (capability gating, OPFS persistence, the single-tab lock, sync-required entry, crash recovery of the double-buffered blobs) owes a scenario to `e2e-web/`. Do **not** dual-drive the desktop suite against a browser: the premise that lets one suite cover both clients is "same tree, only the seam differs", and that premise is verified by the **seam contract tests** (`tests/platform/seam-contract.ts`, run against every implementation in both CI lanes), not by re-running every tauri-driver scenario file in `e2e/`. `docs/decisions.md` 2026-07-26 "Web E2E policy".
 
 `pnpm` is the canonical package manager (Tauri's `beforeDevCommand`/`beforeBuildCommand` invoke it). Pinned versions: Node `.nvmrc`, Rust `rust-toolchain.toml`. **Do not bypass the pinning** — CI and reproducible-build rely on it.
 
-JS tests run on **Vitest** (`pnpm test` → `vitest run`; config `vite.config.ts`/`vitest.config.ts`, specs under `tests/**/*.test.ts`). `tsc` via `pnpm build` is the typecheck; for Rust use `cargo test`. (Note: `tests/` is outside `tsc`'s `include: ["src"]`, so Vitest is the only check that exercises test files.)
+JS tests run on **Vitest** (`pnpm test` → `vitest run`; config `vitest.config.ts` — standalone, it does not extend `vite.config.ts` — specs under `tests/**/*.test.{ts,tsx}`). The other lanes have configs of their own: `vitest.e2e.config.ts` (desktop E2E), `vitest.web-e2e.config.ts` (web E2E), `vitest.capture.config.ts` (user-guide screenshots). `tsc` via `pnpm build` is the typecheck; for Rust use `cargo test`. (Note: `tests/` is outside `tsc`'s `include: ["src"]`, so Vitest is the only check that exercises test files.)
 
 ## What lives where
 
 ```
 myne/
 ├── docs/                ← specs, threat model, glossary, decisions log (CC-BY-4.0)
-├── src/                 ← React UI, shared by BOTH clients; src/dialect + src/editor are re-export shims into the shared pkgs below
+├── src/                 ← React UI, shared by BOTH clients; src/editor is a re-export shim into @myne/editor, src/dialect shims @myne/dialect PLUS desktop-side dialect code never extracted (clip.ts, clip/, html/, text/)
 │   └── platform/        ← the platform seam: the ONLY place under src/ allowed to import @tauri-apps/*
 ├── web/                 ← Phase 3 desktop-browser client: same src/ tree, seam substituted at build time (pnpm web:dev / web:build)
-├── e2e-web/             ← browser-driven web E2E lane (deliberately thin: web-specific behaviour only) — lands with MYND-574 task 105
 ├── src-tauri/           ← Tauri 2 + Rust desktop core
 │   └── capabilities/    ← Tauri capability ACLs (security-load-bearing)
 ├── dialect/             ← @myne/dialect: shared markdown-parser source pkg (source-consumed, no build), desktop+mobile WebView
 ├── editor/              ← @myne/editor: shared CodeMirror engine; platform IO injected via the EditorHost seam (decisions.md 2026-07-05)
+├── copy/                ← @myne/copy: load-bearing user-facing strings kept byte-identical across clients by construction (SYNC-42); deliberately outside i18n
 ├── protocol/            ← Rust crypto crate
-├── core/                ← myne-core: shared backend plugin cores (vault/notes/prefs), desktop+mobile
+├── core/                ← myne-core: shared backend plugin cores + the host/IO/task seams; consumed by desktop, mobile AND the web wasm entry crate
+├── theme-validator/     ← shared custom-theme value-shape allowlist — SECURITY-LOAD-BEARING: the WebView CSP carries style-src 'unsafe-inline', so a theme value that reaches the DOM executes. Desktop themes plugin and myne-themes marketplace CI run this exact crate so the grammar cannot drift (threat-model.md "Custom-theme CSS-value surface"; MYND-508)
+├── tests/               ← Vitest unit/component specs; tests/platform/ holds the seam contract run against every seam implementation
+├── e2e/                 ← tauri-driver desktop E2E suite + fixture-gen crate, fixtures and harness (pnpm test:e2e)
+├── e2e-web/             ← browser-driven web E2E lane, deliberately thin: web-specific behaviour only (pnpm test:e2e:web)
+├── scripts/             ← repo guards + dev tooling — see "Repo guards" below for what each guard blocks
+├── locales/             ← i18n catalogs, one directory per language; locales/en/common.json is the source of truth
+├── packaging/           ← distro packaging (Arch PKGBUILD + .desktop entry)
 ├── public/              ← static assets bundled into the WebView
 ├── workspace/           ← multi-repo helper scripts + manifest
-├── pnpm-workspace.yaml  ← pnpm workspace members (dialect, editor)
-├── Cargo.toml           ← workspace root (members: src-tauri, protocol, core)
+├── pnpm-workspace.yaml  ← pnpm workspace members (dialect, editor, copy)
+├── Cargo.toml           ← workspace root; its `members` list is the source of truth (today: src-tauri, protocol, core, theme-validator, e2e/fixture-gen, web/wasm, web/bench/wasm)
 ├── Cargo.lock           ← single shared lockfile (TB9 audit anchor)
 ├── rust-toolchain.toml  ← pinned Rust toolchain
 ├── package.json         ← pnpm + Vite + React 19 + TS toolchain
 └── vite.config.ts       ← Tauri-aware Vite config
 ```
 
-**Companion repos** (clone via `./workspace/setup.sh` reading `workspace/manifest.txt`): `myne-test-vectors/`, `myne-server/`, `myne-mobile/`, `myne-website/`, `myne-ops/`, `myne-agents/`. (`myne-web` is **not** in this list: the web client is the in-repo `web/` target, and the empty companion repo is archived — `decisions.md` 2026-07-26.) Each is a separate GitHub repo under [`myne-md`](https://github.com/myne-md) — **never commit changes to them through this repo**. Each carries its own CLAUDE.md (lazy-load when you `cd` into it).
+**Companion repos** (clone via `./workspace/setup.sh` reading `workspace/manifest.txt`, which is the list): `myne-test-vectors/`, `myne-server/`, `myne-mobile/`, `myne-website/`, `myne-ops/`, `myne-agents/`, `myne-clipper/`, `myne-themes/`, `myne-branding/`. (`myne-web` is **not** in this list: the web client is the in-repo `web/` target, and the empty companion repo is archived — `decisions.md` 2026-07-26.) Each is a separate GitHub repo under [`myne-md`](https://github.com/myne-md) — **never commit changes to them through this repo**. Each carries its own CLAUDE.md (lazy-load when you `cd` into it).
+
+## Repo guards (what blocks a commit, and what blocks CI)
+
+Most of `scripts/` is not tooling — it is the machine-checked half of the rules this file states in prose. Each guard exists because the failure it catches is invisible to every compiler: a TS string literal that no `match` arm answers, a `std::fs` call that compiles for wasm32 and dies at runtime, a value in the served bundle that should not be there. They are zero-dependency and hand-runnable (`node scripts/<name>.mjs`, `bash scripts/<name>.sh`); every one carries a header comment explaining the failure it prevents, which is the thing to read when it fires.
+
+| Guard | Enforces | Fires in |
+|---|---|---|
+| `check-platform-seam.mjs` | `src/platform/` is the only place under `src/` importing `@tauri-apps/*`; `editor/`, `dialect/`, `copy/` get **zero** Tauri imports | `pre-commit` + CI `pnpm-build` |
+| `check-core-task-seam.mjs` | `crate::task` is the only place in `core/` reaching tokio's *execution* surface (`spawn_blocking` compiles for wasm32 and panics at runtime) | `pre-commit` + CI `pnpm-build` |
+| `check-core-io-seam.mjs` | filesystem ratchet: a `core/src` file not on the recorded list may not start using `std::fs`, and one that leaves may not come back | `pre-commit` + CI `pnpm-build` |
+| `check-web-command-coverage.mjs` | every `plugin:<x>\|<y>` literal in the shared tree is classified in `web/wasm/src/capability.rs` — dispatched, absent-on-web, or a port still owed | `pre-commit` + CI `pnpm-build`, `web-build` |
+| `check-web-capabilities.mjs` | the UI's capability descriptor and the dispatcher's refusal table agree (disagreement is invisible from either side alone) | `pre-commit` + CI `pnpm-build`, `web-build` |
+| `check-i18n.mjs` | no empty English source value in `locales/en/common.json`; every static `t("…")` key in `src/` exists in the catalog | `pre-commit` + CI `pnpm-build` |
+| `hooks-parity-check.sh` | CI backstop for the pre-commit checks that are otherwise `--no-verify`-bypassable: SPDX headers, EOF newline, trailing whitespace — its own header lists what it deliberately leaves to `pnpm-build` and why | CI `hooks-parity` (**unfiltered**: runs on docs-only commits too) |
+| `check-bundle-record.mjs` | the published-bundle-hash record is append-only (`--append-only`), and a deploy may only ship a hash already recorded (`--has`) | CI `bundle-record` (**unfiltered**) + `web-docker-build` (the `--has` precondition, before the image can be deployed) |
+| `wasm-csprng-check.sh` | `protocol` builds for `wasm32-unknown-unknown` **and** its `getrandom` hook stays *undefined* there, so the final Worker-host link must supply entropy explicitly instead of something in the graph quietly supplying it | CI `wasm-protocol` |
+| `wasm-core-graph-check.sh` | `myne-core`'s **dependency graph** resolves for wasm32 (the walls are in the graph, before core's own code compiles) | CI `wasm-protocol` |
+| `wasm-repro-check.sh` | the wasm artefact rebuilds byte-identically (double build, `wasm-bindgen-cli` version read from the lock, never hardcoded). It runs here rather than only locally because CI is a *different* machine — that difference is most of the value. `threat-model.md` §6's substitute for the missing audit; against A15/TB11 a bundle hash nobody else can reproduce is a number the publisher asserts about itself | CI `wasm-protocol` |
+| `check-web-third-party.mjs` | zero third-party origins in the web bundle | CI `web-build` |
+| `check-web-no-phrase.mjs` | the recovery phrase is **absent** from the served bundle, not merely hidden | CI `web-build` |
+| `check-web-no-test-hooks.mjs` | no production test hooks in the served bundle (a hook a scenario can call is a hook any script on the page can call) | CI `web-build` |
+| `check-web-bundle-budget.mjs` | first-load size ratchet, measured from a real build rather than invented | CI `web-build` |
+| `check-web-screens.mjs` / `check-web-surfaces.mjs` | every screen, and every `src/components/settings/`, `src/lib/`, `src/hooks/` module, carries a web verdict — and the excluded ones really are absent | CI `web-build` |
+| `check-web-testids.mjs` | every web-only rendering module has a testid, named `<screen>.<element>`, and no `data-*` on a pre-unlock web screen is fed a runtime expression (the account number is one keystroke from the DOM, screenshots and CI artefacts) | CI `web-build` |
+| `check-web-container-headers.sh` | the container actually *serves* its security headers and operational endpoints (config being right is not the same as its effect being right) | CI `web-docker-build` |
+| `web-smoke.sh` | post-deploy, against the public TLS origin: the right commit shipped and the right sync origin is wired | CI `web-smoke` |
+| `check-icons.mjs` | icon variants exist at the right dimensions, `bundle.icon` is coherent, no Tauri-default icon hashes survive, master SVG hash pinned | CI `e2e` |
+| `src-tauri/scripts/ai-no-network-check.sh` | the on-device AI path has no network surface (a standing anti-feature) | CI `ai-no-network` |
+
+Not gated anywhere and run by hand: `check-web-no-ip-logging.sh` (asserts the web container logs no client IP — the "no persistent server-side IP logging" commitment; a page load on that origin is a vault opening). The rest of `scripts/` is tooling, not gates: `build-wasm.sh`, `emit-web-version.mjs`, the `e2e-*.sh` runners, `bench-web.mjs`, `browser-vectors.sh`, `capture-userguide.sh`, `clipper-dev-install.sh`, `penpot-diff.sh`.
 
 ## The spec is the source of truth
 
 Read `docs/` before changing anything that touches cryptography, on-disk format, key handling, or sync. Order:
 
 1. `docs/vision.md` — phased plan, anti-features (commitments, not "maybe later")
-2. `docs/threat-model.md` — A1–A14 adversaries, AS1–AS17 assets, TB1–TB10 trust boundaries. **Normative**: marketing copy and code may not exceed its guarantees.
+2. `docs/threat-model.md` — A1–A15 adversaries, AS1–AS19 assets, TB1–TB11 trust boundaries (A15 + TB11 are the web bundle's delivery channel, added 2026-07-26). **Normative**: marketing copy and code may not exceed its guarantees.
 3. `docs/spec/protocol.md` — v0.1 cryptographic protocol
 4. `docs/spec/account-number.md` — 20-character Crockford-base32 + Damm-32 identifier
-5. `docs/glossary.md` — canonical terminology (~115 entries). Every new term in any doc gets a glossary entry in the same change.
+5. `docs/glossary.md` — canonical terminology, one A–Z entry per term. Every new term in any doc gets a glossary entry in the same change.
 6. `docs/decisions.md` — append-only timeline. Newest entry **last**. Reversals get new entries that say "supersedes <date> — <title>"; never delete or rewrite past entries.
 
 See `docs/CLAUDE.md` for spec-authoring discipline in depth.
 
 ## Phase 1 plan & ownership
 
-Active Phase 1 work is tracked in Plane: **plane.myne.md** (self-hosted). Lane IDs (`A`, `B`, `C`, `D`, `S`) are retired — Plane native work-item identifiers (e.g., `MYN-…`) are the new anchor for cross-references in `docs/decisions.md`, feature directories, commit subjects, and PR titles. Historical lane-ID references in `docs/decisions.md` and git history are preserved (append-only spec discipline).
+Active Phase 1 work is tracked in Plane: **plane.myne.md** (self-hosted). Lane IDs (`A`, `B`, `C`, `D`, `S`) are retired — Plane native work-item identifiers (e.g., `MYND-635`) are the new anchor for cross-references in `docs/decisions.md`, feature directories, commit subjects, and PR titles. Historical lane-ID references in `docs/decisions.md` and git history are preserved (append-only spec discipline).
 
 ## Cryptographically load-bearing identifiers
 
@@ -143,7 +183,7 @@ Identifiers and constants whose change is a major-version event. Most are bound 
 | Subkey role string (prefs sync-id) | `"prefs-sync-id"` (HKDF context `"myne.v0.1 prefs-sync-id"`; §3.4; Phase 2 sync — derives the reserved 16-byte sync blob-id of `vault.prefs` as `DeriveSubkey(root_key, "prefs-sync-id")[0..16]` (`sync-protocol.md` §10.2.1). An **identifier** derivation like `catalog-sync-id`, not a KEK (the prefs KEK stays `prefs-key`); changing it silently splits `vault.prefs` into a second sync record on every existing account.) |
 | AAD role string (AI-embeddings blob) | `"ai-embeddings-blob"` (length-prefixed; §9.17.3; vault-scoped like search/indices — the `{model_hash ∥ embedding_dim ∥ chunker_version}` model-identity tuple invalidates via the inner payload, NOT the AAD) |
 | Protocol identifier string | `myne-protocol-v0.1` |
-| Account-number display prefix | `MY-` + five dash-separated 4-char Crockford groups (27-char display form, `account-number.md` §3; the old `MY-XXXX-XXXX-XXXX-XXXX-X` sketch was illustrative shorthand — the last group is 4 chars, ending in the Damm-32 check char) |
+| Account-number display prefix | `MY-` + five dash-separated 4-char Crockford groups (27-char display form, `account-number.md` §2; the old `MY-XXXX-XXXX-XXXX-XXXX-X` sketch was illustrative shorthand — the last group is 4 chars, ending in the Damm-32 check char) |
 | Damm-32 quasigroup table | frozen literal, `account-number.md` §4.2 — determines which 20-char strings are valid and which check char generation emits; changing it rejects already-distributed account numbers and breaks cross-impl validity agreement |
 | Firefox Gecko extension ID (browser clipper) | `clipper@myne.md` (`src-tauri/src/clipper/manifest.rs::FIREFOX_EXTENSION_ID`) — **not** an AEAD/magic value; load-bearing through *pairing-token binding*: every clipper pairing token is bound to this exact extension ID and the native-messaging host manifest's `allowed_extensions` is generated from it, so changing it invalidates all distributed pairings (a forced re-pair). |
 | Chrome/Edge extension ID (browser clipper) | `ebbbblnjddeockegombcnbiljefmlhbh` (`src-tauri/src/clipper/manifest.rs::CHROMIUM_EXTENSION_ID`) — **not** an AEAD/magic value; load-bearing the same way the Firefox id is: it is written into the Chromium native-messaging manifest's `allowed_origins` (`chrome-extension://<id>/`) and every clipper pairing token binds to it. **Deterministically derived** from the committed manifest `key` in the `myne-clipper` repo (base64-decode → SHA-256 → first 16 bytes → `[a-p]`); changing that `key` re-derives this and forces a re-pair. Installer wiring: `docs/decisions.md` 2026-07-05. |
@@ -180,4 +220,4 @@ Full primitive details, audit anchors, and subkey derivation discipline rule (wh
 
 ## License
 
-Multi-licensed by subtree — see [`LICENSING.md`](LICENSING.md) for the authoritative map. Application code (`src/`, `src-tauri/`, `protocol/`) is **AGPL-3.0** (not "or-later"); the `docs/` subtree is **CC-BY-4.0** so the spec stays reusable for independent implementations as long as Myne is credited. Every `protocol/` source file carries `// SPDX-License-Identifier: AGPL-3.0`. Decision recorded in `docs/decisions.md`.
+Multi-licensed by subtree — see [`LICENSING.md`](LICENSING.md) for the authoritative map. Application code (`src/`, `src-tauri/`, `web/`, `core/`, `protocol/`) is **AGPL-3.0** (not "or-later" — and `web/`'s AGPL is load-bearing: the network clause is what makes a served bundle self-hostable, the only mitigation A15/TB11 has); the `docs/` subtree is **CC-BY-4.0** so the spec stays reusable for independent implementations as long as Myne is credited. Every `protocol/` source file carries `// SPDX-License-Identifier: AGPL-3.0`. Decision recorded in `docs/decisions.md`.

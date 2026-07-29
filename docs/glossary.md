@@ -78,7 +78,7 @@ Used in: MYND-262, MYND-267; `src-tauri/src/spell/`.
 
 ### **adversary class** &nbsp; ⚠️ *Threat*
 
-A category of attacker against which the threat model defines a specific defensive posture. Myne catalogs 13 classes (A1–A13) with explicit Strong / Mitigated / Best-effort / Out-of-scope status per class. Refer to `threat-model.md` §1 for the full catalog rather than enumerating individual classes here.
+A category of attacker against which the threat model defines a specific defensive posture, each carrying an explicit Strong / Mitigated / Best-effort / Out-of-scope status. The catalog grows as the product does — A14 arrived with the browser clipper, A15 with the served web bundle — so `threat-model.md` §1 is the roster of record; refer to it rather than enumerating individual classes (or their count) here.
 
 Used in: `threat-model.md` §1
 
@@ -93,7 +93,7 @@ Reference: RFC 5116.
 
 A simple, modern file-encryption format and library by Filippo Valsorda. Myne does not use age in v0.1 but the research roadmap (`appname-v005`) considers age-style chunked AEAD streams for attachments. The canonical specification lives at the C2SP repository.
 
-Used in: `e2ee-notes-evaluation.md` (recommended-stack discussion)
+Used in: `decisions.md` 2026-04-28 (age/rage cited as the boring-crypto precedent for the RustCrypto stack); `spec/protocol.md` §2
 Reference: https://github.com/C2SP/C2SP/blob/main/age.md
 
 ### **aPAKE (Augmented Password Authentication Key Exchange)** &nbsp; 🏗️ *Construction*
@@ -126,7 +126,7 @@ Reference: RFC 9106.
 
 ### **asset** &nbsp; ⚠️ *Threat*
 
-A resource that the threat model identifies as worth protecting, classified by sensitivity (Critical / Sensitive / Pseudonymous / Metadata) and by visibility (client only, encrypted blob on server, plaintext on server, transient). Myne catalogs 17 assets (AS1–AS17). See `threat-model.md` §2 for the full table.
+A resource that the threat model identifies as worth protecting, classified by sensitivity (Critical / Sensitive / Pseudonymous / Metadata) and by visibility (client only, encrypted blob on server, plaintext on server, transient). The catalogued set grows with the product — AS18 and AS19 arrived with the pending-capture and share-import queues — so `threat-model.md` §2 is the table of record; read it there rather than tracking a count here.
 
 Used in: `threat-model.md` §2
 
@@ -144,7 +144,7 @@ Used in: `spec/protocol.md` §9; `threat-model.md` §1 (A5)
 
 ### **auth_permits** &nbsp; 📦 *Product*
 
-A capacity-1 `tokio::sync::Semaphore` on `VaultRuntimeState` (Rust-side singleton in `src-tauri/src/plugins/vault_unlock/state.rs`) held by **every command that creates, destroys, or mutates `vault.meta`**: `vault_unlock`, `vault_recover_with_phrase`, `vault_complete_recovery`, `vault_change_password`, `vault_delete`, `vault_create::commit`, and `vault_repair`. Each acquires via `try_acquire()` (reject, never queue) at the start of its critical section and releases via RAII guard on every return path. The single-permit invariant guarantees **at most one vault.meta-lifecycle mutation in flight client-wide** — a generalization of the original "at most one ~1-second Argon2id derivation in flight" framing, which became inaccurate once non-Argon2id members joined (`vault_delete` and `vault_repair` hold the permit for a pure filesystem sweep, not a KDF). It defends the no-queue posture (`decisions.md` 2026-05-02 "Phase 1 unlock UI semantics") and closes the `vault_repair` ↔ `vault_create::commit` TOCTOU (`decisions.md` 2026-06-06 "vault_repair v0.2", MYND-159). Renamed from `unlock_permits` (the pre-recovery-flow shape) when the recovery commands started sharing the lock.
+A capacity-1 `tokio::sync::Semaphore` on `VaultRuntimeState` (Rust-side singleton in `core/src/plugins/vault_unlock/state.rs`) held by **every command that creates, destroys, or mutates `vault.meta`**: `vault_unlock`, `vault_recover_with_phrase`, `vault_complete_recovery`, `vault_change_password`, `vault_delete`, `vault_create::commit`, and `vault_repair`. Each acquires via `try_acquire()` (reject, never queue) at the start of its critical section and releases via RAII guard on every return path. The single-permit invariant guarantees **at most one vault.meta-lifecycle mutation in flight client-wide** — a generalization of the original "at most one ~1-second Argon2id derivation in flight" framing, which became inaccurate once non-Argon2id members joined (`vault_delete` and `vault_repair` hold the permit for a pure filesystem sweep, not a KDF). It defends the no-queue posture (`decisions.md` 2026-05-02 "Phase 1 unlock UI semantics") and closes the `vault_repair` ↔ `vault_create::commit` TOCTOU (`decisions.md` 2026-06-06 "vault_repair v0.2", MYND-159). Renamed from `unlock_permits` (the pre-recovery-flow shape) when the recovery commands started sharing the lock.
 
 Used in: `decisions.md` 2026-05-02 "Slot state machine + auth_permits generalization"
 
@@ -261,9 +261,9 @@ Reference: https://github.com/bitcoin/bips/blob/master/bip-0039.mediawiki
 
 ### **bootstrap-fingerprint** &nbsp; 📋 *Protocol*
 
-A short, eye-comparable code derived from a [vault head](#vault-head)'s [head_id](#head_id), compared **out-of-band** between two devices at the device-approval moment to harden the [TOFU bootstrap](#tofu-bootstrap) of a newly-enrolled device against a malicious server — the same role as Signal/Matrix safety numbers. A fresh device has no prior head to compare against, so its first adopted state would otherwise be taken on faith; the user eye-comparing the fingerprint on both screens turns "trust the server" into "verified against an existing trusted device". ~SAS-magnitude (tens of bits), not the full 32-byte MAC. v1 ships the substrate (the fingerprint is a deterministic function of `head_id`); the general always-available fork-audit fingerprint UI is v1.x. Phase 2.
+A short, eye-comparable code derived from a [vault head](#vault-head)'s [head_id](#head_id), compared **out-of-band** between two devices at the device-approval moment to harden the [TOFU bootstrap](#tofu-bootstrap) of a newly-enrolled device against a malicious server — the same role as Signal/Matrix safety numbers. A fresh device has no prior head to compare against, so its first adopted state would otherwise be taken on faith; the user eye-comparing the fingerprint on both screens turns "trust the server" into "verified against an existing trusted device". Exactly **40 bits**, not the full 32-byte `head_id`: `SHA-256("myne.v0.1 vault-head-fingerprint" || head_id)` truncated to its first 5 bytes and rendered as eight Crockford-base32 characters, displayed grouped `XXXX-XXXX`. Every element of that construction is normative and cross-implementation byte-identical (`spec/sync-protocol.md` §6.3, pinned by the `head-fingerprint` golden vectors) — a second implementation that changed the domain string, the truncation width, the bit order, the alphabet or the grouping would show a different code for the same head. There is **no** check character: this code is compared by eye, never typed, so the Damm-32 machinery of `account-number.md` §4 does not apply. v1 ships the substrate (the fingerprint is a deterministic function of `head_id`); the general always-available fork-audit fingerprint UI is v1.x. Phase 2.
 
-Used in: `spec/sync-protocol.md` (vault head); `spec/protocol.md` §3.4 (MYND-416)
+Used in: `spec/sync-protocol.md` §6.3 (normative construction); `spec/protocol.md` §3.4 (MYND-416); `protocol/src/vault_head.rs::head_fingerprint`
 
 ### **blind blob store** &nbsp; 📦 *Product*
 
@@ -432,6 +432,12 @@ The single value the UI consults to decide whether a platform provides a given a
 
 Used in: `decisions.md` 2026-07-26 (web capability set)
 
+### **capability gating** &nbsp; 📦 *Product*
+
+The act of applying the [capability descriptor](#capability-descriptor) — the web client omitting from its interface everything the [web capability set](#web-capability-set) says a browser may not do. Named as a term because it is what the web E2E lane tests by that name (`e2e-web/capability-gating.e2e.ts`), and what it asserts is the **absent, not disabled** rule rather than the presence of an error message. Gating is stated twice on purpose — `web/src/platform/capabilities.ts` decides what the UI omits, `web/wasm/src/capability.rs` decides what the dispatcher refuses — and the two are kept from disagreeing by `scripts/check-web-capabilities.mjs`, because "UI offers, backend refuses" reproduces the greyed-control failure by a different route and "UI omits, backend allows" hides a working feature with nothing reporting it.
+
+Used in: `decisions.md` 2026-07-26 (web E2E policy); `docs/dev/e2e.md`
+
 ### **CTX commitment** &nbsp; 🏗️ *Construction* (deep entry)
 
 The key-committing AEAD construction defined by Chan & Rogaway (ESORICS 2022) that wraps a non-committing AEAD to provide commitment to the key. Myne instantiates CTX with XChaCha20-Poly1305 as the inner AEAD and SHA-256 as the outer hash. The Poly1305 tag T (16 bytes) is replaced on disk by the 32-byte commitment tag T' = SHA-256(canonical_encode(K, N, AD, T)), where `canonical_encode` uses a length-prefixed encoding of AD to eliminate concatenation ambiguity per Chan & Rogaway §3. This defends against partitioning-oracle attacks (Len–Grubbs–Ristenpart, USENIX 2021): without CTX, an attacker with a partial-decrypt oracle could construct a ciphertext that decrypts under multiple keys, enabling binary-search brute-force against weak passwords. The cost is ~30 lines of code, ~0.001% performance, and ~16 extra bytes per AEAD operation on disk.
@@ -450,6 +456,10 @@ Used in: `spec/markdown-dialect.md`, `myne-agents/features/editor-mvp/rfc.md`
 A user-chosen icon replacing a [folder](#folder)'s default sidebar glyph, rendered in `currentColor` (icons are never colored independently, `PRODUCT.md`). Persisted as the `folder_icons` field of [`vault.prefs`](#vaultprefs) — an optional nested-object map from a canonical trailing-slash folder path to an icon name drawn from a curated client-side stroke-glyph set (no arbitrary/uploaded icon, no emoji); NFC-normalized, lexicographically-keyed, omitted-when-empty (`spec/protocol.md` §9.5.2). Folder-keyed entries are prefix-rewritten on folder rename/move and pruned on delete; a stale or unknown-icon entry is ignored at render and pruned on the next write. **Non-load-bearing** (cosmetic, AS-low). Folders only — notes get a [color label](#color-label) but not a custom icon. See also [color label](#color-label), [PrefsView](#prefsview). (MYND-185)
 
 Used in: `spec/protocol.md` §9.5.2; `decisions.md` 2026-06-07
+
+### **custom theme** &nbsp; 📦 *Product*
+
+A user-authored color palette — distinct from the built-in Light/Dark [Theme preference](#theme-preference). A flat map of CSS custom-property names to values (`{ "--paper": "#…", "--ink-1": "#…", … }`): a **single flat palette** that, when selected, *overrides* Light / Dark / System rather than carrying per-mode variants. It is validated host-side (Rust) — the minimal raw-ramp token core must be present, and every value must match a **value-shape allowlist** (hex / `rgb()` / `rgba()` / `hsl()` / named color / `<number><unit>`), the *primary* injection guard because the WebView keeps `style-src 'unsafe-inline'` (`threat-model.md` custom-theme CSS-value surface; `decisions.md` 2026-06-16). **The palette is vault content**: it lives in the encrypted [`vault.themes`](#vaultthemes) blob (`MYT1`, `spec/protocol.md` §9.21) — encrypted at rest, synced, and backed up — while the *selection* `custom:<name>` persists in the encrypted [`vault.prefs`](#prefsview) `custom_theme` field (the blob holds the palettes, prefs holds the pointer). This **supersedes** the original device-local plaintext `app_config_dir/themes/<name>.json` storage (`decisions.md` 2026-07-16); palettes now enter and leave only by explicit user import/export of a `.json`. A custom theme is **validated, not sandboxed**: it is not a security boundary, only a guarded cosmetic surface. Introduced MYND-111 (custom-themes epic); promoted to vault content MYND-486. See also [Theme preference](#theme-preference), [vault.themes](#vaultthemes), [syntax color tokens](#syntax-color-tokens).
 
 ### **Cytoscape.js** &nbsp; 🛠️ *Tooling*
 
@@ -701,6 +711,12 @@ The per-field LWW timestamp of the Phase 2 prefs sync (`sync-protocol.md` §10.2
 
 Used in: `sync-protocol.md` §10.2, `spec/protocol.md` §9.5.2; `decisions.md` 2026-07-13
 
+### **first-load bundle budget** &nbsp; 🛠️ *Tooling*
+
+The web client's ceiling on the bytes a browser must fetch before it can run the application — the entry module, its transitive *static* import graph (what Vite emits as `modulepreload`), the stylesheet, and the HTML. Lazily-imported chunks (mermaid, the drawing canvas, the locale catalogues) are deliberately excluded: counting them would make the budget indifferent to whether code-splitting works. It is a **ratchet, not an invented number**: the raw and gzip figures were measured from a complete build into `web/bundle-baseline.json`, and `scripts/check-web-bundle-budget.mjs` fails the web CI lane when a build exceeds them by more than the recorded margin, so a bundle increase becomes an edit someone makes and signs (`--update`) rather than drift nobody sees. The gzip number is the one that fails the build (it is the transfer size); raw bytes are reported because they are what the browser must parse. It also carries one architectural assertion — the wasm core must not appear in the first-load graph at all, since it is needed at unlock rather than at first paint. Shipping the full unsubset Inter face is recorded against this budget as a deliberate cost (`decisions.md` 2026-07-28).
+
+Used in: `decisions.md` 2026-07-28; `scripts/check-web-bundle-budget.mjs`, `web/bundle-baseline.json`
+
 ### **focus mode** &nbsp; 📦 *Product*
 
 The editor's distraction-free writing state (MYND-348): a `Mod-Shift-F` toggle fades the in-app chrome (sidebars, tab strip, [bottom bar](#bottom-bar), floated title-bar cluster) and centers the column, so only the words remain. The fade is **in-app only** — a CSS rule keyed on the editor root's `data-focus-active` attribute, never OS fullscreen (no Tauri window-API capability is added). The active state is **ephemeral** React state (opt in each session, never auto-entered, not persisted to any blob). Exit via the toggle or **Esc** at low keymap precedence (the editor's autocomplete / multi-cursor consume Esc first). v1 also ships [typewriter scroll](#typewriter-scroll) and [line-focus dimming](#line-focus-dimming), each a Settings → Editor toggle (the `editor_focus_typewriter` / `editor_focus_dim_inactive` MYP1 fields, default on); the command palette and Settings open over focus and return to it on close. Threat-neutral (UI state + two cosmetic prefs fields). See also [typewriter scroll](#typewriter-scroll), [line-focus dimming](#line-focus-dimming).
@@ -806,7 +822,7 @@ Reference: RFC 5869.
 
 A class of attack where an adversary captures encrypted traffic or storage today, expecting future cryptographic advances (notably quantum computing) to enable decryption later. Myne v0.1 does not provide post-quantum protection; the `appname-v005` roadmap introduces hybrid X25519 + ML-KEM-768 wrap to address HNDL for sync-server scenarios.
 
-Used in: `threat-model.md` §1 (A10 discussion); `e2ee-notes-evaluation.md`
+Used in: `threat-model.md` §1 (A10 discussion)
 
 ### **embedded HTML rendering** &nbsp; 📦 *Product*
 
@@ -860,7 +876,7 @@ Used in: `decisions.md` 2026-05-31
 
 ### **in-transit encryption** &nbsp; 🏗️ *Construction*
 
-TLS 1.3 with strict cipher configuration plus client-side certificate pinning. The transport layer in Myne's protocol is TLS-only — no plaintext fallback (`threat-model.md` §3 TB4). Distinct from at-rest encryption and from the AEAD that ciphertext bytes carry inside their TLS payload.
+TLS 1.3 with strict cipher configuration plus client-side certificate pinning. The transport layer in Myne's protocol is TLS-only — no plaintext fallback (`threat-model.md` §3 TB4). **The pinning half is a native-client property**: configuring an endpoint captures its leaf certificate on first connect (TOFU) and every later connection is checked against that pin, with only the *hosted static* pin deferred until the hosted certificate and domain exist. A browser exposes no certificate pinning to page JavaScript, so a web-client session rests on the platform trust store and nothing more (`threat-model.md` §1 A4). Distinct from at-rest encryption and from the AEAD that ciphertext bytes carry inside their TLS payload.
 
 Used in: `threat-model.md` §3 TB4
 
@@ -1024,7 +1040,7 @@ Used in: `spec/protocol.md` §9.5.2
 
 A mechanism for publishing user-key bindings to a verifiable log so that clients can detect malicious server-side key substitution. Out of scope for v0.1 (no multi-device or multi-user identity); a `appname-v005` deliverable.
 
-Used in: `spec/protocol.md` §11; `e2ee-notes-evaluation.md`
+Used in: `spec/protocol.md` §11
 
 ### **label slot** &nbsp; 📦 *Product*
 
@@ -1056,9 +1072,9 @@ Used in: `spec/protocol.md` §5.1.4 (third-party guidance only)
 
 ### **libsodium-sys-stable / sodiumoxide** &nbsp; 🛠️ *Tooling*
 
-Rust FFI bindings to the libsodium C library. The desktop crypto layer uses one of these (selected at implementation time).
+Rust FFI bindings to the libsodium C library. **Evaluated and rejected — neither is a Myne dependency.** An early stack sketch had the Rust crypto layer bind libsodium through one of these with RustCrypto crates as a fallback; `decisions.md` 2026-04-28 supersedes that clause by name and makes the **RustCrypto stack** the primary Rust provider, chiefly because FFI bindings would drag a vendored C tarball, `cc-rs`, and a per-platform C-compiler matrix into the reproducible-build story (`threat-model.md` §6, TB7/TB9). `protocol/Cargo.toml` names no libsodium binding. The entry is kept for the audit trail. See [libsodium](#libsodium), [RustCrypto](#rustcrypto).
 
-Used in: `decisions.md` (Tauri stack realignment)
+Used in: `decisions.md` 2026-04-26 (Tauri stack realignment, where the binding was first sketched) and 2026-04-28 (which supersedes it)
 
 ### **line-focus dimming** &nbsp; 📦 *Product*
 
@@ -1157,7 +1173,7 @@ Used in: `spec/protocol.md` §9.1, §5.2
 
 Host-side newtype around the per-note UUIDv7 (`note_uuid`). Generated server-side by the `note_create` Tauri command (`NoteId::new_v7`) and returned to the UI as the canonical lowercase-hyphenated 36-char form; the UI never produces a `NoteId` — only consumes the string returned by `note_create` and passes it back unchanged to subsequent reads/updates. `NoteId::parse(&str)` is **strict**: 36 chars + lowercase ASCII letter/digit/hyphen + hyphens at fixed positions 8/13/18/23 + `uuid::Uuid::parse_str` succeeds + `version_num == 7`. Each rejection routes through a `pub(crate) InvalidNoteIdCause` (5 sub-causes) emitted via `tracing::debug!` for ops debugging, then collapses to the single public `InvalidNoteId` IPC variant per the unlock-error-discipline boundary policy (`decisions.md` 2026-04-26). The strict contract delivers three structural defenses: path-traversal becomes impossible (no UI string reaches a path component without `parse` succeeding), filesystem case-sensitivity inconsistency between APFS / ext4 is structurally prevented, and the backend-gen v7-only contract is double-pinned (a v4 UUID submitted by a buggy/hostile UI is rejected at `WrongVersion` before any path concat).
 
-Used in: `spec/protocol.md` §9.1, §5.2; `decisions.md` 2026-05-07 "Note UUIDv7 backend-gen" + "NoteId strict parse"; `src-tauri/src/plugins/notes/note_id.rs`
+Used in: `spec/protocol.md` §9.1, §5.2; `decisions.md` 2026-05-07 "Note UUIDv7 backend-gen" + "NoteId strict parse"; `core/src/plugins/notes/note_id.rs`
 
 ### **Myne markdown dialect (D1)** &nbsp; 📦 *Product* (deep entry, *Myne-divergent*)
 
@@ -1316,7 +1332,7 @@ A short piece of dictated note text captured on the native-SwiftUI Apple Watch c
 
 ### **platform seam** &nbsp; 📦 *Product*
 
-The single internal boundary through which the shared React UI reaches its host platform — `src/platform/`, one module per host capability (`core`, `event`, `dialog`, `opener`, `path`, `window`, `webviewWindow`, `clipboardManager`, `deepLink`). Desktop's implementation re-exports Tauri; the web client's routes the same calls into a wasm Worker. No file under `src/` outside the seam may import `@tauri-apps/*`, and a `pre-commit` hook plus a CI step enforce it. The seam's whole purpose is that the two clients are the **same tree with one substitution**, which is also why a single **contract-test** suite runs against every implementation rather than each being tested on its own terms.
+The single internal boundary through which the shared React UI reaches its host platform — `src/platform/`, one module per host capability (`core`, `event`, `dialog`, `opener`, `path`, `window`, `webviewWindow`, `clipboardManager`, `deepLink`). Desktop's implementation re-exports Tauri; the web client's routes the same calls into a wasm Worker. No file under `src/` outside the seam may import `@tauri-apps/*`, and a `pre-commit` hook plus a CI step enforce it. The seam's whole purpose is that the two clients are the **same tree with one substitution**, which is also why a single **contract-test** suite — the [seam contract](#seam-contract) — runs against every implementation rather than each being tested on its own terms.
 
 Used in: `decisions.md` 2026-07-26 (web E2E policy); `src/platform/`
 
@@ -1354,7 +1370,7 @@ Used in: `threat-model.md` §7
 
 Cryptographic primitives believed secure against quantum-computing attacks. Myne v0.1 is not post-quantum. The `appname-v005` roadmap introduces hybrid X25519 + ML-KEM-768 (FIPS 203) for KEM operations and Ed25519 + ML-DSA-65 (FIPS 204) for signatures.
 
-Used in: `e2ee-notes-evaluation.md`; `spec/protocol.md` §11
+Used in: `spec/protocol.md` §11
 
 ### **PQXDH (Post-Quantum Extended Triple Diffie-Hellman)** &nbsp; 🏗️ *Construction*
 
@@ -1492,7 +1508,7 @@ Used in: `spec/protocol.md` §3.1
 
 ### **RustCrypto** &nbsp; 🛠️ *Tooling*
 
-A collection of pure-Rust cryptographic crates (`hkdf`, `chacha20poly1305`, `argon2`, `ml-kem`, `ml-dsa`, etc.). Myne uses RustCrypto as a fallback when libsodium bindings prove inadequate, but libsodium remains the canonical reference. The `ml-kem` and `ml-dsa` crates are the likely Rust path for v005's post-quantum primitives.
+A collection of pure-Rust cryptographic crates (`hkdf`, `chacha20poly1305`, `argon2`, `ml-kem`, `ml-dsa`, etc.). **The primary — and only — primitive provider on Myne's Rust side** (`decisions.md` 2026-04-28, which supersedes the earlier libsodium-bindings clause; `spec/protocol.md` §2 "Library"). `protocol/Cargo.toml` declares **no cryptographic primitive provider outside RustCrypto**: every KDF, AEAD, hash and MAC the protocol specifies comes from `hkdf`, `argon2`, `chacha20poly1305`, `chacha20`, `poly1305`, `sha2` and `pbkdf2` (the RFC 5802/7677 SCRAM KDF), alongside `subtle`, `zeroize` and `getrandom`. The manifest's other entries are not primitive providers and are not claimed to be — `base64` (SCRAM `AuthMessage` serialization), `bip39` (the BIP-39 wordlist and its own internal checksum; the phrase is fed **directly** to RustCrypto's `argon2`, never through BIP-39's PBKDF2 seed step), `unicode-normalization` (NFKD before Argon2id), `thiserror`, `serde`, `tracing`. The same crate is what the desktop, mobile and — compiled to `wasm32-unknown-unknown` — web clients run, so there is no fallback path and no second Rust implementation to keep in agreement. [libsodium](#libsodium) is not linked anywhere; it remains the **byte-level interoperability reference** the primitive choices are stated against, machine-checked by `myne-test-vectors/`. The `ml-kem` and `ml-dsa` crates are the likely Rust path for v005's post-quantum primitives.
 
 Used in: `spec/protocol.md` §2.2
 
@@ -1520,6 +1536,12 @@ Best-effort native window exclusion preventing OS screen-recording and screensho
 
 Used in: `threat-model.md` §6, §7
 
+### **seam contract** &nbsp; 🛠️ *Tooling*
+
+The one assertion suite that pins the behaviour of the [platform seam](#platform-seam) — call shape, error propagation, subscribe/unsubscribe lifecycle, and the typed *unsupported* outcome for every seam module — and is run against **every** implementation (the Tauri one and the web one) in **both** CI lanes (`tests/platform/seam-contract.ts`, driven by `tauri-seam.test.ts` / `web-seam.test.ts`). It exists because the reason the web client gets no mirror of the desktop E2E suite — "it is the same `src/` tree, only the seam differs" — is a *premise*, and an unverified premise is how a divergence ships; the contract turns it into a checked property. It also pins desktop seam behaviour, which nothing pinned before. See also [capability gating](#capability-gating), [single-tab lock](#single-tab-lock).
+
+Used in: `decisions.md` 2026-07-26 (web E2E policy); `docs/dev/e2e.md`; `tests/platform/seam-contract.ts`
+
 ### **search index** &nbsp; 📦 *Product*
 
 Myne's full-text search over note content (MYND-29). A custom in-memory **BM25 inverted index** (AND-of-terms with a last-term prefix match for type-ahead, plus a title-boost) built from decrypted note plaintext while the vault is unlocked, queried in RAM, and persisted as the encrypted `vault.search` blob. Index-side, each note's language is detected (whatlang, EN/TR/DE) and single-stemmed (the raw token is always indexed too); query-side, terms are multi-stemmed across all supported languages (the query is too short to detect a language) — a deliberate index/query asymmetry. The index is **plaintext-derived RAM**, as sensitive as the open notes: zeroized on lock (`threat-model.md` A6), and never the source of truth (the `.myn` files are). Engine choice sits behind a swappable trait; the MYND-29 benchmark (`decisions.md` 2026-05-31) selected the custom engine over tantivy on the budget table. See also [search-index-key](#search-index-key), [fall-to-rebuild](#fall-to-rebuild).
@@ -1538,9 +1560,13 @@ Used in: `spec/protocol.md` §3.4, §5.2, §9.6
 
 ### **service worker** &nbsp; 📦 *Product*
 
-A script the browser installs for an origin and consults for that origin's network requests. In the Phase 3 web client it is the **code-pinning** mechanism: after the first load it serves the bundle it already holds, so a bundle substituted *later* cannot reach a session that has already started. It is a partial answer to [served-code delivery](#served-code-delivery), not a complete one — it does nothing about *targeted first delivery*, where the very first bundle a user receives is the malicious one. Its update policy is in direct tension with shipping security fixes, which is why the policy is written before any pinning ships rather than after.
+A script the browser installs for an origin and consults for that origin's network requests. In the Phase 3 web client it is the intended **code-pinning** mechanism: once implemented it will serve the bundle it already holds and accept a replacement only when that bundle's hash is *both* signed by a release key the worker carries *and* present in the public append-only record of released hashes — so a bundle substituted *later* cannot reach a client that has already loaded once.
 
-Used in: `threat-model.md` §1 A15, §3 TB11
+**The policy is fixed; the worker is not built.** `decisions.md` 2026-07-26 settles the update rules deliberately ahead of the implementation, because pinning code and shipping security fixes are in direct tension and resolving that tension inside an update path nobody reviews as a security decision is exactly how the hole reopens. What exists today is that policy alone, extracted as a pure function (`web/src/sw/update-policy.ts`, whose only caller is its unit test): no worker script ships, nothing registers one, and nothing currently pins a loaded bundle. Until one does, the compensating controls that actually ship against [served-code delivery](#served-code-delivery) are the detection-oriented pair — the reproducible bundle build, and the per-release hashes published in [`web-bundle-hashes.md`](web-bundle-hashes.md).
+
+Even fully implemented it stays a partial answer, in two ways that do not go away: it does nothing about *targeted first delivery*, where the very first bundle a user receives is the malicious one; and the browser fetches the worker script itself from the network rather than from the worker's own cache, so an operator controlling the origin can serve a replacement worker that omits the verification. The accurate claim it will buy is the narrow one — every load after the first is as strong as [TB7](#trust-boundary) — never "the web client verifies its own code".
+
+Used in: `threat-model.md` §1 A15, §3 TB11; `decisions.md` 2026-07-26
 
 ### **session-state-key** &nbsp; 🗝️ *Key/identifier*
 
@@ -1578,21 +1604,21 @@ Used in: `vision.md`, `threat-model.md` §3
 
 ### **served-code delivery** &nbsp; ⚠️ *Threat*
 
-The property that distinguishes the web client's code channel from every other one Myne uses: the client program is re-sent from an origin on **every page load**, the browser verifies no signature over it, and the user keeps no artifact afterwards to hash or compare. This makes the origin operator able to serve one identified account modified code and everyone else the honest code, undetectably at the time and in the same page the master password is typed into. It is a **separate boundary (TB11) and a separate adversary (A15)**, not a variant of the signed, hash-published, reproducible distribution channel TB7 describes — a served bundle satisfies none of TB7's three crossing conditions. Compensating controls are detection-oriented (reproducible builds, published bundle hashes in a public append-only record, a service worker that pins the code after first load) and close *later substitution*, not *targeted first delivery*.
+The property that distinguishes the web client's code channel from every other one Myne uses: the client program is re-sent from an origin on **every page load**, the browser verifies no signature over it, and the user keeps no artifact afterwards to hash or compare. This makes the origin operator able to serve one identified account modified code and everyone else the honest code, undetectably at the time and in the same page the master password is typed into. It is a **separate boundary (TB11) and a separate adversary (A15)**, not a variant of the signed, hash-published, reproducible distribution channel TB7 describes — a served bundle satisfies none of TB7's three crossing conditions. Compensating controls are detection-oriented and close *later substitution*, not *targeted first delivery*. Two of them ship: the reproducible bundle build, and the per-release bundle hashes published in a public append-only record ([`web-bundle-hashes.md`](web-bundle-hashes.md)). The third — a [service worker](#service-worker) pinning the code after first load — has its policy fixed (`decisions.md` 2026-07-26) but no implementation, so today nothing bounds a later substitution either.
 
 Used in: `threat-model.md` §1 A15, §3 TB11, §5
 
 ### **server-auth subkey** &nbsp; 🗝️ *Key/identifier*
 
-A subkey derived from `root_key` via `derive_key(root_key, "myne.v0.1 server-auth")`. **Reserved, not used in v0.1.** The exact protocol-level role (simple verifier transmission vs OPAQUE `export_key` integration) is deferred to Phase 2; see `spec/protocol.md` §11.1.
+A subkey derived from `root_key` via `derive_key(root_key, "myne.v0.1 server-auth")`. **Active in Phase 2 sync**: it is the high-entropy secret behind the SCRAM handshake — the client proves possession of it at device enroll and on every sync cycle (`core/src/plugins/sync/{cycle,enroll,orchestrator}.rs`), and the server stores only a `StoredKey`/`ServerKey` verifier, so the subkey itself is **never transmitted**. The mechanism choice that `spec/protocol.md` §11.1 deferred (simple verifier vs OPAQUE `export_key`) was resolved to **SCRAM-SHA-256** by `decisions.md` 2026-06-20; the `-PLUS` channel binding named there is currently inert, so the honest posture is SCRAM-SHA-256 over pinned TLS (`decisions.md` 2026-07-13 F5). The OPAQUE upgrade path stays a v005 item.
 
-Used in: `spec/protocol.md` §3.4, §11.1
+Used in: `spec/protocol.md` §3.4, §11.1; `spec/server-protocol.md` §3.1; `decisions.md` 2026-06-20
 
 ### **serverPassword** &nbsp; 🗝️ *Key/identifier*
 
-A generic term referring to whatever value is sent to the sync server for authentication in Phase 2. The concrete form is one of the two options in §11.1 — a deferred decision. v0.1 defines no transmitted server credential.
+A generic term referring to whatever value is sent to the sync server for authentication in Phase 2. The §11.1 choice it stood in for was resolved to **SCRAM-SHA-256** (`decisions.md` 2026-06-20), which sends a *proof* rather than a credential — so the term is retained only as a placeholder for the generic notion, and the protocol still transmits no server credential. See [server-auth subkey](#server-auth-subkey), [per-device token](#per-device-token).
 
-Used in: `spec/protocol.md` §1.1, §11.1
+Used in: `spec/protocol.md` §1.1, §11.1; `spec/server-protocol.md` §3.1
 
 ### **share-import staging queue** &nbsp; 📋 *Protocol*
 
@@ -1649,6 +1675,12 @@ The Notes sidebar's hybrid refresh strategy pinned in `decisions.md` 2026-05-15:
 
 Used in: `decisions.md` 2026-05-15; MYND-82
 
+### **single-tab lock** &nbsp; 📦 *Product*
+
+The web client's guarantee that **exactly one browser tab may hold a vault open**. Two tabs on one [OPFS](#opfs-origin-private-file-system) container would race and corrupt it — OPFS has no cross-context write coordination, and both the [double-buffered blob](#double-buffered-blob) writes and the per-note write-new-then-remove-old sequence assume a single writer. The second tab therefore **reports** rather than takes over; taking over would convert "two writers" into "one writer whose files vanished". The primitive is the **Web Locks API** (`web/src/vault-lock.ts`), chosen over a ServiceWorker + BroadcastChannel protocol because a Web Lock is released automatically when its holding context goes away — tab closed, crashed, or killed — so there is no heartbeat, no timeout, and no window in which a dead tab still looks alive. The module deliberately does not decide *when* to acquire: the caller acquires before the vault is opened and releases on lock/close, which is what makes "the second tab never writes" a property of call order rather than a check inside each write. Web-specific, so it is one of the behaviours the thin `e2e-web/` lane owns.
+
+Used in: `decisions.md` 2026-07-26 (web E2E policy); `docs/dev/e2e.md`; `web/src/vault-lock.ts`
+
 ### **size class** &nbsp; 📦 *Product*
 
 The mobile client's layout axis — the discriminator that decides which pane composition the wired app renders, **derived from window geometry, never from device brand**: `compact` (the phone's full-screen list ⇄ editor swap), `medium` (≥700px: list + detail two-pane), `expanded` (≥1000px: the WS-01 three-pane — sidebar 248 / list 316 / editor). Two inputs: the **window width** (`window.innerWidth`, so an iPad Split View pane narrowed to phone width falls back to the phone layout, and the Playwright flow tier drives every layout purely by viewport) and a **phone guard** on `window.screen`'s smaller dimension (< 480px → always `compact`; reading `screen` rather than window height keeps the Android IME — which shrinks the layout viewport — from flipping the layout and remounting the editor mid-typing). Orthogonal to [platform](#platform) (`PlatformContext` keeps owning biometric copy / brand concerns; `SizeClassContext` owns layout). Breakpoint budget mirrors the desktop `layoutClamp.ts` discipline (editor pane ≥ 360px, the desktop `CENTER_MIN_WIDTH`).
@@ -1663,7 +1695,7 @@ Used in: `decisions.md` 2026-05-02 "Slot state machine + auth_permits generaliza
 
 ### **SlotKind** &nbsp; 📋 *Protocol*
 
-The discriminator for the [`Slot`] enum, exposed across the IPC boundary by the `vault_status` Tauri command. Three variants: `Empty | Recovering | Unlocked`. Serde-Serialize encoding is the bare variant name (no `#[serde(tag)]` wrapper), so the JSON payload on the wire is one of three bare strings — `"Empty"`, `"Recovering"`, `"Unlocked"`. The TypeScript hand-mirror at `src/types/slot-kind.ts` is therefore a string-literal union, not an object discriminator. Used by frontend boot-time and post-WebView-reload routing — never on the post-recovery happy path (the in-process `Slot::Recovering` → `Slot::Unlocked` transition uses the IPC `Ok(())` from `vault_complete_recovery` as the success signal; a defensive `vault_status` round-trip would be paranoia).
+The discriminator for the [`Slot`] enum, exposed across the IPC boundary by the `vault_slot_kind` command (**not** by [vault_status](#vault_status), which probes `vault.meta` on disk). Three variants: `Empty | Recovering | Unlocked`. Serde-Serialize encoding is the bare variant name (no `#[serde(tag)]` wrapper), so the JSON payload on the wire is one of three bare strings — `"Empty"`, `"Recovering"`, `"Unlocked"`. The TypeScript hand-mirror at `src/types/slot-kind.ts` is therefore a string-literal union, not an object discriminator. Used by frontend boot-time and post-WebView-reload routing — never on the post-recovery happy path (the in-process `Slot::Recovering` → `Slot::Unlocked` transition uses the IPC `Ok(())` from `vault_complete_recovery` as the success signal; a defensive `vault_slot_kind` round-trip would be paranoia).
 
 Used in: `decisions.md` 2026-05-02 "Slot state machine + auth_permits generalization"
 
@@ -1716,6 +1748,12 @@ Used in: `threat-model.md` §1 (A8), §7
 The Phase 2 opaque, per-device **monotone position** marking how far a device has pulled. A pull sends the cursor and receives the [per-blob sync-meta](#per-blob-sync-meta) for everything changed since; the cursor then advances. It carries **no wall-clock** (clock/order authority is the [version vector](#version-vector-vv), §4.1 Pin 4) — it is a catch-up bookmark, not a security primitive. Persisted device-locally alongside (but separate from) the [vault head](#vault-head) baseline. Phase 2.
 
 Used in: `spec/sync-protocol.md` §8
+
+### **sync-required entry** &nbsp; 📦 *Product*
+
+The rule that the only way into the web client is an **existing synced account**: there is no local-only vault on this client, so account creation, vault creation and phrase-based recovery are absent from it and the browser is a window onto a vault that already exists elsewhere. Two independent reasons, either sufficient — the 24-word [recovery phrase](#recovery-phrase) never crosses into served code (it is unrotatable, so an exposure is permanent), and conflict resolution is sync-based, so a vault that arrived by any other route would be an orphan fork with nothing to reconcile against. A normative clause of the [web capability set](#web-capability-set), and one of the web-specific behaviours the thin `e2e-web/` lane owns.
+
+Used in: `decisions.md` 2026-07-26 (web capability set; web E2E policy); `docs/dev/e2e.md`
 
 ### **sync taxonomy** &nbsp; 📋 *Protocol*
 
@@ -1786,6 +1824,16 @@ Cross-implementation byte-level fixture pinning an `input → expected-output` m
 
 Used in: `myne-test-vectors/` (the companion repository carrying every landed `cases.json`), `protocol/tests/vectors.rs` (the integration test driving the live Rust impl against each landed category and asserting byte-equality), `threat-model.md` §6 (the audit-substitute discipline the vectors operationalize), `decisions.md` 2026-05-28 entry "Canonical test-vector schema + first new category (HKDF DeriveSubkey) landed (MYND-66 + MYND-67)" (the canonical schema mechanism), `prefs-blob` glossary entry (which mentions "byte-stable KAT vectors" — cross-reference for the older terminology).
 
+### **Theme preference** &nbsp; 📦 *Product*
+
+The user's Light / Dark / System choice, persisted as the `theme` field of [`vault.prefs`](#prefsview) (`spec/protocol.md` §9.5.2). An optional string — `"light"` or `"dark"` — where **absence of the key is the canonical encoding of "system"** (follow the OS `prefers-color-scheme`); there is no `"system"` value, so a vault that made no explicit choice omits the field and stays byte-identical to a pre-MYND-110 blob. Rendering is a **pure-CSS hybrid**: an explicit choice sets `<html data-theme="light|dark">` (overriding the OS); System and every pre-unlock screen carry no attribute, so a `prefers-color-scheme` `@media` block follows the OS live with no JS. The preference is **non-load-bearing** — a cosmetic UI setting (AS-low) with no protective-envelope clamp (unlike [AUTO_LOCK_CEILING](#auto_lock_ceiling)); a tampered or replayed `vault.prefs` can at worst surface the wrong color, and an unrecognized value decodes to "system" rather than failing. It lives inside the encrypted blob (not plaintext) so a disk-at-rest adversary learns nothing — the same structural-privacy reasoning that keeps [auto-lock](#auto-lock-on-idle)'s timeout encrypted. On lock the attribute is removed (the UI follows the OS), the UI-layer image of zeroize-on-lock. The theme is a [device-local pref](#device-local-pref) (`sync-protocol.md` §10.2, MYND-478): presentation is per-device taste, so it never crosses the Phase 2 prefs merge. Introduced MYND-110. See also [PrefsView](#prefsview), [syntax color tokens](#syntax-color-tokens), [custom theme](#custom-theme).
+
+### **theme-install deep link** &nbsp; 📦 *Product*
+
+A `myne://theme/install?v=1&name=…&author=…&src=…&payload=…` URL that hands a [custom theme](#custom-theme) from the website's Themes page to the desktop app in one click (MYND-567; website half MYND-568). The OS resolves the `myne://` scheme to the installed app — registered at bundle time on macOS / Windows / Linux — which then shows a **confirmation dialog** (name, author, source, palette preview) before anything is written; Apply routes through the ordinary `themes_import` into [`vault.themes`](#vaultthemes), Cancel writes nothing.
+
+The palette travels **inside the URL** as base64url-encoded JSON, not as a link the app fetches: the client has no network egress path (CSP `connect-src` allowlist + no HTTP-client crate, gated by `no_egress.rs`), so a `src=` parameter is **displayed provenance only, never dereferenced**. Every field is treated as hostile input — any website can serve such a link — under explicit caps (16 KiB decoded payload, 64-char name, fatal UTF-8 decoding, control/bidi stripping on display strings), and the payload must still clear the host-side `theme_validator` value-shape allowlist before it is sealed. A link arriving while the vault is locked is held in an in-memory latch and presented after unlock, then dropped with the process if the user never unlocks. The `myne://` scheme is **shared with the mobile client**, which owns the `open` and `capture` actions (`decisions.md` 2026-07-13); each client ignores the other's actions. Introduced `decisions.md` 2026-07-25. See also [custom theme](#custom-theme), [vault.themes](#vaultthemes).
+
 ### **threat model** &nbsp; ⚠️ *Threat*
 
 The structured catalog of adversaries, assets, trust boundaries, and defensive posture that defines what Myne protects against and what it explicitly does not. The authoritative document is `threat-model.md`. Marketing copy must not exceed the guarantees there; that document is normative for what users may rely on.
@@ -1822,7 +1870,7 @@ Used in: `spec/markdown-dialect.md` §3.6.1, `decisions.md` 2026-06-03 + 2026-05
 
 ### **trust boundary** &nbsp; ⚠️ *Threat*
 
-A line in the system where the security model changes — what is trusted on one side is not trusted on the other. Myne catalogs nine boundaries (TB1–TB9). See `threat-model.md` §3 for the full table.
+A line in the system where the security model changes — what is trusted on one side is not trusted on the other. The catalog grows as the product does — TB10 arrived with the browser clipper's native-messaging bridge, TB11 with the served web bundle — so `threat-model.md` §3 is the table of record; read the boundaries there rather than restating their extent (or their count) here.
 
 Used in: `threat-model.md` §3
 
@@ -1882,7 +1930,7 @@ Used in: `spec/protocol.md` §9.11; `threat-model.md` §7; `decisions.md` 2026-0
 
 ### **vault creation session** &nbsp; 📦 *Product*
 
-The backend-resident state held between the `begin` and `commit` IPC calls of the vault-creation flow. A `VaultCreationSession` (Rust struct in `src-tauri/src/plugins/vault_creation/state.rs`) carries the freshly generated `account_number`, `recovery_phrase`, `root_key`, two Argon2id salts, the cached password and recovery wrap keys, the chosen `KdfParams`, and a `created_at: Instant` timestamp. Lives in a `Mutex<HashMap<Uuid, VaultCreationSession>>` indexed by **session token**. Bounded by `MAX_CONCURRENT_SESSIONS = 4` and `SESSION_TTL_SECS = 600` (10 minutes); evicted by a background `tokio::time::interval(60s)` task whose evicted tokens land in a parallel **tombstone** map for up to `TOMBSTONE_RETENTION_SECS = 3600` (1 hour). `root_key` and the wrap keys never cross the IPC boundary — they live only in this session until `commit` consumes it.
+The backend-resident state held between the `begin` and `commit` IPC calls of the vault-creation flow. A `VaultCreationSession` (Rust struct in `core/src/plugins/vault_creation/state.rs`) carries the freshly generated `account_number`, `recovery_phrase`, `root_key`, two Argon2id salts, the cached password and recovery wrap keys, the chosen `KdfParams`, and a `created_at: Instant` timestamp. Lives in a `Mutex<HashMap<Uuid, VaultCreationSession>>` indexed by **session token**. Bounded by `MAX_CONCURRENT_SESSIONS = 4` and `SESSION_TTL_SECS = 600` (10 minutes); evicted by a background `tokio::time::interval(60s)` task whose evicted tokens land in a parallel **tombstone** map for up to `TOMBSTONE_RETENTION_SECS = 3600` (1 hour). `root_key` and the wrap keys never cross the IPC boundary — they live only in this session until `commit` consumes it.
 
 Used in: `decisions.md` 2026-04-28 "Vault creation flow", "Vault creation session TTL"
 
@@ -1972,23 +2020,29 @@ Vault-level singleton encrypted blob caching the [search index](#search-index) (
 
 Used in: `spec/protocol.md` §9.6; `decisions.md` 2026-05-31
 
+### **vault.themes** &nbsp; 📦 *Product*
+
+The encrypted singleton blob (`MYT1`, `spec/protocol.md` §9.21) holding every [custom theme](#custom-theme) palette in a vault, as a map `{ theme_name → { palette, clocks } }`. Sealed under `custom_themes_key = DeriveSubkey(root_key, "custom-themes-key")` — `root_key`-derived and itemsKey-independent, like [vault.prefs](#vaultprefs) / the [personal dictionary](#personal-dictionary) — with AAD role `"custom-themes-blob"` binding `account_number_hash`. A **singleton**, not a per-item family with a catalog: a vault holds a handful of themes. Each name carries its own `created_at`/`updated_at`/`deleted_at` clocks so the Phase-2 sync merges **per theme name** (two devices adding different themes both keep theirs), with the palette LWW within a name and deletions carried as tombstones under the [attachment catalog tombstone](#attachment-catalog-tombstone) resurrection guard (`sync-protocol.md` §10.2.2). Its reserved sync blob-id is `themes_sync_id = DeriveSubkey(root_key, "themes-sync-id")[0..16]` — an *identifier* derivation, not a KEK. A §9.11.3 backup-allowlist member (`sync ⊆ backup`). Introduced MYND-486.
+
 ### **vault_<verb_past> tracing event-name pattern** &nbsp; 🛠️ *Tooling*
 
 Project-wide naming discipline for `tracing::info!(event = "...")` success-event emissions across the auth-pipeline plugins. Format: `vault_<verb in past tense>`. Concrete instances in v0.1: `vault_unlocked` (vault_unlock command success), `vault_locked` (vault_lock command success), `vault_recovered_with_phrase` (A8d phrase-recovery success), `vault_recovery_completed` (A8f post-recovery password commit success), and the forthcoming `vault_password_changed` (MYND-22's vault_change_password commit success). Future Phase 2 plugins (OPAQUE, hardware-unlock, etc.) extend the pattern without per-plugin `decisions.md` entries — the convention is self-evident from the existing instances. Phase 2 ops-tooling primitive: log aggregation queries can pattern-match `event = "vault_*"` once a `tracing-subscriber` is wired (deferred today). Pinned by `decisions.md` 2026-05-06 "Tracing event-name pattern: vault_<verb_past> across auth-pipeline plugins".
 
-Used in: `src-tauri/src/plugins/{vault_unlock,vault_recover}/commands.rs`; `decisions.md` 2026-05-06.
+Used in: `core/src/plugins/{vault_unlock,vault_recover}/commands.rs`; `decisions.md` 2026-05-06.
 
 ### **vault_meta_bytes_hash** &nbsp; 🛠️ *Tooling*
 
 Public-material `[u8; 32]` field on the desktop client's `Slot::Unlocked` carrying `SHA-256(vault.meta bytes)` captured at slot-populate time. Populated by `vault_unlock` (digest of unlock-time read bytes) and by `vault_complete_recovery` (digest of the freshly-rewritten bytes; AFTER `atomic_write` succeeds). Serves as the **in-memory CAS anchor** for `vault_change_password`'s in-place rewrite — the command compares the slot-held hash against a fresh digest of the on-disk bytes before committing the rewrite, returning `VaultMetaChangedExternally` and force-relocking on mismatch. SHA-256 of public bytes is itself public material; held bare without `Zeroize`. Pinned by `decisions.md` 2026-05-06 entry "Slot::Unlocked anchor field for vault.meta CAS" (MYND-22 foundation hardening).
 
-Used in: `src-tauri/src/plugins/vault_unlock/state.rs::UnlockedVault.vault_meta_bytes_hash`; `decisions.md` 2026-05-06.
+Used in: `core/src/plugins/vault_unlock/state.rs::UnlockedVault.vault_meta_bytes_hash`; `decisions.md` 2026-05-06.
 
 ### **vault_status** &nbsp; 🛠️ *Tooling*
 
-The Tauri command `vault_unlock:status` that returns the current [`SlotKind`]. Read-only (`tokio::sync::RwLock::read`); never fails in practice — the `Result<SlotKind, VaultUnlockError>` return is purely IPC-contract uniformity with the rest of the unlock plugin. Lives in `vault_unlock` because the plugin owns the runtime-state singleton; permission `vault-unlock:default allow-status`. Frontend boot-time and post-WebView-reload routing call `vault_status` to recover from the case where Tauri's Rust state outlives the WebView's JS state across Cmd+R / hot-reload — `Empty` routes to unlock (or vault-creation if no `vault.meta` exists), `Recovering` routes to the password-reset form, `Unlocked` routes to the editor. Explicitly NOT part of the post-recovery happy path: a defensive round-trip after `vault_complete_recovery` would be paranoia per `decisions.md` 2026-05-02 (the IPC contract pins `Slot::Unlocked` as the success postcondition).
+The single-vault **disk probe**: the command `vault_unlock:vault_status`, which reads `vault.meta` and classifies it as one of three states — `Exists` (the bytes parse cleanly via `protocol::parse_vault_meta`), `Missing` (the file is not there; the canonical first-run case, deliberately *not* an error), `Corrupted` (the file is there and `parse_vault_meta` rejected it). A genuine IO failure is **not** folded into `Corrupted`: permission-denied / no-space / other surface as `Err(VaultStatusError::IoError { io_error_kind })`, because IO failure is not corruption even where the fail-closed UI branches the same way. Read-only in the strongest sense — it holds no auth permit, runs no Argon2id, and never touches the runtime slot. Serde encoding is `#[serde(tag = "kind")]`, so the wire payload is an object (`{"kind":"Exists"}`) — mirrored by hand at `src/types/vault-status.ts` and wrapped by `probeVaultStatus` in `src/lib/vault-status.ts`. Permission `vault-unlock:allow-vault-status`, in the `vault-unlock:default` set. Boot routing itself has since moved up to `vault_list`, the multi-vault generalization that enumerates every discovered `vaults/<id>/` rather than probing the single legacy `vault.meta` (`decisions.md` 2026-06-09); `vault_status` remains the single-vault probe, still registered and still routed by the web dispatcher.
 
-Used in: `src-tauri/src/plugins/vault_unlock/commands.rs::status`; `src/types/slot-kind.ts`
+It does **not** return [`SlotKind`] — the in-memory three-state view (`Empty | Recovering | Unlocked`) belongs to the sibling command `vault_slot_kind`, and the two together cover the boot decision tree (disk presence → runtime state). Also distinct from `vault_storage_health`, the mid-session probe that exists to tell an OPFS eviction from a corruption, which the boot vocabulary cannot express. The command body lives in `myne-core` and is the first one migrated onto the `VaultIo` seam, so the same probe answers on desktop and in the browser.
+
+Used in: `core/src/plugins/vault_unlock/commands.rs::vault_status` (+ `VaultStatus`); `src-tauri/permissions/vault-unlock/default.toml`; `src/types/vault-status.ts`
 
 ### **VaultIndices** &nbsp; 📦 *Product*
 
@@ -2071,7 +2125,7 @@ Used in: `docs/dev/i18n.md`; `decisions.md` 2026-06-25.
 
 ### **web capability set** &nbsp; 📦 *Product* (*Myne-divergent*)
 
-The normatively-defined set of things the web client can and cannot do — not a UX scope decision that a later release quietly widens. Its two load-bearing rules: **the 24-word recovery phrase never crosses into served code** (which removes account creation, vault creation, and phrase-based recovery from the browser in one rule, because the phrase is unrotatable — no rotation command exists, so a phrase exposure is permanent), and **web requires sync** (the browser is a window onto a synced vault; conflict resolution is sync-based, so a vault arriving any other way is an orphan fork). `change_password` stays available, because the password is already typed into the page at unlock. Everything the operating system provides and a browser does not — clipper host, local AI, share-sheet import, watch captures, keychain/biometric quick-unlock, OS idle auto-lock, screen-capture protection, backup export/restore, vault migration, native file dialogs — is **absent from the interface**, not shown disabled.
+The normatively-defined set of things the web client can and cannot do — not a UX scope decision that a later release quietly widens. Its two load-bearing rules: **the 24-word recovery phrase never crosses into served code** (which removes account creation, vault creation, and phrase-based recovery from the browser in one rule, because the phrase is unrotatable — no rotation command exists, so a phrase exposure is permanent), and **web requires sync** (the browser is a window onto a synced vault; conflict resolution is sync-based, so a vault arriving any other way is an orphan fork). `change_password` stays available, because the password is already typed into the page at unlock. Everything the operating system provides and a browser does not — clipper host, local AI, share-sheet import, watch captures, keychain/biometric quick-unlock, OS idle auto-lock, screen-capture protection, backup export/restore, vault migration, native file dialogs — is **absent from the interface**, not shown disabled. See also [sync-required entry](#sync-required-entry) (the second rule, named), [capability gating](#capability-gating) (how the set is applied at runtime), [capability descriptor](#capability-descriptor).
 
 Used in: `decisions.md` 2026-07-26 (web capability set); `vision.md`
 
@@ -2097,7 +2151,7 @@ Used in: `decisions.md` 2026-04-28 "Vault creation flow"
 
 The Diffie-Hellman key-agreement function on Curve25519 (RFC 7748). Not used in Myne's v0.1 at-rest encryption; reserved for `appname-v005` user-to-user key agreement (sharing) and multi-device coordination.
 
-Used in: `e2ee-notes-evaluation.md`; `spec/protocol.md` §11
+Used in: `spec/protocol.md` §11
 Reference: RFC 7748.
 
 ### **XChaCha20-Poly1305** &nbsp; 🔐 *Primitive* (deep entry)
@@ -2136,13 +2190,15 @@ Used in: `spec/protocol.md` §4.1
 
 | Primitive | Used for | Library |
 |---|---|---|
-| Argon2id (`m=256 MiB, t=3, p=2`) | Password and recovery-phrase stretching → wrap keys | libsodium |
-| HKDF-SHA-256 | Subkey derivation from root_key (via `derive_key` helper) | libsodium |
-| XChaCha20-Poly1305 (192-bit nonce) | Every AEAD operation | libsodium |
-| SHA-256 | CTX commitment outer hash, account hash, salt construction | libsodium / stdlib |
-| BIP-39 (encoding only) | Recovery phrase presentation | `@scure/bip39` |
+| Argon2id (`m=256 MiB, t=3, p=2`) | Password and recovery-phrase stretching → wrap keys | RustCrypto `argon2` |
+| HKDF-SHA-256 | Subkey derivation from root_key (via `derive_key` helper) | RustCrypto `hkdf` |
+| XChaCha20-Poly1305 (192-bit nonce) | Every AEAD operation | RustCrypto `chacha20poly1305` |
+| SHA-256 | CTX commitment outer hash, account hash, salt construction | RustCrypto `sha2` |
+| BIP-39 (encoding only) | Recovery phrase presentation | `bip39` Rust crate (in `protocol/`); the TS side only normalizes (`src/lib/bip39-normalize`) |
 | Crockford base32 | Account number alphabet | hand-rolled |
 | Damm-32 | Account number check digit | hand-rolled (frozen table, `account-number.md` §4.2) |
+
+The **Library** column names what Myne's own clients actually link — `protocol/Cargo.toml` is the source of truth, and every client runs that one crate (the web client compiles it to `wasm32-unknown-unknown`). [libsodium](#libsodium) is the byte-level interoperability *reference* the choices are stated against, not a dependency; agreement with it is machine-checked by `myne-test-vectors/` rather than obtained by linking it.
 
 ### Index 2 — Myne-specific keys and where they live
 
@@ -2156,9 +2212,9 @@ Used in: `spec/protocol.md` §4.1
 | `itemsKey_wrap_key` | KEK for the singleton `itemsKey` | Derived only | Session |
 | `itemsKey` (32 B random) | Wraps every per-note `item_key` | Encrypted in `vault.meta` | Vault lifetime |
 | `item_key` (32 B random) | Encrypts one note's plaintext | Encrypted in `.myn` file | Note lifetime |
-| `server-auth` subkey | Reserved for Phase 2 sync auth | Derived only (not transmitted in v0.1) | Session |
+| `server-auth` subkey | Sync-server authentication secret — **active**: the SCRAM-SHA-256 credential the sync client derives at enroll and on every cycle (`core/src/plugins/sync/{cycle,enroll,orchestrator}.rs`) | Derived only; **never transmitted** (SCRAM proves it, the server stores only a verifier) | Session |
 | `backup-key` | Reserved for a future sealed-backup variant — not used in v0.1 (demoted 2026-06-10) | Derived only (reserved) | — |
-| `head_mac_key` | Reserved for Phase 2 [vault head](#vault-head) fork-consistency MAC (`vault-head-mac`) | Derived only (not used in v0.1) | Session |
+| `head_mac_key` | [Vault head](#vault-head) fork-consistency MAC (`vault-head-mac`) — **active**: every pull MAC-verifies the head before reading it (`protocol/src/vault_head.rs::open_vault_head`, called from `core/src/plugins/sync/engine.rs`) | Derived only | Session |
 | `account_number` (95-bit + Damm) | User identifier; bearer token in P2+ | User offline storage | Permanent |
 | `account_number_hash` (SHA-256[:16]) | Argon2id salt binding | `vault.meta` | Vault lifetime |
 
@@ -2171,31 +2227,13 @@ Used in: `spec/protocol.md` §4.1
 
 The four prefixes for a single major version are deliberately non-interchangeable: each lives in a different cryptographic call site, and using one in place of another is a protocol violation. See entry **`myne.v0.1` prefix** and `spec/protocol.md` §10.3.
 
-### Theme preference
-
-The user's Light / Dark / System choice, persisted as the `theme` field of [`vault.prefs`](#prefsview) (`spec/protocol.md` §9.5.2). An optional string — `"light"` or `"dark"` — where **absence of the key is the canonical encoding of "system"** (follow the OS `prefers-color-scheme`); there is no `"system"` value, so a vault that made no explicit choice omits the field and stays byte-identical to a pre-MYND-110 blob. Rendering is a **pure-CSS hybrid**: an explicit choice sets `<html data-theme="light|dark">` (overriding the OS); System and every pre-unlock screen carry no attribute, so a `prefers-color-scheme` `@media` block follows the OS live with no JS. The preference is **non-load-bearing** — a cosmetic UI setting (AS-low) with no protective-envelope clamp (unlike [AUTO_LOCK_CEILING](#auto_lock_ceiling)); a tampered or replayed `vault.prefs` can at worst surface the wrong color, and an unrecognized value decodes to "system" rather than failing. It lives inside the encrypted blob (not plaintext) so a disk-at-rest adversary learns nothing — the same structural-privacy reasoning that keeps [auto-lock](#auto-lock-on-idle)'s timeout encrypted. On lock the attribute is removed (the UI follows the OS), the UI-layer image of zeroize-on-lock. The theme is a [device-local pref](#device-local-pref) (`sync-protocol.md` §10.2, MYND-478): presentation is per-device taste, so it never crosses the Phase 2 prefs merge. Introduced MYND-110. See also [PrefsView](#prefsview), [syntax color tokens](#syntax-color-tokens), [custom theme](#custom-theme).
-
-### custom theme
-
-A user-authored color palette — distinct from the built-in Light/Dark [Theme preference](#theme-preference). A flat map of CSS custom-property names to values (`{ "--paper": "#…", "--ink-1": "#…", … }`): a **single flat palette** that, when selected, *overrides* Light / Dark / System rather than carrying per-mode variants. It is validated host-side (Rust) — the minimal raw-ramp token core must be present, and every value must match a **value-shape allowlist** (hex / `rgb()` / `rgba()` / `hsl()` / named color / `<number><unit>`), the *primary* injection guard because the WebView keeps `style-src 'unsafe-inline'` (`threat-model.md` custom-theme CSS-value surface; `decisions.md` 2026-06-16). **The palette is vault content**: it lives in the encrypted [`vault.themes`](#vaultthemes) blob (`MYT1`, `spec/protocol.md` §9.21) — encrypted at rest, synced, and backed up — while the *selection* `custom:<name>` persists in the encrypted [`vault.prefs`](#prefsview) `custom_theme` field (the blob holds the palettes, prefs holds the pointer). This **supersedes** the original device-local plaintext `app_config_dir/themes/<name>.json` storage (`decisions.md` 2026-07-16); palettes now enter and leave only by explicit user import/export of a `.json`. A custom theme is **validated, not sandboxed**: it is not a security boundary, only a guarded cosmetic surface. Introduced MYND-111 (custom-themes epic); promoted to vault content MYND-486. See also [Theme preference](#theme-preference), [vault.themes](#vaultthemes), [syntax color tokens](#syntax-color-tokens).
-
-### **vault.themes** &nbsp; 📦 *Product*
-
-The encrypted singleton blob (`MYT1`, `spec/protocol.md` §9.21) holding every [custom theme](#custom-theme) palette in a vault, as a map `{ theme_name → { palette, clocks } }`. Sealed under `custom_themes_key = DeriveSubkey(root_key, "custom-themes-key")` — `root_key`-derived and itemsKey-independent, like [vault.prefs](#vaultprefs) / the [personal dictionary](#personal-dictionary) — with AAD role `"custom-themes-blob"` binding `account_number_hash`. A **singleton**, not a per-item family with a catalog: a vault holds a handful of themes. Each name carries its own `created_at`/`updated_at`/`deleted_at` clocks so the Phase-2 sync merges **per theme name** (two devices adding different themes both keep theirs), with the palette LWW within a name and deletions carried as tombstones under the [attachment catalog tombstone](#attachment-catalog-tombstone) resurrection guard (`sync-protocol.md` §10.2.2). Its reserved sync blob-id is `themes_sync_id = DeriveSubkey(root_key, "themes-sync-id")[0..16]` — an *identifier* derivation, not a KEK. A §9.11.3 backup-allowlist member (`sync ⊆ backup`). Introduced MYND-486.
-
-### theme-install deep link &nbsp; 📦 *Product*
-
-A `myne://theme/install?v=1&name=…&author=…&src=…&payload=…` URL that hands a [custom theme](#custom-theme) from the website's Themes page to the desktop app in one click (MYND-567; website half MYND-568). The OS resolves the `myne://` scheme to the installed app — registered at bundle time on macOS / Windows / Linux — which then shows a **confirmation dialog** (name, author, source, palette preview) before anything is written; Apply routes through the ordinary `themes_import` into [`vault.themes`](#vaultthemes), Cancel writes nothing.
-
-The palette travels **inside the URL** as base64url-encoded JSON, not as a link the app fetches: the client has no network egress path (CSP `connect-src` allowlist + no HTTP-client crate, gated by `no_egress.rs`), so a `src=` parameter is **displayed provenance only, never dereferenced**. Every field is treated as hostile input — any website can serve such a link — under explicit caps (16 KiB decoded payload, 64-char name, fatal UTF-8 decoding, control/bidi stripping on display strings), and the payload must still clear the host-side `theme_validator` value-shape allowlist before it is sealed. A link arriving while the vault is locked is held in an in-memory latch and presented after unlock, then dropped with the process if the user never unlocks. The `myne://` scheme is **shared with the mobile client**, which owns the `open` and `capture` actions (`decisions.md` 2026-07-13); each client ignores the other's actions. Introduced `decisions.md` 2026-07-25. See also [custom theme](#custom-theme), [vault.themes](#vaultthemes).
-
 ### Threat-model enumerations (link out, not enumerated here)
 
-- **Adversary classes A1–A13** → `threat-model.md` §1
-- **Assets AS1–AS17** → `threat-model.md` §2
-- **Trust boundaries TB1–TB9** → `threat-model.md` §3
+- **Adversary classes** (`A…`) → `threat-model.md` §1
+- **Assets** (`AS…`) → `threat-model.md` §2
+- **Trust boundaries** (`TB…`) → `threat-model.md` §3
 
-These enumerations are normative and frequently referenced from other docs (e.g., "TB7 mitigates A9 via signed auto-update"), but enumerating each one in the glossary would duplicate the threat model. Read those sections directly when an entry references an A/AS/TB number.
+Each of the three rosters is open-ended and has grown since v0.1 (most recently with the web client's A15 / TB11), so the ranges are deliberately not restated here — those three sections are the enumeration of record. These enumerations are normative and frequently referenced from other docs (e.g., "TB7 mitigates A9 via signed auto-update"), but enumerating each one in the glossary would duplicate the threat model. Read those sections directly when an entry references an A/AS/TB number.
 
 ---
 

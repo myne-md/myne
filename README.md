@@ -6,7 +6,7 @@
 
 This is the main repository of the [Myne](https://github.com/myne-md/myne) project — an end-to-end-encrypted, local-first markdown notes app with optional zero-knowledge sync. It holds three things: the Tauri 2 + Vite + React + TypeScript desktop client ([`src/`](src/), [`src-tauri/`](src-tauri/)), the Rust cryptographic protocol crate ([`protocol/`](protocol/)), and the canonical v0.1 specification, threat model, and decisions log ([`docs/`](docs/)). The browser-clipper native host and clip pipeline also live here ([`src-tauri/src/clipper/`](src-tauri/src/clipper), [`src/clip/`](src/clip)).
 
-The companion repos (server, web, mobile, website, ops, agents, clipper extension, themes, branding assets, test vectors) live under the [`myne-md`](https://github.com/myne-md) organization and are described below. The specs in this repo's [`docs/`](docs/) are the source of truth across every client and implementation.
+The companion repos (server, mobile, website, ops, agents, clipper extension, themes, branding assets, test vectors) live under the [`myne-md`](https://github.com/myne-md) organization and are described below. The specs in this repo's [`docs/`](docs/) are the source of truth across every client and implementation.
 
 ## What Myne commits to
 
@@ -23,14 +23,14 @@ The threat model is normative: marketing copy and code may not exceed its guaran
 
 **Pre-alpha.** No release has shipped, the on-disk format is still pre-1.0, and v0.1 and the future v005 major are forward-incompatible by design. That said, the desktop client is well past scaffold stage. What concretely exists in this repo today:
 
-- **Protocol crate ([`protocol/`](protocol/))** — `#![no_std]` + `alloc`, built on the RustCrypto stack with no custom primitives. Implements account numbers, KDF, AEAD, subkey derivation, BIP-39 recovery, and the full set of encrypted blob families (per-note, vault metadata, prefs, search, workspace, indices, attachments + catalog, backup container, personal dictionary, quick-unlock, attachment-text). Covered by a large unit, property-based, and attack test suite.
+- **Protocol crate ([`protocol/`](protocol/))** — `#![no_std]` + `alloc`, built on the RustCrypto stack with no custom primitives. Implements account numbers, KDF, AEAD, subkey derivation, BIP-39 recovery, and every blob family the magic-byte registry allocates — per-note, vault metadata, prefs, search, workspace, indices, attachments + catalog, backup container, personal dictionary, quick-unlock, attachment-text, sync baseline, AI embeddings, pending capture, graph layout, share import, custom themes ([`docs/spec/protocol.md`](docs/spec/protocol.md) §10.3 is the registry of record). Covered by a large unit, property-based, and attack test suite.
 - **Desktop core ([`src-tauri/`](src-tauri/))** — Tauri 2 host with atomic writes, auto-lock, snapshot/backup, vault registry and migration, on-device search and spell-check, screen-capture protection, and the browser-clipper native-messaging host. Capability ACLs live under [`src-tauri/capabilities/`](src-tauri/capabilities).
 - **UI ([`src/`](src/))** — React 19 vault onboarding/unlock/recovery flows, a CodeMirror 6 markdown editor (reading/source modes, folding, find-and-replace, multi-cursor, wikilinks, tags), graph view, attachments, saved views, and export (TXT/HTML/PDF).
-- **Specs ([`docs/`](docs/))** — complete v0.1 protocol, threat model, account-number spec, ~115-entry glossary, and an append-only decisions log.
+- **Specs ([`docs/`](docs/))** — complete v0.1 protocol, threat model, account-number spec, canonical glossary, and an append-only decisions log.
 - **Web client ([`web/`](web/))** — the Phase 3 desktop-**browser** target. Not a second UI: it compiles the same [`src/`](src/) tree and the same [`protocol/`](protocol/) crate (to `wasm32-unknown-unknown`), substituting one internal boundary — the platform seam at [`src/platform/`](src/platform/) — at build time. Deliberately narrower than the native clients: no account or vault creation, no recovery-phrase unlock, and it requires sync. Its delivery channel is weaker than a signed desktop build; see [`docs/threat-model.md`](docs/threat-model.md) A15 / TB11 for exactly what that costs.
-- **E2E suite ([`e2e/`](e2e/))** — 50+ scenarios driving the production binary via tauri-driver. A new user-facing flow ships with its E2E coverage.
+- **E2E suite ([`e2e/`](e2e/))** — 93 scenario files today (`e2e/*.e2e.ts`) driving the production binary via tauri-driver, plus the browser-driven web lane ([`e2e-web/`](e2e-web/)). A new user-facing flow ships with its E2E coverage.
 
-Planned and not yet in this repo: a tagged release, signed reproducible builds, and the published bundle-hash record the web client's verifiability story depends on. The sync **server** and the **mobile** client live in their own companion repos (below); the web client does not — it is the in-repo `web/` target above.
+Planned and not yet in this repo: a tagged release and signed reproducible builds. The published bundle-hash record the web client's verifiability story depends on **does** exist — [`docs/web-bundle-hashes.md`](docs/web-bundle-hashes.md), append-only and enforced by CI as a *precondition* of the deploy, so a bundle whose hash was not published first cannot reach the origin. A maintainer-run hosted instance is deployed from `develop` at [app.myne.md](https://app.myne.md). The sync **server** and the **mobile** client live in their own companion repos (below); the web client does not — it is the in-repo `web/` target above.
 
 ## Repository layout
 
@@ -40,23 +40,30 @@ myne/
 ├── src/                 ← React UI — shared by BOTH clients
 │   ├── clip/            ← clip assembly + dispatch (clipper-paired)
 │   └── platform/        ← platform seam: the only place allowed to import @tauri-apps/*
+├── editor/              ← @myne/editor — shared CodeMirror engine, platform IO injected
+├── dialect/             ← @myne/dialect — shared markdown-parser core
+├── copy/                ← @myne/copy — load-bearing strings, byte-identical across clients
+├── locales/             ← translation catalogs, one directory per language
 ├── src-tauri/           ← Tauri 2 + Rust desktop core
 │   ├── capabilities/    ← Tauri capability ACLs (security-load-bearing)
 │   └── src/clipper/     ← browser-clipper native-messaging host
+├── core/                ← myne-core — shared Rust backend, desktop + mobile
 ├── protocol/            ← Rust cryptographic protocol crate (no_std + alloc)
+├── theme-validator/     ← custom-theme allowlist, shared with the themes marketplace
 ├── web/                 ← Phase 3 desktop-browser client (same src/ tree, seam substituted)
 ├── e2e/                 ← tauri-driver end-to-end scenarios + fixture-gen (desktop lane)
 ├── e2e-web/             ← browser-driven web E2E lane (web-specific behaviour only)
-├── tests/              ← Vitest unit/integration specs
+├── tests/               ← Vitest unit/integration specs
+├── scripts/             ← build helpers + the CI guards (platform seam, wasm, bundle record)
 ├── public/              ← static assets bundled into the WebView
 ├── workspace/           ← multi-repo helper scripts + manifest
-├── Cargo.toml           ← workspace root (src-tauri, protocol, e2e/fixture-gen)
+├── Cargo.toml           ← Cargo workspace root; its members list is the crate roster
 ├── Cargo.lock           ← single shared lockfile (audit anchor)
 ├── rust-toolchain.toml  ← pinned Rust toolchain
 └── package.json         ← pnpm + Vite + React + TS toolchain
 ```
 
-The desktop client lives at the repo root, not under `apps/`, because mobile, server, and website each live in a dedicated companion repo — a one-child `apps/desktop/` would be needless nesting. The **web** client is the exception, and deliberately so: it lives in-repo at `web/` because it compiles the same `src/` tree, and a cross-repo split would mean publishing that tree as a versioned package — reintroducing exactly the drift the shared tree exists to prevent ([`docs/decisions.md`](docs/decisions.md), 2026-07-26). `src-tauri/`, `protocol/`, and `e2e/fixture-gen/` are members of one Cargo workspace sharing a single root `Cargo.lock` so there is exactly one auditable lockfile.
+The desktop client lives at the repo root, not under `apps/`, because mobile, server, and website each live in a dedicated companion repo — a one-child `apps/desktop/` would be needless nesting. The **web** client is the exception, and deliberately so: it lives in-repo at `web/` because it compiles the same `src/` tree, and a cross-repo split would mean publishing that tree as a versioned package — reintroducing exactly the drift the shared tree exists to prevent ([`docs/decisions.md`](docs/decisions.md), 2026-07-26). The Rust crates named in [`Cargo.toml`](Cargo.toml)'s `members` list — `src-tauri/`, `protocol/`, `core/`, `theme-validator/`, `e2e/fixture-gen/`, `web/wasm/` and `web/bench/wasm/` — are members of one Cargo workspace sharing a single root `Cargo.lock` so there is exactly one auditable lockfile.
 
 ## Development
 

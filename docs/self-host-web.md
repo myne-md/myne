@@ -88,21 +88,33 @@ that the two differ in nothing but that one origin.
 This is the part that turns the self-host mitigation from a claim into
 something you can check.
 
-1. Check out the released tag.
+1. Check out the commit whose bundle you intend to serve. The record is keyed on
+   a commit, not a tag — nothing has been tagged as a release yet.
 2. Build the bundle: `pnpm install --frozen-lockfile && pnpm web:build`.
-3. Hash the output the same way the release pipeline does.
-4. Compare against the published hash for that release in the public
-   append-only record.
+3. Read the hash the build itself wrote. `pnpm web:build` ends in
+   `scripts/emit-web-version.mjs`, which emits `web/dist/version.json` carrying
+   `bundle_hash` — one SHA-256 over every emitted asset, sorted, path and
+   content. You do not hash anything by hand, and an origin serving the bundle
+   answers with the same field at `/version.json` (uncached, so it describes the
+   build actually being served), so the identical comparison works against a
+   running deployment as well as against a fresh build.
+4. Compare it against the row for that commit in
+   [`web-bundle-hashes.md`](web-bundle-hashes.md) — the public append-only
+   record, which also carries a container-based recipe for reproducing a row
+   from scratch.
 
 A match means the bundle you are about to serve is the one built from the source
 you just read. A mismatch means it is not, and that is worth stopping for.
 
-> **Status:** the reproducible-build pipeline and the published hash record land
-> with MYND-574 tasks 16 and 56. Until they do, step 3's exact command and step
-> 4's record location are not yet fixed, and this section describes the intended
-> procedure rather than one you can follow today. It is written now because the
-> container's runtime-configuration design exists **to make it possible** — and
-> a reader deserves to know which parts are shipped and which are not.
+Two things make that comparison worth making. The record is a **precondition for
+the hosted deploy rather than a log kept afterwards** — `check-bundle-record.mjs`
+refuses an image whose hash is not already in the table, so a substituted bundle
+would have to be published before it could be served. And the reproducibility the
+comparison rests on is itself gated: `version.json` carries the *commit's*
+timestamp rather than a wall clock, the wasm build remaps every machine-specific
+path, and CI rebuilds the wasm artefact twice cold and fails if the two digests
+differ (`scripts/wasm-repro-check.sh`) — on a different machine than the author's,
+which is most of the value.
 
 ## Which security properties depend on you
 

@@ -11,7 +11,7 @@
 
 ## Design tokens (canonical source)
 
-`docs/design/colors_and_type.css` is loaded globally. **Use CSS variables, not hex codes:**
+`src/styles/tokens.css` is the sheet the app actually loads — `main.tsx` imports it and it is the only global CSS in the tree. The design-subtree copy, `docs/design/colors_and_type.css`, is a **subset of it, not a mirror**: the two agree name-for-name and value-for-value on `:root` and `:root[data-theme="dark"]`, and the design copy stops there. It has no `:root[data-theme="amoled"]` block (the third theme the app ships, ~50 tokens), no `--selection-bg`, and none of the app-only globals `tokens.css` also carries (box-sizing reset, the `:focus-visible` ring, the spinner, the editor-chrome and reduced-motion rules). Nothing in either client loads the design copy: it is read by the `docs/design/` preview pages (`ui_kits/desktop/index.html`, `website/index.html`, and `preview/_card.css`'s `@import`) and by the specs that parse it for token values — `tests/a11y/contrast.test.ts` and `tests/a11y/focus-ring.test.ts` today; more specs under `tests/` *name* the file in a comment while reading `src/styles/tokens.css`, so a bare grep over-reports. Edit `src/styles/tokens.css` to change what ships, and keep the blocks the design copy does carry in step in the same change. **Use CSS variables, not hex codes:**
 
 ```tsx
 // ✅ correct
@@ -21,7 +21,7 @@
 <div style={{ background: "#0a0a0a", color: "#888" }} />
 ```
 
-Available tokens include `--bg-1`/`--bg-2`, `--paper-1`/`--paper-2`, `--fg-1`/`--fg-2`/`--fg-3`, `--line-1`, `--font-sans`, `--font-mono`. Dark mode coverage is inherited automatically.
+Available tokens include the surface ramp `--paper`/`--paper-2`/`--paper-3` (semantic aliases `--bg-1`/`--bg-2`/`--bg-3`), the ink ramp `--ink-1`…`--ink-3` (aliases `--fg-1`/`--fg-2`/`--fg-3`), `--line-1`/`--line-2`/`--line-3`, `--font-sans`, `--font-mono`. **There is no `--paper-1`** — the light end of the surface ramp is plain `--paper`, and `var(--paper-1)` resolves to nothing. Dark mode coverage is inherited automatically: the theme blocks re-point the ramps, so the aliases follow.
 
 Self-hosted fonts: Inter Variable + JetBrains Mono in `public/fonts/` (commit 40eab75). Don't add Google Fonts CDN — adds tracking + breaks reproducibility.
 
@@ -33,70 +33,90 @@ User-facing strings go through **react-i18next**, not hardcoded JSX. Source lang
 - Add a key → `pnpm i18n:extract` → fill the **English** value in `locales/en/common.json`. Never hand-edit non-English catalogs (Weblate owns them).
 - **Do NOT i18n load-bearing copy** (`src/lib/load-bearing-copy.ts`): its exact English wording is a privacy property and is E2E-pinned by literal equality. Render the constant verbatim in every locale.
 - **Module-level data (command catalogs, label maps, error maps): store i18n KEYS, resolve with `t()`/`i18n.t()` at the render/usage consumer — never freeze a resolved string at module top level** (it would capture the boot language and not react to a language switch). `main.tsx` imports `./i18n` first so module-level `i18n.t()` (called at usage time) resolves against loaded resources.
-- Status: **Comprehensive** — the whole desktop UI is migrated (~1300 strings, ~139 files, en catalog ≈1500 keys). When you add a user-facing string, add its `t()` key in the same change (`pnpm i18n:extract`, fill the English value in `locales/en/common.json`).
+- Status: **Comprehensive** — the whole desktop UI is migrated (~1700 `t()` call sites across ~150 files; the en catalog holds ~2500 leaf keys, and `locales/en/common.json` is its source of truth — don't trust a number here over a `pnpm i18n:status` run). When you add a user-facing string, add its `t()` key in the same change (`pnpm i18n:extract`, fill the English value in `locales/en/common.json`).
 
 ## Layout
 
+One line per top-level entry. The per-file enumeration this section used to carry cannot be kept true at ~60 files in `lib/` alone — read the directory, and treat the annotations below as "what this is for", not as a roster.
+
 ```
 src/
-├── App.tsx              ← top-level stage union (welcome / create-vault / unlock / editor / recover)
-├── main.tsx             ← React 19 root mount
-├── screens/             ← top-level screens (one per stage)
-│   ├── CreateVault.tsx
-│   ├── Editor.tsx       ← B4.5 placeholder; full CodeMirror = Lane B #10 (B5). Hosts SettingsModal mount.
+├── App.tsx              ← boot probe + the Stage switch (one arm per variant in lib/stage.ts)
+├── main.tsx             ← React 19 root mount; imports ./i18n first, then ./editor-host, then <App>
+├── editor-host.ts       ← installs the EditorHost seam (IPC + i18n) into @myne/editor before any editor mounts
+├── platform/            ← THE PLATFORM SEAM — the only directory allowed to import `@tauri-apps/*`
+│                          (one module per Tauri module, substituted at build time for the web client;
+│                          `capabilities.ts` + `unsupported.ts` model what a host cannot do). See Gotchas.
+├── screens/             ← top-level screens: one per Stage variant, plus the non-Stage takeovers
+│                          and the multi-step flow dirs
+│   ├── vault-creation/  ← multi-step create flow (BriefingStep, PasswordStep, PhraseStep, ConfirmStep, …)
+│   ├── vault-recover/   ← recover-from-phrase flow
+│   ├── Editor.tsx       ← the post-unlock workspace chrome + every modal mount (see "Editor screen" below)
 │   ├── Unlock.tsx       ← quick-unlock OR password form (one at a time, MYND-558) + reducer (idle / decrypting / corrupted modes); renders SuspicionBanner when stage carries one
-│   ├── VaultRecover.tsx
-│   ├── Welcome.tsx
-│   ├── vault-creation/  ← multi-step flow (PasswordStep, PhraseStep, ConfirmStep, ...)
-│   └── vault-recover/   ← recover-from-phrase flow
-├── components/          ← reusable UI primitives
+│   └── …                ← the remaining Stage variants (Welcome, CreateVault, VaultRecover,
+│                          VaultPicker, RestoreBackup, AccountBootstrap — which serves BOTH
+│                          account-entry and pending-approval, and composes the web-only
+│                          AccountNumberEntry); the two takeovers Editor.tsx mounts rather than
+│                          stages the router can reach, StorageLost and DeviceRevoked (see
+│                          "Editor screen" below); the web-only dead-end WebNoAccount; and the
+│                          layout helpers (editorLayout, centerView, layoutClamp,
+│                          responsiveCollapse, titlebar)
+├── components/          ← reusable UI + the modal surfaces
 │   ├── primitives/      ← Button, Input, Icon, CenteredCard, MyneMark, ModalShell (shared modal carve-out chrome)
-│   ├── BlockingProgressStep.tsx
-│   ├── DestructiveBanner.tsx
-│   ├── ErrorBanner.tsx
-│   ├── FailClosedError.tsx  ← shared fail-closed UI (reason: invalid-state | corrupted-vault | io-error)
+│   ├── settings/        ← per-panel content rendered by SettingsModal, plus `search/` (settings-search index + scorer)
+│   ├── attachments/ backup/ export/ sync/   ← per-feature component clusters
+│   ├── SettingsModal.tsx       ← Settings shell modal (rail roster = its `PANELS` const; carve-out per decisions.md 2026-05-08)
+│   ├── TemplatesManager.tsx    ← Note-template management modal (MYND-189; modal carve-out, opened by the "Manage templates…" palette action)
+│   ├── CommandPalette.tsx / QuickPicker.tsx / VaultSwitcher.tsx / PairingDialog.tsx / ThemeInstallDialog.tsx
+│   ├── FailClosedError.tsx     ← shared fail-closed UI (reason: invalid-state | corrupted-vault | io-error)
 │   ├── PasswordChangeForm.tsx  ← 3-input form (current + new + confirm) used by Settings → Account
 │   ├── PasswordCreateForm.tsx  ← 2-input form (new + confirm) used by vault-creation + vault-recover (renamed from PasswordForm.tsx)
 │   ├── PasswordInput.tsx       ← single-field primitive: Input + eye toggle + optional zxcvbn meter slot; exports MIN_PASSWORD_LEN/MIN_ZXCVBN_SCORE + usePasswordStrength hook
-│   ├── PasswordStrength.tsx
-│   ├── SettingsModal.tsx       ← Settings shell modal (6-panel rail; carve-out per decisions.md 2026-05-08, taxonomy superseded — Editor panel added)
-│   ├── TemplatesManager.tsx    ← Note-template management modal (MYND-189; modal carve-out, opened by the "Manage templates…" palette action)
-│   ├── settings/               ← per-panel content components rendered by SettingsModal
-│   │   ├── AboutPanel.tsx
-│   │   ├── AccountPanel.tsx
-│   │   ├── AppearancePanel.tsx  ← purely-visual controls (theme / custom theme)
-│   │   ├── EditorPanel.tsx      ← note-authoring behaviour (spell-check + daily-notes); composes SpellSettings + DailyNotesSettings
-│   │   ├── PrivacyPanel.tsx
-│   │   └── StoragePanel.tsx
-│   ├── Spinner.tsx
+│   ├── RootErrorBoundary.tsx   ← mounted by main.tsx around <App>
 │   ├── SuspicionBanner.tsx     ← red/informational banner driven by Stage.unlock.suspicionReason
-│   └── Toast.tsx               ← post-event notification (auto-dismiss 2.5s); used by Editor for "Parola güncellendi"
-├── lib/                 ← non-UI helpers
-│   ├── app-window.ts             ← HAS_TAURI runtime probe (closeApp moved to platform/app-exit, task 95)
-│   ├── bip39-normalize.ts
-│   ├── icons.ts
-│   ├── io-banner.ts
-│   ├── notes.ts
-│   ├── password-generator.ts
-│   ├── secret-export.ts
-│   ├── stage.ts                   ← Stage / Action discriminated unions + transition() + dev harness; carries optional suspicionReason on the unlock variant
-│   ├── vault-change-password.ts   ← changePassword() IPC wrapper (MYND-22 backend)
-│   ├── vault-creation-errors.ts
-│   ├── vault-creation-logging.ts
-│   ├── vault-recover.ts
-│   ├── vault-slot-kind.ts
-│   ├── vault-status.ts            ← probeVaultStatus() boot probe wrapper
-│   └── vault-unlock.ts            ← isVaultUnlocked() + lockVault() wrappers
-├── styles/              ← global CSS only
+│   └── Toast.tsx               ← post-event notification (2.5 s auto-dismiss; 6 s when it carries an action)
+├── lib/                 ← non-UI helpers + the IPC wrappers: stage.ts (Stage / Action unions + transition()
+│                          + dev harness), the vault-*.ts command wrappers, load-bearing-copy.ts, icons.ts, …
+├── hooks/               ← cross-screen React hooks (usePrefs, useSyncStatus, useBackupScheduler,
+│                          useActivityHeartbeat + useIdleAutoLock — the two auto-lock clocks, …)
+├── notes/               ← the notes domain: sidebar, tabs, panes (components/PaneView.tsx is what mounts the
+│                          editor), templates, views, import/export
+├── commands/            ← command registry + bindable catalog + keybind engine/dispatcher (drives CommandPalette)
+├── editor/              ← re-export shim into @myne/editor (repo-root `editor/`) — no logic of its own
+├── dialect/             ← re-export shim into @myne/dialect (repo-root `dialect/`) — parser + template engine
+├── clip/                ← browser-clipper ingest: envelope validation, clip assembly, host→WebView dispatch listener
+├── pdf-export/          ← the script for the hidden PDF-export render window (MYND-255)
+├── i18n/                ← react-i18next config + static catalog bundling
+├── styles/              ← global CSS only (`tokens.css` — see "Design tokens" above)
 ├── types/               ← shared TS types (mirrors Rust error enums)
 └── vite-env.d.ts        ← Vite client types + __APP_VERSION__ compile-time global (sourced from package.json::version, displayed by Settings → About)
 ```
 
+### Adding a file here has a roster obligation
+
+Four of those directories are under a web-lane gate that fails on a file with **no verdict** — and fails equally on a verdict with no file, so the roster cannot outlive the tree it describes:
+
+| New file under | Gate | Where it runs |
+|---|---|---|
+| `src/screens/` | `scripts/check-web-screens.mjs` | CI `web-build` |
+| `src/lib/`, `src/hooks/`, `src/components/settings/` | `scripts/check-web-surfaces.mjs` | CI `web-build` |
+
+The fix is one line in the script's verdict table: `ported` (runs on web as written), `adapted` (runs, with the stated difference), or `excluded` (substituted out of the web bundle — which needs a `marker` string the gate then greps `web/dist` for, because "the route is hidden" is not "the code is absent"). Each script's header documents one more for its own domain — `web-only` for screens, `typed-unsupported` for the service layer (reachable, and its backend answers a typed refusal). `check-web-surfaces.mjs --emit` regenerates the checked-in assessment from the same table, so don't hand-edit that document.
+
+Two neighbours in the same family, for the same reason:
+
+- **A new `plugin:<plugin>|<command>` literal anywhere in the shared tree** must be classified in `web/wasm/src/capability.rs` (`DISPATCHED` / `PLUGIN_DEFAULT` / `PER_COMMAND`) in the same change, or `scripts/check-web-command-coverage.mjs` fails — this one in **`pre-commit`** as well as CI, and whole-tree rather than glob-scoped.
+- **`scripts/check-web-testids.mjs`** (CI) holds `web/src` plus the two web-only shared screens (`src/screens/AccountNumberEntry.tsx`, `src/screens/WebNoAccount.tsx`) to the testid contract below, including the SYNC-7 rule that no `data-*` on a pre-unlock screen may carry a runtime value.
+
 ## Tauri command bindings
 
-**No mock layer.** Plan 2 §B1 originally called for a `VITE_USE_MOCK_BACKEND` mock layer; it was skipped. Real Tauri commands are called directly from `src/lib/`. Risk: signature drift between Rust `#[command]` definitions and TS callers has no canary. `tauri-specta` (or equivalent codegen) is on the radar — see Furkan's todo `[B1]` (status `⏸`).
+**No mock layer.** An early plan called for a `VITE_USE_MOCK_BACKEND` mock layer; it was skipped, and the real commands are invoked straight from `src/lib/` — through `src/platform/core.ts`'s `invoke`, never `@tauri-apps/api/core` directly (see Gotchas). Risk: signature drift between Rust `#[command]` definitions and TS callers has no canary. Codegen (`ts-rs`, per the `TODO(Phase-1-end)` in `src/types/vault-status.ts`) would close that; nothing schedules it yet, so treat the mirror as hand-maintained.
 
-When you add a new Tauri command on the Rust side, manually mirror the signature in the matching `src/lib/<flow>.ts` file. Keep types in `src/types/` so a second consumer can reuse them.
+Adding a Tauri command on the Rust side is three edits on this side, and only the third one fails loudly:
+
+1. Mirror the signature in the matching `src/lib/<flow>.ts` wrapper.
+2. Keep the request/error types in `src/types/` so a second consumer can reuse them.
+3. Classify the new `plugin:<plugin>|<command>` literal in `web/wasm/src/capability.rs` — see "Adding a file here has a roster obligation" above. Skip it and `scripts/check-web-command-coverage.mjs` rejects the commit.
 
 ## Vault creation flow (B3a/B3b shipped)
 
@@ -110,22 +130,47 @@ When you add a new Tauri command on the Rust side, manually mirror the signature
 
 When building the next multi-step flow (recovery — separate PR), reuse this structure.
 
-## Empty editor shell (B4.5 shipped, placeholder)
+## Editor screen (the post-unlock workspace)
 
-`src/screens/Editor.tsx` is a textarea-based placeholder — no save, no CodeMirror, no autosave. Full editor lands in B5 (`@uiw/react-codemirror` + markdown language pack). Layout:
-- Outer flex column
-- Row of three panes (left sidebar + center pane + right sidebar)
-- 28 px bottom bar
-- Section heading style + status text style extracted as `CSSProperties` constants (`SECTION_HEADING_STYLE`, `STATUS_TEXT_STYLE`)
-- Center toolbar height 38 px; textarea minHeight 360; padding 32px 64px on scroll container, maxWidth 680 inner
+`src/screens/Editor.tsx` is the largest module in the tree and it is **production code, not a shell** — an earlier revision of this file described it as a textarea placeholder waiting for a "real" editor; that placeholder is long gone. What it owns is the *chrome*, not the text editing:
 
-Don't ship features against this placeholder — wait for B5.
+- outer flex column: sync banners, the three-pane row (left `SidebarPane` + `PaneTree` + right `SidebarPane`), and the bottom bar;
+- the split/tab workspace via `PaneTree` → `src/notes/components/PaneView.tsx` — each leaf pane owns its own content state and autosave loop, so two panes can show two notes side by side;
+- the modal mounts, all Editor-local booleans per the desktop modal carve-out: `SettingsModal`, `TemplatesManager`, `CommandPalette` + `QuickPicker`, `VaultSwitcher`, and the fail-closed / storage-lost / device-revoked takeovers.
+
+The text editor itself is **not here and not in `src/`**. It is the shared CodeMirror 6 engine in the repo-root `editor/` package (`@myne/editor`), reached three hops:
+
+```
+src/screens/Editor.tsx  →  src/notes/components/PaneView.tsx  →  src/editor/*  (re-export shim)  →  @myne/editor
+```
+
+Platform-coupled operations the engine needs (i18n, the vault tag index, spell, on-device AI, attachment IO, prefs, open-URL) are **injected**, not imported: `src/editor-host.ts` calls `setEditorHost(...)` once at startup — `main.tsx` imports it for that side effect, after `./i18n` and before `<App>`. That file is the `EditorHost` seam described in `editor/src/host.ts`, and it is where a platform's *absent* members are omitted so the engine hides the affordance instead of showing one that throws.
+
+So: engine behaviour (keymaps, decorations, slash menu, vim, drawing, math) is an `editor/` change; pane/tab/sidebar/chrome behaviour is an `Editor.tsx` or `src/notes/` change.
 
 ## App shell (MYND-80 full state machine + route guards)
 
-**(Web note: `phase3-web-client` task 64 gives the web target browser history, URL routing and a working back button on top of this same `Stage` union — the desktop client stays URL-free.)** `src/App.tsx` uses the full Stage discriminated union (`{ name: "welcome" } | { name: "create-vault" } | { name: "unlock"; initialStatus } | { name: "editor" } | { name: "recover"; subStep }`) — the v0.1 definition of "routing" (no URL/history-aware router). Pure `transition(prev, action): Stage` function in `src/lib/stage.ts` enforces legal source/target combinations; illegal pairs return `prev` unchanged + dev `console.warn`. Boot starts in `null` (loading shim) until `vault_status` IPC probe resolves; `initialStageFromProbe(result)` maps Ok(Missing)→welcome, Ok(Exists)→unlock(Exists), Ok(Corrupted)→unlock(Corrupted), Err(IoError)→unlock(IoError). User-initiated `editor.lock` lands directly on `unlock(Exists)` — no intermediate "vault locked" screen (MYND-131). Lock-on-idle (auto-lock on idle timer) is **explicitly out of scope** for Phase 1 per `src-tauri/src/plugins/vault_unlock/state.rs` Phase 2+ docstring — there is no Phase 1 writer for `last_activity`, so a stub here would be dead code.
+**(Web note: `phase3-web-client` task 64 gives the web target browser history, URL routing and a working back button on top of this same `Stage` union — the desktop client stays URL-free.)** `src/App.tsx` uses the full Stage discriminated union — the v0.1 definition of "routing" (no URL/history-aware router). `src/lib/stage.ts` is the roster; it currently declares nine variants and `App.tsx` has one switch arm for each: `welcome`, `create-vault`, `unlock` (carries `initialStatus`), `editor`, `recover` (carries `subStep`), `picker` (≥2 vaults, SYNC-7a), `account-entry` and `pending-approval` (the web client's first-run identity step and its approval wait, MYND-635 — both rendered by `AccountBootstrap`), and `restore-backup`. Pure `transition(prev, action): Stage` function in `src/lib/stage.ts` enforces legal source/target combinations; illegal pairs return `prev` unchanged + dev `console.warn`.
 
-Belt+suspenders invalid-state guard (Q5β-1 of `app-state-machine` grill): `transition()` is React-side defense; `Editor` mount probes `vault_is_unlocked()` at mount as the Rust-side reality check, rendering `<FailClosedError reason="invalid-state" />` if React Stage and Rust slot disagree. The "Kilitle" CTA on that error UI calls `vault_lock` + reprobe via `App.tsx::reprobe()` (out-of-band reset; bypasses transition fn intentionally).
+Boot starts in `null` (loading shim) until the probes resolve. `initialStageFromProbe(vaultList, slotMap, pendingApproval)` takes **three** inputs, gathered by one `Promise.all` in `App.tsx` — the on-disk vault list (`listVaults()`), the runtime slot kind, and whether this device is enrolled but still awaiting approval — and routes:
+
+- **slot-priority first**: a non-Empty runtime slot pins the stage regardless of disk state (`Recovering` → recover, `Unlocked` → editor);
+- list-level IO failure → `unlock(IoError)` (fail-closed, whatever the count);
+- 0 vaults → `welcome`, or `account-entry` where the `vaultCreation` capability is absent (on web an empty container means "this browser hasn't been told which account to pull", not "make one");
+- 1 vault, `Exists` → `unlock(Exists)` carrying its `vaultId` — unless `pendingApproval` and no `vaultCreation` capability, which lands on `pending-approval`;
+- 1 vault, `Corrupted` → `unlock(Corrupted)` where `backup` exists, else `account-entry` (a corrupt container on a server-backed client is a re-bootstrap, not data loss — `decisions.md` 2026-07-26);
+- ≥2 vaults → `picker`.
+
+Read the function before relying on that summary; the capability gates are what make the same code route two clients differently. User-initiated `editor.lock` lands directly on `unlock(Exists)` — no intermediate "vault locked" screen (MYND-131).
+
+**Lock-on-idle ships (MYND-121)** — an earlier revision of this file called it out of scope, and that is no longer true. Two mechanisms, split by which client can see idleness:
+
+- **Desktop.** The timer is `src-tauri/src/auto_lock.rs`, and its "idle" is machine-level OS idle where the platform exposes one (`effective_idle_from`), falling back — fail-secure, strictly more eager — to a window-level clock this side keeps fresh. That clock is `src/hooks/useActivityHeartbeat.ts`: mounted by `Editor.tsx`, i.e. exactly while a vault is unlocked, throttled to one IPC per 5 s, calling `reportUserActivity()` (`src/lib/vault-unlock.ts` → `plugin:vault-unlock|report_user_activity`) → `VaultRuntimeState::report_activity`, a relaxed store into the `last_activity_millis` atom in `core/src/plugins/vault_unlock/state.rs`. Best-effort by design: a dropped heartbeat only lets idle grow.
+- **Web.** No OS idle source exists, so `src/hooks/useIdleAutoLock.ts` drives the lock from the page — active only where the `osIdleAutoLock` capability is absent, so the two never race. It compares timestamps rather than counting ticks (a hidden tab's timers are throttled to nothing) and calls the Lock button's own flush-then-lock handler, so the keys are dropped and the plaintext unmounted rather than hidden.
+
+The timeout is the `auto_lock_seconds` pref — Settings → Privacy → `usePrefs`'s `setAutoLock` → `plugin:prefs|set_auto_lock_timeout`. On desktop it is clamped by the code-constant protective envelope in `auto_lock.rs` (`MIN_AUTO_LOCK_SECS` / `AUTO_LOCK_CEILING_SECS` / `DEFAULT_AUTO_LOCK_SECS`), which has **no disabled state** — a tampered `vault.prefs` can only make auto-lock stricter. The `UnlockedVault` docstring in `core/src/plugins/vault_unlock/state.rs` still says a `last_activity` field awaits Phase 2+ "because there is no Phase 1 writer for it"; that rationale is stale — the writer exists, the atoms just live on `VaultRuntimeState` rather than on `UnlockedVault`.
+
+Belt+suspenders invalid-state guard (Q5β-1 of `app-state-machine` grill): `transition()` is React-side defense; `Editor` mount probes `vault_is_unlocked()` at mount as the Rust-side reality check, rendering `<FailClosedError reason="invalid-state" />` if React Stage and Rust slot disagree. That surface's CTA (`t("failClosed.invalidState.cta")` — a **lock**, not an exit) calls `vault_lock` + reprobe via `App.tsx::reprobe()` (out-of-band reset; bypasses transition fn intentionally). Its label comes from the reason's own copy; only the call sites whose CTA is the platform *exit* pass `ctaLabelKey`, because that label has to track behaviour that differs per platform (desktop destroys the window, web reloads the page).
 
 No dev-only stage shortcut: any `?test-stage=` URL parameter has no effect. Per `app-state-machine` PRD + MYND-80 acceptance, dev cannot bypass production guards.
 
@@ -137,7 +182,9 @@ The `unlock` variant carries an optional `suspicionReason` payload — `"vault-m
 
 The Settings UI is **not** a Stage variant. It mounts as a modal overlay inside `Editor.tsx` driven by Editor-local React state (`settingsOpen` boolean), per the desktop modal carve-out in `docs/decisions.md` 2026-05-08. Entry points: gear button in BottomBar's right cluster + `Cmd+,` / `Ctrl+,` keyboard shortcut. Both toggle `settingsOpen`; `<SettingsModal open onClose>` only renders when true.
 
-`SettingsModal.tsx` owns the 6-panel rail (Account → Privacy → Editor → Appearance → Storage → About). The taxonomy was first locked at 5 panels by `decisions.md` 2026-05-08; the **Editor** panel was added by a superseding `decisions.md` entry, which also scoped Appearance down to purely-visual controls (spell-check + daily-notes moved from Appearance to Editor — they are note-authoring behaviour, not appearance). Panel content components live in `src/components/settings/`; the Editor panel (`EditorPanel.tsx`) is a thin composition of `SpellSettings` + `DailyNotesSettings`. Rail navigation: ↑/↓ arrows cycle (with focus management via per-panel refs); click sets selection. Default panel: Account.
+`SettingsModal.tsx` owns the rail, and the `PANELS` const inside it is the roster — read it rather than a prose list, because the taxonomy has been extended more than once. As it stands the rail runs Account → Privacy → Sync → Editor → Files → Hotkeys → Appearance → Storage → About, followed by a `labs` group holding the beta **AI** panel behind a `BetaBadge`. Two mechanisms are worth knowing before you touch it: `group: "labs"` renders a one-off divider at the core→labs boundary (a non-focusable presentation row, so the ↑/↓ cycle and `itemRefs` are untouched), and the array is **filtered**, not render-hidden — `ai` is dropped entirely where the `localAi` capability is absent, i.e. on web, because a greyed panel is an offer the platform cannot honour (`decisions.md` 2026-07-26 makes omission normative). The taxonomy was first locked at 5 panels by `decisions.md` 2026-05-08; the **Editor** panel came with a superseding entry that also scoped Appearance down to purely-visual controls (spell-check + daily-notes are note-authoring behaviour, not appearance), and **Files** (note-storage + startup behaviour, MYND-462) with a further one — the `PanelId` docstring in `SettingsModal.tsx` carries that provenance. Panel content components live in `src/components/settings/`, one file per panel plus the shared control blocks they compose. Rail navigation: ↑/↓ arrows cycle (with focus management via per-panel refs); click sets selection. Default panel: Account.
+
+The modal also carries a **settings search** (`src/components/settings/search/`, MYND-536): `searchSettings(query, t)` scores a static registry, `groupResultsByPanel` groups the hits, and selecting one navigates to the owning panel and scrolls to the setting's `data-setting-anchor` (falling back to its `data-testid`). Matching runs against the registry, never the rendered DOM — panels run IPC on mount, so scanning their text is not an option. Consequence: **a new user-facing setting ships with its entry in `settingsSearchIndex.ts` in the same change**, capability-gated where its control is, or search finds it and scrolls to something that was never rendered.
 
 **In-flight gating (Q9 of the grill):** Settings's only Argon2id-bound IPC today is `vault_change_password`. During the ~1-3s window, AccountPanel calls `onInFlightChange(true)` which gates the parent's Esc / backdrop / × dismissal handlers (the user must wait for the backend response). The Editor's BottomBar Lock button stays enabled — firing `vault_lock` during in-flight is the canonical graceful-cancel path; backend returns `VaultLockedDuringChange` which routes through `setStageWithSuspicion()` → Unlock screen with informational `SuspicionBanner`.
 
@@ -154,7 +201,7 @@ frontmatter flag (the inverse-visibility twin of `trashed:`; `markdown-dialect.m
 - **Management surface** (`components/TemplatesManager.tsx`): a modal-class
   surface mounted from `Editor.tsx` via an Editor-local boolean (`templatesOpen`)
   — the **same desktop modal carve-out as SettingsModal**, NOT a Stage variant,
-  NOT a 6th Settings panel, NOT a sidebar surface. Opened by the
+  NOT one more Settings panel, NOT a sidebar surface. Opened by the
   `templates.manage` command-palette action ("Manage templates…", `editor`-stage
   guarded) → `CommandContext.onManageTemplates` → `setTemplatesOpen(true)`.
   Lists `listTemplates()` (the `template: true` filter, trashed excluded); row
@@ -184,10 +231,12 @@ frontmatter flag (the inverse-visibility twin of `trashed:`; `markdown-dialect.m
 
 ## Test observability (E2E contract — SYNC-8)
 
-The real-IPC E2E suites (`e2e/`, see `e2e/CLAUDE.md` + `docs/dev/e2e.md`)
+The real-IPC E2E suites (`e2e/`, tauri-driver — see `e2e/CLAUDE.md` +
+`docs/dev/e2e.md`; and the deliberately thin browser lane `e2e-web/`)
 locate everything by `data-testid`. **A screen without testids is invisible to
 E2E — adding a user-facing flow means adding its testid pass in the same
-change.**
+change.** Which lane owes a scenario is the root `CLAUDE.md`'s call, not this
+file's: shared-tree flows go to `e2e/`, web-specific behaviour to `e2e-web/`.
 
 - Naming: `<screen>.<element>` (`unlock.password-input`, `picker.vault-row`,
   `create.phrase-grid`). Repeated rows carry a discriminator attribute
@@ -200,6 +249,14 @@ change.**
 - **Load-bearing user-facing copy lives in `src/lib/load-bearing-copy.ts`**
   (non-distinguishing banners etc.). Production renders the constant; E2E
   asserts it by full-literal equality. Don't inline-duplicate such strings.
+- Across the shared tree the convention is held by **review alone**. The one
+  mechanical enforcer is `scripts/check-web-testids.mjs` (CI), and its scope is
+  `web/src` plus the two web-only shared screens
+  (`src/screens/AccountNumberEntry.tsx`, `src/screens/WebNoAccount.tsx`): at
+  least one testid per rendering module, `<screen>.<element>` naming, and no
+  `data-*` fed a runtime expression on a pre-unlock screen — the account number
+  is typed on one of them, and a `data-value={account}` would put it in the DOM,
+  in screenshots and in every failure artefact CI keeps.
 
 ## Common commands
 
@@ -208,7 +265,15 @@ pnpm install
 pnpm dev                # Vite only — useful when testing UI in isolation
 pnpm tauri dev          # full app (Vite + Rust core)
 pnpm build              # tsc typecheck + vite build → dist/
-pnpm test:e2e           # E2E suites — Linux-only; on macOS use ./scripts/e2e-local.sh
+pnpm test               # Vitest — the only runner that exercises tests/ (outside tsc's include)
+pnpm test:e2e           # desktop E2E suite — Linux-only; on macOS use ./scripts/e2e-local.sh
+
+# the web lane compiles this same tree with the seam substituted
+pnpm web:dev            # web client dev server on :1421 (runs alongside the desktop one)
+pnpm web:build          # typecheck web/ against src/ + production web bundle
+pnpm test:e2e:web       # browser E2E lane (e2e-web/)
+pnpm test:seam:desktop  # seam contract vs. the Tauri implementation
+pnpm test:seam:web      # …and vs. the web one — both must pass for a seam change
 ```
 
 ## Gotchas
