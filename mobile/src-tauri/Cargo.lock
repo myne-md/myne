@@ -2489,6 +2489,7 @@ dependencies = [
  "tauri-plugin-deep-link",
  "tauri-plugin-opener",
  "tauri-plugin-qr-scan",
+ "tauri-plugin-reminders",
  "tauri-plugin-screen-guard",
  "tauri-plugin-share-intent",
  "tauri-utils",
@@ -4558,6 +4559,17 @@ name = "tauri-plugin-qr-scan"
 version = "0.1.0"
 dependencies = [
  "serde",
+ "tauri",
+ "tauri-plugin",
+ "thiserror 2.0.18",
+]
+
+[[package]]
+name = "tauri-plugin-reminders"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
  "tauri",
  "tauri-plugin",
  "thiserror 2.0.18",

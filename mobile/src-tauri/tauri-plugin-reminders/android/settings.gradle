@@ -1,0 +1,8 @@
+// Standalone-development include only. The app build ignores this file: the
+// generated gen/android project includes this module through
+// tauri.settings.gradle (from the plugin build.rs's android_library_path
+// metadata), pointing :tauri-android at the app's own copy of the Tauri
+// Kotlin API. `.tauri/tauri-api` is copied in by the plugin build script and
+// gitignored.
+include ':tauri-android'
+project(':tauri-android').projectDir = new File('./.tauri/tauri-api')

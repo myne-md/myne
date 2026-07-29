@@ -16,6 +16,11 @@ import { usePrefsNonce } from "./prefsNonce";
  *  optional field unset (`null` / empty), timestamps shown, screen-capture off. */
 export const DEFAULT_PREFS: PrefsView = {
   screen_capture_protection: false,
+  // ENABLED, matching the Rust default (MYND-618/619). An absent key must read
+  // as on: reading it as off would silently disable reminders on every existing
+  // vault, which is the worst available reading of a missing value.
+  reminders_enabled: true,
+  reminder_horizon_days: null,
   show_note_timestamps: true,
   spell_enabled: null,
   spell_languages: [],

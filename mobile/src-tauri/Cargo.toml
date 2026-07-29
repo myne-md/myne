@@ -2,10 +2,16 @@
 # directory, so without this table cargo would treat src-tauri as a member
 # of the main repo's workspace (which doesn't list it) and fail. The
 # screen-guard plugin is a member so ONE Cargo.lock governs it (TB9-style
-# single-lock discipline). The share-intent plugin (MYND-511) is a member for
-# the same reason.
+# single-lock discipline). The share-intent plugin (MYND-511), the qr-scan
+# plugin (MYND-466) and the reminders plugin (MYND-619) are members for the same
+# reason.
 [workspace]
-members = ["tauri-plugin-screen-guard", "tauri-plugin-share-intent", "tauri-plugin-qr-scan"]
+members = [
+    "tauri-plugin-screen-guard",
+    "tauri-plugin-share-intent",
+    "tauri-plugin-qr-scan",
+    "tauri-plugin-reminders",
+]
 
 [package]
 name = "myne-mobile"
@@ -86,6 +92,16 @@ tauri-plugin-share-intent = { path = "tauri-plugin-share-intent" }
 # command `scan` (deny-by-default `qr-scan:default` capability, camera-gated,
 # NSCameraUsageDescription). iOS-only (SYNC-46); Android decode is MYND-465.
 tauri-plugin-qr-scan = { path = "tauri-plugin-qr-scan" }
+# MYND-619: in-repo local-notification scheduler for task reminders, carrying
+# BOTH native halves (Swift + Kotlin) under the plugin's own `ios/`+`android/`.
+# Four WebView commands behind the deny-by-default `reminders:default`
+# capability. `tauri-plugin-notification` was declined (grill SYNC-44): it
+# implements `schedule` on mobile ONLY — its desktop backend silently drops the
+# schedule field — so "one plugin everywhere" would have shipped a half-feature
+# on the desktop, and on Android it would additionally have pulled a large JSON
+# library, AppCompat and Material, and added three install-time permissions.
+# Zero external crates.
+tauri-plugin-reminders = { path = "tauri-plugin-reminders" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 uuid = { version = "1", features = ["v4", "v7"] }
