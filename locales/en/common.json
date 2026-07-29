@@ -1029,7 +1029,15 @@
         "green": "Green",
         "pink": "Pink",
         "purple": "Purple",
-        "yellow": "Yellow"
+        "yellow": "Yellow",
+        "orange": "Orange",
+        "red": "Red",
+        "teal": "Teal",
+        "cyan": "Cyan",
+        "lime": "Lime",
+        "brown": "Brown",
+        "grey": "Grey",
+        "indigo": "Indigo"
       },
       "urlPlaceholder": "Paste link URL"
     },
