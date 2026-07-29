@@ -192,13 +192,21 @@ pub fn current_vault_root_from_host(host: &dyn HostCtx) -> Result<PathBuf, HostP
 }
 
 /// [`active_vault_root`] over a host.
+///
+/// When no vault is active the host gets to name its sole vault before the
+/// `None` arm's disk scan runs ([`HostCtx::sole_vault_id`], `None` on desktop
+/// and mobile so their behaviour is unchanged). The order matters and is not
+/// arbitrary: an ACTIVE id always wins, because a host that can hold several
+/// vaults and has one open must resolve to the open one. The fallback only
+/// speaks when there is nothing to override — which is precisely the pre-unlock
+/// window where the scan is both needed and, on `wasm32`, impossible.
 pub fn active_vault_root_from_host(
     host: &dyn HostCtx,
     active_id: Option<VaultId>,
 ) -> Result<PathBuf, HostPathError> {
     Ok(active_vault_root_from_base(
         &host.app_data_dir()?,
-        active_id,
+        active_id.or_else(|| host.sole_vault_id()),
     ))
 }
 
@@ -1012,6 +1020,98 @@ mod tests {
         assert_eq!(
             active_vault_root_from_host(&host, None).unwrap(),
             active_vault_root_from_base(&base, None)
+        );
+    }
+
+    /// A host that names a sole vault, the way the browser's `WebHost` does.
+    struct SoleVaultHost {
+        inner: TestHost,
+        sole: VaultId,
+    }
+
+    impl HostCtx for SoleVaultHost {
+        fn app_data_dir(&self) -> Result<PathBuf, HostPathError> {
+            self.inner.app_data_dir()
+        }
+        fn app_config_dir(&self) -> Result<PathBuf, HostPathError> {
+            self.inner.app_config_dir()
+        }
+        fn emit(&self, _event: &'static str, _payload: crate::host::EventPayload) {}
+        fn now_unix_millis(&self) -> u64 {
+            0
+        }
+        fn monotonic_millis(&self) -> u64 {
+            0
+        }
+        fn sole_vault_id(&self) -> Option<VaultId> {
+            Some(self.sole)
+        }
+    }
+
+    /// The pre-unlock window: `active_id` is `None`, and a host that owns
+    /// exactly one vault must still resolve to THAT vault rather than to the
+    /// legacy directory the disk-scan arm falls back to.
+    ///
+    /// This is the browser's whole problem in one assertion. There,
+    /// `current_vault_root_from_base`'s `std::fs::read_dir` always errors, so
+    /// the scan silently yields the legacy path and every pre-unlock read
+    /// reports an absent vault. Asserting against `vaults/<sole>/`
+    /// **explicitly** — rather than against whatever the default arm returns —
+    /// is what makes this test fail if the `or_else` is ever dropped.
+    #[test]
+    fn a_sole_vault_host_resolves_to_its_own_vault_when_none_is_active() {
+        let tmp = ScopedTempDir::new("sole-vault-host").unwrap();
+        let sole = VaultId::mint();
+        let host = SoleVaultHost {
+            inner: TestHost::with_dirs(tmp.path(), tmp.path().join("config")),
+            sole,
+        };
+        let base = host.app_data_dir().unwrap();
+
+        assert_eq!(
+            active_vault_root_from_host(&host, None).unwrap(),
+            vault_root_for_id_from_base(&base, sole),
+            "a host that names a sole vault must resolve to it before the disk scan"
+        );
+        assert_ne!(
+            active_vault_root_from_host(&host, None).unwrap(),
+            current_vault_root_from_base(&base),
+            "resolving to the scan's answer is the bug, not an equivalent result"
+        );
+    }
+
+    /// An ACTIVE id outranks the fallback. A host that can hold several vaults
+    /// and has one open must resolve to the open one — otherwise this fix would
+    /// pin every read to the sole id even after a different vault was unlocked.
+    #[test]
+    fn an_active_id_outranks_the_sole_vault_fallback() {
+        let tmp = ScopedTempDir::new("sole-vault-override").unwrap();
+        let sole = VaultId::mint();
+        let active = VaultId::mint();
+        assert_ne!(sole, active);
+        let host = SoleVaultHost {
+            inner: TestHost::with_dirs(tmp.path(), tmp.path().join("config")),
+            sole,
+        };
+        let base = host.app_data_dir().unwrap();
+
+        assert_eq!(
+            active_vault_root_from_host(&host, Some(active)).unwrap(),
+            vault_root_for_id_from_base(&base, active)
+        );
+    }
+
+    /// The default is silence: desktop and mobile are untouched by the seam
+    /// method existing at all.
+    #[test]
+    fn a_host_that_names_no_sole_vault_still_falls_to_the_disk_scan() {
+        let tmp = ScopedTempDir::new("no-sole-vault").unwrap();
+        let host = TestHost::with_dirs(tmp.path(), tmp.path().join("config"));
+        let base = host.app_data_dir().unwrap();
+        assert_eq!(host.sole_vault_id(), None);
+        assert_eq!(
+            active_vault_root_from_host(&host, None).unwrap(),
+            current_vault_root_from_base(&base)
         );
     }
 

@@ -14,7 +14,7 @@ use crate::host::HostCtx;
 use std::path::PathBuf;
 // The rest of this module is still Tauri-shaped (task 79 step 9); only the two
 // entry points the auth cluster calls have host arms so far.
-use tauri::{AppHandle, Emitter, Manager, Runtime};
+use tauri::{AppHandle, Manager, Runtime};
 
 /// Re-exported so `generate_handler!`, the mobile crate and the TS mirror keep
 /// resolving `commands::SyncRuntimeStatus`; the type moved to `status` with the
@@ -117,7 +117,6 @@ pub async fn sync_decode_join_qr(
 }
 
 use super::to_hex as hex_lower;
-use super::token_store::TokenStore;
 
 /// Re-exported: both moved to `config` with the endpoint cores (task 84), where
 /// the pin policy belongs beside the config it reads.
@@ -273,7 +272,6 @@ pub async fn sync_materialisation_progress(
     Ok(super::progress::read())
 }
 
-use super::cycle::sync_cycle_mutex;
 /// Re-exported: the cycle and its outcome type moved to `cycle` with task 84,
 /// so the browser runs the same code. `loop_control` and `sync_now` keep
 /// resolving `commands::{CycleOutcome, run_active_cycle}`.
@@ -486,25 +484,12 @@ pub async fn sync_reset_local<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
 ) -> Result<(), SyncDeviceError> {
-    // Serialize against an in-flight cycle: without this a reset can clear the
-    // token / device-local sync files while a cycle's spawn_blocking is finishing,
-    // and the cycle then writes them back — reviving the enrollment/baseline the
-    // reset removed.
-    let _cycle_guard = sync_cycle_mutex().lock().await;
-    let dir = crate::paths::active_vault_root_io(&app, state.active_vault_id().await)
-        .map_err(|_| SyncDeviceError::Internal)?;
-    super::token_store::default_store()
-        .clear(&crate::vault_io::StdVaultIo, &dir)
-        .await
-        .map_err(|_| SyncDeviceError::Internal)?;
-    super::state::clear_device_local_sync(&crate::vault_io::StdVaultIo, &dir)
-        .await
-        .map_err(|_| SyncDeviceError::Internal)?;
-    // Nudge both the status indicator and the device roster to re-read immediately —
-    // they poll independently (5s / 4s), so without this they would disagree (one still
-    // "Synced") for up to a poll interval after the reset.
-    let _ = app.emit("sync://enrollment-changed", ());
-    Ok(())
+    devices::reset_local_from_host(
+        &crate::host::tauri_host::TauriHost::new(app.clone()),
+        &crate::vault_io::StdVaultIo,
+        state.inner(),
+    )
+    .await
 }
 
 /// List the note ids (hex) with a staged conflicting remote revision awaiting
@@ -686,23 +671,9 @@ pub async fn sync_delete_quarantine<R: Runtime>(
 // (the same posture as 24-word recovery). The heavy Argon2id + the blocking
 // transport run in spawn_blocking; the credential is Zeroizing-wrapped.
 
-use protocol::{head_fingerprint, HEAD_ID_LEN};
-
-/// Decode a 32-byte `head_id` hex → the frozen SAS fingerprint. Delegates to the
-/// vector-locked [`protocol::head_fingerprint`] — no re-derivation, one encoding
-/// (SYNC-17). Returns `None` only on a malformed hex string (wrong length /
-/// non-hex). Factored out so the encoding is host-unit-testable against the
-/// `head-fingerprint` golden vector without a live vault.
-fn head_fingerprint_of_hex(head_id_hex: &str) -> Option<String> {
-    if head_id_hex.len() != HEAD_ID_LEN * 2 || !head_id_hex.bytes().all(|b| b.is_ascii_hexdigit()) {
-        return None;
-    }
-    let mut head_id = [0u8; HEAD_ID_LEN];
-    for (i, b) in head_id.iter_mut().enumerate() {
-        *b = u8::from_str_radix(&head_id_hex[i * 2..i * 2 + 2], 16).ok()?;
-    }
-    Some(head_fingerprint(&head_id))
-}
+// `head_fingerprint_of_hex` moved to `devices` with MYND-635 — `commands` is
+// `tauri-ipc`-gated, so anything living here is invisible to the wasm build, and
+// the web client needs this encoding for the same eye-compare the desktop does.
 
 /// The 8-char Crockford `XXXX-XXXX` SAS fingerprint of this device's currently
 /// adopted vault head — the substrate for the enroll-time out-of-band eye-compare
@@ -721,17 +692,12 @@ pub async fn sync_head_fingerprint<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
 ) -> Result<Option<String>, SyncDeviceError> {
-    let dir = crate::paths::active_vault_root_io(&app, state.active_vault_id().await)
-        .map_err(|_| SyncDeviceError::Internal)?;
-    let sync_state = super::state::read_sync_state(&crate::vault_io::StdVaultIo, &dir)
-        .await
-        .map_err(|_| SyncDeviceError::Internal)?;
-    match sync_state.vv_log.last() {
-        Some(obs) => Ok(Some(
-            head_fingerprint_of_hex(&obs.head_id_hex).ok_or(SyncDeviceError::Internal)?,
-        )),
-        None => Ok(None),
-    }
+    devices::head_fingerprint_from_host(
+        &crate::host::tauri_host::TauriHost::new(app.clone()),
+        &crate::vault_io::StdVaultIo,
+        state.inner(),
+    )
+    .await
 }
 
 /// Re-exported: the enrolment types moved to `enroll` with the flow (task 84),
@@ -819,6 +785,9 @@ pub async fn sync_join_account<R: Runtime>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    // Only the test below still reaches for it — `sync_reset_local`'s body moved
+    // to `devices` with MYND-635.
+    use super::super::cycle::sync_cycle_mutex;
     // Used only by the quarantine fixtures below; imported here rather than at
     // module scope so the lib build does not carry an unused import.
     use super::super::conflict::parse_quarantine_file_name;
@@ -871,25 +840,10 @@ mod tests {
         assert!(decode_join_qr_view("https://evil.example", 1).is_err());
     }
 
-    #[test]
-    fn head_fingerprint_of_hex_matches_golden_vector() {
-        // head-fingerprint/v0.1/all-zero golden: head_id = 0x00×32 → "TYRS-N318".
-        // Proves the command's encoding delegates to the vector-locked primitive
-        // verbatim (no re-derivation, one encoding — SYNC-17).
-        let all_zero = "0".repeat(HEAD_ID_LEN * 2);
-        assert_eq!(
-            head_fingerprint_of_hex(&all_zero),
-            Some(String::from("TYRS-N318"))
-        );
-        // Malformed input → None (no panic, no fallback encoding).
-        assert_eq!(
-            head_fingerprint_of_hex(
-                "not-hex-not-hex-not-hex-not-hex-not-hex-not-hex-not-hex-not-hex!"
-            ),
-            None
-        );
-        assert_eq!(head_fingerprint_of_hex("00"), None); // wrong length
-    }
+    // `head_fingerprint_of_hex_matches_golden_vector` moved to `devices` with
+    // the function itself (MYND-635). It gains coverage rather than losing it:
+    // this module is `tauri-ipc`-gated, so the golden vector was never checked
+    // on the wasm build that now uses the same encoding.
 
     #[test]
     fn sync_cycle_mutex_serializes_concurrent_holders() {

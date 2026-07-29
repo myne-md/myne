@@ -237,6 +237,26 @@ tauri-ipc = ["dep:tauri"]
 # the module via `#[cfg(any(test, feature = "test-support"))]`.
 test-support = []
 
+# The two fixture emitters import `test_support` / `double_buffer_fixtures`, so
+# they cannot compile unless `test-support` is on. Declared rather than left
+# implicit because `--all-targets` builds EXAMPLES: CI's `tauri-compile` did
+# exactly that and failed with `unresolved import myne_core::test_support`,
+# while `cargo check -p myne-core` (no `--all-targets`) passed locally and hid
+# it. `required-features` makes cargo SKIP them instead, which is the mechanism
+# for precisely this — and it is not a workaround: an emitter that needs the
+# fixtures is genuinely not part of a production build.
+#
+# `approve-device` and `seed-account` are deliberately absent: both compile
+# without the feature, and listing them would silently drop them from the
+# default `--all-targets` build that currently type-checks them.
+[[example]]
+name = "emit-vault-fixture"
+required-features = ["test-support"]
+
+[[example]]
+name = "emit-double-buffer-fixtures"
+required-features = ["test-support"]
+
 [dev-dependencies]
 tracing-test = "0.2"
 

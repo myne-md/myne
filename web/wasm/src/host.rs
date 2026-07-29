@@ -52,6 +52,20 @@ impl HostCtx for WebHost {
         Ok(PathBuf::from(APP_CONFIG_ROOT))
     }
 
+    fn sole_vault_id(&self) -> Option<myne_core::vault_id::VaultId> {
+        // One origin, one vault, one fixed id — the property `vault_list`'s
+        // dispatch arm already relies on when it resolves against this same
+        // constant. Answering it here is what lets every OTHER vault-root read
+        // work before unlock, where `active_vault_id()` is `None` and the core's
+        // `None` arm would otherwise fall to a `std::fs::read_dir` scan that
+        // cannot run on `wasm32` (see `HostCtx::sole_vault_id`).
+        //
+        // Naming the same constant in both places rather than threading it
+        // through each call site is deliberate: a second opinion about which
+        // directory is the vault is exactly the bug this closes.
+        Some(myne_core::paths::web_single_vault_id())
+    }
+
     fn emit(&self, event: &'static str, payload: EventPayload) {
         // Backend→UI push. Posted straight out of the Worker on the same
         // channel as command replies, correlated to no request (`id: 0`), which

@@ -7,7 +7,7 @@
 // right things, and about the comparison biting at the right point.
 
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   initialAssetsFrom,
@@ -15,6 +15,30 @@ import {
   wasmOnCriticalPath,
   withinBudget,
 } from "../../scripts/check-web-bundle-budget.mjs";
+
+/**
+ * The built bundle's entry document, when one exists.
+ *
+ * Two assertions below read it, and in CI it is NOT there: `vitest` runs before
+ * `web-build`, so nothing has produced `web/dist` yet. They failed there with a
+ * bare ENOENT — a defect that shipped with MYND-574 and stayed invisible because
+ * the pipeline erred at config-compile from that day on, so this suite never ran
+ * remotely.
+ *
+ * **Skipping is safe here specifically, and it is worth saying why rather than
+ * assuming it.** The property those two guard — a scan that matches NOTHING
+ * reports a 0-byte bundle and passes forever — is enforced against the real
+ * build by `check-web-bundle-budget.mjs` itself, which refuses an empty asset
+ * list and runs in `web-build` where a bundle is guaranteed. So the coverage
+ * lives at the point that has the artefact, and these two are the local
+ * convenience of getting the same answer before a build.
+ */
+const REAL_HTML = join(process.cwd(), "web", "dist", "index.html");
+const hasBuild = existsSync(REAL_HTML);
+/** Skipped, never silently passed: a skip is REPORTED, and an absent bundle is a
+ *  fact about the run rather than a result. A guard that returned early instead
+ *  would render as a pass and be indistinguishable from one that ran. */
+const itWithBuild = it.skipIf(!hasBuild);
 
 const HTML = `<!doctype html>
 <html><head>
@@ -47,10 +71,10 @@ describe("what counts as first load", () => {
     expect(initialAssetsFrom(html)).not.toContain("assets/mermaid-xyz.js");
   });
 
-  it("finds something in the REAL built HTML", () => {
+  itWithBuild("finds something in the REAL built HTML", () => {
     // The regexes above are tested against a fixture; this is the one that
     // catches Vite changing how it emits the entry.
-    const real = readFileSync(join(process.cwd(), "web", "dist", "index.html"), "utf8");
+    const real = readFileSync(REAL_HTML, "utf8");
     const assets = initialAssetsFrom(real);
     expect(assets.length).toBeGreaterThan(0);
     expect(assets.some((a) => a.endsWith(".js"))).toBe(true);
@@ -70,8 +94,8 @@ describe("the wasm assertion", () => {
     expect(wasmOnCriticalPath(["assets/index-abc.js", "assets/index-ghi.css"])).toEqual([]);
   });
 
-  it("holds for the real build", () => {
-    const real = readFileSync(join(process.cwd(), "web", "dist", "index.html"), "utf8");
+  itWithBuild("holds for the real build", () => {
+    const real = readFileSync(REAL_HTML, "utf8");
     expect(wasmOnCriticalPath(initialAssetsFrom(real))).toEqual([]);
   });
 });

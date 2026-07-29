@@ -30,6 +30,16 @@ if [ -z "$version" ]; then
   exit 1
 fi
 
+# `cargo install` puts binaries in `$CARGO_HOME/bin`, and that directory is on
+# PATH only when CARGO_HOME is the default. CI overrides it to a cache volume,
+# so without this the script installs the CLI and then cannot find the thing it
+# just installed — `cargo install` reports "already installed" (the cache holds
+# it) while `command -v` reports "none", and the two readings never meet.
+#
+# Exported before the detection below rather than after the install, so the
+# already-cached case is recognised instead of re-installing every run.
+export PATH="${CARGO_HOME:-$HOME/.cargo}/bin:$PATH"
+
 have=""
 if command -v wasm-bindgen >/dev/null 2>&1; then
   have="$(wasm-bindgen --version | awk '{print $2}')"

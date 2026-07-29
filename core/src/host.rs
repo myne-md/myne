@@ -205,6 +205,32 @@ pub trait HostCtx: Send + Sync + 'static {
         None
     }
 
+    /// The one vault this host can hold, when it holds exactly one **by
+    /// construction** rather than by happening to have one on disk.
+    ///
+    /// This is the seam's answer to a resolution step that cannot work in a
+    /// browser. [`crate::paths::current_vault_root_from_base`] disambiguates a
+    /// `None` active-vault id with a `std::fs::read_dir` scan of `vaults/`,
+    /// which on `wasm32` **always errors** — so the scan silently falls through
+    /// to the legacy single-vault directory, and every pre-unlock read lands in
+    /// a directory the web client never writes. That failure is invisible: the
+    /// call succeeds, returns a plausible path, and reports the vault as absent.
+    ///
+    /// It bites specifically **before unlock**, because that is when
+    /// `active_vault_id()` is `None` — which is exactly when boot routing needs
+    /// an answer. A device awaiting sync approval read as `NotEnrolled` instead
+    /// of `Pending` for this reason, and boot sent it to the unlock screen.
+    ///
+    /// Defaulted to `None` so desktop and mobile are untouched: they genuinely
+    /// can hold several vaults, and the disk scan is the right disambiguation
+    /// there. The web host overrides it with the fixed
+    /// [`crate::paths::web_single_vault_id`] — the same constant its `vault_list`
+    /// already resolves against, so the two cannot disagree about which
+    /// directory is the vault.
+    fn sole_vault_id(&self) -> Option<crate::vault_id::VaultId> {
+        None
+    }
+
     /// Separate from [`Self::now_unix_secs`] because they answer different
     /// questions and fail differently. Wall-clock time is what goes *inside* the
     /// encrypted blob and what the sync merge reconciles on; it can jump

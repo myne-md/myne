@@ -150,6 +150,50 @@ pub async fn read_status(
     Ok(overlay_status(base, live, conflict_count))
 }
 
+/// Which of the two "cannot sync yet" states this device is in: awaiting
+/// approval, or not enrolled at all (MYND-635).
+///
+/// Exists because a cycle that declines to run reports one coarse
+/// `CycleOutcome::NotReady` covering three unrelated situations — locked vault,
+/// never enrolled, and **enrolled but pending approval** — and `sync_now` used
+/// to answer `NotEnrolled` for all three. That made two commands disagree about
+/// the same fact: `sync_status` said `Pending` while `sync_now` said
+/// `NotEnrolled`, and the UI believed whichever it had asked last.
+///
+/// Deliberately NARROWER than [`read_status`], which is why this is not a call
+/// to that. `read_status` answers `Idle` whenever a token exists — correct for a
+/// status readout, wrong here: a locked-vault cycle would then turn the
+/// indicator green on a sync that never ran, which is precisely the failure the
+/// `Ran`-only-`Idle` rule in `sync_now_from_host` exists to prevent. This can
+/// return only the two states that are honest about not having synced.
+pub async fn not_ready_reason(
+    host: &dyn crate::host::HostCtx,
+    io: &dyn crate::vault_io::VaultIo,
+    state: &crate::plugins::vault_unlock::state::VaultRuntimeState,
+) -> SyncRuntimeStatus {
+    let Ok(dir) = crate::paths::active_vault_root_io_from_host(host, state.active_vault_id().await)
+    else {
+        return SyncRuntimeStatus::NotEnrolled;
+    };
+    use super::token_store::TokenStore as _;
+    let token_present = matches!(
+        super::token_store::default_store().read(io, &dir).await,
+        Ok(Some(_))
+    );
+    // Identity without a token is the whole definition of "awaiting approval":
+    // the join persists `device_id` unconditionally so the device can claim its
+    // token once approved, and the token is what it does not have yet.
+    let identity_present = super::state::read_sync_state(io, &dir)
+        .await
+        .map(|s| s.device_id_hex.is_some())
+        .unwrap_or(false);
+    if identity_present && !token_present {
+        SyncRuntimeStatus::Pending
+    } else {
+        SyncRuntimeStatus::NotEnrolled
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -165,6 +209,87 @@ mod tests {
             status_from(true, false, false),
             SyncRuntimeStatus::NotEnrolled
         );
+    }
+
+    /// The three-way collapse that made two commands disagree (MYND-635).
+    ///
+    /// `CycleOutcome::NotReady` covers a locked vault, a never-enrolled device
+    /// and one awaiting approval. `sync_now` answered `NotEnrolled` for all
+    /// three while `sync_status` answered `Pending` for the last — so the same
+    /// device reported two different states depending on which command the UI
+    /// happened to ask.
+    ///
+    /// Driven through the real reader against a real directory, not a stubbed
+    /// presence pair: the claim is about what is ON DISK after a join, and a
+    /// test that asserted over booleans would keep passing if the identity
+    /// stopped being persisted at all.
+    #[test]
+    fn not_ready_separates_awaiting_approval_from_never_enrolled() {
+        use crate::host::test_host::TestHost;
+        use crate::plugins::vault_unlock::state::VaultRuntimeState;
+        use crate::test_support::{block_on, ScopedTempDir};
+        use crate::vault_io::VaultIo as _;
+
+        let tmp = ScopedTempDir::new("not-ready-reason").unwrap();
+        let host = TestHost::with_dirs(tmp.path(), tmp.path().join("config"));
+        let io = crate::vault_io::StdVaultIo;
+        let state = VaultRuntimeState::default();
+
+        block_on(async {
+            // No vault dir, no identity, no token — nothing has ever enrolled.
+            assert_eq!(
+                not_ready_reason(&host, &io, &state).await,
+                SyncRuntimeStatus::NotEnrolled,
+                "a device with nothing on disk has not enrolled"
+            );
+
+            // A join persists `device_id` BEFORE approval and writes no token.
+            // That pair is the definition of awaiting approval.
+            let dir = crate::paths::active_vault_root_io_from_host(&host, None).unwrap();
+            io.create_dir_all(&dir).await.unwrap();
+            let st = super::super::state::SyncState {
+                device_id_hex: Some("0".repeat(32)),
+                ..Default::default()
+            };
+            super::super::state::write_sync_state(&io, &dir, &st)
+                .await
+                .unwrap();
+
+            assert_eq!(
+                not_ready_reason(&host, &io, &state).await,
+                SyncRuntimeStatus::Pending,
+                "identity without a token is awaiting approval, not unenrolled"
+            );
+        });
+    }
+
+    /// `not_ready_reason` must never answer `Idle`. It is only ever consulted
+    /// when a cycle DECLINED to run, and a green indicator there would claim a
+    /// sync that did not happen — the exact rule `sync_now_from_host`'s
+    /// `Ran`-only-`Idle` mapping exists to hold.
+    #[test]
+    fn not_ready_can_never_report_a_synced_state() {
+        use crate::host::test_host::TestHost;
+        use crate::plugins::vault_unlock::state::VaultRuntimeState;
+        use crate::test_support::{block_on, ScopedTempDir};
+
+        let tmp = ScopedTempDir::new("not-ready-never-idle").unwrap();
+        let host = TestHost::with_dirs(tmp.path(), tmp.path().join("config"));
+        let io = crate::vault_io::StdVaultIo;
+        let state = VaultRuntimeState::default();
+
+        block_on(async {
+            for _ in 0..2 {
+                let got = not_ready_reason(&host, &io, &state).await;
+                assert!(
+                    matches!(
+                        got,
+                        SyncRuntimeStatus::Pending | SyncRuntimeStatus::NotEnrolled
+                    ),
+                    "not_ready_reason returned {got:?}, which claims more than a declined cycle can"
+                );
+            }
+        });
     }
 
     #[test]

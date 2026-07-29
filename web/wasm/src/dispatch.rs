@@ -1386,6 +1386,50 @@ pub async fn dispatch(cmd: &str, args: serde_json::Value) -> Outcome {
             Outcome::ok(&status)
         }
 
+        // ── the pending-approval wait's two halves (MYND-635) ────────────────
+        //
+        // Both are called by `AccountBootstrap`, the WEB-ONLY entry screen, and
+        // neither was dispatched — so the screen that exists to hold a browser
+        // until an existing device approves it could not detect the approval and
+        // could not abort. Ported together because they are one flow: the poll
+        // and the way out of it.
+        //
+        // `head_fingerprint_from_host` reads the device-local sync state's last
+        // head observation. `None` means "no head adopted yet", which is the
+        // normal answer for the whole time the device is pending — the caller
+        // treats the transition to `Some` as the signal, so an honest `None` is
+        // load-bearing rather than a stub.
+        "plugin:sync|sync_head_fingerprint" => {
+            match myne_core::plugins::sync::devices::head_fingerprint_from_host(
+                host_ctx(),
+                vault_io(),
+                crate::session::state(),
+            )
+            .await
+            {
+                Ok(v) => Outcome::ok(&v),
+                Err(e) => Outcome::error(&e),
+            }
+        }
+
+        // The abort. Clears this device's token and sync baseline; touches no
+        // note, no attachment and no `vault.meta`, and never calls the server.
+        // Its failure must SURFACE — the caller's whole reason to press it is
+        // that it no longer trusts what this device adopted, and a swallowed
+        // error there reads as success.
+        "plugin:sync|sync_reset_local" => {
+            match myne_core::plugins::sync::devices::reset_local_from_host(
+                host_ctx(),
+                vault_io(),
+                crate::session::state(),
+            )
+            .await
+            {
+                Ok(()) => Outcome::ok(&()),
+                Err(e) => Outcome::error(&e),
+            }
+        }
+
         // ── sync: enrolment ─────────────────────────────────────────────────
         //
         // What puts this browser INTO the device roster — task 33's remaining
