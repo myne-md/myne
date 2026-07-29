@@ -345,24 +345,21 @@ pub async fn complete_recovery_from_host(
     let vault_path = vault_meta_path(host, target)?;
     complete_recovery_with_path(new_password, target, &vault_path, state, host).await?;
 
-    // MYND-160 fix: post-recovery slot transition to Unlocked must
-    // re-apply persisted prefs (user story 11). Same pattern as
-    // `vault_unlock::commands::unlock` — best-effort post-pipeline
-    // hook; failure does not propagate (vault_complete_recovery's
-    // Ok(()) is already committed by this point).
-    crate::plugins::vault_unlock::commands::apply_persisted_prefs(
+    // MYND-160 fix: a post-recovery slot transition to Unlocked owes the same
+    // post-unlock pipeline as every other credential path — persisted prefs
+    // (user story 11), search hydration, and the steps this call site used to
+    // omit (spell, AI vectors, the rename roll-forward, the stray-blob
+    // reclaim). Best-effort post-pipeline hook; failure does not propagate
+    // (`vault_complete_recovery`'s `Ok(())` is already committed by this
+    // point). See `run_post_unlock_pipeline` for why the steps live in one
+    // shared function rather than inline per path.
+    crate::plugins::vault_unlock::commands::run_post_unlock_pipeline(
         host,
         state,
         hooks,
         &crate::vault_io::StdVaultIo,
     )
     .await;
-
-    // MYND-29 Task 7: post-recovery slot transition to Unlocked must hydrate
-    // the search index too (same best-effort, inline post-pipeline hook as
-    // `vault_unlock::commands::unlock`). A recovered user's vault opens with
-    // a working search index — full-rebuild if no blob exists yet.
-    hooks.hydrate_search_index(state).await;
 
     // F1: recovery reset just rewrote the password-side wrap of `vault.meta`
     // (root_key preserved). Best-effort push it so a second device derives

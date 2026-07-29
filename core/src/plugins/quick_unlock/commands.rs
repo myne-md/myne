@@ -257,6 +257,11 @@ pub async fn quick_unlock_with_dir<P: QuickUnlockProvider + Send + 'static>(
     // `wasm32-unknown-unknown`. Both production callers already hold a host, so
     // this costs them nothing.
     host: &dyn crate::host::HostCtx,
+    // Threaded in so a successful quick-unlock runs the same post-unlock
+    // `apply_persisted_prefs` step the password path runs — see the call site
+    // below for why omitting it left screen-capture protection stuck ON.
+    hooks: &crate::hooks::Hooks,
+    vault_io: &dyn crate::vault_io::VaultIo,
 ) -> Result<(), QuickUnlockError> {
     // Spring-loaded gate (task 9): quick-unlock is permitted only after a full
     // master-password unlock has happened THIS session. A fresh process (app
@@ -339,6 +344,21 @@ pub async fn quick_unlock_with_dir<P: QuickUnlockProvider + Send + 'static>(
                     "quick-unlock succeeded; attempt-reset not persisted"
                 );
             }
+
+            // The slot is now `Unlocked`, so this path owes the same
+            // post-unlock pipeline the password path runs — persisted prefs
+            // (screen-capture protection above all), search + spell hydration,
+            // the rename roll-forward, the stray-blob reclaim. Quick-unlock ran
+            // NONE of it until MYND-160's screen-capture regression surfaced
+            // the gap; see `run_post_unlock_pipeline`'s doc for the full story.
+            //
+            // Best-effort end-to-end (every step swallows its own failures), so
+            // the unlock the user just completed can never fail because of it.
+            crate::plugins::vault_unlock::commands::run_post_unlock_pipeline(
+                host, state, hooks, vault_io,
+            )
+            .await;
+
             Ok(())
         }
         Err(_) => match attempts.record_failure() {
@@ -428,13 +448,15 @@ pub async fn quick_unlock_with_pin_from_host(
     vault_id: Option<String>,
     host: &dyn HostCtx,
     state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    vault_io: &dyn crate::vault_io::VaultIo,
 ) -> Result<(), QuickUnlockError> {
     let pin = Zeroizing::new(pin);
     let dir = target_dir(host, state, vault_id.as_deref()).await?;
     let (_, meta) = read_meta(&dir)?;
     let id = crate::paths::vault_id_from_root(&dir);
     let provider = PinProvider::new(pin, meta.account_number_hash, meta.kdf_params);
-    quick_unlock_with_dir(&dir, id, state, provider, host).await
+    quick_unlock_with_dir(&dir, id, state, provider, host, hooks, vault_io).await
 }
 
 /// IPC wrapper. Delegates; the command name and payload the frontend
@@ -446,8 +468,17 @@ pub async fn quick_unlock_with_pin<R: Runtime>(
     vault_id: Option<String>,
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
 ) -> Result<(), QuickUnlockError> {
-    quick_unlock_with_pin_from_host(pin, vault_id, &TauriHost::new(app), state.inner()).await
+    quick_unlock_with_pin_from_host(
+        pin,
+        vault_id,
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
 }
 
 /// Configure Apple biometric quick-unlock (macOS Touch ID / iOS Face ID or
@@ -491,6 +522,8 @@ pub async fn quick_unlock_with_biometric_from_host(
     vault_id: Option<String>,
     host: &dyn HostCtx,
     state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    vault_io: &dyn crate::vault_io::VaultIo,
 ) -> Result<(), QuickUnlockError> {
     #[cfg(any(target_os = "macos", target_os = "ios"))]
     {
@@ -498,11 +531,11 @@ pub async fn quick_unlock_with_biometric_from_host(
         let (_, meta) = read_meta(&dir)?;
         let id = crate::paths::vault_id_from_root(&dir);
         let provider = super::apple::AppleBiometricProvider::new(meta.account_number_hash);
-        quick_unlock_with_dir(&dir, id, state, provider, host).await
+        quick_unlock_with_dir(&dir, id, state, provider, host, hooks, vault_io).await
     }
     #[cfg(not(any(target_os = "macos", target_os = "ios")))]
     {
-        let _ = (host, &state, &vault_id);
+        let _ = (host, &state, &vault_id, hooks, vault_io);
         Err(QuickUnlockError::HardwareUnavailable)
     }
 }
@@ -515,8 +548,16 @@ pub async fn quick_unlock_with_biometric<R: Runtime>(
     vault_id: Option<String>,
     app: AppHandle<R>,
     state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
 ) -> Result<(), QuickUnlockError> {
-    quick_unlock_with_biometric_from_host(vault_id, &TauriHost::new(app), state.inner()).await
+    quick_unlock_with_biometric_from_host(
+        vault_id,
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
 }
 
 /// Report quick-unlock status for the active vault.
@@ -582,6 +623,18 @@ mod tests {
     const ITEMS_KEY: [u8; 32] = [0xCC; 32];
     const ACCOUNT_HASH: [u8; 16] = [0x5a; 16];
 
+    /// No-op hooks for the `*_with_dir` cores. The post-unlock
+    /// `apply_persisted_prefs` step reaches the native world only through this
+    /// seam, so a `NoopHooks` keeps these tests OS-free — the screen-capture
+    /// side effect itself is asserted by the tracking test below.
+    fn test_hooks() -> crate::hooks::Hooks {
+        std::sync::Arc::new(crate::hooks::NoopHooks)
+    }
+
+    fn test_io() -> crate::vault_io::StdVaultIo {
+        crate::vault_io::StdVaultIo
+    }
+
     /// Current-thread tokio runtime for the async `*_with_dir` cores (the crate
     /// convention — `tokio::test` is deliberately not used; cf. vault_unlock
     /// state tests).
@@ -641,6 +694,208 @@ mod tests {
             .await;
     }
 
+    /// A `Hooks` that records the two post-unlock-pipeline steps this module's
+    /// tests assert on and no-ops everything else (the `CountingHooks` pattern
+    /// from the prefs tests).
+    struct RecordingHooks {
+        screen_capture: std::sync::Mutex<Vec<(bool, &'static str)>>,
+        search_hydrations: std::sync::atomic::AtomicUsize,
+    }
+
+    impl RecordingHooks {
+        fn new() -> std::sync::Arc<Self> {
+            std::sync::Arc::new(Self {
+                screen_capture: std::sync::Mutex::new(Vec::new()),
+                search_hydrations: std::sync::atomic::AtomicUsize::new(0),
+            })
+        }
+        fn calls(&self) -> Vec<(bool, &'static str)> {
+            self.screen_capture
+                .lock()
+                .expect("recording hooks lock")
+                .clone()
+        }
+        fn search_hydrations(&self) -> usize {
+            self.search_hydrations
+                .load(std::sync::atomic::Ordering::Relaxed)
+        }
+    }
+
+    impl crate::hooks::VaultLifecycleHooks for RecordingHooks {
+        fn apply_screen_capture(&self, enabled: bool, site: &'static str) {
+            self.screen_capture
+                .lock()
+                .expect("recording hooks lock")
+                .push((enabled, site));
+        }
+
+        fn hydrate_search_index<'a>(
+            &'a self,
+            _: &'a VaultRuntimeState,
+        ) -> crate::hooks::BoxFuture<'a> {
+            self.search_hydrations
+                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            Box::pin(std::future::ready(()))
+        }
+        fn hydrate_spell<'a>(&'a self, _: &'a VaultRuntimeState) -> crate::hooks::BoxFuture<'a> {
+            Box::pin(std::future::ready(()))
+        }
+        fn reclaim_stray_attachment_blobs<'a>(
+            &'a self,
+            _: &'a VaultRuntimeState,
+        ) -> crate::hooks::BoxFuture<'a> {
+            Box::pin(std::future::ready(()))
+        }
+        fn persist_search_index<'a>(
+            &'a self,
+            _: &'a VaultRuntimeState,
+        ) -> crate::hooks::BoxFuture<'a> {
+            Box::pin(std::future::ready(()))
+        }
+        fn hydrate_ai_vectors<'a>(
+            &'a self,
+            _: &'a VaultRuntimeState,
+        ) -> crate::hooks::BoxFuture<'a> {
+            Box::pin(std::future::ready(()))
+        }
+        fn index_note_attachments<'a>(
+            &'a self,
+            _: &'a VaultRuntimeState,
+            _: &'a str,
+            _: &'a str,
+            _: &'a str,
+        ) -> crate::hooks::BoxFuture<'a> {
+            Box::pin(std::future::ready(()))
+        }
+        fn preempt_inflight_backup<'a>(
+            &'a self,
+            _: &'a VaultRuntimeState,
+        ) -> crate::hooks::BoxFuture<'a> {
+            Box::pin(std::future::ready(()))
+        }
+        fn zeroize_search_index(&self) {}
+        fn zeroize_spell(&self) {}
+        fn zeroize_vault_indices(&self) {}
+        fn zeroize_attachment_refs(&self) {}
+        fn abort_active_recording(&self) {}
+        fn pdf_export_teardown_on_lock(&self) {}
+        fn clear_staged_descriptor(&self) {}
+        fn search_upsert(&self, _: &str, _: &str, _: &str) {}
+        fn search_remove(&self, _: &str) {}
+        fn ai_note_changed(&self, _: &str, _: &str) {}
+        fn ai_note_deleted(&self, _: &str) {}
+        fn ai_policy_changed(&self, _: bool, _: &[String]) {}
+        fn bump_local_change(&self) {}
+        fn emit_snapshot_write_failed(&self, _: &str) {}
+        fn effective_auto_lock_secs(&self, prefs_value: Option<u32>) -> u32 {
+            prefs_value.unwrap_or(crate::DEFAULT_AUTO_LOCK_SECS)
+        }
+        fn hydrate_clipper_pairing(&self, _: &[protocol::PairedExtension]) {}
+        fn invalidate_quick_unlock(&self, _: &std::path::Path) {}
+        fn capture_snapshot(&self, _: &Path, _: &str, _: &[u8], _: u64, _: bool) -> bool {
+            false
+        }
+        fn purge_note_snapshots(&self, _: &Path, _: &str) -> std::io::Result<usize> {
+            Ok(0)
+        }
+    }
+
+    /// A quick-unlock must re-apply the PERSISTED screen-capture preference,
+    /// exactly like the password path does.
+    ///
+    /// The regression this pins: every lock re-applies
+    /// `set_content_protected(true)` unconditionally (lock-on-default-ON,
+    /// `decisions.md` 2026-05-27), and only the post-unlock `vault.prefs`
+    /// re-read restores a user who turned protection OFF. While quick-unlock
+    /// skipped that step, a lock → PIN-unlock cycle left protection ON
+    /// natively while the Privacy panel — reading the same blob — kept showing
+    /// the toggle off. Asserting on `false` here (not merely "some call
+    /// happened") is what makes the test fail if the step is dropped again:
+    /// the vault-dir-resolution fallback also calls the hook, but with `true`.
+    #[test]
+    fn quick_unlock_reapplies_the_persisted_screen_capture_preference() {
+        rt().block_on(quick_unlock_reapplies_the_persisted_screen_capture_preference_inner())
+    }
+    async fn quick_unlock_reapplies_the_persisted_screen_capture_preference_inner() {
+        // The post-unlock step resolves the vault dir through the HOST
+        // (`<app_data_dir>/vaults/<id>/`), so the fixture has to live where the
+        // resolver will look rather than at an arbitrary temp path.
+        let tmp = ScopedTempDir::new("qu-prefs-reapply").unwrap();
+        let host = crate::host::test_host::TestHost::new(tmp.path().to_str().expect("utf-8 path"));
+        let vault_id = crate::vault_id::VaultId::mint();
+        let dir = host
+            .app_data_dir()
+            .expect("test host app_data_dir")
+            .join("vaults")
+            .join(vault_id.to_string());
+        std::fs::create_dir_all(&dir).expect("vault dir");
+        write_sealed_meta(&dir);
+
+        // Persist "protection OFF" + configure quick-unlock, both of which
+        // require an unlocked slot.
+        let setup_state = unlocked_state();
+        setup_state
+            .set_unlocked(
+                vault_id,
+                UnlockedVault {
+                    root_key: Zeroizing::new(ROOT_KEY),
+                    items_key: Zeroizing::new(ITEMS_KEY),
+                    items_key_id: [0x07u8; 16],
+                    unlocked_at: 0,
+                    vault_meta_bytes_hash: [0u8; 32],
+                },
+            )
+            .await;
+        crate::plugins::prefs::commands::set_screen_capture_protection_with_dir(
+            &dir,
+            &setup_state,
+            &test_hooks(),
+            false,
+            &test_io(),
+            &host,
+        )
+        .await
+        .expect("persist protection-off");
+
+        let provider = MockProvider::new(PROVIDER_KIND_PIN, 0x11);
+        setup_with_dir(&dir, &setup_state, provider.clone(), &ACCOUNT_HASH)
+            .await
+            .expect("setup");
+
+        // A FRESH (locked) runtime quick-unlocks — the lock that got it here
+        // would have forced protection back ON.
+        let fresh = unlocked_state();
+        fresh.mark_full_unlock_done();
+        let hooks = RecordingHooks::new();
+        let hooks_handle: crate::hooks::Hooks = hooks.clone();
+        quick_unlock_with_dir(
+            &dir,
+            vault_id,
+            &fresh,
+            provider,
+            &host,
+            &hooks_handle,
+            &test_io(),
+        )
+        .await
+        .expect("quick unlock");
+
+        assert_eq!(
+            hooks.calls(),
+            vec![(false, "runtime_apply")],
+            "quick-unlock must re-apply the persisted toggle (OFF), once"
+        );
+        // The prefs step is one member of the shared post-unlock pipeline, and
+        // the pipeline is what quick-unlock was missing — so assert a second,
+        // independent member ran too. Without this a future edit could restore
+        // the prefs call alone and leave the vault searchable-by-nothing again.
+        assert_eq!(
+            hooks.search_hydrations(),
+            1,
+            "quick-unlock must run the whole post-unlock pipeline, not just prefs"
+        );
+    }
+
     #[test]
     fn setup_then_quick_unlock_round_trips_the_unlocked_slot() {
         rt().block_on(setup_then_quick_unlock_round_trips_the_unlocked_slot_inner())
@@ -670,6 +925,8 @@ mod tests {
             &fresh,
             provider.clone(),
             &crate::host::NoopHost,
+            &test_hooks(),
+            &test_io(),
         )
         .await
         .expect("quick unlock");
@@ -703,10 +960,17 @@ mod tests {
         fresh.mark_full_unlock_done();
         let vault_id = crate::paths::vault_id_from_root(dir);
         for expected_remaining in [4, 3, 2, 1] {
-            let err =
-                quick_unlock_with_dir(dir, vault_id, &fresh, bad.clone(), &crate::host::NoopHost)
-                    .await
-                    .unwrap_err();
+            let err = quick_unlock_with_dir(
+                dir,
+                vault_id,
+                &fresh,
+                bad.clone(),
+                &crate::host::NoopHost,
+                &test_hooks(),
+                &test_io(),
+            )
+            .await
+            .unwrap_err();
             assert_eq!(
                 err,
                 QuickUnlockError::WrongCredential {
@@ -715,9 +979,17 @@ mod tests {
             );
         }
         // 5th failure wipes the credential.
-        let err = quick_unlock_with_dir(dir, vault_id, &fresh, bad.clone(), &crate::host::NoopHost)
-            .await
-            .unwrap_err();
+        let err = quick_unlock_with_dir(
+            dir,
+            vault_id,
+            &fresh,
+            bad.clone(),
+            &crate::host::NoopHost,
+            &test_hooks(),
+            &test_io(),
+        )
+        .await
+        .unwrap_err();
         assert_eq!(err, QuickUnlockError::AttemptsExhausted);
         assert!(!blob_path(dir).exists());
         assert!(!status_with_dir(dir).configured);
@@ -755,6 +1027,8 @@ mod tests {
                 &fresh,
                 cancelling.clone(),
                 &crate::host::NoopHost,
+                &test_hooks(),
+                &test_io(),
             )
             .await
             .unwrap_err();
@@ -781,7 +1055,9 @@ mod tests {
                 vault_id,
                 &fresh,
                 provider.clone(),
-                &crate::host::NoopHost
+                &crate::host::NoopHost,
+                &test_hooks(),
+                &test_io(),
             )
             .await
             .unwrap_err(),
@@ -853,7 +1129,9 @@ mod tests {
                 vault_id,
                 &restarted,
                 provider.clone(),
-                &crate::host::NoopHost
+                &crate::host::NoopHost,
+                &test_hooks(),
+                &test_io(),
             )
             .await
             .unwrap_err(),
@@ -870,6 +1148,8 @@ mod tests {
             &restarted,
             provider.clone(),
             &crate::host::NoopHost,
+            &test_hooks(),
+            &test_io(),
         )
         .await
         .expect("quick unlock after full unlock");

@@ -28,6 +28,17 @@
 //     The complementary no-PIN fallback is qu2 plus every other suite that
 //     boots straight into the password form.
 //
+// Post-unlock pipeline parity, one story:
+//   qu4 pins that a PIN unlock runs the SAME post-unlock pipeline as a password
+//     unlock. The regression it guards: quick-unlock installed its `Unlocked`
+//     slot without running any of it, so a PIN unlock opened a vault whose
+//     search index (zeroized on every lock, hydrated only by that pipeline)
+//     was empty — a search that had worked seconds earlier returned nothing.
+//     The pipeline's other observable member, the persisted screen-capture
+//     preference, is native state WebDriver cannot see; it is pinned by the
+//     Rust test `quick_unlock_reapplies_the_persisted_screen_capture_preference`
+//     instead. Search is the browser-visible half of the same fix.
+//
 // Precondition: exactly 1 vault (weak KDF — unlock reads params from vault.meta).
 //
 // Verified 3× green in the Linux tauri-driver container (`./scripts/e2e-local.sh`,
@@ -41,15 +52,37 @@ import { it } from "vitest";
 import { describeE2E, scenario } from "./support/scenario";
 import { seedVault } from "./support/fixtures";
 import {
+  createNote,
   dismissImporterOffer,
+  dismissImporterOfferIfPresent,
+  editorText,
   openSettings,
   closeSettings,
+  searchAndOpenNote,
+  typeIntoEditor,
   unlockToEditor,
+  waitForSaved,
 } from "./support/flows";
 import { testIdSelector, type Session } from "./support/webdriver";
 
 const PIN = "135790";
 const WRONG_PIN = "024680";
+
+/** Read the `data-note-id` of the currently-selected sidebar row — the note
+ *  `createNote` just created and left selected. Mirrors the helper in
+ *  `search-palette.e2e.ts`; the sidebar row carries `aria-current="true"`
+ *  alongside `data-note-id`, which is the byTestId-only path to a
+ *  live-created note's id. */
+async function selectedNoteId(s: Session): Promise<string> {
+  const row = await s.waitForElement(
+    '[data-testid="notes.row"][aria-current="true"]',
+  );
+  const id = await row.attribute("data-note-id");
+  if (id === null || id === "") {
+    throw new Error("selected notes.row carried no data-note-id");
+  }
+  return id;
+}
 
 /**
  * Configure a PIN in Settings → Privacy from an unlocked editor.
@@ -229,6 +262,61 @@ describeE2E("qu3 PIN is the only surface, password is one click away (MYND-558)"
 
         // ---- The revealed password path still unlocks the vault -------------
         await unlockToEditor(s, password);
+      },
+    );
+  });
+});
+
+describeE2E("qu4 PIN unlock runs the post-unlock pipeline (search survives)", () => {
+  // Precondition: exactly 1 vault (weak KDF). Same-session lock, so the
+  // spring-loaded gate is open and the PIN affordance is offered.
+  it("finds a note by search after re-entering with the PIN", async () => {
+    // A single distinctive token, per the search-palette suite's shape. The
+    // leading space gives it a clean word boundary after `typeIntoEditor`'s
+    // sacrificial probe char.
+    const QUERY = "pipelinequokka";
+    const BODY = ` ${QUERY} pintail7q4z`;
+    let password = "";
+    await scenario(
+      "qu4-pin-search-hydrate",
+      {
+        seed: (dir) => {
+          const v = seedVault(dir);
+          password = v.password;
+        },
+      },
+      async (app) => {
+        const s = app.session;
+        await unlockToEditor(s, password);
+        await dismissImporterOffer(s);
+
+        // ---- A real note the search index must know about -------------------
+        await createNote(s, "Pipeline Note");
+        await typeIntoEditor(s, BODY);
+        await waitForSaved(s);
+        const noteId = await selectedNoteId(s);
+
+        await configurePinInSettings(s);
+
+        // ---- Lock (which zeroizes the index) and re-enter with the PIN ------
+        await (await s.byTestId("editor.lock-cta")).click();
+        await s.byTestId("unlock.quick-pin-input");
+        await (await s.byTestId("unlock.quick-pin-input")).replaceText(PIN);
+        await (await s.byTestId("unlock.quick-pin-submit")).click();
+        await s.byTestId("editor.lock-cta", { timeoutMs: 15_000 });
+        await dismissImporterOfferIfPresent(s);
+
+        // ---- The note is searchable again -----------------------------------
+        //
+        // This is the whole assertion: before the fix the PIN path skipped the
+        // hydrate, the palette rendered no NOTES hit, and this call timed out
+        // waiting for the row. Opening the specific note (rather than counting
+        // rows) also proves the hit is the real note, not a stale entry.
+        await searchAndOpenNote(s, QUERY, noteId);
+        const body = await editorText(s);
+        if (!body.includes(QUERY)) {
+          throw new Error("search result opened a note without the query token");
+        }
       },
     );
   });
