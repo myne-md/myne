@@ -54,6 +54,11 @@ const ROW_STYLE: CSSProperties = {
   display: "flex",
   flexDirection: "row",
   alignItems: "center",
+  // MYND-595 / MYND-623: the delete-confirm state swaps one ghost button for
+  // two, and with a long theme name the row ran out of width and pushed Cancel
+  // outside its own border -- an unreachable escape from a destructive prompt.
+  // Wrapping keeps both choices inside the row at any name length.
+  flexWrap: "wrap",
   gap: "var(--space-3)",
   padding: "var(--space-2) var(--space-3)",
   border: "1px solid var(--line-2)",
