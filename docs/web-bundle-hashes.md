@@ -46,6 +46,21 @@ curl -s localhost:8099/version.json | grep bundle_hash
 A hash nobody can independently reproduce proves nothing, which is why this
 procedure is part of the record and not a footnote to it.
 
+**`git checkout <commit>` may need a fetch first.** The `commit` column holds the
+commit CI built, which is whatever the deploying branch pointed at — and a branch
+that is squash-merged leaves that commit off `develop` entirely. Both rows below
+are such commits: neither is an ancestor of `develop`, and a fresh clone will not
+have either until the branch carrying them is fetched.
+
+```
+git fetch origin feat/mynd-574-phase3-web-client
+```
+
+They are **not** re-pointed at the squash commit afterwards. The append-only gate
+below treats an edited `commit` cell exactly like an edited hash, and quietly
+moving a published row to a different commit is the rewrite this file exists to
+prevent — even when the new commit is the "same" code.
+
 ## What "append-only" means here, and what it does not
 
 Rows are **added, never edited or removed**, and

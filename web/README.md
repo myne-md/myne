@@ -23,18 +23,38 @@ web/
 ├── index.html          entry document (loads ../src through web/src/main.tsx)
 ├── vite.config.ts      the seam substitution + web-specific build config
 ├── tsconfig.json       typecheck of web/ against the shared src/ tree
+├── csp.ts              the Content-Security-Policy the container generates at start
+├── bundle-baseline.json  the initial-bundle budget CI measures every build against
+├── wasm/               the wasm entry crate — JS↔Rust boundary, OPFS arm, CSPRNG
+├── bench/              wasm benchmarks (bench/wasm is a second workspace crate)
+├── container/          the self-host image (see below)
 └── src/
     ├── main.tsx        web entry — the desktop main.tsx minus its desktop-only boot steps
-    └── platform/       the web implementation of the seam (one file per seam module)
+    ├── platform/       the web implementation of the seam (one file per seam module)
+    ├── worker/         the Worker the wasm module runs in — OPFS, sync loop, transport
+    ├── sw/             service-worker update policy (may this client replace its bundle?)
+    ├── screens/        build-time substitutes for the screens web deliberately omits
+    ├── components/     web-only surfaces (sync, backup, settings, device pairing)
+    ├── hooks/          web-only hooks
+    └── *.ts(x)         environment gate, quota precheck, single-tab vault lock
 ```
 
 ## Commands
 
 ```bash
+./scripts/build-wasm.sh   # wasm-bindgen glue into web/wasm/pkg/ — needed FIRST
 pnpm web:dev      # Vite dev server on :1421 (desktop dev keeps :1420)
 pnpm web:build    # typecheck + production bundle into web/dist/
 pnpm web:preview  # serve the built bundle
+pnpm test:e2e:web # the browser E2E lane (needs a WebDriver on :4544)
 ```
+
+`web/wasm/pkg/` is a derived artefact and gitignored, but `src/worker/worker.ts`
+imports it by path — so a clone that has never run `build-wasm.sh`, or one where
+a new `#[wasm_bindgen]` export has been added since, fails the bundle with a
+missing-export error rather than at runtime. The script reads the required
+`wasm-bindgen-cli` version out of `Cargo.lock` rather than hardcoding it, so a
+`cargo update` cannot leave the pin stale.
 
 The desktop commands (`pnpm dev`, `pnpm build`, `pnpm tauri dev`) are unaffected
 — they read the root `vite.config.ts`, which this target does not touch.
@@ -60,8 +80,34 @@ this file stays a contributor's map of the target, not an operator runbook
 
 ## State
 
-Wiring only, at this stage. Every seam module under `src/platform/` currently
-throws the typed `PlatformUnsupportedError`; the real implementations (wasm
-Worker, OPFS, browser dialogs) land with the tasks that own them. The page
-loads, the shell mounts, and the first backend call fails legibly — which is
-the point of a wiring task, and is verified rather than assumed.
+Implemented and deployed. Every module under `src/platform/` is a real web
+implementation — the wasm Worker, OPFS persistence, browser dialogs, downloads
+— and the target has its own CI lane. `web-build` typechecks and bundles, then
+runs the seam contract against this implementation plus the artefact greps, the
+bundle budget and the screen/surface/testid rosters; `e2e-web` drives the built
+bundle in a real browser. On `develop`, `web-docker-build` →
+`web-docker-deploy` → `web-smoke` build the `container/` image, refuse to deploy
+a bundle whose hash is not already published in
+[`docs/web-bundle-hashes.md`](../docs/web-bundle-hashes.md), and smoke the
+result over the public origin — the maintainer-run instance at `app.example.com`.
+
+**Durability is not the desktop's, and cannot be.** OPFS offers no crash-atomic
+rename — Safari does not implement `FileSystemFileHandle.move()` at all — so a
+port of `core/src/atomic_write.rs` has no correct implementation here. Instead
+each singleton lives as **two files written alternately**, each carrying an
+8-byte generation prefix *outside* the blob; on open the newest copy that passes
+AEAD verification wins (`core/src/double_buffer.rs`). Strip those 8 bytes and
+what remains is byte-identical to what the desktop writes — no new magic, no
+format change, no version bump. Two tabs on one OPFS container would race that
+scheme, so a vault is held under a Web Locks lease and a second tab **reports**
+rather than takes over (`src/vault-lock.ts`).
+
+**Narrower than the native clients, by decision and in the artefact.** Account
+and vault creation are absent, and nothing that generates or accepts the 24-word
+recovery phrase is in the bundle: those modules are substituted away at build
+time by the same resolver that substitutes the seam (`src/screens/`), and
+`scripts/check-web-no-phrase.mjs` greps the built output to keep it that way.
+Sync is required — there is no offline-first first run. `decisions.md`
+2026-07-26 is the normative record of that capability set, and
+[`docs/threat-model.md`](../docs/threat-model.md) A15 / TB11 states what the
+served-code delivery channel costs relative to a signed desktop build.

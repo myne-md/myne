@@ -234,7 +234,7 @@ Both webfonts are self-hosted under `public/fonts/` (`InterVariable.woff2`, `Jet
 - **Label / Eyebrow** (semibold 600, 11px, line-height 1.5, letter-spacing 0.08em, uppercase, ink-tertiary): The only place the system uses uppercase. Eyebrow tags above primary blocks; nothing else gets all caps.
 - **Mono** (regular 400, 14px, line-height 1.4, `ss02 + zero + calt`): Code spans, fingerprints, file paths.
 - **Mono Large** (regular 400, 18px, line-height 1.4): Recovery-phrase word display.
-- **Account Number** (medium 500, 16px, line-height 1.4, letter-spacing 0.04em, `ss02 + zero + calt`): The signature treatment for `MY-XXXX-XXXX-XXXX-XXXX-X`. Always non-breaking hyphens (U+2011), `user-select: all`. Truncates to `MY-XXXX-...-XXXX-X` only in the sidebar account chip.
+- **Account Number** (medium 500, 16px, line-height 1.4, letter-spacing 0.04em, `ss02 + zero + calt`): The signature treatment for `MY-XXXX-XXXX-XXXX-XXXX-XXXX` (27 characters — `MY-` plus five 4-char Crockford groups; `docs/spec/account-number.md` §2). Always non-breaking hyphens (U+2011), `user-select: all`. Truncates to `MY-XXXX-...-XXXX` only in the sidebar account chip.
 
 ### Named Rules
 
@@ -309,7 +309,7 @@ Lucide stroke icons throughout (`https://lucide.dev`), copied locally to `docs/d
 
 ### Account Number (signature component)
 
-The most distinctive visual element in the product. Renders as `MY-XXXX-XXXX-XXXX-XXXX-X` in JetBrains Mono medium 16px with letter-spacing 0.04em. Hyphens are non-breaking (U+2011) so the value never wraps mid-group. `user-select: all` so a single click selects the whole value. The slashed zero (`ss02 + zero` features) is mandatory because the value is hand-typed from another device. In the sidebar account chip, truncates to `MY-XXXX-...-XXXX-X`; everywhere else, full form.
+The most distinctive visual element in the product. Renders as `MY-XXXX-XXXX-XXXX-XXXX-XXXX` in JetBrains Mono medium 16px with letter-spacing 0.04em — 27 characters, the `MY-` prefix plus five 4-char Crockford groups, the last of which ends in the Damm-32 check character (`docs/spec/account-number.md` §2). Size input fields and chips for the full 27; the truncated `-X` schematic that appears in older prose is illustrative shorthand, not the display form. Hyphens are non-breaking (U+2011) so the value never wraps mid-group. `user-select: all` so a single click selects the whole value. The slashed zero (`ss02 + zero` features) is mandatory because the value is hand-typed from another device. In the sidebar account chip, truncates to `MY-XXXX-...-XXXX` (first group + last group); everywhere else, full form.
 
 ### Recovery Phrase Word
 

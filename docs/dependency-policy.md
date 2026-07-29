@@ -8,9 +8,11 @@
 
 Applies to **every direct dependency** added to:
 
-- `Cargo.toml` (workspace + `protocol/` + `src-tauri/`)
-- `package.json`
+- Any `Cargo.toml` in the workspace — the crates the root `Cargo.toml`'s `members` list names (today `src-tauri/`, `protocol/`, `core/`, `theme-validator/`, `e2e/fixture-gen/`, `web/wasm/`, `web/bench/wasm/`)
+- Any `package.json` in the pnpm workspace — the root one plus the source packages `pnpm-workspace.yaml` lists (today `editor/`, `dialect/`, `copy/`)
 - Any companion repo's equivalent (`go.mod`, `Cargo.toml`, `package.json`, `Podfile`, `build.gradle`, etc.)
+
+A dependency's manifest is where it is *declared*, not where the feature that wanted it lives: the shared source packages are compiled into both clients' bundles, so a dep added to `editor/package.json` reaches exactly as far as one added to the root.
 
 **Indirect (transitive) dependencies** are reviewed during the direct-dep review (you can't add a direct dep without inspecting what it pulls in).
 
@@ -88,6 +90,8 @@ Pending getters: Tauri 2.10.3 does NOT expose a `WebviewWindow::is_content_prote
 
 Running ledger of direct deps accepted under "The bar" above, with the justification that would otherwise live in a per-dep PR body. New entries append; never rewrite (mirrors the `decisions.md` discipline).
 
+**Where the ledger starts, and what an absence means.** It does not restate the scaffold's own baseline: the closed RustCrypto primitive set (`decisions.md` 2026-04-28), the Tauri 2 runtime and its official plugins, and the Vite + React + TypeScript toolchain (`decisions.md` 2026-04-26) were each decided in `decisions.md` and are governed there. Everything admitted **for a feature** belongs here, and a feature dep that is missing is a **gap, not a boundary** — append it when you notice it, dated to the admission it documents rather than to the day you wrote it down.
+
 ### Search index (MYND-29) — `src-tauri/Cargo.toml`
 
 Four pure-Rust deps for the full-text search engine. None is crypto (the RustCrypto/primitive set is unchanged — search consumes already-decrypted plaintext); none is telemetry; all are leaf-use, small-tree, permissive-licensed.
@@ -161,7 +165,7 @@ One JS dep for the Phase-1 minimal graph view's force-directed layout. Not crypt
 
 | Dep | Version | Used for | Transitive footprint | License | Justified-by |
 |---|---|---|---|---|---|
-| `dompurify` | 3.4.8 (exact-pinned) | Sanitize note-authored embedded HTML to an ultra-tight allowlist before render (`src/editor/html/sanitize.ts`); also reused for mermaid SVG (MYND-49) | One small transitive (`@types/trusted-types`), pure-JS | (MPL-2.0 OR Apache-2.0) | epic `markdown-render-conformance` SYNC-4/SYNC-5; grill 2026-06-08 `embedded-html-rendering`; `decisions.md` 2026-06-08 |
+| `dompurify` | 3.4.10 (exact-pinned; admitted at 3.4.8, patch-bumped since) | Sanitize note-authored embedded HTML to an ultra-tight allowlist before render (`src/editor/html/sanitize.ts`); also reused for mermaid SVG (MYND-49) | One small transitive (`@types/trusted-types`), pure-JS | (MPL-2.0 OR Apache-2.0) | epic `markdown-render-conformance` SYNC-4/SYNC-5; grill 2026-06-08 `embedded-html-rendering`; `decisions.md` 2026-06-08 |
 
 - **Non-existence of alternative:** the createElement-per-tag allowlist path (the standing "no sanitizer" preference) was considered but does not cleanly handle `<details>`'s nested content; a correct HTML sanitizer is not safely hand-rollable (parser-differential / mutation-XSS classes). DOMPurify is the industry-standard, single-purpose, widely-audited choice. This is the **deliberate reversal** of the prior "no content sanitization layer" posture, scoped to the desktop editor.
 - **Maintained:** very active (cure53), huge install base; bus-factor low for a security-critical lib.
@@ -191,15 +195,15 @@ One JS dep for the Phase-1 minimal graph view's force-directed layout. Not crypt
 - **Security:** `securityLevel:'strict'` + `htmlLabels:false` → mermaid sanitizes its own SVG via its bundled DOMPurify (no click/script/`<foreignObject>`, no raw-HTML labels). No remote fetch. `threat-model.md` §6.
 - **Mandatory fallback:** parse-error / load-failure → monospace code card (mermaid is never a hard dependency of the render surface).
 
-### Excalidraw drawing canvas (MYND-498, drawing-notes SF1) — `package.json` — ⚠️ RED-FLAG DEPENDENCY
+### Excalidraw drawing canvas (MYND-498, drawing-notes SF1) — `editor/package.json` — ⚠️ RED-FLAG DEPENDENCY
 
 | Dep | Version | Used for | Transitive footprint | License | Justified-by |
 |---|---|---|---|---|---|
-| `@excalidraw/excalidraw` | 0.18.1 (exact-pinned) | Native drawing/canvas note type — the hardened, lazy-loaded Excalidraw shell (`src/drawing/`) | **+119 packages** (`pnpm add` report) — roughjs (already in-tree via mermaid → deduped), its own hand-drawn fonts, etc. | MIT | epic `drawing-notes` (MYND-497); grill 2026-07-14 `excalidraw-embed-hardening` (MYND-498); `decisions.md` override (user-owned, pending) |
+| `@excalidraw/excalidraw` | 0.18.1 (exact-pinned) | Native drawing/canvas note type — the hardened, lazy-loaded Excalidraw shell (`editor/src/drawing/`, exported as `@myne/editor/drawing`) | **+119 packages** (`pnpm add` report) — roughjs (already in-tree via mermaid → deduped), its own hand-drawn fonts, etc. | MIT | epic `drawing-notes` (MYND-497); grill 2026-07-14 `excalidraw-embed-hardening` (MYND-498); `decisions.md` override (user-owned, pending) |
 
 - **"The bar" Q1 (hand-roll?):** a whiteboard/canvas engine is not hand-rollable — same class as mermaid/pdf.js/katex. User pre-approved the dependency surface (2026-07-14).
 - **"The bar" Q4 (transitive tree):** RED FLAG by the policy's own ≥50-transitive heuristic (**+119**). roughjs is deduped (already pulled by mermaid). Accepted as a **conscious decision** (user override, 2026-07-14); the `decisions.md` override entry is user-owned and pending (autopilot flags, does not auto-write).
-- **Bundle size:** **lazy-loaded via `React.lazy(() => import(...))`** (`src/drawing/DrawingCanvasLazy.tsx`) — a drawing-free session pays **zero** bytes (verified: `@excalidraw` library code absent from the cold `main` chunk). Now that SF2 wires `<DrawingCanvasLazy>` reachable, the vite build code-splits it into a dedicated **`DrawingCanvas-*.js` ≈ 568 KB** chunk (+ a shared ≈ 520 KB Excalidraw chunk), confirmed out of `main`. (Owed at PR: a byte-stable-across-builds reproducibility check.)
+- **Bundle size:** **lazy-loaded via `React.lazy(() => import(...))`** (`editor/src/drawing/DrawingCanvasLazy.tsx`) — a drawing-free session pays **zero** bytes (verified: `@excalidraw` library code absent from the cold `main` chunk). Now that SF2 wires `<DrawingCanvasLazy>` reachable, the vite build code-splits it into a dedicated **`DrawingCanvas-*.js` ≈ 568 KB** chunk (+ a shared ≈ 520 KB Excalidraw chunk), confirmed out of `main`. (Owed at PR: a byte-stable-across-builds reproducibility check.)
 - **CSP / safety:** no `eval` needed; renders to `<canvas>` (not `innerHTML`), so no DOMPurify pass here; embeddables rejected (`validateEmbeddable: () => false`, SYNC-5); collaboration / library-CDN / image-from-URL / font-CDN all foreclosed by CSP + the self-hosted `EXCALIDRAW_ASSET_PATH`. Fonts self-hosted under `public/excalidraw-assets/fonts` (SIL OFL 1.1, no CDN — reproducible-build-safe).
 - **License artifact:** the repo's first bundled `public/THIRD-PARTY-LICENSES.txt` (Excalidraw MIT + OFL fonts). The whole-npm-tree license CI gate is spun out to **MYND-504**.
 
@@ -283,7 +287,7 @@ One JS dep for the Phase-1 minimal graph view's force-directed layout. Not crypt
 
 ### On-device inference (local-ai, MYND-406) — `src-tauri/Cargo.toml` — ⚠️ HEAVIEST RUST DEPENDENCY
 
-The Candle ML stack + tokenizer for [local inference](../glossary.md) — the single largest Rust-side transitive surface Myne takes (the peer of Mermaid on the npm side).
+The Candle ML stack + tokenizer for [local inference](glossary.md) — the single largest Rust-side transitive surface Myne takes (the peer of Mermaid on the npm side).
 
 | Dep | Version | Use | Transitive footprint | License | Provenance |
 |---|---|---|---|---|---|
@@ -383,8 +387,81 @@ untouched.
 - **Neither option gives a CI Safari seat, and that is a property of the runner.** The Woodpecker runner is Linux-only; Safari does not run there under any driver. Safari verification is a **documented manual gate on macOS**, in both worlds. Stating that is strictly better than paying for a dependency that hides it.
 - **Q4 (transitive tree):** RED FLAG by the policy's own ≥50-transitive heuristic, before counting the browser binaries — which are not in any lockfile's hash-pinning story the way an npm tarball is.
 - **Artifact leakage cuts the same way.** A Playwright trace records DOM **plus network** by default, which is strictly leakier than the desktop harness's artifact set and sits against `e2e/CLAUDE.md`'s credentials-never-in-output rule. Honouring that rule would mean configuring the tracer *down*, i.e. paying for a feature and then disabling it.
-- **What is given up, stated rather than glossed:** Playwright's auto-waiting, its selector ergonomics and its trace viewer. The desktop lane has lived without all three for 92 scenario files; the cost is real and it is known.
+- **What is given up, stated rather than glossed:** Playwright's auto-waiting, its selector ergonomics and its trace viewer. The desktop lane has lived without all three across 93 scenario files today (`e2e/*.e2e.ts`); the cost is real and it is known.
 - **Revisit trigger.** If a CI runner with real Safari ever exists (a macOS runner), the WebKit question reopens — but it reopens as "add a macOS runner", not as "add Playwright", because even then Playwright's WebKit would not be the thing under test.
+
+### Backfilled admissions (ledger audit, 2026-07-29)
+
+Six feature-level dependency admissions landed with their `decisions.md` entries but never got a ledger row. They are recorded here — at the end, because the ledger appends and never inserts — each dated to the decision it documents, not to the audit. Read them as the record that was owed at the time.
+
+**Version ranges.** Several rows below carry a `^` range in `package.json` rather than the exact pin the hash-pinning rule prefers. `pnpm-lock.yaml` still pins the resolved version, so no build floats; what is missing is the per-dep justification the rule asks for. Stated rather than quietly normalised.
+
+#### Offline spell checker (MYND-261 / MYND-262) — `src-tauri/Cargo.toml`
+
+| Dep | Version | Used for | Transitive footprint | License | Justified-by |
+|---|---|---|---|---|---|
+| `spellbook` | `=0.4.2` (exact-pinned) | The pure-Rust Hunspell-format speller behind the `spell_check` command (`src-tauri/src/spell/`) — decrypted note text stays Rust-side, the same posture as full-text search | `foldhash` + `hashbrown`, both pure-Rust and `no_std` | MPL-2.0 | `decisions.md` 2026-06-14 (offline spell checker), whose Reference block names this ledger row as owed; MYND-262 |
+
+- **"The bar" Q1 (hand-roll?):** no. Hunspell affix + compound handling and edit-distance suggestion is a specified external grammar with no advantage in reimplementing — the katex / pdf.js class.
+- **Why `spellbook` and not `zspell`:** the obvious alternative failed this policy on four counts, recorded in the 2026-06-14 entry — last release more than 12 months old, suggestions behind an `unstable-suggestions` flag, no compound handling, an 11-crate tree. `spellbook` is actively maintained, `no_std`, small-tree, with a stable `suggest`.
+- **Local is a requirement, not a preference:** spell-checking reads AS3-Sensitive note content, so an OS or cloud speller is excluded by the zero-knowledge commitment. The personal dictionary it writes is its own encrypted blob family (`MYD1`, `protocol.md` §9.13), not a plaintext sidecar.
+- **The exact `=0.4.2` pin is not cosmetic.** Which bundled dictionaries load is coupled to this speller's flag parsing — Turkish is deferred because 0.4.2 rejects that dictionary's `FLAG num` + `SFX 0` class as `MalformedFlag(ZeroFlag)` — so a version bump changes the shipped language set and is re-tested as one.
+- **Hash-pinning:** exact version in `src-tauri/Cargo.toml`, single workspace `Cargo.lock`; added to `src-tauri/` only, never `protocol/`.
+
+#### Device-join QR (MYND-466) — `src-tauri/Cargo.toml`
+
+| Dep | Version | Used for | Transitive footprint | License | Justified-by |
+|---|---|---|---|---|---|
+| `qrcode` | 0.14 (`default-features = false`, feature `svg`) | Render the `MYQR` device-join payload as an SVG on the trusted desktop (`src-tauri/src/plugins/sync/qr.rs`) | **Zero** — the locked 0.14.1 has no dependencies at all | MIT/Apache-2.0 | `decisions.md` 2026-07-19 (device-join via QR); MYND-466 |
+
+- **Feature surface narrowed below the crate default:** `default-features = false` + `svg` drops the bitmap `image` backend; the payload is rendered straight to SVG markup, so nothing rasterises.
+- **Desktop-only by construction.** Mobile *scans* and never generates, so this crate is off the mobile build — and the scanning half is a thin custom AVFoundation Tauri plugin rather than a third-party scanner (no MLKit, no Play Services), which is the same minimal-dependency posture applied on the other side of the same feature.
+- **Not crypto, not a secret channel.** The payload carries `{server_url, account#, cert_pin, generated_at}`, all non-secret; the password and the recovery phrase are never in it. `MYQR` lives outside the `protocol` crate and is deliberately **not** a load-bearing magic (`decisions.md` 2026-07-19).
+
+#### UI localization (i18n Phase 0, MYND-485) — `package.json`
+
+| Dep | Version | Used for | Transitive footprint | License | Justified-by |
+|---|---|---|---|---|---|
+| `i18next` | ^26.3.1 | The translation runtime the catalogs are loaded into (`src/i18n/`) | **Zero** runtime deps | MIT | `decisions.md` 2026-06-25 (UI internationalization), which calls this "a logged dependency decision"; MYND-485 |
+| `react-i18next` | ^17.0.8 | The React binding (`useTranslation`) every migrated screen uses | `@babel/runtime`, `html-parse-stringify`, `use-sync-external-store` — three small pure-JS packages | MIT | same |
+| `i18next-cli` | ^1.64.1 (**devDependency**) | Key extraction and coverage status (`pnpm i18n:extract` / `pnpm i18n:status`) | pulls `@swc/core`, whose pnpm build script is **declined** in `pnpm-workspace.yaml` so no native build runs | MIT | same |
+
+- **Zero egress, by construction.** Catalogs under `locales/` are imported **statically** and ship inside the bundle — no `i18next-backend`, no HTTP loader — so localization adds no network surface, consistent with the no-network-by-default posture.
+- **Why this stack over Lingui / FormatJS:** JSON is Weblate's first-class monolingual format and needs no babel/swc macro step in the app build — the lowest tooling surface for a Vite + React target. The `@swc/core` decline keeps that true for the extraction tool as well.
+- **Load-bearing copy is deliberately out of scope.** `@myne/copy` and `src/lib/load-bearing-copy.ts` hold strings whose exact English wording is a privacy property; E2E asserts them by full-literal equality and they are never translation keys. Localizing any of them needs its own review gate, not the open Weblate flow.
+- **`i18next-cli` replaced the deprecated `i18next-parser`** it warns against; it is dev-only and reaches no shipped artefact.
+
+#### Password-strength meter — `package.json`
+
+| Dep | Version | Used for | Transitive footprint | License | Justified-by |
+|---|---|---|---|---|---|
+| `@zxcvbn-ts/core` | ^3.0.4 | Frontend password-strength scoring in the create / change / reset password forms, gating on `MIN_ZXCVBN_SCORE = 3` (`src/components/PasswordInput.tsx`) | `fastest-levenshtein` | MIT | `decisions.md` 2026-04-26 (password strength expectations — "zxcvbn ≥3") and 2026-05-06 (`MIN_PASSWORD_LEN` floor), which records the frontend-only scope |
+| `@zxcvbn-ts/language-common` | ^3.0.4 | The shared dictionary + keyboard-adjacency data the scorer needs | **Zero** | MIT | same |
+| `@zxcvbn-ts/language-en` | ^3.0.2 | The English wordlists | **Zero** | MIT | same |
+
+- **Frontend-only is the decision, not an oversight.** `decisions.md` 2026-05-06 records that admitting the Rust `zxcvbn-rs` as a direct dep was **rejected** on this policy's grounds (~1–2 MB binary plus transitive surface, and the only justifying threat is out of scope per the threat model). The backend enforces `protocol::password_policy::validate_min_length` — a structural floor, explicitly **not** an entropy guarantee.
+- **Bundle size:** all three are **lazy-loaded via dynamic `import()`** at the point the meter first renders, so the wordlists never enter the cold bundle.
+- **No network, no telemetry:** the wordlists are bundled data and scoring is a pure function over the typed string, which never leaves the process.
+
+#### YAML frontmatter parsing — `package.json`, `dialect/package.json`, `editor/package.json`
+
+| Dep | Version | Used for | Transitive footprint | License | Justified-by |
+|---|---|---|---|---|---|
+| `js-yaml` | 4.2.0 (exact-pinned) | Parse and re-emit note frontmatter — the dialect parser's frontmatter visitor, the byte-level `title:` / `updated:` surgery's scalar quoting, the note-batch loader, and the Obsidian `.base` reader | `argparse` | MIT | `decisions.md` 2026-05-01 (markdown dialect: YAML frontmatter recognition); 2026-05-09 (frontmatter surgery owned by the TS dialect module) |
+
+- **"The bar" Q1 (hand-roll?):** no — YAML is squarely the non-trivial-parsing class Q1 excludes. The 2026-05-09 entry chose the TS side precisely *because* the alternative was adding a YAML parser to the security-critical Rust surface for a feature with no AEAD or key-handling involvement.
+- **Reused rather than re-admitted, twice.** The Obsidian *Bases* importer (`decisions.md` 2026-06-15) records reading `.base` files with this same parser as its **zero-new-dependency** path, and the mobile client declares it (`decisions.md` 2026-07-07) so the shared frontmatter surgery compiles there unchanged.
+- **Three declaring manifests, one admission** — the root client, `@myne/dialect` (the parser) and `@myne/editor` (frontmatter decorations + property typing). Same shape as `image` in the OCR row above: a second declaring package is not a second admission.
+
+#### Accessibility gate (MYND-93) — `package.json` (devDependency)
+
+| Dep | Version | Used for | Transitive footprint | License | Justified-by |
+|---|---|---|---|---|---|
+| `axe-core` | ^4.12.1 (**devDependency**) | The WCAG 2.1 AA rule engine behind both accessibility tiers — the Vitest/jsdom structural pass (`tests/a11y/axe-config.ts`) and the real-render E2E pass (`e2e/support/axe.ts`, `e2e/a11y-axe.e2e.ts`) | **Zero** | MPL-2.0 | `decisions.md` 2026-06-25 (accessibility + keyboard-only release gate), which names it "test-scope devDependency, never bundled" |
+
+- **It cannot reach a shipped artefact.** Dev-only, imported from `tests/` and `e2e/` alone; the E2E tier reads the UMD source off disk and injects it into the page under test at run time, so nothing about it is bundled.
+- **"The bar" Q1 (hand-roll?):** no — the maintained WCAG rule corpus *is* the dependency. The decision entry is explicit that axe covers only ~30–40% of WCAG and that the rest is a manual checklist, so the dep is never asked to carry more than it can.
+- **One config, two tiers:** `WCAG_AA_TAGS` is shared so the jsdom pass and the real-render pass cannot drift on rule scope; `color-contrast` is disabled explicitly in jsdom (no layout/paint) rather than left to auto-detection.
 
 
 ## Reference

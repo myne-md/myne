@@ -1,6 +1,6 @@
 # Myne Sync Protocol Specification (Phase 2)
 
-> **Status: draft.** Phase 2 multi-device synchronization over an untrusted server (TB5). This document specifies the **vault head** fork-consistency primitive (MYND-416) and will grow to cover the sync wire protocol (push/pull/CAS — MYND-414), server protocol (MYND-415), and conflict resolution. It builds on the at-rest protocol in [`protocol.md`](protocol.md); all cryptographic primitives, the subkey-derivation helper (§3.2), the AAD/encode-then-hash discipline (§5), and the magic-byte registry (§10.3) are inherited from there. v0.1 and v005 remain forward-incompatible (`protocol.md` §10); nothing here changes the v0.1 at-rest vault format — the head is **sync-wire-only** plus one device-local blob (`MYH1`, `protocol.md` §9.15).
+> **Status: draft.** Phase 2 multi-device synchronization over an untrusted server (TB5). This document specifies the **vault head** fork-consistency primitive (MYND-416) and will grow to cover the sync wire protocol (push/pull/CAS — MYND-414), server protocol (MYND-415), and conflict resolution. It builds on the at-rest protocol in [`protocol.md`](protocol.md); all cryptographic primitives, the subkey-derivation helper (§3.2), the AAD/encode-then-hash discipline (§5), and the magic-byte registry (§10.3) are inherited from there. v0.1 and v005 remain forward-incompatible (`protocol.md` §10); nothing here changes the v0.1 at-rest vault format — the head is **sync-wire-only** plus one device-local blob (`MYH1`, `protocol.md` §9.16).
 
 ---
 
@@ -122,15 +122,16 @@ Because `head_id` covers `head_mac`, the chain is unforgeable end-to-end: a serv
 
 ### 3.5 SHA-256 domain separation
 
-Three distinct SHA-256 inputs exist in the combined protocol, and none may be reinterpretable as another:
+Four distinct SHA-256 inputs exist on the combined protocol's head / manifest / commitment path, and none may be reinterpretable as another:
 
 | Hash | Input begins with | Defined in |
 |---|---|---|
 | `manifest_hash` | the manifest canonical prefix (MYND-414) | §4 / MYND-414 |
 | `head_id` | `head_mac_input`, i.e. `"myne.v0.1|"` … | §3.4 |
+| `head_fingerprint` digest | the domain string `"myne.v0.1 vault-head-fingerprint"`, then `head_id` | §6.3 |
 | CTX commitment | the §5.1.3 `canonical_encode` of (K, N, AD, T) | `protocol.md` §5.1.3 |
 
-Each input starts with a distinct, non-overlapping prefix (the head via the `"myne.v0.1|"` AAD prefix; the manifest under its own MYND-414 prefix; the CTX commitment under its fixed-length key/nonce-first layout), so no hash input is a prefix or re-encoding of another. Implementations MUST NOT feed bare, prefix-free data into any of these.
+Each input starts with a distinct, non-overlapping prefix (the head via the `"myne.v0.1|"` AAD prefix; the manifest under its own MYND-414 prefix; the bootstrap fingerprint under its own `"myne.v0.1 vault-head-fingerprint"` domain string — which begins with the HKDF-style context prefix `"myne.v0.1 "`, **trailing space**, not the AAD prefix `"myne.v0.1|"`, so a fingerprint digest input can never be read as a `head_mac_input`; the CTX commitment under its fixed-length key/nonce-first layout), so no hash input is a prefix or re-encoding of another. In particular the fingerprint hashes `head_id` **under a domain**, never bare: displaying a truncation of `head_id` itself would make the displayed code a re-encoding of the identifier it is supposed to attest. Implementations MUST NOT feed bare, prefix-free data into any of these.
 
 ### 3.6 `head_format_version` (forward hook)
 
@@ -262,9 +263,25 @@ A re-enrolled device generates a **new** `device_id` (§4.1) — it does not rec
 
 The bootstrap is **not** in a vacuum: enrollment (MYND-425) runs a **device-approval gate** where an existing, unlocked device approves the newcomer — so the user is physically at *both* devices, and an out-of-band channel (their eyes) is naturally present. v1 hardens TOFU by having both devices display a short **bootstrap-fingerprint** derived from the adopted `head_id`, for the user to eye-compare — exactly Signal/Matrix safety-number verification. A match turns "trust the untrusted server" into "verified against an existing trusted device."
 
-- The fingerprint is **~SAS-magnitude** (tens of bits — a few words / a 6–8 char code), eye-comparable, a deterministic function of `head_id` (not the full 32-byte value).
+- The fingerprint is **~SAS-magnitude** — 40 bits rendered as an 8-character eye-comparable code, a deterministic function of `head_id` (not the full 32-byte value). The exact construction is normative below.
 - It is **targeted** to the approval moment. If the device-approval gate ships in v1, this compare ships in v1 (the marginal UX cost is one glance on a screen the user is already on, at the exact vulnerability point).
 - It is distinct from the **general fork-audit fingerprint** — an always-available affordance to compare current heads across devices at any time — whose prompt-UX stays v1.x. v1 ships the *substrate* (a deterministic fingerprint of any `head_id`); the general UI is later.
+
+**Construction (normative).** The compare is only worth anything if both sides derive the same code, so the derivation is fixed here rather than left to the client:
+
+```text
+digest      = SHA-256("myne.v0.1 vault-head-fingerprint" || head_id)
+fingerprint = crockford32(digest[0..5])   ← first 40 bits, big-endian,
+                                             eight 5-bit groups, MSB group first
+display     = fingerprint[0..4] || "-" || fingerprint[4..8]
+```
+
+- The **domain string** is `"myne.v0.1 vault-head-fingerprint"` — 32 ASCII bytes, no trailing separator, prepended verbatim. It is **load-bearing**: any drift changes every displayed fingerprint on every device. Note it carries the HKDF-style context prefix `"myne.v0.1 "` (trailing **space**), not the AAD prefix `"myne.v0.1|"` (§3.5). It is a domain-separated hash input, **not** an HKDF context — no subkey is derived and no `protocol.md` §3.4 row exists for it.
+- `head_id` is the full 32-byte value of §3.4, appended verbatim; the fingerprint never hashes a truncation of it.
+- The **alphabet** is the frozen Crockford base32 alphabet `0123456789ABCDEFGHJKMNPQRSTVWXYZ` — the same one, with the same `I`/`L`/`O`/`U` exclusions, that [`account-number.md`](account-number.md) §2 fixes. There is **no** check character: this is a code the user compares by eye, not one they type, so the Damm-32 machinery of `account-number.md` §4 does not apply.
+- The **display form** is the 8 characters grouped `XXXX-XXXX` (9 characters including the dash). Both devices MUST show the same grouping — an ungrouped or differently-grouped rendering of the same head reads as a mismatch to the user.
+
+Every element above is **cross-implementation byte-identical** and is pinned by the `head-fingerprint` golden vectors in the `myne-test-vectors` companion. A second implementation that changed the domain string, the truncation width, the bit-packing order, the alphabet, or the grouping would display a different code for the *same* head — the compare would then fail for the wrong reason, and a user trained to expect mismatches is a user who clicks through the real one.
 
 Without an out-of-band compare, TOFU adoption remains trust-the-server; with it, the malicious-server bootstrap attack is closed for that enrollment. The spec MUST present TOFU honestly (the guarantee holds only after a verified baseline exists) and MUST NOT imply that MAC-verification alone authenticates freshness.
 
@@ -272,11 +289,11 @@ Without an out-of-band compare, TOFU adoption remains trust-the-server; with it,
 
 ## 7. Device-local baseline (`MYH1`)
 
-The last-seen head (§5.1) is persisted **device-locally** in the `MYH1` `vault.head-state` blob; its on-disk format, integrity rule, and honest limits are normative in [`protocol.md`](protocol.md) §9.15. The sync-relevant properties:
+The last-seen head (§5.1) is persisted **device-locally** in the `MYH1` `vault.head-state` blob; its on-disk format, integrity rule, and honest limits are normative in [`protocol.md`](protocol.md) §9.16. The sync-relevant properties:
 
 - **Device-local, never synced, never backed up.** The baseline MUST NOT live on the server — a server-held baseline would let the server roll *it* back too, defeating §5 entirely. It is structurally excluded from sync by the closed sync-allowlist's **default-deny** (it is simply not an allowlisted member, not a special-cased exclusion) and from backup by the §9.11.3 allowlist (a restored baseline would be stale → the restored vault re-bootstraps via §6 TOFU).
 - **Stores the full wire-head TIP only**, re-verifying the head's own `vault-head-mac` on load (no separate at-rest MAC, no KEK — the head carries no vault plaintext the sync server doesn't already see). Written every accepted-pull and every authored-push.
-- **Anti-rollback of the baseline itself is bounded, not absolute.** Lowering the on-disk baseline to force acceptance of a server rollback requires a **conjunction** — local-disk-write **and** a colluding malicious server; neither alone suffices (disk-write-only: an honest server still serves the real, dominating tip; server-rollback-only: an intact baseline rejects it). Impact is bounded to stale *own* data (never forged or decrypted), and the in-session RAM baseline only advances. Accepted for v0.1 and recorded in `threat-model.md` §7; a hardware monotonic counter is the v005 closure (`protocol.md` §9.15).
+- **Anti-rollback of the baseline itself is bounded, not absolute.** Lowering the on-disk baseline to force acceptance of a server rollback requires a **conjunction** — local-disk-write **and** a colluding malicious server; neither alone suffices (disk-write-only: an honest server still serves the real, dominating tip; server-rollback-only: an intact baseline rejects it). Impact is bounded to stale *own* data (never forged or decrypted), and the in-session RAM baseline only advances. Accepted for v0.1 and recorded in `threat-model.md` §7; a hardware monotonic counter is the v005 closure (`protocol.md` §9.16).
 
 ---
 
@@ -383,15 +400,15 @@ The table below is the **single normative classification**. The implementation m
 | `field_clocks` | — | merge metadata, not a preference: the merged blob carries the winning clock per field (see below) |
 | `auto_lock_seconds`, `screen_capture_protection` | device-local | local wins (security posture is per-device) |
 | `theme`, `custom_theme`, `show_note_timestamps`, `editor_content_width`, `editor_default_view_mode`, `editor_focus_dim_inactive`, `editor_focus_typewriter`, `editor_font_family`, `editor_layout`, `editor_line_numbers`, `editor_line_spacing`, `editor_text_size` | device-local | local wins (presentation) |
-| `keymap` | device-local | local wins (input hardware) |
+| `keymap`, `editor_vim_mode` | device-local | local wins (input hardware) — a physical keyboard and a touch keyboard want different answers, so a modal-editing choice made on the desktop must not follow the vault onto a phone (MYND-313) |
 | `attachment_ocr_enabled` | device-local | local wins (per-device compute budget) — image OCR (`protocol.md` §9.15, MYND-441) is CPU-heavy, and battery and thermal capacity differ per device, so turning it off on a phone must not turn it off on a desktop. Same reasoning as `ai_enabled`. **Defaults to `true`**, so it is emitted only when `false` and a blob predating the field decodes with the feature on |
-| `hidden_bar_items`, `bar_items_order`, `right_panel_active_tab`, `right_panel_hidden_tabs`, `right_panel_tab_order`, `editor_toolbar_order`, `editor_toolbar_hidden` | device-local | local wins (screen-size-dependent UI layout) |
+| `hidden_bar_items`, `bar_items_order`, `right_panel_active_tab`, `right_panel_hidden_tabs`, `right_panel_tab_order`, `editor_toolbar_order`, `editor_toolbar_hidden`, `editor_slash_order`, `editor_slash_hidden` | device-local | local wins (screen-size-dependent UI layout) |
 | `startup_open`, `startup_open_note`, `active_workspace` | device-local | local wins (session/startup behaviour; `active_workspace` points at the device-local `MYW1` artefact) |
 | `last_backup_at`, `paired_extensions`, `ai_enabled`, `spell_enabled` | device-local | local wins (device state / device capability) |
 
 Two rows are **deliberate reclassifications** of this section's original posture: `hidden_bar_items` (was set-union synced) and `active_workspace` (was scalar-LWW) are device-local now — the first is screen-size-dependent bar layout, the second points at an artefact (`vault.workspace`, class 4) that never syncs. And one field the original posture silently misclassified is now honest: `last_backup_at` is inherently per-device.
 
-`editor_toolbar_order` / `editor_toolbar_hidden` join the bar-layout row **as a gap closure, not a reclassification** — they landed in `vault.prefs` with MYND-336 (desktop toolbar customization) and were never classified here at all, so their merge behaviour was undefined rather than wrong. They are device-local for the same reason the rest of that row is: a toolbar layout is a function of the screen it is laid out on. That also settles the cross-client question MYND-555 raised — a phone's above-keyboard format bar and a desktop's floating toolbar are the same *preference* on incomparable form factors, so the field must not propagate. **Consequence, stated so it is not discovered later:** desktop↔desktop toolbar layout no longer converges either. That is the intended reading of "screen-size-dependent", not an omission — a 13" laptop and a 32" display are as incomparable as a phone and a laptop.
+`editor_toolbar_order` / `editor_toolbar_hidden` — and, from the same MYND-336 change, their slash-menu twins `editor_slash_order` / `editor_slash_hidden`, plus `editor_vim_mode` (MYND-313) on the input-hardware row — join their rows **as a gap closure, not a reclassification**: all five landed in `vault.prefs` and were classified in the implementation but never here, so their merge behaviour was undefined rather than wrong. The four command-layout arrays are device-local for the same reason the rest of the bar-layout row is: a toolbar or slash-menu layout is a function of the screen it is laid out on. `editor_vim_mode` is device-local for the `keymap` reason instead — modal editing is an input-hardware choice, not a vault convention. That also settles the cross-client question MYND-555 raised — a phone's above-keyboard format bar and a desktop's floating toolbar are the same *preference* on incomparable form factors, so the field must not propagate. **Consequence, stated so it is not discovered later:** desktop↔desktop toolbar layout no longer converges either. That is the intended reading of "screen-size-dependent", not an omission — a 13" laptop and a 32" display are as incomparable as a phone and a laptop.
 
 Because the fields are device-local, each client interprets the stored ids against **its own** vocabulary, and the two vocabularies legitimately differ (mobile's bar carries `undo` / `redo` / `heading1` / `heading2`; desktop's carries `strike` / `highlight` / `numberedList` and dropdown clusters). Divergence is harmless in normal operation — the value never crosses. The one path that *can* carry ids across clients is a **backup restore** (`vault.prefs` is inside `MYB1`, class 1): a resolver MUST therefore drop ids absent from its own vocabulary and append its own canonical remainder, which is already the required behaviour for a stale id from the same client's older build. No id is ever renamed or removed silently — the vocabulary is governed on-disk data the moment a vault persists a layout (`protocol.md` §9.5), so a rename is a migration event.
 
