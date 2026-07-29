@@ -173,6 +173,10 @@ const V = {
   "src/lib/noteImageCard.ts": ["ported", "Pure markdown/DOM shaping."],
   "src/lib/noteImageExport.ts": ["adapted", "Rendering is portable; delivery goes through the download seam."],
   "src/lib/password-generator.ts": ["ported", "CSPRNG through `crypto.getRandomValues`, which a browser has."],
+  "src/lib/pending-approval.ts": [
+    "ported",
+    "One `sync_status` read through the seam, and the web router dispatches it. Web is in fact the client that needs it most: the password path is the only enrolment a browser has, so landing pending is the ORDINARY outcome here — `e2e-web/pending-approval.e2e.ts` drives it in a real browser.",
+  ],
   "src/lib/picked-file.ts": [
     "adapted",
     "The desktop handle only. The unwrap moved INTO the seam in task 67 — it used to throw for every web pick.",
