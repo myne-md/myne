@@ -57,16 +57,23 @@ const CHEVRON_BUTTON_STYLE: CSSProperties = {
   cursor: "pointer",
 };
 
+// MYND-622: these metrics are the sidebar tree's, not this section's own.
+// Views sat in the same rail as the folder/note rows while being 2px taller,
+// sharper-cornered, inset 2px further, and gapless — small differences that
+// added up to the section reading as if it belonged to a different app. Height,
+// radius, side inset and the 3px inter-row gap are now the same values
+// `FolderRow.rowBaseStyle` / `NoteRow.rowBaseStyle` use; keep them in step.
 const ROW_BASE_STYLE: CSSProperties = {
   display: "flex",
   alignItems: "center",
   gap: 6,
   width: "100%",
-  height: 32,
+  height: 30,
   padding: "0 8px",
-  margin: "0 6px",
+  margin: "0 4px",
+  marginBottom: 3,
   boxSizing: "border-box",
-  borderRadius: 3,
+  borderRadius: 6,
   background: "transparent",
   border: 0,
   color: "var(--fg-2)",

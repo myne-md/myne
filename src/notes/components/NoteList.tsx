@@ -62,6 +62,7 @@ import { Toast } from "../../components/Toast";
 import { FolderRow } from "./FolderRow";
 import { NoteRow } from "./NoteRow";
 import { TreeRails } from "./TreeRails";
+import { BASE_PADDING_LEFT as TREE_BASE_PADDING_LEFT } from "./FolderRow";
 import {
   createFolderNote,
   setFolderIndex,
@@ -434,10 +435,20 @@ const NOTE_INDENT_PER_LEVEL = 18;
 // the motion is done. Stagger is capped so a folder with many children doesn't
 // drag the cleanup out indefinitely.
 const TREE_ANIM_BASE_MS = 180;
-const TREE_ANIM_STAGGER_MS = 18;
-const TREE_ANIM_MAX_STAGGER = 8;
-const TREE_ANIM_TOTAL_MS =
-  TREE_ANIM_BASE_MS + TREE_ANIM_MAX_STAGGER * TREE_ANIM_STAGGER_MS + 60;
+/**
+ * Total time the cascade is allowed to span, independent of row count
+ * (MYND-622).
+ *
+ * The stagger used to be a fixed 18ms per row, clamped at the 8th. That reads
+ * fine for a small folder and badly for a populated one: the first eight rows
+ * tick down in sequence and then every remaining row arrives at once, so a long
+ * nested folder opens as a short cascade followed by a wall. Spreading a FIXED
+ * budget across however many rows there are keeps the motion continuous at any
+ * size — a handful of rows stay near-simultaneous and snappy, a hundred rows
+ * flow evenly instead of slamming.
+ */
+const TREE_ANIM_STAGGER_SPAN_MS = 144;
+const TREE_ANIM_TOTAL_MS = TREE_ANIM_BASE_MS + TREE_ANIM_STAGGER_SPAN_MS + 60;
 
 const NEW_FOLDER_ROW_STYLE: CSSProperties = {
   display: "flex",
@@ -917,12 +928,17 @@ export function NoteList({ onNewFromTemplate, exportHooks }: NoteListProps = {})
     const anchor = rows.findIndex((r) => r.key === `f-${treeAnim.folderKey}`);
     if (anchor < 0) return map;
     const folderDepth = rows[anchor]!.depth;
-    let i = 0;
-    for (let r = anchor + 1; r < rows.length; r++) {
-      if (rows[r]!.depth <= folderDepth) break;
-      const delay = Math.min(i, TREE_ANIM_MAX_STAGGER) * TREE_ANIM_STAGGER_MS;
+    // Count the affected rows first so the stagger can be spread across them
+    // rather than clamped after the eighth (see TREE_ANIM_STAGGER_SPAN_MS).
+    let end = anchor + 1;
+    while (end < rows.length && rows[end]!.depth > folderDepth) end++;
+    const count = end - (anchor + 1);
+    // One row needs no cascade; `count - 1` divisions put the last row exactly
+    // at the end of the budget.
+    const step = count > 1 ? TREE_ANIM_STAGGER_SPAN_MS / (count - 1) : 0;
+    for (let r = anchor + 1; r < end; r++) {
+      const delay = Math.round((r - anchor - 1) * step);
       map.set(rows[r]!.key, { mode: treeAnim.mode, delay });
-      i++;
     }
     return map;
   }, [treeAnim, rows]);
@@ -1244,10 +1260,25 @@ function EmptyState({
 function DisclosureWrapper({
   anim,
   delay,
+  railDepth = 0,
   children,
 }: {
   anim: "in" | "out" | null;
   delay: number;
+  /**
+   * Ancestor depth whose indent rails belong to this row (MYND-622).
+   *
+   * The rails are drawn HERE, on the wrapper's outer box, rather than inside the
+   * row. Each rail overhangs its row by `ROW_GAP` px so it meets the next row's
+   * rail and the tree reads as one continuous line down a sibling group — but
+   * the inner box clips to `overflow: hidden` while a disclosure animates, which
+   * cut exactly that overhang off. Every expand/collapse therefore shredded the
+   * tree lines into per-row dashes, worst on a deep tree where the most rails
+   * are in flight at once. The outer box never clips, so the rails survive.
+   *
+   * `0` renders nothing (root rows have no ancestors).
+   */
+  railDepth?: number;
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(anim !== "in");
@@ -1269,6 +1300,9 @@ function DisclosureWrapper({
     <div
       style={{
         display: "grid",
+        // Anchors the indent rails below, which must sit outside the clipped
+        // inner box (see `railDepth`).
+        position: "relative",
         gridTemplateRows: open ? "1fr" : "0fr",
         // Bound the single column to the container (min 0 = shrinkable below the
         // row's content, max 1fr = fill). Without this the implicit `auto` column
@@ -1284,6 +1318,7 @@ function DisclosureWrapper({
         willChange: animating ? "grid-template-rows, opacity" : undefined,
       }}
     >
+      <TreeRails depth={railDepth} />
       <div style={{ minHeight: 0, minWidth: 0, overflow: animating ? "hidden" : "visible" }}>
         {children}
       </div>
@@ -1431,7 +1466,15 @@ function PopulatedList({
   const [menu, setMenu] = useState<ContextMenuState>(null);
   // Bulk "Move N notes to…" target submenu anchor (MYND-367) — opened from the
   // bulk context menu, lists folder options + Vault root.
-  const [moveTarget, setMoveTarget] = useState<{ x: number; y: number } | null>(
+  // The move picker acts on an EXPLICIT id set carried on the target (MYND-622).
+  // It used to read the multi-selection at commit time, which was fine while
+  // "Move to…" existed only in the bulk menu; the single-note entry needs to move
+  // the row that was right-clicked, which is not necessarily selected at all.
+  const [moveTarget, setMoveTarget] = useState<{
+    x: number;
+    y: number;
+    ids: NoteId[];
+  } | null>(
     null,
   );
   // Undo target for a bulk trash (MYND-367) — the ids just moved to Trash, so
@@ -1719,8 +1762,8 @@ function PopulatedList({
   // best-effort, then collapse the set. Reads `selectedIds` at call time (not
   // inside the async closure) so a concurrent clear can't shrink the payload.
   const runBulkMove = useCallback(
-    async (folder: string | null) => {
-      const ids = [...ctx.selectedIds];
+    async (folder: string | null, explicitIds?: readonly NoteId[]) => {
+      const ids = explicitIds !== undefined ? [...explicitIds] : [...ctx.selectedIds];
       setMoveTarget(null);
       setMenu(null);
       if (ids.length === 0) return;
@@ -1824,15 +1867,15 @@ function PopulatedList({
       {
         id: "__vault_root__",
         label: t("notes.list.vaultRoot"),
-        onSelect: () => void runBulkMove(null),
+        onSelect: () => void runBulkMove(null, moveTarget?.ids),
       },
       ...folderOptions.map((o) => ({
         id: o.path,
         label: o.label,
-        onSelect: () => void runBulkMove(o.path),
+        onSelect: () => void runBulkMove(o.path, moveTarget?.ids),
       })),
     ],
-    [folderOptions, runBulkMove, t],
+    [folderOptions, runBulkMove, moveTarget, t],
   );
 
   const menuItems: ContextMenuItem[] = useMemo(() => {
@@ -1846,7 +1889,8 @@ function PopulatedList({
           id: "bulk-move",
           group: "organize",
           label: t("notes.list.bulkMove", { count: selCount }),
-          onSelect: () => setMoveTarget({ x: menu.x, y: menu.y }),
+          onSelect: () =>
+            setMoveTarget({ x: menu.x, y: menu.y, ids: [...ctx.selectedIds] }),
         },
         // Archiving disabled → no "archive these" entry (the feature is hidden).
         ...(archiveDisabled
@@ -1880,6 +1924,16 @@ function PopulatedList({
         group: "open",
         label: t("notes.list.openToSide"),
         onSelect: () => openNote(menu.id, { toSide: true }),
+      },
+      {
+        // MYND-622: desktop parity with mobile's folder context menu (MYND-480),
+        // which has had "Move to folder" since it shipped. Dragging was the only
+        // way to move a single note here, which is unreachable when the target
+        // folder is collapsed or off-screen.
+        id: "move",
+        group: "organize",
+        label: t("notes.list.moveTo"),
+        onSelect: () => setMoveTarget({ x: menu.x, y: menu.y, ids: [menu.id] }),
       },
       {
         id: "rename",
@@ -2355,6 +2409,7 @@ function PopulatedList({
                 <DisclosureWrapper
                   anim={anim?.mode ?? null}
                   delay={anim?.delay ?? 0}
+                  railDepth={row.depth}
                 >
                   <FolderRow
                     node={row.node}
@@ -2408,11 +2463,17 @@ function PopulatedList({
               <DisclosureWrapper
                 anim={anim?.mode ?? null}
                 delay={anim?.delay ?? 0}
+                railDepth={row.depth}
               >
                 <div
                   style={{
                     position: "relative",
-                    paddingLeft: row.depth * NOTE_INDENT_PER_LEVEL,
+                    // Same base offset folder rows use, so a note and a folder at
+                    // the same depth start in the same column. Notes were missing
+                    // it, which sat every note 8px left of its sibling folders and
+                    // read as the tree losing its spine (MYND-622).
+                    paddingLeft:
+                      TREE_BASE_PADDING_LEFT + row.depth * NOTE_INDENT_PER_LEVEL,
                   }}
                   draggable={ctx.renamingId === null}
                   data-note-depth={row.depth}
@@ -2433,7 +2494,6 @@ function PopulatedList({
                     void fm.onNoteReorder(id, dragEdge(e));
                   }}
                 >
-                  <TreeRails depth={row.depth} />
                   {reorderPlace && (
                     <div
                       style={insertionLineStyle(reorderPlace)}

@@ -1610,6 +1610,7 @@
       "bulkDelete": "Delete {{count}} notes",
       "bulkDelete_one": "Delete {{count}} note",
       "bulkDelete_other": "Delete {{count}} notes",
+      "moveTo": "Move to…",
       "bulkMove": "Move {{count}} notes to…",
       "bulkMove_one": "Move {{count}} note to…",
       "bulkMove_other": "Move {{count}} notes to…",
