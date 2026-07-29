@@ -242,6 +242,9 @@ export type FolderRowProps = {
   onDragTarget?: (key: string | null) => void;
   /** A note (or notes) dropped onto this folder. */
   onDropNote?: (folderPath: string) => void;
+  /** OS files dropped onto this folder (MYND-629) — markdown becomes notes
+   *  filed here; the handler owns filtering and the result summary. */
+  onDropFiles?: (folderPath: string, files: File[]) => void;
   /** This folder row started being dragged (folder reorder). */
   onDragStartFolder?: (e: ReactDragEvent, node: FolderNode) => void;
   /** A folder is hovering over this row at `place` (reorder indicator). */
@@ -286,6 +289,7 @@ export function FolderRow({
   onContextMenu,
   onDragTarget,
   onDropNote,
+  onDropFiles,
   onDragStartFolder,
   onFolderReorderOver,
   onFolderReorderLeave,
@@ -360,6 +364,16 @@ export function FolderRow({
       onDragStart={(e) => onDragStartFolder?.(e, node)}
       onDragEnd={onDragEnd}
       onDragOver={(e) => {
+        // MYND-629: files dragged in from the OS. `dragKind` is null (no
+        // in-app drag started), and the payload is only inspectable as
+        // `types` during dragover — `files` is empty until drop, by spec.
+        if (dragKind === null && e.dataTransfer.types.includes("Files")) {
+          if (!onDropFiles) return;
+          e.preventDefault();
+          e.dataTransfer.dropEffect = "copy";
+          onDragTarget?.(node.key);
+          return;
+        }
         if (dragKind === "folder") {
           // Folder drag → reorder among sibling folders (2-edge).
           if (!onFolderReorderOver) return;
@@ -388,6 +402,11 @@ export function FolderRow({
       }}
       onDrop={(e) => {
         e.preventDefault();
+        if (dragKind === null && e.dataTransfer.files.length > 0) {
+          onDragTarget?.(null);
+          onDropFiles?.(node.path, Array.from(e.dataTransfer.files));
+          return;
+        }
         if (dragKind === "folder") {
           onFolderReorderDrop?.(node, dragEdge(e));
           return;

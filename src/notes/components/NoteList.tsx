@@ -62,6 +62,7 @@ import { Toast } from "../../components/Toast";
 import { FolderRow } from "./FolderRow";
 import { NoteRow } from "./NoteRow";
 import { TreeRails } from "./TreeRails";
+import { importDroppedMarkdown } from "../dropImport";
 import { BASE_PADDING_LEFT as TREE_BASE_PADDING_LEFT } from "./FolderRow";
 import {
   createFolderNote,
@@ -1483,6 +1484,36 @@ function PopulatedList({
   // Undo-toast target: the id of the note just moved to the trash. "Undo"
   // restores it (MYND-133). Replaced when another note is trashed.
   const [undoToast, setUndoToast] = useState<NoteId | null>(null);
+  // Summary of the last drag-drop markdown import (MYND-629).
+  const [importToast, setImportToast] = useState<string | null>(null);
+
+  /**
+   * Import markdown files dropped onto a folder row. Reports a count rather
+   * than per-file detail: a drop of twenty should not produce twenty toasts,
+   * and the skip reasons are coarse by design (an underlying error can carry a
+   * filesystem path, which must not reach the UI).
+   */
+  const handleDropFiles = useCallback(
+    async (folderPath: string, files: File[]) => {
+      if (!files.some((f) => /\.(md|markdown|mdown|txt)$/i.test(f.name))) {
+        setImportToast(t("notes.list.importNoMarkdown"));
+        return;
+      }
+      const result = await importDroppedMarkdown(files, folderPath);
+      // Same create-then-refresh discipline the folder-note path uses: pull the
+      // real slice for each new id rather than assuming the list will notice.
+      for (const id of result.created) await ctx.refreshOne(id);
+      setImportToast(
+        result.skipped.length === 0
+          ? t("notes.list.imported", { count: result.created.length })
+          : t("notes.list.importedWithSkips", {
+              count: result.created.length,
+              skipped: result.skipped.length,
+            }),
+      );
+    },
+    [ctx, t],
+  );
   // Non-blocking error toast shown when a trash IPC fails after rollback.
   const [trashError, setTrashError] = useState<string | null>(null);
   // Confirmation gate for the keyboard Delete/Backspace path (MYND-487). An
@@ -2432,6 +2463,9 @@ function PopulatedList({
                     onDropNote={(folderPath) =>
                       void fm.onFolderDropNote(folderPath)
                     }
+                    onDropFiles={(folderPath, files) =>
+                      void handleDropFiles(folderPath, files)
+                    }
                     onDragStartFolder={fm.onFolderDragStart}
                     onFolderReorderOver={(node, place) =>
                       fm.updateFolderReorderTarget(node.key, place)
@@ -2645,6 +2679,11 @@ function PopulatedList({
         onDone={() => setBulkUndo(null)}
         durationMs={6000}
         action={{ label: t("notes.list.undo"), onAction: handleUndoBulk }}
+      />
+      <Toast
+        message={importToast}
+        onDone={() => setImportToast(null)}
+        durationMs={5000}
       />
       <Toast message={trashError} onDone={() => setTrashError(null)} />
     </div>

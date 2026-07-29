@@ -107,7 +107,10 @@ export async function createBlankNamedNote(
  * — keeping the title/folder surgery + create in one place so an ordering change
  * lands once.
  */
-async function createNoteFromBody(
+/** Create a note from an explicit body + title + folder. Exported for the
+ *  drag-drop markdown import (MYND-629), which has the same shape as a
+ *  template instantiation: known body, known name, known destination. */
+export async function createNoteFromBody(
   body: string,
   name: string,
   folder: string | null,
