@@ -341,4 +341,63 @@ describe("web first-run bootstrap", () => {
     expect(screen.getByTestId("account-entry.input")).toBeTruthy();
     expect(screen.queryByTestId("account-bootstrap.password")).toBeNull();
   });
+
+  // ── surviving a refresh (MYND-635) ────────────────────────────────────────
+  //
+  // The reported failure: enrol, see the wait, refresh, get asked for the
+  // password, land in an EMPTY vault with no way back to the wait.
+  //
+  // The state was `useState(false)` on this screen, so a reload erased it — and
+  // boot, which routes on `vault.meta` existence, found the meta the join had
+  // already written and offered unlock. The password worked (the meta is the
+  // account's real one) and the vault opened empty, because a pending device
+  // holds no token and can pull nothing.
+  //
+  // Boot now detects the pending device itself and mounts this screen ALREADY
+  // in the wait. These tests are about that entry, not about the wait's
+  // contents — which the cases above already pin.
+
+  it("mounts straight into the wait when boot says this device is pending", async () => {
+    wire();
+    render(<AccountBootstrap onBootstrapped={() => {}} initiallyPending />);
+    // No account number, no password: the credentials were entered before the
+    // refresh, and asking again would imply the previous attempt did not happen.
+    await screen.findByTestId("account-bootstrap.pending-notice");
+    expect(screen.queryByTestId("account-entry.input")).toBeNull();
+    expect(screen.queryByTestId("account-bootstrap.password")).toBeNull();
+  });
+
+  it("without that signal it still starts at the account number", async () => {
+    // The pair that gives the test above its meaning. A screen that ALWAYS
+    // mounted pending would satisfy it and break every first run.
+    wire();
+    render(<AccountBootstrap onBootstrapped={() => {}} />);
+    expect(screen.getByTestId("account-entry.input")).toBeTruthy();
+    expect(screen.queryByTestId("account-bootstrap.pending-notice")).toBeNull();
+  });
+
+  it("polls for approval from a resumed wait, not just a freshly-joined one", async () => {
+    // The half that made the wait useless on web even before the refresh: this
+    // poll calls `sync_now` then `sync_head_fingerprint`, and the latter was
+    // never ported to the wasm router — so it threw into the catch that exists
+    // for a pending device's legitimately-failing cycles, and the screen could
+    // never advance even after a desktop approved it.
+    //
+    // Asserting the poll RUNS on a resumed mount is what pins the resumed path
+    // to the same mechanism as the fresh one, rather than a second, quieter
+    // implementation of waiting.
+    const seen: string[] = [];
+    invokeMock.mockImplementation(async (cmd) => {
+      seen.push(cmd);
+      if (cmd === "plugin:sync|sync_head_fingerprint") return null; // no head yet
+      if (cmd === "plugin:sync|sync_list_devices") throw { kind: "NotEnrolled" };
+      return null;
+    });
+    render(<AccountBootstrap onBootstrapped={() => {}} initiallyPending />);
+    await screen.findByTestId("account-bootstrap.pending-notice");
+    await waitFor(() => {
+      expect(seen).toContain("plugin:sync|sync_now");
+      expect(seen).toContain("plugin:sync|sync_head_fingerprint");
+    });
+  });
 });

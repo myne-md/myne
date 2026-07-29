@@ -2758,6 +2758,9 @@
         "helper": "Sign in on a new device with your account number and password or recovery phrase. A device stays pending until an existing device approves it.",
         "label": "Add a device"
       },
+      "awaitingApproval": {
+        "label": "Awaiting approval"
+      },
       "conflicts": {
         "helper": "When the same note is edited on two devices at once, Myne keeps both copies so nothing is lost. Resolve them here.",
         "label": "Conflicts"

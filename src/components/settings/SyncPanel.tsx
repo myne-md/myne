@@ -35,6 +35,8 @@ import { Toast } from "../Toast";
 import { noteList } from "../../notes";
 import { useDevices } from "../../hooks/useDevices";
 import { useAccountStatus } from "../../hooks/useAccountStatus";
+import { useSyncStatus } from "../../hooks/useSyncStatus";
+import { ENROLL_PENDING_NOTICE } from "../../lib/load-bearing-copy";
 import {
   PANEL_ROOT_STYLE,
   BLOCK_STYLE,
@@ -72,7 +74,24 @@ export function SyncPanel() {
   );
   const enrollmentKnown =
     devicesHook.devices !== null || devicesHook.error !== null;
-  const showEnroll = enrollmentKnown && !enrolledHere;
+  // A device AWAITING APPROVAL must not be offered the enrol form (MYND-635).
+  //
+  // It reads as unenrolled from here and always will: a pending device holds no
+  // token, so the roster call fails `NotEnrolled` and `enrolledHere` can never
+  // become true. The form was therefore shown to exactly the person it cannot
+  // help — and using it does real harm, because enrolling mints a FRESH
+  // `device_id` and leaves a second pending record behind. Repeat that a few
+  // times and the account accumulates devices nobody can identify, each needing
+  // its own approval, while the one the user is sitting at still waits.
+  //
+  // `sync_status` is the arbiter rather than the roster, and that is the point:
+  // the roster is the thing a pending device cannot read, so asking it "am I
+  // pending?" is asking the one source guaranteed to be silent. Status derives
+  // the answer from disk — identity persisted, token absent — with no server
+  // round trip.
+  const { status: syncStatus } = useSyncStatus();
+  const awaitingApproval = syncStatus?.state === "pending";
+  const showEnroll = enrollmentKnown && !enrolledHere && !awaitingApproval;
 
   // Cold-start "building search index…" state. Producer: the MYND-426 engine
   // re-derives vault.search/vault.indices after a full-reconcile or a fresh
@@ -224,6 +243,27 @@ export function SyncPanel() {
           </span>
           <p style={HELPER_STYLE}>{t("sync.panel.addDevice.helper")}</p>
           <EnrollDeviceForm />
+        </div>
+      )}
+
+      {/* What that form is replaced BY for a device that is already waiting
+          (MYND-635). Stating the situation rather than offering an action,
+          because there is no action to take here: approval happens on another
+          device, and the only button this screen could honestly show would
+          create a second pending record.
+
+          The sentence is `ENROLL_PENDING_NOTICE`, rendered verbatim from
+          `@myne/copy` — the same literal `EnrollDeviceForm` and the web entry
+          screen already show. Not an i18n key: `scripts/check-i18n.mjs` derives
+          the load-bearing list from those exported constants and fails if one
+          appears as a catalog value, precisely so this sentence cannot acquire
+          24 machine-filled variants. */}
+      {enrollmentKnown && !enrolledHere && awaitingApproval && (
+        <div style={BLOCK_STYLE} data-testid="sync.panel.awaiting-approval">
+          <span style={SECTION_TITLE_STYLE}>
+            {t("sync.panel.awaitingApproval.label")}
+          </span>
+          <p style={HELPER_STYLE}>{ENROLL_PENDING_NOTICE}</p>
         </div>
       )}
 

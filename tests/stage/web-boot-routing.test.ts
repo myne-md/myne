@@ -78,6 +78,100 @@ describe("boot routing, per client", () => {
     }
   });
 
+  // ── awaiting approval (MYND-635) ──────────────────────────────────────────
+  //
+  // The reported bug: enrol on `app.myne.md`, see "Waiting for approval",
+  // refresh, get asked for the password, and land in an EMPTY vault with the
+  // approval screen unreachable.
+  //
+  // The trap is that nothing about the disk looks wrong. `sync_join_account`
+  // fetches the account's real `vault.meta` and writes it BEFORE running the
+  // enrolment that comes back pending, so the container is genuine and the
+  // password genuinely opens it. It is empty because a pending device holds no
+  // token and can pull nothing — the emptiness was the honest content of a
+  // state the UI had lost track of, not corruption.
+
+  it("a pending device returns to the wait instead of being offered unlock", async () => {
+    const { initialStageFromProbe } = await loadStage(WEB_ABSENT);
+    expect(
+      initialStageFromProbe({ ok: [{ id: "v1", status: EXISTS }] } as never, {}, true),
+    ).toEqual({ name: "pending-approval" });
+  });
+
+  it("DESKTOP never routes to the wait, even when it is pending", async () => {
+    // Desktop can be pending too — enrol from Settings, quit before another
+    // device approves. Sending it to the wait would lock the user out of a
+    // vault that opens perfectly well: awaiting sync approval does not block
+    // local use there, and the wait already has a home in the Settings panel.
+    //
+    // This was a real regression, shipped and caught by re-reading rather than
+    // by a test: the branch went in ungated, and the desktop E2E suite could not
+    // see it because its vaults have sync unconfigured, which never derives
+    // `pending` at all.
+    const { initialStageFromProbe } = await loadStage(DESKTOP_ABSENT);
+    expect(
+      initialStageFromProbe({ ok: [{ id: "v1", status: EXISTS }] } as never, {}, true),
+    ).toEqual({ name: "unlock", initialStatus: EXISTS, vaultId: "v1" });
+  });
+
+  it("the same probe without the pending fact still routes to unlock", async () => {
+    // The pair that makes the assertion above mean something. Identical inputs
+    // apart from the third probe — so a fix that routed EVERY healthy vault to
+    // the wait would pass the test above and fail this one.
+    const { initialStageFromProbe } = await loadStage(WEB_ABSENT);
+    const healthy = { ok: [{ id: "v1", status: EXISTS }] } as never;
+    expect(initialStageFromProbe(healthy, {}, false)).toEqual({
+      name: "unlock",
+      initialStatus: EXISTS,
+      vaultId: "v1",
+    });
+    // And omitting the argument entirely — every desktop call site — is the
+    // same as passing `false`. Desktop is untouched by construction.
+    expect(initialStageFromProbe(healthy, {})).toEqual({
+      name: "unlock",
+      initialStatus: EXISTS,
+      vaultId: "v1",
+    });
+  });
+
+  it("an open vault is never evicted by the pending fact", async () => {
+    // Slot-priority outranks enrolment. A user inside an unlocked vault must
+    // not be thrown back to a wait screen by a status read — whatever the
+    // enrolment says, the vault is open and the keys are in memory.
+    const { initialStageFromProbe } = await loadStage(WEB_ABSENT);
+    expect(
+      initialStageFromProbe(
+        { ok: [{ id: "v1", status: EXISTS }] } as never,
+        { v1: "Unlocked" } as never,
+        true,
+      ),
+    ).toEqual({ name: "editor" });
+  });
+
+  it("a corrupted container is still a re-bootstrap, even while pending", async () => {
+    // Waiting for approval on a vault that cannot be opened at all is a longer
+    // dead end than the one being fixed. Corruption wins.
+    const { initialStageFromProbe } = await loadStage(WEB_ABSENT);
+    expect(
+      initialStageFromProbe({ ok: [{ id: "v1", status: CORRUPTED }] } as never, {}, true),
+    ).toEqual({ name: "account-entry" });
+  });
+
+  it("the pending stage accepts no transitions — approval is not an action", async () => {
+    // Approval is granted on ANOTHER device and observed by polling. An
+    // action-driven exit would mean this client deciding it is approved, which
+    // is the shape of the bug: a state believed rather than read.
+    const { transition } = await loadStage(WEB_ABSENT);
+    const pending = { name: "pending-approval" } as const;
+    for (const action of [
+      { type: "editor.lock" },
+      { type: "unlock.success" },
+      { type: "welcome.restore-backup" },
+    ] as never[]) {
+      expect(transition(pending, action)).toEqual(pending);
+    }
+  });
+
   it("a live slot still wins over disk state on both", async () => {
     // The slot-priority rule predates this change and must not have moved: an
     // unlocked runtime slot pins the stage regardless of what the container

@@ -382,7 +382,14 @@ pub async fn sync_now_from_host(
     use super::status::SyncRuntimeStatus;
     match run_active_cycle_from_host(host, io, state, true).await {
         CycleOutcome::Disabled => SyncRuntimeStatus::Disabled,
-        CycleOutcome::NotReady => SyncRuntimeStatus::NotEnrolled,
+        // `NotReady` is one outcome covering three situations — locked vault,
+        // never enrolled, and enrolled-but-awaiting-approval. Answering
+        // `NotEnrolled` for all three made this command contradict
+        // `sync_status`, which reports `Pending` for the third (MYND-635). Ask
+        // the one derivation instead of hard-coding a second opinion; it can
+        // only return `Pending` or `NotEnrolled`, so the `Ran`-only-`Idle` rule
+        // above still holds.
+        CycleOutcome::NotReady => super::status::not_ready_reason(host, io, state).await,
         CycleOutcome::Ran(summary) => {
             if summary.pulled > 0 || summary.dropped > 0 {
                 // A manual sync pulled notes to disk (or reconcile quarantined

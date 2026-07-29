@@ -263,6 +263,24 @@ pub const DISPATCHED: &[&str] = &[
     // plugin assumes a vault already exists. Its vault id is a constant, which
     // is what makes re-running it idempotent by construction.
     "plugin:sync|sync_join_account",
+    // The two halves of the pending-approval wait (MYND-635), which the web
+    // entry screen has always called and this roster has never carried.
+    //
+    // `sync_head_fingerprint` is how that screen learns approval LANDED: it
+    // polls `sync_now` then this, and a non-`None` answer means a head was
+    // adopted. Unported, it threw into the `catch` that exists for a pending
+    // device's legitimately-failing cycles — so the screen polled forever and
+    // never advanced, even after a desktop approved it.
+    //
+    // `sync_reset_local` is that screen's "the fingerprints don't match"
+    // escape hatch. Unported, its rejection was swallowed and the UI claimed
+    // the device had stopped trusting forked data while the enrolment stood.
+    //
+    // Both were absent from the dispatch router AND from here, which is why no
+    // gate caught them: the two files agreed with each other about commands
+    // neither knew existed.
+    "plugin:sync|sync_head_fingerprint",
+    "plugin:sync|sync_reset_local",
     // The quarantine surface (task 87) — `sync-protocol.md` §11.3's "moved
     // aside, never destroyed" rule needs a door, and these are it. `restore` is
     // NOT here: it mints a new note through `note_create_with_dir`, so it lands

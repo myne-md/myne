@@ -33,6 +33,12 @@ export type RouteName =
   | "recover"
   | "picker"
   | "account-entry"
+  // The web approval wait (MYND-635). Addressable for the same reason
+  // `account-entry` is: it is a real screen the boot probe can land on, and a
+  // name `useStageRoute` cannot address gets `replaceRoute`d to something else.
+  // It carries nothing — the pending fact lives on disk and is re-derived on
+  // every boot, so there is no session state a URL could assert.
+  | "pending-approval"
   | "restore-backup";
 
 /**

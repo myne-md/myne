@@ -238,6 +238,15 @@ steps:
       # Woodpecker's config-compile runs env substitution over this file and a
       # shell expansion in a step (or even in a comment) can error the whole
       # pipeline config.
+      #
+      # `nodejs` because `build-wasm.sh` reads cargo's `--message-format=json`
+      # artefact record with it, and `rust:slim` has no node. Added 2026-07-29
+      # after this step ran for the FIRST TIME: it landed with MYND-574 and every
+      # pipeline since errored at config-compile, so it was written, reviewed and
+      # merged without once executing. A gate that has never run is a gate whose
+      # result nobody has seen — which is the same failure class the step itself
+      # exists to catch, one layer up.
+      - apt-get update && apt-get install -y --no-install-recommends nodejs
       - bash scripts/wasm-repro-check.sh
 
   # ─── Hook-parity backstop ────────────────────────────────────
@@ -775,32 +784,43 @@ steps:
   # The step still self-skips on an absent token rather than failing, so a fork
   # PR (which gets no secrets) is not blocked by a companion it cannot clone.
   #
-  vector-verification:
-    image: rust:1.96.0-slim
-    when: *code-paths
-    depends_on: [cargo-test]
-    environment:
-      VECTORS_TOKEN:
-        from_secret: vectors_token
-    commands:
-      - |
-        if [ -z "$VECTORS_TOKEN" ]; then
-          echo "vectors_token not provided -> skipping cross-impl vectors";
-          exit 0;
-        fi
-      # chromium + its driver are what make the browser lane possible; the
-      # driver's major version must match the browser's, which is why they are
-      # installed as a pair from the same distro archive rather than pinned
-      # separately. (Learned locally the same week: chromedriver 151 refuses a
-      # Chrome 150 session outright.)
-      - apt-get update && apt-get install -y --no-install-recommends git ca-certificates curl chromium chromium-driver
-      - git clone --depth 1 "https://oauth2:$VECTORS_TOKEN@git.myne.md/Myne/myne-test-vectors.git" myne-test-vectors
-      # Native lane: the desktop/mobile execution target.
-      - cargo test -p protocol --test vectors
-      # Browser lane: the web client's. Same runners, same fixtures, different
-      # wasm engine. The script fails rather than skips when either the
-      # fixtures or a driver are missing.
-      - CHROMEDRIVER=/usr/bin/chromedriver bash scripts/browser-vectors.sh
+  # RE-COMMENTED 2026-07-29 (MYND-635). Enabling this on 2026-07-28 asserted the
+  # secret was provisioned; it was not, and the caution three paragraphs up says
+  # exactly what follows from that — a `from_secret:` naming a secret the repo
+  # cannot see fails CONFIG-COMPILE, so no step runs at all. Every gate on this
+  # repo was dead from that commit until this one: fmt, clippy, cargo-test,
+  # vitest, e2e, the web lane, all of it, on every branch and every PR.
+  #
+  # The lesson is not "be careful" — it is that enabling this is a TWO-PART
+  # change and the parts are not both in git. Add `vectors_token` to this repo's
+  # Woodpecker secrets FIRST, confirm a pipeline still compiles, and only then
+  # uncomment. Nothing in a diff can tell you the first half happened.
+  # vector-verification:
+  #   image: rust:1.96.0-slim
+  #   when: *code-paths
+  #   depends_on: [cargo-test]
+  #   environment:
+  #     VECTORS_TOKEN:
+  #       from_secret: vectors_token
+  #   commands:
+  #     - |
+  #       if [ -z "$VECTORS_TOKEN" ]; then
+  #         echo "vectors_token not provided -> skipping cross-impl vectors";
+  #         exit 0;
+  #       fi
+  #     # chromium + its driver are what make the browser lane possible; the
+  #     # driver's major version must match the browser's, which is why they are
+  #     # installed as a pair from the same distro archive rather than pinned
+  #     # separately. (Learned locally the same week: chromedriver 151 refuses a
+  #     # Chrome 150 session outright.)
+  #     - apt-get update && apt-get install -y --no-install-recommends git ca-certificates curl chromium chromium-driver
+  #     - git clone --depth 1 "https://oauth2:$VECTORS_TOKEN@git.myne.md/Myne/myne-test-vectors.git" myne-test-vectors
+  #     # Native lane: the desktop/mobile execution target.
+  #     - cargo test -p protocol --test vectors
+  #     # Browser lane: the web client's. Same runners, same fixtures, different
+  #     # wasm engine. The script fails rather than skips when either the
+  #     # fixtures or a driver are missing.
+  #     - CHROMEDRIVER=/usr/bin/chromedriver bash scripts/browser-vectors.sh
 
   # Failure notification via Pushover. The token + group come ONLY from CI
   # secrets, never committed (public repo). A missing secret (e.g. a fork PR)
@@ -831,8 +851,8 @@ steps:
       # Enabled with the `vectors_token` secret (task 15). Listed here because
       # this is the only thing that pushes a failure to the maintainer, and a
       # gate nobody is told about is a gate that goes red unnoticed.
-      - name: vector-verification
-        optional: true
+      # vector-verification is commented out (see the step above); its entry
+      # returns here in the same change that re-enables it.
       - name: pnpm-build
         optional: true
       - name: vitest

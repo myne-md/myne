@@ -33,6 +33,7 @@ const NAMES: ReadonlySet<string> = new Set<RouteName>([
   "recover",
   "picker",
   "account-entry",
+  "pending-approval",
   "restore-backup",
 ]);
 

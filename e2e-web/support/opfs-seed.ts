@@ -119,7 +119,31 @@ export interface VaultFixture {
   readonly password: string;
   readonly accountNumber: string;
   readonly files: FixtureFile[];
+  /**
+   * The device-identity half of an awaiting-approval state (`sync-state.json`),
+   * relative to the vault root.
+   *
+   * Separate from `files` deliberately: `files` alone is a plain vault with sync
+   * unconfigured, which is what every other scenario wants. Folding these in
+   * would turn `unlock-from-fixture` into a pending scenario without anyone
+   * editing it, so awaiting-approval is opted INTO rather than inherited.
+   */
+  readonly pendingFiles?: FixtureFile[];
+  /**
+   * The endpoint half (`sync-config.json`), relative to the CONFIG root — a
+   * different OPFS directory from the vault (`app_config_dir`, device-scoped and
+   * vault-independent).
+   */
+  readonly configFiles?: FixtureFile[];
 }
+
+/**
+ * The OPFS path the web client keeps its device-scoped config under, the
+ * counterpart to {@link VAULT_ROOT}.
+ *
+ * A constant for the same reason: `WebHost::app_config_dir` is fixed.
+ */
+export const CONFIG_ROOT = "myne-config";
 
 export function loadVaultFixture(
   path = join("e2e-web", "fixtures", "unlockable-vault.json"),
@@ -138,6 +162,42 @@ export function loadVaultFixture(
  *  OPFS, so a bug in it fails both rather than hiding in one. */
 export async function seedVault(session: Session, v: VaultFixture): Promise<void> {
   await seedFiles(session, VAULT_ROOT, v.files, "unlockable-vault");
+}
+
+/**
+ * Seed a vault whose device enrolled but is **awaiting approval** (MYND-635).
+ *
+ * The state is a triple the client reads from disk: a device identity
+ * persisted, an endpoint configured, and **no token**. `sync_status` derives
+ * `pending` from exactly that, which is what boot routing consults — so this is
+ * how a lane with no sync server reproduces the state at all.
+ *
+ * The absent token is a positive part of the fixture, not an omission. Writing
+ * one would describe an APPROVED device, and the scenario would pass while
+ * testing nothing.
+ *
+ * The two extra arrays land in different OPFS roots (`sync-state.json` beside
+ * the vault, `sync-config.json` under the config dir), which is why this cannot
+ * be one `seedFiles` call.
+ */
+export async function seedPendingVault(session: Session, v: VaultFixture): Promise<void> {
+  if (!v.pendingFiles?.length || !v.configFiles?.length) {
+    throw new Error(
+      "the vault fixture carries no pending state. Re-emit with:\n" +
+        "  cargo run --release -p myne-core --features test-support --example emit-vault-fixture " +
+        "> e2e-web/fixtures/unlockable-vault.json",
+    );
+  }
+  // The vault root gets meta AND identity in one clearing write — `seedFiles`
+  // wipes its root first, so two calls against the same root would leave only
+  // the second.
+  await seedFiles(
+    session,
+    VAULT_ROOT,
+    [...v.files, ...v.pendingFiles],
+    "unlockable-vault (pending)",
+  );
+  await seedFiles(session, CONFIG_ROOT, v.configFiles, "sync-config");
 }
 
 /** Write `files` under `root`, clearing `root` first. The shared body of both

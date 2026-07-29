@@ -127,6 +127,31 @@ mod tests {
     use super::*;
     use crate::plugins::sync::transport::FakeTransport;
 
+    /// Moved here from `commands` with the function (MYND-635). It gains
+    /// coverage rather than losing it: `commands` is `tauri-ipc`-gated, so this
+    /// golden vector was never checked on the wasm build — which now uses the
+    /// same encoding for the same eye-compare.
+    #[test]
+    fn head_fingerprint_of_hex_matches_golden_vector() {
+        use protocol::HEAD_ID_LEN;
+        // head-fingerprint/v0.1/all-zero golden: head_id = 0x00×32 → "TYRS-N318".
+        // Proves the encoding delegates to the vector-locked primitive verbatim
+        // (no re-derivation, one encoding — SYNC-17).
+        let all_zero = "0".repeat(HEAD_ID_LEN * 2);
+        assert_eq!(
+            head_fingerprint_of_hex(&all_zero),
+            Some(String::from("TYRS-N318"))
+        );
+        // Malformed input → None (no panic, no fallback encoding).
+        assert_eq!(
+            head_fingerprint_of_hex(
+                "not-hex-not-hex-not-hex-not-hex-not-hex-not-hex-not-hex-not-hex!"
+            ),
+            None
+        );
+        assert_eq!(head_fingerprint_of_hex("00"), None); // wrong length
+    }
+
     fn roster_json() -> Vec<u8> {
         b"{\"devices\":[\
             {\"device_id_hex\":\"01010101010101010101010101010101\",\"approved\":true,\"retired\":false},\
@@ -422,4 +447,92 @@ pub async fn account_status_from_host(
     .await
     .unwrap_or(None);
     Ok(parsed)
+}
+
+// ── the SAS fingerprint + the local un-enrol (MYND-635) ─────────────────────
+//
+// Both moved here from `commands`, which is `tauri-ipc`-gated and therefore
+// invisible to the wasm build — the reason the web client had neither. They sit
+// beside `approve_device_from_host` because that is the flow they belong to: the
+// fingerprint is what the two devices compare after an approval, and the reset
+// is what the comparing device does when the two do not match.
+
+/// Decode a 32-byte `head_id` hex → the frozen SAS fingerprint. Delegates to the
+/// vector-locked [`protocol::head_fingerprint`] — no re-derivation, one encoding
+/// (SYNC-17). Returns `None` only on a malformed hex string (wrong length /
+/// non-hex). Factored out so the encoding is host-unit-testable against the
+/// `head-fingerprint` golden vector without a live vault.
+pub(crate) fn head_fingerprint_of_hex(head_id_hex: &str) -> Option<String> {
+    use protocol::HEAD_ID_LEN;
+    if head_id_hex.len() != HEAD_ID_LEN * 2 || !head_id_hex.bytes().all(|b| b.is_ascii_hexdigit()) {
+        return None;
+    }
+    let mut head_id = [0u8; HEAD_ID_LEN];
+    for (i, b) in head_id.iter_mut().enumerate() {
+        *b = u8::from_str_radix(&head_id_hex[i * 2..i * 2 + 2], 16).ok()?;
+    }
+    Some(protocol::head_fingerprint(&head_id))
+}
+
+/// This device's latest head observation as a SAS fingerprint, or `None` when it
+/// has adopted no head yet.
+///
+/// `None` is the normal answer for the entire time a device is pending, and the
+/// web entry screen polls for the transition to `Some` as its signal that an
+/// approval landed. That makes the honest `None` load-bearing: a stub answering
+/// anything else would advance a screen whose whole job is to wait.
+pub async fn head_fingerprint_from_host(
+    host: &dyn crate::host::HostCtx,
+    io: &dyn crate::vault_io::VaultIo,
+    state: &crate::plugins::vault_unlock::state::VaultRuntimeState,
+) -> Result<Option<String>, SyncDeviceError> {
+    let dir = crate::paths::active_vault_root_io_from_host(host, state.active_vault_id().await)
+        .map_err(|_| SyncDeviceError::Internal)?;
+    let sync_state = super::state::read_sync_state(io, &dir)
+        .await
+        .map_err(|_| SyncDeviceError::Internal)?;
+    match sync_state.vv_log.last() {
+        Some(obs) => Ok(Some(
+            head_fingerprint_of_hex(&obs.head_id_hex).ok_or(SyncDeviceError::Internal)?,
+        )),
+        None => Ok(None),
+    }
+}
+
+/// Reset this device's sync enrolment locally: clear the device-local token and
+/// the sync baseline for the active vault, returning it to a clean "not
+/// enrolled, unsynced" state.
+///
+/// NEVER touches `notes/`, attachments or `vault.meta`, and never calls the
+/// server — a rejected token cannot authenticate a server-side remove, and the
+/// server-side row is reaped by the existing approval/retire path.
+///
+/// Its failure must surface to the caller. The reason to invoke it is that the
+/// device no longer trusts what it adopted, so an error swallowed on the way
+/// back reads as "un-enrolled" when nothing was cleared.
+pub async fn reset_local_from_host(
+    host: &dyn crate::host::HostCtx,
+    io: &dyn crate::vault_io::VaultIo,
+    state: &crate::plugins::vault_unlock::state::VaultRuntimeState,
+) -> Result<(), SyncDeviceError> {
+    // Serialize against an in-flight cycle: without this a reset can clear the
+    // token / device-local sync files while a cycle's blocking half is
+    // finishing, and the cycle then writes them back — reviving the enrolment
+    // and baseline the reset removed.
+    let _cycle_guard = super::cycle::sync_cycle_mutex().lock().await;
+    let dir = crate::paths::active_vault_root_io_from_host(host, state.active_vault_id().await)
+        .map_err(|_| SyncDeviceError::Internal)?;
+    use super::token_store::TokenStore as _;
+    super::token_store::default_store()
+        .clear(io, &dir)
+        .await
+        .map_err(|_| SyncDeviceError::Internal)?;
+    super::state::clear_device_local_sync(io, &dir)
+        .await
+        .map_err(|_| SyncDeviceError::Internal)?;
+    // Nudge both the status indicator and the device roster to re-read
+    // immediately — they poll independently (5 s / 4 s), so without this they
+    // would disagree (one still "Synced") for up to a poll interval.
+    host.emit("sync://enrollment-changed", crate::host::EventPayload::Unit);
+    Ok(())
 }

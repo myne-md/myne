@@ -104,6 +104,22 @@ export interface AccountBootstrapProps {
    * place that decides what a container means.
    */
   onBootstrapped: () => void;
+  /**
+   * Mount straight into the approval wait, skipping account-number and password
+   * entry (MYND-635).
+   *
+   * Set by boot routing when the probe finds this device enrolled but not yet
+   * approved. Before this existed the wait was reachable only by *completing* a
+   * join in the current page, so a refresh lost it — and the boot probe, seeing
+   * the `vault.meta` the join had already written, offered the unlock form
+   * instead. The password worked and the vault opened empty, because a pending
+   * device holds no token and can pull nothing.
+   *
+   * A mount-time INITIAL value, not a controlled prop: once mounted the screen
+   * owns the state, so an approval it observes takes effect immediately instead
+   * of waiting for the parent to re-probe.
+   */
+  initiallyPending?: boolean;
 }
 
 const SAS_STYLE: CSSProperties = {
@@ -125,14 +141,17 @@ const APPROVER_LIST_STYLE: CSSProperties = {
   paddingLeft: "var(--space-5)",
 };
 
-export function AccountBootstrap({ onBootstrapped }: AccountBootstrapProps) {
+export function AccountBootstrap({
+  onBootstrapped,
+  initiallyPending = false,
+}: AccountBootstrapProps) {
   const { t } = useTranslation();
   const [account, setAccount] = useState<string | null>(null);
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [pending, setPending] = useState(false);
+  const [pending, setPending] = useState(initiallyPending);
   /** The head-fingerprint SAS, once an approval has let a cycle adopt a head. */
   const [sas, setSas] = useState<string | null>(null);
   const [aborting, setAborting] = useState(false);
@@ -203,10 +222,16 @@ export function AccountBootstrap({ onBootstrapped }: AccountBootstrapProps) {
     ? ENROLL_NON_DISTINGUISHING_BANNER
     : ENROLL_NON_DISTINGUISHING_BANNER_NO_PHRASE;
 
-  if (account === null) {
-    return <AccountNumberEntry onValid={setAccount} />;
-  }
-
+  // The wait is checked BEFORE the account-number step (MYND-635), and the
+  // order is the whole point of a resumed mount. `account` is React state, so a
+  // device that enrolled before a refresh comes back with it `null` — and an
+  // account-number-first check would put the user back at the beginning of a
+  // flow they have already completed, asking for a credential that is already
+  // registered. Enrolling again from there mints a fresh `device_id` and
+  // strands a second pending record.
+  //
+  // Safe for the fresh path too: `pending` only becomes true when a join has
+  // returned, which cannot happen before an account number was entered.
   if (pending) {
     // The device is registered and awaiting approval from an existing one.
     //
@@ -298,6 +323,12 @@ export function AccountBootstrap({ onBootstrapped }: AccountBootstrapProps) {
         )}
       </CenteredCard>
     );
+  }
+
+  // Only now the first-run beginning. Below the wait, not above it — see the
+  // ordering note there.
+  if (account === null) {
+    return <AccountNumberEntry onValid={setAccount} />;
   }
 
   async function handleSubmit(e: FormEvent) {

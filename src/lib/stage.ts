@@ -230,6 +230,29 @@ export type Stage =
    * vault: there is no `initialStatus` to carry and no password to ask for yet.
    */
   | { name: "account-entry" }
+  /**
+   * This browser enrolled against an account and is **waiting for an existing
+   * device to approve it** (MYND-635).
+   *
+   * A stage rather than component state, which is the whole fix. It used to be
+   * a `useState(false)` inside `AccountBootstrap`, so a page refresh erased it
+   * — and the boot probe, which routes on `vault.meta` existence alone, then
+   * saw the meta the join had already written and sent the user to `/unlock`.
+   * The password worked (the meta is the account's real one), so they landed in
+   * a correctly-keyed but EMPTY vault, with the approval screen unreachable and
+   * nothing saying why. A pending device holds no token and can pull nothing,
+   * so "empty" was the honest content of a state the UI had lost track of.
+   *
+   * Web-only in practice, and by a reason rather than a flag: on desktop
+   * enrolment happens FROM an unlocked vault and the Settings panel already
+   * surfaces the wait, so there is nothing for a pre-unlock stage to add. The
+   * browser is the only client that can be nothing BUT pending.
+   *
+   * Carries no payload. The fact is on disk — identity persisted, token absent
+   * — and re-derived by the probe on every boot, so a copy here could only go
+   * stale.
+   */
+  | { name: "pending-approval" }
   | {
       /**
        * Restore-from-backup flow (MYND-56 / MYND-218). A pre-unlock-class
@@ -614,6 +637,14 @@ export function transition(prev: Stage, action: Action): Stage {
       // would put the same fact in two places — the reducer and the screen —
       // and they would drift.
       return rejectIllegal(prev, action);
+    case "pending-approval":
+      // Same posture again, and here it is load-bearing rather than tidy
+      // (MYND-635). Approval is granted on ANOTHER device; this one learns of
+      // it by polling. An action-driven exit would mean the screen deciding it
+      // is approved, which is the shape of the bug being fixed — a state the
+      // client believed instead of read. The exit is `reprobe()`, so the same
+      // on-disk fact that put the user here is what takes them out.
+      return rejectIllegal(prev, action);
     default:
       return assertNever(prev);
   }
@@ -681,7 +712,25 @@ export type SlotMap = Record<VaultId, SlotKind>;
  * editor mount surfaces the real failure. Keeping the boot decision tree
  * slot-priority preserves the silent-recovery posture (Q4) at the boundary.
  */
-export function initialStageFromProbe(vaultList: VaultListResult, slotMap: SlotMap): Stage {
+export function initialStageFromProbe(
+  vaultList: VaultListResult,
+  slotMap: SlotMap,
+  /**
+   * Whether this device has enrolled against an account but is still awaiting
+   * approval from one that already has access (MYND-635).
+   *
+   * A third probe input because the first two cannot express it: the disk says
+   * a `vault.meta` exists — the join writes it *before* the enrolment that
+   * comes back pending — and the runtime slot says nothing, because a refresh
+   * empties it. So the only two signals boot had both reported a perfectly
+   * ordinary vault, and routing sent a device that can sync nothing to the
+   * unlock screen.
+   *
+   * Optional, defaulting to "no": every desktop caller is unchanged by
+   * construction rather than by remembering to pass `false`.
+   */
+  pendingApproval = false,
+): Stage {
   // Slot-priority: a non-Empty runtime slot pins the boot stage
   // regardless of disk state / vault count. Under SYNC-1 at most one
   // slot is non-Empty; we scan defensively and let `Recovering` win
@@ -726,6 +775,32 @@ export function initialStageFromProbe(vaultList: VaultListResult, slotMap: SlotM
     const status = vaults[0].status;
     switch (status.kind) {
       case "Exists":
+        // A device still awaiting approval goes back to the wait, not to the
+        // unlock form (MYND-635). Its `vault.meta` is real — the join fetched
+        // the account's own and wrote it BEFORE enrolling — so the password
+        // works and the vault opens; it is simply EMPTY, because a pending
+        // device holds no token and can pull nothing. Offering unlock there
+        // hands the user a working door onto an empty room and no way back to
+        // the screen that explains why.
+        //
+        // Deliberately only under `Exists`. A `Corrupted` container cannot be
+        // unlocked at all, so its answer stays the web re-bootstrap below —
+        // waiting for approval on a vault that will not open is a longer dead
+        // end than the one it replaces. And this sits AFTER the slot-priority
+        // checks above on purpose: an `Unlocked` runtime slot means a vault is
+        // genuinely open, and no enrolment fact should evict a user from it.
+        //
+        // Gated on the same capability the arms above use, and the gate is
+        // load-bearing rather than tidy. A DESKTOP device can be pending too —
+        // enrol from Settings, quit before another device approves — and sending
+        // it here would lock the user out of a vault that opens perfectly well:
+        // on desktop, awaiting sync approval does not block local use, and the
+        // wait already has a home in the Settings panel. The browser is the only
+        // client with nowhere else to put it and nothing else to do until the
+        // approval lands.
+        if (pendingApproval && !has("vaultCreation")) {
+          return { name: "pending-approval" };
+        }
         return { name: "unlock", initialStatus: { kind: "Exists" }, vaultId };
       case "Corrupted":
         // On a client whose vault came from a server, a corrupt local container
@@ -816,6 +891,10 @@ const ALL_STAGES_FOR_VERIFICATION: Stage[] = [
   // (task 32's flow), not by a stage action — so this entry asserts the
   // stage does not accidentally accept one.
   { name: "account-entry" },
+  // The web approval wait (MYND-635). Like `account-entry` it has no outgoing
+  // transitions — approval happens on another device and is discovered by
+  // polling, never by an action — so this entry asserts it accepts none.
+  { name: "pending-approval" },
   { name: "create-vault" },
   // Coverage entry for the optional `briefing` payload field (MYND-114).
   // Payload, not the `name` discriminator — `transition` ignores it on
@@ -986,6 +1065,8 @@ function verifyInitialStageFromProbe(): void {
     // (task 8). `undefined` here means "do not assert" (multi-vault picker
     // route + list-level IoError carry no targeting id).
     expectedVaultId?: VaultId;
+    /** The third probe input (MYND-635). Omitted = not pending, as on desktop. */
+    pendingApproval?: boolean;
   };
   const cases: Array<Case> = [
     // ---- All slots Empty: list-based routing (cold boot path) ----
@@ -1093,10 +1174,64 @@ function verifyInitialStageFromProbe(): void {
       slotMap: oneUnlocked,
       expectedName: "editor",
     },
+
+    // ---- Awaiting approval (MYND-635) ----
+    //
+    // The bug, as a case: a device that enrolled and is waiting has a real
+    // `vault.meta` on disk, because the join writes it BEFORE the enrolment
+    // that comes back pending. The first two probes therefore describe an
+    // ordinary vault, and boot offered the unlock form — which works, and opens
+    // an empty vault, because a pending device holds no token and can pull
+    // nothing.
+    {
+      // Capability-DERIVED, like the two cases above it: the wait is for the
+      // client that cannot approve itself and has nowhere else to show it.
+      // Desktop can be pending too, and routing it here would lock a user out
+      // of a vault that opens fine — awaiting approval does not block local use
+      // where the Settings panel already surfaces the wait.
+      label: "AllEmpty + 1 vault Exists + pending",
+      vaultList: okList(existsVault(VID_A)),
+      slotMap: allEmpty,
+      pendingApproval: true,
+      expectedName: has("vaultCreation") ? "unlock" : "pending-approval",
+    },
+    {
+      // The default is silence. Every desktop caller omits the argument, so
+      // this pins that omitting it changes nothing — the case directly above
+      // the pending pair, asserted a second time from the other direction.
+      label: "AllEmpty + 1 vault Exists + NOT pending — unchanged",
+      vaultList: okList(existsVault(VID_A)),
+      slotMap: allEmpty,
+      pendingApproval: false,
+      expectedName: "unlock",
+      expectedInitialStatus: { kind: "Exists" },
+      expectedVaultId: VID_A,
+    },
+    {
+      // A corrupt container cannot be unlocked at all, so waiting on it is a
+      // longer dead end than the re-bootstrap. Pending must NOT override the
+      // corrupted arm.
+      label: "AllEmpty + 1 vault Corrupted + pending — corruption still wins",
+      vaultList: okList(corruptVault(VID_A)),
+      slotMap: allEmpty,
+      pendingApproval: true,
+      expectedName: has("backup") ? "unlock" : "account-entry",
+      expectedInitialStatus: { kind: "Corrupted" },
+      expectedVaultId: VID_A,
+    },
+    {
+      // Slot-priority outranks the enrolment fact. A genuinely open vault must
+      // not be closed by a stale-looking pending read — the user is inside it.
+      label: "Unlocked + 1 vault + pending — an open vault is not evicted",
+      vaultList: okList(existsVault(VID_A)),
+      slotMap: oneUnlocked,
+      pendingApproval: true,
+      expectedName: "editor",
+    },
   ];
 
   for (const c of cases) {
-    const actual = initialStageFromProbe(c.vaultList, c.slotMap);
+    const actual = initialStageFromProbe(c.vaultList, c.slotMap, c.pendingApproval);
     if (actual.name !== c.expectedName) {
       throw new Error(
         `[stage] regression: initialStageFromProbe(${c.label}) returned name=${actual.name}; expected ${c.expectedName}`,

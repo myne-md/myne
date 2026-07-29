@@ -107,11 +107,75 @@ fn main() {
         .expect("write quarantined note");
     });
 
+    // ── the awaiting-approval state (MYND-635) ──────────────────────────────
+    //
+    // What a browser holds after a join that came back pending: a device
+    // identity persisted, NO token, and an endpoint configured. `sync_status`
+    // reads exactly that triple and answers `Pending`, which is what boot
+    // routing consults — so seeding it is how a lane with no sync server can
+    // reproduce the state the whole bug lives in.
+    //
+    // Written through the same container writer as everything else, and that is
+    // not incidental: `sync-state.json` and `sync-config.json` are BOTH in
+    // `DOUBLE_BUFFERED`, so what the client opens is `sync-state.json.a` behind
+    // an 8-byte generation frame. A fixture carrying the plain JSON would be
+    // unreadable in a way that looks like a device which never enrolled — the
+    // precise wrong answer, since the test would then pass against a client that
+    // had regressed.
+    //
+    // No token file is written, deliberately. Its ABSENCE is half the
+    // definition of pending; a fixture that included one would describe an
+    // approved device and quietly stop testing anything.
+    let config_dir = tmp.path().join("config");
+    block_on(async {
+        let io = ContainerVaultIo;
+        let st = myne_core::plugins::sync::state::SyncState {
+            device_id_hex: Some("a1".repeat(16)),
+            account_hash_hex: Some(hex_of(&parsed.account_number_hash)),
+            ..Default::default()
+        };
+        myne_core::plugins::sync::state::write_sync_state(&io, &vault_dir, &st)
+            .await
+            .expect("write sync-state.json");
+
+        io.create_dir_all(&config_dir).await.expect("mkdir config");
+        let cfg = myne_core::plugins::sync::config::SyncEndpointConfig {
+            endpoint_url: Some(String::from("https://sync.example.test")),
+            cert_pin_hex: None,
+        };
+        myne_core::plugins::sync::config::write_config(
+            &io,
+            &config_dir.join("sync-config.json"),
+            &cfg,
+        )
+        .await
+        .expect("write sync-config.json");
+    });
+
     let files = collect_slots(&vault_dir);
     assert!(
         !files.is_empty(),
         "the container wrote no slot — a fixture of nothing would seed an empty \
          store and read as a first run"
+    );
+    // Kept OUT of `files` on purpose. `files` is what every existing scenario
+    // seeds to get an unlockable vault, and folding the pending state into it
+    // would silently turn those into pending scenarios — `unlock-from-fixture`
+    // would stop testing an unlock. A scenario opts INTO awaiting-approval by
+    // seeding these two extra arrays; seeding `files` alone still describes a
+    // plain vault with sync unconfigured.
+    let pending_files = collect_named(&vault_dir, "sync-state.json");
+    assert!(
+        !pending_files.is_empty(),
+        "no sync-state slot — without a persisted device identity the fixture \
+         describes a device that never enrolled, and the pending scenario would \
+         quietly become a first-run one"
+    );
+    let config_files = collect_named(&config_dir, "sync-config.json");
+    assert!(
+        !config_files.is_empty(),
+        "no sync-config slot — without an endpoint the status derivation answers \
+         Disabled, and the pending fixture would describe nothing"
     );
 
     println!("{{");
@@ -134,8 +198,59 @@ fn main() {
             if i + 1 == files.len() { "" } else { "," }
         );
     }
+    println!("  ],");
+    println!("  \"pendingFiles\": [");
+    for (i, (name, bytes)) in pending_files.iter().enumerate() {
+        println!(
+            "    {{ \"name\": \"{}\", \"bytes\": [{}] }}{}",
+            name,
+            bytes
+                .iter()
+                .map(|b| b.to_string())
+                .collect::<Vec<_>>()
+                .join(","),
+            if i + 1 == pending_files.len() {
+                ""
+            } else {
+                ","
+            }
+        );
+    }
+    println!("  ],");
+    println!("  \"configFiles\": [");
+    for (i, (name, bytes)) in config_files.iter().enumerate() {
+        println!(
+            "    {{ \"name\": \"{}\", \"bytes\": [{}] }}{}",
+            name,
+            bytes
+                .iter()
+                .map(|b| b.to_string())
+                .collect::<Vec<_>>()
+                .join(","),
+            if i + 1 == config_files.len() { "" } else { "," }
+        );
+    }
     println!("  ]");
     println!("}}");
+}
+
+/// Lowercase hex, so the fixture's `account_hash_hex` matches what the join
+/// would have persisted (it is the SCRAM username — see `state.rs`).
+fn hex_of(bytes: &[u8]) -> String {
+    bytes.iter().map(|b| format!("{b:02x}")).collect()
+}
+
+/// Every container slot the writer produced for one logical name, read back
+/// rather than assumed — same discipline as [`collect_slots`].
+fn collect_named(dir: &Path, logical: &str) -> Vec<(String, Vec<u8>)> {
+    let mut out = Vec::new();
+    for slot in double_buffer::SLOT_SUFFIXES {
+        let name = format!("{logical}{slot}");
+        if let Ok(bytes) = std::fs::read(dir.join(&name)) {
+            out.push((name, bytes));
+        }
+    }
+    out
 }
 
 /// Every slot file the container actually produced, by name — read back rather

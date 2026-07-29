@@ -20,6 +20,7 @@ import {
 import { PairingDialog } from "./components/PairingDialog";
 import { listVaults } from "./lib/vault-list";
 import { probeSlotKind } from "./lib/vault-slot-kind";
+import { isPendingApproval } from "./lib/pending-approval";
 import { switchVault } from "./lib/vault-switch";
 import { openInNoteFind } from "./editor/find/find-session";
 import { prefsRead } from "./lib/prefs";
@@ -97,12 +98,19 @@ function App() {
       // slot is detected and routes to `recover`. Routing keys only on
       // the slot KIND, never the vault id (the runtime owns active-vault
       // identity), so the synthetic key below is purely structural.
-      const [vaultList, activeSlotKind] = await Promise.all([
+      // The third probe (MYND-635) rides in the same `Promise.all` rather than
+      // after it: it is another cheap read, independent of the other two, so
+      // boot still blocks on the slowest single probe instead of their sum.
+      // What it adds is the one fact the other two structurally cannot carry —
+      // that a `vault.meta` on disk can belong to a device which has not been
+      // approved yet and can therefore read nothing out of it.
+      const [vaultList, activeSlotKind, pendingApproval] = await Promise.all([
         listVaults(),
         probeSlotKind(),
+        isPendingApproval(),
       ]);
       const slotMap: SlotMap = { [ACTIVE_SLOT_KEY]: activeSlotKind };
-      setStage(initialStageFromProbe(vaultList, slotMap));
+      setStage(initialStageFromProbe(vaultList, slotMap, pendingApproval));
     })();
   }, [stage]);
 
@@ -257,9 +265,22 @@ function App() {
         // has written a container, the flow comes back through the boot probe,
         // which is the same door every other out-of-band completion uses
         // (restore-backup, back-from-create). The probe then finds a `vault.meta`
-        // and routes to unlock — so this screen never has to know what comes
-        // next, and boot routing stays the one place that decides.
+        // and routes to unlock — or, if this device is still awaiting approval,
+        // to `pending-approval` below. Either way this screen never has to know
+        // what comes next, and boot routing stays the one place that decides.
         return <AccountBootstrap onBootstrapped={() => void reprobe()} />;
+      case "pending-approval":
+        // The same screen, entered already-pending (MYND-635). Not a second
+        // component: the wait, its approval poll and its SAS comparison are one
+        // flow, and splitting them would mean two implementations of "has an
+        // approval landed" — which is how the two halves would drift.
+        //
+        // What this stage adds is that the wait SURVIVES A REFRESH. It used to
+        // be React state on this screen, so reloading erased it and boot — which
+        // routes on `vault.meta` existence, and the join writes that meta before
+        // it enrols — offered the unlock form. The password worked, because the
+        // meta is the account's real one, and the vault opened empty.
+        return <AccountBootstrap onBootstrapped={() => void reprobe()} initiallyPending />;
       case "welcome":
         return (
           <Welcome
