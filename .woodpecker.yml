@@ -613,6 +613,85 @@ steps:
       # scripts, and the seam contract runs against BOTH implementations here.
       - pnpm test
 
+  # ─── Web E2E lane (the built bundle in a real browser, MYND-574 task 105) ────
+  # Drives `web/dist` — the SAME artefact `web-build` just produced, served by
+  # the harness with the production security headers (`e2e-web/support/server.ts`
+  # calls `securityHeaders()` from `web/csp.ts`, not a copy) — through
+  # chromedriver. Both `docs/dev/e2e.md` and `e2e-web/CLAUDE.md` describe this
+  # lane as a per-push CI gate; until this step existed, they described an
+  # intention.
+  #
+  # `depends_on: [web-build]` and nothing else. The built bundle is the only
+  # thing this lane needs, and web-build already hangs off the END of the desktop
+  # chain, so this adds nothing to the desktop lane's wall-clock — web-build's own
+  # comment makes that argument, and this is it one step further out. It is NOT
+  # `failure: ignore`: a non-blocking lane is not the coverage those docs claim.
+  #
+  # WHAT IT GATES: pipeline status, NOT the deploy. `web-docker-build` ->
+  # `web-docker-deploy` -> `web-smoke` hang off `web-build`, not off this step,
+  # so on a develop push the app.example.com deploy runs in PARALLEL with this lane
+  # and ships whatever `web-build` produced regardless of how the browser lane
+  # ends. A red lane reddens the pipeline after the fact; it does not hold the
+  # bundle back. Making it gate the deploy is one line — add `e2e-web` to
+  # `web-docker-build`'s `depends_on` — and it is deliberately not taken here:
+  # it puts a browser suite in front of every deploy, which is a wall-clock vs
+  # safety call for the maintainer, not a side effect of adding a test lane.
+  #
+  # ONE shard, one driver, deliberately. `e2e-web/support/worker-ports.ts`
+  # offsets MYNE_WEB_E2E_DRIVER_PORT by 100 per vitest slot, so a parallel run
+  # needs one driver PROCESS per slot (a shared one is half-right at best:
+  # chromedriver is multi-session, geckodriver is not). Serial costs wall-clock
+  # on a lane nobody is waiting on; the parallel version costs a spawn loop in
+  # the file whose config-compile has twice taken the whole pipeline down.
+  #
+  # CHROMIUM ONLY, and the matrix in `docs/dev/e2e.md` also lists Firefox. That
+  # seat needs geckodriver, which Debian does not package — it would be a
+  # downloaded release archive, and the rule this repo follows for those
+  # (cargo-deny above) is a pinned version WITH its sha256. Adding it is a
+  # separate change, not a line snuck into this one.
+  #
+  # Browser and driver are installed as a PAIR from the same distro archive so
+  # their major versions match — chromedriver 151 refuses a Chrome 150 session
+  # outright. That is a matched pair, NOT a version pin: an archive update moves
+  # both together and nothing below asserts a version. Both docs say so in those
+  # words; the rule they state — no unpinned RELEASE-ARCHIVE download in a
+  # blocking step — is what rules Firefox out above, and it is untouched by a
+  # signed-archive apt install.
+  e2e-web:
+    image: node:25
+    when: *code-paths
+    depends_on: [web-build]
+    environment:
+      CI: "true"
+      # An explicit opt-in meaning "a driver is listening" — see
+      # `e2e-web/support/worker-ports.ts`, which only offsets this into the
+      # slot's band when it is already set. Without it the lane SKIPS with a
+      # reason instead of failing, which is the honest answer on a laptop with no
+      # driver and the wrong one here.
+      MYNE_WEB_E2E_DRIVER_PORT: "4544"
+      MYNE_WEB_E2E_BROWSER: chrome
+      MYNE_WEB_E2E_SHARDS: "1"
+    commands:
+      - apt-get update && apt-get install -y --no-install-recommends ca-certificates curl chromium chromium-driver
+      - npm install -g pnpm@11.8.0
+      - pnpm install --frozen-lockfile --store-dir /cache/cargo/pnpm-store
+      # Driver start, readiness wait and the run in ONE block: the driver is a
+      # background process, and a readiness wait in a different shell than the run
+      # proves nothing. Deliberately free of dollar-sign expansion — Woodpecker's
+      # config-compile runs env substitution over this file before any step runs.
+      - |
+        chromedriver --port=4544 >/tmp/chromedriver.log 2>&1 &
+        for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
+          curl -fsS http://127.0.0.1:4544/status >/dev/null 2>&1 && break
+          sleep 0.5
+        done
+        if ! curl -fsS http://127.0.0.1:4544/status >/dev/null 2>&1; then
+          echo "chromedriver did not come up on :4544 — the lane would have SKIPPED";
+          cat /tmp/chromedriver.log;
+          exit 1;
+        fi
+        pnpm test:e2e:web
+
   # ─── Hosted web-client deploy (MYND-574 task 112) ────────────────────────────
   # The repo's first deployable artefact. Same shape every sibling repo already
   # uses (`myne-server`, `myne-website`): a `docker:28-cli` step that builds on
@@ -866,6 +945,11 @@ steps:
       - name: bundle-record
         optional: true
       - name: web-build
+        optional: true
+      # The web E2E lane (task 105). It can go red on its own — it is a blocking
+      # gate, not a quarantine — so leaving it out would mean a red pipeline with
+      # no push, the same hole `mobile-crosscheck` left below.
+      - name: e2e-web
         optional: true
       # The deploy chain (task 112). A deploy that fails silently is worse than
       # one that fails loudly: the previous container keeps serving and nobody
