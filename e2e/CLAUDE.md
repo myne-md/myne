@@ -68,7 +68,8 @@
   save a boot.
 - Build on the layers, don't re-roll them: `support/scenario.ts`
   (`describeE2E` + `scenario()` — self-skip off-platform, artifacts-on-throw,
-  teardown-in-finally), `support/fixtures.ts` (seeding + fault injection),
+  teardown-in-finally; `describeE2E.flaky` is the quarantine marker, below),
+  `support/fixtures.ts` (seeding + fault injection),
   `support/flows.ts` (`unlockToEditor`, `selectPickerRow`, `switchToVault`,
   `dismissImporterOffer`, `enterRecoveryPhrase`, `completePasswordReset`),
   `support/realistic-fixture.ts` (`seedProductionVault` — VC-1 capture with
@@ -104,8 +105,20 @@
   processes flush late), and own the final `rmSync` in a `finally`.
   PS-1 (`plaintext-residue.e2e.ts`) is the template.
 - Definition of done for a new/changed scenario: **green 3× consecutive in the
-  container** (`./scripts/e2e-local.sh`, `--skip-build` when only test files
-  changed; production-code changes need the full rebuild).
+  container**, and run it ISOLATED — the full suite contaminates, so
+  `./scripts/e2e-one.sh <spec>` (test-file changes only) or
+  `./scripts/e2e-buildrun.sh <spec>` (production-code changes, rebuilds first)
+  is the gate, with `./scripts/e2e-batch.sh <spec>…` when several specs need
+  it. `./scripts/e2e-local.sh` runs the whole suite and is the wrong tool for
+  proving one scenario. Invocations: `docs/dev/e2e.md`.
+- **`describeE2E.flaky` takes a scenario OUT of the merge gate.** It is the
+  quarantine marker (`support/scenario.ts`): the blocking `e2e` CI step skips
+  the flaky set so an unrelated PR cannot go red on someone else's contention
+  flake, and the non-blocking `e2e-quarantine` step (`MYNE_E2E_QUARANTINE=1`,
+  `failure: ignore`) runs only them and reports without gating. Reserve it for a
+  scenario verified as a runner-contention victim, keep the set short, and
+  record the debt on the Plane item — a real failure marked `.flaky` is a real
+  failure nobody will see. Currently quarantined: `nav1`, `tp1`.
 - States unreachable through real UI are NOT forced into E2E: downgrade to a
   Vitest component test (mocked `invoke`) and record the downgrade on the
   Plane item.
