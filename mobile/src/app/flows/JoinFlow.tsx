@@ -386,9 +386,33 @@ export function JoinFlow({ onComplete, onCancel }: JoinFlowProps) {
     if (step !== "pending" || !HAS_TAURI) return;
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
+    // At most one full sync in flight at a time (see below).
+    let syncing = false;
+    // MYND-537: the fingerprint poll must NOT sit behind a full content sync.
+    //
+    // This awaited `syncNow()` before every fingerprint check. `syncNow` claims
+    // the approval AND pulls the vault, so on a first join the match code — which
+    // needs nothing but an adopted head — was gated on the entire vault
+    // arriving. On a small vault that reads as a multi-minute "waiting for
+    // approval"; on a large one the tick never returns, the next one never
+    // fires, and the screen never appears at all. The desktop side has long
+    // since shown "approved".
+    //
+    // So: poll the fingerprint on its own cadence, and let `syncNow` run
+    // alongside rather than in front of it. `syncing` keeps at most one in
+    // flight, since overlapping full syncs would contend for the same vault.
     const tick = async () => {
       try {
-        await syncNow(); // claim + sync if approved (no-op while still pending)
+        if (!syncing) {
+          syncing = true;
+          void syncNow()
+            .catch(() => {
+              /* transient — the next tick starts another */
+            })
+            .finally(() => {
+              syncing = false;
+            });
+        }
         const fp = await syncHeadFingerprint();
         if (!cancelled && fp) {
           // A head was adopted ⇒ this device completed an authed cycle, so the
