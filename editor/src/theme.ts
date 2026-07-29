@@ -204,10 +204,16 @@ export const myneTheme = EditorView.theme({
   // Hanging indent. The `+ 6px` keeps the MARKER aligned with the body text
   // column (CM's default `.cm-line` left padding is 6px) instead of hanging it at
   // the line's hard left edge — at x≈0 the top-level •/* /+ markers fell 6px into
-  // the gutter and read as "no marker at all". Wrapped lines still hang to 1.5em.
+  // the gutter and read as "no marker at all".
+  //
+  // The depth itself is now MEASURED per line and delivered as an inline style
+  // by `decorations/list.ts::hangingIndentCh` (MYND-626) — a fixed value cannot
+  // serve a bullet widget, an ordered marker and a nested item at once. These
+  // are the fallback metrics for a line the decoration has not styled (and they
+  // keep the rule from being empty); the inline style wins wherever it applies.
   ".cm-list-item-line": {
-    textIndent: "-1.5em",
-    paddingLeft: "calc(1.5em + 6px)",
+    textIndent: "-1.4ch",
+    paddingLeft: "calc(1.4ch + 6px)",
   },
 
   // Inline typography — highlight / sub / sup from inline-typography.ts
@@ -944,7 +950,7 @@ export const myneTheme = EditorView.theme({
     cursor: "pointer",
     verticalAlign: "baseline",
     // `text-indent` is inherited and applies to an inline-block's own first
-    // line. Inside a `.cm-list-item-line` (which sets `text-indent: -1.5em`
+    // line. Inside a `.cm-list-item-line` (which sets a negative `text-indent`
     // for its hanging indent) the chip would otherwise shift its label ~1.5em
     // left, escaping the pill. Reset it so the label stays centered in the box.
     textIndent: "0",
