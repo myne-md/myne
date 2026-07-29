@@ -16,7 +16,7 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 import type { FolderNode } from "../folderTree";
-import { ColorDot } from "./ColorDot";
+import { labelColorVar } from "../decorations";
 import { FolderGlyph } from "./FolderGlyph";
 import { Icon } from "../../components/primitives/Icon";
 import { dragEdge, dragZone, insertionLineStyle } from "./reorderDnd";
@@ -193,7 +193,8 @@ function FolderIconGlyph({
 
 // Open/closed folder glyphs stacked and cross-faded on `open` so the icon
 // transitions smoothly rather than snapping (an SVG path swap can't tween).
-function FolderIcon({ open }: { open: boolean }) {
+function FolderIcon({ open, colorSlot }: { open: boolean; colorSlot?: string }) {
+  const tint = colorSlot ? labelColorVar(colorSlot) : undefined;
   return (
     <span
       style={{ position: "relative", width: 17, height: 17, flexShrink: 0 }}
@@ -201,11 +202,19 @@ function FolderIcon({ open }: { open: boolean }) {
     >
       <FolderIconGlyph
         open={false}
-        style={{ ...folderGlyphSvgStyle, opacity: open ? 0 : 1 }}
+        style={{
+          ...folderGlyphSvgStyle,
+          opacity: open ? 0 : 1,
+          ...(tint ? { color: tint } : {}),
+        }}
       />
       <FolderIconGlyph
         open={true}
-        style={{ ...folderGlyphSvgStyle, opacity: open ? 1 : 0 }}
+        style={{
+          ...folderGlyphSvgStyle,
+          opacity: open ? 1 : 0,
+          ...(tint ? { color: tint } : {}),
+        }}
       />
     </span>
   );
@@ -397,12 +406,26 @@ export function FolderRow({
       {reorderPlace && (
         <div style={insertionLineStyle(reorderPlace)} aria-hidden="true" />
       )}
-      {iconName ? (
-        <FolderGlyph name={iconName} size={17} style={{ color: "var(--fg-3)" }} />
-      ) : (
-        <FolderIcon open={expanded} />
-      )}
-      <ColorDot slot={colorSlot} style={{ marginRight: 1 }} />
+      {/* MYND-627: a colour tints the row's OWN icon rather than adding a
+          separate dot beside it. The dot cost a fixed slice of horizontal
+          width on every coloured row -- painful in a narrow sidebar and worse
+          on mobile -- to say something the icon that is already there can say
+          for free. The title text stays in the ink ramp either way, so the
+          PRODUCT.md rule that colour never tints prose still holds. */}
+      {/* `data-color-slot` stays the machine-readable marker for the row's
+          colour even though the paint moved from a dot onto the icon — E2E and
+          the component tests locate colour by it. */}
+      <span data-color-slot={colorSlot} style={{ display: "inline-flex", flexShrink: 0 }}>
+        {iconName ? (
+          <FolderGlyph
+            name={iconName}
+            size={17}
+            style={{ color: colorSlot ? labelColorVar(colorSlot) : "var(--fg-3)" }}
+          />
+        ) : (
+          <FolderIcon open={expanded} colorSlot={colorSlot} />
+        )}
+      </span>
       {renaming ? (
         <input
           ref={inputRef}
