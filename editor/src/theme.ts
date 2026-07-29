@@ -275,6 +275,30 @@ export const myneTheme = EditorView.theme({
   ".cm-embedded-html mark.hl-purple": {
     backgroundColor: "var(--highlight-purple, #e2d8ee)",
   },
+".cm-embedded-html mark.hl-orange": {
+    backgroundColor: "var(--highlight-orange, #e2d8ee)",
+  },
+".cm-embedded-html mark.hl-red": {
+    backgroundColor: "var(--highlight-red, #e2d8ee)",
+  },
+".cm-embedded-html mark.hl-teal": {
+    backgroundColor: "var(--highlight-teal, #e2d8ee)",
+  },
+".cm-embedded-html mark.hl-cyan": {
+    backgroundColor: "var(--highlight-cyan, #e2d8ee)",
+  },
+".cm-embedded-html mark.hl-lime": {
+    backgroundColor: "var(--highlight-lime, #e2d8ee)",
+  },
+".cm-embedded-html mark.hl-brown": {
+    backgroundColor: "var(--highlight-brown, #e2d8ee)",
+  },
+".cm-embedded-html mark.hl-grey": {
+    backgroundColor: "var(--highlight-grey, #e2d8ee)",
+  },
+".cm-embedded-html mark.hl-indigo": {
+    backgroundColor: "var(--highlight-indigo, #e2d8ee)",
+  },
   ".cm-embedded-html kbd": {
     fontFamily: "var(--font-mono)",
     fontSize: "0.85em",

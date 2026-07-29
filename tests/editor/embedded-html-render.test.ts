@@ -68,7 +68,7 @@ describe("inline embedded HTML", () => {
   });
 
   it("drops an unknown highlight class, rendering a plain <mark>", () => {
-    m = withPurifier('<mark class="hl-orange">pop</mark>\n');
+    m = withPurifier('<mark class="hl-chartreuse">pop</mark>\n');
     const mark = query(m, ".cm-embedded-html mark");
     expect(mark).not.toBeNull();
     expect(mark!.getAttribute("class")).toBeNull();
