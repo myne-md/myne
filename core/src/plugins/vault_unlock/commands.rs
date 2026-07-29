@@ -220,6 +220,43 @@ pub async fn unlock_from_host(
         crate::vault_registry::record_unlock(&base, &target_id, host.now_unix_millis());
     }
 
+    run_post_unlock_pipeline(host, state, hooks, io).await;
+
+    Ok(())
+}
+
+/// Everything that must run once a slot has transitioned to `Unlocked`,
+/// regardless of WHICH credential opened it.
+///
+/// **This function exists because the paths drifted.** The steps below were
+/// written inline in the password path, and the quick-unlock (PIN / biometric)
+/// path — added later — installed its `Unlocked` slot without any of them,
+/// while the recovery path ran two of the six. The user-visible symptom that
+/// surfaced it: every lock re-applies `set_content_protected(true)`
+/// unconditionally (lock-on-default-ON, `decisions.md` 2026-05-27) and only
+/// [`apply_persisted_prefs`] restores a user who turned that off, so a
+/// lock → PIN-unlock cycle left screen-capture protection ON natively while
+/// the Privacy panel — reading the same `vault.prefs` blob — kept showing the
+/// toggle off. The search index (zeroized on lock, hydrated only here) had the
+/// same shape: quick-unlocking opened a vault whose search returned nothing.
+///
+/// Keeping it as one function is the point — a new credential path gets the
+/// whole pipeline by calling this, and a new pipeline step reaches every
+/// credential path by being added here. Do not inline a step back into a
+/// caller.
+///
+/// Best-effort end-to-end: every step swallows its own failures (logged via
+/// `tracing::warn!` at the step), so no caller's error surface changes and the
+/// unlock the user just completed can never fail because of this.
+///
+/// Ordering is load-bearing in one place only — the rename roll-forward runs
+/// FIRST, before anything builds a resolution index over the notes dir.
+pub(crate) async fn run_post_unlock_pipeline(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    io: &dyn VaultIo,
+) {
     // ---- MYND-85: roll-forward-recover a crashed transactional rename ----
     //
     // BEFORE any resolution index is built — the inline search hydration
@@ -292,8 +329,6 @@ pub async fn unlock_from_host(
     // (feature-off) desktop build install a no-op. Best-effort: it can never
     // block or fail the unlock the user just completed.
     hooks.hydrate_ai_vectors(state).await;
-
-    Ok(())
 }
 
 /// IPC wrapper. Delegates; the command name and payload the frontend
