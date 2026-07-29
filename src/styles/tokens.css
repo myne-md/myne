@@ -620,12 +620,34 @@ textarea,
     animation-duration: 0ms !important;
     transition-duration: 0ms !important;
   }
+
+  /* MYND-630: motion that CARRIES STATE is exempt.
+     The blanket rule above is right for decoration — easing, slides, the
+     disclosure cascade — and wrong for a progress indicator, where the motion
+     is the message. A spinner frozen mid-arc does not read as "reduced
+     motion", it reads as "hung": the one moment a user most needs to know the
+     app is alive is the one where we stopped telling them. Reduced-motion
+     preferences are about vestibular safety, not about hiding whether work is
+     in flight, and a small in-place rotation is not the class of motion they
+     target.
+
+     Slowed rather than restored: half speed keeps it unmistakably alive while
+     dropping the flicker rate that makes fast spin uncomfortable.
+
+     Opt IN by marking the element `data-motion="essential"` — the default for
+     any new animation stays suppressed. */
+  .myne-spinner,
+  [data-motion="essential"],
+  [data-motion="essential"]::before,
+  [data-motion="essential"]::after {
+    animation-duration: 1600ms !important;
+  }
 }
 
 /* -- Spinner ----------------------------------------------------------------
    Used by <Spinner /> primitive. Border-top accent + linear rotation.
-   The reduced-motion media query above zeroes the animation duration, leaving
-   a static ring — honest work-in-progress indicator without rotation. */
+   Under reduced motion it keeps turning at half speed (see the exemption
+   above) rather than freezing — a static ring reads as hung, not as calm. */
 
 @keyframes myne-spinner-rotate {
   from { transform: rotate(0deg); }
