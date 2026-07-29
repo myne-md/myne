@@ -1,6 +1,9 @@
 // @vitest-environment jsdom
 //
 // Component tests for `src/components/settings/SpellSettings.tsx`. Covers the
+// The toggle is the shared `<Switch>` primitive (MYND-624), so its state is
+// read from `aria-checked` -- it renders no On/Off text of its own.
+//
 // optimistic spell-check toggle (flip → persist → live-update editor; revert +
 // error on failure), the disabled language picker when spell-check is off, and
 // the language multi-select persistence. The prefs setters, the spell lib, and
@@ -50,7 +53,7 @@ describe("SpellSettings — enable toggle", () => {
   it("seeds On from prefs and toggles to Off (persist + live editor update)", async () => {
     render(<SpellSettings />);
     await waitFor(() =>
-      expect(screen.getByTestId("settings.spell-check").textContent).toBe("On"),
+      expect(screen.getByTestId("settings.spell-check").getAttribute("aria-checked")).toBe("true"),
     );
     // Wait for `prefsRead` to resolve and seed `active` (the picker trigger shows
     // the selected language label) before toggling — otherwise the click races
@@ -64,7 +67,7 @@ describe("SpellSettings — enable toggle", () => {
     // Turning off frees the active dictionaries.
     expect(setActiveSpellLanguages).toHaveBeenCalledWith([]);
     await waitFor(() =>
-      expect(screen.getByTestId("settings.spell-check").textContent).toBe("Off"),
+      expect(screen.getByTestId("settings.spell-check").getAttribute("aria-checked")).toBe("false"),
     );
   });
 
@@ -72,7 +75,7 @@ describe("SpellSettings — enable toggle", () => {
     setSpellEnabled.mockRejectedValueOnce(new Error("io"));
     render(<SpellSettings />);
     await waitFor(() =>
-      expect(screen.getByTestId("settings.spell-check").textContent).toBe("On"),
+      expect(screen.getByTestId("settings.spell-check").getAttribute("aria-checked")).toBe("true"),
     );
     await act(async () => {
       fireEvent.click(screen.getByTestId("settings.spell-check"));
@@ -82,14 +85,14 @@ describe("SpellSettings — enable toggle", () => {
         screen.getByText("Could not save the spell-check setting."),
       ).toBeTruthy(),
     );
-    expect(screen.getByTestId("settings.spell-check").textContent).toBe("On");
+    expect(screen.getByTestId("settings.spell-check").getAttribute("aria-checked")).toBe("true");
   });
 
   it("disables the language picker when spell-check is off", async () => {
     prefsRead.mockResolvedValue({ spell_enabled: false, spell_languages: ["en-US"] });
     render(<SpellSettings />);
     await waitFor(() =>
-      expect(screen.getByTestId("settings.spell-check").textContent).toBe("Off"),
+      expect(screen.getByTestId("settings.spell-check").getAttribute("aria-checked")).toBe("false"),
     );
     expect(
       (screen.getByTestId("settings.spell-language-select") as HTMLButtonElement)
