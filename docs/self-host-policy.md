@@ -116,13 +116,21 @@ client additionally depends on is the origin that serves it the client code, whi
 with a separate adversary (`threat-model.md` TB11 / A15) — and if you self-host the web client too, that
 origin is yours.
 
-- **Hosted:** the client ships with a pinned certificate for the hosted endpoint (settled).
-- **Self-host:** how your client trusts *your* operator-chosen certificate/domain is being finalised with
-  the Phase 2 client work (MYND-424). The **proposed** mechanism is **trust-on-first-use (TOFU)**: your
-  client pins the certificate it sees on first connection and you **eye-compare a fingerprint** at device
-  enrollment (reusing the same out-of-band fingerprint channel the device-approval gate already uses).
-  Until MYND-424 ratifies this, treat self-host certificate-pinning as **design-pending** — this section
-  will be updated to settled once the client side lands.
+- **Hosted:** a build-time static pin for the hosted endpoint is the **settled design** (`decisions.md`
+  2026-06-20) and is **not shipped**. The hosted certificate and domain do not exist yet, so the client's
+  hosted-pin lookup deliberately answers "no pin", and a hosted endpoint is pinned by TOFU like any other
+  — filling in the constant is the whole remaining change and lands with its own `decisions.md` entry at
+  hosted launch. What already ships is the *distinction*: the client records where a pin came from and
+  surfaces it, so a first-connect TOFU pin is never presented as the pre-vetted hosted one.
+- **Self-host:** **trust-on-first-use (TOFU)**, shipped with the Phase 2 client work (MYND-424). When you
+  point a native client at your endpoint it completes one TLS handshake, records the SHA-256 of the leaf
+  certificate it was served, and verifies every later connection against that pin; you **eye-compare the
+  fingerprint** the client shows you across your devices (the same out-of-band channel the device-approval
+  gate already uses). It is *assumed* trust rather than verified cryptography — the first connection is
+  taken on faith, and the eye-compare is what turns it into something you checked. A loopback `http`
+  endpoint has no certificate, so nothing is pinned and the client reports that rather than implying a
+  pin. A **browser cannot pin at all** (above): it reports that the platform's trust store is doing the
+  verifying, which is a third answer rather than a missing one.
 
 ## 7. The honest limitation (what TB5 does and doesn't buy you)
 

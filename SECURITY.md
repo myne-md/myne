@@ -29,9 +29,10 @@ We may also work with you to coordinate disclosure timing with downstream packag
 
 In scope for security reports:
 - The `myne-md/myne` repository (this one) — desktop client, the in-repo **web client** (`web/`), `protocol/` Rust crypto crate, build configuration
-- Companion repositories under `myne-md/`: `myne-server`, `myne-mobile`, `myne-website`, `myne-ops`, `myne-test-vectors`
+- Companion repositories under `myne-md/`: `myne-server`, `myne-mobile`, `myne-clipper`, `myne-website`, `myne-themes`, `myne-status`, `myne-ops`, `myne-test-vectors`
+  - `myne-clipper` also reaches across into this one: the extension is keyless, and its scoped pairing token binds it to the native-messaging host that lives in `src-tauri/src/clipper/` here (`docs/threat-model.md` TB10 / A14). Report either half wherever you found it — we will route it.
 - **The served web bundle and its integrity chain** — the reproducible build of `web/`, the published per-release bundle hashes and their append-only record, and any way to make a served bundle differ from the source it claims to be built from without that being detectable
-- **The service-worker update path** — its signing key, its rotation and revocation story, and any way to get code past the pin that the documented update policy is supposed to prevent
+- **The documented service-worker update policy and the decision logic that implements it** (`web/src/sw/update-policy.ts`) — its signing key, its rotation and revocation story, and any way to get code past the pin that policy defines. The worker that would enforce it **is not implemented yet** (`docs/threat-model.md` A15 / TB11), so a report here is against the design and the policy function, not against a pin running in anyone's browser
 - **The security-header and CSP configuration shipped in the self-host container** — a way to weaken or bypass the strict CSP, the zero-third-party-origin rule, or cross-origin isolation counts, whether via the container's own configuration surface or the runtime sync-origin knob
 - **The hosted `app.myne.md` origin**, as a maintainer-run instance
 - The published v0.1 cryptographic protocol (`docs/spec/protocol.md`) and account-number scheme (`docs/spec/account-number.md`) — including formal modeling concerns or attack analyses
@@ -40,8 +41,10 @@ In scope for security reports:
 
 Out of scope:
 - Self-hosted instances run by third parties — report to the operator
-- **Bundles served by third parties.** An operator serving a modified web bundle to their own users is a policy matter between them and those users, not a vulnerability in this project — the same boundary the self-hosted-instance carve-out draws. What *is* in scope: any way for someone who is **not** the operator to alter what a bundle origin serves, and any weakness in the mechanisms that make a substituted bundle detectable (the reproducible build, the published hashes, the service-worker pin).
+- **Bundles served by third parties.** An operator serving a modified web bundle to their own users is a policy matter between them and those users, not a vulnerability in this project — the same boundary the self-hosted-instance carve-out draws. What *is* in scope: any way for someone who is **not** the operator to alter what a bundle origin serves, and any weakness in the mechanisms that make a substituted bundle detectable (the reproducible build and the published hashes — the service-worker pin is policy that has not shipped yet, so reports against it belong under the update-policy bullet above).
 - The `myne-agents/` repository (private, internal tooling)
+- The `myne-branding/` repository (brand assets only — logo, wordmark, icon and type exports; it ships no code and runs no service)
+- The `myne-web/` repository — retired and superseded by the in-repo `web/` target (`docs/decisions.md` 2026-07-26); nothing is built or served from it, so web-client reports belong against this repository
 - Third-party dependencies — report upstream first; we'll track via `cargo audit` / `pnpm audit`
 - Social-engineering attacks against maintainers
 - Theoretical attacks below the published threat model (`docs/threat-model.md` §6 — we acknowledge "no third-party audit" as an explicit compensating-controls regime)
