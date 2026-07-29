@@ -13,7 +13,13 @@
 import { setEditorHost, type EditorHost, type EditorPrefs } from "@myne/editor/host";
 import i18n from "@myne/i18n";
 import { documentDir, join } from "@tauri-apps/api/path";
-import { attachmentExport, attachmentRename } from "./lib/attachments";
+import {
+  attachmentExport,
+  attachmentImport,
+  attachmentRename,
+  catalogList,
+} from "./lib/attachments";
+import { attachmentSrc } from "./lib/attachmentRef";
 import { prefsRead } from "./lib/prefs";
 import { currentEditorTagTree } from "./lib/editor-tag-bridge";
 import { requestVoiceRecording } from "./lib/voice-record-bridge";
@@ -43,6 +49,45 @@ const host: EditorHost = {
     isMediaTarget,
   },
   attachments: {
+    // The three members that moved onto the seam when `@myne/editor` stopped
+    // importing Tauri directly. The IPC strings and payloads are unchanged —
+    // only the caller moved.
+    //
+    // `picked` cannot reach this host: it carries a `PickedFile` whose handle is
+    // host-private, and this host mints none (it omits `pickFiles`,
+    // `resolveLiteralSource` and `pickedFromDropped`, so the editor renders no
+    // picker affordance at all and every mobile attach goes through the React
+    // sheet's own `<input type="file">` → `importFile`). Rejecting is the honest
+    // answer to a handle from a host that does not exist here; silently reading
+    // `handle` as if it were a `File` would be a guess.
+    import: (source) => {
+      if (source.kind === "picked") {
+        return Promise.reject(
+          new Error("editor-host: this host mints no PickedFile, so it cannot import one"),
+        );
+      }
+      return attachmentImport({
+        kind: "bytes",
+        bytes: source.bytes,
+        filename: source.filename,
+      });
+    },
+    // The host shapes the rows, so the editor's render path holds no knowledge
+    // of the IPC field names.
+    catalogList: async () =>
+      (await catalogList()).map((r) => ({
+        id: r.id,
+        contentType: r.content_type,
+        filename: r.filename,
+        size: r.size,
+      })),
+    // The `attachment://` scheme in whichever form this platform can actually
+    // intercept — MYND-519: Android's WebView cannot intercept a custom scheme
+    // and Tauri serves it as `http://attachment.localhost/<id>` there, so this
+    // must go through `convertFileSrc` rather than build the literal.
+    // `warmRefs` is omitted: the URL derives from the id with no IO, so there
+    // is nothing to warm.
+    resolveRef: attachmentSrc,
     attachmentExport,
     attachmentRename,
     // Mobile has no Save-As dialog plugin: export the decrypted bytes into the

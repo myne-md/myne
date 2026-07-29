@@ -42,17 +42,34 @@ pub async fn attachment_import<R: Runtime>(
     // a phone would have no way to turn OCR off at all. An unreadable prefs blob
     // reads as ON, matching desktop: a prefs read failure must not silently
     // disable a search feature.
-    let ocr_enabled = myne_core::plugins::prefs::commands::prefs_read_with_dir(&dir, state.inner())
-        .await
-        .map(|p| p.attachment_ocr_enabled)
-        .unwrap_or(true);
+    let ocr_enabled = myne_core::plugins::prefs::commands::prefs_read_with_dir(
+        &dir,
+        state.inner(),
+        &myne_core::vault_io::StdVaultIo,
+    )
+    .await
+    .map(|p| p.attachment_ocr_enabled)
+    .unwrap_or(true);
     let extractor = if ocr_enabled {
         myne_core::plugins::attachments::ocr::extract_image_only
     } else {
         no_ocr_extract
     };
-    let result =
-        attachment_import_with_dir_ext(&dir, state.inner(), source, created_at, extractor).await;
+    // `StdVaultIo` + `TauriHost`: the same `std::fs` and the same Tauri app
+    // handle this path already used before the shared core moved filesystem
+    // access and host services behind seams. Mobile is a native target — the
+    // seams exist so a *browser* can supply something else, not so mobile
+    // behaves differently.
+    let result = attachment_import_with_dir_ext(
+        &myne_core::vault_io::StdVaultIo,
+        &myne_core::host::tauri_host::TauriHost::new(app.clone()),
+        &dir,
+        state.inner(),
+        source,
+        created_at,
+        extractor,
+    )
+    .await;
     if matches!(&result, Ok(imported) if !imported.deduplicated) {
         hooks.bump_local_change();
     }
