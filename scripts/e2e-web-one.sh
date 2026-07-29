@@ -64,7 +64,17 @@ done
 
 export MYNE_WEB_E2E_DRIVER_PORT="$DRIVER_PORT"
 export MYNE_WEB_E2E_BROWSER="$BROWSER"
-# One worker: a single file has nothing to parallelise, and a single slot keeps
-# the port band deterministic while debugging.
-pnpm exec vitest run --config vitest.web-e2e.config.ts --poolOptions.threads.maxThreads=1 \
-  "e2e-web/${SPEC}.e2e.ts" "$@"
+# One worker, and it is NOT optional here: this runner starts exactly ONE driver,
+# on one port, while `worker-ports.ts` offsets the driver port into each slot's
+# band. A second slot would look for a driver that was never started. A single
+# file has nothing to parallelise anyway.
+#
+# Set through the lane's own knob rather than a CLI flag, for two reasons. It is
+# the variable `vitest.web-e2e.config.ts` already reads into `maxWorkers`, so the
+# runner and the config cannot disagree about the shard count — the same
+# same-variable reasoning `e2e-web-local.sh` uses to keep its driver count
+# honest. And it does not depend on a CLI spelling: this line previously passed
+# `--poolOptions.threads.maxThreads=1`, which vitest 4 removed, so the script
+# died with `CACError: Unknown option --poolOptions` before running anything.
+export MYNE_WEB_E2E_SHARDS=1
+pnpm exec vitest run --config vitest.web-e2e.config.ts "e2e-web/${SPEC}.e2e.ts" "$@"
