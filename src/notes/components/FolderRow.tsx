@@ -20,14 +20,15 @@ import { ColorDot } from "./ColorDot";
 import { FolderGlyph } from "./FolderGlyph";
 import { Icon } from "../../components/primitives/Icon";
 import { dragEdge, dragZone, insertionLineStyle } from "./reorderDnd";
-import { TreeRails } from "./TreeRails";
 
 const INDENT_PER_LEVEL = 18;
 // Left inset of a top-level folder icon. Kept small so the folder glyph sits
 // close to the sidebar edge (just past the section eyebrow) rather than looking
 // indented, and so its center (BASE_PADDING_LEFT + iconSize/2 = 8 + 8.5 = 16.5)
 // lines up with the descending indent rail (`TreeRails.RAIL_X0`).
-const BASE_PADDING_LEFT = 8;
+// Re-exported so note rows can start in the same column as sibling folders
+// (MYND-622) instead of carrying their own, smaller base offset.
+export const BASE_PADDING_LEFT = 8;
 
 const rowBaseStyle: CSSProperties = {
   display: "flex",
@@ -393,7 +394,6 @@ export function FolderRow({
       data-folder-path={node.path}
       title={node.path}
     >
-      <TreeRails depth={depth} />
       {reorderPlace && (
         <div style={insertionLineStyle(reorderPlace)} aria-hidden="true" />
       )}
@@ -457,8 +457,14 @@ export function FolderRow({
                   onCreateFolderNote(node.path);
                 }}
               >
+                {/* Icon only (MYND-622). This used to carry a "folder note"
+                    text label, which meant every folder the pointer crossed
+                    grew a word — noisy on a tree you are scanning rather than
+                    reading, and inconsistent with the has-a-folder-note state
+                    next door, which is already icon-only. The `title` +
+                    `aria-label` still name the action on dwell and to a screen
+                    reader, so nothing is lost but the constant flicker. */}
                 <Icon name="book-open" size={13} />
-                <span>{t("notes.folderRow.folderNote")}</span>
               </button>
             )
           )}
