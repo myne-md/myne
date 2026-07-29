@@ -1,5 +1,5 @@
 // Settings → Editor: line-number gutter toggle (editor-line-numbers, MYND-314).
-// A single `role="switch"` toggle mirroring SpellSettings' control. Self-
+// A single `<Switch>` toggle mirroring SpellSettings' control. Self-
 // contained like its sibling controls (SpellSettings / TypographySettings):
 // local state loaded on mount, disk-first persist with no in-flight gating.
 //
@@ -10,20 +10,9 @@
 
 import { useEffect, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
+import { Switch } from "../primitives/Switch";
 import { ControlBlock } from "./ControlBlock";
 import { prefsRead, setEditorLineNumbers } from "../../lib/prefs";
-
-const TOGGLE_STYLE: CSSProperties = {
-  fontFamily: "var(--font-sans)",
-  fontSize: 13,
-  padding: "6px 12px",
-  borderRadius: "var(--radius-1)",
-  border: "1px solid var(--line-2)",
-  background: "var(--bg-1)",
-  color: "var(--fg-1)",
-  cursor: "pointer",
-  alignSelf: "flex-start",
-};
 
 const ERROR_STYLE: CSSProperties = {
   marginTop: "var(--space-2)",
@@ -71,17 +60,12 @@ export function LineNumbersSettings() {
         label={t("settings.lineNumbers.label")}
         helper={t("settings.lineNumbers.helper")}
         control={
-          <button
-            type="button"
-            role="switch"
-            aria-checked={enabled}
-            aria-label={t("settings.lineNumbers.label")}
-            data-testid="settings.line-numbers"
-            onClick={() => void toggle(!enabled)}
-            style={TOGGLE_STYLE}
-          >
-            {enabled ? t("settings.lineNumbers.on") : t("settings.lineNumbers.off")}
-          </button>
+          <Switch
+            checked={enabled}
+            onChange={() => toggle(!enabled)}
+            ariaLabel={t("settings.lineNumbers.label")}
+            testId="settings.line-numbers"
+          />
         }
       />
       {error !== null && <p style={ERROR_STYLE}>{error}</p>}
