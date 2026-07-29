@@ -509,6 +509,12 @@ A folder the user explicitly created that persists in the sidebar tree even when
 
 Used in: `spec/protocol.md` §9.5.2, `spec/markdown-dialect.md` §3.6.2; `decisions.md` 2026-05-29
 
+### **device-class refusal** &nbsp; 📦 *Product*
+
+The Phase 3 web client's refusal to run on a phone or tablet, decided before anything mounts and rendered as the [unsupported-environment](#web-capability-set) screen with its own heading. Distinct from the capability refusals it shares that screen with: those name a browser API that is missing, this one names the *device*, because a modern mobile browser has every API the client needs and is still the wrong place to run it — a `WebAssembly.Memory` reservation is virtual, so the 336 MiB KDF probe succeeds on hardware that then dies part-way through Argon2id. Decided from **form-factor signals**, never a user-agent string and never a viewport width: `navigator.userAgentData.mobile`, the `(pointer: coarse) and (hover: none)` primary-input media query, and `navigator.maxTouchPoints` on a Mac platform (the iPad-with-a-trackpad case). Width is excluded deliberately — a desktop window snapped to a quarter of the screen is ~400 px wide and supported. Hard: there is no continue-anyway, because the failure it prevents happens after the user has typed their password. See also [web capability set](#web-capability-set), [cross-origin isolation](#cross-origin-isolation).
+
+Used in: `decisions.md` 2026-07-29; `web/src/environment-gate.ts`
+
 ### **DEM (Data Encapsulation Mechanism)** &nbsp; 🏗️ *Construction*
 
 The symmetric-encryption layer in a hybrid encryption scheme — pairs with a KEM. Myne does not use KEM-DEM in v0.1 (no asymmetric encryption); referenced in the v005 roadmap for sharing operations.

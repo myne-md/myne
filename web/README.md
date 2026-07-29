@@ -11,6 +11,13 @@ to be published and versioned, which introduces exactly the drift the shared
 tree exists to prevent. A `web/` directory that started growing its own screens
 would be the signal that decision had failed.
 
+**Desktop-browser is the whole scope, and it is enforced rather than assumed.**
+Phones and tablets are refused before anything mounts — see
+`src/environment-gate.ts` and `decisions.md` 2026-07-29. The signals are the
+platform's own mobile boolean and the primary-pointer media features, never a
+user-agent string and **never a viewport width**: a desktop window snapped to a
+quarter of the screen is ~400 px wide and is supported.
+
 ```
 web/
 ├── index.html          entry document (loads ../src through web/src/main.tsx)

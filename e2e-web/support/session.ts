@@ -52,7 +52,17 @@ export interface BrowserSessionOptions {
   readonly browser: SupportedBrowser;
   /** Run without a visible window. Defaults to true (CI has no display). */
   readonly headless?: boolean;
+  /**
+   * Present the session as a phone. Chrome only — see `capabilitiesFor`.
+   *
+   * Only the device-class refusal wants this. Every other scenario is about a
+   * desktop browser and must not set it.
+   */
+  readonly emulateMobile?: boolean;
 }
+
+/** The phone the device-class scenario emulates. Chrome's own device list. */
+export const EMULATED_MOBILE_DEVICE = "Pixel 7";
 
 /** A session plus the throwaway profile it owns. */
 export interface BrowserSession {
@@ -93,12 +103,25 @@ export function capabilitiesFor(
   browser: SupportedBrowser,
   profileDir: string,
   headless: boolean,
+  opts: { emulateMobile?: boolean } = {},
 ): Record<string, unknown> {
+  // Refused rather than ignored. A silently-dropped emulation flag produces a
+  // scenario that drives a DESKTOP browser while asserting a phone is refused —
+  // it fails, but it fails saying the product is broken.
+  if (opts.emulateMobile && browser !== "chrome") {
+    throw new Error(
+      `mobile emulation is a chromedriver capability; ${browser} cannot be asked for it`,
+    );
+  }
   switch (browser) {
     case "chrome":
       return {
         browserName: "chrome",
         "goog:chromeOptions": {
+          // Touch emulation (so the primary pointer reports coarse with no
+          // hover) plus `Sec-CH-UA-Mobile: ?1` — two of the three signals
+          // `isMobileFormFactor` reads, from a real browser rather than a fake.
+          ...(opts.emulateMobile ? { mobileEmulation: { deviceName: EMULATED_MOBILE_DEVICE } } : {}),
           args: [
             `--user-data-dir=${profileDir}`,
             ...(headless ? ["--headless=new"] : []),
@@ -157,7 +180,7 @@ export async function newBrowserSession(
   try {
     const value = await wireNewSession(
       opts.baseUrl,
-      capabilitiesFor(opts.browser, profileDir, headless),
+      capabilitiesFor(opts.browser, profileDir, headless, { emulateMobile: opts.emulateMobile }),
     );
     session = new Session(opts.baseUrl, value.sessionId);
   } catch (e) {

@@ -19,9 +19,30 @@
 // Every probe here is cheap and side-effect-free. `WebAssembly.Memory` is a
 // virtual reservation, not a commit, so the headroom probe costs a syscall on a
 // capable machine and throws immediately on one that cannot serve it.
+//
+// ── and the reason capability probing alone was not enough ───────────────────
+//
+// That last sentence is also the hole. A virtual reservation is exactly what a
+// 64-bit Android Chrome serves without hesitation: it has OPFS, synchronous
+// access handles, Web Locks and a CSPRNG, so every probe below goes green and a
+// phone reaches a mounted desktop UI on a 390 px touch screen — and, on the
+// devices whose reservation was a promise rather than a fact, still dies part-way
+// into Argon2id. iPadOS Safari makes the same trip while presenting itself as
+// desktop Safari.
+//
+// So there is a second, earlier refusal: **device class**. This client is the
+// desktop-browser client; phones and tablets have native apps that are better on
+// every axis, and admitting one here has no good outcome. The stance above is
+// NARROWED by this, not abandoned — nothing here parses a user-agent string. The
+// signals are a boolean the platform publishes (`navigator.userAgentData.mobile`),
+// two CSS media features about the primary input device, and a touch-point count.
+// See `isMobileFormFactor` for what each one is for and, more importantly, for
+// the one signal deliberately absent from the list.
 
 /** Everything the client structurally requires to open a vault at all. */
 export type RequiredCapability =
+  /** Not a browser API — a precondition. See `isMobileFormFactor`. */
+  | "desktop-form-factor"
   | "webassembly"
   | "wasm-memory-headroom"
   | "worker"
@@ -36,6 +57,76 @@ export interface EnvironmentVerdict {
   missing: RequiredCapability[];
 }
 
+// ── device class ─────────────────────────────────────────────────────────────
+
+/**
+ * What the platform will tell us about the device it is running on, gathered in
+ * one place so the decision below is a pure function of four values.
+ */
+export interface FormFactorSignals {
+  /** `navigator.userAgentData.mobile` — `undefined` where UA-CH is not shipped. */
+  uaDataMobile: boolean | undefined;
+  /** `(pointer: coarse) and (hover: none)` — the PRIMARY input device. */
+  coarsePrimaryPointer: boolean;
+  /** `navigator.maxTouchPoints`. */
+  maxTouchPoints: number;
+  /** `navigator.platform`. Deprecated, and used here for exactly one thing. */
+  platform: string;
+}
+
+/** Read the signals from the running browser. Never throws. */
+export function readFormFactorSignals(): FormFactorSignals {
+  const nav =
+    typeof navigator !== "undefined"
+      ? (navigator as Navigator & {
+          userAgentData?: { mobile?: boolean };
+          maxTouchPoints?: number;
+          platform?: string;
+        })
+      : undefined;
+  return {
+    uaDataMobile: nav?.userAgentData?.mobile,
+    coarsePrimaryPointer:
+      typeof matchMedia === "function" &&
+      matchMedia("(pointer: coarse) and (hover: none)").matches,
+    maxTouchPoints: nav?.maxTouchPoints ?? 0,
+    platform: nav?.platform ?? "",
+  };
+}
+
+/**
+ * Is this a phone or a tablet?
+ *
+ * Three signals, OR-ed, because each covers a device the others miss:
+ *
+ * 1. **`uaDataMobile`** — the browser's own structured answer. Chromium sets it
+ *    on Android and it is the cheapest correct case. Absent on WebKit and
+ *    Gecko, which is why it cannot be the only signal.
+ * 2. **`coarsePrimaryPointer`** — phones and tablets, including iPadOS Safari
+ *    under "Request Desktop Website", where every string lies and the media
+ *    features do not. The media query asks about the PRIMARY pointer, so a
+ *    touch-screen Windows laptop — whose primary pointer is `fine` and which
+ *    hovers — is not caught by it. That distinction is the whole reason this is
+ *    `(pointer: coarse)` rather than `any-pointer`.
+ * 3. **`maxTouchPoints > 1` on a Mac platform** — an iPad with a trackpad or a
+ *    mouse attached, which reports `pointer: fine` / `hover: hover` and
+ *    `platform === "MacIntel"`, and is otherwise indistinguishable from a
+ *    desktop Safari. A real Mac reports `maxTouchPoints === 0`; a Magic
+ *    Trackpad does not change that, because it is not a touchscreen.
+ *
+ * **Viewport width is deliberately not a signal, and must not become one.** A
+ * desktop window snapped to a quarter of the screen is ~400 px wide and is a
+ * SUPPORTED configuration — `e2e-web/isolation-and-viewport.e2e.ts` pins
+ * 400 × 900 as the narrow end of the range this client is expected to lay out
+ * for. A width rule would refuse that window, and it would refuse it silently,
+ * on the one signal a user can change by dragging an edge.
+ */
+export function isMobileFormFactor(s: FormFactorSignals): boolean {
+  if (s.uaDataMobile === true) return true;
+  if (s.coarsePrimaryPointer) return true;
+  return s.maxTouchPoints > 1 && /^Mac/.test(s.platform);
+}
+
 /**
  * Argon2id at the v0.1 baseline needs a 256 MiB block; the Phase 0 spike
  * measured wasm linear memory settling at **321 MiB** across all three
@@ -47,6 +138,7 @@ const REQUIRED_WASM_PAGES = Math.ceil((336 * 1024 * 1024) / 65536);
 
 /** Injectable global, so the probes are testable without a real browser. */
 export interface EnvironmentProbes {
+  isMobileFormFactor: () => boolean;
   hasWebAssembly: () => boolean;
   canReserveWasmMemory: (pages: number) => boolean;
   hasWorker: () => boolean;
@@ -56,6 +148,8 @@ export interface EnvironmentProbes {
 }
 
 export const defaultProbes: EnvironmentProbes = {
+  isMobileFormFactor: () => isMobileFormFactor(readFormFactorSignals()),
+
   hasWebAssembly: () => typeof WebAssembly === "object" && typeof WebAssembly.Memory === "function",
 
   canReserveWasmMemory: (pages) => {
@@ -98,6 +192,14 @@ export const defaultProbes: EnvironmentProbes = {
  * without paying for the memory reservation.
  */
 export function probeEnvironment(probes: EnvironmentProbes = defaultProbes): EnvironmentVerdict {
+  // Device class first, and ALONE. A phone gets one sentence saying it is a
+  // phone, rather than a list that also mentions Web Locks — the reader has a
+  // native app to open, and nothing else on the list is actionable for them.
+  // It also means a refused device never pays for the 336 MiB reservation.
+  if (probes.isMobileFormFactor()) {
+    return { supported: false, missing: ["desktop-form-factor"] };
+  }
+
   const missing: RequiredCapability[] = [];
 
   if (!probes.hasCryptoRandom()) missing.push("crypto-getrandomvalues");
@@ -205,6 +307,8 @@ export async function gateEnvironment(
  */
 export function explainMissing(cap: RequiredCapability): string {
   switch (cap) {
+    case "desktop-form-factor":
+      return "Myne in the browser is built for a desktop computer — it needs the memory and the input a phone or tablet browser cannot give it. On this device the Myne app is the better client anyway: it is faster, it works offline, and it keeps your notes when the browser clears its storage.";
     case "wasm-memory-headroom":
       return "This browser cannot reserve the ~336 MB of memory the vault's key derivation needs. Phone and tablet browsers generally cannot; that limit is set by the vault itself and cannot be lowered for one device without making the vault unreadable everywhere else.";
     case "webassembly":
@@ -221,6 +325,16 @@ export function explainMissing(cap: RequiredCapability): string {
       return "This browser does not provide a cryptographic random-number source.";
   }
 }
+
+/**
+ * The heading for a device-class refusal.
+ *
+ * "Can't run in this browser" would be a lie here and, worse, an unhelpful one:
+ * the browser is fine, the device is a phone, and a reader told their browser is
+ * at fault will go looking for a different browser. So the mobile case gets its
+ * own heading, pointing at the thing that actually works.
+ */
+export const MOBILE_REFUSAL_TITLE = "Open Myne's app on this device";
 
 /** Where to go instead. Named clients, not a vague suggestion. */
 export const NATIVE_HANDOFF =
