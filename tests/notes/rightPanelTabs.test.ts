@@ -19,12 +19,15 @@ describe("RIGHT_PANEL_TABS vocabulary", () => {
     );
   });
 
-  it("exposes the expected four tabs in canonical order", () => {
-    // The AI Chat tab (ai-ux-surface MYND-408) is the fourth, last in order.
+  it("exposes the expected five tabs in canonical order", () => {
+    // The AI Chat tab (ai-ux-surface MYND-408) stays LAST. Tasks (MYND-616)
+    // slots in beside the other this-note surfaces — backlinks are this note's
+    // links, the outline its headings, tasks its work.
     expect(RIGHT_PANEL_DEFAULT_ORDER).toEqual([
       "backlinks",
       "unlinked",
       "outline",
+      "tasks",
       "ai-chat",
     ]);
   });
@@ -60,7 +63,7 @@ describe("resolveActiveTab", () => {
   });
 
   it("returns null when every tab is hidden", () => {
-    const allHidden = ["backlinks", "unlinked", "outline", "ai-chat"];
+    const allHidden = [...RIGHT_PANEL_DEFAULT_ORDER];
     expect(resolveActiveTab("backlinks", order, allHidden)).toBeNull();
     expect(resolveActiveTab(null, order, allHidden)).toBeNull();
   });

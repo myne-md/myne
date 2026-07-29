@@ -271,6 +271,14 @@ pub fn merge_prefs(local: &PrefsView, remote: &PrefsView) -> PrefsView {
     PrefsView {
         // ---- shared: scalar-LWW -----------------------------------------
         archive_disabled: lww!("archive_disabled", archive_disabled),
+        // MYND-613 — Shared/ScalarLww, unlike its lexicographic neighbour
+        // `show_note_timestamps`, which is DeviceLocal.
+        // Device-local (MYND-618): whether a machine shows reminders, and how
+        // far ahead it registers them, are properties of THAT machine — so the
+        // local value wins outright rather than merging.
+        reminders_enabled: local.reminders_enabled,
+        reminder_horizon_days: local.reminder_horizon_days,
+        show_task_marker: lww!("show_task_marker", show_task_marker),
         daily_date_format: lww!("daily_date_format", daily_date_format),
         daily_folder: lww!("daily_folder", daily_folder),
         daily_template: lww!("daily_template", daily_template),

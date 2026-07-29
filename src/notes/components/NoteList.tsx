@@ -1543,6 +1543,7 @@ function PopulatedList({
           isIndexNote={role === "index"}
           indexConflict={role === "conflict"}
           unsynced={unsyncedIds.has(id)}
+          showTaskMarker={rowPrefs.show_task_marker}
         />
       );
     },
@@ -1556,6 +1557,7 @@ function PopulatedList({
       showTimestamps,
       folderIndexRoles,
       unsyncedIds,
+      rowPrefs.show_task_marker,
     ],
   );
 

@@ -272,7 +272,7 @@ Lucide stroke icons throughout (`https://lucide.dev`), copied locally to `docs/d
 
 ### Buttons
 
-- **Shape:** rounded medium (6px). Pill radius is reserved for status pills; small radius (3px) is reserved for inputs and chips.
+- **Shape:** rounded medium (6px). Pill radius is reserved for status pills **and inline editor chips**; small radius (3px) is reserved for inputs and for chips outside the editor. (The inline-chip exception is deliberate — see "Inline editor chips" below.)
 - **Primary:** iron-blue background (`#2c4a7a`), white text (`#ffffff`), 14px Inter, 10px×16px padding. Hover shifts the background to `#233b62`, press to `#1b2e4d`. A 1px inset shadow is acceptable on press; **no scale or translate transforms**, the product is not playful. Focus ring is the standard 2px iron-blue stroke with a 1px paper offset.
 - **Secondary:** warm-paper background (`#fbfbfa`), ink-primary text (`#1a1a17`), 1px hairline border (`#e3e2dd`), same padding. Hover background shifts to `#ecebe7`.
 - **Ghost:** transparent background, ink-secondary text, no border. Used in dense toolbars only.
@@ -329,7 +329,11 @@ Used only when an inline progressive disclosure is genuinely impossible. Backgro
 - **Do** use sentence case everywhere. "Save note", not "Save Note". Title case is reserved for proper nouns (Myne, Argon2id, BIP-39, XChaCha20-Poly1305, Crockford-base32, Tauri).
 - **Do** communicate state with an icon plus a text label, never with color alone.
 - **Do** keep motion under 260ms with exponential ease-out cubic curves. Disable transitions globally under `prefers-reduced-motion`.
-- **Do** ship `border-radius: 6px` on buttons and cards as the workhorse; 3px on inputs and chips; 10px on the command palette and modals; pill on status pills.
+**Inline editor chips use pill radius.** The canon reserved pill radius for status pills and small radius for chips, but the one shipped editor chip (`#tag`) uses pill radius, and MYND-614 adds three more chips that sit in the same line of prose beside it. The canon is updated toward the shipped artifact rather than the other way round: on-screen consistency between two chips sharing a line of text is worth more than consistency with a document the code already diverged from, and the project's own workflow says the projection gets updated when the two disagree.
+
+Scope of the exception: **inline chips inside the editor** (`.cm-tag-chip`, `.cm-task-chip`). Chips elsewhere — the tag browser's rows, panel chips — keep the 3px small radius. The status-pill rule is untouched, and so is the prohibition on a green check.
+
+- **Do** ship `border-radius: 6px` on buttons and cards as the workhorse; 3px on inputs and on chips outside the editor; 10px on the command palette and modals; pill on status pills **and on inline editor chips**.
 - **Do** keep neutrals warm-shifted: `#fbfbfa` not `#fff`, `#1a1a17` not `#000`. The 1% chroma is identity-defining.
 
 ### Don't

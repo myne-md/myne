@@ -13,6 +13,7 @@ import { Wikilink } from "./wikilink";
 import { InlineTag } from "./inline-tag";
 import { DefinitionList } from "./definition-list";
 import { Footnote } from "./footnote";
+import { TaskField } from "./task-field";
 import { Highlight } from "./highlight";
 import { Math } from "./math";
 import { Comment } from "./comment";
@@ -23,6 +24,11 @@ export const parser = baseParser.configure([
   InlineTag,
   DefinitionList,
   Footnote,
+  // Inline task fields (MYND-611): `[due:: 2026-08-01]` and the Obsidian emoji
+  // form. Registered `before: "Link"` like the footnote/wikilink configs, since
+  // the bracketed form collides with link syntax. Recognize-only — task 2 types
+  // the values, task 3 owns the single writer seam; bytes round-trip (§6 C1).
+  TaskField,
   // Dialect comments `%%…%%` (MYND-315): inline delimiter + multi-line leaf
   // block, both terminated-only (an unterminated `%%` stays plain text).
   // Recognize-only — render hides off-cursor, lossy projections strip; bytes

@@ -34,6 +34,7 @@ import {
   prefsRead,
   setCustomTheme,
   setShowNoteTimestamps,
+  setShowTaskMarker,
   setTheme,
   type ThemeChoice,
 } from "../../lib/prefs";
@@ -150,6 +151,10 @@ export function AppearancePanel() {
   // `true` (visible) until the stored value loads — matches PrefsView::default.
   const [showTimestamps, setShowTimestamps] = useState(true);
   const [tsError, setTsError] = useState<string | null>(null);
+  // MYND-613 — note-task marker visibility. Defaults `true`, matching the
+  // pref's own omit-when-default polarity.
+  const [showTaskMarkerState, setShowTaskMarkerState] = useState(true);
+  const [markerError, setMarkerError] = useState<string | null>(null);
 
   // Sliding-pill geometry: measured from the active segment's box so the fill
   // can glide to it (segments have unequal widths — "System" is wider than
@@ -173,6 +178,7 @@ export function AppearancePanel() {
         if (!cancelled) {
           setSelected(segmentFor(prefs.theme));
           setShowTimestamps(prefs.show_note_timestamps);
+          setShowTaskMarkerState(prefs.show_task_marker);
           setActiveCustom(prefs.custom_theme);
         }
       })
@@ -201,6 +207,21 @@ export function AppearancePanel() {
       applyTheme(theme); // also clears any applied custom CSS vars
     } catch {
       setError(t("settings.appearance.themeSaveError"));
+    }
+  }
+
+  async function toggleTaskMarker(next: boolean) {
+    setMarkerError(null);
+    // Optimistic like the timestamps toggle: flip immediately, persist, and
+    // revert on failure so the switch never shows a "saved" illusion. The setter
+    // bumps the prefs nonce, so the sidebar and the tab strip (each their own
+    // `usePrefs` instance) reflect it live.
+    setShowTaskMarkerState(next);
+    try {
+      await setShowTaskMarker(next);
+    } catch {
+      setShowTaskMarkerState(!next);
+      setMarkerError(t("settings.appearance.taskMarkerSaveError"));
     }
   }
 
@@ -294,6 +315,27 @@ export function AppearancePanel() {
         {tsError && (
           <p role="alert" style={ERROR_STYLE}>
             {tsError}
+          </p>
+        )}
+      </div>
+
+      <div style={BLOCK_STYLE}>
+        <div style={TOGGLE_ROW_STYLE}>
+          <span style={LABEL_STYLE}>{t("settings.appearance.taskMarkerLabel")}</span>
+          <Switch
+            checked={showTaskMarkerState}
+            onChange={(next) => void toggleTaskMarker(next)}
+            ariaLabel={t("settings.appearance.taskMarkerAria")}
+            ariaDescribedBy="task-marker-helper"
+            testId="settings.task-marker-toggle"
+          />
+        </div>
+        <p id="task-marker-helper" style={HELPER_STYLE}>
+          {t("settings.appearance.taskMarkerHelper")}
+        </p>
+        {markerError && (
+          <p role="alert" style={ERROR_STYLE}>
+            {markerError}
           </p>
         )}
       </div>

@@ -32,8 +32,9 @@
 //! ------  ----  ---------------------  ----------------------------------
 //! 0       4     magic                  ASCII "MYI1"
 //! 4       1     protocol_version       0x01
-//! 5       1     index_format_version   0x01 = the v0.1 inner-plaintext
-//!                                       schema; bumping it lets a client
+//! 5       1     index_format_version   0x02 = the current inner-plaintext
+//!                                       schema (0x01 = pre-MYND-612, now
+//!                                       rejected); bumping it lets a client
 //!                                       fall to rebuild on an unknown form
 //! 6       24    nonce                  XChaCha20-Poly1305 nonce
 //! 30      4     ciphertext_len         big-endian uint32, plaintext_len + 32
@@ -63,12 +64,31 @@ pub const VAULT_INDICES_BLOB_MAGIC: [u8; 4] = *b"MYI1";
 /// `protocol_version` byte at offset 4 — `0x01` for v0.1.
 pub const VAULT_INDICES_BLOB_PROTOCOL_VERSION: u8 = 0x01;
 
-/// `index_format_version` byte at offset 5 — the v0.1 inner-plaintext
+/// `index_format_version` byte at offset 5 — the originally-shipped v0.1
+/// inner-plaintext schema. **No longer written and no longer accepted**
+/// (MYND-612 moved to [`VAULT_INDICES_BLOB_FORMAT_V2`]); retained so the
+/// rejection path can be exercised against a real pre-612 byte rather than an
+/// invented one.
+pub const VAULT_INDICES_BLOB_FORMAT_V1: u8 = 0x01;
+
+/// `index_format_version` byte at offset 5 — the current inner-plaintext
 /// schema. Distinct from `protocol_version`: the structured-index schema may
 /// grow fields within v0.1 (a new property type, a new edge field, a
 /// different serialization), and a client that does not understand a newer
 /// form falls to rebuild (§ 9.8.4) rather than mis-parsing.
-pub const VAULT_INDICES_BLOB_FORMAT_V1: u8 = 0x01;
+///
+/// Bumped to `0x02` by MYND-612, which added per-note line-task records to the
+/// payload. The bump is **deliberate rather than incidental**: the nearest
+/// precedent leaned on postcard being non-self-describing, so a payload with a
+/// new trailing field simply failed to decode against the old struct. That is
+/// an implementation property of the serializer, not a guarantee of the format
+/// — if it ever stopped holding, an old blob would parse *successfully and
+/// wrongly*, which is a silently incorrect index. A version byte checked
+/// before decryption cannot fail that way.
+pub const VAULT_INDICES_BLOB_FORMAT_V2: u8 = 0x02;
+
+/// The `index_format_version` this build writes and accepts.
+pub const VAULT_INDICES_BLOB_FORMAT_CURRENT: u8 = VAULT_INDICES_BLOB_FORMAT_V2;
 
 /// Length of the 16-byte `account_number_hash` bound into
 /// `AAD_vault_indices_blob` (spec § 9.8.3 + § 9.3 offset 6).
@@ -170,7 +190,7 @@ pub fn encode_vault_indices_blob_raw(
     encode_blob_envelope_raw(
         vault_indices_key,
         &VAULT_INDICES_BLOB_MAGIC,
-        VAULT_INDICES_BLOB_FORMAT_V1,
+        VAULT_INDICES_BLOB_FORMAT_CURRENT,
         &aad,
         MAX_VAULT_INDICES_PLAINTEXT_LEN,
         plaintext,
@@ -191,7 +211,7 @@ pub fn encode_vault_indices_blob(
     encode_blob_envelope(
         vault_indices_key,
         &VAULT_INDICES_BLOB_MAGIC,
-        VAULT_INDICES_BLOB_FORMAT_V1,
+        VAULT_INDICES_BLOB_FORMAT_CURRENT,
         &aad,
         MAX_VAULT_INDICES_PLAINTEXT_LEN,
         plaintext,
@@ -213,7 +233,7 @@ pub fn decode_vault_indices_blob(
     decode_blob_envelope(
         vault_indices_key,
         &VAULT_INDICES_BLOB_MAGIC,
-        VAULT_INDICES_BLOB_FORMAT_V1,
+        VAULT_INDICES_BLOB_FORMAT_CURRENT,
         &aad,
         MAX_VAULT_INDICES_PLAINTEXT_LEN,
         blob,
@@ -246,7 +266,7 @@ mod tests {
         let blob = encode_vault_indices_blob_raw(&key, &h, pt, &nonce()).unwrap();
         assert_eq!(&blob[0..4], b"MYI1");
         assert_eq!(blob[4], 0x01);
-        assert_eq!(blob[5], 0x01);
+        assert_eq!(blob[5], 0x02, "index_format_version is written as 0x02");
         let out = decode_vault_indices_blob(&key, &h, &blob).unwrap();
         assert_eq!(out.as_slice(), pt.as_slice());
     }
@@ -297,10 +317,46 @@ mod tests {
         let key = fixed_key();
         let h = account_hash();
         let mut blob = encode_vault_indices_blob_raw(&key, &h, b"x", &nonce()).unwrap();
-        blob[5] = 0x02;
+        blob[5] = 0x03; // a future schema this build does not understand
         assert_eq!(
             decode_vault_indices_blob(&key, &h, &blob),
             Err(VaultIndicesBlobError::FormatUnsupported),
+        );
+    }
+
+    #[test]
+    fn a_pre_612_v1_blob_is_rejected_before_any_decryption_is_attempted() {
+        // MYND-612. The pre-bump blob must be refused on its version byte, not
+        // by luck of the serializer: postcard being non-self-describing is an
+        // implementation property, and if it stopped holding, an old payload
+        // would decode successfully against the new struct and produce a
+        // silently incorrect index. So this asserts the refusal happens with a
+        // key that WOULD decrypt the body — only the version byte differs.
+        let key = fixed_key();
+        let h = account_hash();
+        let mut blob = encode_vault_indices_blob_raw(&key, &h, b"pre-612 payload", &nonce())
+            .expect("encode");
+        blob[5] = VAULT_INDICES_BLOB_FORMAT_V1;
+
+        assert_eq!(
+            decode_vault_indices_blob(&key, &h, &blob),
+            Err(VaultIndicesBlobError::FormatUnsupported),
+            "a 0x01 blob is rejected, and on the format byte rather than on AEAD"
+        );
+    }
+
+    #[test]
+    fn a_current_v2_blob_loads() {
+        let key = fixed_key();
+        let h = account_hash();
+        let pt = b"post-612 payload carrying task records";
+        let blob = encode_vault_indices_blob_raw(&key, &h, pt, &nonce()).expect("encode");
+        assert_eq!(blob[5], VAULT_INDICES_BLOB_FORMAT_CURRENT);
+        assert_eq!(
+            decode_vault_indices_blob(&key, &h, &blob)
+                .expect("decodes")
+                .as_slice(),
+            pt.as_slice()
         );
     }
 
@@ -471,7 +527,11 @@ mod tests {
         let mut pf_version = blob_small.clone();
         pf_version[4] = 0x02;
         let mut pf_index_format = blob_small.clone();
-        pf_index_format[5] = 0x02;
+        // MYND-612 bumped the current index format to 0x02, so the
+        // forward-hook case moves to 0x03. The hook is RELOCATED, not burned:
+        // it still pins "a client rejects a version it does not know", which is
+        // the only thing it ever existed to prove.
+        pf_index_format[5] = 0x03;
         let pf_header_short: alloc::vec::Vec<u8> = VAULT_INDICES_BLOB_MAGIC.to_vec(); // 4 < 34
         let mut pf_truncated = blob_small.clone();
         pf_truncated.truncate(pf_truncated.len() - 1);
@@ -489,7 +549,7 @@ mod tests {
         dump.push_str("  \"schema\": \"vault-indices\",\n");
         dump.push_str("  \"protocol_version\": \"v0.1\",\n");
         dump.push_str("  \"spec_section\": \"protocol.md §9.8 + §3.4 + §5.2 + §6.4\",\n");
-        dump.push_str("  \"description\": \"Pins protocol::encode_vault_indices_blob_raw + protocol::decode_vault_indices_blob byte mapping for the MYI1 vault.indices encrypted structured-metadata codec (MYND-271; design MYND-31). The inner plaintext is OPAQUE (client-serialized structured index: wikilink graph + tag index + title map + typed property records) — no canonical-JSON discipline, unlike vault-prefs; the structural twin of vault.search/vault.workspace. vault_indices_key = derive_subkey(root_key, SubkeyRole::VaultIndicesKey) (role 'vault-indices-key'); account_number_hash binds via aad_vault_indices_blob (role 'vault-indices-blob' — a DISTINCT load-bearing string, and DISTINCT from search-index-key/-blob: one magic + one KEK per blob family, MYI1 != MYS1). 12 cases: 3 encrypt (empty / small descriptor / 1-KB) + 1 decrypt_ok + 2 decrypt_aead_fail (tag-tamper + cross-vault, both non-distinguishing per §6.4, real-key fixtures) + 6 parse_fail (one per distinguishable pre-decryption structural reject incl. the load-bearing format_unsupported forward hook). Cases generated by `cargo test -p protocol --lib emit_vault_indices_vectors_for_paste -- --ignored` (in protocol/src/vault_indices_blob.rs).\",\n");
+        dump.push_str("  \"description\": \"Pins protocol::encode_vault_indices_blob_raw + protocol::decode_vault_indices_blob byte mapping for the MYI1 vault.indices encrypted structured-metadata codec (MYND-271; design MYND-31). The header's index_format_version is 0x02 as of MYND-612, which added per-note line-task records to the inner plaintext; 0x01 blobs are rejected rather than migrated, since the index is a rebuildable cache. The inner plaintext is OPAQUE (client-serialized structured index: wikilink graph + tag index + title map + typed property records + per-note line-task records) — no canonical-JSON discipline, unlike vault-prefs; the structural twin of vault.search/vault.workspace. vault_indices_key = derive_subkey(root_key, SubkeyRole::VaultIndicesKey) (role 'vault-indices-key'); account_number_hash binds via aad_vault_indices_blob (role 'vault-indices-blob' — a DISTINCT load-bearing string, and DISTINCT from search-index-key/-blob: one magic + one KEK per blob family, MYI1 != MYS1). 12 cases: 3 encrypt (empty / small descriptor / 1-KB) + 1 decrypt_ok + 2 decrypt_aead_fail (tag-tamper + cross-vault, both non-distinguishing per §6.4, real-key fixtures) + 6 parse_fail (one per distinguishable pre-decryption structural reject incl. the load-bearing format_unsupported forward hook). Cases generated by `cargo test -p protocol --lib emit_vault_indices_vectors_for_paste -- --ignored` (in protocol/src/vault_indices_blob.rs).\",\n");
         dump.push_str("  \"cases\": [\n");
 
         // ---- encrypt closure ----------------------------------------
@@ -712,7 +772,7 @@ mod tests {
         emit_parse_fail(
             &mut dump,
             "parse-fail-format-unsupported",
-            "index_format_version byte (offset 5) set to 0x02 — a future structured-index serialization a v0.1 client does not understand. The decoder rejects cleanly so the caller falls to rebuild from the .myn files (§9.8.4). This is the forward-migration hook and is load-bearing.",
+            "index_format_version byte (offset 5) set to 0x03 — a future structured-index serialization a v0.1 client does not understand. The decoder rejects cleanly so the caller falls to rebuild from the .myn files (§9.8.4). This is the forward-migration hook and is load-bearing. It pinned 0x02 until MYND-612 made 0x02 the CURRENT format (per-note line-task records); the hook relocated to 0x03 rather than being burned, since what it proves — a client rejects a version it does not know — is unchanged.",
             &pf_index_format,
             "format_unsupported",
             true,
