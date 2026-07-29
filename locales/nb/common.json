@@ -1,4 +1,30 @@
 {
+  "accountBootstrap": {
+    "accountMismatch": "Denne nettleseren inneholder allerede hvelvet til en annen konto. Åpne det, eller logg ut og slett denne nettleserens kopi først.",
+    "changeAccount": "Bruk et annet kontonummer",
+    "continue": "Fortsett",
+    "failed": "Kunne ikke åpne den kontoen. Sjekk kontonummeret og passordet, og prøv igjen.",
+    "hint": "Skriv inn hovedpassordet for denne kontoen. Myne henter hvelvet ditt og registrerer denne nettleseren som en enhet på kontoen.",
+    "noEndpoint": "Denne kopien av Myne har ingen synkroniseringsserver konfigurert, så den får ikke tak i hvelvet ditt. Ta kontakt med den som drifter denne kopien.",
+    "passwordLabel": "Hovedpassord",
+    "approversIntro": "Disse enhetene kan godkjenne denne:",
+    "noApprovers": "Ingen annen enhet på denne kontoen kan godkjenne den akkurat nå. Åpne Myne på en enhet som allerede har tilgang, og kom deretter tilbake hit.",
+    "pendingTitle": "Venter på godkjenning",
+    "sasMatch": "De stemmer — fortsett",
+    "sasMismatch": "De stemmer ikke",
+    "verifyBody": "Sjekk at denne koden er den samme på begge enhetene før du fortsetter. Hvis den ikke er det, stopp — noe er galt med tilkoblingen, ikke med passordet ditt.",
+    "verifyTitle": "Sammenlign denne koden",
+    "title": "Logg inn på hvelvet ditt",
+    "working": "Setter opp…"
+  },
+  "accountEntry": {
+    "checkFailed": "Kunne ikke sjekke det kontonummeret. Prøv igjen.",
+    "checking": "Sjekker…",
+    "continue": "Fortsett",
+    "hint": "Det ser slik ut: MY-XXXX-XXXX-XXXX-XXXX-XXXX. Kontrolleres her på enheten din — ingenting sendes ennå.",
+    "invalid": "Det kontonummeret er ikke gyldig. Sjekk det og prøv igjen.",
+    "title": "Skriv inn kontonummeret ditt"
+  },
   "attachments": {
     "cleanUnused": {
       "cancel": "Avbryt",
@@ -8,6 +34,7 @@
       "deleteCta": "Slett {{count}} ubrukte",
       "deleteCta_one": "Slett {{count}} ubrukt",
       "deleteCta_other": "Slett {{count}} ubrukte",
+      "corpusIncomplete": "Fullfør synkroniseringen først — denne enheten har ikke alle notatene dine ennå. Ingenting ble slettet.",
       "error": "Kunne ikke rydde opp. Noen notater kan være uleselige — ingenting ble slettet.",
       "intro_one": "Dette vedlegget brukes ikke i noe notat. Å slette det er permanent og kan ikke angres.",
       "intro_other": "Disse {{count}} vedleggene brukes ikke i noe notat. Å slette dem er permanent og kan ikke angres.",
@@ -47,6 +74,7 @@
       "actionsTitle": "Handlinger",
       "checking": "Sjekker…",
       "checkUnusedFailedNotice": "Kunne ikke se etter ubrukte vedlegg. Prøv igjen.",
+      "corpusIncompleteNotice": "Fullfør synkroniseringen først — denne enheten har ikke alle notatene dine ennå, så den kan ikke avgjøre hvilke vedlegg som er ubrukte.",
       "cleanUnused": "Rydd opp i ubrukte",
       "cleanUnusedTitle": "Slett vedlegg som ikke brukes i noe notat",
       "colCreated": "Opprettet",
@@ -69,6 +97,7 @@
       "menuExport": "Eksporter",
       "menuPreview": "Forhåndsvis",
       "menuRename": "Endre navn",
+      "menuTranscribe": "Transkriber",
       "noMatch": "Ingen vedlegg samsvarer med søket.",
       "noUnusedNotice": "Ingen ubrukte vedlegg å rydde opp i.",
       "preview": "Forhåndsvis",
@@ -84,6 +113,10 @@
       "sortAriaLabel": "Sorter vedlegg",
       "supportedFilesFilter": "Støttede filer",
       "title": "Vedlegg",
+      "transcribeDone": "Transkribering fullført.",
+      "transcribeFailed": "Transkribering mislyktes. Prøv igjen.",
+      "transcribeNoModel": "Velg en transkriberingsmodell i Innstillinger → Labs → AI.",
+      "transcribeStarted": "Transkriberer…",
       "typeFilter": {
         "all": "Alle typer",
         "audio": "Lyd",
@@ -210,6 +243,9 @@
       },
       "toggleLineNumbers": {
         "label": "Slå av/på linjenumre"
+      },
+      "toggleVimMode": {
+        "label": "Slå av/på vim-tastaturmodus"
       },
       "toggleSpellCheck": {
         "label": "Slå av/på stavekontroll"
@@ -512,6 +548,7 @@
     }
   },
   "common": {
+    "cancel": "Avbryt",
     "dismiss": "Lukk",
     "prompt": {
       "cancel": "Avbryt",
@@ -522,6 +559,10 @@
     },
     "back": "Tilbake",
     "continue": "Fortsett"
+  },
+  "deviceRevoked": {
+    "cta": "Start på nytt",
+    "title": "Denne nettleseren ble fjernet fra kontoen din"
   },
   "editor": {
     "attachment": {
@@ -675,7 +716,8 @@
           "export": "Eksporter",
           "remove": "Fjern",
           "rename": "Endre navn",
-          "reveal": "Vis i biblioteket"
+          "reveal": "Vis i biblioteket",
+          "transcribe": "Transkriber"
         },
         "pdfFallback": "PDF",
         "textPreview": {
@@ -686,6 +728,15 @@
           "brokenLabel": "ødelagt",
           "deletedAria": "Slettet vedlegg: {{filename}}",
           "deletedLabel": "slettet"
+        },
+        "transcribe": {
+          "disabledReason": "Aktiver AI i Innstillinger → Labs → AI for å transkribere.",
+          "failed": "Transkribering mislyktes. Prøv igjen.",
+          "heading": "Transkripsjon",
+          "insert": "Sett inn transkripsjonen i notatet",
+          "noModelHint": "Velg en transkriberingsmodell i Innstillinger → Labs → AI.",
+          "progress": "Transkriberer…",
+          "stop": "Stopp"
         },
         "urlImageFallback": "bilde"
       }
@@ -735,6 +786,7 @@
         "tags": "Etiketter",
         "viewMode": "Visningsmodus",
         "views": "Visninger",
+        "vimMode": "Vim-modus",
         "wordCount": "Ordtelling",
         "workspace": "Arbeidsområde"
       },
@@ -766,6 +818,13 @@
           "title_one": "{{characters}} tegn · {{words}} ord · {{spaces}} mellomrom · {{count}} avsnitt",
           "title_other": "{{characters}} tegn · {{words}} ord · {{spaces}} mellomrom · {{count}} avsnitt",
           "titleSelectionSuffix": " (utvalg)"
+        },
+        "vimMode": {
+          "insert": "Insert",
+          "normal": "Normal",
+          "replace": "Replace",
+          "title": "Vim-modus — trykk Esc for normalmodus",
+          "visual": "Visual"
         },
         "graphTitle": "Graf (⌘⇧G)",
         "lock": "Lås",
@@ -998,6 +1057,23 @@
         "xl": "Ekstra stor"
       }
     },
+    "vim": {
+      "ex": {
+        "refused": {
+          "edit": "`:e` støttes ikke — Myne åpner notater, ikke filer. Bruk kommandopaletten eller sidefeltet.",
+          "map": "Egendefinerte tastetilordninger støttes ikke i Myne. Snarveier konfigureres i Innstillinger → Hurtigtaster.",
+          "set": "`:set` støttes ikke — Myne har ingen vim-alternativer. Innstillinger for redigereren finner du i Innstillinger → Redigering.",
+          "source": "`:source` støttes ikke. Myne har bevisst ingen flate for konfigurasjonsskript.",
+          "unsupported": "Den kommandoen støttes ikke i Myne."
+        },
+        "substitute": {
+          "malformed": "Kunne ikke tolke den erstatningen. Forventet :s/pattern/replacement/",
+          "refused": "Det mønsteret bruker vim-spesifikk syntaks ({{what}}), som Mynes søk ikke støtter. Ingenting ble endret."
+        },
+        "writeFailed": "Kunne ikke lagre.",
+        "written": "Lagret."
+      }
+    },
     "wikilink": {
       "chip": {
         "embed": "Bygg inn: {{label}}"
@@ -1188,6 +1264,11 @@
         "title": "Eksporter som Markdown"
       }
     },
+    "egress": {
+      "cancel": "Avbryt",
+      "confirm": "Last ned",
+      "title": "Last ned denne filen"
+    },
     "pdf": {
       "cancel": "Avbryt",
       "continue": "Fortsett…",
@@ -1254,6 +1335,10 @@
     }
   },
   "failClosed": {
+    "exit": {
+      "quit": "Lukk appen",
+      "reload": "Last inn på nytt"
+    },
     "corrupted": {
       "body": "Hvis du har en sikkerhetskopi, kan du gjenopprette den — de nåværende filene dine berøres ikke; sikkerhetskopien gjenopprettes som et separat hvelv først.",
       "cta": "Lukk appen",
@@ -1274,6 +1359,8 @@
       "cta": "Lukk appen",
       "title": "Ingen tillatelse til å åpne hvelvfilen."
     },
+    "copyDiagnostics": "Kopier diagnostikk",
+    "diagnosticsCopied": "Kopiert",
     "restoreFromBackup": "Gjenopprett fra sikkerhetskopi…"
   },
   "notes": {
@@ -1343,14 +1430,20 @@
       "noteCount_other": "{{count}} notater",
       "of": "av:",
       "ofTheGroups": "av gruppene:",
+      "op": {
+        "contains": "inneholder"
+      },
+      "propertyValuePlaceholder": "verdi",
       "removeCondition": "Fjern betingelse",
       "replaceFilter": "Erstatt filter",
       "save": "Lagre",
       "searchTextPlaceholder": "søketekst",
       "selectFolderPlaceholder": "velg en mappe…",
+      "selectPropertyPlaceholder": "velg en egenskap…",
       "selectTagPlaceholder": "velg en etikett…",
       "type": {
         "folder": "Mappe",
+        "property": "Egenskap",
         "search": "Søk",
         "tag": "Etikett"
       },
@@ -1451,7 +1544,11 @@
         "titleFailed": "Import mislyktes",
         "titleSetup": "Importer Obsidian-hvelv",
         "vaultFolderLabel": "Hvelvmappe",
-        "vaultRoot": "(hvelvrot)"
+        "vaultRoot": "(hvelvrot)",
+        "titlePick": "Importer notater",
+        "keepsLabel": "Hva som blir med",
+        "losesLabel": "Hva som ikke blir med",
+        "changeSource": "Bytt kilde"
       },
       "offer": {
         "body": "Hent dine eksisterende notater inn i Myne. Hvert enkelt krypteres etter hvert som det importeres — ingenting forlater denne enheten, og originalfilene dine forblir nøyaktig der de er.",
@@ -1459,6 +1556,46 @@
         "laterHint": "Du kan alltid importere senere fra Innstillinger → Lagring.",
         "notNow": "Ikke nå",
         "title": "Importere ditt Obsidian-hvelv?"
+      },
+      "picker": {
+        "intro": "Hvor kommer notatene dine fra?"
+      },
+      "source": {
+        "obsidian": {
+          "label": "Obsidian",
+          "pickerTitle": "Velg din Obsidian-hvelvmappe",
+          "survives": "Blir med: Markdown, frontmatter, [[wikilinks]], mappestruktur, vedlegg.",
+          "loses": "Blir ikke med: canvas-filer og alt som ikke er et Markdown-notat.",
+          "short": "En hvelvmappe med Markdown-notater"
+        },
+        "notion": {
+          "label": "Notion",
+          "pickerTitle": "Velg den utpakkede Notion-eksportmappen din",
+          "survives": "Blir med: sider, mappestruktur, sideegenskaper som felt og interne lenker som wikilenker. Hver database kommer også som et tabellnotat med lenker til radene sine.",
+          "loses": "Pakk ut eksporten først — Myne leser mappen, ikke .zip-filen. Toggle-blokker, callouts og farget tekst har ingen tilsvarende form og listes opp i en importrapport.",
+          "short": "En utpakket eksportmappe"
+        },
+        "evernote": {
+          "label": "Evernote",
+          "pickerTitle": "Velg .enex-filen fra Evernote",
+          "survives": "Blir med: hvert notat i filen, formatering og vedlegg. Krypterte blokker beholdes som tekst du fortsatt kan dekryptere i Evernote.",
+          "loses": "Blir ikke med: påminnelser og notathistorikk. Svært store eksporter avvises heller enn å risikeres — del opp eksporten hvis det skjer.",
+          "short": "Én enkelt .enex-eksportfil"
+        },
+        "html": {
+          "label": "HTML",
+          "pickerTitle": "Velg en mappe med HTML-filer",
+          "survives": "Blir med: overskrifter, lister, tabeller, lenker, kode og utheving.",
+          "loses": "Blir ikke med: stiler, skript og innbygginger. Eksterne bilder beholdes som lenker og lastes aldri ned.",
+          "short": "En mappe med lagrede nettsider"
+        },
+        "csv": {
+          "label": "CSV",
+          "pickerTitle": "Velg .csv-filen din",
+          "survives": "Blir ett enkelt notat som inneholder tabellen.",
+          "loses": "Det blir ett notat, ikke ett notat per rad — Myne er ingen database. Svært brede eller svært lange filer beskjæres, og importrapporten sier hvor mye.",
+          "short": "Én regnearkfil"
+        }
       }
     },
     "list": {
@@ -1497,7 +1634,10 @@
       "exportPdf": "Eksporter som PDF…",
       "exportTxt": "Eksporter som ren tekst…",
       "favoritesHeading": "Favoritter",
+      "icon": "Ikon…",
       "mergeAnyway": "Slå sammen likevel",
+      "newDrawingHere": "Ny tegning her",
+      "newDrawingMenu": "Ny tegning",
       "newFolder": "Ny mappe",
       "newFolderInPlaceholder": "Ny mappe i {{path}}",
       "newFolderPlaceholder": "Ny mappe",
@@ -1550,6 +1690,7 @@
     },
     "newTab": {
       "createNote": "Opprett et nytt notat",
+      "createDrawing": "Ny tegning",
       "noNotesMatch": "Ingen notater samsvarer.",
       "noNotesYet": "Ingen notater ennå.",
       "searchAriaLabel": "Søk i notater for å åpne",
@@ -1579,12 +1720,16 @@
       "loadError": "Kunne ikke laste dette notatet",
       "removeFromFavorites": "Fjern fra favoritter",
       "renameAriaLabel": "Endre navn på notat",
+      "unsyncedLabel": "Ikke på serveren ennå",
+      "unsyncedTitle": "De siste endringene i dette notatet finnes bare på denne enheten",
       "untitled": "Uten tittel"
     },
     "savedView": {
       "defaultName": "Filtrert visning"
     },
     "saveStatus": {
+      "conflict": "Løser redigeringskonflikt…",
+      "conflictTitle": "Dette notatet ble endret på en annen enhet — beholder begge versjonene",
       "editing": "Redigerer",
       "editingEllipsis": "Redigerer…",
       "editingTitle": "Redigerer — autolagring er klar",
@@ -1594,6 +1739,8 @@
       "savedRelative": "Lagret {{rel}}",
       "saveFailed": "Lagring mislyktes",
       "saveFailedTitle": "Lagring mislyktes — klikk Prøv igjen",
+      "storageFull": "Lagringen er full",
+      "storageFullTitle": "Det er ikke plass igjen til å lagre dette notatet. Frigjør plass (eller fjern noen vedlegg), og prøv igjen. Inntil det lagres, finnes denne endringen bare i dette vinduet — den er ikke på serveren heller.",
       "saving": "Lagrer",
       "savingEllipsis": "Lagrer…"
     },
@@ -1708,6 +1855,10 @@
       "host": {
         "unsupported": "Denne visningstypen kommer i en senere oppdatering."
       },
+      "list": {
+        "empty": "Ingen notater samsvarer med denne visningen",
+        "noValue": "Ingen verdi"
+      },
       "menu": {
         "deleteView": "Slett visning",
         "editFilter": "Rediger filter…",
@@ -1717,6 +1868,11 @@
         "viewSettings": "Visningsinnstillinger…"
       },
       "newView": "Ny visning",
+      "table": {
+        "empty": "Ingen notater samsvarer med denne visningen",
+        "name": "Navn",
+        "noValue": "Ingen verdi"
+      },
       "untitledView": "Visning uten tittel"
     },
     "viewSettings": {
@@ -1730,12 +1886,26 @@
       "cancel": "Avbryt",
       "cardSize": "Kortstørrelse",
       "cardSizeValue": "{{size}} px",
+      "columns": "Kolonner",
+      "columnsEmpty": "Ingen egenskaper funnet",
+      "columnsHint": "Frontmatter-egenskaper som vises som kolonner (tabell) eller som en detaljlinje (liste / kort).",
+      "columnsPlaceholder": "Legg til kolonner…",
       "coverImageHint": "Frontmatter-egenskapen hvis verdi er et bilde — vises som omslaget for hvert kort. La stå tomt for å droppe omslag.",
       "coverImagePlaceholder": "f.eks. cover",
       "coverImageProperty": "Egenskap for omslagsbilde",
+      "groupBy": "Grupper etter",
       "imageAspectRatio": "Bildeforhold",
+      "propertyNone": "Ingen",
       "reset": "Nullstill",
-      "save": "Lagre"
+      "save": "Lagre",
+      "sortAsc": "Stigende",
+      "sortBy": "Sorter etter",
+      "sortDesc": "Synkende",
+      "sortDirection": "Sorteringsretning",
+      "viewType": "Visningstype",
+      "viewTypeCards": "Kort",
+      "viewTypeList": "Liste",
+      "viewTypeTable": "Tabell"
     },
     "welcome": {
       "body": "Velkommen til Myne, ditt private rom for å tenke og skrive.\n\nAlt du lagrer her er kryptert og forblir på enheten din. **Passordet** og **gjenopprettingsfrasen** din er de eneste nøklene til det, så oppbevar dem et trygt sted. Hvis begge går tapt, kan ingen hente notatene dine tilbake, ikke engang vi.\n\nDette er bare et vanlig notat, så gjør det til ditt eget. Rediger det, gi det nytt navn eller slett det når du vil, og legg til nye notater etter hvert som ideene dine vokser.\n\nVi er glade for at du er her. For å lære mer om Myne, besøk https://myne.md\n",
@@ -1836,6 +2006,7 @@
   "settings": {
     "about": {
       "buildChannelDevelopment": "Utviklingsbygg",
+      "buildLabel": "Bygg",
       "buildChannelLabel": "Byggkanal",
       "buildChannelStable": "Stabil",
       "changelogButton": "Vis endringslogg…",
@@ -1857,12 +2028,16 @@
         "ioError": "Diskfeil, prøv igjen.",
         "joinFailure": "Noe gikk galt, prøv igjen.",
         "samePasswordRejected": "Det nye passordet er likt det nåværende.",
+        "serverAckPending": "Det nye passordet ditt virker på denne enheten, men Myne fikk ikke kontakt med serveren for å lagre det. Inntil det skjer, forventer de andre enhetene dine fortsatt det gamle passordet — og hvis denne nettleserens kopi slettes før den tid, går endringen tapt. Myne prøver igjen automatisk.",
         "weakNewPassword": "Det nye passordet må være minst 12 tegn."
       },
       "changePasswordHeading": "Endre passord",
       "changePasswordHelper": "Roter hovedpassordet ditt mens du beholder det samme hvelvet. Gjenopprettingsfrasen forblir den samme.",
       "dangerZoneHeading": "Faresone",
       "dangerZoneHelper": "Slett dette hvelvet og alle notater permanent. Kan ikke angres. Gjenopprettingsfrasen gjenoppretter ikke hvelvet.",
+      "localEraseHeading": "Denne nettleseren",
+      "localEraseHelper": "Slett Mynes kopi av hvelvet ditt fra denne nettleseren. Kontoen din og alt som allerede er synkronisert, blir liggende på serveren.",
+      "localEraseButton": "Logg ut og slett denne nettleserens kopi…",
       "deleteVaultButton": "Slett hvelv…",
       "memoryCost": "Minnekostnad",
       "parallelism": "Parallellisme",
@@ -1887,6 +2062,7 @@
       "changing": "Endrer…"
     },
     "appearance": {
+      "homeQuickActions": "Hurtighandlinger på startskjermen",
       "showEditTimesAria": "Vis redigeringstidspunkter i sidefeltet",
       "showEditTimesHelper": "Vis hvert notats sist redigerte tidspunkt under tittelen i sidefeltet.",
       "showEditTimesLabel": "Vis redigeringstidspunkter",
@@ -1914,6 +2090,13 @@
       "off": "Av",
       "on": "På",
       "saveError": "Kunne ikke oppdatere arkiveringsinnstillingen."
+    },
+    "attachmentOcr": {
+      "label": "Søk inne i bilder og skannede dokumenter",
+      "helper": "Leser tekst ut av bildevedlegg og skannede PDF-er på denne enheten, slik at søket kan finne dem etter innholdet. Ingenting lastes opp. Slår du dette av, stopper uttrekkingen i bakgrunnen; tekst som allerede er trukket ut, beholdes.",
+      "errorSaveSetting": "Kunne ikke lagre denne innstillingen.",
+      "processing_one": "Leser 1 vedlegg…",
+      "processing_other": "Leser {{count}} vedlegg…"
     },
     "autoBackup": {
       "backupFolder": "Sikkerhetskopimappe",
@@ -1991,6 +2174,8 @@
         "parseError": "Ikke gyldig JSON",
         "parseErrorWithLine": "Ikke gyldig JSON (linje {{line}})"
       },
+      "export": "Eksporter",
+      "exportError": "Kunne ikke eksportere det temaet. Prøv igjen.",
       "fileFilterName": "Myne-tema",
       "helper": "Bruk din egen fargepalett. Temaer valideres på denne enheten før bruk — ingenting lastes opp.",
       "importButton": "Importer tema…",
@@ -2025,6 +2210,10 @@
       "heading": "Slett hvelv",
       "ioFailBody": "Kunne ikke få tilgang til hvelvfilene for sletting. Hvelvnøklene er allerede nullstilt fra minnet; eventuelle hvelvdata som blir igjen på disken, er ugjenopprettelig Argon2id-pakket søppel.",
       "ioFailTitle": "Diskfeil under sletting",
+      "localEraseHeading": "Logg ut og slett denne nettleserens kopi",
+      "localEraseEyebrow": "KUN DENNE NETTLESEREN",
+      "localEraseSubmit": "Slett denne nettleserens kopi",
+      "localEraseSubmitInFlight": "Sletter…",
       "partialFailBody_one": "{{count}} fil kunne ikke slettes fra disken. Hvelvnøklene er allerede nullstilt fra minnet, så eventuell foreldreløs chiffertekst som blir igjen, er ugjenopprettelig Argon2id-pakket søppel.",
       "partialFailBody_other": "{{count}} filer kunne ikke slettes fra disken. Hvelvnøklene er allerede nullstilt fra minnet, så eventuell foreldreløs chiffertekst som blir igjen, er ugjenopprettelig Argon2id-pakket søppel.",
       "partialFailTitle": "Sletting av hvelv mislyktes delvis",
@@ -2090,6 +2279,32 @@
       "helper": "Vis og endre tastatursnarveier. Redigeringsformatering og fanesyklus-snarveien er faste.",
       "notSet": "Ikke angitt",
       "removeBindingAria": "Fjern {{chord}}",
+      "reserved": {
+        "bookmarkPage": "bokmerker siden",
+        "closeTab": "lukker fanen",
+        "closeWindow": "lukker vinduet",
+        "cycleTabs": "bytter mellom faner",
+        "focusAddressBar": "setter fokus i adressefeltet",
+        "hideApplication": "skjuler nettleseren",
+        "inspectElement": "åpner elementinspektøren",
+        "minimiseWindow": "minimerer vinduet",
+        "newPrivateWindow": "åpner et privat vindu",
+        "newTab": "åpner en ny fane",
+        "newWindow": "åpner et nytt vindu",
+        "openBookmarks": "åpner bokmerkene",
+        "openDevTools": "åpner utviklerverktøyene",
+        "openExtensions": "åpner utvidelsene",
+        "openFile": "åpner en fil",
+        "openHistory": "åpner historikken",
+        "quit": "avslutter nettleseren",
+        "reopenTab": "åpner den sist lukkede fanen på nytt",
+        "switchTab": "bytter fane",
+        "toggleFullscreen": "slår fullskjerm av/på"
+      },
+      "reservedBadge": "Utilgjengelig her",
+      "reservedBadgeTitle": "Nettleseren din {{action}} med {{chord}}, så snarveien når aldri frem til Myne. Den virker fortsatt i skrivebordsappen.",
+      "reservedRefused": "{{chord}} tilhører nettleseren din — den {{action}}. Velg en annen snarvei; snarveiene dine i skrivebordsappen er uendret.",
+      "reservedUnreliable": "{{chord}} når kanskje ikke frem til Myne — i noen nettlesere er det snarveien som {{action}}. Lagt til likevel.",
       "resetAll": "Tilbakestill alle hurtigtaster…",
       "resetAllConfirm": "Tilbakestille hver egendefinert snarvei til standard?",
       "resetAllYes": "Tilbakestill alle",
@@ -2106,6 +2321,14 @@
       "errorSaveSetting": "Kunne ikke lagre linjenummerinnstillingen.",
       "helper": "Vis en linjenummermarg i redigereren. Ett nummer per linje; av som standard.",
       "label": "Linjenummer",
+      "off": "Av",
+      "on": "På"
+    },
+    "vimMode": {
+      "chordCaveat": "På Windows og Linux har Mynes egne snarveier forrang, så vim-tastekombinasjonene som kolliderer med dem (Ctrl-a, Ctrl-b, Ctrl-d, Ctrl-e, Ctrl-f, Ctrl-i, Ctrl-p, Ctrl-t, Ctrl-v, Ctrl-w, Ctrl-x) er ikke tilgjengelige i redigereren. Ctrl-[ virker fortsatt som Escape, og visual-block flyttes til Alt-v.",
+      "errorSaveSetting": "Kunne ikke lagre innstillingen for vim-modus.",
+      "helper": "Bruk vim-taster i redigereren: normal-, insert- og visual-modus, med de vanlige bevegelsene og operatorene. Av som standard. Notater åpnes i kildemodus mens dette er på.",
+      "label": "Vim-tastaturmodus",
       "off": "Av",
       "on": "På"
     },
@@ -2134,10 +2357,12 @@
       "modelGenerationLabel": "Tekstmodell – chat, oppsummeringer, skriving",
       "modelNone": "Ingen fil valgt",
       "modelSaveFailed": "Kunne ikke lagre modellstien (den må være utenfor hvelvet ditt).",
+      "modelTranscriptionLabel": "Tale-til-tekst-modell (transkribering)",
       "modelsHelper": "Myne laster aldri ned modeller – det ville bety å sende data over nettverket. Åpne en lenke for å hente en i nettleseren din, og velg deretter de nedlastede filene her. Alt kjører på enheten din.",
       "modelsLabel": "Modeller",
       "recommendedFilesEmbedding": "Trenger model.safetensors + config.json + tokenizer.json i én mappe.",
       "recommendedFilesGeneration": "Trenger .gguf-filen + tokenizer.json i samme mappe.",
+      "recommendedFilesTranscription": "Trenger .gguf-filen fra Whisper + config.json + tokenizer.json i samme mappe.",
       "title": "AI"
     },
     "prefs": {
@@ -2154,6 +2379,7 @@
       "screenCaptureHelperOn": "Aktiv på macOS og Windows 10 (May 2020 Update eller nyere). Linux-støtte kommer i en fremtidig utgivelse.",
       "screenCaptureLabel": "Beskyttelse mot skjermopptak",
       "screenCaptureSubtitle": "Blokker skjermbilder og skjermopptak",
+      "screenshotBlocked": "Beskyttelse mot skjermopptak er på — skjermbilder av Myne blir tomme.",
       "autoLockAfter": "Automatisk låsing etter",
       "autoLock1m": "1 min",
       "autoLock5m": "5 min",
@@ -2254,6 +2480,8 @@
       "locationHelper": "Hvert hvelv er en mappe med krypterte filer under denne banen. Foretrekk Sikkerhetskopi-knappen nedenfor fremfor manuelle kopier — den verifiserer den skrevne filen.",
       "locationLabel": "Hvelvplassering",
       "openInFiles": "Åpne i Filer",
+      "webLocationHelper": "Notatene dine ligger i denne nettleserens lagring for dette nettstedet, styrt av nettleseren — det finnes ingen mappe å åpne. Sletter du dataene for dette nettstedet, forsvinner den lokale kopien; fordi denne klienten synkroniserer, lastes den ned igjen når du logger inn på nytt.",
+      "webLocationLabel": "Hvor notatene dine lagres",
       "pathUnavailable": "Bane utilgjengelig",
       "restoreBackup": "Gjenopprett fra sikkerhetskopi…"
     },
@@ -2313,9 +2541,92 @@
       "typewriter": "Skrivemaskinrulling",
       "typewriterSubtitle": "Hold markøren vertikalt sentrert",
       "enableArchiving": "Aktiver arkivering"
+    },
+    "search": {
+      "placeholder": "Søk i innstillinger…",
+      "ariaLabel": "Søk i innstillinger",
+      "empty": "Ingen innstillinger samsvarer med «{{query}}».",
+      "resultsLabel": "Søkeresultater",
+      "extra": {
+        "lastActiveNoteTitle": "Fortsett der du slapp",
+        "lastActiveNoteDesc": "Synkroniser hvilket notat du hadde åpent, slik at du kan fortsette på det på en annen enhet."
+      },
+      "keywords": {
+        "aiEnable": "lokal ai på av aktiver deaktiver slå på maskinlæring local enable disable",
+        "aiExcluded": "ekskluderte mapper utelat ignorer ai personvern excluded folders",
+        "aiModels": "modeller modell gguf last ned tekst embedding llm models",
+        "archive": "arkiv arkivering skjul gjenopprett notater archive",
+        "autoBackup": "automatiske sikkerhetskopier tidsplan hyppighet oppbevaring mappe backup",
+        "autoLock": "autolås automatisk låsing tidsavbrudd inaktivitet lås timer økt auto lock",
+        "backup": "sikkerhetskopi backup eksport myne-backup gjenopprett lagre kopi",
+        "buildChannel": "byggkanal versjon utgivelse stabil beta nightly build channel",
+        "changePassword": "endre passord hovedpassord legitimasjon oppdater tilbakestill change password",
+        "changelog": "endringslogg utgivelsesnotater nyheter hva er nytt historikk changelog",
+        "clipper": "nettleserklipper klipper utvidelse nett klipp chrome firefox",
+        "contentWidth": "innholdsbredde bredde kolonne lesing linjelengde content width",
+        "customThemes": "egendefinerte temaer tema palett farger utseende importer theme",
+        "dailyNotes": "dagsnotat dagsnotater dagbok dato mal mappe journal daily notes",
+        "dangerZone": "faresone slett hvelv fjern ødelegg sletting danger zone",
+        "export": "eksporter eksport markdown dekrypter filer dokumenter ren tekst export",
+        "focusMode": "fokusmodus skrivemaskinrulling demp inaktive linjer distraksjonsfri focus mode",
+        "font": "skrift skrifttype font sans serif mono typografi",
+        "hotkeys": "hurtigtaster tastatursnarveier snarveier tastatur tastekombinasjoner hotkeys shortcuts",
+        "import": "importer import notater obsidian notion evernote enex html csv migrere migrering hente",
+        "language": "språk lokalisering grensesnitt oversettelse ui language",
+        "lastActiveNote": "fortsett der du slapp siste notat gjenoppta synkroniser åpne sync last note",
+        "license": "lisens agpl åpen kildekode juridisk license",
+        "lineNumbers": "linjenummer linjenumre marg redigerer vis line numbers",
+        "vimMode": "vim vim-modus modal redigering normal insert visual tastatur",
+        "lineSpacing": "linjeavstand avstand linjehøyde typografi lesbarhet line spacing",
+        "newNoteLocation": "nye notater plassering mappe standard hvor opprettes new note location",
+        "quickUnlock": "rask opplåsing hurtig pin touch id biometri ansikt lås opp",
+        "realtimeSync": "sanntidssynkronisering sanntid live tilkobling synkronisering realtime sync",
+        "screenCapture": "skjermopptak skjermbilde beskyttelse blokker personvern screen capture",
+        "showEditTimes": "redigeringstidspunkter tidsstempler endret datoer notater vis edit times",
+        "spell": "stavekontroll staving ordliste autokorrektur spell check",
+        "spellLanguages": "stavekontrollspråk språk ordlister ord spell languages",
+        "startupOpen": "oppstart åpne standardfil start hvilket notat startup",
+        "attachmentOcr": "ocr bilde skann skannet pdf foto skjermbilde tekstgjenkjenning søk vedlegg cpu batteri",
+        "syncAddDevice": "legg til enhet par koble telefon bærbar synkronisering add device",
+        "syncConflicts": "konflikter slå sammen løs versjoner synkronisering conflicts",
+        "syncDevices": "enheter tilkoblede parede synkronisering maskiner devices",
+        "syncRecovered": "gjenopprettede notater gjenopprett synkronisering berge recovered",
+        "syncServer": "synkroniseringsserver server vert selvhostet adresse url sync server",
+        "syncStatus": "synkroniseringsstatus status tilkobling tilstand oppdatert sync status",
+        "textSize": "tekststørrelse skriftstørrelse zoom skalering lesbarhet text size",
+        "theme": "tema mørkt lyst modus utseende fargepalett amoled system theme dark light",
+        "threatModel": "trusselmodell sikkerhet angripere ressurser tillit threat model",
+        "toolbar": "verktøylinje knapper formatering utvalg tilpass toolbar",
+        "vaultIcon": "hvelvikon ikon avatar bilde symbol vault icon",
+        "vaultLabel": "hvelvetikett etikett navn endre navn tittel vault label",
+        "vaultLocation": "hvelvplassering bane mappe disk hvor lagres vault location",
+        "viewMode": "standard visningsmodus live lesing kilde forhåndsvisning view mode"
+      }
     }
   },
+  "storageLost": {
+    "allSynced": "Ingenting gikk tapt — hvert notat her hadde allerede nådd serveren.",
+    "evicted": {
+      "body": "Nettleseren din tømte lagringen for dette nettstedet for å frigjøre plass. Ingenting er ødelagt, og ingenting ble slettet på serveren — alt som var synkronisert, ligger der fortsatt.",
+      "title": "Nettleseren din slettet den lokale kopien av dette hvelvet"
+    },
+    "lockCta": "Lås og prøv igjen",
+    "reDownloadCta": "Sett opp denne nettleseren på nytt",
+    "reEnrolNotice": "Å sette opp på nytt registrerer denne nettleseren som en ny enhet, så den venter på godkjenning fra en av de andre enhetene dine før den kan synkronisere.",
+    "unopenable": {
+      "body": "Den lokale kopien av dette hvelvet kan ikke lenger leses. Ingenting på serveren berøres — kopien her er en hurtigbuffer, og den kan erstattes.",
+      "title": "Den lokale kopien av dette hvelvet kan ikke leses"
+    },
+    "unsyncedIntro": "{{count}} notater hadde ikke nådd serveren ennå. De er borte — dette var den eneste kopien:",
+    "unsyncedIntro_one": "{{count}} notat hadde ikke nådd serveren ennå. Det er borte — dette var den eneste kopien:",
+    "unsyncedIntro_other": "{{count}} notater hadde ikke nådd serveren ennå. De er borte — dette var den eneste kopien:",
+    "unsyncedOverflow": "…og {{count}} til.",
+    "unsyncedOverflow_one": "…og {{count}} til.",
+    "unsyncedOverflow_other": "…og {{count}} til."
+  },
   "sync": {
+    "materialising": "Laster ned notatene dine — {{done}} av {{total}}. Du kan begynne å jobbe; resten dukker opp etter hvert som de kommer.",
+    "credentialAmbiguous": "Passordet ditt kan ha blitt endret både på denne enheten og på en annen, og Myne kan ikke avgjøre hvilken endring som er nyest — så ingenting er endret. Logg inn på en enhet som allerede har tilgang, for å rydde opp i det.",
     "attachments": {
       "aria": {
         "downloading": "Laster ned {{name}}",
@@ -2343,6 +2654,17 @@
       "untitled": "Uten tittel ({{hex}})",
       "useThisVersion": "Bruk denne versjonen"
     },
+    "deviceJoinQr": {
+      "accountLabel": "Kontonummer",
+      "accountPlaceholder": "MY-XXXX-XXXX-XXXX-XXXX-XXXX",
+      "error": "Kunne ikke lage QR-koden. Prøv igjen.",
+      "generate": "Lag QR",
+      "hint": "Lim inn kontonummeret ditt for å lage en QR-kode telefonen din kan skanne — den fyller inn server og kontonummer for deg.",
+      "invalidAccount": "Det ser ikke ut som et gyldig kontonummer.",
+      "notConfigured": "Konfigurer en synkroniseringsserver først, og lag deretter en QR-kode.",
+      "scanWithApp": "Skann med iOS-appen",
+      "title": "Legg til en enhet med QR"
+    },
     "devices": {
       "approve": "Godkjenn",
       "awaitingApproval_one": "{{count}} enhet venter på godkjenning",
@@ -2350,8 +2672,22 @@
       "loading": "Laster…",
       "noDevices": "Ingen enheter synkronisert ennå.",
       "notEnrolled": "Denne enheten er ikke tilkoblet ennå. Hvis du nettopp la den til, vent på godkjenning fra en annen enhet; ellers legger du den til med skjemaet «Legg til en enhet» ovenfor.",
+      "platform": {
+        "android": "Android-telefon",
+        "androidTablet": "Android-nettbrett",
+        "ios": "iPhone",
+        "ipad": "iPad",
+        "linux": "Linux-PC",
+        "macos": "Mac",
+        "unknown": "Denne enheten",
+        "web": "Nettleser",
+        "windows": "Windows-PC"
+      },
       "remove": "Fjern",
       "removedElsewhere": "Denne enheten ble fjernet fra kontoen din på en annen enhet.",
+      "rename": "Endre navn",
+      "renameFailed": "Kunne ikke lagre det navnet. Prøv igjen.",
+      "renameLabel": "Enhetsnavn",
       "resetAndReAdd": "Tilbakestill og legg til denne enheten på nytt",
       "resetSyncOnThisDevice": "Tilbakestill synkronisering på denne enheten",
       "shortName": "Enhet {{hex}}",
@@ -2371,10 +2707,14 @@
       "connect": "Koble til",
       "connectedLocal": "Tilkoblet (lokalt, uten TLS).",
       "connectedTls": "Tilkoblet. Kontroller at dette fingeravtrykket stemmer på den andre enheten din.",
+      "connectedPlatformTrust": "Tilkoblet over TLS. Nettleseren din verifiserte sertifikatet til denne serveren.",
       "connecting": "Kobler til…",
       "fingerprintLabel": "Fingeravtrykk for serversertifikat:",
       "pinStatic": "Verifisert mot Mynes innebygde sertifikat.",
       "pinTofu": "Festet ved første tilkobling. Sammenlign dette fingeravtrykket på tvers av enhetene dine.",
+      "fixedOrigin": "Denne klienten synkroniserer med én server, valgt da den ble satt i drift. Den kan ikke endres herfra — siden har bare lov til å snakke med denne ene adressen.",
+      "fixedOriginNone": "Ingen synkroniseringsserver er konfigurert for denne installasjonen.",
+      "pinPlatformTrust": "Verifisert mot sertifikatlageret i nettleseren din. Denne klienten kan ikke feste et sertifikat selv.",
       "placeholder": "https://your-server.example   ·   http://127.0.0.1:8080",
       "unreachable": "Kunne ikke nå den serveren — sjekk URL-en og at den kjører."
     },
@@ -2383,6 +2723,8 @@
       "accountNumberPlaceholder": "MY-XXXX-XXXX-XXXX-XXXX-X",
       "connecting": "Kobler til…",
       "credentialTypeAria": "Legitimasjonstype",
+      "deviceNameHelp": "Vises i enhetslisten din. Du kan endre det senere.",
+      "deviceNameLabel": "Gi denne enheten et navn",
       "error": {
         "notConfigured": "Angi en synkroniseringsserver i innstillingene før du legger til denne enheten.",
         "transport": "Kunne ikke nå synkroniseringsserveren. Sjekk tilkoblingen din og prøv igjen."
@@ -2424,12 +2766,28 @@
         "helper": "Logg inn på en ny enhet med kontonummeret og passordet eller gjenopprettingsfrasen din. En enhet forblir ventende til en eksisterende enhet godkjenner den.",
         "label": "Legg til en enhet"
       },
+      "awaitingApproval": {
+        "label": "Venter på godkjenning"
+      },
       "conflicts": {
         "helper": "Når det samme notatet redigeres på to enheter samtidig, beholder Myne begge kopiene så ingenting går tapt. Løs dem her.",
         "label": "Konflikter"
       },
       "devices": {
         "label": "Enheter"
+      },
+      "recovered": {
+        "close": "Lukk",
+        "decrypting": "Dekrypterer…",
+        "deleteConfirmTitle": "Slette dette gjenopprettede notatet?",
+        "deleteConfirmWarning": "Dette sletter permanent den eneste kopien som er beholdt på denne enheten. Dette kan ikke angres.",
+        "deleteCta": "Slett",
+        "errorGeneric": "Noe gikk galt. Prøv igjen.",
+        "helper": "Når et notat som er slettet på en annen enhet fjernes her, beholdes den krypterte kopien på denne enheten. Gjenopprett ett som et nytt notat, eller slett det permanent.",
+        "label": "Gjenopprettede notater",
+        "previewCta": "Forhåndsvis",
+        "previewTitle": "Gjenopprettet notat",
+        "restoreCta": "Gjenopprett"
       },
       "server": {
         "helper": "Skriv inn den samme server-URL-en på hver enhet. For en selvhostet server bruker du dens <1>https://</1>-adresse; kontroller at sertifikatets fingeravtrykk stemmer på tvers av enhetene dine.",
@@ -2438,22 +2796,42 @@
       "status": {
         "helper": "Myne synkroniserer de krypterte notatene dine på tvers av enhetene dine. Serveren lagrer bare chiffertekst den ikke kan lese.",
         "label": "Synkroniseringsstatus"
+      },
+      "usage": {
+        "helper": "Hvor mye kryptert data denne kontoen lagrer på serveren, og hvor mange enheter som er logget inn.",
+        "label": "Lagring og enheter"
       }
     },
     "reconcile": {
       "message": "Denne enheten var frakoblet en stund — tar igjen synkroniseringen. Notatene dine er trygge."
+    },
+    "recovered": {
+      "restoredToast": "Gjenopprettet som et nytt notat."
     },
     "status": {
       "awaitingApproval": "Venter på godkjenning",
       "conflicts_one": "{{count}} konflikt å gjennomgå",
       "conflicts_other": "{{count}} konflikter å gjennomgå",
       "error": "Synkroniseringsfeil",
+      "errorAuth": "Synkroniseringsinnlogging utløpt",
+      "errorFrozen": "Kontoen er fryst — opplasting satt på pause",
+      "errorDeviceRevoked": "Denne enheten ble fjernet fra kontoen din",
+      "errorStorageFull": "Lagringen er full — synkronisering satt på pause",
+      "errorQuota": "Lagringen er full — opplasting satt på pause",
+      "errorRateLimited": "Synkronisering strupet — prøver igjen",
+      "errorTooLarge": "En fil er for stor til å lastes opp",
       "loading": "Synkroniseringsstatus…",
       "notEnrolled": "Ikke registrert",
       "off": "Synkronisering av",
       "synced": "Synkronisert",
       "syncing": "Synkroniserer…",
       "syncNow": "Synkroniser nå"
+    },
+    "usage": {
+      "devices": "Enheter",
+      "frozen": "Denne kontoen er fryst. Nye endringer kan ikke lastes opp; notatene dine lastes fortsatt ned.",
+      "ofTotal": "{{used}} av {{total}}",
+      "storage": "Lagring"
     },
     "settings": {
       "serverSection": "Server",
@@ -2516,6 +2894,32 @@
     "deleteConfirm": "Slette denne malen?",
     "convertToNote": "Konverter til notat"
   },
+  "themeInstall": {
+    "apply": "Bruk tema",
+    "applying": "Tar i bruk…",
+    "byAuthor": "Denne lenken sier at den er laget av {{author}}",
+    "cancel": "Avbryt",
+    "close": "Lukk",
+    "collision": {
+      "keepBoth": "Behold begge — installer som «{{name}}»",
+      "question": "Du har allerede et tema som heter «{{name}}».",
+      "replace": "Erstatt «{{name}}»"
+    },
+    "error": {
+      "importFailed": "Kunne ikke installere det temaet. Ingenting ble endret.",
+      "installedNotActivated": "«{{name}}» ble installert, men kunne ikke slås på. Du kan ta det i bruk fra Innstillinger → Utseende.",
+      "invalidName": "Den lenken oppgir ikke navnet på temaet den vil installere.",
+      "listUnavailable": "Kunne ikke lese de eksisterende temaene dine, så dette kan ikke installeres trygt akkurat nå. Lukk dette, og prøv lenken på nytt.",
+      "malformedPayload": "Temadataene i den lenken er skadet eller ufullstendige.",
+      "nothingWritten": "Ingenting ble skrevet til hvelvet ditt.",
+      "payloadTooLarge": "Temadataene i den lenken er for store til å være et tema.",
+      "unsupportedVersion": "Den lenken ble laget for en nyere versjon av Myne. Oppdater Myne, og prøv igjen."
+    },
+    "errorTitle": "Kunne ikke lese det temaet",
+    "helper": "Temaer er en fargepalett, ikke kode. Myne validerer dette temaet på denne enheten før det tas i bruk — ingenting lastes opp.",
+    "question": "Vil du bruke dette temaet?",
+    "title": "Installer tema"
+  },
   "unlock": {
     "backToPicker": "Velg et annet hvelv",
     "continue": "Fortsett",
@@ -2524,6 +2928,7 @@
     "errors": {
       "alreadyUnlocked": "Hvelvet er allerede låst opp.",
       "inProgress": "En operasjon pågår.",
+      "kdfMemoryExceedsHost": "Dette hvelvet trenger {{required}} MiB minne for å åpnes — mer enn denne nettleseren kan gi det ({{available}} MiB). Det er ingenting galt med hvelvet; åpne det i Myne-skrivebordsappen.",
       "unexpected": "Uventet feil. Prøv igjen.",
       "vaultNotFound": "Fant ikke hvelvfilen. Start appen på nytt."
     },
@@ -2879,6 +3284,7 @@
     "containsPlaceholder": "inneholder…",
     "tagPlaceholder": "etikett",
     "folderPlaceholder": "Mappe/",
+    "propertyKeyPlaceholder": "egenskapsnøkkel",
     "addCondition": "+ Legg til betingelse",
     "createView": "Opprett visning"
   },
@@ -2941,7 +3347,23 @@
     "serverPlaceholder": "https://sync.example.com",
     "accountHint": "Dobbeltsjekk dette nummeret – det ser ikke riktig ut.",
     "approvalHint": "Notatene dine vises når du godkjenner denne enheten fra en enhet som allerede har kontoen din.",
-    "connectingSubtitle": "Henter kontoen din og låser opp hvelvet ditt på denne enheten."
+    "connectingSubtitle": "Henter kontoen din og låser opp hvelvet ditt på denne enheten.",
+    "qr": {
+      "cancel": "Avbryt",
+      "confirmAccount": "Konto",
+      "confirmServer": "Server",
+      "confirmTitle": "Legge til denne enheten?",
+      "continue": "Fortsett",
+      "expired": "Denne QR-koden er utløpt — vis en ny på den andre enheten din, og skann på nytt.",
+      "invalid": "Dette er ikke en QR-kode for en Myne-enhet.",
+      "newerVersion": "Denne QR-koden er fra en nyere versjon av Myne — oppdater appen og prøv igjen.",
+      "pinHosted": "Server driftet av Myne",
+      "pinNone": "Selvhostet server",
+      "pinSelfHost": "Sertifikat festet fra den betrodde enheten din",
+      "scan": "Skann QR",
+      "scanFailed": "Kunne ikke skanne. Prøv igjen, eller skriv inn opplysningene manuelt.",
+      "scanUnavailable": "Skanning er ikke tilgjengelig på denne enheten — skriv inn opplysningene nedenfor."
+    }
   },
   "createVault": {
     "beginWeakPassword": "Velg et sterkere passord og prøv igjen.",
@@ -2979,5 +3401,46 @@
     "personalLabel": "Personlig",
     "openVault": "Åpne hvelv",
     "backUpNow": "Sikkerhetskopier nå"
+  },
+  "web": {
+    "reload": {
+      "body": "Å laste denne siden på nytt betyr at du må oppgi passordet ditt igjen — det finnes ingen raskere vei inn, med hensikt. Hvelvet ditt forblir kryptert på denne enheten mens siden er lukket, og nøkkelen bygges opp igjen fra passordet ditt hver gang.",
+      "title": "En ny innlasting betyr passordet ditt på nytt"
+    },
+    "wall": {
+      "getNative": "Skaff Myne for skrivebord eller mobil",
+      "noAccount": {
+        "body": "Kontoer opprettes i Myne-appen for skrivebord eller mobil, ikke her.",
+        "reason": "Å opprette en konto genererer den 24-ord lange gjenopprettingsfrasen din og viser den for deg én gang. En nettside bør aldri være det som viser deg den frasen — hvis den lekket der, kunne ingenting i Myne ta den tilbake.",
+        "title": "Du trenger en konto først"
+      },
+      "noSync": {
+        "body": "Denne nettleseren har ingen synkroniseringsserver konfigurert, så det er ingenting den kan åpne.",
+        "reason": "I motsetning til skrivebordsappen har nettleseren ikke noe eget hvelv å falle tilbake på — notatene den viser kommer fra synkroniseringen. Sett den opp i skrivebords- eller mobilappen, og kom deretter tilbake hit.",
+        "title": "Synkronisering er ikke satt opp ennå"
+      }
+    },
+    "unavailableHere": {
+      "backup": "Krypterte sikkerhetskopier lages og gjenopprettes i Myne-skrivebordsappen, som kan skrive sikkerhetskopifilen dit du velger. Notatene dine her kommer fra serveren, så denne nettleseren gjenoppretter seg selv ved å synkronisere.",
+      "creation": "Nye kontoer opprettes i Myne-skrivebordsappen. Den viser deg gjenopprettingsfrasen din — og en gjenopprettingsfrase bør aldri vises av en nettside.",
+      "multiVault": "Denne nettleseren rommer én konto. For å bruke en annen må du åpne den i Myne-skrivebordsappen eller i en annen nettleserprofil.",
+      "phraseRecovery": "Gjenoppretting med frase skjer i Myne-skrivebordsappen. Gjenopprettingsfrasen din bør aldri skrives inn på en nettside.",
+      "title": "Ikke tilgjengelig i nettleseren"
+    },
+    "unsupported": {
+      "title": "Myne kan ikke kjøre i denne nettleseren",
+      "mobileTitle": "Åpne Myne-appen på denne enheten",
+      "handoff": "Myne-skrivebordsappen (macOS, Windows, Linux) og mobilappen (iOS, Android) har ingen slik begrensning — og de verifiserer sin egen signatur før de kjører, noe en nettside ikke kan.",
+      "reason": {
+        "desktop-form-factor": "Myne i nettleseren er laget for en datamaskin — den trenger minnet og inndataene som en nettleser på telefon eller nettbrett ikke kan gi den. På denne enheten er Myne-appen uansett den beste klienten: den er raskere, den virker frakoblet, og den beholder notatene dine når nettleseren tømmer lagringen sin.",
+        "webassembly": "Denne nettleseren støtter ikke WebAssembly, som krypteringskjernen kjører på.",
+        "wasm-memory-headroom": "Denne nettleseren kan ikke reservere de ~336 MB med minne som hvelvets nøkkelutledning trenger. Nettlesere på telefon og nettbrett kan vanligvis ikke det; den grensen settes av hvelvet selv og kan ikke senkes for én enhet uten å gjøre hvelvet uleselig overalt ellers.",
+        "worker": "Denne nettleseren støtter ikke Web Workers, som hvelvets lagring og kryptering kjører inne i.",
+        "opfs": "Denne nettleseren tilbyr ikke privat lokal lagring for nettapper, så det finnes ikke noe sted å oppbevare hvelvet ditt mellom sidelastinger.",
+        "opfs-sync-access-handle": "Den private lokale lagringen i denne nettleseren mangler den synkrone filtilgangen hvelvet trenger for å skrive trygt.",
+        "web-locks": "Denne nettleseren støtter ikke låsen som hindrer at to faner skriver til samme hvelv samtidig.",
+        "crypto-getrandomvalues": "Denne nettleseren tilbyr ingen kryptografisk kilde til tilfeldige tall."
+      }
+    }
   }
 }
