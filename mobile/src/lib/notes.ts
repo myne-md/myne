@@ -57,15 +57,39 @@ export async function noteRead(noteId: string): Promise<string> {
 /**
  * Re-encrypt an existing `.myn` note in place. Stateless idempotent
  * overwrite primitive — autosave coalescing lives at the UI layer, not
- * here. Arg shape: `{ noteId, plaintext }`.
+ * here. Arg shape: `{ noteId, plaintext }`, plus the optional
+ * `expectedBaseHashHex` guard.
+ *
+ * `expectedBaseHashHex` (§11.3 expected-base guard, MYND-617 task 11):
+ * SHA-256 hex of the UTF-8 plaintext the caller believes is currently on
+ * disk. When present and the disk has moved on — a sync pull-apply raced
+ * the write — the backend rejects with `{kind:"BaseMismatch"}` and writes
+ * **nothing**.
+ *
+ * **The parameter was missing here, and the gap was never task-specific.**
+ * The backend has always accepted it as optional; the mobile wrapper simply
+ * never passed it, so **every** mobile note write was a blind overwrite of
+ * whatever was on disk. On a note the user is not looking at, that discards
+ * an edit sync had just pulled. Leaving the query block read-only on mobile
+ * until this was fixed was considered and rejected: it would have turned an
+ * existing defect into a permanent design decision.
+ *
+ * Omitting it keeps the legacy last-write-wins behaviour, so every existing
+ * caller compiles and behaves exactly as before.
  *
  * Rejects with a {@link NoteUpdateError}.
  */
 export async function noteUpdate(
   noteId: string,
   plaintext: string,
+  expectedBaseHashHex?: string,
 ): Promise<void> {
-  await invoke<void>("plugin:notes|note_update", { noteId, plaintext });
+  await invoke<void>(
+    "plugin:notes|note_update",
+    expectedBaseHashHex === undefined
+      ? { noteId, plaintext }
+      : { noteId, plaintext, expectedBaseHashHex },
+  );
 }
 
 /**

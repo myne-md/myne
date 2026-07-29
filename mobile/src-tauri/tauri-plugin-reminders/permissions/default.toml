@@ -1,0 +1,33 @@
+"$schema" = "schemas/schema.json"
+
+# Deny-by-default (TB6): the reminder commands are granted as one set, and ONLY
+# to the main window. The four scheduling commands are granted together because
+# they are one operation seen from four angles — a reconciliation pass lists,
+# cancels and schedules in the same breath, so a grant that held back `cancel`
+# would leave registrations the app could create but never withdraw, which is
+# worse than not granting at all.
+#
+# The two permission commands ride in the same set because they are the same
+# operation's precondition: on iOS an unauthorized `add` SUCCEEDS and then
+# delivers nothing, so granting scheduling without them would ship a feature that
+# silently never fires. Neither one decides *when* to ask — that is
+# `requestReminderPermission` above the seam (first reminder, after an in-app
+# explanation, marked before the ask, never automatically repeated).
+#
+# What this grant does NOT open: nothing here reads the vault, touches the
+# filesystem, or opens a network path. No push service, no push token and no
+# background-refresh registration exists anywhere behind it. The plugin hands the
+# operating system an opaque identifier and a local instant, and reads back what
+# it is holding.
+[default]
+description = "Allow the reminder scheduler's commands (schedule, cancel, cancel-all, list-pending), the notification-permission pair they require (permission-status, request-permission), and the Android precise-delivery pair (exact-alarm-status, request-exact-alarm). Each registration carries only an opaque identifier and a local instant — no task text, no note identifier, no vault access, no push service."
+permissions = [
+  "allow-schedule",
+  "allow-cancel",
+  "allow-cancel-all",
+  "allow-list-pending",
+  "allow-permission-status",
+  "allow-request-permission",
+  "allow-exact-alarm-status",
+  "allow-request-exact-alarm",
+]

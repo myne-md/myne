@@ -238,3 +238,19 @@ export const CONNECTED_EXTENSIONS_REVOKE_LABEL = "Revoke";
  *  extension's side, out of scope for this UI). */
 export const CONNECTED_EXTENSIONS_REPAIR_HINT =
   "A revoked extension must pair again to reconnect.";
+
+// Android precise delivery (MYND-619 task 6). Same discipline as the desktop
+// reminder sentences (`REMINDER_LINUX_LIMITATION_SENTENCE` and its two
+// siblings): a platform limitation stated in the settings copy rather than
+// discovered by a user whose reminder arrived late, pinned by full-literal
+// assertion, and **not translated** — its wording is a promise about behaviour,
+// which is what separates it from a label.
+//
+// Classified as a **usability** limitation, not a security one: a device that
+// batches a wake-up leaks nothing extra. The bar it has to clear is honesty,
+// not alarm — it states the drift and what removes it, and it does not imply
+// the app is broken or that the user must act.
+
+/** Shown when the precise-alarm permission is not held — the default state. */
+export const REMINDER_APPROXIMATE_DELIVERY_SENTENCE =
+  "Android batches wake-ups to save battery, so reminders arrive around the time you set rather than exactly on it. Allowing exact timing removes the delay.";

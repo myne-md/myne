@@ -1,0 +1,50 @@
+# In-repo Tauri mobile plugin: the local-notification SCHEDULER behind task
+# reminders (MYND-619 task 1). It is the mobile half of the four-platform
+# reminder model — the OS holds a short horizon of pending registrations so one
+# can fire while Myne is closed and the vault is locked.
+#
+# WHY IN-REPO, not `tauri-plugin-notification` (grill SYNC-44, ratified): that
+# plugin implements `schedule` on MOBILE ONLY — its desktop backend does
+# fire-now and silently drops the schedule field. "One plugin everywhere" would
+# therefore mean a half-feature on the desktop, which the design pass had
+# already rejected. The uniformity that was actually wanted exists only in our
+# own code. On Android it would additionally pull a large JSON library, an
+# AppCompat and a Material dependency, and add three permissions to an app whose
+# entire current permission set is two audio permissions.
+#
+# ZERO NEW CRATES: `tauri`, `serde` and `thiserror` are already in this repo's
+# single `src-tauri/Cargo.lock` (the `tauri-plugin-qr-scan` dependency set,
+# verbatim). Nothing new enters the lockfile tree.
+#
+# Native code lives in `ios/` and `android/` because `src-tauri/gen` is
+# gitignored — a fresh `tauri [ios|android] init` cannot clobber these modules;
+# the app build wires them in automatically from the metadata
+# `tauri_plugin::Builder` emits (no `scripts/android-postinit.sh` step needed).
+[package]
+name = "tauri-plugin-reminders"
+version = "0.1.0"
+description = "Myne mobile — in-repo local-notification scheduler for task reminders (MYND-619)"
+authors = ["Myne"]
+edition = "2021"
+license = "AGPL-3.0"
+# Mandatory for tauri-plugin build scripts (build fails without it) and must
+# equal the crate name exactly.
+links = "tauri-plugin-reminders"
+
+[build-dependencies]
+# Already in the shared lock (pulled by tauri-plugin-deep-link) — no new crates.
+tauri-plugin = { version = "2", features = ["build"] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde = { version = "1", features = ["derive"] }
+thiserror = "2"
+# The tap channel closure parses the native `{id}` JSON before re-emitting it as
+# a global event (the deep-link / share-intent bridge precedent). Already in the
+# shared lock — no new crate.
+serde_json = "1"
+
+[dev-dependencies]
+# (`serde_json` is a runtime dependency above; the wire-shape tests use it to pin
+# what actually crosses into OS-owned plaintext, which is a privacy property
+# rather than a formatting detail.)

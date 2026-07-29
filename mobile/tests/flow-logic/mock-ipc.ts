@@ -52,6 +52,13 @@ export interface MockConfig {
    *  `folder_icons` / `item_colors` so a display test asserts the row renders
    *  the assigned glyph / color dot. */
   prefs?: Record<string, unknown>;
+  /** What `plugin:reminders|exact_alarm_status` answers (MYND-619). Defaults to
+   *  `"not-applicable"` — the iOS / no-such-permission case, where the
+   *  precise-delivery block renders nothing at all. */
+  exactAlarm?: "exact" | "approximate" | "not-applicable";
+  /** What the status becomes after the user returns from the platform screen —
+   *  the granted case, which a mock cannot otherwise reach. */
+  exactAlarmAfterRequest?: "exact" | "approximate" | "not-applicable";
   endpoint?: { endpoint_url: string | null; cert_pin_hex: string | null; pin_source: "static" | "tofu" | null };
   setEndpoint?: { fingerprint: string | null; pin_source: "static" | "tofu" | null };
   devices?: MockDevice[];
@@ -131,6 +138,10 @@ export interface MockConfig {
    *  `upsert_saved_view` / `set_view_order` / `delete_saved_view` mutate it, so
    *  a view created through the UI appears on the next `usePrefs` re-read. */
   savedViews?: SavedView[];
+  /** Seeded whole-vault task list (MYND-620). `vault_indices_tasks` returns it
+   *  verbatim: Rust does no filtering, sorting or date comparison, so a test
+   *  seeds the records and the surfaces do the rest. */
+  tasks?: Record<string, unknown>[];
   /** Canned `vault_indices_property_keys` — the view editor's property /
    *  groupBy / sort / column picker universe. */
   propertyKeys?: string[];
@@ -162,6 +173,10 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
   await page.addInitScript((config: MockConfig) => {
     const DEFAULT_PREFS = {
       screen_capture_protection: false,
+      // MYND-619: an absent key reads as ENABLED, matching the Rust default —
+      // reading it as off would silently disable reminders on every vault.
+      reminders_enabled: true,
+      reminder_horizon_days: null,
       show_note_timestamps: true,
       spell_enabled: null,
       spell_languages: [],
@@ -215,6 +230,12 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
     // nonce-bump round-trip). `note_read` looks the body up by id.
     const seededNotes = config.notes ?? [];
     const noteText = new Map(seededNotes.map((n) => [n.id, n.text]));
+    // MYND-619 reminder state — STATEFUL for the same reason savedViews is: the
+    // switch is only meaningful if a write survives into the next `prefs_read`.
+    let remindersEnabled = (config.prefs?.reminders_enabled as boolean | undefined) ?? true;
+    let reminderHorizonDays =
+      (config.prefs?.reminder_horizon_days as number | null | undefined) ?? null;
+    let exactAlarm: string = config.exactAlarm ?? "not-applicable";
     let savedViews: SavedView[] = config.savedViews ? [...config.savedViews] : [];
     let viewOrder: string[] = savedViews.map((v) => v.id);
     // MYND-548: device_names is STATEFUL for the same reason savedViews is — a
@@ -302,6 +323,8 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
         // owns these fields, else the seed would keep winning and a write made
         // through the UI would appear to no-op on the next read.
         deliberate_folders: deliberateFolders,
+        reminders_enabled: remindersEnabled,
+        reminder_horizon_days: reminderHorizonDays,
         device_names: { ...deviceNames },
         editor_toolbar_order: toolbarOrder,
         editor_toolbar_hidden: toolbarHidden,
@@ -310,6 +333,29 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
       // store. `order` is a verbatim sequence; `hidden` is sorted+deduped by the
       // real Rust codec, so mirror that here or the mock would let a test pass
       // against an ordering the device would never return.
+      // ── Task reminders (MYND-619) ──────────────────────────────────────
+      "plugin:prefs|set_reminders_enabled": (args) => {
+        const enabled = Boolean(args.enabled);
+        const w = window as unknown as { __remindersEnabledWrites?: boolean[] };
+        (w.__remindersEnabledWrites ??= []).push(enabled);
+        remindersEnabled = enabled;
+        return null;
+      },
+      "plugin:prefs|set_reminder_horizon_days": (args) => {
+        reminderHorizonDays = (args.days ?? null) as number | null;
+        return null;
+      },
+      // The precise-alarm surface. `config.exactAlarm` seeds what the platform
+      // answers; opening the settings screen is RECORDED rather than simulated,
+      // because a mock cannot leave the app — `exactAlarmAfterRequest` is how a
+      // test drives the granted-and-came-back case.
+      "plugin:reminders|exact_alarm_status": () => exactAlarm,
+      "plugin:reminders|request_exact_alarm": () => {
+        const w = window as unknown as { __exactAlarmRequests?: number };
+        w.__exactAlarmRequests = (w.__exactAlarmRequests ?? 0) + 1;
+        if (config.exactAlarmAfterRequest) exactAlarm = config.exactAlarmAfterRequest;
+        return null;
+      },
       "plugin:prefs|set_editor_toolbar_order": (args) => {
         const order = (args.order ?? []) as string[];
         const w = window as unknown as { __toolbarOrderWrites?: string[][] };
@@ -395,6 +441,10 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
         return null;
       },
       // ── Vault-indices property surface (saved-view property conditions) ──
+      // MYND-620: the whole-vault task dump. Unparameterized on purpose — a
+      // parameterized accessor would move the §3.6.4 type authority out of the
+      // dialect layer, so every surface filters the one list.
+      "plugin:vault-indices|vault_indices_tasks": () => config.tasks ?? [],
       "plugin:vault-indices|vault_indices_property_keys": () => config.propertyKeys ?? [],
       "plugin:vault-indices|vault_indices_property_values": (args) =>
         config.propertyValues?.[String(args.key ?? "")] ?? [],

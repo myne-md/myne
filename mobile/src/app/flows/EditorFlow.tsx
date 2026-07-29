@@ -100,6 +100,10 @@ import { NoteRow } from "./editor/chrome/NoteRow";
 import { FolderTreeRow } from "./editor/chrome/FolderTreeRow";
 import { ReadingBar } from "./editor/chrome/ReadingBar";
 import { TabBar } from "./editor/chrome/TabBar";
+import { TaskSurface } from "../../components/TaskSurface";
+import { EMPTY_SCOPE, type TaskScope } from "@myne/task-scope";
+import { takeReminderLanding } from "../../lib/reminderLanding";
+import { vaultTasks } from "../../lib/tasks";
 import { NoteContextPanel } from "./editor/panels/NoteContextPanel";
 import { CommandPalette } from "./editor/sheets/CommandPalette";
 import { FilterSheet } from "./editor/sheets/FilterSheet";
@@ -135,12 +139,18 @@ type Editing = { id: string | null };
 /** Left-to-right tab position — drives the slide direction of the page
  *  transition: moving to a higher-indexed tab enters from the right, a
  *  lower-indexed tab from the left (an iOS push/pop feel across the tab row). */
-const TAB_ORDER: Record<"notes" | "search" | "graph" | "files" | "templates", number> = {
+const TAB_ORDER: Record<"notes" | "tasks" | "note-tasks" | "search" | "graph" | "files" | "templates", number> = {
   notes: 0,
-  search: 1,
-  graph: 2,
-  files: 3,
-  templates: 4,
+  // MYND-620: `tasks` is placed between notes and graph rather than appended,
+  // because this record is what decides the push/pop slide direction — a tab
+  // that sits second in the bar and last in this record slides in from the
+  // wrong side.
+  tasks: 1,
+  "note-tasks": 2,
+  search: 3,
+  graph: 4,
+  files: 5,
+  templates: 6,
 };
 
 /** Editor typography presets (mirror the desktop `editor-typography` prefs), so
@@ -169,7 +179,7 @@ function entryFrom(id: string, text: string): NoteEntry {
 export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDeleteVaultSuccess }: EditorFlowProps) {
   const { t } = useTranslation();
   const [view, setView] = useState<"list" | "editor">("list");
-  const [tab, setTab] = useState<"notes" | "search" | "graph" | "files" | "templates">("notes");
+  const [tab, setTab] = useState<"notes" | "tasks" | "note-tasks" | "search" | "graph" | "files" | "templates">("notes");
   // Layout axis (SizeClassContext): compact = the phone's full-screen list ⇄
   // editor swap; medium/expanded ("regular") = persistent multi-pane split.
   // `view` stays the compact navigation intent; `editing` drives the detail
@@ -377,6 +387,12 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
   const [rightPanel, setRightPanel] = useState(false);
   // Note actions overflow (⋯): Copy / Move / History / Export / Archive / Trash.
   const [moreOpen, setMoreOpen] = useState(false);
+  // MYND-620 task 4: the phone's answer to the desktop's note-scoped side panel.
+  // There is no permanently-visible panel beside an editor on a phone, so the
+  // same information arrives as a sheet on request — the established mechanism
+  // that attachments, snapshots, templates, settings and the view editor all
+  // already use.
+  const [noteTasksOpen, setNoteTasksOpen] = useState(false);
   // Long-press action sheet target: the list-row note whose actions are open.
   const [rowActions, setRowActions] = useState<NoteEntry | null>(null);
   // Backend vault-indices edge dump (null until the first sweep; drives the
@@ -398,6 +414,35 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
   const [sortMode, setSortMode] = useState<"none" | "az" | "za">("none");
   // Which slice of the notes tab is shown: live notes / archive / trash.
   const [listView, setListView] = useState<"notes" | "archive" | "trash">("notes");
+  // MYND-620 task 3: the Tasks destination's folder/tag narrowing. Owned here so
+  // it survives leaving and re-entering the destination — a scope that silently
+  // reset on every visit would be a control that does not hold.
+  const [taskScope, setTaskScope] = useState<TaskScope>(EMPTY_SCOPE);
+
+  // MYND-620 task 7: a reminder tapped while locked lands here, once, after
+  // unlock. The editor mounts on every unlock path, which is the same seam the
+  // watch-capture drain and the share-import drain already use.
+  //
+  // The latch is consumed even when it cannot be resolved: one that survived a
+  // failed resolution would fire again on the next unlock and send the user
+  // somewhere they did not ask to go a second time.
+  useEffect(() => {
+    let live = true;
+    void (async () => {
+      const landing = takeReminderLanding(await vaultTasks());
+      if (!live || landing.kind === "none") return;
+      // Either way the notification led somewhere: to the task's note when the
+      // identifier still names one, and to the Tasks list when it does not —
+      // which is where that task would have been.
+      setTab("tasks");
+      if (landing.kind === "task") void openNote(landing.task.noteId);
+    })();
+    return () => {
+      live = false;
+    };
+    // Mount only: this is the unlock moment, not a subscription.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   // Archive-view folder drill (MYND-470): null = archive root (folder rows +
   // loose archived notes); a folder path = browsing that archived folder's notes.
   const [archiveFolder, setArchiveFolder] = useState<string | null>(null);
@@ -585,6 +630,13 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
   );
   // The `#tag` index over the LIVE notes — drives the notes-list tag filter.
   const tagIndex = useMemo(() => buildTagIndex(liveNotes, bodies), [liveNotes, bodies]);
+  // The scope strip's tag half. `noteTags` is already built for the tag browser;
+  // a second derivation would be a second answer to "what tags does this note
+  // carry".
+  const tagsOfNote = useCallback(
+    (noteId: string): readonly string[] => tagIndex.noteTags.get(noteId) ?? [],
+    [tagIndex],
+  );
 
   // Publish the live tags into the shared editor host so the in-editor `#tag`
   // autocomplete suggests the vault's existing tags (flat; folded key for match,
@@ -2014,6 +2066,31 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
 
         {tab === "graph" && <GraphTab graph={noteGraph} onOpen={(id) => void openFromList(id)} />}
         {tab === "files" && <AttachmentsSheet variant="page" onClose={() => setTab("notes")} />}
+        {/* MYND-620 task 3: the vault-wide Tasks destination. Same shape as the
+            Files destination above — one component serving both a full-screen
+            destination and an editor sheet. */}
+        {tab === "tasks" && (
+          <TaskSurface
+            scope={{ kind: "vault" }}
+            taskScope={taskScope}
+            onScopeChange={setTaskScope}
+            tagsOf={tagsOfNote}
+            onOpen={(task) => {
+              setTab("notes");
+              void openNote(task.noteId);
+            }}
+            testIdPrefix="tasks.vault"
+          />
+        )}
+        {/* The note-scoped tab. Expanded-only in practice: the phone reaches
+            this list through the editor sheet (task 4), and the sidebar that
+            offers this row does not render below the expanded size class. */}
+        {tab === "note-tasks" && editing?.id && (
+          <TaskSurface
+            scope={{ kind: "note", noteId: editing.id }}
+            testIdPrefix="tasks.note-tab"
+          />
+        )}
         {tab === "templates" && (
           <TemplatesSheet
             variant="page"
@@ -2078,6 +2155,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
           <TabBar
             active={tab}
             onNotes={() => { setTab("notes"); setPanesRevealed(true); }}
+            onTasks={() => setTab("tasks")}
             onGraph={() => setTab("graph")}
             onAttachments={() => setTab("files")}
           />
@@ -2529,6 +2607,10 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
             setMoveInput(readNoteFolder(editorText) ?? "");
             setMoveTarget(editing.id);
           }}
+          onTasks={() => {
+            setMoreOpen(false);
+            setNoteTasksOpen(true);
+          }}
           onHistory={() => {
             setMoreOpen(false);
             setHistoryOpen(true);
@@ -2556,6 +2638,18 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
             setManageAttachments(false);
           }}
         />
+      )}
+
+      {noteTasksOpen && editing?.id && (
+        <Sheet onClose={() => setNoteTasksOpen(false)} padded={false}>
+          {() => (
+            <TaskSurface
+              scope={{ kind: "note", noteId: editing.id as string }}
+              onOpen={() => setNoteTasksOpen(false)}
+              testIdPrefix="tasks.note"
+            />
+          )}
+        </Sheet>
       )}
 
       {historyOpen && editing?.id && (
@@ -2713,6 +2807,8 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
             tab={tab}
             listView={listView}
             onAllNotes={() => { setTab("notes"); setListView("notes"); setActiveTag(null); setActiveViewId(null); }}
+            onTasks={() => setTab("tasks")}
+            {...(editing?.id === undefined ? {} : { onNoteTasks: () => setTab("note-tasks") })}
             onGraph={() => setTab("graph")}
             onFiles={() => setTab("files")}
             onTemplates={() => setTab("templates")}
@@ -2762,6 +2858,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
         <TabBar
           active={tab}
           onNotes={() => { setTab("notes"); setPanesRevealed(true); }}
+          onTasks={() => setTab("tasks")}
           onGraph={() => setTab("graph")}
           onAttachments={() => setTab("files")}
         />

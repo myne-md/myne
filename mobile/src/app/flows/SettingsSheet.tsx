@@ -5,6 +5,7 @@ import { setLanguage } from "@myne/i18n";
 import { SUPPORTED_LANGUAGES, SUPPORTED_CODES, type LanguageCode } from "@myne/i18n/config";
 import { Sheet, Banner, Button, Icon, Toast, StrengthMeter, Switch, Segmented, Spinner } from "../../components";
 import { SyncHubPanel, SyncEndpointPanel, SyncEnrollPanel, SyncDevicesPanel } from "../../components";
+import { ExactAlarmBlock, ReminderSwitchBlock } from "../../components";
 import { applyTheme } from "../../platform/theme";
 import type { ThemeName } from "../../platform/PlatformContext";
 import { HAS_TAURI } from "../../lib/app-window";
@@ -44,6 +45,7 @@ import {
   setEditorToolbarOrder,
   setEditorToolbarHidden,
   type PrefsView,
+  setRemindersEnabled,
 } from "../../lib/prefs";
 import { formatBarLabelKey, resolveFormatBarOrder } from "../../lib/formatBarItems";
 import type { VaultChangePasswordError } from "../../types/vault-change-password-error";
@@ -1379,6 +1381,21 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
                 </div>
               </Row>
             </Group>
+            {/* Reminders live here rather than in a rail entry of their own:
+                the rail is governance-locked, and what this block has to say —
+                that reminder times leave the encrypted vault, and how precisely
+                this phone will deliver them — is a privacy statement before it
+                is a preference (MYND-619 tasks 6 + 8). The switch owns the
+                section heading; the precise-delivery row sits under it and
+                renders nothing at all on a platform with no such permission. */}
+            <ReminderSwitchBlock
+              enabled={eff.reminders_enabled}
+              horizonDays={eff.reminder_horizon_days}
+              onEnabledChange={(next) =>
+                writePref("reminders_enabled", next, () => setRemindersEnabled(next))
+              }
+            />
+            {eff.reminders_enabled && <ExactAlarmBlock />}
           </div>
         )}
 

@@ -86,7 +86,7 @@ export function EditorTopBar({
           </svg>
         </button>
         {onMore && (
-          <button onClick={onMore} aria-label={t("editor.topBar.noteActions")} style={chromeBtn}>
+          <button onClick={onMore} data-testid="editor.more" aria-label={t("editor.topBar.noteActions")} style={chromeBtn}>
             <svg width="21" height="21" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.6" fill="var(--fg-2)" /><circle cx="12" cy="12" r="1.6" fill="var(--fg-2)" /><circle cx="19" cy="12" r="1.6" fill="var(--fg-2)" /></svg>
           </button>
         )}

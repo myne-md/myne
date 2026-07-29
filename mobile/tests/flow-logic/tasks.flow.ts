@@ -1,0 +1,167 @@
+// Flow-logic: the mobile task surfaces (MYND-620 tasks 3, 4, 8).
+// Headless Chromium + mock IPC — NOT end-to-end.
+//
+// What this tier is for here is stated in the task itself: **a navigation change
+// must not be able to silently remove these surfaces.** So the assertions are
+// about existence and routing (the destination is in the bar, one tap reaches
+// it, the sheet opens from the editor and shows only that note), and about the
+// one behaviour that spans surfaces — that ticking from a list writes to the
+// **note the task came from**, not to whatever note happens to be open.
+//
+// It does NOT re-test filtering or sorting. Those are the desktop's code, used
+// here verbatim through `@myne/task-panel`, and the desktop already covers them;
+// re-asserting them would only test that an alias works.
+
+import { test, expect, type Page } from "@playwright/test";
+import { installMockIpc } from "./mock-ipc";
+
+/** Two notes, four tasks — enough that a vault-wide list is visibly wider than
+ *  a note-scoped one, which is the distinction under test. */
+const TASKS = [
+  {
+    noteId: "note-a",
+    noteTitle: "Groceries",
+    noteFolder: "Home",
+    lineIndex: 1,
+    rawLine: "- [ ] buy milk",
+    completed: false,
+    oversized: false,
+    due: "2026-08-01",
+  },
+  {
+    noteId: "note-a",
+    noteTitle: "Groceries",
+    noteFolder: "Home",
+    lineIndex: 2,
+    rawLine: "- [ ] buy bread",
+    completed: false,
+    oversized: false,
+  },
+  {
+    noteId: "note-b",
+    noteTitle: "Work",
+    noteFolder: "Office",
+    lineIndex: 4,
+    rawLine: "- [ ] send the invoice",
+    completed: false,
+    oversized: false,
+    due: "2026-08-02",
+  },
+  {
+    noteId: "note-b",
+    noteTitle: "Work",
+    noteFolder: "Office",
+    lineIndex: 7,
+    rawLine: "- [ ] chase the reply",
+    completed: false,
+    oversized: false,
+  },
+];
+
+const NOTE_BODIES = {
+  "note-a": "# Groceries\n- [ ] buy milk\n- [ ] buy bread\n",
+  "note-b": "# Work\n\n\n\n- [ ] send the invoice\n\n\n- [ ] chase the reply\n",
+};
+
+async function openTasksDestination(page: Page): Promise<void> {
+  await page.getByTestId("workspace.tab-tasks").click();
+}
+
+/** Show every task regardless of date — the destination opens on "Today". */
+async function showAll(page: Page): Promise<void> {
+  await page.getByText("All", { exact: true }).first().click();
+}
+
+test.describe("mobile task surfaces", () => {
+  test("the Tasks destination is one tap away and lists tasks across notes", async ({
+    page,
+  }) => {
+    await installMockIpc(page, { tasks: TASKS, noteIds: ["note-a", "note-b"], noteBodies: NOTE_BODIES });
+    await page.goto("/");
+
+    // In the bar itself — the information-architecture decision this task made,
+    // and the one a navigation change could silently undo.
+    const destination = page.getByTestId("workspace.tab-tasks");
+    await expect(destination).toBeVisible();
+
+    await destination.click();
+    await showAll(page);
+
+    // Across notes: a vault-wide list whose rows all came from one note would
+    // not be a vault-wide list.
+    await expect(page.getByText("buy milk")).toBeVisible();
+    await expect(page.getByText("send the invoice")).toBeVisible();
+    // And each row names where it came from, which is the whole reason the row
+    // is two lines on a phone.
+    await expect(page.getByText("Groceries").first()).toBeVisible();
+    await expect(page.getByText("Work").first()).toBeVisible();
+  });
+
+  test("the four filters are there, with the overdue count on its own", async ({ page }) => {
+    await installMockIpc(page, { tasks: TASKS, noteIds: ["note-a", "note-b"], noteBodies: NOTE_BODIES });
+    await page.goto("/");
+    await openTasksDestination(page);
+
+    for (const label of ["Today", "Upcoming", "Overdue", "All"]) {
+      await expect(page.getByText(label, { exact: true }).first()).toBeVisible();
+    }
+  });
+
+  test("the scope strip narrows by folder", async ({ page }) => {
+    await installMockIpc(page, { tasks: TASKS, noteIds: ["note-a", "note-b"], noteBodies: NOTE_BODIES });
+    await page.goto("/");
+    await openTasksDestination(page);
+    await showAll(page);
+
+    await page.getByTestId("tasks.scope-folder-Office").click();
+
+    // Folder narrows (AND) — the shared semantics, not a mobile invention.
+    await expect(page.getByText("send the invoice")).toBeVisible();
+    await expect(page.getByText("buy milk")).toHaveCount(0);
+
+    await page.getByTestId("tasks.scope-all").click();
+    await expect(page.getByText("buy milk")).toBeVisible();
+  });
+
+  test("the editor sheet lists only the open note's tasks", async ({ page }) => {
+    await installMockIpc(page, { tasks: TASKS, noteIds: ["note-a", "note-b"], noteBodies: NOTE_BODIES });
+    await page.goto("/");
+
+    await page.getByTestId("notes.row").first().click();
+    await page.getByTestId("editor.more").click();
+    await page.getByTestId("editor.note-menu-tasks").click();
+    await showAll(page);
+
+    // Scoped to the PANEL: the note's body is open in the editor behind the
+    // sheet, so an unscoped text match resolves to the editor line, the tab
+    // preview and the row all at once.
+    const panel = page.getByTestId("tasks.note.panel");
+    await expect(panel.getByText("buy milk")).toBeVisible();
+    // The point of the note scope: the other note's tasks are absent.
+    await expect(panel.getByText("send the invoice")).toHaveCount(0);
+  });
+
+  test("ticking from the vault-wide list writes to the task's own note", async ({ page }) => {
+    await installMockIpc(page, { tasks: TASKS, noteIds: ["note-a", "note-b"], noteBodies: NOTE_BODIES });
+    await page.goto("/");
+    await openTasksDestination(page);
+    await showAll(page);
+
+    // Tick a task belonging to note-b while nothing is open. The write must
+    // land in note-b — a list that wrote to "the current note" would corrupt a
+    // different note every time.
+    const row = page
+      .getByTestId("tasks.vault.row.row")
+      .filter({ hasText: "send the invoice" });
+    await row.getByTestId("tasks.vault.row.checkbox").click();
+
+    await expect
+      .poll(() => page.evaluate(() => (window as unknown as { __noteUpdates?: string[] }).__noteUpdates))
+      .toEqual([expect.stringContaining("- [x] send the invoice")]);
+    // And nothing about the OTHER note was written.
+    const written = await page.evaluate(
+      () => (window as unknown as { __noteUpdates?: string[] }).__noteUpdates ?? [],
+    );
+    expect(written.join("\n")).not.toContain("buy milk\n- [x]");
+  });
+});

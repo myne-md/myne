@@ -47,6 +47,10 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::vault_indices_property_keys,
             commands::vault_indices_persist,
             commands::vault_indices_hydrate,
+            // MYND-620: the whole-vault line-task dump the mobile task surfaces read.
+            // Shared with desktop through `myne-core`; mobile was missing only the
+            // three registration sites.
+            commands::vault_indices_tasks,
         ])
         .build()
 }

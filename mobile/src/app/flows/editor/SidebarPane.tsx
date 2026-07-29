@@ -65,6 +65,8 @@ export function SidebarPane({
   tab,
   listView,
   onAllNotes,
+  onTasks,
+  onNoteTasks,
   onGraph,
   onFiles,
   onTemplates,
@@ -77,9 +79,13 @@ export function SidebarPane({
   onSettings,
 }: {
   label: string;
-  tab: "notes" | "search" | "graph" | "files" | "templates";
+  tab: "notes" | "tasks" | "note-tasks" | "search" | "graph" | "files" | "templates";
   listView: "notes" | "archive" | "trash";
   onAllNotes: () => void;
+  onTasks: () => void;
+  /** Omitted when no note is open — a note-scoped tab with no note is a row
+   *  that cannot do anything. */
+  onNoteTasks?: () => void;
   onGraph: () => void;
   onFiles: () => void;
   onTemplates: () => void;
@@ -135,6 +141,26 @@ export function SidebarPane({
           onClick={onSearch}
           icon={<svg width="17" height="17" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7" {...gi} /><path d="M21 21l-4.3-4.3" {...gi} /></svg>}
         />
+        {/* MYND-620 task 5: BOTH scopes as sidebar tabs. On a larger screen the
+            sidebar can show tasks BESIDE a note rather than instead of it,
+            which is the whole reason the expanded layout exists — so the
+            note-scoped list is a tab here rather than the phone's sheet. */}
+        <NavItem
+          testid="sidebar.nav-tasks"
+          label={t("tasks.title")}
+          active={tab === "tasks"}
+          onClick={onTasks}
+          icon={<svg width="17" height="17" viewBox="0 0 24 24"><rect x="4" y="4" width="6" height="6" rx="1.6" {...gi} /><path d="M5.4 7l1.3 1.3L9 5.8" {...gi} /><path d="M13 6.5h7M13 12h7M13 17.5h7M5 12h5M5 17.5h5" {...gi} /></svg>}
+        />
+        {onNoteTasks !== undefined && (
+          <NavItem
+            testid="sidebar.nav-note-tasks"
+            label={t("tasks.noteTitle")}
+            active={tab === "note-tasks"}
+            onClick={onNoteTasks}
+            icon={<svg width="17" height="17" viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="2.5" {...gi} /><path d="M9 9h6M9 13h4" {...gi} /><path d="M8.6 17.2l1 1 2-2.2" {...gi} /></svg>}
+          />
+        )}
         <NavItem
           testid="sidebar.nav-graph"
           label={t("editor.chrome.barItems.graph")}
