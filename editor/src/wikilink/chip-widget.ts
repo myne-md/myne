@@ -37,7 +37,12 @@ import {
 } from "@codemirror/view";
 import { parseAttachmentTarget } from "@myne/editor/host/notes/attachmentRef";
 import { readNoteSet } from "./note-set";
-import { chipKeySets, isChipBroken, resolveChipParts } from "./resolve-chip";
+import {
+  chipKeySets,
+  isChipBroken,
+  isDrawingEmbed,
+  resolveChipParts,
+} from "./resolve-chip";
 import { pickerActiveFromField } from "./picker";
 import { hasAnchor, type WikilinkAnchor } from "./anchor";
 import { isCursorLine, readingModeFacet } from "../decorations/cursor-aware";
@@ -154,6 +159,8 @@ export class WikilinkChipWidget extends WidgetType {
     private readonly display: string,
     private readonly isEmbed: boolean,
     private readonly broken: boolean,
+    /** Target is a `kind: drawing` note — rendered as a drawing embed. */
+    private readonly drawing: boolean = false,
   ) {
     super();
   }
@@ -161,13 +168,15 @@ export class WikilinkChipWidget extends WidgetType {
     return (
       other.display === this.display &&
       other.isEmbed === this.isEmbed &&
-      other.broken === this.broken
+      other.broken === this.broken &&
+      other.drawing === this.drawing
     );
   }
   toDOM(): HTMLElement {
     const span = document.createElement("span");
     const classes = ["cm-wikilink-chip"];
     if (this.isEmbed) classes.push("cm-wikilink-chip-embed");
+    if (this.drawing) classes.push("cm-wikilink-chip-drawing");
     // §5.3 broken-link styling: a non-embed wikilink with no matching note.
     if (this.broken) classes.push("cm-wikilink-chip-broken");
     span.className = classes.join(" ");
@@ -189,7 +198,11 @@ function buildWikilinkChipDecorations(view: EditorView, ranges: ReadonlyArray<{ 
   // Both broken-check key sets folded from the note-set in one pass: `titles`
   // for ordinary chips, `folderIndex` for folder-target chips (`[[Projects/]]`,
   // MYND-370). Built ONCE per build so each chip's check stays an O(1) lookup.
-  const { titles: presentKeys, folderIndex: presentFolderIndex } = chipKeySets(
+  const {
+    titles: presentKeys,
+    folderIndex: presentFolderIndex,
+    drawings: drawingKeys,
+  } = chipKeySets(
     readNoteSet(state),
   );
   // The `[[…]]` the `[[` picker is actively authoring — left as raw text.
@@ -211,9 +224,14 @@ function buildWikilinkChipDecorations(view: EditorView, ranges: ReadonlyArray<{ 
         if ((parts.target ?? "") === "") return false;
         const display = chipDisplayText(parts);
         const broken = isChipBroken(parts, presentKeys, presentFolderIndex);
+        // MYND-634: a drawing embed reads as a drawing, not as prose. This is
+        // the first consumer of the resolver's `isDrawing` flag; the full
+        // inline canvas (locked thumbnail ↔ editable surface) builds on this
+        // discrimination rather than replacing it.
+        const drawing = isDrawingEmbed(parts, drawingKeys);
         decorations.push(
           Decoration.replace({
-            widget: new WikilinkChipWidget(display, parts.isEmbed, broken),
+            widget: new WikilinkChipWidget(display, parts.isEmbed, broken, drawing),
           }).range(node.from, node.to),
         );
         return false;
