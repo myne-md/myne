@@ -984,6 +984,11 @@ export function PaneView({
             // editable editor, gated on ai_enabled + the excluded-folder check
             // (SYNC-14). The reading-view instance below leaves it default-false.
             aiEnabled={aiSlashEnabled}
+            // MYND-592: an independent, opt-OUT switch. Not ANDed with the
+            // excluded-folder rule above — that rule is about ambient AI
+            // reading of note content, while transcribing is a per-file action
+            // the user explicitly asks for.
+            transcriptionEnabled={prefs.transcription_enabled}
             // editor-line-numbers (MYND-314): default OFF (prose-first); the open
             // editor reconfigures its line-number compartment live when the pref
             // flips (no remount). `prefs` is already a useMemo dep below.

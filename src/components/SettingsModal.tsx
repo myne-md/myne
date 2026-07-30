@@ -47,6 +47,7 @@ import { BetaBadge } from "./settings/BetaBadge";
 import { AppearancePanel } from "./settings/AppearancePanel";
 import { EditorPanel } from "./settings/EditorPanel";
 import { FilesPanel } from "./settings/FilesPanel";
+import { TranscriptionPanel } from "./settings/TranscriptionPanel";
 import { HotkeysPanel } from "./settings/HotkeysPanel";
 import { PrivacyPanel } from "./settings/PrivacyPanel";
 import { StoragePanel } from "./settings/StoragePanel";
@@ -66,6 +67,7 @@ export type PanelId =
   | "ai"
   | "editor"
   | "files"
+  | "transcription"
   | "hotkeys"
   | "appearance"
   | "storage"
@@ -110,6 +112,7 @@ const PANELS: readonly PanelMeta[] = (
   { id: "sync", labelKey: "settings.shell.panels.sync" },
   { id: "editor", labelKey: "settings.shell.panels.editor" },
   { id: "files", labelKey: "settings.shell.panels.files" },
+  { id: "transcription", labelKey: "settings.shell.panels.transcription" },
   { id: "hotkeys", labelKey: "settings.shell.panels.hotkeys" },
   { id: "appearance", labelKey: "settings.shell.panels.appearance" },
   { id: "storage", labelKey: "settings.shell.panels.storage" },
@@ -355,6 +358,7 @@ export function SettingsModal({
     ai: null,
     editor: null,
     files: null,
+    transcription: null,
     hotkeys: null,
     appearance: null,
     storage: null,
@@ -517,6 +521,7 @@ export function SettingsModal({
     ai: <AiPanel onShowToast={onShowToast} />,
     editor: <EditorPanel />,
     files: <FilesPanel />,
+    transcription: <TranscriptionPanel />,
     hotkeys: <HotkeysPanel />,
     appearance: <AppearancePanel />,
     storage: (

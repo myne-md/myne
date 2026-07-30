@@ -143,6 +143,7 @@ fn main() {
                 // registered in the handler list and in default.toml but are
                 // MISSING from this mirror — pre-existing, not introduced here.
                 "set_show_task_marker",
+                "set_transcription_enabled",
                 "set_reminders_enabled",
                 "set_reminder_horizon_days",
             ]),

@@ -32,6 +32,7 @@ const PANEL_IDS = [
   "ai",
   "editor",
   "files",
+  "transcription",
   "hotkeys",
   "appearance",
   "storage",

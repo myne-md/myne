@@ -167,6 +167,17 @@ export interface PrefsView {
   reminder_horizon_days: number | null;
   show_task_marker: boolean;
   /**
+   * Whether speech-to-text may run on this vault's audio attachments
+   * (MYND-592). Defaults to `true`; persisted only when `false`.
+   *
+   * Deliberately NOT `ai_enabled`: transcription ships a bundled model, runs
+   * on-device and is invoked one file at a time by the user, so it is a
+   * product feature rather than part of the AI beta opt-in. The host re-reads
+   * this before it decrypts anything — the UI gate below is discovery, not
+   * enforcement.
+   */
+  transcription_enabled: boolean;
+  /**
    * Spell-check enabled toggle (MYND-267). `null` ≡ unset → the host applies
    * the default-ON policy (SYNC-15). Serialized from Rust `Option<bool>`.
    */
@@ -1067,6 +1078,16 @@ export async function setShowNoteTimestamps(enabled: boolean): Promise<void> {
  */
 export async function setShowTaskMarker(enabled: boolean): Promise<void> {
   await invoke<void>("plugin:prefs|set_show_task_marker", { enabled });
+  bumpPrefsNonce();
+}
+
+/**
+ * Enable or disable speech-to-text for this vault's audio attachments
+ * (MYND-592). Shared across devices (scalar LWW) for the same reason as the
+ * task marker above: it is a preference, not a device capability.
+ */
+export async function setTranscriptionEnabled(enabled: boolean): Promise<void> {
+  await invoke<void>("plugin:prefs|set_transcription_enabled", { enabled });
   bumpPrefsNonce();
 }
 

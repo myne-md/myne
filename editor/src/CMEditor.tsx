@@ -15,7 +15,7 @@ import { useEffect, useRef, type CSSProperties } from "react";
 import { EditorState, type Extension } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { diffDoc } from "./doc-diff";
-import { myneExtensions, reconfigureAi } from "./extensions";
+import { myneExtensions, reconfigureAi, reconfigureTranscription } from "./extensions";
 import { selectedRangesText } from "./selectionText";
 import { reconfigureNoteSet } from "./wikilink/note-set";
 import { reconfigureVaultHeadings } from "./wikilink/vault-headings";
@@ -150,6 +150,9 @@ export type CMEditorProps = {
    *  `ai_enabled` pref (MYP1). Default false; read at mount (writing-assistant
    *  task 6). Never set on the reading-view instance (inert in Reading view). */
   aiEnabled?: boolean;
+  /** Whether speech-to-text is offered on audio attachments (MYND-592).
+   *  Default TRUE — an opt-OUT independent of `aiEnabled`. */
+  transcriptionEnabled?: boolean;
   /** Mount the floating selection toolbar that appears over a text selection
    *  (MYND-559). Default TRUE — desktop's formatting surface, unchanged. A host
    *  that renders its own bar via {@link onReady} passes `false` so the two don't
@@ -178,7 +181,7 @@ export type CMEditorProps = {
 };
 
 export function CMEditor(props: CMEditorProps) {
-  const { value, onChange, onBlur, onSelectionChange, extensions, noteSet, vaultHeadings, vaultBlockAnchors, taskQueryResults, onTaskQueryToggle, onTaskQueryOpen, onOpenWikilink, scrollAnchor = null, lineNumbers = false, vimMode = false, viewMode = "live", readOnly = false, aiEnabled = false, selectionToolbar = true, style, onReady, onSwapReady } = props;
+  const { value, onChange, onBlur, onSelectionChange, extensions, noteSet, vaultHeadings, vaultBlockAnchors, taskQueryResults, onTaskQueryToggle, onTaskQueryOpen, onOpenWikilink, scrollAnchor = null, lineNumbers = false, vimMode = false, viewMode = "live", readOnly = false, aiEnabled = false, transcriptionEnabled = true, selectionToolbar = true, style, onReady, onSwapReady } = props;
   const hostRef = useRef<HTMLDivElement | null>(null);
   const viewRef = useRef<EditorView | null>(null);
   const onChangeRef = useRef(onChange);
@@ -205,6 +208,7 @@ export function CMEditor(props: CMEditorProps) {
   const viewModeRef = useRef(viewMode);
   const readOnlyRef = useRef(readOnly);
   const aiEnabledRef = useRef(aiEnabled);
+  const transcriptionEnabledRef = useRef(transcriptionEnabled);
   const vimModeRef = useRef(vimMode);
   useEffect(() => {
     onSwapReadyRef.current = onSwapReady;
@@ -268,6 +272,7 @@ export function CMEditor(props: CMEditorProps) {
             viewMode: viewModeRef.current,
             readOnly: readOnlyRef.current,
             aiEnabled: aiEnabledRef.current,
+            transcriptionEnabled: transcriptionEnabledRef.current,
             // Mount-read, ref-free on purpose (MYND-559): a host's formatting
             // surface is a platform constant, so every state this view ever
             // builds — mount or post-swap — carries the SAME choice.
@@ -288,6 +293,7 @@ export function CMEditor(props: CMEditorProps) {
       v.dispatch({ effects: reconfigureLineNumbers(lineNumbersRef.current) });
       v.dispatch({ effects: reconfigureViewMode(viewModeRef.current, readOnlyRef.current) });
       v.dispatch({ effects: reconfigureAi(aiEnabledRef.current) });
+      v.dispatch({ effects: reconfigureTranscription(transcriptionEnabledRef.current) });
       if (noteSetRef.current !== undefined) {
         v.dispatch({ effects: reconfigureNoteSet(noteSetRef.current) });
       }
@@ -499,6 +505,13 @@ export function CMEditor(props: CMEditorProps) {
     if (view === null) return;
     view.dispatch({ effects: reconfigureAi(aiEnabled) });
   }, [aiEnabled]);
+
+  useEffect(() => {
+    transcriptionEnabledRef.current = transcriptionEnabled;
+    const view = viewRef.current;
+    if (view === null) return;
+    view.dispatch({ effects: reconfigureTranscription(transcriptionEnabled) });
+  }, [transcriptionEnabled]);
 
   // MYND-305 deep-link scroll (SYNC-5). Keyed on BOTH the request nonce and
   // `value`: the click sets the request, but the target note's body arrives

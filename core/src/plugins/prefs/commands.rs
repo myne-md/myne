@@ -837,6 +837,76 @@ pub(crate) async fn set_show_task_marker_with_dir(
     Ok(())
 }
 
+/// Slot::Unlocked-gated setter for whether speech-to-text may run on this
+/// vault's audio attachments (MYND-592). Shared / scalar-LWW: a bundled model
+/// every client carries, so wanting the feature is a vault-level preference
+/// rather than a device capability. Omit-when-default keeps an untouched vault
+/// byte-identical to a pre-feature `vault.prefs`.
+///
+/// **Not** the enforcement point — the host-side gate re-reads the persisted
+/// value at the top of `transcribe` rather than trusting a resident copy, so
+/// this setter has no native side-effect and needs no lifecycle hook.
+pub async fn set_transcription_enabled_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    enabled: bool,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_transcription_enabled_with_dir(&dir, state, hooks, enabled, io, host).await
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn set_transcription_enabled<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
+    enabled: bool,
+) -> Result<(), PrefsWriteError> {
+    set_transcription_enabled_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        enabled,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
+}
+
+/// Testable core of [`set_transcription_enabled`].
+pub(crate) async fn set_transcription_enabled_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    enabled: bool,
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
+) -> Result<(), PrefsWriteError> {
+    update_prefs_with_dir(
+        vault_dir,
+        state,
+        hooks,
+        |prefs| {
+            prefs.transcription_enabled = enabled;
+        },
+        io,
+        host,
+    )
+    .await?;
+
+    tracing::info!(
+        event = "prefs_written",
+        field = "transcription_enabled",
+        value = enabled
+    );
+    Ok(())
+}
+
 /// Slot::Unlocked-gated setter for whether THIS DEVICE shows task reminders
 /// (MYND-618). Device-local: whether a given machine should be interrupted is a
 /// property of that machine, so it never syncs. Omit-when-default keeps an

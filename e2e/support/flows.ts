@@ -264,6 +264,7 @@ export async function openSettings(
     | "appearance"
     | "storage"
     | "ai"
+    | "transcription"
     | "about",
 ): Promise<void> {
   await (await session.byTestId("editor.settings-cta")).click();
@@ -279,6 +280,32 @@ export async function openSettings(
  *  that drive those flows enable AI BEFORE opening the target note. Reflects the
  *  persisted pref via `aria-checked` on the `role="switch"` element. Requires the
  *  `local-inference`(-stub) build — the AI settings tab is absent otherwise. */
+/** Set the speech-to-text switch via Settings → Transcription, then close the
+ *  modal (MYND-592). Idempotent: it clicks only when the switch is not already
+ *  in the wanted state, so a caller can assert the DEFAULT (on) without a
+ *  no-op click flipping it off. Unlike `enableAi` this is an opt-OUT — the
+ *  feature is on out of the box, and the AI master switch has no bearing on it.
+ */
+export async function setTranscriptionEnabled(
+  session: Session,
+  enabled: boolean,
+): Promise<void> {
+  const want = enabled ? "true" : "false";
+  await openSettings(session, "transcription");
+  await session.byTestId("settings.transcription-panel");
+  if ((await (await session.byTestId("settings.transcription")).attribute("aria-checked")) !== want) {
+    await (await session.byTestId("settings.transcription")).click();
+  }
+  await session.waitUntil(
+    async () =>
+      (await (await session.byTestId("settings.transcription")).attribute("aria-checked")) === want
+        ? true
+        : null,
+    { label: `transcription_enabled = ${want}`, timeoutMs: 10_000 },
+  );
+  await closeSettings(session);
+}
+
 export async function enableAi(session: Session): Promise<void> {
   await openSettings(session, "ai");
   await session.byTestId("settings.ai-panel");
