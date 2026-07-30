@@ -160,6 +160,21 @@ export interface PrefsView {
    */
   show_note_timestamps: boolean;
   /**
+   * Whether an imported image attachment is downscaled + re-encoded before it
+   * is encrypted and stored (ingest-image-compression). `true` (the default)
+   * ≡ compression on — the codec OMITS the field on disk when `true`, so a
+   * vault that never touched the toggle is byte-identical to a pre-feature
+   * `vault.prefs`. Serialized from Rust `bool` with `default = true`.
+   *
+   * **Shared** in the sync merge (`sync-protocol.md` §10.2) — a deliberate
+   * divergence from device-local compute-budget toggles like `spell_enabled`:
+   * this is a content-fidelity switch whose effect (irreversible pixel loss)
+   * is vault-wide, so the switch must have the same reach as the effect.
+   * Toggling it here changes policy for every device, not just this phone.
+   * Write via {@link setAttachmentCompressionEnabled}.
+   */
+  attachment_compression_enabled: boolean;
+  /**
    * Spell-check enabled toggle (MYND-267). `null` ≡ unset → the host applies
    * the default-ON policy (SYNC-15). Serialized from Rust `Option<bool>`.
    */
@@ -530,6 +545,19 @@ export async function prefsRead(): Promise<PrefsView> {
  */
 export async function setScreenCaptureProtection(enabled: boolean): Promise<void> {
   await invoke<void>("plugin:prefs|set_screen_capture_protection", { enabled });
+}
+
+/**
+ * Persist the `attachment_compression_enabled` toggle (ingest-image-compression)
+ * — whether a newly imported image attachment is downscaled + re-encoded before
+ * it is encrypted and stored. This preference is **shared** (vault-wide): the
+ * backend classifies it in the sync merge, so toggling it here also applies to
+ * every other device on the vault, not just this phone. No native side-effect;
+ * a rejected promise means the disk write failed and the caller's optimistic UI
+ * must revert.
+ */
+export async function setAttachmentCompressionEnabled(enabled: boolean): Promise<void> {
+  await invoke<void>("plugin:prefs|set_attachment_compression_enabled", { enabled });
 }
 
 /**

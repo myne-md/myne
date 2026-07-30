@@ -22,6 +22,7 @@ export const DEFAULT_PREFS: PrefsView = {
   reminders_enabled: true,
   reminder_horizon_days: null,
   show_note_timestamps: true,
+  attachment_compression_enabled: true,
   spell_enabled: null,
   spell_languages: [],
   keymap: {},
