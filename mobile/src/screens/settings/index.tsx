@@ -370,15 +370,6 @@ function Privacy() {
             <span style={{ fontSize: 16 }}>Screen-capture protection</span>
             <Toggle on />
           </Row>
-          <Row style={{ gap: 14 }}>
-            <div>
-              <div style={{ fontSize: 16 }}>Real-time sync</div>
-              <div style={{ fontSize: 12, color: "var(--fg-3)", marginTop: 2 }}>
-                reveals activity timing to the relay
-              </div>
-            </div>
-            <Toggle on />
-          </Row>
           <Row>
             <span style={{ fontSize: 16 }}>Continue where I left off</span>
             <Toggle />
