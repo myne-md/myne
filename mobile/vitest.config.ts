@@ -31,6 +31,15 @@ export default defineConfig({
       // Shared decoration vocabulary for the synced `folder_icons` / `item_colors`
       // prefs maps (MYND-516) — mirror of vite.config.ts, which carries the
       // rationale for sharing these rather than copying them.
+      // The reminder scheduling decision core (MYND-619 task 5) — mirror of
+      // vite.config.ts, which carries the rationale for sharing rather than
+      // copying it.
+      { find: /^@myne\/reminder-schedule$/, replacement: sib("../src/lib/reminderSchedule.ts") },
+      { find: /^@myne\/task-panel$/, replacement: sib("../src/notes/components/TaskListPanel.tsx") },
+      { find: /^@myne\/task-filters$/, replacement: sib("../src/notes/taskFilters.ts") },
+      { find: /^@myne\/task-scope$/, replacement: sib("../src/notes/taskScope.ts") },
+      { find: /^@myne\/task-write$/, replacement: sib("../src/notes/taskWriteCore.ts") },
+      { find: /^@myne\/note-completion$/, replacement: sib("../src/notes/completeNoteCore.ts") },
       { find: /^@myne\/decorations$/, replacement: sib("../src/notes/decorations.ts") },
       { find: /^@myne\/decorations\/folderIcons$/, replacement: sib("../src/notes/folderIcons.ts") },
     ],

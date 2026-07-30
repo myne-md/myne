@@ -139,6 +139,17 @@ export interface SavedView {
 
 export interface PrefsView {
   screen_capture_protection: boolean;
+  /** Whether THIS DEVICE shows task reminders (MYND-618/619). Device-local:
+   *  whether a phone should be interrupted is a property of that phone, so it
+   *  never syncs. Default true — an absent key reads as ENABLED, because
+   *  silently disabling reminders on every existing vault would be the worst
+   *  available reading of a missing value. */
+  reminders_enabled: boolean;
+  /** How many days ahead this device registers reminders with the OS
+   *  (MYND-618/619); null falls back to the client's built-in horizon. A
+   *  PRIVACY bound before a resource one — pending times sit in OS-owned
+   *  plaintext (`threat-model.md` §7), so a shorter horizon exposes less. */
+  reminder_horizon_days: number | null;
   /**
    * Show the per-note "last edited" timestamp under each sidebar note row
    * (sidebar-note-timestamps). `true` (the default) ≡ timestamps visible — the
@@ -519,6 +530,28 @@ export async function prefsRead(): Promise<PrefsView> {
  */
 export async function setScreenCaptureProtection(enabled: boolean): Promise<void> {
   await invoke<void>("plugin:prefs|set_screen_capture_protection", { enabled });
+}
+
+/**
+ * Set whether THIS DEVICE shows task reminders (MYND-618/619).
+ *
+ * Device-local: it never syncs, because whether a given phone should be
+ * interrupted is a property of that phone rather than of the vault. The field,
+ * codec and core setter are the desktop feature's — mobile consumes them.
+ */
+export async function setRemindersEnabled(enabled: boolean): Promise<void> {
+  await invoke<void>("plugin:prefs|set_reminders_enabled", { enabled });
+}
+
+/**
+ * Set how many days ahead this device registers reminders with the OS, or
+ * `null` to fall back to the built-in horizon (MYND-618/619).
+ *
+ * Shorter is more private, not merely cheaper: pending reminder times leave the
+ * AEAD envelope and sit in OS-owned plaintext (`threat-model.md` §7).
+ */
+export async function setReminderHorizonDays(days: number | null): Promise<void> {
+  await invoke<void>("plugin:prefs|set_reminder_horizon_days", { days });
 }
 
 /**

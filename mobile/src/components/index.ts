@@ -25,3 +25,10 @@ export {
   type SyncEnrollPanelProps,
   SyncDevicesPanel,
 } from "./SyncSettingsPanels";
+export {
+  ExactAlarmBlock,
+  type ExactAlarmBlockProps,
+  ReminderSwitchBlock,
+  type ReminderSwitchBlockProps,
+  horizonDate,
+} from "./ReminderSettings";
