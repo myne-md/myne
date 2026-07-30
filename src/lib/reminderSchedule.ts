@@ -88,6 +88,27 @@ function localStamp(at: Date): string {
 }
 
 /**
+ * `YYYY-MM-DDTHH:MM` → a `Date` in the **local** zone.
+ *
+ * Local is the only reading that agrees with how the reminder was written: a
+ * stored instant is a wall-clock time carrying no offset (`markdown-dialect.md`
+ * §3.8 — an offset-bearing value does not type at all), so 09:00 means 09:00
+ * where the user is. Built from explicit fields rather than `new Date(string)`,
+ * whose treatment of a bare `T`-form has changed across engines and versions.
+ *
+ * Exported because both consumers that need it — the scheduler's sleep
+ * computation and the in-app notifier's timer — would otherwise each carry
+ * their own copy, and two parsers that disagree by an hour is a bug nobody
+ * would look for.
+ */
+export function parseLocalInstant(at: string): Date {
+  const [date, time] = at.split("T");
+  const [y, m, d] = (date ?? "").split("-").map(Number);
+  const [hh, mm] = (time ?? "").split(":").map(Number);
+  return new Date(y ?? 1970, (m ?? 1) - 1, d ?? 1, hh ?? 0, mm ?? 0);
+}
+
+/**
  * The reminders that SHOULD be registered right now.
  *
  * Excluded, each for its own reason:

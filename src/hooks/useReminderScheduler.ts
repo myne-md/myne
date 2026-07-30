@@ -19,6 +19,7 @@
 
 import { useEffect, useRef } from "react";
 import {
+  parseLocalInstant,
   runReminderPass,
   targetReminders,
   type ReminderNotifier,
@@ -51,12 +52,9 @@ export function msUntilNextPass(
 ): number {
   const next = targetReminders(tasks, now, horizonDays)[0];
   if (next === undefined) return MAX_SLEEP_MS;
-  // `at` is a local wall-clock stamp; parsing it as local is what makes the
-  // comparison agree with how the reminder was written.
-  const [date, time] = next.at.split("T");
-  const [y, m, d] = date!.split("-").map(Number);
-  const [hh, mm] = time!.split(":").map(Number);
-  const delta = new Date(y!, m! - 1, d!, hh!, mm!).getTime() - now.getTime();
+  // `at` is a local wall-clock stamp; the shared parser is what keeps this
+  // agreeing with the notifier's timer to the minute.
+  const delta = parseLocalInstant(next.at).getTime() - now.getTime();
   return Math.min(MAX_SLEEP_MS, Math.max(MIN_SLEEP_MS, delta));
 }
 

@@ -15,7 +15,7 @@
 
 import { useCallback, useMemo, useState, type ReactElement } from "react";
 import { TaskListPanel } from "./TaskListPanel";
-import { setTaskCompleted, TaskWriteRefused } from "../toggleTask";
+import { toggleTaskSwallowingRefusal } from "../toggleTask";
 import { TASK_FILTERS, todayLocal, type TaskFilter } from "../taskFilters";
 import { EMPTY_SCOPE, type TaskScope } from "../taskScope";
 import { useLiveVaultTasks, type VaultTask } from "../taskIndex";
@@ -36,26 +36,6 @@ function asScope(raw: { folder?: string; tags?: readonly string[] } | undefined)
   return { folder: raw.folder ?? null, tags: raw.tags ?? [] };
 }
 
-/**
- * Toggle a task through the single writer, swallowing a refusal into a message.
- *
- * A refusal is not an error the user caused, and it is not a crash; it is the
- * writer declining to write something it cannot verify. Surfacing it as a
- * console warning here keeps this wrapper thin — the surfaces that need a toast
- * pass their own handler.
- */
-async function toggle(task: VaultTask, flushAll: () => Promise<void>): Promise<void> {
-  try {
-    await setTaskCompleted(task, !task.completed, { flushDirtyPanes: flushAll });
-  } catch (err) {
-    if (err instanceof TaskWriteRefused) {
-      console.warn(`[tasks] write refused: ${err.reason}`);
-      return;
-    }
-    throw err;
-  }
-}
-
 /** The vault-wide task list, mounted as a pane body. */
 export function TasksPane({ paneId, item }: { paneId: PaneId; item: WorkspaceItem }): ReactElement {
   const ws = useWorkspace();
@@ -71,7 +51,7 @@ export function TasksPane({ paneId, item }: { paneId: PaneId; item: WorkspaceIte
     [ws, paneId],
   );
   const onToggle = useCallback(
-    (task: VaultTask) => void toggle(task, ws.flushAll),
+    (task: VaultTask) => void toggleTaskSwallowingRefusal(task, ws.flushAll),
     [ws.flushAll],
   );
   const onOpen = useCallback((task: VaultTask) => ws.openInFocused(task.noteId), [ws]);
@@ -107,7 +87,7 @@ export function NoteTasksPanel(): ReactElement {
   );
 
   const onToggle = useCallback(
-    (task: VaultTask) => void toggle(task, ws.flushAll),
+    (task: VaultTask) => void toggleTaskSwallowingRefusal(task, ws.flushAll),
     [ws.flushAll],
   );
 

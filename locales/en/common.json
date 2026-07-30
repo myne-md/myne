@@ -2639,6 +2639,7 @@
         "newNoteLocation": "new note location folder default where notes created",
         "quickUnlock": "quick unlock pin touch id biometric face unlock",
         "realtimeSync": "real time sync live connection presence polling",
+        "reminders": "reminders notify notification alert task due remind",
         "screenCapture": "screen capture protection screenshot recording block privacy",
         "showEditTimes": "show edit times timestamps modified dates notes",
         "spell": "spell check spelling dictionary autocorrect",
@@ -2967,6 +2968,9 @@
       "refused": "Myne could not read any of this query, so it is showing nothing rather than everything.",
       "remainder_one": "{{count}} more task matched",
       "remainder_other": "{{count}} more tasks matched"
+    },
+    "reminder": {
+      "due": "A task reminder is due."
     },
     "row": {
       "completed": "Task, completed",

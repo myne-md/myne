@@ -225,14 +225,6 @@ pub struct PrefsView {
     #[serde(default = "default_true")]
     pub show_note_timestamps: bool,
 
-    /// Whether the note-task marker is shown in the sidebar row and the tab
-    /// (MYND-613). `true` (default) shows it. **Shared, not device-local**:
-    /// device-local settings exist because devices genuinely differ in
-    /// capability, and a marker's visibility is taste — a device-local value
-    /// would mean re-choosing it on every new device. **Non-load-bearing** (a
-    /// tampered value can at worst show or hide a glyph) — no protective-envelope
-    /// clamp. Same inverted default polarity as `show_note_timestamps`: a plain
-    /// `bool` defaulting `true`, so the serde-derive path needs
     /// Whether THIS DEVICE shows task reminders (MYND-618). Default `true`.
     ///
     /// **Device-local**, and for the real reason rather than the assumed one:
@@ -263,6 +255,14 @@ pub struct PrefsView {
     /// (`p` < `r`), before `reminders_enabled`.
     pub reminder_horizon_days: Option<u32>,
 
+    /// Whether the note-task marker is shown in the sidebar row and the tab
+    /// (MYND-613). `true` (default) shows it. **Shared, not device-local**:
+    /// device-local settings exist because devices genuinely differ in
+    /// capability, and a marker's visibility is taste — a device-local value
+    /// would mean re-choosing it on every new device. **Non-load-bearing** (a
+    /// tampered value can at worst show or hide a glyph) — no protective-envelope
+    /// clamp. Same inverted default polarity as `show_note_timestamps`: a plain
+    /// `bool` defaulting `true`, so the serde-derive path needs
     /// `default = "default_true"`. Canonical key `show_task_marker` — sorts after
     /// `show_note_timestamps` (`show_n` < `show_t`), before `spell_enabled`
     /// (`sho` < `spe`).
@@ -5251,9 +5251,7 @@ mod tests {
         // The property the existing KAT vectors depend on: adding two fields
         // must not change one byte of a blob that never set them.
         let encoded = canonical_json_encode(&PrefsView::default());
-        assert!(!encoded
-            .windows(b"reminder".len())
-            .any(|w| w == b"reminder"));
+        assert!(!encoded.windows(b"reminder".len()).any(|w| w == b"reminder"));
     }
 
     #[test]

@@ -12,6 +12,7 @@ import { describe, expect, it, vi } from "vitest";
 import { createRoot } from "react-dom/client";
 import { act } from "react";
 import {
+  REMINDER_IN_APP_ONLY_SENTENCE,
   REMINDER_LINUX_LIMITATION_SENTENCE,
   REMINDER_OS_DISCLOSURE_SENTENCE,
   REMINDER_SHOW_TEXT_SENTENCE,
@@ -51,21 +52,29 @@ const q = (host: HTMLElement, id: string): HTMLElement | null =>
   host.querySelector(`[data-testid="${id}"]`);
 
 describe("the disclosure is load-bearing copy", () => {
-  it("renders the OS disclosure VERBATIM", () => {
+  it("renders the sentence that is TRUE of this build, verbatim", () => {
+    // While reminders are in-app only, nothing leaves the encrypted vault —
+    // there is no OS registration to store times in. So the limitation is what
+    // the user reads, and the disclosure of a cost this build does not impose
+    // must NOT appear: disclosing a leak that does not exist is its own kind of
+    // dishonesty, and it would also imply closed-app delivery that is not there.
     const { host, cleanup } = render(
-      <ReminderSettings
-        enabled
-        showText={false}
-        horizonDays={null}
-        onEnabledChange={() => {}}
-        onShowTextChange={() => {}}
-        today="2026-07-28"
-      />,
+      <ReminderSettings enabled horizonDays={null} onEnabledChange={() => {}} today="2026-07-28" />,
     );
-    expect(q(host, "settings.reminders.disclosure")?.textContent).toBe(
-      REMINDER_OS_DISCLOSURE_SENTENCE,
+    expect(q(host, "settings.reminders.in-app-only")?.textContent).toBe(
+      REMINDER_IN_APP_ONLY_SENTENCE,
     );
+    expect(q(host, "settings.reminders.disclosure")).toBeNull();
     cleanup();
+  });
+
+  it("states the limitation without naming a platform", () => {
+    // The Linux-specific sentence was right when Linux was the exception. Every
+    // platform is in-app only in this build, and "On Linux…" on a Mac is false
+    // in a way the user would notice.
+    expect(REMINDER_IN_APP_ONLY_SENTENCE).toBe("Reminders appear only while Myne is open.");
+    expect(REMINDER_IN_APP_ONLY_SENTENCE).not.toMatch(/linux|macos|windows/i);
+    expect(REMINDER_LINUX_LIMITATION_SENTENCE).toContain("On Linux");
   });
 
   it("does not claim control over what the lock screen previews", () => {
@@ -80,75 +89,48 @@ describe("the disclosure is load-bearing copy", () => {
     expect(REMINDER_OS_DISCLOSURE_SENTENCE).toContain("not your task text");
   });
 
-  it("the text opt-in has its own sentence, shown at the decision point", () => {
+  it("does not render the task-text opt-in, which has no preference behind it", () => {
+    // `vault.prefs` never gained a `reminder_show_text` field, so the toggle
+    // could not persist. A switch that forgets is worse than an absent one; the
+    // reviewed wording is kept for the tier that will carry it.
     const { host, cleanup } = render(
-      <ReminderSettings
-        enabled
-        showText={false}
-        horizonDays={null}
-        onEnabledChange={() => {}}
-        onShowTextChange={() => {}}
-        today="2026-07-28"
-      />,
+      <ReminderSettings enabled horizonDays={null} onEnabledChange={() => {}} today="2026-07-28" />,
     );
-    expect(q(host, "settings.reminders.text-disclosure")?.textContent).toBe(
-      REMINDER_SHOW_TEXT_SENTENCE,
-    );
+    expect(q(host, "settings.reminders-text-toggle")).toBeNull();
+    expect(q(host, "settings.reminders.text-disclosure")).toBeNull();
     cleanup();
   });
 
-  it("neither sentence alarms", () => {
-    for (const s of [REMINDER_OS_DISCLOSURE_SENTENCE, REMINDER_SHOW_TEXT_SENTENCE]) {
+  it("no sentence alarms", () => {
+    for (const s of [
+      REMINDER_OS_DISCLOSURE_SENTENCE,
+      REMINDER_SHOW_TEXT_SENTENCE,
+      REMINDER_IN_APP_ONLY_SENTENCE,
+    ]) {
       expect(s).not.toMatch(/warning|danger|⚠|risk|insecure/i);
     }
   });
 });
 
-describe("the switch and the text opt-in", () => {
-  it("the text opt-in defaults off — its own toggle, reported upward", () => {
-    const onShowTextChange = vi.fn();
-    const { host, cleanup } = render(
-      <ReminderSettings
-        enabled
-        showText={false}
-        horizonDays={null}
-        onEnabledChange={() => {}}
-        onShowTextChange={onShowTextChange}
-        today="2026-07-28"
-      />,
-    );
-    const toggle = q(host, "settings.reminders-text-toggle")!;
-    expect(toggle.getAttribute("aria-checked")).toBe("false");
-    cleanup();
-  });
-
-  it("hides the text opt-in and the horizon when reminders are off", () => {
+describe("the switch", () => {
+  it("keeps the limitation visible when reminders are off", () => {
+    // It explains what the switch does, so it stays either way.
     const { host, cleanup } = render(
       <ReminderSettings
         enabled={false}
-        showText={false}
         horizonDays={null}
         onEnabledChange={() => {}}
-        onShowTextChange={() => {}}
         today="2026-07-28"
       />,
     );
-    expect(q(host, "settings.reminders-text-toggle")).toBeNull();
+    expect(q(host, "settings.reminders.in-app-only")).not.toBeNull();
     expect(q(host, "settings.reminders.horizon")).toBeNull();
-    // The disclosure stays: it explains what the switch does.
-    expect(q(host, "settings.reminders.disclosure")).not.toBeNull();
     cleanup();
   });
 
   it("creates no new settings panel — it is a block, not a rail entry", () => {
     const { host, cleanup } = render(
-      <ReminderSettings
-        enabled
-        showText={false}
-        horizonDays={null}
-        onEnabledChange={() => {}}
-        onShowTextChange={() => {}}
-      />,
+      <ReminderSettings enabled horizonDays={null} onEnabledChange={() => {}} />,
     );
     expect(host.querySelectorAll("[role='tablist']")).toHaveLength(0);
     cleanup();
@@ -170,33 +152,35 @@ describe("the horizon line (task 13)", () => {
     expect(horizonThrough(null, "2026-07-28")).toBe(horizonThrough(7, "2026-07-28"));
   });
 
-  it("renders the date and is factual rather than alarming", () => {
+  it("is NOT rendered while reminders are in-app only", () => {
+    // A registration horizon is only observable when the OS holds the
+    // registration. While reminders fire from the running app, "registered
+    // through 3 August" would describe a mechanism that is not running — so the
+    // line is gated with the tier rather than shown as decoration. The
+    // arithmetic above stays covered for the tier that will render it.
     const { host, cleanup } = render(
-      <ReminderSettings
-        enabled
-        showText={false}
-        horizonDays={7}
-        onEnabledChange={() => {}}
-        onShowTextChange={() => {}}
-        today="2026-07-28"
-      />,
+      <ReminderSettings enabled horizonDays={7} onEnabledChange={() => {}} today="2026-07-28" />,
     );
-    const line = q(host, "settings.reminders.horizon")!;
-    expect(line.textContent).toContain("2026-08-03");
-    expect(line.textContent).not.toMatch(/warning|will fail|lost|⚠/i);
+    expect(q(host, "settings.reminders.horizon")).toBeNull();
     cleanup();
   });
 });
 
 describe("platform honesty (task 7)", () => {
-  it("classifies macOS and Windows as pre-registered", () => {
-    expect(reminderTier("macos")).toBe("pre-registered");
-    expect(reminderTier("windows")).toBe("pre-registered");
-  });
-
-  it("classifies Linux as in-app only", () => {
-    expect(reminderTier("linux")).toBe("in-app-only");
-    expect(showsInAppOnlyLimitation("linux")).toBe(true);
+  it("claims in-app only on EVERY platform, because no adapter registers with an OS", () => {
+    // This is a statement about what the build can deliver, not about what macOS
+    // and Windows can do. Writing the OS-registration adapter is gated behind the
+    // delivery measurement in `features/task-notifications-desktop/tasks.md`
+    // (🔴, a live `[NEEDS DECISION]`, never run for our artifacts), so reporting
+    // `pre-registered` here would put "arrives even when Myne is closed" in the
+    // settings copy on the strength of an assumption.
+    //
+    // When the adapter lands, this test changes in the same commit — that is the
+    // point of pinning it rather than leaving the tier implicit.
+    for (const platform of ["macos", "windows", "linux", "unknown"] as const) {
+      expect(reminderTier(platform)).toBe("in-app-only");
+      expect(showsInAppOnlyLimitation(platform)).toBe(true);
+    }
   });
 
   it("treats an UNKNOWN platform as in-app only", () => {

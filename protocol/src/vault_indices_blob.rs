@@ -334,8 +334,8 @@ mod tests {
         // key that WOULD decrypt the body — only the version byte differs.
         let key = fixed_key();
         let h = account_hash();
-        let mut blob = encode_vault_indices_blob_raw(&key, &h, b"pre-612 payload", &nonce())
-            .expect("encode");
+        let mut blob =
+            encode_vault_indices_blob_raw(&key, &h, b"pre-612 payload", &nonce()).expect("encode");
         blob[5] = VAULT_INDICES_BLOB_FORMAT_V1;
 
         assert_eq!(

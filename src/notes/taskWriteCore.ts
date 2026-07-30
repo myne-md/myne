@@ -27,6 +27,20 @@ import type { VaultTask } from "./taskIndex";
 export type { VaultTask };
 
 /**
+ * A task's stable row identity. `(noteId, lineIndex)` is unique across the
+ * vault; a note-task has no line, so it keys on `note`.
+ *
+ * It lives beside the writer rather than beside a surface because **more than
+ * one surface mints it and the writer is what consumes it**: the panel's rows
+ * and the query block's rows must agree byte-for-byte, or a toggle dispatched
+ * by one cannot be resolved by the other. Two spellings of "which task is this"
+ * would drift in the quietest possible way — the row renders, the write misses.
+ */
+export function taskRowKey(task: Pick<VaultTask, "noteId" | "lineIndex">): string {
+  return `${task.noteId}:${task.lineIndex ?? "note"}`;
+}
+
+/**
  * Broadcast after a task write so any pane showing that note reloads its body.
  *
  * A bare window signal carrying the note id, following the `close-active-tab`
@@ -100,10 +114,21 @@ export function announceWrite(noteId: string): void {
   );
 }
 
-/** Flip a task line's marker. Returns null when the line carries no marker. */
+/**
+ * Flip a task line's marker. Returns null when the line carries no marker.
+ *
+ * A line already in the requested state comes back **byte-identical**, and the
+ * comparison is on the marker's MEANING rather than on the rendered string.
+ * That distinction is the whole point: `[X]` and `[x]` both mean completed, so
+ * re-asserting "completed" on an imported `[X]` must not rewrite it to `[x]`.
+ * Doing so would be a normalization §6 C1 says this layer does not perform, and
+ * `TaskRecord`'s own doc promises the uppercase marker survives untouched.
+ */
 export function flipMarker(line: string, completed: boolean): string | null {
   const match = /^(\s*[-*+]\s*)\[([ xX])\]/.exec(line);
   if (match === null) return null;
+  const current = match[2]!;
+  if ((current === "x" || current === "X") === completed) return line;
   const prefix = match[1]!;
   const marker = completed ? "[x]" : "[ ]";
   return `${prefix}${marker}${line.slice(match[0].length)}`;

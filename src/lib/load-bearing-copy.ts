@@ -128,20 +128,47 @@ export const VAULT_EXPORT_PLAIN_TREE_SENTENCE =
  *  what a lock screen previews — the platform's own preview settings are the
  *  user's, not ours, and implying otherwise would be a promise we cannot keep.
  *  It does not soften "leaves the vault" into something vaguer. And it does not
- *  alarm: it states the fact and stops. */
+ *  alarm: it states the fact and stops.
+ *
+ *  NOT RENDERED YET, and the reason is the point: it describes a cost the
+ *  `pre-registered` tier imposes, and no platform ships that tier — there is no
+ *  OS-registration adapter, so nothing is stored outside the vault. Showing this
+ *  today would disclose a leak that does not exist and imply a capability that
+ *  does not either. `ReminderSettings` gates it on the tier, so it appears on the
+ *  same change that makes it true. */
 export const REMINDER_OS_DISCLOSURE_SENTENCE =
   "To remind you while Myne is closed, your device stores the reminder times — not your task text — outside the encrypted vault.";
 
 /** The opt-in for putting real task text in the notification body. Default OFF
  *  (MYND-618). Its own sentence, because turning it on changes what leaves the
- *  vault, and the user should read that at the moment they decide. */
+ *  vault, and the user should read that at the moment they decide.
+ *
+ *  NOT RENDERED YET: the opt-in has no preference behind it (`vault.prefs` never
+ *  gained a `reminder_show_text` field), and a toggle whose state cannot persist
+ *  is worse than an absent one. Held here rather than deleted because the wording
+ *  is reviewed, and the surface it belongs to is the OS tier's. */
 export const REMINDER_SHOW_TEXT_SENTENCE =
   "Turning this on puts your task's text in the notification, where your device — and anyone who can see its screen — can read it.";
+
+/** What the user is told while reminders are in-app only — which is **every
+ *  platform** in this build, because the OS-registration adapter is gated behind
+ *  a delivery measurement that has never been run (`reminderPlatform.ts`).
+ *
+ *  Deliberately platform-neutral. The Linux-specific sentence below says "On
+ *  Linux", which was right when Linux was the exception; saying it on a Mac would
+ *  be false in a way the user would notice, and stating the limitation without
+ *  naming a platform is true everywhere. */
+export const REMINDER_IN_APP_ONLY_SENTENCE =
+  "Reminders appear only while Myne is open.";
 
 /** Linux: the in-app layer is the whole feature there, said plainly rather than
  *  left to be discovered (MYND-618 task 7). Classified as a usability
  *  limitation, matching the threat-model entry: a platform that holds no
- *  registration leaks nothing, so this gap is the safer side of the trade. */
+ *  registration leaks nothing, so this gap is the safer side of the trade.
+ *
+ *  Superseded in the UI by the platform-neutral sentence above for as long as
+ *  every platform is in-app only. It returns when the OS adapter lands and Linux
+ *  becomes the exception again. */
 export const REMINDER_LINUX_LIMITATION_SENTENCE =
   "On Linux, reminders appear only while Myne is open.";
 

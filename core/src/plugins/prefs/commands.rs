@@ -829,7 +829,11 @@ pub(crate) async fn set_show_task_marker_with_dir(
     )
     .await?;
 
-    tracing::info!(event = "prefs_written", field = "show_task_marker", value = enabled);
+    tracing::info!(
+        event = "prefs_written",
+        field = "show_task_marker",
+        value = enabled
+    );
     Ok(())
 }
 
@@ -891,7 +895,11 @@ pub(crate) async fn set_reminders_enabled_with_dir(
     )
     .await?;
 
-    tracing::info!(event = "prefs_written", field = "reminders_enabled", value = enabled);
+    tracing::info!(
+        event = "prefs_written",
+        field = "reminders_enabled",
+        value = enabled
+    );
     Ok(())
 }
 
@@ -955,7 +963,11 @@ pub(crate) async fn set_reminder_horizon_days_with_dir(
     )
     .await?;
 
-    tracing::info!(event = "prefs_written", field = "reminder_horizon_days", value = days);
+    tracing::info!(
+        event = "prefs_written",
+        field = "reminder_horizon_days",
+        value = days
+    );
     Ok(())
 }
 

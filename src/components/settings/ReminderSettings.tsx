@@ -19,9 +19,8 @@ import { useCallback, useMemo, useState, type CSSProperties, type ReactElement }
 import { useTranslation } from "react-i18next";
 import { Switch } from "../primitives/Switch";
 import {
-  REMINDER_LINUX_LIMITATION_SENTENCE,
+  REMINDER_IN_APP_ONLY_SENTENCE,
   REMINDER_OS_DISCLOSURE_SENTENCE,
-  REMINDER_SHOW_TEXT_SENTENCE,
 } from "../../lib/load-bearing-copy";
 import { setReminderHorizonDays, setRemindersEnabled } from "../../lib/prefs";
 import { showsInAppOnlyLimitation } from "../../lib/reminderPlatform";
@@ -46,11 +45,12 @@ const ERROR_STYLE: CSSProperties = { margin: "6px 0 0", fontSize: 12, color: "va
 
 export type ReminderSettingsProps = {
   enabled: boolean;
-  /** Opt-in for putting real task text in the notification body. Default off. */
-  showText: boolean;
+  /**
+   * The registration horizon, for the horizon line. Only rendered while the OS
+   * tier is active — see the gate below.
+   */
   horizonDays: number | null;
   onEnabledChange: (next: boolean) => void;
-  onShowTextChange: (next: boolean) => void;
   /** Injected for tests; production reads the local calendar day. */
   today?: string;
 };
@@ -68,10 +68,8 @@ export function horizonThrough(horizonDays: number | null, today: string): strin
 
 export function ReminderSettings({
   enabled,
-  showText,
   horizonDays,
   onEnabledChange,
-  onShowTextChange,
   today = todayLocal(),
 }: ReminderSettingsProps): ReactElement {
   const { t } = useTranslation();
@@ -105,13 +103,29 @@ export function ReminderSettings({
             testId="settings.reminders-toggle"
           />
         </div>
-        {/* Load-bearing: rendered verbatim, never translated. */}
-        <p id="reminders-disclosure" style={HELPER_STYLE} data-testid="settings.reminders.disclosure">
-          {REMINDER_OS_DISCLOSURE_SENTENCE}
-        </p>
-        {inAppOnly && (
-          <p style={HELPER_STYLE} data-testid="settings.reminders.platform-limitation">
-            {REMINDER_LINUX_LIMITATION_SENTENCE}
+        {/* Load-bearing: rendered verbatim, never translated.
+
+            Which sentence the user sees follows what this build can actually do.
+            While reminders are in-app only, NOTHING leaves the encrypted vault —
+            there is no OS registration to store times in — so the disclosure of
+            that cost would be describing a leak that does not exist. The
+            limitation is stated instead, and the disclosure returns on the change
+            that makes it true. */}
+        {inAppOnly ? (
+          <p
+            id="reminders-disclosure"
+            style={HELPER_STYLE}
+            data-testid="settings.reminders.in-app-only"
+          >
+            {REMINDER_IN_APP_ONLY_SENTENCE}
+          </p>
+        ) : (
+          <p
+            id="reminders-disclosure"
+            style={HELPER_STYLE}
+            data-testid="settings.reminders.disclosure"
+          >
+            {REMINDER_OS_DISCLOSURE_SENTENCE}
           </p>
         )}
         {error !== null && (
@@ -121,37 +135,16 @@ export function ReminderSettings({
         )}
       </div>
 
-      {enabled && (
-        <>
-          <div style={BLOCK_STYLE}>
-            <div style={ROW_STYLE}>
-              <span style={LABEL_STYLE}>{t("settings.reminders.showTextLabel")}</span>
-              <Switch
-                checked={showText}
-                onChange={onShowTextChange}
-                ariaLabel={t("settings.reminders.showTextAria")}
-                ariaDescribedBy="reminders-text-disclosure"
-                testId="settings.reminders-text-toggle"
-              />
-            </div>
-            {/* Also load-bearing: turning this on changes what leaves the vault,
-                so the user reads it at the moment they decide. */}
-            <p
-              id="reminders-text-disclosure"
-              style={HELPER_STYLE}
-              data-testid="settings.reminders.text-disclosure"
-            >
-              {REMINDER_SHOW_TEXT_SENTENCE}
-            </p>
-          </div>
-
-          {/* The horizon line (task 13). Factual: reminders stop if the app is
-              not opened within the horizon, because registration can only
-              happen inside an unlocked session. */}
-          <p style={HELPER_STYLE} data-testid="settings.reminders.horizon">
-            {t("settings.reminders.horizon", { date: through })}
-          </p>
-        </>
+      {/* The horizon line (task 13) belongs to the OS tier and is gated with it.
+          A registration horizon is only something the user can observe when the
+          operating system holds the registration; while reminders fire from the
+          running app, the app being open is the only condition that matters, and
+          stating a "registered through <date>" bound would describe a mechanism
+          that is not running. */}
+      {enabled && !inAppOnly && (
+        <p style={HELPER_STYLE} data-testid="settings.reminders.horizon">
+          {t("settings.reminders.horizon", { date: through })}
+        </p>
       )}
     </div>
   );

@@ -1318,7 +1318,10 @@ mod tests {
             Some("2026-08-01T10:00:00+03:00"),
             "an offset is neither stripped nor normalized here"
         );
-        assert_eq!(stored.tasks[0].raw_line, "- [X] ship it ✅ 2026-07-27 🔁 every 3 days");
+        assert_eq!(
+            stored.tasks[0].raw_line,
+            "- [X] ship it ✅ 2026-07-27 🔁 every 3 days"
+        );
     }
 
     #[test]
@@ -1338,10 +1341,7 @@ mod tests {
         let mut a = rec("Alpha", None);
         a.tasks = vec![task(1, Some("2026-08-01")), task(2, None)];
         state.apply("note-a", a);
-        assert_eq!(
-            state.note_record("note-a").expect("present").tasks.len(),
-            2
-        );
+        assert_eq!(state.note_record("note-a").expect("present").tasks.len(), 2);
 
         state.clear();
         assert!(

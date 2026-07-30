@@ -180,6 +180,10 @@ import { ResizeHandle } from "../components/primitives/ResizeHandle";
 import { VaultSwitcher } from "../components/VaultSwitcher";
 import { useEditorLayout } from "./editorLayout";
 import { usePrefs } from "../hooks/usePrefs";
+import { useReminderScheduler } from "../hooks/useReminderScheduler";
+import { createInAppNotifier } from "../lib/reminderNotifier";
+import { useLiveVaultTasks } from "../notes/taskIndex";
+import i18n from "../i18n";
 import { useIdleAutoLock } from "../hooks/useIdleAutoLock";
 import { runFlushChain } from "../lib/flush-chain";
 import {
@@ -921,6 +925,38 @@ function EditorChrome({
   // optimistically. `barMenu` holds the click coords while the menu is open.
   const { prefs: barPrefs, setHiddenBarItems, setBarItemsOrder } = usePrefs();
   const hiddenBarItems = barPrefs.hidden_bar_items;
+
+  // Task reminders, in-app tier (MYND-618). Mounted in THIS component rather than
+  // the outer `Editor`, and the reason is structural: the task index reads the
+  // sidebar's live/trashed set, so it needs `<SidebarStateProvider>` — which is
+  // what this component is inside. In the outer one the hook would also run on
+  // the fail-closed path, where no provider exists and no editor body renders.
+  // It reads `barPrefs` rather than calling `usePrefs` again, since a second call
+  // is a second `prefsRead` IPC for a value already in hand.
+  //
+  // This component's lifetime is still the unlocked session's, so the scheduler's
+  // is too, and `reminderLifecycle`'s cancel-everything-on-lock is satisfied by
+  // this unmount rather than by a second signal kept in step with the first.
+  //
+  // The toast is deliberately **content-free** even though it never leaves the
+  // app. `ReminderPayload` carries `{id, at}` and nothing else; resolving the id
+  // back to its task here to quote the text would make that contract look soft,
+  // while a reminder can still surface over a shared screen. It says a reminder
+  // is due — the task surfaces say which.
+  const reminderTasks = useLiveVaultTasks();
+  const reminderNotifier = useMemo(
+    () =>
+      createInAppNotifier({
+        deliver: () => setToast({ message: i18n.t("tasks.reminder.due") }),
+      }),
+    [setToast],
+  );
+  useEffect(() => () => reminderNotifier.dispose(), [reminderNotifier]);
+  useReminderScheduler({
+    enabled: barPrefs.reminders_enabled,
+    tasks: reminderTasks,
+    notifier: reminderNotifier,
+  });
   // `barMenu` holds the open menu's anchor coords + which mode it is in: a
   // plain `{x, y}` opens the bar-wide visibility checklist (right-click on
   // empty bar space); an entry with `itemId` opens the per-item menu (move

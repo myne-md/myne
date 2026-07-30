@@ -11,6 +11,7 @@
 // Appearance. This panel is a thin composition shell — the persistence logic
 // lives in the two child components.
 
+import { useEffect, useState } from "react";
 import { TypographySettings } from "./TypographySettings";
 import { LineNumbersSettings } from "./LineNumbersSettings";
 import { VimModeSettings } from "./VimModeSettings";
@@ -20,9 +21,20 @@ import { FocusModeSettings } from "./FocusModeSettings";
 import { SpellSettings } from "./SpellSettings";
 import { DailyNotesSettings } from "./DailyNotesSettings";
 import { ArchiveSettings } from "./ArchiveSettings";
+import { ReminderSettings } from "./ReminderSettings";
 import { PANEL_ROOT_STYLE } from "./panel-styles";
+import { usePrefs } from "../../hooks/usePrefs";
 
 export function EditorPanel() {
+  // Task reminders (MYND-618) read their pref here and echo the toggle locally:
+  // `usePrefs` reads once on mount, so the panel — not the hook — is what keeps
+  // the switch in step with the write the block performs itself.
+  const { prefs } = usePrefs();
+  const [remindersEnabled, setRemindersEnabledEcho] = useState<boolean | null>(null);
+  useEffect(() => {
+    setRemindersEnabledEcho(null);
+  }, [prefs.reminders_enabled]);
+
   return (
     <div style={PANEL_ROOT_STYLE}>
       {/* Editor-typography (editor-typography) — text size / line spacing /
@@ -57,6 +69,15 @@ export function EditorPanel() {
 
       {/* Daily-notes configuration (MYND-191) — folder / date-format / template. */}
       <DailyNotesSettings />
+
+      {/* Task reminders (MYND-618) — note-authoring behaviour, so it sits beside
+          spell-check and daily notes rather than under Appearance. Device-local:
+          whether THIS machine is interrupted is a property of the machine. */}
+      <ReminderSettings
+        enabled={remindersEnabled ?? prefs.reminders_enabled}
+        horizonDays={prefs.reminder_horizon_days}
+        onEnabledChange={setRemindersEnabledEcho}
+      />
 
       {/* Note-archive feature toggle (archive-disable, MYND-…) — on by default;
           turning it off restores every archived note and hides the archive
