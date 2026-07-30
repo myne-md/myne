@@ -36,6 +36,8 @@ function resolvers(
     hasTag: vi.fn(async (tag: string) => tags[tag] ?? []),
     inFolder: vi.fn(async (path: string) => folders[path] ?? []),
     search: vi.fn(async (query: string) => searches[query] ?? []),
+    titleMatch: vi.fn(async (query: string) => searches[query] ?? []),
+    hasTask: vi.fn(async () => []),
     propertyValues: vi.fn(async (key: string) => props[key] ?? []),
   };
 }
