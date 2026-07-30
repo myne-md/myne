@@ -385,9 +385,6 @@
       "restoreBackup": {
         "label": "Restore vault from backup…"
       },
-      "toggleRealtimeSync": {
-        "label": "Toggle real-time sync"
-      },
       "revealVaultFolder": {
         "label": "Reveal vault folder in file manager"
       },
@@ -2528,8 +2525,6 @@
       "autoLockLabel": "Auto-lock",
       "autoLockSearchEmpty": "No durations match.",
       "autoLockSearchPlaceholder": "Search durations…",
-      "realtimeSyncHelper": "Changes from other devices arrive within seconds over a contentless signal — the server relays only “something changed”, never what. While your vault is unlocked the app checks the server regularly anyway, so this adds no meaningful visibility; there is nothing to configure.",
-      "realtimeSyncLabel": "Real-time sync",
       "screenCaptureHelperOff": "Protection always applies before unlock. After unlock, follows this preference.",
       "screenCaptureHelperOn": "Active on macOS and Windows 10 (May 2020 Update or later). Linux support coming in a future release.",
       "screenCaptureLabel": "Screen-capture protection",
@@ -2747,7 +2742,6 @@
         "lineSpacing": "line spacing leading height typography readability",
         "newNoteLocation": "new note location folder default where notes created",
         "quickUnlock": "quick unlock pin touch id biometric face unlock",
-        "realtimeSync": "real time sync live connection presence polling",
         "reminders": "reminders notify notification alert task due remind",
         "screenCapture": "screen capture protection screenshot recording block privacy",
         "showEditTimes": "show edit times timestamps modified dates notes",

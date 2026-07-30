@@ -110,14 +110,6 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     keywordsKey: "settings.search.keywords.screenCapture",
   },
   {
-    id: "privacy.realtime-sync",
-    panelId: "privacy",
-    testid: "settings.realtime-sync-info",
-    titleKey: "settings.privacy.realtimeSyncLabel",
-    descriptionKey: "settings.privacy.realtimeSyncHelper",
-    keywordsKey: "settings.search.keywords.realtimeSync",
-  },
-  {
     // The "Continue where you left off" toggle renders inline English (no
     // `settings.*` key today); give search a dedicated translatable pair.
     id: "privacy.last-active-note",
