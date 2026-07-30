@@ -57,7 +57,11 @@ import {
 } from "../notes/import/media";
 import { emitAttachmentEmbed } from "../notes/attachmentRef";
 import { parseClipImageRef } from "../dialect/clip";
-import type { ImportedAttachment } from "../editor/attachments/insert";
+import {
+  tallyCompression,
+  type CompressionTally,
+  type ImportedAttachment,
+} from "../editor/attachments/insert";
 import type { RawClipImage } from "./validateClipEnvelope";
 
 /**
@@ -87,6 +91,11 @@ export interface ClipImageResult {
   /** How many imports were a content-address dedup hit (the second-and-later
    *  occurrence of identical bytes — `attachment.deduplicated === true`). */
   readonly dedupHits: number;
+  /** How much ingest-time image compression this pass performed. A clipped
+   *  image goes through the same shared-core transform a pasted one does, so
+   *  the clip notice owes the same disclosure the paste toast gives
+   *  (`decisions.md` 2026-07-30). Zero when nothing compressed. */
+  readonly compression: CompressionTally;
 }
 
 /** The placeholder comment that replaces a non-ingestable clip image ref —
@@ -166,6 +175,7 @@ export async function ingestClipImages(
   const ingested = emptyMediaByType();
   const omitted = emptyMediaByType();
   const edits: TextEdit[] = [];
+  const stored: ImportedAttachment[] = [];
   let dedupHits = 0;
 
   for (const ref of refs) {
@@ -186,6 +196,7 @@ export async function ingestClipImages(
         replacement: emitAttachmentEmbed(outcome.attachment.id, filename),
       });
       ingested.image++;
+      stored.push(outcome.attachment);
       if (outcome.attachment.deduplicated) dedupHits++;
     } else {
       // Residual (oversize / non-image / IO / throw / no-bytes) → placeholder +
@@ -203,6 +214,7 @@ export async function ingestClipImages(
     body: applyTextRewrites(body, edits),
     counts: { ingested, omitted },
     dedupHits,
+    compression: tallyCompression(stored),
   };
 }
 

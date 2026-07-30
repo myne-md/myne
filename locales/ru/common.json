@@ -1331,7 +1331,10 @@
         "includeAttachments_few": "Включить {{count}} вложения",
         "includeAttachments_many": "Включить {{count}} вложений",
         "includeAttachments_other": "Включить {{count}} вложений",
-        "title": "Экспорт как Markdown"
+        "title": "Экспорт как Markdown",
+        "copyLabel": "Копировать текст заметки в буфер обмена",
+        "copied": "Текст заметки скопирован",
+        "copyFailed": "Не удалось скопировать текст заметки"
       }
     },
     "egress": {

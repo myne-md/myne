@@ -47,6 +47,7 @@ permissions = [
   "allow-set-active-workspace",
   "allow-set-ai-enabled",
   "allow-set-attachment-ocr-enabled",
+  "allow-set-attachment-compression-enabled",
   "allow-set-ai-excluded-folders",
   "allow-set-developer-mode",
   "allow-set-editor-default-view-mode",
@@ -462,6 +463,11 @@ commands.allow = ["set_ai_enabled"]
 identifier = "allow-set-attachment-ocr-enabled"
 description = "Allow invoking prefs:set_attachment_ocr_enabled (Slot::Unlocked-gated setter for the attachment_ocr_enabled image-OCR toggle, MYND-441; atomic-writes vault.prefs with no native side-effect; device-local per sync-protocol.md §10.2; defaults to true, so it is emitted on disk only when false)."
 commands.allow = ["set_attachment_ocr_enabled"]
+
+[[permission]]
+identifier = "allow-set-attachment-compression-enabled"
+description = "Allow invoking prefs:set_attachment_compression_enabled (Slot::Unlocked-gated setter for the attachment_compression_enabled ingest-time image-compression toggle; atomic-writes vault.prefs with no native side-effect; shared per sync-protocol.md §10.2 — a content-fidelity switch with a vault-wide irreversible effect, unlike the device-local attachment_ocr_enabled/ai_enabled cluster; defaults to true, so it is emitted on disk only when false)."
+commands.allow = ["set_attachment_compression_enabled"]
 
 [[permission]]
 identifier = "allow-set-ai-excluded-folders"

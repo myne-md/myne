@@ -58,6 +58,11 @@ import {
   type MediaByType,
   type RefImporter as MediaRefImporter,
 } from "./media";
+import {
+  addCompressionTally,
+  emptyCompressionTally,
+  type CompressionTally,
+} from "../../editor/attachments/insert";
 
 // `ImportDirEntry` / `ImportPorts` now live on the seam (`source.ts`) so adapters
 // depend on the seam alone; re-exported here because every shipped caller and test
@@ -93,6 +98,13 @@ export interface ImportResult {
   ignore: IgnoreCounts;
   /** Media ingested vs omitted, by type (SYNC-7 / SYNC-2); zeros if no media importer. */
   media: MediaCounts;
+  /** How many ingested images ingest-time compression shrank, and by how much.
+   *  An import runs through the same shared-core transform a paste does, so the
+   *  import summary owes the same disclosure the paste toast gives
+   *  (`decisions.md` 2026-07-30) — a bulk route is where silently discarding
+   *  pixels would be least noticed, not most excusable. Zeros if no media
+   *  importer, or if nothing compressed. */
+  compression: CompressionTally;
   emptyFoldersPreserved: number;
   /** Remaining (un-ingested) `.md` count if cancelled mid-walk; `null` if completed. */
   cancelled: number | null;
@@ -152,6 +164,7 @@ export async function importFromSource(
   const preexistingFolders: PreexistingFolder[] = [];
   const noteFolders: (string | null)[] = [];
   const media: MediaCounts = { ingested: emptyMediaByType(), omitted: emptyMediaByType() };
+  let compression: CompressionTally = emptyCompressionTally();
   const lossyNotes: LossyNote[] = [];
   let imported = 0;
   let skippedExisting = 0;
@@ -165,6 +178,15 @@ export async function importFromSource(
     const ref = items[i]!;
     const rel = ref.relPath;
     const loaded = await source.load(ref);
+    // Folded HERE rather than in the created-note branch below, because a source
+    // that ingests inside `load()` (Evernote's inline base64 resources) has
+    // already stored and already compressed those bytes by the time dedup gets a
+    // say — the attachments are in the vault whether or not this note survives.
+    // The `importMedia` tally below is the opposite case and folds there for the
+    // same reason: nothing is ingested for a note that is skipped.
+    if (loaded.compression !== undefined) {
+      compression = addCompressionTally(compression, loaded.compression);
+    }
     const mapped = mapImportedFile(rel, loaded.markdown);
     illegalFlags.push(...mapped.illegalFlags);
     if (mapped.preexistingFolder !== null) {
@@ -191,6 +213,7 @@ export async function importFromSource(
         plaintext = m.body;
         addByType(media.ingested, m.counts.ingested);
         addByType(media.omitted, m.counts.omitted);
+        compression = addCompressionTally(compression, m.compression);
       }
       await sink.createNote(plaintext);
       imported++;
@@ -223,6 +246,7 @@ export async function importFromSource(
     preexistingFolders,
     ignore,
     media,
+    compression,
     emptyFoldersPreserved: deliberate.length,
     cancelled,
     total,

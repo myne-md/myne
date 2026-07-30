@@ -1261,7 +1261,10 @@
         "export": "Vie…",
         "includeAttachments_one": "Sisällytä {{count}} liite",
         "includeAttachments_other": "Sisällytä {{count}} liitettä",
-        "title": "Vie Markdown-muodossa"
+        "title": "Vie Markdown-muodossa",
+        "copyLabel": "Kopioi muistiinpanon teksti leikepöydälle",
+        "copied": "Muistiinpanon teksti kopioitu",
+        "copyFailed": "Muistiinpanon tekstiä ei voitu kopioida"
       }
     },
     "egress": {

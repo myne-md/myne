@@ -1261,7 +1261,10 @@
         "export": "Xuất…",
         "includeAttachments_one": "Bao gồm {{count}} tệp đính kèm",
         "includeAttachments_other": "Bao gồm {{count}} tệp đính kèm",
-        "title": "Xuất dạng Markdown"
+        "title": "Xuất dạng Markdown",
+        "copyLabel": "Sao chép văn bản ghi chú vào bảng nhớ tạm",
+        "copied": "Đã sao chép văn bản ghi chú",
+        "copyFailed": "Không thể sao chép văn bản ghi chú"
       }
     },
     "egress": {

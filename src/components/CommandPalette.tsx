@@ -44,6 +44,9 @@ import {
 } from "../notes/searchNotes";
 import { noteRead } from "../notes/readNote";
 import { requestRevealMatch } from "../notes/views/revealMatchSignal";
+import { parseQuery, queryHasOperators } from "../notes/queryParser";
+import { runOperatorSearch } from "../notes/searchQuery";
+import { useRunViewContext } from "../notes/views/useRunViewContext";
 import type { NoteMatchedIn, NoteSearchResult } from "../types/note-search-result";
 
 const BACKDROP_STYLE: CSSProperties = {
@@ -273,6 +276,23 @@ export function CommandPalette({
   // each query change and flushed on Enter.
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Operator-query wiring (MYND-303/307). The Saved Views run-context is the
+  // single source of the live working set + leaf resolvers (tag/path/file/task/
+  // property), reused verbatim so a palette query and a saved view resolve the
+  // SAME way. An operator-free query never touches this — it keeps the exact
+  // BM25 `note_search` path below.
+  const viewCtx = useRunViewContext();
+  const operatorDeps = useMemo(
+    () => ({
+      liveIds: viewCtx.liveIds,
+      resolvers: viewCtx.resolvers,
+      search: searchNotes,
+      titleFor: (id: string) => viewCtx.rowFor(id).title,
+      recencyFallback: viewCtx.recencyFallback,
+    }),
+    [viewCtx],
+  );
+
   // Reset state every time the palette opens.
   useEffect(() => {
     if (open) {
@@ -288,20 +308,29 @@ export function CommandPalette({
   // it is still the latest (generation-guard, MYND-40) — Tauri invoke is not
   // cancelable, so an earlier query's late response is dropped rather than
   // overwriting fresher results.
-  const runNoteSearch = useCallback((q: string) => {
-    const seq = (latestSearchSeq.current += 1);
-    void searchNotes(q)
-      .then((hits) => {
-        if (shouldApplyNoteSearchResult(seq, latestSearchSeq.current)) {
-          setNoteHits(hits);
-        }
-      })
-      .catch(() => {
-        if (shouldApplyNoteSearchResult(seq, latestSearchSeq.current)) {
-          setNoteHits([]);
-        }
-      });
-  }, []);
+  const runNoteSearch = useCallback(
+    (q: string) => {
+      const seq = (latestSearchSeq.current += 1);
+      // An operator/boolean/phrase query parses to a `FilterNode` and resolves
+      // through the shared engine + ranker; a plain query keeps the untouched
+      // BM25 path (no regression for the common case, MYND-303/307).
+      const dispatch = queryHasOperators(q)
+        ? runOperatorSearch(parseQuery(q), operatorDeps)
+        : searchNotes(q);
+      void dispatch
+        .then((hits) => {
+          if (shouldApplyNoteSearchResult(seq, latestSearchSeq.current)) {
+            setNoteHits(hits);
+          }
+        })
+        .catch(() => {
+          if (shouldApplyNoteSearchResult(seq, latestSearchSeq.current)) {
+            setNoteHits([]);
+          }
+        });
+    },
+    [operatorDeps],
+  );
 
   // Debounced NOTES-section search. A ~120ms trailing timer coalesces a
   // keystroke burst into one IPC per typing pause; the cleanup clears the

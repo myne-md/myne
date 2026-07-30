@@ -103,6 +103,14 @@ export interface ImportedAttachment {
   readonly size: number;
   readonly created_at: number;
   readonly deduplicated: boolean;
+  /** Byte length before ingest-time compression (`ingest-image-compression`),
+   *  present only when a fresh import actually got smaller. Optional (rather
+   *  than `| null`) so the many existing test fixtures built before this
+   *  field existed stay valid without an edit. */
+  readonly original_size?: number | null;
+  /** `true` only when `original_size` is set and the re-encode also changed
+   *  the container (e.g. PNG → WebP). */
+  readonly container_changed?: boolean;
 }
 
 /** The `source` argument to an attachment import.

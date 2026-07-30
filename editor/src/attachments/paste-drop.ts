@@ -22,7 +22,7 @@ import {
   type ImportSource,
   autoPasteName,
   importMany,
-  summarizeBatch,
+  importToastMessage,
 } from "./insert";
 import { getHost } from "../host";
 import { showAttachmentToast } from "./toast";
@@ -141,8 +141,8 @@ export async function importAndInsert(
 
   insertEmbedsForOutcomes(view, outcomes, insertPos);
 
-  const summary = summarizeBatch(outcomes);
-  if (summary !== null) showAttachmentToast(summary);
+  const message = importToastMessage(outcomes);
+  if (message !== null) showAttachmentToast(message);
   return outcomes;
 }
 

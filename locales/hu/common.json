@@ -1261,7 +1261,10 @@
         "export": "Exportálás…",
         "includeAttachments_one": "{{count}} melléklet belefoglalása",
         "includeAttachments_other": "{{count}} melléklet belefoglalása",
-        "title": "Exportálás Markdownként"
+        "title": "Exportálás Markdownként",
+        "copyLabel": "Jegyzet szövegének másolása a vágólapra",
+        "copied": "Jegyzet szövege másolva",
+        "copyFailed": "Nem sikerült másolni a jegyzet szövegét"
       }
     },
     "egress": {

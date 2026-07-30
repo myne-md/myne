@@ -54,11 +54,35 @@ async function settleFonts(): Promise<void> {
 
 /** Wait until every image (the `attachment://` embeds) is decoded; a
  *  broken/missing attachment must stall nothing — it prints as the
- *  browser's broken-image placeholder rather than wedging the export. */
+ *  browser's broken-image placeholder rather than wedging the export.
+ *
+ *  Not stalling is right; staying SILENT was not (MYND-638). The
+ *  `attachment://` handler was fenced to the `main` webview label, so every
+ *  image request from this window was refused with a 403 — and because the
+ *  failure was swallowed here without a trace, the export produced a PDF with
+ *  no images at all and reported success. Count the failures and warn: this
+ *  page's console is the only place a reader can see that a projection which
+ *  asked for images printed without them. */
 async function settleImages(): Promise<void> {
-  await Promise.all(
-    Array.from(document.images, (img) => img.decode().catch(() => undefined)),
+  const outcomes = await Promise.all(
+    Array.from(document.images, (img) =>
+      img.decode().then(
+        () => true,
+        () => false,
+      ),
+    ),
   );
+  const failed = outcomes.filter((ok) => !ok).length;
+  if (failed > 0) {
+    // Count only — an attachment id is a per-note correlation tag and a
+    // filename is note content, so neither belongs in a log line
+    // (`src-tauri/CLAUDE.md` secret-handling discipline).
+    // eslint-disable-next-line no-console
+    console.warn(
+      `[pdf-export] ${failed} of ${outcomes.length} images failed to load; ` +
+        "the PDF will print without them",
+    );
+  }
 }
 
 /** Two animation frames: layout + paint with the final fonts/images —

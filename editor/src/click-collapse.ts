@@ -11,6 +11,8 @@
 // drag) yet a SMALL selection appeared, it's that reflow artifact — collapse it
 // to a caret at the head. A genuine drag (pointer moved past the threshold) or a
 // larger selection is left untouched, so deliberate selection still works.
+//
+// MOUSE ONLY (MYND-642). A touch press is exempt: see `fromTouch` below.
 
 import { EditorSelection, type Extension } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
@@ -21,7 +23,27 @@ const MAX_SPURIOUS = 6; // chars — only collapse small reflow-induced ranges
 export function clickCollapseExtension(): Extension {
   let downX: number | null = null;
   let downY: number | null = null;
+  // MYND-642: whether the press that is in flight came from a finger.
+  //
+  // The `event.detail >= 2` exemption below is the only thing that lets a
+  // deliberate double-click through, and `detail` carries a click count only for
+  // a real mouse. On touch, WebKit synthesizes the mouse pair from a tap and
+  // does not reliably reach 2 for a double-tap — so the exemption never fired,
+  // the collapse ran, and a double-tapped word dropped straight back to a caret.
+  // It only ever looked intermittent because the collapse is capped at
+  // MAX_SPURIOUS: short words broke, long ones did not.
+  //
+  // `pointerdown` fires before `mousedown` and carries the real `pointerType`,
+  // so it is the honest signal. Touch presses skip the collapse entirely rather
+  // than trying to count taps: the artifact this guards against is a
+  // sub-pixel mouse-precision problem between down and up, and a tap does not
+  // land a caret mid-word the way a drifting mouse does.
+  let fromTouch = false;
   return EditorView.domEventHandlers({
+    pointerdown(event) {
+      fromTouch = event.pointerType === "touch" || event.pointerType === "pen";
+      return false; // record only — never preempt CM's own selection
+    },
     mousedown(event) {
       if (event.button !== 0) return false;
       downX = event.clientX;
@@ -41,6 +63,9 @@ export function clickCollapseExtension(): Extension {
       // collapsed straight back to a caret, so short words never stayed selected
       // (and the selection toolbar never opened for them).
       if (event.detail >= 2) return false;
+      // A finger never produces the reflow artifact this collapses, and cannot
+      // be trusted to report a double-tap through `detail` (see `fromTouch`).
+      if (fromTouch) return false;
       if (moved) return false; // deliberate drag-select — leave it
       // Defer past CM's own selection update AND the reveal reflow.
       requestAnimationFrame(() => {

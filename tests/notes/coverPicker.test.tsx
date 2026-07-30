@@ -18,6 +18,12 @@ vi.mock("../../src/lib/attachments", () => ({
 vi.mock("@tauri-apps/plugin-dialog", () => ({ open: vi.fn() }));
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
 
+// The file picker — mocked so the upload path is drivable without a host.
+const pickFilesMock = vi.fn();
+vi.mock("../../src/platform/filePicker", () => ({
+  pickFiles: (opts: unknown) => pickFilesMock(opts),
+}));
+
 // The thumbnail decrypts via `attachment://`; in jsdom we only care that a tile
 // exists per image, so stub it to a marker.
 vi.mock("../../src/components/attachments/AttachmentThumbnail", () => ({
@@ -27,9 +33,17 @@ vi.mock("../../src/components/attachments/AttachmentThumbnail", () => ({
 }));
 
 import { CoverPicker } from "../../src/components/attachments/CoverPicker";
+import { setImportFn } from "../../src/editor/attachments/insert";
+import { dismissAttachmentToast } from "../../src/editor/attachments/toast";
 
-beforeEach(() => catalogListMock.mockReset());
-afterEach(cleanup);
+beforeEach(() => {
+  catalogListMock.mockReset();
+  pickFilesMock.mockReset();
+});
+afterEach(() => {
+  cleanup();
+  dismissAttachmentToast();
+});
 
 const IMAGE = {
   id: "img1",
@@ -97,5 +111,59 @@ describe("CoverPicker", () => {
     renderPicker({ hasCover: false });
     await screen.findByTestId("cover-picker.image");
     expect(screen.queryByTestId("cover-picker.remove")).toBeNull();
+  });
+});
+
+describe("CoverPicker — ingest-time compression disclosure", () => {
+  // A cover image is imported through the same shared-core path a pasted one
+  // is, so it is downscaled and re-encoded on the same terms and the original
+  // bytes are not kept. `decisions.md` 2026-07-30 makes a notice at import the
+  // thing that stands in for a consent gate — which means it is owed on every
+  // route that imports, not only the ones inside the editor.
+  const picked = [{ kind: "picked", name: "shot.png" }];
+
+  async function clickUpload() {
+    catalogListMock.mockResolvedValue([]);
+    const props = renderPicker();
+    fireEvent.click(await screen.findByTestId("cover-picker.upload"));
+    // Let the picker promise + the import promise settle.
+    await new Promise((r) => setTimeout(r, 0));
+    return props;
+  }
+
+  it("shows the notice when the import was compressed", async () => {
+    pickFilesMock.mockResolvedValue(picked);
+    const restore = setImportFn(async () => ({
+      id: "a".repeat(64),
+      content_type: "image/webp",
+      filename: "shot.webp",
+      size: 300,
+      created_at: 0,
+      deduplicated: false,
+      original_size: 2400,
+      container_changed: true,
+    }));
+    const props = await clickUpload();
+    restore();
+    expect(props.onPick).toHaveBeenCalled();
+    expect(document.querySelector(".cm-attach-toast")?.textContent).toBe(
+      "Compressed to WebP: 2.3 KiB → 300 B",
+    );
+  });
+
+  it("stays silent when the import was not compressed", async () => {
+    pickFilesMock.mockResolvedValue(picked);
+    const restore = setImportFn(async () => ({
+      id: "b".repeat(64),
+      content_type: "image/png",
+      filename: "shot.png",
+      size: 300,
+      created_at: 0,
+      deduplicated: false,
+    }));
+    const props = await clickUpload();
+    restore();
+    expect(props.onPick).toHaveBeenCalled();
+    expect(document.querySelector(".cm-attach-toast")).toBeNull();
   });
 });
