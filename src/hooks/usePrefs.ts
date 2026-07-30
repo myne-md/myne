@@ -81,6 +81,7 @@ const DEFAULT_PREFS: PrefsView = {
   device_names: {},
   hidden_bar_items: [],
   bar_items_order: [],
+  color_groups: [],
   right_panel_active_tab: null,
   right_panel_hidden_tabs: [],
   right_panel_tab_order: [],

@@ -22,6 +22,7 @@ import {
   seedPositions,
   setGraphPositions,
 } from "../graphLayoutStore";
+import { resolveNodeRadius } from "../graphSettings";
 import type {
   LayoutRequest,
   LayoutResponse,
@@ -32,12 +33,27 @@ import { scheduleGraphLayoutFlush } from "../graphLayoutPersist";
 type SimNode = GraphNode & { x: number; y: number };
 type SimLink = { source: SimNode; target: SimNode; weight: number };
 
-const NODE_RADIUS = 5;
+// Coarse-pointer devices keep the same *ratio* above the label-fade zoom the
+// pre-task-6 hardcoded thresholds had (2.2 / 1.4), rather than a second
+// persisted field — one slider tunes both.
+const COARSE_LOD_SCALE = 2.2 / 1.4;
+// A node's degree contribution to its radius is capped so one hub note can't
+// make itself (or its neighbours' hit targets) absurdly large.
+const MAX_DEGREE_FOR_SIZE = 10;
 
 export default function GraphCanvas({
   model,
   onNodeClick,
   onNodeDoubleClick,
+  arrowsEnabled = true,
+  labelFadeZoom = 1.4,
+  nodeSize = 5,
+  nodeSizeStrength = 0,
+  lineThickness = 1,
+  forceCenterStrength = 1,
+  forceRepelStrength = 120,
+  forceLinkStrength = 1,
+  forceLinkDistance = 60,
 }: {
   model: GraphModel;
   /** Single click on a node — navigate (whole graph) or pivot (local graph). */
@@ -46,6 +62,29 @@ export default function GraphCanvas({
    *  SYNC-6: a pivot must NOT carry ctx.open's side-effects). Omit in the whole
    *  graph (where a single click already navigates). */
   onNodeDoubleClick?: (id: string) => void;
+  /** Edge-direction arrows toggle (graph settings panel, graph-connection-ux-
+   *  polish task 5). Gates the existing zoom-LOD arrow check entirely — off
+   *  means never, on means "when zoomed in enough", matching the pre-feature
+   *  behavior (default `true`). RENDER-TIME ONLY: toggling schedules one
+   *  repaint via the `arrowsEnabled`-keyed effect below; it never touches
+   *  `model` and so never re-runs the layout/worker. */
+  arrowsEnabled?: boolean;
+  /** Appearance controls (graph settings panel, task 6). All four are
+   *  RENDER-TIME ONLY, exactly like `arrowsEnabled` — read live via refs and
+   *  repainted by the single settings-keyed effect below, never touching
+   *  `model` and so never re-running the layout/worker. */
+  labelFadeZoom?: number;
+  nodeSize?: number;
+  nodeSizeStrength?: number;
+  lineThickness?: number;
+  /** Force controls (graph settings panel, task 6). Changing one DOES re-run
+   *  the bounded layout — the user is explicitly asking for a different
+   *  arrangement — warm-started from the nodes' current positions (see the
+   *  dedicated effect below), then freezes like every other layout run. */
+  forceCenterStrength?: number;
+  forceRepelStrength?: number;
+  forceLinkStrength?: number;
+  forceLinkDistance?: number;
 }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   // Pan/zoom view transform + the laid-out nodes, in refs so the render loop and
@@ -58,6 +97,29 @@ export default function GraphCanvas({
   // fresh callback identities — the effect keys on `model` ALONE.
   const cbRef = useRef({ onNodeClick, onNodeDoubleClick });
   cbRef.current = { onNodeClick, onNodeDoubleClick };
+  // `arrowsEnabled` read live by the render loop via this ref (same reason as
+  // `cbRef`), and a SEPARATE effect below schedules a repaint when it changes
+  // — without re-running the `[model]` effect that owns the worker/simulation.
+  const arrowsEnabledRef = useRef(arrowsEnabled);
+  arrowsEnabledRef.current = arrowsEnabled;
+  // The four appearance controls, same "read via ref, repaint via a sibling
+  // effect" shape as `arrowsEnabledRef` above — RENDER-TIME ONLY, never
+  // re-entering the `[model]` effect.
+  const labelFadeZoomRef = useRef(labelFadeZoom);
+  labelFadeZoomRef.current = labelFadeZoom;
+  const nodeSizeRef = useRef(nodeSize);
+  nodeSizeRef.current = nodeSize;
+  const nodeSizeStrengthRef = useRef(nodeSizeStrength);
+  nodeSizeStrengthRef.current = nodeSizeStrength;
+  const lineThicknessRef = useRef(lineThickness);
+  lineThicknessRef.current = lineThickness;
+  const scheduleRef = useRef<(() => void) | null>(null);
+  // Per-node degree (in + out), computed once per model build — the input to
+  // `radiusOf` alongside the live `nodeSize`/`nodeSizeStrength` refs.
+  const degreeRef = useRef<Map<string, number>>(new Map());
+  // The canvas's current CSS box, kept live so the forces-relayout effect
+  // (below) can size a fresh `LayoutRequest` without re-reading the DOM.
+  const sizeRef = useRef({ width: 0, height: 0 });
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -90,6 +152,7 @@ export default function GraphCanvas({
       const r = canvas.getBoundingClientRect();
       cssW = r.width;
       cssH = r.height;
+      sizeRef.current = { width: cssW, height: cssH };
       canvas.width = Math.max(1, Math.floor(r.width * dpr));
       canvas.height = Math.max(1, Math.floor(r.height * dpr));
     };
@@ -117,6 +180,23 @@ export default function GraphCanvas({
       .filter((l): l is SimLink => l !== null);
     nodesRef.current = nodes;
     linksRef.current = links;
+
+    // Degree (in + out) per node — the input to `radiusOf`'s connectivity
+    // term. Computed once per model build; unaffected by appearance-setting
+    // changes (only their weight, `nodeSizeStrengthRef`, changes live).
+    const degree = new Map<string, number>();
+    for (const l of links) {
+      degree.set(l.source.id, (degree.get(l.source.id) ?? 0) + 1);
+      degree.set(l.target.id, (degree.get(l.target.id) ?? 0) + 1);
+    }
+    degreeRef.current = degree;
+    const radiusOf = (n: SimNode) =>
+      resolveNodeRadius(
+        nodeSizeRef.current,
+        nodeSizeStrengthRef.current,
+        degreeRef.current.get(n.id) ?? 0,
+        MAX_DEGREE_FOR_SIZE,
+      );
 
     // Render immediately at warm-start positions (never a blank frame), then
     // compute the settled layout OFF the main thread. The worker cannot call
@@ -146,6 +226,15 @@ export default function GraphCanvas({
       seed: seedPositions(nodeIds),
       width: cssW,
       height: cssH,
+      // Current force settings at build time — a LIVE change to one of them
+      // is handled by the separate `[forceCenterStrength, ...]` effect below,
+      // not by re-running this effect (which would recreate the whole sim).
+      forces: {
+        centerStrength: forceCenterStrength,
+        repelStrength: forceRepelStrength,
+        linkStrength: forceLinkStrength,
+        linkDistance: forceLinkDistance,
+      },
     } satisfies LayoutRequest);
 
     // Cull bookkeeping reused across frames (reset per render, never
@@ -164,18 +253,27 @@ export default function GraphCanvas({
       ctx.translate(v.x, v.y);
       ctx.scale(v.k, v.k);
 
-      // Cull to the visible graph box (margin = a few radii so partly-visible
-      // nodes/labels aren't clipped). At high zoom this drops most of a large
-      // graph; at overview everything is visible and batching carries the load.
-      const bounds = visibleBounds(v, cssW, cssH, NODE_RADIUS * 4);
-      // Level-of-detail thresholds — tighter on coarse pointers (mobile).
-      const showLabels = v.k >= (coarse ? 2.2 : 1.4);
-      const showArrows = v.k >= (coarse ? 1.2 : 0.6);
+      // Cull to the visible graph box (margin = a few max-radii so partly-
+      // visible nodes/labels aren't clipped, even at the largest node size).
+      // At high zoom this drops most of a large graph; at overview everything
+      // is visible and batching carries the load.
+      const maxRadius = resolveNodeRadius(
+        nodeSizeRef.current,
+        nodeSizeStrengthRef.current,
+        MAX_DEGREE_FOR_SIZE,
+        MAX_DEGREE_FOR_SIZE,
+      );
+      const bounds = visibleBounds(v, cssW, cssH, maxRadius * 4);
+      // Level-of-detail thresholds — tighter on coarse pointers (mobile), and
+      // the label one user-tunable via `labelFadeZoom` (task 6).
+      const showLabels =
+        v.k >= labelFadeZoomRef.current * (coarse ? COARSE_LOD_SCALE : 1);
+      const showArrows = arrowsEnabledRef.current && v.k >= (coarse ? 1.2 : 0.6);
 
       // --- Edges: ONE batched stroke path for every visible line (was a
       // beginPath+stroke PER edge — the dominant Canvas cost at scale). Collect
       // the drawn edges for the arrowhead pass ONLY when arrows are shown. ---
-      ctx.lineWidth = 1 / v.k;
+      ctx.lineWidth = (1 / v.k) * lineThicknessRef.current;
       ctx.strokeStyle = colEdge;
       ctx.beginPath();
       for (const l of linksRef.current) {
@@ -198,8 +296,8 @@ export default function GraphCanvas({
           const len = Math.hypot(dx, dy) || 1;
           const ux = dx / len;
           const uy = dy / len;
-          const tipX = l.target.x - ux * (NODE_RADIUS + 1);
-          const tipY = l.target.y - uy * (NODE_RADIUS + 1);
+          const tipX = l.target.x - ux * (radiusOf(l.target) + 1);
+          const tipY = l.target.y - uy * (radiusOf(l.target) + 1);
           ctx.moveTo(tipX, tipY);
           ctx.lineTo(tipX - ux * ah - uy * ah * 0.6, tipY - uy * ah + ux * ah * 0.6);
           ctx.lineTo(tipX - ux * ah + uy * ah * 0.6, tipY - uy * ah - ux * ah * 0.6);
@@ -216,8 +314,9 @@ export default function GraphCanvas({
       for (const n of nodesRef.current) {
         if (!isNodeVisible(n, bounds)) continue;
         if (showLabels) visibleNodes.push(n);
-        ctx.moveTo(n.x + NODE_RADIUS, n.y);
-        ctx.arc(n.x, n.y, NODE_RADIUS, 0, Math.PI * 2);
+        const r = radiusOf(n);
+        ctx.moveTo(n.x + r, n.y);
+        ctx.arc(n.x, n.y, r, 0, Math.PI * 2);
       }
       ctx.fill();
 
@@ -227,7 +326,7 @@ export default function GraphCanvas({
         ctx.fillStyle = colLabel;
         ctx.font = `${11 / v.k}px sans-serif`;
         for (const n of visibleNodes) {
-          if (n.title) ctx.fillText(n.title, n.x + NODE_RADIUS + 2, n.y + 3);
+          if (n.title) ctx.fillText(n.title, n.x + radiusOf(n) + 2, n.y + 3);
         }
       }
       ctx.restore();
@@ -235,6 +334,7 @@ export default function GraphCanvas({
     const schedule = () => {
       if (raf === 0) raf = requestAnimationFrame(render);
     };
+    scheduleRef.current = schedule;
     schedule();
 
     // Convert a client point to graph (pre-transform) coordinates.
@@ -247,8 +347,10 @@ export default function GraphCanvas({
       };
     };
     const hitNode = (gx: number, gy: number): SimNode | null => {
-      const rr = (NODE_RADIUS + 3) ** 2;
+      // Per-node hit radius tracks `radiusOf` (the drawn radius) so the click
+      // target stays consistent with what is rendered at every size setting.
       for (const n of nodesRef.current) {
+        const rr = (radiusOf(n) + 3) ** 2;
         if ((n.x - gx) ** 2 + (n.y - gy) ** 2 <= rr) return n;
       }
       return null;
@@ -354,6 +456,7 @@ export default function GraphCanvas({
     window.addEventListener("resize", onResize);
 
     return () => {
+      scheduleRef.current = null;
       worker.terminate();
       if (raf !== 0) cancelAnimationFrame(raf);
       cancelPendingClick();
@@ -367,6 +470,79 @@ export default function GraphCanvas({
       window.removeEventListener("resize", onResize);
     };
   }, [model]);
+
+  // Repaint-only reaction to the appearance controls — deliberately a
+  // SEPARATE effect from the `[model]` one above so tuning any of these never
+  // re-enters it (which would re-create the worker and re-run the layout).
+  // All four are read live via refs during render; this effect only has to
+  // schedule the one repaint that picks up the new ref values.
+  useEffect(() => {
+    scheduleRef.current?.();
+  }, [arrowsEnabled, labelFadeZoom, nodeSize, nodeSizeStrength, lineThickness]);
+
+  // Bounded-relayout reaction to the force controls (task 6) — the opposite
+  // contract from appearance: a force change DOES re-run the layout, because
+  // the user is explicitly asking for a different arrangement. Deliberately a
+  // SEPARATE effect from `[model]` so a force tweak re-runs ONLY the layout
+  // (warm-started from the nodes' current live positions, via a fresh
+  // short-lived worker) rather than tearing down and rebuilding the whole
+  // canvas/pointer-handler setup. Skips its first run — the `[model]` effect's
+  // own initial `postMessage` already used the force values as of mount.
+  const isFirstForcesRun = useRef(true);
+  useEffect(() => {
+    if (isFirstForcesRun.current) {
+      isFirstForcesRun.current = false;
+      return;
+    }
+    const nodes = nodesRef.current;
+    if (nodes.length === 0) return;
+    const seed: Record<string, { x: number; y: number }> = {};
+    for (const n of nodes) seed[n.id] = { x: n.x, y: n.y };
+    const edges = linksRef.current.map((l) => ({
+      source: l.source.id,
+      target: l.target.id,
+      weight: l.weight,
+    }));
+    const size = sizeRef.current;
+    const worker = new Worker(
+      new URL("../graphLayout.worker.ts", import.meta.url),
+      { type: "module" },
+    );
+    worker.onmessage = (e: MessageEvent<LayoutResponse>) => {
+      const pos = new Map(e.data.positions.map((p) => [p.id, p]));
+      for (const n of nodesRef.current) {
+        const p = pos.get(n.id);
+        if (p !== undefined) {
+          n.x = p.x;
+          n.y = p.y;
+        }
+      }
+      setGraphPositions(e.data.positions);
+      scheduleGraphLayoutFlush();
+      scheduleRef.current?.();
+      worker.terminate();
+    };
+    worker.postMessage({
+      nodes: nodes.map((n) => ({ id: n.id })),
+      edges,
+      seed,
+      width: size.width,
+      height: size.height,
+      forces: {
+        centerStrength: forceCenterStrength,
+        repelStrength: forceRepelStrength,
+        linkStrength: forceLinkStrength,
+        linkDistance: forceLinkDistance,
+      },
+    } satisfies LayoutRequest);
+    // Bounded by construction (the worker runs its fixed tick budget once and
+    // posts back one message) — no perpetual loop. If the effect re-fires
+    // before that message arrives (a rapid slider drag), the cleanup below
+    // terminates the stale worker first.
+    return () => {
+      worker.terminate();
+    };
+  }, [forceCenterStrength, forceRepelStrength, forceLinkStrength, forceLinkDistance]);
 
   return (
     <canvas

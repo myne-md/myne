@@ -61,7 +61,7 @@ use unicode_normalization::UnicodeNormalization;
 /// is AEAD-authenticated and bounded by the 64 KiB `MYP1` cap, but a depth
 /// guard is cheap defense-in-depth against a pathologically-nested blob
 /// exhausting the recursive parser's stack. No real view nests this deep.
-const MAX_JSON_DEPTH: usize = 64;
+pub(crate) const MAX_JSON_DEPTH: usize = 64;
 
 /// View render type. `Map` is deliberately absent — a map view needs a Maps
 /// plugin and is not representable in v1 (SYNC-5). Serialized lowercase
@@ -361,7 +361,7 @@ fn encode_sort_into(out: &mut Vec<u8>, sort: &ViewSort) {
     out.push(b'}');
 }
 
-fn encode_filter_into(out: &mut Vec<u8>, node: &FilterNode) {
+pub(crate) fn encode_filter_into(out: &mut Vec<u8>, node: &FilterNode) {
     // Each variant emits its keys in lexicographic order.
     out.push(b'{');
     match node {
@@ -449,7 +449,7 @@ fn property_op_str(op: PropertyOp) -> &'static str {
     }
 }
 
-fn nfc(s: &str) -> String {
+pub(crate) fn nfc(s: &str) -> String {
     s.nfc().collect::<String>()
 }
 
@@ -481,11 +481,11 @@ pub fn canonical_decode_saved_view(bytes: &[u8]) -> Result<SavedView, SavedViewP
 /// schema needs. Keeps the recursive AST decode out of the substring-scanning
 /// idiom (infeasible for a recursive structure) without pulling `serde_json`
 /// into the main dependency surface.
-enum JsonValue {
-    // A boolean literal — accepted so an unknown future key may carry one, but
-    // no current schema field is a bare bool, so the value is not retained
-    // (a future bool field re-adds the payload + its `as_bool` consumer).
-    Bool,
+pub(crate) enum JsonValue {
+    /// A boolean literal. `SavedView` itself has no bare-bool field (this
+    /// variant existed payload-less until `color_group.rs`'s `enabled` field
+    /// needed one — see [`as_bool`]).
+    Bool(bool),
     Int(i64),
     Str(String),
     Array(Vec<JsonValue>),
@@ -493,15 +493,21 @@ enum JsonValue {
     Null,
 }
 
-struct JsonParser<'a> {
+pub(crate) struct JsonParser<'a> {
     b: &'a [u8],
     i: usize,
     depth: usize,
 }
 
 impl<'a> JsonParser<'a> {
-    fn new(b: &'a [u8]) -> Self {
+    pub(crate) fn new(b: &'a [u8]) -> Self {
         Self { b, i: 0, depth: 0 }
+    }
+
+    /// Bytes consumed so far — the cursor position an embedding codec (a
+    /// sibling `vault.prefs`-embedded array family) advances past.
+    pub(crate) fn consumed(&self) -> usize {
+        self.i
     }
 
     fn skip_ws(&mut self) {
@@ -510,7 +516,7 @@ impl<'a> JsonParser<'a> {
         }
     }
 
-    fn parse_value(&mut self) -> Result<JsonValue, SavedViewParseError> {
+    pub(crate) fn parse_value(&mut self) -> Result<JsonValue, SavedViewParseError> {
         self.skip_ws();
         match self.b.get(self.i) {
             Some(b'{') => self.parse_object(),
@@ -672,10 +678,10 @@ impl<'a> JsonParser<'a> {
     fn parse_bool(&mut self) -> Result<JsonValue, SavedViewParseError> {
         if self.b[self.i..].starts_with(b"true") {
             self.i += 4;
-            Ok(JsonValue::Bool)
+            Ok(JsonValue::Bool(true))
         } else if self.b[self.i..].starts_with(b"false") {
             self.i += 5;
-            Ok(JsonValue::Bool)
+            Ok(JsonValue::Bool(false))
         } else {
             Err(SavedViewParseError::Malformed)
         }
@@ -691,36 +697,46 @@ impl<'a> JsonParser<'a> {
     }
 }
 
-fn find<'a>(obj: &'a [(String, JsonValue)], key: &str) -> Option<&'a JsonValue> {
+pub(crate) fn find<'a>(obj: &'a [(String, JsonValue)], key: &str) -> Option<&'a JsonValue> {
     obj.iter().find(|(k, _)| k == key).map(|(_, v)| v)
 }
 
-fn as_object(v: &JsonValue) -> Result<&[(String, JsonValue)], SavedViewParseError> {
+pub(crate) fn as_object(v: &JsonValue) -> Result<&[(String, JsonValue)], SavedViewParseError> {
     match v {
         JsonValue::Object(o) => Ok(o),
         _ => Err(SavedViewParseError::WrongType),
     }
 }
 
-fn as_str(v: &JsonValue) -> Result<&str, SavedViewParseError> {
+pub(crate) fn as_str(v: &JsonValue) -> Result<&str, SavedViewParseError> {
     match v {
         JsonValue::Str(s) => Ok(s),
         _ => Err(SavedViewParseError::WrongType),
     }
 }
 
-fn req<'a>(
+pub(crate) fn as_bool(v: &JsonValue) -> Result<bool, SavedViewParseError> {
+    match v {
+        JsonValue::Bool(b) => Ok(*b),
+        _ => Err(SavedViewParseError::WrongType),
+    }
+}
+
+pub(crate) fn req<'a>(
     obj: &'a [(String, JsonValue)],
     key: &str,
 ) -> Result<&'a JsonValue, SavedViewParseError> {
     find(obj, key).ok_or(SavedViewParseError::MissingField)
 }
 
-fn req_string(obj: &[(String, JsonValue)], key: &str) -> Result<String, SavedViewParseError> {
+pub(crate) fn req_string(
+    obj: &[(String, JsonValue)],
+    key: &str,
+) -> Result<String, SavedViewParseError> {
     Ok(as_str(req(obj, key)?)?.to_string())
 }
 
-fn opt_string(
+pub(crate) fn opt_string(
     obj: &[(String, JsonValue)],
     key: &str,
 ) -> Result<Option<String>, SavedViewParseError> {
@@ -787,7 +803,10 @@ fn sort_from_json(v: &JsonValue) -> Result<ViewSort, SavedViewParseError> {
     })
 }
 
-fn filter_from_json(v: &JsonValue, depth: usize) -> Result<FilterNode, SavedViewParseError> {
+pub(crate) fn filter_from_json(
+    v: &JsonValue,
+    depth: usize,
+) -> Result<FilterNode, SavedViewParseError> {
     if depth > MAX_JSON_DEPTH {
         return Err(SavedViewParseError::Malformed);
     }

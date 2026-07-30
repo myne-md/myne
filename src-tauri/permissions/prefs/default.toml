@@ -69,6 +69,7 @@ permissions = [
   "allow-set-right-panel-active-tab",
   "allow-set-right-panel-hidden-tabs",
   "allow-set-right-panel-tab-order",
+  "allow-set-color-groups",
 ]
 
 [[permission]]
@@ -457,3 +458,16 @@ commands.allow = ["set_attachment_ocr_enabled"]
 identifier = "allow-set-ai-excluded-folders"
 description = "Allow invoking prefs:set_ai_excluded_folders (Slot::Unlocked-gated setter for the ai_excluded_folders set — folders the AI never reads/indexes; same canonical set encoding as deliberate_folders; atomic-writes vault.prefs with no native side-effect)."
 commands.allow = ["set_ai_excluded_folders"]
+
+# graph-connection-ux-polish: a whole-list-replace write setter for the
+# color_groups rule list. Inherits the same main-window-only invariant as the
+# other allow-set-* permissions — v0.2 multi-window MUST NOT grant this to any
+# non-main window. Atomic-writes vault.prefs with no native side-effect,
+# preserving element order verbatim (order is rule precedence, not a
+# separately-tracked `*_order` field); the 64 KiB MYP1 cap fails the encode
+# before any write, leaving on-disk prefs intact; logs count only, never a
+# rule name, color key or filter (AS3-Sensitive).
+[[permission]]
+identifier = "allow-set-color-groups"
+description = "Allow invoking prefs:set_color_groups (Slot::Unlocked-gated whole-list-replace setter for the color_groups rule list — the graph pane's color-group editor; atomic-writes vault.prefs with no native side-effect, preserving element order verbatim since order is rule precedence; logs count only, never a rule name, color key or filter)."
+commands.allow = ["set_color_groups"]

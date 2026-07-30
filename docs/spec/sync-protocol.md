@@ -394,6 +394,7 @@ The table below is the **single normative classification**. The implementation m
 | `spell_languages` | shared | set-union (sorted, deduplicated; clockless) — language codes, case-sensitive |
 | `favorites`, `item_order`, `view_order` | shared | sequence-LWW-on-whole (the whole ordered list is replaced, never per-element merged; one clock per list) |
 | `saved_views` | shared | whole-value LWW (the whole array is replaced; one clock) |
+| `color_groups` | shared | whole-value LWW (the whole array is replaced; one clock) — array order IS rule precedence, so a set-union or per-key merge would silently corrupt it; whole-value LWW races it as a unit (graph-connection-ux-polish, MYND-635) |
 | `folder_icons`, `item_colors` | shared | **per-key map merge** — union of keys; a key edited on both sides resolves LWW on its own `<field>/<key>` clock (revised 2026-07-19, MYND-562 — supersedes the original whole-value-LWW discipline, which dropped a concurrent edit to a *different* folder). Keyed by the folded folder identity (`folderKey`, `markdown-dialect.md` §3.6.2) + note UUIDs |
 | `device_names` | shared | **per-key map merge** — union of keys; a key edited on both sides resolves LWW on its own `device_names/<key>` clock |
 | `last_active_note` (§9.1; planned, opt-in) | shared | scalar-LWW |

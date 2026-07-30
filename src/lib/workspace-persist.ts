@@ -8,6 +8,7 @@
 // under `session_state_key` (`MYW1`, protocol.md § 9.7).
 
 import { invoke } from "../platform/core";
+import { decodeGraphSettings, encodeGraphSettings } from "../notes/graphSettings";
 import {
   collectLeaves,
   findLeaf,
@@ -114,6 +115,13 @@ export function deserializeWorkspace(json: string): WorkspaceState | null {
  *  same omit-when-default discipline (pinned / stacked / viewMode) applies
  *  per slot. */
 export function serializeWorkspaces(container: NamedWorkspaces): string {
+  // graph-connection-ux-polish task 5: the graph pane's device-local settings,
+  // omit-when-default per field (see `graphSettings.ts`). Same discipline as
+  // `expandedFolders` below — no format bump, an old reader tolerates the
+  // unknown field, a reader on a default-only vault sees no key at all.
+  const encodedGraphSettings = container.graphSettings
+    ? encodeGraphSettings(container.graphSettings)
+    : undefined;
   return JSON.stringify({
     slots: container.slots.map((s) => ({
       id: s.id,
@@ -127,6 +135,7 @@ export function serializeWorkspaces(container: NamedWorkspaces): string {
     ...(container.expandedFolders && container.expandedFolders.length > 0
       ? { expandedFolders: [...container.expandedFolders] }
       : {}),
+    ...(encodedGraphSettings ? { graphSettings: encodedGraphSettings } : {}),
   });
 }
 
@@ -191,9 +200,18 @@ export function deserializeWorkspaces(
       ? (obj.expandedFolders as string[])
       : undefined;
 
-  return expandedFolders && expandedFolders.length > 0
-    ? { slots, activeId: obj.activeId, expandedFolders }
-    : { slots, activeId: obj.activeId };
+  // graph-connection-ux-polish task 5: decode field-by-field (a malformed
+  // value degrades to its default, never rejects the whole blob — see
+  // `decodeGraphSettings`), then drop the key entirely when the result is
+  // all-default (the same omit-when-default check `encodeGraphSettings` uses
+  // on write, kept as the single source of truth for "is this default").
+  const decodedGraphSettings = decodeGraphSettings(obj.graphSettings);
+  const graphSettings = encodeGraphSettings(decodedGraphSettings) ? decodedGraphSettings : undefined;
+
+  const result: NamedWorkspaces = { slots, activeId: obj.activeId };
+  if (expandedFolders && expandedFolders.length > 0) result.expandedFolders = expandedFolders;
+  if (graphSettings) result.graphSettings = graphSettings;
+  return result;
 }
 
 /** One parsed tab: a valid item, a well-formed-but-unknown-kind tab to DROP

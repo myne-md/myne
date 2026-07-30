@@ -60,6 +60,10 @@ pub const CLASSIFICATION: &[(&str, PrefClass)] = &[
     ("attachment_ocr_enabled", PrefClass::DeviceLocal),
     ("auto_lock_seconds", PrefClass::DeviceLocal),
     ("bar_items_order", PrefClass::DeviceLocal),
+    (
+        "color_groups",
+        PrefClass::Shared(SharedDiscipline::WholeValueLww),
+    ),
     ("custom_theme", PrefClass::DeviceLocal),
     (
         "daily_date_format",
@@ -184,6 +188,7 @@ mod tests {
             attachment_ocr_enabled: _,
             auto_lock_seconds: _,
             bar_items_order: _,
+            color_groups: _,
             custom_theme: _,
             daily_date_format: _,
             daily_folder: _,
@@ -243,6 +248,7 @@ mod tests {
             "attachment_ocr_enabled",
             "auto_lock_seconds",
             "bar_items_order",
+            "color_groups",
             "custom_theme",
             "daily_date_format",
             "daily_folder",
