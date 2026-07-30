@@ -158,6 +158,16 @@ pub const CLASSIFICATION: &[(&str, PrefClass)] = &[
     ("startup_open", PrefClass::DeviceLocal),
     ("startup_open_note", PrefClass::DeviceLocal),
     ("theme", PrefClass::DeviceLocal),
+    // MYND-592. **Shared**, for the same reason as `show_task_marker` above and
+    // deliberately unlike `ai_enabled` (DeviceLocal): that flag is device-local
+    // because it gates a device-local model-path override, and this one gates a
+    // bundled model every client carries. Whether the user wants speech-to-text
+    // at all is taste, not capability — a device-local value would mean
+    // re-choosing it on every new device.
+    (
+        "transcription_enabled",
+        PrefClass::Shared(SharedDiscipline::ScalarLww),
+    ),
     (
         "view_order",
         PrefClass::Shared(SharedDiscipline::SequenceLww),
@@ -242,6 +252,7 @@ mod tests {
             startup_open: _,
             startup_open_note: _,
             theme: _,
+            transcription_enabled: _,
             view_order: _,
         } = PrefsView::default();
 
@@ -304,6 +315,7 @@ mod tests {
             "startup_open",
             "startup_open_note",
             "theme",
+            "transcription_enabled",
             "view_order",
         ];
 
