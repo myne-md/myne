@@ -14,6 +14,7 @@ import {
   loadWholeVaultGraph,
   type GraphModel,
 } from "../graphAdapter";
+import { DEFAULT_GRAPH_SETTINGS } from "../graphSettings";
 import { getIndexNonce, useIndexNonce } from "../indexNonce";
 import { loadGraphLayoutFromDisk } from "../graphLayoutPersist";
 import { useResolverNotes } from "../resolverNotes";
@@ -26,6 +27,7 @@ import {
   type TagTreeNode,
 } from "../vaultIndices";
 import { useWorkspace } from "../workspaceContext";
+import { GraphSettingsPanel } from "./GraphSettingsPanel";
 
 // Lazy-loaded so the d3-force + canvas-renderer chunk stays OUT of the initial
 // bundle (vision.md "separate, lazy-loaded"; SYNC-8 TB9 posture). The app's
@@ -183,6 +185,15 @@ export function GraphPane() {
               : onOpenNode
           }
           onNodeDoubleClick={filter.kind === "local" ? onOpenNode : undefined}
+          arrowsEnabled={ws.graphSettings.showArrows}
+          labelFadeZoom={ws.graphSettings.labelFadeZoom}
+          nodeSize={ws.graphSettings.nodeSize}
+          nodeSizeStrength={ws.graphSettings.nodeSizeStrength}
+          lineThickness={ws.graphSettings.lineThickness}
+          forceCenterStrength={ws.graphSettings.forceCenterStrength}
+          forceRepelStrength={ws.graphSettings.forceRepelStrength}
+          forceLinkStrength={ws.graphSettings.forceLinkStrength}
+          forceLinkDistance={ws.graphSettings.forceLinkDistance}
         />
       </Suspense>
     );
@@ -299,7 +310,26 @@ export function GraphPane() {
           </button>
         )}
       </div>
-      {content}
+      <div
+        // The gear + floating panel live in THIS wrapper, not the outer pane
+        // div — so they overlay the canvas only, positioned relative to it,
+        // and (load-bearing) never change the canvas's own width/height: the
+        // panel is `position: absolute`, so opening it never re-runs layout.
+        style={{
+          position: "relative",
+          flex: 1,
+          minHeight: 0,
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
+        {content}
+        <GraphSettingsPanel
+          settings={ws.graphSettings}
+          onChange={ws.setGraphSettings}
+          onReset={() => ws.setGraphSettings(DEFAULT_GRAPH_SETTINGS)}
+        />
+      </div>
     </div>
   );
 }

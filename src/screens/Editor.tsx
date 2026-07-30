@@ -1305,6 +1305,9 @@ function EditorChrome({
     // `{...c}`, which preserves `slots`/`activeId` identity, so a sidebar
     // folder toggle would otherwise never mark the blob dirty — and a Cmd+Q
     // would flush the stale staged container and lose the expand set.
+    // `graphSettings` (graph-connection-ux-polish task 5) is the same shape of
+    // dep for the same reason: a graph-panel toggle only changes that one
+    // field on the spread container.
   }, [
     restoreSettled,
     ws.slots,
@@ -1312,6 +1315,7 @@ function EditorChrome({
     ws.root,
     ws.focusedPaneId,
     ws.expandedFolders,
+    ws.graphSettings,
   ]);
 
   // MYND-308 (SYNC-6, mtime-defense) — coalesced background flush. The

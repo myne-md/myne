@@ -114,6 +114,7 @@ pub const DISPATCHED: &[&str] = &[
     "plugin:prefs|delete_saved_view",
     "plugin:prefs|set_view_order",
     "plugin:prefs|set_bar_items_order",
+    "plugin:prefs|set_color_groups",
     "plugin:prefs|set_right_panel_active_tab",
     "plugin:prefs|set_right_panel_hidden_tabs",
     "plugin:prefs|set_right_panel_tab_order",

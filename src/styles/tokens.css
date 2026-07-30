@@ -157,6 +157,27 @@
   --label-plum:   #7e4d76;   /* muted purple    */
   --label-stone:  #6f6d64;   /* warm grey       */
 
+  /* -- Color -- Graph color groups (graph-connection-ux-polish) --------
+     Eight categorical, decorative node-dot colors for the graph pane's
+     color-group feature — read SIDE BY SIDE at small node radius, so
+     legibility is a property of the set, not any one color. Hues are
+     chosen to stay clear of the three role hues (danger red ~7°, warning
+     ochre ~43°, success green ~150° on the HSL wheel) so a group can never
+     read as an error/warning/success state, and to alternate lightness
+     (34%/44% in light, mirrored in dark) so two adjacent hues stay
+     distinguishable under red-green color-vision deficiency, not just by
+     hue. Mirrors docs/design/colors_and_type.css (light + dark only — the
+     amoled twins below reuse the dark values verbatim, like label/syntax/
+     highlight do, since these hues don't need to change for pure black). */
+  --group-olive:   #5d7b32;
+  --group-fern:    #549f41;
+  --group-teal:    #32647b;
+  --group-denim:   #415c9f;
+  --group-indigo:  #3b327b;
+  --group-violet:  #72419f;
+  --group-orchid:  #75327b;
+  --group-rose:    #9f4182;
+
   /* -- Color -- Code syntax highlighting (MYND-154) ------------------- */
   /* Mirrors docs/design/colors_and_type.css. Each hue clears WCAG AA
      (>=4.5:1) vs --paper-2 in both themes (grill Q15). */
@@ -269,6 +290,16 @@
   --_label-plum-dark:   #c79cc0;
   --_label-stone-dark:  #a8a69d;
 
+  /* Graph color groups — dark-surface values. Mirrors colors_and_type.css. */
+  --_group-olive-dark:   #cce3ab;
+  --_group-fern-dark:    #9cd98c;
+  --_group-teal-dark:    #abd1e3;
+  --_group-denim-dark:   #8ca2d9;
+  --_group-indigo-dark:  #b1abe3;
+  --_group-violet-dark:  #b48cd9;
+  --_group-orchid-dark:  #deabe3;
+  --_group-rose-dark:    #d98cc1;
+
   --_syntax-keyword-dark:  #c79ad4;
   --_syntax-string-dark:   #8cc1a4;
   --_syntax-comment-dark:  #8e8d85;
@@ -341,6 +372,15 @@
   --_highlight-brown-amoled:  #322a20;
   --_highlight-grey-amoled:   #2c2b2f;
   --_highlight-indigo-amoled: #202342;
+
+  --_group-olive-amoled:   var(--_group-olive-dark);
+  --_group-fern-amoled:    var(--_group-fern-dark);
+  --_group-teal-amoled:    var(--_group-teal-dark);
+  --_group-denim-amoled:   var(--_group-denim-dark);
+  --_group-indigo-amoled:  var(--_group-indigo-dark);
+  --_group-violet-amoled:  var(--_group-violet-dark);
+  --_group-orchid-amoled:  var(--_group-orchid-dark);
+  --_group-rose-amoled:    var(--_group-rose-dark);
 
   --_label-clay-amoled:   var(--_label-clay-dark);
   --_label-ochre-amoled:  var(--_label-ochre-dark);
@@ -429,6 +469,15 @@
   --label-plum:   var(--_label-plum-dark);
   --label-stone:  var(--_label-stone-dark);
 
+  --group-olive:   var(--_group-olive-dark);
+  --group-fern:    var(--_group-fern-dark);
+  --group-teal:    var(--_group-teal-dark);
+  --group-denim:   var(--_group-denim-dark);
+  --group-indigo:  var(--_group-indigo-dark);
+  --group-violet:  var(--_group-violet-dark);
+  --group-orchid:  var(--_group-orchid-dark);
+  --group-rose:    var(--_group-rose-dark);
+
   --syntax-keyword:  var(--_syntax-keyword-dark);
   --syntax-string:   var(--_syntax-string-dark);
   --syntax-comment:  var(--_syntax-comment-dark);
@@ -501,6 +550,15 @@
   --label-plum:   var(--_label-plum-amoled);
   --label-stone:  var(--_label-stone-amoled);
 
+  --group-olive:   var(--_group-olive-amoled);
+  --group-fern:    var(--_group-fern-amoled);
+  --group-teal:    var(--_group-teal-amoled);
+  --group-denim:   var(--_group-denim-amoled);
+  --group-indigo:  var(--_group-indigo-amoled);
+  --group-violet:  var(--_group-violet-amoled);
+  --group-orchid:  var(--_group-orchid-amoled);
+  --group-rose:    var(--_group-rose-amoled);
+
   --syntax-keyword:  var(--_syntax-keyword-amoled);
   --syntax-string:   var(--_syntax-string-amoled);
   --syntax-comment:  var(--_syntax-comment-amoled);
@@ -569,6 +627,15 @@
     --label-slate:  var(--_label-slate-dark);
     --label-plum:   var(--_label-plum-dark);
     --label-stone:  var(--_label-stone-dark);
+
+    --group-olive:   var(--_group-olive-dark);
+    --group-fern:    var(--_group-fern-dark);
+    --group-teal:    var(--_group-teal-dark);
+    --group-denim:   var(--_group-denim-dark);
+    --group-indigo:  var(--_group-indigo-dark);
+    --group-violet:  var(--_group-violet-dark);
+    --group-orchid:  var(--_group-orchid-dark);
+    --group-rose:    var(--_group-rose-dark);
 
     --syntax-keyword:  var(--_syntax-keyword-dark);
     --syntax-string:   var(--_syntax-string-dark);

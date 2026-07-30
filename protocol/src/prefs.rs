@@ -674,6 +674,32 @@ pub struct PrefsView {
     #[serde(default)]
     pub bar_items_order: Vec<String>,
 
+    /// Color-group rules (graph-connection-ux-polish, MYND-635) — the ordered
+    /// list of user-authored `{id, name, color, enabled, filter}` rules the
+    /// knowledge-graph pane paints matching notes with at render time. ONE
+    /// structured field, not a field per rule (the `saved_views` precedent
+    /// class). Order is MEANINGFUL and IS the rule precedence — first match
+    /// wins — so unlike `saved_views` (sorted by id; its display order lives
+    /// in the separate `view_order`) this array is preserved **verbatim**,
+    /// never re-sorted (the `bar_items_order` / `favorites` sequence
+    /// discipline, but classified whole-value LWW, not sequence-LWW — see
+    /// `core::plugins::sync::prefs_classification`). A disabled rule stays in
+    /// the list, evaluated as a no-match. Each element is a nested canonical
+    /// [`crate::color_group::ColorGroup`] object; `filter` reuses the same
+    /// `FilterNode` AST `saved_views` already persists. Default empty;
+    /// **omitted entirely from the canonical JSON when empty**, so a vault
+    /// that never opens the feature stays byte-identical to a pre-feature
+    /// `vault.prefs` (no outer-envelope / magic change — migration-less
+    /// additive field on `MYP1`). AS3-Sensitive (a rule's name / filter /
+    /// referenced tag or folder) — rides the existing prefs AEAD envelope;
+    /// **non-load-bearing** (no protective-envelope clamp — a tampered or
+    /// replayed `vault.prefs` can at worst reset rules to empty or apply a
+    /// stale rule set, never expose or corrupt note content). Canonical key
+    /// `color_groups` — sorts after `bar_items_order` (`b` < `c`), before
+    /// `custom_theme` (`col` < `cus`).
+    #[serde(default)]
+    pub color_groups: Vec<crate::color_group::ColorGroup>,
+
     /// Per-vault decorative icon (vault-icons) — the curated stroke-glyph name
     /// the in-app vault switcher shows beside this vault's name, replacing the
     /// default `M` wordmark. `None` ≡ no icon set → the switcher shows the
@@ -963,6 +989,7 @@ impl Default for PrefsView {
         Self {
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
+            color_groups: Vec::new(),
             show_note_timestamps: true,
             folder_icons: Default::default(),
             hidden_bar_items: Vec::new(),
@@ -1247,6 +1274,21 @@ fn canonical_json_encode(prefs: &PrefsView) -> Vec<u8> {
     if !prefs.bar_items_order.is_empty() {
         out.extend_from_slice(b"\"bar_items_order\":");
         push_ordered_string_array(&mut out, &prefs.bar_items_order);
+        out.push(b',');
+    }
+
+    // color_groups (canonical key 'col' — after bar_items_order [b < c], before
+    // custom_theme [col < cus], MYND-635 graph-connection-ux-polish). The
+    // ordered color-group rule list; order IS rule precedence, so the array is
+    // encoded via the canonical codec's OWN verbatim-order encoder (never
+    // re-sorted — contrast `saved_views`, which the codec sorts by id).
+    // Omitted entirely when empty so a vault that never opens the feature is
+    // byte-identical to a pre-feature vault.prefs.
+    if !prefs.color_groups.is_empty() {
+        out.extend_from_slice(b"\"color_groups\":");
+        out.extend_from_slice(&crate::color_group::canonical_encode_color_groups(
+            &prefs.color_groups,
+        ));
         out.push(b',');
     }
 
@@ -2068,6 +2110,12 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
     // preserved verbatim (sort/dedup is encode-side and this field is a
     // sequence, so neither happens). Present-but-malformed → PlaintextParseFailed.
     let bar_items_order = parse_optional_array_field(rest, &mut cursor, b"\"bar_items_order\":")?;
+    // color_groups (canonical key 'col' — after bar_items_order [b < c], before
+    // custom_theme [col < cus], MYND-635). A nested array of canonical
+    // ColorGroup objects parsed from the same monotonic cursor; absent → empty;
+    // order preserved verbatim (it IS the rule precedence — never re-sorted).
+    // Present-but-malformed → PlaintextParseFailed.
+    let color_groups = parse_optional_color_groups_field(rest, &mut cursor, b"\"color_groups\":")?;
     // custom_theme (canonical key 'c' — before the daily_* block 'd'). The active
     // custom-theme name; takes precedence over `theme` host-side. Optional.
     let custom_theme = parse_optional_string_field(rest, &mut cursor, b"\"custom_theme\":")?;
@@ -2270,6 +2318,7 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
         folder_icons,
         hidden_bar_items,
         bar_items_order,
+        color_groups,
         icon,
         item_colors,
         deliberate_folders,
@@ -2342,6 +2391,35 @@ fn parse_optional_saved_views_field(
                 .map_err(|_| PrefsBlobError::PlaintextParseFailed)?;
             *cursor = val_start + consumed;
             Ok(views)
+        }
+        None => Ok(Vec::new()),
+    }
+}
+
+/// Parse the OPTIONAL `color_groups` nested-array-of-objects field
+/// (MYND-635), searching `rest` from `*cursor` onward. On a hit, decodes the
+/// canonical `ColorGroup` array via
+/// [`crate::color_group::parse_color_groups_array`] and advances `*cursor`
+/// past the closing `]`; on a miss returns an empty `Vec` and leaves
+/// `*cursor` unchanged. A malformed array (a `ColorGroup` that fails to
+/// decode, or a non-array value) collapses to
+/// [`PrefsBlobError::PlaintextParseFailed`] (the caller falls back to
+/// defaults per § 9.5.5). The monotonic cursor keeps the canonical
+/// key-order discipline: the following `custom_theme` find never matches
+/// inside a rule's content.
+fn parse_optional_color_groups_field(
+    rest: &[u8],
+    cursor: &mut usize,
+    marker: &[u8],
+) -> Result<Vec<crate::color_group::ColorGroup>, PrefsBlobError> {
+    match find_subslice(&rest[*cursor..], marker) {
+        Some(rel_idx) => {
+            let val_start = *cursor + rel_idx + marker.len();
+            let (groups, consumed) =
+                crate::color_group::parse_color_groups_array(&rest[val_start..])
+                    .map_err(|_| PrefsBlobError::PlaintextParseFailed)?;
+            *cursor = val_start + consumed;
+            Ok(groups)
         }
         None => Ok(Vec::new()),
     }
@@ -3097,6 +3175,7 @@ mod tests {
             attachment_ocr_enabled: true,
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
+            color_groups: Vec::new(),
             show_note_timestamps: true,
             folder_icons: Default::default(),
             device_names: Default::default(),
@@ -3158,6 +3237,7 @@ mod tests {
             attachment_ocr_enabled: true,
             screen_capture_protection: false,
             bar_items_order: Vec::new(),
+            color_groups: Vec::new(),
             show_note_timestamps: true,
             folder_icons: Default::default(),
             device_names: Default::default(),
@@ -3478,6 +3558,7 @@ mod tests {
                 attachment_ocr_enabled: true,
                 screen_capture_protection: true,
                 bar_items_order: Vec::new(),
+                color_groups: Vec::new(),
                 icon: None,
                 ai_enabled: false,
                 ai_excluded_folders: Vec::new(),
@@ -3541,6 +3622,7 @@ mod tests {
                 attachment_ocr_enabled: true,
                 screen_capture_protection: false,
                 bar_items_order: Vec::new(),
+                color_groups: Vec::new(),
                 icon: None,
                 ai_enabled: false,
                 ai_excluded_folders: Vec::new(),
@@ -4705,6 +4787,7 @@ mod tests {
         let encoded = canonical_json_encode(&PrefsView {
             screen_capture_protection: false,
             bar_items_order: Vec::new(),
+            color_groups: Vec::new(),
             show_note_timestamps: true,
             folder_icons: Default::default(),
             device_names: Default::default(),
@@ -4727,6 +4810,7 @@ mod tests {
             attachment_ocr_enabled: true,
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
+            color_groups: Vec::new(),
             archived_folders: Vec::new(),
             show_note_timestamps: true,
             folder_icons: Default::default(),
@@ -5025,6 +5109,7 @@ mod tests {
             attachment_ocr_enabled: true,
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
+            color_groups: Vec::new(),
             show_note_timestamps: true,
             folder_icons: Default::default(),
             device_names: Default::default(),
@@ -5092,6 +5177,7 @@ mod tests {
             attachment_ocr_enabled: true,
             screen_capture_protection: false,
             bar_items_order: Vec::new(),
+            color_groups: Vec::new(),
             show_note_timestamps: true,
             folder_icons: Default::default(),
             device_names: Default::default(),
@@ -5162,6 +5248,7 @@ mod tests {
             attachment_ocr_enabled: true,
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
+            color_groups: Vec::new(),
             show_note_timestamps: true,
             folder_icons: Default::default(),
             device_names: Default::default(),
@@ -5227,6 +5314,7 @@ mod tests {
             attachment_ocr_enabled: true,
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
+            color_groups: Vec::new(),
             show_note_timestamps: true,
             folder_icons: Default::default(),
             device_names: Default::default(),
@@ -5352,6 +5440,7 @@ mod tests {
             attachment_ocr_enabled: true,
             screen_capture_protection: false,
             bar_items_order: Vec::new(),
+            color_groups: Vec::new(),
             show_note_timestamps: true,
             folder_icons: Default::default(),
             device_names: Default::default(),
@@ -5442,6 +5531,7 @@ mod tests {
             field_clocks: Default::default(),
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
+            color_groups: Vec::new(),
             show_note_timestamps: true,
             folder_icons: Default::default(),
             device_names: Default::default(),
@@ -5515,6 +5605,7 @@ mod tests {
             attachment_ocr_enabled: true,
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
+            color_groups: Vec::new(),
             show_note_timestamps: true,
             folder_icons: Default::default(),
             device_names: Default::default(),
@@ -5619,6 +5710,7 @@ mod tests {
             field_clocks: Default::default(),
             screen_capture_protection: false,
             bar_items_order: Vec::new(),
+            color_groups: Vec::new(),
             show_note_timestamps: true,
             folder_icons: Default::default(),
             device_names: Default::default(),
@@ -5706,6 +5798,7 @@ mod tests {
             attachment_ocr_enabled: true,
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
+            color_groups: Vec::new(),
             show_note_timestamps: true,
             folder_icons: map_of(&[("Projects/", "book")]),
             device_names: Default::default(),
@@ -5894,6 +5987,7 @@ mod tests {
             attachment_ocr_enabled: true,
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
+            color_groups: Vec::new(),
             show_note_timestamps: true,
             folder_icons: Default::default(),
             device_names: Default::default(),
@@ -5959,6 +6053,7 @@ mod tests {
             attachment_ocr_enabled: true,
             screen_capture_protection: false,
             bar_items_order: Vec::new(),
+            color_groups: Vec::new(),
             show_note_timestamps: true,
             folder_icons: Default::default(),
             device_names: Default::default(),
@@ -6026,6 +6121,7 @@ mod tests {
             attachment_ocr_enabled: true,
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
+            color_groups: Vec::new(),
             show_note_timestamps: true,
             folder_icons: Default::default(),
             device_names: Default::default(),
@@ -6161,6 +6257,7 @@ mod tests {
             attachment_ocr_enabled: true,
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
+            color_groups: Vec::new(),
             show_note_timestamps: true,
             folder_icons: Default::default(),
             device_names: Default::default(),
@@ -6270,6 +6367,7 @@ mod tests {
             attachment_ocr_enabled: true,
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
+            color_groups: Vec::new(),
             archived_folders: Vec::new(),
             show_note_timestamps: true,
             folder_icons: Default::default(),
@@ -6569,6 +6667,7 @@ mod tests {
             attachment_ocr_enabled: true,
             screen_capture_protection: false,
             bar_items_order: Vec::new(),
+            color_groups: Vec::new(),
             show_note_timestamps: true,
             folder_icons: Default::default(),
             device_names: Default::default(),
@@ -6638,6 +6737,7 @@ mod tests {
             attachment_ocr_enabled: true,
             screen_capture_protection: false,
             bar_items_order: Vec::new(),
+            color_groups: Vec::new(),
             show_note_timestamps: true,
             folder_icons: Default::default(),
             device_names: Default::default(),
@@ -6968,6 +7068,7 @@ mod tests {
                 attachment_ocr_enabled: true,
                 screen_capture_protection: true,
                 bar_items_order: Vec::new(),
+                color_groups: Vec::new(),
                 icon: None,
                 ai_enabled: false,
                 ai_excluded_folders: Vec::new(),
@@ -7030,6 +7131,7 @@ mod tests {
                 attachment_ocr_enabled: true,
                 screen_capture_protection: false,
                 bar_items_order: Vec::new(),
+                color_groups: Vec::new(),
                 icon: None,
                 ai_enabled: false,
                 ai_excluded_folders: Vec::new(),
@@ -7095,6 +7197,7 @@ mod tests {
             field_clocks: Default::default(),
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
+            color_groups: Vec::new(),
             ai_enabled: false,
             ai_excluded_folders: Vec::new(),
             archived_folders: Vec::new(),
@@ -9212,6 +9315,81 @@ mod tests {
         let hash = fixed_account_number_hash();
         let blob = encode_prefs_blob_raw(&prefs_key, &hash, &prefs, &fixed_prefs_nonce()).unwrap();
         assert_eq!(decode_prefs_blob(&prefs_key, &hash, &blob).unwrap(), prefs);
+    }
+
+    // ---- color_groups (graph-connection-ux-polish, MYND-635) ---------------
+
+    fn sample_color_group(id: &str, name: &str) -> crate::color_group::ColorGroup {
+        crate::color_group::ColorGroup {
+            id: id.into(),
+            name: name.into(),
+            color: "moss".into(),
+            enabled: true,
+            filter: crate::saved_view::FilterNode::HasTag { tag: "work".into() },
+        }
+    }
+
+    #[test]
+    fn color_groups_round_trips_and_positions_b_before_col_before_cus() {
+        // Round-trip alongside bar_items_order (before, 'b') + custom_theme
+        // (after, 'cus') to pin color_groups' canonical position ('col').
+        let prefs = PrefsView {
+            bar_items_order: alloc::vec!["graph".into()],
+            color_groups: alloc::vec![
+                sample_color_group("g1", "Work"),
+                sample_color_group("g2", "Rest")
+            ],
+            custom_theme: Some("solarized-dark".into()),
+            ..PrefsView::default()
+        };
+        let prefs_key = derive_subkey(&fixed_root_key(), SubkeyRole::PrefsKey);
+        let hash = fixed_account_number_hash();
+        let blob = encode_prefs_blob_raw(&prefs_key, &hash, &prefs, &fixed_prefs_nonce()).unwrap();
+        let decoded = decode_prefs_blob(&prefs_key, &hash, &blob).unwrap();
+        assert_eq!(decoded, prefs);
+        // Order preserved verbatim — precedence, not id-sorted (g1 before g2).
+        assert_eq!(decoded.color_groups[0].id, "g1");
+        assert_eq!(decoded.color_groups[1].id, "g2");
+
+        let json = canonical_json_encode(&prefs);
+        let s = core::str::from_utf8(&json).unwrap();
+        let b = s.find("bar_items_order").unwrap();
+        let cg = s.find("color_groups").unwrap();
+        let cus = s.find("custom_theme").unwrap();
+        assert!(
+            b < cg && cg < cus,
+            "canonical order must be b < col < cus: {s}"
+        );
+    }
+
+    #[test]
+    fn color_groups_omitted_when_empty_byte_identical_to_pre_feature_blob() {
+        // A vault that never opens the feature re-encodes byte-identically to
+        // a pre-MYND-635 vault.prefs (story 36) — the field must not appear
+        // at all, not merely as `[]`.
+        let prefs = PrefsView::default();
+        let json = canonical_json_encode(&prefs);
+        let s = core::str::from_utf8(&json).unwrap();
+        assert!(
+            !s.contains("color_groups"),
+            "empty color_groups must be omitted: {s}"
+        );
+    }
+
+    #[test]
+    fn color_groups_disabled_rule_round_trips() {
+        let mut g = sample_color_group("g1", "Muted");
+        g.enabled = false;
+        let prefs = PrefsView {
+            color_groups: alloc::vec![g],
+            ..PrefsView::default()
+        };
+        let prefs_key = derive_subkey(&fixed_root_key(), SubkeyRole::PrefsKey);
+        let hash = fixed_account_number_hash();
+        let blob = encode_prefs_blob_raw(&prefs_key, &hash, &prefs, &fixed_prefs_nonce()).unwrap();
+        let decoded = decode_prefs_blob(&prefs_key, &hash, &blob).unwrap();
+        assert_eq!(decoded, prefs);
+        assert!(!decoded.color_groups[0].enabled);
     }
 
     // ---- custom_theme (custom-themes epic, MYND-297) -----------------------

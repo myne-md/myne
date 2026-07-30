@@ -120,6 +120,10 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::set_editor_toolbar_hidden,
             commands::set_editor_slash_order,
             commands::set_editor_slash_hidden,
+            // graph-connection-ux-polish task 7: whole-list replace for the
+            // color-group rule list — order is precedence, no separate
+            // `*_order` field, same shape as `set_bar_items_order`.
+            commands::set_color_groups,
         ])
         .build()
 }

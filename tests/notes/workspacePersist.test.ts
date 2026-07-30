@@ -4,6 +4,7 @@
 // malformed so the editor falls back to a clean single empty pane.
 
 import { describe, expect, it } from "vitest";
+import { DEFAULT_GRAPH_SETTINGS } from "../../src/notes/graphSettings";
 import {
   deserializeWorkspace,
   deserializeWorkspaces,
@@ -23,6 +24,7 @@ import {
   setPinned,
   setStacked,
   viewItem,
+  type NamedWorkspaces,
   type WorkspaceState,
 } from "../../src/notes/workspaceState";
 
@@ -457,5 +459,74 @@ describe("named-workspaces container (de)serialization", () => {
     const withGarbage = JSON.stringify({ ...JSON.parse(json), expandedFolders: [1, 2] });
     expect(deserializeWorkspaces(withGarbage)).not.toBeNull();
     expect(deserializeWorkspaces(withGarbage)!.expandedFolders).toBeUndefined();
+  });
+
+  // graph-connection-ux-polish task 5: graph pane settings at the container
+  // level, same omit-when-default shape as `expandedFolders` above. Task 6
+  // extended `GraphSettings` with the appearance + forces fields — the wire
+  // shape (per-field omit-when-default) is unchanged, so these round-trip the
+  // full decoded object (every field present, non-default ones carrying their
+  // set value) rather than the single-field literal task 5 asserted.
+  it("round-trips graph settings when one field is non-default", () => {
+    const c: NamedWorkspaces = {
+      ...emptyNamedWorkspaces("p1", "s1"),
+      graphSettings: { ...DEFAULT_GRAPH_SETTINGS, showArrows: false },
+    };
+    const restored = deserializeWorkspaces(serializeWorkspaces(c));
+    expect(restored!.graphSettings).toEqual({ ...DEFAULT_GRAPH_SETTINGS, showArrows: false });
+  });
+
+  it("round-trips graph settings when every field is non-default", () => {
+    const touched = {
+      showArrows: false,
+      labelFadeZoom: 2,
+      nodeSize: 8,
+      nodeSizeStrength: 0.5,
+      lineThickness: 2,
+      forceCenterStrength: 1.5,
+      forceRepelStrength: 200,
+      forceLinkStrength: 0.5,
+      forceLinkDistance: 100,
+    };
+    const c: NamedWorkspaces = {
+      ...emptyNamedWorkspaces("p1", "s1"),
+      graphSettings: touched,
+    };
+    const json = serializeWorkspaces(c);
+    // Every field differs from default, so every field is on the wire.
+    expect(JSON.parse(json).graphSettings).toEqual(touched);
+    expect(deserializeWorkspaces(json)!.graphSettings).toEqual(touched);
+  });
+
+  it("omits graph settings when all-default (no format bump)", () => {
+    const defaultOnly: NamedWorkspaces = {
+      ...emptyNamedWorkspaces("p1", "s1"),
+      graphSettings: { ...DEFAULT_GRAPH_SETTINGS },
+    };
+    const json = serializeWorkspaces(defaultOnly);
+    // Absent from the wire when default — byte-compatible with a pre-feature reader.
+    expect(JSON.parse(json)).not.toHaveProperty("graphSettings");
+    expect(deserializeWorkspaces(json)!.graphSettings).toBeUndefined();
+    // A container that never touched graphSettings at all also omits it.
+    const untouched = emptyNamedWorkspaces("p1", "s1");
+    expect(JSON.parse(serializeWorkspaces(untouched))).not.toHaveProperty("graphSettings");
+    // A malformed field is tolerated (fields default individually), never a hard reject.
+    const withGarbage = JSON.stringify({ ...JSON.parse(json), graphSettings: { showArrows: "nope" } });
+    expect(deserializeWorkspaces(withGarbage)).not.toBeNull();
+    expect(deserializeWorkspaces(withGarbage)!.graphSettings).toBeUndefined();
+  });
+
+  it("omits only the still-default fields when just one field is malformed among several set", () => {
+    // A vault written by a client where `nodeSize` corrupted (e.g. NaN over
+    // the wire as JSON `null`) but `showArrows` is a valid non-default value:
+    // `nodeSize` defaults back silently, `showArrows` survives.
+    const json = JSON.stringify({
+      ...JSON.parse(serializeWorkspaces(emptyNamedWorkspaces("p1", "s1"))),
+      graphSettings: { showArrows: false, nodeSize: null },
+    });
+    expect(deserializeWorkspaces(json)!.graphSettings).toEqual({
+      ...DEFAULT_GRAPH_SETTINGS,
+      showArrows: false,
+    });
   });
 });

@@ -772,6 +772,10 @@
         "linkedFrom": "Linked from {{count}}",
         "linkedFrom_one": "Linked from {{count}}",
         "linkedFrom_other": "Linked from {{count}}",
+        "linksTo": "Links to {{count}}",
+        "linksTo_one": "Links to {{count}}",
+        "linksTo_other": "Links to {{count}}",
+        "outgoingEmpty": "This note doesn't link to anything yet.",
         "untitled": "Untitled"
       },
       "barItems": {
@@ -886,7 +890,7 @@
         },
         "tabs": {
           "aiChat": "AI Chat",
-          "backlinks": "Backlinks",
+          "backlinks": "Links",
           "outline": "Outline",
           "unlinked": "Unlinked mentions"
         }
@@ -1473,6 +1477,22 @@
     "graph": {
       "allConnected": "Everything is connected — no isolated notes.",
       "building": "Building graph…",
+      "colorGroups": {
+        "addRule": "Add rule",
+        "colorSwatchTitle": "Choose color",
+        "deleteRuleTitle": "Delete rule",
+        "dragHandleTitle": "Drag to reorder",
+        "editFilterButton": "Edit filter…",
+        "editFilterTitle": "Edit color-group filter",
+        "emptyBody": "Color groups let you color graph nodes by tag or folder — work notes in one color, personal notes in another. Add your first rule to get started.",
+        "emptyTitle": "No color groups yet",
+        "enableToggleAriaLabel": "Enable rule",
+        "filterAllNotes": "Matches every note",
+        "filterConditions_one": "{{count}} condition",
+        "filterConditions_other": "{{count}} conditions",
+        "heading": "Color groups",
+        "namePlaceholder": "Untitled rule"
+      },
       "depthToggleTitle": "Toggle neighborhood depth (1 ↔ 2 hops)",
       "filterAll": "All",
       "filterAroundNote": "Around this note",
@@ -1483,6 +1503,23 @@
       "noNotes": "No notes to graph yet.",
       "refresh": "Refresh",
       "refreshTitle": "The vault changed — rebuild the graph",
+      "settings": {
+        "appearanceHeading": "Appearance",
+        "closeTitle": "Close",
+        "forceCenter": "Center pull",
+        "forceLinkDistance": "Link distance",
+        "forceLinkStrength": "Link strength",
+        "forceRepel": "Repel",
+        "forcesHeading": "Forces",
+        "labelFadeZoom": "Label fade",
+        "lineThickness": "Line thickness",
+        "nodeSize": "Node size",
+        "nodeSizeStrength": "Size by connections",
+        "openTitle": "Graph settings",
+        "reset": "Reset to defaults",
+        "showArrows": "Show direction arrows",
+        "title": "Graph settings"
+      },
       "tagPlaceholder": "Tag…"
     },
     "import": {

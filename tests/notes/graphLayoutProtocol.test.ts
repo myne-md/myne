@@ -48,4 +48,36 @@ describe("computeGraphLayout", () => {
     });
     expect(positions.length).toBe(3); // no throw, dangling edge dropped
   });
+
+  it("omitting `forces` matches the pre-task-6 fixed constants explicitly passed", () => {
+    const withoutForces = computeGraphLayout(seededReq);
+    const withDefaultForces = computeGraphLayout({
+      ...seededReq,
+      forces: { centerStrength: 1, repelStrength: 120, linkStrength: 1, linkDistance: 60 },
+    });
+    expect(withoutForces.positions).toEqual(withDefaultForces.positions);
+  });
+
+  it("a custom `forces` payload produces a different (still finite) layout", () => {
+    const tight = computeGraphLayout({
+      ...seededReq,
+      forces: { centerStrength: 1, repelStrength: 20, linkStrength: 1, linkDistance: 10 },
+    });
+    const loose = computeGraphLayout({
+      ...seededReq,
+      forces: { centerStrength: 1, repelStrength: 300, linkStrength: 1, linkDistance: 150 },
+    });
+    for (const p of [...tight.positions, ...loose.positions]) {
+      expect(Number.isFinite(p.x)).toBe(true);
+      expect(Number.isFinite(p.y)).toBe(true);
+    }
+    // A much looser repel/link-distance settles the graph into a visibly
+    // larger spread than a much tighter one — proves `forces` actually reaches
+    // the simulation rather than being silently ignored.
+    const spread = (positions: typeof tight.positions) => {
+      const xs = positions.map((p) => p.x);
+      return Math.max(...xs) - Math.min(...xs);
+    };
+    expect(spread(loose.positions)).toBeGreaterThan(spread(tight.positions));
+  });
 });
