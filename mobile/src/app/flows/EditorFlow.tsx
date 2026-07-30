@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { CMEditor } from "@myne/editor/CMEditor";
 import { typographyStyle } from "@myne/editor/typography";
 import { REVEAL_ATTACHMENT_EVENT } from "@myne/editor/attachments/fileCardActions";
+import { installTaskChipEditor } from "@myne/editor/decorations/task-chip-listener";
 import { headingSections } from "@myne/dialect";
 import type { EditorView } from "@codemirror/view";
 import { emit, listen } from "@tauri-apps/api/event";
@@ -940,6 +941,14 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
     window.addEventListener(REVEAL_ATTACHMENT_EVENT, onReveal);
     return () => window.removeEventListener(REVEAL_ATTACHMENT_EVENT, onReveal);
   }, []);
+
+  // Task-field chip activation (MYND-614): the shared task-chip decoration
+  // dispatches `myne-open-task-chip`; the shared listener opens the field editor
+  // anchored to that chip and writes the result back through the single writer
+  // seam. This is the SAME implementation the desktop installs — without it the
+  // chips render and do nothing, which is exactly the state the mobile editor
+  // shipped in (the decoration is cross-client; only desktop had listened).
+  useEffect(() => installTaskChipEditor(), []);
 
   // Auto-lock: re-lock the vault after `auto_lock_seconds` of inactivity (any
   // touch / key / pointer resets the countdown). Idle re-lock is what makes the
