@@ -11,6 +11,7 @@ import {
   type ImportedAttachment,
   type ImportOutcome,
   autoPasteName,
+  compressionNoticeMessage,
   displayNameForRef,
   extensionForMime,
   findImportedImageRefs,
@@ -20,6 +21,7 @@ import {
   setImportFn,
   skipReasonFromError,
   summarizeBatch,
+  summarizeCompression,
 } from "../../src/editor/attachments/insert";
 
 function imported(id: string, filename: string): ImportedAttachment {
@@ -101,6 +103,71 @@ describe("summarizeBatch (multi-file partial-success toast)", () => {
 
   it("handles an all-skipped batch (no 'added' segment)", () => {
     expect(summarizeBatch([tooLarge, tooLarge])).toBe("2 skipped: too large");
+  });
+});
+
+describe("summarizeCompression / compressionNoticeMessage (insert-time notice)", () => {
+  const uncompressed: ImportOutcome = { ok: true, attachment: imported(ID_A, "x.png") };
+  const dedupHit: ImportOutcome = {
+    ok: true,
+    attachment: { ...imported(ID_A, "x.png"), deduplicated: true },
+  };
+  const compressedNoContainerChange: ImportOutcome = {
+    ok: true,
+    attachment: { ...imported(ID_A, "shot.webp"), size: 300, original_size: 2400 },
+  };
+  const compressedWithContainerChange: ImportOutcome = {
+    ok: true,
+    attachment: {
+      ...imported(ID_B, "shot.webp"),
+      content_type: "image/webp",
+      size: 300,
+      original_size: 2400,
+      container_changed: true,
+    },
+  };
+
+  it("is silent when nothing compressed (unchanged import)", () => {
+    expect(summarizeCompression([uncompressed])).toBeNull();
+  });
+
+  it("is silent on a dedup hit, even though the id was compressed originally", () => {
+    expect(summarizeCompression([dedupHit])).toBeNull();
+  });
+
+  it("is silent for a skipped outcome mixed into the batch", () => {
+    expect(summarizeCompression([{ ok: false, reason: "too-large" }])).toBeNull();
+  });
+
+  it("summarizes a single compressed import with both sizes", () => {
+    const summary = summarizeCompression([compressedNoContainerChange]);
+    expect(summary).toEqual({
+      originalBytes: 2400,
+      finalBytes: 300,
+      containerChanged: false,
+      contentType: "image/png",
+    });
+    expect(compressionNoticeMessage(summary!)).toBe("Compressed: 2.3 KiB → 300 B");
+  });
+
+  it("mentions the container change when one occurred", () => {
+    const summary = summarizeCompression([compressedWithContainerChange]);
+    expect(summary?.containerChanged).toBe(true);
+    expect(compressionNoticeMessage(summary!)).toBe("Compressed to WebP: 2.3 KiB → 300 B");
+  });
+
+  it("aggregates multiple compressed imports in one batch", () => {
+    const summary = summarizeCompression([
+      compressedNoContainerChange,
+      compressedWithContainerChange,
+      uncompressed,
+    ]);
+    expect(summary).toEqual({
+      originalBytes: 4800,
+      finalBytes: 600,
+      containerChanged: true,
+      contentType: "image/webp",
+    });
   });
 });
 

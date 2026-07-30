@@ -271,6 +271,14 @@ pub fn merge_prefs(local: &PrefsView, remote: &PrefsView) -> PrefsView {
     PrefsView {
         // ---- shared: scalar-LWW -----------------------------------------
         archive_disabled: lww!("archive_disabled", archive_disabled),
+        // ingest-image-compression: a content-fidelity switch with a
+        // vault-wide irreversible effect, unlike the device-local compute-
+        // budget siblings below (`attachment_ocr_enabled` et al.) — see
+        // prefs_classification.rs's comment on this row.
+        attachment_compression_enabled: lww!(
+            "attachment_compression_enabled",
+            attachment_compression_enabled
+        ),
         daily_date_format: lww!("daily_date_format", daily_date_format),
         daily_folder: lww!("daily_folder", daily_folder),
         daily_template: lww!("daily_template", daily_template),
@@ -401,6 +409,36 @@ mod tests {
         assert_eq!(ba.label.as_deref(), Some("Phone"));
         assert_eq!(ab.field_clocks.get("label"), Some(&200));
         assert_eq!(ba.field_clocks.get("label"), Some(&200));
+    }
+
+    #[test]
+    fn attachment_compression_enabled_is_shared_scalar_lww() {
+        // ingest-image-compression: unlike attachment_ocr_enabled (device-local),
+        // this toggle is shared — a vault-wide, irreversible content-fidelity
+        // switch, so the newer clock wins in both directions like `label`.
+        let mut a = PrefsView {
+            attachment_compression_enabled: false,
+            ..PrefsView::default()
+        };
+        stamped(&mut a, "attachment_compression_enabled", 200);
+        let mut b = PrefsView {
+            attachment_compression_enabled: true,
+            ..PrefsView::default()
+        };
+        stamped(&mut b, "attachment_compression_enabled", 100);
+
+        let ab = merge_prefs(&a, &b);
+        let ba = merge_prefs(&b, &a);
+        assert!(!ab.attachment_compression_enabled);
+        assert!(!ba.attachment_compression_enabled);
+        assert_eq!(
+            ab.field_clocks.get("attachment_compression_enabled"),
+            Some(&200)
+        );
+        assert_eq!(
+            ba.field_clocks.get("attachment_compression_enabled"),
+            Some(&200)
+        );
     }
 
     #[test]

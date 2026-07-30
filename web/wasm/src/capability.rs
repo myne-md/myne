@@ -106,6 +106,7 @@ pub const DISPATCHED: &[&str] = &[
     "plugin:prefs|set_deliberate_folders",
     "plugin:prefs|set_archived_folders",
     "plugin:prefs|set_ai_enabled",
+    "plugin:prefs|set_attachment_compression_enabled",
     "plugin:prefs|set_attachment_ocr_enabled",
     "plugin:prefs|set_ai_excluded_folders",
     "plugin:prefs|set_item_order",

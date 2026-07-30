@@ -438,10 +438,29 @@ pub struct PrefsView {
     #[serde(default)]
     pub archived_folders: Vec<alloc::string::String>,
 
+    /// Whether an imported image attachment is downscaled + re-encoded at
+    /// ingest time (ingest-image-compression). Canonical key
+    /// `attachment_compression_enabled` — sorts after `archived_folders`
+    /// (`archived_` < `attachment_c`), before `attachment_ocr_enabled`
+    /// (`attachment_c` < `attachment_o`).
+    ///
+    /// **Default ON**, hence the explicit default function: a bare
+    /// `#[serde(default)]` would yield `false` and silently disable the
+    /// feature for every vault whose prefs blob predates this field — i.e.
+    /// all of them.
+    ///
+    /// Unlike `attachment_ocr_enabled`, this switch's effect is **content-fidelity**,
+    /// not compute-budget, and is classified **shared** rather than
+    /// device-local in the sync merge (`docs/spec/sync-protocol.md` §10.2) —
+    /// see that classification for the rationale. The codec here is
+    /// classification-agnostic; it only carries the bit.
+    #[serde(default = "default_true")]
+    pub attachment_compression_enabled: bool,
+
     /// Whether attachment text extraction may read images and scanned PDFs
     /// (image OCR, MYND-441). Canonical key `attachment_ocr_enabled` — sorts
-    /// after `archived_folders` (`ar` < `at`), before `auto_lock_seconds`
-    /// (`att` < `aut`).
+    /// after `attachment_compression_enabled` (`attachment_c` < `attachment_o`),
+    /// before `auto_lock_seconds` (`att` < `aut`).
     ///
     /// **Default ON**, hence the explicit default function: a bare
     /// `#[serde(default)]` would yield `false` and silently disable the feature
@@ -975,6 +994,7 @@ impl Default for PrefsView {
             item_order: Vec::new(),
             deliberate_folders: Vec::new(),
             device_names: Default::default(),
+            attachment_compression_enabled: true,
             attachment_ocr_enabled: true,
             auto_lock_seconds: None,
             custom_theme: None,
@@ -1217,8 +1237,22 @@ fn canonical_json_encode(prefs: &PrefsView) -> Vec<u8> {
         out.extend_from_slice(b"],");
     }
 
+    // attachment_compression_enabled (canonical key
+    // 'attachment_compression_enabled' — after archived_folders
+    // ['archived_' < 'attachment_c'], before attachment_ocr_enabled
+    // ['attachment_c' < 'attachment_o']). Ingest-time image compression
+    // opt-out (ingest-image-compression). Emitted ONLY when FALSE — same
+    // inverse-of-`ai_enabled` rule as attachment_ocr_enabled, because this
+    // one also defaults to TRUE. A vault that never touched the toggle is
+    // therefore byte-identical to a pre-feature vault.prefs, which preserves
+    // the existing KAT vectors.
+    if !prefs.attachment_compression_enabled {
+        out.extend_from_slice(b"\"attachment_compression_enabled\":false,");
+    }
+
     // attachment_ocr_enabled (canonical key 'attachment_ocr_enabled' — after
-    // archived_folders ['ar' < 'at'], before auto_lock_seconds ['att' < 'aut']).
+    // attachment_compression_enabled ['attachment_c' < 'attachment_o'], before
+    // auto_lock_seconds ['att' < 'aut']).
     // Image-OCR opt-out (MYND-441). Emitted ONLY when FALSE — the inverse of the
     // `ai_enabled` rule, because this one defaults to TRUE. A vault that never
     // touched the toggle is therefore byte-identical to a pre-feature
@@ -2009,17 +2043,18 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
             None => (Vec::new(), post_archive),
         };
 
-    // ---- attachment_ocr_enabled (optional, after archived_folders) ----
-    // Canonical key order archived_folders < attachment_ocr_enabled <
-    // auto_lock_seconds, so when present this bool is a literal PREFIX of the
-    // post-archived_folders bytes (strip_prefix, not find_subslice — a folder
-    // name containing an `"attachment_ocr_enabled":`-looking substring cannot
-    // fool it). The encoder emits it only as `false`; `true` is tolerated for
-    // robustness. **Absent → TRUE**, the default, which is what makes every
-    // pre-MYND-441 blob decode with the feature on. MUST be followed by `,`.
-    let attachment_ocr_marker = b"\"attachment_ocr_enabled\":";
-    let (attachment_ocr_enabled, post_attachment_ocr) =
-        match post_archived_folders.strip_prefix(attachment_ocr_marker) {
+    // ---- attachment_compression_enabled (optional, after archived_folders) ----
+    // Canonical key order archived_folders < attachment_compression_enabled <
+    // attachment_ocr_enabled, so when present this bool is a literal PREFIX of
+    // the post-archived_folders bytes (strip_prefix, not find_subslice — a
+    // folder name containing an `"attachment_compression_enabled":`-looking
+    // substring cannot fool it). The encoder emits it only as `false`; `true`
+    // is tolerated for robustness. **Absent → TRUE**, the default, which is
+    // what makes every pre-feature blob decode with the feature on. MUST be
+    // followed by `,`.
+    let attachment_compression_marker = b"\"attachment_compression_enabled\":";
+    let (attachment_compression_enabled, post_attachment_compression) =
+        match post_archived_folders.strip_prefix(attachment_compression_marker) {
             Some(after) => {
                 let (val, after_val) =
                     parse_json_bool(after).ok_or(PrefsBlobError::PlaintextParseFailed)?;
@@ -2029,6 +2064,29 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
                 (val, rest)
             }
             None => (true, post_archived_folders),
+        };
+
+    // ---- attachment_ocr_enabled (optional, after attachment_compression_enabled) ----
+    // Canonical key order attachment_compression_enabled < attachment_ocr_enabled <
+    // auto_lock_seconds, so when present this bool is a literal PREFIX of the
+    // post-attachment_compression_enabled bytes (strip_prefix, not
+    // find_subslice — a folder name containing an
+    // `"attachment_ocr_enabled":`-looking substring cannot fool it). The
+    // encoder emits it only as `false`; `true` is tolerated for robustness.
+    // **Absent → TRUE**, the default, which is what makes every pre-MYND-441
+    // blob decode with the feature on. MUST be followed by `,`.
+    let attachment_ocr_marker = b"\"attachment_ocr_enabled\":";
+    let (attachment_ocr_enabled, post_attachment_ocr) =
+        match post_attachment_compression.strip_prefix(attachment_ocr_marker) {
+            Some(after) => {
+                let (val, after_val) =
+                    parse_json_bool(after).ok_or(PrefsBlobError::PlaintextParseFailed)?;
+                let rest = after_val
+                    .strip_prefix(b",")
+                    .ok_or(PrefsBlobError::PlaintextParseFailed)?;
+                (val, rest)
+            }
+            None => (true, post_attachment_compression),
         };
 
     // ---- auto_lock_seconds (optional, after archived_folders) ----
@@ -2264,6 +2322,7 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
     let startup_open_note = parse_optional_string_marker(after_key, b"\"startup_open_note\":");
 
     Ok(PrefsView {
+        attachment_compression_enabled,
         attachment_ocr_enabled,
         screen_capture_protection,
         show_note_timestamps,
@@ -3094,6 +3153,7 @@ mod tests {
     #[test]
     fn canonical_json_encodes_true_to_expected_bytes() {
         let prefs = PrefsView {
+            attachment_compression_enabled: true,
             attachment_ocr_enabled: true,
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
@@ -3155,6 +3215,7 @@ mod tests {
     #[test]
     fn canonical_json_encodes_false_to_expected_bytes() {
         let prefs = PrefsView {
+            attachment_compression_enabled: true,
             attachment_ocr_enabled: true,
             screen_capture_protection: false,
             bar_items_order: Vec::new(),
@@ -3475,6 +3536,7 @@ mod tests {
         assert_eq!(
             parsed,
             PrefsView {
+                attachment_compression_enabled: true,
                 attachment_ocr_enabled: true,
                 screen_capture_protection: true,
                 bar_items_order: Vec::new(),
@@ -3538,6 +3600,7 @@ mod tests {
         assert_eq!(
             parsed,
             PrefsView {
+                attachment_compression_enabled: true,
                 attachment_ocr_enabled: true,
                 screen_capture_protection: false,
                 bar_items_order: Vec::new(),
@@ -4235,6 +4298,82 @@ mod tests {
         );
     }
 
+    /// The inverse of the `ai_enabled` rule, same shape as
+    /// `attachment_ocr_enabled`'s coverage: it is emitted only when the user
+    /// turned it OFF. A vault that never touched the toggle therefore stays
+    /// byte-identical to a pre-feature blob, which is what preserves the
+    /// existing KAT vectors.
+    #[test]
+    fn attachment_compression_omitted_when_true_emitted_only_when_false() {
+        let on = canonical_json_encode(&PrefsView {
+            attachment_compression_enabled: true,
+            ..PrefsView::default()
+        });
+        assert!(
+            !core::str::from_utf8(&on)
+                .unwrap()
+                .contains("attachment_compression_enabled"),
+            "the default must not be written"
+        );
+        let off = canonical_json_encode(&PrefsView {
+            attachment_compression_enabled: false,
+            ..PrefsView::default()
+        });
+        assert_eq!(
+            off.as_slice(),
+            br#"{"attachment_compression_enabled":false,"screen_capture_protection":true}"#,
+        );
+    }
+
+    /// **The backward-compatibility assertion that matters.** Every vault in
+    /// existence has a prefs blob written before this field existed. Decoding
+    /// one must yield the feature ON — a bare `#[serde(default)]` would have
+    /// yielded `false` and silently disabled compression for every existing
+    /// user.
+    #[test]
+    fn a_prefs_blob_predating_the_field_decodes_with_compression_enabled() {
+        let pre_feature = br#"{"screen_capture_protection":true}"#;
+        let parsed = canonical_json_decode(pre_feature).expect("decodes");
+        assert!(
+            parsed.attachment_compression_enabled,
+            "an older blob must decode with compression ON, not off"
+        );
+    }
+
+    /// Round-trip in the non-default direction, including the canonical key
+    /// position (after `archived_folders`, before `attachment_ocr_enabled`).
+    #[test]
+    fn attachment_compression_false_round_trips_in_canonical_position() {
+        let src = PrefsView {
+            attachment_compression_enabled: false,
+            archived_folders: alloc::vec!["Ops/".into()],
+            attachment_ocr_enabled: false,
+            ..PrefsView::default()
+        };
+        let bytes = canonical_json_encode(&src);
+        let text = core::str::from_utf8(&bytes).unwrap();
+        let i_arch = text
+            .find("archived_folders")
+            .expect("archived_folders present");
+        let i_compress = text
+            .find("attachment_compression_enabled")
+            .expect("attachment_compression_enabled present");
+        let i_ocr = text
+            .find("attachment_ocr_enabled")
+            .expect("attachment_ocr_enabled present");
+        assert!(
+            i_arch < i_compress && i_compress < i_ocr,
+            "canonical key order violated: {text}"
+        );
+        let back = canonical_json_decode(&bytes).expect("decodes");
+        assert!(!back.attachment_compression_enabled);
+        assert!(!back.attachment_ocr_enabled);
+        assert_eq!(
+            back.archived_folders,
+            alloc::vec![alloc::string::String::from("Ops/")]
+        );
+    }
+
     #[test]
     fn ai_excluded_folders_omitted_when_empty_present_when_set() {
         let empty = canonical_json_encode(&PrefsView {
@@ -4724,6 +4863,7 @@ mod tests {
     fn encode_emits_theme_after_all_other_fields() {
         // Full field-mix: a < d < e < f < i < s < t. theme sits last.
         let prefs = PrefsView {
+            attachment_compression_enabled: true,
             attachment_ocr_enabled: true,
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
@@ -5022,6 +5162,7 @@ mod tests {
     fn encode_emits_sorted_keys_with_nonempty_folders() {
         // Keys sorted: deliberate_folders (d) before screen_capture_protection (s).
         let prefs = PrefsView {
+            attachment_compression_enabled: true,
             attachment_ocr_enabled: true,
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
@@ -5089,6 +5230,7 @@ mod tests {
     #[test]
     fn encode_sorts_and_dedupes_folder_elements() {
         let prefs = PrefsView {
+            attachment_compression_enabled: true,
             attachment_ocr_enabled: true,
             screen_capture_protection: false,
             bar_items_order: Vec::new(),
@@ -5159,6 +5301,7 @@ mod tests {
         // `"` is allowed in a folder segment (Q5 forbidden set excludes it),
         // so JSON escaping is load-bearing.
         let prefs = PrefsView {
+            attachment_compression_enabled: true,
             attachment_ocr_enabled: true,
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
@@ -5224,6 +5367,7 @@ mod tests {
     fn encode_nfc_normalizes_folder_elements() {
         // Decomposed "é" (e + U+0301) → NFC precomposed (U+00E9) at encode.
         let prefs = PrefsView {
+            attachment_compression_enabled: true,
             attachment_ocr_enabled: true,
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
@@ -5349,6 +5493,7 @@ mod tests {
         let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
         let account_hash = fixed_account_number_hash();
         let original = PrefsView {
+            attachment_compression_enabled: true,
             attachment_ocr_enabled: true,
             screen_capture_protection: false,
             bar_items_order: Vec::new(),
@@ -5438,6 +5583,7 @@ mod tests {
         // favorites, screen_capture_protection last. item_order is
         // HETEROGENEOUS — a folder path interleaved between note UUIDs.
         let prefs = PrefsView {
+            attachment_compression_enabled: true,
             attachment_ocr_enabled: true,
             field_clocks: Default::default(),
             screen_capture_protection: true,
@@ -5512,6 +5658,7 @@ mod tests {
         // encoder must NOT sort and NOT dedupe (contrast canonical_folder_list
         // which does both). The duplicate "zzz" must survive verbatim.
         let prefs = PrefsView {
+            attachment_compression_enabled: true,
             attachment_ocr_enabled: true,
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
@@ -5615,6 +5762,7 @@ mod tests {
         let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
         let account_hash = fixed_account_number_hash();
         let original = PrefsView {
+            attachment_compression_enabled: true,
             attachment_ocr_enabled: true,
             field_clocks: Default::default(),
             screen_capture_protection: false,
@@ -5703,6 +5851,7 @@ mod tests {
         // item_colors (i). The set-array is sorted + exact-deduped on encode
         // (graph/word-count out of order + a duplicate collapse to a clean set).
         let prefs = PrefsView {
+            attachment_compression_enabled: true,
             attachment_ocr_enabled: true,
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
@@ -5891,6 +6040,7 @@ mod tests {
     fn encode_emits_auto_lock_seconds_first_in_canonical_order() {
         // Canonical key order: auto_lock_seconds (a) < screen_capture_protection (s).
         let prefs = PrefsView {
+            attachment_compression_enabled: true,
             attachment_ocr_enabled: true,
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
@@ -5956,6 +6106,7 @@ mod tests {
     fn encode_emits_all_three_fields_in_canonical_order() {
         // a < d < s: auto_lock_seconds, deliberate_folders, screen_capture_protection.
         let prefs = PrefsView {
+            attachment_compression_enabled: true,
             attachment_ocr_enabled: true,
             screen_capture_protection: false,
             bar_items_order: Vec::new(),
@@ -6023,6 +6174,7 @@ mod tests {
         // no trailing ".0"). The clamp/always-on policy lives in the Tauri
         // layer; the codec faithfully persists whatever integer it is given.
         let prefs = PrefsView {
+            attachment_compression_enabled: true,
             attachment_ocr_enabled: true,
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
@@ -6158,6 +6310,7 @@ mod tests {
         let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
         let account_hash = fixed_account_number_hash();
         let original = PrefsView {
+            attachment_compression_enabled: true,
             attachment_ocr_enabled: true,
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
@@ -6267,6 +6420,7 @@ mod tests {
         // canonical order: left_collapsed < left_width < right_collapsed <
         // right_width.
         let prefs = PrefsView {
+            attachment_compression_enabled: true,
             attachment_ocr_enabled: true,
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
@@ -6566,6 +6720,7 @@ mod tests {
         let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
         let account_hash = fixed_account_number_hash();
         let original = PrefsView {
+            attachment_compression_enabled: true,
             attachment_ocr_enabled: true,
             screen_capture_protection: false,
             bar_items_order: Vec::new(),
@@ -6635,6 +6790,7 @@ mod tests {
         let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
         let account_hash = fixed_account_number_hash();
         let original = PrefsView {
+            attachment_compression_enabled: true,
             attachment_ocr_enabled: true,
             screen_capture_protection: false,
             bar_items_order: Vec::new(),
@@ -6965,6 +7121,7 @@ mod tests {
             &prefs_key_a,
             &account_hash_a,
             &PrefsView {
+                attachment_compression_enabled: true,
                 attachment_ocr_enabled: true,
                 screen_capture_protection: true,
                 bar_items_order: Vec::new(),
@@ -7027,6 +7184,7 @@ mod tests {
             &prefs_key_a,
             &account_hash_a,
             &PrefsView {
+                attachment_compression_enabled: true,
                 attachment_ocr_enabled: true,
                 screen_capture_protection: false,
                 bar_items_order: Vec::new(),
@@ -7091,6 +7249,7 @@ mod tests {
         // (not hardcoded) so the generator self-validates the canonical key
         // order + sequence discipline before emitting.
         let prefs_populated = PrefsView {
+            attachment_compression_enabled: true,
             attachment_ocr_enabled: true,
             field_clocks: Default::default(),
             screen_capture_protection: true,

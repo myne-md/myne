@@ -156,6 +156,41 @@ describe("importAndInsert", () => {
     expect(showAttachmentToast).not.toHaveBeenCalled();
     view.destroy();
   });
+
+  it("shows the compression notice (story 4) for a single compressed import", async () => {
+    restores.push(
+      setImportFn(async () => ({
+        ...imported(ID_A, "shot.webp"),
+        content_type: "image/webp",
+        size: 300,
+        original_size: 2400,
+        container_changed: true,
+      })),
+    );
+    const view = mount("");
+    await importAndInsert(
+      view,
+      [{ source: { kind: "bytes", bytes: [1], filename: "shot.png" }, filename: "shot.png" }],
+      0,
+    );
+    // A single clean success is otherwise silent — the notice is the ONE
+    // exception, and it must mention the container swap.
+    expect(showAttachmentToast).toHaveBeenCalledTimes(1);
+    expect(showAttachmentToast).toHaveBeenCalledWith("Compressed to WebP: 2.3 KiB → 300 B");
+    view.destroy();
+  });
+
+  it("stays silent when compression made no improvement (no `original_size`)", async () => {
+    restores.push(setImportFn(async () => imported(ID_A, "unchanged.png")));
+    const view = mount("");
+    await importAndInsert(
+      view,
+      [{ source: { kind: "bytes", bytes: [1], filename: "unchanged.png" }, filename: "x" }],
+      0,
+    );
+    expect(showAttachmentToast).not.toHaveBeenCalled();
+    view.destroy();
+  });
 });
 
 // Flush the import→insert async chain (arrayBuffer read + importMany + dispatch).

@@ -48,6 +48,10 @@ const V = {
   ],
   "src/components/settings/AppearancePanel.tsx": ["ported", "Themes + typography; all prefs-backed."],
   "src/components/settings/ArchiveSettings.tsx": ["ported", "Pure prefs toggle."],
+  "src/components/settings/AttachmentCompressionSettings.tsx": [
+    "ported",
+    "Pure prefs toggle; the setter is dispatched (ingest-image-compression).",
+  ],
   "src/components/settings/AttachmentOcrSettings.tsx": [
     "adapted",
     "Ships; OCR extraction is a backend concern and its command answers per the dispatcher.",

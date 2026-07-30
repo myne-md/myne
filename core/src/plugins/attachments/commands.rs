@@ -21,6 +21,7 @@
 //!
 //! See: ../../CLAUDE.md "Secret-handling logging discipline".
 
+use super::compress::{self, CompressOutcome};
 use super::error::{
     AttachmentCleanUnusedError, AttachmentDeleteError, AttachmentExportError,
     AttachmentImportError, AttachmentRenameError, AttachmentServeError, AttachmentUnusedListError,
@@ -131,6 +132,19 @@ pub struct ImportedAttachment {
     /// `true` when this id already existed (dedup hit — no new blob was
     /// written); `false` when a fresh blob + catalog entry were created.
     pub deduplicated: bool,
+    /// The byte length before ingest-time compression
+    /// (`ingest-image-compression`), present only on a fresh (non-dedup)
+    /// import where the transform actually reduced the stored bytes.
+    /// `None` on a dedup hit, an unchanged transform, an ineligible source,
+    /// or the preference being off — every one of those cases must leave
+    /// the insert-time notice silent (PRD story 4). Not persisted anywhere;
+    /// this is a one-shot IPC-response signal, not a catalog field.
+    pub original_size: Option<u64>,
+    /// `true` only when `original_size` is `Some` and the re-encode also
+    /// changed the stored container (e.g. PNG → lossless WebP); otherwise
+    /// `false`. Lets the insert-time notice mention a container swap
+    /// without knowing the pre-compression content-type.
+    pub container_changed: bool,
 }
 
 /// Lowercase-hex-encode a byte slice (no separators). Used for the
@@ -232,12 +246,12 @@ pub const UNUSED_CLEANUP_GRACE_SECS: u64 = 7 * 24 * 60 * 60;
 /// file-card and is never served inline.
 const OCTET_STREAM: &str = "application/octet-stream";
 
-/// Derive a display filename for a byte-source import when the caller
-/// did not supply one: a fixed stem plus the extension implied by the
-/// sniffed content-type. (For path imports the final path component is
-/// used instead — see [`attachment_import_with_dir`].)
-fn auto_filename(content_type: &str) -> String {
-    let ext = match content_type {
+/// The file extension conventionally implied by an allowlisted content-type
+/// (falls back to `"bin"` for anything else, e.g. `application/octet-stream`).
+/// Shared by [`auto_filename`] and [`rename_extension_for_content_type`], the
+/// two places that need to turn a content-type back into a display name.
+fn extension_for_content_type(content_type: &str) -> &'static str {
+    match content_type {
         "image/png" => "png",
         "image/jpeg" => "jpg",
         "image/gif" => "gif",
@@ -245,8 +259,29 @@ fn auto_filename(content_type: &str) -> String {
         "image/svg+xml" => "svg",
         "application/pdf" => "pdf",
         _ => "bin",
-    };
-    format!("attachment.{ext}")
+    }
+}
+
+/// Derive a display filename for a byte-source import when the caller
+/// did not supply one: a fixed stem plus the extension implied by the
+/// sniffed content-type. (For path imports the final path component is
+/// used instead — see [`attachment_import_with_dir`].)
+fn auto_filename(content_type: &str) -> String {
+    format!("attachment.{}", extension_for_content_type(content_type))
+}
+
+/// Swap `filename`'s extension to match `content_type` after ingest-time
+/// compression changed the stored container (PRD story 17: an exported
+/// `screenshot.png` that is actually WebP bytes is a lie the filename tells).
+/// Replaces a trailing `.ext` when one exists (including when the stem is
+/// otherwise empty, e.g. a dotfile-shaped name), else appends the new
+/// extension.
+fn rename_extension_for_content_type(filename: &str, content_type: &str) -> String {
+    let ext = extension_for_content_type(content_type);
+    match filename.rsplit_once('.') {
+        Some((stem, _old_ext)) => format!("{stem}.{ext}"),
+        None => format!("{filename}.{ext}"),
+    }
 }
 
 // ---- attachment_import --------------------------------------------------
@@ -416,6 +451,70 @@ where
     let content_type = sniff_content_type(&file_bytes).unwrap_or(OCTET_STREAM);
     tracing::debug!(stage = "sniff", content_type = content_type);
 
+    // (3b) Ingest-time compression gate (ingest-image-compression). Sits
+    // BEFORE the slot-holding guard below, on purpose, for two reasons: the
+    // transform itself is a pure function over bytes that needs no key
+    // material, and the preference read below takes its own momentary slot
+    // peek (`prefs_read_with_dir`) — re-entering the slots `RwLock`'s read
+    // side while a `SlotReadGuard` from `hold_unlocked_attachment_material`
+    // is already held is the reentrant-lock hazard `vault_unlock/state.rs`
+    // documents (a writer queued in between the two reads can starve the
+    // second one). Running the gate here needs no guard at all.
+    //
+    // Diverges deliberately from `attachment_ocr_enabled`'s fail-OPEN default
+    // (`src-tauri/src/plugins/attachments/ocr_queue.rs`): an unreadable prefs
+    // blob here means DO NOT compress — fail toward the reversible outcome,
+    // because a lost compression pass discards pixels permanently, where a
+    // lost OCR pass is just a missing search result the next successful
+    // drain repairs.
+    let compression_enabled =
+        crate::plugins::prefs::commands::prefs_read_with_dir(vault_dir, state, io)
+            .await
+            .map(|p| p.attachment_compression_enabled)
+            .unwrap_or(false);
+
+    let mut file_bytes = file_bytes;
+    let mut content_type = content_type;
+    let mut container_changed = false;
+    // `Some` only once the transform actually fires below — this is the
+    // insert-time-notice signal (task 8), captured BEFORE `file_bytes` is
+    // overwritten so it reads the true pre-compression length.
+    let mut original_size: Option<u64> = None;
+    if compression_enabled {
+        // The decode+resize+encode is real CPU work (task 1's own framing:
+        // "compression makes every imported image an untrusted decode") so it
+        // runs on the blocking pool like the AEAD seal below, not inline on
+        // the async task. The bytes are CLONED into the closure rather than
+        // moved: a worker panic (`JoinFailure`) must still leave the ORIGINAL
+        // bytes available to fall back to — compression is best-effort and
+        // must never turn a successful import into a failed one, and a moved-
+        // then-lost buffer would break that guarantee on the one path that
+        // can't be unit-tested (a codec panic).
+        let bytes_for_compress = file_bytes.clone();
+        let content_type_for_compress = content_type;
+        let outcome = crate::task::run_blocking(move || {
+            compress::compress_for_import(&bytes_for_compress, content_type_for_compress)
+        })
+        .await
+        .unwrap_or(CompressOutcome::Unchanged);
+        if let CompressOutcome::Compressed {
+            bytes,
+            content_type: new_content_type,
+        } = outcome
+        {
+            tracing::debug!(
+                stage = "compress",
+                from_bytes = file_bytes.len(),
+                to_bytes = bytes.len(),
+                content_type = new_content_type,
+            );
+            original_size = Some(file_bytes.len() as u64);
+            container_changed = new_content_type != content_type;
+            file_bytes = Zeroizing::new(bytes);
+            content_type = new_content_type;
+        }
+    }
+
     // (4) Slot gate — clone `(items_key, items_key_id, root_key)` out of
     //     the Unlocked slot. `root_key` is needed for BOTH the id-HMAC
     //     subkey (compute_attachment_id) and the catalog KEK
@@ -464,13 +563,28 @@ where
             size: existing.size,
             created_at: existing.created_at,
             deduplicated: true,
+            // A dedup hit never fires the insert-time notice (PRD story 4) —
+            // whatever compression happened, happened on the ORIGINAL import.
+            original_size: None,
+            container_changed: false,
         });
     }
 
     // (9) Fresh import. Resolve the display filename (caller-supplied,
-    //     else auto from the sniffed type) and the size + timestamp.
+    //     else auto from the sniffed type) and the size + timestamp. A
+    //     caller-supplied name survives a container change (PNG re-encoded to
+    //     WebP) with its extension swapped — `auto_filename` already derives
+    //     from the (possibly post-compression) `content_type`, so only the
+    //     caller-supplied branch needs the explicit fix-up.
     let filename = claimed_filename
         .filter(|f| !f.trim().is_empty())
+        .map(|f| {
+            if container_changed {
+                rename_extension_for_content_type(&f, content_type)
+            } else {
+                f
+            }
+        })
         .unwrap_or_else(|| auto_filename(content_type));
     let size = file_bytes.len() as u64;
     let created_at = created_at_override.unwrap_or_else(|| host.now_unix_secs());
@@ -629,6 +743,8 @@ where
         size,
         created_at,
         deduplicated: false,
+        original_size,
+        container_changed,
     })
 }
 
@@ -2601,6 +2717,10 @@ mod tests {
             assert_eq!(imported.filename, "photo.png");
             assert_eq!(imported.size, PNG_BYTES.len() as u64);
             assert_eq!(imported.id.len(), 64);
+            // Not a decodable image (see the module-level fixture note), so no
+            // compression fires — the insert-time-notice signal stays silent.
+            assert_eq!(imported.original_size, None);
+            assert!(!imported.container_changed);
 
             // Blob is on disk at attachments/<id>.
             let blob_path = tmp.path().join("attachments").join(&imported.id);
@@ -2960,6 +3080,250 @@ mod tests {
             )
             .expect("stored blob must decode under the vault's items_key");
             assert_eq!(plaintext.as_slice(), PNG_BYTES);
+        });
+    }
+
+    // ---- ingest-time compression (task 6, ingest-image-compression) ---
+
+    /// A real, decodable, downscale-eligible PNG (3000x1500, exceeding
+    /// `compress::MAX_LONG_EDGE_PX`). `Uncompressed` DEFLATE deliberately
+    /// bloats it, mirroring `compress.rs`'s own test fixtures, so a
+    /// lossless-WebP re-encode reliably wins rather than depending on the
+    /// PNG encoder's own compression luck.
+    fn make_oversized_png() -> Vec<u8> {
+        use image::codecs::png::{CompressionType, FilterType as PngFilterType, PngEncoder};
+        use image::{ImageBuffer, Rgb};
+        let (w, h) = (3000u32, 1500u32);
+        let img: ImageBuffer<Rgb<u8>, Vec<u8>> = ImageBuffer::from_fn(w, h, |x, y| {
+            Rgb([
+                ((x * 7 + y * 13) % 256) as u8,
+                ((x * 3 + y * 29) % 256) as u8,
+                ((x.wrapping_mul(11) ^ y.wrapping_mul(17)) % 256) as u8,
+            ])
+        });
+        let mut out = Vec::new();
+        let encoder = PngEncoder::new_with_quality(
+            &mut out,
+            CompressionType::Uncompressed,
+            PngFilterType::NoFilter,
+        );
+        img.write_with_encoder(encoder).expect("encode fixture png");
+        out
+    }
+
+    /// A `Hooks` that no-ops every lifecycle call — same helper shape as
+    /// `prefs::commands::tests::noop_hooks`, duplicated here rather than
+    /// exposed cross-module since it is a one-line `Arc::new`.
+    fn noop_hooks() -> crate::hooks::Hooks {
+        std::sync::Arc::new(crate::hooks::NoopHooks)
+    }
+
+    #[test]
+    fn import_compresses_oversized_png_and_stores_final_bytes() {
+        // Acceptance: "the stored id and catalog `size` reflect the
+        // compressed bytes." The preference defaults on, so a real
+        // downscale-eligible PNG must be re-encoded before the id/size are
+        // computed, not the original bytes.
+        rt().block_on(async {
+            let (tmp, state) = temp_vault().await;
+            let png = make_oversized_png();
+            let (expected_bytes, expected_content_type) =
+                match compress::compress_for_import(&png, "image/png") {
+                    CompressOutcome::Compressed {
+                        bytes,
+                        content_type,
+                    } => (bytes, content_type),
+                    CompressOutcome::Unchanged => {
+                        panic!("fixture must compress for this test to mean anything")
+                    }
+                };
+
+            let imported = attachment_import_with_dir(
+                tmp.path(),
+                &state,
+                ImportSource::Bytes {
+                    bytes: png.clone(),
+                    filename: Some("screenshot.png".to_string()),
+                },
+            )
+            .await
+            .expect("import succeeds");
+
+            assert_eq!(imported.content_type, expected_content_type);
+            assert_eq!(imported.size, expected_bytes.len() as u64);
+            assert!(imported.size < png.len() as u64);
+            // Container changed (png -> webp): filename extension follows.
+            assert_eq!(imported.filename, "screenshot.webp");
+            // Insert-time-notice signal: a fresh, actually-compressed import
+            // carries the pre-compression size and flags the container swap.
+            assert_eq!(imported.original_size, Some(png.len() as u64));
+            assert!(imported.container_changed);
+
+            let items_key = [SEED_ITEMS; 32];
+            let items_key_id = [SEED_ITEMS_ID; 16];
+            let id = hex_decode_id(&imported.id).unwrap();
+            let blob = std::fs::read(tmp.path().join("attachments").join(&imported.id)).unwrap();
+            let plaintext = protocol::decode_attachment_blob(
+                &blob,
+                &id,
+                imported.content_type.as_bytes(),
+                &items_key,
+                &items_key_id,
+            )
+            .expect("stored blob decodes under the vault's items_key");
+            assert_eq!(
+                plaintext.as_slice(),
+                expected_bytes.as_slice(),
+                "stored plaintext must be the COMPRESSED bytes, not the original"
+            );
+        });
+    }
+
+    #[test]
+    fn import_dedups_after_compression() {
+        // Acceptance: "importing the same source twice deduplicates to one
+        // blob." Dedup keys on the id computed from the POST-compression
+        // bytes, and the transform is deterministic (task 1), so two
+        // imports of the same source must collide.
+        rt().block_on(async {
+            let (tmp, state) = temp_vault().await;
+            let png = make_oversized_png();
+            let first = attachment_import_with_dir(
+                tmp.path(),
+                &state,
+                ImportSource::Bytes {
+                    bytes: png.clone(),
+                    filename: None,
+                },
+            )
+            .await
+            .expect("first import succeeds");
+            assert!(!first.deduplicated);
+            assert!(
+                first.original_size.is_some(),
+                "the fresh import actually compressed"
+            );
+
+            let second = attachment_import_with_dir(
+                tmp.path(),
+                &state,
+                ImportSource::Bytes {
+                    bytes: png,
+                    filename: None,
+                },
+            )
+            .await
+            .expect("second import succeeds");
+            assert!(second.deduplicated);
+            assert_eq!(second.id, first.id);
+            // A dedup hit must never carry the insert-time-notice signal —
+            // whatever compression happened, happened on the FIRST import.
+            assert_eq!(second.original_size, None);
+            assert!(!second.container_changed);
+
+            let rows = catalog_list_with_dir(tmp.path(), &state)
+                .await
+                .expect("list succeeds");
+            assert_eq!(rows.len(), 1, "compression must not defeat dedup");
+        });
+    }
+
+    #[test]
+    fn import_with_preference_off_is_byte_identical() {
+        // Acceptance: "with the preference off, import is byte-identical to
+        // pre-feature behaviour."
+        rt().block_on(async {
+            let (tmp, state) = temp_vault().await;
+            crate::plugins::prefs::commands::set_attachment_compression_enabled_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                false,
+                io(),
+                &host(),
+            )
+            .await
+            .expect("setter succeeds");
+
+            let png = make_oversized_png();
+            let imported = attachment_import_with_dir(
+                tmp.path(),
+                &state,
+                ImportSource::Bytes {
+                    bytes: png.clone(),
+                    filename: Some("screenshot.png".to_string()),
+                },
+            )
+            .await
+            .expect("import succeeds");
+
+            assert_eq!(imported.content_type, "image/png");
+            assert_eq!(imported.size, png.len() as u64);
+            assert_eq!(imported.filename, "screenshot.png");
+            // Preference off: no transform ran, so no notice signal either.
+            assert_eq!(imported.original_size, None);
+            assert!(!imported.container_changed);
+
+            let items_key = [SEED_ITEMS; 32];
+            let items_key_id = [SEED_ITEMS_ID; 16];
+            let id = hex_decode_id(&imported.id).unwrap();
+            let blob = std::fs::read(tmp.path().join("attachments").join(&imported.id)).unwrap();
+            let plaintext = protocol::decode_attachment_blob(
+                &blob,
+                &id,
+                imported.content_type.as_bytes(),
+                &items_key,
+                &items_key_id,
+            )
+            .expect("stored blob decodes under the vault's items_key");
+            assert_eq!(plaintext.as_slice(), png.as_slice());
+        });
+    }
+
+    #[test]
+    fn import_with_unreadable_vault_state_never_compresses() {
+        // Acceptance: "an unreadable prefs blob results in NO compression."
+        //
+        // This shared core reads `vault.prefs` (the compression gate) and
+        // `vault.meta` (the id-computation's `account_number_hash`) off the
+        // SAME file, so a genuinely corrupt `vault.meta` breaks both reads
+        // identically — there is no architecturally-reachable state in this
+        // function where the prefs peek fails but the rest of import still
+        // succeeds (the two reads share a failure mode by construction).
+        // Proving the fail-closed default (`.unwrap_or(false)`, diverging
+        // from OCR's `.unwrap_or(true)` in `ocr_queue.rs`) is therefore a
+        // negative proof: even in the exact failure class the divergence
+        // exists for, nothing gets compressed, encoded, or stored — the
+        // whole import fails closed rather than silently compressing.
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("attach-compress-unreadable-meta").expect("tempdir");
+            // Deliberately corrupt vault.meta (too short to parse) rather
+            // than seeding a valid one.
+            std::fs::write(tmp.path().join("vault.meta"), b"not a real vault.meta").unwrap();
+            let state = unlocked_state().await;
+
+            let png = make_oversized_png();
+            let result = attachment_import_with_dir(
+                tmp.path(),
+                &state,
+                ImportSource::Bytes {
+                    bytes: png,
+                    filename: None,
+                },
+            )
+            .await;
+            assert!(
+                matches!(
+                    result,
+                    Err(AttachmentImportError::InvalidVaultMeta)
+                        | Err(AttachmentImportError::Io { .. })
+                ),
+                "expected the corrupt vault.meta to fail the import closed, got {result:?}"
+            );
+            assert!(
+                !tmp.path().join("attachments").exists(),
+                "no blob may be written when the import fails before compression can run"
+            );
         });
     }
 

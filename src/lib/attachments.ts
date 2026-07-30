@@ -50,6 +50,14 @@ export interface ImportedAttachment {
   created_at: number;
   /** `true` when the id already existed (dedup hit — no new blob written). */
   deduplicated: boolean;
+  /** Byte length before ingest-time compression (`ingest-image-compression`),
+   *  present only when a fresh import actually got smaller. Optional (rather
+   *  than `| null`) so the many existing test fixtures built before this
+   *  field existed stay valid without an edit. */
+  original_size?: number | null;
+  /** `true` only when `original_size` is set and the re-encode also changed
+   *  the container (e.g. PNG → WebP). */
+  container_changed?: boolean;
 }
 
 /**

@@ -390,6 +390,7 @@ The table below is the **single normative classification**. The implementation m
 | `archive_disabled` | shared | scalar-LWW |
 | `daily_date_format`, `daily_folder`, `daily_template` | shared | scalar-LWW |
 | `new_note_location`, `new_note_location_folder` | shared | scalar-LWW |
+| `attachment_compression_enabled` | shared | scalar-LWW — a deliberate divergence from the neighboring `attachment_ocr_enabled` / `ai_enabled` / `spell_enabled` cluster below: those are compute-budget switches whose effect is local and reversible, while this one gates ingest-time image compression (`protocol.md` §9.9/§9.10), an irreversible, vault-wide content-fidelity change applied to every future imported attachment — the switch must have the same reach as the effect it controls, so it syncs. **Defaults to `true`**, so it is emitted only when `false` and a blob predating the field decodes with the feature on |
 | `deliberate_folders`, `archived_folders`, `ai_excluded_folders` | shared | set-union, **case-insensitive** (folded by `folderKey` per `markdown-dialect.md` §3.6.2 so `personal/` ≡ `PERSONAL/` collapse to the lexicographic-min display; sorted, deduplicated, clockless) — revised 2026-07-19, MYND-562 |
 | `spell_languages` | shared | set-union (sorted, deduplicated; clockless) — language codes, case-sensitive |
 | `favorites`, `item_order`, `view_order` | shared | sequence-LWW-on-whole (the whole ordered list is replaced, never per-element merged; one clock per list) |

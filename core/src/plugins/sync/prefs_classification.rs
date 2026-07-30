@@ -57,6 +57,17 @@ pub const CLASSIFICATION: &[(&str, PrefClass)] = &[
         "archived_folders",
         PrefClass::Shared(SharedDiscipline::SetUnion),
     ),
+    // Shared (ingest-image-compression, MYND-478 §10.2 row): a deliberate
+    // divergence from the neighboring compute-budget cluster just below
+    // (`attachment_ocr_enabled` / `ai_enabled` / `spell_enabled`) — those are
+    // per-device resource switches whose effect is local and reversible,
+    // while this one gates an irreversible, vault-wide content-fidelity
+    // change to every future imported attachment. The switch must have the
+    // same reach as the effect it controls, so it syncs.
+    (
+        "attachment_compression_enabled",
+        PrefClass::Shared(SharedDiscipline::ScalarLww),
+    ),
     ("attachment_ocr_enabled", PrefClass::DeviceLocal),
     ("auto_lock_seconds", PrefClass::DeviceLocal),
     ("bar_items_order", PrefClass::DeviceLocal),
@@ -181,6 +192,7 @@ mod tests {
             ai_excluded_folders: _,
             archive_disabled: _,
             archived_folders: _,
+            attachment_compression_enabled: _,
             attachment_ocr_enabled: _,
             auto_lock_seconds: _,
             bar_items_order: _,
@@ -240,6 +252,7 @@ mod tests {
             "ai_excluded_folders",
             "archive_disabled",
             "archived_folders",
+            "attachment_compression_enabled",
             "attachment_ocr_enabled",
             "auto_lock_seconds",
             "bar_items_order",
@@ -349,5 +362,16 @@ mod tests {
         );
         // The clock map is metadata, never merged as a preference.
         assert_eq!(classify("field_clocks"), Some(PrefClass::MergeMetadata));
+        // ingest-image-compression: a content-fidelity switch is shared,
+        // unlike its device-local compute-budget siblings just below it.
+        assert_eq!(
+            classify("attachment_compression_enabled"),
+            Some(PrefClass::Shared(SharedDiscipline::ScalarLww))
+        );
+        assert_eq!(
+            classify("attachment_ocr_enabled"),
+            Some(PrefClass::DeviceLocal)
+        );
+        assert_eq!(classify("ai_enabled"), Some(PrefClass::DeviceLocal));
     }
 }

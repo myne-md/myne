@@ -231,6 +231,18 @@ export interface PrefsView {
    */
   ai_enabled: boolean;
   /**
+   * Whether an imported image attachment is downscaled + re-encoded at ingest
+   * time (ingest-image-compression). **Defaults to `true`** — omitted from the
+   * encrypted blob when true, so a vault predating the field reads as enabled.
+   * The transform is irreversible (the original bytes are not kept), which is
+   * why this toggle — unlike its neighbor {@link PrefsView.attachment_ocr_enabled}
+   * — is classified **shared** rather than device-local in the sync merge
+   * (`sync-protocol.md` §10.2): a content-fidelity switch with a vault-wide,
+   * irreversible effect needs the same reach as that effect. Write via
+   * {@link setAttachmentCompressionEnabled}.
+   */
+  attachment_compression_enabled: boolean;
+  /**
    * Whether attachment text extraction may read images and scanned PDFs
    * (image OCR, MYND-441). **Defaults to `true`** — omitted from the encrypted
    * blob when true, so a vault predating the field reads as enabled. Turning it
@@ -593,6 +605,17 @@ export interface OcrBacklogProgress {
   remaining: number;
   /** Attachments extracted so far in this drain. */
   done: number;
+}
+
+/**
+ * Persist the `attachment_compression_enabled` toggle (ingest-image-compression)
+ * — whether a newly imported image attachment is downscaled + re-encoded before
+ * it is encrypted and stored. This preference is **shared** (vault-wide): the
+ * backend classifies it in the sync merge, not this wrapper. A rejected promise
+ * means the disk write failed and the caller's optimistic UI must revert.
+ */
+export async function setAttachmentCompressionEnabled(enabled: boolean): Promise<void> {
+  await invoke<void>("plugin:prefs|set_attachment_compression_enabled", { enabled });
 }
 
 /**

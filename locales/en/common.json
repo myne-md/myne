@@ -573,6 +573,10 @@
         "renameFailed": "Couldn't rename the attachment.",
         "saveDialogFailed": "Couldn't open the save dialog."
       },
+      "compression": {
+        "notice": "Compressed: {{from}} → {{to}}",
+        "noticeContainerChanged": "Compressed to {{format}}: {{from}} → {{to}}"
+      },
       "convert": {
         "cancel": "Cancel",
         "confirm": "Convert",
@@ -2085,6 +2089,11 @@
       "on": "On",
       "saveError": "Could not update the archiving setting."
     },
+    "attachmentCompression": {
+      "label": "Compress images on import",
+      "helper": "Shrinks pasted or dropped images before they are encrypted and stored, so your vault, backups, and sync stay smaller. This is irreversible — the original file is not kept. Applies to the whole vault, on every device.",
+      "errorSaveSetting": "Could not save this setting."
+    },
     "attachmentOcr": {
       "label": "Search inside images and scanned documents",
       "helper": "Reads text out of image attachments and scanned PDFs on this device, so search can find them by their contents. Nothing is uploaded. Turning this off stops the background extraction; text already extracted is kept.",
@@ -2579,6 +2588,7 @@
         "spellLanguages": "spell languages dictionaries locale words",
         "startupOpen": "startup open default file launch boot which note",
         "attachmentOcr": "ocr image scan scanned pdf photo screenshot text recognition search inside attachments cpu battery",
+        "attachmentCompression": "compress compression image shrink downscale resize webp jpeg import paste vault size storage",
         "syncAddDevice": "add device pair link phone laptop sync",
         "syncConflicts": "conflicts merge resolve versions sync",
         "syncDevices": "devices linked paired sync machines",

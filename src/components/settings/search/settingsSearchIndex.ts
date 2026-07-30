@@ -315,6 +315,14 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     keywordsKey: "settings.search.keywords.newNoteLocation",
   },
   {
+    id: "files.attachment-compression",
+    panelId: "files",
+    testid: "settings.attachment-compression",
+    titleKey: "settings.attachmentCompression.label",
+    descriptionKey: "settings.attachmentCompression.helper",
+    keywordsKey: "settings.search.keywords.attachmentCompression",
+  },
+  {
     id: "files.attachment-ocr",
     panelId: "files",
     testid: "settings.attachment-ocr",
