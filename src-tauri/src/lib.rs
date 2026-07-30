@@ -2,6 +2,11 @@ pub use myne_core::atomic_write;
 mod auto_lock;
 mod backup_container;
 mod backup_schedule;
+// The CLI terminal-access door (cli-thin-client task 3, MYND-490): a local
+// socket bound to `cli_enabled` AND unlocked, torn down when either drops.
+// See module docs for the full shape; `auto_lock::spawn_idle_lock_timer`
+// below is untouched by this feature by design.
+mod cli_bridge;
 // `clipper` — the keyless browser↔desktop native-messaging host (TB10,
 // `ext-foundation-handoff`). An EXTERNAL stdio ingress NOT governed by the
 // Tauri capability ACL (TB6); it carries its own untrusted-input
@@ -48,6 +53,9 @@ pub use myne_core::search;
 // (mirrors the `myne_core::paths` re-export above).
 pub use myne_core::{snapshot_policy, snapshot_store};
 mod spell;
+// Shared Unix-domain-socket bind (owner-only 0600, TOCTOU-closed), used by
+// both local ingresses: `clipper::relay` and `cli_bridge::socket`.
+mod uds;
 #[cfg(test)]
 pub use myne_core::test_support;
 pub use myne_core::text;
@@ -302,6 +310,11 @@ pub fn run() {
         // PairingState singleton (pending session + in-memory token
         // registry; task 7 persists it).
         .plugin(plugins::clipper_pairing::init())
+        // cli-thin-client task 12 (MYND-490): the CLI door's Settings block
+        // reads one read-only command from here — the RAM-only last-access age
+        // and whether `myne` is on the user's PATH. Everything about the door
+        // that IS a preference goes through `prefs` instead.
+        .plugin(cli_bridge::plugin::init())
         // MYND-262: offline spell-check engine (spellbook). Binds spell_check +
         // add/ignore commands; SpellState is managed in setup below.
         .plugin(spell::init())
@@ -395,6 +408,27 @@ pub fn run() {
             // MYND-121: start the authoritative, fail-closed idle-lock timer.
             // Runs for the process lifetime; no-op until a vault is Unlocked.
             auto_lock::spawn_idle_lock_timer(app.handle().clone());
+            // cli-thin-client task 12: the CLI door's last-access marker.
+            // Managed BEFORE the supervisor is spawned (below) so the socket
+            // side and the `cli-bridge` command read one instance. Managed
+            // unconditionally, not under `#[cfg(unix)]`, because the command
+            // is registered on every platform and a `State` with nothing
+            // behind it fails the invoke rather than answering "never used".
+            app.manage(cli_bridge::activity::SharedLastAccess::default());
+            // cli-thin-client task 3 (MYND-490): the CLI terminal-access
+            // door's lifecycle supervisor. Runs for the process lifetime;
+            // the command socket it manages exists only while `cli_enabled`
+            // is true AND the vault is Unlocked. Unix-only today, matching
+            // `clipper::relay_app::spawn_relay_listener`'s existing posture.
+            #[cfg(unix)]
+            cli_bridge::spawn_lifecycle_supervisor(app.handle().clone());
+            // cli-thin-client task 11: put the bundled `myne` sidecar on the
+            // user's PATH via a `~/.local/bin` launcher. Idempotent,
+            // best-effort and non-fatal (the clipper wrapper's discipline),
+            // and NOT gated on `cli_enabled`: the CLI's "access is disabled,
+            // enable it in Settings" refusal is only readable if the command
+            // exists. Never clobbers a `myne` we did not write.
+            cli_bridge::path_shim::reconcile();
             // Shared command-core lifecycle hooks (myne-core). The desktop
             // impl captures the AppHandle and delegates to the desktop-only
             // modules below; must be managed before any command taking

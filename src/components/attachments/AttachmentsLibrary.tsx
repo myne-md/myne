@@ -39,6 +39,7 @@ import {
   type CleanResult,
 } from "../../lib/attachments";
 import { attachmentUrl } from "../../notes/attachmentRef";
+import { getHost } from "@myne/editor/host";
 import { startTranscription } from "../../lib/transcribe";
 import { usePrefs } from "../../hooks/usePrefs";
 import { showAttachmentToast } from "../../editor/attachments/toast";
@@ -240,11 +241,12 @@ export function AttachmentsLibrary({ onClose }: AttachmentsLibraryProps) {
   const { t } = useTranslation();
   const ctx = useSelectedNote();
   // AI opt-in gate for the per-item Transcribe action (voice-to-text MYND-552,
-  // SYNC-V9). Gated on `ai_enabled` ALONE — a library attachment has no single
-  // folder, so the `ai_excluded_folders` gate does NOT apply (transcribing the
-  // media bytes is an explicit per-attachment user action, not ambient reading).
+  // SYNC-V9). Gated on `transcription_enabled` (MYND-592) — its own switch, not
+  // the AI beta opt-in. The `ai_excluded_folders` rule never applied here either:
+  // a library attachment has no single folder, and transcribing the media bytes
+  // is an explicit per-attachment user action rather than ambient reading.
   const { prefs } = usePrefs();
-  const aiEnabled = prefs.ai_enabled;
+  const transcriptionEnabled = prefs.transcription_enabled;
   // Resolve the option labels at render time (reactive to language switch).
   const typeFilterOptions: readonly SelectOption<TypeFilter>[] = useMemo(
     () => TYPE_FILTER_OPTION_KEYS.map((o) => ({ value: o.value, label: t(o.labelKey) })),
@@ -256,6 +258,9 @@ export function AttachmentsLibrary({ onClose }: AttachmentsLibraryProps) {
   );
   const [entries, setEntries] = useState<CatalogEntry[] | null>(null);
   const [loadError, setLoadError] = useState(false);
+  /** Bumped once the visible entries' render URLs are resolvable, so the
+   *  thumbnails re-render against the warmed answers (see the effect below). */
+  const [warmNonce, setWarmNonce] = useState(0);
   const [view, setView] = useState<ViewMode>("grid");
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<SortKey>("created-desc");
@@ -523,6 +528,46 @@ export function AttachmentsLibrary({ onClose }: AttachmentsLibraryProps) {
 
   // ---- render ------------------------------------------------------------
 
+  // Make every listed attachment's render URL resolvable before the thumbnails
+  // ask for it.
+  //
+  // On desktop this is a no-op: `attachment://<id>` is a pure function of the
+  // id and the Rust handler decrypts per request. A browser has no custom
+  // protocol — it mints a `blob:` URL from bytes the Worker decrypted — and
+  // `resolveRef` is called during render, where it cannot do IO. So an id
+  // nobody warmed resolves to the pending placeholder, which is why the web
+  // library painted a grid of blank tiles while the same files rendered fine
+  // once something else had warmed them.
+  //
+  // The editor already warms the ids the OPEN NOTE embeds
+  // (`editor/src/attachments/catalog.ts`); nothing warmed the ids the LIBRARY
+  // lists, and this surface is precisely the one that lists all of them.
+  //
+  // Scoped to what is actually on screen after filtering, not the whole
+  // catalog: warming everything would decrypt every attachment in the vault to
+  // paint one screenful, which on an attachment-heavy vault is gigabytes.
+  useEffect(() => {
+    const warmRefs = getHost().attachments.warmRefs;
+    if (warmRefs === undefined) return; // desktop — nothing to prepare
+    const ids = visible.map((e) => e.id);
+    if (ids.length === 0) return;
+    let cancelled = false;
+    void warmRefs(ids)
+      .then(() => {
+        // The tiles rendered against the pre-warm answers, so they have to be
+        // told to ask again.
+        if (!cancelled) setWarmNonce((n) => n + 1);
+      })
+      .catch(() => {
+        // Best-effort, and per-id inside the host: one attachment that will not
+        // decrypt must not blank the rest. Anything unwarmed keeps the pending
+        // placeholder, which is what a failed desktop fetch shows too.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [visible]);
+
   const isLoading = entries === null;
   const isEmpty = !isLoading && (entries?.length ?? 0) === 0;
   const isNoMatch = !isLoading && !isEmpty && visible.length === 0;
@@ -545,7 +590,7 @@ export function AttachmentsLibrary({ onClose }: AttachmentsLibraryProps) {
     onJump: handleJump,
     // Transcribe is an audio-only, `ai_enabled`-gated action (SYNC-V9).
     transcribable: kindOf(entry.content_type) === "audio",
-    aiEnabled,
+    transcriptionEnabled,
     onTranscribe: () => handleTranscribe(entry),
     // Only image/PDF open the shared lightbox preview. Audio plays inline in
     // its own tile (its own play button), and a generic ("other") file has no
@@ -680,7 +725,11 @@ export function AttachmentsLibrary({ onClose }: AttachmentsLibraryProps) {
         ) : view === "grid" ? (
           <div style={GRID_STYLE}>
             {visible.map((entry) => (
-              <AttachmentTile key={entry.id} {...itemProps(entry)} />
+              /* `warmNonce` in the key remounts the tile once its render URL
+                 has been warmed (web only — see the warm effect above), so the
+                 <img> is recreated against the resolved URL rather than left
+                 holding the pending placeholder it first rendered with. */
+              <AttachmentTile key={`${entry.id}:${warmNonce}`} {...itemProps(entry)} />
             ))}
           </div>
         ) : (
@@ -825,7 +874,7 @@ interface ItemActionProps {
   /** Whether this attachment is audio → the ⋮ menu shows Transcribe (MYND-552). */
   transcribable: boolean;
   /** Whether AI is enabled (SYNC-V9 gate for Transcribe — `ai_enabled` alone). */
-  aiEnabled: boolean;
+  transcriptionEnabled: boolean;
   /** Start transcribing this attachment (audio only). */
   onTranscribe: () => void;
   /** Whether THIS row's ⋮ action menu is the one open (single-open). */
@@ -1144,7 +1193,7 @@ function ItemMenu({
   onStartRename,
   onDelete,
   transcribable,
-  aiEnabled,
+  transcriptionEnabled,
   onTranscribe,
 }: {
   open: boolean;
@@ -1156,7 +1205,7 @@ function ItemMenu({
   onStartRename: () => void;
   onDelete: () => void;
   transcribable: boolean;
-  aiEnabled: boolean;
+  transcriptionEnabled: boolean;
   onTranscribe: () => void;
 }) {
   const { t } = useTranslation();
@@ -1171,10 +1220,11 @@ function ItemMenu({
           },
         ]
       : []),
-    // Transcribe — audio only (SYNC-V9), gated on `ai_enabled` ALONE (no
-    // folder-exclusion gate). HIDDEN when local AI is off (MYND-270 product
-    // tweak: no dangling affordance when the subsystem is off), not disabled.
-    ...(transcribable && aiEnabled
+    // Transcribe — audio only (SYNC-V9), gated on `transcription_enabled`
+    // (MYND-592). HIDDEN when the feature is off (MYND-270 product tweak: no
+    // dangling affordance when the subsystem is off), not disabled — the same
+    // affordance policy the in-note widget uses, so the two surfaces agree.
+    ...(transcribable && transcriptionEnabled
       ? [
           {
             id: "transcribe",
@@ -1352,7 +1402,7 @@ function AttachmentTile({
   onJump,
   previewable,
   transcribable,
-  aiEnabled,
+  transcriptionEnabled,
   onTranscribe,
   actionMenuOpen,
   onToggleActionMenu,
@@ -1406,7 +1456,7 @@ function AttachmentTile({
             onStartRename={onStartRename}
             onDelete={onDelete}
             transcribable={transcribable}
-            aiEnabled={aiEnabled}
+            transcriptionEnabled={transcriptionEnabled}
             onTranscribe={onTranscribe}
           />
         </div>
@@ -1469,7 +1519,7 @@ function AttachmentListRow({
   onJump,
   previewable,
   transcribable,
-  aiEnabled,
+  transcriptionEnabled,
   onTranscribe,
   actionMenuOpen,
   onToggleActionMenu,
@@ -1529,7 +1579,7 @@ function AttachmentListRow({
           onStartRename={onStartRename}
           onDelete={onDelete}
           transcribable={transcribable}
-          aiEnabled={aiEnabled}
+          transcriptionEnabled={transcriptionEnabled}
           onTranscribe={onTranscribe}
         />
       </div>

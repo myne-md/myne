@@ -1,0 +1,24 @@
+[package]
+name = "myne-cli"
+version = "0.1.0"
+edition = "2021"
+license = "AGPL-3.0"
+publish = false
+description = "The `myne` sidecar CLI: talks to the running, unlocked desktop over its local command socket (cli-thin-client, MYND-490). Never opens the vault, never holds a key."
+
+[[bin]]
+name = "myne"
+path = "src/main.rs"
+
+[dependencies]
+# Only the wire encoding — no dependency on `myne-desktop`/`myne-core`/
+# `protocol` (see the workspace Cargo.toml comment on this member).
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# Cross-platform data-dir resolution, matching Tauri's own
+# `app_data_dir()` exactly (`dirs::data_dir().join(identifier)` — verified
+# against the vendored `tauri` crate's `src/path/desktop.rs`). Already a
+# transitive dependency of this workspace via `tauri` itself, so this adds
+# no new supply-chain surface, just a direct edge to a version already
+# resolved in `Cargo.lock`.
+dirs = "6"

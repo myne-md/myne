@@ -72,6 +72,14 @@ e2e/artifacts/
 # about (phase3-web-client task 105).
 e2e-web/artifacts/
 
+# cli-thin-client task 11: the staged `myne` CLI sidecar Tauri's `externalBin`
+# consumes. Pure build artefact — `scripts/build-cli-sidecar.mjs` rebuilds it from
+# `cli/` on every `pnpm tauri dev` / `pnpm tauri build`, and its name carries the
+# host target triple, so a committed copy would be wrong on every other platform.
+# Same reasoning as `web/wasm/pkg/` below: a multi-MB binary in every diff, and a
+# bundle whose contents depend on whoever last ran the script.
+src-tauri/binaries/
+
 # phase3-web-client task 11: the wasm-bindgen output for `web/wasm`. Pure build
 # artefact — derived from `web/wasm/src/` plus the pinned toolchain by
 # `scripts/build-wasm.sh`. Committing it would put a 128 KiB binary in every diff

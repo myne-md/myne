@@ -11,6 +11,7 @@ import { invoke } from "../platform/core";
 import { extractBlockAnchors } from "@myne/editor";
 import { foldSegment, normalizeFolderPath } from "../dialect/folderPath";
 import { parse } from "../dialect/parse";
+import { extractLineTasks, type LineTask } from "../dialect/visitors/lineTasks";
 import type {
   ParseResult,
   WikilinkRef,
@@ -214,7 +215,7 @@ export function extractWikilinkEdges(
 }
 
 /** Upsert a note's index contribution (title + folder + wikilink edges + tags
- *  + typed frontmatter properties). */
+ *  + typed frontmatter properties + line-tasks). */
 export async function vaultIndicesApply(
   noteId: string,
   title: string | null,
@@ -223,6 +224,7 @@ export async function vaultIndicesApply(
   tags: ReadonlyArray<TagEntry>,
   properties: ReadonlyArray<PropertyEntry>,
   blockAnchors: ReadonlyArray<BlockAnchorEntry>,
+  tasks: ReadonlyArray<LineTask>,
 ): Promise<void> {
   await invoke<void>("plugin:vault-indices|vault_indices_apply", {
     noteId,
@@ -238,6 +240,12 @@ export async function vaultIndicesApply(
     properties,
     // MYND-382: enumerate-only imported block anchors for the `[[^^` picker.
     blockAnchors,
+    // MYND-612: the note's line-tasks, typed TS-side. Sent unconditionally —
+    // `[]` included — because `apply` has replace semantics: a note whose last
+    // task was just deleted must overwrite the stored vector, and an omitted
+    // field would rely on Rust's `unwrap_or_default()` meaning the same thing.
+    // Saying it explicitly keeps the wire honest about what this client knows.
+    tasks,
   });
   // SYNC-5: bump the index-changed nonce AFTER the slice updated (single
   // post-mutation chokepoint) so reader surfaces re-query.
@@ -390,6 +398,12 @@ export async function reindexNoteFromBody(
       extractProperties(parsed.frontmatter.raw),
       // MYND-382: imported `^block-id` anchors for the vault-wide `[[^^` picker.
       extractBlockAnchorEntries(body),
+      // MYND-612: line-tasks. The extractor re-parses rather than reusing the
+      // tree above, because `parse()` keeps its tree local — one extra lezer
+      // pass per save, which is below measurement next to the IPC round-trip.
+      // It owns its own exclusions (frontmatter, drawing-class notes, the raw
+      // cap), so nothing here filters what it returns.
+      extractLineTasks(body),
     );
   } catch {
     // Best-effort — self-healed by a later apply / the next reconcile.

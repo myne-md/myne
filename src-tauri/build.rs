@@ -138,6 +138,22 @@ fn main() {
                 "device_platform",
                 "vault_set_label",
                 "vault_set_icon",
+                // MYND-613. NOTE: several shipped prefs setters
+                // (`set_archive_disabled`, `set_show_note_timestamps`, …) are
+                // registered in the handler list and in default.toml but are
+                // MISSING from this mirror — pre-existing, not introduced here.
+                "set_show_task_marker",
+                "set_transcription_enabled",
+                "set_reminders_enabled",
+                "set_reminder_horizon_days",
+                // developer-mode (MYND-593): named here too, though not
+                // strictly required (the plugin's own InlinedPlugin
+                // declaration above is what creates the `prefs:` ACL
+                // namespace; a hand-written `[[permission]]` block in
+                // permissions/prefs/default.toml is what actually wires this
+                // one — see the `prefs_read` siblings above for the same
+                // belt-and-suspenders pattern).
+                "set_developer_mode",
             ]),
         )
         .plugin(
@@ -214,6 +230,10 @@ fn main() {
                 "vault_indices_forward",
                 "vault_indices_all_edges",
                 "vault_indices_orphans",
+                // MYND-612. NOTE: `vault_indices_block_anchors` (MYND-382) is
+                // registered in the handler list and in default.toml but is
+                // MISSING from this mirror — pre-existing, not introduced here.
+                "vault_indices_tasks",
                 "vault_indices_backlink_candidates",
                 "vault_indices_by_tag",
                 "vault_indices_tag_tree",
@@ -440,6 +460,21 @@ fn main() {
                 "clip_dispatch_complete",
                 "pairing_dispatch_complete",
             ]),
+        )
+        .plugin(
+            "cli-bridge",
+            // cli-thin-client task 12 (MYND-490): ONE read-only command behind
+            // the Settings CLI-access block. It answers the two facts that are
+            // deliberately not `vault.prefs` fields — how long ago the command
+            // socket last served a request (RAM only; see
+            // `cli_bridge::activity`) and whether `myne` is on the user's
+            // `$PATH` at all, plus the shim dir for the one `export PATH=…`
+            // line we decline to write into their shell profile
+            // (`cli_bridge::path_shim` rule 3). No arguments, no vault access,
+            // no writes. InlinedPlugin mirror load-bearing per the
+            // vault-creation note above; keep it lock-stepped with
+            // `permissions/cli-bridge/default.toml`.
+            tauri_build::InlinedPlugin::new().commands(&["cli_access_state"]),
         );
 
     // local-ai (MYND-406): declare the `local-inference` plugin's ACL namespace

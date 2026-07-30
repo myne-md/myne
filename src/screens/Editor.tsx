@@ -49,6 +49,7 @@ import { catalogDefaults } from "../commands/bindableCatalog";
 import { asViewMode, type ViewMode } from "../editor/view-mode";
 import { VIM_MODE_EVENT, type VimModeEventDetail } from "../editor/vim";
 import { CLOSE_ACTIVE_TAB_EVENT } from "../notes/closeActiveTabSignal";
+import { installTaskChipEditor } from "@myne/editor/decorations/task-chip-listener";
 import { focusKindOf } from "../commands/scope";
 import { FailClosedError } from "../components/FailClosedError";
 import { StorageLost } from "./StorageLost";
@@ -130,6 +131,8 @@ import { requestRevealViews } from "../notes/views/revealViewsSignal";
 import { useResolverNotes } from "../notes/resolverNotes";
 import { UnlinkedMentionsSection } from "../notes/components/UnlinkedMentionsSection";
 import { AiChatTab } from "../notes/components/AiChatTab";
+import { NoteTasksPanel } from "../notes/components/TasksPane";
+import { TASK_WRITE_EVENT } from "../notes/toggleTask";
 import { clearAiOutput } from "../notes/ai/aiOutputStore";
 import { clearTagSuggest } from "../notes/ai/tagSuggestStore";
 import { clearChat, stopChatTurn } from "../notes/ai/chatStore";
@@ -170,6 +173,10 @@ import { ResizeHandle } from "../components/primitives/ResizeHandle";
 import { VaultSwitcher } from "../components/VaultSwitcher";
 import { useEditorLayout } from "./editorLayout";
 import { usePrefs } from "../hooks/usePrefs";
+import { useReminderScheduler } from "../hooks/useReminderScheduler";
+import { createInAppNotifier } from "../lib/reminderNotifier";
+import { useLiveVaultTasks } from "../notes/taskIndex";
+import i18n from "../i18n";
 import { useIdleAutoLock } from "../hooks/useIdleAutoLock";
 import { runFlushChain } from "../lib/flush-chain";
 import {
@@ -645,6 +652,22 @@ function EditorChrome({
     (message: string) => setToast({ message }),
     [setToast],
   );
+  /** MYND-643: copy the open note's body to the clipboard. A clipboard write
+   *  has no visible result, so success MUST toast — otherwise the button reads
+   *  as broken — and so must failure, or the user pastes stale content
+   *  believing it worked. */
+  const copyOpenNoteMarkdown = useCallback(async () => {
+    const id = ctx.selectedId;
+    if (id === null) return;
+    try {
+      const { copyNoteMarkdown } = await import("../notes/copyNoteMarkdown");
+      await copyNoteMarkdown(id);
+      setToast({ message: i18n.t("export.note.modal.copied") });
+    } catch {
+      setToast({ message: i18n.t("export.note.modal.copyFailed") });
+    }
+  }, [ctx.selectedId, setToast]);
+
   const showExportToast = useCallback(
     (t: ExportToast) =>
       setToast({
@@ -830,6 +853,27 @@ function EditorChrome({
     window.addEventListener("myne-open-tag", onOpenTag);
     return () => window.removeEventListener("myne-open-tag", onOpenTag);
   }, []);
+  // A task written from a LIST surface (MYND-616 task 8) changes a note's bytes
+  // out-of-band of any pane's own autosave, so every open pane must re-read.
+  // `reloadOpenNote` is the existing blanket bump used after a sync pull — each
+  // pane applies its own dirty guard, so it never clobbers in-flight typing.
+  useEffect(() => {
+    const onWritten = (): void => ctx.reloadOpenNote();
+    window.addEventListener(TASK_WRITE_EVENT, onWritten);
+    return () => window.removeEventListener(TASK_WRITE_EVENT, onWritten);
+  }, [ctx]);
+  // Editor task-field chip activation (MYND-614 tasks 6 + 7): the chip
+  // decoration dispatches a bubbling `myne-open-task-chip` event; open the
+  // field editor anchored to that chip and write the result back through the
+  // single writer seam. Same Editor-level-listener shape as the `#tag` chip
+  // above, and for the same reason — no per-pane prop threading.
+  //
+  // Because the chips never open on caret entry, this listener is the ONLY way
+  // to edit these values in live mode. It is therefore load-bearing rather than
+  // convenience wiring: without it the chips render and do nothing. The listener
+  // itself lives in the shared editor package so desktop and mobile install the
+  // SAME implementation (`installTaskChipEditor`) rather than two copies.
+  useEffect(() => installTaskChipEditor(), []);
   const [newFromTemplateOpen, setNewFromTemplateOpen] = useState<boolean>(false);
   // Bottom-bar readout (save status + word count) — reported up by
   // whichever PaneView is currently focused (MYND-166). Per-pane PaneViews
@@ -859,6 +903,38 @@ function EditorChrome({
   // optimistically. `barMenu` holds the click coords while the menu is open.
   const { prefs: barPrefs, setHiddenBarItems, setBarItemsOrder } = usePrefs();
   const hiddenBarItems = barPrefs.hidden_bar_items;
+
+  // Task reminders, in-app tier (MYND-618). Mounted in THIS component rather than
+  // the outer `Editor`, and the reason is structural: the task index reads the
+  // sidebar's live/trashed set, so it needs `<SidebarStateProvider>` — which is
+  // what this component is inside. In the outer one the hook would also run on
+  // the fail-closed path, where no provider exists and no editor body renders.
+  // It reads `barPrefs` rather than calling `usePrefs` again, since a second call
+  // is a second `prefsRead` IPC for a value already in hand.
+  //
+  // This component's lifetime is still the unlocked session's, so the scheduler's
+  // is too, and `reminderLifecycle`'s cancel-everything-on-lock is satisfied by
+  // this unmount rather than by a second signal kept in step with the first.
+  //
+  // The toast is deliberately **content-free** even though it never leaves the
+  // app. `ReminderPayload` carries `{id, at}` and nothing else; resolving the id
+  // back to its task here to quote the text would make that contract look soft,
+  // while a reminder can still surface over a shared screen. It says a reminder
+  // is due — the task surfaces say which.
+  const reminderTasks = useLiveVaultTasks();
+  const reminderNotifier = useMemo(
+    () =>
+      createInAppNotifier({
+        deliver: () => setToast({ message: i18n.t("tasks.reminder.due") }),
+      }),
+    [setToast],
+  );
+  useEffect(() => () => reminderNotifier.dispose(), [reminderNotifier]);
+  useReminderScheduler({
+    enabled: barPrefs.reminders_enabled,
+    tasks: reminderTasks,
+    notifier: reminderNotifier,
+  });
   // `barMenu` holds the open menu's anchor coords + which mode it is in: a
   // plain `{x, y}` opens the bar-wide visibility checklist (right-click on
   // empty bar space); an entry with `itemId` opens the per-item menu (move
@@ -2104,6 +2180,10 @@ function EditorChrome({
           setPaletteOpen(false);
           ws.openGraph();
         }}
+        onShowTasks={() => {
+          setPaletteOpen(false);
+          ws.openTasks();
+        }}
         onShowTags={() => {
           setPaletteOpen(false);
           setTagsSeed(null);
@@ -2202,6 +2282,14 @@ function EditorChrome({
         onConfirm={(includeAttachments) => {
           exportPreflight?.resolve({ includeAttachments });
           setExportPreflight(null);
+        }}
+        onCopy={() => {
+          // MYND-643: resolve the pre-flight as CANCELLED so the export flow
+          // stops cleanly (it must not also write a file), then copy. Resolving
+          // with a choice would run the save-dialog path we are replacing.
+          exportPreflight?.resolve(null);
+          setExportPreflight(null);
+          void copyOpenNoteMarkdown();
         }}
       />
       <NotePdfExportNotice
@@ -2448,6 +2536,7 @@ type CommandPaletteHostProps = {
   onShowTags: () => void;
   onShowViews: () => void;
   onImportObsidian: () => void;
+  onShowTasks: () => void;
   onImportBaseView: () => void;
   onBackupVault: () => void;
   onRestoreBackup: () => void;
@@ -2483,6 +2572,7 @@ function CommandPaletteHost({
   onShowTags,
   onShowViews,
   onImportObsidian,
+  onShowTasks,
   onImportBaseView,
   onBackupVault,
   onExportVaultMarkdown,
@@ -2860,6 +2950,7 @@ function CommandPaletteHost({
       onShowTags,
       onShowViews,
       onImportObsidian,
+      onShowTasks,
       onImportBaseView,
       onBackupVault,
       onExportVaultMarkdown,
@@ -2908,6 +2999,7 @@ function CommandPaletteHost({
       onShowTags,
       onShowViews,
       onImportObsidian,
+      onShowTasks,
       onImportBaseView,
       onBackupVault,
       onExportVaultMarkdown,
@@ -3442,6 +3534,8 @@ function RightSidebar() {
           />
         ) : active === "outline" ? (
           <OutlineTab />
+        ) : active === "tasks" ? (
+          <NoteTasksPanel />
         ) : active === "ai-chat" ? (
           <AiChatTab
             onInsert={(text) => {

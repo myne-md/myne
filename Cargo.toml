@@ -6,7 +6,14 @@
 # `src-tauri/scripts/ai-no-network-check.sh`). Its host build compiles the pure
 # router/classification logic and its unit tests; the JS boundary and the CSPRNG
 # registration are `cfg(target_arch = "wasm32")`. See `web/wasm/Cargo.toml`.
-members = ["src-tauri", "protocol", "core", "e2e/fixture-gen", "theme-validator", "web/wasm", "web/bench/wasm"]
+#
+# `cli` (cli-thin-client MYND-490, task 4) is the `myne` sidecar binary: it
+# does NOT depend on `myne-desktop` or `myne-core` — it talks to the running
+# desktop only over the local command socket's JSON wire contract (its own
+# copy of the framing/wire types, deliberately not shared — see
+# `src-tauri/src/cli_bridge/dispatch.rs`'s doc comment). It joins this
+# workspace purely for the single shared `Cargo.lock` (TB9).
+members = ["src-tauri", "protocol", "core", "e2e/fixture-gen", "theme-validator", "web/wasm", "web/bench/wasm", "cli"]
 resolver = "2"
 
 # Optimize the on-device AI math crates even in DEV builds. Candle + its `gemm`

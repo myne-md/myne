@@ -110,6 +110,20 @@ describe("capability descriptor", () => {
       // filename. `MYE1` is device-local and never synced, so a browser cannot
       // inherit a desktop's extractions either.
       "attachmentTextSearch",
+      // Named for the TRANSFORM, not the preference behind it: images still
+      // import on web, they are just stored as given, because `catch_unwind`
+      // cannot contain a decoder panic on wasm32 and a hostile image would kill
+      // the vault Worker. `attachment_compression_enabled` is shared vault
+      // content this client reads, writes and syncs like any other field —
+      // which is why the absence changes the settings copy rather than removing
+      // the control.
+      "imageCompression",
+      // MYND-490. The only entry in this list that is absent by PLATFORM FACT
+      // rather than by decision or bundle budget: the door is a local socket a
+      // shell command connects to, and the command is a binary inside the
+      // desktop bundle. There is no browser-shaped version of either, so there
+      // is nothing a later port could deliver.
+      "cliAccess",
     ];
     const actualAbsent = desktop.ALL_CAPABILITIES.filter((c) => !web.has(c));
     expect([...actualAbsent].sort()).toEqual([...expectedAbsent].sort());

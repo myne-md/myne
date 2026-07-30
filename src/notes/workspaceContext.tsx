@@ -38,6 +38,7 @@ import {
   emptyWorkspace,
   focusedLeaf,
   graphItem,
+  tasksItem,
   listSlots,
   noteItem,
   openInFocusedTab,
@@ -50,6 +51,7 @@ import {
   setFocusedPane,
   setPinned as setPinnedOp,
   setItemViewMode as setItemViewModeOp,
+  setTaskTabState as setTaskTabStateOp,
   splitPane,
   splitPaneWithItem as splitPaneWithItemOp,
   switchToSlot as switchToSlotOp,
@@ -198,6 +200,15 @@ export type WorkspaceApi = {
    *  like `openInFocused`). The graph is a singleton, so re-opening it reveals
    *  the existing tab (global duplicate-forbid) instead of making a second. */
   openGraph: () => void;
+  /** Open (or reveal) the vault-wide task list — a singleton tab, like the
+   *  graph, so calling twice reveals rather than duplicating (MYND-616). */
+  openTasks: () => void;
+  /** Persist the task tab's filter / scope WITH the tab (MYND-616 task 9).
+   *  Session state, per tab, never a preference. */
+  setTaskTabState: (
+    paneId: PaneId,
+    next: { filter?: string; folder?: string | null; tags?: readonly string[] },
+  ) => void;
   /** Activate any tab item (note or view) within a pane. */
   activateItemInPane: (paneId: PaneId, item: WorkspaceItem) => void;
   /** Close any tab item (note or view) within a pane. */
@@ -447,6 +458,21 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         : openInFocusedTab(s, graphItem()),
     );
   }, [setPending]);
+  const openTasks = useCallback(() => {
+    const wasPending = pendingRef.current;
+    setPending(null);
+    setState((s) =>
+      wasPending !== null && wasPending === s.focusedPaneId
+        ? openInNewTab(s, tasksItem())
+        : openInFocusedTab(s, tasksItem()),
+    );
+  }, [setPending]);
+  const setTaskTabState = useCallback(
+    (paneId: PaneId, next: { filter?: string; folder?: string | null; tags?: readonly string[] }) => {
+      setState((s) => setTaskTabStateOp(s, paneId, next));
+    },
+    [],
+  );
   const activateItemInPane = useCallback(
     (paneId: PaneId, item: WorkspaceItem) => {
       setPending(null);
@@ -650,6 +676,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       splitPaneWithNote,
       openView,
       openGraph,
+      openTasks,
+      setTaskTabState,
       activateItemInPane,
       closeItemInPane,
       dropItemOnPane,
@@ -697,6 +725,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       splitPaneWithNote,
       openView,
       openGraph,
+      openTasks,
+      setTaskTabState,
       activateItemInPane,
       closeItemInPane,
       dropItemOnPane,

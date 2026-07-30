@@ -113,3 +113,72 @@ pub async fn collect_referenced_attachment_ids(
     }
     Ok(referenced)
 }
+
+/// Every note's attachment references, as `(note_id, [attachment_id])` pairs.
+///
+/// The per-note twin of [`collect_referenced_attachment_ids`], which flattens
+/// the same walk into a bare set because its caller (the GC) only needs "is
+/// this attachment referenced at all". The reference GRAPH needs the mapping:
+/// "used in N notes" and the delete warning's note list are both answers about
+/// which notes, not how many attachments.
+///
+/// **Why this exists (MYND — attachment refs read 0 after every unlock).** The
+/// graph is RAM-only and zeroized on lock, and it was only ever populated by
+/// `attachment_refs_apply` as notes are saved. `reconcile.rs` says so in its own
+/// header — "the live note lifecycle + the unlock-time full rebuild is NOT wired
+/// here" — so after every app start each attachment reported "used in 0 notes"
+/// until the referencing note happened to be re-saved. Persisted indices
+/// (`vault.indices`, MYI1) survive a lock; this graph does not, so it has to be
+/// rebuilt, and rebuilding needs the mapping this returns.
+///
+/// Fail-closed exactly like its twin: any read or decrypt failure aborts with an
+/// error rather than returning a partial map, because a partial graph would
+/// under-report references — and under-reporting is what makes a delete warning
+/// lie about which notes it will break.
+///
+/// A note with no attachment embeds is omitted rather than emitted empty: the
+/// caller applies these to a graph keyed by note, and an absent note is already
+/// "references nothing".
+pub async fn collect_note_attachment_refs(
+    io: &dyn VaultIo,
+    notes_dir: &std::path::Path,
+    items_key: &[u8; 32],
+    items_key_id: &[u8; 16],
+) -> Result<Vec<(String, Vec<String>)>, ReferencedScanError> {
+    let ids = match io.read_dir(notes_dir).await {
+        Ok(entries) => crate::plugins::notes::commands::note_ids_from_entries(&entries),
+        Err(IoFailureKind::NotFound) => return Ok(Vec::new()),
+        Err(kind) => return Err(ReferencedScanError::Io(kind)),
+    };
+    let mut out: Vec<(String, Vec<String>)> = Vec::new();
+    for note_id in ids {
+        let note_uuid_bytes = *note_id.as_uuid().as_bytes();
+        let path = notes_dir.join(format!("{}.myn", note_id.as_uuid()));
+        let blob = match io.read(&path).await {
+            Ok(b) => b,
+            // Deleted between enumerate + read (single-writer TOCTOU) — it
+            // references nothing. Benign skip, same as the twin.
+            Err(IoFailureKind::NotFound) => continue,
+            Err(kind) => return Err(ReferencedScanError::Io(kind)),
+        };
+        let decrypted = decode_note(&blob, &note_uuid_bytes, items_key, items_key_id)
+            .map_err(|_: DecryptError| ReferencedScanError::CannotDecrypt)?;
+        let plaintext = std::str::from_utf8(decrypted.plaintext())
+            .map_err(|_| ReferencedScanError::InvalidPlaintextEncoding)?;
+        let mut refs: Vec<String> = Vec::new();
+        for span in crate::plugins::attachments::reconcile::extract_att_embed_spans(plaintext) {
+            let id = span.id.to_string();
+            // One note embedding the same attachment twice is one reference.
+            if !refs.contains(&id) {
+                refs.push(id);
+            }
+        }
+        if !refs.is_empty() {
+            out.push((note_id.as_uuid().to_string(), refs));
+        }
+        // Same minimize-the-window discipline as the twin: drop the decrypted
+        // handle so its Zeroizing plaintext wipes before the next read.
+        drop(decrypted);
+    }
+    Ok(out)
+}

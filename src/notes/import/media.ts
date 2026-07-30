@@ -27,6 +27,8 @@
 import {
   findImportedImageRefs,
   planRewrite,
+  tallyCompression,
+  type CompressionTally,
   type ImportedImageRef,
   type ImportedAttachment,
 } from "../../editor/attachments/insert";
@@ -99,6 +101,13 @@ export interface MediaResult {
   /** The body with ingestable refs rewritten to form C + residual refs placeholder-commented. */
   body: string;
   counts: MediaCounts;
+  /** How much ingest-time image compression this note's media pass performed.
+   *  Compression is gated in shared core, so an import ingests through exactly
+   *  the same transform a paste does — and `decisions.md` 2026-07-30 makes a
+   *  notice at import the thing that stands in for a consent gate, so a route
+   *  that imports in bulk owes the user a tally rather than silence. Additive,
+   *  so the engine folds it across every note it creates. */
+  compression: CompressionTally;
 }
 
 /**
@@ -114,6 +123,7 @@ export async function processImportedMedia(
   const ingested = emptyMediaByType();
   const omitted = emptyMediaByType();
   const edits: TextEdit[] = [];
+  const stored: ImportedAttachment[] = [];
 
   for (const ref of refs) {
     const cls = classifyMediaType(ref.source);
@@ -122,11 +132,16 @@ export async function processImportedMedia(
       const { replacement } = planRewrite(ref, outcome.attachment);
       edits.push({ from: ref.from, to: ref.to, replacement });
       ingested[cls]++;
+      stored.push(outcome.attachment);
     } else {
       edits.push({ from: ref.from, to: ref.to, replacement: placeholderComment(ref) });
       omitted[cls]++;
     }
   }
 
-  return { body: applyTextRewrites(body, edits), counts: { ingested, omitted } };
+  return {
+    body: applyTextRewrites(body, edits),
+    counts: { ingested, omitted },
+    compression: tallyCompression(stored),
+  };
 }

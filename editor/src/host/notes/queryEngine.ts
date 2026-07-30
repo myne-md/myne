@@ -54,6 +54,14 @@ export type FilterLeaf =
   | { readonly kind: "hasTag"; readonly tag: string }
   | { readonly kind: "inFolder"; readonly path: string }
   | { readonly kind: "search"; readonly query: string }
+  // `file:` operator (MYND-303). Title-only full-text match — Myne notes have a
+  // DERIVED title (first heading), not a filename, so this is a title match, not
+  // a filename glob. Backed by `note_search` filtered to `matched_in.title`.
+  | { readonly kind: "titleMatch"; readonly query: string }
+  // `task:` operator (MYND-303). Notes carrying a task-list item; with a
+  // `query`, only tasks whose text matches. Backed by the `vault_indices_tasks`
+  // index (no new Rust command — the note-id set is derived TS-side).
+  | { readonly kind: "hasTask"; readonly query?: string }
   | {
       readonly kind: "property";
       readonly key: string;
@@ -77,6 +85,18 @@ export type LeafResolvers = {
   readonly hasTag: (tag: string) => Promise<ReadonlyArray<string>>;
   readonly inFolder: (path: string) => Promise<ReadonlyArray<string>>;
   readonly search: (query: string) => Promise<ReadonlyArray<string>>;
+  /** `file:` — full-text search restricted to title matches (MYND-303).
+   *  OPTIONAL: `titleMatch`/`hasTask` leaves are produced only by the command-
+   *  palette operator parser, never by a saved view, so a client without that
+   *  parser (mobile) need not supply them — the evaluator treats an absent
+   *  resolver as "no matches". */
+  readonly titleMatch?: (query: string) => Promise<ReadonlyArray<string>>;
+  /** `task:` — notes with a task-list item; `query` (when set) matches the
+   *  task text. Derived TS-side from the `vault_indices_tasks` index. Optional
+   *  for the same reason as `titleMatch` above. */
+  readonly hasTask?: (
+    query: string | undefined,
+  ) => Promise<ReadonlyArray<string>>;
   /** Every note carrying property `key`, as `[noteId, storedProperty]` — the
    *  #1 by-key accessor (`vault_indices_property_values`). The engine compares
    *  each value type-awarely; it never re-types. */
@@ -117,6 +137,14 @@ export async function evaluateFilter(
       );
     case "search":
       return (await resolvers.search(node.query)).filter((id) =>
+        liveIds.has(id),
+      );
+    case "titleMatch":
+      return ((await resolvers.titleMatch?.(node.query)) ?? []).filter((id) =>
+        liveIds.has(id),
+      );
+    case "hasTask":
+      return ((await resolvers.hasTask?.(node.query)) ?? []).filter((id) =>
         liveIds.has(id),
       );
     case "property": {

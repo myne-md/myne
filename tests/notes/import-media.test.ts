@@ -40,6 +40,19 @@ const ingestExts =
     return { ok: false };
   };
 
+/** A RefImporter that ingests every ref and reports it as compressed. */
+const ingestCompressed =
+  (originalSize: number, storedSize: number): RefImporter =>
+  async (ref: ImportedImageRef) => ({
+    ok: true,
+    attachment: {
+      ...attachment("id-c", ref.source, "image/webp"),
+      size: storedSize,
+      original_size: originalSize,
+      container_changed: true,
+    },
+  });
+
 describe("classifyMediaType", () => {
   it("maps extensions to user-meaningful classes (SVG under image)", () => {
     expect(classifyMediaType("a.png")).toBe("image");
@@ -117,5 +130,30 @@ describe("applyTextRewrites", () => {
       { from: 6, to: 8, replacement: "Y" },
     ]);
     expect(out).toBe("01XX45Y89");
+  });
+});
+
+describe("processImportedMedia — ingest-time compression tally", () => {
+  // Compression is gated in shared core, so an import ingests through the same
+  // transform a paste does. `decisions.md` 2026-07-30 makes disclosure at
+  // import the thing that stands in for a consent gate, so the importer has to
+  // carry the fact out to its summary rather than swallow it — a bulk route is
+  // where silently discarding pixels would be LEAST noticed.
+  it("sums the compressed subset across a note's refs", async () => {
+    const body = "![[a.png]]\n![[b.png]]\n";
+    const r = await processImportedMedia(body, ingestCompressed(2400, 300));
+    expect(r.compression).toEqual({ count: 2, originalBytes: 4800, finalBytes: 600 });
+  });
+
+  it("stays at zero when nothing compressed, so the summary line stays silent", async () => {
+    const body = "![[a.png]]\n";
+    const r = await processImportedMedia(body, ingestExts(new Set(["png"])));
+    expect(r.compression).toEqual({ count: 0, originalBytes: 0, finalBytes: 0 });
+  });
+
+  it("counts nothing for refs that were omitted rather than ingested", async () => {
+    const body = "![[a.mp3]]\n";
+    const r = await processImportedMedia(body, ingestExts(new Set(["png"])));
+    expect(r.compression.count).toBe(0);
   });
 });

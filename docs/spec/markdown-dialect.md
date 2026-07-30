@@ -109,7 +109,7 @@ Frontmatter is recognized as a structured block and rendered as a code block in 
 
 #### 3.6.1 Myne-managed canonical frontmatter fields
 
-Myne writes eleven canonical fields to YAML frontmatter from the host, all via the dialect surgery module per [`decisions.md`](../decisions.md) 2026-05-09 "Frontmatter byte-level surgery owned by TS dialect module" (which supersedes the 2026-05-07 writer mechanic) — the eight below (the seventh, `kind:`, added by the drawing-notes epic MYND-499) plus the Phase 2 sync trio `deleted:` / `conflict:` / `conflict_of:` (`deleted:` via the dedicated `patchDeletedField`; the conflict pair via the generic `patchFrontmatterField`):
+Myne writes twelve canonical fields to YAML frontmatter from the host, all via the dialect surgery module per [`decisions.md`](../decisions.md) 2026-05-09 "Frontmatter byte-level surgery owned by TS dialect module" (which supersedes the 2026-05-07 writer mechanic) — the nine below (the seventh, `kind:`, added by the drawing-notes epic MYND-499; the ninth, `done:`, by the task epic MYND-613) plus the Phase 2 sync trio `deleted:` / `conflict:` / `conflict_of:` (`deleted:` via the dedicated `patchDeletedField`; the conflict pair via the generic `patchFrontmatterField`):
 
 | Field | Type | Semantics | Writer | Trigger |
 |---|---|---|---|---|
@@ -119,8 +119,9 @@ Myne writes eleven canonical fields to YAML frontmatter from the host, all via t
 | `trashed` | RFC 3339 string (UTC); **value-strict** — only a parseable RFC 3339 value marks the note trashed, any other value leaves it live | Note is soft-deleted (in the vault trash); **absent** = live. Trash-state lives inside the AEAD blob exactly like `folder:` — no `<vault>/.trash/` directory and no on-disk-layout change (`protocol.md` §9.1 stays flat). The Trash panel reconstructs the trashed set client-side from this field; trashed notes are excluded from sidebar / folder-tree / search (MYND-133) | `src/dialect/surgery.ts::patchTrashedField` | Trash + restore actions (`src/notes/trashNote.ts`) only — never body autosave |
 | `template` | **value-strict boolean** — only the canonical `true` form marks the note a template; any other value (`1`, `yes`, `True`, quoted `"true"`) or absence = ordinary note (exactly mirroring how `trashed:` is value-strict on RFC 3339) | Note is a reusable template skeleton: **hidden** from the sidebar file-tree, folder-tree, and search (the same exclusion machinery as `trashed:`) but **surfaced** in the template picker + management UI — the inverse-visibility twin of `trashed:` (trash hides from views *and* picker; template hides from views but *appears* in the picker). **Absent** = ordinary note. Template-state lives inside the AEAD blob exactly like `trashed:` — no on-disk-layout change (`protocol.md` §9.1 stays flat) (MYND-186) | `src/dialect/surgery.ts::patchTemplateField` | Template create / convert actions (`src/notes/templates.ts`) only — never body autosave |
 | `folder_index` | **value-strict boolean** — only the canonical `true` form designates the note its folder's index note; any other value (`1`, `yes`, `True`, quoted `"true"`) or absence = ordinary note (exactly mirroring how `template:` is value-strict) | Note is the **index note** of whichever folder its own `folder:` names (§3.6.1) — the binding is the boolean alone and carries **no path**, so a folder rename rewrites `folder:` and the binding follows for free (rename drift is structurally impossible). A folder has **exactly one** index note. It is **hidden from the sidebar folder tree** (no separate row / pin / badge) and opened by **double-clicking the folder**; the hiding is **sidebar-tree-only**, so unlike `template:`/`trashed:` (hidden everywhere) the index note stays a real, enumerable note in search / saved views / backlinks / graph / `[[<folder>/]]` resolution (`decisions.md` 2026-06-27, supersedes the original "fully visible, pinned, badged" behaviour). **Absent** = ordinary note. Index-state lives inside the AEAD blob exactly like `template:` — no on-disk-layout change (`protocol.md` §9.1 stays flat) (MYND-370) | `src/dialect/surgery.ts::patchFolderIndexField` | Folder-note designate / undesignate actions (`src/notes/folderNote.ts`) only — never body autosave |
-| `kind` | **value-strict string enum** — only the canonical unquoted `drawing` marks the note a drawing; any other value (quoted `"drawing"`, `Drawing`, `task`) or absence = ordinary markdown note (the value-strict rule mirrors `template:`, and matters more here because it drives the render surface, not just visibility) | Note is a **[drawing note](../glossary.md)**: its editing surface is an Excalidraw canvas (not CodeMirror), with the scene serialized into a ` ```excalidraw ` fenced body. Rides the existing `MY01` envelope with `content_type` unchanged at `"text/markdown"` — no on-disk-layout / protocol change (the `template:`/snapshot precedent). Drives the render-surface dispatch + tab glyph, and the search fold (a drawing's scene text is projected, its raw JSON never indexed). The value-strict read is a mirrored **TS↔Rust pair** (`dialect readKindFromFmBody` / core `is_drawing`) because `kind` gates BOTH the render surface (TS) and the index fold (Rust) of the same note — a disagreement would render a canvas while indexing raw JSON. **Absent** = ordinary note (MYND-499) | `dialect/src/surgery.ts::patchKindField` | Drawing create (`src/notes/createDrawing.ts`) only — never body autosave |
+| `kind` | **value-strict string enum** — the **note-class marker**. Two canonical unquoted values: `drawing` and `task` (MYND-613). Any other value (quoted `"drawing"`, `Drawing`, `Task`, `chore`) or absence = ordinary markdown note (the value-strict rule mirrors `template:`, and matters more here because **one value additionally routes the render surface**, not just visibility). The **first** `kind:` line wins; a non-canonical first line reads as absent rather than falling through to a later valid one | Note is a **[drawing note](../glossary.md)**: its editing surface is an Excalidraw canvas (not CodeMirror), with the scene serialized into a ` ```excalidraw ` fenced body. Rides the existing `MY01` envelope with `content_type` unchanged at `"text/markdown"` — no on-disk-layout / protocol change (the `template:`/snapshot precedent). Drives the render-surface dispatch + tab glyph, and the search fold (a drawing's scene text is projected, its raw JSON never indexed). The value-strict read is a mirrored **TS↔Rust pair** (`dialect readKindFromFmBody` / core `is_drawing`) because `kind` gates BOTH the render surface (TS) and the index fold (Rust) of the same note — a disagreement would render a canvas while indexing raw JSON. **Absent** = ordinary note (MYND-499). The `task` value marks a **note-task** (MYND-613): a whole note the user has declared as a unit of work, distinct from a [line-task](#38-inline-task-field-extension). Unlike `drawing` it does **not** change the render surface — the body stays ordinary markdown — so it needs no Rust mirror; it surfaces as a muted marker in the sidebar row and the tab, and it gates the completion action of `done:` | `dialect/src/surgery.ts::patchKindField` | Drawing create (`src/notes/createDrawing.ts`) and the task-marker action only — never body autosave |
 | `archived` | RFC 3339 string (UTC); **value-strict** — only a parseable RFC 3339 value marks the note archived, any other value (e.g. `archived: true`) leaves it live (the exact twin of `trashed:`) | Note is in the indefinite-retention **Archive** (a declutter layer kept forever — no auto-purge); **absent** = not archived. Archive is a *location* axis **mutually exclusive with `trashed:`** — a note is at most one of archived / trashed (the action layer clears one when setting the other). Unlike `trashed:`, an archived note is **hidden from the working set (sidebar tree + favorites display) but stays discoverable**: it still appears in full-text search and still resolves as a wikilink/backlink target (archive ≠ soft-trash). Archive-state lives inside the AEAD blob exactly like `trashed:` — no on-disk-layout change (`protocol.md` §9.1 stays flat) (MYND-331) | `src/dialect/surgery.ts::patchArchivedField` | Archive + unarchive actions (`src/notes/archiveNote.ts`) only — never body autosave |
+| `done` | RFC 3339 string (UTC); **value-strict** — only a parseable RFC 3339 value marks the note-task complete; any other value (`done: true`, `done: soon`) leaves it incomplete. **Quoting does not demote it**: the scalar is unquoted before the date check, matching the §3.6.4 rule where quoting demotes checkbox and number values but never dates — so this reader and the derived property index agree | The **completion stamp of a note-task** (MYND-613), recording *when* it was finished. Meaningful only alongside `kind: task` — the completion action is gated on the class marker, because a note that is "completed" without being work is state no surface lists. **Orthogonal to the location markers**: `done:` is a *lifecycle* axis, so a task may be done and archived, or done and trashed — there is no mutual exclusion with `archived:` / `trashed:` (contrast archive ⊥ trash, which are two positions on one *location* axis). Un-completion **deletes** the field; a note never carries `done: false`. Neither transition bumps `updated:` — flipping a managed flag is not a content edit | `dialect/src/surgery.ts::patchDoneField` | Complete / un-complete actions (`src/notes/completeNote.ts`) only — never body autosave |
 | `deleted` | RFC 3339 string (UTC); **value-strict** — only a parseable RFC 3339 value marks the note a deletion tombstone, any other value leaves it live (the exact twin of `trashed:`) | **Phase 2 sync deletion tombstone.** Under sync a delete writes a `deleted: <ts>` version (a new encrypted version with a fresh `content_nonce`, committed by the [vault head](sync-protocol.md)) so the deletion **propagates** to other devices — a bare `unlink` cannot (the blind server can't relay an absence, and a re-pull would risk resurrection). A **local-only** (un-synced) delete stays the hard cryptographic-erase `unlink` — the tombstone is the under-sync reroute only. **Absent** = live. Tombstoned notes are excluded client-side from sidebar / folder-tree / search exactly like `trashed:`. The tombstone is GC'd at the tombstone horizon (`sync-protocol.md` §11). Tombstone-state lives inside the AEAD blob — no on-disk-layout change (`protocol.md` §9.1 stays flat) (MYND-426) | `src/dialect/surgery.ts::patchDeletedField` | Delete-under-sync reroute (`src/notes/deleteNote.ts::tombstoneNote` / `deleteNoteRouted`) only — never body autosave |
 | `conflict` | **value-strict boolean** — only the canonical `true` form marks the note a sync conflict copy; any other value (`1`, `yes`, `True`, quoted `"true"`) or absence = ordinary note (mirroring `template:` / `folder_index:`) | **Phase 2 keep-both conflict copy (SYNC-11).** When the same note is edited concurrently on two devices, the engine materializes the remote revision as a **new** `.myn` carrying `conflict: true` + `conflict_of:` so **both survive** — never a silent overwrite. A conflict copy is **excluded** from the live sidebar, folder-tree, full-text search, and the backlink resolver (`src/notes/sidebarState.tsx` `liveCache` / `resolverCache`) — surfaced **only** in the Conflicts view, reached via a count badge. **Absent** = ordinary note. "Keep as separate" clears the markers (the copy re-enters the live set); "Discard" deletes it. Conflict-state lives inside the AEAD blob — no on-disk-layout change (MYND-427) | `src/notes/conflictCopy.ts` (generic `patchFrontmatterField`, **not** a dedicated `patch*Field`) | Engine keep-both resolution + the Conflicts view keep/discard actions — never body autosave |
 | `conflict_of` | YAML string — the **`note_uuid` of the original** the conflict copy forked from | Pairs with `conflict: true`: names the note this copy diverged from so the Conflicts view groups copies by original (`conflictRecordsByOriginal`). Meaningful only on a `conflict: true` note; absent on ordinary notes; cleared together with `conflict:` on resolve. Lives inside the AEAD blob — no on-disk-layout change (MYND-427) | `src/notes/conflictCopy.ts` (generic `patchFrontmatterField`) | Set when the engine materializes a conflict copy; cleared on resolve — never body autosave |
@@ -133,7 +134,7 @@ Mechanics — shared across the eight dedicated-surgery fields (the seven above 
 - **The ten managed fields compose on one blob without clobbering** (per the §3.6 unknown-field-preservation rule): each writer touches only its own line, so a single note can carry any combination — e.g. `template: true` + `trashed: <ts>` simultaneously (a deleted template, restorable from Trash, re-entering the template set on restore), or `folder: Projects/` + `folder_index: true` (the visible index note of the Projects folder), or `conflict: true` + `conflict_of: <uuid>` (a keep-both copy). Setting or deleting one managed field preserves every other managed field, user-authored field, and comment byte-for-byte. The one **semantic** (not byte-level) exclusion is `archived:` ⊥ `trashed:`: the surgery composes them freely, but the archive/trash **action layer** clears one when setting the other so a note is never simultaneously archived and trashed (MYND-331).
 - Other frontmatter fields (`tags:`, user-authored fields) are preserved per the §3.6 "Unknown frontmatter fields are preserved on write" rule.
 - `created_at` is **not** stored in frontmatter — it is derived from the UUIDv7 filename's millisecond time component per [`protocol.md`](protocol.md) §9.1 (already public-accepted leak; no new commitment violation, no frontmatter write needed).
-- The set of Myne-managed canonical frontmatter fields is forward-incompatible-by-design with v005: v005 may rename, drop, or supersede `updated:` / `title:` / `folder:` / `trashed:` / `template:` / `folder_index:` / `kind:` / `archived:` / `deleted:` / `conflict:` / `conflict_of:` per its own dialect specification.
+- The set of Myne-managed canonical frontmatter fields is forward-incompatible-by-design with v005: v005 may rename, drop, or supersede `updated:` / `title:` / `folder:` / `trashed:` / `template:` / `folder_index:` / `kind:` / `archived:` / `done:` / `deleted:` / `conflict:` / `conflict_of:` per its own dialect specification.
 
 Mechanics — per-field:
 
@@ -175,6 +176,10 @@ Skipping an entry writes nothing, so the importer's C1 sanctioned-diff allowlist
 #### 3.6.4 Property value typing (coercion ruleset)
 
 The derived property-index read-parse (§3.6) assigns **every** arbitrary frontmatter key's value exactly **one** of five Myne property types — `string` / `number` / `date` / `list` / `checkbox`. This subsection is the **normative, cross-client-stable** coercion ruleset: two independent Myne clients reading the same note MUST type every value identically. property-index is the **single type authority** for the Saved Views feature — the query engine, view model, render layer, and `.base` importer **consume** this typing and **never redefine** it. Pinned by the `property-coercion` golden vectors in the `myne-test-vectors` companion.
+
+**Scope: frontmatter values *and* inline task-field values.** The type authority is not frontmatter-only. The inline task-field values of §3.8.3 are typed against the same authority — concretely, the `YYYY-MM-DD` full-date shape is defined here and consumed there, never redeclared. Without this scope statement, typing an inline `[due:: …]` would bring a second, undocumented type authority into existence, which is exactly the drift this subsection exists to prevent. The consume-never-redefine rule therefore binds the task-field parser, the task index, the task query keywords, and the chip renderer just as it binds the Saved Views consumers.
+
+Two differences follow from the domains rather than from the rules, and are stated so they are not mistaken for drift: task fields admit a **wall-clock date-time that carries no offset**, which §3.6.4's date-time (which *requires* an offset) does not describe, and task fields **refuse** a value that does not type instead of falling back to `string`. Neither alters any coercion rule below.
 
 The ruleset is **extraction-and-typing only** — it defines no evaluatable expression, no computed/derived field, and no formula (mirroring the closed-registry discipline of `protocol/src/template.rs`). Querying over the typed values is the query-engine sub-feature's concern, not this layer's.
 
@@ -277,6 +282,169 @@ The inline-tag tokenizer surfaces tag bytes verbatim — un-normalized, un-folde
 
 The parser exposes raw bytes to keep its output deterministic and to push encoding policy to one place; downstream consumers (search index, sidebar UI, backlink graph) all share the same fold/normalize rule by virtue of going through the index layer. (Research Q10.)
 
+### 3.8 Inline task-field extension
+
+A **line-task** is a task-list item (§3.3) whose content may carry **task inline fields** — the metadata saying when it is due, whether it repeats, when it was completed, how urgent it is, and when to be reminded. Task management rests on a task being plain markdown and nothing else, so this metadata lives in the line, never in a sidecar.
+
+Myne **reads three dialects and writes one**. Reading recognizes Obsidian's emoji form and Obsidian's Dataview-style inline fields, so a vault imported from Obsidian lights up in whichever form the user already had; without that, an import "succeeds" and the user's tasks are silently gone. Writing emits a single form. Obsidian parity is a **read** goal, not a write goal.
+
+#### 3.8.1 Recognized forms
+
+Two syntactic forms, which may both appear on one line:
+
+**Bracketed (Dataview-style).** `[key:: value]` — an opening `[`, a key, the two-character separator `::`, an optional run of spaces or tabs, the value, a closing `]`. A key is a non-empty run of `[A-Za-z0-9_-]`. This is deliberately narrower than Dataview, which tolerates spaces in keys: a permissive key rule makes every `[` in prose a parse candidate, and every key in the recognized vocabulary is a single word. A field never spans a line break, and an unterminated field is not a field.
+
+**Emoji (Obsidian Tasks).** A marker emoji followed by its value. Markers carrying a value: `📅` due, `🔁` repeat, `✅` done, `⏰` remind, `⏳` scheduled, `🛫` start, `❌` cancelled, `➕` created, `🆔` id, `⛔` dependsOn. Markers that **are** their value: `🔺` highest, `⏫` high, `🔼` medium, `🔽` low, `⏬` lowest. A trailing variation selector (U+FE0F) is absorbed into the marker.
+
+An emoji field's value ends at the **first** of: the next marker emoji, a `[` (so both dialects can share a line in a half-migrated vault), a token-initial `#` (so a trailing `#tag` stays a tag instead of being swallowed into a recurrence expression), or the end of the line.
+
+Key identity is case-insensitive; the record carries the canonical spelling. Obsidian's `completion` is read as Myne's **`done`**.
+
+#### 3.8.2 Emitted form
+
+Myne emits **one** form: bracketed fields with Myne's key names, single-space separated, in a stable order — `due`, `priority`, `remind`, `repeat`, `done`, then recognized-but-untyped fields, then values that did not parse. The stable order is normative: an unstable one would make every edit produce a spurious diff on the line.
+
+Five fields are written: **`due`** (may carry a time), **`repeat`**, **`done`**, **`priority`**, **`remind`** (absolute). Everything else Obsidian Tasks supports is read and preserved but never emitted.
+
+Myne diverges from Obsidian's key names in exactly one place: `completion` becomes `done`, so the inline field and the frontmatter field for note-tasks share one word for one concept. The "third dialect" a reader must learn is a single key.
+
+**Editing any field on a line converts the whole line** to the emitted form, including fields the user did not touch — following §6's rule that only directly-changed lines adopt canonical forms. The consequence is accepted and stated plainly rather than left to be discovered: a task imported from Obsidian and then edited in Myne drops out of that user's Obsidian Tasks view.
+
+#### 3.8.3 Value typing
+
+`due`, `done` and `remind` carry an instant: a **full-date** (the `YYYY-MM-DD` shape owned by §3.6.4) optionally followed by a wall-clock time, separated by a space or a `T` — `HH:MM` or `HH:MM:SS`.
+
+**Times are local wall-clock.** No UTC offset and no IANA zone identifier is ever stored or emitted. "09:00" means 09:00 wherever the user is, which is what a personal reminder means, and it keeps a coarse geolocation datum out of a file that gets exported as plaintext.
+
+A value carrying an offset (`2026-08-01T10:00:00Z`, `…+03:00`) therefore **does not type at all**: it is preserved verbatim and surfaced as unparsed. Stripping the offset would silently shift a due date; refusing is the safer failure. Dates passing the shape but not existing (`2026-02-31`) are likewise refused rather than corrected.
+
+`priority` types from its word form — `highest` / `high` / `medium` / `low` / `lowest`, case-insensitive — or from a priority marker emoji. `repeat` carries a **recurrence rule expression**, whose vocabulary is frozen in §3.8.7.
+
+Values that fail to type MUST be **preserved and surfaced as unparsed**, never discarded and never reported as a parse error.
+
+#### 3.8.4 `onCompletion` is deliberately not recognized
+
+Obsidian's `onCompletion` runs an **action** when a task completes. It is a miniature action language, and interpreting it crosses the no-code-eval line the dialect defends elsewhere (§3.6.4's extraction-and-typing-only rule; the closed-registry discipline of the template engine).
+
+Myne assigns it **no meaning whatsoever**. Its bytes are nonetheless preserved: because editing a line converts the whole line (§3.8.2), anything absent from the parsed record is deleted by the next write. Preservation and non-interpretation are separate obligations, and both are normative.
+
+#### 3.8.5 Recognize-only
+
+The task-field recognizer **only recognizes**. It MUST NOT rewrite, normalize, or canonicalize the bytes of any matched field. The §6 C1 byte-stability guarantee extends to task-field bytes: a file imported and never edited round-trips byte-identically, and a line already in the emitted form is a **fixed point** — rewriting it produces no change, so opening a vault cannot dirty its task lines.
+
+Emission happens only through the single writer seam (§3.8.2), never as an implicit rewrite on load or save.
+
+#### 3.8.6 Scope of recognition
+
+The recognizer operates on **inline** content and has no view of the enclosing block, so it recognizes fields on any line, not only on line-tasks — exactly as the inline-tag tokenizer does (§3.7). Restricting fields to line-tasks is the **consuming layer's** obligation: the task index and the editor's chip decoration each apply it. A conformant implementation MAY recognize more broadly than it consumes, but MUST NOT consume a field from a line that is not a line-task.
+
+Frontmatter is out of scope for task fields, and that exclusion is enforced where §3.7.6's is — at the aggregator, not in the tokenizer. The remaining exclusion zones of §3.7.5 (code spans, fenced code, wikilink interiors, HTML) apply structurally, since inline parsing is never invoked inside a range those nodes have already consumed.
+
+#### 3.8.7 Recurrence rule vocabulary
+
+The `repeat` field's value is a **recurrence rule expression** drawn from a **CLOSED** vocabulary of three tiers. The list below is exhaustive and normative; an expression outside it is not a rule (see "Unrecognized rules" below). Closedness is the point rather than a limitation: a general implementation of a recurrence standard is an **evaluator**, and admitting one would put a second execution surface in a dialect that refuses `onCompletion` (§3.8.4) and keeps the template registry closed for the same reason. Nothing in this section requires a date library, and a conformant implementation MUST NOT need one.
+
+**Tier 1 — plain intervals.** `every <unit>` and `every <n> <unit>s`, where `<unit>` is one of `day`, `week`, `month`, `year` and `<n>` is a decimal integer ≥ 1 of at most three digits. Both singular and plural unit spellings are read.
+
+**Tier 2 — weekday sets.** `every <weekday>`, and sets joined by `and` and/or commas: `every tuesday and thursday`, `every monday, wednesday and friday`. Weekday names are the seven canonical English names, Monday-first. A set is **normalized** on parse — deduplicated and reordered to canonical Monday-first order — so two spellings of one set are one rule.
+
+**Tier 3 — calendar positions in a month.** `<ordinal> <weekday> of every month`, where `<ordinal>` is one of `first`, `second`, `third`, `fourth`, `last`; plus `day <n> of every month` (1 ≤ n ≤ 31) and `last day of every month`.
+
+Parsing is **case-insensitive and whitespace-tolerant** (runs of whitespace fold to one space), because the value may arrive from a file a human hand-wrote or an importer produced. The *vocabulary* is nonetheless closed: tolerance never extends to admitting an unlisted phrase.
+
+**Storage is canonical English; display is localized.** The bytes in the file are always the canonical English form above. A file MUST NOT carry a localized rule: a vault opened on a differently-configured device would otherwise become unreadable to its own owner, and switching app language would strand the user's own rules. Since a rule is **chosen from a control, never typed**, the canonical form is not something a user is ever asked to produce.
+
+**Two families, with deliberately different behaviour.** The user selects between them by selecting the rule, so no hidden setting and no remembered anchor is involved:
+
+| Family | Rules | Behaviour |
+|---|---|---|
+| **interval** | tier 1, tier 2 | Counts from the previous date. **Clamps** into a short month and then counts from the clamped date, so it may drift. |
+| **calendar** | tier 3 | Anchored to the nominal calendar position. **Clamps** into a short month for that occurrence only, then returns to the nominal position — it does not drift. |
+
+The contrast is normative and is what makes the month-end question answerable without hidden state. `every month` from 31 January gives 28 February and then **28 March**. `day 31 of every month` from 31 January gives 28 February and then **31 March**. A user who wants the 31st kept says so with a calendar rule; nothing has to remember an original anchor day the file does not carry.
+
+Where a tier-3 ordinal position does not exist in a month (a month holding only four of a weekday, addressed as `fourth`), the occurrence clamps **back** to the last one in that month rather than spilling into the next.
+
+**Anchoring mode.** A rule may carry the suffix ` when done`, which is part of the expression and case-insensitive like the rest of it:
+
+- **due-anchored** (the default, no suffix) — the next occurrence is computed from the previous **due date**, so a calendar obligation does not drift when it is handled late;
+- **completion-anchored** (` when done`) — the next occurrence is computed from the **completion date**, so an interval-from-last-action task ("water the plants every 3 days") drifts, as it should.
+
+Both are real needs, which is why the mode is carried in the expression rather than inferred: inferring it would mean guessing which of two correct behaviours the user wanted, with no way for them to correct the guess.
+
+**Advance rule (normative).** In due-anchored mode, the next occurrence is produced by adding **whole intervals from the previous due date until the result is strictly after the current date**. This yields exactly **one** pending occurrence — a rule three years stale produces one date, not a thousand catch-up occurrences — while preserving the calendar anchor. Completion-anchored mode has no stale-date case by construction, since its anchor is the completion itself.
+
+Advancing is reachable **only from a user action** on the task. Nothing in this section permits an implementation to advance a rule on its own; a missed occurrence stays where it is, overdue and visible, until the user acts.
+
+**Reminder co-advance.** When a line carries both `due` and `remind`, `due` is the anchor; when it carries only `remind`, `remind` is the anchor. The anchor advances by the rule and the other field shifts by **the same number of days the anchor moved** — the gap is carried, not recomputed. Recomputing it would let "ten minutes before" drift into "three hours after" over enough cycles.
+
+**Unrecognized rules.** An expression outside this vocabulary MUST be **preserved verbatim** and **surfaced as unrecognized**. It MUST NOT raise a parse error, MUST NOT be approximated, and — the load-bearing clause — MUST NOT fall back to any default rule. A rule Myne cannot read must *look* unread: silently treating it as non-recurring, or as "every day", is a data-loss-shaped surprise in which the user believes a task repeats, completes it, and discovers months later that it did not.
+
+### 3.9 Task-query block
+
+A fenced code block whose info string is exactly `tasks` is a **task-query block**: a live list of tasks matching a query, rendered in place of the code. Recognition is by info string alone — no parser extension is required, since the info string is already in the parse tree — and it sits beside the diagram block (`mermaid`), which is recognized the same way.
+
+Rendering is **purely visual**. The block's bytes are never modified by rendering, so §6 C1 holds unchanged: a file carrying a task-query block round-trips byte-identically when it is not edited.
+
+**Self-reference is impossible by construction.** Inline parsing never descends into a code node, so a `- [ ]` written inside a task-query block is not a line-task. A block therefore cannot match itself, and a conformant implementation needs no cycle guard.
+
+#### 3.9.1 The roster
+
+The query body is a sequence of lines, one clause each. Blank lines and lines beginning with `#` are ignored. The clause roster is **CLOSED and exhaustive**; the list below is normative.
+
+| Clause | Form |
+|---|---|
+| completion state | `done` · `not done` |
+| due comparison | `due before <value>` · `due after <value>` · `due on <value>` |
+| no due date | `no due date` |
+| path containment | `path includes <text>` |
+| tag containment | `tag includes <text>` (also `tags include`; a leading `#` is not part of the value) |
+| priority | `priority is <highest\|high\|medium\|low\|lowest>` |
+| sort | `sort by <due\|priority\|path>` · optionally suffixed ` reverse` |
+| limit | `limit <n>` (also `limit to <n> tasks`) |
+
+Clauses are **AND**'d. Parsing is case-insensitive and whitespace-tolerant; tolerance never extends to admitting an unlisted phrase.
+
+A `<value>` is one of exactly three things:
+
+- an **absolute** full-date, `YYYY-MM-DD` (the shape §3.6.4 owns);
+- a **named** day — `today`, `tomorrow`, `yesterday`;
+- a **relative** parameterized constant — `in <n> <unit>` or `<n> <unit> ago`, where `<unit>` is `day`, `week`, `month` or `year`.
+
+#### 3.9.2 The boundary
+
+> **A field name may never appear where a value goes.**
+
+That sentence is the whole of the closedness rule, and it is what keeps the block a filter rather than an expression language.
+
+`in 3 days` is a **parameterized constant** — the same shape §3.8.7's recurrence intervals already admit — and is accepted. `due + 3d` is an **expression**: it reads a field and operates on it. Once that is representable, so is comparing one field to another, and from there a conformant implementation needs an evaluator — which the dialect refuses on the same grounds it refuses `onCompletion` (§3.8.4) and keeps the template registry closed.
+
+The three **function-valued** clause forms of the upstream grammar — `filter by function`, `sort by function`, `group by function` — are **all** excluded. Naming one and silently accepting the others would break the closedness claim.
+
+The value set therefore has no field-reference member, and a conformant implementation SHOULD make that unrepresentable in its type system rather than merely rejected at parse time.
+
+#### 3.9.3 Unreadable clauses, and the widen guard
+
+Parsing is **total**: it MUST NOT raise an error on any input, and it MUST NOT silently ignore anything.
+
+- An unreadable clause is **dropped**, and the implementation MUST record the clause's source text verbatim so the surface can report it. The clauses it *could* read still execute.
+- When **every** clause was dropped and at least one clause was written, the query **MUST refuse** — it MUST NOT be treated as matching everything. A misunderstood query that renders the whole vault presents as a correct enormous result, which is the worst available failure for this construct.
+- A query with **no clauses at all** is a different case and is legitimately unfiltered.
+
+Both conditions produce zero clauses; only one refuses. An implementation that conflates them renders the entire vault for a misread query.
+
+Dropped clauses MUST be reported **persistently, in the rendered block** — not in a transient notification. The block re-renders on every note open: a notification would recur indefinitely, and a shown-once notification goes silent, which is the exact failure the visible-drop rule exists to prevent.
+
+#### 3.9.4 English only
+
+The roster is **English only** and is not localized. It is a specification artifact: translating it would mean one contract and one vector set per shipped language, and — decisively — a vault that stops being portable between a user's own devices, because a query written under one app language would be unreadable under another.
+
+The cost is paid down two ways rather than argued away: a **builder** writes canonical query text from choices, so keywords are read rather than memorized, and an unreadable clause is surfaced visibly (§3.9.3) rather than silently ignored.
+
+#### 3.9.5 Row bound
+
+An implementation SHOULD bound the rendered rows, and MUST state the remainder when it does. A list quietly showing part of its matches is a wrong answer presented as a complete one. Myne's bound is 100 rows absent an explicit `limit` clause.
+
 ## 4. File extension and on-disk identity
 
 - The post-decryption plaintext content of a note is stored as **UTF-8 markdown text**.
@@ -365,6 +533,7 @@ For the v0.1 reference implementation in the desktop client:
 - Definition lists (§3.1) use a custom `MarkdownConfig` extension (a `LeafBlockParser`, the same hook CommonMark uses for setext headings and link references) that emits a `DefinitionList` block node with `DefinitionTerm` / `DefinitionMarker` (`:`) / `DefinitionDesc` children for the pinned tight subset. GFM has no definition-list node, so this extension is the sole producer; it is registered both in the shared serialization parser and in the editor's `markdown({ extensions })` so the editor's `syntaxTree` carries the node for decoration. Setext headings and reference links require **no** parser extension — `markdownLanguage` already produces `SetextHeading1`/`SetextHeading2` and reference-style `Link` nodes; MYND-146/148 are decoration-only.
 - Comments (§3.1 / §3.2) use a custom `MarkdownConfig` extension (`src/dialect/lezer/comment.ts`, MYND-315) because GFM and `@lezer/markdown` ship no `%%` comment construct (the package's reserved `Comment`/`CommentBlock` nodes are for HTML `<!-- -->` comments, a distinct construct). It is hand-rolled (no new dependency, like the highlight config). Two hooks, both **terminated-only**: an inline `parseInline` delimiter (`%%`, registered `after: "Emphasis"` — the same slot family as highlight / strikethrough) emits a `DialectComment` node with `DialectCommentMark` (`%%`) children, and the delimiter resolver leaves an unmatched `%%` as plain text (no node — the inert rule, for free); a block `parseBlock` `LeafBlockParser` (the def-list / link-reference pattern) attaches to a paragraph-class line opening with `%%` (`endLeaf` so it interrupts an open paragraph), accumulates lines, and on the first line carrying a closing `%%` commits a `DialectCommentBlock` node (open + close `DialectCommentMark` children) — and on external termination (blank line / EOF / another block) with **no** closing `%%` seen, `finish` returns `false` so the run reverts to an ordinary paragraph (the inert rule). The node names are deliberately distinct from the reserved HTML-comment nodes so the strip targets them precisely. Like footnotes/definition-lists it is registered in both the shared serialization parser and the editor's `markdown({ extensions })`. Recognizer-only — emits nodes, never mutates bytes (§6 C1). The editor decoration (`src/editor/decorations/comment.ts`) applies a single de-emphasis (dim) `Decoration.mark` to both the inline span and the multi-line block — the comment stays visible-but-muted in the editor, never hidden (the 2026-06-17 UX revision: a fully-hidden comment is invisible-and-confusing); the strip happens only in the lossy projections, a single recognize-strip pass over the same nodes consumed by `emitNoteHtml` (HTML/PDF), `emitNoteText` (stripped-TXT), and the `extractBodyText` document-statistics projection.
 - Footnotes (§3.4) use a custom `MarkdownConfig` extension (`src/dialect/lezer/footnote.ts`, MYND-153) because the `GFM` bundle (`[Table, TaskList, Strikethrough, Autolink]`) carries no footnote config and `@lezer/markdown` exports none. It emits an inline `FootnoteReference` node (registered `before: "Link"` so `[^…]` outranks standard link parsing) and a block `FootnoteDefinition` node (registered `before: "LinkReference"` so a `[^id]: text` line is claimed as a footnote rather than half-parsed as a CommonMark link reference definition), each exposing `FootnoteMark` (`[^`, `]` / `]:`) and `FootnoteLabel` (the identifier) children. The `FootnoteDefinition` is a **composite block**: its body parses as nested block content via a continuation rule (`NodeSpec.composite`), so multi-paragraph footnotes and fenced code / blockquotes *inside* a footnote render correctly. Like definition lists it is registered in both the shared serialization parser and the editor's `markdown({ extensions })`. The v0.1 subset: an identifier is a non-empty whitespace-free run with no `]`; a definition begins a block line (`[^id]:`, content optional — a bare `[^id]:` is an empty definition) and its body continues onto following lines that are blank or indented ≥4 columns (the Pandoc / GitHub continuation rule), ending at the first less-indented non-blank line; a footnote-definition line also interrupts an open paragraph (so consecutive `[^1]:`/`[^2]:` lines are distinct definitions). Recognizer-only — it emits nodes and never mutates bytes. The editor renders the reference as a superscript marker and collects definitions into a derived end-of-document list (a VIEW; in-source definition lines stay byte-stable in place); see `decisions.md` 2026-05-31.
+- Inline task fields (§3.8) use a custom `MarkdownConfig` extension (`dialect/src/lezer/task-field.ts`, MYND-611). Both dialects are recognized in one pass and emit one node shape — `TaskField` with `TaskFieldKey`, optional `TaskFieldValue`, and (bracketed form only) `TaskFieldMark` children for `[`, `::` and `]` — so a consumer walks a single structure regardless of which dialect the file happens to use. The bracketed rule is registered **`before: "Link"`**, and that slot is load-bearing rather than incidental: `[due:: 2026-08-01]` collides with CommonMark link syntax, so without outranking `Link` the field is claimed as a link label first and never forms. This is the same slot, for the same reason, as the footnote reference (`[^id]`) and the wikilink config; the three coexist because each rejects immediately on its own second character. Emoji markers are up to two UTF-16 code units, so the two-unit form is matched first — otherwise a surrogate pair's lead unit is mistaken for a one-unit marker. Registered in both the shared serialization parser and the editor's `markdown({ extensions })`. Recognizer-only — emits nodes, never mutates bytes (§6 C1); typing lives in `dialect/src/taskFields.ts` and emission in `dialect/src/taskFieldWriter.ts`, which is the single writer seam.
 - The frontmatter recognizer is single-pass and does not parse the YAML body; it only delimits the block. A **separate, read-only YAML-body parse** runs *outside* the editor recognizer to populate the derived property index (§3.6 + the value-typing ruleset §3.6.4; the `vault.indices` / `MYI1` projection, [`protocol.md`](protocol.md) §9.8, MYND-271): it parses the body for *indexing only*, is non-mutating (§6 C1 preserved), and is distinct from the still-deferred Properties *editing* UI. The editor's in-buffer recognizer stays single-pass and YAML-body-blind; the derived parse is a query-layer concern, not an editor-decoration concern.
 - HTML embedded inside markdown is recognized via `@codemirror/lang-html` (forced transitive of `lang-markdown`). **Amended by MYND-209** (`decisions.md` 2026-06-08, supersedes the prior "no sanitization, no XSS surface" posture): a curated safe subset — inline `<kbd>`/`<mark>`/`<sub>`/`<sup>`/`<abbr title>` and block `<p>`/`<details>`/`<summary>` — is **rendered** by sanitizing the raw span through **DOMPurify** (lazy-loaded) under an ultra-tight allowlist (`ALLOWED_TAGS` = those 8; `ALLOWED_ATTR` = `[title, class]`; KEEP_CONTENT). **`class` is widened only for multi-color highlight** (decisions.md 2026-06-15) and immediately narrowed by an `uponSanitizeAttribute` hook: it survives ONLY as exactly one allowlisted token from the closed `hl-*` set AND ONLY on a `<mark>` — multi-class, unknown tokens, and `class` on any other tag are stripped (falling back to plain rendering; bytes still preserved per §6 C1). No `style`/`id`/`src`/`href` ever survives. Rendering is via `innerHTML` of the **sanitized output ONLY** — never raw note HTML — so the introduced XSS surface is bounded to DOMPurify's vetted output; CSP (`script-src 'self'`, no `'unsafe-inline'`) is defense-in-depth. Off-allowlist tags (`<script>`/`<iframe>`/`<img>`/etc.) and HTML inside code spans/fences are NOT rendered and stay plain text. This is the SYNC-5 trusted-input contract reused by mermaid (MYND-49) SVG sanitization.
 

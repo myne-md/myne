@@ -102,6 +102,8 @@ export type CommandContext = {
   onExportNoteTxt: () => void;
   /** Open the whole-vault graph view (modal carve-out, lazy-loaded) (MYND-198). */
   onShowGraph: () => void;
+  /** Open (or reveal) the vault-wide task list (MYND-616). */
+  onShowTasks: () => void;
   /** Open the tag browser (modal carve-out: tree + multi-select filter) (MYND-46). */
   onShowTags: () => void;
   /** Reveal the Saved Views surface — the sidebar "Views" section (MYND-274). */

@@ -11,6 +11,7 @@
 // Appearance. This panel is a thin composition shell — the persistence logic
 // lives in the two child components.
 
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { TypographySettings } from "./TypographySettings";
 import { LineNumbersSettings } from "./LineNumbersSettings";
@@ -21,11 +22,22 @@ import { FocusModeSettings } from "./FocusModeSettings";
 import { SpellSettings } from "./SpellSettings";
 import { DailyNotesSettings } from "./DailyNotesSettings";
 import { ArchiveSettings } from "./ArchiveSettings";
+import { ReminderSettings } from "./ReminderSettings";
 import { PANEL_ROOT_STYLE } from "./panel-styles";
 import { SettingsSection } from "./SettingsSection";
+import { usePrefs } from "../../hooks/usePrefs";
 
 export function EditorPanel() {
   const { t } = useTranslation();
+  // Task reminders (MYND-618) read their pref here and echo the toggle locally:
+  // `usePrefs` reads once on mount, so the panel — not the hook — is what keeps
+  // the switch in step with the write the block performs itself.
+  const { prefs } = usePrefs();
+  const [remindersEnabled, setRemindersEnabledEcho] = useState<boolean | null>(null);
+  useEffect(() => {
+    setRemindersEnabledEcho(null);
+  }, [prefs.reminders_enabled]);
+
   return (
     <div style={PANEL_ROOT_STYLE}>
       {/* MYND-624: grouped rather than run together. The order within each group
@@ -70,6 +82,14 @@ export function EditorPanel() {
         {/* Daily-notes configuration (MYND-191) — folder / date-format /
             template. */}
         <DailyNotesSettings />
+        {/* Task reminders (MYND-618) — note-authoring behaviour, which is why it
+            belongs in this group rather than under Appearance. Device-local:
+            whether THIS machine is interrupted is a property of the machine. */}
+        <ReminderSettings
+          enabled={remindersEnabled ?? prefs.reminders_enabled}
+          horizonDays={prefs.reminder_horizon_days}
+          onEnabledChange={setRemindersEnabledEcho}
+        />
       </SettingsSection>
 
       <SettingsSection

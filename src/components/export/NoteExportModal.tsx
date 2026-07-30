@@ -25,6 +25,7 @@ import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import { useFocusTrap } from "../../hooks/useFocusTrap";
 import { Button } from "../primitives/Button";
+import { IconButton } from "../primitives/IconButton";
 import {
   EXPORT_ATTACHMENTS_PLACEMENT_SUBLABEL,
   EXPORT_PLAIN_MARKDOWN_SENTENCE,
@@ -38,6 +39,23 @@ interface NoteExportModalProps {
   onCancel: () => void;
   /** "Export…" — carries the toggle's state. */
   onConfirm: (includeAttachments: boolean) => void;
+  /**
+   * Copy the note's markdown to the clipboard instead of writing a file
+   * (MYND-643). Icon-only, beside Export: the common case is getting the text
+   * into another app, and going through a save dialog and then opening the file
+   * is a long way round for that.
+   *
+   * Same TB3 posture as Export — deliberate, user-initiated plaintext egress —
+   * but a DIFFERENT surface, not a shortcut for the same one: the clipboard is
+   * readable by any local app and the user does not choose where it lands.
+   * `docs/threat-model.md` §5's export exception already covers user-initiated
+   * plaintext egress, so no spec change; it earns the mention because "copy" is
+   * easy to read as cosmetic.
+   *
+   * Ignores the include-attachments toggle: a clipboard holds text, so there is
+   * nowhere for attachment bytes to go. The caller's toast says what landed.
+   */
+  onCopy: () => void;
 }
 
 export const BACKDROP_STYLE: CSSProperties = {
@@ -118,6 +136,7 @@ export function NoteExportModal({
   attachmentCount,
   onCancel,
   onConfirm,
+  onCopy,
 }: NoteExportModalProps) {
   const { t } = useTranslation();
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -185,6 +204,14 @@ export function NoteExportModal({
           >
             {t("export.note.modal.cancel")}
           </Button>
+          {/* Icon-only (MYND-643): the label would compete with Export for the
+              eye while doing less, and the tooltip carries the meaning. */}
+          <IconButton
+            icon="copy"
+            label={t("export.note.modal.copyLabel")}
+            onClick={onCopy}
+            testId="export.copy"
+          />
           <Button
             variant="primary"
             style={{ height: 36 }}

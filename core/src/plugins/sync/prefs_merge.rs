@@ -271,6 +271,25 @@ pub fn merge_prefs(local: &PrefsView, remote: &PrefsView) -> PrefsView {
     PrefsView {
         // ---- shared: scalar-LWW -----------------------------------------
         archive_disabled: lww!("archive_disabled", archive_disabled),
+        // ingest-image-compression: a content-fidelity switch with a
+        // vault-wide irreversible effect, unlike the device-local compute-
+        // budget siblings below (`attachment_ocr_enabled` et al.) — see
+        // prefs_classification.rs's comment on this row.
+        attachment_compression_enabled: lww!(
+            "attachment_compression_enabled",
+            attachment_compression_enabled
+        ),
+        // MYND-613 — Shared/ScalarLww, unlike its lexicographic neighbour
+        // `show_note_timestamps`, which is DeviceLocal.
+        // Device-local (MYND-618): whether a machine shows reminders, and how
+        // far ahead it registers them, are properties of THAT machine — so the
+        // local value wins outright rather than merging.
+        reminders_enabled: local.reminders_enabled,
+        reminder_horizon_days: local.reminder_horizon_days,
+        show_task_marker: lww!("show_task_marker", show_task_marker),
+        // MYND-592: shared for the same reason as `show_task_marker` — wanting
+        // speech-to-text is taste, not device capability.
+        transcription_enabled: lww!("transcription_enabled", transcription_enabled),
         daily_date_format: lww!("daily_date_format", daily_date_format),
         daily_folder: lww!("daily_folder", daily_folder),
         daily_template: lww!("daily_template", daily_template),
@@ -287,6 +306,14 @@ pub fn merge_prefs(local: &PrefsView, remote: &PrefsView) -> PrefsView {
             &remote.ai_excluded_folders,
         ),
         archived_folders: merge_set_union_folded(&local.archived_folders, &remote.archived_folders),
+        // myne-cli epic (MYND-490): a folder-path set, same fold discipline as
+        // ai_excluded_folders/archived_folders/deliberate_folders — an exclusion
+        // added on one device must never be lost in a merge with a device that
+        // lacks it.
+        cli_excluded_folders: merge_set_union_folded(
+            &local.cli_excluded_folders,
+            &remote.cli_excluded_folders,
+        ),
         deliberate_folders: merge_set_union_folded(
             &local.deliberate_folders,
             &remote.deliberate_folders,
@@ -335,7 +362,15 @@ pub fn merge_prefs(local: &PrefsView, remote: &PrefsView) -> PrefsView {
         attachment_ocr_enabled: local.attachment_ocr_enabled,
         auto_lock_seconds: local.auto_lock_seconds,
         bar_items_order: local.bar_items_order.clone(),
+        // myne-cli epic (MYND-490): a per-machine door + performance knob — the
+        // local value always survives the merge, same discipline as ai_enabled.
+        cli_enabled: local.cli_enabled,
+        cli_rate_limit_disabled: local.cli_rate_limit_disabled,
         custom_theme: local.custom_theme.clone(),
+        // developer-mode (MYND-593): device-local like `ai_enabled` — it gates
+        // a device-local model-path override, so a synced flag would read "on"
+        // on a device with no override behind it.
+        developer_mode: local.developer_mode,
         editor_content_width: local.editor_content_width.clone(),
         editor_default_view_mode: local.editor_default_view_mode.clone(),
         editor_focus_dim_inactive: local.editor_focus_dim_inactive,
@@ -414,6 +449,36 @@ mod tests {
         assert_eq!(ba.label.as_deref(), Some("Phone"));
         assert_eq!(ab.field_clocks.get("label"), Some(&200));
         assert_eq!(ba.field_clocks.get("label"), Some(&200));
+    }
+
+    #[test]
+    fn attachment_compression_enabled_is_shared_scalar_lww() {
+        // ingest-image-compression: unlike attachment_ocr_enabled (device-local),
+        // this toggle is shared — a vault-wide, irreversible content-fidelity
+        // switch, so the newer clock wins in both directions like `label`.
+        let mut a = PrefsView {
+            attachment_compression_enabled: false,
+            ..PrefsView::default()
+        };
+        stamped(&mut a, "attachment_compression_enabled", 200);
+        let mut b = PrefsView {
+            attachment_compression_enabled: true,
+            ..PrefsView::default()
+        };
+        stamped(&mut b, "attachment_compression_enabled", 100);
+
+        let ab = merge_prefs(&a, &b);
+        let ba = merge_prefs(&b, &a);
+        assert!(!ab.attachment_compression_enabled);
+        assert!(!ba.attachment_compression_enabled);
+        assert_eq!(
+            ab.field_clocks.get("attachment_compression_enabled"),
+            Some(&200)
+        );
+        assert_eq!(
+            ba.field_clocks.get("attachment_compression_enabled"),
+            Some(&200)
+        );
     }
 
     #[test]
@@ -508,6 +573,23 @@ mod tests {
         assert!(merged.field_clocks.is_empty());
     }
 
+    /// myne-cli epic (MYND-490): an exclusion added on one device must never
+    /// be lost in a merge with a device that never touched the list — the
+    /// same fail-safe SetUnion discipline as `ai_excluded_folders`.
+    #[test]
+    fn cli_excluded_folders_union_survives_a_device_that_lacks_it() {
+        let a = PrefsView {
+            cli_excluded_folders: vec!["Journal/".into()],
+            ..PrefsView::default()
+        };
+        let b = PrefsView::default(); // never touched the CLI exclusion list
+
+        for merged in [merge_prefs(&a, &b), merge_prefs(&b, &a)] {
+            assert_eq!(merged.cli_excluded_folders, vec!["Journal/".to_string()]);
+        }
+        assert!(merge_prefs(&a, &b).field_clocks.is_empty());
+    }
+
     #[test]
     fn folder_path_sets_fold_case_variants() {
         // MYND-562: a folder present as "personal/" on one device and
@@ -580,6 +662,54 @@ mod tests {
         assert_eq!(merged.auto_lock_seconds, Some(30));
         // And the bogus clock entry is NOT propagated into the merged map.
         assert!(!merged.field_clocks.contains_key("auto_lock_seconds"));
+    }
+
+    /// myne-cli epic (MYND-490): the CLI door is a per-machine decision, so it
+    /// must NOT propagate across a merge — after merging local=false with a
+    /// remote that has it on, the merged value stays local's (`false`), same
+    /// as `ai_enabled`'s device-local discipline.
+    #[test]
+    fn cli_enabled_does_not_propagate_across_a_merge() {
+        let local = PrefsView {
+            cli_enabled: false,
+            ..PrefsView::default()
+        };
+        let mut remote = PrefsView {
+            cli_enabled: true,
+            ..PrefsView::default()
+        };
+        // Even a (bogus) remote clock on a device-local field changes nothing.
+        stamped(&mut remote, "cli_enabled", u64::MAX);
+
+        let merged = merge_prefs(&local, &remote);
+        assert!(!merged.cli_enabled);
+        assert!(!merged.field_clocks.contains_key("cli_enabled"));
+
+        // And the reverse: local=true survives a remote that has it off.
+        let local_on = PrefsView {
+            cli_enabled: true,
+            ..PrefsView::default()
+        };
+        let remote_off = PrefsView {
+            cli_enabled: false,
+            ..PrefsView::default()
+        };
+        assert!(merge_prefs(&local_on, &remote_off).cli_enabled);
+    }
+
+    /// Same device-local discipline for the rate-limit toggle — a machine-local
+    /// performance knob, not a shared preference.
+    #[test]
+    fn cli_rate_limit_disabled_does_not_propagate_across_a_merge() {
+        let local = PrefsView {
+            cli_rate_limit_disabled: None,
+            ..PrefsView::default()
+        };
+        let remote = PrefsView {
+            cli_rate_limit_disabled: Some(true),
+            ..PrefsView::default()
+        };
+        assert_eq!(merge_prefs(&local, &remote).cli_rate_limit_disabled, None);
     }
 
     #[test]
@@ -718,6 +848,29 @@ mod tests {
         let merged = merge_prefs(&local, &remote);
         assert_eq!(merged.label.as_deref(), Some("Synced"));
         assert_eq!(merged.theme, None);
+    }
+
+    #[test]
+    fn developer_mode_is_device_local_local_wins_both_sides() {
+        // MYND-593: developer_mode gates a device-local model-path override,
+        // so — like ai_enabled / attachment_ocr_enabled — the local value
+        // must survive the merge regardless of which side is "on".
+        assert_eq!(classify("developer_mode"), Some(PrefClass::DeviceLocal));
+
+        let off = PrefsView::default();
+        let on = PrefsView {
+            developer_mode: true,
+            ..PrefsView::default()
+        };
+
+        assert!(
+            !merge_prefs(&off, &on).developer_mode,
+            "local off must stay off"
+        );
+        assert!(
+            merge_prefs(&on, &off).developer_mode,
+            "local on must stay on"
+        );
     }
 
     #[test]

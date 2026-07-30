@@ -16,6 +16,7 @@
 //      such link would be permanently dead and the user's page graph would arrive
 //      fully disconnected. (Grill N3.)
 
+import { isManagedFrontmatterField } from "../../../dialect/managedFields";
 import { resolveTarget, type NotionResolution } from "./names";
 
 /** A property line: `Key: value`, where the key has no markdown syntax in it. */
@@ -100,7 +101,10 @@ export function propertiesToFrontmatter(properties: Record<string, string>): {
   const rejected: string[] = [];
   for (const [key, value] of Object.entries(properties)) {
     // Reserved Myne-managed fields must never be forged by imported content.
-    if (["title", "folder", "trashed", "template", "archived"].includes(key.toLowerCase())) {
+    // The list is the single §3.6.1 constant, not an inline array: it used to
+    // name five of the eleven managed fields, which left `updated`,
+    // `folder_index`, `kind`, `deleted`, `conflict` and `conflict_of` forgeable.
+    if (isManagedFrontmatterField(key)) {
       rejected.push(key);
       continue;
     }

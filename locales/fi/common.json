@@ -115,7 +115,7 @@
       "title": "Liitteet",
       "transcribeDone": "Litterointi valmis.",
       "transcribeFailed": "Litterointi epäonnistui. Yritä uudelleen.",
-      "transcribeNoModel": "Valitse litterointimalli kohdasta Asetukset → Labs → Tekoäly.",
+      "transcribeNoModel": "Valitse litterointimalli kohdasta Asetukset → Developer → Tekoäly.",
       "transcribeStarted": "Litteroidaan…",
       "typeFilter": {
         "all": "Kaikki tyypit",
@@ -730,11 +730,11 @@
           "deletedLabel": "poistettu"
         },
         "transcribe": {
-          "disabledReason": "Litterointi vaatii tekoälyn — ota se käyttöön kohdasta Asetukset → Labs → Tekoäly.",
+          "disabledReason": "Litterointi vaatii tekoälyn — ota se käyttöön kohdasta Asetukset → Developer → Tekoäly.",
           "failed": "Litterointi epäonnistui. Yritä uudelleen.",
           "heading": "Litteraatti",
           "insert": "Lisää litteraatti muistiinpanoon",
-          "noModelHint": "Valitse litterointimalli kohdasta Asetukset → Labs → Tekoäly.",
+          "noModelHint": "Valitse litterointimalli kohdasta Asetukset → Developer → Tekoäly.",
           "progress": "Litteroidaan…",
           "stop": "Pysäytä"
         },
@@ -865,8 +865,8 @@
           "gettingReadyHint": "Valmistellaan muistiinpanojasi tekoälyä varten — hetki.",
           "insert": "Lisää muistiinpanoon",
           "noAnswer": "Ei vastausta — kokeile muotoilla uudelleen.",
-          "noModelHint": "Mallia ei valittu. Aloita valitsemalla malli kohdasta Asetukset → Labs → Tekoäly.",
-          "offHint": "Paikallinen tekoäly on pois päältä. Ota se käyttöön kohdasta Asetukset → Labs → Tekoäly.",
+          "noModelHint": "Mallia ei valittu. Aloita valitsemalla malli kohdasta Asetukset → Developer → Tekoäly.",
+          "offHint": "Paikallinen tekoäly on pois päältä. Ota se käyttöön kohdasta Asetukset → Developer → Tekoäly.",
           "send": "Lähetä",
           "statusGettingReady": "Valmistellaan…",
           "statusNoModel": "Ei mallia",
@@ -1261,7 +1261,10 @@
         "export": "Vie…",
         "includeAttachments_one": "Sisällytä {{count}} liite",
         "includeAttachments_other": "Sisällytä {{count}} liitettä",
-        "title": "Vie Markdown-muodossa"
+        "title": "Vie Markdown-muodossa",
+        "copyLabel": "Kopioi muistiinpanon teksti leikepöydälle",
+        "copied": "Muistiinpanon teksti kopioitu",
+        "copyFailed": "Muistiinpanon tekstiä ei voitu kopioida"
       }
     },
     "egress": {
@@ -2012,6 +2015,8 @@
       "changelogButton": "Näytä muutosloki…",
       "changelogHelper": "Versiokohtaiset muistiinpanot. Tulevat näkyviin, kun MYND-119 valmistuu.",
       "changelogLabel": "Muutosloki",
+      "developerModeHelper": "",
+      "developerModeLabel": "",
       "licenseBody": "Esialfa · CC-BY-4.0-asiakirjat · AGPL-3.0-sovelluskoodi vaiheen 1 julkaisussa.",
       "licenseLabel": "Lisenssi",
       "tagline": "Esialfa · Vaiheen 1 työpöytäsovellus",
@@ -2341,7 +2346,6 @@
       "pendingHint": "Tulossa pian"
     },
     "ai": {
-      "betaBadge": "Beta",
       "disclosureToggle": "Miten tämä toimii?",
       "enableHelper": "Suorittaa antamasi mallin kokonaan laitteellasi. Kokeellinen, oletuksena pois päältä.",
       "enableLabel": "Ota paikallinen tekoäly käyttöön",
@@ -2434,7 +2438,7 @@
     "shell": {
       "closeLabel": "Sulje asetukset",
       "groups": {
-        "labs": "Labs"
+        "developer": ""
       },
       "navLabel": "Asetuspaneelit",
       "panels": {

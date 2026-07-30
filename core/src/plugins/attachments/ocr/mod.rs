@@ -233,54 +233,24 @@ pub fn extract_image(bytes: &[u8]) -> ExtractedText {
     };
 
     // Read the header only — an undersized image must cost nothing beyond this.
-    let reader = match image::ImageReader::new(std::io::Cursor::new(bytes)).with_guessed_format() {
-        Ok(r) => r,
-        Err(_) => return ExtractedText::negative(ExtractStatus::Failed, SourceFormat::Image),
+    let Some((w, h)) = super::decode::dimensions(bytes) else {
+        return ExtractedText::negative(ExtractStatus::Failed, SourceFormat::Image);
     };
-    match reader.into_dimensions() {
-        Ok((w, h)) => {
-            if w.min(h) < MIN_OCR_IMAGE_SIDE {
-                return unsupported();
-            }
-        }
-        Err(_) => return ExtractedText::negative(ExtractStatus::Failed, SourceFormat::Image),
+    if w.min(h) < MIN_OCR_IMAGE_SIDE {
+        return unsupported();
     }
 
     // The DECODE is inside the guard too, not just the pipeline: the third-party
     // decoder is the component actually parsing hostile bytes, so containing
     // only what runs after it would have protected the wrong half.
     let out = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        let decoded = decode_bounded(bytes)?;
+        let decoded = super::decode::decode_bounded(bytes)?;
         Some(pipeline::recognize(models, &decoded))
     }));
     match out {
         Ok(Some(o)) => ExtractedText::finalize(o.text(), SourceFormat::Image),
         Ok(None) | Err(_) => ExtractedText::negative(ExtractStatus::Failed, SourceFormat::Image),
     }
-}
-
-/// Maximum pixel dimension accepted for decoding.
-///
-/// An attachment is capped at 64 MiB of *compressed* bytes, which says nothing
-/// about the decoded size — PNG reaches ~1000:1, so a few hundred KB can expand
-/// to tens of gigabytes. `image`'s default limits leave width and height
-/// unbounded (only a 512 MiB allocation ceiling), and an allocation abort is not
-/// something `catch_unwind` recovers from. 20000 px comfortably exceeds any real
-/// scan (a 600 dpi A4 page is ~7000 px) while making the bomb case a clean
-/// `Failed`.
-const MAX_OCR_IMAGE_DIMENSION: u32 = 20_000;
-
-/// Decode with explicit dimension limits. `None` on anything the decoder
-/// rejects, including an image whose declared size exceeds the cap.
-fn decode_bounded(bytes: &[u8]) -> Option<image::DynamicImage> {
-    let mut limits = image::Limits::default();
-    limits.max_image_width = Some(MAX_OCR_IMAGE_DIMENSION);
-    limits.max_image_height = Some(MAX_OCR_IMAGE_DIMENSION);
-    let mut reader = image::ImageReader::new(std::io::Cursor::new(bytes))
-        .with_guessed_format()
-        .ok()?;
-    reader.limits(limits);
-    reader.decode().ok()
 }
 
 /// Load the bundled models from `base` and install them process-wide. Idempotent

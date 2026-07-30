@@ -9,7 +9,7 @@
 // Because AI now ships in the default build as a runtime beta opt-in (decisions.md
 // 2026-07-02), the status has THREE resting states: off (`ai_enabled` false),
 // no-model (enabled but no generation model side-loaded — every infer would fail
-// `NotReady`, so we point at Settings → Labs → AI), and ready. The "AI thinking…"
+// `NotReady`, so we point at Settings → Developer → AI), and ready. The "AI thinking…"
 // busy state is wired when a sibling drives a blocking inference call (SYNC-7).
 //
 // Inference is local — no provider call, ever (the trust affordance in the AI
