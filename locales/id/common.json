@@ -1261,7 +1261,10 @@
         "export": "Ekspor…",
         "includeAttachments_one": "Sertakan {{count}} lampiran",
         "includeAttachments_other": "Sertakan {{count}} lampiran",
-        "title": "Ekspor sebagai Markdown"
+        "title": "Ekspor sebagai Markdown",
+        "copyLabel": "Salin teks catatan ke papan klip",
+        "copied": "Teks catatan disalin",
+        "copyFailed": "Tidak dapat menyalin teks catatan"
       }
     },
     "egress": {

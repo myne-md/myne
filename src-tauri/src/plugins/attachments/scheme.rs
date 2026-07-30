@@ -29,8 +29,9 @@
 //! - **No plaintext on disk** — decode happens in RAM; only the response
 //!   body (a fresh `Vec<u8>`) leaves `scheme_core`, handed to the WebView.
 //! - **Unlock-gated** — a locked vault serves `403`.
-//! - **Main-window-scoped** — the handler rejects any request whose
-//!   originating webview label is not `"main"`.
+//! - **Label-scoped** — the handler rejects any request whose originating
+//!   webview label is not in [`ALLOWED_WEBVIEW_LABELS`] (the app window and
+//!   the hidden PDF-export render window; MYND-638).
 //! - **Content-type re-sniff** — the served `Content-Type` is derived
 //!   from the bytes, allowlist-fenced (in `scheme_core::build_response`).
 //!
@@ -47,10 +48,29 @@ use tauri::{http, Manager, Runtime, UriSchemeContext, UriSchemeResponder};
 /// `lib.rs` via `register_asynchronous_uri_scheme_protocol`.
 pub const SCHEME: &str = "attachment";
 
-/// The single webview label permitted to fetch `attachment://` URIs.
-/// v0.1 is single-window; any other label is a routing anomaly and is
-/// rejected with `403`.
-const MAIN_WINDOW_LABEL: &str = "main";
+/// The webview labels permitted to fetch `attachment://` URIs. Any other
+/// label is a routing anomaly and is rejected with `403`.
+///
+/// **`main`** is the app. **`pdf-export`** (MYND-638) is the hidden
+/// render window the PDF export drives, and it has to be here or a PDF
+/// silently comes out with no images: the fence predates that window, so
+/// every `<img>` in the export projection was refused, and
+/// `src/pdf-export/main.ts` swallows a failed image decode by design
+/// ("a broken/missing attachment must stall nothing"). A blocked request
+/// therefore became an invisible defect rather than an error.
+///
+/// Widening to an allowlist rather than dropping the fence is deliberate.
+/// The guard exists to catch a request from a webview that should not
+/// exist; both entries here are windows THIS crate creates, load a
+/// bundled `WebviewUrl::App` page, are never user-navigable, and carry
+/// narrow capabilities (`pdf-export` has exactly one permission,
+/// `pdf-export:page`). A future window gets no access by accident — it
+/// has to be added here, in the file whose whole job is saying who may
+/// read decrypted attachment bytes.
+const ALLOWED_WEBVIEW_LABELS: [&str; 2] = [
+    "main",
+    crate::plugins::pdf_export::commands::PDF_EXPORT_WINDOW_LABEL,
+];
 
 /// The Tauri async-URI-scheme handler entry point. Registered in
 /// `lib.rs`. Spawns the decrypt + serve work onto the async runtime so
@@ -74,7 +94,7 @@ pub fn handle<R: Runtime>(
 
 /// Resolve one `attachment://` request to a full HTTP response.
 ///
-/// The main-window fence + slot peek + vault-dir resolution are host
+/// The webview-label fence + slot peek + vault-dir resolution are host
 /// concerns (they need the `AppHandle` + the managed `VaultRuntimeState`);
 /// the actual decode logic is delegated to
 /// [`crate::plugins::attachments::scheme_core::build_response`], which is
@@ -84,12 +104,14 @@ async fn serve<R: Runtime>(
     webview_label: &str,
     uri: &http::Uri,
 ) -> http::Response<Vec<u8>> {
-    // (1) Main-window-only fence. Any other originating webview → 403.
-    if webview_label != MAIN_WINDOW_LABEL {
+    // (1) Webview-label fence. Any originating webview outside the
+    //     allowlist → 403. The label is a `&'static str` comparison
+    //     against our own constants; nothing user-controlled reaches it.
+    if !ALLOWED_WEBVIEW_LABELS.contains(&webview_label) {
         tracing::warn!(
             stage = "scheme_label_check",
             status = 403,
-            "attachment:// request from non-main webview rejected"
+            "attachment:// request from a webview outside the allowlist rejected"
         );
         return forbidden();
     }
@@ -139,4 +161,42 @@ fn vault_dir<R: Runtime>(
     active_id: Option<crate::vault_id::VaultId>,
 ) -> std::io::Result<PathBuf> {
     crate::paths::active_vault_root_io(app, active_id)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The allowlist is the only thing standing between an arbitrary webview and
+    /// decrypted attachment bytes, so pin both what it admits and what it does
+    /// not. A future window added to the app must fail here until someone
+    /// deliberately lists it (MYND-638).
+    #[test]
+    fn allowlist_admits_the_app_and_the_pdf_export_window_only() {
+        assert!(ALLOWED_WEBVIEW_LABELS.contains(&"main"));
+        assert!(ALLOWED_WEBVIEW_LABELS
+            .contains(&crate::plugins::pdf_export::commands::PDF_EXPORT_WINDOW_LABEL));
+        assert_eq!(
+            ALLOWED_WEBVIEW_LABELS.len(),
+            2,
+            "no third label without review"
+        );
+
+        for label in ["", "clipper", "settings", "Main", "pdf_export", "devtools"] {
+            assert!(
+                !ALLOWED_WEBVIEW_LABELS.contains(&label),
+                "label {label:?} must not reach attachment bytes"
+            );
+        }
+    }
+
+    /// The constant is shared with the window builder rather than re-typed —
+    /// a copy would drift and silently re-break the export.
+    #[test]
+    fn pdf_export_label_is_the_one_the_window_is_built_with() {
+        assert_eq!(
+            crate::plugins::pdf_export::commands::PDF_EXPORT_WINDOW_LABEL,
+            "pdf-export"
+        );
+    }
 }

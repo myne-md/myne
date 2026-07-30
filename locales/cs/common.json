@@ -1331,7 +1331,10 @@
         "includeAttachments_few": "Zahrnout {{count}} přílohy",
         "includeAttachments_many": "Zahrnout {{count}} přílohy",
         "includeAttachments_other": "Zahrnout {{count}} příloh",
-        "title": "Exportovat jako Markdown"
+        "title": "Exportovat jako Markdown",
+        "copyLabel": "Kopírovat text poznámky do schránky",
+        "copied": "Text poznámky zkopírován",
+        "copyFailed": "Text poznámky se nepodařilo zkopírovat"
       }
     },
     "egress": {

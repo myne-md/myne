@@ -1261,7 +1261,10 @@
         "export": "Eksporter…",
         "includeAttachments_one": "Inkluder {{count}} vedlegg",
         "includeAttachments_other": "Inkluder {{count}} vedlegg",
-        "title": "Eksporter som Markdown"
+        "title": "Eksporter som Markdown",
+        "copyLabel": "Kopier notatteksten til utklippstavlen",
+        "copied": "Notattekst kopiert",
+        "copyFailed": "Kunne ikke kopiere notatteksten"
       }
     },
     "egress": {

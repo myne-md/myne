@@ -1261,7 +1261,10 @@
         "export": "エクスポート…",
         "includeAttachments_one": "添付ファイル{{count}}件を含める",
         "includeAttachments_other": "添付ファイル{{count}}件を含める",
-        "title": "Markdownとしてエクスポート"
+        "title": "Markdownとしてエクスポート",
+        "copyLabel": "ノートのテキストをクリップボードにコピー",
+        "copied": "ノートのテキストをコピーしました",
+        "copyFailed": "ノートのテキストをコピーできませんでした"
       }
     },
     "egress": {

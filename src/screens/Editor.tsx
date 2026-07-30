@@ -49,14 +49,7 @@ import { catalogDefaults } from "../commands/bindableCatalog";
 import { asViewMode, type ViewMode } from "../editor/view-mode";
 import { VIM_MODE_EVENT, type VimModeEventDetail } from "../editor/vim";
 import { CLOSE_ACTIVE_TAB_EVENT } from "../notes/closeActiveTabSignal";
-import { EditorView } from "@codemirror/view";
-import {
-  applyTaskFieldEdit,
-  beginTaskFieldEdit,
-  TASK_CHIP_EVENT,
-  type TaskChipEventDetail,
-} from "@myne/editor/decorations/task-chip";
-import { openTaskFieldEditor } from "@myne/editor/task-field-editor";
+import { installTaskChipEditor } from "@myne/editor/decorations/task-chip-listener";
 import { focusKindOf } from "../commands/scope";
 import { FailClosedError } from "../components/FailClosedError";
 import { StorageLost } from "./StorageLost";
@@ -659,6 +652,22 @@ function EditorChrome({
     (message: string) => setToast({ message }),
     [setToast],
   );
+  /** MYND-643: copy the open note's body to the clipboard. A clipboard write
+   *  has no visible result, so success MUST toast — otherwise the button reads
+   *  as broken — and so must failure, or the user pastes stale content
+   *  believing it worked. */
+  const copyOpenNoteMarkdown = useCallback(async () => {
+    const id = ctx.selectedId;
+    if (id === null) return;
+    try {
+      const { copyNoteMarkdown } = await import("../notes/copyNoteMarkdown");
+      await copyNoteMarkdown(id);
+      setToast({ message: i18n.t("export.note.modal.copied") });
+    } catch {
+      setToast({ message: i18n.t("export.note.modal.copyFailed") });
+    }
+  }, [ctx.selectedId, setToast]);
+
   const showExportToast = useCallback(
     (t: ExportToast) =>
       setToast({
@@ -861,41 +870,10 @@ function EditorChrome({
   //
   // Because the chips never open on caret entry, this listener is the ONLY way
   // to edit these values in live mode. It is therefore load-bearing rather than
-  // convenience wiring: without it the chips render and do nothing.
-  useEffect(() => {
-    const onOpenChip = (e: Event) => {
-      const detail = (e as CustomEvent<TaskChipEventDetail>).detail;
-      const target = e.target as HTMLElement | null;
-      const anchor = target?.closest?.("[data-task-chip]") as HTMLElement | null;
-      if (detail === undefined || anchor === null || anchor === undefined) return;
-      // The view is recovered from the DOM rather than threaded down, so a
-      // chip in any pane resolves against its own editor.
-      const view = EditorView.findFromDOM(anchor);
-      if (view === null) return;
-
-      // Track the span across document changes for as long as the popover is
-      // open. The document stays live underneath it — a background autosave
-      // rewrites the frontmatter stamp about a second after any edit — and
-      // writing at the offsets captured on click would land the new value in
-      // whatever text has since moved into them.
-      const edit = beginTaskFieldEdit(view, detail);
-      openTaskFieldEditor({
-        anchor,
-        kind: detail.kind,
-        value: detail.value,
-        onCommit: (next) => {
-          const span = edit.current();
-          edit.end();
-          // Null means the field was deleted while the popover was open;
-          // declining is the only correct answer.
-          if (span !== null) applyTaskFieldEdit(view, span, next);
-        },
-        onCancel: () => edit.end(),
-      });
-    };
-    window.addEventListener(TASK_CHIP_EVENT, onOpenChip);
-    return () => window.removeEventListener(TASK_CHIP_EVENT, onOpenChip);
-  }, []);
+  // convenience wiring: without it the chips render and do nothing. The listener
+  // itself lives in the shared editor package so desktop and mobile install the
+  // SAME implementation (`installTaskChipEditor`) rather than two copies.
+  useEffect(() => installTaskChipEditor(), []);
   const [newFromTemplateOpen, setNewFromTemplateOpen] = useState<boolean>(false);
   // Bottom-bar readout (save status + word count) — reported up by
   // whichever PaneView is currently focused (MYND-166). Per-pane PaneViews
@@ -2296,6 +2274,14 @@ function EditorChrome({
         onConfirm={(includeAttachments) => {
           exportPreflight?.resolve({ includeAttachments });
           setExportPreflight(null);
+        }}
+        onCopy={() => {
+          // MYND-643: resolve the pre-flight as CANCELLED so the export flow
+          // stops cleanly (it must not also write a file), then copy. Resolving
+          // with a choice would run the save-dialog path we are replacing.
+          exportPreflight?.resolve(null);
+          setExportPreflight(null);
+          void copyOpenNoteMarkdown();
         }}
       />
       <NotePdfExportNotice

@@ -46,7 +46,7 @@ describe("opens from every chip kind", () => {
     anchor.remove();
   });
 
-  it("opens for a repeat field with free text — the rule vocabulary is not this layer's", () => {
+  it("opens for a repeat field with a control, never a free-text box (dialect §3.8.7)", () => {
     const anchor = anchorEl();
     const handle = openTaskFieldEditor({
       anchor,
@@ -54,9 +54,36 @@ describe("opens from every chip kind", () => {
       value: "every 3 days",
       onCommit: () => {},
     });
-    const el = input() as HTMLInputElement;
-    expect(el.type).toBe("text");
-    expect(el.value).toBe("every 3 days");
+    // The primary control is a family SELECT, and there is NO free-text input in
+    // the surface — a rule is assembled and serialized, never typed.
+    const el = input();
+    expect(el.tagName).toBe("SELECT");
+    expect(el.classList.contains("cm-recurrence-family")).toBe(true);
+    const textInputs = [...surface()!.querySelectorAll("input")].filter(
+      (i) => i.type === "text",
+    );
+    expect(textInputs.length).toBe(0);
+    handle.close();
+    anchor.remove();
+  });
+
+  it("seeds the recurrence control from the existing rule", () => {
+    const anchor = anchorEl();
+    const handle = openTaskFieldEditor({
+      anchor,
+      kind: "repeat",
+      value: "every 3 weeks",
+      onCommit: () => {},
+    });
+    expect((input() as HTMLSelectElement).value).toBe("interval");
+    expect(
+      (surface()!.querySelector('[data-testid="editor.recurrence-count"]') as HTMLInputElement)
+        .value,
+    ).toBe("3");
+    expect(
+      (surface()!.querySelector('[data-testid="editor.recurrence-unit"]') as HTMLSelectElement)
+        .value,
+    ).toBe("week");
     handle.close();
     anchor.remove();
   });
@@ -134,13 +161,91 @@ describe("keyboard operation", () => {
   it("commits via the button too", () => {
     const anchor = anchorEl();
     const onCommit = vi.fn();
-    openTaskFieldEditor({ anchor, kind: "repeat", value: "every week", onCommit });
+    openTaskFieldEditor({ anchor, kind: "due", value: "2026-08-01", onCommit });
 
-    (input() as HTMLInputElement).value = "every 2 weeks";
+    (input() as HTMLInputElement).value = "2026-09-09";
     (document.querySelector('[data-testid="editor.task-field-commit"]') as HTMLElement).click();
 
-    expect(onCommit).toHaveBeenCalledWith("every 2 weeks");
+    expect(onCommit).toHaveBeenCalledWith("2026-09-09");
     anchor.remove();
+  });
+});
+
+describe("the repeat control assembles canonical rules from choices", () => {
+  function commitValue(value: string, drive: (root: HTMLElement) => void): string {
+    const anchor = anchorEl();
+    const onCommit = vi.fn();
+    openTaskFieldEditor({ anchor, kind: "repeat", value, onCommit });
+    drive(surface()!);
+    (document.querySelector('[data-testid="editor.task-field-commit"]') as HTMLElement).click();
+    anchor.remove();
+    return onCommit.mock.calls[0]![0] as string;
+  }
+
+  function setSelect(root: HTMLElement, testId: string, value: string): void {
+    const el = root.querySelector(`[data-testid="${testId}"]`) as HTMLSelectElement;
+    el.value = value;
+    el.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+
+  it("interval: count + unit → `every N units`", () => {
+    const out = commitValue("every day", (root) => {
+      setSelect(root, "editor.task-field-input", "interval");
+      const count = root.querySelector('[data-testid="editor.recurrence-count"]') as HTMLInputElement;
+      count.value = "2";
+      setSelect(root, "editor.recurrence-unit", "week");
+    });
+    expect(out).toBe("every 2 weeks");
+  });
+
+  it("weekdays: pressed pills → normalized Monday-first set", () => {
+    const out = commitValue("every day", (root) => {
+      setSelect(root, "editor.task-field-input", "weekdays");
+      // Press Friday then Tuesday; the rule normalizes to Monday-first order.
+      (root.querySelector('[data-testid="editor.recurrence-day-friday"]') as HTMLElement).click();
+      (root.querySelector('[data-testid="editor.recurrence-day-tuesday"]') as HTMLElement).click();
+    });
+    // The seed pressed Monday (interval seed leaves weekdays defaulting to
+    // Monday); Tuesday + Friday add to it.
+    expect(out).toBe("every monday, tuesday and friday");
+  });
+
+  it("dayOfMonth: `day N of every month`", () => {
+    const out = commitValue("every day", (root) => {
+      setSelect(root, "editor.task-field-input", "dayOfMonth");
+      setSelect(root, "editor.recurrence-dayofmonth", "15");
+    });
+    expect(out).toBe("day 15 of every month");
+  });
+
+  it("dayOfMonth last: `last day of every month`", () => {
+    const out = commitValue("every day", (root) => {
+      setSelect(root, "editor.task-field-input", "dayOfMonth");
+      setSelect(root, "editor.recurrence-dayofmonth", "last");
+    });
+    expect(out).toBe("last day of every month");
+  });
+
+  it("ordinal: `<ordinal> <weekday> of every month`", () => {
+    const out = commitValue("every day", (root) => {
+      setSelect(root, "editor.task-field-input", "ordinal");
+      setSelect(root, "editor.recurrence-ordinal", "second");
+      setSelect(root, "editor.recurrence-ordinal-weekday", "thursday");
+    });
+    expect(out).toBe("second thursday of every month");
+  });
+
+  it("completion-anchoring appends ` when done`", () => {
+    const out = commitValue("every day", (root) => {
+      (root.querySelector('[data-testid="editor.recurrence-when-done"]') as HTMLInputElement).checked =
+        true;
+    });
+    expect(out).toBe("every day when done");
+  });
+
+  it("round-trips an existing completion-anchored rule untouched", () => {
+    const out = commitValue("every 3 days when done", () => {});
+    expect(out).toBe("every 3 days when done");
   });
 });
 
