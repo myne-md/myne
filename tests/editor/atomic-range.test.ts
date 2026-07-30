@@ -25,6 +25,7 @@ import {
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { Wikilink } from "../../src/dialect/lezer/wikilink";
 import { wikilinkChipExtensions } from "../../src/editor/wikilink";
+import { frontmatterDecorations } from "../../src/editor/decorations/frontmatter";
 
 type Mounted = { view: EditorView; host: HTMLElement };
 
@@ -172,5 +173,103 @@ describe("Wikilink chip atomic-range (A1-A8)", () => {
     mounted = mount(doc, rightOfChip);
     deleteCharBackward(mounted.view);
     expect(mounted.view.state.doc.toString()).toBe("before  after");
+  });
+});
+
+// Frontmatter Properties block atomic-range (MYND-608). The block-replace over
+// the frontmatter source used to contribute NO atomicRanges, so cursor motion /
+// selection / Backspace could enter the hidden YAML (folder:/updated:) — two
+// silent-corruption paths. These pin the same atomic behaviour the wikilink
+// suite above verifies for the chip, but for the Properties block.
+
+function mountFm(doc: string, selectionFrom: number): Mounted {
+  const host = document.createElement("div");
+  document.body.appendChild(host);
+  const view = new EditorView({
+    state: EditorState.create({
+      doc,
+      selection: { anchor: selectionFrom },
+      // The range is located by a raw doc scan (`cachedLocateFrontmatter`), not
+      // the syntax tree, so a bare markdown base is enough.
+      extensions: [markdown({ base: markdownLanguage }), frontmatterDecorations()],
+    }),
+    parent: host,
+  });
+  return { view, host };
+}
+
+/** The single frontmatter atomic range currently registered on the view — read
+ *  from the real `atomicRanges` facet so the assertions don't hard-code offsets. */
+function fmAtomicRange(view: EditorView): { from: number; to: number } {
+  let out: { from: number; to: number } | null = null;
+  for (const provider of view.state.facet(EditorView.atomicRanges)) {
+    const iter = provider(view).iter();
+    while (iter.value !== null) {
+      out = { from: iter.from, to: iter.to };
+      iter.next();
+    }
+  }
+  if (out === null) throw new Error("no frontmatter atomic range registered");
+  return out;
+}
+
+const FM_DOC = "---\nfolder: work/\nupdated: 2026-01-01\n---\n\nbody text";
+
+describe("Frontmatter Properties atomic-range (MYND-608)", () => {
+  let mounted: Mounted | null = null;
+  beforeEach(() => {
+    mounted = null;
+  });
+  afterEach(() => {
+    if (mounted !== null) teardown(mounted);
+  });
+
+  it("FM1: ArrowRight at the block's left edge jumps past the whole block", () => {
+    mounted = mountFm(FM_DOC, 0);
+    const { from, to } = fmAtomicRange(mounted.view);
+    mounted.view.dispatch({ selection: { anchor: from } });
+    cursorCharRight(mounted.view);
+    expect(mounted.view.state.selection.main.head).toBe(to);
+  });
+
+  it("FM2: ArrowLeft at the block's right edge jumps back over the whole block", () => {
+    mounted = mountFm(FM_DOC, 0);
+    const { from, to } = fmAtomicRange(mounted.view);
+    mounted.view.dispatch({ selection: { anchor: to } });
+    cursorCharLeft(mounted.view);
+    expect(mounted.view.state.selection.main.head).toBe(from);
+  });
+
+  it("FM3: selection extension into the block snaps to its outer boundary (no partial-YAML selection)", () => {
+    mounted = mountFm(FM_DOC, 0);
+    const { from, to } = fmAtomicRange(mounted.view);
+    mounted.view.dispatch({ selection: { anchor: to } });
+    selectCharLeft(mounted.view);
+    expect(mounted.view.state.selection.main.head).toBe(from);
+    expect(mounted.view.state.selection.main.anchor).toBe(to);
+  });
+
+  it("FM4: Backspace at the block boundary deletes the WHOLE block, never a single char into the YAML", () => {
+    mounted = mountFm(FM_DOC, 0);
+    const { to } = fmAtomicRange(mounted.view);
+    mounted.view.dispatch({ selection: { anchor: to } });
+    deleteCharBackward(mounted.view);
+    const after = mounted.view.state.doc.toString();
+    // The frontmatter is gone as a unit — not partially mangled into invalid YAML.
+    expect(after).not.toContain("folder:");
+    expect(after).not.toContain("updated:");
+    expect(after.startsWith("---")).toBe(false);
+    expect(after).toContain("body text");
+  });
+
+  it("FM5: the widget + its inputs and add button still render with atomicRanges present", () => {
+    mounted = mountFm(FM_DOC, FM_DOC.length);
+    const panel = mounted.host.querySelector(".cm-fm-properties");
+    expect(panel, "Properties panel renders").not.toBeNull();
+    expect(panel!.querySelector("input"), "an editable field renders").not.toBeNull();
+    expect(
+      panel!.querySelector(".cm-fm-properties-add"),
+      "the + Add property button renders",
+    ).not.toBeNull();
   });
 });
