@@ -49,6 +49,10 @@ export type SeamOperation =
   | "path.join"
   | "window.destroy"
   | "window.isFullscreen"
+  // MYND-628 — reveal a window that idle auto-lock hid. Refused on WEB: a page
+  // has no hidden window, because web auto-lock re-renders the locked surface in
+  // the same tab rather than taking one away.
+  | "window.show"
   | "webviewWindow.listen"
   | "clipboard.writeText"
   | "clipboard.readText"

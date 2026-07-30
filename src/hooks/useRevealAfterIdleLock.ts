@@ -36,13 +36,19 @@
 // rejected by the Tauri 2 deny-by-default ACL and take `show()` down with it.
 
 import { useEffect } from "react";
-import { getCurrentWindow } from "@tauri-apps/api/window";
+import { getCurrentWindow } from "../platform/window";
 
 /**
  * Reveal the window once a locked surface has mounted.
  *
  * Idempotent on a normal boot — `screen_capture::init` has already shown the
- * window, so this is a no-op there. No-op outside Tauri (browser dev shim).
+ * window, so this is a no-op there.
+ *
+ * On the web client the seam refuses `window.show` outright, and the `catch`
+ * below is the correct handler for it: a page has no hidden window, because web
+ * auto-lock re-renders the locked surface in the same tab rather than taking one
+ * away. The refusal is typed (`web/src/platform/window.ts`) rather than a silent
+ * no-op so a later caller cannot read success into it.
  */
 export function useRevealAfterIdleLock(): void {
   useEffect(() => {

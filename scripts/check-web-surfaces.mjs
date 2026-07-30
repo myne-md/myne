@@ -96,6 +96,10 @@ const V = {
     "adapted",
     "Rendered only where quick-unlock exists; the PIN path itself is portable and task 40 owns it.",
   ],
+  "src/components/settings/SettingsSection.tsx": [
+    "ported",
+    "The settings-panel section wrapper (MYND-624). Presentational — a heading plus its children, no host call and no capability of its own, so it carries whatever its contents already carry.",
+  ],
   "src/components/settings/SpellSettings.tsx": [
     "adapted",
     "Rendered only where `spellCheck` is present (task 47 decided its absence on web).",
@@ -256,6 +260,10 @@ const V = {
   ],
   "src/hooks/useLastActiveNotePref.ts": ["ported", "Prefs-backed."],
   "src/hooks/usePrefs.ts": ["ported", "The shared prefs hook."],
+  "src/hooks/useRevealAfterIdleLock.ts": [
+    "adapted",
+    "Mounts on web and reaches a seam that REFUSES it (MYND-628). Desktop idle auto-lock hides the OS window with `orderOut:` and nothing on the Rust side shows it again, so a locked boot surface has to ask; a page has no hidden window, because web auto-lock re-renders the locked surface in the same tab. `window.show` is a typed refusal rather than a no-op, and the hook's `catch` is the correct handler — so this is adapted, not excluded: it still runs, it just correctly does nothing.",
+  ],
   "src/hooks/useSyncStatus.ts": ["ported", "Sync status; more load-bearing on web, where sync is required."],
   "src/lib/diagnostics.ts": [
     "ported",
