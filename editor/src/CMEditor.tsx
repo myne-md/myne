@@ -182,6 +182,10 @@ export function CMEditor(props: CMEditorProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const viewRef = useRef<EditorView | null>(null);
   const onChangeRef = useRef(onChange);
+  // The PREVIOUS `value` prop — the base an incoming one is rebased against
+  // (MYND-625). Not the last text we emitted: the outside's edit is
+  // `prevValue -> value`, and only that delta may be applied.
+  const prevValueRef = useRef<string | null>(null);
   const onBlurRef = useRef(onBlur);
   const onSelectionChangeRef = useRef(onSelectionChange);
   const onOpenWikilinkRef = useRef(onOpenWikilink);
@@ -358,10 +362,51 @@ export function CMEditor(props: CMEditorProps) {
   // A full doc replacement (`{from: 0, to: docLength, insert: value}`)
   // would land the cursor at position 0 after every autosave, since CM6
   // doesn't infer how to map cursor across an indiscriminate replace.
+  //
+  // MYND-625: an incoming `value` that the live doc has already moved past is
+  // DROPPED, not applied.
+  //
+  // Diffing against the live doc was a lost-update bug. Autosave snapshots the
+  // doc, writes it, and the parent echoes the saved text back as `value` — but
+  // the user keeps typing during that round trip, so by the time the echo
+  // arrives the live doc is AHEAD of it. A diff between "doc with the new
+  // keystrokes" and "value without them" describes deleting those keystrokes,
+  // and dispatching it did exactly that. That is all three reported symptoms
+  // from one cause: a single character vanishing while typing fast (one
+  // keystroke inside the window), a whole line disappearing after leaving the
+  // note (a longer run inside a slower window), and the caret jumping (the
+  // deletion moves it, and the next selection change scrolls it back into
+  // view).
+  //
+  // The guard below compares the live doc against the text the outside last
+  // had. Equal means no local edits happened in the meantime and the incoming
+  // value is authoritative — note switch, sync, conflict resolution — so it is
+  // applied exactly as before. Unequal means the buffer is ahead of the echo,
+  // and the echo is dropped.
   useEffect(() => {
     const view = viewRef.current;
     if (view === null) return;
-    const diff = diffDoc(view.state.doc.toString(), value);
+    const live = view.state.doc.toString();
+    const prev = prevValueRef.current;
+    prevValueRef.current = value;
+
+    if (live === value) return;
+
+    // LOCAL EDITS WIN over a stale echo. If the live doc no longer matches the
+    // text the outside last had, the user has typed since that snapshot and
+    // this `value` cannot describe their document. Applying it would delete
+    // whatever they added — which is exactly the reported data loss. Drop it:
+    // the buffer is already newer, and the next save carries it (including a
+    // fresh `updated:` stamp, so nothing is permanently missed).
+    //
+    // A single-range diff cannot be rebased safely here. When the echo differs
+    // from the live doc by BOTH a frontmatter edit and the trailing keystrokes,
+    // the longest-common-prefix/suffix scan collapses them into one wide
+    // replacement whose range spans the user's text — so "apply it carefully"
+    // has no correct formulation. Dropping is the only non-destructive answer.
+    if (prev !== null && live !== prev) return;
+
+    const diff = diffDoc(live, value);
     if (diff === null) return;
     view.dispatch({ changes: diff });
   }, [value]);

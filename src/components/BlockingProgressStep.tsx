@@ -16,9 +16,10 @@
 // while this surface is mounted; the recover screen achieves this
 // structurally by not rendering any Lock CTA inside its sub-steps.
 //
-// Reduced motion: <Spinner> falls back to a static ring under
-// `prefers-reduced-motion: reduce` (tokens.css zeroes
-// animation-duration).
+// Reduced motion: <Spinner> keeps turning, at half speed (MYND-630). This
+// surface BLOCKS the user on an Argon2id-bound operation, so a frozen ring
+// here is the worst possible reading — it is exactly when "is this still
+// working?" needs an answer. See the essential-motion exemption in tokens.css.
 
 import { useEffect, useRef, type CSSProperties } from "react";
 import { Spinner } from "./Spinner";

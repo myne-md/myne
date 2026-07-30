@@ -330,6 +330,39 @@ export function AttachmentsLibrary({ onClose }: AttachmentsLibraryProps) {
 
   // ---- actions -----------------------------------------------------------
 
+  // MYND-629: files dropped onto the pane import the same way the button's
+  // file dialog does — same `attachmentImport` IPC, same refresh — so a drop
+  // and a pick cannot diverge in what they accept or produce. Only the source
+  // of the bytes differs: a drop hands us the bytes directly (no filesystem
+  // path crosses IPC), a pick hands us a path the backend reads.
+  const [dropping, setDropping] = useState(false);
+
+  const handleDropFiles = useCallback(
+    async (files: File[]) => {
+      if (files.length === 0) return;
+      setImporting(true);
+      try {
+        for (const file of files) {
+          const bytes = new Uint8Array(await file.arrayBuffer());
+          await attachmentImport({
+            kind: "bytes",
+            bytes: Array.from(bytes),
+            filename: file.name || null,
+          });
+        }
+        await refresh();
+      } catch (err) {
+        if (import.meta.env.DEV) {
+          // eslint-disable-next-line no-console
+          console.warn("[AttachmentsLibrary] drop import failed:", err);
+        }
+      } finally {
+        setImporting(false);
+      }
+    },
+    [refresh],
+  );
+
   const handleImport = useCallback(async () => {
     setImporting(true);
     try {
@@ -527,9 +560,30 @@ export function AttachmentsLibrary({ onClose }: AttachmentsLibraryProps) {
 
   return (
     <main
+      onDragOver={(e) => {
+        // Only claim the drop when the OS is actually offering files; an
+        // in-app note drag must keep falling through to the sidebar.
+        if (!e.dataTransfer.types.includes("Files")) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "copy";
+        setDropping(true);
+      }}
+      onDragLeave={() => setDropping(false)}
+      onDrop={(e) => {
+        if (!e.dataTransfer.types.includes("Files")) return;
+        e.preventDefault();
+        setDropping(false);
+        void handleDropFiles(Array.from(e.dataTransfer.files));
+      }}
+      data-testid="attachments.library"
+      data-dropping={dropping ? "true" : undefined}
       style={{
         flex: 1,
         minWidth: 0,
+        // Drop affordance (MYND-629): an inset accent ring while files hover,
+        // so the pane visibly claims the drop instead of silently accepting it.
+        outline: dropping ? "2px dashed var(--accent)" : undefined,
+        outlineOffset: dropping ? "-6px" : undefined,
         // Allow this flex-column item to shrink below its content height so the
         // SCROLL_STYLE child (overflowY: auto) actually scrolls instead of the
         // grid overflowing the pane (flexbox min-height:auto trap).

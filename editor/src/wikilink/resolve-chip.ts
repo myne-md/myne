@@ -97,16 +97,37 @@ export function chipFolderTargetKey(parts: WikilinkParts): string | null {
 export function chipKeySets(notes: readonly ResolverNote[]): {
   titles: Set<string>;
   folderIndex: Set<string>;
+  drawings: Set<string>;
 } {
   const titles = new Set<string>();
   const folderIndex = new Set<string>();
+  // MYND-634: title keys of notes that are DRAWINGS (`kind: drawing`). The
+  // resolver has carried `isDrawing` since the drawing epic but nothing read
+  // it — the inline-embed consumer it was plumbed for was never written, so a
+  // drawing embed rendered as an ordinary text chip, indistinguishable from a
+  // link to a prose note.
+  const drawings = new Set<string>();
   for (const n of notes) {
     if (n.title !== null) titles.add(foldSegment(n.title));
     if (n.folderIndex === true && n.folder !== null) {
       folderIndex.add(folderKey(n.folder));
     }
+    if (n.isDrawing === true && n.title !== null) {
+      drawings.add(foldSegment(n.title));
+    }
   }
-  return { titles, folderIndex };
+  return { titles, folderIndex, drawings };
+}
+
+/** Whether an EMBED chip points at a drawing note (MYND-634). */
+export function isDrawingEmbed(
+  parts: WikilinkParts,
+  drawingKeys: ReadonlySet<string>,
+): boolean {
+  if (!parts.isEmbed) return false;
+  const target = parts.target ?? "";
+  if (target === "") return false;
+  return drawingKeys.has(foldSegment(target));
 }
 
 /**

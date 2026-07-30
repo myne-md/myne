@@ -25,6 +25,7 @@ import {
   historyKeymap,
   indentWithTab,
 } from "@codemirror/commands";
+import { indentUnit } from "@codemirror/language";
 import { closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { Subscript, Superscript, Emoji } from "@lezer/markdown";
@@ -239,6 +240,15 @@ export function myneExtensions(opts?: {
       indentWithTab,
     ]),
     myneTheme,
+    // MYND-626: Tab indents by FOUR spaces, not CodeMirror's default two.
+    // Two is too shallow to read as a level in a nested task list — the child
+    // sits so close to its parent that the tree reads flat. Four is also the
+    // width every CommonMark parser accepts unambiguously for a nested item
+    // under any marker, so a Myne-indented list keeps its shape when it leaves
+    // the app. This is the editor-wide indent unit, so it applies to plain
+    // lists and indented code alike; `indentWithTab` (below, in the keymap)
+    // reads this facet.
+    indentUnit.of("    "),
     EditorView.lineWrapping,
     // Optional line-number gutter (editor-line-numbers, MYND-314), seeded OFF
     // (prose-first default). Lives in a CM6 Compartment so the host can

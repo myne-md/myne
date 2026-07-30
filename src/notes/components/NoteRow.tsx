@@ -28,10 +28,10 @@ import {
   type MouseEvent as ReactMouseEvent,
 } from "react";
 import { useTranslation } from "react-i18next";
+import { labelColorVar } from "../decorations";
 import type { TitleRecord } from "../loadNoteBatch";
 import { TASK_KIND_VALUE } from "../../dialect";
 import { uuidv7Ms } from "../sidebarState";
-import { ColorDot } from "./ColorDot";
 import { Icon } from "../../components/primitives/Icon";
 import { formatRelativeTime, useTick } from "./relativeTime";
 
@@ -68,7 +68,8 @@ export type NoteRowProps = {
    *  non-interactive filled badge shown only on favorited rows (render-only;
    *  the toggle handler is wired in the favorites-membership task). */
   onToggleFavorite?: (id: string) => void;
-  /** Color-label slot (MYND-184) — renders a small leading dot before the
+  /** Color-label slot (MYND-184) — washes the row's background (MYND-627,
+   *  replacing the leading dot) before the
    *  title. Undefined when the note has no color. */
   colorSlot?: string;
   /** Whether this row is part of the active multi-selection (MYND-367) — paints
@@ -439,15 +440,32 @@ export function NoteRow(props: NoteRowProps) {
   // A multi-selected row paints the same accent-soft fill as the open row, so
   // the whole gathered set reads as picked (MYND-367).
   const highlighted = selected || multiSelected;
+  // MYND-627: a coloured note washes its ROW rather than carrying a dot.
+  // The dot spent a fixed slice of width on every coloured row -- costly in a
+  // narrow sidebar, worse on mobile -- and read as a bullet rather than as the
+  // note being marked. A highlight-style wash costs no width at all. Kept low
+  // enough in alpha to sit under the selected/hover fills without muddying
+  // them, and the title text stays in the ink ramp, so PRODUCT.md's rule that
+  // colour never tints prose still holds.
+  const colorWash =
+    colorSlot && !highlighted
+      ? {
+          background: `color-mix(in srgb, ${labelColorVar(colorSlot)} 14%, transparent)`,
+        }
+      : {};
   const composedRowStyle: CSSProperties = {
     ...rowBaseStyle,
     ...(showTimestamps ? {} : rowCompactStyle),
+    ...colorWash,
     ...(highlighted ? rowSelectedStyle : hovering ? rowHoverStyle : {}),
   };
 
   return (
     <div
       style={composedRowStyle}
+      // Marker for the row's colour label — the paint is the wash above, but
+      // this is what E2E and the component tests locate it by.
+      data-color-slot={colorSlot}
       onClick={handleClick}
       onAuxClick={handleAuxClick}
       onDoubleClick={handleDoubleClick}
@@ -473,7 +491,6 @@ export function NoteRow(props: NoteRowProps) {
         ) : (
           <TitleLine
             record={record}
-            colorSlot={colorSlot}
             isIndexNote={isIndexNote}
             indexConflict={indexConflict}
             showTaskMarker={showTaskMarker}
@@ -537,21 +554,20 @@ export function NoteRow(props: NoteRowProps) {
 
 // ─── TitleLine — handles Untitled placeholder + error indicator ───
 
+// Colour no longer reaches the title: MYND-627 moved it to the row's own wash,
+// so this renders text and trailing markers only.
 function TitleLine({
   record,
-  colorSlot,
   isIndexNote = false,
   indexConflict = false,
   showTaskMarker = true,
 }: {
   record: TitleRecord;
-  colorSlot?: string;
   isIndexNote?: boolean;
   indexConflict?: boolean;
   showTaskMarker?: boolean;
 }) {
   const { t } = useTranslation();
-  const dot = <ColorDot slot={colorSlot} style={{ marginRight: 6, verticalAlign: "middle" }} />;
   // Trailing markers (MYND-370) — the index badge on the folder's index note,
   // and the muted conflict dot on a claimant that lost the tiebreak. Both are
   // subtle, inline-after-title, and mutually exclusive in practice (a winner is
@@ -598,7 +614,6 @@ function TitleLine({
   if (record.error !== undefined) {
     return (
       <div style={titleUntitledStyle} title={t("notes.row.loadError")}>
-        {dot}
         <span style={errorIndicatorStyle} aria-hidden="true" />
         {t("notes.row.untitled")}
         {markers}
@@ -608,7 +623,6 @@ function TitleLine({
   if (record.title === null) {
     return (
       <div style={titleUntitledStyle}>
-        {dot}
         {t("notes.row.untitled")}
         {markers}
       </div>
@@ -616,7 +630,6 @@ function TitleLine({
   }
   return (
     <div style={titleStyle}>
-      {dot}
       {record.title}
       {markers}
     </div>
