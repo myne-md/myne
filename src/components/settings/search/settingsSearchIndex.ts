@@ -349,7 +349,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     keywordsKey: "settings.search.keywords.showEditTimes",
   },
   {
-    // A pointer row, not a control (MYND-635): the graph's own settings live in
+    // A pointer row, not a control (MYND-604): the graph's own settings live in
     // the graph pane. Indexed anyway — "where do I change how the graph looks?"
     // is exactly the question Settings search is asked, and the row it lands on
     // answers it.

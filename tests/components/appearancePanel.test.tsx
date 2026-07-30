@@ -6,7 +6,7 @@
 // (flip-then-persist, revert + error on failure). The prefs setters + applyTheme
 // are mocked at the lib boundary.
 //
-// Also covers the MYND-635 graph pointer row: the panel carries no graph
+// Also covers the MYND-604 graph pointer row: the panel carries no graph
 // controls of its own — the row exists only to say where they live and to open
 // the graph — so the test asserts exactly that (label + working action + the
 // defensive disabled degrade when no handler is supplied).
@@ -151,7 +151,7 @@ describe("AppearancePanel — theme segmented control", () => {
   });
 });
 
-describe("AppearancePanel — graph settings pointer row (MYND-635)", () => {
+describe("AppearancePanel — graph settings pointer row (MYND-604)", () => {
   it("renders the row with its i18n label, helper and action", async () => {
     render(<AppearancePanel onOpenGraph={() => {}} />);
     await waitFor(() => expect(prefsRead).toHaveBeenCalled());

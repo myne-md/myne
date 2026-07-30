@@ -66,7 +66,7 @@ export function backlinkRowsEqual(
 }
 
 /** One outgoing-links-panel row: a target note + how many occurrences in the
- *  open note resolve to it (the Links tab's outgoing half, MYND-635 task 1). */
+ *  open note resolve to it (the Links tab's outgoing half, MYND-604 task 1). */
 export type OutgoingLinkRow = {
   targetUuid: string;
   targetTitle: string | null;

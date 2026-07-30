@@ -8,7 +8,7 @@
 // Editor panel (`EditorPanel.tsx`) — see the taxonomy entry in
 // `docs/decisions.md` superseding the 2026-05-08 5-panel lock.
 //
-// One row here is a POINTER, not a control (MYND-635): the graph's appearance
+// One row here is a POINTER, not a control (MYND-604): the graph's appearance
 // and physics settings live in a floating panel inside the graph pane, because
 // they are per-device tuning previewed against the canvas they change — adding
 // a seventh Settings panel for them was rejected. That leaves a discoverability
@@ -145,7 +145,7 @@ function wireValue(value: ThemeOption["value"]): ThemeChoice | null {
 
 interface AppearancePanelProps {
   /**
-   * Open the graph tab (MYND-635 task 9). The graph's own appearance and
+   * Open the graph tab (MYND-604 task 9). The graph's own appearance and
    * physics controls live in a panel inside the graph pane, not in Settings —
    * deliberately, so the 6-panel taxonomy stays as it is. This row is the
    * pointer that closes the discoverability gap that decision creates.

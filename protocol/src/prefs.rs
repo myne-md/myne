@@ -273,8 +273,8 @@ pub struct PrefsView {
     /// Light/Dark/System choice): when set, the host applies the custom palette
     /// and ignores `theme`. Omitted entirely from the canonical JSON when `None`,
     /// so a vault with no custom theme is byte-identical to a pre-MYND-297
-    /// `vault.prefs`. Canonical key `custom_theme` — the only 'c' key, sorts
-    /// between `auto_lock_seconds` (a) and the `daily_*` block (d). A
+    /// `vault.prefs`. Canonical key `custom_theme` — sorts after `color_groups`
+    /// (`col` < `cus`) and before the `daily_*` block (d). A
     /// **non-load-bearing** cosmetic preference (AS-low): a tampered/replayed
     /// value can at worst select a different or absent palette (the host
     /// validates the file + falls back to a built-in theme on any failure), so
@@ -674,7 +674,7 @@ pub struct PrefsView {
     #[serde(default)]
     pub bar_items_order: Vec<String>,
 
-    /// Color-group rules (graph-connection-ux-polish, MYND-635) — the ordered
+    /// Color-group rules (graph-connection-ux-polish, MYND-604) — the ordered
     /// list of user-authored `{id, name, color, enabled, filter}` rules the
     /// knowledge-graph pane paints matching notes with at render time. ONE
     /// structured field, not a field per rule (the `saved_views` precedent
@@ -1278,7 +1278,7 @@ fn canonical_json_encode(prefs: &PrefsView) -> Vec<u8> {
     }
 
     // color_groups (canonical key 'col' — after bar_items_order [b < c], before
-    // custom_theme [col < cus], MYND-635 graph-connection-ux-polish). The
+    // custom_theme [col < cus], MYND-604 graph-connection-ux-polish). The
     // ordered color-group rule list; order IS rule precedence, so the array is
     // encoded via the canonical codec's OWN verbatim-order encoder (never
     // re-sorted — contrast `saved_views`, which the codec sorts by id).
@@ -1292,8 +1292,8 @@ fn canonical_json_encode(prefs: &PrefsView) -> Vec<u8> {
         out.push(b',');
     }
 
-    // custom_theme (canonical key 'c' — after auto_lock_seconds 'a', before the
-    // daily_* block 'd'; the only 'c' key). The active custom-theme name; takes
+    // custom_theme (canonical key 'cus' — after color_groups 'col' [col < cus],
+    // before the daily_* block 'd'). The active custom-theme name; takes
     // precedence over `theme` host-side. Omitted when None so a vault with no
     // custom theme is byte-identical to a pre-MYND-297 vault.prefs.
     if let Some(ref name) = prefs.custom_theme {
@@ -2111,7 +2111,7 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
     // sequence, so neither happens). Present-but-malformed → PlaintextParseFailed.
     let bar_items_order = parse_optional_array_field(rest, &mut cursor, b"\"bar_items_order\":")?;
     // color_groups (canonical key 'col' — after bar_items_order [b < c], before
-    // custom_theme [col < cus], MYND-635). A nested array of canonical
+    // custom_theme [col < cus], MYND-604). A nested array of canonical
     // ColorGroup objects parsed from the same monotonic cursor; absent → empty;
     // order preserved verbatim (it IS the rule precedence — never re-sorted).
     // Present-but-malformed → PlaintextParseFailed.
@@ -2397,7 +2397,7 @@ fn parse_optional_saved_views_field(
 }
 
 /// Parse the OPTIONAL `color_groups` nested-array-of-objects field
-/// (MYND-635), searching `rest` from `*cursor` onward. On a hit, decodes the
+/// (MYND-604), searching `rest` from `*cursor` onward. On a hit, decodes the
 /// canonical `ColorGroup` array via
 /// [`crate::color_group::parse_color_groups_array`] and advances `*cursor`
 /// past the closing `]`; on a miss returns an empty `Vec` and leaves
@@ -3450,7 +3450,7 @@ mod tests {
 
     #[test]
     fn a_stale_field_clock_key_never_shadows_its_absent_field() {
-        // REGRESSION (MYND-635). `field_clocks` keys ARE field names (§ 9.5.2),
+        // REGRESSION (MYND-604). `field_clocks` keys ARE field names (§ 9.5.2),
         // so a byte-search for a top-level `"<field>":` used to match the clock
         // entry of a field that had since been UNSET — parse the integer as the
         // field's value, fail, and hand § 9.5.5 a blanket "return defaults".
@@ -9435,7 +9435,7 @@ mod tests {
         assert_eq!(decode_prefs_blob(&prefs_key, &hash, &blob).unwrap(), prefs);
     }
 
-    // ---- color_groups (graph-connection-ux-polish, MYND-635) ---------------
+    // ---- color_groups (graph-connection-ux-polish, MYND-604) ---------------
 
     fn sample_color_group(id: &str, name: &str) -> crate::color_group::ColorGroup {
         crate::color_group::ColorGroup {
@@ -9483,7 +9483,7 @@ mod tests {
     #[test]
     fn color_groups_omitted_when_empty_byte_identical_to_pre_feature_blob() {
         // A vault that never opens the feature re-encodes byte-identically to
-        // a pre-MYND-635 vault.prefs (story 36) — the field must not appear
+        // a pre-MYND-604 vault.prefs (story 36) — the field must not appear
         // at all, not merely as `[]`.
         let prefs = PrefsView::default();
         let json = canonical_json_encode(&prefs);

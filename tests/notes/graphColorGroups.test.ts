@@ -283,13 +283,13 @@ describe("colorGroupVar — the shared declarative degrade", () => {
   // failure shapes below are reachable from another client — this is the same
   // forward-compat posture the evaluator gives an unsupported filter leaf.
   it("resolves a known palette key through its token", () => {
-    expect(colorGroupVar("group-teal")).toBe("var(--group-teal, var(--accent))");
+    expect(colorGroupVar("group-teal")).toBe("var(--group-teal, var(--fg-2))");
   });
 
   it("carries a neutral fallback, so an undefined token degrades rather than blanking", () => {
     // Well-formed but undefined here — a ninth palette entry from a future
     // client. It reaches `var()`; the fallback is what saves it.
-    expect(colorGroupVar("group-future")).toBe("var(--group-future, var(--accent))");
+    expect(colorGroupVar("group-future")).toBe("var(--group-future, var(--fg-2))");
   });
 
   it("rejects a key that already carries the `--` prefix", () => {
@@ -297,17 +297,17 @@ describe("colorGroupVar — the shared declarative degrade", () => {
     // so it would not error — it would just name a property nothing defines,
     // and (with no fallback) paint the initial value. Anchoring the first
     // character is what keeps it from reaching `var()` at all.
-    expect(colorGroupVar("--group-rose")).toBe("var(--accent)");
+    expect(colorGroupVar("--group-rose")).toBe("var(--fg-2)");
   });
 
   it("rejects a key that could break out of the declaration", () => {
-    expect(colorGroupVar("red); background: url(x")).toBe("var(--accent)");
-    expect(colorGroupVar("group teal")).toBe("var(--accent)");
-    expect(colorGroupVar("GROUP-TEAL")).toBe("var(--accent)");
+    expect(colorGroupVar("red); background: url(x")).toBe("var(--fg-2)");
+    expect(colorGroupVar("group teal")).toBe("var(--fg-2)");
+    expect(colorGroupVar("GROUP-TEAL")).toBe("var(--fg-2)");
   });
 
   it("treats an absent or empty key as unclassified", () => {
-    expect(colorGroupVar(undefined)).toBe("var(--accent)");
-    expect(colorGroupVar("")).toBe("var(--accent)");
+    expect(colorGroupVar(undefined)).toBe("var(--fg-2)");
+    expect(colorGroupVar("")).toBe("var(--fg-2)");
   });
 });

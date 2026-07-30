@@ -1,6 +1,6 @@
 // Links tab body (right-panel tabs) — two sections under the `backlinks` tab
 // ID: "linked from" (incoming, extracted verbatim from the former
-// single-purpose RightSidebar) and "links to" (outgoing, MYND-635 task 1).
+// single-purpose RightSidebar) and "links to" (outgoing, MYND-604 task 1).
 // Both recompute from the SYNC-5 indices on every index-nonce bump with the
 // reference-equality bail (SYNC-5 condition 2). Incoming testids preserved
 // exactly (`editor.backlink-row`, `data-source-id`,

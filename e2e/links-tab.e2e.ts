@@ -1,4 +1,4 @@
-// Links tab suite (right-panel tabs, MYND-635 task 1) — the Backlinks tab
+// Links tab suite (right-panel tabs, MYND-604 task 1) — the Backlinks tab
 // grows a second, outgoing section and becomes a two-section Links tab. The
 // tab ID stays `backlinks` (persisted in every user's tab order/hidden-tab
 // list); only the label and body change.
@@ -81,7 +81,7 @@ async function moveTab(s: Session, tabId: string, dir: "left" | "right"): Promis
   ).click();
 }
 
-describeE2E("lt1 links tab — incoming + outgoing sections (MYND-635)", () => {
+describeE2E("lt1 links tab — incoming + outgoing sections (MYND-604)", () => {
   // Vault-count precondition: 1 (weak KDF).
   it("renders both directions with correct counts, opens either on click, shows an empty-state per direction, and the tab order survives lock→unlock", async () => {
     // C is the target of A's one outgoing link (and has none of its own —

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0
 
 //! `ColorGroup` — an ordered rule pairing a filter with a color, applied to
-//! graph nodes at paint time (graph-connection-ux-polish, MYND-635 task 2).
+//! graph nodes at paint time (graph-connection-ux-polish, MYND-604 task 2).
 //! See `docs/spec/protocol.md` § 9.5.2.
 //!
 //! A color group is **authored content** (a user-named rule over the same
