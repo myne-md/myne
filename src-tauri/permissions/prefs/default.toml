@@ -38,6 +38,7 @@ permissions = [
   "allow-set-editor-vim-mode",
   "allow-set-archive-disabled",
   "allow-set-show-task-marker",
+  "allow-set-transcription-enabled",
   "allow-set-reminders-enabled",
   "allow-set-reminder-horizon-days",
   "allow-set-editor-line-spacing",
