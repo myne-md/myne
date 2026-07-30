@@ -71,6 +71,17 @@ export default defineConfig(async () => ({
       // ~0.7s of typecheck. Exact specifier, no wildcard — `../src/lib/` is full
       // of modules that would drag `@tauri-apps/*` in.
       { find: /^@myne\/reminder-schedule$/, replacement: sib("../src/lib/reminderSchedule.ts") },
+      // The custom-theme SYNTAX DERIVATION (MYND-598). Shared for the same
+      // reason as the reminder core: it encodes a readability rule both clients
+      // must answer identically — which of the 12 `--syntax-*` roles a custom
+      // palette leaves undefined get aliased to the built-in dark ramp. Desktop
+      // has already had to fix this twice (MYND-356, then MYND-527 when the
+      // first fix's all-or-nothing gate missed partial token sets); a hand-copy
+      // is how it drifts a third time, silently, into unreadable code blocks.
+      // Safe to alias out of Tauri-coupled `../src/lib/`: the module has NO
+      // imports at all — pure functions over a `Record<string, string>`, no DOM,
+      // no host calls. Exact specifier, no wildcard (same reasoning as above).
+      { find: /^@myne\/syntax-theme$/, replacement: sib("../src/lib/syntaxTheme.ts") },
       { find: /^@myne\/task-panel$/, replacement: sib("../src/notes/components/TaskListPanel.tsx") },
       { find: /^@myne\/task-filters$/, replacement: sib("../src/notes/taskFilters.ts") },
       { find: /^@myne\/task-scope$/, replacement: sib("../src/notes/taskScope.ts") },
