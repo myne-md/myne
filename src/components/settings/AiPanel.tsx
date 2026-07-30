@@ -33,15 +33,7 @@ import {
   AI_TRUST_HEADLINE,
 } from "../../lib/load-bearing-copy";
 import { Switch } from "../primitives/Switch";
-import { BetaBadge } from "./BetaBadge";
 import { BLOCK_STYLE, HELPER_STYLE, LABEL_STYLE, PANEL_ROOT_STYLE } from "./panel-styles";
-
-// Panel header row — the panel title carries the "Beta" badge so the beta
-// framing is visible inside the panel (not only on the Labs rail entry).
-const HEADER_ROW_STYLE: CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-};
 
 const TITLE_STYLE: CSSProperties = {
   margin: 0,
@@ -268,11 +260,7 @@ export function AiPanel({ onShowToast }: AiPanelProps) {
 
   return (
     <div data-testid="settings.ai-panel" style={PANEL_ROOT_STYLE}>
-      {/* Panel header — title + Beta badge (local-ai epic MYND-408). */}
-      <div style={HEADER_ROW_STYLE}>
-        <h3 style={TITLE_STYLE}>{t("settings.ai.title")}</h3>
-        <BetaBadge testId="ai.beta-badge" />
-      </div>
+      <h3 style={TITLE_STYLE}>{t("settings.ai.title")}</h3>
 
       {/* Opt-in toggle. */}
       <div style={BLOCK_STYLE}>

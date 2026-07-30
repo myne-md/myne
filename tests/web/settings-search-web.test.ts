@@ -47,9 +47,11 @@ async function load(absent: string[]) {
 const t = (key: string) => key;
 
 describe("the index, filtered by capability", () => {
+  // Developer mode ON throughout — these tests are about capability filtering,
+  // which is orthogonal to (and unaffected by) the developer-mode gate.
   it("hides every entry whose capability this client lacks", async () => {
     const { visibleSettingsIndex, SETTINGS_SEARCH_INDEX } = await load(WEB_ABSENT);
-    const visible = visibleSettingsIndex();
+    const visible = visibleSettingsIndex(true);
     expect(visible.length).toBeLessThan(SETTINGS_SEARCH_INDEX.length);
     for (const e of visible) {
       expect(WEB_ABSENT).not.toContain(e.capability ?? "");
@@ -58,7 +60,7 @@ describe("the index, filtered by capability", () => {
 
   it("shows everything on a client with every capability", async () => {
     const { visibleSettingsIndex, SETTINGS_SEARCH_INDEX } = await load([]);
-    expect(visibleSettingsIndex().length).toBe(SETTINGS_SEARCH_INDEX.length);
+    expect(visibleSettingsIndex(true).length).toBe(SETTINGS_SEARCH_INDEX.length);
   });
 
   it("returns no result for an absent control, searched by its own label", async () => {
@@ -72,7 +74,7 @@ describe("the index, filtered by capability", () => {
     );
     expect(gated.length).toBeGreaterThan(5); // the fixture is not empty
     for (const e of gated) {
-      const found = searchSettings(e.titleKey, t).map((r) => r.id);
+      const found = searchSettings(e.titleKey, t, true).map((r) => r.id);
       expect(found, `search for ${e.id} (${e.titleKey})`).not.toContain(e.id);
     }
   });
@@ -83,7 +85,9 @@ describe("the index, filtered by capability", () => {
     const { searchSettings } = await load(WEB_ABSENT);
     const kept = SETTINGS_SEARCH_INDEX.filter((e) => e.capability === undefined);
     for (const e of kept.slice(0, 8)) {
-      expect(searchSettings(e.titleKey, t).map((r) => r.id), `search for ${e.id}`).toContain(e.id);
+      expect(searchSettings(e.titleKey, t, true).map((r) => r.id), `search for ${e.id}`).toContain(
+        e.id,
+      );
     }
   });
 });

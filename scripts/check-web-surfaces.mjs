@@ -57,7 +57,6 @@ const V = {
     "Reached only through StoragePanel, which is substituted; carries the backup schedule chain.",
     "settings.auto-backup-retention",
   ],
-  "src/components/settings/BetaBadge.tsx": ["ported", "Presentational."],
   "src/components/settings/browser-icons.tsx": [
     "excluded",
     "Renders extension identities for the clipper block; leaves with ConnectedExtensions.",

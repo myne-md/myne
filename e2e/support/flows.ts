@@ -139,7 +139,7 @@ async function sendPaletteChord(session: Session): Promise<void> {
  *  attachment dialog, a view switch, …), so re-send until the input mounts.
  *  A chord sent while the palette is already open would toggle it shut, so each
  *  round checks for an open palette BEFORE re-firing. */
-async function openPalette(session: Session): Promise<void> {
+export async function openPalette(session: Session): Promise<void> {
   await session.waitUntil(
     async () => {
       try {

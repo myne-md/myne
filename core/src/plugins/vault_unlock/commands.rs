@@ -2088,6 +2088,7 @@ mod tests {
                 &prefs_key,
                 &parsed_meta.account_number_hash,
                 &protocol::PrefsView {
+                    developer_mode: false,
                     attachment_ocr_enabled: true,
                     transcription_enabled: true,
                     screen_capture_protection: false,
@@ -2247,6 +2248,7 @@ mod tests {
             &prefs_key,
             &account_hash,
             &protocol::PrefsView {
+                developer_mode: false,
                 attachment_ocr_enabled: true,
                 transcription_enabled: true,
                 screen_capture_protection: false,
