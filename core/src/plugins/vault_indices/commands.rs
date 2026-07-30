@@ -17,8 +17,8 @@
 use super::error::VaultIndicesError;
 use super::persist::{decode_snapshot, encode_snapshot, reconcile_delta};
 use super::state::{
-    BlockAnchor, CandidateEdge, NoteRecord, PropertyEntry, TagEntry, TagTreeNode, VaultBlockAnchor,
-    VaultIndicesState, WikilinkEdge,
+    BlockAnchor, CandidateEdge, NoteRecord, PropertyEntry, TagEntry, TagTreeNode, TaskRecord,
+    VaultBlockAnchor, VaultIndicesState, VaultTask, WikilinkEdge,
 };
 use crate::host::HostCtx;
 use crate::plugins::vault_unlock::state::{SlotKind, VaultRuntimeState};
@@ -53,6 +53,11 @@ pub async fn vault_indices_apply_from_host(
     // desktop build — is `None` → `[]`, exactly the `title: Option` pattern Tauri
     // already relies on for an absent optional invoke arg (no wire break).
     block_anchors: Option<Vec<BlockAnchor>>,
+    // MYND-612: line-tasks TS extracted. `Option` for the same reason
+    // `block_anchors` is — a caller that omits it (mobile, which has its own
+    // extractor, or an older desktop build) is `None` → `[]`, so the wire shape
+    // stays compatible in both directions.
+    tasks: Option<Vec<TaskRecord>>,
     runtime: &VaultRuntimeState,
     indices: &VaultIndicesState,
 ) -> Result<(), VaultIndicesError> {
@@ -73,6 +78,10 @@ pub async fn vault_indices_apply_from_host(
             properties,
             // MYND-382: enumerate-only imported block anchors for the `[[^^` picker.
             block_anchors: block_anchors.unwrap_or_default(),
+            // MYND-612: opaque verbatim task fields. Rust stores and returns
+            // them; it parses no date and compares nothing — §3.8.3 typing
+            // belongs to the dialect layer, TS-side.
+            tasks: tasks.unwrap_or_default(),
         },
     );
     Ok(())
@@ -99,6 +108,9 @@ pub async fn vault_indices_apply(
     // desktop build — is `None` → `[]`, exactly the `title: Option` pattern Tauri
     // already relies on for an absent optional invoke arg (no wire break).
     block_anchors: Option<Vec<BlockAnchor>>,
+    // MYND-612: line-tasks TS extracted, same `Option` wire-compat shape as
+    // `block_anchors`.
+    tasks: Option<Vec<TaskRecord>>,
     runtime: State<'_, VaultRuntimeState>,
     indices: State<'_, VaultIndicesState>,
 ) -> Result<(), VaultIndicesError> {
@@ -111,6 +123,7 @@ pub async fn vault_indices_apply(
         tags,
         properties,
         block_anchors,
+        tasks,
         runtime.inner(),
         indices.inner(),
     )
@@ -181,6 +194,40 @@ pub async fn vault_indices_block_anchors(
     indices: State<'_, VaultIndicesState>,
 ) -> Result<Vec<VaultBlockAnchor>, VaultIndicesError> {
     vault_indices_block_anchors_from_host(runtime.inner(), indices.inner()).await
+}
+
+/// Defensive ceiling on a whole-vault task dump, parallel to the block-anchor
+/// ceiling: a high, finite bound on a pathological IPC payload rather than a
+/// product limit anyone should reach.
+const MAX_TASKS: usize = 100_000;
+
+/// Every line-task across the vault (MYND-612) — the record plus the note that
+/// carries it. **Rust filters nothing**: no date comparison, no sorting, no tag
+/// matching. A parameterized accessor was rejected because it would require Rust
+/// to compare dates, and the next request after that is sorting and the one
+/// after is tag filtering — at which point the §3.6.4 type authority has quietly
+/// moved out of the dialect layer. Surfaces filter TS-side over one shared
+/// fetch. Rejected with [`VaultIndicesError::SlotNotUnlocked`] when no vault is
+/// unlocked (the index is plaintext-derived RAM, unlocked-only).
+pub async fn vault_indices_tasks_from_host(
+    runtime: &VaultRuntimeState,
+    indices: &VaultIndicesState,
+) -> Result<Vec<VaultTask>, VaultIndicesError> {
+    if runtime.slot_kind_active().await != SlotKind::Unlocked {
+        return Err(VaultIndicesError::SlotNotUnlocked);
+    }
+    Ok(indices.all_tasks(MAX_TASKS))
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn vault_indices_tasks(
+    runtime: State<'_, VaultRuntimeState>,
+    indices: State<'_, VaultIndicesState>,
+) -> Result<Vec<VaultTask>, VaultIndicesError> {
+    vault_indices_tasks_from_host(runtime.inner(), indices.inner()).await
 }
 
 /// Structurally-isolated ("orphan") note ids — zero in+out raw edges

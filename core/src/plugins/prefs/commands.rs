@@ -771,6 +771,206 @@ pub(crate) async fn set_archive_disabled_with_dir(
     Ok(())
 }
 
+/// Slot::Unlocked-gated setter for the note-task marker's visibility
+/// (MYND-613). Read-modify-write under the per-plugin write mutex; no native
+/// side-effect. Omit-when-default keeps a vault that never touched it
+/// byte-identical to a pre-feature `vault.prefs`. Non-load-bearing (it can at
+/// worst show or hide a glyph) → no protective-envelope clamp.
+pub async fn set_show_task_marker_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    enabled: bool,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_show_task_marker_with_dir(&dir, state, hooks, enabled, io, host).await
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn set_show_task_marker<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
+    enabled: bool,
+) -> Result<(), PrefsWriteError> {
+    set_show_task_marker_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        enabled,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
+}
+
+/// Testable core of [`set_show_task_marker`].
+pub(crate) async fn set_show_task_marker_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    enabled: bool,
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
+) -> Result<(), PrefsWriteError> {
+    update_prefs_with_dir(
+        vault_dir,
+        state,
+        hooks,
+        |prefs| {
+            prefs.show_task_marker = enabled;
+        },
+        io,
+        host,
+    )
+    .await?;
+
+    tracing::info!(
+        event = "prefs_written",
+        field = "show_task_marker",
+        value = enabled
+    );
+    Ok(())
+}
+
+/// Slot::Unlocked-gated setter for whether THIS DEVICE shows task reminders
+/// (MYND-618). Device-local: whether a given machine should be interrupted is a
+/// property of that machine, so it never syncs. Omit-when-default keeps an
+/// untouched vault byte-identical. Non-load-bearing (it can at worst silence or
+/// enable a notification) → no protective-envelope clamp.
+pub async fn set_reminders_enabled_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    enabled: bool,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_reminders_enabled_with_dir(&dir, state, hooks, enabled, io, host).await
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn set_reminders_enabled<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
+    enabled: bool,
+) -> Result<(), PrefsWriteError> {
+    set_reminders_enabled_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        enabled,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
+}
+
+/// Testable core of [`set_reminders_enabled`].
+pub(crate) async fn set_reminders_enabled_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    enabled: bool,
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
+) -> Result<(), PrefsWriteError> {
+    update_prefs_with_dir(
+        vault_dir,
+        state,
+        hooks,
+        |prefs| {
+            prefs.reminders_enabled = enabled;
+        },
+        io,
+        host,
+    )
+    .await?;
+
+    tracing::info!(
+        event = "prefs_written",
+        field = "reminders_enabled",
+        value = enabled
+    );
+    Ok(())
+}
+
+/// Slot::Unlocked-gated setter for how many days ahead this device registers
+/// reminders with the OS (MYND-618); `None` falls back to the client's built-in
+/// horizon. Device-local for the same reason as `reminders_enabled`. The horizon
+/// is a PRIVACY bound before a resource one — pending times leave the AEAD
+/// envelope and sit in OS-owned plaintext (`threat-model.md` §7) — so it is
+/// stored verbatim with no clamp; clamping here would silently disagree with
+/// what the settings UI showed.
+pub async fn set_reminder_horizon_days_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    days: Option<u32>,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_reminder_horizon_days_with_dir(&dir, state, hooks, days, io, host).await
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn set_reminder_horizon_days<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
+    days: Option<u32>,
+) -> Result<(), PrefsWriteError> {
+    set_reminder_horizon_days_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        days,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
+}
+
+/// Testable core of [`set_reminder_horizon_days`].
+pub(crate) async fn set_reminder_horizon_days_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    days: Option<u32>,
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
+) -> Result<(), PrefsWriteError> {
+    update_prefs_with_dir(
+        vault_dir,
+        state,
+        hooks,
+        |prefs| {
+            prefs.reminder_horizon_days = days;
+        },
+        io,
+        host,
+    )
+    .await?;
+
+    tracing::info!(
+        event = "prefs_written",
+        field = "reminder_horizon_days",
+        value = days
+    );
+    Ok(())
+}
+
 /// Slot::Unlocked-gated setter for the `active_workspace` slot id (MYND-308) —
 /// the workspace slot the editor restores on unlock, or `None` to clear back to
 /// the host default. Read-modify-write under the per-plugin write mutex; no
@@ -4486,6 +4686,9 @@ mod tests {
                     editor_slash_order: Vec::new(),
                     editor_slash_hidden: Vec::new(),
                     show_note_timestamps: true,
+                    reminders_enabled: true,
+                    reminder_horizon_days: None,
+                    show_task_marker: true,
                     folder_icons: Default::default(),
                     hidden_bar_items: Vec::new(),
                     icon: None,

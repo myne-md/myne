@@ -27,6 +27,7 @@ export { parse } from "./parse";
 export { extractFullText, extractBodyText } from "./visitors/fullText";
 export { headingSections } from "./visitors/headingSections";
 export type { HeadingSection } from "./visitors/headingSections";
+export type { NoteKind } from "./surgery";
 export { stripDialectComments, hasDialectComment } from "./stripComments";
 export {
   buildInitialPlaintext,
@@ -38,6 +39,7 @@ export {
   patchFolderIndexField,
   patchFrontmatterField,
   patchKindField,
+  patchDoneField,
   patchSourceRanges,
   patchTemplateField,
   patchTitleField,
@@ -49,10 +51,13 @@ export {
   readDeletedFromFmBody,
   readFolderIndexFromFmBody,
   readKindFromFmBody,
+  readDoneFromFmBody,
   readTemplateFromFmBody,
   readTitleFromFmBody,
   readTrashedFromFmBody,
   DRAWING_KIND_VALUE,
+  TASK_KIND_VALUE,
+  CANONICAL_KIND_VALUES,
   FOLDER_INDEX_FLAG_VALUE,
   TEMPLATE_FLAG_VALUE,
 } from "./surgery";

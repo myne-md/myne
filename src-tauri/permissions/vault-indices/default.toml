@@ -21,6 +21,7 @@ permissions = [
   "allow-vault-indices-forward",
   "allow-vault-indices-all-edges",
   "allow-vault-indices-block-anchors",
+  "allow-vault-indices-tasks",
   "allow-vault-indices-orphans",
   "allow-vault-indices-backlink-candidates",
   "allow-vault-indices-by-tag",
@@ -41,6 +42,11 @@ commands.allow = ["vault_indices_all_edges"]
 identifier = "allow-vault-indices-block-anchors"
 description = "Allow invoking vault-indices:vault_indices_block_anchors (Slot::Unlocked-gated whole-vault dump of imported ^block-id anchors — {noteId, noteTitle, blockId, preview} per anchor, for the [[^^ enumerate-only block-deep-link picker, MYND-382; defensive anchor-ceiling). Enumerate-only: surfaces markers that already exist (import), never mints one. Returns vault-wide block-anchor metadata (AS3/AS4-Sensitive) → main-window-only, same invariant as the prefs setters (v0.2 multi-window MUST NOT grant it to sub-windows)."
 commands.allow = ["vault_indices_block_anchors"]
+
+[[permission]]
+identifier = "allow-vault-indices-tasks"
+description = "Allow invoking vault-indices:vault_indices_tasks (Slot::Unlocked-gated whole-vault line-task dump — {noteId, noteTitle, noteFolder} plus the stored record per task, for the task panel / query block / reminder scheduler, MYND-612; defensive task-ceiling). Rust performs NO filtering, sorting, or date comparison: a parameterized accessor would move the §3.6.4 type authority out of the dialect layer, so surfaces filter TS-side over one shared fetch. Returns vault-wide task metadata (AS3/AS4-Sensitive) → main-window-only, same invariant as the prefs setters (v0.2 multi-window MUST NOT grant it to sub-windows)."
+commands.allow = ["vault_indices_tasks"]
 
 [[permission]]
 identifier = "allow-vault-indices-orphans"

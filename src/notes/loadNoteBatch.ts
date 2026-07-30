@@ -31,11 +31,13 @@ import {
   readConflictOfFromFmBody,
   readDeletedFromFmBody,
   readFolderIndexFromFmBody,
+  readDoneFromFmBody,
   readKindFromFmBody,
   readTemplateFromFmBody,
   readTitleFromFmBody,
   readTrashedFromFmBody,
 } from "../dialect";
+import type { NoteKind } from "../dialect";
 import { normalizeFolderPath } from "../dialect/folderPath";
 import type {
   NoteTitleError,
@@ -149,7 +151,11 @@ export type TitleRecord = {
    * markdown note as a canvas. Drives the render-surface dispatch + tab/sidebar
    * glyph; unlike `trashed:`/`template:` it does NOT hide the note.
    */
-  kind: "drawing" | null;
+  kind: NoteKind;
+  /** Value-strict `done:` completion stamp (MYND-613) — the RFC 3339 string iff
+   *  the note carries a parseable one, else `null`. Meaningful only alongside
+   *  `kind: task`; a user's own `done: yes` reads `null`. */
+  done: string | null;
   error?: NoteTitleError;
 };
 
@@ -267,6 +273,7 @@ function recordFromSlice(slice: TitleSlice): TitleRecord {
   // `template:`/`folder_index:` — js-yaml would coerce the value and a user's
   // `kind: "drawing"` (quoted) must NOT read as the canonical marker.
   const kind = readKindFromFmBody(slice.frontmatter_bytes ?? "");
+  const done = readDoneFromFmBody(slice.frontmatter_bytes ?? "");
   return {
     noteUuid: slice.note_uuid,
     title: titleFromFm,
@@ -281,6 +288,7 @@ function recordFromSlice(slice: TitleSlice): TitleRecord {
     conflictOf,
     hasSource,
     kind,
+    done,
   };
 }
 
@@ -333,6 +341,7 @@ export async function loadNoteBatch(ids: string[]): Promise<TitleRecord[]> {
       conflictOf: null,
       hasSource: false,
       kind: null,
+      done: null,
       error: r.Err,
     };
   });

@@ -1,7 +1,7 @@
 // `archiveNote` / `unarchiveNote` — vault-internal note archive (note-archive /
 // MYND-331).
 //
-// `archived:` is the 7th Myne-managed canonical FM field (markdown-dialect
+// `archived:` is the 8th Myne-managed canonical FM field (markdown-dialect
 // §3.6.1). Archive/unarchive are TS orchestrators over the existing `note_update`
 // IPC primitive — exactly like `trashNote.ts` (decisions.md 2026-05-09
 // "Frontmatter byte-level surgery owned by TS dialect module"). There is no
