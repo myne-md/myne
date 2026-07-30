@@ -43,7 +43,6 @@ import { AboutPanel } from "./settings/AboutPanel";
 import { AccountPanel } from "./settings/AccountPanel";
 import * as capabilities from "../platform/capabilities";
 import { AiPanel } from "./settings/AiPanel";
-import { BetaBadge } from "./settings/BetaBadge";
 import { AppearancePanel } from "./settings/AppearancePanel";
 import { EditorPanel } from "./settings/EditorPanel";
 import { FilesPanel } from "./settings/FilesPanel";
@@ -52,6 +51,7 @@ import { HotkeysPanel } from "./settings/HotkeysPanel";
 import { PrivacyPanel } from "./settings/PrivacyPanel";
 import { StoragePanel } from "./settings/StoragePanel";
 import { SyncPanel } from "./settings/SyncPanel";
+import { usePrefs } from "../hooks/usePrefs";
 import type { StageVaultStatus, SuspicionReason } from "../lib/stage";
 
 /**
@@ -73,11 +73,12 @@ export type PanelId =
   | "storage"
   | "about";
 
-/** Rail sections. `core` is the standard settings set; `labs` groups
- *  experimental / beta features under a divider header (local-ai epic
- *  MYND-408). Ordering below places every `core` panel before the single
- *  `labs` panel so the divider renders once at the boundary. */
-type PanelGroup = "core" | "labs";
+/** Rail sections. `core` is the standard settings set; `developer` groups the
+ *  panels that leave the path Myne vouches for, under a divider header
+ *  (developer-mode feature, MYND-593 — supersedes the `labs` group). Ordering
+ *  below places every `core` panel before the single `developer` panel so the
+ *  divider renders once at the boundary. */
+type PanelGroup = "core" | "developer";
 
 interface PanelMeta {
   id: PanelId;
@@ -86,14 +87,14 @@ interface PanelMeta {
   labelKey: string;
   /** Rail section. Omitted → `core`. */
   group?: PanelGroup;
-  /** Render a small "Beta" badge next to the rail label. */
-  beta?: boolean;
 }
 
-// `ai` sits LAST, in the `labs` group: it ships in the default build but is a
-// runtime beta opt-in (decisions.md 2026-07-02). Keeping PANELS a single flat
-// array preserves the ArrowUp/ArrowDown cycle + `itemRefs` logic unchanged — the
-// Labs divider is a non-focusable presentation row inserted at the group edge.
+// `ai` sits LAST, in the `developer` group: Developer mode is where the user
+// leaves the path Myne vouches for (prd.md "Solution"), and local AI — user-
+// supplied weights, an in-process runtime, no isolation guarantee yet — is
+// squarely that. Keeping PANELS_BASE a single flat array preserves the
+// ArrowUp/ArrowDown cycle + `itemRefs` logic unchanged — the Developer divider
+// is a non-focusable presentation row inserted at the group edge.
 //
 // **Capability gating (MYND-574 task 27).** `ai` is absent on web — the on-device
 // LLM needs multi-GiB weights and a CPU thread pool, neither of which a Worker
@@ -101,12 +102,22 @@ interface PanelMeta {
 // panel is an offer the platform cannot honour, and `decisions.md` 2026-07-26
 // makes omission normative rather than a UX preference.
 //
+// **Developer-mode gating (MYND-593).** `ai` is ALSO filtered out whenever the
+// `developer_mode` preference is off, for the same reason: the group's whole
+// point is that its contents are things Myne does not vouch for, and the rail
+// must not offer a door onto that unless the user has deliberately opened it
+// in About. The predicate is `capabilities.has("localAi") && developer_mode` —
+// both gates apply, neither substitutes for the other.
+//
 // Filtering the ARRAY (rather than hiding a row at render time) is what keeps
 // the ArrowUp/ArrowDown cycle and `itemRefs` correct: a hidden-but-present entry
 // would still be a keyboard stop, which is exactly the "unreachable by menu,
-// reachable by shortcut" gap this task exists to close.
-const PANELS: readonly PanelMeta[] = (
-  [
+// reachable by shortcut" gap this task exists to close. Because the group has
+// exactly one member today, filtering it out also removes the group itself —
+// the divider only renders when a panel in that group survives the filter, so
+// "no Developer group" is derived rather than a second, separately-maintained
+// condition (see the `opensDeveloper` computation in the render below).
+const PANELS_BASE: readonly PanelMeta[] = [
   { id: "account", labelKey: "settings.shell.panels.account" },
   { id: "privacy", labelKey: "settings.shell.panels.privacy" },
   { id: "sync", labelKey: "settings.shell.panels.sync" },
@@ -117,9 +128,8 @@ const PANELS: readonly PanelMeta[] = (
   { id: "appearance", labelKey: "settings.shell.panels.appearance" },
   { id: "storage", labelKey: "settings.shell.panels.storage" },
   { id: "about", labelKey: "settings.shell.panels.about" },
-  { id: "ai", labelKey: "settings.shell.panels.ai", group: "labs", beta: true },
-  ] as const satisfies readonly PanelMeta[]
-).filter((p) => p.id !== "ai" || capabilities.has("localAi"));
+  { id: "ai", labelKey: "settings.shell.panels.ai", group: "developer" },
+] as const satisfies readonly PanelMeta[];
 
 interface SettingsModalProps {
   open: boolean;
@@ -275,8 +285,9 @@ const RAIL_ITEM_SELECTED_STYLE: CSSProperties = {
   color: "var(--fg-1)",
 };
 
-// Non-focusable divider heading that opens the Labs section in the rail. Not a
-// tab (no `role="tab"`, absent from `itemRefs`), so ↑/↓ tab cycling skips it.
+// Non-focusable divider heading that opens the Developer section in the rail.
+// Not a tab (no `role="tab"`, absent from `itemRefs`), so ↑/↓ tab cycling
+// skips it.
 const RAIL_GROUP_HEADER_STYLE: CSSProperties = {
   padding: "var(--space-4) var(--space-5) var(--space-2)",
   fontFamily: "var(--font-sans)",
@@ -310,7 +321,25 @@ export function SettingsModal({
   onImportObsidian,
 }: SettingsModalProps) {
   const { t } = useTranslation();
+  const { prefs } = usePrefs();
+  // The rail roster, re-filtered whenever Developer mode flips (About panel,
+  // task 6) so the group appears/disappears immediately per the PRD's "no
+  // restart, no confirmation dialog" requirement — no separate effect needed,
+  // this just re-derives on every render `prefs.developer_mode` changes.
+  const panels = useMemo(
+    () =>
+      PANELS_BASE.filter(
+        (p) => p.id !== "ai" || (capabilities.has("localAi") && prefs.developer_mode),
+      ),
+    [prefs.developer_mode],
+  );
   const [selected, setSelected] = useState<PanelId>("account");
+  // If the selected panel drops out of the roster (Developer mode turned off
+  // while its group was open), fall back to Account rather than stranding the
+  // content pane on a panel no longer reachable from the rail.
+  useEffect(() => {
+    if (!panels.some((p) => p.id === selected)) setSelected("account");
+  }, [panels, selected]);
   const [childInFlight, setChildInFlight] = useState(false);
   // Settings search (MYND-536). A non-empty query swaps the content pane from
   // the active panel to a flat, panel-grouped results list built off the static
@@ -333,9 +362,9 @@ export function SettingsModal({
   const results = useMemo(
     () =>
       searching
-        ? flattenGroups(groupResultsByPanel(searchSettings(query, t)))
+        ? flattenGroups(groupResultsByPanel(searchSettings(query, t, prefs.developer_mode)))
         : [],
-    [searching, query, t],
+    [searching, query, t, prefs.developer_mode],
   );
   // Keyboard-highlighted result (arrow keys move it; Enter opens it). Reset to
   // the top whenever the query changes so the highlight never points past the
@@ -371,6 +400,7 @@ export function SettingsModal({
   const selectedRef = useRef(selected);
   const childInFlightRef = useRef(childInFlight);
   const queryRef = useRef(query);
+  const panelsRef = useRef(panels);
   useEffect(() => {
     selectedRef.current = selected;
   }, [selected]);
@@ -380,6 +410,9 @@ export function SettingsModal({
   useEffect(() => {
     queryRef.current = query;
   }, [query]);
+  useEffect(() => {
+    panelsRef.current = panels;
+  }, [panels]);
 
   // Global modal keys (MYND-536 extends the original rail nav):
   //   "/"          → focus the search box (unless already typing in a field)
@@ -421,12 +454,13 @@ export function SettingsModal({
         // While searching or focused in the box, the results list owns arrows.
         if (queryRef.current.trim() !== "" || inSearchBox) return;
         e.preventDefault();
-        const idx = PANELS.findIndex((p) => p.id === selectedRef.current);
+        const currentPanels = panelsRef.current;
+        const idx = currentPanels.findIndex((p) => p.id === selectedRef.current);
         const next =
           e.key === "ArrowDown"
-            ? (idx + 1) % PANELS.length
-            : (idx - 1 + PANELS.length) % PANELS.length;
-        const nextId = PANELS[next].id;
+            ? (idx + 1) % currentPanels.length
+            : (idx - 1 + currentPanels.length) % currentPanels.length;
+        const nextId = currentPanels[next].id;
         setSelected(nextId);
         itemRefs.current[nextId]?.focus();
       }
@@ -587,21 +621,25 @@ export function SettingsModal({
               aria-orientation="vertical"
               style={RAIL_NAV_STYLE}
             >
-              {PANELS.map((panel, i) => {
+              {panels.map((panel, i) => {
               const isSelected = panel.id === selected;
-              // Insert the Labs divider once, at the core→labs boundary.
-              const opensLabs =
-                panel.group === "labs" &&
-                (i === 0 || PANELS[i - 1].group !== "labs");
+              // Insert the Developer divider once, at the core→developer
+              // boundary. Because `panels` is already filtered, this only
+              // fires when a developer-group panel survived the filter — an
+              // empty group renders no divider and no header, derived rather
+              // than asserted (task 5 acceptance).
+              const opensDeveloper =
+                panel.group === "developer" &&
+                (i === 0 || panels[i - 1].group !== "developer");
               return (
                 <Fragment key={panel.id}>
-                  {opensLabs && (
+                  {opensDeveloper && (
                     <div
                       role="presentation"
-                      data-testid="settings.labs-group"
+                      data-testid="settings.developer-group"
                       style={RAIL_GROUP_HEADER_STYLE}
                     >
-                      {t("settings.shell.groups.labs")}
+                      {t("settings.shell.groups.developer")}
                     </div>
                   )}
                   <button
@@ -624,7 +662,6 @@ export function SettingsModal({
                     }
                   >
                     {t(panel.labelKey)}
-                    {panel.beta && <BetaBadge testId="settings.rail-ai-beta" />}
                   </button>
                 </Fragment>
               );

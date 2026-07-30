@@ -276,6 +276,14 @@ export interface PrefsView {
    */
   ai_excluded_folders: string[];
   /**
+   * Developer mode toggle (`developer-mode` feature, MYND-593). `false` ≡ off
+   * (the default). Serialized from Rust `bool`; omitted from the encrypted
+   * blob when `false` (byte-identical to a pre-feature vault). Gates the AI
+   * opt-in and the local-model override pickers. Device-local
+   * (`sync-protocol.md` §10.2). Non-load-bearing.
+   */
+  developer_mode: boolean;
+  /**
    * Folders archived as a unit (folder-archive) — canonical trailing-slash
    * form. Same encoding as `deliberate_folders` / `ai_excluded_folders`
    * (NFC-normalized, sorted, deduped set). Absent → defaulted to `[]`. A folder
@@ -631,6 +639,16 @@ export interface OcrBacklogProgress {
  */
 export async function setAttachmentOcrEnabled(enabled: boolean): Promise<void> {
   await invoke<void>("plugin:prefs|set_attachment_ocr_enabled", { enabled });
+}
+
+/**
+ * Persist the `developer_mode` toggle (`developer-mode` feature, MYND-593) —
+ * the gate the AI opt-in and the local-model override pickers sit behind. A
+ * rejected promise means the disk write failed and the caller's optimistic UI
+ * must revert.
+ */
+export async function setDeveloperMode(enabled: boolean): Promise<void> {
+  await invoke<void>("plugin:prefs|set_developer_mode", { enabled });
 }
 
 /**

@@ -22,9 +22,17 @@ export function panelLabelKey(panelId: SettingsIndexEntry["panelId"]): string {
  * Return the index entries matching `query`, best-match first. Including the
  * panel label in the haystack lets a panel name (e.g. "Appearance") surface all
  * of that panel's settings. An empty query returns every entry (index order).
+ *
+ * `developerModeEnabled` gates the entries tagged `developerGated` in the
+ * index (the AI settings, MYND-593) — a search for "AI" or "model" must not
+ * navigate into a panel the rail itself would refuse to show.
  */
-export function searchSettings(query: string, t: Translate): SettingsIndexEntry[] {
-  const candidates = visibleSettingsIndex().map((entry) => ({
+export function searchSettings(
+  query: string,
+  t: Translate,
+  developerModeEnabled: boolean,
+): SettingsIndexEntry[] {
+  const candidates = visibleSettingsIndex(developerModeEnabled).map((entry) => ({
     item: entry,
     haystacks: [
       t(entry.titleKey),

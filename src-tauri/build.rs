@@ -146,6 +146,14 @@ fn main() {
                 "set_transcription_enabled",
                 "set_reminders_enabled",
                 "set_reminder_horizon_days",
+                // developer-mode (MYND-593): named here too, though not
+                // strictly required (the plugin's own InlinedPlugin
+                // declaration above is what creates the `prefs:` ACL
+                // namespace; a hand-written `[[permission]]` block in
+                // permissions/prefs/default.toml is what actually wires this
+                // one — see the `prefs_read` siblings above for the same
+                // belt-and-suspenders pattern).
+                "set_developer_mode",
             ]),
         )
         .plugin(

@@ -120,7 +120,7 @@
       "title": "Atașamente",
       "transcribeDone": "Transcriere finalizată.",
       "transcribeFailed": "Transcrierea a eșuat. Te rugăm să încerci din nou.",
-      "transcribeNoModel": "Selectează un model de transcriere din Setări → Laborator → AI.",
+      "transcribeNoModel": "Selectează un model de transcriere din Setări → Developer → AI.",
       "transcribeStarted": "Se transcrie…",
       "typeFilter": {
         "all": "Toate tipurile",
@@ -744,11 +744,11 @@
           "deletedLabel": "șters"
         },
         "transcribe": {
-          "disabledReason": "Activează AI din Setări → Laborator → AI pentru a transcrie.",
+          "disabledReason": "Activează AI din Setări → Developer → AI pentru a transcrie.",
           "failed": "Transcrierea a eșuat. Te rugăm să încerci din nou.",
           "heading": "Transcriere",
           "insert": "Inserează transcrierea în notă",
-          "noModelHint": "Selectează un model de transcriere din Setări → Laborator → AI.",
+          "noModelHint": "Selectează un model de transcriere din Setări → Developer → AI.",
           "progress": "Se transcrie…",
           "stop": "Oprește"
         },
@@ -888,8 +888,8 @@
           "gettingReadyHint": "Se pregătesc notele tale pentru AI — un moment.",
           "insert": "Inserează în notă",
           "noAnswer": "Niciun răspuns — încearcă să reformulezi.",
-          "noModelHint": "Niciun model selectat. Alege unul din Setări → Laborator → AI pentru a începe.",
-          "offHint": "AI-ul local este dezactivat. Activează-l din Setări → Laborator → AI.",
+          "noModelHint": "Niciun model selectat. Alege unul din Setări → Developer → AI pentru a începe.",
+          "offHint": "AI-ul local este dezactivat. Activează-l din Setări → Developer → AI.",
           "send": "Trimite",
           "statusGettingReady": "Se pregătește…",
           "statusNoModel": "Niciun model",
@@ -2072,6 +2072,8 @@
       "changelogButton": "Vezi jurnalul de modificări…",
       "changelogHelper": "Note pentru fiecare versiune. Vor apărea când va fi disponibil MYND-119.",
       "changelogLabel": "Jurnal de modificări",
+      "developerModeHelper": "",
+      "developerModeLabel": "",
       "licenseBody": "Pre-alfa · documentație CC-BY-4.0 · cod de aplicație AGPL-3.0 la lansarea Fazei 1.",
       "licenseLabel": "Licență",
       "tagline": "Pre-alfa · Client desktop Faza 1",
@@ -2406,7 +2408,6 @@
       "pendingHint": "În curând"
     },
     "ai": {
-      "betaBadge": "Beta",
       "disclosureToggle": "Cum funcționează?",
       "enableHelper": "Rulează un model furnizat de tine în întregime pe dispozitivul tău. Experimental, dezactivat implicit.",
       "enableLabel": "Activează AI local",
@@ -2501,7 +2502,7 @@
     "shell": {
       "closeLabel": "Închide setările",
       "groups": {
-        "labs": "Laborator"
+        "developer": ""
       },
       "navLabel": "Panouri de setări",
       "panels": {
