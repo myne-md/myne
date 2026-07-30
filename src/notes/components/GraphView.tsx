@@ -4,7 +4,7 @@
 // via `ws.openGraph()` from a command-palette action, a persistent BottomBar
 // affordance (SYNC-7 — graph is wedge-first-class), and the ⌘⇧G shortcut.
 
-import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -14,6 +14,12 @@ import {
   loadWholeVaultGraph,
   type GraphModel,
 } from "../graphAdapter";
+import { usePrefs } from "../../hooks/usePrefs";
+import {
+  buildColorGroupNoteMeta,
+  collectRuleTags,
+  resolveGraphColorGroups,
+} from "../graphColorGroups";
 import { DEFAULT_GRAPH_SETTINGS } from "../graphSettings";
 import { getIndexNonce, useIndexNonce } from "../indexNonce";
 import { loadGraphLayoutFromDisk } from "../graphLayoutPersist";
@@ -42,6 +48,10 @@ type Filter =
   // open note's 1-2 hop neighborhood. Pivot re-points `seed`; double-click navigates.
   | { kind: "local"; seed: string; depth: 1 | 2 };
 
+// One stable identity for "no node is colored", so the no-rules case hands
+// `GraphCanvas` the same map on every render and never schedules a repaint.
+const NO_NODE_COLORS: ReadonlyMap<string, string> = new Map();
+
 const MESSAGE_STYLE = {
   flex: 1,
   display: "grid",
@@ -68,6 +78,7 @@ export function GraphPane() {
   const hydratedRef = useRef(false);
   const ctx = useSelectedNote();
   const ws = useWorkspace();
+  const { prefs } = usePrefs();
   const indexNonce = useIndexNonce();
   const [filter, setFilter] = useState<Filter>({ kind: "all" });
   const [model, setModel] = useState<GraphModel | null>(null);
@@ -83,6 +94,8 @@ export function GraphPane() {
   const [layoutNonce, setLayoutNonce] = useState(0);
   const [buildNonce, setBuildNonce] = useState(0);
   const [buildTrigger, setBuildTrigger] = useState(0);
+  const [nodeColors, setNodeColors] =
+    useState<ReadonlyMap<string, string>>(NO_NODE_COLORS);
 
   // Tag list for the filter (fetched on mount).
   useEffect(() => {
@@ -152,6 +165,66 @@ export function GraphPane() {
     // explicit Refresh (`buildTrigger`).
   }, [filter, buildTrigger]);
 
+  // --- Color groups (task 8) -------------------------------------------
+  // The note-id → color-key map the renderer paints with. Deliberately its own
+  // state + effect: `model` is NOT in what this writes, so a rule edit updates
+  // only this map, `GraphCanvas`'s `[model]` effect never re-runs, and
+  // `layoutNonce` never bumps. Color is a render-time layer, never part of the
+  // layout model (`GraphNode` stays `{id,title}`).
+  //
+  // `usePrefs` hands back a FRESH `color_groups` array on every prefs reload,
+  // and every prefs write in the app bumps the shared nonce — so keying this
+  // effect on the array identity would re-query the tag index whenever an
+  // unrelated preference changed. Key it on the rules' content instead and read
+  // the array itself through a ref (the same discipline `notesRef` above uses
+  // for the build effect).
+  const colorRulesRef = useRef(prefs.color_groups);
+  colorRulesRef.current = prefs.color_groups;
+  const colorRulesKey = useMemo(
+    () => JSON.stringify(prefs.color_groups),
+    [prefs.color_groups],
+  );
+  useEffect(() => {
+    if (model === null) {
+      setNodeColors(NO_NODE_COLORS);
+      return;
+    }
+    const colorRules = colorRulesRef.current;
+    // The tags the ENABLED rules reference — the exact set of index queries
+    // owed, O(rules) rather than O(tags) or O(notes), and the same
+    // `hasTag → byTag(tag)` resolution Saved Views uses, so the two surfaces
+    // agree on tag membership by construction.
+    const tags = collectRuleTags(colorRules);
+    const notes = notesRef.current;
+    const liveIds = liveIdSet(notes);
+    let cancelled = false;
+    const run = async () => {
+      const members = await Promise.all(
+        tags.map((tag) =>
+          byTag(tag, liveIds).then(
+            (ids) => [tag, new Set(ids)] as const,
+            // One unavailable tag must not blank the whole palette — an empty
+            // membership set simply leaves that leaf unmatched.
+            () => [tag, new Set<string>()] as const,
+          ),
+        ),
+      );
+      if (cancelled) return;
+      const folderById = new Map(notes.map((n) => [n.noteUuid, n.folder]));
+      const meta = buildColorGroupNoteMeta(
+        model.nodes.map((n) => n.id),
+        folderById,
+        new Map(members),
+      );
+      const resolved = resolveGraphColorGroups(colorRules, meta);
+      setNodeColors(resolved.size === 0 ? NO_NODE_COLORS : resolved);
+    };
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [model, colorRulesKey]);
+
   // SYNC-14: stale when the index changed since the layout was built. The
   // expensive re-layout is gated to an explicit refresh, never the nonce.
   const stale = indexNonce !== buildNonce;
@@ -185,6 +258,9 @@ export function GraphPane() {
               : onOpenNode
           }
           onNodeDoubleClick={filter.kind === "local" ? onOpenNode : undefined}
+          // Same map for the whole-vault, tag, orphan AND local-graph filters —
+          // one renderer, so color groups apply identically in every view.
+          nodeColors={nodeColors}
           arrowsEnabled={ws.graphSettings.showArrows}
           labelFadeZoom={ws.graphSettings.labelFadeZoom}
           nodeSize={ws.graphSettings.nodeSize}
@@ -205,6 +281,10 @@ export function GraphPane() {
       data-node-count={String(model?.nodes.length ?? 0)}
       data-layout-hydrated={String(layoutHydrated)}
       data-layout-nonce={String(layoutNonce)}
+      // How many of the rendered nodes a color-group rule matched (task 8).
+      // A bounded count, never an id — the E2E probe for "the rule painted",
+      // paired with `data-layout-nonce` for "and it did NOT re-run the layout".
+      data-colored-node-count={String(nodeColors.size)}
       style={{
         display: "flex",
         flexDirection: "column",

@@ -6676,6 +6676,315 @@ mod tests {
             assert_eq!(on_disk.field_clocks.get("icon"), Some(&300));
             std::fs::remove_dir_all(&dir).ok();
         }
+
+        // ---- MYND-635: color groups across two devices ----------------------
+        //
+        // The criterion these serve is task 7's "rules … appear on a second
+        // synced device". The restart half is proven by the desktop E2E
+        // (`gc2`); this is the OTHER device. What makes a `FakeTransport`
+        // faithful here rather than a stand-in: `run_sync_cycle`'s
+        // `prefs_phase.dirty` arm uploads `io.read(vault_root/"vault.prefs")`
+        // VERBATIM — the pushed ciphertext IS the author's on-disk blob — and
+        // the server is a zero-knowledge relay that cannot read or alter it.
+        // So serving device A's actual file bytes as B's server record models
+        // the wire payload exactly; only the socket is faked, and the response
+        // is parsed by the same `download_blob_backoff` + codec production
+        // uses. `prefs_merge`'s tests cover the merge algebra in isolation;
+        // these cover the phase that carries it between two vault dirs.
+
+        /// Register ALREADY-ENCODED bytes (a peer's on-disk blob, which is
+        /// verbatim what the push path uploads) as the server's record.
+        fn serve_remote_raw(
+            t: &FakeTransport,
+            pid: &[u8; 16],
+            bytes: &[u8],
+            version: u64,
+        ) -> ChangedBlob {
+            let nonce = read_prefs_nonce(bytes).unwrap();
+            let body = serde_json::json!({ "ciphertext_b64": B64.encode(bytes) });
+            t.on(
+                HttpMethod::Get,
+                &format!("/sync/blob?id={}", hex(pid)),
+                200,
+                serde_json::to_vec(&body).unwrap(),
+            );
+            ChangedBlob {
+                id: *pid,
+                content_nonce: nonce,
+                version,
+                size: bytes.len(),
+                attachment_id: None,
+            }
+        }
+
+        /// Two ordered rules exercising both v1 filter leaves, one of them
+        /// DISABLED — a disabled rule is retained, so it must cross the wire
+        /// too or re-enabling it on the peer loses the authoring work.
+        fn authored_rules() -> Vec<protocol::ColorGroup> {
+            use protocol::{ColorGroup, FilterNode};
+            vec![
+                ColorGroup {
+                    id: "g-first".into(),
+                    name: "Work".into(),
+                    color: "group-teal".into(),
+                    enabled: true,
+                    filter: FilterNode::HasTag { tag: "work".into() },
+                },
+                ColorGroup {
+                    id: "g-second".into(),
+                    name: "Archive".into(),
+                    color: "group-rose".into(),
+                    enabled: false,
+                    filter: FilterNode::InFolder {
+                        path: "Archive/2026".into(),
+                    },
+                },
+            ]
+        }
+
+        // Device A authors color groups; device B receives them. A's push
+        // registers as dirty, and B's phase lands A's EXACT blob bytes: same
+        // rules, same precedence order, same disabled flag, same filter ASTs —
+        // while B's own device-local tuning survives untouched.
+        #[test]
+        fn color_groups_authored_on_device_a_land_on_device_b() {
+            let dir_a = scratch("cgdevA");
+            let dir_b = scratch("cgdevB");
+            let pid = prefs_sync_id(&ROOT);
+
+            // --- Device A: author the rules, then run its phase against a
+            // server that has never held prefs → the §10.2.1 initial publish.
+            let mut a = PrefsView {
+                color_groups: authored_rules(),
+                ..PrefsView::default()
+            };
+            a.field_clocks.insert("color_groups".into(), 1_000);
+            write_local(&dir_a, &a);
+            let mut st_a = SyncState::default();
+            let t_a = FakeTransport::new();
+            let phase_a = blocking(sync_prefs_phase(
+                &IO, &t_a, "tok", &ROOT, &HASH, &dir_a, &mut st_a, &pid, None,
+            ))
+            .unwrap();
+            assert!(phase_a.dirty, "A must push its newly authored rules");
+
+            // The bytes `run_sync_cycle` would upload for A, read the same way.
+            let pushed = std::fs::read(dir_a.join("vault.prefs")).unwrap();
+
+            // --- Device B: an already-synced device with no color groups and
+            // its own device-local theme.
+            let b_before = PrefsView {
+                theme: Some(protocol::ThemeChoice::Dark),
+                ..PrefsView::default()
+            };
+            write_local(&dir_b, &b_before);
+            let mut st_b = SyncState::default();
+            st_b.blobs.insert(
+                hex(&pid),
+                BlobSyncState {
+                    version: 3,
+                    content_nonce_hex: "00".repeat(24),
+                },
+            );
+            set_prefs_gate_baseline(&dir_b, shared_subset_hash(&PrefsView::default()));
+            let t_b = FakeTransport::new();
+            let rec = serve_remote_raw(&t_b, &pid, &pushed, 8);
+
+            let phase_b = blocking(sync_prefs_phase(
+                &IO,
+                &t_b,
+                "tok",
+                &ROOT,
+                &HASH,
+                &dir_b,
+                &mut st_b,
+                &pid,
+                Some(&rec),
+            ))
+            .unwrap();
+            assert!(phase_b.applied_remote, "A's rules must land on B");
+            assert!(
+                !phase_b.dirty,
+                "B adopted a shared subset it already agrees with ⇒ no ping-pong re-push"
+            );
+
+            // B's DISK is the assertion — the peer reads its rules back from
+            // the blob it persisted, not from the merge's return value.
+            let on_b = read_local(&dir_b);
+            assert_eq!(
+                on_b.color_groups,
+                authored_rules(),
+                "every field of every rule, in authoring order (= precedence)"
+            );
+            assert_eq!(
+                on_b.color_groups
+                    .iter()
+                    .map(|g| g.id.as_str())
+                    .collect::<Vec<_>>(),
+                vec!["g-first", "g-second"],
+                "precedence order survives the wire; never re-sorted by id"
+            );
+            assert!(!on_b.color_groups[1].enabled, "a disabled rule is retained");
+            assert_eq!(on_b.field_clocks.get("color_groups"), Some(&1_000));
+            assert_eq!(
+                on_b.theme,
+                Some(protocol::ThemeChoice::Dark),
+                "B's device-local theme is not overwritten by A's vault content"
+            );
+
+            std::fs::remove_dir_all(&dir_a).ok();
+            std::fs::remove_dir_all(&dir_b).ok();
+        }
+
+        // …and back the other way: B edits the list it just received and A
+        // converges on B's version. The reverse leg is a separate claim —
+        // `color_groups` is `Shared(WholeValueLww)`, so the peer that edits
+        // second must WIN on the author, not merge into a hybrid list.
+        #[test]
+        fn a_color_group_edited_on_device_b_converges_back_onto_device_a() {
+            let dir_a = scratch("cgbackA");
+            let dir_b = scratch("cgbackB");
+            let pid = prefs_sync_id(&ROOT);
+
+            // A holds the authored list (clock 1_000).
+            let mut a = PrefsView {
+                color_groups: authored_rules(),
+                ..PrefsView::default()
+            };
+            a.field_clocks.insert("color_groups".into(), 1_000);
+            write_local(&dir_a, &a);
+
+            // B edits it: reorders (precedence change), renames the first rule
+            // and re-enables the second — under a newer clock.
+            let mut edited = authored_rules();
+            edited.swap(0, 1);
+            edited[0].enabled = true;
+            edited[1].name = "Work Notes".into();
+            let mut b = PrefsView {
+                color_groups: edited.clone(),
+                theme: Some(protocol::ThemeChoice::Dark),
+                ..PrefsView::default()
+            };
+            b.field_clocks.insert("color_groups".into(), 2_000);
+            write_local(&dir_b, &b);
+            let b_bytes = std::fs::read(dir_b.join("vault.prefs")).unwrap();
+
+            // A pulls B's blob.
+            let mut st_a = SyncState::default();
+            st_a.blobs.insert(
+                hex(&pid),
+                BlobSyncState {
+                    version: 3,
+                    content_nonce_hex: "00".repeat(24),
+                },
+            );
+            set_prefs_gate_baseline(&dir_a, shared_subset_hash(&a));
+            let t_a = FakeTransport::new();
+            let rec = serve_remote_raw(&t_a, &pid, &b_bytes, 9);
+
+            let phase = blocking(sync_prefs_phase(
+                &IO,
+                &t_a,
+                "tok",
+                &ROOT,
+                &HASH,
+                &dir_a,
+                &mut st_a,
+                &pid,
+                Some(&rec),
+            ))
+            .unwrap();
+            assert!(phase.applied_remote, "B's newer edit must land on A");
+
+            let on_a = read_local(&dir_a);
+            assert_eq!(
+                on_a.color_groups, edited,
+                "whole-value LWW: A adopts B's list entire, never a hybrid"
+            );
+            assert_eq!(
+                on_a.color_groups
+                    .iter()
+                    .map(|g| g.id.as_str())
+                    .collect::<Vec<_>>(),
+                vec!["g-second", "g-first"],
+                "the reordered precedence is what converged"
+            );
+            assert_eq!(on_a.field_clocks.get("color_groups"), Some(&2_000));
+            assert_eq!(
+                on_a.theme, None,
+                "B's device-local theme did NOT travel to A"
+            );
+
+            std::fs::remove_dir_all(&dir_a).ok();
+            std::fs::remove_dir_all(&dir_b).ok();
+        }
+
+        // A stale peer cannot resurrect deleted rules. The delete is the case
+        // the codec bug found last turn lived in, and it is the one an LWW
+        // field gets wrong most easily: an empty list is omitted from the
+        // blob, so "absent" must read as "cleared under clock 3_000", not as
+        // "this device has nothing to say".
+        #[test]
+        fn deleting_every_rule_on_one_device_deletes_them_on_the_other() {
+            let dir_a = scratch("cgdelA");
+            let pid = prefs_sync_id(&ROOT);
+
+            // A still holds the rules under the OLD clock.
+            let mut a = PrefsView {
+                label: Some("Keep Me".into()),
+                color_groups: authored_rules(),
+                ..PrefsView::default()
+            };
+            a.field_clocks.insert("color_groups".into(), 1_000);
+            a.field_clocks.insert("label".into(), 50);
+            write_local(&dir_a, &a);
+
+            // B cleared the list under a NEWER clock and pushed that.
+            let mut b = PrefsView::default();
+            b.field_clocks.insert("color_groups".into(), 3_000);
+            let cleared_bytes = protocol::encode_prefs_blob(&prefs_key(), &HASH, &b).unwrap();
+
+            let mut st_a = SyncState::default();
+            st_a.blobs.insert(
+                hex(&pid),
+                BlobSyncState {
+                    version: 3,
+                    content_nonce_hex: "00".repeat(24),
+                },
+            );
+            set_prefs_gate_baseline(&dir_a, shared_subset_hash(&a));
+            let t_a = FakeTransport::new();
+            let rec = serve_remote_raw(&t_a, &pid, &cleared_bytes, 11);
+
+            blocking(sync_prefs_phase(
+                &IO,
+                &t_a,
+                "tok",
+                &ROOT,
+                &HASH,
+                &dir_a,
+                &mut st_a,
+                &pid,
+                Some(&rec),
+            ))
+            .unwrap();
+
+            let on_a = read_local(&dir_a);
+            assert!(
+                on_a.color_groups.is_empty(),
+                "the peer's delete wins; rules do not come back"
+            );
+            // The neighbour-field guard from last turn's decoder bug: a view
+            // that collapsed to defaults would ALSO show an empty list, so
+            // assert something else survived the read.
+            assert_eq!(
+                on_a.label.as_deref(),
+                Some("Keep Me"),
+                "the rest of the preference set is intact (not a defaults fallback)"
+            );
+
+            std::fs::remove_dir_all(&dir_a).ok();
+        }
     }
 
     // ---- MYND-486: vault.themes phase (sync_themes_phase) --------------------

@@ -22,8 +22,10 @@ import { Switch } from "../../components/primitives/Switch";
 import { collectFolderOptions } from "../../components/export/vaultExportFlow";
 import { usePrefs } from "../../hooks/usePrefs";
 import { setColorGroups, type ColorGroup } from "../../lib/prefs";
+import { colorGroupVar } from "../graphColorGroups";
 import { useSelectedNote } from "../sidebarState";
 import { FilterBuilder, type FolderOption } from "./FilterBuilder";
+import { dragEdge, insertionLineStyle } from "./reorderDnd";
 import {
   draftToFilterNode,
   filterNodeToDraft,
@@ -57,6 +59,7 @@ const SECTION_HEADING_STYLE: CSSProperties = {
 };
 
 const ROW_STYLE: CSSProperties = {
+  position: "relative",
   display: "flex",
   alignItems: "center",
   gap: 6,
@@ -97,7 +100,13 @@ const SWATCH_STYLE = (colorKey: string): CSSProperties => ({
   flexShrink: 0,
   borderRadius: "50%",
   border: "1px solid var(--line-2)",
-  background: `var(--${colorKey})`,
+  // NOT `var(--${colorKey})`: the ROW swatch paints `rule.color`, which is
+  // synced content a peer (or a future client's ninth palette entry) can set to
+  // something this build cannot resolve. A bare `var()` with no fallback paints
+  // the swatch transparent, so the editor would show a blank circle for a rule
+  // the canvas is meanwhile painting neutral — two surfaces disagreeing about
+  // the same key. `colorGroupVar` is the shared degrade both clients use.
+  background: colorGroupVar(colorKey),
   cursor: "pointer",
   padding: 0,
 });
@@ -141,7 +150,10 @@ export function ColorGroupEditor() {
   const { cache } = useSelectedNote();
   const rules = prefs.color_groups;
 
-  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [dropTarget, setDropTarget] = useState<{ id: string; place: "above" | "below" } | null>(
+    null,
+  );
   const [pickingColorFor, setPickingColorFor] = useState<string | null>(null);
   const [editingFilterFor, setEditingFilterFor] = useState<string | null>(null);
 
@@ -172,13 +184,19 @@ export function ColorGroupEditor() {
 
   const deleteRule = (id: string) => persist(rules.filter((r) => r.id !== id));
 
-  const reorder = (from: number, to: number) => {
-    if (from === to) return;
-    const next = [...rules];
-    const [moved] = next.splice(from, 1);
+  /** Drop `movedId` above/below `targetId` — the same above/below insertion
+   *  semantics the sidebar's note and folder reorder use (`dragEdge`), so the
+   *  gesture behaves identically here. Order IS precedence, so the resulting
+   *  sequence is the whole payload of the write. */
+  const reorder = (movedId: string, targetId: string, place: "above" | "below") => {
+    if (movedId === targetId) return;
+    const moved = rules.find((r) => r.id === movedId);
     if (moved === undefined) return;
-    next.splice(to, 0, moved);
-    persist(next);
+    const rest = rules.filter((r) => r.id !== movedId);
+    const targetIdx = rest.findIndex((r) => r.id === targetId);
+    if (targetIdx === -1) return;
+    const insertAt = place === "above" ? targetIdx : targetIdx + 1;
+    persist([...rest.slice(0, insertAt), moved, ...rest.slice(insertAt)]);
   };
 
   const commitName = (id: string, name: string) => {
@@ -198,26 +216,43 @@ export function ColorGroupEditor() {
 
       {rules.length === 0 ? (
         <div data-testid="editor.color-groups-empty" style={EMPTY_HINT_STYLE}>
+          <p style={{ margin: "0 0 2px", color: "var(--fg-2)", fontWeight: 500 }}>
+            {t("notes.graph.colorGroups.emptyTitle")}
+          </p>
           <p style={{ margin: "0 0 6px" }}>{t("notes.graph.colorGroups.emptyBody")}</p>
         </div>
       ) : (
         <div data-testid="editor.color-groups-list">
-          {rules.map((rule, index) => (
+          {rules.map((rule) => (
             <div key={rule.id}>
               <div
                 data-testid="editor.color-group-row"
                 data-rule-id={rule.id}
                 draggable
-                onDragStart={() => setDragIndex(index)}
-                onDragOver={(e: ReactDragEvent<HTMLDivElement>) => e.preventDefault()}
+                onDragStart={() => setDragId(rule.id)}
+                onDragOver={(e: ReactDragEvent<HTMLDivElement>) => {
+                  if (dragId === null || dragId === rule.id) return;
+                  e.preventDefault();
+                  setDropTarget({ id: rule.id, place: dragEdge(e) });
+                }}
+                onDragLeave={() =>
+                  setDropTarget((cur) => (cur?.id === rule.id ? null : cur))
+                }
                 onDrop={(e: ReactDragEvent<HTMLDivElement>) => {
                   e.preventDefault();
-                  if (dragIndex !== null) reorder(dragIndex, index);
-                  setDragIndex(null);
+                  if (dragId !== null) reorder(dragId, rule.id, dragEdge(e));
+                  setDragId(null);
+                  setDropTarget(null);
                 }}
-                onDragEnd={() => setDragIndex(null)}
+                onDragEnd={() => {
+                  setDragId(null);
+                  setDropTarget(null);
+                }}
                 style={ROW_STYLE}
               >
+                {dropTarget?.id === rule.id && (
+                  <div style={insertionLineStyle(dropTarget.place)} aria-hidden="true" />
+                )}
                 <span
                   aria-hidden="true"
                   title={t("notes.graph.colorGroups.dragHandleTitle")}

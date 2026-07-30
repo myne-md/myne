@@ -1919,6 +1919,10 @@ function EditorChrome({
           setSettingsOpen(false);
           setImporterOpen(true);
         }}
+        onOpenGraph={() => {
+          setSettingsOpen(false);
+          ws.openGraph();
+        }}
         onBackupVault={() => {
           setSettingsOpen(false);
           setBackupExportOpen(true);
