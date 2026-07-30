@@ -69,8 +69,30 @@ describe("tallyIgnore — rolls into the three SYNC-2 count fields", () => {
     const classes = names.map(classifyEntry);
     expect(tallyIgnore(classes)).toEqual({
       canvasSkipped: 1,
+      excalidrawSkipped: 0,
       nonMarkdownSkipped: 2,
       hiddenIgnored: 3,
+    });
+  });
+
+  // MYND-633: an Obsidian Excalidraw drawing is a markdown WRAPPER around a
+  // serialized scene. It ends in `.md`, so it used to pass the markdown filter
+  // and be imported as an ordinary note — the wrapper then rendered as prose,
+  // which is what "the excalidraw data looks corrupted" actually was.
+  it("keeps Obsidian Excalidraw drawings out of the note importer", () => {
+    expect(classifyEntry("sketch.excalidraw.md")).toBe("excalidraw-skipped");
+    expect(classifyEntry("Sketch.Excalidraw.MD")).toBe("excalidraw-skipped");
+    expect(classifyEntry("legacy.excalidraw")).toBe("excalidraw-skipped");
+    // A note that merely mentions the word is still a note.
+    expect(classifyEntry("about-excalidraw.md")).toBe("import-as-note");
+  });
+
+  it("tallies an Excalidraw skip into its own bucket", () => {
+    expect(tallyIgnore([classifyEntry("a.excalidraw.md")])).toEqual({
+      canvasSkipped: 0,
+      excalidrawSkipped: 1,
+      nonMarkdownSkipped: 0,
+      hiddenIgnored: 0,
     });
   });
 });

@@ -25,7 +25,7 @@ import {
   type DecorationSet,
   EditorView,
 } from "@codemirror/view";
-import { isCursorLine } from "./cursor-aware";
+import { isInsideRange } from "./cursor-aware";
 import { makeCursorAwareDecorationPlugin } from "./plugin-factory";
 
 // Nesting bars. Penpot `flow--editor-ref-and-block` blockquote specimen
@@ -108,11 +108,13 @@ function buildBlockquoteDecorations(view: EditorView): DecorationSet {
           const endLine = view.state.doc.lineAt(node.to).number;
           for (let n = startLine; n <= endLine; n++) tableLines.add(n);
         } else if (node.name === "QuoteMark") {
-          if (!isCursorLine(view, node.from, node.to)) {
-            // Hide `>` + trailing space if present.
-            const after = node.to;
-            const nextChar = view.state.doc.sliceString(after, after + 1);
-            const hideTo = nextChar === " " ? after + 1 : after;
+          // MYND-631: caret-scoped, not line-scoped. Editing inside a quote
+          // used to expose every `>` on the line and shift the text; now the
+          // marker lifts only when the caret is actually in it.
+          const after = node.to;
+          const nextChar = view.state.doc.sliceString(after, after + 1);
+          const hideTo = nextChar === " " ? after + 1 : after;
+          if (!isInsideRange(view, node.from, hideTo)) {
             markHides.push({ from: node.from, to: hideTo });
           }
         }

@@ -47,8 +47,24 @@ function findNode(nodes: readonly FolderNode[], key: string): FolderNode | null 
 }
 
 /** Every note in `node`'s subtree (itself + all descendants), pre-order. */
+/**
+ * Every note id under `node`, INCLUDING each folder's own folder note.
+ *
+ * MYND-599: `FolderNode.noteIds` deliberately EXCLUDES `indexNoteId` — the
+ * folder note is hidden from the sidebar so it does not render as a row inside
+ * its own folder. Walking `noteIds` alone therefore collected everything except
+ * the one note that keeps the folder alive: the delete soft-trashed the
+ * subtree, the folder note stayed, the folder still had a note, and the derived
+ * tree re-materialised it. To the user, "delete the folder → confirm → nothing
+ * happens; the folder stays" — which is why archive-then-trash was the only
+ * path that worked.
+ *
+ * Conflict claimants that LOST the index tiebreak are already in `noteIds`
+ * (only the winner is hidden), so `indexNoteId` is the sole addition.
+ */
 function collectSubtreeNoteIds(node: FolderNode): string[] {
   const ids = [...node.noteIds];
+  if (node.indexNoteId !== null) ids.push(node.indexNoteId);
   for (const child of node.children) ids.push(...collectSubtreeNoteIds(child));
   return ids;
 }

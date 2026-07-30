@@ -21,6 +21,9 @@
 export type EntryClass =
   | "import-as-note"
   | "canvas-skipped"
+  /** An Obsidian Excalidraw drawing (`.excalidraw.md` / `.excalidraw`).
+   *  Reported rather than imported (MYND-633) — see {@link classifyEntry}. */
+  | "excalidraw-skipped"
   | "non-markdown-skipped"
   | "hidden-ignored";
 
@@ -37,6 +40,16 @@ export type EntryClass =
 export function classifyEntry(name: string): EntryClass {
   if (name.startsWith(".")) return "hidden-ignored"; // rule (i) — wins
   const lower = name.toLowerCase(); // case-insensitive extension match
+  // MYND-633: `.excalidraw.md` BEFORE the plain `.md` arm — it ends in `.md`,
+  // so it was passing the markdown filter and being imported as an ordinary
+  // note. Obsidian's Excalidraw plugin stores a drawing as a markdown wrapper
+  // around its own serialized scene, so what landed in the vault was that
+  // wrapper rendered as prose: a "# Excalidraw Data" heading, an
+  // "## Text Elements" dump and a fenced blob. That is the reported corruption
+  // — nothing was mangled in transit, the file was never a note to begin with.
+  if (lower.endsWith(".excalidraw.md") || lower.endsWith(".excalidraw")) {
+    return "excalidraw-skipped";
+  }
   if (lower.endsWith(".md")) return "import-as-note";
   if (lower.endsWith(".canvas")) return "canvas-skipped";
   return "non-markdown-skipped";
@@ -51,12 +64,19 @@ export function classifyEntry(name: string): EntryClass {
  */
 export interface IgnoreCounts {
   canvasSkipped: number;
+  /** Obsidian Excalidraw drawings reported instead of imported (MYND-633). */
+  excalidrawSkipped: number;
   nonMarkdownSkipped: number;
   hiddenIgnored: number;
 }
 
 export function emptyIgnoreCounts(): IgnoreCounts {
-  return { canvasSkipped: 0, nonMarkdownSkipped: 0, hiddenIgnored: 0 };
+  return {
+    canvasSkipped: 0,
+    excalidrawSkipped: 0,
+    nonMarkdownSkipped: 0,
+    hiddenIgnored: 0,
+  };
 }
 
 /** Roll a list of classifications into the three SYNC-2 count fields. */
@@ -64,6 +84,7 @@ export function tallyIgnore(classes: readonly EntryClass[]): IgnoreCounts {
   const counts = emptyIgnoreCounts();
   for (const c of classes) {
     if (c === "canvas-skipped") counts.canvasSkipped++;
+    else if (c === "excalidraw-skipped") counts.excalidrawSkipped++;
     else if (c === "non-markdown-skipped") counts.nonMarkdownSkipped++;
     else if (c === "hidden-ignored") counts.hiddenIgnored++;
   }

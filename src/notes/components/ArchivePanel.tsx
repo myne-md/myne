@@ -45,7 +45,10 @@ import {
   HEADER_TITLE_STYLE,
   LIST_STYLE,
   PANEL_STYLE,
+  ROW_BTN_DANGER_STYLE,
   ROW_BTN_STYLE,
+  ROW_CONFIRM_STYLE,
+  ROW_CONFIRM_TEXT_STYLE,
   ROW_STYLE,
   ROW_TITLE_STYLE,
   STATUS_STYLE,
@@ -221,15 +224,17 @@ export function ArchivePanel({
                     {folderLabel(path)}
                   </span>
                   {armed ? (
-                    <>
-                      <span style={AGE_STYLE}>
+                    /* Armed state gets its own band rather than swapping the
+                       buttons in place — see ROW_CONFIRM_STYLE (MYND-623). */
+                    <div style={ROW_CONFIRM_STYLE}>
+                      <span style={ROW_CONFIRM_TEXT_STYLE}>
                         {t("notes.archive.folderDeleteConfirm", {
                           count: subtreeCount,
                         })}
                       </span>
                       <button
                         type="button"
-                        style={ROW_BTN_STYLE}
+                        style={ROW_BTN_DANGER_STYLE}
                         data-testid="archive.folder-delete-confirm"
                         data-folder-path={path}
                         onClick={confirmDeleteFolder}
@@ -244,7 +249,7 @@ export function ArchivePanel({
                       >
                         {t("notes.archive.cancel")}
                       </button>
-                    </>
+                    </div>
                   ) : (
                     <>
                       <button

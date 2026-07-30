@@ -82,6 +82,8 @@ export type VirtualListProps<T> = {
 const DEFAULT_ESTIMATED_HEIGHT = 52;
 const DEFAULT_BUFFER = 5;
 
+import { useDragAutoScroll } from "./useDragAutoScroll";
+
 export function VirtualList<T>(props: VirtualListProps<T>): ReactNode {
   const {
     items,
@@ -267,6 +269,8 @@ export function VirtualList<T>(props: VirtualListProps<T>): ReactNode {
     return cb;
   }, []);
 
+  const autoScroll = useDragAutoScroll(containerRef);
+
   const containerStyle: CSSProperties = {
     height: "100%",
     overflowY: "auto",
@@ -275,7 +279,17 @@ export function VirtualList<T>(props: VirtualListProps<T>): ReactNode {
   };
 
   return (
-    <div ref={containerRef} style={containerStyle}>
+    <div
+      ref={containerRef}
+      style={containerStyle}
+      // MYND-622: scroll the list while a drag hovers its top/bottom edge, so a
+      // note can be moved somewhere off-screen in one gesture. Additive — no
+      // preventDefault, no dataTransfer access, so the rows' own drop handling
+      // is untouched.
+      onDragOver={autoScroll.onDragOver}
+      onDragLeave={autoScroll.stop}
+      onDrop={autoScroll.stop}
+    >
       <div style={{ height: topSpacer }} aria-hidden="true" />
       {visibleSlice.map(({ item, index, key }) => (
         <div
