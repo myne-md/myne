@@ -920,6 +920,16 @@ TLS 1.3 with strict cipher configuration plus client-side certificate pinning. T
 
 Used in: `threat-model.md` §3 TB4
 
+### **ingest-time image compression** &nbsp; 🏗️ *Construction*
+
+The one-way downscale-and-re-encode applied to a raster image **as it is imported** as an attachment, governed by the `attachment_compression_enabled` preference (`spec/protocol.md` §9.5.2, default **on**). Three rules run in order over a bounded decode: cap the long edge at the display ceiling; re-encode a lossless source to lossless WebP with no size floor; re-encode a JPEG lossily above a byte floor. The transform sits **between the content-type sniff and the content-addressed id computation**, so the attachment id, the dedup check, the stored blob and the catalog `size` all derive from the final bytes — dedup, the fail-closed GC, sync, backup and export need no knowledge that compression happened (`spec/protocol.md` §9.9/§9.10).
+
+**Irreversible, and that is the design rather than a limitation**: the original bytes are not retained, because a retained original is a second stored blob and a second synced object — it would raise the two costs the feature exists to lower. The obligation that creates is met by a **notice at import** reporting the before and after sizes, not by a consent gate; a per-image confirmation was weighed and rejected as friction on the most common action in the app. Four rails bound the one-way-ness: the stored bytes are whichever of {original, processed} is smaller, so it is never a size downgrade; every failure path (undecodable bytes, unsupported format, encode failure, decode-limits violation) stores the original and the import still succeeds; SVG and animated GIF are excluded by rule and never decoded; and an explicit `image::Limits` dimension check runs **before allocation**, since compression makes every imported image an untrusted decode.
+
+Deliberately **not** classified like its neighbours. [image OCR](#image-ocr), on-device AI and spell-check are device-local compute-budget switches whose effects are local and reversible; this is a content-fidelity switch whose effect is vault-wide and irreversible, so it is **shared** in the sync merge (scalar-LWW, `spec/sync-protocol.md` §10.2) — a switch must have the same reach as the effect it controls. Applies to **future** imports only; existing attachments are never read, rewritten, or re-referenced (`decisions.md` 2026-07-30).
+
+Used in: `spec/protocol.md` §9.5.2, `spec/sync-protocol.md` §10.2, `decisions.md` 2026-07-30
+
 ### **IP-scrubbing proxy** &nbsp; 🏗️ *Construction*
 
 The self-host bundle's TLS edge (a vetted Caddy reverse proxy) configured to **delete every client-IP-bearing field** from its access log (`remote_ip`, `client_ip`, `X-Forwarded-For`, `X-Real-Ip`, `Forwarded`). Caddy's *default* access log emits the client IP, so the scrub is explicit and load-bearing: it enforces the no-persistent-IP-logging commitment (C4/AS14) at the **edge**, complementing the app's in-process `noIP` middleware (defense in depth). An operator who fronts the bundle with their own load balancer inherits the obligation to scrub the IP there. Phase 2.

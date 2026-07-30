@@ -57,6 +57,34 @@ fn vault_dir_from_host(
     crate::paths::active_vault_root_io_from_host(host, active_id)
 }
 
+/// Where a [`PrefsView`] came from, for the callers that cannot treat a
+/// § 9.5.5 fallback as an answer.
+///
+/// The spec rule — absent / undecodable `vault.prefs` degrades to defaults,
+/// never fails — is right for every consumer whose action the user can simply
+/// redo: a wrong theme is one click away from correct. It is **not** enough for
+/// a consumer whose action is irreversible. `attachment_compression_enabled`
+/// defaults to `true`, so on a damaged blob the fallback would start discarding
+/// pixels on behalf of a user whose actual answer nobody could read.
+///
+/// This enum changes no value and no fallback: [`read_or_default`] returns
+/// exactly what it did before. It only lets a caller ask the second question —
+/// *is this the stored answer, or the fallback?* — instead of guessing from a
+/// value that looks identical either way.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PrefsOrigin {
+    /// Decoded from a stored blob. These are the user's settings.
+    Stored,
+    /// No blob exists. Defaults are the *correct* answer here rather than a
+    /// fallback — a vault that has never written prefs is not a damaged one
+    /// (the standard case for a fresh vault and for every pre-MYND-160 one),
+    /// and "never changed the default" is itself an answer.
+    Absent,
+    /// A blob exists and could not be read or decoded. The values are § 9.5.5
+    /// defaults and say nothing about what the user chose.
+    Degraded,
+}
+
 /// Read `vault.prefs` from disk and decode under `prefs_key` + AAD
 /// bound to `account_number_hash`. Returns `PrefsView::default()` on
 /// any failure (absent / truncated / AEAD-fail / parse-fail) per
@@ -72,6 +100,21 @@ pub async fn read_or_default(
     prefs_key: &[u8; 32],
     account_number_hash: &[u8; VAULT_META_ACCOUNT_HASH_LEN],
 ) -> PrefsView {
+    read_or_default_reporting_origin(io, prefs_path, prefs_key, account_number_hash)
+        .await
+        .0
+}
+
+/// [`read_or_default`], plus the [`PrefsOrigin`] that produced it.
+///
+/// The single implementation of both; `read_or_default` is this with the origin
+/// dropped, so the fallback rule cannot drift between them.
+pub async fn read_or_default_reporting_origin(
+    io: &dyn crate::vault_io::VaultIo,
+    prefs_path: &Path,
+    prefs_key: &[u8; 32],
+    account_number_hash: &[u8; VAULT_META_ACCOUNT_HASH_LEN],
+) -> (PrefsView, PrefsOrigin) {
     // The newest copy that DECODES (phase3-web-client task 18), not the newest
     // copy. On the web client a singleton is two alternating files, and here the
     // difference is user-visible in a way it is nowhere else: § 9.5.5 says an
@@ -87,13 +130,13 @@ pub async fn read_or_default(
     })
     .await
     {
-        Ok(view) => view,
+        Ok(view) => (view, PrefsOrigin::Stored),
         Err(crate::singleton::OpenOutcome::Absent) => {
             // Absent file is the standard case for pre-MYND-160 vaults
             // and for the first read after vault_create (until Task 12
             // lands eager-write). Not a warn — this is the documented
             // happy path of spec § 9.5.5.
-            PrefsView::default()
+            (PrefsView::default(), PrefsOrigin::Absent)
         }
         Err(crate::singleton::OpenOutcome::Io(e)) => {
             tracing::warn!(
@@ -102,7 +145,7 @@ pub async fn read_or_default(
                 io_kind = ?e,
                 "vault.prefs read failed; falling back to defaults"
             );
-            PrefsView::default()
+            (PrefsView::default(), PrefsOrigin::Degraded)
         }
         Err(crate::singleton::OpenOutcome::Undecodable(cause)) => {
             // Every stored copy failed — on desktop the only one, on web both.
@@ -114,7 +157,7 @@ pub async fn read_or_default(
                 reason = prefs_blob_error_kind(&cause),
                 "vault.prefs decode failed; falling back to defaults"
             );
-            PrefsView::default()
+            (PrefsView::default(), PrefsOrigin::Degraded)
         }
     }
 }
@@ -345,6 +388,22 @@ pub async fn prefs_read_with_dir(
     state: &VaultRuntimeState,
     io: &dyn crate::vault_io::VaultIo,
 ) -> Result<PrefsView, PrefsReadError> {
+    prefs_read_with_dir_reporting_origin(vault_dir, state, io)
+        .await
+        .map(|(view, _origin)| view)
+}
+
+/// [`prefs_read_with_dir`], plus the [`PrefsOrigin`] behind the returned view.
+///
+/// For the callers that must distinguish "the user's stored answer" from "the
+/// § 9.5.5 fallback that happens to look like one" — today the ingest-time
+/// image-compression gate in `plugins::attachments::commands`, whose action
+/// discards pixels and cannot be undone by re-reading a repaired blob.
+pub async fn prefs_read_with_dir_reporting_origin(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(PrefsView, PrefsOrigin), PrefsReadError> {
     // Peek root_key from the Unlocked slot (ignore the
     // vault_meta_bytes_hash — prefs has no CAS anchor against it).
     let (root_key, _vmh) = state
@@ -356,7 +415,7 @@ pub async fn prefs_read_with_dir(
     let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
     let prefs_path = vault_dir.join("vault.prefs");
 
-    Ok(read_or_default(io, &prefs_path, &prefs_key, &account_number_hash).await)
+    Ok(read_or_default_reporting_origin(io, &prefs_path, &prefs_key, &account_number_hash).await)
 }
 
 /// Internal (non-IPC) setter: record the last successful backup export
@@ -1824,6 +1883,78 @@ pub(crate) async fn set_developer_mode_with_dir(
     .await?;
 
     tracing::info!(event = "prefs_written", field = "developer_mode", enabled);
+    Ok(())
+}
+
+/// Slot::Unlocked-gated setter for the `attachment_compression_enabled`
+/// toggle — whether an imported image attachment is downscaled/re-encoded on
+/// ingest. Read-modify-write under the per-plugin write mutex; **no native
+/// side-effect**, exactly like [`set_attachment_ocr_enabled`].
+///
+/// Shared (`sync-protocol.md` §10.2), unlike its OCR/AI neighbours: this is a
+/// content-fidelity switch with a vault-wide, irreversible effect (a
+/// compressed attachment's original bytes are gone), not a per-device
+/// compute-budget switch, so the switch must have the same reach as the
+/// effect. Toggling it off affects only attachments imported *after* the
+/// change; nothing already stored is read or rewritten.
+pub async fn set_attachment_compression_enabled_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    enabled: bool,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_attachment_compression_enabled_with_dir(&dir, state, hooks, enabled, io, host).await
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn set_attachment_compression_enabled<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
+    enabled: bool,
+) -> Result<(), PrefsWriteError> {
+    set_attachment_compression_enabled_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        enabled,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
+}
+
+/// Testable core of [`set_attachment_compression_enabled`].
+pub(crate) async fn set_attachment_compression_enabled_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    enabled: bool,
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
+) -> Result<(), PrefsWriteError> {
+    update_prefs_with_dir(
+        vault_dir,
+        state,
+        hooks,
+        |prefs| {
+            prefs.attachment_compression_enabled = enabled;
+        },
+        io,
+        host,
+    )
+    .await?;
+
+    tracing::info!(
+        event = "prefs_written",
+        field = "attachment_compression_enabled",
+        enabled
+    );
     Ok(())
 }
 
@@ -5017,6 +5148,7 @@ mod tests {
                 &prefs_key,
                 &account_hash,
                 &PrefsView {
+                    attachment_compression_enabled: true,
                     developer_mode: false,
                     attachment_ocr_enabled: true,
                     transcription_enabled: true,
@@ -7051,6 +7183,91 @@ mod tests {
                 .await
                 .expect("read after off");
             assert_eq!(view.archive_disabled, Some(false));
+        });
+    }
+
+    // ---- attachment_compression_enabled setter -------------------------
+
+    #[test]
+    fn set_attachment_compression_enabled_rejects_when_slot_empty() {
+        rt().block_on(async {
+            let tmp =
+                ScopedTempDir::new("prefs-attachment-compression-empty").expect("scoped tempdir");
+            let state = VaultRuntimeState::default();
+            let result = set_attachment_compression_enabled_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                false,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await;
+            assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
+        });
+    }
+
+    #[test]
+    fn attachment_compression_enabled_round_trips_via_set_then_read() {
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x53).await;
+
+            // Default (no write yet) reads back as `true` — compression on.
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
+                .await
+                .expect("read default");
+            assert!(view.attachment_compression_enabled);
+
+            // Turn OFF persists (disk-first) + round-trips.
+            set_attachment_compression_enabled_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                false,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("write off");
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
+                .await
+                .expect("read after off");
+            assert!(!view.attachment_compression_enabled);
+            // Pre-existing screen_capture default untouched.
+            assert!(view.screen_capture_protection);
+
+            // Simulate a lock/unlock cycle: a fresh VaultRuntimeState reading
+            // the same on-disk vault.prefs must still observe the persisted
+            // value (the setter's disk write, not any in-memory cache, is
+            // what the value survives on). Match `make_temp_vault_with_unlocked_state`'s
+            // fixture key material (0x42, 0x99, 1) so the re-derived prefs_key
+            // can decrypt the blob written above.
+            let reunlocked_state = VaultRuntimeState::default();
+            let unlocked = fixture_unlocked_with_keys(0x42, 0x99, 1);
+            reunlocked_state
+                .set_unlocked(test_vault_id(), unlocked)
+                .await;
+            let view =
+                prefs_read_with_dir(tmp.path(), &reunlocked_state, &crate::vault_io::StdVaultIo)
+                    .await
+                    .expect("read after simulated re-unlock");
+            assert!(!view.attachment_compression_enabled);
+
+            // Turn back ON overwrites (explicit true again).
+            set_attachment_compression_enabled_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                true,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("write on");
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
+                .await
+                .expect("read after on");
+            assert!(view.attachment_compression_enabled);
         });
     }
 

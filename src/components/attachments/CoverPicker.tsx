@@ -29,7 +29,13 @@ import { Button } from "../primitives/Button";
 import { AttachmentThumbnail } from "./AttachmentThumbnail";
 import { kindOf } from "./format";
 import { catalogList, type CatalogEntry } from "../../lib/attachments";
-import { importMany, type ImportSource } from "../../editor/attachments/insert";
+import {
+  compressionNoticeMessage,
+  importMany,
+  summarizeCompressedAttachments,
+  type ImportSource,
+} from "../../editor/attachments/insert";
+import { showAttachmentToast } from "../../editor/attachments/toast";
 
 /** The minimal attachment shape the caller needs to write a cover reference. */
 export interface CoverChoice {
@@ -114,6 +120,23 @@ function firstOk(
   return null;
 }
 
+/**
+ * Announce ingest-time compression, if any of these imports was compressed.
+ *
+ * A cover image goes through the same shared-core import as a pasted one, so it
+ * is downscaled and re-encoded on the same terms — and the original bytes are
+ * not kept. `decisions.md` 2026-07-30 makes a notice at import the thing that
+ * stands in for a consent gate, which means it is owed on every route that
+ * imports, not only the ones inside the editor. Reuses the editor's attachment
+ * toast rather than introducing a second notice surface with its own wording.
+ */
+function discloseCompression(outcomes: Awaited<ReturnType<typeof importMany>>): void {
+  const summary = summarizeCompressedAttachments(
+    outcomes.flatMap((o) => (o.ok ? [o.attachment] : [])),
+  );
+  if (summary !== null) showAttachmentToast(compressionNoticeMessage(summary));
+}
+
 export function CoverPicker({
   open,
   hasCover,
@@ -146,7 +169,9 @@ export function CoverPicker({
       const selected = await pickFiles({ multiple: false });
       if (selected === null || selected.length === 0) return; // cancelled
       const sources: ImportSource[] = selected.map((file) => ({ kind: "picked", file }));
-      const choice = firstOk(await importMany(sources));
+      const outcomes = await importMany(sources);
+      discloseCompression(outcomes);
+      const choice = firstOk(outcomes);
       if (choice !== null) onPick(choice);
     } catch {
       /* picker / import failure surfaces via backend tracing */
@@ -164,7 +189,9 @@ export function CoverPicker({
       setBusy(true);
       try {
         const sources = await Promise.all(files.map(fileToSource));
-        const choice = firstOk(await importMany(sources));
+        const outcomes = await importMany(sources);
+        discloseCompression(outcomes);
+        const choice = firstOk(outcomes);
         if (choice !== null) onPick(choice);
       } catch {
         /* import failure surfaces via backend tracing */

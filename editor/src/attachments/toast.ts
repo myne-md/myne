@@ -43,6 +43,7 @@ export function showAttachmentToast(
   el.className = "cm-attach-toast";
   el.setAttribute("role", "status");
   el.setAttribute("aria-live", "polite");
+  el.setAttribute("data-testid", "attachment-toast");
   el.textContent = message;
   document.body.appendChild(el);
   activeEl = el;

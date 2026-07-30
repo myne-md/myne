@@ -94,6 +94,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::set_active_workspace,
             commands::set_ai_enabled,
             commands::set_attachment_ocr_enabled,
+            commands::set_attachment_compression_enabled,
             commands::set_developer_mode,
             commands::set_ai_excluded_folders,
             commands::set_editor_default_view_mode,

@@ -99,6 +99,7 @@ import { resolveClipWikilinks } from "./resolveClipWikilinks";
 import { validateClipEnvelope, type RawClipEnvelope } from "./validateClipEnvelope";
 
 import type { MediaCounts } from "../notes/import/media";
+import type { CompressionTally } from "../editor/attachments/insert";
 import type { ClipEnvelopeRejection, ValidatedClipEnvelope } from "./validateClipEnvelope";
 import type { ResolverNote } from "../notes/resolveWikilink";
 
@@ -158,7 +159,15 @@ export type ClipPlaintextComposer = (
  *     is the validation rejection literal or the note-create error `kind`.
  */
 export type ClipIngestResult =
-  | { readonly kind: "accepted"; readonly noteId: string; readonly counts: MediaCounts }
+  | {
+      readonly kind: "accepted";
+      readonly noteId: string;
+      readonly counts: MediaCounts;
+      /** Ingest-time image compression performed while sealing this clip —
+       *  carried out to task 7's notice so a clipped image discloses on the
+       *  same terms a pasted one does (`decisions.md` 2026-07-30). */
+      readonly compression: CompressionTally;
+    }
   | { readonly kind: "locked" }
   | { readonly kind: "error"; readonly reason: ClipAssemblyErrorReason };
 
@@ -258,7 +267,12 @@ export async function assembleClip(
   }
 
   // (7) ACCEPTED — only now that the seal resolved. Carries the new id + counts.
-  return { kind: "accepted", noteId, counts: imageResult.counts };
+  return {
+    kind: "accepted",
+    noteId,
+    counts: imageResult.counts,
+    compression: imageResult.compression,
+  };
 }
 
 /**

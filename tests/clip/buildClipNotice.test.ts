@@ -99,3 +99,45 @@ describe("noticeFromResult", () => {
     expect(noticeFromResult({ kind: "error", reason: "PlaintextTooLarge" })).toBeNull();
   });
 });
+
+describe("buildClipNotice — ingest-time compression disclosure", () => {
+  // A clipped image goes through the same shared-core transform a pasted one
+  // does, and the original bytes are not kept. `decisions.md` 2026-07-30 makes
+  // a notice at import the thing that stands in for a consent gate, so the
+  // clip notice owes it on the same terms the paste toast does.
+  // The explicit zero tally is what `ingestClipImages` actually produces on a
+  // clip where nothing shrank — distinct from the absent-tally case below, and
+  // the one a real caller hits.
+  it("emits no line when nothing compressed", () => {
+    const notice = buildClipNotice({
+      noteId: "n1",
+      counts: counts({}),
+      compression: { count: 0, originalBytes: 0, finalBytes: 0 },
+    });
+    expect(notice.compressionLine).toBeNull();
+  });
+
+  it("emits no line when the tally is absent entirely (pre-feature callers)", () => {
+    const notice = buildClipNotice({ noteId: "n1", counts: counts({}) });
+    expect(notice.compressionLine).toBeNull();
+  });
+
+  it("discloses the before/after bytes when images were compressed", () => {
+    const notice = buildClipNotice({
+      noteId: "n1",
+      counts: counts({}),
+      compression: { count: 2, originalBytes: 2400, finalBytes: 300 },
+    });
+    expect(notice.compressionLine).toBe("2 images compressed: 2.3 KiB → 300 B");
+  });
+
+  it("keeps the omitted tally AND the compression line — they report different losses", () => {
+    const notice = buildClipNotice({
+      noteId: "n1",
+      counts: counts({ image: 1 }),
+      compression: { count: 1, originalBytes: 2400, finalBytes: 300 },
+    });
+    expect(notice.tally).not.toBeNull();
+    expect(notice.compressionLine).toBe("1 image compressed: 2.3 KiB → 300 B");
+  });
+});
