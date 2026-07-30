@@ -18,14 +18,8 @@ import { EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { markdown } from "@codemirror/lang-markdown";
 import { parser } from "../../src/dialect/lezer/parser";
-import {
-  applyTaskFieldEdit,
-  beginTaskFieldEdit,
-  taskChipDecorations,
-  TASK_CHIP_EVENT,
-  type TaskChipEventDetail,
-} from "@myne/editor/decorations/task-chip";
-import { openTaskFieldEditor } from "@myne/editor/task-field-editor";
+import { taskChipDecorations } from "@myne/editor/decorations/task-chip";
+import { installTaskChipEditor } from "@myne/editor/decorations/task-chip-listener";
 
 const DOC = "- [ ] pay the rent [due:: 2026-08-01] [priority:: high]\n";
 
@@ -37,34 +31,16 @@ afterEach(() => {
 });
 
 /**
- * The listener as `src/screens/Editor.tsx` installs it. Kept a faithful copy
- * rather than an import, because the app's copy lives inside a 4000-line React
- * screen that cannot be mounted here — so this file pins the SHAPE, and the
- * shape is what was missing.
+ * The listener as the clients install it. This used to be a hand-kept "faithful
+ * copy" of the shape buried inside `src/screens/Editor.tsx`, because that copy
+ * could not be mounted here. The shape now lives in the shared editor package
+ * (`installTaskChipEditor`), imported by BOTH desktop and mobile, so this test
+ * exercises the **real** wire rather than a lookalike — and the gap it was
+ * written to catch (a client that renders chips but installs no listener) is now
+ * one line to get wrong instead of a whole duplicated block.
  */
 function installChipListener(): () => void {
-  const onOpenChip = (e: Event) => {
-    const detail = (e as CustomEvent<TaskChipEventDetail>).detail;
-    const target = e.target as HTMLElement | null;
-    const anchor = target?.closest?.("[data-task-chip]") as HTMLElement | null;
-    if (detail === undefined || anchor === null || anchor === undefined) return;
-    const view = EditorView.findFromDOM(anchor);
-    if (view === null) return;
-    const edit = beginTaskFieldEdit(view, detail);
-    openTaskFieldEditor({
-      anchor,
-      kind: detail.kind,
-      value: detail.value,
-      onCommit: (next) => {
-        const span = edit.current();
-        edit.end();
-        if (span !== null) applyTaskFieldEdit(view, span, next);
-      },
-      onCancel: () => edit.end(),
-    });
-  };
-  window.addEventListener(TASK_CHIP_EVENT, onOpenChip);
-  return () => window.removeEventListener(TASK_CHIP_EVENT, onOpenChip);
+  return installTaskChipEditor();
 }
 
 function mount(doc = DOC): { view: EditorView; host: HTMLElement } {
