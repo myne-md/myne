@@ -73,7 +73,18 @@ pub fn list_devices(
         200 => {
             let wire: DevicesResp =
                 serde_json::from_slice(&resp.body).map_err(|_| DeviceMgmtError::BadResponse)?;
-            Ok(wire.devices)
+            let mut devices = wire.devices;
+            // Defensive deterministic order (MYND-588). The server SHOULD return a
+            // stable order, but a client talks to arbitrary — possibly older —
+            // self-hosted servers (TB5) and cannot assume it was fixed: an unsorted
+            // server hands back a freshly shuffled roster on every poll, so the list
+            // teleports under the cursor (a wrong-device-removal hazard on the
+            // per-row Remove button). Sort by the immutable `device_id_hex`, never a
+            // name or last-activity (those would jump rows on rename/sync — the same
+            // bug in a subtler form). `is_current` is stamped by the caller and does
+            // not reorder.
+            devices.sort_by(|a, b| a.device_id_hex.cmp(&b.device_id_hex));
+            Ok(devices)
         }
         401 => Err(DeviceMgmtError::Unauthenticated),
         _ => Err(DeviceMgmtError::BadResponse),
@@ -170,6 +181,39 @@ mod tests {
         assert!(!devices[1].approved);
         // The request carried the bearer token.
         assert_eq!(t.requests()[0].3.as_deref(), Some("tok"));
+    }
+
+    #[test]
+    fn list_devices_sorts_by_device_id_hex() {
+        // MYND-588: the server may return the roster in any order (a Go map's
+        // iteration is randomised). The client sorts defensively so an older /
+        // unfixed server cannot reshuffle rows under the cursor. Feed a scrambled
+        // wire order and assert it comes back sorted by device_id_hex.
+        let t = FakeTransport::new();
+        t.on(
+            HttpMethod::Get,
+            "/auth/devices",
+            200,
+            b"{\"devices\":[\
+                {\"device_id_hex\":\"03030303030303030303030303030303\",\"approved\":true,\"retired\":false},\
+                {\"device_id_hex\":\"01010101010101010101010101010101\",\"approved\":true,\"retired\":false},\
+                {\"device_id_hex\":\"02020202020202020202020202020202\",\"approved\":false,\"retired\":false}\
+            ]}"
+            .to_vec(),
+        );
+        let order: Vec<String> = list_devices(&t, "tok")
+            .unwrap()
+            .into_iter()
+            .map(|d| d.device_id_hex)
+            .collect();
+        assert_eq!(
+            order,
+            vec![
+                "01010101010101010101010101010101",
+                "02020202020202020202020202020202",
+                "03030303030303030303030303030303",
+            ]
+        );
     }
 
     #[test]
