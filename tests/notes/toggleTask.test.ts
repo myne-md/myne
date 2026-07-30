@@ -56,8 +56,18 @@ describe("flipMarker", () => {
     expect(flipMarker("- [x] done thing", false)).toBe("- [ ] done thing");
   });
 
-  it("normalizes an uppercase marker on the way through", () => {
+  it("un-ticks an uppercase marker", () => {
     expect(flipMarker("- [X] shouty", false)).toBe("- [ ] shouty");
+  });
+
+  it("leaves a line already in the requested state byte-identical", () => {
+    // The comparison is on the marker's MEANING, not on the rendered string, so
+    // re-asserting "completed" on an imported `[X]` must not rewrite it to
+    // `[x]` — that would be a §6 C1 normalization this layer does not perform,
+    // and `TaskRecord`'s doc promises the uppercase marker survives untouched.
+    expect(flipMarker("- [X] shouty", true)).toBe("- [X] shouty");
+    expect(flipMarker("- [x] done thing", true)).toBe("- [x] done thing");
+    expect(flipMarker("- [ ] open thing", false)).toBe("- [ ] open thing");
   });
 
   it("preserves indentation and the list bullet", () => {

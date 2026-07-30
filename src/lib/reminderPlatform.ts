@@ -50,8 +50,25 @@ export function detectReminderPlatform(): ReminderPlatform {
  * a delivery guarantee for a platform we could not identify would be exactly the
  * promise this module exists to avoid making.
  */
-export function reminderTier(platform: ReminderPlatform = detectReminderPlatform()): ReminderTier {
-  return platform === "macos" || platform === "windows" ? "pre-registered" : "in-app-only";
+export function reminderTier(_platform: ReminderPlatform = detectReminderPlatform()): ReminderTier {
+  // EVERY platform reports `in-app-only`, and that is a statement about what
+  // this build can deliver rather than about what macOS and Windows can do.
+  //
+  // The `pre-registered` tier needs an OS-registration adapter, and there is
+  // none: writing one is gated behind the delivery measurement in
+  // `features/task-notifications-desktop/tasks.md` — whether a Developer-ID-
+  // signed, non-App-Store bundle actually fires a scheduled local notification
+  // while not running — which is marked 🔴 with a live `[NEEDS DECISION]` and
+  // has never been run for our artifacts.
+  //
+  // Reporting `pre-registered` here would put "arrives even when Myne is
+  // closed" in the settings copy on the strength of an assumption. The whole
+  // point of this module is to not do that: "a platform that holds no
+  // registration leaks nothing", and a client that promises no delivery it
+  // cannot perform is the same discipline pointed at the user instead of the
+  // adversary. When the adapter lands, this returns `pre-registered` for the
+  // platforms it covers and the copy follows automatically.
+  return "in-app-only";
 }
 
 /** Whether the settings panel must show the in-app-only limitation sentence. */

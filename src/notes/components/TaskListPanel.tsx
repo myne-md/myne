@@ -30,6 +30,7 @@ import {
   type TaskFilter,
 } from "../taskFilters";
 import { filterTasksByScope, isScopeEmpty, type TaskScope } from "../taskScope";
+import { taskRowKey } from "../taskWriteCore";
 import type { VaultTask } from "../taskIndex";
 
 export type TaskListPanelProps = {
@@ -55,15 +56,10 @@ export type TaskListPanelProps = {
 
 const NO_TAGS: readonly string[] = [];
 
-/** A row's stable key. `(noteId, lineIndex)` is unique; a note-task has no line. */
-function rowKey(task: VaultTask): string {
-  return `${task.noteId}:${task.lineIndex ?? "note"}`;
-}
-
 /** Project an index record into what a row needs. */
 function toRowData(task: VaultTask): TaskRowData {
   return {
-    key: rowKey(task),
+    key: taskRowKey(task),
     // A note-task has no line; its title is the task.
     text: task.lineIndex === null ? (task.noteTitle ?? "") : taskDescription(task.rawLine),
     completed: task.completed,
@@ -199,7 +195,7 @@ export function TaskListPanel({
         ) : (
           visible.map((task) => (
             <TaskRow
-              key={rowKey(task)}
+              key={taskRowKey(task)}
               task={toRowData(task)}
               scope={rowScope}
               {...(twoLine === undefined ? {} : { twoLine })}

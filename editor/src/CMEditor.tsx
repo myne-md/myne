@@ -26,6 +26,13 @@ import { reconfigureLineNumbers } from "./line-numbers";
 import { reconfigureVim } from "./vim";
 import { reconfigureViewMode, type ViewMode } from "./view-mode";
 import { resolveAnchorRange, type WikilinkAnchor } from "./wikilink/anchor";
+import {
+  setTaskQueryResults,
+  TASK_QUERY_OPEN_EVENT,
+  TASK_QUERY_TOGGLE_EVENT,
+  type TaskQueryRender,
+  type TaskQueryRowEventDetail,
+} from "./decorations/task-query-block";
 import type { ResolverNote } from "@myne/editor/host/notes/resolveWikilink";
 
 /** A deep-link scroll request (MYND-305, SYNC-5): a generic anchor to scroll to
@@ -90,6 +97,26 @@ export type CMEditorProps = {
    *  (re-mount-free) like `vaultHeadings`. Optional — when absent, `[[^^` finds
    *  nothing. */
   vaultBlockAnchors?: readonly VaultBlockAnchor[];
+  /** MYND-617: results for the task-query blocks in THIS document, keyed by the
+   *  block's query text. Pushed into the editor's task-query results field
+   *  (re-mount-free) like `vaultBlockAnchors`.
+   *
+   *  The host computes these because the query semantics are the host's: reading
+   *  a `due::` value is the dialect's §3.6.4 type authority, and the vault-wide
+   *  task list is a host IPC surface. This package supplies the block list
+   *  (`taskQueryBlocks`) and renders what it is handed, and nothing more.
+   *
+   *  Optional, and its absence is NOT an empty result — a block with no entry
+   *  renders as LOADING, because an empty list would be a wrong answer presented
+   *  as a finished one. */
+  taskQueryResults?: ReadonlyMap<string, TaskQueryRender>;
+  /** MYND-617: a task-query row's checkbox was activated. The widget emits a
+   *  bubbling `myne-task-query-toggle`; this relays it. The host performs the
+   *  write — this package never writes bytes. */
+  onTaskQueryToggle?: (detail: TaskQueryRowEventDetail) => void;
+  /** MYND-617: a task-query row's source note was activated. Relayed from
+   *  `myne-task-query-open` so the workspace can open that note. */
+  onTaskQueryOpen?: (detail: TaskQueryRowEventDetail) => void;
   /** Called when a resolved wikilink chip is clicked (the workspace opens the
    *  target note). The chip emits a `myne-open-wikilink` event; this relays it.
    *  MYND-305: `anchor` carries the GENERIC `#heading` / `^block-id` deep-link
@@ -151,13 +178,15 @@ export type CMEditorProps = {
 };
 
 export function CMEditor(props: CMEditorProps) {
-  const { value, onChange, onBlur, onSelectionChange, extensions, noteSet, vaultHeadings, vaultBlockAnchors, onOpenWikilink, scrollAnchor = null, lineNumbers = false, vimMode = false, viewMode = "live", readOnly = false, aiEnabled = false, selectionToolbar = true, style, onReady, onSwapReady } = props;
+  const { value, onChange, onBlur, onSelectionChange, extensions, noteSet, vaultHeadings, vaultBlockAnchors, taskQueryResults, onTaskQueryToggle, onTaskQueryOpen, onOpenWikilink, scrollAnchor = null, lineNumbers = false, vimMode = false, viewMode = "live", readOnly = false, aiEnabled = false, selectionToolbar = true, style, onReady, onSwapReady } = props;
   const hostRef = useRef<HTMLDivElement | null>(null);
   const viewRef = useRef<EditorView | null>(null);
   const onChangeRef = useRef(onChange);
   const onBlurRef = useRef(onBlur);
   const onSelectionChangeRef = useRef(onSelectionChange);
   const onOpenWikilinkRef = useRef(onOpenWikilink);
+  const onTaskQueryToggleRef = useRef(onTaskQueryToggle);
+  const onTaskQueryOpenRef = useRef(onTaskQueryOpen);
   const onReadyRef = useRef(onReady);
   const onSwapReadyRef = useRef(onSwapReady);
   // MYND-534: config refs so `buildState` / `applyState` (called imperatively by
@@ -167,6 +196,7 @@ export function CMEditor(props: CMEditorProps) {
   const noteSetRef = useRef(noteSet);
   const vaultHeadingsRef = useRef(vaultHeadings);
   const vaultBlockAnchorsRef = useRef(vaultBlockAnchors);
+  const taskQueryResultsRef = useRef(taskQueryResults);
   const lineNumbersRef = useRef(lineNumbers);
   const viewModeRef = useRef(viewMode);
   const readOnlyRef = useRef(readOnly);
@@ -181,6 +211,12 @@ export function CMEditor(props: CMEditorProps) {
   useEffect(() => {
     onOpenWikilinkRef.current = onOpenWikilink;
   }, [onOpenWikilink]);
+  useEffect(() => {
+    onTaskQueryToggleRef.current = onTaskQueryToggle;
+  }, [onTaskQueryToggle]);
+  useEffect(() => {
+    onTaskQueryOpenRef.current = onTaskQueryOpen;
+  }, [onTaskQueryOpen]);
   useEffect(() => {
     onReadyRef.current = onReady;
   }, [onReady]);
@@ -256,6 +292,13 @@ export function CMEditor(props: CMEditorProps) {
       }
       if (vaultBlockAnchorsRef.current !== undefined) {
         v.dispatch({ effects: reconfigureVaultBlockAnchors(vaultBlockAnchorsRef.current) });
+      }
+      // MYND-617: the task-query results live in a StateField, and `setState`
+      // resets it to the empty map its `create` seeds. Without this line every
+      // query block in a note reopened from the swap cache falls back to its
+      // LOADING state until the host's next recompute.
+      if (taskQueryResultsRef.current !== undefined) {
+        v.dispatch({ effects: setTaskQueryResults.of(taskQueryResultsRef.current) });
       }
       // MYND-534 × MYND-313: the vim layer is a compartment too, and it is seeded
       // OFF (`vimExtension()` → `vimCompartment.of([])`), so a `setState` swap
@@ -351,6 +394,17 @@ export function CMEditor(props: CMEditorProps) {
     if (view === null || vaultBlockAnchors === undefined) return;
     view.dispatch({ effects: reconfigureVaultBlockAnchors(vaultBlockAnchors) });
   }, [vaultBlockAnchors]);
+
+  // MYND-617: push the host-computed task-query results into the view's results
+  // field (same re-mount-free pattern as the sets above) so every `tasks` block
+  // in the open note renders its list. The host recomputes on doc + index change;
+  // this only carries the answer across.
+  useEffect(() => {
+    taskQueryResultsRef.current = taskQueryResults;
+    const view = viewRef.current;
+    if (view === null || taskQueryResults === undefined) return;
+    view.dispatch({ effects: setTaskQueryResults.of(taskQueryResults) });
+  }, [taskQueryResults]);
 
   // editor-line-numbers (MYND-314): push the line-number gutter toggle into the
   // view's line-number compartment whenever the `editor_line_numbers` pref
@@ -450,6 +504,28 @@ export function CMEditor(props: CMEditorProps) {
     };
     host.addEventListener("myne-open-wikilink", handler);
     return () => host.removeEventListener("myne-open-wikilink", handler);
+  }, []);
+
+  // MYND-617: relay the task-query row events (dispatched on the editor DOM by
+  // the query-block extension) to the host callbacks. Same shape as the wikilink
+  // relay above: the widget owns the DOM, the host owns the write.
+  useEffect(() => {
+    const host = hostRef.current;
+    if (host === null) return;
+    const onToggle = (e: Event): void => {
+      const detail = (e as CustomEvent<TaskQueryRowEventDetail>).detail;
+      if (detail?.rowKey) onTaskQueryToggleRef.current?.(detail);
+    };
+    const onOpen = (e: Event): void => {
+      const detail = (e as CustomEvent<TaskQueryRowEventDetail>).detail;
+      if (detail?.rowKey) onTaskQueryOpenRef.current?.(detail);
+    };
+    host.addEventListener(TASK_QUERY_TOGGLE_EVENT, onToggle);
+    host.addEventListener(TASK_QUERY_OPEN_EVENT, onOpen);
+    return () => {
+      host.removeEventListener(TASK_QUERY_TOGGLE_EVENT, onToggle);
+      host.removeEventListener(TASK_QUERY_OPEN_EVENT, onOpen);
+    };
   }, []);
 
   return (

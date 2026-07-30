@@ -43,6 +43,10 @@ import { saveNote } from "./saveNote";
 import {
   announceWrite,
   writeTaskCompletion,
+  // Imported as a VALUE (the re-export block below is types-and-names only, and
+  // `instanceof` needs the binding) under an alias, so the re-export keeps the
+  // public name.
+  TaskWriteRefused as TaskWriteRefusedClass,
   type TaskWriteDeps,
 } from "./taskWriteCore";
 import type { VaultTask } from "./taskIndex";
@@ -88,4 +92,28 @@ export async function setTaskCompleted(
 /** Convenience: flip whatever state the record currently reports. */
 export async function toggleTask(task: VaultTask, deps?: TaskWriteDeps): Promise<void> {
   await setTaskCompleted(task, !task.completed, deps);
+}
+
+/**
+ * Flip a task, swallowing a refusal into a warning.
+ *
+ * A refusal is not an error the user caused and it is not a crash — it is the
+ * writer declining to write something it cannot verify. Surfaces that want to
+ * explain one to the user pass their own handler to {@link setTaskCompleted}
+ * instead; the two that don't (the task panes and the query block) share this,
+ * so "what a refused toggle does" has one answer rather than one per surface.
+ */
+export async function toggleTaskSwallowingRefusal(
+  task: VaultTask,
+  flushDirtyPanes: () => Promise<void>,
+): Promise<void> {
+  try {
+    await setTaskCompleted(task, !task.completed, { flushDirtyPanes });
+  } catch (err) {
+    if (err instanceof TaskWriteRefusedClass) {
+      console.warn(`[tasks] write refused: ${err.reason}`);
+      return;
+    }
+    throw err;
+  }
 }
