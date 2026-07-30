@@ -438,6 +438,15 @@ const PLUGIN_DEFAULT: &[(&str, Class)] = &[
     // the browser download flow (`web/src/platform/download.ts`), because their
     // obstacle was the destination and a download answers that.
     ("pdf-export", Class::Unsupported),
+    // MYND-490 (cli-thin-client task 12): the `myne` terminal client's door.
+    // The one command here reports the door's session state — how long ago the
+    // command socket last served a request, and whether the `myne` binary is on
+    // the user's `$PATH`. Both questions presuppose a machine: a local Unix
+    // socket the desktop process binds, and a sidecar shipped inside the desktop
+    // bundle. `Unsupported` rather than `Pending` because there is nothing to
+    // port — the capability backing it (`cliAccess`) is absent by platform fact,
+    // and the Settings block is omitted rather than greyed.
+    ("cli-bridge", Class::Unsupported),
 ];
 
 /// Per-command overrides of [`PLUGIN_DEFAULT`]. Four entries, each one a place

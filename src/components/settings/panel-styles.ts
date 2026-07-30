@@ -34,3 +34,28 @@ export const HELPER_STYLE: CSSProperties = {
   color: "var(--fg-3)",
   margin: 0,
 };
+
+/** Label on the left, control (usually a `Switch`) on the right. */
+export const TOGGLE_ROW_STYLE: CSSProperties = {
+  display: "flex",
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: "var(--space-3)",
+};
+
+/** One folder per line, mono — the excluded-folders editor shape shared by
+ *  the AI panel and the CLI terminal-access block. */
+export const FOLDER_TEXTAREA_STYLE: CSSProperties = {
+  marginTop: "var(--space-1)",
+  width: "100%",
+  resize: "vertical",
+  font: "inherit",
+  fontSize: 13,
+  fontFamily: "var(--font-mono)",
+  color: "var(--fg-1)",
+  background: "var(--paper-2)",
+  border: "1px solid var(--line-1)",
+  borderRadius: "var(--radius-1)",
+  padding: "var(--space-2)",
+};

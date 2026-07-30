@@ -170,35 +170,12 @@ pub fn serve_connection<R: Read, W: Write>(
     }
 }
 
-/// Bind a Unix domain socket listener at `path` with owner-only (0600) perms.
-///
-/// Removes a stale socket file at `path` first (a leftover from a previous
-/// unclean exit), binds, and sets `0600` BEFORE returning the listener so the
-/// channel is owner-only from the first accept. Unix-only; the Windows arm is a
-/// documented seam (named pipe + owner-only DACL) the dev/CI target does not
-/// exercise.
+/// The owner-only (0600), TOCTOU-closed UDS bind. It lives in `crate::uds`
+/// because the CLI door binds its own socket with exactly this discipline
+/// (`cli_bridge::socket`) — re-exported here so this module's own callers,
+/// tests and doc links keep reaching it under the name they always used.
 #[cfg(unix)]
-pub fn bind_listener(path: &Path) -> std::io::Result<std::os::unix::net::UnixListener> {
-    use std::os::unix::fs::PermissionsExt;
-    // Bind at a sibling TEMP path, lock it to 0600, then atomically rename it
-    // into place. `UnixListener::bind` creates the socket node with umask-default
-    // perms, so a bind-at-`path`-then-chmod sequence leaves a window where a
-    // same-host peer could connect before the chmod lands (the bind→chmod
-    // TOCTOU). Binding at a temp name closes it deterministically: a client
-    // connects via `path`, which only ever appears already at 0600 — the rename
-    // preserves the inode's perms, and the bound listener fd keeps serving across
-    // the rename (the pathname is just the rendezvous address).
-    let tmp = path.with_extension("sock.tmp");
-    let _ = std::fs::remove_file(&tmp);
-    // A stale socket / non-socket anomaly at the final path (previous unclean
-    // exit) — remove it so the rename can replace it (the app owns its
-    // app_data_dir).
-    let _ = std::fs::remove_file(path);
-    let listener = std::os::unix::net::UnixListener::bind(&tmp)?;
-    std::fs::set_permissions(&tmp, std::fs::Permissions::from_mode(0o600))?;
-    std::fs::rename(&tmp, path)?;
-    Ok(listener)
-}
+pub use crate::uds::bind_listener;
 
 /// The host-side relay: forward each ext→host frame from `host_reader`
 /// (extension stdin) to the app over `app_writer` (the socket), and relay each

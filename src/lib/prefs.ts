@@ -440,6 +440,41 @@ export interface PrefsView {
    */
   archive_disabled: boolean | null;
   /**
+   * CLI terminal-access door toggle (myne-cli epic, MYND-490). `false` ≡ the
+   * door is closed (the default) — the local socket the `myne` CLI dials is
+   * never created regardless of unlock state. Serialized from Rust `bool`;
+   * omitted from the encrypted blob when `false` (byte-identical to a
+   * pre-feature vault), same discipline as {@link PrefsView.ai_enabled}.
+   * **Device-local** (`sync-protocol.md` §10.2): the CLI door is a per-machine
+   * decision, so this value never travels in a merge. Rationale:
+   * `docs/decisions.md` "CLI terminal access is a default-off, unlock-gated
+   * local socket with a folder exclusion list (MYND-490)" and
+   * `docs/threat-model.md` §7. Non-load-bearing.
+   */
+  cli_enabled: boolean;
+  /**
+   * Folders excluded from the CLI's reach (myne-cli epic, MYND-490) —
+   * canonical trailing-slash form. Same encoding as `deliberate_folders` /
+   * `ai_excluded_folders` (NFC-normalized, sorted, deduped set). Absent →
+   * defaulted to `[]`. **Shared(SetUnion)**: an exclusion added on one device
+   * must never be lost in a merge with a device that lacks it. Enforcement of
+   * the exclusion (filtering CLI reads/writes) is a separate concern from this
+   * codec field. Non-load-bearing.
+   */
+  cli_excluded_folders: string[];
+  /**
+   * CLI socket rate-limit opt-out (myne-cli epic, MYND-490). `null` ≡ unset →
+   * the default-ON rate limit applies (a runaway or hostile script cannot
+   * drain the vault at full speed). `true` ≡ the user explicitly disabled the
+   * limit in Settings. `false` is a legal value (re-enabling after disabling)
+   * but the UI is not expected to produce it — omitting the field again has
+   * the identical effect. Serialized from Rust `Option<bool>`; omitted from
+   * the encrypted blob when `null`, same shape as
+   * {@link PrefsView.archive_disabled}. **Device-local**
+   * (`sync-protocol.md` §10.2): a machine-local performance knob. Non-load-bearing.
+   */
+  cli_rate_limit_disabled: boolean | null;
+  /**
    * User theme preference (MYND-110). `null` ≡ **system** (follow the OS
    * `prefers-color-scheme`) — the canonical encoding of "no explicit choice",
    * omitted from the encrypted blob. `"light"` / `"dark"` are explicit
@@ -660,6 +695,28 @@ export async function setDeveloperMode(enabled: boolean): Promise<void> {
  */
 export async function setAiExcludedFolders(folders: string[]): Promise<void> {
   await invoke<void>("plugin:prefs|set_ai_excluded_folders", { folders });
+}
+
+/**
+ * Persist the `cli_enabled` CLI terminal-access door toggle (myne-cli epic,
+ * MYND-490). Per-vault + encrypted; a rejected promise means the disk write
+ * failed and the caller's optimistic UI must revert. Same pattern as
+ * {@link setAiEnabled}.
+ */
+export async function setCliEnabled(enabled: boolean): Promise<void> {
+  await invoke<void>("plugin:prefs|set_cli_enabled", { enabled });
+}
+
+/**
+ * Persist the full `cli_excluded_folders` set — folders the CLI door never
+ * reaches (myne-cli epic, MYND-490). Same canonical set encoding as
+ * `deliberate_folders` / `ai_excluded_folders` (the Rust codec NFC-sorts +
+ * exact-dedups). The caller passes the entire desired set; a rejected promise
+ * means the disk write failed and the caller's optimistic UI must revert.
+ * Same pattern as {@link setAiExcludedFolders}.
+ */
+export async function setCliExcludedFolders(folders: string[]): Promise<void> {
+  await invoke<void>("plugin:prefs|set_cli_excluded_folders", { folders });
 }
 
 /**
@@ -1216,6 +1273,18 @@ export async function setEditorVimMode(value: boolean): Promise<void> {
  */
 export async function setArchiveDisabled(value: boolean): Promise<void> {
   await invoke<void>("plugin:prefs|set_archive_disabled", { enabled: value });
+  bumpPrefsNonce();
+}
+
+/**
+ * Persist the `cli_rate_limit_disabled` toggle — removes the default-on CLI
+ * socket rate limit (myne-cli epic, MYND-490). Always writes an explicit
+ * `Some(disabled)` on the Rust side (the `archive_disabled` precedent); a
+ * rejected promise means the disk write failed and the caller's optimistic UI
+ * must revert. Same pattern as {@link setArchiveDisabled}.
+ */
+export async function setCliRateLimitDisabled(disabled: boolean): Promise<void> {
+  await invoke<void>("plugin:prefs|set_cli_rate_limit_disabled", { disabled });
   bumpPrefsNonce();
 }
 

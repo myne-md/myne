@@ -1,0 +1,28 @@
+# Permissions for the in-app `cli-bridge` Tauri plugin (cli-thin-client task
+# 12, MYND-490). Picked up under the `cli-bridge:` ACL namespace only because
+# `build.rs` declares this as an `InlinedPlugin`. Capability files reference
+# these as `cli-bridge:default` (or the individual `cli-bridge:allow-*`).
+#
+# One read-only command, and everything about the CLI door that CAN be a
+# preference already is one (`prefs:allow-set-cli-enabled`,
+# `allow-set-cli-excluded-folders`, `allow-set-cli-rate-limit-disabled`). This
+# namespace exists for the two facts that cannot: a RAM-only last-access age
+# and whether `myne` is typeable on this machine.
+#
+# Nothing here mutates state, so unlike the write-capable plugins there is no
+# v0.2 multi-window carve-out to state: a second window reading the same age is
+# harmless. The door itself is gated by the command socket's existence
+# (`cli_bridge::gate`), never by this ACL.
+
+"$schema" = "../../gen/schemas/desktop-schema.json"
+
+[default]
+description = "Default permission set for the cli-bridge plugin — read the CLI door's session state (last-access age + whether the `myne` command is on PATH)."
+permissions = [
+  "allow-cli-access-state",
+]
+
+[[permission]]
+identifier = "allow-cli-access-state"
+description = "Allow invoking cli-bridge:cli_access_state (read-only: how many whole seconds ago the CLI command socket last served a request — RAM only, never persisted, cleared when the vault locks — plus whether `myne` currently resolves on the user's PATH and the directory the PATH shim is installed into, so Settings can show the one line the user adds themselves. Takes no arguments, touches no vault state, writes nothing, and returns no note id, folder name or note content)."
+commands.allow = ["cli_access_state"]

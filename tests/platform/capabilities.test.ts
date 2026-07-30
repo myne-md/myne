@@ -110,6 +110,12 @@ describe("capability descriptor", () => {
       // filename. `MYE1` is device-local and never synced, so a browser cannot
       // inherit a desktop's extractions either.
       "attachmentTextSearch",
+      // MYND-490. The only entry in this list that is absent by PLATFORM FACT
+      // rather than by decision or bundle budget: the door is a local socket a
+      // shell command connects to, and the command is a binary inside the
+      // desktop bundle. There is no browser-shaped version of either, so there
+      // is nothing a later port could deliver.
+      "cliAccess",
     ];
     const actualAbsent = desktop.ALL_CAPABILITIES.filter((c) => !web.has(c));
     expect([...actualAbsent].sort()).toEqual([...expectedAbsent].sort());

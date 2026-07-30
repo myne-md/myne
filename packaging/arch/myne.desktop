@@ -2,7 +2,7 @@
 Name=Myne
 GenericName=Notes
 Comment=A calm place for your notes
-Exec=myne
+Exec=myne-desktop
 Icon=md.myne.desktop
 Terminal=false
 Type=Application

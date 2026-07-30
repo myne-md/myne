@@ -27,6 +27,9 @@ import {
   setAiEnabled as persistAiEnabled,
   setAiExcludedFolders as persistAiExcludedFolders,
   setAutoLockTimeout,
+  setCliEnabled as persistCliEnabled,
+  setCliExcludedFolders as persistCliExcludedFolders,
+  setCliRateLimitDisabled as persistCliRateLimitDisabled,
   setDeveloperMode as persistDeveloperMode,
   setEditorContentWidth,
   setEditorFontFamily,
@@ -82,6 +85,13 @@ const DEFAULT_PREFS: PrefsView = {
   editor_line_numbers: null,
   editor_vim_mode: null,
   archive_disabled: null,
+  // myne-cli epic (MYND-490). Matches the Rust defaults: door closed, no
+  // exclusions, rate-limit toggle unset (default-ON limit applies). Task 12
+  // wires up UI-facing setters for these; this task only extends the type +
+  // default so the fields are readable from the UI.
+  cli_enabled: false,
+  cli_excluded_folders: [],
+  cli_rate_limit_disabled: null,
   theme: null,
   folder_icons: {},
   device_names: {},
@@ -125,6 +135,19 @@ interface UsePrefsResult {
   setAiExcludedFolders: (folders: string[]) => Promise<void>;
   /** Flip the Developer mode toggle (optimistic; same converge-on-error pattern). */
   setDeveloperMode: (enabled: boolean) => Promise<void>;
+  /**
+   * Open or close the CLI terminal-access door (myne-cli epic, MYND-490).
+   * Optimistic; same converge-on-error pattern. The socket itself follows
+   * within one supervisor tick — this only writes the preference.
+   */
+  setCliEnabled: (enabled: boolean) => Promise<void>;
+  /** Replace the CLI excluded-folders set (optimistic; same pattern). */
+  setCliExcludedFolders: (folders: string[]) => Promise<void>;
+  /**
+   * Remove (or restore) the default-on CLI command rate limit. A pace bound on
+   * a runaway script, NOT a permission check — see `cli_bridge::rate_limit`.
+   */
+  setCliRateLimitDisabled: (disabled: boolean) => Promise<void>;
   /**
    * Set the auto-lock-on-idle timeout (seconds). Optimistic: cache updates
    * immediately. On IPC rejection, the cache is re-read from disk
@@ -317,6 +340,55 @@ export function usePrefs(onError?: (message: string) => void): UsePrefsResult {
     [onError],
   );
 
+  /**
+   * Shared optimistic-then-reread-on-error core: patch the cache immediately
+   * (so an open surface re-renders live), persist, and on failure re-read disk
+   * truth — the same convergence discipline the setters above spell out by
+   * hand. Every setter written from here on composes this instead of copying
+   * the block again.
+   */
+  const writePref = useCallback(
+    async (patch: Partial<PrefsView>, persist: () => Promise<void>) => {
+      setPrefs((p) => ({ ...p, ...patch }));
+      try {
+        await persist();
+      } catch {
+        try {
+          setPrefs(await prefsRead());
+        } catch {
+          // Re-read also failed — keep the optimistic value; backend tracing
+          // logged the original failure. User can retry.
+        }
+        onError?.(i18n.t("settings.prefs.saveError"));
+      }
+    },
+    [onError],
+  );
+
+  // CLI terminal-access door (myne-cli epic, MYND-490; cli-thin-client task
+  // 12). Three fields, the same optimistic-then-converge discipline as the AI
+  // pair above — the door's own lifecycle supervisor re-reads `vault.prefs`
+  // every tick, so a failed write that converges back to disk truth also
+  // converges the socket.
+  const setCliEnabledPref = useCallback(
+    (enabled: boolean) => writePref({ cli_enabled: enabled }, () => persistCliEnabled(enabled)),
+    [writePref],
+  );
+
+  const setCliExcludedFoldersPref = useCallback(
+    (folders: string[]) =>
+      writePref({ cli_excluded_folders: folders }, () => persistCliExcludedFolders(folders)),
+    [writePref],
+  );
+
+  const setCliRateLimitDisabledPref = useCallback(
+    (disabled: boolean) =>
+      writePref({ cli_rate_limit_disabled: disabled }, () =>
+        persistCliRateLimitDisabled(disabled),
+      ),
+    [writePref],
+  );
+
   const setAutoLock = useCallback(
     async (seconds: number) => {
       // Optimistic via functional update (no captured-previous staleness).
@@ -443,48 +515,25 @@ export function usePrefs(onError?: (message: string) => void): UsePrefsResult {
     [onError],
   );
 
-  // Shared optimistic-then-reread-on-error core for the editor-typography
-  // setters: patch the cache immediately (so the open editor re-renders live),
-  // persist, and on failure re-read disk truth — same convergence discipline as
-  // the spelled-out setters above, factored out for the four near-identical
-  // typography fields.
-  const writeTypographyPref = useCallback(
-    async (patch: Partial<PrefsView>, persist: () => Promise<void>) => {
-      setPrefs((p) => ({ ...p, ...patch }));
-      try {
-        await persist();
-      } catch {
-        try {
-          setPrefs(await prefsRead());
-        } catch {
-          // Re-read also failed — keep the optimistic value; backend tracing
-          // logged the original failure. User can retry.
-        }
-        onError?.(i18n.t("settings.prefs.saveError"));
-      }
-    },
-    [onError],
-  );
-
+  // The four editor-typography setters, over the shared `writePref` core.
   const setEditorTextSizePref = useCallback(
-    (value: string | null) =>
-      writeTypographyPref({ editor_text_size: value }, () => setEditorTextSize(value)),
-    [writeTypographyPref],
+    (value: string | null) => writePref({ editor_text_size: value }, () => setEditorTextSize(value)),
+    [writePref],
   );
   const setEditorLineSpacingPref = useCallback(
     (value: string | null) =>
-      writeTypographyPref({ editor_line_spacing: value }, () => setEditorLineSpacing(value)),
-    [writeTypographyPref],
+      writePref({ editor_line_spacing: value }, () => setEditorLineSpacing(value)),
+    [writePref],
   );
   const setEditorContentWidthPref = useCallback(
     (value: string | null) =>
-      writeTypographyPref({ editor_content_width: value }, () => setEditorContentWidth(value)),
-    [writeTypographyPref],
+      writePref({ editor_content_width: value }, () => setEditorContentWidth(value)),
+    [writePref],
   );
   const setEditorFontFamilyPref = useCallback(
     (value: string | null) =>
-      writeTypographyPref({ editor_font_family: value }, () => setEditorFontFamily(value)),
-    [writeTypographyPref],
+      writePref({ editor_font_family: value }, () => setEditorFontFamily(value)),
+    [writePref],
   );
 
   const setKeymapBindingPref = useCallback(
@@ -539,6 +588,9 @@ export function usePrefs(onError?: (message: string) => void): UsePrefsResult {
     toggleScreenCapture,
     setAiEnabled: setAiEnabledPref,
     setAiExcludedFolders: setAiExcludedFoldersPref,
+    setCliEnabled: setCliEnabledPref,
+    setCliExcludedFolders: setCliExcludedFoldersPref,
+    setCliRateLimitDisabled: setCliRateLimitDisabledPref,
     setDeveloperMode: setDeveloperModePref,
     setAutoLock,
     setHiddenBarItems,
