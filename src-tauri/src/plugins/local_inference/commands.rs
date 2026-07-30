@@ -85,8 +85,10 @@ pub async fn embed(
 /// [`decode_attachment_plaintext`]), decodes WAV → 16 kHz mono
 /// ([`super::audio::wav_to_mono_16k`]), then runs the ASR engine under
 /// `spawn_blocking`, streaming each newly-decoded segment over `on_segment` and
-/// returning the full transcript. Host-side `ai_enabled`-gated (a compromised
-/// WebView is not trusted to stop calling — mirror [`semantic_search`]).
+/// returning the full transcript. Host-side `transcription_enabled`-gated (a
+/// compromised WebView is not trusted to stop calling — same posture as
+/// [`semantic_search`], but a different switch: speech-to-text is a product
+/// feature with a bundled model, not part of the AI beta opt-in (MYND-592)).
 ///
 /// DENY-list logging only: the decrypted WAV, the derived PCM, and the transcript
 /// are `Zeroizing`-wrapped and NEVER written to disk or logged. Cancellation
@@ -98,12 +100,33 @@ pub async fn transcribe<R: Runtime>(
     on_segment: Channel<String>,
     app: AppHandle<R>,
     engine_state: State<'_, LocalInferenceState>,
-    vector_state: State<'_, LocalInferenceVectorState>,
     vault_state: State<'_, VaultRuntimeState>,
     cancel: State<'_, CancelToken>,
 ) -> Result<String, EngineError> {
-    // Host-side `ai_enabled` gate — no engine call and no decrypt when AI is off.
-    if !vector_state.lock().is_enabled() {
+    // Host-side `transcription_enabled` gate — no engine call and no decrypt
+    // when speech-to-text is off. A compromised WebView is not trusted to stop
+    // calling, so this is re-read here rather than taken on the caller's word.
+    //
+    // MYND-592: this used to consult the AI vector store's `is_enabled()`, i.e.
+    // the *embedding / semantic-search* opt-in, which transcription has nothing
+    // to do with — it was simply hanging off the nearest available flag, so
+    // turning off the AI beta silently killed speech-to-text.
+    //
+    // The persisted preference is the single source of truth, deliberately: a
+    // resident copy would need a lifecycle hook to stay in step and could drift
+    // from disk. One small AEAD-decrypt per transcription is free next to
+    // running an ML model over an audio file. A prefs blob that cannot be read
+    // decodes to defaults (spec § 9.5.5), and this field defaults ON — the same
+    // fail-open posture the feature has by design; a locked slot still fails
+    // closed, because `prefs_read_from_host` refuses without one.
+    let prefs = crate::plugins::prefs::commands::prefs_read_from_host(
+        &myne_core::host::tauri_host::TauriHost::new(app.clone()),
+        vault_state.inner(),
+        &myne_core::vault_io::StdVaultIo,
+    )
+    .await
+    .map_err(|_| EngineError::NotReady)?;
+    if !prefs.transcription_enabled {
         return Err(EngineError::NotReady);
     }
     // Fresh cancel window (a prior Stop must not abort this run).

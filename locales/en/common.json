@@ -2154,6 +2154,11 @@
       "on": "On",
       "saveError": "Could not update the archiving setting."
     },
+    "transcription": {
+      "label": "Speech-to-text",
+      "helper": "Turn an audio attachment into text, on this device. The model ships with Myne and nothing is sent anywhere. Turning this off hides the Transcribe action everywhere and stops the app from transcribing at all.",
+      "errorSaveSetting": "Couldn't save that setting."
+    },
     "attachmentOcr": {
       "label": "Search inside images and scanned documents",
       "helper": "Reads text out of image attachments and scanned PDFs on this device, so search can find them by their contents. Nothing is uploaded. Turning this off stops the background extraction; text already extracted is kept.",
@@ -2516,6 +2521,7 @@
         "appearance": "Appearance",
         "editor": "Editor",
         "files": "Files",
+        "transcription": "Transcription",
         "hotkeys": "Hotkeys",
         "privacy": "Privacy",
         "storage": "Storage",
@@ -2667,7 +2673,8 @@
         "spell": "spell check spelling dictionary autocorrect",
         "spellLanguages": "spell languages dictionaries locale words",
         "startupOpen": "startup open default file launch boot which note",
-        "attachmentOcr": "ocr image scan scanned pdf photo screenshot text recognition search inside attachments cpu battery",
+        "transcription": "transcribe transcription speech voice audio dictation subtitle whisper recording sound to text",
+          "attachmentOcr": "ocr image scan scanned pdf photo screenshot text recognition search inside attachments cpu battery",
         "syncAddDevice": "add device pair link phone laptop sync",
         "syncConflicts": "conflicts merge resolve versions sync",
         "syncDevices": "devices linked paired sync machines",

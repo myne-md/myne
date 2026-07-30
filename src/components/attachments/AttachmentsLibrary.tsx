@@ -240,11 +240,12 @@ export function AttachmentsLibrary({ onClose }: AttachmentsLibraryProps) {
   const { t } = useTranslation();
   const ctx = useSelectedNote();
   // AI opt-in gate for the per-item Transcribe action (voice-to-text MYND-552,
-  // SYNC-V9). Gated on `ai_enabled` ALONE — a library attachment has no single
-  // folder, so the `ai_excluded_folders` gate does NOT apply (transcribing the
-  // media bytes is an explicit per-attachment user action, not ambient reading).
+  // SYNC-V9). Gated on `transcription_enabled` (MYND-592) — its own switch, not
+  // the AI beta opt-in. The `ai_excluded_folders` rule never applied here either:
+  // a library attachment has no single folder, and transcribing the media bytes
+  // is an explicit per-attachment user action rather than ambient reading.
   const { prefs } = usePrefs();
-  const aiEnabled = prefs.ai_enabled;
+  const transcriptionEnabled = prefs.transcription_enabled;
   // Resolve the option labels at render time (reactive to language switch).
   const typeFilterOptions: readonly SelectOption<TypeFilter>[] = useMemo(
     () => TYPE_FILTER_OPTION_KEYS.map((o) => ({ value: o.value, label: t(o.labelKey) })),
@@ -545,7 +546,7 @@ export function AttachmentsLibrary({ onClose }: AttachmentsLibraryProps) {
     onJump: handleJump,
     // Transcribe is an audio-only, `ai_enabled`-gated action (SYNC-V9).
     transcribable: kindOf(entry.content_type) === "audio",
-    aiEnabled,
+    transcriptionEnabled,
     onTranscribe: () => handleTranscribe(entry),
     // Only image/PDF open the shared lightbox preview. Audio plays inline in
     // its own tile (its own play button), and a generic ("other") file has no
@@ -825,7 +826,7 @@ interface ItemActionProps {
   /** Whether this attachment is audio → the ⋮ menu shows Transcribe (MYND-552). */
   transcribable: boolean;
   /** Whether AI is enabled (SYNC-V9 gate for Transcribe — `ai_enabled` alone). */
-  aiEnabled: boolean;
+  transcriptionEnabled: boolean;
   /** Start transcribing this attachment (audio only). */
   onTranscribe: () => void;
   /** Whether THIS row's ⋮ action menu is the one open (single-open). */
@@ -1144,7 +1145,7 @@ function ItemMenu({
   onStartRename,
   onDelete,
   transcribable,
-  aiEnabled,
+  transcriptionEnabled,
   onTranscribe,
 }: {
   open: boolean;
@@ -1156,7 +1157,7 @@ function ItemMenu({
   onStartRename: () => void;
   onDelete: () => void;
   transcribable: boolean;
-  aiEnabled: boolean;
+  transcriptionEnabled: boolean;
   onTranscribe: () => void;
 }) {
   const { t } = useTranslation();
@@ -1171,10 +1172,11 @@ function ItemMenu({
           },
         ]
       : []),
-    // Transcribe — audio only (SYNC-V9), gated on `ai_enabled` ALONE (no
-    // folder-exclusion gate). HIDDEN when local AI is off (MYND-270 product
-    // tweak: no dangling affordance when the subsystem is off), not disabled.
-    ...(transcribable && aiEnabled
+    // Transcribe — audio only (SYNC-V9), gated on `transcription_enabled`
+    // (MYND-592). HIDDEN when the feature is off (MYND-270 product tweak: no
+    // dangling affordance when the subsystem is off), not disabled — the same
+    // affordance policy the in-note widget uses, so the two surfaces agree.
+    ...(transcribable && transcriptionEnabled
       ? [
           {
             id: "transcribe",
@@ -1352,7 +1354,7 @@ function AttachmentTile({
   onJump,
   previewable,
   transcribable,
-  aiEnabled,
+  transcriptionEnabled,
   onTranscribe,
   actionMenuOpen,
   onToggleActionMenu,
@@ -1406,7 +1408,7 @@ function AttachmentTile({
             onStartRename={onStartRename}
             onDelete={onDelete}
             transcribable={transcribable}
-            aiEnabled={aiEnabled}
+            transcriptionEnabled={transcriptionEnabled}
             onTranscribe={onTranscribe}
           />
         </div>
@@ -1469,7 +1471,7 @@ function AttachmentListRow({
   onJump,
   previewable,
   transcribable,
-  aiEnabled,
+  transcriptionEnabled,
   onTranscribe,
   actionMenuOpen,
   onToggleActionMenu,
@@ -1529,7 +1531,7 @@ function AttachmentListRow({
           onStartRename={onStartRename}
           onDelete={onDelete}
           transcribable={transcribable}
-          aiEnabled={aiEnabled}
+          transcriptionEnabled={transcriptionEnabled}
           onTranscribe={onTranscribe}
         />
       </div>

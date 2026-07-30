@@ -330,6 +330,16 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     keywordsKey: "settings.search.keywords.attachmentOcr",
   },
 
+  // ── Transcription ──────────────────────────────────────────────────────────
+  {
+    id: "transcription.enabled",
+    panelId: "transcription",
+    testid: "settings.transcription",
+    titleKey: "settings.transcription.label",
+    descriptionKey: "settings.transcription.helper",
+    keywordsKey: "settings.search.keywords.transcription",
+  },
+
   // ── Hotkeys (the panel has its own in-panel search; one entry routes to it) ──
   {
     id: "hotkeys.shortcuts",

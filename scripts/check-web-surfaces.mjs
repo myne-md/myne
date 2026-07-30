@@ -79,6 +79,10 @@ const V = {
     "Ships; the spell-check rows are filtered from search and the controls are omitted where `spellCheck` is absent.",
   ],
   "src/components/settings/FilesPanel.tsx": ["ported", "Prefs-backed."],
+  "src/components/settings/TranscriptionPanel.tsx": [
+    "ported",
+    "Prefs-backed. The panel renders on web; the transcribe ACTION is desktop-only\n     (the local-inference plugin has no web counterpart), so the switch there governs\n     a preference that syncs to a device which can act on it.",
+  ],
   "src/components/settings/FocusModeSettings.tsx": ["ported", "Prefs-backed."],
   "src/components/settings/HotkeysPanel.tsx": [
     "adapted",
