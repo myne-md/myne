@@ -163,6 +163,7 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
     const DEFAULT_PREFS = {
       screen_capture_protection: false,
       show_note_timestamps: true,
+      attachment_compression_enabled: true,
       spell_enabled: null,
       spell_languages: [],
       keymap: {},
