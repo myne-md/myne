@@ -53,7 +53,7 @@ describe("settings-search keyboard/visual order reconciliation", () => {
     // above a Privacy keyword hit above more Sync hits):
     const interleaved: SettingsIndexEntry[] = [
       { id: "sync.status", panelId: "sync", titleKey: "x" },
-      { id: "privacy.realtime-sync", panelId: "privacy", titleKey: "x" },
+      { id: "privacy.last-active-note", panelId: "privacy", titleKey: "x" },
       { id: "sync.devices", panelId: "sync", titleKey: "x" },
     ];
     // Precondition — this is the shape that made the highlight jump.
@@ -65,7 +65,7 @@ describe("settings-search keyboard/visual order reconciliation", () => {
     expect(ordered.map((e) => e.id)).toEqual([
       "sync.status",
       "sync.devices",
-      "privacy.realtime-sync",
+      "privacy.last-active-note",
     ]);
     // …and re-grouping it is a no-op, so the rendered rows (which re-group)
     // traverse the same sequence: highlight and rows can never disagree.
