@@ -177,25 +177,6 @@ interface PrivacyPanelProps {
   onShowToast?: (message: string) => void;
 }
 
-// Real-time sync is baseline behaviour, not a toggle (amended sync-protocol
-// §8.3): the fixed-interval polling fallback already discloses presence at
-// poll granularity while the vault is unlocked, so the continuous connection's
-// marginal presence-signal delta stopped justifying a user-facing option. The
-// panel keeps an INFO row (no switch) so the disclosure stays honest.
-function RealtimeSyncInfoRow() {
-  const { t } = useTranslation();
-  return (
-    <div style={BLOCK_STYLE} data-testid="settings.realtime-sync-info">
-      <div style={TOGGLE_ROW_STYLE}>
-        <span style={LABEL_STYLE}>{t("settings.privacy.realtimeSyncLabel")}</span>
-      </div>
-      <p id="realtime-sync-helper" style={HELPER_STYLE}>
-        {t("settings.privacy.realtimeSyncHelper")}
-      </p>
-    </div>
-  );
-}
-
 export function PrivacyPanel({ onShowToast }: PrivacyPanelProps = {}) {
   const { t } = useTranslation();
   const {
@@ -221,7 +202,6 @@ export function PrivacyPanel({ onShowToast }: PrivacyPanelProps = {}) {
         }}
         anchorId="privacy.screen-capture"
       />
-      <RealtimeSyncInfoRow />
       <ToggleRow
         label="Continue where you left off"
         ariaLabel="Continue where you left off"
