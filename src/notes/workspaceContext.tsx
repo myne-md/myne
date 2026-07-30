@@ -25,6 +25,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { DEFAULT_GRAPH_SETTINGS, encodeGraphSettings, type GraphSettings } from "./graphSettings";
 import type { NoteId } from "./sidebarState";
 import {
   activeSlotState,
@@ -145,6 +146,17 @@ export type WorkspaceApi = {
   setExpandedFolders: (
     next: ReadonlySet<string> | ((prev: ReadonlySet<string>) => ReadonlySet<string>),
   ) => void;
+
+  // ── graph pane settings (graph-connection-ux-polish task 5) — container-level, window-global ──
+  /** The graph pane's device-local settings (defaults resolved — never
+   *  partial). This is the SINGLE owner, like `expandedFolders`: the graph
+   *  settings panel renders straight off it. */
+  graphSettings: GraphSettings;
+  /** Persist the graph pane settings (staged into the workspace blob on the
+   *  next graceful-exit / coalesced flush). Reverting to all-defaults clears
+   *  the field (omit-when-default). Takes an updater so a caller can toggle
+   *  against the live value without reading it first. */
+  setGraphSettings: (next: GraphSettings | ((prev: GraphSettings) => GraphSettings)) => void;
 
   // ── back/forward history (focused pane; ephemeral, never persisted) ──
   /** Step the focused pane back to the previously viewed note (no-op when
@@ -355,6 +367,21 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         const resolved =
           typeof next === "function" ? next(new Set(c.expandedFolders ?? [])) : next;
         return { ...c, expandedFolders: resolved.size > 0 ? [...resolved] : undefined };
+      });
+    },
+    [],
+  );
+  // graph-connection-ux-polish task 5: the graph pane's device-local settings,
+  // owned at the container level (window-global, like `expandedFolders`
+  // above). All-default → drop the field (omit-when-default, mirrors the
+  // write-side check `serializeWorkspaces` also applies — kept in one place,
+  // `encodeGraphSettings`, so the two can't drift).
+  const setGraphSettings = useCallback(
+    (next: GraphSettings | ((prev: GraphSettings) => GraphSettings)) => {
+      setContainer((c) => {
+        const prev = c.graphSettings ?? DEFAULT_GRAPH_SETTINGS;
+        const resolved = typeof next === "function" ? next(prev) : next;
+        return { ...c, graphSettings: encodeGraphSettings(resolved) ? resolved : undefined };
       });
     },
     [],
@@ -628,6 +655,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       activeWorkspaceId: container.activeId,
       expandedFolders: container.expandedFolders ?? EMPTY_EXPANDED,
       setExpandedFolders,
+      graphSettings: container.graphSettings ?? DEFAULT_GRAPH_SETTINGS,
+      setGraphSettings,
       restoreContainer,
       saveWorkspaceAs,
       switchWorkspace,
@@ -682,6 +711,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       deleteWorkspace,
       workspacesSnapshot,
       setExpandedFolders,
+      setGraphSettings,
       goBack,
       goForward,
       canGoBack,

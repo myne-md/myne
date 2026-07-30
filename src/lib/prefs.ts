@@ -137,6 +137,27 @@ export interface SavedView {
   image_aspect_ratio?: string;
 }
 
+/** One color-group rule (graph-connection-ux-polish) — a stable id, a
+ *  user-visible name, a color-palette key (resolved against the design-token
+ *  palette; this type carries it verbatim, no palette validation here), an
+ *  enable flag (a disabled rule stays in {@link PrefsView.color_groups} but
+ *  contributes no match), and the filter it matches against. Mirrors Rust
+ *  `protocol::color_group::ColorGroup`. `filter` reuses {@link FilterNode} —
+ *  the single canonical filter AST also used by {@link SavedView}. */
+export interface ColorGroup {
+  /** Stable unique id (a UUIDv7 in practice). */
+  id: string;
+  /** User-visible rule name. */
+  name: string;
+  /** The color-palette key (a design-token name; the UI offers only the
+   *  fixed palette, never free-form entry). */
+  color: string;
+  /** Whether the rule is evaluated — a disabled rule is retained but skipped. */
+  enabled: boolean;
+  /** The filter AST (an `{ kind: "all" }` leaf matches every note). */
+  filter: FilterNode;
+}
+
 export interface PrefsView {
   screen_capture_protection: boolean;
   /**
@@ -536,6 +557,18 @@ export interface PrefsView {
    * pre-feature vault. Serialized from Rust `Vec<String>`; absent → `[]`.
    */
   bar_items_order: string[];
+  /**
+   * Color-group rules (graph-connection-ux-polish) — the ordered list of
+   * user-authored rules the knowledge-graph pane paints matching notes with at
+   * render time. Order is MEANINGFUL and IS the rule precedence (first match
+   * wins) — unlike {@link PrefsView.saved_views} (id-sorted; its display order
+   * lives in the separate `view_order`), this array is preserved verbatim,
+   * never re-sorted. A disabled rule stays in the list, evaluated as a
+   * no-match by {@link resolveGraphColorGroups}. Serialized from Rust
+   * `Vec<ColorGroup>`; empty (the default) is byte-identical to a pre-feature
+   * vault.
+   */
+  color_groups: ColorGroup[];
   /**
    * Active right-panel tab id (right-panel tabs) — the right-sidebar tab the
    * editor restores (e.g. `backlinks`, `unlinked`, `outline`). `null` ≡ unset →
@@ -1387,5 +1420,20 @@ export async function deleteSavedView(id: string): Promise<void> {
  */
 export async function setViewOrder(order: string[]): Promise<void> {
   await invoke<void>("plugin:prefs|set_view_order", { order });
+  bumpPrefsNonce();
+}
+
+/**
+ * Persist the full color-group rule list (graph-connection-ux-polish) — a
+ * WHOLE-LIST replace, not a per-item upsert/delete. Order is rule precedence
+ * (first match wins), so unlike {@link setViewOrder} there is no separate
+ * order field to reconcile: the caller passes the complete desired sequence
+ * and the backend preserves it verbatim. Disk-first, no native side-effect;
+ * the 64 KiB `vault.prefs` cap fails the write BEFORE touching disk, leaving
+ * the prior rules intact. A rejected promise means the write failed and the
+ * caller's optimistic UI must revert.
+ */
+export async function setColorGroups(groups: ColorGroup[]): Promise<void> {
+  await invoke<void>("plugin:prefs|set_color_groups", { groups });
   bumpPrefsNonce();
 }

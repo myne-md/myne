@@ -30,6 +30,7 @@
 //  - **`focusedPaneId` always references an existing leaf.**
 
 import i18n from "../i18n";
+import type { GraphSettings } from "./graphSettings";
 import type { NoteId } from "./sidebarState";
 
 /** Opaque identifier for a pane (leaf or split node). */
@@ -967,6 +968,12 @@ export type NamedWorkspaces = {
    *  bump). Container ops spread `{...c}`, so it survives switch/save/rename;
    *  `emptyNamedWorkspaces` omits it (a fresh vault opens collapsed). */
   expandedFolders?: readonly string[];
+  /** Graph pane settings (graph-connection-ux-polish task 5) — the physics +
+   *  appearance controls behind the graph pane's gear. Device-local, window-
+   *  global (one set for the graph, not per-slot) like `expandedFolders`.
+   *  Omit-when-default (see `graphSettings.ts`); a fresh container leaves it
+   *  unset. */
+  graphSettings?: GraphSettings;
 };
 
 /** Caller-supplied slot-id factory (the app wires `crypto.randomUUID`). */

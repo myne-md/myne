@@ -77,6 +77,10 @@ pub const CLASSIFICATION: &[(&str, PrefClass)] = &[
         PrefClass::Shared(SharedDiscipline::SetUnion),
     ),
     ("cli_rate_limit_disabled", PrefClass::DeviceLocal),
+    (
+        "color_groups",
+        PrefClass::Shared(SharedDiscipline::WholeValueLww),
+    ),
     ("custom_theme", PrefClass::DeviceLocal),
     (
         "daily_date_format",
@@ -230,6 +234,7 @@ mod tests {
             cli_enabled: _,
             cli_excluded_folders: _,
             cli_rate_limit_disabled: _,
+            color_groups: _,
             custom_theme: _,
             daily_date_format: _,
             daily_folder: _,
@@ -298,6 +303,7 @@ mod tests {
             "cli_enabled",
             "cli_excluded_folders",
             "cli_rate_limit_disabled",
+            "color_groups",
             "custom_theme",
             "daily_date_format",
             "daily_folder",

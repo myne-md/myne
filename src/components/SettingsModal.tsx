@@ -174,6 +174,12 @@ interface SettingsModalProps {
    * and opens the importer modal at the Editor level.
    */
   onImportObsidian?: () => void;
+  /**
+   * Open the graph tab (MYND-604). Threaded from Editor → AppearancePanel's
+   * pointer row; the handler closes Settings and opens the graph, whose own
+   * floating panel holds the graph appearance + physics controls.
+   */
+  onOpenGraph?: () => void;
 }
 
 const BACKDROP_STYLE: CSSProperties = {
@@ -319,6 +325,7 @@ export function SettingsModal({
   onForceRelock,
   onDeleteVaultSuccess,
   onImportObsidian,
+  onOpenGraph,
 }: SettingsModalProps) {
   const { t } = useTranslation();
   const { prefs } = usePrefs();
@@ -557,7 +564,7 @@ export function SettingsModal({
     files: <FilesPanel />,
     transcription: <TranscriptionPanel />,
     hotkeys: <HotkeysPanel />,
-    appearance: <AppearancePanel />,
+    appearance: <AppearancePanel onOpenGraph={onOpenGraph} />,
     storage: (
       <StoragePanel
         onImportObsidian={onImportObsidian}

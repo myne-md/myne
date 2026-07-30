@@ -335,8 +335,8 @@ pub struct PrefsView {
     /// Light/Dark/System choice): when set, the host applies the custom palette
     /// and ignores `theme`. Omitted entirely from the canonical JSON when `None`,
     /// so a vault with no custom theme is byte-identical to a pre-MYND-297
-    /// `vault.prefs`. Canonical key `custom_theme` — the only 'c' key, sorts
-    /// between `auto_lock_seconds` (a) and the `daily_*` block (d). A
+    /// `vault.prefs`. Canonical key `custom_theme` — sorts after `color_groups`
+    /// (`col` < `cus`) and before the `daily_*` block (d). A
     /// **non-load-bearing** cosmetic preference (AS-low): a tampered/replayed
     /// value can at worst select a different or absent palette (the host
     /// validates the file + falls back to a built-in theme on any failure), so
@@ -844,6 +844,31 @@ pub struct PrefsView {
     /// `custom_theme` (`cli` < `cu`).
     #[serde(default)]
     pub cli_rate_limit_disabled: Option<bool>,
+    /// Color-group rules (graph-connection-ux-polish, MYND-604) — the ordered
+    /// list of user-authored `{id, name, color, enabled, filter}` rules the
+    /// knowledge-graph pane paints matching notes with at render time. ONE
+    /// structured field, not a field per rule (the `saved_views` precedent
+    /// class). Order is MEANINGFUL and IS the rule precedence — first match
+    /// wins — so unlike `saved_views` (sorted by id; its display order lives
+    /// in the separate `view_order`) this array is preserved **verbatim**,
+    /// never re-sorted (the `bar_items_order` / `favorites` sequence
+    /// discipline, but classified whole-value LWW, not sequence-LWW — see
+    /// `core::plugins::sync::prefs_classification`). A disabled rule stays in
+    /// the list, evaluated as a no-match. Each element is a nested canonical
+    /// [`crate::color_group::ColorGroup`] object; `filter` reuses the same
+    /// `FilterNode` AST `saved_views` already persists. Default empty;
+    /// **omitted entirely from the canonical JSON when empty**, so a vault
+    /// that never opens the feature stays byte-identical to a pre-feature
+    /// `vault.prefs` (no outer-envelope / magic change — migration-less
+    /// additive field on `MYP1`). AS3-Sensitive (a rule's name / filter /
+    /// referenced tag or folder) — rides the existing prefs AEAD envelope;
+    /// **non-load-bearing** (no protective-envelope clamp — a tampered or
+    /// replayed `vault.prefs` can at worst reset rules to empty or apply a
+    /// stale rule set, never expose or corrupt note content). Canonical key
+    /// `color_groups` — sorts after `bar_items_order` (`b` < `c`), before
+    /// `custom_theme` (`col` < `cus`).
+    #[serde(default)]
+    pub color_groups: Vec<crate::color_group::ColorGroup>,
 
     /// Per-vault decorative icon (vault-icons) — the curated stroke-glyph name
     /// the in-app vault switcher shows beside this vault's name, replacing the
@@ -1137,6 +1162,7 @@ impl Default for PrefsView {
             cli_enabled: false,
             cli_excluded_folders: Vec::new(),
             cli_rate_limit_disabled: None,
+            color_groups: Vec::new(),
             show_note_timestamps: true,
             reminders_enabled: true,
             reminder_horizon_days: None,
@@ -1490,6 +1516,23 @@ fn canonical_json_encode(prefs: &PrefsView) -> Vec<u8> {
 
     // custom_theme (canonical key 'c' — after auto_lock_seconds 'a', before the
     // daily_* block 'd'; the only 'c' key). The active custom-theme name; takes
+    // color_groups (canonical key 'col' — after bar_items_order [b < c], before
+    // custom_theme [col < cus], MYND-604 graph-connection-ux-polish). The
+    // ordered color-group rule list; order IS rule precedence, so the array is
+    // encoded via the canonical codec's OWN verbatim-order encoder (never
+    // re-sorted — contrast `saved_views`, which the codec sorts by id).
+    // Omitted entirely when empty so a vault that never opens the feature is
+    // byte-identical to a pre-feature vault.prefs.
+    if !prefs.color_groups.is_empty() {
+        out.extend_from_slice(b"\"color_groups\":");
+        out.extend_from_slice(&crate::color_group::canonical_encode_color_groups(
+            &prefs.color_groups,
+        ));
+        out.push(b',');
+    }
+
+    // custom_theme (canonical key 'cus' — after color_groups 'col' [col < cus],
+    // before the daily_* block 'd'). The active custom-theme name; takes
     // precedence over `theme` host-side. Omitted when None so a vault with no
     // custom theme is byte-identical to a pre-MYND-297 vault.prefs.
     if let Some(ref name) = prefs.custom_theme {
@@ -2398,6 +2441,12 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
     // None (the default-ON rate limit applies).
     let cli_rate_limit_disabled =
         parse_optional_bool_field(rest, &mut cursor, b"\"cli_rate_limit_disabled\":")?;
+    // color_groups (canonical key 'col' — after bar_items_order [b < c], before
+    // custom_theme [col < cus], MYND-604). A nested array of canonical
+    // ColorGroup objects parsed from the same monotonic cursor; absent → empty;
+    // order preserved verbatim (it IS the rule precedence — never re-sorted).
+    // Present-but-malformed → PlaintextParseFailed.
+    let color_groups = parse_optional_color_groups_field(rest, &mut cursor, b"\"color_groups\":")?;
     // custom_theme (canonical key 'c' — before the daily_* block 'd'). The active
     // custom-theme name; takes precedence over `theme` host-side. Optional.
     let custom_theme = parse_optional_string_field(rest, &mut cursor, b"\"custom_theme\":")?;
@@ -2635,6 +2684,7 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
         cli_enabled,
         cli_excluded_folders,
         cli_rate_limit_disabled,
+        color_groups,
         icon,
         item_colors,
         deliberate_folders,
@@ -2703,13 +2753,42 @@ fn parse_optional_saved_views_field(
     cursor: &mut usize,
     marker: &[u8],
 ) -> Result<Vec<crate::saved_view::SavedView>, PrefsBlobError> {
-    match find_subslice(&rest[*cursor..], marker) {
+    match find_top_level_marker(rest, *cursor, marker) {
         Some(rel_idx) => {
             let val_start = *cursor + rel_idx + marker.len();
             let (views, consumed) = crate::saved_view::parse_saved_views_array(&rest[val_start..])
                 .map_err(|_| PrefsBlobError::PlaintextParseFailed)?;
             *cursor = val_start + consumed;
             Ok(views)
+        }
+        None => Ok(Vec::new()),
+    }
+}
+
+/// Parse the OPTIONAL `color_groups` nested-array-of-objects field
+/// (MYND-604), searching `rest` from `*cursor` onward. On a hit, decodes the
+/// canonical `ColorGroup` array via
+/// [`crate::color_group::parse_color_groups_array`] and advances `*cursor`
+/// past the closing `]`; on a miss returns an empty `Vec` and leaves
+/// `*cursor` unchanged. A malformed array (a `ColorGroup` that fails to
+/// decode, or a non-array value) collapses to
+/// [`PrefsBlobError::PlaintextParseFailed`] (the caller falls back to
+/// defaults per § 9.5.5). The monotonic cursor keeps the canonical
+/// key-order discipline: the following `custom_theme` find never matches
+/// inside a rule's content.
+fn parse_optional_color_groups_field(
+    rest: &[u8],
+    cursor: &mut usize,
+    marker: &[u8],
+) -> Result<Vec<crate::color_group::ColorGroup>, PrefsBlobError> {
+    match find_top_level_marker(rest, *cursor, marker) {
+        Some(rel_idx) => {
+            let val_start = *cursor + rel_idx + marker.len();
+            let (groups, consumed) =
+                crate::color_group::parse_color_groups_array(&rest[val_start..])
+                    .map_err(|_| PrefsBlobError::PlaintextParseFailed)?;
+            *cursor = val_start + consumed;
+            Ok(groups)
         }
         None => Ok(Vec::new()),
     }
@@ -2731,7 +2810,7 @@ fn parse_optional_paired_extensions_field(
     cursor: &mut usize,
     marker: &[u8],
 ) -> Result<Vec<crate::paired_extension::PairedExtension>, PrefsBlobError> {
-    match find_subslice(&rest[*cursor..], marker) {
+    match find_top_level_marker(rest, *cursor, marker) {
         Some(rel_idx) => {
             let val_start = *cursor + rel_idx + marker.len();
             let (records, consumed) =
@@ -2804,7 +2883,7 @@ fn parse_optional_uint64_field(
     cursor: &mut usize,
     marker: &[u8],
 ) -> Result<Option<u64>, PrefsBlobError> {
-    match find_subslice(&rest[*cursor..], marker) {
+    match find_top_level_marker(rest, *cursor, marker) {
         Some(rel_idx) => {
             let val_start = *cursor + rel_idx + marker.len();
             let (val, consumed) = parse_json_uint64(&rest[val_start..])?;
@@ -2833,7 +2912,7 @@ fn parse_optional_bool_field(
     cursor: &mut usize,
     marker: &[u8],
 ) -> Result<Option<bool>, PrefsBlobError> {
-    match find_subslice(&rest[*cursor..], marker) {
+    match find_top_level_marker(rest, *cursor, marker) {
         Some(rel_idx) => {
             let val_start = *cursor + rel_idx + marker.len();
             let (val, after) =
@@ -2880,7 +2959,7 @@ fn parse_optional_string_field(
     cursor: &mut usize,
     marker: &[u8],
 ) -> Result<Option<String>, PrefsBlobError> {
-    match find_subslice(&rest[*cursor..], marker) {
+    match find_top_level_marker(rest, *cursor, marker) {
         Some(rel_idx) => {
             let val_start = *cursor + rel_idx + marker.len();
             let (value, consumed) = parse_json_string(&rest[val_start..])
@@ -2927,7 +3006,7 @@ fn parse_optional_editor_layout(
     cursor: &mut usize,
     marker: &[u8],
 ) -> Result<Option<EditorLayout>, PrefsBlobError> {
-    match find_subslice(&rest[*cursor..], marker) {
+    match find_top_level_marker(rest, *cursor, marker) {
         Some(rel_idx) => {
             let obj_start = *cursor + rel_idx + marker.len();
             let (layout, consumed) = parse_editor_layout_object(&rest[obj_start..])
@@ -2994,7 +3073,7 @@ fn parse_optional_array_field(
     cursor: &mut usize,
     marker: &[u8],
 ) -> Result<Vec<String>, PrefsBlobError> {
-    match find_subslice(&rest[*cursor..], marker) {
+    match find_top_level_marker(rest, *cursor, marker) {
         Some(rel_idx) => {
             let array_start = *cursor + rel_idx + marker.len();
             let (list, consumed) = parse_json_string_array(&rest[array_start..])
@@ -3017,7 +3096,7 @@ fn parse_optional_string_map_field(
     cursor: &mut usize,
     marker: &[u8],
 ) -> Result<BTreeMap<String, String>, PrefsBlobError> {
-    match find_subslice(&rest[*cursor..], marker) {
+    match find_top_level_marker(rest, *cursor, marker) {
         Some(rel_idx) => {
             let obj_start = *cursor + rel_idx + marker.len();
             let (map, consumed) = parse_json_string_map(&rest[obj_start..])
@@ -3039,7 +3118,7 @@ fn parse_optional_u64_map_field(
     cursor: &mut usize,
     marker: &[u8],
 ) -> Result<BTreeMap<String, u64>, PrefsBlobError> {
-    match find_subslice(&rest[*cursor..], marker) {
+    match find_top_level_marker(rest, *cursor, marker) {
         Some(rel_idx) => {
             let obj_start = *cursor + rel_idx + marker.len();
             let (map, consumed) = parse_json_u64_map(&rest[obj_start..])
@@ -3141,7 +3220,7 @@ fn parse_optional_string_array_map_field(
     cursor: &mut usize,
     marker: &[u8],
 ) -> Result<BTreeMap<String, Vec<String>>, PrefsBlobError> {
-    match find_subslice(&rest[*cursor..], marker) {
+    match find_top_level_marker(rest, *cursor, marker) {
         Some(rel_idx) => {
             let obj_start = *cursor + rel_idx + marker.len();
             let (map, consumed) = parse_json_string_array_map(&rest[obj_start..])
@@ -3314,6 +3393,69 @@ fn find_subslice(haystack: &[u8], needle: &[u8]) -> Option<usize> {
         .position(|window| window == needle)
 }
 
+/// Find a canonical `"key":` marker at the **top level** of the prefs object,
+/// scanning `rest` from `from` onward and returning the offset RELATIVE to
+/// `from` (so the cursor-chain call sites read exactly like the
+/// [`find_subslice`] they replace).
+///
+/// WHY THIS IS NOT `find_subslice`. `field_clocks` is a nested object whose
+/// KEYS ARE FIELD NAMES by construction (§ 9.5.2), so a plain byte search for
+/// `"color_groups":` happily matches the clock entry `"color_groups":17…` and
+/// then tries to parse an integer as a rule array. That mattered exactly when
+/// the real field was ABSENT — set a field, then unset it, and its stale clock
+/// key stays behind to shadow it. Because § 9.5.5 collapses any inner parse
+/// failure to "return defaults", the result was the SILENT loss of the whole
+/// preference set (label, favorites, saved views, folder icons, every editor
+/// setting), persisted by the next write. `color_groups` made it reachable by
+/// an ordinary action — delete your last colour rule — but the trap is older
+/// than that field and `favorites` / the `daily_*` fields sit in it too: every
+/// stamped shared field parsed from the cursor chain BEFORE `field_clocks`
+/// (`fi`) in canonical key order.
+///
+/// `rest` begins inside the root object (the strictly-positional prefix fields
+/// are already consumed), so relative depth 0 IS the top level. Skipping
+/// deeper matches also closes the same shadowing through the user-keyed maps
+/// (`keymap`, `folder_icons`, `item_colors`).
+///
+/// Decode-side only: no encoding changes, so byte-stability and the golden
+/// vectors are untouched, and every blob that parsed before still parses —
+/// this strictly REMOVES false matches.
+fn find_top_level_marker(rest: &[u8], from: usize, marker: &[u8]) -> Option<usize> {
+    let hay = rest.get(from..)?;
+    let mut depth = 0i32;
+    let mut i = 0usize;
+    while i < hay.len() {
+        match hay[i] {
+            b'"' => {
+                if depth == 0 && hay[i..].starts_with(marker) {
+                    return Some(i);
+                }
+                // Skip the whole string, honouring backslash escapes, so a
+                // brace or quote inside a value can never move `depth`. A
+                // top-level string VALUE can never false-match: the marker
+                // ends in `:`, and a value is always followed by `,` or `}`.
+                i += 1;
+                while i < hay.len() {
+                    match hay[i] {
+                        b'\\' => i += 2,
+                        b'"' => {
+                            i += 1;
+                            break;
+                        }
+                        _ => i += 1,
+                    }
+                }
+                continue;
+            }
+            b'{' | b'[' => depth += 1,
+            b'}' | b']' => depth -= 1,
+            _ => {}
+        }
+        i += 1;
+    }
+    None
+}
+
 // ---- encode / decode primitives ---------------------------------------
 
 /// Encode a `vault.prefs` blob with caller-supplied randomness
@@ -3471,6 +3613,7 @@ mod tests {
             cli_enabled: false,
             cli_excluded_folders: Vec::new(),
             cli_rate_limit_disabled: None,
+            color_groups: Vec::new(),
             show_note_timestamps: true,
             reminders_enabled: true,
             reminder_horizon_days: None,
@@ -3541,6 +3684,7 @@ mod tests {
             cli_enabled: false,
             cli_excluded_folders: Vec::new(),
             cli_rate_limit_disabled: None,
+            color_groups: Vec::new(),
             show_note_timestamps: true,
             reminders_enabled: true,
             reminder_horizon_days: None,
@@ -3689,6 +3833,61 @@ mod tests {
         assert!(!encoded
             .windows(b"field_clocks".len())
             .any(|w| w == b"field_clocks"));
+    }
+
+    #[test]
+    fn a_stale_field_clock_key_never_shadows_its_absent_field() {
+        // REGRESSION (MYND-604). `field_clocks` keys ARE field names (§ 9.5.2),
+        // so a byte-search for a top-level `"<field>":` used to match the clock
+        // entry of a field that had since been UNSET — parse the integer as the
+        // field's value, fail, and hand § 9.5.5 a blanket "return defaults".
+        // The user-visible bug was total, silent prefs loss (label, favorites,
+        // saved views, folder icons, every editor setting) after an ordinary
+        // action: delete your last colour rule.
+        //
+        // Both fields below are parsed from the cursor chain BEFORE
+        // `field_clocks` (`col` < `fi`, `fa` < `fi`), which is what made them
+        // reachable; `favorites` shows the trap predates `color_groups`.
+        for field in ["color_groups", "favorites"] {
+            let mut clocks = BTreeMap::new();
+            clocks.insert(String::from(field), 1_700_000_000_000u64);
+            let view = PrefsView {
+                label: Some(String::from("Keepme")),
+                item_order: alloc::vec![String::from("0190a000-0000-7000-8000-000000000002")],
+                field_clocks: clocks.clone(),
+                ..PrefsView::default()
+            };
+            let decoded = canonical_json_decode(&canonical_json_encode(&view))
+                .expect("a stale clock key must not fail the parse");
+            // The rest of the blob survived rather than collapsing to defaults.
+            assert_eq!(decoded.label.as_deref(), Some("Keepme"), "{field}");
+            assert_eq!(decoded.item_order, view.item_order, "{field}");
+            assert_eq!(decoded.field_clocks, clocks, "{field}");
+            // …and the shadowed field itself reads as genuinely absent.
+            assert!(decoded.color_groups.is_empty(), "{field}");
+            assert!(decoded.favorites.is_empty(), "{field}");
+        }
+    }
+
+    #[test]
+    fn top_level_marker_search_ignores_nested_and_value_lookalikes() {
+        // The finder keys on structural depth, not on `field_clocks`
+        // specifically: a user-controlled map key (`folder_icons` paths) and a
+        // string VALUE that spells a field name are both non-matches, while the
+        // real top-level field is still found.
+        let mut icons = BTreeMap::new();
+        icons.insert(String::from("Projects/"), String::from("book"));
+        let view = PrefsView {
+            // A label whose VALUE is a field name.
+            label: Some(String::from("favorites")),
+            favorites: alloc::vec![String::from("0190a000-0000-7000-8000-000000000002")],
+            folder_icons: icons,
+            ..PrefsView::default()
+        };
+        let decoded = canonical_json_decode(&canonical_json_encode(&view)).expect("parses");
+        assert_eq!(decoded.favorites, view.favorites);
+        assert_eq!(decoded.label.as_deref(), Some("favorites"));
+        assert_eq!(decoded.folder_icons, view.folder_icons);
     }
 
     #[test]
@@ -3870,6 +4069,7 @@ mod tests {
                 cli_enabled: false,
                 cli_excluded_folders: Vec::new(),
                 cli_rate_limit_disabled: None,
+                color_groups: Vec::new(),
                 icon: None,
                 ai_enabled: false,
                 ai_excluded_folders: Vec::new(),
@@ -3942,6 +4142,7 @@ mod tests {
                 cli_enabled: false,
                 cli_excluded_folders: Vec::new(),
                 cli_rate_limit_disabled: None,
+                color_groups: Vec::new(),
                 icon: None,
                 ai_enabled: false,
                 ai_excluded_folders: Vec::new(),
@@ -5283,6 +5484,7 @@ mod tests {
         let encoded = canonical_json_encode(&PrefsView {
             screen_capture_protection: false,
             bar_items_order: Vec::new(),
+            color_groups: Vec::new(),
             show_note_timestamps: true,
             reminders_enabled: true,
             reminder_horizon_days: None,
@@ -5314,6 +5516,7 @@ mod tests {
             cli_enabled: false,
             cli_excluded_folders: Vec::new(),
             cli_rate_limit_disabled: None,
+            color_groups: Vec::new(),
             archived_folders: Vec::new(),
             show_note_timestamps: true,
             reminders_enabled: true,
@@ -5762,6 +5965,7 @@ mod tests {
             cli_enabled: false,
             cli_excluded_folders: Vec::new(),
             cli_rate_limit_disabled: None,
+            color_groups: Vec::new(),
             show_note_timestamps: true,
             reminders_enabled: true,
             reminder_horizon_days: None,
@@ -5838,6 +6042,7 @@ mod tests {
             cli_enabled: false,
             cli_excluded_folders: Vec::new(),
             cli_rate_limit_disabled: None,
+            color_groups: Vec::new(),
             show_note_timestamps: true,
             reminders_enabled: true,
             reminder_horizon_days: None,
@@ -5917,6 +6122,7 @@ mod tests {
             cli_enabled: false,
             cli_excluded_folders: Vec::new(),
             cli_rate_limit_disabled: None,
+            color_groups: Vec::new(),
             show_note_timestamps: true,
             reminders_enabled: true,
             reminder_horizon_days: None,
@@ -5991,6 +6197,7 @@ mod tests {
             cli_enabled: false,
             cli_excluded_folders: Vec::new(),
             cli_rate_limit_disabled: None,
+            color_groups: Vec::new(),
             show_note_timestamps: true,
             reminders_enabled: true,
             reminder_horizon_days: None,
@@ -6125,6 +6332,7 @@ mod tests {
             cli_enabled: false,
             cli_excluded_folders: Vec::new(),
             cli_rate_limit_disabled: None,
+            color_groups: Vec::new(),
             show_note_timestamps: true,
             reminders_enabled: true,
             reminder_horizon_days: None,
@@ -6224,6 +6432,7 @@ mod tests {
             cli_enabled: false,
             cli_excluded_folders: Vec::new(),
             cli_rate_limit_disabled: None,
+            color_groups: Vec::new(),
             show_note_timestamps: true,
             reminders_enabled: true,
             reminder_horizon_days: None,
@@ -6306,6 +6515,7 @@ mod tests {
             cli_enabled: false,
             cli_excluded_folders: Vec::new(),
             cli_rate_limit_disabled: None,
+            color_groups: Vec::new(),
             show_note_timestamps: true,
             reminders_enabled: true,
             reminder_horizon_days: None,
@@ -6419,6 +6629,7 @@ mod tests {
             cli_enabled: false,
             cli_excluded_folders: Vec::new(),
             cli_rate_limit_disabled: None,
+            color_groups: Vec::new(),
             show_note_timestamps: true,
             reminders_enabled: true,
             reminder_horizon_days: None,
@@ -6515,6 +6726,7 @@ mod tests {
             cli_enabled: false,
             cli_excluded_folders: Vec::new(),
             cli_rate_limit_disabled: None,
+            color_groups: Vec::new(),
             show_note_timestamps: true,
             reminders_enabled: true,
             reminder_horizon_days: None,
@@ -6852,6 +7064,7 @@ mod tests {
             cli_enabled: false,
             cli_excluded_folders: Vec::new(),
             cli_rate_limit_disabled: None,
+            color_groups: Vec::new(),
             show_note_timestamps: true,
             reminders_enabled: true,
             reminder_horizon_days: None,
@@ -6926,6 +7139,7 @@ mod tests {
             cli_enabled: false,
             cli_excluded_folders: Vec::new(),
             cli_rate_limit_disabled: None,
+            color_groups: Vec::new(),
             show_note_timestamps: true,
             reminders_enabled: true,
             reminder_horizon_days: None,
@@ -7002,6 +7216,7 @@ mod tests {
             cli_enabled: false,
             cli_excluded_folders: Vec::new(),
             cli_rate_limit_disabled: None,
+            color_groups: Vec::new(),
             show_note_timestamps: true,
             reminders_enabled: true,
             reminder_horizon_days: None,
@@ -7146,6 +7361,7 @@ mod tests {
             cli_enabled: false,
             cli_excluded_folders: Vec::new(),
             cli_rate_limit_disabled: None,
+            color_groups: Vec::new(),
             show_note_timestamps: true,
             reminders_enabled: true,
             reminder_horizon_days: None,
@@ -7264,6 +7480,7 @@ mod tests {
             cli_enabled: false,
             cli_excluded_folders: Vec::new(),
             cli_rate_limit_disabled: None,
+            color_groups: Vec::new(),
             archived_folders: Vec::new(),
             show_note_timestamps: true,
             reminders_enabled: true,
@@ -7572,6 +7789,7 @@ mod tests {
             cli_enabled: false,
             cli_excluded_folders: Vec::new(),
             cli_rate_limit_disabled: None,
+            color_groups: Vec::new(),
             show_note_timestamps: true,
             reminders_enabled: true,
             reminder_horizon_days: None,
@@ -7650,6 +7868,7 @@ mod tests {
             cli_enabled: false,
             cli_excluded_folders: Vec::new(),
             cli_rate_limit_disabled: None,
+            color_groups: Vec::new(),
             show_note_timestamps: true,
             reminders_enabled: true,
             reminder_horizon_days: None,
@@ -7989,6 +8208,7 @@ mod tests {
                 cli_enabled: false,
                 cli_excluded_folders: Vec::new(),
                 cli_rate_limit_disabled: None,
+                color_groups: Vec::new(),
                 icon: None,
                 ai_enabled: false,
                 ai_excluded_folders: Vec::new(),
@@ -8060,6 +8280,7 @@ mod tests {
                 cli_enabled: false,
                 cli_excluded_folders: Vec::new(),
                 cli_rate_limit_disabled: None,
+                color_groups: Vec::new(),
                 icon: None,
                 ai_enabled: false,
                 ai_excluded_folders: Vec::new(),
@@ -8134,6 +8355,7 @@ mod tests {
             cli_enabled: false,
             cli_excluded_folders: Vec::new(),
             cli_rate_limit_disabled: None,
+            color_groups: Vec::new(),
             ai_enabled: false,
             ai_excluded_folders: Vec::new(),
             archived_folders: Vec::new(),
@@ -10254,6 +10476,81 @@ mod tests {
         let hash = fixed_account_number_hash();
         let blob = encode_prefs_blob_raw(&prefs_key, &hash, &prefs, &fixed_prefs_nonce()).unwrap();
         assert_eq!(decode_prefs_blob(&prefs_key, &hash, &blob).unwrap(), prefs);
+    }
+
+    // ---- color_groups (graph-connection-ux-polish, MYND-604) ---------------
+
+    fn sample_color_group(id: &str, name: &str) -> crate::color_group::ColorGroup {
+        crate::color_group::ColorGroup {
+            id: id.into(),
+            name: name.into(),
+            color: "moss".into(),
+            enabled: true,
+            filter: crate::saved_view::FilterNode::HasTag { tag: "work".into() },
+        }
+    }
+
+    #[test]
+    fn color_groups_round_trips_and_positions_b_before_col_before_cus() {
+        // Round-trip alongside bar_items_order (before, 'b') + custom_theme
+        // (after, 'cus') to pin color_groups' canonical position ('col').
+        let prefs = PrefsView {
+            bar_items_order: alloc::vec!["graph".into()],
+            color_groups: alloc::vec![
+                sample_color_group("g1", "Work"),
+                sample_color_group("g2", "Rest")
+            ],
+            custom_theme: Some("solarized-dark".into()),
+            ..PrefsView::default()
+        };
+        let prefs_key = derive_subkey(&fixed_root_key(), SubkeyRole::PrefsKey);
+        let hash = fixed_account_number_hash();
+        let blob = encode_prefs_blob_raw(&prefs_key, &hash, &prefs, &fixed_prefs_nonce()).unwrap();
+        let decoded = decode_prefs_blob(&prefs_key, &hash, &blob).unwrap();
+        assert_eq!(decoded, prefs);
+        // Order preserved verbatim — precedence, not id-sorted (g1 before g2).
+        assert_eq!(decoded.color_groups[0].id, "g1");
+        assert_eq!(decoded.color_groups[1].id, "g2");
+
+        let json = canonical_json_encode(&prefs);
+        let s = core::str::from_utf8(&json).unwrap();
+        let b = s.find("bar_items_order").unwrap();
+        let cg = s.find("color_groups").unwrap();
+        let cus = s.find("custom_theme").unwrap();
+        assert!(
+            b < cg && cg < cus,
+            "canonical order must be b < col < cus: {s}"
+        );
+    }
+
+    #[test]
+    fn color_groups_omitted_when_empty_byte_identical_to_pre_feature_blob() {
+        // A vault that never opens the feature re-encodes byte-identically to
+        // a pre-MYND-604 vault.prefs (story 36) — the field must not appear
+        // at all, not merely as `[]`.
+        let prefs = PrefsView::default();
+        let json = canonical_json_encode(&prefs);
+        let s = core::str::from_utf8(&json).unwrap();
+        assert!(
+            !s.contains("color_groups"),
+            "empty color_groups must be omitted: {s}"
+        );
+    }
+
+    #[test]
+    fn color_groups_disabled_rule_round_trips() {
+        let mut g = sample_color_group("g1", "Muted");
+        g.enabled = false;
+        let prefs = PrefsView {
+            color_groups: alloc::vec![g],
+            ..PrefsView::default()
+        };
+        let prefs_key = derive_subkey(&fixed_root_key(), SubkeyRole::PrefsKey);
+        let hash = fixed_account_number_hash();
+        let blob = encode_prefs_blob_raw(&prefs_key, &hash, &prefs, &fixed_prefs_nonce()).unwrap();
+        let decoded = decode_prefs_blob(&prefs_key, &hash, &blob).unwrap();
+        assert_eq!(decoded, prefs);
+        assert!(!decoded.color_groups[0].enabled);
     }
 
     // ---- custom_theme (custom-themes epic, MYND-297) -----------------------

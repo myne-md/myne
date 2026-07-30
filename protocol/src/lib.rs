@@ -59,6 +59,7 @@ pub mod blob;
 pub(crate) mod blob_envelope;
 pub(crate) mod canonical_json;
 pub mod capture_blob;
+pub mod color_group;
 pub mod dictionary_blob;
 pub mod embeddings_blob;
 pub mod error;
@@ -121,6 +122,9 @@ pub use attachments_catalog::{
 pub use blob::{
     decode_note, encode_new_note, encode_new_note_blob_raw, encode_update, encode_update_blob_raw,
     DecryptError, DecryptedNote,
+};
+pub use color_group::{
+    canonical_encode_color_groups, parse_color_groups_array, ColorGroup, ColorGroupParseError,
 };
 pub use dictionary_blob::{
     decode_dictionary_blob, encode_dictionary_blob, encode_dictionary_blob_raw,

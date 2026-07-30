@@ -324,8 +324,8 @@ pub fn merge_prefs(local: &PrefsView, remote: &PrefsView) -> PrefsView {
         item_order: lww!("item_order", item_order),
         view_order: lww!("view_order", view_order),
         // ---- shared: whole-value LWW -------------------------------------
-        // (saved_views needs the codec's canonical encoder — serde would emit
-        // struct-declaration key order.)
+        // (saved_views / color_groups need their codec's canonical encoder —
+        // serde would emit struct-declaration key order.)
         saved_views: lww_field_keyed(
             "saved_views",
             &local.saved_views,
@@ -334,6 +334,19 @@ pub fn merge_prefs(local: &PrefsView, remote: &PrefsView) -> PrefsView {
             clock_of(remote, "saved_views"),
             &mut clocks,
             |v| protocol::canonical_encode_saved_views(v),
+        ),
+        // color_groups (MYND-604): order IS rule precedence, so — unlike
+        // saved_views — the tiebreak key must NOT re-sort; the canonical
+        // encoder already preserves slice order verbatim, which is exactly
+        // what `lww_field_keyed` needs (a deterministic byte key per value).
+        color_groups: lww_field_keyed(
+            "color_groups",
+            &local.color_groups,
+            clock_of(local, "color_groups"),
+            &remote.color_groups,
+            clock_of(remote, "color_groups"),
+            &mut clocks,
+            |v| protocol::canonical_encode_color_groups(v),
         ),
         // ---- shared: per-key map merge (MYND-478 device_names; MYND-562
         // folder decorations) — computed above so each borrows `clocks` once.
@@ -932,6 +945,76 @@ mod tests {
         };
         assert_eq!(merge_prefs(&a, &b).saved_views, expected);
         assert_eq!(merge_prefs(&b, &a).saved_views, expected);
+    }
+
+    #[test]
+    fn color_groups_merge_is_commutative_and_tie_breaks_on_the_canonical_encoding() {
+        // MYND-604: color_groups is classified whole-value LWW like
+        // saved_views, and for the same reason the tiebreak must use the
+        // canonical (order-preserving) encoding, not serde's — pin both
+        // merge(a,b) == merge(b,a) AND the winner-by-canonical-bytes rule.
+        use protocol::{ColorGroup, FilterNode};
+        let rule = |id: &str, name: &str| ColorGroup {
+            id: id.into(),
+            name: name.into(),
+            color: "moss".into(),
+            enabled: true,
+            filter: FilterNode::All,
+        };
+        let mut a = PrefsView {
+            color_groups: vec![rule("g-a", "Work")],
+            ..PrefsView::default()
+        };
+        stamped(&mut a, "color_groups", 500);
+        let mut b = PrefsView {
+            color_groups: vec![rule("g-b", "Rest")],
+            ..PrefsView::default()
+        };
+        stamped(&mut b, "color_groups", 500);
+
+        let expected = if protocol::canonical_encode_color_groups(&a.color_groups)
+            > protocol::canonical_encode_color_groups(&b.color_groups)
+        {
+            a.color_groups.clone()
+        } else {
+            b.color_groups.clone()
+        };
+        assert_eq!(merge_prefs(&a, &b).color_groups, expected);
+        assert_eq!(merge_prefs(&b, &a).color_groups, expected);
+    }
+
+    #[test]
+    fn color_groups_newer_clock_wins_and_precedence_order_survives() {
+        // A non-tie case: the newer side wins outright, and its rule ORDER
+        // (precedence) survives verbatim — not re-sorted by id.
+        use protocol::{ColorGroup, FilterNode};
+        let rule = |id: &str| ColorGroup {
+            id: id.into(),
+            name: id.into(),
+            color: "slate".into(),
+            enabled: true,
+            filter: FilterNode::All,
+        };
+        let mut older = PrefsView {
+            color_groups: vec![rule("zzz"), rule("aaa")],
+            ..PrefsView::default()
+        };
+        stamped(&mut older, "color_groups", 100);
+        let mut newer = PrefsView {
+            color_groups: vec![rule("bbb"), rule("ccc")],
+            ..PrefsView::default()
+        };
+        stamped(&mut newer, "color_groups", 200);
+
+        let merged = merge_prefs(&older, &newer);
+        assert_eq!(
+            merged
+                .color_groups
+                .iter()
+                .map(|g| g.id.clone())
+                .collect::<Vec<_>>(),
+            vec!["bbb".to_string(), "ccc".to_string()]
+        );
     }
 
     #[test]
