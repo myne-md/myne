@@ -76,6 +76,7 @@ export class AttachmentImageWidget extends WidgetType {
 
     const img = document.createElement("img");
     img.className = "cm-attachment-img";
+    img.setAttribute("data-testid", "attachment-image");
     // attachment://<id> — the Rust handler decrypts in-memory + re-sniffs +
     // allowlists. SVG is served as image/svg+xml and rendered here ONLY through
     // the `<img>` element (secure static mode); its markup never enters the DOM.
