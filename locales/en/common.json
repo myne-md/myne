@@ -1007,7 +1007,13 @@
     "taskField": {
       "invalidDue": "Myne can't read this date, so it isn't shown as a due date.",
       "invalidPriority": "Myne can't read this priority. Use highest, high, medium, low or lowest.",
-      "invalidRepeat": "Myne doesn't recognise this repeat rule, so this task won't repeat."
+      "invalidRepeat": "Myne doesn't recognise this repeat rule, so this task won't repeat.",
+      "save": "Save",
+      "title": {
+        "due": "Due date",
+        "repeat": "Repeat",
+        "priority": "Priority"
+      }
     },
     "toolbar": {
       "apply": "Apply",
@@ -2028,7 +2034,35 @@
       "sunday": "Sunday"
     },
     "weekdaySeparator": ", ",
-    "whenDone": "{{rule}}, when done"
+    "whenDone": "{{rule}}, when done",
+    "builder": {
+      "family": "Repeat",
+      "familyInterval": "Every…",
+      "familyWeekdays": "Weekly on…",
+      "familyDayOfMonth": "Monthly on a day…",
+      "familyOrdinal": "Monthly on a weekday…",
+      "count": "Interval",
+      "unitLabel": "Unit",
+      "units": {
+        "day": "days",
+        "week": "weeks",
+        "month": "months",
+        "year": "years"
+      },
+      "ordinal": "Position",
+      "weekday": "Weekday",
+      "lastDay": "Last day",
+      "whenDone": "Repeat from the date it's completed",
+      "weekdayShort": {
+        "monday": "Mon",
+        "tuesday": "Tue",
+        "wednesday": "Wed",
+        "thursday": "Thu",
+        "friday": "Fri",
+        "saturday": "Sat",
+        "sunday": "Sun"
+      }
+    }
   },
   "restore": {
     "backLabel": "Back",
