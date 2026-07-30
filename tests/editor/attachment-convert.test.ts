@@ -140,6 +140,44 @@ describe("convertImportedRefs (mandatory diff-preview)", () => {
     attachment: imported(ID_C, ref.source),
   });
 
+  it("discloses ingest-time compression on the convert toast", async () => {
+    // Compression is gated in shared core, so import-&-convert compresses on
+    // exactly the terms paste does. `decisions.md` 2026-07-30 makes disclosure
+    // at import the thing that stands in for a consent gate — a route that
+    // compresses without saying so is the half that gets forgotten. The
+    // converted count stays too: it is what the user asked this command for.
+    const compressing: RefImporter = async (ref) => ({
+      ok: true,
+      attachment: {
+        ...imported(ID_C, ref.source),
+        content_type: "image/webp",
+        size: 300,
+        original_size: 2400,
+        container_changed: true,
+      },
+    });
+    const view = mount("doc ![[pic.png]] tail");
+    const p = convertImportedRefs(view, compressing);
+    await afterModal("convert");
+    await p;
+    const toast = document.querySelector(".cm-attach-toast");
+    expect(toast?.textContent).toBe(
+      "1 converted · Compressed to WebP: 2.3 KiB → 300 B",
+    );
+    view.destroy();
+  });
+
+  it("leaves the convert toast alone when nothing was compressed", async () => {
+    const view = mount("doc ![[pic.png]] tail");
+    const p = convertImportedRefs(view, allResolve);
+    await afterModal("convert");
+    await p;
+    expect(document.querySelector(".cm-attach-toast")?.textContent).toBe(
+      "1 converted",
+    );
+    view.destroy();
+  });
+
   it("rewrites refs to form C only after the user confirms", async () => {
     const view = mount("doc ![[pic.png]] tail");
     const p = convertImportedRefs(view, allResolve);

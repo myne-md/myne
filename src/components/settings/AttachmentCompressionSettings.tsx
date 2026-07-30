@@ -9,6 +9,17 @@
 // irreversible — the original bytes are not kept — since that is the one
 // fact a user flipping this switch (or deciding not to) needs to know.
 //
+// Its closing SCOPE sentence is chosen by the `imageCompression` capability,
+// because the preference and the transform have different reaches: the
+// preference is shared vault content every client reads, writes and syncs
+// (`decisions.md` 2026-07-30), while the transform does not run on a client
+// that cannot contain a decoder panic. The control therefore stays everywhere —
+// a web user turning it off is turning it off for their desktop — but "on every
+// device" is false in front of the client that will not honour it, and for a
+// feature whose ethical justification is disclosure rather than consent, a
+// settings row misdescribing what THIS client does is the wrong end to be loose
+// at.
+//
 // Default state is ON, not off: starting from `false` and correcting after
 // the disk read would flash the wrong answer for effectively every vault.
 
@@ -16,6 +27,7 @@ import { useEffect, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import { ControlBlock } from "./ControlBlock";
 import { Switch } from "../primitives/Switch";
+import { has } from "../../platform/capabilities";
 import { prefsRead, setAttachmentCompressionEnabled } from "../../lib/prefs";
 
 const ERROR_STYLE: CSSProperties = {
@@ -57,11 +69,15 @@ export function AttachmentCompressionSettings() {
     }
   }
 
+  const scope = has("imageCompression")
+    ? t("settings.attachmentCompression.helperScopeEveryDevice")
+    : t("settings.attachmentCompression.helperScopeNotHere");
+
   return (
     <>
       <ControlBlock
         label={t("settings.attachmentCompression.label")}
-        helper={t("settings.attachmentCompression.helper")}
+        helper={`${t("settings.attachmentCompression.helper")} ${scope}`}
         control={
           <Switch
             checked={enabled}

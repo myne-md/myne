@@ -11,15 +11,36 @@
 //!
 //! Every failure path returns [`CompressOutcome::Unchanged`] rather than an
 //! error: compression is best-effort and must never turn a successful
-//! import into a failed one.
+//! import into a failed one. That includes a **panic** inside the third-party
+//! decoder or encoder — [`compress_for_import`] contains one itself rather than
+//! relying on its caller's `run_blocking` to catch it, so the contract is a
+//! property of this function and not of one call site.
+//!
+//! ## The one target where that contract cannot hold — and what is done about it
+//!
+//! `catch_unwind` needs unwinding, and `wasm32-unknown-unknown` has none: a
+//! panic aborts the module (`crate::task` says so of `run_blocking`, whose wasm
+//! arm runs the closure inline on the Worker's own loop, making the caller's
+//! `Err(_) => Unchanged` arm dead code there). A hostile image that panicked
+//! the decoder would therefore kill the vault Worker instead of falling back to
+//! `Unchanged` — turning a successful import into a dead tab, which is exactly
+//! the outcome the contract above forbids.
+//!
+//! So the transform does not run on wasm at all; see
+//! [`is_supported_on_this_target`]. The `attachment_compression_enabled`
+//! preference is untouched by this — it is a **shared** vault preference
+//! (`decisions.md` 2026-07-30), so a web session still reads, writes and syncs
+//! it, and every client that *can* contain a decoder panic keeps honouring it.
+//! What the web client declines is performing the decode, not the setting.
 //!
 //! ## Decode limits are mandatory
 //!
 //! Compression makes every imported PNG/JPEG/WebP an untrusted decode, where
-//! today only the OCR path (`ocr/mod.rs::decode_bounded`) decodes images at
-//! all. This module copies that discipline exactly: an explicit
-//! [`image::Limits`] bounding width and height, checked by the decoder
-//! before it allocates a pixel buffer, with a limits violation treated as
+//! before this the OCR path was the only one decoding images at all. Both go
+//! through the one shared rail, [`super::decode::decode_bounded`]: an explicit
+//! [`image::Limits`] bounding width, height **and total allocation**, checked
+//! by the decoder before it allocates a pixel buffer, with a limits violation
+//! treated as
 //! "store the original" rather than an error. A small file can declare
 //! enormous dimensions and expand to gigabytes on decode; refusing the
 //! header is the only safe response.
@@ -33,6 +54,7 @@
 //! covers the animated-GIF exclusion the PRD calls out by name (all GIF,
 //! animated or not, is out of scope for this transform).
 
+use super::decode::{decode_bounded, dimensions};
 use image::codecs::jpeg::JpegEncoder;
 use image::codecs::webp::WebPEncoder;
 use image::imageops::FilterType;
@@ -48,7 +70,7 @@ use image::DynamicImage;
 /// to argue for a higher ceiling — only loses ~27% of its long edge at this
 /// ceiling. Real desktop screenshots (1280px class) and the brand banner
 /// (3000px) both stay well-served by this value. Not moved.
-pub(crate) const MAX_LONG_EDGE_PX: u32 = 2400;
+const MAX_LONG_EDGE_PX: u32 = 2400;
 
 /// JPEG quality (1-100) used for the lossy re-encode path.
 ///
@@ -60,7 +82,7 @@ pub(crate) const MAX_LONG_EDGE_PX: u32 = 2400;
 /// synthetic 4032x3024 (12MP-equivalent) fixture confirmed the downscale +
 /// re-encode pipeline fires correctly at this quality; it does not speak to
 /// visual fidelity since the fixture is adversarial noise, not a photo.
-pub(crate) const JPEG_QUALITY: u8 = 85;
+const JPEG_QUALITY: u8 = 85;
 
 /// Byte floor below which a JPEG is left untouched by the lossy path
 /// (unless downscaling already fired — see [`compress_for_import`]). A
@@ -72,20 +94,11 @@ pub(crate) const JPEG_QUALITY: u8 = 85;
 /// Confirmed at 256 KiB by the task 2 measurement pass (`progress.md`): no
 /// real small-JPEG corpus was available to move it against, and the PRD's
 /// reasoned value has no counter-evidence. Not moved.
-pub(crate) const JPEG_LOSSY_FLOOR_BYTES: usize = 256 * 1024;
-
-/// Maximum pixel dimension accepted for decoding.
-///
-/// Same discipline as `ocr/mod.rs`'s `MAX_OCR_IMAGE_DIMENSION`: an attachment
-/// is capped at 64 MiB of *compressed* bytes, which says nothing about the
-/// decoded size — PNG reaches ~1000:1, so a few hundred KB can expand to
-/// tens of gigabytes. 20000 px comfortably exceeds any real screenshot or
-/// scan while making the bomb case a clean, allocation-free rejection.
-const MAX_DECODE_DIMENSION_PX: u32 = 20_000;
+const JPEG_LOSSY_FLOOR_BYTES: usize = 256 * 1024;
 
 /// The outcome of [`compress_for_import`].
 #[derive(Debug, PartialEq, Eq)]
-pub enum CompressOutcome {
+pub(super) enum CompressOutcome {
     /// No rule fired, a rule's result was not strictly smaller than the
     /// input, or the input could not be safely decoded/encoded. The caller
     /// stores the original bytes untouched.
@@ -107,41 +120,95 @@ pub enum CompressOutcome {
 /// Three rules apply, in order, to a bounded decode of `bytes`:
 /// 1. Downscale when the long edge exceeds [`MAX_LONG_EDGE_PX`], preserving
 ///    aspect ratio.
-/// 2. A PNG or WebP source (lossless-eligible) is re-encoded to lossless
-///    WebP unconditionally — no byte floor, since the lossless path never
-///    loses a pixel.
-/// 3. A JPEG source is re-encoded lossily at [`JPEG_QUALITY`] only when
-///    downscaling already fired, or the input exceeds
-///    [`JPEG_LOSSY_FLOOR_BYTES`] — re-encoding an already-small JPEG that
-///    does not need to shrink in pixel dimensions is pure generation loss
-///    for negligible saving.
+/// 2. A PNG source is re-encoded to lossless WebP unconditionally — no byte
+///    floor, since the lossless path never loses a pixel. A **WebP** source is
+///    lossless-eligible too, but is only touched when rule 1 fires: see the
+///    gate below for why re-encoding it otherwise is work with a known outcome.
+/// 3. A JPEG source is re-encoded lossily at [`JPEG_QUALITY`] only when rule 1
+///    will fire, or the input exceeds [`JPEG_LOSSY_FLOOR_BYTES`] —
+///    re-encoding an already-small JPEG that does not need to shrink in pixel
+///    dimensions is pure generation loss for negligible saving.
 ///
-/// SVG and GIF short-circuit to `Unchanged` without a decode attempt. Any
-/// decode/encode failure, and a result that is not strictly smaller than
-/// `bytes`, also fall back to `Unchanged`.
-pub fn compress_for_import(bytes: &[u8], content_type: &str) -> CompressOutcome {
+/// Anything [`is_eligible`] rejects short-circuits to `Unchanged` without a
+/// decode attempt, as does a source the header alone settles. Any
+/// decode/encode failure — **including a panic inside the decoder or the
+/// encoder** — and a result that is not strictly smaller than `bytes`, also
+/// fall back to `Unchanged`.
+pub(super) fn compress_for_import(bytes: &[u8], content_type: &str) -> CompressOutcome {
     let is_jpeg = match content_type {
         "image/png" | "image/webp" => false,
         "image/jpeg" => true,
-        // GIF, SVG, PDF, WAV, and anything else this transform does not
-        // know how to decode: store as imported.
+        // Unreachable via `attachment_import`, which gates on `is_eligible`
+        // first; kept so the transform is total over any content type.
         _ => return CompressOutcome::Unchanged,
     };
+
+    // EVERY parse of `bytes` is inside the guard — the header read in
+    // `transform`'s short-circuit as much as the full decode: the third-party
+    // parser is the component actually reading hostile bytes, so containing
+    // only what runs after it would protect the wrong half, and a header parse
+    // (PNG IHDR, JPEG SOF, the VP8 header) is a parser over the same bytes.
+    // The same reasoning, and the same shape, as `ocr::extract_image`. Without
+    // this the module header's "every failure path returns `Unchanged`" would
+    // hold only because `attachment_import` happens to call through
+    // `run_blocking`, which is a property of one call site rather than of this
+    // function.
+    //
+    // `AssertUnwindSafe` is sound here because nothing observable survives an
+    // unwind: `bytes` is borrowed read-only, and every buffer the closure
+    // allocates is local to it.
+    std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        transform(bytes, content_type, is_jpeg)
+    }))
+    .unwrap_or(CompressOutcome::Unchanged)
+}
+
+/// The header short-circuit → decode → downscale → re-encode body of
+/// [`compress_for_import`], split out so the panic guard wraps it whole.
+///
+/// The plaintext intermediates here — the decoded `DynamicImage` pixel buffer,
+/// the resize intermediate, and the encoder's output `Vec` before the caller
+/// wraps it — are **not** `Zeroizing`, and that is the honest shape rather than
+/// a slip (the same statement `commands.rs` makes about its own buffers). Two
+/// reasons: they are pixels the WebView already holds in a V8 heap this crate
+/// cannot reach (`src-tauri/CLAUDE.md`, "Secret-handling logging discipline"),
+/// so the retention window is dominated by a copy outside this process; and
+/// `image` allocates and reallocates internally, so wrapping the handles this
+/// function holds would zero the last buffer while leaving the growth chain
+/// behind it untouched — a guarantee that reads stronger than it is.
+fn transform(bytes: &[u8], content_type: &str, is_jpeg: bool) -> CompressOutcome {
+    // Two sources the HEADER alone settles, decided before paying a full
+    // entropy decode into a pixel buffer that would then be discarded:
+    //
+    // * JPEG under rule 3's floor. Whether rule 1 fires is a function of the
+    //   declared dimensions alone, so this is the same gate at a header
+    //   parse's cost. That is the common case: a pasted, already-small,
+    //   already-screen-sized JPEG.
+    // * **Any** WebP. The source is already in the container the lossless path
+    //   targets, so the re-encode has no format change to win with: a lossy
+    //   WebP inflates when written back losslessly and is discarded by the
+    //   not-smaller guard, and an already-lossless one round-trips to roughly
+    //   its own size. Either way the outcome is known before the work, and the
+    //   only WebP worth decoding is one that must lose pixels regardless.
+    let header_settles_it = match content_type {
+        "image/jpeg" => bytes.len() <= JPEG_LOSSY_FLOOR_BYTES,
+        "image/webp" => true,
+        _ => false,
+    };
+    if header_settles_it && !exceeds_long_edge(bytes) {
+        return CompressOutcome::Unchanged;
+    }
 
     let Some(decoded) = decode_bounded(bytes) else {
         return CompressOutcome::Unchanged;
     };
 
-    let (was_downscaled, image) = downscale_if_needed(decoded);
-
-    if is_jpeg && !was_downscaled && bytes.len() <= JPEG_LOSSY_FLOOR_BYTES {
-        return CompressOutcome::Unchanged;
-    }
+    let image = downscale_if_needed(decoded);
 
     let encoded = if is_jpeg {
-        encode_jpeg(&image)
+        encode_jpeg(&image, bytes.len())
     } else {
-        encode_lossless_webp(&image)
+        encode_lossless_webp(&image, bytes.len())
     };
 
     let Some(encoded) = encoded else {
@@ -158,63 +225,102 @@ pub fn compress_for_import(bytes: &[u8], content_type: &str) -> CompressOutcome 
     }
 }
 
-/// Decode with explicit dimension limits, refusing a bomb-shaped header
-/// before allocation. `None` on anything the decoder rejects, including a
-/// declared size beyond [`MAX_DECODE_DIMENSION_PX`].
-fn decode_bounded(bytes: &[u8]) -> Option<DynamicImage> {
-    let mut limits = image::Limits::default();
-    limits.max_image_width = Some(MAX_DECODE_DIMENSION_PX);
-    limits.max_image_height = Some(MAX_DECODE_DIMENSION_PX);
-    let mut reader = image::ImageReader::new(std::io::Cursor::new(bytes))
-        .with_guessed_format()
-        .ok()?;
-    reader.limits(limits);
-    reader.decode().ok()
+/// Whether ingest-time compression may run on this build's target at all.
+///
+/// `false` on `wasm32` only, and for a containment reason rather than a
+/// capability one — the module header states it in full. Separate from
+/// [`is_eligible`]'s format question because the two are independent: this one
+/// would stay false on the web client even if every format were supported.
+pub(super) const fn is_supported_on_this_target() -> bool {
+    cfg!(not(target_arch = "wasm32"))
+}
+
+/// Whether [`compress_for_import`] can do anything at all with a content type.
+///
+/// Visible to the plugin so `attachment_import` can ask BEFORE reading the
+/// preference and copying the bytes: a PDF, a zip or a voice clip must not pay
+/// a `vault.prefs` decrypt and a full-size buffer copy to be told "no". Format
+/// knowledge stays here — the caller learns only whether to bother. GIF and SVG
+/// are absent for the reasons in this module's header, and so is every format
+/// on a target [`is_supported_on_this_target`] rules out.
+pub(super) fn is_eligible(content_type: &str) -> bool {
+    is_supported_on_this_target()
+        && matches!(content_type, "image/png" | "image/webp" | "image/jpeg")
+}
+
+/// Whether the declared long edge exceeds [`MAX_LONG_EDGE_PX`], read from the
+/// header alone. `false` when the header does not parse — the full decode
+/// would fail too, and `Unchanged` is the answer either way.
+fn exceeds_long_edge(bytes: &[u8]) -> bool {
+    dimensions(bytes).is_some_and(|(w, h)| w.max(h) > MAX_LONG_EDGE_PX)
 }
 
 /// Downscale `image` to fit within [`MAX_LONG_EDGE_PX`] on its long edge,
-/// preserving aspect ratio. Returns whether a resize actually happened —
-/// callers use it to decide whether the JPEG byte floor still applies.
-fn downscale_if_needed(image: DynamicImage) -> (bool, DynamicImage) {
+/// preserving aspect ratio. A no-op when it already fits.
+fn downscale_if_needed(image: DynamicImage) -> DynamicImage {
     if image.width() <= MAX_LONG_EDGE_PX && image.height() <= MAX_LONG_EDGE_PX {
-        return (false, image);
+        return image;
     }
-    let resized = image.resize(MAX_LONG_EDGE_PX, MAX_LONG_EDGE_PX, FilterType::Lanczos3);
-    (true, resized)
+    image.resize(MAX_LONG_EDGE_PX, MAX_LONG_EDGE_PX, FilterType::Lanczos3)
 }
 
-/// Re-encode `image` as lossless WebP. `None` on encode failure.
-fn encode_lossless_webp(image: &DynamicImage) -> Option<Vec<u8>> {
-    let mut out = Vec::new();
+/// Re-encode `image` as lossless WebP. `None` on encode failure. `capacity_hint`
+/// is the source's byte length: a result at or above it is discarded by the
+/// caller, so sizing the buffer there costs nothing and spares the growth
+/// realloc chain from zero.
+fn encode_lossless_webp(image: &DynamicImage, capacity_hint: usize) -> Option<Vec<u8>> {
+    let mut out = Vec::with_capacity(capacity_hint);
     let encoder = WebPEncoder::new_lossless(&mut out);
     image.write_with_encoder(encoder).ok()?;
     Some(out)
 }
 
 /// Re-encode `image` as JPEG at [`JPEG_QUALITY`]. `None` on encode failure.
-fn encode_jpeg(image: &DynamicImage) -> Option<Vec<u8>> {
-    let mut out = Vec::new();
+/// `capacity_hint` as in [`encode_lossless_webp`].
+fn encode_jpeg(image: &DynamicImage, capacity_hint: usize) -> Option<Vec<u8>> {
+    let mut out = Vec::with_capacity(capacity_hint);
     let encoder = JpegEncoder::new_with_quality(&mut out, JPEG_QUALITY);
     image.write_with_encoder(encoder).ok()?;
     Some(out)
+}
+
+/// Deterministic non-uniform pixel pattern — flat color would make the
+/// PNG/JPEG encoders' own compression heuristics behave unrealistically
+/// well, which would mask bugs a photo-like input would expose.
+#[cfg(test)]
+fn pattern_pixel(x: u32, y: u32) -> image::Rgb<u8> {
+    let r = ((x * 7 + y * 13) % 256) as u8;
+    let g = ((x * 3 + y * 29) % 256) as u8;
+    let b = ((x.wrapping_mul(11) ^ y.wrapping_mul(17)) % 256) as u8;
+    image::Rgb([r, g, b])
+}
+
+/// A PNG fixture of `pattern_pixel` at the given `compression`. Shared with
+/// `commands.rs`'s import tests, which need the same
+/// `CompressionType::Uncompressed` trick — a deliberately bloated source, so
+/// the re-encode reliably wins instead of depending on the PNG encoder's own
+/// compression luck.
+#[cfg(test)]
+pub(super) fn make_png(
+    width: u32,
+    height: u32,
+    compression: image::codecs::png::CompressionType,
+) -> Vec<u8> {
+    use image::codecs::png::{FilterType as PngFilterType, PngEncoder};
+    use image::{ImageBuffer, Rgb};
+    let img: ImageBuffer<Rgb<u8>, Vec<u8>> = ImageBuffer::from_fn(width, height, pattern_pixel);
+    let mut out = Vec::new();
+    let encoder = PngEncoder::new_with_quality(&mut out, compression, PngFilterType::NoFilter);
+    img.write_with_encoder(encoder).expect("encode fixture png");
+    out
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use image::codecs::jpeg::JpegEncoder as TestJpegEncoder;
-    use image::codecs::png::{CompressionType, FilterType as PngFilterType, PngEncoder};
+    use image::codecs::png::CompressionType;
     use image::{ImageBuffer, Rgb};
-
-    /// Deterministic non-uniform pixel pattern — flat color would make the
-    /// PNG/JPEG encoders' own compression heuristics behave unrealistically
-    /// well, which would mask bugs a photo-like input would expose.
-    fn pattern_pixel(x: u32, y: u32) -> Rgb<u8> {
-        let r = ((x * 7 + y * 13) % 256) as u8;
-        let g = ((x * 3 + y * 29) % 256) as u8;
-        let b = ((x.wrapping_mul(11) ^ y.wrapping_mul(17)) % 256) as u8;
-        Rgb([r, g, b])
-    }
 
     /// A chaotic, JPEG-hostile pixel pattern used to force a JPEG fixture
     /// above [`JPEG_LOSSY_FLOOR_BYTES`] without needing a huge canvas.
@@ -226,14 +332,6 @@ mod tests {
         Rgb([(h >> 24) as u8, (h >> 16) as u8, (h >> 8) as u8])
     }
 
-    fn make_png(width: u32, height: u32, compression: CompressionType) -> Vec<u8> {
-        let img: ImageBuffer<Rgb<u8>, Vec<u8>> = ImageBuffer::from_fn(width, height, pattern_pixel);
-        let mut out = Vec::new();
-        let encoder = PngEncoder::new_with_quality(&mut out, compression, PngFilterType::NoFilter);
-        img.write_with_encoder(encoder).expect("encode fixture png");
-        out
-    }
-
     fn make_jpeg(width: u32, height: u32, quality: u8, noisy: bool) -> Vec<u8> {
         let pixel_fn = if noisy { noisy_pixel } else { pattern_pixel };
         let img: ImageBuffer<Rgb<u8>, Vec<u8>> = ImageBuffer::from_fn(width, height, pixel_fn);
@@ -241,6 +339,15 @@ mod tests {
         let encoder = TestJpegEncoder::new_with_quality(&mut out, quality);
         img.write_with_encoder(encoder)
             .expect("encode fixture jpeg");
+        out
+    }
+
+    fn make_webp(width: u32, height: u32) -> Vec<u8> {
+        let img: ImageBuffer<Rgb<u8>, Vec<u8>> = ImageBuffer::from_fn(width, height, pattern_pixel);
+        let mut out = Vec::new();
+        let encoder = WebPEncoder::new_lossless(&mut out);
+        img.write_with_encoder(encoder)
+            .expect("encode fixture webp");
         out
     }
 
@@ -279,7 +386,7 @@ mod tests {
     }
 
     /// A hand-assembled PNG whose IHDR declares dimensions far beyond
-    /// [`MAX_DECODE_DIMENSION_PX`], with no IDAT at all. The `png` crate
+    /// [`super::super::decode::MAX_IMAGE_DIMENSION_PX`], with no IDAT at all. The `png` crate
     /// rejects this while still parsing the header (`LimitsExceeded`,
     /// checked against the raw row length / output buffer size derived
     /// purely from IHDR), so the decoder never gets far enough to need
@@ -369,12 +476,16 @@ mod tests {
                 assert_eq!(content_type, "image/jpeg");
                 assert!(bytes.len() < jpeg.len());
             }
+            // Deliberately fatal rather than tolerated. An `Unchanged` arm
+            // that passes would make this test green even if the lossy path
+            // were deleted outright — the floor gate is the only thing it
+            // owns, and a gate that suppressed the attempt is exactly the
+            // failure it exists to catch. The fixture is quality-100 noise,
+            // so a quality-85 re-encode at the same dimensions shrinks it by
+            // a wide margin; if a future encoder ever makes that untrue, the
+            // fixture is what should move.
             CompressOutcome::Unchanged => {
-                // A quality-85 re-encode of already-lossy noise is not
-                // guaranteed to shrink further; the never-a-downgrade
-                // invariant is allowed to win here. Assert on the
-                // invariant this test actually owns instead: the floor
-                // gate did not suppress the attempt.
+                panic!("an over-floor JPEG must be re-encoded, not suppressed by the floor gate")
             }
         }
     }
@@ -382,10 +493,35 @@ mod tests {
     #[test]
     fn svg_is_unchanged_without_decoding() {
         let svg = b"<svg xmlns=\"http://www.w3.org/2000/svg\"></svg>".to_vec();
+        assert!(!is_eligible("image/svg+xml"));
         assert_eq!(
             compress_for_import(&svg, "image/svg+xml"),
             CompressOutcome::Unchanged
         );
+    }
+
+    /// `is_eligible` is what `attachment_import` gates on before it reads the
+    /// preference and copies the bytes, so it must agree exactly with the
+    /// set `compress_for_import` can act on — a disagreement in one direction
+    /// silently disables the feature for a format, and in the other reinstates
+    /// the wasted prefs read + copy this predicate exists to avoid.
+    #[test]
+    fn eligibility_matches_the_formats_the_transform_handles() {
+        for ct in ["image/png", "image/webp", "image/jpeg"] {
+            assert!(is_eligible(ct), "{ct} must be eligible");
+        }
+        for ct in [
+            "image/gif",
+            "image/svg+xml",
+            "application/pdf",
+            "audio/wav",
+            "application/octet-stream",
+        ] {
+            assert!(!is_eligible(ct), "{ct} must not be eligible");
+            // The transform agrees, given bytes it could otherwise decode.
+            let png = make_png(10, 10, CompressionType::Uncompressed);
+            assert_eq!(compress_for_import(&png, ct), CompressOutcome::Unchanged);
+        }
     }
 
     #[test]
@@ -397,6 +533,7 @@ mod tests {
         // `myne-core`'s `image` dependency has no gif codec compiled in at
         // all.
         let gif = b"GIF89a\x21\xF9\x04\x00\x00\x00\x00\x00".to_vec();
+        assert!(!is_eligible("image/gif"));
         assert_eq!(
             compress_for_import(&gif, "image/gif"),
             CompressOutcome::Unchanged
@@ -429,8 +566,8 @@ mod tests {
         // encode helpers must report failure as `None`, not panic — the
         // caller turns that into `CompressOutcome::Unchanged`.
         let empty = DynamicImage::new_rgb8(0, 0);
-        assert!(encode_lossless_webp(&empty).is_none());
-        assert!(encode_jpeg(&empty).is_none());
+        assert!(encode_lossless_webp(&empty, 0).is_none());
+        assert!(encode_jpeg(&empty, 0).is_none());
     }
 
     #[test]
@@ -461,5 +598,104 @@ mod tests {
         let first = compress_for_import(&png, "image/png");
         let second = compress_for_import(&png, "image/png");
         assert_eq!(first, second);
+    }
+
+    /// Determinism is the premise dedup rests on, and repeating a call in one
+    /// process cannot show it: the interesting question is whether two
+    /// PLATFORMS agree, since the same image imported on a laptop and a phone
+    /// must land on one attachment id, not two. That cannot be asserted from
+    /// inside a single process either — but it can be PINNED, so a divergence
+    /// shows up as a red test on whichever platform disagrees instead of as two
+    /// blobs nobody looks at.
+    ///
+    /// **If this fires:** the encoder's output moved. That is not automatically
+    /// a bug — an `image` bump may legitimately change it — but it does mean
+    /// every attachment imported before the change now dedups separately from
+    /// the same image imported after it. Re-pin the literal deliberately and
+    /// say so in the commit; do not "fix" it by deleting the assert.
+    #[test]
+    fn compressed_output_is_byte_stable() {
+        use sha2::{Digest, Sha256};
+
+        let png = make_png(1200, 900, CompressionType::Uncompressed);
+        let CompressOutcome::Compressed { bytes, .. } = compress_for_import(&png, "image/png")
+        else {
+            panic!("fixture must compress for this pin to mean anything");
+        };
+        let digest = Sha256::digest(&bytes)
+            .iter()
+            .fold(String::new(), |mut s, b| {
+                use std::fmt::Write;
+                let _ = write!(s, "{b:02x}");
+                s
+            });
+        assert_eq!(
+            digest, "509f0f30b880d6d415cd659748b5ddafb2f0171fd7c07c119b15bedc5b7f5cb6",
+            "lossless-WebP encoder output moved; see this test's doc comment"
+        );
+    }
+
+    /// A WebP source is already in the container the lossless path targets, so
+    /// the transform has no format change to win with. Below the downscale
+    /// ceiling the answer is knowable from the header, and paying a full decode
+    /// plus a lossless re-encode to reach the not-smaller guard is work whose
+    /// result was never in doubt.
+    #[test]
+    fn small_webp_is_unchanged_without_a_decode() {
+        let webp = make_webp(200, 200);
+        assert!(is_eligible("image/webp"));
+        assert_eq!(
+            compress_for_import(&webp, "image/webp"),
+            CompressOutcome::Unchanged
+        );
+    }
+
+    /// The other half of the gate above: a WebP big enough to need rule 1 IS
+    /// worth the decode, because downscaling wins on pixels rather than on
+    /// container. Without both tests the skip could be a silent disable.
+    ///
+    /// The fixture is 6000 px rather than a hair over the ceiling on purpose.
+    /// `pattern_pixel` is deliberately incompressible, and Lanczos-resampling
+    /// it produces data that costs MORE per pixel losslessly than the original
+    /// did — so a marginal downscale can legitimately fail the not-smaller
+    /// guard and would make this test assert the gate while actually measuring
+    /// the encoder. At 6.25 % of the source's pixel count the pixel saving
+    /// dominates any per-pixel loss, which is what makes the `Compressed` arm
+    /// a statement about the gate.
+    #[test]
+    fn oversized_webp_is_still_downscaled() {
+        let webp = make_webp(6000, 3000);
+        match compress_for_import(&webp, "image/webp") {
+            CompressOutcome::Compressed {
+                bytes,
+                content_type,
+            } => {
+                assert_eq!(content_type, "image/webp");
+                assert!(bytes.len() < webp.len());
+                let (w, h) = decode_dimensions(&bytes);
+                assert_eq!(w.max(h), MAX_LONG_EDGE_PX);
+            }
+            other => panic!("expected Compressed, got {other:?}"),
+        }
+    }
+
+    /// The wasm arm's containment gate, asserted from the side the test suite
+    /// runs on. `is_eligible` must fold in the target question, not just the
+    /// format one — a refactor that drops the conjunct would silently re-enable
+    /// an uncontainable decode in the vault Worker, and nothing else in this
+    /// repo's gates would notice (the wasm build compiles either way).
+    #[test]
+    fn eligibility_folds_in_the_target_support_gate() {
+        assert!(
+            is_supported_on_this_target(),
+            "native targets can contain a decoder panic and must run the transform"
+        );
+        for ct in ["image/png", "image/webp", "image/jpeg"] {
+            assert_eq!(
+                is_eligible(ct),
+                is_supported_on_this_target(),
+                "{ct}'s eligibility must track target support, not only format"
+            );
+        }
     }
 }

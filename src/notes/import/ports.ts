@@ -434,6 +434,10 @@ export async function runSourceImport(
             : createEnexSource(root, ports, {
                 // Evernote inlines every resource as base64, so ingestion needs the
                 // BYTES seam rather than the path-based media resolver.
+                // The WHOLE attachment is handed back, not `{id, filename}`: the
+                // adapter tallies ingest-time compression off `original_size`,
+                // and narrowing here is what once made this route — the one bulk
+                // importer with no media path — compress in silence.
                 ingestBytes: async (bytes, filename) => {
                   try {
                     const att = await attachmentImport({
@@ -441,7 +445,7 @@ export async function runSourceImport(
                       bytes: Array.from(bytes),
                       filename,
                     });
-                    return { id: att.id, filename: att.filename ?? filename };
+                    return { ...att, filename: att.filename ?? filename };
                   } catch {
                     return null; // oversize / unsupported → placeholder + reported loss
                   }

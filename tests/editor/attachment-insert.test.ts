@@ -17,11 +17,17 @@ import {
   findImportedImageRefs,
   importMany,
   importOne,
+  importToastMessage,
   planRewrite,
   setImportFn,
   skipReasonFromError,
   summarizeBatch,
   summarizeCompression,
+  summarizeCompressedAttachments,
+  tallyCompression,
+  compressionTallyMessage,
+  emptyCompressionTally,
+  addCompressionTally,
 } from "../../src/editor/attachments/insert";
 
 function imported(id: string, filename: string): ImportedAttachment {
@@ -168,6 +174,112 @@ describe("summarizeCompression / compressionNoticeMessage (insert-time notice)",
       containerChanged: true,
       contentType: "image/webp",
     });
+  });
+
+  it("names the format of an import that actually swapped container, not the last one", () => {
+    // Order matters: the container-changed import comes FIRST, and a
+    // same-container import follows it. The notice names a destination
+    // format, so it must come from the outcome that has one.
+    const summary = summarizeCompression([
+      compressedWithContainerChange,
+      compressedNoContainerChange,
+    ]);
+    expect(summary?.contentType).toBe("image/webp");
+    expect(compressionNoticeMessage(summary!)).toBe("Compressed to WebP: 4.7 KiB → 600 B");
+  });
+});
+
+describe("summarizeCompressedAttachments / the bulk tally (non-editor import routes)", () => {
+  // Compression is gated in shared core, so it fires on EVERY import route —
+  // the cover picker, import-&-convert, the vault importer, the browser
+  // clipper. `decisions.md` 2026-07-30 makes disclosure at import the thing
+  // that stands in for a consent gate, so routes that never build an
+  // `ImportOutcome` need the same fold reachable from an attachment alone.
+  const compressed: ImportedAttachment = {
+    ...imported(ID_A, "shot.webp"),
+    content_type: "image/webp",
+    size: 300,
+    original_size: 2400,
+    container_changed: true,
+  };
+
+  it("summarizes attachments directly, matching the outcome-shaped entry point", () => {
+    expect(summarizeCompressedAttachments([compressed])).toEqual(
+      summarizeCompression([{ ok: true, attachment: compressed }]),
+    );
+  });
+
+  it("is silent when nothing compressed", () => {
+    expect(summarizeCompressedAttachments([imported(ID_A, "x.png")])).toBeNull();
+    expect(summarizeCompressedAttachments([])).toBeNull();
+  });
+
+  it("tallies count + both byte totals, ignoring uncompressed imports", () => {
+    expect(tallyCompression([compressed, imported(ID_B, "x.png"), compressed])).toEqual({
+      count: 2,
+      originalBytes: 4800,
+      finalBytes: 600,
+    });
+  });
+
+  it("adds tallies, so a bulk route can fold across many notes", () => {
+    const a = tallyCompression([compressed]);
+    expect(addCompressionTally(a, emptyCompressionTally())).toEqual(a);
+    expect(addCompressionTally(a, a)).toEqual({
+      count: 2,
+      originalBytes: 4800,
+      finalBytes: 600,
+    });
+  });
+
+  it("renders nothing for the zero tally — a notice for a no-op teaches users to ignore notices", () => {
+    expect(compressionTallyMessage(emptyCompressionTally())).toBeNull();
+  });
+
+  it("renders singular and plural bulk lines", () => {
+    expect(compressionTallyMessage({ count: 1, originalBytes: 2400, finalBytes: 300 })).toBe(
+      "1 image compressed: 2.3 KiB → 300 B",
+    );
+    expect(compressionTallyMessage({ count: 3, originalBytes: 4800, finalBytes: 600 })).toBe(
+      "3 images compressed: 4.7 KiB → 600 B",
+    );
+  });
+});
+
+describe("importToastMessage (one toast per batch)", () => {
+  const compressed: ImportOutcome = {
+    ok: true,
+    attachment: {
+      ...imported(ID_A, "shot.webp"),
+      content_type: "image/webp",
+      size: 300,
+      original_size: 2400,
+      container_changed: true,
+    },
+  };
+
+  it("is silent for a single clean uncompressed success", () => {
+    expect(importToastMessage([{ ok: true, attachment: imported(ID_A, "x.png") }])).toBeNull();
+  });
+
+  it("falls back to the batch summary when nothing compressed", () => {
+    expect(importToastMessage([{ ok: false, reason: "too-large" }])).toBe(
+      "1 skipped: too large",
+    );
+  });
+
+  it("keeps BOTH parts when a batch compressed something and skipped something", () => {
+    // Only one toast can show, and these two answer different questions: the
+    // disclosure is the irreversible half, the skip count is the actionable
+    // one. Dropping either would make a true sentence that hides a fact the
+    // user needs — four files that never arrived, or pixels that are gone.
+    expect(importToastMessage([compressed, { ok: false, reason: "too-large" }])).toBe(
+      "Compressed to WebP: 2.3 KiB → 300 B · 1 added · 1 skipped: too large",
+    );
+  });
+
+  it("shows the disclosure alone when nothing was skipped", () => {
+    expect(importToastMessage([compressed])).toBe("Compressed to WebP: 2.3 KiB → 300 B");
   });
 });
 

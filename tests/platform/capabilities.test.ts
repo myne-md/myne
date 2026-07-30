@@ -110,6 +110,14 @@ describe("capability descriptor", () => {
       // filename. `MYE1` is device-local and never synced, so a browser cannot
       // inherit a desktop's extractions either.
       "attachmentTextSearch",
+      // Named for the TRANSFORM, not the preference behind it: images still
+      // import on web, they are just stored as given, because `catch_unwind`
+      // cannot contain a decoder panic on wasm32 and a hostile image would kill
+      // the vault Worker. `attachment_compression_enabled` is shared vault
+      // content this client reads, writes and syncs like any other field —
+      // which is why the absence changes the settings copy rather than removing
+      // the control.
+      "imageCompression",
     ];
     const actualAbsent = desktop.ALL_CAPABILITIES.filter((c) => !web.has(c));
     expect([...actualAbsent].sort()).toEqual([...expectedAbsent].sort());

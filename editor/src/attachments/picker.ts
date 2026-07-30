@@ -18,13 +18,7 @@
 import { EditorView } from "@codemirror/view";
 import { getHost, type PickedFile } from "../host";
 import i18n from "@myne/editor/i18n";
-import {
-  type ImportSource,
-  compressionNoticeMessage,
-  importMany,
-  summarizeBatch,
-  summarizeCompression,
-} from "./insert";
+import { type ImportSource, importMany, importToastMessage } from "./insert";
 import { insertEmbedsForOutcomes } from "./paste-drop";
 import { showAttachmentToast } from "./toast";
 
@@ -74,10 +68,6 @@ export async function pickAndInsert(view: EditorView, insertAt?: number): Promis
 
   insertEmbedsForOutcomes(view, outcomes, at);
 
-  const summary = summarizeBatch(outcomes);
-  if (summary !== null) showAttachmentToast(summary);
-  // See paste-drop.ts's importAndInsert for why compression wins when both
-  // would fire.
-  const compression = summarizeCompression(outcomes);
-  if (compression !== null) showAttachmentToast(compressionNoticeMessage(compression));
+  const message = importToastMessage(outcomes);
+  if (message !== null) showAttachmentToast(message);
 }

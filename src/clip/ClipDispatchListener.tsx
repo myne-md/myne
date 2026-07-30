@@ -230,9 +230,15 @@ export function ClipDispatchListener({
  * are the load-bearing constants `buildClipNotice` resolved.
  */
 function composeNoticeMessage(notice: ClipNotice): string {
-  if (notice.tally === null) return notice.message;
-  const tally = notice.tally.map((entry) => entry.line).join(" · ");
-  return `${notice.message} ${tally}`;
+  // The compression disclosure rides on the same line as the omitted tally
+  // rather than replacing it: they report different losses (files that never
+  // arrived vs. pixels that arrived smaller), and each is the one the user
+  // would be surprised to learn later.
+  const parts = [
+    notice.tally === null ? null : notice.tally.map((entry) => entry.line).join(" · "),
+    notice.compressionLine,
+  ].filter((p): p is string => p !== null);
+  return parts.length === 0 ? notice.message : `${notice.message} ${parts.join(" · ")}`;
 }
 
 /**

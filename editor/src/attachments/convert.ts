@@ -22,8 +22,10 @@ import {
   type ImportedAttachment,
   type ImportedImageRef,
   type PlannedRewrite,
+  compressionNoticeMessage,
   findImportedImageRefs,
   planRewrite,
+  summarizeCompressedAttachments,
 } from "./insert";
 import { type DiffPreviewRow, showDiffPreview } from "./diff-preview";
 import { showAttachmentToast } from "./toast";
@@ -75,6 +77,12 @@ export async function convertImportedRefs(
 
   const rewrites: ResolvedRewrite[] = [];
   const skipped: SkippedRef[] = [];
+  // Every attachment this run actually stored, kept for the ingest-time
+  // compression disclosure below. Compression is gated in shared core, so it
+  // fires here exactly as it does on paste and drop — and a route that
+  // compresses without saying so is the half of the obligation that gets
+  // forgotten (`decisions.md` 2026-07-30).
+  const stored: ImportedAttachment[] = [];
   // Imported rows, seeded into the editor catalog cache before the rewrite so
   // the new form-C embeds resolve to their image immediately (not a stale
   // "deleted" tombstone until a note-reopen).
@@ -95,6 +103,7 @@ export async function convertImportedRefs(
       continue;
     }
     rewrites.push({ ref, rewrite: planRewrite(ref, outcome.attachment) });
+    stored.push(outcome.attachment);
     importedRows.push({
       id: outcome.attachment.id,
       contentType: outcome.attachment.content_type,
@@ -135,7 +144,14 @@ export async function convertImportedRefs(
       (skipped.length > 0
         ? i18n.t("editor.attachment.convertCore.skippedSuffix", { count: skipped.length })
         : "");
-    showAttachmentToast(msg);
+    // The compression disclosure rides on the existing toast rather than
+    // replacing it: the converted/skipped counts are what the user asked this
+    // command for, and the notice is the fact they did not ask for and cannot
+    // undo. Same `" · "` join the batch summary uses between its own parts.
+    const compression = summarizeCompressedAttachments(stored);
+    showAttachmentToast(
+      compression === null ? msg : `${msg} · ${compressionNoticeMessage(compression)}`,
+    );
   }
   return { converted: rewrites.length, skipped: skipped.length, cancelled: false };
 }

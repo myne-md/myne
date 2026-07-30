@@ -160,7 +160,30 @@ export type Capability =
    * loses: attachments still import, still sync, still open, and their filenames
    * are still searchable. Only their contents are not.
    */
-  | "attachmentTextSearch";
+  | "attachmentTextSearch"
+  /**
+   * Performing the ingest-time image TRANSFORM — downscale + re-encode before
+   * an imported image is encrypted and stored.
+   *
+   * Named for the transform, not for the preference, and the distinction is the
+   * whole point. `attachment_compression_enabled` is ordinary shared vault
+   * content (`decisions.md` 2026-07-30): every client reads it, writes it and
+   * syncs it, and a web session flipping it changes what this user's desktop
+   * does. What a client without this capability declines is doing the decode.
+   *
+   * **Absent on web**, and for a containment reason rather than a capability
+   * one: `catch_unwind` needs unwinding and `wasm32-unknown-unknown` has none,
+   * so a hostile image that panicked the decoder would kill the vault Worker
+   * instead of falling back to storing the original — turning a successful
+   * import into a dead tab. `compress::is_supported_on_this_target` is the
+   * backend half of the same statement.
+   *
+   * Like `localOnlyVault`, this changes COPY rather than removing a control:
+   * the setting stays (it governs the user's other devices), but a helper line
+   * claiming it "applies on every device" is false in front of the one client
+   * that will not honour it.
+   */
+  | "imageCompression";
 
 /**
  * Every capability, keyed so the compiler can count.
@@ -199,6 +222,7 @@ const CAPABILITY_KEYS: Readonly<Record<Capability, true>> = Object.freeze({
   localOnlyVault: true,
   hostDirectoryRead: true,
   attachmentTextSearch: true,
+  imageCompression: true,
 });
 
 /** Every capability, derived from the keyed record so it cannot fall behind. */
