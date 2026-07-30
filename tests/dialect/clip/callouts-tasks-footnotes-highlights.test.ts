@@ -200,9 +200,9 @@ describe("clip serializer — highlights", () => {
   });
 
   it("degrades an OUT-OF-SET color to a bare <mark>, never an arbitrary class", () => {
-    const input = 'A <mark class="hl-orange">x</mark> word.\n';
+    const input = 'A <mark class="hl-chartreuse">x</mark> word.\n';
     const emitted = serializeClipMarkdown(input);
-    expect(emitted).not.toContain("hl-orange");
+    expect(emitted).not.toContain("hl-chartreuse");
     expect(emitted).not.toContain("class=");
     expect(emitted).toContain("<mark>x</mark>");
     expect(shapeOf(emitted)).toBe(shapeOf(input));

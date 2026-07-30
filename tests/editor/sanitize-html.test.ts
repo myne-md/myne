@@ -78,7 +78,7 @@ describe("sanitizeEmbeddedHtml — multi-color highlight class (decisions.md 202
   });
 
   it("strips an unknown highlight token (not in the closed set)", async () => {
-    const out = await sanitizeEmbeddedHtml('<mark class="hl-orange">x</mark>');
+    const out = await sanitizeEmbeddedHtml('<mark class="hl-chartreuse">x</mark>');
     expect(out).toBe("<mark>x</mark>");
   });
 

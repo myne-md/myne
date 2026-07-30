@@ -14,6 +14,7 @@
 // to document.body and renders on a rAF, so each assertion awaits a frame.
 
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
+import { HIGHLIGHT_CLASSES } from "../../editor/src/html/sanitize";
 import { EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { forceParsing } from "@codemirror/language";
@@ -182,7 +183,7 @@ describe("highlight control", () => {
     expect(m.view.state.doc.toString()).toBe("==hello== world");
   });
 
-  it("the caret opens a 5-swatch dropdown; a color swatch wraps in <mark class>", async () => {
+  it("the caret opens a swatch dropdown, one per allowed class; a swatch wraps in <mark class>", async () => {
     m = mount("hello world", 0, 5);
     await raf();
     const caret = toolbar()!.querySelector<HTMLButtonElement>(
@@ -191,7 +192,10 @@ describe("highlight control", () => {
     press(caret!);
     await raf();
     const swatches = toolbar()!.querySelectorAll(".cm-toolbar-highlight-swatch");
-    expect(swatches.length).toBe(5);
+    // Bound to the sanitizer's allowlist rather than a literal (MYND-632): the
+    // dropdown must offer exactly the classes that survive sanitization, so a
+    // palette change cannot silently ship a swatch that renders unstyled.
+    expect(swatches.length).toBe(HIGHLIGHT_CLASSES.length);
     const green = toolbar()!.querySelector<HTMLButtonElement>(
       "[data-testid='toolbar.highlight-hl-green']",
     );

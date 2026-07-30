@@ -212,6 +212,7 @@ describe("Obsidian source — behaviour-preserving extraction", () => {
     expect(plan.dirs).toEqual(["notes"]);
     expect(plan.ignore).toEqual({
       canvasSkipped: 1,
+      excalidrawSkipped: 0,
       nonMarkdownSkipped: 1,
       hiddenIgnored: 1,
     });

@@ -30,12 +30,28 @@ export interface Purifier {
 // `class` survives the sanitizer ONLY as exactly ONE of these tokens, and ONLY
 // on a `<mark>` — enforced by the `uponSanitizeAttribute` hook below. `hl-yellow`
 // is the default amber (== `--highlight`); the rest are sibling washes.
+//
+// MYND-632: grown from five to thirteen. Five was too few to categorise with —
+// people ran out and started reusing a colour for two meanings, which is worse
+// than having none. It stays a CLOSED allowlist: this is the XSS boundary
+// (decisions.md 2026-06-15), and the request for arbitrary hex would have
+// breached it, so the answer is more tokens, not a different mechanism. Every
+// entry needs a matching `--highlight-*` pair (light + dark) in
+// `docs/design/colors_and_type.css` and a toolbar entry, or it renders unstyled.
 export const HIGHLIGHT_CLASSES = [
   "hl-yellow",
   "hl-green",
   "hl-blue",
   "hl-pink",
   "hl-purple",
+  "hl-orange",
+  "hl-red",
+  "hl-teal",
+  "hl-cyan",
+  "hl-lime",
+  "hl-brown",
+  "hl-grey",
+  "hl-indigo",
 ] as const;
 const HL_SET: ReadonlySet<string> = new Set(HIGHLIGHT_CLASSES);
 

@@ -204,10 +204,16 @@ export const myneTheme = EditorView.theme({
   // Hanging indent. The `+ 6px` keeps the MARKER aligned with the body text
   // column (CM's default `.cm-line` left padding is 6px) instead of hanging it at
   // the line's hard left edge — at x≈0 the top-level •/* /+ markers fell 6px into
-  // the gutter and read as "no marker at all". Wrapped lines still hang to 1.5em.
+  // the gutter and read as "no marker at all".
+  //
+  // The depth itself is now MEASURED per line and delivered as an inline style
+  // by `decorations/list.ts::hangingIndentCh` (MYND-626) — a fixed value cannot
+  // serve a bullet widget, an ordered marker and a nested item at once. These
+  // are the fallback metrics for a line the decoration has not styled (and they
+  // keep the rule from being empty); the inline style wins wherever it applies.
   ".cm-list-item-line": {
-    textIndent: "-1.5em",
-    paddingLeft: "calc(1.5em + 6px)",
+    textIndent: "-1.4ch",
+    paddingLeft: "calc(1.4ch + 6px)",
   },
 
   // Inline typography — highlight / sub / sup from inline-typography.ts
@@ -268,6 +274,34 @@ export const myneTheme = EditorView.theme({
   },
   ".cm-embedded-html mark.hl-purple": {
     backgroundColor: "var(--highlight-purple, #e2d8ee)",
+  },
+  // MYND-632's eight. Each fallback is that colour's OWN light value, matching
+  // the five above — a shared fallback would render eight indistinguishable
+  // washes wherever the stylesheet has not loaded, which is the exact failure
+  // the palette exists to prevent.
+  ".cm-embedded-html mark.hl-orange": {
+    backgroundColor: "var(--highlight-orange, #f2ddc6)",
+  },
+  ".cm-embedded-html mark.hl-red": {
+    backgroundColor: "var(--highlight-red, #efd3d3)",
+  },
+  ".cm-embedded-html mark.hl-teal": {
+    backgroundColor: "var(--highlight-teal, #cfe6e2)",
+  },
+  ".cm-embedded-html mark.hl-cyan": {
+    backgroundColor: "var(--highlight-cyan, #cfe4ea)",
+  },
+  ".cm-embedded-html mark.hl-lime": {
+    backgroundColor: "var(--highlight-lime, #e0ecc4)",
+  },
+  ".cm-embedded-html mark.hl-brown": {
+    backgroundColor: "var(--highlight-brown, #e3d9cd)",
+  },
+  ".cm-embedded-html mark.hl-grey": {
+    backgroundColor: "var(--highlight-grey, #dedcd8)",
+  },
+  ".cm-embedded-html mark.hl-indigo": {
+    backgroundColor: "var(--highlight-indigo, #d6d8ee)",
   },
   ".cm-embedded-html kbd": {
     fontFamily: "var(--font-mono)",
@@ -944,7 +978,7 @@ export const myneTheme = EditorView.theme({
     cursor: "pointer",
     verticalAlign: "baseline",
     // `text-indent` is inherited and applies to an inline-block's own first
-    // line. Inside a `.cm-list-item-line` (which sets `text-indent: -1.5em`
+    // line. Inside a `.cm-list-item-line` (which sets a negative `text-indent`
     // for its hanging indent) the chip would otherwise shift its label ~1.5em
     // left, escaping the pill. Reset it so the label stays centered in the box.
     textIndent: "0",
@@ -955,6 +989,15 @@ export const myneTheme = EditorView.theme({
   ".cm-wikilink-chip-embed": {
     backgroundColor: "var(--paper-3, #ece9e2)",
     fontStyle: "italic",
+  },
+  // MYND-634: a drawing embed is visually its own thing, not a link to prose.
+  // The full inline canvas (a locked thumbnail that unlocks into an editable
+  // surface) renders through this same class once it lands; until then the chip
+  // at least stops claiming to be a text note.
+  ".cm-wikilink-chip-drawing": {
+    fontStyle: "normal",
+    borderStyle: "dashed",
+    borderColor: "var(--line-2, #cfccc4)",
   },
   // §5.3 broken-link styling (MYND-37/83): a wikilink whose target matches no
   // note — faded foreground, italic, no underline. Same chip surface as the

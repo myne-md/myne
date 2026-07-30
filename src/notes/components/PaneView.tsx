@@ -1054,6 +1054,13 @@ export function PaneView({
             ? t("notes.pane.untitledView")
             : view.name;
         }}
+        colorOf={(key) => {
+          // Only real notes carry a colour label; views / graph tabs have none.
+          const it = parseItemKey(key);
+          // `item_colors` (MYND-184) is keyed by note UUID; views and graph
+          // tabs are not colourable, so they resolve to undefined.
+          return it.kind === "note" ? prefs.item_colors[it.id] : undefined;
+        }}
         iconOf={(key) => {
           const it = parseItemKey(key);
           if (it.kind === "view") return "layout-grid";

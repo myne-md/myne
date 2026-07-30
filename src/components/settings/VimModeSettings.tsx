@@ -1,5 +1,5 @@
 // Settings → Editor: vim keyboard-mode toggle (vim-keyboard-mode, MYND-313).
-// A single `role="switch"` toggle, the direct sibling of LineNumbersSettings —
+// A single `<Switch>` toggle, the direct sibling of LineNumbersSettings —
 // local state loaded on mount, disk-first persist with no in-flight gating.
 //
 // Default OFF (modal editing is opt-in). `null` ≡ unset → host default-OFF; only
@@ -14,21 +14,10 @@
 
 import { useEffect, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
+import { Switch } from "../primitives/Switch";
 import { ControlBlock } from "./ControlBlock";
 import { prefsRead, setEditorVimMode } from "../../lib/prefs";
 import { chordPolicyActive } from "../../editor/vim-chords";
-
-const TOGGLE_STYLE: CSSProperties = {
-  fontFamily: "var(--font-sans)",
-  fontSize: 13,
-  padding: "6px 12px",
-  borderRadius: "var(--radius-1)",
-  border: "1px solid var(--line-2)",
-  background: "var(--bg-1)",
-  color: "var(--fg-1)",
-  cursor: "pointer",
-  alignSelf: "flex-start",
-};
 
 const ERROR_STYLE: CSSProperties = {
   marginTop: "var(--space-2)",
@@ -83,17 +72,12 @@ export function VimModeSettings() {
         label={t("settings.vimMode.label")}
         helper={t("settings.vimMode.helper")}
         control={
-          <button
-            type="button"
-            role="switch"
-            aria-checked={enabled}
-            aria-label={t("settings.vimMode.label")}
-            data-testid="settings.vim-mode"
-            onClick={() => void toggle(!enabled)}
-            style={TOGGLE_STYLE}
-          >
-            {enabled ? t("settings.vimMode.on") : t("settings.vimMode.off")}
-          </button>
+          <Switch
+            checked={enabled}
+            onChange={() => toggle(!enabled)}
+            ariaLabel={t("settings.vimMode.label")}
+            testId="settings.vim-mode"
+          />
         }
       />
       {/* The caveat is only true where `Mod` resolves to Ctrl; on macOS vim
