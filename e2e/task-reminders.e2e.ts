@@ -26,7 +26,12 @@
 import { expect, it } from "vitest";
 import { describeE2E, scenario } from "./support/scenario";
 import { seedVault } from "./support/fixtures";
-import { dismissImporterOffer, openSettings, unlockToEditor } from "./support/flows";
+import {
+  dismissImporterOffer,
+  dismissImporterOfferIfPresent,
+  openSettings,
+  unlockToEditor,
+} from "./support/flows";
 import {
   REMINDER_IN_APP_ONLY_SENTENCE,
   REMINDER_OS_DISCLOSURE_SENTENCE,
@@ -86,7 +91,10 @@ describeE2E("tr1 the reminder switch tells the truth and remembers (MYND-618)", 
         await (await s.byTestId("editor.lock-cta")).click();
         await s.byTestId("unlock.password-input", { timeoutMs: 20_000 });
         await unlockToEditor(s, password);
-        await dismissImporterOffer(s);
+        // Second mount of this scenario: the offer is a fresh-vault first-editor
+        // overlay and does NOT re-appear here, so the hard variant would burn its
+        // whole timeout waiting for something that is never coming.
+        await dismissImporterOfferIfPresent(s);
 
         await openReminderSettings(s);
         expect(await toggleState(s)).toBe("false");

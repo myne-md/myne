@@ -51,11 +51,13 @@ describeE2E("tp1 the vault-wide task tab lists tasks across notes (MYND-616)", (
 
         // Two notes, each with one task, on two different dates.
         await createNote(s, "Bills");
-        await typeIntoEditor(s, "- [ ] pay the rent [due:: 2026-08-01]");
+        await typeIntoEditor(s, "- [ ] pay the rent [due:: 2026-08-01]", {
+          landedText: "pay the rent",
+        });
         await waitForSaved(s);
 
         await createNote(s, "Errands");
-        await typeIntoEditor(s, "- [ ] buy milk [due:: 2030-12-31]");
+        await typeIntoEditor(s, "- [ ] buy milk [due:: 2030-12-31]", { landedText: "buy milk" });
         await waitForSaved(s);
 
         await openTaskTab(s);

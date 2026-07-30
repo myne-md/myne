@@ -352,6 +352,30 @@ export async function reopenNoteAfterReload(session: Session): Promise<void> {
   );
 }
 
+/**
+ * Send one key to the focused editor document, without typing a payload.
+ *
+ * The case this exists for: a **block widget renders only while the caret is
+ * outside its lines** — the live-preview reveal rule. A scenario that types a
+ * block therefore ends with the caret inside it and the block still raw, and
+ * any assertion about the rendered form fails against source text. One Enter
+ * after the typing moves the caret out, which is what a user does anyway.
+ *
+ * Pass a W3C key code (`` Enter, `` ArrowDown, …), not a literal
+ * `"\n"` — WebKit's driver delivers U+000A as a character, not a keypress.
+ */
+export async function pressInEditor(session: Session, key: string): Promise<void> {
+  const [content] = await session.findElements(CM_CONTENT);
+  if (!content) throw new Error("pressInEditor: editor content not found");
+  await content.sendKeys(key);
+}
+
+/** The W3C Enter key, for `pressInEditor`. */
+export const ENTER_KEY = String.fromCharCode(0xe007);
+
+/** The W3C Escape key, for `pressInEditor`. */
+export const ESCAPE_KEY = String.fromCharCode(0xe00c);
+
 /** Type into the live CodeMirror document. A plain element click does
  *  NOT focus CM under this driver (activeElement stays put); sendKeys'
  *  implicit focus does, but keys sent during that focus settle drop
@@ -362,8 +386,20 @@ export async function reopenNoteAfterReload(session: Session): Promise<void> {
  *  (observed: probe chars wiped + the payload's leading edge swallowed
  *  by the fresh doc), so a payload that didn't land gets ONE re-send.
  *  Callers' asserts are `includes(...)`, so stray probe chars and a
- *  leftover truncated fragment are harmless. */
-export async function typeIntoEditor(session: Session, text: string): Promise<void> {
+ *  leftover truncated fragment are harmless.
+ *
+ *  `landedText` overrides what the arrival check looks for. The default —
+ *  the payload itself — assumes Live preview only HIDES syntax, so the words
+ *  survive. A decoration that REPLACES a span with a different label breaks
+ *  that assumption: a task field types as `[due:: 2026-08-01]` and renders as
+ *  a chip reading `2026-08-01`, so the word "due" is nowhere in the DOM and
+ *  the check can never pass — it re-sends, and the line ends up typed twice.
+ *  Pass the part that survives rendering (usually the plain prose) instead. */
+export async function typeIntoEditor(
+  session: Session,
+  text: string,
+  opts?: { landedText?: string },
+): Promise<void> {
   // Focus the editor. When a double-click CREATES+opens a note (folder index
   // note, MYND-370), the editor re-renders asynchronously and REPLACES the
   // .cm-content node — a handle located once then clicked goes genuinely stale
@@ -420,7 +456,7 @@ export async function typeIntoEditor(session: Session, text: string): Promise<vo
   // whitespace, punctuation, and any auto-inserted list bullets / indent) — a
   // true "did the words land, in order" proof, robust to Live-mode decoration.
   const norm = (s: string): string => s.replace(/[^a-z0-9]/gi, "").toLowerCase();
-  const flat = norm(text);
+  const flat = norm(opts?.landedText ?? text);
   const landed = async () => norm(await editorText(session)).includes(flat) || null;
   // A literal "\n" in a sendKeys payload is delivered as U+000A, which WebKit's
   // driver does NOT translate into an Enter keypress — CM6 stays on one line
