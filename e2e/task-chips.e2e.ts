@@ -14,6 +14,7 @@ import { it } from "vitest";
 import { describeE2E, scenario } from "./support/scenario";
 import { seedVault } from "./support/fixtures";
 import {
+  ESCAPE_KEY,
   createNote,
   dismissImporterOffer,
   editorText,
@@ -44,7 +45,7 @@ describeE2E("tc1 task-field chips render, open, and write (MYND-614)", () => {
         await dismissImporterOffer(s);
         await createNote(s, "Task Note");
 
-        await typeIntoEditor(s, `- [ ]${TASK_LINE}`);
+        await typeIntoEditor(s, `- [ ]${TASK_LINE}`, { landedText: "pay the rent" });
         await waitForSaved(s);
 
         // 1. All three chips render in live mode.
@@ -62,18 +63,32 @@ describeE2E("tc1 task-field chips render, open, and write (MYND-614)", () => {
           { label: "one priority chip" },
         );
 
-        // 2. Clicking a chip opens the field editor.
+        // 2. Clicking a chip opens the field editor. The `due` editor is a
+        //    native `<input type="date">`, so this proves the OPEN path for the
+        //    one field whose control is a platform widget.
         await (await s.byTestId("editor.task-chip-due")).click();
         await s.waitForElement(testIdSelector("editor.task-field-editor"));
+        // Escape goes to the FIELD INPUT, which is what holds focus while the
+        // editor is open — `.cm-content` is not focusable then (tc2's pattern).
+        await (await s.byTestId("editor.task-field-input")).sendKeys(ESCAPE_KEY);
+        await s.waitForGone(testIdSelector("editor.task-field-editor"));
 
         // 3. A value change lands in the FILE — the point of the whole path.
+        //    Driven through `repeat`, whose editor is a plain text input: a
+        //    date input takes keystrokes per SEGMENT in a locale-dependent
+        //    order, so typing an ISO string into it asserts on the platform's
+        //    date widget rather than on Myne's write path. The write path is
+        //    the same for every field, and this is the one that can be driven
+        //    honestly.
+        await (await s.byTestId("editor.task-chip-repeat")).click();
+        await s.waitForElement(testIdSelector("editor.task-field-editor"));
         const input = await s.byTestId("editor.task-field-input");
-        await input.sendKeys("2026-09-09");
+        await input.replaceText("every week");
         await (await s.byTestId("editor.task-field-commit")).click();
         await waitForSaved(s);
 
         await s.waitUntil(
-          async () => ((await editorText(s)).includes("2026-09-09") ? true : null),
+          async () => ((await editorText(s)).includes("every week") ? true : null),
           { label: "edited value reached the document" },
         );
       },
@@ -94,7 +109,9 @@ describeE2E("tc2 chip editor dismissal leaves the value alone (MYND-614)", () =>
         await dismissImporterOffer(s);
         await createNote(s, "Escape Note");
 
-        await typeIntoEditor(s, "- [ ] pay the rent [due:: 2026-08-01]");
+        await typeIntoEditor(s, "- [ ] pay the rent [due:: 2026-08-01]", {
+          landedText: "pay the rent",
+        });
         await waitForSaved(s);
         await s.waitForElement(testIdSelector("editor.task-chip-due"));
 

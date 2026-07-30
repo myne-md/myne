@@ -114,6 +114,33 @@ describe("shape", () => {
     const [task] = await fetchVaultTasks(1);
     expect(task.oversized).toBe(true);
   });
+
+  // Rust's `Option<String>` serializes as `null`, not as an absent key — the
+  // struct carries no `skip_serializing_if` because it is also the on-disk MYI1
+  // payload. `VaultTask` promises optional-or-absent, so consumers write
+  // `x === undefined`, and a `null` walks through that straight into
+  // `.split(…)` on a non-string. That is a real crash, not a style point: the
+  // reminder scheduler threw on every pass the moment this index stopped
+  // returning an empty list (MYND-644), as an unhandled rejection no surface
+  // could show.
+  it("drops the wire's nulls, so an absent field is absent and never null", async () => {
+    invoke.mockResolvedValue([
+      { ...ROW, due: null, repeat: null, done: null, priority: null, remind: null },
+    ]);
+    const [task] = await fetchVaultTasks(1);
+    for (const key of ["due", "repeat", "done", "priority", "remind"] as const) {
+      expect(task[key], `${key} must not be null`).toBeUndefined();
+      expect(Object.hasOwn(task, key), `${key} must be absent, not present-undefined`).toBe(false);
+    }
+  });
+
+  it("keeps the values it is given", async () => {
+    invoke.mockResolvedValue([{ ...ROW, remind: "2026-08-01 09:00", priority: "high" }]);
+    const [task] = await fetchVaultTasks(1);
+    expect(task.remind).toBe("2026-08-01 09:00");
+    expect(task.priority).toBe("high");
+    expect(task.due).toBe("2026-08-01");
+  });
 });
 
 describe("live-set gate (task 7)", () => {

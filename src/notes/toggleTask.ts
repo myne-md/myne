@@ -50,6 +50,31 @@ import {
   type TaskWriteDeps,
 } from "./taskWriteCore";
 import type { VaultTask } from "./taskIndex";
+import { reindexNoteFromBody } from "./vaultIndices";
+
+/**
+ * The desktop write: `saveNote`, then the index refresh.
+ *
+ * `saveNote` writes the note and nothing else — the live re-index that follows
+ * a save is performed by the **autosave hook** (`useAutosave.ts`), not by the
+ * save primitive. Every other cross-note writer reaches the index through some
+ * path of its own; this one had none, so a tick written from a list wrote the
+ * file and left the index reporting the old state. The row stayed unchecked,
+ * and because `vaultIndicesApply` is also what bumps the index nonce, no task
+ * surface even re-queried.
+ *
+ * Fire-and-forget, matching the autosave hook: a VaultIndices hiccup must not
+ * turn a successful write into a failed one. The next reconcile self-heals.
+ */
+async function saveAndReindex(
+  noteId: string,
+  body: string,
+  baseHashHex: string,
+): Promise<string> {
+  const stamped = await saveNote(noteId, body, baseHashHex);
+  void reindexNoteFromBody(noteId, stamped);
+  return stamped;
+}
 
 // The write path itself lives in `taskWriteCore.ts` with its IO required rather
 // than defaulted, so a second client (mobile, MYND-620) can use the same
@@ -81,7 +106,7 @@ export async function setTaskCompleted(
   await writeTaskCompletion(task, completed, {
     flushDirtyPanes: deps.flushDirtyPanes,
     readNote: deps.readNote ?? noteRead,
-    writeNote: deps.writeNote ?? saveNote,
+    writeNote: deps.writeNote ?? saveAndReindex,
     completeNoteTask: deps.completeNoteTask ?? completeNote,
     uncompleteNoteTask: deps.uncompleteNoteTask ?? uncompleteNote,
     announce: deps.announce ?? announceWrite,

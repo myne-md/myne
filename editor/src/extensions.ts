@@ -42,6 +42,7 @@ import { Footnote } from "@myne/dialect/lezer/footnote";
 import { Highlight } from "@myne/dialect/lezer/highlight";
 import { Math } from "@myne/dialect/lezer/math";
 import { Comment } from "@myne/dialect/lezer/comment";
+import { TaskField } from "@myne/dialect/lezer/task-field";
 import { codeNestMarkdownExtension, codeSyntaxHighlighting } from "./code-highlight";
 import { autoCloseFenceKeymap } from "./auto-close-fence";
 import { viewModeExtension, type ViewMode } from "./view-mode";
@@ -153,6 +154,12 @@ export function myneExtensions(opts?: {
         Emoji,
         Highlight,
         Math,
+        // Inline task fields (MYND-611): `[due:: 2026-08-01]` and the Obsidian
+        // emoji form. Must match parser.ts. Without it the editor's tree has no
+        // `TaskField` node at all, and everything keyed on one silently does
+        // nothing: the chips never render (`chipRangesIn` finds no nodes) and
+        // spell-skip never skips a field's value.
+        TaskField,
         // Dialect comments `%%…%%` (MYND-315). Must match parser.ts. Hidden
         // off-cursor by commentDecorations(); never emitted/rewritten (§6 C1).
         Comment,
