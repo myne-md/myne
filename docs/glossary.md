@@ -1676,6 +1676,12 @@ Myne's full-text search over note content (MYND-29). A custom in-memory **BM25 i
 
 Used in: `spec/protocol.md` §9.6; `decisions.md` 2026-05-31
 
+### **search query language** &nbsp; 📦 *Product*
+
+The operator + boolean syntax the command palette accepts over the [search index](#search-index) (MYND-303 + MYND-307). **Field operators** scope a query — `tag:` (→ [tag index](#tag-index)), `path:` (folder subtree), `content:` / bare terms (full-text), `file:` (title match — a Myne note's title is *derived* from its first heading, so `file:` is a title match, **not** a filename glob), `task:` (notes carrying a task item) — and **boolean/phrase combinators** compose it: implicit AND, `OR`, `-` negation, `( )` grouping, `"exact phrase"`. It is a **frontend parser**: the string compiles to a [saved view](#saved-view) filter tree and is resolved by the same client-side engine + leaf resolvers, so every predicate evaluates over already-decrypted in-RAM state — zero server visibility, no crypto cost, and the BM25 index stays a bag-of-words matcher with no query language of its own. An operator-free query keeps the unchanged BM25 path; `line:` / `section:` / `/regex/` need a post-decrypt body scan and are deferred (Slice B). An unknown `foo:` prefix is literal search text.
+
+Used in: `decisions.md` 2026-07-30
+
 ### **graph-layout-key** &nbsp; 🗝️ *Key/identifier*
 
 The 32-byte AEAD KEK encrypting [`vault.graph`](#vaultgraph) (`MYG1`, §9.19). Derived deterministically from `root_key` via the canonical `DeriveSubkey(root_key, "graph-layout-key")` helper (`spec/protocol.md` §3.4 registry entry `"myne.v0.1 graph-layout-key"`). Never persisted; re-derived on each read/write of the layout cache. Independent from the `itemsKey` lineage by design — like `search-index-key` / `ai-embeddings-key` it derives straight from `root_key`, so it survives the v005 epoch-rotation `itemsKey` evolution. The AAD `AAD_graph_layout_blob` (role `"graph-layout-blob"`, `spec/protocol.md` §5.2) binds the blob to its vault via `account_number_hash`. **DISTINCT** from the AAD role string `"graph-layout-blob"` (a different load-bearing constant).
