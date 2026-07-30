@@ -1956,7 +1956,7 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
               </div>
             ) : treeMode ? (
               <ScreenScroll style={{ marginTop: 4 }}>
-                {favStripVisible && <FavoritesStrip notes={favNotes} onOpen={(id) => void openFromList(id)} />}
+                {favStripVisible && <FavoritesStrip notes={favNotes} onOpen={(id) => void openFromList(id)} onHold={setRowActions} />}
                 {renderTree(null, 0)}
               </ScreenScroll>
             ) : (

@@ -255,6 +255,14 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
       ? [...(config.prefs.deliberate_folders as string[])]
       : [];
 
+    // STATEFUL favorites list (MYND-597). The favorites strip pulls a favorited
+    // note out of the list, and un-favoriting from the strip's long-press sheet
+    // must return it — which only works if `set_favorites` survives into the next
+    // `prefs_read`, exactly like the real setter + nonce-bump round-trip.
+    let favorites: string[] = Array.isArray(config.prefs?.favorites)
+      ? [...(config.prefs.favorites as string[])]
+      : [];
+
     // STATEFUL vault.workspace descriptor (MYND-561). The opaque JSON string the
     // frontend seals into MYW1; `workspace_read` hands back whatever the last
     // `workspace_write` staged, so a "reopen the app" assertion can re-read the
@@ -323,6 +331,7 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
         // owns these fields, else the seed would keep winning and a write made
         // through the UI would appear to no-op on the next read.
         deliberate_folders: deliberateFolders,
+        favorites,
         reminders_enabled: remindersEnabled,
         reminder_horizon_days: reminderHorizonDays,
         device_names: { ...deviceNames },
@@ -377,6 +386,16 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
         const w = window as unknown as { __deliberateFolderWrites?: string[][] };
         (w.__deliberateFolderWrites ??= []).push([...folders]);
         deliberateFolders = [...folders];
+        return null;
+      },
+      // Whole-list favorites setter (MYND-597): record the write AND mutate the
+      // store, so un-favoriting from the strip's long-press sheet returns the
+      // note to the list on the nonce-bumped re-read. Payload key is `order`.
+      "plugin:prefs|set_favorites": (args) => {
+        const order = (args.order ?? []) as string[];
+        const w = window as unknown as { __favoriteWrites?: string[][] };
+        (w.__favoriteWrites ??= []).push([...order]);
+        favorites = [...order];
         return null;
       },
       // ── Workspace-state persistence (vault.workspace MYW1 descriptor) ──
