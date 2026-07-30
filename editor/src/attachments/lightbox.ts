@@ -202,16 +202,20 @@ export function showAttachmentLightbox(opts: LightboxOptions): void {
 
     // Zoom/pan controls (ED-08 design: − / percentage / +), floating bottom-
     // centre. Wheel / pinch / double-tap / keyboard are wired by the controller
-    // (MYND-594); the buttons drive the same API.
-    let setPercent: (pct: number) => void = () => {};
-    const zoom = mountImageZoom(backdrop, img, (pct) => setPercent(pct));
-    activeImageZoom = zoom;
+    // (MYND-594); the buttons drive the same API. Build the controls FIRST so
+    // `controls.setPercent` is passed straight into the controller: a cached
+    // image reports `complete` synchronously, so the controller can initialise
+    // (and emit its first percentage) DURING `mountImageZoom` — a later-assigned
+    // setter would drop that initial readout.
+    let zoomRef: ImageZoomController | null = null;
     const controls = buildZoomControls({
-      onZoomOut: () => zoom.zoomOut(),
-      onZoomIn: () => zoom.zoomIn(),
-      onReset: () => zoom.reset(),
+      onZoomOut: () => zoomRef?.zoomOut(),
+      onZoomIn: () => zoomRef?.zoomIn(),
+      onReset: () => zoomRef?.reset(),
     });
-    setPercent = controls.setPercent;
+    const zoom = mountImageZoom(backdrop, img, controls.setPercent);
+    zoomRef = zoom;
+    activeImageZoom = zoom;
     backdrop.appendChild(controls.el);
   }
 
