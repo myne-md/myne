@@ -1,5 +1,6 @@
 import { type ReactNode, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { showAttachmentLightbox } from "@myne/editor/attachments/lightbox";
 import { parseBlocks, type Block, type Inline } from "../lib/markdown";
 import { attachmentSrc } from "../lib/attachmentRef";
 
@@ -39,12 +40,17 @@ function AttachmentInline({ id, label }: { id: string; label: string }) {
       />
     );
   }
+  // Tap opens the shared @myne/editor lightbox (zoom/pan, MYND-594). Before this
+  // there was no handler at all — an image could not be inspected on a phone.
+  const src = attachmentSrc(id);
   return (
     <img
-      src={attachmentSrc(id)}
+      src={src}
       alt={label}
+      data-testid="markdown.image"
       onError={() => setFailed(true)}
-      style={{ display: "block", maxWidth: "100%", borderRadius: 8, margin: "8px 0" }}
+      onClick={() => showAttachmentLightbox({ url: src, alt: label, id })}
+      style={{ display: "block", maxWidth: "100%", borderRadius: 8, margin: "8px 0", cursor: "zoom-in" }}
     />
   );
 }
