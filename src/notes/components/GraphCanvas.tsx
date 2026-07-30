@@ -48,7 +48,7 @@ const MAX_DEGREE_FOR_SIZE = 10;
 // anything it rejects — or any token that resolves empty — falls back to the
 // neutral color, which is the same forward-compat degrade the rule evaluator
 // applies to an unsupported filter leaf.
-const COLOR_KEY_SHAPE = /^[a-z0-9-]+$/;
+const COLOR_KEY_SHAPE = /^[a-z0-9][a-z0-9-]*$/;
 
 export default function GraphCanvas({
   model,

@@ -162,7 +162,7 @@ interface SettingsModalProps {
    */
   onImportObsidian?: () => void;
   /**
-   * Open the graph tab (MYND-635). Threaded from Editor → AppearancePanel's
+   * Open the graph tab (MYND-604). Threaded from Editor → AppearancePanel's
    * pointer row; the handler closes Settings and opens the graph, whose own
    * floating panel holds the graph appearance + physics controls.
    */

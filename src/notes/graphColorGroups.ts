@@ -41,9 +41,9 @@ const TOKEN_KEY = /^[a-z0-9][a-z0-9-]*$/;
  * build does not define (a ninth palette entry authored by a future client).
  * The canvas degrades both by reading the computed value back and testing it
  * for empty; declarative CSS cannot read it back, so the degrade has to be
- * written into the expression. Both land on the same neutral accent an
- * unclassified node gets, so the editor's swatch and the graph agree about a
- * key neither of them understands.
+ * written into the expression. Both land on `--fg-2`, the same neutral node
+ * color an unclassified node gets (`GraphCanvas`'s neutral batch), so the
+ * editor's swatch and the graph agree about a key neither of them understands.
  *
  * Shared rather than duplicated per client for the reason the evaluator is:
  * the value crosses the client boundary through `vault.prefs`, so the two ends
@@ -51,8 +51,8 @@ const TOKEN_KEY = /^[a-z0-9][a-z0-9-]*$/;
  */
 export function colorGroupVar(color: string | undefined): string {
   return color !== undefined && TOKEN_KEY.test(color)
-    ? `var(--${color}, var(--accent))`
-    : "var(--accent)";
+    ? `var(--${color}, var(--fg-2))`
+    : "var(--fg-2)";
 }
 
 /** The slice of a note's metadata a color-group rule can match against —

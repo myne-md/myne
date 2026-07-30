@@ -308,7 +308,7 @@ pub fn merge_prefs(local: &PrefsView, remote: &PrefsView) -> PrefsView {
             &mut clocks,
             |v| protocol::canonical_encode_saved_views(v),
         ),
-        // color_groups (MYND-635): order IS rule precedence, so — unlike
+        // color_groups (MYND-604): order IS rule precedence, so — unlike
         // saved_views — the tiebreak key must NOT re-sort; the canonical
         // encoder already preserves slice order verbatim, which is exactly
         // what `lww_field_keyed` needs (a deterministic byte key per value).
@@ -796,7 +796,7 @@ mod tests {
 
     #[test]
     fn color_groups_merge_is_commutative_and_tie_breaks_on_the_canonical_encoding() {
-        // MYND-635: color_groups is classified whole-value LWW like
+        // MYND-604: color_groups is classified whole-value LWW like
         // saved_views, and for the same reason the tiebreak must use the
         // canonical (order-preserving) encoding, not serde's — pin both
         // merge(a,b) == merge(b,a) AND the winner-by-canonical-bytes rule.

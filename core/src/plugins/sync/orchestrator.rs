@@ -6677,7 +6677,7 @@ mod tests {
             std::fs::remove_dir_all(&dir).ok();
         }
 
-        // ---- MYND-635: color groups across two devices ----------------------
+        // ---- MYND-604: color groups across two devices ----------------------
         //
         // The criterion these serve is task 7's "rules … appear on a second
         // synced device". The restart half is proven by the desktop E2E
