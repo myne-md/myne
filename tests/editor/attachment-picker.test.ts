@@ -108,6 +108,22 @@ describe("pickAndInsert (/attach picker)", () => {
     view.destroy();
   });
 
+  it("shows the compression notice (story 4) after a compressed pick", async () => {
+    restores.push(
+      setPickerFn(async () => [picked("/abs/shot.png")]),
+      setImportFn(async () => ({
+        ...imported("shot.png"),
+        size: 300,
+        original_size: 2400,
+      })),
+    );
+    const view = mount("");
+    await pickAndInsert(view);
+    const toast = document.querySelector('[data-testid="attachment-toast"]');
+    expect(toast?.textContent).toBe("Compressed: 2.3 KiB → 300 B");
+    view.destroy();
+  });
+
   it("skips an invalid file and still inserts the valid one (partial success)", async () => {
     restores.push(
       setPickerFn(async () => [picked("/abs/big.png"), picked("/abs/ok.png")]),

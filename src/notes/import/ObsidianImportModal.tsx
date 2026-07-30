@@ -40,6 +40,7 @@ import { DEFAULT_DUPLICATE_POLICY, type DuplicatePolicy } from "./conflict";
 import type { IllegalSegmentFlag, PreexistingFolder } from "./mapping";
 import type { ImportResult } from "./engine";
 import type { MediaByType } from "./media";
+import { compressionTallyMessage } from "../../editor/attachments/insert";
 import { runSourceImport } from "./ports";
 import {
   IMPORT_SOURCES,
@@ -684,6 +685,11 @@ function SummaryBody({ result, onDone }: { result: ImportResult; onDone: () => v
   const mediaIngested = totalByType(result.media.ingested);
   const mediaOmitted = totalByType(result.media.omitted);
   const hasMedia = mediaIngested > 0 || mediaOmitted > 0;
+  // Ingest-time image compression ran on the same shared-core path a paste
+  // takes, so the summary owes the same disclosure the paste toast gives
+  // (`decisions.md` 2026-07-30). `null` when nothing compressed — a notice that
+  // fires when nothing happened is how a user learns to stop reading notices.
+  const compressionLine = compressionTallyMessage(result.compression);
   const needsAttention = result.illegalFlags.length + result.preexistingFolders.length;
 
   return (
@@ -716,6 +722,16 @@ function SummaryBody({ result, onDone }: { result: ImportResult; onDone: () => v
                 <span style={{ ...MONO, fontSize: "var(--text-sm)", color: "var(--fg-2)" }}>
                   {t("notes.import.modal.mediaImported", { count: mediaIngested })}
                   {mediaOmitted > 0 ? t("notes.import.modal.mediaOmittedSuffix", { count: mediaOmitted }) : ""}
+                </span>
+              }
+            />
+          )}
+          {compressionLine !== null && (
+            <StatRow
+              label={t("notes.import.modal.statCompressed")}
+              valueNode={
+                <span style={{ ...MONO, fontSize: "var(--text-sm)", color: "var(--fg-2)" }}>
+                  {compressionLine}
                 </span>
               }
             />
