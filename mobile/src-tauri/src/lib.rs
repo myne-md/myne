@@ -174,6 +174,13 @@ pub fn run() {
         // lockstep with build.rs + permissions/workspace/default.toml or the ACL
         // resolver fails closed.
         .plugin(plugins::workspace::init())
+        // Custom themes (MYT1, §9.21): read-only consumer of the encrypted
+        // vault.themes store the desktop authors and sync already delivers here.
+        // Shared from `myne-core`, but ONE of desktop's five commands —
+        // `themes_list`, whose entries carry each palette. The command list must
+        // stay in lockstep with build.rs + permissions/themes/default.toml or
+        // the ACL resolver fails closed.
+        .plugin(plugins::themes::init())
         .plugin(plugins::search::init())
         .plugin(plugins::snapshots::init())
         .plugin(plugins::attachments::init())
