@@ -2384,7 +2384,7 @@ fn parse_optional_saved_views_field(
     cursor: &mut usize,
     marker: &[u8],
 ) -> Result<Vec<crate::saved_view::SavedView>, PrefsBlobError> {
-    match find_subslice(&rest[*cursor..], marker) {
+    match find_top_level_marker(rest, *cursor, marker) {
         Some(rel_idx) => {
             let val_start = *cursor + rel_idx + marker.len();
             let (views, consumed) = crate::saved_view::parse_saved_views_array(&rest[val_start..])
@@ -2412,7 +2412,7 @@ fn parse_optional_color_groups_field(
     cursor: &mut usize,
     marker: &[u8],
 ) -> Result<Vec<crate::color_group::ColorGroup>, PrefsBlobError> {
-    match find_subslice(&rest[*cursor..], marker) {
+    match find_top_level_marker(rest, *cursor, marker) {
         Some(rel_idx) => {
             let val_start = *cursor + rel_idx + marker.len();
             let (groups, consumed) =
@@ -2441,7 +2441,7 @@ fn parse_optional_paired_extensions_field(
     cursor: &mut usize,
     marker: &[u8],
 ) -> Result<Vec<crate::paired_extension::PairedExtension>, PrefsBlobError> {
-    match find_subslice(&rest[*cursor..], marker) {
+    match find_top_level_marker(rest, *cursor, marker) {
         Some(rel_idx) => {
             let val_start = *cursor + rel_idx + marker.len();
             let (records, consumed) =
@@ -2514,7 +2514,7 @@ fn parse_optional_uint64_field(
     cursor: &mut usize,
     marker: &[u8],
 ) -> Result<Option<u64>, PrefsBlobError> {
-    match find_subslice(&rest[*cursor..], marker) {
+    match find_top_level_marker(rest, *cursor, marker) {
         Some(rel_idx) => {
             let val_start = *cursor + rel_idx + marker.len();
             let (val, consumed) = parse_json_uint64(&rest[val_start..])?;
@@ -2543,7 +2543,7 @@ fn parse_optional_bool_field(
     cursor: &mut usize,
     marker: &[u8],
 ) -> Result<Option<bool>, PrefsBlobError> {
-    match find_subslice(&rest[*cursor..], marker) {
+    match find_top_level_marker(rest, *cursor, marker) {
         Some(rel_idx) => {
             let val_start = *cursor + rel_idx + marker.len();
             let (val, after) =
@@ -2590,7 +2590,7 @@ fn parse_optional_string_field(
     cursor: &mut usize,
     marker: &[u8],
 ) -> Result<Option<String>, PrefsBlobError> {
-    match find_subslice(&rest[*cursor..], marker) {
+    match find_top_level_marker(rest, *cursor, marker) {
         Some(rel_idx) => {
             let val_start = *cursor + rel_idx + marker.len();
             let (value, consumed) = parse_json_string(&rest[val_start..])
@@ -2637,7 +2637,7 @@ fn parse_optional_editor_layout(
     cursor: &mut usize,
     marker: &[u8],
 ) -> Result<Option<EditorLayout>, PrefsBlobError> {
-    match find_subslice(&rest[*cursor..], marker) {
+    match find_top_level_marker(rest, *cursor, marker) {
         Some(rel_idx) => {
             let obj_start = *cursor + rel_idx + marker.len();
             let (layout, consumed) = parse_editor_layout_object(&rest[obj_start..])
@@ -2704,7 +2704,7 @@ fn parse_optional_array_field(
     cursor: &mut usize,
     marker: &[u8],
 ) -> Result<Vec<String>, PrefsBlobError> {
-    match find_subslice(&rest[*cursor..], marker) {
+    match find_top_level_marker(rest, *cursor, marker) {
         Some(rel_idx) => {
             let array_start = *cursor + rel_idx + marker.len();
             let (list, consumed) = parse_json_string_array(&rest[array_start..])
@@ -2727,7 +2727,7 @@ fn parse_optional_string_map_field(
     cursor: &mut usize,
     marker: &[u8],
 ) -> Result<BTreeMap<String, String>, PrefsBlobError> {
-    match find_subslice(&rest[*cursor..], marker) {
+    match find_top_level_marker(rest, *cursor, marker) {
         Some(rel_idx) => {
             let obj_start = *cursor + rel_idx + marker.len();
             let (map, consumed) = parse_json_string_map(&rest[obj_start..])
@@ -2749,7 +2749,7 @@ fn parse_optional_u64_map_field(
     cursor: &mut usize,
     marker: &[u8],
 ) -> Result<BTreeMap<String, u64>, PrefsBlobError> {
-    match find_subslice(&rest[*cursor..], marker) {
+    match find_top_level_marker(rest, *cursor, marker) {
         Some(rel_idx) => {
             let obj_start = *cursor + rel_idx + marker.len();
             let (map, consumed) = parse_json_u64_map(&rest[obj_start..])
@@ -2851,7 +2851,7 @@ fn parse_optional_string_array_map_field(
     cursor: &mut usize,
     marker: &[u8],
 ) -> Result<BTreeMap<String, Vec<String>>, PrefsBlobError> {
-    match find_subslice(&rest[*cursor..], marker) {
+    match find_top_level_marker(rest, *cursor, marker) {
         Some(rel_idx) => {
             let obj_start = *cursor + rel_idx + marker.len();
             let (map, consumed) = parse_json_string_array_map(&rest[obj_start..])
@@ -3022,6 +3022,69 @@ fn find_subslice(haystack: &[u8], needle: &[u8]) -> Option<usize> {
     haystack
         .windows(needle.len())
         .position(|window| window == needle)
+}
+
+/// Find a canonical `"key":` marker at the **top level** of the prefs object,
+/// scanning `rest` from `from` onward and returning the offset RELATIVE to
+/// `from` (so the cursor-chain call sites read exactly like the
+/// [`find_subslice`] they replace).
+///
+/// WHY THIS IS NOT `find_subslice`. `field_clocks` is a nested object whose
+/// KEYS ARE FIELD NAMES by construction (§ 9.5.2), so a plain byte search for
+/// `"color_groups":` happily matches the clock entry `"color_groups":17…` and
+/// then tries to parse an integer as a rule array. That mattered exactly when
+/// the real field was ABSENT — set a field, then unset it, and its stale clock
+/// key stays behind to shadow it. Because § 9.5.5 collapses any inner parse
+/// failure to "return defaults", the result was the SILENT loss of the whole
+/// preference set (label, favorites, saved views, folder icons, every editor
+/// setting), persisted by the next write. `color_groups` made it reachable by
+/// an ordinary action — delete your last colour rule — but the trap is older
+/// than that field and `favorites` / the `daily_*` fields sit in it too: every
+/// stamped shared field parsed from the cursor chain BEFORE `field_clocks`
+/// (`fi`) in canonical key order.
+///
+/// `rest` begins inside the root object (the strictly-positional prefix fields
+/// are already consumed), so relative depth 0 IS the top level. Skipping
+/// deeper matches also closes the same shadowing through the user-keyed maps
+/// (`keymap`, `folder_icons`, `item_colors`).
+///
+/// Decode-side only: no encoding changes, so byte-stability and the golden
+/// vectors are untouched, and every blob that parsed before still parses —
+/// this strictly REMOVES false matches.
+fn find_top_level_marker(rest: &[u8], from: usize, marker: &[u8]) -> Option<usize> {
+    let hay = rest.get(from..)?;
+    let mut depth = 0i32;
+    let mut i = 0usize;
+    while i < hay.len() {
+        match hay[i] {
+            b'"' => {
+                if depth == 0 && hay[i..].starts_with(marker) {
+                    return Some(i);
+                }
+                // Skip the whole string, honouring backslash escapes, so a
+                // brace or quote inside a value can never move `depth`. A
+                // top-level string VALUE can never false-match: the marker
+                // ends in `:`, and a value is always followed by `,` or `}`.
+                i += 1;
+                while i < hay.len() {
+                    match hay[i] {
+                        b'\\' => i += 2,
+                        b'"' => {
+                            i += 1;
+                            break;
+                        }
+                        _ => i += 1,
+                    }
+                }
+                continue;
+            }
+            b'{' | b'[' => depth += 1,
+            b'}' | b']' => depth -= 1,
+            _ => {}
+        }
+        i += 1;
+    }
+    None
 }
 
 // ---- encode / decode primitives ---------------------------------------
@@ -3383,6 +3446,61 @@ mod tests {
         assert!(!encoded
             .windows(b"field_clocks".len())
             .any(|w| w == b"field_clocks"));
+    }
+
+    #[test]
+    fn a_stale_field_clock_key_never_shadows_its_absent_field() {
+        // REGRESSION (MYND-635). `field_clocks` keys ARE field names (§ 9.5.2),
+        // so a byte-search for a top-level `"<field>":` used to match the clock
+        // entry of a field that had since been UNSET — parse the integer as the
+        // field's value, fail, and hand § 9.5.5 a blanket "return defaults".
+        // The user-visible bug was total, silent prefs loss (label, favorites,
+        // saved views, folder icons, every editor setting) after an ordinary
+        // action: delete your last colour rule.
+        //
+        // Both fields below are parsed from the cursor chain BEFORE
+        // `field_clocks` (`col` < `fi`, `fa` < `fi`), which is what made them
+        // reachable; `favorites` shows the trap predates `color_groups`.
+        for field in ["color_groups", "favorites"] {
+            let mut clocks = BTreeMap::new();
+            clocks.insert(String::from(field), 1_700_000_000_000u64);
+            let view = PrefsView {
+                label: Some(String::from("Keepme")),
+                item_order: alloc::vec![String::from("0190a000-0000-7000-8000-000000000002")],
+                field_clocks: clocks.clone(),
+                ..PrefsView::default()
+            };
+            let decoded = canonical_json_decode(&canonical_json_encode(&view))
+                .expect("a stale clock key must not fail the parse");
+            // The rest of the blob survived rather than collapsing to defaults.
+            assert_eq!(decoded.label.as_deref(), Some("Keepme"), "{field}");
+            assert_eq!(decoded.item_order, view.item_order, "{field}");
+            assert_eq!(decoded.field_clocks, clocks, "{field}");
+            // …and the shadowed field itself reads as genuinely absent.
+            assert!(decoded.color_groups.is_empty(), "{field}");
+            assert!(decoded.favorites.is_empty(), "{field}");
+        }
+    }
+
+    #[test]
+    fn top_level_marker_search_ignores_nested_and_value_lookalikes() {
+        // The finder keys on structural depth, not on `field_clocks`
+        // specifically: a user-controlled map key (`folder_icons` paths) and a
+        // string VALUE that spells a field name are both non-matches, while the
+        // real top-level field is still found.
+        let mut icons = BTreeMap::new();
+        icons.insert(String::from("Projects/"), String::from("book"));
+        let view = PrefsView {
+            // A label whose VALUE is a field name.
+            label: Some(String::from("favorites")),
+            favorites: alloc::vec![String::from("0190a000-0000-7000-8000-000000000002")],
+            folder_icons: icons,
+            ..PrefsView::default()
+        };
+        let decoded = canonical_json_decode(&canonical_json_encode(&view)).expect("parses");
+        assert_eq!(decoded.favorites, view.favorites);
+        assert_eq!(decoded.label.as_deref(), Some("favorites"));
+        assert_eq!(decoded.folder_icons, view.folder_icons);
     }
 
     #[test]

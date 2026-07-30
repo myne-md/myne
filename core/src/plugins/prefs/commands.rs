@@ -5793,6 +5793,103 @@ mod tests {
         });
     }
 
+    #[test]
+    fn color_groups_edit_stamps_its_lww_clock_and_opens_the_push_window() {
+        // MYND-635: the two things that must be true on the AUTHORING device
+        // before a color group can reach a second synced device at all. The
+        // round-trip above proves neither — it passes `NoopHost` + `noop_hooks`,
+        // which swallow both signals — and neither follows from the §10.2
+        // classification row on its own.
+        //
+        //   1. the write stamps `field_clocks["color_groups"]`. The field is
+        //      `Shared(WholeValueLww)`, so ordering IS the clock. Left
+        //      unstamped it reads as 0 and ties with a peer's untouched empty
+        //      list, at which point the equal-clock tiebreak (canonical-encoding
+        //      bytes) decides whether the authored rules survive — i.e. luck.
+        //   2. the write calls `bump_local_change` — the MYND-517 coalesced
+        //      push window. Without it the blob sits on disk until some
+        //      unrelated note push carries it along, which on a phone is
+        //      effectively never.
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x4b).await;
+            let (hooks, bumps) = counting_hooks();
+            let host = crate::host::test_host::TestHost::new(tmp.path());
+            let bumped = || bumps.load(std::sync::atomic::Ordering::Relaxed);
+            let groups = vec![test_color_group("g1", "group-olive", true)];
+
+            set_color_groups_with_dir(
+                tmp.path(),
+                &state,
+                &hooks,
+                groups.clone(),
+                &crate::vault_io::StdVaultIo,
+                &host,
+            )
+            .await
+            .expect("author color groups");
+
+            let authored_clock = {
+                let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
+                    .await
+                    .expect("read");
+                *view
+                    .field_clocks
+                    .get("color_groups")
+                    .expect("color_groups stamped")
+            };
+            assert_eq!(authored_clock, host.now_unix_millis());
+            assert!(authored_clock > 0, "epoch-ms clock must be non-zero");
+            assert_eq!(bumped(), 1, "authoring opens the push window");
+
+            // A no-op re-write of the IDENTICAL list must neither re-stamp nor
+            // re-bump, even though the clock has advanced in between: the gate
+            // is the shared-subset hash, not "a setter ran". A device that
+            // re-stamped here would win every race by writing nothing.
+            host.set_now(1_700_000_500);
+            set_color_groups_with_dir(
+                tmp.path(),
+                &state,
+                &hooks,
+                groups.clone(),
+                &crate::vault_io::StdVaultIo,
+                &host,
+            )
+            .await
+            .expect("no-op re-write");
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
+                .await
+                .expect("read");
+            assert_eq!(view.field_clocks.get("color_groups"), Some(&authored_clock));
+            assert_eq!(bumped(), 1, "a no-op write must not bump");
+
+            // Clearing must advance the clock and bump again — otherwise the
+            // deletion loses to a stale peer still holding the rules and they
+            // come back on the next merge.
+            set_color_groups_with_dir(
+                tmp.path(),
+                &state,
+                &hooks,
+                Vec::new(),
+                &crate::vault_io::StdVaultIo,
+                &host,
+            )
+            .await
+            .expect("clear color groups");
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
+                .await
+                .expect("read");
+            let cleared_clock = *view
+                .field_clocks
+                .get("color_groups")
+                .expect("clearing stamps too");
+            assert!(
+                cleared_clock > authored_clock,
+                "a delete must out-rank the write it deletes ({cleared_clock} vs {authored_clock})"
+            );
+            assert_eq!(bumped(), 2, "clearing opens the push window too");
+        });
+    }
+
     // ---- theme setter (MYND-110) --------------------------------------
 
     #[test]

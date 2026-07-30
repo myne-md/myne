@@ -5,6 +5,11 @@
 // failure, same-segment no-op) and the optimistic "Show edit times" toggle
 // (flip-then-persist, revert + error on failure). The prefs setters + applyTheme
 // are mocked at the lib boundary.
+//
+// Also covers the MYND-635 graph pointer row: the panel carries no graph
+// controls of its own — the row exists only to say where they live and to open
+// the graph — so the test asserts exactly that (label + working action + the
+// defensive disabled degrade when no handler is supplied).
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
@@ -143,6 +148,36 @@ describe("AppearancePanel — theme segmented control", () => {
     expect(
       screen.getByTestId("settings.theme-system").getAttribute("aria-checked"),
     ).toBe("true");
+  });
+});
+
+describe("AppearancePanel — graph settings pointer row (MYND-635)", () => {
+  it("renders the row with its i18n label, helper and action", async () => {
+    render(<AppearancePanel onOpenGraph={() => {}} />);
+    await waitFor(() => expect(prefsRead).toHaveBeenCalled());
+    expect(screen.getByText("Graph appearance")).toBeTruthy();
+    expect(
+      screen.getByText(/set inside the graph itself/i),
+    ).toBeTruthy();
+    expect(screen.getByTestId("settings.open-graph").textContent).toBe(
+      "Open graph",
+    );
+  });
+
+  it("clicking the action opens the graph", async () => {
+    const onOpenGraph = vi.fn();
+    render(<AppearancePanel onOpenGraph={onOpenGraph} />);
+    await waitFor(() => expect(prefsRead).toHaveBeenCalled());
+    fireEvent.click(screen.getByTestId("settings.open-graph"));
+    expect(onOpenGraph).toHaveBeenCalledTimes(1);
+  });
+
+  it("disables the action when no handler is supplied", async () => {
+    render(<AppearancePanel />);
+    await waitFor(() => expect(prefsRead).toHaveBeenCalled());
+    expect(
+      (screen.getByTestId("settings.open-graph") as HTMLButtonElement).disabled,
+    ).toBe(true);
   });
 });
 

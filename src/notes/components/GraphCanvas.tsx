@@ -14,7 +14,7 @@
 // opens; node-drag is persisted to the layout store (Phase A) so a manual
 // arrangement survives filter switches / tab open-close.
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { GraphEdge, GraphModel, GraphNode } from "../graphAdapter";
 import {
   getGraphPosition,
@@ -40,11 +40,21 @@ const COARSE_LOD_SCALE = 2.2 / 1.4;
 // A node's degree contribution to its radius is capped so one hub note can't
 // make itself (or its neighbours' hit targets) absurdly large.
 const MAX_DEGREE_FOR_SIZE = 10;
+// A color-group key is a bare design-token name (`group-teal`), resolved as
+// `--group-teal` off the canvas's own computed style — so group colors follow
+// the theme, dark mode and a custom theme's token override exactly like the
+// neutral node color does. The shape check keeps a rule authored by a future
+// (or malformed) client from reaching the CSSOM lookup as an arbitrary string;
+// anything it rejects — or any token that resolves empty — falls back to the
+// neutral color, which is the same forward-compat degrade the rule evaluator
+// applies to an unsupported filter leaf.
+const COLOR_KEY_SHAPE = /^[a-z0-9-]+$/;
 
 export default function GraphCanvas({
   model,
   onNodeClick,
   onNodeDoubleClick,
+  nodeColors,
   arrowsEnabled = true,
   labelFadeZoom = 1.4,
   nodeSize = 5,
@@ -62,6 +72,16 @@ export default function GraphCanvas({
    *  SYNC-6: a pivot must NOT carry ctx.open's side-effects). Omit in the whole
    *  graph (where a single click already navigates). */
   onNodeDoubleClick?: (id: string) => void;
+  /** Color groups (graph-connection-ux-polish task 8): note id → color-group
+   *  KEY (a bare `--group-*` token name), as resolved by
+   *  `resolveGraphColorGroups`. A node absent from the map keeps the neutral
+   *  color, so unclassified notes recede.
+   *
+   *  Load-bearing: color is a RENDER-TIME LAYER, never part of the layout
+   *  model. `GraphNode` stays `{id,title}`, this map is read live via a ref,
+   *  and a rule edit repaints through the settings-keyed effect below — it
+   *  never touches `model`, so it can never re-run the layout. */
+  nodeColors?: ReadonlyMap<string, string>;
   /** Edge-direction arrows toggle (graph settings panel, graph-connection-ux-
    *  polish task 5). Gates the existing zoom-LOD arrow check entirely — off
    *  means never, on means "when zoomed in enough", matching the pre-feature
@@ -113,7 +133,28 @@ export default function GraphCanvas({
   nodeSizeStrengthRef.current = nodeSizeStrength;
   const lineThicknessRef = useRef(lineThickness);
   lineThicknessRef.current = lineThickness;
+  // The color-group map, same ref-read/sibling-effect-repaint shape — so a rule
+  // edit repaints without re-entering the `[model]` effect.
+  const nodeColorsRef = useRef(nodeColors);
+  nodeColorsRef.current = nodeColors;
   const scheduleRef = useRef<(() => void) | null>(null);
+  // Bumped whenever the canvas re-resolves its design tokens (mount + every
+  // theme change). Reflected onto `data-palette-nonce` as bounded E2E
+  // observability for "the colors followed the theme" — a monotonic counter,
+  // never a note id or a coordinate (SYNC-8 DENY-list clean).
+  const [paletteNonce, setPaletteNonce] = useState(0);
+  // The force-relayout contract's two observable halves (task 6), same bounded
+  // shape as `paletteNonce` above — integers only, never an id or a coordinate:
+  //   runs   — how many force-driven re-layouts have COMPLETED. A force change
+  //            must take it up by exactly ONE and then stop; an appearance
+  //            change must never move it at all.
+  //   seeded — how many nodes the LATEST force re-layout warm-started from
+  //            their live positions. Equal to the node count means every node
+  //            carried its place into the run; `seedInitialPosition` only
+  //            randomizes a node the request did NOT seed, so this is the
+  //            warm-start-vs-re-scatter question in one number.
+  const [forceRelayoutRuns, setForceRelayoutRuns] = useState(0);
+  const [forceRelayoutSeeded, setForceRelayoutSeeded] = useState(0);
   // Per-node degree (in + out), computed once per model build — the input to
   // `radiusOf` alongside the live `nodeSize`/`nodeSizeStrength` refs.
   const degreeRef = useRef<Map<string, number>>(new Map());
@@ -129,14 +170,37 @@ export default function GraphCanvas({
 
     // Resolve design tokens for the canvas (2D context needs concrete color
     // strings, not CSS vars) — so the graph follows the palette + dark mode
-    // instead of hardcoded hex. Resolved once per open (the modal is transient).
+    // instead of hardcoded hex. `cs` is LIVE (getComputedStyle returns a view,
+    // not a snapshot), so a re-read after a theme change yields the new values;
+    // only the memoized strings below need invalidating, which is what the
+    // theme observer at the end of this effect does.
     const cs = getComputedStyle(canvas);
     const token = (name: string, fallback: string) =>
       cs.getPropertyValue(name).trim() || fallback;
-    const colNode = token("--fg-2", "#7a7a7a");
-    const colEdge = token("--line-1", "#444");
-    const colArrow = token("--fg-3", "#888");
-    const colLabel = token("--fg-3", "#bdbdbd");
+    let colNode = token("--fg-2", "#7a7a7a");
+    let colEdge = token("--line-1", "#444");
+    let colArrow = token("--fg-3", "#888");
+    let colLabel = token("--fg-3", "#bdbdbd");
+    // Group-color keys resolve lazily and are memoized per theme — only the
+    // handful of keys the current rule set actually uses is ever looked up.
+    const groupColors = new Map<string, string | null>();
+    const groupColor = (key: string): string | null => {
+      const cached = groupColors.get(key);
+      if (cached !== undefined) return cached;
+      const resolved = COLOR_KEY_SHAPE.test(key)
+        ? cs.getPropertyValue(`--${key}`).trim() || null
+        : null;
+      groupColors.set(key, resolved);
+      return resolved;
+    };
+    const resolveTokens = () => {
+      colNode = token("--fg-2", "#7a7a7a");
+      colEdge = token("--line-1", "#444");
+      colArrow = token("--fg-3", "#888");
+      colLabel = token("--fg-3", "#bdbdbd");
+      groupColors.clear();
+      setPaletteNonce((n) => n + 1);
+    };
 
     // Coarse-pointer (touch / mobile) → tighter LOD thresholds (less to draw).
     const coarse =
@@ -242,10 +306,15 @@ export default function GraphCanvas({
     // overview pan (arrows + labels off) does zero per-frame array work.
     const visibleLinks: SimLink[] = [];
     const visibleNodes: SimNode[] = [];
+    // One bucket per group color in play (≤ the palette size), reused across
+    // frames like the two arrays above. Keeps the node pass to a bounded number
+    // of batched fills instead of one path per node.
+    const colorBuckets = new Map<string, SimNode[]>();
     const render = () => {
       raf = 0;
       visibleLinks.length = 0;
       visibleNodes.length = 0;
+      for (const bucket of colorBuckets.values()) bucket.length = 0;
       const v = viewRef.current;
       ctx.save();
       ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -306,19 +375,48 @@ export default function GraphCanvas({
         ctx.fill();
       }
 
-      // --- Nodes: ONE batched fill path for every visible disc. `moveTo` to
-      // each arc's start first so consecutive circles aren't joined by a line.
-      // Collect the drawn nodes for the label pass ONLY when labels are shown. ---
+      // --- Nodes: ONE batched fill path per color. `moveTo` to each arc's
+      // start first so consecutive circles aren't joined by a line. Collect the
+      // drawn nodes for the label pass ONLY when labels are shown, and the
+      // color-grouped ones into their bucket for the pass below — a node whose
+      // rule color is absent, unresolvable or simply unset stays in the neutral
+      // batch, so unclassified notes recede exactly as before. ---
+      const colorMap = nodeColorsRef.current;
       ctx.fillStyle = colNode;
       ctx.beginPath();
       for (const n of nodesRef.current) {
         if (!isNodeVisible(n, bounds)) continue;
         if (showLabels) visibleNodes.push(n);
+        const key = colorMap?.get(n.id);
+        if (key !== undefined && groupColor(key) !== null) {
+          let bucket = colorBuckets.get(key);
+          if (bucket === undefined) {
+            bucket = [];
+            colorBuckets.set(key, bucket);
+          }
+          bucket.push(n);
+          continue;
+        }
         const r = radiusOf(n);
         ctx.moveTo(n.x + r, n.y);
         ctx.arc(n.x, n.y, r, 0, Math.PI * 2);
       }
       ctx.fill();
+
+      // --- Group-colored nodes: one batched fill per color in play. ---
+      for (const [key, bucket] of colorBuckets) {
+        if (bucket.length === 0) continue;
+        const color = groupColor(key);
+        if (color === null) continue;
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        for (const n of bucket) {
+          const r = radiusOf(n);
+          ctx.moveTo(n.x + r, n.y);
+          ctx.arc(n.x, n.y, r, 0, Math.PI * 2);
+        }
+        ctx.fill();
+      }
 
       // --- Labels: only when zoomed in (calm at overview) and only for the
       // visible nodes. ---
@@ -448,6 +546,26 @@ export default function GraphCanvas({
       schedule(); // re-render at current positions — never re-layout on resize.
     };
 
+    // Theme reactivity: the 2D context holds resolved color STRINGS, so a
+    // theme switch has to invalidate them explicitly (a CSS var change repaints
+    // the DOM for free, a canvas never). Both switch mechanisms mutate
+    // `<html>` — `applyTheme` sets/removes `data-theme`, `applyCustomTheme`
+    // writes `--*` properties onto its inline style (`src/lib/theme.ts`) — so
+    // one attribute observer catches both, and the media listener covers the
+    // System choice (no attribute at all) following the OS live. Repaint only:
+    // this never touches `model`, so the layout is not re-run.
+    const onThemeChange = () => {
+      resolveTokens();
+      schedule();
+    };
+    const themeObserver = new MutationObserver(onThemeChange);
+    themeObserver.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["data-theme", "style"],
+    });
+    const colorScheme = window.matchMedia?.("(prefers-color-scheme: dark)");
+    colorScheme?.addEventListener?.("change", onThemeChange);
+
     canvas.addEventListener("pointerdown", onPointerDown);
     canvas.addEventListener("pointermove", onPointerMove);
     canvas.addEventListener("pointerup", onPointerUp);
@@ -468,17 +586,28 @@ export default function GraphCanvas({
       // Was previously leaked — the anonymous resize listener accumulated one
       // per effect re-run (every model/filter change).
       window.removeEventListener("resize", onResize);
+      themeObserver.disconnect();
+      colorScheme?.removeEventListener?.("change", onThemeChange);
     };
   }, [model]);
 
-  // Repaint-only reaction to the appearance controls — deliberately a
-  // SEPARATE effect from the `[model]` one above so tuning any of these never
-  // re-enters it (which would re-create the worker and re-run the layout).
-  // All four are read live via refs during render; this effect only has to
-  // schedule the one repaint that picks up the new ref values.
+  // Repaint-only reaction to the appearance controls and the color-group map —
+  // deliberately a SEPARATE effect from the `[model]` one above so tuning any
+  // of these never re-enters it (which would re-create the worker and re-run
+  // the layout). All are read live via refs during render; this effect only has
+  // to schedule the one repaint that picks up the new ref values. `nodeColors`
+  // sits here, not in `[model]`, because that is the whole point of task 8:
+  // editing a color-group rule REPAINTS, it does not re-lay-out.
   useEffect(() => {
     scheduleRef.current?.();
-  }, [arrowsEnabled, labelFadeZoom, nodeSize, nodeSizeStrength, lineThickness]);
+  }, [
+    arrowsEnabled,
+    labelFadeZoom,
+    nodeSize,
+    nodeSizeStrength,
+    lineThickness,
+    nodeColors,
+  ]);
 
   // Bounded-relayout reaction to the force controls (task 6) — the opposite
   // contract from appearance: a force change DOES re-run the layout, because
@@ -521,7 +650,9 @@ export default function GraphCanvas({
       scheduleGraphLayoutFlush();
       scheduleRef.current?.();
       worker.terminate();
+      setForceRelayoutRuns((n) => n + 1);
     };
+    setForceRelayoutSeeded(Object.keys(seed).length);
     worker.postMessage({
       nodes: nodes.map((n) => ({ id: n.id })),
       edges,
@@ -547,6 +678,10 @@ export default function GraphCanvas({
   return (
     <canvas
       ref={canvasRef}
+      data-testid="editor.graph-canvas"
+      data-palette-nonce={String(paletteNonce)}
+      data-force-relayout-count={String(forceRelayoutRuns)}
+      data-force-relayout-seeded={String(forceRelayoutSeeded)}
       style={{
         flex: 1,
         width: "100%",

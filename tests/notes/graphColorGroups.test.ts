@@ -1,10 +1,19 @@
 // Color-group rule resolver — pure, IPC-free (graph-connection-ux-polish task
 // 3): precedence, disabled-rule skip, unmatched → absent, empty list no-op,
 // and forward-compat degrade-to-no-match on an unsupported filter leaf.
+//
+// Plus (task 8) the two pure assembly helpers the graph pane calls BEFORE the
+// resolver: `collectRuleTags` (which tags the caller must resolve through the
+// vault tag index) and `buildColorGroupNoteMeta` (turning the graph's node ids
+// + the resident folder map + the resolved tag membership into the resolver's
+// input shape).
 
 import { describe, expect, it } from "vitest";
 
 import {
+  buildColorGroupNoteMeta,
+  collectRuleTags,
+  colorGroupVar,
   resolveGraphColorGroups,
   type ColorGroupNoteMeta,
 } from "../../src/notes/graphColorGroups";
@@ -151,5 +160,154 @@ describe("resolveGraphColorGroups", () => {
     // "all" degrades to no-match rather than matching everything, so "b"
     // (no "work" tag) stays unmatched even though it would match a real "all".
     expect(colors.has("b")).toBe(false);
+  });
+});
+
+describe("collectRuleTags", () => {
+  it("returns the distinct folded tags of every hasTag leaf", () => {
+    expect(
+      collectRuleTags([
+        rule("r1", "group-teal", hasTag("Work")),
+        rule("r2", "group-rose", hasTag("personal")),
+      ]),
+    ).toEqual(["work", "personal"]);
+  });
+
+  it("descends through and/or/not combinators", () => {
+    const filter: FilterNode = {
+      kind: "and",
+      children: [
+        hasTag("work"),
+        { kind: "not", child: hasTag("archived") },
+        { kind: "or", children: [hasTag("urgent"), inFolder("Projects/")] },
+      ],
+    };
+    expect(collectRuleTags([rule("r1", "group-teal", filter)])).toEqual([
+      "work",
+      "archived",
+      "urgent",
+    ]);
+  });
+
+  it("de-duplicates a tag referenced by several rules", () => {
+    expect(
+      collectRuleTags([
+        rule("r1", "group-teal", hasTag("work")),
+        rule("r2", "group-rose", hasTag("WORK")),
+      ]),
+    ).toEqual(["work"]);
+  });
+
+  it("skips disabled rules — a rule that cannot match owes no index query", () => {
+    expect(
+      collectRuleTags([
+        rule("r1", "group-teal", hasTag("work"), false),
+        rule("r2", "group-rose", hasTag("personal")),
+      ]),
+    ).toEqual(["personal"]);
+  });
+
+  it("ignores an empty tag and returns nothing for a tag-free rule set", () => {
+    expect(collectRuleTags([rule("r1", "group-teal", hasTag("  "))])).toEqual([]);
+    expect(collectRuleTags([rule("r1", "group-teal", inFolder("Work/"))])).toEqual(
+      [],
+    );
+    expect(collectRuleTags([])).toEqual([]);
+  });
+});
+
+describe("buildColorGroupNoteMeta", () => {
+  it("carries each node's folder from the resident folder map", () => {
+    const meta = buildColorGroupNoteMeta(
+      ["a", "b"],
+      new Map([
+        ["a", "Projects/"],
+        ["b", null],
+      ]),
+      new Map(),
+    );
+    expect(meta).toEqual([
+      { id: "a", tags: [], folder: "Projects/" },
+      { id: "b", tags: [], folder: null },
+    ]);
+  });
+
+  it("a node absent from the folder map is treated as unfiled, not dropped", () => {
+    const meta = buildColorGroupNoteMeta(["ghost"], new Map(), new Map());
+    expect(meta).toEqual([{ id: "ghost", tags: [], folder: null }]);
+  });
+
+  it("attaches every rule tag the note is a (subtree-inclusive) member of", () => {
+    const meta = buildColorGroupNoteMeta(
+      ["a", "b"],
+      new Map(),
+      new Map([
+        ["work", new Set(["a", "b"])],
+        ["urgent", new Set(["b"])],
+      ]),
+    );
+    expect(meta[0]).toEqual({ id: "a", tags: ["work"], folder: null });
+    expect(meta[1]).toEqual({ id: "b", tags: ["work", "urgent"], folder: null });
+  });
+
+  it("feeds the resolver: assembled membership resolves to the rule's color", () => {
+    const rules = [
+      rule("r1", "group-teal", hasTag("work")),
+      rule("r2", "group-rose", inFolder("Personal/")),
+    ];
+    // What the pane holds: the graph's node ids, the resident folder map, and
+    // the tag index's answer for each tag `collectRuleTags` asked about.
+    const tags = collectRuleTags(rules);
+    expect(tags).toEqual(["work"]);
+    const meta = buildColorGroupNoteMeta(
+      ["a", "b", "c"],
+      new Map([
+        ["a", "Work/"],
+        ["b", "Personal/"],
+        ["c", null],
+      ]),
+      new Map([["work", new Set(["a"])]]),
+    );
+    const colors = resolveGraphColorGroups(rules, meta);
+    expect(colors.get("a")).toBe("group-teal");
+    expect(colors.get("b")).toBe("group-rose");
+    expect(colors.has("c")).toBe(false);
+  });
+});
+
+describe("colorGroupVar — the shared declarative degrade", () => {
+  // The canvas resolves a color key off computed style and tests the result for
+  // empty. Surfaces that paint the key DECLARATIVELY (an inline `background`, an
+  // SVG `fill`) cannot read it back, so their degrade has to live in the
+  // expression. `ColorGroup.color` is synced, peer-authorable content, so both
+  // failure shapes below are reachable from another client — this is the same
+  // forward-compat posture the evaluator gives an unsupported filter leaf.
+  it("resolves a known palette key through its token", () => {
+    expect(colorGroupVar("group-teal")).toBe("var(--group-teal, var(--accent))");
+  });
+
+  it("carries a neutral fallback, so an undefined token degrades rather than blanking", () => {
+    // Well-formed but undefined here — a ninth palette entry from a future
+    // client. It reaches `var()`; the fallback is what saves it.
+    expect(colorGroupVar("group-future")).toBe("var(--group-future, var(--accent))");
+  });
+
+  it("rejects a key that already carries the `--` prefix", () => {
+    // `var(----group-rose)` IS a syntactically valid custom-property reference,
+    // so it would not error — it would just name a property nothing defines,
+    // and (with no fallback) paint the initial value. Anchoring the first
+    // character is what keeps it from reaching `var()` at all.
+    expect(colorGroupVar("--group-rose")).toBe("var(--accent)");
+  });
+
+  it("rejects a key that could break out of the declaration", () => {
+    expect(colorGroupVar("red); background: url(x")).toBe("var(--accent)");
+    expect(colorGroupVar("group teal")).toBe("var(--accent)");
+    expect(colorGroupVar("GROUP-TEAL")).toBe("var(--accent)");
+  });
+
+  it("treats an absent or empty key as unclassified", () => {
+    expect(colorGroupVar(undefined)).toBe("var(--accent)");
+    expect(colorGroupVar("")).toBe("var(--accent)");
   });
 });

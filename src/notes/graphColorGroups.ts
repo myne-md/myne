@@ -22,6 +22,39 @@
 import { folderKey, foldSegment } from "../dialect/folderPath";
 import type { ColorGroup, FilterNode } from "../lib/prefs";
 
+/** A color-group key, shape-checked. Anchored at the FIRST character on
+ *  purpose: a plain `[a-z0-9-]+` also accepts a key that already carries the
+ *  `--` prefix, which composes into `var(----group-rose)` — a syntactically
+ *  valid custom-property name that nothing ever defines, so the declaration is
+ *  invalid at computed-value time and the property silently falls back to its
+ *  initial value (transparent, for a background). */
+const TOKEN_KEY = /^[a-z0-9][a-z0-9-]*$/;
+
+/**
+ * One color-group key as a CSS `var()` expression, for the surfaces that paint
+ * it DECLARATIVELY (a swatch's inline `background`, an SVG `fill`) instead of
+ * resolving it through computed style the way {@link GraphCanvas} does.
+ *
+ * {@link ColorGroup.color} is synced, peer-authorable content — not a
+ * compile-time constant — so two values reach here that the palette picker can
+ * never produce: a malformed key, and a well-formed key naming a token this
+ * build does not define (a ninth palette entry authored by a future client).
+ * The canvas degrades both by reading the computed value back and testing it
+ * for empty; declarative CSS cannot read it back, so the degrade has to be
+ * written into the expression. Both land on the same neutral accent an
+ * unclassified node gets, so the editor's swatch and the graph agree about a
+ * key neither of them understands.
+ *
+ * Shared rather than duplicated per client for the reason the evaluator is:
+ * the value crosses the client boundary through `vault.prefs`, so the two ends
+ * must not drift about what it means.
+ */
+export function colorGroupVar(color: string | undefined): string {
+  return color !== undefined && TOKEN_KEY.test(color)
+    ? `var(--${color}, var(--accent))`
+    : "var(--accent)";
+}
+
 /** The slice of a note's metadata a color-group rule can match against —
  *  deliberately narrow (v1 exposes only tag + folder leaves). `tags` and
  *  `folder` are the SAME shapes the rest of the notes domain already carries
@@ -111,4 +144,80 @@ export function resolveGraphColorGroups(
     }
   }
   return colors;
+}
+
+/** Collect every folded `hasTag` tag reachable in `node`'s subtree into `out`. */
+function collectTagsInto(node: FilterNode, out: Set<string>): void {
+  switch (node.kind) {
+    case "and":
+    case "or":
+      for (const child of node.children) collectTagsInto(child, out);
+      return;
+    case "not":
+      collectTagsInto(node.child, out);
+      return;
+    case "hasTag": {
+      // Stored in the SAME folded form `matchesTag` compares against, so a
+      // membership answer keyed here lands on the leaf that asked for it. A
+      // tag with no non-whitespace content denotes nothing and is skipped —
+      // `matchesTag` would reject it too, so skipping only avoids a pointless
+      // index query, it never changes the resolved colors.
+      const folded = foldSegment(node.tag);
+      if (folded.trim().length > 0) out.add(folded);
+      return;
+    }
+    default:
+      // No other leaf carries a tag (and the unsupported ones never match).
+      return;
+  }
+}
+
+/**
+ * The distinct, folded tags the ENABLED rules reference — i.e. exactly the set
+ * of `vault_indices_by_tag` queries the caller must run before it can assemble
+ * {@link ColorGroupNoteMeta}. Disabled rules are skipped: a rule that cannot
+ * match owes no index query. Pure.
+ *
+ * The result is O(rules), not O(tags in the vault) and certainly not O(notes) —
+ * this is what keeps the paint-time assembly off a per-note or per-rule IPC
+ * fan-out (the same `hasTag → byTag(tag)` shape `useRunViewContext` already
+ * uses for Saved Views, so both surfaces agree on tag membership by
+ * construction).
+ */
+export function collectRuleTags(
+  rules: ReadonlyArray<ColorGroup>,
+): string[] {
+  const tags = new Set<string>();
+  for (const rule of rules) {
+    if (!rule.enabled) continue;
+    collectTagsInto(rule.filter, tags);
+  }
+  return [...tags];
+}
+
+/**
+ * Assemble the resolver's input from what the graph pane already holds: the
+ * model's node ids, the resident note-set's folder map, and the tag index's
+ * answer for each tag {@link collectRuleTags} asked about (`folded tag → note
+ * ids`, already subtree-inclusive Rust-side).
+ *
+ * A node with no entry in `folderById` is treated as unfiled (`folder: null`)
+ * rather than dropped — the graph's node-set and the resident note-set are
+ * derived from the same cache, but a node the map has not caught up with must
+ * still render (neutral, or matched by a tag rule), never disappear.
+ *
+ * Pure: no IPC, no canvas, no `GraphNode` import (the model stays `{id,title}`).
+ */
+export function buildColorGroupNoteMeta(
+  nodeIds: ReadonlyArray<string>,
+  folderById: ReadonlyMap<string, string | null>,
+  tagMembers: ReadonlyMap<string, ReadonlySet<string>>,
+): ColorGroupNoteMeta[] {
+  return nodeIds.map((id) => {
+    const tags: string[] = [];
+    for (const [tag, members] of tagMembers) {
+      if (members.has(id)) tags.push(tag);
+    }
+    return { id, tags, folder: folderById.get(id) ?? null };
+  });
 }
