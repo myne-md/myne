@@ -659,7 +659,10 @@
         "exportAria": "Export attachment",
         "imagePreview": "Image preview",
         "pdfFallback": "PDF",
-        "pdfPreview": "PDF preview"
+        "pdfPreview": "PDF preview",
+        "zoomIn": "Zoom in",
+        "zoomOut": "Zoom out",
+        "zoomReset": "Reset zoom"
       },
       "menu": {
         "actionsAria": "Attachment actions"
