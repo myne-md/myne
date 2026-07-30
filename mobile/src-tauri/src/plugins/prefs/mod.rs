@@ -73,6 +73,13 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
         .invoke_handler(tauri::generate_handler![
             commands::prefs_read,
             commands::set_screen_capture_protection,
+            // ingest-image-compression: shared (sync-protocol.md §10.2) toggle
+            // for whether an imported image is downscaled/re-encoded on ingest.
+            // Body lives in the SHARED myne-core prefs core (desktop already
+            // registers it); this plugin only wires the ACL. Must stay in
+            // lockstep with permissions/prefs/default.toml or the ACL resolver
+            // fails closed — same fail-closed discipline as MYND-548 below.
+            commands::set_attachment_compression_enabled,
             commands::set_deliberate_folders,
             commands::set_archived_folders,
             commands::set_auto_lock_timeout,

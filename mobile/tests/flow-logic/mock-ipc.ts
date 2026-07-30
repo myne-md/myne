@@ -178,6 +178,7 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
       reminders_enabled: true,
       reminder_horizon_days: null,
       show_note_timestamps: true,
+      attachment_compression_enabled: true,
       spell_enabled: null,
       spell_languages: [],
       keymap: {},

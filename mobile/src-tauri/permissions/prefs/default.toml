@@ -20,6 +20,7 @@ permissions = [
   "allow-set-reminders-enabled",
   "allow-set-reminder-horizon-days",
   "allow-set-screen-capture-protection",
+  "allow-set-attachment-compression-enabled",
   "allow-set-deliberate-folders",
   "allow-set-archived-folders",
   "allow-set-auto-lock-timeout",
@@ -75,6 +76,17 @@ commands.allow = ["prefs_read"]
 identifier = "allow-set-screen-capture-protection"
 description = "Allow invoking prefs:set_screen_capture_protection (Slot::Unlocked-gated per-field setter for the screen_capture_protection bool; atomic-writes vault.prefs FIRST then calls screen_capture::apply for the native side-effect — disk-then-native ordering is load-bearing for UI/disk consistency per MYND-160 grill Q5.2)."
 commands.allow = ["set_screen_capture_protection"]
+
+# ingest-image-compression: a write setter, so it inherits the same
+# main-window-only invariant as the other allow-set-* permissions — v0.2
+# multi-window MUST NOT grant this to any non-main window. SHARED in the sync
+# merge (sync-protocol.md §10.2) — a content-fidelity switch with a vault-wide
+# irreversible effect, unlike the device-local compute-budget toggles
+# (spell_enabled etc.) elsewhere in this file.
+[[permission]]
+identifier = "allow-set-attachment-compression-enabled"
+description = "Allow invoking prefs:set_attachment_compression_enabled (Slot::Unlocked-gated setter for the attachment_compression_enabled ingest-time image-compression toggle; atomic-writes vault.prefs with no native side-effect; shared per sync-protocol.md §10.2 — a content-fidelity switch with a vault-wide irreversible effect, unlike the device-local attachment_ocr_enabled/spell_enabled cluster; defaults to true, so it is emitted on disk only when false)."
+commands.allow = ["set_attachment_compression_enabled"]
 
 # MYND-144: a write setter, so it inherits the same main-window-only
 # invariant as allow-set-screen-capture-protection — v0.2 multi-window
