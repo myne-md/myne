@@ -659,6 +659,22 @@ function EditorChrome({
     (message: string) => setToast({ message }),
     [setToast],
   );
+  /** MYND-643: copy the open note's body to the clipboard. A clipboard write
+   *  has no visible result, so success MUST toast — otherwise the button reads
+   *  as broken — and so must failure, or the user pastes stale content
+   *  believing it worked. */
+  const copyOpenNoteMarkdown = useCallback(async () => {
+    const id = ctx.selectedId;
+    if (id === null) return;
+    try {
+      const { copyNoteMarkdown } = await import("../notes/copyNoteMarkdown");
+      await copyNoteMarkdown(id);
+      setToast({ message: i18n.t("export.note.modal.copied") });
+    } catch {
+      setToast({ message: i18n.t("export.note.modal.copyFailed") });
+    }
+  }, [ctx.selectedId, setToast]);
+
   const showExportToast = useCallback(
     (t: ExportToast) =>
       setToast({
@@ -2296,6 +2312,14 @@ function EditorChrome({
         onConfirm={(includeAttachments) => {
           exportPreflight?.resolve({ includeAttachments });
           setExportPreflight(null);
+        }}
+        onCopy={() => {
+          // MYND-643: resolve the pre-flight as CANCELLED so the export flow
+          // stops cleanly (it must not also write a file), then copy. Resolving
+          // with a choice would run the save-dialog path we are replacing.
+          exportPreflight?.resolve(null);
+          setExportPreflight(null);
+          void copyOpenNoteMarkdown();
         }}
       />
       <NotePdfExportNotice

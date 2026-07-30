@@ -2017,6 +2017,76 @@ async fn read_catalog_or_empty(
         .unwrap_or_else(|_| AttachmentsCatalog::empty())
 }
 
+/// Rebuild the attachment reference graph from the notes on disk.
+///
+/// **Why this runs at all.** The graph is RAM-only: `zeroize_attachment_refs`
+/// wipes it on every lock, and it was only ever written by
+/// `attachment_refs_apply` as a note is SAVED. Nothing rebuilt it on the way
+/// back in — `reconcile.rs` says so in its own header ("the live note lifecycle
+/// plus the unlock-time full rebuild is NOT wired here"). The visible result
+/// was that after every app start each attachment reported "used in 0 notes",
+/// on every client, until its referencing note happened to be re-saved. Unlike
+/// `vault.indices` (persisted, MYI1), this graph has no disk form to reload, so
+/// the rebuild has to read the notes.
+///
+/// Best-effort and silent on failure, like the sibling hydrates: a graph that
+/// cannot be rebuilt is left as empty as it already was, and an unlock the user
+/// completed must never fail because of it. `collect_note_attachment_refs` is
+/// fail-closed, so a partial walk aborts rather than installing an
+/// under-reporting graph — under-reporting is what would make a delete warning
+/// lie about which notes it breaks.
+pub async fn hydrate_attachment_refs_core(
+    host: &dyn HostCtx,
+    io: &dyn VaultIo,
+    state: &VaultRuntimeState,
+    refs: &crate::plugins::attachments::reconcile::AttachmentRefsState,
+) {
+    let Ok(vault_dir) =
+        crate::paths::active_vault_root_io_from_host(host, state.active_vault_id().await)
+    else {
+        tracing::warn!(
+            event = "attachment_refs_rebuild_skipped",
+            reason = "vault_dir_resolution_failed"
+        );
+        return;
+    };
+    let Some((items_key, items_key_id, _root_key)) =
+        state.peek_unlocked_attachment_material().await
+    else {
+        // A concurrent lock raced — skip; the next unlock rebuilds.
+        tracing::warn!(
+            event = "attachment_refs_rebuild_skipped",
+            reason = "slot_not_unlocked"
+        );
+        return;
+    };
+
+    match crate::plugins::attachments::ref_scan::collect_note_attachment_refs(
+        io,
+        &vault_dir.join("notes"),
+        &items_key,
+        &items_key_id,
+    )
+    .await
+    {
+        Ok(pairs) => {
+            let notes = pairs.len();
+            for (note_id, ids) in pairs {
+                refs.apply(&note_id, ids);
+            }
+            // Counts only — a note-id is a per-vault correlation tag and an
+            // attachment-id is another, so neither goes in a log line.
+            tracing::info!(event = "attachment_refs_rebuilt", notes);
+        }
+        Err(_) => {
+            tracing::warn!(
+                event = "attachment_refs_rebuild_skipped",
+                reason = "scan_failed"
+            );
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

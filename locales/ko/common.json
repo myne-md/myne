@@ -1261,7 +1261,10 @@
         "export": "내보내기…",
         "includeAttachments_one": "첨부 파일 {{count}}개 포함",
         "includeAttachments_other": "첨부 파일 {{count}}개 포함",
-        "title": "Markdown으로 내보내기"
+        "title": "Markdown으로 내보내기",
+        "copyLabel": "메모 텍스트를 클립보드에 복사",
+        "copied": "메모 텍스트가 복사됨",
+        "copyFailed": "메모 텍스트를 복사하지 못했습니다"
       }
     },
     "egress": {

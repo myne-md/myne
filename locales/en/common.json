@@ -1279,7 +1279,10 @@
         "export": "Export…",
         "includeAttachments_one": "Include {{count}} attachment",
         "includeAttachments_other": "Include {{count}} attachments",
-        "title": "Export as Markdown"
+        "title": "Export as Markdown",
+        "copyLabel": "Copy note text to clipboard",
+        "copied": "Note text copied",
+        "copyFailed": "Couldn't copy the note text"
       }
     },
     "egress": {
@@ -2092,7 +2095,7 @@
         "ioError": "Disk error, please try again.",
         "joinFailure": "Something went wrong, please try again.",
         "samePasswordRejected": "New password matches the current one.",
-          "serverAckPending": "Your new password works on this device, but Myne couldn't reach the server to save it. Until it does, your other devices still expect the old password — and if this browser's copy is cleared before then, the change is lost. It will retry automatically.",
+        "serverAckPending": "Your new password works on this device, but Myne couldn't reach the server to save it. Until it does, your other devices still expect the old password — and if this browser's copy is cleared before then, the change is lost. It will retry automatically.",
         "weakNewPassword": "New password must be at least 12 characters."
       },
       "changePasswordHeading": "Change password",
@@ -2822,14 +2825,14 @@
       "connect": "Connect",
       "connectedLocal": "Connected (local, no TLS).",
       "connectedTls": "Connected. Check that this fingerprint matches on your other device.",
-      "connectedPlatformTrust": "Connected over TLS. Your browser verified this server\u2019s certificate.",
+      "connectedPlatformTrust": "Connected over TLS. Your browser verified this server’s certificate.",
       "connecting": "Connecting…",
       "fingerprintLabel": "Server certificate fingerprint:",
       "pinStatic": "Verified against Myne’s built-in certificate.",
       "pinTofu": "Pinned on first connect. Compare this fingerprint across your devices.",
       "fixedOrigin": "This client syncs with one server, set when it was deployed. It cannot be changed from here — the page is only allowed to talk to this one address.",
       "fixedOriginNone": "No sync server is configured for this deployment.",
-      "pinPlatformTrust": "Verified by your browser\u2019s certificate store. This client cannot pin a certificate itself.",
+      "pinPlatformTrust": "Verified by your browser’s certificate store. This client cannot pin a certificate itself.",
       "placeholder": "https://your-server.example   ·   http://127.0.0.1:8080",
       "unreachable": "Couldn’t reach that server — check the URL and that it’s running."
     },
@@ -2931,7 +2934,7 @@
       "errorAuth": "Sync sign-in expired",
       "errorFrozen": "Account frozen — uploads paused",
       "errorDeviceRevoked": "This device was removed from your account",
-        "errorStorageFull": "Storage full — syncing paused",
+      "errorStorageFull": "Storage full — syncing paused",
       "errorQuota": "Storage full — uploads paused",
       "errorRateLimited": "Sync throttled — retrying",
       "errorTooLarge": "A file is too large to upload",

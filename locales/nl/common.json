@@ -1261,7 +1261,10 @@
         "export": "Exporteren…",
         "includeAttachments_one": "{{count}} bijlage opnemen",
         "includeAttachments_other": "{{count}} bijlagen opnemen",
-        "title": "Exporteren als Markdown"
+        "title": "Exporteren als Markdown",
+        "copyLabel": "Notitietekst naar klembord kopiëren",
+        "copied": "Notitietekst gekopieerd",
+        "copyFailed": "Kon de notitietekst niet kopiëren"
       }
     },
     "egress": {

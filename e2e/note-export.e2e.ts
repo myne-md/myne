@@ -319,3 +319,48 @@ describeE2E("ne3 UI flow lands the success toast (MYND-116)", () => {
     );
   });
 });
+
+describeE2E("ne4 Copy puts the note text on the clipboard and toasts (MYND-643)", () => {
+  // Vault-count precondition: 1 (weak KDF, export-suite notes).
+  it("export modal → icon-only Copy → success toast (no OS dialog on this path)", async () => {
+    let seeded!: SeededVault;
+    await scenario(
+      "ne4-copy-toast",
+      { seed: (dir) => void (seeded = seedVault(dir, { exportSuite: true })) },
+      async (app) => {
+        const s = app.session;
+        const suite = seededExportSuite(seeded);
+        await unlockToEditor(s, seeded.password);
+        await dismissImporterOffer(s);
+
+        // The icon-only Copy button lives inside the export pre-flight modal,
+        // which the ATTACHMENTS-bearing note raises (the no-attachments note
+        // skips straight to the save dialog). Copy is text-only — the
+        // attachment count is irrelevant to what lands on the clipboard.
+        const item = await openExportMenuItem(s, suite.attachmentsNoteId);
+        await item.click();
+        await s.byTestId("export.modal", { timeoutMs: 15_000 });
+
+        // Copy has no OS dialog (a clipboard is not a file), so unlike export
+        // this whole path is driveable end-to-end through the production
+        // binary. onCopy strips frontmatter, writes the body to the clipboard
+        // and — because a clipboard write has no visible result — MUST toast.
+        // The frontmatter-strip golden lives in the tests/notes/copyNoteMarkdown
+        // unit suite; here we pin the UI flow reaching the success toast.
+        await (await s.byTestId("export.copy")).click();
+
+        const message = await s.waitUntil(
+          async () =>
+            await s.execute<string | null>(
+              'const t = document.querySelector(\'[data-testid="editor.toast"]\');' +
+                "if (!t) return null;" +
+                "const span = t.querySelector('span');" +
+                "return span && span.textContent ? span.textContent : null;",
+            ),
+          { label: "copy success toast", timeoutMs: 20_000 },
+        );
+        expect(message).toBe("Note text copied");
+      },
+    );
+  });
+});
