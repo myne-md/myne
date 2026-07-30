@@ -134,6 +134,33 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     descriptionKey: "settings.quickUnlock.setupHelper",
     keywordsKey: "settings.search.keywords.quickUnlock",
   },
+  // CLI terminal access (MYND-490). All three carry `cliAccess`: the block is
+  // omitted where the capability is absent, so an ungated entry would navigate
+  // to an anchor that was never rendered.
+  {
+    id: "privacy.cli-access",
+    capability: "cliAccess",
+    panelId: "privacy",
+    titleKey: "settings.cliAccess.label",
+    descriptionKey: "settings.cliAccess.helperOff",
+    keywordsKey: "settings.search.keywords.cliAccess",
+  },
+  {
+    id: "privacy.cli-excluded-folders",
+    capability: "cliAccess",
+    panelId: "privacy",
+    titleKey: "settings.cliAccess.excludedLabel",
+    descriptionKey: "settings.cliAccess.excludedHelper",
+    keywordsKey: "settings.search.keywords.cliExcludedFolders",
+  },
+  {
+    id: "privacy.cli-rate-limit",
+    capability: "cliAccess",
+    panelId: "privacy",
+    titleKey: "settings.cliAccess.rateLimitLabel",
+    descriptionKey: "settings.cliAccess.rateLimitHelper",
+    keywordsKey: "settings.search.keywords.cliRateLimit",
+  },
 
   // ── Sync (keys live under `sync.panel.*`, not `settings.*`) ─────────────────
   {

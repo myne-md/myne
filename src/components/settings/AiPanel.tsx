@@ -34,7 +34,14 @@ import {
 } from "../../lib/load-bearing-copy";
 import { Switch } from "../primitives/Switch";
 import { BetaBadge } from "./BetaBadge";
-import { BLOCK_STYLE, HELPER_STYLE, LABEL_STYLE, PANEL_ROOT_STYLE } from "./panel-styles";
+import {
+  BLOCK_STYLE,
+  FOLDER_TEXTAREA_STYLE,
+  HELPER_STYLE,
+  LABEL_STYLE,
+  PANEL_ROOT_STYLE,
+  TOGGLE_ROW_STYLE,
+} from "./panel-styles";
 
 // Panel header row — the panel title carries the "Beta" badge so the beta
 // framing is visible inside the panel (not only on the Labs rail entry).
@@ -48,13 +55,6 @@ const TITLE_STYLE: CSSProperties = {
   fontSize: "var(--text-lg)",
   fontWeight: "var(--weight-semibold)" as CSSProperties["fontWeight"],
   color: "var(--fg-1)",
-};
-
-const TOGGLE_ROW_STYLE: CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "space-between",
-  gap: "var(--space-3)",
 };
 
 const LINK_STYLE: CSSProperties = {
@@ -392,19 +392,7 @@ export function AiPanel({ onShowToast }: AiPanelProps) {
           rows={3}
           spellCheck={false}
           placeholder={t("settings.ai.excludedPlaceholder")}
-          style={{
-            marginTop: "var(--space-1)",
-            width: "100%",
-            resize: "vertical",
-            font: "inherit",
-            fontSize: 13,
-            fontFamily: "var(--font-mono)",
-            color: "var(--fg-1)",
-            background: "var(--paper-2)",
-            border: "1px solid var(--line-1)",
-            borderRadius: "var(--radius-1)",
-            padding: "var(--space-2)",
-          }}
+          style={FOLDER_TEXTAREA_STYLE}
         />
         <p style={HELPER_STYLE}>{t("settings.ai.excludedHelper")}</p>
       </div>

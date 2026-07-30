@@ -13,28 +13,22 @@
 // framework exists yet). TR strings ("Otomatik kilit" / "Bu kadar
 // hareketsizlik sonrası kasayı kilitle.") await an app-wide i18n layer.
 
-import type { CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import { usePrefs } from "../../hooks/usePrefs";
 import { useLastActiveNotePref } from "../../hooks/useLastActiveNotePref";
+import { has } from "../../platform/capabilities";
 import { SearchableSelect } from "../primitives/SearchableSelect";
 import type { SelectOption } from "../primitives/Select";
 import { Switch } from "../primitives/Switch";
+import { CliAccessSettings } from "./CliAccessSettings";
 import { QuickUnlockSettings } from "./QuickUnlockSettings";
 import {
   BLOCK_STYLE,
   HELPER_STYLE,
   LABEL_STYLE,
   PANEL_ROOT_STYLE,
+  TOGGLE_ROW_STYLE,
 } from "./panel-styles";
-
-const TOGGLE_ROW_STYLE: CSSProperties = {
-  display: "flex",
-  flexDirection: "row",
-  alignItems: "center",
-  justifyContent: "space-between",
-  gap: "var(--space-3)",
-};
 
 // MYND-160 grill Q2.1 disclosure: when the user toggles off, the
 // helper text MUST disclose the off-after-unlock semantic so a
@@ -204,7 +198,14 @@ function RealtimeSyncInfoRow() {
 
 export function PrivacyPanel({ onShowToast }: PrivacyPanelProps = {}) {
   const { t } = useTranslation();
-  const { prefs, toggleScreenCapture, setAutoLock } = usePrefs(onShowToast);
+  const {
+    prefs,
+    toggleScreenCapture,
+    setAutoLock,
+    setCliEnabled,
+    setCliExcludedFolders,
+    setCliRateLimitDisabled,
+  } = usePrefs(onShowToast);
   const { enabled: lastActiveNote, setEnabled: setLastActiveNote } =
     useLastActiveNotePref();
   return (
@@ -237,6 +238,27 @@ export function PrivacyPanel({ onShowToast }: PrivacyPanelProps = {}) {
         }}
       />
       <QuickUnlockSettings />
+      {/* CLI terminal access (cli-thin-client task 12, MYND-490). Omitted where
+          `cliAccess` is absent rather than greyed out: a browser tab cannot host
+          a terminal's Unix socket, and the sidecar it would talk to is a file
+          inside a desktop bundle (`decisions.md` 2026-07-26 "Web capability
+          set" makes omission normative). */}
+      {has("cliAccess") && (
+        <CliAccessSettings
+          enabled={prefs.cli_enabled}
+          excludedFolders={prefs.cli_excluded_folders}
+          rateLimitDisabled={prefs.cli_rate_limit_disabled}
+          onSetEnabled={(next) => {
+            void setCliEnabled(next);
+          }}
+          onSetExcludedFolders={(folders) => {
+            void setCliExcludedFolders(folders);
+          }}
+          onSetRateLimitDisabled={(next) => {
+            void setCliRateLimitDisabled(next);
+          }}
+        />
+      )}
     </div>
   );
 }

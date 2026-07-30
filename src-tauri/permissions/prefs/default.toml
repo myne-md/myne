@@ -69,6 +69,11 @@ permissions = [
   "allow-set-right-panel-active-tab",
   "allow-set-right-panel-hidden-tabs",
   "allow-set-right-panel-tab-order",
+  # myne-cli epic (MYND-490; cli-thin-client task 2): the three CLI-door prefs
+  # setters — see the identifiers' own descriptions below.
+  "allow-set-cli-enabled",
+  "allow-set-cli-excluded-folders",
+  "allow-set-cli-rate-limit-disabled",
 ]
 
 [[permission]]
@@ -457,3 +462,27 @@ commands.allow = ["set_attachment_ocr_enabled"]
 identifier = "allow-set-ai-excluded-folders"
 description = "Allow invoking prefs:set_ai_excluded_folders (Slot::Unlocked-gated setter for the ai_excluded_folders set — folders the AI never reads/indexes; same canonical set encoding as deliberate_folders; atomic-writes vault.prefs with no native side-effect)."
 commands.allow = ["set_ai_excluded_folders"]
+
+# myne-cli epic (MYND-490; cli-thin-client task 2): three write setters for the
+# CLI terminal-access door prefs (design-notes.md "CLI terminal access is a
+# default-off, unlock-gated local socket with a folder exclusion list
+# (MYND-490)"; docs/threat-model.md §7). All three inherit the same
+# main-window-only invariant as the other allow-set-* permissions — v0.2
+# multi-window MUST NOT grant these to any non-main window. All three
+# atomic-write vault.prefs with no native side-effect; opening/closing the
+# actual socket in response to cli_enabled + unlock state is a separate
+# lifecycle concern (cli-thin-client task 3), not this ACL.
+[[permission]]
+identifier = "allow-set-cli-enabled"
+description = "Allow invoking prefs:set_cli_enabled (Slot::Unlocked-gated setter for the cli_enabled CLI terminal-access door toggle; atomic-writes vault.prefs with no native side-effect; class DeviceLocal per sync-protocol.md §10.2 — each machine's door is its own; default-off, emitted on disk only when true)."
+commands.allow = ["set_cli_enabled"]
+
+[[permission]]
+identifier = "allow-set-cli-excluded-folders"
+description = "Allow invoking prefs:set_cli_excluded_folders (Slot::Unlocked-gated setter for the cli_excluded_folders set — folders the CLI door never reaches; same canonical set encoding as deliberate_folders/ai_excluded_folders; atomic-writes vault.prefs with no native side-effect; class Shared(SetUnion) per sync-protocol.md §10.2 — an exclusion added on one device must never be lost in a merge)."
+commands.allow = ["set_cli_excluded_folders"]
+
+[[permission]]
+identifier = "allow-set-cli-rate-limit-disabled"
+description = "Allow invoking prefs:set_cli_rate_limit_disabled (Slot::Unlocked-gated setter for the cli_rate_limit_disabled toggle — removes the default-on socket rate limit; atomic-writes vault.prefs with no native side-effect; class DeviceLocal per sync-protocol.md §10.2 — a machine-local performance knob; Option<bool>, the archive_disabled precedent, omitted on disk only when unset)."
+commands.allow = ["set_cli_rate_limit_disabled"]

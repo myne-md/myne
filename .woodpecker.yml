@@ -303,6 +303,12 @@ steps:
       # Capability-descriptor drift gate (MYND-574 task 27): the UI's omission
       # set and the dispatcher's refusal set must agree, in both directions.
       - node scripts/check-web-capabilities.mjs
+      # CLI sidecar contract (cli-thin-client task 11): the `myne` CLI crate has
+      # no dependency on `myne-desktop`, so the bundle identifier + the
+      # socket/status basenames are duplicated by design — drift compiles clean
+      # on both sides and only shows up as "app not running" against a running
+      # app. Also asserts the sidecar is still in `bundle.externalBin`.
+      - node scripts/check-cli-sidecar.mjs
       - pnpm build
       # i18n-catalog parity (hook-only otherwise): fails on empty English source
       # values or static t()/i18n.t() keys missing from locales/en/common.json.
@@ -386,7 +392,11 @@ steps:
       # `-c` overrides beforeBuildCommand to reuse the dist/ already built by the
       # pnpm-build step (shared workspace) instead of rebuilding it here (Q3);
       # `test -d dist || pnpm build` still rebuilds if dist/ is somehow absent.
-      - pnpm tauri build --no-bundle -c '{"build":{"beforeBuildCommand":"test -d dist || pnpm build"}}'
+      # The override keeps the sidecar half of `beforeBuildCommand`
+      # (cli-thin-client task 11) and only swaps the frontend half: staging the
+      # `myne` sidecar is what `bundle.externalBin` consumes, and running it here
+      # is also the only CI exercise `scripts/build-cli-sidecar.mjs` gets.
+      - pnpm tauri build --no-bundle -c '{"build":{"beforeBuildCommand":"node scripts/build-cli-sidecar.mjs --profile release && (test -d dist || pnpm build)"}}'
       # Guard the AI-free auditable variant: `--no-default-features` drops candle
       # entirely and exercises the `#[cfg(not(feature="local-inference"))]` no-op
       # hook arms (hooks.rs / auto_lock.rs) + the zero-ML-symbol reproducible path.

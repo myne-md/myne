@@ -29,7 +29,13 @@ import { useTranslation } from "react-i18next";
 import { ControlBlock } from "./ControlBlock";
 import { LanguageSelect } from "./LanguageSelect";
 import { Switch } from "../primitives/Switch";
-import { BLOCK_STYLE, HELPER_STYLE, LABEL_STYLE, PANEL_ROOT_STYLE } from "./panel-styles";
+import {
+  BLOCK_STYLE,
+  HELPER_STYLE,
+  LABEL_STYLE,
+  PANEL_ROOT_STYLE,
+  TOGGLE_ROW_STYLE,
+} from "./panel-styles";
 import {
   prefsRead,
   setCustomTheme,
@@ -41,14 +47,6 @@ import { applyTheme } from "../../lib/theme";
 import { CustomThemesSection } from "./CustomThemesSection";
 
 // Label + switch on one row, helper below — mirrors PrivacyPanel's toggle shape.
-const TOGGLE_ROW_STYLE: CSSProperties = {
-  display: "flex",
-  flexDirection: "row",
-  alignItems: "center",
-  justifyContent: "space-between",
-  gap: "var(--space-3)",
-};
-
 const SEGMENTED_STYLE: CSSProperties = {
   position: "relative",
   display: "inline-flex",
