@@ -2089,6 +2089,7 @@ mod tests {
                 &parsed_meta.account_number_hash,
                 &protocol::PrefsView {
                     attachment_ocr_enabled: true,
+                    transcription_enabled: true,
                     screen_capture_protection: false,
                     ai_enabled: false,
                     ai_excluded_folders: Vec::new(),
@@ -2247,6 +2248,7 @@ mod tests {
             &account_hash,
             &protocol::PrefsView {
                 attachment_ocr_enabled: true,
+                transcription_enabled: true,
                 screen_capture_protection: false,
                 ai_enabled: false,
                 ai_excluded_folders: Vec::new(),

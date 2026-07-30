@@ -4677,6 +4677,7 @@ mod tests {
                 &account_hash,
                 &PrefsView {
                     attachment_ocr_enabled: true,
+                    transcription_enabled: true,
                     screen_capture_protection: false,
                     ai_enabled: false,
                     ai_excluded_folders: Vec::new(),

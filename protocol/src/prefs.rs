@@ -665,6 +665,30 @@ pub struct PrefsView {
     #[serde(default)]
     pub theme: Option<ThemeChoice>,
 
+    /// Whether speech-to-text may run on this vault's audio attachments
+    /// (MYND-592). Canonical key `transcription_enabled` — sorts after `theme`
+    /// (`the` < `tra`), before `view_order` (`t` < `v`).
+    ///
+    /// **Default ON**, hence the explicit default function — the same polarity
+    /// as `attachment_ocr_enabled` and for the same two reasons: a bare
+    /// `#[serde(default)]` would yield `false` and silently disable the feature
+    /// for every vault whose blob predates the field, and emitting only the
+    /// non-default `false` keeps such a vault byte-identical to a pre-feature
+    /// `vault.prefs` (existing golden vectors unaffected).
+    ///
+    /// This field exists because transcription was previously gated on
+    /// `ai_enabled` — the *embedding store's* opt-in, which it has nothing to
+    /// do with. Speech-to-text ships a bundled model, runs entirely on-device
+    /// and does one bounded, user-initiated thing, so it is a product feature
+    /// rather than a lab experiment and carries its own switch.
+    ///
+    /// **Non-load-bearing / AS-low** — no protective-envelope clamp. A tampered
+    /// value can at worst enable or disable a user-initiated local computation;
+    /// it grants no read access the vault did not already have, and the host
+    /// re-reads it rather than trusting the WebView.
+    #[serde(default = "default_true")]
+    pub transcription_enabled: bool,
+
     /// Per-folder custom sidebar icon (MYND-185) — a map from a canonical
     /// trailing-slash folder path to an icon name drawn from the client's
     /// curated stroke-glyph set, replacing that folder's default glyph. A
@@ -1023,6 +1047,7 @@ impl Default for PrefsView {
             deliberate_folders: Vec::new(),
             device_names: Default::default(),
             attachment_ocr_enabled: true,
+            transcription_enabled: true,
             auto_lock_seconds: None,
             custom_theme: None,
             daily_date_format: None,
@@ -1808,6 +1833,16 @@ fn canonical_json_encode(prefs: &PrefsView) -> Vec<u8> {
         out.push(b'"');
     }
 
+    // transcription_enabled (canonical key 'transcription_enabled' — after
+    // theme ['the' < 'tra'], before view_order ['t' < 'v']). Speech-to-text
+    // opt-OUT (MYND-592). Emitted ONLY when FALSE — the same inverse rule as
+    // attachment_ocr_enabled, because this one defaults to TRUE. A vault that
+    // never touched the toggle is therefore byte-identical to a pre-feature
+    // vault.prefs, which preserves the existing KAT vectors.
+    if !prefs.transcription_enabled {
+        out.extend_from_slice(b",\"transcription_enabled\":false");
+    }
+
     // view_order (canonical key 'v' — LAST, after theme ['t' < 'v']). The
     // saved-view display sequence (MYND-273); same order-preserving discipline
     // as item_order / favorites. Leading comma; omitted entirely when empty so a
@@ -2343,6 +2378,12 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
     // omit-when-default rule, so a pre-MYND-613 blob parses unchanged.
     let show_task_marker =
         parse_optional_bool_marker(after_key, b"\"show_task_marker\":").unwrap_or(true);
+    // transcription_enabled (key 'tra…' — between theme and view_order,
+    // MYND-592). Same omit-when-default polarity as show_task_marker above:
+    // absent ≡ `true`, so every blob predating the field decodes with
+    // speech-to-text on, and only a literal `false` turns it off.
+    let transcription_enabled =
+        parse_optional_bool_marker(after_key, b"\"transcription_enabled\":").unwrap_or(true);
     // view_order (key 'v' — LAST, after theme [t < v], MYND-273). A sequence
     // array located by marker in the post-screen_capture_protection region, like
     // theme/spell. Absent → empty; present-but-malformed → PlaintextParseFailed.
@@ -2361,6 +2402,7 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
         screen_capture_protection,
         show_note_timestamps,
         show_task_marker,
+        transcription_enabled,
         folder_icons,
         hidden_bar_items,
         bar_items_order,
@@ -3191,6 +3233,7 @@ mod tests {
     fn canonical_json_encodes_true_to_expected_bytes() {
         let prefs = PrefsView {
             attachment_ocr_enabled: true,
+            transcription_enabled: true,
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
             show_note_timestamps: true,
@@ -3255,6 +3298,7 @@ mod tests {
     fn canonical_json_encodes_false_to_expected_bytes() {
         let prefs = PrefsView {
             attachment_ocr_enabled: true,
+            transcription_enabled: true,
             screen_capture_protection: false,
             bar_items_order: Vec::new(),
             show_note_timestamps: true,
@@ -3578,6 +3622,7 @@ mod tests {
             parsed,
             PrefsView {
                 attachment_ocr_enabled: true,
+                transcription_enabled: true,
                 screen_capture_protection: true,
                 bar_items_order: Vec::new(),
                 icon: None,
@@ -3644,6 +3689,7 @@ mod tests {
             parsed,
             PrefsView {
                 attachment_ocr_enabled: true,
+                transcription_enabled: true,
                 screen_capture_protection: false,
                 bar_items_order: Vec::new(),
                 icon: None,
@@ -4836,6 +4882,7 @@ mod tests {
         // Full field-mix: a < d < e < f < i < s < t. theme sits last.
         let prefs = PrefsView {
             attachment_ocr_enabled: true,
+            transcription_enabled: true,
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
             archived_folders: Vec::new(),
@@ -5278,6 +5325,7 @@ mod tests {
         // Keys sorted: deliberate_folders (d) before screen_capture_protection (s).
         let prefs = PrefsView {
             attachment_ocr_enabled: true,
+            transcription_enabled: true,
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
             show_note_timestamps: true,
@@ -5348,6 +5396,7 @@ mod tests {
     fn encode_sorts_and_dedupes_folder_elements() {
         let prefs = PrefsView {
             attachment_ocr_enabled: true,
+            transcription_enabled: true,
             screen_capture_protection: false,
             bar_items_order: Vec::new(),
             show_note_timestamps: true,
@@ -5421,6 +5470,7 @@ mod tests {
         // so JSON escaping is load-bearing.
         let prefs = PrefsView {
             attachment_ocr_enabled: true,
+            transcription_enabled: true,
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
             show_note_timestamps: true,
@@ -5489,6 +5539,7 @@ mod tests {
         // Decomposed "é" (e + U+0301) → NFC precomposed (U+00E9) at encode.
         let prefs = PrefsView {
             attachment_ocr_enabled: true,
+            transcription_enabled: true,
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
             show_note_timestamps: true,
@@ -5617,6 +5668,7 @@ mod tests {
         let account_hash = fixed_account_number_hash();
         let original = PrefsView {
             attachment_ocr_enabled: true,
+            transcription_enabled: true,
             screen_capture_protection: false,
             bar_items_order: Vec::new(),
             show_note_timestamps: true,
@@ -5709,6 +5761,7 @@ mod tests {
         // HETEROGENEOUS — a folder path interleaved between note UUIDs.
         let prefs = PrefsView {
             attachment_ocr_enabled: true,
+            transcription_enabled: true,
             field_clocks: Default::default(),
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
@@ -5786,6 +5839,7 @@ mod tests {
         // which does both). The duplicate "zzz" must survive verbatim.
         let prefs = PrefsView {
             attachment_ocr_enabled: true,
+            transcription_enabled: true,
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
             show_note_timestamps: true,
@@ -5892,6 +5946,7 @@ mod tests {
         let account_hash = fixed_account_number_hash();
         let original = PrefsView {
             attachment_ocr_enabled: true,
+            transcription_enabled: true,
             field_clocks: Default::default(),
             screen_capture_protection: false,
             bar_items_order: Vec::new(),
@@ -5983,6 +6038,7 @@ mod tests {
         // (graph/word-count out of order + a duplicate collapse to a clean set).
         let prefs = PrefsView {
             attachment_ocr_enabled: true,
+            transcription_enabled: true,
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
             show_note_timestamps: true,
@@ -6174,6 +6230,7 @@ mod tests {
         // Canonical key order: auto_lock_seconds (a) < screen_capture_protection (s).
         let prefs = PrefsView {
             attachment_ocr_enabled: true,
+            transcription_enabled: true,
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
             show_note_timestamps: true,
@@ -6242,6 +6299,7 @@ mod tests {
         // a < d < s: auto_lock_seconds, deliberate_folders, screen_capture_protection.
         let prefs = PrefsView {
             attachment_ocr_enabled: true,
+            transcription_enabled: true,
             screen_capture_protection: false,
             bar_items_order: Vec::new(),
             show_note_timestamps: true,
@@ -6312,6 +6370,7 @@ mod tests {
         // layer; the codec faithfully persists whatever integer it is given.
         let prefs = PrefsView {
             attachment_ocr_enabled: true,
+            transcription_enabled: true,
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
             show_note_timestamps: true,
@@ -6450,6 +6509,7 @@ mod tests {
         let account_hash = fixed_account_number_hash();
         let original = PrefsView {
             attachment_ocr_enabled: true,
+            transcription_enabled: true,
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
             show_note_timestamps: true,
@@ -6562,6 +6622,7 @@ mod tests {
         // right_width.
         let prefs = PrefsView {
             attachment_ocr_enabled: true,
+            transcription_enabled: true,
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
             archived_folders: Vec::new(),
@@ -6864,6 +6925,7 @@ mod tests {
         let account_hash = fixed_account_number_hash();
         let original = PrefsView {
             attachment_ocr_enabled: true,
+            transcription_enabled: true,
             screen_capture_protection: false,
             bar_items_order: Vec::new(),
             show_note_timestamps: true,
@@ -6936,6 +6998,7 @@ mod tests {
         let account_hash = fixed_account_number_hash();
         let original = PrefsView {
             attachment_ocr_enabled: true,
+            transcription_enabled: true,
             screen_capture_protection: false,
             bar_items_order: Vec::new(),
             show_note_timestamps: true,
@@ -7269,6 +7332,7 @@ mod tests {
             &account_hash_a,
             &PrefsView {
                 attachment_ocr_enabled: true,
+                transcription_enabled: true,
                 screen_capture_protection: true,
                 bar_items_order: Vec::new(),
                 icon: None,
@@ -7334,6 +7398,7 @@ mod tests {
             &account_hash_a,
             &PrefsView {
                 attachment_ocr_enabled: true,
+                transcription_enabled: true,
                 screen_capture_protection: false,
                 bar_items_order: Vec::new(),
                 icon: None,
@@ -7401,6 +7466,7 @@ mod tests {
         // order + sequence discipline before emitting.
         let prefs_populated = PrefsView {
             attachment_ocr_enabled: true,
+            transcription_enabled: true,
             field_clocks: Default::default(),
             screen_capture_protection: true,
             bar_items_order: Vec::new(),

@@ -279,6 +279,9 @@ pub fn merge_prefs(local: &PrefsView, remote: &PrefsView) -> PrefsView {
         reminders_enabled: local.reminders_enabled,
         reminder_horizon_days: local.reminder_horizon_days,
         show_task_marker: lww!("show_task_marker", show_task_marker),
+        // MYND-592: shared for the same reason as `show_task_marker` — wanting
+        // speech-to-text is taste, not device capability.
+        transcription_enabled: lww!("transcription_enabled", transcription_enabled),
         daily_date_format: lww!("daily_date_format", daily_date_format),
         daily_folder: lww!("daily_folder", daily_folder),
         daily_template: lww!("daily_template", daily_template),
