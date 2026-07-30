@@ -151,15 +151,79 @@ const CSS = `
   padding: var(--space-5, 24px);
   z-index: 1300;
   cursor: zoom-out;
+  /* The image (image mode) is absolutely positioned + transformed; clip it to
+     the viewport so a zoomed image never overflows the page (MYND-594). */
+  overflow: hidden;
 }
 .cm-attach-lightbox-img {
   /* The image sits directly on the dimmed backdrop — no white frame, padding,
-     or background box. A focused preview, not a full-bleed takeover. */
-  max-width: min(80vw, 1100px);
-  max-height: 80vh;
+     or background box. Absolutely positioned + transform-driven so it can be
+     zoomed/panned (MYND-594); the controller sets translate/scale + cursor. */
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+  max-width: 100%;
+  max-height: 100%;
   object-fit: contain;
   display: block;
-  cursor: default;
+  will-change: transform;
+  /* We own wheel/pinch/pan — keep the browser off the gesture + native drag. */
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-user-drag: none;
+  /* cursor is set by the zoom controller: zoom-in (fit) / grab / grabbing. */
+}
+/* Zoom controls (ED-08: − / percentage / +), floating bottom-centre over the
+   dimmed backdrop. The percentage doubles as a reset-to-fit button. */
+.cm-attach-lightbox-zoom {
+  position: fixed;
+  bottom: max(20px, calc(env(safe-area-inset-bottom, 0px) + 16px));
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  border-radius: 999px;
+  background: rgba(20, 20, 20, 0.72);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  z-index: 1310;
+  font-family: var(--font-sans);
+}
+.cm-attach-lightbox-zoom-btn,
+.cm-attach-lightbox-zoom-pct {
+  border: none;
+  background: transparent;
+  color: #fff;
+  cursor: pointer;
+  font-family: inherit;
+  height: 34px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.cm-attach-lightbox-zoom-btn {
+  width: 34px;
+  font-size: 20px;
+  line-height: 1;
+}
+.cm-attach-lightbox-zoom-pct {
+  min-width: 56px;
+  padding: 0 8px;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.cm-attach-lightbox-zoom-btn:hover,
+.cm-attach-lightbox-zoom-pct:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+.cm-attach-lightbox-zoom-btn:focus-visible,
+.cm-attach-lightbox-zoom-pct:focus-visible {
+  outline: 2px solid var(--accent, #6ea8fe);
+  outline-offset: 2px;
 }
 /* Lightbox PDF mode: a bigger scrollable multi-page reader mounted in place of
    the <img>. The surface itself scrolls (it is the IntersectionObserver root);
@@ -173,10 +237,14 @@ const CSS = `
   max-width: min(80vw, 1100px);
   height: 80vh;
   max-height: 80vh;
-  overflow-y: auto;
+  /* Both axes scroll: a user-scaled page (MYND-594) can exceed the surface
+     width. "safe center" keeps pages centred until they overflow, then aligns
+     to the start so horizontal scroll reveals the whole page (plain center
+     would strand the left overflow unreachable). */
+  overflow: auto;
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: safe center;
   gap: var(--space-3, 10px);
   padding: var(--space-4, 14px);
   background: var(--paper, #faf8f3);
