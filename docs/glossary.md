@@ -236,7 +236,7 @@ Used in: `decisions.md` 2026-06-15; Saved Views (MYND-276)
 
 *(Aliases: backlinks, wikilinks.)*
 
-Links between notes that are queryable from both endpoints — opening a note shows which other notes link to it. Myne supports the `[[wikilink]]` syntax in v0.1 with a backlinks pane; the graph view (d3-force + hand-rolled render) is also part of v1.0 scope (`vision.md` Phase 1 Scope).
+Links between notes that are queryable from both endpoints — opening a note shows which other notes link to it. Myne supports the `[[wikilink]]` syntax in v0.1 with a [Links tab](#links-tab) answering both directions; the graph view (d3-force + hand-rolled render) is also part of v1.0 scope (`vision.md` Phase 1 Scope).
 
 Used in: `vision.md` Phase 1 Scope
 
@@ -361,9 +361,15 @@ The code-editor framework used as the markdown editor in Myne's Phase 1 desktop 
 
 Used in: `vision.md` Phase 1 Scope
 
+### **color group** &nbsp; 📦 *Product*
+
+An ordered rule pairing a [filter AST](#filter-ast) with a palette color, applied to [graph view](#graph-view) nodes **at paint time** — the notes a rule matches render in its color; a note matching no rule keeps the neutral node color. Rules are evaluated **first-match-wins in list order**, so array position *is* precedence; a disabled rule stays in the list and contributes no match. Persisted as the `color_groups` field of [`vault.prefs`](#vaultprefs) — a nested array of `{id, name, color, enabled, filter}` objects encoded in caller order verbatim (never sorted, unlike `saved_views`), omitted when empty so a vault that never opens the feature stays byte-identical to a pre-feature blob (`spec/protocol.md` §9.5.2). Phase 2 sync classification is **shared, whole-value LWW** — a per-key or set-union merge would silently corrupt precedence. `color` is a design-token palette key, not a hex value, so group colors follow theme, dark mode and a [custom theme](#custom-theme)'s override like every other token; an unresolvable key degrades to neutral. v1 exposes only the `hasTag` and `inFolder` leaves through the authoring UI while persisting the full AST, so widening later is UI-only; an unsupported leaf degrades to no-match rather than throwing, so a rule authored by a newer client never breaks an older one's render. **Non-load-bearing** (cosmetic, AS3-Sensitive content inside the AEAD blob) — a tampered or replayed `vault.prefs` can at worst reset or stale the rule set. Color is a render-time layer only: a rule change repaints and never re-runs the graph layout. Distinct from a [color label](#color-label), which colors a *sidebar row* and is keyed per note/folder rather than by a filter. (MYND-604)
+
+Used in: `spec/protocol.md` §9.5.2
+
 ### **color label** &nbsp; 📦 *Product*
 
-A user-assigned color on a sidebar note or [folder](#folder) row, rendered as a small dot (the title text stays in the ink ramp; a colored left-border is banned by `PRODUCT.md`). Persisted as the `item_colors` field of [`vault.prefs`](#vaultprefs) — an optional nested-object map from a note UUID **or** canonical trailing-slash folder path (discriminated by the trailing `/`, like [item order](#item-order)) to a [label slot](#label-slot) name; NFC-normalized, lexicographically-keyed, omitted-when-empty (`spec/protocol.md` §9.5.2). Note-keyed entries survive note rename/move (the UUID is the filename); folder-keyed entries are prefix-rewritten on folder rename/move and pruned on delete; a stale entry is ignored at render and pruned on the next write. **Non-load-bearing** (cosmetic, AS-low) — a tampered/replayed blob can at worst surface the wrong color. Notes **and** folders both take a color (contrast [custom folder icon](#custom-folder-icon), folders only). See also [label slot](#label-slot), [PrefsView](#prefsview). (MYND-184)
+A user-assigned color on a sidebar note or [folder](#folder) row, rendered as a small dot (the title text stays in the ink ramp; a colored left-border is banned by `PRODUCT.md`). Persisted as the `item_colors` field of [`vault.prefs`](#vaultprefs) — an optional nested-object map from a note UUID **or** canonical trailing-slash folder path (discriminated by the trailing `/`, like [item order](#item-order)) to a [label slot](#label-slot) name; NFC-normalized, lexicographically-keyed, omitted-when-empty (`spec/protocol.md` §9.5.2). Note-keyed entries survive note rename/move (the UUID is the filename); folder-keyed entries are prefix-rewritten on folder rename/move and pruned on delete; a stale entry is ignored at render and pruned on the next write. **Non-load-bearing** (cosmetic, AS-low) — a tampered/replayed blob can at worst surface the wrong color. Notes **and** folders both take a color (contrast [custom folder icon](#custom-folder-icon), folders only). See also [label slot](#label-slot), [PrefsView](#prefsview); contrast [color group](#color-group), which colors *graph* nodes by filter rather than a row by key. (MYND-184)
 
 Used in: `spec/protocol.md` §9.5.2; `decisions.md` 2026-06-07
 
@@ -1161,6 +1167,12 @@ Used in: `spec/protocol.md` §9.8.2; `decisions.md` 2026-07-28
 A `[label]: url` line (CommonMark "link reference definition") that supplies the destination for a [reference link](#reference-link) (`[text][label]`) or a reference-style image (`![alt][label]`) elsewhere in the same note. Labels match by CommonMark rules — case-folded with internal whitespace collapsed — and the first definition of a given label wins. In the Myne editor a shared collector scans all such definition lines into a `label → { target, range }` map; a definition referenced by a resolved reference link is hidden off-cursor (it reads as body noise otherwise) and revealed when the cursor enters its line. The definition bytes are preserved (§6 C1) and the form is never emitted by an authoring affordance. See also [reference link](#reference-link).
 
 Used in: `spec/markdown-dialect.md` §3.2; `decisions.md` 2026-05-30
+
+### **Links tab** &nbsp; 📦 *Product*
+
+*(Aliases: backlinks pane — the pre-MYND-604 name.)*
+
+The right-panel tab answering **both** directions of a note's [bidirectional links](#bidirectional-links) in two counted sections: "linked from" (incoming — the notes that link to the open note) and "links to" (outgoing — the notes it links to). Each direction lists clickable rows that open the target note and shows an explicit empty state when it has none; both recompute from the in-RAM [VaultIndices](#vaultindices) on an index-nonce bump, keeping the previous row array when the result is unchanged so a no-op reindex does not re-render. Renamed from "Backlinks" when the outgoing half landed (MYND-604); the **tab id stays `backlinks`** — it is persisted in every user's `right_panel_tab_order` / `right_panel_hidden_tabs` (`spec/protocol.md` §9.5.2), so only the label changed. Distinct from the sibling **Unlinked** tab, which surfaces [unlinked mentions](#unlinked-mention) rather than explicit links.
 
 ### **local inference** &nbsp; 📦 *Product* (*Myne-divergent*)
 
@@ -2379,7 +2391,7 @@ Reference: https://vite.dev
 
 ### **unlinked mention** &nbsp; 📦 *Product*
 
-A note whose prose mentions the open note's **title** as a whole-word, fold-identity phrase **without** `[[wikilink]]`-ing it — surfaced as a collapsed-by-default second section of the **backlinks** pane with a one-click "link" action (Obsidian-parity discovery/cleanup aid; MYND-196, build-phase v1.1). Distinct from a backlink, which is an explicit link. Candidate recall rides the existing encrypted `vault.search` body index as a *filter only*; identity is verified by a `foldSegment` word-boundary match on the decrypted candidate body (`vault.search`'s language-detecting tokenizer is never the identity authority). A corpus-relative phrase document-frequency floor (df > ~0.15 → suppress) plus a ≤2-folded-char guard suppress common/short titles; the 0.15 threshold is a **tunable code constant, not spec** (deliberate contrast with the frozen Damm-32 table). Adds **no new at-rest artefact** — the guarantee surface does not move. Clicking "link" inserts `[[Title]]` through the canonical `saveNote` write path and never clobbers an open+dirty note (SYNC-15 guard).
+A note whose prose mentions the open note's **title** as a whole-word, fold-identity phrase **without** `[[wikilink]]`-ing it — surfaced collapsed-by-default in the **Unlinked** right-panel tab (sibling of the [Links tab](#links-tab)) with a one-click "link" action (Obsidian-parity discovery/cleanup aid; MYND-196, build-phase v1.1). Distinct from a backlink, which is an explicit link. Candidate recall rides the existing encrypted `vault.search` body index as a *filter only*; identity is verified by a `foldSegment` word-boundary match on the decrypted candidate body (`vault.search`'s language-detecting tokenizer is never the identity authority). A corpus-relative phrase document-frequency floor (df > ~0.15 → suppress) plus a ≤2-folded-char guard suppress common/short titles; the 0.15 threshold is a **tunable code constant, not spec** (deliberate contrast with the frozen Damm-32 table). Adds **no new at-rest artefact** — the guarantee surface does not move. Clicking "link" inserts `[[Title]]` through the canonical `saveNote` write path and never clobbers an open+dirty note (SYNC-15 guard).
 
 Used in: `agent-tooling/features/unlinked-mentions/prd.md`, `spec/wikilink.md`, `vision.md` Phase 1 Scope
 

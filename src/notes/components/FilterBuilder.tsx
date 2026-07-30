@@ -137,6 +137,12 @@ export interface FilterBuilderProps {
   representable?: boolean;
   /** Folder choices for the folder-condition picker (from the sidebar tree). */
   folderOptions: readonly FolderOption[];
+  /** Restrict the offered condition types (graph color-groups v1: tag/folder
+   *  only, matching `graphColorGroups.ts`'s supported-leaf set — offering
+   *  `search`/`property` there would let a rule silently never match, since
+   *  the evaluator degrades any other leaf to no-match). Omit for the full
+   *  four-type set (Saved Views' own usage, unchanged). */
+  allowedTypes?: readonly ConditionType[];
   /** Dismiss without persisting (Cancel / Esc / backdrop). */
   onCancel: () => void;
   /** Persist the composed draft. The parent maps it to a `FilterNode` and
@@ -161,6 +167,7 @@ export function FilterBuilder({
   initialDraft,
   representable = true,
   folderOptions,
+  allowedTypes,
   onCancel,
   onSave,
 }: FilterBuilderProps) {
@@ -169,12 +176,15 @@ export function FilterBuilder({
     { value: "and", label: t("notes.filterBuilder.combinator.all") },
     { value: "or", label: t("notes.filterBuilder.combinator.any") },
   ];
-  const TYPE_OPTIONS: readonly SelectOption<ConditionType>[] = [
+  const ALL_TYPE_OPTIONS: readonly SelectOption<ConditionType>[] = [
     { value: "tag", label: t("notes.filterBuilder.type.tag") },
     { value: "folder", label: t("notes.filterBuilder.type.folder") },
     { value: "search", label: t("notes.filterBuilder.type.search") },
     { value: "property", label: t("notes.filterBuilder.type.property") },
   ];
+  const TYPE_OPTIONS = allowedTypes
+    ? ALL_TYPE_OPTIONS.filter((o) => allowedTypes.includes(o.value))
+    : ALL_TYPE_OPTIONS;
   const NEGATE_OPTIONS: readonly SelectOption<"is" | "not">[] = [
     { value: "is", label: t("notes.filterBuilder.negate.is") },
     { value: "not", label: t("notes.filterBuilder.negate.isNot") },

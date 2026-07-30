@@ -782,6 +782,10 @@
         "linkedFrom": "Linked from {{count}}",
         "linkedFrom_one": "Linked from {{count}}",
         "linkedFrom_other": "Linked from {{count}}",
+        "linksTo": "Links to {{count}}",
+        "linksTo_one": "Links to {{count}}",
+        "linksTo_other": "Links to {{count}}",
+        "outgoingEmpty": "This note doesn't link to anything yet.",
         "untitled": "Untitled"
       },
       "barItems": {
@@ -896,7 +900,7 @@
         },
         "tabs": {
           "aiChat": "AI Chat",
-          "backlinks": "Backlinks",
+          "backlinks": "Links",
           "outline": "Outline",
           "tasks": "Tasks",
           "unlinked": "Unlinked mentions"
@@ -1499,6 +1503,24 @@
     "graph": {
       "allConnected": "Everything is connected — no isolated notes.",
       "building": "Building graph…",
+      "colorGroups": {
+        "addRule": "Add rule",
+        "colorSwatchTitle": "Choose color",
+        "deleteRuleTitle": "Delete rule",
+        "dragHandleTitle": "Drag to reorder",
+        "editFilterButton": "Edit filter…",
+        "editFilterTitle": "Edit color-group filter",
+        "emptyBody": "Color groups let you color graph nodes by tag or folder — work notes in one color, personal notes in another. Add your first rule.",
+        "emptyTitle": "No color groups yet",
+        "enableToggleAriaLabel": "Enable rule",
+        "filterAllNotes": "Matches every note",
+        "filterConditions_one": "{{count}} condition",
+        "filterConditions_other": "{{count}} conditions",
+        "heading": "Color groups",
+        "moveDown": "Move rule down",
+        "moveUp": "Move rule up",
+        "namePlaceholder": "Untitled rule"
+      },
       "depthToggleTitle": "Toggle neighborhood depth (1 ↔ 2 hops)",
       "filterAll": "All",
       "filterAroundNote": "Around this note",
@@ -1509,6 +1531,23 @@
       "noNotes": "No notes to graph yet.",
       "refresh": "Refresh",
       "refreshTitle": "The vault changed — rebuild the graph",
+      "settings": {
+        "appearanceHeading": "Appearance",
+        "closeTitle": "Close",
+        "forceCenter": "Center pull",
+        "forceLinkDistance": "Link distance",
+        "forceLinkStrength": "Link strength",
+        "forceRepel": "Repel",
+        "forcesHeading": "Forces",
+        "labelFadeZoom": "Label fade",
+        "lineThickness": "Line thickness",
+        "nodeSize": "Node size",
+        "nodeSizeStrength": "Size by connections",
+        "openTitle": "Graph settings",
+        "reset": "Reset to defaults",
+        "showArrows": "Show direction arrows",
+        "title": "Graph settings"
+      },
       "tagPlaceholder": "Tag…"
     },
     "import": {
@@ -2191,7 +2230,10 @@
       "sizeL": "L",
       "sizeXL": "XL",
       "editorFont": "Editor font",
-      "showEditTimesSubtitle": "Timestamps under each note"
+      "showEditTimesSubtitle": "Timestamps under each note",
+      "graphSettingsLabel": "Graph appearance",
+      "graphSettingsHelper": "Node colors, labels, sizing and layout forces are set inside the graph itself — open it and use the gear in its corner. They are kept per device, so a change here doesn't follow you to your phone.",
+      "openGraph": "Open graph"
     },
     "archive": {
       "helper": "Let notes be moved to an Archive, kept out of the main list. Turning this off restores every archived note to its folder and hides the archive controls.",
@@ -2732,6 +2774,7 @@
         "export": "export markdown decrypt plain files documents",
         "focusMode": "focus mode typewriter dim inactive lines distraction free",
         "font": "font typeface family sans serif mono typography",
+        "graphSettings": "graph appearance physics forces nodes links layout color groups labels canvas",
         "hotkeys": "hotkeys keyboard shortcuts keybindings keymap chords bindings",
         "import": "import notes obsidian notion evernote enex html csv migrate migration bring",
         "language": "language locale interface translation ui",

@@ -8,6 +8,13 @@
 // Editor panel (`EditorPanel.tsx`) — see the taxonomy entry in
 // `design-notes.md` superseding the 2026-05-08 5-panel lock.
 //
+// One row here is a POINTER, not a control (MYND-604): the graph's appearance
+// and physics settings live in a floating panel inside the graph pane, because
+// they are per-device tuning previewed against the canvas they change — adding
+// a seventh Settings panel for them was rejected. That leaves a discoverability
+// gap ("where do I change how the graph looks?"), and the row closes it by
+// naming where the settings are and opening the graph.
+//
 // Theme model (MYND-110): the choice persists in the encrypted vault.prefs
 // blob (`theme: Option<ThemeChoice>`, None ≡ system). Selecting a segment is
 // **disk-first** — `setTheme` persists, then `applyTheme` flips `<html
@@ -28,6 +35,7 @@ import {
 import { useTranslation } from "react-i18next";
 import { ControlBlock } from "./ControlBlock";
 import { LanguageSelect } from "./LanguageSelect";
+import { Button } from "../primitives/Button";
 import { Switch } from "../primitives/Switch";
 import {
   BLOCK_STYLE,
@@ -134,7 +142,20 @@ function wireValue(value: ThemeOption["value"]): ThemeChoice | null {
   return value === "system" ? null : value;
 }
 
-export function AppearancePanel() {
+interface AppearancePanelProps {
+  /**
+   * Open the graph tab (MYND-604 task 9). The graph's own appearance and
+   * physics controls live in a panel inside the graph pane, not in Settings —
+   * deliberately, so the 6-panel taxonomy stays as it is. This row is the
+   * pointer that closes the discoverability gap that decision creates.
+   * Absent → the control is disabled, the same defensive degrade StoragePanel's
+   * rows use (Settings only opens from the unlocked editor, so in practice it
+   * is always supplied).
+   */
+  onOpenGraph?: () => void;
+}
+
+export function AppearancePanel({ onOpenGraph }: AppearancePanelProps = {}) {
   const { t } = useTranslation();
   // Default is "system" — it matches the `None ≡ system` storage default, so a
   // fresh vault (no theme chosen) shows "System" selected, not a misleading
@@ -337,6 +358,20 @@ export function AppearancePanel() {
           </p>
         )}
       </div>
+      <ControlBlock
+        label={t("settings.appearance.graphSettingsLabel")}
+        helper={t("settings.appearance.graphSettingsHelper")}
+        control={
+          <Button
+            variant="secondary"
+            onClick={onOpenGraph}
+            disabled={onOpenGraph === undefined}
+            data-testid="settings.open-graph"
+          >
+            {t("settings.appearance.openGraph")}
+          </Button>
+        }
+      />
 
       <CustomThemesSection
         activeCustom={activeCustom}

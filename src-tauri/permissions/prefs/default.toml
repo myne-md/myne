@@ -80,6 +80,7 @@ permissions = [
   "allow-set-cli-enabled",
   "allow-set-cli-excluded-folders",
   "allow-set-cli-rate-limit-disabled",
+  "allow-set-color-groups",
 ]
 
 [[permission]]
@@ -527,3 +528,15 @@ commands.allow = ["set_cli_excluded_folders"]
 identifier = "allow-set-cli-rate-limit-disabled"
 description = "Allow invoking prefs:set_cli_rate_limit_disabled (Slot::Unlocked-gated setter for the cli_rate_limit_disabled toggle — removes the default-on socket rate limit; atomic-writes vault.prefs with no native side-effect; class DeviceLocal per sync-protocol.md §10.2 — a machine-local performance knob; Option<bool>, the archive_disabled precedent, omitted on disk only when unset)."
 commands.allow = ["set_cli_rate_limit_disabled"]
+# graph-connection-ux-polish: a whole-list-replace write setter for the
+# color_groups rule list. Inherits the same main-window-only invariant as the
+# other allow-set-* permissions — v0.2 multi-window MUST NOT grant this to any
+# non-main window. Atomic-writes vault.prefs with no native side-effect,
+# preserving element order verbatim (order is rule precedence, not a
+# separately-tracked `*_order` field); the 64 KiB MYP1 cap fails the encode
+# before any write, leaving on-disk prefs intact; logs count only, never a
+# rule name, color key or filter (AS3-Sensitive).
+[[permission]]
+identifier = "allow-set-color-groups"
+description = "Allow invoking prefs:set_color_groups (Slot::Unlocked-gated whole-list-replace setter for the color_groups rule list — the graph pane's color-group editor; atomic-writes vault.prefs with no native side-effect, preserving element order verbatim since order is rule precedence; logs count only, never a rule name, color key or filter)."
+commands.allow = ["set_color_groups"]

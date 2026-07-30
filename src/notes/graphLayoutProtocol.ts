@@ -20,6 +20,25 @@ import {
 } from "d3-force";
 import { seedInitialPosition, type GraphPosition } from "./graphLayoutStore";
 
+/** Force-simulation tuning (graph-connection-ux-polish task 6's four force
+ *  controls in the graph settings panel). Omitted → the pre-task-6 fixed
+ *  constants (charge -120, link distance 60, center strength 1 — d3's own
+ *  default). `repelStrength` is a positive magnitude, negated internally
+ *  before reaching d3 (its charge force is negative for repulsion). */
+export interface LayoutForces {
+  centerStrength: number;
+  repelStrength: number;
+  linkStrength: number;
+  linkDistance: number;
+}
+
+const DEFAULT_FORCES: LayoutForces = {
+  centerStrength: 1,
+  repelStrength: 120,
+  linkStrength: 1,
+  linkDistance: 60,
+};
+
 /** A resolved model + warm-start seed + canvas box, posted INTO the worker. */
 export interface LayoutRequest {
   /** Nodes to place (already resolved; title not needed for layout). */
@@ -31,6 +50,9 @@ export interface LayoutRequest {
   seed: Record<string, GraphPosition>;
   width: number;
   height: number;
+  /** See {@link LayoutForces}. Optional — a caller that never wires the
+   *  settings panel gets the pre-task-6 fixed constants. */
+  forces?: LayoutForces;
 }
 
 export interface LaidOutNode {
@@ -54,12 +76,13 @@ type SimLink = { source: SimNode; target: SimNode; weight: number };
 /**
  * Run the bounded d3-force layout and return final node positions. Pure w.r.t.
  * its inputs EXCEPT the fresh jitter given to un-seeded nodes (`Math.random`) —
- * a fully-seeded request is deterministic. Force parameters mirror the previous
- * `GraphCanvas` sim (charge -120, link distance 60, centered) so the layout is
- * visually unchanged; only the thread it runs on moved.
+ * a fully-seeded request is deterministic. `forces` defaults to the original
+ * fixed `GraphCanvas` sim tuning (charge -120, link distance 60, centered) so
+ * a caller that never wires the settings panel sees the same layout as before
+ * task 6; a caller that does gets a live re-run under the new tuning.
  */
 export function computeGraphLayout(req: LayoutRequest): LayoutResponse {
-  const { nodes, edges, seed, width, height } = req;
+  const { nodes, edges, seed, width, height, forces = DEFAULT_FORCES } = req;
   const cx = width / 2;
   const cy = height / 2;
 
@@ -77,9 +100,14 @@ export function computeGraphLayout(req: LayoutRequest): LayoutResponse {
   }
 
   const sim: Simulation<SimNode, undefined> = forceSimulation(simNodes)
-    .force("charge", forceManyBody().strength(-120))
-    .force("link", forceLink<SimNode, SimLink>(simLinks).distance(60))
-    .force("center", forceCenter(cx, cy))
+    .force("charge", forceManyBody().strength(-forces.repelStrength))
+    .force(
+      "link",
+      forceLink<SimNode, SimLink>(simLinks)
+        .distance(forces.linkDistance)
+        .strength(forces.linkStrength),
+    )
+    .force("center", forceCenter(cx, cy).strength(forces.centerStrength))
     .stop();
   sim.tick(TICKS);
   sim.stop();

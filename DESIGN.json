@@ -46,6 +46,19 @@
         "tonalRamp": ["#0f2419", "#1a3b29", "#2f6048", "#4d7e64", "#6e9a82", "#94b6a3", "#c0d2c5", "#e3eee8"]
       }
     },
+    "categoricalPalette": {
+      "purpose": "Eight decorative node-dot colors for the graph pane's color-group feature (graph-connection-ux-polish). Read side by side at small node radius, so legibility is a property of the set: hues stay clear of the three state roles above (never confusable with an error/warning/success color) and alternate lightness band per hue so adjacent colors stay distinguishable under red-green color-vision deficiency, not by hue alone. Source of truth is src/styles/tokens.css (light + dark + amoled, the amoled twin reusing the dark value verbatim); docs/design/colors_and_type.css mirrors light + dark.",
+      "colors": [
+        { "name": "group-olive", "displayName": "Olive", "light": "#5d7b32", "dark": "#cce3ab" },
+        { "name": "group-fern", "displayName": "Fern", "light": "#549f41", "dark": "#9cd98c" },
+        { "name": "group-teal", "displayName": "Teal", "light": "#32647b", "dark": "#abd1e3" },
+        { "name": "group-denim", "displayName": "Denim", "light": "#415c9f", "dark": "#8ca2d9" },
+        { "name": "group-indigo", "displayName": "Indigo", "light": "#3b327b", "dark": "#b1abe3" },
+        { "name": "group-violet", "displayName": "Violet", "light": "#72419f", "dark": "#b48cd9" },
+        { "name": "group-orchid", "displayName": "Orchid", "light": "#75327b", "dark": "#deabe3" },
+        { "name": "group-rose", "displayName": "Rose", "light": "#9f4182", "dark": "#d98cc1" }
+      ]
+    },
     "typographyMeta": {
       "display": { "displayName": "Display", "purpose": "Hero headlines on marketing-adjacent surfaces only." },
       "headline": { "displayName": "Headline", "purpose": "Welcome screen sections, vault-creation step headings." },

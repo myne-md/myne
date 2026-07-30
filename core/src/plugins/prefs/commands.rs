@@ -15,8 +15,9 @@ use super::error::{PrefsReadError, PrefsWriteError};
 use crate::host::HostCtx;
 use crate::plugins::vault_unlock::state::VaultRuntimeState;
 use protocol::{
-    decode_prefs_blob, derive_subkey, encode_prefs_blob, parse_vault_meta, EditorLayout,
-    PrefsBlobError, PrefsView, SavedView, SubkeyRole, ThemeChoice, VAULT_META_ACCOUNT_HASH_LEN,
+    decode_prefs_blob, derive_subkey, encode_prefs_blob, parse_vault_meta, ColorGroup,
+    EditorLayout, PrefsBlobError, PrefsView, SavedView, SubkeyRole, ThemeChoice,
+    VAULT_META_ACCOUNT_HASH_LEN,
 };
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
@@ -4487,6 +4488,76 @@ pub(crate) async fn vault_set_icon_with_dir(
     Ok(())
 }
 
+/// Slot::Unlocked-gated setter for the `color_groups` list (graph-connection-
+/// ux-polish, docs/spec/protocol.md §9.5.2) — the ordered color-group rule list
+/// the graph pane's color-group editor authors. Read-modify-write under the
+/// per-plugin write mutex; **no native side-effect**. The caller passes the
+/// FULL desired list; the codec preserves element order VERBATIM (order IS
+/// rule precedence here — unlike `saved_views`, there is no separate
+/// `*_order` field, so this is a whole-list replace in the `set_bar_items_order`
+/// shape, not a per-item upsert/delete like `upsert_saved_view`). Classified
+/// `Shared(WholeValueLww)` in `prefs_classification` — the centralized LWW
+/// clock stamp in `update_prefs_with_dir` covers this field automatically.
+/// Logs the COUNT only — never a rule name, color key or filter (AS3-Sensitive).
+pub async fn set_color_groups_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    groups: Vec<ColorGroup>,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_color_groups_with_dir(&dir, state, hooks, groups, io, host).await
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn set_color_groups<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
+    groups: Vec<ColorGroup>,
+) -> Result<(), PrefsWriteError> {
+    set_color_groups_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        groups,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
+}
+
+/// Testable core of [`set_color_groups`].
+pub(crate) async fn set_color_groups_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    groups: Vec<ColorGroup>,
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
+) -> Result<(), PrefsWriteError> {
+    let count = groups.len();
+    update_prefs_with_dir(
+        vault_dir,
+        state,
+        hooks,
+        |prefs| {
+            prefs.color_groups = groups;
+        },
+        io,
+        host,
+    )
+    .await?;
+
+    // COUNT only — never a rule name, color key or filter (AS3-Sensitive).
+    tracing::info!(event = "prefs_written", field = "color_groups", count);
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -5159,6 +5230,7 @@ mod tests {
                     cli_enabled: false,
                     cli_excluded_folders: Vec::new(),
                     cli_rate_limit_disabled: None,
+                    color_groups: Vec::new(),
                     editor_toolbar_order: Vec::new(),
                     editor_toolbar_hidden: Vec::new(),
                     editor_slash_order: Vec::new(),
@@ -6550,6 +6622,176 @@ mod tests {
                 .await
                 .expect("read");
             assert!(cleared.bar_items_order.is_empty());
+        });
+    }
+
+    // ---- color-groups setter (graph-connection-ux-polish) -------------
+
+    fn test_color_group(id: &str, color: &str, enabled: bool) -> ColorGroup {
+        ColorGroup {
+            id: id.to_string(),
+            name: id.to_string(),
+            color: color.to_string(),
+            enabled,
+            filter: protocol::FilterNode::All,
+        }
+    }
+
+    #[test]
+    fn set_color_groups_rejects_when_slot_empty() {
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("prefs-color-groups-empty").expect("scoped tempdir");
+            let state = VaultRuntimeState::default();
+            let result = set_color_groups_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                vec![test_color_group("g1", "group-olive", true)],
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await;
+            assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
+        });
+    }
+
+    #[test]
+    fn set_color_groups_preserves_order_verbatim_and_round_trips() {
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x4a).await;
+            // Order is precedence here — no separate `*_order` field, so the
+            // codec must preserve caller order VERBATIM (not id-sorted).
+            let groups = vec![
+                test_color_group("g2", "group-fern", true),
+                test_color_group("g1", "group-olive", false),
+            ];
+            set_color_groups_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                groups.clone(),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("set color groups");
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
+                .await
+                .expect("read");
+            assert_eq!(view.color_groups, groups);
+
+            // Clearing round-trips back to empty (omit-when-empty on disk).
+            set_color_groups_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                Vec::new(),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("clear color groups");
+            let cleared = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
+                .await
+                .expect("read");
+            assert!(cleared.color_groups.is_empty());
+        });
+    }
+
+    #[test]
+    fn color_groups_edit_stamps_its_lww_clock_and_opens_the_push_window() {
+        // MYND-635: the two things that must be true on the AUTHORING device
+        // before a color group can reach a second synced device at all. The
+        // round-trip above proves neither — it passes `NoopHost` + `noop_hooks`,
+        // which swallow both signals — and neither follows from the §10.2
+        // classification row on its own.
+        //
+        //   1. the write stamps `field_clocks["color_groups"]`. The field is
+        //      `Shared(WholeValueLww)`, so ordering IS the clock. Left
+        //      unstamped it reads as 0 and ties with a peer's untouched empty
+        //      list, at which point the equal-clock tiebreak (canonical-encoding
+        //      bytes) decides whether the authored rules survive — i.e. luck.
+        //   2. the write calls `bump_local_change` — the MYND-517 coalesced
+        //      push window. Without it the blob sits on disk until some
+        //      unrelated note push carries it along, which on a phone is
+        //      effectively never.
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x4b).await;
+            let (hooks, bumps) = counting_hooks();
+            let host = crate::host::test_host::TestHost::new(tmp.path());
+            let bumped = || bumps.load(std::sync::atomic::Ordering::Relaxed);
+            let groups = vec![test_color_group("g1", "group-olive", true)];
+
+            set_color_groups_with_dir(
+                tmp.path(),
+                &state,
+                &hooks,
+                groups.clone(),
+                &crate::vault_io::StdVaultIo,
+                &host,
+            )
+            .await
+            .expect("author color groups");
+
+            let authored_clock = {
+                let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
+                    .await
+                    .expect("read");
+                *view
+                    .field_clocks
+                    .get("color_groups")
+                    .expect("color_groups stamped")
+            };
+            assert_eq!(authored_clock, host.now_unix_millis());
+            assert!(authored_clock > 0, "epoch-ms clock must be non-zero");
+            assert_eq!(bumped(), 1, "authoring opens the push window");
+
+            // A no-op re-write of the IDENTICAL list must neither re-stamp nor
+            // re-bump, even though the clock has advanced in between: the gate
+            // is the shared-subset hash, not "a setter ran". A device that
+            // re-stamped here would win every race by writing nothing.
+            host.set_now(1_700_000_500);
+            set_color_groups_with_dir(
+                tmp.path(),
+                &state,
+                &hooks,
+                groups.clone(),
+                &crate::vault_io::StdVaultIo,
+                &host,
+            )
+            .await
+            .expect("no-op re-write");
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
+                .await
+                .expect("read");
+            assert_eq!(view.field_clocks.get("color_groups"), Some(&authored_clock));
+            assert_eq!(bumped(), 1, "a no-op write must not bump");
+
+            // Clearing must advance the clock and bump again — otherwise the
+            // deletion loses to a stale peer still holding the rules and they
+            // come back on the next merge.
+            set_color_groups_with_dir(
+                tmp.path(),
+                &state,
+                &hooks,
+                Vec::new(),
+                &crate::vault_io::StdVaultIo,
+                &host,
+            )
+            .await
+            .expect("clear color groups");
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
+                .await
+                .expect("read");
+            let cleared_clock = *view
+                .field_clocks
+                .get("color_groups")
+                .expect("clearing stamps too");
+            assert!(
+                cleared_clock > authored_clock,
+                "a delete must out-rank the write it deletes ({cleared_clock} vs {authored_clock})"
+            );
+            assert_eq!(bumped(), 2, "clearing opens the push window too");
         });
     }
 

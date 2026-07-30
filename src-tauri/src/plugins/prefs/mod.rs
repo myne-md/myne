@@ -132,6 +132,10 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::set_cli_enabled,
             commands::set_cli_excluded_folders,
             commands::set_cli_rate_limit_disabled,
+            // graph-connection-ux-polish task 7: whole-list replace for the
+            // color-group rule list — order is precedence, no separate
+            // `*_order` field, same shape as `set_bar_items_order`.
+            commands::set_color_groups,
         ])
         .build()
 }
