@@ -39,6 +39,7 @@ import {
   setSpellEnabled,
   setArchiveDisabled,
   setScreenCaptureProtection,
+  setAttachmentCompressionEnabled,
   setAutoLockTimeout,
   setVaultLabel,
   setEditorToolbarOrder,
@@ -1383,7 +1384,17 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess }
         )}
 
         {panel === "data" && (
-          <div style={{ marginTop: 4 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 4 }}>
+            <Group>
+              <ToggleRow
+                first
+                title={t("settings.attachmentCompression.label")}
+                subtitle={t("settings.attachmentCompression.helper")}
+                on={eff.attachment_compression_enabled}
+                onToggle={() => writePref("attachment_compression_enabled", !eff.attachment_compression_enabled, () => setAttachmentCompressionEnabled(!eff.attachment_compression_enabled))}
+                testId="settings.attachment-compression"
+              />
+            </Group>
             <Group>
               <Row first onClick={exporting ? undefined : () => void runExport()}>
                 <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>

@@ -17,6 +17,7 @@ import { usePrefsNonce } from "./prefsNonce";
 export const DEFAULT_PREFS: PrefsView = {
   screen_capture_protection: false,
   show_note_timestamps: true,
+  attachment_compression_enabled: true,
   spell_enabled: null,
   spell_languages: [],
   keymap: {},
