@@ -1049,6 +1049,25 @@ const showGraphAction: CommandAction = {
   },
 };
 
+const showTasksAction: CommandAction = {
+  // The identifier is FROZEN here. Command ids carry migration weight the
+  // moment a user rebinds one — a rename silently drops their keybinding — so
+  // this string must not change even if the surface is renamed.
+  id: "tasks.show",
+  get label() {
+    return i18n.t("commands.actions.showTasks.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.editor");
+  },
+  kbd: "⌘⇧T",
+  defaultBinding: "Mod-Shift-t",
+  visibility: (ctx) => (ctx.stageName === "editor" ? "show" : "hidden"),
+  run: (ctx) => {
+    ctx.onShowTasks();
+  },
+};
+
 const showTagsAction: CommandAction = {
   id: "tags.show",
   get label() {
@@ -1347,6 +1366,7 @@ const ALL_COMMAND_ACTIONS: readonly CommandAction[] = Object.freeze([
   exportNoteHtmlAction,
   exportNoteTxtAction,
   showGraphAction,
+  showTasksAction,
   showTagsAction,
   showViewsAction,
   importBaseViewAction,

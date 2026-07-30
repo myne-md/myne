@@ -289,6 +289,13 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     keywordsKey: "settings.search.keywords.dailyNotes",
   },
   {
+    id: "editor.reminders",
+    panelId: "editor",
+    testid: "settings.reminders-toggle",
+    titleKey: "settings.reminders.label",
+    keywordsKey: "settings.search.keywords.reminders",
+  },
+  {
     id: "editor.archive",
     panelId: "editor",
     testid: "settings.archive-disabled",

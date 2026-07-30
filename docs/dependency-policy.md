@@ -84,6 +84,8 @@ Direct dependency methods whose semantic changes would silently affect Myne's pr
 |---|---|---|---|
 | `tauri` (2.x) | `WebviewWindow::set_content_protected` | Screen-capture protection (best-effort A7 defense-in-depth) | `threat-model.md` §6; `decisions.md` 2026-05-27 — "Screen-capture protection: Tauri `set_content_protected` abstraction over direct FFI" |
 
+**Notification capability namespace does NOT trip the network CI gate (MYND-618).** `scripts/ai-no-network-check.sh` is the gate that keeps a network arm from appearing in a surface that promises not to have one, and it does not cover the notification capability namespace. That is fine today — a scheduling adapter has no reason to reach the network — and it is exactly the sort of gap that is obvious while building the feature and invisible two years later. So: **if a notification dependency ever grows a network arm, nothing in CI will notice.** On any upgrade of a crate serving the notification adapters, the release notes MUST be read for a new network capability, because the automated check will not do it. This is a **watchlist item, not a prohibition** — no denylist rule is added and no dependency is forbidden by it.
+
 Pending getters: Tauri 2.10.3 does NOT expose a `WebviewWindow::is_content_protected() -> bool` reader. If a future Tauri release adds this getter, extend the screen-capture-protection feature with a 5-line smoke test (`tests/screen_capture_protection.rs`) asserting `set_content_protected(true)` followed by `is_content_protected()` returns `true`. Tracked here so the smoke test lands the same quarter the getter ships.
 
 ## Recorded direct dependencies (ledger)

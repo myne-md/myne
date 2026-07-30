@@ -138,6 +138,13 @@ fn main() {
                 "device_platform",
                 "vault_set_label",
                 "vault_set_icon",
+                // MYND-613. NOTE: several shipped prefs setters
+                // (`set_archive_disabled`, `set_show_note_timestamps`, …) are
+                // registered in the handler list and in default.toml but are
+                // MISSING from this mirror — pre-existing, not introduced here.
+                "set_show_task_marker",
+                "set_reminders_enabled",
+                "set_reminder_horizon_days",
             ]),
         )
         .plugin(
@@ -214,6 +221,10 @@ fn main() {
                 "vault_indices_forward",
                 "vault_indices_all_edges",
                 "vault_indices_orphans",
+                // MYND-612. NOTE: `vault_indices_block_anchors` (MYND-382) is
+                // registered in the handler list and in default.toml but is
+                // MISSING from this mirror — pre-existing, not introduced here.
+                "vault_indices_tasks",
                 "vault_indices_backlink_candidates",
                 "vault_indices_by_tag",
                 "vault_indices_tag_tree",

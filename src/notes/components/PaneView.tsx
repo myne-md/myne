@@ -55,8 +55,13 @@ import { TAB_DRAG_MIME, readTabDrag } from "../tabDrag";
 import { NewTabChooser } from "./NewTabChooser";
 import { GraphPane } from "./GraphView";
 import { TabStrip, STRIP_HEIGHT } from "./TabStrip";
+import { TASK_KIND_VALUE } from "../../dialect";
 import { useViewResult } from "../views/useViewResult";
 import { ViewRenderHost } from "../views/viewRenderHost";
+import { TasksPane } from "./TasksPane";
+import { useTaskQueryResults } from "../useTaskQueryResults";
+import { toggleTaskSwallowingRefusal } from "../toggleTask";
+import type { TaskQueryRowEventDetail } from "@myne/editor/decorations/task-query-block";
 import { resolveCoverAttachmentId } from "../views/cardsView";
 import { setNoteCover } from "../setNoteCover";
 import { upsertSavedView } from "../../lib/prefs";
@@ -199,6 +204,9 @@ export function PaneView({
   // A graph-kind active tab renders the whole-vault graph pane (MYND-198) in
   // place of the note editor — a first-class tab, no longer a modal carve-out.
   const isGraph = leaf.activeTab?.kind === "graph";
+  // A tasks-kind active tab renders the vault-wide task list (MYND-616) in place
+  // of the note editor — the same first-class-tab pattern the graph established.
+  const isTasks = leaf.activeTab?.kind === "tasks";
   // WL-5/WL-6: the live resolver note-set fed into this pane's editor so wikilink
   // chips resolve (broken-link styling + hover R1). Re-feed a fresh reference on
   // every SYNC-5 index-change nonce so a note created/renamed/loaded elsewhere
@@ -356,6 +364,8 @@ export function PaneView({
   const headingFroms = useMemo(() => headingSections(content).map((h) => h.from), [content]);
   const headingFromsRef = useRef<number[]>(headingFroms);
   const outlineViewRef = useRef<OutlineTrackView>(null);
+  // The same view as `outlineViewRef`, in state — see `handleEditorReady`.
+  const [editorView, setEditorView] = useState<OutlineTrackView>(null);
   const outlineScrollerRef = useRef<HTMLDivElement | null>(null);
   const activeIdRef = useRef(activeId);
   const focusedRef = useRef(focused);
@@ -433,12 +443,49 @@ export function PaneView({
 
   // The primary editor hands back its live view on mount (and null on unmount);
   // capture it and take an initial reading.
+  //
+  // Kept in STATE as well as the ref (MYND-617): the outline tracker reads the
+  // view imperatively from a scroll handler, but the task-query results have to
+  // be recomputed by a hook, and a ref does not re-render. Same view, two
+  // consumers with different reactivity needs.
   const handleEditorReady = useCallback(
     (view: OutlineTrackView) => {
       outlineViewRef.current = view;
+      setEditorView(view);
       if (view !== null) recomputeActiveHeading();
     },
     [recomputeActiveHeading],
+  );
+
+  // MYND-617: results for every task-query block in this pane's document. The
+  // editor finds the blocks and renders rows; what a query MEANS is decided
+  // here, because the type authority for a `due::` value is the dialect's and
+  // the vault-wide task list is an IPC surface.
+  const { results: taskQueryResults, resolveRow: resolveTaskRow } = useTaskQueryResults(
+    editorView,
+    content,
+    indexNonce,
+  );
+
+  // A row's checkbox → the ONE writer every task surface goes through. The
+  // widget dispatched a `{queryKey, rowKey}` and nothing else, so the record is
+  // looked back up here; an unresolvable key means the index moved under the
+  // render and doing nothing is the right answer.
+  const handleTaskQueryToggle = useCallback(
+    (detail: TaskQueryRowEventDetail) => {
+      const task = resolveTaskRow(detail.rowKey);
+      if (task === undefined) return;
+      void toggleTaskSwallowingRefusal(task, ws.flushAll);
+    },
+    [resolveTaskRow, ws.flushAll],
+  );
+
+  const handleTaskQueryOpen = useCallback(
+    (detail: TaskQueryRowEventDetail) => {
+      const task = resolveTaskRow(detail.rowKey);
+      if (task !== undefined) ws.openInFocused(task.noteId);
+    },
+    [resolveTaskRow, ws],
   );
 
   // Load / restore the active note's body on change (MYND-534). Persistent-view
@@ -868,6 +915,9 @@ export function PaneView({
     if (isGraph) {
       return <GraphPane />;
     }
+    if (isTasks && leaf.activeTab !== null) {
+      return <TasksPane paneId={leaf.id} item={leaf.activeTab} />;
+    }
     if (loading) {
       return <PaneLoading />;
     }
@@ -916,6 +966,11 @@ export function PaneView({
             vaultHeadings={vaultHeadings}
             vaultBlockAnchors={vaultBlockAnchors}
             onOpenWikilink={handleOpenWikilink}
+            // MYND-617: the task-query blocks in this document. Absent entries
+            // render as loading, never as an empty result.
+            taskQueryResults={taskQueryResults}
+            onTaskQueryToggle={handleTaskQueryToggle}
+            onTaskQueryOpen={handleTaskQueryOpen}
             scrollAnchor={activeScrollAnchor}
             // outline-scroll-tracking: hand the live view to the pane so it can
             // watch the scroller and report the top heading to the Outline tab.
@@ -964,6 +1019,12 @@ export function PaneView({
               noteSet={notes}
               vaultHeadings={vaultHeadings}
               vaultBlockAnchors={vaultBlockAnchors}
+              // The reading companion renders query blocks too, and its
+              // checkboxes stay live: reading mode makes the HOST note
+              // read-only, but a row's write targets a different note entirely.
+              taskQueryResults={taskQueryResults}
+              onTaskQueryToggle={handleTaskQueryToggle}
+              onTaskQueryOpen={handleTaskQueryOpen}
               readOnly
               viewMode="reading"
               style={{ width: "100%", minHeight: 360, color: "var(--fg-1)" }}
@@ -979,6 +1040,7 @@ export function PaneView({
     inNewTabState,
     activeViewId,
     isGraph,
+    isTasks,
     onPickNote,
     onCreateNote,
     onCreateDrawing,
@@ -992,6 +1054,9 @@ export function PaneView({
     vaultHeadings,
     vaultBlockAnchors,
     handleOpenWikilink,
+    taskQueryResults,
+    handleTaskQueryToggle,
+    handleTaskQueryOpen,
     activeScrollAnchor,
     handleEditorReady,
     isDrawing,
@@ -1045,6 +1110,7 @@ export function PaneView({
           if (it.kind === "note") return ctx.cache.get(it.id)?.title ?? null;
           // Graph tab: the whole-vault graph is a singleton with a fixed label.
           if (it.kind === "graph") return t("notes.pane.graphTab");
+          if (it.kind === "tasks") return t("notes.pane.tasksTab");
           // View tab: label by the saved view's name (MYND-274), not its raw id.
           // A blank name shows "Untitled view" (the sidebar's label rule); an
           // unknown id (a stale tab for a deleted view) falls back to null.
@@ -1065,12 +1131,20 @@ export function PaneView({
           const it = parseItemKey(key);
           if (it.kind === "view") return "layout-grid";
           if (it.kind === "graph") return "share-2";
+          if (it.kind === "tasks") return "list-todo";
           // url-bookmark (SYNC-16): a note carrying an unmanaged `source:`
           // provenance key is a clipped link-only bookmark → bookmark glyph;
           // every ordinary note keeps the default `file-text`.
           // Drawing note (kind: drawing) → a pencil glyph so a canvas tab reads
           // distinctly from a markdown note in the tab strip (SF2, MYND-499).
           if (ctx.cache.get(it.id)?.kind === "drawing") return "pencil";
+          // Note-task (kind: task, MYND-613) → the same muted list glyph its
+          // sidebar row carries, so the user's declaration is visible without
+          // opening the note. Deliberately NOT a check: the marker says "this
+          // is a task", not "this task is done", and the canon prohibits a
+          // green check badge.
+          if (prefs.show_task_marker && ctx.cache.get(it.id)?.kind === TASK_KIND_VALUE)
+            return "list";
           if (ctx.cache.get(it.id)?.hasSource === true) return "bookmark";
           return "file-text";
         }}

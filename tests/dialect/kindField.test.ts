@@ -19,13 +19,17 @@ import {
   readTemplateFromFmBody,
   readTrashedFromFmBody,
   DRAWING_KIND_VALUE,
+  TASK_KIND_VALUE,
+  CANONICAL_KIND_VALUES,
 } from "../../src/dialect/surgery";
 import { enc, dec } from "./_helpers";
 
 const TS = "2026-07-14T11:00:00Z";
 const apply = (src: string, kind: "drawing" | null): string =>
   dec.decode(patchKindField(enc.encode(src), kind));
-const read = (fmBody: string): "drawing" | null => readKindFromFmBody(fmBody);
+const read = (fmBody: string) => readKindFromFmBody(fmBody);
+const applyKind = (src: string, kind: "drawing" | "task" | null): string =>
+  dec.decode(patchKindField(enc.encode(src), kind));
 
 function fmBodyOf(source: string): string {
   const m = /^---\n([\s\S]*?)\n---\n/.exec(source);
@@ -104,8 +108,11 @@ describe("readKindFromFmBody — value-strict string enum (FM body input)", () =
   it("returns null for capitalized Drawing (case-sensitive)", () => {
     expect(read("kind: Drawing\n")).toBe(null);
   });
-  it("returns null for another kind value (kind: task)", () => {
-    expect(read("kind: task\n")).toBe(null);
+  // Was `kind: task` until MYND-613 widened the enum — `task` is now canonical.
+  // The property this test guards is unchanged: a value outside the canonical
+  // set reads as an ordinary note.
+  it("returns null for a non-canonical kind value (kind: chore)", () => {
+    expect(read("kind: chore\n")).toBe(null);
   });
   it("returns null for an empty kind value", () => {
     expect(read("kind:\n")).toBe(null);
@@ -145,5 +152,88 @@ describe("kind composes with the other managed fields (no clobbering)", () => {
     expect(read(body)).toBe("drawing");
     expect(readTemplateFromFmBody(body)).toBe(true);
     expect(readTrashedFromFmBody(body)).toBe(TS);
+  });
+});
+
+// === MYND-613 task 2: the task class marker ===
+//
+// `kind:` becomes a TWO-value enum. The widening must not loosen value-strictness:
+// a user's own `kind:` still never files their note as a task.
+
+describe("TASK_KIND_VALUE (MYND-613)", () => {
+  it("is the canonical unquoted task", () => {
+    expect(TASK_KIND_VALUE).toBe("task");
+  });
+
+  it("CANONICAL_KIND_VALUES is exactly the two canonical values", () => {
+    expect([...CANONICAL_KIND_VALUES]).toEqual(["drawing", "task"]);
+  });
+});
+
+describe("readKindFromFmBody — task value", () => {
+  it("marks a note as a task on the canonical unquoted value", () => {
+    expect(read("title: A\nkind: task")).toBe("task");
+  });
+
+  it("still reads drawing unchanged", () => {
+    expect(read("title: A\nkind: drawing")).toBe("drawing");
+  });
+
+  it("rejects a quoted value", () => {
+    expect(read('kind: "task"')).toBeNull();
+    expect(read("kind: 'task'")).toBeNull();
+  });
+
+  it("rejects a capitalized value", () => {
+    expect(read("kind: Task")).toBeNull();
+    expect(read("kind: TASK")).toBeNull();
+  });
+
+  it("rejects an unknown value", () => {
+    expect(read("kind: chore")).toBeNull();
+    expect(read("kind: tasks")).toBeNull();
+  });
+
+  it("tolerates a trailing comment", () => {
+    expect(read("kind: task # note to self")).toBe("task");
+  });
+
+  it("resolves first-line-wins on a note carrying two class lines", () => {
+    expect(read("kind: task\nkind: drawing")).toBe("task");
+    expect(read("kind: drawing\nkind: task")).toBe("drawing");
+    // A bogus first line does NOT fall through to a valid later one — the first
+    // `kind:` decides, which is what "deterministically" means here.
+    expect(read("kind: bogus\nkind: task")).toBeNull();
+  });
+});
+
+describe("patchKindField — task value", () => {
+  it("writes the canonical task marker", () => {
+    const out = applyKind("---\ntitle: A\n---\n\nbody\n", "task");
+    expect(read(fmBodyOf(out))).toBe("task");
+    expect(out).toContain("kind: task");
+  });
+
+  it("changes drawing to task in place", () => {
+    const first = applyKind("---\ntitle: A\n---\n\nbody\n", "drawing");
+    const second = applyKind(first, "task");
+    expect(read(fmBodyOf(second))).toBe("task");
+    expect(second).not.toContain("drawing");
+  });
+
+  it("deletes the marker on null", () => {
+    const set = applyKind("---\ntitle: A\n---\n\nbody\n", "task");
+    expect(read(fmBodyOf(applyKind(set, null)))).toBeNull();
+  });
+
+  it("leaves every other managed field, user field and the body byte-identical", () => {
+    const source =
+      "---\ntitle: A\nfolder: Projects/\ntemplate: true\nstatus: open\n---\n\n# Body\n\ntext\n";
+    const out = applyKind(source, "task");
+    expect(out).toContain("title: A");
+    expect(out).toContain("folder: Projects/");
+    expect(out).toContain("template: true");
+    expect(out).toContain("status: open");
+    expect(out).toContain("# Body\n\ntext\n");
   });
 });

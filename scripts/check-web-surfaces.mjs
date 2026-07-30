@@ -96,6 +96,10 @@ const V = {
     "adapted",
     "Rendered only where quick-unlock exists; the PIN path itself is portable and task 40 owns it.",
   ],
+  "src/components/settings/ReminderSettings.tsx": [
+    "adapted",
+    "Renders and persists through the prefs setters like its siblings. The copy it shows follows `reminderTier`, which reports in-app-only on every host — so a browser reads the same honest sentence a desktop does, and neither is shown the OS-registration disclosure while no registration happens.",
+  ],
   "src/components/settings/SettingsSection.tsx": [
     "ported",
     "The settings-panel section wrapper (MYND-624). Presentational — a heading plus its children, no host call and no capability of its own, so it carries whatever its contents already carry.",
@@ -187,6 +191,26 @@ const V = {
   ],
   "src/lib/prefs.ts": ["ported", "Prefs IPC; the plugin is dispatched."],
   "src/lib/promptForText.ts": ["ported", "In-app modal prompt, not a host dialog."],
+  "src/lib/reminderLifecycle.ts": [
+    "ported",
+    "A pure decision table (which lifecycle event reconciles, which cancels everything). No host call, no timer, no DOM.",
+  ],
+  "src/lib/reminderNotifier.ts": [
+    "ported",
+    "The in-app tier's delivery: an in-memory pending set, `setTimeout`, and an injected callback. No notification API and no `@tauri-apps/*` — a browser runs it as written. The OS-registration tier, when it lands, is what will need a seam member here.",
+  ],
+  "src/lib/reminderPermission.ts": [
+    "ported",
+    "Pure policy over an injected platform API. No production API implementation exists on either client — the in-app tier needs no permission, since nothing is handed to the operating system.",
+  ],
+  "src/lib/reminderPlatform.ts": [
+    "ported",
+    "Reads `navigator.platform` to name the host, but `reminderTier` reports `in-app-only` everywhere until an OS-registration adapter exists — which is also the right answer for a browser tab, since it holds no registration either.",
+  ],
+  "src/lib/reminderSchedule.ts": [
+    "ported",
+    "Pure scheduling arithmetic: the target set, the diff, and the reconcile pass over an injected notifier.",
+  ],
   "src/lib/quick-unlock.ts": ["adapted", "The PIN path is portable (task 40); the biometric path is a decided absence."],
   "src/lib/routing.ts": ["adapted", "The stage/history binding; desktop's seam arm is all no-ops (task 64)."],
   "src/lib/flush-chain.ts": [
@@ -260,6 +284,10 @@ const V = {
   ],
   "src/hooks/useLastActiveNotePref.ts": ["ported", "Prefs-backed."],
   "src/hooks/usePrefs.ts": ["ported", "The shared prefs hook."],
+  "src/hooks/useReminderScheduler.ts": [
+    "adapted",
+    "The hook itself is timers over an injected notifier and runs as written. What differs is its input: the task list comes from the vault-indices plugin, which the web dispatcher still answers `Pending` (task 31), so the pass finds nothing to register until that lands. It fails quiet rather than loud — an empty target set is a valid pass.",
+  ],
   "src/hooks/useRevealAfterIdleLock.ts": [
     "adapted",
     "Mounts on web and reaches a seam that REFUSES it (MYND-628). Desktop idle auto-lock hides the OS window with `orderOut:` and nothing on the Rust side shows it again, so a locked boot surface has to ask; a page has no hidden window, because web auto-lock re-renders the locked surface in the same tab. `window.show` is a typed refusal rather than a no-op, and the hook's `catch` is the correct handler — so this is adapted, not excluded: it still runs, it just correctly does nothing.",

@@ -49,6 +49,14 @@ import { catalogDefaults } from "../commands/bindableCatalog";
 import { asViewMode, type ViewMode } from "../editor/view-mode";
 import { VIM_MODE_EVENT, type VimModeEventDetail } from "../editor/vim";
 import { CLOSE_ACTIVE_TAB_EVENT } from "../notes/closeActiveTabSignal";
+import { EditorView } from "@codemirror/view";
+import {
+  applyTaskFieldEdit,
+  beginTaskFieldEdit,
+  TASK_CHIP_EVENT,
+  type TaskChipEventDetail,
+} from "@myne/editor/decorations/task-chip";
+import { openTaskFieldEditor } from "@myne/editor/task-field-editor";
 import { focusKindOf } from "../commands/scope";
 import { FailClosedError } from "../components/FailClosedError";
 import { StorageLost } from "./StorageLost";
@@ -130,6 +138,8 @@ import { requestRevealViews } from "../notes/views/revealViewsSignal";
 import { useResolverNotes } from "../notes/resolverNotes";
 import { UnlinkedMentionsSection } from "../notes/components/UnlinkedMentionsSection";
 import { AiChatTab } from "../notes/components/AiChatTab";
+import { NoteTasksPanel } from "../notes/components/TasksPane";
+import { TASK_WRITE_EVENT } from "../notes/toggleTask";
 import { clearAiOutput } from "../notes/ai/aiOutputStore";
 import { clearTagSuggest } from "../notes/ai/tagSuggestStore";
 import { clearChat, stopChatTurn } from "../notes/ai/chatStore";
@@ -170,6 +180,10 @@ import { ResizeHandle } from "../components/primitives/ResizeHandle";
 import { VaultSwitcher } from "../components/VaultSwitcher";
 import { useEditorLayout } from "./editorLayout";
 import { usePrefs } from "../hooks/usePrefs";
+import { useReminderScheduler } from "../hooks/useReminderScheduler";
+import { createInAppNotifier } from "../lib/reminderNotifier";
+import { useLiveVaultTasks } from "../notes/taskIndex";
+import i18n from "../i18n";
 import { useIdleAutoLock } from "../hooks/useIdleAutoLock";
 import { runFlushChain } from "../lib/flush-chain";
 import {
@@ -830,6 +844,58 @@ function EditorChrome({
     window.addEventListener("myne-open-tag", onOpenTag);
     return () => window.removeEventListener("myne-open-tag", onOpenTag);
   }, []);
+  // A task written from a LIST surface (MYND-616 task 8) changes a note's bytes
+  // out-of-band of any pane's own autosave, so every open pane must re-read.
+  // `reloadOpenNote` is the existing blanket bump used after a sync pull — each
+  // pane applies its own dirty guard, so it never clobbers in-flight typing.
+  useEffect(() => {
+    const onWritten = (): void => ctx.reloadOpenNote();
+    window.addEventListener(TASK_WRITE_EVENT, onWritten);
+    return () => window.removeEventListener(TASK_WRITE_EVENT, onWritten);
+  }, [ctx]);
+  // Editor task-field chip activation (MYND-614 tasks 6 + 7): the chip
+  // decoration dispatches a bubbling `myne-open-task-chip` event; open the
+  // field editor anchored to that chip and write the result back through the
+  // single writer seam. Same Editor-level-listener shape as the `#tag` chip
+  // above, and for the same reason — no per-pane prop threading.
+  //
+  // Because the chips never open on caret entry, this listener is the ONLY way
+  // to edit these values in live mode. It is therefore load-bearing rather than
+  // convenience wiring: without it the chips render and do nothing.
+  useEffect(() => {
+    const onOpenChip = (e: Event) => {
+      const detail = (e as CustomEvent<TaskChipEventDetail>).detail;
+      const target = e.target as HTMLElement | null;
+      const anchor = target?.closest?.("[data-task-chip]") as HTMLElement | null;
+      if (detail === undefined || anchor === null || anchor === undefined) return;
+      // The view is recovered from the DOM rather than threaded down, so a
+      // chip in any pane resolves against its own editor.
+      const view = EditorView.findFromDOM(anchor);
+      if (view === null) return;
+
+      // Track the span across document changes for as long as the popover is
+      // open. The document stays live underneath it — a background autosave
+      // rewrites the frontmatter stamp about a second after any edit — and
+      // writing at the offsets captured on click would land the new value in
+      // whatever text has since moved into them.
+      const edit = beginTaskFieldEdit(view, detail);
+      openTaskFieldEditor({
+        anchor,
+        kind: detail.kind,
+        value: detail.value,
+        onCommit: (next) => {
+          const span = edit.current();
+          edit.end();
+          // Null means the field was deleted while the popover was open;
+          // declining is the only correct answer.
+          if (span !== null) applyTaskFieldEdit(view, span, next);
+        },
+        onCancel: () => edit.end(),
+      });
+    };
+    window.addEventListener(TASK_CHIP_EVENT, onOpenChip);
+    return () => window.removeEventListener(TASK_CHIP_EVENT, onOpenChip);
+  }, []);
   const [newFromTemplateOpen, setNewFromTemplateOpen] = useState<boolean>(false);
   // Bottom-bar readout (save status + word count) — reported up by
   // whichever PaneView is currently focused (MYND-166). Per-pane PaneViews
@@ -859,6 +925,38 @@ function EditorChrome({
   // optimistically. `barMenu` holds the click coords while the menu is open.
   const { prefs: barPrefs, setHiddenBarItems, setBarItemsOrder } = usePrefs();
   const hiddenBarItems = barPrefs.hidden_bar_items;
+
+  // Task reminders, in-app tier (MYND-618). Mounted in THIS component rather than
+  // the outer `Editor`, and the reason is structural: the task index reads the
+  // sidebar's live/trashed set, so it needs `<SidebarStateProvider>` — which is
+  // what this component is inside. In the outer one the hook would also run on
+  // the fail-closed path, where no provider exists and no editor body renders.
+  // It reads `barPrefs` rather than calling `usePrefs` again, since a second call
+  // is a second `prefsRead` IPC for a value already in hand.
+  //
+  // This component's lifetime is still the unlocked session's, so the scheduler's
+  // is too, and `reminderLifecycle`'s cancel-everything-on-lock is satisfied by
+  // this unmount rather than by a second signal kept in step with the first.
+  //
+  // The toast is deliberately **content-free** even though it never leaves the
+  // app. `ReminderPayload` carries `{id, at}` and nothing else; resolving the id
+  // back to its task here to quote the text would make that contract look soft,
+  // while a reminder can still surface over a shared screen. It says a reminder
+  // is due — the task surfaces say which.
+  const reminderTasks = useLiveVaultTasks();
+  const reminderNotifier = useMemo(
+    () =>
+      createInAppNotifier({
+        deliver: () => setToast({ message: i18n.t("tasks.reminder.due") }),
+      }),
+    [setToast],
+  );
+  useEffect(() => () => reminderNotifier.dispose(), [reminderNotifier]);
+  useReminderScheduler({
+    enabled: barPrefs.reminders_enabled,
+    tasks: reminderTasks,
+    notifier: reminderNotifier,
+  });
   // `barMenu` holds the open menu's anchor coords + which mode it is in: a
   // plain `{x, y}` opens the bar-wide visibility checklist (right-click on
   // empty bar space); an entry with `itemId` opens the per-item menu (move
@@ -2096,6 +2194,10 @@ function EditorChrome({
           setPaletteOpen(false);
           ws.openGraph();
         }}
+        onShowTasks={() => {
+          setPaletteOpen(false);
+          ws.openTasks();
+        }}
         onShowTags={() => {
           setPaletteOpen(false);
           setTagsSeed(null);
@@ -2440,6 +2542,7 @@ type CommandPaletteHostProps = {
   onShowTags: () => void;
   onShowViews: () => void;
   onImportObsidian: () => void;
+  onShowTasks: () => void;
   onImportBaseView: () => void;
   onBackupVault: () => void;
   onRestoreBackup: () => void;
@@ -2475,6 +2578,7 @@ function CommandPaletteHost({
   onShowTags,
   onShowViews,
   onImportObsidian,
+  onShowTasks,
   onImportBaseView,
   onBackupVault,
   onExportVaultMarkdown,
@@ -2852,6 +2956,7 @@ function CommandPaletteHost({
       onShowTags,
       onShowViews,
       onImportObsidian,
+      onShowTasks,
       onImportBaseView,
       onBackupVault,
       onExportVaultMarkdown,
@@ -2900,6 +3005,7 @@ function CommandPaletteHost({
       onShowTags,
       onShowViews,
       onImportObsidian,
+      onShowTasks,
       onImportBaseView,
       onBackupVault,
       onExportVaultMarkdown,
@@ -3434,6 +3540,8 @@ function RightSidebar() {
           />
         ) : active === "outline" ? (
           <OutlineTab />
+        ) : active === "tasks" ? (
+          <NoteTasksPanel />
         ) : active === "ai-chat" ? (
           <AiChatTab
             onInsert={(text) => {

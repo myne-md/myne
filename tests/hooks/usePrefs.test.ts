@@ -44,6 +44,9 @@ function view(over: Record<string, unknown> = {}) {
   return {
     screen_capture_protection: true,
     show_note_timestamps: true,
+    reminders_enabled: true,
+    reminder_horizon_days: null,
+    show_task_marker: true,
     deliberate_folders: [],
     auto_lock_seconds: null,
     daily_date_format: null,

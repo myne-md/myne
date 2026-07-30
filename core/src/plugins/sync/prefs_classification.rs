@@ -130,6 +130,8 @@ pub const CLASSIFICATION: &[(&str, PrefClass)] = &[
         PrefClass::Shared(SharedDiscipline::ScalarLww),
     ),
     ("paired_extensions", PrefClass::DeviceLocal),
+    ("reminder_horizon_days", PrefClass::DeviceLocal),
+    ("reminders_enabled", PrefClass::DeviceLocal),
     ("right_panel_active_tab", PrefClass::DeviceLocal),
     ("right_panel_hidden_tabs", PrefClass::DeviceLocal),
     ("right_panel_tab_order", PrefClass::DeviceLocal),
@@ -139,6 +141,15 @@ pub const CLASSIFICATION: &[(&str, PrefClass)] = &[
     ),
     ("screen_capture_protection", PrefClass::DeviceLocal),
     ("show_note_timestamps", PrefClass::DeviceLocal),
+    // MYND-613. **Shared**, deliberately unlike its lexicographic neighbour
+    // `show_note_timestamps` (DeviceLocal): device-local exists because devices
+    // genuinely differ in capability, and a marker's visibility is taste, not
+    // capability — a device-local value would mean re-choosing it on every new
+    // device.
+    (
+        "show_task_marker",
+        PrefClass::Shared(SharedDiscipline::ScalarLww),
+    ),
     ("spell_enabled", PrefClass::DeviceLocal),
     (
         "spell_languages",
@@ -223,6 +234,9 @@ mod tests {
             saved_views: _,
             screen_capture_protection: _,
             show_note_timestamps: _,
+            reminders_enabled: _,
+            reminder_horizon_days: _,
+            show_task_marker: _,
             spell_enabled: _,
             spell_languages: _,
             startup_open: _,
@@ -276,12 +290,15 @@ mod tests {
             "new_note_location",
             "new_note_location_folder",
             "paired_extensions",
+            "reminder_horizon_days",
+            "reminders_enabled",
             "right_panel_active_tab",
             "right_panel_hidden_tabs",
             "right_panel_tab_order",
             "saved_views",
             "screen_capture_protection",
             "show_note_timestamps",
+            "show_task_marker",
             "spell_enabled",
             "spell_languages",
             "startup_open",

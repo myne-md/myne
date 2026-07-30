@@ -42,6 +42,18 @@ const SKIP_NODE_NAMES = new Set([
   "InlineTag",
   "URL",
   "Autolink",
+  // Inline task fields (MYND-614 task 11). Without these, a recurrence rule made
+  // of ordinary dictionary words — `every 3 days` — gets underlined as prose.
+  // Visible in source mode, which is where a vim user lives by default.
+  //
+  // The whole `TaskField` is skipped rather than only its key: the key is a
+  // machine token, and the value is a date or a rule expression, neither of
+  // which is prose either. One entry covers both the squiggle layer and the
+  // correction menu, since both consume `isSpellable`.
+  "TaskField",
+  "TaskFieldKey",
+  "TaskFieldValue",
+  "TaskFieldMark",
 ]);
 
 /**

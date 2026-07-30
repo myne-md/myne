@@ -88,7 +88,7 @@ function find(id: string): CommandAction {
 }
 
 describe("Command palette action registry", () => {
-  it("exposes exactly the v1 actions (note picking moved to inline search, MYND-40; templates.manage MYND-189; templates.new-note MYND-190; snapshots.open MYND-97; graph.show MYND-198; tags.show MYND-46; sidebar toggles MYND-166)", () => {
+  it("exposes exactly the v1 actions (note picking moved to inline search, MYND-40; templates.manage MYND-189; templates.new-note MYND-190; snapshots.open MYND-97; graph.show MYND-198; tags.show MYND-46; tasks.show MYND-616; sidebar toggles MYND-166)", () => {
     expect([...COMMAND_ACTIONS].map((a) => a.id).sort()).toEqual([
       "ai.open-chat",
       "ai.rewrite-selection",
@@ -149,6 +149,7 @@ describe("Command palette action registry", () => {
       "tab.next",
       "tab.prev",
       "tags.show",
+      "tasks.show",
       "templates.manage",
       "templates.new-note",
       "trash.empty",

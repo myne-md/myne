@@ -149,6 +149,24 @@ export interface PrefsView {
    */
   show_note_timestamps: boolean;
   /**
+   * Whether the note-task marker (MYND-613) is shown in the sidebar row and the
+   * tab. Defaults `true`; only the non-default `false` is persisted, so an
+   * untouched vault stays byte-identical to a pre-feature `vault.prefs`.
+   * Classified **Shared / scalar last-write-wins**, deliberately unlike its
+   * neighbour `show_note_timestamps` (device-local): a marker's visibility is
+   * taste, not device capability, so it should not be re-chosen per device.
+   */
+  /** Whether THIS DEVICE shows task reminders (MYND-618). Device-local:
+   *  whether a machine should be interrupted is a property of that
+   *  machine, so it never syncs. Default true. */
+  reminders_enabled: boolean;
+  /** How many days ahead this device registers reminders with the OS
+   *  (MYND-618); null falls back to the client's built-in horizon. A
+   *  PRIVACY bound before a resource one — pending times sit in OS-owned
+   *  plaintext, so a shorter horizon exposes less. */
+  reminder_horizon_days: number | null;
+  show_task_marker: boolean;
+  /**
    * Spell-check enabled toggle (MYND-267). `null` ≡ unset → the host applies
    * the default-ON policy (SYNC-15). Serialized from Rust `Option<bool>`.
    */
@@ -1041,6 +1059,36 @@ export async function setKeymapBinding(
 export async function setShowNoteTimestamps(enabled: boolean): Promise<void> {
   await invoke<void>("plugin:prefs|set_show_note_timestamps", { enabled });
   bumpPrefsNonce();
+}
+
+/**
+ * Show or hide the note-task marker in the sidebar row and the tab (MYND-613).
+ * Shared across devices (scalar LWW), unlike the timestamp toggle above.
+ */
+export async function setShowTaskMarker(enabled: boolean): Promise<void> {
+  await invoke<void>("plugin:prefs|set_show_task_marker", { enabled });
+  bumpPrefsNonce();
+}
+
+/**
+ * Set whether THIS DEVICE shows task reminders (MYND-618).
+ *
+ * Device-local: it never syncs, because whether a given machine should be
+ * interrupted is a property of that machine rather than of the vault.
+ */
+export async function setRemindersEnabled(enabled: boolean): Promise<void> {
+  await invoke<void>("plugin:prefs|set_reminders_enabled", { enabled });
+}
+
+/**
+ * Set how many days ahead this device registers reminders with the OS, or
+ * `null` to fall back to the built-in horizon (MYND-618).
+ *
+ * Shorter is more private, not merely cheaper: pending reminder times leave the
+ * AEAD envelope and sit in OS-owned plaintext (`threat-model.md` §7).
+ */
+export async function setReminderHorizonDays(days: number | null): Promise<void> {
+  await invoke<void>("plugin:prefs|set_reminder_horizon_days", { days });
 }
 
 /**
