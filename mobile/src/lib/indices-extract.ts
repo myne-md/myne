@@ -5,6 +5,7 @@
 
 import { foldSegment } from "../dialect/folderPath";
 import { locateFrontmatter } from "../dialect/lezer/frontmatter";
+import { extractLineTasks } from "../dialect/visitors/lineTasks";
 import { extractProperties } from "@myne/editor/host/notes/propertyTyping";
 import { parseTags } from "./tags";
 import type { WikilinkEdge, TagEntry, IndexRecord } from "./vault-indices";
@@ -95,5 +96,12 @@ export function extractRecord(noteId: string, title: string, folder: string | nu
     // `reindexNoteFromBody` feeds the index, so a saved view's groupBy / sort /
     // columns / property-filter resolve identically on both clients.
     properties: extractProperties(rawFrontmatter(body)),
+    // MYND-612: line-tasks, from the SHARED dialect extractor rather than a
+    // mobile regex like the wikilink/tag ones above. A second recognizer would
+    // drift from the first — the field grammar reads three dialects and the
+    // parse tree is what keeps code blocks, wikilink interiors and frontmatter
+    // structurally out. This is mobile's first lezer parse on the save path;
+    // the cost is one pass over a note-sized string.
+    tasks: extractLineTasks(body),
   };
 }
