@@ -7,6 +7,7 @@
 
 import { StartupOpenSettings } from "./StartupOpenSettings";
 import { NewNoteLocationSettings } from "./NewNoteLocationSettings";
+import { AttachmentCompressionSettings } from "./AttachmentCompressionSettings";
 import { AttachmentOcrSettings } from "./AttachmentOcrSettings";
 import { PANEL_ROOT_STYLE } from "./panel-styles";
 
@@ -20,6 +21,11 @@ export function FilesPanel() {
       {/* Default location for new notes (MYND-462) — vault root / current note's
           folder / a specific folder. */}
       <NewNoteLocationSettings />
+
+      {/* Whether an imported image is downscaled + re-encoded at ingest time
+          (ingest-image-compression). Shared vault-wide, unlike its neighbor
+          below — see the preference's own doc comment for why. */}
+      <AttachmentCompressionSettings />
 
       {/* Whether attachment text extraction reads images and scanned PDFs
           (MYND-441). Lives here rather than under Labs because OCR is search

@@ -1493,6 +1493,78 @@ pub(crate) async fn set_attachment_ocr_enabled_with_dir(
     Ok(())
 }
 
+/// Slot::Unlocked-gated setter for the `attachment_compression_enabled`
+/// toggle — whether an imported image attachment is downscaled/re-encoded on
+/// ingest. Read-modify-write under the per-plugin write mutex; **no native
+/// side-effect**, exactly like [`set_attachment_ocr_enabled`].
+///
+/// Shared (`sync-protocol.md` §10.2), unlike its OCR/AI neighbours: this is a
+/// content-fidelity switch with a vault-wide, irreversible effect (a
+/// compressed attachment's original bytes are gone), not a per-device
+/// compute-budget switch, so the switch must have the same reach as the
+/// effect. Toggling it off affects only attachments imported *after* the
+/// change; nothing already stored is read or rewritten.
+pub async fn set_attachment_compression_enabled_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    enabled: bool,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_attachment_compression_enabled_with_dir(&dir, state, hooks, enabled, io, host).await
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn set_attachment_compression_enabled<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
+    enabled: bool,
+) -> Result<(), PrefsWriteError> {
+    set_attachment_compression_enabled_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        enabled,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
+}
+
+/// Testable core of [`set_attachment_compression_enabled`].
+pub(crate) async fn set_attachment_compression_enabled_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    enabled: bool,
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
+) -> Result<(), PrefsWriteError> {
+    update_prefs_with_dir(
+        vault_dir,
+        state,
+        hooks,
+        |prefs| {
+            prefs.attachment_compression_enabled = enabled;
+        },
+        io,
+        host,
+    )
+    .await?;
+
+    tracing::info!(
+        event = "prefs_written",
+        field = "attachment_compression_enabled",
+        enabled
+    );
+    Ok(())
+}
+
 /// Slot::Unlocked-gated setter for the `ai_excluded_folders` set (local-ai
 /// epic, ai-ux-surface MYND-408, SYNC-14) — folders the AI never reads/indexes.
 /// Same canonical set encoding as `deliberate_folders`; direct mirror of
@@ -4476,6 +4548,7 @@ mod tests {
                 &prefs_key,
                 &account_hash,
                 &PrefsView {
+                    attachment_compression_enabled: true,
                     attachment_ocr_enabled: true,
                     screen_capture_protection: false,
                     ai_enabled: false,
@@ -6278,6 +6351,91 @@ mod tests {
                 .await
                 .expect("read after off");
             assert_eq!(view.archive_disabled, Some(false));
+        });
+    }
+
+    // ---- attachment_compression_enabled setter -------------------------
+
+    #[test]
+    fn set_attachment_compression_enabled_rejects_when_slot_empty() {
+        rt().block_on(async {
+            let tmp =
+                ScopedTempDir::new("prefs-attachment-compression-empty").expect("scoped tempdir");
+            let state = VaultRuntimeState::default();
+            let result = set_attachment_compression_enabled_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                false,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await;
+            assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
+        });
+    }
+
+    #[test]
+    fn attachment_compression_enabled_round_trips_via_set_then_read() {
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x53).await;
+
+            // Default (no write yet) reads back as `true` — compression on.
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
+                .await
+                .expect("read default");
+            assert!(view.attachment_compression_enabled);
+
+            // Turn OFF persists (disk-first) + round-trips.
+            set_attachment_compression_enabled_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                false,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("write off");
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
+                .await
+                .expect("read after off");
+            assert!(!view.attachment_compression_enabled);
+            // Pre-existing screen_capture default untouched.
+            assert!(view.screen_capture_protection);
+
+            // Simulate a lock/unlock cycle: a fresh VaultRuntimeState reading
+            // the same on-disk vault.prefs must still observe the persisted
+            // value (the setter's disk write, not any in-memory cache, is
+            // what the value survives on). Match `make_temp_vault_with_unlocked_state`'s
+            // fixture key material (0x42, 0x99, 1) so the re-derived prefs_key
+            // can decrypt the blob written above.
+            let reunlocked_state = VaultRuntimeState::default();
+            let unlocked = fixture_unlocked_with_keys(0x42, 0x99, 1);
+            reunlocked_state
+                .set_unlocked(test_vault_id(), unlocked)
+                .await;
+            let view =
+                prefs_read_with_dir(tmp.path(), &reunlocked_state, &crate::vault_io::StdVaultIo)
+                    .await
+                    .expect("read after simulated re-unlock");
+            assert!(!view.attachment_compression_enabled);
+
+            // Turn back ON overwrites (explicit true again).
+            set_attachment_compression_enabled_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                true,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("write on");
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
+                .await
+                .expect("read after on");
+            assert!(view.attachment_compression_enabled);
         });
     }
 

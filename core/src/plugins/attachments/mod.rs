@@ -7,8 +7,9 @@
 //! read + stray-blob reclaim, the `MYE1` extracted-text cache codec + fold
 //! (`text_cache`, with the pure payload types in `extract_types`), the in-RAM
 //! reference graph + its reconcile IPC surface (`reconcile` / `reconcile_commands`),
-//! the content-type sniffer (`sniff`), the authoritative reference scan behind
-//! cleanup (`ref_scan`), and the pure `attachment://` decode+serve core
+//! the content-type sniffer (`sniff`), the ingest-time downscale+re-encode
+//! transform (`compress`), the authoritative reference scan behind cleanup
+//! (`ref_scan`), and the pure `attachment://` decode+serve core
 //! (`scheme_core`). The `MYA1`/`MYC1`/`MYE1` codecs themselves live in
 //! `protocol` (shared, unchanged).
 //!
@@ -31,6 +32,7 @@
 //! See: `src-tauri/CLAUDE.md` "Secret-handling logging discipline".
 
 pub mod commands;
+pub mod compress;
 pub mod error;
 pub mod extract_types;
 pub mod ocr;

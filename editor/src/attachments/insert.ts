@@ -20,6 +20,7 @@
 import { getHost } from "../host";
 import i18n from "@myne/editor/i18n";
 import { emitAttachmentEmbed } from "@myne/editor/host/notes/attachmentRef";
+import { formatBytes, typeLabel } from "@myne/editor/host/components/attachments/format";
 
 /** The success payload of `attachment_import` (mirrors Rust
  *  `ImportedAttachment`). Only the fields the insert path needs. */
@@ -206,6 +207,60 @@ export function summarizeBatch(outcomes: readonly ImportOutcome[]): string | nul
   if (added > 0) parts.push(i18n.t("editor.attachment.summary.added", { count: added }));
   parts.push(...skipParts);
   return parts.join(" · ");
+}
+
+// ---- compression notice --------------------------------------------------
+
+/** Aggregate ingest-time-compression signal across a batch of import
+ *  outcomes — the insert-time disclosure (PRD story 4). Multiple compressed
+ *  images in one batch sum their before/after bytes into a single notice
+ *  rather than stacking toasts (the toast surface shows one message at a
+ *  time); the container-change flag is `true` if any of them changed. */
+export interface CompressionSummary {
+  readonly originalBytes: number;
+  readonly finalBytes: number;
+  readonly containerChanged: boolean;
+  readonly contentType: string;
+}
+
+/**
+ * Fold a batch of outcomes into one {@link CompressionSummary}, or `null`
+ * when none of them actually compressed. `null` covers every case the notice
+ * must stay silent for: the preference off, a dedup hit, an ineligible
+ * source, or a transform that produced no improvement — `attachment_import`
+ * (`core/src/plugins/attachments/commands.rs`) only ever sets
+ * `original_size` when a fresh import's bytes actually got smaller.
+ */
+export function summarizeCompression(
+  outcomes: readonly ImportOutcome[],
+): CompressionSummary | null {
+  const compressed = outcomes.filter(
+    (o): o is Extract<ImportOutcome, { ok: true }> =>
+      o.ok && o.attachment.original_size != null,
+  );
+  if (compressed.length === 0) return null;
+  return {
+    originalBytes: compressed.reduce((sum, o) => sum + (o.attachment.original_size ?? 0), 0),
+    finalBytes: compressed.reduce((sum, o) => sum + o.attachment.size, 0),
+    containerChanged: compressed.some((o) => o.attachment.container_changed === true),
+    contentType: compressed[compressed.length - 1].attachment.content_type,
+  };
+}
+
+/** Render a {@link CompressionSummary} into the insert-time notice text
+ *  (decision: reuse the existing attachment toast rather than a new surface).
+ *  Mentions the container swap (e.g. PNG → WebP) only when one occurred, so
+ *  a filename that silently changed extension does not arrive unannounced. */
+export function compressionNoticeMessage(summary: CompressionSummary): string {
+  const from = formatBytes(summary.originalBytes);
+  const to = formatBytes(summary.finalBytes);
+  return summary.containerChanged
+    ? i18n.t("editor.attachment.compression.noticeContainerChanged", {
+        format: typeLabel(summary.contentType),
+        from,
+        to,
+      })
+    : i18n.t("editor.attachment.compression.notice", { from, to });
 }
 
 // ---- imported filename-only ref parse (import-&-convert) ----------------
