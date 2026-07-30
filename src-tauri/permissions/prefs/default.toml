@@ -37,6 +37,9 @@ permissions = [
   "allow-set-editor-line-numbers",
   "allow-set-editor-vim-mode",
   "allow-set-archive-disabled",
+  "allow-set-show-task-marker",
+  "allow-set-reminders-enabled",
+  "allow-set-reminder-horizon-days",
   "allow-set-editor-line-spacing",
   "allow-set-editor-content-width",
   "allow-set-editor-font-family",
@@ -44,6 +47,7 @@ permissions = [
   "allow-set-ai-enabled",
   "allow-set-attachment-ocr-enabled",
   "allow-set-ai-excluded-folders",
+  "allow-set-developer-mode",
   "allow-set-editor-default-view-mode",
   "allow-set-editor-focus-dim-inactive",
   "allow-set-editor-focus-typewriter",
@@ -462,6 +466,36 @@ commands.allow = ["set_attachment_ocr_enabled"]
 identifier = "allow-set-ai-excluded-folders"
 description = "Allow invoking prefs:set_ai_excluded_folders (Slot::Unlocked-gated setter for the ai_excluded_folders set — folders the AI never reads/indexes; same canonical set encoding as deliberate_folders; atomic-writes vault.prefs with no native side-effect)."
 commands.allow = ["set_ai_excluded_folders"]
+
+[[permission]]
+identifier = "allow-set-reminders-enabled"
+description = "Allow invoking prefs:set_reminders_enabled (Slot::Unlocked-gated setter for whether THIS DEVICE shows task reminders, MYND-618). A plain bool defaulting true, omitted from the canonical encoding at its default so an untouched vault stays byte-identical to a pre-feature vault.prefs. Classified DEVICE-LOCAL — whether a given machine should be interrupted is a property of that machine, so it must not sync. Non-load-bearing: a tampered or replayed value can at worst silence or enable a notification. Main-window-only, same invariant as the other prefs setters (v0.2 multi-window MUST NOT grant it to sub-windows)."
+commands.allow = ["set_reminders_enabled"]
+
+[[permission]]
+identifier = "allow-set-reminder-horizon-days"
+description = "Allow invoking prefs:set_reminder_horizon_days (Slot::Unlocked-gated setter for how many days ahead this device registers reminders with the OS, MYND-618; None falls back to the client's built-in horizon). Optional and omitted when unset, so an untouched vault stays byte-identical. Classified DEVICE-LOCAL for the same reason as reminders_enabled. The horizon is a PRIVACY bound before a resource one — pending reminder times leave the AEAD envelope and sit in OS-owned plaintext (threat-model.md §7), so a shorter horizon exposes less. Stored verbatim with no clamp; clamping here would silently disagree with what the settings UI showed. Main-window-only, same invariant as the other prefs setters."
+commands.allow = ["set_reminder_horizon_days"]
+
+[[permission]]
+identifier = "allow-set-show-task-marker"
+description = "Allow invoking prefs:set_show_task_marker (Slot::Unlocked-gated setter for the note-task marker's visibility in the sidebar row and the tab, MYND-613). A plain bool defaulting true, omitted from the canonical encoding at its default so an untouched vault stays byte-identical to a pre-feature vault.prefs. Classified Shared / scalar last-write-wins — a marker's visibility is taste, not device capability, so it should not be re-chosen on every new device. Non-load-bearing: a tampered or replayed value can at worst show or hide a glyph. Main-window-only, same invariant as the other prefs setters (v0.2 multi-window MUST NOT grant it to sub-windows)."
+commands.allow = ["set_show_task_marker"]
+
+[[permission]]
+identifier = "allow-set-transcription-enabled"
+description = "Allow invoking prefs:set_transcription_enabled (Slot::Unlocked-gated setter for whether speech-to-text may run on this vault's audio attachments, MYND-592). A plain bool defaulting true, omitted from the canonical encoding at its default so an untouched vault stays byte-identical to a pre-feature vault.prefs. Classified Shared / scalar last-write-wins, deliberately unlike ai_enabled and attachment_ocr_enabled which are device-local: those gate per-device compute or a device-local model-path override, while transcription runs a bundled model every client carries, so wanting the feature is a vault-level preference rather than a device capability. This setter is NOT the enforcement point — transcribe re-reads the persisted value host-side before it decrypts anything, so a WebView that skips or forges the setter gains nothing. Non-load-bearing: a tampered or replayed value can at worst enable or disable a user-initiated local computation. Main-window-only, same invariant as the other prefs setters (v0.2 multi-window MUST NOT grant it to sub-windows)."
+commands.allow = ["set_transcription_enabled"]
+
+# developer-mode (MYND-593): a write setter, so it inherits the same
+# main-window-only invariant as the other allow-set-* permissions — v0.2
+# multi-window MUST NOT grant this to any non-main window. Gates the AI
+# opt-in and the local-model override pickers (task 4); this setter itself
+# has no native side-effect and no consumer yet.
+[[permission]]
+identifier = "allow-set-developer-mode"
+description = "Allow invoking prefs:set_developer_mode (Slot::Unlocked-gated setter for the developer_mode toggle, MYND-593; atomic-writes vault.prefs with no native side-effect; defaults to false, so it is emitted on disk only when true)."
+commands.allow = ["set_developer_mode"]
 
 # myne-cli epic (MYND-490; cli-thin-client task 2): three write setters for the
 # CLI terminal-access door prefs (docs/decisions.md "CLI terminal access is a

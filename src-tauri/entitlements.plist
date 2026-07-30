@@ -4,9 +4,15 @@
 <dict>
   <!--
     Keychain access for the MYND-329 quick-unlock Touch ID provider
-    (src-tauri/src/plugins/quick_unlock/macos.rs). Without this entitlement on a
-    SIGNED binary, storing/reading a biometric-gated (kSecAccessControlBiometry-
-    CurrentSet) Keychain item fails with errSecMissingEntitlement (-34018).
+    (core/src/plugins/quick_unlock/apple.rs — moved out of the desktop crate and
+    generalized macOS -> macOS + iOS per decisions.md 2026-07-12). Without this
+    entitlement on a SIGNED binary, storing/reading a biometric-gated
+    (kSecAccessControlBiometryCurrentSet) Keychain item fails with
+    errSecMissingEntitlement (-34018).
+
+    That OSStatus is mapped to ProviderError::HardwareUnavailable (MYND-628), so
+    an unsigned build reports "biometric unavailable" and falls back to the
+    password instead of surfacing an opaque backend error.
 
     The access group is the app's own identifier (self-access). With a real
     Apple Development / Developer ID certificate, prefix it with the team:

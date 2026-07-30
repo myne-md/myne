@@ -115,7 +115,7 @@
       "title": "Lampiran",
       "transcribeDone": "Transkripsi selesai.",
       "transcribeFailed": "Transkripsi gagal. Silakan coba lagi.",
-      "transcribeNoModel": "Pilih model transkripsi di Pengaturan → Labs → AI.",
+      "transcribeNoModel": "Pilih model transkripsi di Pengaturan → Developer → AI.",
       "transcribeStarted": "Mentranskripsikan…",
       "typeFilter": {
         "all": "Semua tipe",
@@ -730,11 +730,11 @@
           "deletedLabel": "dihapus"
         },
         "transcribe": {
-          "disabledReason": "Aktifkan AI di Pengaturan → Labs → AI untuk mentranskripsikan.",
+          "disabledReason": "Aktifkan AI di Pengaturan → Developer → AI untuk mentranskripsikan.",
           "failed": "Transkripsi gagal. Silakan coba lagi.",
           "heading": "Transkrip",
           "insert": "Sisipkan transkrip ke catatan",
-          "noModelHint": "Pilih model transkripsi di Pengaturan → Labs → AI.",
+          "noModelHint": "Pilih model transkripsi di Pengaturan → Developer → AI.",
           "progress": "Mentranskripsikan…",
           "stop": "Hentikan"
         },
@@ -865,8 +865,8 @@
           "gettingReadyHint": "Menyiapkan catatan Anda untuk AI — mohon tunggu.",
           "insert": "Sisipkan ke catatan",
           "noAnswer": "Tidak ada jawaban — coba ubah kalimatnya.",
-          "noModelHint": "Tidak ada model terpilih. Pilih satu di Setelan → Labs → AI untuk memulai.",
-          "offHint": "AI lokal mati. Nyalakan di Setelan → Labs → AI.",
+          "noModelHint": "Tidak ada model terpilih. Pilih satu di Setelan → Developer → AI untuk memulai.",
+          "offHint": "AI lokal mati. Nyalakan di Setelan → Developer → AI.",
           "send": "Kirim",
           "statusGettingReady": "Menyiapkan…",
           "statusNoModel": "Tidak ada model",
@@ -2012,6 +2012,8 @@
       "changelogButton": "Lihat changelog…",
       "changelogHelper": "Catatan per versi. Akan muncul saat MYND-119 dirilis.",
       "changelogLabel": "Changelog",
+      "developerModeHelper": "",
+      "developerModeLabel": "",
       "licenseBody": "Pra-alfa · Dokumen CC-BY-4.0 · Kode aplikasi AGPL-3.0 pada rilis Fase 1.",
       "licenseLabel": "Lisensi",
       "tagline": "Pra-alfa · Klien desktop Fase 1",
@@ -2341,7 +2343,6 @@
       "pendingHint": "Segera hadir"
     },
     "ai": {
-      "betaBadge": "Beta",
       "disclosureToggle": "Bagaimana ini bekerja?",
       "enableHelper": "Menjalankan model yang Anda sediakan sepenuhnya di perangkat Anda. Eksperimental, mati secara bawaan.",
       "enableLabel": "Aktifkan AI lokal",
@@ -2434,7 +2435,7 @@
     "shell": {
       "closeLabel": "Tutup pengaturan",
       "groups": {
-        "labs": "Labs"
+        "developer": ""
       },
       "navLabel": "Panel pengaturan",
       "panels": {

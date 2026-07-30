@@ -224,7 +224,12 @@ const toggleAiEnabledAction: CommandAction = {
   get category() {
     return i18n.t("commands.actions.category.app");
   },
-  visibility: editorOnly,
+  // Developer-mode gated (developer-mode feature, MYND-593): local AI moved
+  // behind the Developer group in Settings, so a keyboard shortcut must not
+  // be able to flip the opt-in the settings UI no longer offers while the
+  // mode is off (PRD story 5). Hidden, not disabled — the point is that this
+  // action does not exist for a default user, not that it's greyed out.
+  visibility: (ctx) => (ctx.stageName === "editor" && ctx.prefs.developer_mode ? "show" : "hidden"),
   run: (ctx) => {
     void setAiEnabled(!ctx.prefs.ai_enabled);
   },
@@ -810,6 +815,12 @@ export function exportSelectionImageWithToast(): void {
 // (disabled-control discipline). Capability actions (siblings 4/6/7) register
 // through the same gate + the reserved `ai.*` id / `ai.insert`/`ai.rewrite`/
 // `ai.title` userEvent namespace.
+//
+// Developer-mode gated on top of that (MYND-593): local AI now lives behind
+// the Developer group, and the palette can flip `ai_enabled` without Settings
+// being involved at all — so while the mode is off, all five ai.* actions are
+// HIDDEN outright, not merely disabled. The disabled-control discipline above
+// still applies once the mode is on; it just no longer applies before it.
 const aiOpenChatAction: CommandAction = {
   id: "ai.open-chat",
   get label() {
@@ -819,17 +830,22 @@ const aiOpenChatAction: CommandAction = {
     return i18n.t("commands.actions.category.ai");
   },
   visibility: (ctx) =>
-    ctx.stageName !== "editor" ? "hidden" : ctx.aiEnabled ? "show" : "disabled",
+    ctx.stageName !== "editor" || !ctx.prefs.developer_mode
+      ? "hidden"
+      : ctx.aiEnabled
+        ? "show"
+        : "disabled",
   run: (ctx) => {
     ctx.onOpenAiChat();
   },
 };
 
 // Summarize the open note / selection (note-summarization MYND-409). Per-note
-// AI action: needs a selected note (the exportNote pattern) AND ai_enabled. In
-// the editor with a note but AI off → disabled (discoverable); with no note, or
-// outside the editor → hidden. The excluded-folder block (SYNC-14) + the
-// ephemeral AI Chat render are the handler's concern; this is the gate + entry.
+// AI action: needs a selected note (the exportNote pattern) AND ai_enabled AND
+// developer_mode. In the editor with a note, mode on, but AI off → disabled
+// (discoverable); with no note, mode off, or outside the editor → hidden. The
+// excluded-folder block (SYNC-14) + the ephemeral AI Chat render are the
+// handler's concern; this is the gate + entry.
 const aiSummarizeNoteAction: CommandAction = {
   id: "ai.summarize-note",
   get label() {
@@ -839,7 +855,7 @@ const aiSummarizeNoteAction: CommandAction = {
     return i18n.t("commands.actions.category.ai");
   },
   visibility: (ctx) =>
-    ctx.stageName !== "editor" || ctx.selectedNoteId === null
+    ctx.stageName !== "editor" || ctx.selectedNoteId === null || !ctx.prefs.developer_mode
       ? "hidden"
       : ctx.aiEnabled
         ? "show"
@@ -858,7 +874,7 @@ const aiSuggestTagsAction: CommandAction = {
     return i18n.t("commands.actions.category.ai");
   },
   visibility: (ctx) =>
-    ctx.stageName !== "editor" || ctx.selectedNoteId === null
+    ctx.stageName !== "editor" || ctx.selectedNoteId === null || !ctx.prefs.developer_mode
       ? "hidden"
       : ctx.aiEnabled
         ? "show"
@@ -877,7 +893,7 @@ const aiRewriteSelectionAction: CommandAction = {
     return i18n.t("commands.actions.category.ai");
   },
   visibility: (ctx) =>
-    ctx.stageName !== "editor" || ctx.selectedNoteId === null
+    ctx.stageName !== "editor" || ctx.selectedNoteId === null || !ctx.prefs.developer_mode
       ? "hidden"
       : ctx.aiEnabled
         ? "show"
@@ -1046,6 +1062,25 @@ const showGraphAction: CommandAction = {
   visibility: (ctx) => (ctx.stageName === "editor" ? "show" : "hidden"),
   run: (ctx) => {
     ctx.onShowGraph();
+  },
+};
+
+const showTasksAction: CommandAction = {
+  // The identifier is FROZEN here. Command ids carry migration weight the
+  // moment a user rebinds one — a rename silently drops their keybinding — so
+  // this string must not change even if the surface is renamed.
+  id: "tasks.show",
+  get label() {
+    return i18n.t("commands.actions.showTasks.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.editor");
+  },
+  kbd: "⌘⇧T",
+  defaultBinding: "Mod-Shift-t",
+  visibility: (ctx) => (ctx.stageName === "editor" ? "show" : "hidden"),
+  run: (ctx) => {
+    ctx.onShowTasks();
   },
 };
 
@@ -1347,6 +1382,7 @@ const ALL_COMMAND_ACTIONS: readonly CommandAction[] = Object.freeze([
   exportNoteHtmlAction,
   exportNoteTxtAction,
   showGraphAction,
+  showTasksAction,
   showTagsAction,
   showViewsAction,
   importBaseViewAction,

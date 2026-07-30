@@ -2,10 +2,13 @@
 //
 // Attachments Library Transcribe entry (voice-to-text MYND-552 task 5, SYNC-V9).
 // Pins the library carve-out: the per-item ⋮ menu shows a Transcribe item for
-// AUDIO attachments only, gated on `ai_enabled` ALONE (HIDDEN when off — NO
-// folder-exclusion gate), and selecting it (AI on) routes through the
-// SAME shared `startTranscription` helper the in-note widget uses. `usePrefs`,
-// the catalog IPC, and the transcribe helper are mocked.
+// AUDIO attachments only, gated on `transcription_enabled` (HIDDEN when off —
+// NO folder-exclusion gate), and selecting it routes through the SAME shared
+// `startTranscription` helper the in-note widget uses. `usePrefs`, the catalog
+// IPC, and the transcribe helper are mocked.
+//
+// MYND-592: the gate used to be `ai_enabled`, the AI beta opt-in. Speech-to-text
+// has its own switch now — turning the AI beta off no longer removes this row.
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { render, screen, cleanup, fireEvent, waitFor, within } from "@testing-library/react";
@@ -34,10 +37,10 @@ vi.mock("../../src/lib/transcribe", () => ({
   startTranscription: vi.fn(() => ({ done: Promise.resolve("stub"), stop: vi.fn() })),
 }));
 
-// usePrefs is mocked per-test to flip `ai_enabled`.
-let aiEnabled = false;
+// usePrefs is mocked per-test to flip `transcription_enabled`.
+let transcriptionEnabled = false;
 vi.mock("../../src/hooks/usePrefs", () => ({
-  usePrefs: () => ({ prefs: { ai_enabled: aiEnabled } }),
+  usePrefs: () => ({ prefs: { transcription_enabled: transcriptionEnabled } }),
 }));
 
 const mockedCatalog = vi.mocked(catalogList);
@@ -77,12 +80,12 @@ async function openMenuFor(name: string) {
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
-  aiEnabled = false;
+  transcriptionEnabled = false;
 });
 
 describe("Attachments Library Transcribe entry (SYNC-V9)", () => {
-  it("shows Transcribe for an audio item when AI is on (enabled)", async () => {
-    aiEnabled = true;
+  it("shows Transcribe for an audio item when transcription is on", async () => {
+    transcriptionEnabled = true;
     mockedCatalog.mockResolvedValue([AUDIO]);
     renderLibrary();
     const menu = await openMenuFor("voice.wav");
@@ -91,26 +94,26 @@ describe("Attachments Library Transcribe entry (SYNC-V9)", () => {
     expect((item as HTMLButtonElement).disabled).toBe(false);
   });
 
-  it("HIDES Transcribe for an audio item when AI is off", async () => {
-    aiEnabled = false;
+  it("HIDES Transcribe for an audio item when transcription is off", async () => {
+    transcriptionEnabled = false;
     mockedCatalog.mockResolvedValue([AUDIO]);
     renderLibrary();
     const menu = await openMenuFor("voice.wav");
-    // Local AI off → the Transcribe entry is omitted entirely (MYND-270:
+    // Transcription off → the entry is omitted entirely (MYND-270:
     // hidden, not disabled).
     expect(within(menu).queryByTestId("attachments.action-transcribe")).toBeNull();
   });
 
   it("does NOT show Transcribe for a non-audio item", async () => {
-    aiEnabled = true;
+    transcriptionEnabled = true;
     mockedCatalog.mockResolvedValue([IMAGE]);
     renderLibrary();
     const menu = await openMenuFor("pic.png");
     expect(within(menu).queryByTestId("attachments.action-transcribe")).toBeNull();
   });
 
-  it("selecting Transcribe (AI on) routes through the shared helper with the attachment id", async () => {
-    aiEnabled = true;
+  it("selecting Transcribe routes through the shared helper with the attachment id", async () => {
+    transcriptionEnabled = true;
     mockedCatalog.mockResolvedValue([AUDIO]);
     renderLibrary();
     const menu = await openMenuFor("voice.wav");

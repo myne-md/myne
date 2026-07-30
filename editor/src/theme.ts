@@ -9,6 +9,7 @@
 
 import { EditorView } from "@codemirror/view";
 import { tagChipCmTheme } from "@myne/editor/host/notes/tagPillToken";
+import { taskChipCmTheme } from "@myne/editor/host/notes/taskChipToken";
 
 export const myneTheme = EditorView.theme({
   "&": {
@@ -204,10 +205,16 @@ export const myneTheme = EditorView.theme({
   // Hanging indent. The `+ 6px` keeps the MARKER aligned with the body text
   // column (CM's default `.cm-line` left padding is 6px) instead of hanging it at
   // the line's hard left edge — at x≈0 the top-level •/* /+ markers fell 6px into
-  // the gutter and read as "no marker at all". Wrapped lines still hang to 1.5em.
+  // the gutter and read as "no marker at all".
+  //
+  // The depth itself is now MEASURED per line and delivered as an inline style
+  // by `decorations/list.ts::hangingIndentCh` (MYND-626) — a fixed value cannot
+  // serve a bullet widget, an ordered marker and a nested item at once. These
+  // are the fallback metrics for a line the decoration has not styled (and they
+  // keep the rule from being empty); the inline style wins wherever it applies.
   ".cm-list-item-line": {
-    textIndent: "-1.5em",
-    paddingLeft: "calc(1.5em + 6px)",
+    textIndent: "-1.4ch",
+    paddingLeft: "calc(1.4ch + 6px)",
   },
 
   // Inline typography — highlight / sub / sup from inline-typography.ts
@@ -269,6 +276,34 @@ export const myneTheme = EditorView.theme({
   ".cm-embedded-html mark.hl-purple": {
     backgroundColor: "var(--highlight-purple, #e2d8ee)",
   },
+  // MYND-632's eight. Each fallback is that colour's OWN light value, matching
+  // the five above — a shared fallback would render eight indistinguishable
+  // washes wherever the stylesheet has not loaded, which is the exact failure
+  // the palette exists to prevent.
+  ".cm-embedded-html mark.hl-orange": {
+    backgroundColor: "var(--highlight-orange, #f2ddc6)",
+  },
+  ".cm-embedded-html mark.hl-red": {
+    backgroundColor: "var(--highlight-red, #efd3d3)",
+  },
+  ".cm-embedded-html mark.hl-teal": {
+    backgroundColor: "var(--highlight-teal, #cfe6e2)",
+  },
+  ".cm-embedded-html mark.hl-cyan": {
+    backgroundColor: "var(--highlight-cyan, #cfe4ea)",
+  },
+  ".cm-embedded-html mark.hl-lime": {
+    backgroundColor: "var(--highlight-lime, #e0ecc4)",
+  },
+  ".cm-embedded-html mark.hl-brown": {
+    backgroundColor: "var(--highlight-brown, #e3d9cd)",
+  },
+  ".cm-embedded-html mark.hl-grey": {
+    backgroundColor: "var(--highlight-grey, #dedcd8)",
+  },
+  ".cm-embedded-html mark.hl-indigo": {
+    backgroundColor: "var(--highlight-indigo, #d6d8ee)",
+  },
   ".cm-embedded-html kbd": {
     fontFamily: "var(--font-mono)",
     fontSize: "0.85em",
@@ -310,6 +345,96 @@ export const myneTheme = EditorView.theme({
     cursor: "pointer",
   },
   ".cm-math-inline": { cursor: "pointer" },
+
+  // Malformed task-field value (MYND-614 task 8) — raw source text carrying a
+  // subtle failure hint, the math-error treatment. Never a blank chip, never a
+  // silently corrected value; the characters stay in place so the user can fix
+  // them, and the span stays clickable.
+  ".cm-task-field-invalid": {
+    textDecoration: "underline dotted var(--fg-3, #6b6a64)",
+    textDecorationSkipInk: "none",
+    cursor: "pointer",
+  },
+
+  // Task-query block (MYND-617) — a live list where a code card would be. The
+  // fill is neutral and the completed state is a filled box plus struck text:
+  // the canon's no-green-check and no-state-as-fill rules apply here exactly as
+  // they do in the panel, because it is the same list in a different frame.
+  ".cm-task-query": {
+    display: "block",
+    padding: "8px 10px",
+    margin: "6px 0",
+    border: "1px solid var(--line-1, #d8d5cc)",
+    borderRadius: "var(--radius-2, 6px)",
+    background: "var(--paper-1)",
+    fontFamily: "var(--font-sans)",
+    fontSize: "13px",
+    lineHeight: "1.5",
+  },
+  ".cm-task-query-row": {
+    display: "flex",
+    alignItems: "flex-start",
+    gap: "8px",
+    padding: "3px 0",
+  },
+  ".cm-task-query-box": {
+    flex: "0 0 auto",
+    width: "13px",
+    height: "13px",
+    marginTop: "3px",
+    borderRadius: "3px",
+    border: "1px solid var(--line-2, #d8d5cc)",
+    cursor: "pointer",
+  },
+  ".cm-task-query-box-done": {
+    background: "var(--fg-3, #6b6a64)",
+    borderColor: "var(--fg-3, #6b6a64)",
+  },
+  ".cm-task-query-box:focus-visible": {
+    outline: "2px solid var(--accent)",
+    outlineOffset: "1px",
+  },
+  ".cm-task-query-text": { flex: "1 1 auto", minWidth: "0", overflowWrap: "anywhere" },
+  ".cm-task-query-text-done": {
+    textDecoration: "line-through",
+    color: "var(--fg-3, #6b6a64)",
+  },
+  ".cm-task-query-note": {
+    flex: "0 0 auto",
+    background: "none",
+    border: "none",
+    padding: "0",
+    color: "var(--fg-3, #6b6a64)",
+    fontFamily: "inherit",
+    fontSize: "12px",
+    cursor: "pointer",
+    maxWidth: "160px",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+  },
+  ".cm-task-query-empty, .cm-task-query-more": {
+    color: "var(--fg-3, #6b6a64)",
+    fontSize: "12px",
+    padding: "2px 0",
+  },
+  // The refusal reads differently from an empty result on purpose: an empty
+  // list that was actually a misread query sends the user hunting for tasks
+  // that are really there.
+  ".cm-task-query-refused": {
+    color: "var(--fg-2, #4a4943)",
+    fontSize: "12px",
+    padding: "2px 0",
+    borderLeft: "2px solid var(--line-2, #d8d5cc)",
+    paddingLeft: "8px",
+  },
+  ".cm-task-query-dropped": {
+    marginTop: "6px",
+    color: "var(--fg-3, #6b6a64)",
+    fontSize: "12px",
+  },
+  ".cm-task-query-dropped summary": { cursor: "pointer" },
+  ".cm-task-query-dropped ul": { margin: "4px 0 0", paddingLeft: "18px" },
 
   // Spell-check squiggle (MYND-264, SYNC-9) — a wavy red underline driven by
   // the `--danger` design token (no hex), tracking the glyphs via
@@ -924,6 +1049,18 @@ export const myneTheme = EditorView.theme({
     textDecorationColor: "var(--line-3, #a3a29c)",
     color: "var(--fg-3)",
   },
+  // Carve-out (MYND-614 task 9) — MANDATORY, not cosmetic. The completed-task
+  // strike runs to the end of the line, so without this it draws straight
+  // through every chip on that line and the values become unreadable. The chip
+  // keeps its own muted treatment; the strike belongs to the prose.
+  ".cm-task-done-label .cm-task-chip": {
+    textDecoration: "none",
+  },
+  // The same carve-out for a malformed field's hint underline: two overlapping
+  // decorations on one span render as a muddle.
+  ".cm-task-done-label .cm-task-field-invalid": {
+    textDecoration: "underline dotted var(--fg-3, #6b6a64)",
+  },
 
   // Wikilink chip widget from wikilink/chip-widget.ts.
   ".cm-wikilink-chip": {
@@ -944,7 +1081,7 @@ export const myneTheme = EditorView.theme({
     cursor: "pointer",
     verticalAlign: "baseline",
     // `text-indent` is inherited and applies to an inline-block's own first
-    // line. Inside a `.cm-list-item-line` (which sets `text-indent: -1.5em`
+    // line. Inside a `.cm-list-item-line` (which sets a negative `text-indent`
     // for its hanging indent) the chip would otherwise shift its label ~1.5em
     // left, escaping the pill. Reset it so the label stays centered in the box.
     textIndent: "0",
@@ -955,6 +1092,15 @@ export const myneTheme = EditorView.theme({
   ".cm-wikilink-chip-embed": {
     backgroundColor: "var(--paper-3, #ece9e2)",
     fontStyle: "italic",
+  },
+  // MYND-634: a drawing embed is visually its own thing, not a link to prose.
+  // The full inline canvas (a locked thumbnail that unlocks into an editable
+  // surface) renders through this same class once it lands; until then the chip
+  // at least stops claiming to be a text note.
+  ".cm-wikilink-chip-drawing": {
+    fontStyle: "normal",
+    borderStyle: "dashed",
+    borderColor: "var(--line-2, #cfccc4)",
   },
   // §5.3 broken-link styling (MYND-37/83): a wikilink whose target matches no
   // note — faded foreground, italic, no underline. Same chip surface as the
@@ -969,6 +1115,7 @@ export const myneTheme = EditorView.theme({
   // browser's pill rows never drift. Pill shape distinguishes a tag from a
   // wikilink chip.
   ...tagChipCmTheme(),
+  ...taskChipCmTheme(),
   // Generic tooltip surface (Myne design system). CM6's default `.cm-tooltip`
   // is a light box that clashes with the dark editor; bring it onto the paper
   // surface. The autocomplete tooltip's 2-class rule (`.cm-tooltip-autocomplete`)

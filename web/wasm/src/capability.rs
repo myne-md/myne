@@ -108,6 +108,12 @@ pub const DISPATCHED: &[&str] = &[
     "plugin:prefs|set_ai_enabled",
     "plugin:prefs|set_attachment_ocr_enabled",
     "plugin:prefs|set_ai_excluded_folders",
+    // developer-mode (MYND-593): same reasoning as the AI/OCR toggles above —
+    // the pref is vault content that syncs to every client (task 2 classifies
+    // it DeviceLocal, but it still lives in vault.prefs and must round-trip),
+    // even though the feature it gates (local-model overrides) has no web
+    // affordance yet.
+    "plugin:prefs|set_developer_mode",
     "plugin:prefs|set_item_order",
     "plugin:prefs|set_hidden_bar_items",
     "plugin:prefs|upsert_saved_view",

@@ -17,6 +17,7 @@ import {
   formatLocalWeekday,
 } from "@myne/editor/host/notes/localDateTime";
 import i18n from "@myne/editor/i18n";
+import { openTaskQueryBuilder } from "../task-query-builder";
 import type { SlashIconName } from "./icons";
 
 export type SlashCommand = {
@@ -229,6 +230,34 @@ export function slashCommands(): readonly SlashCommand[] {
       icon: "☐",
       svgIcon: "check-square",
       apply: (v, f, t) => replaceLinePrefix(v, f, t, "- [ ] "),
+    },
+    {
+      // `/tasks` (MYND-617 task 10): opens the query BUILDER rather than
+      // inserting a bare fence. The builder is what makes the English-only
+      // grammar acceptable — keywords are read, never memorized — so the slash
+      // command must lead to it, not to an empty block the user has to fill in
+      // from documentation they have not read.
+      id: "task-query",
+      label: i18n.t("editor.slash.taskQuery"),
+      icon: "\u2611",
+      svgIcon: "check-square",
+      apply: (v, f, t) => {
+        // Remove the trigger first so the inserted block lands cleanly, exactly
+        // as `/attach` does before its async picker.
+        v.dispatch({ changes: { from: f, to: t, insert: "" }, userEvent: "slash.apply" });
+        const at = f;
+        openTaskQueryBuilder({
+          onInsert: (block) => {
+            v.dispatch({
+              changes: { from: at, to: at, insert: block },
+              selection: { anchor: at + block.length },
+              userEvent: "slash.apply",
+            });
+            v.focus();
+          },
+          onCancel: () => v.focus(),
+        });
+      },
     },
     {
       // `/attach` (MYND-164): a single command (not type-split) — opens the

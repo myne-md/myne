@@ -30,6 +30,7 @@ import {
   setCliEnabled as persistCliEnabled,
   setCliExcludedFolders as persistCliExcludedFolders,
   setCliRateLimitDisabled as persistCliRateLimitDisabled,
+  setDeveloperMode as persistDeveloperMode,
   setEditorContentWidth,
   setEditorFontFamily,
   setEditorLineSpacing,
@@ -52,6 +53,10 @@ import { subscribePrefsNonce } from "../notes/prefsNonce";
 const DEFAULT_PREFS: PrefsView = {
   screen_capture_protection: true,
   show_note_timestamps: true,
+  reminders_enabled: true,
+  reminder_horizon_days: null,
+  show_task_marker: true,
+  transcription_enabled: true,
   deliberate_folders: [],
   ai_enabled: false,
   // MYND-441: matches the Rust default. OCR is on unless the user turns it off,
@@ -59,6 +64,7 @@ const DEFAULT_PREFS: PrefsView = {
   // would flash the wrong answer for effectively every vault.
   attachment_ocr_enabled: true,
   ai_excluded_folders: [],
+  developer_mode: false,
   archived_folders: [],
   auto_lock_seconds: null,
   active_workspace: null,
@@ -127,6 +133,8 @@ interface UsePrefsResult {
   setAiEnabled: (enabled: boolean) => Promise<void>;
   /** Replace the AI excluded-folders set (optimistic; same pattern). */
   setAiExcludedFolders: (folders: string[]) => Promise<void>;
+  /** Flip the Developer mode toggle (optimistic; same converge-on-error pattern). */
+  setDeveloperMode: (enabled: boolean) => Promise<void>;
   /**
    * Open or close the CLI terminal-access door (myne-cli epic, MYND-490).
    * Optimistic; same converge-on-error pattern. The socket itself follows
@@ -279,6 +287,27 @@ export function usePrefs(onError?: (message: string) => void): UsePrefsResult {
       setPrefs((p) => ({ ...p, ai_enabled: enabled }));
       try {
         await persistAiEnabled(enabled);
+      } catch {
+        try {
+          const view = await prefsRead();
+          setPrefs(view);
+        } catch {
+          // Re-read also failed — keep the optimistic value; the backend
+          // tracing logged the original failure. User can retry.
+        }
+        onError?.(i18n.t("settings.prefs.saveError"));
+      }
+    },
+    [onError],
+  );
+
+  // Developer mode toggle (`developer-mode` feature, MYND-593). Same
+  // optimistic-then-converge discipline as `setAiEnabledPref`.
+  const setDeveloperModePref = useCallback(
+    async (enabled: boolean) => {
+      setPrefs((p) => ({ ...p, developer_mode: enabled }));
+      try {
+        await persistDeveloperMode(enabled);
       } catch {
         try {
           const view = await prefsRead();
@@ -562,6 +591,7 @@ export function usePrefs(onError?: (message: string) => void): UsePrefsResult {
     setCliEnabled: setCliEnabledPref,
     setCliExcludedFolders: setCliExcludedFoldersPref,
     setCliRateLimitDisabled: setCliRateLimitDisabledPref,
+    setDeveloperMode: setDeveloperModePref,
     setAutoLock,
     setHiddenBarItems,
     setBarItemsOrder,

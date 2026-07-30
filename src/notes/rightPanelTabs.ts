@@ -27,6 +27,10 @@ export const RIGHT_PANEL_TABS: readonly RightPanelTab[] = [
   { id: "backlinks", labelKey: "editor.chrome.rightPanel.tabs.backlinks", icon: "link" },
   { id: "unlinked", labelKey: "editor.chrome.rightPanel.tabs.unlinked", icon: "hash" },
   { id: "outline", labelKey: "editor.chrome.rightPanel.tabs.outline", icon: "list" },
+  // This note's tasks (MYND-616) — which is exactly what the right panel is
+  // for: backlinks are this note's links, the outline is this note's headings,
+  // and tasks are this note's work. A hideable, reorderable tab like any other.
+  { id: "tasks", labelKey: "editor.chrome.rightPanel.tabs.tasks", icon: "list-todo" },
   // AI Chat — the canonical render target the local-ai sibling outputs (summary,
   // Q&A, tag/link suggestions) mount into (local-ai epic, ai-ux-surface MYND-408,
   // SYNC-15). Always present in the vocabulary; the "AI off" / "thinking" chrome
@@ -45,6 +49,7 @@ export const RIGHT_PANEL_DEFAULT_ORDER: readonly string[] = [
   "backlinks",
   "unlinked",
   "outline",
+  "tasks",
   "ai-chat",
 ];
 
