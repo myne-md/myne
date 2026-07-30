@@ -62,6 +62,19 @@ pub trait VaultLifecycleHooks: Send + Sync + 'static {
     fn hydrate_search_index<'a>(&'a self, state: &'a VaultRuntimeState) -> BoxFuture<'a>;
     fn hydrate_spell<'a>(&'a self, state: &'a VaultRuntimeState) -> BoxFuture<'a>;
     fn reclaim_stray_attachment_blobs<'a>(&'a self, state: &'a VaultRuntimeState) -> BoxFuture<'a>;
+    /// Rebuild the attachment reference graph from the notes on disk.
+    ///
+    /// The graph is RAM-only and `zeroize_attachment_refs` wipes it on lock, so
+    /// unlike `vault.indices` (persisted, MYI1) it does not survive. It was only
+    /// ever populated by `attachment_refs_apply` as notes are SAVED — which
+    /// meant that after every app start each attachment reported "used in 0
+    /// notes" until its referencing note happened to be re-saved.
+    /// `reconcile.rs` names this gap in its own header; this is the sweep it
+    /// says is missing.
+    ///
+    /// Best-effort like the other hydrates: a failure leaves the graph as empty
+    /// as it already was and must never fail an unlock the user completed.
+    fn hydrate_attachment_refs<'a>(&'a self, state: &'a VaultRuntimeState) -> BoxFuture<'a>;
     fn persist_search_index<'a>(&'a self, state: &'a VaultRuntimeState) -> BoxFuture<'a>;
 
     /// Embed-on-unlock trigger for the local-AI semantic index (semantic-search-
@@ -173,6 +186,9 @@ pub trait VaultLifecycleHooks: Send + Sync + 'static {
 pub struct NoopHooks;
 
 impl VaultLifecycleHooks for NoopHooks {
+    fn hydrate_attachment_refs<'a>(&'a self, _: &'a VaultRuntimeState) -> BoxFuture<'a> {
+        Box::pin(std::future::ready(()))
+    }
     fn hydrate_search_index<'a>(&'a self, _: &'a VaultRuntimeState) -> BoxFuture<'a> {
         Box::pin(std::future::ready(()))
     }

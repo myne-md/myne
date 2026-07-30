@@ -39,6 +39,7 @@ import {
   type CleanResult,
 } from "../../lib/attachments";
 import { attachmentUrl } from "../../notes/attachmentRef";
+import { getHost } from "@myne/editor/host";
 import { startTranscription } from "../../lib/transcribe";
 import { usePrefs } from "../../hooks/usePrefs";
 import { showAttachmentToast } from "../../editor/attachments/toast";
@@ -257,6 +258,9 @@ export function AttachmentsLibrary({ onClose }: AttachmentsLibraryProps) {
   );
   const [entries, setEntries] = useState<CatalogEntry[] | null>(null);
   const [loadError, setLoadError] = useState(false);
+  /** Bumped once the visible entries' render URLs are resolvable, so the
+   *  thumbnails re-render against the warmed answers (see the effect below). */
+  const [warmNonce, setWarmNonce] = useState(0);
   const [view, setView] = useState<ViewMode>("grid");
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<SortKey>("created-desc");
@@ -524,6 +528,46 @@ export function AttachmentsLibrary({ onClose }: AttachmentsLibraryProps) {
 
   // ---- render ------------------------------------------------------------
 
+  // Make every listed attachment's render URL resolvable before the thumbnails
+  // ask for it.
+  //
+  // On desktop this is a no-op: `attachment://<id>` is a pure function of the
+  // id and the Rust handler decrypts per request. A browser has no custom
+  // protocol — it mints a `blob:` URL from bytes the Worker decrypted — and
+  // `resolveRef` is called during render, where it cannot do IO. So an id
+  // nobody warmed resolves to the pending placeholder, which is why the web
+  // library painted a grid of blank tiles while the same files rendered fine
+  // once something else had warmed them.
+  //
+  // The editor already warms the ids the OPEN NOTE embeds
+  // (`editor/src/attachments/catalog.ts`); nothing warmed the ids the LIBRARY
+  // lists, and this surface is precisely the one that lists all of them.
+  //
+  // Scoped to what is actually on screen after filtering, not the whole
+  // catalog: warming everything would decrypt every attachment in the vault to
+  // paint one screenful, which on an attachment-heavy vault is gigabytes.
+  useEffect(() => {
+    const warmRefs = getHost().attachments.warmRefs;
+    if (warmRefs === undefined) return; // desktop — nothing to prepare
+    const ids = visible.map((e) => e.id);
+    if (ids.length === 0) return;
+    let cancelled = false;
+    void warmRefs(ids)
+      .then(() => {
+        // The tiles rendered against the pre-warm answers, so they have to be
+        // told to ask again.
+        if (!cancelled) setWarmNonce((n) => n + 1);
+      })
+      .catch(() => {
+        // Best-effort, and per-id inside the host: one attachment that will not
+        // decrypt must not blank the rest. Anything unwarmed keeps the pending
+        // placeholder, which is what a failed desktop fetch shows too.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [visible]);
+
   const isLoading = entries === null;
   const isEmpty = !isLoading && (entries?.length ?? 0) === 0;
   const isNoMatch = !isLoading && !isEmpty && visible.length === 0;
@@ -681,7 +725,11 @@ export function AttachmentsLibrary({ onClose }: AttachmentsLibraryProps) {
         ) : view === "grid" ? (
           <div style={GRID_STYLE}>
             {visible.map((entry) => (
-              <AttachmentTile key={entry.id} {...itemProps(entry)} />
+              /* `warmNonce` in the key remounts the tile once its render URL
+                 has been warmed (web only — see the warm effect above), so the
+                 <img> is recreated against the resolved URL rather than left
+                 holding the pending placeholder it first rendered with. */
+              <AttachmentTile key={`${entry.id}:${warmNonce}`} {...itemProps(entry)} />
             ))}
           </div>
         ) : (

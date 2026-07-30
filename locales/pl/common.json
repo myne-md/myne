@@ -1331,7 +1331,10 @@
         "includeAttachments_few": "Dołącz {{count}} załączniki",
         "includeAttachments_many": "Dołącz {{count}} załączników",
         "includeAttachments_other": "Dołącz {{count}} załączników",
-        "title": "Eksportuj jako Markdown"
+        "title": "Eksportuj jako Markdown",
+        "copyLabel": "Kopiuj tekst notatki do schowka",
+        "copied": "Tekst notatki skopiowany",
+        "copyFailed": "Nie udało się skopiować tekstu notatki"
       }
     },
     "egress": {

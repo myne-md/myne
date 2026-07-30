@@ -4384,6 +4384,12 @@ mod tests {
     struct CountingHooks(std::sync::Arc<std::sync::atomic::AtomicU64>);
 
     impl crate::hooks::VaultLifecycleHooks for CountingHooks {
+        fn hydrate_attachment_refs<'a>(
+            &'a self,
+            _: &'a VaultRuntimeState,
+        ) -> crate::hooks::BoxFuture<'a> {
+            Box::pin(std::future::ready(()))
+        }
         fn hydrate_search_index<'a>(
             &'a self,
             _: &'a VaultRuntimeState,

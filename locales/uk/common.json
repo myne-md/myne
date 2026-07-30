@@ -1331,7 +1331,10 @@
         "includeAttachments_few": "Включити {{count}} вкладення",
         "includeAttachments_many": "Включити {{count}} вкладень",
         "includeAttachments_other": "Включити {{count}} вкладень",
-        "title": "Експортувати як Markdown"
+        "title": "Експортувати як Markdown",
+        "copyLabel": "Копіювати текст нотатки до буфера обміну",
+        "copied": "Текст нотатки скопійовано",
+        "copyFailed": "Не вдалося скопіювати текст нотатки"
       }
     },
     "egress": {
