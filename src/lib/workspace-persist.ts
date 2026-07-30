@@ -12,6 +12,7 @@ import {
   collectLeaves,
   findLeaf,
   GRAPH_TAB_ID,
+  TASKS_TAB_ID,
   itemKey,
   sameItem,
   wrapAsSingleSlot,
@@ -204,6 +205,29 @@ type ParsedItem = { item: WorkspaceItem } | "drop" | "invalid";
  *  format, pre-MYND-274); `{kind:"note"|"view"|"graph", id}` is a current item; a
  *  well-formed `{kind:<other>, id}` is a future kind to drop; anything else is
  *  invalid. */
+/** The persisted task filter, or nothing when it is absent/unknown.
+ *  Omit-when-default: `"today"` never round-trips, so a tab on the default
+ *  stays byte-identical to a pre-feature descriptor. */
+function parseTaskFilter(raw: unknown): { taskFilter?: string } {
+  if (raw === "upcoming" || raw === "overdue" || raw === "all") return { taskFilter: raw };
+  // Anything else — absent, `"today"`, or a name a future build wrote — is the
+  // default. A future filter name degrades to Today rather than erroring.
+  return {};
+}
+
+/** The persisted task scope, defensively. A malformed value degrades to the
+ *  unset scope rather than rejecting the workspace blob. */
+function parseTaskScope(raw: unknown): { taskScope?: { folder?: string; tags?: string[] } } {
+  if (typeof raw !== "object" || raw === null) return {};
+  const o = raw as Record<string, unknown>;
+  const folder = typeof o.folder === "string" && o.folder !== "" ? { folder: o.folder } : {};
+  const tags = Array.isArray(o.tags)
+    ? o.tags.filter((t): t is string => typeof t === "string" && t !== "")
+    : [];
+  if (Object.keys(folder).length === 0 && tags.length === 0) return {};
+  return { taskScope: { ...folder, ...(tags.length > 0 ? { tags } : {}) } };
+}
+
 function parseItem(t: unknown): ParsedItem {
   if (typeof t === "string") return { item: { kind: "note", id: t } };
   if (typeof t !== "object" || t === null) return "invalid";
@@ -232,6 +256,23 @@ function parseItem(t: unknown): ParsedItem {
   // sentinel, so any persisted id normalizes to a canonical graph item.
   if (o.kind === "graph") {
     return { item: { kind: "graph", id: GRAPH_TAB_ID, ...pinned, ...viewMode } };
+  }
+  // The vault-wide task list (MYND-616) — a singleton like the graph, plus two
+  // pieces of per-tab session state. Both are read-when-present and
+  // **degrade to the default rather than erroring**: an unknown filter name from
+  // a future build, or junk in `taskScope`, must not reject the whole workspace
+  // blob and lose every open tab.
+  if (o.kind === "tasks") {
+    return {
+      item: {
+        kind: "tasks",
+        id: TASKS_TAB_ID,
+        ...pinned,
+        ...viewMode,
+        ...parseTaskFilter(o.taskFilter),
+        ...parseTaskScope(o.taskScope),
+      },
+    };
   }
   if (typeof o.kind === "string") return "drop"; // unknown future kind
   return "invalid";

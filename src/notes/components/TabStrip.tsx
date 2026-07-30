@@ -27,6 +27,7 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 import i18n from "../../i18n";
+import { labelColorVar } from "../decorations";
 import { Icon } from "../../components/primitives/Icon";
 import type { IconName } from "../../lib/icons";
 import { TAB_DRAG_MIME, readTabDrag, writeTabDrag } from "../tabDrag";
@@ -82,6 +83,11 @@ export type TabStripProps = {
   activeTab: string | null;
   /** Display title for a tab handle; `null` → rendered as italic "Untitled". */
   titleOf: (id: string) => string | null;
+  /** Colour-label slot for a tab, or `undefined` for an uncoloured item
+   *  (MYND-627). Tints the tab's icon, matching how the sidebar shows the same
+   *  colour — a note you marked stays recognisable once it is open, which was
+   *  the point of colouring it. */
+  colorOf?: (id: string) => string | undefined;
   /** Leading icon for a tab handle (note vs view, MYND-274). Default file-text. */
   iconOf?: (id: string) => IconName;
   /** Whether a tab handle is PINNED (tab-modes / MYND-320): a pinned tab shows a
@@ -121,6 +127,7 @@ export function TabStrip({
   tabs,
   activeTab,
   titleOf,
+  colorOf,
   iconOf,
   isPinned,
   onTogglePin,
@@ -218,6 +225,7 @@ export function TabStrip({
             id={id}
             paneId={paneId}
             title={titleOf(id)}
+            colorSlot={colorOf?.(id)}
             icon={iconOf?.(id) ?? "file-text"}
             active={id === activeTab}
             dirty={id === activeTab && activeDirty}
@@ -308,6 +316,8 @@ type TabProps = {
   paneId: string;
   title: string | null;
   icon: IconName;
+  /** Colour-label slot; tints the icon (MYND-627). */
+  colorSlot?: string;
   active: boolean;
   dirty: boolean;
   /** Pinned (tab-modes / MYND-320): pin affordance shown, × close-guarded. */
@@ -327,6 +337,7 @@ function Tab({
   paneId,
   title,
   icon,
+  colorSlot,
   active,
   dirty,
   pinned,
@@ -462,7 +473,11 @@ function Tab({
             }}
           />
         ) : (
-          <Icon name={icon} size={13} />
+          <Icon
+            name={icon}
+            size={13}
+            style={colorSlot ? { color: labelColorVar(colorSlot) } : undefined}
+          />
         )}
       </span>
       <span

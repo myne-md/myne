@@ -1479,9 +1479,16 @@ runner(
         },
       );
 
-      // ---- Frame: AI settings (the AI Labs panel, off by default) ----
-      // `ai` sits in the Labs group; the tab is always present, the panel shows
-      // the enable toggle + model pickers + trust disclosure even when AI is off.
+      // ---- Frame: AI settings (the AI panel, off by default) ----
+      // `ai` now sits in the Developer group (developer-mode feature, MYND-593
+      // — supersedes the earlier always-visible Labs framing this comment used
+      // to describe) and the tab only renders once Developer mode is on. This
+      // capture currently relies on `settings.tab-ai` being reachable
+      // unconditionally, which is no longer true — it needs an
+      // enable-Developer-mode step from the About panel before this frame,
+      // once that toggle lands (developer-mode feature task 6). Flagging
+      // rather than silently leaving a capture step that will fail once this
+      // TODO is addressed.
       await frame(
         s,
         "ai-settings",

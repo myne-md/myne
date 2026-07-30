@@ -50,7 +50,24 @@ pub struct TitleSlices<'a> {
 /// headings are deliberately routed through the FM `title:` slot
 /// instead (negligible Phase 1 dogfood prevalence).
 pub fn extract_title_slices(plaintext: &[u8]) -> TitleSlices<'_> {
-    // --- FM boundary scan -------------------------------------------
+    let (frontmatter_bytes, body_offset) = scan_frontmatter(plaintext);
+
+    // --- First-H1 line scan -----------------------------------------
+    let body = &plaintext[body_offset..];
+    let first_h1_line = body
+        .split(|b| *b == b'\n')
+        .find(|line| line.starts_with(H1_PREFIX));
+
+    TitleSlices {
+        frontmatter_bytes,
+        first_h1_line,
+    }
+}
+
+/// The FM boundary scan shared by [`extract_title_slices`] and
+/// [`body_after_frontmatter`] — locates the frontmatter block (if any) and
+/// returns it alongside the byte offset where the body region starts.
+fn scan_frontmatter(plaintext: &[u8]) -> (Option<&[u8]>, usize) {
     let mut frontmatter_bytes: Option<&[u8]> = None;
     let mut body_offset: usize = 0;
 
@@ -84,16 +101,20 @@ pub fn extract_title_slices(plaintext: &[u8]) -> TitleSlices<'_> {
         }
     }
 
-    // --- First-H1 line scan -----------------------------------------
-    let body = &plaintext[body_offset..];
-    let first_h1_line = body
-        .split(|b| *b == b'\n')
-        .find(|line| line.starts_with(H1_PREFIX));
+    (frontmatter_bytes, body_offset)
+}
 
-    TitleSlices {
-        frontmatter_bytes,
-        first_h1_line,
-    }
+/// The plaintext after its frontmatter block (or the whole input when there
+/// is none), with a single leading blank-line FM/body separator stripped —
+/// mirrors `newNoteFromTemplate.ts::extractTemplateBody` exactly. Used to
+/// extract a template note's body for daily-note instantiation
+/// (cli-thin-client task 9; `myne daily`'s create path has no WebView to run
+/// that TS function, so this is the Rust-side equivalent over the same FM
+/// scan `extract_title_slices` already performs).
+pub fn body_after_frontmatter(plaintext: &[u8]) -> &[u8] {
+    let (_, body_offset) = scan_frontmatter(plaintext);
+    let body = &plaintext[body_offset..];
+    body.strip_prefix(b"\n").unwrap_or(body)
 }
 
 /// Extract the H1 title from an already-located first-H1 line (`"# "` prefix
@@ -385,5 +406,46 @@ mod tests {
     fn resolve_none_when_neither_fm_title_nor_h1() {
         assert_eq!(resolve_note_title(b"plain body, no heading"), None);
         assert_eq!(resolve_note_title(b"---\nfolder: x\n---\nbody only"), None);
+    }
+
+    // ---- body_after_frontmatter (template-body extraction, task 9) -------
+
+    #[test]
+    fn body_after_frontmatter_strips_fm_block_and_one_blank_line() {
+        let input = b"---\ntitle: T\n---\n\nbody line 1\nbody line 2\n";
+        assert_eq!(
+            body_after_frontmatter(input),
+            b"body line 1\nbody line 2\n".as_ref()
+        );
+    }
+
+    #[test]
+    fn body_after_frontmatter_with_no_blank_separator_keeps_body_intact() {
+        // FM closer immediately followed by body content with no blank line.
+        let input = b"---\ntitle: T\n---\nno blank line here";
+        assert_eq!(
+            body_after_frontmatter(input),
+            b"no blank line here".as_ref()
+        );
+    }
+
+    #[test]
+    fn body_after_frontmatter_with_no_fm_returns_whole_input() {
+        let input = b"just a plain body\nno frontmatter";
+        assert_eq!(body_after_frontmatter(input), input.as_ref());
+    }
+
+    #[test]
+    fn body_after_frontmatter_with_empty_body_returns_empty() {
+        let input = b"---\ntitle: T\n---\n";
+        assert_eq!(body_after_frontmatter(input), b"".as_ref());
+    }
+
+    #[test]
+    fn body_after_frontmatter_strips_only_one_leading_blank_line() {
+        // Two blank lines after the FM closer: only the FIRST (the FM/body
+        // separator) is stripped — the second is real body content.
+        let input = b"---\ntitle: T\n---\n\n\nbody\n";
+        assert_eq!(body_after_frontmatter(input), b"\nbody\n".as_ref());
     }
 }

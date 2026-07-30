@@ -13,11 +13,13 @@
 //                 expander renders the stub output → Insert into note → assert
 //                 the note body now contains the transcript (SYNC-V1/V17).
 //
-//   tr2 (UNGATED) — on the DEFAULT build (AI off), the Transcribe ⋮ row is
-//                   ABSENT (hidden-not-disabled; MYND-270 product tweak — no
-//                   dangling affordance when the whole AI subsystem is off, see
-//                   `editor/src/attachments/widgets.ts`). The other ⋮ rows still
-//                   render, so the menu opens; only Transcribe is gone.
+//   tr2 (UNGATED) — the Transcribe ⋮ row follows `transcription_enabled`, NOT
+//                   the AI opt-in (MYND-592). On the DEFAULT build the AI beta
+//                   is off and the row is nonetheless PRESENT; turning the
+//                   transcription switch off hides it (hidden-not-disabled,
+//                   MYND-270 — no dangling affordance when the subsystem is
+//                   off, see `editor/src/attachments/widgets.ts`). The other ⋮
+//                   rows render throughout, so the menu opens either way.
 //
 // Per `e2e/CLAUDE.md` definition of done a new/changed scenario must go green 3×
 // consecutive via `./scripts/e2e-local.sh` before merge (it exercises the
@@ -38,6 +40,7 @@ import {
   dismissImporterOffer,
   editorText,
   enableAi,
+  setTranscriptionEnabled,
   pageSeatInvoke,
   reopenNoteAfterReload,
   unlockToEditor,
@@ -154,10 +157,11 @@ aiDescribe("tr1 transcribe chain — progress → transcript → insert (transcr
   });
 });
 
-describeE2E("tr2 Transcribe row is absent (hidden) with AI off (transcription-ui)", () => {
+describeE2E("tr2 the Transcribe row follows its OWN switch, not the AI opt-in (MYND-592)", () => {
   // Vault-count precondition: 1 (weak KDF). Runs on the DEFAULT build (no stub,
-  // no model) — AI is off by default, so the row must be hidden-not-disabled.
-  it("hides the Transcribe ⋮ row when AI is off", async () => {
+  // no model) — the AI opt-in is off, which is exactly the state that used to
+  // hide this row and must no longer.
+  it("offers Transcribe by default (AI off), and hides it once transcription is turned off", async () => {
     let seeded: SeededVault;
     await scenario(
       "tr2-transcribe-hidden",
@@ -198,7 +202,33 @@ describeE2E("tr2 Transcribe row is absent (hidden) with AI off (transcription-ui
           },
           { label: "audio ⋮ menu open, Transcribe row read", timeoutMs: 20_000 },
         );
-        expect(read.transcribe, "Transcribe row is hidden while AI is off").toBe(0);
+        expect(
+          read.transcribe,
+          "Transcribe is offered by default, even though the AI opt-in is off",
+        ).toBe(1);
+
+        // Flip the real switch and read the same menu again — this half is what
+        // proves the row is wired to this preference rather than merely
+        // always-on. Close the ⋮ menu first: it is body-portaled and would sit
+        // above the settings modal. The button toggles it; wait for a row that
+        // is only present while it is open, so "closed" is observed, not hoped.
+        await (await s.byTestId("attachment-audio.menu-button")).click();
+        await s.waitForGone(testIdSelector("attachment-audio.reveal"));
+        await setTranscriptionEnabled(s, false);
+
+        const after = await s.waitUntil(
+          async () => {
+            const transcribe = (await s.byTestIdAll("attachment-audio.transcribe")).length;
+            const revealOpen = (await s.byTestIdAll("attachment-audio.reveal")).length > 0;
+            if (!revealOpen) {
+              await (await s.byTestId("attachment-audio.menu-button")).click();
+              return null;
+            }
+            return { transcribe };
+          },
+          { label: "audio ⋮ menu re-read after turning transcription off", timeoutMs: 20_000 },
+        );
+        expect(after.transcribe, "Transcribe is hidden once transcription is off").toBe(0);
       },
     );
   });

@@ -737,6 +737,10 @@ function SummaryBody({ result, onDone }: { result: ImportResult; onDone: () => v
             />
           )}
           <StatRow label={t("notes.import.modal.statCanvasSkipped")} value={result.ignore.canvasSkipped} muted />
+          {/* MYND-633: reported, not silently absent — an Excalidraw file used
+              to import as a broken note, so the user needs to see it was left
+              behind rather than wonder where the drawing went. */}
+          <StatRow label={t("notes.import.modal.statExcalidrawSkipped")} value={result.ignore.excalidrawSkipped} muted />
           <StatRow label={t("notes.import.modal.statOtherSkipped")} value={result.ignore.nonMarkdownSkipped} muted />
           <StatRow label={t("notes.import.modal.statEmptyFoldersKept")} value={result.emptyFoldersPreserved} muted />
           {result.cancelled !== null && (

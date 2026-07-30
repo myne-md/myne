@@ -32,6 +32,7 @@ const PANEL_IDS = [
   "ai",
   "editor",
   "files",
+  "transcription",
   "hotkeys",
   "appearance",
   "storage",
@@ -119,26 +120,65 @@ describe("settings search-index — integrity", () => {
 });
 
 describe("settings search-index — searchSettings behaviour", () => {
+  // Developer mode ON throughout this describe block: these tests are about
+  // the generic scorer/grouping behaviour, not about the developer-mode gate
+  // (that has its own describe block below), so the gate is held open.
   it("finds a Privacy setting by title", () => {
-    const ids = searchSettings("screen capture", t).map((e) => e.id);
+    const ids = searchSettings("screen capture", t, true).map((e) => e.id);
     expect(ids).toContain("privacy.screen-capture");
   });
 
   it("finds the theme setting by a keyword not in its title ('dark')", () => {
-    const ids = searchSettings("dark", t).map((e) => e.id);
+    const ids = searchSettings("dark", t, true).map((e) => e.id);
     expect(ids).toContain("appearance.theme");
   });
 
   it("surfaces panel members by the panel name in the haystack", () => {
-    const panels = new Set(searchSettings("appearance", t).map((e) => e.panelId));
+    const panels = new Set(searchSettings("appearance", t, true).map((e) => e.panelId));
     expect(panels).toContain("appearance");
   });
 
   it("returns [] for a no-match query", () => {
-    expect(searchSettings("zzzzznope42", t)).toEqual([]);
+    expect(searchSettings("zzzzznope42", t, true)).toEqual([]);
   });
 
   it("returns every entry for an empty query", () => {
-    expect(searchSettings("", t).length).toBe(SETTINGS_SEARCH_INDEX.length);
+    expect(searchSettings("", t, true).length).toBe(SETTINGS_SEARCH_INDEX.length);
+  });
+});
+
+describe("settings search-index — developer-mode gate (MYND-593)", () => {
+  const AI_IDS = ["ai.enable", "ai.models", "ai.excluded-folders"];
+
+  it("tags every `ai` panel entry as developer-gated", () => {
+    for (const e of SETTINGS_SEARCH_INDEX) {
+      if (e.panelId === "ai") expect(e.developerGated, `entry ${e.id}`).toBe(true);
+    }
+  });
+
+  it("mode off: the three AI entries are absent from every search, even by exact title", () => {
+    for (const id of AI_IDS) {
+      const entry = SETTINGS_SEARCH_INDEX.find((e) => e.id === id)!;
+      const found = searchSettings(entry.titleKey, t, false).map((r) => r.id);
+      expect(found, `search for ${id}`).not.toContain(id);
+    }
+    // An empty query (list-everything) must also drop them.
+    const allIds = searchSettings("", t, false).map((e) => e.id);
+    for (const id of AI_IDS) expect(allIds).not.toContain(id);
+  });
+
+  it("mode on: the three AI entries are found again", () => {
+    const allIds = searchSettings("", t, true).map((e) => e.id);
+    for (const id of AI_IDS) expect(allIds).toContain(id);
+  });
+
+  it("mode off does not hide anything that isn't developer-gated", () => {
+    const withGateOff = new Set(searchSettings("", t, false).map((e) => e.id));
+    const withGateOn = new Set(searchSettings("", t, true).map((e) => e.id));
+    const nonGated = SETTINGS_SEARCH_INDEX.filter((e) => !e.developerGated);
+    for (const e of nonGated) {
+      expect(withGateOff.has(e.id), `${e.id} missing with gate off`).toBe(true);
+      expect(withGateOn.has(e.id), `${e.id} missing with gate on`).toBe(true);
+    }
   });
 });

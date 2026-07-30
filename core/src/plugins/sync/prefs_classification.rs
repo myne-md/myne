@@ -71,6 +71,12 @@ pub const CLASSIFICATION: &[(&str, PrefClass)] = &[
     ("attachment_ocr_enabled", PrefClass::DeviceLocal),
     ("auto_lock_seconds", PrefClass::DeviceLocal),
     ("bar_items_order", PrefClass::DeviceLocal),
+    ("cli_enabled", PrefClass::DeviceLocal),
+    (
+        "cli_excluded_folders",
+        PrefClass::Shared(SharedDiscipline::SetUnion),
+    ),
+    ("cli_rate_limit_disabled", PrefClass::DeviceLocal),
     ("custom_theme", PrefClass::DeviceLocal),
     (
         "daily_date_format",
@@ -88,6 +94,10 @@ pub const CLASSIFICATION: &[(&str, PrefClass)] = &[
         "deliberate_folders",
         PrefClass::Shared(SharedDiscipline::SetUnion),
     ),
+    // developer-mode (MYND-593): gates a device-local model-path override, so
+    // a synced flag would read "on" on a device with no override behind it —
+    // same reasoning as `ai_enabled` / `attachment_ocr_enabled`.
+    ("developer_mode", PrefClass::DeviceLocal),
     (
         "device_names",
         PrefClass::Shared(SharedDiscipline::PerKeyMapMerge),
@@ -141,6 +151,8 @@ pub const CLASSIFICATION: &[(&str, PrefClass)] = &[
         PrefClass::Shared(SharedDiscipline::ScalarLww),
     ),
     ("paired_extensions", PrefClass::DeviceLocal),
+    ("reminder_horizon_days", PrefClass::DeviceLocal),
+    ("reminders_enabled", PrefClass::DeviceLocal),
     ("right_panel_active_tab", PrefClass::DeviceLocal),
     ("right_panel_hidden_tabs", PrefClass::DeviceLocal),
     ("right_panel_tab_order", PrefClass::DeviceLocal),
@@ -150,6 +162,15 @@ pub const CLASSIFICATION: &[(&str, PrefClass)] = &[
     ),
     ("screen_capture_protection", PrefClass::DeviceLocal),
     ("show_note_timestamps", PrefClass::DeviceLocal),
+    // MYND-613. **Shared**, deliberately unlike its lexicographic neighbour
+    // `show_note_timestamps` (DeviceLocal): device-local exists because devices
+    // genuinely differ in capability, and a marker's visibility is taste, not
+    // capability — a device-local value would mean re-choosing it on every new
+    // device.
+    (
+        "show_task_marker",
+        PrefClass::Shared(SharedDiscipline::ScalarLww),
+    ),
     ("spell_enabled", PrefClass::DeviceLocal),
     (
         "spell_languages",
@@ -158,6 +179,16 @@ pub const CLASSIFICATION: &[(&str, PrefClass)] = &[
     ("startup_open", PrefClass::DeviceLocal),
     ("startup_open_note", PrefClass::DeviceLocal),
     ("theme", PrefClass::DeviceLocal),
+    // MYND-592. **Shared**, for the same reason as `show_task_marker` above and
+    // deliberately unlike `ai_enabled` (DeviceLocal): that flag is device-local
+    // because it gates a device-local model-path override, and this one gates a
+    // bundled model every client carries. Whether the user wants speech-to-text
+    // at all is taste, not capability — a device-local value would mean
+    // re-choosing it on every new device.
+    (
+        "transcription_enabled",
+        PrefClass::Shared(SharedDiscipline::ScalarLww),
+    ),
     (
         "view_order",
         PrefClass::Shared(SharedDiscipline::SequenceLww),
@@ -196,11 +227,15 @@ mod tests {
             attachment_ocr_enabled: _,
             auto_lock_seconds: _,
             bar_items_order: _,
+            cli_enabled: _,
+            cli_excluded_folders: _,
+            cli_rate_limit_disabled: _,
             custom_theme: _,
             daily_date_format: _,
             daily_folder: _,
             daily_template: _,
             deliberate_folders: _,
+            developer_mode: _,
             device_names: _,
             editor_content_width: _,
             editor_default_view_mode: _,
@@ -235,11 +270,15 @@ mod tests {
             saved_views: _,
             screen_capture_protection: _,
             show_note_timestamps: _,
+            reminders_enabled: _,
+            reminder_horizon_days: _,
+            show_task_marker: _,
             spell_enabled: _,
             spell_languages: _,
             startup_open: _,
             startup_open_note: _,
             theme: _,
+            transcription_enabled: _,
             view_order: _,
         } = PrefsView::default();
 
@@ -256,11 +295,15 @@ mod tests {
             "attachment_ocr_enabled",
             "auto_lock_seconds",
             "bar_items_order",
+            "cli_enabled",
+            "cli_excluded_folders",
+            "cli_rate_limit_disabled",
             "custom_theme",
             "daily_date_format",
             "daily_folder",
             "daily_template",
             "deliberate_folders",
+            "developer_mode",
             "device_names",
             "editor_content_width",
             "editor_default_view_mode",
@@ -289,17 +332,21 @@ mod tests {
             "new_note_location",
             "new_note_location_folder",
             "paired_extensions",
+            "reminder_horizon_days",
+            "reminders_enabled",
             "right_panel_active_tab",
             "right_panel_hidden_tabs",
             "right_panel_tab_order",
             "saved_views",
             "screen_capture_protection",
             "show_note_timestamps",
+            "show_task_marker",
             "spell_enabled",
             "spell_languages",
             "startup_open",
             "startup_open_note",
             "theme",
+            "transcription_enabled",
             "view_order",
         ];
 

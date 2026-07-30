@@ -44,6 +44,11 @@ export type ViewId = string;
  *  invariant then makes "open graph" idempotent — a reveal, never a 2nd tab). */
 export const GRAPH_TAB_ID = "graph";
 
+/** The vault-wide task list is a singleton tab too, for the same reason the
+ *  graph is: there is exactly one per workspace, so a fixed sentinel id makes
+ *  "open tasks" idempotent — a reveal, never a second tab (MYND-616). */
+export const TASKS_TAB_ID = "tasks";
+
 /**
  * Per-tab editor view mode (reading-source-modes / MYND-299): how the tab's
  * buffer renders. `"live"` is the default WYSIWYG editing surface; `"reading"`
@@ -70,7 +75,27 @@ export type ViewMode = "live" | "reading" | "source";
 export type WorkspaceItem =
   | { kind: "note"; id: NoteId; pinned?: boolean; viewMode?: ViewMode }
   | { kind: "view"; id: ViewId; pinned?: boolean; viewMode?: ViewMode }
-  | { kind: "graph"; id: typeof GRAPH_TAB_ID; pinned?: boolean; viewMode?: ViewMode };
+  | { kind: "graph"; id: typeof GRAPH_TAB_ID; pinned?: boolean; viewMode?: ViewMode }
+  /**
+   * The vault-wide task list (MYND-616). `taskFilter` and `taskScope` are
+   * **per-tab session state**, not preferences: "which filter am I looking at"
+   * is where you are, and preferences are for stated choices like theme and
+   * auto-lock. Carrying them here also avoids the roughly thirteen-site
+   * preference registration surface — of which the specification roster is the
+   * one nothing verifies.
+   *
+   * Both are **omit-when-default**, exactly like `pinned` and `viewMode`, so a
+   * tab left on its defaults stays byte-identical to a pre-feature descriptor.
+   * The descriptor is opaque to the storage codec, so this is no format change.
+   */
+  | {
+      kind: "tasks";
+      id: typeof TASKS_TAB_ID;
+      pinned?: boolean;
+      viewMode?: ViewMode;
+      taskFilter?: string;
+      taskScope?: { folder?: string; tags?: readonly string[] };
+    };
 
 /** Stable string key for an item — `"note:<id>"` / `"view:<id>"`. Used for
  *  set/equality comparisons over the heterogeneous tab strip. Ignores `pinned`
@@ -110,6 +135,11 @@ export function graphItem(): WorkspaceItem {
   return { kind: "graph", id: GRAPH_TAB_ID };
 }
 
+/** The vault-wide task-list tab item (singleton — see [`TASKS_TAB_ID`]). */
+export function tasksItem(): WorkspaceItem {
+  return { kind: "tasks", id: TASKS_TAB_ID };
+}
+
 /** Inverse of [`itemKey`]: parse a `"note:<id>"` / `"view:<id>"` / `"graph:<id>"`
  *  handle back to an item. An unrecognized prefix is treated as a note id (the
  *  legacy/default kind), so a bare or note-prefixed handle always yields a note
@@ -117,6 +147,7 @@ export function graphItem(): WorkspaceItem {
 export function parseItemKey(key: string): WorkspaceItem {
   if (key.startsWith("view:")) return { kind: "view", id: key.slice(5) };
   if (key.startsWith("graph:")) return { kind: "graph", id: GRAPH_TAB_ID };
+  if (key.startsWith("tasks:")) return { kind: "tasks", id: TASKS_TAB_ID };
   if (key.startsWith("note:")) return { kind: "note", id: key.slice(5) };
   return { kind: "note", id: key };
 }
@@ -665,6 +696,51 @@ export function setItemViewMode(
           }
         : leaf,
     ),
+  };
+}
+
+/**
+ * Persist the task tab's filter and scope **with the tab** (MYND-616 task 9).
+ *
+ * Session state, not a preference: "which filter am I looking at" is where the
+ * user is, and preferences are for stated choices like theme and auto-lock.
+ * Storing it here also keeps it **per tab** rather than global, so two panes
+ * showing task lists do not fight over one setting.
+ *
+ * Omit-when-default throughout: the default filter and an unset scope DROP their
+ * keys, so a task tab left alone serializes byte-identical to one written before
+ * this existed.
+ */
+export function setTaskTabState(
+  state: WorkspaceState,
+  paneId: PaneId,
+  next: { filter?: string; folder?: string | null; tags?: readonly string[] },
+): WorkspaceState {
+  const apply = (t: WorkspaceItem): WorkspaceItem => {
+    if (t.kind !== "tasks") return t;
+    const rest: Record<string, unknown> = { ...t };
+    delete rest.taskFilter;
+    delete rest.taskScope;
+
+    const filter = next.filter ?? t.taskFilter;
+    if (filter !== undefined && filter !== "today") rest.taskFilter = filter;
+
+    const folder = next.folder !== undefined ? next.folder : (t.taskScope?.folder ?? null);
+    const tags = next.tags ?? t.taskScope?.tags ?? [];
+    const scope: Record<string, unknown> = {};
+    if (folder !== null && folder !== "") scope.folder = folder;
+    if (tags.length > 0) scope.tags = [...tags];
+    if (Object.keys(scope).length > 0) rest.taskScope = scope;
+
+    return rest as WorkspaceItem;
+  };
+  return {
+    ...state,
+    root: updateLeaf(state.root, paneId, (leaf) => ({
+      ...leaf,
+      tabs: leaf.tabs.map(apply),
+      activeTab: leaf.activeTab === null ? null : apply(leaf.activeTab),
+    })),
   };
 }
 

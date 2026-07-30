@@ -347,12 +347,12 @@ describe("FolderRow — visual extras", () => {
     expect(container.querySelectorAll("svg").length).toBeGreaterThan(0);
   });
 
-  it("renders the color dot when colorSlot is set", () => {
+  it("marks the row with its colour slot when colorSlot is set", () => {
     const { container } = renderRow({ colorSlot: "amber" });
     expect(container.querySelector('[data-color-slot="amber"]')).toBeTruthy();
   });
 
-  it("renders no color dot when colorSlot is omitted", () => {
+  it("carries no colour marker when colorSlot is omitted", () => {
     const { container } = renderRow();
     expect(container.querySelector("[data-color-slot]")).toBeNull();
   });

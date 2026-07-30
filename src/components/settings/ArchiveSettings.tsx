@@ -1,5 +1,5 @@
 // Settings → Editor: note-archive feature toggle (archive-disable, MYND-…).
-// A single `role="switch"` toggle mirroring LineNumbersSettings' control, but
+// A single `<Switch>` toggle mirroring LineNumbersSettings' control, but
 // with one extra responsibility: turning archiving OFF first empties the
 // Archive (auto-unarchives every archived note) so no note is left inaccessible
 // once the archive entry points are hidden. Only then is the disable flag
@@ -17,6 +17,7 @@
 
 import { useEffect, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
+import { Switch } from "../primitives/Switch";
 import { ControlBlock } from "./ControlBlock";
 import {
   prefsRead,
@@ -24,18 +25,6 @@ import {
   setArchivedFolders,
 } from "../../lib/prefs";
 import { archivedRecords, useSelectedNote } from "../../notes/sidebarState";
-
-const TOGGLE_STYLE: CSSProperties = {
-  fontFamily: "var(--font-sans)",
-  fontSize: 13,
-  padding: "6px 12px",
-  borderRadius: "var(--radius-1)",
-  border: "1px solid var(--line-2)",
-  background: "var(--bg-1)",
-  color: "var(--fg-1)",
-  cursor: "pointer",
-  alignSelf: "flex-start",
-};
 
 const ERROR_STYLE: CSSProperties = {
   marginTop: "var(--space-2)",
@@ -101,17 +90,12 @@ export function ArchiveSettings() {
         label={t("settings.archive.label")}
         helper={t("settings.archive.helper")}
         control={
-          <button
-            type="button"
-            role="switch"
-            aria-checked={enabled}
-            aria-label={t("settings.archive.label")}
-            data-testid="settings.archive-disabled"
-            onClick={() => void toggle(!enabled)}
-            style={TOGGLE_STYLE}
-          >
-            {enabled ? t("settings.archive.on") : t("settings.archive.off")}
-          </button>
+          <Switch
+            checked={enabled}
+            onChange={() => toggle(!enabled)}
+            ariaLabel={t("settings.archive.label")}
+            testId="settings.archive-disabled"
+          />
         }
       />
       {error !== null && <p style={ERROR_STYLE}>{error}</p>}

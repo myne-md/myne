@@ -84,6 +84,10 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::set_editor_line_numbers,
             commands::set_editor_vim_mode,
             commands::set_archive_disabled,
+            commands::set_show_task_marker,
+            commands::set_transcription_enabled,
+            commands::set_reminders_enabled,
+            commands::set_reminder_horizon_days,
             commands::set_editor_line_spacing,
             commands::set_editor_content_width,
             commands::set_editor_font_family,
@@ -91,6 +95,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::set_ai_enabled,
             commands::set_attachment_ocr_enabled,
             commands::set_attachment_compression_enabled,
+            commands::set_developer_mode,
             commands::set_ai_excluded_folders,
             commands::set_editor_default_view_mode,
             commands::set_editor_focus_dim_inactive,
@@ -121,6 +126,12 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::set_editor_toolbar_hidden,
             commands::set_editor_slash_order,
             commands::set_editor_slash_hidden,
+            // myne-cli epic (MYND-490; cli-thin-client task 2). Each needs a
+            // matching allow- entry in permissions/prefs/default.toml — see
+            // the security-regression note above.
+            commands::set_cli_enabled,
+            commands::set_cli_excluded_folders,
+            commands::set_cli_rate_limit_disabled,
         ])
         .build()
 }

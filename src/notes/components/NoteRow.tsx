@@ -28,9 +28,10 @@ import {
   type MouseEvent as ReactMouseEvent,
 } from "react";
 import { useTranslation } from "react-i18next";
+import { labelColorVar } from "../decorations";
 import type { TitleRecord } from "../loadNoteBatch";
+import { TASK_KIND_VALUE } from "../../dialect";
 import { uuidv7Ms } from "../sidebarState";
-import { ColorDot } from "./ColorDot";
 import { Icon } from "../../components/primitives/Icon";
 import { formatRelativeTime, useTick } from "./relativeTime";
 
@@ -67,7 +68,8 @@ export type NoteRowProps = {
    *  non-interactive filled badge shown only on favorited rows (render-only;
    *  the toggle handler is wired in the favorites-membership task). */
   onToggleFavorite?: (id: string) => void;
-  /** Color-label slot (MYND-184) — renders a small leading dot before the
+  /** Color-label slot (MYND-184) — washes the row's background (MYND-627,
+   *  replacing the leading dot) before the
    *  title. Undefined when the note has no color. */
   colorSlot?: string;
   /** Whether this row is part of the active multi-selection (MYND-367) — paints
@@ -85,6 +87,10 @@ export type NoteRowProps = {
    *  NoteList. Renders a subtle index badge after the title. Distinct from
    *  `record.folderIndex`, which can't tell a conflict loser from the winner. */
   isIndexNote?: boolean;
+  /** Whether the note-task marker is shown (MYND-613, `show_task_marker`).
+   *  Threaded from NoteList rather than read per row — the list already holds a
+   *  `usePrefs` instance and a hook per row would be wasteful. */
+  showTaskMarker?: boolean;
   /** Whether this note CLAIMED `folder_index: true` but lost the deterministic
    *  tiebreak (its id is in `FolderNode.indexConflictIds`, MYND-370). Surfaces a
    *  muted "folder already has an index" indicator so the user can resolve it. */
@@ -244,6 +250,18 @@ const errorIndicatorStyle: CSSProperties = {
 /** Folder-index badge (MYND-370) — a small muted open-book glyph trailing the
  *  title on the folder's index note. Subtle by design (PRODUCT.md calm tone):
  *  `fg-3` ink, no fill, no accent. */
+/** Note-task marker (MYND-613) — a muted trailing glyph on a `kind: task` note.
+ *  Same treatment as the index badge: `--fg-3`, 12px, inline after the title. It
+ *  marks the note as a task and says nothing about completion — no check state,
+ *  and no green check, which the canon prohibits. */
+const taskBadgeStyle: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  marginLeft: 6,
+  color: "var(--fg-3)",
+  verticalAlign: "middle",
+};
+
 const indexBadgeStyle: CSSProperties = {
   display: "inline-flex",
   alignItems: "center",
@@ -336,6 +354,7 @@ export function NoteRow(props: NoteRowProps) {
     isIndexNote = false,
     indexConflict = false,
     unsynced = false,
+    showTaskMarker = true,
   } = props;
 
   const [hovering, setHovering] = useState(false);
@@ -421,15 +440,32 @@ export function NoteRow(props: NoteRowProps) {
   // A multi-selected row paints the same accent-soft fill as the open row, so
   // the whole gathered set reads as picked (MYND-367).
   const highlighted = selected || multiSelected;
+  // MYND-627: a coloured note washes its ROW rather than carrying a dot.
+  // The dot spent a fixed slice of width on every coloured row -- costly in a
+  // narrow sidebar, worse on mobile -- and read as a bullet rather than as the
+  // note being marked. A highlight-style wash costs no width at all. Kept low
+  // enough in alpha to sit under the selected/hover fills without muddying
+  // them, and the title text stays in the ink ramp, so PRODUCT.md's rule that
+  // colour never tints prose still holds.
+  const colorWash =
+    colorSlot && !highlighted
+      ? {
+          background: `color-mix(in srgb, ${labelColorVar(colorSlot)} 14%, transparent)`,
+        }
+      : {};
   const composedRowStyle: CSSProperties = {
     ...rowBaseStyle,
     ...(showTimestamps ? {} : rowCompactStyle),
+    ...colorWash,
     ...(highlighted ? rowSelectedStyle : hovering ? rowHoverStyle : {}),
   };
 
   return (
     <div
       style={composedRowStyle}
+      // Marker for the row's colour label — the paint is the wash above, but
+      // this is what E2E and the component tests locate it by.
+      data-color-slot={colorSlot}
       onClick={handleClick}
       onAuxClick={handleAuxClick}
       onDoubleClick={handleDoubleClick}
@@ -455,9 +491,9 @@ export function NoteRow(props: NoteRowProps) {
         ) : (
           <TitleLine
             record={record}
-            colorSlot={colorSlot}
             isIndexNote={isIndexNote}
             indexConflict={indexConflict}
+            showTaskMarker={showTaskMarker}
           />
         )}
         {showTimestamps && (
@@ -518,25 +554,43 @@ export function NoteRow(props: NoteRowProps) {
 
 // ─── TitleLine — handles Untitled placeholder + error indicator ───
 
+// Colour no longer reaches the title: MYND-627 moved it to the row's own wash,
+// so this renders text and trailing markers only.
 function TitleLine({
   record,
-  colorSlot,
   isIndexNote = false,
   indexConflict = false,
+  showTaskMarker = true,
 }: {
   record: TitleRecord;
-  colorSlot?: string;
   isIndexNote?: boolean;
   indexConflict?: boolean;
+  showTaskMarker?: boolean;
 }) {
   const { t } = useTranslation();
-  const dot = <ColorDot slot={colorSlot} style={{ marginRight: 6, verticalAlign: "middle" }} />;
   // Trailing markers (MYND-370) — the index badge on the folder's index note,
   // and the muted conflict dot on a claimant that lost the tiebreak. Both are
   // subtle, inline-after-title, and mutually exclusive in practice (a winner is
   // never a conflict loser).
+  //
+  // MYND-613 adds a third: the note-task marker. It rides the same muted
+  // trailing-glyph treatment rather than inventing a second visual language, and
+  // deliberately carries **no completion styling** — no check state, and above
+  // all no green check, which the design canon prohibits. The marker says "this
+  // note is a task", not "this task is done"; whether it should change once the
+  // task completes is a separate design question this slice leaves open.
   const markers = (
     <>
+      {showTaskMarker && record.kind === TASK_KIND_VALUE && (
+        <span
+          style={taskBadgeStyle}
+          data-testid="notes.row-task-badge"
+          title={t("notes.row.taskBadgeTitle")}
+          aria-label={t("notes.row.taskBadgeLabel")}
+        >
+          <Icon name="list" size={12} />
+        </span>
+      )}
       {isIndexNote && (
         <span
           style={indexBadgeStyle}
@@ -560,7 +614,6 @@ function TitleLine({
   if (record.error !== undefined) {
     return (
       <div style={titleUntitledStyle} title={t("notes.row.loadError")}>
-        {dot}
         <span style={errorIndicatorStyle} aria-hidden="true" />
         {t("notes.row.untitled")}
         {markers}
@@ -570,7 +623,6 @@ function TitleLine({
   if (record.title === null) {
     return (
       <div style={titleUntitledStyle}>
-        {dot}
         {t("notes.row.untitled")}
         {markers}
       </div>
@@ -578,7 +630,6 @@ function TitleLine({
   }
   return (
     <div style={titleStyle}>
-      {dot}
       {record.title}
       {markers}
     </div>

@@ -109,6 +109,12 @@ pub const DISPATCHED: &[&str] = &[
     "plugin:prefs|set_attachment_compression_enabled",
     "plugin:prefs|set_attachment_ocr_enabled",
     "plugin:prefs|set_ai_excluded_folders",
+    // developer-mode (MYND-593): same reasoning as the AI/OCR toggles above —
+    // the pref is vault content that syncs to every client (task 2 classifies
+    // it DeviceLocal, but it still lives in vault.prefs and must round-trip),
+    // even though the feature it gates (local-model overrides) has no web
+    // affordance yet.
+    "plugin:prefs|set_developer_mode",
     "plugin:prefs|set_item_order",
     "plugin:prefs|set_hidden_bar_items",
     "plugin:prefs|upsert_saved_view",
@@ -433,6 +439,15 @@ const PLUGIN_DEFAULT: &[(&str, Class)] = &[
     // the browser download flow (`web/src/platform/download.ts`), because their
     // obstacle was the destination and a download answers that.
     ("pdf-export", Class::Unsupported),
+    // MYND-490 (cli-thin-client task 12): the `myne` terminal client's door.
+    // The one command here reports the door's session state — how long ago the
+    // command socket last served a request, and whether the `myne` binary is on
+    // the user's `$PATH`. Both questions presuppose a machine: a local Unix
+    // socket the desktop process binds, and a sidecar shipped inside the desktop
+    // bundle. `Unsupported` rather than `Pending` because there is nothing to
+    // port — the capability backing it (`cliAccess`) is absent by platform fact,
+    // and the Settings block is omitted rather than greyed.
+    ("cli-bridge", Class::Unsupported),
 ];
 
 /// Per-command overrides of [`PLUGIN_DEFAULT`]. Four entries, each one a place
