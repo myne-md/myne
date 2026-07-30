@@ -23,10 +23,40 @@
 import { expect, it } from "vitest";
 import { describeE2E, scenario } from "./support/scenario";
 import { seedVault, type SeededVault } from "./support/fixtures";
-import { dismissImporterOffer, pageSeatInvoke, unlockToEditor } from "./support/flows";
+import {
+  dismissImporterOffer,
+  pageSeatInvoke,
+  runPaletteAction,
+  unlockToEditor,
+} from "./support/flows";
 import { testIdSelector, type Session } from "./support/webdriver";
 
 const IPC_TIMEOUT = 15_000;
+
+/** W3C key codepoint (Enter). Written as an escape, never as the literal
+ *  character — it is invisible in an editor and gets lost when a line is
+ *  copied between files. */
+const ENTER = "\uE007";
+
+/**
+ * Create a folder through the sidebar "New folder" CTA and its inline input —
+ * the same flow `folder-notes.e2e.ts` uses.
+ *
+ * **Why not seed a `folder:` note over IPC.** A folder is derived from notes'
+ * frontmatter, so seeding one that way looks like it should work — but a
+ * page-seat `note_create` writes past the UI, and nothing re-derives the tree
+ * afterwards, so `notes.folder-row` never materializes and the scenario times
+ * out waiting for a row that only a reload would produce.
+ *
+ * Lowercase-only name: WebKitWebDriver's Send Keys drops the shift modifier, so
+ * an uppercase char would arrive lowercased (a driver limitation, not a product
+ * one) and the `data-folder-path` assertion would miss.
+ */
+async function createFolder(s: Session, name: string): Promise<void> {
+  await (await s.byTestId("notes.new-folder")).click();
+  await (await s.byTestId("notes.new-folder-input")).sendKeys(`${name}${ENTER}`);
+  await s.byTestId("notes.folder-row");
+}
 
 /**
  * Dispatch a real `drop` (preceded by `dragover`, which the handlers gate on)
@@ -84,29 +114,26 @@ describeE2E("drag-drop import (MYND-629)", () => {
         await unlockToEditor(s, seeded.password);
         await dismissImporterOffer(s);
 
-        // A folder only exists once a note is filed in it, so seed one note
-        // carrying the `folder:` field and let the tree derive from it.
-        const seedRes = await pageSeatInvoke(
-          s,
-          "plugin:notes|note_create",
-          { plaintext: "---\ntitle: anchor\nfolder: Research/\n---\n\nanchor\n" },
-          IPC_TIMEOUT,
-        );
-        expect(seedRes.err, "seed note_create should succeed").toBeUndefined();
+        // The drop target has to exist as a real row, so build it the way a user
+        // does. Seeding a `folder:` note over IPC does NOT work — see
+        // `createFolder`'s doc for why.
+        const FOLDER = "research";
+        await createFolder(s, FOLDER);
 
         const row = testIdSelector("notes.folder-row");
-        await s.waitForElement(row);
 
-        await dropFiles(s, `${row}[data-folder-path="Research/"]`, [
+        await dropFiles(s, `${row}[data-folder-path="${FOLDER}/"]`, [
           { name: "dropped-one.md", text: "# One\n\nbody one\n", type: "text/markdown" },
           { name: "dropped-two.md", text: "# Two\n\nbody two\n", type: "text/markdown" },
           // A non-markdown sibling must be skipped, not imported as a note.
           { name: "photo.png", text: "not markdown", type: "image/png" },
         ]);
 
-        // Disk oracle: two new notes, both carrying the destination folder and
-        // their filename as the title, and nothing created for the PNG.
-        await s.waitUntil(async () => (await noteBodies(s)).length === 3, {
+        // Disk oracle: exactly the two dropped notes, both carrying the
+        // destination folder and their filename as the title, and nothing
+        // created for the PNG. The vault started empty and the folder was made
+        // through the sidebar, so no anchor note inflates the count.
+        await s.waitUntil(async () => (await noteBodies(s)).length === 2, {
           timeoutMs: 15_000,
           label: "two dropped notes to land on disk",
         });
@@ -115,9 +142,9 @@ describeE2E("drag-drop import (MYND-629)", () => {
         const two = bodies.find((b) => b.includes("body two"));
         expect(one, "dropped-one.md should have been imported").toBeDefined();
         expect(two, "dropped-two.md should have been imported").toBeDefined();
-        expect(one).toContain("folder: Research/");
+        expect(one).toContain(`folder: ${FOLDER}/`);
         expect(one).toContain("title: dropped-one");
-        expect(two).toContain("folder: Research/");
+        expect(two).toContain(`folder: ${FOLDER}/`);
         expect(bodies.some((b) => b.includes("photo")), "the PNG must not become a note").toBe(
           false,
         );
@@ -134,6 +161,13 @@ describeE2E("drag-drop import (MYND-629)", () => {
         const s = app.session;
         await unlockToEditor(s, seeded.password);
         await dismissImporterOffer(s);
+
+        // The attachments library is a CENTER VIEW, not always-mounted chrome:
+        // `Editor.tsx` renders it only while `centerView === "attachments"`, so
+        // waiting for its testid straight after unlock waits for an element that
+        // will never appear. The command palette is the entry path the other two
+        // attachment suites use.
+        await runPaletteAction(s, "attachments.open", "attach");
 
         const pane = testIdSelector("attachments.library");
         await s.waitForElement(pane);
