@@ -14,6 +14,18 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 // Capture the AccountPanel's onInFlightChange so a test can flip in-flight.
 let accountInFlight: ((busy: boolean) => void) | undefined;
 
+// Developer mode gates the AI panel/rail entry (developer-mode feature,
+// MYND-593) — controllable per test, default off (matches usePrefs'
+// DEFAULT_PREFS before the first read resolves).
+let developerMode = false;
+
+vi.mock("../../src/hooks/usePrefs", () => ({
+  usePrefs: () => ({
+    prefs: { developer_mode: developerMode },
+    setDeveloperMode: vi.fn(),
+  }),
+}));
+
 vi.mock("../../src/components/settings/AccountPanel", () => ({
   AccountPanel: (props: { onInFlightChange?: (b: boolean) => void }) => {
     accountInFlight = props.onInFlightChange;
@@ -43,6 +55,7 @@ import { SettingsModal } from "../../src/components/SettingsModal";
 
 beforeEach(() => {
   accountInFlight = undefined;
+  developerMode = false;
 });
 
 afterEach(cleanup);
@@ -84,7 +97,7 @@ describe("SettingsModal — tab routing", () => {
     ).toBe("true");
   });
 
-  it("ArrowDown cycles to the next panel; ArrowUp wraps to the last", () => {
+  it("ArrowDown cycles to the next panel; ArrowUp wraps to the last (Developer mode off)", () => {
     renderModal();
     // account → privacy
     fireEvent.keyDown(window, { key: "ArrowDown" });
@@ -92,7 +105,34 @@ describe("SettingsModal — tab routing", () => {
     // ArrowUp from account would wrap; reset to account first by clicking.
     fireEvent.click(screen.getByTestId("settings.tab-account"));
     fireEvent.keyDown(window, { key: "ArrowUp" });
-    // Wraps to the last panel — now AI (the Labs group panel, moved last).
+    // Wraps to the last VISIBLE panel — About, since the Developer group (AI)
+    // is filtered out of the roster while the mode is off.
+    expect(screen.getByTestId("panel.about")).toBeTruthy();
+    expect(
+      screen.getByTestId("settings.tab-about").getAttribute("aria-selected"),
+    ).toBe("true");
+  });
+});
+
+describe("SettingsModal — Developer group gating (MYND-593)", () => {
+  it("mode off: no Developer group, no AI tab", () => {
+    renderModal();
+    expect(screen.queryByTestId("settings.developer-group")).toBeNull();
+    expect(screen.queryByTestId("settings.tab-ai")).toBeNull();
+  });
+
+  it("mode on: Developer group and AI tab appear, and are reachable", () => {
+    developerMode = true;
+    renderModal();
+    expect(screen.getByTestId("settings.developer-group")).toBeTruthy();
+    fireEvent.click(screen.getByTestId("settings.tab-ai"));
+    expect(screen.getByTestId("panel.ai")).toBeTruthy();
+  });
+
+  it("ArrowUp wraps to AI when the Developer group is visible", () => {
+    developerMode = true;
+    renderModal();
+    fireEvent.keyDown(window, { key: "ArrowUp" });
     expect(screen.getByTestId("panel.ai")).toBeTruthy();
     expect(
       screen.getByTestId("settings.tab-ai").getAttribute("aria-selected"),

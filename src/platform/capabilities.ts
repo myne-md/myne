@@ -183,7 +183,23 @@ export type Capability =
    * claiming it "applies on every device" is false in front of the one client
    * that will not honour it.
    */
-  | "imageCompression";
+  | "imageCompression"
+  /**
+   * The `myne` terminal client reaching this vault over a local command socket
+   * (MYND-490).
+   *
+   * **Absent on web, and it cannot be otherwise.** The door is a Unix domain
+   * socket (or named pipe) that a shell command connects to, and the command is
+   * a binary shipped inside the desktop bundle. A page has neither: no socket to
+   * bind, no filesystem for a sidecar to sit on, and nothing on the machine that
+   * could reach the tab if it did.
+   *
+   * Named for the ACCESS, not for the binary, because that is what the Settings
+   * block governs — a door onto already-decrypted notes whose whole risk story
+   * (`threat-model.md` §7) is about which programs on the machine can walk
+   * through it. There is no browser-shaped version of that question.
+   */
+  | "cliAccess";
 
 /**
  * Every capability, keyed so the compiler can count.
@@ -223,6 +239,7 @@ const CAPABILITY_KEYS: Readonly<Record<Capability, true>> = Object.freeze({
   hostDirectoryRead: true,
   attachmentTextSearch: true,
   imageCompression: true,
+  cliAccess: true,
 });
 
 /** Every capability, derived from the keyed record so it cannot fall behind. */

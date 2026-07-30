@@ -1,5 +1,5 @@
 // Settings → Editor: focus-mode behaviours (focus-mode, MYND-348).
-// Two `role="switch"` toggles — typewriter scroll + dim inactive lines — that the
+// Two `<Switch>` toggles — typewriter scroll + dim inactive lines — that the
 // distraction-free focus mode honors. Both default ON; `null` ≡ unset → host
 // default-ON. Self-contained like the sibling controls: local state on mount,
 // disk-first persist, no in-flight gating.
@@ -10,24 +10,13 @@
 
 import { useEffect, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
+import { Switch } from "../primitives/Switch";
 import { ControlBlock } from "./ControlBlock";
 import {
   prefsRead,
   setEditorFocusTypewriter,
   setEditorFocusDimInactive,
 } from "../../lib/prefs";
-
-const TOGGLE_STYLE: CSSProperties = {
-  fontFamily: "var(--font-sans)",
-  fontSize: 13,
-  padding: "6px 12px",
-  borderRadius: "var(--radius-1)",
-  border: "1px solid var(--line-2)",
-  background: "var(--bg-1)",
-  color: "var(--fg-1)",
-  cursor: "pointer",
-  alignSelf: "flex-start",
-};
 
 const ERROR_STYLE: CSSProperties = {
   marginTop: "var(--space-2)",
@@ -89,34 +78,24 @@ export function FocusModeSettings() {
         label={t("settings.focusMode.typewriterLabel")}
         helper={t("settings.focusMode.typewriterHelper")}
         control={
-          <button
-            type="button"
-            role="switch"
-            aria-checked={typewriter}
-            aria-label={t("settings.focusMode.typewriterAria")}
-            data-testid="settings.focus-typewriter"
-            onClick={() => void toggleTypewriter(!typewriter)}
-            style={TOGGLE_STYLE}
-          >
-            {typewriter ? t("settings.focusMode.on") : t("settings.focusMode.off")}
-          </button>
+          <Switch
+            checked={typewriter}
+            onChange={() => toggleTypewriter(!typewriter)}
+            ariaLabel={t("settings.focusMode.typewriterAria")}
+            testId="settings.focus-typewriter"
+          />
         }
       />
       <ControlBlock
         label={t("settings.focusMode.dimLabel")}
         helper={t("settings.focusMode.dimHelper")}
         control={
-          <button
-            type="button"
-            role="switch"
-            aria-checked={dim}
-            aria-label={t("settings.focusMode.dimAria")}
-            data-testid="settings.focus-dim"
-            onClick={() => void toggleDim(!dim)}
-            style={TOGGLE_STYLE}
-          >
-            {dim ? t("settings.focusMode.on") : t("settings.focusMode.off")}
-          </button>
+          <Switch
+            checked={dim}
+            onChange={() => toggleDim(!dim)}
+            ariaLabel={t("settings.focusMode.dimAria")}
+            testId="settings.focus-dim"
+          />
         }
       />
       {error !== null && <p style={ERROR_STYLE}>{error}</p>}

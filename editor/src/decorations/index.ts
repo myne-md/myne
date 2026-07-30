@@ -34,6 +34,8 @@ import { fencedCodeDecorations } from "./fenced-code";
 import { mermaidDecorations } from "./mermaid";
 import { footnoteDecorations } from "./footnote";
 import { tagChipDecorations } from "./tag-chip";
+import { taskChipDecorations } from "./task-chip";
+import { taskQueryBlockDecorations } from "./task-query-block";
 import { commentDecorations } from "./comment";
 
 // SYNC-17 (MYND-200 / knowledge-graph-ux; `decisions.md` 2026-06-08 "Interactive
@@ -80,6 +82,15 @@ export function myneDecorations(): readonly Extension[] {
     // their marker), so order is non-conflicting but keeps list rendering grouped.
     listDecorations(),
     taskListDecorations(),
+    // Inline task-field chips (MYND-614) — kept adjacent to the task-list layer
+    // they belong with, so a reader finds both halves of task rendering in one
+    // place. They are inline replace decorations like the tag chip, but carry no
+    // ordering dependency on the inline layers below: their spans come from
+    // `TaskField` nodes, which no other decoration claims.
+    ...taskChipDecorations(),
+    // Task-query blocks (MYND-617) sit next to the chips: same feature
+    // family, and the fenced-code card skips this info string for them.
+    ...taskQueryBlockDecorations(),
     blockquoteDecorations(),
     // Callouts (MYND-47): promote `> [!TYPE]` blockquotes to styled containers.
     // Separate layer — reads the same Blockquote nodes, composes with blockquote.

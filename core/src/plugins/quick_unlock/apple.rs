@@ -139,6 +139,15 @@ impl QuickUnlockProvider for AppleBiometricProvider {
 const ERR_SEC_USER_CANCELED: i32 = -128;
 /// `errSecItemNotFound` — the Keychain item is absent (wiped / never set).
 const ERR_SEC_ITEM_NOT_FOUND: i32 = -25300;
+/// `errSecMissingEntitlement` — this PROCESS may not use the Keychain item,
+/// regardless of hardware. The dominant cause is an unsigned binary: a
+/// biometric-gated (`kSecAccessControlBiometryCurrentSet`) item requires the
+/// `keychain-access-groups` entitlement on a SIGNED build, and `tauri dev`
+/// runs unsigned. Distinguishing it from [`ProviderError::Backend`] is what
+/// lets the Unlock screen say "biometric unavailable in this build" and fall
+/// back to the password, instead of surfacing an opaque backend failure that
+/// reads as "Touch ID is broken" (MYND-628).
+const ERR_SEC_MISSING_ENTITLEMENT: i32 = -34018;
 
 /// Log a Keychain failure with its OSStatus code (safe to emit — an OS status
 /// code is not key material; the DENY-list covers keys/PINs/paths, not error
@@ -156,13 +165,16 @@ fn log_keychain_err(op: &'static str, e: &security_framework::base::Error) {
 
 /// Map a Keychain error (from `retrieve`) to the coarse provider error, logging
 /// its OSStatus code first. User-cancel → silent password fallback (no attempt
-/// burned); item-not-found → credential missing; everything else → a backend
-/// failure surfaced (with the logged code) so the real cause is visible.
+/// burned); item-not-found → credential missing; missing-entitlement → the
+/// facility is unusable by this build (see [`ERR_SEC_MISSING_ENTITLEMENT`]);
+/// everything else → a backend failure surfaced (with the logged code) so the
+/// real cause is visible.
 fn map_keychain_error(e: security_framework::base::Error) -> ProviderError {
     log_keychain_err("retrieve", &e);
     match e.code() {
         ERR_SEC_USER_CANCELED => ProviderError::UserCancelled,
         ERR_SEC_ITEM_NOT_FOUND => ProviderError::CredentialMissing,
+        ERR_SEC_MISSING_ENTITLEMENT => ProviderError::HardwareUnavailable,
         _ => ProviderError::Backend,
     }
 }
@@ -176,4 +188,41 @@ fn hex_lower(bytes: &[u8]) -> String {
         out.push(HEX[(b & 0x0f) as usize] as char);
     }
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // The OSStatus constants are the contract with the OS, not our invention —
+    // a typo here would silently reroute a real failure into the wrong
+    // user-facing branch. Pin them against Apple's published values.
+    #[test]
+    fn osstatus_constants_match_apple_values() {
+        assert_eq!(ERR_SEC_USER_CANCELED, -128, "errSecUserCanceled");
+        assert_eq!(ERR_SEC_ITEM_NOT_FOUND, -25300, "errSecItemNotFound");
+        assert_eq!(
+            ERR_SEC_MISSING_ENTITLEMENT, -34018,
+            "errSecMissingEntitlement"
+        );
+    }
+
+    #[test]
+    fn account_key_is_lowercase_hex_of_the_account_number_hash() {
+        // The Keychain account component IS the vault's identity: two vaults on
+        // one device must land on distinct items, and the encoding must stay
+        // byte-stable or every existing macOS credential stops resolving.
+        let provider = AppleBiometricProvider::new([
+            0x00, 0x0f, 0x10, 0xff, 0xab, 0xcd, 0xef, 0x01, 0x23, 0x45, 0x67, 0x89, 0x9a, 0xbc,
+            0xde, 0xf0,
+        ]);
+        assert_eq!(provider.account, "000f10ffabcdef01234567899abcdef0");
+    }
+
+    #[test]
+    fn distinct_vaults_get_distinct_keychain_accounts() {
+        let a = AppleBiometricProvider::new([0u8; 16]);
+        let b = AppleBiometricProvider::new([1u8; 16]);
+        assert_ne!(a.account, b.account);
+    }
 }

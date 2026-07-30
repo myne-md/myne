@@ -118,10 +118,39 @@ export const fontFamilyKey = (p: PrefsView): string =>
 export type TypographyStyle = CSSProperties & Record<`--${string}`, string>;
 
 export function typographyStyle(p: PrefsView): TypographyStyle {
+  return typographyStyleFromKeys({
+    textSize: textSizeKey(p),
+    lineSpacing: lineSpacingKey(p),
+    contentWidth: contentWidthKey(p),
+    fontFamily: fontFamilyKey(p),
+  });
+}
+
+/** The four preset keys, as the Settings UI holds them in local state. */
+export interface TypographyKeys {
+  textSize: string;
+  lineSpacing: string;
+  contentWidth: string;
+  fontFamily: string;
+}
+
+/**
+ * Same style object as [`typographyStyle`], resolved from preset KEYS rather
+ * than a `PrefsView`.
+ *
+ * Settings needs this to render a live preview (MYND-624): the panel holds the
+ * user's in-progress choice in local state and persists it disk-first, so at
+ * the moment the preview must update there is no `PrefsView` carrying it yet.
+ * Both entry points resolve through the same maps, so the preview cannot drift
+ * from what the editor will actually render.
+ */
+export function typographyStyleFromKeys(k: TypographyKeys): TypographyStyle {
   return {
-    "--editor-text-size": TEXT_SIZE[textSizeKey(p)],
-    "--editor-line-spacing": LINE_SPACING[lineSpacingKey(p)],
-    "--editor-font-family": FONT_FAMILY[fontFamilyKey(p)],
-    maxWidth: CONTENT_WIDTH[contentWidthKey(p)],
+    "--editor-text-size": TEXT_SIZE[k.textSize] ?? TEXT_SIZE[TEXT_SIZE_DEFAULT]!,
+    "--editor-line-spacing":
+      LINE_SPACING[k.lineSpacing] ?? LINE_SPACING[LINE_SPACING_DEFAULT]!,
+    "--editor-font-family":
+      FONT_FAMILY[k.fontFamily] ?? FONT_FAMILY[FONT_FAMILY_DEFAULT]!,
+    maxWidth: CONTENT_WIDTH[k.contentWidth] ?? CONTENT_WIDTH[CONTENT_WIDTH_DEFAULT]!,
   };
 }

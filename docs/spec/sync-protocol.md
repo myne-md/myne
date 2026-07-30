@@ -388,6 +388,7 @@ The table below is the **single normative classification**. The implementation m
 |---|---|---|
 | `label`, `icon` | shared | scalar-LWW |
 | `archive_disabled` | shared | scalar-LWW |
+| `transcription_enabled` | shared | scalar-LWW — **deliberately unlike `ai_enabled` and `attachment_ocr_enabled` below**, which are device-local. Those two gate per-device *compute* (an embedding walk, an OCR pass) or a device-local model-path override; speech-to-text runs a bundled model every client carries and is invoked one file at a time by the user, so wanting the feature at all is a vault-level preference rather than a device capability (MYND-592). **Defaults to `true`**, emitted only when `false`, so a blob predating the field decodes with it enabled |
 | `daily_date_format`, `daily_folder`, `daily_template` | shared | scalar-LWW |
 | `new_note_location`, `new_note_location_folder` | shared | scalar-LWW |
 | `attachment_compression_enabled` | shared | scalar-LWW — a deliberate divergence from the neighboring `attachment_ocr_enabled` / `ai_enabled` / `spell_enabled` cluster below: those are compute-budget switches whose effect is local and reversible, while this one gates [ingest-time image compression](../glossary.md#ingest-time-image-compression) (`protocol.md` §9.9/§9.10), an irreversible, vault-wide content-fidelity change applied to every future imported attachment — the switch must have the same reach as the effect it controls, so it syncs. **Defaults to `true`**, so it is emitted only when `false` and a blob predating the field decodes with the feature on |
@@ -406,6 +407,7 @@ The table below is the **single normative classification**. The implementation m
 | `hidden_bar_items`, `bar_items_order`, `right_panel_active_tab`, `right_panel_hidden_tabs`, `right_panel_tab_order`, `editor_toolbar_order`, `editor_toolbar_hidden`, `editor_slash_order`, `editor_slash_hidden` | device-local | local wins (screen-size-dependent UI layout) |
 | `startup_open`, `startup_open_note`, `active_workspace` | device-local | local wins (session/startup behaviour; `active_workspace` points at the device-local `MYW1` artefact) |
 | `last_backup_at`, `paired_extensions`, `ai_enabled`, `spell_enabled` | device-local | local wins (device state / device capability) |
+| `developer_mode` | device-local | local wins (device state / device capability) — gates a device-local model-path override (`protocol.md` §9.5.2, developer-mode MYND-593), so a synced flag would read "on" on a device with no override behind it. Same reasoning as `ai_enabled` / `attachment_ocr_enabled` |
 
 Two rows are **deliberate reclassifications** of this section's original posture: `hidden_bar_items` (was set-union synced) and `active_workspace` (was scalar-LWW) are device-local now — the first is screen-size-dependent bar layout, the second points at an artefact (`vault.workspace`, class 4) that never syncs. And one field the original posture silently misclassified is now honest: `last_backup_at` is inherently per-device.
 

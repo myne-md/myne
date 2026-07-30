@@ -14,7 +14,7 @@ import {
   WidgetType,
 } from "@codemirror/view";
 import { cachedLocateFrontmatter } from "../frontmatter-cache";
-import { isCursorLine } from "./cursor-aware";
+import { isInsideRange } from "./cursor-aware";
 import { makeCursorAwareDecorationPlugin } from "./plugin-factory";
 
 class HorizontalRuleWidget extends WidgetType {
@@ -55,7 +55,8 @@ function buildHorizontalRuleDecorations(view: EditorView): DecorationSet {
         ) {
           return undefined;
         }
-        if (!isCursorLine(view, node.from, node.to)) {
+        // MYND-631: caret-scoped reveal (see heading.ts).
+        if (!isInsideRange(view, node.from, node.to)) {
           decorations.push(
             Decoration.replace({
               widget: new HorizontalRuleWidget(),

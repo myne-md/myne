@@ -118,6 +118,12 @@ describe("capability descriptor", () => {
       // which is why the absence changes the settings copy rather than removing
       // the control.
       "imageCompression",
+      // MYND-490. The only entry in this list that is absent by PLATFORM FACT
+      // rather than by decision or bundle budget: the door is a local socket a
+      // shell command connects to, and the command is a binary inside the
+      // desktop bundle. There is no browser-shaped version of either, so there
+      // is nothing a later port could deliver.
+      "cliAccess",
     ];
     const actualAbsent = desktop.ALL_CAPABILITIES.filter((c) => !web.has(c));
     expect([...actualAbsent].sort()).toEqual([...expectedAbsent].sort());

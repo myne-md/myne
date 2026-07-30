@@ -108,6 +108,14 @@ const HIGHLIGHT_SWATCHES = [
   { id: "hl-blue", labelKey: "editor.toolbar.highlight.blue", cssVar: "--highlight-blue", open: '<mark class="hl-blue">', close: "</mark>" },
   { id: "hl-pink", labelKey: "editor.toolbar.highlight.pink", cssVar: "--highlight-pink", open: '<mark class="hl-pink">', close: "</mark>" },
   { id: "hl-purple", labelKey: "editor.toolbar.highlight.purple", cssVar: "--highlight-purple", open: '<mark class="hl-purple">', close: "</mark>" },
+  { id: "hl-orange", labelKey: "editor.toolbar.highlight.orange", cssVar: "--highlight-orange", open: '<mark class="hl-orange">', close: "</mark>" },
+  { id: "hl-red", labelKey: "editor.toolbar.highlight.red", cssVar: "--highlight-red", open: '<mark class="hl-red">', close: "</mark>" },
+  { id: "hl-teal", labelKey: "editor.toolbar.highlight.teal", cssVar: "--highlight-teal", open: '<mark class="hl-teal">', close: "</mark>" },
+  { id: "hl-cyan", labelKey: "editor.toolbar.highlight.cyan", cssVar: "--highlight-cyan", open: '<mark class="hl-cyan">', close: "</mark>" },
+  { id: "hl-lime", labelKey: "editor.toolbar.highlight.lime", cssVar: "--highlight-lime", open: '<mark class="hl-lime">', close: "</mark>" },
+  { id: "hl-brown", labelKey: "editor.toolbar.highlight.brown", cssVar: "--highlight-brown", open: '<mark class="hl-brown">', close: "</mark>" },
+  { id: "hl-grey", labelKey: "editor.toolbar.highlight.grey", cssVar: "--highlight-grey", open: '<mark class="hl-grey">', close: "</mark>" },
+  { id: "hl-indigo", labelKey: "editor.toolbar.highlight.indigo", cssVar: "--highlight-indigo", open: '<mark class="hl-indigo">', close: "</mark>" },
 ] as const;
 
 

@@ -37,6 +37,7 @@
     "graph-layout:default",
     "spell:default",
     "clipper-pairing:default",
+    "cli-bridge:default",
     "clipboard-manager:allow-write-text",
     "clipboard-manager:allow-read-text",
     "clipboard-manager:allow-clear",

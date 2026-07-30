@@ -101,6 +101,16 @@ export function QuickUnlockEntry({
         case "RequiresFullPassword":
         case "AttemptsExhausted":
         case "NotConfigured":
+        // Same shape, different cause (MYND-628): the OS refused the biometric
+        // facility to this process — no hardware, or the build cannot reach the
+        // Keychain item at all (`errSecMissingEntitlement`, which an unsigned
+        // build always hits). Retrying cannot succeed for as long as this build
+        // is running, so a note telling the user to try again would be a lie.
+        // Folding away is honest AND non-destructive: the credential is never
+        // wiped and no failed attempt is burned (the provider errors before the
+        // counter — `quick_unlock_with_dir`), so it works again the moment the
+        // user runs a signed build.
+        case "HardwareUnavailable":
           onUnavailable();
           return;
         case "WrongCredential":

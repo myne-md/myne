@@ -1,0 +1,1181 @@
+//! JSON command dispatch for the CLI bridge command socket (cli-thin-client
+//! task 4; MYND-490).
+//!
+//! ## Wire contract
+//!
+//! One JSON object per length-prefixed frame ([`super::framing`]), each
+//! direction:
+//!
+//! - Request: `{"cmd": "<name>", ...}`.
+//! - Response: `{"ok": true, ...}` on success, or
+//!   `{"ok": false, "error": {"kind": "<wire kind>", "message": "<text>"}}`
+//!   on failure. `kind` is a closed vocabulary (`vault_locked` / `io` /
+//!   `invalid_request` / `rate_limited`) the `cli/` crate maps to a distinct
+//!   exit code.
+//!
+//! **This module is NOT a dependency of the `cli/` crate and vice versa** —
+//! same reasoning as [`super::framing`]'s own doc comment: a wire
+//! *contract*, not shared Rust types, so the CLI binary never depends on
+//! `myne-desktop`. The `cli/` crate decodes/encodes this exact shape with
+//! its own copy.
+//!
+//! ## Testability
+//!
+//! [`serve_connection`] is generic over `Read`/`Write` and takes the
+//! vault-state seam as `&dyn NoteLister` — the same shape
+//! `clipper::relay::serve_connection` already uses for its own app-state
+//! seams (`VaultStatusSource`, `ClipAssembler`). This is what lets the
+//! decode → dispatch → encode loop run in a unit test over an in-memory
+//! pipe with a fake [`NoteLister`], with no `AppHandle` / `tauri::test`
+//! harness (core/CLAUDE.md's stated reason for avoiding that harness: the
+//! TB9 Cargo.lock discipline). The production seam, [`AppNoteLister`],
+//! bridges the real async `note_list_from_host` call via
+//! `tauri::async_runtime::block_on` — the same bridge
+//! `clipper::relay_app::AppVaultStatus` already uses for its own
+//! `VaultStatusSource` impl. It then filters the result through
+//! [`crate::cli_bridge::scope::filter_note_ids_by_scope`] (task 5) before
+//! returning — the ids this trait hands back are already in-scope, so a
+//! `NoteLister` caller never has to remember to filter.
+//!
+//! See: src-tauri/CLAUDE.md "Secret-handling logging discipline" — a `list`
+//! reply body carries note ids only (a vault-stable correlation tag, same
+//! DENY class as salts/nonces per that doc); this module never logs a
+//! request/response body, only the bounded outcome tags below.
+
+use std::io::{Read, Write};
+
+use serde::{Deserialize, Serialize};
+
+use super::framing;
+use super::rate_limit::{RateDecision, SharedRateLimiter};
+
+/// The request shapes this module dispatches.
+#[derive(Debug, Deserialize)]
+#[serde(tag = "cmd", rename_all = "snake_case")]
+enum Request {
+    List,
+    Show {
+        id: String,
+    },
+    Search {
+        query: String,
+    },
+    New {
+        body: String,
+        #[serde(default)]
+        folder: Option<String>,
+    },
+    Daily,
+    DailyAppend {
+        line: String,
+    },
+}
+
+/// One search hit on the wire: an id + its title, nothing else. No score,
+/// no snippet, no `matched_in` badge — task 7's own scope is "prints
+/// matching notes with ids and titles", and every extra field is one more
+/// thing the oracle discipline below would have to reason about.
+#[derive(Debug, Serialize, PartialEq, Eq)]
+pub struct SearchHitWire {
+    pub id: String,
+    pub title: String,
+}
+
+/// Closed outcome of a `list` request against the vault-state seam. Not a
+/// 1:1 mirror of `myne_core::plugins::notes::error::NoteListError` — the
+/// wire only distinguishes what the CLI's exit-code map (task 4's own
+/// acceptance criteria) needs to distinguish; every other failure
+/// collapses to `Io`.
+pub enum ListOutcome {
+    Ok(Vec<String>),
+    /// The vault locked between the socket accepting this connection and
+    /// the request executing — a narrow race (the supervisor tears the
+    /// socket down within one tick of a lock), not the common case.
+    VaultLocked,
+    Io,
+}
+
+/// Closed outcome of a `show` request (task 6). `NotFound` covers both an
+/// unknown/malformed note id AND an excluded one — see
+/// [`crate::cli_bridge::scope::body_out_of_scope_from_host`]'s doc comment for
+/// why those two must stay indistinguishable at every layer, this one
+/// included.
+pub enum ShowOutcome {
+    Ok(String),
+    NotFound,
+    /// Same narrow race as `ListOutcome::VaultLocked`.
+    VaultLocked,
+    Io,
+}
+
+/// Closed outcome of a `search` request (task 7). No "N results were
+/// hidden" case exists anywhere in this enum — an excluded hit and a
+/// genuine no-match both collapse into `Ok(vec![])`, which is the whole
+/// point (see [`crate::cli_bridge::scope::search_in_scope`]'s doc comment).
+pub enum SearchOutcome {
+    Ok(Vec<SearchHitWire>),
+    /// Same narrow race as `ListOutcome::VaultLocked`.
+    VaultLocked,
+    Io,
+}
+
+/// Closed outcome of a `new` request (task 8). `FolderExcluded` is the
+/// write-path twin of `show`'s `NotFound` — an EXPLICIT wire-visible refusal
+/// (not folded into `Io`), because task 8's own acceptance criteria demand a
+/// distinct exit code the CLI can branch on ("refused, nothing written" is a
+/// different user situation than a generic failure).
+pub enum NewOutcome {
+    /// The new note's id — the same string `note_create_from_host` returns.
+    Ok(String),
+    /// The requested destination folder (or one of its ancestors) is in
+    /// `cli_excluded_folders`. Checked BEFORE the core create path runs, so
+    /// nothing is ever written on this outcome.
+    FolderExcluded,
+    /// The `folder` argument is not a folder path at all — it carries a
+    /// control character, which would break out of the frontmatter VALUE and
+    /// become additional frontmatter lines
+    /// ([`crate::cli_bridge::compose::folder_arg_has_control_char`]). Refused
+    /// before normalization, so nothing is written and no scope check is ever
+    /// asked about a destination that is not the real one.
+    InvalidFolder,
+    /// Same narrow race as `ListOutcome::VaultLocked`.
+    VaultLocked,
+    Io,
+}
+
+/// Closed outcome of a `daily` request (task 9) — the same open-or-create
+/// contract `show` uses (`Ok` carries the resolved note's markdown body).
+/// `FolderExcluded` fires when the CONFIGURED daily folder is in
+/// `cli_excluded_folders`, checked before any scan or write runs (task 9's
+/// own text: "never a silent no-op").
+pub enum DailyOutcome {
+    Ok(String),
+    FolderExcluded,
+    /// Same narrow race as `ListOutcome::VaultLocked`.
+    VaultLocked,
+    Io,
+}
+
+/// Closed outcome of a `daily_append` request (task 9). `Ok` carries no
+/// payload — success is silent, matching the `>>` mental model this
+/// command restores.
+pub enum DailyAppendOutcome {
+    Ok,
+    FolderExcluded,
+    /// Same narrow race as `ListOutcome::VaultLocked`.
+    VaultLocked,
+    Io,
+}
+
+/// The vault-state seam [`serve_connection`] dispatches through. `&dyn`,
+/// not `AppHandle<R>` — so a test can supply a fake with no Tauri runtime
+/// at all (mirrors `clipper::envelope::VaultStatusSource`).
+pub trait NoteLister: Send + Sync {
+    fn list_notes(&self) -> ListOutcome;
+    fn show_note(&self, id: &str) -> ShowOutcome;
+    fn search_notes(&self, query: &str) -> SearchOutcome;
+    fn create_note(&self, body: &str, folder: Option<&str>) -> NewOutcome;
+    fn daily(&self) -> DailyOutcome;
+    fn daily_append(&self, line: &str) -> DailyAppendOutcome;
+}
+
+fn handle_request(lister: &dyn NoteLister, request_body: &[u8]) -> Vec<u8> {
+    let request: Request = match serde_json::from_slice(request_body) {
+        Ok(r) => r,
+        Err(_) => return encode_err("invalid_request", "malformed request"),
+    };
+    match request {
+        Request::List => match lister.list_notes() {
+            ListOutcome::Ok(notes) => encode_ok_notes(&notes),
+            ListOutcome::VaultLocked => {
+                encode_err("vault_locked", "the vault locked during this request")
+            }
+            ListOutcome::Io => encode_err("io", "an internal error occurred"),
+        },
+        Request::Show { id } => match lister.show_note(&id) {
+            ShowOutcome::Ok(body) => encode_ok_body(&body),
+            ShowOutcome::NotFound => encode_err("not_found", "no matching note"),
+            ShowOutcome::VaultLocked => {
+                encode_err("vault_locked", "the vault locked during this request")
+            }
+            ShowOutcome::Io => encode_err("io", "an internal error occurred"),
+        },
+        Request::Search { query } => match lister.search_notes(&query) {
+            SearchOutcome::Ok(hits) => encode_ok_search(&hits),
+            SearchOutcome::VaultLocked => {
+                encode_err("vault_locked", "the vault locked during this request")
+            }
+            SearchOutcome::Io => encode_err("io", "an internal error occurred"),
+        },
+        Request::New { body, folder } => match lister.create_note(&body, folder.as_deref()) {
+            NewOutcome::Ok(id) => encode_ok_id(&id),
+            NewOutcome::FolderExcluded => {
+                encode_err("folder_excluded", "that folder is excluded from CLI access")
+            }
+            NewOutcome::InvalidFolder => encode_err(
+                "invalid_request",
+                "a folder path cannot contain a control character",
+            ),
+            NewOutcome::VaultLocked => {
+                encode_err("vault_locked", "the vault locked during this request")
+            }
+            NewOutcome::Io => encode_err("io", "an internal error occurred"),
+        },
+        Request::Daily => match lister.daily() {
+            DailyOutcome::Ok(body) => encode_ok_body(&body),
+            DailyOutcome::FolderExcluded => {
+                encode_err("folder_excluded", "that folder is excluded from CLI access")
+            }
+            DailyOutcome::VaultLocked => {
+                encode_err("vault_locked", "the vault locked during this request")
+            }
+            DailyOutcome::Io => encode_err("io", "an internal error occurred"),
+        },
+        Request::DailyAppend { line } => match lister.daily_append(&line) {
+            DailyAppendOutcome::Ok => encode_ok(),
+            DailyAppendOutcome::FolderExcluded => {
+                encode_err("folder_excluded", "that folder is excluded from CLI access")
+            }
+            DailyAppendOutcome::VaultLocked => {
+                encode_err("vault_locked", "the vault locked during this request")
+            }
+            DailyAppendOutcome::Io => encode_err("io", "an internal error occurred"),
+        },
+    }
+}
+
+fn encode_ok_notes(notes: &[String]) -> Vec<u8> {
+    serde_json::to_vec(&serde_json::json!({ "ok": true, "notes": notes }))
+        .unwrap_or_else(|_| encode_err("io", "response encode failure"))
+}
+
+/// `show`'s success reply. The note body is exactly what this exists to
+/// carry across the wire — not logged anywhere, per this module's own DENY
+/// discipline note above.
+fn encode_ok_body(body: &str) -> Vec<u8> {
+    serde_json::to_vec(&serde_json::json!({ "ok": true, "body": body }))
+        .unwrap_or_else(|_| encode_err("io", "response encode failure"))
+}
+
+/// `search`'s success reply. **No field beyond `results` may ever appear
+/// here** — a count, a "was anything hidden" bool, anything at all beyond
+/// the array itself, would be exactly the oracle task 7 exists to close off
+/// (`crate::cli_bridge::scope::search_in_scope`'s doc comment).
+fn encode_ok_search(hits: &[SearchHitWire]) -> Vec<u8> {
+    serde_json::to_vec(&serde_json::json!({ "ok": true, "results": hits }))
+        .unwrap_or_else(|_| encode_err("io", "response encode failure"))
+}
+
+/// `new`'s success reply — the new note's id, the one piece of information a
+/// script piping `myne new`'s output needs (e.g. to `myne show` it right
+/// back). Not a DENY-listed value across THIS boundary: `note_id` is DENY-
+/// listed for `tracing`/log output (a vault-stable correlation tag), but the
+/// wire reply crossing back to the CLI that just minted it is the one place
+/// that id is supposed to go — the same distinction `show`'s `body` field
+/// already draws between "never logged" and "the whole point of the reply".
+fn encode_ok_id(id: &str) -> Vec<u8> {
+    serde_json::to_vec(&serde_json::json!({ "ok": true, "id": id }))
+        .unwrap_or_else(|_| encode_err("io", "response encode failure"))
+}
+
+/// `daily_append`'s success reply — no payload beyond `ok`, matching the
+/// silent-success shape of `>>` this command restores.
+fn encode_ok() -> Vec<u8> {
+    serde_json::to_vec(&serde_json::json!({ "ok": true })).expect("static ok shape always encodes")
+}
+
+fn encode_err(kind: &'static str, message: &'static str) -> Vec<u8> {
+    serde_json::to_vec(&serde_json::json!({
+        "ok": false,
+        "error": { "kind": kind, "message": message }
+    }))
+    .expect("static error shape always encodes")
+}
+
+/// Serve exactly one command-socket connection: read exactly one bounded
+/// frame, dispatch it against `lister`, write exactly one reply frame, then
+/// return. One request per connection — not a loop like the clipper
+/// relay's — because the CLI (task 4's `IpcBackend`) opens a fresh
+/// connection per invocation; there is no keep-alive to serve.
+///
+/// Never panics on malformed input: a frame that fails to decode, or a body
+/// that isn't the expected JSON shape, produces a typed error reply rather
+/// than propagating.
+///
+/// `limiter` is the process-wide command-socket rate limit (task 10). An
+/// over-budget request is answered with the `rate_limited` kind and
+/// `lister` is never touched — the reply is immediate, so the caller gets a
+/// distinct exit code instead of a hang.
+pub fn serve_connection<R: Read, W: Write>(
+    reader: &mut R,
+    writer: &mut W,
+    lister: &dyn NoteLister,
+    limiter: &SharedRateLimiter,
+) {
+    let body = match framing::read_frame(reader) {
+        Ok(b) => b,
+        Err(e) => {
+            tracing::debug!(stage = "cli_bridge_conn", frame_error = e.label());
+            return;
+        }
+    };
+    // The limiter gates requests the door would otherwise answer, and is
+    // checked before the request is even parsed, so a flood costs the
+    // sender a decode-and-refuse rather than a whole-vault scan. A frame
+    // that never decoded (above) never reaches it — a malformed-frame
+    // burst cannot eat a working caller's window.
+    if limiter.check(std::time::Instant::now()) == RateDecision::Throttled {
+        tracing::debug!(stage = "cli_bridge_conn", event = "rate_limited");
+        let reply = encode_err(
+            "rate_limited",
+            "too many requests in a short time; wait a moment, \
+             or turn the CLI rate limit off in Settings",
+        );
+        if let Err(e) = framing::write_frame(writer, &reply) {
+            tracing::debug!(stage = "cli_bridge_conn", frame_error = e.label());
+        }
+        return;
+    }
+    let reply = handle_request(lister, &body);
+    if let Err(e) = framing::write_frame(writer, &reply) {
+        tracing::debug!(stage = "cli_bridge_conn", frame_error = e.label());
+    }
+}
+
+// ---- production seam: bridges the real vault state ------------------------
+
+#[cfg(unix)]
+mod app_seam {
+    use tauri::{AppHandle, Manager, Runtime};
+
+    use super::{
+        DailyAppendOutcome, DailyOutcome, ListOutcome, NewOutcome, NoteLister, SearchHitWire,
+        SearchOutcome, ShowOutcome,
+    };
+
+    /// Production [`NoteLister`] over the running app. Cheap to construct
+    /// per-connection (just holds the handle) — mirrors
+    /// `clipper::relay_app::AppVaultStatus`.
+    pub struct AppNoteLister<R: Runtime> {
+        app: AppHandle<R>,
+    }
+
+    impl<R: Runtime> AppNoteLister<R> {
+        pub fn new(app: AppHandle<R>) -> Self {
+            Self { app }
+        }
+    }
+
+    impl<R: Runtime> NoteLister for AppNoteLister<R> {
+        fn list_notes(&self) -> ListOutcome {
+            use myne_core::plugins::notes::commands::note_list_from_host;
+            use myne_core::plugins::notes::error::NoteListError;
+
+            use crate::cli_bridge::scope::{filter_note_ids_by_scope, ScopeError};
+
+            let Some(state) = self
+                .app
+                .try_state::<crate::plugins::vault_unlock::state::VaultRuntimeState>()
+            else {
+                return ListOutcome::Io;
+            };
+            let host = myne_core::host::tauri_host::TauriHost::new(self.app.clone());
+            let io = myne_core::vault_io::StdVaultIo;
+            let result = tauri::async_runtime::block_on(async {
+                let ids = match note_list_from_host(&host, state.inner(), &io).await {
+                    Ok(ids) => ids.iter().map(|id| id.to_string()).collect::<Vec<_>>(),
+                    Err(NoteListError::VaultNotUnlocked) => return Err(ScopeError::VaultLocked),
+                    Err(_) => return Err(ScopeError::Io),
+                };
+                // Central scope enforcement (task 5): every note this command
+                // hands back must clear the exclusion filter, applied here
+                // rather than trusted to a future per-command opt-in.
+                filter_note_ids_by_scope(&host, state.inner(), &io, ids).await
+            });
+            match result {
+                Ok(ids) => ListOutcome::Ok(ids),
+                Err(ScopeError::VaultLocked) => ListOutcome::VaultLocked,
+                Err(ScopeError::Io) => ListOutcome::Io,
+            }
+        }
+
+        fn show_note(&self, id: &str) -> ShowOutcome {
+            use myne_core::plugins::notes::commands::note_read_from_host;
+            use myne_core::plugins::notes::error::NoteReadError;
+
+            use crate::cli_bridge::scope::{body_out_of_scope_from_host, ScopeError};
+
+            let Some(state) = self
+                .app
+                .try_state::<crate::plugins::vault_unlock::state::VaultRuntimeState>()
+            else {
+                return ShowOutcome::Io;
+            };
+            let host = myne_core::host::tauri_host::TauriHost::new(self.app.clone());
+            let io = myne_core::vault_io::StdVaultIo;
+            tauri::async_runtime::block_on(async {
+                let body =
+                    match note_read_from_host(&host, state.inner(), id.to_string(), &io).await {
+                        Ok(body) => body,
+                        Err(NoteReadError::VaultNotUnlocked) => return ShowOutcome::VaultLocked,
+                        // A malformed or unknown id gets the same reply as an
+                        // excluded one, below — see `ShowOutcome::NotFound`'s
+                        // doc comment.
+                        Err(NoteReadError::NoteNotFound) | Err(NoteReadError::InvalidNoteId) => {
+                            return ShowOutcome::NotFound
+                        }
+                        Err(_) => return ShowOutcome::Io,
+                    };
+                // Central scope enforcement (task 5): an excluded note — or a
+                // trashed/tombstoned/template one, which is out of scope for
+                // the same reason it is absent from every list in the app —
+                // must be indistinguishable from an unknown one, so this maps
+                // to the exact same `NotFound` outcome above rather than a
+                // separate wire-visible case.
+                match body_out_of_scope_from_host(&host, state.inner(), &io, &body).await {
+                    Ok(true) => ShowOutcome::NotFound,
+                    Ok(false) => ShowOutcome::Ok(body),
+                    Err(ScopeError::VaultLocked) => ShowOutcome::VaultLocked,
+                    Err(ScopeError::Io) => ShowOutcome::Io,
+                }
+            })
+        }
+
+        fn search_notes(&self, query: &str) -> SearchOutcome {
+            use crate::cli_bridge::scope::{search_in_scope, ScopeError};
+
+            let Some(state) = self
+                .app
+                .try_state::<crate::plugins::vault_unlock::state::VaultRuntimeState>()
+            else {
+                return SearchOutcome::Io;
+            };
+            let Some(search) = self.app.try_state::<myne_core::search::SearchIndexState>() else {
+                return SearchOutcome::Io;
+            };
+            let host = myne_core::host::tauri_host::TauriHost::new(self.app.clone());
+            let io = myne_core::vault_io::StdVaultIo;
+            let result = tauri::async_runtime::block_on(search_in_scope(
+                &host,
+                state.inner(),
+                &io,
+                search.inner(),
+                query,
+            ));
+            match result {
+                Ok(hits) => SearchOutcome::Ok(
+                    hits.into_iter()
+                        .map(|(id, title)| SearchHitWire { id, title })
+                        .collect(),
+                ),
+                Err(ScopeError::VaultLocked) => SearchOutcome::VaultLocked,
+                Err(ScopeError::Io) => SearchOutcome::Io,
+            }
+        }
+
+        fn create_note(&self, body: &str, folder: Option<&str>) -> NewOutcome {
+            use myne_core::plugins::notes::commands::note_create_from_host;
+            use myne_core::plugins::notes::error::NoteCreateError;
+
+            use crate::cli_bridge::compose::{
+                compose_plaintext, folder_arg_has_control_char, normalize_folder_path,
+            };
+            use crate::cli_bridge::scope::{folder_excluded_from_host, folder_of, ScopeError};
+
+            let Some(state) = self
+                .app
+                .try_state::<crate::plugins::vault_unlock::state::VaultRuntimeState>()
+            else {
+                return NewOutcome::Io;
+            };
+            let Some(hooks) = self.app.try_state::<myne_core::hooks::Hooks>() else {
+                return NewOutcome::Io;
+            };
+            let host = myne_core::host::tauri_host::TauriHost::new(self.app.clone());
+            let io = myne_core::vault_io::StdVaultIo;
+            // Ahead of everything else: a control character in the folder
+            // argument is not a folder path, it is a frontmatter line break
+            // (see `compose::folder_arg_has_control_char`). Refusing here is
+            // what keeps the scope check below asking about the destination
+            // the note will ACTUALLY land in.
+            if folder.is_some_and(folder_arg_has_control_char) {
+                return NewOutcome::InvalidFolder;
+            }
+            let folder = folder.and_then(normalize_folder_path);
+            tauri::async_runtime::block_on(async {
+                let plaintext = compose_plaintext(body, folder.as_deref());
+                // Central scope enforcement (task 5): a write into an
+                // excluded destination is refused BEFORE the core create
+                // path ever runs, so a refusal writes nothing.
+                //
+                // Checked against the EFFECTIVE destination — the `folder:`
+                // the composed plaintext actually reads back as — rather than
+                // against the `--folder` argument alone. `note_create` is
+                // dialect-blind: whatever frontmatter is in this string is
+                // where the note lands, and a caller supplying its own
+                // `---\nfolder: Private/\n---` body with no `--folder` at all
+                // would otherwise be measured against `None` and allowed
+                // straight into the folder the user excluded.
+                let destination = folder_of(&plaintext);
+                match folder_excluded_from_host(&host, state.inner(), &io, destination.as_deref())
+                    .await
+                {
+                    Ok(true) => return NewOutcome::FolderExcluded,
+                    Ok(false) => {}
+                    Err(ScopeError::VaultLocked) => return NewOutcome::VaultLocked,
+                    Err(ScopeError::Io) => return NewOutcome::Io,
+                }
+                match note_create_from_host(&host, state.inner(), hooks.inner(), plaintext, &io)
+                    .await
+                {
+                    Ok(id) => NewOutcome::Ok(id),
+                    Err(NoteCreateError::VaultNotUnlocked) => NewOutcome::VaultLocked,
+                    Err(_) => NewOutcome::Io,
+                }
+            })
+        }
+
+        fn daily(&self) -> DailyOutcome {
+            use crate::cli_bridge::daily::{daily_show, DailyError};
+
+            let Some(state) = self
+                .app
+                .try_state::<crate::plugins::vault_unlock::state::VaultRuntimeState>()
+            else {
+                return DailyOutcome::Io;
+            };
+            let Some(hooks) = self.app.try_state::<myne_core::hooks::Hooks>() else {
+                return DailyOutcome::Io;
+            };
+            let host = myne_core::host::tauri_host::TauriHost::new(self.app.clone());
+            let io = myne_core::vault_io::StdVaultIo;
+            let result = tauri::async_runtime::block_on(daily_show(
+                &host,
+                state.inner(),
+                hooks.inner(),
+                &io,
+            ));
+            match result {
+                Ok(body) => DailyOutcome::Ok(body),
+                Err(DailyError::FolderExcluded) => DailyOutcome::FolderExcluded,
+                Err(DailyError::VaultLocked) => DailyOutcome::VaultLocked,
+                Err(DailyError::Io) => DailyOutcome::Io,
+            }
+        }
+
+        fn daily_append(&self, line: &str) -> DailyAppendOutcome {
+            use crate::cli_bridge::daily::{daily_append, DailyError};
+
+            let Some(state) = self
+                .app
+                .try_state::<crate::plugins::vault_unlock::state::VaultRuntimeState>()
+            else {
+                return DailyAppendOutcome::Io;
+            };
+            let Some(hooks) = self.app.try_state::<myne_core::hooks::Hooks>() else {
+                return DailyAppendOutcome::Io;
+            };
+            let host = myne_core::host::tauri_host::TauriHost::new(self.app.clone());
+            let io = myne_core::vault_io::StdVaultIo;
+            let result = tauri::async_runtime::block_on(daily_append(
+                &host,
+                state.inner(),
+                hooks.inner(),
+                &io,
+                line,
+            ));
+            match result {
+                Ok(()) => DailyAppendOutcome::Ok,
+                Err(DailyError::FolderExcluded) => DailyAppendOutcome::FolderExcluded,
+                Err(DailyError::VaultLocked) => DailyAppendOutcome::VaultLocked,
+                Err(DailyError::Io) => DailyAppendOutcome::Io,
+            }
+        }
+    }
+}
+
+#[cfg(unix)]
+pub use app_seam::AppNoteLister;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Cursor;
+
+    struct FixedLister {
+        list: fn() -> ListOutcome,
+        show: fn(&str) -> ShowOutcome,
+        search: fn(&str) -> SearchOutcome,
+        new_note: fn(&str, Option<&str>) -> NewOutcome,
+        daily: fn() -> DailyOutcome,
+        daily_append: fn(&str) -> DailyAppendOutcome,
+    }
+    impl FixedLister {
+        fn list_only(list: fn() -> ListOutcome) -> Self {
+            Self {
+                list,
+                show: |_| ShowOutcome::Io,
+                search: |_| SearchOutcome::Io,
+                new_note: |_, _| NewOutcome::Io,
+                daily: || DailyOutcome::Io,
+                daily_append: |_| DailyAppendOutcome::Io,
+            }
+        }
+        fn show_only(show: fn(&str) -> ShowOutcome) -> Self {
+            Self {
+                list: || ListOutcome::Io,
+                show,
+                search: |_| SearchOutcome::Io,
+                new_note: |_, _| NewOutcome::Io,
+                daily: || DailyOutcome::Io,
+                daily_append: |_| DailyAppendOutcome::Io,
+            }
+        }
+        fn search_only(search: fn(&str) -> SearchOutcome) -> Self {
+            Self {
+                list: || ListOutcome::Io,
+                show: |_| ShowOutcome::Io,
+                search,
+                new_note: |_, _| NewOutcome::Io,
+                daily: || DailyOutcome::Io,
+                daily_append: |_| DailyAppendOutcome::Io,
+            }
+        }
+        fn new_note_only(new_note: fn(&str, Option<&str>) -> NewOutcome) -> Self {
+            Self {
+                list: || ListOutcome::Io,
+                show: |_| ShowOutcome::Io,
+                search: |_| SearchOutcome::Io,
+                new_note,
+                daily: || DailyOutcome::Io,
+                daily_append: |_| DailyAppendOutcome::Io,
+            }
+        }
+        fn daily_only(daily: fn() -> DailyOutcome) -> Self {
+            Self {
+                list: || ListOutcome::Io,
+                show: |_| ShowOutcome::Io,
+                search: |_| SearchOutcome::Io,
+                new_note: |_, _| NewOutcome::Io,
+                daily,
+                daily_append: |_| DailyAppendOutcome::Io,
+            }
+        }
+        fn daily_append_only(daily_append: fn(&str) -> DailyAppendOutcome) -> Self {
+            Self {
+                list: || ListOutcome::Io,
+                show: |_| ShowOutcome::Io,
+                search: |_| SearchOutcome::Io,
+                new_note: |_, _| NewOutcome::Io,
+                daily: || DailyOutcome::Io,
+                daily_append,
+            }
+        }
+    }
+    impl NoteLister for FixedLister {
+        fn list_notes(&self) -> ListOutcome {
+            (self.list)()
+        }
+        fn show_note(&self, id: &str) -> ShowOutcome {
+            (self.show)(id)
+        }
+        fn search_notes(&self, query: &str) -> SearchOutcome {
+            (self.search)(query)
+        }
+        fn create_note(&self, body: &str, folder: Option<&str>) -> NewOutcome {
+            (self.new_note)(body, folder)
+        }
+        fn daily(&self) -> DailyOutcome {
+            (self.daily)()
+        }
+        fn daily_append(&self, line: &str) -> DailyAppendOutcome {
+            (self.daily_append)(line)
+        }
+    }
+
+    fn framed(body: &[u8]) -> Vec<u8> {
+        let mut v = (body.len() as u32).to_le_bytes().to_vec();
+        v.extend_from_slice(body);
+        v
+    }
+
+    /// A limiter that never throttles — every pre-task-10 test wants the
+    /// dispatch behaviour, not the rate limit, so the cap is set beyond
+    /// anything a single test issues.
+    fn open_limiter() -> SharedRateLimiter {
+        SharedRateLimiter::new(u32::MAX, std::time::Duration::from_secs(60))
+    }
+
+    fn roundtrip(request_json: &[u8], lister: &dyn NoteLister) -> serde_json::Value {
+        roundtrip_limited(request_json, lister, &open_limiter())
+    }
+
+    fn roundtrip_limited(
+        request_json: &[u8],
+        lister: &dyn NoteLister,
+        limiter: &SharedRateLimiter,
+    ) -> serde_json::Value {
+        let mut reader = Cursor::new(framed(request_json));
+        let mut writer = Vec::new();
+        serve_connection(&mut reader, &mut writer, lister, limiter);
+        let reply_body = framing::read_frame(&mut Cursor::new(writer)).expect("reply frame");
+        serde_json::from_slice(&reply_body).expect("reply is valid JSON")
+    }
+
+    #[test]
+    fn list_ok_returns_notes() {
+        let lister = FixedLister::list_only(|| ListOutcome::Ok(vec!["a".into(), "b".into()]));
+        let reply = roundtrip(br#"{"cmd":"list"}"#, &lister);
+        assert_eq!(reply["ok"], true);
+        assert_eq!(reply["notes"], serde_json::json!(["a", "b"]));
+    }
+
+    #[test]
+    fn list_vault_locked_maps_to_vault_locked_kind() {
+        let lister = FixedLister::list_only(|| ListOutcome::VaultLocked);
+        let reply = roundtrip(br#"{"cmd":"list"}"#, &lister);
+        assert_eq!(reply["ok"], false);
+        assert_eq!(reply["error"]["kind"], "vault_locked");
+    }
+
+    #[test]
+    fn list_io_failure_maps_to_io_kind() {
+        let lister = FixedLister::list_only(|| ListOutcome::Io);
+        let reply = roundtrip(br#"{"cmd":"list"}"#, &lister);
+        assert_eq!(reply["ok"], false);
+        assert_eq!(reply["error"]["kind"], "io");
+    }
+
+    #[test]
+    fn malformed_json_maps_to_invalid_request_and_never_panics() {
+        let lister = FixedLister::list_only(|| ListOutcome::Io);
+        let reply = roundtrip(b"not json", &lister);
+        assert_eq!(reply["ok"], false);
+        assert_eq!(reply["error"]["kind"], "invalid_request");
+    }
+
+    #[test]
+    fn unknown_cmd_maps_to_invalid_request() {
+        let lister = FixedLister::list_only(|| ListOutcome::Io);
+        let reply = roundtrip(br#"{"cmd":"delete"}"#, &lister);
+        assert_eq!(reply["ok"], false);
+        assert_eq!(reply["error"]["kind"], "invalid_request");
+    }
+
+    #[test]
+    fn a_truncated_frame_never_panics_and_writes_no_reply() {
+        // Declares 100 bytes, sends far fewer — `read_frame` returns
+        // `Truncated`; `serve_connection` must return cleanly with no
+        // reply written.
+        let mut wire = (100u32).to_le_bytes().to_vec();
+        wire.extend_from_slice(b"short");
+        let mut reader = Cursor::new(wire);
+        let mut writer = Vec::new();
+        let lister = FixedLister::list_only(|| ListOutcome::Io);
+        serve_connection(&mut reader, &mut writer, &lister, &open_limiter());
+        assert!(writer.is_empty(), "a truncated request must get no reply");
+    }
+
+    // ---- rate limit (task 10) ------------------------------------------
+
+    #[test]
+    fn an_over_budget_request_is_answered_with_the_rate_limited_kind() {
+        let lister = FixedLister::list_only(|| ListOutcome::Ok(vec!["a".into()]));
+        let limiter = SharedRateLimiter::new(1, std::time::Duration::from_secs(60));
+        let first = roundtrip_limited(br#"{"cmd":"list"}"#, &lister, &limiter);
+        assert_eq!(first["ok"], true, "the first request is within budget");
+        let second = roundtrip_limited(br#"{"cmd":"list"}"#, &lister, &limiter);
+        assert_eq!(second["ok"], false);
+        assert_eq!(second["error"]["kind"], "rate_limited");
+    }
+
+    #[test]
+    fn a_throttled_request_never_reaches_the_vault() {
+        // The point of refusing early: an over-budget request must not
+        // cost a whole-vault decrypt scan. The lister panics if touched.
+        struct NeverCalled;
+        impl NoteLister for NeverCalled {
+            fn list_notes(&self) -> ListOutcome {
+                panic!("a throttled request must never reach the vault");
+            }
+            fn show_note(&self, _id: &str) -> ShowOutcome {
+                panic!("a throttled request must never reach the vault");
+            }
+            fn search_notes(&self, _query: &str) -> SearchOutcome {
+                panic!("a throttled request must never reach the vault");
+            }
+            fn create_note(&self, _body: &str, _folder: Option<&str>) -> NewOutcome {
+                panic!("a throttled request must never reach the vault");
+            }
+            fn daily(&self) -> DailyOutcome {
+                panic!("a throttled request must never reach the vault");
+            }
+            fn daily_append(&self, _line: &str) -> DailyAppendOutcome {
+                panic!("a throttled request must never reach the vault");
+            }
+        }
+        let limiter = SharedRateLimiter::new(0, std::time::Duration::from_secs(60));
+        for request in [
+            &br#"{"cmd":"list"}"#[..],
+            br#"{"cmd":"show","id":"x"}"#,
+            br#"{"cmd":"search","query":"x"}"#,
+            br#"{"cmd":"new","body":"x"}"#,
+            br#"{"cmd":"daily"}"#,
+            br#"{"cmd":"daily_append","line":"x"}"#,
+        ] {
+            let reply = roundtrip_limited(request, &NeverCalled, &limiter);
+            assert_eq!(reply["error"]["kind"], "rate_limited");
+        }
+    }
+
+    #[test]
+    fn a_throttled_reply_carries_no_field_beyond_the_error() {
+        let lister = FixedLister::list_only(|| ListOutcome::Io);
+        let limiter = SharedRateLimiter::new(0, std::time::Duration::from_secs(60));
+        let reply = roundtrip_limited(br#"{"cmd":"list"}"#, &lister, &limiter);
+        let obj = reply.as_object().expect("reply is an object");
+        assert_eq!(obj.len(), 2, "exactly ok + error, no retry-after oracle");
+        let message = reply["error"]["message"].as_str().unwrap().to_lowercase();
+        // Copy discipline: the wire message is user-visible via `--json`,
+        // so the same rule the CLI's own copy is tested against applies.
+        for forbidden in ["protect", "security", "secure", "guard", "attack"] {
+            assert!(
+                !message.contains(forbidden),
+                "rate-limit wire copy must not use {forbidden:?}: {message:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn removing_the_limit_is_observable_at_the_dispatch_layer() {
+        // Task 10's "takes effect without restarting the app": the
+        // supervisor flips this same flag on its next tick, and the very
+        // next request over the SAME limiter is served.
+        let lister = FixedLister::list_only(|| ListOutcome::Ok(vec![]));
+        let limiter = SharedRateLimiter::new(0, std::time::Duration::from_secs(60));
+        let refused = roundtrip_limited(br#"{"cmd":"list"}"#, &lister, &limiter);
+        assert_eq!(refused["error"]["kind"], "rate_limited");
+        limiter.set_disabled(true);
+        let served = roundtrip_limited(br#"{"cmd":"list"}"#, &lister, &limiter);
+        assert_eq!(served["ok"], true);
+    }
+
+    #[test]
+    fn a_malformed_frame_does_not_consume_budget() {
+        // A burst of undecodable frames must not eat a working caller's
+        // window — the limiter sits after `read_frame`, before dispatch.
+        let lister = FixedLister::list_only(|| ListOutcome::Ok(vec!["a".into()]));
+        let limiter = SharedRateLimiter::new(1, std::time::Duration::from_secs(60));
+        for _ in 0..10 {
+            let mut wire = (100u32).to_le_bytes().to_vec();
+            wire.extend_from_slice(b"short");
+            let mut reader = Cursor::new(wire);
+            let mut writer = Vec::new();
+            serve_connection(&mut reader, &mut writer, &lister, &limiter);
+            assert!(writer.is_empty());
+        }
+        let reply = roundtrip_limited(br#"{"cmd":"list"}"#, &lister, &limiter);
+        assert_eq!(reply["ok"], true, "the one budgeted request survives");
+    }
+
+    #[test]
+    fn show_ok_returns_body() {
+        let lister = FixedLister::show_only(|_| ShowOutcome::Ok("hello world".to_string()));
+        let reply = roundtrip(br#"{"cmd":"show","id":"x"}"#, &lister);
+        assert_eq!(reply["ok"], true);
+        assert_eq!(reply["body"], "hello world");
+    }
+
+    #[test]
+    fn show_not_found_maps_to_not_found_kind() {
+        let lister = FixedLister::show_only(|_| ShowOutcome::NotFound);
+        let reply = roundtrip(br#"{"cmd":"show","id":"bogus"}"#, &lister);
+        assert_eq!(reply["ok"], false);
+        assert_eq!(reply["error"]["kind"], "not_found");
+    }
+
+    #[test]
+    fn show_passes_the_requested_id_through_to_the_lister() {
+        let lister = FixedLister::show_only(|id| {
+            if id == "wanted" {
+                ShowOutcome::Ok("matched".to_string())
+            } else {
+                ShowOutcome::NotFound
+            }
+        });
+        let reply = roundtrip(br#"{"cmd":"show","id":"wanted"}"#, &lister);
+        assert_eq!(reply["ok"], true);
+        assert_eq!(reply["body"], "matched");
+    }
+
+    #[test]
+    fn show_vault_locked_maps_to_vault_locked_kind() {
+        let lister = FixedLister::show_only(|_| ShowOutcome::VaultLocked);
+        let reply = roundtrip(br#"{"cmd":"show","id":"x"}"#, &lister);
+        assert_eq!(reply["ok"], false);
+        assert_eq!(reply["error"]["kind"], "vault_locked");
+    }
+
+    #[test]
+    fn show_io_failure_maps_to_io_kind() {
+        let lister = FixedLister::show_only(|_| ShowOutcome::Io);
+        let reply = roundtrip(br#"{"cmd":"show","id":"x"}"#, &lister);
+        assert_eq!(reply["ok"], false);
+        assert_eq!(reply["error"]["kind"], "io");
+    }
+
+    #[test]
+    fn show_missing_id_field_maps_to_invalid_request() {
+        let lister = FixedLister::show_only(|_| ShowOutcome::Io);
+        let reply = roundtrip(br#"{"cmd":"show"}"#, &lister);
+        assert_eq!(reply["ok"], false);
+        assert_eq!(reply["error"]["kind"], "invalid_request");
+    }
+
+    #[test]
+    fn search_ok_returns_results() {
+        let lister = FixedLister::search_only(|_| {
+            SearchOutcome::Ok(vec![SearchHitWire {
+                id: "a".into(),
+                title: "Note A".into(),
+            }])
+        });
+        let reply = roundtrip(br#"{"cmd":"search","query":"a"}"#, &lister);
+        assert_eq!(reply["ok"], true);
+        assert_eq!(
+            reply["results"],
+            serde_json::json!([{"id": "a", "title": "Note A"}])
+        );
+    }
+
+    #[test]
+    fn search_empty_results_carries_no_other_field() {
+        // The oracle discipline (task 7): an empty result set — whether a
+        // genuine no-match or an excluded hit — must be the ENTIRE reply
+        // beyond `ok`/`results`. No count, no flag.
+        let lister = FixedLister::search_only(|_| SearchOutcome::Ok(vec![]));
+        let reply = roundtrip(br#"{"cmd":"search","query":"anything"}"#, &lister);
+        assert_eq!(
+            reply,
+            serde_json::json!({ "ok": true, "results": [] }),
+            "an empty search reply must carry nothing beyond ok/results"
+        );
+    }
+
+    #[test]
+    fn search_passes_the_query_through_to_the_lister() {
+        let lister = FixedLister::search_only(|query| {
+            if query == "wanted" {
+                SearchOutcome::Ok(vec![SearchHitWire {
+                    id: "x".into(),
+                    title: "X".into(),
+                }])
+            } else {
+                SearchOutcome::Ok(vec![])
+            }
+        });
+        let reply = roundtrip(br#"{"cmd":"search","query":"wanted"}"#, &lister);
+        assert_eq!(
+            reply["results"],
+            serde_json::json!([{"id": "x", "title": "X"}])
+        );
+    }
+
+    #[test]
+    fn search_vault_locked_maps_to_vault_locked_kind() {
+        let lister = FixedLister::search_only(|_| SearchOutcome::VaultLocked);
+        let reply = roundtrip(br#"{"cmd":"search","query":"x"}"#, &lister);
+        assert_eq!(reply["ok"], false);
+        assert_eq!(reply["error"]["kind"], "vault_locked");
+    }
+
+    #[test]
+    fn search_io_failure_maps_to_io_kind() {
+        let lister = FixedLister::search_only(|_| SearchOutcome::Io);
+        let reply = roundtrip(br#"{"cmd":"search","query":"x"}"#, &lister);
+        assert_eq!(reply["ok"], false);
+        assert_eq!(reply["error"]["kind"], "io");
+    }
+
+    #[test]
+    fn search_missing_query_field_maps_to_invalid_request() {
+        let lister = FixedLister::search_only(|_| SearchOutcome::Io);
+        let reply = roundtrip(br#"{"cmd":"search"}"#, &lister);
+        assert_eq!(reply["ok"], false);
+        assert_eq!(reply["error"]["kind"], "invalid_request");
+    }
+
+    #[test]
+    fn new_ok_returns_the_new_note_id() {
+        let lister =
+            FixedLister::new_note_only(|_, _| NewOutcome::Ok("01970e83-4f2f-7000-8000-x".into()));
+        let reply = roundtrip(br#"{"cmd":"new","body":"hello"}"#, &lister);
+        assert_eq!(reply["ok"], true);
+        assert_eq!(reply["id"], "01970e83-4f2f-7000-8000-x");
+    }
+
+    #[test]
+    fn new_folder_excluded_maps_to_folder_excluded_kind() {
+        let lister = FixedLister::new_note_only(|_, _| NewOutcome::FolderExcluded);
+        let reply = roundtrip(
+            br#"{"cmd":"new","body":"hello","folder":"Private/"}"#,
+            &lister,
+        );
+        assert_eq!(reply["ok"], false);
+        assert_eq!(reply["error"]["kind"], "folder_excluded");
+    }
+
+    #[test]
+    fn new_invalid_folder_maps_to_invalid_request_kind() {
+        let lister = FixedLister::new_note_only(|_, _| NewOutcome::InvalidFolder);
+        let reply = roundtrip(
+            br#"{"cmd":"new","body":"hello","folder":"Private\nx"}"#,
+            &lister,
+        );
+        assert_eq!(reply["ok"], false);
+        assert_eq!(reply["error"]["kind"], "invalid_request");
+    }
+
+    #[test]
+    fn new_vault_locked_maps_to_vault_locked_kind() {
+        let lister = FixedLister::new_note_only(|_, _| NewOutcome::VaultLocked);
+        let reply = roundtrip(br#"{"cmd":"new","body":"hello"}"#, &lister);
+        assert_eq!(reply["ok"], false);
+        assert_eq!(reply["error"]["kind"], "vault_locked");
+    }
+
+    #[test]
+    fn new_io_failure_maps_to_io_kind() {
+        let lister = FixedLister::new_note_only(|_, _| NewOutcome::Io);
+        let reply = roundtrip(br#"{"cmd":"new","body":"hello"}"#, &lister);
+        assert_eq!(reply["ok"], false);
+        assert_eq!(reply["error"]["kind"], "io");
+    }
+
+    #[test]
+    fn new_missing_body_field_maps_to_invalid_request() {
+        let lister = FixedLister::new_note_only(|_, _| NewOutcome::Io);
+        let reply = roundtrip(br#"{"cmd":"new"}"#, &lister);
+        assert_eq!(reply["ok"], false);
+        assert_eq!(reply["error"]["kind"], "invalid_request");
+    }
+
+    #[test]
+    fn new_passes_the_body_and_folder_through_to_the_lister() {
+        let lister = FixedLister::new_note_only(|body, folder| {
+            if body == "wanted body" && folder == Some("Work/") {
+                NewOutcome::Ok("matched".to_string())
+            } else {
+                NewOutcome::Io
+            }
+        });
+        let reply = roundtrip(
+            br#"{"cmd":"new","body":"wanted body","folder":"Work/"}"#,
+            &lister,
+        );
+        assert_eq!(reply["ok"], true);
+        assert_eq!(reply["id"], "matched");
+    }
+
+    #[test]
+    fn new_with_no_folder_field_passes_none_through() {
+        let lister = FixedLister::new_note_only(|_, folder| {
+            if folder.is_none() {
+                NewOutcome::Ok("root".to_string())
+            } else {
+                NewOutcome::Io
+            }
+        });
+        let reply = roundtrip(br#"{"cmd":"new","body":"hello"}"#, &lister);
+        assert_eq!(reply["ok"], true);
+        assert_eq!(reply["id"], "root");
+    }
+
+    #[test]
+    fn daily_ok_returns_body() {
+        let lister = FixedLister::daily_only(|| DailyOutcome::Ok("today's body".to_string()));
+        let reply = roundtrip(br#"{"cmd":"daily"}"#, &lister);
+        assert_eq!(reply["ok"], true);
+        assert_eq!(reply["body"], "today's body");
+    }
+
+    #[test]
+    fn daily_folder_excluded_maps_to_folder_excluded_kind() {
+        let lister = FixedLister::daily_only(|| DailyOutcome::FolderExcluded);
+        let reply = roundtrip(br#"{"cmd":"daily"}"#, &lister);
+        assert_eq!(reply["ok"], false);
+        assert_eq!(reply["error"]["kind"], "folder_excluded");
+    }
+
+    #[test]
+    fn daily_vault_locked_maps_to_vault_locked_kind() {
+        let lister = FixedLister::daily_only(|| DailyOutcome::VaultLocked);
+        let reply = roundtrip(br#"{"cmd":"daily"}"#, &lister);
+        assert_eq!(reply["ok"], false);
+        assert_eq!(reply["error"]["kind"], "vault_locked");
+    }
+
+    #[test]
+    fn daily_io_failure_maps_to_io_kind() {
+        let lister = FixedLister::daily_only(|| DailyOutcome::Io);
+        let reply = roundtrip(br#"{"cmd":"daily"}"#, &lister);
+        assert_eq!(reply["ok"], false);
+        assert_eq!(reply["error"]["kind"], "io");
+    }
+
+    #[test]
+    fn daily_append_ok_returns_bare_ok_with_no_extra_field() {
+        let lister = FixedLister::daily_append_only(|_| DailyAppendOutcome::Ok);
+        let reply = roundtrip(br#"{"cmd":"daily_append","line":"hello"}"#, &lister);
+        assert_eq!(
+            reply,
+            serde_json::json!({ "ok": true }),
+            "success carries nothing beyond ok"
+        );
+    }
+
+    #[test]
+    fn daily_append_passes_the_line_through_to_the_lister() {
+        let lister = FixedLister::daily_append_only(|line| {
+            if line == "wanted line" {
+                DailyAppendOutcome::Ok
+            } else {
+                DailyAppendOutcome::Io
+            }
+        });
+        let reply = roundtrip(br#"{"cmd":"daily_append","line":"wanted line"}"#, &lister);
+        assert_eq!(reply["ok"], true);
+    }
+
+    #[test]
+    fn daily_append_folder_excluded_maps_to_folder_excluded_kind() {
+        let lister = FixedLister::daily_append_only(|_| DailyAppendOutcome::FolderExcluded);
+        let reply = roundtrip(br#"{"cmd":"daily_append","line":"x"}"#, &lister);
+        assert_eq!(reply["ok"], false);
+        assert_eq!(reply["error"]["kind"], "folder_excluded");
+    }
+
+    #[test]
+    fn daily_append_vault_locked_maps_to_vault_locked_kind() {
+        let lister = FixedLister::daily_append_only(|_| DailyAppendOutcome::VaultLocked);
+        let reply = roundtrip(br#"{"cmd":"daily_append","line":"x"}"#, &lister);
+        assert_eq!(reply["ok"], false);
+        assert_eq!(reply["error"]["kind"], "vault_locked");
+    }
+
+    #[test]
+    fn daily_append_io_failure_maps_to_io_kind() {
+        let lister = FixedLister::daily_append_only(|_| DailyAppendOutcome::Io);
+        let reply = roundtrip(br#"{"cmd":"daily_append","line":"x"}"#, &lister);
+        assert_eq!(reply["ok"], false);
+        assert_eq!(reply["error"]["kind"], "io");
+    }
+
+    #[test]
+    fn daily_append_missing_line_field_maps_to_invalid_request() {
+        let lister = FixedLister::daily_append_only(|_| DailyAppendOutcome::Io);
+        let reply = roundtrip(br#"{"cmd":"daily_append"}"#, &lister);
+        assert_eq!(reply["ok"], false);
+        assert_eq!(reply["error"]["kind"], "invalid_request");
+    }
+}

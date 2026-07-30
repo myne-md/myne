@@ -18,6 +18,7 @@ import {
   resolveTitle,
   backlinks,
   byTag,
+  reindexNoteFromBody,
   type WikilinkEdge,
 } from "../../src/notes/vaultIndices";
 import type {
@@ -261,5 +262,69 @@ describe("backlinks (resolve-then-keep, trash exclusion, grouping)", () => {
     ]);
     const groups = await backlinks("t", notes);
     expect(groups.map((g) => g.sourceUuid)).toEqual(["s-live"]);
+  });
+});
+
+// The seam between the dialect extractor and the index. Both ends were covered
+// before this suite existed — `tests/notes/taskIndex.test.ts` for what the
+// extractor produces, the Rust `state.rs` tests for what the index stores — and
+// the call BETWEEN them was not, which is exactly the gap line-tasks shipped
+// through: `reindexNoteFromBody` never invoked the extractor, `tasks` never
+// reached the payload, and Rust's `Option` field turned the omission into an
+// empty vector rather than an error. Every task surface read an empty index and
+// no layer could tell it was broken. These assertions are about the WIRE, not
+// about extraction — they fail if the field ever stops being sent.
+describe("reindexNoteFromBody → the tasks leg of the apply payload", () => {
+  function applyPayload(): Record<string, unknown> {
+    const call = invokeMock.mock.calls.find(
+      ([command]) => command === "plugin:vault-indices|vault_indices_apply",
+    );
+    expect(call, "vault_indices_apply was never invoked").toBeDefined();
+    return call![1] as Record<string, unknown>;
+  }
+
+  it("carries every line-task, in document order, with its typed fields", async () => {
+    await reindexNoteFromBody(
+      "n1",
+      [
+        "# Ev",
+        "",
+        "- [ ] kirayı öde [due:: 2026-08-01] [repeat:: every month] [priority:: high]",
+        "- [x] faturayı öde [done:: 2026-07-29]",
+      ].join("\n"),
+    );
+
+    const tasks = applyPayload().tasks as Array<Record<string, unknown>>;
+    expect(tasks).toHaveLength(2);
+    expect(tasks[0]).toMatchObject({
+      lineIndex: 2,
+      completed: false,
+      due: "2026-08-01",
+      repeat: "every month",
+      priority: "high",
+    });
+    // The raw line is the authority the pre-write verification compares
+    // against, so it must survive verbatim — not normalized, not re-emitted.
+    expect(tasks[0]!.rawLine).toBe(
+      "- [ ] kirayı öde [due:: 2026-08-01] [repeat:: every month] [priority:: high]",
+    );
+    expect(tasks[1]).toMatchObject({ lineIndex: 3, completed: true, done: "2026-07-29" });
+  });
+
+  it("sends an empty vector for a note with no tasks, never an absent field", async () => {
+    // `apply` has replace semantics: deleting a note's last task must overwrite
+    // the stored vector. Omitting the field would lean on Rust's
+    // `unwrap_or_default()` to mean the same thing — true today, and exactly
+    // the kind of implicit agreement that broke this leg in the first place.
+    await reindexNoteFromBody("n2", "# Ev\n\nsade bir not, task yok\n");
+    expect(applyPayload().tasks).toEqual([]);
+  });
+
+  it("yields nothing for a drawing note, whose body is scene JSON", async () => {
+    // A `- [ ]` inside serialized scene JSON is a phantom task. The extractor
+    // skips drawing-class notes wholesale; asserting it here keeps the wire
+    // honest if that exclusion ever moves.
+    await reindexNoteFromBody("n3", '---\nkind: drawing\n---\n- [ ] phantom\n');
+    expect(applyPayload().tasks).toEqual([]);
   });
 });

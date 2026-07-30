@@ -61,7 +61,6 @@ const V = {
     "Reached only through StoragePanel, which is substituted; carries the backup schedule chain.",
     "settings.auto-backup-retention",
   ],
-  "src/components/settings/BetaBadge.tsx": ["ported", "Presentational."],
   "src/components/settings/browser-icons.tsx": [
     "excluded",
     "Renders extension identities for the clipper block; leaves with ConnectedExtensions.",
@@ -70,6 +69,10 @@ const V = {
     "excluded",
     "The clipper is a native-messaging host a page cannot reach; substituted so its five command names leave the bundle.",
     "clipper-pairing|pairing_revoke",
+  ],
+  "src/components/settings/CliAccessSettings.tsx": [
+    "adapted",
+    "Never rendered: PrivacyPanel gates the block on `cliAccess`, which is absent on web, so the whole terminal-access surface is omitted rather than greyed. Ships in the bundle (it is one small component inside a panel that does ship) but nothing on this client mounts it, and its one command is `Unsupported` in the dispatcher.",
   ],
   "src/components/settings/ControlBlock.tsx": ["ported", "Layout primitive."],
   "src/components/settings/CustomThemesSection.tsx": [
@@ -83,6 +86,10 @@ const V = {
     "Ships; the spell-check rows are filtered from search and the controls are omitted where `spellCheck` is absent.",
   ],
   "src/components/settings/FilesPanel.tsx": ["ported", "Prefs-backed."],
+  "src/components/settings/TranscriptionPanel.tsx": [
+    "ported",
+    "Prefs-backed. The panel renders on web; the transcribe ACTION is desktop-only\n     (the local-inference plugin has no web counterpart), so the switch there governs\n     a preference that syncs to a device which can act on it.",
+  ],
   "src/components/settings/FocusModeSettings.tsx": ["ported", "Prefs-backed."],
   "src/components/settings/HotkeysPanel.tsx": [
     "adapted",
@@ -99,6 +106,14 @@ const V = {
   "src/components/settings/QuickUnlockSettings.tsx": [
     "adapted",
     "Rendered only where quick-unlock exists; the PIN path itself is portable and task 40 owns it.",
+  ],
+  "src/components/settings/ReminderSettings.tsx": [
+    "adapted",
+    "Renders and persists through the prefs setters like its siblings. The copy it shows follows `reminderTier`, which reports in-app-only on every host — so a browser reads the same honest sentence a desktop does, and neither is shown the OS-registration disclosure while no registration happens.",
+  ],
+  "src/components/settings/SettingsSection.tsx": [
+    "ported",
+    "The settings-panel section wrapper (MYND-624). Presentational — a heading plus its children, no host call and no capability of its own, so it carries whatever its contents already carry.",
   ],
   "src/components/settings/SpellSettings.tsx": [
     "adapted",
@@ -160,6 +175,10 @@ const V = {
     "adapted",
     "Pure NFKD/whitespace normalisation, with NO IMPORT EDGE from served code since task 92: its one phrase-entry caller moved into `src/components/sync/phrase-credential.ts`, which the web build substitutes with a stub that cannot construct a credential. What remains here is a string function nothing on this client feeds a phrase.",
   ],
+  "src/lib/cli-access.ts": [
+    "typed-unsupported",
+    "The CLI door's session-state read. Reachable — the module ships and the binding is one `invoke` — and `cli-bridge` is `Unsupported` in the dispatcher, so a call that arrives by a path gating did not cover gets a typed refusal rather than a hang. No web path calls it: the only caller is the capability-gated Settings block.",
+  ],
   "src/lib/clipper-pairing.ts": [
     "excluded",
     "Pairing IPC; leaves with ConnectedExtensions.",
@@ -187,6 +206,26 @@ const V = {
   ],
   "src/lib/prefs.ts": ["ported", "Prefs IPC; the plugin is dispatched."],
   "src/lib/promptForText.ts": ["ported", "In-app modal prompt, not a host dialog."],
+  "src/lib/reminderLifecycle.ts": [
+    "ported",
+    "A pure decision table (which lifecycle event reconciles, which cancels everything). No host call, no timer, no DOM.",
+  ],
+  "src/lib/reminderNotifier.ts": [
+    "ported",
+    "The in-app tier's delivery: an in-memory pending set, `setTimeout`, and an injected callback. No notification API and no `@tauri-apps/*` — a browser runs it as written. The OS-registration tier, when it lands, is what will need a seam member here.",
+  ],
+  "src/lib/reminderPermission.ts": [
+    "ported",
+    "Pure policy over an injected platform API. No production API implementation exists on either client — the in-app tier needs no permission, since nothing is handed to the operating system.",
+  ],
+  "src/lib/reminderPlatform.ts": [
+    "ported",
+    "Reads `navigator.platform` to name the host, but `reminderTier` reports `in-app-only` everywhere until an OS-registration adapter exists — which is also the right answer for a browser tab, since it holds no registration either.",
+  ],
+  "src/lib/reminderSchedule.ts": [
+    "ported",
+    "Pure scheduling arithmetic: the target set, the diff, and the reconcile pass over an injected notifier.",
+  ],
   "src/lib/quick-unlock.ts": ["adapted", "The PIN path is portable (task 40); the biometric path is a decided absence."],
   "src/lib/routing.ts": ["adapted", "The stage/history binding; desktop's seam arm is all no-ops (task 64)."],
   "src/lib/flush-chain.ts": [
@@ -260,6 +299,14 @@ const V = {
   ],
   "src/hooks/useLastActiveNotePref.ts": ["ported", "Prefs-backed."],
   "src/hooks/usePrefs.ts": ["ported", "The shared prefs hook."],
+  "src/hooks/useReminderScheduler.ts": [
+    "adapted",
+    "The hook itself is timers over an injected notifier and runs as written. What differs is its input: the task list comes from the vault-indices plugin, which the web dispatcher still answers `Pending` (task 31), so the pass finds nothing to register until that lands. It fails quiet rather than loud — an empty target set is a valid pass.",
+  ],
+  "src/hooks/useRevealAfterIdleLock.ts": [
+    "adapted",
+    "Mounts on web and reaches a seam that REFUSES it (MYND-628). Desktop idle auto-lock hides the OS window with `orderOut:` and nothing on the Rust side shows it again, so a locked boot surface has to ask; a page has no hidden window, because web auto-lock re-renders the locked surface in the same tab. `window.show` is a typed refusal rather than a no-op, and the hook's `catch` is the correct handler — so this is adapted, not excluded: it still runs, it just correctly does nothing.",
+  ],
   "src/hooks/useSyncStatus.ts": ["ported", "Sync status; more load-bearing on web, where sync is required."],
   "src/lib/diagnostics.ts": [
     "ported",

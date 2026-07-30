@@ -42,7 +42,7 @@ export function tagChipCmTheme(): Record<string, Record<string, string>> {
       cursor: "pointer",
       verticalAlign: "baseline",
       // `text-indent` is inherited and applies to an inline-block's own first
-      // line. Inside a `.cm-list-item-line` (hanging indent `text-indent:
+      // line. Inside a `.cm-list-item-line` (hanging indent: negative `text-indent:
       // -1.5em`) the chip would shift its label left, out of the pill. Reset.
       textIndent: "0",
     },

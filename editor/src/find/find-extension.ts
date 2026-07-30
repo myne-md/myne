@@ -25,7 +25,7 @@
 import {
   keymap,
   ViewPlugin,
-  type EditorView,
+  EditorView,
   type Panel,
   type ViewUpdate,
 } from "@codemirror/view";
@@ -51,6 +51,39 @@ import {
 import { ensureFloatingStyles } from "../floating-styles";
 
 const SCAN_DEBOUNCE_MS = 120; // matches the command-palette note-search cadence
+
+// MYND-626: centre the match instead of leaving it wherever it happened to land.
+//
+// `findNext` / `findPrevious` move the selection and scroll it into view with
+// CodeMirror's default `y: "nearest"`, which does the minimum work to make the
+// match visible — so a match just below the fold stops one line inside the
+// bottom edge, half-hidden behind the status bar, and a long run of hits walks
+// the viewport a line at a time instead of stepping through them. Re-issuing an
+// explicit `y: "center"` scroll after the command puts every match in the same
+// place, so the eye can stay still while Enter cycles.
+//
+// This is the same treatment global search already gives a result click
+// (MYND-448) and footnote navigation already gives its target — this was the
+// one match-navigation surface still on the default.
+function scrollMatchToCentre(view: EditorView): void {
+  view.dispatch({
+    effects: EditorView.scrollIntoView(view.state.selection.main.head, {
+      y: "center",
+    }),
+  });
+}
+
+/** `findNext` + centre. Use everywhere the user steps to the next match. */
+function findNextCentred(view: EditorView): void {
+  findNext(view);
+  scrollMatchToCentre(view);
+}
+
+/** `findPrevious` + centre. */
+function findPreviousCentred(view: EditorView): void {
+  findPrevious(view);
+  scrollMatchToCentre(view);
+}
 
 function createFindPanel(view: EditorView): Panel {
   // Self-contained: inject the editor-chrome CSS (incl. `.cm-find-bar*`) in case
@@ -177,10 +210,10 @@ function createFindPanel(view: EditorView): Panel {
         applyQuery(bar.input.value);
       },
       onNext: () => {
-        findNext(view);
+        findNextCentred(view);
       },
       onPrev: () => {
-        findPrevious(view);
+        findPreviousCentred(view);
       },
       onClose: () => {
         closeSearchPanel(view);
@@ -228,8 +261,8 @@ function createFindPanel(view: EditorView): Panel {
     }
     if (e.key === "Enter") {
       e.preventDefault();
-      if (e.shiftKey) findPrevious(view);
-      else findNext(view);
+      if (e.shiftKey) findPreviousCentred(view);
+      else findNextCentred(view);
     }
   });
 
