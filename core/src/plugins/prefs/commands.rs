@@ -1569,6 +1569,207 @@ pub(crate) async fn set_ai_excluded_folders_with_dir(
     Ok(())
 }
 
+/// Slot::Unlocked-gated setter for the `cli_enabled` CLI terminal-access door
+/// toggle (myne-cli epic, MYND-490; `cli-thin-client` task 2). Read-modify-write
+/// under the per-plugin write mutex; **no native side-effect** — same shape as
+/// [`set_archive_disabled`]. Opening/closing the actual socket in response to
+/// this toggle (plus the vault's unlock state) is the task-3 lifecycle's job,
+/// not this setter's; this command only persists the flag.
+pub async fn set_cli_enabled_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    enabled: bool,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_cli_enabled_with_dir(&dir, state, hooks, enabled, io, host).await
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn set_cli_enabled<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
+    enabled: bool,
+) -> Result<(), PrefsWriteError> {
+    set_cli_enabled_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        enabled,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
+}
+
+/// Testable core of [`set_cli_enabled`].
+pub(crate) async fn set_cli_enabled_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    enabled: bool,
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
+) -> Result<(), PrefsWriteError> {
+    update_prefs_with_dir(
+        vault_dir,
+        state,
+        hooks,
+        |prefs| {
+            prefs.cli_enabled = enabled;
+        },
+        io,
+        host,
+    )
+    .await?;
+
+    tracing::info!(event = "prefs_written", field = "cli_enabled", enabled);
+    Ok(())
+}
+
+/// Slot::Unlocked-gated setter for the `cli_excluded_folders` set (myne-cli
+/// epic, MYND-490; `cli-thin-client` task 2) — folders the CLI door never
+/// reaches. Same canonical set encoding as `deliberate_folders` /
+/// `ai_excluded_folders`; direct mirror of [`set_ai_excluded_folders`]
+/// (read-modify-write, no native side-effect — enforcing the exclusion is
+/// task 5's job, not this setter's).
+pub async fn set_cli_excluded_folders_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    folders: Vec<String>,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_cli_excluded_folders_with_dir(&dir, state, hooks, folders, io, host).await
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn set_cli_excluded_folders<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
+    folders: Vec<String>,
+) -> Result<(), PrefsWriteError> {
+    set_cli_excluded_folders_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        folders,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
+}
+
+/// Testable core of [`set_cli_excluded_folders`].
+pub(crate) async fn set_cli_excluded_folders_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    folders: Vec<String>,
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
+) -> Result<(), PrefsWriteError> {
+    let count = folders.len();
+    update_prefs_with_dir(
+        vault_dir,
+        state,
+        hooks,
+        |prefs| {
+            prefs.cli_excluded_folders = folders;
+        },
+        io,
+        host,
+    )
+    .await?;
+
+    // Folder COUNT only — never the paths (AS3 Sensitive; see the
+    // `set_deliberate_folders` note + ../../CLAUDE.md logging discipline).
+    tracing::info!(
+        event = "prefs_written",
+        field = "cli_excluded_folders",
+        count
+    );
+    Ok(())
+}
+
+/// Slot::Unlocked-gated setter for the `cli_rate_limit_disabled` toggle
+/// (myne-cli epic, MYND-490; `cli-thin-client` task 2). Read-modify-write
+/// under the per-plugin write mutex; **no native side-effect** (the task-3
+/// socket reads the current value on the next request rather than being
+/// pushed to). Always persists an explicit `Some(disabled)` — the
+/// `set_archive_disabled` precedent — because the default-ON rate limit is a
+/// host read-time concern, not a stored value. Non-load-bearing → no clamp.
+pub async fn set_cli_rate_limit_disabled_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    disabled: bool,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_cli_rate_limit_disabled_with_dir(&dir, state, hooks, disabled, io, host).await
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn set_cli_rate_limit_disabled<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
+    disabled: bool,
+) -> Result<(), PrefsWriteError> {
+    set_cli_rate_limit_disabled_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        disabled,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
+}
+
+/// Testable core of [`set_cli_rate_limit_disabled`].
+pub(crate) async fn set_cli_rate_limit_disabled_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    disabled: bool,
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
+) -> Result<(), PrefsWriteError> {
+    update_prefs_with_dir(
+        vault_dir,
+        state,
+        hooks,
+        |prefs| {
+            prefs.cli_rate_limit_disabled = Some(disabled);
+        },
+        io,
+        host,
+    )
+    .await?;
+
+    tracing::info!(
+        event = "prefs_written",
+        field = "cli_rate_limit_disabled",
+        disabled
+    );
+    Ok(())
+}
+
 /// Slot::Unlocked-gated setter for the `item_order` sequence — the unified
 /// manual sidebar order across the single interleaved file-tree (a flat,
 /// heterogeneous list of note UUIDs + folder paths, MYND-183, superseding the
@@ -4481,6 +4682,9 @@ mod tests {
                     ai_enabled: false,
                     ai_excluded_folders: Vec::new(),
                     bar_items_order: Vec::new(),
+                    cli_enabled: false,
+                    cli_excluded_folders: Vec::new(),
+                    cli_rate_limit_disabled: None,
                     editor_toolbar_order: Vec::new(),
                     editor_toolbar_hidden: Vec::new(),
                     editor_slash_order: Vec::new(),
@@ -4941,6 +5145,162 @@ mod tests {
                 .expect("read after clear");
             assert!(!cleared.ai_enabled);
             assert!(cleared.ai_excluded_folders.is_empty());
+        });
+    }
+
+    // ---- CLI prefs setters (myne-cli epic, MYND-490; task 2) ----------
+
+    #[test]
+    fn set_cli_enabled_rejects_when_slot_empty() {
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("prefs-cli-enabled-empty").expect("scoped tempdir");
+            let state = VaultRuntimeState::default();
+            let result = set_cli_enabled_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                true,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await;
+            assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
+        });
+    }
+
+    #[test]
+    fn set_cli_excluded_folders_rejects_when_slot_empty() {
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("prefs-cli-excluded-empty").expect("scoped tempdir");
+            let state = VaultRuntimeState::default();
+            let result = set_cli_excluded_folders_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                alloc_vec(["Secret/"]),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await;
+            assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
+        });
+    }
+
+    #[test]
+    fn set_cli_rate_limit_disabled_rejects_when_slot_empty() {
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("prefs-cli-ratelimit-empty").expect("scoped tempdir");
+            let state = VaultRuntimeState::default();
+            let result = set_cli_rate_limit_disabled_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                true,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await;
+            assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
+        });
+    }
+
+    #[test]
+    fn cli_prefs_round_trip_via_set_then_read() {
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x52).await;
+
+            // Defaults: door closed, no exclusions, rate limit untouched.
+            let base = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
+                .await
+                .expect("read");
+            assert!(!base.cli_enabled);
+            assert!(base.cli_excluded_folders.is_empty());
+            assert_eq!(base.cli_rate_limit_disabled, None);
+
+            // Enable + set exclusions (unsorted input) + disable the rate limit.
+            set_cli_enabled_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                true,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("enable must succeed");
+            set_cli_excluded_folders_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                alloc_vec(["Private/", "Archive/2025/"]),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("set exclusions must succeed");
+            set_cli_rate_limit_disabled_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                true,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("disable rate limit must succeed");
+
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
+                .await
+                .expect("read after write");
+            assert!(view.cli_enabled);
+            // Canonical sort applies at encode → read-back is sorted.
+            assert_eq!(
+                view.cli_excluded_folders,
+                alloc_vec(["Archive/2025/", "Private/"]),
+            );
+            assert_eq!(view.cli_rate_limit_disabled, Some(true));
+            // Unrelated fields untouched (defaults on).
+            assert!(view.screen_capture_protection);
+
+            // Disable + clear → back to defaults (door closed, empty set); the
+            // rate-limit toggle persists an explicit Some(false), not back to
+            // None (the archive_disabled precedent).
+            set_cli_enabled_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                false,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("disable must succeed");
+            set_cli_excluded_folders_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                Vec::new(),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("clear must succeed");
+            set_cli_rate_limit_disabled_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                false,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("re-enable rate limit must succeed");
+            let cleared = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
+                .await
+                .expect("read after clear");
+            assert!(!cleared.cli_enabled);
+            assert!(cleared.cli_excluded_folders.is_empty());
+            assert_eq!(cleared.cli_rate_limit_disabled, Some(false));
         });
     }
 

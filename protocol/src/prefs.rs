@@ -674,6 +674,72 @@ pub struct PrefsView {
     #[serde(default)]
     pub bar_items_order: Vec<String>,
 
+    /// CLI terminal-access door toggle (myne-cli epic, MYND-490; `cli-thin-client`
+    /// task 2). `false` ≡ the door is closed (the default) — the local socket the
+    /// `myne` CLI dials is never created regardless of unlock state. **Omitted
+    /// entirely from the canonical JSON when `false`**, so a vault that never
+    /// enabled the CLI is byte-identical to a pre-feature `vault.prefs` (existing
+    /// golden vectors unaffected — migration-less additive field on `MYP1`, the
+    /// `ai_enabled` precedent class exactly). Class `DeviceLocal` (see
+    /// `core/src/plugins/sync/prefs_classification.rs`): the CLI door is a
+    /// per-machine decision, so this value never travels in a merge — a laptop
+    /// and a desktop each carry their own. Rationale for the no-identity-gatekeeper
+    /// design this toggle is one leg of: `docs/decisions.md` "CLI terminal access
+    /// is a default-off, unlock-gated local socket with a folder exclusion list
+    /// (MYND-490)" and `docs/threat-model.md` §7. **Non-load-bearing / AS-low** —
+    /// no protective-envelope clamp; the host treats a tampered/replayed value as
+    /// a cosmetic toggle, same as `ai_enabled`. Canonical key `cli_enabled` —
+    /// sorts after `bar_items_order` (`b` < `c`), before `cli_excluded_folders`
+    /// (`cli_en` < `cli_ex`) and `custom_theme` (`cli` < `cu`).
+    #[serde(default)]
+    pub cli_enabled: bool,
+
+    /// Folders excluded from the CLI's reach (myne-cli epic, MYND-490;
+    /// `cli-thin-client` task 2) — canonical trailing-slash display form.
+    /// **Same canonical encoding as `deliberate_folders` / `ai_excluded_folders`**
+    /// (NFC-normalized, lexicographically sorted, exact-deduped set) and
+    /// **omitted entirely when empty**, so a vault with no CLI exclusions is
+    /// byte-identical to a pre-feature `vault.prefs`. Default empty (whole vault
+    /// in scope once the door is opened). Class `Shared(SetUnion)`: an exclusion
+    /// added on one device must never be lost in a merge with a device that lacks
+    /// it — union is the fail-safe discipline, exactly the `ai_excluded_folders`
+    /// precedent. Enforcement of the exclusion (filtering `list`/`search`/writes)
+    /// is out of scope for this field's codec — see `cli-thin-client` task 5;
+    /// this field only stores and syncs the set. **Non-load-bearing** — a
+    /// tampered value can at worst widen/narrow the CLI's reach; no
+    /// protective-envelope clamp. Canonical key `cli_excluded_folders` — sorts
+    /// after `cli_enabled` (`cli_en` < `cli_ex`), before `cli_rate_limit_disabled`
+    /// (`cli_ex` < `cli_r`) and `custom_theme` (`cli` < `cu`).
+    #[serde(default)]
+    pub cli_excluded_folders: Vec<alloc::string::String>,
+
+    /// CLI socket rate-limit opt-out (myne-cli epic, MYND-490; `cli-thin-client`
+    /// task 2). **Shape decision, made by this field** (task 2's "What to build"
+    /// flagged the rate-limit field's shape as an open question): modeled
+    /// **exactly on the `archive_disabled` precedent** — `Option<bool>`, not a
+    /// numeric requests-per-second value, because the control the user is given
+    /// in Settings is a single on/off switch ("remove the default slowdown"), not
+    /// a tunable rate. `None` ≡ unset → the default-ON rate limit applies (a
+    /// runaway or hostile script cannot drain the vault at full speed).
+    /// `Some(true)` ≡ the user explicitly disabled the limit in Settings (task 10
+    /// reads this to skip rate-limiting the socket). `Some(false)` is a legal
+    /// value — re-enabling the limit after disabling it — but the UI is not
+    /// expected to ever produce it: omitting the field again (returning to
+    /// `None`) has the identical effect, and which one a "re-enable" control
+    /// writes is the client's choice, not something this codec cares about.
+    /// Omitted entirely from the canonical JSON when `None`, so a vault that
+    /// never touched the toggle is byte-identical to a pre-feature `vault.prefs`
+    /// (existing golden vectors unaffected — migration-less additive field on
+    /// `MYP1`). Class `DeviceLocal`: a machine-local performance knob — a laptop
+    /// and a desktop may legitimately want different limits. **Non-load-bearing**
+    /// (a tampered/replayed value can at worst speed up or slow down the CLI
+    /// socket; it grants no capability the door does not already grant) — no
+    /// protective-envelope clamp. Canonical key `cli_rate_limit_disabled` —
+    /// sorts after `cli_excluded_folders` (`cli_ex` < `cli_r`), before
+    /// `custom_theme` (`cli` < `cu`).
+    #[serde(default)]
+    pub cli_rate_limit_disabled: Option<bool>,
+
     /// Per-vault decorative icon (vault-icons) — the curated stroke-glyph name
     /// the in-app vault switcher shows beside this vault's name, replacing the
     /// default `M` wordmark. `None` ≡ no icon set → the switcher shows the
@@ -963,6 +1029,9 @@ impl Default for PrefsView {
         Self {
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
+            cli_enabled: false,
+            cli_excluded_folders: Vec::new(),
+            cli_rate_limit_disabled: None,
             show_note_timestamps: true,
             folder_icons: Default::default(),
             hidden_bar_items: Vec::new(),
@@ -1247,6 +1316,50 @@ fn canonical_json_encode(prefs: &PrefsView) -> Vec<u8> {
     if !prefs.bar_items_order.is_empty() {
         out.extend_from_slice(b"\"bar_items_order\":");
         push_ordered_string_array(&mut out, &prefs.bar_items_order);
+        out.push(b',');
+    }
+
+    // cli_enabled (canonical key 'cli_enabled' — after bar_items_order ['b' <
+    // 'c'], before cli_excluded_folders ['cli_en' < 'cli_ex'] and custom_theme
+    // ['cli' < 'cu']). CLI terminal-access door toggle (myne-cli epic,
+    // MYND-490). Emitted ONLY when true; omitted entirely when false (the
+    // default) so a vault that never enabled the CLI is byte-identical to a
+    // pre-feature vault.prefs (preserves existing KAT vectors) — same
+    // discipline as ai_enabled.
+    if prefs.cli_enabled {
+        out.extend_from_slice(b"\"cli_enabled\":true,");
+    }
+
+    // cli_excluded_folders (canonical key 'cli_excluded_folders' — after
+    // cli_enabled ['cli_en' < 'cli_ex'], before cli_rate_limit_disabled
+    // ['cli_ex' < 'cli_r'] and custom_theme ['cli' < 'cu']). Folders the CLI
+    // never reaches (myne-cli epic, MYND-490). SAME canonical encoding as
+    // deliberate_folders / ai_excluded_folders (NFC-normalized, sorted,
+    // exact-deduped set), OMITTED entirely when empty so a vault with no CLI
+    // exclusions is byte-identical to a pre-feature vault.prefs (preserves
+    // existing KAT vectors).
+    let cli_folders = canonical_folder_list(&prefs.cli_excluded_folders);
+    if !cli_folders.is_empty() {
+        out.extend_from_slice(b"\"cli_excluded_folders\":[");
+        for (i, f) in cli_folders.iter().enumerate() {
+            if i > 0 {
+                out.push(b',');
+            }
+            push_json_string(&mut out, f);
+        }
+        out.extend_from_slice(b"],");
+    }
+
+    // cli_rate_limit_disabled (canonical key 'cli_rate_limit_disabled' — after
+    // cli_excluded_folders ['cli_ex' < 'cli_r'], before custom_theme ['cli' <
+    // 'cu']). CLI socket rate-limit opt-out (myne-cli epic, MYND-490); shape
+    // decision recorded on the field's rustdoc — Option<bool>, the
+    // archive_disabled precedent class. A bool; omitted entirely when None so
+    // a vault that never touched the rate-limit toggle is byte-identical to a
+    // pre-feature vault.prefs (preserves existing KAT vectors).
+    if let Some(on) = prefs.cli_rate_limit_disabled {
+        out.extend_from_slice(b"\"cli_rate_limit_disabled\":");
+        out.extend_from_slice(if on { b"true" } else { b"false" });
         out.push(b',');
     }
 
@@ -2068,6 +2181,26 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
     // preserved verbatim (sort/dedup is encode-side and this field is a
     // sequence, so neither happens). Present-but-malformed → PlaintextParseFailed.
     let bar_items_order = parse_optional_array_field(rest, &mut cursor, b"\"bar_items_order\":")?;
+    // cli_enabled (canonical key 'cli_enabled' — after bar_items_order ['b' <
+    // 'c'], before cli_excluded_folders ['cli_en' < 'cli_ex']). CLI
+    // terminal-access door toggle (myne-cli epic, MYND-490). Parsed from the
+    // same monotonic cursor so a later field's key marker is never matched
+    // inside a prior field's content. Emitted only as `true` by the encoder;
+    // `false` is tolerated for robustness. Absent → false (the default).
+    let cli_enabled =
+        parse_optional_bool_field(rest, &mut cursor, b"\"cli_enabled\":")?.unwrap_or(false);
+    // cli_excluded_folders (canonical key 'cli_excluded_folders' — after
+    // cli_enabled ['cli_en' < 'cli_ex'], before cli_rate_limit_disabled
+    // ['cli_ex' < 'cli_r']). Same canonical set encoding as
+    // deliberate_folders / ai_excluded_folders; absent → empty.
+    let cli_excluded_folders =
+        parse_optional_array_field(rest, &mut cursor, b"\"cli_excluded_folders\":")?;
+    // cli_rate_limit_disabled (canonical key 'cli_rate_limit_disabled' — after
+    // cli_excluded_folders ['cli_ex' < 'cli_r'], before custom_theme ['cli' <
+    // 'cu']). Option<bool>, the archive_disabled precedent class. Absent →
+    // None (the default-ON rate limit applies).
+    let cli_rate_limit_disabled =
+        parse_optional_bool_field(rest, &mut cursor, b"\"cli_rate_limit_disabled\":")?;
     // custom_theme (canonical key 'c' — before the daily_* block 'd'). The active
     // custom-theme name; takes precedence over `theme` host-side. Optional.
     let custom_theme = parse_optional_string_field(rest, &mut cursor, b"\"custom_theme\":")?;
@@ -2270,6 +2403,9 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
         folder_icons,
         hidden_bar_items,
         bar_items_order,
+        cli_enabled,
+        cli_excluded_folders,
+        cli_rate_limit_disabled,
         icon,
         item_colors,
         deliberate_folders,
@@ -3097,6 +3233,9 @@ mod tests {
             attachment_ocr_enabled: true,
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
+            cli_enabled: false,
+            cli_excluded_folders: Vec::new(),
+            cli_rate_limit_disabled: None,
             show_note_timestamps: true,
             folder_icons: Default::default(),
             device_names: Default::default(),
@@ -3158,6 +3297,9 @@ mod tests {
             attachment_ocr_enabled: true,
             screen_capture_protection: false,
             bar_items_order: Vec::new(),
+            cli_enabled: false,
+            cli_excluded_folders: Vec::new(),
+            cli_rate_limit_disabled: None,
             show_note_timestamps: true,
             folder_icons: Default::default(),
             device_names: Default::default(),
@@ -3478,6 +3620,9 @@ mod tests {
                 attachment_ocr_enabled: true,
                 screen_capture_protection: true,
                 bar_items_order: Vec::new(),
+                cli_enabled: false,
+                cli_excluded_folders: Vec::new(),
+                cli_rate_limit_disabled: None,
                 icon: None,
                 ai_enabled: false,
                 ai_excluded_folders: Vec::new(),
@@ -3541,6 +3686,9 @@ mod tests {
                 attachment_ocr_enabled: true,
                 screen_capture_protection: false,
                 bar_items_order: Vec::new(),
+                cli_enabled: false,
+                cli_excluded_folders: Vec::new(),
+                cli_rate_limit_disabled: None,
                 icon: None,
                 ai_enabled: false,
                 ai_excluded_folders: Vec::new(),
@@ -4727,6 +4875,9 @@ mod tests {
             attachment_ocr_enabled: true,
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
+            cli_enabled: false,
+            cli_excluded_folders: Vec::new(),
+            cli_rate_limit_disabled: None,
             archived_folders: Vec::new(),
             show_note_timestamps: true,
             folder_icons: Default::default(),
@@ -5025,6 +5176,9 @@ mod tests {
             attachment_ocr_enabled: true,
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
+            cli_enabled: false,
+            cli_excluded_folders: Vec::new(),
+            cli_rate_limit_disabled: None,
             show_note_timestamps: true,
             folder_icons: Default::default(),
             device_names: Default::default(),
@@ -5092,6 +5246,9 @@ mod tests {
             attachment_ocr_enabled: true,
             screen_capture_protection: false,
             bar_items_order: Vec::new(),
+            cli_enabled: false,
+            cli_excluded_folders: Vec::new(),
+            cli_rate_limit_disabled: None,
             show_note_timestamps: true,
             folder_icons: Default::default(),
             device_names: Default::default(),
@@ -5162,6 +5319,9 @@ mod tests {
             attachment_ocr_enabled: true,
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
+            cli_enabled: false,
+            cli_excluded_folders: Vec::new(),
+            cli_rate_limit_disabled: None,
             show_note_timestamps: true,
             folder_icons: Default::default(),
             device_names: Default::default(),
@@ -5227,6 +5387,9 @@ mod tests {
             attachment_ocr_enabled: true,
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
+            cli_enabled: false,
+            cli_excluded_folders: Vec::new(),
+            cli_rate_limit_disabled: None,
             show_note_timestamps: true,
             folder_icons: Default::default(),
             device_names: Default::default(),
@@ -5352,6 +5515,9 @@ mod tests {
             attachment_ocr_enabled: true,
             screen_capture_protection: false,
             bar_items_order: Vec::new(),
+            cli_enabled: false,
+            cli_excluded_folders: Vec::new(),
+            cli_rate_limit_disabled: None,
             show_note_timestamps: true,
             folder_icons: Default::default(),
             device_names: Default::default(),
@@ -5442,6 +5608,9 @@ mod tests {
             field_clocks: Default::default(),
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
+            cli_enabled: false,
+            cli_excluded_folders: Vec::new(),
+            cli_rate_limit_disabled: None,
             show_note_timestamps: true,
             folder_icons: Default::default(),
             device_names: Default::default(),
@@ -5515,6 +5684,9 @@ mod tests {
             attachment_ocr_enabled: true,
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
+            cli_enabled: false,
+            cli_excluded_folders: Vec::new(),
+            cli_rate_limit_disabled: None,
             show_note_timestamps: true,
             folder_icons: Default::default(),
             device_names: Default::default(),
@@ -5619,6 +5791,9 @@ mod tests {
             field_clocks: Default::default(),
             screen_capture_protection: false,
             bar_items_order: Vec::new(),
+            cli_enabled: false,
+            cli_excluded_folders: Vec::new(),
+            cli_rate_limit_disabled: None,
             show_note_timestamps: true,
             folder_icons: Default::default(),
             device_names: Default::default(),
@@ -5706,6 +5881,9 @@ mod tests {
             attachment_ocr_enabled: true,
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
+            cli_enabled: false,
+            cli_excluded_folders: Vec::new(),
+            cli_rate_limit_disabled: None,
             show_note_timestamps: true,
             folder_icons: map_of(&[("Projects/", "book")]),
             device_names: Default::default(),
@@ -5823,6 +6001,146 @@ mod tests {
         assert_eq!(decoded.bar_items_order, order);
     }
 
+    // ---- cli_enabled / cli_excluded_folders / cli_rate_limit_disabled
+    // (myne-cli epic, MYND-490; `cli-thin-client` task 2) ------------------
+
+    #[test]
+    fn cli_enabled_omitted_when_false_emitted_only_when_true() {
+        let off = canonical_json_encode(&PrefsView {
+            cli_enabled: false,
+            ..PrefsView::default()
+        });
+        assert!(!core::str::from_utf8(&off).unwrap().contains("cli_enabled"));
+        let on = canonical_json_encode(&PrefsView {
+            cli_enabled: true,
+            ..PrefsView::default()
+        });
+        assert_eq!(
+            on.as_slice(),
+            br#"{"cli_enabled":true,"screen_capture_protection":true}"#,
+        );
+    }
+
+    #[test]
+    fn cli_excluded_folders_omitted_when_empty_present_when_set() {
+        let empty = canonical_json_encode(&PrefsView {
+            cli_excluded_folders: Vec::new(),
+            ..PrefsView::default()
+        });
+        assert!(!core::str::from_utf8(&empty)
+            .unwrap()
+            .contains("cli_excluded_folders"));
+        let set = canonical_json_encode(&PrefsView {
+            cli_excluded_folders: alloc::vec![alloc::string::String::from("Secret/")],
+            ..PrefsView::default()
+        });
+        assert_eq!(
+            set.as_slice(),
+            br#"{"cli_excluded_folders":["Secret/"],"screen_capture_protection":true}"#,
+        );
+    }
+
+    #[test]
+    fn cli_excluded_folders_canonicalized_nfc_sorted_deduped() {
+        // Same canonical set encoding as ai_excluded_folders / deliberate_folders:
+        // NFC-normalized, lexicographically sorted, exact-deduped.
+        let nfd_cafe = alloc::string::String::from("Cafe\u{0301}/"); // "Café/" as NFD
+        let encoded = canonical_json_encode(&PrefsView {
+            cli_excluded_folders: alloc::vec![
+                alloc::string::String::from("Zeta/"),
+                nfd_cafe,
+                alloc::string::String::from("Alpha/"),
+                alloc::string::String::from("Alpha/"),
+            ],
+            ..PrefsView::default()
+        });
+        assert_eq!(
+            encoded.as_slice(),
+            "{\"cli_excluded_folders\":[\"Alpha/\",\"Café/\",\"Zeta/\"],\"screen_capture_protection\":true}"
+                .as_bytes(),
+        );
+    }
+
+    #[test]
+    fn encode_omits_cli_rate_limit_disabled_when_none_byte_identical_to_pre_feature() {
+        let encoded = canonical_json_encode(&PrefsView {
+            cli_rate_limit_disabled: None,
+            ..PrefsView::default()
+        });
+        assert_eq!(encoded.as_slice(), br#"{"screen_capture_protection":true}"#);
+    }
+
+    #[test]
+    fn encode_emits_cli_fields_between_bar_items_order_and_custom_theme() {
+        // Canonical key order: bar_items_order (b) < cli_enabled <
+        // cli_excluded_folders < cli_rate_limit_disabled < custom_theme (c).
+        let encoded = canonical_json_encode(&PrefsView {
+            bar_items_order: alloc::vec!["graph".into()],
+            cli_enabled: true,
+            cli_excluded_folders: alloc::vec![alloc::string::String::from("Work/")],
+            cli_rate_limit_disabled: Some(true),
+            custom_theme: Some("midnight".into()),
+            ..PrefsView::default()
+        });
+        assert_eq!(
+            encoded.as_slice(),
+            br#"{"bar_items_order":["graph"],"cli_enabled":true,"cli_excluded_folders":["Work/"],"cli_rate_limit_disabled":true,"custom_theme":"midnight","screen_capture_protection":true}"#,
+        );
+        // The non-default `false` is persisted explicitly (Some(false) != None).
+        let off = canonical_json_encode(&PrefsView {
+            cli_rate_limit_disabled: Some(false),
+            ..PrefsView::default()
+        });
+        assert_eq!(
+            off.as_slice(),
+            br#"{"cli_rate_limit_disabled":false,"screen_capture_protection":true}"#,
+        );
+    }
+
+    #[test]
+    fn cli_fields_round_trip_through_decode() {
+        let original = PrefsView {
+            bar_items_order: alloc::vec!["tags".into()],
+            cli_enabled: true,
+            cli_excluded_folders: alloc::vec![
+                alloc::string::String::from("Alpha/"),
+                alloc::string::String::from("Beta/"),
+            ],
+            cli_rate_limit_disabled: Some(true),
+            custom_theme: Some("midnight".into()),
+            ..PrefsView::default()
+        };
+        let encoded = canonical_json_encode(&original);
+        let decoded = canonical_json_decode(&encoded).expect("decode");
+        assert_eq!(decoded, original);
+    }
+
+    #[test]
+    fn cli_fields_default_off_empty_none_when_absent_on_decode() {
+        // A pre-feature blob (no cli_* keys) decodes to the defaults — closed
+        // door, empty exclusion set, unset rate-limit toggle — spec § 9.5.2
+        // forward-compat fall-back.
+        let decoded =
+            canonical_json_decode(br#"{"screen_capture_protection":true}"#).expect("decode");
+        assert!(!decoded.cli_enabled);
+        assert!(decoded.cli_excluded_folders.is_empty());
+        assert_eq!(decoded.cli_rate_limit_disabled, None);
+    }
+
+    #[test]
+    fn cli_rate_limit_disabled_round_trips_through_decode() {
+        for value in [Some(true), Some(false), None] {
+            let original = PrefsView {
+                cli_rate_limit_disabled: value,
+                ..PrefsView::default()
+            };
+            let encoded = canonical_json_encode(&original);
+            let decoded = canonical_json_decode(&encoded).expect("decode");
+            assert_eq!(decoded, original);
+            assert_eq!(decoded.cli_rate_limit_disabled, value);
+        }
+    }
+
     // ---- editor toolbar / slash customization (MYND-336) ---------------
 
     #[test]
@@ -5894,6 +6212,9 @@ mod tests {
             attachment_ocr_enabled: true,
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
+            cli_enabled: false,
+            cli_excluded_folders: Vec::new(),
+            cli_rate_limit_disabled: None,
             show_note_timestamps: true,
             folder_icons: Default::default(),
             device_names: Default::default(),
@@ -5959,6 +6280,9 @@ mod tests {
             attachment_ocr_enabled: true,
             screen_capture_protection: false,
             bar_items_order: Vec::new(),
+            cli_enabled: false,
+            cli_excluded_folders: Vec::new(),
+            cli_rate_limit_disabled: None,
             show_note_timestamps: true,
             folder_icons: Default::default(),
             device_names: Default::default(),
@@ -6026,6 +6350,9 @@ mod tests {
             attachment_ocr_enabled: true,
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
+            cli_enabled: false,
+            cli_excluded_folders: Vec::new(),
+            cli_rate_limit_disabled: None,
             show_note_timestamps: true,
             folder_icons: Default::default(),
             device_names: Default::default(),
@@ -6161,6 +6488,9 @@ mod tests {
             attachment_ocr_enabled: true,
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
+            cli_enabled: false,
+            cli_excluded_folders: Vec::new(),
+            cli_rate_limit_disabled: None,
             show_note_timestamps: true,
             folder_icons: Default::default(),
             device_names: Default::default(),
@@ -6270,6 +6600,9 @@ mod tests {
             attachment_ocr_enabled: true,
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
+            cli_enabled: false,
+            cli_excluded_folders: Vec::new(),
+            cli_rate_limit_disabled: None,
             archived_folders: Vec::new(),
             show_note_timestamps: true,
             folder_icons: Default::default(),
@@ -6569,6 +6902,9 @@ mod tests {
             attachment_ocr_enabled: true,
             screen_capture_protection: false,
             bar_items_order: Vec::new(),
+            cli_enabled: false,
+            cli_excluded_folders: Vec::new(),
+            cli_rate_limit_disabled: None,
             show_note_timestamps: true,
             folder_icons: Default::default(),
             device_names: Default::default(),
@@ -6638,6 +6974,9 @@ mod tests {
             attachment_ocr_enabled: true,
             screen_capture_protection: false,
             bar_items_order: Vec::new(),
+            cli_enabled: false,
+            cli_excluded_folders: Vec::new(),
+            cli_rate_limit_disabled: None,
             show_note_timestamps: true,
             folder_icons: Default::default(),
             device_names: Default::default(),
@@ -6968,6 +7307,9 @@ mod tests {
                 attachment_ocr_enabled: true,
                 screen_capture_protection: true,
                 bar_items_order: Vec::new(),
+                cli_enabled: false,
+                cli_excluded_folders: Vec::new(),
+                cli_rate_limit_disabled: None,
                 icon: None,
                 ai_enabled: false,
                 ai_excluded_folders: Vec::new(),
@@ -7030,6 +7372,9 @@ mod tests {
                 attachment_ocr_enabled: true,
                 screen_capture_protection: false,
                 bar_items_order: Vec::new(),
+                cli_enabled: false,
+                cli_excluded_folders: Vec::new(),
+                cli_rate_limit_disabled: None,
                 icon: None,
                 ai_enabled: false,
                 ai_excluded_folders: Vec::new(),
@@ -7095,6 +7440,9 @@ mod tests {
             field_clocks: Default::default(),
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
+            cli_enabled: false,
+            cli_excluded_folders: Vec::new(),
+            cli_rate_limit_disabled: None,
             ai_enabled: false,
             ai_excluded_folders: Vec::new(),
             archived_folders: Vec::new(),

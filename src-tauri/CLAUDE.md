@@ -19,8 +19,10 @@ What stays desktop-side: the `tauri::Builder` wiring in `lib.rs`, the per-plugin
 ## Frontend coupling (don't break)
 
 `tauri.conf.json` declares:
-- `beforeDevCommand: "pnpm dev"`
-- `beforeBuildCommand: "pnpm build"`
+- `beforeDevCommand: "pnpm sidecar && pnpm dev"`
+- `beforeBuildCommand: "pnpm sidecar:release && pnpm build"`
+
+The `pnpm sidecar` half is load-bearing, not a convenience: it builds and stages the `myne` CLI binary under the target-triple name `bundle.externalBin` expects (`scripts/build-cli-sidecar.mjs`, MYND-490). Drop it and `tauri build` fails to find the sidecar; drop it from the dev hook and `pnpm tauri dev` runs against a stale one.
 
 **pnpm only.** Switching to npm/yarn here breaks Tauri's lifecycle hooks. Node is pinned by `.nvmrc` at repo root (25.9.0); the pnpm version is pinned by the `packageManager` field in the root `package.json` (`pnpm@11.8.0`).
 

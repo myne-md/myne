@@ -120,6 +120,12 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::set_editor_toolbar_hidden,
             commands::set_editor_slash_order,
             commands::set_editor_slash_hidden,
+            // myne-cli epic (MYND-490; cli-thin-client task 2). Each needs a
+            // matching allow- entry in permissions/prefs/default.toml — see
+            // the security-regression note above.
+            commands::set_cli_enabled,
+            commands::set_cli_excluded_folders,
+            commands::set_cli_rate_limit_disabled,
         ])
         .build()
 }
