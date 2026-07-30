@@ -25,6 +25,29 @@ impl<R: Runtime> DesktopHooks<R> {
 
 impl<R: Runtime> VaultLifecycleHooks for DesktopHooks<R> {
     // ---- Group 1: async ---------------------------------------------------
+    fn hydrate_attachment_refs<'a>(&'a self, state: &'a VaultRuntimeState) -> BoxFuture<'a> {
+        // Same shape as `reclaim_stray_attachment_blobs` below: a plain core
+        // helper, reached through the host seam rather than an `AppHandle`.
+        let host = myne_core::host::tauri_host::TauriHost::new(self.app.clone());
+        let app = self.app.clone();
+        Box::pin(async move {
+            // The graph itself is managed host-side; without it there is
+            // nothing to fill, which is the mobile/no-plugin case.
+            let Some(refs) =
+                app.try_state::<myne_core::plugins::attachments::reconcile::AttachmentRefsState>()
+            else {
+                return;
+            };
+            myne_core::plugins::attachments::commands::hydrate_attachment_refs_core(
+                &host,
+                &myne_core::vault_io::StdVaultIo,
+                state,
+                refs.inner(),
+            )
+            .await
+        })
+    }
+
     fn hydrate_search_index<'a>(&'a self, state: &'a VaultRuntimeState) -> BoxFuture<'a> {
         let app = self.app.clone();
         Box::pin(async move {

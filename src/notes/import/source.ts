@@ -31,6 +31,7 @@
 // Evernote adapter bounds it with a size cap (MYND-581). No counting pre-pass and
 // no indeterminate progress bar.
 
+import type { CompressionTally } from "../../editor/attachments/insert";
 import type { IgnoreCounts } from "./skipPredicate";
 
 /** One external directory entry — mirrors the Rust `ImportDirEntry`. */
@@ -94,6 +95,20 @@ export interface LoadedItem {
    * import-report note. Empty for a lossless source like Obsidian `.md`.
    */
   lossy: readonly string[];
+  /**
+   * Ingest-time image compression this item's OWN media ingest performed, for a
+   * source that ingests inside `load()` rather than through the engine's
+   * `importMedia` port (Evernote inlines its resources as base64, so it has no
+   * media path for that port to resolve).
+   *
+   * Absent for every path-based source: there the engine tallies
+   * `processImportedMedia`'s own report instead, and a source reporting the same
+   * bytes twice would double-count them. `decisions.md` 2026-07-30 makes the
+   * disclosure at import what stands in for a consent gate, so a route that
+   * ingests images without reaching that port still owes the user a tally —
+   * this is how it hands one over.
+   */
+  compression?: CompressionTally;
 }
 
 /**

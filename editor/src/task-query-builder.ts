@@ -13,6 +13,7 @@
 // alone from the first version, for the same reason the chip editor is: a
 // surface that is the only route to a feature cannot be mouse-only.
 
+import "./task-surfaces.css";
 import { openModal } from "./host/lib/imperative-modal";
 import i18n from "@myne/editor/i18n";
 
@@ -134,6 +135,10 @@ export function openTaskQueryBuilder(options: Options): QueryBuilderHandle {
   let inserted = false;
 
   const modal = openModal({
+    // A dimmed, viewport-spanning backdrop that centers the dialog. Without a
+    // class the backdrop is an unstyled zero-size div, so the builder rendered
+    // at the top-left corner of the page with no chrome — the defect this closes.
+    backdropClass: "cm-task-query-builder-backdrop",
     onDismiss: () => {
       modal.close();
       if (!inserted) options.onCancel?.();

@@ -1261,7 +1261,10 @@
         "export": "Dışa aktar…",
         "includeAttachments_one": "{{count}} eki dahil et",
         "includeAttachments_other": "{{count}} eki dahil et",
-        "title": "Markdown olarak dışa aktar"
+        "title": "Markdown olarak dışa aktar",
+        "copyLabel": "Not metnini panoya kopyala",
+        "copied": "Not metni kopyalandı",
+        "copyFailed": "Not metni kopyalanamadı"
       }
     },
     "egress": {

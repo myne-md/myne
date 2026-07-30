@@ -87,7 +87,20 @@ export const myneTheme = EditorView.theme({
   // which otherwise win over a plain `.cm-selectionBackground` rule — leaving the
   // library's unreadable default wash (the bug). `!important` guarantees ours
   // applies in both focus states.
-  ".cm-selectionBackground, ::selection": {
+  // Only the DRAWN layer. The bare `::selection` that used to ride along in this
+  // selector list is gone: `drawSelection` already paints the selection itself
+  // and zeroes the native one inside `.cm-line` (both the compound and the
+  // descendant form, `Prec.highest` + `!important`), so a second rule
+  // re-asserting a native `::selection` background across the whole editor
+  // could only ever paint ON TOP of the drawn band — two washes over the same
+  // text, in two tones. That is the double highlight.
+  //
+  // It is not needed for anything: the one place the drawn layer genuinely
+  // cannot be seen is a fenced code card, whose opaque body paints over it, and
+  // that case has its own deliberate carve-out below at a specificity chosen to
+  // out-rank the upstream zeroing. Outside the editor, `tokens.css`'s global
+  // `::selection` still styles ordinary UI text.
+  ".cm-selectionBackground": {
     backgroundColor: "var(--selection-bg, rgba(44, 74, 122, 0.24)) !important",
   },
   "&.cm-focused .cm-selectionBackground": {

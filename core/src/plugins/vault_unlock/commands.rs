@@ -2088,6 +2088,7 @@ mod tests {
                 &prefs_key,
                 &parsed_meta.account_number_hash,
                 &protocol::PrefsView {
+                    attachment_compression_enabled: true,
                     developer_mode: false,
                     attachment_ocr_enabled: true,
                     transcription_enabled: true,
@@ -2251,6 +2252,7 @@ mod tests {
             &prefs_key,
             &account_hash,
             &protocol::PrefsView {
+                attachment_compression_enabled: true,
                 developer_mode: false,
                 attachment_ocr_enabled: true,
                 transcription_enabled: true,

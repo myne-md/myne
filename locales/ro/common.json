@@ -1296,7 +1296,10 @@
         "includeAttachments_one": "Include {{count}} atașament",
         "includeAttachments_few": "Include {{count}} atașamente",
         "includeAttachments_other": "Include {{count}} de atașamente",
-        "title": "Exportă ca Markdown"
+        "title": "Exportă ca Markdown",
+        "copyLabel": "Copiază textul notiței în clipboard",
+        "copied": "Textul notiței a fost copiat",
+        "copyFailed": "Textul notiței nu a putut fi copiat"
       }
     },
     "egress": {

@@ -18,6 +18,11 @@
 // external DTD and resolves no external entity — see `html/parse.ts` for why that
 // makes the no-remote-fetch anti-feature structural here rather than procedural.
 
+import {
+  tallyCompression,
+  type CompressionTally,
+  type ImportedAttachment,
+} from "../../../editor/attachments/insert";
 import { htmlToMarkdown } from "../html";
 import { MarkupParseError, parseMarkup } from "../html/parse";
 import { emptyIgnoreCounts } from "../skipPredicate";
@@ -50,12 +55,19 @@ export class EnexTooLargeError extends Error {
   }
 }
 
-/** Ingest raw bytes as a vault attachment. Injected so this module needs no Tauri. */
+/** Ingest raw bytes as a vault attachment. Injected so this module needs no Tauri.
+ *
+ *  Returns the WHOLE stored attachment rather than the `{id, filename}` the
+ *  rewrite needs: ingest-time image compression is gated in shared core, so a
+ *  resource arriving here is downscaled and re-encoded exactly as a pasted image
+ *  is, and the `original_size` that says so lives on the attachment. Narrowing
+ *  the return type here is what previously made this — the one bulk route that
+ *  ingests without a media path — compress in silence. */
 export type BytesIngestor = (
   bytes: Uint8Array,
   filename: string,
   mime: string | null,
-) => Promise<{ id: string; filename: string } | null>;
+) => Promise<ImportedAttachment | null>;
 
 export interface EnexSourceOptions {
   /** Wired in production to `attachment_import {kind:"bytes"}`. Omitted → resources
@@ -163,11 +175,13 @@ export function createEnexSource(
       // as XML first so `<en-crypt>` / `<en-media>` are addressable elements.
       const enml = note.querySelector("content")?.textContent ?? "";
       let body = enml;
+      let compression: CompressionTally | undefined;
       if (enml.trim().length > 0) {
         try {
           const inner = parseMarkup(enml, "xml");
           if (preserveEnCrypt(inner) > 0) lossy.add("evernote-encrypted-block");
-          await rewriteResources(inner, note, options.ingestBytes, lossy);
+          const stored = await rewriteResources(inner, note, options.ingestBytes, lossy);
+          compression = tallyCompression(stored);
           body = inner.documentElement.innerHTML;
         } catch {
           // Malformed ENML: fall through to the lenient HTML path below rather than
@@ -178,7 +192,7 @@ export function createEnexSource(
 
       const converted = await htmlToMarkdown(body, "html");
       for (const l of converted.lossy) lossy.add(l);
-      return { markdown: converted.markdown, lossy: [...lossy].sort() };
+      return { markdown: converted.markdown, lossy: [...lossy].sort(), compression };
     },
   };
 }
@@ -191,15 +205,20 @@ export function createEnexSource(
  * `<resource>` is found by comparing hashes — and because the payload is base64
  * INLINE rather than a path, ingestion needs the bytes seam, not the media-path
  * resolver the Obsidian importer uses.
+ *
+ * Returns every attachment actually stored, so the caller can tally what
+ * ingest-time compression did to them — the disclosure obligation the bytes seam
+ * carries in place of the media port's.
  */
 async function rewriteResources(
   inner: Document,
   note: Element,
   ingestBytes: BytesIngestor | undefined,
   lossy: Set<string>,
-): Promise<void> {
+): Promise<ImportedAttachment[]> {
+  const stored: ImportedAttachment[] = [];
   const medias = Array.from(inner.querySelectorAll("en-media"));
-  if (medias.length === 0) return;
+  if (medias.length === 0) return stored;
 
   const resources = Array.from(note.querySelectorAll("resource"));
 
@@ -218,6 +237,7 @@ async function rewriteResources(
         const ingested = await ingestBytes(bytes, filename, mime);
         if (ingested !== null) {
           replacement = `![[att:${ingested.id}|${ingested.filename}]]`;
+          stored.push(ingested);
         }
       }
     }
@@ -233,6 +253,8 @@ async function rewriteResources(
     }
     media.replaceWith(node);
   }
+
+  return stored;
 }
 
 /** The `<resource>` whose data hash matches an `<en-media hash>`, if identifiable. */

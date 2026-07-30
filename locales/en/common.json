@@ -574,6 +574,12 @@
         "renameFailed": "Couldn't rename the attachment.",
         "saveDialogFailed": "Couldn't open the save dialog."
       },
+      "compression": {
+        "bulkNotice_one": "{{count}} image compressed: {{from}} → {{to}}",
+        "bulkNotice_other": "{{count}} images compressed: {{from}} → {{to}}",
+        "notice": "Compressed: {{from}} → {{to}}",
+        "noticeContainerChanged": "Compressed to {{format}}: {{from}} → {{to}}"
+      },
       "convert": {
         "cancel": "Cancel",
         "confirm": "Convert",
@@ -650,7 +656,10 @@
         "exportAria": "Export attachment",
         "imagePreview": "Image preview",
         "pdfFallback": "PDF",
-        "pdfPreview": "PDF preview"
+        "pdfPreview": "PDF preview",
+        "zoomIn": "Zoom in",
+        "zoomOut": "Zoom out",
+        "zoomReset": "Reset zoom"
       },
       "menu": {
         "actionsAria": "Attachment actions"
@@ -1004,7 +1013,13 @@
     "taskField": {
       "invalidDue": "Myne can't read this date, so it isn't shown as a due date.",
       "invalidPriority": "Myne can't read this priority. Use highest, high, medium, low or lowest.",
-      "invalidRepeat": "Myne doesn't recognise this repeat rule, so this task won't repeat."
+      "invalidRepeat": "Myne doesn't recognise this repeat rule, so this task won't repeat.",
+      "save": "Save",
+      "title": {
+        "due": "Due date",
+        "repeat": "Repeat",
+        "priority": "Priority"
+      }
     },
     "toolbar": {
       "apply": "Apply",
@@ -1276,7 +1291,10 @@
         "export": "Export…",
         "includeAttachments_one": "Include {{count}} attachment",
         "includeAttachments_other": "Include {{count}} attachments",
-        "title": "Export as Markdown"
+        "title": "Export as Markdown",
+        "copyLabel": "Copy note text to clipboard",
+        "copied": "Note text copied",
+        "copyFailed": "Couldn't copy the note text"
       }
     },
     "egress": {
@@ -1549,6 +1567,7 @@
         "setupIntro": "Myne imports and encrypts your notes on the spot — nothing leaves this device, and your original files are never changed.",
         "statCancelled": "Cancelled",
         "statCanvasSkipped": ".canvas files skipped",
+        "statCompressed": "Images compressed",
         "statEmptyFoldersKept": "Empty folders kept",
         "statMedia": "Media",
         "statOtherSkipped": "Other files skipped",
@@ -2022,7 +2041,35 @@
       "sunday": "Sunday"
     },
     "weekdaySeparator": ", ",
-    "whenDone": "{{rule}}, when done"
+    "whenDone": "{{rule}}, when done",
+    "builder": {
+      "family": "Repeat",
+      "familyInterval": "Every…",
+      "familyWeekdays": "Weekly on…",
+      "familyDayOfMonth": "Monthly on a day…",
+      "familyOrdinal": "Monthly on a weekday…",
+      "count": "Interval",
+      "unitLabel": "Unit",
+      "units": {
+        "day": "days",
+        "week": "weeks",
+        "month": "months",
+        "year": "years"
+      },
+      "ordinal": "Position",
+      "weekday": "Weekday",
+      "lastDay": "Last day",
+      "whenDone": "Repeat from the date it's completed",
+      "weekdayShort": {
+        "monday": "Mon",
+        "tuesday": "Tue",
+        "wednesday": "Wed",
+        "thursday": "Thu",
+        "friday": "Fri",
+        "saturday": "Sat",
+        "sunday": "Sun"
+      }
+    }
   },
   "restore": {
     "backLabel": "Back",
@@ -2089,7 +2136,7 @@
         "ioError": "Disk error, please try again.",
         "joinFailure": "Something went wrong, please try again.",
         "samePasswordRejected": "New password matches the current one.",
-          "serverAckPending": "Your new password works on this device, but Myne couldn't reach the server to save it. Until it does, your other devices still expect the old password — and if this browser's copy is cleared before then, the change is lost. It will retry automatically.",
+        "serverAckPending": "Your new password works on this device, but Myne couldn't reach the server to save it. Until it does, your other devices still expect the old password — and if this browser's copy is cleared before then, the change is lost. It will retry automatically.",
         "weakNewPassword": "New password must be at least 12 characters."
       },
       "changePasswordHeading": "Change password",
@@ -2152,6 +2199,13 @@
       "off": "Off",
       "on": "On",
       "saveError": "Could not update the archiving setting."
+    },
+    "attachmentCompression": {
+      "label": "Compress images on import",
+      "helper": "Shrinks pasted or dropped images before they are encrypted and stored, so your vault, backups, and sync stay smaller. This is irreversible — the original file is not kept.",
+      "helperScopeEveryDevice": "Applies to the whole vault, on every device.",
+      "helperScopeNotHere": "Applies to the whole vault, but not in this browser — images added here are stored exactly as given.",
+      "errorSaveSetting": "Could not save this setting."
     },
     "transcription": {
       "label": "Speech-to-text",
@@ -2694,8 +2748,9 @@
         "spell": "spell check spelling dictionary autocorrect",
         "spellLanguages": "spell languages dictionaries locale words",
         "startupOpen": "startup open default file launch boot which note",
+        "attachmentOcr": "ocr image scan scanned pdf photo screenshot text recognition search inside attachments cpu battery",
+        "attachmentCompression": "compress compression image shrink downscale resize webp jpeg import paste vault size storage",
         "transcription": "transcribe transcription speech voice audio dictation subtitle whisper recording sound to text",
-          "attachmentOcr": "ocr image scan scanned pdf photo screenshot text recognition search inside attachments cpu battery",
         "syncAddDevice": "add device pair link phone laptop sync",
         "syncConflicts": "conflicts merge resolve versions sync",
         "syncDevices": "devices linked paired sync machines",
@@ -2816,14 +2871,14 @@
       "connect": "Connect",
       "connectedLocal": "Connected (local, no TLS).",
       "connectedTls": "Connected. Check that this fingerprint matches on your other device.",
-      "connectedPlatformTrust": "Connected over TLS. Your browser verified this server\u2019s certificate.",
+      "connectedPlatformTrust": "Connected over TLS. Your browser verified this server’s certificate.",
       "connecting": "Connecting…",
       "fingerprintLabel": "Server certificate fingerprint:",
       "pinStatic": "Verified against Myne’s built-in certificate.",
       "pinTofu": "Pinned on first connect. Compare this fingerprint across your devices.",
       "fixedOrigin": "This client syncs with one server, set when it was deployed. It cannot be changed from here — the page is only allowed to talk to this one address.",
       "fixedOriginNone": "No sync server is configured for this deployment.",
-      "pinPlatformTrust": "Verified by your browser\u2019s certificate store. This client cannot pin a certificate itself.",
+      "pinPlatformTrust": "Verified by your browser’s certificate store. This client cannot pin a certificate itself.",
       "placeholder": "https://your-server.example   ·   http://127.0.0.1:8080",
       "unreachable": "Couldn’t reach that server — check the URL and that it’s running."
     },
@@ -2925,7 +2980,7 @@
       "errorAuth": "Sync sign-in expired",
       "errorFrozen": "Account frozen — uploads paused",
       "errorDeviceRevoked": "This device was removed from your account",
-        "errorStorageFull": "Storage full — syncing paused",
+      "errorStorageFull": "Storage full — syncing paused",
       "errorQuota": "Storage full — uploads paused",
       "errorRateLimited": "Sync throttled — retrying",
       "errorTooLarge": "A file is too large to upload",

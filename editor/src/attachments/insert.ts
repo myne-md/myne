@@ -20,6 +20,7 @@
 import { getHost } from "../host";
 import i18n from "@myne/editor/i18n";
 import { emitAttachmentEmbed } from "@myne/editor/host/notes/attachmentRef";
+import { formatBytes, typeLabel } from "@myne/editor/host/components/attachments/format";
 
 /** The success payload of `attachment_import` (mirrors Rust
  *  `ImportedAttachment`). Only the fields the insert path needs. */
@@ -206,6 +207,170 @@ export function summarizeBatch(outcomes: readonly ImportOutcome[]): string | nul
   if (added > 0) parts.push(i18n.t("editor.attachment.summary.added", { count: added }));
   parts.push(...skipParts);
   return parts.join(" · ");
+}
+
+// ---- compression notice --------------------------------------------------
+
+/** Aggregate ingest-time-compression signal across a batch of import
+ *  outcomes — the insert-time disclosure (PRD story 4). Multiple compressed
+ *  images in one batch sum their before/after bytes into a single notice
+ *  rather than stacking toasts (the toast surface shows one message at a
+ *  time); the container-change flag is `true` if any of them changed. */
+export interface CompressionSummary {
+  readonly originalBytes: number;
+  readonly finalBytes: number;
+  readonly containerChanged: boolean;
+  readonly contentType: string;
+}
+
+/**
+ * Fold a batch of outcomes into one {@link CompressionSummary}, or `null`
+ * when none of them actually compressed. `null` covers every case the notice
+ * must stay silent for: the preference off, a dedup hit, an ineligible
+ * source, or a transform that produced no improvement — `attachment_import`
+ * (`core/src/plugins/attachments/commands.rs`) only ever sets
+ * `original_size` when a fresh import's bytes actually got smaller.
+ */
+export function summarizeCompression(
+  outcomes: readonly ImportOutcome[],
+): CompressionSummary | null {
+  return summarizeCompressedAttachments(
+    outcomes.filter((o): o is Extract<ImportOutcome, { ok: true }> => o.ok).map((o) => o.attachment),
+  );
+}
+
+/**
+ * {@link summarizeCompression} over stored attachments directly, for the import
+ * routes that never build an `ImportOutcome`.
+ *
+ * Compression is gated in shared core, so it fires on **every** import route —
+ * paste, drop, `/attach`, import-&-convert, the cover picker, the vault
+ * importer, the browser clipper. The disclosure obligation follows the
+ * behaviour (`decisions.md` 2026-07-30: disclosure at import is what stands in
+ * for a consent gate), so it has to be reachable from a route that has an
+ * `ImportedAttachment` and nothing else. This is that entry point; every route
+ * folds the same way rather than each computing its own idea of the notice.
+ */
+export function summarizeCompressedAttachments(
+  attachments: readonly ImportedAttachment[],
+): CompressionSummary | null {
+  const compressed = attachments.filter((a) => a.original_size != null);
+  if (compressed.length === 0) return null;
+  // The format label names the container the swap produced, so it has to come
+  // from an attachment that actually swapped — in a mixed batch the last
+  // compressed import may be one that kept its container, and naming its type
+  // would tell the user the wrong format.
+  const swapped = compressed.filter((a) => a.container_changed === true);
+  const labelled = swapped.length > 0 ? swapped : compressed;
+  return {
+    originalBytes: compressed.reduce((sum, a) => sum + (a.original_size ?? 0), 0),
+    finalBytes: compressed.reduce((sum, a) => sum + a.size, 0),
+    containerChanged: swapped.length > 0,
+    contentType: labelled[labelled.length - 1].content_type,
+  };
+}
+
+/** Render a {@link CompressionSummary} into the insert-time notice text
+ *  (decision: reuse the existing attachment toast rather than a new surface).
+ *  Mentions the container swap (e.g. PNG → WebP) only when one occurred, so
+ *  a filename that silently changed extension does not arrive unannounced. */
+export function compressionNoticeMessage(summary: CompressionSummary): string {
+  const from = formatBytes(summary.originalBytes);
+  const to = formatBytes(summary.finalBytes);
+  return summary.containerChanged
+    ? i18n.t("editor.attachment.compression.noticeContainerChanged", {
+        format: typeLabel(summary.contentType),
+        from,
+        to,
+      })
+    : i18n.t("editor.attachment.compression.notice", { from, to });
+}
+
+/** An additive ingest-time-compression count, for the routes that import in
+ *  BULK and report a summary rather than a per-batch toast (the vault importer,
+ *  the browser clipper). Additive on purpose: those routes accumulate across
+ *  many notes/pages and cannot hold every {@link CompressionSummary} to fold at
+ *  the end, and unlike a summary this carries no format label — naming one
+ *  container across hundreds of images would be noise at best and wrong at
+ *  worst. */
+export interface CompressionTally {
+  readonly count: number;
+  readonly originalBytes: number;
+  readonly finalBytes: number;
+}
+
+/** The zero tally — the correct state for a route that imported nothing. */
+export function emptyCompressionTally(): CompressionTally {
+  return { count: 0, originalBytes: 0, finalBytes: 0 };
+}
+
+/** Tally the compressed subset of `attachments`. Uncompressed imports
+ *  contribute nothing, so an all-uncompressed batch yields the zero tally and
+ *  the surface stays silent. */
+export function tallyCompression(
+  attachments: readonly ImportedAttachment[],
+): CompressionTally {
+  let count = 0;
+  let originalBytes = 0;
+  let finalBytes = 0;
+  for (const a of attachments) {
+    if (a.original_size == null) continue;
+    count += 1;
+    originalBytes += a.original_size;
+    finalBytes += a.size;
+  }
+  return { count, originalBytes, finalBytes };
+}
+
+/** Merge two tallies. */
+export function addCompressionTally(
+  a: CompressionTally,
+  b: CompressionTally,
+): CompressionTally {
+  return {
+    count: a.count + b.count,
+    originalBytes: a.originalBytes + b.originalBytes,
+    finalBytes: a.finalBytes + b.finalBytes,
+  };
+}
+
+/** Render a {@link CompressionTally} as the bulk-import disclosure line, or
+ *  `null` when nothing was compressed — a notice that appears when nothing
+ *  happened is how a user learns to stop reading notices. */
+export function compressionTallyMessage(tally: CompressionTally): string | null {
+  if (tally.count === 0) return null;
+  return i18n.t("editor.attachment.compression.bulkNotice", {
+    count: tally.count,
+    from: formatBytes(tally.originalBytes),
+    to: formatBytes(tally.finalBytes),
+  });
+}
+
+/**
+ * The ONE toast message a finished batch deserves, or `null` for silence.
+ *
+ * The toast surface shows a single message at a time (`toast.ts` replaces the
+ * visible one), so the composition happens here rather than by calling
+ * `showAttachmentToast` twice and letting the second win.
+ *
+ * Both parts are kept when both fire — they answer different questions and
+ * neither substitutes for the other. Drop five images, four over the 64 MiB
+ * cap and one compressed, and "Compressed to WebP: 149 KiB → 40 KiB" alone
+ * would be a true sentence that hides the more actionable fact: four files did
+ * not arrive. The compression disclosure leads because it is the irreversible
+ * half, and the skip count follows, joined with the same `" · "` separator
+ * `summarizeBatch` already uses between its own parts.
+ *
+ * Every insert path (paste, drop, `/attach`) announces through this, so the
+ * composition is a decision stated once instead of a call-order convention
+ * copied between call sites.
+ */
+export function importToastMessage(outcomes: readonly ImportOutcome[]): string | null {
+  const compression = summarizeCompression(outcomes);
+  const batch = summarizeBatch(outcomes);
+  if (compression === null) return batch;
+  const notice = compressionNoticeMessage(compression);
+  return batch === null ? notice : `${notice} · ${batch}`;
 }
 
 // ---- imported filename-only ref parse (import-&-convert) ----------------

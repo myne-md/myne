@@ -33,6 +33,7 @@ import {
 } from "../../../src/notes/import/notion/transform";
 import { buildImportReport, formatStamp, reportTitle } from "../../../src/notes/import/report";
 import type { ImportPorts, ImportSink } from "../../../src/notes/import/source";
+import type { ImportedAttachment } from "../../../src/editor/attachments/insert";
 
 const HEX = "1a2b3c4d5e6f7890abcdef1234567890";
 
@@ -194,6 +195,21 @@ const ENEX = (notes: string): string =>
   '<!DOCTYPE en-export SYSTEM "http://xml.evernote.com/pub/evernote-export3.dtd">' +
   `<en-export>${notes}</en-export>`;
 
+/** A stored-attachment payload for the bytes seam, defaulted to the
+ *  no-compression shape (`original_size` absent) so a test that cares only
+ *  about the rewrite says nothing about compression. */
+function ingestedAttachment(over: Partial<ImportedAttachment> = {}): ImportedAttachment {
+  return {
+    id: "deadbeef",
+    content_type: "image/png",
+    filename: "pic.png",
+    size: 2,
+    created_at: 0,
+    deduplicated: false,
+    ...over,
+  };
+}
+
 describe("Evernote adapter", () => {
   it("turns ONE file into N notes (the shape the walk could not express)", async () => {
     const ports = fakePorts(
@@ -264,13 +280,70 @@ describe("Evernote adapter", () => {
       ingestBytes: async (bytes, filename) => {
         expect(new TextDecoder().decode(bytes)).toBe("hi");
         expect(filename).toBe("pic.png");
-        return { id: "deadbeef", filename };
+        return ingestedAttachment({ id: "deadbeef", filename });
       },
     });
     await src.plan();
     const loaded = await src.load({ relPath: "WithMedia.md", handle: 0 });
     expect(loaded.markdown).toContain("att:deadbeef");
     expect(loaded.lossy).not.toContain("evernote-attachment");
+  });
+
+  // `decisions.md` 2026-07-30 makes disclosure at import the thing that stands
+  // in for a consent gate, and a bulk route is where discarded pixels would be
+  // LEAST noticed. Evernote is the one source that ingests through the bytes
+  // seam instead of the engine's media port, so its tally has to travel out of
+  // `load()` or the import summary reports nothing at all.
+  it("reports what ingest-time compression did to its resources", async () => {
+    const ports = fakePorts(
+      {},
+      {
+        "/e/c.enex": ENEX(
+          "<note><title>Shrunk</title>" +
+            '<content><![CDATA[<en-note><en-media type="image/png" hash="abc"/></en-note>]]></content>' +
+            '<resource><data encoding="base64" hash="abc">aGk=</data>' +
+            "<resource-attributes><file-name>pic.png</file-name></resource-attributes></resource>" +
+            "</note>",
+        ),
+      },
+    );
+    const src = createEnexSource("/e/c.enex", ports, {
+      ingestBytes: async (_bytes, filename) =>
+        ingestedAttachment({
+          id: "deadbeef",
+          filename,
+          size: 40_000,
+          original_size: 150_000,
+          container_changed: true,
+        }),
+    });
+    const sink = recordingSink();
+    const result = await importFromSource(src, sink, new Set(), "skip");
+    expect(result.compression).toEqual({
+      count: 1,
+      originalBytes: 150_000,
+      finalBytes: 40_000,
+    });
+  });
+
+  it("reports a zero tally when its resources were stored untouched", async () => {
+    const ports = fakePorts(
+      {},
+      {
+        "/e/u.enex": ENEX(
+          "<note><title>Untouched</title>" +
+            '<content><![CDATA[<en-note><en-media type="image/png" hash="abc"/></en-note>]]></content>' +
+            '<resource><data encoding="base64" hash="abc">aGk=</data>' +
+            "<resource-attributes><file-name>pic.png</file-name></resource-attributes></resource>" +
+            "</note>",
+        ),
+      },
+    );
+    const src = createEnexSource("/e/u.enex", ports, {
+      ingestBytes: async (_bytes, filename) => ingestedAttachment({ id: "deadbeef", filename }),
+    });
+    const result = await importFromSource(src, recordingSink(), new Set(), "skip");
+    expect(result.compression).toEqual({ count: 0, originalBytes: 0, finalBytes: 0 });
   });
 
   it("falls back to a reported placeholder when no ingestor is wired", async () => {

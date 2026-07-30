@@ -1296,7 +1296,10 @@
         "includeAttachments_one": "Inclure {{count}} pièce jointe",
         "includeAttachments_many": "Inclure {{count}} de pièces jointes",
         "includeAttachments_other": "Inclure {{count}} pièces jointes",
-        "title": "Exporter en Markdown"
+        "title": "Exporter en Markdown",
+        "copyLabel": "Copier le texte de la note dans le presse-papiers",
+        "copied": "Texte de la note copié",
+        "copyFailed": "Impossible de copier le texte de la note"
       }
     },
     "egress": {

@@ -1261,7 +1261,10 @@
         "export": "导出…",
         "includeAttachments_one": "包含 {{count}} 个附件",
         "includeAttachments_other": "包含 {{count}} 个附件",
-        "title": "导出为 Markdown"
+        "title": "导出为 Markdown",
+        "copyLabel": "将笔记文本复制到剪贴板",
+        "copied": "笔记文本已复制",
+        "copyFailed": "无法复制笔记文本"
       }
     },
     "egress": {

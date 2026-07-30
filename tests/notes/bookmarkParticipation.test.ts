@@ -138,6 +138,8 @@ function resolversFromNotes(
     hasTag: vi.fn(async () => []),
     inFolder: vi.fn(async () => []),
     search: vi.fn(async () => []),
+    titleMatch: vi.fn(async () => []),
+    hasTask: vi.fn(async () => []),
     propertyValues: vi.fn(async (key: string) => propertyValues(key)),
   };
 }
@@ -306,6 +308,8 @@ describe("bookmark folder participation — ordinary folder: frontmatter + inFol
         path === "Reading/" ? ["bm"] : [],
       ),
       search: vi.fn(async () => []),
+      titleMatch: vi.fn(async () => []),
+      hasTask: vi.fn(async () => []),
       propertyValues: vi.fn(async () => []),
     };
     const ids = await evaluateFilter(

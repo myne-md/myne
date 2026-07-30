@@ -148,6 +148,28 @@ export async function fetchVaultTasks(nonce: number): Promise<readonly VaultTask
 }
 
 /**
+ * Note ids carrying a task-list item — the `task:` search operator's leaf
+ * resolver (MYND-303). With `query`, only tasks whose raw text contains it
+ * (case-insensitive substring — a Slice-A approximation; the engine intersects
+ * the result with the live set, so trash/template/archive exclusion is not this
+ * function's job). A fresh index read per call, mirroring the `byTag` resolver.
+ */
+export async function noteIdsWithTask(
+  query: string | undefined,
+): Promise<string[]> {
+  // The raw wire shape (`VaultTaskWire`) — but this reads only `noteId` +
+  // `rawLine`, both required strings on both shapes, so no `fromWire` needed.
+  const rows = await invoke<VaultTaskWire[]>("plugin:vault-indices|vault_indices_tasks");
+  const q = query?.trim().toLowerCase();
+  const ids = new Set<string>();
+  for (const row of rows) {
+    if (q && q !== "" && !row.rawLine.toLowerCase().includes(q)) continue;
+    ids.add(row.noteId);
+  }
+  return [...ids];
+}
+
+/**
  * The vault's line-tasks, shared across every consumer. Re-reads on the existing
  * SYNC-5 index-changed nonce; N mounted consumers cause one fetch per change, not
  * N.

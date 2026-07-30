@@ -48,6 +48,10 @@ const V = {
   ],
   "src/components/settings/AppearancePanel.tsx": ["ported", "Themes + typography; all prefs-backed."],
   "src/components/settings/ArchiveSettings.tsx": ["ported", "Pure prefs toggle."],
+  "src/components/settings/AttachmentCompressionSettings.tsx": [
+    "adapted",
+    "Ships; the setter is dispatched and the preference is shared, so the toggle governs the vault. The web client itself does not perform the transform: `catch_unwind` cannot contain a decoder panic on wasm32 (core/src/plugins/attachments/compress.rs), so `is_supported_on_this_target` gates it off there rather than risk killing the Worker on a hostile image. The helper's closing scope sentence is selected by the `imageCompression` capability, so this client says the transform does not run here instead of claiming it applies on every device.",
+  ],
   "src/components/settings/AttachmentOcrSettings.tsx": [
     "adapted",
     "Ships; OCR extraction is a backend concern and its command answers per the dispatcher.",

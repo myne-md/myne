@@ -59,6 +59,11 @@ const DEFAULT_PREFS: PrefsView = {
   transcription_enabled: true,
   deliberate_folders: [],
   ai_enabled: false,
+  // ingest-image-compression: matches the Rust default. Compression is on
+  // unless the user turns it off, so the optimistic pre-read value must be
+  // `true` — starting from `false` would flash the wrong answer for
+  // effectively every vault.
+  attachment_compression_enabled: true,
   // MYND-441: matches the Rust default. OCR is on unless the user turns it off,
   // so the optimistic pre-read value must be `true` — starting from `false`
   // would flash the wrong answer for effectively every vault.

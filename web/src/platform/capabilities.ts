@@ -104,6 +104,20 @@ const ABSENT: ReadonlySet<Capability> = new Set<Capability>([
   // their obstacle was the destination, and the browser download flow answers
   // that (see `platform/download.ts`).
   "pdfExport",
+  // The TRANSFORM, not the preference. `catch_unwind` needs unwinding and
+  // `wasm32-unknown-unknown` has none, so a hostile image that panicked the
+  // third-party decoder would kill the vault Worker rather than fall back to
+  // storing the original — a successful import turning into a dead tab.
+  // `compress::is_supported_on_this_target` refuses it in the backend for
+  // exactly that reason.
+  //
+  // `attachment_compression_enabled` is NOT covered by this absence and must not
+  // be: it is shared vault content (`decisions.md` 2026-07-30), so this client
+  // reads, writes and syncs it like any other field, and a user who turns it off
+  // here turns it off for their desktop. The absence changes the COPY around the
+  // control — a helper line promising "on every device" is false in front of the
+  // one client that will not honour it — not the control.
+  "imageCompression",
   // MYND-490 (cli-thin-client task 12). The `myne` terminal client connects to
   // a local Unix socket / named pipe that the desktop process binds, and the
   // binary itself ships inside the desktop bundle as a Tauri `externalBin`. A

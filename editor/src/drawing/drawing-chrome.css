@@ -71,3 +71,60 @@
   --color-on-primary: var(--accent-on);
   --color-selection: var(--accent);
 }
+
+/* ---------------------------------------------------------------------------
+ * Touch chrome (MYND-639).
+ *
+ * Excalidraw already switches to its own mobile layout on a narrow container —
+ * the padlock + hand island in the reporter's screenshot IS its
+ * `mobile-misc-tools-container`. What it does not do is keep the main tool
+ * island inside the viewport: on a ~390pt phone the strip of tools is wider
+ * than the screen, so its tail is clipped at the right edge and the last tools
+ * cannot be reached at all, while the misc-tools island — absolutely positioned
+ * at that same right edge — is drawn on top of whatever the toolbar had there.
+ * Two floating surfaces, one set of coordinates, and a row of unreachable
+ * controls.
+ *
+ * Gated on `pointer: coarse` so the desktop layout is untouched: this is not a
+ * width breakpoint (a narrow desktop window is still a mouse, and its toolbar
+ * fits differently) but a statement about fingers.
+ *
+ * VERSION-COUPLED. These are upstream class names, not a public API, pinned
+ * against @excalidraw/excalidraw 0.18.1 (exact-pinned in package.json). A major
+ * bump has to re-check them. We reach for CSS here because the overflow and the
+ * stacking are layout, not behaviour — `UIOptions` can remove a tool but cannot
+ * tell the island to scroll.
+ * --------------------------------------------------------------------------- */
+@media (pointer: coarse) {
+  /* Reserve the misc-tools island's own width so the toolbar stops short of it
+     instead of running underneath, and let what remains scroll rather than
+     clip. `scrollbar-width: none` because a visible bar on a floating island
+     reads as a rendering fault, and the content is discoverable by swipe. */
+  .drawing-canvas-chrome .excalidraw .App-toolbar {
+    max-width: calc(100vw - 5rem);
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+    flex-wrap: nowrap;
+  }
+  .drawing-canvas-chrome .excalidraw .App-toolbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Keep the toolbar's own scroll from being hijacked by the canvas's pan
+     gesture, and stop a horizontal swipe on it from triggering the app's
+     swipe-back (the editor's own edge gesture lives on an ancestor). */
+  .drawing-canvas-chrome .excalidraw .App-toolbar {
+    touch-action: pan-x;
+    overscroll-behavior-x: contain;
+  }
+
+  /* Finger-sized targets. Excalidraw's default is mouse-sized; 44px is the
+     platform floor on both iOS and Android. Applied to the tool buttons only —
+     widening every `.ToolIcon` would also inflate the colour swatches in the
+     properties panel, which are deliberately dense. */
+  .drawing-canvas-chrome .excalidraw .App-toolbar .ToolIcon__icon {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
