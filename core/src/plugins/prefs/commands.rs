@@ -57,6 +57,34 @@ fn vault_dir_from_host(
     crate::paths::active_vault_root_io_from_host(host, active_id)
 }
 
+/// Where a [`PrefsView`] came from, for the callers that cannot treat a
+/// § 9.5.5 fallback as an answer.
+///
+/// The spec rule — absent / undecodable `vault.prefs` degrades to defaults,
+/// never fails — is right for every consumer whose action the user can simply
+/// redo: a wrong theme is one click away from correct. It is **not** enough for
+/// a consumer whose action is irreversible. `attachment_compression_enabled`
+/// defaults to `true`, so on a damaged blob the fallback would start discarding
+/// pixels on behalf of a user whose actual answer nobody could read.
+///
+/// This enum changes no value and no fallback: [`read_or_default`] returns
+/// exactly what it did before. It only lets a caller ask the second question —
+/// *is this the stored answer, or the fallback?* — instead of guessing from a
+/// value that looks identical either way.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PrefsOrigin {
+    /// Decoded from a stored blob. These are the user's settings.
+    Stored,
+    /// No blob exists. Defaults are the *correct* answer here rather than a
+    /// fallback — a vault that has never written prefs is not a damaged one
+    /// (the standard case for a fresh vault and for every pre-MYND-160 one),
+    /// and "never changed the default" is itself an answer.
+    Absent,
+    /// A blob exists and could not be read or decoded. The values are § 9.5.5
+    /// defaults and say nothing about what the user chose.
+    Degraded,
+}
+
 /// Read `vault.prefs` from disk and decode under `prefs_key` + AAD
 /// bound to `account_number_hash`. Returns `PrefsView::default()` on
 /// any failure (absent / truncated / AEAD-fail / parse-fail) per
@@ -72,6 +100,21 @@ pub async fn read_or_default(
     prefs_key: &[u8; 32],
     account_number_hash: &[u8; VAULT_META_ACCOUNT_HASH_LEN],
 ) -> PrefsView {
+    read_or_default_reporting_origin(io, prefs_path, prefs_key, account_number_hash)
+        .await
+        .0
+}
+
+/// [`read_or_default`], plus the [`PrefsOrigin`] that produced it.
+///
+/// The single implementation of both; `read_or_default` is this with the origin
+/// dropped, so the fallback rule cannot drift between them.
+pub async fn read_or_default_reporting_origin(
+    io: &dyn crate::vault_io::VaultIo,
+    prefs_path: &Path,
+    prefs_key: &[u8; 32],
+    account_number_hash: &[u8; VAULT_META_ACCOUNT_HASH_LEN],
+) -> (PrefsView, PrefsOrigin) {
     // The newest copy that DECODES (phase3-web-client task 18), not the newest
     // copy. On the web client a singleton is two alternating files, and here the
     // difference is user-visible in a way it is nowhere else: § 9.5.5 says an
@@ -87,13 +130,13 @@ pub async fn read_or_default(
     })
     .await
     {
-        Ok(view) => view,
+        Ok(view) => (view, PrefsOrigin::Stored),
         Err(crate::singleton::OpenOutcome::Absent) => {
             // Absent file is the standard case for pre-MYND-160 vaults
             // and for the first read after vault_create (until Task 12
             // lands eager-write). Not a warn — this is the documented
             // happy path of spec § 9.5.5.
-            PrefsView::default()
+            (PrefsView::default(), PrefsOrigin::Absent)
         }
         Err(crate::singleton::OpenOutcome::Io(e)) => {
             tracing::warn!(
@@ -102,7 +145,7 @@ pub async fn read_or_default(
                 io_kind = ?e,
                 "vault.prefs read failed; falling back to defaults"
             );
-            PrefsView::default()
+            (PrefsView::default(), PrefsOrigin::Degraded)
         }
         Err(crate::singleton::OpenOutcome::Undecodable(cause)) => {
             // Every stored copy failed — on desktop the only one, on web both.
@@ -114,7 +157,7 @@ pub async fn read_or_default(
                 reason = prefs_blob_error_kind(&cause),
                 "vault.prefs decode failed; falling back to defaults"
             );
-            PrefsView::default()
+            (PrefsView::default(), PrefsOrigin::Degraded)
         }
     }
 }
@@ -345,6 +388,22 @@ pub async fn prefs_read_with_dir(
     state: &VaultRuntimeState,
     io: &dyn crate::vault_io::VaultIo,
 ) -> Result<PrefsView, PrefsReadError> {
+    prefs_read_with_dir_reporting_origin(vault_dir, state, io)
+        .await
+        .map(|(view, _origin)| view)
+}
+
+/// [`prefs_read_with_dir`], plus the [`PrefsOrigin`] behind the returned view.
+///
+/// For the callers that must distinguish "the user's stored answer" from "the
+/// § 9.5.5 fallback that happens to look like one" — today the ingest-time
+/// image-compression gate in `plugins::attachments::commands`, whose action
+/// discards pixels and cannot be undone by re-reading a repaired blob.
+pub async fn prefs_read_with_dir_reporting_origin(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(PrefsView, PrefsOrigin), PrefsReadError> {
     // Peek root_key from the Unlocked slot (ignore the
     // vault_meta_bytes_hash — prefs has no CAS anchor against it).
     let (root_key, _vmh) = state
@@ -356,7 +415,7 @@ pub async fn prefs_read_with_dir(
     let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
     let prefs_path = vault_dir.join("vault.prefs");
 
-    Ok(read_or_default(io, &prefs_path, &prefs_key, &account_number_hash).await)
+    Ok(read_or_default_reporting_origin(io, &prefs_path, &prefs_key, &account_number_hash).await)
 }
 
 /// Internal (non-IPC) setter: record the last successful backup export

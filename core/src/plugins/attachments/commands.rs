@@ -273,14 +273,18 @@ fn auto_filename(content_type: &str) -> String {
 /// Swap `filename`'s extension to match `content_type` after ingest-time
 /// compression changed the stored container (PRD story 17: an exported
 /// `screenshot.png` that is actually WebP bytes is a lie the filename tells).
-/// Replaces a trailing `.ext` when one exists (including when the stem is
-/// otherwise empty, e.g. a dotfile-shaped name), else appends the new
-/// extension.
+/// Replaces a trailing `.ext` when one exists, else appends the new extension.
 fn rename_extension_for_content_type(filename: &str, content_type: &str) -> String {
     let ext = extension_for_content_type(content_type);
-    match filename.rsplit_once('.') {
-        Some((stem, _old_ext)) => format!("{stem}.{ext}"),
-        None => format!("{filename}.{ext}"),
+    // `rfind` with an `i > 0` guard rather than `rsplit_once`: a LEADING dot is
+    // not an extension separator. `rsplit_once` splits `.hidden` into an empty
+    // stem plus `hidden`, so the rename would drop the user's whole filename
+    // and store the attachment as `.webp`. A dotfile-shaped name has no
+    // extension to replace — its stem is the entire string, and it gains the
+    // new suffix like any other extensionless name.
+    match filename.rfind('.') {
+        Some(i) if i > 0 => format!("{}.{ext}", &filename[..i]),
+        _ => format!("{filename}.{ext}"),
     }
 }
 
@@ -461,17 +465,37 @@ where
     // documents (a writer queued in between the two reads can starve the
     // second one). Running the gate here needs no guard at all.
     //
-    // Diverges deliberately from `attachment_ocr_enabled`'s fail-OPEN default
-    // (`src-tauri/src/plugins/attachments/ocr_queue.rs`): an unreadable prefs
-    // blob here means DO NOT compress — fail toward the reversible outcome,
-    // because a lost compression pass discards pixels permanently, where a
-    // lost OCR pass is just a missing search result the next successful
-    // drain repairs.
-    let compression_enabled =
-        crate::plugins::prefs::commands::prefs_read_with_dir(vault_dir, state, io)
-            .await
-            .map(|p| p.attachment_compression_enabled)
-            .unwrap_or(false);
+    // The eligibility question is asked FIRST and answered by `compress`
+    // itself: a PDF, a zip or a voice clip can never be compressed, and must
+    // not pay a `vault.prefs` decrypt and a full-size buffer copy to be told
+    // so. The prefs read is short-circuited away for them.
+    //
+    // The preference read diverges deliberately from `attachment_ocr_enabled`'s
+    // fail-OPEN default (`src-tauri/src/plugins/attachments/ocr_queue.rs`): an
+    // unreadable prefs blob here means DO NOT compress — fail toward the
+    // reversible outcome, because a lost compression pass discards pixels
+    // permanently, where a lost OCR pass is just a missing search result the
+    // next successful drain repairs.
+    //
+    // That divergence needs the ORIGIN, not just the value, and this is the
+    // reason `prefs_read_with_dir_reporting_origin` exists. § 9.5.5 degrades an
+    // absent or undecodable `vault.prefs` to defaults — and the default here is
+    // `true` — so reading the plain value would have this gate compress on a
+    // corrupt blob while looking, at the call site, exactly like a user who
+    // left the switch on. `Degraded` is the only outcome that must not be
+    // trusted; `Absent` genuinely means "never changed the default", which is
+    // an answer, and is the normal state of every vault that has not opened
+    // Settings.
+    let compress_this = compress::is_eligible(content_type)
+        && matches!(
+            crate::plugins::prefs::commands::prefs_read_with_dir_reporting_origin(
+                vault_dir, state, io,
+            )
+            .await,
+            Ok((prefs, origin))
+                if origin != crate::plugins::prefs::commands::PrefsOrigin::Degraded
+                    && prefs.attachment_compression_enabled
+        );
 
     let mut file_bytes = file_bytes;
     let mut content_type = content_type;
@@ -480,23 +504,28 @@ where
     // insert-time-notice signal (task 8), captured BEFORE `file_bytes` is
     // overwritten so it reads the true pre-compression length.
     let mut original_size: Option<u64> = None;
-    if compression_enabled {
+    if compress_this {
         // The decode+resize+encode is real CPU work (task 1's own framing:
         // "compression makes every imported image an untrusted decode") so it
         // runs on the blocking pool like the AEAD seal below, not inline on
-        // the async task. The bytes are CLONED into the closure rather than
-        // moved: a worker panic (`JoinFailure`) must still leave the ORIGINAL
-        // bytes available to fall back to — compression is best-effort and
-        // must never turn a successful import into a failed one, and a moved-
-        // then-lost buffer would break that guarantee on the one path that
-        // can't be unit-tested (a codec panic).
-        let bytes_for_compress = file_bytes.clone();
+        // the async task. `run_blocking` needs a `'static` closure, so the
+        // bytes go in behind an `Arc` rather than being moved or copied: a
+        // worker panic (`JoinFailure`) must still leave the ORIGINAL bytes
+        // available to fall back to — compression is best-effort and must
+        // never turn a successful import into a failed one — and the worker's
+        // `Arc` is dropped on the unwind path just as on the success path, so
+        // `try_unwrap` reclaims the sole owner either way. A 12 MP photo would
+        // otherwise be memcpy'd in full for a transform that may not fire.
+        let source = std::sync::Arc::new(file_bytes);
+        let bytes_for_compress = std::sync::Arc::clone(&source);
         let content_type_for_compress = content_type;
         let outcome = crate::task::run_blocking(move || {
-            compress::compress_for_import(&bytes_for_compress, content_type_for_compress)
+            compress::compress_for_import(bytes_for_compress.as_slice(), content_type_for_compress)
         })
         .await
         .unwrap_or(CompressOutcome::Unchanged);
+        file_bytes = std::sync::Arc::try_unwrap(source)
+            .unwrap_or_else(|shared| Zeroizing::new(shared.as_slice().to_vec()));
         if let CompressOutcome::Compressed {
             bytes,
             content_type: new_content_type,
@@ -3085,30 +3114,17 @@ mod tests {
 
     // ---- ingest-time compression (task 6, ingest-image-compression) ---
 
-    /// A real, decodable, downscale-eligible PNG (3000x1500, exceeding
-    /// `compress::MAX_LONG_EDGE_PX`). `Uncompressed` DEFLATE deliberately
-    /// bloats it, mirroring `compress.rs`'s own test fixtures, so a
-    /// lossless-WebP re-encode reliably wins rather than depending on the
-    /// PNG encoder's own compression luck.
+    /// A real, decodable, downscale-eligible PNG (3000x1500, exceeding the
+    /// transform's long-edge ceiling), built by `compress.rs`'s own fixture
+    /// builder so the "`Uncompressed` DEFLATE, so the re-encode reliably wins
+    /// instead of depending on the PNG encoder's compression luck" trick is
+    /// stated once and both suites move together if the ceiling does.
     fn make_oversized_png() -> Vec<u8> {
-        use image::codecs::png::{CompressionType, FilterType as PngFilterType, PngEncoder};
-        use image::{ImageBuffer, Rgb};
-        let (w, h) = (3000u32, 1500u32);
-        let img: ImageBuffer<Rgb<u8>, Vec<u8>> = ImageBuffer::from_fn(w, h, |x, y| {
-            Rgb([
-                ((x * 7 + y * 13) % 256) as u8,
-                ((x * 3 + y * 29) % 256) as u8,
-                ((x.wrapping_mul(11) ^ y.wrapping_mul(17)) % 256) as u8,
-            ])
-        });
-        let mut out = Vec::new();
-        let encoder = PngEncoder::new_with_quality(
-            &mut out,
-            CompressionType::Uncompressed,
-            PngFilterType::NoFilter,
-        );
-        img.write_with_encoder(encoder).expect("encode fixture png");
-        out
+        compress::make_png(
+            3000,
+            1500,
+            image::codecs::png::CompressionType::Uncompressed,
+        )
     }
 
     /// A `Hooks` that no-ops every lifecycle call — same helper shape as
@@ -3281,20 +3297,118 @@ mod tests {
     }
 
     #[test]
-    fn import_with_unreadable_vault_state_never_compresses() {
+    fn import_with_undecodable_prefs_blob_never_compresses() {
         // Acceptance: "an unreadable prefs blob results in NO compression."
         //
-        // This shared core reads `vault.prefs` (the compression gate) and
-        // `vault.meta` (the id-computation's `account_number_hash`) off the
-        // SAME file, so a genuinely corrupt `vault.meta` breaks both reads
-        // identically — there is no architecturally-reachable state in this
-        // function where the prefs peek fails but the rest of import still
-        // succeeds (the two reads share a failure mode by construction).
-        // Proving the fail-closed default (`.unwrap_or(false)`, diverging
-        // from OCR's `.unwrap_or(true)` in `ocr_queue.rs`) is therefore a
-        // negative proof: even in the exact failure class the divergence
-        // exists for, nothing gets compressed, encoded, or stored — the
-        // whole import fails closed rather than silently compressing.
+        // This is the case the fail-closed gate exists for, and it is the one
+        // that is easy to believe is already covered when it is not. § 9.5.5
+        // degrades an undecodable `vault.prefs` to DEFAULTS, and the default of
+        // `attachment_compression_enabled` is `true` — so a gate reading the
+        // plain `PrefsView` would compress here while looking, at the call
+        // site, exactly like a user who left the switch on. The vault is
+        // otherwise entirely healthy: `vault.meta` is valid, the slot is
+        // unlocked, and the import SUCCEEDS. Only the prefs blob is damaged.
+        //
+        // The import still storing the ORIGINAL bytes is the whole assertion.
+        rt().block_on(async {
+            let (tmp, state) = temp_vault().await;
+            // A real prefs write first, so the file exists and the failure is
+            // `Undecodable` rather than `Absent` — the two are different
+            // answers (absent means "never changed the default", which IS an
+            // answer; undecodable means nobody can read what they chose).
+            crate::plugins::prefs::commands::set_attachment_compression_enabled_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                true,
+                io(),
+                &host(),
+            )
+            .await
+            .expect("setter succeeds");
+            let prefs_path = tmp.path().join("vault.prefs");
+            assert!(prefs_path.exists(), "the blob must exist to be corrupted");
+            std::fs::write(&prefs_path, b"MYP1 but not really, this will not decode").unwrap();
+
+            let png = make_oversized_png();
+            let imported = attachment_import_with_dir(
+                tmp.path(),
+                &state,
+                ImportSource::Bytes {
+                    bytes: png.clone(),
+                    filename: Some("screenshot.png".to_string()),
+                },
+            )
+            .await
+            .expect("a damaged prefs blob must not fail the import");
+
+            assert_eq!(
+                imported.size,
+                png.len() as u64,
+                "the ORIGINAL bytes must be stored when the preference cannot be read"
+            );
+            assert_eq!(imported.content_type, "image/png");
+            assert_eq!(imported.filename, "screenshot.png");
+            assert_eq!(imported.original_size, None);
+            assert!(!imported.container_changed);
+
+            let items_key = [SEED_ITEMS; 32];
+            let items_key_id = [SEED_ITEMS_ID; 16];
+            let id = hex_decode_id(&imported.id).unwrap();
+            let blob = std::fs::read(tmp.path().join("attachments").join(&imported.id)).unwrap();
+            let plaintext = protocol::decode_attachment_blob(
+                &blob,
+                &id,
+                imported.content_type.as_bytes(),
+                &items_key,
+                &items_key_id,
+            )
+            .expect("stored blob decodes under the vault's items_key");
+            assert_eq!(plaintext.as_slice(), png.as_slice());
+        });
+    }
+
+    #[test]
+    fn import_with_absent_prefs_blob_still_compresses() {
+        // The other side of the gate, and the reason it keys on the read's
+        // ORIGIN rather than on "did the read succeed". A vault that has never
+        // opened Settings has no `vault.prefs` at all — the standard state of
+        // every fresh vault — and "never changed the default" is an answer, not
+        // a damaged blob. Failing closed there would ship the feature disabled
+        // for exactly the users who never turned it off.
+        rt().block_on(async {
+            let (tmp, state) = temp_vault().await;
+            assert!(
+                !tmp.path().join("vault.prefs").exists(),
+                "this test's premise is a vault with no prefs blob"
+            );
+
+            let png = make_oversized_png();
+            let imported = attachment_import_with_dir(
+                tmp.path(),
+                &state,
+                ImportSource::Bytes {
+                    bytes: png.clone(),
+                    filename: Some("screenshot.png".to_string()),
+                },
+            )
+            .await
+            .expect("import succeeds");
+
+            assert!(
+                imported.original_size.is_some(),
+                "an absent prefs blob means the default (on), so the transform must run"
+            );
+            assert!(imported.size < png.len() as u64);
+        });
+    }
+
+    #[test]
+    fn import_with_corrupt_vault_meta_fails_before_any_blob_is_written() {
+        // Adjacent to the two above, and deliberately kept separate: a corrupt
+        // `vault.meta` is not a prefs failure, it is an import failure. The
+        // `account_number_hash` the catalog AAD binds is unreadable, so there
+        // is no correct blob to write and the whole import fails closed.
         rt().block_on(async {
             let tmp = ScopedTempDir::new("attach-compress-unreadable-meta").expect("tempdir");
             // Deliberately corrupt vault.meta (too short to parse) rather
@@ -3325,6 +3439,38 @@ mod tests {
                 "no blob may be written when the import fails before compression can run"
             );
         });
+    }
+
+    #[test]
+    fn rename_extension_swaps_a_real_extension_and_appends_otherwise() {
+        // The ordinary case: a container change makes `screenshot.png` a lie
+        // (PRD story 17), so the extension follows the bytes.
+        assert_eq!(
+            rename_extension_for_content_type("screenshot.png", "image/webp"),
+            "screenshot.webp"
+        );
+        // Only the LAST extension moves; a dotted stem is part of the name.
+        assert_eq!(
+            rename_extension_for_content_type("v1.2.final.png", "image/webp"),
+            "v1.2.final.webp"
+        );
+        // No extension at all: append rather than invent a stem.
+        assert_eq!(
+            rename_extension_for_content_type("screenshot", "image/webp"),
+            "screenshot.webp"
+        );
+        // A LEADING dot is not an extension separator. Splitting on it would
+        // leave an empty stem and store the attachment as a bare `.webp`,
+        // discarding the user's whole filename — a rename that loses more than
+        // it fixes.
+        assert_eq!(
+            rename_extension_for_content_type(".hidden", "image/webp"),
+            ".hidden.webp"
+        );
+        assert_eq!(
+            rename_extension_for_content_type(".hidden.png", "image/webp"),
+            ".hidden.webp"
+        );
     }
 
     // Touch the SubkeyRole import so the catalog KEK derivation is

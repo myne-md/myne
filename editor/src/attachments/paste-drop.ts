@@ -21,10 +21,8 @@ import {
   type ImportOutcome,
   type ImportSource,
   autoPasteName,
-  compressionNoticeMessage,
   importMany,
-  summarizeBatch,
-  summarizeCompression,
+  importToastMessage,
 } from "./insert";
 import { getHost } from "../host";
 import { showAttachmentToast } from "./toast";
@@ -143,14 +141,8 @@ export async function importAndInsert(
 
   insertEmbedsForOutcomes(view, outcomes, insertPos);
 
-  const summary = summarizeBatch(outcomes);
-  if (summary !== null) showAttachmentToast(summary);
-  // The compression disclosure (PRD story 4) takes priority over the batch
-  // summary when both would fire (rare: a mixed batch with a skip AND a
-  // compressed success) — the toast surface shows one message at a time, and
-  // the irreversible-pixel-loss disclosure outranks a skip count.
-  const compression = summarizeCompression(outcomes);
-  if (compression !== null) showAttachmentToast(compressionNoticeMessage(compression));
+  const message = importToastMessage(outcomes);
+  if (message !== null) showAttachmentToast(message);
   return outcomes;
 }
 

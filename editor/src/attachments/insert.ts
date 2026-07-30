@@ -234,16 +234,39 @@ export interface CompressionSummary {
 export function summarizeCompression(
   outcomes: readonly ImportOutcome[],
 ): CompressionSummary | null {
-  const compressed = outcomes.filter(
-    (o): o is Extract<ImportOutcome, { ok: true }> =>
-      o.ok && o.attachment.original_size != null,
+  return summarizeCompressedAttachments(
+    outcomes.filter((o): o is Extract<ImportOutcome, { ok: true }> => o.ok).map((o) => o.attachment),
   );
+}
+
+/**
+ * {@link summarizeCompression} over stored attachments directly, for the import
+ * routes that never build an `ImportOutcome`.
+ *
+ * Compression is gated in shared core, so it fires on **every** import route —
+ * paste, drop, `/attach`, import-&-convert, the cover picker, the vault
+ * importer, the browser clipper. The disclosure obligation follows the
+ * behaviour (`decisions.md` 2026-07-30: disclosure at import is what stands in
+ * for a consent gate), so it has to be reachable from a route that has an
+ * `ImportedAttachment` and nothing else. This is that entry point; every route
+ * folds the same way rather than each computing its own idea of the notice.
+ */
+export function summarizeCompressedAttachments(
+  attachments: readonly ImportedAttachment[],
+): CompressionSummary | null {
+  const compressed = attachments.filter((a) => a.original_size != null);
   if (compressed.length === 0) return null;
+  // The format label names the container the swap produced, so it has to come
+  // from an attachment that actually swapped — in a mixed batch the last
+  // compressed import may be one that kept its container, and naming its type
+  // would tell the user the wrong format.
+  const swapped = compressed.filter((a) => a.container_changed === true);
+  const labelled = swapped.length > 0 ? swapped : compressed;
   return {
-    originalBytes: compressed.reduce((sum, o) => sum + (o.attachment.original_size ?? 0), 0),
-    finalBytes: compressed.reduce((sum, o) => sum + o.attachment.size, 0),
-    containerChanged: compressed.some((o) => o.attachment.container_changed === true),
-    contentType: compressed[compressed.length - 1].attachment.content_type,
+    originalBytes: compressed.reduce((sum, a) => sum + (a.original_size ?? 0), 0),
+    finalBytes: compressed.reduce((sum, a) => sum + a.size, 0),
+    containerChanged: swapped.length > 0,
+    contentType: labelled[labelled.length - 1].content_type,
   };
 }
 
@@ -261,6 +284,93 @@ export function compressionNoticeMessage(summary: CompressionSummary): string {
         to,
       })
     : i18n.t("editor.attachment.compression.notice", { from, to });
+}
+
+/** An additive ingest-time-compression count, for the routes that import in
+ *  BULK and report a summary rather than a per-batch toast (the vault importer,
+ *  the browser clipper). Additive on purpose: those routes accumulate across
+ *  many notes/pages and cannot hold every {@link CompressionSummary} to fold at
+ *  the end, and unlike a summary this carries no format label — naming one
+ *  container across hundreds of images would be noise at best and wrong at
+ *  worst. */
+export interface CompressionTally {
+  readonly count: number;
+  readonly originalBytes: number;
+  readonly finalBytes: number;
+}
+
+/** The zero tally — the correct state for a route that imported nothing. */
+export function emptyCompressionTally(): CompressionTally {
+  return { count: 0, originalBytes: 0, finalBytes: 0 };
+}
+
+/** Tally the compressed subset of `attachments`. Uncompressed imports
+ *  contribute nothing, so an all-uncompressed batch yields the zero tally and
+ *  the surface stays silent. */
+export function tallyCompression(
+  attachments: readonly ImportedAttachment[],
+): CompressionTally {
+  let count = 0;
+  let originalBytes = 0;
+  let finalBytes = 0;
+  for (const a of attachments) {
+    if (a.original_size == null) continue;
+    count += 1;
+    originalBytes += a.original_size;
+    finalBytes += a.size;
+  }
+  return { count, originalBytes, finalBytes };
+}
+
+/** Merge two tallies. */
+export function addCompressionTally(
+  a: CompressionTally,
+  b: CompressionTally,
+): CompressionTally {
+  return {
+    count: a.count + b.count,
+    originalBytes: a.originalBytes + b.originalBytes,
+    finalBytes: a.finalBytes + b.finalBytes,
+  };
+}
+
+/** Render a {@link CompressionTally} as the bulk-import disclosure line, or
+ *  `null` when nothing was compressed — a notice that appears when nothing
+ *  happened is how a user learns to stop reading notices. */
+export function compressionTallyMessage(tally: CompressionTally): string | null {
+  if (tally.count === 0) return null;
+  return i18n.t("editor.attachment.compression.bulkNotice", {
+    count: tally.count,
+    from: formatBytes(tally.originalBytes),
+    to: formatBytes(tally.finalBytes),
+  });
+}
+
+/**
+ * The ONE toast message a finished batch deserves, or `null` for silence.
+ *
+ * The toast surface shows a single message at a time (`toast.ts` replaces the
+ * visible one), so the composition happens here rather than by calling
+ * `showAttachmentToast` twice and letting the second win.
+ *
+ * Both parts are kept when both fire — they answer different questions and
+ * neither substitutes for the other. Drop five images, four over the 64 MiB
+ * cap and one compressed, and "Compressed to WebP: 149 KiB → 40 KiB" alone
+ * would be a true sentence that hides the more actionable fact: four files did
+ * not arrive. The compression disclosure leads because it is the irreversible
+ * half, and the skip count follows, joined with the same `" · "` separator
+ * `summarizeBatch` already uses between its own parts.
+ *
+ * Every insert path (paste, drop, `/attach`) announces through this, so the
+ * composition is a decision stated once instead of a call-order convention
+ * copied between call sites.
+ */
+export function importToastMessage(outcomes: readonly ImportOutcome[]): string | null {
+  const compression = summarizeCompression(outcomes);
+  const batch = summarizeBatch(outcomes);
+  if (compression === null) return batch;
+  const notice = compressionNoticeMessage(compression);
+  return batch === null ? notice : `${notice} · ${batch}`;
 }
 
 // ---- imported filename-only ref parse (import-&-convert) ----------------
