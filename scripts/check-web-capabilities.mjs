@@ -102,6 +102,21 @@ const CAPABILITY_BACKING = {
   // Task 48: the whole `pdf-export` plugin is refused. The markdown and
   // attachment downloads are deliberately NOT behind this — they ship.
   pdfExport: ["pdf-export"],
+  // Deliberately empty, for the same reason `localOnlyVault` is.
+  // `plugin:attachments|attachment_import` IS dispatched on web — images import
+  // there, they are just stored as given, because the transform inside that one
+  // command is gated off (`compress::is_supported_on_this_target`). And the
+  // preference behind it is ordinary shared vault content that this client reads,
+  // writes and syncs. So there is no refused command to point at: what the
+  // absence governs is the COPY on the settings row.
+  imageCompression: [],
+  // MYND-490 (cli-thin-client task 12): the whole `cli-bridge` plugin. Its one
+  // command reports the CLI door's session state, and both facts it answers
+  // presuppose a machine — a local socket the desktop binds, and a sidecar
+  // binary on a filesystem. The three `prefs|set_cli_*` setters are deliberately
+  // NOT here: they write ordinary `vault.prefs` fields that sync to every
+  // client, and a desktop that later reads them must see what the user chose.
+  cliAccess: ["cli-bridge"],
 };
 
 const descriptor = readFileSync(DESCRIPTOR, "utf8");

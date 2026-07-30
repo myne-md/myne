@@ -166,6 +166,10 @@ describe("assembleClip — full-article happy path", () => {
       kind: "accepted",
       noteId: NEW_NOTE_ID,
       counts: expect.any(Object),
+      // The ingest-time-compression tally rides out with the counts so the
+      // clip notice can disclose it (`decisions.md` 2026-07-30). Zero here —
+      // the fake import port stores bytes verbatim.
+      compression: { count: 0, originalBytes: 0, finalBytes: 0 },
     });
   });
 });

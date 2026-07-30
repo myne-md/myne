@@ -288,6 +288,18 @@ const CSS = `
      so the Properties block scales with the text-size setting. The fallback is
      the canonical md default (14px). */
   font-size: var(--editor-text-size, 14px);
+  /* MYND-608 defence-in-depth: atomicRanges stops the EDITOR cursor/selection
+     from entering the hidden frontmatter source; this stops a raw pointer
+     DRAG-selection from painting a text-selection bar across the widget. Text
+     selection is re-enabled on the widget's own inputs just below so the fields
+     stay usable. */
+  user-select: none;
+  -webkit-user-select: none;
+}
+.cm-fm-properties input,
+.cm-fm-properties textarea {
+  user-select: text;
+  -webkit-user-select: text;
 }
 .cm-fm-properties-name {
   display: block;

@@ -25,6 +25,11 @@ import {
   clipOmittedTallyLine,
 } from "../lib/load-bearing-copy";
 
+import {
+  compressionTallyMessage,
+  emptyCompressionTally,
+  type CompressionTally,
+} from "../editor/attachments/insert";
 import type { MediaByType, MediaClass, MediaCounts } from "../notes/import/media";
 import type { ClipIngestResult } from "./assembleClip";
 
@@ -47,6 +52,14 @@ export interface ClipNotice {
   /** The per-type omitted tally, or `null` when nothing was omitted. A
    *  non-null tally always has ≥1 entry (the empty case collapses to `null`). */
   readonly tally: readonly ClipNoticeTallyEntry[] | null;
+  /** The ingest-time-compression disclosure line, or `null` when nothing was
+   *  compressed. A clipped image runs through the same shared-core transform a
+   *  pasted one does — the original bytes are not kept — and `decisions.md`
+   *  2026-07-30 makes a notice at import the thing that stands in for a consent
+   *  gate, so the clip notice owes it too. i18n'd, unlike the omitted tally
+   *  above: that one is load-bearing copy pinned by E2E literal equality, this
+   *  one is ordinary user-facing text. */
+  readonly compressionLine: string | null;
 }
 
 // The stable presentation order of the media classes in the tally — the image
@@ -65,12 +78,16 @@ const TALLY_ORDER: readonly MediaClass[] = ["image", "pdf", "audio", "video", "o
 export function buildClipNotice(result: {
   readonly noteId: string;
   readonly counts: MediaCounts;
+  /** Optional so the many existing callers that predate ingest-time
+   *  compression stay valid; absent reads as "nothing compressed". */
+  readonly compression?: CompressionTally;
 }): ClipNotice {
   return {
     message: CLIP_NOTICE_ROOT_MESSAGE,
     viewLabel: CLIP_NOTICE_VIEW_ACTION,
     noteId: result.noteId,
     tally: buildTally(result.counts.omitted),
+    compressionLine: compressionTallyMessage(result.compression ?? emptyCompressionTally()),
   };
 }
 

@@ -38,7 +38,7 @@ import {
 import { buildOverflowMenu, type OverflowAction } from "./actionMenu";
 import { decodePeaks } from "./waveform";
 import { createTranscriptSection } from "./transcript";
-import { aiSlashEnabledFacet } from "../slash/aiSlash";
+import { transcriptionEnabledFacet } from "./transcription-gate";
 
 /** Width (CSS px) the inline image / PDF frame renders at. */
 const FRAME_WIDTH = 320;
@@ -76,6 +76,7 @@ export class AttachmentImageWidget extends WidgetType {
 
     const img = document.createElement("img");
     img.className = "cm-attachment-img";
+    img.setAttribute("data-testid", "attachment-image");
     // attachment://<id> — the Rust handler decrypts in-memory + re-sniffs +
     // allowlists. SVG is served as image/svg+xml and rendered here ONLY through
     // the `<img>` element (secure static mode); its markup never enters the DOM.
@@ -488,13 +489,19 @@ export class AttachmentAudioWidget extends WidgetType {
       { label: i18n.t("editor.attachment.widget.menu.reveal"), testid: "attachment-audio.reveal", run: () => revealFileCard(view, this.id) },
     ];
     // "Transcribe" (SYNC-V7) — only when the host backs speech-to-text (desktop;
-    // mobile leaves the slot unset → row omitted) AND local AI is on. When AI is
-    // off — or the note's folder is AI-excluded (both folded into the AI facet by
-    // the host) — the row is HIDDEN, not shown-disabled (MYND-270 product tweak:
-    // no dangling affordance when the whole subsystem is off). When AI is on but
-    // no model is ready the run surfaces a "select a model" hint (inside the
+    // mobile leaves the slot unset → row omitted) AND transcription is enabled.
+    // When it is off the row is HIDDEN, not shown-disabled (MYND-270 product
+    // tweak: no dangling affordance when the whole subsystem is off), and the
+    // Attachments Library now hides it the same way rather than greying it.
+    // When a model is not ready the run surfaces a hint instead (inside the
     // transcript section).
-    if (getHost().transcribe !== undefined && view.state.facet(aiSlashEnabledFacet)) {
+    //
+    // MYND-592: this gate was `aiSlashEnabledFacet` — the AI beta opt-in with
+    // the AI-excluded-folder rule folded in. Both were wrong here. The opt-in
+    // is for the embedding store, and a folder excluded from ambient AI
+    // *reading* says nothing about whether the user may transcribe a file they
+    // explicitly picked.
+    if (getHost().transcribe !== undefined && view.state.facet(transcriptionEnabledFacet)) {
       actions.push({
         label: i18n.t("editor.attachment.widget.menu.transcribe"),
         testid: "attachment-audio.transcribe",

@@ -170,6 +170,35 @@ export interface PrefsView {
    */
   show_note_timestamps: boolean;
   /**
+   * Whether the note-task marker (MYND-613) is shown in the sidebar row and the
+   * tab. Defaults `true`; only the non-default `false` is persisted, so an
+   * untouched vault stays byte-identical to a pre-feature `vault.prefs`.
+   * Classified **Shared / scalar last-write-wins**, deliberately unlike its
+   * neighbour `show_note_timestamps` (device-local): a marker's visibility is
+   * taste, not device capability, so it should not be re-chosen per device.
+   */
+  /** Whether THIS DEVICE shows task reminders (MYND-618). Device-local:
+   *  whether a machine should be interrupted is a property of that
+   *  machine, so it never syncs. Default true. */
+  reminders_enabled: boolean;
+  /** How many days ahead this device registers reminders with the OS
+   *  (MYND-618); null falls back to the client's built-in horizon. A
+   *  PRIVACY bound before a resource one — pending times sit in OS-owned
+   *  plaintext, so a shorter horizon exposes less. */
+  reminder_horizon_days: number | null;
+  show_task_marker: boolean;
+  /**
+   * Whether speech-to-text may run on this vault's audio attachments
+   * (MYND-592). Defaults to `true`; persisted only when `false`.
+   *
+   * Deliberately NOT `ai_enabled`: transcription ships a bundled model, runs
+   * on-device and is invoked one file at a time by the user, so it is a
+   * product feature rather than part of the AI beta opt-in. The host re-reads
+   * this before it decrypts anything — the UI gate below is discovery, not
+   * enforcement.
+   */
+  transcription_enabled: boolean;
+  /**
    * Spell-check enabled toggle (MYND-267). `null` ≡ unset → the host applies
    * the default-ON policy (SYNC-15). Serialized from Rust `Option<bool>`.
    */
@@ -252,6 +281,18 @@ export interface PrefsView {
    */
   ai_enabled: boolean;
   /**
+   * Whether an imported image attachment is downscaled + re-encoded at ingest
+   * time (ingest-image-compression). **Defaults to `true`** — omitted from the
+   * encrypted blob when true, so a vault predating the field reads as enabled.
+   * The transform is irreversible (the original bytes are not kept), which is
+   * why this toggle — unlike its neighbor {@link PrefsView.attachment_ocr_enabled}
+   * — is classified **shared** rather than device-local in the sync merge
+   * (`sync-protocol.md` §10.2): a content-fidelity switch with a vault-wide,
+   * irreversible effect needs the same reach as that effect. Write via
+   * {@link setAttachmentCompressionEnabled}.
+   */
+  attachment_compression_enabled: boolean;
+  /**
    * Whether attachment text extraction may read images and scanned PDFs
    * (image OCR, MYND-441). **Defaults to `true`** — omitted from the encrypted
    * blob when true, so a vault predating the field reads as enabled. Turning it
@@ -267,6 +308,14 @@ export interface PrefsView {
    * defaulted to `[]`. Non-load-bearing.
    */
   ai_excluded_folders: string[];
+  /**
+   * Developer mode toggle (`developer-mode` feature, MYND-593). `false` ≡ off
+   * (the default). Serialized from Rust `bool`; omitted from the encrypted
+   * blob when `false` (byte-identical to a pre-feature vault). Gates the AI
+   * opt-in and the local-model override pickers. Device-local
+   * (`sync-protocol.md` §10.2). Non-load-bearing.
+   */
+  developer_mode: boolean;
   /**
    * Folders archived as a unit (folder-archive) — canonical trailing-slash
    * form. Same encoding as `deliberate_folders` / `ai_excluded_folders`
@@ -423,6 +472,41 @@ export interface PrefsView {
    * untouched; this flag only gates the UI surfaces.
    */
   archive_disabled: boolean | null;
+  /**
+   * CLI terminal-access door toggle (myne-cli epic, MYND-490). `false` ≡ the
+   * door is closed (the default) — the local socket the `myne` CLI dials is
+   * never created regardless of unlock state. Serialized from Rust `bool`;
+   * omitted from the encrypted blob when `false` (byte-identical to a
+   * pre-feature vault), same discipline as {@link PrefsView.ai_enabled}.
+   * **Device-local** (`sync-protocol.md` §10.2): the CLI door is a per-machine
+   * decision, so this value never travels in a merge. Rationale:
+   * `design-notes.md` "CLI terminal access is a default-off, unlock-gated
+   * local socket with a folder exclusion list (MYND-490)" and
+   * `docs/threat-model.md` §7. Non-load-bearing.
+   */
+  cli_enabled: boolean;
+  /**
+   * Folders excluded from the CLI's reach (myne-cli epic, MYND-490) —
+   * canonical trailing-slash form. Same encoding as `deliberate_folders` /
+   * `ai_excluded_folders` (NFC-normalized, sorted, deduped set). Absent →
+   * defaulted to `[]`. **Shared(SetUnion)**: an exclusion added on one device
+   * must never be lost in a merge with a device that lacks it. Enforcement of
+   * the exclusion (filtering CLI reads/writes) is a separate concern from this
+   * codec field. Non-load-bearing.
+   */
+  cli_excluded_folders: string[];
+  /**
+   * CLI socket rate-limit opt-out (myne-cli epic, MYND-490). `null` ≡ unset →
+   * the default-ON rate limit applies (a runaway or hostile script cannot
+   * drain the vault at full speed). `true` ≡ the user explicitly disabled the
+   * limit in Settings. `false` is a legal value (re-enabling after disabling)
+   * but the UI is not expected to produce it — omitting the field again has
+   * the identical effect. Serialized from Rust `Option<bool>`; omitted from
+   * the encrypted blob when `null`, same shape as
+   * {@link PrefsView.archive_disabled}. **Device-local**
+   * (`sync-protocol.md` §10.2): a machine-local performance knob. Non-load-bearing.
+   */
+  cli_rate_limit_disabled: boolean | null;
   /**
    * User theme preference (MYND-110). `null` ≡ **system** (follow the OS
    * `prefers-color-scheme`) — the canonical encoding of "no explicit choice",
@@ -629,12 +713,33 @@ export interface OcrBacklogProgress {
 }
 
 /**
+ * Persist the `attachment_compression_enabled` toggle (ingest-image-compression)
+ * — whether a newly imported image attachment is downscaled + re-encoded before
+ * it is encrypted and stored. This preference is **shared** (vault-wide): the
+ * backend classifies it in the sync merge, not this wrapper. A rejected promise
+ * means the disk write failed and the caller's optimistic UI must revert.
+ */
+export async function setAttachmentCompressionEnabled(enabled: boolean): Promise<void> {
+  await invoke<void>("plugin:prefs|set_attachment_compression_enabled", { enabled });
+}
+
+/**
  * Persist the `attachment_ocr_enabled` toggle (MYND-441) — whether attachment
  * text extraction may read images and scanned PDFs. A rejected promise means the
  * disk write failed and the caller's optimistic UI must revert.
  */
 export async function setAttachmentOcrEnabled(enabled: boolean): Promise<void> {
   await invoke<void>("plugin:prefs|set_attachment_ocr_enabled", { enabled });
+}
+
+/**
+ * Persist the `developer_mode` toggle (`developer-mode` feature, MYND-593) —
+ * the gate the AI opt-in and the local-model override pickers sit behind. A
+ * rejected promise means the disk write failed and the caller's optimistic UI
+ * must revert.
+ */
+export async function setDeveloperMode(enabled: boolean): Promise<void> {
+  await invoke<void>("plugin:prefs|set_developer_mode", { enabled });
 }
 
 /**
@@ -646,6 +751,28 @@ export async function setAttachmentOcrEnabled(enabled: boolean): Promise<void> {
  */
 export async function setAiExcludedFolders(folders: string[]): Promise<void> {
   await invoke<void>("plugin:prefs|set_ai_excluded_folders", { folders });
+}
+
+/**
+ * Persist the `cli_enabled` CLI terminal-access door toggle (myne-cli epic,
+ * MYND-490). Per-vault + encrypted; a rejected promise means the disk write
+ * failed and the caller's optimistic UI must revert. Same pattern as
+ * {@link setAiEnabled}.
+ */
+export async function setCliEnabled(enabled: boolean): Promise<void> {
+  await invoke<void>("plugin:prefs|set_cli_enabled", { enabled });
+}
+
+/**
+ * Persist the full `cli_excluded_folders` set — folders the CLI door never
+ * reaches (myne-cli epic, MYND-490). Same canonical set encoding as
+ * `deliberate_folders` / `ai_excluded_folders` (the Rust codec NFC-sorts +
+ * exact-dedups). The caller passes the entire desired set; a rejected promise
+ * means the disk write failed and the caller's optimistic UI must revert.
+ * Same pattern as {@link setAiExcludedFolders}.
+ */
+export async function setCliExcludedFolders(folders: string[]): Promise<void> {
+  await invoke<void>("plugin:prefs|set_cli_excluded_folders", { folders });
 }
 
 /**
@@ -1077,6 +1204,46 @@ export async function setShowNoteTimestamps(enabled: boolean): Promise<void> {
 }
 
 /**
+ * Show or hide the note-task marker in the sidebar row and the tab (MYND-613).
+ * Shared across devices (scalar LWW), unlike the timestamp toggle above.
+ */
+export async function setShowTaskMarker(enabled: boolean): Promise<void> {
+  await invoke<void>("plugin:prefs|set_show_task_marker", { enabled });
+  bumpPrefsNonce();
+}
+
+/**
+ * Enable or disable speech-to-text for this vault's audio attachments
+ * (MYND-592). Shared across devices (scalar LWW) for the same reason as the
+ * task marker above: it is a preference, not a device capability.
+ */
+export async function setTranscriptionEnabled(enabled: boolean): Promise<void> {
+  await invoke<void>("plugin:prefs|set_transcription_enabled", { enabled });
+  bumpPrefsNonce();
+}
+
+/**
+ * Set whether THIS DEVICE shows task reminders (MYND-618).
+ *
+ * Device-local: it never syncs, because whether a given machine should be
+ * interrupted is a property of that machine rather than of the vault.
+ */
+export async function setRemindersEnabled(enabled: boolean): Promise<void> {
+  await invoke<void>("plugin:prefs|set_reminders_enabled", { enabled });
+}
+
+/**
+ * Set how many days ahead this device registers reminders with the OS, or
+ * `null` to fall back to the built-in horizon (MYND-618).
+ *
+ * Shorter is more private, not merely cheaper: pending reminder times leave the
+ * AEAD envelope and sit in OS-owned plaintext (`threat-model.md` §7).
+ */
+export async function setReminderHorizonDays(days: number | null): Promise<void> {
+  await invoke<void>("plugin:prefs|set_reminder_horizon_days", { days });
+}
+
+/**
  * Set (or clear) the editor base text-size preset (editor-typography) — pass
  * `"sm"`/`"md"`/`"lg"`/`"xl"`, or `null` to clear back to the `"md"` default.
  * Disk-first, no native side-effect; a rejected promise means the write failed
@@ -1162,6 +1329,18 @@ export async function setEditorVimMode(value: boolean): Promise<void> {
  */
 export async function setArchiveDisabled(value: boolean): Promise<void> {
   await invoke<void>("plugin:prefs|set_archive_disabled", { enabled: value });
+  bumpPrefsNonce();
+}
+
+/**
+ * Persist the `cli_rate_limit_disabled` toggle — removes the default-on CLI
+ * socket rate limit (myne-cli epic, MYND-490). Always writes an explicit
+ * `Some(disabled)` on the Rust side (the `archive_disabled` precedent); a
+ * rejected promise means the disk write failed and the caller's optimistic UI
+ * must revert. Same pattern as {@link setArchiveDisabled}.
+ */
+export async function setCliRateLimitDisabled(disabled: boolean): Promise<void> {
+  await invoke<void>("plugin:prefs|set_cli_rate_limit_disabled", { disabled });
   bumpPrefsNonce();
 }
 

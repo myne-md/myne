@@ -257,27 +257,46 @@ impl AiVectorStore {
     }
 }
 
-/// Canonicalize a folder path for exclusion comparison: NFC-normalize then
-/// case-fold (lowercase). Trailing-slash canonicalization already happened in
-/// the prefs codec; this makes the match diacritic- and case-insensitive so a
-/// note under `Private/` is still excluded when the entry was typed `private/`
-/// on a case-insensitive filesystem (SYNC-14). Kept byte-for-byte identical to
-/// the frontend mirror (`src/lib/aiExcludedFolders.ts`).
+/// Canonicalize a folder path for exclusion comparison: structural path
+/// normalization (split on `/`, drop empty segments, rejoin with one trailing
+/// slash) then NFC-normalize + case-fold (lowercase). Root — empty, `"/"` —
+/// canonicalizes to `""`. Kept byte-for-byte identical to the frontend mirror
+/// (`src/lib/aiExcludedFolders.ts`) and behaviourally identical to the CLI
+/// door's independent copy (`myne_core::plugins::prefs::folder_scope`).
+///
+/// The case fold makes the match diacritic- and case-insensitive so a note
+/// under `Private/` is still excluded when the entry was typed `private/` on a
+/// case-insensitive filesystem (SYNC-14). The **structural** half is the
+/// security-load-bearing one: the prefs codec NFC-normalizes, sorts and
+/// dedupes but does NOT canonicalize the path shape, and `markdown-dialect.md`
+/// §3.6.2 says reads TOLERATE a missing trailing slash and leading/duplicate
+/// slashes — so a note carrying `folder: Private` (what the Obsidian importer
+/// preserves verbatim, and what a hand-edited note has) displays inside
+/// `Private/` in the app while a raw comparison would leave it outside the
+/// user's own exclusion.
 pub fn canonical_folder(folder: &str) -> String {
     use unicode_normalization::UnicodeNormalization;
-    folder.nfc().collect::<String>().to_lowercase()
+    let segments: Vec<&str> = folder.split('/').filter(|s| !s.is_empty()).collect();
+    if segments.is_empty() {
+        return String::new();
+    }
+    let mut key: String = segments.join("/").nfc().collect::<String>().to_lowercase();
+    key.push('/');
+    key
 }
 
 /// Whether a note's `folder` (RAW, un-canonicalized) is under any entry in the
 /// ALREADY-canonicalized `excluded` set. Equal-or-nested test via a trailing-
-/// slash prefix (an entry ends in `/`, so `Private/` matches `Private/Sub/` but
-/// not `PrivateStuff/`). An empty entry is ignored (would exclude the whole
-/// vault). `folder` is canonicalized here so callers pass raw folders.
+/// slash prefix — [`canonical_folder`] guarantees every non-empty key ends in
+/// `/`, which is what makes the single prefix test cover both cases and never
+/// false-match a sibling (`privatestuff/` does not start with `private/`). An
+/// empty entry is ignored (would exclude the whole vault). `folder` is
+/// canonicalized here so callers pass raw folders.
 pub fn folder_matches_excluded(folder: &str, excluded: &[String]) -> bool {
     let folder = canonical_folder(folder);
-    excluded.iter().any(|ex| {
-        !ex.is_empty() && (folder == *ex || (ex.ends_with('/') && folder.starts_with(ex.as_str())))
-    })
+    excluded
+        .iter()
+        .any(|ex| !ex.is_empty() && folder.starts_with(ex.as_str()))
 }
 
 /// Overwrite a vector's elements to `0.0` in place (best-effort RAM wipe). Not
@@ -489,6 +508,39 @@ mod tests {
         assert!(!store.is_note_excluded(&sib));
         // An unknown note (no recorded folder) is fail-closed excluded.
         assert!(store.is_note_excluded(&nid("24")));
+    }
+
+    #[test]
+    fn a_non_canonical_folder_path_is_still_excluded_on_both_sides() {
+        // `markdown-dialect.md` §3.6.2 tolerates a missing trailing slash and
+        // leading/duplicate slashes on READ, and the prefs codec does not
+        // canonicalize the path shape — so both the note's folder and the
+        // stored entry can arrive in a non-canonical form. Neither may escape
+        // the user's own exclusion. Mirrors the frontend twin's
+        // "normalizes …" cases (`tests/lib/aiExcludedFolders.test.ts`).
+        for raw in ["Private", "/Private/", "//Private//", "Private/Sub"] {
+            assert!(
+                folder_matches_excluded(raw, &[canonical_folder("Private/")]),
+                "a note filed under {raw:?} must not escape a `Private/` exclusion"
+            );
+        }
+        for entry in ["Private", "/Private/", "//Private//"] {
+            assert!(
+                folder_matches_excluded("Private/", &[canonical_folder(entry)]),
+                "an entry stored as {entry:?} must still exclude `Private/`"
+            );
+        }
+        // Canonicalization APPENDS the trailing slash rather than dropping
+        // it, so a slash-less entry never becomes a sibling wildcard.
+        assert!(!folder_matches_excluded(
+            "PrivateStuff/",
+            &[canonical_folder("Private")]
+        ));
+        // The vault root is under no real entry.
+        assert!(!folder_matches_excluded(
+            "",
+            &[canonical_folder("Private/")]
+        ));
     }
 
     #[test]

@@ -107,7 +107,7 @@ mod tests {
     use super::*;
     use crate::note_nonce::MYN_CONTENT_NONCE_LEN;
     use crate::plugins::vault_indices::state::{
-        BlockAnchor, PropertyEntry, TagEntry, WikilinkEdge,
+        BlockAnchor, PropertyEntry, TagEntry, TaskRecord, WikilinkEdge,
     };
 
     const KEY: [u8; AEAD_KEY_LEN] = [0x42; AEAD_KEY_LEN];
@@ -147,6 +147,20 @@ mod tests {
             block_anchors: vec![BlockAnchor {
                 block_id: "intro".to_string(),
                 preview: "The introduction paragraph.".to_string(),
+            }],
+            // MYND-612: opaque verbatim task fields. The round-trip below is the
+            // whole contract on the Rust side — the values must come back
+            // byte-identical, because nothing here is allowed to interpret them.
+            tasks: vec![TaskRecord {
+                line_index: 7,
+                raw_line: "- [ ] pay the rent [due:: 2026-08-01] [priority:: high]".to_string(),
+                completed: false,
+                oversized: false,
+                due: Some("2026-08-01".to_string()),
+                repeat: None,
+                done: None,
+                priority: Some("high".to_string()),
+                remind: None,
             }],
         }
     }

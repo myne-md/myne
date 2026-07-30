@@ -1,0 +1,230 @@
+/* Task-field chip editor + task-query builder surfaces.
+ *
+ * Imported as a side effect by `task-field-editor.ts` and `task-query-builder.ts`.
+ * Both surfaces mount to `document.body` through `openModal`, OUTSIDE `.cm-editor`,
+ * so the CodeMirror `baseTheme` in `theme.ts` cannot reach them — they need a real
+ * stylesheet or they render as unstyled boxes (the defect this file closes).
+ *
+ * Tokens carry literal light-mode fallbacks — the same pattern `theme.ts` uses for
+ * the rendered task-query block — so a surface still reads if a token is undefined
+ * (a bare test DOM). Both the desktop and mobile clients define the full semantic
+ * family AND flip it for dark / amoled, so those themes come for free: nothing here
+ * hard-codes a colour that would survive the flip.
+ */
+
+/* ── The anchored chip editor (a popover, positioned by computePosition) ────── */
+
+.cm-task-field-editor {
+  position: fixed;
+  z-index: 2147483000;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 220px;
+  max-width: min(340px, calc(100vw - 24px));
+  padding: 12px;
+  background: var(--bg-1, #fbfaf7);
+  border: 1px solid var(--line-1, #e3e2dd);
+  border-radius: var(--radius-3, 10px);
+  box-shadow: var(--shadow-3, 0 8px 16px rgba(11, 11, 9, 0.08), 0 16px 40px rgba(11, 11, 9, 0.12));
+  font-family: var(--font-sans, ui-sans-serif, system-ui, sans-serif);
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--fg-1, #23221e);
+}
+
+/* One consistent control skin for every native input/select the surfaces use. */
+.cm-task-field-editor input,
+.cm-task-field-editor select,
+.cm-task-query-builder input,
+.cm-task-query-builder select {
+  box-sizing: border-box;
+  min-height: 32px;
+  padding: 5px 8px;
+  background: var(--bg-1, #fbfaf7);
+  color: var(--fg-1, #23221e);
+  border: 1px solid var(--line-2, #c8c7c1);
+  border-radius: var(--radius-2, 6px);
+  font-family: inherit;
+  font-size: 13px;
+}
+
+.cm-task-field-editor input:focus-visible,
+.cm-task-field-editor select:focus-visible,
+.cm-task-field-editor button:focus-visible,
+.cm-task-query-builder input:focus-visible,
+.cm-task-query-builder select:focus-visible,
+.cm-task-query-builder button:focus-visible,
+.cm-recurrence-day:focus-visible {
+  outline: 2px solid var(--accent, #2c4a7a);
+  outline-offset: 1px;
+}
+
+/* The commit / cancel pair. */
+.cm-task-field-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.cm-task-field-editor button,
+.cm-task-query-builder-actions button {
+  min-height: 32px;
+  padding: 6px 14px;
+  border-radius: var(--radius-2, 6px);
+  border: 1px solid var(--line-2, #c8c7c1);
+  background: var(--bg-1, #fbfaf7);
+  color: var(--fg-1, #23221e);
+  font-family: var(--font-sans, ui-sans-serif, system-ui, sans-serif);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* The primary action is the last button in each actions row. */
+.cm-task-field-actions button:last-child,
+.cm-task-query-builder-actions button:last-child {
+  background: var(--accent, #2c4a7a);
+  border-color: var(--accent, #2c4a7a);
+  color: var(--accent-on, #ffffff);
+}
+
+/* ── The recurrence control (repeat field) ─────────────────────────────────── */
+
+.cm-recurrence {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cm-recurrence-family {
+  width: 100%;
+}
+
+.cm-recurrence-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.cm-recurrence-count {
+  width: 64px;
+}
+
+/* Weekday toggles — a wrapping row of pressable pills. */
+.cm-recurrence-weekdays {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.cm-recurrence-day {
+  min-width: 34px;
+  min-height: 32px;
+  padding: 4px 6px;
+  border: 1px solid var(--line-2, #c8c7c1);
+  border-radius: var(--radius-2, 6px);
+  background: var(--bg-1, #fbfaf7);
+  color: var(--fg-2, #4a4943);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.cm-recurrence-day[aria-pressed="true"] {
+  background: var(--accent-soft, #e8edf5);
+  border-color: var(--accent, #2c4a7a);
+  color: var(--accent, #2c4a7a);
+}
+
+/* The completion-anchoring toggle. */
+.cm-recurrence-mode {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--fg-2, #4a4943);
+  cursor: pointer;
+}
+
+.cm-recurrence-mode input {
+  min-height: 0;
+  width: auto;
+  padding: 0;
+  cursor: pointer;
+}
+
+/* ── The task-query builder (a centered dialog) ────────────────────────────── */
+
+.cm-task-query-builder-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: color-mix(in srgb, var(--ink-1, #23221e) 32%, transparent);
+}
+
+.cm-task-query-builder {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: min(420px, 100%);
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  padding: 18px;
+  background: var(--bg-1, #fbfaf7);
+  border: 1px solid var(--line-1, #e3e2dd);
+  border-radius: var(--radius-3, 10px);
+  box-shadow: var(--shadow-3, 0 8px 16px rgba(11, 11, 9, 0.08), 0 16px 40px rgba(11, 11, 9, 0.12));
+  font-family: var(--font-sans, ui-sans-serif, system-ui, sans-serif);
+  font-size: 13px;
+  color: var(--fg-1, #23221e);
+}
+
+.cm-task-query-builder-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.cm-task-query-builder-row > span {
+  flex: 0 0 auto;
+  color: var(--fg-2, #4a4943);
+  font-weight: 600;
+}
+
+.cm-task-query-builder-row > select,
+.cm-task-query-builder-row > input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* The live canonical-text preview — teaches the roster by showing what it wrote. */
+.cm-task-query-builder-preview {
+  margin: 4px 0 0;
+  padding: 8px 10px;
+  background: var(--bg-2, #f2f0ea);
+  border: 1px solid var(--line-1, #e3e2dd);
+  border-radius: var(--radius-2, 6px);
+  color: var(--fg-2, #4a4943);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.cm-task-query-builder-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}

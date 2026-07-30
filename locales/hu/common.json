@@ -115,7 +115,7 @@
       "title": "Mellékletek",
       "transcribeDone": "Az átirat elkészült.",
       "transcribeFailed": "Az átirat készítése meghiúsult. Kérlek, próbáld újra.",
-      "transcribeNoModel": "Válassz átiratkészítő modellt a Beállítások → Labor → AI menüben.",
+      "transcribeNoModel": "Válassz átiratkészítő modellt a Beállítások → Developer → AI menüben.",
       "transcribeStarted": "Átirat készítése…",
       "typeFilter": {
         "all": "Minden típus",
@@ -730,11 +730,11 @@
           "deletedLabel": "törölve"
         },
         "transcribe": {
-          "disabledReason": "Az átirathoz kapcsold be az AI-t a Beállítások → Labor → AI menüben.",
+          "disabledReason": "Az átirathoz kapcsold be az AI-t a Beállítások → Developer → AI menüben.",
           "failed": "Az átirat készítése meghiúsult. Kérlek, próbáld újra.",
           "heading": "Átirat",
           "insert": "Átirat beszúrása a jegyzetbe",
-          "noModelHint": "Válassz átiratkészítő modellt a Beállítások → Labor → AI menüben.",
+          "noModelHint": "Válassz átiratkészítő modellt a Beállítások → Developer → AI menüben.",
           "progress": "Átirat készítése…",
           "stop": "Leállítás"
         },
@@ -865,8 +865,8 @@
           "gettingReadyHint": "A jegyzetek előkészítése az AI számára – egy pillanat.",
           "insert": "Beszúrás a jegyzetbe",
           "noAnswer": "Nincs válasz – próbálja átfogalmazni.",
-          "noModelHint": "Nincs kiválasztott modell. Válasszon egyet a Beállítások → Labor → AI menüben a kezdéshez.",
-          "offHint": "A helyi AI ki van kapcsolva. Kapcsolja be a Beállítások → Labor → AI menüben.",
+          "noModelHint": "Nincs kiválasztott modell. Válasszon egyet a Beállítások → Developer → AI menüben a kezdéshez.",
+          "offHint": "A helyi AI ki van kapcsolva. Kapcsolja be a Beállítások → Developer → AI menüben.",
           "send": "Küldés",
           "statusGettingReady": "Előkészítés…",
           "statusNoModel": "Nincs modell",
@@ -1261,7 +1261,10 @@
         "export": "Exportálás…",
         "includeAttachments_one": "{{count}} melléklet belefoglalása",
         "includeAttachments_other": "{{count}} melléklet belefoglalása",
-        "title": "Exportálás Markdownként"
+        "title": "Exportálás Markdownként",
+        "copyLabel": "Jegyzet szövegének másolása a vágólapra",
+        "copied": "Jegyzet szövege másolva",
+        "copyFailed": "Nem sikerült másolni a jegyzet szövegét"
       }
     },
     "egress": {
@@ -2012,6 +2015,8 @@
       "changelogButton": "Változásnapló megtekintése…",
       "changelogHelper": "Verziónkénti megjegyzések. A MYND-119 megérkezésekor jelennek meg.",
       "changelogLabel": "Változásnapló",
+      "developerModeHelper": "",
+      "developerModeLabel": "",
       "licenseBody": "Pre-alfa · CC-BY-4.0 dokumentáció · AGPL-3.0 alkalmazáskód az 1. fázis kiadásakor.",
       "licenseLabel": "Licenc",
       "tagline": "Pre-alfa · 1. fázisú asztali kliens",
@@ -2341,7 +2346,6 @@
       "pendingHint": "Hamarosan"
     },
     "ai": {
-      "betaBadge": "Béta",
       "disclosureToggle": "Hogyan működik ez?",
       "enableHelper": "Egy Ön által biztosított modellt futtat teljes egészében az eszközén. Kísérleti, alapértelmezés szerint kikapcsolva.",
       "enableLabel": "Helyi AI engedélyezése",
@@ -2434,7 +2438,7 @@
     "shell": {
       "closeLabel": "Beállítások bezárása",
       "groups": {
-        "labs": "Labor"
+        "developer": ""
       },
       "navLabel": "Beállítások panelei",
       "panels": {

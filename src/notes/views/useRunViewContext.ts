@@ -17,6 +17,7 @@ import { archivedFolderKeys, filterVisibleDeliberate } from "../archivedFolders"
 import { deriveFolderTree } from "../folderTree";
 import { liveCache, sortBatchIds, useSelectedNote } from "../sidebarState";
 import { searchNotes } from "../searchNotes";
+import { noteIdsWithTask } from "../taskIndex";
 import { byTag, vaultIndicesPropertyValues } from "../vaultIndices";
 import { folderSubtreeNoteIds, type RunViewContext } from "../queryEngine";
 
@@ -63,6 +64,14 @@ export function useRunViewContext(): RunViewContext {
           const hits = await searchNotes(query);
           return hits.map((h) => h.note_id);
         },
+        // `file:` — full-text hits whose TITLE matched (`matched_in.title`),
+        // computed by the engine's own stemmer (MYND-303).
+        titleMatch: async (query) => {
+          const hits = await searchNotes(query);
+          return hits.filter((h) => h.matched_in.title).map((h) => h.note_id);
+        },
+        // `task:` — notes with a task item (optionally matching the query text).
+        hasTask: (query) => noteIdsWithTask(query),
         propertyValues: (key) => vaultIndicesPropertyValues(key),
       },
       rowFor: (id) => {

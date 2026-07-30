@@ -340,6 +340,24 @@ candle-core = { version = "0.8", optional = true, default-features = false, feat
 candle-nn = { version = "0.8", optional = true, default-features = false, features = ["accelerate", "metal"] }
 candle-transformers = { version = "0.8", optional = true, default-features = false, features = ["accelerate", "metal"] }
 
+# `myne daily`'s OS-local calendar date (cli-thin-client task 9, MYND-490):
+# `localtime_r` via direct FFI rather than `chrono`/`time`. `chrono` sits in
+# `Cargo.lock` only as an unreached transitive of `serde_with`/`tauri-utils`
+# (no workspace member's dependency graph actually resolves it — confirmed
+# via `cargo tree -p myne-desktop -i chrono`), so pulling it in would be new
+# supply-chain surface, not an already-trusted one (`docs/dependency-policy.md`
+# — contrast the `dirs` precedent in `cli/Cargo.toml`, which WAS already
+# reachable). `time`'s local-offset API is unsound on multi-threaded Unix
+# (the documented `getenv` TZ race) and is explicitly disabled there by the
+# crate itself. `libc` is already reachable transitively on every Unix build
+# (tokio/cpal pull it in) — `localtime_r` is POSIX, thread-safe on glibc
+# absent a concurrent `setenv("TZ", …)` (never done in this codebase), and
+# needs no feature flags. Unix-only: `cli_bridge`'s production socket path is
+# already `#[cfg(unix)]`-gated (task 3); Windows gets the same documented
+# seam posture as the socket bind itself.
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
 # Dev-dependencies — evaluated under the same `docs/dependency-policy.md`
 # bar as runtime dependencies. `tracing-test` (tokio-rs org, MIT) is the
 # project's first dev-dep; it captures `tracing` events per-test so the

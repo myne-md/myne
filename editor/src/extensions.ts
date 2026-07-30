@@ -42,6 +42,7 @@ import { Footnote } from "@myne/dialect/lezer/footnote";
 import { Highlight } from "@myne/dialect/lezer/highlight";
 import { Math } from "@myne/dialect/lezer/math";
 import { Comment } from "@myne/dialect/lezer/comment";
+import { TaskField } from "@myne/dialect/lezer/task-field";
 import { codeNestMarkdownExtension, codeSyntaxHighlighting } from "./code-highlight";
 import { autoCloseFenceKeymap } from "./auto-close-fence";
 import { viewModeExtension, type ViewMode } from "./view-mode";
@@ -57,6 +58,7 @@ import { attachmentPasteDropExtension } from "./attachments/paste-drop";
 import { attachmentInsertPlaceholderExtension } from "./attachments/insert-placeholder";
 import { slashMenuExtension } from "./slash/plugin";
 import { aiSlashEnabledFacet } from "./slash/aiSlash";
+import { transcriptionEnabledFacet } from "./attachments/transcription-gate";
 import { ghostTextExtension } from "./ai/ghostText";
 
 // AI surface (slash AI commands + inline ghost-text) lives in a CM6 Compartment
@@ -82,6 +84,23 @@ export function aiSurface(enabled: boolean): Extension {
 export function reconfigureAi(enabled: boolean): StateEffect<unknown> {
   return aiCompartment.reconfigure(aiSurface(enabled));
 }
+
+/** Compartment for the transcription gate — separate from the AI one because
+ *  the two switches are independent (MYND-592) and flip on different events. */
+const transcriptionCompartment = new Compartment();
+
+/** The transcription surface for a given enabled state. Only the facet today;
+ *  it exists as a function so a future transcription-only extension has an
+ *  obvious home, mirroring `aiSurface`. */
+export function transcriptionSurface(enabled: boolean): Extension {
+  return [transcriptionEnabledFacet.of(enabled)];
+}
+
+/** Reconfigure the live transcription gate (host dispatches this on a
+ *  `transcription_enabled` change) — re-mount-free, like `reconfigureAi`. */
+export function reconfigureTranscription(enabled: boolean): StateEffect<unknown> {
+  return transcriptionCompartment.reconfigure(transcriptionSurface(enabled));
+}
 import { templateTokenMenuExtension } from "./template-tokens/plugin";
 import { selectionToolbarExtension } from "./toolbar/plugin";
 import { completionExtension } from "./completion";
@@ -100,6 +119,11 @@ export function myneExtensions(opts?: {
   viewMode?: ViewMode;
   readOnly?: boolean;
   aiEnabled?: boolean;
+  /** Whether speech-to-text is offered on audio attachments (MYND-592).
+   *  Default TRUE — an opt-OUT, the opposite polarity from `aiEnabled`, and
+   *  independent of it: transcription is a product feature with a bundled
+   *  model, not part of the AI beta. */
+  transcriptionEnabled?: boolean;
   /** Mount the floating selection toolbar (MYND-559). Default TRUE — desktop's
    *  formatting surface. Mobile passes `false`: it drives formatting from the
    *  above-keyboard `FormatBar` (via `onReady`), so the floating toolbar would be
@@ -153,6 +177,12 @@ export function myneExtensions(opts?: {
         Emoji,
         Highlight,
         Math,
+        // Inline task fields (MYND-611): `[due:: 2026-08-01]` and the Obsidian
+        // emoji form. Must match parser.ts. Without it the editor's tree has no
+        // `TaskField` node at all, and everything keyed on one silently does
+        // nothing: the chips never render (`chipRangesIn` finds no nodes) and
+        // spell-skip never skips a field's value.
+        TaskField,
         // Dialect comments `%%…%%` (MYND-315). Must match parser.ts. Hidden
         // off-cursor by commentDecorations(); never emitted/rewritten (§6 C1).
         Comment,
@@ -192,6 +222,7 @@ export function myneExtensions(opts?: {
     // a remount (see `reconfigureAi`). Off = zero ghost field / trigger / keymap
     // and the base slash menu only.
     aiCompartment.of(aiSurface(opts?.aiEnabled ?? false)),
+    transcriptionCompartment.of(transcriptionSurface(opts?.transcriptionEnabled ?? true)),
     // `[[` note picker (MYND-38) — fuzzy note search → canonical §3 emit. Reads
     // the WL-5 note-set facet; reuses the slash-menu surface + fuzzyFilter.
     wikilinkPickerExtension(),

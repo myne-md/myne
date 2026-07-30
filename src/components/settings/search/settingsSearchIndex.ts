@@ -51,6 +51,16 @@ export interface SettingsIndexEntry {
    * source of truth.
    */
   capability?: Capability;
+  /**
+   * Whether this entry additionally requires the `developer_mode` preference
+   * to be on (developer-mode feature, MYND-593). **Deliberately separate from
+   * `capability`** — the capability set is a static per-build descriptor the
+   * platform seam-contract tests rest on, while Developer mode is a runtime
+   * user toggle; folding the two together would make a static invariant
+   * dynamic. Settings search resolves straight to a panel id, so without this
+   * an entry behind the gate would happily navigate into a hidden panel.
+   */
+  developerGated?: boolean;
 }
 
 // Ordered by rail order (account → … → about → ai), and within a panel by the
@@ -100,14 +110,6 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     keywordsKey: "settings.search.keywords.screenCapture",
   },
   {
-    id: "privacy.realtime-sync",
-    panelId: "privacy",
-    testid: "settings.realtime-sync-info",
-    titleKey: "settings.privacy.realtimeSyncLabel",
-    descriptionKey: "settings.privacy.realtimeSyncHelper",
-    keywordsKey: "settings.search.keywords.realtimeSync",
-  },
-  {
     // The "Continue where you left off" toggle renders inline English (no
     // `settings.*` key today); give search a dedicated translatable pair.
     id: "privacy.last-active-note",
@@ -133,6 +135,33 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     titleKey: "settings.quickUnlock.title",
     descriptionKey: "settings.quickUnlock.setupHelper",
     keywordsKey: "settings.search.keywords.quickUnlock",
+  },
+  // CLI terminal access (MYND-490). All three carry `cliAccess`: the block is
+  // omitted where the capability is absent, so an ungated entry would navigate
+  // to an anchor that was never rendered.
+  {
+    id: "privacy.cli-access",
+    capability: "cliAccess",
+    panelId: "privacy",
+    titleKey: "settings.cliAccess.label",
+    descriptionKey: "settings.cliAccess.helperOff",
+    keywordsKey: "settings.search.keywords.cliAccess",
+  },
+  {
+    id: "privacy.cli-excluded-folders",
+    capability: "cliAccess",
+    panelId: "privacy",
+    titleKey: "settings.cliAccess.excludedLabel",
+    descriptionKey: "settings.cliAccess.excludedHelper",
+    keywordsKey: "settings.search.keywords.cliExcludedFolders",
+  },
+  {
+    id: "privacy.cli-rate-limit",
+    capability: "cliAccess",
+    panelId: "privacy",
+    titleKey: "settings.cliAccess.rateLimitLabel",
+    descriptionKey: "settings.cliAccess.rateLimitHelper",
+    keywordsKey: "settings.search.keywords.cliRateLimit",
   },
 
   // ── Sync (keys live under `sync.panel.*`, not `settings.*`) ─────────────────
@@ -289,6 +318,13 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     keywordsKey: "settings.search.keywords.dailyNotes",
   },
   {
+    id: "editor.reminders",
+    panelId: "editor",
+    testid: "settings.reminders-toggle",
+    titleKey: "settings.reminders.label",
+    keywordsKey: "settings.search.keywords.reminders",
+  },
+  {
     id: "editor.archive",
     panelId: "editor",
     testid: "settings.archive-disabled",
@@ -315,12 +351,30 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     keywordsKey: "settings.search.keywords.newNoteLocation",
   },
   {
+    id: "files.attachment-compression",
+    panelId: "files",
+    testid: "settings.attachment-compression",
+    titleKey: "settings.attachmentCompression.label",
+    descriptionKey: "settings.attachmentCompression.helper",
+    keywordsKey: "settings.search.keywords.attachmentCompression",
+  },
+  {
     id: "files.attachment-ocr",
     panelId: "files",
     testid: "settings.attachment-ocr",
     titleKey: "settings.attachmentOcr.label",
     descriptionKey: "settings.attachmentOcr.helper",
     keywordsKey: "settings.search.keywords.attachmentOcr",
+  },
+
+  // ── Transcription ──────────────────────────────────────────────────────────
+  {
+    id: "transcription.enabled",
+    panelId: "transcription",
+    testid: "settings.transcription",
+    titleKey: "settings.transcription.label",
+    descriptionKey: "settings.transcription.helper",
+    keywordsKey: "settings.search.keywords.transcription",
   },
 
   // ── Hotkeys (the panel has its own in-panel search; one entry routes to it) ──
@@ -450,10 +504,11 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     keywordsKey: "settings.search.keywords.threatModel",
   },
 
-  // ── AI (Labs) ──────────────────────────────────────────────────────────────
+  // ── AI (Developer group, MYND-593) ──────────────────────────────────────────
   {
     id: "ai.enable",
     capability: "localAi",
+    developerGated: true,
     panelId: "ai",
     titleKey: "settings.ai.enableLabel",
     descriptionKey: "settings.ai.enableHelper",
@@ -462,6 +517,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   {
     id: "ai.models",
     capability: "localAi",
+    developerGated: true,
     panelId: "ai",
     titleKey: "settings.ai.modelsLabel",
     descriptionKey: "settings.ai.modelsHelper",
@@ -470,6 +526,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   {
     id: "ai.excluded-folders",
     capability: "localAi",
+    developerGated: true,
     panelId: "ai",
     titleKey: "settings.ai.excludedLabel",
     descriptionKey: "settings.ai.excludedHelper",
@@ -478,13 +535,20 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
 ];
 
 /**
- * The entries this client can actually navigate to.
+ * The entries this client can actually navigate to right now.
  *
  * Every search path goes through here rather than through
  * {@link SETTINGS_SEARCH_INDEX} directly — the raw array stays exported because
  * the drift test needs to see ALL of it, including the entries this platform
- * hides.
+ * hides. `developerModeEnabled` is the live `vault.prefs.developer_mode` value
+ * (developer-mode feature, MYND-593) — a runtime toggle, unlike `capability`,
+ * so it's threaded in as a parameter rather than read from a module-level
+ * static the way the capability set is.
  */
-export function visibleSettingsIndex(): readonly SettingsIndexEntry[] {
-  return SETTINGS_SEARCH_INDEX.filter((e) => e.capability === undefined || has(e.capability));
+export function visibleSettingsIndex(developerModeEnabled: boolean): readonly SettingsIndexEntry[] {
+  return SETTINGS_SEARCH_INDEX.filter(
+    (e) =>
+      (e.capability === undefined || has(e.capability)) &&
+      (!e.developerGated || developerModeEnabled),
+  );
 }

@@ -35,6 +35,32 @@ vi.mock("../../src/notes/searchNotes", async () => {
   return { ...actual, searchNotes: vi.fn() };
 });
 
+// The palette reads the Saved Views run-context for operator queries
+// (MYND-303/307). These tests render the palette without its provider tree and
+// exercise only plain (operator-free) queries, so a minimal stub that never
+// throws is sufficient — the operator path is covered by the parser/ranker unit
+// tests and the E2E scenario.
+vi.mock("../../src/notes/views/useRunViewContext", () => {
+  // A STABLE singleton — production `useRunViewContext` is memoized, so the
+  // palette's `operatorDeps`/`runNoteSearch` identities are stable across
+  // renders. A stub that returned a fresh object each call would churn those
+  // identities and spin the debounced-search effect into a render loop.
+  const ctx = {
+    liveIds: new Set<string>(),
+    resolvers: {
+      hasTag: async () => [],
+      inFolder: async () => [],
+      search: async () => [],
+      titleMatch: async () => [],
+      hasTask: async () => [],
+      propertyValues: async () => [],
+    },
+    rowFor: () => ({ title: null, folder: null }),
+    recencyFallback: (ids: string[]) => ids,
+  };
+  return { useRunViewContext: () => ctx };
+});
+
 const mockedSearch = vi.mocked(searchNotes);
 
 function buildCtx(over: Partial<CommandContext> = {}): CommandContext {

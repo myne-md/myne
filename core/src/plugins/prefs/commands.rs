@@ -58,6 +58,34 @@ fn vault_dir_from_host(
     crate::paths::active_vault_root_io_from_host(host, active_id)
 }
 
+/// Where a [`PrefsView`] came from, for the callers that cannot treat a
+/// § 9.5.5 fallback as an answer.
+///
+/// The spec rule — absent / undecodable `vault.prefs` degrades to defaults,
+/// never fails — is right for every consumer whose action the user can simply
+/// redo: a wrong theme is one click away from correct. It is **not** enough for
+/// a consumer whose action is irreversible. `attachment_compression_enabled`
+/// defaults to `true`, so on a damaged blob the fallback would start discarding
+/// pixels on behalf of a user whose actual answer nobody could read.
+///
+/// This enum changes no value and no fallback: [`read_or_default`] returns
+/// exactly what it did before. It only lets a caller ask the second question —
+/// *is this the stored answer, or the fallback?* — instead of guessing from a
+/// value that looks identical either way.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PrefsOrigin {
+    /// Decoded from a stored blob. These are the user's settings.
+    Stored,
+    /// No blob exists. Defaults are the *correct* answer here rather than a
+    /// fallback — a vault that has never written prefs is not a damaged one
+    /// (the standard case for a fresh vault and for every pre-MYND-160 one),
+    /// and "never changed the default" is itself an answer.
+    Absent,
+    /// A blob exists and could not be read or decoded. The values are § 9.5.5
+    /// defaults and say nothing about what the user chose.
+    Degraded,
+}
+
 /// Read `vault.prefs` from disk and decode under `prefs_key` + AAD
 /// bound to `account_number_hash`. Returns `PrefsView::default()` on
 /// any failure (absent / truncated / AEAD-fail / parse-fail) per
@@ -73,6 +101,21 @@ pub async fn read_or_default(
     prefs_key: &[u8; 32],
     account_number_hash: &[u8; VAULT_META_ACCOUNT_HASH_LEN],
 ) -> PrefsView {
+    read_or_default_reporting_origin(io, prefs_path, prefs_key, account_number_hash)
+        .await
+        .0
+}
+
+/// [`read_or_default`], plus the [`PrefsOrigin`] that produced it.
+///
+/// The single implementation of both; `read_or_default` is this with the origin
+/// dropped, so the fallback rule cannot drift between them.
+pub async fn read_or_default_reporting_origin(
+    io: &dyn crate::vault_io::VaultIo,
+    prefs_path: &Path,
+    prefs_key: &[u8; 32],
+    account_number_hash: &[u8; VAULT_META_ACCOUNT_HASH_LEN],
+) -> (PrefsView, PrefsOrigin) {
     // The newest copy that DECODES (phase3-web-client task 18), not the newest
     // copy. On the web client a singleton is two alternating files, and here the
     // difference is user-visible in a way it is nowhere else: § 9.5.5 says an
@@ -88,13 +131,13 @@ pub async fn read_or_default(
     })
     .await
     {
-        Ok(view) => view,
+        Ok(view) => (view, PrefsOrigin::Stored),
         Err(crate::singleton::OpenOutcome::Absent) => {
             // Absent file is the standard case for pre-MYND-160 vaults
             // and for the first read after vault_create (until Task 12
             // lands eager-write). Not a warn — this is the documented
             // happy path of spec § 9.5.5.
-            PrefsView::default()
+            (PrefsView::default(), PrefsOrigin::Absent)
         }
         Err(crate::singleton::OpenOutcome::Io(e)) => {
             tracing::warn!(
@@ -103,7 +146,7 @@ pub async fn read_or_default(
                 io_kind = ?e,
                 "vault.prefs read failed; falling back to defaults"
             );
-            PrefsView::default()
+            (PrefsView::default(), PrefsOrigin::Degraded)
         }
         Err(crate::singleton::OpenOutcome::Undecodable(cause)) => {
             // Every stored copy failed — on desktop the only one, on web both.
@@ -115,7 +158,7 @@ pub async fn read_or_default(
                 reason = prefs_blob_error_kind(&cause),
                 "vault.prefs decode failed; falling back to defaults"
             );
-            PrefsView::default()
+            (PrefsView::default(), PrefsOrigin::Degraded)
         }
     }
 }
@@ -346,6 +389,22 @@ pub async fn prefs_read_with_dir(
     state: &VaultRuntimeState,
     io: &dyn crate::vault_io::VaultIo,
 ) -> Result<PrefsView, PrefsReadError> {
+    prefs_read_with_dir_reporting_origin(vault_dir, state, io)
+        .await
+        .map(|(view, _origin)| view)
+}
+
+/// [`prefs_read_with_dir`], plus the [`PrefsOrigin`] behind the returned view.
+///
+/// For the callers that must distinguish "the user's stored answer" from "the
+/// § 9.5.5 fallback that happens to look like one" — today the ingest-time
+/// image-compression gate in `plugins::attachments::commands`, whose action
+/// discards pixels and cannot be undone by re-reading a repaired blob.
+pub async fn prefs_read_with_dir_reporting_origin(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(PrefsView, PrefsOrigin), PrefsReadError> {
     // Peek root_key from the Unlocked slot (ignore the
     // vault_meta_bytes_hash — prefs has no CAS anchor against it).
     let (root_key, _vmh) = state
@@ -357,7 +416,7 @@ pub async fn prefs_read_with_dir(
     let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
     let prefs_path = vault_dir.join("vault.prefs");
 
-    Ok(read_or_default(io, &prefs_path, &prefs_key, &account_number_hash).await)
+    Ok(read_or_default_reporting_origin(io, &prefs_path, &prefs_key, &account_number_hash).await)
 }
 
 /// Internal (non-IPC) setter: record the last successful backup export
@@ -768,6 +827,276 @@ pub(crate) async fn set_archive_disabled_with_dir(
         event = "prefs_written",
         field = "archive_disabled",
         value = enabled
+    );
+    Ok(())
+}
+
+/// Slot::Unlocked-gated setter for the note-task marker's visibility
+/// (MYND-613). Read-modify-write under the per-plugin write mutex; no native
+/// side-effect. Omit-when-default keeps a vault that never touched it
+/// byte-identical to a pre-feature `vault.prefs`. Non-load-bearing (it can at
+/// worst show or hide a glyph) → no protective-envelope clamp.
+pub async fn set_show_task_marker_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    enabled: bool,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_show_task_marker_with_dir(&dir, state, hooks, enabled, io, host).await
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn set_show_task_marker<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
+    enabled: bool,
+) -> Result<(), PrefsWriteError> {
+    set_show_task_marker_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        enabled,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
+}
+
+/// Testable core of [`set_show_task_marker`].
+pub(crate) async fn set_show_task_marker_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    enabled: bool,
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
+) -> Result<(), PrefsWriteError> {
+    update_prefs_with_dir(
+        vault_dir,
+        state,
+        hooks,
+        |prefs| {
+            prefs.show_task_marker = enabled;
+        },
+        io,
+        host,
+    )
+    .await?;
+
+    tracing::info!(
+        event = "prefs_written",
+        field = "show_task_marker",
+        value = enabled
+    );
+    Ok(())
+}
+
+/// Slot::Unlocked-gated setter for whether speech-to-text may run on this
+/// vault's audio attachments (MYND-592). Shared / scalar-LWW: a bundled model
+/// every client carries, so wanting the feature is a vault-level preference
+/// rather than a device capability. Omit-when-default keeps an untouched vault
+/// byte-identical to a pre-feature `vault.prefs`.
+///
+/// **Not** the enforcement point — the host-side gate re-reads the persisted
+/// value at the top of `transcribe` rather than trusting a resident copy, so
+/// this setter has no native side-effect and needs no lifecycle hook.
+pub async fn set_transcription_enabled_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    enabled: bool,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_transcription_enabled_with_dir(&dir, state, hooks, enabled, io, host).await
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn set_transcription_enabled<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
+    enabled: bool,
+) -> Result<(), PrefsWriteError> {
+    set_transcription_enabled_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        enabled,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
+}
+
+/// Testable core of [`set_transcription_enabled`].
+pub(crate) async fn set_transcription_enabled_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    enabled: bool,
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
+) -> Result<(), PrefsWriteError> {
+    update_prefs_with_dir(
+        vault_dir,
+        state,
+        hooks,
+        |prefs| {
+            prefs.transcription_enabled = enabled;
+        },
+        io,
+        host,
+    )
+    .await?;
+
+    tracing::info!(
+        event = "prefs_written",
+        field = "transcription_enabled",
+        value = enabled
+    );
+    Ok(())
+}
+
+/// Slot::Unlocked-gated setter for whether THIS DEVICE shows task reminders
+/// (MYND-618). Device-local: whether a given machine should be interrupted is a
+/// property of that machine, so it never syncs. Omit-when-default keeps an
+/// untouched vault byte-identical. Non-load-bearing (it can at worst silence or
+/// enable a notification) → no protective-envelope clamp.
+pub async fn set_reminders_enabled_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    enabled: bool,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_reminders_enabled_with_dir(&dir, state, hooks, enabled, io, host).await
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn set_reminders_enabled<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
+    enabled: bool,
+) -> Result<(), PrefsWriteError> {
+    set_reminders_enabled_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        enabled,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
+}
+
+/// Testable core of [`set_reminders_enabled`].
+pub(crate) async fn set_reminders_enabled_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    enabled: bool,
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
+) -> Result<(), PrefsWriteError> {
+    update_prefs_with_dir(
+        vault_dir,
+        state,
+        hooks,
+        |prefs| {
+            prefs.reminders_enabled = enabled;
+        },
+        io,
+        host,
+    )
+    .await?;
+
+    tracing::info!(
+        event = "prefs_written",
+        field = "reminders_enabled",
+        value = enabled
+    );
+    Ok(())
+}
+
+/// Slot::Unlocked-gated setter for how many days ahead this device registers
+/// reminders with the OS (MYND-618); `None` falls back to the client's built-in
+/// horizon. Device-local for the same reason as `reminders_enabled`. The horizon
+/// is a PRIVACY bound before a resource one — pending times leave the AEAD
+/// envelope and sit in OS-owned plaintext (`threat-model.md` §7) — so it is
+/// stored verbatim with no clamp; clamping here would silently disagree with
+/// what the settings UI showed.
+pub async fn set_reminder_horizon_days_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    days: Option<u32>,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_reminder_horizon_days_with_dir(&dir, state, hooks, days, io, host).await
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn set_reminder_horizon_days<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
+    days: Option<u32>,
+) -> Result<(), PrefsWriteError> {
+    set_reminder_horizon_days_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        days,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
+}
+
+/// Testable core of [`set_reminder_horizon_days`].
+pub(crate) async fn set_reminder_horizon_days_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    days: Option<u32>,
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
+) -> Result<(), PrefsWriteError> {
+    update_prefs_with_dir(
+        vault_dir,
+        state,
+        hooks,
+        |prefs| {
+            prefs.reminder_horizon_days = days;
+        },
+        io,
+        host,
+    )
+    .await?;
+
+    tracing::info!(
+        event = "prefs_written",
+        field = "reminder_horizon_days",
+        value = days
     );
     Ok(())
 }
@@ -1494,6 +1823,142 @@ pub(crate) async fn set_attachment_ocr_enabled_with_dir(
     Ok(())
 }
 
+/// Slot::Unlocked-gated setter for the `developer_mode` toggle (MYND-593,
+/// `developer-mode` feature task 3) — the gate the AI opt-in and the local-model
+/// override pickers sit behind. Read-modify-write under the per-plugin write
+/// mutex; **no native side-effect**, same disk-only shape as
+/// [`set_attachment_ocr_enabled`]. Nothing consumes this field yet — the
+/// host-side effective-enabled conjunction and the model-path rejection are
+/// task 4's territory; this setter only persists the flag.
+pub async fn set_developer_mode_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    enabled: bool,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_developer_mode_with_dir(&dir, state, hooks, enabled, io, host).await
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn set_developer_mode<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
+    enabled: bool,
+) -> Result<(), PrefsWriteError> {
+    set_developer_mode_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        enabled,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
+}
+
+/// Testable core of [`set_developer_mode`].
+pub(crate) async fn set_developer_mode_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    enabled: bool,
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
+) -> Result<(), PrefsWriteError> {
+    update_prefs_with_dir(
+        vault_dir,
+        state,
+        hooks,
+        |prefs| {
+            prefs.developer_mode = enabled;
+        },
+        io,
+        host,
+    )
+    .await?;
+
+    tracing::info!(event = "prefs_written", field = "developer_mode", enabled);
+    Ok(())
+}
+
+/// Slot::Unlocked-gated setter for the `attachment_compression_enabled`
+/// toggle — whether an imported image attachment is downscaled/re-encoded on
+/// ingest. Read-modify-write under the per-plugin write mutex; **no native
+/// side-effect**, exactly like [`set_attachment_ocr_enabled`].
+///
+/// Shared (`sync-protocol.md` §10.2), unlike its OCR/AI neighbours: this is a
+/// content-fidelity switch with a vault-wide, irreversible effect (a
+/// compressed attachment's original bytes are gone), not a per-device
+/// compute-budget switch, so the switch must have the same reach as the
+/// effect. Toggling it off affects only attachments imported *after* the
+/// change; nothing already stored is read or rewritten.
+pub async fn set_attachment_compression_enabled_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    enabled: bool,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_attachment_compression_enabled_with_dir(&dir, state, hooks, enabled, io, host).await
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn set_attachment_compression_enabled<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
+    enabled: bool,
+) -> Result<(), PrefsWriteError> {
+    set_attachment_compression_enabled_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        enabled,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
+}
+
+/// Testable core of [`set_attachment_compression_enabled`].
+pub(crate) async fn set_attachment_compression_enabled_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    enabled: bool,
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
+) -> Result<(), PrefsWriteError> {
+    update_prefs_with_dir(
+        vault_dir,
+        state,
+        hooks,
+        |prefs| {
+            prefs.attachment_compression_enabled = enabled;
+        },
+        io,
+        host,
+    )
+    .await?;
+
+    tracing::info!(
+        event = "prefs_written",
+        field = "attachment_compression_enabled",
+        enabled
+    );
+    Ok(())
+}
+
 /// Slot::Unlocked-gated setter for the `ai_excluded_folders` set (local-ai
 /// epic, ai-ux-surface MYND-408, SYNC-14) — folders the AI never reads/indexes.
 /// Same canonical set encoding as `deliberate_folders`; direct mirror of
@@ -1566,6 +2031,207 @@ pub(crate) async fn set_ai_excluded_folders_with_dir(
         event = "prefs_written",
         field = "ai_excluded_folders",
         count
+    );
+    Ok(())
+}
+
+/// Slot::Unlocked-gated setter for the `cli_enabled` CLI terminal-access door
+/// toggle (myne-cli epic, MYND-490; `cli-thin-client` task 2). Read-modify-write
+/// under the per-plugin write mutex; **no native side-effect** — same shape as
+/// [`set_archive_disabled`]. Opening/closing the actual socket in response to
+/// this toggle (plus the vault's unlock state) is the task-3 lifecycle's job,
+/// not this setter's; this command only persists the flag.
+pub async fn set_cli_enabled_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    enabled: bool,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_cli_enabled_with_dir(&dir, state, hooks, enabled, io, host).await
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn set_cli_enabled<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
+    enabled: bool,
+) -> Result<(), PrefsWriteError> {
+    set_cli_enabled_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        enabled,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
+}
+
+/// Testable core of [`set_cli_enabled`].
+pub(crate) async fn set_cli_enabled_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    enabled: bool,
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
+) -> Result<(), PrefsWriteError> {
+    update_prefs_with_dir(
+        vault_dir,
+        state,
+        hooks,
+        |prefs| {
+            prefs.cli_enabled = enabled;
+        },
+        io,
+        host,
+    )
+    .await?;
+
+    tracing::info!(event = "prefs_written", field = "cli_enabled", enabled);
+    Ok(())
+}
+
+/// Slot::Unlocked-gated setter for the `cli_excluded_folders` set (myne-cli
+/// epic, MYND-490; `cli-thin-client` task 2) — folders the CLI door never
+/// reaches. Same canonical set encoding as `deliberate_folders` /
+/// `ai_excluded_folders`; direct mirror of [`set_ai_excluded_folders`]
+/// (read-modify-write, no native side-effect — enforcing the exclusion is
+/// task 5's job, not this setter's).
+pub async fn set_cli_excluded_folders_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    folders: Vec<String>,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_cli_excluded_folders_with_dir(&dir, state, hooks, folders, io, host).await
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn set_cli_excluded_folders<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
+    folders: Vec<String>,
+) -> Result<(), PrefsWriteError> {
+    set_cli_excluded_folders_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        folders,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
+}
+
+/// Testable core of [`set_cli_excluded_folders`].
+pub(crate) async fn set_cli_excluded_folders_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    folders: Vec<String>,
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
+) -> Result<(), PrefsWriteError> {
+    let count = folders.len();
+    update_prefs_with_dir(
+        vault_dir,
+        state,
+        hooks,
+        |prefs| {
+            prefs.cli_excluded_folders = folders;
+        },
+        io,
+        host,
+    )
+    .await?;
+
+    // Folder COUNT only — never the paths (AS3 Sensitive; see the
+    // `set_deliberate_folders` note + ../../CLAUDE.md logging discipline).
+    tracing::info!(
+        event = "prefs_written",
+        field = "cli_excluded_folders",
+        count
+    );
+    Ok(())
+}
+
+/// Slot::Unlocked-gated setter for the `cli_rate_limit_disabled` toggle
+/// (myne-cli epic, MYND-490; `cli-thin-client` task 2). Read-modify-write
+/// under the per-plugin write mutex; **no native side-effect** (the task-3
+/// socket reads the current value on the next request rather than being
+/// pushed to). Always persists an explicit `Some(disabled)` — the
+/// `set_archive_disabled` precedent — because the default-ON rate limit is a
+/// host read-time concern, not a stored value. Non-load-bearing → no clamp.
+pub async fn set_cli_rate_limit_disabled_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    disabled: bool,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_cli_rate_limit_disabled_with_dir(&dir, state, hooks, disabled, io, host).await
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn set_cli_rate_limit_disabled<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
+    disabled: bool,
+) -> Result<(), PrefsWriteError> {
+    set_cli_rate_limit_disabled_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        disabled,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
+}
+
+/// Testable core of [`set_cli_rate_limit_disabled`].
+pub(crate) async fn set_cli_rate_limit_disabled_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    disabled: bool,
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
+) -> Result<(), PrefsWriteError> {
+    update_prefs_with_dir(
+        vault_dir,
+        state,
+        hooks,
+        |prefs| {
+            prefs.cli_rate_limit_disabled = Some(disabled);
+        },
+        io,
+        host,
+    )
+    .await?;
+
+    tracing::info!(
+        event = "prefs_written",
+        field = "cli_rate_limit_disabled",
+        disabled
     );
     Ok(())
 }
@@ -3920,6 +4586,12 @@ mod tests {
     struct CountingHooks(std::sync::Arc<std::sync::atomic::AtomicU64>);
 
     impl crate::hooks::VaultLifecycleHooks for CountingHooks {
+        fn hydrate_attachment_refs<'a>(
+            &'a self,
+            _: &'a VaultRuntimeState,
+        ) -> crate::hooks::BoxFuture<'a> {
+            Box::pin(std::future::ready(()))
+        }
         fn hydrate_search_index<'a>(
             &'a self,
             _: &'a VaultRuntimeState,
@@ -4547,17 +5219,26 @@ mod tests {
                 &prefs_key,
                 &account_hash,
                 &PrefsView {
+                    attachment_compression_enabled: true,
+                    developer_mode: false,
                     attachment_ocr_enabled: true,
+                    transcription_enabled: true,
                     screen_capture_protection: false,
                     ai_enabled: false,
                     ai_excluded_folders: Vec::new(),
                     bar_items_order: Vec::new(),
+                    cli_enabled: false,
+                    cli_excluded_folders: Vec::new(),
+                    cli_rate_limit_disabled: None,
                     color_groups: Vec::new(),
                     editor_toolbar_order: Vec::new(),
                     editor_toolbar_hidden: Vec::new(),
                     editor_slash_order: Vec::new(),
                     editor_slash_hidden: Vec::new(),
                     show_note_timestamps: true,
+                    reminders_enabled: true,
+                    reminder_horizon_days: None,
+                    show_task_marker: true,
                     folder_icons: Default::default(),
                     hidden_bar_items: Vec::new(),
                     icon: None,
@@ -5013,6 +5694,230 @@ mod tests {
                 .expect("read after clear");
             assert!(!cleared.ai_enabled);
             assert!(cleared.ai_excluded_folders.is_empty());
+        });
+    }
+
+    // ---- Developer mode setter (developer-mode, MYND-593) -------------
+
+    #[test]
+    fn developer_mode_persist_and_reload_round_trip() {
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x52).await;
+
+            // Default: off.
+            let base = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
+                .await
+                .expect("read");
+            assert!(!base.developer_mode);
+
+            // Enable, then reload from a fresh read (persist-and-reload).
+            set_developer_mode_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                true,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("enable must succeed");
+            let enabled = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
+                .await
+                .expect("read after enable");
+            assert!(enabled.developer_mode);
+            // Unrelated fields untouched.
+            assert!(enabled.screen_capture_protection);
+
+            // Disable → back to default (byte-identical to pre-field, since the
+            // codec emits the key only when true).
+            set_developer_mode_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                false,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("disable must succeed");
+            let disabled = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
+                .await
+                .expect("read after disable");
+            assert!(!disabled.developer_mode);
+        });
+    }
+
+    #[test]
+    fn set_developer_mode_rejects_when_slot_empty() {
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("prefs-devmode-empty").expect("scoped tempdir");
+            let state = VaultRuntimeState::default();
+            let result = set_developer_mode_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                true,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await;
+            assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
+        });
+    }
+
+    // ---- CLI prefs setters (myne-cli epic, MYND-490; task 2) ----------
+
+    #[test]
+    fn set_cli_enabled_rejects_when_slot_empty() {
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("prefs-cli-enabled-empty").expect("scoped tempdir");
+            let state = VaultRuntimeState::default();
+            let result = set_cli_enabled_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                true,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await;
+            assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
+        });
+    }
+
+    #[test]
+    fn set_cli_excluded_folders_rejects_when_slot_empty() {
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("prefs-cli-excluded-empty").expect("scoped tempdir");
+            let state = VaultRuntimeState::default();
+            let result = set_cli_excluded_folders_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                alloc_vec(["Secret/"]),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await;
+            assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
+        });
+    }
+
+    #[test]
+    fn set_cli_rate_limit_disabled_rejects_when_slot_empty() {
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("prefs-cli-ratelimit-empty").expect("scoped tempdir");
+            let state = VaultRuntimeState::default();
+            let result = set_cli_rate_limit_disabled_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                true,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await;
+            assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
+        });
+    }
+
+    #[test]
+    fn cli_prefs_round_trip_via_set_then_read() {
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x52).await;
+
+            // Defaults: door closed, no exclusions, rate limit untouched.
+            let base = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
+                .await
+                .expect("read");
+            assert!(!base.cli_enabled);
+            assert!(base.cli_excluded_folders.is_empty());
+            assert_eq!(base.cli_rate_limit_disabled, None);
+
+            // Enable + set exclusions (unsorted input) + disable the rate limit.
+            set_cli_enabled_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                true,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("enable must succeed");
+            set_cli_excluded_folders_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                alloc_vec(["Private/", "Archive/2025/"]),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("set exclusions must succeed");
+            set_cli_rate_limit_disabled_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                true,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("disable rate limit must succeed");
+
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
+                .await
+                .expect("read after write");
+            assert!(view.cli_enabled);
+            // Canonical sort applies at encode → read-back is sorted.
+            assert_eq!(
+                view.cli_excluded_folders,
+                alloc_vec(["Archive/2025/", "Private/"]),
+            );
+            assert_eq!(view.cli_rate_limit_disabled, Some(true));
+            // Unrelated fields untouched (defaults on).
+            assert!(view.screen_capture_protection);
+
+            // Disable + clear → back to defaults (door closed, empty set); the
+            // rate-limit toggle persists an explicit Some(false), not back to
+            // None (the archive_disabled precedent).
+            set_cli_enabled_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                false,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("disable must succeed");
+            set_cli_excluded_folders_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                Vec::new(),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("clear must succeed");
+            set_cli_rate_limit_disabled_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                false,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("re-enable rate limit must succeed");
+            let cleared = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
+                .await
+                .expect("read after clear");
+            assert!(!cleared.cli_enabled);
+            assert!(cleared.cli_excluded_folders.is_empty());
+            assert_eq!(cleared.cli_rate_limit_disabled, Some(false));
         });
     }
 
@@ -6520,6 +7425,91 @@ mod tests {
                 .await
                 .expect("read after off");
             assert_eq!(view.archive_disabled, Some(false));
+        });
+    }
+
+    // ---- attachment_compression_enabled setter -------------------------
+
+    #[test]
+    fn set_attachment_compression_enabled_rejects_when_slot_empty() {
+        rt().block_on(async {
+            let tmp =
+                ScopedTempDir::new("prefs-attachment-compression-empty").expect("scoped tempdir");
+            let state = VaultRuntimeState::default();
+            let result = set_attachment_compression_enabled_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                false,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await;
+            assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
+        });
+    }
+
+    #[test]
+    fn attachment_compression_enabled_round_trips_via_set_then_read() {
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x53).await;
+
+            // Default (no write yet) reads back as `true` — compression on.
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
+                .await
+                .expect("read default");
+            assert!(view.attachment_compression_enabled);
+
+            // Turn OFF persists (disk-first) + round-trips.
+            set_attachment_compression_enabled_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                false,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("write off");
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
+                .await
+                .expect("read after off");
+            assert!(!view.attachment_compression_enabled);
+            // Pre-existing screen_capture default untouched.
+            assert!(view.screen_capture_protection);
+
+            // Simulate a lock/unlock cycle: a fresh VaultRuntimeState reading
+            // the same on-disk vault.prefs must still observe the persisted
+            // value (the setter's disk write, not any in-memory cache, is
+            // what the value survives on). Match `make_temp_vault_with_unlocked_state`'s
+            // fixture key material (0x42, 0x99, 1) so the re-derived prefs_key
+            // can decrypt the blob written above.
+            let reunlocked_state = VaultRuntimeState::default();
+            let unlocked = fixture_unlocked_with_keys(0x42, 0x99, 1);
+            reunlocked_state
+                .set_unlocked(test_vault_id(), unlocked)
+                .await;
+            let view =
+                prefs_read_with_dir(tmp.path(), &reunlocked_state, &crate::vault_io::StdVaultIo)
+                    .await
+                    .expect("read after simulated re-unlock");
+            assert!(!view.attachment_compression_enabled);
+
+            // Turn back ON overwrites (explicit true again).
+            set_attachment_compression_enabled_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                true,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("write on");
+            let view = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
+                .await
+                .expect("read after on");
+            assert!(view.attachment_compression_enabled);
         });
     }
 

@@ -120,7 +120,7 @@
       "title": "Anexos",
       "transcribeDone": "Transcrição concluída.",
       "transcribeFailed": "A transcrição falhou. Tente novamente.",
-      "transcribeNoModel": "Selecione um modelo de transcrição em Definições → Labs → IA.",
+      "transcribeNoModel": "Selecione um modelo de transcrição em Definições → Developer → IA.",
       "transcribeStarted": "A transcrever…",
       "typeFilter": {
         "all": "Todos os tipos",
@@ -744,11 +744,11 @@
           "deletedLabel": "apagado"
         },
         "transcribe": {
-          "disabledReason": "Ative a IA em Definições → Labs → IA para transcrever.",
+          "disabledReason": "Ative a IA em Definições → Developer → IA para transcrever.",
           "failed": "A transcrição falhou. Tente novamente.",
           "heading": "Transcrição",
           "insert": "Inserir a transcrição na nota",
-          "noModelHint": "Selecione um modelo de transcrição em Definições → Labs → IA.",
+          "noModelHint": "Selecione um modelo de transcrição em Definições → Developer → IA.",
           "progress": "A transcrever…",
           "stop": "Parar"
         },
@@ -888,8 +888,8 @@
           "gettingReadyHint": "A preparar as suas notas para a IA — um momento.",
           "insert": "Inserir na nota",
           "noAnswer": "Sem resposta — tente reformular.",
-          "noModelHint": "Nenhum modelo selecionado. Escolha um em Definições → Labs → IA para começar.",
-          "offHint": "A IA local está desligada. Ligue-a em Definições → Labs → IA.",
+          "noModelHint": "Nenhum modelo selecionado. Escolha um em Definições → Developer → IA para começar.",
+          "offHint": "A IA local está desligada. Ligue-a em Definições → Developer → IA.",
           "send": "Enviar",
           "statusGettingReady": "A preparar…",
           "statusNoModel": "Sem modelo",
@@ -1296,7 +1296,10 @@
         "includeAttachments_one": "Incluir {{count}} anexo",
         "includeAttachments_many": "Incluir {{count}} anexos",
         "includeAttachments_other": "Incluir {{count}} anexos",
-        "title": "Exportar como Markdown"
+        "title": "Exportar como Markdown",
+        "copyLabel": "Copiar o texto da nota para a área de transferência",
+        "copied": "Texto da nota copiado",
+        "copyFailed": "Não foi possível copiar o texto da nota"
       }
     },
     "egress": {
@@ -2072,6 +2075,8 @@
       "changelogButton": "Ver registo de alterações…",
       "changelogHelper": "Notas por versão. Aparecerá quando o MYND-119 estiver concluído.",
       "changelogLabel": "Registo de alterações",
+      "developerModeHelper": "",
+      "developerModeLabel": "",
       "licenseBody": "Pré-alfa · documentação CC-BY-4.0 · código da aplicação AGPL-3.0 no lançamento da Fase 1.",
       "licenseLabel": "Licença",
       "tagline": "Pré-alfa · cliente de ambiente de trabalho da Fase 1",
@@ -2406,7 +2411,6 @@
       "pendingHint": "Brevemente"
     },
     "ai": {
-      "betaBadge": "Beta",
       "disclosureToggle": "Como funciona?",
       "enableHelper": "Executa inteiramente no seu dispositivo um modelo fornecido por si. Experimental, desativado por predefinição.",
       "enableLabel": "Ativar IA local",
@@ -2501,7 +2505,7 @@
     "shell": {
       "closeLabel": "Fechar definições",
       "groups": {
-        "labs": "Labs"
+        "developer": ""
       },
       "navLabel": "Painéis de definições",
       "panels": {

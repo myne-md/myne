@@ -115,7 +115,7 @@
       "title": "Bijlagen",
       "transcribeDone": "Transcriptie voltooid.",
       "transcribeFailed": "Transcriptie mislukt. Probeer het opnieuw.",
-      "transcribeNoModel": "Selecteer een transcriptiemodel in Instellingen → Labs → AI.",
+      "transcribeNoModel": "Selecteer een transcriptiemodel in Instellingen → Developer → AI.",
       "transcribeStarted": "Transcriberen…",
       "typeFilter": {
         "all": "Alle types",
@@ -730,11 +730,11 @@
           "deletedLabel": "verwijderd"
         },
         "transcribe": {
-          "disabledReason": "Schakel AI in via Instellingen → Labs → AI om te transcriberen.",
+          "disabledReason": "Schakel AI in via Instellingen → Developer → AI om te transcriberen.",
           "failed": "Transcriptie mislukt. Probeer het opnieuw.",
           "heading": "Transcript",
           "insert": "Transcript in notitie invoegen",
-          "noModelHint": "Selecteer een transcriptiemodel in Instellingen → Labs → AI.",
+          "noModelHint": "Selecteer een transcriptiemodel in Instellingen → Developer → AI.",
           "progress": "Transcriberen…",
           "stop": "Stoppen"
         },
@@ -865,8 +865,8 @@
           "gettingReadyHint": "Je notities worden voorbereid voor AI — een moment.",
           "insert": "Invoegen in notitie",
           "noAnswer": "Geen antwoord — probeer het anders te formuleren.",
-          "noModelHint": "Geen model geselecteerd. Kies er een in Instellingen → Labs → AI om te beginnen.",
-          "offHint": "Lokale AI is uit. Schakel het in via Instellingen → Labs → AI.",
+          "noModelHint": "Geen model geselecteerd. Kies er een in Instellingen → Developer → AI om te beginnen.",
+          "offHint": "Lokale AI is uit. Schakel het in via Instellingen → Developer → AI.",
           "send": "Verzenden",
           "statusGettingReady": "Voorbereiden…",
           "statusNoModel": "Geen model",
@@ -1261,7 +1261,10 @@
         "export": "Exporteren…",
         "includeAttachments_one": "{{count}} bijlage opnemen",
         "includeAttachments_other": "{{count}} bijlagen opnemen",
-        "title": "Exporteren als Markdown"
+        "title": "Exporteren als Markdown",
+        "copyLabel": "Notitietekst naar klembord kopiëren",
+        "copied": "Notitietekst gekopieerd",
+        "copyFailed": "Kon de notitietekst niet kopiëren"
       }
     },
     "egress": {
@@ -2012,6 +2015,8 @@
       "changelogButton": "Wijzigingslog bekijken…",
       "changelogHelper": "Notities per versie. Verschijnt zodra MYND-119 wordt opgeleverd.",
       "changelogLabel": "Wijzigingslog",
+      "developerModeHelper": "",
+      "developerModeLabel": "",
       "licenseBody": "Pre-alpha · CC-BY-4.0-documentatie · AGPL-3.0-toepassingscode bij de release van fase 1.",
       "licenseLabel": "Licentie",
       "tagline": "Pre-alpha · Desktopclient fase 1",
@@ -2341,7 +2346,6 @@
       "pendingHint": "Binnenkort beschikbaar"
     },
     "ai": {
-      "betaBadge": "Bèta",
       "disclosureToggle": "Hoe werkt dit?",
       "enableHelper": "Draait een model dat je zelf aanlevert volledig op je apparaat. Experimenteel, standaard uit.",
       "enableLabel": "Lokale AI inschakelen",
@@ -2434,7 +2438,7 @@
     "shell": {
       "closeLabel": "Instellingen sluiten",
       "groups": {
-        "labs": "Labs"
+        "developer": ""
       },
       "navLabel": "Instellingenpanelen",
       "panels": {

@@ -33,3 +33,13 @@ function searchableExample() {
 And ![[image-as-wikilink.png]] for the embed form.
 
 #daily-tag and #parent/child/grand-child tags both work.
+
+## Tasks carried over from Obsidian
+
+- [ ] pay the rent 📅 2026-08-01 🔁 every month
+- [x] ship the release ✅ 2026-07-27 ⏫
+- [ ] call the plumber [due:: 2026-08-05] [priority:: medium]
+- [X] uppercase marker survives 📅 2026-07-30
+- [ ] carries fields Myne does not type [scheduled:: 2026-08-05] [onCompletion:: delete]
+- [ ] half-written date [due:: 2026-08] stays raw
+- [ ] not a task field: `[due:: 2026-08-01]` inside code

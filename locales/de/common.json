@@ -115,7 +115,7 @@
       "title": "Anhänge",
       "transcribeDone": "Transkription abgeschlossen.",
       "transcribeFailed": "Transkription fehlgeschlagen. Bitte versuchen Sie es erneut.",
-      "transcribeNoModel": "Wählen Sie unter Einstellungen → Labs → KI ein Transkriptionsmodell aus.",
+      "transcribeNoModel": "Wählen Sie unter Einstellungen → Developer → KI ein Transkriptionsmodell aus.",
       "transcribeStarted": "Wird transkribiert…",
       "typeFilter": {
         "all": "Alle Typen",
@@ -730,11 +730,11 @@
           "deletedLabel": "gelöscht"
         },
         "transcribe": {
-          "disabledReason": "Aktivieren Sie die KI unter Einstellungen → Labs → KI, um zu transkribieren.",
+          "disabledReason": "Aktivieren Sie die KI unter Einstellungen → Developer → KI, um zu transkribieren.",
           "failed": "Transkription fehlgeschlagen. Bitte versuchen Sie es erneut.",
           "heading": "Transkript",
           "insert": "Transkript in Notiz einfügen",
-          "noModelHint": "Wählen Sie unter Einstellungen → Labs → KI ein Transkriptionsmodell aus.",
+          "noModelHint": "Wählen Sie unter Einstellungen → Developer → KI ein Transkriptionsmodell aus.",
           "progress": "Wird transkribiert…",
           "stop": "Stopp"
         },
@@ -865,8 +865,8 @@
           "gettingReadyHint": "Deine Notizen werden für die KI vorbereitet – einen Moment.",
           "insert": "In Notiz einfügen",
           "noAnswer": "Keine Antwort – versuche es anders zu formulieren.",
-          "noModelHint": "Kein Modell ausgewählt. Wähle eines unter Einstellungen → Labs → KI, um zu beginnen.",
-          "offHint": "Lokale KI ist aus. Aktiviere sie unter Einstellungen → Labs → KI.",
+          "noModelHint": "Kein Modell ausgewählt. Wähle eines unter Einstellungen → Developer → KI, um zu beginnen.",
+          "offHint": "Lokale KI ist aus. Aktiviere sie unter Einstellungen → Developer → KI.",
           "send": "Senden",
           "statusGettingReady": "Wird vorbereitet…",
           "statusNoModel": "Kein Modell",
@@ -1261,7 +1261,10 @@
         "export": "Exportieren…",
         "includeAttachments_one": "{{count}} Anhang einschließen",
         "includeAttachments_other": "{{count}} Anhänge einschließen",
-        "title": "Als Markdown exportieren"
+        "title": "Als Markdown exportieren",
+        "copyLabel": "Notiztext in die Zwischenablage kopieren",
+        "copied": "Notiztext kopiert",
+        "copyFailed": "Notiztext konnte nicht kopiert werden"
       }
     },
     "egress": {
@@ -2012,6 +2015,8 @@
       "changelogButton": "Änderungsprotokoll anzeigen…",
       "changelogHelper": "Hinweise je Version. Erscheinen, sobald MYND-119 landet.",
       "changelogLabel": "Änderungsprotokoll",
+      "developerModeHelper": "",
+      "developerModeLabel": "",
       "licenseBody": "Pre-Alpha · CC-BY-4.0-Dokumentation · AGPL-3.0-Anwendungscode mit dem Phase-1-Release.",
       "licenseLabel": "Lizenz",
       "tagline": "Pre-Alpha · Phase-1-Desktop-Client",
@@ -2341,7 +2346,6 @@
       "pendingHint": "Demnächst verfügbar"
     },
     "ai": {
-      "betaBadge": "Beta",
       "disclosureToggle": "Wie funktioniert das?",
       "enableHelper": "Führt ein von dir bereitgestelltes Modell vollständig auf deinem Gerät aus. Experimentell, standardmäßig aus.",
       "enableLabel": "Lokale KI aktivieren",
@@ -2434,7 +2438,7 @@
     "shell": {
       "closeLabel": "Einstellungen schließen",
       "groups": {
-        "labs": "Labs"
+        "developer": ""
       },
       "navLabel": "Einstellungsbereiche",
       "panels": {

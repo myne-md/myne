@@ -283,19 +283,19 @@ describe("ColorGroupEditor — an unresolvable synced color key degrades", () =>
     return screen.getByTestId("editor.color-group-swatch").getAttribute("style") ?? "";
   };
 
-  it("resolves a known palette key through its token, with a neutral fallback", () => {
-    expect(swatchStyle("group-rose")).toContain("var(--group-rose, var(--accent))");
+  it("resolves a known palette key through its token, with a neutral --fg-2 fallback", () => {
+    expect(swatchStyle("group-rose")).toContain("var(--group-rose, var(--fg-2))");
   });
 
   it("never composes a double-prefixed custom property from a `--`-prefixed key", () => {
     const style = swatchStyle("--group-rose");
     expect(style).not.toContain("var(----group-rose");
-    expect(style).toContain("var(--accent)");
+    expect(style).toContain("var(--fg-2)");
   });
 
-  it("falls back to the neutral accent for a palette entry it cannot resolve", () => {
+  it("falls back to the neutral node color for a palette entry it cannot resolve", () => {
     // Well-formed, so it DOES reach `var()` — the fallback is what saves it.
-    expect(swatchStyle("group-future")).toContain("var(--group-future, var(--accent))");
+    expect(swatchStyle("group-future")).toContain("var(--group-future, var(--fg-2))");
   });
 
   it("leaves the stored key untouched — the degrade is a render concern only", () => {

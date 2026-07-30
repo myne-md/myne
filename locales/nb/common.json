@@ -115,7 +115,7 @@
       "title": "Vedlegg",
       "transcribeDone": "Transkribering fullført.",
       "transcribeFailed": "Transkribering mislyktes. Prøv igjen.",
-      "transcribeNoModel": "Velg en transkriberingsmodell i Innstillinger → Labs → AI.",
+      "transcribeNoModel": "Velg en transkriberingsmodell i Innstillinger → Developer → AI.",
       "transcribeStarted": "Transkriberer…",
       "typeFilter": {
         "all": "Alle typer",
@@ -730,11 +730,11 @@
           "deletedLabel": "slettet"
         },
         "transcribe": {
-          "disabledReason": "Aktiver AI i Innstillinger → Labs → AI for å transkribere.",
+          "disabledReason": "Aktiver AI i Innstillinger → Developer → AI for å transkribere.",
           "failed": "Transkribering mislyktes. Prøv igjen.",
           "heading": "Transkripsjon",
           "insert": "Sett inn transkripsjonen i notatet",
-          "noModelHint": "Velg en transkriberingsmodell i Innstillinger → Labs → AI.",
+          "noModelHint": "Velg en transkriberingsmodell i Innstillinger → Developer → AI.",
           "progress": "Transkriberer…",
           "stop": "Stopp"
         },
@@ -865,8 +865,8 @@
           "gettingReadyHint": "Forbereder notatene dine for AI – et øyeblikk.",
           "insert": "Sett inn i notat",
           "noAnswer": "Ingen svar – prøv å omformulere.",
-          "noModelHint": "Ingen modell valgt. Velg en i Innstillinger → Labs → AI for å starte.",
-          "offHint": "Lokal AI er av. Slå den på i Innstillinger → Labs → AI.",
+          "noModelHint": "Ingen modell valgt. Velg en i Innstillinger → Developer → AI for å starte.",
+          "offHint": "Lokal AI er av. Slå den på i Innstillinger → Developer → AI.",
           "send": "Send",
           "statusGettingReady": "Forbereder…",
           "statusNoModel": "Ingen modell",
@@ -1261,7 +1261,10 @@
         "export": "Eksporter…",
         "includeAttachments_one": "Inkluder {{count}} vedlegg",
         "includeAttachments_other": "Inkluder {{count}} vedlegg",
-        "title": "Eksporter som Markdown"
+        "title": "Eksporter som Markdown",
+        "copyLabel": "Kopier notatteksten til utklippstavlen",
+        "copied": "Notattekst kopiert",
+        "copyFailed": "Kunne ikke kopiere notatteksten"
       }
     },
     "egress": {
@@ -2012,6 +2015,8 @@
       "changelogButton": "Vis endringslogg…",
       "changelogHelper": "Notater per versjon. Vises når MYND-119 lander.",
       "changelogLabel": "Endringslogg",
+      "developerModeHelper": "",
+      "developerModeLabel": "",
       "licenseBody": "Pre-alfa · CC-BY-4.0-dokumentasjon · AGPL-3.0 applikasjonskode ved fase 1-utgivelse.",
       "licenseLabel": "Lisens",
       "tagline": "Pre-alfa · Fase 1 skrivebordsklient",
@@ -2341,7 +2346,6 @@
       "pendingHint": "Kommer snart"
     },
     "ai": {
-      "betaBadge": "Beta",
       "disclosureToggle": "Hvordan fungerer dette?",
       "enableHelper": "Kjører en modell du oppgir helt og holdent på enheten din. Eksperimentell, av som standard.",
       "enableLabel": "Aktiver lokal AI",
@@ -2434,7 +2438,7 @@
     "shell": {
       "closeLabel": "Lukk innstillinger",
       "groups": {
-        "labs": "Labs"
+        "developer": ""
       },
       "navLabel": "Innstillingspaneler",
       "panels": {

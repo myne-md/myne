@@ -547,6 +547,12 @@ mod tests {
     /// `ClampHooks` precedent in `prefs/mod.rs`.
     struct SnapshotHooks;
     impl crate::hooks::VaultLifecycleHooks for SnapshotHooks {
+        fn hydrate_attachment_refs<'a>(
+            &'a self,
+            _: &'a VaultRuntimeState,
+        ) -> crate::hooks::BoxFuture<'a> {
+            Box::pin(std::future::ready(()))
+        }
         fn hydrate_search_index<'a>(
             &'a self,
             _: &'a VaultRuntimeState,

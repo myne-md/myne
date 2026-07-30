@@ -115,7 +115,7 @@
       "title": "Attachments",
       "transcribeDone": "Transcription complete.",
       "transcribeFailed": "Transcription failed. Please try again.",
-      "transcribeNoModel": "Select a transcription model in Settings → Labs → AI.",
+      "transcribeNoModel": "Select a transcription model in Settings → Developer → AI.",
       "transcribeStarted": "Transcribing…",
       "typeFilter": {
         "all": "All types",
@@ -385,9 +385,6 @@
       "restoreBackup": {
         "label": "Restore vault from backup…"
       },
-      "toggleRealtimeSync": {
-        "label": "Toggle real-time sync"
-      },
       "revealVaultFolder": {
         "label": "Reveal vault folder in file manager"
       },
@@ -469,6 +466,9 @@
       "showGraph": {
         "label": "Show graph view…"
       },
+      "showTasks": {
+        "label": "Show tasks"
+      },
       "showTags": {
         "label": "Browse tags…"
       },
@@ -522,6 +522,7 @@
         "saveWorkspaceAs": "Save workspace as",
         "selectAllScoped": "Select all (scoped)",
         "showGraphView": "Show graph view",
+        "showTasks": "Show tasks",
         "splitPaneDown": "Split pane (down)",
         "splitPaneRight": "Split pane (right)",
         "switchWorkspace": "Switch workspace",
@@ -572,6 +573,12 @@
         "renamed": "Renamed to {{name}}.",
         "renameFailed": "Couldn't rename the attachment.",
         "saveDialogFailed": "Couldn't open the save dialog."
+      },
+      "compression": {
+        "bulkNotice_one": "{{count}} image compressed: {{from}} → {{to}}",
+        "bulkNotice_other": "{{count}} images compressed: {{from}} → {{to}}",
+        "notice": "Compressed: {{from}} → {{to}}",
+        "noticeContainerChanged": "Compressed to {{format}}: {{from}} → {{to}}"
       },
       "convert": {
         "cancel": "Cancel",
@@ -649,7 +656,10 @@
         "exportAria": "Export attachment",
         "imagePreview": "Image preview",
         "pdfFallback": "PDF",
-        "pdfPreview": "PDF preview"
+        "pdfPreview": "PDF preview",
+        "zoomIn": "Zoom in",
+        "zoomOut": "Zoom out",
+        "zoomReset": "Reset zoom"
       },
       "menu": {
         "actionsAria": "Attachment actions"
@@ -730,11 +740,11 @@
           "deletedLabel": "deleted"
         },
         "transcribe": {
-          "disabledReason": "Enable AI in Settings → Labs → AI to transcribe.",
+          "disabledReason": "Enable AI in Settings → Developer → AI to transcribe.",
           "failed": "Transcription failed. Please try again.",
           "heading": "Transcript",
           "insert": "Insert transcript into note",
-          "noModelHint": "Select a transcription model in Settings → Labs → AI.",
+          "noModelHint": "Select a transcription model in Settings → Developer → AI.",
           "progress": "Transcribing…",
           "stop": "Stop"
         },
@@ -868,8 +878,8 @@
           "gettingReadyHint": "Preparing your notes for AI — one moment.",
           "insert": "Insert into note",
           "noAnswer": "No answer — try rephrasing.",
-          "noModelHint": "No model selected. Choose one in Settings → Labs → AI to start.",
-          "offHint": "Local AI is off. Turn it on in Settings → Labs → AI.",
+          "noModelHint": "No model selected. Choose one in Settings → Developer → AI to start.",
+          "offHint": "Local AI is off. Turn it on in Settings → Developer → AI.",
           "send": "Send",
           "statusGettingReady": "Preparing…",
           "statusNoModel": "No model",
@@ -892,6 +902,7 @@
           "aiChat": "AI Chat",
           "backlinks": "Links",
           "outline": "Outline",
+          "tasks": "Tasks",
           "unlinked": "Unlinked mentions"
         }
       },
@@ -980,6 +991,7 @@
       "numberedList": "Numbered list",
       "quote": "Quote",
       "table": "Table",
+      "taskQuery": "Task list",
       "time": "Time",
       "todoList": "To-do list",
       "voiceNote": "Voice note",
@@ -1001,6 +1013,17 @@
       "deleteRow": "Delete row",
       "reorderColumn": "Reorder column",
       "reorderRow": "Reorder row"
+    },
+    "taskField": {
+      "invalidDue": "Myne can't read this date, so it isn't shown as a due date.",
+      "invalidPriority": "Myne can't read this priority. Use highest, high, medium, low or lowest.",
+      "invalidRepeat": "Myne doesn't recognise this repeat rule, so this task won't repeat.",
+      "save": "Save",
+      "title": {
+        "due": "Due date",
+        "repeat": "Repeat",
+        "priority": "Priority"
+      }
     },
     "toolbar": {
       "apply": "Apply",
@@ -1272,7 +1295,10 @@
         "export": "Export…",
         "includeAttachments_one": "Include {{count}} attachment",
         "includeAttachments_other": "Include {{count}} attachments",
-        "title": "Export as Markdown"
+        "title": "Export as Markdown",
+        "copyLabel": "Copy note text to clipboard",
+        "copied": "Note text copied",
+        "copyFailed": "Couldn't copy the note text"
       }
     },
     "egress": {
@@ -1580,6 +1606,7 @@
         "setupIntro": "Myne imports and encrypts your notes on the spot — nothing leaves this device, and your original files are never changed.",
         "statCancelled": "Cancelled",
         "statCanvasSkipped": ".canvas files skipped",
+        "statCompressed": "Images compressed",
         "statEmptyFoldersKept": "Empty folders kept",
         "statMedia": "Media",
         "statOtherSkipped": "Other files skipped",
@@ -1750,6 +1777,7 @@
     },
     "pane": {
       "graphTab": "Graph",
+      "tasksTab": "Tasks",
       "loading": "Loading…",
       "untitledView": "Untitled view"
     },
@@ -1771,6 +1799,8 @@
       "loadError": "Couldn't load this note",
       "removeFromFavorites": "Remove from favorites",
       "renameAriaLabel": "Rename note",
+      "taskBadgeLabel": "This note is a task",
+      "taskBadgeTitle": "Task note",
       "unsyncedLabel": "Not yet on the server",
       "unsyncedTitle": "This note's latest changes are only on this device",
       "untitled": "Untitled"
@@ -2015,6 +2045,71 @@
     "passwordHelper": "Never stored, never transmitted. It encrypts your keys on this device.",
     "encryptingSubtitle": "Wrapping your vault keys with your new password."
   },
+  "recurrence": {
+    "every": {
+      "day": "every day",
+      "week": "every week",
+      "month": "every month",
+      "year": "every year"
+    },
+    "everyN": {
+      "day": "every {{count}} days",
+      "week": "every {{count}} weeks",
+      "month": "every {{count}} months",
+      "year": "every {{count}} years"
+    },
+    "everyWeekday": "every {{days}}",
+    "everyWeekdays": "every {{days}}",
+    "ordinal": {
+      "first": "first",
+      "second": "second",
+      "third": "third",
+      "fourth": "fourth",
+      "last": "last"
+    },
+    "ordinalOfMonth": "{{ordinal}} {{weekday}} of every month",
+    "dayOfMonth": "day {{day}} of every month",
+    "lastDayOfMonth": "last day of every month",
+    "weekday": {
+      "monday": "Monday",
+      "tuesday": "Tuesday",
+      "wednesday": "Wednesday",
+      "thursday": "Thursday",
+      "friday": "Friday",
+      "saturday": "Saturday",
+      "sunday": "Sunday"
+    },
+    "weekdaySeparator": ", ",
+    "whenDone": "{{rule}}, when done",
+    "builder": {
+      "family": "Repeat",
+      "familyInterval": "Every…",
+      "familyWeekdays": "Weekly on…",
+      "familyDayOfMonth": "Monthly on a day…",
+      "familyOrdinal": "Monthly on a weekday…",
+      "count": "Interval",
+      "unitLabel": "Unit",
+      "units": {
+        "day": "days",
+        "week": "weeks",
+        "month": "months",
+        "year": "years"
+      },
+      "ordinal": "Position",
+      "weekday": "Weekday",
+      "lastDay": "Last day",
+      "whenDone": "Repeat from the date it's completed",
+      "weekdayShort": {
+        "monday": "Mon",
+        "tuesday": "Tue",
+        "wednesday": "Wed",
+        "thursday": "Thu",
+        "friday": "Fri",
+        "saturday": "Sat",
+        "sunday": "Sun"
+      }
+    }
+  },
   "restore": {
     "backLabel": "Back",
     "cancelLabel": "Cancel",
@@ -2063,6 +2158,8 @@
       "changelogButton": "View changelog…",
       "changelogHelper": "Per-version notes. Will appear when MYND-119 lands.",
       "changelogLabel": "Changelog",
+      "developerModeHelper": "Turning this on lets you replace a model Myne has verified with one you supply yourself. It still runs entirely on your device and sends nothing over the network — but Myne does not vouch for what you provide.",
+      "developerModeLabel": "Developer mode",
       "licenseBody": "Pre-alpha · CC-BY-4.0 docs · AGPL-3.0 application code on Phase 1 release.",
       "licenseLabel": "License",
       "tagline": "Pre-alpha · Phase 1 desktop client",
@@ -2078,7 +2175,7 @@
         "ioError": "Disk error, please try again.",
         "joinFailure": "Something went wrong, please try again.",
         "samePasswordRejected": "New password matches the current one.",
-          "serverAckPending": "Your new password works on this device, but Myne couldn't reach the server to save it. Until it does, your other devices still expect the old password — and if this browser's copy is cleared before then, the change is lost. It will retry automatically.",
+        "serverAckPending": "Your new password works on this device, but Myne couldn't reach the server to save it. Until it does, your other devices still expect the old password — and if this browser's copy is cleared before then, the change is lost. It will retry automatically.",
         "weakNewPassword": "New password must be at least 12 characters."
       },
       "changePasswordHeading": "Change password",
@@ -2113,6 +2210,10 @@
       "showEditTimesAria": "Show edit times in sidebar",
       "showEditTimesHelper": "Display each note's last-edited time beneath its title in the sidebar.",
       "showEditTimesLabel": "Show edit times",
+      "taskMarkerAria": "Show the task marker on task notes",
+      "taskMarkerHelper": "Marks notes you have declared as tasks in the sidebar and on their tab.",
+      "taskMarkerLabel": "Show task marker",
+      "taskMarkerSaveError": "Could not save that setting. Try again.",
       "theme": {
         "amoled": "AMOLED",
         "dark": "Dark",
@@ -2140,6 +2241,18 @@
       "off": "Off",
       "on": "On",
       "saveError": "Could not update the archiving setting."
+    },
+    "attachmentCompression": {
+      "label": "Compress images on import",
+      "helper": "Shrinks pasted or dropped images before they are encrypted and stored, so your vault, backups, and sync stay smaller. This is irreversible — the original file is not kept.",
+      "helperScopeEveryDevice": "Applies to the whole vault, on every device.",
+      "helperScopeNotHere": "Applies to the whole vault, but not in this browser — images added here are stored exactly as given.",
+      "errorSaveSetting": "Could not save this setting."
+    },
+    "transcription": {
+      "label": "Speech-to-text",
+      "helper": "Turn an audio attachment into text, on this device. The model ships with Myne and nothing is sent anywhere. Turning this off hides the Transcribe action everywhere and stops the app from transcribing at all.",
+      "errorSaveSetting": "Couldn't save that setting."
     },
     "attachmentOcr": {
       "label": "Search inside images and scanned documents",
@@ -2199,6 +2312,29 @@
         "minutesAgo_other": "Connected {{count}} min ago",
         "onDate": "Connected {{date}}"
       }
+    },
+    "cliAccess": {
+      "label": "Terminal access",
+      "helperOff": "Off. The `myne` command can't read or change anything in this vault.",
+      "helperOn": "On while this vault is unlocked. Any program running under your account can read, search and create notes through it — Myne can't tell your terminal apart from a script, and checks nothing beyond the door being open. It never asks for your password, closes the moment the vault locks, and can't delete notes.",
+      "lastUsedNever": "Not used since this vault was unlocked.",
+      "lastUsedJustNow": "Last used just now.",
+      "lastUsedMinutesAgo": "Last used {{count}} min ago.",
+      "lastUsedMinutesAgo_one": "Last used {{count}} min ago.",
+      "lastUsedMinutesAgo_other": "Last used {{count}} min ago.",
+      "lastUsedHoursAgo": "Last used {{count}} h ago.",
+      "lastUsedHoursAgo_one": "Last used {{count}} h ago.",
+      "lastUsedHoursAgo_other": "Last used {{count}} h ago.",
+      "lastUsedDaysAgo": "Last used {{count}} days ago.",
+      "lastUsedDaysAgo_one": "Last used {{count}} day ago.",
+      "lastUsedDaysAgo_other": "Last used {{count}} days ago.",
+      "notOnPathHint": "Your shell can't find `myne` yet. Add this line to your shell profile, then open a new terminal:",
+      "pathLine": "export PATH=\"{{dir}}:$PATH\"",
+      "excludedLabel": "Folders the terminal never sees",
+      "excludedHelper": "One folder path per line. Notes in these folders are left out of every terminal result and can't be written there from the terminal — they stay fully available in the app. You can set this before turning terminal access on.",
+      "excludedPlaceholder": "Private/\nJournal/",
+      "rateLimitLabel": "Let the terminal run at full speed",
+      "rateLimitHelper": "Myne answers at most 120 terminal commands a minute by default. That's a pace limit on a runaway script, not a permission check — nothing decides which program is allowed to ask. Turn this on for bulk work, like piping every note through another tool."
     },
     "clipperInstall": {
       "error": "Could not update the browser clipper setting.",
@@ -2389,7 +2525,6 @@
       "pendingHint": "Coming soon"
     },
     "ai": {
-      "betaBadge": "Beta",
       "disclosureToggle": "How does this work?",
       "enableHelper": "Runs a model you provide entirely on your device. Experimental, off by default.",
       "enableLabel": "Enable local AI",
@@ -2416,13 +2551,22 @@
     "prefs": {
       "saveError": "Couldn't save preference — try again"
     },
+    "reminders": {
+      "aria": "Show task reminders on this device",
+      "exactAllow": "Allow",
+      "exactLabel": "Exact timing",
+      "exactOn": "On",
+      "horizon": "Reminders are registered through {{date}}. Open Myne before then to keep them coming.",
+      "label": "Task reminders",
+      "saveError": "Could not save that setting. Try again.",
+      "showTextAria": "Show task text in the notification",
+      "showTextLabel": "Show task text"
+    },
     "privacy": {
       "autoLockHelper": "Lock the vault after this much inactivity.",
       "autoLockLabel": "Auto-lock",
       "autoLockSearchEmpty": "No durations match.",
       "autoLockSearchPlaceholder": "Search durations…",
-      "realtimeSyncHelper": "Changes from other devices arrive within seconds over a contentless signal — the server relays only “something changed”, never what. While your vault is unlocked the app checks the server regularly anyway, so this adds no meaningful visibility; there is nothing to configure.",
-      "realtimeSyncLabel": "Real-time sync",
       "screenCaptureHelperOff": "Protection always applies before unlock. After unlock, follows this preference.",
       "screenCaptureHelperOn": "Active on macOS and Windows 10 (May 2020 Update or later). Linux support coming in a future release.",
       "screenCaptureLabel": "Screen-capture protection",
@@ -2482,7 +2626,7 @@
     "shell": {
       "closeLabel": "Close settings",
       "groups": {
-        "labs": "Labs"
+        "developer": "Developer"
       },
       "navLabel": "Settings panels",
       "panels": {
@@ -2492,6 +2636,7 @@
         "appearance": "Appearance",
         "editor": "Editor",
         "files": "Files",
+        "transcription": "Transcription",
         "hotkeys": "Hotkeys",
         "privacy": "Privacy",
         "storage": "Storage",
@@ -2618,6 +2763,9 @@
         "buildChannel": "build channel version release stable beta nightly",
         "changePassword": "change password passphrase credentials update reset",
         "changelog": "changelog release notes what is new history",
+        "cliAccess": "cli terminal access command line shell myne command console",
+        "cliExcludedFolders": "cli excluded folders terminal exclude hide command line private",
+        "cliRateLimit": "cli rate limit terminal speed throttle bulk pace commands per minute",
         "clipper": "browser clipper extension web capture chrome firefox",
         "contentWidth": "content width column reading measure line length",
         "customThemes": "custom themes palette colors appearance import theme",
@@ -2637,13 +2785,15 @@
         "lineSpacing": "line spacing leading height typography readability",
         "newNoteLocation": "new note location folder default where notes created",
         "quickUnlock": "quick unlock pin touch id biometric face unlock",
-        "realtimeSync": "real time sync live connection presence polling",
+        "reminders": "reminders notify notification alert task due remind",
         "screenCapture": "screen capture protection screenshot recording block privacy",
         "showEditTimes": "show edit times timestamps modified dates notes",
         "spell": "spell check spelling dictionary autocorrect",
         "spellLanguages": "spell languages dictionaries locale words",
         "startupOpen": "startup open default file launch boot which note",
         "attachmentOcr": "ocr image scan scanned pdf photo screenshot text recognition search inside attachments cpu battery",
+        "attachmentCompression": "compress compression image shrink downscale resize webp jpeg import paste vault size storage",
+        "transcription": "transcribe transcription speech voice audio dictation subtitle whisper recording sound to text",
         "syncAddDevice": "add device pair link phone laptop sync",
         "syncConflicts": "conflicts merge resolve versions sync",
         "syncDevices": "devices linked paired sync machines",
@@ -2764,14 +2914,14 @@
       "connect": "Connect",
       "connectedLocal": "Connected (local, no TLS).",
       "connectedTls": "Connected. Check that this fingerprint matches on your other device.",
-      "connectedPlatformTrust": "Connected over TLS. Your browser verified this server\u2019s certificate.",
+      "connectedPlatformTrust": "Connected over TLS. Your browser verified this server’s certificate.",
       "connecting": "Connecting…",
       "fingerprintLabel": "Server certificate fingerprint:",
       "pinStatic": "Verified against Myne’s built-in certificate.",
       "pinTofu": "Pinned on first connect. Compare this fingerprint across your devices.",
       "fixedOrigin": "This client syncs with one server, set when it was deployed. It cannot be changed from here — the page is only allowed to talk to this one address.",
       "fixedOriginNone": "No sync server is configured for this deployment.",
-      "pinPlatformTrust": "Verified by your browser\u2019s certificate store. This client cannot pin a certificate itself.",
+      "pinPlatformTrust": "Verified by your browser’s certificate store. This client cannot pin a certificate itself.",
       "placeholder": "https://your-server.example   ·   http://127.0.0.1:8080",
       "unreachable": "Couldn’t reach that server — check the URL and that it’s running."
     },
@@ -2873,7 +3023,7 @@
       "errorAuth": "Sync sign-in expired",
       "errorFrozen": "Account frozen — uploads paused",
       "errorDeviceRevoked": "This device was removed from your account",
-        "errorStorageFull": "Storage full — syncing paused",
+      "errorStorageFull": "Storage full — syncing paused",
       "errorQuota": "Storage full — uploads paused",
       "errorRateLimited": "Sync throttled — retrying",
       "errorTooLarge": "A file is too large to upload",
@@ -2927,6 +3077,60 @@
       "catchingUp": "Catching up on sync — your notes are safe.",
       "verifyDevices": "Verify devices"
     }
+  },
+  "tasks": {
+    "builder": {
+      "any": "Any",
+      "due": "Due",
+      "folder": "Folder",
+      "insert": "Insert",
+      "noDueDate": "No due date",
+      "priority": "Priority",
+      "sort": "Sort by",
+      "sortDue": "Due date",
+      "sortPath": "Note",
+      "sortPriority": "Priority",
+      "status": "Status",
+      "statusDone": "Completed",
+      "statusTodo": "Not done",
+      "tag": "Tag"
+    },
+    "empty": {
+      "filter": "Nothing here right now. Try another filter.",
+      "rebuilding": "Reading your notes…",
+      "scope": "No tasks in this folder or tag. Try widening the scope.",
+      "vault": "No tasks yet. Write “- [ ]” on a line in any note to make one."
+    },
+    "filter": {
+      "all": "All",
+      "overdue": "Overdue",
+      "today": "Today",
+      "upcoming": "Upcoming"
+    },
+    "noteTitle": "Tasks in this note",
+    "query": {
+      "dropped_one": "{{count}} clause Myne could not read",
+      "dropped_other": "{{count}} clauses Myne could not read",
+      "empty": "No tasks match this query.",
+      "loading": "Reading your notes…",
+      "refused": "Myne could not read any of this query, so it is showing nothing rather than everything.",
+      "remainder_one": "{{count}} more task matched",
+      "remainder_other": "{{count}} more tasks matched"
+    },
+    "reminder": {
+      "due": "A task reminder is due."
+    },
+    "row": {
+      "completed": "Task, completed",
+      "notCompleted": "Task, not completed",
+      "tooLongToWrite": "This task's line is too long to edit from here. Open its note instead.",
+      "untitled": "Untitled task"
+    },
+    "scope": {
+      "allFolders": "All folders",
+      "label": "Narrow by"
+    },
+    "title": "Tasks"
   },
   "templates": {
     "manager": {

@@ -7,6 +7,7 @@
 
 import { StartupOpenSettings } from "./StartupOpenSettings";
 import { NewNoteLocationSettings } from "./NewNoteLocationSettings";
+import { AttachmentCompressionSettings } from "./AttachmentCompressionSettings";
 import { AttachmentOcrSettings } from "./AttachmentOcrSettings";
 import { PANEL_ROOT_STYLE } from "./panel-styles";
 
@@ -21,8 +22,13 @@ export function FilesPanel() {
           folder / a specific folder. */}
       <NewNoteLocationSettings />
 
+      {/* Whether an imported image is downscaled + re-encoded at ingest time
+          (ingest-image-compression). Shared vault-wide, unlike its neighbor
+          below — see the preference's own doc comment for why. */}
+      <AttachmentCompressionSettings />
+
       {/* Whether attachment text extraction reads images and scanned PDFs
-          (MYND-441). Lives here rather than under Labs because OCR is search
+          (MYND-441). Lives here rather than under Developer because OCR is search
           correctness, not an AI feature — it ships on by default. */}
       <AttachmentOcrSettings />
     </div>

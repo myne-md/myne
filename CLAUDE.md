@@ -35,6 +35,9 @@ pnpm tauri dev          # full Tauri dev (spawns Vite on :1420 + Rust core)
 pnpm dev                # Vite only — port fixed via strictPort, fails if 1420 is taken
 pnpm tauri build        # production desktop bundle
 
+pnpm sidecar            # build + stage the `myne` CLI sidecar for externalBin (debug)
+pnpm sidecar:release    # same, release profile — both tauri lifecycle hooks run these
+
 pnpm web:dev            # web client dev server on :1421 (runs alongside the desktop one)
 pnpm web:build          # typecheck web/ against the shared src/ tree + production web bundle
 pnpm web:preview        # serve the built web bundle
@@ -68,6 +71,7 @@ myne/
 ├── copy/                ← @myne/copy: load-bearing user-facing strings kept byte-identical across clients by construction (SYNC-42); deliberately outside i18n
 ├── protocol/            ← Rust crypto crate
 ├── core/                ← myne-core: shared backend plugin cores + the host/IO/task seams; consumed by desktop, mobile AND the web wasm entry crate
+├── cli/                 ← myne-cli: the `myne` terminal client (MYND-490). Ships as a Tauri `externalBin` sidecar INSIDE the desktop bundle (staged by scripts/build-cli-sidecar.mjs, PATH shim by src-tauri/src/cli_bridge/path_shim.rs) and drives the running, unlocked desktop over its local command socket — it never opens the vault and depends on neither myne-core nor protocol
 ├── theme-validator/     ← shared custom-theme value-shape allowlist — SECURITY-LOAD-BEARING: the WebView CSP carries style-src 'unsafe-inline', so a theme value that reaches the DOM executes. Desktop themes plugin and myne-themes marketplace CI run this exact crate so the grammar cannot drift (threat-model.md "Custom-theme CSS-value surface"; MYND-508)
 ├── tests/               ← Vitest unit/component specs; tests/platform/ holds the seam contract run against every seam implementation
 ├── e2e/                 ← tauri-driver desktop E2E suite + fixture-gen crate, fixtures and harness (pnpm test:e2e)
@@ -78,7 +82,7 @@ myne/
 ├── public/              ← static assets bundled into the WebView
 ├── workspace/           ← multi-repo helper scripts + manifest
 ├── pnpm-workspace.yaml  ← pnpm workspace members (dialect, editor, copy)
-├── Cargo.toml           ← workspace root; its `members` list is the source of truth (today: src-tauri, protocol, core, theme-validator, e2e/fixture-gen, web/wasm, web/bench/wasm)
+├── Cargo.toml           ← workspace root; its `members` list is the source of truth (today: src-tauri, protocol, core, cli, theme-validator, e2e/fixture-gen, web/wasm, web/bench/wasm)
 ├── Cargo.lock           ← single shared lockfile (TB9 audit anchor)
 ├── rust-toolchain.toml  ← pinned Rust toolchain
 ├── package.json         ← pnpm + Vite + React 19 + TS toolchain
@@ -99,6 +103,7 @@ Most of `scripts/` is not tooling — it is the machine-checked half of the rule
 | `check-web-command-coverage.mjs` | every `plugin:<x>\|<y>` literal in the shared tree is classified in `web/wasm/src/capability.rs` — dispatched, absent-on-web, or a port still owed | `pre-commit` + CI `pnpm-build`, `web-build` |
 | `check-web-capabilities.mjs` | the UI's capability descriptor and the dispatcher's refusal table agree (disagreement is invisible from either side alone) | `pre-commit` + CI `pnpm-build`, `web-build` |
 | `check-i18n.mjs` | no empty English source value in `locales/en/common.json`; every static `t("…")` key in `src/` exists in the catalog | `pre-commit` + CI `pnpm-build` |
+| `check-cli-sidecar.mjs` | the `myne` CLI's duplicated-by-design contract with the desktop: bundle identifier + command-socket/status basenames agree across `cli/src/paths.rs` and `src-tauri/src/cli_bridge/`, and the sidecar is still listed in `bundle.externalBin` (drift compiles clean on both sides, then reports "app not running" against a running app) | `pre-commit` + CI `pnpm-build` |
 | `hooks-parity-check.sh` | CI backstop for the pre-commit checks that are otherwise `--no-verify`-bypassable: SPDX headers, EOF newline, trailing whitespace — its own header lists what it deliberately leaves to `pnpm-build` and why | CI `hooks-parity` (**unfiltered**: runs on docs-only commits too) |
 | `check-bundle-record.mjs` | the published-bundle-hash record is append-only (`--append-only`), and a deploy may only ship a hash already recorded (`--has`) | CI `bundle-record` (**unfiltered**) + `web-docker-build` (the `--has` precondition, before the image can be deployed) |
 | `wasm-csprng-check.sh` | `protocol` builds for `wasm32-unknown-unknown` **and** its `getrandom` hook stays *undefined* there, so the final Worker-host link must supply entropy explicitly instead of something in the graph quietly supplying it | CI `wasm-protocol` |

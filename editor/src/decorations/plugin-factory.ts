@@ -53,6 +53,24 @@ export function makeCursorAwareDecorationPlugin(
   return makeDecorationPlugin(build, cursorAwareUpdate);
 }
 
+/**
+ * Like {@link makeCursorAwareDecorationPlugin} but with a caller-supplied
+ * recompute trigger, for a decoration whose reveal depends on state the default
+ * gate does not watch. MYND-614's task chips need this: their reveal is driven
+ * by the find panel, and `openSearchPanel` dispatches a StateEffect that changes
+ * neither the doc, the viewport, the selection, nor focus — so the default gate
+ * never fires and the chips would stay rendered over a search match.
+ */
+export function makeGatedDecorationPlugin(
+  build: (view: EditorView) => DecorationSet,
+  shouldUpdate: (update: ViewUpdate) => boolean,
+): Extension {
+  return makeDecorationPlugin(
+    build,
+    (update) => cursorAwareUpdate(update) || shouldUpdate(update),
+  );
+}
+
 export function makeDocOnlyDecorationPlugin(
   build: (view: EditorView) => DecorationSet,
 ): Extension {

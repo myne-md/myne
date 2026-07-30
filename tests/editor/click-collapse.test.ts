@@ -67,6 +67,21 @@ function pressRelease(
   if (selectionAfter !== undefined) m.view.dispatch({ selection: selectionAfter });
 }
 
+/** A finger's press: `pointerdown` with `pointerType: "touch"` before the
+ *  synthesized mouse pair, which is what a WebView emits for a tap. jsdom has no
+ *  PointerEvent constructor, so the event is built from MouseEvent with the
+ *  property added — the extension only reads `pointerType`. */
+function touchPressRelease(
+  m: Mounted,
+  selectionAfter: { anchor: number; head: number },
+): void {
+  const target = m.view.contentDOM;
+  const pd = new MouseEvent("pointerdown", { button: 0, clientX: 10, clientY: 10, bubbles: true });
+  Object.defineProperty(pd, "pointerType", { value: "touch" });
+  target.dispatchEvent(pd);
+  pressRelease(m, { x: 10, y: 10 }, { x: 10, y: 10 }, selectionAfter);
+}
+
 let m: Mounted | null = null;
 afterEach(() => {
   if (m !== null) teardown(m);
@@ -118,5 +133,38 @@ describe("clickCollapseExtension", () => {
     m.view.dispatch({ selection: { anchor: 0, head: 3 } });
     await raf();
     expect(m.view.state.selection.main.empty).toBe(false);
+  });
+
+  // MYND-642: a double-TAP on a short word used to lose its selection. The
+  // `event.detail >= 2` exemption is the only path a deliberate double-press
+  // has, and WebKit's tap-synthesized mouse events do not reliably carry
+  // `detail >= 2` — so the collapse ran and the word dropped to a caret. It
+  // looked intermittent only because the collapse is capped at MAX_SPURIOUS:
+  // short words broke, long ones survived.
+  it("leaves a touch-originated selection alone, however small", async () => {
+    m = mount("the cat sat");
+    touchPressRelease(m, { anchor: 4, head: 7 }); // "cat" — 3 chars, well under the cap
+    await raf();
+    expect(
+      m.view.state.selection.main.empty,
+      "a double-tapped short word must stay selected",
+    ).toBe(false);
+    expect(m.view.state.selection.main.anchor).toBe(4);
+    expect(m.view.state.selection.main.head).toBe(7);
+  });
+
+  it("still collapses a MOUSE click after a touch press has been seen", async () => {
+    // The touch flag must track the press in flight, not latch for the session:
+    // a trackpad click after a tap (iPad with a mouse, a hybrid laptop) still
+    // produces the reflow artifact and still needs collapsing.
+    m = mount("Heading text here");
+    touchPressRelease(m, { anchor: 4, head: 7 });
+    await raf();
+    const pd = new MouseEvent("pointerdown", { button: 0, clientX: 10, clientY: 10, bubbles: true });
+    Object.defineProperty(pd, "pointerType", { value: "mouse" });
+    m.view.contentDOM.dispatchEvent(pd);
+    pressRelease(m, { x: 10, y: 10 }, { x: 10, y: 10 }, { anchor: 0, head: 3 });
+    await raf();
+    expect(m.view.state.selection.main.empty).toBe(true);
   });
 });

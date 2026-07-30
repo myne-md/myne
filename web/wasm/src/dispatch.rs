@@ -2220,6 +2220,35 @@ pub async fn dispatch(cmd: &str, args: serde_json::Value) -> Outcome {
             }
         }
 
+        "plugin:prefs|set_attachment_compression_enabled" => {
+            #[derive(serde::Deserialize)]
+            #[serde(rename_all = "camelCase")]
+            struct Args {
+                enabled: bool,
+            }
+            let a: Args = match serde_json::from_value(args) {
+                Ok(a) => a,
+                Err(e) => {
+                    return Outcome::BadArgs {
+                        command: cmd.to_string(),
+                        detail: e.to_string(),
+                    }
+                }
+            };
+            match myne_core::plugins::prefs::commands::set_attachment_compression_enabled_from_host(
+                host_ctx(),
+                crate::session::state(),
+                crate::session::hooks(),
+                a.enabled,
+                vault_io(),
+            )
+            .await
+            {
+                Ok(()) => Outcome::ok(&serde_json::Value::Null),
+                Err(e) => Outcome::error(&e),
+            }
+        }
+
         "plugin:prefs|set_attachment_ocr_enabled" => {
             #[derive(serde::Deserialize)]
             #[serde(rename_all = "camelCase")]
@@ -2236,6 +2265,35 @@ pub async fn dispatch(cmd: &str, args: serde_json::Value) -> Outcome {
                 }
             };
             match myne_core::plugins::prefs::commands::set_attachment_ocr_enabled_from_host(
+                host_ctx(),
+                crate::session::state(),
+                crate::session::hooks(),
+                a.enabled,
+                vault_io(),
+            )
+            .await
+            {
+                Ok(()) => Outcome::ok(&serde_json::Value::Null),
+                Err(e) => Outcome::error(&e),
+            }
+        }
+
+        "plugin:prefs|set_developer_mode" => {
+            #[derive(serde::Deserialize)]
+            #[serde(rename_all = "camelCase")]
+            struct Args {
+                enabled: bool,
+            }
+            let a: Args = match serde_json::from_value(args) {
+                Ok(a) => a,
+                Err(e) => {
+                    return Outcome::BadArgs {
+                        command: cmd.to_string(),
+                        detail: e.to_string(),
+                    }
+                }
+            };
+            match myne_core::plugins::prefs::commands::set_developer_mode_from_host(
                 host_ctx(),
                 crate::session::state(),
                 crate::session::hooks(),

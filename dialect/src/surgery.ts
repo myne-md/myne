@@ -18,6 +18,8 @@ const ARCHIVED_KEY_RE = /^([ \t]*archived[ \t]*:[ \t]*)(.*)$/;
 // MYND-426: the sync deletion tombstone marker. Value-strict RFC 3339 like
 // `trashed:`/`archived:` — only a parseable timestamp marks the note deleted.
 const DELETED_KEY_RE = /^([ \t]*deleted[ \t]*:[ \t]*)(.*)$/;
+// `done:` — the MYND-613 completion stamp (§3.6.1, twelfth managed field).
+const DONE_KEY_RE = /^([ \t]*done[ \t]*:[ \t]*)(.*)$/;
 // MYND-427: the conflict-copy markers. `conflict:` is value-strict canonical
 // `true` (like `template:`); `conflict_of:` carries the original note UUID.
 const CONFLICT_KEY_RE = /^([ \t]*conflict[ \t]*:[ \t]*)(.*)$/;
@@ -791,7 +793,7 @@ export function readDeletedFromFmBody(fmBody: string): string | null {
  * RFC 3339 value, else `null` (not archived). A user's own non-timestamp
  * `archived:` (e.g. `archived: true`) leaves the note live — the same
  * unprefixed-field collision mitigation as `trashed:` (§3.6.1; note-archive /
- * MYND-331). `archived:` is the 7th Myne-managed canonical FM field, joining
+ * MYND-331). `archived:` is the 8th Myne-managed canonical FM field, joining
  * `updated:` / `title:` / `folder:` / `trashed:` / `template:` / `folder_index:`.
  * It shares `extractTrashedScalar` + `isValidRfc3339` with `trashed:` because the
  * two are structurally identical timestamp fields (a `/simplify` candidate is to
@@ -845,7 +847,7 @@ export function readConflictOfFromFmBody(fmBody: string): string | null {
 
 // === patchArchivedField — note-archive write target for FM `archived:` ===
 //
-// Spec: docs/spec/markdown-dialect.md §3.6.1 (`archived:` is the 7th Myne-managed
+// Spec: docs/spec/markdown-dialect.md §3.6.1 (`archived:` is the 8th Myne-managed
 // canonical FM field). Write trigger = archive (`src/notes/archiveNote.ts`) +
 // unarchive (state-D delete). note-archive / MYND-331. Structurally identical to
 // `patchTrashedField`: A/B/C value-surgery for the set path, plus state D (delete
@@ -1274,7 +1276,7 @@ function isCanonicalFolderIndexFlag(valuePortion: string): boolean {
 
 // === kind: drawing — the drawing-note marker (drawing-notes SF2, MYND-499) ===
 //
-// `kind:` is the 11th Myne-managed canonical FM field (markdown-dialect.md
+// `kind:` is the 7th Myne-managed canonical FM field (markdown-dialect.md
 // §3.6.1). Unlike the boolean flags it is a string enum; v1 defines exactly one
 // value, `drawing`, which routes the note to the Excalidraw canvas surface
 // instead of CodeMirror. The READ is value-strict (bespoke, mirrors
@@ -1286,46 +1288,110 @@ function isCanonicalFolderIndexFlag(valuePortion: string): boolean {
 // `patchFrontmatterField` (the only value Myne writes is the canonical `drawing`,
 // a plain scalar).
 
-/** The single canonical `kind:` value that marks a drawing note. Value-strict. */
-export const DRAWING_KIND_VALUE = "drawing";
+/**
+ * Set or clear the Myne-managed `done:` completion timestamp (MYND-613) — the
+ * twelfth managed canonical field (§3.6.1), an exact twin of the `trashed:` /
+ * `archived:` / `deleted:` date-valued trio.
+ *
+ * A **thin named wrapper over the generic patcher**, deliberately not a bespoke
+ * surgery family like `patchArchivedField`: the generic path already provides
+ * set, change, delete and empty-block collapse, and a bespoke family is only
+ * warranted when the value shape is unusual. An RFC 3339 timestamp is not.
+ *
+ * `null` deletes the field — **un-completion removes the marker rather than
+ * writing a falsy value**, so a note is never carrying `done: false`.
+ *
+ * Written only by an orchestrator over the note-update path; body autosave never
+ * touches it.
+ */
+export function patchDoneField(bytes: Uint8Array, value: string | null): Uint8Array {
+  return patchFrontmatterField(bytes, "done", value);
+}
 
 /**
- * Set or clear the Myne-managed `kind:` frontmatter field. `"drawing"` writes the
- * canonical `kind: drawing`; `null` deletes it (with empty-block collapse).
- * Touches only the `kind:` line, composing with `title:` / `template:` / … without
- * clobbering. Thin wrapper over {@link patchFrontmatterField}.
+ * Read the Myne-managed `done:` completion timestamp, **value-strict**, from a
+ * frontmatter **body**. Returns the RFC 3339 string iff `done:` carries a valid
+ * one, else `null` — so a user's own `done: yes` or `done: soon` leaves the note
+ * incomplete rather than silently marking it finished.
+ *
+ * **Quoting does not demote the value.** The scalar is unquoted before the date
+ * check, matching the existing quoting asymmetry in which quoting demotes
+ * checkbox and number values but never dates — so this reader and the derived
+ * property index (§3.6.4) agree on `done: "2026-08-01T09:00:00Z"`. A divergence
+ * between the two would be a real bug: the note would read complete on one
+ * surface and incomplete on another.
+ *
+ * First `done:` line wins, like every other managed-field reader here.
  */
-export function patchKindField(
-  bytes: Uint8Array,
-  kind: "drawing" | null,
-): Uint8Array {
+export function readDoneFromFmBody(fmBody: string): string | null {
+  const lines = fmBody.split(NEWLINE);
+  for (const line of lines) {
+    const m = DONE_KEY_RE.exec(line);
+    if (m === null) continue;
+    const value = extractTrashedScalar(m[2] ?? "");
+    if (value !== null && isValidRfc3339(value)) return value;
+    return null;
+  }
+  return null;
+}
+
+/** The canonical `kind:` value that marks a drawing note. Value-strict. */
+export const DRAWING_KIND_VALUE = "drawing";
+
+/** The canonical `kind:` value that marks a note-task (MYND-613). Value-strict. */
+export const TASK_KIND_VALUE = "task";
+
+/**
+ * Every canonical `kind:` value. The field is a **value-strict enum**: anything
+ * outside this set — quoted, capitalized, or unknown — reads as an ordinary note.
+ */
+export const CANONICAL_KIND_VALUES = [DRAWING_KIND_VALUE, TASK_KIND_VALUE] as const;
+
+/** A canonical note class, or `null` for an ordinary markdown note. */
+export type NoteKind = (typeof CANONICAL_KIND_VALUES)[number] | null;
+
+/**
+ * Set or clear the Myne-managed `kind:` frontmatter field. A canonical value
+ * writes it (`kind: drawing`, `kind: task`); `null` deletes it (with empty-block
+ * collapse). Touches only the `kind:` line, composing with `title:` /
+ * `template:` / … without clobbering. Thin wrapper over
+ * {@link patchFrontmatterField}.
+ */
+export function patchKindField(bytes: Uint8Array, kind: NoteKind): Uint8Array {
   return patchFrontmatterField(bytes, "kind", kind);
 }
 
 /**
  * Read the Myne-managed `kind:` marker, **value-strict**, from a frontmatter
  * **body** (the slice shape `loadNoteBatch` parses, identical to
- * {@link readTemplateFromFmBody}). Returns `"drawing"` iff a `kind:` field carries
- * the canonical, unquoted {@link DRAWING_KIND_VALUE}, else `null`. A user's own
- * non-canonical `kind:` (`"drawing"`, `Drawing`, `task`) reads as `null`.
+ * {@link readTemplateFromFmBody}). Returns the canonical value iff a `kind:`
+ * field carries it unquoted, else `null`. A user's own non-canonical `kind:`
+ * (`"drawing"`, `Drawing`, `Task`, `chore`) reads as `null`, so a stray value
+ * never force-renders a markdown note as a canvas nor files it as a task.
+ *
+ * **First `kind:` line wins**, deterministically: a note carrying two class
+ * lines resolves on the first, exactly as it did before the enum widened.
  */
-export function readKindFromFmBody(fmBody: string): "drawing" | null {
+export function readKindFromFmBody(fmBody: string): NoteKind {
   const lines = fmBody.split(NEWLINE);
   for (const line of lines) {
     const m = KIND_KEY_RE.exec(line);
     if (m === null) continue;
-    return isCanonicalDrawingKind(m[2] ?? "") ? DRAWING_KIND_VALUE : null;
+    return canonicalKind(m[2] ?? "");
   }
   return null;
 }
 
 // Value-strict canonical check for a `kind:` scalar. Strips a trailing
-// `# comment` and requires the literal unquoted `drawing`; a quoted `"drawing"`
-// is a YAML string, not the canonical marker, so it is rejected.
-function isCanonicalDrawingKind(valuePortion: string): boolean {
+// `# comment` and requires one of the literal unquoted canonical values; a
+// quoted `"drawing"` is a YAML string, not the canonical marker, so it is
+// rejected.
+function canonicalKind(valuePortion: string): NoteKind {
   const commentM = /^([^#]*?)([ \t]+#.*)$/.exec(valuePortion);
-  const raw = commentM !== null ? (commentM[1] ?? "") : valuePortion;
-  return raw.trim() === DRAWING_KIND_VALUE;
+  const raw = (commentM !== null ? (commentM[1] ?? "") : valuePortion).trim();
+  return (CANONICAL_KIND_VALUES as readonly string[]).includes(raw)
+    ? (raw as NonNullable<NoteKind>)
+    : null;
 }
 
 // === patchFrontmatterField — generic keyed scalar surgery ===

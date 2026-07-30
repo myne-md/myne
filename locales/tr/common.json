@@ -115,7 +115,7 @@
       "title": "Ekler",
       "transcribeDone": "Yazıya dökme tamamlandı.",
       "transcribeFailed": "Yazıya dökme başarısız oldu. Lütfen tekrar deneyin.",
-      "transcribeNoModel": "Ayarlar → Labs → Yapay Zeka bölümünden bir yazıya dökme modeli seçin.",
+      "transcribeNoModel": "Ayarlar → Developer → Yapay Zeka bölümünden bir yazıya dökme modeli seçin.",
       "transcribeStarted": "Yazıya dökülüyor…",
       "typeFilter": {
         "all": "Tüm türler",
@@ -730,11 +730,11 @@
           "deletedLabel": "silindi"
         },
         "transcribe": {
-          "disabledReason": "Yazıya dökmek için Ayarlar → Labs → Yapay Zeka bölümünden yapay zekayı açın.",
+          "disabledReason": "Yazıya dökmek için Ayarlar → Developer → Yapay Zeka bölümünden yapay zekayı açın.",
           "failed": "Yazıya dökme başarısız oldu. Lütfen tekrar deneyin.",
           "heading": "Metin dökümü",
           "insert": "Metin dökümünü nota ekle",
-          "noModelHint": "Ayarlar → Labs → Yapay Zeka bölümünden bir yazıya dökme modeli seçin.",
+          "noModelHint": "Ayarlar → Developer → Yapay Zeka bölümünden bir yazıya dökme modeli seçin.",
           "progress": "Yazıya dökülüyor…",
           "stop": "Durdur"
         },
@@ -865,8 +865,8 @@
           "gettingReadyHint": "Notlarınız yapay zeka için hazırlanıyor — bir dakika.",
           "insert": "Nota ekle",
           "noAnswer": "Yanıt yok — farklı ifade etmeyi deneyin.",
-          "noModelHint": "Model seçilmedi. Başlamak için Ayarlar → Labs → Yapay Zeka bölümünden bir tane seçin.",
-          "offHint": "Yerel yapay zeka kapalı. Ayarlar → Labs → Yapay Zeka bölümünden açın.",
+          "noModelHint": "Model seçilmedi. Başlamak için Ayarlar → Developer → Yapay Zeka bölümünden bir tane seçin.",
+          "offHint": "Yerel yapay zeka kapalı. Ayarlar → Developer → Yapay Zeka bölümünden açın.",
           "send": "Gönder",
           "statusGettingReady": "Hazırlanıyor…",
           "statusNoModel": "Model yok",
@@ -1261,7 +1261,10 @@
         "export": "Dışa aktar…",
         "includeAttachments_one": "{{count}} eki dahil et",
         "includeAttachments_other": "{{count}} eki dahil et",
-        "title": "Markdown olarak dışa aktar"
+        "title": "Markdown olarak dışa aktar",
+        "copyLabel": "Not metnini panoya kopyala",
+        "copied": "Not metni kopyalandı",
+        "copyFailed": "Not metni kopyalanamadı"
       }
     },
     "egress": {
@@ -2012,6 +2015,8 @@
       "changelogButton": "Değişiklik günlüğünü görüntüle…",
       "changelogHelper": "Sürüm başına notlar. MYND-119 tamamlandığında görünecek.",
       "changelogLabel": "Değişiklik günlüğü",
+      "developerModeHelper": "",
+      "developerModeLabel": "",
       "licenseBody": "Pre-alpha · CC-BY-4.0 belgeler · Faz 1 sürümünde AGPL-3.0 uygulama kodu.",
       "licenseLabel": "Lisans",
       "tagline": "Pre-alpha · Faz 1 masaüstü istemcisi",
@@ -2341,7 +2346,6 @@
       "pendingHint": "Yakında"
     },
     "ai": {
-      "betaBadge": "Beta",
       "disclosureToggle": "Bu nasıl çalışır?",
       "enableHelper": "Sağladığınız bir modeli tamamen cihazınızda çalıştırır. Deneyseldir, varsayılan olarak kapalıdır.",
       "enableLabel": "Yerel yapay zekayı etkinleştir",
@@ -2434,7 +2438,7 @@
     "shell": {
       "closeLabel": "Ayarları kapat",
       "groups": {
-        "labs": "Labs"
+        "developer": ""
       },
       "navLabel": "Ayarlar panelleri",
       "panels": {

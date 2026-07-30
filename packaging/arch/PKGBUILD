@@ -26,7 +26,9 @@ build() {
   export CARGO_TARGET_DIR="$srcdir/target"
   # Produce a single executable with the frontend embedded — no Tauri installer
   # bundle (a raw binary instead of .deb/.AppImage; we do the pacman-native
-  # packaging ourselves below).
+  # packaging ourselves below). `beforeBuildCommand` also builds + stages the
+  # `myne` CLI sidecar (scripts/build-cli-sidecar.mjs), so `$srcdir/target/release`
+  # holds BOTH binaries after this line — see package() below.
   pnpm tauri build --no-bundle
 }
 
@@ -34,8 +36,22 @@ package() {
   cd "$srcdir/$pkgname"
   local rel="$srcdir/target/release"
 
-  # Executable → /usr/bin/myne
-  install -Dm755 "$rel/myne-desktop" "$pkgdir/usr/bin/myne"
+  # ── Two binaries, and `myne` is the CLI ────────────────────────────────────
+  # cli-thin-client (MYND-490) gives the name `myne` to the command-line client:
+  # every documented invocation is `myne list` / `myne show <id>` / `myne daily`,
+  # and `cli/Cargo.toml`'s `[[bin]] name` is `myne`. So the GUI executable, which
+  # this PKGBUILD used to install as /usr/bin/myne, moves to its own crate name
+  # (`myne-desktop`, matching every other platform's bundle) and the desktop entry
+  # below launches THAT. Users start the app from the desktop entry; the terminal
+  # name is the one that has to be `myne`.
+  #
+  # This also means the runtime PATH shim
+  # (`src-tauri/src/cli_bridge/path_shim.rs`) is a no-op on Arch: it resolves the
+  # sidecar as a sibling of the running binary — /usr/bin/myne — finds that exact
+  # file already on PATH, and reports `sidecar_already_on_path` without writing
+  # anything into ~/.local/bin.
+  install -Dm755 "$rel/myne-desktop" "$pkgdir/usr/bin/myne-desktop"
+  install -Dm755 "$rel/myne"         "$pkgdir/usr/bin/myne"
 
   # Desktop entry + AppStream metadata
   install -Dm644 "packaging/arch/myne.desktop" \

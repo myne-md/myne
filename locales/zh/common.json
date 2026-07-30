@@ -115,7 +115,7 @@
       "title": "附件",
       "transcribeDone": "转录完成。",
       "transcribeFailed": "转录失败。请重试。",
-      "transcribeNoModel": "请在设置 → 实验室 → AI 中选择一个转录模型。",
+      "transcribeNoModel": "请在设置 → Developer → AI 中选择一个转录模型。",
       "transcribeStarted": "正在转录…",
       "typeFilter": {
         "all": "所有类型",
@@ -730,11 +730,11 @@
           "deletedLabel": "已删除"
         },
         "transcribe": {
-          "disabledReason": "请在设置 → 实验室 → AI 中启用 AI 后再进行转录。",
+          "disabledReason": "请在设置 → Developer → AI 中启用 AI 后再进行转录。",
           "failed": "转录失败。请重试。",
           "heading": "转录文本",
           "insert": "将转录文本插入笔记",
-          "noModelHint": "请在设置 → 实验室 → AI 中选择一个转录模型。",
+          "noModelHint": "请在设置 → Developer → AI 中选择一个转录模型。",
           "progress": "正在转录…",
           "stop": "停止"
         },
@@ -865,8 +865,8 @@
           "gettingReadyHint": "正在为 AI 准备你的笔记——请稍候。",
           "insert": "插入到笔记",
           "noAnswer": "没有答案——请尝试换个说法。",
-          "noModelHint": "未选择模型。请在设置 → 实验室 → AI 中选择一个以开始。",
-          "offHint": "本地 AI 已关闭。请在设置 → 实验室 → AI 中开启。",
+          "noModelHint": "未选择模型。请在设置 → Developer → AI 中选择一个以开始。",
+          "offHint": "本地 AI 已关闭。请在设置 → Developer → AI 中开启。",
           "send": "发送",
           "statusGettingReady": "正在准备…",
           "statusNoModel": "无模型",
@@ -1261,7 +1261,10 @@
         "export": "导出…",
         "includeAttachments_one": "包含 {{count}} 个附件",
         "includeAttachments_other": "包含 {{count}} 个附件",
-        "title": "导出为 Markdown"
+        "title": "导出为 Markdown",
+        "copyLabel": "将笔记文本复制到剪贴板",
+        "copied": "笔记文本已复制",
+        "copyFailed": "无法复制笔记文本"
       }
     },
     "egress": {
@@ -2012,6 +2015,8 @@
       "changelogButton": "查看更新日志…",
       "changelogHelper": "各版本的更新说明。将在 MYND-119 完成后显示。",
       "changelogLabel": "更新日志",
+      "developerModeHelper": "",
+      "developerModeLabel": "",
       "licenseBody": "预览版（pre-alpha）· 文档采用 CC-BY-4.0 · 第 1 阶段发布时应用代码采用 AGPL-3.0。",
       "licenseLabel": "许可证",
       "tagline": "预览版（pre-alpha）· 第 1 阶段桌面客户端",
@@ -2341,7 +2346,6 @@
       "pendingHint": "即将推出"
     },
     "ai": {
-      "betaBadge": "测试版",
       "disclosureToggle": "这是如何运作的？",
       "enableHelper": "完全在你的设备上运行你提供的模型。实验性功能，默认关闭。",
       "enableLabel": "启用本地 AI",
@@ -2434,7 +2438,7 @@
     "shell": {
       "closeLabel": "关闭设置",
       "groups": {
-        "labs": "实验室"
+        "developer": ""
       },
       "navLabel": "设置面板",
       "panels": {
