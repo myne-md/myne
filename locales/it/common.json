@@ -1296,7 +1296,10 @@
         "includeAttachments_one": "Includi {{count}} allegato",
         "includeAttachments_many": "Includi {{count}} allegati",
         "includeAttachments_other": "Includi {{count}} allegati",
-        "title": "Esporta come Markdown"
+        "title": "Esporta come Markdown",
+        "copyLabel": "Copia il testo della nota negli appunti",
+        "copied": "Testo della nota copiato",
+        "copyFailed": "Impossibile copiare il testo della nota"
       }
     },
     "egress": {

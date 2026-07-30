@@ -1261,7 +1261,10 @@
         "export": "Exportera…",
         "includeAttachments_one": "Inkludera {{count}} bilaga",
         "includeAttachments_other": "Inkludera {{count}} bilagor",
-        "title": "Exportera som Markdown"
+        "title": "Exportera som Markdown",
+        "copyLabel": "Kopiera anteckningstexten till urklipp",
+        "copied": "Anteckningstext kopierad",
+        "copyFailed": "Det gick inte att kopiera anteckningstexten"
       }
     },
     "egress": {

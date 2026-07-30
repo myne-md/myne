@@ -1432,6 +1432,12 @@ mod tests {
     /// Cargo.lock discipline) — the `ClampHooks` precedent in `prefs/mod.rs`.
     struct SnapshotHooks;
     impl myne_core::hooks::VaultLifecycleHooks for SnapshotHooks {
+        fn hydrate_attachment_refs<'a>(
+            &'a self,
+            _: &'a VaultRuntimeState,
+        ) -> myne_core::hooks::BoxFuture<'a> {
+            Box::pin(std::future::ready(()))
+        }
         fn hydrate_search_index<'a>(
             &'a self,
             _: &'a VaultRuntimeState,

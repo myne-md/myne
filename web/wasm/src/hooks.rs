@@ -99,6 +99,18 @@ impl VaultLifecycleHooks for WebHooks {
         Box::pin(std::future::ready(()))
     }
 
+    /// **Owed — the unlock-time reference-graph rebuild is not dispatched on web
+    /// yet.** On desktop this scans every note on unlock to repopulate the
+    /// RAM-only attachment-reference graph (MYND-171) that backs the "used in N
+    /// notes" badge. The scan seam is async-ready on this target, but nothing on
+    /// this client drives that per-note badge, and the graph is populated lazily
+    /// by `attachment_refs_apply` as notes are SAVED regardless — so an empty
+    /// hydrate is honest until that surface ships. Like every caller: best-effort
+    /// and must never block an unlock the user completed.
+    fn hydrate_attachment_refs<'a>(&'a self, _: &'a VaultRuntimeState) -> BoxFuture<'a> {
+        Box::pin(std::future::ready(()))
+    }
+
     /// **Implemented** (tasks 14 + 83). Snapshots the live index, re-derives the
     /// nonce manifest from disk so the snapshot matches exactly, and writes the
     /// encrypted `vault.search` blob. Must run while the slot is still

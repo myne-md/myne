@@ -1261,7 +1261,10 @@
         "export": "Eksportér…",
         "includeAttachments_one": "Medtag {{count}} vedhæftet fil",
         "includeAttachments_other": "Medtag {{count}} vedhæftede filer",
-        "title": "Eksportér som Markdown"
+        "title": "Eksportér som Markdown",
+        "copyLabel": "Kopiér notens tekst til udklipsholderen",
+        "copied": "Notetekst kopieret",
+        "copyFailed": "Kunne ikke kopiere noteteksten"
       }
     },
     "egress": {

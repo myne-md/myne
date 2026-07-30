@@ -225,13 +225,58 @@ pub fn status_with_dir(dir: &Path) -> QuickUnlockStatus {
     }
 }
 
-/// Whether quick-unlock can be redeemed right now: a credential exists AND the
-/// spring-loaded session gate is open. Mirrors the `quick_unlock_with_dir` gate
-/// (a cold start has no full unlock yet, so quick-unlock is suppressed) so the
-/// Unlock screen never offers a PIN that would immediately fail
-/// `RequiresFullPassword`.
-fn compute_available(configured: bool, full_unlock_this_session: bool) -> bool {
-    configured && full_unlock_this_session
+/// Whether quick-unlock can be redeemed right now. Mirrors the
+/// [`quick_unlock_with_dir`] gate exactly, so the Unlock screen never offers a
+/// credential that would immediately fail `RequiresFullPassword`.
+///
+/// **The session gate is PIN-only (MYND-641).** A configured BIOMETRIC
+/// credential is available on a cold start; a PIN is not. The asymmetry is
+/// argued at the gate itself — see [`requires_full_unlock_first`].
+fn compute_available(
+    configured: bool,
+    method: Option<&str>,
+    full_unlock_this_session: bool,
+) -> bool {
+    if !configured {
+        return false;
+    }
+    // Anchor on method_label's own output, not a second "biometric" literal. This
+    // status gate and the redeem gate (`requires_full_unlock_first`) must agree on
+    // which provider is session-exempt; a drifted string here would silently
+    // re-gate biometric on cold start — the MYND-641 bug returning — with no test
+    // failing. One source of the label: method_label(PROVIDER_KIND_BIOMETRIC).
+    if method == method_label(PROVIDER_KIND_BIOMETRIC) {
+        return true;
+    }
+    full_unlock_this_session
+}
+
+/// Whether this provider must see a full master-password unlock this session
+/// before it may be redeemed.
+///
+/// **PIN: yes. Biometric: no (MYND-641).**
+///
+/// The gate exists so a process restart cannot hand the vault back on a short
+/// secret alone — the 1Password "restarting won't keep it unlocked" model, from
+/// MYND-329. For a PIN that is the whole protection: six digits guarded by our
+/// own five-attempt counter, and a restart is exactly the moment to demand the
+/// real credential again.
+///
+/// A biometric credential is not that. Its wrap key lives in the Keychain under
+/// `kSecAccessControlBiometryCurrentSet` + `kSecAttrAccessibleWhenUnlockedThisDeviceOnly`
+/// (`super::apple`): reading it is gated by the OS on a Secure-Enclave-backed
+/// prompt, it is non-exportable, and the OS invalidates the item outright if the
+/// enrolled biometric set changes. That gate already survives a restart, which
+/// is the model every iOS app relies on — stacking ours on top bought nothing
+/// and cost the feature outright, because iOS evicts backgrounded apps so
+/// aggressively that in practice EVERY launch is a cold start. A user who
+/// enrolled Face ID was offered it almost never.
+///
+/// Decided 2026-07-30; `design-notes.md` carries the entry and the
+/// `threat-model.md` A6 row records the changed post-restart window for this one
+/// credential class. This narrows MYND-329's gate rather than removing it.
+fn requires_full_unlock_first(provider_kind: u8) -> bool {
+    provider_kind != PROVIDER_KIND_BIOMETRIC
 }
 
 /// Disable quick-unlock: remove the device-local files. OS-free — the
@@ -263,12 +308,11 @@ pub async fn quick_unlock_with_dir<P: QuickUnlockProvider + Send + 'static>(
     hooks: &crate::hooks::Hooks,
     vault_io: &dyn crate::vault_io::VaultIo,
 ) -> Result<(), QuickUnlockError> {
-    // Spring-loaded gate (task 9): quick-unlock is permitted only after a full
-    // master-password unlock has happened THIS session. A fresh process (app
-    // restart) has not, so this forces one full-password unlock first — the
-    // 1Password "restarting won't keep it unlocked" model. Checked before any
-    // disk read so a restart never even consults the credential.
-    if !state.has_full_unlock_this_session() {
+    // Spring-loaded gate (task 9), narrowed to PIN in MYND-641: see
+    // `requires_full_unlock_first` for why biometric is exempt. Read off the
+    // PROVIDER, not the blob, so the check still costs no disk access — a
+    // restart never consults the credential to decide whether it may be used.
+    if requires_full_unlock_first(provider.kind()) && !state.has_full_unlock_this_session() {
         return Err(QuickUnlockError::RequiresFullPassword);
     }
 
@@ -568,11 +612,16 @@ pub async fn quick_unlock_status_from_host(
 ) -> Result<QuickUnlockStatus, QuickUnlockError> {
     let dir = target_dir(host, state, vault_id.as_deref()).await?;
     let mut status = status_with_dir(&dir);
-    // Layer the spring-loaded session gate on: a cold start (no full unlock yet)
-    // reports `available: false` so the Unlock screen hides the PIN field rather
-    // than offer a credential that `quick_unlock_with_dir` would immediately
-    // reject with `RequiresFullPassword`.
-    status.available = compute_available(status.configured, state.has_full_unlock_this_session());
+    // Layer the session gate on — PIN-only since MYND-641. A cold start reports
+    // `available: false` for a PIN so the Unlock screen hides the field rather
+    // than offer a credential `quick_unlock_with_dir` would immediately reject;
+    // a biometric credential stays available, which is the whole point of the
+    // change (iOS makes every launch a cold start).
+    status.available = compute_available(
+        status.configured,
+        status.method,
+        state.has_full_unlock_this_session(),
+    );
     Ok(status)
 }
 
@@ -729,6 +778,12 @@ mod tests {
                 .push((enabled, site));
         }
 
+        fn hydrate_attachment_refs<'a>(
+            &'a self,
+            _: &'a VaultRuntimeState,
+        ) -> crate::hooks::BoxFuture<'a> {
+            Box::pin(std::future::ready(()))
+        }
         fn hydrate_search_index<'a>(
             &'a self,
             _: &'a VaultRuntimeState,
@@ -1092,17 +1147,40 @@ mod tests {
     }
 
     #[test]
-    fn status_available_requires_both_configured_and_open_gate() {
-        // Cold start: configured on disk but the session gate is closed → the
-        // Unlock screen must hide the PIN field (no `RequiresFullPassword` dead
-        // end). This is the bug fix: status now mirrors the redeem-path gate.
-        assert!(!compute_available(true, false));
-        // After a full master-password unlock this session, an auto-lock leaves
-        // the credential redeemable → the PIN field shows.
-        assert!(compute_available(true, true));
-        // Never available when nothing is configured.
-        assert!(!compute_available(false, true));
-        assert!(!compute_available(false, false));
+    fn status_available_gates_a_pin_on_the_session_but_not_biometric() {
+        const PIN: Option<&str> = Some("pin");
+        const BIO: Option<&str> = Some("biometric");
+
+        // PIN, cold start: configured on disk but the session gate is closed →
+        // the Unlock screen must hide the field (no `RequiresFullPassword` dead
+        // end). Status mirrors the redeem-path gate.
+        assert!(!compute_available(true, PIN, false));
+        // PIN, after a full master-password unlock this session: an auto-lock
+        // leaves the credential redeemable → the field shows.
+        assert!(compute_available(true, PIN, true));
+
+        // BIOMETRIC is available on a cold start (MYND-641). Its wrap key sits
+        // behind the OS biometric gate, which survives a restart on its own —
+        // and iOS evicts apps so aggressively that gating on the session made
+        // Face ID unreachable in practice.
+        assert!(compute_available(true, BIO, false));
+        assert!(compute_available(true, BIO, true));
+
+        // Never available when nothing is configured, whatever the method.
+        assert!(!compute_available(false, PIN, true));
+        assert!(!compute_available(false, BIO, false));
+        assert!(!compute_available(false, None, false));
+    }
+
+    #[test]
+    fn only_the_pin_provider_demands_a_full_unlock_first() {
+        // The redeem-path twin of the assertions above — the two must agree, or
+        // the Unlock screen offers a credential the redeem path then rejects.
+        assert!(!requires_full_unlock_first(PROVIDER_KIND_BIOMETRIC));
+        assert!(requires_full_unlock_first(PROVIDER_KIND_PIN));
+        // An unknown kind fails CLOSED: anything that is not the biometric
+        // provider keeps the gate.
+        assert!(requires_full_unlock_first(0xFF));
     }
 
     #[test]

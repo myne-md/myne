@@ -74,22 +74,25 @@ describeE2E("tc1 task-field chips render, open, and write (MYND-614)", () => {
         await s.waitForGone(testIdSelector("editor.task-field-editor"));
 
         // 3. A value change lands in the FILE — the point of the whole path.
-        //    Driven through `repeat`, whose editor is a plain text input: a
-        //    date input takes keystrokes per SEGMENT in a locale-dependent
-        //    order, so typing an ISO string into it asserts on the platform's
-        //    date widget rather than on Myne's write path. The write path is
-        //    the same for every field, and this is the one that can be driven
-        //    honestly.
+        //    Driven through `repeat`, whose editor is a CONTROL, not a text box
+        //    (dialect §3.8.7: a rule is chosen from a control, never typed). The
+        //    seed rule `every month` opens the interval family; bumping the
+        //    interval count to 3 and committing must serialize canonical
+        //    `every 3 months` into the file — the control → canonical-English →
+        //    write path, end to end. The count is a number input, so it takes
+        //    real keystrokes honestly (a native `<select>` would be asserting on
+        //    the platform's dropdown, the trap the old text-input note called
+        //    out for the date widget).
         await (await s.byTestId("editor.task-chip-repeat")).click();
         await s.waitForElement(testIdSelector("editor.task-field-editor"));
-        const input = await s.byTestId("editor.task-field-input");
-        await input.replaceText("every week");
+        const count = await s.byTestId("editor.recurrence-count");
+        await count.replaceText("3");
         await (await s.byTestId("editor.task-field-commit")).click();
         await waitForSaved(s);
 
         await s.waitUntil(
-          async () => ((await editorText(s)).includes("every week") ? true : null),
-          { label: "edited value reached the document" },
+          async () => ((await editorText(s)).includes("every 3 months") ? true : null),
+          { label: "assembled rule reached the document" },
         );
       },
     );

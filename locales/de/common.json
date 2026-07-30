@@ -1261,7 +1261,10 @@
         "export": "Exportieren…",
         "includeAttachments_one": "{{count}} Anhang einschließen",
         "includeAttachments_other": "{{count}} Anhänge einschließen",
-        "title": "Als Markdown exportieren"
+        "title": "Als Markdown exportieren",
+        "copyLabel": "Notiztext in die Zwischenablage kopieren",
+        "copied": "Notiztext kopiert",
+        "copyFailed": "Notiztext konnte nicht kopiert werden"
       }
     },
     "egress": {
