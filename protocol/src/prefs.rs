@@ -280,6 +280,24 @@ pub struct PrefsView {
     #[serde(default)]
     pub deliberate_folders: Vec<alloc::string::String>,
 
+    /// Developer mode master switch (developer-mode feature, MYND-593).
+    /// `false` ≡ off (the default). **Omitted entirely from the canonical
+    /// JSON when `false`**, so a vault that never enabled it is
+    /// byte-identical to a pre-feature `vault.prefs` (existing golden
+    /// vectors unaffected — migration-less additive field on `MYP1`, the
+    /// same emit-only-when-true convention as [`PrefsView::ai_enabled`]).
+    /// Canonical key `developer_mode` — sorts after `deliberate_folders`
+    /// (`deliberate_` < `developer_`, `l`=0x6C < `v`=0x76 at the 3rd byte),
+    /// before `device_names` (`develope` < `device_n`, `e`=0x65 < `i`=0x69
+    /// at the 4th byte). Classified **device-local** in
+    /// `sync-protocol.md` §10.2: it gates a device-local model-path
+    /// override, so a synced flag would read "on" on a device with no
+    /// override behind it. **Non-load-bearing** — a tampered/replayed
+    /// value can at worst reveal or hide the AI/local-model developer
+    /// surface; no protective-envelope clamp.
+    #[serde(default)]
+    pub developer_mode: bool,
+
     /// Friendly device names (device-management, SYNC-41) — a map of
     /// `device_id` (hex) → user-chosen display name. **The single home** for
     /// device names so no client ships a second default-name heuristic; both
@@ -1045,6 +1063,7 @@ impl Default for PrefsView {
             field_clocks: Default::default(),
             item_order: Vec::new(),
             deliberate_folders: Vec::new(),
+            developer_mode: false,
             device_names: Default::default(),
             attachment_ocr_enabled: true,
             transcription_enabled: true,
@@ -1363,6 +1382,15 @@ fn canonical_json_encode(prefs: &PrefsView) -> Vec<u8> {
             push_json_string(&mut out, f);
         }
         out.extend_from_slice(b"],");
+    }
+
+    // developer_mode (canonical key 'd' — after deliberate_folders
+    // [`deliberate_` < `developer_`], before device_names [`develope` <
+    // `device_n`]). Emitted only when `true` (the `ai_enabled` positive-opt-in
+    // convention), so a vault that never enabled it is byte-identical to a
+    // pre-feature vault.prefs.
+    if prefs.developer_mode {
+        out.extend_from_slice(b"\"developer_mode\":true,");
     }
 
     // device_names (canonical key 'd' — after deliberate_folders [`del` < `dev`],
@@ -2191,6 +2219,12 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
     let daily_template = parse_optional_string_field(rest, &mut cursor, b"\"daily_template\":")?;
     let deliberate_folders =
         parse_optional_array_field(rest, &mut cursor, b"\"deliberate_folders\":")?;
+    // developer_mode (canonical key 'd' — after deliberate_folders
+    // [`deliberate_` < `developer_`], before device_names [`develope` <
+    // `device_n`]). Encoder emits it only as `true`; `false` is tolerated for
+    // robustness. Absent → false (the default).
+    let developer_mode =
+        parse_optional_bool_field(rest, &mut cursor, b"\"developer_mode\":")?.unwrap_or(false);
     // device_names (canonical key 'd' — after deliberate_folders [del < dev],
     // before the editor_* block [d < e]). A string→string map (device_id-hex →
     // friendly name, SYNC-41); absent → empty (the folder_icons precedent).
@@ -2409,6 +2443,7 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
         icon,
         item_colors,
         deliberate_folders,
+        developer_mode,
         device_names,
         auto_lock_seconds,
         custom_theme,
@@ -3232,6 +3267,7 @@ mod tests {
     #[test]
     fn canonical_json_encodes_true_to_expected_bytes() {
         let prefs = PrefsView {
+            developer_mode: false,
             attachment_ocr_enabled: true,
             transcription_enabled: true,
             screen_capture_protection: true,
@@ -3297,6 +3333,7 @@ mod tests {
     #[test]
     fn canonical_json_encodes_false_to_expected_bytes() {
         let prefs = PrefsView {
+            developer_mode: false,
             attachment_ocr_enabled: true,
             transcription_enabled: true,
             screen_capture_protection: false,
@@ -3621,6 +3658,7 @@ mod tests {
         assert_eq!(
             parsed,
             PrefsView {
+                developer_mode: false,
                 attachment_ocr_enabled: true,
                 transcription_enabled: true,
                 screen_capture_protection: true,
@@ -3688,6 +3726,7 @@ mod tests {
         assert_eq!(
             parsed,
             PrefsView {
+                developer_mode: false,
                 attachment_ocr_enabled: true,
                 transcription_enabled: true,
                 screen_capture_protection: false,
@@ -4315,6 +4354,59 @@ mod tests {
         );
     }
 
+    #[test]
+    fn developer_mode_omitted_when_false_emitted_only_when_true() {
+        let off = canonical_json_encode(&PrefsView {
+            developer_mode: false,
+            ..PrefsView::default()
+        });
+        assert!(!core::str::from_utf8(&off)
+            .unwrap()
+            .contains("developer_mode"));
+        let on = canonical_json_encode(&PrefsView {
+            developer_mode: true,
+            ..PrefsView::default()
+        });
+        assert_eq!(
+            on.as_slice(),
+            br#"{"developer_mode":true,"screen_capture_protection":true}"#,
+        );
+    }
+
+    #[test]
+    fn developer_mode_canonical_position_between_deliberate_folders_and_device_names() {
+        let encoded = canonical_json_encode(&PrefsView {
+            deliberate_folders: alloc::vec![alloc::string::String::from("A/")],
+            developer_mode: true,
+            device_names: map_of(&[("d1", "Mac")]),
+            ..PrefsView::default()
+        });
+        assert_eq!(
+            encoded.as_slice(),
+            br#"{"deliberate_folders":["A/"],"developer_mode":true,"device_names":{"d1":"Mac"},"screen_capture_protection":true}"#,
+        );
+    }
+
+    #[test]
+    fn developer_mode_round_trips_through_decode_both_values() {
+        for value in [true, false] {
+            let original = PrefsView {
+                developer_mode: value,
+                ..PrefsView::default()
+            };
+            let encoded = canonical_json_encode(&original);
+            let decoded = canonical_json_decode(&encoded).expect("decode must succeed");
+            assert_eq!(decoded.developer_mode, value);
+        }
+    }
+
+    #[test]
+    fn developer_mode_absent_decodes_to_false() {
+        let decoded =
+            canonical_json_decode(br#"{"screen_capture_protection":true}"#).expect("decode ok");
+        assert!(!decoded.developer_mode);
+    }
+
     /// The inverse of the `ai_enabled` rule, because this pref defaults to TRUE:
     /// it is emitted only when the user turned it OFF. A vault that never
     /// touched the toggle therefore stays byte-identical to a pre-MYND-441
@@ -4881,6 +4973,7 @@ mod tests {
     fn encode_emits_theme_after_all_other_fields() {
         // Full field-mix: a < d < e < f < i < s < t. theme sits last.
         let prefs = PrefsView {
+            developer_mode: false,
             attachment_ocr_enabled: true,
             transcription_enabled: true,
             screen_capture_protection: true,
@@ -5324,6 +5417,7 @@ mod tests {
     fn encode_emits_sorted_keys_with_nonempty_folders() {
         // Keys sorted: deliberate_folders (d) before screen_capture_protection (s).
         let prefs = PrefsView {
+            developer_mode: false,
             attachment_ocr_enabled: true,
             transcription_enabled: true,
             screen_capture_protection: true,
@@ -5395,6 +5489,7 @@ mod tests {
     #[test]
     fn encode_sorts_and_dedupes_folder_elements() {
         let prefs = PrefsView {
+            developer_mode: false,
             attachment_ocr_enabled: true,
             transcription_enabled: true,
             screen_capture_protection: false,
@@ -5469,6 +5564,7 @@ mod tests {
         // `"` is allowed in a folder segment (Q5 forbidden set excludes it),
         // so JSON escaping is load-bearing.
         let prefs = PrefsView {
+            developer_mode: false,
             attachment_ocr_enabled: true,
             transcription_enabled: true,
             screen_capture_protection: true,
@@ -5538,6 +5634,7 @@ mod tests {
     fn encode_nfc_normalizes_folder_elements() {
         // Decomposed "é" (e + U+0301) → NFC precomposed (U+00E9) at encode.
         let prefs = PrefsView {
+            developer_mode: false,
             attachment_ocr_enabled: true,
             transcription_enabled: true,
             screen_capture_protection: true,
@@ -5667,6 +5764,7 @@ mod tests {
         let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
         let account_hash = fixed_account_number_hash();
         let original = PrefsView {
+            developer_mode: false,
             attachment_ocr_enabled: true,
             transcription_enabled: true,
             screen_capture_protection: false,
@@ -5760,6 +5858,7 @@ mod tests {
         // favorites, screen_capture_protection last. item_order is
         // HETEROGENEOUS — a folder path interleaved between note UUIDs.
         let prefs = PrefsView {
+            developer_mode: false,
             attachment_ocr_enabled: true,
             transcription_enabled: true,
             field_clocks: Default::default(),
@@ -5838,6 +5937,7 @@ mod tests {
         // encoder must NOT sort and NOT dedupe (contrast canonical_folder_list
         // which does both). The duplicate "zzz" must survive verbatim.
         let prefs = PrefsView {
+            developer_mode: false,
             attachment_ocr_enabled: true,
             transcription_enabled: true,
             screen_capture_protection: true,
@@ -5945,6 +6045,7 @@ mod tests {
         let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
         let account_hash = fixed_account_number_hash();
         let original = PrefsView {
+            developer_mode: false,
             attachment_ocr_enabled: true,
             transcription_enabled: true,
             field_clocks: Default::default(),
@@ -6037,6 +6138,7 @@ mod tests {
         // item_colors (i). The set-array is sorted + exact-deduped on encode
         // (graph/word-count out of order + a duplicate collapse to a clean set).
         let prefs = PrefsView {
+            developer_mode: false,
             attachment_ocr_enabled: true,
             transcription_enabled: true,
             screen_capture_protection: true,
@@ -6229,6 +6331,7 @@ mod tests {
     fn encode_emits_auto_lock_seconds_first_in_canonical_order() {
         // Canonical key order: auto_lock_seconds (a) < screen_capture_protection (s).
         let prefs = PrefsView {
+            developer_mode: false,
             attachment_ocr_enabled: true,
             transcription_enabled: true,
             screen_capture_protection: true,
@@ -6298,6 +6401,7 @@ mod tests {
     fn encode_emits_all_three_fields_in_canonical_order() {
         // a < d < s: auto_lock_seconds, deliberate_folders, screen_capture_protection.
         let prefs = PrefsView {
+            developer_mode: false,
             attachment_ocr_enabled: true,
             transcription_enabled: true,
             screen_capture_protection: false,
@@ -6369,6 +6473,7 @@ mod tests {
         // no trailing ".0"). The clamp/always-on policy lives in the Tauri
         // layer; the codec faithfully persists whatever integer it is given.
         let prefs = PrefsView {
+            developer_mode: false,
             attachment_ocr_enabled: true,
             transcription_enabled: true,
             screen_capture_protection: true,
@@ -6508,6 +6613,7 @@ mod tests {
         let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
         let account_hash = fixed_account_number_hash();
         let original = PrefsView {
+            developer_mode: false,
             attachment_ocr_enabled: true,
             transcription_enabled: true,
             screen_capture_protection: true,
@@ -6621,6 +6727,7 @@ mod tests {
         // canonical order: left_collapsed < left_width < right_collapsed <
         // right_width.
         let prefs = PrefsView {
+            developer_mode: false,
             attachment_ocr_enabled: true,
             transcription_enabled: true,
             screen_capture_protection: true,
@@ -6924,6 +7031,7 @@ mod tests {
         let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
         let account_hash = fixed_account_number_hash();
         let original = PrefsView {
+            developer_mode: false,
             attachment_ocr_enabled: true,
             transcription_enabled: true,
             screen_capture_protection: false,
@@ -6997,6 +7105,7 @@ mod tests {
         let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
         let account_hash = fixed_account_number_hash();
         let original = PrefsView {
+            developer_mode: false,
             attachment_ocr_enabled: true,
             transcription_enabled: true,
             screen_capture_protection: false,
@@ -7331,6 +7440,7 @@ mod tests {
             &prefs_key_a,
             &account_hash_a,
             &PrefsView {
+                developer_mode: false,
                 attachment_ocr_enabled: true,
                 transcription_enabled: true,
                 screen_capture_protection: true,
@@ -7397,6 +7507,7 @@ mod tests {
             &prefs_key_a,
             &account_hash_a,
             &PrefsView {
+                developer_mode: false,
                 attachment_ocr_enabled: true,
                 transcription_enabled: true,
                 screen_capture_protection: false,
@@ -7465,6 +7576,7 @@ mod tests {
         // (not hardcoded) so the generator self-validates the canonical key
         // order + sequence discipline before emitting.
         let prefs_populated = PrefsView {
+            developer_mode: false,
             attachment_ocr_enabled: true,
             transcription_enabled: true,
             field_clocks: Default::default(),

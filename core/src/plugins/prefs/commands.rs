@@ -1763,6 +1763,70 @@ pub(crate) async fn set_attachment_ocr_enabled_with_dir(
     Ok(())
 }
 
+/// Slot::Unlocked-gated setter for the `developer_mode` toggle (MYND-593,
+/// `developer-mode` feature task 3) — the gate the AI opt-in and the local-model
+/// override pickers sit behind. Read-modify-write under the per-plugin write
+/// mutex; **no native side-effect**, same disk-only shape as
+/// [`set_attachment_ocr_enabled`]. Nothing consumes this field yet — the
+/// host-side effective-enabled conjunction and the model-path rejection are
+/// task 4's territory; this setter only persists the flag.
+pub async fn set_developer_mode_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    enabled: bool,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_developer_mode_with_dir(&dir, state, hooks, enabled, io, host).await
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend
+/// sends are unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn set_developer_mode<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
+    enabled: bool,
+) -> Result<(), PrefsWriteError> {
+    set_developer_mode_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        enabled,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
+}
+
+/// Testable core of [`set_developer_mode`].
+pub(crate) async fn set_developer_mode_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    enabled: bool,
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
+) -> Result<(), PrefsWriteError> {
+    update_prefs_with_dir(
+        vault_dir,
+        state,
+        hooks,
+        |prefs| {
+            prefs.developer_mode = enabled;
+        },
+        io,
+        host,
+    )
+    .await?;
+
+    tracing::info!(event = "prefs_written", field = "developer_mode", enabled);
+    Ok(())
+}
+
 /// Slot::Unlocked-gated setter for the `ai_excluded_folders` set (local-ai
 /// epic, ai-ux-surface MYND-408, SYNC-14) — folders the AI never reads/indexes.
 /// Same canonical set encoding as `deliberate_folders`; direct mirror of
@@ -4746,6 +4810,7 @@ mod tests {
                 &prefs_key,
                 &account_hash,
                 &PrefsView {
+                    developer_mode: false,
                     attachment_ocr_enabled: true,
                     transcription_enabled: true,
                     screen_capture_protection: false,
@@ -5215,6 +5280,74 @@ mod tests {
                 .expect("read after clear");
             assert!(!cleared.ai_enabled);
             assert!(cleared.ai_excluded_folders.is_empty());
+        });
+    }
+
+    // ---- Developer mode setter (developer-mode, MYND-593) -------------
+
+    #[test]
+    fn developer_mode_persist_and_reload_round_trip() {
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x52).await;
+
+            // Default: off.
+            let base = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
+                .await
+                .expect("read");
+            assert!(!base.developer_mode);
+
+            // Enable, then reload from a fresh read (persist-and-reload).
+            set_developer_mode_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                true,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("enable must succeed");
+            let enabled = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
+                .await
+                .expect("read after enable");
+            assert!(enabled.developer_mode);
+            // Unrelated fields untouched.
+            assert!(enabled.screen_capture_protection);
+
+            // Disable → back to default (byte-identical to pre-field, since the
+            // codec emits the key only when true).
+            set_developer_mode_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                false,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("disable must succeed");
+            let disabled = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
+                .await
+                .expect("read after disable");
+            assert!(!disabled.developer_mode);
+        });
+    }
+
+    #[test]
+    fn set_developer_mode_rejects_when_slot_empty() {
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("prefs-devmode-empty").expect("scoped tempdir");
+            let state = VaultRuntimeState::default();
+            let result = set_developer_mode_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                true,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await;
+            assert!(matches!(result, Err(PrefsWriteError::SlotNotUnlocked)));
         });
     }
 

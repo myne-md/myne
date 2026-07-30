@@ -125,7 +125,7 @@
       "title": "Přílohy",
       "transcribeDone": "Přepis dokončen.",
       "transcribeFailed": "Přepis selhal. Zkuste to prosím znovu.",
-      "transcribeNoModel": "Vyberte model pro přepis v Nastavení → Labs → AI.",
+      "transcribeNoModel": "Vyberte model pro přepis v Nastavení → Developer → AI.",
       "transcribeStarted": "Probíhá přepis…",
       "typeFilter": {
         "all": "Všechny typy",
@@ -758,11 +758,11 @@
           "deletedLabel": "smazáno"
         },
         "transcribe": {
-          "disabledReason": "Pro přepis zapněte AI v Nastavení → Labs → AI.",
+          "disabledReason": "Pro přepis zapněte AI v Nastavení → Developer → AI.",
           "failed": "Přepis selhal. Zkuste to prosím znovu.",
           "heading": "Přepis",
           "insert": "Vložit přepis do poznámky",
-          "noModelHint": "Vyberte model pro přepis v Nastavení → Labs → AI.",
+          "noModelHint": "Vyberte model pro přepis v Nastavení → Developer → AI.",
           "progress": "Probíhá přepis…",
           "stop": "Zastavit"
         },
@@ -911,8 +911,8 @@
           "gettingReadyHint": "Připravuji vaše poznámky pro AI — okamžik.",
           "insert": "Vložit do poznámky",
           "noAnswer": "Žádná odpověď — zkuste otázku přeformulovat.",
-          "noModelHint": "Není vybrán žádný model. Vyberte jej v Nastavení → Labs → AI a začněte.",
-          "offHint": "Místní AI je vypnutá. Zapněte ji v Nastavení → Labs → AI.",
+          "noModelHint": "Není vybrán žádný model. Vyberte jej v Nastavení → Developer → AI a začněte.",
+          "offHint": "Místní AI je vypnutá. Zapněte ji v Nastavení → Developer → AI.",
           "send": "Odeslat",
           "statusGettingReady": "Připravuji…",
           "statusNoModel": "Žádný model",
@@ -2132,6 +2132,8 @@
       "changelogButton": "Zobrazit seznam změn…",
       "changelogHelper": "Poznámky k jednotlivým verzím. Objeví se, až přistane MYND-119.",
       "changelogLabel": "Seznam změn",
+      "developerModeHelper": "",
+      "developerModeLabel": "",
       "licenseBody": "Pre-alfa · dokumentace CC-BY-4.0 · kód aplikace AGPL-3.0 při vydání 1. fáze.",
       "licenseLabel": "Licence",
       "tagline": "Pre-alfa · desktopový klient 1. fáze",
@@ -2471,7 +2473,6 @@
       "pendingHint": "Již brzy"
     },
     "ai": {
-      "betaBadge": "Beta",
       "disclosureToggle": "Jak to funguje?",
       "enableHelper": "Spouští model, který poskytnete, výhradně na vašem zařízení. Experimentální, ve výchozím nastavení vypnuto.",
       "enableLabel": "Povolit místní AI",
@@ -2568,7 +2569,7 @@
     "shell": {
       "closeLabel": "Zavřít nastavení",
       "groups": {
-        "labs": "Labs"
+        "developer": ""
       },
       "navLabel": "Panely nastavení",
       "panels": {

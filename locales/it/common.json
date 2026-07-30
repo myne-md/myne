@@ -120,7 +120,7 @@
       "title": "Allegati",
       "transcribeDone": "Trascrizione completata.",
       "transcribeFailed": "Trascrizione non riuscita. Riprova.",
-      "transcribeNoModel": "Seleziona un modello di trascrizione in Impostazioni → Labs → AI.",
+      "transcribeNoModel": "Seleziona un modello di trascrizione in Impostazioni → Developer → AI.",
       "transcribeStarted": "Trascrizione in corso…",
       "typeFilter": {
         "all": "Tutti i tipi",
@@ -744,11 +744,11 @@
           "deletedLabel": "eliminato"
         },
         "transcribe": {
-          "disabledReason": "Abilita l'AI in Impostazioni → Labs → AI per trascrivere.",
+          "disabledReason": "Abilita l'AI in Impostazioni → Developer → AI per trascrivere.",
           "failed": "Trascrizione non riuscita. Riprova.",
           "heading": "Trascrizione",
           "insert": "Inserisci la trascrizione nella nota",
-          "noModelHint": "Seleziona un modello di trascrizione in Impostazioni → Labs → AI.",
+          "noModelHint": "Seleziona un modello di trascrizione in Impostazioni → Developer → AI.",
           "progress": "Trascrizione in corso…",
           "stop": "Interrompi"
         },
@@ -888,8 +888,8 @@
           "gettingReadyHint": "Preparazione delle tue note per l'AI — un momento.",
           "insert": "Inserisci nella nota",
           "noAnswer": "Nessuna risposta — prova a riformulare.",
-          "noModelHint": "Nessun modello selezionato. Scegline uno in Impostazioni → Labs → AI per iniziare.",
-          "offHint": "L'AI locale è disattivata. Attivala in Impostazioni → Labs → AI.",
+          "noModelHint": "Nessun modello selezionato. Scegline uno in Impostazioni → Developer → AI per iniziare.",
+          "offHint": "L'AI locale è disattivata. Attivala in Impostazioni → Developer → AI.",
           "send": "Invia",
           "statusGettingReady": "Preparazione…",
           "statusNoModel": "Nessun modello",
@@ -2072,6 +2072,8 @@
       "changelogButton": "Visualizza changelog…",
       "changelogHelper": "Note per versione. Saranno disponibili quando verrà rilasciato MYND-119.",
       "changelogLabel": "Changelog",
+      "developerModeHelper": "",
+      "developerModeLabel": "",
       "licenseBody": "Pre-alpha · documentazione CC-BY-4.0 · codice dell'app AGPL-3.0 al rilascio della Fase 1.",
       "licenseLabel": "Licenza",
       "tagline": "Pre-alpha · client desktop della Fase 1",
@@ -2406,7 +2408,6 @@
       "pendingHint": "Prossimamente"
     },
     "ai": {
-      "betaBadge": "Beta",
       "disclosureToggle": "Come funziona?",
       "enableHelper": "Esegue un modello fornito da te interamente sul tuo dispositivo. Sperimentale, disattivato per impostazione predefinita.",
       "enableLabel": "Abilita l'AI locale",
@@ -2501,7 +2502,7 @@
     "shell": {
       "closeLabel": "Chiudi impostazioni",
       "groups": {
-        "labs": "Labs"
+        "developer": ""
       },
       "navLabel": "Pannelli delle impostazioni",
       "panels": {
