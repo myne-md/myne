@@ -102,6 +102,13 @@ const CAPABILITY_BACKING = {
   // Task 48: the whole `pdf-export` plugin is refused. The markdown and
   // attachment downloads are deliberately NOT behind this — they ship.
   pdfExport: ["pdf-export"],
+  // MYND-490 (cli-thin-client task 12): the whole `cli-bridge` plugin. Its one
+  // command reports the CLI door's session state, and both facts it answers
+  // presuppose a machine — a local socket the desktop binds, and a sidecar
+  // binary on a filesystem. The three `prefs|set_cli_*` setters are deliberately
+  // NOT here: they write ordinary `vault.prefs` fields that sync to every
+  // client, and a desktop that later reads them must see what the user chose.
+  cliAccess: ["cli-bridge"],
 };
 
 const descriptor = readFileSync(DESCRIPTOR, "utf8");

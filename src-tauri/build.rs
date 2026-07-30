@@ -460,6 +460,21 @@ fn main() {
                 "clip_dispatch_complete",
                 "pairing_dispatch_complete",
             ]),
+        )
+        .plugin(
+            "cli-bridge",
+            // cli-thin-client task 12 (MYND-490): ONE read-only command behind
+            // the Settings CLI-access block. It answers the two facts that are
+            // deliberately not `vault.prefs` fields — how long ago the command
+            // socket last served a request (RAM only; see
+            // `cli_bridge::activity`) and whether `myne` is on the user's
+            // `$PATH` at all, plus the shim dir for the one `export PATH=…`
+            // line we decline to write into their shell profile
+            // (`cli_bridge::path_shim` rule 3). No arguments, no vault access,
+            // no writes. InlinedPlugin mirror load-bearing per the
+            // vault-creation note above; keep it lock-stepped with
+            // `permissions/cli-bridge/default.toml`.
+            tauri_build::InlinedPlugin::new().commands(&["cli_access_state"]),
         );
 
     // local-ai (MYND-406): declare the `local-inference` plugin's ACL namespace

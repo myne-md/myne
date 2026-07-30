@@ -104,6 +104,14 @@ const ABSENT: ReadonlySet<Capability> = new Set<Capability>([
   // their obstacle was the destination, and the browser download flow answers
   // that (see `platform/download.ts`).
   "pdfExport",
+  // MYND-490 (cli-thin-client task 12). The `myne` terminal client connects to
+  // a local Unix socket / named pipe that the desktop process binds, and the
+  // binary itself ships inside the desktop bundle as a Tauri `externalBin`. A
+  // page can neither bind that socket nor be reached through one, and there is
+  // no filesystem here for a sidecar to be installed onto — so the Settings
+  // block is omitted rather than greyed. Absent by platform fact, not by
+  // decision: there is nothing to port.
+  "cliAccess",
 ]);
 
 export function has(cap: Capability): boolean {

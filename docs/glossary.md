@@ -325,6 +325,18 @@ A single keyboard-shortcut combination, e.g. `Mod-Shift-g` (hotkeys epic, MYND-3
 
 Used in: `spec/protocol.md` §9.5.2
 
+### **CLI-excluded folder** &nbsp; 📦 *Product*
+
+*(Alias: `cli_excluded_folders`.)*
+
+A folder the user has excluded from [CLI terminal access](#cli-terminal-access): notes inside it (and its subfolders) are absent from `myne list` and `myne search` results with no trace — no count, no title, no snippet — and refused as write destinations. Backed by the additive `cli_excluded_folders` field in the encrypted `vault.prefs` (`MYP1`), `Shared(SetUnion)` classification (the `ai_excluded_folders`/`deliberate_folders` precedent: NFC-normalized, sorted, deduped folder paths, subfolder containment; an exclusion set on one device must never be lost in a Phase 2 sync merge). Enforced at a single central point on the desktop side of the socket, **after decrypt** (a note's folder lives in its encrypted frontmatter, so the check cannot run any earlier) — not a new leak, since the desktop already holds the plaintext and simply declines to hand it to the CLI, but it means the `vault.search` index (`MYS1`) is itself not scope-aware and results are filtered by folder on the way out. `myne search` specifically treats an excluded match as an oracle risk (a result count that varies with the query would let a caller infer an excluded folder's subject matter without reading a note) and so omits it as completely as a genuine no-match. Contrast [AI-excluded folder](#ai-excluded-folder) (same encoding discipline, different consumer). See `threat-model.md` §7, `decisions.md` 2026-07-29.
+
+### **CLI terminal access** &nbsp; 📦 *Product*
+
+*(Alias: the terminal-access door, CLI thin client.)*
+
+Phase 1 of the `myne` CLI epic (MYND-490, `agent-tooling` epic `myne-cli` ledger CLI-18): a `myne` binary shipped as a Tauri `externalBin` sidecar inside the desktop bundle, registered on the user's PATH, that never opens the vault itself. It connects over a local socket (a Unix domain socket on macOS/Linux, a named pipe on Windows) to the already-running, already-unlocked desktop process and asks it to read/write vault content on its behalf — no key, no password prompt, ever. Gated on two conditions simultaneously: the `cli_enabled` preference (default off, `DeviceLocal`, the `ai_enabled` precedent) and the vault's unlock state — the socket exists only while both hold, so auto-lock closes the door with no CLI-specific logic and no risk of falling out of sync with it. Reach is further narrowed by [CLI-excluded folder](#cli-excluded-folder). Deliberately carries **no identity-checking gatekeeper**: a paired token, a peer-PID check, or a code-signature check would each be defeated by construction by any program already running as the same OS user (confused deputy), so none is built — the residual (any same-user program can drive the door while it is open) is stated rather than hidden. See `threat-model.md` §7, `decisions.md` 2026-07-29. Phase 2 (MYND-491..495, out of scope for Phase 1) adds a standalone `CoreBackend` that opens the vault directly when the desktop isn't running.
+
 ### **clip** &nbsp; 📦 *Product*
 
 A captured web article or selection written into the vault as an ordinary [`.myn`](#myn-file) note by the [browser clipper](#browser-clipper). Authored content emitted as canonical [D1](#myne-markdown-dialect-d1) by the [clip serializer](#clip-serializer); images imported as [`MYA1`](#mya1) attachments; saved to the vault root.

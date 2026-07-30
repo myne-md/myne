@@ -31,4 +31,29 @@ describe("isNoteAiExcluded (AI excluded-folders filter)", () => {
   it("normalizes a missing trailing slash before the check", () => {
     expect(isNoteAiExcluded("Private", ["Private/"])).toBe(true);
   });
+
+  it("normalizes leading and duplicate slashes on the note side", () => {
+    // §3.6.2 tolerates these shapes on READ, and `normalizeFolderPath` is
+    // what makes the app display such a note inside `Private/` — so the
+    // exclusion has to see the same folder the user sees.
+    for (const raw of ["/Private/", "//Private//", "/Private", "Private/Sub"]) {
+      expect(isNoteAiExcluded(raw, ["Private/"])).toBe(true);
+    }
+  });
+
+  it("normalizes the excluded entry too", () => {
+    // The prefs codec NFC-normalizes, sorts and dedupes but does NOT
+    // canonicalize the path shape, so an entry can reach here slash-less.
+    for (const entry of ["Private", "/Private/", "//Private//"]) {
+      expect(isNoteAiExcluded("Private/", [entry])).toBe(true);
+    }
+  });
+
+  it("canonicalizing an entry never widens it into a sibling wildcard", () => {
+    // The trailing slash is APPENDED, not dropped — so it stays part of the
+    // matched prefix and a sibling whose name merely starts the same way is
+    // still in scope.
+    expect(isNoteAiExcluded("PrivateStuff/", ["Private"])).toBe(false);
+    expect(isNoteAiExcluded("Privateer/", ["Private/"])).toBe(false);
+  });
 });

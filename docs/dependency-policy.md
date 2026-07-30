@@ -465,6 +465,20 @@ Six feature-level dependency admissions landed with their `decisions.md` entries
 - **"The bar" Q1 (hand-roll?):** no — the maintained WCAG rule corpus *is* the dependency. The decision entry is explicit that axe covers only ~30–40% of WCAG and that the rest is a manual checklist, so the dep is never asked to carry more than it can.
 - **One config, two tiers:** `WCAG_AA_TAGS` is shared so the jsdom pass and the real-render pass cannot drift on rule scope; `color-contrast` is disabled explicitly in jsdom (no layout/paint) rather than left to auto-detection.
 
+### CLI terminal access (MYND-490) — `cli/Cargo.toml`, `src-tauri/Cargo.toml`
+
+| Dep | Version | Used for | Transitive footprint | License | Justified-by |
+|---|---|---|---|---|---|
+| `dirs` | 6 | Resolve the app-data dir the command socket and status marker live under, from the `myne` sidecar — which must agree with Tauri's `app_data_dir()` **byte for byte** or the CLI reports "app not running" against a running app (`cli/src/paths.rs`) | **Zero new `Cargo.lock` entries** — already locked and reached via `tauri` itself. Transitive→direct promotion, the `unicode-normalization` / `async-trait` shape. | MIT/Apache-2.0 | `decisions.md` 2026-07-30 (CLI terminal access); MYND-490 task 2 |
+| `libc` | 0.2 (`[target.'cfg(unix)'.dependencies]`) | `localtime_r` for `myne daily`'s OS-local calendar date — `src-tauri/src/cli_bridge/daily.rs` | **Zero new entries** — already reachable on every Unix build via `tokio` / `cpal`. | MIT/Apache-2.0 | `decisions.md` 2026-07-30; MYND-490 task 9 |
+
+- **"The bar" Q1 (hand-roll?) for `dirs`:** the alternative is a hand-written per-platform table (`$XDG_DATA_HOME`, `~/Library/Application Support`, `%APPDATA%`) that must not merely be *correct* but must stay **identical to the copy Tauri resolves with**. Two independent implementations of the same platform table is exactly the drift `scripts/check-cli-sidecar.mjs` exists to catch elsewhere; using the crate Tauri already uses removes the drift instead of testing for it.
+- **Why `libc` and not `chrono` or `time`.** Recorded in full in the `src-tauri/Cargo.toml` comment at the declaration; the short form: `chrono` sits in `Cargo.lock` only as an **unreached** transitive of `serde_with`/`tauri-utils` (`cargo tree -p myne-desktop -i chrono` resolves nothing), so admitting it would be genuinely new supply-chain surface rather than an already-trusted edge — the opposite of the `dirs` case. `time`'s local-offset API is unsound on multi-threaded Unix (the documented `getenv` TZ race) and the crate disables it there itself. `localtime_r` is POSIX and thread-safe on glibc absent a concurrent `setenv("TZ", …)`, which this codebase never does.
+- **The `myne-cli` crate's ENTIRE dependency set is `serde` + `serde_json` + `dirs`.** That is the deliberate shape, not an accident of a young crate: the sidecar depends on neither `myne-core` nor `protocol`, holds no key, opens no vault, and **no crate in its graph can originate a network request** — which is what makes "the CLI is a thin client" a property of the dependency graph rather than a claim in a doc.
+- **`libc`'s placement.** `[target.'cfg(unix)'.dependencies]` sits at the END of `src-tauri/Cargo.toml`, per the root `CLAUDE.md` gotcha — a target table inserted beside the crate it overrides silently terminates `[dependencies]` and swallows everything after it.
+- **Hash-pinning:** both carry `checksum` lines in the single shared workspace `Cargo.lock`; added to `cli/` and `src-tauri/` only, never `protocol/`.
+- **Network surface:** none, in either.
+
 
 ## Reference
 

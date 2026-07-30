@@ -66,6 +66,10 @@ const V = {
     "The clipper is a native-messaging host a page cannot reach; substituted so its five command names leave the bundle.",
     "clipper-pairing|pairing_revoke",
   ],
+  "src/components/settings/CliAccessSettings.tsx": [
+    "adapted",
+    "Never rendered: PrivacyPanel gates the block on `cliAccess`, which is absent on web, so the whole terminal-access surface is omitted rather than greyed. Ships in the bundle (it is one small component inside a panel that does ship) but nothing on this client mounts it, and its one command is `Unsupported` in the dispatcher.",
+  ],
   "src/components/settings/ControlBlock.tsx": ["ported", "Layout primitive."],
   "src/components/settings/CustomThemesSection.tsx": [
     "adapted",
@@ -166,6 +170,10 @@ const V = {
   "src/lib/bip39-normalize.ts": [
     "adapted",
     "Pure NFKD/whitespace normalisation, with NO IMPORT EDGE from served code since task 92: its one phrase-entry caller moved into `src/components/sync/phrase-credential.ts`, which the web build substitutes with a stub that cannot construct a credential. What remains here is a string function nothing on this client feeds a phrase.",
+  ],
+  "src/lib/cli-access.ts": [
+    "typed-unsupported",
+    "The CLI door's session-state read. Reachable — the module ships and the binding is one `invoke` — and `cli-bridge` is `Unsupported` in the dispatcher, so a call that arrives by a path gating did not cover gets a typed refusal rather than a hang. No web path calls it: the only caller is the capability-gated Settings block.",
   ],
   "src/lib/clipper-pairing.ts": [
     "excluded",

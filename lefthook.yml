@@ -91,6 +91,19 @@ pre-commit:
       glob: "*.{ts,tsx,rs}"
       run: node scripts/check-web-command-coverage.mjs
 
+    cli-sidecar:
+      # cli-thin-client task 11: the `myne` CLI is a separate binary with NO
+      # dependency on `myne-desktop`, so the bundle identifier and the
+      # socket/status basenames are duplicated on purpose — and drift between
+      # the two sides compiles clean on both, then reports "app not running"
+      # while the app is running. Also asserts the sidecar is still listed in
+      # `bundle.externalBin`, without which the bundle ships no CLI at all.
+      #
+      # Whole-contract by nature (like web-command-coverage above): a rename on
+      # one side never touches the other side's file.
+      glob: "*.{rs,json}"
+      run: node scripts/check-cli-sidecar.mjs
+
     i18n-catalog:
       # Guards the i18n migration (decisions.md 2026-06-25): fails if
       # locales/en/common.json has any EMPTY English source value, or if a
