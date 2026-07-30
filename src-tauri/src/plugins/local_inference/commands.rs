@@ -125,9 +125,12 @@ pub async fn transcribe<R: Runtime>(
         &myne_core::vault_io::StdVaultIo,
     )
     .await
-    .map_err(|_| EngineError::NotReady)?;
+    // `prefs_read_from_host` returns defaults on any prefs-blob failure; it only
+    // errors on a locked slot (or a rare vault.meta IO failure). Transcribe
+    // requires an unlocked vault anyway, so both surface as "unlock" (MYND-591).
+    .map_err(|_| EngineError::VaultLocked)?;
     if !prefs.transcription_enabled {
-        return Err(EngineError::NotReady);
+        return Err(EngineError::FeatureOff);
     }
     // Fresh cancel window (a prior Stop must not abort this run).
     cancel.reset();
@@ -141,7 +144,7 @@ pub async fn transcribe<R: Runtime>(
             items_key_id,
             root_key,
         },
-        None => return Err(EngineError::NotReady),
+        None => return Err(EngineError::VaultLocked),
     };
     let active_id = vault_state.active_vault_id().await;
     let vault_dir = crate::paths::active_vault_root_io(&app, active_id)
@@ -807,6 +810,25 @@ mod tests {
         assert_eq!(
             local_inference_error_kind(&EngineError::InferenceFailed),
             "inference_failed"
+        );
+        // The MYND-591 transcribe-cause split: each carries a distinct,
+        // content-free tag (the wire uses the bare variant name; these tags are
+        // logging-only, but must stay pairwise-distinct and DENY-safe).
+        assert_eq!(
+            local_inference_error_kind(&EngineError::FeatureOff),
+            "feature_off"
+        );
+        assert_eq!(
+            local_inference_error_kind(&EngineError::VaultLocked),
+            "vault_locked"
+        );
+        assert_eq!(
+            local_inference_error_kind(&EngineError::NoModel),
+            "no_model"
+        );
+        assert_eq!(
+            local_inference_error_kind(&EngineError::ModelLoadFailed),
+            "model_load_failed"
         );
     }
 

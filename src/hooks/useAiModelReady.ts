@@ -16,9 +16,12 @@ import { loadModelPath, type ModelRole } from "../lib/ai-model-store";
  * `null` while the (fast, device-local) path check is in flight, `true` once a
  * model path for `role` is recorded, `false` when none is set. Only probes when
  * `enabled` — a disabled toggle needs no check. Re-runs when `enabled`/`role`
- * flips. `role` defaults to `"generation"` (the chat/writing surfaces); the
- * voice-to-text surfaces pass `"transcription"` (MYND-552) so they can render a
- * truthful "select a model" vs "ready" state without a false positive.
+ * flips. `role` defaults to `"generation"` (the chat/writing surfaces), and that
+ * is the only role any caller uses today: the AI-chat header (`AiChatTab`) is
+ * the sole consumer. Transcription readiness is NOT handled here — speech-to-text
+ * ships a bundled default model (MYND-270) and gates on `transcription_enabled`,
+ * so its surfaces react to the backend cause (MYND-591) rather than probing a
+ * side-loaded path. The generic `role` param is retained for future callers.
  */
 export function useAiModelReady(
   enabled: boolean,
