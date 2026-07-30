@@ -24,7 +24,11 @@ function makeContext(over: Partial<CommandContext> = {}): CommandContext {
     aiEnabled: false,
     // Wave-1 toggle/cycle actions read ctx.prefs; the registry/visibility tests
     // never invoke their run(), so an empty stub is enough (defaults fill in).
-    prefs: {} as CommandContext["prefs"],
+    // `developer_mode: true` by default so the pre-existing ai.* visibility
+    // tests below keep exercising the aiEnabled-driven show/disabled behavior
+    // they were written for; the developer-mode-off tests override it
+    // explicitly (developer-mode feature, MYND-593).
+    prefs: { developer_mode: true } as CommandContext["prefs"],
     onOpenAiChat: vi.fn(),
     onSummarizeNote: vi.fn(),
     onSuggestTags: vi.fn(),
@@ -229,6 +233,30 @@ describe("Command palette action registry", () => {
     expect(onOpenAiChat).toHaveBeenCalledTimes(1);
   });
 
+  it("ai.open-chat is HIDDEN (not disabled) while Developer mode is off, even with AI enabled (MYND-593)", () => {
+    // Developer mode off means the AI panel isn't reachable in Settings at
+    // all — a keyboard shortcut must not offer a door onto it either.
+    const action = find("ai.open-chat");
+    expect(
+      action.visibility(
+        makeContext({
+          stageName: "editor",
+          aiEnabled: true,
+          prefs: { developer_mode: false } as CommandContext["prefs"],
+        }),
+      ),
+    ).toBe("hidden");
+    expect(
+      action.visibility(
+        makeContext({
+          stageName: "editor",
+          aiEnabled: false,
+          prefs: { developer_mode: false } as CommandContext["prefs"],
+        }),
+      ),
+    ).toBe("hidden");
+  });
+
   it("ai.summarize-note needs editor + a selected note + ai_enabled; disabled when off, hidden without a note (SYNC-9/14)", () => {
     const action = find("ai.summarize-note");
     const note = "n1" as CommandContext["selectedNoteId"];
@@ -252,6 +280,21 @@ describe("Command palette action registry", () => {
     expect(onSummarizeNote).toHaveBeenCalledTimes(1);
   });
 
+  it("ai.summarize-note is HIDDEN while Developer mode is off, even with AI enabled + a note selected (MYND-593)", () => {
+    const action = find("ai.summarize-note");
+    const note = "n1" as CommandContext["selectedNoteId"];
+    expect(
+      action.visibility(
+        makeContext({
+          stageName: "editor",
+          selectedNoteId: note,
+          aiEnabled: true,
+          prefs: { developer_mode: false } as CommandContext["prefs"],
+        }),
+      ),
+    ).toBe("hidden");
+  });
+
   it("ai.suggest-tags needs editor + a selected note + ai_enabled; disabled when off, hidden without a note (SYNC-9/14)", () => {
     const action = find("ai.suggest-tags");
     const note = "n1" as CommandContext["selectedNoteId"];
@@ -272,6 +315,21 @@ describe("Command palette action registry", () => {
     expect(onSuggestTags).toHaveBeenCalledTimes(1);
   });
 
+  it("ai.suggest-tags is HIDDEN while Developer mode is off, even with AI enabled + a note selected (MYND-593)", () => {
+    const action = find("ai.suggest-tags");
+    const note = "n1" as CommandContext["selectedNoteId"];
+    expect(
+      action.visibility(
+        makeContext({
+          stageName: "editor",
+          selectedNoteId: note,
+          aiEnabled: true,
+          prefs: { developer_mode: false } as CommandContext["prefs"],
+        }),
+      ),
+    ).toBe("hidden");
+  });
+
   it("ai.rewrite-selection needs editor + a selected note + ai_enabled; disabled when off, hidden without a note", () => {
     const action = find("ai.rewrite-selection");
     const note = "n1" as CommandContext["selectedNoteId"];
@@ -287,6 +345,42 @@ describe("Command palette action registry", () => {
     const onRewriteSelection = vi.fn();
     void action.run(makeContext({ onRewriteSelection }));
     expect(onRewriteSelection).toHaveBeenCalledTimes(1);
+  });
+
+  it("ai.rewrite-selection is HIDDEN while Developer mode is off, even with AI enabled + a note selected (MYND-593)", () => {
+    const action = find("ai.rewrite-selection");
+    const note = "n1" as CommandContext["selectedNoteId"];
+    expect(
+      action.visibility(
+        makeContext({
+          stageName: "editor",
+          selectedNoteId: note,
+          aiEnabled: true,
+          prefs: { developer_mode: false } as CommandContext["prefs"],
+        }),
+      ),
+    ).toBe("hidden");
+  });
+
+  it("ai.toggle-enabled requires editor stage + Developer mode; hidden otherwise (MYND-593)", () => {
+    const action = find("ai.toggle-enabled");
+    expect(action.visibility(makeContext({ stageName: "editor" }))).toBe("show");
+    expect(
+      action.visibility(
+        makeContext({
+          stageName: "editor",
+          prefs: { developer_mode: false } as CommandContext["prefs"],
+        }),
+      ),
+    ).toBe("hidden");
+    expect(
+      action.visibility(
+        makeContext({
+          stageName: "welcome",
+          prefs: { developer_mode: true } as CommandContext["prefs"],
+        }),
+      ),
+    ).toBe("hidden");
   });
 
   it("views.show is editor-only and dispatches to onShowViews (MYND-274)", () => {

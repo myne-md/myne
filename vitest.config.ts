@@ -14,6 +14,15 @@ import { defineConfig } from "vitest/config";
 const src = (p: string) => resolve(process.cwd(), p);
 
 export default defineConfig({
+  // Vite's compile-time `define`s (vite.config.ts) don't apply here — Vitest
+  // has its own config, not an extension of vite.config.ts (this file's own
+  // header). AboutPanel.tsx references both directly, so a bare render throws
+  // `ReferenceError: __APP_VERSION__ is not defined` without these; the actual
+  // values are irrelevant to any test, so fixed stubs are fine.
+  define: {
+    __APP_VERSION__: JSON.stringify("test"),
+    __BUILD_COMMIT__: JSON.stringify("test"),
+  },
   // The shared editor/dialect engines are pnpm-workspace packages symlinked into
   // node_modules, which Vitest treats as EXTERNAL deps — so `vi.mock` hoisting is
   // skipped for their internal imports and test mocks of `@tauri-apps/api/*` and

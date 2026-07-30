@@ -27,6 +27,7 @@ import {
   setAiEnabled as persistAiEnabled,
   setAiExcludedFolders as persistAiExcludedFolders,
   setAutoLockTimeout,
+  setDeveloperMode as persistDeveloperMode,
   setEditorContentWidth,
   setEditorFontFamily,
   setEditorLineSpacing,
@@ -60,6 +61,7 @@ const DEFAULT_PREFS: PrefsView = {
   // would flash the wrong answer for effectively every vault.
   attachment_ocr_enabled: true,
   ai_excluded_folders: [],
+  developer_mode: false,
   archived_folders: [],
   auto_lock_seconds: null,
   active_workspace: null,
@@ -121,6 +123,8 @@ interface UsePrefsResult {
   setAiEnabled: (enabled: boolean) => Promise<void>;
   /** Replace the AI excluded-folders set (optimistic; same pattern). */
   setAiExcludedFolders: (folders: string[]) => Promise<void>;
+  /** Flip the Developer mode toggle (optimistic; same converge-on-error pattern). */
+  setDeveloperMode: (enabled: boolean) => Promise<void>;
   /**
    * Set the auto-lock-on-idle timeout (seconds). Optimistic: cache updates
    * immediately. On IPC rejection, the cache is re-read from disk
@@ -260,6 +264,27 @@ export function usePrefs(onError?: (message: string) => void): UsePrefsResult {
       setPrefs((p) => ({ ...p, ai_enabled: enabled }));
       try {
         await persistAiEnabled(enabled);
+      } catch {
+        try {
+          const view = await prefsRead();
+          setPrefs(view);
+        } catch {
+          // Re-read also failed — keep the optimistic value; the backend
+          // tracing logged the original failure. User can retry.
+        }
+        onError?.(i18n.t("settings.prefs.saveError"));
+      }
+    },
+    [onError],
+  );
+
+  // Developer mode toggle (`developer-mode` feature, MYND-593). Same
+  // optimistic-then-converge discipline as `setAiEnabledPref`.
+  const setDeveloperModePref = useCallback(
+    async (enabled: boolean) => {
+      setPrefs((p) => ({ ...p, developer_mode: enabled }));
+      try {
+        await persistDeveloperMode(enabled);
       } catch {
         try {
           const view = await prefsRead();
@@ -514,6 +539,7 @@ export function usePrefs(onError?: (message: string) => void): UsePrefsResult {
     toggleScreenCapture,
     setAiEnabled: setAiEnabledPref,
     setAiExcludedFolders: setAiExcludedFoldersPref,
+    setDeveloperMode: setDeveloperModePref,
     setAutoLock,
     setHiddenBarItems,
     setBarItemsOrder,

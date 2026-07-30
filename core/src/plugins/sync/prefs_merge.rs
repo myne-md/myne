@@ -334,6 +334,10 @@ pub fn merge_prefs(local: &PrefsView, remote: &PrefsView) -> PrefsView {
         auto_lock_seconds: local.auto_lock_seconds,
         bar_items_order: local.bar_items_order.clone(),
         custom_theme: local.custom_theme.clone(),
+        // developer-mode (MYND-593): device-local like `ai_enabled` — it gates
+        // a device-local model-path override, so a synced flag would read "on"
+        // on a device with no override behind it.
+        developer_mode: local.developer_mode,
         editor_content_width: local.editor_content_width.clone(),
         editor_default_view_mode: local.editor_default_view_mode.clone(),
         editor_focus_dim_inactive: local.editor_focus_dim_inactive,
@@ -716,6 +720,29 @@ mod tests {
         let merged = merge_prefs(&local, &remote);
         assert_eq!(merged.label.as_deref(), Some("Synced"));
         assert_eq!(merged.theme, None);
+    }
+
+    #[test]
+    fn developer_mode_is_device_local_local_wins_both_sides() {
+        // MYND-593: developer_mode gates a device-local model-path override,
+        // so — like ai_enabled / attachment_ocr_enabled — the local value
+        // must survive the merge regardless of which side is "on".
+        assert_eq!(classify("developer_mode"), Some(PrefClass::DeviceLocal));
+
+        let off = PrefsView::default();
+        let on = PrefsView {
+            developer_mode: true,
+            ..PrefsView::default()
+        };
+
+        assert!(
+            !merge_prefs(&off, &on).developer_mode,
+            "local off must stay off"
+        );
+        assert!(
+            merge_prefs(&on, &off).developer_mode,
+            "local on must stay on"
+        );
     }
 
     #[test]

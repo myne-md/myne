@@ -115,7 +115,7 @@
       "title": "Attachments",
       "transcribeDone": "Transcription complete.",
       "transcribeFailed": "Transcription failed. Please try again.",
-      "transcribeNoModel": "Select a transcription model in Settings → Labs → AI.",
+      "transcribeNoModel": "Select a transcription model in Settings → Developer → AI.",
       "transcribeStarted": "Transcribing…",
       "typeFilter": {
         "all": "All types",
@@ -734,11 +734,11 @@
           "deletedLabel": "deleted"
         },
         "transcribe": {
-          "disabledReason": "Enable AI in Settings → Labs → AI to transcribe.",
+          "disabledReason": "Enable AI in Settings → Developer → AI to transcribe.",
           "failed": "Transcription failed. Please try again.",
           "heading": "Transcript",
           "insert": "Insert transcript into note",
-          "noModelHint": "Select a transcription model in Settings → Labs → AI.",
+          "noModelHint": "Select a transcription model in Settings → Developer → AI.",
           "progress": "Transcribing…",
           "stop": "Stop"
         },
@@ -868,8 +868,8 @@
           "gettingReadyHint": "Preparing your notes for AI — one moment.",
           "insert": "Insert into note",
           "noAnswer": "No answer — try rephrasing.",
-          "noModelHint": "No model selected. Choose one in Settings → Labs → AI to start.",
-          "offHint": "Local AI is off. Turn it on in Settings → Labs → AI.",
+          "noModelHint": "No model selected. Choose one in Settings → Developer → AI to start.",
+          "offHint": "Local AI is off. Turn it on in Settings → Developer → AI.",
           "send": "Send",
           "statusGettingReady": "Preparing…",
           "statusNoModel": "No model",
@@ -2075,6 +2075,8 @@
       "changelogButton": "View changelog…",
       "changelogHelper": "Per-version notes. Will appear when MYND-119 lands.",
       "changelogLabel": "Changelog",
+      "developerModeHelper": "Turning this on lets you replace a model Myne has verified with one you supply yourself. It still runs entirely on your device and sends nothing over the network — but Myne does not vouch for what you provide.",
+      "developerModeLabel": "Developer mode",
       "licenseBody": "Pre-alpha · CC-BY-4.0 docs · AGPL-3.0 application code on Phase 1 release.",
       "licenseLabel": "License",
       "tagline": "Pre-alpha · Phase 1 desktop client",
@@ -2407,7 +2409,6 @@
       "pendingHint": "Coming soon"
     },
     "ai": {
-      "betaBadge": "Beta",
       "disclosureToggle": "How does this work?",
       "enableHelper": "Runs a model you provide entirely on your device. Experimental, off by default.",
       "enableLabel": "Enable local AI",
@@ -2511,7 +2512,7 @@
     "shell": {
       "closeLabel": "Close settings",
       "groups": {
-        "labs": "Labs"
+        "developer": "Developer"
       },
       "navLabel": "Settings panels",
       "panels": {

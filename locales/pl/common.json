@@ -125,7 +125,7 @@
       "title": "Załączniki",
       "transcribeDone": "Transkrypcja zakończona.",
       "transcribeFailed": "Transkrypcja nie powiodła się. Spróbuj ponownie.",
-      "transcribeNoModel": "Wybierz model transkrypcji w Ustawienia → Labs → AI.",
+      "transcribeNoModel": "Wybierz model transkrypcji w Ustawienia → Developer → AI.",
       "transcribeStarted": "Transkrybowanie…",
       "typeFilter": {
         "all": "Wszystkie typy",
@@ -758,11 +758,11 @@
           "deletedLabel": "usunięty"
         },
         "transcribe": {
-          "disabledReason": "Włącz AI w Ustawienia → Labs → AI, aby transkrybować.",
+          "disabledReason": "Włącz AI w Ustawienia → Developer → AI, aby transkrybować.",
           "failed": "Transkrypcja nie powiodła się. Spróbuj ponownie.",
           "heading": "Transkrypcja",
           "insert": "Wstaw transkrypcję do notatki",
-          "noModelHint": "Wybierz model transkrypcji w Ustawienia → Labs → AI.",
+          "noModelHint": "Wybierz model transkrypcji w Ustawienia → Developer → AI.",
           "progress": "Transkrybowanie…",
           "stop": "Zatrzymaj"
         },
@@ -911,8 +911,8 @@
           "gettingReadyHint": "Przygotowywanie notatek dla AI — chwileczkę.",
           "insert": "Wstaw do notatki",
           "noAnswer": "Brak odpowiedzi — spróbuj przeformułować.",
-          "noModelHint": "Nie wybrano modelu. Wybierz go w Ustawienia → Labs → AI, aby rozpocząć.",
-          "offHint": "Lokalne AI jest wyłączone. Włącz je w Ustawienia → Labs → AI.",
+          "noModelHint": "Nie wybrano modelu. Wybierz go w Ustawienia → Developer → AI, aby rozpocząć.",
+          "offHint": "Lokalne AI jest wyłączone. Włącz je w Ustawienia → Developer → AI.",
           "send": "Wyślij",
           "statusGettingReady": "Przygotowywanie…",
           "statusNoModel": "Brak modelu",
@@ -2132,6 +2132,8 @@
       "changelogButton": "Wyświetl listę zmian…",
       "changelogHelper": "Notatki dla poszczególnych wersji. Pojawią się po wdrożeniu MYND-119.",
       "changelogLabel": "Lista zmian",
+      "developerModeHelper": "",
+      "developerModeLabel": "",
       "licenseBody": "Pre-alfa · dokumentacja CC-BY-4.0 · kod aplikacji AGPL-3.0 w wydaniu Fazy 1.",
       "licenseLabel": "Licencja",
       "tagline": "Pre-alfa · klient desktopowy Fazy 1",
@@ -2471,7 +2473,6 @@
       "pendingHint": "Wkrótce"
     },
     "ai": {
-      "betaBadge": "Beta",
       "disclosureToggle": "Jak to działa?",
       "enableHelper": "Uruchamia dostarczony przez Ciebie model w całości na Twoim urządzeniu. Eksperymentalne, domyślnie wyłączone.",
       "enableLabel": "Włącz lokalne AI",
@@ -2568,7 +2569,7 @@
     "shell": {
       "closeLabel": "Zamknij ustawienia",
       "groups": {
-        "labs": "Labs"
+        "developer": ""
       },
       "navLabel": "Panele ustawień",
       "panels": {

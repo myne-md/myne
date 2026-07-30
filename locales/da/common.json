@@ -115,7 +115,7 @@
       "title": "Vedhæftede filer",
       "transcribeDone": "Transskription fuldført.",
       "transcribeFailed": "Transskription mislykkedes. Prøv igen.",
-      "transcribeNoModel": "Vælg en transskriptionsmodel under Indstillinger → Labs → AI.",
+      "transcribeNoModel": "Vælg en transskriptionsmodel under Indstillinger → Developer → AI.",
       "transcribeStarted": "Transskriberer…",
       "typeFilter": {
         "all": "Alle typer",
@@ -730,11 +730,11 @@
           "deletedLabel": "slettet"
         },
         "transcribe": {
-          "disabledReason": "Aktivér AI under Indstillinger → Labs → AI for at transskribere.",
+          "disabledReason": "Aktivér AI under Indstillinger → Developer → AI for at transskribere.",
           "failed": "Transskription mislykkedes. Prøv igen.",
           "heading": "Transskription",
           "insert": "Indsæt transskription i noten",
-          "noModelHint": "Vælg en transskriptionsmodel under Indstillinger → Labs → AI.",
+          "noModelHint": "Vælg en transskriptionsmodel under Indstillinger → Developer → AI.",
           "progress": "Transskriberer…",
           "stop": "Stop"
         },
@@ -865,8 +865,8 @@
           "gettingReadyHint": "Forbereder dine noter til AI — et øjeblik.",
           "insert": "Indsæt i note",
           "noAnswer": "Intet svar — prøv at omformulere.",
-          "noModelHint": "Ingen model valgt. Vælg en under Indstillinger → Labs → AI for at starte.",
-          "offHint": "Lokal AI er slået fra. Slå den til under Indstillinger → Labs → AI.",
+          "noModelHint": "Ingen model valgt. Vælg en under Indstillinger → Developer → AI for at starte.",
+          "offHint": "Lokal AI er slået fra. Slå den til under Indstillinger → Developer → AI.",
           "send": "Send",
           "statusGettingReady": "Forbereder…",
           "statusNoModel": "Ingen model",
@@ -2012,6 +2012,8 @@
       "changelogButton": "Vis ændringslog…",
       "changelogHelper": "Noter pr. version. Vises, når MYND-119 lander.",
       "changelogLabel": "Ændringslog",
+      "developerModeHelper": "",
+      "developerModeLabel": "",
       "licenseBody": "Pre-alfa · CC-BY-4.0-dokumenter · AGPL-3.0-programkode ved fase 1-udgivelse.",
       "licenseLabel": "Licens",
       "tagline": "Pre-alfa · Fase 1 desktopklient",
@@ -2341,7 +2343,6 @@
       "pendingHint": "Kommer snart"
     },
     "ai": {
-      "betaBadge": "Beta",
       "disclosureToggle": "Hvordan fungerer det?",
       "enableHelper": "Kører en model, du selv leverer, helt på din enhed. Eksperimentel, slået fra som standard.",
       "enableLabel": "Aktivér lokal AI",
@@ -2434,7 +2435,7 @@
     "shell": {
       "closeLabel": "Luk indstillinger",
       "groups": {
-        "labs": "Labs"
+        "developer": ""
       },
       "navLabel": "Indstillingspaneler",
       "panels": {

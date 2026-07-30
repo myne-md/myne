@@ -115,7 +115,7 @@
       "title": "Tệp đính kèm",
       "transcribeDone": "Đã chép lời xong.",
       "transcribeFailed": "Chép lời thất bại. Vui lòng thử lại.",
-      "transcribeNoModel": "Chọn một mô hình chép lời trong Cài đặt → Labs → AI.",
+      "transcribeNoModel": "Chọn một mô hình chép lời trong Cài đặt → Developer → AI.",
       "transcribeStarted": "Đang chép lời…",
       "typeFilter": {
         "all": "Tất cả các loại",
@@ -730,11 +730,11 @@
           "deletedLabel": "đã xóa"
         },
         "transcribe": {
-          "disabledReason": "Bật AI trong Cài đặt → Labs → AI để chép lời.",
+          "disabledReason": "Bật AI trong Cài đặt → Developer → AI để chép lời.",
           "failed": "Chép lời thất bại. Vui lòng thử lại.",
           "heading": "Bản chép lời",
           "insert": "Chèn bản chép lời vào ghi chú",
-          "noModelHint": "Chọn một mô hình chép lời trong Cài đặt → Labs → AI.",
+          "noModelHint": "Chọn một mô hình chép lời trong Cài đặt → Developer → AI.",
           "progress": "Đang chép lời…",
           "stop": "Dừng"
         },
@@ -865,8 +865,8 @@
           "gettingReadyHint": "Đang chuẩn bị ghi chú của bạn cho AI — chờ một chút.",
           "insert": "Chèn vào ghi chú",
           "noAnswer": "Không có câu trả lời — thử diễn đạt lại.",
-          "noModelHint": "Chưa chọn mô hình. Chọn một mô hình trong Cài đặt → Labs → AI để bắt đầu.",
-          "offHint": "AI cục bộ đang tắt. Bật nó trong Cài đặt → Labs → AI.",
+          "noModelHint": "Chưa chọn mô hình. Chọn một mô hình trong Cài đặt → Developer → AI để bắt đầu.",
+          "offHint": "AI cục bộ đang tắt. Bật nó trong Cài đặt → Developer → AI.",
           "send": "Gửi",
           "statusGettingReady": "Đang chuẩn bị…",
           "statusNoModel": "Không có mô hình",
@@ -2012,6 +2012,8 @@
       "changelogButton": "Xem nhật ký thay đổi…",
       "changelogHelper": "Ghi chú theo từng phiên bản. Sẽ xuất hiện khi MYND-119 hoàn thành.",
       "changelogLabel": "Nhật ký thay đổi",
+      "developerModeHelper": "",
+      "developerModeLabel": "",
       "licenseBody": "Tiền alpha · Tài liệu CC-BY-4.0 · Mã ứng dụng AGPL-3.0 khi phát hành Giai đoạn 1.",
       "licenseLabel": "Giấy phép",
       "tagline": "Tiền alpha · Trình khách máy tính Giai đoạn 1",
@@ -2341,7 +2343,6 @@
       "pendingHint": "Sắp ra mắt"
     },
     "ai": {
-      "betaBadge": "Beta",
       "disclosureToggle": "Cách này hoạt động thế nào?",
       "enableHelper": "Chạy một mô hình do bạn cung cấp hoàn toàn trên thiết bị của bạn. Thử nghiệm, tắt theo mặc định.",
       "enableLabel": "Bật AI cục bộ",
@@ -2434,7 +2435,7 @@
     "shell": {
       "closeLabel": "Đóng cài đặt",
       "groups": {
-        "labs": "Labs"
+        "developer": ""
       },
       "navLabel": "Bảng cài đặt",
       "panels": {

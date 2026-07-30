@@ -77,6 +77,10 @@ pub const CLASSIFICATION: &[(&str, PrefClass)] = &[
         "deliberate_folders",
         PrefClass::Shared(SharedDiscipline::SetUnion),
     ),
+    // developer-mode (MYND-593): gates a device-local model-path override, so
+    // a synced flag would read "on" on a device with no override behind it —
+    // same reasoning as `ai_enabled` / `attachment_ocr_enabled`.
+    ("developer_mode", PrefClass::DeviceLocal),
     (
         "device_names",
         PrefClass::Shared(SharedDiscipline::PerKeyMapMerge),
@@ -210,6 +214,7 @@ mod tests {
             daily_folder: _,
             daily_template: _,
             deliberate_folders: _,
+            developer_mode: _,
             device_names: _,
             editor_content_width: _,
             editor_default_view_mode: _,
@@ -273,6 +278,7 @@ mod tests {
             "daily_folder",
             "daily_template",
             "deliberate_folders",
+            "developer_mode",
             "device_names",
             "editor_content_width",
             "editor_default_view_mode",
