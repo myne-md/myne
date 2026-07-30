@@ -23,6 +23,12 @@ vi.mock("../../src/lib/prefs", () => ({
   setDailyFolder: (...a: unknown[]) => setDailyFolder(...a),
   setDailyTemplate: (...a: unknown[]) => setDailyTemplate(...a),
 }));
+// The folder PICKER (MYND-624) enumerates the vault; these tests are about the
+// persistence wiring, so stub it empty and exercise the free-text fallback the
+// component renders for a vault with no folders yet.
+vi.mock("../../src/notes/listFolderPaths", () => ({
+  listFolderPaths: () => Promise.resolve([]),
+}));
 vi.mock("../../src/notes", () => ({
   listTemplates: (...a: unknown[]) => listTemplates(...a),
   DEFAULT_DAILY_FOLDER: "Daily/",

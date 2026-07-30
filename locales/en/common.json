@@ -1040,7 +1040,15 @@
         "green": "Green",
         "pink": "Pink",
         "purple": "Purple",
-        "yellow": "Yellow"
+        "yellow": "Yellow",
+        "orange": "Orange",
+        "red": "Red",
+        "teal": "Teal",
+        "cyan": "Cyan",
+        "lime": "Lime",
+        "brown": "Brown",
+        "grey": "Grey",
+        "indigo": "Indigo"
       },
       "urlPlaceholder": "Paste link URL"
     },
@@ -1557,7 +1565,8 @@
         "titlePick": "Import notes",
         "keepsLabel": "What comes across",
         "losesLabel": "What doesn't",
-        "changeSource": "Change source"
+        "changeSource": "Change source",
+        "statExcalidrawSkipped": "Excalidraw drawings skipped"
       },
       "offer": {
         "body": "Bring your existing notes into Myne. Each one is encrypted as it’s imported — nothing leaves this device, and your original files stay exactly where they are.",
@@ -1621,6 +1630,7 @@
       "bulkDelete": "Delete {{count}} notes",
       "bulkDelete_one": "Delete {{count}} note",
       "bulkDelete_other": "Delete {{count}} notes",
+      "moveTo": "Move to…",
       "bulkMove": "Move {{count}} notes to…",
       "bulkMove_one": "Move {{count}} note to…",
       "bulkMove_other": "Move {{count}} notes to…",
@@ -1682,7 +1692,11 @@
       "trashSingleError": "Couldn't move the note to Trash.",
       "undo": "Undo",
       "vaultRoot": "Vault root",
-      "viewSettingsTitle": "View settings"
+      "viewSettingsTitle": "View settings",
+      "imported_one": "Imported 1 note into this folder",
+      "imported_other": "Imported {{count}} notes into this folder",
+      "importedWithSkips": "Imported {{count}} — {{skipped}} skipped",
+      "importNoMarkdown": "No markdown files in that drop"
     },
     "newFromTemplate": {
       "back": "Back",
@@ -2552,6 +2566,8 @@
       "lineSpacingHelper": "Vertical space between lines.",
       "lineSpacingLabel": "Line spacing",
       "textSizeHelper": "Base size of the editor text. Headings scale with it.",
+      "previewLabel": "Preview",
+      "previewBody": "The quick brown fox jumps over the lazy dog. Typography settings change how every note reads, so this sample updates as you choose.",
       "textSizeLabel": "Text size"
     },
     "viewMode": {
@@ -2595,6 +2611,12 @@
     "sectionOptions": "Options",
     "footerTagline": "myne · encrypted on this device · open source",
     "editor": {
+      "sections": {
+        "text": "Text & display",
+        "editing": "Editing",
+        "writing": "Writing",
+        "features": "Features"
+      },
       "defaultView": "Default view",
       "typewriter": "Typewriter scrolling",
       "typewriterSubtitle": "Keep the caret vertically centered",

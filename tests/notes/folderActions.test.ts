@@ -39,6 +39,27 @@ describe("planFolderDelete — collects the subtree's notes (no longer blocks)",
     expect(plan.noteIds).toEqual(["n1"]);
   });
 
+  // MYND-599: the folder note is EXCLUDED from `FolderNode.noteIds` (it is
+  // hidden from the sidebar tree), so a collector that walked `noteIds` alone
+  // left behind the one note keeping the folder alive — the delete appeared to
+  // do nothing, and archive-then-trash was the only path that worked.
+  it("collects a folder's own folder note, which is hidden from noteIds", () => {
+    const t = tree([
+      { noteUuid: "idx", folder: "Projects/", folderIndex: true },
+      { noteUuid: "n1", folder: "Projects/" },
+    ]);
+    const plan = planFolderDelete("Projects/", t, []);
+    expect(plan.noteIds.sort()).toEqual(["idx", "n1"]);
+  });
+
+  it("collects a DESCENDANT folder's folder note too", () => {
+    const t = tree([
+      { noteUuid: "deep", folder: "Projects/Myne/", folderIndex: true },
+    ]);
+    const plan = planFolderDelete("Projects/", t, []);
+    expect(plan.noteIds).toEqual(["deep"]);
+  });
+
   it("collects every note across the whole subtree, not its siblings", () => {
     const t = tree([
       { noteUuid: "a", folder: "Projects/" },

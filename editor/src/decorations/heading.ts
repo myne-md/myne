@@ -19,7 +19,7 @@ import {
   type DecorationSet,
   EditorView,
 } from "@codemirror/view";
-import { isCursorLine } from "./cursor-aware";
+import { isInsideRange } from "./cursor-aware";
 import { makeCursorAwareDecorationPlugin } from "./plugin-factory";
 
 const HEADING_NODE_BY_LEVEL: Record<number, string> = {
@@ -55,11 +55,17 @@ function buildHeadingDecorations(view: EditorView): DecorationSet {
           lineDecorations.push(
             Decoration.line({ class: HEADING_CLASS[level] }).range(line.from),
           );
-          if (!isCursorLine(view, node.from, node.to)) {
-            // Find the trailing HeaderMark range plus the following space.
-            const child = node.node.firstChild;
-            if (child !== null && child.name === "HeaderMark") {
-              const markEnd = Math.min(child.to + 1, node.to);
+          // MYND-631: the `##` marker lifts only when the caret is IN it, not
+          // anywhere on the line. Putting the caret in a heading to edit its
+          // text used to flip the whole row to raw markdown and shove the text
+          // sideways by the marker's width — a visible jolt on every heading
+          // you touch. This is the treatment task checkboxes already had (raw
+          // only inside the box); the rendered typography never lifts either
+          // way, so the row keeps its shape while you type in it.
+          const child = node.node.firstChild;
+          if (child !== null && child.name === "HeaderMark") {
+            const markEnd = Math.min(child.to + 1, node.to);
+            if (!isInsideRange(view, child.from, markEnd)) {
               markDecorations.push(
                 Decoration.replace({}).range(child.from, markEnd),
               );

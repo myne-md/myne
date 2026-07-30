@@ -11,6 +11,7 @@ import { listen } from "./event";
 export function getCurrentWindow(): {
   destroy: () => Promise<void>;
   isFullscreen: () => Promise<boolean>;
+  show: () => Promise<void>;
   listen: (name: string, handler: (e: unknown) => void) => Promise<() => void>;
 } {
   return {
@@ -33,6 +34,20 @@ export function getCurrentWindow(): {
      * question the caller is actually asking (is chrome hidden from the user).
      */
     isFullscreen: async () => document.fullscreenElement !== null,
+
+    /**
+     * **Refused.** The desktop counterpart reveals a window that idle auto-lock
+     * hid with `orderOut:` (MYND-121/MYND-628, `src/hooks/useRevealAfterIdleLock.ts`).
+     * A page has no hidden window to reveal: web auto-lock zeroizes and re-renders
+     * the locked surface in the same tab, which was never taken away.
+     *
+     * The refusal is typed rather than a no-op `async () => {}` on purpose. A
+     * silent success would claim the reveal happened, and the one caller treats
+     * a throw as "not inside Tauri, nothing actionable" — which is exactly the
+     * right outcome here — so the refusal reads correctly at the call site while
+     * a stub would make a future second caller believe it worked.
+     */
+    show: async () => unsupported("window.show"),
 
     /**
      * Window-scoped events route through the same Worker event bus as
