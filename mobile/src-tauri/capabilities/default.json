@@ -27,6 +27,7 @@
     "export:default",
     "secret-export:default",
     "sync:default",
-    "qr-scan:default"
+    "qr-scan:default",
+    "reminders:default"
   ]
 }

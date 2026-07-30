@@ -58,6 +58,24 @@ export default defineConfig(async () => ({
       // presentational wrappers (FolderGlyph, ColorDot) stay mobile-local.
       { find: /^@myne\/decorations$/, replacement: sib("../src/notes/decorations.ts") },
       { find: /^@myne\/decorations\/folderIcons$/, replacement: sib("../src/notes/folderIcons.ts") },
+      // The reminder scheduling DECISION CORE (MYND-619 task 5). Shared for the
+      // same reason as the decoration vocabulary, and with more at stake: what
+      // it decides is which reminders the operating system is currently holding,
+      // and a second copy of "compute the target set, diff it, cancel before you
+      // schedule" would be two answers to a question the epic insists has one.
+      // Mobile adds a bound on top (`src/lib/reminderPass.ts`) rather than
+      // reimplementing any of it.
+      // Safe to alias despite living in Tauri-coupled `../src/lib/`: this module's
+      // ONLY import is `import type { VaultTask }`, which erases at compile time,
+      // so nothing from the desktop app tree reaches the mobile bundle. It costs
+      // ~0.7s of typecheck. Exact specifier, no wildcard — `../src/lib/` is full
+      // of modules that would drag `@tauri-apps/*` in.
+      { find: /^@myne\/reminder-schedule$/, replacement: sib("../src/lib/reminderSchedule.ts") },
+      { find: /^@myne\/task-panel$/, replacement: sib("../src/notes/components/TaskListPanel.tsx") },
+      { find: /^@myne\/task-filters$/, replacement: sib("../src/notes/taskFilters.ts") },
+      { find: /^@myne\/task-scope$/, replacement: sib("../src/notes/taskScope.ts") },
+      { find: /^@myne\/task-write$/, replacement: sib("../src/notes/taskWriteCore.ts") },
+      { find: /^@myne\/note-completion$/, replacement: sib("../src/notes/completeNoteCore.ts") },
     ],
     // The aliased editor source lives OUTSIDE this repo (../editor/src), so its
     // bare-specifier imports could otherwise resolve to the parent repo's

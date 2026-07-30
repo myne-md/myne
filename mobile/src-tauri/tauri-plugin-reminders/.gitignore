@@ -1,0 +1,17 @@
+# Generated / machine-specific build artifacts — never committed (the
+# `tauri-plugin-qr-scan` `.gitignore` discipline; the gradle module keeps its
+# own `android/.gitignore`, matching screen-guard / share-intent).
+# `.tauri/` is the generated Tauri-API surface; `ios/.build/` holds SwiftPM +
+# SourceKit index output (incl. binary `*.mdb`); `Package.resolved` re-resolves
+# from the local `../.tauri/tauri-api` path at each build.
+/.tauri
+/ios/.build
+/ios/Package.resolved
+# Created by an ISOLATED Swift compile of this package, which is worth doing and
+# is recorded in the feature's progress notes:
+#   cd ios && xcodebuild build -scheme tauri-plugin-reminders \
+#     -destination 'generic/platform=iOS' -derivedDataPath <scratch>
+# It needs `../.tauri/tauri-api` to exist, which any `cargo check` of this crate
+# materializes. That is the only way the Swift half gets a compiler at all
+# without a full `tauri ios build`.
+/ios/.swiftpm
