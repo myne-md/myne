@@ -364,6 +364,25 @@ function buildFrontmatterDecorations(
   return builder.finish();
 }
 
+/**
+ * Mirror the block-replace range into a PLAIN-replace range set for
+ * `EditorView.atomicRanges` (MYND-608). The frontmatter field already re-tracks
+ * the range on every doc change, so we derive from it rather than re-walking the
+ * document; it holds at most one range, so no syntax-tree cache is needed (unlike
+ * the table/attachment widgets). Re-emitted as a plain `Decoration.replace({})`
+ * because the `block: true` layout role is irrelevant to atomicity — the three
+ * sibling widgets register the same plain shape.
+ */
+function frontmatterAtomicRanges(set: DecorationSet): DecorationSet {
+  const builder = new RangeSetBuilder<Decoration>();
+  const iter = set.iter();
+  while (iter.value !== null) {
+    builder.add(iter.from, iter.to, Decoration.replace({}));
+    iter.next();
+  }
+  return builder.finish();
+}
+
 const frontmatterField = StateField.define<DecorationSet>({
   create(state) {
     return buildFrontmatterDecorations(state);
@@ -373,7 +392,18 @@ const frontmatterField = StateField.define<DecorationSet>({
     return buildFrontmatterDecorations(tr.state);
   },
   provide(field) {
-    return EditorView.decorations.from(field);
+    return [
+      EditorView.decorations.from(field),
+      // The block-replace alone still lets cursor motion / selection / Backspace
+      // enter the hidden frontmatter source (`folder:`/`updated:` — two silent-
+      // corruption paths). Registering the SAME span with atomicRanges makes CM6
+      // treat the Properties block as one indivisible unit, exactly like the
+      // attachment/wikilink/table widgets. Editing rides only through the
+      // widget's own inputs (`ignoreEvent()` returns true).
+      EditorView.atomicRanges.of((view) =>
+        frontmatterAtomicRanges(view.state.field(field)),
+      ),
+    ];
   },
 });
 
