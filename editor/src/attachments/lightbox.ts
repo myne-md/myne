@@ -21,6 +21,8 @@ import { ensureAttachmentInsertStyles, hasDom } from "./styles";
 import { mountPdfScroller } from "./pdf-reader";
 import { canExportAttachment } from "@myne/editor/host/lib/attachments";
 import { exportAttachment } from "./fileCardActions";
+import { mountImageZoom, type ImageZoomController } from "./image-zoom-controller";
+import { ZOOM_STEP } from "./image-zoom";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 
@@ -52,6 +54,59 @@ function makeCloseIcon(): SVGSVGElement {
   return svg;
 }
 
+/**
+ * Build the floating − / percentage / + zoom controls (ED-08). The percentage
+ * doubles as a reset-to-fit button. Shared by the image and PDF surfaces; the
+ * caller wires the three handlers and pushes updates through `setPercent`.
+ */
+function buildZoomControls(handlers: {
+  onZoomOut: () => void;
+  onZoomIn: () => void;
+  onReset: () => void;
+}): { el: HTMLDivElement; setPercent: (pct: number) => void } {
+  const controls = document.createElement("div");
+  controls.className = "cm-attach-lightbox-zoom";
+  const mkBtn = (
+    label: string,
+    aria: string,
+    testid: string,
+    onClick: () => void,
+  ): HTMLButtonElement => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "cm-attach-lightbox-zoom-btn";
+    b.setAttribute("aria-label", aria);
+    b.setAttribute("data-testid", testid);
+    b.textContent = label;
+    b.addEventListener("click", (e) => {
+      e.stopPropagation();
+      onClick();
+    });
+    return b;
+  };
+  const pctBtn = document.createElement("button");
+  pctBtn.type = "button";
+  pctBtn.className = "cm-attach-lightbox-zoom-pct";
+  pctBtn.setAttribute("data-testid", "attachment-lightbox.zoom-percent");
+  pctBtn.setAttribute("aria-label", i18n.t("editor.attachment.lightbox.zoomReset"));
+  pctBtn.setAttribute("aria-live", "polite");
+  pctBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    handlers.onReset();
+  });
+  controls.append(
+    mkBtn("−", i18n.t("editor.attachment.lightbox.zoomOut"), "attachment-lightbox.zoom-out", handlers.onZoomOut),
+    pctBtn,
+    mkBtn("+", i18n.t("editor.attachment.lightbox.zoomIn"), "attachment-lightbox.zoom-in", handlers.onZoomIn),
+  );
+  return {
+    el: controls,
+    setPercent: (pct) => {
+      pctBtn.textContent = `${pct}%`;
+    },
+  };
+}
+
 /** What to show: the decrypted-bytes URL + an accessible label. */
 export interface LightboxOptions {
   /** The `attachment://<id>` URL of the full-size image / PDF bytes. */
@@ -72,6 +127,9 @@ let activeClose: (() => void) | null = null;
 // Cleanup for an open PDF reader (task.destroy + observer disconnect). Null for
 // image mode / when nothing is open.
 let activePdfCleanup: (() => void) | null = null;
+// Zoom/pan controller for an open image lightbox (removes its listeners). Null
+// for PDF mode / when nothing is open (MYND-594).
+let activeImageZoom: ImageZoomController | null = null;
 
 /** Tear down any open lightbox (Esc / backdrop click / replace / test cleanup). */
 export function dismissAttachmentLightbox(): void {
@@ -80,6 +138,10 @@ export function dismissAttachmentLightbox(): void {
     // (activeClose removes the backdrop).
     activePdfCleanup();
     activePdfCleanup = null;
+  }
+  if (activeImageZoom !== null) {
+    activeImageZoom.destroy();
+    activeImageZoom = null;
   }
   activeClose?.();
   activeClose = null;
@@ -131,10 +193,30 @@ export function showAttachmentLightbox(opts: LightboxOptions): void {
   } else {
     const img = document.createElement("img");
     img.className = "cm-attach-lightbox-img";
+    img.setAttribute("data-testid", "attachment-lightbox.image");
     // Same decrypted-bytes source as the inline chip; never a remote fetch.
     img.src = opts.url;
     img.alt = opts.alt;
+    img.draggable = false; // we own drag → pan; suppress the native image drag
     backdrop.appendChild(img);
+
+    // Zoom/pan controls (ED-08 design: − / percentage / +), floating bottom-
+    // centre. Wheel / pinch / double-tap / keyboard are wired by the controller
+    // (MYND-594); the buttons drive the same API. Build the controls FIRST so
+    // `controls.setPercent` is passed straight into the controller: a cached
+    // image reports `complete` synchronously, so the controller can initialise
+    // (and emit its first percentage) DURING `mountImageZoom` — a later-assigned
+    // setter would drop that initial readout.
+    let zoomRef: ImageZoomController | null = null;
+    const controls = buildZoomControls({
+      onZoomOut: () => zoomRef?.zoomOut(),
+      onZoomIn: () => zoomRef?.zoomIn(),
+      onReset: () => zoomRef?.reset(),
+    });
+    const zoom = mountImageZoom(backdrop, img, controls.setPercent);
+    zoomRef = zoom;
+    activeImageZoom = zoom;
+    backdrop.appendChild(controls.el);
   }
 
   // Vault-wide Export (Save As) affordance (MYND-173): present whenever the
@@ -191,19 +273,59 @@ export function showAttachmentLightbox(opts: LightboxOptions): void {
     // surfaces stay wide, so this still resolves to the 900 cap there.
     const padX = parseFloat(getComputedStyle(surface).paddingLeft) || 0;
     const avail = surface.clientWidth - padX * 2;
-    const pageWidth = avail > 0 ? Math.max(240, Math.min(LIGHTBOX_PDF_PAGE_WIDTH, Math.floor(avail))) : LIGHTBOX_PDF_PAGE_WIDTH;
-    activePdfCleanup = mountPdfScroller(surface, {
-      url: opts.url,
-      pageWidth,
-      onError: () => {
-        // Reader failed to load/parse → swap in the generic-PDF-icon fallback so
-        // the lightbox isn't an empty box. DENY-list-safe; already warned.
-        const fb = document.createElement("div");
-        fb.className = "cm-attach-lightbox-pdf-fallback";
-        fb.textContent = i18n.t("editor.attachment.lightbox.pdfFallback");
-        surface.replaceChildren(fb);
-      },
+    const basePageWidth = avail > 0 ? Math.max(240, Math.min(LIGHTBOX_PDF_PAGE_WIDTH, Math.floor(avail))) : LIGHTBOX_PDF_PAGE_WIDTH;
+
+    // User scale control (MYND-594): 100% = fit-to-width (the reader's baseline),
+    // up to 4×. A scale change re-renders pages through pdf.js at the new width —
+    // a true resolution zoom, not a CSS upscale — preserving scroll position.
+    const PDF_MIN_SCALE = 1;
+    const PDF_MAX_SCALE = 4;
+    let pdfScale = 1;
+    let setPdfPercent: (pct: number) => void = () => {};
+    const mountAtScale = (next: number): void => {
+      pdfScale = Math.min(PDF_MAX_SCALE, Math.max(PDF_MIN_SCALE, next));
+      const ratio = surface.scrollHeight > 0 ? surface.scrollTop / surface.scrollHeight : 0;
+      if (activePdfCleanup !== null) activePdfCleanup();
+      activePdfCleanup = mountPdfScroller(surface, {
+        url: opts.url,
+        pageWidth: Math.round(basePageWidth * pdfScale),
+        onError: () => {
+          // Reader failed to load/parse → swap in the generic-PDF-icon fallback
+          // so the lightbox isn't an empty box. DENY-list-safe; already warned.
+          const fb = document.createElement("div");
+          fb.className = "cm-attach-lightbox-pdf-fallback";
+          fb.textContent = i18n.t("editor.attachment.lightbox.pdfFallback");
+          surface.replaceChildren(fb);
+        },
+      });
+      // Restore the scroll position (proportionally) after the new layout settles.
+      requestAnimationFrame(() => {
+        surface.scrollTop = ratio * surface.scrollHeight;
+      });
+      setPdfPercent(Math.round(pdfScale * 100));
+    };
+    const pdfControls = buildZoomControls({
+      onZoomOut: () => mountAtScale(pdfScale / ZOOM_STEP),
+      onZoomIn: () => mountAtScale(pdfScale * ZOOM_STEP),
+      onReset: () => mountAtScale(1),
     });
+    setPdfPercent = pdfControls.setPercent;
+    backdrop.appendChild(pdfControls.el);
+    // Keyboard parity with the image reader: +/− scale, 0 resets to fit. Bound to
+    // the backdrop (focus-trapped), removed with it on dismiss.
+    backdrop.addEventListener("keydown", (e) => {
+      if (e.key === "+" || e.key === "=") {
+        e.preventDefault();
+        mountAtScale(pdfScale * ZOOM_STEP);
+      } else if (e.key === "-" || e.key === "_") {
+        e.preventDefault();
+        mountAtScale(pdfScale / ZOOM_STEP);
+      } else if (e.key === "0") {
+        e.preventDefault();
+        mountAtScale(1);
+      }
+    });
+    mountAtScale(1);
   }
 
   // Trap + restore focus (MYND-93). Esc + backdrop-click dismissal are already
