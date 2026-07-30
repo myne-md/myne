@@ -2675,7 +2675,11 @@ export function EditorFlow({ vaultId, onLock, onCreateVault, onSwitchVault, onDe
     <>
       {/* SF5 share-import confirmation toast (§9.20, SYNC-18) — self-contained,
           listens for the drain result; renders in every layout branch. */}
-      <ShareImportToast />
+      {/* MYND-640: tapping the toast opens the library the share landed in.
+          Without it the only signal a share arrived was a sentence that
+          disappeared after a few seconds, pointing at a place the user had no
+          reason to open. */}
+      <ShareImportToast onOpenLibrary={() => setTab("files")} />
       {purgeId != null && (
         <Sheet onClose={() => setPurgeId(null)}>
           {(close) => (

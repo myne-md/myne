@@ -42,6 +42,30 @@ test.describe("OS share-sheet drain", () => {
     expect(await readShareDrains(page)).toBeGreaterThan(0);
   });
 
+  test("tapping the confirmation toast opens the library the share landed in (MYND-640)", async ({ page }) => {
+    await installMockIpc(page, {
+      pendingShares: [
+        { id: "a".repeat(32), filename: "receipt.pdf", deduplicated: false },
+        { id: "b".repeat(32), filename: "photo.png", deduplicated: false },
+      ],
+    });
+    await page.goto("/");
+    await expect(page.getByRole("button", { name: "Settings" }).first()).toBeVisible();
+
+    const toast = page.getByTestId("share-import-toast");
+    await expect(toast).toBeVisible();
+
+    // The toast is the ONLY route to the imported file (the drain files it into
+    // the attachment library, not where the user was looking). Tapping it must
+    // open the Files library and dismiss the toast. Regression guard for the
+    // pointer-events fix: the confirmation is a real <button> whose pointer
+    // events are enabled — before the fix the full-width wrapper swallowed the
+    // tap and this click never reached the button.
+    await page.getByTestId("share-import-toast-open").click();
+    await expect(page.getByTestId("files.page")).toBeVisible();
+    await expect(page.getByTestId("share-import-toast")).toHaveCount(0);
+  });
+
   test("a single shared file names the file in the toast", async ({ page }) => {
     await installMockIpc(page, {
       pendingShares: [{ id: "c".repeat(32), filename: "invoice.pdf", deduplicated: false }],
