@@ -4,7 +4,7 @@
 // a note authored with `<mark class="hl-green">…</mark>` renders a colored
 // `<mark>` whose `hl-green` class survived the REAL DOMPurify sanitizer (the
 // `uponSanitizeAttribute` hook registered in `loadPurifier`), an UNKNOWN class
-// (`hl-orange`) is stripped and falls back to a plain `<mark>`, and the colored
+// (`hl-chartreuse`) is stripped and falls back to a plain `<mark>`, and the colored
 // `<mark>` bytes round-trip through the MY01 AEAD blob (lock → unlock → reopen)
 // and re-render — proving §6 C1 byte-preservation for user-authored HTML.
 //
@@ -35,13 +35,21 @@ const EDITOR = '[data-testid="editor.content"]';
 const CM_CONTENT = `${EDITOR} .cm-content`;
 const BACKSPACE = "\uE003"; // W3C key codepoint (Backspace)
 
-// A note carrying one allowlisted color (green) and one off-allowlist color
-// (orange). Each `<mark>` ends BEFORE trailing text so the cursor lands past the
+// A note carrying one allowlisted color (green) and one off-allowlist color.
+//
+// The probe is `hl-chartreuse`, a colour NOT in `HIGHLIGHT_CLASSES` — it must
+// stay off the allowlist for this scenario to mean anything. It used to be
+// `hl-orange`, which MYND-632 then ADDED when the palette grew 5 -> 13, so the
+// assertion below started failing while the sanitizer was behaving correctly.
+// The three unit-test analogues moved to the same probe; pick from the same
+// place if it ever needs changing again.
+//
+// Each `<mark>` ends BEFORE trailing text so the cursor lands past the
 // span (isInsideRange is boundary-inclusive) → the embedded-HTML decoration
 // renders both off-cursor instead of revealing raw.
 const DOC =
   'a <mark class="hl-green">leaf</mark> b ' +
-  '<mark class="hl-orange">dusk</mark> end';
+  '<mark class="hl-chartreuse">dusk</mark> end';
 
 /** Establish the CM key pipeline (probe char then deleted), then send the raw
  *  payload. Unlike `typeIntoEditor`, this does NOT assert the raw bytes survive
@@ -64,7 +72,7 @@ async function typeRaw(session: Session, text: string): Promise<void> {
 
 describeE2E("hc1 colored highlight renders; unknown class falls back (MYND-209)", () => {
   // Vault-count precondition: 1 (weak KDF).
-  it("a hl-green mark keeps its class; a hl-orange mark renders plain", async () => {
+  it("a hl-green mark keeps its class; an off-allowlist mark renders plain", async () => {
     let password = "";
     await scenario(
       "hc1-render",
@@ -80,8 +88,10 @@ describeE2E("hc1 colored highlight renders; unknown class falls back (MYND-209)"
         // The allowlisted color survives the real DOMPurify sanitizer + decoration.
         await s.waitForElement(`${EDITOR} .cm-embedded-html mark.hl-green`);
         // The off-allowlist class is stripped → no colored mark for it.
-        const orange = await s.findElements(`${EDITOR} .cm-embedded-html mark.hl-orange`);
-        expect(orange.length).toBe(0);
+        const offList = await s.findElements(
+          `${EDITOR} .cm-embedded-html mark.hl-chartreuse`,
+        );
+        expect(offList.length).toBe(0);
         // …but the bare <mark> still renders (only its class was dropped).
         const marks = await s.findElements(`${EDITOR} .cm-embedded-html mark`);
         expect(marks.length).toBeGreaterThanOrEqual(2);

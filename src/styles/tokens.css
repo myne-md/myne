@@ -124,13 +124,27 @@
      reads on it). Single-sourced like the other dark values below. */
   --highlight:     #f3e7c4;
   /* Multi-color highlight palette (`<mark class="hl-…">`; decisions.md
-     2026-06-15). `--highlight` IS the yellow/default (`hl-yellow` + `==text==`).
-     Four sibling washes follow the same per-theme flip discipline: low-sat paper
-     washes here, dark twins below. Closed vocabulary — see sanitize.ts. */
+     2026-06-15, grown 5 -> 13 by MYND-632). `--highlight` IS the yellow/default
+     (`hl-yellow` + `==text==`). The twelve sibling washes follow the same
+     per-theme flip discipline: low-sat paper washes here, dark twins below,
+     amoled twins below that. Closed vocabulary — see sanitize.ts.
+
+     EVERY member needs a value in all four theme blocks of THIS file. It is the
+     sheet the app loads (`src/main.tsx`); `docs/design/colors_and_type.css` is a
+     non-loaded projection, so adding a token only there ships a `var()` that
+     resolves to nothing and the wash falls back to `theme.ts`'s literal. */
   --highlight-green:  #d8e9cf;
   --highlight-blue:   #d3e2ee;
   --highlight-pink:   #efd8e2;
   --highlight-purple: #e2d8ee;
+  --highlight-orange: #f2ddc6;
+  --highlight-red:    #efd3d3;
+  --highlight-teal:   #cfe6e2;
+  --highlight-cyan:   #cfe4ea;
+  --highlight-lime:   #e0ecc4;
+  --highlight-brown:  #e3d9cd;
+  --highlight-grey:   #dedcd8;
+  --highlight-indigo: #d6d8ee;
 
   /* -- Color -- Label slots (MYND-184; sidebar color labels) ---------- */
   /* Six muted, hue-named DECORATIVE slots for note/folder color dots — NOT a
@@ -238,6 +252,14 @@
   --_highlight-blue-dark:   #24384a;
   --_highlight-pink-dark:   #46283a;
   --_highlight-purple-dark: #392a4c;
+  --_highlight-orange-dark: #4a3722;
+  --_highlight-red-dark:    #4a2a2a;
+  --_highlight-teal-dark:   #23403c;
+  --_highlight-cyan-dark:   #223a42;
+  --_highlight-lime-dark:   #37411f;
+  --_highlight-brown-dark:  #3d352b;
+  --_highlight-grey-dark:   #37363a;
+  --_highlight-indigo-dark: #2b2e4d;
 
   /* Label slots — dark-surface values (MYND-184). Mirrors colors_and_type.css. */
   --_label-clay-dark:   #d99683;
@@ -309,6 +331,16 @@
   --_highlight-blue-amoled:   #1b2d3d;
   --_highlight-pink-amoled:   #3a1e2e;
   --_highlight-purple-amoled: #2e2040;
+  /* MYND-632's eight: each is its dark twin stepped down by 11 per channel, the
+     delta the five above already use (it is exactly -11 in all five). */
+  --_highlight-orange-amoled: #3f2c17;
+  --_highlight-red-amoled:    #3f1f1f;
+  --_highlight-teal-amoled:   #183531;
+  --_highlight-cyan-amoled:   #172f37;
+  --_highlight-lime-amoled:   #2c3614;
+  --_highlight-brown-amoled:  #322a20;
+  --_highlight-grey-amoled:   #2c2b2f;
+  --_highlight-indigo-amoled: #202342;
 
   --_label-clay-amoled:   var(--_label-clay-dark);
   --_label-ochre-amoled:  var(--_label-ochre-dark);
@@ -381,6 +413,14 @@
   --highlight-blue:   var(--_highlight-blue-dark);
   --highlight-pink:   var(--_highlight-pink-dark);
   --highlight-purple: var(--_highlight-purple-dark);
+  --highlight-orange: var(--_highlight-orange-dark);
+  --highlight-red:    var(--_highlight-red-dark);
+  --highlight-teal:   var(--_highlight-teal-dark);
+  --highlight-cyan:   var(--_highlight-cyan-dark);
+  --highlight-lime:   var(--_highlight-lime-dark);
+  --highlight-brown:  var(--_highlight-brown-dark);
+  --highlight-grey:   var(--_highlight-grey-dark);
+  --highlight-indigo: var(--_highlight-indigo-dark);
 
   --label-clay:   var(--_label-clay-dark);
   --label-ochre:  var(--_label-ochre-dark);
@@ -445,6 +485,14 @@
   --highlight-blue:   var(--_highlight-blue-amoled);
   --highlight-pink:   var(--_highlight-pink-amoled);
   --highlight-purple: var(--_highlight-purple-amoled);
+  --highlight-orange: var(--_highlight-orange-amoled);
+  --highlight-red:    var(--_highlight-red-amoled);
+  --highlight-teal:   var(--_highlight-teal-amoled);
+  --highlight-cyan:   var(--_highlight-cyan-amoled);
+  --highlight-lime:   var(--_highlight-lime-amoled);
+  --highlight-brown:  var(--_highlight-brown-amoled);
+  --highlight-grey:   var(--_highlight-grey-amoled);
+  --highlight-indigo: var(--_highlight-indigo-amoled);
 
   --label-clay:   var(--_label-clay-amoled);
   --label-ochre:  var(--_label-ochre-amoled);
@@ -506,6 +554,14 @@
     --highlight-blue:   var(--_highlight-blue-dark);
     --highlight-pink:   var(--_highlight-pink-dark);
     --highlight-purple: var(--_highlight-purple-dark);
+    --highlight-orange: var(--_highlight-orange-dark);
+    --highlight-red:    var(--_highlight-red-dark);
+    --highlight-teal:   var(--_highlight-teal-dark);
+    --highlight-cyan:   var(--_highlight-cyan-dark);
+    --highlight-lime:   var(--_highlight-lime-dark);
+    --highlight-brown:  var(--_highlight-brown-dark);
+    --highlight-grey:   var(--_highlight-grey-dark);
+    --highlight-indigo: var(--_highlight-indigo-dark);
 
     --label-clay:   var(--_label-clay-dark);
     --label-ochre:  var(--_label-ochre-dark);

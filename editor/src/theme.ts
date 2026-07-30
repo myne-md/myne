@@ -275,29 +275,33 @@ export const myneTheme = EditorView.theme({
   ".cm-embedded-html mark.hl-purple": {
     backgroundColor: "var(--highlight-purple, #e2d8ee)",
   },
-".cm-embedded-html mark.hl-orange": {
-    backgroundColor: "var(--highlight-orange, #e2d8ee)",
+  // MYND-632's eight. Each fallback is that colour's OWN light value, matching
+  // the five above — a shared fallback would render eight indistinguishable
+  // washes wherever the stylesheet has not loaded, which is the exact failure
+  // the palette exists to prevent.
+  ".cm-embedded-html mark.hl-orange": {
+    backgroundColor: "var(--highlight-orange, #f2ddc6)",
   },
-".cm-embedded-html mark.hl-red": {
-    backgroundColor: "var(--highlight-red, #e2d8ee)",
+  ".cm-embedded-html mark.hl-red": {
+    backgroundColor: "var(--highlight-red, #efd3d3)",
   },
-".cm-embedded-html mark.hl-teal": {
-    backgroundColor: "var(--highlight-teal, #e2d8ee)",
+  ".cm-embedded-html mark.hl-teal": {
+    backgroundColor: "var(--highlight-teal, #cfe6e2)",
   },
-".cm-embedded-html mark.hl-cyan": {
-    backgroundColor: "var(--highlight-cyan, #e2d8ee)",
+  ".cm-embedded-html mark.hl-cyan": {
+    backgroundColor: "var(--highlight-cyan, #cfe4ea)",
   },
-".cm-embedded-html mark.hl-lime": {
-    backgroundColor: "var(--highlight-lime, #e2d8ee)",
+  ".cm-embedded-html mark.hl-lime": {
+    backgroundColor: "var(--highlight-lime, #e0ecc4)",
   },
-".cm-embedded-html mark.hl-brown": {
-    backgroundColor: "var(--highlight-brown, #e2d8ee)",
+  ".cm-embedded-html mark.hl-brown": {
+    backgroundColor: "var(--highlight-brown, #e3d9cd)",
   },
-".cm-embedded-html mark.hl-grey": {
-    backgroundColor: "var(--highlight-grey, #e2d8ee)",
+  ".cm-embedded-html mark.hl-grey": {
+    backgroundColor: "var(--highlight-grey, #dedcd8)",
   },
-".cm-embedded-html mark.hl-indigo": {
-    backgroundColor: "var(--highlight-indigo, #e2d8ee)",
+  ".cm-embedded-html mark.hl-indigo": {
+    backgroundColor: "var(--highlight-indigo, #d6d8ee)",
   },
   ".cm-embedded-html kbd": {
     fontFamily: "var(--font-mono)",
