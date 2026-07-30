@@ -1,7 +1,8 @@
-import { type ReactNode, useRef } from "react";
+import { type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import type { NoteEntry, PressEvt } from "../types";
+import type { NoteEntry } from "../types";
 import { ColorDot } from "../decorations/ColorDot";
+import { useHold } from "./useHold";
 
 /** A chronological note row (mirror notes/05 ChronoRow geometry). */
 const STAR_PATH = "M12 3l2.9 5.9 6.5.9-4.7 4.6 1.1 6.5L12 18.4 6.2 21.4l1.1-6.5L2.6 9.8l6.5-.9z";
@@ -45,46 +46,18 @@ export function NoteRow({
 }) {
   const { t } = useTranslation();
   const sub = subtitle !== undefined ? subtitle : entry.snippet;
-  // Long-press (touch) / right-click reveals the row action sheet. A hold that
-  // survives ~480ms without the finger drifting (which would be a scroll) fires
-  // onHold; the ensuing click is then swallowed so the note doesn't also open.
-  const holdTimer = useRef<number | null>(null);
-  const holdAt = useRef<{ x: number; y: number } | null>(null);
-  const held = useRef(false);
-  const clearHold = () => {
-    if (holdTimer.current != null) window.clearTimeout(holdTimer.current);
-    holdTimer.current = null;
-    holdAt.current = null;
-  };
-  const startHold = (e: PressEvt) => {
-    if (!onHold) return;
-    held.current = false;
-    holdAt.current = { x: e.clientX, y: e.clientY };
-    holdTimer.current = window.setTimeout(() => {
-      held.current = true;
-      holdTimer.current = null;
-      onHold();
-    }, 480);
-  };
-  const moveHold = (e: PressEvt) => {
-    const s = holdAt.current;
-    if (s && (Math.abs(e.clientX - s.x) > 10 || Math.abs(e.clientY - s.y) > 10)) clearHold();
-  };
+  // Long-press (touch) / right-click reveals the row action sheet (shared hook).
+  const { handlers, consumeHeldClick } = useHold(onHold);
   return (
     <div
       data-testid="notes.row"
       data-note-id={entry.id}
       data-selected={selected || undefined}
       onClick={() => {
-        if (held.current) { held.current = false; return; } // consumed by the long-press
+        if (consumeHeldClick()) return; // this click was the long-press tail
         onOpen();
       }}
-      onPointerDown={startHold}
-      onPointerMove={moveHold}
-      onPointerUp={clearHold}
-      onPointerLeave={clearHold}
-      onPointerCancel={clearHold}
-      onContextMenu={(e) => { if (onHold) e.preventDefault(); }}
+      {...handlers}
       style={{
         borderTop: divider ? "1px solid var(--line-1)" : undefined,
         borderBottom: divider && last ? "1px solid var(--line-1)" : undefined,

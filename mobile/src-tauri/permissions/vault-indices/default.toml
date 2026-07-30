@@ -28,6 +28,7 @@ permissions = [
   "allow-vault-indices-property-keys",
   "allow-vault-indices-persist",
   "allow-vault-indices-hydrate",
+  "allow-vault-indices-tasks",
 ]
 
 [[permission]]
@@ -94,3 +95,8 @@ commands.allow = ["vault_indices_persist"]
 identifier = "allow-vault-indices-hydrate"
 description = "Allow invoking vault-indices:vault_indices_hydrate (Slot::Unlocked-gated load of the vault.indices / MYI1 blob as the unlock fast path — populates the store with unchanged-note records, drops deleted, and returns the stale note ids for TS to re-apply, Build-B reconcile; absent/undecodable/stale -> full rebuild). Returns vault-wide stale-id list (AS3/AS4-Sensitive) -> main-window-only."
 commands.allow = ["vault_indices_hydrate"]
+
+[[permission]]
+identifier = "allow-vault-indices-tasks"
+description = "Allow invoking vault-indices:vault_indices_tasks (Slot::Unlocked-gated whole-vault line-task dump — {noteId, noteTitle, noteFolder} plus the stored record per task, for the mobile task surfaces and the reminder scheduler, MYND-612/619/620; defensive task-ceiling). Rust performs NO filtering, sorting or date comparison: a parameterized accessor would move the §3.6.4 type authority out of the dialect layer, so surfaces filter TS-side over one shared fetch. Returns vault-wide task metadata (AS3/AS4-Sensitive) → main-window-only, the same invariant as every other setter here."
+commands.allow = ["vault_indices_tasks"]

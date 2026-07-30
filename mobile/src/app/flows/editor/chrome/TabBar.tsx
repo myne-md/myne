@@ -7,11 +7,13 @@ import { useTranslation } from "react-i18next";
 export function TabBar({
   active,
   onNotes,
+  onTasks,
   onGraph,
   onAttachments,
 }: {
-  active: "notes" | "search" | "graph" | "files" | "templates";
+  active: "notes" | "tasks" | "note-tasks" | "search" | "graph" | "files" | "templates";
   onNotes: () => void;
+  onTasks: () => void;
   onGraph: () => void;
   onAttachments: () => void;
 }) {
@@ -49,6 +51,18 @@ export function TabBar({
           <path d="M9 8h6M9 12h6M9 16h3" stroke={col(active === "notes")} strokeWidth="1.8" strokeLinecap="round" />
         </svg>
         <span style={label(active === "notes")}>{t("notes.list.notesHeading")}</span>
+      </button>
+      {/* MYND-620: Tasks sits second, directly after Notes. Putting it in the
+          bar at all is the information-architecture decision — it says tasks are
+          alongside notes in the product's mobile identity — and it is hard to
+          reverse, because top-level navigation is something users learn. */}
+      <button data-testid="workspace.tab-tasks" onClick={onTasks} aria-label={t("tasks.title")} style={tab}>
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+          <rect x="4" y="4" width="6" height="6" rx="1.6" stroke={col(active === "tasks")} strokeWidth="1.8" />
+          <path d="M5.4 7l1.3 1.3L9 5.8" stroke={col(active === "tasks")} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+          <path d="M13 6.5h7M13 12h7M13 17.5h7M5 12h5M5 17.5h5" stroke={col(active === "tasks")} strokeWidth="1.8" strokeLinecap="round" />
+        </svg>
+        <span style={label(active === "tasks")}>{t("tasks.title")}</span>
       </button>
       <button data-testid="workspace.tab-graph" onClick={onGraph} aria-label={t("editor.chrome.barItems.graph")} style={tab}>
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none">

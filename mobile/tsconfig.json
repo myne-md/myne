@@ -27,6 +27,12 @@
       "@myne/locales-en": ["../locales/en/common.json"],
       "@myne/i18n": ["../src/i18n/index.ts"],
       "@myne/i18n/*": ["../src/i18n/*"],
+      "@myne/reminder-schedule": ["../src/lib/reminderSchedule.ts"],
+      "@myne/task-panel": ["../src/notes/components/TaskListPanel.tsx"],
+      "@myne/task-filters": ["../src/notes/taskFilters.ts"],
+      "@myne/task-scope": ["../src/notes/taskScope.ts"],
+      "@myne/task-write": ["../src/notes/taskWriteCore.ts"],
+      "@myne/note-completion": ["../src/notes/completeNoteCore.ts"],
       "@myne/decorations": ["../src/notes/decorations.ts"],
       "@myne/decorations/folderIcons": ["../src/notes/folderIcons.ts"]
     }

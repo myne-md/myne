@@ -204,6 +204,35 @@ function PasswordField({ value, onChange, onEnter, testId }: { value: string; on
   );
 }
 
+/**
+ * Persist the enrollment device name, retrying the transient window right after
+ * a head is adopted (MYND-548). Returns whether it landed.
+ *
+ * Three attempts over ~1.5s: enough to outlast the prefs write that adopting a
+ * head performs. Failures are deliberately not distinguished — the setter's
+ * error surface is coarse and the caller's only recourse is the same either way.
+ *
+ * Deliberately NOT cancellable, and it touches no React state. The caller starts
+ * it and stops waiting (MYND-537: nothing may sit in front of the match code),
+ * which means it outlives the polling effect that started it — correct, because
+ * a name the user typed should still land after the screen it was typed on has
+ * moved on. There is no unmount hazard to guard: the only effect is the write.
+ */
+async function persistDeviceNameWithRetry(
+  deviceIdHex: string,
+  name: string,
+): Promise<boolean> {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      await setDeviceName(deviceIdHex, name);
+      return true;
+    } catch {
+      if (attempt < 2) await new Promise((r) => setTimeout(r, 500));
+    }
+  }
+  return false;
+}
+
 export function JoinFlow({ onComplete, onCancel }: JoinFlowProps) {
   const { t } = useTranslation();
   const [serverUrl, setServerUrl] = useState("");
@@ -362,19 +391,63 @@ export function JoinFlow({ onComplete, onCancel }: JoinFlowProps) {
     if (step !== "pending" || !HAS_TAURI) return;
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
+    // At most one full sync in flight at a time (see below).
+    let syncing = false;
+    // MYND-537: the fingerprint poll must NOT sit behind a full content sync.
+    //
+    // This awaited `syncNow()` before every fingerprint check. `syncNow` claims
+    // the approval AND pulls the vault, so on a first join the match code — which
+    // needs nothing but an adopted head — was gated on the entire vault
+    // arriving. On a small vault that reads as a multi-minute "waiting for
+    // approval"; on a large one the tick never returns, the next one never
+    // fires, and the screen never appears at all. The desktop side has long
+    // since shown "approved".
+    //
+    // So: poll the fingerprint on its own cadence, and let `syncNow` run
+    // alongside rather than in front of it. `syncing` keeps at most one in
+    // flight, since overlapping full syncs would contend for the same vault.
     const tick = async () => {
       try {
-        await syncNow(); // claim + sync if approved (no-op while still pending)
+        if (!syncing) {
+          syncing = true;
+          void syncNow()
+            .catch(() => {
+              /* transient — the next tick starts another */
+            })
+            .finally(() => {
+              syncing = false;
+            });
+        }
         const fp = await syncHeadFingerprint();
         if (!cancelled && fp) {
           // A head was adopted ⇒ this device completed an authed cycle, so the
           // §10.2.1 seed has had its turn and naming is now safe.
           if (joinedDeviceId.current) {
-            try {
-              await setDeviceName(joinedDeviceId.current, deviceNameField.resolved);
-            } catch {
-              // The row keeps its id-derived label; rename fixes it.
-            }
+            // MYND-548: RETRY, don't abandon. This was a single attempt whose
+            // failure was swallowed — and it fires in the same tick the head is
+            // adopted, racing the prefs write that landing a head performs, so
+            // failing here is ordinary rather than exotic. Because the poll
+            // returns immediately afterwards there was no second chance: the
+            // name the user had just typed was gone for good, and nothing told
+            // them. That is why "I named this device" ended in a list showing
+            // id-derived labels on both clients.
+            //
+            // NOT awaited, which is the MYND-537 constraint applied to this fix:
+            // three attempts across ~1.5s in front of `setStep` would put a
+            // second delay on the very screen this PR exists to stop delaying.
+            // The write needs an adopted head, not a rendered screen, so it runs
+            // alongside — see the helper's doc for why outliving this effect is
+            // the intended behaviour rather than a leak.
+            //
+            // A name that still will not write is NOT reported to the user yet:
+            // that copy has to land in the shared `@myne/i18n` catalog, so
+            // hard-coding English here would be the wrong trade. The device list
+            // falls back to its id-derived label and renaming from Settings is
+            // the repair. This is the obvious home for that follow-up.
+            void persistDeviceNameWithRetry(
+              joinedDeviceId.current,
+              deviceNameField.resolved,
+            );
           }
           setFingerprint(fp);
           setStep("verify");

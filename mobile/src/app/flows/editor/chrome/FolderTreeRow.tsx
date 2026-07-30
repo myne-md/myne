@@ -1,7 +1,6 @@
-import { useRef } from "react";
-import type { PressEvt } from "../types";
 import { FolderGlyph } from "../decorations/FolderGlyph";
 import { ColorDot } from "../decorations/ColorDot";
+import { useHold } from "./useHold";
 
 /** A folder header row in the inline notes tree (MYND-480): tap toggles the
  *  subtree; a ~480ms long-press (that doesn't drift into a scroll) opens the
@@ -29,27 +28,7 @@ export function FolderTreeRow({
   onToggle: () => void;
   onHold: () => void;
 }) {
-  const holdTimer = useRef<number | null>(null);
-  const holdAt = useRef<{ x: number; y: number } | null>(null);
-  const held = useRef(false);
-  const clearHold = () => {
-    if (holdTimer.current != null) window.clearTimeout(holdTimer.current);
-    holdTimer.current = null;
-    holdAt.current = null;
-  };
-  const startHold = (e: PressEvt) => {
-    held.current = false;
-    holdAt.current = { x: e.clientX, y: e.clientY };
-    holdTimer.current = window.setTimeout(() => {
-      held.current = true;
-      holdTimer.current = null;
-      onHold();
-    }, 480);
-  };
-  const moveHold = (e: PressEvt) => {
-    const s = holdAt.current;
-    if (s && (Math.abs(e.clientX - s.x) > 10 || Math.abs(e.clientY - s.y) > 10)) clearHold();
-  };
+  const { handlers, consumeHeldClick } = useHold(onHold);
   return (
     <div
       data-testid="notes.folder-row"
@@ -59,15 +38,10 @@ export function FolderTreeRow({
       // which Playwright can't read as state.
       data-collapsed={collapsed ? "true" : "false"}
       onClick={() => {
-        if (held.current) { held.current = false; return; } // consumed by the long-press
+        if (consumeHeldClick()) return; // this click was the long-press tail
         onToggle();
       }}
-      onPointerDown={startHold}
-      onPointerMove={moveHold}
-      onPointerUp={clearHold}
-      onPointerLeave={clearHold}
-      onPointerCancel={clearHold}
-      onContextMenu={(e) => e.preventDefault()}
+      {...handlers}
       style={{ position: "relative", display: "flex", alignItems: "center", gap: 8, padding: "11px 20px", paddingLeft: indentPx, cursor: "pointer" }}
     >
       <svg width="12" height="12" viewBox="0 0 24 24" style={{ flexShrink: 0, transform: collapsed ? "rotate(0deg)" : "rotate(90deg)", transition: "transform 140ms ease" }}>

@@ -13,6 +13,7 @@ import App from "./App";
 import { initDeepLinks } from "./lib/deep-link";
 import { initCaptures } from "./lib/captures";
 import { initShareIntent } from "./lib/shareImport";
+import { initReminderTaps } from "./lib/reminderTap";
 import "./styles/tokens.css";
 import "./styles/mobile.css";
 
@@ -31,6 +32,14 @@ void initCaptures();
 // queue here (device-key based, runs while the vault is locked); the drain into
 // the attachment library happens later, on unlock, from EditorFlow.
 void initShareIntent();
+
+// Subscribe to reminder taps (MYND-619 task 7), as early as the deep links for
+// the same reason: tapping a reminder on a locked phone cold-launches the app,
+// so the identifier arrives long before anything can act on it. It is latched in
+// memory, never written to disk, and consumed exactly once after unlock. A tap
+// that lands before this runs is dropped — deliberately, because the only
+// alternative to dropping is a queue, and a queue is a file.
+void initReminderTaps();
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>

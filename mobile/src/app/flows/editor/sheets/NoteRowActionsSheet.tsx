@@ -51,7 +51,7 @@ export function NoteRowActionsSheet({
           <div style={{ padding: "0 18px 12px", fontSize: 13, fontWeight: 600, color: "var(--fg-2)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{title}</div>
           {row(t("notes.cardMenu.open"), onOpen)}
           {sep}
-          {row(favorited ? t("notes.row.removeFromFavorites") : t("notes.row.addToFavorites"), onToggleFavorite, { groupTop: true })}
+          {row(favorited ? t("notes.row.removeFromFavorites") : t("notes.row.addToFavorites"), onToggleFavorite, { groupTop: true, testId: "notes.favorite-action" })}
           {row(t("editor.noteMenu.moveToFolder"), onMove)}
           {row(t("notes.list.color"), onColor, { testId: "notes.note-color-action" })}
           {row(t("notes.archive.title"), onArchive)}

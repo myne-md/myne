@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  THREE permissions, and each is the minimum its feature requires. None is
+  granted at install in the sense that matters: POST_NOTIFICATIONS is a RUNTIME
+  request on Android 13+, asked at the first reminder after an in-app
+  explanation; SCHEDULE_EXACT_ALARM is a *special app access* the user grants on
+  a settings screen, reached only from an in-app affordance they tapped; and
+  RECEIVE_BOOT_COMPLETED grants no access to anything — it is the only way an app
+  can learn that the platform threw its alarms away.
+
+  The app's entire permission set before this was two audio permissions. The
+  off-the-shelf notification plugin would have added three at install time.
+
+  SCHEDULE_EXACT_ALARM must be DECLARED to be requestable at all — declaring it
+  is not asking for it. Until the user grants it on that screen,
+  `canScheduleExactAlarms()` stays false, delivery is approximate, and the
+  settings copy says so in as many words rather than letting a late reminder be
+  discovered as a bug.
+
+  What is deliberately NOT here:
+
+  * USE_EXACT_ALARM — never. The platform reserves the install-time entitlement
+    for alarm-clock and calendar-class apps, `vision.md` says Myne has no
+    calendar, and `decisions.md` records no store-distribution decisions at all
+    to stand on. Claiming it would be both inconsistent and a review gamble.
+  * Nothing for a background work scheduler, because none is used, and nothing
+    for direct boot: `LOCKED_BOOT_COMPLETED` would need device-protected storage,
+    a second persistence location, for a few minutes of earliness.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+
+    <application>
+        <!--
+          `exported="false"` is load-bearing: only the alarm this app registered
+          may trigger it, so no other app can make Myne draw a notification. The
+          receiver is not registered at runtime because an alarm can fire into a
+          cold process, where no runtime registration would exist.
+        -->
+        <receiver
+            android:name="md.myne.reminders.ReminderReceiver"
+            android:exported="false" />
+
+        <!--
+          Exported, and safe: a receiver must be exported to hear a system
+          broadcast, and BOTH actions below are *protected broadcasts* that only
+          the platform may send — so exporting it does not let another app
+          trigger a re-registration sweep.
+
+          MY_PACKAGE_REPLACED is here beside BOOT_COMPLETED because Android drops
+          pending alarms on an app update exactly as it does on a reboot. Same
+          failure, same fix, and it costs no permission — leaving it out would
+          ship a feature that silently stops working after every update.
+        -->
+        <receiver
+            android:name="md.myne.reminders.BootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+    </application>
+</manifest>
