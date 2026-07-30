@@ -209,9 +209,14 @@ function PasswordField({ value, onChange, onEnter, testId }: { value: string; on
  * a head is adopted (MYND-548). Returns whether it landed.
  *
  * Three attempts over ~1.5s: enough to outlast the prefs write that adopting a
- * head performs, short enough not to hold the verify step. Failures are
- * deliberately not distinguished — the setter's error surface is coarse and the
- * caller's only recourse is the same either way.
+ * head performs. Failures are deliberately not distinguished — the setter's
+ * error surface is coarse and the caller's only recourse is the same either way.
+ *
+ * Deliberately NOT cancellable, and it touches no React state. The caller starts
+ * it and stops waiting (MYND-537: nothing may sit in front of the match code),
+ * which means it outlives the polling effect that started it — correct, because
+ * a name the user typed should still land after the screen it was typed on has
+ * moved on. There is no unmount hazard to guard: the only effect is the write.
  */
 async function persistDeviceNameWithRetry(
   deviceIdHex: string,
@@ -427,19 +432,22 @@ export function JoinFlow({ onComplete, onCancel }: JoinFlowProps) {
             // them. That is why "I named this device" ended in a list showing
             // id-derived labels on both clients.
             //
-            // A bounded retry covers the transient window; a name that still
-            // will not write leaves `nameFailed` set, so the verify step can say
-            // so instead of pretending it worked. Renaming from the device list
-            // remains the manual repair either way.
-            const ok = await persistDeviceNameWithRetry(
+            // NOT awaited, which is the MYND-537 constraint applied to this fix:
+            // three attempts across ~1.5s in front of `setStep` would put a
+            // second delay on the very screen this PR exists to stop delaying.
+            // The write needs an adopted head, not a rendered screen, so it runs
+            // alongside — see the helper's doc for why outliving this effect is
+            // the intended behaviour rather than a leak.
+            //
+            // A name that still will not write is NOT reported to the user yet:
+            // that copy has to land in the shared `@myne/i18n` catalog, so
+            // hard-coding English here would be the wrong trade. The device list
+            // falls back to its id-derived label and renaming from Settings is
+            // the repair. This is the obvious home for that follow-up.
+            void persistDeviceNameWithRetry(
               joinedDeviceId.current,
               deviceNameField.resolved,
             );
-            // Retries exhausted: the device list falls back to its id-derived
-            // label and renaming from Settings is the repair. Telling the user
-            // here needs copy in the shared `@myne/i18n` catalog, which lands
-            // separately rather than hard-coding English into this flow.
-            void ok;
           }
           setFingerprint(fp);
           setStep("verify");
